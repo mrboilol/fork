@@ -292,7 +292,7 @@ hook.Add("Think", "Fake", function()
 				angl:RotateAroundAxis(angl:Forward(), 90)
 				angl:RotateAroundAxis(angl:Up(), 90)
 				angl:RotateAroundAxis(angl:Forward(), ishgweapon(wep) and not wep:IsPistolHoldType() and 120 or 180)
-				angl:RotateAroundAxis(angl:Up(), -0)
+				angl:RotateAroundAxis(angl:Up(), ishgweapon(wep) and wep:IsResting() and 50 - ply:EyeAngles().p or 0)
 				shadowControl(ragdoll, 1, 0.1, angl, 250, 20)
 			end
 
@@ -359,7 +359,7 @@ hook.Add("Think", "Fake", function()
 		
 		if not wep.RagdollFunc then
 			local force = math.max(1 - org.larm / 1.3, 0)
-			if !IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or ((ishgweapon(wep) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2))) then// || ply:InVehicle() then
+			if !IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and !wep:IsResting()) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2))) then// || ply:InVehicle() then
 				if org.canmove then
 					//if !ply:InVehicle() then
 						ang2:Set(angles)

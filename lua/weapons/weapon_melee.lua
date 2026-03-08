@@ -239,9 +239,20 @@ if CLIENT then
 
         if IsValid(owner) then
             if not self.cycling then
+                local dtime = SysTime() - (self.lasthuyhuy or SysTime())
+                self.lasthuyhuy = SysTime()
+                
+                if self.stopanim and self.stopanim > 0 then
+                    self.animtime = self.animtime + dtime * game.GetTimeScale()
+                    self.stopanim = self.stopanim - dtime * game.GetTimeScale()
+                else
+                    self.stopanim = nil
+                end
+
                 local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
                 timing = self.reverseanim and (1 - timing) or timing
 				timing = self.CustomTiming and self:CustomTiming() or timing
+                
                 WorldModel:SetCycle(timing)
                 --PrintTable( WorldModel:GetSequenceList() )
                 
@@ -818,7 +829,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     //ent:Spawn()
     //ent:SetMoveType(MOVETYPE_NONE)
     //ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-    if self:IsEntSoft(eyetr.Entity) then return eyetr end
+    --if self:IsEntSoft(eyetr.Entity) then return eyetr end
     
     local trace
 
@@ -836,7 +847,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         local tr = {}
 
         tr.start = eyetr.StartPos
-        tr.endpos = eyetr.StartPos + normal:Forward() * (self:GetAttackLength() + vellen)
+        tr.endpos = eyetr.StartPos + normal:Forward() * math.max(0.5, 1 - math.abs((0.5 - inattackLength) * 2)) * (self:GetAttackLength() + vellen)
         tr.filter = self.MultiDmg1 and {owner, ent} or self.HitEnts
 
         local size = 0.15
@@ -1145,17 +1156,54 @@ function SWEP:CustomThink()
                 goto meleeskip1
             end
 
+            --self:SetInAttack(false)
+
             if SERVER and self:IsEntSoft(ent) and self.HitEnts[#self.HitEnts] ~= ent then
                 self:AddDecal()
             end
 
-			if CLIENT and self.weight > 0.4 then
-				if not self:IsEntSoft(ent) then
-					self.animspeed = 3.5
+			if CLIENT and self.weight > 0.4 and !self.stopanim then
+				if not self:IsEntSoft(ent) or self.AnimAlwaysBack then   
+                    local mul = 5
+                    self.animspeed = self.animspeed * mul
+
+                    self.animtime = CurTime() - (self.animtime - CurTime()) * mul + self.animspeed - 0.1
+                    
+                    timer.Simple(0.4, function()
+                        if !IsValid(self) then return end
+
+                        local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
+                        local mul = 0.25
+                        
+                        self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
+                        self.animspeed = self.animspeed * mul
+                    end)
+
+                    util.ScreenShake(self:GetPos(), 35, 1, 1, 100)
+
+                    self.stopanim = 0.2
 					self.reverseanim = true
 				else
-					self.reverseanim = true
-					self.animspeed = 3.2
+                    local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
+                    local mul = 5
+                    
+                    self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
+                    self.animspeed = self.animspeed * mul
+                    
+                    timer.Simple(0.4, function()
+                        if !IsValid(self) then return end
+
+                        local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
+                        local mul = 0.25
+                        
+                        self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
+                        self.animspeed = self.animspeed * mul
+                    end)
+
+                    util.ScreenShake(self:GetPos(), 35, 1, 1, 100)
+
+                    self.stopanim = 0.2
+					--self.reverseanim = true
 				end
 			end
 

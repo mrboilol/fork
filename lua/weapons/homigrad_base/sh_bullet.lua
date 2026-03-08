@@ -584,7 +584,7 @@ function SWEP:FireBullet()
 		local phys = char:GetPhysicsObjectNum(0)
 		
 		if IsValid(phys) then
-			phys:ApplyForceOffset(-dir * math.min(self.Primary.Force, 70) * 40 * (self.NumBullet or 1), pos)
+			phys:ApplyForceCenter(-dir * math.min(self.Primary.Force, 70) * 40 * (self.NumBullet or 1))
 		end
 	end
 

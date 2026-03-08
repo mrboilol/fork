@@ -99,7 +99,7 @@ function SWEP:GetZoomPos(recoilZoomPos, view, eyePos)
 		if self:HasAttachment("sight","optic") then
 			posZoom = posZoom - recoilZoomPos * 0.25 - ang2:Forward() * (self.AdditionalPos2[1]) * 0.5 + ang2:Forward() * 1
 		else
-			local _, hitpos, dist = util.DistanceToLine(posZoom, posZoom + view.angles:Forward(), eyePos)
+			local _, hitpos, dist = util.DistanceToLine(posZoom, posZoom + (self:GetOwner():EyeAngles()):Forward(), eyePos)
 			dist = dist - 1
 			posZoom = posZoom + ang2:Forward() * dist - recoilZoomPos * 0.5
 		end

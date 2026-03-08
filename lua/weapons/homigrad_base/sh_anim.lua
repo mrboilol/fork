@@ -153,6 +153,7 @@ function SWEP:AnimHold()
 	self.holdtype = (self:IsPistolHoldType() and (self:GetButtstockAttack() - CurTime() > -0.5)) and "melee" or self.holdtype
 	--self.holdtype = (!self:IsPistolHoldType() and ply.posture == 2 and "revolver" or self.holdtype)
 	--self.holdtype = self:ReadyStance() and not self:IsPistolHoldType() and "pistol" or self.holdtype
+	self.holdtype = self:IsResting() and "slam" or self.holdtype
 	self:SetHold(self.holdtype)
 
 	local stam = (ply.organism ~= nil and ply.organism.stamina and ply.organism.stamina[1]) or 180

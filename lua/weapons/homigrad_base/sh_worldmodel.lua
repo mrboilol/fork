@@ -165,7 +165,7 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 		
 	self.setrhik = true
 	self.setlhik = !self:IsPistolHoldType() or !ply.suiciding
-	self.setlhik = (not (ply.posture == 7 or ply.posture == 8 or ( (self:IsPistolHoldType() or self.CanEpicRun) and self:IsSprinting() and !(ply.organism and ply.organism.rarmamputated) ) or (self:IsPistolHoldType() and ply.posture == 9) or (self:IsPistolHoldType() and ply.suiciding) ) or self.reload and self.setlhik or false)
+	self.setlhik = !self:IsResting() and (not (ply.posture == 7 or ply.posture == 8 or ( (self:IsPistolHoldType() or self.CanEpicRun) and self:IsSprinting() and !(ply.organism and ply.organism.rarmamputated) ) or (self:IsPistolHoldType() and ply.posture == 9) or (self:IsPistolHoldType() and ply.suiciding) ) or self.reload and self.setlhik or false)
 	self.setlhik = !(self:IsPistolHoldType() and (self:GetButtstockAttack() - CurTime() > -0.5)) and self.setlhik
 	
 	local tr = hg.eyeTrace(ply, 60, ent)
@@ -239,7 +239,11 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
         localPos:Zero()
         localAng:Zero()
 
-        local lpos, lang = self:RestedAnim(localPos, localAng, dtime)
+		local back = (bNoAdditional and Vector() or (self.AdditionalPos + self.AdditionalPos2))
+		back[3] = 0
+		back[2] = 0
+
+        local lpos, lang = self:RestedAnim(localPos + back, localAng, dtime)
 
         desiredPos = LocalToWorld(LerpVector(self.restlerp, vector_origin, -self.RestPosition - self.WorldPos) + lpos, lang, LerpVector(self.restlerp, desiredPos, restpos), desiredAng)
     end

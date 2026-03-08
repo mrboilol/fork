@@ -296,7 +296,9 @@ function SpecCam(ply, vec, ang, fov, znear, zfar)
 
 	return view
 end
--- Сделайте чтобы локальный игрок рендерился всегда, у меня не вышло
+
+local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 5)
+
 CalcView = function(ply, origin, angles, fov, znear, zfar)
 	if g_VR and g_VR.active then return end
 	if GetViewEntity() ~= (ply or LocalPlayer()) then return end
@@ -329,7 +331,12 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	end
 
 	--angles.roll = (turned and 180 or 0) + lean_lerp * 10
-	
+
+	local vpang = GetViewPunchAngles2() + GetViewPunchAngles3()
+	vpang[3] = 0
+
+
+
 	if IsValid(follow) then
 		return hg.CalcViewFake(ply, origin, angles, fov, znear, zfar)
 	end
@@ -431,8 +438,6 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	hg.clamp(vel, limit)
 	angles = ply:InVehicle() and ply:GetAimVector():AngleEx(vehicle:GetUp()) or angles
 
-	angles:RotateAroundAxis(angles:Up(),-LookX)
-	angles:RotateAroundAxis(angles:Right(),-LookY)
 	--angles = angles + Angle(LookY,-LookX,0)
 	
 	hg.cam_things(ply,view,angles)
@@ -483,7 +488,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	view.drawviewer = true--not hullcheck.Hit
 	view.origin = origin
 	view.angles = angles
-	
+
 	--local fixVal = math.min(math.max(angles[1] -30,0),40)/40
 	--fixLerp = LerpFT(.4,fixLerp, fixVal)
 	--local fixBlinkingModel = angles:Forward() * (-8 * fixLerp) + angles:Up()* (2 * fixLerp)
@@ -496,6 +501,15 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	view.origin, view.angles = HGAddView(ply, view.origin, view.angles, velLen)
 	--end
 	
+	realangle = realangle or lply:EyeAngles()
+
+	if hg_coolcamera:GetBool() then
+		view.angles = realangle + GetViewPunchAngles() * 0.2 + vpang
+		view.angles[3] = view.angles[3] - GetViewPunchAngles4()[3]
+	end
+
+	view.angles:RotateAroundAxis(view.angles:Up(),-LookX)
+	view.angles:RotateAroundAxis(view.angles:Right(),-LookY)
 	--[[if lply:InVehicle() then
 		local FPersPos =  lply:GetAttachment(lply:LookupAttachment( "eyes" ))
 		view.origin = FPersPos.Pos
@@ -517,18 +531,16 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 		traceBuilder.endpos = view.origin
 		local trace = hg.hullCheck(ply:EyePos() - vector_up * 10,view.origin,ply)
 		view.origin = trace.HitPos
-		local vpang = GetViewPunchAngles2() + GetViewPunchAngles3()
-		vpang[3] = 0
+		
 		view.angles:Add(-vpang)
 		view.angles[3] = view.angles[3] + GetViewPunchAngles4()[3]
 		hook_Run("PostHGCalcView", ply, view)
 		return view
 	end
-	
+
 	view.origin = eyePos
 	view.angles = angles
-	local vpang = GetViewPunchAngles2() + GetViewPunchAngles3()
-	vpang[3] = 0
+
 	view.angles:Add(-vpang)
 	view.angles[3] = view.angles[3] + GetViewPunchAngles4()[3]
 
