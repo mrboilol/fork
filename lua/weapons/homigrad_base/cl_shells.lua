@@ -149,7 +149,9 @@ function hg.CreateMag( self, vel, bodygroups, bDontChangePhys )
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return end
 	
-	local matrix = self:GetWM():GetBoneMatrix(isnumber(self.FakeMagDropBone) and self.FakeMagDropBone or self:GetWM():LookupBone(self.FakeMagDropBone or "Magazine") or self:GetWM():LookupBone("ValveBiped.Bip01_L_Hand"))
+	local bone = isnumber(self.FakeMagDropBone) and self.FakeMagDropBone or self:GetWM():LookupBone(self.FakeMagDropBone or "Magazine") or self:GetWM():LookupBone("ValveBiped.Bip01_L_Hand")
+	if not bone then return end
+	local matrix = self:GetWM():GetBoneMatrix(bone)
 	
 
 	if not matrix then return end

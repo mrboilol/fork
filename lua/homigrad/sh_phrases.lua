@@ -81,7 +81,7 @@ contextPhrases = {
 			"vo/episode_1/npc/male01/cit_shock04.wav",
 			"vo/outland_02/griggs_fightlion_01.wav",
 			"vo/npc/male01/no02.wav",
-			"vo/npc/male01/cit_dropper04.wav",
+			--"vo/npc/male01/cit_dropper04.wav",
 			"vo/npc/male01/headsup02.wav"
 
 		},
