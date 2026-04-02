@@ -230,7 +230,11 @@ local coldMat = Material("effects/shaders/zb_colda")
 local grainMat = Material("effects/shaders/zb_grain2")
 local heatMat = Material("effects/shaders/zb_heat")
 local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
-local blindMat = Material("effects/shaders/zb_blind")
+
+local blindMat
+timer.Simple(1, function()
+    blindMat = Material("effects/shaders/zb_blind")
+end)
 
 local PainLerp = 0
 local O2Lerp = 0
