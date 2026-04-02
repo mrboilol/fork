@@ -300,13 +300,7 @@ end
 local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 5)
 -- Сделайте чтобы локальный игрок рендерился всегда, у меня не вышло
 CalcView = function(ply, origin, angles, fov, znear, zfar)
-	local x, y = input.GetCursorPos()
 
-	if vgui.CursorVisible() or (x == 0 and y == 0) then
-		local ang = ply:EyeAngles()
-		ang[3] = 0
-		ply:SetEyeAngles(ang)
-	end
 
 	if g_VR and g_VR.active then return end
 	if GetViewEntity() ~= (ply or LocalPlayer()) then return end

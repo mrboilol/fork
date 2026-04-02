@@ -77,6 +77,8 @@ local BgMat3 = Material("vgui/background6.png")
 local BgMat4 = Material("vgui/pickman.png")
 local BgMat4Overlay = Material("vgui/background4.png")
 local NoiseMat = Material("vgui/noisevhs")
+local HuyMat = Material("huy.png")
+local hg_creepyeye = CreateClientConVar("hg_creepyeye", "0", true, false)
 if NoiseMat:IsError() then
     NoiseMat = Material("vgui/white")
 end
@@ -289,7 +291,7 @@ function PANEL:Init()
     self.LogoY = ScreenScaleH(20)
     
     surface.SetFont("ZC_MM_Title")
-    local _, th = surface.GetTextSize("meleecity: delicacy")
+    local _, th = surface.GetTextSize("the big city")
     self.LogoH = th
 
     self.MenuTop = self.LogoY + self.LogoH + ScreenScaleH(60)
@@ -2315,7 +2317,13 @@ function PANEL:Paint(w,h)
         end
         
         local mat = BgMat
-        if self.IsIntro then mat = EyeMat end
+        if self.IsIntro then
+            if hg_creepyeye:GetBool() then
+                mat = EyeMat
+            else
+                mat = HuyMat
+            end
+        end
 
         if not mat:IsError() then
             surface.SetMaterial( mat )
@@ -2483,7 +2491,7 @@ function PANEL:Paint(w,h)
     end
     
     -- Title Transition Logic
-    local text1 = "meleecity: delicacy"
+    local text1 = "the big city"
     
     surface.SetFont("ZC_MM_Title")
     
