@@ -1,4 +1,5 @@
 local healthModel
+local redModel
 local blinkModel
 local whiteMat = Material("models/debug/debugwhite")
 local gradientMat = Material("gui/center_gradient")
@@ -22,18 +23,55 @@ local limbStates = {}
 local boneCache = {}
 local lastLifeState = nil
 
-local limbBones = {
-    lleg = "ValveBiped.Bip01_L_Thigh",
-    rleg = "ValveBiped.Bip01_R_Thigh",
-    larm = "ValveBiped.Bip01_L_UpperArm",
-    rarm = "ValveBiped.Bip01_R_UpperArm"
-}
 
-local amputationBones = {
-    lleg = "ValveBiped.Bip01_L_Calf",
-    rleg = "ValveBiped.Bip01_R_Calf",
-    larm = "ValveBiped.Bip01_L_Forearm",
-    rarm = "ValveBiped.Bip01_R_Forearm"
+local bodyParts = {
+    lleg = {
+        bones = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"},
+        health = function(org) return org.lleg end,
+        dislocated = function(org) return org.llegdislocation end,
+        amputated = function(org) return org.llegamputated end,
+        amputation_bone = "ValveBiped.Bip01_L_Calf",
+    },
+    rleg = {
+        bones = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"},
+        health = function(org) return org.rleg end,
+        dislocated = function(org) return org.rlegdislocation end,
+        amputated = function(org) return org.rlegamputated end,
+        amputation_bone = "ValveBiped.Bip01_R_Calf",
+    },
+    larm = {
+        bones = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"},
+        health = function(org) return org.larm end,
+        dislocated = function(org) return org.larmdislocation end,
+        amputated = function(org) return org.larmamputated end,
+        amputation_bone = "ValveBiped.Bip01_L_Forearm",
+    },
+    rarm = {
+        bones = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"},
+        health = function(org) return org.rarm end,
+        dislocated = function(org) return org.rarmdislocation end,
+        amputated = function(org) return org.rarmamputated end,
+        amputation_bone = "ValveBiped.Bip01_R_Forearm",
+    },
+    chest = {
+        bones = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Spine"},
+        health = function(org) return math.max(org.chest, org.spine2, org.spine3) end,
+    },
+    pelvis = {
+        bones = {"ValveBiped.Bip01_Pelvis"},
+        health = function(org) return math.max(org.pelvis, org.spine1) end,
+    },
+    neck = {
+        bones = {"ValveBiped.Bip01_Neck1"},
+        health = function(org) return org.spine3 end,
+        dislocated = function(org) return org.arteria end, -- Using dislocated for arteria damage
+    },
+    head = {
+        bones = {"ValveBiped.Bip01_Head1"},
+        health = function(org) return org.skull end,
+        dislocated = function(org) return org.jawdislocation end, -- Using for jaw dislocation
+        broken = function(org) return org.jaw end, -- Using for jaw destruction
+    },
 }
 
 local function ScreenScaleFixed(size)
@@ -79,7 +117,11 @@ local function ResetModels(ply)
     if IsValid(blinkModel) then
         blinkModel:Remove()
     end
+    if IsValid(redModel) then
+        redModel:Remove()
+    end
     healthModel = nil
+    redModel = nil
     blinkModel = nil
     limbStates = {}
     pulseStartTime = 0
@@ -209,10 +251,24 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
             blinkModel:SetCycle(0)
         end
         InitBlinkModel(blinkModel)
+        InitBlinkModel(redModel)
+    end
+
+    if not IsValid(redModel) then
+        redModel = ClientsideModel(ply:GetModel(), RENDERGROUP_OTHER)
+        redModel:SetNoDraw(true)
+        redModel:SetIK(false)
+        local seq = redModel:LookupSequence("idle_suitcase")
+        if seq then
+            redModel:SetSequence(seq)
+            redModel:SetCycle(0)
+        end
+        InitBlinkModel(redModel)
     end
 
     if healthModel:GetModel() ~= ply:GetModel() then
         healthModel:SetModel(ply:GetModel())
+        redModel:SetModel(ply:GetModel())
         blinkModel:SetModel(ply:GetModel())
         
         local seq = healthModel:LookupSequence("idle_suitcase")
@@ -224,6 +280,11 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
         if seq2 then
             blinkModel:SetSequence(seq2)
             blinkModel:SetCycle(0)
+        end
+        local seq3 = redModel:LookupSequence("idle_suitcase")
+        if seq3 then
+            redModel:SetSequence(seq3)
+            redModel:SetCycle(0)
         end
 
         InitBlinkModel(blinkModel)
@@ -254,82 +315,52 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     
     local time = CurTime()
     if org then
-        for limb, boneName in pairs(limbBones) do
-            local isAmputated = org[limb.."amputated"]
-            local isBroken = (org[limb] and org[limb] >= 1)
-            local isDislocated = org[limb.."dislocation"]
-            
-            if not limbStates[limb] then
-                limbStates[limb] = { 
-                    amputated = false, 
-                    blinking = false, 
+        for partName, partData in pairs(bodyParts) do
+            local health = (partData.health and partData.health(org)) or 0
+            local isBroken = health >= 1 or (partData.broken and partData.broken(org))
+            local isDislocated = partData.dislocated and partData.dislocated(org)
+            local isAmputated = partData.amputated and partData.amputated(org)
+
+            if not limbStates[partName] then
+                limbStates[partName] = {
+                    health = 0,
+                    amputated = false,
+                    blinking = false,
                     blinkEnd = 0,
                     fractured = false
                 }
             end
-            
-            local state = limbStates[limb]
-            local ampBoneName = amputationBones[limb] or boneName
-            
-            if state.amputated and not isAmputated then
-                state.amputated = false
-                state.blinking = false
-                local boneID = healthModel:LookupBone(ampBoneName)
-                if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
-                local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
-            end
-            
-            if state.fractured and not (isBroken or isDislocated) then
-                state.fractured = false
-                if not state.amputated then
-                    local blinkBoneID = blinkModel:LookupBone(boneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
-                    
-                    local boneID = healthModel:LookupBone(boneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
-                end
-            end
 
+            local state = limbStates[partName]
+            state.health = health
+            state.isBroken = isBroken
+            state.isDislocated = isDislocated
+
+            -- Handle amputation
             if isAmputated then
-                if state.fractured then
-                     state.fractured = false
-                     local blinkBoneID = blinkModel:LookupBone(boneName)
-                     if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
-                     
-                     local boneID = healthModel:LookupBone(boneName)
-                     if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
-                end
-
                 if not state.amputated then
                     state.amputated = true
                     state.blinking = true
                     state.blinkEnd = time + BLINK_DURATION
                     pulseStartTime = time
-                    
-                    local boneID = healthModel:LookupBone(ampBoneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
-                    
-                    local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
                 end
-                
-                if state.blinking and time > state.blinkEnd then
-                    state.blinking = false
-                    local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
-                end
-                
-            elseif (isBroken or isDislocated) then
+            elseif state.amputated then
+                state.amputated = false
+                state.blinking = false
+            end
+
+            -- Handle fracture/dislocation
+            if isBroken or isDislocated then
                 if not state.fractured then
                     state.fractured = true
                     pulseStartTime = time
-                    local blinkBoneID = blinkModel:LookupBone(boneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
-                    
-                    local boneID = healthModel:LookupBone(boneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
                 end
+            elseif state.fractured then
+                state.fractured = false
+            end
+            
+            if state.blinking and time > state.blinkEnd then
+                state.blinking = false
             end
         end
     end

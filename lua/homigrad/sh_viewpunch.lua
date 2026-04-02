@@ -54,7 +54,7 @@ local IsValid = IsValid
 		end
 
 		hook.Add("Think", "vp_think", function()
-			if IsValid(lply.FakeRagdoll) and hg.InGame() then return end
+			if IsValid(lply.FakeRagdoll) or not hg.InGame() then return end
 			
 			hook.Run("ViewpunchThink")
 		end)

@@ -1,4 +1,12 @@
 --local Organism = hg.organism
+local function PlayBoneBreakSound(entity)
+    if math.random() < 0.5 then
+        entity:EmitSound("owfuck"..math.random(1, 6)..".ogg", 75, 100, 1, CHAN_AUTO)
+    else
+        entity:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO)
+    end
+end
+
 local function isCrush(dmgInfo)
 	return (not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)) or dmgInfo:GetInflictor().RubberBullets
 end
@@ -103,7 +111,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
+		PlayBoneBreakSound(org.owner)
 		//broken
 	else
 		//org[key] = 0.5
@@ -117,7 +125,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_leg[math.random(#dislocated_leg)], 1, "dislocated"..key, 1, nil, nil) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
+		PlayBoneBreakSound(org.owner)
 		//dislocated
 	end
 
@@ -159,7 +167,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
+		PlayBoneBreakSound(org.owner)
 		//broken
 	else
 		org[key.."dislocation"] = true
@@ -172,7 +180,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
+		PlayBoneBreakSound(org.owner)
 		//dislocated
 	end
 
@@ -211,7 +219,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
-		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
+			PlayBoneBreakSound(org.owner)
 		if org.owner:IsPlayer() then
 			org.owner:Notify(huyasd[name], true, name, 2)
 		end
@@ -257,7 +265,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
 
-		if oldDmg != 1 then org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30) end
+		if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
 	end
 
 	org.shock = org.shock + dmg * 3
@@ -267,8 +275,8 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		org.avgpain = org.avgpain + dmg * 20
 		
 		if !org.jawdislocation then
-			org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
-		end
+				PlayBoneBreakSound(org.owner)
+			end
 
 		org.jawdislocation = true
 
@@ -313,7 +321,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.shock = org.shock + dmg * 20
 		org.avgpain = org.avgpain + dmg * 30
 
-		if oldDmg != 1 then org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30) end
+		if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
 	end
 
 	org.shock = org.shock + dmg * 3
@@ -411,7 +419,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if org.brokenribs > 0 then
 			//org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
-			org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
+			PlayBoneBreakSound(org.owner)
 
 			return math.min(0, result)
 		end
