@@ -435,6 +435,7 @@ local matrix, matrixSet
 local math_random = math.random
 local primary
 local weapons_Get = weapons.Get
+local RecipientFilter = RecipientFilter
 if SERVER then util.AddNetworkString("hgwep shoot") end
 
 local CantDoIt = {
@@ -521,7 +522,17 @@ function SWEP:PrimaryAttack(broadcast)
 		net.WriteEntity(self)
 		net.WriteBool(huy)
 		net.WriteBool(broadcast)
-		net.Broadcast()
+		local owner = self:GetOwner()
+		if IsValid(owner) then
+			local rf = RecipientFilter()
+			rf:AddPVS(owner:GetPos())
+			if owner:IsPlayer() then
+				rf:AddPlayer(owner)
+			end
+			net.Send(rf)
+		else
+			net.Broadcast()
+		end
 	end
 end
 
@@ -689,6 +700,16 @@ function SWEP:EmitShoot()
 		self:PlaySnd((self.Supressor and self.SupressedSoundFP) or self.Primary.SoundFP, nil, nil, vol, nil, 55533, not self.Supressor)
 	else
 		self:PlaySnd(self.Supressor and (self.SupressedSound or (self:IsPistolHoldType() and "homigrad/weapons/pistols/sil.wav" or "m4a1/m4a1_suppressed_fp.wav")) or self.Primary.Sound, nil, nil, vol, nil, 55533, not self.Supressor)
+	end
+	local primaryAmmo = self.Primary and self.Primary.Ammo or ""
+	local suppressedSound = self.SupressedSound
+	local suppressedSoundPath = istable(suppressedSound) and suppressedSound[1] or suppressedSound
+	local isSilencedShotgun = self.Supressor and (
+		(isstring(primaryAmmo) and (string.find(primaryAmmo, "gauge", 1, true) or string.find(primaryAmmo, "23x75", 1, true))) or
+		(isstring(suppressedSoundPath) and string.find(suppressedSoundPath, "toz_shotgun/", 1, true))
+	)
+	if isSilencedShotgun then
+		self:PlaySnd("silencedshotgunfire.wav", nil, nil, vol, nil, 55534, false)
 	end
 	if !self.Supressor then
 		self:PlaySndDist(self.DistSound, nil, nil, nil, nil, 55511, not self.Supressor)
@@ -1733,9 +1754,8 @@ function SWEP:GetAdditionalValues()
 	self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + animpos * -10
 	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + animpos * -20
 
-	if self:IsLocal2() and self:IsZoom() then
-		self.k = self.k or 0
-		self.ZoomAnimLerp = LerpFT(0.05, self.ZoomAnimLerp or 0, self.k > 0.2 and self.k < 0.6 and 1 or 0)
+	if self:IsClient() and self:IsZoom() then
+		self.ZoomAnimLerp = LerpFT(0.05,self.ZoomAnimLerp or 0,self.k > 0.2 and self.k < 0.6 and 1 or 0)
 		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.ease.InOutBack(self.ZoomAnimLerp) * 3
 		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.ease.InOutBack(self.ZoomAnimLerp) * 2
 		if self.k > 0.7 and self.k < 0.75 then
@@ -1754,8 +1774,8 @@ function SWEP:GetAdditionalValues()
 
 	local posture = ((animpos < 0.2 and self:IsSprinting()) or animpos > (self:IsPistolHoldType() and 0.5 or 0.2)) and (self:IsPistolHoldType() and 3 or 4) or ply.posture
 
-	local func = hg.postureFunctions2[(self:IsSprinting() or huya) and (self:GetButtstockAttack() - CurTime() < -1) and ((ply.posture == 3 and 3) or (ply.posture == 3 and 3) or (self:IsPistolHoldType() and 3 or 3)) or ply.posture] or funcNil
-	func = ply:GetNWFloat("InLegKick", 0) > CurTime() and hg.postureFunctions2["legkicking"] or func
+	local func = hg.postureFunctions2[ply:GetNWFloat("InLegKick", 0) > CurTime() and "legkicking" and 0 or (self:IsSprinting() or huya) and (self:GetButtstockAttack() - CurTime() < -1) and ((ply.posture == 3 and 3) or (ply.posture == 3 and 3) or (self:IsPistolHoldType() and 3 or 3)) or ply.posture] or funcNil
+
 	if not self.inspect then
 		func(self, ply, huya)
 	end
@@ -1953,21 +1973,11 @@ function SWEP:GetAdditionalValues()
 	
 	if not suiciding and !self.norecoil then
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
-		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
-		local shit = 0.2 * mulhuy / host_timescale()
-		local animpos3 = self:GetAnimShoot2(shit, true) / shit
-		
-		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1)
+		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true) * 0.5
+		animpos = animpos * 0.3 * mulhuy * (self:IsPistolHoldType() and 1 or 1)
 		animpos = animpos * math.min((self.Primary.Force2 or self.Primary.Force) / 40,3) * ((self.NumBullet or 1) * 3 or 1) * (self.animposmul or 1) // * 4
 
-		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
-		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5
-		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
-		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
-		
-		self.AdditionalPos2:Add(VectorRand(-0.07, 0.07) * animpos3 * shit2)
-
+		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 7
 		//self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * ply.offsetView[2] * 0.2
 		
 		if self.podkid or self:IsPistolHoldType() then

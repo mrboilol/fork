@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.PrintName = "Combat Knife"
 SWEP.Instructions = "A military grade combat knife designed to neutralize the enemy during combat operations and special operations."
 SWEP.Category = "Weapons - Melee"
@@ -8,6 +8,7 @@ SWEP.AdminOnly = false
 SWEP.Slot = 1
 
 SWEP.Weight = 0
+SWEP.weight = 0.4
 SWEP.AutoSwitchTo = false
 SWEP.AutoSwitchFrom = false
 
@@ -24,7 +25,6 @@ SWEP.WorldModelReal = "models/weapons/combatknife/tactical_knife_iw7_vm.mdl"
 SWEP.WorldModelExchange = false
 SWEP.ViewModel = ""
 SWEP.HoldType = "knife"
-SWEP.weight = 0.4
 
 function SWEP:CanPrimaryAttack()
 	return true
@@ -54,22 +54,31 @@ SWEP.AttackLen1 = 55
 SWEP.Attack2Time = 0.1
 SWEP.AnimTime2 = 0.6
 SWEP.WaitTime2 = 0.4
-SWEP.AttackLen2 = 45
+SWEP.AttackLen2 = 45 
 
 SWEP.DamageType = DMG_SLASH
 SWEP.DamagePrimary = 15
 SWEP.DamageSecondary = 8
+
+SWEP.ArteryChance = 0.75
+SWEP.SwingSoundPitch = nil
 
 SWEP.PenetrationPrimary = 8
 SWEP.PenetrationSecondary = 4
 
 SWEP.MaxPenLen = 6
 
+SWEP.NoReverse = false
+
 SWEP.PenetrationSizePrimary = 0.75
 SWEP.PenetrationSizeSecondary = 2.5
 
 SWEP.StaminaPrimary = 10
 SWEP.StaminaSecondary = 8.5
+
+SWEP.BlockTier = 1
+SWEP.MeleeMaterial = "none"
+SWEP.BlockImpactSound = nil
 
 SWEP.ViewPunch1 = Angle(2,0,0)
 SWEP.ViewPunch2 = Angle(0,1,0)
@@ -86,6 +95,30 @@ SWEP.AnimList = {
     ["attack2"] = "vm_knifeonly_swipe",
 }
 
+SWEP.Attack_Charge_Begin = "Attack_Charge_Begin"
+SWEP.Attack_Charge_Idle = "Attack_Charge_Idle"
+SWEP.Attack_Charge_End = "Attack_Charge_End"
+
+SWEP.HeavyAttackDamageMul = 2.0
+SWEP.HeavyAttackWaitTime = 1.0
+SWEP.HeavyAttackAnimTimeBegin = 1.0
+SWEP.HeavyAttackAnimTimeIdle = 0.5
+SWEP.HeavyAttackAnimTimeEnd = 0.5
+
+SWEP.HeavyAttackStamina = 20
+SWEP.HeavyAttackDelay = 0.5 -- Slower swing
+SWEP.HeavyAttackTimeLength = 0.4 -- Longer hit window
+SWEP.HeavyAttackViewPunch = Angle(2, 2, 0)
+SWEP.HeavyAttackMaxChargeTime = 2.0 -- Time to reach max damage
+
+SWEP.HeavyAttackSwingAng = 0
+SWEP.HeavyAttackRads = 65
+SWEP.HeavyAttackDamageType = nil -- Damage type for heavy attack (nil = use Primary)
+
+SWEP.CanHeavyAttack = false
+local MELEE_GLOBAL_KNOCKBACK_MUL = 0.7
+local MELEE_GLOBAL_ACCURACY_MUL = 0.75
+
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")
 	SWEP.IconOverride = "vgui/hud/tfa_iw7_tactical_knife.png"
@@ -93,9 +126,14 @@ if CLIENT then
 end
 
 SWEP.AttackSwing = "weapons/slam/throw.wav" --!! заменить звуки
+SWEP.SwingSound = nil
+SWEP.SwingSoundPitch = nil
 SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
 SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+SWEP.HitFleshExtra = nil
+SWEP.HitFleshExtraPitch = nil
+SWEP.HitFleshPlus = nil
 SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
 SWEP.DeploySnd = "snd_jack_hmcd_knifedraw.wav"
 
@@ -238,6 +276,25 @@ if CLIENT then
         local inuse = self:InUse()
 
         if IsValid(owner) then
+            local timing = 0
+            
+            local animCalcTime = CurTime()
+            if self.FreezeTime then
+                if animCalcTime < self.FreezeTime + self.FreezeDuration then
+                    animCalcTime = self.FreezeTime
+                elseif self.FadeDuration and animCalcTime < self.FreezeTime + self.FreezeDuration + self.FadeDuration then
+                    local fadeProgress = (animCalcTime - (self.FreezeTime + self.FreezeDuration)) / self.FadeDuration
+                    local advancedTime = 0.5 * self.FadeDuration * fadeProgress * fadeProgress
+                    animCalcTime = self.FreezeTime + advancedTime
+                else
+                     local totalLost = self.FreezeDuration + (self.FadeDuration and (0.5 * self.FadeDuration) or 0)
+                     self.animtime = self.animtime + totalLost
+                     self.FreezeTime = nil
+                     self.FreezeDuration = nil
+                     self.FadeDuration = nil
+                end
+            end
+
             if not self.cycling then
                 local dtime = SysTime() - (self.lasthuyhuy or SysTime())
                 self.lasthuyhuy = SysTime()
@@ -249,10 +306,8 @@ if CLIENT then
                     self.stopanim = nil
                 end
 
-                local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
+                local timing = (1 - math.Clamp((self.animtime - animCalcTime) / self.animspeed, 0, 1))
                 timing = self.reverseanim and (1 - timing) or timing
-				timing = self.CustomTiming and self:CustomTiming() or timing
-                
                 WorldModel:SetCycle(timing)
                 --PrintTable( WorldModel:GetSequenceList() )
                 
@@ -261,13 +316,30 @@ if CLIENT then
                     self.callback = nil
                 end
             else
-                local timing = ((CurTime() - (self.animtime - self.animspeed))%self.animspeed) / self.animspeed
+                local timing = ((animCalcTime - (self.animtime - self.animspeed))%self.animspeed) / self.animspeed
                 WorldModel:SetCycle(timing)
             end
 
             if WorldModel:GetModel() ~= self.WorldModelReal then WorldModel:SetModel(self.WorldModelReal) end
             
             local pos, ang = self:ModelAnim(WorldModel)
+
+            self.ShakePos = self.ShakePos or Vector(0, 0, 0)
+            self.ShakeAng = self.ShakeAng or Angle(0, 0, 0)
+
+            local targetShakePos = Vector(0, 0, 0)
+            local targetShakeAng = Angle(0, 0, 0)
+
+            if self.FreezeTime and self.FreezeDuration and (CurTime() < self.FreezeTime + self.FreezeDuration) then
+                targetShakePos = VectorRand() * 0.02
+                targetShakeAng = Angle(math.Rand(-1,1), math.Rand(-1,1), math.Rand(-1,1)) * 0.5
+            end
+
+            self.ShakePos = LerpVector(FrameTime() * 15, self.ShakePos, targetShakePos)
+            self.ShakeAng = LerpAngle(FrameTime() * 15, self.ShakeAng, targetShakeAng)
+
+            pos = pos + self.ShakePos
+            ang = ang + self.ShakeAng
 
 			WorldModel:SetRenderOrigin(pos)
 			WorldModel:SetRenderAngles(ang)
@@ -374,6 +446,57 @@ local vechuy = Vector()
 local addPosLerp = Vector()
 local addAngLerp = Angle()
 
+SWEP.BlockPushPos = Vector(0,0,0)
+SWEP.BlockPushVel = Vector(0,0,0)
+SWEP.BlockPushAng = Angle(0,0,0)
+SWEP.BlockPushAngVel = Angle(0,0,0)
+
+function SWEP:AddBlockPush(normal)
+    -- normal is the direction of the attack (world space)
+    -- We want to push the viewmodel in that direction relative to the player
+    
+    local ply = self:GetOwner()
+    if not IsValid(ply) then return end
+    
+    local eyeAng = ply:EyeAngles()
+    local localDir = WorldToLocal(ply:GetPos() + normal * 10, Angle(0,0,0), ply:GetPos(), eyeAng)
+    localDir:Normalize()
+    
+    -- Push back (negative x/y? check coord system)
+    -- Usually X is forward/back, Y is right/left, Z is up/down in Source Viewmodels? 
+    -- Actually in ModelAnim addPos:
+    -- addPos.x = addPos.x + eyeAng[1] * 0.05
+    -- addPos.y = addPos.y - angle_difference.y * 2
+    
+    -- Let's apply a force.
+    -- If hit from front (normal points to me), localDir.x should be negative.
+    
+    self.BlockPushVel = self.BlockPushVel + localDir * 40 -- Strength
+    
+    -- Add some random rotation
+    self.BlockPushAngVel = self.BlockPushAngVel + Angle(math.Rand(-20,20), math.Rand(-10,10), math.Rand(-20,20))
+end
+
+function SWEP:UpdateBlockPush()
+    local dt = FrameTime()
+    
+    -- Spring constants
+    local stiffness = 100
+    local damping = 10
+    
+    -- Position Spring
+    local force = -self.BlockPushPos * stiffness
+    self.BlockPushVel = self.BlockPushVel + force * dt
+    self.BlockPushVel = self.BlockPushVel - self.BlockPushVel * damping * dt
+    self.BlockPushPos = self.BlockPushPos + self.BlockPushVel * dt
+    
+    -- Angle Spring
+    local torque = -self.BlockPushAng * stiffness
+    self.BlockPushAngVel = self.BlockPushAngVel + torque * dt
+    self.BlockPushAngVel = self.BlockPushAngVel - self.BlockPushAngVel * damping * dt
+    self.BlockPushAng = self.BlockPushAng + self.BlockPushAngVel * dt
+end
+
 function SWEP:CustomBlockAnim(addPosLerp, addAngLerp)
     return false
 end
@@ -392,7 +515,7 @@ function SWEP:ModelAnim(model, pos, ang)
     if !IsValid(owner) or !owner:IsPlayer() then return end
 
     local ent = hg.GetCurrentCharacter(owner)
-    local tr = hg.eyeTrace(owner, 40, ent)
+    local tr = hg.eyeTrace(owner, 20, ent)
     local eyeAng = owner:EyeAngles()
 
     local vel = ent:GetVelocity()
@@ -401,6 +524,17 @@ function SWEP:ModelAnim(model, pos, ang)
     local vellenlerp = self.velocityAdd and self.velocityAdd:Length() or vellen
 
     if !tr then return end
+
+    if CLIENT then
+        self.BlockPushPos = self.BlockPushPos or Vector(0,0,0)
+        self.BlockPushVel = self.BlockPushVel or Vector(0,0,0)
+        self.BlockPushAng = self.BlockPushAng or Angle(0,0,0)
+        self.BlockPushAngVel = self.BlockPushAngVel or Angle(0,0,0)
+
+        self:UpdateBlockPush()
+        addPos:Add(self.BlockPushPos)
+        addAng:Add(self.BlockPushAng)
+    end
 
     local dtime = SysTime() - (self.timetick2 or SysTime() + 0.015)
 
@@ -442,7 +576,7 @@ function SWEP:ModelAnim(model, pos, ang)
        addAngLerp.p = addAngLerp.p - math.min(math.abs(math.max(eyeAng.p,0)),25)
     end
 
-    addPosLerp.x = addPosLerp.x - 20 * math.max(0.5 - tr.Fraction, 0)
+    addPosLerp.x = addPosLerp.x - 20 * math.max(0.5 - tr.Fraction,0)
 
     if self.CanSuicide and owner.suiciding then
         addPosLerp:Set(self.SuicidePos)
@@ -506,10 +640,6 @@ function SWEP:ModelAnim(model, pos, ang)
     local pos, ang = LocalToWorld(hpos + addPos + self.lerpedAddPos, hang + addAng + self.lerpedAddAng, tr.StartPos + self.velocityAdd, eyeAng)
 
 	self.timetick2 = SysTime()
-
-    if self.ModelAnimAdd then
-        return self:ModelAnimAdd(model,pos,ang)
-    end
 
     return pos, ang
 end
@@ -695,6 +825,10 @@ function SWEP:SetupDataTables()
 	self:NetworkVar("Bool", 6, "InAttack")
     self:NetworkVar("Float", 7, "AttackLength")
     self:NetworkVar("Float", 8, "AttackTime")
+    
+    self:NetworkVar("Int", 6, "ChargeState") -- 0: None, 1: Begin, 2: Idle, 3: Attack
+    self:NetworkVar("Float", 9, "NextChargeStateTime")
+    self:NetworkVar("Float", 10, "ChargeStartTime")
 end
 
 function SWEP:OwnerChanged()
@@ -725,7 +859,25 @@ end
 
 function SWEP:Holster(wep)
     self:SetInAttack(false)
+    if self.CanHeavyAttack then
+        if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
+        if CLIENT then
+            self.ShakePos = Vector(0,0,0)
+            self.ShakeAng = Angle(0,0,0)
+        end
+    end
     return true
+end
+
+function SWEP:OnDrop()
+    self:SetInAttack(false)
+    if self.CanHeavyAttack then
+        if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
+        if CLIENT then
+            self.ShakePos = Vector(0,0,0)
+            self.ShakeAng = Angle(0,0,0)
+        end
+    end
 end
 
 function SWEP:IsEntSoft(ent)
@@ -767,7 +919,9 @@ if CLIENT then
 end
 
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)
-    mul = mul * 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90,1,1.3)
+    if owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
+        mul = mul * 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90,1,1.3)
+    end
     mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
     mul = mul * (ent ~= owner and 0.75 or 1)
     mul = mul * (owner.MeleeDamageMul or 1)
@@ -778,6 +932,21 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
 
     if owner:IsBerserk() then
         mul = mul * (1 + owner.organism.berserk)
+    end
+
+    if self:GetAttackType() == 3 then
+        local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
+        local chargeTime = startTime > 0 and (CurTime() - startTime) or 0
+        local chargeProgress = math.Clamp(chargeTime / self.HeavyAttackMaxChargeTime, 0, 1)
+        
+        -- Start at 1.0 (normal damage), ramp up to HeavyAttackDamageMul (2.0)
+        local bonus = (self.HeavyAttackDamageMul - 1.0) * chargeProgress
+        mul = mul * (1.0 + bonus)
+    end
+
+    if self:GetInAttack() and self.MouseSwayAccumulator then
+        local swayBonus = math.Clamp(self.MouseSwayAccumulator / 180, 0, 0.5)
+        mul = mul * (1.0 + swayBonus)
     end
 
     return mul
@@ -793,16 +962,20 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
                 self.viewpunch = nil
             end
         else
-            self.Penetration = attacktype and self.PenetrationSecondary or self.PenetrationPrimary
-            self.PenetrationSize = attacktype and self.PenetrationSizeSecondary or self.PenetrationSizePrimary
+            self.Penetration = (attacktype == 3 and self.PenetrationPrimary * 1.5) or (attacktype and self.PenetrationSecondary or self.PenetrationPrimary)
+            self.PenetrationSize = (attacktype == 3 and self.PenetrationSizePrimary * 1.5) or (attacktype and self.PenetrationSizeSecondary or self.PenetrationSizePrimary)
             
-            owner:EmitSound(self.AttackSwing or "weapons/slam/throw.wav",50,math.random(95,105))
+            local pitch = self.SwingSoundPitch and (istable(self.SwingSoundPitch) and math.random(self.SwingSoundPitch[1], self.SwingSoundPitch[2]) or self.SwingSoundPitch) or math.random(95,105)
+            if attacktype == 3 then pitch = pitch - 20 end
+            owner:EmitSound(self.SwingSound or self.AttackSwing or "weapons/slam/throw.wav",50,pitch)
             
-            if owner.organism then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + (attacktype and self.StaminaSecondary or self.StaminaPrimary) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+            if owner.organism and attacktype ~= 3 then
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + ((attacktype and self.StaminaSecondary or self.StaminaPrimary)) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
             end
 
-            if !attacktype then
+            if attacktype == 3 then
+                -- heavy attack custom logic if needed
+            elseif !attacktype then
                 if self.CustomAttack and self:CustomAttack() then
                     self:SetInAttack(false)
 
@@ -829,7 +1002,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     //ent:Spawn()
     //ent:SetMoveType(MOVETYPE_NONE)
     //ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
-    --if self:IsEntSoft(eyetr.Entity) then return eyetr end
+    if self:IsEntSoft(eyetr.Entity) then return eyetr end
     
     local trace
 
@@ -838,16 +1011,19 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     for i = 0, amt do
         local normal = eyetr.Normal:Angle()
 
-        normal:RotateAroundAxis(normal:Forward(), (attacktype and self.SwingAng2 or self.SwingAng) or -90)
-        normal:RotateAroundAxis(normal:Up(), ((0.5 - inattackLength) * ((attacktype and self.AttackRads2 or self.AttackRads) or 65)))
-        normal:RotateAroundAxis(normal:Up(), (i - amt * 0.5) * 1)
+        local ang = (attacktype == 3 and self.HeavyAttackSwingAng) or (attacktype and self.SwingAng2 or self.SwingAng) or -90
+        local rads = ((attacktype == 3 and self.HeavyAttackRads) or (attacktype and self.AttackRads2 or self.AttackRads) or 65) * MELEE_GLOBAL_ACCURACY_MUL
+
+        normal:RotateAroundAxis(normal:Forward(), ang)
+        normal:RotateAroundAxis(normal:Up(), ((0.5 - inattackLength) * rads))
+        normal:RotateAroundAxis(normal:Up(), (i - amt * 0.5) * MELEE_GLOBAL_ACCURACY_MUL)
         
         --debugoverlay.Line(eyetr.StartPos, eyetr.StartPos + normal:Forward() * (self:GetAttackLength() + vellen), 3, color_white)
 
         local tr = {}
 
         tr.start = eyetr.StartPos
-        tr.endpos = eyetr.StartPos + normal:Forward() * (attacktype and 1 or math.max(0.5, 1 - math.abs((0.5 - inattackLength) * 2))) * (self:GetAttackLength() + vellen)
+        tr.endpos = eyetr.StartPos + normal:Forward() * (self:GetAttackLength() + vellen)
         tr.filter = self.MultiDmg1 and {owner, ent} or self.HitEnts
 
         local size = 0.15
@@ -864,29 +1040,40 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         //    owner:SetVelocity(vec)
         //end
 
-        if self:IsEntSoft(trace.Entity) then
-			break
-		end
+        if self:IsEntSoft(trace.Entity) then break end
     end
-
+    
     return trace
 end
 
-local bluntDecals, bluntDecalsRand = {}, 1
-for i = 1, 4 do
-	local mat = "decals/zcity/blunt_impact" .. i
-	table.insert(bluntDecals, mat)
-	game.AddDecal("Impact.BluntAdd" .. i, mat)
+local bluntDecals, bluntDecalsRand = {}, 1 
+for i = 1, 4 do 
+	 local mat = "decals/zcity/blunt_impact" .. i 
+	 table.insert(bluntDecals, mat) 
+	 game.AddDecal("Impact.BluntAdd" .. i, mat) 
 
-	list.Add("PaintMaterials", "Impact.BluntAdd" .. i)
-	bluntDecalsRand = i
-end
+	 list.Add("PaintMaterials", "Impact.BluntAdd" .. i) 
+	 bluntDecalsRand = i 
+end 
 
 function SWEP:PlayEffects(trace, attacktype)
     local owner = self:GetOwner()
     
     if self:IsEntSoft(trace.Entity) then
-        owner:EmitSound(attacktype and self.Attack2HitFlesh or self.AttackHitFlesh, 50)
+        owner:EmitSound("hitregister.ogg", 75, 115)
+        local sound = (attacktype == 3 and self.AttackHitFlesh) or (attacktype and self.Attack2HitFlesh or self.AttackHitFlesh)
+        owner:EmitSound(sound,75)
+
+        if not attacktype or attacktype == 3 then
+            if self.HitFleshExtra and #self.HitFleshExtra > 0 then
+                local snd = table.Random(self.HitFleshExtra)
+                owner:EmitSound(snd, 75, self.HitFleshExtraPitch and (istable(self.HitFleshExtraPitch) and math.random(self.HitFleshExtraPitch[1], self.HitFleshExtraPitch[2]) or self.HitFleshExtraPitch) or 100)
+            end
+
+            if self.HitFleshPlus then
+                owner:EmitSound(self.HitFleshPlus, 75)
+            end
+        end
 
         if self.DamageType == DMG_SLASH then
             util.Decal( "Blood", trace.HitPos + trace.HitNormal * 15, trace.HitPos - trace.HitNormal * 15, owner )
@@ -895,12 +1082,13 @@ function SWEP:PlayEffects(trace, attacktype)
     elseif not self.AttackHitPlayed then
         self.AttackHitPlayed = true
 
-        owner:EmitSound(self.AttackHit, 50)
+        owner:EmitSound("hitregister.ogg", 75, 115)
+        owner:EmitSound(self.AttackHit,75)
+        owner:EmitSound(self.AttackHit, 75)
 
-		if self.weight >= 1.5 and self.DamageType ~= DMG_SLASH and trace.MatType ~= MAT_GLASS and not attacktype then
-			util.Decal("Impact.BluntAdd" .. math.random(bluntDecalsRand), trace.HitPos + trace.HitNormal, trace.HitPos - trace.HitNormal, owner)
-			owner:ScreenShake(trace.HitPos, 35, 10, 0.5, 150, false)
-		end
+        if self.DamageType ~= DMG_SLASH and trace.MatType ~= MAT_GLASS then
+            util.Decal("Impact.BluntAdd" .. math.random(bluntDecalsRand), trace.HitPos + trace.HitNormal, trace.HitPos - trace.HitNormal, owner)
+        end
     end
 end
 
@@ -931,17 +1119,21 @@ function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
 
         if ply:IsPlayer() then
             local normal = Angle(0,0,0)
-            normal:RotateAroundAxis(normal:Forward(),-((attacktype and self.SwingAng2 or self.SwingAng) or -90))
-            normal:RotateAroundAxis(normal:Up(),-((attacktype and self.AttackRads2 or self.AttackRads) or 65))
+            
+            local ang = (attacktype == 3 and self.HeavyAttackSwingAng) or (attacktype and self.SwingAng2 or self.SwingAng) or -90
+            local rads = ((attacktype == 3 and self.HeavyAttackRads) or (attacktype and self.AttackRads2 or self.AttackRads) or 65) * MELEE_GLOBAL_ACCURACY_MUL
+
+            normal:RotateAroundAxis(normal:Forward(),-ang)
+            normal:RotateAroundAxis(normal:Up(),-rads)
 
             local dot = ply:GetAimVector():Dot(trnormal)
             
             local angrand = AngleRand(-5, 5)
 
             ply:ViewPunch((normal * -dot) * dmg / 30)
-			if ply:OnGround() or ply.organism.superfighter then
-           		ply:SetVelocity((trnormal:Angle() + normal):Forward() * -5 * dmg + trnormal * dmg * 10)
-			end
+			--if ply:OnGround() or ply.organism.superfighter then
+           		ply:SetVelocity(((trnormal:Angle() + normal):Forward() * -5 * math.min(dmg, 30) + trnormal * math.min(dmg, 30) * 10) * MELEE_GLOBAL_KNOCKBACK_MUL)
+			--end
         end
     end
 end
@@ -982,27 +1174,69 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
         local selfdmg = self.DamagePrimary * 0.2
 
         if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
-            local perfectblock = CurTime() - wep:GetStartedBlocking() < 0.5
-            
-            ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1)
+            local defenderBlockTier = wep.BlockTier or 1
+            local attackerBlockTier = self.BlockTier or 1
 
-            //viewpunch the attacker maybe?
-			if not owner:IsNPC() then
-            	self:PunchPlayer(owner, attacktype, -owner:GetAimVector(), selfdmg / 2)
-			end
-            self:PunchPlayer(ent, attacktype, owner:GetAimVector(), selfdmg / 2)
-            
-            if perfectblock then
-                ent:EmitSound("tasty/empty.wav")
+            if defenderBlockTier >= attackerBlockTier then
+                if attacktype == 3 then
+                    ent:EmitSound("blockbreak.ogg", 75, 125)
+                    if SERVER then
+                        hg.drop(ent)
+                        
+                        net.Start("MeleeBlockEffect")
+                        net.WriteVector(trace.HitPos)
+                        net.WriteString((wep.MeleeMaterial or "none") .. "_broken")
+                        net.Broadcast()
+                    end
+                    return 1
+                end
+
+                if wep.BlockImpactSound then
+                    ent:EmitSound(wep.BlockImpactSound, 60)
+                end
+
+                if SERVER then
+                    net.Start("MeleeBlockEffect")
+                    net.WriteVector(trace.HitPos)
+                    net.WriteString(wep.MeleeMaterial or "none")
+                    net.Broadcast()
+                    
+                    net.Start("MeleeBlockPush")
+                    net.WriteVector(trace.Normal)
+                    net.Send(ent)
+                end
+
+                if wep.SetLastBlocked then
+                    -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
+                end
+
+                local perfectblock = CurTime() - wep:GetStartedBlocking() < 0.5
+                
+                if perfectblock then
+                    ent:EmitSound("parry.ogg", 75)
+                else
+                    if ent.organism then
+                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15
+                    end
+                end
+
+                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1)
+
+                if not owner:IsNPC() then
+                    self:PunchPlayer(owner, attacktype, -owner:GetAimVector(), selfdmg / 2)
+                end
+                self:PunchPlayer(ent, attacktype, owner:GetAimVector(), selfdmg / 2)
+                
+                if perfectblock then
+                    -- ent:EmitSound("tasty/empty.wav")
+                end
+                
+                -- if wep.SetLastBlocked then
+                --    wep:SetLastBlocked(CurTime())
+                -- end
+
+                return 0
             end
-            
-            //ent:EmitSound("physics/metal/metal_computer_impact_bullet3.wav") -- parry sound
-
-            if wep.SetLastBlocked then
-                wep:SetLastBlocked(CurTime())
-            end
-
-            return math.Clamp(selfdmg / dmg / math.Clamp(ent.organism.stamina[1] / (ent.organism.stamina.max * 0.66), 0.1, 1), 0.1, 1) * (perfectblock and 0 or 1)
         end
     end
 
@@ -1029,9 +1263,30 @@ if CLIENT then
     hg_nomeleestop = ConVarExists("hg_nomeleestop") and GetConVar("hg_nomeleestop") or CreateConVar("hg_nomeleestop", 0, FCVAR_ARCHIVE, "Toggle melee stop-on-hit animation feature", 0, 1)
 end
 
+function SWEP:SetupMove(ply, mv, cmd)
+    if self.CanHeavyAttack then
+        local state = self.GetChargeState and self:GetChargeState() or self:GetDTInt(6)
+        if state == 1 or state == 2 then
+            local speed = 110
+            
+            mv:SetMaxSpeed(speed)
+            mv:SetMaxClientSpeed(speed)
+            
+            if cmd then
+                cmd:RemoveKey(IN_SPEED)
+            end
+        end
+    end
+end
+
 function SWEP:CustomThink()
     local owner = self:GetOwner()
     local actwep = owner.GetActiveWeapon and owner:GetActiveWeapon()
+
+    if CLIENT and (not self.ShakePos or not self.ShakeAng) then
+        self.ShakePos = Vector(0,0,0)
+        self.ShakeAng = Angle(0,0,0)
+    end
 
 	if SERVER and not owner:IsNPC() and owner.organism and (not owner.organism.canmove or ((owner.organism.stun - CurTime()) > 0) or (owner.organism.larm == 1 and owner.organism.rarm == 1)) and IsValid(actwep) and self == actwep then
 		self:RemoveFake()
@@ -1098,12 +1353,161 @@ function SWEP:CustomThink()
     if owner.organism and owner.organism.larmamputated and self.TwoHanded then return end
 
     self:ThinkAdd()
+
+    local owner = self:GetOwner()
+
+    if self.CanHeavyAttack then
+        local state = self.GetChargeState and self:GetChargeState() or self:GetDTInt(6)
+        local nextState = self.GetNextChargeStateTime and self:GetNextChargeStateTime() or self:GetDTFloat(9)
+        local curTime = CurTime()
+
+        if not IsValid(owner) or not owner:Alive() or owner.fake or (owner.organism and (owner.organism.fake or owner.organism.otrub)) or IsValid(owner.FakeRagdoll) then
+            if state ~= 0 then
+                if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
+                self.HeavyAttackStaminaDeducted = false
+                if CLIENT then
+                    self.ShakePos = Vector(0,0,0)
+                    self.ShakeAng = Angle(0,0,0)
+                end
+                
+                -- Stop charge effects
+                owner:StopSound("pwb2/weapons/mac11/draw.wav")
+                self:PlayAnim("idle", 1, false, nil, false)
+            end
+        elseif state == 0 then
+            if hg.KeyDown(owner, IN_USE) and hg.KeyDown(owner, IN_ATTACK) and not self:GetInAttack() and (self:GetLastAttack() + self:GetAttackWait() < curTime) and not self:GetBlocking() then
+                if owner.organism and owner.organism.stamina and owner.organism.stamina[1] and owner.organism.stamina[1] < 80 then return end
+                if self.SetChargeState then self:SetChargeState(1) else self:SetDTInt(6, 1) end
+                self.HeavyAttackStaminaDeducted = false
+                if self.SetNextChargeStateTime then self:SetNextChargeStateTime(curTime + self.HeavyAttackAnimTimeBegin) else self:SetDTFloat(9, curTime + self.HeavyAttackAnimTimeBegin) end
+                if self.SetChargeStartTime then self:SetChargeStartTime(curTime) else self:SetDTFloat(10, curTime) end
+                self:PlayAnim(self.Attack_Charge_Begin, self.HeavyAttackAnimTimeBegin, false, nil, false)
+                
+                -- Play cloth sound on begin
+                owner:EmitSound("pwb2/weapons/mac11/draw.wav", 55, 100)
+            end
+        elseif state == 1 then
+             local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
+             local chargeProgress = math.min((curTime - startTime) / self.HeavyAttackMaxChargeTime, 1.0)
+             
+             if CLIENT then
+                local shake = chargeProgress * 0.01 -- Reduced from 0.05
+                self.ShakePos = self.ShakePos + VectorRand() * shake
+                self.ShakeAng = self.ShakeAng + AngleRand() * (shake * 0.5)
+             end
+
+            if curTime >= nextState then
+                if not hg.KeyDown(owner, IN_ATTACK) then
+                     -- Released during charge? Go straight to attack
+                    if self.SetChargeState then self:SetChargeState(3) else self:SetDTInt(6, 3) end
+                    
+                    self.HitEnts = nil
+                    self.FirstAttackTick = false
+                    self.AttackHitPlayed = false
+                    
+                local mul = 1
+                if owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
+                    mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
+                end
+
+                self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false)
+
+                if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
+                    self.HeavyAttackStaminaDeducted = true
+                end
+                
+                self:SetAttackType(3)
+                self:SetLastAttack(curTime + self.HeavyAttackDelay / mul)
+                self:SetAttackTime(curTime + self.HeavyAttackTimeLength / mul)
+                self:SetAttackLength(self.AttackLen1)
+                self:SetAttackWait(self.HeavyAttackWaitTime / mul)
+                self:SetInAttack(true)
+                
+                -- Reset shake immediately on attack release to prevent animation lag/jitter
+                if CLIENT then
+                    self.ShakePos = Vector(0,0,0)
+                    self.ShakeAng = Angle(0,0,0)
+                end
+                    
+                    if CLIENT and not self:IsLocal() and owner.AnimRestartGesture then
+                         owner:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_HL2MP_GESTURE_RANGE_ATTACK_SLAM, true)
+                    end
+                    
+                    self.viewpunch = true
+                else
+                    if self.SetChargeState then self:SetChargeState(2) else self:SetDTInt(6, 2) end
+                    if self.SetNextChargeStateTime then self:SetNextChargeStateTime(curTime + self.HeavyAttackAnimTimeIdle) else self:SetDTFloat(9, curTime + self.HeavyAttackAnimTimeIdle) end
+                    self:PlayAnim(self.Attack_Charge_Idle, self.HeavyAttackAnimTimeIdle, true, nil, false)
+                end
+            end
+        elseif state == 2 then
+             local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
+             local chargeProgress = math.min((curTime - startTime) / self.HeavyAttackMaxChargeTime, 1.0)
+
+             if CLIENT then
+                local shake = chargeProgress * 0.02 -- Reduced from 0.1
+                self.ShakePos = self.ShakePos + VectorRand() * shake
+                self.ShakeAng = self.ShakeAng + AngleRand() * (shake * 0.5)
+             end
+
+            if not hg.KeyDown(owner, IN_ATTACK) then
+                -- Trigger Attack
+                if self.SetChargeState then self:SetChargeState(3) else self:SetDTInt(6, 3) end
+                
+                local mul = 1
+                if owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
+                    mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
+                end
+                
+                self.HitEnts = nil
+                self.FirstAttackTick = false
+                self.AttackHitPlayed = false
+                
+                self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false)
+
+                if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
+                    self.HeavyAttackStaminaDeducted = true
+                end
+                
+                self:SetAttackType(3)
+                self:SetLastAttack(curTime + self.HeavyAttackDelay / mul)
+                self:SetAttackTime(curTime + self.HeavyAttackTimeLength / mul)
+                self:SetAttackLength(self.AttackLen1) -- Use Primary length or custom?
+                self:SetAttackWait(self.HeavyAttackWaitTime / mul)
+                self:SetInAttack(true)
+                self.HitWorld = false
+                
+                -- Reset shake immediately on attack release
+                if CLIENT then
+                    self.ShakePos = Vector(0,0,0)
+                    self.ShakeAng = Angle(0,0,0)
+                end
+                
+                if CLIENT and not self:IsLocal() and owner.AnimRestartGesture then
+                     owner:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_HL2MP_GESTURE_RANGE_ATTACK_SLAM, true)
+                end
+                
+                self.viewpunch = true
+            elseif curTime >= nextState then
+                 -- Loop idle
+                 if self.SetNextChargeStateTime then self:SetNextChargeStateTime(curTime + self.HeavyAttackAnimTimeIdle) else self:SetDTFloat(9, curTime + self.HeavyAttackAnimTimeIdle) end
+                 self:PlayAnim(self.Attack_Charge_Idle, self.HeavyAttackAnimTimeIdle, true, nil, false)
+            end
+        elseif state == 3 then
+             -- Attack logic is handled by GetInAttack() block
+             if not self:GetInAttack() then
+                 if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
+             end
+        end
+    end
     
     if CLIENT and owner ~= lply then return end
 
     //if SERVER then
         local oldblocking = self:GetBlocking()
-        local blocking = ((CurTime() - self:GetStartedBlocking()) > 1 or oldblocking) and owner.organism and owner.organism.stamina[1] > 90 and !self:GetInAttack() and (self:GetAttackTime() - CurTime() - 0) < 0 and ((self:GetLastBlocked() + 3) < CurTime()) and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2)
+        local blocking = ((CurTime() - self:GetStartedBlocking()) > 1 or oldblocking) and owner.organism and owner.organism.stamina and owner.organism.stamina[1] and owner.organism.stamina[1] > 90 and !self:GetInAttack() and (self:GetAttackTime() - CurTime() - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2)
         --if self:CutDuct() then return end
         self:SetBlocking(blocking)
         
@@ -1125,11 +1529,24 @@ function SWEP:CustomThink()
 	end
 
     if self:GetInAttack() then
+        local currentEyeAngles = owner:EyeAngles()
+        if self.LastEyeAngles then
+            local diff = currentEyeAngles - self.LastEyeAngles
+            diff:Normalize()
+            local sway = math.abs(diff.y) + math.abs(diff.p)
+            self.MouseSwayAccumulator = (self.MouseSwayAccumulator or 0) + sway
+        end
+        self.LastEyeAngles = currentEyeAngles
+
+        local blockMul = 1
         local inattack1 = math.max(self:GetLastAttack() - CurTime(), 0) / self.AttackTime
         local inattack2 = math.max(self:GetLastAttack() - CurTime(), 0) / self.Attack2Time
 
         local inattackL1 = math.max(self:GetAttackTime() - CurTime(), 0) / self.AttackTimeLength
         local inattackL2 = math.max(self:GetAttackTime() - CurTime(), 0) / self.Attack2TimeLength
+
+        local inattack3 = math.max(self:GetLastAttack() - CurTime(), 0) / self.HeavyAttackDelay
+        local inattackL3 = math.max(self:GetAttackTime() - CurTime(), 0) / self.HeavyAttackTimeLength
         
         local ent = hg.GetCurrentCharacter(owner)
         local vellen = ent:GetVelocity():Length()
@@ -1155,71 +1572,87 @@ function SWEP:CustomThink()
             local ent = trace.Entity
 
             local shouldhit = (IsValid(ent) or ent:IsWorld())
+            local soft = self:IsEntSoft(ent)
 
             local dmg = math.random(self.DamagePrimary - 3, self.DamagePrimary + 3)
+            blockMul = 1
 
-            local soft = self:IsEntSoft(ent)
             if !shouldhit then
                 goto meleeskip1
             end
 
-            --self:SetInAttack(false)
             if SERVER and soft and self.HitEnts[#self.HitEnts] ~= ent then
                 self:AddDecal()
             end
+            
+            if CLIENT and IsFirstTimePredicted() then
+                local weight = self.weight or self.Weight or 0
+                
+                if weight > 0.4 and (not self.stopanim or (not soft and not self.HitWorld)) and (not hg_nomeleestop or not hg_nomeleestop:GetBool()) then
+                    if not soft or self.AnimAlwaysBack or self.HitWorld then
+                        if not self.NoReverse then
+                            local mul = 3
+                            self.animspeed = self.animspeed * mul
 
-			if CLIENT and IsFirstTimePredicted() and self.weight > 0.4 and (!self.stopanim or (!soft and !self.HitWorld)) and !hg_nomeleestop:GetBool() then
-				if !soft or self.AnimAlwaysBack or self.HitWorld then   
-                    local mul = 5
-                    self.animspeed = self.animspeed * mul
+                            self.animtime = CurTime() - (self.animtime - CurTime()) * mul + self.animspeed - 0.1
+                            
+                            timer.Simple(0.15, function()
+                                if not IsValid(self) then return end
 
-                    self.animtime = CurTime() - (self.animtime - CurTime()) * mul + self.animspeed - 0.1
-                    
-                    timer.Simple(0.4, function()
-                        if !IsValid(self) then return end
+                                local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
+                                local mul = 0.5
+                                
+                                self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
+                                self.animspeed = self.animspeed * mul
+                            end)
 
+                            util.ScreenShake(self:GetPos(), 15, 5, 0.2, 100)
+
+                            self.stopanim = 0.15
+                            self.reverseanim = true
+                        else
+                            util.ScreenShake(self:GetPos(), 15, 5, 0.2, 100)
+                        end
+                        self.HitWorld = true
+                    else
                         local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
-                        local mul = 0.25
+                        local mul = 2
                         
                         self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
                         self.animspeed = self.animspeed * mul
-                    end)
-
-                    util.ScreenShake(self:GetPos(), 35, 1, 1, 100)
-
-                    self.stopanim = 0.2
-					self.reverseanim = true
-                    self.HitWorld = true
-				else
-                    local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
-                    local mul = 5
-                    
-                    self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
-                    self.animspeed = self.animspeed * mul
-                    
-                    timer.Simple(0.1, function()
-                        if !IsValid(self) then return end
-
-                        local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
-                        local mul = 0.3
                         
-                        self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
-                        self.animspeed = self.animspeed * mul
-                    end)
+                        timer.Simple(0.05, function()
+                            if not IsValid(self) then return end
 
-                    util.ScreenShake(self:GetPos(), 35, 1, 1, 100)
+                            local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
+                            local mul = 0.5
+                            
+                            self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
+                            self.animspeed = self.animspeed * mul
+                        end)
 
-                    self.stopanim = 0.2
-					--self.reverseanim = true
-				end
-			end
+                        util.ScreenShake(self:GetPos(), 15, 5, 0.1, 100)
+
+                        self.stopanim = 0.05
+                    end
+                end
+            end
 
             if CLIENT then goto meleeskip1 end
 
             ent:PrecacheGibs()
 
             mul = mul * (self:BehindAttack(ent) and 2 or 1)
-            mul = mul * self:BlockingLogic(ent, mul, false, trace)
+            blockMul = self:BlockingLogic(ent, mul, false, trace)
+            mul = mul * blockMul
+
+            if blockMul == 0 and self.DamageType == DMG_SLASH then
+                self:SetInAttack(false)
+                self.HitEnts = nil
+                self.FirstAttackTick = false
+                self.AttackHitPlayed = false
+                return
+            end
 
             dmg = dmg * mul
 
@@ -1232,9 +1665,6 @@ function SWEP:CustomThink()
             end
             
             if self.MultiDmg1 or (self.HitEnts[#self.HitEnts] ~= ent) then
-                //if self:BreakGlass(ent) then
-                    //goto meleeskip1
-                //end
 
                 if self.MultiDmg1 or not self:IsEntSoft(ent) then
                     dmg = dmg / (self.AttackRads * self.AttackTimeLength)
@@ -1247,25 +1677,56 @@ function SWEP:CustomThink()
                 dmginfo:SetAttacker(owner)
                 dmginfo:SetInflictor(self)
                 dmginfo:SetDamage(dmg)
-                dmginfo:SetDamageForce(trace.Normal * dmg)
-                dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or self.DamageType)
+                dmginfo:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
+                
+                local dmgType = self.DamageType
+                if self:GetAttackType() == 3 and self.HeavyAttackDamageType then
+                    dmgType = self.HeavyAttackDamageType
+                end
+                
+                dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or dmgType)
                 dmginfo:SetDamagePosition(trace.HitPos)
                 
-                self.slash = self.MultiDmg1
-                ent:TakeDamageInfo(dmginfo)
-                self.attackedOnce = true
-                self.slash = nil
-                
-                hg.AddForceRag(ent, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400, 0.5)
+                hg.AddForceRag(ent, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL, 0.5)
 
                 self:PunchPlayer(ent, false, trace.Normal, dmg)
 
                 local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
 
                 if IsValid(phys) then
-                    phys:ApplyForceOffset(trace.Normal * math.min(dmg, 25) * 400, trace.HitPos)
+                    local forceMultiplier = math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
+                    phys:ApplyForceCenter(trace.Normal * forceMultiplier * 0.8)
+                    phys:ApplyForceOffset(trace.Normal * forceMultiplier * 0.2, trace.HitPos)
                 end
 
+                self.slash = self.MultiDmg1
+                ent:TakeDamageInfo(dmginfo)
+
+                if SERVER and self.NeckBreakChance and (self.DamagePrimary or 0) >= (self.DamageSecondary or 0) and blockMul >= 1 then
+                    local isHead = trace.HitGroup == HITGROUP_HEAD
+                    if not isHead and ent:IsRagdoll() then
+                        local physBone = trace.PhysicsBone
+                        if physBone then
+                            local bone = ent:TranslatePhysBoneToBone(physBone)
+                            if bone then
+                                local name = ent:GetBoneName(bone)
+                                if name and string.find(string.lower(name), "head") then
+                                    isHead = true
+                                end
+                            end
+                        end
+                    end
+
+                    if (ent:IsPlayer() or ent:IsRagdoll()) and isHead then
+                         if math.random() <= self.NeckBreakChance then
+                              hg.BreakNeck(ent)
+                         end
+                    end
+                end
+
+                self.attackedOnce = true
+                self.slash = nil
+                
                 self:PrimaryAttackAdd(ent, trace)
             end
 
@@ -1297,6 +1758,7 @@ function SWEP:CustomThink()
             local shouldhit = (IsValid(ent) or ent:IsWorld())
 
             local dmg = math.random(self.DamageSecondary - 3, self.DamageSecondary + 3)
+            blockMul = 1
 
             if !shouldhit then
                 goto meleeskip2
@@ -1311,14 +1773,23 @@ function SWEP:CustomThink()
             ent:PrecacheGibs()
 
             if SERVER then -- ранбуст для супербойцов and (ent:OnGround() or ent.organism and ent.organism.superfighter)
-                local vec = trace.Normal * math.min(self.DamageSecondary  * 0.5, 20)
+                local vec = trace.Normal * math.min(self.DamageSecondary  * 0.5, 20) * MELEE_GLOBAL_KNOCKBACK_MUL
                 vec[3] = 0
                 
                 ent:SetVelocity(vec)
             end
 
             mul = mul * (self:BehindAttack(ent) and 2 or 1)
-            mul = mul * self:BlockingLogic(ent, mul, true, trace)
+            blockMul = self:BlockingLogic(ent, mul, true, trace)
+            mul = mul * blockMul
+
+            if blockMul == 0 and self.DamageType == DMG_SLASH then
+                self:SetInAttack(false)
+                self.HitEnts = nil
+                self.FirstAttackTick = false
+                self.AttackHitPlayed = false
+                return
+            end
 
             dmg = dmg * mul
 
@@ -1344,25 +1815,50 @@ function SWEP:CustomThink()
                 dmginfo:SetAttacker(owner)
                 dmginfo:SetInflictor(self)
                 dmginfo:SetDamage(dmg)
-                dmginfo:SetDamageForce(trace.Normal * dmg)
+                dmginfo:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
                 dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or self.DamageType)
                 dmginfo:SetDamagePosition(trace.HitPos)
 
-                self.slash = self.MultiDmg2
-                --print(dmg)
-                ent:TakeDamageInfo(dmginfo)
-                self.attackedOnce = true
-                self.slash = nil
-
                 local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
 
-                hg.AddForceRag(ent, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400, 0.5)
+                hg.AddForceRag(ent, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL, 0.5)
 
                 self:PunchPlayer(ent, true, trace.Normal, dmg)
 
                 if IsValid(phys) then
-                    phys:ApplyForceOffset(trace.Normal * math.min(dmg, 25) * 400, trace.HitPos)
+                    local forceMultiplier = math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
+                    phys:ApplyForceCenter(trace.Normal * forceMultiplier * 0.8)
+                    phys:ApplyForceOffset(trace.Normal * forceMultiplier * 0.2, trace.HitPos)
                 end
+
+                self.slash = self.MultiDmg2
+                --print(dmg)
+                ent:TakeDamageInfo(dmginfo)
+
+                if SERVER and self.NeckBreakChance and (self.DamageSecondary or 0) > (self.DamagePrimary or 0) and blockMul >= 1 then
+                    local isHead = trace.HitGroup == HITGROUP_HEAD
+                    if not isHead and ent:IsRagdoll() then
+                        local physBone = trace.PhysicsBone
+                        if physBone then
+                            local bone = ent:TranslatePhysBoneToBone(physBone)
+                            if bone then
+                                local name = ent:GetBoneName(bone)
+                                if name and string.find(string.lower(name), "head") then
+                                    isHead = true
+                                end
+                            end
+                        end
+                    end
+
+                    if (ent:IsPlayer() or ent:IsRagdoll()) and isHead then
+                         if math.random() <= self.NeckBreakChance then
+                              hg.BreakNeck(ent)
+                         end
+                    end
+                end
+
+                self.attackedOnce = true
+                self.slash = nil
 
                 self:SecondaryAttackAdd(ent, trace)
             end
@@ -1381,9 +1877,129 @@ function SWEP:CustomThink()
                 self.FirstAttackTick = false
                 self.AttackHitPlayed = false
             end
+        elseif self:GetAttackType() == 3 and inattack3 == 0 then
+            owner:LagCompensation(true)
+            
+            local trace = self:Attack(owner, ent, vellen, 3, inattackL3)
+
+            owner:LagCompensation(false)
+
+            if SERVER and (owner:OnGround() or owner.organism.superfighter) then
+                local vec = owner:GetAimVector() * math.min(self.DamagePrimary * 0.5 * 2, 40)
+                vec[3] = 0
+
+                owner:SetVelocity(vec)
+            end
+
+            if !trace then return end
+
+            local ent = trace.Entity
+
+            local shouldhit = (IsValid(ent) or ent:IsWorld())
+
+            local dmg = math.random(self.DamagePrimary - 3, self.DamagePrimary + 3)
+            blockMul = 1
+
+            if !shouldhit then
+                goto meleeskip3
+            end
+
+            if SERVER and self:IsEntSoft(ent) and self.HitEnts[#self.HitEnts] ~= ent then
+                self:AddDecal()
+            end
+
+            if CLIENT and IsFirstTimePredicted() then
+                util.ScreenShake(self:GetPos(), 25, 1, 1, 100)
+            end
+
+            if CLIENT then goto meleeskip3 end
+
+            ent:PrecacheGibs()
+            
+            if SERVER then
+                local vec = trace.Normal * math.min(self.DamagePrimary * 2 * 0.5, 30) * MELEE_GLOBAL_KNOCKBACK_MUL
+                vec[3] = 0
+                ent:SetVelocity(vec)
+            end
+
+            mul = mul * (self:BehindAttack(ent) and 2 or 1)
+            blockMul = self:BlockingLogic(ent, mul, 3, trace)
+            mul = mul * blockMul
+
+            if blockMul == 0 and self.DamageType == DMG_SLASH then
+                self:SetInAttack(false)
+                self.HitEnts = nil
+                self.FirstAttackTick = false
+                self.AttackHitPlayed = false
+                return
+            end
+
+            dmg = dmg * mul
+
+            if self:AlreadyHit(ent, trace) then
+                goto meleeskip3
+            end
+            
+            if self.HitEnts[#self.HitEnts] ~= ent then
+                self:PlayEffects(trace, 3)
+            end
+            
+            if self.MultiDmg1 or (self.HitEnts[#self.HitEnts] ~= ent) then
+                if self.MultiDmg1 or not self:IsEntSoft(ent) then
+                    dmg = dmg / (self.HeavyAttackRads * self.HeavyAttackTimeLength)
+                else
+                    dmg = dmg / 1.5
+                end
+                                
+                local dmginfo = DamageInfo()
+
+                dmginfo:SetAttacker(owner)
+                dmginfo:SetInflictor(self)
+                dmginfo:SetDamage(dmg)
+                dmginfo:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
+                dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or self.DamageType)
+                dmginfo:SetDamagePosition(trace.HitPos)
+                
+                hg.AddForceRag(ent, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL, 0.5)
+
+                self:PunchPlayer(ent, 3, trace.Normal, dmg)
+
+                local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
+
+                if IsValid(phys) then
+                    local forceMultiplier = math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
+                    phys:ApplyForceCenter(trace.Normal * forceMultiplier * 0.8)
+                    phys:ApplyForceOffset(trace.Normal * forceMultiplier * 0.2, trace.HitPos)
+                end
+
+                self.slash = self.MultiDmg1
+                ent:TakeDamageInfo(dmginfo)
+
+                self.attackedOnce = true
+                self.slash = nil
+                
+                self:PrimaryAttackAdd(ent, trace)
+            end
+
+            ::meleeskip3::
+            
+            if not ent:IsWorld() and self:IsEntSoft(ent) then
+                self.HitEnts[#self.HitEnts + 1] = ent
+            end
+
+            self.FirstAttackTick = true
+
+            if inattackL3 == 0 then
+                self:SetInAttack(false)
+                self.HitEnts = nil
+                self.FirstAttackTick = false
+                self.AttackHitPlayed = false
+            end
         end
     else
         self.attackedOnce = nil
+        self.LastEyeAngles = nil
+        self.MouseSwayAccumulator = 0
     end
 
 end
@@ -1410,6 +2026,8 @@ function SWEP:PrimaryAttack()
     if self.cutthroat and self.cutthroat + 1 > CurTime() then return end
     if self.CanSuicide and ply.suiciding then return end
 
+    if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or self:GetChargeState() > 0) and not (ply.fake or (ply.organism and (ply.organism.fake or ply.organism.otrub)) or IsValid(ply.FakeRagdoll)) then return end
+
     if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
     if !hg.KeyDown(self:GetOwner(), IN_ATTACK2) and not self:CanPrimaryAttack() then return end
     
@@ -1429,8 +2047,11 @@ function SWEP:PrimaryAttack()
     if !self:InUse() then return end
     if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
     if self.lastattack and (self.lastattack + self.attackwait) > CurTime() then return end
-
-    local mul = 1 / math.Clamp((180 - self:GetOwner().organism.stamina[1]) / 90, 1, 2)
+    
+    local mul = 1
+    if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
+        mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
+    end
 
     
     self.HitEnts = nil
@@ -1446,6 +2067,7 @@ function SWEP:PrimaryAttack()
     self:SetInAttack(true)
     self.lastattack = CurTime() + self.Attack2Time / mul
     self.attackwait = self.WaitTime2 / mul
+
     if CLIENT and not self:IsLocal() and ply.AnimRestartGesture then
         self:GetOwner():AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_HL2MP_GESTURE_RANGE_ATTACK_SLAM, true)
     end
@@ -1505,12 +2127,15 @@ function SWEP:CutDuct()
 end
 
 function SWEP:CanBlock()
+    if self.CanHeavyAttack and self.GetChargeState and self:GetChargeState() > 0 then return false end
     return true
 end
 
 function SWEP:SecondaryAttack(override)
     local ply = self:GetOwner()
     if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
+
+    if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or self:GetChargeState() > 0) then return end
 
     if self:CutDuct() then
         return
@@ -1528,7 +2153,7 @@ function SWEP:SecondaryAttack(override)
         
         return
     end
-    
+
     if not game.SinglePlayer() and not IsFirstTimePredicted() then return end
 
     local ent = hg.GetCurrentCharacter(ply)
@@ -1538,8 +2163,11 @@ function SWEP:SecondaryAttack(override)
     if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
     if self.lastattack and (self.lastattack + self.attackwait) > CurTime() then return end
 
-    local mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
-    
+    local mul = 1
+    if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
+        mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
+    end
+
     self.HitEnts = nil
     self.FirstAttackTick = false
     self.AttackHitPlayed = false
@@ -1547,13 +2175,13 @@ function SWEP:SecondaryAttack(override)
     self:PlayAnim("attack2",self.AnimTime2 / mul,false,nil,false,false)
     self:SetAttackType(2)
     self:SetLastAttack(CurTime() + self.Attack2Time / mul)
-    self:SetAttackTime(self:GetLastAttack() + (self.Attack2TimeLength / mul) )
+    self:SetAttackTime(self:GetLastAttack() + (self.Attack2TimeLength / mul))
     self:SetAttackLength(self.AttackLen2)
     self:SetAttackWait(self.WaitTime2 / mul)
     self:SetInAttack(true)
     self.lastattack = CurTime() + self.Attack2Time / mul
     self.attackwait = self.WaitTime2 / mul
-
+    
     if CLIENT and not self:IsLocal() and ply.AnimRestartGesture then
         ply:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_HL2MP_GESTURE_RANGE_ATTACK_SLAM, true)
     end
@@ -1578,6 +2206,8 @@ function SWEP:Initialize()
     self:PlayAnim("idle",10,true)
 
 	if CLIENT then
+		self.ShakePos = Vector(0,0,0)
+		self.ShakeAng = Angle(0,0,0)
 		self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>".. self.PrintName .."</font>\n<font=ZCity_SuperTiny><colour=125,125,125>".. self.HowToUseInstructions .."</colour></font>",450)
 	end
 
@@ -1636,10 +2266,19 @@ function SWEP:Initialize()
     end
     self:SetHold(self.HoldType)
     
+    if self.SwingSound then util.PrecacheSound(self.SwingSound) end
     util.PrecacheSound(self.AttackSwing)
     util.PrecacheSound(self.AttackHit)
     util.PrecacheSound(self.Attack2Hit)
     util.PrecacheSound(self.AttackHitFlesh)
+    if self.HitFleshExtra then
+        for _, sound in ipairs(self.HitFleshExtra) do
+            util.PrecacheSound(sound)
+        end
+    end
+    if self.HitFleshPlus then
+        util.PrecacheSound(self.HitFleshPlus)
+    end
     util.PrecacheSound(self.Attack2HitFlesh)
     util.PrecacheSound(self.DeploySnd)
 
@@ -1655,16 +2294,166 @@ SWEP.tries = 10
 
 if SERVER then
     util.AddNetworkString("melee_attack")
+    util.AddNetworkString("MeleeBlockEffect")
+    util.AddNetworkString("MeleeBlockPush")
 elseif CLIENT then
+    net.Receive("MeleeBlockPush", function()
+        local normal = net.ReadVector()
+        local ply = LocalPlayer()
+        local wep = ply:GetActiveWeapon()
+        
+        if IsValid(wep) and wep.AddBlockPush then
+            wep:AddBlockPush(normal)
+        end
+    end)
+
+    net.Receive("MeleeBlockEffect", function()
+        local pos = net.ReadVector()
+        local mat = net.ReadString()
+        
+        local isBroken = string.sub(mat, -7) == "_broken"
+        if isBroken then
+            mat = string.sub(mat, 1, -8)
+        end
+        
+        local emitter = ParticleEmitter(pos)
+        
+        if mat == "wood" then
+            if isBroken then
+                     for i=1, 60 do
+                        local part = emitter:Add("effects/fleck_wood" .. math.random(1,2), pos)
+                        if part then
+                            part:SetVelocity(VectorRand() * 400 + Vector(0,0,200))
+                            part:SetDieTime(6)
+                            part:SetStartAlpha(255)
+                            part:SetEndAlpha(0)
+                            part:SetStartSize(2)
+                            part:SetEndSize(0)
+                            part:SetRoll(math.Rand(0, 360))
+                            part:SetGravity(Vector(0,0,-350))
+                            part:SetCollide(true)
+                            part:SetBounce(0.4)
+                        end
+                    end
+                 for i=1, 10 do
+                     local part = emitter:Add("particle/smokesprites_000" .. math.random(1,9), pos)
+                     if part then
+                         part:SetVelocity(VectorRand() * 50)
+                         part:SetDieTime(3)
+                         part:SetStartAlpha(150)
+                         part:SetEndAlpha(0)
+                         part:SetStartSize(15)
+                         part:SetEndSize(30)
+                         part:SetRoll(math.Rand(0, 360))
+                         part:SetColor(100, 90, 70)
+                     end
+                 end
+            else
+                for i=1, 5 do
+                    local part = emitter:Add("effects/fleck_wood" .. math.random(1,2), pos)
+                    if part then
+                        part:SetVelocity(VectorRand() * 50 + Vector(0,0,50))
+                        part:SetDieTime(3)
+                        part:SetStartAlpha(255)
+                        part:SetEndAlpha(0)
+                        part:SetStartSize(1.5)
+                        part:SetEndSize(0)
+                        part:SetRoll(math.Rand(0, 360))
+                        part:SetGravity(Vector(0,0,-200))
+                        part:SetCollide(true)
+                    end
+                end
+                 local part = emitter:Add("particle/smokesprites_000" .. math.random(1,9), pos)
+                 if part then
+                     part:SetVelocity(VectorRand() * 10)
+                     part:SetDieTime(1)
+                     part:SetStartAlpha(50)
+                     part:SetEndAlpha(0)
+                     part:SetStartSize(5)
+                     part:SetEndSize(10)
+                     part:SetRoll(math.Rand(0, 360))
+                 end
+            end
+             
+        elseif mat == "metal" then
+            if isBroken then
+                for i=1, 80 do
+                    local part = emitter:Add("effects/spark", pos)
+                    if part then
+                        part:SetVelocity(VectorRand() * 500)
+                        part:SetDieTime(2.5)
+                        part:SetStartAlpha(255)
+                        part:SetEndAlpha(0)
+                        part:SetStartSize(2.5)
+                        part:SetEndSize(0)
+                        part:SetRoll(math.Rand(0, 360))
+                        part:SetGravity(Vector(0,0,-350))
+                        part:SetCollide(true)
+                        part:SetBounce(0.7)
+                    end
+                end
+                 local part = emitter:Add("effects/yellowflare", pos)
+                 if part then
+                     part:SetVelocity(Vector(0,0,0))
+                     part:SetDieTime(0.3)
+                     part:SetStartAlpha(255)
+                     part:SetEndAlpha(0)
+                     part:SetStartSize(80)
+                     part:SetEndSize(0)
+                 end
+                 
+                 for i=1, 6 do
+                     local part = emitter:Add("particle/smokesprites_000" .. math.random(1,9), pos)
+                     if part then
+                         part:SetVelocity(VectorRand() * 40)
+                         part:SetDieTime(2.5)
+                         part:SetStartAlpha(180)
+                         part:SetEndAlpha(0)
+                         part:SetStartSize(15)
+                         part:SetEndSize(40)
+                         part:SetRoll(math.Rand(0, 360))
+                         part:SetColor(100,100,100)
+                     end
+                 end
+            else
+                for i=1, 10 do
+                    local part = emitter:Add("effects/spark", pos)
+                    if part then
+                        part:SetVelocity(VectorRand() * 100)
+                        part:SetDieTime(0.5)
+                        part:SetStartAlpha(255)
+                        part:SetEndAlpha(0)
+                        part:SetStartSize(2)
+                        part:SetEndSize(0)
+                        part:SetRoll(math.Rand(0, 360))
+                        part:SetGravity(Vector(0,0,-200))
+                        part:SetCollide(true)
+                        part:SetBounce(0.5)
+                    end
+                end
+                 local part = emitter:Add("effects/yellowflare", pos)
+                 if part then
+                     part:SetVelocity(Vector(0,0,0))
+                     part:SetDieTime(0.1)
+                     part:SetStartAlpha(255)
+                     part:SetEndAlpha(0)
+                     part:SetStartSize(20)
+                     part:SetEndSize(0)
+                 end
+            end
+        end
+        
+        emitter:Finish()
+    end)
     net.Receive("melee_attack",function()
         local tbl = net.ReadTable()
         local ent = net.ReadEntity()
         local sendtoclient = net.ReadBool()
 
-        if ent.IsLocal and !ent:IsLocal() then
+        if ent.IsLocal and (not ent:IsLocal() or sendtoclient) then
             if IsValid(ent) and ent.PlayAnim then
                 ent:PlayAnim(tbl.anim,tbl.time,tbl.cycling,tbl.callback,tbl.reverse)
-                
+
                 if (tbl.anim == "attack" or tbl.anim == "attack2") and ent:GetOwner().AnimRestartGesture and IsValid(ent:GetOwner()) and not ent:GetOwner():IsWorld() then
                     ent:GetOwner():AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_HL2MP_GESTURE_RANGE_ATTACK_SLAM, true)
                 end
@@ -1757,8 +2546,6 @@ end
 
 function SWEP:NPCThink()
     local npc = self:GetOwner()
-    if not IsValid(npc) or not npc:IsNPC() then return end
-
     self:SetWeaponHoldType("melee")
     
     if npc:GetClass() == "npc_metropolice" then
@@ -1772,7 +2559,7 @@ function SWEP:NPCThink()
     end
     
     local enemy = npc:GetEnemy()
-    if not IsValid(enemy) then return end
+    if not enemy then return end
 
     local dist = enemy:GetPos():Distance(npc:GetPos())
 
@@ -1796,7 +2583,7 @@ function SWEP:NPCThink()
         local trEnt = IsValid(trace.Entity) and trace.Entity
 		if IsValid(trEnt) then
 			self.LastNPCAttack = CurTime() + (self.AnimTime1 or 1)
-			npc:EmitSound(self.AttackSwing, 70)
+			npc:EmitSound(self.SwingSound or self.AttackSwing or "weapons/slam/throw.wav", 70, self.SwingSoundPitch and (istable(self.SwingSoundPitch) and math.random(self.SwingSoundPitch[1], self.SwingSoundPitch[2]) or self.SwingSoundPitch) or math.random(95,110))
 
             npc:SetSchedule(SCHED_MELEE_ATTACK1)
 			timer.Create(timerId, (self.AttackTime + 0.1) or 0.4, 1, function()
@@ -1811,21 +2598,32 @@ function SWEP:NPCThink()
 					dmginfo:SetAttacker(npc)
 					dmginfo:SetInflictor(self)
 					dmginfo:SetDamage(dmg)
-					dmginfo:SetDamageForce(trace.Normal * dmg * 1)
+					dmginfo:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
 					dmginfo:SetDamageType(self.DamageType)
 					dmginfo:SetDamagePosition(trace.HitPos)
 					trEnt:TakeDamageInfo(dmginfo)
-					npc:EmitSound(self.AttackHitFlesh, 60)
+					npc:EmitSound("hitregister.ogg", 75, 115)
+					npc:EmitSound(self.AttackHitFlesh, 75)
+					if self.HitFleshExtra and #self.HitFleshExtra > 0 then
+						local snd = table.Random(self.HitFleshExtra)
+						npc:EmitSound(snd, 75, self.HitFleshExtraPitch and (istable(self.HitFleshExtraPitch) and math.random(self.HitFleshExtraPitch[1], self.HitFleshExtraPitch[2]) or self.HitFleshExtraPitch) or 100)
+					end
+
+					if self.HitFleshPlus then
+						npc:EmitSound(self.HitFleshPlus, 75)
+					end
 
 					if trEnt:IsPlayer() then
-						hg.AddForceRag(trEnt, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400, 0.5)
+						hg.AddForceRag(trEnt, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL, 0.5)
 
 						self:PunchPlayer(trEnt, false, trace.Normal, dmg)
 		
 						local phys = trEnt:GetPhysicsObjectNum(trace.PhysicsBone or 0)
 		
 						if IsValid(phys) then
-							phys:ApplyForceOffset(trace.Normal * math.min(dmg, 25) * 400, trace.HitPos)
+							local forceMultiplier = math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
+							phys:ApplyForceCenter(trace.Normal * forceMultiplier * 0.8)
+							phys:ApplyForceOffset(trace.Normal * forceMultiplier * 0.2, trace.HitPos)
 						end
 					end
 				end

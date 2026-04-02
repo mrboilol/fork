@@ -32,8 +32,14 @@ net.Receive("HMCD_RoundStart",function()
 	MODE.TraitorWord = net.ReadString()
 	MODE.TraitorWordSecond = net.ReadString()
 	MODE.TraitorExpectedAmt = net.ReadUInt(MODE.TraitorExpectedAmtBits)
+	local traitor_list_count = net.ReadUInt(8)
 	StartTime = CurTime()
 	MODE.TraitorsLocal = {}
+
+	for key = 1, traitor_list_count do
+		local traitor_info = {net.ReadColor(false), net.ReadString()}
+		MODE.TraitorsLocal[#MODE.TraitorsLocal + 1] = traitor_info
+	end
 
 	if(lply.isTraitor and screen_time_is_default)then
 		if(MODE.TraitorExpectedAmt == 1)then
@@ -48,19 +54,13 @@ net.Receive("HMCD_RoundStart",function()
 			chat.AddText("Traitor secret words are: \"" .. MODE.TraitorWord .. "\" and \"" .. MODE.TraitorWordSecond .. "\".")
 		end
 
-		if(lply.MainTraitor)then
-			if(MODE.TraitorExpectedAmt > 1)then
-				chat.AddText("Traitor names (only you, as a main traitor can see them):")
-			end
+		if(MODE.TraitorExpectedAmt > 1)then
+			chat.AddText("Traitor names:")
+		end
 
-			for key = 1, MODE.TraitorExpectedAmt do
-				local traitor_info = {net.ReadColor(false), net.ReadString()}
-
-				if(MODE.TraitorExpectedAmt > 1)then
-					MODE.TraitorsLocal[#MODE.TraitorsLocal + 1] = traitor_info
-
-					chat.AddText(traitor_info[1], "\t" .. traitor_info[2])
-				end
+		if(lply.isTraitor and MODE.TraitorExpectedAmt > 1)then
+			for _, traitor_info in ipairs(MODE.TraitorsLocal) do
+				chat.AddText(traitor_info[1], "\t" .. traitor_info[2])
 			end
 		end
 	end
@@ -97,7 +97,7 @@ MODE.TypeNames = {
 }
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
-local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", "Bahnschrift", true, false, "Change UI text font")
+local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", "Bahnschrift", true, false, "change every text font to selected because ui customization is cool")
 local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Bahnschrift"
     local usefont = "Bahnschrift"
 
@@ -340,30 +340,17 @@ function MODE:HUDPaint()
 
 	if(lply.isTraitor)then
 		cur_y = cur_y + ScreenScale(20)
+		MODE.TraitorsLocal = MODE.TraitorsLocal or {}
 
-		if(lply.MainTraitor)then
-			MODE.TraitorsLocal = MODE.TraitorsLocal or {}
+		if(#MODE.TraitorsLocal > 1)then
+			draw.SimpleText("Traitors list:", "ZB_HomicideMedium", sw * 0.5, cur_y, ColorRole, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
-			if(#MODE.TraitorsLocal > 1)then
-				draw.SimpleText("Traitors list:", "ZB_HomicideMedium", sw * 0.5, cur_y, ColorRole, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			for _, traitor_info in ipairs(MODE.TraitorsLocal) do
+				local traitor_color = Color(traitor_info[1].r, traitor_info[1].g, traitor_info[1].b, 255 * fade)
+				cur_y = cur_y + ScreenScale(15)
 
-				for _, traitor_info in ipairs(MODE.TraitorsLocal) do
-					local traitor_color = Color(traitor_info[1].r, traitor_info[1].g, traitor_info[1].b, 255 * fade)
-					cur_y = cur_y + ScreenScale(15)
-
-					draw.SimpleText(traitor_info[2], "ZB_HomicideMedium", sw * 0.5, cur_y, traitor_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-				end
+				draw.SimpleText(traitor_info[2], "ZB_HomicideMedium", sw * 0.5, cur_y, traitor_color, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
-		else
-			draw.SimpleText("Traitor secret words:", "ZB_HomicideMedium", sw * 0.5, cur_y, ColorRole, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-			cur_y = cur_y + ScreenScale(15)
-
-			draw.SimpleText("\"" .. MODE.TraitorWord .. "\"", "ZB_HomicideMedium", sw * 0.5, cur_y, color_white_faded, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-			cur_y = cur_y + ScreenScale(15)
-
-			draw.SimpleText("\"" .. MODE.TraitorWordSecond .. "\"", "ZB_HomicideMedium", sw * 0.5, cur_y, color_white_faded, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 	end
 
@@ -447,7 +434,7 @@ net.Receive("hmcd_announce_traitor_lose", function()
 	local traitor_alive = net.ReadBool()
 
 	if(IsValid(traitor))then
-		chat.AddText(color_white, (traitor_alive and "" or "Traitor "), traitor:GetPlayerColor():ToColor(), traitor:GetPlayerName() .. ", " .. traitor:Nick(), color_white, " was " .. (traitor_alive and "a Traitor." or "killed."))
+		chat.AddText(color_white, "Traitor ", traitor:GetPlayerColor():ToColor(), traitor:GetPlayerName() .. ", " .. traitor:Nick(), color_white, " was " .. (traitor_alive and "arrested." or "killed."))
 	end
 end)
 

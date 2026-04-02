@@ -470,6 +470,7 @@ SWEP.tries = 10
 
 if SERVER then
     util.AddNetworkString("melee_attack2")
+    util.AddNetworkString("MeleeHitFreeze")
 elseif CLIENT then
     net.Receive("melee_attack2",function()
         local tbl = net.ReadTable()
@@ -480,6 +481,13 @@ elseif CLIENT then
             --if tbl.anim == "attack" or tbl.anim == "attack2" and ent:GetOwner().AnimRestartGesture then
             --    ent:GetOwner():AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_HL2MP_GESTURE_RANGE_ATTACK_SLAM, true)
             --end
+        end
+    end)
+
+    net.Receive("MeleeHitFreeze", function()
+        local ent = net.ReadEntity()
+        if IsValid(ent) and ent.FreezeAnim then
+            ent:FreezeAnim(0.15)
         end
     end)
 end
@@ -577,6 +585,16 @@ if CLIENT then
 		end
 		table.Empty(self.VM_TimerEvents)
 	end
+end
+
+function SWEP:FreezeAnim(duration)
+    if not self.FreezeTime then
+        self.FreezeTime = CurTime()
+        self.FreezeDuration = duration
+    else
+        self.FreezeTime = CurTime()
+        self.FreezeDuration = duration
+    end
 end
 
 function SWEP:SetFakeGun(ent)

@@ -117,7 +117,7 @@ hook.Add("PlayerPostThink", "HMCD_SubRoles_Abilities", function(ply)
 			end
 
 			if(ply.SubRole == "traitor_chemist")then
-				DegradeChemicalsOfPlayer(ply)
+				MODE.DegradeChemicalsOfPlayer(ply)
 				
 				if(!ply.PassiveAbility_ChemicalAccumulation_NextNetworkTime or ply.PassiveAbility_ChemicalAccumulation_NextNetworkTime <= CurTime())then
 					MODE.NetworkChemicalResistanceOfPlayer(ply)

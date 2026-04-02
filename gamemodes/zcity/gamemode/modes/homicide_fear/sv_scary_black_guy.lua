@@ -81,7 +81,7 @@ function EVENT:Run( ply )
         ply:SendLua("surface.PlaySound(\"lurker_scream.wav\")")
     end
     if vec:Distance(ply:GetPos()) < 50 then
-        ply:KillSilent()
+        hg.BreakNeck(ply)
         timer.Simple(0.6,function()
             ply:SendLua("RunConsoleCommand(\"stopsound\")")
         end)--

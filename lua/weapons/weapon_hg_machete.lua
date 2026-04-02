@@ -6,9 +6,9 @@ SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 
-SWEP.WorldModel = "models/weapons/tfa_nmrih/w_me_machete.mdl"
+SWEP.WorldModel = "models/weapons/melee/w_ws_pamachete.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_machete.mdl"
---SWEP.WorldModelExchange = "models/weapons/tfa_nmrih/w_me_machete.mdl"
+SWEP.WorldModelExchange = "models/weapons/melee/w_ws_pamachete.mdl"
 SWEP.ViewModel = ""
 
 SWEP.SuicidePos = Vector(20, 1, -27)
@@ -21,20 +21,18 @@ SWEP.CanSuicide = true
 SWEP.SuicideNoLH = true
 SWEP.SuicidePunchAng = Angle(5, -15, 0)
 
-SWEP.bloodID = 3
-
 SWEP.NoHolster = true
 
 SWEP.HoldType = "melee"
 
 SWEP.DamageType = DMG_SLASH
 
-SWEP.HoldPos = Vector(-15,1,-4)
+SWEP.HoldPos = Vector(-15,4,-2)
 SWEP.HoldAng = Angle(-2,0,-4)
 
-SWEP.AttackTime = 0.25
-SWEP.AnimTime1 = 1.1
-SWEP.WaitTime1 = 0.9
+SWEP.AttackTime = 0.5
+SWEP.AnimTime1 = 1.75
+SWEP.WaitTime1 = 1.35
 SWEP.ViewPunch1 = Angle(1,2,0)
 
 SWEP.Attack2Time = 0.15
@@ -49,16 +47,16 @@ SWEP.sprint_ang = Angle(15,0,0)
 
 SWEP.basebone = 94
 
-SWEP.weaponPos = Vector(0,0,0)
-SWEP.weaponAng = Angle(0,0,0)
+SWEP.weaponPos = Vector(0,5,0)
+SWEP.weaponAng = Angle(90,0,0)
 
 SWEP.DamageType = DMG_SLASH
-SWEP.DamagePrimary = 30
+SWEP.DamagePrimary = 32
 SWEP.DamageSecondary = 3
-SWEP.BleedMultiplier = 1.8
-SWEP.PainMultiplier = 1.3
+SWEP.BleedMultiplier = 1.5
+SWEP.PainMultiplier = 1.26
 
-SWEP.PenetrationPrimary = 7
+SWEP.PenetrationPrimary = 3
 SWEP.PenetrationSecondary = 0
 
 SWEP.MaxPenLen = 6
@@ -66,7 +64,7 @@ SWEP.MaxPenLen = 6
 SWEP.PenetrationSizePrimary = 1.5
 SWEP.PenetrationSizeSecondary = 0
 
-SWEP.StaminaPrimary = 25
+SWEP.StaminaPrimary = 27
 SWEP.StaminaSecondary = 10
 
 SWEP.AttackLen1 = 50
@@ -95,6 +93,22 @@ SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
 SWEP.AttackHitFlesh = "weapons/knife/knife_hit1.wav"
 SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.wav"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
+SWEP.SwingSound = "machete/macheteswing1.ogg"
+SWEP.HitFleshExtra = {
+    "machete/machetehit1.ogg",
+    "machete/machetehit2.ogg",
+    "machete/machetehit3.ogg",
+    "machete/machetehit4.ogg",
+    "machete/machetehit5.ogg",
+    "machete/machetehit6.ogg",
+}
+SWEP.HitFleshExtraPitch = 75
+SWEP.ArteryChance = 1
+SWEP.SwingSoundPitch = 85
+
+SWEP.BlockTier = 3
+SWEP.MeleeMaterial = "metal"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 
@@ -114,21 +128,21 @@ function SWEP:CanSecondaryAttack()
             self.HoldType = "slam"
         end
     end)
-    return true
+    return false
 end
 
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
     self.AttackHit = "snd_jack_hmcd_knifehit.wav"
     self.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
-    self.AttackHitFlesh = "weapons/knife/knife_hit"..math.random(4)..".wav"
+    self.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
     return true
 end
 
-SWEP.AttackTimeLength = 0.1
+SWEP.AttackTimeLength = 0.15
 SWEP.Attack2TimeLength = 0.05
 
-SWEP.AttackRads = 85
+SWEP.AttackRads = 65
 SWEP.AttackRads2 = 35
 
 SWEP.SwingAng = -15

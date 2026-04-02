@@ -103,7 +103,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO)
+		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
 		//broken
 	else
 		//org[key] = 0.5
@@ -117,7 +117,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_leg[math.random(#dislocated_leg)], 1, "dislocated"..key, 1, nil, nil) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO)
+		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
 		//dislocated
 	end
 
@@ -159,7 +159,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO)
+		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
 		//broken
 	else
 		org[key.."dislocation"] = true
@@ -172,7 +172,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO)
+		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
 		//dislocated
 	end
 
@@ -211,7 +211,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
-		org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO)
+		org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
 		if org.owner:IsPlayer() then
 			org.owner:Notify(huyasd[name], true, name, 2)
 		end
@@ -257,7 +257,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
 
-		if oldDmg != 1 then org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO) end
+		if oldDmg != 1 then org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30) end
 	end
 
 	org.shock = org.shock + dmg * 3
@@ -267,7 +267,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		org.avgpain = org.avgpain + dmg * 20
 		
 		if !org.jawdislocation then
-			org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO)
+			org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
 		end
 
 		org.jawdislocation = true
@@ -277,6 +277,18 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	if dmg > 0.2 then
 		if org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner,1 + dmg) end) end
+	end
+	if dmg > 0 and dmgInfo:IsDamageType(DMG_CLUB) and math.random(3) == 1 then
+		local effectEnt = hg.GetCurrentCharacter(org.owner)
+		if not IsValid(effectEnt) then effectEnt = org.owner end
+		net.Start("hg_brainmist")
+		net.WriteEntity(effectEnt)
+		net.WriteVector(dmgInfo:GetDamagePosition())
+		net.WriteAngle(dmgInfo:GetDamageForce():GetNormalized():Angle())
+		net.WriteBool(false)
+		net.WriteBool(true)
+		net.WriteBool(false)
+		net.Broadcast()
 	end
 
 	return result, vecrand
@@ -298,16 +310,18 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 
 	if org.skull == 1 then
-		org.shock = org.shock + dmg * 40
+		org.shock = org.shock + dmg * 20
 		org.avgpain = org.avgpain + dmg * 30
 
-		if oldDmg != 1 then org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO) end
+		if oldDmg != 1 then org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30) end
 	end
 
 	org.shock = org.shock + dmg * 3
 
+	org.concussion = math.min((org.concussion or 0) + dmg * 6, 10)
+
 	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
-	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
+	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 1.5 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
 
@@ -322,11 +336,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		timer.Simple(0.1, function()
 			local rag = hg.GetCurrentCharacter(org.owner)
 
-			if IsValid(rag) and rag:IsRagdoll() then
-				hg.applyFencingToPlayer(org.owner, org)
-				--local stype = "rigor"--hg.getRandomSpasm()
-				--hg.applySpasm(rag, stype)
-				--if rag.organism then rag.organism.spasm, rag.organism.spasmType = true, stype end
+			if rag:IsRagdoll() then
+				local stype = hg.getRandomSpasm()
+				hg.applySpasm(rag, stype)
+				if rag.organism then rag.organism.spasm, rag.organism.spasmType = true, stype end
 			end
 		end)
 	end
@@ -338,8 +351,20 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			end)
 		end
 	end
+	if dmg > 0 and dmgInfo:IsDamageType(DMG_CLUB) and math.random(3) == 1 then
+		local effectEnt = hg.GetCurrentCharacter(org.owner)
+		if not IsValid(effectEnt) then effectEnt = org.owner end
+		net.Start("hg_brainmist")
+		net.WriteEntity(effectEnt)
+		net.WriteVector(dmgInfo:GetDamagePosition())
+		net.WriteAngle(dmgInfo:GetDamageForce():GetNormalized():Angle())
+		net.WriteBool(false)
+		net.WriteBool(true)
+		net.WriteBool(false)
+		net.Broadcast()
+	end
 	
-	org.shock = org.shock + (dmg > 1 and 50 or dmg * 10)
+	org.shock = org.shock + (dmg > 1 and 40 or dmg * 8)
 
 	if org.skull == 1 then
 		if org.isPly then
@@ -386,7 +411,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if org.brokenribs > 0 then
 			//org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
-			org.owner:EmitSound("bones/bone"..math.random(8)..".mp3", 75, 100, 1, CHAN_AUTO)
+			org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO, 0, 30)
 
 			return math.min(0, result)
 		end

@@ -1,4 +1,129 @@
 --local Organism = hg.organism
+-- Brain Chunks Logic (Ported from actually_brain_chunks_rework_check_desc_3673949172)
+local GORE_CVARS = {
+    scale = 0.9,
+    life_span = 60,
+    cleanup = true,
+    visuals = true
+}
+
+local GORE_DECAL_REGISTRY = {}
+local GORE_DECAL_PATH = "effects/droplets/"
+
+for i = 2, 13 do
+    local base = "drop" .. i
+    local function register(name)
+        if file.Exists("materials/" .. GORE_DECAL_PATH .. name .. ".vmt", "GAME") then
+            local id = "Meat_" .. name
+            game.AddDecal(id, GORE_DECAL_PATH .. name)
+            table.insert(GORE_DECAL_REGISTRY, id)
+        end
+    end
+
+    register(base)
+    for j = 1, 5 do register(base .. "_" .. j) end
+end
+
+local CHUNKS_IN_WORLD = {}
+
+local function CreateBrainChunk(origin, direction)
+    if #CHUNKS_IN_WORLD >= 30 then return end
+
+    local piece = ents.Create("prop_physics")
+    if not IsValid(piece) then return end
+
+    piece:SetModel("models/props_junk/watermelon01_chunk02c.mdl")
+    piece:SetPos(origin)
+    piece:SetAngles(AngleRand())
+    piece:SetMaterial("models/flesh")
+    piece:SetColor(Color(120, 0, 0))
+    piece:DrawShadow(false)
+    
+    local baseScale = GORE_CVARS.scale
+    piece:SetModelScale(math.Rand(baseScale * 0.9, baseScale * 1.35), 0)
+    piece:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+    piece:Spawn()
+
+    piece:EmitSound("physics/flesh/flesh_squishy_impact_hard"..math.random(1,4)..".wav", 60, math.random(200, 255))
+
+    piece.GoreState = {
+        Sticking = false,
+        SlideSpeed = 1,
+        GravityMod = math.Rand(0.04, 0.07),
+        Friction = math.Rand(0.00005, 0.00015)
+    }
+
+    local phys = piece:GetPhysicsObject()
+    if IsValid(phys) then
+        phys:SetMaterial("flesh")
+        phys:SetVelocity(direction * 50 + VectorRand() * 20)
+    end
+
+    if GORE_CVARS.cleanup then 
+        SafeRemoveEntityDelayed(piece, GORE_CVARS.life_span) 
+    end
+    table.insert(CHUNKS_IN_WORLD, piece)
+end
+
+hook.Add("Think", "BrainChunks_GoreSimProcessor", function()
+    for i = #CHUNKS_IN_WORLD, 1, -1 do
+        local ent = CHUNKS_IN_WORLD[i]
+        if not IsValid(ent) then table.remove(CHUNKS_IN_WORLD, i) continue end
+
+        local state = ent.GoreState
+        if not state.Sticking then
+            local trace = util.TraceLine({
+                start = ent:GetPos(),
+                endpos = ent:GetPos() + (ent:GetVelocity() * FrameTime() * 1.5),
+                filter = ent
+            })
+
+            if trace.Hit and trace.HitWorld and not trace.HitSky then
+                state.Sticking = true
+                ent:SetMoveType(MOVETYPE_NONE)
+                ent:SetPos(trace.HitPos + trace.HitNormal * 0.1)
+                
+                local phys = ent:GetPhysicsObject()
+                if IsValid(phys) then 
+                    state.ImpactDir = phys:GetVelocity():GetNormalized()
+                    phys:EnableCollisions(false) 
+                end
+
+                if GORE_CVARS.visuals and #GORE_DECAL_REGISTRY > 0 then
+                    util.Decal(table.Random(GORE_DECAL_REGISTRY), trace.HitPos + trace.HitNormal, trace.HitPos - trace.HitNormal, ent)
+                end
+            end
+        else
+            local moved, attached = false, true
+            
+            if state.GravityMod > 0.001 then
+                local downPos = ent:GetPos() + Vector(0, 0, -state.GravityMod)
+                if bit.band(util.PointContents(downPos), CONTENTS_SOLID) != CONTENTS_SOLID then
+                    ent:SetPos(downPos)
+                    moved = true
+                else
+                    attached = false
+                end
+                state.GravityMod = state.GravityMod - (state.Friction or 0)
+            end
+
+            if not attached and state.ImpactDir and state.SlideSpeed > 0.01 then
+                local driftPos = ent:GetPos() + Vector(state.ImpactDir.x, state.ImpactDir.y, 0) * state.SlideSpeed
+                if bit.band(util.PointContents(driftPos), CONTENTS_SOLID) != CONTENTS_SOLID then
+                    ent:SetPos(driftPos)
+                    moved = true
+                end
+                state.SlideSpeed = state.SlideSpeed - 0.02
+            end
+
+            if moved and GORE_CVARS.visuals and #GORE_DECAL_REGISTRY > 0 and (ent.NextDrip or 0) < CurTime() then
+                util.Decal(table.Random(GORE_DECAL_REGISTRY), ent:GetPos() + Vector(0,0,2), ent:GetPos() - Vector(0,0,5), ent)
+                ent.NextDrip = CurTime() + math.Rand(0.03, 0.08)
+            end
+        end
+    end
+end)
+
 local function isCrush(dmgInfo)
 	return not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH + DMG_BLAST)
 end
@@ -84,40 +209,70 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
 	local oldDmg = org.brain
 	local result = damageOrgan(org, dmg * 1, dmgInfo, "brain")
+	local brainDelta = org.brain - oldDmg
 
-	hg.AddHarmToAttacker(dmgInfo, (org.brain - oldDmg) * 15, "Brain damage harm")
+	hg.AddHarmToAttacker(dmgInfo, brainDelta * 15, "Brain damage harm")
 
-	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
-		local dmgPos = dmgInfo:GetDamagePosition()
-		local dirCool = dmgInfo:GetDamageForce():GetNormalized()
+	if brainDelta > 0 then
+		local time = CurTime()
+		if not org.brainBurstWindowStart or (time - org.brainBurstWindowStart) > 1.2 then
+			org.brainBurstWindowStart = time
+			org.brainBurstDamage = 0
+		end
+		org.brainBurstLast = time
+		org.brainBurstDamage = (org.brainBurstDamage or 0) + brainDelta
+	end
 
-		local effdata = EffectData()
-		effdata:SetOrigin(dmgPos)
-		effdata:SetRadius(dmg / 10)
-		effdata:SetMagnitude(dmg / 10)
-		effdata:SetScale(1)
-		util.Effect("BloodImpact",effdata)
+	if brainDelta > 0 then
+		local soundFile = (math.random(2) == 1) and "hits/headshot1.wav" or "hits/headshot2.wav"
+		org.owner:EmitSound(soundFile, 60, math.random(90, 120))
+	end
 
-		local ent = hg.GetCurrentCharacter(org.owner)
-		
-		if !ent.organism.SpawnedBrainChunks and math.random(5) == 1 then
-			SpawnMeatGore(ent, dmgPos + dirCool * 5, 3, dirCool * 1000, 0.4)
-			ent.organism.SpawnedBrainChunks = true
+	-- Brain chunks logic
+	if org.skull and org.skull >= 1 and org.brain > 0.55 then
+		local multiplier = 0
+		if dmgInfo:IsDamageType(DMG_CLUB) then
+			multiplier = 0.45
+		elseif dmgInfo:IsDamageType(DMG_BUCKSHOT) then
+			multiplier = 1.1
+		elseif dmgInfo:IsDamageType(DMG_BULLET) then
+			multiplier = 1
+		end
+
+		if multiplier > 0 then
+			local base_chunks = 3
+			local count = math.floor(base_chunks * multiplier)
+			for i=1, count do
+				CreateBrainChunk(dmgInfo:GetDamagePosition(), dmgInfo:GetDamageForce():GetNormalized() + VectorRand() * 0.5)
+			end
 		end
 	end
 
-	if org.brain >= 0.01 and (org.brain - oldDmg) > 0.01 and math.random(3) == 1 then
+	local headshotEffect = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and org.skull and org.skull >= 1
+	if dmg > 0 then
+		local effectEnt = hg.GetCurrentCharacter(org.owner)
+		if not IsValid(effectEnt) then effectEnt = org.owner end
+		net.Start("hg_brainmist")
+		net.WriteEntity(effectEnt)
+		net.WriteVector(dmgInfo:GetDamagePosition())
+		net.WriteAngle(dmgInfo:GetDamageForce():GetNormalized():Angle())
+		net.WriteBool(headshotEffect)
+		net.WriteBool(dmgInfo:IsDamageType(DMG_CLUB))
+		net.WriteBool(true)
+		net.Broadcast()
+	end
+
+	if org.brain >= 0.01 and brainDelta > 0.01 and math.random(3) == 1 then
 		--hg.applyFencingToPlayer(org.owner, org)
 		org.shock = 70
 
 		timer.Simple(0.1, function()
 			local rag = hg.GetCurrentCharacter(org.owner)
 
-			if IsValid(rag) and rag:IsRagdoll() then
-				hg.applyFencingToPlayer(org.owner, org) -- looks more appealing anyways
-				--local stype = "rigor"--hg.getRandomSpasm()
-				--hg.applySpasm(rag, stype)
-				--if rag.organism then rag.organism.spasm, rag.organism.spasmType = true, stype end
+			if rag:IsRagdoll() then
+				local stype = hg.getRandomSpasm()
+				hg.applySpasm(rag, stype)
+				if rag.organism then rag.organism.spasm, rag.organism.spasmType = true, stype end
 			end
 		end)
 	end
@@ -163,10 +318,19 @@ local arteryMessages ={
 local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
-	if dmgInfo:IsDamageType(DMG_SLASH) and (math.random(5) != 1) and dmg < 2 then return end
+	
+	local wep = dmgInfo:GetInflictor()
+	local chance = (IsValid(wep) and wep.ArteryChance) or 0
+	if dmgInfo:IsDamageType(DMG_SLASH) then
+		local baseChance = (dmg < 2) and 0.2 or 1.0
+		local totalChance = baseChance + chance
+		if totalChance < 1 and math.random() > totalChance then return end
+	end
+	
 	org.painadd = org.painadd + dmg * 1
 	if org[artery] == 1 then return 0 end
 	if org[string.Replace(artery, "artery", "").."amputated"] then return end
+	local owner = org.owner
 
 	if artery ~= "arteria" then
 		hg.AddHarmToAttacker(dmgInfo, 4, "Random artery punctured harm")//((1 - org[artery]) - math.max((1 - org[artery]) - dmg,0)) / 4
@@ -176,11 +340,32 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 		end
 		
 		hg.AddHarmToAttacker(dmgInfo, 15, "Carotid artery punctured harm")
+		org.neckslit = true
+		org.needfake = true
+		
+		local ent = hg.GetCurrentCharacter(owner)
+		if IsValid(ent) and not org.otrub and not org.needotrub and (owner:IsPlayer() and owner:Alive() or not owner:IsPlayer()) then
+			ent:EmitSound("neckslit.ogg", 70, 100, 1, CHAN_AUTO)
+		end
+		
+		local snd = (ThatPlyIsFemale and ThatPlyIsFemale(owner)) and "femaleneck.mp3" or "maleneck.mp3"
+		timer.Simple(0, function()
+			if IsValid(owner) then
+				if owner:IsPlayer() and owner:Alive() then
+					hg.Fake(owner, nil, true, true)
+				end
+				local rag = hg.GetCurrentCharacter(owner)
+				if IsValid(rag) and not org.otrub and not org.needotrub and (owner:IsPlayer() and owner:Alive() or not owner:IsPlayer()) then
+					rag:EmitSound(snd, 70, 100, 1, CHAN_VOICE)
+					org.neckslitSoundName = snd
+					org.neckslitSoundEnt = rag
+				end
+			end
+		end)
 	end
 
 	org[artery] = math.min(org[artery] + 1, 1)
 
-	local owner = org.owner
 	local bonea = owner:LookupBone(boneindex)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
 	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), dir2 * 100, artery})

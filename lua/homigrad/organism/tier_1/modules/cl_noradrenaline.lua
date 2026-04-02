@@ -97,17 +97,16 @@ hook.Add("Post Post Processing", "noradrenalineEffect", function()
 		local start = math.Clamp((SysTime() - hg.noradrenalineStartTime) * 2, 0, 1) * lply.organism.noradrenaline
 
 		local asad = math.sin(CurTime() * 10) / 4
-		--print(asad)
-		grainMat:SetFloat("$c0_x", CurTime() * start) -- time
-		grainMat:SetFloat("$c0_y", asad * start) -- gate
-		grainMat:SetFloat("$c0_z", 1) -- Pixelize
-		grainMat:SetFloat("$c1_x", (0.2 * hg.noradrenalineClamped) * start) -- lerp
-		grainMat:SetFloat("$c1_y", 0.6 * start) -- vignette intensity
-		grainMat:SetFloat("$c1_z", (0.2 * asad) * start) -- BlurIntensity
-		grainMat:SetFloat("$c2_x", 0) -- r
-		grainMat:SetFloat("$c2_y", 2 * start) -- g
-		grainMat:SetFloat("$c2_z", 6 * start) -- b
-		grainMat:SetFloat("$c3_x", 0) -- ImageIntensity
+		grainMat:SetFloat("$c0_x", CurTime() * start)
+		grainMat:SetFloat("$c0_y", asad * start)
+		grainMat:SetFloat("$c0_z", 1)
+		grainMat:SetFloat("$c1_x", (0.2 * hg.noradrenalineClamped) * start)
+		grainMat:SetFloat("$c1_y", 0.6 * start)
+		grainMat:SetFloat("$c1_z", (0.2 * asad) * start)
+		grainMat:SetFloat("$c2_x", 0)
+		grainMat:SetFloat("$c2_y", 2 * start)
+		grainMat:SetFloat("$c2_z", 6 * start)
+		grainMat:SetFloat("$c3_x", 0)
 	
 		render.SetMaterial(grainMat)
 		render.DrawScreenQuad()

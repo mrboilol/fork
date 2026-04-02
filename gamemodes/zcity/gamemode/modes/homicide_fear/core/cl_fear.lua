@@ -187,10 +187,10 @@ local ScarySounds = {
 }
 
 local notifs = {
-	"Uh-oh...",
-	"Oh no",
-	"This isn't good",
-	"Where's everyone?",
+	"I feel suddenly so alone...",
+	"You feel a chill running down your spine.",
+	"I am alone, but... I feel someone's presence...",
+	"Where is everyone?",
 }
 
 function MODE:Player_Death(ply)
@@ -209,7 +209,7 @@ function MODE:Player_Death(ply)
 				hg.CreateNotification(table.Random(notifs))
 
 				self:CreateTimer("fear2", 115, 1, function()
-					hg.CreateNotification("bye")
+					hg.CreateNotification("Turn around.")
 				end)
 			end)
 

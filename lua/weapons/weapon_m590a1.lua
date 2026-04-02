@@ -271,13 +271,13 @@ local function reloadFunc(self)
 
 	self:SetNetVar("shootgunReload",CurTime() + 1.1)
 
-	if self.MagIndex then
+	if self.MagIndex and IsValid(self:GetWM()) then
 		self:GetWM():ManipulateBoneScale(self.MagIndex, vector_full)
 	end
 	
 	self:PlayAnim(self.AnimList["insert"] or "sgreload_insert", 1, false, function() 
 		self:InsertAmmo(1) 
-		if self.MagIndex then
+		if self.MagIndex and IsValid(self:GetWM()) then
 			self:GetWM():ManipulateBoneScale(self.MagIndex, vector_origin)
 		end
 		

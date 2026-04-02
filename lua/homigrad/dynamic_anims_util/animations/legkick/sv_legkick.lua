@@ -1,36 +1,40 @@
 --
 local PLAYER = FindMetaTable("Player")
 
-local vpang = Angle(2, -1, 1)
+local vpang = Angle(2, 0, 0)
 function PLAYER:LegAttack()
-    if not self:Alive() or hg.GetCurrentCharacter(self):IsRagdoll() or self:GetNWFloat("InLegKick",0) > CurTime() or not self:IsOnGround() or self:IsSprinting() then return end
+    if not self:Alive() or hg.GetCurrentCharacter(self):IsRagdoll() or self:GetNWFloat("InLegKick",0) > CurTime() then return end
     if self.InLegKick and self.InLegKick > CurTime() then return end
     if self:GetNWBool("TauntStopMoving", false) then return end
     if hook.Run( "PlayerCanLegAttack", self ) == false then return end
 
-	local handClass = "weapon_hands_sh"
-	if self:HasWeapon("weapon_hg_coolhands") then
-		handClass = "weapon_hg_coolhands"
-	else
-		handClass = "weapon_hands_sh"
-	end
+    local isMidAir = not self:IsOnGround()
+    if self:IsSprinting() and not isMidAir then return end
 
-    local hands = self:GetWeapon(handClass)
-    if not IsValid(hands) then
-        self:Notify("Where is your hands swep???", 1, "WHERE YOUR HANDS AT??", 0)
-    return end
+    if isMidAir and self.organism.stamina[1] < 70 then return end
 
     local anim = "kick_pistol_base"
     anim = (self:KeyDown(IN_DUCK) or self:Crouching()) and "kick_pistol_base_crouch" or self:EyeAngles()[1] > 60 and "curbstomp_base" or self:EyeAngles()[1] > 35 and "kick_pistol_25_base" or self:EyeAngles()[1] > 20 and "kick_pistol_45_base" or anim
 
+    if isMidAir then
+        anim = self:EyeAngles()[1] > 60 and "curbstomp_midair" or self:EyeAngles()[1] > 35 and "kick_midair_25" or self:EyeAngles()[1] > 20 and "kick_midair_45" or "kick_midair"
+    end
+
     self:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav",65)
 
     local org = self.organism
-    org.stamina.subadd = org.stamina.subadd + (anim == "curbstomp_base" and 12 or 20) / (org.superfighter and 2 or 1)
+    org.stamina.subadd = org.stamina.subadd + (anim == "curbstomp_base" and 12 or 20)
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.5 * speedmul
     local animstopAdjust = 0.3 * speedmul
     local dmg = anim == "curbstomp_base" and 22 or 10 * (2 - speedmul)
+
+    if isMidAir then
+        local vel = self:GetVelocity():Length()
+        local mult = Lerp(math.Clamp(vel / 700, 0, 1), 3, 5)
+        dmg = dmg * mult
+    end
+
     dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
     dmg = dmg * (org.legstrength or 1)
     --print(dmg)
@@ -38,7 +42,7 @@ function PLAYER:LegAttack()
     self:PlayCustomAnims(anim, true, speed, true, animstopAdjust, {
         [0.12] = function(self)
             if hg.GetCurrentCharacter(self):IsRagdoll() then return end
-            if !self:IsOnGround() then self:PlayCustomAnims("") return end
+            if !self:IsOnGround() and !isMidAir then self:PlayCustomAnims("") return end
             local ang = self:EyeAngles()
             ang[1] = 0
 
@@ -49,13 +53,13 @@ function PLAYER:LegAttack()
                 endpos = reportPos + ang:Forward() * 32,
                 filter = {hg.GetCurrentCharacter(self),self}
             })
-            if tr.Hit and self:IsOnGround() then
+            if tr.Hit and (self:IsOnGround() or isMidAir) then
                 self:SetVelocity(ang:Forward() * -300)
             end
         end,
         [0.21] = function(self)
             if hg.GetCurrentCharacter(self):IsRagdoll() then return end
-            if !self:IsOnGround() then self:PlayCustomAnims("") return end
+            if !self:IsOnGround() and !isMidAir then self:PlayCustomAnims("") return end
             local ang = self:EyeAngles()
             if ang[1] > 55 and not (self:KeyDown(IN_DUCK) or self:Crouching()) then
 				self:ViewPunch(vpang)
@@ -70,14 +74,14 @@ function PLAYER:LegAttack()
                 endpos = reportPos + ang:Forward() * 72,
                 filter = {hg.GetCurrentCharacter(self),self}
             })
-            if tr.Hit and self:IsOnGround() then
+            if tr.Hit and (self:IsOnGround() or isMidAir) then
                 --self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
                 self:SetVelocity(ang:Forward() * -150)
             end
         end,
         [0.33] = function(self) -- kick moment
             if hg.GetCurrentCharacter(self):IsRagdoll() then return end
-            if !self:IsOnGround() then self:PlayCustomAnims("") return end
+            if !self:IsOnGround() and !isMidAir then self:PlayCustomAnims("") return end
             local ang = self:EyeAngles()
             ang[1] = 0
 
@@ -114,6 +118,23 @@ function PLAYER:LegAttack()
                     org.painadd = org.painadd + 20
                 end
                 self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+            elseif isMidAir then
+                -- If it's a dropkick, we want a larger hit area or forward trace to ensure it lands
+                 local tr_midair = util.TraceHull({
+                    start = self:EyePos(),
+                    endpos = self:EyePos() + ang:Forward() * 82,
+                    filter = {hg.GetCurrentCharacter(self),self},
+                    maxs = rad * 2, -- Bigger hull for midair
+                    mins = -rad * 2
+                })
+                if tr_midair.Hit then
+                    tr = tr_midair
+                     if !table.HasValue(entss, tr.Entity) then
+                        entss[#entss+1] = tr.Entity
+                    end
+                     soundplayed = true
+                     self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                end
             end
 
             if tr.Entity.fires then
@@ -146,8 +167,7 @@ function PLAYER:LegAttack()
                     local dmginfo = DamageInfo()
 
                     dmginfo:SetAttacker(self)
-                    local inflictor = self:GetWeapon(handClass)
-                    dmginfo:SetInflictor(inflictor)
+                    dmginfo:SetInflictor(self)
                     dmginfo:SetDamage(dmg)
                     dmginfo:SetDamageForce(normal * dmg)
                     dmginfo:SetDamageType((ent:GetClass() == "func_breakable_surf") and DMG_SLASH or DMG_CLUB)
@@ -210,6 +230,14 @@ function PLAYER:LegAttack()
     })
     self.InLegKick = CurTime() + speed - animstopAdjust
     self:SetNWFloat("InLegKick",CurTime() + speed - animstopAdjust)
+
+    if isMidAir then
+        timer.Simple(0.8, function()
+            if IsValid(self) then
+                hg.Fake(self)
+            end
+        end)
+    end
 end
 
 hook.Add("HG_MovementCalc_2","HG-LegKickAnim",function(mul, ply, cmd, mv)

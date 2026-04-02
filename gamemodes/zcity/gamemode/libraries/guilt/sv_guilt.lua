@@ -121,7 +121,6 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
 
     if not IsValid(Attacker) or not Attacker:IsPlayer() then return end
     if not IsValid(Victim) or not (Victim:IsPlayer() or (Victim.organism.fakePlayer and Victim.organism.alive)) then return end
-	if Victim:IsNPC() or Victim:IsNextBot() then return end
 
     local id = Victim:IsPlayer() and Victim:SteamID() or Victim:EntIndex()
     local id2 = Attacker:IsPlayer() and Attacker:SteamID() or Attacker:EntIndex()
@@ -144,10 +143,6 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     if amt > 0.2 or newharm / maxharm > 0.8 then
         --print("Player "..Attacker:Name().." harmed player "..(Victim:IsPlayer() and Victim:Name() or (tostring(Victim))).." with "..harm.." points.")
         --print("They contributed a total of "..math.Round(newharm / maxharm * 100, 0).."% of "..(Victim:IsPlayer() and Victim:Name() or (tostring(Victim))).."'s death")
-    end
-
-    if zb and zb.hostage and Victim == zb.hostage then
-        zb.hostageLastTouched = Attacker
     end
 
     local attackerTeam = dmgInfo:GetInflictor().team or (Attacker:IsPlayer() and Attacker:Team()) or Attacker.team
@@ -186,6 +181,8 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
 
     zb.GuiltTable[Attacker] = zb.GuiltTable[Attacker] or {}
     zb.GuiltTable[Victim] = zb.GuiltTable[Victim] or {}
+    zb.HarmDoneKarma[Victim] = zb.HarmDoneKarma[Victim] or {}
+    zb.HarmDoneKarma[Victim][Attacker] = zb.HarmDoneKarma[Victim][Attacker] or 0
     
     Attacker.LastAttacked = CurTime()
 
@@ -400,14 +397,68 @@ net.Receive("get_karma",function(len, ply)
 end)
 
 concommand.Add("hg_setkarma",function(ply,cmd,args)
-    if not ply:IsAdmin() then return end
+    if IsValid(ply) and not ply:IsAdmin() then return end
     
     local lenargs = #args
     local newply = player.GetListByName(lenargs > 1 and args[1] or ply:Name())[1]
+    if not IsValid(newply) then return end
 
     newply.Karma = tonumber(lenargs > 1 and args[2] or args[1])
-    newply:SetNetVar("Karma",ply.Karma)
+    newply:SetNetVar("Karma",newply.Karma)
     //newply:guilt_SetValue( ply.Karma or 100 )
+end)
+
+local function ResolvePlayerForKarma(query)
+    if not isstring(query) or query == "" then return nil end
+    local trimmed = string.Trim(query)
+    local lowerQuery = string.lower(trimmed)
+
+    for _, pl in player.Iterator() do
+        if pl:SteamID64() == trimmed then
+            return pl
+        end
+    end
+
+    for _, pl in player.Iterator() do
+        if pl:SteamID() == trimmed then
+            return pl
+        end
+    end
+
+    for _, pl in player.Iterator() do
+        if string.lower(pl:Name()) == lowerQuery then
+            return pl
+        end
+    end
+
+    for _, pl in player.Iterator() do
+        if string.find(string.lower(pl:Name()), lowerQuery, 1, true) then
+            return pl
+        end
+    end
+end
+
+concommand.Add("hg_addkarma", function(ply, cmd, args)
+    if IsValid(ply) and not ply:IsAdmin() then return end
+
+    local targetQuery = args[1]
+    local addAmount = tonumber(args[2] or "")
+    if not targetQuery or not addAmount or addAmount <= 0 then return end
+
+    local target = ResolvePlayerForKarma(targetQuery)
+    if not IsValid(target) then return end
+
+    local oldKarma = target.Karma or target:guilt_GetValue() or 100
+    local newKarma = math.Clamp(oldKarma + addAmount, -60, zb.MaxKarma)
+    target.Karma = newKarma
+    target:SetNetVar("Karma", newKarma)
+    target:guilt_SetValue(newKarma)
+
+    if IsValid(ply) then
+        ply:ChatPrint("Added " .. tostring(addAmount) .. " karma to " .. target:Name() .. ". New karma: " .. tostring(math.Round(newKarma, 2)))
+    else
+        print("[hg_addkarma] Added " .. tostring(addAmount) .. " karma to " .. target:Name() .. ". New karma: " .. tostring(math.Round(newKarma, 2)))
+    end
 end)
 
 util.AddNetworkString("open_guilt_menu")

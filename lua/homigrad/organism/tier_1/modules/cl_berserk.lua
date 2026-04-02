@@ -73,9 +73,9 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 				part:StopEmission( false, true, false )
 			end
 
-			for i = 1, 120 do
-				timer.Simple(i/90,function()
-					ViewPunch(AngleRand(-1.5,1.5))
+			for i = 1, 30 do
+				timer.Simple(i/120,function()
+					ViewPunch(AngleRand(-1,1))
 				end)
 			end
 
@@ -204,11 +204,9 @@ end)
 
 local META = FindMetaTable("Player")
 function META:IsBerserk()
-	if !IsValid(self) then return false end
-	if self:IsPlayer() and not self:Alive() then return false end
+	if !self:Alive() then return false end
 
-	local org = self.organism
-	return org and org.berserkActive2 or false
+	return hg.underberserk2 or false
 end
 
 local META2 = FindMetaTable("Entity")

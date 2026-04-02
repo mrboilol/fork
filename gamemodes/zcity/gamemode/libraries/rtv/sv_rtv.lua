@@ -13,6 +13,10 @@ local playervote = {}
 
 local mappull = {}
 local playerVoteWeight = {}
+local currentRTVMaps = {}
+local currentRTVEndTime = 0
+local rtvChoiceCount = 8
+local rtvDirectMapCount = rtvChoiceCount - 1
 
 local function GetMapFamily(map)
     if string.find(string.lower(map), "smalltown") then
@@ -35,6 +39,7 @@ local blacklist = {
     ["gm_construct"] = true, ["gm_flatgrass"] = true, ["gm_altarskforest"] = true, ["gm_renostruct_v2"] = true,
     ["gm_renostruct_v2_night"] = true, ["gm_city_of_silence"] = true, ["ttt_hogwarts"] = true,
 }
+local adminBlacklist = {}
 
 local allowedPrefix = {
     ["ttt"] = true, ["hmcd"] = true, ["mu"] = true, ["ze"] = false,
@@ -81,6 +86,29 @@ if file.Exists(popularityPath, "DATA") then
     mapPopularity = util.JSONToTable(data) or {}
 end
 
+local adminBlacklistPath = GetDataPath("AdminMapBlacklist.json")
+if file.Exists(adminBlacklistPath, "DATA") then
+    local data = file.Read(adminBlacklistPath, "DATA")
+    adminBlacklist = util.JSONToTable(data) or {}
+end
+
+local function SaveAdminBlacklist()
+    file.Write(adminBlacklistPath, util.TableToJSON(adminBlacklist))
+end
+
+local function NormalizeMapName(mapName)
+    mapName = string.Trim(string.lower(tostring(mapName or "")))
+    if string.EndsWith(mapName, ".bsp") then
+        mapName = string.sub(mapName, 1, -5)
+    end
+    return mapName
+end
+
+local function IsMapBlacklisted(mapName)
+    mapName = NormalizeMapName(mapName)
+    return blacklist[mapName] or adminBlacklist[mapName] or false
+end
+
 local function getmaps()
     table.Empty(mappull)
 
@@ -105,7 +133,7 @@ local function getmaps()
     for _, map in ipairs(maps) do
         map = map:sub(1, -5)
         local mapstr = map:Split("_")
-        if (allowedPrefix[mapstr[1]] or not string.find(map, "_")) and not blacklist[map] then
+        if (allowedPrefix[mapstr[1]] or not string.find(map, "_")) and not IsMapBlacklisted(map) then
             table.insert(mappull, map)
         end
     end
@@ -156,6 +184,7 @@ net.Receive("ZB_RockTheVote_vote", function(len, ply)
     local map = net.ReadString()
     if not map or map == "" then return end
     if map ~= "random" and not table.HasValue(mappull, map) then return end
+    if map ~= "random" and IsMapBlacklisted(map) then return end
     playervote[playerIdx] = map
 
     playerVoteWeight[playerIdx] = 1
@@ -177,7 +206,26 @@ function zb.EndRTV()
     if not winmap then return end
 
     if winmap == "random" then
-        winmap = mappull[math.random(#mappull)]
+        local randomPool = {}
+        for _, mapName in ipairs(currentRTVMaps) do
+            if mapName ~= "random" and not IsMapBlacklisted(mapName) then
+                table.insert(randomPool, mapName)
+            end
+        end
+        if #randomPool > 0 then
+            winmap = randomPool[math.random(#randomPool)]
+        elseif #mappull > 0 then
+            winmap = mappull[math.random(#mappull)]
+        end
+    end
+
+    if winmap and IsMapBlacklisted(winmap) then
+        for _, mapName in ipairs(currentRTVMaps) do
+            if mapName ~= "random" and not IsMapBlacklisted(mapName) then
+                winmap = mapName
+                break
+            end
+        end
     end
 
 	if not winmap then
@@ -242,7 +290,9 @@ function zb.EndRTV()
         --zb.votestarted = false
         table.Empty(votes)
         table.Empty(playervote)
-        table.Empty(playerVoteWeight) 
+        table.Empty(playerVoteWeight)
+        table.Empty(currentRTVMaps)
+        currentRTVEndTime = 0
         RunConsoleCommand("changelevel", winmap) --;; Gavnoooooo
     end)
 end
@@ -297,12 +347,19 @@ local function getMapWeight(map)
     return 1 - (pop / 100) 
 end
 
+local function ShuffleArray(tbl)
+    for i = #tbl, 2, -1 do
+        local j = math.random(i)
+        tbl[i], tbl[j] = tbl[j], tbl[i]
+    end
+end
+
 function zb.StartRTV(time)
     if zb.votestarted then return end
     
     getmaps()
 
-    rtvtime = CurTime() + (time or 45)
+    rtvtime = CurTime() + (time or 75)
 
     local PlayedMaps = {}
     local playedMapsPath = GetDataPath("PlayedMaps.json")
@@ -335,12 +392,10 @@ function zb.StartRTV(time)
             end
         end
 
+        ShuffleArray(possible)
         selectedPrefixes = {}
-        table.SortByKey(possible)
-        for i = 1, 3 do
-            if possible[i] then
-                table.insert(selectedPrefixes, possible[i])
-            end
+        for i = 1, math.min(3, #possible) do
+            table.insert(selectedPrefixes, possible[i])
         end
     end
 
@@ -349,11 +404,12 @@ function zb.StartRTV(time)
     end
 
     local finalmaps = {}
+    local finalMapSet = {}
     for _, prefix in ipairs(selectedPrefixes) do
         local prefixMaps = getMapsByPrefix(prefix)
         local validMaps = {}
         for _, m in ipairs(prefixMaps) do
-            if not table.HasValue(PlayedMaps, m) then
+            if not table.HasValue(PlayedMaps, m) and not IsMapBlacklisted(m) and not finalMapSet[m] then
                 table.insert(validMaps, m)
             end
         end
@@ -378,24 +434,26 @@ function zb.StartRTV(time)
             end
 
             if selectedIndex then
-                table.insert(finalmaps, validMaps[selectedIndex])
+                local selectedMap = validMaps[selectedIndex]
+                table.insert(finalmaps, selectedMap)
+                finalMapSet[selectedMap] = true
                 table.remove(validMaps, selectedIndex)
             end
         end
     end
 
-    if #finalmaps < 12 then
+    if #finalmaps < rtvDirectMapCount then
         local fallbackPrefix = "gm"
         local fallbackMaps = getMapsByPrefix(fallbackPrefix)
         local filteredFallback = {}
         for _, m in ipairs(fallbackMaps) do
-            if not table.HasValue(PlayedMaps, m) then
+            if not table.HasValue(PlayedMaps, m) and not IsMapBlacklisted(m) and not finalMapSet[m] then
                 table.insert(filteredFallback, m)
             end
         end
 
         local attempts = 0
-        while #finalmaps < 12 and #filteredFallback > 0 do
+        while #finalmaps < rtvDirectMapCount and #filteredFallback > 0 do
             attempts = attempts + 1
             if attempts > 300 then
                 break
@@ -419,22 +477,54 @@ function zb.StartRTV(time)
             end
 
             if selectedIndex then
-                table.insert(finalmaps, filteredFallback[selectedIndex])
+                local selectedMap = filteredFallback[selectedIndex]
+                table.insert(finalmaps, selectedMap)
+                finalMapSet[selectedMap] = true
                 table.remove(filteredFallback, selectedIndex)
             end
         end
     end
 
-    if #finalmaps == 0 then
-        local rndMap = mappull[ math.random(#mappull) ]
-        table.insert(finalmaps, rndMap)
+    if #finalmaps < rtvDirectMapCount then
+        local backupMaps = {}
+        for _, mapName in ipairs(mappull) do
+            if not IsMapBlacklisted(mapName) and not finalMapSet[mapName] then
+                table.insert(backupMaps, mapName)
+            end
+        end
+        ShuffleArray(backupMaps)
+        for _, mapName in ipairs(backupMaps) do
+            table.insert(finalmaps, mapName)
+            finalMapSet[mapName] = true
+            if #finalmaps >= rtvDirectMapCount then
+                break
+            end
+        end
     end
 
+    if #finalmaps == 0 and #mappull > 0 then
+        local rndMap = mappull[math.random(#mappull)]
+        table.insert(finalmaps, rndMap)
+        finalMapSet[rndMap] = true
+    end
+
+    if #finalmaps > rtvDirectMapCount then
+        while #finalmaps > rtvDirectMapCount do
+            local removed = table.remove(finalmaps, #finalmaps)
+            finalMapSet[removed] = nil
+        end
+    end
+
+    ShuffleArray(finalmaps)
+
     table.insert(finalmaps, "random")
+    currentRTVMaps = table.Copy(finalmaps)
+    currentRTVEndTime = rtvtime
 
     net.Start("ZB_RockTheVote_start")
         net.WriteTable(finalmaps)
         net.WriteFloat(rtvtime)
+        net.WriteTable(adminBlacklist)
     net.Broadcast()
 
     zb.votestarted = true
@@ -446,16 +536,53 @@ end
 util.AddNetworkString("RTVMenu")
 function zb.RTVMenu(ply)
     net.Start("RTVMenu")
+        local hasData = zb.votestarted and istable(currentRTVMaps) and #currentRTVMaps > 0
+        net.WriteBool(hasData)
+        if hasData then
+            net.WriteTable(currentRTVMaps)
+            net.WriteFloat(currentRTVEndTime)
+            net.WriteTable(adminBlacklist)
+        end
     net.Send(ply)
 end
 
 
 COMMANDS.forcertv = {function(ply, args)
 	if not ply:IsAdmin() then ply:ChatPrint("You don't have access") return end
-		zb.StartRTV(20)
+		zb.StartRTV(45)
 	end,
 	0
 }
+
+concommand.Add("mcd_blacklist", function(ply, cmd, args, argStr)
+    if IsValid(ply) and not ply:IsAdmin() then return end
+    local mapName = NormalizeMapName(argStr ~= "" and argStr or args[1])
+    if mapName == "" or not file.Exists("maps/" .. mapName .. ".bsp", "GAME") then
+        if IsValid(ply) then ply:ChatPrint("Map was not found.") end
+        return
+    end
+    if blacklist[mapName] then
+        if IsValid(ply) then ply:ChatPrint("Map is hard-blacklisted in code.") end
+        return
+    end
+    adminBlacklist[mapName] = true
+    SaveAdminBlacklist()
+    getmaps()
+    if IsValid(ply) then ply:ChatPrint("Blacklisted: " .. mapName) end
+end)
+
+concommand.Add("mcd_removeblacklist", function(ply, cmd, args, argStr)
+    if IsValid(ply) and not ply:IsAdmin() then return end
+    local mapName = NormalizeMapName(argStr ~= "" and argStr or args[1])
+    if mapName == "" then
+        if IsValid(ply) then ply:ChatPrint("Map name is required.") end
+        return
+    end
+    adminBlacklist[mapName] = nil
+    SaveAdminBlacklist()
+    getmaps()
+    if IsValid(ply) then ply:ChatPrint("Removed blacklist: " .. mapName) end
+end)
 
 --;; чут чут переписал 
 local rtvVotes = {} -- Dagestani fleas heard lezginka and trampled a cat to death

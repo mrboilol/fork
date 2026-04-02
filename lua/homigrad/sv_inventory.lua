@@ -370,7 +370,7 @@ local functions = {
 util.AddNetworkString("ply_take_item")
 net.Receive("ply_take_item", function(len, ply)
     if (ply.cooldown_takeitem or 0) > CurTime() then return end
-    ply.cooldown_takeitem = CurTime() + 0.5
+    ply.cooldown_takeitem = CurTime() + 0.3
 
     local tblIndex = net.ReadString()
     local thing = net.ReadString()
@@ -378,7 +378,10 @@ net.Receive("ply_take_item", function(len, ply)
     local ent = net.ReadEntity()
     
     if !IsValid(ent) or !IsValid(ply) then return end
-    if ent:IsPlayer() and not IsValid(ent.FakeRagdoll) then return end
+    if ent:IsPlayer() then
+        if not (ent.organism and ent.organism.otrub) then return end
+        if not IsValid(ent.FakeRagdoll) then return end
+    end
 
     if ent:GetPos():Distance(ply:GetPos()) > 125 then return end
     local func = functions[tblIndex]
@@ -394,10 +397,13 @@ local playerMeta = FindMetaTable("Player")
 function playerMeta:OpenInventory(ent)
     hook.Run("ZB_InventoryOpened",self,ent)
     if not IsValid(ent) then return end
-    if ent:IsPlayer() and not IsValid(ent.FakeRagdoll) then return end
+    if ent:IsPlayer() then
+        if not (ent.organism and ent.organism.otrub) then return end
+        if not IsValid(ent.FakeRagdoll) then return end
+    end
     if ent:IsPlayer() then hg.RenewInv(ent) end
     if self:IsPlayer() then hg.RenewInv(self) end
-    self.cooldown_takeitem = CurTime() + 0.5
+    self.cooldown_takeitem = CurTime() + 0.3
     net.Start("should_open_inv")
     net.WriteEntity(ent)
     net.Send(self)
@@ -428,6 +434,11 @@ hook.Add("Player Think", "loot-fellows",function(ply)
         if not trace then return end
         local ent = trace.Entity
         ent = IsValid(hg.RagdollOwner(ent)) and hg.RagdollOwner(ent) or ent
+        if ent:IsPlayer() and not (ent.organism and ent.organism.otrub) then
+            if not ply.keypressed then ply:ChatPrint("I cant loot them.") end
+            ply.keypressed = true
+            return
+        end
 		local _ply, _ent, canloot = hook.Run("ZB_CanLootInventory", ply, ent, canloot)
 		if canloot ~= nil and canloot == false then
 			ply.keypressed = true

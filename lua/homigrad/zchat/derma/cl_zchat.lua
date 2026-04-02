@@ -1,9 +1,13 @@
---made by mrrp :3
+--faggots
 
 local maxLength = GetConVar("zchat_maxmessagelength")
 
 local NoDrop = CreateClientConVar("zchat_dropcharacters", 1, true, false, "Play the character dropping animation when erasing text", 0, 1)
 local ShowTextBoxInactive = CreateClientConVar("zchat_showtextboxinactive", 1, true, false, "Showing your text in textbox while chat is turned off", 0, 1)
+local ChatPosX = CreateClientConVar("zchat_pos_x", -1, true, false)
+local ChatPosY = CreateClientConVar("zchat_pos_y", -1, true, false)
+local ChatSizeW = CreateClientConVar("zchat_size_w", 0, true, false)
+local ChatSizeH = CreateClientConVar("zchat_size_h", 0, true, false)
 
 local function CallbackBind(self, callback)
 	return function(_, ...)
@@ -14,7 +18,6 @@ end
 local function PaintMarkupOverride(text, font, x, y, color, alignX, alignY, alpha)
 	alpha = alpha or 255
 
-	-- background for easier reading
 	surface.SetTextPos(x + 1, y + 1)
 	surface.SetTextColor(0, 0, 0, alpha)
 	surface.SetFont(font)
@@ -225,6 +228,12 @@ function PANEL:OnValueChange(text)
 		end
 	end
 
+	local parent = self:GetParent()
+	local chatbox = IsValid(parent) and parent:GetParent() or nil
+	if IsValid(chatbox) and chatbox.OnEntryTextChanged then
+		chatbox:OnEntryTextChanged(prevText, text)
+	end
+
 	self.prevText = text
 end
 
@@ -240,12 +249,47 @@ function PANEL:Init()
 
 	self.entries = {}
 	self.messageHistory = {}
+	self.Dragging = {0, 0}
+	self.Sizing = nil
+	self.m_iMinWidth = 340
+	self.m_iMinHeight = 180
 
 	self.alpha = 255
 	self.realAlpha = 255
+	self.outlinePulse = 0
+	self.outlinePulseTarget = 0
 
-	self:SetSize(ScrW() * 0.3, ScrH() * 0.2)
-	self:SetPos(ScrW() * 0.02, ScrH() * 0.67) --six seven!!!!!!!!!!
+	local defaultW = math.max(self.m_iMinWidth, math.floor(ScrW() * 0.36))
+	local defaultH = math.max(self.m_iMinHeight, math.floor(ScrH() * 0.26))
+	local w = ChatSizeW:GetInt()
+	local h = ChatSizeH:GetInt()
+	if w <= 0 then w = defaultW end
+	if h <= 0 then h = defaultH end
+	w = math.Clamp(w, self.m_iMinWidth, ScrW())
+	h = math.Clamp(h, self.m_iMinHeight, ScrH())
+	self:SetSize(w, h)
+
+	local x = ChatPosX:GetInt()
+	local y = ChatPosY:GetInt()
+	if x < 0 then x = math.floor(ScrW() * 0.02) end
+	if y < 0 then y = math.floor(ScrH() * 0.62) end
+	x = math.Clamp(x, 0, ScrW() - w)
+	y = math.Clamp(y, 0, ScrH() - h)
+	self:SetPos(x, y)
+
+	self.topBar = self:Add("Panel")
+	self.topBar:SetTall(24)
+	self.topBar:Dock(TOP)
+
+	self.settingsButton = self.topBar:Add("DImageButton")
+	self.settingsButton:Dock(RIGHT)
+	self.settingsButton:DockMargin(0, 4, 4, 4)
+	self.settingsButton:SetWide(16)
+	self.settingsButton:SetImage("icon16/cog.png")
+	self.settingsButton:SetTooltip("zChat settings")
+	self.settingsButton.DoClick = CallbackBind(self, self.ToggleSettingsPanel)
+	self.topBar.OnMousePressed = CallbackBind(self, self.OnMousePressed)
+	self.topBar.OnMouseReleased = CallbackBind(self, self.OnMouseReleased)
 
 	local entryPanel = self:Add("Panel")
 	entryPanel:SetZPos(1)
@@ -262,20 +306,28 @@ function PANEL:Init()
 	self.history:Dock(FILL)
 	self.history:DockMargin(4, 2, 4, 4)
 
+	ChatPosX:SetInt(x)
+	ChatPosY:SetInt(y)
+	ChatSizeW:SetInt(w)
+	ChatSizeH:SetInt(h)
+
 	self:SetActive(false)
 end
 
-local gradient_d = Material("vgui/gradient-d")
 local gray = Color(255, 255, 255, 100)
 local black = Color(0, 0, 0, 200)
 
 function PANEL:Paint(w, h)
-	surface.SetDrawColor(247, 67, 67, 100 + math.sin(CurTime()) * 30)
-	surface.SetMaterial(gradient_d)
-	surface.DrawTexturedRect(0, h * 0.5, w, h * 0.5)
-
-	surface.SetDrawColor(0, 0, 0, 200)
+	surface.SetDrawColor(0, 0, 0, 230)
 	surface.DrawRect(0, 0, w, h)
+
+	local pulse = self.outlinePulse or 0
+	surface.SetDrawColor(92, 92, 92, 140)
+	surface.DrawOutlinedRect(0, 0, w, h, 1)
+	if pulse > 0.001 then
+		surface.SetDrawColor(175, 175, 175, 35 + (pulse * 170))
+		surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 1)
+	end
 
 	surface.SetAlphaMultiplier(1)
 		self.history:PaintManual()
@@ -287,14 +339,28 @@ function PANEL:Paint(w, h)
 		draw.SimpleText("Hold left ALT and press ENTER to whisper", "zChatFontSmall", 5, h * 1.01 + 1, black)
 		draw.SimpleText("Hold left ALT and press ENTER to whisper", "zChatFontSmall", 4, h * 1.01, gray)
 
-		if LocalPlayer().organism and LocalPlayer().organism.otrub  then
-			draw.SimpleText("Your messages are currently not visible to anyone.", "zChatFontSmall", ScrW() * 0.3 + 1, h * 1.01 + 1, black, TEXT_ALIGN_RIGHT)
-			draw.SimpleText("Your messages are currently not visible to anyone.", "zChatFontSmall", ScrW() * 0.3, h * 1.01, gray, TEXT_ALIGN_RIGHT)
+		local lply = LocalPlayer()
+		if IsValid(lply) and lply.organism and lply.organism.otrub then
+			draw.SimpleText("Your messages are currently not visible to anyone.", "zChatFontSmall", w - 3, h * 1.01 + 1, black, TEXT_ALIGN_RIGHT)
+			draw.SimpleText("Your messages are currently not visible to anyone.", "zChatFontSmall", w - 4, h * 1.01, gray, TEXT_ALIGN_RIGHT)
 		end
 	DisableClipping(false)
 
 	if self.bActive then
 		self:SetAlpha(self.alpha - (255 - self.realAlpha))
+	end
+end
+
+function PANEL:PulseOutline(strength)
+	self.outlinePulseTarget = math.min(1, math.max(self.outlinePulseTarget or 0, strength or 1))
+end
+
+function PANEL:OnEntryTextChanged(prevText, newText)
+	local prevLen = prevText:utf8len()
+	local newLen = newText:utf8len()
+
+	if newLen > prevLen then
+		self:PulseOutline(1)
 	end
 end
 
@@ -344,6 +410,151 @@ end
 
 function PANEL:SetRealAlpha(alpha)
 	self.realAlpha = alpha
+end
+
+function PANEL:ToggleSettingsPanel()
+	if IsValid(self.settingsFrame) then
+		self.settingsFrame:SetVisible(not self.settingsFrame:IsVisible())
+		if self.settingsFrame:IsVisible() then
+			self.settingsFrame:MakePopup()
+		end
+		return
+	end
+
+	local minWidth = self.m_iMinWidth or 340
+	local minHeight = self.m_iMinHeight or 180
+
+	local frame = vgui.Create("DFrame")
+	frame:SetSize(320, 210)
+	frame:SetTitle("Chat Settings")
+	frame:SetDeleteOnClose(false)
+	frame:MakePopup()
+	local x, y = self:LocalToScreen(self:GetWide() + 8, 0)
+	frame:SetPos(math.Clamp(x, 0, ScrW() - frame:GetWide()), math.Clamp(y, 0, ScrH() - frame:GetTall()))
+
+	local settingsList = frame:Add("DScrollPanel")
+	settingsList:Dock(FILL)
+	settingsList:DockMargin(4, 4, 4, 4)
+
+	local sizeSlider = settingsList:Add("DNumSlider")
+	sizeSlider:Dock(TOP)
+	sizeSlider:SetText("Font Size")
+	sizeSlider:SetMinMax(4, 30)
+	sizeSlider:SetDecimals(1)
+	sizeSlider:SetConVar("zchat_fontsize")
+
+	local weightSlider = settingsList:Add("DNumSlider")
+	weightSlider:Dock(TOP)
+	weightSlider:SetText("Font Weight")
+	weightSlider:SetMinMax(200, 1000)
+	weightSlider:SetDecimals(0)
+	weightSlider:SetConVar("zchat_fontweight")
+
+	local aaCheck = settingsList:Add("DCheckBoxLabel")
+	aaCheck:Dock(TOP)
+	aaCheck:SetText("Font Anti-Aliasing")
+	aaCheck:SetConVar("zchat_fontaa")
+	aaCheck:SizeToContents()
+	aaCheck:DockMargin(8, 6, 0, 0)
+
+	local inactiveCheck = settingsList:Add("DCheckBoxLabel")
+	inactiveCheck:Dock(TOP)
+	inactiveCheck:SetText("Show Text While Inactive")
+	inactiveCheck:SetConVar("zchat_showtextboxinactive")
+	inactiveCheck:SizeToContents()
+	inactiveCheck:DockMargin(8, 4, 0, 0)
+
+	local dropCheck = settingsList:Add("DCheckBoxLabel")
+	dropCheck:Dock(TOP)
+	dropCheck:SetText("Drop Deleted Characters")
+	dropCheck:SetConVar("zchat_dropcharacters")
+	dropCheck:SizeToContents()
+	dropCheck:DockMargin(8, 4, 0, 0)
+
+	local resetButton = settingsList:Add("DButton")
+	resetButton:Dock(TOP)
+	resetButton:SetText("Reset Chat Position and Size")
+	resetButton:DockMargin(0, 8, 0, 0)
+	resetButton.DoClick = function()
+		local w = math.max(minWidth, math.floor(ScrW() * 0.36))
+		local h = math.max(minHeight, math.floor(ScrH() * 0.26))
+		local xReset = math.floor(ScrW() * 0.02)
+		local yReset = math.floor(ScrH() * 0.62)
+		self:SetSize(w, h)
+		self:SetPos(xReset, yReset)
+		ChatPosX:SetInt(xReset)
+		ChatPosY:SetInt(yReset)
+		ChatSizeW:SetInt(w)
+		ChatSizeH:SetInt(h)
+	end
+
+	self.settingsFrame = frame
+end
+
+function PANEL:OnMousePressed()
+	local mouseX = gui.MouseX()
+	local mouseY = gui.MouseY()
+	local x, y = self:GetPos()
+	local w, h = self:GetSize()
+
+	if mouseX > (x + w - 16) and mouseY > (y + h - 16) then
+		self.Sizing = {mouseX - w, mouseY - h}
+		self:MouseCapture(true)
+		return
+	end
+
+	if mouseY < y + self.topBar:GetTall() then
+		self.Dragging[1] = mouseX - x
+		self.Dragging[2] = mouseY - y
+		self:MouseCapture(true)
+	end
+end
+
+function PANEL:OnMouseReleased()
+	self.Dragging = {0, 0}
+	self.Sizing = nil
+	self:MouseCapture(false)
+end
+
+function PANEL:Think()
+	local mouseX, mouseY = gui.MousePos()
+	local x, y = self:GetPos()
+	local w, h = self:GetSize()
+
+	if self.Dragging[1] != 0 then
+		local newX = math.Clamp(mouseX - self.Dragging[1], 0, ScrW() - w)
+		local newY = math.Clamp(mouseY - self.Dragging[2], 0, ScrH() - h)
+		self:SetPos(newX, newY)
+		ChatPosX:SetInt(newX)
+		ChatPosY:SetInt(newY)
+	end
+
+	if self.Sizing then
+		local newW = mouseX - self.Sizing[1]
+		local newH = mouseY - self.Sizing[2]
+		newW = math.Clamp(newW, self.m_iMinWidth, ScrW() - x)
+		newH = math.Clamp(newH, self.m_iMinHeight, ScrH() - y)
+		self:SetSize(newW, newH)
+		ChatSizeW:SetInt(newW)
+		ChatSizeH:SetInt(newH)
+		self:SetCursor("sizenwse")
+		return
+	end
+
+	if self:IsHovered() and mouseX > (x + w - 16) and mouseY > (y + h - 16) then
+		self:SetCursor("sizenwse")
+		return
+	end
+
+	if self:IsHovered() and mouseY < y + self.topBar:GetTall() then
+		self:SetCursor("sizeall")
+		return
+	end
+
+	self.outlinePulseTarget = math.max((self.outlinePulseTarget or 0) - FrameTime() * 3.2, 0)
+	self.outlinePulse = Lerp(FrameTime() * 12, self.outlinePulse or 0, self.outlinePulseTarget)
+
+	self:SetCursor("arrow")
 end
 
 function PANEL:OnMessageSent()

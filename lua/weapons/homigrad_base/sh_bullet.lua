@@ -1,4 +1,4 @@
-﻿AddCSLuaFile()
+AddCSLuaFile()
 --
 local surface_hardness = {
 	[MAT_METAL] = 1,
@@ -50,6 +50,27 @@ end
 local bulletHit
 local timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game = timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game
 local hg_bulletholes = CreateConVar("hg_bulletholes", "0", FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED, "Enable R6S bulletholes feature", 0, 1)
+local ents_FindByClass = ents.FindByClass
+local areaportalCache
+
+local function getAreaPortalByTarget(targetName)
+	if targetName == "" then return nil end
+	if not areaportalCache then
+		areaportalCache = {}
+		for _, enta in ipairs(ents_FindByClass("func_areaportal")) do
+			areaportalCache[enta:GetInternalVariable("target") or ""] = enta
+		end
+	end
+	local enta = areaportalCache[targetName]
+	if IsValid(enta) then return enta end
+	areaportalCache = nil
+	for _, enta2 in ipairs(ents_FindByClass("func_areaportal")) do
+		if enta2:GetInternalVariable("target") == targetName then
+			return enta2
+		end
+	end
+	return nil
+end
 
 local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	if CLIENT then return end
@@ -177,14 +198,10 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 					table.insert(hg.bulletholes, {hitPos2, dir2, dist, hitNormal2, size, ent})
 
 					if hgIsDoor(ent) then -- open the areaportal so it can be seen through
-						for i, enta in ipairs(ents.FindByClass("func_areaportal")) do
-							if enta:GetInternalVariable("target") == ent:GetName() then
-								enta:SetKeyValue("target", "")
-								enta:Fire("Open")
-								-- that door is now always "open"
-								-- fuck your optimisation mr mapping guy!!!
-								break
-							end
+						local enta = getAreaPortalByTarget(ent:GetName())
+						if enta then
+							enta:SetKeyValue("target", "")
+							enta:Fire("Open")
 						end
 					end
 
@@ -203,14 +220,6 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 				mask = MASK_SHOT
 			} )
 
-			timer.Simple(0.1,function()
-				local effectdata1 = EffectData()
-				effectdata1:SetOrigin(tr.HitPos)
-				effectdata1:SetStart(hitPos + hitNormal)
-				effectdata1:SetEntity(self)
-				effectdata1:SetMagnitude(2)
-				util.Effect("eff_tracer", effectdata1)
-			end)
 		end
 	elseif ApproachAngle < MaxRicAngle * 0.7 then --previosly 0.2, made 1 for fun
 		--if CLIENT then return end
@@ -255,14 +264,6 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			endpos = hitPos + hitNormal + -NewVec * 10000,
 			mask = MASK_SHOT
 		} )
-		timer.Simple(0,function()
-			local effectdata1 = EffectData()
-			effectdata1:SetOrigin(tr.HitPos)
-			effectdata1:SetStart(hitPos + hitNormal)
-			effectdata1:SetEntity(self)
-			effectdata1:SetMagnitude(2)
-			util.Effect("eff_tracer", effectdata1)
-		end)
 	elseif math.random(2) == 1 then
 		if CLIENT then return end
 		local effectdata1 = EffectData()
@@ -372,6 +373,13 @@ local vecCone = Vector(0, 0, 0)
 local cone, att, att2, owner, primary, ang
 local math_Rand, math_random = math.Rand, math.random
 local gun
+local function tableCopyShallow(tbl)
+	local t = {}
+	for k, v in pairs(tbl) do
+		t[k] = v
+	end
+	return t
+end
 function SWEP:GetWeaponEntity()
 	return IsValid(self.worldModel) and IsValid(self:GetOwner()) and self.worldModel or self
 end
@@ -761,7 +769,7 @@ function SWEP:FireBullet()
 	end
 	
     for i = 1, numbullet do
-		local bullet = table.Copy(bullet)
+		local bullet = tableCopyShallow(bullet)
 		bullet.penetrated = 0
 		bullet.MaxPenLen = 100
 		bullet.Penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
@@ -786,16 +794,6 @@ function SWEP:FireBullet()
 			--if owner.suiciding then bullet.DisableLagComp = true end
 			self:FireLuaBullets(bullet)
 
-			if CLIENT and !GetGlobalBool("PhysBullets_ReplaceDefault") then					
-				if tr then
-					local effectdata1 = EffectData()
-					if tr.HitPos then effectdata1:SetOrigin(tr.HitPos) end
-					if tr.StartPos then effectdata1:SetStart(pos) end
-					effectdata1:SetEntity(self)
-					effectdata1:SetMagnitude(1)
-					util.Effect("eff_tracer", effectdata1)
-				end
-			end
 		end
     end
 
@@ -878,6 +876,16 @@ else
 		net.Start("reject shell")
 			net.WriteEntity(self)
 			net.WriteString(shell)
-		net.Broadcast()
+		local owner = self:GetOwner()
+		if IsValid(owner) then
+			local rf = RecipientFilter()
+			rf:AddPVS(owner:GetPos())
+			if owner:IsPlayer() then
+				rf:AddPlayer(owner)
+			end
+			net.Send(rf)
+		else
+			net.Broadcast()
+		end
 	end
 end

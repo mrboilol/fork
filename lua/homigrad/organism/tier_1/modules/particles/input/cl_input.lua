@@ -42,7 +42,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
 
-local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
+local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
 	time = time or 30
@@ -57,7 +57,7 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
-	hg.bloodparticles2[#hg.bloodparticles2 + 1] = {pos, pos2, vel, mat or cloudmat, w or 60, h or 60, CurTime() + time, time, water = water, owner = owner}
+	hg.bloodparticles2[#hg.bloodparticles2 + 1] = {pos, pos2, vel, mat or cloudmat, w or 60, h or 60, CurTime() + time, time, water = water, owner = owner, color = color}
 end
 
 hg.addBloodPart = addBloodPart
@@ -65,18 +65,14 @@ hg.addBloodPart2 = addBloodPart2
 
 local Rand = math.Rand
 
-local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
-
 local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
 	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
 	
-	if hg_bloodimpacts:GetBool() then
-		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
-	end
+	addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+	addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+	addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
 
 	for i = 1, iters do
 		local size = 1--math.random(2, 4) * 1
@@ -92,6 +88,41 @@ net.Receive("hg_bloodimpact", function()
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
 	for i = 1, amt do impact(pos,vel,mul) end
+end)
+
+net.Receive("hg_brainmist", function()
+	local ent = net.ReadEntity()
+	local pos = net.ReadVector()
+	local ang = net.ReadAngle()
+	local headshot = net.ReadBool()
+	local club = net.ReadBool()
+	local redmist = net.ReadBool()
+	local renderEnt = IsValid(ent) and (hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent) or ent) or nil
+	if IsValid(renderEnt) and renderEnt:LookupBone("ValveBiped.Bip01_Head1") then
+		local bone = renderEnt:LookupBone("ValveBiped.Bip01_Head1")
+		local headpos, headang = renderEnt:GetBonePosition(bone)
+		if headpos then
+			pos = headpos
+			ang = headang
+		end
+	end
+	if headshot then
+		ParticleEffect("headshot", pos, ang)
+	end
+	if redmist then
+		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-35, 35) + ang:Forward() * -15, nil, 34, 34, 0.6, true, renderEnt or ent)
+		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-25, 25), nil, 26, 26, 0.45, true, renderEnt or ent)
+		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-20, 20), nil, 20, 20, 0.35, true, renderEnt or ent)
+		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-45, 45) + ang:Forward() * -20, nil, 40, 40, 0.75, true, renderEnt or ent)
+		hg.addBloodPart2(pos + VectorRand(-3, 3), VectorRand(-30, 30), nil, 28, 28, 0.55, true, renderEnt or ent)
+		hg.addBloodPart(pos + VectorRand(-1, 1), VectorRand(-20, 20) + ang:Forward() * -10, nil, 2, 2, true, nil, renderEnt or ent)
+		hg.addBloodPart(pos + VectorRand(-1, 1), VectorRand(-25, 25), nil, 2, 2, true, nil, renderEnt or ent)
+	end
+	if club then
+		local spitColor = Color(210, 230, 235, 110)
+		hg.addBloodPart2(pos + VectorRand(-1, 1), ang:Forward() * -90 + VectorRand(-10, 10), nil, 20, 20, 0.25, false, renderEnt or ent, spitColor)
+		hg.addBloodPart2(pos + VectorRand(-1, 1), ang:Forward() * -70 + VectorRand(-8, 8), nil, 16, 16, 0.2, false, renderEnt or ent, spitColor)
+	end
 end)
 
 local function explode(pos, size, force)

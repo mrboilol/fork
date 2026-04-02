@@ -48,11 +48,25 @@ end
 
 local scrW, scrH = ScrW(), ScrH()
 
-local AcsentColor = Color(155,0,0)
+local AcsentColor = Color(155,155,155)
 local gradient_u = Material("vgui/gradient-d")
 
+surface.CreateFont("HomigradFontTypewriterMedium", {
+    font = "Veteran Typewriter",
+    size = ScreenScale(8),
+    weight = 500,
+    antialias = true
+})
+
+surface.CreateFont("HomigradFontTypewriterSmall", {
+    font = "Veteran Typewriter",
+    size = 17,
+    weight = 500,
+    antialias = true
+})
+
 function WS.WeaponSelectorDraw( ply )
-    if not IsValid( ply ) or not ply:Alive() or GetGlobalBool("RadialInventory", false) then return end
+    if not IsValid( ply ) or not ply:Alive() then return end
     if WS.Show < CurTime() then 
         WS.SelectedSlot = WS.LastSelectedSlot 
         WS.SelectedSlotPos = -1
@@ -79,7 +93,7 @@ function WS.WeaponSelectorDraw( ply )
         local sizeX = scrW*0.1
         local position = scrW/2 + ( ( SuperAmmout -  (AmmoutSlots/2)) * sizeX )
         
-        WS.DrawText( i+1, "HomigradFontMedium", position + sizeX/2, scrH*0.02, ColorAlpha(color_white,WS.Transparent*255) ,TEXT_ALIGN_CENTER )
+        WS.DrawText( i+1, "HomigradFontTypewriterMedium", position + sizeX/2, scrH*0.02, ColorAlpha(color_white,WS.Transparent*255) ,TEXT_ALIGN_CENTER )
         
         --  draw.RoundedBox(
         --      1,
@@ -118,16 +132,28 @@ function WS.WeaponSelectorDraw( ply )
                 2, 
                 ColorAlpha(color_black,WS.Transparent*205) 
             )
-            surface.SetDrawColor( 155, 0, 0, WS.Transparent*( SelectedWep == wep and 200 or 0 )  )
+            surface.SetDrawColor( 100, 100, 100, WS.Transparent*( SelectedWep == wep and 200 or 0 )  )
             surface.SetMaterial( gradient_u )
             surface.DrawTexturedRect( position, (scrH * 0.025) * (Ammout) + (scrH * 0.05) + lastPos, sizeX, sizeH )
             if SelectedWep == wep then
-                surface.SetDrawColor( 255, 0, 0, WS.Transparent*155 )
+                surface.SetDrawColor( 180, 180, 180, WS.Transparent*155 )
 	            surface.DrawOutlinedRect( position, (scrH * 0.025) * (Ammout) + (scrH * 0.05) + lastPos, sizeX, sizeH, 2 )
             end
             local sizeHi = (scrH *0.025) * (Ammout) + (scrH * 0.05) + lastPos
             sizeHi = sizeHi + 2.5
-            WS.DrawText( WS.GetPrintName(wep), "HomigradFontSmall", position + sizeX/2, sizeHi, ColorAlpha(color_white,WS.Transparent*255) ,TEXT_ALIGN_CENTER )
+            
+            local textColor = ColorAlpha(color_white,WS.Transparent*255)
+            if SelectedWep == wep then
+                local time = CurTime()
+                local trigger = math.sin(time * 0.5)
+                if trigger > 0.8 then
+                     local t = (math.sin(time * 30) + 1) / 2
+                     local gb = 255 * (1 - t)
+                     textColor = ColorAlpha(Color(255, gb, gb), WS.Transparent*255)
+                end
+            end
+
+            WS.DrawText( WS.GetPrintName(wep), "HomigradFontTypewriterSmall", position + sizeX/2, sizeHi, textColor ,TEXT_ALIGN_CENTER )
             Ammout = Ammout + 1
 
             if SelectedWep == wep and wep.DrawWeaponSelection then
@@ -185,6 +211,7 @@ local function GetUpper(Weapons)
     if Weapons[WS.SelectedSlot] == nil or Weapons[WS.SelectedSlot][WS.SelectedSlotPos] == nil then
         GetUpper(Weapons)
     end
+
 end
 
 local function GetDown(Weapons)
@@ -197,6 +224,7 @@ local function GetDown(Weapons)
     if Weapons[WS.SelectedSlot] == nil or Weapons[WS.SelectedSlot][WS.SelectedSlotPos] == nil then
         GetDown(Weapons)
     end
+
 end
 
 local LastSelected = 0
@@ -214,11 +242,11 @@ local function canUseSelector(ply)
         return true
     end
 
-    return IsAiming(ply) or (IsValid(wep) and wep:GetClass() == "weapon_physgun" and ply:KeyDown(IN_ATTACK)) or (lply.organism and lply.organism.pain and lply.organism.pain > 100) or GetGlobalBool("RadialInventory", false)
+    return IsAiming(ply) or (IsValid(wep) and wep:GetClass() == "weapon_physgun" and ply:KeyDown(IN_ATTACK)) or (lply.organism and lply.organism.pain and lply.organism.pain > 100)
 end
 
 function WS.ChangeSelectionWep( ply, key )
-    if not IsValid( ply ) or not ply:Alive() or GetGlobalBool("RadialInventory", false) then return end
+    if not IsValid( ply ) or not ply:Alive() then return end
     if ply.organism and ply.organism.otrub then return end
     if canUseSelector( ply ) then return end
     --print(canUseSelector( ply ))
@@ -268,7 +296,7 @@ function WS.ChangeSelectionWep( ply, key )
 end
 
 function WS.SetActuallyWeapon( ply, cmd )
-    if not IsValid( ply ) or not ply:Alive() or GetGlobalBool("RadialInventory", false) then return end
+    if not IsValid( ply ) or not ply:Alive() then return end
     if (cmd:KeyDown( IN_ATTACK ) or cmd:KeyDown( IN_ATTACK2 )) and WS.Show > CurTime() then
 
         if WS.Selected and WS.Selected > CurTime() then 

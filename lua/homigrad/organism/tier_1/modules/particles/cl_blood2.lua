@@ -27,10 +27,16 @@ bloodparticles_hook[3] = function(anim_pos)
         local part = hg.bloodparticles2[i]
         if not part then continue end
         local animpos = math.max((part[7] - time) / part[8], 0)
-        color.a = part.water and (200 * animpos) or (122 * animpos)
+        local drawColor
+        if part.color and part.color.r and type(part.color.r) == "number" then
+            drawColor = Color(part.color.r, part.color.g, part.color.b, part.color.a or 122)
+            drawColor.a = (part.color.a or 122) * animpos
+        else
+            drawColor = Color(color.r, color.g, color.b, part.water and (200 * animpos) or (122 * animpos))
+        end
         local sizeing = part.water and math.max((1 - animpos), 0.1) or 1
         render_SetMaterial(part[4])
-        render_DrawSprite(LerpVector(anim_pos,part[2],part[1]),part[5] * sizeing, part[6] * sizeing, color)
+        render_DrawSprite(LerpVector(anim_pos,part[2],part[1]),part[5] * sizeing, part[6] * sizeing, drawColor)
     end
 end
 

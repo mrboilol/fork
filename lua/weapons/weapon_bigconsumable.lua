@@ -33,18 +33,14 @@ SWEP.FoodModelsKCNNeutralizers = {
 }
 
 SWEP.FoodModels = {
-	"models/jordfood/canned_burger.mdl",
-	"models/jorddrink/the_bottle_of_water.mdl",
-	"models/foodnhouseholditems/milk.mdl",
+	"models/jordfood/canned_burger.mdl", 
+	"models/jorddrink/the_bottle_of_water.mdl", 
+	"models/foodnhouseholditems/milk.mdl", 
 	"models/jordfood/can.mdl",
 	"models/foodnhouseholditems/juice.mdl",
 	"models/foodnhouseholditems/cola.mdl",
 	"models/foodnhouseholditems/bagette.mdl",
 	"models/jordfood/prongleclosedfilledgreen.mdl",
-}
-
-SWEP.DoNotDropModels = {
-	["models/foodnhouseholditems/bagette.mdl"] = true,
 }
 
 SWEP.WaterModel = {
@@ -56,12 +52,12 @@ SWEP.WaterModel = {
 
 SWEP.FallSnd = "snd_jack_hmcd_foodbounce.wav"
 SWEP.DeploySnd = "snd_jack_hmcd_foodbounce.wav"
-SWEP.Eating = 0
-SWEP.CDEating = 0
 
 function SWEP:SetupDataTables()
+
 	self:NetworkVar( "String", "CurModel" ) 
 	self:NetworkVar( "Float", 0, "Holding" )
+
 end
 
 function SWEP:DrawWorldModel2()
@@ -97,6 +93,14 @@ end
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 
+	local owner = self:GetOwner()
+	if owner:IsNPC() then
+		self:SetHold("melee")
+		owner:SetHealth(math.Clamp(owner:Health() + (owner:GetMaxHealth() * 0.15), 0, owner:GetMaxHealth() * 2))
+		owner:EmitSound("snd_jack_hmcd_eat"..math.random(4)..".wav", 75, math.random(95, 105))
+		self:Remove()
+	end
+
 	local sharedrand = math.Round(util.SharedRandom("rand"..self:EntIndex()..math.floor(CurTime()),1,#self.FoodModels))
 	local model = self.FoodModels[sharedrand]
 	self:SetModel( model )
@@ -116,71 +120,35 @@ end
 function SWEP:SecondaryAttack()
 end
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
-
-function SWEP:Think()
-	if (not self:GetOwner():KeyDown(IN_ATTACK) or self.CDEating > CurTime()) and hg_healanims:GetBool() then
-		self:SetHolding(math.max(self:GetHolding() - 10, 0))
-	end
-end
-
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
 function SWEP:Animation()
 	if (self:GetOwner().zmanipstart ~= nil and not self:GetOwner().organism.larmamputated) then return end
 	local hold = self:GetHolding()
-    self:BoneSet("r_upperarm", vector_origin, Angle(0, -10 - hold, 10))
-    self:BoneSet("r_forearm", vector_origin, Angle(-15, -hold, -hold))
+    self:BoneSet("r_upperarm", vector_origin, Angle(0, -10 -hold / 2, 10))
+    self:BoneSet("r_forearm", vector_origin, Angle(-5, -hold / 2.5, -hold / 1.5))
 
     self:BoneSet("l_upperarm", vector_origin, lang1)
     self:BoneSet("l_forearm", vector_origin, lang2)
 end
 
-function SWEP:OwnerChanged()
-	local owner = self:GetOwner()
-	if IsValid(owner) and owner:IsNPC() then
-		if not self.DoNotDropModels[self:GetCurModel()] then
-			self:SpawnGarbage(self:GetCurModel() or nil)
-		end
-		self:NPCHeal(owner, 0.2, "snd_jack_hmcd_eat"..math.random(4)..".wav")
-	end
-end
-
 if SERVER then
-	local ang_eat = Angle(6, 0, 0)
-	function SWEP:Heal(ent, mode)
-		if ent:IsNPC() then
-			if not self.DoNotDropModels[self:GetCurModel()] then
-				self:SpawnGarbage(self:GetCurModel() or nil)
-			end
-			self:NPCHeal(ent, 0.2, "snd_jack_hmcd_eat"..math.random(4)..".wav")
-		end
-
+	function SWEP:Heal(ent, mode, bone)
 		local org = ent.organism
 		if not org then return end
-
+		self.Eating = self.Eating or 0
+		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end
 
-		local owner = self:GetOwner()
-		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
-			self:SetHolding(math.min(self:GetHolding() + 10, 100))
-
-			if self:GetHolding() < 100 then
-				return
-			end
-		end
-
 		org.satiety = org.satiety + 25/5
-		owner:ViewPunch(ang_eat)
+		local ply = self:GetOwner()
+		ply:ViewPunch(Angle(3,0,0))
 		
 		ent:EmitSound( self.WaterModel[self.WorldModel] and "snd_jack_hmcd_drink"..math.random(3)..".wav" or "snd_jack_hmcd_eat"..math.random(4)..".wav", 60, math.random(95, 105))
 		self.CDEating = CurTime() + 0.5
 		self.Eating = self.Eating + 1
-
+		--self:SetHolding(0.98)
 		if self.Eating > 5 then
-			owner:SelectWeapon("weapon_hands_sh")
-			if not self.DoNotDropModels[self:GetCurModel()] then
-				self:SpawnGarbage(self:GetCurModel() or nil)
-			end
+			self:GetOwner():SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end
 		

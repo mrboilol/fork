@@ -99,7 +99,6 @@ end)
 			buffer[#buffer + 1] = "<color=150,150,150>[whisper]</color> "
 		end
 	end)
---//
 
 -- hook.Add("Player_Death", "ResetChatFont",function()
 -- 	atlaschat.font:SetString("atlaschat.theme.text")

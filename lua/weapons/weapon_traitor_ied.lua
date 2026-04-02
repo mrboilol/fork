@@ -227,7 +227,38 @@ local function ExplodeTheItem(self,ent)
 
 		timer.Simple(0.2,function()
 			if not IsValid(ent) then self:Remove() return end
-			util.BlastDamage(self, IsValid(self:GetOwner()) and self:GetOwner() or self, EntPos, BlastDis / 0.01905, BlastDamage * 0.1) -- эта функция полное говно кстати. бьет сковзь любые пропы...
+			
+			local blastRadius = BlastDis / 0.01905
+			local nearRadius = 150
+			local damage = BlastDamage * 0.1
+			local attacker = IsValid(self:GetOwner()) and self:GetOwner() or self
+
+			for _, nearEnt in ipairs(ents.FindInSphere(EntPos, nearRadius)) do
+				if nearEnt:IsPlayer() then
+					local tr = util.TraceLine({
+						start = EntPos,
+						endpos = nearEnt:BodyTarget(EntPos),
+						filter = {self, nearEnt}
+					})
+					
+					if tr.HitWorld or (IsValid(tr.Entity) and tr.Entity ~= nearEnt) then
+						local dmgInfo = DamageInfo()
+						dmgInfo:SetDamage(damage / 2)
+						dmgInfo:SetAttacker(attacker)
+						dmgInfo:SetInflictor(self)
+						dmgInfo:SetDamageType(DMG_BLAST)
+						dmgInfo:SetDamagePosition(EntPos)
+						nearEnt:TakeDamageInfo(dmgInfo)
+
+						hg.LightStunPlayer(nearEnt, 5)
+						if not IsValid(nearEnt.FakeRagdoll) then
+							hg.Fake(nearEnt)
+						end
+					end
+				end
+			end
+
+			util.BlastDamage(self, attacker, EntPos, blastRadius, damage) -- эта функция полное говно кстати. бьет сковзь любые пропы...
 			
 			local dis = BlastDis / 0.01905
 			local disorientation_dis = 10 / 0.01905  
@@ -271,7 +302,7 @@ local function ExplodeTheItem(self,ent)
 				phys:ApplyForceCenter(forceadd)
 			end
 
-			--hgWreckBuildings(ent, EntPos, BlastDamage / 400, BlastDis/8, false)
+			hgWreckBuildings(ent, EntPos, BlastDamage / 400, BlastDis/8, false)
 			hgBlastDoors(ent, EntPos, BlastDamage / 400, BlastDis/8, false)
 			util.ScreenShake( EntPos, 45, 225, 2.5, 3000 )
 

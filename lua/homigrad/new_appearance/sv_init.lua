@@ -159,6 +159,9 @@ net.Receive("Get_Appearance",function(len,client)
     local bRandom = net.ReadBool()
     if !APmodule.AppearanceValidater(tAppearance) then bRandom = true end
 
+    -- Update cache immediately so next respawn uses this
+    client.CachedAppearance = tAppearance
+
     ApplyAppearance(client,tAppearance, table.IsEmpty(tAppearance) and true or bRandom,true)
 end)
 

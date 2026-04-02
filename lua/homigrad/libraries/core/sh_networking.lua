@@ -128,13 +128,13 @@ else
     	return value != nil and value or default
     end
 
-    function SetNetVar(key, value, receiver, unreliable)
+    function SetNetVar(key, value, receiver)
     	if (CheckBadType(key, value)) then return end
     	--if (GetNetVar(key) == value) then return end
 		
     	zb.net.globals[key] = value
 
-    	net.Start("zbGlobalVarSet", unreliable)
+    	net.Start("zbGlobalVarSet")
     	net.WriteString(key)
     	net.WriteType(value)
 

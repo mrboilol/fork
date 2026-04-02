@@ -762,7 +762,7 @@
 		local hg_tpik_distance = ConVarExists("hg_tpik_distance") and GetConVar("hg_tpik_distance") or CreateClientConVar("hg_tpik_distance",1024,true,false,"The distance (in hammer units) at which the third person inverse kinematics enables, 0 = inf",0,2048)
 
 		local render_GetViewSetup = render.GetViewSetup
-		function hg.ShouldTPIK(ply)
+		function hg.ShouldTPIK(ply, wpn)
 			local time = CurTime()
 			if (ply.cachedtpik or 0) > time then return ply.cachedval end
 			ply.cachedtpik = time + 0.1

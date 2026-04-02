@@ -23,7 +23,7 @@ SWEP.CanSuicide = true
 SWEP.BleedMultiplier = 1.5
 SWEP.PainMultiplier = 1.8
 
-SWEP.DamagePrimary = 20
+SWEP.DamagePrimary = 25
 SWEP.DamageSecondary = 10
 
 SWEP.setlh = false
@@ -72,9 +72,9 @@ function SWEP:Initialize()
     self:InitAdd()
 end
 
-SWEP.AttackTime = 0.01
-SWEP.AnimTime1 = 0.8
-SWEP.WaitTime1 = 0.6
+SWEP.AttackTime = 0.28
+SWEP.AnimTime1 = 1.15
+SWEP.WaitTime1 = 0.75
 
 SWEP.AnimTime2 = 1
 SWEP.WaitTime2 = 0.4
@@ -85,6 +85,10 @@ SWEP.AnimList = {
     ["attack"] = "stab_miss",
     ["attack2"] = "midslash1",
 }
+
+SWEP.BlockTier = 2
+SWEP.MeleeMaterial = "metal"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 function SWEP:Reload()
     if SERVER then
