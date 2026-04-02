@@ -1145,6 +1145,63 @@ local IsValid = IsValid
 --\\ remove default death sound
 	hook.Add("PlayerDeathSound", "removesound", function() return true end)
 --//
+--// rest in peace my granny she got hit by a bazooka
+	function hg.GetArmInjuryWeaponWeight(ply, wep)
+		if not IsValid(ply) or not IsValid(wep) then return 0 end
+
+		local base = wep.Base
+		local class = wep:GetClass()
+		if base ~= "weapon_base" and base ~= "weapon_melee" and base ~= "homigrad_base" and class ~= "weapon_base" and class ~= "weapon_melee" then return 0 end
+		if type(wep.weight) ~= "number" and type(wep.hg_base_weight) ~= "number" then return 0 end
+
+		local org = ply.organism
+		if not org then return 0 end
+
+		local extra = 0
+		if not org.larmamputated and ((org.larm or 0) >= 1 or org.larmdislocation) then
+			extra = extra + 4
+		end
+		if not org.rarmamputated and ((org.rarm or 0) >= 1 or org.rarmdislocation) then
+			extra = extra + 4
+		end
+
+		return extra
+	end
+
+	hook.Add("Player Think", "hg-arm-injury-weapon-weight", function(ply)
+		if not IsValid(ply) or not ply:IsPlayer() then return end
+
+		local active = ply:GetActiveWeapon()
+		local weps = ply:GetWeapons()
+
+		for i, wep in ipairs(weps) do
+			if not IsValid(wep) then continue end
+
+			local base = wep.Base
+			local class = wep:GetClass()
+			local tracked = base == "weapon_base" or base == "weapon_melee" or base == "homigrad_base" or class == "weapon_base" or class == "weapon_melee"
+			if not tracked then
+				if type(wep.hg_base_weight) == "number" and type(wep.weight) == "number" and wep.weight ~= wep.hg_base_weight then
+					wep.weight = wep.hg_base_weight
+				end
+				continue
+			end
+
+			local baseWeight = wep.hg_base_weight
+			if type(baseWeight) ~= "number" then
+				if type(wep.weight) ~= "number" then continue end
+				baseWeight = wep.weight
+				wep.hg_base_weight = baseWeight
+			end
+
+			local extra = (wep == active) and hg.GetArmInjuryWeaponWeight(ply, wep) or 0
+			local wanted = baseWeight + extra
+			if wep.weight ~= wanted then
+				wep.weight = wanted
+			end
+		end
+	end)
+	--//
 --\\ flashlight custom switch
 	hook.Add("PlayerSwitchFlashlight", "removeflashlights", function(ply, enabled)
 		if ply.PlayerClassName == "Combine" or ply.PlayerClassName == "furry" then return false end --!! TODO: CLASS.NoFlashLight boolean

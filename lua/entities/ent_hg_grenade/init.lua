@@ -197,11 +197,11 @@ function ENT:Explode()
 				mask = MASK_SHOT,
 				filter = self
 			})
-		--if line.Hit then
-		--	ParticleEffect("pcf_jack_groundsplode_small3",selfPos,-vector_up:Angle())
-		--else
+		if line.Hit then
+			ParticleEffect("pcf_jack_groundsplode_small3",selfPos,-vector_up:Angle())
+		else
 			ParticleEffect("pcf_jack_airsplode_small3",selfPos,-vector_up:Angle())
-		--end
+		end
 	else
 		local effectdata = EffectData()
 		effectdata:SetOrigin(selfPos)
@@ -265,7 +265,67 @@ function ENT:Explode()
 		EmitSound(self.DebrisSounds[math.random(#self.DebrisSounds)], self:GetPos(), self:EntIndex(), CHAN_AUTO, 1, 80)
 	end
 
-	util.BlastDamage(self, IsValid(self.owner) and self.owner or self, selfPos, self.BlastDis / 0.01905, 35)
+	local blastRadius = self.BlastDis / 0.01905
+	local nearRadius = 150
+	local damage = 35
+	local attacker = IsValid(self.owner) and self.owner or self
+
+	for _, ent in ipairs(ents.FindInSphere(selfPos, nearRadius)) do
+		if ent:IsPlayer() then
+			local tr = util.TraceLine({
+				start = selfPos,
+				endpos = ent:BodyTarget(selfPos),
+				filter = {self, ent}
+			})
+			if tr.HitWorld or (IsValid(tr.Entity) and tr.Entity ~= ent) then
+				local dmgInfo = DamageInfo()
+				dmgInfo:SetDamage(damage / 2)
+				dmgInfo:SetAttacker(attacker)
+				dmgInfo:SetInflictor(self)
+				dmgInfo:SetDamageType(DMG_BLAST)
+				dmgInfo:SetDamagePosition(selfPos)
+				ent:TakeDamageInfo(dmgInfo)
+
+				hg.LightStunPlayer(ent, 5)
+				if not IsValid(ent.FakeRagdoll) then
+					hg.Fake(ent)
+				end
+			end
+		end
+	end
+
+	util.BlastDamage(self, attacker, selfPos, blastRadius, damage)
+
+	local blastRadius = self.BlastDis / 0.01905
+	local nearRadius = 150
+	local damage = 35
+	local attacker = IsValid(self.owner) and self.owner or self
+
+	for _, ent in ipairs(ents.FindInSphere(selfPos, nearRadius)) do
+		if ent:IsPlayer() then
+			local tr = util.TraceLine({
+				start = selfPos,
+				endpos = ent:BodyTarget(selfPos),
+				filter = {self, ent}
+			})
+			if tr.HitWorld or (IsValid(tr.Entity) and tr.Entity ~= ent) then
+				local dmgInfo = DamageInfo()
+				dmgInfo:SetDamage(damage / 2)
+				dmgInfo:SetAttacker(attacker)
+				dmgInfo:SetInflictor(self)
+				dmgInfo:SetDamageType(DMG_BLAST)
+				dmgInfo:SetDamagePosition(selfPos)
+				ent:TakeDamageInfo(dmgInfo)
+
+				hg.LightStunPlayer(ent, 5)
+				if not IsValid(ent.FakeRagdoll) then
+					hg.Fake(ent)
+				end
+			end
+		end
+	end
+
+	util.BlastDamage(self, attacker, selfPos, blastRadius, damage)
 
 	--;; Расскажу вам тайну но у нас трассировка делалась просто ужасно
 	local dis = self.BlastDis / 0.01905
@@ -328,7 +388,7 @@ function ENT:Explode()
 	Poof:SetScale(1.2)
 	util.Effect("eff_jack_hmcd_shrapnel",Poof,true,true)
 
-	timer.Simple(0, function()
+		timer.Simple(0, function()
 		util.ScreenShake( selfPos, 35, 200, 1, 1000 )
 
 		local ammo = "Metal Debris"

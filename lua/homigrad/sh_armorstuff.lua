@@ -630,7 +630,7 @@ hg.armor.face = {
 					"griggs/models/ballistic_mask_phonky","griggs/models/ballistic_mask_steamhappy",
 					"griggs/models/ballistic_mask_z", "griggs/models/ballistic_mask_pluvmaska",
 					"griggs/models/ballistic_mask_coolkid_01","griggs/models/ballistic_mask_coolkid_02",
-					"sosoda/models/ballistic_mask_manhunt"},
+					"sosoda/models/ballistic_mask_manhunt","napas/models/ballistic_mask_smiley", "griggs/models/ballistic_mask_peace", "sosoda/models/ballistic_mask_manhunt", "napas/models/ballistic_mask_hockey"},
 		norender = true,
 		scale = 1,
 		femscale = 0.97,
