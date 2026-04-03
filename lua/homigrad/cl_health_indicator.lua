@@ -71,6 +71,7 @@ local bodyParts = {
         health = function(org) return org.skull or 0 end,
         dislocated = function(org) return org.jawdislocation end, -- Using for jaw dislocation
         broken = function(org) return org.jaw or 0 end, -- Using for jaw destruction
+        amputated = function(org) return org.headamputated end,
     },
 }
 
@@ -316,9 +317,9 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     if org then
         for partName, partData in pairs(bodyParts) do
             local health = (partData.health and partData.health(org)) or 0
-            local isBroken = health >= 1 or (partData.broken and partData.broken(org))
             local isDislocated = partData.dislocated and partData.dislocated(org)
             local isAmputated = partData.amputated and partData.amputated(org)
+            local isBroken = not isAmputated and (health >= 1 or (partData.broken and partData.broken(org)))
 
             if not limbStates[partName] then
                 limbStates[partName] = {

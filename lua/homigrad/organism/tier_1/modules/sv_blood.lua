@@ -43,6 +43,10 @@ module[1] = function(org)
 	org.hemotransfusionshock = 0
 
 	org.survivalchance = 1
+
+	org.bleedingmul = 1.0
+	org.coagulation_multiplier = 1.0
+	org.blood_regeneration_multiplier = 1.0
 end
 
 local internalbleed_phrases = {
@@ -88,7 +92,7 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70, 5000)
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier, 5000)
 	end
 
 	if org.hemotransfusionshock > 0 then
@@ -114,7 +118,7 @@ module[2] = function(owner, org, mulTime)
 			local rand1 = math.Rand(4, 10) * 1
 			local rand2 = math.Rand(0.5, 1) * 1
 			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04-- / #org.wounds
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04 * org.coagulation_multiplier-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
 			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
 			

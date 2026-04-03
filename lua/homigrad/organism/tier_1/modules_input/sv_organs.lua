@@ -382,7 +382,7 @@ input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) r
 input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return 0 end--hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit) end
+input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.lungsL = function(org, bone, dmg, dmgInfo)
 	local prot = math.max(0.3 - org.lungsL[1],0)
 	local oldval = org.lungsL[1]
@@ -415,16 +415,27 @@ input_list.lungsR = function(org, bone, dmg, dmgInfo)
 end
 
 input_list.trachea = function(org, bone, dmg, dmgInfo)
-	do return 0 end
+    if math.random() < 0.25 then
+        return input_list.arteria(org, bone, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dmgInfo:GetDamageForce():GetNormalized(), dmgInfo:GetDamagePosition())
+    end
+
 	local oldDmg = org.trachea
+
+    dmg = dmg * 0.1 -- 90% resistance
+
+    if isCrush(dmgInfo) then
+        if math.random() < 0.25 then
+            return 0
+        else
+            dmg = dmg * 10
+        end
+    end
 
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 5 end
 
 	local result = damageOrgan(org, dmg * 2, dmgInfo, "trachea")
 
 	hg.AddHarmToAttacker(dmgInfo, (org.trachea - oldDmg) * 8, "Trachea damage harm")
-
-	//org.internalBleed = org.internalBleed + dmg * 2
 
 	return result
 end

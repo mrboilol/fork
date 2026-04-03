@@ -1385,6 +1385,30 @@ function SWEP:CoreStep()
 			end
 			self.zoomsound = nil
 		end
+		if self:IsLocal() then
+			local org = owner.organism
+			if org then
+				local shake_intensity = 0
+				local function get_arm_shake(is_broken, is_dislocated)
+					if is_broken then return 0.1 end
+					if is_dislocated then return 0.05 end
+					return 0
+				end
+
+				if self:IsPistolHoldType() then
+					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
+				else
+					shake_intensity = shake_intensity + get_arm_shake(org.larm == 1, org.larmdislocated)
+					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
+				end
+
+				if shake_intensity > 0 then
+					local time = CurTime() * 10
+					local random_shake = Angle(math.sin(time) * shake_intensity, math.cos(time * 0.8) * shake_intensity, 0)
+					self.AdditionalAngPreLerp:Add(random_shake)
+				end
+			end
+		end
 	end
 
 	if SERVER then self:DrawAttachments() end

@@ -220,6 +220,7 @@ hook.Add("Player Spawn", "hg.forsaken.deathscene.reset", function(ply)
 	forsaken_scene_start = 0
 	forsaken_scene_end = 0
 	forsaken_soundfade_release_until = 0
+	forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
 end)
 
 local alivestart = CurTime()
@@ -1048,7 +1049,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							hg.addBloodPart(pos, VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70, nil, size, size, true, nil, ent)
+							local chaos = Vector(math.sin(CurTime() * 15) * 15, math.cos(CurTime() * 15) * 15, math.sin(CurTime()*15) * 5)
+							hg.addBloodPart(pos, dir * math.Rand(1.0, 1.5) + VectorRand(-15, 15) + chaos, nil, size, size, true, nil, ent)
 							if wound[7] == "arteria" then
 								hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-12, 12) + dir * 0.1, nil, 18, 18, 0.2, false, ent)
 								hg.addBloodPart(pos + VectorRand(-1, 1), dir * 0.3 + VectorRand(-6, 6), nil, 1, 1, true, nil, ent)

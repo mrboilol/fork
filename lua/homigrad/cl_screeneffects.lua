@@ -336,6 +336,7 @@ local stations = {
 local choosera = 1
 local tempolerp = 0
 hook.Add("Post Post Processing", "ItHurts", function()
+	if not org then return end
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	
 	if IsValid(PainStation) then

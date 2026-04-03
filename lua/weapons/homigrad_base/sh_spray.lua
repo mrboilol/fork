@@ -66,6 +66,7 @@ function SWEP:PrimarySpread()
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
+		mul = mul * self:GetArmRecoilMultiplier(owner)
 
 		local angRand = AngleRand(0.03, 0.05)
 		angRand[1] = -math.abs(angRand[1])

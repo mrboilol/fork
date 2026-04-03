@@ -2,22 +2,22 @@ EFFECT.MatBeam = Material(effectslaser_tracer)
 EFFECT.MatGlow = Material(spriteslight_glow02_add)
 EFFECT.MatFire = Material(particlefire)
 
-function EFFECTInit(data)
-    self.StartPos = dataGetStart()
-    self.EndPos = dataGetOrigin()
-    self.Intensity = math.max(dataGetScale(), 1)
-    self.VisualSpeed = math.max(dataGetMagnitude(), 260)
+function EFFECT:Init(data)
+    self.StartPos = data:GetStart()
+    self.EndPos = data:GetOrigin()
+    self.Intensity = math.max(data:GetScale(), 1)
+    self.VisualSpeed = math.max(data:GetMagnitude(), 260)
     self.SpawnTime = CurTime()
-    self.Length = self.StartPosDistance(self.EndPos)
-    self.Duration = math.Clamp(self.Length  self.VisualSpeed, 0.75, 1.75)
+    self.Length = self.StartPos:Distance(self.EndPos)
+    self.Duration = math.Clamp(self.Length / self.VisualSpeed, 0.75, 1.75)
     self.DieTime = self.SpawnTime + self.Duration
     self.MaxPathPoints = 14
     self.Path = {}
-    self.DropAmount = math.Clamp(self.Length  0.08, 28, 180)
+    self.DropAmount = math.Clamp(self.Length * 0.08, 28, 180)
 
     self.Color = Color(255, 100, 28)
     self.CoreColor = Color(255, 225, 160)
-    selfSetRenderBoundsWS(self.StartPos, self.EndPos)
+    self:SetRenderBoundsWS(self.StartPos, self.EndPos)
 end
 
 function EFFECTGetHeadPos(frac)

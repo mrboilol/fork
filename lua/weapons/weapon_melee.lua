@@ -934,6 +934,29 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
         mul = mul * (1 + owner.organism.berserk)
     end
 
+    if owner.organism then
+        local org = owner.organism
+        local damage_multiplier = 1.0
+
+        local function get_arm_debuff(is_broken, is_dislocated)
+            if is_broken then return 0.4 end -- 60% damage reduction for broken arm
+            if is_dislocated then return 0.7 end -- 30% damage reduction for dislocated arm
+            return 1.0
+        end
+
+        if self.TwoHanded then
+            damage_multiplier = damage_multiplier * get_arm_debuff(org.larm == 1, org.larmdislocated)
+            damage_multiplier = damage_multiplier * get_arm_debuff(org.rarm == 1, org.rarmdislocated)
+        else
+            if self.setrh then -- Right-handed
+                damage_multiplier = damage_multiplier * get_arm_debuff(org.rarm == 1, org.rarmdislocated)
+            elseif self.setlh then -- Left-handed
+                damage_multiplier = damage_multiplier * get_arm_debuff(org.larm == 1, org.larmdislocated)
+            end
+        end
+        mul = mul * damage_multiplier
+    end
+
     if self:GetAttackType() == 3 then
         local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
         local chargeTime = startTime > 0 and (CurTime() - startTime) or 0
@@ -950,6 +973,35 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     end
 
     return mul
+end
+
+function SWEP:ArmPainEffect(owner)
+    if not IsValid(owner) or not owner:IsPlayer() or not owner.organism then return end
+
+    local org = owner.organism
+    local pain_intensity = 0
+
+    local function get_arm_pain(is_broken, is_dislocated)
+        if is_broken then return 3 end
+        if is_dislocated then return 1.5 end
+        return 0
+    end
+
+    if self.TwoHanded then
+        pain_intensity = pain_intensity + get_arm_pain(org.larm == 1, org.larmdislocated)
+        pain_intensity = pain_intensity + get_arm_pain(org.rarm == 1, org.rarmdislocated)
+    else
+        if self.setrh then
+            pain_intensity = pain_intensity + get_arm_pain(org.rarm == 1, org.rarmdislocated)
+        elseif self.setlh then
+            pain_intensity = pain_intensity + get_arm_pain(org.larm == 1, org.larmdislocated)
+        end
+    end
+
+    if pain_intensity > 0 then
+        owner:ViewPunch(Angle(math.Rand(-1, 1) * pain_intensity, math.Rand(-1, 1) * pain_intensity, math.Rand(-1, 1) * pain_intensity))
+        owner:EmitSound("physics/flesh/flesh_impact_bullet"..math.random(1,4)..".wav", 70, 90 + pain_intensity * 2)
+    end
 end
 
 function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
@@ -1058,6 +1110,10 @@ end
 
 function SWEP:PlayEffects(trace, attacktype)
     local owner = self:GetOwner()
+
+    if SERVER then
+        self:ArmPainEffect(owner)
+    end
     
     if self:IsEntSoft(trace.Entity) then
         owner:EmitSound("hitregister.ogg", 75, 115)
@@ -1176,6 +1232,10 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
         if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
             local defenderBlockTier = wep.BlockTier or 1
             local attackerBlockTier = self.BlockTier or 1
+
+            if SERVER and wep.ArmPainEffect then
+                wep:ArmPainEffect(ent)
+            end
 
             if defenderBlockTier >= attackerBlockTier then
                 if attacktype == 3 then

@@ -2,7 +2,7 @@ hg = hg or {}
 hg.organism = hg.organism or {}
 hg.organism.fake_spine1 = 1
 hg.organism.fake_spine2 = 1
-hg.organism.fake_spine3 = 0.5
+hg.organism.fake_spine3 = 0.75
 hg.organism.fake_legs = 1
 hg.organism.input_list = hg.organism.input_list or {}
 

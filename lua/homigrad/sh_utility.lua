@@ -865,15 +865,42 @@ local IsValid = IsValid
 
 --\\ Suicide
 	if SERVER then
+		local hg_huyside = CreateConVar("hg_huyside", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Enable rare suicide cutscene", 0, 1)
 		concommand.Add("suicide", function(ply)
-			ply.suiciding = !ply.suiciding
+			if not hg.CanSuicide(ply) then
+				ply:ChatPrint("no nigga")
+				return
+			end
+
+			local wep = ply:GetActiveWeapon()
+			local org = ply.organism
+			local fear = (org and org.fear) or 0
+
+			if hg_huyside:GetBool() and IsValid(wep) and wep.ishgweapon and not wep.ismelee and not wep.ismelee2 then
+				local chance = 0.01 + (fear * 0.89) -- at fear 1, chance is 0.9
+				if math.random() <= chance then
+					ply.suiciding = !ply.suiciding
+					return
+				end
+			end
+
+			ply:Kill()
 		end)
 	end
 
 	function hg.CanSuicide(ply)
-		if not IsValid(ply) or not ply.GetActiveWeapon then return false end
+		if not IsValid(ply) or not ply:Alive() or not ply.GetActiveWeapon then return false end
 		local wep = ply:GetActiveWeapon()
-		return ishgweapon(wep) and wep.CanSuicide and not wep.reload
+		if not IsValid(wep) then return false end
+		if not wep.CanSuicide or wep.reload then return false end
+
+		-- if it's a gun, it must be an hgweapon.
+		if not wep.ismelee and not wep.ismelee2 then
+			return wep.ishgweapon
+		end
+
+		-- it's a melee weapon, and CanSuicide is true.
+		return true
 	end
 --//
 --\\ Calculate Weight 
