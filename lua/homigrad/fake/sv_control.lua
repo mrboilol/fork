@@ -320,8 +320,33 @@ hook.Add("Think", "Fake", function()
 		local forward = ply:KeyDown(IN_FORWARD)
 		local back = ply:KeyDown(IN_BACK)
 		time = CurTime()
-		
-		if ply.organism and ply.organism.wounds and not table.IsEmpty(ply.organism.wounds) and org.canmove and (ply.fakecd and (ply.fakecd + 1) > CurTime()) then
+
+		--huy
+		if org.neckslit and not org.otrub and org.arterialwounds and not table.IsEmpty(org.arterialwounds) then
+			local neckwound
+			for i, wound in pairs(org.arterialwounds) do
+				if wound[7] == "arteria" then
+					neckwound = wound
+					break
+				end
+			end
+
+			if neckwound and ragdoll:LookupBone(neckwound[4]) then
+				local bone = ragdoll:LookupBone(neckwound[4])
+				local neckpos, neckang = ragdoll:GetBonePosition(bone)
+				if neckpos and neckang then
+					local right = neckang:Right()
+					local forward = neckang:Forward()
+					local up = neckang:Up()
+					local leftpos = neckpos + right * -3 + forward * 2 + up * -1
+					local rightpos = neckpos + right * 3 + forward * 2 + up * -1
+					shadowControl(ragdoll, 5, 0.001, nil, nil, nil, leftpos, 100, 20)
+					shadowControl(ragdoll, 7, 0.001, nil, nil, nil, rightpos, 100, 20)
+					shadowControl(ragdoll, 10, 0.001, nil, nil, nil, neckpos, 50, 10)
+					return -- Skip the rest of the logic
+				end
+			end
+		elseif ply.organism and ply.organism.wounds and not table.IsEmpty(ply.organism.wounds) and org.canmove and (ply.fakecd and (ply.fakecd + 1) > CurTime()) then
 			local tr = {}
 			tr.start = ragdoll:GetPos()
 			tr.endpos = ragdoll:GetPos() - vector_up * 60
@@ -750,7 +775,25 @@ hook.Add("Think", "Fake", function()
 			--print("huy")
 		end
 
-		if ply:KeyDown(IN_MOVELEFT) and ragdoll:IsOnFire() and not inmove and !ply:InVehicle() then
+				local keyLeft = false
+		local keyRight = false
+		local isNeckSlitRolling = false
+		
+		if org and org.neckslit and not org.otrub and ply:Alive() and not ply:InVehicle() then
+			local phase = (CurTime() * 1.5) % 4
+			if phase < 1 then
+				keyLeft = true
+				isNeckSlitRolling = true
+			elseif phase >= 2 and phase < 3 then
+				keyRight = true
+				isNeckSlitRolling = true
+			end
+		else
+			keyLeft = ply:KeyDown(IN_MOVELEFT)
+			keyRight = ply:KeyDown(IN_MOVERIGHT)
+		end
+
+		if keyLeft and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
 			if org.canmove then
 				local angle = spine:GetAngles()
 				angle[3] = angle[3] - 20 * (ragdoll:IsOnFire() and 1.5 or 1)
@@ -777,7 +820,7 @@ hook.Add("Think", "Fake", function()
 			end
 		end
 
-		if ply:KeyDown(IN_MOVERIGHT) and ragdoll:IsOnFire() and not inmove and !ply:InVehicle() then
+		if keyRight and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
 			if org.canmove and not org.otrub then
 				local angle = spine:GetAngles()
 				angle[3] = angle[3] + 20 * (ragdoll:IsOnFire() and 1.5 or 1)
@@ -943,5 +986,75 @@ hook.Add("PlayerDeath", "homigrad-fake-control", function(ply)
 		for i = 1, 4 do
 			ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_R_Finger" .. tostring(i) .. "1"), Angle(0, 0, 0))
 		end
+	end
+end)
+
+hook.Add("Think", "RagdollWaterSplash", function()
+	for _, ragdoll in ipairs(ents.FindByClass("prop_ragdoll")) do
+		local waterLevel = ragdoll:WaterLevel()
+		if waterLevel > 0 and (ragdoll.oldWaterLevel or 0) == 0 then
+			local velocity = ragdoll:GetVelocity():Length()
+			if velocity > 100 then
+				local effectData = EffectData()
+				effectData:SetOrigin(ragdoll:GetPos())
+				effectData:SetScale(math.min(3 + velocity / 100, 20))
+				effectData:SetFlags(0)
+				util.Effect("WaterSplash", effectData)
+
+				ragdoll:EmitSound("physics/surfaces/underwater_impact_heavy" .. math.random(1, 4) .. ".wav", 75, math.Clamp(velocity / 2, 50, 150))
+--minecraft
+				if velocity > 400 then
+					local ply = hg.RagdollOwner(ragdoll)
+					if IsValid(ply) and ply:Alive() and ply.organism and not ply.organism.godmode then
+						local dmg = (velocity - 400) / 1000
+						local dmgInfo = DamageInfo()
+						dmgInfo:SetDamage(dmg * 20)
+						dmgInfo:SetDamageType(DMG_CRUSH)
+						dmgInfo:SetAttacker(game.GetWorld())
+						dmgInfo:SetInflictor(game.GetWorld())
+						dmgInfo:SetDamagePosition(ragdoll:GetPos())
+
+						local org = ply.organism
+
+						local bones = {
+							{HITGROUP_CHEST, "chest"},
+							{HITGROUP_STOMACH, "pelvis"},
+							{HITGROUP_HEAD, "skull"},
+							{HITGROUP_LEFTLEG, "llegdown"},
+							{HITGROUP_RIGHTLEG, "rlegdown"},
+							{HITGROUP_LEFTARM, "larmup"},
+							{HITGROUP_RIGHTARM, "rarmup"}
+						}
+						local selected = bones[math.random(#bones)]
+						local hitgroup = selected[1]
+						local input_func = selected[2]
+
+						if hg.organism.input_list[input_func] then
+							hg.organism.input_list[input_func](org, 0, dmg * 3, dmgInfo)
+						end
+
+						org.internalBleed = org.internalBleed + (dmg * 2)
+
+						if velocity > 800 then
+							if dmg > 0.5 then
+								ragdoll:EmitSound("bones/bone" .. math.random(8) .. ".mp3", 75, 100, 0.6)
+							end
+						end
+
+						org.painadd = org.painadd + (dmg * 50)
+						org.shock = org.shock + (dmg * 30)
+
+						if velocity > 500 then
+							local numWounds = math.floor((velocity - 500) / 200) + 1
+							for i = 1, numWounds do
+								local randomBone = math.random(0, ragdoll:GetPhysicsObjectCount() - 1)
+								hg.organism.AddWoundManual(ragdoll, dmg * 15, vector_origin, angle_zero, randomBone, CurTime() + (dmg * 500))
+							end
+						end
+					end
+				end
+			end
+		end
+		ragdoll.oldWaterLevel = waterLevel
 	end
 end)

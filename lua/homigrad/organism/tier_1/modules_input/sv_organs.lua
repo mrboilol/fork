@@ -128,10 +128,28 @@ local function isCrush(dmgInfo)
 	return not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH + DMG_BLAST)
 end
 
+local abdominal_organs = {
+    ["stomach"] = true,
+    ["liver"] = true,
+    ["intestines"] = true,
+}
+
 local function damageOrgan(org, dmg, dmgInfo, key)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
 	org[key] = math.Round(math.min(org[key] + dmg * (isCrush(dmgInfo) and 1 or 3), 1), 3)
+
+	local damage_dealt = org[key] - oldval
+	if damage_dealt > 0 then
+		org.internalBleed = org.internalBleed + damage_dealt * 0.5 -- Base internal bleeding for any organ damage
+		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
+
+		if abdominal_organs[key] then
+			local multiplier = (oldval >= 1) and 2.5 or 1.5 -- Extra penalty if already destroyed
+			org.internalBleed = org.internalBleed + damage_dealt * multiplier
+			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 10 * multiplier
+		end
+	end
 	
 	//local damage = org[key] - oldval
 	//dmgInfo:SetDamage(dmgInfo:GetDamage() + (damage * 5))

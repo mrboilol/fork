@@ -22,13 +22,14 @@ SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
 SWEP.offsetVec = Vector(4, -0.5, -3)
 SWEP.offsetAng = Angle(-30, 20, 90)
-SWEP.modes = 5
+SWEP.modes = 6
 SWEP.modeNames = {
 	[1] = "bandaging",
 	[2] = "painkiller",
 	[3] = "tranexamic acid",
 	[4] = "tourniquet",
 	[5] = "decompression needle",
+	[6] = "tracheotomy",
 }
 SWEP.ofsV = Vector(-2,-10,8)
 SWEP.ofsA = Angle(90,-90,90)
@@ -41,6 +42,7 @@ function SWEP:InitializeAdd()
 		[3] = 10,
 		[4] = 1,
 		[5] = 1,
+		[6] = 1,
 	}
 end
 
@@ -50,6 +52,7 @@ SWEP.modeValuesdef = {
 	[3] = {10,true},
 	[4] = {1,true},
 	[5] = {1,false},
+	[6] = {1,false},
 }
 SWEP.ShouldDeleteOnFullUse = true
 
@@ -163,9 +166,15 @@ if SERVER then
 				self.modeValues[5] = 0
 				entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 			//end
+		elseif self.mode == 6 then
+			if self.modeValues[6] > 0 and org.trachea and org.trachea > 0 then
+				org.trachea = math.max(org.trachea - 0.75, 0)
+				self.modeValues[6] = 0
+				entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
+			end
 		end
 
-		if self.modeValues[1] == 0 and self.modeValues[2] == 0 and self.modeValues[3] == 0 and self.modeValues[4] == 0 and self.modeValues[5] == 0 and self.ShouldDeleteOnFullUse then
+		if self.modeValues[1] <= 0 and self.modeValues[2] <= 0 and self.modeValues[3] <= 0 and self.modeValues[4] <= 0 and self.modeValues[5] <= 0 and self.modeValues[6] <= 0 and self.ShouldDeleteOnFullUse then
 			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end

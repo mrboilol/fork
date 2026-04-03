@@ -88,15 +88,20 @@ if SERVER then
 		//if ent != owner and !org.otrub then return end -- meh??
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
-		//org.lungsR[2] = 0
-		//org.lungsL[2] = 0
-		org.needle = 1
 
-		if !(org.lungsR[2] == 1 or org.lungsL[2] == 1) then
-			if math.random(2) == 1 then 
-				org.lungsR[2] = 1
-			else
-				org.lungsL[2] = 1
+		if org.trachea and org.trachea > 0 then
+			org.trachea = math.max(org.trachea - 0.75, 0)
+		else
+			//org.lungsR[2] = 0
+			//org.lungsL[2] = 0
+			org.needle = 1
+
+			if !(org.lungsR[2] == 1 or org.lungsL[2] == 1) then
+				if math.random(2) == 1 then 
+					org.lungsR[2] = 1
+				else
+					org.lungsL[2] = 1
+				end
 			end
 		end
 		

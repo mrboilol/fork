@@ -863,7 +863,7 @@ local IsValid = IsValid
 	end
 --//
 
---\\ Suicide
+	--\\ Suicide
 	if SERVER then
 		local hg_huyside = CreateConVar("hg_huyside", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Enable rare suicide cutscene", 0, 1)
 		concommand.Add("suicide", function(ply)
@@ -871,7 +871,6 @@ local IsValid = IsValid
 				ply:ChatPrint("no nigga")
 				return
 			end
-
 			local wep = ply:GetActiveWeapon()
 			local org = ply.organism
 			local fear = (org and org.fear) or 0
