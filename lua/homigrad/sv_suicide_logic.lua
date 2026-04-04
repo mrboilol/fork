@@ -9,15 +9,9 @@ if SERVER then
 
         local wep = ply:GetActiveWeapon()
         -- Only for HG weapons (guns), exclude melee
-        if not IsValid(wep) or not wep.ishgweapon or wep.ismelee or wep.ismelee2 then 
-            ply:ChatPrint("You must be holding a gun to do this.")
+        if not IsValid(wep) or not wep.ishgweapon or wep.ismelee or wep.ismelee2 or wep:Clip1() <= 0 then 
+            ply:Kill()
             return 
-        end
-        
-        -- Check if weapon has ammo
-        if wep:Clip1() <= 0 then
-            ply:ChatPrint("You don't have ammo!")
-            return
         end
         
         -- Start cutscene

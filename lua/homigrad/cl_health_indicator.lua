@@ -26,32 +26,56 @@ local lastLifeState = nil
 
 local bodyParts = {
     lleg = {
-        bones = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot"},
+        bones = {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf"},
         health = function(org) return (org.lleg or 0) / 100 end,
         dislocated = function(org) return org.llegdislocation end,
         amputated = function(org) return org.llegamputated end,
         amputation_bone = "ValveBiped.Bip01_L_Calf",
     },
+    lfoot = {
+        bones = {"ValveBiped.Bip01_L_Foot"},
+        health = function(org) return (org.lleg or 0) / 100 end,
+        dislocated = function(org) return org.llegdislocation end,
+        amputated = function(org) return org.llegamputated end,
+    },
     rleg = {
-        bones = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot"},
+        bones = {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf"},
         health = function(org) return (org.rleg or 0) / 100 end,
         dislocated = function(org) return org.rlegdislocation end,
         amputated = function(org) return org.rlegamputated end,
         amputation_bone = "ValveBiped.Bip01_R_Calf",
     },
+    rfoot = {
+        bones = {"ValveBiped.Bip01_R_Foot"},
+        health = function(org) return (org.rleg or 0) / 100 end,
+        dislocated = function(org) return org.rlegdislocation end,
+        amputated = function(org) return org.rlegamputated end,
+    },
     larm = {
-        bones = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand"},
+        bones = {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm"},
         health = function(org) return (org.larm or 0) / 100 end,
         dislocated = function(org) return org.larmdislocation end,
         amputated = function(org) return org.larmamputated end,
         amputation_bone = "ValveBiped.Bip01_L_Forearm",
     },
+    lhand = {
+        bones = {"ValveBiped.Bip01_L_Hand"},
+        health = function(org) return (org.larm or 0) / 100 end,
+        dislocated = function(org) return org.larmdislocation end,
+        amputated = function(org) return org.larmamputated end,
+    },
     rarm = {
-        bones = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand"},
+        bones = {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm"},
         health = function(org) return (org.rarm or 0) / 100 end,
         dislocated = function(org) return org.rarmdislocation end,
         amputated = function(org) return org.rarmamputated end,
         amputation_bone = "ValveBiped.Bip01_R_Forearm",
+    },
+    rhand = {
+        bones = {"ValveBiped.Bip01_R_Hand"},
+        health = function(org) return (org.rarm or 0) / 100 end,
+        dislocated = function(org) return org.rarmdislocation end,
+        amputated = function(org) return org.rarmamputated end,
     },
     chest = {
         bones = {"ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Spine"},
@@ -488,6 +512,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
             end
         end
 
+        render.SetColorModulation(col, col, col)
         DrawHealthAccessories(healthModel, ply)
         
         render.MaterialOverride(nil)
