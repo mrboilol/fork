@@ -187,6 +187,15 @@ if CLIENT then
         local tbl = {
             [1] = {
                 [1] = function(mouseClick)
+                    local wep = lply:GetActiveWeapon()
+                    if not IsValid(wep) or not ishgweapon(wep) then return end
+
+                    if wep:GetJammed() then
+                        net.Start("hg_clear_jam")
+                        net.SendToServer()
+                        return
+                    end
+
                     if mouseClick == 1 then
                         RunConsoleCommand("hg_change_posture", -1)
                     else
@@ -194,8 +203,8 @@ if CLIENT then
 
                         for i, str in pairs(hg.postures) do -- DO. NOT. CHANGE. TO. IPAIRS. kthxbye
 							if istable(str) then
-								if str.isPistolOnly and !wep:IsPistolHoldType() then continue end
-							end
+									if str.isPistolOnly and !wep:IsPistolHoldType() then continue end
+								end
                             tbl2[#tbl2 + 1] = {
                                 [1] = function()
                                     RunConsoleCommand("hg_change_posture", i)
@@ -210,7 +219,13 @@ if CLIENT then
 
                     return -1
                 end,
-                [2] = "Change Posture\nRMB - Menu"
+                [2] = function()
+                    local wep = lply:GetActiveWeapon()
+                    if IsValid(wep) and ishgweapon(wep) and wep:GetJammed() then
+                        return "Clear Jam"
+                    end
+                    return "Change Stance\nRMB - Menu"
+                end
             },
             [2] = {
                 [1] = function()

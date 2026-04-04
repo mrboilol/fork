@@ -8,9 +8,7 @@ if SERVER then
         if ply.suicideCutscene then return end -- Cutscene playing
 
         local wep = ply:GetActiveWeapon()
-        -- Only for HG weapons (guns), exclude melee
         if not IsValid(wep) or not wep.ishgweapon or wep.ismelee or wep.ismelee2 or wep:Clip1() <= 0 then 
-            ply:Kill()
             return 
         end
         

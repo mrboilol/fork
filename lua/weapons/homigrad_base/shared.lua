@@ -116,6 +116,8 @@ function SWEP:Initialize()
 	self:SetClip1(self.Primary.DefaultClip)
 	self:Draw()
 
+    self:SetJammed(false)
+
 	self.AdditionalPos = Vector(0,0,0)
 	self.AdditionalPos2 = Vector(0,0,0)
 	self.AdditionalAng = Angle(0,0,0)
@@ -485,6 +487,20 @@ function SWEP:Shoot(override)
 	if !override and !self:CanPrimaryAttack() then return false end
 	if !override and !self:CanUse() then return false end
 	if CLIENT and owner != LocalPlayer() and !override then return false end
+
+    if self:GetJammed() then
+        if SERVER then
+            self:GetOwner():Notify("Fuck, the thing jammed!", 2)
+        end
+        self:EmitSound(self.Primary.SoundEmpty, true, CHAN_AUTO)
+        return false
+    end
+
+    if SERVER and self.Primary.Ammo and hg.ammotypes[self.Primary.Ammo] and math.random(1, 2000) < (12 / hg.ammotypes[self.Primary.Ammo].BulletSettings.Diameter) then
+        self:SetJammed(true)
+        self:EmitSound(self.Primary.SoundEmpty, true, CHAN_AUTO)
+        return false
+    end
 
 	local primary = self.Primary
 	if override then self.drawBullet = true end
@@ -1038,6 +1054,10 @@ hook.Add("Player Think", "suicidingaa", function(ply)
 end)
 
 function SWEP:Think()
+    if self.ishgweapon and self:GetNWFloat("reload", 0) > CurTime() and SERVER and math.random(1, 1250) < ((self:GetOwner().organism and self:GetOwner().organism.fear or 0) * 10) then
+        self:GetOwner():DropWeapon(self)
+    end
+
 	if SERVER then
 		self:Step()
 	end
@@ -1151,6 +1171,10 @@ function SWEP:CoreStep()
 		self:WorldModel_Transform()
 	end
 	
+    if self:GetIsUnjamming() then
+        self.inspect = true
+    end
+
 	if SERVER and (not IsValid(owner) or (IsValid(actwep) and self != actwep)) then
 		self:SetNWBool("IsResting", false)
 
@@ -2316,12 +2340,35 @@ function SWEP:OnVarChanged(name, old, new)
 	//end
 end
 
+if SERVER then
+    util.AddNetworkString("hg_clear_jam")
+
+    net.Receive("hg_clear_jam", function(len, ply)
+        local wep = ply:GetActiveWeapon()
+        if not IsValid(wep) or not wep.ishgweapon or not wep:GetJammed() then return end
+
+        wep:SetIsUnjamming(true)
+
+        local clearTime = math.random(2, 5) + (ply.organism and ply.organism.fear or 0)
+        timer.Simple(clearTime, function()
+            if IsValid(wep) then
+                wep:SetJammed(false)
+                wep:SetIsUnjamming(false)
+                wep:RejectShell(wep.ShellEject)
+                ply:ViewPunch(Angle(math.random(-2, 2), math.random(-2, 2), math.random(-2, 2)))
+            end
+        end)
+    end)
+end
+
 function SWEP:SetupDataTables()
 	self:NetworkVar( "Float", 0, "Holster" )
 	self:NetworkVar( "Float", 1, "Deploy" )
 	self:NetworkVar( "Entity", 2, "HolsterWep" )
 	self:NetworkVar( "Angle", 3, "OffsetView" )
 	self:NetworkVar( "Float", 4, "ButtstockAttack" )
+    self:NetworkVar("Bool", 5, "Jammed")
+    self:NetworkVar("Bool", 6, "IsUnjamming")
 
 	//if (SERVER) then
 		//self:NetworkVarNotify( "OffsetView", self.OnVarChanged )

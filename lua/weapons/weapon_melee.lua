@@ -944,7 +944,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
             return 1.0
         end
 
-        if self.TwoHanded then
+        if self.TwoHanded or self.weight > 2 then
             damage_multiplier = damage_multiplier * get_arm_debuff(org.larm == 1, org.larmdislocated)
             damage_multiplier = damage_multiplier * get_arm_debuff(org.rarm == 1, org.rarmdislocated)
         else
@@ -1005,6 +1005,14 @@ function SWEP:ArmPainEffect(owner)
 end
 
 function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
+    if SERVER and owner.organism and owner.organism.stamina and owner.organism.stamina[1] < 45 and math.random(1, 500) < (owner.organism.fear or 0) * 10 then
+        owner:DropWeapon(self)
+        return
+    end
+
+    if SERVER then
+        self:ArmPainEffect(owner)
+    end
     //if SERVER then owner:SetNetVar("slowDown", owner:GetNetVar("slowDown", 0) + (attacktype and self.DamageSecondary or self.DamagePrimary)) end
     
     if not self.FirstAttackTick then 
