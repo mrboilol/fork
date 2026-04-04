@@ -12,6 +12,9 @@ function PLAYER:LegAttack()
 
     if isMidAir and self.organism.stamina[1] < 85 then return end
 
+    local dmg = 15
+    dmg = dmg * (1 + (self:GetStat("Strength") - 10) * 0.1)
+
     local anim = "kick_pistol_base"
     anim = (self:KeyDown(IN_DUCK) or self:Crouching()) and "kick_pistol_base_crouch" or self:EyeAngles()[1] > 60 and "curbstomp_base" or self:EyeAngles()[1] > 35 and "kick_pistol_25_base" or self:EyeAngles()[1] > 20 and "kick_pistol_45_base" or anim
 
@@ -26,10 +29,7 @@ function PLAYER:LegAttack()
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.5 * speedmul
     local animstopAdjust = 0.3 * speedmul
-    local org = self.organism
-    if hg.IsGoodKarma(self) and org.karma > 75 then
-        dmg = dmg * math.min(1.25, 1 + (org.karma - 75) / 100)
-    end
+    
 
     if isMidAir then
         local vel = self:GetVelocity():Length()
@@ -38,7 +38,7 @@ function PLAYER:LegAttack()
     end
 
     dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
-    dmg = dmg * (org.legstrength or 1)
+    
     if isMidAir then
         dmg = math.min(dmg, 42)
     end

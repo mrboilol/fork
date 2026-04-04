@@ -159,6 +159,29 @@ local sounds = {
 	Sound("player/zombie_head_explode_06.wav")
 }
 
+local limb_loss_messages = {
+    lleg = {
+        "MY LEG, MY LEG IS FUCKING GONE!",
+        "AAAAH, MY FUCKING LEG!",
+        "THEY TOOK MY LEG!",
+    },
+    rleg = {
+        "MY OTHER LEG! NOT AGAIN!",
+        "I CAN'T FEEL MY LEG!",
+        "WHERE IS MY LEG?!",
+    },
+    larm = {
+        "MY ARM! I NEED THAT!",
+        "I CAN'T HOLD MY GUN ANYMORE!",
+        "MY ARM IS GONE!",
+    },
+    rarm = {
+        "NOT THE RIGHT ARM! NOT THE RIGHT ARM!",
+        "MY AIMING ARM! FUCK!",
+        "I'M DISARMED! LITERALLY!",
+    }
+}
+
 local ents_Create = ents.Create
 function hg.organism.AmputateLimb(org, limb)
 	if org[limb.."amputated"] == nil then return end
@@ -192,6 +215,13 @@ function hg.organism.AmputateLimb(org, limb)
 	hg.organism.input_list[limb.."up"](org, 0, 5, dmgInfo)
 
 	org.owner:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
+
+    local messages = limb_loss_messages[limb]
+    if messages then
+        local message = table.Random(messages)
+        org.owner:ChatPrint(message)
+    end
+
 	
 	local ent = hg.GetCurrentCharacter(org.owner)
 	SpawnMeatGore(ent, select(1, ent:GetBonePosition(ent:LookupBone(bone))), 4)
@@ -460,6 +490,12 @@ local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodi
 local net, math, hg, IsValid = net, math, hg, IsValid
 local takeRagdollDamage
 hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
+    if ent:IsPlayer() then
+        local endurance = ent:GetStat("Endurance")
+        local damage_mul = 1 - (endurance - 10) * 0.05
+        dmgInfo:ScaleDamage(math.max(0.5, damage_mul))
+    end
+
 	if dmgInfo:IsDamageType(DMG_CRUSH) and ent:IsPlayer() and IsValid(ent.FakeRagdoll) then
 		RagdollCollision(ent.FakeRagdoll, {Speed = dmgInfo:GetDamage(), DeltaTime = 1, HitObject = dmgInfo:GetAttacker(), HitPos = dmgInfo:GetDamagePosition(), HitNormal = dmgInfo:GetDamageForce():GetNormalized()})
 		return true
@@ -631,7 +667,16 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if dmgInfo:GetInflictor().poisoned2 and dmgInfo:IsDamageType(DMG_SLASH) then
 		org.poison4 = CurTime()
 
-		dmgInfo:GetInflictor().poisoned2 = nil
+		local attacker = dmgInfo:GetAttacker()
+		if IsValid(attacker) and attacker:IsPlayer() then
+			local intel = attacker:GetStat("Intelligence")
+			local chance = (intel - 10) * 5 -- 5% chance per point above 10
+			if math.random(100) > chance then
+				dmgInfo:GetInflictor().poisoned2 = nil
+			end
+		else
+			dmgInfo:GetInflictor().poisoned2 = nil
+		end
 	end
 	
 	local organs = hg.organism.GetHitBoxOrgans(ent:GetModel(), ent)
@@ -838,6 +883,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	--if hitbody then
 	if not org.superfighter then
+        local endurance_multiplier = 1 - (org.owner:GetStat("Endurance") - 10) * 0.05
+        dmg = dmg * endurance_multiplier
 		dmgBlood = dmgBlood * 1.5
 		local bleed_add = dmgBlood * bleedMul// / (RagdollDamageBoneMul[hitgroup] or 1)
 		--org.bleed = org.bleed + bleed_add
@@ -851,9 +898,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		local instant_pain = instantPainMul * painadd
 		local slow_pain = (1 - instantPainMul) * painadd
-		org.painadd = org.painadd + slow_pain
-		//org.avgpain = org.avgpain + instant_pain
-		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * math.Clamp(pen / 5,1,2), 70)
+        local endurance_multiplier = 1 - (org.owner:GetStat("Endurance") - 10) * 0.075
+		org.painadd = org.painadd + slow_pain * endurance_multiplier
+		--org.avgpain = org.avgpain + instant_pain
+		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * math.Clamp(pen / 5,1,2) * endurance_multiplier, 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
 		
@@ -989,7 +1037,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
-	local hitgroup_max = 100--hitgroup == HITGROUP_HEAD and 150 or 30
+	local hitgroup_max = 100 + (org.owner:GetStat("Endurance") - 10) * 10
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
@@ -1509,26 +1557,27 @@ local function velocityDamage(ent, data)
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )
 
 		if hitgroup == HITGROUP_HEAD then
-			local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
-			
-			hg.organism.input_list.skull(org, bone, dmg * 6 * (hadhelmet and 0.2 or 1), dmgInfo)
-			
-			org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1))
-			
-			local neck_not_broken = org.spine3 < 0.8
-			
-			//if dmg > 0.5 then
-				hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1), dmgInfo)
-			//end
-			if dmg * 10 > 0.5 and !hadhelmet then
-				org.otrub = true
-				org.shock = org.shock + 10
-			end
+				local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
+                local intel_multiplier = 1 - (org.owner:GetStat("Intelligence") - 10) * 0.05
+				
+				hg.organism.input_list.skull(org, bone, dmg * 6 * (hadhelmet and 0.2 or 1) * intel_multiplier, dmgInfo)
+				
+				org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1) * intel_multiplier)
+				
+				local neck_not_broken = org.spine3 < 0.8
+				
+				//if dmg > 0.5 then
+					hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1) * intel_multiplier, dmgInfo)
+				//end
+				if dmg * 10 > 0.5 and !hadhelmet then
+					org.otrub = true
+					org.shock = org.shock + 10
+				end
 
-			if neck_not_broken and org.spine3 >= 0.8 then
-				hg.BreakNeck(ent)
+				if neck_not_broken and org.spine3 >= 0.8 then
+					hg.BreakNeck(ent)
+				end
 			end
-		end
 	else
 		local sfd = org.fakePlayer and ent or ply
 		if not IsValid(sfd) then return end

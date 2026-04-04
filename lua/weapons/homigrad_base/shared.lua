@@ -303,8 +303,7 @@ function SWEP:IsZoom()
 		!(self:IsSprinting() and !IsValid(owner.FakeRagdoll)) and
 		((IsValid(owner.FakeRagdoll) and (self:KeyDown(IN_USE) or hg.RagdollCombatInUse(owner))) or
 		(owner:IsOnGround() or owner:InVehicle())) and 
-		not owner.suiciding and !(owner.organism and (owner.organism.larm and !self:IsPistolHoldType())
-		and owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99))
+		not owner.suiciding and !(owner.organism and (owner.organism.larm and !self:IsPistolHoldType() and owner:GetStat("Strength") < 15) and owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99))
 		
 		-- and owner.posture ~= 1 and owner.posture ~= 3-- and (not IsValid(owner.FakeRagdoll) or self:KeyDown(IN_JUMP))
 end
@@ -1425,6 +1424,8 @@ function SWEP:CoreStep()
 					shake_intensity = shake_intensity + get_arm_shake(org.larm == 1, org.larmdislocated)
 					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
 				end
+
+                shake_intensity = shake_intensity * (1 - (owner:GetStat("Strength") - 10) * 0.1)
 
 				if shake_intensity > 0 then
 					local time = CurTime() * 10

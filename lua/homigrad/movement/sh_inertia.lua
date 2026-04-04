@@ -397,7 +397,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 				//ply:SetNetVar("slowDown", math.Approach(slwdwn, 0, delta_time * 250))
 			//end
 			k = k * math.Clamp((250 - slwdwn) / 250, 0.75, 1)
-		end
+    end
+
+    k = k * (1 + (ply:GetStat("Dexterity") - 10) * 0.05)
 
 		k = math.max(k, 20 / 200)
 

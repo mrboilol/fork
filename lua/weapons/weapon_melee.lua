@@ -997,6 +997,8 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
         mul = mul * (1.0 + swayBonus)
     end
 
+    mul = mul * (1 + (owner:GetStat("Strength") - 10) * 0.1)
+
     return mul
 end
 
@@ -1303,7 +1305,8 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
                 end
 
-                local perfectblock = CurTime() - wep:GetStartedBlocking() < 0.5
+				local parry_bonus = (ent:GetStat("Dexterity") - 10) * 0.01 + (ent:GetStat("Intelligence") - 10) * 0.01
+                local perfectblock = CurTime() - wep:GetStartedBlocking() < (0.5 + parry_bonus)
                 
                 if perfectblock then
                     ent:EmitSound("parry.ogg", 75)
@@ -2207,6 +2210,8 @@ function SWEP:PrimaryAttack()
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
+    mul = mul * (1 - (ply:GetStat("Dexterity") - 10) * 0.05)
+    mul = mul * (1 - (ply:GetStat("Dexterity") - 10) * 0.05)
 
     
     self.HitEnts = nil

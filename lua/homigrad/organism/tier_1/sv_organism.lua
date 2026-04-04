@@ -498,16 +498,17 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if org.brain < 0.4 then
 		local naturalHeal
 		local thiamineConsumptionRate = timeValue / 240
+        local endurance_bonus = 1 + (org.owner:GetStat("Endurance") - 10) * 0.1
 
 		if org.thiamine > 0 then
 			if (org.hungry or 0) < 1 then -- Well-fed check
-				naturalHeal = timeValue / 240 -- Faster healing
+				naturalHeal = timeValue / (240 / endurance_bonus) -- Faster healing
 				thiamineConsumptionRate = timeValue / 120 -- Faster consumption
 			else
-				naturalHeal = timeValue / 480 -- Normal thiamine healing
+				naturalHeal = timeValue / (480 / endurance_bonus) -- Normal thiamine healing
 			end
 		else
-			naturalHeal = timeValue / 1800 -- No thiamine
+			naturalHeal = timeValue / (1800 / endurance_bonus) -- No thiamine
 		end
 
 		-- full heal in ~30 minutes (really fast tho)
@@ -564,10 +565,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 
-	if owner:IsPlayer() and (org.healthRegen or 0) < CurTime() then
-		org.healthRegen = CurTime() + 30
-		owner:SetHealth(math.min(owner:GetMaxHealth(), owner:Health() + math.max(1.5 - org.hurt, 0)))
-	end
+
 
 	org.health = owner:Health()
 	local rag = owner:IsPlayer() and owner.FakeRagdoll or owner
@@ -777,6 +775,7 @@ end)
 
 hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
 	local ent = hg.GetCurrentCharacter(plya)
+    local intel_multiplier = 1 + (plya:GetStat("Intelligence") - 10) * 0.05
 	for i,ply in ipairs(ents.FindInSphere(ent:GetPos(),256)) do
 		if not ply:IsPlayer() or not ply.organism or plya == ply then continue end
 
@@ -786,7 +785,7 @@ hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
 		tr.filter = {ply,ent}
 		if not util.TraceLine(tr).Hit then
 			ply.organism.adrenalineAdd = ply.organism.adrenalineAdd + 0.3
-			ply.organism.fearadd = ply.organism.fearadd + 0.3
+			ply.organism.fearadd = ply.organism.fearadd + (0.3 * intel_multiplier)
 		end
 	end
 end)
