@@ -233,9 +233,10 @@ local function SyncMoodles(ply)
         { threshold = 42.0, texture = "materials/moodles/Heat_4.png" },
     }, temperature)
 
-    -- Incapacitated / Critical
-    manageMoodleState(ply, "incapacitated", org.incapacitated and not org.critical, "materials/moodles/Concussion_moodle.png")
-    manageMoodleState(ply, "critical", org.critical, "materials/moodles/HorrifiedMoodle.png")
+    -- Concussion, Incapacitated, & Critical
+    manageMoodleState(ply, "concussion", (org.concussion or 0) > 0.1, "materials/moodles/Concussion_moodle.png")
+    manageMoodleState(ply, "horrified", org.incapacitated and not org.critical, "materials/moodles/HorrifiedMoodle.png")
+    manageMoodleState(ply, "deceased", org.critical, "materials/moodles/Deceased_Moodle.png")
 
     -- Tinnitus
     local tinnitus_active = (org.tinnitus_end_time or 0) > CurTime()

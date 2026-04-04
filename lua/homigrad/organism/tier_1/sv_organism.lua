@@ -77,6 +77,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.assimilated = 0
 	org.berserk = 0
 	org.noradrenaline = 0
+	org.blindness = nil 
 
 	if IsValid(org.owner) then
 		if org.owner:IsPlayer() and org.owner:Alive() then
@@ -163,6 +164,7 @@ local function send_organism(org, ply)
 	sendtable.noradrenaline = org.noradrenaline
 	sendtable.LodgedEntities = org.LodgedEntities
 	sendtable.CantCheckPulse = org.CantCheckPulse
+	sendtable.blindness = org.blindness
 
 	sendtable.critical = org.critical
 	sendtable.incapacitated = org.incapacitated
@@ -494,12 +496,25 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if org.brain < 0.4 then
-		local naturalHeal = org.thiamine > 0 and timeValue / 480 or timeValue / 1800
-		-- full heal in ~30 minutes (really fast tho) -- Ну не идет столько раунд даже в каких-нибудь скраперсах ну какой даун это придумал
-		-- 8 minutes with thiamine -- ДАЖЕ СТОЛЬКО НЕ ВСЕГДА ДЛИТСЯ
+		local naturalHeal
+		local thiamineConsumptionRate = timeValue / 240
 
-		org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
-		-- you'd need to give 1 thiamine each 4 minutes
+		if org.thiamine > 0 then
+			if (org.hungry or 0) < 1 then -- Well-fed check
+				naturalHeal = timeValue / 240 -- Faster healing
+				thiamineConsumptionRate = timeValue / 120 -- Faster consumption
+			else
+				naturalHeal = timeValue / 480 -- Normal thiamine healing
+			end
+		else
+			naturalHeal = timeValue / 1800 -- No thiamine
+		end
+
+		-- full heal in ~30 minutes (really fast tho)
+		-- 8 minutes with thiamine
+
+		org.thiamine = math.Approach(org.thiamine, 0, thiamineConsumptionRate)
+		-- you'd need to give 1 thiamine each 4 minutes (or 2 if well-fed)
 
 		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
 		if org.heart < 1 then org.heart = math.Approach(org.heart, 0, naturalHeal) end

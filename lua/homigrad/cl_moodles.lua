@@ -73,6 +73,7 @@ local MOODLE_INFO = {
     ["cold_3"] = { title = "Very Cold", desc = "Its really, REALLY cold." },
     ["cold_4"] = { title = "Hypothermia", desc = "Its... So... Cold..." },
 
+    ["concussion"] = { title = "Concussion", desc = "Your head is spinning. It's hard to focus." },
     ["incapacitated"] = { title = "Incapacitated", desc = "You need help to get up." },
     ["deaf_1"] = { title = "Tinnitus", desc = "Your sensitive ears are ringing." },
     ["deaf_2"] = { title = "Partial Deafness", desc = "You barely can hear." },
@@ -151,6 +152,7 @@ local MOODLE_INFO = {
     ["unconscious"] = { title = "Unconscious", desc = "Unresponsive to stimuli, lights out!" },
     ["sepsis"] = { title = "Sepsis", desc = "Not so fun now is it?" },
     ["critical"] = { title = "Critically Injured", desc = "This is the end of you. Goodbye!" },
+    ["horrified"] = { title = "Incapacitated", desc = "You're down and can't get up." },
 }
 
 local color_white = Color(255, 255, 255)
@@ -186,12 +188,6 @@ net.Receive("Moodle_Add", function()
     local cnt = net.ReadInt(8)
 
     local ply = LocalPlayer()
-    if IsValid(ply) and ply:GetNWBool("otrub", false) and not VITAL_MOODLES[id] and not CRITICAL_MOODLES[id] then 
-        if CLIENT_MOODLES[id] then
-            CLIENT_MOODLES[id].updating = false
-        end
-        return 
-    end
     
     local existing = CLIENT_MOODLES[id]
     if not existing then
@@ -270,7 +266,7 @@ net.Receive("Moodle_Remove", function()
     if IsDebugDrawEnabled() then MsgC(DEBUG_COLOR_CL_REMOVE, "[MM] - "..id.."\n") end
 end)
 
-hook.Add("HUDPaint", "Moodle_Draw", function()
+hook.Add("HUDPaintBackground", "Moodle_Draw", function()
     local mx, my = gui.MouseX(), gui.MouseY()
     local ply = LocalPlayer()
     if not IsValid(ply) then 
@@ -299,7 +295,7 @@ hook.Add("HUDPaint", "Moodle_Draw", function()
         baseY = 16
     else
         baseX = 16
-        baseY = 16
+        baseY = screenH - 64
     end
     
     local hovered = nil
@@ -322,34 +318,40 @@ hook.Add("HUDPaint", "Moodle_Draw", function()
     end
     table.sort(sorted_moodles, function(a, b) return a.spawn < b.spawn end)
 
+    local ammo_box_x = ScrW() * 0.93 - 100 -- A bit of padding
+
     local layout_x = baseX
     local layout_y = baseY
+    local row = 0
 
     -- First, calculate target positions for all visible moodles
     for _, moodle in ipairs(sorted_moodles) do
         local data = moodle.data
 
         if not data.remove_time then
-            local targetX, targetY
             if GetConVar("hg_sidemoodles"):GetBool() then
                 if layout_y + iconSize + pad > screenH then
                     layout_y = baseY
                     layout_x = layout_x - (iconSize + pad)
                 end
-                targetX = layout_x
-                targetY = layout_y
+                data.target_x = layout_x
+                data.target_y = layout_y
                 layout_y = layout_y + iconSize + pad
             else
+                if layout_x + iconSize + pad > ammo_box_x and row == 0 then
+                    layout_x = baseX
+                    layout_y = baseY - (iconSize + pad)
+                    row = 1
+                end
                 if layout_x + iconSize + pad > screenW then
                     layout_x = baseX
-                    layout_y = layout_y + iconSize + pad
+                    layout_y = baseY - (iconSize + pad)
+                    row = 1
                 end
-                targetX = layout_x
-                targetY = layout_y
+                data.target_x = layout_x
+                data.target_y = layout_y
                 layout_x = layout_x + iconSize + pad
             end
-            data.target_x = targetX
-            data.target_y = targetY
         end
     end
 
@@ -397,6 +399,15 @@ hook.Add("HUDPaint", "Moodle_Draw", function()
         local drawX = data.x + sway_offset_x
         local drawY = data.y + sway_offset_y
 
+        if not GetConVar("hg_sidemoodles"):GetBool() then
+            local ammo_box_x = ScrW() * 0.93 - 100 -- A bit of padding
+            local fade_zone = 150
+            if drawX + iconSize > ammo_box_x - fade_zone then
+                local fade = (drawX + iconSize - (ammo_box_x - fade_zone)) / fade_zone
+                alpha = alpha * (1 - math.Clamp(fade, 0, 1))
+            end
+        end
+
         -- Shake animation for worsening moodles
         if data.worsen_time and (CurTime() - data.worsen_time) < 0.5 then
             local shake_intensity = 5
@@ -407,8 +418,18 @@ hook.Add("HUDPaint", "Moodle_Draw", function()
         
         -- Draw texture or fallback box
         if data.mat and not data.mat:IsError() then
-            local color_val = 128 + (127 * consciousness)
-            surface.SetDrawColor(color_val, color_val, color_val, alpha)
+            local is_otrub = IsValid(ply) and ply:GetNWBool("otrub", false)
+            local is_beneficial = not CRITICAL_MOODLES[id] and not VITAL_MOODLES[id]
+
+            if not is_otrub and not is_beneficial then
+                -- Non-beneficial moodles are desaturated
+                surface.SetDrawColor(128, 128, 128, alpha)
+            else
+                -- Otrub and beneficial moodles are full color
+                local color_val = 128 + (127 * consciousness)
+                surface.SetDrawColor(color_val, color_val, color_val, alpha)
+            end
+            
             surface.SetMaterial(data.mat)
             surface.DrawTexturedRect(drawX, drawY, drawW, drawH)
         else
@@ -480,6 +501,10 @@ hook.Add("HUDPaint", "Moodle_Draw", function()
 
         local tx = mx + 20
         local ty = my + 20
+
+        if row == 1 then
+            ty = baseY - (iconSize + pad) - th - 20
+        end
 
         if tx + tw > ScrW() then tx = mx - tw - 20 end
         if ty + th > ScrH() then ty = my - th - 20 end

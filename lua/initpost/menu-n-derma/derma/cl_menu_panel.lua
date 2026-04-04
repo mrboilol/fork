@@ -27,7 +27,7 @@ local Selects = {
         fade:AlphaTo(255, 0.3)
 
         local lbl = vgui.Create("DLabel", fade)
-        lbl:SetText("bye nigga")
+        lbl:SetText("goodbye.")
         lbl:SetFont("ZC_MM_Title")
         lbl:SetTextColor(Color(255, 255, 255))
         lbl:SizeToContents()
@@ -53,13 +53,6 @@ local Selects = {
     end},
 }
 
-surface.CreateFont("ZCity_Moodle", {
-    font = "JMH Typewriter",
-    size = ScreenScaleH(14),
-    weight = 500,
-    antialias = true
-})
-
 surface.CreateFont("ZCity_Veteran", {
     font = "Veteran Typewriter",
     size = ScreenScaleH(18),
@@ -84,8 +77,6 @@ local BgMat3 = Material("vgui/background6.png")
 local BgMat4 = Material("vgui/pickman.png")
 local BgMat4Overlay = Material("vgui/background4.png")
 local NoiseMat = Material("vgui/noisevhs")
-local HuyMat = Material("huy.png")
-local hg_creepyeye = CreateClientConVar("hg_creepyeye", "0", true, false)
 if NoiseMat:IsError() then
     NoiseMat = Material("vgui/white")
 end
@@ -106,14 +97,14 @@ function PANEL:InitializeMarkup()
 	local gm = string.lower(gmod.GetGamemode().Name .. " | " .. string.NiceName(zb ~= nil and zb.GetRoundName or mapname))
 
     if hg.PluvTown.Active then
-        local text = "<font=ZC_MM_Title>meleecity</font>\n<font=ZCity_Moodle>" .. gm .. "</font>"
+        local text = "<font=ZC_MM_Title>meleecity</font>\n<font=ZCity_Small>" .. gm .. "</font>"
 
         self.SelectedPluv = table.Random(hg.PluvTown.PluvMats)
 
         return markup.Parse(text)
     end
 
-    local text = "<font=ZC_MM_Title>meleecity</font>\n<font=ZCity_Moodle>" .. gm .. "</font>"
+    local text = "<font=ZC_MM_Title>meleecity</font>\n<font=ZCity_Small>" .. gm .. "</font>"
     return markup.Parse(text)
 end
 
@@ -298,7 +289,7 @@ function PANEL:Init()
     self.LogoY = ScreenScaleH(20)
     
     surface.SetFont("ZC_MM_Title")
-    local _, th = surface.GetTextSize("meleecity dickacy")
+    local _, th = surface.GetTextSize("meleecity: delicacy")
     self.LogoH = th
 
     self.MenuTop = self.LogoY + self.LogoH + ScreenScaleH(60)
@@ -1440,17 +1431,21 @@ function PANEL:CreateTraitorMenuPanel()
     -- State
     local savedData = file.Read("meleecity_traitor_loadout.txt", "DATA")
     local parsedLoadout = nil
-    if savedData then
-        parsedLoadout = util.JSONToTable(savedData)
+    if isstring(savedData) and savedData ~= "" then
+        local ok, parsed = pcall(util.JSONToTable, savedData)
+        if ok and istable(parsed) then
+            parsedLoadout = parsed
+        end
     end
 
     local TraitorItems = {
-        ["weapon_zoraki"] = {cost = 5, name = "Zoraki Flash Pistol"},
+        ["weapon_pl15"] = {cost = 15, name = "PL-15"},
         ["weapon_buck200knife"] = {cost = 3, name = "Buck 200 Knife"},
         ["weapon_sogknife"] = {cost = 3, name = "SOG Knife"},
         ["weapon_fiberwire"] = {cost = 3, name = "Fiber Wire"},
         ["weapon_hg_rgd_tpik"] = {cost = 6, name = "RGD-5 Grenade"},
         ["weapon_adrenaline"] = {cost = 4, name = "Epipen"},
+        ["weapon_pepperspray_tpik"] = {cost = 4, name = "Pepper Spray"},
         ["weapon_hg_shuriken"] = {cost = 2, name = "Shuriken"},
         ["weapon_hg_smokenade_tpik"] = {cost = 3, name = "Smoke Grenade"},
         ["weapon_traitor_ied"] = {cost = 6, name = "IED"},
@@ -1466,8 +1461,13 @@ function PANEL:CreateTraitorMenuPanel()
     local TraitorAddons = {
         ["weapon_p22_extra_mag"] = {cost = 2, name = "P22 Extra Magazine", parent = "weapon_p22"},
         ["weapon_p22_silencer"] = {cost = 2, name = "P22 Silencer", parent = "weapon_p22"},
+        ["weapon_pl15_extra_mag"] = {cost = 3, name = "PL-15 Extra Magazine", parent = "weapon_pl15"},
+        ["weapon_pl15_silencer"] = {cost = 2, name = "PL-15 Silencer", parent = "weapon_pl15"},
     }
-    local P22AddonOrder = {"weapon_p22_extra_mag", "weapon_p22_silencer"}
+    local WeaponAddonOrder = {
+        ["weapon_p22"] = {"weapon_p22_extra_mag", "weapon_p22_silencer"},
+        ["weapon_pl15"] = {"weapon_pl15_extra_mag", "weapon_pl15_silencer"},
+    }
 
     local Skillsets = {
         ["none"] = {cost = 0, name = "None", desc = "No special skillset."},
@@ -1588,13 +1588,23 @@ function PANEL:CreateTraitorMenuPanel()
 
     currentLoadout = SanitizeLoadout(parsedLoadout or {})
 
+    local function EncodeLoadout(loadoutData)
+        local dataStr = util.TableToJSON(loadoutData)
+        if not isstring(dataStr) or dataStr == "" then
+            dataStr = "{\"weapons\":[],\"skillset\":\"none\"}"
+        end
+        return dataStr
+    end
+
     local function SaveLoadout()
         currentLoadout = SanitizeLoadout(currentLoadout)
-        local dataStr = util.TableToJSON(currentLoadout)
+        local dataStr = EncodeLoadout(currentLoadout)
         file.Write("meleecity_traitor_loadout.txt", dataStr)
         local cv = GetConVar("hmcd_traitor_loadout")
         if cv then cv:SetString(dataStr) end
     end
+
+    SaveLoadout()
 
     local infoContent = vgui.Create("DPanel", infoPanel)
     infoContent:Dock(FILL)
@@ -2027,8 +2037,9 @@ function PANEL:CreateTraitorMenuPanel()
                 end
                 if table.HasValue(currentLoadout.weapons, id) then
                     table.RemoveByValue(currentLoadout.weapons, id)
-                    if id == "weapon_p22" then
-                        for _, addonId in ipairs(P22AddonOrder) do
+                    local addonOrder = WeaponAddonOrder[id]
+                    if addonOrder then
+                        for _, addonId in ipairs(addonOrder) do
                             table.RemoveByValue(currentLoadout.weapons, addonId)
                         end
                     end
@@ -2048,8 +2059,9 @@ function PANEL:CreateTraitorMenuPanel()
                 sound.PlayFile("sound/press.mp3", "noblock", function(station) if IsValid(station) then station:Play() end end)
             end
 
-            if id == "weapon_p22" and table.HasValue(currentLoadout.weapons, "weapon_p22") then
-                for _, addonId in ipairs(P22AddonOrder) do
+            local addonOrder = WeaponAddonOrder[id]
+            if addonOrder and table.HasValue(currentLoadout.weapons, id) then
+                for _, addonId in ipairs(addonOrder) do
                     local addonInfo = TraitorAddons[addonId]
                     if addonInfo then
                         local addonBtn = vgui.Create("DButton", loadoutScroll)
@@ -2070,7 +2082,7 @@ function PANEL:CreateTraitorMenuPanel()
                             end
                         end
                         addonBtn.DoClick = function()
-                            if not table.HasValue(currentLoadout.weapons, "weapon_p22") then
+                            if not table.HasValue(currentLoadout.weapons, id) then
                                 surface.PlaySound("buttons/button10.wav")
                                 return
                             end
@@ -2083,7 +2095,7 @@ function PANEL:CreateTraitorMenuPanel()
                                 end
                                 table.insert(currentLoadout.weapons, addonId)
                             end
-                            previewWeaponId = "weapon_p22"
+                            previewWeaponId = id
                             SaveLoadout()
                             RefreshLoadoutUI()
                             sound.PlayFile("sound/press.mp3", "noblock", function(station) if IsValid(station) then station:Play() end end)
@@ -2324,13 +2336,7 @@ function PANEL:Paint(w,h)
         end
         
         local mat = BgMat
-        if self.IsIntro then
-            if hg_creepyeye:GetBool() then
-                mat = EyeMat
-            else
-                mat = HuyMat
-            end
-        end
+        if self.IsIntro then mat = EyeMat end
 
         if not mat:IsError() then
             surface.SetMaterial( mat )
@@ -2498,7 +2504,7 @@ function PANEL:Paint(w,h)
     end
     
     -- Title Transition Logic
-    local text1 = "meleecity dickacy"
+    local text1 = "meleecity: delicacy"
     
     surface.SetFont("ZC_MM_Title")
     

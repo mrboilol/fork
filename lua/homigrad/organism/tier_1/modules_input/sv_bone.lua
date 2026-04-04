@@ -270,9 +270,20 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	org.shock = org.shock + dmg * 3
 
-	if dislocated then
-		org.shock = org.shock + dmg * 20
-		org.avgpain = org.avgpain + dmg * 20
+    org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Lower rate for jaw
+
+    -- Slight disorientation and consciousness loss
+    org.disorientation = org.disorientation + dmg * 0.5
+    org.consciousness = math.max(org.consciousness - dmg * 0.05, 0)
+
+    -- Add more concussion for significant damage
+    if dmg > 0.2 then
+        org.concussion = math.min((org.concussion or 0) + dmg * 2, 10)
+    end
+
+    if dislocated then
+        org.shock = org.shock + dmg * 20
+        org.avgpain = org.avgpain + dmg * 20
 		
 		if !org.jawdislocation then
 				PlayBoneBreakSound(org.owner)
