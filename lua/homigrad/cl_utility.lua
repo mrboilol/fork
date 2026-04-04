@@ -396,7 +396,7 @@ players : 1 humans, 0 bots (20 max)
 		end)
 
 		hook.Add("Think","SIB_Suppresss_Think",function()
-			SIB_suppress.Force = Lerp(0.25 * FrameTime(), SIB_suppress.Force,0)
+			SIB_suppress.Force = Lerp(0.50 * FrameTime(), SIB_suppress.Force,0)
 		end)
 
 		hook.Add("PlayerDeath","huyDeathRemoveSuppression",function()

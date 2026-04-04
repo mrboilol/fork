@@ -431,7 +431,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 
-	--[[if isPly then
+	if isPly then
 		local aimed = false
 
 		local entities = ents.FindInCone(owner:EyePos(), owner:GetAimVector(), 128, math.cos(math.rad(90)))
@@ -452,8 +452,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			owner.aimed_at = owner.aimed_at or 0
 			owner.aimed_at = math.Approach(owner.aimed_at, 0, timeValue / 5)
 		end
-	end--]]
-	--bullshit
+	end
+	--huh
 
 	if org.otrub then
 		org.uncon_timer = org.uncon_timer or 0
