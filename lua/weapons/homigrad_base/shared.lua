@@ -1427,6 +1427,11 @@ function SWEP:CoreStep()
 
                 shake_intensity = shake_intensity * (1 - (owner:GetStat("Strength") - 10) * 0.1)
 
+                local strength = owner:GetStat("Strength")
+                if strength < 10 then
+                    shake_intensity = shake_intensity + (10 - strength) * 0.02
+                end
+
 				if shake_intensity > 0 then
 					local time = CurTime() * 10
 					local random_shake = Angle(math.sin(time) * shake_intensity, math.cos(time * 0.8) * shake_intensity, 0)
@@ -2016,6 +2021,10 @@ function SWEP:GetAdditionalValues()
 	end
 
 	local skillissue = ply.organism and ply.organism.recoilmul or 1
+    local strength = ply:GetStat("Strength")
+    if strength < 10 then
+        skillissue = skillissue + (10 - strength) * 0.1
+    end
 
 
 	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)

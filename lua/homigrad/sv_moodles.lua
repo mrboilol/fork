@@ -8,6 +8,28 @@ util.AddNetworkString("Moodle_Remove")
 local MOODLE_DEBUG = false
 local DEBUG_COLOR_SV = Color(255, 150, 0)
 
+local intelligence_gated_moodles = {
+    -- Level 11
+    ["shock"] = 11,
+    ["hemothorax"] = 11,
+    ["internal_bleed"] = 11,
+    ["respfailure"] = 11,
+    ["hypovolemia_3"] = 11,
+    ["brain_damage_2"] = 11,
+    ["overdose_2"] = 11,
+
+    -- Level 12
+    ["sepsis"] = 12,
+    ["overdose_3"] = 12,
+    ["hypovolemia_4"] = 12,
+    ["brain_damage_3"] = 12,
+
+    -- Level 13
+    ["cardiac_arrest"] = 13,
+    ["overdose_4"] = 13,
+    ["brain_damage_4"] = 13,
+}
+
 if MOODLE_DEBUG then
     print("[Moodles] Server-side system started (DEBUG)")
 end
@@ -24,6 +46,13 @@ end
 local function manageMoodleState(ply, moodle, active, material, count, bypass_cooldown)
     ply.MoodleStates = ply.MoodleStates or {}
     local org = ply.organism
+
+    local base_moodle_id = moodle:match("(.+)_%d+$") or moodle
+    local required_intel = intelligence_gated_moodles[base_moodle_id]
+
+    if required_intel and (ply:GetStat("Intelligence") or 10) < required_intel then
+        active = false
+    end
 
     if org and org.otrub then
         local otrub_moodles = {
