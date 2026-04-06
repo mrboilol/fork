@@ -180,7 +180,7 @@ local MOODLE_INFO = {
     ["depression_1"] = { title = "Shaken", desc = "You dont want to keep experiencing this." },
     ["depression_2"] = { title = "Traumatized", desc = "Your body saw something it didnt want to see." },
     ["depression_3"] = { title = "Depressed", desc = "Life isnt fair." },
-    ["depression_4"] = { title = "Desensitized", desc = "Life stopped making sense." },
+    ["depression_4"] = { title = "Despair", desc = "Life stopped making sense." },
 
 
     ["fractured_neck"] = { title = "Spine Injury", desc = "Your spine is severely damaged, leaving you paralyzed." },

@@ -91,8 +91,8 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
         if not otrub_moodles[moodle:match("(.+)_%d+$") or moodle] then
             active = false
         end
-    elseif org and (org.desensitized or 0) > 0 then
-        local desensitized_moodles = {
+    elseif org and (org.despair or 0) > 0 then
+        local despair_moodles = {
             ["bleeding"] = 0.2,
             ["hurt"] = 0.3,
             ["pain"] = 0.4,
@@ -104,7 +104,7 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
             ["fracture"] = 0.8,
         }
         local base_id = (moodle:match("(.+)_%d+$") or moodle)
-        if desensitized_moodles[base_id] and org.desensitized > desensitized_moodles[base_id] then
+        if despair_moodles[base_id] and org.despair > despair_moodles[base_id] then
             active = false
         end
     end
@@ -318,14 +318,14 @@ local function SyncMoodles(ply)
     local tinnitus_active = (org.tinnitus_end_time or 0) > CurTime()
     manageMoodleState(ply, "deaf_1", tinnitus_active, "materials/moodles/Deaf_2.png")
 
-    -- Depression (Desensitized)
-    local desensitized = org.desensitized or 0
+    -- Depression (Despair)
+    local despair = org.despair or 0
     manageHierarchicalMoodle(ply, "depression", {
         { threshold = 0.25, texture = "materials/moodles/Depression_1.png" },
         { threshold = 0.50, texture = "materials/moodles/Depression_2.png" },
         { threshold = 0.75, texture = "materials/moodles/Depression_3.png" },
         { threshold = 0.95, texture = "materials/moodles/Depression_4.png" },
-    }, desensitized)
+    }, despair)
 
     -- The mood system was removed, but the happy moodles are still used in other parts of the code.
     -- manageMoodleState(ply, "happy_1", false, nil, nil, true)

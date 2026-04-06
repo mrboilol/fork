@@ -877,7 +877,7 @@ local IsValid = IsValid
 
 			if hg_huyside:GetBool() then -- huyside == 1, cutscene logic
 				if is_gun_for_cutscene then
-					if ply.organism and (ply.organism.desensitized or 0) >= 0.95 then
+					if ply.organism and (ply.organism.despair or 0) >= 0.95 then
 						ply.suiciding = !ply.suiciding
 					else
 						ply:ChatPrint("You are not in despair enough to do that.")
