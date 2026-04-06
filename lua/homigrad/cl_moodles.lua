@@ -99,6 +99,14 @@ end
 -- Client-side moodle rendering template
 if not CLIENT then return end
 
+surface.CreateFont("ZCity_Moodle", {
+    font = "Bahnschrift",
+    size = 14,
+    weight = 1000,
+    antialias = true,
+})
+
+
 CreateConVar("hg_showothermoodle", "0", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Show moodles of other players above their head", 0, 1)
 CreateConVar("hg_sidemoodles", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Show moodles on the side of the screen", 0, 1)
 CreateConVar("hg_simplemoodles", "0", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Use simple moodles from health indicator", 0, 1)
