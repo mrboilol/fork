@@ -495,10 +495,26 @@ function SWEP:Shoot(override)
         return false
     end
 
-    if SERVER and self.Primary.Ammo and hg.ammotypes[self.Primary.Ammo] and math.random(1, 2000) < (12 / hg.ammotypes[self.Primary.Ammo].BulletSettings.Diameter) then
-        self:SetJammed(true)
-        self:EmitSound(self.Primary.SoundEmpty, true, CHAN_AUTO)
-        return false
+    if SERVER and self.Primary.Ammo and hg.ammotypes[self.Primary.Ammo] then
+        local jamChance = (12 / hg.ammotypes[self.Primary.Ammo].BulletSettings.Diameter)
+
+        if IsValid(owner) and owner:IsPlayer() and owner.organism then
+            local fear = owner.organism.fear or 0
+            if fear > 0 then
+                jamChance = jamChance + fear * 0.5 -- 0.5 bonus chance per fear point
+            end
+            
+            local intelligence = owner:GetStat("Intelligence")
+            if intelligence < 10 then
+                jamChance = jamChance * (1 + (10 - intelligence) * 0.05) -- 5% more chance per point below 10
+            end
+        end
+
+        if math.random(1, 2000) < jamChance then
+            self:SetJammed(true)
+            self:EmitSound(self.Primary.SoundEmpty, true, CHAN_AUTO)
+            return false
+        end
     end
 
 	local primary = self.Primary
@@ -1053,8 +1069,20 @@ hook.Add("Player Think", "suicidingaa", function(ply)
 end)
 
 function SWEP:Think()
-    if self.ishgweapon and self:GetNWFloat("reload", 0) > CurTime() and SERVER and math.random(1, 1250) < ((self:GetOwner().organism and self:GetOwner().organism.fear or 0) * 10) then
-        self:GetOwner():DropWeapon(self)
+    local owner = self:GetOwner()
+    if IsValid(owner) and owner:IsPlayer() and owner.organism then
+        local fear = owner.organism.fear or 0
+        if fear > 0 and self.ishgweapon and self:GetNWFloat("reload", 0) > CurTime() and SERVER then
+            local intelligence = owner:GetStat("Intelligence")
+            local chance = fear * 2 -- 2% chance per fear point
+            if intelligence < 10 then
+                chance = chance * (1 + (10 - intelligence) * 0.1) -- 10% more chance per point below 10
+            end
+
+            if math.random(100) < chance then
+                owner:DropWeapon(self)
+            end
+        end
     end
 
 	if SERVER then
@@ -1426,6 +1454,16 @@ function SWEP:CoreStep()
 				end
 
                 shake_intensity = shake_intensity * (1 - (owner:GetStat("Strength") - 10) * 0.1)
+
+                local strength = owner:GetStat("Strength")
+                if strength < 10 then
+                    shake_intensity = shake_intensity + (10 - strength) * 0.02
+                end
+
+                local fear = owner.organism.fear or 0
+                if fear > 0 then
+                    shake_intensity = shake_intensity + fear * 0.005 -- 0.5% more shake per fear point
+                end
 
                 local strength = owner:GetStat("Strength")
                 if strength < 10 then

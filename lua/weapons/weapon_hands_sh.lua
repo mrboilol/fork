@@ -2150,7 +2150,7 @@ if SERVER then
 		local isAdmiring = not ply:GetNWBool("mcd_admiring", false)
 		if args[1] == "cancel" then isAdmiring = false end
 		ply:SetNWBool("mcd_admiring", isAdmiring)
-		ply.mcd_admire_cooldown = CurTime() + 1.5 -- Prevent spam
+		ply.mcd_admire_cooldown = CurTime() + 1.0 -- Prevent spam
 		
 		if isAdmiring then
 			if not ply:HasWeapon("weapon_hands_sh") then

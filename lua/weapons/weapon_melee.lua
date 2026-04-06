@@ -1035,9 +1035,20 @@ end
 
 
 function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
-       if SERVER and owner.organism and owner.organism.stamina and owner.organism.stamina[1] < 45 and math.random(1, 500) < (owner.organism.fear or 0) * 10 then
-        owner:DropWeapon(self)
-        return
+    if SERVER and owner.organism and owner.organism.stamina and owner.organism.stamina[1] < 45 then
+        local fear = owner.organism.fear or 0
+        if fear > 0 then
+            local intelligence = owner:GetStat("Intelligence")
+            local chance = fear * 3 -- 3% chance per fear point
+            if intelligence < 10 then
+                chance = chance * (1 + (10 - intelligence) * 0.1) -- 10% more chance per point below 10
+            end
+
+            if math.random(100) < chance then
+                owner:DropWeapon(self)
+                return
+            end
+        end
     end
 
     if SERVER then

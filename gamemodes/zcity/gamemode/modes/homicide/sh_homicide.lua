@@ -269,7 +269,120 @@ local function EncodeNormalizedLoadoutString(rawLoadout, fillRandomIfEmpty)
 	return normalizedLoadout, encodedLoadout
 end
 
+local function DecodeLoadoutFromString(loadoutStr)
+	if not isstring(loadoutStr) then return nil end
+	loadoutStr = string.Trim(loadoutStr)
+	if loadoutStr == "" then return nil end
+
+	local function tryDecode(jsonStr)
+		if not isstring(jsonStr) or jsonStr == "" then return nil end
+		local ok, decoded = pcall(util.JSONToTable, jsonStr)
+		if not ok then return nil end
+		if istable(decoded) then return decoded end
+		if isstring(decoded) and decoded ~= "" then
+			local secondOk, secondDecoded = pcall(util.JSONToTable, decoded)
+			if secondOk and istable(secondDecoded) then
+				return secondDecoded
+			end
+		end
+		return nil
+	end
+
+	local decodedDirect = tryDecode(loadoutStr)
+	if decodedDirect then
+		return decodedDirect
+	end
+
+	if string.StartWith(loadoutStr, "\"") and string.EndsWith(loadoutStr, "\"") and #loadoutStr >= 2 then
+		local unwrapped = string.sub(loadoutStr, 2, #loadoutStr - 1)
+		unwrapped = string.Replace(unwrapped, "\\\"", "\"")
+		unwrapped = string.Replace(unwrapped, "\\\\", "\\")
+
+		local decodedUnwrapped = tryDecode(unwrapped)
+		if decodedUnwrapped then
+			return decodedUnwrapped
+		end
+	end
+
+	return nil
+end
+
+local function ResolvePlayerTraitorLoadout(ply)
+	local candidateLoadoutStrings = {
+		ply:GetInfo("hmcd_traitor_loadout"),
+		ply.HMCDTraitorLoadoutString,
+		ply:GetPData("zb_hmcd_traitor_loadout_cache", "")
+	}
+	local emptyLoadout
+	local emptyLoadoutString
+
+	for _, candidate in ipairs(candidateLoadoutStrings) do
+		local decoded = DecodeLoadoutFromString(candidate)
+		if decoded then
+			local normalizedLoadout, normalizedString = EncodeNormalizedLoadoutString(decoded, false)
+			if normalizedLoadout.skillset ~= "none" or #normalizedLoadout.weapons > 0 then
+				ply.HMCDTraitorLoadoutString = normalizedString
+				ply:SetPData("zb_hmcd_traitor_loadout_cache", normalizedString)
+				return normalizedLoadout
+			end
+
+			if not emptyLoadout then
+				emptyLoadout = normalizedLoadout
+				emptyLoadoutString = normalizedString
+			end
+		end
+	end
+
+	if emptyLoadout then
+		ply.HMCDTraitorLoadoutString = emptyLoadoutString
+		ply:SetPData("zb_hmcd_traitor_loadout_cache", emptyLoadoutString)
+		return emptyLoadout
+	end
+
+	local fallbackLoadout, fallbackString = EncodeNormalizedLoadoutString(nil, true)
+	ply.HMCDTraitorLoadoutString = fallbackString
+	ply:SetPData("zb_hmcd_traitor_loadout_cache", fallbackString)
+	return fallbackLoadout
+end
+
+if SERVER then
+	util.AddNetworkString("HMCD_SyncTraitorLoadout")
+
+	net.Receive("HMCD_SyncTraitorLoadout", function(_, ply)
+		if not IsValid(ply) then return end
+
+		local incomingLoadoutString = net.ReadString()
+		local decoded = DecodeLoadoutFromString(incomingLoadoutString)
+		if not decoded then return end
+		local _, normalizedString = EncodeNormalizedLoadoutString(decoded, false)
+
+		ply.HMCDTraitorLoadoutString = normalizedString
+		ply:SetPData("zb_hmcd_traitor_loadout_cache", normalizedString)
+	end)
+
+	hook.Add("PlayerInitialSpawn", "HMCD_LoadTraitorLoadoutCache", function(ply)
+		if not IsValid(ply) then return end
+
+		local cachedLoadoutString = ply:GetPData("zb_hmcd_traitor_loadout_cache", "")
+		if not isstring(cachedLoadoutString) or cachedLoadoutString == "" then return end
+
+		local decoded = DecodeLoadoutFromString(cachedLoadoutString)
+		if not decoded then return end
+
+		local _, normalizedString = EncodeNormalizedLoadoutString(decoded, false)
+		ply.HMCDTraitorLoadoutString = normalizedString
+		ply:SetPData("zb_hmcd_traitor_loadout_cache", normalizedString)
+	end)
+end
+
 if CLIENT then
+	local function HMCDSyncTraitorLoadout(loadoutString)
+		if not isstring(loadoutString) or loadoutString == "" then return end
+		net.Start("HMCD_SyncTraitorLoadout")
+		net.WriteString(loadoutString)
+		net.SendToServer()
+	end
+
 	hook.Add("Initialize", "HMCD_InitLoadout", function()
 		local savedData = file.Read("meleecity_traitor_loadout.txt", "DATA")
 		local decoded = {}
@@ -288,20 +401,20 @@ if CLIENT then
 		if cv then
 			cv:SetString(normalizedString)
 		end
+
+		HMCDSyncTraitorLoadout(normalizedString)
 	end)
+
+	cvars.AddChangeCallback("hmcd_traitor_loadout", function(_, _, newValue)
+		local decoded = DecodeLoadoutFromString(newValue)
+		if not decoded then return end
+		local _, normalizedString = EncodeNormalizedLoadoutString(decoded, false)
+		HMCDSyncTraitorLoadout(normalizedString)
+	end, "HMCD_TraitorLoadoutSync")
 end
 
 local function ApplyLoadout(ply)
-	local loadoutStr = ply:GetInfo("hmcd_traitor_loadout")
-	local data = nil
-	if isstring(loadoutStr) and loadoutStr ~= "" then
-		local ok, decoded = pcall(util.JSONToTable, loadoutStr)
-		if ok and istable(decoded) then
-			data = decoded
-		end
-	end
-
-	local normalizedLoadout = SanitizeLoadout(data, true)
+	local normalizedLoadout = ResolvePlayerTraitorLoadout(ply)
 	local weapons = normalizedLoadout.weapons
 	local skillset = normalizedLoadout.skillset
 	local hasP22ExtraMag = table.HasValue(weapons, "weapon_p22_extra_mag")
@@ -330,6 +443,28 @@ local function ApplyLoadout(ply)
 
 	if hasP22ExtraMag or hasP22Silencer then
 		local extraMagApplied = false
+
+		local function tryGiveP22ExtraMagAmmo(wep)
+			if not IsValid(wep) then return false end
+
+			local reserveAmount = wep:GetMaxClip1()
+			if not isnumber(reserveAmount) or reserveAmount <= 0 then
+				reserveAmount = (wep.Primary and wep.Primary.ClipSize) or 0
+			end
+			if reserveAmount <= 0 then return false end
+
+			local ammoType = wep:GetPrimaryAmmoType()
+			if not isnumber(ammoType) or ammoType < 0 then
+				local ammoName = wep.Primary and wep.Primary.Ammo
+				if isstring(ammoName) and ammoName ~= "" then
+					ammoType = game.GetAmmoID(ammoName)
+				end
+			end
+			if not isnumber(ammoType) or ammoType < 0 then return false end
+
+			ply:GiveAmmo(reserveAmount, ammoType, true)
+			return true
+		end
 
 		local function ensureP22Suppressor(wep)
 			if not IsValid(wep) or not wep.attachments or not wep.availableAttachments then return false end
@@ -367,8 +502,7 @@ local function ApplyLoadout(ply)
 		local function applyP22Addons(wep)
 			if not IsValid(wep) then return end
 			if hasP22ExtraMag and not extraMagApplied then
-				ply:GiveAmmo(wep:GetMaxClip1(), wep:GetPrimaryAmmoType(), true)
-				extraMagApplied = true
+				extraMagApplied = tryGiveP22ExtraMagAmmo(wep)
 			end
 			if hasP22Silencer then
 				ensureP22Suppressor(wep)

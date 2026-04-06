@@ -1,6 +1,5 @@
 local getBloodColor = FindMetaTable( "Entity" ).GetBloodColor
 local isBulletDamage = FindMetaTable( "CTakeDamageInfo" ).IsBulletDamage
-
 hg.ConVars = hg.ConVars or {}
 
 local hg_legacycam = ConVarExists("hg_legacycam") and GetConVar("hg_legacycam") or CreateConVar("hg_legacycam", 0, FCVAR_REPLICATED, "Toggle legacy first-person view camera", 0, 1)
@@ -1285,32 +1284,30 @@ hook.Add( "OnEntityCreated", "ReplaceEnt", function( ent )
 end )
 
 -- https://www.youtube.com/watch?v=HvtIwUgJgjA
---\\ Kick on death
-	local reasons = {
-		"Goodbye.",
-		"Better luck next time.",
-		"Error",
-		"Something wrong"
-	}
+-- Death
+local reasons = {
+	"Goodbye.",
+    "Better luck next time.",
+    "Error",
+    "Something wrong"
+}
 
-	local plymeta = FindMetaTable("Player")
+local plymeta = FindMetaTable("Player")
 
-	local flags = bit.bor(FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_SERVER_CAN_EXECUTE, FCVAR_NEVER_AS_STRING)
-	local hg_sync = CreateConVar("hg_sync", 0, flags, "Toggle death synchronized (kick player on death)", 0, 1)
+local flags = bit.bor(FCVAR_REPLICATED, FCVAR_NOTIFY, FCVAR_SERVER_CAN_EXECUTE, FCVAR_NEVER_AS_STRING)
+local hg_sync = CreateConVar("hg_sync", 0, flags, "Toggle death synchronized (kick player on death)", 0, 1)
 
-	function plymeta:SyncDeath()
-		local SyncLastMessage = table.Random(reasons)
-		if !self:IsSuperAdmin() then
-			self:Kick(SyncLastMessage)
-		end
+function plymeta:SyncDeath()
+	local SyncLastMessage = table.Random(reasons)
+	if !self:IsSuperAdmin() then
+		self:Kick(SyncLastMessage)
 	end
-
+end
 	hook.Add("PlayerDeath","I_Feel_Death",function(ply)
 		if hg_sync:GetBool() then
 			ply:SyncDeath()
 		end
 	end)
---//
 
 oldGetUseEntity = oldGetUseEntity or plymeta.GetUseEntity
 
@@ -1320,7 +1317,6 @@ function plymeta:GetUseEntity()
 	return ent
 end
 
---\\ Get shards/table legs on break
 	local string_find = string.find
 	hook.Add("PropBreak", "FurnitureLegs", function(ply, ent)
 		if IsValid(ent) and string_find(ent:GetModel(), "furniture", 1, "%a") and math.random(3) == 2 then
@@ -1342,22 +1338,49 @@ end
 		end
 	end)
 
-	hook.Add("PostEntityTakeDamage", "GlassShards", function(ent, dmginfo)
-		if IsValid(ent) and math.random(4) == 2 then
-			if ent:GetClass() == "func_breakable_surf" or (ent:GetClass() == "func_breakable" and ent:GetMaterialType() == MAT_GLASS) then
-				local glass = ents.Create("weapon_hg_glassshard")
-				local inf = dmginfo:GetInflictor()
-				glass:SetPos(IsValid(inf) and inf:GetPos() or dmginfo:GetAttacker():GetPos())
-				glass:SetAngles(AngleRand(-180, 180))
-				glass:Spawn()
-				glass.IsSpawned = true
-				glass.init = true
-				--Player(2):SetPos(IsValid(inf) and inf:GetPos() or dmginfo:GetAttacker():GetPos())
-				--print(ent, glass) -- bro im spawned and etc.
-			end
-		end
-	end)
---//
+local glassShardSpawnData = setmetatable({}, {__mode = "k"})
+
+hook.Add("PostEntityTakeDamage", "GlassShards", function(ent, dmginfo)
+	if not IsValid(ent) then return end
+
+	local class = ent:GetClass()
+	local isGlass = class == "func_breakable_surf" or (class == "func_breakable" and ent:GetMaterialType() == MAT_GLASS)
+	if not isGlass then return end
+	if math.random(4) ~= 2 then return end
+
+	local data = glassShardSpawnData[ent]
+	local curTime = CurTime()
+
+	if data then
+		if curTime < data.nextTime then return end
+		if data.count >= 3 then return end
+	else
+		data = {nextTime = 0, count = 0}
+		glassShardSpawnData[ent] = data
+	end
+
+	local inf = dmginfo:GetInflictor()
+	local attacker = dmginfo:GetAttacker()
+	local sourcePos
+
+	if IsValid(inf) then
+		sourcePos = inf:GetPos()
+	elseif IsValid(attacker) then
+		sourcePos = attacker:GetPos()
+	else
+		sourcePos = ent:GetPos()
+	end
+
+	local glass = ents.Create("weapon_hg_glassshard")
+	glass:SetPos(sourcePos)
+	glass:SetAngles(AngleRand(-180, 180))
+	glass:Spawn()
+	glass.IsSpawned = true
+	glass.init = true
+
+	data.count = data.count + 1
+	data.nextTime = curTime + 0.35
+end)
 
 local entMeta = FindMetaTable( "Entity" )
 
@@ -1521,7 +1544,6 @@ hook.Add( "AcceptInput", "StealthOpenDoors", function( ent, inp, act, ply, val )
 		end
 	end
 end )
-
 hook.Add("PlayerUse", "DoorClose", function(ply, ent)
 	local getdoor = ply:GetUseEntity()
 	if string_find(tostring(getdoor), "prop_door_rotating") and getdoor:GetInternalVariable("m_eDoorState") == 2 then
@@ -1555,7 +1577,7 @@ hook.Add( "KeyPress", "snowballs_pickup", function( ply, key )
 end )
 
 local warmingEnts = {
-	["env_sprite"] = 0.0,
+	["env_sprite"] = 0.1,
 	["env_fire"] = 0.5,
 	["vfire"] = function(ent) return ent:GetFireState() end,
 }
@@ -1639,7 +1661,6 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 	
 	local isFreezing = temp < 0
 	local isHeating = temp > 30
-
 	local MaxWarmMul = 1
 	local warmLoseMul = 1
 
@@ -1652,7 +1673,6 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 		MaxWarmMul = result2
 		warmLoseMul = result3
 	end
-
 	if temp > 25 then
 		changeRate = changeRate * math.Clamp(((org.heatbuff - 30) / 60), 1, 2)
 	end

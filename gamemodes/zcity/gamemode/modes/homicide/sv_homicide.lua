@@ -194,7 +194,7 @@ local gunmanWeaponAttachments = {
 	["weapon_px4beretta"] = {"supressor4"},
 	["weapon_remington870"] = {"supressor5","holo1","holo2","holo15"},
 	["weapon_kar98"] = {"optic12"},
-	["weapon_mosin"] = {},
+	["weapon_mosin"] = {"supressor1"},
 }
 
 local function GiveMixedGunmanWeapon(ply)

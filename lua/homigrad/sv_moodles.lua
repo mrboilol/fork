@@ -30,6 +30,22 @@ local intelligence_gated_moodles = {
     ["brain_damage_4"] = 13,
 }
 
+local GENERIC_MOODLE_TEXTURES = {
+    ["bleeding"] = "materials/moodles/bleeding.png",
+    ["hypovolemia"] = "materials/moodles/hypovolemia.png",
+    ["brain_damage"] = "materials/moodles/brain_damage.png",
+    ["cold"] = "materials/moodles/cold.png",
+    ["heat"] = "materials/moodles/heat.png",
+    ["depression"] = "materials/moodles/depression.png",
+    ["encumbered"] = "materials/moodles/encumbered.png",
+    ["endurance"] = "materials/moodles/endurance.png",
+    ["faint"] = "materials/moodles/faint.png",
+    ["overdose"] = "materials/moodles/overdose.png",
+    ["hypoxemia"] = "materials/moodles/hypoxemia.png",
+    ["pain"] = "materials/moodles/pain.png",
+    ["trauma"] = "materials/moodles/trauma.png",
+}
+
 if MOODLE_DEBUG then
     print("[Moodles] Server-side system started (DEBUG)")
 end
@@ -47,7 +63,15 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
     ply.MoodleStates = ply.MoodleStates or {}
     local org = ply.organism
 
-    local base_moodle_id = moodle:match("(.+)_%d+$") or moodle
+    local is_admiring = ply:GetNWBool("mcd_admiring", false)
+
+    local base_moodle_id, level = moodle:match("(.+)_([%d+])")
+    
+    if not is_admiring and level then
+        base_moodle_id = base_moodle_id or moodle
+        moodle = base_moodle_id
+        material = GENERIC_MOODLE_TEXTURES[base_moodle_id] or "materials/moodles/" .. base_moodle_id .. ".png" -- Fallback just in case
+    end
     local required_intel = intelligence_gated_moodles[base_moodle_id]
 
     if required_intel and (ply:GetStat("Intelligence") or 10) < required_intel then
@@ -107,22 +131,45 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
 end
 
 local function manageHierarchicalMoodle(ply, baseID, levels, value)
-    local active_level = 0
-    for i = #levels, 1, -1 do
-        local level_info = levels[i]
-        if value >= level_info.threshold then
-            active_level = i
-            break
-        end
-    end
+    local is_admiring = ply:GetNWBool("mcd_admiring", false)
 
-    for i = 1, #levels do
-        local level_info = levels[i]
-        local moodleID = baseID .. "_" .. i
-        local should_be_active = (i == active_level)
-        -- When a moodle is being deactivated as part of a hierarchy change, bypass the cooldown to prevent flickering.
-        local bypass_cooldown = (not should_be_active and active_level > 0)
-        manageMoodleState(ply, moodleID, should_be_active, level_info.texture, nil, bypass_cooldown)
+    if not is_admiring then
+        local active_level = 0
+        for i = #levels, 1, -1 do
+            if value >= levels[i].threshold then
+                active_level = i
+                break
+            end
+        end
+
+        for i = 1, #levels do
+            local moodleID = baseID .. "_" .. i
+            manageMoodleState(ply, moodleID, false, nil, nil, true) -- Remove all specific levels
+        end
+
+        if active_level > 0 then
+            local generic_texture = GENERIC_MOODLE_TEXTURES[baseID] or "materials/moodles/" .. baseID .. ".png" -- Fallback just in case
+            manageMoodleState(ply, baseID, true, generic_texture, nil, false)
+        else
+            manageMoodleState(ply, baseID, false, nil, nil, true)
+        end
+    else
+        local active_level = 0
+        for i = #levels, 1, -1 do
+            local level_info = levels[i]
+            if value >= level_info.threshold then
+                active_level = i
+                break
+            end
+        end
+
+        for i = 1, #levels do
+            local level_info = levels[i]
+            local moodleID = baseID .. "_" .. i
+            local should_be_active = (i == active_level)
+            local bypass_cooldown = (not should_be_active and active_level > 0)
+            manageMoodleState(ply, moodleID, should_be_active, level_info.texture, nil, bypass_cooldown)
+        end
     end
 end
 

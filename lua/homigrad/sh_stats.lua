@@ -4,6 +4,8 @@
 -- Shared stats system for players.
 ---------------------------------------------------------------------------]]
 
+local hg_stats_enabled = CreateConVar("hg_stats_enabled", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Enable/Disable the stat system.")
+
 PLAYER.Stats = PLAYER.Stats or {}
 
 -- Stat definitions
@@ -15,12 +17,14 @@ PLAYER.Stats.Intelligence = 10
 -- Stat-related functions
 function PLAYER:SetStat(stat, value)
     if not self:IsPlayer() then return end
+    if not hg_stats_enabled:GetBool() then return end
     value = math.Clamp(value, 1, 20)
     self:SetNWInt("Stat_" .. stat, value)
 end
 
 function PLAYER:GetStat(stat)
     if not self:IsPlayer() then return 10 end
+    if not hg_stats_enabled:GetBool() then return 10 end
     return self:GetNWInt("Stat_" .. stat, 10)
 end
 
@@ -48,6 +52,7 @@ if SERVER then
 
     -- Set default stats on spawn
     hook.Add("PlayerInitialSpawn", "Stats.PlayerInitialSpawn", function(ply)
+        if not hg_stats_enabled:GetBool() then return end
         local stats = {"Strength", "Endurance", "Dexterity", "Intelligence"}
         for _, stat in pairs(stats) do
             ply:SetStat(stat, math.random(9, 11))
@@ -72,6 +77,10 @@ if SERVER then
     -- Console command to set stats
     concommand.Add("set_stat", function(ply, cmd, args)
         if not ply:IsAdmin() then return end
+        if not hg_stats_enabled:GetBool() then
+            ply:ChatPrint("The stat system is currently disabled.")
+            return
+        end
 
         local stat = args[1]
         local value = tonumber(args[2])
@@ -90,6 +99,7 @@ end
 if CLIENT then
     -- Receive message to display stats
     usermessage.Hook("Stats.Display", function()
+        if not hg_stats_enabled:GetBool() then return end
         local ply = LocalPlayer()
         local str = "Strength: " .. ply:GetStat("Strength")
         local endu = "Endurance: " .. ply:GetStat("Endurance")
