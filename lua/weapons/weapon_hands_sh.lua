@@ -2166,8 +2166,8 @@ if SERVER then
 					wep:DoBFSAnimation("seq_admire", 5, true, true)
 					
 					-- Ensure animation doesn't get interrupted
-					wep:SetNextPrimaryFire(CurTime() + 10)
-					wep:SetNextSecondaryFire(CurTime() + 10)
+					wep:SetNextPrimaryFire(CurTime() + 7)
+					wep:SetNextSecondaryFire(CurTime() + 7)
 				end
 			end)
 		else
