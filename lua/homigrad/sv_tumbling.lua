@@ -110,7 +110,7 @@ hook.Add("Think", "stanleytumbler", function()
             end
         end
 
-        local dexterity = ply:GetStat("Dexterity")
+        local dexterity = ply:GetStat("Dexterity") or 10
         if dexterity < 10 then
             tripChance = tripChance * (1 + (10 - dexterity) * 0.1) -- 10% more chance per point below 10
         end

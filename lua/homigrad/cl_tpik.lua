@@ -808,7 +808,9 @@ function hg.MainTPIKFunction(ent, ply, wpn)
         hg.DoZManip(ent, ply)
         //local systime = SysTime()
         hg.DoTPIK(ply, ent)
-        applyInjuryTPIK(ent, ply)
+        if applyInjuryTPIK then
+            applyInjuryTPIK(ent, ply)
+        end
         --hg._DeprecatedDoTPIK(ply, ent)
         //print("DoTPIK: ", SysTime() - systime)
     end

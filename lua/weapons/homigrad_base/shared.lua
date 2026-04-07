@@ -1522,9 +1522,9 @@ function SWEP:CoreStep()
 					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
 				end
 
-                shake_intensity = shake_intensity * (1 - (owner:GetStat("Strength") - 10) * 0.1)
+                shake_intensity = shake_intensity * (1 - ((owner:GetStat("Strength") or 10) - 10) * 0.1)
 
-                local strength = owner:GetStat("Strength")
+                local strength = owner:GetStat("Strength") or 10
                 if strength < 10 then
                     shake_intensity = shake_intensity + (10 - strength) * 0.02
                 end
@@ -1532,11 +1532,6 @@ function SWEP:CoreStep()
                 local fear = owner.organism.fear or 0
                 if fear > 0 then
                     shake_intensity = shake_intensity + fear * 0.005 -- 0.5% more shake per fear point
-                end
-
-                local strength = owner:GetStat("Strength")
-                if strength < 10 then
-                    shake_intensity = shake_intensity + (10 - strength) * 0.02
                 end
 
 				if shake_intensity > 0 then
