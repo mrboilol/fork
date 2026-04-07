@@ -997,7 +997,11 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
         mul = mul * (1.0 + swayBonus)
     end
 
-    mul = mul * (1 + (owner:GetStat("Strength") - 10) * 0.1)
+    local strength = 10
+    if IsValid(owner) and owner.GetStat then
+        strength = owner:GetStat("Strength") or 10
+    end
+    mul = mul * (1 + (strength - 10) * 0.1)
 
     return mul
 end

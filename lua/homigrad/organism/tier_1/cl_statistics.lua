@@ -259,13 +259,29 @@ local function LerpVariables(lerp,org_source,org_target)
 	end
 end
 
-hg.LerpVariables = LerpVariables
+local stat_display_time = 0
+local stat_display_alpha = 0
+
+net.Receive("show_stats", function()
+    stat_display_time = CurTime() + 2
+end)
+
 
 local littleblack = Color(75, 75, 75, 255)
 local trahalgmod = Color(0, 0, 0, 75)
 local weight = 200
 local developer = GetConVar("developer")
 local hg_stats = GetConVar("hg_stats") or CreateClientConVar("hg_stats", 1, true, false, "show stats", 0, 1)
+concommand.Add("toggle_stats", function()
+    local hg_stats = GetConVar("hg_stats")
+    hg_stats:SetBool(not hg_stats:GetBool())
+end, nil, "Toggles the persistent stats display.")
+
+concommand.Add("show_stats", function()
+    net.Start("show_stats")
+    net.SendToServer()
+end, nil, "Shows your stats temporarily.")
+
 hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")

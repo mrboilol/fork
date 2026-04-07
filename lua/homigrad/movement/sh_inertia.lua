@@ -123,6 +123,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		local slow_walking = ply:KeyDown(IN_WALK)
 		local aiming = ply:KeyDown(IN_ATTACK2) and wep and IsValid(wep) and ishgweapon(wep)
+        if slow_walking and ply:KeyDown(IN_SPEED) then
+            slow_walking = false
+        end
 		local walk_speed = ply:GetWalkSpeed()
 		local slow_walk_speed = ply:GetSlowWalkSpeed()
 		local crouch_walk_speed = ply:GetCrouchedWalkSpeed()
