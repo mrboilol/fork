@@ -539,6 +539,9 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     
     local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
     local y = ScrH() - h - ScreenScaleFixed(20)
+    if ply.PlayerClassName == "Combine" or ply.PlayerClassName == "Gordon" then
+        y = ScreenScaleFixed(20)
+    end
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)

@@ -184,9 +184,7 @@ hook.Add("Think", "Fake", function()
 		power = power * org.consciousness
 
 		local strength = (IsValid(ply) and ply.GetStat and ply:GetStat("Strength")) or 10
-		if strength < 10 then
-			power = power * (1 - (10 - strength) * 0.05)
-		end
+		power = power * (1 + (strength - 10) * 0.05)
 
 		ragdoll.power = power
 

@@ -403,7 +403,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			k = k * math.Clamp((250 - slwdwn) / 250, 0.75, 1)
     end
 
-    k = k * (1 + (ply:GetStat("Dexterity") - 10) * 0.05)
+    k = k * (1 + ((ply:GetStat("Dexterity") or 10) - 10) * 0.1)
 
 		k = math.max(k, 20 / 200)
 

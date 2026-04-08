@@ -315,7 +315,7 @@ function SWEP:IsZoom()
 	--print( (owner.armors and (hg.armor.head[owner.armors["head"]] and not hg.armor.head[owner.armors["head"]].cantsight)))
 	return self:CanUse() and
 		(!hg_aimtoshoot:GetBool() or self:GetNWBool("aiming")) and
-		(self:GetButtstockAttack() - CurTime() < -1) and 
+		((self:GetButtstockAttack() or 0) - CurTime() < -1) and 
 		(self:GetOwner():IsPlayer() and self:KeyDown(IN_ATTACK2) and not self:IsSprinting()) and
 		!(self:IsSprinting() and !IsValid(owner.FakeRagdoll)) and
 		((IsValid(owner.FakeRagdoll) and (self:KeyDown(IN_USE) or hg.RagdollCombatInUse(owner))) or
@@ -522,9 +522,7 @@ function SWEP:Shoot(override)
             end
             
             local intelligence = owner:GetStat("Intelligence")
-            if intelligence < 10 then
-                jamChance = jamChance * (1 + (10 - intelligence) * 0.05) -- 5% more chance per point below 10
-            end
+            jamChance = jamChance * (1 - (intelligence - 10) * 0.025)
         end
 
         if math.random(1, 2000) < jamChance then
@@ -1144,9 +1142,7 @@ function SWEP:Think()
         if fear > 0 and self.ishgweapon and self:GetNWFloat("reload", 0) > CurTime() and SERVER then
             local intelligence = owner:GetStat("Intelligence")
             local chance = fear * 2 -- 2% chance per fear point
-            if intelligence < 10 then
-                chance = chance * (1 + (10 - intelligence) * 0.1) -- 10% more chance per point below 10
-            end
+            chance = chance * (1 - (intelligence - 10) * 0.05)
 
             if math.random(100) < chance then
                 owner:DropWeapon(self)
@@ -1522,12 +1518,7 @@ function SWEP:CoreStep()
 					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
 				end
 
-                shake_intensity = shake_intensity * (1 - ((owner:GetStat("Strength") or 10) - 10) * 0.1)
-
-                local strength = owner:GetStat("Strength") or 10
-                if strength < 10 then
-                    shake_intensity = shake_intensity + (10 - strength) * 0.02
-                end
+                shake_intensity = shake_intensity * (1 - ((owner:GetStat("Strength") or 10) - 10) * 0.05)
 
                 local fear = owner.organism.fear or 0
                 if fear > 0 then
@@ -2124,9 +2115,7 @@ function SWEP:GetAdditionalValues()
 
 	local skillissue = (ply.organism and ply.organism.recoilmul) or 1
     local strength = (IsValid(ply) and ply.GetStat and ply:GetStat("Strength")) or 10
-    if strength < 10 then
-        skillissue = skillissue + (10 - strength) * 0.1
-    end
+    skillissue = skillissue - (strength - 10) * 0.05
 
 
 	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)

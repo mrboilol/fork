@@ -49,13 +49,13 @@ SWEP.ismelee2 = true
 SWEP.AttackTime = 0.2
 SWEP.DrawAnimTime = 1.25
 SWEP.EquipTime = 1
-SWEP.AnimTime1 = 0.7
-SWEP.WaitTime1 = 0.5
+SWEP.AnimTime1 = 1.05
+SWEP.WaitTime1 = 0.75
 SWEP.AttackLen1 = 55
 
 SWEP.Attack2Time = 0.1
-SWEP.AnimTime2 = 0.6
-SWEP.WaitTime2 = 0.4
+SWEP.AnimTime2 = 0.9
+SWEP.WaitTime2 = 0.6
 SWEP.AttackLen2 = 45 
 
 SWEP.DamageType = DMG_SLASH
@@ -955,7 +955,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     end
 
     if owner:IsBerserk() then
-        mul = mul * (1 + owner.organism.berserk)
+        mul = mul * (1 + math.min(owner.organism.berserk, 2)) -- Cap berserk bonus to 2 (3x damage)
     end
 
 
@@ -1001,7 +1001,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     if IsValid(owner) and owner.GetStat then
         strength = owner:GetStat("Strength") or 10
     end
-    mul = mul * (1 + (strength - 10) * 0.1)
+    mul = mul * (1 + (strength - 10) * 0.025)
 
     return mul
 end
@@ -1042,7 +1042,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     if SERVER and owner.organism and owner.organism.stamina and owner.organism.stamina[1] < 45 then
         local fear = owner.organism.fear or 0
         if fear > 0 then
-            local intelligence = owner:GetStat("Intelligence")
+            local intelligence = owner:GetStat("Intelligence") or 10
             local chance = fear * 3 -- 3% chance per fear point
             if intelligence < 10 then
                 chance = chance * (1 + (10 - intelligence) * 0.1) -- 10% more chance per point below 10
@@ -1320,7 +1320,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
                 end
 
-				local parry_bonus = (ent:GetStat("Dexterity") - 10) * 0.01 + (ent:GetStat("Intelligence") - 10) * 0.01
+				local parry_bonus = ((ent:GetStat("Dexterity") or 10) - 10) * 0.01 + ((ent:GetStat("Intelligence") or 10) - 10) * 0.01
                 local perfectblock = CurTime() - wep:GetStartedBlocking() < (0.5 + parry_bonus)
                 
                 if perfectblock then
@@ -2225,8 +2225,7 @@ function SWEP:PrimaryAttack()
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
-    mul = mul * (1 - (ply:GetStat("Dexterity") - 10) * 0.05)
-    mul = mul * (1 - (ply:GetStat("Dexterity") - 10) * 0.05)
+    mul = mul * (1 + ((ply:GetStat("Strength") or 10) - 10) * 0.025)
 
     
     self.HitEnts = nil
@@ -2344,6 +2343,7 @@ function SWEP:SecondaryAttack(override)
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
+    mul = mul * (1 + ((ply:GetStat("Strength") or 10) - 10) * 0.025)
 
     self.HitEnts = nil
     self.FirstAttackTick = false

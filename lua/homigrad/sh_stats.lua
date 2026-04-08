@@ -72,19 +72,29 @@ if SERVER then
 end
 
 if CLIENT then
-    -- Receive message to display stats
+    local stat_display_time = 0
+    local stats_to_display = {}
+
     usermessage.Hook("Stats.Display", function()
         if not hg_stats_enabled:GetBool() then return end
+        
         local ply = LocalPlayer()
-        local str = "Strength: " .. ply:GetStat("Strength")
-        local endu = "Endurance: " .. ply:GetStat("Endurance")
-        local dex = "Dexterity: " .. ply:GetStat("Dexterity")
-        local int = "Intelligence: " .. ply:GetStat("Intelligence")
+        stats_to_display = {
+            "Your stats:",
+            "Strength: " .. ply:GetStat("Strength"),
+            "Endurance: " .. ply:GetStat("Endurance"),
+            "Dexterity: " .. ply:GetStat("Dexterity"),
+            "Intelligence: " .. ply:GetStat("Intelligence")
+        }
+        stat_display_time = CurTime() + 10
+    end)
 
-        chat.AddText(Color(255, 255, 0), "Your stats:")
-        chat.AddText(Color(255, 255, 255), str)
-        chat.AddText(Color(255, 255, 255), endu)
-        chat.AddText(Color(255, 255, 255), dex)
-        chat.AddText(Color(255, 255, 255), int)
+    hook.Add("HUDPaint", "Stats.HUDDisplay", function()
+        if not hg_stats_enabled:GetBool() then return end
+        if stat_display_time < CurTime() then return end
+
+        for i, text in ipairs(stats_to_display) do
+            draw.SimpleText(text, "DermaDefault", 10, 10 + (i - 1) * 20, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        end
     end)
 end
