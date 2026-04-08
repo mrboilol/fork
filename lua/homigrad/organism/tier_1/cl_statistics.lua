@@ -287,12 +287,9 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
 	local new_organism = lply:Alive() and lply.new_organism or (viewmode == 1 and IsValid(spect) and spect.new_organism) or {}
-	
-	--LerpVariables(FrameTime(),organism,new_organism)
+        LerpVariables(FrameTime(), organism, new_organism)
 	if !organism then return end
-	if not developer:GetBool() then return end
-	if not LocalPlayer():IsAdmin() then return end
-	if !hg_stats:GetBool() then return end
+		if not hg_stats:GetBool() and not (stat_display_time > CurTime()) then return end
 	local textList = getTextTable(organism)
 	local h = math.Round(ScreenScaleH(5.5))
 	local cutoff = math.floor((ScrH() - 150 - 50) / h)
@@ -326,8 +323,7 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	local trent = tr.Entity
 	local organism_otherply = trent.organism or {}
 	local new_organism_otherply = trent.new_organism or {}
-	
-	--LerpVariables(FrameTime(),organism_otherply,new_organism_otherply)
+        LerpVariables(FrameTime(), organism_otherply, new_organism_otherply)
 
 	if not organism_otherply or table.IsEmpty(organism_otherply) then return end
 	trent = organism_otherply.owner

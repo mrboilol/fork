@@ -29,26 +29,7 @@ function PLAYER:GetStat(stat)
 end
 
 if SERVER then
-    local function ScaleStats(ply, stat, value)
-        local scaled_stat
-        if stat == "Strength" then
-            scaled_stat = "Endurance"
-        elseif stat == "Endurance" then
-            scaled_stat = "Strength"
-        elseif stat == "Dexterity" then
-            scaled_stat = "Intelligence"
-        elseif stat == "Intelligence" then
-            scaled_stat = "Dexterity"
-        end
 
-        if scaled_stat then
-            local scaled_value = ply:GetStat(scaled_stat)
-            local diff = value - scaled_value
-            if math.abs(diff) > 2 then
-                ply:SetStat(scaled_stat, scaled_value + (diff > 0 and 1 or -1))
-            end
-        end
-    end
 
     -- Set default stats on spawn
     hook.Add("PlayerInitialSpawn", "Stats.PlayerInitialSpawn", function(ply)
@@ -56,11 +37,6 @@ if SERVER then
         local stats = {"Strength", "Endurance", "Dexterity", "Intelligence"}
         for _, stat in pairs(stats) do
             ply:SetStat(stat, math.random(9, 11))
-        end
-
-        -- Apply scaling
-        for _, stat in pairs(stats) do
-            ScaleStats(ply, stat, ply:GetStat(stat))
         end
 
         -- Chance for an extra point
@@ -91,7 +67,6 @@ if SERVER then
         end
 
         ply:SetStat(stat, value)
-        ScaleStats(ply, stat, value)
         ply:ChatPrint(stat .. " set to " .. value)
     end)
 end
