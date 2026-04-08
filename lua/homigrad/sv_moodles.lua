@@ -253,6 +253,7 @@ end
 
 -- Main sync function where your custom logic goes
 local function SyncOriginalMoodles(ply)
+    if GetConVar("hg_simplemoodles"):GetBool() then return end
     if not IsValid(ply) or not ply:Alive() then return end
     
     ply.MoodleStates = ply.MoodleStates or {}
@@ -557,6 +558,7 @@ local function GetOrgValueNumber(value)
 end
 
 local function SyncAfflictionMoodles(ply)
+    if not GetConVar("hg_simplemoodles"):GetBool() then return end
     if not IsValid(ply) or not ply:Alive() then return end
 
     ply.MoodleStates = ply.MoodleStates or {}
@@ -656,13 +658,7 @@ end
 
 
 -- Main sync function where your custom logic goes
-local function SyncMoodles(ply)
-    if GetConVar("hg_simplemoodles"):GetBool() then
-        SyncAfflictionMoodles(ply)
-    else
-        SyncOriginalMoodles(ply)
-    end
-end
+
 
 -- Think loop for periodic syncing
 hook.Add("Think", "Moodle_ThinkSync", function()
@@ -676,9 +672,14 @@ hook.Add("Think", "Moodle_ThinkSync", function()
         if curTime >= ply.moodle_last_sync + syncInterval then
             ply.moodle_last_sync = curTime
             
-            local ok, err = pcall(SyncMoodles, ply)
+            local ok, err = pcall(SyncOriginalMoodles, ply)
             if not ok and MOODLE_DEBUG then 
-                MsgC(DEBUG_COLOR_SV, "[Moodle] Sync error: "..tostring(err).."\n") 
+                MsgC(DEBUG_COLOR_SV, "[Moodle] Sync error (Original): "..tostring(err).."\n") 
+            end
+
+            ok, err = pcall(SyncAfflictionMoodles, ply)
+            if not ok and MOODLE_DEBUG then 
+                MsgC(DEBUG_COLOR_SV, "[Moodle] Sync error (Affliction): "..tostring(err).."\n") 
             end
         end
     end
