@@ -10,6 +10,9 @@ module[1] = function(org)
 	org.bloodpressure = 93
 	org.systolic = 120
 	org.diastolic = 80
+	org.bloodpressure = 93
+	org.systolic = 120
+	org.diastolic = 80
 
 	org.tempchanging = 0
 	org.heatbuff = 30 -- seconds of heat supply

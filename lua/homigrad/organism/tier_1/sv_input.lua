@@ -901,7 +901,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local adrenaline = org.adrenaline
 		local analgesiaMul = (org.analgesia * 4 + 1)
 		local painkillerMul = (org.painkiller * 0.5 + 1)
-			local inflictor = dmgInfo:GetInflictor()
+		local inflictor = dmgInfo:GetInflictor()
 		local inflictorClass = IsValid(inflictor) and inflictor:GetClass() or ""
 		local inflictorBase = IsValid(inflictor) and inflictor.Base or ""
 		local meleeHit = dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH) or inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee"

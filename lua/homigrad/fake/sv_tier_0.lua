@@ -716,6 +716,7 @@ function hg.FakeUp(ply, forced, instant)
 	//if ply:InVehicle() and ply:GetVehicle():WaterLevel() >= 3 then return end
 	if not forced and (not IsValid(ply.FakeRagdoll) or not ply:Alive() or hook_Run("Should Fake Up", ply) ~= nil) then return false end
 	ply.fakecd = CurTime() + 2
+	ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
 
 	if ply:InVehicle() then
 		return

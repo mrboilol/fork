@@ -1483,16 +1483,12 @@ function SWEP:CustomThink()
                     if IsValid(owner) then
                         owner:StopSound("pwb2/weapons/mac11/draw.wav")
                     end
-                    if not inFakeState then
-                        self:PlayAnim("idle", 1, false, nil, false)
-                    end
+                    self:PlayAnim("idle", 1, false, nil, false)
                 end
             elseif CLIENT then
                 self.HeavyChargeNextStateLocal = 0
                 self.HeavyChargeStartLocal = 0
-                if not inFakeState then
-                    self:PlayAnim("idle", 1, false, nil, false, true)
-                end
+                self:PlayAnim("idle", 1, false, nil, false, true)
             end
         elseif (state == 1 or state == 2) and useDown and attackDown and feintPressed and not self:GetInAttack() then
             local cancelTime = self.HeavyAttackAnimTimeBegin
