@@ -31,16 +31,16 @@ function PLAYER:LegAttack()
     local dmg = anim == "curbstomp_base" and 24 or 10 * (2 - speedmul)
     local kickNerf = 0.9
 
-    if isMidAir then
-        local vel = self:GetVelocity():Length()
-        local mult = Lerp(math.Clamp(vel / 700, 0, 1), 1.25, 2.25)
-        dmg = dmg * mult
-    end
+    local vel = self:GetVelocity():Length()
+    local mult = Lerp(math.Clamp(vel / 800, 0, 1), 1.0, 3.5)
+    dmg = dmg * mult
 
     dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
     
     if isMidAir then
-        dmg = math.min(dmg, 42)
+        dmg = math.min(dmg, 75)
+    else
+        dmg = math.min(dmg, 50)
     end
     dmg = dmg * kickNerf
     --print(dmg)

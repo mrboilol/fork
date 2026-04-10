@@ -418,7 +418,8 @@ function ENT:Explode()
 
 	timer.Simple(0, function()
 		util.ScreenShake( selfPos, 35, 200, 1, 1000 )
-				local ammo = "Metal Debris"
+		
+		local ammo = "Metal Debris"
 		local ammotype = hg.ammotypeshuy[ammo].BulletSettings
 		
 		local co = coroutine.create(function()
@@ -435,14 +436,13 @@ function ENT:Explode()
 					local Tr = util.QuickTrace(selfPos, dir * 10000, self)
 
 					if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
-												local bullet = {}
+						local bullet = {}
 						bullet.Speed = ammotype.Speed
 						bullet.Distance = ammotype.Distance or 56756
 						bullet.penetrated = 0
 						bullet.MaxPenLen = 100
 						bullet.Penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
 						bullet.Diameter = ammotype.Diameter or 1
-
 						bullet.Src = selfPos
 						bullet.Spread = vecCone
 						bullet.Force = 20
