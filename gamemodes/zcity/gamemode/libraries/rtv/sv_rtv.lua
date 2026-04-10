@@ -614,8 +614,7 @@ function zb.CheckRTVVotes(needPrint)
     
     return false
 end
-
-COMMANDS.rtv = {function(ply, args)
+local function rtv(ply, args)
     --print(zb.votestarted)
 	if zb.votestarted then
 		zb.RTVMenu(ply)
@@ -670,8 +669,11 @@ COMMANDS.rtv = {function(ply, args)
 
     if zb.CheckRTVVotes(true) then
         return
-    end
-end, 0}
+    end 
+end
+
+COMMANDS.rtv = {rtv, 0}
+COMMANDS.кем = {rtv, 0}
 
 hook.Add("ShutDown", "ResetRTVVotesOnMapChange", zb.ClearRTVVotes)
 hook.Add("PostGamemodeLoaded", "InitializeRTVSystem", function()
