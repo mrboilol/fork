@@ -58,7 +58,7 @@ MODE.LootTable = {
 		{2,"weapon_hg_crowbar"},
 		{1,"weapon_hatchet"},
 		{0.9,"weapon_hg_axe"},
-		{0.9,"weapon_hg_katana"},
+		{0.15,"weapon_hg_katana"},
 		{0.5,"weapon_hg_machete"},
 		{0.4,"weapon_hg_sledgehammer"},
 
@@ -128,6 +128,7 @@ MODE.LootTable = {
 		{1,"weapon_musket"},
 		{1,"weapon_vpo136"},
 		{1,"weapon_sr25"},
+		{0.15,"weapon_hg_nunchuks"},
 	}},
 }
 
@@ -156,9 +157,10 @@ MODE.LootTableStandard = {
 
 		{0.12,"weapon_hatchet"},
 		{0.10,"weapon_hg_axe"},
-		{0.03,"weapon_hg_katana"},
+		{0.01,"weapon_hg_katana"},
 		{0.09,"weapon_hg_sledgehammer"},
 		{0.07,"weapon_hg_machete"},
+		{0.01,"weapon_hg_nunchuks"},
 	}},
 }
 
@@ -1826,7 +1828,9 @@ function MODE.SpawnPlayers(spawn_with_subroles)
             if(gaymaps[game.GetMap()])then
                 local inv = current_ply:GetNetVar("Inventory") or {}
                 inv["Weapons"] = inv["Weapons"] or {}
-                inv["Weapons"]["hg_flashlight"] = true
+                if(current_ply.SubRole != "traitor_martial_artist")then
+                	inv["Weapons"]["hg_flashlight"] = true
+                end
                 current_ply:SetNetVar("Inventory", inv)
             end
 

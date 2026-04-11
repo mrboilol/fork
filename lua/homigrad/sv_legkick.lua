@@ -43,6 +43,7 @@ function PLAYER:LegAttack()
     else
         dmg = math.min(dmg, 50)
     end
+    dmg = dmg * (self.KickDamageMul or 1)
     dmg = dmg * kickNerf
     --print(dmg)
     --print(speedmul)
