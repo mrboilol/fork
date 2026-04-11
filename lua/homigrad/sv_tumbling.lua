@@ -118,6 +118,12 @@ hook.Add("Think", "stanleytumbler", function()
             tripChance = tripChance + despair * 0.25
         end
 
+        local maxStamina = (org.stamina and org.stamina.max) or 100
+        if stamina < maxStamina then
+            local staminaPenalty = (maxStamina - stamina) / maxStamina
+            tripChance = tripChance + staminaPenalty * 0.2
+        end
+
         if org.superfighter then
             tripChance = tripChance * 0.1
         end
@@ -139,8 +145,8 @@ hook.Add("Think", "stanleytumbler", function()
                 hg.Fake(ply)
                 --mcity reference?
                 if not org.superfighter then
-                    local breakChance = 0.25
-                    local dislocationChance = 0.5
+                    local breakChance = 0.15
+                    local dislocationChance = 0.3
 
                     if math.random() < breakChance then
                         -- Limb break
