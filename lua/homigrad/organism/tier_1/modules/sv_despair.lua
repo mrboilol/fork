@@ -46,6 +46,7 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 end)
 
 hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
+	-- print("sv_despair.lua Org Think")
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	org.despair = Clamp(org.despair or 0, 0, 1)
@@ -62,9 +63,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		add = add + (adrenaline - 3) * timeValue * 0.045
 	end
 
-	if adrenalineAdd > 0.35 then
-		add = add + min(adrenalineAdd, 2) * timeValue * 0.03
-	end
+	--if adrenalineAdd > 0.35 then
+	--	add = add + min(adrenalineAdd, 2) * timeValue * 0.03
+	--end
 
 	if adrenalineDelta > 0 then
 		add = add + min(adrenalineDelta * 0.25, 0.08)

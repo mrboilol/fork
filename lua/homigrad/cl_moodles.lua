@@ -118,7 +118,7 @@ local color_black = Color(0, 0, 0, 255)
 CreateClientConVar("moodle_debug_draw", 0, true, false, "Toggle client-side moodle debug HUD (1=on, 0=off)")
 local function IsDebugDrawEnabled() return GetConVar("moodle_debug_draw"):GetInt() == 1 end
 
-local CLIENT_MOODLES = {}
+hg.CLIENT_MOODLES = {}
 hg.FadingOutMoodles = {}
 local last_removed_moodle = {}
 local prev_view_angles = Angle(0,0,0)
@@ -296,7 +296,7 @@ net.Receive("Moodle_Add", function()
 
     local ply = LocalPlayer()
     
-    local existing = CLIENT_MOODLES[id]
+    local existing = hg.CLIENT_MOODLES[id]
     if not existing then
         CLIENT_MOODLES[id] = { texture = tex, count = cnt, mat = Material(tex), spawn = CurTime() }
     else
@@ -433,8 +433,20 @@ hook.Add("HUDPaintBackground", "Moodle_Draw", function()
     local row = 0
 
     -- First, calculate target positions for all visible moodles
+    local org = ply.organism
+    local despair = org and org.despair or 0
+    local fear = org and org.fear or 0
+    local adrenaline = org and org.adrenaline or 0
+    local fade_time = 10 -- seconds
+    if despair > 0.5 or fear > 0.5 or adrenaline > 1 then
+        fade_time = 5
+    end
     for _, moodle in ipairs(sorted_moodles) do
         local data = moodle.data
+
+        if not data.remove_time and (CurTime() - data.spawn) > fade_time then
+            data.remove_time = CurTime()
+        end
 
         if not data.remove_time then
             if GetConVar("hg_sidemoodles"):GetBool() then

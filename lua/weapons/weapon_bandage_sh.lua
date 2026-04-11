@@ -480,6 +480,24 @@ if SERVER then
 	util.AddNetworkString("select_mode")
 	util.AddNetworkString(circleNetDone)
 	util.AddNetworkString(circleNetStart)
+    net.Receive(circleNetDone, function(len, ply)
+        local wep = net.ReadEntity()
+        if not IsValid(wep) or wep:GetOwner() ~= ply then return end
+        local attackType = net.ReadUInt(2)
+        local target
+        if attackType == 1 then
+            target = ply
+        else
+            target = hg.eyeTrace(ply).Entity
+        end
+        if not IsValid(target) then return end
+        target = ResolveBandageTargetServer(target)
+        if not IsValid(target) then return end
+        local done = wep:Heal(target, wep.mode)
+        if done and wep.PostHeal then
+            wep:PostHeal(target, wep.mode)
+        end
+    end)
 else
 	net.Receive("select_mode",function()
 		net.ReadEntity().mode = net.ReadInt(4)

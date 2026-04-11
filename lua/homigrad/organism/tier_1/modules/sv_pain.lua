@@ -158,4 +158,5 @@ module[2] = function(owner, org, timeValue)
 	//org.shock = math.max(org.shock, tempo * 4)
 	
 	org.disorientation = math.Approach(org.disorientation, 0, timeValue / 5)
+	org.despair = math.max(org.despair - org.analgesia * 0.1 * timeValue, 0)
 end

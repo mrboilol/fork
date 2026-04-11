@@ -250,7 +250,7 @@ module[2] = function(owner, org, mulTime)
 		org.critical = false
 	end
 
-	org.bleed = (bleedoutspeed + bleedoutspeed2)
+	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
 end
 
 util.AddNetworkString("bloodsquirt2")

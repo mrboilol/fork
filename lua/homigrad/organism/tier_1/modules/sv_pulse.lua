@@ -73,7 +73,8 @@ module[2] = function(owner, org, timeValue)
 	-- if no fear, in 3 minutes become slightly talkative, so would say random phrases to calm themselves in a current situation
 	local gainfear = hg.organism.should_gain_fear(org)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
-	org.fearadd = math.Approach(org.fearadd, 1, gainfear and timeValue / 5 or 0)
+	local fear_gain_speed = (org.hungry or 0) < 10 and timeValue / 10 or timeValue / 5
+	org.fearadd = math.Approach(org.fearadd, 1, gainfear and fear_gain_speed or 0)
 	
 	if org.fear > 0.5 then
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, org.fear * 2, timeValue)

@@ -428,6 +428,7 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 end)
 
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
+	-- print("sv_organism.lua Org Think")
 	if not IsValid(owner) then
 		hg.organism.list[owner] = nil
 		return
@@ -457,15 +458,22 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		despairAdd = despairAdd + (adrenaline - 8) * timeValue * 0.003
 	end
 
-	if adrenalineAdd > 0.9 then
-		despairAdd = despairAdd + math.min(adrenalineAdd, 2) * timeValue * 0.002
-	end
+	--if adrenalineAdd > 0.9 then
+	--	despairAdd = despairAdd + math.min(adrenalineAdd, 2) * timeValue * 0.002
+	--end
 
 	if adrenalineDelta > 0 then
 		despairAdd = despairAdd + math.min(adrenalineDelta * 0.02, 0.004)
 	end
 
-	if (org.fear or 0) > 0 then
+	org.fear = (org.fear or 0)
+
+	org.fear = org.fear + (org.fearadd or 0)
+	org.fearadd = 0
+
+	org.fear = math.Approach(org.fear, 0, timeValue * 0.75)
+
+	if org.fear > 0 then
 		despairAdd = despairAdd + math.Clamp(org.fear, 0, 2) * timeValue * 0.0035
 	end
 
@@ -539,6 +547,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if despairAdd > 0 then
+		if (org.hungry or 0) < 10 then -- Well Fed
+			despairAdd = despairAdd * 0.5
+		end
 		despairAdd = math.min(despairAdd, timeValue * 0.03)
 		org.despair = math.min(org.despair + despairAdd, 1)
 	end
