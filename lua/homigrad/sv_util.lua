@@ -1128,6 +1128,8 @@ local TrackedEnts = {
 	["Grenade"] = {"weapon_hg_hl2nade_tpik"},
 	["npc_grenade_frag"] = {"ent_hg_grenade_hl2grenade"},
 	["ent_jack_hmcd_ducttape"] = {"weapon_ducttape"},
+	["ent_hmcd_mansion_cup"]={"weapon_hg_mug"},
+	["ent_hmcd_mansion_knife"]={"weapon_pocketknife"},
 }
 
 local TrackedEntsHalfLife = {
@@ -1148,6 +1150,7 @@ local TrackedEntsHalfLife = {
 	["item_ammo_pistol_large"]={"ent_ammo_9x19mmparabellum"},
 	["item_ammo_ar2"]={"ent_ammo_pulse"},
 	["item_ammo_ar2_large"]={"ent_ammo_pulse"},
+	["weapon_physcannon"]={"weapon_hg_gravitygun"},
 	["item_ammo_ar2_altfire"]={"ent_ammo_pulse"},--TODO: add altfire!!!!
 	["item_ammo_smg1"]={"ent_ammo_4.6x30mm"},
 	["item_box_mrounds"]={"ent_ammo_4.6x30mm"},
@@ -1165,6 +1168,7 @@ local TrackedEntsHalfLife = {
 	["ent_hmcd_mansion_cup"]={"weapon_hg_mug"},
 	["ent_hmcd_mansion_knife"]={"weapon_pocketknife"},
 	["ent_hmcd_mansion_cuestick"]={"weapon_hg_spear"},
+
 }
 
 local TrackedModelsa = {
@@ -1200,6 +1204,7 @@ TrackedEntsNpc["weapon_crowbar"] = {"weapon_bat"}
 TrackedEntsNpc["weapon_stunstick"] = {"weapon_hg_stunstick"}
 TrackedEntsNpc["weapon_shotgun"] = {"weapon_spas12"}
 TrackedEntsNpc["npc_grenade_frag"] = {"ent_hg_grenade_hl2grenade"}
+TrackedEntsNpc["weapon_alyxgun"] = {"weapon_pl15"}	--for co-op!
 
 local fuckingwait = 0
 hook.Add("PreCleanupMap","ReplaceEntCD",function()
