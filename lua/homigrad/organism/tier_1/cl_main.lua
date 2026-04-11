@@ -127,6 +127,13 @@ local forsaken_text_phrases = {
 	"how are you this bad",
 	"go play roblox",
 	"ouch",
+	"mortis",
+	"lmfao",
+	"that was bad",
+	"wait i didnt see that",
+	"jesus fucking christ",
+	"WHERES YO HEAD AT???",
+	"OW FUCKING FUCK FUCKER FUCKING SHIT",
 }
 
 local forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
