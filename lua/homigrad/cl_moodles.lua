@@ -119,6 +119,7 @@ CreateClientConVar("moodle_debug_draw", 0, true, false, "Toggle client-side mood
 local function IsDebugDrawEnabled() return GetConVar("moodle_debug_draw"):GetInt() == 1 end
 
 local CLIENT_MOODLES = {}
+hg.FadingOutMoodles = {}
 local last_removed_moodle = {}
 local prev_view_angles = Angle(0,0,0)
 local sway_offset_x = 0
@@ -367,6 +368,7 @@ net.Receive("Moodle_Remove", function()
     last_removed_moodle = {id = id, time = CurTime()}
     if CLIENT_MOODLES[id] then
         CLIENT_MOODLES[id].remove_time = CurTime()
+        hg.FadingOutMoodles[id] = CLIENT_MOODLES[id]
     end
 
     if IsDebugDrawEnabled() then MsgC(DEBUG_COLOR_CL_REMOVE, "[MM] - "..id.."\n") end
@@ -483,6 +485,7 @@ hook.Add("HUDPaintBackground", "Moodle_Draw", function()
 
             if remove_dt > 0.4 then
                 CLIENT_MOODLES[id] = nil
+                hg.FadingOutMoodles[id] = nil
                 if IsDebugDrawEnabled() and id ~= "*" then MsgC(DEBUG_COLOR_CL_REMOVE, "[M] - "..id.."\n") end
                 continue
             end

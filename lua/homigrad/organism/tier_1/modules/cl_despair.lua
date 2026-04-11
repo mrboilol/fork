@@ -125,8 +125,8 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	draw.SimpleText("Your mind is in despair.", despairFont, x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText("Your mind is in despair.", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("Im so fucking scared", despairFont, x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("Im so fucking scared", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 hook.Add("Player_Death", "hg_despair_cleanup", function(ply)

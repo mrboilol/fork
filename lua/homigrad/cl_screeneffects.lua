@@ -947,8 +947,8 @@ hook.Add("DrawOverlay", "despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("im so fucking scared", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("im so fucking scared", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local function removeflash()
