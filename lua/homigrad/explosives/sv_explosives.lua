@@ -57,7 +57,7 @@ local GasTankPushForce = {
 	["models/props_c17/canister02a.mdl"] = 125,
 	["models/props_junk/PropaneCanister001a.mdl"] = 120,
 	["models/props_c17/canister_propane01a.mdl"] = 135,
-	["models/props_junk/propane_tank001a.mdl"] = 145
+	["models/props_junk/propane_tank001a.mdl"] = 35
 }
 
 local GasTankSmokeSettings = {
@@ -92,8 +92,117 @@ end
 
 local function IsLeakingTankOnFire(ent)
 	if not IsValid(ent) then return false end
-	if ent:IsOnFire() then return true end
-	return istable(ent.fires) and next(ent.fires) != nil
+	if not istable(ent.fires) then return false end
+	local entIndex = ent:EntIndex()
+	for fireEnt, _ in pairs(ent.fires) do
+		if IsValid(fireEnt) then
+			if fireEnt.hgLeakSourceEntIndex != entIndex then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+local function RemoveLeakFire(leak)
+	if not istable(leak) then return end
+	if IsValid(leak.FireEnt) then
+		leak.FireEnt:Remove()
+	end
+	leak.FireEnt = nil
+end
+
+local function RemoveTankLeakFires(data)
+	if not istable(data) or not istable(data.Leaks) then return end
+	for i = 1, #data.Leaks do
+		RemoveLeakFire(data.Leaks[i])
+	end
+end
+
+local function EnsureLeakFire(ent, leak)
+	if not IsValid(ent) or not istable(leak) or not leak.LocalHolePos then return end
+	if IsValid(leak.FireEnt) then return end
+	local holePos = ent:LocalToWorld(leak.LocalHolePos)
+	local normal = leak.LocalNormal or Vector(0, 0, 1)
+	local worldNormal = ent:LocalToWorld(leak.LocalHolePos + normal) - holePos
+	if worldNormal:LengthSqr() < 0.001 then
+		worldNormal = ent:GetForward()
+	end
+	worldNormal:Normalize()
+	local fire = CreateVFire(ent, holePos, worldNormal, 35, ent)
+	if IsValid(fire) then
+		fire.hgLeakSourceEntIndex = ent:EntIndex()
+		fire:ChangeLife(45)
+		leak.FireEnt = fire
+	end
+end
+
+local function IsWoodProp(ent)
+	if not IsValid(ent) then return false end
+	if ent:GetClass() != "prop_physics" then return false end
+	if GasTankModels[ent:GetModel()] then return false end
+	local phys = ent:GetPhysicsObject()
+	if IsValid(phys) then
+		local mat = string.lower(phys:GetMaterial() or "")
+		if string.find(mat, "wood", 1, true) then return true end
+	end
+	local mdl = string.lower(ent:GetModel() or "")
+	if string.find(mdl, "wood", 1, true) then return true end
+	if string.find(mdl, "crate", 1, true) then return true end
+	if string.find(mdl, "pallet", 1, true) then return true end
+	return false
+end
+
+local function TryLeakIgniteNearby(ent, data, holePos, dir)
+	if not IsValid(ent) or not istable(data) then return end
+	local curTime = CurTime()
+	if curTime < (data.NextLeakIgniteThink or 0) then return end
+	data.NextLeakIgniteThink = curTime + 0.25
+	data.NextIgniteTimes = data.NextIgniteTimes or {}
+	local ignitePos = holePos + dir * 35
+	local ignitedCount = 0
+	for _, v in ipairs(ents.FindInSphere(ignitePos, 120)) do
+		if v == ent or not IsValid(v) then continue end
+		local idx = v:EntIndex()
+		if curTime < (data.NextIgniteTimes[idx] or 0) then continue end
+		local targetPos = v.WorldSpaceCenter and v:WorldSpaceCenter() or v:GetPos()
+		local tr = util.TraceLine({
+			start = holePos,
+			endpos = targetPos,
+			filter = {ent}
+		})
+		if tr.Hit and tr.Entity != v then continue end
+		if v:IsPlayer() or v:IsNPC() or v:IsNextBot() then
+			if not (istable(v.fires) and next(v.fires) != nil) then
+				local downTrace = util.QuickTrace(targetPos + vector_up * 12, -vector_up * 80, {ent, v})
+				local firePos = downTrace.Hit and downTrace.HitPos or targetPos
+				local fireNormal = downTrace.Hit and downTrace.HitNormal or vector_up
+				local fire = CreateVFire(game.GetWorld(), firePos, fireNormal, 50, ent)
+				if IsValid(fire) then
+					fire:ChangeLife(55)
+				end
+			end
+			data.NextIgniteTimes[idx] = curTime + 1.35
+			ignitedCount = ignitedCount + 1
+		elseif IsWoodProp(v) then
+			if not (istable(v.fires) and next(v.fires) != nil) then
+				local nearest = v:NearestPoint(holePos)
+				local normal = nearest - v:WorldSpaceCenter()
+				if normal:LengthSqr() < 0.001 then
+					normal = vector_up
+				else
+					normal:Normalize()
+				end
+				local fire = CreateVFire(game.GetWorld(), nearest, normal, 45, ent)
+				if IsValid(fire) then
+					fire:ChangeLife(45)
+				end
+			end
+			data.NextIgniteTimes[idx] = curTime + 1.5
+			ignitedCount = ignitedCount + 1
+		end
+		if ignitedCount >= 2 then break end
+	end
 end
 
 local function ResolveGasTankLeak(target, dmginfo)
@@ -123,6 +232,7 @@ function hg.GasTankDetonate(ent)
 	ent.IsExploding = true
 	local idx = ent:EntIndex()
 	local data = hg.GasTank.ActiveTanks[idx]
+	RemoveTankLeakFires(data)
 	local baseGas = (data and data.BaseGasAmount) or (ent.Volume or 75)
 	local curGas = (data and data.GasAmount) or baseGas
 	local ratio = math.Clamp(curGas / baseGas, 0.1, 1)
@@ -555,11 +665,12 @@ hook.Add("Think", "hg_gastank_mainloop", function()
 	for idx, data in pairs(hg.GasTank.ActiveTanks) do
 		local ent = data.Ent
 		if not IsValid(ent) then
+			RemoveTankLeakFires(data)
 			hg.GasTank.ActiveTanks[idx] = nil
 			continue
 		end
 
-		if IsLeakingTankOnFire(ent) then
+		if not data.IsActive and IsLeakingTankOnFire(ent) then
 			hg.GasTankDetonate(ent)
 			continue
 		end
@@ -580,15 +691,8 @@ hook.Add("Think", "hg_gastank_mainloop", function()
 
 					if leak.Mode == "fire" and CurTime() > (data.NextBurnTime or 0) then
 						data.NextBurnTime = CurTime() + 0.1
-						local burnPos = holePos + dir * 50
-						for _, v in ipairs(ents.FindInSphere(burnPos, 100)) do
-							if v == ent or not IsValid(v) then continue end
-							if v:IsPlayer() or v:IsNPC() or v:IsNextBot() then
-								v:Ignite(1)
-							elseif v:GetClass() == "prop_physics" and not GasTankModels[v:GetModel()] then
-								v:Ignite(1)
-							end
-						end
+						EnsureLeakFire(ent, leak)
+						TryLeakIgniteNearby(ent, data, holePos, dir)
 					end
 					if leak.Mode == "smoke" and CurTime() > (leak.NextSmokeTime or 0) then
 						if (data.GasAmount or 0) <= 0 then
@@ -617,6 +721,7 @@ hook.Add("Think", "hg_gastank_mainloop", function()
 
 		if (data.GasAmount or 0) <= 0 and data.LeakMode == "smoke" then
 			data.IsActive = false
+			RemoveTankLeakFires(data)
 			data.Leaks = {}
 			net.Start("hg_gastank_stop")
 			net.WriteUInt(idx, 16)
@@ -642,6 +747,9 @@ hook.Add("Think", "hg_gastank_mainloop", function()
 end)
 
 hook.Add("PostCleanupMap", "hg_gastank_reset", function()
+	for _, data in pairs(hg.GasTank.ActiveTanks) do
+		RemoveTankLeakFires(data)
+	end
 	hg.GasTank.ActiveTanks = {}
 end)
 
@@ -649,7 +757,7 @@ hook.Add("EntityTakeDamage", "ExplosiveDamage", function( target, dmginfo )
 	if IsValid(target) then
 		local tankData = hg.GasTank.ActiveTanks[target:EntIndex()]
 		if tankData then
-			if dmginfo:IsDamageType(DMG_BURN) or IsLeakingTankOnFire(target) then
+			if not tankData.IsActive and (dmginfo:IsDamageType(DMG_BURN) or IsLeakingTankOnFire(target)) then
 				hg.GasTankDetonate(target)
 				dmginfo:SetDamage(0)
 				return true
@@ -660,6 +768,7 @@ hook.Add("EntityTakeDamage", "ExplosiveDamage", function( target, dmginfo )
 					tankData.IsActive = true
 					tankData.NextBurnTime = 0
 					tankData.ExplodeAt = CurTime() + math.Rand(3, 5)
+					tankData.NextLeakBroadcastAt = 0
 					if not tankData.BaseGasAmount then
 						tankData.BaseGasAmount = target.Volume or 75
 						tankData.GasAmount = tankData.BaseGasAmount
@@ -672,10 +781,11 @@ hook.Add("EntityTakeDamage", "ExplosiveDamage", function( target, dmginfo )
 
 				local localHole, localNormal = ResolveGasTankLeak(target, dmginfo)
 
-				local mode = tankData.LeakMode or (RNG(100) <= 30 and "fire" or "smoke")
+				local mode = tankData.LeakMode or (RNG(100) <= 45 and "fire" or "smoke")
 				tankData.LeakMode = mode
 				if #tankData.Leaks >= 4 then
-					table.remove(tankData.Leaks, 1)
+					local removedLeak = table.remove(tankData.Leaks, 1)
+					RemoveLeakFire(removedLeak)
 				end
 				tankData.Leaks[#tankData.Leaks + 1] = {
 					LocalHolePos = localHole,
@@ -684,12 +794,15 @@ hook.Add("EntityTakeDamage", "ExplosiveDamage", function( target, dmginfo )
 					Time = CurTime()
 				}
 
-				net.Start("hg_gastank_leak")
-				net.WriteEntity(target)
-				net.WriteVector(localHole)
-				net.WriteVector(localNormal)
-				net.WriteString(mode)
-				net.Broadcast()
+				if CurTime() >= (tankData.NextLeakBroadcastAt or 0) then
+					tankData.NextLeakBroadcastAt = CurTime() + 0.06
+					net.Start("hg_gastank_leak")
+					net.WriteEntity(target)
+					net.WriteVector(localHole)
+					net.WriteVector(localNormal)
+					net.WriteString(mode)
+					net.Broadcast()
+				end
 
 				local phys = target:GetPhysicsObject()
 				if IsValid(phys) then

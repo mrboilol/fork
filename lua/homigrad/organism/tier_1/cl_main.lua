@@ -883,7 +883,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	ply.pulse_breathe = ply.pulse_breathe or {}
 	ent.pulse_breathe = ply.pulse_breathe
 	
-	hg.LerpVariables(FrameTime() * 10, organism, new_organism)
+	if hg.LerpVariables then
+		hg.LerpVariables(FrameTime() * 10, organism, new_organism)
+	end
 	
 	local org = ent.organism or {}
 	local owner = ent

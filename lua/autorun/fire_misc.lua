@@ -65,6 +65,7 @@ function vFireIsCharacter(ent)
 	if ent.vFireIsCharacter != nil then return ent.vFireIsCharacter end
 	local isCharacter = ent:IsRagdoll() or ent:IsNPC() or ent:IsPlayer()
 	ent.vFireIsCharacter = isCharacter
+	return isCharacter
 end
 
 function vFireIsMobile(ent)
@@ -748,7 +749,9 @@ if CLIENT then
 		if isvector(data) then
 			pos = data
 		else
+			if !IsValid(data) or !data.GetPos then return 1 end
 			pos = data:GetPos()
+			if !isvector(pos) then return 1 end
 		end
 
 		-- Are we forcing our LOD settings via ConVars?
@@ -761,8 +764,16 @@ if CLIENT then
 		end
 
 		-- Proceed as normal
-		local dist = GetViewEntity():GetPos():DistToSqr(pos)
-		local fov = LocalPlayer():GetFOV()
+		local viewEntity = GetViewEntity()
+		if !IsValid(viewEntity) or !viewEntity.GetPos then return 1 end
+		local viewPos = viewEntity:GetPos()
+		if !isvector(viewPos) then return 1 end
+		local localPly = LocalPlayer()
+		if !IsValid(localPly) or !localPly.GetFOV then return 1 end
+		local fov = localPly:GetFOV()
+		if !isnumber(fov) or fov <= 0 then fov = 90 end
+		local dist = viewPos:DistToSqr(pos)
+		if dist <= 0 then dist = 1 end
 
 		-- The higher LODVal the more detail we should see
 		local LODVal = 1000000000 / (dist * fov)

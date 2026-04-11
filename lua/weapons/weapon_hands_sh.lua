@@ -1734,7 +1734,7 @@ function SWEP:AttackFront(special_attack, rand)
 			self.DamageMul = special_attack and 1.6 or 3
 		end
 
-		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul
+		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul * (1 + (owner:GetStat("Strength") - 10) * 0.1)
 		local ent = Ent
 		local vec = AimVec
 
@@ -2150,7 +2150,7 @@ if SERVER then
 		local isAdmiring = not ply:GetNWBool("mcd_admiring", false)
 		if args[1] == "cancel" then isAdmiring = false end
 		ply:SetNWBool("mcd_admiring", isAdmiring)
-		ply.mcd_admire_cooldown = CurTime() + 1.5 -- Prevent spam
+		ply.mcd_admire_cooldown = CurTime() + 1.0 -- Prevent spam
 		
 		if isAdmiring then
 			if not ply:HasWeapon("weapon_hands_sh") then
@@ -2166,8 +2166,8 @@ if SERVER then
 					wep:DoBFSAnimation("seq_admire", 5, true, true)
 					
 					-- Ensure animation doesn't get interrupted
-					wep:SetNextPrimaryFire(CurTime() + 10)
-					wep:SetNextSecondaryFire(CurTime() + 10)
+					wep:SetNextPrimaryFire(CurTime() + 7)
+					wep:SetNextSecondaryFire(CurTime() + 7)
 				end
 			end)
 		else

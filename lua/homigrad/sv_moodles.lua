@@ -2,11 +2,70 @@
 -- Server-side moodle sync template
 if not SERVER then return end
 
+CreateConVar("hg_simplemoodles", "0", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Enable simple moodles (health indicator style)")
+
+cvars.AddChangeCallback("hg_simplemoodles", function(convar_name, value_old, value_new)
+    for _, ply in ipairs(player.GetAll()) do
+        if IsValid(ply) then
+            ply.MoodleStates = {}
+            net.Start("Moodle_Remove")
+            net.WriteString("*") -- "*" acts as a wildcard to clear all client-side
+            net.Send(ply)
+        end
+    end
+end)
+
 util.AddNetworkString("Moodle_Add")
 util.AddNetworkString("Moodle_Remove")
 
 local MOODLE_DEBUG = false
 local DEBUG_COLOR_SV = Color(255, 150, 0)
+
+local intelligence_gated_moodles = {
+    -- Level 11
+    ["shock"] = 11,
+    ["hemothorax"] = 11,
+    ["internal_bleed"] = 11,
+    ["respfailure"] = 11,
+    ["hypovolemia_3"] = 11,
+    ["brain_damage_2"] = 11,
+    ["overdose_2"] = 11,
+
+    -- Level 12
+    ["sepsis"] = 12,
+    ["overdose_3"] = 12,
+    ["hypovolemia_4"] = 12,
+    ["brain_damage_3"] = 12,
+
+    -- Level 13
+    ["cardiac_arrest"] = 13,
+    ["overdose_4"] = 13,
+    ["brain_damage_4"] = 13,
+}
+
+local GENERIC_MOODLE_TEXTURES = {
+
+
+    -- Affliction moodles
+    ["open-wound"] = "materials/sef_icons/open-wound.png",
+    ["deepwound"] = "materials/sef_icons/deepwound.png",
+    ["bleed"] = "materials/sef_icons/bleed.png",
+    ["broken"] = "materials/sef_icons/broken.png",
+    ["concussion"] = "materials/sef_icons/concussion.png",
+    ["blind"] = "materials/sef_icons/blind.png",
+    ["wither"] = "materials/sef_icons/wither.png",
+    ["incap"] = "materials/sef_icons/incap.png",
+    ["bloodlust"] = "materials/sef_icons/bloodlust.png",
+    ["haste"] = "materials/sef_icons/haste.png",
+    ["anagenthasdied"] = "materials/sef_icons/anagenthasdied.png",
+    ["warning"] = "materials/sef_icons/warning.png",
+    ["hindered"] = "materials/sef_icons/hindered.png",
+    ["stunned"] = "materials/sef_icons/stunned.png",
+    ["poison-gas"] = "materials/sef_icons/poison-gas.png",
+    ["exhaust"] = "materials/sef_icons/exhaust.png",
+    ["discharge"] = "materials/sef_icons/discharge.png",
+    ["frozen"] = "materials/sef_icons/frozen.png",
+}
 
 if MOODLE_DEBUG then
     print("[Moodles] Server-side system started (DEBUG)")
@@ -25,6 +84,21 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
     ply.MoodleStates = ply.MoodleStates or {}
     local org = ply.organism
 
+    local is_admiring = ply:GetNWBool("mcd_admiring", false)
+
+    local base_moodle_id, level = moodle:match("(.+)_([%d+])")
+
+    if GetConVar("hg_simplemoodles"):GetBool() and not is_admiring and level then
+        base_moodle_id = base_moodle_id or moodle
+        moodle = base_moodle_id
+        material = GENERIC_MOODLE_TEXTURES[base_moodle_id] or "materials/moodles/" .. base_moodle_id .. ".png" -- Fallback just in case
+    end
+    local required_intel = intelligence_gated_moodles[base_moodle_id]
+
+    if required_intel and (ply:GetStat("Intelligence") or 10) < required_intel then
+        active = false
+    end
+
     if org and org.otrub then
         local otrub_moodles = {
             ["cardiac_arrest"] = true,
@@ -38,8 +112,8 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
         if not otrub_moodles[moodle:match("(.+)_%d+$") or moodle] then
             active = false
         end
-    elseif org and (org.desensitized or 0) > 0 then
-        local desensitized_moodles = {
+    elseif org and (org.despair or 0) > 0 then
+        local despair_moodles = {
             ["bleeding"] = 0.2,
             ["hurt"] = 0.3,
             ["pain"] = 0.4,
@@ -51,7 +125,7 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
             ["fracture"] = 0.8,
         }
         local base_id = (moodle:match("(.+)_%d+$") or moodle)
-        if desensitized_moodles[base_id] and org.desensitized > desensitized_moodles[base_id] then
+        if despair_moodles[base_id] and org.despair > despair_moodles[base_id] then
             active = false
         end
     end
@@ -78,22 +152,45 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
 end
 
 local function manageHierarchicalMoodle(ply, baseID, levels, value)
-    local active_level = 0
-    for i = #levels, 1, -1 do
-        local level_info = levels[i]
-        if value >= level_info.threshold then
-            active_level = i
-            break
-        end
-    end
+    local is_admiring = ply:GetNWBool("mcd_admiring", false)
 
-    for i = 1, #levels do
-        local level_info = levels[i]
-        local moodleID = baseID .. "_" .. i
-        local should_be_active = (i == active_level)
-        -- When a moodle is being deactivated as part of a hierarchy change, bypass the cooldown to prevent flickering.
-        local bypass_cooldown = (not should_be_active and active_level > 0)
-        manageMoodleState(ply, moodleID, should_be_active, level_info.texture, nil, bypass_cooldown)
+    if GetConVar("hg_simplemoodles"):GetBool() and not is_admiring then
+        local active_level = 0
+        for i = #levels, 1, -1 do
+            if value >= levels[i].threshold then
+                active_level = i
+                break
+            end
+        end
+
+        for i = 1, #levels do
+            local moodleID = baseID .. "_" .. i
+            manageMoodleState(ply, moodleID, false, nil, nil, true) -- Remove all specific levels
+        end
+
+        if active_level > 0 then
+            local generic_texture = GENERIC_MOODLE_TEXTURES[baseID] or "materials/moodles/" .. baseID .. ".png" -- Fallback just in case
+            manageMoodleState(ply, baseID, true, generic_texture, nil, false)
+        else
+            manageMoodleState(ply, baseID, false, nil, nil, true)
+        end
+    else
+        local active_level = 0
+        for i = #levels, 1, -1 do
+            local level_info = levels[i]
+            if value >= level_info.threshold then
+                active_level = i
+                break
+            end
+        end
+
+        for i = 1, #levels do
+            local level_info = levels[i]
+            local moodleID = baseID .. "_" .. i
+            local should_be_active = (i == active_level)
+            local bypass_cooldown = (not should_be_active and active_level > 0)
+            manageMoodleState(ply, moodleID, should_be_active, level_info.texture, nil, bypass_cooldown)
+        end
     end
 end
 
@@ -155,7 +252,8 @@ local function ApplyBrainDamageEffects(ply, org)
 end
 
 -- Main sync function where your custom logic goes
-local function SyncMoodles(ply)
+local function SyncOriginalMoodles(ply)
+    if GetConVar("hg_simplemoodles"):GetBool() then return end
     if not IsValid(ply) or not ply:Alive() then return end
     
     ply.MoodleStates = ply.MoodleStates or {}
@@ -242,14 +340,14 @@ local function SyncMoodles(ply)
     local tinnitus_active = (org.tinnitus_end_time or 0) > CurTime()
     manageMoodleState(ply, "deaf_1", tinnitus_active, "materials/moodles/Deaf_2.png")
 
-    -- Depression (Desensitized)
-    local desensitized = org.desensitized or 0
+    -- Depression (Despair)
+    local despair = org.despair or 0
     manageHierarchicalMoodle(ply, "depression", {
         { threshold = 0.25, texture = "materials/moodles/Depression_1.png" },
         { threshold = 0.50, texture = "materials/moodles/Depression_2.png" },
         { threshold = 0.75, texture = "materials/moodles/Depression_3.png" },
         { threshold = 0.95, texture = "materials/moodles/Depression_4.png" },
-    }, desensitized)
+    }, despair)
 
     -- The mood system was removed, but the happy moodles are still used in other parts of the code.
     -- manageMoodleState(ply, "happy_1", false, nil, nil, true)
@@ -448,6 +546,120 @@ local function SyncMoodles(ply)
     end
 end
 
+
+local function GetOrgValueNumber(value)
+    if type(value) == "number" then return value end
+    if type(value) == "table" then
+        if type(value[1]) == "number" then return value[1] end
+        if type(value.cur) == "number" then return value.cur end
+        if type(value.value) == "number" then return value.value end
+    end
+    return 0
+end
+
+local function SyncAfflictionMoodles(ply)
+    if not GetConVar("hg_simplemoodles"):GetBool() then return end
+    if not IsValid(ply) or not ply:Alive() then return end
+
+    ply.MoodleStates = ply.MoodleStates or {}
+    local org = ply.organism
+    if not org then return end
+
+    -- Wounds
+    local wounds = ply:GetNetVar("wounds")
+    local arterialwounds = ply:GetNetVar("arterialwounds")
+    local woundsCount = istable(wounds) and #wounds or 0
+    local arterialCount = istable(arterialwounds) and #arterialwounds or 0
+
+    if woundsCount > 0 then
+        manageHierarchicalMoodle(ply, "open-wound", {
+            { threshold = 1, texture = "materials/sef_icons/open-wound.png" },
+            { threshold = 3, texture = "materials/sef_icons/open-wound.png" },
+            { threshold = 6, texture = "materials/sef_icons/open-wound.png" },
+        }, woundsCount)
+    else
+        manageMoodleState(ply, "open-wound", false, nil, nil, true)
+    end
+
+    if arterialCount > 0 then
+        manageHierarchicalMoodle(ply, "deepwound", {
+            { threshold = 1, texture = "materials/sef_icons/deepwound.png" },
+            { threshold = 2, texture = "materials/sef_icons/deepwound.png" },
+        }, arterialCount)
+    else
+        manageMoodleState(ply, "deepwound", false, nil, nil, true)
+    end
+
+    -- Bleed
+    local bleed = GetOrgValueNumber(org.bleed)
+    if bleed > 0 then
+        manageHierarchicalMoodle(ply, "bleed", {
+            { threshold = 1, texture = "materials/sef_icons/bleed.png" },
+            { threshold = 4, texture = "materials/sef_icons/bleed.png" },
+            { threshold = 8, texture = "materials/sef_icons/bleed.png" },
+        }, bleed)
+    else
+        manageMoodleState(ply, "bleed", false, nil, nil, true)
+    end
+
+    -- Broken/Dislocated/Amputated
+    local hasBrokenLimb = (org.lleg and org.lleg >= 1) or (org.rleg and org.rleg >= 1) or (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1)
+    local hasDislocation = org.llegdislocation or org.rlegdislocation or org.larmdislocation or org.rarmdislocation or org.jawdislocation
+    local hasAmputation = org.llegamputated or org.rlegamputated or org.larmamputated or org.rarmamputated or org.headamputated
+    manageMoodleState(ply, "broken", hasBrokenLimb or hasDislocation or hasAmputation, "materials/sef_icons/broken.png")
+
+    -- Concussion
+    local concussion = GetOrgValueNumber(org.concussion)
+    manageMoodleState(ply, "concussion", concussion > 0, "materials/sef_icons/concussion.png")
+
+    -- Blind
+    manageMoodleState(ply, "blind", org.blindness, "materials/sef_icons/blind.png")
+
+    -- Assimilated
+    local assimilated = GetOrgValueNumber(org.assimilated)
+    manageMoodleState(ply, "wither", assimilated > 0, "materials/sef_icons/wither.png")
+
+    -- Incapacitated
+    manageMoodleState(ply, "incap", org.incapacitated, "materials/sef_icons/incap.png")
+
+    -- Berserk/Haste
+    manageMoodleState(ply, "bloodlust", org.berserkActive2, "materials/sef_icons/bloodlust.png")
+    manageMoodleState(ply, "haste", org.noradrenalineActive, "materials/sef_icons/haste.png")
+
+    -- Despair
+    local despair = GetOrgValueNumber(org.despair)
+    manageMoodleState(ply, "anagenthasdied", despair > 0.25, "materials/sef_icons/anagenthasdied.png")
+
+    -- Critical
+    manageMoodleState(ply, "warning", org.critical, "materials/sef_icons/warning.png")
+
+    -- Hindered
+    local immobilization = GetOrgValueNumber(org.immobilization)
+    manageMoodleState(ply, "hindered", (not org.canmove) or immobilization > 0, "materials/sef_icons/hindered.png")
+
+    -- Stunned
+    local pain = GetOrgValueNumber(org.pain)
+    local shock = GetOrgValueNumber(org.shock)
+    manageMoodleState(ply, "stunned", pain > 60 or shock > 0.5, "materials/sef_icons/stunned.png")
+
+    -- Poison Gas
+    local co = GetOrgValueNumber(org.CO)
+    manageMoodleState(ply, "poison-gas", co > 0.1, "materials/sef_icons/poison-gas.png")
+
+    -- Exhaust
+    local o2 = GetOrgValueNumber(org.o2)
+    manageMoodleState(ply, "exhaust", o2 > 0 and o2 < 20, "materials/sef_icons/exhaust.png")
+
+    -- Temperature
+    local temperature = GetOrgValueNumber(org.temperature)
+    manageMoodleState(ply, "discharge", temperature > 39, "materials/sef_icons/discharge.png")
+    manageMoodleState(ply, "frozen", temperature > 0 and temperature < 34.5, "materials/sef_icons/frozen.png")
+end
+
+
+-- Main sync function where your custom logic goes
+
+
 -- Think loop for periodic syncing
 hook.Add("Think", "Moodle_ThinkSync", function()
     local curTime = CurTime()
@@ -460,9 +672,14 @@ hook.Add("Think", "Moodle_ThinkSync", function()
         if curTime >= ply.moodle_last_sync + syncInterval then
             ply.moodle_last_sync = curTime
             
-            local ok, err = pcall(SyncMoodles, ply)
+            local ok, err = pcall(SyncOriginalMoodles, ply)
             if not ok and MOODLE_DEBUG then 
-                MsgC(DEBUG_COLOR_SV, "[Moodle] Sync error: "..tostring(err).."\n") 
+                MsgC(DEBUG_COLOR_SV, "[Moodle] Sync error (Original): "..tostring(err).."\n") 
+            end
+
+            ok, err = pcall(SyncAfflictionMoodles, ply)
+            if not ok and MOODLE_DEBUG then 
+                MsgC(DEBUG_COLOR_SV, "[Moodle] Sync error (Affliction): "..tostring(err).."\n") 
             end
         end
     end

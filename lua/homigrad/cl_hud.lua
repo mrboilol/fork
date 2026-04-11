@@ -22,7 +22,10 @@ local gordon_hide = {
 }
 
 hook.Add("HUDShouldDraw", "homigrad", function(name)
-	if hide[name] or lply.PlayerClassName and lply.PlayerClassName == "Gordon" and gordon_hide[name] then
+	if hide[name] then
+		return false
+	end
+	if IsValid(lply) and lply.PlayerClassName and lply.PlayerClassName == "Gordon" and gordon_hide[name] then
 		return false
 	end
 end)
@@ -455,7 +458,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 			local tRad = rInner + (hoverR - rInner) * 0.58
 
 			local txt = option[2]
-            if isfunction(txt) then
+			            if isfunction(txt) then
                 txt = txt()
             end
 			if txt and !options_old then return end

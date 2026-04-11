@@ -123,6 +123,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		local slow_walking = ply:KeyDown(IN_WALK)
 		local aiming = ply:KeyDown(IN_ATTACK2) and wep and IsValid(wep) and ishgweapon(wep)
+        if slow_walking and ply:KeyDown(IN_SPEED) then
+            slow_walking = false
+        end
 		local walk_speed = ply:GetWalkSpeed()
 		local slow_walk_speed = ply:GetSlowWalkSpeed()
 		local crouch_walk_speed = ply:GetCrouchedWalkSpeed()
@@ -389,6 +392,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		k = k * ((IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) and math.Clamp(50 / math.max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
 		k = k * math.Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
+			k = k * (1 - math.Clamp(org.despair or 0, 0, 1) * 0.28)
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)
 
 		local slwdwn = ply:GetNetVar("slowDown", 0)
@@ -397,7 +401,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 				//ply:SetNetVar("slowDown", math.Approach(slwdwn, 0, delta_time * 250))
 			//end
 			k = k * math.Clamp((250 - slwdwn) / 250, 0.75, 1)
-		end
+    end
+
+    k = k * (1 + ((ply:GetStat("Dexterity") or 10) - 10) * 0.1)
 
 		k = math.max(k, 20 / 200)
 

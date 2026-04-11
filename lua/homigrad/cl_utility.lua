@@ -583,10 +583,12 @@ players : 1 humans, 0 bots (20 max)
 		table_Add(entities, player_GetAll())
 
 		local orgents = {}
-		for ent in pairs(hg.organism_ents) do
-			if !IsValid(ent) then hg.organism_ents[ent] = nil continue end
+		if hg.organism_ents then
+			for ent in pairs(hg.organism_ents) do
+				if !IsValid(ent) then hg.organism_ents[ent] = nil continue end
 
-			table.insert(entities, ent)
+				table.insert(entities, ent)
+			end
 		end
 
 		hg.seenents = {}

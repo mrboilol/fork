@@ -110,6 +110,9 @@ hook.Add("Think", "stanleytumbler", function()
             end
         end
 
+        local dexterity = ply:GetStat("Dexterity") or 10
+        tripChance = tripChance * (1 - (dexterity - 10) * 0.05)
+
         if org.superfighter then
             tripChance = tripChance * 0.1
         end
@@ -136,7 +139,7 @@ hook.Add("Think", "stanleytumbler", function()
 
                     if math.random() < breakChance then
                         -- Limb break
-                        ply:EmitSound("owfuck"..math.random(1, 4)..".ogg")
+                        ply:EmitSound("owfuck"..math.random(1, 6)..".ogg")
                         org.painadd = (org.painadd or 0) + 70 -- More pain for a break
 
                         if tripType == "wall" then

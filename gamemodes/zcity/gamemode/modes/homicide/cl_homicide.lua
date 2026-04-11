@@ -1,6 +1,9 @@
 local MODE = MODE
 MODE.name = "hmcd"
 
+local huy_material = Material("huy.png")
+local hg_scaryeye = CreateClientConVar("hg_scaryeye", "1", true, false)
+
 --\\Local Functions
 local function screen_scale_2(num)
 	return ScreenScale(num) / (ScrW() / ScrH())
@@ -286,8 +289,14 @@ function MODE:RenderScreenspaceEffects()
 
 		local fade = math.min(time_diff / MODE.FadeScreenTime, 1)
 
-		surface.SetDrawColor(0, 0, 0, 255 * fade)
-		surface.DrawRect(-1, -1, ScrW() + 1, ScrH() + 1 )
+		if hg_scaryeye:GetInt() == 0 then
+			surface.SetDrawColor(255, 255, 255, 255 * fade)
+			surface.SetMaterial(huy_material)
+			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+		else
+			surface.SetDrawColor(0, 0, 0, 255 * fade)
+			surface.DrawRect(-1, -1, ScrW() + 1, ScrH() + 1 )
+		end
 	end
 end
 

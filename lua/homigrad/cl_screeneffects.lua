@@ -9,6 +9,18 @@ local function DrawSunEffect()
 	DrawSunbeams(0.1, 0.15 * dot * sun.obstruction, 0.1, scrpos.x / ScrW(), scrpos.y / ScrH())
 end
 
+local despair_font = function()
+	return "Mx437 IBM PS/55 re."
+end
+
+surface.CreateFont("ZCity_Despair_Text", {
+	font = despair_font(),
+	size = ScreenScaleH(20),
+	weight = 700,
+	antialias = true
+})
+hg.despair_builtin = true
+
 hg.postprocess = hg.postprocess or {}
 local postprs = hg.postprocess
 postprs.addtiveLayer = {
@@ -29,7 +41,7 @@ postprs.addtiveLayer = {
 	brightness = 0,
 	sharpen = 0,
 	sharpen_dist = 0,
-	grayscale = 0
+    grayscale = 0
 }
 
 postprs.layers = postprs.layers or {}
@@ -77,7 +89,6 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	//if not brain_motionblur then DrawMotionBlur(addtiveLayer.blur_addalpha, addtiveLayer.blur_drawalpha, addtiveLayer.blur_delay) end
 	//DrawToyTown(addtiveLayer.toytown, addtiveLayer.toytown_h * ScrH())
 	tab["$pp_colour_brightness"] = addtiveLayer.brightness
-	tab["$pp_colour_grayscale"] = addtiveLayer.grayscale
 	DrawColorModify(tab)
 
 	hook_Run("Post Pre Post Processing")
@@ -165,7 +176,6 @@ hook.Add("Post Processing", "Main", function()
 		LayerWeight("water", 0.5, 0)
 		LayerWeight("water2", 0.01, 0)
 	end
-
 	local org = ply.organism
 	if not org then
 		addtiveLayer.grayscale = Lerp(FrameTime() * 2, addtiveLayer.grayscale, 0)
@@ -217,7 +227,6 @@ local haloents = {
 	["weapon_revolver2"] = true,
 	["weapon_hg_f1_tpik"] = true
 }
-
 hook.Add( "PreDrawHalos", "AddPropHalos", function() -- вариант с подсветкой всего в радиусе
 	local pickuphalo = {}
 	 
@@ -263,6 +272,7 @@ local assimilationMat = Material("effects/shaders/zb_assimilation")
 local coldMat = Material("effects/shaders/zb_colda")
 local grainMat = Material("effects/shaders/zb_grain2")
 local heatMat = Material("effects/shaders/zb_heat")
+local blindMat = Material("effects/shaders/zb_blind")
 local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 
 local PainLerp = 0
@@ -293,10 +303,10 @@ local function stopthings()
 
 	lply.tinnitus = 0
 	
-	--[[if IsValid(PainStation) then
+	if IsValid(PainStation) then
 		PainStation:Stop()
 		PainStation = nil
-	end--]]
+	end
 
 	if IsValid(NoiseStation) then
 		NoiseStation:Stop()
@@ -364,7 +374,45 @@ local stations = {
 
 local choosera = 1
 local tempolerp = 0
+local despairLerp = 0
+local despairVisualLerp = 0
+local despairTextLerp = 0
+local despairSound
+local despairSoundVol = 0
+local despairSoundLoading = false
 hook.Add("Post Post Processing", "ItHurts", function()
+	if not IsValid(lply) then return end
+	if IsValid(lply:GetNWEntity("spect")) then
+		stopthings()
+		if IsValid(despairSound) then
+			despairSound:Stop()
+			despairSound = nil
+		end
+		despairSoundVol = 0
+		despairLerp = 0
+		despairVisualLerp = 0
+		despairTextLerp = 0
+		tab["$pp_colour_brightness"] = 0
+		tab["$pp_colour_contrast"] = 1
+		tab["$pp_colour_colour"] = 1
+		return
+	end
+	if not lply:Alive() then
+		stopthings()
+		if IsValid(despairSound) then
+			despairSound:Stop()
+			despairSound = nil
+		end
+		despairSoundVol = 0
+		despairLerp = 0
+		despairVisualLerp = 0
+		despairTextLerp = 0
+		tab["$pp_colour_brightness"] = 0
+		tab["$pp_colour_contrast"] = 1
+		tab["$pp_colour_colour"] = 1
+		return
+	end
+
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	
 	if IsValid(PainStation) then
@@ -376,12 +424,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	
 	if !lply:Alive() and !IsValid(spect) then stopthings() return end
 	if !lply:Alive() and viewmode != 1 then stopthings() return end
-	local organism = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
+	local organism = lply:Alive() and (lply.new_organism or lply.organism) or (IsValid(spect) and (spect.new_organism or spect.organism))
 	if not organism then stopthings() return end
 	if not organism.brain then stopthings() return end
 	local org = organism
 
-		if org.blindness or amtflashed >= 0.8 then
+	if org.blindness or amtflashed >= 0.8 then
 		local blindness = ((org.blindness and math.Round(org.blindness) == 0) or amtflashed >= 0.8) and 0 or (org.blindness)
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
@@ -702,7 +750,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	else
 		brain_motionblur = false
 		show_image_time = 0
-		lobotomy_index = nil
+		lobotomy_index = 0
 	end
 	
 	if O2Lerp > 1 then
@@ -790,54 +838,117 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			NoiseStation = nil
 		end
 	end
+
+	local despair = math.Clamp(org.despair or 0, 0, 1)
+	despairLerp = LerpFT(0.04, despairLerp, despair)
+	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
+
+	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
+	if despairFx > 0.001 then
+		render.UpdateScreenEffectTexture()
+		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
+		heatMat:SetFloat("$c0_y", despairFx * 0.22)
+		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairFx * 3.7))
+		render.SetMaterial(heatMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		coldMat:SetFloat("$c0_y", despairFx * 1.05)
+		render.SetMaterial(coldMat)
+		render.DrawScreenQuad()
+
+		tab["$pp_colour_brightness"] = -(despairFx ^ 1.35) * 0.42
+		tab["$pp_colour_contrast"] = 1 - despairFx * 0.35
+		tab["$pp_colour_colour"] = 1 - despairFx * 0.97
+		tab["$pp_colour_mulr"] = 0
+		tab["$pp_colour_mulg"] = 0
+		tab["$pp_colour_mulb"] = 0
+		DrawColorModify(tab)
+	else
+		tab["$pp_colour_brightness"] = 0
+		tab["$pp_colour_contrast"] = 1
+		tab["$pp_colour_colour"] = 1
+	end
+
+	if despair >= 0.35 then
+		if not IsValid(despairSound) and not despairSoundLoading then
+			despairSoundLoading = true
+			sound.PlayFile("sound/despair.ogg", "noblock noplay", function(station)
+				despairSoundLoading = false
+				if not IsValid(station) then return end
+				station:SetVolume(0)
+				station:Play()
+				station:EnableLooping(true)
+				despairSound = station
+			end)
+		end
+
+		local targetVol = math.Remap(despair, 0.35, 1, 0.08, 1)
+		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
+		if IsValid(despairSound) then
+			despairSound:SetVolume(despairSoundVol)
+		end
+	else
+		if IsValid(despairSound) then
+			despairSoundVol = math.max(despairSoundVol - FrameTime() * 0.4, 0)
+			despairSound:SetVolume(despairSoundVol)
+			if despairSoundVol <= 0.001 then
+				despairSound:Stop()
+				despairSound = nil
+			end
+		end
+	end
 end)
 
 hook.Add("Player_Death", "ItDoesntNow", function(ply)
-	if !((ply == lply) or (ply == lply:GetNWEntity("spect"))) then return end
+	local me = IsValid(lply) and lply or LocalPlayer()
+	if not IsValid(me) then return end
+	if !((ply == me) or (ply == me:GetNWEntity("spect"))) then return end
 
 	stopthings()
+	if IsValid(despairSound) then
+		despairSound:Stop()
+		despairSound = nil
+	end
+	despairSoundVol = 0
 end)
 
 hook.Add("Player Spawn", "ItDoesntNow", function(ply)
-	if ply != lply then return end
+	local me = IsValid(lply) and lply or LocalPlayer()
+	if not IsValid(me) or ply != me then return end
 
 	stopthings()
+	if IsValid(despairSound) then
+		despairSound:Stop()
+		despairSound = nil
+	end
+	despairSoundVol = 0
 end)
 
-local function GetConsciousBeatPulse()
-	if not IsValid(lply) or not lply:Alive() then return 0 end
-	
-	local intensity = hg.consciousBeatIntensity or 0
-	if intensity <= 0.01 then return 0 end
-	
-	-- Only trigger the pulse if the sound is actually playing and hasn't been stopped
-	if not IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING or NoiseStation2:GetVolume() <= 0.01 then return 0 end
-	
-	local time = NoiseStation2:GetTime()
-	
-	local phase = time % 1.85
-	local pulse = math.exp(-phase * 5) -- sharp spike that quickly fades
-	
-	return pulse * intensity
-end
-
-hook.Add("TranslateFOV", "ConsciousBeatZoom", function(ply, fov)
-	local pulse = GetConsciousBeatPulse()
-	if pulse > 0 then
-		return fov - (pulse * 20) -- zooms in slightly
+hook.Add("DrawOverlay", "despair_text", function()
+	local ply = IsValid(lply) and lply or LocalPlayer()
+	if not IsValid(ply) then return end
+	if !ply:Alive() then
+		despairTextLerp = LerpFT(0.15, despairTextLerp, 0)
+		return
 	end
-end)
 
-hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, znear, zfar)
-	local pulse = GetConsciousBeatPulse()
-	if pulse > 0 then
-		local shakeAmt = pulse * 2.5
-		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
-		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
-		angles.r = angles.r + math.Rand(-shakeAmt, shakeAmt)
-		-- Also modify fova for when RenderScene is disabled
-		fova[1] = (fova[1] or 0) - (pulse * 20)
-	end
+	local org = ply.new_organism or ply.organism
+	if not org then return end
+
+	local despair = math.Clamp(org.despair or 0, 0, 1)
+	local target = math.Clamp((despair - 0.5) / 0.5, 0, 1)
+	despairTextLerp = LerpFT(0.03, despairTextLerp, target)
+	if despairTextLerp <= 0.001 then return end
+
+	local time = CurTime()
+	local sway = 10 + 16 * despairTextLerp
+	local x = ScrW() * 0.5 + math.sin(time * 0.7) * sway + math.cos(time * 0.33) * sway * 0.7
+	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
+	local alpha = math.floor(255 * despairTextLerp)
+
+	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local function removeflash()
@@ -878,4 +989,80 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	lply.blindflash:SetPos(view.origin)
 	lply.blindflash:SetAngles(Ang)
 	lply.blindflash:Update()
+end)
+
+local function GetConsciousBeatPulse()
+	if not IsValid(lply) or not lply:Alive() then return 0 end
+	
+	local intensity = hg.consciousBeatIntensity or 0
+	if intensity <= 0.01 then return 0 end
+	
+	-- Only trigger the pulse if the sound is actually playing and hasn't been stopped
+	if not IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING or NoiseStation2:GetVolume() <= 0.01 then return 0 end
+	
+	local time = NoiseStation2:GetTime()
+	
+	local phase = time % 1.85
+	local pulse = math.exp(-phase * 5) -- sharp spike that quickly fades
+	
+	return pulse * intensity
+end
+
+hook.Add("TranslateFOV", "ConsciousBeatZoom", function(ply, fov)
+	local pulse = GetConsciousBeatPulse()
+	if pulse > 0 then
+		return fov - (pulse * 20) -- zooms in slightly
+	end
+end)
+
+hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, znear, zfar)
+	local pulse = GetConsciousBeatPulse()
+	if pulse > 0 then
+		local shakeAmt = pulse * 2.5
+		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
+		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
+		angles.r = angles.r + math.Rand(-shakeAmt, shakeAmt)
+		-- Also modify fova for when RenderScene is disabled
+		fova[1] = (fova[1] or 0) - (pulse * 20)
+	end
+end)
+
+local function GetDespairCamPulse()
+	local ply = IsValid(lply) and lply or LocalPlayer()
+	if not IsValid(ply) then return 0, 0 end
+	local spect = IsValid(ply:GetNWEntity("spect")) and ply:GetNWEntity("spect")
+	if !ply:Alive() and !IsValid(spect) then return 0, 0 end
+	if !ply:Alive() and viewmode != 1 then return 0, 0 end
+
+	local org = ply:Alive() and (ply.new_organism or ply.organism) or (IsValid(spect) and (spect.new_organism or spect.organism))
+	if not org then return 0, 0 end
+
+	local despair = math.Clamp(org.despair or 0, 0, 1)
+	local intensity = math.Clamp((despair - 0.35) / 0.65, 0, 1)
+	if intensity <= 0 then return 0, 0 end
+
+	local time = CurTime()
+	local cycle = 1.5
+	local phase = (time % cycle) / cycle
+	local pushPull = math.sin(phase * math.pi * 2) * intensity
+	local step = math.floor(time / cycle)
+	local jitter = (math.sin(time * 13 + step * 1.7) + math.cos(time * 11.5 + step * 2.3)) * 0.5 * intensity
+
+	return pushPull, jitter
+end
+
+hook.Add("TranslateFOV", "DespairBreathFov", function(ply, fov)
+	local pushPull = GetDespairCamPulse()
+	if pushPull ~= 0 then
+		return fov + pushPull * 2.8
+	end
+end)
+
+hook.Add("HG_CalcView", "DespairBreathShake", function(ply, pos, angles, fova, znear, zfar)
+	local pushPull, jitter = GetDespairCamPulse()
+	if pushPull == 0 and jitter == 0 then return end
+	angles.p = angles.p + jitter * 0.75
+	angles.y = angles.y + jitter * 0.6
+	angles.r = angles.r + jitter * 0.5
+	fova[1] = (fova[1] or 0) + pushPull * 2.8
 end)

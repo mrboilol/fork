@@ -49,11 +49,16 @@ if SERVER or CLIENT then
 		-- Store the parent
 		self.parent = parent
 		if !parent.fires then parent.fires = {} end
-
-		if not isvector(self:GetPos()) then return end
-		--FUCK YOU WHOEVER THOUGHT THIS WAS A GOOD IDEA TO REMOVE ENTITY ON ITS INITIALIZATION
-		
-		parent.fires[self] = parent:WorldToLocal(self.GetPos and self:GetPos() or parent:GetPos())
+		if SERVER then
+			local firePos = self:GetPos()
+			if isvector(firePos) then
+				parent.fires[self] = parent:WorldToLocal(firePos)
+			else
+				parent.fires[self] = vector_origin
+			end
+		else
+			parent.fires[self] = vector_origin
+		end
 
 		if SERVER then
 			-- Life misc
@@ -104,7 +109,10 @@ if SERVER or CLIENT then
 			self.nextAnimationThink = 0
 
 			-- Start working
-			self:RedoParticles(1)
+			timer.Simple(0, function()
+				if !IsValid(self) then return end
+				self:RedoParticles(1)
+			end)
 		end
 		
 		-- Prioritize the new fire for responsiveness
@@ -169,7 +177,9 @@ if SERVER or CLIENT then
 			end
 		end)
 
-		self:Think()
+		if SERVER then
+			self:Think()
+		end
 
 		if SERVER and broadcast then
 			if player.GetCount() > 0 then
@@ -595,7 +605,8 @@ if SERVER then
 	function ENT:Think()
 		
 		-- Don't think at all if we don't have a parent
-		if !IsValid(self.parent) and !self.parent:IsWorld() then self:Remove() return end
+		local parent = self.parent
+		if !(IsValid(parent) or (parent and parent.IsWorld and parent:IsWorld())) then self:Remove() return end
 		
 		
 		local curTime = CurTime()
@@ -838,7 +849,7 @@ if SERVER then
 				-- If we're burning a character, use the oppurtunity to spread to it
 				if vFireIsCharacter(ent) and vFireEnableSpread then
 					-- If we're burning an NPC, spread to it, if it's a player, lower the chance of spread
-					if (ent:IsPlayer() and hg.GetCurrentCharacter(ent):IsPlayer() and math.random(1, 6) == 1) or !ent:IsPlayer() then
+					if ent:IsPlayer() and math.random(1, 2) == 1 or !ent:IsPlayer() then
 						local newFeed = self.feed + vFireTakeFuel(ent, 12)
 						if newFeed > 0 then
 							CreateVFire(ent, ent:GetPos(), Vector(), newFeed, self)
@@ -1046,6 +1057,10 @@ if CLIENT then
 	function ENT:RedoParticles(state)
 
 		if !IsValid(self) then return end
+		state = math.Clamp(math.floor(tonumber(state) or 1), 1, vFireMaxState)
+
+		local parent = self.parent
+		if !IsValid(parent) and !(parent and parent.IsWorld and parent:IsWorld()) then return end
 
 		local size = vFireStateToSize(state)
 
@@ -1076,7 +1091,7 @@ if CLIENT then
 				"vFire_Flames_"..size..LODStr,
 				0,
 				0,
-				nil
+				vector_origin
 			)
 
 		else
@@ -1114,7 +1129,7 @@ if CLIENT then
 						"vFire_Flames_"..size..LODStr,
 						0,
 						0,
-						nil
+						vector_origin
 					)
 				end
 
@@ -1123,7 +1138,8 @@ if CLIENT then
 					self,
 					"vFire_Flames_"..size..LODStr,
 					0,
-					0
+					0,
+					vector_origin
 				)
 			end
 
@@ -1317,6 +1333,9 @@ if CLIENT then
 	Thinking tasks
 	---------------------------------------------------------------------------]]
 	function ENT:Think()
+		if !IsValid(self) then return false end
+		local parent = self.parent
+		if !(IsValid(parent) or (parent and parent.IsWorld and parent:IsWorld())) then self:Remove() return false end
 
 		local curTime = CurTime()
 
@@ -1372,6 +1391,10 @@ if CLIENT then
 	end
 
 	function ENT:ParticlesThink()
+		if !IsValid(self) then return end
+		local parent = self.parent
+		if !(IsValid(parent) or (parent and parent.IsWorld and parent:IsWorld())) then return end
+
 		-- Check if we should LOD up
 		if IsValid(self.cluster) then
 			-- Use the cluster LOD to avoid LOD calculations for every fire
