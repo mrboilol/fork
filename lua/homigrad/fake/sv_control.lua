@@ -183,8 +183,7 @@ hook.Add("Think", "Fake", function()
 		local power = org.pain and ((org.pain > 50 or org.blood < 2900 or org.o2[1] < 5) and 0.3) or ((org.pain > 20 or org.blood < 4200 or org.o2[1] < 10) and 0.5) or 1
 		power = power * org.consciousness
 
-		local strength = (IsValid(ply) and ply.GetStat and ply:GetStat("Strength")) or 10
-		power = power * (1 + (strength - 10) * 0.05)
+
 
 		ragdoll.power = power
 

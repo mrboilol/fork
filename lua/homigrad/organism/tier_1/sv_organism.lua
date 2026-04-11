@@ -728,7 +728,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if org.brain < 0.4 then
 		local naturalHeal
 		local thiamineConsumptionRate = timeValue / 240
-        local endurance_bonus = 1 + (org.owner:GetStat("Endurance") - 10) * 0.05
+        local endurance_bonus = 1.05
 
 		if org.thiamine > 0 then
 			if (org.hungry or 0) < 1 then -- Well-fed check
@@ -1005,7 +1005,7 @@ end)
 
 hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
 	local ent = hg.GetCurrentCharacter(plya)
-    local intel_multiplier = 1 - (plya:GetStat("Intelligence") - 10) * 0.05
+    local intel_multiplier = 1
 	for i,ply in ipairs(ents.FindInSphere(ent:GetPos(),256)) do
 		if not ply:IsPlayer() or not ply.organism or plya == ply then continue end
 

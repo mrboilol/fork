@@ -166,21 +166,7 @@ function SWEP:Initialize()
 			end
 		end)
 
-if CLIENT then
-    concommand.Add("hg_stats_temp", function(ply, cmd, args)
-        local wep = ply:GetActiveWeapon()
-        if not IsValid(wep) or not wep.ishgwep then return end
-        wep.hudinspect = CurTime() + 5
-		wep.StatsMarkup = nil
-    end)
 
-    concommand.Add("hg_stats", function(ply, cmd, args)
-        local wep = ply:GetActiveWeapon()
-        if not IsValid(wep) or not wep.ishgwep then return end
-        wep.toggle_stats = not wep.toggle_stats
-		wep.StatsMarkup = nil
-    end)
-end
 	end
 
 	self:AddCallback("PhysicsCollide", function(ent, data)
@@ -320,7 +306,7 @@ function SWEP:IsZoom()
 		!(self:IsSprinting() and !IsValid(owner.FakeRagdoll)) and
 		((IsValid(owner.FakeRagdoll) and (self:KeyDown(IN_USE) or hg.RagdollCombatInUse(owner))) or
 		(owner:IsOnGround() or owner:InVehicle())) and 
-		not owner.suiciding and !(owner.organism and (owner.organism.larm and !self:IsPistolHoldType() and owner:GetStat("Strength") < 15) and owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99))
+		not owner.suiciding and !(owner.organism and (owner.organism.larm and !self:IsPistolHoldType()) and owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99))
 		
 		-- and owner.posture ~= 1 and owner.posture ~= 3-- and (not IsValid(owner.FakeRagdoll) or self:KeyDown(IN_JUMP))
 end
@@ -521,8 +507,7 @@ function SWEP:Shoot(override)
                 jamChance = jamChance + fear * 0.5 -- 0.5 bonus chance per fear point
             end
             
-            local intelligence = owner:GetStat("Intelligence")
-            jamChance = jamChance * (1 - (intelligence - 10) * 0.025)
+
         end
 
         if math.random(1, 2000) < jamChance then
@@ -831,49 +816,6 @@ if CLIENT then
 end
 
 function SWEP:DrawHUDAdd()
-	self.hudinspect = self.hudinspect or 0
-	self.toggle_stats = self.toggle_stats or false
-
-	local should_show_stats = self.toggle_stats or (self.hudinspect > CurTime())
-
-	if should_show_stats then
-		self.InfoAlpha = Lerp(FrameTime() * 5, self.InfoAlpha or 0, 255)
-	else
-		self.InfoAlpha = Lerp(FrameTime() * 5, self.InfoAlpha or 0, 0)
-	end
-
-	if self.InfoAlpha > 1 then
-		local stats = {}
-		table.insert(stats, "Weapon: " .. self.PrintName)
-		table.insert(stats, "Ammo: " .. self.Primary.Ammo)
-		table.insert(stats, "Clip Size: " .. self:GetMaxClip1())
-		table.insert(stats, "Weight: " .. self.Weight)
-		table.insert(stats, "Ergonomics: " .. self.Ergonomics)
-		table.insert(stats, "Fire Rate: " .. self.Primary.Wait)
-		table.insert(stats, "Recoil: " .. (self.Primary.Force or "N/A"))
-
-		local ply = self:GetOwner()
-		if IsValid(ply) and ply:IsPlayer() then
-			table.insert(stats, "Strength: " .. (ply:GetStat("Strength") or "N/A"))
-			table.insert(stats, "Dexterity: " .. (ply:GetStat("Dexterity") or "N/A"))
-			table.insert(stats, "Intelligence: " .. (ply:GetStat("Intelligence") or "N/A"))
-			table.insert(stats, "Endurance: " .. (ply:GetStat("Endurance") or "N/A"))
-		end
-
-		local text = table.concat(stats, "\n")
-		
-		-- Use markup.Parse to handle the font and color
-		if not self.StatsMarkup then
-			self.StatsMarkup = markup.Parse("<font=HG_StatsFont>" .. text .. "</font>", 500)
-		end
-		
-		local w, h = self.StatsMarkup:GetWidth(), self.StatsMarkup:GetHeight()
-		local x = ScrW() / 2 - w / 2
-		local y = ScrH() / 2 - h / 2
-		
-		DrawBlurRect(x - 10, y - 10, w + 20, h + 20, 7, self.InfoAlpha)
-		self.StatsMarkup:Draw(x, y, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, self.InfoAlpha)
-	end
 end
 
 local blur = Material( "pp/blurscreen" )
@@ -1140,9 +1082,7 @@ function SWEP:Think()
     if IsValid(owner) and owner:IsPlayer() and owner.organism then
         local fear = owner.organism.fear or 0
         if fear > 0 and self.ishgweapon and self:GetNWFloat("reload", 0) > CurTime() and SERVER then
-            local intelligence = owner:GetStat("Intelligence")
-            local chance = fear * 2 -- 2% chance per fear point
-            chance = chance * (1 - (intelligence - 10) * 0.05)
+            local chance = fear * 2
 
             if math.random(100) < chance then
                 owner:DropWeapon(self)
@@ -1518,7 +1458,7 @@ function SWEP:CoreStep()
 					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
 				end
 
-                shake_intensity = shake_intensity * (1 - ((owner:GetStat("Strength") or 10) - 10) * 0.05)
+
 
                 local fear = owner.organism.fear or 0
                 if fear > 0 then
@@ -2114,8 +2054,7 @@ function SWEP:GetAdditionalValues()
 	end
 
 	local skillissue = (ply.organism and ply.organism.recoilmul) or 1
-    local strength = (IsValid(ply) and ply.GetStat and ply:GetStat("Strength")) or 10
-    skillissue = skillissue - (strength - 10) * 0.05
+
 
 
 	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)

@@ -997,11 +997,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
         mul = mul * (1.0 + swayBonus)
     end
 
-    local strength = 10
-    if IsValid(owner) and owner.GetStat then
-        strength = owner:GetStat("Strength") or 10
-    end
-    mul = mul * (1 + (strength - 10) * 0.025)
+
 
     return mul
 end
@@ -1039,21 +1035,7 @@ end
 
 
 function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
-    if SERVER and owner.organism and owner.organism.stamina and owner.organism.stamina[1] < 45 then
-        local fear = owner.organism.fear or 0
-        if fear > 0 then
-            local intelligence = owner:GetStat("Intelligence") or 10
-            local chance = fear * 3 -- 3% chance per fear point
-            if intelligence < 10 then
-                chance = chance * (1 + (10 - intelligence) * 0.1) -- 10% more chance per point below 10
-            end
 
-            if math.random(100) < chance then
-                owner:DropWeapon(self)
-                return
-            end
-        end
-    end
 
     if SERVER then
         self:ArmPainEffect(owner)
@@ -1320,8 +1302,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
                 end
 
-				local parry_bonus = ((ent:GetStat("Dexterity") or 10) - 10) * 0.01 + ((ent:GetStat("Intelligence") or 10) - 10) * 0.01
-                local perfectblock = CurTime() - wep:GetStartedBlocking() < (0.5 + parry_bonus)
+                local perfectblock = CurTime() - wep:GetStartedBlocking() < 0.5
                 
                 if perfectblock then
                     ent:EmitSound("parry.ogg", 75)
@@ -2225,7 +2206,7 @@ function SWEP:PrimaryAttack()
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
-    mul = mul * (1 + ((ply:GetStat("Strength") or 10) - 10) * 0.025)
+
 
     
     self.HitEnts = nil
@@ -2343,7 +2324,7 @@ function SWEP:SecondaryAttack(override)
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
-    mul = mul * (1 + ((ply:GetStat("Strength") or 10) - 10) * 0.025)
+
 
     self.HitEnts = nil
     self.FirstAttackTick = false
