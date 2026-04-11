@@ -21,27 +21,6 @@ util.AddNetworkString("Moodle_Remove")
 local MOODLE_DEBUG = false
 local DEBUG_COLOR_SV = Color(255, 150, 0)
 
-local intelligence_gated_moodles = {
-    -- Level 11
-    ["shock"] = 11,
-    ["hemothorax"] = 11,
-    ["internal_bleed"] = 11,
-    ["respfailure"] = 11,
-    ["hypovolemia_3"] = 11,
-    ["brain_damage_2"] = 11,
-    ["overdose_2"] = 11,
-
-    -- Level 12
-    ["sepsis"] = 12,
-    ["overdose_3"] = 12,
-    ["hypovolemia_4"] = 12,
-    ["brain_damage_3"] = 12,
-
-    -- Level 13
-    ["cardiac_arrest"] = 13,
-    ["overdose_4"] = 13,
-    ["brain_damage_4"] = 13,
-}
 
 local GENERIC_MOODLE_TEXTURES = {
 
@@ -92,11 +71,6 @@ local function manageMoodleState(ply, moodle, active, material, count, bypass_co
         base_moodle_id = base_moodle_id or moodle
         moodle = base_moodle_id
         material = GENERIC_MOODLE_TEXTURES[base_moodle_id] or "materials/moodles/" .. base_moodle_id .. ".png" -- Fallback just in case
-    end
-    local required_intel = intelligence_gated_moodles[base_moodle_id]
-
-    if required_intel and (ply:GetStat("Intelligence") or 10) < required_intel then
-        active = false
     end
 
     if org and org.otrub then
@@ -409,7 +383,7 @@ local function SyncOriginalMoodles(ply)
         { threshold = 0.75, texture = "materials/moodles/Endurance_3.png" },
         { threshold = 1, texture = "materials/moodles/Endurance_4.png" },
     }, 1 - stPct)
-    manageMoodleState(ply, "energized", stamina > maxStamina * 1.5, "materials/moodles/Energized.png")
+    manageMoodleState(ply, "energized", stamina > 180, "materials/moodles/Energized.png")
 
     -- Faint (Scaling based on Low Consciousness + Disorientation)
     local consciousness = org.consciousness or 1

@@ -75,6 +75,10 @@ module[2] = function(owner, org, timeValue)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
 	org.fearadd = math.Approach(org.fearadd, 1, gainfear and timeValue / 5 or 0)
 	
+	if org.fear > 0.5 then
+		org.adrenalineAdd = math.Approach(org.adrenalineAdd, org.fear * 2, timeValue)
+	end
+	
 	local adrenK = max(1 + org.adrenaline, 1)
 	local adren = org.adrenaline
 

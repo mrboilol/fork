@@ -29,6 +29,7 @@ hook.Add("Think", "stanleytumbler", function()
         local org = ply.organism or {}
         local consciousness = org.consciousness or 1
         local fear = org.fear or 0
+        local despair = org.despair or 0
         local stamina = org.stamina and org.stamina[1] or 100
         local effectiveThreshold = TUMBLE_SPEED_THRESHOLD
         effectiveThreshold = effectiveThreshold * math.Clamp(consciousness, 0.5, 1.0)
@@ -110,8 +111,12 @@ hook.Add("Think", "stanleytumbler", function()
             end
         end
 
-        local dexterity = ply:GetStat("Dexterity") or 10
-        tripChance = tripChance * (1 - (dexterity - 10) * 0.05)
+        if fear > 0.1 then
+            tripChance = tripChance + fear * 0.25
+        end
+        if despair > 0.1 then
+            tripChance = tripChance + despair * 0.25
+        end
 
         if org.superfighter then
             tripChance = tripChance * 0.1

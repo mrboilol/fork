@@ -63,6 +63,7 @@ function SWEP:PrimarySpread()
 		mul = mul * (((organism.larm or 0) + (organism.rarm or 0) + 2) / 1 + ((organism.larmamputated and 5 or 0) + (organism.rarmamputated and 5 or 0)))
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
+		mul = mul * (1 + (organism.fear or 0) * 0.5)
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)

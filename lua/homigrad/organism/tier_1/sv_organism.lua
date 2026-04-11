@@ -1015,7 +1015,7 @@ hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
 		tr.filter = {ply,ent}
 		if not util.TraceLine(tr).Hit then
 			ply.organism.adrenalineAdd = ply.organism.adrenalineAdd + 0.3
-			ply.organism.fearadd = ply.organism.fearadd + (0.3 * intel_multiplier)
+			ply.organism.fearadd = ply.organism.fearadd + 0.3
 		end
 	end
 end)

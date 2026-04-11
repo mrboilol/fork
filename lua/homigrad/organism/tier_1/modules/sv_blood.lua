@@ -72,10 +72,8 @@ module[2] = function(owner, org, mulTime)
 	local adrenaline = math.min(org.adrenaline, 2)
 
     if owner:IsPlayer() then
-        local endurance = owner:GetStat("Endurance")
-        local endurance_bonus = 1 + (endurance - 10) * 0.05
-        org.coagulation_multiplier = endurance_bonus
-        org.blood_regeneration_multiplier = endurance_bonus
+        org.coagulation_multiplier = 1
+        org.blood_regeneration_multiplier = 1
     else
         org.coagulation_multiplier = 1
         org.blood_regeneration_multiplier = 1

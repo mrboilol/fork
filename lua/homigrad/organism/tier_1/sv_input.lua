@@ -490,11 +490,6 @@ local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodi
 local net, math, hg, IsValid = net, math, hg, IsValid
 local takeRagdollDamage
 hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
-    if ent:IsPlayer() then
-        local endurance = ent:GetStat("Endurance")
-        local damage_mul = 1 - (endurance - 10) * 0.05
-        dmgInfo:ScaleDamage(math.max(0.5, damage_mul))
-    end
 
 	if dmgInfo:IsDamageType(DMG_CRUSH) and ent:IsPlayer() and IsValid(ent.FakeRagdoll) then
 		RagdollCollision(ent.FakeRagdoll, {Speed = dmgInfo:GetDamage(), DeltaTime = 1, HitObject = dmgInfo:GetAttacker(), HitPos = dmgInfo:GetDamagePosition(), HitNormal = dmgInfo:GetDamageForce():GetNormalized()})
@@ -669,15 +664,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		local attacker = dmgInfo:GetAttacker()
 		if IsValid(attacker) and attacker:IsPlayer() then
-			local intel = attacker:GetStat("Intelligence")
-			local chance = (intel - 10) * 5 -- 5% chance per point above 10
-			if math.random(100) > chance then
-				dmgInfo:GetInflictor().poisoned2 = nil
-			end
-		else
 			dmgInfo:GetInflictor().poisoned2 = nil
 		end
+	else
+			dmgInfo:GetInflictor().poisoned2 = nil
 	end
+
 	
 	local organs = hg.organism.GetHitBoxOrgans(ent:GetModel(), ent)
 	local boxs, pos, sphere = hg.organism.ShootMatrix(ent, organs)
@@ -883,7 +875,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	--if hitbody then
 	if not org.superfighter then
-        local endurance_multiplier = 1 - (org.owner:GetStat("Endurance") - 10) * 0.05
+        local endurance_multiplier = 1
         dmg = dmg * endurance_multiplier
 		dmgBlood = dmgBlood * 1.5
 		local bleed_add = dmgBlood * bleedMul// / (RagdollDamageBoneMul[hitgroup] or 1)
@@ -898,7 +890,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		local instant_pain = instantPainMul * painadd
 		local slow_pain = (1 - instantPainMul) * painadd
-        local endurance_multiplier = 1 - (org.owner:GetStat("Endurance") - 10) * 0.075
+        local endurance_multiplier = 1
 		org.painadd = org.painadd + slow_pain * endurance_multiplier
 		--org.avgpain = org.avgpain + instant_pain
 		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * math.Clamp(pen / 5,1,2) * endurance_multiplier, 70)
@@ -1037,7 +1029,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
-	local hitgroup_max = 100 + (org.owner:GetStat("Endurance") - 10) * 10
+	local hitgroup_max = 250
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
@@ -1558,7 +1550,7 @@ local function velocityDamage(ent, data)
 
 		if hitgroup == HITGROUP_HEAD then
 				local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
-                local intel_multiplier = 1 - (org.owner:GetStat("Intelligence") - 10) * 0.05
+                local intel_multiplier = 1
 				
 				hg.organism.input_list.skull(org, bone, dmg * 6 * (hadhelmet and 0.2 or 1) * intel_multiplier, dmgInfo)
 				

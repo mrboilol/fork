@@ -13,7 +13,6 @@ function PLAYER:LegAttack()
     if isMidAir and self.organism.stamina[1] < 85 then return end
 
     local dmg = 15
-    dmg = dmg * (1 + (self:GetStat("Strength") - 10) * 0.1)
 
     local anim = "kick_pistol_base"
     anim = (self:KeyDown(IN_DUCK) or self:Crouching()) and "kick_pistol_base_crouch" or self:EyeAngles()[1] > 60 and "curbstomp_base" or self:EyeAngles()[1] > 35 and "kick_pistol_25_base" or self:EyeAngles()[1] > 20 and "kick_pistol_45_base" or anim
