@@ -480,24 +480,6 @@ if SERVER then
 	util.AddNetworkString("select_mode")
 	util.AddNetworkString(circleNetDone)
 	util.AddNetworkString(circleNetStart)
-    net.Receive(circleNetDone, function(len, ply)
-        local wep = net.ReadEntity()
-        if not IsValid(wep) or wep:GetOwner() ~= ply then return end
-        local attackType = net.ReadUInt(2)
-        local target
-        if attackType == 1 then
-            target = ply
-        else
-            target = hg.eyeTrace(ply).Entity
-        end
-        if not IsValid(target) then return end
-        target = ResolveBandageTargetServer(target)
-        if not IsValid(target) then return end
-        local done = wep:Heal(target, wep.mode)
-        if done and wep.PostHeal then
-            wep:PostHeal(target, wep.mode)
-        end
-    end)
 else
 	net.Receive("select_mode",function()
 		net.ReadEntity().mode = net.ReadInt(4)
@@ -649,31 +631,31 @@ if SERVER then
 		
 		if not bone then
 			--print(#org.wounds)
-			if self.modeValues[1] > 0 and #org.wounds > 0 then
-				local biggestWound = org.wounds[1][1]
-				local intel_bonus = 1.5
-				local healedWound = math.max(biggestWound - self.modeValues[1] * intel_bonus, 0)
-				local woundHeal = self.modeValues[1] - (biggestWound - healedWound)
-				org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
-				org.wounds[1][1] = healedWound
-				self.modeValues[1] = woundHeal > 0.1 and woundHeal or 0
-				org.pain = math.max(org.pain - (biggestWound - healedWound) / 4, 0)
-				
-				if (biggestWound - healedWound) > 0.1 then
-					bandaged = true
-				end
+			for i = 1, #org.wounds do
+				if self.modeValues[1] > 0 and #org.wounds > 0 then
+					local biggestWound = org.wounds[1][1]
+					local healedWound = math.max(biggestWound - self.modeValues[1], 0)
+					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)-- * ((owner.Profession == "doctor") and 0.33 or 1)
+					org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
+					org.wounds[1][1] = healedWound
+					self.modeValues[1] = woundHeal > 0.1 and woundHeal or 0
+					
+					if (biggestWound - healedWound) > 0.1 then
+						bandaged = true
+					end
 
-				local owner = self:GetOwner()
-				if owner.Karma then
-					--owner.Karma = math.Clamp(owner.Karma + 0.25,0,zb.MaxKarma)
+					local owner = self:GetOwner()
+					if owner.Karma then
+						--owner.Karma = math.Clamp(owner.Karma + 0.25,0,zb.MaxKarma)
+					end
+					ent.bandaged_limbs = ent.bandaged_limbs or {}
+					local bone_name = org.wounds[1][4]
+					if not ent.bandaged_limbs[bone_name] then
+						ent.bandaged_limbs[bone_name] = true
+						done = true
+					end
+					if org.wounds[1][1] == 0 then table.remove(org.wounds, 1) end
 				end
-				ent.bandaged_limbs = ent.bandaged_limbs or {}
-				local bone_name = org.wounds[1][4]
-				if not ent.bandaged_limbs[bone_name] then
-					ent.bandaged_limbs[bone_name] = true
-					done = true
-				end
-				if org.wounds[1][1] == 0 then table.remove(org.wounds, 1) end
 			end
 		else
 			local bonewounds = {}

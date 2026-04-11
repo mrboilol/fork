@@ -538,35 +538,6 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
             end
         end
     end
-                    state.blinkEnd = time + BLINK_DURATION
-                    pulseStartTime = time
-                    
-                    local boneID = healthModel:LookupBone(ampBoneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
-                    
-                    local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
-                end
-                
-                if state.blinking and time > state.blinkEnd then
-                    state.blinking = false
-                    local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
-                end
-                
-            elseif (isBroken or isDislocated) then
-                if not state.fractured then
-                    state.fractured = true
-                    pulseStartTime = time
-                    local blinkBoneID = blinkModel:LookupBone(boneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
-                    
-                    local boneID = healthModel:LookupBone(boneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
-                end
-            end
-        end
-    end
     
     local shouldShowIndicator = admiring and not otrub
     local targetX = shouldShowIndicator and POS_VISIBLE_X or POS_HIDDEN_X
