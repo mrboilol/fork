@@ -71,6 +71,12 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 
 	local org = get_target_organism()
 	local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
+	if org and org.otrub then
+		despair = 0
+		despairLerp = 0
+		despairTextLerp = 0
+		stop_despair_sound(true)
+	end
 
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 
@@ -113,6 +119,10 @@ end)
 
 hook.Add("DrawOverlay", "hg_despair_text", function()
 	local org = get_target_organism()
+	if org and org.otrub then
+		despairTextLerp = 0
+		return
+	end
 	local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
 	local target = math.Clamp((despair - 0.5) / 0.5, 0, 1)
 	despairTextLerp = LerpFT(0.03, despairTextLerp, target)
@@ -125,8 +135,8 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	draw.SimpleText("Im so fucking scared", despairFont, x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText("Im so fucking scared", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("im so fucking scared", despairFont, x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("im so fucking scared", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 hook.Add("Player_Death", "hg_despair_cleanup", function(ply)

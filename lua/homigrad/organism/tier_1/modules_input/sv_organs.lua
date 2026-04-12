@@ -145,9 +145,18 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
 
 		if abdominal_organs[key] then
-			local multiplier = (oldval >= 1) and 2.5 or 1.5 -- Extra penalty if already destroyed
-			org.internalBleed = org.internalBleed + damage_dealt * multiplier
-			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 10 * multiplier
+			local multiplier = (oldval >= 1) and 3.5 or 2.0 -- Extra penalty if already destroyed
+			org.internalBleed = org.internalBleed + damage_dealt * 1.5 * multiplier
+			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 15 * multiplier
+			org.disorientation = (org.disorientation or 0) + damage_dealt * 5 * multiplier
+
+			if org.analgesia < 0.4 and damage_dealt * multiplier > 0.3 then
+				timer.Simple(0, function()
+					if IsValid(org.owner) then
+						hg.StunPlayer(org.owner, 1.5)
+					end
+				end)
+			end
 		end
 	end
 	
@@ -175,30 +184,15 @@ end
 
 input_list.liver = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.liver
-	local prot = math.max(0.3 - org.liver,0)
-	
+
+	local result = damageOrgan(org, dmg, dmgInfo, "liver")
+
 	hg.AddHarmToAttacker(dmgInfo, (org.liver - oldDmg) * 3, "Liver damage harm")
 	
 	org.shock = org.shock + dmg * 20
 	org.painadd = org.painadd + dmg * 35
-	
-	org.liver = math.min(org.liver + dmg, 1)
-	local harmed = (org.liver - oldDmg)
-	if org.analgesia < 0.4 and harmed >= 0.2 then
-		timer.Simple(0, function()
-			if harmed > 0 then -- wtf? whatever
-				hg.StunPlayer(org.owner,2)
-			else
-				hg.LightStunPlayer(org.owner,2)
-			end
-		end)
-	end
 
-	org.internalBleed = org.internalBleed + harmed * 4
-	
-	dmgInfo:ScaleDamage(0.8)
-
-	return 0
+	return result
 end
 
 input_list.stomach = function(org, bone, dmg, dmgInfo)
@@ -208,7 +202,6 @@ input_list.stomach = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.stomach - oldDmg) * 2, "Stomach damage harm")
 	
-	org.internalBleed = org.internalBleed + (org.stomach - oldDmg) * 2
 	return result
 end
 
@@ -219,7 +212,6 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.intestines - oldDmg) * 2, "Intestines damage harm")
 
-	org.internalBleed = org.internalBleed + (org.intestines - oldDmg) * 2
 	return result
 end
 

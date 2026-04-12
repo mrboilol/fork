@@ -40,8 +40,7 @@ postprs.addtiveLayer = {
 	toytown_h = 0,
 	brightness = 0,
 	sharpen = 0,
-	sharpen_dist = 0,
-    grayscale = 0
+	sharpen_dist = 0
 }
 
 postprs.layers = postprs.layers or {}
@@ -65,8 +64,7 @@ local addtiveLayer = postprs.addtiveLayer
 local tab = {
 	["$pp_colour_brightness"] = 0,
 	["$pp_colour_contrast"] = 1,
-	["$pp_colour_colour"] = 1,
-	["$pp_colour_grayscale"] = 0
+	["$pp_colour_colour"] = 1
 }
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
@@ -176,36 +174,6 @@ hook.Add("Post Processing", "Main", function()
 		LayerWeight("water", 0.5, 0)
 		LayerWeight("water2", 0.01, 0)
 	end
-	local org = ply.organism
-	if not org then
-		addtiveLayer.grayscale = Lerp(FrameTime() * 2, addtiveLayer.grayscale, 0)
-		return
-	end
-
-	local grayscale = 0
-	local fear = org.fear or 0
-	if fear > 0.1 then
-		grayscale = math.max(grayscale, (fear - 0.1) * 0.9)
-	end
-
-	if IsValid(PainStation) and PainStation:GetState() == GMOD_CHANNEL_PLAYING then
-		grayscale = math.max(grayscale, 0.5)
-	end
-
-	if IsValid(RealityStation) and RealityStation:GetState() == GMOD_CHANNEL_PLAYING then
-		grayscale = math.max(grayscale, 0.5)
-	end
-
-	if IsValid(NoiseStation2) and NoiseStation2:GetState() == GMOD_CHANNEL_PLAYING then
-		grayscale = math.max(grayscale, 0.5)
-	end
-
-	local o2 = org.o2 and org.o2[1] or 100
-	if o2 < 30 then
-		grayscale = math.max(grayscale, 1 - (o2 / 30))
-	end
-
-	addtiveLayer.grayscale = Lerp(FrameTime() * 2, addtiveLayer.grayscale, grayscale)
 
 	oldWaterLevel = waterLevel
 
@@ -227,6 +195,7 @@ local haloents = {
 	["weapon_revolver2"] = true,
 	["weapon_hg_f1_tpik"] = true
 }
+
 hook.Add( "PreDrawHalos", "AddPropHalos", function() -- вариант с подсветкой всего в радиусе
 	local pickuphalo = {}
 	 
@@ -429,6 +398,20 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if not organism.brain then stopthings() return end
 	local org = organism
 
+    -- Concussion and low blood blur
+    local blurAmount = 0
+    if org.concussion and org.concussion > 2 then
+        blurAmount = math.min((org.concussion - 2) / 8, 1) * 4
+    end
+
+    if org.blood and org.blood < 4000 then
+        blurAmount = math.max(blurAmount, math.min((4000 - org.blood) / 3500, 1) * 5)
+    end
+
+    if blurAmount > 0 then
+        DrawToyTown(blurAmount, ScrH() / 2)
+    end
+
 	if org.blindness or amtflashed >= 0.8 then
 		local blindness = ((org.blindness and math.Round(org.blindness) == 0) or amtflashed >= 0.8) and 0 or (org.blindness)
 		render.UpdateScreenEffectTexture()
@@ -441,6 +424,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.SetMaterial(blindMat)
 		render.DrawScreenQuad()
 	end
+
 
 local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
@@ -839,27 +823,30 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 	end
 
-	local despair = math.Clamp(org.despair or 0, 0, 1)
+	local despair = org.otrub and 0 or math.Clamp(org.despair or 0, 0, 1)
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
 
 	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
 	if despairFx > 0.001 then
+		local despairShock = despairFx ^ 0.7
 		render.UpdateScreenEffectTexture()
 		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-		heatMat:SetFloat("$c0_y", despairFx * 0.22)
-		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairFx * 3.7))
+		heatMat:SetFloat("$c0_y", despairShock * 0.34)
+		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 5.4))
 		render.SetMaterial(heatMat)
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
-		coldMat:SetFloat("$c0_y", despairFx * 1.05)
-		render.SetMaterial(coldMat)
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", despairShock * 2.4)
+		vignetteMat:SetFloat("$c1_y", despairShock * 2.6)
+		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
-		tab["$pp_colour_brightness"] = -(despairFx ^ 1.35) * 0.42
-		tab["$pp_colour_contrast"] = 1 - despairFx * 0.35
-		tab["$pp_colour_colour"] = 1 - despairFx * 0.97
+		tab["$pp_colour_brightness"] = -(despairShock ^ 1.2) * 0.58
+		tab["$pp_colour_contrast"] = 1 - despairShock * 0.5
+		tab["$pp_colour_colour"] = 1 - despairShock * 1.15
 		tab["$pp_colour_mulr"] = 0
 		tab["$pp_colour_mulg"] = 0
 		tab["$pp_colour_mulb"] = 0
@@ -890,11 +877,17 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 	else
 		if IsValid(despairSound) then
-			despairSoundVol = math.max(despairSoundVol - FrameTime() * 0.4, 0)
-			despairSound:SetVolume(despairSoundVol)
-			if despairSoundVol <= 0.001 then
+			if org.otrub then
 				despairSound:Stop()
 				despairSound = nil
+				despairSoundVol = 0
+			else
+				despairSoundVol = math.max(despairSoundVol - FrameTime() * 0.4, 0)
+				despairSound:SetVolume(despairSoundVol)
+				if despairSoundVol <= 0.001 then
+					despairSound:Stop()
+					despairSound = nil
+				end
 			end
 		end
 	end
@@ -935,6 +928,10 @@ hook.Add("DrawOverlay", "despair_text", function()
 
 	local org = ply.new_organism or ply.organism
 	if not org then return end
+	if org.otrub then
+		despairTextLerp = 0
+		return
+	end
 
 	local despair = math.Clamp(org.despair or 0, 0, 1)
 	local target = math.Clamp((despair - 0.5) / 0.5, 0, 1)
@@ -947,8 +944,8 @@ hook.Add("DrawOverlay", "despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	draw.SimpleText("im so fucking scared", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText("im so fucking scared", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local function removeflash()
@@ -1065,4 +1062,40 @@ hook.Add("HG_CalcView", "DespairBreathShake", function(ply, pos, angles, fova, z
 	angles.y = angles.y + jitter * 0.6
 	angles.r = angles.r + jitter * 0.5
 	fova[1] = (fova[1] or 0) + pushPull * 2.8
+end)
+
+net.Receive("headtrauma_flash", function()
+    local pos = net.ReadVector()
+    local time = net.ReadFloat()
+    local size = net.ReadInt(20)
+    -- local sound = net.ReadString() -- Not reading sound, as we'll hardcode it.
+
+    local lply = LocalPlayer()
+    if not IsValid(lply) then return end
+
+    local org = lply:Alive() and (lply.new_organism or lply.organism)
+    if not org then return end
+
+    -- Check if player just went unconscious
+    if org.consciousness and org.consciousness < 0.1 then
+        lply:ScreenFade(SCREENFADE.IN, Color(255, 255, 255, 255), 0.1, 0)
+        timer.Simple(0.1, function()
+            if not IsValid(lply) then return end
+            lply:ScreenFade(SCREENFADE.OUT, Color(255, 255, 255, 255), 0.5, 0)
+        end)
+        
+        if math.random(1, 2) == 1 then
+            surface.PlaySound("knocked.wav")
+        else
+            surface.PlaySound("knocked.ogg")
+        end
+
+        -- Extra shock
+        ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
+
+    else
+        -- More severe flash
+        hg.AddFlash(lply:EyePos(), 1, pos, time * 1.5, size * 1.2)
+        surface.PlaySound("headhit.mp3")
+    end
 end)

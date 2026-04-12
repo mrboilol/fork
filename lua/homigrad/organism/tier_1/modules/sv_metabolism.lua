@@ -48,7 +48,7 @@ module[2] = function(owner, org, timeValue)
 
     if org.satiety == 0 then return end
 
-    org.satiety = min(max(org.satiety - timeValue * 0.5, 0), 100)
+    org.satiety = min(max(org.satiety - timeValue * 0.25, 0), 100)
     org.blood = min(org.blood + timeValue * (org.satiety/10) , 5000)
     org.regeneratehp = (!((org.regeneratehp or 0) >= 1) and min( (org.regeneratehp or 0) + timeValue * (org.satiety/100), 1)) or 0
     owner:SetHealth(min(owner:Health() + org.regeneratehp,100))

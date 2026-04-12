@@ -139,6 +139,10 @@ local list = {
 	{"heartstop", true, true}, 
 	{"pulse", 70}, 
 	{"heartbeat", 70}, false, 
+	"bloodpressure",
+	"systolic",
+	"diastolic",
+	false,
 	{"stomach", 1, true}, 
 	{"liver", 1, true}, 
 	{"intestines", 1, true}, 
@@ -259,37 +263,24 @@ local function LerpVariables(lerp,org_source,org_target)
 	end
 end
 
-local stat_display_time = 0
-local stat_display_alpha = 0
-
-net.Receive("show_stats", function()
-    stat_display_time = CurTime() + 2
-end)
-
+hg.LerpVariables = LerpVariables
 
 local littleblack = Color(75, 75, 75, 255)
 local trahalgmod = Color(0, 0, 0, 75)
 local weight = 200
 local developer = GetConVar("developer")
 local hg_stats = GetConVar("hg_stats") or CreateClientConVar("hg_stats", 1, true, false, "show stats", 0, 1)
-concommand.Add("toggle_stats", function()
-    local hg_stats = GetConVar("hg_stats")
-    hg_stats:SetBool(not hg_stats:GetBool())
-end, nil, "Toggles the persistent stats display.")
-
-concommand.Add("show_stats", function()
-    net.Start("show_stats")
-    net.SendToServer()
-end, nil, "Shows your stats temporarily.")
-
 hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
 	local new_organism = lply:Alive() and lply.new_organism or (viewmode == 1 and IsValid(spect) and spect.new_organism) or {}
-        LerpVariables(FrameTime(), organism, new_organism)
+	
+	--LerpVariables(FrameTime(),organism,new_organism)
 	if !organism then return end
-		if not hg_stats:GetBool() and not (stat_display_time > CurTime()) then return end
+	if not developer:GetBool() then return end
+	if not LocalPlayer():IsAdmin() then return end
+	if !hg_stats:GetBool() then return end
 	local textList = getTextTable(organism)
 	local h = math.Round(ScreenScaleH(5.5))
 	local cutoff = math.floor((ScrH() - 150 - 50) / h)
@@ -323,7 +314,8 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	local trent = tr.Entity
 	local organism_otherply = trent.organism or {}
 	local new_organism_otherply = trent.new_organism or {}
-        LerpVariables(FrameTime(), organism_otherply, new_organism_otherply)
+	
+	--LerpVariables(FrameTime(),organism_otherply,new_organism_otherply)
 
 	if not organism_otherply or table.IsEmpty(organism_otherply) then return end
 	trent = organism_otherply.owner

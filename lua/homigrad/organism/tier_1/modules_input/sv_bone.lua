@@ -79,7 +79,7 @@ local dislocated_leg = {
 
 local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
-	local dmg = dmg * 4
+	local dmg = dmg * 3.25
 
 	if dmgInfo:IsDamageType(DMG_CRUSH) and dmg > 4 and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key)
@@ -136,7 +136,7 @@ end
 
 local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
-	local dmg = dmg * 4
+	local dmg = dmg * 3.25
 	
 	if dmgInfo:IsDamageType(DMG_CRUSH) and dmg > 4 and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key)
@@ -152,7 +152,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	org[key] = org[key] * 0.5
 
-	if dmg < 0.6 then return 0 end
+	if dmg < 0.75 then return 0 end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) then return 0 end
 
 	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
@@ -259,7 +259,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
 
-	local dislocated = (org.jaw - oldDmg) > math.Rand(0.1, 0.3)
+	local dislocated = (org.jaw - oldDmg) > math.Rand(0.2, 0.4)
 
 	if org.jaw == 1 then
 		org.shock = org.shock + dmg * 40
@@ -270,16 +270,22 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	org.shock = org.shock + dmg * 3
 
-    org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Lower rate for jaw
+    org.concussion = math.min((org.concussion or 0) + dmg * 8, 10) -- Increased from 4 to 8
 
     -- Slight disorientation and consciousness loss
-    org.disorientation = org.disorientation + dmg * 0.5
-    org.consciousness = math.max(org.consciousness - dmg * 0.05, 0)
+    org.disorientation = org.disorientation + dmg * 1.5 -- Increased from 0.5 to 1.5
+    org.consciousness = math.max(org.consciousness - dmg * 0.15, 0) -- Increased from 0.05 to 0.15
 
     -- Add more concussion for significant damage
     if dmg > 0.2 then
-        org.concussion = math.min((org.concussion or 0) + dmg * 2, 10)
+        org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Increased from 2 to 4
     end
+
+    net.Start("headtrauma_flash")
+    net.WriteVector(dmgInfo:GetDamagePosition())
+    net.WriteFloat(0.5)
+    net.WriteInt(100, 20)
+    net.Send(org.owner)
 
     if dislocated then
         org.shock = org.shock + dmg * 20

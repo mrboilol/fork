@@ -819,6 +819,8 @@ function hg.FakeUp(ply, forced, instant)
 				ply:DrawShadow(true)
 				ply:SetRenderMode(RENDERMODE_NORMAL)
 				ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
+				ply.fakecd = CurTime() + 2
+				ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
 
 				--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 				hg.ragdollFake[ply] = nil
@@ -833,6 +835,8 @@ function hg.FakeUp(ply, forced, instant)
 			ply:SetRenderMode(RENDERMODE_NORMAL)
 			ply:SetCollisionGroup(ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
 			ply:SetMoveType(ply.switchingseat and MOVETYPE_NONE or MOVETYPE_WALK)
+			ply.fakecd = CurTime() + 2
+			ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
 			
 			--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 			hg.ragdollFake[ply] = nil

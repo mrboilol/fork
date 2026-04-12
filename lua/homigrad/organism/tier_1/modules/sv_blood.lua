@@ -79,6 +79,19 @@ module[2] = function(owner, org, mulTime)
         org.blood_regeneration_multiplier = 1
     end
 
+	org.bleedingmul = 1.0
+
+	if org.liver > 0 then
+		org.coagulation_multiplier = org.coagulation_multiplier * (1 - org.liver * 0.5)
+		org.blood_regeneration_multiplier = org.blood_regeneration_multiplier * (1 - org.liver * 0.75)
+		org.bleedingmul = org.bleedingmul * (1 + org.liver * 0.5)
+		org.internalBleed = org.internalBleed + (org.liver * mulTime * 0.05)
+	else
+		org.coagulation_multiplier = 1.2
+		org.blood_regeneration_multiplier = 1.2
+		org.bleedingmul = 0.8
+	end
+
 	if org.vomitInThroat then
 		local ent = hg.GetCurrentCharacter(owner)
 		
@@ -104,7 +117,7 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier, 5000)
+		org.blood = min(org.blood + mulTime * 5 * 0.65 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier, 5000)
 	end
 
 	if org.hemotransfusionshock > 0 then
@@ -130,7 +143,7 @@ module[2] = function(owner, org, mulTime)
 			local rand1 = math.Rand(4, 10) * 1
 			local rand2 = math.Rand(0.5, 1) * 1
 			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04 * org.coagulation_multiplier-- / #org.wounds
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * org.coagulation_multiplier-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
 			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
 			
@@ -155,8 +168,8 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.liver > 0.5 then
-		//org.blood = math.max(org.blood - mulTime * 10 * org.pulse / 70 * org.liver,0)
-		//bleedoutspeed = bleedoutspeed + mulTime * 10 * org.pulse / 70 * org.liver
+		org.blood = math.max(org.blood - mulTime * 10 * org.pulse / 70 * org.liver,0)
+		bleedoutspeed = bleedoutspeed + mulTime * 10 * org.pulse / 70 * org.liver
 	end
 
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
@@ -199,14 +212,14 @@ module[2] = function(owner, org, mulTime)
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 10 * org.pulse / 70, 1) end
 
 	if org.internalBleed > 0.1 then
-		local chance = (org.internalBleed - 0.1) * 0.005 -- 0.5% chance at 1.1 internal bleeding
+		local chance = (org.internalBleed - 0.1) * 0.002 -- 0.2% chance at 1.1 internal bleeding
 		if math.random() < chance * mulTime then
 			org.hemothorax = true
 		end
 	end
 
 	if org.internalBleed > 0.1 then
-		local chance = (org.internalBleed - 0.1) * 0.005 -- 0.5% chance at 1.1 internal bleeding
+		local chance = (org.internalBleed - 0.1) * 0.002 -- 0.2% chance at 1.1 internal bleeding
 		if math.random() < chance * mulTime then
 			org.hemothorax = true
 		end

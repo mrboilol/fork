@@ -33,7 +33,6 @@ MODE.LootTable = {
 
 		{1,"weapon_matches"},
 		{1,"weapon_zippo_tpik"},
-		{0.1,"weapon_flaregun"},
 
 		{0.2,"weapon_morphine"},
 		{0.2,"weapon_mannitol"},
@@ -47,6 +46,7 @@ MODE.LootTable = {
 	}},
 	{20,{
 		{12,"weapon_hammer"},
+		{2,"weapon_wrench"},
 		{6,"weapon_brick"},
 		{10,"weapon_pocketknife"},
 
@@ -58,6 +58,7 @@ MODE.LootTable = {
 		{2,"weapon_hg_crowbar"},
 		{1,"weapon_hatchet"},
 		{0.9,"weapon_hg_axe"},
+		{0.9,"weapon_hg_katana"},
 		{0.5,"weapon_hg_machete"},
 		{0.4,"weapon_hg_sledgehammer"},
 
@@ -85,7 +86,6 @@ MODE.LootTable = {
 		{3.5,"weapon_m1911"},
 		{3,"weapon_m9beretta"},
 		{2,"weapon_fn45"},
-		{2,"weapon_flaregun"},
 	}},
 	{6, {
 		{9,"weapon_hk_usp"},
@@ -146,6 +146,7 @@ MODE.LootTableStandard = {
 	{35, {
 		{1,"weapon_hammer"},
 		{1,"weapon_brick"},
+		{0.45,"weapon_wrench"},
 		{1,"weapon_pocketknife"},
 		{0.32,"weapon_bat"},
 		{0.3,"weapon_leadpipe"},
@@ -155,6 +156,7 @@ MODE.LootTableStandard = {
 
 		{0.12,"weapon_hatchet"},
 		{0.10,"weapon_hg_axe"},
+		{0.03,"weapon_hg_katana"},
 		{0.09,"weapon_hg_sledgehammer"},
 		{0.07,"weapon_hg_machete"},
 	}},
@@ -293,12 +295,31 @@ MODE.TraitorActions = {
 }
 
 SetGlobalBool("RolesPlus_Enable", true)
+SetGlobalBool("HMCDPoliceArrived", false)
 
 util.AddNetworkString("HMCDPoliceRole")
 util.AddNetworkString("HMCD(StartPlayersRoleSelection)")
 util.AddNetworkString("HMCD(EndPlayersRoleSelection)")
 util.AddNetworkString("HMCD(SetSubRole)")
 util.AddNetworkString("hmcd_announce_traitor_lose")
+util.AddNetworkString("hg_surrender_hmcd_police_state")
+
+local function BroadcastHMCDPoliceArrivedState(state, target)
+	net.Start("hg_surrender_hmcd_police_state")
+	net.WriteBool(state and true or false)
+	if IsValid(target) then
+		net.Send(target)
+	else
+		net.Broadcast()
+	end
+end
+
+hook.Add("PlayerInitialSpawn", "HMCDPoliceArrivedSync", function(ply)
+	timer.Simple(1, function()
+		if not IsValid(ply) then return end
+		BroadcastHMCDPoliceArrivedState(GetGlobalBool("HMCDPoliceArrived", false), ply)
+	end)
+end)
 
 MODE.Type = MODE.Type or "standard"
 MODE.Types = MODE.Types or {}
@@ -1082,6 +1103,8 @@ function MODE:RoundThink()
 	
 			if spawned > 0 then
 				self.PoliceSpawned = true
+				SetGlobalBool("HMCDPoliceArrived", true)
+				BroadcastHMCDPoliceArrivedState(true)
 				PrintMessage(HUD_PRINTTALK, "Police have arrived.")
 				EmitSound("snd_jack_hmcd_policesiren.wav", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
 			end
@@ -1119,6 +1142,8 @@ function MODE:RoundThink()
 			local spawned = self:SpawnForce("nationalguard", count)
 			if spawned > 0 then
 				self.PoliceSpawned = true
+				SetGlobalBool("HMCDPoliceArrived", true)
+				BroadcastHMCDPoliceArrivedState(true)
 				PrintMessage(HUD_PRINTTALK, self.Types[self.Type].PoliceText or "National Guard have arrived.")
 				EmitSound(self.Types[self.Type].PoliceSound or "snd_jack_hmcd_heli2.mp3", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
 			end
@@ -1395,6 +1420,8 @@ function MODE:RoundStart()
 	self.deadPoliceCount = 0
 	self.swatDeployed = false
 	self.spawnedPoliceCount = 0
+	SetGlobalBool("HMCDPoliceArrived", false)
+	BroadcastHMCDPoliceArrivedState(false)
 	
 
 	timer.Remove("HMCDSpawnSWAT")
@@ -1421,6 +1448,8 @@ function MODE:EndRound()
 	self.swatDeployed = false
 	self.spawnedPoliceCount = 0
 	self.roundStartType = nil
+	SetGlobalBool("HMCDPoliceArrived", false)
+	BroadcastHMCDPoliceArrivedState(false)
 
 	local traitors, gunners = {}, {}
 	local players_alive = 0

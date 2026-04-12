@@ -69,6 +69,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:OnRemove()
+	self:StopPulseCheck()
 	--[[if IsValid(self.worldModel) then
 		self.worldModel:Remove()
 	end--]]
@@ -918,6 +919,98 @@ function SWEP:SecondaryAttack()
 end
 
 SWEP.Checking = 0
+SWEP.PulseCheckDuration = 10
+SWEP.PulseCheckTick = 0.02
+
+function SWEP:StopPulseCheck(targetPly, skipNotify)
+	if not self.ActivePulseChecks then return end
+
+	for ply, data in pairs(self.ActivePulseChecks) do
+		if not targetPly or targetPly == ply then
+			if data and data.timerName then
+				timer.Remove(data.timerName)
+			end
+
+			if not skipNotify and IsValid(ply) and data and data.completed and data.counted then
+				local bpm = data.counted * 6
+				ply:Notify(data.counted .. " x 6 = " .. bpm .. " BPM", 3)
+			end
+
+			self.ActivePulseChecks[ply] = nil
+		end
+	end
+end
+
+function SWEP:StartPulseCheck(ply, org)
+	if not IsValid(ply) or not org then return end
+
+	self.ActivePulseChecks = self.ActivePulseChecks or {}
+
+	local active = self.ActivePulseChecks[ply]
+	if active then
+		ply:Notify("Interrupted.", 1)
+		return
+	end
+
+	if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
+		ply:Notify("No Pulse.", 2)
+		return
+	end
+
+	local now = CurTime()
+	local timerName = "hg_hands_pulsecheck_" .. self:EntIndex() .. "_" .. ply:EntIndex()
+
+	self.ActivePulseChecks[ply] = {
+		timerName = timerName,
+		started = now,
+		ends = now + self.PulseCheckDuration,
+		carryEnt = self:GetCarrying(),
+		nextBeat = now,
+		counted = 0,
+		completed = false
+	}
+
+	ply:Notify("Counting..", 1)
+
+	timer.Create(timerName, self.PulseCheckTick, 0, function()
+		if not IsValid(self) or not IsValid(ply) then
+			self:StopPulseCheck(ply, true)
+			return
+		end
+
+		local data = self.ActivePulseChecks and self.ActivePulseChecks[ply]
+		if not data then
+			timer.Remove(timerName)
+			return
+		end
+
+		local heldEnt = self:GetCarrying()
+		if not IsValid(heldEnt) or heldEnt ~= data.carryEnt then
+			self:StopPulseCheck(ply, true)
+			return
+		end
+
+		if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
+			ply:Notify("No Pulse.", 2)
+			self:StopPulseCheck(ply, true)
+			return
+		end
+
+		local timeNow = CurTime()
+		while timeNow >= data.nextBeat and data.nextBeat <= data.ends do
+			data.counted = data.counted + 1
+			ply:NotifyBerserk(tostring(data.counted), nil, nil, 0, nil, nil, true)
+			local dynamicRate = math.max(tonumber(org.heartbeat) or tonumber(org.pulse) or 0, 1)
+			data.nextBeat = data.nextBeat + (60 / dynamicRate)
+		end
+
+		if timeNow >= data.ends then
+			data.completed = true
+			self:StopPulseCheck(ply, false)
+			return
+		end
+	end)
+end
 
 -- function SWEP:AdjustMouseSensitivity()
 -- 	local owner = self:GetOwner()
@@ -1025,6 +1118,10 @@ function SWEP:ApplyForce()
 						--ply:ChatPrint("The armor is too thick to feel the pulse.")
 					elseif ((bone == "ValveBiped.Bip01_L_Hand") or (bone == "ValveBiped.Bip01_R_Hand") or (bone == "ValveBiped.Bip01_Head1")) then
 						local org = ply2.organism
+
+						if bone == "ValveBiped.Bip01_Head1" then
+							self:StartPulseCheck(ply, org)
+						end
 
 						if org.heartstop then
 							--ply:ChatPrint("No pulse.")
@@ -1252,6 +1349,8 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 			owner:SetNetVar("carrymass",self.CarryEnt:GetPhysicsObjectNum(self.CarryBone):GetMass())
 		end
 	else
+		self:StopPulseCheck(owner, true)
+
 		if IsValid(self.CarryEnt) and self.CarryEnt:GetCustomCollisionCheck() then
 			self.CarryEnt:CollisionRulesChanged()
 			owner:CollisionRulesChanged()
@@ -1734,7 +1833,7 @@ function SWEP:AttackFront(special_attack, rand)
 			self.DamageMul = special_attack and 1.6 or 3
 		end
 
-		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul * (1)
+		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul
 		local ent = Ent
 		local vec = AimVec
 
@@ -1750,7 +1849,7 @@ function SWEP:AttackFront(special_attack, rand)
 			end)
 		end
 
-		Mul = Mul * (owner.MeleeDamageMul or 1)
+		Mul = Mul * (owner.FistsDamageMul or owner.MeleeDamageMul or 1)
 
 		if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
 			Mul = Mul * (self:GetBlocking() and 0.5 or 1)
@@ -1885,12 +1984,25 @@ end
 function SWEP:Reload()
 	if not IsFirstTimePredicted() then return end
 
+	local owner = self:GetOwner()
+	local ent = self:GetCarrying()
+
+	if SERVER and IsValid(ent) and ent:GetClass() == "prop_ragdoll" and self.CarryBone != nil then
+		local ply2 = RagdollOwner(ent) or ent
+		if not ply2.noHead and ply2.organism then
+			local boneId = ent:TranslatePhysBoneToBone(self.CarryBone)
+			local boneName = ent:GetBoneName(boneId)
+			if boneName == "ValveBiped.Bip01_Head1" then
+				self:StartPulseCheck(owner, ply2.organism)
+				return
+			end
+		end
+	end
+
 	if self:GetOwner().PlayerClassName ~= "headcrabzombie" then
 		self:SetFists(false)
 		self:SetBlocking(false)
 	end
-
-	local ent = self:GetCarrying()
 
 	if SERVER then
 		local target,_ = WorldToLocal(self:GetOwner():GetAimVector() * (self.CarryDist or 50) + self:GetOwner():GetShootPos(),angle_zero,self:GetOwner():EyePos(),self:GetOwner():EyeAngles())
@@ -2150,7 +2262,7 @@ if SERVER then
 		local isAdmiring = not ply:GetNWBool("mcd_admiring", false)
 		if args[1] == "cancel" then isAdmiring = false end
 		ply:SetNWBool("mcd_admiring", isAdmiring)
-		ply.mcd_admire_cooldown = CurTime() + 1.0 -- Prevent spam
+		ply.mcd_admire_cooldown = CurTime() + 1.5 -- Prevent spam
 		
 		if isAdmiring then
 			if not ply:HasWeapon("weapon_hands_sh") then
@@ -2166,8 +2278,8 @@ if SERVER then
 					wep:DoBFSAnimation("seq_admire", 5, true, true)
 					
 					-- Ensure animation doesn't get interrupted
-					wep:SetNextPrimaryFire(CurTime() + 7)
-					wep:SetNextSecondaryFire(CurTime() + 7)
+					wep:SetNextPrimaryFire(CurTime() + 10)
+					wep:SetNextSecondaryFire(CurTime() + 10)
 				end
 			end)
 		else
