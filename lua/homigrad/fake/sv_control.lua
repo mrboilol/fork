@@ -338,15 +338,35 @@ hook.Add("Think", "Fake", function()
 				local bone = ragdoll:LookupBone(neckwound[4])
 				local neckpos, neckang = ragdoll:GetBonePosition(bone)
 				if neckpos and neckang then
+					local handsOnNeck = 2
 					local right = neckang:Right()
 					local forward = neckang:Forward()
 					local up = neckang:Up()
 					local leftpos = neckpos + right * -3 + forward * 2 + up * -1
 					local rightpos = neckpos + right * 3 + forward * 2 + up * -1
-					shadowControl(ragdoll, 5, 0.001, nil, nil, nil, leftpos, 100, 20)
-					shadowControl(ragdoll, 7, 0.001, nil, nil, nil, rightpos, 100, 20)
+
+					if not ply:KeyDown(IN_ATTACK) then
+						shadowControl(ragdoll, 5, 0.001, nil, nil, nil, leftpos, 100, 20) -- Left Hand
+					else
+						handsOnNeck = handsOnNeck - 1
+					end
+
+					if not ply:KeyDown(IN_ATTACK2) then
+						shadowControl(ragdoll, 7, 0.001, nil, nil, nil, rightpos, 100, 20) -- Right Hand
+					else
+						handsOnNeck = handsOnNeck - 1
+					end
+
+					if handsOnNeck == 2 then
+						org.neckslitBleedingReduction = 0.2
+					elseif handsOnNeck == 1 then
+						org.neckslitBleedingReduction = 0.6
+					else
+						org.neckslitBleedingReduction = 1.0
+					end
+
 					shadowControl(ragdoll, 10, 0.001, nil, nil, nil, neckpos, 50, 10)
-					return -- Skip the rest of the logic
+					--return -- Skip the rest of the logic
 				end
 			end
 		elseif ply.organism and ply.organism.wounds and not table.IsEmpty(ply.organism.wounds) and org.canmove and (ply.fakecd and (ply.fakecd + 1) > CurTime()) then
@@ -799,7 +819,7 @@ hook.Add("Think", "Fake", function()
 		if keyLeft and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
 			if org.canmove then
 				local angle = spine:GetAngles()
-				angle[3] = angle[3] - 20 * (ragdoll:IsOnFire() and 1.5 or 1)
+				angle[3] = angle[3] - 20 * ((ragdoll:IsOnFire() or isNeckSlitRolling) and 1.5 or 1)
 				--ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp
 				shadowControl(ragdoll, 1, 0.001, angle, 490, 90)
 				local head = ragdoll:GetPhysicsObject(ragdoll:TranslateBoneToPhysBone(ragdoll:LookupBone("ValveBiped.Bip01_Head1")))
@@ -826,7 +846,7 @@ hook.Add("Think", "Fake", function()
 		if keyRight and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
 			if org.canmove and not org.otrub then
 				local angle = spine:GetAngles()
-				angle[3] = angle[3] + 20 * (ragdoll:IsOnFire() and 1.5 or 1)
+				angle[3] = angle[3] + 20 * ((ragdoll:IsOnFire() or isNeckSlitRolling) and 1.5 or 1)
 				shadowControl(ragdoll, 1, 0.001, angle, 490, 90)
 				local head = ragdoll:GetPhysicsObject(ragdoll:TranslateBoneToPhysBone(ragdoll:LookupBone("ValveBiped.Bip01_Head1")))
 

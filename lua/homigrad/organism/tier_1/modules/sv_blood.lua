@@ -46,6 +46,7 @@ module[1] = function(org)
 	org.hemothorax = false
 	org.stamina_damage = 0
 
+	org.neckslitBleedingReduction = 1.0
 	org.bleedingmul = 1.0
 	org.coagulation_multiplier = 1.0
 	org.blood_regeneration_multiplier = 1.0
@@ -183,7 +184,11 @@ module[2] = function(owner, org, mulTime)
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80, 1)
+			if wound[7] == "arteria" then
+				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * (org.neckslitBleedingReduction or 1.0), 1)
+			else
+				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80, 1)
+			end
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 				local dir = wound[6]
 				local len = dir:Length()

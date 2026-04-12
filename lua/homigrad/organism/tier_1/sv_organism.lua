@@ -444,9 +444,19 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	org.despair = math.Clamp(org.despair or 0, 0, 1)
+	
+	local adrenaline = org.adrenaline or 0
+	local prevAdrenaline = org._despairLastAdrenaline or adrenaline
+	local adrenalineDelta = adrenaline - prevAdrenaline
+	org._despairLastAdrenaline = adrenaline
+
 	local despairDecay = timeValue / 160
 	if org.despair > 0.35 then
 		despairDecay = timeValue / 360
+	end
+
+	if adrenalineDelta < 0 then
+		despairDecay = despairDecay * (1 + math.abs(adrenalineDelta) * 5)
 	end
 
 	local analgesia = math.Clamp(org.analgesia or 0, 0, 4)
@@ -456,23 +466,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.despair = math.Approach(org.despair, 0, despairDecay)
 
 	local despairAdd = 0
-	local adrenaline = org.adrenaline or 0
-	local adrenalineAdd = org.adrenalineAdd or 0
-	local prevAdrenaline = org._despairLastAdrenaline or adrenaline
-	local adrenalineDelta = math.max(adrenaline - prevAdrenaline, 0)
-	org._despairLastAdrenaline = adrenaline
-
-	if adrenaline > 8 then
-		despairAdd = despairAdd + (adrenaline - 8) * timeValue * 0.003
-	end
-
-	--if adrenalineAdd > 0.9 then
-	--	despairAdd = despairAdd + math.min(adrenalineAdd, 2) * timeValue * 0.002
-	--end
-
-	if adrenalineDelta > 0 then
-		despairAdd = despairAdd + math.min(adrenalineDelta * 0.02, 0.004)
-	end
 
 	org.fear = (org.fear or 0)
 
@@ -486,7 +479,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if (org.pain or 0) > 45 then
-		despairAdd = despairAdd + math.Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.008
+		despairAdd = despairAdd + math.Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.006
 	end
 
 	if (org.shock or 0) > 20 then
@@ -552,6 +545,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if corpsesSeen > 0 then
 			despairAdd = despairAdd + timeValue * 0.028 * corpsesSeen
 		end
+	end
+
+	if adrenaline > 1 then
+		despairAdd = despairAdd * (1 - math.Clamp(adrenaline / 15, 0, 0.8))
 	end
 
 	if despairAdd > 0 then

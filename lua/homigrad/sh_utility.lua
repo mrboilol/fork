@@ -1784,7 +1784,7 @@ duplicator.Allow( "homigrad_base" )
 --\\ Custom table.IsEmpty
 	hg.isempty = hg.isempty or table.IsEmpty
 	function table.IsEmpty( tab )
-		return next( tab ) == nil
+		return tab == nil or next( tab ) == nil
 	end
 --//
 
