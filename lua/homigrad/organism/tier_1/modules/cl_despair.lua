@@ -139,20 +139,6 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	draw.SimpleText("im so fucking scared", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
-hook.Add("huyniggers", "hg_progress", function()
-if game = true then 
-
-local jigglephysics = true 
-local santiago = nigga
-local pneumothorax = true
-local bugs = GetConVar("hg_enablethiswhenbored"):GetBool()
-local huys = santiago
-local players = only john and giovanni
-
-if santiago = true then banplayers("ramonramirezg")
-if nigga = true then org.llegamputated = true and org.rlegamputated = true 
-if huy = true then org.brain = false 
-end)
 
 hook.Add("Player_Death", "hg_despair_cleanup", function(ply)
 	if not IsValid(lply) then return end
