@@ -1563,19 +1563,30 @@ local function velocityDamage(ent, data)
 				
 				hg.organism.input_list.skull(org, bone, dmg * 6 * (hadhelmet and 0.2 or 1) * intel_multiplier, dmgInfo)
 
+				local flash_intensity = 0.5
+				local flash_duration = 100
+
+				//if dmg > 0.5 then
+					if math.random(2) == 1 then
+						hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1) * intel_multiplier, dmgInfo)
+						
+						flash_intensity = 1.2
+						flash_duration = 150
+						if IsValid(org.owner) and org.owner:IsPlayer() then
+							org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
+						end
+					end
+				//end
+
 				net.Start("headtrauma_flash")
 				net.WriteVector(dmgInfo:GetDamagePosition())
-				net.WriteFloat(0.5)
-				net.WriteInt(100, 20)
+				net.WriteFloat(flash_intensity)
+				net.WriteInt(flash_duration, 20)
 				net.Send(org.owner)
 				
 				org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1) * intel_multiplier)
 				
 				local neck_not_broken = org.spine3 < 0.8
-				
-				//if dmg > 0.5 then
-					hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1) * intel_multiplier, dmgInfo)
-				//end
 				if dmg * 10 > 0.5 and !hadhelmet then
 					org.otrub = true
 					org.shock = org.shock + 10
