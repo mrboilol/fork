@@ -1,4 +1,5 @@
-CreateClientConVar("cl_simplemoodles", 0, true, false)
+local showmoodles = CreateClientConVar("showmoodles", 2, true, false, "0 = moodles only show when admiring, 1 = moodles fade away after 5 seconds, 2 = moodles show forever", 0, 2)
+local simplemoodle = CreateClientConVar("simplemoodle", 0, true, false, "0 = normal moodles, 1 = affliction style moodles", 0, 1)
 
 local healthModel
 local blinkModel
@@ -28,6 +29,11 @@ local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
+local afflictionIcons = {}
+local afflictionIconsVisibility = 0
+local afflictionIconsAppearTime = 0
+local afflictionIconsTargetVisible = false
+local lastAfflictionCount = 0
 
 local limbBones = {
     lleg = "ValveBiped.Bip01_L_Thigh",
@@ -215,7 +221,7 @@ end
 local function CollectAfflictionIcons(ply, org)
     local icons = {}
     local seen = {}
-    local function add(iconName, severity)
+    local function add(iconName, severity, description)
         severity = math.Clamp(severity or 0.5, 0.05, 1)
         if seen[iconName] then
             seen[iconName].severity = math.max(seen[iconName].severity, severity)
@@ -223,7 +229,7 @@ local function CollectAfflictionIcons(ply, org)
         end
         local mat = GetStatusIcon(iconName)
         if not mat then return end
-        local entry = {mat = mat, severity = severity}
+        local entry = {mat = mat, severity = severity, desc = description}
         seen[iconName] = entry
         icons[#icons + 1] = entry
     end
@@ -238,16 +244,16 @@ local function CollectAfflictionIcons(ply, org)
     local arterialCount = istable(arterialwounds) and #arterialwounds or 0
 
     if woundsCount > 0 then
-        add("open-wound", math.min(1, woundsCount / 6))
+        add("open-wound", math.min(1, woundsCount / 6), "Open Wound")
     end
 
     if arterialCount > 0 then
-        add("deepwound", math.min(1, 0.7 + arterialCount * 0.2))
+        add("deepwound", math.min(1, 0.7 + arterialCount * 0.2), "Arterial Bleeding")
     end
 
     local bleed = GetOrgValueNumber(org.bleed)
     if bleed > 0 then
-        add("bleed", math.min(1, bleed / 8))
+        add("bleed", math.min(1, bleed / 8), "Bleeding")
     end
 
     local hasBrokenLimb = (org.lleg and org.lleg >= 1) or (org.rleg and org.rleg >= 1) or (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1)
@@ -255,7 +261,7 @@ local function CollectAfflictionIcons(ply, org)
     local hasAmputation = org.llegamputated or org.rlegamputated or org.larmamputated or org.rarmamputated or org.headamputated
     if hasBrokenLimb or hasDislocation or hasAmputation then
         local sev = hasAmputation and 1 or (hasDislocation and 0.65 or 0.5)
-        add("vuln", sev)
+        add("vuln", sev, "Fracture/Dislocation")
     end
 
     local concussion = GetOrgValueNumber(org.concussion)
@@ -320,7 +326,7 @@ local function CollectAfflictionIcons(ply, org)
     return icons
 end
 
-local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, appearTime, timeNow, consciousness, org)
+local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, appearTime, timeNow)
     if not iconEntries or #iconEntries == 0 or visibility <= 0.01 then return end
 
     local iconSize = math.max(math.floor(ScreenScaleFixed(26)), 18)
@@ -331,12 +337,8 @@ local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, ap
     local maxPerRow = math.max(1, math.floor((horizontalSpace + spacing) / (bgSize + spacing)))
     local rows = math.ceil(#iconEntries / maxPerRow)
     local appearFrac = math.Clamp((timeNow - (appearTime or timeNow)) / 0.35, 0, 1)
-
-    -- Adjust fade-in time based on fear, despair, or adrenaline
-    local fadeMultiplier = 1
-    if org and (GetOrgValueNumber(org.despair) > 0.25 or org.noradrenalineActive) then
-        fadeMultiplier = 3
-    end
+    local shakeMul = (1 - appearFrac) * visibility
+    local baseAlpha = math.floor(255 * visibility)
 
     for row = 1, rows do
         local rowStart = (row - 1) * maxPerRow + 1
@@ -352,19 +354,9 @@ local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, ap
         for col = 1, rowCount do
             local idx = rowStart + col - 1
             local entry = iconEntries[idx]
-            if not entry.creationTime then
-                entry.creationTime = RealTime()
-            end
-
-            local timeSinceRender = RealTime() - (entry.lastRenderTime or 0)
-            entry.lastRenderTime = RealTime()
-            local fadeAwayFactor = math.max(0, 1 - (RealTime() - (entry.creationTime or 0) - 2) / 2)
-            local shakeMul = (1 - appearFrac) * visibility * (1 + fadeAwayFactor * 2)
-            local baseAlpha = math.floor(255 * visibility * fadeAwayFactor)
-
             local severity = entry.severity or 0.5
             local pulse = 1 + math.sin(timeNow * (4 + severity * 9) + idx * 1.4) * (0.05 + severity * 0.08) * visibility
-            local shakeAmp = ScreenScaleFixed(2 + severity * 2) * shakeMul
+            local shakeAmp = ScreenScaleFixed(8 + severity * 5) * shakeMul -- Increased shake
             local shakeX = math.sin(timeNow * (95 + idx * 7)) * shakeAmp
             local shakeY = math.cos(timeNow * (110 + idx * 9)) * shakeAmp
             local drawX = x + (col - 1) * (bgSize + spacing)
@@ -373,19 +365,19 @@ local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, ap
             local centerDrawY = drawY + bgSize * 0.5 + shakeY
             local bgDrawSize = bgSize * pulse
             local iconDrawSize = iconSize * pulse
-            local bgAlpha = math.floor((160 + severity * 95) * visibility * fadeAwayFactor)
-
-            -- Grayscale effect based on consciousness
-            local colorMultiplier = math.Clamp(consciousness ^ 0.5, 0.2, 1)
-            local gray = 255 * colorMultiplier
+            local bgAlpha = math.floor((160 + severity * 95) * visibility)
 
             surface.SetMaterial(statusCircleMat)
             surface.SetDrawColor(8, 8, 8, bgAlpha)
             surface.DrawTexturedRect(centerDrawX - bgDrawSize * 0.5, centerDrawY - bgDrawSize * 0.5, bgDrawSize, bgDrawSize)
 
             surface.SetMaterial(entry.mat)
-            surface.SetDrawColor(gray, gray, gray, baseAlpha)
+            surface.SetDrawColor(255, 255, 255, baseAlpha)
             surface.DrawTexturedRect(centerDrawX - iconDrawSize * 0.5, centerDrawY - iconDrawSize * 0.5, iconDrawSize, iconDrawSize)
+
+            if simplemoodle:GetInt() == 1 and entry.desc then
+                draw.SimpleText(entry.desc, "Default", centerDrawX, centerDrawY + bgDrawSize * 0.5, Color(255, 255, 255, baseAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            end
         end
     end
 end
@@ -464,76 +456,85 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     local time = CurTime()
     local hasActiveLimbAffliction = false
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
-
-    if GetConVar("cl_simplemoodles"):GetInt() == 1 then
-        -- Affliction icons are drawn later, based on 'admiring' state
-    else
-        if org then
-            for limb, boneName in pairs(limbBones) do
-                local isAmputated = org[limb.."amputated"]
-                local isBroken = (org[limb] and org[limb] >= 1)
-                local isDislocated = org[limb.."dislocation"]
-                if isAmputated or isBroken or isDislocated then
-                    hasActiveLimbAffliction = true
-                end
-                
-                if not limbStates[limb] then
-                    limbStates[limb] = { 
-                        amputated = false, 
-                        blinking = false, 
-                        blinkEnd = 0,
-                        fractured = false
-                    }
-                end
-                
-                local state = limbStates[limb]
-                local ampBoneName = amputationBones[limb] or boneName
-                
-                if state.amputated and not isAmputated then
-                    state.amputated = false
-                    state.blinking = false
-                    local boneID = healthModel:LookupBone(ampBoneName)
+    if org then
+        for limb, boneName in pairs(limbBones) do
+            local isAmputated = org[limb.."amputated"]
+            local isBroken = (org[limb] and org[limb] >= 1)
+            local isDislocated = org[limb.."dislocation"]
+            if isAmputated or isBroken or isDislocated then
+                hasActiveLimbAffliction = true
+            end
+            
+            if not limbStates[limb] then
+                limbStates[limb] = { 
+                    amputated = false, 
+                    blinking = false, 
+                    blinkEnd = 0,
+                    fractured = false
+                }
+            end
+            
+            local state = limbStates[limb]
+            local ampBoneName = amputationBones[limb] or boneName
+            
+            if state.amputated and not isAmputated then
+                state.amputated = false
+                state.blinking = false
+                local boneID = healthModel:LookupBone(ampBoneName)
+                if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
+                local blinkBoneID = blinkModel:LookupBone(ampBoneName)
+                if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
+            end
+            
+            if state.fractured and not (isBroken or isDislocated) then
+                state.fractured = false
+                if not state.amputated then
+                    local blinkBoneID = blinkModel:LookupBone(boneName)
+                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
+                    
+                    local boneID = healthModel:LookupBone(boneName)
                     if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
+                end
+            end
+
+            if isAmputated then
+                if state.fractured then
+                     state.fractured = false
+                     local blinkBoneID = blinkModel:LookupBone(boneName)
+                     if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
+                     
+                     local boneID = healthModel:LookupBone(boneName)
+                     if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
+                end
+
+                if not state.amputated then
+                    state.amputated = true
+                    state.blinking = true
+                    state.blinkEnd = time + BLINK_DURATION
+                    pulseStartTime = time
+                    
+                    local boneID = healthModel:LookupBone(ampBoneName)
+                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
+                    
+                    local blinkBoneID = blinkModel:LookupBone(ampBoneName)
+                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
+                end
+                
+                if state.blinking and time > state.blinkEnd then
+                    state.blinking = false
                     local blinkBoneID = blinkModel:LookupBone(ampBoneName)
                     if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
                 end
                 
-                if state.fractured and not (isBroken or isDislocated) then
-                    state.fractured = false
-                    if not state.amputated then
-                        local blinkBoneID = blinkModel:LookupBone(boneName)
-                        if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
-                        
-                        local boneID = healthModel:LookupBone(boneName)
-                        if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
-                    end
-                end
-
-                if isAmputated then
-                    if state.fractured then
-                        state.fractured = false
-                        local blinkBoneID = blinkModel:LookupBone(boneName)
-                        if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
-                        
-                        local boneID = healthModel:LookupBone(boneName)
-                        if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
-                    end
-
-                    if not state.amputated then
-                        state.amputated = true
-                        state.blinking = true
-                        state.blinkEnd = time + BLINK_DURATION
-                        local boneID = healthModel:LookupBone(ampBoneName)
-                        if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
-                    end
-                else
-                    if isBroken or isDislocated then
-                        if not state.fractured then
-                            state.fractured = true
-                            state.blinking = true
-                            state.blinkEnd = time + BLINK_DURATION
-                        end
-                    end
+            elseif (isBroken or isDislocated) then
+                if not state.fractured then
+                    state.fractured = true
+                    pulseStartTime = time
+                    local blinkBoneID = blinkModel:LookupBone(boneName)
+                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
+                    
+                    local boneID = healthModel:LookupBone(boneName)
+                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
                 end
             end
         end
@@ -550,9 +551,6 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     
     local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
     local y = ScrH() - h - ScreenScaleFixed(20)
-    if ply.PlayerClassName == "Combine" or ply.PlayerClassName == "Gordon" then
-        y = ScreenScaleFixed(20)
-    end
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)
@@ -577,22 +575,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     surface.DrawOutlinedRect(backdropX, backdropY, backdropW, backdropH, 1)
     
     if shouldShowIndicator then
-        if GetConVar("cl_simplemoodles"):GetInt() == 1 then
-            cachedAfflictionIcons = CollectAfflictionIcons(ply, org)
-        else
-            local fadingMoodles = {}
-            if hg.FadingOutMoodles then
-                for id, data in pairs(hg.FadingOutMoodles) do
-                    if data.mat and not data.mat:IsError() then
-                        local remove_dt = CurTime() - (data.remove_time or 0)
-                        local severity = math.max(0, 1 - (remove_dt / 0.4))
-                        table.insert(fadingMoodles, {mat = data.mat, severity = severity, creationTime = data.remove_time})
-                    end
-                end
-            end
-            cachedAfflictionIcons = fadingMoodles
-        end
-
+        cachedAfflictionIcons = CollectAfflictionIcons(ply, org)
         if not iconsTargetVisible then
             iconsAppearTime = time
         end
@@ -601,12 +584,64 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     iconsVisibility = Lerp(FrameTime() * 10, iconsVisibility, shouldShowIndicator and 1 or 0)
     iconsTargetVisible = shouldShowIndicator
 
-    if iconsVisibility > 0.01 and #cachedAfflictionIcons > 0 then
+    -- New affliction icons logic
+    local newAfflictionIcons = CollectAfflictionIcons(ply, org)
+    local showMoodlesValue = showmoodles:GetInt()
+    local simpleMoodlesValue = simplemoodle:GetInt()
+    local shouldShowIcons = #newAfflictionIcons > 0
+
+    if showMoodlesValue == 0 then
+        shouldShowIcons = shouldShowIcons and admiring
+    end
+
+    if simpleMoodlesValue == 0 and admiring then
+        shouldShowIcons = false
+    end
+
+    local despair = GetOrgValueNumber(org.despair)
+    local adrenaline = org.noradrenalineActive
+    local inBadState = despair > 0.25 or adrenaline
+
+    if showMoodlesValue == 1 and inBadState and not admiring then
+        shouldShowIcons = false
+    end
+
+    if #newAfflictionIcons > lastAfflictionCount and #newAfflictionIcons > 0 then
+        afflictionIconsAppearTime = time
+        if shouldShowIcons then
+            afflictionIconsTargetVisible = true
+        end
+    end
+
+    if #newAfflictionIcons == 0 then
+        afflictionIconsTargetVisible = false
+    end
+
+    lastAfflictionCount = #newAfflictionIcons
+
+    if showMoodlesValue == 1 then
+        if time - afflictionIconsAppearTime > 5 and #newAfflictionIcons > 0 then
+            afflictionIconsTargetVisible = false
+        end
+    elseif showMoodlesValue == 2 then
+        if shouldShowIcons then
+            afflictionIconsTargetVisible = true
+        end
+    elseif showMoodlesValue == 0 then
+         if shouldShowIcons then
+            afflictionIconsTargetVisible = true
+        else
+            afflictionIconsTargetVisible = false
+        end
+    end
+    
+    local fadeSpeed = inBadState and 20 or 10
+    afflictionIconsVisibility = Lerp(FrameTime() * fadeSpeed, afflictionIconsVisibility, (afflictionIconsTargetVisible and shouldShowIcons) and 1 or 0)
+
+    if afflictionIconsVisibility > 0.01 and #newAfflictionIcons > 0 and shouldShowIcons then
         local iconsX = ScrW() * 0.5
         local iconsBottom = ScrH() - ScreenScaleFixed(ICONS_SCREEN_MARGIN_Y)
-        DrawAfflictionIcons(cachedAfflictionIcons, iconsX, iconsBottom, iconsVisibility, iconsAppearTime, time, consciousness, org)
-    elseif not shouldShowIndicator and iconsVisibility <= 0.01 then
-        cachedAfflictionIcons = {}
+        DrawAfflictionIcons(newAfflictionIcons, iconsX, iconsBottom, afflictionIconsVisibility, afflictionIconsAppearTime, time)
     end
     
     local camRenderX = viewX

@@ -298,21 +298,21 @@ net.Receive("Moodle_Add", function()
     
     local existing = hg.CLIENT_MOODLES[id]
     if not existing then
-        CLIENT_MOODLES[id] = { texture = tex, count = cnt, mat = Material(tex), spawn = CurTime() }
+        hg.CLIENT_MOODLES[id] = { texture = tex, count = cnt, mat = Material(tex), spawn = CurTime() }
     else
-        CLIENT_MOODLES[id].texture = tex
-        CLIENT_MOODLES[id].count = cnt
-        CLIENT_MOODLES[id].mat = CLIENT_MOODLES[id].mat or Material(tex)
+        hg.CLIENT_MOODLES[id].texture = tex
+        hg.CLIENT_MOODLES[id].count = cnt
+        hg.CLIENT_MOODLES[id].mat = hg.CLIENT_MOODLES[id].mat or Material(tex)
     end
-    CLIENT_MOODLES[id].updating = true
-    CLIENT_MOODLES[id].remove_time = nil
+    hg.CLIENT_MOODLES[id].updating = true
+    hg.CLIENT_MOODLES[id].remove_time = nil
 
     if last_removed_moodle.id and (CurTime() - last_removed_moodle.time) < 0.1 then
         local old_base, old_level = last_removed_moodle.id:match("(.+)_([%d+])")
         local new_base, new_level = id:match("(.+)_([%d+])")
 
         if old_base and new_base and old_base == new_base and tonumber(new_level) > tonumber(old_level) then
-            CLIENT_MOODLES[id].worsen_time = CurTime()
+            hg.CLIENT_MOODLES[id].worsen_time = CurTime()
             util.ScreenShake(Vector(0,0,0), 5, 0.5, 0.5, 0.5)
         end
     end
@@ -359,16 +359,16 @@ net.Receive("Moodle_Remove", function()
     local id = net.ReadString()
     if id == "*" then
         if IsDebugDrawEnabled() then MsgC(DEBUG_COLOR_CL_REMOVE, "[MM] - Clearing all moodles\n") end
-        for k, v in pairs(CLIENT_MOODLES) do
+        for k, v in pairs(hg.CLIENT_MOODLES) do
             v.remove_time = CurTime()
         end
         return 
     end
     
     last_removed_moodle = {id = id, time = CurTime()}
-    if CLIENT_MOODLES[id] then
-        CLIENT_MOODLES[id].remove_time = CurTime()
-        hg.FadingOutMoodles[id] = CLIENT_MOODLES[id]
+    if hg.CLIENT_MOODLES[id] then
+        hg.CLIENT_MOODLES[id].remove_time = CurTime()
+        hg.FadingOutMoodles[id] = hg.CLIENT_MOODLES[id]
     end
 
     if IsDebugDrawEnabled() then MsgC(DEBUG_COLOR_CL_REMOVE, "[MM] - "..id.."\n") end
@@ -378,7 +378,7 @@ hook.Add("HUDPaintBackground", "Moodle_Draw", function()
     local mx, my = gui.MouseX(), gui.MouseY()
     local ply = LocalPlayer()
     if not IsValid(ply) then 
-        CLIENT_MOODLES = {} 
+        hg.CLIENT_MOODLES = {} 
         return 
     end
 
@@ -390,7 +390,7 @@ hook.Add("HUDPaintBackground", "Moodle_Draw", function()
     sway_offset_x = Lerp(FrameTime() * 5, sway_offset_x, -angle_diff_y * 2)
     sway_offset_y = Lerp(FrameTime() * 5, sway_offset_y, angle_diff_p * 2)
 
-    if table.IsEmpty(CLIENT_MOODLES) then return end
+    if table.IsEmpty(hg.CLIENT_MOODLES) then return end
     
     -- Layout settings
     local iconSize, pad = 48, 10
@@ -421,7 +421,7 @@ hook.Add("HUDPaintBackground", "Moodle_Draw", function()
 
     -- Create a sorted list of moodles to ensure consistent layout
     local sorted_moodles = {}
-    for id, data in pairs(CLIENT_MOODLES) do
+    for id, data in pairs(hg.CLIENT_MOODLES) do
         table.insert(sorted_moodles, {id = id, data = data, spawn = data.spawn or 0})
     end
     table.sort(sorted_moodles, function(a, b) return a.spawn < b.spawn end)
@@ -496,7 +496,7 @@ hook.Add("HUDPaintBackground", "Moodle_Draw", function()
             alpha = Lerp(easeOutQuint(animT), 255, 0)
 
             if remove_dt > 0.4 then
-                CLIENT_MOODLES[id] = nil
+                hg.CLIENT_MOODLES[id] = nil
                 hg.FadingOutMoodles[id] = nil
                 if IsDebugDrawEnabled() and id ~= "*" then MsgC(DEBUG_COLOR_CL_REMOVE, "[M] - "..id.."\n") end
                 continue

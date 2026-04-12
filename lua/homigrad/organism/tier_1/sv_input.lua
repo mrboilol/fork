@@ -1391,6 +1391,7 @@ end
 
 hg.GetTraceDamage = GetTraceDamage
 
+util.AddNetworkString("headtrauma_flash")
 --local Organism = hg.organism
 local abs = math.abs
 takeRagdollDamage = function(ent, dmgInfo)
