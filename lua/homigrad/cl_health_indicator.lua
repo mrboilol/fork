@@ -1,5 +1,4 @@
 local showmoodles = CreateClientConVar("showmoodles", 2, true, false, "0 = moodles only show when admiring, 1 = moodles fade away after 5 seconds, 2 = moodles show forever", 0, 2)
-local simplemoodle = CreateClientConVar("simplemoodle", 0, true, false, "0 = normal moodles, 1 = affliction style moodles", 0, 1)
 
 local healthModel
 local blinkModel
@@ -266,61 +265,61 @@ local function CollectAfflictionIcons(ply, org)
 
     local concussion = GetOrgValueNumber(org.concussion)
     if concussion > 0 then
-        add("concussion", math.min(1, concussion))
+        add("concussion", math.min(1, concussion), "Your head is spinning. It's hard to focus.")
     end
 
     if org.blindness then
-        add("blind", 0.7)
+        add("blind", 0.7, "You cannot see.")
     end
 
     local assimilated = GetOrgValueNumber(org.assimilated)
     if assimilated > 0 then
-        add("wither", math.min(1, assimilated))
+        add("wither", math.min(1, assimilated), "You are withering away.")
     end
 
     if org.incapacitated then
-        add("incap", 1)
+        add("incap", 1, "You need help to get up.")
     end
 
     if org.berserkActive2 then
-        add("bloodlust", 0.45)
+        add("bloodlust", 0.45, "You feel an uncontrollable rage.")
     end
 
     if org.noradrenalineActive then
-        add("haste", 0.45)
+        add("haste", 0.45, "You feel faster.")
     end
 
     local despair = GetOrgValueNumber(org.despair)
     if despair > 0.25 then
-        add("anagenthasdied", math.min(1, despair))
+        add("anagenthasdied", math.min(1, despair), "I need to run.")
     end
 
     if org.critical then
-        add("warning", 1)
+        add("warning", 1, "You are in a critical state.")
     end
 
     if (not org.canmove) or GetOrgValueNumber(org.immobilization) > 0 then
-        add("hindered", 0.65)
+        add("hindered", 0.65, "You are hindered.")
     end
 
     if GetOrgValueNumber(org.pain) > 60 or GetOrgValueNumber(org.shock) > 0.5 then
-        add("stunned", math.min(1, math.max(GetOrgValueNumber(org.pain) / 120, GetOrgValueNumber(org.shock))))
+        add("stunned", math.min(1, math.max(GetOrgValueNumber(org.pain) / 120, GetOrgValueNumber(org.shock))), "You are stunned.")
     end
 
     if GetOrgValueNumber(org.CO) > 0.1 then
-        add("poison-gas", math.min(1, GetOrgValueNumber(org.CO) / 4))
+        add("poison-gas", math.min(1, GetOrgValueNumber(org.CO) / 4), "You are breathing poison gas.")
     end
 
     local o2 = GetOrgValueNumber(org.o2)
     if o2 > 0 and o2 < 20 then
-        add("exhaust", math.min(1, (20 - o2) / 20))
+        add("exhaust", math.min(1, (20 - o2) / 20), "You are exhausted.")
     end
 
     local temperature = GetOrgValueNumber(org.temperature)
     if temperature > 39 then
-        add("discharge", math.min(1, (temperature - 39) / 2))
+        add("discharge", math.min(1, (temperature - 39) / 2), "You are burning up.")
     elseif temperature > 0 and temperature < 34.5 then
-        add("frozen", math.min(1, (34.5 - temperature) / 3))
+        add("frozen", math.min(1, (34.5 - temperature) / 3), "You are freezing.")
     end
 
     return icons
@@ -375,7 +374,7 @@ local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, ap
             surface.SetDrawColor(255, 255, 255, baseAlpha)
             surface.DrawTexturedRect(centerDrawX - iconDrawSize * 0.5, centerDrawY - iconDrawSize * 0.5, iconDrawSize, iconDrawSize)
 
-            if simplemoodle:GetInt() == 1 and entry.desc then
+            if entry.desc then
                 draw.SimpleText(entry.desc, "Default", centerDrawX, centerDrawY + bgDrawSize * 0.5, Color(255, 255, 255, baseAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
             end
         end
@@ -587,16 +586,13 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     -- New affliction icons logic
     local newAfflictionIcons = CollectAfflictionIcons(ply, org)
     local showMoodlesValue = showmoodles:GetInt()
-    local simpleMoodlesValue = simplemoodle:GetInt()
     local shouldShowIcons = #newAfflictionIcons > 0
 
     if showMoodlesValue == 0 then
         shouldShowIcons = shouldShowIcons and admiring
     end
 
-    if simpleMoodlesValue == 0 and admiring then
-        shouldShowIcons = false
-    end
+
 
     local despair = GetOrgValueNumber(org.despair)
     local adrenaline = org.noradrenalineActive
@@ -638,7 +634,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     local fadeSpeed = inBadState and 20 or 10
     afflictionIconsVisibility = Lerp(FrameTime() * fadeSpeed, afflictionIconsVisibility, (afflictionIconsTargetVisible and shouldShowIcons) and 1 or 0)
 
-    if afflictionIconsVisibility > 0.01 and #newAfflictionIcons > 0 and shouldShowIcons then
+    if afflictionIconsVisibility > 0.01 and #newAfflictionIcons > 0 and shouldShowIcons and GetConVar("hg_simplemoodles"):GetBool() then
         local iconsX = ScrW() * 0.5
         local iconsBottom = ScrH() - ScreenScaleFixed(ICONS_SCREEN_MARGIN_Y)
         DrawAfflictionIcons(newAfflictionIcons, iconsX, iconsBottom, afflictionIconsVisibility, afflictionIconsAppearTime, time)

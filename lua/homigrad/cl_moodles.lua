@@ -536,6 +536,16 @@ hook.Add("HUDPaintBackground", "Moodle_Draw", function()
             local shake_amount = shake_intensity * (1 - shake_t) * math.sin(shake_t * 20)
             drawX = drawX + shake_amount
         end
+
+        if CRITICAL_MOODLES[id] then
+            local timeNow = CurTime()
+            local severity = 1
+            local shakeAmp = (8 + severity * 5) -- no screen scale fixed because it's not available here
+            local shakeX = math.sin(timeNow * (95 + 1 * 7)) * shakeAmp
+            local shakeY = math.cos(timeNow * (110 + 1 * 9)) * shakeAmp
+            drawX = drawX + shakeX
+            drawY = drawY + shakeY
+        end
         
         -- Draw texture or fallback box
         if data.mat and not data.mat:IsError() then
