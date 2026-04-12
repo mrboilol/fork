@@ -147,6 +147,8 @@ local function send_organism(org, ply)
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
+	sendtable.arterialBoostEndTime = org.arterialBoostEndTime
+	sendtable.arterialPeakTime = org.arterialPeakTime
 	sendtable.recoilmul = org.recoilmul
 	sendtable.meleespeed = org.meleespeed
 	sendtable.temperature = org.temperature
@@ -431,6 +433,7 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 end)
 
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
+	timeValue = math.min(timeValue, 0.1)
 	-- print("sv_organism.lua Org Think")
 	if not IsValid(owner) then
 		hg.organism.list[owner] = nil
@@ -917,6 +920,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 end)
 
 hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValue)
+	timeValue = math.min(timeValue, 0.1)
 	if not owner:IsPlayer() or not owner:Alive() then return end
 	if org.noradrenaline <= 0 then return end
 	

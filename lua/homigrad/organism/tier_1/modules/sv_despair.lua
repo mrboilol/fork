@@ -25,7 +25,6 @@ end
 
 hook.Add("Org Clear", "hg_despair_init", function(org)
 	org.despair = 0
-	org._despairLastAdrenaline = 0
 	org._despairNextCorpseCheck = 0
 end)
 
@@ -53,23 +52,23 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	org.despair = math.Approach(org.despair, 0, timeValue / 120)
 
 	local add = 0
-	local adrenaline = org.adrenaline or 0
-	local adrenalineAdd = org.adrenalineAdd or 0
-	local prevAdrenaline = org._despairLastAdrenaline or adrenaline
-	local adrenalineDelta = max(adrenaline - prevAdrenaline, 0)
-	org._despairLastAdrenaline = adrenaline
+	--local adrenaline = org.adrenaline or 0
+	--local adrenalineAdd = org.adrenalineAdd or 0
+	--local prevAdrenaline = org._despairLastAdrenaline or adrenaline
+	--local adrenalineDelta = max(adrenaline - prevAdrenaline, 0)
+	--org._despairLastAdrenaline = adrenaline
 
-	if adrenaline > 3 then
-		add = add + (adrenaline - 3) * timeValue * 0.045
-	end
+	--if adrenaline > 3 then
+	--	add = add + (adrenaline - 3) * timeValue * 0.045
+	--end
 
 	--if adrenalineAdd > 0.35 then
 	--	add = add + min(adrenalineAdd, 2) * timeValue * 0.03
 	--end
 
-	if adrenalineDelta > 0 then
-		add = add + min(adrenalineDelta * 0.25, 0.08)
-	end
+	--if adrenalineDelta > 0 then
+	--	add = add + min(adrenalineDelta * 0.25, 0.08)
+	--end
 
 	if org.o2 and org.o2[1] then
 		local o2 = org.o2[1]

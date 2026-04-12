@@ -45,6 +45,9 @@ module[1] = function(org)
 	org.survivalchance = 1
 	org.hemothorax = false
 	org.stamina_damage = 0
+	org.arterialBoostEndTime = 0
+	org.arterialPeakTime = 0
+	org.arterialO2Debuff = 0
 
 	org.neckslitBleedingReduction = 1.0
 	org.bleedingmul = 1.0
@@ -130,6 +133,8 @@ module[2] = function(owner, org, mulTime)
 		org.o2[1] = math.max(org.o2[1] - mulTime * 5,0)
 	end
 
+	org.o2[1] = math.max(org.o2[1] - org.arterialO2Debuff * mulTime, 0)
+
 	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
@@ -175,6 +180,14 @@ module[2] = function(owner, org, mulTime)
 
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
 
+	if org.pulse > 150 and #org.arterialwounds > 0 and math.random() < 0.05 * mulTime then
+		org.arterialPeakTime = CurTime() + 2.5
+	end
+
+	if org.pulse < 60 and #org.arterialwounds > 0 and math.random() < 0.1 * mulTime then
+		hg.organism.ArterialCough(owner, org)
+	end
+
 	local bleedoutspeed2 = 0
 	local next_arterypump = 1 / math.max(org.pulse, 10)
 	local ent = owner:IsPlayer() and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
@@ -198,11 +211,15 @@ module[2] = function(owner, org, mulTime)
 			end
 
 			if wound[1] == 0 then
-				table.remove(org.arterialwounds, i)
-				owner:SetNetVar("arterialwounds", org.arterialwounds)
+					table.remove(org.arterialwounds, i)
+					owner:SetNetVar("arterialwounds", org.arterialwounds)
 
-				org[wound[7]] = 0
-			end
+					if #org.arterialwounds == 0 then
+						org.arterialO2Debuff = 0
+					end
+
+					org[wound[7]] = 0
+				end
 		end
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
@@ -269,6 +286,29 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
+end
+
+function hg.organism.ArterialCough(owner, org)
+	if !hg.IsValidPlayer(owner) then return end
+	org.blood = math.max(org.blood - 30, 0)
+	local ent = hg.GetCurrentCharacter(owner)
+
+	local bon = "ValveBiped.Bip01_Head1"
+	local bone = ent:LookupBone(bon)
+	local mat = ent:GetBoneMatrix(bone)
+
+	if not mat then return end
+
+	net.Start("bloodsquirt2")
+	net.WriteEntity(ent)
+	net.WriteString(bon)
+	net.WriteMatrix(mat)
+	net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
+	net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
+	net.Broadcast()
+
+	local sound = "squirt"..math.random(1,3)..".ogg"
+	ent:EmitSound(sound, 75, 100)
 end
 
 util.AddNetworkString("bloodsquirt2")

@@ -803,13 +803,19 @@ hook.Add("Think", "Fake", function()
 		local isNeckSlitRolling = false
 		
 		if org and org.neckslit and not org.otrub and ply:Alive() and not ply:InVehicle() then
-			local phase = (CurTime() * 1.5) % 4
-			if phase < 1 then
-				keyLeft = true
-				isNeckSlitRolling = true
-			elseif phase >= 2 and phase < 3 then
-				keyRight = true
-				isNeckSlitRolling = true
+			local hasInput = ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK) or ply:KeyDown(IN_MOVELEFT) or ply:KeyDown(IN_MOVERIGHT)
+			if not hasInput then
+				local phase = (CurTime() * 1.5) % 4
+				if phase < 1 then
+					keyLeft = true
+					isNeckSlitRolling = true
+				elseif phase >= 2 and phase < 3 then
+					keyRight = true
+					isNeckSlitRolling = true
+				end
+			else
+				keyLeft = ply:KeyDown(IN_MOVELEFT)
+				keyRight = ply:KeyDown(IN_MOVERIGHT)
 			end
 		else
 			keyLeft = ply:KeyDown(IN_MOVELEFT)

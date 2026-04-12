@@ -1579,8 +1579,6 @@ local function velocityDamage(ent, data)
 					end
 				//end
 
-				timer.Simple(0.1, function()
-					if not IsValid(org.owner) then return end
 					net.Start("headtrauma_flash")
 					net.WriteVector(dmgInfo:GetDamagePosition())
 					net.WriteFloat(flash_intensity)
@@ -1598,9 +1596,8 @@ local function velocityDamage(ent, data)
 					net.WriteBool(play_knockout_sound)
 
 					net.Send(org.owner)
-				end)
 				
-				org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1) * intel_multiplier)
+				org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1))
 				
 				local neck_not_broken = org.spine3 < 0.8
 				if dmg * 10 > 0.5 and !hadhelmet then

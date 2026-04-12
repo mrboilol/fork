@@ -18,6 +18,8 @@ for i = 2, 13 do
             game.AddDecal(id, GORE_DECAL_PATH .. name)
             table.insert(GORE_DECAL_REGISTRY, id)
         end
+
+util.AddNetworkString("hg_artery_sound")
     end
 
     register(base)
@@ -379,6 +381,13 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	local bonea = owner:LookupBone(boneindex)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
 	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), dir2 * 100, artery})
+	if #org.arterialwounds == 1 then
+		org.arterialBoostEndTime = CurTime() + 5
+		org.arterialO2Debuff = 5
+		net.Start("hg_artery_sound")
+		net.WriteEntity(owner)
+		net.Broadcast()
+	end
 	owner:SetNetVar("arterialwounds", org.arterialwounds)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0

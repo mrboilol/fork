@@ -944,6 +944,18 @@ if CLIENT then
 
 end
 
+SWEP.BrokenArmPenalty = {
+    DamageMultiplier = 0.5, -- 50% damage
+    StaminaMultiplier = 1.5, -- 50% more stamina
+    SwingSpeedMultiplier = 1.5, -- 50% slower
+    BlockDurationMultiplier = 0.5 -- 50% shorter block
+}
+
+function SWEP:HasBrokenArm(owner)
+    if not IsValid(owner) or not owner.organism then return false end
+    return (owner.organism.larm and owner.organism.larm >= 1) or (owner.organism.rarm and owner.organism.rarm >= 1)
+end
+
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     if owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
         mul = mul * 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90,1,1.3)
@@ -975,6 +987,10 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
         mul = mul * (1.0 + swayBonus)
     end
 
+    if self:HasBrokenArm(owner) then
+        mul = mul * self.BrokenArmPenalty.DamageMultiplier
+    end
+
     return mul
 end
 
@@ -995,9 +1011,14 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             if attacktype == 3 then pitch = pitch - 20 end
             owner:EmitSound(self.SwingSound or self.AttackSwing or "weapons/slam/throw.wav",50,pitch)
             
-            if owner.organism and attacktype ~= 3 then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + ((attacktype and self.StaminaSecondary or self.StaminaPrimary)) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
-            end
+            local staminaCost = (attacktype and self.StaminaSecondary or self.StaminaPrimary)
+        if self:HasBrokenArm(owner) then
+            staminaCost = staminaCost * self.BrokenArmPenalty.StaminaMultiplier
+        end
+
+        if owner.organism and attacktype ~= 3 then
+            owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+        end
 
             if attacktype == 3 then
                 -- heavy attack custom logic if needed
@@ -1657,7 +1678,11 @@ function SWEP:CustomThink()
         local oldblocking = self:GetBlocking()
         local now = CurTime()
         local feintLockActive = (self.HeavyAttackFeintLockEndTime or 0) > now
-        local blocking = not feintLockActive and ((now - self:GetStartedBlocking()) > 1 or oldblocking) and owner.organism and owner.organism.stamina and owner.organism.stamina[1] and owner.organism.stamina[1] > 90 and !self:GetInAttack() and (self:GetAttackTime() - now - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2)
+                local blockDuration = 1
+        if self:HasBrokenArm(owner) then
+            blockDuration = blockDuration * self.BrokenArmPenalty.BlockDurationMultiplier
+        end
+        local blocking = not feintLockActive and ((now - self:GetStartedBlocking()) > blockDuration or oldblocking) and owner.organism and owner.organism.stamina and owner.organism.stamina[1] and owner.organism.stamina[1] > 90 and !self:GetInAttack() and (self:GetAttackTime() - now - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2)
         --if self:CutDuct() then return end
         self:SetBlocking(blocking)
         
@@ -2196,12 +2221,16 @@ function SWEP:PrimaryAttack()
     local ent = hg.GetCurrentCharacter(ply)
 
     if !self:InUse() then return end
-    if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
+        if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
     if self.lastattack and (self.lastattack + self.attackwait) > CurTime() then return end
     
     local mul = 1
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
+    end
+
+    if self:HasBrokenArm(ply) then
+        mul = mul * self.BrokenArmPenalty.SwingSpeedMultiplier
     end
 
     
@@ -2313,12 +2342,16 @@ function SWEP:SecondaryAttack(override)
 
     if !self:InUse() then return end
     if (hg.KeyDown(ply, IN_USE) and not IsValid(ply.FakeRagdoll)) then return end
-    if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
+        if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
     if self.lastattack and (self.lastattack + self.attackwait) > CurTime() then return end
 
     local mul = 1
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
+    end
+
+    if self:HasBrokenArm(ply) then
+        mul = mul * self.BrokenArmPenalty.SwingSpeedMultiplier
     end
 
     self.HitEnts = nil
