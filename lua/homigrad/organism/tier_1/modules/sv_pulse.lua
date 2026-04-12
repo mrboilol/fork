@@ -50,8 +50,7 @@ module[2] = function(owner, org, timeValue)
 	local heartbeat = org.pulse < 70 and 70 + (70 - org.pulse) * 4 or org.pulse
 
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
-	org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
-	
+		org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
 	heartbeat = heartbeat + (owner.suiciding and 50 or 0)
 	heartbeat = heartbeat + 40 * math.max(0, org.fear)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
@@ -62,9 +61,9 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
-	
 	if org.heartbeat > 300 then -- fibrillation into cardiac arrest
 		org.heartstop = true
+	end
 
 	local blood = math.Clamp(org.blood or 5000, 0, 5000)
 	local bloodK = math.Clamp((blood - 1400) / 3600, 0, 1)
@@ -132,7 +131,7 @@ module[2] = function(owner, org, timeValue)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
 	local fear_gain_speed = (org.hungry or 0) < 10 and timeValue / 10 or timeValue / 5
 	org.fearadd = math.Approach(org.fearadd, 1, gainfear and fear_gain_speed or 0)
-	
+
 	if org.fear > 0.5 then
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, org.fear * 2, timeValue)
 	end
@@ -142,7 +141,6 @@ module[2] = function(owner, org, timeValue)
 
 	if org.pulse < 10 or org.brain >= 0.6 then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
-
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
 		org.fear = math.max(org.fear, 0)
 	end
