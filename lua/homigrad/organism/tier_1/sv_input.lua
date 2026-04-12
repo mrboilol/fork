@@ -1578,11 +1578,26 @@ local function velocityDamage(ent, data)
 					end
 				//end
 
-				net.Start("headtrauma_flash")
-				net.WriteVector(dmgInfo:GetDamagePosition())
-				net.WriteFloat(flash_intensity)
-				net.WriteInt(flash_duration, 20)
-				net.Send(org.owner)
+				timer.Simple(0.1, function()
+					if not IsValid(org.owner) then return end
+					net.Start("headtrauma_flash")
+					net.WriteVector(dmgInfo:GetDamagePosition())
+					net.WriteFloat(flash_intensity)
+					net.WriteInt(flash_duration, 20)
+
+					local play_knockout_sound = false
+					if org.otrub then
+						if not org.played_knockout_sound then
+							play_knockout_sound = true
+							org.played_knockout_sound = true
+						end
+					else
+						org.played_knockout_sound = false
+					end
+					net.WriteBool(play_knockout_sound)
+
+					net.Send(org.owner)
+				end)
 				
 				org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1) * intel_multiplier)
 				

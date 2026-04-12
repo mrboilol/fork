@@ -1068,16 +1068,12 @@ net.Receive("headtrauma_flash", function()
     local pos = net.ReadVector()
     local time = net.ReadFloat()
     local size = net.ReadInt(20)
-    -- local sound = net.ReadString() -- Not reading sound, as we'll hardcode it.
+    local play_knockout_sound = net.ReadBool()
 
     local lply = LocalPlayer()
     if not IsValid(lply) then return end
 
-    local org = lply:Alive() and (lply.new_organism or lply.organism)
-    if not org then return end
-
-    -- Check if player just went unconscious
-    if org.consciousness and org.consciousness < 0.1 then
+    if play_knockout_sound then
         lply:ScreenFade(SCREENFADE.IN, Color(255, 255, 255, 255), 0.1, 0)
         timer.Simple(0.1, function()
             if not IsValid(lply) then return end
@@ -1090,12 +1086,9 @@ net.Receive("headtrauma_flash", function()
             surface.PlaySound("knocked.ogg")
         end
 
-        -- Extra shock
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
-
     else
-        -- More severe flash
-        hg.AddFlash(lply:EyePos(), 1, pos, time * 1.5, size * 1.2)
+        hg.AddFlash(lply:EyePos(), 1, pos, time, size)
         surface.PlaySound("headhit.mp3")
     end
 end)
