@@ -808,6 +808,7 @@ local muffedClasses = {
 }
 
 local last_pulse_phase = {}
+local achoo_end_time = {}
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	--local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 	--print(ply,ent,ply.organism.owner,ply.new_organism.owner)
@@ -1064,16 +1065,26 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 								boost_multiplier = 1.5
 							end
 
-							if boost_multiplier == 1.0 then
-								local pulse = org.pulse or 70
+							local ent_idx = ent:EntIndex()
+							if not achoo_end_time[ent_idx] then achoo_end_time[ent_idx] = {} end
+							if not achoo_end_time[ent_idx][i] then achoo_end_time[ent_idx][i] = 0 end
+
+							local achoo_multiplier = 1.0
+							if CurTime() < achoo_end_time[ent_idx][i] then
+								local duration = 0.2
+								local time_left = achoo_end_time[ent_idx][i] - CurTime()
+								achoo_multiplier = 1.0 + (time_left / duration)
+							end
+
+							if boost_multiplier == 1.0 and pulse < 70 then
 								local pulse_phase_val = (CurTime() * pulse / 10)
 								
-								local ent_idx = ent:EntIndex()
 								if not last_pulse_phase[ent_idx] then last_pulse_phase[ent_idx] = {} end
 								if not last_pulse_phase[ent_idx][i] then last_pulse_phase[ent_idx][i] = 0 end
 
 								if math.sin(pulse_phase_val) > 0.9 and math.sin(last_pulse_phase[ent_idx][i]) <= 0.9 then
 									 ent:EmitSound("artery"..math.random(1,3)..".ogg", 75, math.random(90,110))
+									 achoo_end_time[ent_idx][i] = CurTime() + 0.2
 								end
 								last_pulse_phase[ent_idx][i] = pulse_phase_val
 							end
@@ -1083,7 +1094,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local spray_power = base_power + math.sin(CurTime() * pulse / 10) * pulse_power
 
 							-- Add chaos and make it stronger, and scale it down to a reasonable level
-							spray_power = spray_power * math.Rand(0.9, 1.5) * 0.05 * boost_multiplier
+							spray_power = spray_power * math.Rand(0.9, 1.5) * 0.05 * boost_multiplier * achoo_multiplier
 
 							local _, spray_dir_angle = LocalToWorld(vector_origin, wound[6]:Angle(), vector_origin, ang)
 							local spray_vec = -spray_dir_angle:Forward()
