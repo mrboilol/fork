@@ -309,7 +309,54 @@ function hg.organism.Vomit(owner, snd)
 
 	local on_spine = mat:GetAngles():Right()[3] > 0.25
 	if on_spine then
-		-- code omitted
+		org.vomitInThroat = true
+	end
+
+	owner:SetNetVar("vomiting", CurTime() + 1.5)
+
+	ent:EmitSound(snd or "zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "female" or "male").."_cough"..math.random(4)..".mp3")
+	if !on_spine then ent:EmitSound("vomit/vomit5.mp3") end
+	
+	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
+		owner:SetNetVar("zableval_masku", true)
+	else
+		if !on_spine then
+			net.Start("bloodsquirt2")
+			net.WriteEntity(ent)
+			net.WriteString(bon)
+			net.WriteMatrix(mat)
+			net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
+			net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
+			net.Broadcast()
+		end
+	end
+end
+
+function hg.organism.CoughBlood(org)
+	local ply = org.owner
+	local phr = "zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".mp3"
+	ply:EmitSound(phr)
+	ply.phrCld = CurTime() + 2
+	ply.lastPhr = phr
+
+	if math.random(5) == 1 then
+		org.vomitInThroat = nil
+
+		net.Start("bloodsquirt2")
+		net.WriteEntity(ent)
+		net.WriteString(bon)
+		net.WriteMatrix(mat)
+		net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
+		net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
+		net.Broadcast()
+
+		ent:EmitSound("vomit/vomit5.mp3")
+	end
+end
+
+function hg.organism.BloodDroplet2(owner, org, wound, dir, artery)
+	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery)
+end
 
 util.AddNetworkString("hg_artery_sneeze")
 net.Receive("hg_artery_sneeze", function(len, ply)
