@@ -184,10 +184,6 @@ module[2] = function(owner, org, mulTime)
 		org.arterialPeakTime = CurTime() + 2.5
 	end
 
-	if org.pulse < 60 and #org.arterialwounds > 0 and math.random() < 0.1 * mulTime then
-		hg.organism.ArterialCough(owner, org)
-	end
-
 	local bleedoutspeed2 = 0
 	local next_arterypump = 1 / math.max(org.pulse, 10)
 	local ent = owner:IsPlayer() and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
@@ -197,10 +193,18 @@ module[2] = function(owner, org, mulTime)
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
+
+			local boost_multiplier = 1.0
+			if CurTime() < (org.arterialBoostEndTime or 0) then
+				boost_multiplier = 2.0
+			elseif CurTime() < (org.arterialPeakTime or 0) then
+				boost_multiplier = 1.5
+			end
+
 			if wound[7] == "arteria" then
-				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * (org.neckslitBleedingReduction or 1.0), 1)
+				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * (org.neckslitBleedingReduction or 1.0) * boost_multiplier, 1)
 			else
-				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80, 1)
+				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * boost_multiplier, 1)
 			end
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 				local dir = wound[6]
@@ -288,29 +292,6 @@ module[2] = function(owner, org, mulTime)
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
 end
 
-function hg.organism.ArterialCough(owner, org)
-	if !hg.IsValidPlayer(owner) then return end
-	org.blood = math.max(org.blood - 30, 0)
-	local ent = hg.GetCurrentCharacter(owner)
-
-	local bon = "ValveBiped.Bip01_Head1"
-	local bone = ent:LookupBone(bon)
-	local mat = ent:GetBoneMatrix(bone)
-
-	if not mat then return end
-
-	net.Start("bloodsquirt2")
-	net.WriteEntity(ent)
-	net.WriteString(bon)
-	net.WriteMatrix(mat)
-	net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
-	net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
-	net.Broadcast()
-
-	local sound = "squirt"..math.random(1,3)..".ogg"
-	ent:EmitSound(sound, 75, 100)
-end
-
 util.AddNetworkString("bloodsquirt2")
 
 function hg.organism.Vomit(owner, snd)
@@ -328,51 +309,12 @@ function hg.organism.Vomit(owner, snd)
 
 	local on_spine = mat:GetAngles():Right()[3] > 0.25
 	if on_spine then
-		org.vomitInThroat = true
-	end
+		-- code omitted
 
-	owner:SetNetVar("vomiting", CurTime() + 1.5)
-
-	ent:EmitSound(snd or "zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "female" or "male").."_cough"..math.random(4)..".mp3")
-	if !on_spine then ent:EmitSound("vomit/vomit5.mp3") end
-	
-	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
-		owner:SetNetVar("zableval_masku", true)
-	else
-		if !on_spine then
-			net.Start("bloodsquirt2")
-			net.WriteEntity(ent)
-			net.WriteString(bon)
-			net.WriteMatrix(mat)
-			net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
-			net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
-			net.Broadcast()
-		end
-	end
-end
-
-function hg.organism.CoughBlood(org)
-	local ply = org.owner
-	local phr = "zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".mp3"
-	ply:EmitSound(phr)
-	ply.phrCld = CurTime() + 2
-	ply.lastPhr = phr
-
-	if math.random(5) == 1 then
-		org.vomitInThroat = nil
-
-		net.Start("bloodsquirt2")
-		net.WriteEntity(ent)
-		net.WriteString(bon)
-		net.WriteMatrix(mat)
-		net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
-		net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
-		net.Broadcast()
-
-		ent:EmitSound("vomit/vomit5.mp3")
-	end
-end
-
-function hg.organism.BloodDroplet2(owner, org, wound, dir, artery)
-	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery)
-end
+util.AddNetworkString("hg_artery_sneeze")
+net.Receive("hg_artery_sneeze", function(len, ply)
+    if not IsValid(ply) then return end
+    local org = ply.organism
+    if not org then return end
+    org.blood = math.max(org.blood - 5, 0)
+end)
