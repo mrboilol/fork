@@ -472,6 +472,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		despairDecay = despairDecay * (1 - math.Clamp(adrenaline / 20, 0, 0.9))
 	end
 
+	if (org.hungry or 0) < 10 then -- Well Fed
+		despairDecay = despairDecay * 1.5
+	end
+
 	org.despair = math.Approach(org.despair, 0, despairDecay)
 
 	local despairAdd = 0

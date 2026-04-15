@@ -45,6 +45,7 @@ module[1] = function(org)
 	org.survivalchance = 1
 	org.hemothorax = false
 	org.stamina_damage = 0
+	org.holdingNeck = false
 
 	org.arterialO2Debuff = 0
 
@@ -72,6 +73,31 @@ local about_to_puke = {
 
 local vecZero = Vector(0, 0, 0)
 module[2] = function(owner, org, mulTime)
+	org.arterialO2Debuff = 0
+	for i, wound in pairs(org.arterialwounds) do
+		org.arterialO2Debuff = org.arterialO2Debuff + wound[1]
+	end
+	local isHoldingNeck = false
+	local hasNeckArteryWound = false
+	for _, wound in pairs(org.arterialwounds) do
+		if wound[7] == "arteria" then
+			hasNeckArteryWound = true
+			break
+		end
+	end
+
+	if hasNeckArteryWound then
+		local wep = owner:GetActiveWeapon()
+		if IsValid(wep) and wep:GetClass() == "weapon_hands_sh" then
+			if not wep:GetFists() and not wep:GetBlocking() and not IsValid(owner:GetNetVar("carryent")) then
+				isHoldingNeck = true
+			end
+		end
+	end
+
+	org.holdingNeck = isHoldingNeck
+	org.neckslitBleedingReduction = isHoldingNeck and 0.1 or 1.0
+
 	local adrenaline = math.min(org.adrenaline, 2)
 
     if owner:IsPlayer() then
@@ -132,7 +158,9 @@ module[2] = function(owner, org, mulTime)
 		org.o2[1] = math.max(org.o2[1] - mulTime * 5,0)
 	end
 
-	org.o2[1] = math.max(org.o2[1] - org.arterialO2Debuff * mulTime, 0)
+	if not org.holdingNeck then
+		org.o2[1] = math.max(org.o2[1] - org.arterialO2Debuff * mulTime, 0)
+	end
 
 	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
 

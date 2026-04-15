@@ -594,7 +594,7 @@ local cached_huy = {}
 local vector_small = Vector(0,0,0)
 local vector_small2 = Vector(0.001,0.001,0.001)
 
---[[local gloves = {
+local gloves = {
 	[0] = Model("models/weapons/c_arms_citizen.mdl"),
 	[1] = Model("models/weapons/c_arms_combine.mdl"),
 	[2] = Model("models/epangelmatikes/e3_elite_suit.mdl"),
@@ -610,12 +610,12 @@ end
 local hg, LocalToWorld = hg, LocalToWorld
 local durachok = "models/epangelmatikes/e3_elite_suit.mdl"
 local injuryTpikBones = {
-	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 6.6, 2.2},
-	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 6.6, 2.2},
-	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 3.6, 1.2},
-	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 3.6, 1.2},
-	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 6.4, 2.1},
-	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 6.4, 2.1},
+	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 13.2, 4.4},
+	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 13.2, 4.4},
+	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 7.2, 2.4},
+	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 7.2, 2.4},
+	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 12.8, 4.2},
+	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 12.8, 4.2},
 }
 
 local function injuryTpikMotion(state, ent, owner)
@@ -732,7 +732,7 @@ local blackmans = {
 	["models/monolithservers/mpd/male_01.mdl"] = true,
 	["models/monolithservers/mpd/male_03.mdl"] = true,
 	["models/monolithservers/mpd/female_03.mdl"] = true,
-}]]
+}
 
 local hg, LocalToWorld = hg, LocalToWorld
 local durachok = "models/epangelmatikes/e3_elite_suit.mdl"

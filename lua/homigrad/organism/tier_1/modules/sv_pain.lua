@@ -69,7 +69,8 @@ module[2] = function(owner, org, timeValue)
 
 		org.disorientation = math.max(org.pain / 50, org.disorientation)//org.disorientation + add
 		org.adrenalineAdd = org.adrenalineAdd + 0.1 * (1 - org.analgesia * 0.5) * math.max(1 - org.satiety / 100, 0.1)
-		org.fearadd = 1 * (1 - org.analgesia * 0.5)
+		org.fearadd = org.fearadd + (timeValue * (org.pain / 100))
+		org.despair = org.despair + (timeValue * (org.pain / 2000))
 	end
 
 	org.disorientation = math.min(org.disorientation, 10)
