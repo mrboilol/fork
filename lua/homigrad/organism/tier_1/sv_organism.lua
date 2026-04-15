@@ -445,11 +445,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		return
 	end
 
-	if org.berserk > 0 or org.noradrenaline > 0 then
-		org.despair = 0
-		org._despairLastAdrenaline = org.adrenaline or 0
-		return
-	end
+
 
 	org.despair = math.Clamp(org.despair or 0, 0, 1)
 	
@@ -471,16 +467,29 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if analgesia > 0 then
 		despairDecay = despairDecay * (1 + analgesia * 1.25 + analgesia * analgesia * 0.4)
 	end
+
+	if adrenaline > 1 then
+		despairDecay = despairDecay * (1 - math.Clamp(adrenaline / 20, 0, 0.9))
+	end
+
 	org.despair = math.Approach(org.despair, 0, despairDecay)
 
 	local despairAdd = 0
 
 	org.fear = (org.fear or 0)
 
-	org.fear = org.fear + (org.fearadd or 0)
+	local current_fear_add = (org.fearadd or 0)
+    if org.adrenaline > 1 then
+        current_fear_add = current_fear_add * (1 - math.Clamp(org.adrenaline / 10, 0, 0.95))
+    end
+	org.fear = org.fear + current_fear_add
 	org.fearadd = 0
 
-	org.fear = math.Approach(org.fear, 0, timeValue * 0.75)
+	local fear_decay = timeValue * 0.75
+	if org.adrenaline > 1 then
+        fear_decay = fear_decay * (1 - math.Clamp(org.adrenaline / 20, 0, 0.9))
+    end
+	org.fear = math.Approach(org.fear, 0, fear_decay)
 
 	if org.fear > 0 then
 		despairAdd = despairAdd + math.Clamp(org.fear, 0, 2) * timeValue * 0.0035
@@ -556,7 +565,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if adrenaline > 1 then
-		despairAdd = despairAdd * (1 - math.Clamp(adrenaline / 15, 0, 0.8))
+		despairAdd = despairAdd * (1 - math.Clamp(adrenaline / 10, 0, 0.95))
 	end
 
 	if despairAdd > 0 then
@@ -676,11 +685,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.noradrenalineActive = false
 	end
 
-	if org.berserk > 0 or org.noradrenaline > 0 then
-		org.despair = 0
-		org._despairLastAdrenaline = org.adrenaline or 0
-		return
-	end
+
 
 	org.despair = math.Clamp(org.despair or 0, 0, 1)
 	local despairDecay = timeValue / 160
