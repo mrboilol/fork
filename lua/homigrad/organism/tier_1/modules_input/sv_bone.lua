@@ -281,11 +281,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
         org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Increased from 2 to 4
     end
 
-    net.Start("headtrauma_flash")
-    net.WriteVector(dmgInfo:GetDamagePosition())
-    net.WriteFloat(0.5)
-    net.WriteInt(100, 20)
-    net.Send(org.owner)
+
 
     if dislocated then
         org.shock = org.shock + dmg * 20
@@ -349,9 +345,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 1.5 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
+	org.brain_trauma = math.min(org.brain_trauma + (rnd and dmg * 0.05 or 0), 1)
 
 	if (org.skull - oldDmg) > 0.6 then
 		org.brain = math.min(org.brain + 0.1, 1)
+		org.brain_trauma = math.min(org.brain_trauma + 0.1, 1)
 	end
 
 	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then

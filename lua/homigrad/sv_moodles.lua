@@ -1,3 +1,5 @@
+if true then return end
+
 -- sv_moodles.lua
 -- Server-side moodle sync template
 if not SERVER then return end

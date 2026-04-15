@@ -45,8 +45,7 @@ module[1] = function(org)
 	org.survivalchance = 1
 	org.hemothorax = false
 	org.stamina_damage = 0
-	org.arterialBoostEndTime = 0
-	org.arterialPeakTime = 0
+
 	org.arterialO2Debuff = 0
 
 	org.neckslitBleedingReduction = 1.0
@@ -180,9 +179,7 @@ module[2] = function(owner, org, mulTime)
 
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
 
-	if org.pulse > 150 and #org.arterialwounds > 0 and math.random() < 0.05 * mulTime then
-		org.arterialPeakTime = CurTime() + 2.5
-	end
+
 
 	local bleedoutspeed2 = 0
 	local next_arterypump = 1 / math.max(org.pulse, 10)
@@ -460,4 +457,5 @@ net.Receive("hg_artery_sneeze", function(len, ply)
     local org = ply.organism
     if not org then return end
     org.blood = math.max(org.blood - 5, 0)
+    org.o2[1] = math.max(org.o2[1] - 2, 0)
 end)

@@ -228,6 +228,7 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.brain
 	local result = damageOrgan(org, dmg * 1, dmgInfo, "brain")
 	local brainDelta = org.brain - oldDmg
+	org.brain_trauma = org.brain_trauma + brainDelta
 
 	hg.AddHarmToAttacker(dmgInfo, brainDelta * 15, "Brain damage harm")
 
@@ -387,13 +388,7 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	local bonea = owner:LookupBone(boneindex)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
 	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), dir2 * 100, artery})
-	if #org.arterialwounds == 1 then
-		org.arterialBoostEndTime = CurTime() + 5
-		org.arterialO2Debuff = 5
-		net.Start("hg_artery_sound")
-		net.WriteEntity(owner)
-		net.Broadcast()
-	end
+	org.arterialO2Debuff = 10
 	owner:SetNetVar("arterialwounds", org.arterialwounds)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0

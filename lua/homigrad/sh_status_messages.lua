@@ -24,6 +24,19 @@ local audible_pain = {
 	"I WISH I HAD SOME PAINKILLERS NOW. FUCK.",
 }
 
+local despair_phrases = {
+    "What's the point anymore?",
+    "Everything feels so heavy.",
+    "I'm so tired of fighting.",
+    "Is this all there is?",
+    "I just want it to be over.",
+    "I feel so empty.",
+    "Nothing makes sense.",
+    "I'm lost.",
+    "I can't see a way out.",
+    "This is hopeless."
+}
+
 local sharp_pain = {
 	"AAAHH",
 	"AAAH",
@@ -303,11 +316,13 @@ function hg.likely_to_phrase(ply)
 	local brain = org.brain
 	local blood = org.blood
 	local fear = org.fear
+	local despair = org.despair
 	local temperature = org.temperature
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
 
 	return (broken_dislocated) and 5
 		or (pain > 65) and 5
+		or (despair > 0.5) and 5
 		or (temperature < 31 and 0.5)
 		or (temperature > 38 and 0.5)
 		or (blood < 3000 and 0.3)
@@ -366,8 +381,8 @@ local function get_status_message(ply)
 		most_wanted_phraselist = temperature < 40 and hot_phraselist or heatstroke_phraselist
 	end
 
-	if not most_wanted_phraselist and hungry and hungry > 25 and math.random(3) == 1 then
-		most_wanted_phraselist = hungry > 45 and very_hungry or hungry_a_bit
+	if not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
+		most_wanted_phraselist = despair_phrases
 	end
 
 	if (blood < 3100) or (pain > 75) or (broken_dislocated) or (broken_notify) or (dislocated_notify) then

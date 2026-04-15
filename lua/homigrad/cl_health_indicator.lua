@@ -1,5 +1,3 @@
-local showmoodles = CreateClientConVar("showmoodles", 2, true, false, "0 = moodles only show when admiring, 1 = moodles fade away after 5 seconds, 2 = moodles show forever", 0, 2)
-
 local healthModel
 local blinkModel
 local whiteMat = Material("models/debug/debugwhite")
@@ -28,11 +26,6 @@ local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
-local afflictionIcons = {}
-local afflictionIconsVisibility = 0
-local afflictionIconsAppearTime = 0
-local afflictionIconsTargetVisible = false
-local lastAfflictionCount = 0
 
 local limbBones = {
     lleg = "ValveBiped.Bip01_L_Thigh",
@@ -220,7 +213,7 @@ end
 local function CollectAfflictionIcons(ply, org)
     local icons = {}
     local seen = {}
-    local function add(iconName, severity, description)
+    local function add(iconName, severity)
         severity = math.Clamp(severity or 0.5, 0.05, 1)
         if seen[iconName] then
             seen[iconName].severity = math.max(seen[iconName].severity, severity)
@@ -228,7 +221,7 @@ local function CollectAfflictionIcons(ply, org)
         end
         local mat = GetStatusIcon(iconName)
         if not mat then return end
-        local entry = {mat = mat, severity = severity, desc = description}
+        local entry = {mat = mat, severity = severity}
         seen[iconName] = entry
         icons[#icons + 1] = entry
     end
@@ -243,16 +236,16 @@ local function CollectAfflictionIcons(ply, org)
     local arterialCount = istable(arterialwounds) and #arterialwounds or 0
 
     if woundsCount > 0 then
-        add("open-wound", math.min(1, woundsCount / 6), "Open Wound")
+        add("open-wound", math.min(1, woundsCount / 6))
     end
 
     if arterialCount > 0 then
-        add("deepwound", math.min(1, 0.7 + arterialCount * 0.2), "Arterial Bleeding")
+        add("deepwound", math.min(1, 0.7 + arterialCount * 0.2))
     end
 
     local bleed = GetOrgValueNumber(org.bleed)
     if bleed > 0 then
-        add("bleed", math.min(1, bleed / 8), "Bleeding")
+        add("bleed", math.min(1, bleed / 8))
     end
 
     local hasBrokenLimb = (org.lleg and org.lleg >= 1) or (org.rleg and org.rleg >= 1) or (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1)
@@ -260,66 +253,66 @@ local function CollectAfflictionIcons(ply, org)
     local hasAmputation = org.llegamputated or org.rlegamputated or org.larmamputated or org.rarmamputated or org.headamputated
     if hasBrokenLimb or hasDislocation or hasAmputation then
         local sev = hasAmputation and 1 or (hasDislocation and 0.65 or 0.5)
-        add("vuln", sev, "Fracture/Dislocation")
+        add("vuln", sev)
     end
 
     local concussion = GetOrgValueNumber(org.concussion)
     if concussion > 0 then
-        add("concussion", math.min(1, concussion), "Your head is spinning. It's hard to focus.")
+        add("concussion", math.min(1, concussion))
     end
 
     if org.blindness then
-        add("blind", 0.7, "You cannot see.")
+        add("blind", 0.7)
     end
 
     local assimilated = GetOrgValueNumber(org.assimilated)
     if assimilated > 0 then
-        add("wither", math.min(1, assimilated), "You are withering away.")
+        add("wither", math.min(1, assimilated))
     end
 
     if org.incapacitated then
-        add("incap", 1, "You need help to get up.")
+        add("incap", 1)
     end
 
     if org.berserkActive2 then
-        add("bloodlust", 0.45, "You feel an uncontrollable rage.")
+        add("bloodlust", 0.45)
     end
 
     if org.noradrenalineActive then
-        add("haste", 0.45, "You feel faster.")
+        add("haste", 0.45)
     end
 
     local despair = GetOrgValueNumber(org.despair)
     if despair > 0.25 then
-        add("anagenthasdied", math.min(1, despair), "I need to run.")
+        add("anagenthasdied", math.min(1, despair))
     end
 
     if org.critical then
-        add("warning", 1, "You are in a critical state.")
+        add("warning", 1)
     end
 
     if (not org.canmove) or GetOrgValueNumber(org.immobilization) > 0 then
-        add("hindered", 0.65, "You are hindered.")
+        add("hindered", 0.65)
     end
 
     if GetOrgValueNumber(org.pain) > 60 or GetOrgValueNumber(org.shock) > 0.5 then
-        add("stunned", math.min(1, math.max(GetOrgValueNumber(org.pain) / 120, GetOrgValueNumber(org.shock))), "You are stunned.")
+        add("stunned", math.min(1, math.max(GetOrgValueNumber(org.pain) / 120, GetOrgValueNumber(org.shock))))
     end
 
     if GetOrgValueNumber(org.CO) > 0.1 then
-        add("poison-gas", math.min(1, GetOrgValueNumber(org.CO) / 4), "You are breathing poison gas.")
+        add("poison-gas", math.min(1, GetOrgValueNumber(org.CO) / 4))
     end
 
     local o2 = GetOrgValueNumber(org.o2)
     if o2 > 0 and o2 < 20 then
-        add("exhaust", math.min(1, (20 - o2) / 20), "You are exhausted.")
+        add("exhaust", math.min(1, (20 - o2) / 20))
     end
 
     local temperature = GetOrgValueNumber(org.temperature)
     if temperature > 39 then
-        add("discharge", math.min(1, (temperature - 39) / 2), "You are burning up.")
+        add("discharge", math.min(1, (temperature - 39) / 2))
     elseif temperature > 0 and temperature < 34.5 then
-        add("frozen", math.min(1, (34.5 - temperature) / 3), "You are freezing.")
+        add("frozen", math.min(1, (34.5 - temperature) / 3))
     end
 
     return icons
@@ -355,7 +348,7 @@ local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, ap
             local entry = iconEntries[idx]
             local severity = entry.severity or 0.5
             local pulse = 1 + math.sin(timeNow * (4 + severity * 9) + idx * 1.4) * (0.05 + severity * 0.08) * visibility
-            local shakeAmp = ScreenScaleFixed(8 + severity * 5) * shakeMul -- Increased shake
+            local shakeAmp = ScreenScaleFixed(2 + severity * 2) * shakeMul
             local shakeX = math.sin(timeNow * (95 + idx * 7)) * shakeAmp
             local shakeY = math.cos(timeNow * (110 + idx * 9)) * shakeAmp
             local drawX = x + (col - 1) * (bgSize + spacing)
@@ -373,10 +366,6 @@ local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, ap
             surface.SetMaterial(entry.mat)
             surface.SetDrawColor(255, 255, 255, baseAlpha)
             surface.DrawTexturedRect(centerDrawX - iconDrawSize * 0.5, centerDrawY - iconDrawSize * 0.5, iconDrawSize, iconDrawSize)
-
-            if entry.desc then
-                draw.SimpleText(entry.desc, "Default", centerDrawX, centerDrawY + bgDrawSize * 0.5, Color(255, 255, 255, baseAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-            end
         end
     end
 end
@@ -583,61 +572,12 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     iconsVisibility = Lerp(FrameTime() * 10, iconsVisibility, shouldShowIndicator and 1 or 0)
     iconsTargetVisible = shouldShowIndicator
 
-    -- New affliction icons logic
-    local newAfflictionIcons = CollectAfflictionIcons(ply, org)
-    local showMoodlesValue = showmoodles:GetInt()
-    local shouldShowIcons = #newAfflictionIcons > 0
-
-    if showMoodlesValue == 0 then
-        shouldShowIcons = shouldShowIcons and admiring
-    end
-
-
-
-    local despair = GetOrgValueNumber(org.despair)
-    local adrenaline = org.noradrenalineActive
-    local inBadState = despair > 0.25 or adrenaline
-
-    if showMoodlesValue == 1 and inBadState and not admiring then
-        shouldShowIcons = false
-    end
-
-    if #newAfflictionIcons > lastAfflictionCount and #newAfflictionIcons > 0 then
-        afflictionIconsAppearTime = time
-        if shouldShowIcons then
-            afflictionIconsTargetVisible = true
-        end
-    end
-
-    if #newAfflictionIcons == 0 then
-        afflictionIconsTargetVisible = false
-    end
-
-    lastAfflictionCount = #newAfflictionIcons
-
-    if showMoodlesValue == 1 then
-        if time - afflictionIconsAppearTime > 5 and #newAfflictionIcons > 0 then
-            afflictionIconsTargetVisible = false
-        end
-    elseif showMoodlesValue == 2 then
-        if shouldShowIcons then
-            afflictionIconsTargetVisible = true
-        end
-    elseif showMoodlesValue == 0 then
-         if shouldShowIcons then
-            afflictionIconsTargetVisible = true
-        else
-            afflictionIconsTargetVisible = false
-        end
-    end
-    
-    local fadeSpeed = inBadState and 20 or 10
-    afflictionIconsVisibility = Lerp(FrameTime() * fadeSpeed, afflictionIconsVisibility, (afflictionIconsTargetVisible and shouldShowIcons) and 1 or 0)
-
-    if afflictionIconsVisibility > 0.01 and #newAfflictionIcons > 0 and shouldShowIcons and GetConVar("hg_simplemoodles"):GetBool() then
+    if iconsVisibility > 0.01 and #cachedAfflictionIcons > 0 then
         local iconsX = ScrW() * 0.5
         local iconsBottom = ScrH() - ScreenScaleFixed(ICONS_SCREEN_MARGIN_Y)
-        DrawAfflictionIcons(newAfflictionIcons, iconsX, iconsBottom, afflictionIconsVisibility, afflictionIconsAppearTime, time)
+        DrawAfflictionIcons(cachedAfflictionIcons, iconsX, iconsBottom, iconsVisibility, iconsAppearTime, time)
+    elseif not shouldShowIndicator and iconsVisibility <= 0.01 then
+        cachedAfflictionIcons = {}
     end
     
     local camRenderX = viewX

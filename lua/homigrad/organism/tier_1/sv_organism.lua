@@ -16,6 +16,7 @@ hook.Add("Org Clear", "Main", function(org)
 	module.concussion[1](org)
 	module.random_events[1](org)
 	org.brain = 0
+	org.brain_trauma = 0
 	org.consciousness = 1
 	org.disorientation = 0
 	org.jaw = 0
@@ -119,6 +120,7 @@ local function send_organism(org, ply)
 	sendtable.alive = org.alive
 	sendtable.otrub = org.otrub
 	sendtable.owner = org.owner
+	sendtable.brain_trauma = org.brain_trauma
 	sendtable.stamina = org.stamina
 	sendtable.immobilization = org.immobilization
 	sendtable.adrenaline = org.adrenaline
@@ -131,6 +133,7 @@ local function send_organism(org, ply)
 	sendtable.pelvis = org.pelvis
 	sendtable.disorientation = org.disorientation
 	sendtable.brain = org.brain
+	sendtable.brain_trauma = org.brain_trauma
 	sendtable.o2 = org.o2
 	sendtable.CO = org.CO
 	sendtable.blood = org.blood
@@ -147,8 +150,7 @@ local function send_organism(org, ply)
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
-	sendtable.arterialBoostEndTime = org.arterialBoostEndTime
-	sendtable.arterialPeakTime = org.arterialPeakTime
+
 	sendtable.recoilmul = org.recoilmul
 	sendtable.meleespeed = org.meleespeed
 	sendtable.temperature = org.temperature
@@ -950,7 +952,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 		if not org.likely_phrase then org.likely_phrase = 0 end
 
-		org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 100, 0)
+		org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 50, 0)
 		//print(org.likely_phrase)
 		if org.likely_phrase >= 1 and !hg.GetCurrentCharacter(owner):IsOnFire() then
 			org.likely_phrase = 0

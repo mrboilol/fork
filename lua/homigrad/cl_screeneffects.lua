@@ -707,7 +707,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 	end
 	
-	if brain > 0.1 and not org.otrub then
+	if ((org.skull or 0) > 0.2 or (org.jaw or 0) > 0.2 or (org.brain_trauma or 0) > 0) and not org.otrub then
 		if show_some_images_time > 0 then
 			brain_motionblur = true
 			DrawMotionBlur(0.1, 1., 0.1)

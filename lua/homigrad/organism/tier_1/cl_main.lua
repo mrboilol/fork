@@ -1058,12 +1058,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local diastolic = org.diastolic or 80
 							local pulse = org.pulse or 70
 
-							local boost_multiplier = 1.0
-							if CurTime() < (org.arterialBoostEndTime or 0) then
-								boost_multiplier = 2.0
-							elseif CurTime() < (org.arterialPeakTime or 0) then
-								boost_multiplier = 1.5
-							end
+							local boost_multiplier = (pulse > 50) and 2.0 or 1.0
 
 							local ent_idx = ent:EntIndex()
 							if not achoo_end_time[ent_idx] then achoo_end_time[ent_idx] = {} end
@@ -1076,7 +1071,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 								achoo_multiplier = 1.0 + (time_left / duration)
 							end
 
-							if boost_multiplier == 1.0 and pulse < 70 then
+							if boost_multiplier == 1.0 and pulse < 50 then
 								local pulse_phase_val = (CurTime() * pulse / 10)
 								
 								if not last_pulse_phase[ent_idx] then last_pulse_phase[ent_idx] = {} end
@@ -1086,7 +1081,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 									 ent:EmitSound("artery"..math.random(1,3)..".ogg", 75, math.random(90,110))
 									 achoo_end_time[ent_idx][i] = CurTime() + 0.2
 									 net.Start("hg_artery_sneeze")
-									 net.SendToServer()
+					 net.SendToServer()
+					 hg.addBloodPart(pos, spray_vec * 0.5, nil, size, size, true, nil, ent)
 								end
 								last_pulse_phase[ent_idx][i] = pulse_phase_val
 							end
