@@ -24,12 +24,12 @@ function PLAYER:LegAttack()
     self:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav",65)
 
     local org = self.organism
-    org.stamina.subadd = org.stamina.subadd + (anim == "curbstomp_base" and 10 or 17)
+    org.stamina.subadd = org.stamina.subadd + (anim == "curbstomp_base" and 8 or 14)
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.42 * speedmul
     local animstopAdjust = 0.3 * speedmul
     local dmg = anim == "curbstomp_base" and 24 or 10 * (2 - speedmul)
-    local kickNerf = 1.1
+    local kickNerf = 0.9
 
     if isMidAir then
         local vel = self:GetVelocity():Length()
@@ -215,12 +215,12 @@ function PLAYER:LegAttack()
 					MaxPenLenGlobal = 1
                     
                     local horizSpeed = Vector(velocity.x, velocity.y, 0):Length()
-                    local forceMult = math.max(500, 700 - horizSpeed / 6) * (isMidAir and 0.9 or 1)
+                    local forceMult = math.max(500, 700 - horizSpeed / 6) * (isMidAir and 0.9 or 1) * kickNerf
                     hg.AddForceRag(ent, tr.PhysicsBone or 0, normal * dmg * forceMult, 0.25)
                     ent:TakeDamageInfo(dmginfo)
                     
                     if IsValid(phys) then
-                        local forceOffsetMult = math.max(110, 150 - horizSpeed / 70) * (isMidAir and 0.9 or 1)
+                        local forceOffsetMult = math.max(110, 150 - horizSpeed / 70) * (isMidAir and 0.9 or 1) * kickNerf
                         phys:ApplyForceOffset(normal * dmg * forceOffsetMult, tr.HitPos)
                     end
 
@@ -240,10 +240,6 @@ function PLAYER:LegAttack()
                             local pushKnockback = math.max(150, 230 - horizSpeed / 16) * (isMidAir and 1.7 or 1)
                             ent:SetVelocity(normal * pushKnockback)
                         end
-
-                        local horizSpeed = Vector(velocity.x, velocity.y, 0):Length()
-                        local knockback = math.max(10, 20 - horizSpeed / 70) * (isMidAir and 0.9 or 1)
-                        ent:SetVelocity(normal * knockback)
                     end
                     if hgIsDoor(ent) and !ent:GetNoDraw() then
                         ent.HP = ent.HP or 200
