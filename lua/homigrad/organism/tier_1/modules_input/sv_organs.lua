@@ -155,8 +155,8 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 		if abdominal_organs[key] then
 			local multiplier = (oldval >= 1) and 3.5 or 2.0 -- Extra penalty if already destroyed
 			org.internalBleed = org.internalBleed + damage_dealt * 1.5 * multiplier
-			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 15 * multiplier
-			org.disorientation = (org.disorientation or 0) + damage_dealt * 5 * multiplier
+			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 25 * multiplier
+			org.disorientation = (org.disorientation or 0) + damage_dealt * 1 * multiplier
 
 			if org.analgesia < 0.4 and damage_dealt * multiplier > 0.3 then
 				timer.Simple(0, function()
