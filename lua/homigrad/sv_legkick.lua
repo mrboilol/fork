@@ -19,6 +19,7 @@ function PLAYER:LegAttack()
 
     if isMidAir then
         anim = self:EyeAngles()[1] > 60 and "curbstomp_midair" or self:EyeAngles()[1] > 35 and "kick_midair_25" or self:EyeAngles()[1] > 20 and "kick_midair_45" or "kick_midair"
+        self:EmitSound("HOYAA.mp3", 75, 100)
     end
 
     self:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav",65)
