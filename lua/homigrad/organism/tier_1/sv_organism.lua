@@ -150,6 +150,7 @@ local function send_organism(org, ply)
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
+	sendtable.holdingNeck = org.holdingNeck
 
 	sendtable.recoilmul = org.recoilmul
 	sendtable.meleespeed = org.meleespeed
@@ -454,9 +455,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local adrenalineDelta = adrenaline - prevAdrenaline
 	org._despairLastAdrenaline = adrenaline
 
-	local despairDecay = timeValue / 160
+	local despairDecay = timeValue / 460
 	if org.despair > 0.35 then
-		despairDecay = timeValue / 360
+		despairDecay = timeValue / 960
 	end
 
 	if adrenalineDelta < 0 then
@@ -465,7 +466,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	local analgesia = math.Clamp(org.analgesia or 0, 0, 4)
 	if analgesia > 0 then
-		despairDecay = despairDecay * (1 + analgesia * 1.25 + analgesia * analgesia * 0.4)
+		despairDecay = despairDecay * (1 - math.Clamp(analgesia / 4.5, 0, 0.95))
 	end
 
 	if adrenaline > 1 then
@@ -486,13 +487,19 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
     if org.adrenaline > 1 then
         current_fear_add = current_fear_add * (1 - math.Clamp(org.adrenaline / 10, 0, 0.95))
     end
+	if analgesia > 0 then
+		current_fear_add = current_fear_add * (1 - math.Clamp(analgesia / 5, 0, 0.95))
+	end
 	org.fear = org.fear + current_fear_add
 	org.fearadd = 0
 
-	local fear_decay = timeValue * 0.75
+	local fear_decay = timeValue / 60
 	if org.adrenaline > 1 then
         fear_decay = fear_decay * (1 - math.Clamp(org.adrenaline / 20, 0, 0.9))
     end
+	if analgesia > 0 then
+		fear_decay = fear_decay * (1 - math.Clamp(analgesia / 8, 0, 0.9))
+	end
 	org.fear = math.Approach(org.fear, 0, fear_decay)
 
 	if org.fear > 0 then
@@ -570,6 +577,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if adrenaline > 1 then
 		despairAdd = despairAdd * (1 - math.Clamp(adrenaline / 10, 0, 0.95))
+	end
+
+	if analgesia > 0 then
+		despairAdd = despairAdd * (1 - math.Clamp(analgesia / 6, 0, 0.9))
 	end
 
 	if despairAdd > 0 then
@@ -830,7 +841,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if aimed then
 			owner.aimed_at = owner.aimed_at or 0
 			owner.aimed_at = math.Approach(owner.aimed_at, 1, timeValue / 5)
-			org.fearadd = org.fearadd + timeValue * 2
+			org.fearadd = org.fearadd + timeValue * 1
 		else
 			owner.aimed_at = owner.aimed_at or 0
 			owner.aimed_at = math.Approach(owner.aimed_at, 0, timeValue / 5)
@@ -1041,7 +1052,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.pain = math.Approach(org.pain, 0, timeValue * 10)
 	org.painadd = math.Approach(org.painadd, 0, timeValue * 10)
 	org.avgpain = math.Approach(org.avgpain, 0, timeValue * 10)
-	org.shock = math.Approach(org.shock, 0, timeValue * 10)
+	org.shock = math.Approach(org.shock, 0, timeValue * 10 * (1 + org.adrenaline * 0.4) / (1 + org.analgesia * 0.4))
 	org.immobilization = math.Approach(org.immobilization, 0, timeValue * 10)
 	org.disorientation = math.Approach(org.disorientation, 0, timeValue * 10)
 
@@ -1068,7 +1079,7 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 	org.pain = math.Approach(org.pain, 0, regen * 10)
 	org.painadd = math.Approach(org.painadd, 0, regen * 10)
 	org.avgpain = math.Approach(org.avgpain, 0, regen * 10)
-	org.shock = math.Approach(org.shock, 0, regen * 10)
+	org.shock = math.Approach(org.shock, 0, regen * 10 * (1 + org.adrenaline * 0.4) / (1 + org.analgesia * 0.4))
 	org.immobilization = math.Approach(org.immobilization, 0, regen * 10)
 	org.disorientation = math.Approach(org.disorientation, 0, regen * 10)
 	org.adrenaline = math.Approach(org.adrenaline, 5, regen * 100)

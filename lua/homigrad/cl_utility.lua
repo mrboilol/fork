@@ -307,7 +307,7 @@ players : 1 humans, 0 bots (20 max)
 				or bullet.Damage >= 30 and "cracks/" .. "medium/med" .. "_crack_0" .. mr .. ".ogg"
 				or "cracks/" .. "light/light" .. "_crack_0" .. mr .. ".ogg"
 
-			if dist < 180 then
+			if dist < 250 then
 				timer.Simple(0.02,function()
 					EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
 				end)

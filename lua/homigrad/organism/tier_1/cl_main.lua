@@ -1076,10 +1076,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local spray_power = base_power + math.sin(CurTime() * pulse / 20) * pulse_power
 
 							-- Add chaos and make it stronger, and scale it down to a reasonable level
-							spray_power = spray_power * math.Rand(0.9, 1.5) * 0.05 * boost_multiplier * achoo_multiplier
+							spray_power = spray_power * math.Rand(0.9, 1.5) * 0.1 * boost_multiplier * achoo_multiplier
 
 							local _, spray_dir_angle = LocalToWorld(vector_origin, wound[6]:Angle(), vector_origin, ang)
-							local spray_vec = -spray_dir_angle:Forward()
+							local spray_vec = (-spray_dir_angle:Forward() + Vector(0,0,0.2)):GetNormalized()
 
 							-- More chaotic spray
 							spray_vec = spray_vec * spray_power + VectorRand(-spray_power/ (3 / boost_multiplier), spray_power/ (3 / boost_multiplier))

@@ -32,7 +32,7 @@ module[1] = function(org)
 end
 
 function hg.organism.OxygenateBlood(org)
-	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)// * (1 - org.pneumothorax)
+	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea * 0.5)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)// * (1 - org.pneumothorax)
 end
 
 function hg.organism.CanBreath(org)
@@ -239,7 +239,7 @@ module[2] = function(owner, org, timeValue)
 		org.is_sprayed_at = nil
 
 		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 4500, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 3500, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
 
 		o2.curregen = regenerate
 
@@ -288,16 +288,16 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if o2[1] == 0 then
-		if math.random(50) == 1 then
 			org.lungsfunction = false
-		end
 	else
-		if math.random(50) == 1 then
 			org.lungsfunction = true
-		end
 	end
 
 	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop then
+		org.lungsfunction = false
+	end
+
+	if org.trachea >= 1.0 then
 		org.lungsfunction = false
 	end
 

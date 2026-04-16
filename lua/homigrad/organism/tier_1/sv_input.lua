@@ -900,7 +900,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		org.painadd = org.painadd + slow_pain
 		//org.avgpain = org.avgpain + instant_pain
 		local shockAdd = instaPain * shockMul * 4.5 * math.Clamp(pen / 5,1,2)
-		org.shock = math.min(org.shock + shockAdd, 70)
+		org.shock = math.min(org.shock + shockAdd * (1 + org.adrenaline * 0.1) / (1 + org.analgesia * 0.2), 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
 		

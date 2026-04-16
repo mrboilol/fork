@@ -802,7 +802,15 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 			local bone_matrix = ent:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Head1"))
 			local pos, ang = bone_matrix:GetTranslation(), bone_matrix:GetAngles()
 			hg.DragHandsToPos(ply, ply:GetActiveWeapon(), pos + ang:Right() * 7 - ang:Forward() * 5, true, 5.5, ang:Right(), ang_head1, ang_head2)
-		end
+        end
+
+        if IsValid(wpn) and wpn:GetClass() == "weapon_hands_sh" and ply.organism and ply.organism.holdingNeck then
+            local bone_matrix = ent:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Neck1"))
+            if bone_matrix then
+                local pos, ang = bone_matrix:GetTranslation(), bone_matrix:GetAngles()
+                hg.DragHandsToPos(ply, ply:GetActiveWeapon(), pos + ang:Up() * 2 + ang:Forward() * 5, false, 0, ang:Right(), Angle(0,0,90), Angle(0,0,90))
+            end
+        end
         
         //print("DragHands: ", SysTime() - systime)
         hg.DoZManip(ent, ply)

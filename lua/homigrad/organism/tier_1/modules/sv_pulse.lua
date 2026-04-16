@@ -78,7 +78,7 @@ module[2] = function(owner, org, timeValue)
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.55)
 
-	local compensation = 1 + math.Clamp((3500 - blood) / 2300, 0, 1) * 0.16
+	local compensation = 1 + math.Clamp((2875 - blood) / 2300, 0, 1) * 0.16
 	compensation = compensation * (1 - math.Clamp((2200 - blood) / 1200, 0, 1) * 0.5)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 

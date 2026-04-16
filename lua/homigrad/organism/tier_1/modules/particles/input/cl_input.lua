@@ -31,7 +31,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	--local fps = 1 / hg_blood_fps:GetInt() * 1
 	--if lastplaced + fps > SysTime() then return end
 	--lastplaced = SysTime()
-	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+
 
 	pos = pos + vecZero
 	vel = vel + vecZero
@@ -45,7 +45,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
-	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
+
 
 	time = time or 30
 

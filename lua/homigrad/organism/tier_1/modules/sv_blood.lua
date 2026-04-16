@@ -159,7 +159,7 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if not org.holdingNeck then
-		org.o2[1] = math.max(org.o2[1] - org.arterialO2Debuff * mulTime, 0)
+		org.o2[1] = math.max(org.o2[1] - org.arterialO2Debuff * mulTime * 0.5, 0)
 	end
 
 	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
@@ -237,6 +237,15 @@ module[2] = function(owner, org, mulTime)
 				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
 				dir = -dir:Forward() * len
 				hg.organism.BloodDroplet2(owner, org, wound, owner:GetVelocity() + VectorRand(-10, 10) + dir, true)
+
+				local rand2 = math.Rand(0.5, 1)
+				local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * org.coagulation_multiplier
+
+				local coagulation_speed = 0.1 -- very slow coagulation for arterial wounds
+				if org.holdingNeck and wound[7] == "arteria" then
+					coagulation_speed = 0.8 -- much faster if holding neck
+				end
+				wound[1] = max(wound[1] - coagulate * coagulation_speed, 0)
 			end
 
 			if wound[1] == 0 then

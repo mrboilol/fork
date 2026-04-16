@@ -1073,6 +1073,11 @@ net.Receive("headtrauma_flash", function()
     local lply = LocalPlayer()
     if not IsValid(lply) then return end
 
+    if lply.organism and lply.organism.otrub then
+        hg.PlayOtrubHeadTraumaEffect()
+        return
+    end
+
     if play_knockout_sound then
         lply:ScreenFade(SCREENFADE.IN, Color(255, 255, 255, 255), 0.1, 0)
         timer.Simple(0.1, function()
@@ -1092,3 +1097,36 @@ net.Receive("headtrauma_flash", function()
         surface.PlaySound("headhit.mp3")
     end
 end)
+
+local showing_otrub_headtrauma = false
+function hg.PlayOtrubHeadTraumaEffect()
+    if showing_otrub_headtrauma then return end
+
+    showing_otrub_headtrauma = true
+
+    sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station)
+        if IsValid(station) then
+            station:SetVolume(1)
+            station:Play()
+        end
+    end)
+
+    local start_time = CurTime()
+    local duration = 0.5
+
+    local function show_effect()
+        if CurTime() - start_time > duration then
+            hook.Remove("HUDPaint", "OtrubHeadTraumaEffect")
+            showing_otrub_headtrauma = false
+            return
+        end
+
+        local alpha = (1 - (CurTime() - start_time) / duration) * 255
+        surface.SetDrawColor(255, 255, 255, alpha)
+        surface.SetMaterial(lobotomy_mats[math.random(#lobotomy_mats)])
+        surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+    end
+
+    hook.Add("HUDPaint", "OtrubHeadTraumaEffect", show_effect)
+end
+
