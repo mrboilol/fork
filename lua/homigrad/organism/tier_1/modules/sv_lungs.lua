@@ -208,6 +208,10 @@ module[2] = function(owner, org, timeValue)
 	
 	org.needle = math.Approach(org.needle, 0, timeValue / 1200)
 
+	if org.needle > 0 then
+		org.hemothorax = false
+	end
+
 	if not org.hemothorax then
 		org.pneumothorax = pneumothorax and min(org.pneumothorax + timeValue / 180 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2) or max(org.pneumothorax - timeValue / 10, 0)
 	else
