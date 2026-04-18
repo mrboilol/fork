@@ -1579,7 +1579,6 @@ local function velocityDamage(ent, data)
 						if IsValid(org.owner) and org.owner:IsPlayer() then
 							org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
 						end
-					end
 			//end
 								net.Start("headtrauma_flash")
 					net.WriteVector(dmgInfo:GetDamagePosition())
