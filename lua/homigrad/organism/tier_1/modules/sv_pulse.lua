@@ -26,7 +26,17 @@ module[2] = function(owner, org, timeValue)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
-	//if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts.",true,"heart",6) end
+	//    if org.heart >= 0.8 then
+        hg.status_messages.Send(owner, "YOUR CHEST HURTS REAL BAD!", 4)
+    elseif org.heart >= 0.5 then
+        hg.status_messages.Send(owner, "Your chest hurts.", 2)
+    end
+
+	    if org.heartstop then
+        hg.status_messages.Send(owner, "YOUR HEART HAS STOPPED!", 5)
+    end
+
+	--if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts.",true,"heart",6) end
 	//if org.isPly and not org.otrub and org.heartstop then org.owner:Notify("",true,"heartstop",6) end
 
 	local stamina = org.stamina

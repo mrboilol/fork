@@ -19,7 +19,11 @@ module[1] = function(org)
 		k = 0.5,
 	}
 
-	org.lungsfunction = true
+	    if not org.lungsfunction then
+        hg.status_messages.Send(owner, "Your lungs stopped functioning!", 5)
+    end
+
+			org.lungsfunction = true
 
 	org.o2.curregen = org.o2.regen
 	
@@ -270,6 +274,12 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		if o2[1] < 12 then
+			    if o2[1] < 12 and o2[1] > 6 then
+        hg.status_messages.Send(owner, "You can't breathe!", 3)
+    elseif o2[1] <= 6 then
+        hg.status_messages.Send(owner, "YOU CAN'T BREATHE ANYMORE!", 4)
+    end
+
 			org.owner:Notify(lowoxy[math.random(#lowoxy)], 30, "lowoxy", 0, nil, color_red3)
 	
 			if o2[1] < 6 then

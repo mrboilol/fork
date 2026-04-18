@@ -149,12 +149,12 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
 
 		if abdominal_organs[key] then
-			local multiplier = (oldval >= 1) and 3.5 or 2.0 -- Extra penalty if already destroyed
-			org.internalBleed = org.internalBleed + damage_dealt * 1.5 * multiplier
-			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 25 * multiplier
-			org.disorientation = (org.disorientation or 0) + damage_dealt * 1 * multiplier
+			--local multiplier = (oldval >= 1) and 3.5 or 2.0 -- Extra penalty if already destroyed
+			org.internalBleed = org.internalBleed + damage_dealt * 1.5
+			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 25
+			org.disorientation = (org.disorientation or 0) + damage_dealt * 1
 
-			if org.analgesia < 0.4 and damage_dealt * multiplier > 0.3 then
+			if org.analgesia < 0.4 and damage_dealt > 0.15 then
 				timer.Simple(0, function()
 					if IsValid(org.owner) then
 						hg.StunPlayer(org.owner, 1.5)

@@ -27,6 +27,10 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	
 	dmg = hook_info.dmg
 	
+	    if name == "liver" or name == "stomach" or name == "intestines" then
+        hg.status_messages.Send(dmgInfo:GetAttacker(), "I have damaged one of their abdominal organs.", 2)
+    end
+
 	if func and !hook_info.restricted then
 		return func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
 	else
@@ -46,7 +50,13 @@ local function Trace_Blast(box, amt, org, organs, dmg, dmgInfo)
 
 	local amount = amt * dmg
 	
-	if func then return func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false) end
+	    if func then
+        local limb = hitgrouptolimb[bonetohitgroup[organ[2]]]
+        if limb then
+            org.just_damaged_bone_limb = limb
+        end
+        return func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false)
+    end
 end
 
 local dir = Vector(0, 0, 0)
@@ -161,24 +171,16 @@ local sounds = {
 
 local limb_loss_messages = {
     lleg = {
-        "MY LEG, MY LEG IS FUCKING GONE!",
-        "AAAAH, MY FUCKING LEG!",
-        "THEY TOOK MY LEG!",
+        "Your left leg was shattered by an impact.",
     },
     rleg = {
-        "MY OTHER LEG! NOT AGAIN!",
-        "I CAN'T FEEL MY LEG!",
-        "WHERE IS MY LEG?!",
+        "Your right leg was shattered by an impact.",
     },
     larm = {
-        "MY ARM! I NEED THAT!",
-        "I CAN'T HOLD MY GUN ANYMORE!",
-        "MY ARM IS GONE!",
+        "Your left arm was shattered by an impact.",
     },
     rarm = {
-        "NOT THE RIGHT ARM! NOT THE RIGHT ARM!",
-        "MY AIMING ARM! FUCK!",
-        "I'M DISARMED! LITERALLY!",
+        "Your right arm was shattered by an impact.",
     }
 }
 
@@ -219,7 +221,7 @@ function hg.organism.AmputateLimb(org, limb)
     local messages = limb_loss_messages[limb]
     if messages then
         local message = table.Random(messages)
-        org.owner:ChatPrint(message)
+        hg.status_messages.Send(org.owner, message, 4)
     end
 
 	
@@ -913,6 +915,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 	
+		        if org.otrub and not org.was_otrub then
+            hg.status_messages.Send(attacker, "CRITICAL SUCCESS! You have knocked them out!", 4)
+        end
+
 		local shockFakeThreshold = org.shock_turn * 3.6 * analgesiaMul * painkillerMul * (meleeHit and 1.5 or 1)
 		if shockAdd > 2 and org.shock > shockFakeThreshold and (org.nextShockFake or 0) < CurTime() then
 			org.nextShockFake = CurTime() + (meleeHit and 3.5 or 2.75)

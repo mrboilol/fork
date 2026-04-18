@@ -30,6 +30,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.intestines = 0
 
 	org.thiamine = 0
+	org.thiamine_timer = 0
+	org.thiamine_healed = false
 
 	org.lleg = 0
 	org.rleg = 0
@@ -433,6 +435,8 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 	end
 end)
 
+include("homigrad/status_messages/sv_status_messages.lua")
+
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if not IsValid(owner) then
 		hg.organism.list[owner] = nil
@@ -705,6 +709,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	local just_went_uncon = not org.otrub and org.needotrub
+	    if just_went_uncon then
+        hg.status_messages.Send(owner, "You are unconscious.", 4)
+    end
+
 	local just_woke_up = not org.needotrub and org.otrub and (org.uncon_timer or 0) > 6
 	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner); hook.Run("PlayerDropWeapon", owner) end
 	if isPly and just_woke_up then hook.Run("HG_OnWakeOtrub", owner) end
@@ -735,20 +743,42 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 
-	if org.brain < 0.4 then
-		local naturalHeal = org.thiamine > 0 and timeValue / 480 or timeValue / 1800
-		-- full heal in ~30 minutes (really fast tho) -- Ну не идет столько раунд даже в каких-нибудь скраперсах ну какой даун это придумал
-		-- 8 minutes with thiamine -- ДАЖЕ СТОЛЬКО НЕ ВСЕГДА ДЛИТСЯ
+	-- Thiamine healing logic
+	org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 
-		org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
-		-- you'd need to give 1 thiamine each 4 minutes
+	if org.thiamine > 0 then
+		if not org.thiamine_healed then
+			org.thiamine_timer = org.thiamine_timer + timeValue
+			local heal_delay = (org.satiety or 0) > 50 and 20 or 60
 
-		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
-		if org.heart < 1 then org.heart = math.Approach(org.heart, 0, naturalHeal) end
-		if org.stomach < 1 then org.stomach = math.Approach(org.stomach, 0, naturalHeal) end
-		if org.intestines < 1 then org.intestines = math.Approach(org.intestines, 0, naturalHeal) end
-		if org.lungsR[1] < 1 then org.lungsR[1] = math.Approach(org.lungsR[1], 0, naturalHeal) end
-		if org.lungsL[1] < 1 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, naturalHeal) end
+			if org.thiamine_timer > heal_delay then
+				org.thiamine_healed = true
+			end
+		end
+	else
+		org.thiamine_timer = 0
+		org.thiamine_healed = false
+	end
+
+	if org.thiamine_healed then
+		local thiamineHealRate = timeValue / 480
+		-- Heal all organs
+		local organs_to_heal = {
+			"liver", "heart", "stomach", "intestines", "brain", "jaw",
+			"spine1", "spine2", "spine3", "chest", "pelvis", "skull", "trachea",
+			"lleg", "rleg", "larm", "rarm"
+		}
+
+		for _, organ in ipairs(organs_to_heal) do
+			if org[organ] and org[organ] > 0 then
+				org[organ] = math.Approach(org[organ], 0, thiamineHealRate)
+			end
+		end
+
+		if org.lungsR and org.lungsR[1] > 0 then org.lungsR[1] = math.Approach(org.lungsR[1], 0, thiamineHealRate) end
+		if org.lungsL and org.lungsL[1] > 0 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, thiamineHealRate) end
+		if org.lungsR and org.lungsR[2] > 0 then org.lungsR[2] = math.Approach(org.lungsR[2], 0, thiamineHealRate) end
+		if org.lungsL and org.lungsL[2] > 0 then org.lungsL[2] = math.Approach(org.lungsL[2], 0, thiamineHealRate) end
 	end
 
 	if org.otrub and isPly and org.owner:Alive() then
@@ -780,6 +810,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.neckslitSoundName = nil
 		org.neckslitSoundEnt = nil
 	end
+
+	    org.was_otrub = org.otrub
 
 	org.otrub = org.needotrub
 	org.fake = org.needfake

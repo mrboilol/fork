@@ -361,9 +361,10 @@ local function get_status_message(ply)
 	local hungry = org.hungry
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
 
-	if broken_dislocated and org.just_damaged_bone then
-		org.just_damaged_bone = nil
-	end
+	    if broken_dislocated and org.just_damaged_bone then
+        hg.status_messages.Send(ply, "Your ".. (org.just_damaged_bone_limb or "limb") .." is broken.", 3)
+        org.just_damaged_bone = nil
+    end
 	
 	local broken_notify = (org.rarm == 1) or (org.larm == 1) or (org.rleg == 1) or (org.lleg == 1)
 	local dislocated_notify = (org.rarm == 0.5) or (org.larm == 0.5) or (org.rleg == 0.5) or (org.lleg == 0.5)
@@ -375,11 +376,19 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 	
-	if temperature < 35 then
-		most_wanted_phraselist = temperature > 31 and cold_phraselist or (temperature < 28 and numb_phraselist or freezing_phraselist)
-	elseif temperature > 38 then
-		most_wanted_phraselist = temperature < 40 and hot_phraselist or heatstroke_phraselist
-	end
+	    if temperature < 35 then
+        if temperature < 30 then
+            hg.status_messages.Send(ply, "You are freezing.", 3)
+        else
+            hg.status_messages.Send(ply, "You are cold.", 2)
+        end
+    elseif temperature > 38 then
+        if temperature > 40 then
+            hg.status_messages.Send(ply, "You are burning up.", 3)
+        else
+            hg.status_messages.Send(ply, "You are hot.", 2)
+        end
+    end
 
 	if not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
 		most_wanted_phraselist = despair_phrases
@@ -412,16 +421,28 @@ local function get_status_message(ply)
 	elseif hg.nothing_happening(ply) then
 		//most_wanted_phraselist = random_phrase
 
-		if hungry and hungry > 25 and math.random(5) == 1 then
-			most_wanted_phraselist = hungry > 45 and very_hungry or hungry_a_bit
-		end
+		    if hungry and hungry > 25 then
+        if hungry > 75 then
+            hg.status_messages.Send(ply, "You are starving.", 3)
+        elseif hungry > 50 then
+            hg.status_messages.Send(ply, "You are very hungry.", 2)
+        else
+            hg.status_messages.Send(ply, "You are hungry.", 1)
+        end
+    end
 	elseif hg.fearful(ply) then
 		most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
 	end
 
-	if brain > 0.1 then
-		most_wanted_phraselist = brain < 0.2 and slight_braindamage_phraselist or braindamage_phraselist
-	end
+	    if brain > 0.1 then
+        if brain > 0.5 then
+            hg.status_messages.Send(ply, "Your head feels like it's about to split open.", 4)
+        elseif brain > 0.3 then
+            hg.status_messages.Send(ply, "Your head is pounding.", 3)
+        else
+            hg.status_messages.Send(ply, "You have a headache.", 2)
+        end
+    end
 	
 	if most_wanted_phraselist then
 		str = most_wanted_phraselist[math.random(#most_wanted_phraselist)]
