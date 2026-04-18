@@ -59,7 +59,13 @@ hook.Add("HUDPaint", "hg_status_messages_paint", function()
             msg.shake = math.max(msg.shake - FrameTime() * 10, 0)
         end
 
-        draw.SimpleText(msg.text, "Default", x, yPos, color, TEXT_ALIGN_CENTER)
+        surface.CreateFont("StatusFont", {
+    font = "Roboto",
+    size = 26,
+    weight = 500,
+})
+
+draw.SimpleText(msg.text, "StatusFont", x, yPos, color, TEXT_ALIGN_CENTER)
         yPos = yPos + 20
     end
 end)
