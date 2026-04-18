@@ -227,7 +227,7 @@ hook.Add("Player Spawn", "hg.forsaken.deathscene.reset", function(ply)
 	forsaken_scene_start = 0
 	forsaken_scene_end = 0
 	forsaken_soundfade_release_until = 0
-	forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
+		forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
 end)
 
 local alivestart = CurTime()
@@ -807,8 +807,6 @@ local muffedClasses = {
 	["headcrabzombie"] = true
 }
 
-local last_pulse_phase = {}
-local achoo_end_time = {}
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	--local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 	--print(ply,ent,ply.organism.owner,ply.new_organism.owner)
@@ -885,9 +883,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	ply.pulse_breathe = ply.pulse_breathe or {}
 	ent.pulse_breathe = ply.pulse_breathe
 	
-	if hg.LerpVariables then
-		hg.LerpVariables(FrameTime() * 10, organism, new_organism)
-	end
+	hg.LerpVariables(FrameTime() * 10, organism, new_organism)
 	
 	local org = ent.organism or {}
 	local owner = ent
@@ -1050,66 +1046,21 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
 						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
+						local dir = wound[6]
+						local len = dir:Length() * (org.pulse or 70) / 70
+						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)
+						
+						dir = -dir:Forward() * len
+
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							local systolic = org.systolic or 120
-							local diastolic = org.diastolic or 80
-							local pulse = org.pulse or 70
-
-							local boost_multiplier = 1.0
-							if CurTime() < (org.arterialBoostEndTime or 0) then
-								boost_multiplier = 2.0
-							elseif CurTime() < (org.arterialPeakTime or 0) then
-								boost_multiplier = 1.5
-							end
-
-							local ent_idx = ent:EntIndex()
-							if not achoo_end_time[ent_idx] then achoo_end_time[ent_idx] = {} end
-							if not achoo_end_time[ent_idx][i] then achoo_end_time[ent_idx][i] = 0 end
-
-							local achoo_multiplier = 1.0
-							if CurTime() < achoo_end_time[ent_idx][i] then
-								local duration = 0.2
-								local time_left = achoo_end_time[ent_idx][i] - CurTime()
-								achoo_multiplier = 1.0 + (time_left / duration)
-							end
-
-							local base_power = (systolic + diastolic) / 2
-							local pulse_power = (systolic - diastolic) / 2
-							local spray_power = base_power + math.sin(CurTime() * pulse / 20) * pulse_power
-
-							-- Add chaos and make it stronger, and scale it down to a reasonable level
-							spray_power = spray_power * math.Rand(0.9, 1.5) * 0.1 * boost_multiplier * achoo_multiplier
-
-							local _, spray_dir_angle = LocalToWorld(vector_origin, wound[6]:Angle(), vector_origin, ang)
-							local spray_vec = (-spray_dir_angle:Forward() + Vector(0,0,0.2)):GetNormalized()
-
-							-- More chaotic spray
-							spray_power = spray_power * 2
-							spray_vec = spray_vec * spray_power + VectorRand(-spray_power/ (3 / boost_multiplier), spray_power/ (3 / boost_multiplier))
-
-							if math.random(1, 3) == 1 then
-								local pulse_phase_val = (CurTime() * pulse / 20)
-
-								if not last_pulse_phase[ent_idx] then last_pulse_phase[ent_idx] = {} end
-								if not last_pulse_phase[ent_idx][i] then last_pulse_phase[ent_idx][i] = 0 end
-
-								if math.sin(pulse_phase_val) > 0.9 and math.sin(last_pulse_phase[ent_idx][i]) <= 0.9 then
-									 ent:EmitSound("artery"..math.random(1,3)..".ogg", 75, math.random(90,110))
-									 achoo_end_time[ent_idx][i] = CurTime() + 0.2
-									 net.Start("hg_artery_sneeze")
-									 net.SendToServer()
-									 hg.addBloodPart(pos, spray_vec * 0.5, nil, size, size, true, nil, ent)
-								end
-								last_pulse_phase[ent_idx][i] = pulse_phase_val
-							end
-
-							hg.addBloodPart(pos, spray_vec, nil, size, size, true, nil, ent)
+							hg.addBloodPart(pos, VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70, nil, size, size, true, nil, ent)
 							if wound[7] == "arteria" then
-								hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-12, 12) + spray_vec * 0.1, nil, 18, 18, 0.2, false, ent)
-								hg.addBloodPart(pos, spray_vec * 0.5 + VectorRand(-spray_power/10, spray_power/10), nil, 1, 1, true, nil, ent)
+								hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-12, 12) + dir * 0.1, nil, 18, 18, 0.2, false, ent)
+								hg.addBloodPart(pos + VectorRand(-1, 1), dir * 0.3 + VectorRand(-6, 6), nil, 1, 1, true, nil, ent)
+								hg.addBloodPart(pos + VectorRand(-1, 1), dir * 0.4 + VectorRand(-8, 8), nil, 1, 1, true, nil, ent)
 							end
 						end
 
@@ -1265,10 +1216,4 @@ hook.Add("HG.InputMouseApply","zzzzzzzzzzzzbrain_death",function(tbl)
 	cmd:SetViewAngles(angle)
 
 	return true--]]
-end)
-
-net.Receive("hg_artery_sound", function()
-    local ent = net.ReadEntity()
-    if not IsValid(ent) then return end
-    ent:EmitSound("squirt.ogg", 75, 100)
 end)

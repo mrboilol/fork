@@ -111,7 +111,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		//broken
 	else
 		//org[key] = 0.5
@@ -167,7 +167,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		//broken
 	else
 		org[key.."dislocation"] = true
@@ -180,7 +180,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		//dislocated
 	end
 
@@ -219,7 +219,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
-			PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		if org.owner:IsPlayer() then
 			org.owner:Notify(huyasd[name], true, name, 2)
 		end
@@ -265,12 +265,11 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
 
-		if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
+if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
 	end
 
 	org.shock = org.shock + dmg * 3
-
-    org.concussion = math.min((org.concussion or 0) + dmg * 8, 10) -- Increased from 4 to 8
+	    org.concussion = math.min((org.concussion or 0) + dmg * 8, 10) -- Increased from 4 to 8
 
     -- Slight disorientation and consciousness loss
     org.disorientation = org.disorientation + dmg * 1.5 -- Increased from 0.5 to 1.5
@@ -281,15 +280,13 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
         org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Increased from 2 to 4
     end
 
-
-
-    if dislocated then
-        org.shock = org.shock + dmg * 20
-        org.avgpain = org.avgpain + dmg * 20
+	if dislocated then
+		org.shock = org.shock + dmg * 20
+		org.avgpain = org.avgpain + dmg * 20
 		
 		if !org.jawdislocation then
-				PlayBoneBreakSound(org.owner)
-			end
+PlayBoneBreakSound(org.owner)
+		end
 
 		org.jawdislocation = true
 
@@ -345,11 +342,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 1.5 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
-	org.brain_trauma = math.min(org.brain_trauma + (rnd and dmg * 0.05 or 0), 1)
 
 	if (org.skull - oldDmg) > 0.6 then
 		org.brain = math.min(org.brain + 0.1, 1)
-		org.brain_trauma = math.min(org.brain_trauma + 0.1, 1)
 	end
 
 	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
@@ -434,8 +429,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if org.brokenribs > 0 then
 			//org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
-			PlayBoneBreakSound(org.owner)
-
+					PlayBoneBreakSound(org.owner)
 			return math.min(0, result)
 		end
 	end

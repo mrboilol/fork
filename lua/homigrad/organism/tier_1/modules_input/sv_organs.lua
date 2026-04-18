@@ -18,8 +18,6 @@ for i = 2, 13 do
             game.AddDecal(id, GORE_DECAL_PATH .. name)
             table.insert(GORE_DECAL_REGISTRY, id)
         end
-
-util.AddNetworkString("hg_artery_sound")
     end
 
     register(base)
@@ -135,7 +133,6 @@ end)
 local function isCrush(dmgInfo)
 	return not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH + DMG_BLAST)
 end
-
 local abdominal_organs = {
     ["stomach"] = true,
     ["liver"] = true,
@@ -146,8 +143,7 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
 	org[key] = math.Round(math.min(org[key] + dmg * (isCrush(dmgInfo) and 1 or 3), 1), 3)
-
-	local damage_dealt = org[key] - oldval
+		local damage_dealt = org[key] - oldval
 	if damage_dealt > 0 then
 		org.internalBleed = org.internalBleed + damage_dealt * 0.5 -- Base internal bleeding for any organ damage
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
@@ -192,14 +188,13 @@ end
 
 input_list.liver = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.liver
-
 	local result = damageOrgan(org, dmg, dmgInfo, "liver")
-
+	
 	hg.AddHarmToAttacker(dmgInfo, (org.liver - oldDmg) * 3, "Liver damage harm")
 	
 	org.shock = org.shock + dmg * 20
 	org.painadd = org.painadd + dmg * 35
-
+	
 	return result
 end
 
@@ -209,6 +204,7 @@ input_list.stomach = function(org, bone, dmg, dmgInfo)
 	local result = damageOrgan(org, dmg, dmgInfo, "stomach")
 
 	hg.AddHarmToAttacker(dmgInfo, (org.stomach - oldDmg) * 2, "Stomach damage harm")
+	
 	
 	return result
 end
@@ -220,6 +216,7 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.intestines - oldDmg) * 2, "Intestines damage harm")
 
+
 	return result
 end
 
@@ -228,7 +225,6 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.brain
 	local result = damageOrgan(org, dmg * 1, dmgInfo, "brain")
 	local brainDelta = org.brain - oldDmg
-	org.brain_trauma = org.brain_trauma + brainDelta
 
 	hg.AddHarmToAttacker(dmgInfo, brainDelta * 15, "Brain damage harm")
 
@@ -388,7 +384,6 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	local bonea = owner:LookupBone(boneindex)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
 	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), dir2 * 100, artery})
-
 	owner:SetNetVar("arterialwounds", org.arterialwounds)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
@@ -456,6 +451,8 @@ input_list.trachea = function(org, bone, dmg, dmgInfo)
 	local result = damageOrgan(org, dmg * 2, dmgInfo, "trachea")
 
 	hg.AddHarmToAttacker(dmgInfo, (org.trachea - oldDmg) * 8, "Trachea damage harm")
+
+	org.internalBleed = org.internalBleed + dmg * 2
 
 	return result
 end

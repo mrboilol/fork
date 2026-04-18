@@ -10,9 +10,6 @@ module[1] = function(org)
 	org.bloodpressure = 93
 	org.systolic = 120
 	org.diastolic = 80
-	org.bloodpressure = 93
-	org.systolic = 120
-	org.diastolic = 80
 
 	org.tempchanging = 0
 	org.heatbuff = 30 -- seconds of heat supply
@@ -54,6 +51,7 @@ module[2] = function(owner, org, timeValue)
 
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
 		org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
+	
 	heartbeat = heartbeat + (owner.suiciding and 50 or 0)
 	heartbeat = heartbeat + 40 * math.max(0, org.fear)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
@@ -82,7 +80,7 @@ module[2] = function(owner, org, timeValue)
 	compensation = compensation * (1 - math.Clamp((2200 - blood) / 1200, 0, 1) * 0.5)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 
-	local cardiacK = heartK * bloodK * o2K * brainK * hypothermiaK * math.Clamp(org.pulse / 70, 0.8, 1.2)
+	local cardiacK = heartK * bloodK * o2K * brainK * hypothermiaK
 	local map = 93 * cardiacK * hypertensionMul * compensation
 	map = org.alive and map or 0
 
@@ -132,31 +130,14 @@ module[2] = function(owner, org, timeValue)
 	-- if no fear, in 3 minutes become slightly talkative, so would say random phrases to calm themselves in a current situation
 	local gainfear = hg.organism.should_gain_fear(org)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
-	local fear_gain_speed = (org.hungry or 0) < 10 and timeValue / 10 or timeValue / 5
-	org.fearadd = math.Approach(org.fearadd, 1, gainfear and fear_gain_speed or 0)
-
-	if org.fear > 0.5 then
-		local adrenaline_to_gain = timeValue * org.fear * 2 -- multiplier
-		local free_gain = adrenaline_to_gain / 2
-		local storage_gain = adrenaline_to_gain / 2
-
-		org.adrenaline = org.adrenaline + free_gain
-
-		if (org.adrenaline_storage or 0) > 0 then
-			local can_gain_from_storage = math.min(storage_gain, org.adrenaline_storage)
-			org.adrenaline = org.adrenaline + can_gain_from_storage
-			org.adrenaline_storage = org.adrenaline_storage - can_gain_from_storage
-		else
-			org.adrenaline = org.adrenaline + storage_gain / 4
-		end
-	end
+	org.fearadd = math.Approach(org.fearadd, 1, gainfear and timeValue / 5 or 0)
 	
 	local adrenK = max(1 + org.adrenaline, 1)
 	local adren = org.adrenaline
 
 	if org.pulse < 10 or org.brain >= 0.6 then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
-	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
+		if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
 		org.fear = math.max(org.fear, 0)
 	end
 

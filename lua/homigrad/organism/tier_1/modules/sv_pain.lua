@@ -46,7 +46,7 @@ module[2] = function(owner, org, timeValue)
 
 	local owner = org.owner
 	
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + org.analgesia * 2.5 + org.adrenaline * 0.75), 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5), 0) end
 	org.immobilization = max(org.immobilization - timeValue * 2 * adrenalineMul, 0)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
@@ -68,21 +68,7 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		org.disorientation = math.max(org.pain / 50, org.disorientation)//org.disorientation + add
-		local adrenaline_gain = 0.1 * (1 - org.analgesia * 0.5) * math.max(1 - org.satiety / 100, 0.1) * (1 + org.fear * 0.5)
-		local free_gain = adrenaline_gain / 2
-		local storage_gain = adrenaline_gain / 2
-
-		org.adrenaline = org.adrenaline + free_gain
-
-		if (org.adrenaline_storage or 0) > 0 then
-			local can_gain_from_storage = math.min(storage_gain, org.adrenaline_storage)
-			org.adrenaline = org.adrenaline + can_gain_from_storage
-			org.adrenaline_storage = org.adrenaline_storage - can_gain_from_storage
-		else
-			org.adrenaline = org.adrenaline + storage_gain / 4
-		end
-		org.fearadd = org.fearadd + (timeValue * (org.pain / 100))
-		org.despair = org.despair + (timeValue * (org.pain / 2000))
+		org.fearadd = 1
 	end
 
 	org.disorientation = math.min(org.disorientation, 10)
@@ -172,5 +158,4 @@ module[2] = function(owner, org, timeValue)
 	//org.shock = math.max(org.shock, tempo * 4)
 	
 	org.disorientation = math.Approach(org.disorientation, 0, timeValue / 5)
-	org.despair = math.max(org.despair - org.analgesia * 0.1 * timeValue, 0)
 end

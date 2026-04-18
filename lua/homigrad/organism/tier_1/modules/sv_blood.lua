@@ -44,17 +44,6 @@ module[1] = function(org)
 
 	org.survivalchance = 1
 	org.hemothorax = false
-	org.stamina_damage = 0
-	org.holdingNeck = false
-
-	org.arterialO2Debuff = 0
-
-	org.neckslitBleedingReduction = 1.0
-	org.bleedingmul = 1.0
-	org.coagulation_multiplier = 1.0
-	org.blood_regeneration_multiplier = 1.0
-	org.hemothorax = false
-	org.stamina_damage = 0
 end
 
 local internalbleed_phrases = {
@@ -73,34 +62,8 @@ local about_to_puke = {
 
 local vecZero = Vector(0, 0, 0)
 module[2] = function(owner, org, mulTime)
-	org.arterialO2Debuff = 0
-	for i, wound in pairs(org.arterialwounds) do
-		org.arterialO2Debuff = org.arterialO2Debuff + wound[1]
-	end
-	local isHoldingNeck = false
-	local hasNeckArteryWound = false
-	for _, wound in pairs(org.arterialwounds) do
-		if wound[7] == "arteria" then
-			hasNeckArteryWound = true
-			break
-		end
-	end
-
-	if hasNeckArteryWound then
-		local wep = owner:GetActiveWeapon()
-		if IsValid(wep) and wep:GetClass() == "weapon_hands_sh" then
-			if not wep:GetFists() and not wep:GetBlocking() and not IsValid(owner:GetNetVar("carryent")) then
-				isHoldingNeck = true
-			end
-		end
-	end
-
-	org.holdingNeck = isHoldingNeck
-	org.neckslitBleedingReduction = isHoldingNeck and 0.1 or 1.0
-
 	local adrenaline = math.min(org.adrenaline, 2)
-
-    if owner:IsPlayer() then
+	    if owner:IsPlayer() then
         org.coagulation_multiplier = 1
         org.blood_regeneration_multiplier = 1
     else
@@ -146,7 +109,7 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
-		org.blood = min(org.blood + mulTime * 5 * 0.65 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier, 5000)
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier, 5000)
 	end
 
 	if org.hemotransfusionshock > 0 then
@@ -156,10 +119,6 @@ module[2] = function(owner, org, mulTime)
 
 	if org.arteria == 1 then
 		org.o2[1] = math.max(org.o2[1] - mulTime * 5,0)
-	end
-
-	if not org.holdingNeck then
-		org.o2[1] = math.max(org.o2[1] - org.arterialO2Debuff * mulTime * 0.5, 0)
 	end
 
 	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
@@ -176,7 +135,7 @@ module[2] = function(owner, org, mulTime)
 			local rand1 = math.Rand(4, 10) * 1
 			local rand2 = math.Rand(0.5, 1) * 1
 			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * org.coagulation_multiplier-- / #org.wounds
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 org.coagulation_multiplier-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
 			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
 			
@@ -207,8 +166,6 @@ module[2] = function(owner, org, mulTime)
 
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
 
-
-
 	local bleedoutspeed2 = 0
 	local next_arterypump = 1 / math.max(org.pulse, 10)
 	local ent = owner:IsPlayer() and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
@@ -218,49 +175,21 @@ module[2] = function(owner, org, mulTime)
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-
-			local boost_multiplier = 1.0
-			if CurTime() < (org.arterialBoostEndTime or 0) then
-				boost_multiplier = 2.0
-			elseif CurTime() < (org.arterialPeakTime or 0) then
-				boost_multiplier = 1.5
-			end
-
-			if wound[7] == "arteria" then
-				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * (org.neckslitBleedingReduction or 1.0) * boost_multiplier, 1)
-			else
-				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * boost_multiplier, 1)
-			end
+			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80, 1)
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-				local bp_normalized = math.Clamp((org.bloodpressure or 93) / 93, 0.5, 2.5)
-				local pulse_normalized = math.Clamp((org.pulse or 70) / 70, 0.5, 2)
-				local blood_velocity = 600 * bp_normalized * pulse_normalized
-				local spray_direction = (owner:GetUp() * 0.2 + owner:GetAimVector()):GetNormalized()
-				local spray_velocity = spray_direction * blood_velocity + owner:GetVelocity()
-				org.arterialPeakTime = CurTime() + 0.5 -- Prolonged, more powerful squirt
-				org.arterialBoostEndTime = org.arterialPeakTime + 0.2 -- Even more powerful squirt for a short duration
-				hg.organism.BloodDroplet2(owner, org, wound, spray_velocity, true, true)
-
-				local rand2 = math.Rand(0.5, 1)
-				local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * org.coagulation_multiplier
-
-				local coagulation_speed = 0.1 -- very slow coagulation for arterial wounds
-				if org.holdingNeck and wound[7] == "arteria" then
-					coagulation_speed = 0.8 -- much faster if holding neck
-				end
-				wound[1] = max(wound[1] - coagulate * coagulation_speed, 0)
+				local dir = wound[6]
+				local len = dir:Length()
+				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
+				dir = -dir:Forward() * len
+				hg.organism.BloodDroplet2(owner, org, wound, owner:GetVelocity() + VectorRand(-10, 10) + dir, true)
 			end
 
 			if wound[1] == 0 then
-					table.remove(org.arterialwounds, i)
-					owner:SetNetVar("arterialwounds", org.arterialwounds)
+				table.remove(org.arterialwounds, i)
+				owner:SetNetVar("arterialwounds", org.arterialwounds)
 
-					if #org.arterialwounds == 0 then
-						org.arterialO2Debuff = 0
-					end
-
-					org[wound[7]] = 0
-				end
+				org[wound[7]] = 0
+			end
 		end
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
@@ -273,7 +202,7 @@ module[2] = function(owner, org, mulTime)
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)
 	
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 10 * org.pulse / 70, 1) end
-
+	
 	if org.internalBleed > 0.1 then
 		local chance = (org.internalBleed - 0.1) * 0.002 -- 0.2% chance at 1.1 internal bleeding
 		if math.random() < chance * mulTime then
@@ -487,15 +416,6 @@ function hg.organism.CoughBlood(org)
 	end
 end
 
-function hg.organism.BloodDroplet2(owner, org, wound, dir, artery, sneeze)
-	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery, sneeze)
+function hg.organism.BloodDroplet2(owner, org, wound, dir, artery)
+	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery)
 end
-
-util.AddNetworkString("hg_artery_sneeze")
-net.Receive("hg_artery_sneeze", function(len, ply)
-    if not IsValid(ply) then return end
-    local org = ply.organism
-    if not org then return end
-    org.blood = math.max(org.blood - 5, 0)
-    org.o2[1] = math.max(org.o2[1] - 2, 0)
-end)

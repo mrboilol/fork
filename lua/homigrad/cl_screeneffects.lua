@@ -707,7 +707,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 	end
 	
-	if ((org.skull or 0) > 0.2 or (org.jaw or 0) > 0.2 or (org.brain_trauma or 0) > 0) and not org.otrub then
+	if ((org.skull or 0) > 0.2 or (org.jaw or 0) > 0.2 or (org.concussion or 0) > 0) and not org.otrub then
 		if show_some_images_time > 0 then
 			brain_motionblur = true
 			DrawMotionBlur(0.1, 1., 0.1)
@@ -1074,23 +1074,13 @@ net.Receive("headtrauma_flash", function()
     if not IsValid(lply) then return end
 
     if lply.organism and lply.organism.otrub then
-        hg.PlayOtrubHeadTraumaEffect()
+        hg.PlayOtrubHeadTraumaEffect(pos, time, size)
         return
     end
 
     if play_knockout_sound then
-        lply:ScreenFade(SCREENFADE.IN, Color(255, 255, 255, 255), 0.1, 0)
-        timer.Simple(0.1, function()
-            if not IsValid(lply) then return end
-            lply:ScreenFade(SCREENFADE.OUT, Color(255, 255, 255, 255), 0.5, 0)
-        end)
-        
-        if math.random(1, 2) == 1 then
-            surface.PlaySound("knocked.wav")
-        else
-            surface.PlaySound("knocked.ogg")
-        end
-
+        surface.PlaySound("knocked.wav")
+        hg.AddFlash(lply:EyePos(), 1, pos, time, size)
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     else
         hg.AddFlash(lply:EyePos(), 1, pos, time, size)
@@ -1099,34 +1089,15 @@ net.Receive("headtrauma_flash", function()
 end)
 
 local showing_otrub_headtrauma = false
-function hg.PlayOtrubHeadTraumaEffect()
+function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
     if showing_otrub_headtrauma then return end
-
     showing_otrub_headtrauma = true
+    timer.Simple(0.5, function() showing_otrub_headtrauma = false end)
 
-    sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station)
-        if IsValid(station) then
-            station:SetVolume(1)
-            station:Play()
-        end
-    end)
+    local lply = LocalPlayer()
+    if not IsValid(lply) then return end
 
-    local start_time = CurTime()
-    local duration = 0.5
-
-    local function show_effect()
-        if CurTime() - start_time > duration then
-            hook.Remove("HUDPaint", "OtrubHeadTraumaEffect")
-            showing_otrub_headtrauma = false
-            return
-        end
-
-        local alpha = (1 - (CurTime() - start_time) / duration) * 255
-        surface.SetDrawColor(255, 255, 255, alpha)
-        surface.SetMaterial(lobotomy_mats[math.random(#lobotomy_mats)])
-        surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-    end
-
-    hook.Add("HUDPaint", "OtrubHeadTraumaEffect", show_effect)
+    surface.PlaySound("knocked.wav")
+    hg.AddFlash(lply:EyePos(), 1, pos, time, size)
 end
 

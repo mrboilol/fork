@@ -139,7 +139,6 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	draw.SimpleText("im so fucking scared", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
-
 hook.Add("Player_Death", "hg_despair_cleanup", function(ply)
 	if not IsValid(lply) then return end
 	if ply ~= lply and ply ~= lply:GetNWEntity("spect") then return end
@@ -151,4 +150,3 @@ hook.Add("Player Spawn", "hg_despair_cleanup", function(ply)
 	if ply ~= lply then return end
 	stop_despair_sound(true)
 end)
-

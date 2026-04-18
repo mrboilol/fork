@@ -198,7 +198,7 @@ module[2] = function(owner, org, timeValue)
 	if not head then head = owner:GetPos() end
 	
 	local inwater = bit_band(util_PointContents(head),CONTENTS_WATER) == CONTENTS_WATER
-	-- test
+	
 	local success = owner:IsBerserk() or (not org.heartstop and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
 	if success and owner:IsPlayer() and inwater then success = false end
 	if success and org.choking then org.needfake = true success = false end
@@ -217,6 +217,7 @@ module[2] = function(owner, org, timeValue)
 	else
 		org.pneumothorax = min(org.pneumothorax + timeValue / 120, 1) -- A bit faster than a single punctured lung
 	end
+	
 	if org.lastCOBreathe and org.lastCOBreathe + 1 > CurTime() then
 		org.COregen = math.Approach(org.COregen, 30, timeValue * 1)
 	else
@@ -286,9 +287,10 @@ module[2] = function(owner, org, timeValue)
 			//org.lungsfunction = false
 		end
 	end
-
 	if o2[1] == 0 then
+		if math.random(50) == 1 then
 			org.lungsfunction = false
+		end
 	else
 			org.lungsfunction = true
 	end
@@ -332,7 +334,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local k = halfValue2(o2[1], o2.range, o2.k)
-
+	
 	if o2[1] < 10 then
 		if org.isPly then
 			hg.StunPlayer(owner, 3)

@@ -882,8 +882,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	--if hitbody then
 	if not org.superfighter then
-        local endurance_multiplier = 1
-        dmg = dmg * endurance_multiplier
 		dmgBlood = dmgBlood * 1.5
 		local bleed_add = dmgBlood * bleedMul// / (RagdollDamageBoneMul[hitgroup] or 1)
 		--org.bleed = org.bleed + bleed_add
@@ -900,7 +898,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		org.painadd = org.painadd + slow_pain
 		//org.avgpain = org.avgpain + instant_pain
 		local shockAdd = instaPain * shockMul * 4.5 * math.Clamp(pen / 5,1,2)
-		org.shock = math.min(org.shock + shockAdd * (1 + org.adrenaline * 0.1) / (1 + org.analgesia * 0.2), 70)
+		org.shock = math.min(org.shock + shockAdd, 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
 		
@@ -1045,7 +1043,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
-	local hitgroup_max = 250
+	local hitgroup_max = 135
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
@@ -1397,7 +1395,6 @@ local function GetTraceDamage(ent, start, dir)
 end
 
 hg.GetTraceDamage = GetTraceDamage
-
 util.AddNetworkString("headtrauma_flash")
 --local Organism = hg.organism
 local abs = math.abs
@@ -1566,16 +1563,15 @@ local function velocityDamage(ent, data)
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )
 
 		if hitgroup == HITGROUP_HEAD then
-				local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
-                local intel_multiplier = 1
-				
-				hg.organism.input_list.skull(org, bone, dmg * 6 * (hadhelmet and 0.2 or 1) * intel_multiplier, dmgInfo)
-
-				local flash_intensity = 0.5
+			local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
+			
+			hg.organism.input_list.skull(org, bone, dmg * 4 * (hadhelmet and 0.2 or 1), dmgInfo)
+			
+			
+							local flash_intensity = 0.5
 				local flash_duration = 100
-
-				//if dmg > 0.5 then
-					if math.random(2) == 1 then
+			
+			//if dmg > 0.5 then
 						hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1) * intel_multiplier, dmgInfo)
 						
 						flash_intensity = 1.2
@@ -1584,9 +1580,8 @@ local function velocityDamage(ent, data)
 							org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
 						end
 					end
-				//end
-
-					net.Start("headtrauma_flash")
+			//end
+								net.Start("headtrauma_flash")
 					net.WriteVector(dmgInfo:GetDamagePosition())
 					net.WriteFloat(flash_intensity)
 					net.WriteInt(flash_duration, 20)
@@ -1604,18 +1599,18 @@ local function velocityDamage(ent, data)
 
 					net.Send(org.owner)
 				
-				org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1))
+								org.consciousness = math.Approach(org.consciousness, 0, dmg * 2 * (hadhelmet and 0.2 or 1))
 				
 				local neck_not_broken = org.spine3 < 0.8
-				if dmg * 10 > 0.5 and !hadhelmet then
-					org.otrub = true
-					org.shock = org.shock + 10
-				end
-
-				if neck_not_broken and org.spine3 >= 0.8 then
-					hg.BreakNeck(ent)
-				end
+			if dmg * 10 > 1.0 and !hadhelmet then
+				org.otrub = true
+				org.shock = org.shock + 10
 			end
+
+			if neck_not_broken and org.spine3 >= 0.8 then
+				hg.BreakNeck(ent)
+			end
+		end
 	else
 		local sfd = org.fakePlayer and ent or ply
 		if not IsValid(sfd) then return end
@@ -1632,7 +1627,7 @@ local function velocityDamage(ent, data)
 	if org.isPly and ply then
 		hook.Run("Org Think Call", ply, org)
 		
-		if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
+if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
 			if org.skull == 1 then
 				//ent:SetNWString("PlayerName", "Unidentifiable person")
 			end
@@ -1801,7 +1796,6 @@ end)
 --function PLAYER:ApplyPain(number)
 	--self.organism.painadd = self.organism.painadd + number
 --end
-
 function hg.VehicleHitFunc(ent, tr, bullet, details)
 	local maxdmg = 0
 	local penetration = true
