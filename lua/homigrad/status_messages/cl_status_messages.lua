@@ -59,7 +59,7 @@ hook.Add("HUDPaint", "hg_status_messages_paint", function()
             msg.shake = math.max(msg.shake - FrameTime() * 10, 0)
         end
 
-        draw.SimpleText(msg.text, "HudFontSmall", x, yPos, color, TEXT_ALIGN_CENTER)
+        draw.SimpleText(msg.text, "Default", x, yPos, color, TEXT_ALIGN_CENTER)
         yPos = yPos + 20
     end
 end)

@@ -19,8 +19,13 @@ module[1] = function(org)
 		k = 0.5,
 	}
 
-	    if not org.lungsfunction then
-        hg.status_messages.Send(owner, "Your lungs stopped functioning!", 5)
+	        if not org.lungsfunction then
+        if not org.sent_status_messages["lungs_stopped"] then
+            hg.status_messages.Send(owner, "Your lungs stopped functioning!", 5)
+            org.sent_status_messages["lungs_stopped"] = true
+        end
+    else
+        org.sent_status_messages["lungs_stopped"] = false
     end
 
 			org.lungsfunction = true
@@ -274,10 +279,22 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		if o2[1] < 12 then
-			    if o2[1] < 12 and o2[1] > 6 then
-        hg.status_messages.Send(owner, "You can't breathe!", 3)
-    elseif o2[1] <= 6 then
-        hg.status_messages.Send(owner, "YOU CAN'T BREATHE ANYMORE!", 4)
+			        if o2[1] < 12 and o2[1] > 6 then
+        if not org.sent_status_messages["cant_breathe"] then
+            hg.status_messages.Send(owner, "You can't breathe!", 3)
+            org.sent_status_messages["cant_breathe"] = true
+        end
+    else
+        org.sent_status_messages["cant_breathe"] = false
+    end
+
+    if o2[1] <= 6 then
+        if not org.sent_status_messages["cant_breathe_anymore"] then
+            hg.status_messages.Send(owner, "YOU CAN'T BREATHE ANYMORE!", 4)
+            org.sent_status_messages["cant_breathe_anymore"] = true
+        end
+    else
+        org.sent_status_messages["cant_breathe_anymore"] = false
     end
 
 			org.owner:Notify(lowoxy[math.random(#lowoxy)], 30, "lowoxy", 0, nil, color_red3)

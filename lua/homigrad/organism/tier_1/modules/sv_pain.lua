@@ -77,10 +77,22 @@ module[2] = function(owner, org, timeValue)
 		org.shock = math.Approach(org.shock, 70, timeValue * 4)
 	end
 
-	if org.pain > 80 and org.pain < 100 then
-        hg.status_messages.Send(owner, "You are in excruciating pain.", 3)
-    elseif org.pain >= 100 then
-        hg.status_messages.Send(owner, "YOU ARE IN UNBEARABLE PAIN!", 4)
+	    if org.pain > 80 and org.pain < 100 then
+        if not org.sent_status_messages["excruciating_pain"] then
+            hg.status_messages.Send(owner, "You are in excruciating pain.", 3)
+            org.sent_status_messages["excruciating_pain"] = true
+        end
+    else
+        org.sent_status_messages["excruciating_pain"] = false
+    end
+
+    if org.pain >= 100 then
+        if not org.sent_status_messages["unbearable_pain"] then
+            hg.status_messages.Send(owner, "YOU ARE IN UNBEARABLE PAIN!", 4)
+            org.sent_status_messages["unbearable_pain"] = true
+        end
+    else
+        org.sent_status_messages["unbearable_pain"] = false
     end
 
 	if (org.shock > (30 * analgesiaMul)) or org.otrub then
