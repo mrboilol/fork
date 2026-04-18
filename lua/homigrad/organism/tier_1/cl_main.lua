@@ -1058,7 +1058,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local diastolic = org.diastolic or 80
 							local pulse = org.pulse or 70
 
-							local boost_multiplier = (pulse > 50) and 2.0 or 1.0
+							local boost_multiplier = 1.0
+							if CurTime() < (org.arterialBoostEndTime or 0) then
+								boost_multiplier = 2.0
+							elseif CurTime() < (org.arterialPeakTime or 0) then
+								boost_multiplier = 1.5
+							end
 
 							local ent_idx = ent:EntIndex()
 							if not achoo_end_time[ent_idx] then achoo_end_time[ent_idx] = {} end
@@ -1082,9 +1087,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local spray_vec = (-spray_dir_angle:Forward() + Vector(0,0,0.2)):GetNormalized()
 
 							-- More chaotic spray
+							spray_power = spray_power * 2
 							spray_vec = spray_vec * spray_power + VectorRand(-spray_power/ (3 / boost_multiplier), spray_power/ (3 / boost_multiplier))
 
-							if boost_multiplier == 1.0 and pulse < 50 then
+							if math.random(1, 3) == 1 then
 								local pulse_phase_val = (CurTime() * pulse / 20)
 
 								if not last_pulse_phase[ent_idx] then last_pulse_phase[ent_idx] = {} end

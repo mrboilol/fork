@@ -68,7 +68,19 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		org.disorientation = math.max(org.pain / 50, org.disorientation)//org.disorientation + add
-		org.adrenalineAdd = org.adrenalineAdd + 0.1 * (1 - org.analgesia * 0.5) * math.max(1 - org.satiety / 100, 0.1)
+		local adrenaline_gain = 0.1 * (1 - org.analgesia * 0.5) * math.max(1 - org.satiety / 100, 0.1) * (1 + org.fear * 0.5)
+		local free_gain = adrenaline_gain / 2
+		local storage_gain = adrenaline_gain / 2
+
+		org.adrenaline = org.adrenaline + free_gain
+
+		if (org.adrenaline_storage or 0) > 0 then
+			local can_gain_from_storage = math.min(storage_gain, org.adrenaline_storage)
+			org.adrenaline = org.adrenaline + can_gain_from_storage
+			org.adrenaline_storage = org.adrenaline_storage - can_gain_from_storage
+		else
+			org.adrenaline = org.adrenaline + storage_gain / 4
+		end
 		org.fearadd = org.fearadd + (timeValue * (org.pain / 100))
 		org.despair = org.despair + (timeValue * (org.pain / 2000))
 	end
@@ -133,7 +145,7 @@ module[2] = function(owner, org, timeValue)
 
 	org.adrenalineAdd = Approach(org.adrenalineAdd, 0, org.adrenalineAdd < 0 and timeValue / 30 or timeValue / 5)
 
-	org.adrenaline = Approach(org.adrenaline, 0, timeValue / 25)
+	org.adrenaline = Approach(org.adrenaline, 0, timeValue / (org.otrub and 5 or 25))
 
 	if org.lleg < 1 and !org.llegamputated then
 		org.lleg = max(org.lleg - timeValue / 240, 0)

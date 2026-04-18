@@ -69,7 +69,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local blood = math.Clamp(org.blood or 5000, 0, 5000)
-	local bloodK = math.Clamp((blood - 1400) / 3600, 0, 1)
+	local bloodK = math.Clamp((blood - 1000) / 2000, 0, 1)
 	local o2K = math.Clamp(o2, 0, 1)
 	local heartK = math.Clamp(1 - org.heart, 0, 1)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
@@ -82,7 +82,7 @@ module[2] = function(owner, org, timeValue)
 	compensation = compensation * (1 - math.Clamp((2200 - blood) / 1200, 0, 1) * 0.5)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 
-	local cardiacK = heartK * bloodK * o2K * brainK * hypothermiaK
+	local cardiacK = heartK * bloodK * o2K * brainK * hypothermiaK * math.Clamp(org.pulse / 70, 0.8, 1.2)
 	local map = 93 * cardiacK * hypertensionMul * compensation
 	map = org.alive and map or 0
 
@@ -136,7 +136,19 @@ module[2] = function(owner, org, timeValue)
 	org.fearadd = math.Approach(org.fearadd, 1, gainfear and fear_gain_speed or 0)
 
 	if org.fear > 0.5 then
-		org.adrenalineAdd = math.Approach(org.adrenalineAdd, org.fear * 2, timeValue)
+		local adrenaline_to_gain = timeValue * org.fear * 2 -- multiplier
+		local free_gain = adrenaline_to_gain / 2
+		local storage_gain = adrenaline_to_gain / 2
+
+		org.adrenaline = org.adrenaline + free_gain
+
+		if (org.adrenaline_storage or 0) > 0 then
+			local can_gain_from_storage = math.min(storage_gain, org.adrenaline_storage)
+			org.adrenaline = org.adrenaline + can_gain_from_storage
+			org.adrenaline_storage = org.adrenaline_storage - can_gain_from_storage
+		else
+			org.adrenaline = org.adrenaline + storage_gain / 4
+		end
 	end
 	
 	local adrenK = max(1 + org.adrenaline, 1)

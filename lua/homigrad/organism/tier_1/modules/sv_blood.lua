@@ -232,11 +232,14 @@ module[2] = function(owner, org, mulTime)
 				org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * boost_multiplier, 1)
 			end
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-				local dir = wound[6]
-				local len = dir:Length()
-				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
-				dir = -dir:Forward() * len
-				hg.organism.BloodDroplet2(owner, org, wound, owner:GetVelocity() + VectorRand(-10, 10) + dir, true)
+				local bp_normalized = math.Clamp((org.bloodpressure or 93) / 93, 0.5, 2.5)
+				local pulse_normalized = math.Clamp((org.pulse or 70) / 70, 0.5, 2)
+				local blood_velocity = 600 * bp_normalized * pulse_normalized
+				local spray_direction = (owner:GetUp() * 0.2 + owner:GetAimVector()):GetNormalized()
+				local spray_velocity = spray_direction * blood_velocity + owner:GetVelocity()
+				org.arterialPeakTime = CurTime() + 0.5 -- Prolonged, more powerful squirt
+				org.arterialBoostEndTime = org.arterialPeakTime + 0.2 -- Even more powerful squirt for a short duration
+				hg.organism.BloodDroplet2(owner, org, wound, spray_velocity, true, true)
 
 				local rand2 = math.Rand(0.5, 1)
 				local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * org.coagulation_multiplier
@@ -484,8 +487,8 @@ function hg.organism.CoughBlood(org)
 	end
 end
 
-function hg.organism.BloodDroplet2(owner, org, wound, dir, artery)
-	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery)
+function hg.organism.BloodDroplet2(owner, org, wound, dir, artery, sneeze)
+	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery, sneeze)
 end
 
 util.AddNetworkString("hg_artery_sneeze")

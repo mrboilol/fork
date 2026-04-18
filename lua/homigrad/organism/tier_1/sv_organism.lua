@@ -182,8 +182,13 @@ local function send_organism(org, ply)
 	sendtable.incapacitated = org.incapacitated
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
+	sendtable.arterialPeakTime = org.arterialPeakTime
+	sendtable.arterialBoostEndTime = org.arterialBoostEndTime
 
 	sendtable.superfighter = org.superfighter
+
+	sendtable.arterialPeakTime = org.arterialPeakTime
+	sendtable.arterialBoostEndTime = org.arterialBoostEndTime
 
 	net.Start("organism_send")
 	net.WriteTable(not hg_developer:GetBool() and sendtable or org)
