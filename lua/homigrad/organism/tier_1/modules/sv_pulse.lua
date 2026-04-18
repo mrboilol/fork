@@ -26,7 +26,7 @@ module[2] = function(owner, org, timeValue)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
-	//        if org.heart >= 0.8 then
+	if org.heart >= 0.8 then
         if not org.sent_status_messages["chest_hurts_bad"] then
             hg.status_messages.Send(owner, "YOUR CHEST HURTS REAL BAD!", 4)
             org.sent_status_messages["chest_hurts_bad"] = true
@@ -35,7 +35,7 @@ module[2] = function(owner, org, timeValue)
         org.sent_status_messages["chest_hurts_bad"] = false
     end
 
-        if org.heart >= 0.5 and org.heart < 0.8 then
+    if org.heart >= 0.5 and org.heart < 0.8 then
         if not org.sent_status_messages["chest_hurts"] then
             hg.status_messages.Send(owner, "Your chest hurts.", 2)
             org.sent_status_messages["chest_hurts"] = true
