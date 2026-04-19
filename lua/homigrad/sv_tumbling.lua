@@ -111,6 +111,21 @@ hook.Add("Think", "stanleytumbler", function()
             end
         end
 
+        if not shouldTrip then
+            ply.eyeAnglesOld = ply.eyeAnglesOld or ply:EyeAngles()
+            local cosine = ply:EyeAngles():Forward():Dot(ply.eyeAnglesOld:Forward())
+
+            if speed > 200 and cosine <= 0.99 then
+                local tr = util_TraceLine({ start = pos, endpos = pos - Vector(0,0,1), filter = ply })
+                if tr.Hit and tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2 then
+                    shouldTrip = true
+                    tripType = "slip"
+                    tripChance = tripChance + 0.7
+                end
+            end
+            ply.eyeAnglesOld = ply:EyeAngles()
+        end
+
         if fear > 0.1 then
             tripChance = tripChance + fear * 0.25
         end
@@ -207,22 +222,28 @@ hook.Add("Think", "stanleytumbler", function()
                     local phystorso = (hg.IdealMassPlayer and hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]) or 20
 
                     local force = velocity:GetNormalized() * 150
-                    
-                    local torsoForce = -force * 5 * phystorso
-                    local legForce = (force * 5 - Vector(0,0,2)) * phys1
 
-                    if tripType == "wall" then
-                        torsoForce = torsoForce * 1.2
-                        legForce = legForce * 0.8 
-                    elseif tripType == "gap" then
-                        legForce = legForce * 1.5
-                    elseif tripType == "ragdoll" then
-                         torsoForce = torsoForce * 0.5
+                    if tripType == "slip" then
+                        hg.AddForceRag(ply, torso, -force * 5 * phystorso, 0.5)
+                        hg.AddForceRag(ply, b1, (force * 5 - Vector(0,0,2)) * phys1, 0.5)
+                        hg.AddForceRag(ply, b2, (force * 5 - Vector(0,0,2)) * phys2, 0.5)
+                    else
+                        local torsoForce = -force * 5 * phystorso
+                        local legForce = (force * 5 - Vector(0,0,2)) * phys1
+
+                        if tripType == "wall" then
+                            torsoForce = torsoForce * 1.2
+                            legForce = legForce * 0.8 
+                        elseif tripType == "gap" then
+                            legForce = legForce * 1.5
+                        elseif tripType == "ragdoll" then
+                            torsoForce = torsoForce * 0.5
+                        end
+
+                        hg.AddForceRag(ply, torso, torsoForce, 0.5)
+                        hg.AddForceRag(ply, b1, legForce, 0.5)
+                        hg.AddForceRag(ply, b2, legForce, 0.5)
                     end
-
-                    hg.AddForceRag(ply, torso, torsoForce, 0.5)
-                    hg.AddForceRag(ply, b1, legForce, 0.5)
-                    hg.AddForceRag(ply, b2, legForce, 0.5)
 
                     timer.Simple(0, function()
                         if IsValid(ply) then hg.StunPlayer(ply) end

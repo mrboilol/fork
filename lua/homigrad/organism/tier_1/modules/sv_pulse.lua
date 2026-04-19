@@ -2,6 +2,16 @@ local min, max, Round, halfValue2 = math.min, math.max, math.Round, util.halfVal
 --local Organism = hg.organism
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
+
+local function sendStatusMessageOnce(owner, org, key, message, priority, condition)
+    if condition and not org.sent_status_messages[key] then
+        hg.status_messages.Send(owner, message, priority)
+        org.sent_status_messages[key] = true
+    elseif not condition and org.sent_status_messages[key] then
+        org.sent_status_messages[key] = false
+    end
+end
+
 module[1] = function(org)
 	org.heart = 0
 	org.heartstop = false
@@ -17,7 +27,7 @@ module[1] = function(org)
 end
 
 function hg.organism.should_gain_fear(org)
-	return ((org.pain > 30) or (org.blood < 3000) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
+	return ((org.pain > 30) or (org.blood < 3750) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
 end
 
 module[2] = function(owner, org, timeValue)
@@ -26,32 +36,54 @@ module[2] = function(owner, org, timeValue)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
-	if org.heart >= 0.8 then
-        if not org.sent_status_messages["chest_hurts_bad"] then
-            hg.status_messages.Send(owner, "YOUR CHEST HURTS REAL BAD!", 4)
-            org.sent_status_messages["chest_hurts_bad"] = true
-        end
-    else
-        org.sent_status_messages["chest_hurts_bad"] = false
-    end
+	sendStatusMessageOnce(owner, org, "chest_hurts_bad", "YOUR CHEST HURTS REAL BAD!", 4, org.heart >= 0.8)
+	sendStatusMessageOnce(owner, org, "chest_hurts", "Your chest hurts.", 2, org.heart >= 0.5 and org.heart < 0.8)
+	sendStatusMessageOnce(owner, org, "heart_stopped", "YOUR HEART HAS STOPPED!", 5, org.heartstop)
+	sendStatusMessageOnce(owner, org, "tachycardia", "Your heart is beating frighteningly fast!", 3, org.heartbeat > 150)
+	sendStatusMessageOnce(owner, org, "bradycardia", "Your heart is beating very slowly.", 2, org.heartbeat < 40 and not org.heartstop)
+	sendStatusMessageOnce(owner, org, "hypertension", "You feel a throbbing pressure in your head.", 2, org.systolic > 160 or org.diastolic > 100)
+	sendStatusMessageOnce(owner, org, "hypotension", "You feel weak and dizzy.", 2, org.systolic < 80 or org.diastolic < 50)
+	sendStatusMessageOnce(owner, org, "hypothermia", "You're shivering and feel incredibly cold.", 3, org.temperature < 35)
+	sendStatusMessageOnce(owner, org, "hyperthermia", "You're burning up and feel disoriented.", 3, org.temperature > 39)
+    sendStatusMessageOnce(owner, org, "unconscious", "You have been knocked unconscious!", 5, org.consciousness <= 0)
+    sendStatusMessageOnce(owner, org, "lungs_failed", "Your lungs have stopped functioning!", 5, not org.lungsfunction)
 
-    if org.heart >= 0.5 and org.heart < 0.8 then
-        if not org.sent_status_messages["chest_hurts"] then
-            hg.status_messages.Send(owner, "Your chest hurts.", 2)
-            org.sent_status_messages["chest_hurts"] = true
-        end
-    else
-        org.sent_status_messages["chest_hurts"] = false
-    end
+    -- Dislocations
+    sendStatusMessageOnce(owner, org, "llegdislocation", "Your left leg feels like it's out of place.", 2, org.llegdislocation)
+    sendStatusMessageOnce(owner, org, "rlegdislocation", "Your right leg feels like it's out of place.", 2, org.rlegdislocation)
+    sendStatusMessageOnce(owner, org, "larmdislocation", "Your left arm feels like it's out of place.", 2, org.larmdislocation)
+    sendStatusMessageOnce(owner, org, "rarmdislocation", "Your right arm feels like it's out of place.", 2, org.rarmdislocation)
+    sendStatusMessageOnce(owner, org, "jawdislocation", "Your jaw feels dislocated.", 2, org.jawdislocation)
 
-	    if org.heartstop then
-        if not org.sent_status_messages["heart_stopped"] then
-            hg.status_messages.Send(owner, "YOUR HEART HAS STOPPED!", 5)
-            org.sent_status_messages["heart_stopped"] = true
-        end
-    else
-        org.sent_status_messages["heart_stopped"] = false
-    end
+    -- Amputations
+    sendStatusMessageOnce(owner, org, "llegamputated", "MY LEFT LEG! IT'S GONE!", 5, org.llegamputated)
+    sendStatusMessageOnce(owner, org, "rlegamputated", "MY RIGHT LEG! IT'S GONE!", 5, org.rlegamputated)
+    sendStatusMessageOnce(owner, org, "larmamputated", "MY LEFT ARM! IT'S GONE!", 5, org.larmamputated)
+    sendStatusMessageOnce(owner, org, "rarmamputated", "MY RIGHT ARM! IT'S GONE!", 5, org.rarmamputated)
+
+    -- Bleeding
+    sendStatusMessageOnce(owner, org, "internal_bleeding", "You feel a dull, throbbing pain inside.", 3, org.internalBleed > 5)
+    sendStatusMessageOnce(owner, org, "arterial_bleeding", "You're losing blood at an alarming rate!", 4, org.arteria > 0 or org.rarmartery > 0 or org.larmartery > 0 or org.rlegartery > 0 or org.llegartery > 0 or org.spineartery > 0)
+
+    -- Pain & Shock
+    sendStatusMessageOnce(owner, org, "excruciating_pain", "The pain is excruciating!", 4, org.pain > 80)
+    sendStatusMessageOnce(owner, org, "in_shock", "You feel cold and clammy.", 3, org.shock > 30)
+
+    -- Neurological
+    sendStatusMessageOnce(owner, org, "concussion", "Your head is spinning and you feel confused.", 3, org.concussion > 5)
+    sendStatusMessageOnce(owner, org, "blindness", "You can't see!", 5, org.blindness > 0.8)
+
+    -- Respiratory
+    sendStatusMessageOnce(owner, org, "pneumothorax", "You're struggling to breathe, a sharp pain in your chest.", 4, org.pneumothorax > 0.5)
+    sendStatusMessageOnce(owner, org, "co_poisoning", "You feel dizzy and nauseous.", 3, org.CO > 0.3)
+
+    -- Psychological
+    sendStatusMessageOnce(owner, org, "fear", "Your heart is pounding in your chest.", 2, org.fear > 0.5)
+    sendStatusMessageOnce(owner, org, "despair", "You feel a sense of hopelessness.", 3, org.despair > 0.5)
+
+    -- Drug Effects
+    sendStatusMessageOnce(owner, org, "adrenaline_rush", "You feel a surge of energy!", 2, org.adrenaline > 2)
+    sendStatusMessageOnce(owner, org, "tranquilized", "You feel calm and sedated.", 2, org.tranquilizer > 0.5)
 
 	--if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts.",true,"heart",6) end
 	//if org.isPly and not org.otrub and org.heartstop then org.owner:Notify("",true,"heartstop",6) end
@@ -94,7 +126,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local blood = math.Clamp(org.blood or 5000, 0, 5000)
-	local bloodK = math.Clamp((blood - 1000) / 2000, 0, 1)
+	local bloodK = math.Clamp((blood - 2000) / 2000, 0, 1)
 	local o2K = math.Clamp(o2, 0, 1)
 	local heartK = math.Clamp(1 - org.heart, 0, 1)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
@@ -127,6 +159,16 @@ module[2] = function(owner, org, timeValue)
 
 	org.diastolic = math.Approach(org.diastolic or 80, targetDiastolic, timeValue * 16)
 	org.systolic = math.Approach(org.systolic or 120, targetSystolic, timeValue * 16)
+
+    if org.bloodpressure < 50 then
+        local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
+        local damage = timeValue * ischemiaK * 0.05
+        org.brain = math.min(org.brain + damage, 1)
+        org.heart = math.min(org.heart + damage, 1)
+        org.liver = math.min(org.liver + damage * 0.5, 1)
+        org.stomach = math.min(org.stomach + damage * 0.3, 1)
+        org.intestines = math.min(org.intestines + damage * 0.3, 1)
+    end
 
 	if org.bloodpressure < 65 then
 		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
@@ -162,14 +204,14 @@ module[2] = function(owner, org, timeValue)
 	local adrenK = max(1 + org.adrenaline, 1)
 	local adren = org.adrenaline
 
-	if org.pulse < 10 or org.brain >= 0.6 then org.heartstop = true end
+	if org.bloodpressure < 40 or org.brain >= 0.6 then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 		if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
 		org.fear = math.max(org.fear, 0)
 	end
 
 	-- temperature
-	local needed_temp = math.min(math.max(37 * (org.pulse / 45), 35), 36.7)
+	local needed_temp = 36.7
 	local changeRate = timeValue / 60
 	changeRate = changeRate * (org.temperature < needed_temp and math.Clamp(org.heatbuff / 60, 1, 2) or 1)
 	if math.abs(org.tempchanging) < changeRate then

@@ -156,6 +156,10 @@ local near_death_positive = {
 	"Pain is just a signal. Ignore it.",
 	"If this is it... at least it's gonna be quick.",
 	"I've survived worse. Probably.",
+	"I dont want to die.",
+	"There is still a way out of this.",
+	"This cant be how it ends.",
+	"I'm not sure if this is the end.",
 	"This isn't how I pictured it.",
 }
 
@@ -202,6 +206,26 @@ local after_unconscious = {
 	"Oh it's gonna be hard to get up right now... but I have to...",
 	"I don't recognize this place at all... or do I?",
 	"I don't want to experience this EVER AGAIN!",
+}
+
+local thirsty_a_bit = {
+    "I'm thirsty...",
+    "Some water would be great...",
+    "I should drink something.",
+}
+
+local very_thirsty = {
+    "My throat is so dry...",
+    "If I don't drink, I'll feel even worse...",
+    "Water... Damn it... I feel sick",
+}
+
+local good_mood_phrases = {
+    "I feel great!",
+    "Life is good.",
+    "I can take on the world!",
+    "Everything is going my way.",
+    "I'm on top of the world!",
 }
 
 local slight_braindamage_phraselist = {
@@ -359,7 +383,10 @@ local function get_status_message(ply)
 	local temperature = org.temperature
 	local blood = org.blood
 	local hungry = org.hungry
+	local thirst = org.thirst
+	local goodmood = org.goodmood
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
+    local positive_thinking = (goodmood and goodmood > 0.5)
 
 	    if broken_dislocated and org.just_damaged_bone then
         hg.status_messages.Send(ply, "Your ".. (org.just_damaged_bone_limb or "limb") .." is broken.", 3)
@@ -409,11 +436,9 @@ local function get_status_message(ply)
 
 		if not most_wanted_phraselist then
 			if (broken_dislocated_notify) and (blood < 3100) then
-				most_wanted_phraselist = blood < 2900 and (near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or near_death_poetic)
-			--elseif(broken_dislocated_notify)then
-				--most_wanted_phraselist = (broken_notify and broken_limb or dislocated_limb)
+				most_wanted_phraselist = blood < 2900 and (positive_thinking and near_death_positive or near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or (positive_thinking and near_death_positive or near_death_poetic))
 			elseif(blood < 3100)then
-				most_wanted_phraselist = near_death_poetic
+				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_poetic
 			end
 		end
 	elseif after_unconscious_notify then
@@ -430,8 +455,26 @@ local function get_status_message(ply)
             hg.status_messages.Send(ply, "You are hungry.", 1)
         end
     end
+
+    if thirst and thirst > 25 then
+        if thirst > 75 then
+            hg.status_messages.Send(ply, "You are dying of thirst.", 3)
+        elseif thirst > 50 then
+            hg.status_messages.Send(ply, "You are very thirsty.", 2)
+        else
+            hg.status_messages.Send(ply, "You are thirsty.", 1)
+        end
+    end
+
+    if goodmood and goodmood > 0.8 and math.random(5) == 1 then
+        most_wanted_phraselist = good_mood_phrases
+    end
 	elseif hg.fearful(ply) then
-		most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
+        if positive_thinking and math.random(3) == 1 then
+            most_wanted_phraselist = near_death_positive
+        else
+		    most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
+        end
 	end
 
 	    if brain > 0.1 then

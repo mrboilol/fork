@@ -28,14 +28,23 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	dmg = hook_info.dmg
 	
 	    if name == "liver" or name == "stomach" or name == "intestines" then
-        hg.status_messages.Send(dmgInfo:GetAttacker(), "I have damaged one of their abdominal organs.", 2)
+        hg.status_messages.SendToAttacker(dmgInfo, "I have damaged one of their abdominal organs.", 2)
     end
 
-	if func and !hook_info.restricted then
-		return func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
-	else
-		return 0
-	end
+    if name == "heart" or name == "lungsL" or name == "lungsR" or name == "trachea" then
+        hg.status_messages.SendToAttacker(dmgInfo, "I have damaged one of their chest organs.", 2)
+    end
+
+    if func and !hook_info.restricted then
+        local old_consciousness = org.consciousness
+        local result = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
+        if old_consciousness > 0 and org.consciousness <= 0 then
+            hg.status_messages.SendToAttacker(dmgInfo, "CRITICAL SUCCESS! They appear to be knocked out.", 3)
+        end
+        return result
+    else
+        return 0
+    end
 end
 
 local function Trace_Blast(box, amt, org, organs, dmg, dmgInfo)
@@ -1590,6 +1599,9 @@ local function velocityDamage(ent, data)
 					net.WriteVector(dmgInfo:GetDamagePosition())
 					net.WriteFloat(flash_intensity)
 					net.WriteInt(flash_duration, 20)
+
+					local is_critical = (org.brain > 0.5 and brainDelta > 0.05) or org.skull == 1
+					net.WriteBool(is_critical)
 
 					local play_knockout_sound = false
 					if org.otrub then

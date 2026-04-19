@@ -1068,7 +1068,14 @@ net.Receive("headtrauma_flash", function()
     local pos = net.ReadVector()
     local time = net.ReadFloat()
     local size = net.ReadInt(20)
+    local is_critical = net.ReadBool()
     local play_knockout_sound = net.ReadBool()
+
+    if is_critical then
+        surface.PlaySound("tinnituslong.wav")
+    else
+        surface.PlaySound("tinnitus.wav")
+    end
 
     local lply = LocalPlayer()
     if not IsValid(lply) then return end

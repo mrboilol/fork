@@ -134,13 +134,13 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		ply.weightmul = weightmul
 		weightmul = math.max(weightmul > 0.9 and 1 or weightmul / 0.9, 0.1)
 
-		--\\ Experimental pz-like sprint code
-			--[[ply:SetRunSpeed((IsValid(wep) and wep ~= NULL and wep:GetClass() == "weapon_hands_sh" and slow_walking) and 390 or 230)
+		--// Experimental pz-like sprint code
+			ply:SetRunSpeed((IsValid(wep) and wep ~= NULL and wep:GetClass() == "weapon_hands_sh" and slow_walking) and 390 or 230)
 			if IsValid(wep) and wep ~= NULL and wep:GetClass() == "weapon_hands_sh" and runnin and slow_walking then
 				mv:SetSideSpeed(0)
 				cmd:SetSideMove(0)
 				cmd:RemoveKey(IN_BACK)
-			end]]
+			end
 		--//
 
 		--ply:SetRunSpeed(350)
@@ -340,11 +340,11 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 			local consmul = math.Clamp(((consciousness - 1) * 4 + 1), 0.1, 1)
 
-			//if(water_level > 0)then
-			//	ply.CurrentFrictionMul = math.Approach(ply.CurrentFrictionMul, 0.2, delta_time * ply.FrictionLoseMul * water_level)
-			//else
-				// ply.CurrentFrictionMul = math.Approach(ply.CurrentFrictionMul, consmul, delta_time * ply.FrictionGainMul * (consmul < ply.CurrentFrictionMul and 100 or 10))
-			//end
+			if(water_level > 0)then
+				ply.CurrentFrictionMul = math.Approach(ply.CurrentFrictionMul, 0.2, delta_time * ply.FrictionLoseMul * water_level)
+			else
+				 ply.CurrentFrictionMul = math.Approach(ply.CurrentFrictionMul, consmul, delta_time * ply.FrictionGainMul * (consmul < ply.CurrentFrictionMul and 100 or 10))
+			end
 
 			ply.CurrentFrictionMul = 0.5 / hg_inertiamul:GetFloat()
 			ply.InertiaBlend = ply.InertiaBlend * ply.CurrentFrictionMul
@@ -457,39 +457,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		move = move * k
 		ply.move = move
 
-		if SERVER and not IsValid(ply.FakeRagdoll) then
-			ply.eyeAnglesOld = ply.eyeAnglesOld or ply:EyeAngles()
-			local cosine = ply:EyeAngles():Forward():Dot(ply.eyeAnglesOld:Forward())
-			ply.eyeAnglesOld = ply:EyeAngles()
-
-			if (velLen > 200 and (math.random(150) == 1 or cosine <= 0.99)) then
-				local tr = {}
-				tr.start = ply:GetPos()
-				tr.endpos = tr.start - vector_up * 1
-				tr.filter = ply
-				tr = util.TraceLine(tr)
-
-				if tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps) and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2 then
-					local b1 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_L_Calf"))
-					local phys1 = hg.IdealMassPlayer["ValveBiped.Bip01_L_Calf"]
-
-					local b2 = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_R_Calf"))
-					local phys2 = hg.IdealMassPlayer["ValveBiped.Bip01_R_Calf"]
-
-					local torso = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_Spine2"))
-					local phystorso = hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]
-					local force = vel:GetNormalized() * 150
-
-					hg.AddForceRag(ply, torso, -force * 5 * phystorso, 0.5)
-					hg.AddForceRag(ply, b1, (force * 5 - vector_up * 2) * phys1, 0.5)
-					hg.AddForceRag(ply, b2, (force * 5 - vector_up * 2) * phys2, 0.5)
-
-					timer.Simple(0,function()
-						hg.StunPlayer(ply)
-					end)
-				end
-			end
-		end
+		
 
 		--// Dive jump
 		if hg_divejump:GetBool() then

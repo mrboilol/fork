@@ -1,5 +1,6 @@
 --
 local hg_hungersystem = CreateConVar("hg_hungersystem", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables/disabled hunger system", 0, 1)
+local hg_thirstsystem = CreateConVar("hg_thirstsystem", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables/disabled thirst system", 0, 1)
 local max, min, Round, Lerp, halfValue2 = math.max, math.min, math.Round, Lerp, util.halfValue2
 --local Organism = hg.organism
 hg.organism.module.metabolism = {}
@@ -8,6 +9,9 @@ module[1] = function(org)
 	org.satiety = 0
     org.hungry = 0
     org.hungryDmgCd = 0
+    org.hydration = 0
+    org.thirst = 0
+    org.thirstDmgCd = 0
 end
 
 local colorRed = Color(125,25,25)
@@ -36,6 +40,21 @@ module[2] = function(owner, org, timeValue)
         org.hungry = min(max(org.hungry - timeValue * 2, 0),100)
     end
     org.hungry = Round(org.hungry or 0,3)
+
+    if org.hydration <= 0 and hg_thirstsystem:GetBool() then
+        org.thirst = min(max(org.thirst + timeValue * 0.015, 0), 100)
+        org.thirstDmgCd = org.thirstDmgCd or 0
+        if org.alive and org.thirstDmgCd < CurTime() and org.thirst > 35 then
+            org.painadd = org.painadd + 20 * (org.thirst / 55)
+            org.thirstDmgCd = CurTime() + (math.random(30, 45) - (org.thirst / 6.5))
+            if org.thirst > 60 then
+                org.blood = max(org.blood - timeValue * 15, 1000)
+            end
+        end
+    else
+        org.thirst = min(max(org.thirst - timeValue * 2, 0), 100)
+    end
+    org.thirst = Round(org.thirst or 0, 3)
 
     if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and owner:IsPlayer() and org.satiety > 1 then
         if not org.randomPainSound or org.randomPainSound < CurTime() then

@@ -78,7 +78,8 @@ module[2] = function(owner, org, timeValue)
 		stamina.sub = 0
 	end
 	local despair = math.Clamp(org.despair or 0, 0, 1)
-	stamina.sub = stamina.sub * (1 + despair * 0.6)
+	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
+	stamina.sub = stamina.sub * (1 + despair * 0.6) * (1 - goodmood * 0.5)
 
 	stamina.subadd = 0
 	stamina.weight = owner:IsPlayer() and math.Clamp((1 / hg.CalculateWeight(owner,250)) - 1,0,1) or 0
@@ -90,9 +91,10 @@ module[2] = function(owner, org, timeValue)
 	if stamina.max > 100 then
 		stamina.max = Lerp(despair, stamina.max, 100)
 	end
+	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 	
 	//local old = stamina[1]
-	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 8 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5), stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 8 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * (1 + goodmood * 0.5), stamina.max)
 
 	-- local painfrommoving = (stamina[1] < 150 and 1 or 0) * (stamina[1] - old) * (org.chest)
 	-- org.painadd = org.painadd + painfrommoving * timeValue * 5

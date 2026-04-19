@@ -85,7 +85,17 @@ if SERVER then
 		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end
 
-		org.satiety = org.satiety + 20/5
+		if self.WaterModel[self.WorldModel] then
+			org.hydration = org.hydration + 30
+		else
+			org.satiety = org.satiety + 20
+		end
+
+		if org.hungry < 20 and org.thirst < 20 then
+			org.satiety = org.satiety + 10
+			org.hydration = org.hydration + 10
+		end
+
 		local ply = self:GetOwner()
 		ply:ViewPunch(Angle(3,0,0))
 		
