@@ -502,48 +502,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.random_events[2](owner, org, timeValue)
 	end
 
-	if org.seizure_mode_active then
-		org.brain = math.min(org.brain + timeValue * 0.2, 1)
-		return
-	end
 
-	local isCritical = org.incapacitated or org.critical or org.heartstop or not org.lungsfunction or org.blood < 1500
-
-	if isCritical and org.brain > 0.3 and not org.seizure_mode_active then
-		org.seizure_mode_active = true
-		hg.Fake(owner)
-		owner:EmitSound("seizure.ogg")
-
-		timer.Simple(0, function()
-			if IsValid(owner) and IsValid(owner.FakeRagdoll) then
-				local ragdoll = owner.FakeRagdoll
-				local b1 = owner:TranslateBoneToPhysBone(owner:LookupBone("ValveBiped.Bip01_L_Calf"))
-				local b2 = owner:TranslateBoneToPhysBone(owner:LookupBone("ValveBiped.Bip01_R_Calf"))
-				local torso = owner:TranslateBoneToPhysBone(owner:LookupBone("ValveBiped.Bip01_Spine2"))
-				local force = Vector(math.random(-200, 200), math.random(-200, 200), math.random(50, 150))
-
-				hg.AddForceRag(owner, torso, force, 1.5)
-				hg.AddForceRag(owner, b1, force, 1.5)
-				hg.AddForceRag(owner, b2, force, 1.5)
-			end
-		end)
-	elseif isCritical and not org.last_stand_used and (org.liver < 0.5 and org.heart < 0.5 and org.trachea < 0.5) then
-		org.last_stand_used = true
-		
-		-- Heal organs slightly
-		org.heart = math.max(0, org.heart - 0.2)
-		org.liver = math.max(0, org.liver - 0.2)
-		org.trachea = math.max(0, org.trachea - 0.2)
-		org.brain = math.max(0, org.brain - 0.1)
-		
-		org.blood = math.min(org.blood + 1000, 5000)
-		org.adrenaline = math.min(org.adrenaline + 3, 5)
-		
-		-- Attempt to restart vitals
-		org.heartstop = false
-		org.lungsfunction = true
-		org.o2[1] = org.o2.range[2] -- Full oxygen
-	end
 
 	module.pulse[2](owner, org, timeValue)
 
