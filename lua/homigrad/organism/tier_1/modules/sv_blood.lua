@@ -325,7 +325,7 @@ function hg.organism.Vomit(owner, snd)
 
 	owner:SetNetVar("vomiting", CurTime() + 1.5)
 
-	ent:EmitSound(snd or "puke.wav")
+	ent:EmitSound(snd or "vomit.wav")
 	
 	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
 		owner:SetNetVar("zableval_masku", true)
@@ -365,7 +365,7 @@ function hg.organism.VomitNormal(owner, snd)
 	org.hungry = math.min(math.max((org.hungry or 0) + 7, 0), 100)
 	org.satiety = math.max((org.satiety or 0) - 20, 0)
 
-	ent:EmitSound(snd or "puke.wav")
+	ent:EmitSound(snd or "vomit.wav")
 
 	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
 		owner:SetNetVar("zableval_masku", true)
