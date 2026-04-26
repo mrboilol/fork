@@ -1,10 +1,14 @@
 {
-  "title": "[Z-City] Moodles",
+  "title": "Z-City UNCONSCIOUSNESS CIRCLE",
   "type": "ServerContent",
   "tags": [
+    "fun",
     "roleplay",
-    "realism",
-    "fun"
+    "realism"
   ],
-  "ignore": []
+  "ignore": [
+    "*.dll",
+    "*_source.txt",
+    "lua/weapons/homigrad_base/usefull_things.txt"
+  ]
 }

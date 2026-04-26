@@ -114,7 +114,7 @@ module[2] = function(owner, org, timeValue)
 
     if org.bloodpressure < 50 then
         local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
-        local damage = timeValue * ischemiaK * 0.05
+        local damage = timeValue * ischemiaK * 0.005
         org.brain = math.min(org.brain + damage, 1)
         org.heart = math.min(org.heart + damage, 1)
         org.liver = math.min(org.liver + damage * 0.5, 1)

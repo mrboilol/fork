@@ -135,11 +135,11 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		weightmul = math.max(weightmul > 0.9 and 1 or weightmul / 0.9, 0.1)
 
 		--// Experimental pz-like sprint code
-			ply:SetRunSpeed((IsValid(wep) and wep ~= NULL and wep:GetClass() == "weapon_hands_sh" and slow_walking) and 390 or 230)
+			--[[ply:SetRunSpeed((IsValid(wep) and wep ~= NULL and wep:GetClass() == "weapon_hands_sh" and slow_walking) and 390 or 230)
 			if IsValid(wep) and wep ~= NULL and wep:GetClass() == "weapon_hands_sh" and runnin and slow_walking then
 				mv:SetSideSpeed(0)
 				cmd:SetSideMove(0)
-				cmd:RemoveKey(IN_BACK)
+				cmd:RemoveKey(IN_BACK)]]
 			end
 		--//
 

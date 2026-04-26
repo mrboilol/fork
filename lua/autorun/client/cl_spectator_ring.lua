@@ -33,32 +33,46 @@ local dotBeat = 0
 local ekgPoints = {}
 local sweepPos = 0
 local lastSweepUpdate = 0
+local heartPhase = 0
 
 local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha)
     local time = CurTime()
     if lastSweepUpdate == 0 then lastSweepUpdate = time end
-    local dt_sweep = time - lastSweepUpdate
-    
-    local interval = 60 / pulse
-    local sweepSpeed = width / 4
-    
-    local oldSweepPos = sweepPos
-    sweepPos = (sweepPos + dt_sweep * sweepSpeed) % width
+    local dt = time - lastSweepUpdate
     lastSweepUpdate = time
+    
+    -- Increment heart phase based on pulse
+    -- pulse is BPM, so pulse/60 is beats per second
+    heartPhase = heartPhase + dt * (pulse / 60)
+    
+    local sweepSpeed = width / 4
+    local oldSweepPos = sweepPos
+    sweepPos = (sweepPos + dt * sweepSpeed) % width
 
-    -- Update current position with new waveform data
     -- Fill all indices between oldSweepPos and newSweepPos to ensure no gaps
-    local function getH(t)
-        local beatTime = t % interval
-        if beatTime < 0.1 then return math.sin(beatTime * math.pi * 10) * 0.15
-        elseif beatTime < 0.15 then return 0
-        elseif beatTime < 0.18 then return -math.sin((beatTime - 0.15) * math.pi * 33) * 0.2
-        elseif beatTime < 0.22 then return math.sin((beatTime - 0.18) * math.pi * 25) * 1.0
-        elseif beatTime < 0.25 then return -math.sin((beatTime - 0.22) * math.pi * 33) * 0.3
-        elseif beatTime < 0.4 then return 0
-        elseif beatTime < 0.55 then return math.sin((beatTime - 0.4) * math.pi * 6.6) * 0.2
+    local function getH(phase)
+        phase = phase % 1
+        local h = 0
+        
+        -- P wave: small bump
+        if phase > 0.05 and phase < 0.15 then
+            h = h + math.sin((phase - 0.05) / 0.1 * math.pi) * 0.12
+        -- QRS complex: the main spike
+        elseif phase > 0.2 and phase < 0.32 then
+            local p = (phase - 0.2) / 0.12
+            if p < 0.15 then -- Q
+                h = h - math.sin(p / 0.15 * math.pi) * 0.15
+            elseif p < 0.5 then -- R
+                h = h + math.sin((p - 0.15) / 0.35 * math.pi) * 1.0
+            else -- S
+                h = h - math.sin((p - 0.5) / 0.5 * math.pi) * 0.25
+            end
+        -- T wave: medium bump
+        elseif phase > 0.45 and phase < 0.65 then
+            h = h + math.sin((phase - 0.45) / 0.2 * math.pi) * 0.22
         end
-        return 0
+        
+        return h
     end
 
     local steps = math.max(1, math.floor(math.abs(sweepPos - oldSweepPos)))
@@ -66,12 +80,13 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha)
 
     for i = 0, steps do
         local p = (oldSweepPos + i) % width
-        local t = time - (dt_sweep * (1 - i/steps))
-        ekgPoints[math.floor(p)] = getH(t)
+        -- Interpolate heartPhase for this specific pixel
+        local p_phase = heartPhase - (dt * (pulse / 60) * (1 - i/steps))
+        ekgPoints[math.floor(p)] = getH(p_phase)
     end
     
     -- Clear a small gap ahead of the sweepPos
-    local gap = 10
+    local gap = 12
     for i = 1, gap do
         ekgPoints[math.floor((sweepPos + i) % width)] = nil
     end
@@ -80,6 +95,21 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha)
     local startX = centerX - width / 2
     local lastX, lastY
     
+    -- Move drawSegment outside for efficiency
+    local function drawSegment(sx, sy, slastX, slastY, sthick)
+        if slastX then
+            local sdy = sy - slastY
+            if math.abs(sdy) > 1 then
+                local ssy = sdy > 0 and slastY or sy
+                surface.DrawRect(sx - sthick, ssy, sthick * 2 + 1, math.abs(sdy) + 1)
+            else
+                surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
+            end
+        else
+            surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
+        end
+    end
+
     for i = 0, width - 1 do
         local h_val = ekgPoints[i]
         if h_val == nil then 
@@ -105,21 +135,6 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha)
         
         -- Draw Shadow first
         surface.SetDrawColor(0, 0, 0, shadowAlpha)
-        local function drawSegment(sx, sy, slastX, slastY, sthick)
-            if slastX then
-                local sdy = sy - slastY
-                if math.abs(sdy) > 1 then
-                    local ssy = sdy > 0 and slastY or sy
-                    surface.DrawRect(sx - sthick, ssy, sthick * 2 + 1, math.abs(sdy) + 1)
-                else
-                    surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
-                end
-            else
-                surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
-            end
-        end
-
-        -- Shadow brush is slightly larger
         drawSegment(x, y, lastX, lastY, thick + 1)
 
         -- Draw Main Line
