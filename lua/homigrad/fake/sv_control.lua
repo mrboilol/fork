@@ -3,6 +3,17 @@ local vecZero = Vector(0, 0, 0)
 local angZero = Angle(0, 0, 0)
 local shadowparams = {}
 
+local function manipulateFingerChainSafe(ragdoll, side, ang)
+	if not IsValid(ragdoll) then return end
+
+	for i = 1, 4 do
+		local bone = ragdoll:LookupBone("ValveBiped.Bip01_" .. side .. "_Finger" .. tostring(i) .. "1")
+		if bone then
+			ragdoll:ManipulateBoneAngles(bone, ang)
+		end
+	end
+end
+
 --[[
 local ply = Entity(1)
 local tbl = {}
@@ -728,20 +739,14 @@ hook.Add("Think", "Fake", function()
 							cons.ZCClimbGrip = ent:IsWorld() and not IsValid(choking)
 
 							cons:CallOnRemove("fingersback", function()
-								for i = 1, 4 do
-									if not ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1") then continue end
-									ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1"), Angle(0, 0, 0))
-								end
+								manipulateFingerChainSafe(ragdoll, "L", Angle(0, 0, 0))
 							end)
 
 							cons.choking = choking
 
 							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 50, math.random(95, 105))
 							
-							for i = 1, 4 do
-								if not ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1") then continue end
-								ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1"), Angle(0, -45, 0))
-							end
+							manipulateFingerChainSafe(ragdoll, "L", Angle(0, -45, 0))
 						end
 					end
 				end
@@ -749,10 +754,7 @@ hook.Add("Think", "Fake", function()
 				if IsValid(ragdoll.ConsLH) then
 					ragdoll.ConsLH:Remove()
 					ragdoll.ConsLH = nil
-					for i = 1, 4 do
-						if not ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1") then continue end
-						ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1"), Angle(0, 0, 0))
-					end
+					manipulateFingerChainSafe(ragdoll, "L", Angle(0, 0, 0))
 				end
 			end
 
@@ -817,20 +819,14 @@ hook.Add("Think", "Fake", function()
 							cons.ZCClimbGrip = ent:IsWorld() and not IsValid(choking)
 
 							cons:CallOnRemove("fingersback", function()
-								for i = 1, 4 do
-									if not ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1") then continue end
-									ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1"), Angle(0, 0, 0))
-								end
+								manipulateFingerChainSafe(ragdoll, "R", Angle(0, 0, 0))
 							end)
 
 							cons.choking = choking
 
 							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 55, math.random(95, 105))
 							
-							for i = 1, 4 do
-								if not ragdoll:LookupBone("ValveBiped.Bip01_R_Finger" .. tostring(i) .. "1") then continue end
-								ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_R_Finger" .. tostring(i) .. "1"), Angle(0, -45, 0))
-							end
+							manipulateFingerChainSafe(ragdoll, "R", Angle(0, -45, 0))
 						end
 					end
 				end
@@ -838,10 +834,7 @@ hook.Add("Think", "Fake", function()
 				if IsValid(ragdoll.ConsRH) then
 					ragdoll.ConsRH:Remove()
 					ragdoll.ConsRH = nil
-					for i = 1, 4 do
-						if not ragdoll:LookupBone("ValveBiped.Bip01_R_Finger" .. tostring(i) .. "1") then continue end
-						ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_R_Finger" .. tostring(i) .. "1"), Angle(0, 0, 0))
-					end
+					manipulateFingerChainSafe(ragdoll, "R", Angle(0, 0, 0))
 				end
 			end
 		else
@@ -1080,17 +1073,13 @@ hook.Add("PlayerDeath", "homigrad-fake-control", function(ply)
 	if IsValid(ragdoll.ConsLH) then
 		ragdoll.ConsLH:Remove()
 		ragdoll.ConsLH = nil
-		for i = 1, 4 do
-			ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_L_Finger" .. tostring(i) .. "1"), Angle(0, 0, 0))
-		end
+		manipulateFingerChainSafe(ragdoll, "L", Angle(0, 0, 0))
 	end
 
 	if IsValid(ragdoll.ConsRH) then
 		ragdoll.ConsRH:Remove()
 		ragdoll.ConsRH = nil
-		for i = 1, 4 do
-			ragdoll:ManipulateBoneAngles(ragdoll:LookupBone("ValveBiped.Bip01_R_Finger" .. tostring(i) .. "1"), Angle(0, 0, 0))
-		end
+		manipulateFingerChainSafe(ragdoll, "R", Angle(0, 0, 0))
 	end
 end)
 

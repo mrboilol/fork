@@ -848,9 +848,10 @@ function hg.MainTPIKFunction(ent, ply, wpn)
             local rh = cachedLookupBone(ent, "ValveBiped.Bip01_R_Hand")
             local rhmat = rh and ent:GetBoneMatrix(rh)
 
-            rhmat:SetTranslation(rhmat:GetTranslation() + VectorRand(-0.2, 0.2) * stammul)
-
-            hg.bone_apply_matrix(ent, rh, rhmat)
+            if rh and rhmat then
+                rhmat:SetTranslation(rhmat:GetTranslation() + VectorRand(-0.2, 0.2) * stammul)
+                hg.bone_apply_matrix(ent, rh, rhmat)
+            end
         end
         
         local holdinglh = false
@@ -862,9 +863,10 @@ function hg.MainTPIKFunction(ent, ply, wpn)
             local lh = cachedLookupBone(ent, "ValveBiped.Bip01_L_Hand")
             local lhmat = lh and ent:GetBoneMatrix(lh)
 
-            lhmat:SetTranslation(lhmat:GetTranslation() + VectorRand(-0.2, 0.2) * stammul)
-
-            hg.bone_apply_matrix(ent, lh, lhmat)
+            if lh and lhmat then
+                lhmat:SetTranslation(lhmat:GetTranslation() + VectorRand(-0.2, 0.2) * stammul)
+                hg.bone_apply_matrix(ent, lh, lhmat)
+            end
         end
     end
 end
