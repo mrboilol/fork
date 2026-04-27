@@ -195,6 +195,7 @@ end
 SWEP.modelscale = 1
 SWEP.modelscale2 = 1
 
+
 if CLIENT then
     function PrintBones( entity )
         for i = 0, entity:GetBoneCount() - 1 do
@@ -331,6 +332,7 @@ if CLIENT then
                 local timing = ((animCalcTime - (self.animtime - self.animspeed))%self.animspeed) / self.animspeed
                 WorldModel:SetCycle(timing)
             end
+
 
             local pos, ang = self:ModelAnim(WorldModel)
 
@@ -2700,6 +2702,8 @@ function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient)
 
     local mdl = self:GetWM()
     self.tries = 10
+    local mdl = self:GetWM()
+    self.tries = 10
     if self:GetWM():GetModel() ~= self.WorldModelReal then self:GetWM():SetModel(self.WorldModelReal) end
     
     self:GetWM():SetSequence(self.AnimList[anim] or anim)
@@ -3061,3 +3065,4 @@ end
 
     return true
 end]]
+
