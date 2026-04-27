@@ -199,14 +199,41 @@ function SWEP:Initialize()
 	self:SetHoldType(self.HoldType)
 	self:SetFists(false)
 	self:SetBlocking(false)
-	self.HeadbuttState = "idle"
-	self.HeadbuttStartTime = 0
-	self.HeadbuttStartPitch = 0
-	self.HeadbuttNextHit = 0
+end
+
+function SWEP:ClearSuperadminGrab()
+	local owner = self:GetOwner()
+	local victim = self.AdminGrabVictim
+
+	if IsValid(victim) and victim.AdminHandsGrabber == owner then
+		victim.AdminHandsGrabber = nil
+	end
+
+	if IsValid(owner) and owner.AdminHandsGrabVictim == victim then
+		owner.AdminHandsGrabVictim = nil
+	end
+
+	self.AdminGrabVictim = nil
+	self.AdminGrabRefresh = nil
+end
+
+function SWEP:SetSuperadminGrab(victim)
+	local owner = self:GetOwner()
+
+	if self.AdminGrabVictim == victim then return end
+
+	self:ClearSuperadminGrab()
+
+	if not IsValid(owner) or not IsValid(victim) then return end
+
+	self.AdminGrabVictim = victim
+	self.AdminGrabRefresh = 0
+	owner.AdminHandsGrabVictim = victim
+	victim.AdminHandsGrabber = owner
 end
 
 function SWEP:OnRemove()
-	self:StopPulseCheck()
+	self:ClearSuperadminGrab()
 	--[[if IsValid(self.worldModel) then
 		self.worldModel:Remove()
 	end--]]
@@ -214,6 +241,45 @@ end
 
 if CLIENT then
 	local blocking_ang = Angle(-40,0,0)
+	local function initializeSequenceState(mdl)
+		if not IsValid(mdl) then return end
+
+		mdl.ZCLastSequenceModel = mdl:GetModel()
+		mdl.ZCSequenceReadyAt = CurTime() + 0.25
+		mdl.ZCAnimAssigned = false
+
+		if mdl.ResetSequenceInfo then
+			mdl:ResetSequenceInfo()
+		end
+	end
+
+	local function normalizeSequenceState(mdl, desiredModel)
+		if not IsValid(mdl) then return false end
+
+		if desiredModel and mdl:GetModel() ~= desiredModel then
+			mdl:SetModel(desiredModel)
+		end
+
+		local currentModel = mdl:GetModel()
+		if mdl.ZCLastSequenceModel ~= currentModel then
+			mdl.ZCLastSequenceModel = currentModel
+			mdl.ZCSequenceReadyAt = CurTime() + 0.1
+			mdl.ZCAnimAssigned = false
+		end
+
+		if (mdl.ZCSequenceReadyAt or 0) > CurTime() then return false end
+
+		local seqCount = mdl.GetSequenceCount and mdl:GetSequenceCount() or 0
+		if seqCount <= 0 then return false end
+
+		local seq = mdl:GetSequence()
+		if not isnumber(seq) or seq < 0 or seq >= seqCount then
+			mdl.ZCAnimAssigned = false
+			return false
+		end
+
+		return true
+	end
 
 	--[[if IsValid(modelHands) then
 		modelHands:Remove()
@@ -230,34 +296,21 @@ if CLIENT then
 
 		if not IsValid(self.worldModel) then
 			self.worldModel = ClientsideModel(self.WorldModel)
+            initializeSequenceState(self.worldModel)
 		end
 
-		if clawClasses[owner.PlayerClassName] and self.worldModel != "models/weapons/salat/anims/furry_fists.mdl" then
+		if clawClasses[owner.PlayerClassName] and self.worldModel:GetModel() ~= "models/weapons/salat/anims/furry_fists.mdl" then
 			self.worldModel:SetModel("models/weapons/salat/anims/furry_fists.mdl")
 		end
 
 		if not self:GetFists() then return end
 
 		local WorldModel = self.worldModel
+		if not normalizeSequenceState(WorldModel) then return end
 
-		local timeleft = self.animtime - CurTime()
-		local cycle = 0
-		if self.slowmoanim then
-			if self:GetOwner():GetNWBool("mcd_admiring", false) then
-				-- Freeze animation after 1.5 seconds (which is 1.5 / 5.0 = 0.3 cycle)
-				cycle = 1 - math.Clamp(timeleft / self.slowmoanim, 0, 1)
-				if cycle > 0.3 then
-					cycle = 0.3
-					self.animtime = CurTime() + self.slowmoanim * (1 - 0.3) -- Keep timeleft frozen so it resumes properly later
-				end
-			else
-				cycle = 1 - math.Clamp(timeleft / self.slowmoanim, 0, 1)
-			end
-		else
-			local animDuration = self.animduration or 1
-			cycle = 1 - math.Clamp(timeleft / animDuration, 0, 1)
+		if WorldModel.ZCAnimAssigned then
+			WorldModel:SetCycle(1 - math.Clamp(self.animtime - CurTime(),0,1))
 		end
-		WorldModel:SetCycle(cycle)
 
 		self.blockinganim = qerp(0.05 * FrameTime() / engine.TickInterval(),self.blockinganim,self:GetBlocking() and 1 or 0)
 
@@ -1420,9 +1473,18 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 		end
 
 		if not self.CarryEnt:GetCustomCollisionCheck() then
-			self.CarryEnt:SetCustomCollisionCheck(true)
-			self.CarryEnt:CollisionRulesChanged()
-			owner:CollisionRulesChanged()
+			if hg.QueueSetCustomCollisionCheck then
+				hg.QueueSetCustomCollisionCheck(self.CarryEnt, true)
+			else
+				self.CarryEnt:SetCustomCollisionCheck(true)
+			end
+			if hg.QueueCollisionRulesChanged then
+				hg.QueueCollisionRulesChanged(self.CarryEnt)
+				hg.QueueCollisionRulesChanged(owner)
+			else
+				self.CarryEnt:CollisionRulesChanged()
+				owner:CollisionRulesChanged()
+			end
 
 			self.CarryEnt:CallOnRemove("removenarsla",function()
 				if not IsValid(owner) then return end
@@ -1743,7 +1805,7 @@ function SWEP:PrimaryAttack(forcespecial)
 		if CLIENT and self.IsLocal and not self:IsLocal() and owner.PlayerClassName == "headcrabzombie" then
 			owner:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_GMOD_GESTURE_RANGE_ZOMBIE, true)
 		else
-			owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD,owner:LookupSequence((special_attack or rand) and "range_fists_r" or "range_fists_l"),0,true)
+			addHandsGestureSafe(owner, (special_attack or rand) and "range_fists_r" or "range_fists_l")
 		end
 	end
 
@@ -1826,6 +1888,15 @@ local vent = {
 	"doors/vent_open2.wav",
 	"doors/vent_open3.wav"
 }
+
+local function addHandsGestureSafe(owner, sequenceName)
+	if not IsValid(owner) then return end
+
+	local seqID = owner:LookupSequence(sequenceName)
+	if not isnumber(seqID) or seqID < 0 or seqID >= owner:GetSequenceCount() then return end
+
+	owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD, seqID, 0, true)
+end
 
 function SWEP:AttackFront(special_attack, rand)
 	if CLIENT then return end
@@ -2057,8 +2128,16 @@ function hg.SetCarryEnt2(ply, ent, bone, mass, carrypos, targetpos, targetang, d
 			ply:SetNetVar("carrypos2", carrypos)
 
 			if not ent:GetCustomCollisionCheck() then
-				ent:SetCustomCollisionCheck(true)
-				ent:CollisionRulesChanged()
+				if hg.QueueSetCustomCollisionCheck then
+					hg.QueueSetCustomCollisionCheck(ent, true)
+				else
+					ent:SetCustomCollisionCheck(true)
+				end
+				if hg.QueueCollisionRulesChanged then
+					hg.QueueCollisionRulesChanged(ent)
+				else
+					ent:CollisionRulesChanged()
+				end
 			end
 
 			local dist = dist or phys:GetPos():Distance(ply:EyePos())
@@ -2257,7 +2336,15 @@ end
 
 function SWEP:DoBFSAnimation(anim, time, slowmo, force_local)
 	if CLIENT and IsValid(self:GetWM()) then
-		self:GetWM():SetSequence(type(anim) == "string" and self:GetWM():LookupSequence(anim) or anim)
+		local mdl = self:GetWM()
+		local seq = anim
+		if isstring(seq) then
+			seq = mdl:LookupSequence(seq)
+		end
+		if isnumber(seq) and seq >= 0 and (not mdl.GetSequenceCount or seq < mdl:GetSequenceCount()) then
+			mdl:SetSequence(seq)
+			mdl.ZCAnimAssigned = true
+		end
 		self.animtime = CurTime() + time
 		self.animduration = time
 		self.slowmoanim = slowmo and time or nil
@@ -2289,7 +2376,7 @@ if CLIENT then
 				if CLIENT and self.IsLocal and not self:IsLocal() and owner.PlayerClassName == "headcrabzombie" then
 					owner:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_GMOD_GESTURE_RANGE_ZOMBIE, true)
 				else
-					owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD,owner:LookupSequence((special_attack or rand) and "range_fists_r" or "range_fists_l"),0,true)
+					addHandsGestureSafe(owner, anim == "fists_left" and "range_fists_l" or "range_fists_r")
 				end
 			end
 		end

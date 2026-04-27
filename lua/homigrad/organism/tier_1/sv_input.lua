@@ -752,7 +752,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if true and outputHole and #outputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
 		local bullet = inf.bullet
 		ent.bloodamt = ent.bloodamt or 0
-		ent.bloodamt = ent.bloodamt + 1
+		--ent.bloodamt = ent.bloodamt + 1
 		
 		-- Exit wound blood loss
 		org.blood = org.blood - 50
@@ -765,7 +765,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			net.WriteVector(outputHole[#outputHole])
 			net.WriteVector((-outputDir):GetNormalized() * 2 + VectorRand(-0.5, 0.5))
 			net.WriteFloat(dmg * 2)
-			net.WriteInt(math.min(ent.bloodamt * 2, 255), 8)
+			net.WriteInt(math.min(2, 255), 8)
 			net.Broadcast()
 
 			/*if IsValid(ent) then
@@ -875,7 +875,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	if inputHole and #inputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
 		ent.bloodamt2 = ent.bloodamt2 or 0
-		ent.bloodamt2 = ent.bloodamt2 + 1
+		--ent.bloodamt2 = ent.bloodamt2 + 1
 
 		timer.Simple(0, function()
 			timer.Create("Blood_burst_input"..ent:EntIndex(), 0.02, 1, function()
@@ -884,7 +884,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				net.WriteVector(inputHole[1])
 				net.WriteVector(dir / 2)
 				net.WriteFloat(dmg)
-				net.WriteInt(ent.bloodamt2, 8)
+				net.WriteInt(1, 8)
 				net.Broadcast()
 
 				for i = 1, 3 do
