@@ -103,9 +103,9 @@ function hg.Ragdoll_Create(ply)
 	ragdoll.CurAppearance = table.Copy(ply.CurAppearance)
 
 	local bodygroups = ply:GetBodyGroups()
-	ragdoll:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 	ragdoll:Spawn()
 	ragdoll:Activate()
+	hg.ApplySetCollisionGroupNow(ragdoll, COLLISION_GROUP_NONE)
 	ragdoll:AddEFlags(EFL_NO_DAMAGE_FORCES + EFL_DONTBLOCKLOS)
 	--ragdoll:AddFlags(FL_NOTARGET)
 	--ply:AddFlags(FL_NOTARGET)
@@ -577,7 +577,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		//ply:Spectate(OBS_MODE_FREEZECAM)
 		//ply:UnSpectate()
 		--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
-		ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
+		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
 		ply:SetPos(pos)
 		ply:SetNoDraw(false)
 		ply:SetRenderMode(RENDERMODE_NONE)
@@ -585,7 +585,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 	--end)
 
 	timer.Simple(0, function() -- bandaid shitfix for now
-		ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
+		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
 	end)
 
 	if ply:FlashlightIsOn() then ply:Flashlight(false) end
@@ -819,9 +819,7 @@ function hg.FakeUp(ply, forced, instant)
 
 				ply:DrawShadow(true)
 				ply:SetRenderMode(RENDERMODE_NORMAL)
-				ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
-				ply.fakecd = CurTime() + 2
-				ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
+				hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
 
 				--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 				hg.ragdollFake[ply] = nil
@@ -834,7 +832,7 @@ function hg.FakeUp(ply, forced, instant)
 		else
 			ply:DrawShadow(true)
 			ply:SetRenderMode(RENDERMODE_NORMAL)
-			ply:SetCollisionGroup(ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
+			hg.ApplySetCollisionGroupNow(ply, ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
 			ply:SetMoveType(ply.switchingseat and MOVETYPE_NONE or MOVETYPE_WALK)
 			ply.fakecd = CurTime() + 2
 			ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
@@ -991,7 +989,7 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 		hg.FakeUp(ply, true, ply.switchingseat)
 	else
 		if ragdoll then
-			ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
+			hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
 			--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
 			ragdoll.removingwelds = true
 
@@ -1012,7 +1010,7 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 				veh:EmitSound("zbattle/glass_shatter.ogg")
 			end
 		else
-			ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
+			hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
 			--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 		end
 	end
@@ -1201,6 +1199,106 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 	end]]
 
 	rag.NextSND = data.DeltaTime + 1
+end)
+
+local hg_corpse_settle_delay = ConVarExists("hg_corpse_settle_delay") and GetConVar("hg_corpse_settle_delay") or CreateConVar("hg_corpse_settle_delay", "10", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Delay before settled corpse ragdolls are put to sleep.", 0, 300)
+local hg_corpse_cleanup_max = ConVarExists("hg_corpse_cleanup_max") and GetConVar("hg_corpse_cleanup_max") or CreateConVar("hg_corpse_cleanup_max", "18", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Maximum amount of inactive corpse ragdolls before oldest ones start getting cleaned up. 0 disables corpse culling.", 0, 128)
+local hg_corpse_cleanup_age = ConVarExists("hg_corpse_cleanup_age") and GetConVar("hg_corpse_cleanup_age") or CreateConVar("hg_corpse_cleanup_age", "45", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Minimum corpse age before the automatic ragdoll cleanup can remove it.", 0, 1800)
+local hg_corpse_cleanup_player_radius = ConVarExists("hg_corpse_cleanup_player_radius") and GetConVar("hg_corpse_cleanup_player_radius") or CreateConVar("hg_corpse_cleanup_player_radius", "350", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Corpses near living players are preserved by the automatic ragdoll cleanup.", 0, 5000)
+
+local function IsLiveManagedRagdoll(rag)
+	if not IsValid(rag) then return false end
+
+	local owner = hg.RagdollOwner(rag)
+	if not IsValid(owner) then
+		owner = rag:GetNWEntity("ply")
+	end
+
+	return IsValid(owner) and owner:IsPlayer() and owner:Alive()
+end
+
+local function RagdollIsSettled(rag)
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		local phys = rag:GetPhysicsObjectNum(i)
+		if not IsValid(phys) then continue end
+		if phys:GetVelocity():LengthSqr() > 256 then return false end
+	end
+
+	return true
+end
+
+local function HasNearbyLivingPlayer(pos, radius)
+	local radiusSqr = radius * radius
+
+	for _, ply in ipairs(player.GetAll()) do
+		if IsValid(ply) and ply:Alive() and ply:GetPos():DistToSqr(pos) <= radiusSqr then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function SettleCorpseRagdoll(rag)
+	if rag.hg_corpseSettled then return end
+
+	rag.hg_corpseSettled = true
+	hg.SafeSetCollisionGroup(rag, COLLISION_GROUP_DEBRIS)
+
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		local phys = rag:GetPhysicsObjectNum(i)
+		if IsValid(phys) then phys:Sleep() end
+	end
+end
+
+timer.Create("hg_corpse_optimizer", 5, 0, function()
+	local corpses = {}
+	local now = CurTime()
+
+	for _, rag in ipairs(ents.FindByClass("prop_ragdoll")) do
+		if not IsValid(rag) then continue end
+
+		rag.hg_corpseSpawnTime = rag.hg_corpseSpawnTime or now
+
+		if IsLiveManagedRagdoll(rag) or IsValid(rag:GetParent()) or rag:GetCustomCollisionCheck() then
+			rag.hg_corpseSettled = nil
+
+			if rag:GetCollisionGroup() == COLLISION_GROUP_DEBRIS then
+				hg.SafeSetCollisionGroup(rag, COLLISION_GROUP_NONE)
+			end
+
+			continue
+		end
+
+		corpses[#corpses + 1] = rag
+
+		if (now - rag.hg_corpseSpawnTime) >= hg_corpse_settle_delay:GetFloat() and RagdollIsSettled(rag) then
+			SettleCorpseRagdoll(rag)
+		end
+	end
+
+	local maxCorpses = math.max(hg_corpse_cleanup_max:GetInt(), 0)
+	if maxCorpses <= 0 or #corpses <= maxCorpses then return end
+
+	table.sort(corpses, function(a, b)
+		return (a.hg_corpseSpawnTime or now) < (b.hg_corpseSpawnTime or now)
+	end)
+
+	local minAge = hg_corpse_cleanup_age:GetFloat()
+	local keepRadius = hg_corpse_cleanup_player_radius:GetFloat()
+	local toRemove = #corpses - maxCorpses
+
+	for i = 1, #corpses do
+		if toRemove <= 0 then break end
+
+		local rag = corpses[i]
+		if not IsValid(rag) then continue end
+		if (now - (rag.hg_corpseSpawnTime or now)) < minAge then break end
+		if HasNearbyLivingPlayer(rag:GetPos(), keepRadius) then continue end
+
+		rag:Remove()
+		toRemove = toRemove - 1
+	end
 end)
 
 local hg_shitty_fake = CreateConVar("hg_shitty_fake", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "enable shitty fake", 0, 1)

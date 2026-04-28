@@ -43,6 +43,120 @@ end
 local max_reasonable_pos 		= 25000
 local min_reasonable_pos 		= -25000
 
+hg = hg or {}
+hg._queuedCollisionRuleRefresh = hg._queuedCollisionRuleRefresh or {}
+hg._queuedCollisionGroupChanges = hg._queuedCollisionGroupChanges or {}
+hg._queuedCustomCollisionChecks = hg._queuedCustomCollisionChecks or {}
+
+function hg.QueueCollisionRulesChanged(ent)
+	if not IsValid(ent) then return end
+	hg._queuedCollisionRuleRefresh[ent] = true
+end
+
+function hg.QueueSetCollisionGroup(ent, collisionGroup)
+	if not IsValid(ent) then return end
+	hg._queuedCollisionGroupChanges[ent] = collisionGroup
+end
+
+function hg.QueueSetCustomCollisionCheck(ent, enabled)
+	if not IsValid(ent) then return end
+	hg._queuedCustomCollisionChecks[ent] = enabled and true or false
+end
+
+function hg.SafeSetCustomCollisionCheck(ent, enabled)
+	if not IsValid(ent) then return end
+
+	if hg.QueueSetCustomCollisionCheck then
+		hg.QueueSetCustomCollisionCheck(ent, enabled)
+	else
+		ent:SetCustomCollisionCheck(enabled)
+	end
+end
+
+function hg.SafeSetCollisionGroup(ent, collisionGroup)
+	if not IsValid(ent) then return end
+
+	if hg.QueueSetCollisionGroup then
+		hg.QueueSetCollisionGroup(ent, collisionGroup)
+	else
+		ent:SetCollisionGroup(collisionGroup)
+	end
+end
+
+function hg.SafeCollisionRulesChanged(ent)
+	if not IsValid(ent) then return end
+
+	if hg.QueueCollisionRulesChanged then
+		hg.QueueCollisionRulesChanged(ent)
+	else
+		ent:CollisionRulesChanged()
+	end
+end
+
+function hg.ApplyCollisionRulesChangedNow(ent)
+	if not IsValid(ent) then return end
+
+	hg._queuedCollisionRuleRefresh[ent] = nil
+	ent:CollisionRulesChanged()
+end
+
+function hg.ApplySetCollisionGroupNow(ent, collisionGroup, refreshRules)
+	if not IsValid(ent) then return end
+
+	hg._queuedCollisionGroupChanges[ent] = nil
+
+	if ent:GetCollisionGroup() ~= collisionGroup then
+		ent:SetCollisionGroup(collisionGroup)
+	end
+
+	if refreshRules ~= false then
+		hg.ApplyCollisionRulesChangedNow(ent)
+	end
+end
+
+function hg.ApplySetCustomCollisionCheckNow(ent, enabled, refreshRules)
+	if not IsValid(ent) then return end
+
+	hg._queuedCustomCollisionChecks[ent] = nil
+	enabled = enabled and true or false
+
+	if ent:GetCustomCollisionCheck() ~= enabled then
+		ent:SetCustomCollisionCheck(enabled)
+	end
+
+	if refreshRules ~= false then
+		hg.ApplyCollisionRulesChangedNow(ent)
+	end
+end
+
+if SERVER then
+	hook.Add("Tick", "hg_queue_collision_rules_changed", function()
+		for ent, enabled in pairs(hg._queuedCustomCollisionChecks) do
+			hg._queuedCustomCollisionChecks[ent] = nil
+
+			if IsValid(ent) and ent:GetCustomCollisionCheck() ~= enabled then
+				ent:SetCustomCollisionCheck(enabled)
+			end
+		end
+
+		for ent, collisionGroup in pairs(hg._queuedCollisionGroupChanges) do
+			hg._queuedCollisionGroupChanges[ent] = nil
+
+			if IsValid(ent) and ent:GetCollisionGroup() ~= collisionGroup then
+				ent:SetCollisionGroup(collisionGroup)
+			end
+		end
+
+		for ent in pairs(hg._queuedCollisionRuleRefresh) do
+			hg._queuedCollisionRuleRefresh[ent] = nil
+
+			if IsValid(ent) then
+				ent:CollisionRulesChanged()
+			end
+		end
+	end)
+end
+
 function IsReasonable( pos )
 	local posY, posZ = pos.y, pos.z
 
