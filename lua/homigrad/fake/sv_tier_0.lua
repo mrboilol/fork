@@ -1286,46 +1286,60 @@ IsLiveManagedRagdoll = function(rag)
 	return IsValid(owner) and owner:IsPlayer() and owner:Alive()
 end
 
-local function GetLiveManagedRagdollOwner(rag)
-	if not IsValid(rag) or not rag:IsRagdoll() then return end
+timer.Create("hg_fake_ragdoll_bodyblock", 0.04, 0, function()
+	local now = CurTime()
 
-	local owner = hg.RagdollOwner(rag)
-	if not IsValid(owner) then
-		owner = rag:GetNWEntity("ply")
+	for owner, rag in pairs(hg.ragdollFake) do
+		if not IsValid(owner) or not IsValid(rag) then
+			hg.ragdollFake[owner] = nil
+			continue
+		end
+
+		if not owner:Alive() or not IsLiveManagedRagdoll(rag) then continue end
+
+		local velocity = rag:GetVelocity()
+		local horizontalVelocity = Vector(velocity.x, velocity.y, 0)
+		local speed = horizontalVelocity:Length()
+		if speed < 75 then continue end
+
+		rag.hg_fakeLegBlockCooldown = rag.hg_fakeLegBlockCooldown or 0
+		if rag.hg_fakeLegBlockCooldown > now then continue end
+
+		local ragPos = rag:GetPos()
+		local moveDir = speed > 0 and horizontalVelocity / speed or nil
+		local radius = math.Clamp(18 + speed * 0.015, 22, 30)
+
+		for _, target in ipairs(ents.FindInSphere(ragPos, radius)) do
+			if not IsValid(target) or not target:IsPlayer() or not target:Alive() or target == owner then continue end
+			if IsValid(target.FakeRagdoll) then continue end
+
+			local targetPos = target:GetPos()
+			if math.abs((ragPos.z + 12) - targetPos.z) > 52 then continue end
+
+			local toTarget = targetPos - ragPos
+			local horizontalToTarget = Vector(toTarget.x, toTarget.y, 0)
+			local horizontalDistanceSqr = horizontalToTarget:LengthSqr()
+			if horizontalDistanceSqr > radius * radius then continue end
+
+			if moveDir and horizontalDistanceSqr > 1 then
+				local towardTarget = horizontalToTarget:GetNormalized()
+				if moveDir:Dot(towardTarget) < -0.1 then continue end
+			end
+
+			local awayDir
+			if horizontalDistanceSqr > 1 then
+				awayDir = -horizontalToTarget:GetNormalized()
+			elseif moveDir then
+				awayDir = -moveDir
+			else
+				awayDir = Vector(0, 0, 0)
+			end
+
+			rag.hg_fakeLegBlockCooldown = now + 0.1
+			PushManagedRagdollAway(rag, awayDir, math.Clamp(speed * 0.9, 90, 160))
+			break
+		end
 	end
-
-	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then
-		return
-	end
-
-	if owner.FakeRagdoll ~= rag then
-		return
-	end
-
-	return owner
-end
-
-hook.Add("ShouldCollide", "hg_fake_ragdoll_player_block", function(ent1, ent2)
-	local ply, rag
-
-	if ent1:IsPlayer() and ent2:IsRagdoll() then
-		ply, rag = ent1, ent2
-	elseif ent2:IsPlayer() and ent1:IsRagdoll() then
-		ply, rag = ent2, ent1
-	else
-		return
-	end
-
-	if not IsValid(ply) or not ply:Alive() then
-		return
-	end
-
-	local owner = GetLiveManagedRagdollOwner(rag)
-	if not owner or owner == ply then
-		return
-	end
-
-	return true
 end)
 
 local function RagdollIsSettled(rag)
