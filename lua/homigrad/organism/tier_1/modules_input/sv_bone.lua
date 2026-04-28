@@ -7,6 +7,18 @@ local function PlayBoneBreakSound(entity)
     end
 end
 
+local function CheckConcussionFlash(org, old_concussion, dmgInfo)
+    if old_concussion < 1.5 and org.concussion >= 1.5 then
+        net.Start("headtrauma_flash")
+        net.WriteVector(dmgInfo:GetDamagePosition())
+        net.WriteFloat(2.0) -- flash_intensity
+        net.WriteInt(300, 20) -- flash_duration
+        net.WriteBool(true) -- is_critical
+        net.WriteBool(false) -- play_knockout_sound
+        net.Send(org.owner)
+    end
+end
+
 local function isCrush(dmgInfo)
 	return (not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)) or dmgInfo:GetInflictor().RubberBullets
 end
@@ -252,6 +264,7 @@ local jaw_dislocated_msg = {
 local input_list = hg.organism.input_list
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.jaw
+	local old_concussion = org.concussion or 0
 
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 
@@ -309,6 +322,7 @@ PlayBoneBreakSound(org.owner)
 		net.Broadcast()
 	end
 
+	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result, vecrand
 end
 
@@ -322,6 +336,7 @@ end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.skull
+	local old_concussion = org.concussion or 0
 	
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
@@ -401,6 +416,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
 
+	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand
 end
 
