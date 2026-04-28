@@ -759,15 +759,86 @@ Can detect presence and potency of chemical agents in the air.]],
 			ply:Give("weapon_traitor_poison3")
 			ply:Give("weapon_traitor_poison4")
 			ply:Give("weapon_traitor_poison_consumable")
+			ply:Give("weapon_traitor_sleepcanister")
+			ply:Give("weapon_zc_fiberwire_standalone")
 			
 			ply.organism.stamina.max = 220
 			local inv = ply:GetNetVar("Inventory", {})
 			inv["Weapons"]["hg_flashlight"] = true
 			
 			ply:SetNetVar("Inventory", inv)
-			if CleanChemicalsOfPlayer then
-				CleanChemicalsOfPlayer(ply)
+			MODE.CleanChemicalsOfPlayer(ply)
+		end,
+	},	
+	--==//
+	
+	--==\\
+	["traitor_shadow"] = {
+		Name = "Shadow",
+		Description = [[A master of silent elimination.
+Can camouflage when standing still next to a wall for 5 seconds while upright.
+Equipped with concealed weapons that won't be visible on your body.
+Uses tranquilizer gun, tetrodoxin, handcuffs and a disguise.
+Enhanced stealth capabilities with increased stamina. (+40 units)
+For those who prefer to kill from the shadows.]],
+		Objective = "You're a silent killer. Stay hidden, isolate targets and eliminate them without being detected.",
+		SpawnFunction = function(ply)
+			local tranq = ply:Give("weapon_tranquilizer")
+			if IsValid(tranq) then
+				local playerCount = #player.GetAll()
+				local ammoAmount = math.max(1, math.floor(playerCount / 6))
+				ply:GiveAmmo(tranq:GetMaxClip1() * ammoAmount, tranq:GetPrimaryAmmoType(), true)
 			end
+			ply:Give("weapon_sogknife")
+			ply:Give("weapon_traitor_poison1")
+			ply:Give("weapon_traitor_suit")
+			ply:Give("weapon_adrenaline")
+			ply:Give("weapon_handcuffs")
+			ply:Give("weapon_hg_smokenade_tpik")
+			ply:Give("weapon_fiberwire")
+			
+			ply.organism.stamina.max = 260
+			local inv = ply:GetNetVar("Inventory", {})
+			inv["Weapons"]["hg_flashlight"] = true
+			
+			ply:SetNetVar("Inventory", inv)
+		end,
+	},
+	--==//
+	
+	--==\\
+	["traitor_shadow_soe"] = {
+		Name = "Shadow",
+		Description = [[A master of silent elimination.
+Can camouflage when standing still next to a wall for 5 seconds while upright.
+Equipped with concealed weapons that won't be visible on your body.
+Uses tranquilizer gun, tetrodoxin, handcuffs and a disguise.
+Enhanced stealth capabilities with increased stamina. (+40 units)
+For those who prefer to kill from the shadows.]],
+		Objective = "You're a silent killer. Use your concealed weapons to eliminate targets without being detected.",
+		SpawnFunction = function(ply)
+			-- Silent tranquilizer gun for ranged takedowns
+			local tranq = ply:Give("weapon_tranquilizer")
+			if IsValid(tranq) then
+				-- Dynamic ammo based on player count for balance
+				local playerCount = #player.GetAll()
+				local ammoAmount = math.max(1, math.floor(playerCount / 6)) -- 1 mag per 6 players, minimum 1
+				ply:GiveAmmo(tranq:GetMaxClip1() * ammoAmount, tranq:GetPrimaryAmmoType(), true)
+			end
+			ply:Give("weapon_sogknife")
+			ply:Give("weapon_traitor_poison1")
+			ply:Give("weapon_traitor_suit")
+			ply:Give("weapon_walkie_talkie")
+			ply:Give("weapon_adrenaline")
+			ply:Give("weapon_handcuffs")
+			ply:Give("weapon_hg_smokenade_tpik")
+			ply:Give("weapon_zc_fiberwire_standalone")
+			
+			ply.organism.stamina.max = 260
+			local inv = ply:GetNetVar("Inventory", {})
+			inv["Weapons"]["hg_flashlight"] = true
+			
+			ply:SetNetVar("Inventory", inv)
 		end,
 	},
 	["traitor_martial_artist"] = {
@@ -896,6 +967,7 @@ MODE.RoleChooseRoundTypes = {
 			["traitor_default"] = true,
 			["traitor_infiltrator"] = true,
 			["traitor_chemist"] = true,
+			["traitor_shadow"] = true,
 			["traitor_assasin"] = true,
 			--; ОБЪЕДЕНИТЬ ХИМИКА И ДИВЕРСАНТА!!! наверное
 			-- ["traitor_demoman"] = true,

@@ -118,11 +118,86 @@ end
 
 APmodule.ForceApplyAppearance = ForceApplyAppearance
 
+local function CopyAppearanceAccessories(value)
+    if istable(value) then
+        return table.Copy(value)
+    end
+
+    return value
+end
+
+local function AccessoriesStateEqual(a, b)
+    if istable(a) or istable(b) then
+        if !istable(a) or !istable(b) then return false end
+        if table.Count(a) != table.Count(b) then return false end
+
+        for key, value in pairs(a) do
+            if b[key] != value then
+                return false
+            end
+        end
+
+        for key, value in pairs(b) do
+            if a[key] != value then
+                return false
+            end
+        end
+
+        return true
+    end
+
+    return a == b
+end
+
+local function CaptureLateReplayState(ply)
+    return {
+        model = ply:GetModel(),
+        className = ply.PlayerClassName or "",
+        accessories = CopyAppearanceAccessories(ply:GetNetVar("Accessories", "none"))
+    }
+end
+
+local function ClearLateReplayState(ply)
+    ply.ZCLateAppearanceReplayState = nil
+    ply.ZCLateAppearanceReplayExpires = nil
+end
+
+local function ShouldLateReplayCachedAppearance(ply)
+    if !IsValid(ply) or !ply:IsPlayer() then return false end
+    if APmodule.IsPermamodelEnabled(ply) then return false end
+    if !ply:Alive() then return false end
+
+    local state = ply.ZCLateAppearanceReplayState
+    local expires = ply.ZCLateAppearanceReplayExpires or 0
+    if !istable(state) or expires < CurTime() then
+        ClearLateReplayState(ply)
+        return false
+    end
+
+    if ply:GetModel() != state.model then
+        ClearLateReplayState(ply)
+        return false
+    end
+
+    if (ply.PlayerClassName or "") != (state.className or "") then
+        ClearLateReplayState(ply)
+        return false
+    end
+
+    if !AccessoriesStateEqual(ply:GetNetVar("Accessories", "none"), state.accessories) then
+        ClearLateReplayState(ply)
+        return false
+    end
+
+    return true
+end
+
 local tWaitResponse = {}
 
 function ApplyAppearance(Client,tAppearance,bRandom,bResponeIsValid,bUseCahsed)
     if not IsValid(Client) then return end
     if bRandom or (Client.IsBot and Client:IsBot()) or (Client.IsRagdoll and Client:IsRagdoll()) then
+        ClearLateReplayState(Client)
         tAppearance = APmodule.GetRandomAppearance()
         WearAppearance(Client,tAppearance)
         return
@@ -135,6 +210,8 @@ function ApplyAppearance(Client,tAppearance,bRandom,bResponeIsValid,bUseCahsed)
         net.Start("OnlyGet_Appearance")
         net.Send(Client)
         WearAppearance(Client,tAppearance)
+        Client.ZCLateAppearanceReplayState = CaptureLateReplayState(Client)
+        Client.ZCLateAppearanceReplayExpires = CurTime() + 5
         return
     end
 
@@ -151,6 +228,7 @@ function ApplyAppearance(Client,tAppearance,bRandom,bResponeIsValid,bUseCahsed)
     if !tAppearance then ApplyAppearance(Client,nil,true) return end
     if !APmodule.AppearanceValidater(tAppearance) then ApplyAppearance(Client,nil,true) return end
 
+    ClearLateReplayState(Client)
     WearAppearance(Client,tAppearance)
 end
 
@@ -170,6 +248,23 @@ net.Receive("OnlyGet_Appearance",function(len,client)
     local bRandom = !tAppearance or table.IsEmpty(tAppearance)
     --client:ChatPrint(bRandom)
     client.CachedAppearance = bRandom and APmodule.GetRandomAppearance() or tAppearance
+
+    if !ShouldLateReplayCachedAppearance(client) then return end
+    if !APmodule.AppearanceValidater(client.CachedAppearance) then
+        ClearLateReplayState(client)
+        return
+    end
+
+    timer.Simple(0, function()
+        if !ShouldLateReplayCachedAppearance(client) then return end
+        if !APmodule.AppearanceValidater(client.CachedAppearance) then
+            ClearLateReplayState(client)
+            return
+        end
+
+        ClearLateReplayState(client)
+        WearAppearance(client, table.Copy(client.CachedAppearance))
+    end)
 end)
 
 APmodule.ApplyAppearance = ApplyAppearance
