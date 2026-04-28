@@ -761,12 +761,14 @@ hook.Add("HUDPaint","Identifier",function()
 	if !lply:Alive() then return end
 	if lply:GetNetVar("disappearance", nil) then return end 
 	
-	local trace = hg.eyeTrace(lply)
+	local cache = getCachedHudTrace()
+	local trace = cache.trace
 	
 	if not trace then return end
 
-	local Size = math.max(math.min(1 - trace.Fraction, 1), 0.1)
-	local x, y = trace.HitPos:ToScreen().x, trace.HitPos:ToScreen().y
+	local Size = cache.size
+	local x, y = getCachedHudTraceScreen(trace)
+	if not x then return end
 
 	if trace.Hit and (trace.Entity:IsRagdoll() or trace.Entity:IsPlayer()) then
 		if trace.Entity.PlayerClassName == "sc_infiltrator" then return end
@@ -800,7 +802,8 @@ hook.Add("HUDPaint","EntHints",function()
 	if lply.organism and lply.organism.otrub then return end
 	if !lply:Alive() then return end
 	
-	local trace = hg.eyeTrace(lply)
+	local cache = getCachedHudTrace()
+	local trace = cache.trace
 
 	if not trace then return end
 
@@ -1225,7 +1228,8 @@ function hg.BasicHudHint(ent, trace)
 
 	if not hint then return end
 
-	local x, y = trace.HitPos:ToScreen().x, trace.HitPos:ToScreen().y
+	local x, y = getCachedHudTraceScreen(trace)
+	if not x then return end
 	y = y + 145 + -45
 
 	draw.RoundedBox(2, x - hint:GetWidth() / 2 - 2.5, y - 2.5, hint:GetWidth() + 5, hint:GetHeight() + 5, HintBackgroundColor)

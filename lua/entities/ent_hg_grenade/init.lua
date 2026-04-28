@@ -63,6 +63,43 @@ function ENT:Use(ply)
 	self.owner = ply
 end
 
+local vecCone = Vector(0, 0, 0)
+local GRENADE_SOUND_RADIUS_SQR = 4500 * 4500
+local GRENADE_NEARBY_ENTITY_CAP = 20
+local GRENADE_PLAYER_EFFECT_CAP = 8
+local GRENADE_PHYSICS_PUSH_CAP = 10
+local GRENADE_SHRAPNEL_SAMPLE_CAP = 96
+local GRENADE_SHRAPNEL_BATCH_RESUMES = 3
+local GRENADE_SHRAPNEL_SLICE_TIME = 0.0008
+local GRENADE_CROWD_PLAYER_THRESHOLD = 10
+local GRENADE_CROWD_PLAYER_THRESHOLD_EXTREME = 16
+local GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP = 24
+local GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP_EXTREME = 12
+local GRENADE_CROWD_ENTITY_CAP = 12
+local GRENADE_CROWD_ENTITY_CAP_EXTREME = 8
+
+local function sendFarSound(self, nearSound, farSound, waterSound)
+	local recipients = {}
+	local pos = self:GetPos()
+
+	for _, ply in ipairs(player.GetHumans()) do
+		if IsValid(ply) and ply:GetPos():DistToSqr(pos) <= GRENADE_SOUND_RADIUS_SQR then
+			recipients[#recipients + 1] = ply
+		end
+	end
+
+	if #recipients == 0 then return end
+
+	net.Start("projectileFarSound")
+		net.WriteString(nearSound)
+		net.WriteString(farSound)
+		net.WriteVector(pos)
+		net.WriteEntity(self)
+		net.WriteBool(self:WaterLevel() > 0)
+		net.WriteString(waterSound)
+	net.Send(recipients)
+end
+
 function ENT:Think()
 	if CLIENT then return end
 	self:NextThink(CurTime())
@@ -357,9 +394,28 @@ function ENT:Explode()
 
 	--;; Расскажу вам тайну но у нас трассировка делалась просто ужасно
 	local dis = self.BlastDis / 0.01905
-	local disorientation_dis = 6 / 0.01905  
+	local disorientation_dis = 6 / 0.01905
+	local nearbyPlayerCount = 0
+	for _, ply in ipairs(player.GetHumans()) do
+		if not IsValid(ply) or not ply:Alive() then continue end
+		if ply:GetPos():DistToSqr(selfPos) <= disorientation_dis * disorientation_dis then
+			nearbyPlayerCount = nearbyPlayerCount + 1
+		end
+	end
+
+	local nearbyEntityCap = GRENADE_NEARBY_ENTITY_CAP
+	if nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD_EXTREME then
+		nearbyEntityCap = GRENADE_CROWD_ENTITY_CAP_EXTREME
+	elseif nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD then
+		nearbyEntityCap = GRENADE_CROWD_ENTITY_CAP
+	end
+
 	local entsCount = 0
 	for i, enta in ipairs(ents.FindInSphere(selfPos, disorientation_dis)) do
+		if processedEnts >= nearbyEntityCap then break end
+		if not IsValid(enta) then continue end
+		processedEnts = processedEnts + 1
+
 		local tracePos = enta:IsPlayer() and (enta:GetPos() + enta:OBBCenter()) or enta:GetPos()
 		local tr = hg.ExplosionTrace(selfPos, tracePos, {self})
 		local phys = enta:GetPhysicsObject()
@@ -421,13 +477,17 @@ function ENT:Explode()
 		
 		local ammo = "Metal Debris"
 		local ammotype = hg.ammotypeshuy[ammo].BulletSettings
-		
-		local co = coroutine.create(function()
+		local sampleCount = math.min(self.Fragmentation, GRENADE_SHRAPNEL_SAMPLE_CAP)
+		if nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD_EXTREME then
+			sampleCount = math.min(sampleCount, GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP_EXTREME)
+		elseif nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD then
+			sampleCount = math.min(sampleCount, GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP)
+		end
 
-			local LastShrapnel = SysTime()
-
-			for i = 1, self.Fragmentation do
-					LastShrapnel = SysTime()
+		self.ShrapnelDone = false
+		self.ShrapnelCoroutine = coroutine.create(function()
+			for i = 1, sampleCount do
+				local shrapnelStart = SysTime()
 
 					local dir = VectorRand(-1,1):GetNormalized()--vector_up
 					dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)

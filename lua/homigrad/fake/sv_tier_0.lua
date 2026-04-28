@@ -126,6 +126,7 @@ function hg.Ragdoll_Create(ply)
 	ragdoll.CurAppearance = table.Copy(ply.CurAppearance)
 
 	local bodygroups = ply:GetBodyGroups()
+	hg.SafeSetCollisionGroup(ragdoll, COLLISION_GROUP_WEAPON)
 	ragdoll:Spawn()
 	ragdoll:Activate()
 	hg.ApplySetCollisionGroupNow(ragdoll, COLLISION_GROUP_WEAPON)
@@ -424,7 +425,7 @@ end
 
 hook.Add("PlayerSpawn", "Fake", function(ply)
 	ply:RemoveFlags(FL_NOTARGET)
-	hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+	hg.SafeSetCollisionGroup(ply, COLLISION_GROUP_PLAYER)
 	if OverrideSpawn then return end
 	if ply.gottarespawn then
 		ply:SetNWEntity("RagdollDeath", NULL)
@@ -558,6 +559,7 @@ function hg.ApplyPoses(ply)
 end
 
 function hg.Fake(ply, huyragdoll, no_freemove, force)
+	if not IsValid(ply) then return end
 	ply.switchingseat = nil
 	if ply:GetMoveType() == 0 then return end
 	if ply.InVehicle and ply:InVehicle() and not force then return end
@@ -600,7 +602,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		//ply:Spectate(OBS_MODE_FREEZECAM)
 		//ply:UnSpectate()
 		--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
-		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
+		hg.SafeSetCollisionGroup(ply, COLLISION_GROUP_IN_VEHICLE)
 		ply:SetPos(pos)
 		ply:SetNoDraw(false)
 		ply:SetRenderMode(RENDERMODE_NONE)
@@ -608,7 +610,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 	--end)
 
 	timer.Simple(0, function() -- bandaid shitfix for now
-		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
+		hg.SafeSetCollisionGroup(ply, COLLISION_GROUP_IN_VEHICLE)
 	end)
 
 	if ply:FlashlightIsOn() then ply:Flashlight(false) end
@@ -842,7 +844,7 @@ function hg.FakeUp(ply, forced, instant)
 
 				ply:DrawShadow(true)
 				ply:SetRenderMode(RENDERMODE_NORMAL)
-				hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+				hg.SafeSetCollisionGroup(ply, COLLISION_GROUP_PLAYER)
 
 				--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 				hg.ragdollFake[ply] = nil
@@ -855,7 +857,7 @@ function hg.FakeUp(ply, forced, instant)
 		else
 			ply:DrawShadow(true)
 			ply:SetRenderMode(RENDERMODE_NORMAL)
-			hg.ApplySetCollisionGroupNow(ply, ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
+			hg.SafeSetCollisionGroup(ply, ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
 			ply:SetMoveType(ply.switchingseat and MOVETYPE_NONE or MOVETYPE_WALK)
 			ply.fakecd = CurTime() + 2
 			ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
@@ -958,7 +960,7 @@ hook.Add("PlayerEnteredVehicle","allowweapons",function(ply,veh,role)
 		ply:SetEyeAngles(angle_zero)
 		hg.Fake(ply, nil, nil, true)
 		
-		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+		hg.SafeSetCollisionGroup(ply, COLLISION_GROUP_PLAYER)
 		--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 	end)
 
@@ -1012,7 +1014,7 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 		hg.FakeUp(ply, true, ply.switchingseat)
 	else
 		if ragdoll then
-			hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
+			hg.SafeSetCollisionGroup(ply, COLLISION_GROUP_IN_VEHICLE)
 			--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
 			ragdoll.removingwelds = true
 
@@ -1033,7 +1035,7 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 				veh:EmitSound("zbattle/glass_shatter.ogg")
 			end
 		else
-			hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+			hg.SafeSetCollisionGroup(ply, COLLISION_GROUP_PLAYER)
 			--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 		end
 	end
@@ -1127,7 +1129,7 @@ ragdoll.Appearance = ent.Appearance
 ragdoll:SetModel(ent:GetModel())
 ragdoll:SetPos(ent:GetPos())
 ragdoll:Spawn()
-ragdoll:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+	hg.SafeSetCollisionGroup(ragdoll, COLLISION_GROUP_DEBRIS)
 ent:SetRenderMode(RENDERMODE_NONE)
 ent:SetNWEntity("huy",ragdoll)
 ApplyAppearanceRagdoll(ent,ragdoll)
