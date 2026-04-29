@@ -189,7 +189,7 @@ hook.Add("Think", "stanleytumbler", function()
                         end
                     elseif math.random() < dislocationChance then
                         -- Limb dislocation
-                        ply:EmitSound("disloc"..math.random(1, 2)..".wav")
+                        ply:EmitSound("owfuck"..math.random(1, 6)..".ogg")
                         org.painadd = (org.painadd or 0) + 35
 
                         if tripType == "wall" then

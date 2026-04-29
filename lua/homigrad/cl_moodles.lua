@@ -165,10 +165,11 @@ local VITAL_MOODLES = {
 -- =======================================================
 local MOODLE_INFO = {
     ["amputation"] = { title = "Amputation", desc = "One of your limbs is missing!" },
-    ["bleeding_1"] = { title = "Minor Bleeding", desc = "Blood is leaking out of you, but it should be alright." },
-    ["bleeding_2"] = { title = "Moderate Bleeding", desc = "Losing more blood than usual, this one probably wont clot." },
-    ["bleeding_3"] = { title = "Severe Bleeding", desc = "Blood is leaking out of you, patch it up!" },
-    ["bleeding_4"] = { title = "Catastrophic Bleeding", desc = "Why are you looking at this? Go find a bandage!" },
+    ["bleeding_1"] = { title = "Minor Bleeding", desc = "A small cut, it should stop on its own." },
+    ["bleeding_2"] = { title = "Moderate Bleeding", desc = "This wound is a bit deeper, it might need a bandage." },
+    ["bleeding_3"] = { title = "Severe Bleeding", desc = "You are losing blood at an alarming rate, you need to patch this up now!" },
+    ["bleeding_4"] = { title = "Catastrophic Bleeding", desc = "Your life is draining away, you need immediate medical attention!" },
+    ["bleeding_5"] = { title = "Hemorrhage", desc = "You are about to bleed out. This is your final moment." },
     ["bradycardia"] = { title = "Bradycardia", desc = "Your heart rate is low, something might be wrong..." },
     ["brain_damage_1"] = { title = "Minor Brain Damage", desc = "Huh?." },
     ["brain_damage_2"] = { title = "Moderate Brain Damage", desc = "I smell something very weird..." },

@@ -140,7 +140,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 				mv:SetSideSpeed(0)
 				cmd:SetSideMove(0)
 				cmd:RemoveKey(IN_BACK)]]
-			end
+			--end
 		--//
 
 		--ply:SetRunSpeed(350)

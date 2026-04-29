@@ -1085,13 +1085,12 @@ net.Receive("headtrauma_flash", function()
         return
     end
 
+    sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
+    hg.AddFlash(lply:EyePos(), 1, pos, time, 20000)
     if play_knockout_sound then
-        surface.PlaySound("knocked.wav")
-        hg.AddFlash(lply:EyePos(), 1, pos, time, size)
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     else
-        hg.AddFlash(lply:EyePos(), 1, pos, time, size)
-        surface.PlaySound("headhit.mp3")
+        sound.PlayFile("sound/headhit.mp3", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
     end
 end)
 
@@ -1104,7 +1103,7 @@ function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
     local lply = LocalPlayer()
     if not IsValid(lply) then return end
 
-    surface.PlaySound("knocked.wav")
+    sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
 end
 

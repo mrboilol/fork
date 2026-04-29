@@ -1,55 +1,76 @@
 ----
 local PANEL = {}
-
-local red_select = Color(200,200,200)
+local curent_panel 
+local red_select = Color(192,0,0)
 
 local Selects = {
-    {Title = "return", Func = function(luaMenu) luaMenu:Close() end},
-    {Title = "main menu", Func = function(luaMenu) gui.ActivateGameUI() luaMenu:Close() end},
-    {Title = "settings", Func = function(luaMenu) luaMenu:SwitchToSettings() end},
-    {Title = "discord", Func = function(luaMenu) luaMenu:Close() gui.OpenURL("https://discord.gg/ZXUCAwuke2")  end},
-    {Title = "achievements", Func = function(luaMenu) luaMenu:SwitchToAchievements() end},
-    {Title = "appearance", Func = function(luaMenu) luaMenu:SwitchToAppearance() end},
-    {Title = "traitor menu", GamemodeOnly = true, Func = function(luaMenu) luaMenu:SwitchToTraitorMenu() end},
-    {Title = "disconnect", Func = function(luaMenu)
-        if IsValid(ZCityMainMenuMusic) then ZCityMainMenuMusic:SetVolume(0) end
-        if IsValid(ZCityAppearanceMusic) then ZCityAppearanceMusic:SetVolume(0) end
+    {Title = "Disconnect", Func = function(luaMenu) RunConsoleCommand("disconnect") end},
+    {Title = "Main Menu", Func = function(luaMenu) gui.ActivateGameUI() luaMenu:Close() end},
+    {Title = "Discord", Func = function(luaMenu) luaMenu:Close() gui.OpenURL("https://discord.gg/475EmEdTgH")  end},
+    {Title = "Traitor Role",
+    GamemodeOnly = true,
+    CreatedFunc = function(self, parent, luaMenu)
+        local btn = vgui.Create( "DLabel", self )
+        btn:SetText( "SOE" )
+        btn:SetMouseInputEnabled( true )
+        btn:SizeToContents()
+        btn:SetFont( "ZCity_Small" )
+        btn:SetTall( ScreenScale( 15 ) )
+        btn:Dock(BOTTOM)
+        btn:DockMargin(ScreenScale(20),ScreenScale(10),0,0)
+        btn:SetTextColor(Color(255,255,255))
+        btn:InvalidateParent()
+        btn.RColor = Color(225, 225, 225, 0)
+        btn.WColor = Color(225, 225, 225, 255)
+        btn.x = btn:GetX()
 
-        local fade = vgui.Create("DPanel")
-        fade:SetSize(ScrW(), ScrH())
-        fade:SetPos(0, 0)
-        fade:SetDrawOnTop(true)
-        fade:SetAlpha(0)
-        fade.Paint = function(s, w, h)
-            surface.SetDrawColor(255, 0, 0, 255)
-            surface.DrawRect(0, 0, w, h)
+        function btn:DoClick()
+            luaMenu:Close()
+            hg.SelectPlayerRole(nil, "soe")
         end
-        fade:AlphaTo(255, 0.3)
-
-        local lbl = vgui.Create("DLabel", fade)
-        lbl:SetText("goodbye.")
-        lbl:SetFont("ZC_MM_Title")
-        lbl:SetTextColor(Color(255, 255, 255))
-        lbl:SizeToContents()
-        lbl:Center()
-        local cx, cy = lbl:GetPos()
-        lbl.Think = function(s)
-            s:SetPos(cx + math.random(-2, 2), cy + math.random(-2, 2))
-        end
-
-        for i = 1, 3 do
-            sound.PlayFile("sound/goodbye.mp3", "noblock", function(station)
-                if IsValid(station) then
-                    station:SetPlaybackRate(0.9)
-                    station:SetVolume(1)
-                    station:Play()
-                end
-            end)
+    
+        local selfa = self
+        function btn:Think()
+            self.HoverLerp = selfa.HoverLerp
+            self.HoverLerp2 = LerpFT(0.2, self.HoverLerp2 or 0, self:IsHovered() and 1 or 0)
+                
+            self:SetTextColor(self.RColor:Lerp(self.WColor:Lerp(red_select, self.HoverLerp2), self.HoverLerp))
+            self:SetX(self.x + ScreenScaleH(40) + self.HoverLerp * ScreenScaleH(50))
         end
 
-        timer.Simple(2.5, function()
-            RunConsoleCommand("disconnect")
-        end)
+        local btn = vgui.Create( "DLabel", btn )
+        btn:SetText( "STD" )
+        btn:SetMouseInputEnabled( true )
+        btn:SizeToContents()
+        btn:SetFont( "ZCity_Small" )
+        btn:SetTall( ScreenScale( 15 ) )
+        btn:Dock(BOTTOM)
+        btn:DockMargin(0,ScreenScale(2),0,0)
+        btn:SetTextColor(Color(255,255,255))
+        btn:InvalidateParent()
+        btn.RColor = Color(225, 225, 225, 0)
+        btn.WColor = Color(225, 225, 225, 255)
+        btn.x = btn:GetX()
+
+        function btn:DoClick()
+            luaMenu:Close()
+            hg.SelectPlayerRole(nil, "standard")
+        end
+    
+        function btn:Think()
+            self.HoverLerp = selfa.HoverLerp
+            self.HoverLerp2 = LerpFT(0.2, self.HoverLerp2 or 0, self:IsHovered() and 1 or 0)
+    
+            self:SetTextColor(self.RColor:Lerp(self.WColor:Lerp(red_select, self.HoverLerp2), self.HoverLerp))
+            self:SetX(self.x + ScreenScaleH(35))
+        end
+    end,
+    Func = function(luaMenu)
+        
+    end,
+    },
+    {Title = "Achievements", Func = function(luaMenu,pp) 
+        hg.DrawAchievmentsMenu(pp)
     end},
 }
 
@@ -2723,75 +2744,4 @@ hook.Add("OnPauseMenuShow","OpenMainMenu",function()
     MainMenu = vgui.Create("ZMainMenu")
     MainMenu:MakePopup()
     return false
-end)
-
-
-hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
-    -- Use a timer to ensure everything is fully loaded before opening
-    timer.Simple(1, function()
-        if not ZCityHasSeenIntro then
-            -- Open the menu automatically on join
-            if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
-            MainMenu = vgui.Create("ZMainMenu")
-            MainMenu:MakePopup()
-            -- Force intro state
-            MainMenu.IsIntro = true
-            MainMenu:SetAlpha(255) -- Force visible immediately
-        end
-    end)
-end)
-
--- Force open on file refresh for testing (if not seen intro)
-timer.Simple(0.1, function()
-    if not ZCityHasSeenIntro and (not MainMenu or not IsValid(MainMenu)) then
-        MainMenu = vgui.Create("ZMainMenu")
-        MainMenu:MakePopup()
-        MainMenu.IsIntro = true
-        MainMenu:SetAlpha(255)
-    end
-end)
-hook.Add("OnPauseMenuShow","OpenMainMenu",function()
-    local run = hook.Run("OnShowZCityPause")
-    if run then
-        return run
-    end
-
-    if MainMenu and IsValid(MainMenu) then
-        if MainMenu.IsIntro then
-            return false -- Prevent closing intro menu with ESC
-        end
-        MainMenu:Close()
-        MainMenu = nil
-        return false
-    end
-
-    MainMenu = vgui.Create("ZMainMenu")
-    MainMenu:MakePopup()
-    return false
-end)
-
-
-hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
-    -- Use a timer to ensure everything is fully loaded before opening
-    timer.Simple(1, function()
-        if not ZCityHasSeenIntro then
-            -- Open the menu automatically on join
-            if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
-            MainMenu = vgui.Create("ZMainMenu")
-            MainMenu:MakePopup()
-            -- Force intro state
-            MainMenu.IsIntro = true
-            MainMenu:SetAlpha(255) -- Force visible immediately
-        end
-    end)
-end)
-
--- Force open on file refresh for testing (if not seen intro)
-timer.Simple(0.1, function()
-    if not ZCityHasSeenIntro and (not MainMenu or not IsValid(MainMenu)) then
-        MainMenu = vgui.Create("ZMainMenu")
-        MainMenu:MakePopup()
-        MainMenu.IsIntro = true
-        MainMenu:SetAlpha(255)
-    end
 end)

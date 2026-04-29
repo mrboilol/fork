@@ -252,13 +252,14 @@ local function SyncOriginalMoodles(ply)
     local bleedRate = org.bleed or 0
     local isArterial = ((org.arteria or 0) + (org.rarmartery or 0) + (org.larmartery or 0) + (org.rlegartery or 0) + (org.llegartery or 0)) > 0
     if isArterial then
-        manageMoodleState(ply, "bleeding_4", true, "materials/moodles/Bleeding_4.png")
+        manageMoodleState(ply, "bleeding_5", true, "materials/moodles/Bleeding_4.png")
     else
         manageHierarchicalMoodle(ply, "bleeding", {
             { threshold = 0.01, texture = "materials/moodles/Bleeding_1.png" },
             { threshold = 0.05, texture = "materials/moodles/Bleeding_2.png" },
             { threshold = 0.1, texture = "materials/moodles/Bleeding_3.png" },
             { threshold = 0.15, texture = "materials/moodles/Bleeding_4.png" },
+            { threshold = 0.2, texture = "materials/moodles/Bleeding_4.png" },
         }, bleedRate)
     end
 

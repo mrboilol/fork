@@ -376,6 +376,7 @@ local statusEffectAppearance = {}
 local statusEffectPositions = {}
 local tooltipHoverTime = {}
 local lastHoveredStatus = nil
+local lastStatusEffectLevels = {}
 
 local smooth = {
 	blood = 5000,
@@ -477,7 +478,12 @@ local tooltipTexts = {
 			[2] = "Боль - Довольно сильная боль.",
 			[1] = "Небольшая боль - Ощущается легкая боль."
 		},
-		bleeding = "Кровотечение - Кровь льётся из относительно большой раны. Это вряд ли приведет к летальному исходу, если ты полностью здоров.",
+		bleeding = {
+			[4] = "Кровоизлияние - Вы быстро истекаете кровью. Смерть неизбежна без немедленного медицинского вмешательства.",
+			[3] = "Сильное кровотечение - Кровь свободно течет из серьезной раны. Требуется немедленная помощь.",
+			[2] = "Умеренное кровотечение - Вы теряете заметное количество крови. Следует скоро обработать.",
+			[1] = "Незначительное кровотечение - Небольшая рана вызывает некоторую потерю крови. Вряд ли это станет серьезной проблемой."
+		},
 		internal_bleed = "Внутреннее кровотечение - Как выяснилось, кишки и легкие — это явно НЕ место для твоей крови. Крайне рекомендуется лечение.",
 		conscious = {
 			[4] = "Без сознания - Нет реакции ни на какие внешние раздражители. Ты в отключке.",
@@ -584,27 +590,32 @@ local tooltipTexts = {
 	
 	en = {
 		pain = {
-			[4] = "Agony - Mind-shattering pain. Movement compromised. Death sounds preferable right about now.",
-			[3] = "Severe pain - Half-conscious, mind fogged by intense pain.",
-			[2] = "Pain - Hurting a decent bit.",
-			[1] = "Mild pain - Feeling mild pain."
+			[4] = "JESUS FUCKING CHRIST, I JUST WANT TO PASS OUT RIGHT NOW",
+			[3] = "Severe Pain - Its starting to hurt real bad now, something is totally wrong...",
+			[2] = "Pain - Its probably just a headache...",
+			[1] = "Mild pain - Your average tuesday."
 		},
-		bleeding = "Bleeding - Blood is flowing from a relatively large wound. It's unlikely to be fatal if you're completely healthy.",
-		internal_bleed = "Internal bleeding - As it turns out, your intestines and lungs are definitely NOT the place for your blood. Treatment is highly recommended.",
+		bleeding = {
+			[4] = "Hemorrhaging - You are bleeding out rapidly. Death is imminent without immediate medical intervention.",
+			[3] = "Severe Bleeding - Blood is flowing freely from a serious wound. Immediate attention is required.",
+			[2] = "Moderate Bleeding - You're losing a noticeable amount of blood. Should be treated soon.",
+			[1] = "Minor Bleeding - A small wound is causing some blood loss. Unlikely to be a major issue."
+		},
+		internal_bleed = "Internal bleeding - Something inside broke and you are starting to lose blood inside, while not usually lethal on its own you should get it fixed to prevent complications.",
 		conscious = {
-			[4] = "Unconscious - No reaction to any external stimuli. You're out cold.",
-			[3] = "Fainting - Barely conscious, feeling like you could fall at any moment.",
-			[2] = "Confused - Feeling of confusion and dizziness, difficulty perceiving the world around you.",
-			[1] = "Disoriented - Slightly disoriented with mild dizziness."
+			[4] = "...",
+			[3] = "Fainting - Your body and mind are severely affected by something, you feel extremely sleepy.",
+			[2] = "Confused - Confused and disoriented, you are starting to feel drowsy.",
+			[1] = "Disoriented - Feeling kind of sleepy right now."
 		},
 		stamina = {
-			[4] = "Completely exhausted - Barely able to breathe.",
-			[3] = "Very exhausted - Practically unable to move.",
-			[2] = "Exhausted - Experiencing discomfort and fatigue, difficulty moving and working.",
-			[1] = "Slightly tired - Minor physical strain."
+			[4] = "I CANT BREATHE NOR MOVE, LETS TAKE A BREAK...",
+			[3] = "Very exhausted - Okay, now its REALLY time to stop doing what you are doing...",
+			[2] = "Exhausted - You are starting to feel tired, its time to stop fatiguing yourself.",
+			[1] = "Slightly tired - Strained from activity, you can keep going a little."
 		},
-		spine_fracture = "Spine fracture - Broken spine. If the spinal cord isn't severed, consider yourself lucky.",
-		fracture = "Limb fracture - You have a broken arm or leg. Movement with the injured limb is difficult and causes severe pain.",
+		spine_fracture = "Something is wrong, my back feels non existant and I cant feel something on my body.",
+		fracture = "Fracture",
 		organ_damage = "Organ damage - The organs inside you don't feel well.",
 		dislocation = "Joint dislocation - You've dislocated a limb. Try not to use the injured limb and find a way to reset it.",
 		amputant = "Amputation - A limb has been amputated. You will never be able to use it again.",
@@ -707,7 +718,7 @@ local function getTooltipText(statusName, pos, berserkActive)
 	end
 	
 	if statusName == "pain" or statusName == "conscious" or statusName == "stamina" or 
-	   statusName == "blood_loss" or statusName == "cold" or statusName == "heat" or
+	   statusName == "bleeding" or statusName == "blood_loss" or statusName == "cold" or statusName == "heat" or
 	   statusName == "hemothorax" or statusName == "overdose" or statusName == "oxygen" or
 	   statusName == "vomit" or statusName == "brain_damage" or statusName == "adrenaline" or
 	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" then
@@ -1171,8 +1182,15 @@ local function draw_status_effects()
 		if showAllIcons then
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
 			if bleed_val > HUD.bleeding_threshold then
+				local level_num = 1
+				if bleed_val > 7.5 then level_num = 4
+				elseif bleed_val > 5 then level_num = 3
+				elseif bleed_val > 2.5 then level_num = 2 end
+				
 				table.insert(effects, {
 					name = "bleeding",
+					level_num = level_num,
+					has_levels = true,
 					priority = 0.3,
 					value = math_floor(bleed_val)
 				})
@@ -1478,23 +1496,34 @@ local function draw_status_effects()
 		end
 	end
 	
+	for _, effect in ipairs(effects) do
+		if not statusEffectAppearance[effect.name] or (effect.level_num and effect.level_num ~= lastStatusEffectLevels[effect.name]) then
+			statusEffectAppearance[effect.name] = currentTime
+		end
+		lastStatusEffectLevels[effect.name] = effect.level_num
+	end
+
 	for name, _ in pairs(statusEffectAppearance) do
 		if not currentEffectNames[name] then
 			statusEffectAppearance[name] = nil
 			tooltipHoverTime[name] = nil
+			lastStatusEffectLevels[name] = nil
 		end
 	end
 	
+	local isAdmiring = LocalPlayer():GetNWBool("mcd_admiring", false)
+	local effectsToDraw = {}
 	for _, effect in ipairs(effects) do
-		if not statusEffectAppearance[effect.name] then
-			statusEffectAppearance[effect.name] = currentTime
-		end
+	    local timeActive = currentTime - (statusEffectAppearance[effect.name] or 0)
+	    if isAdmiring or timeActive < 10 then
+	        table.insert(effectsToDraw, effect)
+	    end
 	end
-	
-	table.sort(effects, function(a, b) return a.priority < b.priority end)
-	
+
+	table.sort(effectsToDraw, function(a, b) return a.priority < b.priority end)
+
 	local rawPositions = {}
-	for i, effect in ipairs(effects) do
+	for i, effect in ipairs(effectsToDraw) do
 		local base_x_pos = base_x - size
 		local base_y_pos = base_y + (i - 1) * spacing
 		table.insert(rawPositions, {
@@ -2015,11 +2044,7 @@ local function draw_sprites()
 		if limb.amput and org[limb.amput] then
 			state.target = 0
 		else
-			if HUD.always_show_limbs then
-				state.target = 255
-			else
-				state.target = limbsRevealed and 255 or 0
-			end
+			state.target = 255
 		end
 		
 		state.alpha = Lerp(dt, state.alpha, state.target)
@@ -2196,6 +2221,6 @@ cvars.AddChangeCallback("mzb_language", function(name, old, new)
 end)
 
 hook.Add("HUDPaint", "ZB_Health_Bar", draw_bar)
-hook.Add("HUDPaint", "ZB_Health_Sprites", draw_sprites)
+-- hook.Add("HUDPaint", "ZB_Health_Sprites", draw_sprites)
 hook.Add("HUDPaint", "ZB_Health_StatusEffects", draw_status_effects)
 hook.Add("HUDPaint", "ZB_Health_StatusTooltips", draw_status_tooltips)
