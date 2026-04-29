@@ -28,6 +28,40 @@ hook.Add("CreateMove", "asdasdas22", function(cmd)
 end)
 
 local diff = Angle()
+local inputMouseTbl = {}
+local quatMain = Quaternion()
+local quatPitch = Quaternion()
+local quatYaw = Quaternion()
+local quatRoll = Quaternion()
+
+local function isVortigauntModel(ent)
+	return IsValid(ent) and string.lower(ent:GetModel() or "") == "models/player/vortigaunt.mdl"
+end
+
+local function getCachedEyesAttachment(ent)
+	if not IsValid(ent) then return end
+	local model = ent:GetModel()
+	if ent.ZCEyesAttachmentModel ~= model then
+		ent.ZCEyesAttachmentModel = model
+		local id = ent.LookupAttachment and ent:LookupAttachment("eyes") or 0
+		ent.ZCEyesAttachment = (id and id > 0) and id or false
+	end
+
+	local id = ent.ZCEyesAttachment
+	if id == false or not id then return end
+	local eye = ent:GetAttachment(id)
+	if not eye or not istable(eye) then return end
+
+	if not isVortigauntModel(ent) then
+		return eye
+	end
+
+	return {
+		Pos = eye.Pos + eye.Ang:Forward() * 3 + eye.Ang:Up() * 3 + eye.Ang:Right() * 0,
+		Ang = eye.Ang
+	}
+end
+
 hook.Add("InputMouseApply", "fakeCameraAngles", function(cmd, x, y, angle)
 	local tbl = {}
 	local cc = GetCoolCameraBool()
@@ -299,7 +333,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	
 	if IsValid(ply.OldRagdoll) then DrawPlayerRagdoll(follow, ply) end
 
-	local pos = hg.eye(ply, 10, follow, att_Ang)
+	local pos = hg.eye(ply, 10, follow, att_Ang, att.Pos)
 
 	--local dot = ang:Forward():Dot((pos - att.Pos):GetNormalized())
 	

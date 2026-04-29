@@ -89,6 +89,69 @@ local velocityAddVel = Vector()
 local walkLerped = 0
 local walkTime = 0
 
+local function cachedCameraBone(ent, boneName)
+	if not IsValid(ent) then return nil end
+
+	local model = ent:GetModel()
+	if ent.ZCCameraBoneCacheModel ~= model then
+		ent.ZCCameraBoneCacheModel = model
+		ent.ZCCameraBoneCache = {}
+	end
+
+	local cache = ent.ZCCameraBoneCache
+	local bone = cache[boneName]
+	if bone == nil then
+		bone = ent:LookupBone(boneName) or false
+		cache[boneName] = bone
+	end
+
+	return bone ~= false and bone or nil
+end
+
+local function cachedCameraAttachment(ent, attachmentName)
+	if not IsValid(ent) then return nil end
+
+	local model = ent:GetModel()
+	if ent.ZCCameraAttachmentCacheModel ~= model then
+		ent.ZCCameraAttachmentCacheModel = model
+		ent.ZCCameraAttachmentCache = {}
+	end
+
+	local cache = ent.ZCCameraAttachmentCache
+	local attachment = cache[attachmentName]
+	if attachment == nil then
+		attachment = ent:LookupAttachment(attachmentName) or 0
+		cache[attachmentName] = attachment
+	end
+
+	return attachment > 0 and attachment or nil
+end
+
+local function getCachedAttachmentData(ent, attachmentName)
+	local attachment = cachedCameraAttachment(ent, attachmentName)
+	if not attachment then return nil end
+
+	return ent:GetAttachment(attachment)
+end
+
+local function isVortigauntModel(ent)
+	return IsValid(ent) and string.lower(ent:GetModel() or "") == "models/player/vortigaunt.mdl"
+end
+
+local function getPreferredEyeAttachment(ent)
+	local eye = getCachedAttachmentData(ent, "eyes")
+	if not eye or not istable(eye) then return nil end
+
+	if not isVortigauntModel(ent) then
+		return eye
+	end
+
+	return {
+		Pos = eye.Pos + eye.Ang:Forward() * 3 + eye.Ang:Up() * 3 + eye.Ang:Right() * 0,
+		Ang = eye.Ang
+	}
+end
+
 local lerped_ang = Angle(0,0,0)
 function HGAddView(ply, origin, angles, velLen)
 	if ply:Alive() then
@@ -281,7 +344,8 @@ end)
 function SpecCam(ply, vec, ang, fov, znear, zfar)
 	if !ply:Alive() then return end
 	--local hand = ply:GetAttachment(ply:LookupAttachment("anim_attachment_rh"))
-	local eye = ply:GetAttachment(ply:LookupAttachment("eyes"))
+	local eye = getPreferredEyeAttachment(ply)
+	if not eye then return end
 	--local org = eye.Pos
 	local ang1 = eye.Ang + Angle(5, 2, 0)
 	local org1 = eye.Pos + eye.Ang:Up() * 6 + eye.Ang:Forward() * -3 + eye.Ang:Right() * 6.5
@@ -362,7 +426,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 		end
 	end
 
-	if not IsValid(ply) or not ply.LookupBone or not ply:LookupBone("ValveBiped.Bip01_Head1") then return end
+	if not IsValid(ply) or not ply.LookupBone then return end
 	
 	if not ply.GetAimVector then return end
 
@@ -373,7 +437,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	
 	if not firstPerson then return end
 	
-	att = ply:GetAttachment(ply:LookupAttachment("eyes"))
+	att = getPreferredEyeAttachment(ply)
 	if not att or not istable(att) then return end
 	
 	--ply:SetupBones()
@@ -381,7 +445,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	--ply:DrawModel()
 	--selfdraw = nil
 	//hg.DoTPIK(lply, lply)
-	local tr, hullcheck, headm = hg.eyeTrace(ply, 10, ply, att.Ang)
+	local tr, hullcheck, headm = hg.eyeTrace(ply, 10, ply, att.Ang, att.Pos)
 	
 	--[[if hg_realismcam:GetBool() and ishgweapon(ply:GetActiveWeapon()) then
 		tr = hg.torsoTrace(ply)
