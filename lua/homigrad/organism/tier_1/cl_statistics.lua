@@ -128,6 +128,7 @@ local list = {
 	{"consciousness", 1, false},
 	{"skull", 1, true}, 
 	{"disorientation",1,true},
+	{"stroke_meter", 100, true},
 	{"jaw", 1, true}, false, 
 	{"spine1", 1, true}, 
 	{"spine2", 1, true}, 

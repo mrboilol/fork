@@ -1,8 +1,8 @@
 if SERVER then AddCSLuaFile() end
-SWEP.Base = "weapon_bigconsumable"
+SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Tranexamic Acid"
 SWEP.Instructions = "Use to reduce internal bleeding and stroke meter."
-SWEP.Category = "ZCity Other"
+SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
 SWEP.Primary.Next = 0
@@ -10,8 +10,8 @@ SWEP.HoldType = "slam"
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/props_health/health_vial.mdl"
 if CLIENT then
-	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_fooddrink")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_fooddrink.png"
+	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_medkit")
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.png"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -20,44 +20,49 @@ SWEP.AutoSwitchFrom = false
 SWEP.Slot = 3
 SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
-SWEP.offsetVec = Vector(4, -2, -1)
-SWEP.offsetAng = Angle(180, 0, 0)
-SWEP.showstats = false
-
+SWEP.offsetVec = Vector(4, -0.5, -3)
+SWEP.offsetAng = Angle(-30, 20, 90)
+SWEP.modes = 1
+SWEP.modeNames = {
+	[1] = "tranexamic acid",
+}
 SWEP.ofsV = Vector(-2,-10,8)
 SWEP.ofsA = Angle(90,-90,90)
+function SWEP:InitializeAdd()
+	self:SetHold(self.HoldType)
 
-SWEP.FoodModels = {
-	"models/props_health/health_vial.mdl"
-}
+	self.modeValues = {
+		[1] = 10,
+	}
+	self.mode = 1
+end
 
-SWEP.WaterModel = {
-	["models/props_health/health_vial.mdl"] = true
+SWEP.modeValuesdef = {
+	[1] = {10,true},
 }
+SWEP.ShouldDeleteOnFullUse = true
 
 if SERVER then
-	function SWEP:Heal(ent, mode, bone)
+	function SWEP:Heal(ent, mode)
 		local org = ent.organism
 		if not org then return end
-		self.Eating = self.Eating or 0
-		self.CDEating = self.CDEating or 0
-		if self.CDEating > CurTime() then return end
 
-		org.stroke_meter = math.max(org.stroke_meter - 25, 0)
-        org.internalBleed = math.max(org.internalBleed - 1, 0)
+		local owner = self:GetOwner()
 
-		local ply = self:GetOwner()
-		ply:ViewPunch(Angle(3,0,0))
-		
-		ent:EmitSound( "snd_jack_hmcd_drink"..math.random(3)..".wav", 60, math.random(95, 105))
-		
-		self.CDEating = CurTime() + 0.5
-		self.Eating = self.Eating + 1
-		if self.Eating > 5 then
-			self:GetOwner():SelectWeapon("weapon_hands_sh")
+		if self.modeValues[1] == 0 then return end
+		local internalBleed = org.internalBleed - org.internalBleedHeal
+
+		if internalBleed > 0 then
+			local healed = math.max(internalBleed - self.modeValues[1], 0)
+			self.modeValues[1] = self.modeValues[1] - (internalBleed - healed) * (owner.Profession == "doctor" and 0.5 or 1)
+			org.internalBleedHeal = org.internalBleedHeal + (internalBleed - healed)
+			org.stroke_meter = math.max(org.stroke_meter - 25, 0)
+			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
+		end
+
+		if self.modeValues[1] <= 0 and self.ShouldDeleteOnFullUse then
+			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end
-		
-		return true
 	end
 end
