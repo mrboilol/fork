@@ -499,7 +499,11 @@ local tooltipTexts = {
 		},
 		spine_fracture = "Сломаный позвоночник - Сломан позвоночник. Если спинной мозг не оборван, считай это удачей.",
 		fracture = "Перелом конечности - У тебя сломана рука или нога. Движение повреждённой конечностью затруднено и причиняет сильную боль.",
-		organ_damage = "Повреждение органов - Органы внутри тебя чувствуют себя не хорошо.",
+		organ_damage = {
+			[3] = "Тяжёлое повреждение органов - Ваши внутренние органы в критическом состоянии. Срочно обратитесь за медицинской помощью.",
+			[2] = "Повреждение органов - Ваши внутренние органы повреждены. Это вызывает боль и дискомфорт.",
+			[1] = "Незначительное повреждение органов - Некоторые из ваших внутренних органов получили незначительные повреждения.",
+		},
 		dislocation = "Вывих сустава - Ты вывихнул конечность. Постарайся не использовать поврежденную конечность и найди способ ее вправить.",
 		amputant = "Ампутант - Одна из твоих конечностей была оторвана. Травмирующе. Очевидно, ты навсегда утратил возможность пользоваться оторванной конечностью.",
 		blood_loss = {
@@ -596,10 +600,10 @@ local tooltipTexts = {
 			[1] = "Mild pain - Your average tuesday."
 		},
 		bleeding = {
-			[4] = "Hemorrhaging - You are bleeding out rapidly. Death is imminent without immediate medical intervention.",
-			[3] = "Severe Bleeding - Blood is flowing freely from a serious wound. Immediate attention is required.",
-			[2] = "Moderate Bleeding - You're losing a noticeable amount of blood. Should be treated soon.",
-			[1] = "Minor Bleeding - A small wound is causing some blood loss. Unlikely to be a major issue."
+			[4] = "FUCK- IM BLEEDING OUT, IM ACTUALLY BLEEDING OUT",
+			[3] = "Severe Bleeding - Blood is pouring out of you like a fire hose!",
+			[2] = "Moderate Bleeding - This is severe enough to where you should start worrying about it.",
+			[1] = "Minor Bleeding - Blood is pouring out of a wound at a small rate."
 		},
 		internal_bleed = "Internal bleeding - Something inside broke and you are starting to lose blood inside, while not usually lethal on its own you should get it fixed to prevent complications.",
 		conscious = {
@@ -614,45 +618,49 @@ local tooltipTexts = {
 			[2] = "Exhausted - You are starting to feel tired, its time to stop fatiguing yourself.",
 			[1] = "Slightly tired - Strained from activity, you can keep going a little."
 		},
-		spine_fracture = "Something is wrong, my back feels non existant and I cant feel something on my body.",
-		fracture = "Fracture",
-		organ_damage = "Organ damage - The organs inside you don't feel well.",
-		dislocation = "Joint dislocation - You've dislocated a limb. Try not to use the injured limb and find a way to reset it.",
-		amputant = "Amputation - A limb has been amputated. You will never be able to use it again.",
-		blood_loss = {
-			[4] = "Exsanguination - Blood loss threatens your life. A little more and your heart will stop. Death is inevitable.",
-			[3] = "Critical hypovolemia - Severe blood loss. Semi-conscious. You see blurry... Treatment needed.",
-			[2] = "Hypovolemia - Weakness and disorientation due to blood loss. You feel very unwell. Treatment recommended.",
-			[1] = "Pale - Minor blood loss. Blood pressure is low. You feel slight weakness, skin is pale."
+		spine_fracture = "? - Something is wrong, my back feels split in half and I cant feel something on my body.",
+		fracture = "Fracture - One of your limbs is broken, you should probably put it in a bandage.",
+				organ_damage = {
+			[3] = "Severe Internal Damage - One or more of your important bits are heavily damaged, all hope is lost.",
+			[2] = "Internal Damage - One or more of your internal organs are destroyed completely, just hope its not your liver.",
+			[1] = "Minor Internal Damage - Some of your internal organs are damaged.",
 		},
-		cardiac_arrest = "Cardiac arrest - Your heart has stopped beating, which means oxygen no longer reaches your brain.",
+		dislocation = "Joint dislocation - One of your limb's socket was dislocated, its best to put that back.",
+		amputant = "Amputation - One of your limbs was torn off, Accept the reality you'll never use it again.",
+		blood_loss = {
+			[4] = "This is probably the end of you. Goodbye.",
+			[3] = "Severely Hypovolemic - Ugh... i can barely feel anything...",
+			[2] = "Hypovolemia - Feeling weak, and the low blood is starting to take a toll on you.",
+			[1] = "Pale - You can keep going but your heart is starting to work overtime."
+		},
+		cardiac_arrest = "Your body already worked hard enough, lets rest for now.",
 		cold = {
-			[4] = "Freezing to death - For some unknown reason, you're feeling warm... Good night.",
-			[3] = "Hypothermia - Dangerously low temperature, body and mind exhausted from cold. The whole body is gradually failing.",
-			[2] = "Cold - Unpleasantly cold. Your body is slowing down.",
-			[1] = "Chilly - A bit chilly for comfort."
+			[4] = "Its so warm all of a sudden, and i feel a calming presence over me.",
+			[3] = "Hypothermia - Its so, SO COLD...",
+			[2] = "Cold - Its unusually cold, now is a good time to start to take shelter.",
+			[1] = "Chilly - Is it me or is it cold outside?"
 		},
 		heat = {
-			[4] = "Heat stroke - Brain cells are starting to die from intense heat.",
-			[3] = "Hyperthermia - Dangerously hot. It's hard for you to bear the heat...",
-			[2] = "Hot - Unpleasantly hot.",
-			[1] = "Warm - A bit too warm for comfort."
+			[4] = "I WOULD KILL FOR SOME WATER RIGHT NOW",
+			[3] = "Hyperthermia - Ughhh i want to throw up...",
+			[2] = "Hot - It feels too hot!",
+			[1] = "Warm - Its not nice outside!"
 		},
 		hemothorax = {
-			[4] = "Critical hemothorax - Your lungs are trying to grasp at least a drop of oxygen, but it's hopeless... Good night.",
-			[3] = "Severe hemothorax - Your chest is about to explode, and blood has already filled more than half of your lungs.",
-			[2] = "Serious hemothorax - Blood has accumulated to the point where breathing has become difficult.",
-			[1] = "Hemothorax - Blood is accumulating in the pleural cavity due to internal bleeding or lung puncture. Your chest hurts... Treatment required."
+			[4] = "Breathing is too hard, I want to breathe I WANT TO BREATHE....",
+			[3] = "Severe Pleural Pressure - It hurts so much, and i can barely even breathe...",
+			[2] = "Pleural Pressure - Something is building up in my chest, and it makes it hard to breathe.",
+			[1] = "Lung Discomfort - Its not this hard to catch your breath usually..."
 		},
-		lungs_failure = "Lung failure - Lungs have stopped working due to damage or prolonged absence of breathing cycle.",
+		lungs_failure = "Your body decided to enter respiratory failure due to an absence of oxygen.",
 		overdose = {
-			[4] = "Fatal overdose - Respiratory failure. You're leaving this world in a drug-induced euphoria, but you couldn't care less.",
-			[3] = "Overdose - Breathing is hard, euphoria reigns in your head. This is definitely bad for the body. If only this could last forever...",
-			[2] = "Moderate dose - Very relaxed and calm, but your lungs feel heavy. You tire a bit faster than usual. You feel great, for now...",
-			[1] = "Dose - Relaxed and calm. Your body feels numb."
+			[4] = "Oooh yeah... thats the stuff dude...",
+			[3] = "Drugged - I really like what im feeling...",
+			[2] = "Opiated - You definitively took more than recommended, but it feels great...",
+			[1] = "Numbed - You feel less overall."
 		},
 		oxygen = {
-			[4] = "Anoxemia - Your brain is dying from oxygen starvation. The whole body is rapidly failing. Death is inevitable.",
+			[4] = "What you need the most is gone, all your systems are slowly dying bit by bit...",
 			[3] = "Asphyxia - You're losing consciousness. Tissues are deprived of oxygen. Inevitable brain damage.",
 			[2] = "Severe hypoxemia - Insufficient oxygen in the body. Dizziness and numbness in extremities. Something is DEFINITELY wrong.",
 			[1] = "Hypoxemia - Low blood oxygen level. Slightly confused, skin is sluggish. Something's not right..."
@@ -670,19 +678,19 @@ local tooltipTexts = {
 			[1] = "Cognitive impairment - Mental disorders due to brain damage. You feel strange confusion..."
 		},
 		adrenaline = {
-			[4] = "Adrenaline - Heart working overtime pumping blood. Almost complete absence of pain, surge of strength, and increased resilience.",
-			[3] = "Adrenaline - Almost no pain felt. Stamina increased dramatically.",
-			[2] = "Adrenaline - Pain dulled. State of heightened alertness.",
-			[1] = "Adrenaline - You feel a slight surge of strength."
+			[4] = "Focused - Heart working overtime pumping blood. Almost complete absence of pain, surge of strength, and increased resilience.",
+			[3] = "Fight or Flight - Almost no pain felt. Stamina increased dramatically.",
+			[2] = "Alert - Pain dulled. State of heightened alertness.",
+			[1] = "Tense - You feel a slight surge of strength."
 		},
 		shock = {
-			[4] = "Shock - Your body activates the best defense mechanism to cope with this pain. Sweet dreams.",
-			[3] = "Shock - The most intense pain of your life clouds your mind and reason, turning you into an animal.",
-			[2] = "Shock - Agonizing pain cuts through every cell of your body.",
-			[1] = "Shock - Entering a state of shock"
+			[4] = "The best response your body has is to go unconscious, good night.",
+			[3] = "Traumatic Shock - You definitively dont feel good, you feel horrible and unfocused.",
+			[2] = "Vasovagal Response - Sweaty, Dizzy and drowsy. You feel faint.",
+			[1] = "Vasovagal Response - Your body is responding to whats happening to you."
 		},
 		trauma = {
-			[4] = "Shell-shocked - Terror. Helplessness.",
+			[4] = "Im scared and disoriented. This is hopeless.",
 			[3] = "Severe disorientation - Ringing in ears and the world like a carousel.",
 			[2] = "Serious disorientation - Head spinning and everything floating around.",
 			[1] = "Mild disorientation - Feeling sleepy."
@@ -721,7 +729,7 @@ local function getTooltipText(statusName, pos, berserkActive)
 	   statusName == "bleeding" or statusName == "blood_loss" or statusName == "cold" or statusName == "heat" or
 	   statusName == "hemothorax" or statusName == "overdose" or statusName == "oxygen" or
 	   statusName == "vomit" or statusName == "brain_damage" or statusName == "adrenaline" or
-	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" then
+	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" or statusName == "organ_damage" then
 		
 		local levelTexts = texts[statusName]
 		if levelTexts and type(levelTexts) == "table" then
@@ -1265,18 +1273,45 @@ local function draw_status_effects()
 				currentEffectNames["fracture"] = true
 			end
 			
-			local organ_damage = math_max(
-				getOrgVal(org, "heart", 0),
-				getOrgVal(org, "liver", 0),
-				getOrgVal(org, "stomach", 0),
-				getOrgVal(org, "intestines", 0),
-				getOrgTableVal(org, "lungsR", 1, nil, 0),
-				getOrgTableVal(org, "lungsL", 1, nil, 0),
-				getOrgTableVal(org, "lungsR", 2, nil, 0),
-				getOrgTableVal(org, "lungsL", 2, nil, 0)
-			)
-			if organ_damage > HUD.organ_damage_threshold then
-				table.insert(effects, {name = "organ_damage", priority = 4})
+			-- Organ damage logic
+			local organ_damage_level = 0
+			local destroyed_organs = 0
+			local severely_damaged_vital_organs = 0
+			local damaged_organs = 0
+
+			-- Check for destroyed non-vital organs
+			if getOrgVal(org, "liver", 0) >= 1 then destroyed_organs = destroyed_organs + 1 end
+			if getOrgVal(org, "stomach", 0) >= 1 then destroyed_organs = destroyed_organs + 1 end
+			if getOrgVal(org, "intestines", 0) >= 1 then destroyed_organs = destroyed_organs + 1 end
+
+			-- Check for severely damaged vital organs
+			if getOrgVal(org, "heart", 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgVal(org, "trachea", 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 1, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 1, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 2, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 2, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+
+			-- Check for any damaged organ
+			if getOrgVal(org, "liver", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgVal(org, "stomach", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgVal(org, "intestines", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgVal(org, "heart", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 1, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 1, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 2, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 2, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+
+			if severely_damaged_vital_organs > 0 then
+				organ_damage_level = 3 -- Critical
+			elseif destroyed_organs > 0 then
+				organ_damage_level = 2 -- Major
+			elseif damaged_organs > 0 then
+				organ_damage_level = 1 -- Minor
+			end
+
+			if organ_damage_level > 0 then
+				table.insert(effects, {name = "organ_damage", priority = 4, level_num = organ_damage_level, has_levels = true})
 				currentEffectNames["organ_damage"] = true
 			end
 			

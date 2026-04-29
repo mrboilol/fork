@@ -49,10 +49,10 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 end
 
 local huyasd = {
-	["spine1"] = "I don't feel anything below my hips.",
-	["spine2"] = "I cant't feel or move anything below my torso.",
-	["spine3"] = "I can't move at all. I can barely even breathe.",
-	["skull"] = "My head is aching.",
+	["spine1"] = "My legs- i... i cant feel my legs...",
+	["spine2"] = "I cant move my chest nor my legs, i think i broke something.",
+	["spine3"] = "I cant move at all, much less breathe...",
+	["skull"] = "My head is throbbing so bad, i think i broke something.",
 }
 
 local broke_arm = {
@@ -249,15 +249,15 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 end
 
 local jaw_broken_msg = {
-	"I FEEL PIECES OF MY JAW... FUCK-FUCK-FUCK",
+	"MY JAW, MY JAW IS BROKEN IN PIECES!",
 	"MY JAW IS FUCKING FLOATING IN MY HEAD",
-	"MY JAW... OHH IT HURTS REALLY BAD... I FEEL PIECES OF IT MOVING",
+	"IM DISFIGURED- MY JAW IS ALL OVER THE PLACE!",
 }
 
 local jaw_dislocated_msg = {
-	"I CAN'T CLOSE MY JAW... IT FUCKING HURTS",
-	"MY JAW... ITS JUST STUCK THERE-- OH ITS PAINING",
-	"I CANT MOVE MY JAW AT ALL... AND ITS REALLY ACHING",
+	"JESUS CHRIST- I CAN FEEL MY JAW MUSCLES TUGGING AT MY SKULL",
+	"MY JAW- I CANT MOVE MY JAW IT FUCKING HURTS",
+	"MY JAW IS PAINING SO BAD, I CANT MOVE IT WITHOUT AGONIZINGLY HURTING",
 	//"I CANT EVEN SPEAK, I NEED TO PUNCH IT BACK IN PLACE... BUT IT HURTS REAL BAD",
 }
 
@@ -330,7 +330,7 @@ hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isC
 	if IsValid(output) and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
 		-- and !isChat and output:IsSpeaking()
 		output.organism.painadd = output.organism.painadd + 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))
-		output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
+		output:Notify("FUUUUCK- IT HURTS REAL BAD WHEN SPEAKING", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
 	end
 end)
 
@@ -415,16 +415,17 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
+    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 2, 100)
 
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand
 end
 
 local ribs = {
-	"MY CHEST... SNAPPED",
-	"SOMETHING SNAPPED IN MY TORSO",
-	"THERE'S SOMETHING SHARP IN MY CHEST...",
-	"I FEEL SOMETHING SHARP IN MY TORSO",
+	"Something might not be right, i felt my torso snapping.",
+	"This should not happen, i feel something sharp poking inside.",
+	"Breathing hurts, i think i broke a rib.",
+	"My torso hurts a lot for some reason, i think i broke something.",
 }
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
@@ -438,12 +439,15 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.painadd = org.painadd + dmg * 1
 	org.shock = org.shock + dmg * 1
+	org.o2[1] = math.max(org.o2[1] - dmg * 5, 0)
+	org.stamina_damage = (org.stamina_damage or 0) + dmg * 20
+	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 10
 
 	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 3))) then
 		org.brokenribs = math.Round(org.chest * 3)
 		
 		if org.brokenribs > 0 then
-			//org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
+			org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
 					PlayBoneBreakSound(org.owner)
 			return math.min(0, result)
@@ -455,15 +459,19 @@ end
 
 input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.pelvis
-	org.painadd = org.painadd + dmg * 1
-	org.shock = org.shock + dmg * 1
+	org.painadd = org.painadd + dmg * 1.5
+	org.shock = org.shock + dmg * 1.5
+	org.internalBleed = (org.internalBleed or 0) + dmg * 1.5
+	org.o2[1] = math.max(org.o2[1] - dmg * 3, 0)
+	org.stamina_damage = (org.stamina_damage or 0) + dmg * 15
+	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 5
 
-	local result = damageBone(org, bone, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
+	local result = damageBone(org, bone, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 
 	if org.isPly and org.pelvis == 1 then
-		//org.owner:Notify("My pelvis is agonizingly hurting.", true, "pelvis", 4)
+		org.owner:Notify("FUCKING HELL- MY ASS IS BACKWARDS, LITERALLY!", true, "pelvis", 4)
 	end
 
 	return result

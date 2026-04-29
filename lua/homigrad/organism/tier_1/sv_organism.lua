@@ -28,6 +28,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.skull = 0
 	org.stomach = 0
 	org.intestines = 0
+	org.stroke_meter = 0
+	org.oxygen_deprivation = 0
 
 	org.thiamine = 0
 	org.thiamine_timer = 0
@@ -170,6 +172,8 @@ local function send_organism(org, ply)
 	sendtable.lungsfunction = org.lungsfunction
 	sendtable.consciousness = org.consciousness
 	sendtable.concussion = org.concussion
+	sendtable.stroke_meter = org.stroke_meter
+	sendtable.oxygen_deprivation = org.oxygen_deprivation
 	sendtable.assimilated = org.assimilated
 	sendtable.berserk = org.berserk
 	sendtable.noradrenaline = org.noradrenaline
@@ -181,6 +185,7 @@ local function send_organism(org, ply)
 	sendtable.incapacitated = org.incapacitated
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
+	sendtable.stroke_meter = org.stroke_meter
 
 	sendtable.superfighter = org.superfighter
 
@@ -437,6 +442,27 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 end)
 
 include("homigrad/status_messages/sv_status_messages.lua")
+
+hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
+    if org.skull == 1 then
+        org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * 0.1, 100)
+    end
+
+    local decay_rate = 0.5
+    if org.internalBleed and org.internalBleed > 0 then
+        decay_rate = 0.1
+    end
+
+    org.stroke_meter = math.max((org.stroke_meter or 0) - timeValue * decay_rate, 0)
+
+    if org.stroke_meter >= 100 and not org.is_stroking then
+        org.is_stroking = true
+        org.o2[1] = 3
+        owner:Notify("My head... I can't...", 1, "stroke", 5)
+    elseif org.stroke_meter < 100 and org.is_stroking then
+        org.is_stroking = false
+    end
+end)
 
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if not IsValid(owner) then

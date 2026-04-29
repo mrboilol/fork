@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bigconsumable"
-SWEP.PrintName = "Mannitol"
-SWEP.Instructions = "Use to heavily reduce stroke meter."
+SWEP.PrintName = "Tranexamic Acid"
+SWEP.Instructions = "Use to reduce internal bleeding and stroke meter."
 SWEP.Category = "ZCity Other"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -43,7 +43,8 @@ if SERVER then
 		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end
 
-		org.stroke_meter = math.max(org.stroke_meter - 75, 0)
+		org.stroke_meter = math.max(org.stroke_meter - 25, 0)
+        org.internalBleed = math.max(org.internalBleed - 1, 0)
 
 		local ply = self:GetOwner()
 		ply:ViewPunch(Angle(3,0,0))
