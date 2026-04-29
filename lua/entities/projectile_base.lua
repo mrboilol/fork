@@ -186,25 +186,6 @@ if SERVER then
 		local offset = VectorRand() * 10
 		SelfPos = SelfPos + offset
 
-				local nearbyPlayers = 0
-		for _, ply in ipairs(player.GetHumans()) do
-			if IsValid(ply) and ply:GetPos():DistToSqr(SelfPos) <= (600 * 600) then
-				nearbyPlayers = nearbyPlayers + 1
-			end
-		end
-
-		local nearbyEntityCap = PROJECTILE_NEARBY_ENTITY_CAP
-		local shrapnelSampleCap = PROJECTILE_SHRAPNEL_SAMPLE_CAP
-		if nearbyPlayers >= PROJECTILE_CROWD_PLAYER_THRESHOLD_EXTREME then
-			nearbyEntityCap = PROJECTILE_NEARBY_ENTITY_CAP_EXTREME
-			shrapnelSampleCap = PROJECTILE_SHRAPNEL_SAMPLE_CAP_EXTREME
-		elseif nearbyPlayers >= PROJECTILE_CROWD_PLAYER_THRESHOLD then
-			nearbyEntityCap = PROJECTILE_NEARBY_ENTITY_CAP_CROWDED
-			shrapnelSampleCap = PROJECTILE_SHRAPNEL_SAMPLE_CAP_CROWDED
-		end
-
-		sendProjectileFarSound(self, SelfPos)
-
 		local nearbyPlayers = 0
 		for _, ply in ipairs(player.GetHumans()) do
 			if IsValid(ply) and ply:GetPos():DistToSqr(SelfPos) <= (600 * 600) then
