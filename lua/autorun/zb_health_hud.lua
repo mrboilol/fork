@@ -45,7 +45,6 @@ if SERVER then
 		"materials/vgui/hud/status_oxygen.png",          
 		"materials/vgui/hud/status_vomit.png",           
 		"materials/vgui/hud/status_brain_damage.png",
-		"materials/vgui/hud/status_stroke.png",
 		
 		"materials/vgui/hud/status_adrenaline.png",
 		"materials/vgui/hud/status_shock.png",
@@ -62,7 +61,6 @@ if SERVER then
 		"materials/vgui/hud/status_bleeding_iconalt.png",
 		"materials/vgui/hud/status_blood_lossalt.png",
 		"materials/vgui/hud/status_brain_damagealt.png",
-		"materials/vgui/hud/status_strokealt.png",
 		"materials/vgui/hud/status_cardiac_arrestalt.png",
 		"materials/vgui/hud/status_coldalt.png",
 		"materials/vgui/hud/status_conscious_iconalt.png",
@@ -363,7 +361,6 @@ local status_sprites = {
 	oxygen = nil,
 	vomit = nil,
 	brain_damage = nil,
-	stroke = nil,
 	
 	adrenaline = nil,
 	shock = nil,
@@ -400,7 +397,6 @@ local smooth = {
 	adrenaline = 0,
 	shock = 0,
 	disorientation = 0,
-	stroke_meter = 0,
 }
 
 local limbFadeStates = {
@@ -594,12 +590,6 @@ local tooltipTexts = {
 		berserk_amputant = "Ампутант - МЕНЯ ЭТО ДОЛЖНО ОСТАНОВИТЬ?",
 		berserk_cardiac_arrest = "Остановка сердца - ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО.",
 		berserk_lungs_failure = "Отказ лёгких - ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО.",
-		stroke = {
-			[4] = "Инсульт - Клетки мозга умирают. Вы теряете сознание.",
-			[3] = "Высокий риск инсульта - Сильная головная боль и спутанность сознания.",
-			[2] = "Риск инсульта - Головная боль и головокружение.",
-			[1] = "Низкий риск инсульта - Легкая головная боль."
-		},
 	},
 	
 	en = {
@@ -721,12 +711,6 @@ local tooltipTexts = {
 		berserk_amputant = "Amputation - The limb is gone, but nothing will stop you.",
 		berserk_cardiac_arrest = "Cardiac arrest - You are already dead, but rage still drives you.",
 		berserk_lungs_failure = "Lung failure - No air to breathe, but berserk won't let you fall.",
-		stroke = {
-			[4] = "Stroke - Brain cells are dying. You are losing consciousness.",
-			[3] = "High Stroke Risk - Severe headache and confusion.",
-			[2] = "Stroke Risk - Headache and dizziness.",
-			[1] = "Low Stroke Risk - Mild headache."
-		},
 	}
 }
 
@@ -745,7 +729,7 @@ local function getTooltipText(statusName, pos, berserkActive)
 	   statusName == "bleeding" or statusName == "blood_loss" or statusName == "cold" or statusName == "heat" or
 	   statusName == "hemothorax" or statusName == "overdose" or statusName == "oxygen" or
 	   statusName == "vomit" or statusName == "brain_damage" or statusName == "adrenaline" or
-	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" or statusName == "organ_damage" or statusName == "stroke" then
+	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" or statusName == "organ_damage" then
 		
 		local levelTexts = texts[statusName]
 		if levelTexts and type(levelTexts) == "table" then
@@ -830,7 +814,6 @@ local function load_status_sprites()
 	status_sprites.oxygen = loadMaterial("vgui/hud/status_oxygen.png", suffix)
 	status_sprites.vomit = loadMaterial("vgui/hud/status_vomit.png", suffix)
 	status_sprites.brain_damage = loadMaterial("vgui/hud/status_brain_damage.png", suffix)
-	status_sprites.stroke = loadMaterial("vgui/hud/status_stroke.png", suffix)
 	
 	status_sprites.adrenaline = loadMaterial("vgui/hud/status_adrenaline.png", suffix)
 	status_sprites.shock = loadMaterial("vgui/hud/status_shock.png", suffix)
@@ -918,7 +901,6 @@ local function draw_bar()
 	smooth.adrenaline = Lerp(s * dt, smooth.adrenaline or 0, getOrgVal(org, "adrenaline", 0))
 	smooth.shock = Lerp(s * dt, smooth.shock or 0, getOrgVal(org, "shock", 0))
 	smooth.disorientation = Lerp(s * dt, smooth.disorientation or 0, getOrgVal(org, "disorientation", 0))
-	smooth.stroke_meter = Lerp(s * dt, smooth.stroke_meter or 0, getOrgVal(org, "stroke_meter", 0))
 	
 	update_stability(smooth.blood or 5000, smooth.pulse or 70)
 	
@@ -1187,23 +1169,6 @@ local function draw_status_effects()
 					value = math_floor(trauma_val * 10) / 10
 				})
 				currentEffectNames["trauma"] = true
-			end
-			
-			local stroke_val = smooth.stroke_meter or getOrgVal(org, "stroke_meter", 0)
-			if stroke_val > 1 then
-				local level_num = 1
-				if stroke_val > 75 then level_num = 4
-				elseif stroke_val > 50 then level_num = 3
-				elseif stroke_val > 25 then level_num = 2 end
-
-				table.insert(effects, {
-					name = "stroke",
-					level_num = level_num,
-					has_levels = true,
-					priority = 0.8,
-					value = math_floor(stroke_val)
-				})
-				currentEffectNames["stroke"] = true
 			end
 			
 			if hasAnyAmputation(org) then
@@ -1871,7 +1836,6 @@ local function draw_status_effects()
 		elseif effect.name == "adrenaline" then icon_mat = status_sprites.adrenaline
 		elseif effect.name == "shock" then icon_mat = status_sprites.shock
 		elseif effect.name == "trauma" then icon_mat = status_sprites.trauma
-		elseif effect.name == "stroke" then icon_mat = status_sprites.stroke
 		elseif effect.name == "death" then icon_mat = status_sprites.death
 		elseif effect.name == "berserk" then icon_mat = status_sprites.berserk
 		elseif effect.name == "amputant" then icon_mat = status_sprites.amputant
@@ -1955,9 +1919,6 @@ local function draw_status_effects()
 			elseif effect.name == "trauma" then
 				letter = "T"
 				value_text = effect.value .. ""
-			elseif effect.name == "stroke" then
-				letter = "ST"
-				value_text = effect.value .. "%"
 			elseif effect.name == "death" then
 				letter = "☠"
 			elseif effect.name == "berserk" then
