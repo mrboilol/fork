@@ -78,6 +78,34 @@ local function PrecacheAccessoryModels()
     end)
 end
 
+local function NormalizeAppearanceTable(tbl)
+    if not istable(tbl) then
+        tbl = (isfunction(APmodule.GetRandomAppearance) and APmodule.GetRandomAppearance()) or {}
+    end
+
+    tbl.AAttachments = istable(tbl.AAttachments) and tbl.AAttachments or {}
+    tbl.AAttachments[1] = tbl.AAttachments[1] or "none"
+    tbl.AAttachments[2] = tbl.AAttachments[2] or "none"
+    tbl.AAttachments[3] = tbl.AAttachments[3] or "none"
+
+    tbl.AClothes = istable(tbl.AClothes) and tbl.AClothes or {}
+    tbl.ABodygroups = istable(tbl.ABodygroups) and tbl.ABodygroups or {}
+    tbl.AColor = IsColor(tbl.AColor) and tbl.AColor or color_white
+    tbl.AName = tbl.AName or ""
+
+    if not tbl.AModel and istable(APmodule.PlayerModels) then
+        local firstGroup = APmodule.PlayerModels[1] or APmodule.PlayerModels[2]
+        if istable(firstGroup) then
+            for modelName in pairs(firstGroup) do
+                tbl.AModel = modelName
+                break
+            end
+        end
+    end
+
+    return tbl
+end
+
 
 hook.Add("InitPostEntity", "HG_PrecacheAppearanceModels", function()
     timer.Simple(5, PrecacheAccessoryModels)
@@ -431,7 +459,7 @@ local function CreateStyledAccessoryMenu(parent, title)
 end
 
 function PANEL:SetAppearance( tAppearacne )
-    self.AppearanceTable = tAppearacne
+    self.AppearanceTable = NormalizeAppearanceTable(tAppearacne)
 end
 
 function PANEL:CallbackAppearance()
@@ -495,7 +523,7 @@ function PANEL:PostInit()
     self:SetDraggable(false)
     self.modelPosID = "All"
 
-    self.AppearanceTable = self.AppearanceTable or hg.Appearance.LoadAppearanceFile(hg.Appearance.SelectedAppearance:GetString()) or APmodule.GetRandomAppearance()
+    self.AppearanceTable = NormalizeAppearanceTable(self.AppearanceTable or hg.Appearance.LoadAppearanceFile(hg.Appearance.SelectedAppearance:GetString()))
 
     local tMdl = APmodule.PlayerModels[1][self.AppearanceTable.AModel] or APmodule.PlayerModels[2][self.AppearanceTable.AModel]
     
