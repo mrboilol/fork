@@ -1086,7 +1086,7 @@ net.Receive("headtrauma_flash", function()
     end
 
     sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
-    hg.AddFlash(lply:EyePos(), 1, pos, time, 20000)
+    hg.AddFlash(lply:EyePos(), 1, pos, time, size)
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     else
