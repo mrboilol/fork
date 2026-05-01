@@ -91,25 +91,25 @@ local fear_hurt_ironic = {
 }
 
 local fear_phrases = {
-	"It's not that bad... right?",
+	"I dont want to die today.",
 	"I don't want to die like this.",
 	"Is this really how it ends?",
-	"This isn't good.",
-	"Is this really how it ends?",
-	"I don't want to die like this.",
+	"Im scared of death.",
+	"This cant be it.",
+	"I dont want to die.",
 	"I wish I had a way out.",
 	"I regret so many things.",
 	"This can't be it.",
 	"I can't believe this is happening to me.",
-	"I should've taken this more seriously.",
+	"I dont want to die anymore.",
 	"What if I don't make it..?",
 	"This is worse than I thought.",
-	"This is so unfair.",
+	"I dont want it to end like this.",
 	"I can't give up yet.",
 	"I never thought it would be like this.",
-	"I should've listened to my instincts.",
-	"Breathe. Just breathe.",
-	"Cold hands. Steady hands.",
+	"Why is this happening to me...",
+	"I think im going to die here.",
+	"I cant see the end.",
 }
 
 local is_aimed_at_phrases = {

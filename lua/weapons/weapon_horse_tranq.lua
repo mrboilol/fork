@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
-SWEP.PrintName = "Fentanyl"
-SWEP.Instructions = "Fentanyl is a highly potent synthetic piperidine opioid primarily used as an analgesic. Fentanyl dose must be strictly observed, as it can quickly lead to opiate overdose. Label says that ~20% is a maximum daily dose. RMB to inject into someone else."
+SWEP.PrintName = "horse tranq"
+SWEP.Instructions = "The label reads etorphine or whatever that means, its a very watered down version of horse tranq intended for use in, well, horses however a small dose can very much kill humans. Label says a quarter of the vial is enough to sedate horses."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -10,8 +10,8 @@ SWEP.HoldType = "normal"
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/morphine_syrette/morphine.mdl"
 if CLIENT then
-	SWEP.WepSelectIcon = Material("vgui/icons/ico_fent.png")
-	SWEP.IconOverride = "vgui/icons/ico_fent.png"
+	SWEP.WepSelectIcon = Material("vgui/icons/ico_tranq.png")
+	SWEP.IconOverride = "vgui/icons/ico_tranq.png"
 	SWEP.BounceWeaponIcon = false
 end
 SWEP.AutoSwitchTo = false
@@ -22,7 +22,7 @@ SWEP.WorkWithFake = true
 SWEP.offsetVec = Vector(4, -1.5, 0)
 SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modeNames = {
-	[1] = "analgesic"
+	[1] = "tranq"
 }
 
 SWEP.DeploySnd = ""
@@ -88,7 +88,13 @@ if SERVER then
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 
 		local injected = math.min(FrameTime() * 1, self.modeValues[1])
-		org.analgesiaAdd = math.min(org.analgesiaAdd + injected, 5)
+		
+		-- 5% (0.05) of dose gives 1.0 analgesia. 1 / 0.05 = 20
+		org.analgesia = math.min(org.analgesia + injected * 20, 20) 
+
+		-- 10% (0.1) of dose gives 0.5 tranquilizer. 0.5 / 0.1 = 5
+		org.tranquilizer = math.min(org.tranquilizer + injected * 5, 5)
+
 		self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)
 
 		owner.injectedinto = owner.injectedinto or {}
@@ -110,8 +116,8 @@ if SERVER then
 		if self.modeValues[1] != 0 then
 			entOwner:EmitSound("pshiksnd")
 		else
-			//owner:SelectWeapon("weapon_hands_sh")
-			//self:Remove()
+			--//owner:SelectWeapon("weapon_hands_sh")
+			--//self:Remove()
 		end
 	end
 end

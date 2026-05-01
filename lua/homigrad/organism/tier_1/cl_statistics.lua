@@ -68,6 +68,7 @@ local list = {
 	"blindness",
 	"fear",
 	"despair",
+	"goodmood",
 	"assimilated",
 	"berserk",
 	"noradrenaline",

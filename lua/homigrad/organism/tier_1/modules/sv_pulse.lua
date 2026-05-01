@@ -205,6 +205,18 @@ module[2] = function(owner, org, timeValue)
 		
 		org.lastsoundtime = CurTime() + math.random(25,35)
 	end
+
+	if org.fear > 1.5 then
+        if not org._fear_check_time or CurTime() > org._fear_check_time then
+            org._fear_check_time = CurTime() + 1 -- check every second
+
+            local chance = (org.fear - 1.5) / 0.5 * 0.025 -- at 2.0 fear, 2.5% chance
+            if math.random() < chance then
+                org.heartstop = true
+                org.lungsfunction = false
+            end
+        end
+    end
 end
 
 --if org.heartstop then org.needotrub = true end --не совсем...

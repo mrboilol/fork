@@ -132,7 +132,7 @@ module[2] = function(owner, org, timeValue)
 	org.analgesia =  Approach(org.analgesia, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 	
 	if org.analgesiaAdd > 0 then
-		org.analgesia =  Approach(org.analgesia, 4, timeValue / 15)
+		org.analgesia =  Approach(org.analgesia, 5, timeValue / 15)
 		org.analgesiaAdd = Approach(org.analgesiaAdd, 0, timeValue / 15)
 	end
 

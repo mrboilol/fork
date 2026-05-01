@@ -150,4 +150,16 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if org.despair >= 0.8 then
 		org.disorientation = max(org.disorientation or 0, 1)
 	end
+
+	if org.despair > 0.9 then
+        if not org._despair_check_time or CurTime() > org._despair_check_time then
+            org._despair_check_time = CurTime() + 1 -- check every second
+
+            local chance = (org.despair - 0.9) / 0.1 * 0.05 -- at 1.0 despair, 5% chance
+            if math.random() < chance then
+                org.heartstop = true
+                org.lungsfunction = false
+            end
+        end
+    end
 end)
