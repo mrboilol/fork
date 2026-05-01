@@ -48,8 +48,8 @@ local asystoleSound = nil
 local g_PulseCheckTarget = nil
 local g_PulseCheckData = nil
 
-net.Receive("hg_StartPulseCheckECG", function()
-    g_PulseCheckTarget = net.ReadEntity()
+usermessage.Hook("hg_StartPulseCheckECG", function(msg)
+    g_PulseCheckTarget = msg:ReadEntity()
     g_PulseCheckData = {
         started = CurTime(),
         nextBeat = CurTime(),
@@ -68,24 +68,23 @@ local surface = surface
 local draw = draw
 local Color = Color
 
-local ekgPoints = {}
-local sweepPos = 0
-local lastSweepUpdate = 0
-local heartPhase = 0
+local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+local topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 
-local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha, bloodpressure)
+local function DrawEKG(state, centerX, centerY, width, height, pulse, color, ringAlpha, bloodpressure)
     local time = CurTime()
-    if lastSweepUpdate == 0 then lastSweepUpdate = time end
-    local dt = time - lastSweepUpdate
-    lastSweepUpdate = time
+    if state.lastUpdate == 0 then state.lastUpdate = time end
+    local dt = time - state.lastUpdate
+    state.lastUpdate = time
     
     -- Increment heart phase based on pulse
     -- pulse is BPM, so pulse/60 is beats per second
-    heartPhase = heartPhase + dt * (pulse / 60)
+    state.phase = state.phase + dt * (pulse / 60)
     
     local sweepSpeed = width / 4
-    local oldSweepPos = sweepPos
-    sweepPos = (sweepPos + dt * sweepSpeed) % width
+    local oldSweepPos = state.sweepPos
+    state.sweepPos = (state.sweepPos + dt * sweepSpeed) % width
 
     local amplitudeScale = math.Clamp((bloodpressure or 93) / 93, 0.1, 1.5)
 
@@ -115,20 +114,20 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha,
         return h
     end
 
-    local steps = math.max(1, math.floor(math.abs(sweepPos - oldSweepPos)))
-    if sweepPos < oldSweepPos then steps = math.max(1, math.floor(width - oldSweepPos + sweepPos)) end
+    local steps = math.max(1, math.floor(math.abs(state.sweepPos - oldSweepPos)))
+    if state.sweepPos < oldSweepPos then steps = math.max(1, math.floor(width - oldSweepPos + state.sweepPos)) end
 
     for i = 0, steps do
         local p = (oldSweepPos + i) % width
         -- Interpolate heartPhase for this specific pixel
-        local p_phase = heartPhase - (dt * (pulse / 60) * (1 - i/steps))
-        ekgPoints[math.floor(p)] = getH(p_phase, amplitudeScale)
+        local p_phase = state.phase - (dt * (pulse / 60) * (1 - i/steps))
+        state.points[math.floor(p)] = getH(p_phase, amplitudeScale)
     end
     
     -- Clear a small gap ahead of the sweepPos
     local gap = 12
     for i = 1, gap do
-        ekgPoints[math.floor((sweepPos + i) % width)] = nil
+        state.points[math.floor((state.sweepPos + i) % width)] = nil
     end
     
     -- Draw the buffered points
@@ -151,7 +150,7 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha,
     end
 
     for i = 0, width - 1 do
-        local h_val = ekgPoints[i]
+        local h_val = state.points[i]
         if h_val == nil then 
             lastX, lastY = nil, nil
             continue 
@@ -160,7 +159,7 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha,
         local x = startX + i
         local y = centerY - (h_val * height / 2)
         
-        local dist = sweepPos - i
+                local dist = state.sweepPos - i
         if dist < 0 then dist = dist + width end
         
         -- Matching the reference image: bright leading edge with a long, dim persistent tail
@@ -215,7 +214,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if isUnconscious and isCritical and not flatlinePlayed then
         flatlinePlayed = true
         if IsValid(flatlineSound) then flatlineSound:Stop() end
-        flatlineSound = CreateSound(LocalPlayer(), "sound/asystole.ogg")
+        flatlineSound = CreateSound(LocalPlayer(), "sound/health/asystole.ogg")
         if IsValid(flatlineSound) then
             flatlineSound:Play()
             -- Manual fade out
@@ -248,11 +247,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         dotBeat = math.floor(CurTime()) % 3
     else
         ringAlpha = math.Approach(ringAlpha, 0, FrameTime() * 3)
-        if ringAlpha <= 0 then
+                if ringAlpha <= 0 then
             peakShock = 40
-            ekgPoints = {}
-            sweepPos = 0
-            lastSweepUpdate = 0
+            centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
         end
     end
     
@@ -307,7 +304,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         
         draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     else
-        DrawEKG(centerX, centerY, 540, 140, pulse, dotColor, ringAlpha, bloodpressure)
+        DrawEKG(centerEKGState, centerX, centerY, 540, 140, pulse, dotColor, ringAlpha, bloodpressure)
     end
 
 
@@ -325,15 +322,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local showPulseCheckECG = isCheckingPulse
     local showTopLeftECG = false
 
-    if not showPulseCheckECG then
-        if org.otrub then
+        if not showPulseCheckECG and not org.otrub then
+        local admiring = ply:GetNWBool("mcd_admiring", false)
+        local abnormalHeartRate = (pulse < 40 or pulse > 150)
+        if admiring or abnormalHeartRate then
             showTopLeftECG = true
-        else
-            local admiring = ply:GetNWBool("mcd_admiring", false)
-            local abnormalHeartRate = (pulse < 40 or pulse > 150)
-            if admiring or abnormalHeartRate then
-                showTopLeftECG = true
-            end
         end
     end
 
@@ -375,12 +368,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     g_PulseCheckData.counted = g_PulseCheckData.counted + 1
                     local dynamicRate = math.max(target_pulse, 1)
                     g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
-                    surface.PlaySound("player/heartbeat_lab.wav")
+                    surface.PlaySound("player/health/heartbeat_lab.wav")
                 end
             end
         end
 
-        DrawEKG(boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck, target_bp)
+        DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck, target_bp)
 
         local displayText = ""
         if g_PulseCheckData then
@@ -396,9 +389,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
 
         draw.SimpleText(displayText, "HUDNumber5", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+    else
+        pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
-    if ecgAlpha > 0 then
+        if ecgAlpha > 0 then
         local boxW, boxH = 300, 150
         local boxX, boxY = 20, 20
 
@@ -408,7 +403,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
-        DrawEKG(boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
+        DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
+    else
+        topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
     -- Heartbeat sounds
@@ -419,7 +416,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
             if pulse < 1 then
                 if not asystoleSound then
-                    asystoleSound = CreateSound(ply, "sound/gg.ogg")
+                    asystoleSound = CreateSound(ply, "sound/health/gg.ogg")
                     asystoleSound:Play()
                 end
             else
@@ -430,11 +427,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
                 if pulse > 150 or (org.bloodpressure or 93) > 140 then
                     if critSound then critSound:Stop() end
-                    critSound = CreateSound(ply, "sound/critbeat.ogg")
+                    critSound = CreateSound(ply, "sound/health/critbeat.ogg")
                     critSound:Play()
                 else
                     if beatSound then beatSound:Stop() end
-                    beatSound = CreateSound(ply, "sound/beat.ogg")
+                    beatSound = CreateSound(ply, "sound/health/beat.ogg")
                     beatSound:Play()
                 end
             end
