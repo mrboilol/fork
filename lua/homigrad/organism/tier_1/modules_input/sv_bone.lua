@@ -239,7 +239,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
 	
-	if name == "spine3" and org.spine3 == 1 and oldDmg < 1 then
+	if name == "spine3" and org.spine3 > 0.75 and oldDmg <= 0.75 then
 		if math.random() < 0.5 then
 			hg.BreakNeck(org.owner)
 			return result, vecrand

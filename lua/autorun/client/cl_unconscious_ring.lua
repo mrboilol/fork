@@ -48,6 +48,7 @@ local heartPhase = 0
 
 local g_PulseCheckTarget = nil
 local g_PulseCheckData = nil
+local g_TopLeftECGData = nil
 
 usermessage.Hook("hg_StartPulseCheckECG", function(msg)
     g_PulseCheckTarget = msg:ReadEntity()
@@ -305,6 +306,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
 
+    local showTopLeftECG = false
+    local showPulseCheckECG = false
+
     local isCheckingPulse = false
     if IsValid(g_PulseCheckTarget) then
         local wep = ply:GetActiveWeapon()
@@ -316,15 +320,26 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    local showPulseCheckECG = isCheckingPulse
-    local showTopLeftECG = false
+    if org.otrub then
+        showTopLeftECG = true
+    elseif admiring then
+        showTopLeftECG = true
+    elseif (pulse < 40 or pulse > 150) then
+        showTopLeftECG = true
+    elseif isCheckingPulse then
+        showPulseCheckECG = true
+    end
 
-        if not showPulseCheckECG and not org.otrub then
-        local admiring = ply:GetNWBool("mcd_admiring", false)
-        local abnormalHeartRate = (pulse < 40 or pulse > 150)
-        if admiring or abnormalHeartRate then
-            showTopLeftECG = true
-        end
+    if showTopLeftECG and not g_TopLeftECGData then
+        g_TopLeftECGData = {
+            started = CurTime(),
+            nextBeat = CurTime(),
+            counted = 0,
+            completed = false,
+            finalBPM = 0
+        }
+    elseif not showTopLeftECG and g_TopLeftECGData then
+        g_TopLeftECGData = nil
     end
 
     if showPulseCheckECG then
@@ -399,7 +414,39 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
+        if g_TopLeftECGData and not g_TopLeftECGData.completed then
+            if org.heartstop or pulse <= 0 then
+                g_TopLeftECGData.completed = true
+                g_TopLeftECGData.finalBPM = "No Pulse"
+            elseif CurTime() >= g_TopLeftECGData.started + 10 then
+                g_TopLeftECGData.completed = true
+                g_TopLeftECGData.finalBPM = g_TopLeftECGData.counted * 6
+            else
+                local timeNow = CurTime()
+                while timeNow >= g_TopLeftECGData.nextBeat and g_TopLeftECGData.nextBeat <= g_TopLeftECGData.started + 10 do
+                    g_TopLeftECGData.counted = g_TopLeftECGData.counted + 1
+                    local dynamicRate = math.max(pulse, 1)
+                    g_TopLeftECGData.nextBeat = g_TopLeftECGData.nextBeat + (60 / dynamicRate)
+                end
+            end
+        end
+
         DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
+
+        local displayText = ""
+        if g_TopLeftECGData then
+            if g_TopLeftECGData.completed then
+                if type(g_TopLeftECGData.finalBPM) == "number" then
+                    displayText = g_TopLeftECGData.counted .. " x 6 = " .. g_TopLeftECGData.finalBPM .. " BPM"
+                else
+                    displayText = g_TopLeftECGData.finalBPM
+                end
+            else
+                displayText = "Counting: " .. g_TopLeftECGData.counted
+            end
+        end
+
+        draw.SimpleText(displayText, "HUDNumber5", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
     else
         topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
@@ -412,7 +459,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
             if pulse < 1 then
                 if not asystoleSound then
-                    asystoleSound = CreateSound(ply, "sound/health/gg.ogg")
+                    asystoleSound = CreateSound(ply, "sound/health/asystole.ogg")
                     asystoleSound:Play()
                 end
             else
@@ -423,11 +470,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
                 if pulse > 150 or (bloodpressure or 93) > 140 then
                     if critSound then critSound:Stop() end
-                    critSound = CreateSound(ply, "sound/health/critbeat.ogg")
+                    critSound = CreateSound(ply, "vo/npc/male_01/omg01.wav")
                     critSound:Play()
                 else
                     if beatSound then beatSound:Stop() end
-                    beatSound = CreateSound(ply, "sound/health/beat.ogg")
+                    beatSound = CreateSound(ply, "vo/npc/male_01/pain09.wav")
                     beatSound:Play()
                 end
             end

@@ -93,7 +93,7 @@ if SERVER then
 		org.analgesia = math.min(org.analgesia + injected * 20, 20) 
 
 		-- 10% (0.1) of dose gives 0.5 tranquilizer. 0.5 / 0.1 = 5
-		org.tranquilizer = math.min(org.tranquilizer + injected * 5, 5)
+		org.tranquilizer = math.min(org.tranquilizer + injected * 12.5, 12.5)
 
 		self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)
 
