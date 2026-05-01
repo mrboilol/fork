@@ -5,6 +5,14 @@ local util_TraceHull = util.TraceHull
 local IsValid = IsValid
 local CurTime = CurTime
 
+local function PlayBoneBreakSound(entity)
+    if math.random() < 0.5 then
+                entity:EmitSound("owfuck"..math.random(1, 10)..".ogg")
+    else
+        entity:EmitSound("newbonebreak/break"..math.random(10)..".wav")
+    end
+end
+
 local TUMBLE_SPEED_THRESHOLD = 250
 local TUMBLE_COOLDOWN = 2
 local GAP_CHECK_DIST = 30 
@@ -165,7 +173,7 @@ hook.Add("Think", "stanleytumbler", function()
 
                     if math.random() < breakChance then
                         -- Limb break
-                        ply:EmitSound("owfuck"..math.random(1, 6)..".ogg")
+                                                PlayBoneBreakSound(ply)
                         org.painadd = (org.painadd or 0) + 70 -- More pain for a break
 
                         if tripType == "wall" then
@@ -189,7 +197,7 @@ hook.Add("Think", "stanleytumbler", function()
                         end
                     elseif math.random() < dislocationChance then
                         -- Limb dislocation
-                        ply:EmitSound("owfuck"..math.random(1, 6)..".ogg")
+                                                PlayBoneBreakSound(ply)
                         org.painadd = (org.painadd or 0) + 35
 
                         if tripType == "wall" then

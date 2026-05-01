@@ -1,7 +1,7 @@
 --local Organism = hg.organism
 local function PlayBoneBreakSound(entity)
     if math.random() < 0.5 then
-        entity:EmitSound("owfuck"..math.random(1, 6)..".ogg", 75, 100, 1, CHAN_AUTO)
+                        entity:EmitSound("owfuck"..math.random(1, 10)..".ogg", 75, 100, 1, CHAN_AUTO)
     else
         entity:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO)
     end
@@ -238,6 +238,13 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	local oldDmg = org[name]
 
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
+	
+	if name == "spine3" and org.spine3 == 1 and oldDmg < 1 then
+		if math.random() < 0.5 then
+			hg.BreakNeck(org.owner)
+			return result, vecrand
+		end
+	end
 	
 	hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 5, "Spine bone damage harm")
 	

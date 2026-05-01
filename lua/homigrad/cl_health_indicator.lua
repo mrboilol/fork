@@ -375,12 +375,12 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     local size = IND_SIZE_BASE
     local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
     
-    local targetX = shouldShowIndicator and (ScrW() - w - ScreenScaleFixed(0)) or ScrW()
+    local targetX = shouldShowIndicator and (ScrW() - w - ScreenScaleFixed(20)) or ScrW()
     
     if not currentX then currentX = ScrW() end
     currentX = Lerp(FrameTime() * 2, currentX, targetX)
 
-    local y = ScreenScaleFixed(0)
+    local y = ScreenScaleFixed(-50)
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)

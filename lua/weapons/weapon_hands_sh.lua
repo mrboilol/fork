@@ -1,4 +1,7 @@
 if SERVER then AddCSLuaFile() end
+
+
+
 SWEP.Base = "weapon_base"
 local function RagdollOwner(ent)
 	return hg.RagdollOwner(ent)
@@ -1090,60 +1093,10 @@ function SWEP:StartPulseCheck(ply, org)
 		ply:Notify("No Pulse.", 2)
 		return
 	end
-
-	local now = CurTime()
-	local timerName = "hg_hands_pulsecheck_" .. self:EntIndex() .. "_" .. ply:EntIndex()
-
-	self.ActivePulseChecks[ply] = {
-		timerName = timerName,
-		started = now,
-		ends = now + self.PulseCheckDuration,
-		carryEnt = self:GetCarrying(),
-		nextBeat = now,
-		counted = 0,
-		completed = false
-	}
-
-	ply:Notify("Counting..", 1)
-
-	timer.Create(timerName, self.PulseCheckTick, 0, function()
-		if not IsValid(self) or not IsValid(ply) then
-			self:StopPulseCheck(ply, true)
-			return
-		end
-
-		local data = self.ActivePulseChecks and self.ActivePulseChecks[ply]
-		if not data then
-			timer.Remove(timerName)
-			return
-		end
-
-		local heldEnt = self:GetCarrying()
-		if not IsValid(heldEnt) or heldEnt ~= data.carryEnt then
-			self:StopPulseCheck(ply, true)
-			return
-		end
-
-		if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
-			ply:Notify("No Pulse.", 2)
-			self:StopPulseCheck(ply, true)
-			return
-		end
-
-		local timeNow = CurTime()
-		while timeNow >= data.nextBeat and data.nextBeat <= data.ends do
-			data.counted = data.counted + 1
-			ply:NotifyBerserk(tostring(data.counted), nil, nil, 0, nil, nil, true)
-			local dynamicRate = math.max(tonumber(org.heartbeat) or tonumber(org.pulse) or 0, 1)
-			data.nextBeat = data.nextBeat + (60 / dynamicRate)
-		end
-
-		if timeNow >= data.ends then
-			data.completed = true
-			self:StopPulseCheck(ply, false)
-			return
-		end
-	end)
+    
+    umsg.Start("hg_StartPulseCheckECG", ply)
+    umsg.Entity(org.owner)
+    umsg.End()
 end
 
 -- function SWEP:AdjustMouseSensitivity()

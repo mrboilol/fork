@@ -909,7 +909,7 @@ hook.Add("Player_Death", "ItDoesntNow", function(ply)
 	stopthings()
 	if IsValid(despairSound) then
 		despairSound:Stop()
-		despairSound = nil
+			despairSound = nil
 	end
 	despairSoundVol = 0
 end)
@@ -921,7 +921,7 @@ hook.Add("Player Spawn", "ItDoesntNow", function(ply)
 	stopthings()
 	if IsValid(despairSound) then
 		despairSound:Stop()
-		despairSound = nil
+			despairSound = nil
 	end
 	despairSoundVol = 0
 end)
@@ -1117,4 +1117,8 @@ function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
     end
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
 end
-
+hook.Add("HG_OnOtrub", "FUCKINGSHITOW", function(ply)
+    if ply == LocalPlayer() then
+        sound.PlayFile("sound/owfuck.ogg", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
+    end
+end)

@@ -38,6 +38,27 @@ local dotBeat = 0
 local flatlinePlayed = false
 local flatlineSound
 
+local ecgAlpha = 0
+local ecgAlphaPulseCheck = 0
+local lastHeartBeat = 0
+local beatSound = nil
+local critSound = nil
+local asystoleSound = nil
+
+local g_PulseCheckTarget = nil
+local g_PulseCheckData = nil
+
+net.Receive("hg_StartPulseCheckECG", function()
+    g_PulseCheckTarget = net.ReadEntity()
+    g_PulseCheckData = {
+        started = CurTime(),
+        nextBeat = CurTime(),
+        counted = 0,
+        completed = false,
+        finalBPM = 0
+    }
+end)
+
 local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
 local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
 
@@ -288,5 +309,141 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     else
         DrawEKG(centerX, centerY, 540, 140, pulse, dotColor, ringAlpha, bloodpressure)
     end
+
+
+    local isCheckingPulse = false
+    if IsValid(g_PulseCheckTarget) then
+        local wep = ply:GetActiveWeapon()
+        if IsValid(wep) and wep:GetClass() == "weapon_hands_sh" and wep.GetCarrying and IsValid(wep:GetCarrying()) and wep:GetCarrying() == g_PulseCheckTarget then
+            isCheckingPulse = true
+        else
+            g_PulseCheckTarget = nil
+            g_PulseCheckData = nil
+        end
+    end
+
+    local showPulseCheckECG = isCheckingPulse
+    local showTopLeftECG = false
+
+    if not showPulseCheckECG then
+        if org.otrub then
+            showTopLeftECG = true
+        else
+            local admiring = ply:GetNWBool("mcd_admiring", false)
+            local abnormalHeartRate = (pulse < 40 or pulse > 150)
+            if admiring or abnormalHeartRate then
+                showTopLeftECG = true
+            end
+        end
+    end
+
+    if showPulseCheckECG then
+        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 1, FrameTime() * 2)
+    else
+        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 0, FrameTime() * 3)
+    end
+
+    if showTopLeftECG then
+        ecgAlpha = math.Approach(ecgAlpha, 1, FrameTime() * 2)
+    else
+        ecgAlpha = math.Approach(ecgAlpha, 0, FrameTime() * 3)
+    end
+
+    if ecgAlphaPulseCheck > 0 then
+        local boxW, boxH = 300, 150
+        local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 20
+
+        surface.SetDrawColor(50, 50, 50, 150 * ecgAlphaPulseCheck)
+        surface.DrawRect(boxX, boxY, boxW, boxH)
+        surface.SetDrawColor(255, 255, 255, 200 * ecgAlphaPulseCheck)
+        surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
+
+        local target_org = g_PulseCheckTarget.organism or {}
+        local target_pulse = target_org.heartbeat or target_org.pulse or 70
+        local target_bp = target_org.bloodpressure or 93
+
+        if g_PulseCheckData and not g_PulseCheckData.completed then
+            if target_org.heartstop or target_pulse <= 0 then
+                g_PulseCheckData.completed = true
+                g_PulseCheckData.finalBPM = "No Pulse"
+            elseif CurTime() >= g_PulseCheckData.started + 10 then
+                g_PulseCheckData.completed = true
+                g_PulseCheckData.finalBPM = g_PulseCheckData.counted * 6
+            else
+                local timeNow = CurTime()
+                while timeNow >= g_PulseCheckData.nextBeat and g_PulseCheckData.nextBeat <= g_PulseCheckData.started + 10 do
+                    g_PulseCheckData.counted = g_PulseCheckData.counted + 1
+                    local dynamicRate = math.max(target_pulse, 1)
+                    g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
+                    surface.PlaySound("player/heartbeat_lab.wav")
+                end
+            end
+        end
+
+        DrawEKG(boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck, target_bp)
+
+        local displayText = ""
+        if g_PulseCheckData then
+            if g_PulseCheckData.completed then
+                if type(g_PulseCheckData.finalBPM) == "number" then
+                    displayText = g_PulseCheckData.counted .. " x 6 = " .. g_PulseCheckData.finalBPM .. " BPM"
+                else
+                    displayText = g_PulseCheckData.finalBPM
+                end
+            else
+                displayText = "Counting: " .. g_PulseCheckData.counted
+            end
+        end
+
+        draw.SimpleText(displayText, "HUDNumber5", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+    end
+
+    if ecgAlpha > 0 then
+        local boxW, boxH = 300, 150
+        local boxX, boxY = 20, 20
+
+        -- Green box with white borders
+        surface.SetDrawColor(50, 50, 50, 150 * ecgAlpha)
+        surface.DrawRect(boxX, boxY, boxW, boxH)
+        surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
+        surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
+
+        DrawEKG(boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
+    end
+
+    -- Heartbeat sounds
+    if admiring or org.otrub then
+        local currentHeartBeat = math.floor(heartPhase)
+        if currentHeartBeat > lastHeartBeat then
+            lastHeartBeat = currentHeartBeat
+
+            if pulse < 1 then
+                if not asystoleSound then
+                    asystoleSound = CreateSound(ply, "sound/gg.ogg")
+                    asystoleSound:Play()
+                end
+            else
+                if asystoleSound then
+                    asystoleSound:Stop()
+                    asystoleSound = nil
+                end
+
+                if pulse > 150 or (org.bloodpressure or 93) > 140 then
+                    if critSound then critSound:Stop() end
+                    critSound = CreateSound(ply, "sound/critbeat.ogg")
+                    critSound:Play()
+                else
+                    if beatSound then beatSound:Stop() end
+                    beatSound = CreateSound(ply, "sound/beat.ogg")
+                    beatSound:Play()
+                end
+            end
+        end
+    else
+        if beatSound then beatSound:Stop(); beatSound = nil end
+        if critSound then critSound:Stop(); critSound = nil end
+        if asystoleSound then asystoleSound:Stop(); asystoleSound = nil end
+    end
 end)
+
 
