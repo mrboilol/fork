@@ -146,9 +146,6 @@ if SERVER then
 						local old = -(-self.modeValues[1])
 						self.modeValues[1] = math.min(self.modeValues[1] + FrameTime() * (math.max(ent.organism.pulse / 70,0.3)) * 0.5,1)
 						self.bloodtype = ent.organism.bloodtype
-						if takingSelf and ent.organism.lungsR and ent.organism.lungsL and (ent.organism.lungsR[2] == 1 or ent.organism.lungsL[2] == 1) then
-							ent.organism.needle = 1
-						end
 
 						if ent.organism.furryinfected then
 							self.furryinfected = true
@@ -174,6 +171,9 @@ if SERVER then
 					local ent = owner:KeyDown(IN_ATTACK) and owner or hg.eyeTrace(self:GetOwner()).Entity
 					if not ent.organism then return end
 					local ent = hg.GetCurrentCharacter(ent)
+					if ent.organism and (ent.organism.pneumothorax > 0 or ent.organism.hemothorax) then
+						ent.organism.needle = 1
+					end
 					if ent:GetVelocity():LengthSqr() < 1000 then
 						local old = -(-ent.organism.blood)
 						local good_type = hg.organism.bloodtypes[self.bloodtype or "o-"][ent.organism.bloodtype or "o-"]

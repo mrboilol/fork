@@ -444,9 +444,24 @@ end)
 include("homigrad/status_messages/sv_status_messages.lua")
 
 hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
-    if org.skull == 1 then
-        org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * 0.1, 100)
+    local ramp_rate = 0.1 -- Base rate from original
+
+    -- Ramp up on moderate head damage (skull >= 0.4 but <1)
+    if org.skull >= 0.4 then
+        ramp_rate = ramp_rate + 0.15 -- Slightly faster for moderate damage
     end
+
+    -- Ramp up on minor brain damage (brain >=0.1 and <0.3)
+    if org.brain >= 0.1 and org.brain < 0.3 then
+        ramp_rate = ramp_rate + 0.1
+    end
+
+    -- Ramp up on high blood pressure (>115)
+    if org.bloodpressure > 115 then
+        ramp_rate = ramp_rate + 0.2 -- Faster for hypertension
+    end
+
+    org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 100)
 
     local decay_rate = 0.5
     if org.internalBleed and org.internalBleed > 0 then
@@ -457,10 +472,19 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
 
     if org.stroke_meter >= 100 and not org.is_stroking then
         org.is_stroking = true
+        org.stroke_active = true  -- Set stroke active for persistent effects
         org.o2[1] = 3
         owner:Notify("My head... I can't...", 1, "stroke", 5)
     elseif org.stroke_meter < 100 and org.is_stroking then
         org.is_stroking = false
+        if org.alive then
+            org.heartstop = true
+            org.lungsfunction = false
+        end
+    end
+
+    if org.is_stroking then
+        org.brain = math.max(org.brain - timeValue / 600, 0)  -- Slow brain deterioration during stroke
     end
 end)
 

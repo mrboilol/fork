@@ -953,7 +953,8 @@ SWEP.BrokenArmPenalty = {
 
 function SWEP:HasBrokenArm(owner)
     if not IsValid(owner) or not owner.organism then return false end
-    return (owner.organism.larm and owner.organism.larm >= 1) or (owner.organism.rarm and owner.organism.rarm >= 1)
+    local org = owner.organism
+    return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.rarmdislocation
 end
 
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)

@@ -248,7 +248,15 @@ module[2] = function(owner, org, timeValue)
 		local sprayed = org.is_sprayed_at
 		org.is_sprayed_at = nil
 
-		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1)
+        local blood_pressure_k = 1
+        if org.bloodpressure < 70 then
+            blood_pressure_k = math.Remap(org.bloodpressure, 0, 70, 0.2, 1)
+        elseif org.bloodpressure > 115 then -- from sv_pulse
+            blood_pressure_k = math.Remap(org.bloodpressure, 115, 190, 1, 0.75)
+        end
+        blood_pressure_k = math.Clamp(blood_pressure_k, 0.2, 1)
+
+		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k
 		if org.oxygen_deprivation and org.oxygen_deprivation > 0 then
 			regenerate = regenerate * 0.1 -- 90% penalty
 			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue, 0) -- recovers over time

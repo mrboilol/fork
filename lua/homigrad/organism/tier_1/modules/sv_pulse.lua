@@ -92,7 +92,8 @@ module[2] = function(owner, org, timeValue)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 
 	local cardiacK = heartK * bloodK * o2K * brainK * hypothermiaK
-	local map = 93 * cardiacK * hypertensionMul * compensation
+    local pulse_multiplier = math.Clamp(math.Remap(org.heartbeat, 60, 140, 0.9, 1.2), 0.8, 1.3)
+	local map = 93 * cardiacK * hypertensionMul * compensation * pulse_multiplier
 	map = org.alive and map or 0
 
 	if org.heartstop then
@@ -129,7 +130,7 @@ module[2] = function(owner, org, timeValue)
 		org.stamina[1] = math.max(org.stamina[1] - timeValue * (2 + lowK * 10), 0)
 
 		if org.bloodpressure < 55 then
-			org.consciousness = math.Approach(org.consciousness, 0.12, timeValue * (0.08 + lowK * 0.22))
+			org.consciousness = math.Approach(org.consciousness, 0.12, timeValue * (0.08 + lowK * 0.11))
 		end
 
 		if org.bloodpressure < 45 then

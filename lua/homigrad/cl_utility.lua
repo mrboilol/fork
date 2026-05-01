@@ -992,7 +992,7 @@ players : 1 humans, 0 bots (20 max)
 		amtflashed2 = 0
 	end)
 
-	hook.Add("Post Post Pre Post Processing","flasheseffect",function()
+	hook.Add("Post Pre Post Processing","flasheseffect",function()
 		if !lply:Alive() then
 			if !next(hg.flashes) then
 				hg.flashes = {}

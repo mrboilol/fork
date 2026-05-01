@@ -629,6 +629,14 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
 		end
 		
+		if org.stroke_active then
+			local flashMat = Material("effects/flashlight001")  -- Use existing flash material
+			local alpha = math.min(org.stroke_meter / 100, 1)  -- Fade in based on stroke meter
+			surface.SetDrawColor(0, 0, 0, 255 * alpha)  -- Tint to black
+			surface.SetMaterial(flashMat)
+			surface.DrawTexturedRect(ScrW() / 4, ScrH() / 4, ScrW() / 2, ScrH() / 2)  -- Position a large "flash" as black spot
+		end
+		
 		//if pain > 10 then
 			if IsValid(PainStation) then
 				PainStation:SetVolume(math.Clamp(math.Remap(pain, 0, 120, 0, 2), 0, 2))
@@ -1085,7 +1093,6 @@ net.Receive("headtrauma_flash", function()
         return
     end
 
-    sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
@@ -1095,15 +1102,19 @@ net.Receive("headtrauma_flash", function()
 end)
 
 local showing_otrub_headtrauma = false
+local last_knocked_sound_time = 0
 function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
     if showing_otrub_headtrauma then return end
     showing_otrub_headtrauma = true
     timer.Simple(0.5, function() showing_otrub_headtrauma = false end)
 
     local lply = LocalPlayer()
-    if not IsValid(lply) then return end
+    if not IsValid(lply) or not lply:Alive() then return end
 
-    sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
+    if CurTime() > last_knocked_sound_time + 5 then
+        sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
+        last_knocked_sound_time = CurTime()
+    end
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
 end
 

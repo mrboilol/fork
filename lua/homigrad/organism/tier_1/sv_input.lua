@@ -512,6 +512,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local attacker = dmgInfo:GetAttacker()
 	
 	local org = ent.organism
+    if dmgInfo:IsDamageType(DMG_FALL) and dmgInfo:GetDamage() > 40 then
+        timer.Simple(0, function()
+            if not IsValid(ent) or not ent:IsPlayer() then return end
+            ent:Notify("The fall knocked the wind out of you.")
+        end)
+    end
 
 	-- Glass damage to ragdoll...
 	if IsValid(ent) and string.find(ent:GetClass(),"break") and 
