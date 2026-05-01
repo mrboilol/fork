@@ -44,6 +44,7 @@ local lastHeartBeat = 0
 local beatSound = nil
 local critSound = nil
 local asystoleSound = nil
+local heartPhase = 0
 
 local g_PulseCheckTarget = nil
 local g_PulseCheckData = nil
@@ -206,10 +207,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     
     local isUnconscious = org.otrub
-
     local pulse = org.heartbeat or org.pulse or 70
     local brain = org.brain or 0
+    local bloodpressure = org.bloodpressure or 93
+    local consciousness = org.consciousness or 0
+    local shock = org.shock or 0
     local isCritical = (org.critical == true) or (pulse < 1 and brain >= 0.02) or (brain >= 0.34)
+    local admiring = ply:GetNWBool("mcd_admiring", false)
+    heartPhase = heartPhase + FrameTime() * (pulse / 60)
 
     if isUnconscious and isCritical and not flatlinePlayed then
         flatlinePlayed = true
@@ -217,7 +222,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         flatlineSound = CreateSound(LocalPlayer(), "sound/health/asystole.ogg")
         if IsValid(flatlineSound) then
             flatlineSound:Play()
-            -- Manual fade out
             local vol = 1
             timer.Create("flatline_fade", 0.1, 50, function()
                 if not IsValid(flatlineSound) then timer.Remove("flatline_fade") return end
@@ -247,24 +251,17 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         dotBeat = math.floor(CurTime()) % 3
     else
         ringAlpha = math.Approach(ringAlpha, 0, FrameTime() * 3)
-                if ringAlpha <= 0 then
+        if ringAlpha <= 0 then
             peakShock = 40
             centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
         end
     end
     
-    if ringAlpha <= 0 then return end
+    if ringAlpha <= 0 and not showTopLeftECG and not showPulseCheckECG then return end
     
     lerpBrain = math.Approach(lerpBrain, org.brain or 0, FrameTime() * 2)
     lerpShock = math.Approach(lerpShock, org.shock or 0, FrameTime() * 50)
     lerpConsciousness = math.Approach(lerpConsciousness, org.consciousness or 0, FrameTime() * 2)
-    
-    local pulse = org.heartbeat or org.pulse or 70
-    local bloodpressure = org.bloodpressure or 93
-    local brain = org.brain or 0
-    local consciousness = org.consciousness or 0
-    local shock = org.shock or 0
-    local isCritical = (org.critical == true) or (pulse < 1 and brain >= 0.02) or (brain >= 0.34)
     
     local scrW, scrH = ScrW(), ScrH()
     local centerX, centerY = scrW / 2, scrH / 2
@@ -393,11 +390,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
-        if ecgAlpha > 0 then
+    if ecgAlpha > 0 then
         local boxW, boxH = 300, 150
         local boxX, boxY = 20, 20
 
-        -- Green box with white borders
         surface.SetDrawColor(50, 50, 50, 150 * ecgAlpha)
         surface.DrawRect(boxX, boxY, boxW, boxH)
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
@@ -425,7 +421,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     asystoleSound = nil
                 end
 
-                if pulse > 150 or (org.bloodpressure or 93) > 140 then
+                if pulse > 150 or (bloodpressure or 93) > 140 then
                     if critSound then critSound:Stop() end
                     critSound = CreateSound(ply, "sound/health/critbeat.ogg")
                     critSound:Play()
