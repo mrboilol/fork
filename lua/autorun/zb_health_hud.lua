@@ -2026,7 +2026,7 @@ local function draw_status_effects()
 		local icon_mat = nil
 		if effect.name == "pain" then icon_mat = status_sprites.pain_icon
 		elseif effect.name == "conscious" then icon_mat = status_sprites.conscious_icon
-		elseif effect.name == "stamina" then icon_mat = status_sprites.stamin-icon
+		elseif effect.name == "stamina" then icon_mat = status_sprites.stamina_icon
 		elseif effect.name == "bleeding" then 
 			if effect.level_num == 1 then 
 				icon_mat = status_sprites.bleeding_small

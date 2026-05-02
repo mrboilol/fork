@@ -220,21 +220,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if isUnconscious and isCritical and not flatlinePlayed then
         flatlinePlayed = true
         if IsValid(flatlineSound) then flatlineSound:Stop() end
-        flatlineSound = CreateSound(LocalPlayer(), "sound/health/gg.ogg")
+        flatlineSound = CreateSound(LocalPlayer(), "health/gg.ogg")
         if IsValid(flatlineSound) then
             flatlineSound:Play()
-            local vol = 1
-            timer.Create("flatline_fade", 0.1, 50, function()
-                if not IsValid(flatlineSound) then timer.Remove("flatline_fade") return end
-                vol = vol - 0.02
-                if vol < 0 then
-                    flatlineSound:Stop()
-                    timer.Remove("flatline_fade")
-                else
-                    flatlineSound:ChangeVolume(vol)
-                end
-            end)
         end
+
     elseif not isUnconscious and flatlinePlayed then
         flatlinePlayed = false
         if IsValid(flatlineSound) then
@@ -320,13 +310,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if org.otrub then
-        --showTopLeftECG = true
-    elseif admiring then
+    if admiring or (pulse < 40 or pulse > 150) then
         showTopLeftECG = true
-    elseif (pulse < 40 or pulse > 150) then
-        showTopLeftECG = true
-    elseif isCheckingPulse then
+    end
+	if isCheckingPulse then
         showPulseCheckECG = true
     end
 
@@ -381,11 +368,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     local dynamicRate = math.max(target_pulse, 1)
                     g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
                     if target_pulse < 1 then
-                        surface.PlaySound("sound/health/gg.ogg")
+                        surface.PlaySound("health/gg.ogg")
                     elseif target_pulse > 150 or (target_bp or 93) > 140 then
-                        surface.PlaySound("sound/health/critbeat.ogg")
+                        surface.PlaySound("health/critbeat.ogg")
                     else
-                        surface.PlaySound("sound/health/beat.ogg")
+                        surface.PlaySound("health/beat.ogg")
                     end
                 end
             end
@@ -476,11 +463,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
                 if pulse > 150 or (bloodpressure or 93) > 140 then
                     if critSound then critSound:Stop() end
-                    critSound = CreateSound(ply, "sound/health/critbeat.ogg")
+                    critSound = CreateSound(ply, "health/critbeat.ogg")
                     critSound:Play()
                 else
                     if beatSound then beatSound:Stop() end
-                    beatSound = CreateSound(ply, "sound/health/beat.ogg")
+                    beatSound = CreateSound(ply, "health/beat.ogg")
                     beatSound:Play()
                 end
             end
