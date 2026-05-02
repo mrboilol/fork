@@ -400,7 +400,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         end
 
-        draw.SimpleText(displayText, "HUDNumber5", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+        draw.SimpleText(displayText, "Typewriter", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
     else
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
@@ -459,7 +459,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
             if pulse < 1 then
                 if not asystoleSound then
-                    asystoleSound = CreateSound(ply, "sound/health/asystole.ogg")
+                    asystoleSound = CreateSound(ply, "sound/health/gg.ogg")
                     asystoleSound:Play()
                 end
             else
@@ -470,11 +470,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
                 if pulse > 150 or (bloodpressure or 93) > 140 then
                     if critSound then critSound:Stop() end
-                    critSound = CreateSound(ply, "vo/npc/male_01/omg01.wav")
+                    critSound = CreateSound(ply, "sound/health/critbeat.ogg")
                     critSound:Play()
                 else
                     if beatSound then beatSound:Stop() end
-                    beatSound = CreateSound(ply, "vo/npc/male_01/pain09.wav")
+                    beatSound = CreateSound(ply, "sound/health/beat.ogg")
                     beatSound:Play()
                 end
             end
