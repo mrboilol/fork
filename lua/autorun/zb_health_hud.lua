@@ -100,6 +100,13 @@ if SERVER then
 		"materials/vgui/hud/status_stamina_iconalt.png",
 		"materials/vgui/hud/status_traumaalt.png",
 		"materials/vgui/hud/status_vomitalt.png",
+		"materials/vgui/hud/maxbleeding.png"
+		"materials/vgui/hud/brokenribs.png"
+		"materials/vgui/hud/dislocatedjaw.png"
+		"materials/vgui/hud/encumbered.png"
+		"materials/vgui/hud/smallbleeding.png"
+		"materials/vgui/hud/stroke.png"
+		"materials/vgui/hud/palpitations.png"
 	}
 	
 	for _, path in ipairs(SPRITES) do resource.AddFile(path) end
@@ -928,12 +935,12 @@ local function load_status_sprites()
 	status_sprites.oxygen = loadMaterial("vgui/hud/status_oxygen.png", suffix)
 	status_sprites.vomit = loadMaterial("vgui/hud/status_vomit.png", suffix)
 	status_sprites.brain_damage = loadMaterial("vgui/hud/status_brain_damage.png", suffix)
-	status_sprites.stroke = loadMaterial("vgui/hud/status_stroke.png", suffix)
+	status_sprites.stroke = loadMaterial("vgui/hud/stroke.png", suffix)
 	status_sprites.palpitations = loadMaterial("vgui/hud/palpitations.png", suffix)
 	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix)
 	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
-	status_sprites.bleeding_small = loadMaterial("vgui/hud/bleeding_small.png", suffix)
-	status_sprites.bleeding_max = loadMaterial("vgui/hud/bleeding_max.png", suffix)
+	status_sprites.bleeding_small = loadMaterial("vgui/hud/smallbleeding.png", suffix)
+	status_sprites.bleeding_max = loadMaterial("vgui/hud/maxbleeding.png", suffix)
 	
 	status_sprites.adrenaline = loadMaterial("vgui/hud/status_adrenaline.png", suffix)
 	status_sprites.shock = loadMaterial("vgui/hud/status_shock.png", suffix)
@@ -942,8 +949,8 @@ local function load_status_sprites()
 	status_sprites.death = loadMaterial("vgui/hud/status_death.png", suffix)
 	status_sprites.berserk = loadMaterial("vgui/hud/status_berserk.png", suffix)
 	status_sprites.amputant = loadMaterial("vgui/hud/status_amputant.png", suffix)
-	status_sprites.dislocated_jaw = loadMaterial("vgui/hud/dislocated_jaw.png", suffix)
-	status_sprites.broken_ribs = loadMaterial("vgui/hud/broken_ribs.png", suffix)
+	status_sprites.dislocated_jaw = loadMaterial("vgui/hud/dislocatedjaw.png", suffix)
+	status_sprites.broken_ribs = loadMaterial("vgui/hud/brokenribs.png", suffix)
 	status_sprites.encumbered = loadMaterial("vgui/hud/encumbered.png", suffix)
 end
 
@@ -1346,10 +1353,8 @@ local function draw_status_effects()
 		if showAllIcons then
 				local pulse_val = smooth.pulse or getOrgVal(org, "pulse", 70)
 				if pulse_val > 150 then
-					local level_num = 1
-					if pulse_val > 200 then level_num = 4
-					elseif pulse_val > 180 then level_num = 3
-					elseif pulse_val > 160 then level_num = 2 end
+					local level_num = 3
+					if pulse_val > 200 then level_num = 4 end
 
 					table.insert(effects, {
 						name = "palpitations",
@@ -2030,6 +2035,8 @@ local function draw_status_effects()
 		elseif effect.name == "bleeding" then 
 			if effect.level_num == 1 then 
 				icon_mat = status_sprites.bleeding_small
+			elseif effect.level_num == 2 or effect.level_num == 3 then
+				icon_mat = status_sprites.bleeding_icon
 			elseif effect.level_num == 4 then
 				icon_mat = status_sprites.bleeding_max
 			else

@@ -254,7 +254,7 @@ module[2] = function(owner, org, timeValue)
 
         local blood_pressure_k = 1
         if org.bloodpressure < 70 then
-            blood_pressure_k = math.Remap(org.bloodpressure, 0, 70, 0.2, 1)
+            blood_pressure_k = math.Remap(org.bloodpressure, 0, 70, 0.1, 1)
         elseif org.bloodpressure > 115 then -- from sv_pulse
             blood_pressure_k = math.Remap(org.bloodpressure, 115, 190, 1, 0.75)
         end

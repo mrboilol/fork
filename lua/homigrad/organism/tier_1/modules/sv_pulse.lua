@@ -130,7 +130,11 @@ module[2] = function(owner, org, timeValue)
 		org.stamina[1] = math.max(org.stamina[1] - timeValue * (2 + lowK * 10), 0)
 
 		if org.bloodpressure < 55 then
-			org.consciousness = math.Approach(org.consciousness, 0.12, timeValue * (0.08 + lowK * 0.11))
+			if org.consciousness > 0.45 then
+				org.consciousness = math.Approach(org.consciousness, 0.45, timeValue * (0.08 + lowK * 0.11))
+			else
+				org.consciousness = math.Approach(org.consciousness, 0.12, timeValue * (0.08 + lowK * 0.11))
+			end
 		end
 
 		if org.bloodpressure < 45 then

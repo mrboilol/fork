@@ -310,11 +310,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if admiring or (pulse < 40 or pulse > 150) then
-        showTopLeftECG = true
-    end
-	if isCheckingPulse then
+    if isCheckingPulse then
         showPulseCheckECG = true
+    elseif admiring or (pulse < 40 or pulse > 150) then
+        showTopLeftECG = true
     end
 
     if showTopLeftECG and not g_TopLeftECGData then
