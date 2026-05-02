@@ -1116,7 +1116,7 @@ end
 function SWEP:ApplyForce()
 	local ply = self:GetOwner()
 	local target = self:GetOwner():GetAimVector() * self.CarryDist + select(1, hg.eye(ply))
-	if not IsValid(self.CarryEnt) then return end
+	if not IsValid(self.CarryEnt) or self.CarryBone == nil then return end
 	local phys = self.CarryEnt:GetPhysicsObjectNum(self.CarryBone)
 
 	if ply.organism and ply.organism.rarmamputated and ply:IsTyping() then

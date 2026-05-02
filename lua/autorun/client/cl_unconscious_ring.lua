@@ -321,7 +321,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     if org.otrub then
-        -- showTopLeftECG = true -- Now only the center EKG will show when unconscious
+        --showTopLeftECG = true
     elseif admiring then
         showTopLeftECG = true
     elseif (pulse < 40 or pulse > 150) then

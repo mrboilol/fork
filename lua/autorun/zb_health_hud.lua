@@ -812,7 +812,7 @@ local tooltipTexts = {
 			[4] = "Disfigured - Your skull and jaw are damaged, making it so that your face is unrecognizeable."
 		},
 		broken_ribs = {
-			[1] = "Chest Pains - You better hope its nothing bad."
+			[1] = "Chest Pains - You better hope its nothing bad.",
 			[2] = "Broken Ribs - Definitively, a rib broke. You should pray it never pokes your lungs.",
 			[3] = "Penetrating Injury - This one totally poked a lung, you can barely breathe without paining.",
 			[4] = "Crushed ribs - All of them are gone, hope you dont have any enemies."
