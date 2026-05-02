@@ -226,6 +226,12 @@ module[2] = function(owner, org, timeValue)
 	else
 		org.pneumothorax = min(org.pneumothorax + timeValue / 120, 1) -- A bit faster than a single punctured lung
 	end
+
+		if org.lastCOBreathe and org.lastCOBreathe + 1 > CurTime() then
+		org.COregen = math.Approach(org.COregen, 30, timeValue * 1)
+	else
+		org.COregen = math.Approach(org.COregen, 0, timeValue * 0.5)
+	end
 	
 	if o2[1] < 15 then
         org.CO = math.min(org.CO + timeValue * 0.5, 30)
