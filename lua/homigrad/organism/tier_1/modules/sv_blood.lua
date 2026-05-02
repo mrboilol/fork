@@ -41,6 +41,7 @@ module[1] = function(org)
 	end
 
 	org.hemotransfusionshock = 0
+	org.ischemia = 0
 
 	org.survivalchance = 1
 	org.hemothorax = false
@@ -115,10 +116,11 @@ module[2] = function(owner, org, mulTime)
 	if org.hemotransfusionshock > 0 then
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 200,0)
 		org.internalBleed = org.internalBleed + mulTime / 30
+		org.ischemia = org.ischemia + mulTime / 15
 	end
 
-	if org.arteria == 1 then
-		org.o2[1] = math.max(org.o2[1] - mulTime * 5,0)
+	if org.internalBleed > 1 then
+		org.ischemia = org.ischemia + (org.internalBleed - 1) * mulTime / 20
 	end
 
 	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))

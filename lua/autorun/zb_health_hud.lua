@@ -55,6 +55,7 @@ if SERVER then
 		"materials/vgui/hud/concussion.png",
 		"materials/vgui/hud/bleeding_small.png",
 		"materials/vgui/hud/bleeding_max.png",
+		"materials/vgui/hud/sepsis.png",
 
 		"materials/vgui/hud/status_adrenaline.png",
 		"materials/vgui/hud/status_shock.png",
@@ -392,6 +393,7 @@ local status_sprites = {
 	palpitations = nil,
 	hypoventilation = nil,
 	concussion = nil,
+	sepsis = nil,
 	bleeding_small = nil,
 	bleeding_max = nil,
 	
@@ -432,6 +434,8 @@ local smooth = {
 	disorientation = 0,
 	stroke_meter = 0,
 	concussion = 0,
+	ischemia = 0,
+	hemotransfusionshock = 0,
 }
 
 local limbFadeStates = {
@@ -666,7 +670,8 @@ local tooltipTexts = {
 			[2] = "Weight with impact to speed",
 			[3] = "Weight, and incredibly great impact to speed",
 			[4] = "You move extremely slowly due to weight"
-		}
+		},
+		sepsis = "Сепсис - опасное для жизни состояние, вызванное подавляющей реакцией организма на инфекцию. Может привести к повреждению тканей, отказу органов и смерти."
 	},
 	
 	en = {
@@ -829,7 +834,8 @@ local tooltipTexts = {
 			[2] = "Encumbered - Your gear is limiting your movement somewhat, but not severely.",
 			[3] = "Engulfed - Too much gear, walking sounds like a real workout.",
 			[4] = "Completely Weighted - WAAAY too much gear, how about you take it off and stop LARPING?"
-		}
+		},
+		sepsis = "??? - Something in your body feels funny."
 	}
 }
 
@@ -850,7 +856,7 @@ local function getTooltipText(statusName, pos, berserkActive)
 	   statusName == "vomit" or statusName == "brain_damage" or statusName == "adrenaline" or
 	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" or statusName == "organ_damage" or statusName == "stroke" or
        statusName == "palpitations" or statusName == "hypoventilation" or statusName == "concussion" or
-	   statusName == "dislocated_jaw" or statusName == "broken_ribs" or statusName == "encumbered" then
+	   statusName == "dislocated_jaw" or statusName == "broken_ribs" or statusName == "encumbered" or statusName == "sepsis" then
 		
 		local levelTexts = texts[statusName]
 		if levelTexts and type(levelTexts) == "table" then
@@ -939,6 +945,7 @@ local function load_status_sprites()
 	status_sprites.palpitations = loadMaterial("vgui/hud/palpitations.png", suffix)
 	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix)
 	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
+	status_sprites.sepsis = loadMaterial("vgui/hud/status_sepsis.png", suffix)
 	status_sprites.bleeding_small = loadMaterial("vgui/hud/smallbleeding.png", suffix)
 	status_sprites.bleeding_max = loadMaterial("vgui/hud/maxbleeding.png", suffix)
 	
@@ -1033,6 +1040,8 @@ local function draw_bar()
 	smooth.disorientation = Lerp(s * dt, smooth.disorientation or 0, getOrgVal(org, "disorientation", 0))
 	smooth.stroke_meter = Lerp(s * dt, smooth.stroke_meter or 0, getOrgVal(org, "stroke_meter", 0))
 	smooth.concussion = Lerp(s * dt, smooth.concussion or 0, getOrgVal(org, "concussion", 0))
+	smooth.ischemia = Lerp(s * dt, smooth.ischemia or 0, getOrgVal(org, "ischemia", 0))
+	smooth.hemotransfusionshock = Lerp(s * dt, smooth.hemotransfusionshock or 0, getOrgVal(org, "hemotransfusionshock", 0))
 	
 	update_stability(smooth.blood or 5000, smooth.pulse or 70)
 	
@@ -1350,7 +1359,59 @@ local function draw_status_effects()
 			end
 		end
 		
-		if showAllIcons then
+															local stamina_table = org.stamina
+				if stamina_table and type(stamina_table) == "table" then
+					local stamina_val = stamina_table[1] or 0
+					local stamina_max = stamina_table.max or 180
+					
+					if stamina_max <= 0 then stamina_max = 180 end
+					
+					local stamina_percent = (stamina_val / stamina_max) * 100
+					
+					if stamina_percent < 50 then
+						local level_num = 1
+						if stamina_percent <= 10 then level_num = 4
+						elseif stamina_percent <= 25 then level_num = 3
+						elseif stamina_percent <= 40 then level_num = 2 end
+						
+						table.insert(effects, {
+							name = "encumbered",
+							level_num = level_num,
+							has_levels = true,
+							priority = 9,
+							value = math_floor(stamina_percent)
+						})
+						currentEffectNames["encumbered"] = true
+					end
+				end
+
+				if org.jawdislocation then
+					table.insert(effects, {
+						name = "dislocated_jaw",
+						priority = 8,
+						value = nil
+					})
+					currentEffectNames["dislocated_jaw"] = true
+				end
+
+				local chest_val = getOrgVal(org, "chest", 0)
+				if chest_val > 0.3 then
+					local level_num = 1
+					if chest_val > 0.6 then level_num = 2 end
+					if chest_val > 0.8 then level_num = 3 end
+					if getOrgVal(org, "pneumothorax", 0) > 0.3 then level_num = 4 end
+					
+					table.insert(effects, {
+						name = "broken_ribs",
+						level_num = level_num,
+						has_levels = true,
+						priority = 7,
+						value = math_floor(chest_val * 100)
+					})
+					currentEffectNames["broken_ribs"] = true
+				end
+
+				if showAllIcons then
 				local pulse_val = smooth.pulse or getOrgVal(org, "pulse", 70)
 				if pulse_val > 150 then
 					local level_num = 3
@@ -1367,11 +1428,20 @@ local function draw_status_effects()
 				end
 
 				local o2_val = getO2Value(org)
-				if o2_val < (getO2Max(org) * 0.8) then
+				local o2_curregen = getOrgTableVal(org, "o2", "curregen", nil, 0)
+				if o2_curregen <= 0 and o2_val < 5 then
+					if not currentEffectNames["lungs_failure"] then
+						table.insert(effects, {
+							name = "lungs_failure",
+							priority = 0.35
+						})
+						currentEffectNames["lungs_failure"] = true
+					end
+				elseif (o2_curregen < -0.1 or o2_val < (getO2Max(org) * 0.9)) and not currentEffectNames["lungs_failure"] then
 					local level_num = 1
 					if o2_val < 10 then level_num = 4
 					elseif o2_val < 15 then level_num = 3
-					elseif o2_val < 20 then level_num = 2 end
+					elseif o2_val < 22 then level_num = 2 end
 
 					table.insert(effects, {
 						name = "hypoventilation",
@@ -1399,12 +1469,24 @@ local function draw_status_effects()
 					})
 					currentEffectNames["concussion"] = true
 				end
+
+				local ischemia_val = smooth.ischemia or getOrgVal(org, "ischemia", 0)
+				local hemotransfusionshock_val = smooth.hemotransfusionshock or getOrgVal(org, "hemotransfusionshock", 0)
+				if ischemia_val > 0.1 or hemotransfusionshock_val > 0.1 then
+					table.insert(effects, {
+						name = "sepsis",
+						priority = 0.8,
+						value = math_floor(ischemia_val * 100)
+					})
+					currentEffectNames["sepsis"] = true
+				end
+
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
 			if bleed_val > HUD.bleeding_threshold then
 				local level_num = 1
-				if bleed_val > 7.5 then level_num = 4
-				elseif bleed_val > 5 then level_num = 3
-				elseif bleed_val > 2.5 then level_num = 2 end
+				if bleed_val > 6 then level_num = 2 end
+				if bleed_val > 12 then level_num = 3 end
+				if bleed_val > 18 then level_num = 4 end
 				
 				table.insert(effects, {
 					name = "bleeding",
@@ -1945,7 +2027,13 @@ local function draw_status_effects()
 			value = effect.value
 		})
 		
-		local drawSize = size * scale
+				local effect_scale = 1.0
+		if effect.name == "hypoventilation" then
+			effect_scale = 0.8
+		elseif effect.name == "broken_ribs" or effect.name == "dislocated_jaw" or effect.name == "encumbered" then
+			effect_scale = 0.8
+			end
+		local drawSize = size * scale * effect_scale
 		local drawX = final_x - (drawSize - size) / 2
 		local drawY = final_y - (drawSize - size) / 2
 		

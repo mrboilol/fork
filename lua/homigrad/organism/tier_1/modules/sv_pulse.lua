@@ -123,6 +123,20 @@ module[2] = function(owner, org, timeValue)
         org.intestines = math.min(org.intestines + damage * 0.3, 1)
     end
 
+	if org.ischemia > 0 then
+		if org.ischemia > 1 then
+			local ischemiaK = math.Clamp((org.ischemia - 1) / 5, 0, 1)
+			local damage = timeValue * ischemiaK * 0.007
+			org.brain = math.min(org.brain + damage, 1)
+			org.heart = math.min(org.heart + damage, 1)
+			org.liver = math.min(org.liver + damage * 0.5, 1)
+			org.stomach = math.min(org.stomach + damage * 0.3, 1)
+			org.intestines = math.min(org.intestines + damage * 0.3, 1)
+		end
+
+		org.ischemia = math.max(org.ischemia - timeValue / 10, 0)
+	end
+
 	if org.bloodpressure < 65 then
 		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
 		org.disorientation = math.max(org.disorientation, 0.8 + lowK * 2.2)
