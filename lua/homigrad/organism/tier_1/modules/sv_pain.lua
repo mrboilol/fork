@@ -168,7 +168,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.pain > 100 then
-		--org.needfake = true
+		org.needfake = true
 	end
 
 	//local tempo = math.Clamp(5 - (org.temperature - 31), 0, 15)

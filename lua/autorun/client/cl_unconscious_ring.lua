@@ -312,7 +312,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     if isCheckingPulse then
         showPulseCheckECG = true
-    elseif admiring or (pulse < 40 or pulse > 150) then
+    elseif (admiring or (pulse < 40 or pulse > 150)) and not org.otrub then
         showTopLeftECG = true
     end
 
@@ -392,7 +392,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         end
 
-        draw.SimpleText(displayText, "Typewriter", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+        draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
     else
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
@@ -438,43 +438,40 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         end
 
-        draw.SimpleText(displayText, "Typewriter", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+        draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
     else
         topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
     -- Heartbeat sounds
-    if admiring or org.otrub then
+    local abnormalPulse = (pulse < 40 and pulse >= 1) or pulse > 150
+    if admiring or org.otrub or abnormalPulse then
         local currentHeartBeat = math.floor(heartPhase)
         if currentHeartBeat > lastHeartBeat then
             lastHeartBeat = currentHeartBeat
 
             if pulse < 1 then
-                if not asystoleSound then
-                    asystoleSound = CreateSound(ply, "sound/health/gg.ogg")
-                    asystoleSound:Play()
+                if not IsValid(asystoleSound) then
+                    sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(station)
+                        if IsValid(station) then
+                            station:Play()
+                            asystoleSound = station
+                        end
+                    end)
                 end
             else
-                if asystoleSound then
+                if IsValid(asystoleSound) then
                     asystoleSound:Stop()
                     asystoleSound = nil
                 end
 
-                if pulse > 150 or (bloodpressure or 93) > 140 then
-                    if critSound then critSound:Stop() end
-                    critSound = CreateSound(ply, "health/critbeat.ogg")
-                    critSound:Play()
-                else
-                    if beatSound then beatSound:Stop() end
-                    beatSound = CreateSound(ply, "health/beat.ogg")
-                    beatSound:Play()
-                end
+                local isSevere = pulse > 150 or (bloodpressure or 93) > 140
+                local soundFile = isSevere and "critbeat.ogg" or "beat.ogg"
+                sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
             end
         end
     else
-        if beatSound then beatSound:Stop(); beatSound = nil end
-        if critSound then critSound:Stop(); critSound = nil end
-        if asystoleSound then asystoleSound:Stop(); asystoleSound = nil end
+        if IsValid(asystoleSound) then asystoleSound:Stop(); asystoleSound = nil end
     end
 end)
 

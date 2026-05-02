@@ -7,7 +7,7 @@ local CurTime = CurTime
 
 local function PlayBoneBreakSound(entity)
     if math.random() < 0.5 then
-                entity:EmitSound("owfuck"..math.random(1, 10)..".ogg")
+                entity:EmitSound("owfuck"..math.random(1, 9)..".ogg")
     else
         entity:EmitSound("newbonebreak/break"..math.random(10)..".wav")
     end

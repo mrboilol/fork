@@ -1,4 +1,4 @@
-local hg_showinfo = CreateClientConVar("hg_showinfo", "1", true, true, "Show status info messages")
+local hg_showinfo = CreateClientConVar("hg_showinfo", "0", true, true, "Show status info messages")
 
 hg.status_messages = hg.status_messages or {}
 local messages = {}

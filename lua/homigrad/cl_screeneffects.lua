@@ -331,6 +331,10 @@ local function stopthings()
 		EndStation:Stop()
 		EndStation = nil
 	end
+	if IsValid(WhiteNoiseStation) then
+        WhiteNoiseStation:Stop()
+        WhiteNoiseStation = nil
+    end
 end
 
 local stations = {
@@ -349,6 +353,7 @@ local despairTextLerp = 0
 local despairSound
 local despairSoundVol = 0
 local despairSoundLoading = false
+local WhiteNoiseStation
 hook.Add("Post Post Processing", "ItHurts", function()
 	if not IsValid(lply) then return end
 	if IsValid(lply:GetNWEntity("spect")) then
@@ -587,6 +592,28 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		render.SetMaterial(grainMat)
 		render.DrawScreenQuad()
 	end
+
+	if org.consciousness < 0.5 then
+        if not IsValid(WhiteNoiseStation) then
+            sound.PlayFile("sound/whitenoise.wav", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:EnableLooping(true)
+                    station:Play()
+                    WhiteNoiseStation = station
+                end
+            end)
+        end
+    else
+        if IsValid(WhiteNoiseStation) then
+            WhiteNoiseStation:Stop()
+            WhiteNoiseStation = nil
+        end
+    end
+
+    if IsValid(WhiteNoiseStation) then
+        local vol = math.Remap(org.consciousness, 0, 0.5, 0.6, 0)
+        WhiteNoiseStation:SetVolume(vol)
+    end
 
 	local tempo = math.Clamp((5 - (tempLerp - 29)) * 0.5 - 5 * (org.heartbeat < 1 and 1 or 0), 0, 5)
 	tempolerp = LerpFT(0.01, tempolerp, tempo)

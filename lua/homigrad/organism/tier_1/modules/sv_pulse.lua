@@ -137,7 +137,7 @@ module[2] = function(owner, org, timeValue)
 			end
 		end
 
-		if org.bloodpressure < 45 then
+		if org.bloodpressure < 25 then
 			org.needotrub = true
 		end
 	elseif org.bloodpressure > 115 then

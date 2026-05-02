@@ -100,13 +100,13 @@ if SERVER then
 		"materials/vgui/hud/status_stamina_iconalt.png",
 		"materials/vgui/hud/status_traumaalt.png",
 		"materials/vgui/hud/status_vomitalt.png",
-		"materials/vgui/hud/maxbleeding.png"
-		"materials/vgui/hud/brokenribs.png"
-		"materials/vgui/hud/dislocatedjaw.png"
-		"materials/vgui/hud/encumbered.png"
-		"materials/vgui/hud/smallbleeding.png"
-		"materials/vgui/hud/stroke.png"
-		"materials/vgui/hud/palpitations.png"
+		"materials/vgui/hud/maxbleeding.png",
+		"materials/vgui/hud/brokenribs.png",
+		"materials/vgui/hud/dislocatedjaw.png",
+		"materials/vgui/hud/encumbered.png",
+		"materials/vgui/hud/smallbleeding.png",
+		"materials/vgui/hud/stroke.png",
+		"materials/vgui/hud/palpitations.png",
 	}
 	
 	for _, path in ipairs(SPRITES) do resource.AddFile(path) end

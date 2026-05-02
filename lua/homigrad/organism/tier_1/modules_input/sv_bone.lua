@@ -1,7 +1,7 @@
 --local Organism = hg.organism
 local function PlayBoneBreakSound(entity)
     if math.random() < 0.5 then
-                        entity:EmitSound("owfuck"..math.random(1, 10)..".ogg", 75, 100, 1, CHAN_AUTO)
+                        entity:EmitSound("owfuck"..math.random(1, 9)..".ogg", 75, 100, 1, CHAN_AUTO)
     else
         entity:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO)
     end
