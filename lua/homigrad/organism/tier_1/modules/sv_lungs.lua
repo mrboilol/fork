@@ -227,11 +227,9 @@ module[2] = function(owner, org, timeValue)
 		org.pneumothorax = min(org.pneumothorax + timeValue / 120, 1) -- A bit faster than a single punctured lung
 	end
 	
-	if org.lastCOBreathe and org.lastCOBreathe + 1 > CurTime() then
-		org.COregen = math.Approach(org.COregen, 30, timeValue * 1)
-	else
-		org.COregen = math.Approach(org.COregen, 0, timeValue * 0.5)
-	end
+	if o2[1] < 15 then
+        org.CO = math.min(org.CO + timeValue * 0.5, 30)
+    end
 
 	org.CO = max(org.CO - timeValue, 0)
 	if success then
@@ -256,7 +254,7 @@ module[2] = function(owner, org, timeValue)
         end
         blood_pressure_k = math.Clamp(blood_pressure_k, 0.2, 1)
 
-		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k
+		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * (1 - (org.CO / 30))
 		if org.oxygen_deprivation and org.oxygen_deprivation > 0 then
 			regenerate = regenerate * 0.1 -- 90% penalty
 			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue, 0) -- recovers over time

@@ -56,7 +56,7 @@ if SERVER then
 			local healed = math.max(internalBleed - self.modeValues[1], 0)
 			self.modeValues[1] = self.modeValues[1] - (internalBleed - healed) * (owner.Profession == "doctor" and 0.5 or 1)
 			org.internalBleedHeal = org.internalBleedHeal + (internalBleed - healed)
-			org.stroke_meter = math.max(org.stroke_meter - 25, 0)
+			org.stroke_meter = math.max(org.stroke_meter - 0.25, 0)
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
 		end
 

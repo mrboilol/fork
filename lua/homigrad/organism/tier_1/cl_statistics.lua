@@ -68,7 +68,7 @@ local list = {
 	"blindness",
 	"fear",
 	"despair",
-	"goodmood",
+	{"goodmood", 1, false},
 	"assimilated",
 	"berserk",
 	"noradrenaline",
@@ -280,8 +280,7 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	
 	--LerpVariables(FrameTime(),organism,new_organism)
 	if !organism then return end
-	if not developer:GetBool() then return end
-	if not LocalPlayer():IsAdmin() then return end
+
 	if !hg_stats:GetBool() then return end
 	local textList = getTextTable(organism)
 	local h = math.Round(ScreenScaleH(5.5))

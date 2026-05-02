@@ -1095,7 +1095,7 @@ function SWEP:StartPulseCheck(ply, org)
 	end
     
     umsg.Start("hg_StartPulseCheckECG", ply)
-    umsg.Entity(org.owner)
+    umsg.Entity(self.CarryEnt)
     umsg.End()
 end
 
@@ -1558,6 +1558,10 @@ local customClassInfo = {
 local blockvp = Angle(-1,-1,0.5)
 function SWEP:Think()
 	local owner = self:GetOwner()
+
+    if CLIENT then
+        self.CarryEnt = owner:GetNetVar("carryent")
+    end
 
 	self.handsDesc = "default"
 	local classInfo = customClassInfo[owner.PlayerClassName]

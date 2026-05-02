@@ -437,7 +437,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
-    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 2, 100)
+    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.02, 1)
 
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand

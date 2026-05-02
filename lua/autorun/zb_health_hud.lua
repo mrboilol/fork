@@ -34,6 +34,10 @@ if SERVER then
 		"materials/vgui/hud/status_dislocation.png",
 		"materials/vgui/hud/status_spine_fracture.png",
 		"materials/vgui/hud/status_leg_fracture.png",
+ 		"materials/vgui/hud/dislocated_jaw.png",
+		"materials/vgui/hud/broken_ribs.png",
+		"materials/vgui/hud/encumbered.png",
+
 		
 		"materials/vgui/hud/status_blood_loss.png",      
 		"materials/vgui/hud/status_cardiac_arrest.png",  
@@ -46,7 +50,12 @@ if SERVER then
 		"materials/vgui/hud/status_vomit.png",           
 		"materials/vgui/hud/status_brain_damage.png",
 		"materials/vgui/hud/status_stroke.png",
-		
+		"materials/vgui/hud/palpitations.png",
+		"materials/vgui/hud/hypoventilation.png",
+		"materials/vgui/hud/concussion.png",
+		"materials/vgui/hud/bleeding_small.png",
+		"materials/vgui/hud/bleeding_max.png",
+
 		"materials/vgui/hud/status_adrenaline.png",
 		"materials/vgui/hud/status_shock.png",
 		"materials/vgui/hud/status_trauma.png",
@@ -63,6 +72,11 @@ if SERVER then
 		"materials/vgui/hud/status_blood_lossalt.png",
 		"materials/vgui/hud/status_brain_damagealt.png",
 		"materials/vgui/hud/status_strokealt.png",
+		"materials/vgui/hud/palpitationsalt.png",
+		"materials/vgui/hud/hypoventilationalt.png",
+		"materials/vgui/hud/concussionalt.png",
+		"materials/vgui/hud/bleeding_smallalt.png",
+		"materials/vgui/hud/bleeding_maxalt.png",
 		"materials/vgui/hud/status_cardiac_arrestalt.png",
 		"materials/vgui/hud/status_coldalt.png",
 		"materials/vgui/hud/status_conscious_iconalt.png",
@@ -352,6 +366,10 @@ local status_sprites = {
 	dislocation = nil,
 	spine_fracture = nil,
 	fracture = nil,
+	dislocated_jaw = nil,
+	broken_ribs = nil,
+	encumbered = nil,
+
 	
 	blood_loss = nil,
 	cardiac_arrest = nil,
@@ -364,6 +382,11 @@ local status_sprites = {
 	vomit = nil,
 	brain_damage = nil,
 	stroke = nil,
+	palpitations = nil,
+	hypoventilation = nil,
+	concussion = nil,
+	bleeding_small = nil,
+	bleeding_max = nil,
 	
 	adrenaline = nil,
 	shock = nil,
@@ -401,6 +424,7 @@ local smooth = {
 	shock = 0,
 	disorientation = 0,
 	stroke_meter = 0,
+	concussion = 0,
 }
 
 local limbFadeStates = {
@@ -595,11 +619,47 @@ local tooltipTexts = {
 		berserk_cardiac_arrest = "Остановка сердца - ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО.",
 		berserk_lungs_failure = "Отказ лёгких - ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО.",
 		stroke = {
-			[4] = "Инсульт - Клетки мозга умирают. Вы теряете сознание.",
-			[3] = "Высокий риск инсульта - Сильная головная боль и спутанность сознания.",
+			[4] = "Инсульт - Клетки мозга умирают. Вы теряете сознание, внутреннее кровотечение, и едва можете дышать.",
+			[3] = "Высокий риск инсульта - Сильная головная боль и спутанность сознания. Кто-нибудь чувствует запах железа?",
 			[2] = "Риск инсульта - Головная боль и головокружение.",
 			[1] = "Низкий риск инсульта - Легкая головная боль."
 		},
+		palpitations = {
+            [4] = "Фибрилляция - Ваше сердце бьется хаотично. Немедленная медицинская помощь обязательна.",
+            [3] = "Тяжелые сердцебиения - Очень быстрое и неровное сердцебиение. Вы чувствуете слабость.",
+            [2] = "Учащенное сердцебиение - Ваше сердце колотится. Это вызывает дискомфорт.",
+            [1] = "Легкое сердцебиение - Вы ощущаете, как ваше сердце бьется быстрее, чем обычно."
+        },
+        hypoventilation = {
+            [4] = "Тяжелая гиповентиляция - Вы почти не дышите. Потеря сознания неизбежна.",
+            [3] = "Гиповентиляция - Вам очень трудно дышать. Нехватка кислорода вызывает головокружение.",
+            [2] = "Затрудненное дыхание - Вы дышите с трудом. Вам не хватает воздуха.",
+            [1] = "Поверхностное дыхание - Вы дышите неглубоко. Это вызывает легкий дискомфорт."
+        },
+        concussion = {
+            [4] = "Тяжелое сотрясение мозга - Вы в замешательстве и не можете ясно мыслить. Возможна потеря памяти.",
+            [3] = "Сотрясение мозга - Сильная головная боль, головокружение и тошнота.",
+            [2] = "Легкое сотрясение мозга - Головная боль и чувствительность к свету и звуку.",
+            [1] = "Слабое сотрясение мозга - Легкая головная боль и головокружение."
+        },
+		dislocated_jaw = {
+			[1] = "Dislocated jaw",
+			[2] = "Broken jaw",
+			[3] = "Broken skull",
+			[4] = "Broken skull and damaged jaw"
+		},
+		broken_ribs = {
+			[1] = "Broken ribs but nothing puncturing lungs",
+			[2] = "Broken ribs, puncturing lungs",
+			[3] = "Severely broken ribs",
+			[4] = "Completely broken ribs"
+		},
+		encumbered = {
+			[1] = "Weight but no impact to speed",
+			[2] = "Weight with impact to speed",
+			[3] = "Weight, and incredibly great impact to speed",
+			[4] = "You move extremely slowly due to weight"
+		}
 	},
 	
 	en = {
@@ -722,11 +782,47 @@ local tooltipTexts = {
 		berserk_cardiac_arrest = "Cardiac arrest - You are already dead, but rage still drives you.",
 		berserk_lungs_failure = "Lung failure - No air to breathe, but berserk won't let you fall.",
 		stroke = {
-			[4] = "Stroke - Brain cells are dying. You are losing consciousness.",
-			[3] = "High Stroke Risk - Severe headache and confusion.",
-			[2] = "Stroke Risk - Headache and dizziness.",
-			[1] = "Low Stroke Risk - Mild headache."
+			[4] = "Stroke - Brain cells are dying. You are losing consciousness, bleeding internally, and can barely breathe.",
+			[3] = "High Stroke Risk - Severe headache and confusion. Does anyone smell iron?",
+			[2] = "Dizzyness - Does anyone smell iron?",
+			[1] = "Confusion - My brain feels funny..."
 		},
+		palpitations = {
+            [4] = "Atrial Fibrilation - Really fast and irregular, but this wont do, your heart will fail soon.",
+            [3] = "Palpitations - Irregular and fast, your heart is beating too hard to keep up with your low blood pressure.",
+            [2] = "Flutter - Your heart is beating unusually fast, and it does not feel good.",
+            [1] = "Tachycardia - Probably just a workout."
+        },
+        hypoventilation = {
+            [4] = "I CANT CATCH A SINGLE GOOD BREATH OF AIR",
+            [3] = "Hypoventilation - Its very hard to catch my breath...",
+            [2] = "Shallow Breathing - You can breathe, but theres nothing coming in.",
+            [1] = "Shortness of Breath - Discomfort, maybe you exercised too much."
+        },
+        concussion = {
+            [4] = "Cerebral Bruising - You probably got hit so bad it caused some brain damage.",
+            [3] = "Concussion - My world is spinning around so fast...",
+            [2] = "Lightheaded - My brain is acting funny.",
+            [1] = "Headache - That hurt more than it should have."
+        },
+		dislocated_jaw = {
+			[1] = "Dislocated Jaw - Your jaw got set out of place and your muscles are tugging at it violently, its best to keep your mouth shut.",
+			[2] = "Broken Jaw - Unlike dislocating it, this one is permanent!",
+			[3] = "Broken Skull - Your skull shards are poking at your brain!",
+			[4] = "Disfigured - Your skull and jaw are damaged, making it so that your face is unrecognizeable."
+		},
+		broken_ribs = {
+			[1] = "Chest Pains - You better hope its nothing bad."
+			[2] = "Broken Ribs - Definitively, a rib broke. You should pray it never pokes your lungs.",
+			[3] = "Penetrating Injury - This one totally poked a lung, you can barely breathe without paining.",
+			[4] = "Crushed ribs - All of them are gone, hope you dont have any enemies."
+		},
+		encumbered = {
+			[1] = "Weighted - Nothing bad, but lay off those burgers.",
+			[2] = "Encumbered - Your gear is limiting your movement somewhat, but not severely.",
+			[3] = "Engulfed - Too much gear, walking sounds like a real workout.",
+			[4] = "Completely Weighted - WAAAY too much gear, how about you take it off and stop LARPING?"
+		}
 	}
 }
 
@@ -745,7 +841,9 @@ local function getTooltipText(statusName, pos, berserkActive)
 	   statusName == "bleeding" or statusName == "blood_loss" or statusName == "cold" or statusName == "heat" or
 	   statusName == "hemothorax" or statusName == "overdose" or statusName == "oxygen" or
 	   statusName == "vomit" or statusName == "brain_damage" or statusName == "adrenaline" or
-	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" or statusName == "organ_damage" or statusName == "stroke" then
+	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" or statusName == "organ_damage" or statusName == "stroke" or
+       statusName == "palpitations" or statusName == "hypoventilation" or statusName == "concussion" or
+	   statusName == "dislocated_jaw" or statusName == "broken_ribs" or statusName == "encumbered" then
 		
 		local levelTexts = texts[statusName]
 		if levelTexts and type(levelTexts) == "table" then
@@ -831,6 +929,11 @@ local function load_status_sprites()
 	status_sprites.vomit = loadMaterial("vgui/hud/status_vomit.png", suffix)
 	status_sprites.brain_damage = loadMaterial("vgui/hud/status_brain_damage.png", suffix)
 	status_sprites.stroke = loadMaterial("vgui/hud/status_stroke.png", suffix)
+	status_sprites.palpitations = loadMaterial("vgui/hud/palpitations.png", suffix)
+	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix)
+	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
+	status_sprites.bleeding_small = loadMaterial("vgui/hud/bleeding_small.png", suffix)
+	status_sprites.bleeding_max = loadMaterial("vgui/hud/bleeding_max.png", suffix)
 	
 	status_sprites.adrenaline = loadMaterial("vgui/hud/status_adrenaline.png", suffix)
 	status_sprites.shock = loadMaterial("vgui/hud/status_shock.png", suffix)
@@ -839,6 +942,9 @@ local function load_status_sprites()
 	status_sprites.death = loadMaterial("vgui/hud/status_death.png", suffix)
 	status_sprites.berserk = loadMaterial("vgui/hud/status_berserk.png", suffix)
 	status_sprites.amputant = loadMaterial("vgui/hud/status_amputant.png", suffix)
+	status_sprites.dislocated_jaw = loadMaterial("vgui/hud/dislocated_jaw.png", suffix)
+	status_sprites.broken_ribs = loadMaterial("vgui/hud/broken_ribs.png", suffix)
+	status_sprites.encumbered = loadMaterial("vgui/hud/encumbered.png", suffix)
 end
 
 local function update_stability(blood_val, pulse_val)
@@ -919,6 +1025,7 @@ local function draw_bar()
 	smooth.shock = Lerp(s * dt, smooth.shock or 0, getOrgVal(org, "shock", 0))
 	smooth.disorientation = Lerp(s * dt, smooth.disorientation or 0, getOrgVal(org, "disorientation", 0))
 	smooth.stroke_meter = Lerp(s * dt, smooth.stroke_meter or 0, getOrgVal(org, "stroke_meter", 0))
+	smooth.concussion = Lerp(s * dt, smooth.concussion or 0, getOrgVal(org, "concussion", 0))
 	
 	update_stability(smooth.blood or 5000, smooth.pulse or 70)
 	
@@ -1204,12 +1311,26 @@ local function draw_status_effects()
 					value = math_floor(stroke_val)
 				})
 				currentEffectNames["stroke"] = true
+				if level_num == 4 and not currentEffectNames["internal_bleed"] then
+					table.insert(effects, {
+						name = "internal_bleed",
+						priority = 0.4,
+						value = nil
+					})
+					currentEffectNames["internal_bleed"] = true
+				end
 			end
 			
 			if hasAnyAmputation(org) then
-				table.insert(effects, {name = "amputant", priority = 8})
-				currentEffectNames["amputant"] = true
-			end
+					table.insert(effects, {name = "amputant", priority = 8})
+					currentEffectNames["amputant"] = true
+				end
+				table.insert(effects, {name = "dislocated_jaw", priority = 9, level_num = 1, has_levels = true})
+				currentEffectNames["dislocated_jaw"] = true
+				table.insert(effects, {name = "broken_ribs", priority = 10, level_num = 1, has_levels = true})
+				currentEffectNames["broken_ribs"] = true
+				table.insert(effects, {name = "encumbered", priority = 11, level_num = 1, has_levels = true})
+				currentEffectNames["encumbered"] = true
 			
 			if org.heartstop == true then
 				table.insert(effects, {name = "cardiac_arrest", priority = 0.15})
@@ -1223,6 +1344,56 @@ local function draw_status_effects()
 		end
 		
 		if showAllIcons then
+				local pulse_val = smooth.pulse or getOrgVal(org, "pulse", 70)
+				if pulse_val > 150 then
+					local level_num = 1
+					if pulse_val > 200 then level_num = 4
+					elseif pulse_val > 180 then level_num = 3
+					elseif pulse_val > 160 then level_num = 2 end
+
+					table.insert(effects, {
+						name = "palpitations",
+						level_num = level_num,
+						has_levels = true,
+						priority = 0.28,
+						value = math_floor(pulse_val)
+					})
+					currentEffectNames["palpitations"] = true
+				end
+
+				local o2_val = getO2Value(org)
+				if o2_val < (getO2Max(org) * 0.8) then
+					local level_num = 1
+					if o2_val < 10 then level_num = 4
+					elseif o2_val < 15 then level_num = 3
+					elseif o2_val < 20 then level_num = 2 end
+
+					table.insert(effects, {
+						name = "hypoventilation",
+						level_num = level_num,
+						has_levels = true,
+						priority = 0.51,
+						value = math_floor(o2_val)
+					})
+					currentEffectNames["hypoventilation"] = true
+				end
+
+				local concussion_val = smooth.concussion or getOrgVal(org, "concussion", 0)
+				if concussion_val > 0.1 then
+					local level_num = 1
+					if concussion_val > 0.75 then level_num = 4
+					elseif concussion_val > 0.5 then level_num = 3
+					elseif concussion_val > 0.25 then level_num = 2 end
+
+					table.insert(effects, {
+						name = "concussion",
+						level_num = level_num,
+						has_levels = true,
+						priority = 0.76,
+						value = math_floor(concussion_val * 100)
+					})
+					currentEffectNames["concussion"] = true
+				end
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
 			if bleed_val > HUD.bleeding_threshold then
 				local level_num = 1
@@ -1855,8 +2026,15 @@ local function draw_status_effects()
 		local icon_mat = nil
 		if effect.name == "pain" then icon_mat = status_sprites.pain_icon
 		elseif effect.name == "conscious" then icon_mat = status_sprites.conscious_icon
-		elseif effect.name == "stamina" then icon_mat = status_sprites.stamina_icon
-		elseif effect.name == "bleeding" then icon_mat = status_sprites.bleeding_icon
+		elseif effect.name == "stamina" then icon_mat = status_sprites.stamin-icon
+		elseif effect.name == "bleeding" then 
+			if effect.level_num == 1 then 
+				icon_mat = status_sprites.bleeding_small
+			elseif effect.level_num == 4 then
+				icon_mat = status_sprites.bleeding_max
+			else
+				icon_mat = status_sprites.bleeding_icon
+			end
 		elseif effect.name == "internal_bleed" then icon_mat = status_sprites.internal_bleed_icon
 		elseif effect.name == "blood_loss" then icon_mat = status_sprites.blood_loss
 		elseif effect.name == "cardiac_arrest" then icon_mat = status_sprites.cardiac_arrest
@@ -1872,10 +2050,17 @@ local function draw_status_effects()
 		elseif effect.name == "shock" then icon_mat = status_sprites.shock
 		elseif effect.name == "trauma" then icon_mat = status_sprites.trauma
 		elseif effect.name == "stroke" then icon_mat = status_sprites.stroke
+		elseif effect.name == "palpitations" then icon_mat = status_sprites.palpitations
+		elseif effect.name == "hypoventilation" then icon_mat = status_sprites.hypoventilation
+		elseif effect.name == "concussion" then icon_mat = status_sprites.concussion
 		elseif effect.name == "death" then icon_mat = status_sprites.death
 		elseif effect.name == "berserk" then icon_mat = status_sprites.berserk
 		elseif effect.name == "amputant" then icon_mat = status_sprites.amputant
 		elseif effect.name == "fracture" then icon_mat = status_sprites.fracture
+		elseif effect.name == "dislocated_jaw" then icon_mat = status_sprites.dislocated_jaw
+		elseif effect.name == "broken_ribs" then icon_mat = status_sprites.broken_ribs
+		elseif effect.name == "encumbered" then icon_mat = status_sprites.encumbered
+
 		else icon_mat = status_sprites[effect.name] end
 		
 		if icon_mat and not icon_mat:IsError() then

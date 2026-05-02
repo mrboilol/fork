@@ -220,7 +220,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if isUnconscious and isCritical and not flatlinePlayed then
         flatlinePlayed = true
         if IsValid(flatlineSound) then flatlineSound:Stop() end
-        flatlineSound = CreateSound(LocalPlayer(), "sound/health/asystole.ogg")
+        flatlineSound = CreateSound(LocalPlayer(), "sound/health/gg.ogg")
         if IsValid(flatlineSound) then
             flatlineSound:Play()
             local vol = 1
@@ -321,7 +321,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     if org.otrub then
-        showTopLeftECG = true
+        -- showTopLeftECG = true -- Now only the center EKG will show when unconscious
     elseif admiring then
         showTopLeftECG = true
     elseif (pulse < 40 or pulse > 150) then
@@ -380,7 +380,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     g_PulseCheckData.counted = g_PulseCheckData.counted + 1
                     local dynamicRate = math.max(target_pulse, 1)
                     g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
-                    surface.PlaySound("player/health/heartbeat_lab.wav")
+                    if target_pulse < 1 then
+                        surface.PlaySound("sound/health/gg.ogg")
+                    elseif target_pulse > 150 or (target_bp or 93) > 140 then
+                        surface.PlaySound("sound/health/critbeat.ogg")
+                    else
+                        surface.PlaySound("sound/health/beat.ogg")
+                    end
                 end
             end
         end
@@ -446,7 +452,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         end
 
-        draw.SimpleText(displayText, "HUDNumber5", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+        draw.SimpleText(displayText, "Typewriter", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
     else
         topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
