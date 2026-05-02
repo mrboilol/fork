@@ -753,19 +753,12 @@ function MODE:Intermission()
 	MODE.TraitorFrequency = nil
 	MODE.TraitorWord = MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
 	MODE.TraitorWordSecond = MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
-	local traitors_needed = 1
 	
-	if(MODE.ShouldStartRoleRound())then
-		if(player_count >= 15)then
-			traitors_needed = 3
-		elseif(player_count >= 8)then
-			traitors_needed = 2
-		else
-			traitors_needed = 1
-		end
-	end
+	local traitors_needed = 1 + math.floor(player_count / 15)
 
 	MODE.TraitorExpectedAmt = traitors_needed
+	
+	local main_traitor = nil
 	local traitors = {}
 	local current_round_index = (tonumber(MODE.TraitorSelectionRoundIndex) or 0) + 1
 	MODE.TraitorSelectionRoundIndex = current_round_index
