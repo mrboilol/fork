@@ -466,9 +466,12 @@ function hg.ExplodeHead(ent)
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	if ply:IsPlayer() and ply:Alive() then ply:Kill() end
 	if ent:IsNPC() and ent.organism then ent.organism.shock = 100 end
+	local target = ent
 
 	timer.Simple(0, function()
-		local ent = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
+		if not IsValid(target) then return end
+
+		local ent = target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
 		if not IsValid(ent) then return end
 		--[[if not isbool(ent) then
 			hook.Run("OnHeadExplode", ply, ent)
@@ -1704,9 +1707,12 @@ function hg.BreakNeck(ent)
 
 	ent.organism.spine3 = 1
 	ent:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+	local target = ent
 	
 	timer.Simple(0.1, function()
-		local ent = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
+		if not IsValid(target) then return end
+
+		local ent = target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
 
 		if IsValid(ent) then
 			ent:RemoveInternalConstraint(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1")))
