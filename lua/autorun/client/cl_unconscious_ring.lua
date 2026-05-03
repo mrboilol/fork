@@ -330,7 +330,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local boxW, boxH = 300, 150
         local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 20
 
-        surface.SetDrawColor(50, 50, 50, 150 * ecgAlphaPulseCheck)
+        surface.SetDrawColor(0, 0, 0, 150 * ecgAlphaPulseCheck)
         surface.DrawRect(boxX, boxY, boxW, boxH)
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlphaPulseCheck)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
@@ -352,12 +352,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     g_PulseCheckData.counted = g_PulseCheckData.counted + 1
                     local dynamicRate = math.max(target_pulse, 1)
                     g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
-                    if target_pulse < 1 then
-                        surface.PlaySound("health/gg.ogg")
-                    elseif target_pulse > 150 or (target_bp or 93) > 140 then
-                        surface.PlaySound("health/critbeat.ogg")
+                                        if target_pulse < 1 then
+                        sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
                     else
-                        surface.PlaySound("health/beat.ogg")
+                        local isSevere = target_pulse > 150 or (target_bp or 93) > 140
+                        local soundFile = isSevere and "critbeat.ogg" or "beat.ogg"
+                        sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
                     end
                 end
             end
@@ -387,7 +387,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local boxW, boxH = 300, 150
         local boxX, boxY = 20, 20
 
-        surface.SetDrawColor(50, 50, 50, 150 * ecgAlpha)
+        surface.SetDrawColor(0, 0, 0, 150 * ecgAlpha)
         surface.DrawRect(boxX, boxY, boxW, boxH)
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)

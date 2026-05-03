@@ -2033,7 +2033,7 @@ local function draw_status_effects()
 		elseif effect.name == "broken_ribs" or effect.name == "dislocated_jaw" or effect.name == "encumbered" then
 			effect_scale = 0.8
 			end
-		local drawSize = size * scale * effect_scale
+		local drawSize = size * scale
 		local drawX = final_x - (drawSize - size) / 2
 		local drawY = final_y - (drawSize - size) / 2
 		
@@ -2162,7 +2162,7 @@ local function draw_status_effects()
 			surface_SetDrawColor(255, 255, 255, 255)
 			surface_SetMaterial(icon_mat)
 			
-			local iconDrawSize = drawSize - 4
+			local iconDrawSize = (drawSize - 4) * effect_scale
 			local iconDrawX = drawX + 2 + offsetX
 			local iconDrawY = drawY + 2 + offsetY
 			
