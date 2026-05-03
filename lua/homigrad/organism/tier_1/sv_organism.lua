@@ -605,7 +605,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if org.berserk > 0 or org.noradrenaline > 0 then
 		org.despair = 0
 		org._despairLastAdrenaline = org.adrenaline or 0
-		return
+		--return 
 	end
 
 	org.despair = math.Clamp(org.despair or 0, 0, 1)

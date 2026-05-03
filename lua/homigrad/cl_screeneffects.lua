@@ -241,6 +241,7 @@ local assimilationMat = Material("effects/shaders/zb_assimilation")
 local coldMat = Material("effects/shaders/zb_colda")
 local grainMat = Material("effects/shaders/zb_grain2")
 local heatMat = Material("effects/shaders/zb_heat")
+local chromaticMat = Material("effects/shaders/merc_chromaticaberration")
 local blindMat = Material("effects/shaders/zb_blind")
 local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 
@@ -411,6 +412,25 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
     if org.blood and org.blood < 4000 then
         blurAmount = math.max(blurAmount, math.min((4000 - org.blood) / 3500, 1) * 5)
+    end
+
+    local adrenaline = org.adrenaline or 0
+    if adrenaline > 0.5 then
+        blurAmount = math.max(blurAmount, (adrenaline - 0.5) * 3)
+
+		local adrenalineShock = (adrenaline - 0.5) * 2
+        render.UpdateScreenEffectTexture()
+		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
+		heatMat:SetFloat("$c0_y", adrenalineShock * 0.1)
+		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 1.0))
+		render.SetMaterial(heatMat)
+		render.DrawScreenQuad()
+
+        render.UpdateScreenEffectTexture()
+		chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.05)
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
+		render.DrawScreenQuad()
     end
 
     if blurAmount > 0 then
@@ -651,6 +671,12 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 
+		render.UpdateScreenEffectTexture()
+		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100, 0, 0.1))
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
+		render.DrawScreenQuad()
+
 		if org.otrub then
 			DrawMotionBlur(0.1, 1., 0.01)
 			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
@@ -877,6 +903,12 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		vignetteMat:SetFloat("$c0_z", despairShock * 2.4)
 		vignetteMat:SetFloat("$c1_y", despairShock * 2.6)
 		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		chromaticMat:SetFloat("$c0_x", despairShock * 0.05)
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
 
 		tab["$pp_colour_brightness"] = -(despairShock ^ 1.2) * 0.58
