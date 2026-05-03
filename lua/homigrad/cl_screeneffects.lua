@@ -419,17 +419,25 @@ hook.Add("Post Post Processing", "ItHurts", function()
         blurAmount = math.max(blurAmount, (adrenaline - 0.5) * 3)
 
 		local adrenalineShock = (adrenaline - 0.5) * 2
-        render.UpdateScreenEffectTexture()
-		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-		heatMat:SetFloat("$c0_y", adrenalineShock * 0.1)
-		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 1.0))
-		render.SetMaterial(heatMat)
-		render.DrawScreenQuad()
+        if not (lply:IsBerserk() or lply:IsStimulated()) then
+            render.UpdateScreenEffectTexture()
+            heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
+            heatMat:SetFloat("$c0_y", adrenalineShock * 0.1)
+            heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 1.0))
+            render.SetMaterial(heatMat)
+            render.DrawScreenQuad()
 
+            render.UpdateScreenEffectTexture()
+            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.05)
+            chromaticMat:SetInt("$c0_y", 1)
+            render.SetMaterial(chromaticMat)
+            render.DrawScreenQuad()
+        end
         render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.05)
-		chromaticMat:SetInt("$c0_y", 1)
-		render.SetMaterial(chromaticMat)
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", adrenalineShock * 1.4)
+		vignetteMat:SetFloat("$c1_y", adrenalineShock * 1.6)
+		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
     end
 
@@ -891,25 +899,29 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
 	if despairFx > 0.001 then
 		local despairShock = despairFx ^ 0.7
-		render.UpdateScreenEffectTexture()
-		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-		heatMat:SetFloat("$c0_y", despairShock * 0.34)
-		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 5.4))
-		render.SetMaterial(heatMat)
-		render.DrawScreenQuad()
+        if not (lply:IsBerserk() or lply:IsStimulated()) then
+    		render.UpdateScreenEffectTexture()
+    		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
+    		heatMat:SetFloat("$c0_y", despairShock * 0.34)
+    		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 5.4))
+    		render.SetMaterial(heatMat)
+    		render.DrawScreenQuad()
+        end
 
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
 		vignetteMat:SetFloat("$c0_z", despairShock * 2.4)
-		vignetteMat:SetFloat("$c1_y", despairShock * 2.6)
+		vignetteMat:SetFloat("$c1_y", despairShock * 4.0)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
-		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", despairShock * 0.05)
-		chromaticMat:SetInt("$c0_y", 1)
-		render.SetMaterial(chromaticMat)
-		render.DrawScreenQuad()
+        if not (lply:IsBerserk() or lply:IsStimulated()) then
+    		render.UpdateScreenEffectTexture()
+    		chromaticMat:SetFloat("$c0_x", despairShock * 0.05)
+    		chromaticMat:SetInt("$c0_y", 1)
+    		render.SetMaterial(chromaticMat)
+    		render.DrawScreenQuad()
+        end
 
 		tab["$pp_colour_brightness"] = -(despairShock ^ 1.2) * 0.58
 		tab["$pp_colour_contrast"] = 1 - despairShock * 0.5

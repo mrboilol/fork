@@ -927,7 +927,10 @@ local IsValid = IsValid
 
 		local ammo = ply:GetAmmo()
 		for id,count in pairs(ammo) do
-			weight = weight + (game.GetAmmoForce(id) * count) / 1500
+			local ammoName = game.GetAmmoName(id)
+			if hg.ammotypes[ammoName] and hg.ammotypes[ammoName].BulletSettings and hg.ammotypes[ammoName].BulletSettings.Mass then
+				weight = weight + (hg.ammotypes[ammoName].BulletSettings.Mass * count) / 1000
+			end
 		end
 
 		ply.armors = ply:GetNetVar("Armor",{})
