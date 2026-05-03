@@ -151,7 +151,6 @@ module[2] = function(owner, org, timeValue)
 		if org.bloodpressure < 25 then
 
 			org.needotrub = true
-		end
 	elseif org.bloodpressure > 115 then
 		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
 		org.disorientation = math.max(org.disorientation, highK * 1.4)
