@@ -610,12 +610,12 @@ end
 local hg, LocalToWorld = hg, LocalToWorld
 local durachok = "models/epangelmatikes/e3_elite_suit.mdl"
 local injuryTpikBones = {
-	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 13.2, 6.6},
-	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 13.2, 6.6},
-	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 7.2, 3.6},
-	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 7.2, 3.6},
-	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 12.8, 6.3},
-	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 12.8, 6.3},
+	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 26.4, 13.2},
+	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 26.4, 13.2},
+	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 14.4, 7.2},
+	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 14.4, 7.2},
+	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 25.6, 12.6},
+	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 25.6, 12.6},
 }
 
 local function injuryTpikMotion(state, ent, owner)

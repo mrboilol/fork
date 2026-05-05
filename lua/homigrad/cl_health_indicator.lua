@@ -14,7 +14,8 @@ local PULSE_DURATION = 8
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
 local FRACTURE_BLINK_SPEED = 10
-
+local POS_VISIBLE_X = 0
+local POS_HIDDEN_X = -400
 
 local currentX = nil
 local pulseStartTime = 0
@@ -209,9 +210,165 @@ local function GetStatusIcon(iconName)
     return mat
 end
 
+--[[local function CollectAfflictionIcons(ply, org)
+    local icons = {}
+    local seen = {}
+    local function add(iconName, severity)
+        severity = math.Clamp(severity or 0.5, 0.05, 1)
+        if seen[iconName] then
+            seen[iconName].severity = math.max(seen[iconName].severity, severity)
+            return
+        end
+        local mat = GetStatusIcon(iconName)
+        if not mat then return end
+        local entry = {mat = mat, severity = severity}
+        seen[iconName] = entry
+        icons[#icons + 1] = entry
+    end
 
+    if not org then
+        return icons
+    end
 
+    local wounds = ply.wounds or ply:GetNetVar("wounds")
+    local arterialwounds = ply.arterialwounds or ply:GetNetVar("arterialwounds")
+    local woundsCount = istable(wounds) and #wounds or 0
+    local arterialCount = istable(arterialwounds) and #arterialwounds or 0
 
+    if woundsCount > 0 then
+        add("open-wound", math.min(1, woundsCount / 6))
+    end
+
+    if arterialCount > 0 then
+        add("deepwound", math.min(1, 0.7 + arterialCount * 0.2))
+    end
+
+    local bleed = GetOrgValueNumber(org.bleed)
+    if bleed > 0 then
+        add("bleed", math.min(1, bleed / 8))
+    end
+
+    local hasBrokenLimb = (org.lleg and org.lleg >= 1) or (org.rleg and org.rleg >= 1) or (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1)
+    local hasDislocation = org.llegdislocation or org.rlegdislocation or org.larmdislocation or org.rarmdislocation or org.jawdislocation
+    local hasAmputation = org.llegamputated or org.rlegamputated or org.larmamputated or org.rarmamputated or org.headamputated
+    if hasBrokenLimb or hasDislocation or hasAmputation then
+        local sev = hasAmputation and 1 or (hasDislocation and 0.65 or 0.5)
+        add("vuln", sev)
+    end
+
+    local concussion = GetOrgValueNumber(org.concussion)
+    if concussion > 0 then
+        add("concussion", math.min(1, concussion))
+    end
+
+    if org.blindness then
+        add("blind", 0.7)
+    end
+
+    local assimilated = GetOrgValueNumber(org.assimilated)
+    if assimilated > 0 then
+        add("wither", math.min(1, assimilated))
+    end
+
+    if org.incapacitated then
+        add("incap", 1)
+    end
+
+    if org.berserkActive2 then
+        add("bloodlust", 0.45)
+    end
+
+    if org.noradrenalineActive then
+        add("haste", 0.45)
+    end
+
+    local despair = GetOrgValueNumber(org.despair)
+    if despair > 0.25 then
+        add("anagenthasdied", math.min(1, despair))
+    end
+
+    if org.critical then
+        add("warning", 1)
+    end
+
+    if (not org.canmove) or GetOrgValueNumber(org.immobilization) > 0 then
+        add("hindered", 0.65)
+    end
+
+    if GetOrgValueNumber(org.pain) > 60 or GetOrgValueNumber(org.shock) > 0.5 then
+        add("stunned", math.min(1, math.max(GetOrgValueNumber(org.pain) / 120, GetOrgValueNumber(org.shock))))
+    end
+
+    if GetOrgValueNumber(org.CO) > 0.1 then
+        add("poison-gas", math.min(1, GetOrgValueNumber(org.CO) / 4))
+    end
+
+    local o2 = GetOrgValueNumber(org.o2)
+    if o2 > 0 and o2 < 20 then
+        add("exhaust", math.min(1, (20 - o2) / 20))
+    end
+
+    local temperature = GetOrgValueNumber(org.temperature)
+    if temperature > 39 then
+        add("discharge", math.min(1, (temperature - 39) / 2))
+    elseif temperature > 0 and temperature < 34.5 then
+        add("frozen", math.min(1, (34.5 - temperature) / 3))
+    end
+
+    return icons
+end
+
+local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, appearTime, timeNow)
+    if not iconEntries or #iconEntries == 0 or visibility <= 0.01 then return end
+
+    local iconSize = math.max(math.floor(ScreenScaleFixed(26)), 18)
+    local bgSize = math.max(math.floor(iconSize * 1.35), iconSize + 8)
+    local spacing = math.max(math.floor(ScreenScaleFixed(2)), 1)
+    local iconInset = math.floor((bgSize - iconSize) * 0.5)
+    local horizontalSpace = ScrW() - ScreenScaleFixed(ICONS_SCREEN_EDGE_MARGIN) * 2
+    local maxPerRow = math.max(1, math.floor((horizontalSpace + spacing) / (bgSize + spacing)))
+    local rows = math.ceil(#iconEntries / maxPerRow)
+    local appearFrac = math.Clamp((timeNow - (appearTime or timeNow)) / 0.35, 0, 1)
+    local shakeMul = (1 - appearFrac) * visibility
+    local baseAlpha = math.floor(255 * visibility)
+
+    for row = 1, rows do
+        local rowStart = (row - 1) * maxPerRow + 1
+        local rowCount = math.min(maxPerRow, #iconEntries - rowStart + 1)
+        local rowWidth = rowCount * bgSize + (rowCount - 1) * spacing
+        local x = centerX - rowWidth * 0.5
+        local y = bottomY - row * bgSize - (row - 1) * spacing
+
+        if y < 0 then
+            break
+        end
+
+        for col = 1, rowCount do
+            local idx = rowStart + col - 1
+            local entry = iconEntries[idx]
+            local severity = entry.severity or 0.5
+            local pulse = 1 + math.sin(timeNow * (4 + severity * 9) + idx * 1.4) * (0.05 + severity * 0.08) * visibility
+            local shakeAmp = ScreenScaleFixed(2 + severity * 2) * shakeMul
+            local shakeX = math.sin(timeNow * (95 + idx * 7)) * shakeAmp
+            local shakeY = math.cos(timeNow * (110 + idx * 9)) * shakeAmp
+            local drawX = x + (col - 1) * (bgSize + spacing)
+            local drawY = y
+            local centerDrawX = drawX + bgSize * 0.5 + shakeX
+            local centerDrawY = drawY + bgSize * 0.5 + shakeY
+            local bgDrawSize = bgSize * pulse
+            local iconDrawSize = iconSize * pulse
+            local bgAlpha = math.floor((160 + severity * 95) * visibility)
+
+            surface.SetMaterial(statusCircleMat)
+            surface.SetDrawColor(8, 8, 8, bgAlpha)
+            surface.DrawTexturedRect(centerDrawX - bgDrawSize * 0.5, centerDrawY - bgDrawSize * 0.5, bgDrawSize, bgDrawSize)
+
+            surface.SetMaterial(entry.mat)
+            surface.SetDrawColor(255, 255, 255, baseAlpha)
+            surface.DrawTexturedRect(centerDrawX - iconDrawSize * 0.5, centerDrawY - iconDrawSize * 0.5, iconDrawSize, iconDrawSize)
+        end
+    end
+end]]
 
 hook.Add("HUDPaint", "HG_HealthIndicator", function()
     local ply = LocalPlayer()
@@ -371,16 +528,17 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
         end
     end
     
-    local shouldShowIndicator = not otrub
-    local size = IND_SIZE_BASE
-    local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
+    local shouldShowIndicator = admiring and not otrub
+    local targetX = shouldShowIndicator and POS_VISIBLE_X or POS_HIDDEN_X
+    local targetXScaled = ScreenScaleFixed(targetX)
     
-    local targetX = shouldShowIndicator and (ScrW() - w - ScreenScaleFixed(20)) or ScrW()
-    
-    if not currentX then currentX = ScrW() end
-    currentX = Lerp(FrameTime() * 2, currentX, targetX)
+    if not currentX then currentX = ScreenScaleFixed(POS_HIDDEN_X) end
+    currentX = Lerp(FrameTime() * 2, currentX, targetXScaled)
 
-    local y = ScreenScaleFixed(-50)
+    local size = IND_SIZE_BASE
+    
+    local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
+    local y = ScrH() - h - ScreenScaleFixed(20)
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)
@@ -400,11 +558,27 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     local backdropW = w * 0.92
     local backdropH = h * 0.92
     
-    --draw.RoundedBox(6, backdropX, backdropY, backdropW, backdropH, Color(0, 0, 0, 90))
-    --surface.SetDrawColor(120, 120, 120, 170)
-    --surface.DrawOutlinedRect(backdropX, backdropY, backdropW, backdropH, 1)
+    draw.RoundedBox(6, backdropX, backdropY, backdropW, backdropH, Color(0, 0, 0, 90))
+    surface.SetDrawColor(120, 120, 120, 170)
+    surface.DrawOutlinedRect(backdropX, backdropY, backdropW, backdropH, 1)
     
+    if shouldShowIndicator then
+        cachedAfflictionIcons = CollectAfflictionIcons(ply, org)
+        if not iconsTargetVisible then
+            iconsAppearTime = time
+        end
+    end
 
+    iconsVisibility = Lerp(FrameTime() * 10, iconsVisibility, shouldShowIndicator and 1 or 0)
+    iconsTargetVisible = shouldShowIndicator
+
+    if iconsVisibility > 0.01 and #cachedAfflictionIcons > 0 then
+        local iconsX = ScrW() * 0.5
+        local iconsBottom = ScrH() - ScreenScaleFixed(ICONS_SCREEN_MARGIN_Y)
+        DrawAfflictionIcons(cachedAfflictionIcons, iconsX, iconsBottom, iconsVisibility, iconsAppearTime, time)
+    elseif not shouldShowIndicator and iconsVisibility <= 0.01 then
+        cachedAfflictionIcons = {}
+    end
     
     local camRenderX = viewX
     if camRenderX < 0 then

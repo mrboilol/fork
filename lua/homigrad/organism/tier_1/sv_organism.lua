@@ -446,22 +446,25 @@ include("homigrad/status_messages/sv_status_messages.lua")
 hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     local ramp_rate = 0.002 -- Base rate from original
 
-    -- Ramp up on moderate head damage (skull >= 0.4 but <1)
-    if org.skull >= 0.4 then
-        ramp_rate = ramp_rate + 0.003 -- Slightly faster for moderate damage
+    -- Ramp up on head damage
+    if org.skull > 0 then
+        ramp_rate = ramp_rate + (0.006 * org.skull) -- Proportional to skull damage
     end
 
-    -- Ramp up on minor brain damage (brain >=0.1 and <0.3)
-    if org.brain >= 0.1 and org.brain < 0.3 then
-        ramp_rate = ramp_rate + 0.002
+    -- Ramp up on brain damage
+    if org.brain > 0 then
+        ramp_rate = ramp_rate + (0.01 * org.brain) -- Proportional to brain damage, higher impact
     end
 
     -- Ramp up on high blood pressure (>115)
     if org.bloodpressure > 115 then
-        ramp_rate = ramp_rate + 0.004 -- Faster for hypertension
+        local bp_effect = (org.bloodpressure - 115) / 35 -- Normalize pressure effect
+        ramp_rate = ramp_rate + (0.008 * bp_effect) -- Proportional to how high the blood pressure is
     end
 
-    org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1)
+    ramp_rate = ramp_rate * 1.5
+
+    org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.0)
 
     local decay_rate = 0.005
     if org.internalBleed and org.internalBleed > 0 then
@@ -470,12 +473,13 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
 
     org.stroke_meter = math.max((org.stroke_meter or 0) - timeValue * decay_rate, 0)
 
-    if org.stroke_meter >= 1 and not org.is_stroking then
+    if org.stroke_meter >= 1.0 and not org.is_stroking then
         org.is_stroking = true
         org.stroke_active = true  -- Set stroke active for persistent effects
         org.o2[1] = 3
+		org.alive = false
         owner:Notify("My head... I can't...", 1, "stroke", 5)
-    elseif org.stroke_meter < 1 and org.is_stroking then
+    elseif org.stroke_meter < 1.0 and org.is_stroking then
         org.is_stroking = false
         if org.alive then
             org.heartstop = true
@@ -485,6 +489,19 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
 
     if org.is_stroking then
         org.brain = math.max(org.brain - timeValue / 600, 0)  -- Slow brain deterioration during stroke
+    end
+end)
+
+hook.Add("Org Think", "StrokeEffects", function(owner, org, timeValue)
+    if org.stroke_meter and org.stroke_meter > 0.75 then
+        local effect_scale = (org.stroke_meter - 0.75) / (1.0 - 0.75)
+        org.disorientation = math.max(org.disorientation or 0, 2 * effect_scale)
+        if org.consciousness then
+            org.consciousness = math.max(org.consciousness - (0.05 * effect_scale) * timeValue, 0)
+        end
+        if org.o2 and org.o2[1] then
+             org.o2[1] = math.max(org.o2[1] - (0.1 * effect_scale) * timeValue, 0)
+        end
     end
 end)
 

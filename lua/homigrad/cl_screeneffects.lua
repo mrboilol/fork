@@ -422,8 +422,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
         if not (lply:IsBerserk() or lply:IsStimulated()) then
             render.UpdateScreenEffectTexture()
             heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-            heatMat:SetFloat("$c0_y", adrenalineShock * 0.1)
-            heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 1.0))
+            heatMat:SetFloat("$c0_y", adrenalineShock * 0.05)
+            heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 0.5))
             render.SetMaterial(heatMat)
             render.DrawScreenQuad()
 
@@ -435,8 +435,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
         end
         render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", adrenalineShock * 1.4)
-		vignetteMat:SetFloat("$c1_y", adrenalineShock * 1.6)
+		vignetteMat:SetFloat("$c0_z", adrenalineShock * 1.6)
+		vignetteMat:SetFloat("$c1_y", adrenalineShock * 1.8)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
     end
@@ -902,16 +902,16 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
         if not (lply:IsBerserk() or lply:IsStimulated()) then
     		render.UpdateScreenEffectTexture()
     		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-    		heatMat:SetFloat("$c0_y", despairShock * 0.34)
-    		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 5.4))
+    		heatMat:SetFloat("$c0_y", despairShock * 0.15)
+    		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 2.0))
     		render.SetMaterial(heatMat)
     		render.DrawScreenQuad()
         end
 
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", despairShock * 2.4)
-		vignetteMat:SetFloat("$c1_y", despairShock * 4.0)
+		vignetteMat:SetFloat("$c0_z", despairShock * 2.8)
+		vignetteMat:SetFloat("$c1_y", despairShock * 4.5)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 

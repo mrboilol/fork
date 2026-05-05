@@ -214,7 +214,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local consciousness = org.consciousness or 0
     local shock = org.shock or 0
     local isCritical = (org.critical == true) or (pulse < 1 and brain >= 0.02) or (brain >= 0.34)
-    local admiring = ply:GetNWBool("mcd_admiring", false)
+    local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
     heartPhase = heartPhase + FrameTime() * (pulse / 60)
 
 
@@ -338,6 +338,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local target_org = g_PulseCheckTarget.organism or {}
         local target_pulse = target_org.heartbeat or target_org.pulse or 70
         local target_bp = target_org.bloodpressure or 93
+        local target_brain = target_org.brain or 0
+        local target_isCritical = (target_org.critical == true) or (target_pulse < 1 and target_brain >= 0.02) or (target_brain >= 0.34)
 
         if g_PulseCheckData and not g_PulseCheckData.completed then
             if target_org.heartstop or target_pulse <= 0 then
@@ -355,8 +357,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                                         if target_pulse < 1 then
                         sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
                     else
-                        local isSevere = target_pulse > 150 or (target_bp or 93) > 140
-                        local soundFile = isSevere and "critbeat.ogg" or "beat.ogg"
+                        local soundFile = target_isCritical and "critbeat.ogg" or "beat.ogg"
                         sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
                     end
                 end

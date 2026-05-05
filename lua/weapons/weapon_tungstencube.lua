@@ -30,29 +30,28 @@ end
 function SWEP:PrimaryAttack()
     self:SetNextPrimaryFire(CurTime() + 1)
     self:SendWeaponAnim(ACT_VM_THROW)
-    
+
     if not SERVER then return end
-    
+
     local ply = self:GetOwner()
-    
+
     local ent = ents.Create("ent_throwable")
     ent.WorldModel = self.WorldModel
 
     if hg and hg.eye and hg.GetCurrentCharacter then
-        ent:SetPos(select(1, hg.eye(ply, 60, hg.GetCurrentCharacter(ply))) - ply:GetAimVector() * 2)
+        ent:SetPos(select(1, hg.eye(ply,60,hg.GetCurrentCharacter(ply))) - ply:GetAimVector() * 2)
     else
         ent:SetPos(ply:GetShootPos() + ply:EyeAngles():Forward() * 20)
     end
-    
     ent:SetAngles(ply:EyeAngles())
-    ent:SetOwner(ply)
+    ent:SetOwner(self:GetOwner())
     ent:Spawn()
 
     ent.localshit = Vector(0,0,0)
     ent.wep = self:GetClass()
     ent.owner = ply
-    ent.damage = 75      -- Lowered damage to 75
-    ent.MaxSpeed = 1250  -- Adjusted speed to 1250
+    ent.damage = 100
+    ent.MaxSpeed = 1500
     ent.DamageType = DMG_CLUB
     ent.AttackHit = "Concrete.ImpactHard"
     ent.AttackHitFlesh = "Flesh.ImpactHard"
@@ -61,7 +60,7 @@ function SWEP:PrimaryAttack()
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-        phys:SetMass(100) -- Making the cube incredibly heavy
+		phys:SetMass(200)
         phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
         phys:AddAngleVelocity(VectorRand() * 300)
     end

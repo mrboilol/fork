@@ -766,8 +766,19 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		ent.bloodamt = ent.bloodamt or 0
 		ent.bloodamt = ent.bloodamt + 1
 		
+		-- Exit wound blood loss
+		org.blood = org.blood - 50
+
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
+
+			-- Exit wound blood spray
+			net.Start("hg_bloodimpact")
+			net.WriteVector(outputHole[#outputHole])
+			net.WriteVector((-outputDir):GetNormalized() * 2 + VectorRand(-0.5, 0.5))
+			net.WriteFloat(dmg * 2)
+			net.WriteInt(math.min(ent.bloodamt * 2, 255), 8)
+			net.Broadcast()
 
 			/*if IsValid(ent) then
 				timer.Create("Blood_burst"..ent:EntIndex(),0.02,1,function()
@@ -1064,7 +1075,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
-	local hitgroup_max = 135
+	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 100 or 135 -- easier decapitation
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
@@ -1110,7 +1121,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				return
 			end
 
-			if IsValid(ply) and ply:Alive() then
+			-- Allow decapitation on living players
+			if IsValid(ply) and ply:Alive() and hitgroup ~= HITGROUP_HEAD then
 				org.dmgstack[hitgroup][1] = nil
 				org.dmgstack[hitgroup][2] = nil
 

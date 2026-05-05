@@ -348,7 +348,7 @@ if CLIENT then
 						if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
 						local val = math.Round(val / self.modeValuesdef[i][1] * 100)
 						local x,y = 0, i * ScrH() / 20
-						local reveal = math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
+						local reveal = 1 //math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
 						colBrown.a = reveal * 185
 						draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25 + (#self.modeValues > 0 and 0 or 0),colBrown)
 						surface.SetFont("ZCity_Small")
