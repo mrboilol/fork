@@ -95,7 +95,7 @@ local fear_phrases = {
 	"I don't want to die like this.",
 	"Is this really how it ends?",
 	"Im scared of death.",
-	"This cant be it.",
+	"There's no way out, is there?",
 	"I dont want to die.",
 	"I wish I had a way out.",
 	"I regret so many things.",
@@ -110,6 +110,8 @@ local fear_phrases = {
 	"Why is this happening to me...",
 	"I think im going to die here.",
 	"I cant see the end.",
+	"Calm breaths. Deep breaths...",
+
 }
 
 local is_aimed_at_phrases = {
@@ -253,6 +255,33 @@ local braindamage_phraselist = {
 	"Bhrhraihin.",
 }
 
+local bleeding_out_phrases = {
+    "Why did this happen to me why...",
+    "I feel so weak...",
+    "So dark.. everything is so dark and cold...",
+    "I feel like i want to pass out, but i dont want to...",
+    "Its so hard to move...",
+    "Im so numb... but i can still feel the cold...",
+    "Im going to die arent i?",
+}
+
+local internalbleed_phrases = {
+	"That's... that's blood I just vomited...",
+	"Oh, that's blood...",
+	"Fuck, I just puked blood...",
+	"Oh shit... I don't feel good...",
+}
+hg.internalbleed_phrases = internalbleed_phrases
+
+local adrenaline_phrases = {
+    "Im so incredibly anxious.",
+    "Focus... just focus...",
+    "My hands are so shaky.",
+    "I cant calm down.",
+    "I feel at edge.",
+    "I need to chill out, literally...",
+}
+
 local cold_phraselist = {
 	"It's getting very cold..",
 	"Too cold for me.",
@@ -386,7 +415,13 @@ local function get_status_message(ply)
 	local thirst = org.thirst
 	local goodmood = org.goodmood
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
-    local positive_thinking = (goodmood and goodmood > 0.5)
+    local positive_thinking = (goodmood and goodmood > 0.5) or (org.despair and org.despair < 0.1)
+
+    if org.fear and org.fear >= 1.0 then
+        if math.random(10) > 3 then
+            positive_thinking = false
+        end
+    end
 
 	    if broken_dislocated and org.just_damaged_bone then
         hg.status_messages.Send(ply, "Your ".. (org.just_damaged_bone_limb or "limb") .." is broken.", 3)
@@ -419,6 +454,22 @@ local function get_status_message(ply)
 
 	if not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
 		most_wanted_phraselist = despair_phrases
+	end
+
+	if not most_wanted_phraselist and blood < 3750 then
+		local combined_phrases = {}
+		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
+		for _, phrase in ipairs(near_death_poetic) do table.insert(combined_phrases, phrase) end
+		for _, phrase in ipairs(fear_phrases) do table.insert(combined_phrases, phrase) end
+		if hg.internalbleed_phrases then
+			for _, phrase in ipairs(hg.internalbleed_phrases) do table.insert(combined_phrases, phrase) end
+		end
+		most_wanted_phraselist = combined_phrases
+	end
+
+	local adrenaline = org.adrenaline or 0
+	if not most_wanted_phraselist and adrenaline > 1.5 then
+		most_wanted_phraselist = adrenaline_phrases
 	end
 
 	if (blood < 3100) or (pain > 75) or (broken_dislocated) or (broken_notify) or (dislocated_notify) then

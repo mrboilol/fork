@@ -800,7 +800,7 @@ local tooltipTexts = {
 			[1] = "Confusion - My brain feels funny..."
 		},
 		palpitations = {
-            [4] = "Atrial Fibrilation - Really fast and irregular, but this wont do, your heart will fail soon.",
+            [4] = "Atrial Fibrilation - Really fast and irregular to keep up with your abysmal performance, but this wont do, your heart will fail soon.",
             [3] = "Palpitations - Irregular and fast, your heart is beating too hard to keep up with your low blood pressure.",
             [2] = "Flutter - Your heart is beating unusually fast, and it does not feel good.",
             [1] = "Tachycardia - Probably just a workout."
@@ -1341,12 +1341,6 @@ local function draw_status_effects()
 					table.insert(effects, {name = "amputant", priority = 8})
 					currentEffectNames["amputant"] = true
 				end
-				table.insert(effects, {name = "dislocated_jaw", priority = 9, level_num = 1, has_levels = true})
-				currentEffectNames["dislocated_jaw"] = true
-				table.insert(effects, {name = "broken_ribs", priority = 10, level_num = 1, has_levels = true})
-				currentEffectNames["broken_ribs"] = true
-				table.insert(effects, {name = "encumbered", priority = 11, level_num = 1, has_levels = true})
-				currentEffectNames["encumbered"] = true
 			
 			if org.heartstop == true then
 				table.insert(effects, {name = "cardiac_arrest", priority = 0.15})
@@ -1359,31 +1353,29 @@ local function draw_status_effects()
 			end
 		end
 		
-															local stamina_table = org.stamina
-				if stamina_table and type(stamina_table) == "table" then
-					local stamina_val = stamina_table[1] or 0
-					local stamina_max = stamina_table.max or 180
-					
-					if stamina_max <= 0 then stamina_max = 180 end
-					
-					local stamina_percent = (stamina_val / stamina_max) * 100
-					
-					if stamina_percent < 50 then
-						local level_num = 1
-						if stamina_percent <= 10 then level_num = 4
-						elseif stamina_percent <= 25 then level_num = 3
-						elseif stamina_percent <= 40 then level_num = 2 end
-						
-						table.insert(effects, {
-							name = "encumbered",
-							level_num = level_num,
-							has_levels = true,
-							priority = 9,
-							value = math_floor(stamina_percent)
-						})
-						currentEffectNames["encumbered"] = true
-					end
-				end
+
+			local weight = getOrgVal(org, "weight", 0)
+			local maxweight = getOrgVal(org, "maxweight", 60)
+			
+			if maxweight <= 0 then maxweight = 60 end
+			
+			local weight_percent = (weight / maxweight) * 100
+			
+			if weight_percent > 50 then
+				local level_num = 1
+				if weight_percent > 95 then level_num = 4
+				elseif weight_percent > 85 then level_num = 3
+				elseif weight_percent > 70 then level_num = 2 end
+				
+				table.insert(effects, {
+					name = "encumbered",
+					level_num = level_num,
+					has_levels = true,
+					priority = 9,
+					value = math_floor(weight_percent)
+				})
+				currentEffectNames["encumbered"] = true
+			end
 
 				if org.jawdislocation then
 					table.insert(effects, {
@@ -1413,9 +1405,12 @@ local function draw_status_effects()
 
 				if showAllIcons then
 				local pulse_val = smooth.pulse or getOrgVal(org, "pulse", 70)
-				if pulse_val > 150 then
-					local level_num = 3
-					if pulse_val > 200 then level_num = 4 end
+				if pulse_val > 120 then
+					local level_num = 1
+					if pulse_val > 220 then level_num = 4
+					elseif pulse_val > 180 then level_num = 3
+					elseif pulse_val > 150 then level_num = 2
+					end
 
 					table.insert(effects, {
 						name = "palpitations",
@@ -1582,8 +1577,8 @@ local function draw_status_effects()
 			if getOrgVal(org, "trachea", 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
 			if getOrgTableVal(org, "lungsR", 1, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
 			if getOrgTableVal(org, "lungsL", 1, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
-			if getOrgTableVal(org, "lungsR", 2, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
-			if getOrgTableVal(org, "lungsL", 2, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 2, nil, 0) >= 0.8 and not org.needle_active then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 2, nil, 0) >= 0.8 and not org.needle_active then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
 
 			-- Check for any damaged organ
 			if getOrgVal(org, "liver", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
@@ -2033,7 +2028,7 @@ local function draw_status_effects()
 		elseif effect.name == "broken_ribs" or effect.name == "dislocated_jaw" or effect.name == "encumbered" then
 			effect_scale = 0.8
 			end
-		local drawSize = size * scale * effect_scale
+		local drawSize = size * scale
 		local drawX = final_x - (drawSize - size) / 2
 		local drawY = final_y - (drawSize - size) / 2
 		
@@ -2159,25 +2154,27 @@ local function draw_status_effects()
 		else icon_mat = status_sprites[effect.name] end
 		
 		if icon_mat and not icon_mat:IsError() then
-			surface_SetDrawColor(255, 255, 255, 255)
-			surface_SetMaterial(icon_mat)
-			
-			local iconDrawSize = (drawSize - 4) * effect_scale
-			local iconDrawX = drawX + (drawSize - iconDrawSize) / 2 + offsetX
-			local iconDrawY = drawY + (drawSize - iconDrawSize) / 2 + offsetY
-			
-			if USE_ALT_ICONS then
-				local multiplier = ALT_ICON_SETTINGS.size_multiplier
-				if ALT_ICON_SETTINGS.individual and ALT_ICON_SETTINGS.individual[effect.name] then
-					multiplier = ALT_ICON_SETTINGS.individual[effect.name]
+			if not (effect.name == "hypoventilation" and effect.level_num == 1) then
+				surface_SetDrawColor(255, 255, 255, 255)
+				surface_SetMaterial(icon_mat)
+				
+				local iconDrawSize = (drawSize - 4) * effect_scale
+				local iconDrawX = drawX + (drawSize - iconDrawSize) / 2 + offsetX
+				local iconDrawY = drawY + (drawSize - iconDrawSize) / 2 + offsetY
+				
+				if USE_ALT_ICONS then
+					local multiplier = ALT_ICON_SETTINGS.size_multiplier
+					if ALT_ICON_SETTINGS.individual and ALT_ICON_SETTINGS.individual[effect.name] then
+						multiplier = ALT_ICON_SETTINGS.individual[effect.name]
+					end
+					
+					iconDrawSize = (drawSize - 4) * multiplier
+					iconDrawX = drawX + (drawSize - iconDrawSize) / 2 + offsetX
+					iconDrawY = drawY + (drawSize - iconDrawSize) / 2 + offsetY
 				end
 				
-				iconDrawSize = (drawSize - 4) * multiplier
-				iconDrawX = drawX + (drawSize - iconDrawSize) / 2 + offsetX
-				iconDrawY = drawY + (drawSize - iconDrawSize) / 2 + offsetY
+				surface_DrawTexturedRect(iconDrawX, iconDrawY, iconDrawSize, iconDrawSize)
 			end
-			
-			surface_DrawTexturedRect(iconDrawX, iconDrawY, iconDrawSize, iconDrawSize)
 		else
 			local letterColor = berserkActive and Color(255, 100, 100, 255) or Color(255, 255, 255, 255)
 			local letter = "?"

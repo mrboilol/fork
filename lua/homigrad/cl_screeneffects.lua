@@ -415,28 +415,28 @@ hook.Add("Post Post Processing", "ItHurts", function()
     end
 
     local adrenaline = org.adrenaline or 0
-    if adrenaline > 0.5 then
-        blurAmount = math.max(blurAmount, (adrenaline - 0.5) * 3)
+    if adrenaline > 1.5 then
+        blurAmount = math.max(blurAmount, (adrenaline - 1.5) * 3)
 
-		local adrenalineShock = (adrenaline - 0.5) * 2
+		local adrenalineShock = (adrenaline - 1.5) * 2
         if not (lply:IsBerserk() or lply:IsStimulated()) then
             render.UpdateScreenEffectTexture()
             heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-            heatMat:SetFloat("$c0_y", adrenalineShock * 0.05)
-            heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 0.5))
+            heatMat:SetFloat("$c0_y", adrenalineShock * 0.01)
+            heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (adrenalineShock * 0.1))
             render.SetMaterial(heatMat)
             render.DrawScreenQuad()
 
             render.UpdateScreenEffectTexture()
-            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.05)
+            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.02)
             chromaticMat:SetInt("$c0_y", 1)
             render.SetMaterial(chromaticMat)
             render.DrawScreenQuad()
         end
         render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", adrenalineShock * 1.6)
-		vignetteMat:SetFloat("$c1_y", adrenalineShock * 1.8)
+		vignetteMat:SetFloat("$c0_z", adrenalineShock * 0.4)
+		vignetteMat:SetFloat("$c1_y", adrenalineShock * 0.5)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
     end
@@ -897,21 +897,21 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
 
 	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
-	if despairFx > 0.001 then
+	if despairFx > 0.7 then
 		local despairShock = despairFx ^ 0.7
         if not (lply:IsBerserk() or lply:IsStimulated()) then
     		render.UpdateScreenEffectTexture()
     		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-    		heatMat:SetFloat("$c0_y", despairShock * 0.15)
-    		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 2.0))
+    		heatMat:SetFloat("$c0_y", despairShock * 0.02)
+    		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 0.2))
     		render.SetMaterial(heatMat)
     		render.DrawScreenQuad()
         end
 
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", despairShock * 2.8)
-		vignetteMat:SetFloat("$c1_y", despairShock * 4.5)
+		vignetteMat:SetFloat("$c0_z", despairShock * 0.5)
+		vignetteMat:SetFloat("$c1_y", despairShock * 0.8)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 

@@ -148,6 +148,10 @@ local not_enough_intake = {
 	//"Resting sounds like a nice idea.",
 	"I need to breathe...",
 	"I'm struggling to breathe...",
+	"Why is it so hard to breathe...",
+	"I cant find a way to get a good breath of air.",
+	"I cant breathe right.",
+	"Im struggling to catch my breath...",
 }
 
 local drop_mask = {

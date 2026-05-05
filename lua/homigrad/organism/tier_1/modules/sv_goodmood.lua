@@ -21,6 +21,10 @@ module[2] = function(owner, org, timeValue)
         goodmood_add = goodmood_add + timeValue * 0.05
     end
 
+    if org.pain < 10 then
+        goodmood_add = goodmood_add + timeValue * 0.01
+    end
+
     org.goodmood = math.Clamp(org.goodmood + goodmood_add, 0, 1)
     org.goodmood = math.Approach(org.goodmood, 0, timeValue / 180)
 end

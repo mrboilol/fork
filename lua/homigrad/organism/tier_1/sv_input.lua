@@ -898,6 +898,16 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				net.WriteFloat(dmg)
 				net.WriteInt(ent.bloodamt2, 8)
 				net.Broadcast()
+
+				for i = 1, 3 do
+					net.Start("hg_bloodimpact")
+					net.WriteVector(inputHole[1])
+					net.WriteVector(dir / 4 + VectorRand(-100, 100))
+					net.WriteFloat(dmg / 2)
+					net.WriteInt(math.random(1,2), 8)
+					net.Broadcast()
+				end
+				
 				ent.bloodamt2 = 0
 			end)
 		end)

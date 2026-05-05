@@ -47,12 +47,7 @@ module[1] = function(org)
 	org.hemothorax = false
 end
 
-local internalbleed_phrases = {
-	"That's... that's blood I just vomited...",
-	"Oh, that's blood...",
-	"Fuck, I just puked blood...",
-	"Oh shit... I don't feel good...",
-}
+
 
 local about_to_puke = {
 	"I feel like I'm gonna puke any second now...",
@@ -232,7 +227,7 @@ module[2] = function(owner, org, mulTime)
 	if org.wantToVomit > 1 then
 		org.wantToVomit = 0
 
-		if org.isPly then owner:Notify(internalbleed_phrases[math.random(#internalbleed_phrases)], 15, "internalbleed") end
+		if org.isPly then owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed") end
 
 		hg.organism.Vomit(owner)
 	end
