@@ -302,7 +302,7 @@ if CLIENT then
 	local lerpthing = 1
 	local colBrown = Color(40,40,40)
 	SWEP.showstats = true
-	SWEP.ofsV = Vector(10,-2,1)
+	SWEP.ofsV = Vector(1,-2,1)
 	SWEP.ofsA = Angle(-90,-40,270)
 	local vector_one = Vector(1,1,1)
 	function SWEP:DrawHUD()
@@ -341,7 +341,7 @@ if CLIENT then
 				render.PushFilterMin( TEXFILTER.LINEAR )
 				local m = Matrix()
 				m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
-				m:Scale( vector_one * 0.5 )
+				m:Scale( vector_one * 0.75 )
 
 				cam.PushModelMatrix( m, true )
 					for i, val in ipairs(self.modeValues) do
