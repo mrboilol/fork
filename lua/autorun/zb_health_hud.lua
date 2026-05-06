@@ -1577,8 +1577,8 @@ local function draw_status_effects()
 			if getOrgVal(org, "trachea", 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
 			if getOrgTableVal(org, "lungsR", 1, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
 			if getOrgTableVal(org, "lungsL", 1, nil, 0) >= 0.8 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
-			if getOrgTableVal(org, "lungsR", 2, nil, 0) >= 0.8 and not org.needle_active then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
-			if getOrgTableVal(org, "lungsL", 2, nil, 0) >= 0.8 and not org.needle_active then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 2, nil, 0) >= 0.8 and getOrgVal(org, "needle", 0) <= 0 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 2, nil, 0) >= 0.8 and getOrgVal(org, "needle", 0) <= 0 then severely_damaged_vital_organs = severely_damaged_vital_organs + 1 end
 
 			-- Check for any damaged organ
 			if getOrgVal(org, "liver", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
