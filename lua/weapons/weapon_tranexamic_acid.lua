@@ -6,12 +6,13 @@ SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
 SWEP.Primary.Next = 0
-SWEP.HoldType = "slam"
+SWEP.HoldType = "normal"
 SWEP.ViewModel = ""
-SWEP.WorldModel = "models/props_health/health_vial.mdl"
+SWEP.WorldModel = "models/weapons/w_models/w_jyringe_jroj.mdl"
+SWEP.Model = "models/weapons/w_models/w_jyringe_jroj.mdl"
 if CLIENT then
-	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_medkit")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.png"
+	SWEP.WepSelectIcon = Material("vgui/icons/ico_manitol.png")
+	SWEP.IconOverride = "vgui/icons/ico_manitol.png"
 	SWEP.BounceWeaponIcon = false
 end
 
