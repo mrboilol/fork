@@ -702,7 +702,7 @@ local tooltipTexts = {
 		},
 		spine_fracture = "? - Something is wrong, my back feels split in half and I cant feel something on my body.",
 		fracture = "Fracture - One of your limbs is broken, you should probably put it in a bandage.",
-				organ_damage = {
+		organ_damage = {
 			[3] = "Severe Internal Damage - One or more of your important bits are heavily damaged, all hope is lost.",
 			[2] = "Internal Damage - One or more of your internal organs are destroyed completely, just hope its not your liver.",
 			[1] = "Minor Internal Damage - Some of your internal organs are damaged.",
@@ -1313,11 +1313,11 @@ local function draw_status_effects()
 			end
 			
 			local stroke_val = smooth.stroke_meter or getOrgVal(org, "stroke_meter", 0)
-			if stroke_val > 1 then
+			if stroke_val > 0.5 then
 				local level_num = 1
-				if stroke_val > 75 then level_num = 4
-				elseif stroke_val > 50 then level_num = 3
-				elseif stroke_val > 25 then level_num = 2 end
+				if stroke_val > 0.95 then level_num = 4
+				elseif stroke_val > 0.75 then level_num = 3
+				elseif stroke_val > 0.6 then level_num = 2 end
 
 				table.insert(effects, {
 					name = "stroke",
@@ -1432,18 +1432,18 @@ local function draw_status_effects()
 						})
 						currentEffectNames["lungs_failure"] = true
 					end
-				elseif (o2_curregen < -0.1 or o2_val < (getO2Max(org) * 0.9)) and not currentEffectNames["lungs_failure"] then
+				elseif o2_curregen < -0.1 and not currentEffectNames["lungs_failure"] then
 					local level_num = 1
-					if o2_val < 10 then level_num = 4
-					elseif o2_val < 15 then level_num = 3
-					elseif o2_val < 22 then level_num = 2 end
+					if o2_curregen < -0.8 then level_num = 4
+					elseif o2_curregen < -0.5 then level_num = 3
+					elseif o2_curregen < -0.25 then level_num = 2 end
 
 					table.insert(effects, {
 						name = "hypoventilation",
 						level_num = level_num,
 						has_levels = true,
 						priority = 0.51,
-						value = math_floor(o2_val)
+						value = math.abs(math_floor(o2_curregen * 10))
 					})
 					currentEffectNames["hypoventilation"] = true
 				end
@@ -2154,7 +2154,6 @@ local function draw_status_effects()
 		else icon_mat = status_sprites[effect.name] end
 		
 		if icon_mat and not icon_mat:IsError() then
-			if not (effect.name == "hypoventilation" and effect.level_num == 1) then
 				surface_SetDrawColor(255, 255, 255, 255)
 				surface_SetMaterial(icon_mat)
 				
@@ -2174,7 +2173,6 @@ local function draw_status_effects()
 				end
 				
 				surface_DrawTexturedRect(iconDrawX, iconDrawY, iconDrawSize, iconDrawSize)
-			end
 		else
 			local letterColor = berserkActive and Color(255, 100, 100, 255) or Color(255, 255, 255, 255)
 			local letter = "?"

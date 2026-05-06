@@ -493,8 +493,8 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
 end)
 
 hook.Add("Org Think", "StrokeEffects", function(owner, org, timeValue)
-    if org.stroke_meter and org.stroke_meter > 0.75 then
-        local effect_scale = (org.stroke_meter - 0.75) / (1.0 - 0.75)
+    if org.stroke_meter and org.stroke_meter > 0.5 then
+        local effect_scale = (org.stroke_meter - 0.5) / (1.0 - 0.5)
         org.disorientation = math.max(org.disorientation or 0, 2 * effect_scale)
         if org.consciousness then
             org.consciousness = math.max(org.consciousness - (0.05 * effect_scale) * timeValue, 0)
