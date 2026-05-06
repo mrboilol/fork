@@ -7,6 +7,13 @@ if SERVER then
 		"materials/vgui/hud/health_left_arm.png",
 		"materials/vgui/hud/health_right_leg.png",
 		"materials/vgui/hud/health_left_leg.png",
+
+		"materials/vgui/hud/health_headfurry.png",
+		"materials/vgui/hud/health_torsofurry.png",
+		"materials/vgui/hud/health_right_armfurry.png",
+		"materials/vgui/hud/health_left_armfurry.png",
+		"materials/vgui/hud/health_right_legfurry.png",
+		"materials/vgui/hud/health_left_legfurry.png",
 	}
 	
 	local ICONS = {
@@ -55,6 +62,7 @@ if SERVER then
 		"materials/vgui/hud/concussion.png",
 		"materials/vgui/hud/bleeding_small.png",
 		"materials/vgui/hud/bleeding_max.png",
+		"materials/vgui/hud/heavybleeding.png",
 		"materials/vgui/hud/sepsis.png",
 
 		"materials/vgui/hud/status_adrenaline.png",
@@ -64,6 +72,8 @@ if SERVER then
 		"materials/vgui/hud/status_death.png",
 		"materials/vgui/hud/status_berserk.png",
 		"materials/vgui/hud/status_amputant.png",
+
+		"materials/vgui/hud/status_chip.png",
 		
 		"materials/vgui/hud/status_adrenalinealt.png",
 		"materials/vgui/hud/status_amputantalt.png",
@@ -108,6 +118,8 @@ if SERVER then
 		"materials/vgui/hud/smallbleeding.png",
 		"materials/vgui/hud/stroke.png",
 		"materials/vgui/hud/palpitations.png",
+
+		"materials/vgui/hud/status_chipalt.png",
 	}
 	
 	for _, path in ipairs(SPRITES) do resource.AddFile(path) end
@@ -141,6 +153,8 @@ local cvar_limbs_always = CreateClientConVar("mzb_popalimbs", "0", true, false)
 local cvar_alt_icons = CreateClientConVar("mzb_nopixelicons", "0", true, false)
 local cvar_status_effects = CreateClientConVar("mzb_Disable_moodle", "1", true, false)
 local cvar_language = CreateClientConVar("mzb_language", "eng", true, false)
+local cvar_brain_distortion = CreateClientConVar("mzb_brain_distortion", "1", true, false)
+local cvar_tarkov_indicator = CreateClientConVar("hg_tarkovindicator", "1", true, false)
 
 local LANGUAGE = cvar_language:GetString()
 local USE_ALT_ICONS = cvar_alt_icons:GetBool()
@@ -153,9 +167,7 @@ end
 
 local ALT_ICON_SETTINGS = {
 	size_multiplier = 0.85, 
-	
 	background_multiplier = 0.85,
-	
 	padding_offset = -1,
 }
 
@@ -199,6 +211,11 @@ end
 
 local function isBerserkActive(org)
 	return org and org.berserkActive2 == true
+end
+
+local function isPlayerFurry(ply)
+	if not IsValid(ply) then return false end
+	return ply.PlayerClassName == "furry"
 end
 
 local function lerpCol(ratio, from, to)
@@ -261,38 +278,89 @@ local function getBerserkCamEffect()
     local berserkActive = isBerserkActive(ply.organism)
     if not berserkActive then return 0, 0, 0 end
     
-
     local offsetVal = 0.85
     local bpmVal = 70
     
- 
     local stationTime = 0
     if hg and hg.berserkStation and IsValid(hg.berserkStation) then
         stationTime = hg.berserkStation:GetTime()
     else
-
         local now = CurTime()
         stationTime = (now % (60 / bpmVal)) * bpmVal / 60
     end
     
-
     local beat = 1 - ((stationTime - offsetVal) / 60 * bpmVal)
     beat = (beat - math.Round(beat)) % 1
     local pulseIntensity = math.abs(math.cos(1 - (beat * 2)))
     
-
     local berserkVal = ply.organism.berserk or 0
     local berserkClamped = math.Clamp(berserkVal, 0, 3) * (ply.organism.consciousness or 1)
     
-
     local intensity = pulseIntensity * berserkClamped * 2
     
-
     local shakeX = math.sin(CurTime() * 30) * intensity * 0.5
     local shakeY = math.cos(CurTime() * 25) * intensity * 0.3
     
     return intensity, shakeX, shakeY
 end
+
+local function corruptText(text, brainDamage, seed)
+	if brainDamage <= 0.1 then return text end
+	
+	local corruptionChars = {"m", "b", "n", "o", "a", "u", "c", "v", "w", "q",}
+	local result = ""
+	local corruptionChance
+	
+	if brainDamage <= 0.15 then
+		corruptionChance = 0.025
+	elseif brainDamage <= 0.2 then
+		corruptionChance = 0.05
+	elseif brainDamage <= 0.25 then
+		corruptionChance = 0.1
+	elseif brainDamage <= 0.3 then
+		corruptionChance = 0.175
+	elseif brainDamage <= 0.35 then
+		corruptionChance = 0.25
+	elseif brainDamage <= 0.4 then
+		corruptionChance = 0.5
+	elseif brainDamage <= 0.45 then
+		corruptionChance = 0.7
+	elseif brainDamage <= 0.5 then
+		corruptionChance = 0.8
+	elseif brainDamage <= 0.6 then
+		corruptionChance = 0.9
+	elseif brainDamage <= 0.7 then
+		corruptionChance = 0.85
+	else
+		corruptionChance = 1.0
+	end
+	
+	math.randomseed(seed or 12345)
+	
+	local cleanText = utf8.force(text) or text
+	local chars = {}
+	for char in string.gmatch(cleanText, utf8.charpattern) do
+		table.insert(chars, char)
+	end
+	
+	for i = 1, #chars do
+		if chars[i] == " " or chars[i] == "\n" then
+			result = result .. chars[i]
+		else
+			if math.random() < corruptionChance then
+				local randomChar = corruptionChars[math.random(1, #corruptionChars)]
+				result = result .. randomChar
+			else
+				result = result .. chars[i]
+			end
+		end
+	end
+	
+	math.randomseed(CurTime())
+	
+	return result
+end
+
 
 --кладкорды
 local HUD = {
@@ -311,6 +379,15 @@ local HUD = {
 		right_leg =   { x = 66,  y = 92 },
 		left_leg =    { x = 35, y = 106 },
 	},
+
+	furry_limb_offsets = {
+		head =        { x = -2.5,   y = 63 },
+		torso =       { x = -2.9,   y = 73 },
+		right_arm =   { x = 1,  y = 64 },
+		left_arm =    { x = -7, y = 64 },
+		right_leg =   { x = -2.9,  y = 72 },
+		left_leg =    { x = -4.9, y = 72 },
+	},
 	
 	limb_scale = {
 		head =        { w = 1, h = 1 },
@@ -319,6 +396,15 @@ local HUD = {
 		left_arm =    { w = 1, h = 2 },
 		right_leg =   { w = 1.2, h = 3.5 },
 		left_leg =    { w = 1.2, h = 2.7 },
+	},
+
+	furry_limb_scale = {
+		head =        { w = 5, h = 5 },
+		torso =       { w = 6, h = 6 },
+		right_arm =   { w = 5, h = 5 },
+		left_arm =    { w = 5, h = 5 },
+		right_leg =   { w = 6, h = 6 },
+		left_leg =    { w = 6, h = 6 },
 	},
 	
 	sprite_visibility = 100,
@@ -336,6 +422,7 @@ local HUD = {
 	status_effects_spacing = 55,
 	status_effects_size = 58,
 	show_status_effects = cvar_status_effects:GetBool(),
+	brain_distortion_enabled = cvar_brain_distortion:GetBool(),
 	
 	organ_damage_threshold = 0.3,
 	fracture_threshold = 0.95,
@@ -361,6 +448,7 @@ local HUD = {
 }
 
 local sprites = {}
+local spritesFurry = {}
 local icons = {}
 local status_sprites = {
 	level_backgrounds = {nil, nil, nil, nil},
@@ -377,7 +465,6 @@ local status_sprites = {
 	dislocated_jaw = nil,
 	broken_ribs = nil,
 	encumbered = nil,
-
 	
 	blood_loss = nil,
 	cardiac_arrest = nil,
@@ -396,6 +483,7 @@ local status_sprites = {
 	sepsis = nil,
 	bleeding_small = nil,
 	bleeding_max = nil,
+	bleeding_heavy = nil,
 	
 	adrenaline = nil,
 	shock = nil,
@@ -404,6 +492,7 @@ local status_sprites = {
 	death = nil,
 	berserk = nil,
 	amputant = nil,
+	chip = nil,
 }
 local status_sprites_loaded = false
 local debug_done = false
@@ -508,6 +597,7 @@ local function isAnyMenuOpen()
     
     return gui.MouseX() ~= 0 or gui.MouseY() ~= 0
 end
+
 --ткст
 local tooltipTexts = {
 	ru = {
@@ -671,7 +761,8 @@ local tooltipTexts = {
 			[3] = "Weight, and incredibly great impact to speed",
 			[4] = "You move extremely slowly due to weight"
 		},
-		sepsis = "Сепсис - опасное для жизни состояние, вызванное подавляющей реакцией организма на инфекцию. Может привести к повреждению тканей, отказу органов и смерти."
+		sepsis = "Сепсис - опасное для жизни состояние, вызванное подавляющей реакцией организма на инфекцию. Может привести к повреждению тканей, отказу органов и смерти.",
+		chip = "Чип - -(тест:) )."
 	},
 	
 	en = {
@@ -835,7 +926,8 @@ local tooltipTexts = {
 			[3] = "Engulfed - Too much gear, walking sounds like a real workout.",
 			[4] = "Completely Weighted - WAAAY too much gear, how about you take it off and stop LARPING?"
 		},
-		sepsis = "??? - Something in your body feels funny."
+		sepsis = "??? - Something in your body feels funny.",
+		chip = "Chip - -(test:) )."
 	}
 }
 
@@ -918,7 +1010,7 @@ local function load_status_sprites()
 	for i = 1, 4 do
 		status_sprites.level_backgrounds[i] = loadMaterial("vgui/hud/status_level" .. i .. "_bg.png", suffix)
 	end
-	--мудль
+
 	status_sprites.background = loadMaterial("vgui/hud/status_background.png", suffix)
 	
 	status_sprites.pain_icon = loadMaterial("vgui/hud/status_pain_icon.png", suffix)
@@ -948,6 +1040,7 @@ local function load_status_sprites()
 	status_sprites.sepsis = loadMaterial("vgui/hud/status_sepsis.png", suffix)
 	status_sprites.bleeding_small = loadMaterial("vgui/hud/smallbleeding.png", suffix)
 	status_sprites.bleeding_max = loadMaterial("vgui/hud/maxbleeding.png", suffix)
+	status_sprites.bleeding_heavy = loadMaterial("vgui/hud/heavybleeding.png", suffix)
 	
 	status_sprites.adrenaline = loadMaterial("vgui/hud/status_adrenaline.png", suffix)
 	status_sprites.shock = loadMaterial("vgui/hud/status_shock.png", suffix)
@@ -959,6 +1052,8 @@ local function load_status_sprites()
 	status_sprites.dislocated_jaw = loadMaterial("vgui/hud/dislocatedjaw.png", suffix)
 	status_sprites.broken_ribs = loadMaterial("vgui/hud/brokenribs.png", suffix)
 	status_sprites.encumbered = loadMaterial("vgui/hud/encumbered.png", suffix)
+	
+	status_sprites.chip = loadMaterial("materials/vgui/hud/status_chip.png", suffix)
 end
 
 local function update_stability(blood_val, pulse_val)
@@ -1186,6 +1281,16 @@ local function draw_status_effects()
 		})
 		currentEffectNames["death"] = true
 	else
+		-- Chip moodle
+		if cvar_tarkov_indicator:GetInt() == 2 or isPlayerFurry(ply) then
+			table.insert(effects, {
+				name = "chip",
+				priority = -2,
+				value = nil
+			})
+			currentEffectNames["chip"] = true
+		end
+
 		local pain_val = smooth.pain or getOrgVal(org, "pain", 0)
 		if pain_val > 10 and not berserkActive then
 			local level_num = 1
@@ -1404,7 +1509,7 @@ local function draw_status_effects()
 				end
 
 				if showAllIcons then
-				local pulse_val = smooth.pulse or getOrgVal(org, "pulse", 70)
+				local pulse_val = smooth.heartbeat or getOrgVal(org, "heartbeat", 70)
 				if pulse_val > 120 then
 					local level_num = 1
 					if pulse_val > 220 then level_num = 4
@@ -1470,6 +1575,8 @@ local function draw_status_effects()
 				if ischemia_val > 0.1 or hemotransfusionshock_val > 0.1 then
 					table.insert(effects, {
 						name = "sepsis",
+                        level_num = 1,
+                        has_levels = true,
 						priority = 0.8,
 						value = math_floor(ischemia_val * 100)
 					})
@@ -1479,9 +1586,9 @@ local function draw_status_effects()
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
 			if bleed_val > HUD.bleeding_threshold then
 				local level_num = 1
-				if bleed_val > 6 then level_num = 2 end
-				if bleed_val > 12 then level_num = 3 end
-				if bleed_val > 18 then level_num = 4 end
+				if bleed_val > 0.7 then level_num = 2 end
+				if bleed_val > 1.4 then level_num = 3 end
+				if bleed_val > 2.1 then level_num = 4 end
 				
 				table.insert(effects, {
 					name = "bleeding",
@@ -2100,6 +2207,8 @@ local function draw_status_effects()
 				bg_color = Color(80, 40, 40, 220)
 			elseif effect.name == "fracture" then
 				bg_color = Color(200, 100, 0, 220)
+			elseif effect.name == "chip" then
+				bg_color = Color(0, 200, 255, 220)
 			elseif effect.has_levels then
 				if effect.level_num == 4 then bg_color = Color(180, 30, 30, 220)
 				elseif effect.level_num == 3 then bg_color = Color(220, 60, 30, 220)
@@ -2118,8 +2227,10 @@ local function draw_status_effects()
 		elseif effect.name == "bleeding" then 
 			if effect.level_num == 1 then 
 				icon_mat = status_sprites.bleeding_small
-			elseif effect.level_num == 2 or effect.level_num == 3 then
+			elseif effect.level_num == 2 then
 				icon_mat = status_sprites.bleeding_icon
+			elseif effect.level_num == 3 then
+				icon_mat = status_sprites.bleeding_heavy
 			elseif effect.level_num == 4 then
 				icon_mat = status_sprites.bleeding_max
 			else
@@ -2150,6 +2261,7 @@ local function draw_status_effects()
 		elseif effect.name == "dislocated_jaw" then icon_mat = status_sprites.dislocated_jaw
 		elseif effect.name == "broken_ribs" then icon_mat = status_sprites.broken_ribs
 		elseif effect.name == "encumbered" then icon_mat = status_sprites.encumbered
+		elseif effect.name == "chip" then icon_mat = status_sprites.chip
 
 		else icon_mat = status_sprites[effect.name] end
 		
@@ -2242,6 +2354,8 @@ local function draw_status_effects()
 				letter = "✂"
 			elseif effect.name == "fracture" then
 				letter = "F"
+			elseif effect.name == "chip" then
+				letter = "🐾"
 			else
 				local letters = {spine_fracture = "SF", organ_damage = "OD", dislocation = "D"}
 				letter = letters[effect.name] or "?"
@@ -2276,6 +2390,11 @@ local function draw_status_tooltips()
     local ply = LocalPlayer()
     local berserkActive = IsValid(ply) and ply.organism and isBerserkActive(ply.organism) or false
     
+    local brainDamage = 0
+    if IsValid(ply) and ply.organism then
+        brainDamage = smooth.brain or getOrgVal(ply.organism, "brain", 0)
+    end
+    
     local hoveredStatus = nil
     local hoveredPos = nil
     local hoveredIndex = nil
@@ -2293,6 +2412,13 @@ local function draw_status_tooltips()
         local tooltipText = getTooltipText(hoveredStatus, hoveredPos, berserkActive)
         
         if tooltipText and tooltipText ~= "" then
+
+            -- Apply Brain Distortion Corruption if enabled
+            if brainDamage > 0.1 and HUD.brain_distortion_enabled then
+                local seed = string.len(hoveredStatus) * 100 + (hoveredPos.level_num or 1) * 10 + math.floor(brainDamage * 100)
+                tooltipText = corruptText(tooltipText, brainDamage, seed)
+            end
+
             local font = "DermaDefault"
             if berserkActive then
                 font = "HuyFont"
@@ -2335,6 +2461,9 @@ end
 
 local function draw_sprites()
 	if not HUD.enabled then return end
+
+	local indMode = cvar_tarkov_indicator:GetInt()
+	if indMode == 0 then return end
 	
 	local ply = LocalPlayer()
 	if not IsValid(ply) or not ply.organism then return end
@@ -2345,6 +2474,9 @@ local function draw_sprites()
 	local base_x = HUD.base_x
 	local base_y = HUD.base_y
 	local dt = FrameTime() * HUD.limb_fade_speed
+
+	-- Check depending on user setting (1 = dynamic/normal, 2 = strictly furry)
+	local isFurry = (indMode == 2) or (indMode == 1 and isPlayerFurry(ply))
 	
 	if not debug_done then
 		debug_done = true
@@ -2356,6 +2488,15 @@ local function draw_sprites()
 			right_leg = {"vgui/hud/health_right_leg.png", "vgui/hud/health_right_leg"},
 			left_leg = {"vgui/hud/health_left_leg.png", "vgui/hud/health_left_leg"},
 		}
+
+		local furryPaths = {
+			head = {"vgui/hud/health_headfurry.png", "vgui/hud/health_headfurry"},
+			torso = {"vgui/hud/health_torsofurry.png", "vgui/hud/health_torsofurry"},
+			right_arm = {"vgui/hud/health_right_armfurry.png", "vgui/hud/health_right_armfurry"},
+			left_arm = {"vgui/hud/health_left_armfurry.png", "vgui/hud/health_left_armfurry"},
+			right_leg = {"vgui/hud/health_right_legfurry.png", "vgui/hud/health_right_legfurry"},
+			left_leg = {"vgui/hud/health_left_legfurry.png", "vgui/hud/health_left_legfurry"},
+		}
 		
 		for name, tries in pairs(paths) do
 			for _, path in ipairs(tries) do
@@ -2366,6 +2507,17 @@ local function draw_sprites()
 				end
 			end
 			if not sprites[name] then sprites[name] = false end
+		end
+
+		for name, tries in pairs(furryPaths) do
+			for _, path in ipairs(tries) do
+				local mat = Material(path, "smooth")
+				if mat and not mat:IsError() then
+					spritesFurry[name] = mat
+					break
+				end
+			end
+			if not spritesFurry[name] then spritesFurry[name] = false end
 		end
 	end
 	
@@ -2393,7 +2545,11 @@ local function draw_sprites()
 		if limb.amput and org[limb.amput] then
 			state.target = 0
 		else
-			state.target = 255
+			if HUD.always_show_limbs then
+				state.target = 255
+			else
+				state.target = limbsRevealed and 255 or 0
+			end
 		end
 		
 		state.alpha = Lerp(dt, state.alpha, state.target)
@@ -2403,8 +2559,21 @@ local function draw_sprites()
 		end
 		
 		local dmg = limb.dmg
-		local ofs = HUD.limb_offsets[limb.name] or {x = 0, y = 0}
-		local scale = HUD.limb_scale[limb.name] or {w = 1.0, h = 1.0}
+		
+		local ofs, scale, mat
+		if isFurry then
+			ofs = HUD.furry_limb_offsets[limb.name] or {x = 0, y = 0}
+			scale = HUD.furry_limb_scale[limb.name] or {w = 1.0, h = 1.0}
+			mat = spritesFurry[limb.name]
+		else
+			ofs = HUD.limb_offsets[limb.name] or {x = 0, y = 0}
+			scale = HUD.limb_scale[limb.name] or {w = 1.0, h = 1.0}
+			mat = sprites[limb.name]
+		end
+
+		if isFurry and (not mat or mat:IsError()) then
+			mat = sprites[limb.name]
+		end
 		
 		local x = base_x + ofs.x
 		local y = base_y + ofs.y
@@ -2418,7 +2587,6 @@ local function draw_sprites()
 		local total_visibility = math_min(HUD.sprite_visibility + damage_boost, 100)
 		local alpha = math_floor(state.alpha * (total_visibility / 100))
 		
-		local mat = sprites[limb.name]
 		if mat and not mat:IsError() then
 			surface_SetDrawColor(col.r, col.g, col.b, alpha)
 			surface_SetMaterial(mat)
@@ -2441,6 +2609,7 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		panel:CheckBox("Always show limbs", "mzb_popalimbs")
 		panel:CheckBox("NoPixel icons(test)", "mzb_nopixelicons")
 		panel:CheckBox("Show moodles(Maybe it doesn't work:))", "mzb_Disable_moodle")
+		panel:CheckBox("Enable text change for brain damage", "mzb_brain_distortion")
 		
 		local langCombo = panel:ComboBox("Language", "mzb_language")
 		langCombo:AddChoice("English", "eng")
@@ -2448,9 +2617,24 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		
 		local currentLang = GetConVarString("mzb_language") or "eng"
 		langCombo:SetText(currentLang == "ru" and "Русский" or "English")
+
+		local indCombo = panel:ComboBox("Tarkov Indicator", "hg_tarkovindicator")
+		indCombo:AddChoice("Off", "0")
+		indCombo:AddChoice("Normal", "1")
+		indCombo:AddChoice("Furry Only", "2")
+		
+		local currentInd = GetConVarString("hg_tarkovindicator") or "1"
+		if currentInd == "0" then indCombo:SetText("Off")
+		elseif currentInd == "2" then indCombo:SetText("Furry Only")
+		else indCombo:SetText("Normal") end
 		
 		function langCombo:OnSelect(index, value, data)
 			RunConsoleCommand("mzb_language", data)
+			self:SetText(value)
+		end
+
+		function indCombo:OnSelect(index, value, data)
+			RunConsoleCommand("hg_tarkovindicator", data)
 			self:SetText(value)
 		end
 		
@@ -2525,6 +2709,7 @@ concommand.Add("mzb_nopixelicons", function(ply, cmd, args)
 		death = nil,
 		berserk = nil,
 		amputant = nil,
+		chip = nil,
 	}
 	
 	local status = USE_ALT_ICONS and "ON" or "OFF"
@@ -2551,6 +2736,26 @@ concommand.Add("mzb_popalimbs", function(ply, cmd, args)
 	chat.AddText(Color(0, 200, 255), "Limbs Viewer: ", HUD.always_show_limbs and Color(100, 255, 100, 255) or Color(255, 100, 100, 255), status)
 end)
 
+concommand.Add("mzb_brain_distortion", function(ply, cmd, args)
+	local newValue
+	if args[1] then
+		local val = tonumber(args[1])
+		if val ~= nil then
+			newValue = val ~= 0
+		end
+	end
+	
+	if newValue == nil then
+		newValue = not HUD.brain_distortion_enabled
+	end
+	
+	HUD.brain_distortion_enabled = newValue
+	RunConsoleCommand("mzb_brain_distortion", tostring(HUD.brain_distortion_enabled and 1 or 0))
+	
+	local status = HUD.brain_distortion_enabled and "ON" or "OFF"
+	chat.AddText(Color(0, 200, 255), "Brain distortion text: ", HUD.brain_distortion_enabled and Color(100, 255, 100, 255) or Color(255, 100, 100, 255), status)
+end)
+
 cvars.AddChangeCallback("mzb_MoodleHud_enabled", function(name, old, new)
 	HUD.enabled = tonumber(new) ~= 0
 end)
@@ -2569,7 +2774,11 @@ cvars.AddChangeCallback("mzb_language", function(name, old, new)
 	LANGUAGE = new
 end)
 
+cvars.AddChangeCallback("mzb_brain_distortion", function(name, old, new)
+	HUD.brain_distortion_enabled = tonumber(new) ~= 0
+end)
+
 hook.Add("HUDPaint", "ZB_Health_Bar", draw_bar)
--- hook.Add("HUDPaint", "ZB_Health_Sprites", draw_sprites)
+hook.Add("HUDPaint", "ZB_Health_Sprites", draw_sprites)
 hook.Add("HUDPaint", "ZB_Health_StatusEffects", draw_status_effects)
 hook.Add("HUDPaint", "ZB_Health_StatusTooltips", draw_status_tooltips)
