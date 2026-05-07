@@ -38,10 +38,10 @@ local amputationBones = {
 
 -- 8-way offset for creating the white border outline effect
 local outlineOffsets = {
-    Vector(0, 0.8, 0), Vector(0, -0.8, 0),
-    Vector(0, 0, 0.8), Vector(0, 0, -0.8),
-    Vector(0, 0.6, 0.6), Vector(0, -0.6, -0.6),
-    Vector(0, 0.6, -0.6), Vector(0, -0.6, 0.6)
+    Vector(0, 1.5, 0), Vector(0, -1.5, 0),
+    Vector(0, 0, 1.5), Vector(0, 0, -1.5),
+    Vector(0, 1.2, 1.2), Vector(0, -1.2, -1.2),
+    Vector(0, 1.2, -1.2), Vector(0, -1.2, 1.2)
 }
 
 local function ScreenScaleFixed(size)
@@ -542,37 +542,44 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
         local col = math.Clamp(consciousness, 0, 1)
         
         local srcEnt = ply
-        if IsValid(ply:GetNWEntity("Ragdoll")) then srcEnt = ply:GetNWEntity("Ragdoll")
-        elseif IsValid(ply:GetRagdollEntity()) then srcEnt = ply:GetRagdollEntity() end
+        local isRagdoll = false
+        if IsValid(ply:GetNWEntity("Ragdoll")) then
+            srcEnt = ply:GetNWEntity("Ragdoll")
+            isRagdoll = true
+        elseif IsValid(ply:GetRagdollEntity()) then
+            srcEnt = ply:GetRagdollEntity()
+            isRagdoll = true
+        end
 
-        local yawOffset = srcEnt:GetAngles().y - EyeAngles().y + 180
-        local drawAng = Angle(0, yawOffset, 0)
-        
-        healthModel:SetSequence(srcEnt:GetSequence())
-        healthModel:SetCycle(srcEnt:GetCycle())
-        blinkModel:SetSequence(srcEnt:GetSequence())
-        blinkModel:SetCycle(srcEnt:GetCycle())
+        local drawAng = Angle(0, 180, 0) -- Character faces forward
+
+        if not isRagdoll then
+            healthModel:SetSequence(srcEnt:GetSequence())
+            healthModel:SetCycle(srcEnt:GetCycle())
+            blinkModel:SetSequence(srcEnt:GetSequence())
+            blinkModel:SetCycle(srcEnt:GetCycle())
+        end
 
         healthModel:SetPos(modelOffset)
         healthModel:SetAngles(drawAng)
         blinkModel:SetAngles(drawAng)
-        
+
         for i = 0, ply:GetNumBodyGroups() - 1 do
             healthModel:SetBodygroup(i, ply:GetBodygroup(i))
         end
         healthModel:SetSkin(ply:GetSkin())
-        
+
         healthModel:SetupBones()
-        
-        -- Base Model Outer Outline (White bordered, scaling with consciousness)
-        render.SetColorModulation(col, col, col)
+
+        -- Base Model Outer Outline (White bordered)
+        render.SetColorModulation(1, 1, 1)
         for _, offset in ipairs(outlineOffsets) do
             healthModel:SetPos(modelOffset + offset)
             healthModel:DrawModel()
         end
 
-        -- Base Model Inner Fill (Bright Gray, scaling with consciousness)
-        render.SetColorModulation(0.6 * col, 0.6 * col, 0.6 * col)
+        -- Base Model Inner Fill (Gray)
+        render.SetColorModulation(0.5, 0.5, 0.5)
         healthModel:SetPos(modelOffset)
         healthModel:DrawModel()
         

@@ -444,27 +444,17 @@ end)
 include("homigrad/status_messages/sv_status_messages.lua")
 
 hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
-    local ramp_rate = 0.002 -- Base rate from original
-
-    -- Ramp up on head damage
-    if org.skull > 0 then
-        ramp_rate = ramp_rate + (0.006 * org.skull) -- Proportional to skull damage
-    end
-
-    -- Ramp up on brain damage
-    if org.brain > 0 then
-        ramp_rate = ramp_rate + (0.01 * org.brain) -- Proportional to brain damage, higher impact
-    end
+    local ramp_rate = 0
 
     -- Ramp up on high blood pressure (>115)
     if org.bloodpressure > 115 then
         local bp_effect = (org.bloodpressure - 115) / 35 -- Normalize pressure effect
-        ramp_rate = ramp_rate + (0.008 * bp_effect) -- Proportional to how high the blood pressure is
+        ramp_rate = ramp_rate + (0.01 * bp_effect) -- Proportional to how high the blood pressure is
     end
 
-    ramp_rate = ramp_rate * 1.5
-
-    org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.0)
+    if ramp_rate > 0 then
+        org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.0)
+    end
 
     local decay_rate = 0.005
     if org.internalBleed and org.internalBleed > 0 then
