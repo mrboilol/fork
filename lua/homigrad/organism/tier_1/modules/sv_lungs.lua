@@ -134,11 +134,11 @@ concommand.Add("-hmcd_holdbreath",function(ply)
 end)
 
 local lowoxy = {
-	"I'm gonna faint right now... There's not enough oxygen.",
-	"There's not enough oxygen... I can't hold much longer...",
-	"I really need some fresh air...",
-	"I'm gasping for air...",
-	"Need to breathe air... or I'm gonna faint right here..."
+	"IM GONNA FAINT, I REALLY NEED SOME AIR",
+	"DARK- EVERYTHING IS GOING DARK...",
+	"I CANT BREATHE- WHY CANT I BREATHE...",
+	"MY CHEST HURTS SO MUCH, I NEED AIR...",
+	"THERES NOT ENOUGH OXYGEN, I NEED TO BREATHE..."
 }
 
 local not_enough_intake = {
