@@ -1,4 +1,6 @@
 --local Organism = hg.organism
+local hg_floppy_limbs = GetConVar("hg_floppy_limbs")
+
 local function PlayBoneBreakSound(entity)
     if math.random() < 0.5 then
                         entity:EmitSound("owfuck"..math.random(1, 9)..".ogg", 75, 100, 1, CHAN_AUTO)
@@ -124,6 +126,10 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
 
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
+
 		org.painadd = org.painadd + 55
 		org.owner:AddNaturalAdrenaline(1)
 		org.immobilization = org.immobilization + dmg * 25
@@ -135,8 +141,12 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 				PlayBoneBreakSound(org.owner)
 		//broken
 	else
-		//org[key] = 0.5
+		--//org[key] = 0.5
 		org[key.."dislocation"] = true
+
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
 
 		org.painadd = org.painadd + 35
 		org.owner:AddNaturalAdrenaline(0.5)
@@ -187,6 +197,10 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
 
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
+
 		org.painadd = org.painadd + 55
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
@@ -198,7 +212,12 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		//broken
 	else
 		org[key.."dislocation"] = true
-		//org[key] = 0.5
+
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
+
+		--//org[key] = 0.5
 
 		org.painadd = org.painadd + (climbGrip and 20 or 35)
 		org.owner:AddNaturalAdrenaline(0.5)

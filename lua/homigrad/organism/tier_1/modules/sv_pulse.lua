@@ -3,14 +3,7 @@ local min, max, Round, halfValue2 = math.min, math.max, math.Round, util.halfVal
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
-local function sendStatusMessageOnce(owner, org, key, message, priority, condition)
-    if condition and not org.sent_status_messages[key] then
-        hg.status_messages.Send(owner, message, priority)
-        org.sent_status_messages[key] = true
-    elseif not condition and org.sent_status_messages[key] then
-        org.sent_status_messages[key] = false
-    end
-end
+
 
 module[1] = function(org)
 	org.heart = 0

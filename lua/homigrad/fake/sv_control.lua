@@ -187,6 +187,7 @@ local vector_zero = Vector(0,0,0)
 local vector_usehull = Vector(6, 6, 6)
 
 local hg_shitty_fake = CreateConVar("hg_shitty_fake", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "enable shitty fake", 0, 1)
+local hg_floppy_limbs = CreateConVar("hg_floppy_limbs", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Enable floppy limbs on break.", 0, 1)
 
 local speedupbones = {
 	["ValveBiped.Bip01_L_Foot"] = true,

@@ -27,20 +27,12 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	
 	dmg = hook_info.dmg
 	
-	    if name == "liver" or name == "stomach" or name == "intestines" then
-        hg.status_messages.SendToAttacker(dmgInfo, "I have damaged one of their abdominal organs.", 2)
-    end
-
-    if name == "heart" or name == "lungsL" or name == "lungsR" or name == "trachea" then
-        hg.status_messages.SendToAttacker(dmgInfo, "I have damaged one of their chest organs.", 2)
-    end
+	
 
     if func and !hook_info.restricted then
         local old_consciousness = org.consciousness
         local result = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
-        if old_consciousness > 0 and org.consciousness <= 0 then
-            hg.status_messages.SendToAttacker(dmgInfo, "CRITICAL SUCCESS! They appear to be knocked out.", 3)
-        end
+
         return result
     else
         return 0
@@ -227,11 +219,7 @@ function hg.organism.AmputateLimb(org, limb)
 
 	org.owner:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
 
-    local messages = limb_loss_messages[limb]
-    if messages then
-        local message = table.Random(messages)
-        hg.status_messages.Send(org.owner, message, 4)
-    end
+
 
 	
 	local ent = hg.GetCurrentCharacter(org.owner)
@@ -951,9 +939,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 	
-		        if org.otrub and not org.was_otrub then
-            hg.status_messages.Send(attacker, "CRITICAL SUCCESS! You have knocked them out!", 4)
-        end
+		
 
 		local shockFakeThreshold = org.shock_turn * 3.6 * analgesiaMul * painkillerMul * (meleeHit and 1.5 or 1)
 		if shockAdd > 2 and org.shock > shockFakeThreshold and (org.nextShockFake or 0) < CurTime() then
@@ -1738,6 +1724,62 @@ function hg.BreakNeck(ent)
 			local cons = constraint.AdvBallsocket(ent, ent, spine, head, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
 		end
 	end)
+end
+
+local limb_bones = {
+    larm = {parent = "ValveBiped.Bip01_Spine4", child = "ValveBiped.Bip01_L_UpperArm"},
+    rarm = {parent = "ValveBiped.Bip01_Spine4", child = "ValveBiped.Bip01_R_UpperArm"},
+    lleg = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_L_Thigh"},
+    rleg = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_R_Thigh"},
+	spine0 = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_Spine"},
+    spine1 = {parent = "ValveBiped.Bip01_Spine", child = "ValveBiped.Bip01_Spine1"},
+    spine2 = {parent = "ValveBiped.Bip01_Spine1", child = "ValveBiped.Bip01_Spine2"},
+    spine3 = {parent = "ValveBiped.Bip01_Spine2", child = "ValveBiped.Bip01_Spine4"},
+}
+
+function hg.BreakLimb(ent, limb)
+    if not IsValid(ent) then return end
+    if not limb_bones[limb] then return end
+
+    local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+    -- The user doesn't want to kill the player when a limb is broken
+    -- if ply:Alive() then ply:Kill() end 
+
+    timer.Simple(0.1, function()
+        local ragdoll = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
+
+        if IsValid(ragdoll) then
+            local bone_info = limb_bones[limb]
+            local parent_bone_name = bone_info.parent
+            local child_bone_name = bone_info.child
+
+            local parent_bone_id = ragdoll:LookupBone(parent_bone_name)
+            local child_bone_id = ragdoll:LookupBone(child_bone_name)
+
+            if not parent_bone_id or not child_bone_id then return end
+
+            ragdoll:RemoveInternalConstraint(ragdoll:TranslateBoneToPhysBone(child_bone_id))
+
+            local parent_phys_bone = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
+            local child_phys_bone = ragdoll:TranslateBoneToPhysBone(child_bone_id)
+            
+            if parent_phys_bone == -1 or child_phys_bone == -1 then return end
+
+            local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys_bone)
+            local p_child = ragdoll:GetPhysicsObjectNum(child_phys_bone)
+
+            if not IsValid(p_parent) or not IsValid(p_child) then return end
+            
+            -- Prevent stretching. This is a bit of a guess, might need refinement.
+            local lpos, lang = WorldToLocal(p_child:GetPos(), angle_zero, p_parent:GetPos(), p_parent:GetAngles())
+            p_child:SetPos(p_parent:localToWorld(lpos))
+
+
+            -- Add a ballsocket constraint to make the limb floppy
+            -- The limits are just copied from BreakNeck, they might need to be adjusted for each limb.
+            constraint.AdvBallsocket(ragdoll, ragdoll, parent_phys_bone, child_phys_bone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+        end
+    end)
 end
 
 hook.Add("OnAmputateLimb", "amputate_cuffs", function(org, ent, limb)

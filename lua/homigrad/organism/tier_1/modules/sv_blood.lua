@@ -110,8 +110,8 @@ module[2] = function(owner, org, mulTime)
 
 	if org.hemotransfusionshock > 0 then
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 200,0)
-		org.internalBleed = org.internalBleed + mulTime / 30
-		org.ischemia = org.ischemia + mulTime / 15
+		org.internalBleed = org.internalBleed + mulTime / 15
+		org.ischemia = org.ischemia + mulTime / 7.5
 	end
 
 	if org.internalBleed > 1 then

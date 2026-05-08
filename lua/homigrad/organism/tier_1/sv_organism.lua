@@ -102,7 +102,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.just_damaged_bone = nil
 	org.LodgedEntities = nil
 	
-	    org.sent_status_messages = {}
+	
 	org.dmgstack = {}
 end)
 
@@ -441,7 +441,7 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 	end
 end)
 
-include("homigrad/status_messages/sv_status_messages.lua")
+
 
 hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     local ramp_rate = 0
@@ -770,14 +770,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	local just_went_uncon = not org.otrub and org.needotrub
-	        if just_went_uncon then
-        if not org.sent_status_messages["unconscious"] then
-            hg.status_messages.Send(owner, "You are unconscious.", 4)
-            org.sent_status_messages["unconscious"] = true
-        end
-    else
-        org.sent_status_messages["unconscious"] = false
-    end
+	
 
 	local just_woke_up = not org.needotrub and org.otrub and (org.uncon_timer or 0) > 6
 	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner); hook.Run("PlayerDropWeapon", owner) end
