@@ -540,86 +540,14 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
                 local bID = blinkModel:LookupBone(boneName)
                 if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
             end
-            local limbStates = {}
-            local limbBones = {
-                lleg = "ValveBiped.Bip01_L_Thigh",
-                rleg = "ValveBiped.Bip01_R_Thigh",
-                larm = "ValveBiped.Bip01_L_UpperArm",
-                rarm = "ValveBiped.Bip01_R_UpperArm"
-            }
-            
-            local amputationBones = {
-                lleg = "ValveBiped.Bip01_L_Calf",
-                rleg = "ValveBiped.Bip01_R_Calf",
-                larm = "ValveBiped.Bip01_L_Forearm",
-                rarm = "ValveBiped.Bip01_R_Forearm"
-            }
-                limbStates = {}
-                    for limb, boneName in pairs(limbBones) do
-                        local isAmputated = org[limb.."amputated"]
-                        local isBroken = (org[limb] and org[limb] >= 1)
-                        local isDislocated = org[limb.."dislocation"]
-                        
-                        if not limbStates[limb] then
-                            limbStates[limb] = { 
-                                amputated = false, 
-                                blinking = false, 
-                                fractured = false
-                            }
-                        
-                        local state = limbStates[limb]
-                        local ampBoneName = amputationBones[limb] or boneName
-                        
-                        
-                    -- Base Model Outer Outline (White bordered)
-                    render.SetColorModulation(1, 1, 1)
-                    -- Base Model Inner Fill (Gray)
-                    render.SetColorModulation(0.5, 0.5, 0.5)
-                    DrawHealthAccessories(healthModel, ply, col)
-                    
-                    
-                    for _, state in pairs(limbStates) do
-                        if state.fractured then hasFractureBlink = true end
-                    end
-                    
-                    -- Damage Drawing Helper for maintaining white borders with colored fills
-                    local function DrawDamageBlinkState(blinkModel, redVal)
-                        
-                        -- Keep the outline white for the damaged limb
-                        render.SetColorModulation(1, 1, 1)
-                        
-                        -- Draw inner fill red blending to gray base
-                        local grayToRed = 0.5 + (redVal * 0.5)
-                        local greenBlue = 0.5 * (1 - redVal)
-                        render.SetColorModulation(grayToRed, greenBlue, greenBlue)
-                    
-                        
-                        if hasFractureBlink then
-                            for l, s in pairs(limbStates) do
-                                if s.fractured then
-                                    local bID = blinkModel:LookupBone(limbBones[l])
-                                    if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
-                                end
-                            end
-                        DrawDamageBlinkState(blinkModel, val)
-                        
-                        if hasFractureBlink then
-                            for l, s in pairs(limbStates) do
-                                if s.fractured then
-                                    local bID = blinkModel:LookupBone(limbBones[l])
-                                    if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
-                                end
-                            end
-                    
-                    if hasFractureBlink then
-                        local val = (math.sin(time * FRACTURE_BLINK_SPE
-            DrawDamageBlinkState(blinkModel, 1, 0, 0) -- Solid Red
 
-            for _, key in ipairs(blinkingRedBones) do
+            for _, key in ipairs(solidRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
                 if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
             end
+
+            DrawDamageBlinkState(blinkModel, 1, 0, 0) -- Solid Red
         end
 
         if #blinkingRedBones > 0 then
@@ -629,14 +557,14 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
                 if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
             end
 
-            local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
-            DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val) -- Blinking Red
-
-            for _, key in ipairs(solidRedBones) do
+            for _, key in ipairs(blinkingRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
                 if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
             end
+
+            local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
+            DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val) -- Blinking Red
         end
         
         render.MaterialOverride(nil)
