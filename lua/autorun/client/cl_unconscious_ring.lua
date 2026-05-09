@@ -1,4 +1,3 @@
-
 local function DrawArc(x, y, radius, thickness, start_ang, end_ang, roughness, color)
     surface.SetDrawColor(color.r, color.g, color.b, color.a)
     draw.NoTexture()
@@ -48,7 +47,6 @@ local heartPhase = 0
 
 local g_PulseCheckTarget = nil
 local g_PulseCheckData = nil
-local g_TopLeftECGData = nil
 
 usermessage.Hook("hg_StartPulseCheckECG", function(msg)
     g_PulseCheckTarget = msg:ReadEntity()
@@ -161,7 +159,7 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
         local x = startX + i
         local y = centerY - (h_val * height / 2)
         
-                local dist = state.sweepPos - i
+        local dist = state.sweepPos - i
         if dist < 0 then dist = dist + width end
         
         -- Matching the reference image: bright leading edge with a long, dim persistent tail
@@ -217,8 +215,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
     heartPhase = heartPhase + FrameTime() * (pulse / 60)
 
-
-    
     if isUnconscious then
         local currentShock = org.shock or 0
         if currentShock > peakShock then
@@ -234,54 +230,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
     
-    if ringAlpha <= 0 and not showTopLeftECG and not showPulseCheckECG then return end
-    
-    lerpBrain = math.Approach(lerpBrain, org.brain or 0, FrameTime() * 2)
-    lerpShock = math.Approach(lerpShock, org.shock or 0, FrameTime() * 50)
-    lerpConsciousness = math.Approach(lerpConsciousness, org.consciousness or 0, FrameTime() * 2)
-    
-    local scrW, scrH = ScrW(), ScrH()
-    local centerX, centerY = scrW / 2, scrH / 2
-    
-    surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
-    surface.DrawRect(0, 0, scrW, scrH)
-    
-    local ringColor = isCritical and Color(200, 0, 0, 255 * ringAlpha) or Color(220, 220, 220, 255 * ringAlpha)
-    local dotColor = isCritical and ringColor or Color(255, 255, 255, 255 * ringAlpha)
-    
-    local progress = 0
-    if isCritical then
-        progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
-    else
-        local shockProgress = math.Clamp((peakShock - lerpShock) / (peakShock - 0.02), 0, 1)
-        local consciousnessProgress = math.Clamp(lerpConsciousness / 0.10, 0, 1)
-        progress = math.min(shockProgress, consciousnessProgress)
-    end
-    
-    local radius = 280
-    local thickness = 12
-    
-    DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * ringAlpha))
-    DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
-    
-    if hg_unconsciousclassic:GetBool() then
-        local beat = dotBeat
-        local dotText = ""
-
-        if isCritical then
-            local redDots = {".!", "..!", "...!"}
-            dotText = redDots[beat + 1]
-        else
-            local whiteDots = {".", "..", "..."}
-            dotText = whiteDots[beat + 1]
-        end
-        
-        draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    else
-        DrawEKG(centerEKGState, centerX, centerY, 540, 140, pulse, dotColor, ringAlpha, bloodpressure)
-    end
-
-
+    -- Evaluate states BEFORE returning early to fix the conscious rendering!
     local showTopLeftECG = false
     local showPulseCheckECG = false
 
@@ -298,32 +247,69 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     if isCheckingPulse then
         showPulseCheckECG = true
-    elseif (admiring or (pulse < 40 or pulse > 150)) and not org.otrub then
+    end
+
+    -- TopLeftECG overrides
+    if (admiring or (pulse < 40 or pulse > 150)) and not isUnconscious then
         showTopLeftECG = true
     end
 
-    if showTopLeftECG and not g_TopLeftECGData then
-        g_TopLeftECGData = {
-            started = CurTime(),
-            nextBeat = CurTime(),
-            counted = 0,
-            completed = false,
-            finalBPM = 0
-        }
-    elseif not showTopLeftECG and g_TopLeftECGData then
-        g_TopLeftECGData = nil
+    -- The corrected safety early return
+    if ringAlpha <= 0 and not showTopLeftECG and not showPulseCheckECG then return end
+    
+    -- Unconscious center ring & ECG rendering block
+    if ringAlpha > 0 then
+        lerpBrain = math.Approach(lerpBrain, org.brain or 0, FrameTime() * 2)
+        lerpShock = math.Approach(lerpShock, org.shock or 0, FrameTime() * 50)
+        lerpConsciousness = math.Approach(lerpConsciousness, org.consciousness or 0, FrameTime() * 2)
+        
+        local scrW, scrH = ScrW(), ScrH()
+        local centerX, centerY = scrW / 2, scrH / 2
+        
+        surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
+        surface.DrawRect(0, 0, scrW, scrH)
+        
+        local ringColor = isCritical and Color(200, 0, 0, 255 * ringAlpha) or Color(220, 220, 220, 255 * ringAlpha)
+        local dotColor = isCritical and ringColor or Color(255, 255, 255, 255 * ringAlpha)
+        
+        local progress = 0
+        if isCritical then
+            progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
+        else
+            local shockProgress = math.Clamp((peakShock - lerpShock) / (peakShock - 0.02), 0, 1)
+            local consciousnessProgress = math.Clamp(lerpConsciousness / 0.10, 0, 1)
+            progress = math.min(shockProgress, consciousnessProgress)
+        end
+        
+        local radius = 280
+        local thickness = 12
+        
+        DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * ringAlpha))
+        DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
+        
+        if hg_unconsciousclassic:GetBool() then
+            local beat = dotBeat
+            local dotText = ""
+
+            if isCritical then
+                local redDots = {".!", "..!", "...!"}
+                dotText = redDots[beat + 1]
+            else
+                local whiteDots = {".", "..", "..."}
+                dotText = whiteDots[beat + 1]
+            end
+            
+            draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        else
+            DrawEKG(centerEKGState, centerX, centerY, 540, 140, pulse, dotColor, ringAlpha, bloodpressure)
+        end
     end
 
+    -- Pulse Checking UI Box (Bottom center)
     if showPulseCheckECG then
         ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 1, FrameTime() * 2)
     else
         ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 0, FrameTime() * 3)
-    end
-
-    if showTopLeftECG then
-        ecgAlpha = math.Approach(ecgAlpha, 1, FrameTime() * 2)
-    else
-        ecgAlpha = math.Approach(ecgAlpha, 0, FrameTime() * 3)
     end
 
     if ecgAlphaPulseCheck > 0 then
@@ -341,6 +327,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local target_brain = target_org.brain or 0
         local target_isCritical = (target_org.critical == true) or (target_pulse < 1 and target_brain >= 0.02) or (target_brain >= 0.34)
 
+        -- Target Counting Logic Execution
         if g_PulseCheckData and not g_PulseCheckData.completed then
             if target_org.heartstop or target_pulse <= 0 then
                 g_PulseCheckData.completed = true
@@ -354,7 +341,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     g_PulseCheckData.counted = g_PulseCheckData.counted + 1
                     local dynamicRate = math.max(target_pulse, 1)
                     g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
-                                        if target_pulse < 1 then
+                    if target_pulse < 1 then
                         sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
                     else
                         local soundFile = target_isCritical and "critbeat.ogg" or "beat.ogg"
@@ -384,6 +371,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
+    -- TopLeft ECG UI Box (Self admiring / Abnormal Heart)
+    if showTopLeftECG then
+        ecgAlpha = math.Approach(ecgAlpha, 1, FrameTime() * 2)
+    else
+        ecgAlpha = math.Approach(ecgAlpha, 0, FrameTime() * 3)
+    end
+
     if ecgAlpha > 0 then
         local boxW, boxH = 300, 150
         local boxX, boxY = 20, 20
@@ -393,36 +387,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
-        if g_TopLeftECGData and not g_TopLeftECGData.completed then
-            if org.heartstop or pulse <= 0 then
-                g_TopLeftECGData.completed = true
-                g_TopLeftECGData.finalBPM = "No Pulse"
-            elseif CurTime() >= g_TopLeftECGData.started + 10 then
-                g_TopLeftECGData.completed = true
-                g_TopLeftECGData.finalBPM = g_TopLeftECGData.counted * 6
-            else
-                local timeNow = CurTime()
-                while timeNow >= g_TopLeftECGData.nextBeat and g_TopLeftECGData.nextBeat <= g_TopLeftECGData.started + 10 do
-                    g_TopLeftECGData.counted = g_TopLeftECGData.counted + 1
-                    local dynamicRate = math.max(pulse, 1)
-                    g_TopLeftECGData.nextBeat = g_TopLeftECGData.nextBeat + (60 / dynamicRate)
-                end
-            end
-        end
-
+        -- Purely renders the EKG, no counting logic needed here for the user's monitor!
         DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
 
-        local displayText = ""
-        if g_TopLeftECGData then
-            if g_TopLeftECGData.completed then
-                if type(g_TopLeftECGData.finalBPM) == "number" then
-                    displayText = g_TopLeftECGData.counted .. " x 6 = " .. g_TopLeftECGData.finalBPM .. " BPM"
-                else
-                    displayText = g_TopLeftECGData.finalBPM
-                end
-            else
-                displayText = "Counting: " .. g_TopLeftECGData.counted
-            end
         end
 
         draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
@@ -447,7 +414,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             asystoleSound = nil
         end
 
-        if admiring or org.otrub or abnormalPulse then
+        if admiring or isUnconscious or abnormalPulse then
             local currentHeartBeat = math.floor(heartPhase)
             if currentHeartBeat > lastHeartBeat then
                 lastHeartBeat = currentHeartBeat
@@ -459,5 +426,3 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 end)
-
-

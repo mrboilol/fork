@@ -1546,10 +1546,10 @@ local function velocityDamage(ent, data)
 	local ply = hg.RagdollOwner(ent)
 
 	local traceResult = GetTraceDamage(ent, data.HitPos, -(data.OurOldVelocity - data.TheirOldVelocity))
-	
-	if not bone then
-		bone = tr.PhysicsBone
-	end
+
+    if not bone then
+        bone = traceResult.PhysicsBone
+    end
 
 	if IsValid(att) and att:IsPlayer() and att.organism and att.organism.fear and att.organism.fear < 0 then
 		att.organism.fear = 0
@@ -1772,7 +1772,12 @@ function hg.BreakLimb(ent, limb)
             
             -- Prevent stretching. This is a bit of a guess, might need refinement.
             local lpos, lang = WorldToLocal(p_child:GetPos(), angle_zero, p_parent:GetPos(), p_parent:GetAngles())
-            p_child:SetPos(p_parent:localToWorld(lpos))
+            if lpos then
+                local new_pos = p_parent:localToWorld(lpos)
+                if new_pos then
+                    p_child:SetPos(new_pos)
+                end
+            end
 
 
             -- Add a ballsocket constraint to make the limb floppy
