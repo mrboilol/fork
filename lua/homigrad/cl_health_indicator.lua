@@ -108,25 +108,12 @@ local function SyncBonesCallback(ent, numbones)
     if IsValid(fakeRag) then src = fakeRag
     elseif IsValid(deathRag) then src = deathRag
     elseif IsValid(ply:GetRagdollEntity()) then src = ply:GetRagdollEntity() end
-    
-    -- Fix 1: Establish a stable "Virtual" world center for the indicator
-    -- We use the source position but lock Z to 0 and Angle to 0 to keep it centered
-    local srcWorld = Matrix()
-    local srcPos = src:GetPos()
-    
-    -- Sub Rosa style: Use the pelvis/hips as the anchor point to keep it centered vertically
-    local pelvicBone = src:LookupBone("ValveBiped.Bip01_Pelvis")
-    local verticalOffset = 0
-    if pelvicBone then
-        local pMat = src:GetBoneMatrix(pelvicBone)
-        if pMat then
-            -- Calculate how far the pelvis is from the "ground" and counteract it
-            verticalOffset = pMat:GetTranslation().z - srcPos.z
-        end
-    end
 
-    srcWorld:SetTranslation(Vector(srcPos.x, srcPos.y, srcPos.z + verticalOffset))
-    srcWorld:SetAngles(Angle(0, src:GetAngles().y, 0)) 
+    if not IsValid(src) then return end
+    
+    local srcWorld = Matrix()
+    srcWorld:SetTranslation(src:GetPos())
+    srcWorld:SetAngles(src:GetAngles())
     local srcInv = srcWorld:GetInverseTR()
     
     local entTransform = Matrix()
@@ -340,6 +327,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     end
     
     local time = CurTime()
+    local damagedBones = {}
     
     if org then
         for key, data in pairs(majorBones) do
@@ -426,6 +414,11 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
                     if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
                 end
             end
+
+            local damageValue = GetOrgValueNumber(org[organName])
+            if damageValue > 0 and damageValue < 1 and not state.fractured and not state.amputated then
+                table.insert(damagedBones, {key = key, damage = damageValue})
+            end
         end
     end
     
@@ -436,7 +429,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)
-    local modelOffset = Vector(0, 0, 0)
+    local modelOffset = Vector(0, 0, 10)
     
     local shouldShowIndicator = true -- Always show
 
@@ -497,6 +490,30 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
         healthModel:DrawModel()
         
         DrawHealthAccessories(healthModel, ply, base_col)
+
+        for _, data in ipairs(damagedBones) do
+            local boneName = majorBones[data.key].bone
+            local bID = blinkModel:LookupBone(boneName)
+            if bID then
+                local r, g, b
+                local damage = data.damage
+                if damage <= 0.35 then
+                    local prog = damage / 0.35
+                    r = 0.5 + 0.5 * prog
+                    g = 0.5 + 0.5 * prog
+                    b = 0.5 - 0.5 * prog
+                else
+                    local prog = (damage - 0.35) / 0.65
+                    r = 1
+                    g = 1 - prog
+                    b = 0
+                end
+
+                ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE)
+                DrawDamageBlinkState(blinkModel, r, g, b)
+                ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0))
+            end
+        end
 
         local hasAmputationBlink = false
         local hasFractureBlink = false
@@ -564,7 +581,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
             end
 
             local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
-            DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val) -- Blinking Red
+            DrawDamageBlinkState(blinkModel, val, 0, 0) -- Blinking Red
         end
         
         render.MaterialOverride(nil)
