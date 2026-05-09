@@ -125,6 +125,8 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
+		org[key.."dislocation"] = true
+		org[key.."dislocation"] = true
 
 		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
 			hg.BreakLimb(org.owner, key)
@@ -196,6 +198,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
+		org[key.."dislocation"] = true
 
 		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
 			hg.BreakLimb(org.owner, key)
@@ -368,10 +371,17 @@ PlayBoneBreakSound(org.owner)
 end
 
 hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isChat, teamonly, text)
-	if IsValid(output) and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
-		-- and !isChat and output:IsSpeaking()
-		output.organism.painadd = output.organism.painadd + 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))
-		output:Notify("FUUUUCK- IT HURTS REAL BAD WHEN SPEAKING", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
+	if IsValid(output) and output:Alive() and (output.organism.jaw == 1 or output.organism.jawdislocation) and (output:IsSpeaking() or isChat) then
+        local pain_multiplier = 1
+        if output.organism.jaw == 1 and output.organism.jawdislocation then
+            pain_multiplier = 2.5 -- more pain
+        end
+        output.organism.painadd = output.organism.painadd + (2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))) * pain_multiplier
+        if pain_multiplier > 1 then
+            output:Notify("I CAN BARELY SPEAK WITH MY JAW LIKE THIS...", 60, "painfromjawspeak", 0, nil, Color(255, 150, 150))
+        else
+            output:Notify("FUUUUCK- IT HURTS REAL BAD WHEN SPEAKING", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
+        end
 	end
 end)
 
@@ -463,10 +473,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 end
 
 local ribs = {
-	"Something might not be right, i felt my torso snapping.",
-	"This should not happen, i feel something sharp poking inside.",
-	"Breathing hurts, i think i broke a rib.",
-	"My torso hurts a lot for some reason, i think i broke something.",
+	"I- I felt my torso snapping.",
+	"I feel something sharp poking inside...",
+	"I think i heard my chest break...",
+	"I broke a rib- I think i actually broke a rib...",
 }
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
@@ -529,3 +539,16 @@ input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ric
 input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 1, boneindex, dir, hit, ricochet) end
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
 input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 3, boneindex, dir, hit, ricochet) end
+
+hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
+    if not IsValid(ply) or not ply.organism then return end
+
+    local org = ply.organism
+    local limbs = {"larm", "rarm", "lleg", "rleg"}
+
+    for _, limb in ipairs(limbs) do
+        if (org[limb] and org[limb] >= 1) or org[limb .. "dislocation"] then
+            hg.BreakLimb(ragdoll, limb)
+        end
+    end
+end)

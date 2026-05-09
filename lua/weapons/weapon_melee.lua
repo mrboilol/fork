@@ -989,7 +989,12 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     end
 
     if self:HasBrokenArm(owner) then
-        mul = mul * self.BrokenArmPenalty.DamageMultiplier
+        local multiplier = self.BrokenArmPenalty.DamageMultiplier
+        local org = owner.organism
+        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+            multiplier = multiplier * 0.75 -- Even less damage
+        end
+        mul = mul * multiplier
     end
 
     return mul
@@ -1014,7 +1019,12 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             
             local staminaCost = (attacktype and self.StaminaSecondary or self.StaminaPrimary)
         if self:HasBrokenArm(owner) then
-            staminaCost = staminaCost * self.BrokenArmPenalty.StaminaMultiplier
+            local multiplier = self.BrokenArmPenalty.StaminaMultiplier
+            local org = owner.organism
+            if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+                multiplier = multiplier * 1.5 -- More severe
+            end
+            staminaCost = staminaCost * multiplier
         end
 
         if owner.organism and attacktype ~= 3 then
@@ -1262,7 +1272,11 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
                 end
 
-                local perfectblock = CurTime() - wep:GetStartedBlocking() < 0.5
+                local perfectblock_window = 0.5
+                if wep:HasBrokenArm(ent) then
+                    perfectblock_window = perfectblock_window * (wep.BrokenArmPenalty.BlockDurationMultiplier or 1)
+                end
+                local perfectblock = CurTime() - wep:GetStartedBlocking() < perfectblock_window
                 
                 local heavyBlockedNoBreak = attacktype == 3
                 local staminaLossMul = heavyBlockedNoBreak and 1.75 or 1
@@ -2231,7 +2245,12 @@ function SWEP:PrimaryAttack()
     end
 
     if self:HasBrokenArm(ply) then
-        mul = mul * self.BrokenArmPenalty.SwingSpeedMultiplier
+        local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
+        local org = ply.organism
+        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+            multiplier = multiplier * 1.5 -- More severe
+        end
+        mul = mul * multiplier
     end
 
     
@@ -2352,7 +2371,12 @@ function SWEP:SecondaryAttack(override)
     end
 
     if self:HasBrokenArm(ply) then
-        mul = mul * self.BrokenArmPenalty.SwingSpeedMultiplier
+        local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
+        local org = ply.organism
+        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+            multiplier = multiplier * 1.5 -- More severe
+        end
+        mul = mul * multiplier
     end
 
     self.HitEnts = nil

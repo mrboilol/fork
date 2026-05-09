@@ -1777,7 +1777,7 @@ function hg.BreakLimb(ent, limb)
 
             -- Add a ballsocket constraint to make the limb floppy
             -- The limits are just copied from BreakNeck, they might need to be adjusted for each limb.
-            constraint.AdvBallsocket(ragdoll, ragdoll, parent_phys_bone, child_phys_bone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+            constraint.AdvBallsocket(ragdoll, ragdoll, parent_phys_bone, child_phys_bone, lpos, nil, 0, 0, -80, -135, -75, 80, 50, 75, 0, 0, 0, 0, 0)
         end
     end)
 end

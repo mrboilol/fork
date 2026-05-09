@@ -669,7 +669,7 @@ local function applyInjuryTPIK(ent, ply)
 
 	for i = 1, #injuryTpikBones do
 		local limb = injuryTpikBones[i][1]
-		if !org[limb.."amputated"] and ((org[limb] or 0) >= 1 or org[limb.."dislocation"]) then
+		if !org[limb.."amputated"] and (((org[limb] or 0) >= 0.85) or org[limb.."dislocation"]) then
 			active = true
 			break
 		end

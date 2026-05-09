@@ -168,8 +168,8 @@ local near_death_positive = {
 local broken_limb = {
 	"Shit, i heard it- i heard it snap...",
 	"I can feel the pieces moving, i think i broke it.",
-	"IT'S FUCKING BROKEN. I THINK..",
-	"I need to fix it",
+	"Its- My limb, i heard it snap...",
+	"I broke it, i actually broke it..."
 	"The angle of my limb is so off, i think its broken.",
 	"Oh fuck. It is snapped.",
 	"Fuck me, i think i broke something.",
