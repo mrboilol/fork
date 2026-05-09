@@ -565,6 +565,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
                                 amputated = false, 
                                 blinking = false, 
                                 fractured = false
+                            }
                         
                         local state = limbStates[limb]
                         local ampBoneName = amputationBones[limb] or boneName
