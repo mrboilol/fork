@@ -452,21 +452,21 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if org.skull == 1 then
 		if org.isPly then
-			//org.owner:Notify(huyasd["skull"],true,"skull",4)
+			org.owner:Notify(huyasd["skull"],true,"skull",4)
 		end
 
-		--[[if dir then
+		if dir then
 			net.Start("hg_bloodimpact")
 			net.WriteVector(dmgInfo:GetDamagePosition())
 			net.WriteVector(dir / 10)
 			net.WriteFloat(3)
 			net.WriteInt(1,8)
 			net.Broadcast()
-		end--]]
+		end
 	end
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
-    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.75, 1)
+    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 1.5, 1.15)
 
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand

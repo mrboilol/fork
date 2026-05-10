@@ -307,9 +307,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Pulse Checking UI Box (Bottom center)
     if showPulseCheckECG then
-        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 1, FrameTime() * 2)
+        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 1, FrameTime() * 0.5)
     else
-        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 0, FrameTime() * 3)
+        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 0, FrameTime() * 1)
     end
 
     if ecgAlphaPulseCheck > 0 then
@@ -366,16 +366,16 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         end
 
-        draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+        draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY - 15, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
     else
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
     -- TopLeft ECG UI Box (Self admiring / Abnormal Heart)
     if showTopLeftECG then
-        ecgAlpha = math.Approach(ecgAlpha, 1, FrameTime() * 2)
+        ecgAlpha = math.Approach(ecgAlpha, 1, FrameTime() * 0.5)
     else
-        ecgAlpha = math.Approach(ecgAlpha, 0, FrameTime() * 3)
+        ecgAlpha = math.Approach(ecgAlpha, 0, FrameTime() * 1)
     end
 
     if ecgAlpha > 0 then
@@ -389,10 +389,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
         -- Purely renders the EKG, no counting logic needed here for the user's monitor!
         DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
-
-        end
-
-        draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY + 10, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
     else
         topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
@@ -414,7 +410,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             asystoleSound = nil
         end
 
-        if admiring or isUnconscious or abnormalPulse then
+        if admiring or isUnconscious or abnormalPulse or isCheckingPulse then
             local currentHeartBeat = math.floor(heartPhase)
             if currentHeartBeat > lastHeartBeat then
                 lastHeartBeat = currentHeartBeat

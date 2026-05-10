@@ -429,8 +429,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)
-    local modelOffset = Vector(0, 0, 10)
-    
+
     local shouldShowIndicator = true -- Always show
 
     cam.Start3D(camPos, lookAng, 50, viewX, viewY, w, h)
@@ -453,6 +452,13 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
         elseif IsValid(ply:GetRagdollEntity()) then
             srcEnt = ply:GetRagdollEntity()
             isRagdoll = true
+        end
+
+        local modelOffset
+        if isRagdoll then
+            modelOffset = Vector(0, 0, 40)
+        else
+            modelOffset = Vector(0, 0, 10)
         end
 
         local drawAng = Angle(0, 0, 0) -- Character faces forward (Camera is at +X looking at 0)
@@ -497,15 +503,24 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
             if bID then
                 local r, g, b
                 local damage = data.damage
-                if damage <= 0.35 then
-                    local prog = damage / 0.35
-                    r = 0.5 + 0.5 * prog
-                    g = 0.5 + 0.5 * prog
-                    b = 0.5 - 0.5 * prog
-                else
-                    local prog = (damage - 0.35) / 0.65
+                if damage <= 0.5 then
+                    local prog = damage / 0.5
                     r = 1
-                    g = 1 - prog
+                    g = 1
+                    b = 1 - prog
+                elseif damage <= 0.75 then
+                    local prog = (damage - 0.5) / 0.25
+                    r = 1
+                    g = 1 - 0.5 * prog
+                    b = 0
+                elseif damage <= 0.99 then
+                    local prog = (damage - 0.75) / 0.24
+                    r = 1
+                    g = 0.5 - 0.5 * prog
+                    b = 0
+                else -- damage > 0.99
+                    r = 1
+                    g = 0
                     b = 0
                 end
 

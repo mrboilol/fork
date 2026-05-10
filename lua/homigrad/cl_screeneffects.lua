@@ -70,9 +70,15 @@ local tab = {
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local hook_Run = hook.Run
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
-	//if potatopc:GetInt() >= 1 then return end
+	tab["$pp_colour_brightness"] = 0
+	tab["$pp_colour_contrast"] = 1
+	tab["$pp_colour_colour"] = 1
+	tab["$pp_colour_mulr"] = 0
+	tab["$pp_colour_mulg"] = 0
+	tab["$pp_colour_mulb"] = 0
+	--//if potatopc:GetInt() >= 1 then return end
 	hook_Run("Post Processing")
-	//DrawSunEffect()
+	--//DrawSunEffect()
 	for _, layer in ipairs(layers_name) do
 		layer = layers[layer]
 		local weight = layer.weight
@@ -82,16 +88,16 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 		--end
 	end
 
-	//DrawBloom(addtiveLayer.bloom_darken, addtiveLayer.bloom_mul, addtiveLayer.bloom_sizex, addtiveLayer.bloom_sizey, addtiveLayer.bloom_passes, addtiveLayer.bloom_colormul, addtiveLayer.bloom_colorr, addtiveLayer.bloom_colorg, addtiveLayer.bloom_colorb)
-	//DrawSharpen(addtiveLayer.sharpen, addtiveLayer.sharpen_dist)
-	//if not brain_motionblur then DrawMotionBlur(addtiveLayer.blur_addalpha, addtiveLayer.blur_drawalpha, addtiveLayer.blur_delay) end
-	//DrawToyTown(addtiveLayer.toytown, addtiveLayer.toytown_h * ScrH())
+	--//DrawBloom(addtiveLayer.bloom_darken, addtiveLayer.bloom_mul, addtiveLayer.bloom_sizex, addtiveLayer.bloom_sizey, addtiveLayer.bloom_passes, addtiveLayer.bloom_colormul, addtiveLayer.bloom_colorr, addtiveLayer.bloom_colorg, addtiveLayer.bloom_colorb)
+	--//DrawSharpen(addtiveLayer.sharpen, addtiveLayer.sharpen_dist)
+	--//if not brain_motionblur then DrawMotionBlur(addtiveLayer.blur_addalpha, addtiveLayer.blur_drawalpha, addtiveLayer.blur_delay) end
+	--//DrawToyTown(addtiveLayer.toytown, addtiveLayer.toytown_h * ScrH())
 	tab["$pp_colour_brightness"] = addtiveLayer.brightness
-	DrawColorModify(tab)
 
 	hook_Run("Post Pre Post Processing")
 
 	hook_Run("Post Post Processing")
+	DrawColorModify(tab)
 end)
 
 local postprs = hg.postprocess
@@ -428,7 +434,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
             render.DrawScreenQuad()
 
             render.UpdateScreenEffectTexture()
-            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.02)
+            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.04)
             chromaticMat:SetInt("$c0_y", 1)
             render.SetMaterial(chromaticMat)
             render.DrawScreenQuad()
@@ -680,7 +686,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100, 0, 0.1))
+		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100, 0, 0.25))
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
@@ -929,12 +935,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		tab["$pp_colour_mulr"] = 0
 		tab["$pp_colour_mulg"] = 0
 		tab["$pp_colour_mulb"] = 0
-		DrawColorModify(tab)
-	else
-		tab["$pp_colour_brightness"] = 0
-		tab["$pp_colour_contrast"] = 1
-		tab["$pp_colour_colour"] = 1
-	end
+		end
 
 	if despair >= 0.35 then
 		if not IsValid(despairSound) and not despairSoundLoading then

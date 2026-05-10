@@ -449,11 +449,11 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     -- Ramp up on high blood pressure (>115)
     if org.bloodpressure > 115 then
         local bp_effect = (org.bloodpressure - 115) / 35 -- Normalize pressure effect
-        ramp_rate = ramp_rate + (0.01 * bp_effect) -- Proportional to how high the blood pressure is
+        ramp_rate = ramp_rate + (0.05 * bp_effect) -- Proportional to how high the blood pressure is
     end
 
     if ramp_rate > 0 then
-        org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.0)
+        org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.15)
     end
 
     local decay_rate = 0.005
@@ -463,13 +463,13 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
 
     org.stroke_meter = math.max((org.stroke_meter or 0) - timeValue * decay_rate, 0)
 
-    if org.stroke_meter >= 1.0 and not org.is_stroking then
+    if org.stroke_meter >= 1.15 and not org.is_stroking then
         org.is_stroking = true
         org.stroke_active = true  -- Set stroke active for persistent effects
         org.o2[1] = 3
 		org.alive = false
         owner:Notify("My head... I can't...", 1, "stroke", 5)
-    elseif org.stroke_meter < 1.0 and org.is_stroking then
+    elseif org.stroke_meter < 1.15 and org.is_stroking then
         org.is_stroking = false
         if org.alive then
             org.heartstop = true
@@ -478,19 +478,19 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     end
 
     if org.is_stroking then
-        org.brain = math.max(org.brain - timeValue / 600, 0)  -- Slow brain deterioration during stroke
+        org.brain = math.max(org.brain - timeValue / 300, 0)  -- Slow brain deterioration during stroke
     end
 end)
 
 hook.Add("Org Think", "StrokeEffects", function(owner, org, timeValue)
     if org.stroke_meter and org.stroke_meter > 0.5 then
-        local effect_scale = (org.stroke_meter - 0.5) / (1.0 - 0.5)
-        org.disorientation = math.max(org.disorientation or 0, 2 * effect_scale)
+        local effect_scale = (org.stroke_meter - 0.5) / (1.15 - 0.5)
+        org.disorientation = math.max(org.disorientation or 0, 4 * effect_scale)
         if org.consciousness then
-            org.consciousness = math.max(org.consciousness - (0.05 * effect_scale) * timeValue, 0)
+            org.consciousness = math.max(org.consciousness - (0.1 * effect_scale) * timeValue, 0)
         end
         if org.o2 and org.o2[1] then
-             org.o2[1] = math.max(org.o2[1] - (0.1 * effect_scale) * timeValue, 0)
+             org.o2[1] = math.max(org.o2[1] - (0.2 * effect_scale) * timeValue, 0)
         end
     end
 end)
