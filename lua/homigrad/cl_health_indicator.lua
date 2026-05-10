@@ -497,6 +497,20 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
         
         DrawHealthAccessories(healthModel, ply, base_col)
 
+        local function DrawDamageBlinkState(blinkModel, r, g, b)
+            blinkModel:SetupBones()
+
+            render.SetColorModulation(r, g, b)
+            for _, offset in ipairs(outlineOffsets) do
+                blinkModel:SetPos(modelOffset + offset)
+                blinkModel:DrawModel()
+            end
+
+            render.SetColorModulation(r, g, b)
+            blinkModel:SetPos(modelOffset)
+            blinkModel:DrawModel()
+        end
+
         for _, data in ipairs(damagedBones) do
             local boneName = majorBones[data.key].bone
             local bID = blinkModel:LookupBone(boneName)
@@ -545,20 +559,6 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
                     table.insert(blinkingRedBones, key)
                 end
             end
-        end
-
-        local function DrawDamageBlinkState(blinkModel, r, g, b)
-            blinkModel:SetupBones()
-
-            render.SetColorModulation(r, g, b)
-            for _, offset in ipairs(outlineOffsets) do
-                blinkModel:SetPos(modelOffset + offset)
-                blinkModel:DrawModel()
-            end
-
-            render.SetColorModulation(r, g, b)
-            blinkModel:SetPos(modelOffset)
-            blinkModel:DrawModel()
         end
 
         if hasAmputationBlink then

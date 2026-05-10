@@ -1771,9 +1771,9 @@ function hg.BreakLimb(ent, limb)
             if not IsValid(p_parent) or not IsValid(p_child) then return end
             
             -- Prevent stretching. This is a bit of a guess, might need refinement.
-            local lpos, lang = WorldToLocal(p_child:GetPos(), angle_zero, p_parent:GetPos(), p_parent:GetAngles())
+            local lpos, lang = WorldToLocal(p_child:GetPos(), angZero, p_parent:GetPos(), p_parent:GetAngles())
             if lpos then
-                local new_pos = p_parent:localToWorld(lpos)
+                local new_pos, _ = LocalToWorld(lpos, angZero, p_parent:GetPos(), p_parent:GetAngles())
                 if new_pos then
                     p_child:SetPos(new_pos)
                 end
