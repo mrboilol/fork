@@ -920,10 +920,112 @@ MODE.ProfessionsRoundTypes = {
 }
 
 MODE.Professions = {
-	["doctor"] = {
-		Name = "Doctor",
-		SpawnFunction = function(ply)	--; TODO MAKE IT WORK
+	["medic"] = {
+		Name = "Medic",
+		Objective = "You are the Medic. Keep the innocents alive and treat injuries before the murderer can finish the job.",
+		Loadout = {
+			"weapon_bigbandage_sh",
+			"weapon_defibrilator_homigrad",
+			"weapon_medkit_sh",
+			"weapon_painkillers",
+			"weapon_needle",
+			"weapon_bloodbag",
+			"weapon_tourniquet",
+		},
+		SpawnFunction = function(ply)
+			for _, weapon_class in ipairs(MODE.Professions.medic.Loadout) do
+				local wep = ply:Give(weapon_class)
+
+				if(weapon_class == "weapon_bloodbag" and IsValid(wep))then
+					timer.Simple(0, function()
+						if(IsValid(wep))then
+							wep.modeValues = wep.modeValues or {}
+							wep.modeValues[1] = 1
+							wep.bloodtype = "o-"
+						end
+					end)
+				end
+			end
+		end,
+	},
+	["lucky_guy"] = {
+		Name = "Lucky Guy",
+		Objective = "You are the Lucky Guy. Fortune is on your side, giving you extra health and stamina to outlast the murderer.",
+		Loadout = {
+			"weapon_screwdriver",
+		},
+		HealthMultiplier = 1.3,
+		StaminaMultiplier = 1.2,
+		SpawnFunction = function(ply)
+			for _, weapon_class in ipairs(MODE.Professions.lucky_guy.Loadout) do
+				ply:Give(weapon_class)
+			end
+		end,
+	},
+	["athlete"] = {
+		Name = "Athlete",
+		Objective = "You are the Athlete. Use your larger build, stamina and strength to outrun danger and win close fights.",
+		ModelScale = 1.15,
+		StaminaMultiplier = 2,
+		StaminaExhaustMultiplier = 0.7,
+		MeleeDamageMultiplier = 1.5,
+		LegStrengthMultiplier = 1.5,
+		JumpPowerMultiplier = 1.15,
+		SpawnFunction = function(ply)
 			--; It's a bad practice to give professions any weapons or tools
+		end,
+	},
+	["thug"] = {
+		Name = "Thug",
+		Objective = "You are the Thug. Use your bat and fentanyl to dominate close fights and stay alive.",
+		Loadout = {
+			"weapon_bat",
+			"weapon_fentanyl",
+		},
+		MaxPlayers = 2,
+		SpawnFunction = function(ply)
+			local delayed_bat_timer = "HMCD_ThugDelayedBat_" .. ply:EntIndex()
+
+			timer.Remove(delayed_bat_timer)
+
+			for _, weapon_class in ipairs(MODE.Professions.thug.Loadout) do
+				if(weapon_class == "weapon_bat")then
+					continue
+				end
+
+				ply:Give(weapon_class)
+			end
+
+			timer.Create(delayed_bat_timer, 3, 1, function()
+				if(!IsValid(ply) or !ply:Alive() or ply.Profession != "thug" or ply:HasWeapon("weapon_bat"))then
+					return
+				end
+
+				local active_weapon = ply:GetActiveWeapon()
+				local active_class = IsValid(active_weapon) and active_weapon:GetClass() or nil
+
+				if(!active_class or active_class == "weapon_bat")then
+					active_class = ply:HasWeapon("weapon_fentanyl") and "weapon_fentanyl" or nil
+				end
+
+				local wep = ply:Give("weapon_bat")
+
+				if(!IsValid(wep))then
+					return
+				end
+
+				wep.bigNoDrop = true
+				wep.NoHolster = false
+				wep.weaponInvCategory = 0
+
+				if(active_class and ply:HasWeapon(active_class))then
+					timer.Simple(0, function()
+						if(IsValid(ply) and ply:Alive() and ply:HasWeapon(active_class))then
+							ply:SelectWeapon(active_class)
+						end
+					end)
+				end
+			end)
 		end,
 	},
 	["huntsman"] = {
@@ -973,7 +1075,49 @@ MODE.RoleChooseRoundTypes = {
 			-- ["traitor_demoman"] = true,
 		},
 		Professions = {
-			["doctor"] = {
+			["medic"] = {
+				Chance = 1,
+			},
+			["lucky_guy"] = {
+				Chance = 1,
+			},
+			["athlete"] = {
+				Chance = 1,
+			},
+			["thug"] = {
+				Chance = 1,
+			},
+			["huntsman"] = {
+				Chance = 1,
+			},
+			["engineer"] = {
+				Chance = 1,
+			},
+			["cook"] = {
+				Chance = 1,
+			},
+			["builder"] = {
+				Chance = 1,
+			},
+		},
+	},	
+	["gunfreezone"] = {
+		TraitorDefaultRole = "traitor_default",
+		Traitor = {
+			["traitor_default"] = true,
+			["traitor_infiltrator"] = true,
+			["traitor_chemist"] = true,
+			--["traitor_assasin"] = true,	there's no gunman so why have an assassin?
+			--["traitor_maniac"] = true,	having a maniac in gfz is crazy
+		},
+		Professions = {
+			["medic"] = {
+				Chance = 1,
+			},
+			["lucky_guy"] = {
+				Chance = 1,
+			},
+			["athlete"] = {
 				Chance = 1,
 			},
 			["huntsman"] = {
@@ -1000,7 +1144,16 @@ MODE.RoleChooseRoundTypes = {
 			-- ["traitor_demoman_soe"] = true,
 		},
 		Professions = {
-			["doctor"] = {
+			["medic"] = {
+				Chance = 1,
+			},
+			["lucky_guy"] = {
+				Chance = 1,
+			},
+			["athlete"] = {
+				Chance = 1,
+			},
+			["thug"] = {
 				Chance = 1,
 			},
 			["huntsman"] = {
