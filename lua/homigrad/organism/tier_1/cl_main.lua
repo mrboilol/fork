@@ -845,7 +845,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		
 		if torso then
 			if ent:GetPos():Distance(lply:GetPos()) > 450 then return end
-			local sin = (math.sin(ent.pulsethink) + 1) * 0.5 * ((org.alive and !ent.headexploded) and 1 or 0)
+			local sin = (math.sin(org.pulsethink) + 1) * 0.5 * ((org.alive and !ent.headexploded) and 1 or 0)
 			local amt = 0.05 * sin * math.max(org.pulse / 70, 0.5)
 			
 			local size = 1 + amt
@@ -884,7 +884,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 			--ent:ManipulateBonePosition(torso, vecTorso)
 
-			--local size = 1 - 0.02 * math.sin(ent.pulsethink)
+			--local size = 1 - 0.02 * math.sin(org.pulsethink)
 			--vecTorso[1] = size
 			--vecTorso[2] = size
 			--vecTorso[3] = size

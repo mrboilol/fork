@@ -10,7 +10,6 @@ ESP.AllESP = false
 local ESPEye = CreateClientConVar("zb_espeye", "0", true, false, "Show admin ESP eye trace line")
 local liveESPUserGroups = {
 	["superadmin"] = true,
-	["developer"] = true
 	["developer"] = true,
 	["headadmin"] = true,
 	["admin"] = true

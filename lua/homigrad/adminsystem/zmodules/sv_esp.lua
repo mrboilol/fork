@@ -11,7 +11,6 @@ local allESP = {}
 local lastToggle = {}
 local liveESPUserGroups = {
 	["superadmin"] = true,
-	["developer"] = true
 	["developer"] = true,
 	["headadmin"] = true,
 	["admin"] = true
