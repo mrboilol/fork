@@ -523,6 +523,7 @@ hg.ConVars = hg.ConVars or {}
 				if not IsValid(ply) or not ply:Alive() then return end
 				ply.bull = ents.Create("npc_bullseye")
 				local bull = ply.bull
+				if not IsValid(bull) then return end
 				local bon = ply:LookupBone("ValveBiped.Bip01_Head1")
 				local mat = bon and ply:GetBoneMatrix(bon)
 				local pos = mat and mat:GetTranslation() or ply:EyePos()
