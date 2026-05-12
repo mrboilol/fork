@@ -154,7 +154,7 @@ local cvar_alt_icons = CreateClientConVar("mzb_nopixelicons", "0", true, false)
 local cvar_status_effects = CreateClientConVar("mzb_Disable_moodle", "1", true, false)
 local cvar_language = CreateClientConVar("mzb_language", "eng", true, false)
 local cvar_brain_distortion = CreateClientConVar("mzb_brain_distortion", "1", true, false)
-local cvar_tarkov_indicator = CreateClientConVar("hg_tarkovindicator", "1", true, false)
+
 
 local LANGUAGE = cvar_language:GetString()
 local USE_ALT_ICONS = cvar_alt_icons:GetBool()
@@ -1282,7 +1282,7 @@ local function draw_status_effects()
 		currentEffectNames["death"] = true
 	else
 		-- Chip moodle
-		if cvar_tarkov_indicator:GetInt() == 2 or isPlayerFurry(ply) then
+		if GetConVar("sv_indicator"):GetInt() == 2 or isPlayerFurry(ply) then
 			table.insert(effects, {
 				name = "chip",
 				priority = -2,
@@ -2462,8 +2462,17 @@ end
 local function draw_sprites()
 	if not HUD.enabled then return end
 
-	local indMode = cvar_tarkov_indicator:GetInt()
-	if indMode == 0 then return end
+	local sv_indicator = GetConVar("sv_indicator")
+	local indMode = sv_indicator and sv_indicator:GetInt() or 0
+
+	if indMode == 1 then
+		if HUD_DrawDynamicIndicator then
+			HUD_DrawDynamicIndicator()
+		end
+		return
+	end
+
+	if indMode ~= 0 and indMode ~= 2 and indMode ~= 3 then return end
 	
 	local ply = LocalPlayer()
 	if not IsValid(ply) or not ply.organism then return end
@@ -2475,8 +2484,14 @@ local function draw_sprites()
 	local base_y = HUD.base_y
 	local dt = FrameTime() * HUD.limb_fade_speed
 
-	-- Check depending on user setting (1 = dynamic/normal, 2 = strictly furry)
-	local isFurry = (indMode == 2) or (indMode == 1 and isPlayerFurry(ply))
+	local isFurry
+	if indMode == 0 then
+		isFurry = isPlayerFurry(ply)
+	elseif indMode == 2 then
+		isFurry = true
+	elseif indMode == 3 then
+		isFurry = false
+	end
 	
 	if not debug_done then
 		debug_done = true
@@ -2618,15 +2633,17 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		local currentLang = GetConVarString("mzb_language") or "eng"
 		langCombo:SetText(currentLang == "ru" and "Русский" or "English")
 
-		local indCombo = panel:ComboBox("Tarkov Indicator", "hg_tarkovindicator")
-		indCombo:AddChoice("Off", "0")
-		indCombo:AddChoice("Normal", "1")
+		local indCombo = panel:ComboBox("Tarkov Indicator", "sv_indicator")
+		indCombo:AddChoice("Dynamic Old", "0")
+		indCombo:AddChoice("Dynamic New", "1")
 		indCombo:AddChoice("Furry Only", "2")
+		indCombo:AddChoice("Normal Only", "3")
 		
-		local currentInd = GetConVarString("hg_tarkovindicator") or "1"
-		if currentInd == "0" then indCombo:SetText("Off")
+		local currentInd = GetConVarString("sv_indicator") or "0"
+		if currentInd == "1" then indCombo:SetText("Dynamic New")
 		elseif currentInd == "2" then indCombo:SetText("Furry Only")
-		else indCombo:SetText("Normal") end
+		elseif currentInd == "3" then indCombo:SetText("Normal Only")
+		else indCombo:SetText("Dynamic Old") end
 		
 		function langCombo:OnSelect(index, value, data)
 			RunConsoleCommand("mzb_language", data)
@@ -2634,7 +2651,7 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		end
 
 		function indCombo:OnSelect(index, value, data)
-			RunConsoleCommand("hg_tarkovindicator", data)
+			RunConsoleCommand("sv_indicator", data)
 			self:SetText(value)
 		end
 		
