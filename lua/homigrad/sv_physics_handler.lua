@@ -88,7 +88,7 @@ timer.Create("hg_prop_optimizer", 4, 0, function()
 	local useDebrisCollision = hg_prop_use_debris_collision:GetBool()
 
 	for _, class in ipairs(propClasses) do
-		for _, ent in ipairs(ents_FindByClass(class)) do
+		for _, ent in ipairs(ents.FindByClass(class)) do
 			if not IsValid(ent) then continue end
 
 			ent.hg_prop_optimizer_spawn = ent.hg_prop_optimizer_spawn or now

@@ -1,6 +1,6 @@
 if SERVER then
     CreateConVar("zb_dev", 0, FCVAR_ARCHIVE)
-	CreateConVar("sv_indicator", 0, FCVAR_ARCHIVE)
+	CreateConVar("hg_indicator", 0, FCVAR_ARCHIVE)
 end
 
 if (CLIENT) then

@@ -1281,8 +1281,9 @@ local function draw_status_effects()
 		})
 		currentEffectNames["death"] = true
 	else
+
 		-- Chip moodle
-		if GetConVar("sv_indicator"):GetInt() == 2 or isPlayerFurry(ply) then
+		if GetConVar("hg_indicator"):GetInt() == 2 or isPlayerFurry(ply) then
 			table.insert(effects, {
 				name = "chip",
 				priority = -2,
@@ -1417,34 +1418,34 @@ local function draw_status_effects()
 				currentEffectNames["trauma"] = true
 			end
 			
-			local stroke_val = smooth.stroke_meter or getOrgVal(org, "stroke_meter", 0)
-			if stroke_val > 0.5 then
-				local level_num = 1
-				if stroke_val > 0.95 then level_num = 4
-				elseif stroke_val > 0.75 then level_num = 3
-				elseif stroke_val > 0.6 then level_num = 2 end
-
-				table.insert(effects, {
-					name = "stroke",
-					level_num = level_num,
-					has_levels = true,
-					priority = 0.8,
-					value = math_floor(stroke_val)
-				})
-				currentEffectNames["stroke"] = true
-				if level_num == 4 and not currentEffectNames["internal_bleed"] then
-					table.insert(effects, {
-						name = "internal_bleed",
-						priority = 0.4,
-						value = nil
-					})
-					currentEffectNames["internal_bleed"] = true
-				end
-			end
-			
 			if hasAnyAmputation(org) then
 					table.insert(effects, {name = "amputant", priority = 8})
 					currentEffectNames["amputant"] = true
+				end
+
+				local stroke_val = smooth.stroke_meter or getOrgVal(org, "stroke_meter", 0)
+				if stroke_val > 0.5 then
+					local level_num = 1
+					if stroke_val > 0.95 then level_num = 4
+					elseif stroke_val > 0.75 then level_num = 3
+					elseif stroke_val > 0.6 then level_num = 2 end
+
+					table.insert(effects, {
+						name = "stroke",
+						level_num = level_num,
+						has_levels = true,
+						priority = 0.8,
+						value = math_floor(stroke_val)
+					})
+					currentEffectNames["stroke"] = true
+					if level_num == 4 and not currentEffectNames["internal_bleed"] then
+						table.insert(effects, {
+							name = "internal_bleed",
+							priority = 0.4,
+							value = nil
+						})
+						currentEffectNames["internal_bleed"] = true
+					end
 				end
 			
 			if org.heartstop == true then
@@ -2462,15 +2463,10 @@ end
 local function draw_sprites()
 	if not HUD.enabled then return end
 
-	local sv_indicator = GetConVar("sv_indicator")
-	local indMode = sv_indicator and sv_indicator:GetInt() or 0
+	local hg_indicator = GetConVar("hg_indicator")
+	local indMode = hg_indicator and hg_indicator:GetInt() or 0
 
-	if indMode == 1 then
-		if HUD_DrawDynamicIndicator then
-			HUD_DrawDynamicIndicator()
-		end
-		return
-	end
+	if indMode == 1 then return end
 
 	if indMode ~= 0 and indMode ~= 2 and indMode ~= 3 then return end
 	
@@ -2633,13 +2629,13 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		local currentLang = GetConVarString("mzb_language") or "eng"
 		langCombo:SetText(currentLang == "ru" and "Русский" or "English")
 
-		local indCombo = panel:ComboBox("Tarkov Indicator", "sv_indicator")
+		local indCombo = panel:ComboBox("Tarkov Indicator", "hg_indicator")
 		indCombo:AddChoice("Dynamic Old", "0")
 		indCombo:AddChoice("Dynamic New", "1")
 		indCombo:AddChoice("Furry Only", "2")
 		indCombo:AddChoice("Normal Only", "3")
 		
-		local currentInd = GetConVarString("sv_indicator") or "0"
+		local currentInd = GetConVarString("hg_indicator") or "0"
 		if currentInd == "1" then indCombo:SetText("Dynamic New")
 		elseif currentInd == "2" then indCombo:SetText("Furry Only")
 		elseif currentInd == "3" then indCombo:SetText("Normal Only")
@@ -2651,7 +2647,7 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		end
 
 		function indCombo:OnSelect(index, value, data)
-			RunConsoleCommand("sv_indicator", data)
+			RunConsoleCommand("hg_indicator", data)
 			self:SetText(value)
 		end
 		

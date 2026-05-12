@@ -115,9 +115,7 @@ local fixbones = {
 }
 
 function hg.Ragdoll_Create(ply)
-	local Data = duplicator.CopyEntTable( ply )
 	local ragdoll = ents.Create("prop_ragdoll")
-	duplicator.DoGeneric( ragdoll, Data )
 
 	ragdoll:SetPos(ply:GetPos())
 	ragdoll:SetAngles(ply:GetAngles())

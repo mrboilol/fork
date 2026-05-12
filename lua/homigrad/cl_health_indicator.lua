@@ -608,7 +608,7 @@ function HUD_DrawDynamicIndicator()
         render.SetColorModulation(1, 1, 1)
         render.SuppressEngineLighting(false)
     cam.End3D()
-end)
+end
 
 hook.Add("OnRemove", "HG_CleanupHealthIndicator", function()
     if IsValid(healthModel) then healthModel:Remove() end

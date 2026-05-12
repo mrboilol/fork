@@ -449,7 +449,7 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     -- Ramp up on high blood pressure (>115)
     if org.bloodpressure > 115 then
         local bp_effect = (org.bloodpressure - 115) / 35 -- Normalize pressure effect
-        ramp_rate = ramp_rate + (0.05 * bp_effect) -- Proportional to how high the blood pressure is
+        ramp_rate = ramp_rate + (0.025 * bp_effect) -- Proportional to how high the blood pressure is
     end
 
     if ramp_rate > 0 then
@@ -469,6 +469,10 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
         org.o2[1] = 3
 		org.alive = false
         owner:Notify("My head... I can't...", 1, "stroke", 5)
+
+        -- Add stroke moodle and brain health toll
+        owner:SetMoodle("stroke_moodle", true)
+        org.brain = math.max(org.brain - 25, 0)  -- Immediate brain health toll
     elseif org.stroke_meter < 1.15 and org.is_stroking then
         org.is_stroking = false
         if org.alive then
@@ -478,7 +482,7 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     end
 
     if org.is_stroking then
-        org.brain = math.max(org.brain - timeValue / 300, 0)  -- Slow brain deterioration during stroke
+        org.brain = math.max(org.brain - timeValue / 150, 0)  -- Accelerated brain deterioration during stroke
     end
 end)
 
