@@ -135,6 +135,8 @@ if SERVER then
 	return
 end
 
+include("homigrad/cl_health_indicator.lua")
+
 local math_min, math_max, math_floor, math_sin, math_abs, math_cos, math_sqrt = math.min, math.max, math.floor, math.sin, math.abs, math.cos, math.sqrt
 local Color = Color
 local draw_SimpleText = draw.SimpleText
@@ -2514,7 +2516,12 @@ local function draw_sprites()
 	local hg_indicator = GetConVar("hg_indicator")
 	local indMode = hg_indicator and hg_indicator:GetInt() or 0
 
-	if indMode ~= 0 and indMode ~= 1 and indMode ~= 2 and indMode ~= 3 then return end
+	if indMode == 1 then
+		HUD_DrawDynamicIndicator()
+		return
+	end
+
+	if indMode ~= 0 and indMode ~= 2 and indMode ~= 3 then return end
 	
 	local ply = LocalPlayer()
 	if not IsValid(ply) or not ply.organism then return end
