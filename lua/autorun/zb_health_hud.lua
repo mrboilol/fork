@@ -2514,9 +2514,7 @@ local function draw_sprites()
 	local hg_indicator = GetConVar("hg_indicator")
 	local indMode = hg_indicator and hg_indicator:GetInt() or 0
 
-	if indMode == 1 then return end
-
-	if indMode ~= 0 and indMode ~= 2 and indMode ~= 3 then return end
+	if indMode ~= 0 and indMode ~= 1 and indMode ~= 2 and indMode ~= 3 then return end
 	
 	local ply = LocalPlayer()
 	if not IsValid(ply) or not ply.organism then return end
@@ -2529,7 +2527,7 @@ local function draw_sprites()
 	local dt = FrameTime() * HUD.limb_fade_speed
 
 	local isFurry
-	if indMode == 0 then
+	if indMode == 0 or indMode == 1 then
 		isFurry = isPlayerFurry(ply)
 	elseif indMode == 2 then
 		isFurry = true

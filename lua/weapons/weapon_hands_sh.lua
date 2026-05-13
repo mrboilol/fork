@@ -322,7 +322,12 @@ if CLIENT then
 		if not normalizeSequenceState(WorldModel) then return end
 
 		if WorldModel.ZCAnimAssigned then
-			WorldModel:SetCycle(1 - math.Clamp(self.animtime - CurTime(),0,1))
+			if self.animduration and self.animduration > 0 then
+				local progress = 1 - (self.animtime - CurTime()) / self.animduration
+				WorldModel:SetCycle(math.Clamp(progress, 0, 1))
+			else
+				WorldModel:SetCycle(1 - math.Clamp(self.animtime - CurTime(),0,1))
+			end
 		end
 
 		self.blockinganim = qerp(0.05 * FrameTime() / engine.TickInterval(),self.blockinganim,self:GetBlocking() and 1 or 0)
