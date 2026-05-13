@@ -1,4 +1,7 @@
 if SERVER then AddCSLuaFile() end
+
+
+
 SWEP.Base = "weapon_base"
 local function RagdollOwner(ent)
 	return hg.RagdollOwner(ent)
@@ -36,6 +39,23 @@ SWEP.BreakBoneMul = 0.33
 SWEP.Penetration = 1
 SWEP.DamageMul = 1
 SWEP.animtime = 0
+SWEP.HeadbuttReach = 25
+SWEP.HeadbuttCooldown = 2.35
+SWEP.HeadbuttPitchStart = -22
+SWEP.HeadbuttPitchThreshold = 20
+SWEP.HeadbuttSwingWindow = 0.45
+SWEP.HeadbuttMinSwingSpeed = 55
+SWEP.HeadbuttMinBodySpeed = 0
+SWEP.HeadbuttDamage = 19
+SWEP.HeadbuttBaseForce = 55000
+SWEP.HeadbuttSpeedForceMul = 225
+SWEP.HeadbuttVelocityForceMul = 110
+SWEP.HeadbuttTargetVelocityMul = 95
+SWEP.HeadbuttSelfVelocityMul = 65
+SWEP.HeadbuttConcussionTarget = 1.85
+SWEP.HeadbuttConcussionSelf = 1
+SWEP.HeadbuttDisorientationTarget = 1.15
+SWEP.HeadbuttDisorientationSelf = 0.55
 
 SWEP.BlockTier = 1
 SWEP.MeleeMaterial = "none"
@@ -60,6 +80,119 @@ local function qerp(delta, a, b)
 	return Lerp(qdelta, a, b)
 end
 
+function SWEP:IsValidStandingHeadbutter(ply)
+	if not IsValid(ply) or not ply:IsPlayer() then return false end
+	if not ply:Alive() then return false end
+	if ply:InVehicle() then return false end
+	if ply:Crouching() then return false end
+	if not ply:OnGround() then return false end
+	local org = ply.organism
+	if ply.fake or IsValid(ply.FakeRagdoll) or (org and (org.fake or org.otrub)) then return false end
+	return true
+end
+
+function SWEP:ApplyHeadbuttNeuro(ply, concussion, disorientation)
+	if not IsValid(ply) then return end
+	local org = ply.organism
+	if not org then return end
+	org.concussion = math.min((org.concussion or 0) + concussion, 10)
+	org.disorientation = math.min((org.disorientation or 0) + disorientation, 10)
+end
+
+function SWEP:TryDownwardHeadbutt()
+	if CLIENT then return end
+	local owner = self:GetOwner()
+	if not self:GetFists() then
+		self.HeadbuttState = "idle"
+		return
+	end
+	if not self:IsValidStandingHeadbutter(owner) then
+		self.HeadbuttState = "idle"
+		return
+	end
+	if owner:KeyDown(IN_ATTACK2) then
+		self.HeadbuttState = "idle"
+		return
+	end
+	if not owner:KeyDown(IN_USE) then
+		self.HeadbuttState = "idle"
+		return
+	end
+	local now = CurTime()
+	if now < (self.HeadbuttNextHit or 0) then
+		self.HeadbuttState = "idle"
+		return
+	end
+	local pitch = math.NormalizeAngle(owner:EyeAngles().p)
+	if self.HeadbuttState == "idle" then
+		if pitch <= self.HeadbuttPitchStart then
+			self.HeadbuttState = "down_start"
+			self.HeadbuttStartTime = now
+			self.HeadbuttStartPitch = pitch
+		end
+		return
+	end
+	local elapsed = now - (self.HeadbuttStartTime or now)
+	if elapsed > self.HeadbuttSwingWindow then
+		self.HeadbuttState = "idle"
+		return
+	end
+	local delta = pitch - (self.HeadbuttStartPitch or pitch)
+	if delta < self.HeadbuttPitchThreshold then return end
+	local swingSpeed = delta / math.max(elapsed, 0.01)
+	self.HeadbuttState = "idle"
+	if swingSpeed < self.HeadbuttMinSwingSpeed then return end
+	local velocity = owner:GetVelocity()
+	local speed = velocity:Length()
+	if speed < self.HeadbuttMinBodySpeed then return end
+	local startPos = owner:EyePos()
+	local tr = util.TraceHull({
+		start = startPos,
+		endpos = startPos + owner:GetAimVector() * self.HeadbuttReach,
+		filter = {owner, hg.GetCurrentCharacter(owner)},
+		mins = Vector(-10, -10, -10),
+		maxs = Vector(10, 10, 10),
+		mask = MASK_SHOT_HULL
+	})
+	local target = tr.Entity
+	local hitPos = tr.HitPos
+	if not IsValid(target) or not target:IsPlayer() then
+		local trLine = util.TraceLine({
+			start = startPos,
+			endpos = startPos + owner:GetAimVector() * (self.HeadbuttReach + 16),
+			filter = {owner, hg.GetCurrentCharacter(owner)},
+			mask = MASK_SHOT
+		})
+		if IsValid(trLine.Entity) and trLine.Entity:IsPlayer() then
+			target = trLine.Entity
+			hitPos = trLine.HitPos
+		end
+	end
+	if not IsValid(target) or not target:IsPlayer() or target == owner then return end
+	if not self:IsValidStandingHeadbutter(target) then return end
+	local forward = owner:EyeAngles():Forward()
+	local forceDir = (forward - Vector(0, 0, 0.85)):GetNormalized()
+	local totalForce = self.HeadbuttBaseForce + swingSpeed * self.HeadbuttSpeedForceMul + speed * self.HeadbuttVelocityForceMul
+	local dmg = DamageInfo()
+	dmg:SetDamage(self.HeadbuttDamage)
+	dmg:SetAttacker(owner)
+	dmg:SetInflictor(self)
+	dmg:SetDamageType(DMG_CRUSH)
+	dmg:SetDamagePosition(hitPos)
+	dmg:SetDamageForce(forceDir * totalForce)
+	target:TakeDamageInfo(dmg)
+	target:SetVelocity(forceDir * (self.HeadbuttTargetVelocityMul + speed * 0.25))
+	owner:SetVelocity(-forceDir * (self.HeadbuttSelfVelocityMul + speed * 0.08))
+	sound.Play("Flesh.ImpactHard", hitPos, 75, math.random(96, 104), 1)
+	owner:ViewPunch(Angle(8, 0, 0))
+	target:ViewPunch(Angle(14, 0, 0))
+	self:ApplyHeadbuttNeuro(target, self.HeadbuttConcussionTarget, self.HeadbuttDisorientationTarget)
+	self:ApplyHeadbuttNeuro(owner, self.HeadbuttConcussionSelf, self.HeadbuttDisorientationSelf)
+	self.HeadbuttNextHit = now + self.HeadbuttCooldown
+	self:SetNextPrimaryFire(math.max(self:GetNextPrimaryFire(), self.HeadbuttNextHit))
+	self:SetNextSecondaryFire(math.max(self:GetNextSecondaryFire(), self.HeadbuttNextHit))
+end
+
 function SWEP:Initialize()
 	self:SetNextIdle(CurTime() + 5)
 	self:SetNextDown(CurTime() + 5)
@@ -68,7 +201,39 @@ function SWEP:Initialize()
 	self:SetBlocking(false)
 end
 
+function SWEP:ClearSuperadminGrab()
+	local owner = self:GetOwner()
+	local victim = self.AdminGrabVictim
+
+	if IsValid(victim) and victim.AdminHandsGrabber == owner then
+		victim.AdminHandsGrabber = nil
+	end
+
+	if IsValid(owner) and owner.AdminHandsGrabVictim == victim then
+		owner.AdminHandsGrabVictim = nil
+	end
+
+	self.AdminGrabVictim = nil
+	self.AdminGrabRefresh = nil
+end
+
+function SWEP:SetSuperadminGrab(victim)
+	local owner = self:GetOwner()
+
+	if self.AdminGrabVictim == victim then return end
+
+	self:ClearSuperadminGrab()
+
+	if not IsValid(owner) or not IsValid(victim) then return end
+
+	self.AdminGrabVictim = victim
+	self.AdminGrabRefresh = 0
+	owner.AdminHandsGrabVictim = victim
+	victim.AdminHandsGrabber = owner
+end
+
 function SWEP:OnRemove()
+	self:ClearSuperadminGrab()
 	--[[if IsValid(self.worldModel) then
 		self.worldModel:Remove()
 	end--]]
@@ -76,12 +241,68 @@ end
 
 if CLIENT then
 	local blocking_ang = Angle(-40,0,0)
+	local function initializeSequenceState(mdl)
+		if not IsValid(mdl) then return end
+
+		mdl.ZCLastSequenceModel = mdl:GetModel()
+		mdl.ZCSequenceReadyAt = CurTime() + 0.25
+		mdl.ZCAnimAssigned = false
+
+		if mdl.ResetSequenceInfo then
+			mdl:ResetSequenceInfo()
+		end
+	end
+
+	local function normalizeSequenceState(mdl, desiredModel)
+		if not IsValid(mdl) then return false end
+
+		if desiredModel and mdl:GetModel() ~= desiredModel then
+			mdl:SetModel(desiredModel)
+		end
+
+		local currentModel = mdl:GetModel()
+		if mdl.ZCLastSequenceModel ~= currentModel then
+			mdl.ZCLastSequenceModel = currentModel
+			mdl.ZCSequenceReadyAt = CurTime() + 0.1
+			mdl.ZCAnimAssigned = false
+		end
+
+		if (mdl.ZCSequenceReadyAt or 0) > CurTime() then return false end
+
+		local seqCount = mdl.GetSequenceCount and mdl:GetSequenceCount() or 0
+		if seqCount <= 0 then return false end
+
+		local seq = mdl:GetSequence()
+		if not isnumber(seq) or seq < 0 or seq >= seqCount then
+			mdl.ZCAnimAssigned = false
+			return false
+		end
+
+		return true
+	end
 
 	--[[if IsValid(modelHands) then
 		modelHands:Remove()
 	end--]]
 
 	function SWEP:GetWM()
+		if not IsValid(self.worldModel) then
+			self.worldModel = ClientsideModel(self.WorldModel)
+			if not IsValid(self.worldModel) then return end
+
+			self.worldModel:SetNoDraw(true)
+			initializeSequenceState(self.worldModel)
+
+			local model = self.worldModel
+			self:CallOnRemove("remove_hands_worldmodel", function()
+				if IsValid(model) then
+					model:Remove()
+				end
+			end)
+		end
+
+		self.worldModel:SetNoDraw(true)
+
 		return self.worldModel
 	end
 
@@ -89,37 +310,25 @@ if CLIENT then
 
 	function SWEP:DrawWorldModel()
 		local owner = self:GetOwner()
+		local WorldModel = self:GetWM()
+		if not IsValid(WorldModel) then return end
 
-		if not IsValid(self.worldModel) then
-			self.worldModel = ClientsideModel(self.WorldModel)
-		end
-
-		if clawClasses[owner.PlayerClassName] and self.worldModel != "models/weapons/salat/anims/furry_fists.mdl" then
-			self.worldModel:SetModel("models/weapons/salat/anims/furry_fists.mdl")
+		if IsValid(owner) and clawClasses[owner.PlayerClassName] and WorldModel:GetModel() ~= "models/weapons/salat/anims/furry_fists.mdl" then
+			WorldModel:SetModel("models/weapons/salat/anims/furry_fists.mdl")
 		end
 
 		if not self:GetFists() then return end
 
-		local WorldModel = self.worldModel
+		if not normalizeSequenceState(WorldModel) then return end
 
-		local timeleft = self.animtime - CurTime()
-		local cycle = 0
-		if self.slowmoanim then
-			if self:GetOwner():GetNWBool("mcd_admiring", false) then
-				-- Freeze animation after 1.5 seconds (which is 1.5 / 5.0 = 0.3 cycle)
-				cycle = 1 - math.Clamp(timeleft / self.slowmoanim, 0, 1)
-				if cycle > 0.3 then
-					cycle = 0.3
-					self.animtime = CurTime() + self.slowmoanim * (1 - 0.3) -- Keep timeleft frozen so it resumes properly later
-				end
+		if WorldModel.ZCAnimAssigned then
+			if self.animduration and self.animduration > 0 then
+				local progress = 1 - (self.animtime - CurTime()) / self.animduration
+				WorldModel:SetCycle(math.Clamp(progress, 0, 1))
 			else
-				cycle = 1 - math.Clamp(timeleft / self.slowmoanim, 0, 1)
+				WorldModel:SetCycle(1 - math.Clamp(self.animtime - CurTime(),0,1))
 			end
-		else
-			local animDuration = self.animduration or 1
-			cycle = 1 - math.Clamp(timeleft / animDuration, 0, 1)
 		end
-		WorldModel:SetCycle(cycle)
 
 		self.blockinganim = qerp(0.05 * FrameTime() / engine.TickInterval(),self.blockinganim,self:GetBlocking() and 1 or 0)
 
@@ -445,7 +654,11 @@ function SWEP:SetHandPos(noset)
 	local ply = self:GetOwner()
 	if CLIENT and self.IsLocal and not self:IsLocal() and IsValid(ply) and ply.PlayerClassName == "headcrabzombie" and not IsValid(ply:GetNetVar("carryent")) then return end
 
-	if not IsValid(ply) or not IsValid(self.worldModel) then return end
+	if not IsValid(ply) then return end
+
+	local wm = self:GetWM()
+	if not IsValid(wm) then return end
+
 	if IsValid(ply) and (not ply.shouldTransmit or ply.NotSeen) then return end
 	-- ply:SetupBones()
 
@@ -460,9 +673,6 @@ function SWEP:SetHandPos(noset)
 	local ply_spine_matrix = ply:GetBoneMatrix(ply_spine_index)
 	if !ply_spine_matrix then return end
 	local wmpos = ply_spine_matrix:GetTranslation()
-
-	local wm = self:GetWM()
-	if !IsValid(wm) then return end
 
 	local inv = ply:GetNetVar("Inventory",{})
 	local havekastet = inv["Weapons"] and inv["Weapons"]["hg_brassknuckles"]
@@ -918,6 +1128,48 @@ function SWEP:SecondaryAttack()
 end
 
 SWEP.Checking = 0
+SWEP.PulseCheckDuration = 10
+SWEP.PulseCheckTick = 0.02
+
+function SWEP:StopPulseCheck(targetPly, skipNotify)
+	if not self.ActivePulseChecks then return end
+
+	for ply, data in pairs(self.ActivePulseChecks) do
+		if not targetPly or targetPly == ply then
+			if data and data.timerName then
+				timer.Remove(data.timerName)
+			end
+
+			if not skipNotify and IsValid(ply) and data and data.completed and data.counted then
+				local bpm = data.counted * 6
+				ply:Notify(data.counted .. " x 6 = " .. bpm .. " BPM", 3)
+			end
+
+			self.ActivePulseChecks[ply] = nil
+		end
+	end
+end
+
+function SWEP:StartPulseCheck(ply, org)
+	if not IsValid(ply) or not org then return end
+
+	self.ActivePulseChecks = self.ActivePulseChecks or {}
+
+	local active = self.ActivePulseChecks[ply]
+	if active then
+		ply:Notify("Interrupted.", 1)
+		return
+	end
+
+	if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
+		ply:Notify("No Pulse.", 2)
+		return
+	end
+    
+    umsg.Start("hg_StartPulseCheckECG", ply)
+    umsg.Entity(self.CarryEnt)
+    umsg.End()
+end
 
 -- function SWEP:AdjustMouseSensitivity()
 -- 	local owner = self:GetOwner()
@@ -936,7 +1188,7 @@ SWEP.Checking = 0
 function SWEP:ApplyForce()
 	local ply = self:GetOwner()
 	local target = self:GetOwner():GetAimVector() * self.CarryDist + select(1, hg.eye(ply))
-	if not IsValid(self.CarryEnt) then return end
+	if not IsValid(self.CarryEnt) or self.CarryBone == nil then return end
 	local phys = self.CarryEnt:GetPhysicsObjectNum(self.CarryBone)
 
 	if ply.organism and ply.organism.rarmamputated and ply:IsTyping() then
@@ -1025,6 +1277,10 @@ function SWEP:ApplyForce()
 						--ply:ChatPrint("The armor is too thick to feel the pulse.")
 					elseif ((bone == "ValveBiped.Bip01_L_Hand") or (bone == "ValveBiped.Bip01_R_Hand") or (bone == "ValveBiped.Bip01_Head1")) then
 						local org = ply2.organism
+
+						if bone == "ValveBiped.Bip01_Head1" then
+							self:StartPulseCheck(ply, org)
+						end
 
 						if org.heartstop then
 							--ply:ChatPrint("No pulse.")
@@ -1134,7 +1390,7 @@ function SWEP:ApplyForce()
 					if (self.CPRThink or 0) < CurTime() then
 						self.CPRThink = CurTime() + (1 / 120) * 60
 						if org.alive then
-							//org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2 * (ply.Profession == "doctor" and 2 or 1), org.o2.range)
+							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2 * (ply.Profession == "doctor" and 2 or 1), org.o2.range)
 							org.pulse = math.min(org.pulse + 5 * (ply.Profession == "doctor" and 2 or 1),70)
 							org.CO = math.Approach(org.CO, 0, (ply.Profession == "doctor" and 2 or 1))
 							org.COregen = math.Approach(org.COregen, 0, (ply.Profession == "doctor" and 2 or 1))
@@ -1236,13 +1492,13 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 		end
 
 		if not self.CarryEnt:GetCustomCollisionCheck() then
-			self.CarryEnt:SetCustomCollisionCheck(true)
-			self.CarryEnt:CollisionRulesChanged()
-			owner:CollisionRulesChanged()
+			hg.SafeSetCustomCollisionCheck(self.CarryEnt, true)
+			hg.SafeCollisionRulesChanged(self.CarryEnt)
+			hg.SafeCollisionRulesChanged(owner)
 
 			self.CarryEnt:CallOnRemove("removenarsla",function()
 				if not IsValid(owner) then return end
-				owner:CollisionRulesChanged()
+				hg.SafeCollisionRulesChanged(owner)
 				owner:SetNetVar("carryent",nil)
 				owner:SetNetVar("carrybone",nil)
 				owner:SetNetVar("carrymass",nil)
@@ -1252,9 +1508,11 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 			owner:SetNetVar("carrymass",self.CarryEnt:GetPhysicsObjectNum(self.CarryBone):GetMass())
 		end
 	else
+		self:StopPulseCheck(owner, true)
+
 		if IsValid(self.CarryEnt) and self.CarryEnt:GetCustomCollisionCheck() then
-			self.CarryEnt:CollisionRulesChanged()
-			owner:CollisionRulesChanged()
+			hg.SafeCollisionRulesChanged(self.CarryEnt)
+			hg.SafeCollisionRulesChanged(owner)
 			//self.CarryEnt:SetCustomCollisionCheck(false)
 		end
 
@@ -1373,6 +1631,10 @@ local blockvp = Angle(-1,-1,0.5)
 function SWEP:Think()
 	local owner = self:GetOwner()
 
+    if CLIENT then
+        self.CarryEnt = owner:GetNetVar("carryent")
+    end
+
 	self.handsDesc = "default"
 	local classInfo = customClassInfo[owner.PlayerClassName]
 	if classInfo and self.handsDesc != classInfo.handsDesc then
@@ -1402,6 +1664,8 @@ function SWEP:Think()
 	if owner:GetNWBool("mcd_admiring", false) then
 		return
 	end
+
+	self:TryDownwardHeadbutt()
 
 	if owner.PlayerClassName == "headcrabzombie" and not self:GetCarrying() then
 		self:SetFists(true)
@@ -1551,7 +1815,7 @@ function SWEP:PrimaryAttack(forcespecial)
 		if CLIENT and self.IsLocal and not self:IsLocal() and owner.PlayerClassName == "headcrabzombie" then
 			owner:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_GMOD_GESTURE_RANGE_ZOMBIE, true)
 		else
-			owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD,owner:LookupSequence((special_attack or rand) and "range_fists_r" or "range_fists_l"),0,true)
+			addHandsGestureSafe(owner, (special_attack or rand) and "range_fists_r" or "range_fists_l")
 		end
 	end
 
@@ -1634,6 +1898,15 @@ local vent = {
 	"doors/vent_open2.wav",
 	"doors/vent_open3.wav"
 }
+
+local function addHandsGestureSafe(owner, sequenceName)
+	if not IsValid(owner) then return end
+
+	local seqID = owner:LookupSequence(sequenceName)
+	if not isnumber(seqID) or seqID < 0 or seqID >= owner:GetSequenceCount() then return end
+
+	owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD, seqID, 0, true)
+end
 
 function SWEP:AttackFront(special_attack, rand)
 	if CLIENT then return end
@@ -1734,7 +2007,7 @@ function SWEP:AttackFront(special_attack, rand)
 			self.DamageMul = special_attack and 1.6 or 3
 		end
 
-		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul * (1 + (owner:GetStat("Strength") - 10) * 0.1)
+		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul
 		local ent = Ent
 		local vec = AimVec
 
@@ -1750,7 +2023,7 @@ function SWEP:AttackFront(special_attack, rand)
 			end)
 		end
 
-		Mul = Mul * (owner.MeleeDamageMul or 1)
+		Mul = Mul * (owner.FistsDamageMul or owner.MeleeDamageMul or 1)
 
 		if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
 			Mul = Mul * (self:GetBlocking() and 0.5 or 1)
@@ -1865,8 +2138,8 @@ function hg.SetCarryEnt2(ply, ent, bone, mass, carrypos, targetpos, targetang, d
 			ply:SetNetVar("carrypos2", carrypos)
 
 			if not ent:GetCustomCollisionCheck() then
-				ent:SetCustomCollisionCheck(true)
-				ent:CollisionRulesChanged()
+				hg.SafeSetCustomCollisionCheck(ent, true)
+				hg.SafeCollisionRulesChanged(ent)
 			end
 
 			local dist = dist or phys:GetPos():Distance(ply:EyePos())
@@ -1885,12 +2158,25 @@ end
 function SWEP:Reload()
 	if not IsFirstTimePredicted() then return end
 
+	local owner = self:GetOwner()
+	local ent = self:GetCarrying()
+
+	if SERVER and IsValid(ent) and ent:GetClass() == "prop_ragdoll" and self.CarryBone != nil then
+		local ply2 = RagdollOwner(ent) or ent
+		if not ply2.noHead and ply2.organism then
+			local boneId = ent:TranslatePhysBoneToBone(self.CarryBone)
+			local boneName = ent:GetBoneName(boneId)
+			if boneName == "ValveBiped.Bip01_Head1" then
+				self:StartPulseCheck(owner, ply2.organism)
+				return
+			end
+		end
+	end
+
 	if self:GetOwner().PlayerClassName ~= "headcrabzombie" then
 		self:SetFists(false)
 		self:SetBlocking(false)
 	end
-
-	local ent = self:GetCarrying()
 
 	if SERVER then
 		local target,_ = WorldToLocal(self:GetOwner():GetAimVector() * (self.CarryDist or 50) + self:GetOwner():GetShootPos(),angle_zero,self:GetOwner():EyePos(),self:GetOwner():EyeAngles())
@@ -2052,7 +2338,15 @@ end
 
 function SWEP:DoBFSAnimation(anim, time, slowmo, force_local)
 	if CLIENT and IsValid(self:GetWM()) then
-		self:GetWM():SetSequence(type(anim) == "string" and self:GetWM():LookupSequence(anim) or anim)
+		local mdl = self:GetWM()
+		local seq = anim
+		if isstring(seq) then
+			seq = mdl:LookupSequence(seq)
+		end
+		if isnumber(seq) and seq >= 0 and (not mdl.GetSequenceCount or seq < mdl:GetSequenceCount()) then
+			mdl:SetSequence(seq)
+			mdl.ZCAnimAssigned = true
+		end
 		self.animtime = CurTime() + time
 		self.animduration = time
 		self.slowmoanim = slowmo and time or nil
@@ -2084,7 +2378,7 @@ if CLIENT then
 				if CLIENT and self.IsLocal and not self:IsLocal() and owner.PlayerClassName == "headcrabzombie" then
 					owner:AnimRestartGesture(GESTURE_SLOT_ATTACK_AND_RELOAD, ACT_GMOD_GESTURE_RANGE_ZOMBIE, true)
 				else
-					owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD,owner:LookupSequence((special_attack or rand) and "range_fists_r" or "range_fists_l"),0,true)
+					addHandsGestureSafe(owner, anim == "fists_left" and "range_fists_l" or "range_fists_r")
 				end
 			end
 		end
@@ -2150,7 +2444,7 @@ if SERVER then
 		local isAdmiring = not ply:GetNWBool("mcd_admiring", false)
 		if args[1] == "cancel" then isAdmiring = false end
 		ply:SetNWBool("mcd_admiring", isAdmiring)
-		ply.mcd_admire_cooldown = CurTime() + 1.0 -- Prevent spam
+		ply.mcd_admire_cooldown = CurTime() + 1.5 -- Prevent spam
 		
 		if isAdmiring then
 			if not ply:HasWeapon("weapon_hands_sh") then
@@ -2166,8 +2460,8 @@ if SERVER then
 					wep:DoBFSAnimation("seq_admire", 5, true, true)
 					
 					-- Ensure animation doesn't get interrupted
-					wep:SetNextPrimaryFire(CurTime() + 7)
-					wep:SetNextSecondaryFire(CurTime() + 7)
+					wep:SetNextPrimaryFire(CurTime() + 10)
+					wep:SetNextSecondaryFire(CurTime() + 10)
 				end
 			end)
 		else

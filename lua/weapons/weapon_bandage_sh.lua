@@ -154,9 +154,14 @@ end
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
 function SWEP:Animation()
 	local owner = self:GetOwner()
-	local aimvec = self:GetOwner():GetAimVector()
+	if not IsValid(owner) or not owner.GetAimVector then return end
+
+	local ownerPly = owner:IsPlayer() and owner or hg.GetCurrentCharacter(owner)
+	if not IsValid(ownerPly) or not ownerPly:IsPlayer() or not ownerPly.GetAimVector then return end
+
+	local aimvec = ownerPly:GetAimVector()
 	local hold = self:GetHolding()
-	if (owner.zmanipstart ~= nil and not owner.organism.larmamputated) then return end
+	if (ownerPly.zmanipstart ~= nil and ownerPly.organism and not ownerPly.organism.larmamputated) then return end
 	self:BoneSet("r_upperarm", vector_origin, Angle(30 - hold / 4, -30 + hold / 2 + 20 * aimvec[3], 5 - hold / 3.5))
     self:BoneSet("r_forearm", vector_origin, Angle(hold / 10, -hold / 2.5, 35 -hold/1.5))
 end
@@ -217,11 +222,14 @@ end
 function SWEP:Think()
 	self:SetHold(self.HoldType)
 
-	if self:GetClass() == "weapon_bandage_sh" then
+	if self:GetClass() == "weapon_bandage_sh" and self.modeValues and self.modeValuesdef and self.modeValues[1] and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
 		self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
+	else
+		self.ModelScale = self.ModelScale or 1
 	end
 
-	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+	local owner = self:GetOwner()
+	if IsValid(owner) and not owner:KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 12, 0))
 	end
 
@@ -302,7 +310,7 @@ if CLIENT then
 	local lerpthing = 1
 	local colBrown = Color(40,40,40)
 	SWEP.showstats = true
-	SWEP.ofsV = Vector(10,-2,1)
+	SWEP.ofsV = Vector(1,-2,1)
 	SWEP.ofsA = Angle(-90,-40,270)
 	local vector_one = Vector(1,1,1)
 	function SWEP:DrawHUD()
@@ -335,20 +343,20 @@ if CLIENT then
 		local p,a = mdl:GetPos(), mdl:GetAngles()
 		local pos,ang = LocalToWorld(self.ofsV,self.ofsA,p,a)
 		if self.showstats and self.modeValues and istable(self.modeValues) then
-			//cam.Start3D()
-				//cam.Start3D2D(pos,ang,0.01)
+			cam.Start3D()
+				cam.Start3D2D(pos,ang,0.01)
 				render.PushFilterMag( TEXFILTER.LINEAR )
 				render.PushFilterMin( TEXFILTER.LINEAR )
 				local m = Matrix()
 				m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
-				m:Scale( vector_one * 0.5 )
+				m:Scale( vector_one * 0.75 )
 
 				cam.PushModelMatrix( m, true )
 					for i, val in ipairs(self.modeValues) do
 						if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
 						local val = math.Round(val / self.modeValuesdef[i][1] * 100)
 						local x,y = 0, i * ScrH() / 20
-						local reveal = 1//math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
+						local reveal = 1 //math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
 						colBrown.a = reveal * 185
 						draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25 + (#self.modeValues > 0 and 0 or 0),colBrown)
 						surface.SetFont("ZCity_Small")
@@ -356,7 +364,7 @@ if CLIENT then
 						surface.SetTextColor(255,255,255,255 * reveal)
 						local txt = string.NiceName(tostring(self.modeNames[i]))
 						local w, h = surface.GetTextSize(txt)
-						--surface.DrawText(tostring(self.modeNames[i]))
+						surface.DrawText(tostring(self.modeNames[i]))
 						colBrown.a = reveal * 255
 						draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
 					
@@ -369,8 +377,8 @@ if CLIENT then
 
 				render.PopFilterMag()
 				render.PopFilterMin()
-				//cam.End3D2D()
-			//cam.End3D()
+				cam.End3D2D()
+			cam.End3D()
 		end
 	end
 end
@@ -634,9 +642,8 @@ if SERVER then
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
-					local intel_bonus = 1 + (owner:GetStat("Intelligence") - 10) * 0.05
-					local healedWound = math.max(biggestWound - self.modeValues[1] * intel_bonus, 0)
-					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)
+					local healedWound = math.max(biggestWound - self.modeValues[1], 0)
+					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)-- * ((owner.Profession == "doctor") and 0.33 or 1)
 					org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
 					org.wounds[1][1] = healedWound
 					self.modeValues[1] = woundHeal > 0.1 and woundHeal or 0

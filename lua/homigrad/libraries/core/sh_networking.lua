@@ -76,6 +76,13 @@ if (CLIENT) then
 else
 	util.AddNetworkString("ZB_request_fullupdate")
 
+	local function ShouldSkipNetVarResend(currentValue, newValue, receiver)
+		if receiver ~= nil then return false end
+		if istable(currentValue) or istable(newValue) then return false end
+
+		return currentValue == newValue
+	end
+
 	net.Receive("ZB_request_fullupdate",function(len,ply)
 		ply.cooldown_sendnet = ply.cooldown_sendnet or 0
 		if ply.cooldown_sendnet < CurTime() then
@@ -130,7 +137,8 @@ else
 
     function SetNetVar(key, value, receiver)
     	if (CheckBadType(key, value)) then return end
-    	--if (GetNetVar(key) == value) then return end
+
+		if ShouldSkipNetVarResend(zb.net.globals[key], value, receiver) then return end
 		
     	zb.net.globals[key] = value
 
@@ -189,6 +197,7 @@ else
     	if (CheckBadType(key, value)) then return end
 
     	zb.net.locals[self] = zb.net.locals[self] or {}
+		if ShouldSkipNetVarResend(zb.net.locals[self][key], value, nil) then return end
     	zb.net.locals[self][key] = value
 
     	net.Start("zbLocalVarSet")
@@ -210,11 +219,8 @@ else
 
 		zb.net.list[self] = zb.net.list[self] or {}
 
-		--if not hg.IsChanged(value, key, zb.net.list[self]) then return end
-
-    	if (zb.net.list[self][key] != value) then
-    		zb.net.list[self][key] = value 
-    	end
+		if ShouldSkipNetVarResend(zb.net.list[self][key], value, receiver) then return end
+    	zb.net.list[self][key] = value
 		
 		self:SendNetVar(key, receiver)
 	end

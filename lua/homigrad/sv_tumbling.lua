@@ -5,6 +5,14 @@ local util_TraceHull = util.TraceHull
 local IsValid = IsValid
 local CurTime = CurTime
 
+local function PlayBoneBreakSound(entity)
+    if math.random() < 0.5 then
+                entity:EmitSound("owfuck"..math.random(1, 9)..".ogg")
+    else
+        entity:EmitSound("newbonebreak/break"..math.random(10)..".wav")
+    end
+end
+
 local TUMBLE_SPEED_THRESHOLD = 250
 local TUMBLE_COOLDOWN = 2
 local GAP_CHECK_DIST = 30 
@@ -29,6 +37,7 @@ hook.Add("Think", "stanleytumbler", function()
         local org = ply.organism or {}
         local consciousness = org.consciousness or 1
         local fear = org.fear or 0
+        local despair = org.despair or 0
         local stamina = org.stamina and org.stamina[1] or 100
         local effectiveThreshold = TUMBLE_SPEED_THRESHOLD
         effectiveThreshold = effectiveThreshold * math.Clamp(consciousness, 0.5, 1.0)
@@ -110,8 +119,33 @@ hook.Add("Think", "stanleytumbler", function()
             end
         end
 
-        local dexterity = ply:GetStat("Dexterity") or 10
-        tripChance = tripChance * (1 - (dexterity - 10) * 0.05)
+        if not shouldTrip then
+            ply.eyeAnglesOld = ply.eyeAnglesOld or ply:EyeAngles()
+            local cosine = ply:EyeAngles():Forward():Dot(ply.eyeAnglesOld:Forward())
+
+            if speed > 200 and cosine <= 0.99 then
+                local tr = util_TraceLine({ start = pos, endpos = pos - Vector(0,0,1), filter = ply })
+                if tr.Hit and tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2 then
+                    shouldTrip = true
+                    tripType = "slip"
+                    tripChance = tripChance + 0.7
+                end
+            end
+            ply.eyeAnglesOld = ply:EyeAngles()
+        end
+
+        if fear > 0.1 then
+            tripChance = tripChance + fear * 0.25
+        end
+        if despair > 0.1 then
+            tripChance = tripChance + despair * 0.25
+        end
+
+        local maxStamina = (org.stamina and org.stamina.max) or 100
+        if stamina < maxStamina then
+            local staminaPenalty = (maxStamina - stamina) / maxStamina
+            tripChance = tripChance + staminaPenalty * 0.2
+        end
 
         if org.superfighter then
             tripChance = tripChance * 0.1
@@ -134,12 +168,12 @@ hook.Add("Think", "stanleytumbler", function()
                 hg.Fake(ply)
                 --mcity reference?
                 if not org.superfighter then
-                    local breakChance = 0.25
-                    local dislocationChance = 0.5
+                    local breakChance = 0.15
+                    local dislocationChance = 0.3
 
                     if math.random() < breakChance then
                         -- Limb break
-                        ply:EmitSound("owfuck"..math.random(1, 6)..".ogg")
+                                                PlayBoneBreakSound(ply)
                         org.painadd = (org.painadd or 0) + 70 -- More pain for a break
 
                         if tripType == "wall" then
@@ -163,7 +197,7 @@ hook.Add("Think", "stanleytumbler", function()
                         end
                     elseif math.random() < dislocationChance then
                         -- Limb dislocation
-                        ply:EmitSound("disloc"..math.random(1, 2)..".wav")
+                                                PlayBoneBreakSound(ply)
                         org.painadd = (org.painadd or 0) + 35
 
                         if tripType == "wall" then
@@ -196,22 +230,28 @@ hook.Add("Think", "stanleytumbler", function()
                     local phystorso = (hg.IdealMassPlayer and hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]) or 20
 
                     local force = velocity:GetNormalized() * 150
-                    
-                    local torsoForce = -force * 5 * phystorso
-                    local legForce = (force * 5 - Vector(0,0,2)) * phys1
 
-                    if tripType == "wall" then
-                        torsoForce = torsoForce * 1.2
-                        legForce = legForce * 0.8 
-                    elseif tripType == "gap" then
-                        legForce = legForce * 1.5
-                    elseif tripType == "ragdoll" then
-                         torsoForce = torsoForce * 0.5
+                    if tripType == "slip" then
+                        hg.AddForceRag(ply, torso, -force * 5 * phystorso, 0.5)
+                        hg.AddForceRag(ply, b1, (force * 5 - Vector(0,0,2)) * phys1, 0.5)
+                        hg.AddForceRag(ply, b2, (force * 5 - Vector(0,0,2)) * phys2, 0.5)
+                    else
+                        local torsoForce = -force * 5 * phystorso
+                        local legForce = (force * 5 - Vector(0,0,2)) * phys1
+
+                        if tripType == "wall" then
+                            torsoForce = torsoForce * 1.2
+                            legForce = legForce * 0.8 
+                        elseif tripType == "gap" then
+                            legForce = legForce * 1.5
+                        elseif tripType == "ragdoll" then
+                            torsoForce = torsoForce * 0.5
+                        end
+
+                        hg.AddForceRag(ply, torso, torsoForce, 0.5)
+                        hg.AddForceRag(ply, b1, legForce, 0.5)
+                        hg.AddForceRag(ply, b2, legForce, 0.5)
                     end
-
-                    hg.AddForceRag(ply, torso, torsoForce, 0.5)
-                    hg.AddForceRag(ply, b1, legForce, 0.5)
-                    hg.AddForceRag(ply, b2, legForce, 0.5)
 
                     timer.Simple(0, function()
                         if IsValid(ply) then hg.StunPlayer(ply) end

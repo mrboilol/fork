@@ -1,6 +1,7 @@
 --local Organism = hg.organism
 hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
+hg.despair_server_builtin = true
 hg.organism.lastindex = hg.organism.lastindex or 1000000
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
@@ -15,6 +16,7 @@ hook.Add("Org Clear", "Main", function(org)
 	module.metabolism[1](org)
 	module.concussion[1](org)
 	module.random_events[1](org)
+	module.infection[1](org)
 	org.brain = 0
 	org.consciousness = 1
 	org.disorientation = 0
@@ -27,8 +29,14 @@ hook.Add("Org Clear", "Main", function(org)
 	org.skull = 0
 	org.stomach = 0
 	org.intestines = 0
+	org.stroke_meter = 0
+	org.oxygen_deprivation = 0
+
+	org.tranexamic_acid = 0
 
 	org.thiamine = 0
+	org.thiamine_timer = 0
+	org.thiamine_healed = false
 
 	org.lleg = 0
 	org.rleg = 0
@@ -80,7 +88,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.assimilated = 0
 	org.berserk = 0
 	org.noradrenaline = 0
-	org.blindness = nil 
+	org.blindness = nil
 
 	if IsValid(org.owner) then
 		if org.owner:IsPlayer() and org.owner:Alive() then
@@ -97,12 +105,13 @@ hook.Add("Org Clear", "Main", function(org)
 	org.just_damaged_bone = nil
 	org.LodgedEntities = nil
 	
+	
 	org.dmgstack = {}
 end)
 
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
-	if org.otrub or org.fake or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood < 2900) or org.consciousness <= 0.4 then
+	if org.otrub or org.fake or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood < 2750) or org.consciousness <= 0.4 then
 		return false
 	end
 end)
@@ -141,6 +150,9 @@ local function send_organism(org, ply)
 	sendtable.shock = org.shock
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
+	sendtable.bloodpressure = org.bloodpressure
+	sendtable.systolic = org.systolic
+	sendtable.diastolic = org.diastolic
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
@@ -163,6 +175,8 @@ local function send_organism(org, ply)
 	sendtable.lungsfunction = org.lungsfunction
 	sendtable.consciousness = org.consciousness
 	sendtable.concussion = org.concussion
+	sendtable.stroke_meter = org.stroke_meter
+	sendtable.oxygen_deprivation = org.oxygen_deprivation
 	sendtable.assimilated = org.assimilated
 	sendtable.berserk = org.berserk
 	sendtable.noradrenaline = org.noradrenaline
@@ -174,6 +188,7 @@ local function send_organism(org, ply)
 	sendtable.incapacitated = org.incapacitated
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
+	sendtable.stroke_meter = org.stroke_meter
 
 	sendtable.superfighter = org.superfighter
 
@@ -204,9 +219,13 @@ local function send_bareinfo(org)
 	sendtable.pulse = org.pulse
 	sendtable.blood = org.blood
 	sendtable.heartbeat = org.heartbeat
+	sendtable.bloodpressure = org.bloodpressure
+	sendtable.systolic = org.systolic
+	sendtable.diastolic = org.diastolic
 	sendtable.analgesia = org.analgesia
 	sendtable.o2 = org.o2
 	sendtable.timeValue = org.timeValue
+	sendtable.despair = org.despair
 	sendtable.superfighter = org.superfighter
 	sendtable.lungsfunction = org.lungsfunction
 	sendtable.lleg = org.lleg
@@ -301,7 +320,6 @@ local function is_despair_corpse(ent)
 	return true
 end
 
-
 hook.Add("HomigradDamage", "Berserk", function(ply, dmgInfo, hitgroup, ent)
 	local attacker, victim = dmgInfo:GetAttacker(), ply
 	if !attacker or !IsValid(attacker) or (IsValid(attacker) and !attacker:IsPlayer()) then
@@ -322,7 +340,6 @@ hook.Add("HomigradDamage", "Berserk", function(ply, dmgInfo, hitgroup, ent)
 		end
 	end)
 end)
-
 
 hook.Add("HomigradDamage", "DespairGain", function(ply, dmgInfo)
 	if not IsValid(ply) or not ply:IsPlayer() then return end
@@ -427,124 +444,78 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 	end
 end)
 
+
+
+hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
+    local ramp_rate = 0
+
+    -- Ramp up on high blood pressure (>115), but prevent if tranexamic acid is active
+    if org.bloodpressure > 115 and org.tranexamic_acid <= 0 then
+        local bp_effect = (org.bloodpressure - 115) / 35 -- Normalize pressure effect
+        ramp_rate = ramp_rate + (0.008 * bp_effect) -- Reduced from 0.025 to 0.008 (3x slower)
+    end
+
+    if ramp_rate > 0 then
+        org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.15)
+    end
+
+    local decay_rate = 0.005
+    if org.internalBleed and org.internalBleed > 0 then
+        decay_rate = 0.001
+    end
+
+    -- Tranexamic acid slowly regresses stroke
+    if org.tranexamic_acid > 0 then
+        decay_rate = decay_rate + 0.02 -- Additional decay when tranexamic acid is active
+    end
+
+    org.stroke_meter = math.max((org.stroke_meter or 0) - timeValue * decay_rate, 0)
+
+    -- Need otrub if stroke meter is above 1.025
+    if (org.stroke_meter or 0) > 1.025 then
+        org.needotrub = true
+    end
+
+    if org.stroke_meter >= 1.15 and not org.is_stroking then
+        org.is_stroking = true
+        org.stroke_active = true  -- Set stroke active for persistent effects
+        org.o2[1] = 3
+		org.alive = false
+        owner:Notify("My head... I can't...", 1, "stroke", 5)
+
+        -- Add stroke moodle and brain health toll
+        owner:SetMoodle("stroke_moodle", true)
+        org.brain = math.max(org.brain - 25, 0)  -- Immediate brain health toll
+    elseif org.stroke_meter < 1.15 and org.is_stroking then
+        org.is_stroking = false
+        if org.alive then
+            org.heartstop = true
+            org.lungsfunction = false
+        end
+    end
+
+    if org.is_stroking then
+        org.brain = math.max(org.brain - timeValue / 150, 0)  -- Accelerated brain deterioration during stroke
+    end
+end)
+
+hook.Add("Org Think", "StrokeEffects", function(owner, org, timeValue)
+    if org.stroke_meter and org.stroke_meter > 0.5 then
+        local effect_scale = (org.stroke_meter - 0.5) / (1.15 - 0.5)
+        org.disorientation = math.max(org.disorientation or 0, 4 * effect_scale)
+        if org.consciousness then
+            org.consciousness = math.max(org.consciousness - (0.1 * effect_scale) * timeValue, 0)
+        end
+        if org.o2 and org.o2[1] then
+             org.o2[1] = math.max(org.o2[1] - (0.2 * effect_scale) * timeValue, 0)
+        end
+    end
+end)
+
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if not IsValid(owner) then
 		hg.organism.list[owner] = nil
 		return
-	end
-
-	if org.berserk > 0 or org.noradrenaline > 0 then
-		org.despair = 0
-		org._despairLastAdrenaline = org.adrenaline or 0
-		return
-	end
-
-	org.despair = math.Clamp(org.despair or 0, 0, 1)
-	local despairDecay = timeValue / 160
-	if org.despair > 0.35 then
-		despairDecay = timeValue / 360
-	end
-	org.despair = math.Approach(org.despair, 0, despairDecay)
-
-	local despairAdd = 0
-	local adrenaline = org.adrenaline or 0
-	local adrenalineAdd = org.adrenalineAdd or 0
-	local prevAdrenaline = org._despairLastAdrenaline or adrenaline
-	local adrenalineDelta = math.max(adrenaline - prevAdrenaline, 0)
-	org._despairLastAdrenaline = adrenaline
-
-	if adrenaline > 8 then
-		despairAdd = despairAdd + (adrenaline - 8) * timeValue * 0.003
-	end
-
-	if adrenalineAdd > 0.9 then
-		despairAdd = despairAdd + math.min(adrenalineAdd, 2) * timeValue * 0.002
-	end
-
-	if adrenalineDelta > 0 then
-		despairAdd = despairAdd + math.min(adrenalineDelta * 0.02, 0.004)
-	end
-
-	if (org.fear or 0) > 0 then
-		despairAdd = despairAdd + math.Clamp(org.fear, 0, 2) * timeValue * 0.0035
-	end
-
-	if (org.pain or 0) > 45 then
-		despairAdd = despairAdd + math.Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.008
-	end
-
-	if (org.shock or 0) > 20 then
-		despairAdd = despairAdd + math.Clamp((org.shock - 20) / 50, 0, 1) * timeValue * 0.006
-	end
-
-	if (org.bleed or 0) > 2 then
-		despairAdd = despairAdd + math.Clamp((org.bleed - 2) / 14, 0, 1) * timeValue * 0.007
-	end
-
-	if (org.blood or 5000) < 3200 then
-		despairAdd = despairAdd + math.Clamp((3200 - org.blood) / 2200, 0, 1) * timeValue * 0.009
-	end
-
-	if (org.consciousness or 1) < 0.7 then
-		despairAdd = despairAdd + math.Clamp((0.7 - org.consciousness) / 0.7, 0, 1) * timeValue * 0.008
-	end
-
-	if (org.hungry or 0) > 55 then
-		despairAdd = despairAdd + math.Clamp((org.hungry - 55) / 45, 0, 1) * timeValue * 0.004
-	end
-
-	if org.o2 and org.o2[1] then
-		local o2 = org.o2[1]
-		if o2 < 14 then
-			despairAdd = despairAdd + math.Clamp((14 - o2) / 14, 0, 1) * timeValue * 0.05
-		end
-
-		local curregen = org.o2.curregen or 0
-		local losing = org.losing_oxy or 0
-		if curregen < losing then
-			despairAdd = despairAdd + math.Clamp(losing - curregen, 0, 2) * timeValue * 0.009
-		end
-	end
-
-	local time = CurTime()
-	if isPly and isfunction(owner.GetAimVector) and isfunction(owner.EyePos) and (org._despairNextCorpseCheck or 0) <= time then
-		org._despairNextCorpseCheck = time + 0.35
-
-		local eyePos = owner:EyePos()
-		local aim = owner:GetAimVector()
-		local corpsesSeen = 0
-		local rag = owner.FakeRagdoll
-		local traceFilter = IsValid(rag) and {owner, rag} or owner
-
-		for _, ent in ipairs(ents.FindInCone(eyePos, aim, 1024, math.cos(math.rad(26)))) do
-			if ent == owner or ent == rag then continue end
-			if not is_despair_corpse(ent) then continue end
-
-			local tr = util.TraceLine({
-				start = eyePos,
-				endpos = ent:WorldSpaceCenter(),
-				filter = traceFilter
-			})
-
-			if tr.Entity == ent or not tr.Hit then
-				corpsesSeen = corpsesSeen + 1
-			end
-
-			if corpsesSeen >= 3 then break end
-		end
-
-		if corpsesSeen > 0 then
-			despairAdd = despairAdd + timeValue * 0.028 * corpsesSeen
-		end
-	end
-
-	if despairAdd > 0 then
-		despairAdd = math.min(despairAdd, timeValue * 0.03)
-		org.despair = math.min(org.despair + despairAdd, 1)
-	end
-
-	if org.despair >= 0.8 then
-		org.disorientation = math.max(org.disorientation or 0, 1)
 	end
 
 	if owner:IsPlayer() and not owner:Alive() then return end
@@ -603,7 +574,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.metabolism[2](owner, org, timeValue)
 		module.concussion[2](owner, org, timeValue)
 		module.random_events[2](owner, org, timeValue)
+		module.infection[2](owner, org, timeValue)
 	end
+
+
+
 	module.pulse[2](owner, org, timeValue)
 
 	if org.owner.PlayerClassName == "furry" then
@@ -631,6 +606,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
 	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
+	org.tranexamic_acid = math.Approach(org.tranexamic_acid, 0, timeValue / 120) -- Tranexamic acid decays over 2 minutes
 
 	if org.berserk > 0 and !org.berserkActive then
 		org.berserkActive = true
@@ -652,6 +628,124 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.noradrenalineActive = false
 	end
 
+	if org.berserk > 0 or org.noradrenaline > 0 then
+		org.despair = 0
+		org._despairLastAdrenaline = org.adrenaline or 0
+		--return 
+	end
+
+	org.despair = math.Clamp(org.despair or 0, 0, 1)
+	local despairDecay = timeValue / 160
+	if org.despair > 0.35 then
+		despairDecay = timeValue / 360
+	end
+	local analgesia = math.Clamp(org.analgesia or 0, 0, 4)
+	if analgesia > 0 then
+		despairDecay = despairDecay * (1 + analgesia * 1.25 + analgesia * analgesia * 0.4)
+	end
+	org.despair = math.Approach(org.despair, 0, despairDecay)
+
+	local despairAdd = 0
+	local adrenaline = org.adrenaline or 0
+	local adrenalineAdd = org.adrenalineAdd or 0
+	local prevAdrenaline = org._despairLastAdrenaline or adrenaline
+	local adrenalineDelta = math.max(adrenaline - prevAdrenaline, 0)
+	org._despairLastAdrenaline = adrenaline
+
+	if adrenaline > 8 then
+		despairAdd = despairAdd + (adrenaline - 8) * timeValue * 0.003
+	end
+
+	if adrenalineAdd > 0.9 then
+		despairAdd = despairAdd + math.min(adrenalineAdd, 2) * timeValue * 0.002
+	end
+
+	if adrenalineDelta > 0 then
+		despairAdd = despairAdd + math.min(adrenalineDelta * 0.02, 0.004)
+	end
+
+	if (org.fear or 0) > 0 then
+		despairAdd = despairAdd + math.Clamp(org.fear, 0, 2) * timeValue * 0.0035
+	end
+
+	if (org.pain or 0) > 45 then
+		despairAdd = despairAdd + math.Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.008
+	end
+
+	if (org.shock or 0) > 20 then
+		despairAdd = despairAdd + math.Clamp((org.shock - 20) / 50, 0, 1) * timeValue * 0.006
+	end
+
+	if (org.bleed or 0) > 2 then
+		despairAdd = despairAdd + math.Clamp((org.bleed - 2) / 14, 0, 1) * timeValue * 0.007
+	end
+
+	if (org.blood or 5000) < 3750 then
+		despairAdd = despairAdd + math.Clamp((3750 - org.blood) / 2200, 0, 1) * timeValue * 0.009
+	end
+
+	if (org.consciousness or 1) < 0.7 then
+		despairAdd = despairAdd + math.Clamp((0.7 - org.consciousness) / 0.7, 0, 1) * timeValue * 0.008
+	end
+
+	if (org.hungry or 0) > 55 then
+		despairAdd = despairAdd + math.Clamp((org.hungry - 55) / 45, 0, 1) * timeValue * 0.004
+	end
+
+	if org.o2 and org.o2[1] then
+		local o2 = org.o2[1]
+		if o2 < 14 then
+			despairAdd = despairAdd + math.Clamp((14 - o2) / 14, 0, 1) * timeValue * 0.05
+		end
+
+		local curregen = org.o2.curregen or 0
+		local losing = org.losing_oxy or 0
+		if curregen < losing then
+			despairAdd = despairAdd + math.Clamp(losing - curregen, 0, 2) * timeValue * 0.009
+		end
+	end
+
+	local time = CurTime()
+	if isPly and isfunction(owner.GetAimVector) and isfunction(owner.EyePos) and (org._despairNextCorpseCheck or 0) <= time then
+		org._despairNextCorpseCheck = time + 0.35
+
+		local eyePos = owner:EyePos()
+		local aim = owner:GetAimVector()
+		local corpsesSeen = 0
+		local rag = owner.FakeRagdoll
+		local traceFilter = IsValid(rag) and {owner, rag} or owner
+
+		for _, ent in ipairs(ents.FindInCone(eyePos, aim, 1024, math.cos(math.rad(26)))) do
+			if ent == owner or ent == rag then continue end
+			if not is_despair_corpse(ent) then continue end
+
+			local tr = util.TraceLine({
+				start = eyePos,
+				endpos = ent:WorldSpaceCenter(),
+				filter = traceFilter
+			})
+
+			if tr.Entity == ent or not tr.Hit then
+				corpsesSeen = corpsesSeen + 1
+			end
+
+			if corpsesSeen >= 3 then break end
+		end
+
+		if corpsesSeen > 0 then
+			despairAdd = despairAdd + timeValue * 0.028 * corpsesSeen
+		end
+	end
+
+	if despairAdd > 0 then
+		despairAdd = math.min(despairAdd, timeValue * 0.034)
+		org.despair = math.min(org.despair + despairAdd, 1)
+	end
+
+	if org.despair >= 0.8 then
+		org.disorientation = math.max(org.disorientation or 0, 1)
+	end
+
 	if (org.llegamputated or org.rlegamputated) and org.berserk <= 0.3 then
 		org.needfake = true
 	end
@@ -663,7 +757,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 
-	if isPly then
+	--[[if isPly then
 		local aimed = false
 
 		local entities = ents.FindInCone(owner:EyePos(), owner:GetAimVector(), 128, math.cos(math.rad(90)))
@@ -684,8 +778,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			owner.aimed_at = owner.aimed_at or 0
 			owner.aimed_at = math.Approach(owner.aimed_at, 0, timeValue / 5)
 		end
-	end
-	--huh
+	end--]]
+	--bullshit
 
 	if org.otrub then
 		org.uncon_timer = org.uncon_timer or 0
@@ -695,6 +789,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	local just_went_uncon = not org.otrub and org.needotrub
+	
+
 	local just_woke_up = not org.needotrub and org.otrub and (org.uncon_timer or 0) > 6
 	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner); hook.Run("PlayerDropWeapon", owner) end
 	if isPly and just_woke_up then hook.Run("HG_OnWakeOtrub", owner) end
@@ -703,7 +799,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-	if (org.blood < 2700) then org.needfake = true end
+	if (org.blood < 2750) then org.needfake = true end
 	if org.neckslit and not org.otrub then org.needfake = true end
 
 	local just_went_uncon = not org.otrub and org.needotrub
@@ -725,34 +821,42 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	end
 
-	if org.brain < 0.4 then
-		local naturalHeal
-		local thiamineConsumptionRate = timeValue / 240
-        local endurance_bonus = 1 + (org.owner:GetStat("Endurance") - 10) * 0.05
+	-- Thiamine healing logic
+	org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 
-		if org.thiamine > 0 then
-			if (org.hungry or 0) < 1 then -- Well-fed check
-				naturalHeal = timeValue / (240 / endurance_bonus) -- Faster healing
-				thiamineConsumptionRate = timeValue / 120 -- Faster consumption
-			else
-				naturalHeal = timeValue / (480 / endurance_bonus) -- Normal thiamine healing
+	if org.thiamine > 0 then
+		if not org.thiamine_healed then
+			org.thiamine_timer = org.thiamine_timer + timeValue
+			local heal_delay = (org.satiety or 0) > 50 and 20 or 60
+
+			if org.thiamine_timer > heal_delay then
+				org.thiamine_healed = true
 			end
-		else
-			naturalHeal = timeValue / (1800 / endurance_bonus) -- No thiamine
+		end
+	else
+		org.thiamine_timer = 0
+		org.thiamine_healed = false
+	end
+
+	if org.thiamine_healed then
+		local thiamineHealRate = timeValue / 480
+		-- Heal all organs
+		local organs_to_heal = {
+			"liver", "heart", "stomach", "intestines", "brain", "jaw",
+			"spine1", "spine2", "spine3", "chest", "pelvis", "skull", "trachea",
+			"lleg", "rleg", "larm", "rarm"
+		}
+
+		for _, organ in ipairs(organs_to_heal) do
+			if org[organ] and org[organ] > 0 then
+				org[organ] = math.Approach(org[organ], 0, thiamineHealRate)
+			end
 		end
 
-		-- full heal in ~30 minutes (really fast tho)
-		-- 8 minutes with thiamine
-
-		org.thiamine = math.Approach(org.thiamine, 0, thiamineConsumptionRate)
-		-- you'd need to give 1 thiamine each 4 minutes (or 2 if well-fed)
-
-		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
-		if org.heart < 1 then org.heart = math.Approach(org.heart, 0, naturalHeal) end
-		if org.stomach < 1 then org.stomach = math.Approach(org.stomach, 0, naturalHeal) end
-		if org.intestines < 1 then org.intestines = math.Approach(org.intestines, 0, naturalHeal) end
-		if org.lungsR[1] < 1 then org.lungsR[1] = math.Approach(org.lungsR[1], 0, naturalHeal) end
-		if org.lungsL[1] < 1 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, naturalHeal) end
+		if org.lungsR and org.lungsR[1] > 0 then org.lungsR[1] = math.Approach(org.lungsR[1], 0, thiamineHealRate) end
+		if org.lungsL and org.lungsL[1] > 0 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, thiamineHealRate) end
+		if org.lungsR and org.lungsR[2] > 0 then org.lungsR[2] = math.Approach(org.lungsR[2], 0, thiamineHealRate) end
+		if org.lungsL and org.lungsL[2] > 0 then org.lungsL[2] = math.Approach(org.lungsL[2], 0, thiamineHealRate) end
 	end
 
 	if org.otrub and isPly and org.owner:Alive() then
@@ -785,6 +889,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.neckslitSoundEnt = nil
 	end
 
+	    org.was_otrub = org.otrub
+
 	org.otrub = org.needotrub
 	org.fake = org.needfake
 		if org.needfake and owner:IsNPC() then
@@ -794,12 +900,14 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		owner:TakeDamageInfo(dmgInfo)
 	end
 
-
-
-
 	org.health = owner:Health()
 	local rag = owner:IsPlayer() and owner.FakeRagdoll or owner
-	if IsValid(rag) and rag:IsRagdoll() and (not owner.lastFake or owner.lastFake == 0) then rag:SetCollisionGroup((rag:GetVelocity():LengthSqr() > (200*200)) and COLLISION_GROUP_NONE or COLLISION_GROUP_WEAPON) end
+	if IsValid(rag) and rag:IsRagdoll() and (not owner.lastFake or owner.lastFake == 0) then
+		local wantedCollisionGroup = (rag:GetVelocity():LengthSqr() > (200 * 200)) and COLLISION_GROUP_NONE or COLLISION_GROUP_WEAPON
+		if rag:GetCollisionGroup() ~= wantedCollisionGroup then
+			hg.ApplySetCollisionGroupNow(rag, wantedCollisionGroup)
+		end
+	end
 	if isPly then
 		if org.otrub or org.fake then hg.Fake(owner,nil,true) end
 		if not org.alive and owner:Alive() then owner:Kill() end
@@ -810,7 +918,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 		if not org.likely_phrase then org.likely_phrase = 0 end
 
-		org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 100, 0)
+				org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 50, 0)
 		//print(org.likely_phrase)
 		if org.likely_phrase >= 1 and !hg.GetCurrentCharacter(owner):IsOnFire() then
 			org.likely_phrase = 0
@@ -836,7 +944,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if (org.sendPlyTime > time) and !just_went_uncon then return end
 		org.sendPlyTime = CurTime() + 1 + (not isPly and 2 or 0)
 		send_bareinfo(org)
-			org.owner:SetNetVar("wounds", org.wounds)
+					org.owner:SetNetVar("wounds", org.wounds)
 		org.owner:SetNetVar("arterialwounds", org.arterialwounds)
 
 		if isPly and owner:Alive() then
@@ -928,6 +1036,9 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 
 	org.pulse = math.Approach(org.pulse, 70, regen * 10)
 	org.heartbeat = math.Approach(org.heartbeat, 220, regen * 10)
+	org.bloodpressure = math.Approach(org.bloodpressure or 93, 110, regen * 8)
+	org.systolic = math.Approach(org.systolic or 120, 140, regen * 8)
+	org.diastolic = math.Approach(org.diastolic or 80, 90, regen * 8)
 
 	org.lungsfunction = true
 	org.heartstop = false
@@ -1005,7 +1116,6 @@ end)
 
 hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
 	local ent = hg.GetCurrentCharacter(plya)
-    local intel_multiplier = 1 - (plya:GetStat("Intelligence") - 10) * 0.05
 	for i,ply in ipairs(ents.FindInSphere(ent:GetPos(),256)) do
 		if not ply:IsPlayer() or not ply.organism or plya == ply then continue end
 
@@ -1015,7 +1125,7 @@ hook.Add("HG_OnOtrub", "fearful", function( plya )// ЧЕ
 		tr.filter = {ply,ent}
 		if not util.TraceLine(tr).Hit then
 			ply.organism.adrenalineAdd = ply.organism.adrenalineAdd + 0.3
-			ply.organism.fearadd = ply.organism.fearadd + (0.3 * intel_multiplier)
+			ply.organism.fearadd = ply.organism.fearadd + 0.3
 		end
 	end
 end)
@@ -1110,3 +1220,17 @@ hook.Add("OnEntityWaterLevelChanged", "ClearBlood", function(ent, old, new)
 		ent:RemoveAllDecals()
 	end
 end)
+
+function hg.organism.RadDamage(org, dmg, dmgInfo)
+	hg.organism.GasDamage(org, dmg, dmgInfo)
+
+	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
+end
+
+function hg.organism.InfectionDamage(org, dmg, dmgInfo)
+	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
+end

@@ -12,6 +12,46 @@ end
 
 SWEP.weaponAng = Angle(0, 0, 0)
 local angZero = Angle(0, 0, 0)
+
+local function initializeWorldModelSequenceState(mdl)
+	if not IsValid(mdl) then return end
+
+	mdl.ZCLastSequenceModel = mdl:GetModel()
+	mdl.ZCSequenceReadyAt = CurTime() + 0.25
+	mdl.ZCAnimAssigned = false
+
+	if mdl.ResetSequenceInfo then
+		mdl:ResetSequenceInfo()
+	end
+end
+
+local function normalizeWorldModelSequenceState(mdl, desiredModel)
+	if not IsValid(mdl) then return false end
+
+	if desiredModel and mdl:GetModel() ~= desiredModel then
+		mdl:SetModel(desiredModel)
+	end
+
+	local currentModel = mdl:GetModel()
+	if mdl.ZCLastSequenceModel ~= currentModel then
+		mdl.ZCLastSequenceModel = currentModel
+		mdl.ZCSequenceReadyAt = CurTime() + 0.1
+		mdl.ZCAnimAssigned = false
+	end
+
+	if (mdl.ZCSequenceReadyAt or 0) > CurTime() then return false end
+
+	local seqCount = mdl.GetSequenceCount and mdl:GetSequenceCount() or 0
+	if seqCount <= 0 then return false end
+
+	local seq = mdl:GetSequence()
+	if not isnumber(seq) or seq < 0 or seq >= seqCount then
+		mdl.ZCAnimAssigned = false
+		return false
+	end
+
+	return true
+end
 local math_max, math_Clamp = math.max, math.Clamp
 function SWEP:GetAnimPos_Shoot2(time, timeSpan)
 	local animpos = math.max(time - RealTime() + timeSpan,0) / timeSpan
@@ -229,7 +269,8 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
     
 	local restpos
 
-    if self:GetNWVector("RestPos") and IsValid(self:GetNWEntity("RestEntity")) or self:GetNWEntity("RestEntity"):IsWorld() then
+	local restEntity = self:GetNWEntity("RestEntity")
+	if self:GetNWVector("RestPos") and (IsValid(restEntity) or (restEntity and restEntity.IsWorld and restEntity:IsWorld())) then
 		local posa, anga2, anga = self:GetBipodPosAng()
 
         restpos = LocalToWorld(self:GetNWVector("RestPos"), angle_zero, posa, anga)
@@ -245,7 +286,8 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 
         local lpos, lang = self:RestedAnim(localPos + back, localAng, dtime)
 
-        desiredPos = LocalToWorld(LerpVector(self.restlerp, vector_origin, -self.RestPosition - self.WorldPos) + lpos, lang, LerpVector(self.restlerp, desiredPos, restpos), desiredAng)
+		local restLerp = self.restlerp or 0
+        desiredPos = LocalToWorld(LerpVector(restLerp, vector_origin, -self.RestPosition - self.WorldPos) + lpos, lang, LerpVector(restLerp, desiredPos, restpos), desiredAng)
     end
 
 	local x,y,z = hg.GunPositions[ply] and hg.GunPositions[ply][1], hg.GunPositions[ply] and hg.GunPositions[ply][2], hg.GunPositions[ply] and hg.GunPositions[ply][3]
@@ -374,7 +416,22 @@ local function DrawWorldModel(self, force)
 				end
 			end
 			
-			if self.seq then self:GetWM():SetSequence(self.seq) end
+			local desiredModel = localdraw and self.WorldModelReal or self.worldModel:GetModel()
+			if not normalizeWorldModelSequenceState(self.worldModel, desiredModel) then return end
+
+			if self.seq then
+				local wm = self:GetWM()
+				local seq = self.seq
+				if isstring(seq) then
+					seq = wm:LookupSequence(seq)
+				end
+				if isnumber(seq) and seq >= 0 and (not wm.GetSequenceCount or seq < wm:GetSequenceCount()) then
+					self.seq = seq
+					wm:SetSequence(seq)
+				else
+					self.seq = nil
+				end
+			end
 			local timing
 			if not self.cycling then
 				timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
@@ -470,6 +527,7 @@ function SWEP:CreateWorldModel()
 	
 	local model = ClientsideModel(self.WorldModelFake or self.WorldModel)
 	self.worldModel = model
+	initializeWorldModelSequenceState(model)
 
 	--[[for i, tex in ipairs(model:GetMaterials()) do
 		local mat = Material(tex)
@@ -840,15 +898,20 @@ function SWEP:DrawWorldModel()
 	end
 end
 
+local ACTIVE_WEAPON_RENDER_DIST_SQR = 3400 * 3400
+local HOLSTERED_WEAPON_RENDER_DIST_SQR = 2200 * 2200
+
 --hook.Add("PostDrawPlayerRagdoll", "huyCock", function(ent,owner)
-function hg.RenderWeapons(ent, owner)
+function hg.RenderWeapons(ent, owner, distSqr, criticalView)
 	local wep = owner.GetActiveWeapon and owner:GetActiveWeapon()
+	local canDrawActive = criticalView or distSqr == nil or distSqr <= ACTIVE_WEAPON_RENDER_DIST_SQR
+	local canDrawHolstered = criticalView or distSqr == nil or distSqr <= HOLSTERED_WEAPON_RENDER_DIST_SQR
 	
-	if IsValid(wep) and wep.ishgweapon then
+	if canDrawActive and IsValid(wep) and wep.ishgweapon then
 		DrawWorldModel(wep)
     end
 
-	if owner.GetWeapons then
+	if canDrawHolstered and owner.GetWeapons then
 		local weps = owner:GetWeapons()
 		for i = 1, #weps do
 			local wep2 = weps[i]
@@ -859,7 +922,7 @@ function hg.RenderWeapons(ent, owner)
 	end
 
 	local inv = ent:GetNetVar("Inventory",nil) or ent.PredictedInventory
-	if ent == owner and not owner:IsPlayer()  and inv != nil and inv["Weapons"] then
+	if canDrawHolstered and ent == owner and not owner:IsPlayer()  and inv != nil and inv["Weapons"] then
 		if not ent.shouldTransmit then return end
 		if ent.NotSeen then return end
 	
@@ -876,15 +939,21 @@ end
 
 local table_IsEmpty = table.IsEmpty
 local string_find = string.find
+local LASER_RENDER_DIST_SQR = 1800 * 1800
 
 hook.Add("PostDrawTranslucentRenderables", "huyCock333", function()
 	hg.weapons = hg.weapons or {}
+	local eyePos = EyePos()
 	for i=1, #hg.weapons do
 		self = hg.weapons[i]
 		if not IsValid(self) then table.remove(hg.weapons,i) continue end
 		if IsValid(self:GetOwner()) and self:GetOwner().GetActiveWeapon and self:GetOwner():GetActiveWeapon() ~= self and self.shouldntDrawHolstered then removeFlashlights(self) continue end
 		if not self.attachments then continue end
 		if not self.lasertoggle then removeFlashlights(self) end
+		if self:GetPos():DistToSqr(eyePos) > LASER_RENDER_DIST_SQR then
+			removeFlashlights(self)
+			continue
+		end
 		if self.attachments.underbarrel and not table_IsEmpty(self.attachments.underbarrel) and string_find(self.attachments.underbarrel[1], "laser") or self.laser then self:DrawLaser() end
 	end
 end)

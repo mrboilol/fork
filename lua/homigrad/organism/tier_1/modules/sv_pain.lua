@@ -46,7 +46,7 @@ module[2] = function(owner, org, timeValue)
 
 	local owner = org.owner
 	
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + org.analgesia * 2 + org.adrenaline * 0.5), 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5), 0) end
 	org.immobilization = max(org.immobilization - timeValue * 2 * adrenalineMul, 0)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
@@ -68,7 +68,7 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		org.disorientation = math.max(org.pain / 50, org.disorientation)//org.disorientation + add
-		org.fearadd = 1 * (1 - org.analgesia * 0.5)
+		org.fearadd = 1
 	end
 
 	org.disorientation = math.min(org.disorientation, 10)
@@ -76,6 +76,8 @@ module[2] = function(owner, org, timeValue)
 	if org.pain > 80 then
 		org.shock = math.Approach(org.shock, 70, timeValue * 4)
 	end
+
+	
 
 	if (org.shock > (30 * analgesiaMul)) or org.otrub then
 		org.consciousness = math.Approach(org.consciousness, 0.1, timeValue / 5)
@@ -114,7 +116,7 @@ module[2] = function(owner, org, timeValue)
 	org.analgesia =  Approach(org.analgesia, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 	
 	if org.analgesiaAdd > 0 then
-		org.analgesia =  Approach(org.analgesia, 4, timeValue / 15)
+		org.analgesia =  Approach(org.analgesia, 5, timeValue / 15)
 		org.analgesiaAdd = Approach(org.analgesiaAdd, 0, timeValue / 15)
 	end
 
@@ -131,7 +133,20 @@ module[2] = function(owner, org, timeValue)
 
 	org.adrenalineAdd = Approach(org.adrenalineAdd, 0, org.adrenalineAdd < 0 and timeValue / 30 or timeValue / 5)
 
-	org.adrenaline = Approach(org.adrenaline, 0, timeValue / 25)
+	-- Faster adrenaline decay when coming off berserk or noradrenaline
+	local fastAdrenalineDecay = false
+	if org._berserkEndTime and CurTime() < org._berserkEndTime then
+		fastAdrenalineDecay = true
+	elseif org._noradrenalineEndTime and CurTime() < org._noradrenalineEndTime then
+		fastAdrenalineDecay = true
+	end
+
+	local adrenalineDecayRate = timeValue / (org.otrub and 5 or 25)
+	if fastAdrenalineDecay then
+		adrenalineDecayRate = timeValue / 5 -- Much faster decay
+	end
+
+	org.adrenaline = Approach(org.adrenaline, 0, adrenalineDecayRate)
 
 	if org.lleg < 1 and !org.llegamputated then
 		org.lleg = max(org.lleg - timeValue / 240, 0)
@@ -150,7 +165,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.pain > 100 then
-		--org.needfake = true
+		org.needfake = true
 	end
 
 	//local tempo = math.Clamp(5 - (org.temperature - 31), 0, 15)

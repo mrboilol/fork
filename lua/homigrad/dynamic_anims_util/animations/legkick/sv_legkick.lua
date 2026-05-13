@@ -234,24 +234,7 @@ function PLAYER:LegAttack()
     if isMidAir then
         timer.Simple(0.8, function()
             if IsValid(self) then
-                local dexterity = self:GetStat("Dexterity")
-
-                if dexterity >= 10 then
-                    local chance
-                    if dexterity >= 15 then
-                        chance = 85
-                    elseif dexterity >= 12 then
-                        chance = 45 + (dexterity - 12) * (40/3) -- 45% at 12, scales to 85% at 15
-                    else -- 10 <= dexterity < 12
-                        chance = 10 + (dexterity - 10) * 17.5 -- 10% at 10, scales to 45% at 12
-                    end
-
-                    if math.random(100) <= chance then
-                        return -- Success, don't ragdoll
-                    end
-                end
-                
-                hg.Fake(self) -- Fail condition or dexterity is less than 10
+                hg.Fake(self)
             end
         end)
     end

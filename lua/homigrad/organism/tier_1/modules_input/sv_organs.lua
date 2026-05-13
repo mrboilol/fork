@@ -25,6 +25,7 @@ for i = 2, 13 do
 end
 
 local CHUNKS_IN_WORLD = {}
+local nextGoreThink = 0
 
 local function CreateBrainChunk(origin, direction)
     if #CHUNKS_IN_WORLD >= 30 then return end
@@ -66,6 +67,10 @@ local function CreateBrainChunk(origin, direction)
 end
 
 hook.Add("Think", "BrainChunks_GoreSimProcessor", function()
+    local curTime = CurTime()
+    if curTime < nextGoreThink then return end
+    nextGoreThink = curTime + 0.02
+    local perfStart = HGPerf and HGPerf:Begin() or nil
     for i = #CHUNKS_IN_WORLD, 1, -1 do
         local ent = CHUNKS_IN_WORLD[i]
         if not IsValid(ent) then table.remove(CHUNKS_IN_WORLD, i) continue end
@@ -116,18 +121,18 @@ hook.Add("Think", "BrainChunks_GoreSimProcessor", function()
                 state.SlideSpeed = state.SlideSpeed - 0.02
             end
 
-            if moved and GORE_CVARS.visuals and #GORE_DECAL_REGISTRY > 0 and (ent.NextDrip or 0) < CurTime() then
+            if moved and GORE_CVARS.visuals and #GORE_DECAL_REGISTRY > 0 and (ent.NextDrip or 0) < curTime then
                 util.Decal(table.Random(GORE_DECAL_REGISTRY), ent:GetPos() + Vector(0,0,2), ent:GetPos() - Vector(0,0,5), ent)
-                ent.NextDrip = CurTime() + math.Rand(0.03, 0.08)
+                ent.NextDrip = curTime + math.Rand(0.03, 0.08)
             end
         end
     end
+    if HGPerf and perfStart then HGPerf:End("organs.brainchunks.think", perfStart) end
 end)
 
 local function isCrush(dmgInfo)
 	return not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_SLASH + DMG_BLAST)
 end
-
 local abdominal_organs = {
     ["stomach"] = true,
     ["liver"] = true,
@@ -138,16 +143,24 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
 	org[key] = math.Round(math.min(org[key] + dmg * (isCrush(dmgInfo) and 1 or 3), 1), 3)
-
-	local damage_dealt = org[key] - oldval
+		local damage_dealt = org[key] - oldval
 	if damage_dealt > 0 then
 		org.internalBleed = org.internalBleed + damage_dealt * 0.5 -- Base internal bleeding for any organ damage
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
 
 		if abdominal_organs[key] then
-			local multiplier = (oldval >= 1) and 2.5 or 1.5 -- Extra penalty if already destroyed
-			org.internalBleed = org.internalBleed + damage_dealt * multiplier
-			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 10 * multiplier
+			--local multiplier = (oldval >= 1) and 3.5 or 2.0 -- Extra penalty if already destroyed
+			org.internalBleed = org.internalBleed + damage_dealt * 1.5
+			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 25
+			org.disorientation = (org.disorientation or 0) + damage_dealt * 1
+
+			if org.analgesia < 0.4 and damage_dealt > 0.15 then
+				timer.Simple(0, function()
+					if IsValid(org.owner) then
+						hg.StunPlayer(org.owner, 1.5)
+					end
+				end)
+			end
 		end
 	end
 	
@@ -175,30 +188,14 @@ end
 
 input_list.liver = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.liver
-	local prot = math.max(0.3 - org.liver,0)
+	local result = damageOrgan(org, dmg, dmgInfo, "liver")
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.liver - oldDmg) * 3, "Liver damage harm")
 	
 	org.shock = org.shock + dmg * 20
 	org.painadd = org.painadd + dmg * 35
 	
-	org.liver = math.min(org.liver + dmg, 1)
-	local harmed = (org.liver - oldDmg)
-	if org.analgesia < 0.4 and harmed >= 0.2 then
-		timer.Simple(0, function()
-			if harmed > 0 then -- wtf? whatever
-				hg.StunPlayer(org.owner,2)
-			else
-				hg.LightStunPlayer(org.owner,2)
-			end
-		end)
-	end
-
-	org.internalBleed = org.internalBleed + harmed * 4
-	
-	dmgInfo:ScaleDamage(0.8)
-
-	return 0
+	return result
 end
 
 input_list.stomach = function(org, bone, dmg, dmgInfo)
@@ -208,7 +205,7 @@ input_list.stomach = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.stomach - oldDmg) * 2, "Stomach damage harm")
 	
-	org.internalBleed = org.internalBleed + (org.stomach - oldDmg) * 2
+	
 	return result
 end
 
@@ -219,7 +216,7 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.intestines - oldDmg) * 2, "Intestines damage harm")
 
-	org.internalBleed = org.internalBleed + (org.intestines - oldDmg) * 2
+
 	return result
 end
 
@@ -328,9 +325,9 @@ local arterySize = {
 }
 
 local arteryMessages ={
-	"I can feel blood rushing from my neck...",
-	"My neck.. it's... pumping out blood.",
-	"I'm bleeding out of my neck!"
+	"MY NECK- MY NECK IS BLEEDING OUT",
+	"ITS SO BAD- I CAN FEEL THE WARMTH RUSHING OUT",
+	"ITS BLEEDING- WHY IS MY NECK BLEEDING SO MUCH"
 }
 
 local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
@@ -454,6 +451,8 @@ input_list.trachea = function(org, bone, dmg, dmgInfo)
 	local result = damageOrgan(org, dmg * 2, dmgInfo, "trachea")
 
 	hg.AddHarmToAttacker(dmgInfo, (org.trachea - oldDmg) * 8, "Trachea damage harm")
+
+	org.internalBleed = org.internalBleed + dmg * 2
 
 	return result
 end

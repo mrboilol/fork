@@ -433,13 +433,13 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 		end
 
 		if not self.CarryEnt:GetCustomCollisionCheck() then
-			self.CarryEnt:SetCustomCollisionCheck(true)
-			self.CarryEnt:CollisionRulesChanged()
-			owner:CollisionRulesChanged()
+			hg.SafeSetCustomCollisionCheck(self.CarryEnt, true)
+			hg.SafeCollisionRulesChanged(self.CarryEnt)
+			hg.SafeCollisionRulesChanged(owner)
 
 			self.CarryEnt:CallOnRemove("removenarsla",function()
 				if not IsValid(owner) then return end
-				owner:CollisionRulesChanged()
+				hg.SafeCollisionRulesChanged(owner)
 				owner:SetNetVar("carryent",nil)
 				owner:SetNetVar("carrybone",nil)
 				owner:SetNetVar("carrymass",nil)
@@ -450,8 +450,8 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 		end
 	else
 		if IsValid(self.CarryEnt) and self.CarryEnt:GetCustomCollisionCheck() then
-			self.CarryEnt:CollisionRulesChanged()
-			owner:CollisionRulesChanged()
+			hg.SafeCollisionRulesChanged(self.CarryEnt)
+			hg.SafeCollisionRulesChanged(owner)
 			//self.CarryEnt:SetCustomCollisionCheck(false)
 		end
 

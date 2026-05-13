@@ -8,20 +8,33 @@ local allowedchars = {
 }
 
 local audible_pain = {
-	"AAAAAGH..FUCK.. IT HURTS.",
-	"I CAN'T TAKE THIS ANYMORE!",
+	"WHY... WHY DOES IT HURT THIS MUCH",
+	"JESUS CHRIST I CAN FEEL THE PAIN- AAAAGHHH",
     "Make it STOP make it STOP MAKE IT STOP",
-    "Why won't IT STOP",
-    "Make me unconscious. PLEASE",
+    "PLEASE JUST MAKE ME UNCONSCIOUS ALREADY",
+    "EVERYTHING IN MY BODY HURTS SO MUCH...",
     "Why was I born to feel this why...",
-    "I'd do anything for it to stop... ANYTHING.",
-    "This isn't living this is being TORTURED",
-    "I don't care anymore just STOP the PAIN",
+    "IT HURTS- IT HURTS SO MUCH",
+    "IM BURNING- IM BURNING ALIVE",
+    "MOMMY- I WANT MY MOMMY",
     "Nothing matters EXCEPT MAKING IT STOP...",
-    "Every second is an eternity of FIRE.",
+    "THIS FEELS LIKE THE DEEPEST PIT OF HELL",
     "DEATH WOULD BE MERCY NOW...",
     "Just one moment without the pain..",
 	"I WISH I HAD SOME PAINKILLERS NOW. FUCK.",
+}
+
+local despair_phrases = {
+    "What's the point anymore?",
+    "Everything feels so heavy.",
+    "I'm so tired of fighting.",
+    "Is this all there is?",
+    "I just want it to be over.",
+    "I feel so empty.",
+    "Nothing makes sense.",
+    "I'm lost.",
+    "I can't see a way out.",
+    "This is hopeless."
 }
 
 local sharp_pain = {
@@ -78,25 +91,27 @@ local fear_hurt_ironic = {
 }
 
 local fear_phrases = {
-	"It's not that bad... right?",
+	"I dont want to die today.",
 	"I don't want to die like this.",
 	"Is this really how it ends?",
-	"This isn't good.",
-	"Is this really how it ends?",
-	"I don't want to die like this.",
+	"Im scared of death.",
+	"There's no way out, is there?",
+	"I dont want to die.",
 	"I wish I had a way out.",
 	"I regret so many things.",
 	"This can't be it.",
 	"I can't believe this is happening to me.",
-	"I should've taken this more seriously.",
+	"I dont want to die anymore.",
 	"What if I don't make it..?",
 	"This is worse than I thought.",
-	"This is so unfair.",
+	"I dont want it to end like this.",
 	"I can't give up yet.",
 	"I never thought it would be like this.",
-	"I should've listened to my instincts.",
-	"Breathe. Just breathe.",
-	"Cold hands. Steady hands.",
+	"Why is this happening to me...",
+	"I think im going to die here.",
+	"I cant see the end.",
+	"Calm breaths. Deep breaths...",
+
 }
 
 local is_aimed_at_phrases = {
@@ -143,23 +158,27 @@ local near_death_positive = {
 	"Pain is just a signal. Ignore it.",
 	"If this is it... at least it's gonna be quick.",
 	"I've survived worse. Probably.",
+	"I dont want to die.",
+	"There is still a way out of this.",
+	"This cant be how it ends.",
+	"I'm not sure if this is the end.",
 	"This isn't how I pictured it.",
 }
 
 local broken_limb = {
-	"FUCK. FUCK. ITS DEFINITELY BROKEN!",
-	"I CAN FEEL THE BONE PIECES MOVING!",
-	"IT'S FUCKING BROKEN. I THINK..",
-	"It hurts just thinking about it. Definitely broken.",
-	"I don't think it should bend here.",
+	"Shit, i heard it- i heard it snap...",
+	"I can feel the pieces moving, i think i broke it.",
+	"Its- My limb, i heard it snap...",
+	"I broke it, i actually broke it...",
+	"The angle of my limb is so off, i think its broken.",
 	"Oh fuck. It is snapped.",
-	"I don't see any open fracture, but I feel like I broke something",
+	"Fuck me, i think i broke something.",
 }
 
 local dislocated_limb = {
-	"Yeah that shouldn't be bending like that.",
+	"Its out of place- i can see the bulge where its out of place...",
 	"I have to get this bone back in.",
-	"No... I have to move it back in place.",
+	"I can feel the bone grinding against the joiny...",
 	"It just hurts so much there. I might need a check up.",
 	"My limb is out of place.",
 }
@@ -191,6 +210,26 @@ local after_unconscious = {
 	"I don't want to experience this EVER AGAIN!",
 }
 
+local thirsty_a_bit = {
+    "I'm thirsty...",
+    "Some water would be great...",
+    "I should drink something.",
+}
+
+local very_thirsty = {
+    "My throat is so dry...",
+    "If I don't drink, I'll feel even worse...",
+    "Water... Damn it... I feel sick",
+}
+
+local good_mood_phrases = {
+    "I feel great!",
+    "Life is good.",
+    "I can take on the world!",
+    "Everything is going my way.",
+    "I'm on top of the world!",
+}
+
 local slight_braindamage_phraselist = {
 	"I don't understand...",
 	"It doesn't make sense...",
@@ -214,6 +253,33 @@ local braindamage_phraselist = {
 	"Nghh... Gmh?",
 	"Ggg... Bgh..",
 	"Bhrhraihin.",
+}
+
+local bleeding_out_phrases = {
+    "Why did this happen to me why...",
+    "I feel so weak...",
+    "So dark.. everything is so dark and cold...",
+    "I feel like i want to pass out, but i dont want to...",
+    "Its so hard to move...",
+    "Im so numb... but i can still feel the cold...",
+    "Im going to die arent i?",
+}
+
+local internalbleed_phrases = {
+	"That's... that's blood I just vomited...",
+	"Oh, that's blood...",
+	"Fuck, I just puked blood...",
+	"Oh shit... I don't feel good...",
+}
+hg.internalbleed_phrases = internalbleed_phrases
+
+local adrenaline_phrases = {
+    "Im so incredibly anxious.",
+    "Focus... just focus...",
+    "My hands are so shaky.",
+    "I cant calm down.",
+    "I feel at edge.",
+    "I need to chill out, literally...",
 }
 
 local cold_phraselist = {
@@ -303,11 +369,13 @@ function hg.likely_to_phrase(ply)
 	local brain = org.brain
 	local blood = org.blood
 	local fear = org.fear
+	local despair = org.despair
 	local temperature = org.temperature
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
 
 	return (broken_dislocated) and 5
 		or (pain > 65) and 5
+		or (despair > 0.5) and 5
 		or (temperature < 31 and 0.5)
 		or (temperature > 38 and 0.5)
 		or (blood < 3000 and 0.3)
@@ -344,11 +412,21 @@ local function get_status_message(ply)
 	local temperature = org.temperature
 	local blood = org.blood
 	local hungry = org.hungry
+	local thirst = org.thirst
+	local goodmood = org.goodmood
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
+    local positive_thinking = (goodmood and goodmood > 0.5) or (org.despair and org.despair < 0.1)
 
-	if broken_dislocated and org.just_damaged_bone then
-		org.just_damaged_bone = nil
-	end
+    if org.fear and org.fear >= 1.0 then
+        if math.random(10) > 3 then
+            positive_thinking = false
+        end
+    end
+
+	    if broken_dislocated and org.just_damaged_bone then
+        hg.status_messages.Send(ply, "Your ".. (org.just_damaged_bone_limb or "limb") .." is broken.", 3)
+        org.just_damaged_bone = nil
+    end
 	
 	local broken_notify = (org.rarm == 1) or (org.larm == 1) or (org.rleg == 1) or (org.lleg == 1)
 	local dislocated_notify = (org.rarm == 0.5) or (org.larm == 0.5) or (org.rleg == 0.5) or (org.lleg == 0.5)
@@ -360,14 +438,38 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 	
-	if temperature < 35 then
-		most_wanted_phraselist = temperature > 31 and cold_phraselist or (temperature < 28 and numb_phraselist or freezing_phraselist)
-	elseif temperature > 38 then
-		most_wanted_phraselist = temperature < 40 and hot_phraselist or heatstroke_phraselist
+	    if temperature < 35 then
+        if temperature < 30 then
+            hg.status_messages.Send(ply, "You are freezing.", 3)
+        else
+            hg.status_messages.Send(ply, "You are cold.", 2)
+        end
+    elseif temperature > 38 then
+        if temperature > 40 then
+            hg.status_messages.Send(ply, "You are burning up.", 3)
+        else
+            hg.status_messages.Send(ply, "You are hot.", 2)
+        end
+    end
+
+	if not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
+		most_wanted_phraselist = despair_phrases
 	end
 
-	if not most_wanted_phraselist and hungry and hungry > 25 and math.random(3) == 1 then
-		most_wanted_phraselist = hungry > 45 and very_hungry or hungry_a_bit
+	if not most_wanted_phraselist and blood < 3750 then
+		local combined_phrases = {}
+		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
+		for _, phrase in ipairs(near_death_poetic) do table.insert(combined_phrases, phrase) end
+		for _, phrase in ipairs(fear_phrases) do table.insert(combined_phrases, phrase) end
+		if hg.internalbleed_phrases then
+			for _, phrase in ipairs(hg.internalbleed_phrases) do table.insert(combined_phrases, phrase) end
+		end
+		most_wanted_phraselist = combined_phrases
+	end
+
+	local adrenaline = org.adrenaline or 0
+	if not most_wanted_phraselist and adrenaline > 1.5 then
+		most_wanted_phraselist = adrenaline_phrases
 	end
 
 	if (blood < 3100) or (pain > 75) or (broken_dislocated) or (broken_notify) or (dislocated_notify) then
@@ -385,11 +487,9 @@ local function get_status_message(ply)
 
 		if not most_wanted_phraselist then
 			if (broken_dislocated_notify) and (blood < 3100) then
-				most_wanted_phraselist = blood < 2900 and (near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or near_death_poetic)
-			--elseif(broken_dislocated_notify)then
-				--most_wanted_phraselist = (broken_notify and broken_limb or dislocated_limb)
+				most_wanted_phraselist = blood < 2900 and (positive_thinking and near_death_positive or near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or (positive_thinking and near_death_positive or near_death_poetic))
 			elseif(blood < 3100)then
-				most_wanted_phraselist = near_death_poetic
+				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_poetic
 			end
 		end
 	elseif after_unconscious_notify then
@@ -397,16 +497,46 @@ local function get_status_message(ply)
 	elseif hg.nothing_happening(ply) then
 		//most_wanted_phraselist = random_phrase
 
-		if hungry and hungry > 25 and math.random(5) == 1 then
-			most_wanted_phraselist = hungry > 45 and very_hungry or hungry_a_bit
-		end
+		    if hungry and hungry > 25 then
+        if hungry > 75 then
+            hg.status_messages.Send(ply, "You are starving.", 3)
+        elseif hungry > 50 then
+            hg.status_messages.Send(ply, "You are very hungry.", 2)
+        else
+            hg.status_messages.Send(ply, "You are hungry.", 1)
+        end
+    end
+
+    if thirst and thirst > 25 then
+        if thirst > 75 then
+            hg.status_messages.Send(ply, "You are dying of thirst.", 3)
+        elseif thirst > 50 then
+            hg.status_messages.Send(ply, "You are very thirsty.", 2)
+        else
+            hg.status_messages.Send(ply, "You are thirsty.", 1)
+        end
+    end
+
+    if goodmood and goodmood > 0.8 and math.random(5) == 1 then
+        most_wanted_phraselist = good_mood_phrases
+    end
 	elseif hg.fearful(ply) then
-		most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
+        if positive_thinking and math.random(3) == 1 then
+            most_wanted_phraselist = near_death_positive
+        else
+		    most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
+        end
 	end
 
-	if brain > 0.1 then
-		most_wanted_phraselist = brain < 0.2 and slight_braindamage_phraselist or braindamage_phraselist
-	end
+	    if brain > 0.1 then
+        if brain > 0.5 then
+            hg.status_messages.Send(ply, "Your head feels like it's about to split open.", 4)
+        elseif brain > 0.3 then
+            hg.status_messages.Send(ply, "Your head is pounding.", 3)
+        else
+            hg.status_messages.Send(ply, "You have a headache.", 2)
+        end
+    end
 	
 	if most_wanted_phraselist then
 		str = most_wanted_phraselist[math.random(#most_wanted_phraselist)]

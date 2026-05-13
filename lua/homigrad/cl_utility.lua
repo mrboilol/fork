@@ -118,6 +118,20 @@ hg.ConVars = hg.ConVars or {}
 --\\ Remove cl models on cleanup
 	hg.oldClientsideModel = hg.oldClientsideModel or ClientsideModel
 	hg.ClientsideModels = hg.ClientsideModels or {}
+	local EntityMeta = FindMetaTable("Entity")
+
+	if hg.ZCClientsideModelGuardsInstalled then
+		if hg.oldEntitySetModel then
+			EntityMeta.SetModel = hg.oldEntitySetModel
+		end
+		if hg.oldEntitySetSequence then
+			EntityMeta.SetSequence = hg.oldEntitySetSequence
+		end
+		if hg.oldEntitySetCycle then
+			EntityMeta.SetCycle = hg.oldEntitySetCycle
+		end
+		hg.ZCClientsideModelGuardsInstalled = nil
+	end
 
 	function ClientsideModel(...)
 		local model = hg.oldClientsideModel(...)
@@ -307,7 +321,7 @@ players : 1 humans, 0 bots (20 max)
 				or bullet.Damage >= 30 and "cracks/" .. "medium/med" .. "_crack_0" .. mr .. ".ogg"
 				or "cracks/" .. "light/light" .. "_crack_0" .. mr .. ".ogg"
 
-			if dist < 180 then
+			if dist < 250 then
 				timer.Simple(0.02,function()
 					EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
 				end)
@@ -992,7 +1006,7 @@ players : 1 humans, 0 bots (20 max)
 		amtflashed2 = 0
 	end)
 
-	hook.Add("Post Post Pre Post Processing","flasheseffect",function()
+	hook.Add("Post Pre Post Processing","flasheseffect",function()
 		if !lply:Alive() then
 			if !next(hg.flashes) then
 				hg.flashes = {}

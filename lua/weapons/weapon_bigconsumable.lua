@@ -139,7 +139,7 @@ if SERVER then
 		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end
 
-		org.satiety = org.satiety + 25/5
+		org.satiety = org.satiety + 50/5
 		local ply = self:GetOwner()
 		ply:ViewPunch(Angle(3,0,0))
 		

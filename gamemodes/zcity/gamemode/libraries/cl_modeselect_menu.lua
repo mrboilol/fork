@@ -296,6 +296,8 @@ if CLIENT then
             ["cstrike"] = true,
             ["hmcd"] = true,
             ["hl2dm"] = true,
+            ["hl3"] = true,
+            ["assassinsgreed"] = true,
             ["riot"] = true,
             ["gwars"] = true,
             ["criresp"] = true,

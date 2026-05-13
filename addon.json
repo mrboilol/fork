@@ -1,0 +1,14 @@
+{
+  "title": "Z-City UNCONSCIOUSNESS CIRCLE",
+  "type": "ServerContent",
+  "tags": [
+    "fun",
+    "roleplay",
+    "realism"
+  ],
+  "ignore": [
+    "*.dll",
+    "*_source.txt",
+    "lua/weapons/homigrad_base/usefull_things.txt"
+  ]
+}

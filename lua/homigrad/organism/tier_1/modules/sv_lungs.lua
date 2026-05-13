@@ -19,7 +19,9 @@ module[1] = function(org)
 		k = 0.5,
 	}
 
-	org.lungsfunction = true
+	
+
+			org.lungsfunction = true
 
 	org.o2.curregen = org.o2.regen
 	
@@ -32,7 +34,7 @@ module[1] = function(org)
 end
 
 function hg.organism.OxygenateBlood(org)
-	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)// * (1 - org.pneumothorax)
+	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea * 0.5)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)// * (1 - org.pneumothorax)
 end
 
 function hg.organism.CanBreath(org)
@@ -125,11 +127,11 @@ concommand.Add("-hmcd_holdbreath",function(ply)
 end)
 
 local lowoxy = {
-	"I'm gonna faint right now... There's not enough oxygen.",
-	"There's not enough oxygen... I can't hold much longer...",
-	"I really need some fresh air...",
-	"I'm gasping for air...",
-	"Need to breathe air... or I'm gonna faint right here..."
+	"IM GONNA FAINT, I REALLY NEED SOME AIR",
+	"DARK- EVERYTHING IS GOING DARK...",
+	"I CANT BREATHE- WHY CANT I BREATHE...",
+	"MY CHEST HURTS SO MUCH, I NEED AIR...",
+	"THERES NOT ENOUGH OXYGEN, I NEED TO BREATHE..."
 }
 
 local not_enough_intake = {
@@ -139,6 +141,10 @@ local not_enough_intake = {
 	//"Resting sounds like a nice idea.",
 	"I need to breathe...",
 	"I'm struggling to breathe...",
+	"Why is it so hard to breathe...",
+	"I cant find a way to get a good breath of air.",
+	"I cant breathe right.",
+	"Im struggling to catch my breath...",
 }
 
 local drop_mask = {
@@ -198,7 +204,7 @@ module[2] = function(owner, org, timeValue)
 	if not head then head = owner:GetPos() end
 	
 	local inwater = bit_band(util_PointContents(head),CONTENTS_WATER) == CONTENTS_WATER
-	-- test
+	
 	local success = owner:IsBerserk() or (not org.heartstop and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
 	if success and owner:IsPlayer() and inwater then success = false end
 	if success and org.choking then org.needfake = true success = false end
@@ -208,16 +214,25 @@ module[2] = function(owner, org, timeValue)
 	
 	org.needle = math.Approach(org.needle, 0, timeValue / 1200)
 
-	org.pneumothorax = pneumothorax and min(org.pneumothorax + timeValue / 180 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2) or max(org.pneumothorax - timeValue / 10, 0)
+	if org.needle > 0 then
+		org.hemothorax = false
+	end
 
-	if org.hemothorax then
+	if not org.hemothorax then
+		org.pneumothorax = pneumothorax and min(org.pneumothorax + timeValue / 180 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2) or max(org.pneumothorax - timeValue / 10, 0)
+	else
 		org.pneumothorax = min(org.pneumothorax + timeValue / 120, 1) -- A bit faster than a single punctured lung
 	end
-	if org.lastCOBreathe and org.lastCOBreathe + 1 > CurTime() then
+
+		if org.lastCOBreathe and org.lastCOBreathe + 1 > CurTime() then
 		org.COregen = math.Approach(org.COregen, 30, timeValue * 1)
 	else
 		org.COregen = math.Approach(org.COregen, 0, timeValue * 0.5)
 	end
+	
+	if o2[1] < 15 then
+        org.CO = math.min(org.CO + timeValue * 0.5, 30)
+    end
 
 	org.CO = max(org.CO - timeValue, 0)
 	if success then
@@ -234,8 +249,27 @@ module[2] = function(owner, org, timeValue)
 		local sprayed = org.is_sprayed_at
 		org.is_sprayed_at = nil
 
-		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 4500, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
+        local blood_pressure_k = 1
+        if org.bloodpressure < 70 then
+            blood_pressure_k = math.Remap(org.bloodpressure, 0, 70, 0.1, 1)
+        elseif org.bloodpressure > 115 then -- from sv_pulse
+            blood_pressure_k = math.Remap(org.bloodpressure, 115, 190, 1, 0.75)
+        end
+        blood_pressure_k = math.Clamp(blood_pressure_k, 0.2, 1)
+
+		local pulseMultiplier = math.Clamp((org.heartbeat or 70) / 70, 0.8, 1.5)
+		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * pulseMultiplier * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * (1 - (org.CO / 30))
+		if org.oxygen_deprivation and org.oxygen_deprivation > 0 then
+			regenerate = regenerate * 0.1 -- 90% penalty
+			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue, 0) -- recovers over time
+		end
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 3750, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
+
+		-- Below 2500 blood, keep dropping O2
+		if org.blood < 2500 then
+			local o2DropRate = (2500 - org.blood) / 2500 -- 0 to 1 based on how far below 2500
+			o2[1] = max(o2[1] - timeValue * o2DropRate * 2, 0)
+		end
 
 		o2.curregen = regenerate
 
@@ -265,6 +299,8 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		if o2[1] < 12 then
+
+
 			org.owner:Notify(lowoxy[math.random(#lowoxy)], 30, "lowoxy", 0, nil, color_red3)
 	
 			if o2[1] < 6 then
@@ -282,18 +318,19 @@ module[2] = function(owner, org, timeValue)
 			//org.lungsfunction = false
 		end
 	end
-
 	if o2[1] == 0 then
 		if math.random(50) == 1 then
 			org.lungsfunction = false
 		end
 	else
-		if math.random(50) == 1 then
 			org.lungsfunction = true
-		end
 	end
 
 	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop then
+		org.lungsfunction = false
+	end
+
+	if org.trachea >= 1.0 then
 		org.lungsfunction = false
 	end
 
@@ -328,7 +365,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local k = halfValue2(o2[1], o2.range, o2.k)
-
+	
 	if o2[1] < 10 then
 		if org.isPly then
 			hg.StunPlayer(owner, 3)

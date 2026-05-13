@@ -28,8 +28,42 @@ hook.Add("CreateMove", "asdasdas22", function(cmd)
 end)
 
 local diff = Angle()
+local inputMouseTbl = {}
+local quatMain = Quaternion()
+local quatPitch = Quaternion()
+local quatYaw = Quaternion()
+local quatRoll = Quaternion()
+
+local function isVortigauntModel(ent)
+	return IsValid(ent) and string.lower(ent:GetModel() or "") == "models/player/vortigaunt.mdl"
+end
+
+local function getCachedEyesAttachment(ent)
+	if not IsValid(ent) then return end
+	local model = ent:GetModel()
+	if ent.ZCEyesAttachmentModel ~= model then
+		ent.ZCEyesAttachmentModel = model
+		local id = ent.LookupAttachment and ent:LookupAttachment("eyes") or 0
+		ent.ZCEyesAttachment = (id and id > 0) and id or false
+	end
+
+	local id = ent.ZCEyesAttachment
+	if id == false or not id then return end
+	local eye = ent:GetAttachment(id)
+	if not eye or not istable(eye) then return end
+
+	if not isVortigauntModel(ent) then
+		return eye
+	end
+
+	return {
+		Pos = eye.Pos + eye.Ang:Forward() * 3 + eye.Ang:Up() * 3 + eye.Ang:Right() * 0,
+		Ang = eye.Ang
+	}
+end
+
 hook.Add("InputMouseApply", "fakeCameraAngles", function(cmd, x, y, angle)
-	local tbl = {}
+	local tbl = inputMouseTbl
 	local cc = GetCoolCameraBool()
 	if cc then
 		realanglelerp = realanglelerp or angle
@@ -45,6 +79,8 @@ hook.Add("InputMouseApply", "fakeCameraAngles", function(cmd, x, y, angle)
 	tbl.x = x
 	tbl.y = y
 	tbl.angle = angle
+	tbl.override_angle = nil
+	tbl.vpangle = nil
 	
 	if cc then
 		tbl.angle = realangle
@@ -94,6 +130,25 @@ local hg_newfakecam = ConVarExists("hg_newfakecam") and GetConVar("hg_newfakecam
 local rollang = 0
 local ctime
 local vecUpX, vecUpY, vecUpZ = Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)
+local function getCachedHeadBone(ent)
+	if not IsValid(ent) then return end
+	local bone = ent.ZCHeadBoneFakeCam
+	if bone == nil and ent.LookupBone then
+		bone = ent:LookupBone("ValveBiped.Bip01_Head1")
+		ent.ZCHeadBoneFakeCam = bone or false
+	end
+
+	return bone == false and nil or bone
+end
+
+local function setHeadScaleIfNeeded(ent, wantedScale)
+	local bone = getCachedHeadBone(ent)
+	if not bone then return end
+	local current = ent:GetManipulateBoneScale(bone)
+	if current and current:IsEqualTol(wantedScale, 0.001) then return end
+	ent:ManipulateBoneScale(bone, wantedScale)
+end
+
 hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 	if IsValid(follow) and ctime != CurTime() then
 		ctime = CurTime()
@@ -107,11 +162,12 @@ hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 	local angle = tbl.angle
 
 	local wep = lply:GetActiveWeapon()
+	local org = lply.organism or {}
 
 	local consmul = 1 - hg.CalculateConsciousnessMul()
 
-	if (wep.weight or wep.visualweight) and ((wep.weight and wep.weight > 0 or wep.visualweight and wep.visualweight > 0) or lply.organism.larmamputated or consmul > 0.3) then
-		ViewPunch3(Angle(-y / 50 / 16, x / 50 / 16, 0) * math.min(((wep.visualweight ~= nil and wep.visualweight > 0) and wep.visualweight) or wep.weight, 10) / 3 / (1 - consmul * 0.5) * (lply.organism.larmamputated and 4 or 1) * (lply.organism.rarmamputated and 2 or 1))
+	if IsValid(wep) and (wep.weight or wep.visualweight) and ((wep.weight and wep.weight > 0 or wep.visualweight and wep.visualweight > 0) or org.larmamputated or consmul > 0.3) then
+		ViewPunch3(Angle(-y / 50 / 16, x / 50 / 16, 0) * math.min(((wep.visualweight ~= nil and wep.visualweight > 0) and wep.visualweight) or wep.weight, 10) / 3 / (1 - consmul * 0.5) * (org.larmamputated and 4 or 1) * (org.rarmamputated and 2 or 1))
 	end
 
 	ViewPunch4(Angle(y / 50 / 16, -x / 50 / 16, -x / 50 / 1) * 0.1)
@@ -140,7 +196,7 @@ hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 		return
 	end
 
-	local att = follow:GetAttachment(follow:LookupAttachment("eyes"))
+	local att = getCachedEyesAttachment(follow)
 	if not att or not istable(att) then return end
 	local att_Ang = att.Ang
 	local vel = follow:GetVelocity()
@@ -164,10 +220,10 @@ hook.Add("HG.InputMouseApply", "fakeCameraAngles2", function(tbl)
 
 	rollang = rollang + lean_lerp * 0.5
 
-	local q = Quaternion():SetAngle(angle)
-    local q_pitch = Quaternion():SetAngleAxis(y / 50, vecUpY)
-    local q_yaw = Quaternion():SetAngleAxis(-x / 50, vecUpZ)
-    local q_roll = Quaternion():SetAngleAxis(lean_lerp * 0.5 + huy + x / 50 * math.abs(angle.pitch / 90), vecUpX)
+	local q = quatMain:SetAngle(angle)
+    local q_pitch = quatPitch:SetAngleAxis(y / 50, vecUpY)
+    local q_yaw = quatYaw:SetAngleAxis(-x / 50, vecUpZ)
+    local q_roll = quatRoll:SetAngleAxis(lean_lerp * 0.5 + huy + x / 50 * math.abs(angle.pitch / 90), vecUpX)
 	
 	q = q * q_pitch * q_yaw * q_roll
 
@@ -256,17 +312,17 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 	if not IsValid(ply) then return end
 	if not IsValid(follow) then return end
-	if not follow:LookupBone("ValveBiped.Bip01_Head1") then return end
+	if not getCachedHeadBone(follow) then return end
 	
 	local vpang = GetViewPunchAngles2() + GetViewPunchAngles3()
 	vpang[3] = 0
 
-	view.fov = GetConVar("hg_fov"):GetInt()
+	view.fov = hg_fov:GetInt()
 	firstPerson = GetViewEntity() == lply
 	
 	if not firstPerson then return end
 
-	att = follow:GetAttachment(follow:LookupAttachment("eyes"))
+	att = getCachedEyesAttachment(follow)
 	if not att or not istable(att) then return end
 	ang = angles
 	ang:Normalize()
@@ -299,7 +355,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	
 	if IsValid(ply.OldRagdoll) then DrawPlayerRagdoll(follow, ply) end
 
-	local pos = hg.eye(ply, 10, follow, att_Ang)
+	local pos = hg.eye(ply, 10, follow, att_Ang, att.Pos)
 
 	--local dot = ang:Forward():Dot((pos - att.Pos):GetNormalized())
 	
@@ -327,16 +383,12 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 			deathlerp = LerpFT(0.05,deathlerp,1)
 			local angdeath = LerpAngle(deathlerp,deathLocalAng,att_Ang)
 
-			if not follow:GetManipulateBoneScale(follow:LookupBone("ValveBiped.Bip01_Head1")):IsEqualTol(vecZero,0.001) then
-				follow:ManipulateBoneScale(follow:LookupBone("ValveBiped.Bip01_Head1"), firstPerson and vecPochtiZero or vecFull )
-			end
+			setHeadScaleIfNeeded(follow, firstPerson and vecPochtiZero or vecFull)
 
 			view.origin = pos
 			view.angles = att_Ang
 		else
-			if not follow:GetManipulateBoneScale(follow:LookupBone("ValveBiped.Bip01_Head1")):IsEqualTol(vecZero,0.001) then
-				follow:ManipulateBoneScale(follow:LookupBone("ValveBiped.Bip01_Head1"),lerpasad > 0.9 and vecFull or vecPochtiZero)
-			end
+			setHeadScaleIfNeeded(follow, lerpasad > 0.9 and vecFull or vecPochtiZero)
 
 			lerpasad = Lerp(0.1, lerpasad, (IsAimingNoScope(ply) and 0 or 1))
 
@@ -406,6 +458,11 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 	hook.Run("PostHGCalcView", ply, view)
 
+	result = hook.Run("PostPostHGCalcView", ply, view)
+	if result then
+		return result
+	end
+
 	return view
 end
 
@@ -443,7 +500,8 @@ hook.Add("NetworkEntityCreated", "HG_GiveRenderOverride", function(ragdoll)
 		if !IsValid(ragdoll:GetNWEntity("ply")) then
 			ragdoll.RenderOverride = function(self, flags)
 				if not IsValid(self) or self:IsDormant() then return end
-				if not self:GetBonePosition(1) or self:GetBonePosition(1):IsEqualTol(self:GetPos(), 0.01) then return end
+				local bonePos = self:GetBonePosition(1)
+				if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then return end
 				if not self:GetNWString("PlayerName") then return end
 				local ply = self:GetNWEntity("ply")
 				local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
@@ -476,7 +534,8 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 	if IsValid(ent) then
 		ent.RenderOverride = function(self, flags)
 			if not IsValid(self) or self:IsDormant() then return end
-			if not self:GetBonePosition(1) or self:GetBonePosition(1):IsEqualTol(self:GetPos(), 0.01) then return end
+			local bonePos = self:GetBonePosition(1)
+			if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then return end
 			local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
 			
 			hg.renderOverride(ply, self, flags)
@@ -671,7 +730,7 @@ hook.Add("Player Spawn", "fuckingremoveragdoll", function(ply)
 	
 	if IsValid(ragdoll) then
 		ragdoll:SetNWEntity("ply", NULL)
-		ragdoll:ManipulateBoneScale(ragdoll:LookupBone("ValveBiped.Bip01_Head1"), Vector(1, 1, 1))
+		setHeadScaleIfNeeded(ragdoll, vecFull)
 	end
 	--FUCKING SHIT
 	if IsValid(ply.FakeRagdoll) then

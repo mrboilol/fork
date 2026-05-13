@@ -1,9 +1,23 @@
 --local Organism = hg.organism
+local hg_floppy_limbs = GetConVar("hg_floppy_limbs")
+
 local function PlayBoneBreakSound(entity)
     if math.random() < 0.5 then
-        entity:EmitSound("owfuck"..math.random(1, 6)..".ogg", 75, 100, 1, CHAN_AUTO)
+                        entity:EmitSound("owfuck"..math.random(1, 9)..".ogg", 75, 100, 1, CHAN_AUTO)
     else
         entity:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO)
+    end
+end
+
+local function CheckConcussionFlash(org, old_concussion, dmgInfo)
+    if old_concussion < 1.5 and org.concussion >= 1.5 then
+        net.Start("headtrauma_flash")
+        net.WriteVector(dmgInfo:GetDamagePosition())
+        net.WriteFloat(2.0) -- flash_intensity
+        net.WriteInt(300, 20) -- flash_duration
+        net.WriteBool(true) -- is_critical
+        net.WriteBool(false) -- play_knockout_sound
+        net.Send(org.owner)
     end
 end
 
@@ -37,10 +51,10 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 end
 
 local huyasd = {
-	["spine1"] = "I don't feel anything below my hips.",
-	["spine2"] = "I cant't feel or move anything below my torso.",
-	["spine3"] = "I can't move at all. I can barely even breathe.",
-	["skull"] = "My head is aching.",
+	["spine1"] = "My legs- i... i cant feel my legs...",
+	["spine2"] = "I cant move my chest nor my legs, i think i broke something.",
+	["spine3"] = "I cant move at all, much less breathe...",
+	["skull"] = "My head is throbbing so bad, i think i broke something.",
 }
 
 local broke_arm = {
@@ -77,9 +91,27 @@ local dislocated_leg = {
 	"THE ANKLE'S TWISTED- BUT THE KNEE'S THE REAL PROBLEM!",
 }
 
+local function hasClimbGripActive(owner)
+	if not IsValid(owner) or not owner:IsPlayer() then return false end
+
+	local rag = owner.FakeRagdoll
+	if not IsValid(rag) then return false end
+
+	return (IsValid(rag.ConsLH) and rag.ConsLH.ZCClimbGrip) or (IsValid(rag.ConsRH) and rag.ConsRH.ZCClimbGrip)
+end
+
+local function hasClimbGripActive(owner)
+	if not IsValid(owner) or not owner:IsPlayer() then return false end
+
+	local rag = owner.FakeRagdoll
+	if not IsValid(rag) then return false end
+
+	return (IsValid(rag.ConsLH) and rag.ConsLH.ZCClimbGrip) or (IsValid(rag.ConsRH) and rag.ConsRH.ZCClimbGrip)
+end
+
 local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
-	local dmg = dmg * 4
+	local dmg = dmg * 3.25
 
 	if dmgInfo:IsDamageType(DMG_CRUSH) and dmg > 4 and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key)
@@ -95,13 +127,19 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	org[key] = org[key] * 0.5
 
-	if dmg < 0.7 then return 0 end
+	if dmg < 0.8 then return 0 end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) then return 0 end
 
 	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 	
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
+		org[key.."dislocation"] = true
+		org[key.."dislocation"] = true
+
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
 
 		org.painadd = org.painadd + 55
 		org.owner:AddNaturalAdrenaline(1)
@@ -111,11 +149,15 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		//broken
 	else
-		//org[key] = 0.5
+		--//org[key] = 0.5
 		org[key.."dislocation"] = true
+
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
 
 		org.painadd = org.painadd + 35
 		org.owner:AddNaturalAdrenaline(0.5)
@@ -137,6 +179,16 @@ end
 local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
 	local dmg = dmg * 4
+	local climbGrip = hasClimbGripActive(org.owner)
+
+	if climbGrip and (dmgInfo:IsDamageType(DMG_CRUSH) or dmgInfo:IsDamageType(DMG_FALL)) then
+		dmg = dmg * 0.35
+	end
+	local climbGrip = hasClimbGripActive(org.owner)
+
+	if climbGrip and (dmgInfo:IsDamageType(DMG_CRUSH) or dmgInfo:IsDamageType(DMG_FALL)) then
+		dmg = dmg * 0.35
+	end
 	
 	if dmgInfo:IsDamageType(DMG_CRUSH) and dmg > 4 and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key)
@@ -149,16 +201,24 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	local dmg = org[key]
+	local dislocationThreshold = climbGrip and 0.82 or 0.6
+	local dislocationThreshold = climbGrip and 0.82 or 0.6
 	
 	org[key] = org[key] * 0.5
 
-	if dmg < 0.6 then return 0 end
+	if dmg < dislocationThreshold then return 0 end
+	if dmg < dislocationThreshold then return 0 end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) then return 0 end
 
 	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 	
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
+		org[key.."dislocation"] = true
+
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
 
 		org.painadd = org.painadd + 55
 		org.owner:AddNaturalAdrenaline(1)
@@ -167,20 +227,26 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		//broken
 	else
 		org[key.."dislocation"] = true
-		//org[key] = 0.5
 
-		org.painadd = org.painadd + 35
+		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+			hg.BreakLimb(org.owner, key)
+		end
+
+		--//org[key] = 0.5
+
+		org.painadd = org.painadd + (climbGrip and 20 or 35)
+		org.painadd = org.painadd + (climbGrip and 20 or 35)
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5
 
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		//dislocated
 	end
 
@@ -212,6 +278,13 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
 	
+	if name == "spine3" and org.spine3 > 0.75 and oldDmg <= 0.75 then
+		if math.random() < 0.5 then
+			hg.BreakNeck(org.owner)
+			return result, vecrand
+		end
+	end
+	
 	hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 5, "Spine bone damage harm")
 	
 	if (name == "spine3" || name == "spine2") then
@@ -219,7 +292,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
-			PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(org.owner)
 		if org.owner:IsPlayer() then
 			org.owner:Notify(huyasd[name], true, name, 2)
 		end
@@ -237,21 +310,22 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 end
 
 local jaw_broken_msg = {
-	"I FEEL PIECES OF MY JAW... FUCK-FUCK-FUCK",
+	"MY JAW, MY JAW IS BROKEN IN PIECES!",
 	"MY JAW IS FUCKING FLOATING IN MY HEAD",
-	"MY JAW... OHH IT HURTS REALLY BAD... I FEEL PIECES OF IT MOVING",
+	"IM DISFIGURED- MY JAW IS ALL OVER THE PLACE!",
 }
 
 local jaw_dislocated_msg = {
-	"I CAN'T CLOSE MY JAW... IT FUCKING HURTS",
-	"MY JAW... ITS JUST STUCK THERE-- OH ITS PAINING",
-	"I CANT MOVE MY JAW AT ALL... AND ITS REALLY ACHING",
+	"JESUS CHRIST- I CAN FEEL MY JAW MUSCLES TUGGING AT MY SKULL",
+	"MY JAW- I CANT MOVE MY JAW IT FUCKING HURTS",
+	"MY JAW IS PAINING SO BAD, I CANT MOVE IT WITHOUT AGONIZINGLY HURTING",
 	//"I CANT EVEN SPEAK, I NEED TO PUNCH IT BACK IN PLACE... BUT IT HURTS REAL BAD",
 }
 
 local input_list = hg.organism.input_list
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.jaw
+	local old_concussion = org.concussion or 0
 
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 
@@ -259,35 +333,34 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
 
-	local dislocated = (org.jaw - oldDmg) > math.Rand(0.1, 0.3)
+	local dislocated = (org.jaw - oldDmg) > math.Rand(0.2, 0.4)
 
 	if org.jaw == 1 then
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
 
-		if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
+if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
 	end
 
 	org.shock = org.shock + dmg * 3
-
-    org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Lower rate for jaw
+	    org.concussion = math.min((org.concussion or 0) + dmg * 8, 10) -- Increased from 4 to 8
 
     -- Slight disorientation and consciousness loss
-    org.disorientation = org.disorientation + dmg * 0.5
-    org.consciousness = math.max(org.consciousness - dmg * 0.05, 0)
+    org.disorientation = org.disorientation + dmg * 1.5 -- Increased from 0.5 to 1.5
+    org.consciousness = math.max(org.consciousness - dmg * 0.15, 0) -- Increased from 0.05 to 0.15
 
     -- Add more concussion for significant damage
     if dmg > 0.2 then
-        org.concussion = math.min((org.concussion or 0) + dmg * 2, 10)
+        org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Increased from 2 to 4
     end
 
-    if dislocated then
-        org.shock = org.shock + dmg * 20
-        org.avgpain = org.avgpain + dmg * 20
+	if dislocated then
+		org.shock = org.shock + dmg * 20
+		org.avgpain = org.avgpain + dmg * 20
 		
 		if !org.jawdislocation then
-				PlayBoneBreakSound(org.owner)
-			end
+PlayBoneBreakSound(org.owner)
+		end
 
 		org.jawdislocation = true
 
@@ -310,19 +383,28 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		net.Broadcast()
 	end
 
+	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result, vecrand
 end
 
 hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isChat, teamonly, text)
-	if IsValid(output) and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
-		-- and !isChat and output:IsSpeaking()
-		output.organism.painadd = output.organism.painadd + 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))
-		output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
+	if IsValid(output) and output:Alive() and (output.organism.jaw == 1 or output.organism.jawdislocation) and (output:IsSpeaking() or isChat) then
+        local pain_multiplier = 1
+        if output.organism.jaw == 1 and output.organism.jawdislocation then
+            pain_multiplier = 2.5 -- more pain
+        end
+        output.organism.painadd = output.organism.painadd + (2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))) * pain_multiplier
+        if pain_multiplier > 1 then
+            output:Notify("I CAN BARELY SPEAK WITH MY JAW LIKE THIS...", 60, "painfromjawspeak", 0, nil, Color(255, 150, 150))
+        else
+            output:Notify("FUUUUCK- IT HURTS REAL BAD WHEN SPEAKING", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
+        end
 	end
 end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.skull
+	local old_concussion = org.concussion or 0
 	
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
@@ -387,29 +469,31 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if org.skull == 1 then
 		if org.isPly then
-			//org.owner:Notify(huyasd["skull"],true,"skull",4)
+			org.owner:Notify(huyasd["skull"],true,"skull",4)
 		end
 
-		--[[if dir then
+		if dir then
 			net.Start("hg_bloodimpact")
 			net.WriteVector(dmgInfo:GetDamagePosition())
 			net.WriteVector(dir / 10)
 			net.WriteFloat(3)
 			net.WriteInt(1,8)
 			net.Broadcast()
-		end--]]
+		end
 	end
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
+    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 1.5, 1.15)
 
+	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand
 end
 
 local ribs = {
-	"MY CHEST... SNAPPED",
-	"SOMETHING SNAPPED IN MY TORSO",
-	"THERE'S SOMETHING SHARP IN MY CHEST...",
-	"I FEEL SOMETHING SHARP IN MY TORSO",
+	"I- I felt my torso snapping.",
+	"I feel something sharp poking inside...",
+	"I think i heard my chest break...",
+	"I broke a rib- I think i actually broke a rib...",
 }
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
@@ -423,15 +507,17 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.painadd = org.painadd + dmg * 1
 	org.shock = org.shock + dmg * 1
+	org.o2[1] = math.max(org.o2[1] - dmg * 5, 0)
+	org.stamina_damage = (org.stamina_damage or 0) + dmg * 20
+	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 10
 
 	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 3))) then
 		org.brokenribs = math.Round(org.chest * 3)
 		
 		if org.brokenribs > 0 then
-			//org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
+			org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
-			PlayBoneBreakSound(org.owner)
-
+					PlayBoneBreakSound(org.owner)
 			return math.min(0, result)
 		end
 	end
@@ -441,15 +527,19 @@ end
 
 input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.pelvis
-	org.painadd = org.painadd + dmg * 1
-	org.shock = org.shock + dmg * 1
+	org.painadd = org.painadd + dmg * 1.5
+	org.shock = org.shock + dmg * 1.5
+	org.internalBleed = (org.internalBleed or 0) + dmg * 1.5
+	org.o2[1] = math.max(org.o2[1] - dmg * 3, 0)
+	org.stamina_damage = (org.stamina_damage or 0) + dmg * 15
+	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 5
 
-	local result = damageBone(org, bone, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
+	local result = damageBone(org, bone, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 
 	if org.isPly and org.pelvis == 1 then
-		//org.owner:Notify("My pelvis is agonizingly hurting.", true, "pelvis", 4)
+		org.owner:Notify("FUCKING HELL- MY ASS IS BACKWARDS, LITERALLY!", true, "pelvis", 4)
 	end
 
 	return result
@@ -466,3 +556,16 @@ input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ric
 input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 1, boneindex, dir, hit, ricochet) end
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
 input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 3, boneindex, dir, hit, ricochet) end
+
+hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
+    if not IsValid(ply) or not ply.organism then return end
+
+    local org = ply.organism
+    local limbs = {"larm", "rarm", "lleg", "rleg"}
+
+    for _, limb in ipairs(limbs) do
+        if (org[limb] and org[limb] >= 1) or org[limb .. "dislocation"] then
+            hg.BreakLimb(ragdoll, limb)
+        end
+    end
+end)

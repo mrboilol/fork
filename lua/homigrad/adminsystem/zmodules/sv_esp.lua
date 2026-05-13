@@ -7,7 +7,19 @@ local ESP = {}
 local adminMode = {}
 local espPlayers = {}
 local syncQueue = {}
-local allESP = {} 
+local allESP = {}
+local lastToggle = {}
+local liveESPUserGroups = {
+	["superadmin"] = true,
+	["developer"] = true,
+	["headadmin"] = true,
+	["admin"] = true
+}
+local ESP_PDATA_KEY = "zcity_live_esp_enabled"
+
+local function getSteamKey( ply )
+	return ply:SteamID64() or ply:SteamID()
+end
 
 function ESP:Init()
 	util.AddNetworkString("AS_Sync")

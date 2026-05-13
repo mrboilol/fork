@@ -868,6 +868,7 @@ hook.Add( "OnEntityCreated", "VechicleChairs", function( ent )
 			
 			ent:SetModel("models/props_junk/PopCan01a.mdl")
 			ent:SetAngles(ent:LocalToWorldAngles(UwU and Angle(0, -1, 0) or Angle(0,90,0)))
+			ent:SetPos(ent:GetPos() + vector_up * 3 + ent:GetAngles():Forward() * 5)
 		end
 	end)
 	
@@ -1128,6 +1129,8 @@ local TrackedEnts = {
 	["Grenade"] = {"weapon_hg_hl2nade_tpik"},
 	["npc_grenade_frag"] = {"ent_hg_grenade_hl2grenade"},
 	["ent_jack_hmcd_ducttape"] = {"weapon_ducttape"},
+	["ent_hmcd_mansion_cup"]={"weapon_hg_mug"},
+	["ent_hmcd_mansion_knife"]={"weapon_pocketknife"},
 }
 
 local TrackedEntsHalfLife = {
@@ -1148,6 +1151,7 @@ local TrackedEntsHalfLife = {
 	["item_ammo_pistol_large"]={"ent_ammo_9x19mmparabellum"},
 	["item_ammo_ar2"]={"ent_ammo_pulse"},
 	["item_ammo_ar2_large"]={"ent_ammo_pulse"},
+	["weapon_physcannon"]={"weapon_hg_gravitygun"},
 	["item_ammo_ar2_altfire"]={"ent_ammo_pulse"},--TODO: add altfire!!!!
 	["item_ammo_smg1"]={"ent_ammo_4.6x30mm"},
 	["item_box_mrounds"]={"ent_ammo_4.6x30mm"},
@@ -1161,10 +1165,13 @@ local TrackedEntsHalfLife = {
 	["item_healthvial"]={"weapon_bandage_sh","item_healthvial"},
 	["item_healthkit"]={"weapon_medkit_sh","item_healthkit"},
 	["item_battery"]={"weapon_painkillers","item_battery"},
+	["item_tranexamic_acid"]={"weapon_tranexamic_acid"},
+	["item_mannitol"]={"weapon_mannitol"},
 	["item_suit"]={"item_suit"},
 	["ent_hmcd_mansion_cup"]={"weapon_hg_mug"},
 	["ent_hmcd_mansion_knife"]={"weapon_pocketknife"},
 	["ent_hmcd_mansion_cuestick"]={"weapon_hg_spear"},
+
 }
 
 local TrackedModelsa = {
@@ -1200,6 +1207,7 @@ TrackedEntsNpc["weapon_crowbar"] = {"weapon_bat"}
 TrackedEntsNpc["weapon_stunstick"] = {"weapon_hg_stunstick"}
 TrackedEntsNpc["weapon_shotgun"] = {"weapon_spas12"}
 TrackedEntsNpc["npc_grenade_frag"] = {"ent_hg_grenade_hl2grenade"}
+TrackedEntsNpc["weapon_alyxgun"] = {"weapon_pl15"}	--for co-op!
 
 local fuckingwait = 0
 hook.Add("PreCleanupMap","ReplaceEntCD",function()
@@ -1526,7 +1534,8 @@ end
 
 hook.Add( "AcceptInput", "StealthOpenDoors", function( ent, inp, act, ply, val )
 	if inp == "Use" and ent:SDOIsDoor() then
-		local func = ((ply:KeyDown( IN_SPEED ) and "FastOpenDoor") or ( ply:KeyDown( IN_WALK ) and "StealthOpenDoor") or "NormalOpenDoor")
+		local validPly = IsValid(ply) and ply:IsPlayer()
+		local func = ((validPly and ply:KeyDown( IN_SPEED ) and "FastOpenDoor") or ( validPly and ply:KeyDown( IN_WALK ) and "StealthOpenDoor") or "NormalOpenDoor")
 		ent[func](ent,ply)
 		if ent:GetInternalVariable( "slavename" ) then
 			for k,v in pairs( ents.FindByName( ent:GetInternalVariable( "slavename" ) ) ) do
@@ -1545,20 +1554,21 @@ hook.Add( "AcceptInput", "StealthOpenDoors", function( ent, inp, act, ply, val )
 	end
 end )
 hook.Add("PlayerUse", "DoorClose", function(ply, ent)
-	local getdoor = ply:GetUseEntity()
-	if string_find(tostring(getdoor), "prop_door_rotating") and getdoor:GetInternalVariable("m_eDoorState") == 2 then
-		if getdoor:GetInternalVariable("m_hMaster") != NULL then
-			getdoor:GetInternalVariable("m_hMaster"):Fire("close")
-			hg.RunZManipAnim(ply, "door_open_back", nil, 2, {self})
+	local getdoor = IsValid(ent) and ent or ply:GetUseEntity()
+	if not IsValid(getdoor) or not getdoor.SDOIsDoor or not getdoor:SDOIsDoor() or not DoorIsOpen2(getdoor) then return end
 
-			return false
-		else
-			getdoor:Fire("close")
-			hg.RunZManipAnim(ply, "door_open_back", nil, 2, {self})
+	local masterDoor = getdoor.GetInternalVariable and getdoor:GetInternalVariable("m_hMaster") or nil
+	local targetDoor = getdoor
+	if IsValid(masterDoor) and masterDoor.SDOIsDoor and masterDoor:SDOIsDoor() then
+		targetDoor = masterDoor
+	end
 
-			return false
-		end
-	end	
+	if not IsValid(targetDoor) then return false end
+
+	targetDoor:Fire("close")
+	hg.RunZManipAnim(ply, "door_open_back", nil, 2, {targetDoor})
+
+	return false
 end)
 
 hook.Add( "KeyPress", "snowballs_pickup", function( ply, key )
@@ -1715,7 +1725,7 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 			owner:Notify(hg.get_phraselist(owner, "heatvomit"), 1, "phrase", 1, nil, Color(255, 85, 85, 255))
 			
 			timer.Simple(3, function()
-				hg.organism.Vomit(org.owner)
+				hg.organism.VomitNormal(org.owner)
 			end)
 		end
 	end

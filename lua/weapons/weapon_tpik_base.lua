@@ -76,7 +76,78 @@ end
 
 SWEP.modelscale = 1
 SWEP.modelscale2 = 1
+
+local cachedLookupBone
+local cachedWorldBone
+local cachedOwnerBone
+
 if CLIENT then
+	cachedLookupBone = function(ent, cacheField, modelField, boneName)
+		if not IsValid(ent) then return nil end
+
+		local model = ent:GetModel()
+		if ent[modelField] ~= model then
+			ent[modelField] = model
+			ent[cacheField] = {}
+		end
+
+		local cache = ent[cacheField]
+		local bone = cache[boneName]
+		if bone == nil then
+			bone = ent:LookupBone(boneName) or false
+			cache[boneName] = bone
+		end
+
+		return bone ~= false and bone or nil
+	end
+
+	cachedWorldBone = function(ent, boneName)
+		return cachedLookupBone(ent, "ZCTPIKWorldBoneCache", "ZCTPIKWorldBoneCacheModel", boneName)
+	end
+
+	cachedOwnerBone = function(ent, boneName)
+		return cachedLookupBone(ent, "ZCTPIKOwnerBoneCache", "ZCTPIKOwnerBoneCacheModel", boneName)
+	end
+
+	local function initializeSequenceState(mdl)
+		if not IsValid(mdl) then return end
+
+		mdl.ZCLastSequenceModel = mdl:GetModel()
+		mdl.ZCSequenceReadyAt = CurTime() + 0.25
+		mdl.ZCAnimAssigned = false
+
+		if mdl.ResetSequenceInfo then
+			mdl:ResetSequenceInfo()
+		end
+	end
+
+	local function normalizeSequenceState(mdl, desiredModel)
+		if not IsValid(mdl) then return false end
+
+		if desiredModel and mdl:GetModel() ~= desiredModel then
+			mdl:SetModel(desiredModel)
+		end
+
+		local currentModel = mdl:GetModel()
+		if mdl.ZCLastSequenceModel ~= currentModel then
+			mdl.ZCLastSequenceModel = currentModel
+			mdl.ZCSequenceReadyAt = CurTime() + 0.1
+			mdl.ZCAnimAssigned = false
+		end
+
+		if (mdl.ZCSequenceReadyAt or 0) > CurTime() then return false end
+
+		local seqCount = mdl.GetSequenceCount and mdl:GetSequenceCount() or 0
+		if seqCount <= 0 then return false end
+
+		local seq = mdl:GetSequence()
+		if not isnumber(seq) or seq < 0 or seq >= seqCount then
+			mdl.ZCAnimAssigned = false
+			return false
+		end
+
+		return true
+	end
 
     local vecPochtiZero = Vector(0.0001, 0.0001, 0.0001)
 
@@ -88,6 +159,9 @@ if CLIENT then
 
 	function SWEP:GetWM()
         self.worldModel = IsValid(self.worldModel) and self.worldModel or ClientsideModel(self.WorldModel)
+        if IsValid(self.worldModel) and not self.worldModel.ZCLastSequenceModel then
+            initializeSequenceState(self.worldModel)
+        end
         self.worldModel:SetNoDraw(true)
 		return self.worldModel
 	end
@@ -103,6 +177,7 @@ if CLIENT then
 
         if not IsValid(self.worldModel) then
             self.worldModel = ClientsideModel(self.WorldModel)
+            initializeSequenceState(self.worldModel)
             local model = self.worldModel
             self.worldModel:SetSkin(self.WMSkin or 0)
             self:CallOnRemove("remove_worldmodel1",function()
@@ -124,6 +199,7 @@ if CLIENT then
         local ent = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 
         if (IsValid(owner)) and (ent == owner or hg.KeyDown(owner,IN_USE) or (owner:GetNetVar("lastFake",0) > CurTime())) then
+            if not normalizeSequenceState(WorldModel, self.WorldModelReal) then return end
             local timing = 0
             if not self.cycling then
                 timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed,0,1))
@@ -141,12 +217,10 @@ if CLIENT then
             end
 
             self.sprintanim = qerp(0.02 * FrameTime() / engine.TickInterval(),self.sprintanim or 0,(owner.IsSprinting and owner:IsSprinting()) and 1 or 0)
-            
+
 			local tr = hg.eyeTrace(owner,60)
 			local ang = owner:EyeAngles()
             if not tr then return end
-
-            if WorldModel:GetModel() ~= self.WorldModelReal then WorldModel:SetModel(self.WorldModelReal) end
 
 			local pos = tr.StartPos + ang:Forward() * (self.HoldPos[1] - 4) + ang:Right() * self.HoldPos[2] + ang:Up() * self.HoldPos[3]
 			--pos = pos + ang:Forward() * self.AttackPos[1] * self.attackanim + ang:Right() * self.AttackPos[2] * self.attackanim + ang:Up() * self.AttackPos[3] * self.attackanim
@@ -163,17 +237,17 @@ if CLIENT then
 			WorldModel:SetRenderOrigin(pos)
 			WorldModel:SetRenderAngles(ang)
 		else
-            if WorldModel:GetModel() ~= self.WorldModel then WorldModel:SetModel(self.WorldModel) end
+            if not normalizeSequenceState(WorldModel, self.WorldModel) then return end
 			
             WorldModel:SetRenderOrigin(self:GetPos())
 			WorldModel:SetRenderAngles(self:GetAngles())
 		end
 
-        if IsValid(owner) and not (ent == owner or hg.KeyDown(owner,IN_USE) or (owner:GetNetVar("lastFake",0) > CurTime())) then
-            local bon = ent:LookupBone("ValveBiped.Bip01_R_Hand")
-            if not bon then return end
-            local mat = ent:GetBoneMatrix(bon)
-            if not mat then return end
+		if IsValid(owner) and not (ent == owner or hg.KeyDown(owner,IN_USE) or (owner:GetNetVar("lastFake",0) > CurTime())) then
+			local bon = cachedOwnerBone(ent, "ValveBiped.Bip01_R_Hand")
+			if not bon then return end
+			local mat = ent:GetBoneMatrix(bon)
+			if not mat then return end
             local pos,ang = LocalToWorld(self.lpos or vector_origin,self.lang or angle_zero,mat:GetTranslation(),mat:GetAngles())
             WorldModel:SetRenderOrigin(pos)
 			WorldModel:SetRenderAngles(ang)
@@ -185,27 +259,30 @@ if CLIENT then
             self.worldModel2:SetNoDraw(true)
         end
 
-        if not self.WorldModelExchange or self.HideMeshBones then
-            if self.HideMeshBones then
-                for k,v in ipairs(self.HideMeshBones) do
-                    if not WorldModel:LookupBone(v) then continue end
-                    --print(v)
-                    --WorldModel:ManipulateBoneScale(WorldModel:LookupBone(v),vecPochtiZero)
-                    local matrix = WorldModel:GetBoneMatrix(WorldModel:LookupBone(v))
-                    if self.HideMeshOnlyScale and self.HideMeshOnlyScale[v] then
-                        matrix:SetScale(vecPochtiZero)
-                    else
-                        matrix:Zero()
-                    end
-                    WorldModel:SetBoneMatrix(WorldModel:LookupBone(v),matrix)
-                end
-            end
-            WorldModel:DrawModel()
+		if not self.WorldModelExchange or self.HideMeshBones then
+			if self.HideMeshBones then
+				for k,v in ipairs(self.HideMeshBones) do
+					local hiddenBone = cachedWorldBone(WorldModel, v)
+					if not hiddenBone then continue end
+					--print(v)
+					--WorldModel:ManipulateBoneScale(hiddenBone,vecPochtiZero)
+					local matrix = WorldModel:GetBoneMatrix(hiddenBone)
+					if not matrix then continue end
+					if self.HideMeshOnlyScale and self.HideMeshOnlyScale[v] then
+						matrix:SetScale(vecPochtiZero)
+					else
+						matrix:Zero()
+					end
+					WorldModel:SetBoneMatrix(hiddenBone,matrix)
+				end
+			end
+			WorldModel:DrawModel()
         end
 
-        if IsValid(self.worldModel) and self.WorldModelExchange then
+		if IsValid(self.worldModel) and self.WorldModelExchange then
             if not IsValid(self.worldModel2) then
                 self.worldModel2 = ClientsideModel(self.WorldModelExchange)
+                initializeSequenceState(self.worldModel2)
                 local model = self.worldModel2
                 self:CallOnRemove("remove_worldmodel2",function()
                     if IsValid(model) then
@@ -215,13 +292,20 @@ if CLIENT then
                 end)
             end
 
-            local pos,ang = self.worldModel:GetPos(),self.worldModel:GetAngles()
-            local huy = self.worldModel:GetModel() == self.WorldModelReal
-            
-            if IsValid(self:GetOwner()) or self.DontChangeDropped then
-                pos,ang = LocalToWorld(self.weaponPos,self.weaponAng,huy and self.worldModel:GetBoneMatrix(self.basebone or 1):GetTranslation() or self.worldModel:GetPos(),huy and self.worldModel:GetBoneMatrix(self.basebone or 1):GetAngles() or self.worldModel:GetAngles())
-            end
-            self.worldModel2:SetModelScale(self.modelscale)
+			local pos,ang = self.worldModel:GetPos(),self.worldModel:GetAngles()
+			local huy = self.worldModel:GetModel() == self.WorldModelReal
+			local baseBone = self.basebone or 1
+			local baseMatrix = huy and self.worldModel:GetBoneMatrix(baseBone) or nil
+			
+			if IsValid(self:GetOwner()) or self.DontChangeDropped then
+				pos,ang = LocalToWorld(
+					self.weaponPos,
+					self.weaponAng,
+					baseMatrix and baseMatrix:GetTranslation() or self.worldModel:GetPos(),
+					baseMatrix and baseMatrix:GetAngles() or self.worldModel:GetAngles()
+				)
+			end
+			self.worldModel2:SetModelScale(self.modelscale)
             self.worldModel2:SetRenderOrigin(pos)
             self.worldModel2:SetRenderAngles(ang)
             self.worldModel2:SetupBones()
@@ -231,16 +315,21 @@ if CLIENT then
             end
         end
 
-        if self:IsLocal() and self.isTPIKBase then
-            local camBone = WorldModel:LookupBone(self.ViewBobCamBone or "Camera_animated") or WorldModel:LookupBone("ValveBiped.Bip01_R_Hand")
-            if camBone then
-                local gAngles = WorldModel:GetBoneMatrix(camBone):GetAngles()
-                local _,gAngles = WorldToLocal(vector_origin,gAngles, WorldModel:GetPos(), WorldModel:GetBoneMatrix(WorldModel:LookupBone(self.ViewBobCamBase or "") or 0):GetAngles())
-                self.OldAngPunch = self.OldAngPunch or gAngles
-                ViewPunch( ( self.OldAngPunch - gAngles )/(self.ViewPunchDiv or 100) )
-                self.OldAngPunch = gAngles
-            end
-        end
+		if self:IsLocal() and self.isTPIKBase then
+			local camBone = cachedWorldBone(WorldModel, self.ViewBobCamBone or "Camera_animated") or cachedWorldBone(WorldModel, "ValveBiped.Bip01_R_Hand")
+			if camBone then
+				local camMatrix = WorldModel:GetBoneMatrix(camBone)
+				local camBaseBone = cachedWorldBone(WorldModel, self.ViewBobCamBase or "")
+				local camBaseMatrix = camBaseBone and WorldModel:GetBoneMatrix(camBaseBone) or nil
+				if camMatrix then
+					local gAngles = camMatrix:GetAngles()
+					local _,gAngles = WorldToLocal(vector_origin,gAngles, WorldModel:GetPos(), camBaseMatrix and camBaseMatrix:GetAngles() or WorldModel:GetAngles())
+					self.OldAngPunch = self.OldAngPunch or gAngles
+					ViewPunch( ( self.OldAngPunch - gAngles )/(self.ViewPunchDiv or 100) )
+					self.OldAngPunch = gAngles
+				end
+			end
+		end
 		
 		if(self.DrawPostWorldModel)then
 			self:DrawPostWorldModel()
@@ -304,10 +393,10 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesLH
 
-    local ply_spine_index = ent:LookupBone("ValveBiped.Bip01_Spine4")
-    if !ply_spine_index then return end
-    local ply_spine_matrix = ent:GetBoneMatrix(ply_spine_index)
-    if !ply_spine_matrix then return end
+	local ply_spine_index = cachedOwnerBone(ent, "ValveBiped.Bip01_Spine4")
+	if !ply_spine_index then return end
+	local ply_spine_matrix = ent:GetBoneMatrix(ply_spine_index)
+	if !ply_spine_matrix then return end
     local wmpos = ply_spine_matrix:GetTranslation()
 
 	local wm = self:GetWM()
@@ -317,19 +406,22 @@ function SWEP:SetHandPos(noset)
 	self.rhandik = self.setrh
 	self.lhandik = self.setlh and (ply:GetTable().ChatGestureWeight < 0.1)
 
-    local rhmat, lhmat = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Hand")), ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Hand"))
+	local rhBone = cachedOwnerBone(ent, "ValveBiped.Bip01_R_Hand")
+	local lhBone = cachedOwnerBone(ent, "ValveBiped.Bip01_L_Hand")
+	local rhmat = rhBone and ent:GetBoneMatrix(rhBone) or nil
+	local lhmat = lhBone and ent:GetBoneMatrix(lhBone) or nil
 
 	ply.rhold = rhmat
 	ply.lhold = lhmat
 
 	if self.lhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) and hg.CanUseLeftHand(ply) then
 		for _, bone in ipairs(bones) do
-			local wm_boneindex = wm:LookupBone(bone)
+			local wm_boneindex = cachedWorldBone(wm, bone)
 			if !wm_boneindex then continue end
 			local wm_bonematrix = wm:GetBoneMatrix(wm_boneindex)
 			if !wm_bonematrix then continue end
 			
-			local ply_boneindex = ent:LookupBone(bone)
+			local ply_boneindex = cachedOwnerBone(ent, bone)
 			if !ply_boneindex then continue end
 			local ply_bonematrix = ent:GetBoneMatrix(ply_boneindex)
 			if !ply_bonematrix then continue end
@@ -354,12 +446,12 @@ function SWEP:SetHandPos(noset)
 
 	if self.rhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) then
 		for _, bone in ipairs(bones) do
-			local wm_boneindex = wm:LookupBone(bone)
+			local wm_boneindex = cachedWorldBone(wm, bone)
 			if !wm_boneindex then continue end
 			local wm_bonematrix = wm:GetBoneMatrix(wm_boneindex)
 			if !wm_bonematrix then continue end
 			
-			local ply_boneindex = ent:LookupBone(bone)
+			local ply_boneindex = cachedOwnerBone(ent, bone)
 			if !ply_boneindex then continue end
 			local ply_bonematrix = ent:GetBoneMatrix(ply_boneindex)
 			if !ply_bonematrix then continue end
@@ -541,14 +633,28 @@ function SWEP:PlayAnim(anim,time,cycling,callbackFuncName,reverse,sendtoclient)
 		end
 		return
 	end
-    self.tries = 10
 
     local mdl = self:GetWM()
     if mdl:GetModel() ~= self.WorldModelReal then mdl:SetModel(self.WorldModelReal) end
+    if (mdl.ZCSequenceReadyAt or 0) > CurTime() or ((mdl.GetSequenceCount and mdl:GetSequenceCount()) or 0) <= 0 then
+		local delay = math.max((mdl.ZCSequenceReadyAt or 0) - CurTime(), 0.03)
+		timer.Simple(delay,function()
+            if not IsValid(self) then return end
+			self:PlayAnim(anim,time,cycling,callbackFuncName,reverse)
+		end)
+		return
+	end
+    self.tries = 10
     local tAnim = self.AnimList[anim] or {}
-    self.seq = tAnim and tAnim[1] or anim
+    local seq = tAnim and tAnim[1] or anim
+    if isstring(seq) then
+        seq = mdl:LookupSequence(seq)
+    end
+    if not isnumber(seq) or seq < 0 or (mdl.GetSequenceCount and seq >= mdl:GetSequenceCount()) then return end
+    self.seq = seq
     self.anim = anim
-    mdl:SetSequence(tAnim[1] or anim)
+    mdl.ZCAnimAssigned = true
+    mdl:SetSequence(seq)
     self.animtime = CurTime() + ( time or tAnim[2] or 1)
     self.animspeed = time or tAnim[2] or 1
     self.cycling = cycling or (tAnim[3] ~= nil and tAnim[3])

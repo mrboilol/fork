@@ -1,0 +1,472 @@
+local function DrawArc(x, y, radius, thickness, start_ang, end_ang, roughness, color)
+    surface.SetDrawColor(color.r, color.g, color.b, color.a)
+    draw.NoTexture()
+    
+    local segs = roughness
+    local step = (end_ang - start_ang) / segs
+    
+    for i = 0, segs - 1 do
+        local a1 = math.rad(start_ang + i * step)
+        local a2 = math.rad(start_ang + (i + 1) * step)
+        
+        local cos1, sin1 = math.cos(a1), math.sin(a1)
+        local cos2, sin2 = math.cos(a2), math.sin(a2)
+        
+        local p1 = { x = x + cos1 * (radius - thickness), y = y - sin1 * (radius - thickness) }
+        local p2 = { x = x + cos1 * radius, y = y - sin1 * radius }
+        local p3 = { x = x + cos2 * radius, y = y - sin2 * radius }
+        local p4 = { x = x + cos2 * (radius - thickness), y = y - sin2 * (radius - thickness) }
+        
+        surface.DrawPoly({p1, p2, p3, p4})
+    end
+end
+
+-- Custom thick line function for buttery smooth ECG rendering
+local function DrawThickLine(x1, y1, x2, y2, thickness)
+    local dx = x2 - x1
+    local dy = y2 - y1
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len == 0 then return end
+    
+    local nx = (dy / len) * thickness * 0.5
+    local ny = (-dx / len) * thickness * 0.5
+    
+    surface.DrawPoly({
+        { x = x1 + nx, y = y1 + ny },
+        { x = x2 + nx, y = y2 + ny },
+        { x = x2 - nx, y = y2 - ny },
+        { x = x1 - nx, y = y1 - ny }
+    })
+end
+
+surface.CreateFont("UnconsciousDots", {
+    font = "Bahnschrift",
+    size = 120,
+    weight = 800,
+    antialias = true
+})
+
+local ringAlpha = 0
+local lerpBrain = 0
+local lerpShock = 0
+local lerpConsciousness = 0
+local peakShock = 40
+local dotBeat = 0
+local flatlinePlayed = false
+local flatlineSound
+
+local ecgAlpha = 0
+local ecgAlphaPulseCheck = 0
+local lastHeartBeat = 0
+local beatSound = nil
+local critSound = nil
+local asystoleSound = nil
+local heartPhase = 0
+
+local g_PulseCheckTarget = nil
+local g_PulseCheckData = nil
+
+usermessage.Hook("hg_StartPulseCheckECG", function(msg)
+    g_PulseCheckTarget = msg:ReadEntity()
+    g_PulseCheckData = {
+        started = CurTime(),
+        nextBeat = CurTime(),
+        counted = 0,
+        completed = false,
+        finalBPM = 0
+    }
+end)
+
+local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
+local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
+
+-- Local variables for faster access
+local math = math
+local surface = surface
+local draw = draw
+local Color = Color
+
+local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+local topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+
+local function DrawEKG(state, centerX, centerY, width, height, pulse, color, ringAlpha, bloodpressure)
+    local time = CurTime()
+    if state.lastUpdate == 0 then state.lastUpdate = time end
+    local dt = time - state.lastUpdate
+    state.lastUpdate = time
+    
+    state.phase = state.phase + dt * (pulse / 60)
+    
+    local sweepSpeed = width / 4
+    local oldSweepPos = state.sweepPos
+    state.sweepPos = (state.sweepPos + dt * sweepSpeed) % width
+
+    local amplitudeScale = math.Clamp((bloodpressure or 93) / 93, 0.1, 1.5)
+    
+    -- Calculate fibrillation/messiness based on pulse, blood pressure, and heartbeat ratio
+    local pulseAbnormal = 0
+    if pulse < 40 then
+        pulseAbnormal = (40 - pulse) / 40  -- 0 to 1 for low pulse
+    elseif pulse > 120 then
+        pulseAbnormal = (pulse - 120) / 80  -- 0 to 1 for high pulse
+    end
+    
+    local bpAbnormal = 0
+    if bloodpressure then
+        if bloodpressure < 70 then
+            bpAbnormal = (70 - bloodpressure) / 50
+        elseif bloodpressure > 140 then
+            bpAbnormal = (bloodpressure - 140) / 60
+        end
+    end
+    
+    local heartbeatRatio = pulse / 70  -- Normalized around 70 BPM
+    local ratioAbnormal = math.abs(heartbeatRatio - 1) * 2  -- 0 when normal, higher when abnormal
+    
+    -- Combined fibrillation factor (0 = clean, 1 = maximum fibrillation)
+    local fibrillationFactor = math.Clamp((pulseAbnormal * 0.4 + bpAbnormal * 0.3 + ratioAbnormal * 0.3), 0, 1)
+
+    local function getH(phase, scale)
+        phase = phase % 1
+        local h = 0
+        
+        -- If fibrillating (low BP causing irregular rhythm), skip phases and use curve-like spikes
+        if fibrillationFactor > 0.5 and bloodpressure and bloodpressure < 80 then
+            -- Fibrillation pattern: multiple curve-like spikes instead of proper P-QRS-T
+            local spikePhase = (phase * 8) % 1  -- More frequent spikes
+            local spike = math.sin(spikePhase * math.pi) * 0.4 * scale
+            h = spike * (0.5 + math.random() * 0.3)  -- Reduced amplitude with slight variation
+            -- Add subtle noise
+            local noiseIntensity = fibrillationFactor * 0.08 * scale
+            h = h + (math.random() - 0.5) * 2 * noiseIntensity
+        else
+            -- Normal ECG waveform with possible mild noise
+            if phase > 0.05 and phase < 0.15 then
+                -- P wave: Smooth exponential bell curve
+                local p = (phase - 0.1) / 0.05
+                h = math.exp(-p * p * 5) * 0.12 * scale
+            elseif phase > 0.2 and phase < 0.32 then
+                -- QRS complex: Sharp spikes
+                local p = (phase - 0.2) / 0.12
+                if p < 0.15 then 
+                    -- Q dip
+                    h = -math.sin(p / 0.15 * math.pi) * 0.15 * scale
+                elseif p < 0.5 then 
+                    -- R spike
+                    local rp = (p - 0.15) / 0.35
+                    h = math.sin(rp * math.pi) * 1.1 * scale
+                else 
+                    -- S dip
+                    local sp = (p - 0.5) / 0.5
+                    h = -math.sin(sp * math.pi) * 0.25 * scale
+                end
+            elseif phase > 0.45 and phase < 0.65 then
+                -- T wave: Asymmetric bell curve
+                local p = (phase - 0.55) / 0.1
+                h = math.exp(-p * p * 4) * 0.22 * scale
+            end
+            
+            -- Add mild noise only when moderately abnormal
+            if fibrillationFactor > 0.2 and fibrillationFactor <= 0.5 then
+                local noiseIntensity = fibrillationFactor * 0.05 * scale
+                h = h + (math.random() - 0.5) * 2 * noiseIntensity
+            end
+        end
+        
+        return h
+    end
+
+    local steps = math.max(1, math.floor(math.abs(state.sweepPos - oldSweepPos)))
+    if state.sweepPos < oldSweepPos then steps = math.max(1, math.floor(width - oldSweepPos + state.sweepPos)) end
+
+    for i = 0, steps do
+        local p = (oldSweepPos + i) % width
+        local p_phase = state.phase - (dt * (pulse / 60) * (1 - i/steps))
+        state.points[math.floor(p)] = getH(p_phase, amplitudeScale)
+    end
+    
+    -- Clear a gap ahead of the sweepPos
+    local gap = 12
+    for i = 1, gap do
+        state.points[math.floor((state.sweepPos + i) % width)] = nil
+    end
+    
+    local startX = centerX - width / 2
+    local lastX, lastY
+
+    for i = 0, width - 1 do
+        local h_val = state.points[i]
+        if h_val == nil then 
+            lastX, lastY = nil, nil
+            continue 
+        end
+        
+        local x = startX + i
+        local y = centerY - (h_val * height / 2)
+        
+        local dist = state.sweepPos - i
+        if dist < 0 then dist = dist + width end
+        
+        local alphaMult = math.exp(-dist / (width * 0.08))
+        alphaMult = math.max(alphaMult, math.Clamp(0.18 * (1 - dist / width), 0, 0.18))
+        
+        local currentAlpha = color.a * alphaMult
+        local shadowAlpha = 180 * alphaMult * ringAlpha
+        
+        draw.NoTexture()
+        local thick = 2
+        
+        if lastX and lastY then
+            -- Distance check prevents the line from connecting across the gap
+            if math.abs(x - lastX) < (width / 2) then
+                -- Shadow
+                surface.SetDrawColor(0, 0, 0, shadowAlpha)
+                DrawThickLine(lastX, lastY, x, y, thick + 1.5)
+
+                -- Main Line
+                surface.SetDrawColor(color.r, color.g, color.b, currentAlpha)
+                DrawThickLine(lastX, lastY, x, y, thick)
+            end
+        end
+        
+        lastX, lastY = x, y
+    end
+end
+
+hook.Add("HUDPaint", "DrawUnconsciousRing", function()
+    if not hg_unconsciousring:GetBool() then
+        ringAlpha = 0
+        peakShock = 40
+        return
+    end
+
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not ply:Alive() then 
+        ringAlpha = 0
+        peakShock = 40
+        return 
+    end
+    
+    local org = ply.organism
+    if not org then 
+        ringAlpha = 0
+        peakShock = 40
+        return 
+    end
+    
+    local isUnconscious = org.otrub
+    local pulse = org.heartbeat or org.pulse or 70
+    local brain = org.brain or 0
+    local bloodpressure = org.bloodpressure or 93
+    local consciousness = org.consciousness or 0
+    local shock = org.shock or 0
+    local isCritical = (org.critical == true) or (pulse < 1 and brain >= 0.02) or (brain >= 0.34)
+    local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
+    heartPhase = heartPhase + FrameTime() * (pulse / 60)
+
+    if isUnconscious then
+        local currentShock = org.shock or 0
+        if currentShock > peakShock then
+            peakShock = currentShock
+        end
+        -- Smooth Alpha lerping
+        ringAlpha = Lerp(FrameTime() * 4, ringAlpha, 1)
+        dotBeat = math.floor(CurTime()) % 3
+    else
+        ringAlpha = Lerp(FrameTime() * 6, ringAlpha, 0)
+        if ringAlpha <= 0.01 then
+            ringAlpha = 0
+            peakShock = 40
+            centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+        end
+    end
+    
+    local showTopLeftECG = false
+    local showPulseCheckECG = false
+
+    local isCheckingPulse = false
+    if IsValid(g_PulseCheckTarget) then
+        local wep = ply:GetActiveWeapon()
+        if IsValid(wep) and wep:GetClass() == "weapon_hands_sh" and wep.GetCarrying and IsValid(wep:GetCarrying()) and wep:GetCarrying() == g_PulseCheckTarget then
+            isCheckingPulse = true
+        else
+            g_PulseCheckTarget = nil
+            g_PulseCheckData = nil
+        end
+    end
+
+    if isCheckingPulse then
+        showPulseCheckECG = true
+    end
+
+    if (admiring or (pulse < 40 or pulse > 150)) and not isUnconscious then
+        showTopLeftECG = true
+    end
+
+    if ringAlpha <= 0 and not showTopLeftECG and not showPulseCheckECG then return end
+    
+    -- Unconscious center ring & ECG
+    if ringAlpha > 0.01 then
+        -- Smooth easing values using Lerp instead of Math.Approach
+        lerpBrain = Lerp(FrameTime() * 3, lerpBrain, org.brain or 0)
+        lerpShock = Lerp(FrameTime() * 6, lerpShock, org.shock or 0)
+        lerpConsciousness = Lerp(FrameTime() * 3, lerpConsciousness, org.consciousness or 0)
+        
+        local scrW, scrH = ScrW(), ScrH()
+        local centerX, centerY = scrW / 2, scrH / 2
+        
+        surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
+        surface.DrawRect(0, 0, scrW, scrH)
+        
+        local ringColor = isCritical and Color(200, 0, 0, 255 * ringAlpha) or Color(220, 220, 220, 255 * ringAlpha)
+        local dotColor = isCritical and ringColor or Color(255, 255, 255, 255 * ringAlpha)
+        
+        local progress = 0
+        if isCritical then
+            progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
+        else
+            local shockProgress = math.Clamp((peakShock - lerpShock) / (peakShock - 0.02), 0, 1)
+            local consciousnessProgress = math.Clamp(lerpConsciousness / 0.10, 0, 1)
+            progress = math.min(shockProgress, consciousnessProgress)
+        end
+        
+        local radius = 280
+        local thickness = 12
+        
+        DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * ringAlpha))
+        DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
+        
+        if hg_unconsciousclassic:GetBool() then
+            local beat = dotBeat
+            local dotText = ""
+
+            if isCritical then
+                local redDots = {".!", "..!", "...!"}
+                dotText = redDots[beat + 1]
+            else
+                local whiteDots = {".", "..", "..."}
+                dotText = whiteDots[beat + 1]
+            end
+            
+            draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        else
+            DrawEKG(centerEKGState, centerX, centerY, 540, 140, pulse, dotColor, ringAlpha, bloodpressure)
+        end
+    end
+
+    -- Pulse Checking UI Box
+    if showPulseCheckECG then
+        ecgAlphaPulseCheck = Lerp(FrameTime() * 4, ecgAlphaPulseCheck, 1)
+    else
+        ecgAlphaPulseCheck = Lerp(FrameTime() * 6, ecgAlphaPulseCheck, 0)
+    end
+
+    if ecgAlphaPulseCheck > 0.01 then
+        local boxW, boxH = 300, 150
+        local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 20
+
+        surface.SetDrawColor(0, 0, 0, 150 * ecgAlphaPulseCheck)
+        surface.DrawRect(boxX, boxY, boxW, boxH)
+        surface.SetDrawColor(255, 255, 255, 200 * ecgAlphaPulseCheck)
+        surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
+
+        local target_org = g_PulseCheckTarget.organism or {}
+        local target_pulse = target_org.heartbeat or target_org.pulse or 70
+        local target_bp = target_org.bloodpressure or 93
+        local target_brain = target_org.brain or 0
+        local target_isCritical = (target_org.critical == true) or (target_pulse < 1 and target_brain >= 0.02) or (target_brain >= 0.34)
+
+        if g_PulseCheckData and not g_PulseCheckData.completed then
+            if target_org.heartstop or target_pulse <= 0 then
+                g_PulseCheckData.completed = true
+                g_PulseCheckData.finalBPM = "No Pulse"
+            elseif CurTime() >= g_PulseCheckData.started + 10 then
+                g_PulseCheckData.completed = true
+                g_PulseCheckData.finalBPM = g_PulseCheckData.counted * 6
+            else
+                local timeNow = CurTime()
+                while timeNow >= g_PulseCheckData.nextBeat and g_PulseCheckData.nextBeat <= g_PulseCheckData.started + 10 do
+                    g_PulseCheckData.counted = g_PulseCheckData.counted + 1
+                    local dynamicRate = math.max(target_pulse, 1)
+                    g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
+                    if target_pulse < 1 then
+                        sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
+                    else
+                        local soundFile = target_isCritical and "critbeat.ogg" or "beat.ogg"
+                        sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
+                    end
+                end
+            end
+        end
+
+        DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck, target_bp)
+
+        local displayText = ""
+        if g_PulseCheckData then
+            if g_PulseCheckData.completed then
+                if type(g_PulseCheckData.finalBPM) == "number" then
+                    displayText = g_PulseCheckData.counted .. " x 6 = " .. g_PulseCheckData.finalBPM .. " BPM"
+                else
+                    displayText = g_PulseCheckData.finalBPM
+                end
+            else
+                displayText = "Counting: " .. g_PulseCheckData.counted
+            end
+        end
+
+        draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY - 15, Color(255, 255, 255, 255), TEXT_ALIGN_CENTER)
+    else
+        pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+    end
+
+    -- TopLeft ECG UI Box
+    if showTopLeftECG then
+        ecgAlpha = Lerp(FrameTime() * 4, ecgAlpha, 1)
+    else
+        ecgAlpha = Lerp(FrameTime() * 6, ecgAlpha, 0)
+    end
+
+    if ecgAlpha > 0.01 then
+        local boxW, boxH = 300, 150
+        local boxX, boxY = 20, 20
+
+        surface.SetDrawColor(0, 0, 0, 150 * ecgAlpha)
+        surface.DrawRect(boxX, boxY, boxW, boxH)
+        surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
+        surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
+
+        DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
+    else
+        topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+    end
+
+    -- Heartbeat sounds
+    local abnormalPulse = (pulse < 40 and pulse >= 1) or pulse > 100
+    if pulse < 1 then
+        if not IsValid(asystoleSound) then
+            sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:Play()
+                    asystoleSound = station
+                end
+            end)
+        end
+    else
+        if IsValid(asystoleSound) then
+            asystoleSound:Stop()
+            asystoleSound = nil
+        end
+
+        if admiring or isUnconscious or abnormalPulse or isCheckingPulse then
+            local currentHeartBeat = math.floor(heartPhase)
+            if currentHeartBeat > lastHeartBeat then
+                lastHeartBeat = currentHeartBeat
+
+                local isSevere = pulse > 175 or (bloodpressure or 93) > 140
+                local soundFile = isSevere and "critbeat.ogg" or "beat.ogg"
+                sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
+            end
+        end
+    end
+end)

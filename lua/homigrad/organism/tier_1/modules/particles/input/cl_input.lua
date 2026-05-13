@@ -14,6 +14,8 @@ local mat_huy = Material("effects/blood_core")
 mat_huy:SetTexture("$basetexture",texture)
 
 local cloudmat = Material("effects/smoke_b")
+local vomitColorPrimary = Color(229, 220, 148, 140)
+local vomitColorSecondary = Color(238, 235, 210, 130)
 
 --оставь это лучше выглядит
 --[[for i = 4, 6 do
@@ -37,7 +39,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	if #hg.bloodparticles1 > 200 then table.remove(hg.bloodparticles1, 1) end
+	if #hg.bloodparticles1 > 500 then table.remove(hg.bloodparticles1, 1) end
 	
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
@@ -53,7 +55,7 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	if #hg.bloodparticles2 > 200 then table.remove(hg.bloodparticles2, 1) end
+	if #hg.bloodparticles2 > 500 then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
@@ -67,16 +69,16 @@ local Rand = math.Rand
 
 local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
-	local iters = math.ceil(math.random(1, max) * 2.5)
+	local iters = math.ceil(math.random(1, max) * 5)
 	local velnorm = -vel:GetNormalized() * 5
 	
-	addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
-	addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
-	addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+	addBloodPart2(pos + velnorm, -vel + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.3)
+	addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.3)
+	addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.3)
 
 	for i = 1, iters do
 		local size = 1--math.random(2, 4) * 1
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-40, 40), Rand(-40, 40), Rand(-10, 10)), mat_huy, size, size, false, false)
 	end
 end
 
@@ -87,7 +89,7 @@ net.Receive("hg_bloodimpact", function()
 	local amt = net.ReadInt(8)
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
-	for i = 1, amt do impact(pos,vel,mul) end
+	for i = 1, amt * 2 do impact(pos,vel,mul) end
 end)
 
 net.Receive("hg_brainmist", function()
@@ -287,6 +289,59 @@ net.Receive("bloodsquirt2", function()
 
 		dir = dir:Forward() * len
 		addBloodPart(pos + VectorRand(-0.2, 0.2), dir * amt * 90 + VectorRand(-amt * 25,amt * 25), mat_huy, math.Rand(3,3), math.Rand(3,3), false, false)
+		i = i - 1
+	end)
+	timer.Adjust(name, 0)
+end)
+
+net.Receive("vomitsquirt2", function()
+	local ent = net.ReadEntity()
+	
+	if not IsValid(ent) then return end
+
+	local bone = net.ReadString()
+	local bone = ent:LookupBone(bone)
+	local mat = net.ReadMatrix()
+	local pos = net.ReadVector()
+	local dir = net.ReadVector()
+	local len = dir:Length()
+
+	local ent = hg.RagdollOwner(ent) or ent
+	local ply = ent
+	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
+
+	if ply == lply then
+		localPos:Add(-Vector(2,-2,0))
+	end
+
+	local name = "squirtvomit2"..ent:EntIndex()
+	local i = 34
+	local maxI = i
+	timer.Create(name, 0.012 * game.GetTimeScale(), i + 10, function()
+		if not IsValid(ent) then timer.Remove(name) return end
+		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
+		local amt = math.max(i / maxI, 0.25)
+		if math.random(6) == 1 then return end
+		local mat = ent:GetBoneMatrix(bone)
+		if not mat then timer.Remove(name) return end
+
+		if ply == lply and (i == 34 or i == 17) then
+			ViewPunch(Angle(9,0,0))
+		end
+
+		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
+		
+		if lply == ply then
+			dir = lply:EyeAngles()
+		end
+
+		local curve = VectorRand(-0.14, 0.14)
+		curve[3] = curve[3] * 0.5
+		local dirDown = (dir:Forward() * 0.48 + Vector(0, 0, -0.52) + curve):GetNormalized()
+		local vel = dirDown * (len * amt * 74) + VectorRand(-amt * 12, amt * 12)
+		local col = math.random(4) == 1 and vomitColorSecondary or vomitColorPrimary
+		hg.addBloodPart2(pos + VectorRand(-0.25, 0.25), vel, nil, math.Rand(2.2, 3.2), math.Rand(2.2, 3.2), 2.0 + math.Rand(0, 0.7), false, ply, col)
+		hg.addBloodPart2(pos + VectorRand(-0.2, 0.2), vel * 0.7 + VectorRand(-3.5, 3.5), nil, math.Rand(1.2, 2.0), math.Rand(1.2, 2.0), 1.5 + math.Rand(0, 0.55), false, ply, col)
 		i = i - 1
 	end)
 	timer.Adjust(name, 0)

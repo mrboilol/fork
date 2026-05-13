@@ -363,7 +363,8 @@ hg.ConVars = hg.ConVars or {}
 		if !IsValid(target) then return end
 
 		local oldCollision = target:GetCollisionGroup()
-		target:SetCollisionGroup(COLLISION_GROUP_PASSABLE_DOOR)
+		hg.SafeSetCollisionGroup(target, COLLISION_GROUP_PASSABLE_DOOR)
+		hg.SafeCollisionRulesChanged(target)
 
 		timer.Simple(min or 0, function()
 			if !IsValid(target) then return end
@@ -387,7 +388,8 @@ hg.ConVars = hg.ConVars or {}
 
 				if (!penetrating and !tooNearPlayer) or i >= (math.Round(time / checkdtime) - 1) then
 					if target:GetCollisionGroup() == COLLISION_GROUP_PASSABLE_DOOR then -- if it somehow changed, we shouldn't touch it
-						target:SetCollisionGroup(oldCollision)
+						hg.SafeSetCollisionGroup(target, oldCollision)
+						hg.SafeCollisionRulesChanged(target)
 					end
 
 					timer.Destroy(target:SteamID64().."_checkBounds_cycle")
@@ -519,8 +521,16 @@ hg.ConVars = hg.ConVars or {}
 		if IsValid(ply) and ply:Alive() and not IsValid(ply.bull) and SERVER then
 			timer.Simple(1, function()
 				if not IsValid(ply) or not ply:Alive() then return end
+				
+				-- Check edict limit before creating bullseye
+				if ents.GetCount() >= 8100 then
+					print("[HG] Warning: Edict count too high, skipping bullseye creation for player "..ply:Name())
+					return
+				end
+				
 				ply.bull = ents.Create("npc_bullseye")
 				local bull = ply.bull
+				if not IsValid(bull) then return end
 				local bon = ply:LookupBone("ValveBiped.Bip01_Head1")
 				local mat = bon and ply:GetBoneMatrix(bon)
 				local pos = mat and mat:GetTranslation() or ply:EyePos()
@@ -927,7 +937,10 @@ local IsValid = IsValid
 
 		local ammo = ply:GetAmmo()
 		for id,count in pairs(ammo) do
-			weight = weight + (game.GetAmmoForce(id) * count) / 1500
+			local ammoName = game.GetAmmoName(id)
+			if hg.ammotypes[ammoName] and hg.ammotypes[ammoName].BulletSettings and hg.ammotypes[ammoName].BulletSettings.Mass then
+				weight = weight + (hg.ammotypes[ammoName].BulletSettings.Mass * count) / 1000
+			end
 		end
 
 		ply.armors = ply:GetNetVar("Armor",{})
@@ -938,6 +951,65 @@ local IsValid = IsValid
 		local weightmul = (1 / (weight / maxweight + 1))
 		return weightmul
 	end
+
+	function hg.GetArmInjuryWeaponWeight(ply, wep)
+		if not IsValid(ply) or not IsValid(wep) then return 0 end
+
+		local base = wep.Base
+		local class = wep:GetClass()
+		if base ~= "weapon_base" and base ~= "weapon_melee" and base ~= "homigrad_base" and class ~= "weapon_base" and class ~= "weapon_melee" then return 0 end
+		if type(wep.weight) ~= "number" and type(wep.hg_base_weight) ~= "number" then return 0 end
+
+		local org = ply.organism
+		if not org then return 0 end
+
+		local extra = 0
+		if not org.larmamputated and ((org.larm or 0) >= 1 or org.larmdislocation) then
+			extra = extra + 4
+		end
+		if not org.rarmamputated and ((org.rarm or 0) >= 1 or org.rarmdislocation) then
+			extra = extra + 4
+		end
+		if (org.spine1 or 0) >= (hg.organism and hg.organism.fake_spine1 or 1) or (org.spine2 or 0) >= (hg.organism and hg.organism.fake_spine2 or 1) then
+			extra = extra + 20
+		end
+
+		return extra
+	end
+
+	hook.Add("Player Think", "hg-arm-injury-weapon-weight", function(ply)
+		if not IsValid(ply) or not ply:IsPlayer() then return end
+
+		local active = ply:GetActiveWeapon()
+		local weps = ply:GetWeapons()
+
+		for i, wep in ipairs(weps) do
+			if not IsValid(wep) then continue end
+
+			local base = wep.Base
+			local class = wep:GetClass()
+			local tracked = base == "weapon_base" or base == "weapon_melee" or base == "homigrad_base" or class == "weapon_base" or class == "weapon_melee"
+			if not tracked then
+				if type(wep.hg_base_weight) == "number" and type(wep.weight) == "number" and wep.weight ~= wep.hg_base_weight then
+					wep.weight = wep.hg_base_weight
+				end
+				continue
+			end
+
+			local baseWeight = wep.hg_base_weight
+			if type(baseWeight) ~= "number" then
+				if type(wep.weight) ~= "number" then continue end
+				baseWeight = wep.weight
+				wep.hg_base_weight = baseWeight
+			end
+
+			local extra = (wep == active) and hg.GetArmInjuryWeaponWeight(ply, wep) or 0
+			local wanted = baseWeight + extra
+			if wep.weight ~= wanted then
+				wep.weight = wanted
+			end
+		end
+	end)
 --//
 --\\ Shared custom ragdoll mass
 	hg.IdealMassPlayer = {
@@ -1422,7 +1494,10 @@ local IsValid = IsValid
 			(ply:GetNWBool("TauntLeftHand", false) and ply:GetNWFloat("StartTaunt", 0) + 0.1 < CurTime()) or
 			IsValid(ply.flashlight)) and !ply:GetNetVar("handcuffed") and (wep and not wep.reload)) or
 			(deploying) or
-			(ent != ply and math.abs(ent:GetManipulateBoneAngles(ent:LookupBone("ValveBiped.Bip01_L_Finger11"))[2]) > 5 and !ply:InVehicle()) or
+			(ent != ply and (function()
+				local finger = ent:LookupBone("ValveBiped.Bip01_L_Finger11")
+				return finger and math.abs(ent:GetManipulateBoneAngles(finger)[2]) > 5
+			end)() and !ply:InVehicle()) or
 			( ply:InVehicle() and (wep and not IsValid(wep)) and not wep.reload) and hg.isdriveablevehicle(ply:GetVehicle()) )) or ply.zmanipstart
 	end
 
@@ -1784,7 +1859,7 @@ duplicator.Allow( "homigrad_base" )
 --\\ Custom table.IsEmpty
 	hg.isempty = hg.isempty or table.IsEmpty
 	function table.IsEmpty( tab )
-		return next( tab ) == nil
+		return tab == nil or next( tab ) == nil
 	end
 --//
 

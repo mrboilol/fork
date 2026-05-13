@@ -27,11 +27,16 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	
 	dmg = hook_info.dmg
 	
-	if func and !hook_info.restricted then
-		return func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
-	else
-		return 0
-	end
+	
+
+    if func and !hook_info.restricted then
+        local old_consciousness = org.consciousness
+        local result = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
+
+        return result
+    else
+        return 0
+    end
 end
 
 local function Trace_Blast(box, amt, org, organs, dmg, dmgInfo)
@@ -46,7 +51,13 @@ local function Trace_Blast(box, amt, org, organs, dmg, dmgInfo)
 
 	local amount = amt * dmg
 	
-	if func then return func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false) end
+	    if func then
+        local limb = hitgrouptolimb[bonetohitgroup[organ[2]]]
+        if limb then
+            org.just_damaged_bone_limb = limb
+        end
+        return func(org, 1, amount, dmgInfo, box[6], vector_origin, true, false)
+    end
 end
 
 local dir = Vector(0, 0, 0)
@@ -161,24 +172,16 @@ local sounds = {
 
 local limb_loss_messages = {
     lleg = {
-        "MY LEG, MY LEG IS FUCKING GONE!",
-        "AAAAH, MY FUCKING LEG!",
-        "THEY TOOK MY LEG!",
+        "Your left leg was shattered by an impact.",
     },
     rleg = {
-        "MY OTHER LEG! NOT AGAIN!",
-        "I CAN'T FEEL MY LEG!",
-        "WHERE IS MY LEG?!",
+        "Your right leg was shattered by an impact.",
     },
     larm = {
-        "MY ARM! I NEED THAT!",
-        "I CAN'T HOLD MY GUN ANYMORE!",
-        "MY ARM IS GONE!",
+        "Your left arm was shattered by an impact.",
     },
     rarm = {
-        "NOT THE RIGHT ARM! NOT THE RIGHT ARM!",
-        "MY AIMING ARM! FUCK!",
-        "I'M DISARMED! LITERALLY!",
+        "Your right arm was shattered by an impact.",
     }
 }
 
@@ -216,11 +219,7 @@ function hg.organism.AmputateLimb(org, limb)
 
 	org.owner:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
 
-    local messages = limb_loss_messages[limb]
-    if messages then
-        local message = table.Random(messages)
-        org.owner:ChatPrint(message)
-    end
+
 
 	
 	local ent = hg.GetCurrentCharacter(org.owner)
@@ -467,9 +466,12 @@ function hg.ExplodeHead(ent)
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	if ply:IsPlayer() and ply:Alive() then ply:Kill() end
 	if ent:IsNPC() and ent.organism then ent.organism.shock = 100 end
+	local target = ent
 
 	timer.Simple(0, function()
-		local ent = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
+		if not IsValid(target) then return end
+
+		local ent = target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
 		if not IsValid(ent) then return end
 		--[[if not isbool(ent) then
 			hook.Run("OnHeadExplode", ply, ent)
@@ -490,11 +492,6 @@ local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodi
 local net, math, hg, IsValid = net, math, hg, IsValid
 local takeRagdollDamage
 hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
-    if ent:IsPlayer() then
-        local endurance = ent:GetStat("Endurance")
-        local damage_mul = 1 - (endurance - 10) * 0.05
-        dmgInfo:ScaleDamage(math.max(0.5, damage_mul))
-    end
 
 	if dmgInfo:IsDamageType(DMG_CRUSH) and ent:IsPlayer() and IsValid(ent.FakeRagdoll) then
 		RagdollCollision(ent.FakeRagdoll, {Speed = dmgInfo:GetDamage(), DeltaTime = 1, HitObject = dmgInfo:GetAttacker(), HitPos = dmgInfo:GetDamagePosition(), HitNormal = dmgInfo:GetDamageForce():GetNormalized()})
@@ -506,6 +503,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local attacker = dmgInfo:GetAttacker()
 	
 	local org = ent.organism
+    if dmgInfo:IsDamageType(DMG_FALL) and dmgInfo:GetDamage() > 40 then
+        timer.Simple(0, function()
+            if not IsValid(ent) or not ent:IsPlayer() then return end
+            ent:Notify("The fall knocked the wind out of you.")
+        end)
+    end
 
 	-- Glass damage to ragdoll...
 	if IsValid(ent) and string.find(ent:GetClass(),"break") and 
@@ -586,6 +589,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local inf = IsValid(dmgInfo:GetInflictor()) and not dmgInfo:GetInflictor():IsPlayer() and dmgInfo:GetInflictor() or (dmgInfo:GetAttacker():IsPlayer() and dmgInfo:GetAttacker():GetActiveWeapon()) or dmgInfo:GetAttacker()
 	inf = IsValid(inf.weapon) and inf.weapon or inf
 	if IsValid(inf) then dmgInfo:SetInflictor(inf) end
+
+	local inflictorClass = IsValid(inf) and inf:GetClass() or ""
+	local inflictorBase = IsValid(inf) and inf.Base or ""
+	local isClubMelee = dmgInfo:IsDamageType(DMG_CLUB) and (inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee")
+	if isClubMelee then
+		dmgInfo:ScaleDamage(1.65)
+	end
 	
 	local dmg = dmgInfo:GetDamage()
 
@@ -669,15 +679,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		local attacker = dmgInfo:GetAttacker()
 		if IsValid(attacker) and attacker:IsPlayer() then
-			local intel = attacker:GetStat("Intelligence")
-			local chance = (intel - 10) * 5 -- 5% chance per point above 10
-			if math.random(100) > chance then
-				dmgInfo:GetInflictor().poisoned2 = nil
-			end
-		else
 			dmgInfo:GetInflictor().poisoned2 = nil
 		end
+	else
+			dmgInfo:GetInflictor().poisoned2 = nil
 	end
+
 	
 	local organs = hg.organism.GetHitBoxOrgans(ent:GetModel(), ent)
 	local boxs, pos, sphere = hg.organism.ShootMatrix(ent, organs)
@@ -736,6 +743,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BURN) then
 			org.burns = org.burns + 1
+			org.infection = org.infection + (dmgInfo:GetDamage() * 0.002)
 		end
 
 		if dmgInfo:IsDamageType(DMG_BLAST) then
@@ -748,10 +756,21 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if true and outputHole and #outputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
 		local bullet = inf.bullet
 		ent.bloodamt = ent.bloodamt or 0
-		ent.bloodamt = ent.bloodamt + 1
+		--ent.bloodamt = ent.bloodamt + 1
 		
+		-- Exit wound blood loss
+		org.blood = org.blood - 50
+
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
+
+			-- Exit wound blood spray
+			net.Start("hg_bloodimpact")
+			net.WriteVector(outputHole[#outputHole])
+			net.WriteVector((-outputDir):GetNormalized() * 2 + VectorRand(-0.5, 0.5))
+			net.WriteFloat(dmg * 2)
+			net.WriteInt(math.min(2, 255), 8)
+			net.Broadcast()
 
 			/*if IsValid(ent) then
 				timer.Create("Blood_burst"..ent:EntIndex(),0.02,1,function()
@@ -860,7 +879,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	if inputHole and #inputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
 		ent.bloodamt2 = ent.bloodamt2 or 0
-		ent.bloodamt2 = ent.bloodamt2 + 1
+		--ent.bloodamt2 = ent.bloodamt2 + 1
 
 		timer.Simple(0, function()
 			timer.Create("Blood_burst_input"..ent:EntIndex(), 0.02, 1, function()
@@ -869,8 +888,18 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				net.WriteVector(inputHole[1])
 				net.WriteVector(dir / 2)
 				net.WriteFloat(dmg)
-				net.WriteInt(ent.bloodamt2, 8)
+				net.WriteInt(1, 8)
 				net.Broadcast()
+
+				for i = 1, 3 do
+					net.Start("hg_bloodimpact")
+					net.WriteVector(inputHole[1])
+					net.WriteVector(dir / 4 + VectorRand(-100, 100))
+					net.WriteFloat(dmg / 2)
+					net.WriteInt(math.random(1,2), 8)
+					net.Broadcast()
+				end
+				
 				ent.bloodamt2 = 0
 			end)
 		end)
@@ -883,8 +912,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	--if hitbody then
 	if not org.superfighter then
-        local endurance_multiplier = 1 - (org.owner:GetStat("Endurance") - 10) * 0.05
-        dmg = dmg * endurance_multiplier
 		dmgBlood = dmgBlood * 1.5
 		local bleed_add = dmgBlood * bleedMul// / (RagdollDamageBoneMul[hitgroup] or 1)
 		--org.bleed = org.bleed + bleed_add
@@ -898,10 +925,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		local instant_pain = instantPainMul * painadd
 		local slow_pain = (1 - instantPainMul) * painadd
-        local endurance_multiplier = 1 - (org.owner:GetStat("Endurance") - 10) * 0.075
-		org.painadd = org.painadd + slow_pain * endurance_multiplier
-		--org.avgpain = org.avgpain + instant_pain
-		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * math.Clamp(pen / 5,1,2) * endurance_multiplier, 70)
+		org.painadd = org.painadd + slow_pain
+		//org.avgpain = org.avgpain + instant_pain
+		local shockAdd = instaPain * shockMul * 4.5 * math.Clamp(pen / 5,1,2)
+		org.shock = math.min(org.shock + shockAdd, 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
 		
@@ -909,11 +936,22 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local adrenaline = org.adrenaline
 		local analgesiaMul = (org.analgesia * 4 + 1)
 		local painkillerMul = (org.painkiller * 0.5 + 1)
+		local inflictor = dmgInfo:GetInflictor()
+		local inflictorClass = IsValid(inflictor) and inflictor:GetClass() or ""
+		local inflictorBase = IsValid(inflictor) and inflictor.Base or ""
+		local meleeHit = dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH) or inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee"
 	
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 	
-		if org.shock > org.shock_turn * 1.5 * analgesiaMul * painkillerMul then
-			timer.Simple(0, function() hg.Fake(org.owner) end)
+		
+
+		local shockFakeThreshold = org.shock_turn * 3.6 * analgesiaMul * painkillerMul * (meleeHit and 1.5 or 1)
+		if shockAdd > 2 and org.shock > shockFakeThreshold and (org.nextShockFake or 0) < CurTime() then
+			org.nextShockFake = CurTime() + (meleeHit and 3.5 or 2.75)
+			timer.Simple(0, function()
+				if not IsValid(org.owner) then return end
+				hg.Fake(org.owner)
+			end)
 		end
 
 		if bullet and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.tranquilizer then
@@ -1037,7 +1075,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
-	local hitgroup_max = 100 + (org.owner:GetStat("Endurance") - 10) * 10
+	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 100 or 135 -- easier decapitation
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
@@ -1083,7 +1121,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				return
 			end
 
-			if IsValid(ply) and ply:Alive() then
+			-- Allow decapitation on living players
+			if IsValid(ply) and ply:Alive() and hitgroup ~= HITGROUP_HEAD then
 				org.dmgstack[hitgroup][1] = nil
 				org.dmgstack[hitgroup][2] = nil
 
@@ -1147,7 +1186,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.AmputateLimb(org, "rarm")
 	end--]]
 
-	dmgInfo:ScaleDamage(dmgInfo:IsDamageType(DMG_BURN) and 0.015 or 0.15)
+	dmgInfo:ScaleDamage(dmgInfo:IsDamageType(DMG_BURN) and 0.015 or (dmgInfo:IsDamageType(DMG_CLUB) and 0.25 or 0.15))
 	
 	takeRagdollDamage(ent, dmgInfo)
 
@@ -1389,7 +1428,7 @@ local function GetTraceDamage(ent, start, dir)
 end
 
 hg.GetTraceDamage = GetTraceDamage
-
+util.AddNetworkString("headtrauma_flash")
 --local Organism = hg.organism
 local abs = math.abs
 takeRagdollDamage = function(ent, dmgInfo)
@@ -1511,10 +1550,10 @@ local function velocityDamage(ent, data)
 	local ply = hg.RagdollOwner(ent)
 
 	local traceResult = GetTraceDamage(ent, data.HitPos, -(data.OurOldVelocity - data.TheirOldVelocity))
-	
-	if not bone then
-		bone = tr.PhysicsBone
-	end
+
+    if not bone then
+        bone = traceResult.PhysicsBone
+    end
 
 	if IsValid(att) and att:IsPlayer() and att.organism and att.organism.fear and att.organism.fear < 0 then
 		att.organism.fear = 0
@@ -1557,27 +1596,56 @@ local function velocityDamage(ent, data)
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )
 
 		if hitgroup == HITGROUP_HEAD then
-				local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
-                local intel_multiplier = 1 - (org.owner:GetStat("Intelligence") - 10) * 0.05
+			local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
+			
+			hg.organism.input_list.skull(org, bone, dmg * 4 * (hadhelmet and 0.2 or 1), dmgInfo)
+			
+			
+							local flash_intensity = 0.5
+				local flash_duration = 100
+			
+			//if dmg > 0.5 then
+						hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1) * intel_multiplier, dmgInfo)
+						
+						flash_intensity = 1.2
+						flash_duration = 150
+						if IsValid(org.owner) and org.owner:IsPlayer() then
+							org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
+						end
+			//end
+								net.Start("headtrauma_flash")
+					net.WriteVector(dmgInfo:GetDamagePosition())
+					net.WriteFloat(flash_intensity)
+					net.WriteInt(flash_duration, 20)
+
+					local is_critical = (org.brain > 0.5 and brainDelta > 0.05) or org.skull == 1
+					net.WriteBool(is_critical)
+
+					local play_knockout_sound = false
+					if org.otrub then
+						if not org.played_knockout_sound then
+							play_knockout_sound = true
+							org.played_knockout_sound = true
+						end
+					else
+						org.played_knockout_sound = false
+					end
+					net.WriteBool(play_knockout_sound)
+
+					net.Send(org.owner)
 				
-				hg.organism.input_list.skull(org, bone, dmg * 6 * (hadhelmet and 0.2 or 1) * intel_multiplier, dmgInfo)
-				
-				org.consciousness = math.Approach(org.consciousness, 0, dmg * 20 * (hadhelmet and 0.2 or 1) * intel_multiplier)
+								org.consciousness = math.Approach(org.consciousness, 0, dmg * 2 * (hadhelmet and 0.2 or 1))
 				
 				local neck_not_broken = org.spine3 < 0.8
-				
-				//if dmg > 0.5 then
-					hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1) * intel_multiplier, dmgInfo)
-				//end
-				if dmg * 10 > 0.5 and !hadhelmet then
-					org.otrub = true
-					org.shock = org.shock + 10
-				end
-
-				if neck_not_broken and org.spine3 >= 0.8 then
-					hg.BreakNeck(ent)
-				end
+			if dmg * 10 > 1.0 and !hadhelmet then
+				org.otrub = true
+				org.shock = org.shock + 10
 			end
+
+			if neck_not_broken and org.spine3 >= 0.8 then
+				hg.BreakNeck(ent)
+			end
+		end
 	else
 		local sfd = org.fakePlayer and ent or ply
 		if not IsValid(sfd) then return end
@@ -1594,7 +1662,7 @@ local function velocityDamage(ent, data)
 	if org.isPly and ply then
 		hook.Run("Org Think Call", ply, org)
 		
-		if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
+if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
 			if org.skull == 1 then
 				//ent:SetNWString("PlayerName", "Unidentifiable person")
 			end
@@ -1633,33 +1701,176 @@ local function velocityDamage(ent, data)
 end
 
 function hg.BreakNeck(ent)
-	if !IsValid(ent) then return end
+	if not IsValid(ent) then return end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	if ply:Alive() then ply:Kill() end
+	local wasAlive = ply:Alive()
+	if wasAlive then ply:Kill() end
 
-	ent.organism.spine3 = 1
-	ent:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+	-- Store the player reference for later
+	local playerRef = ply
 	
-	timer.Simple(0.1, function()
-		local ent = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
-
-		if IsValid(ent) then
-			ent:RemoveInternalConstraint(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1")))
-
-			local spine = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Spine2"))
-			local head = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1"))
-
-			local pspine = ent:GetPhysicsObjectNum(spine)
-			local phead = ent:GetPhysicsObjectNum(head)
-
-			local lpos, lang = WorldToLocal(phead:GetPos() + phead:GetAngles():Forward() * -2 + phead:GetAngles():Up() * -1.5, angle_zero, pspine:GetPos(), pspine:GetAngles())
-			
-			phead:SetPos(pspine:GetPos() + pspine:GetAngles():Forward() * 12.9 + pspine:GetAngles():Right() * -1)
-
-			local cons = constraint.AdvBallsocket(ent, ent, spine, head, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+	-- Use a longer delay to ensure ragdoll is created and networked
+	timer.Simple(0.2, function()
+		-- Get the ragdoll - try multiple sources
+		local ragdoll = nil
+		
+		if IsValid(ent) and ent:IsRagdoll() then
+			ragdoll = ent
+		elseif IsValid(playerRef) then
+			ragdoll = playerRef:GetNWEntity("RagdollDeath")
+			if not IsValid(ragdoll) then
+				ragdoll = playerRef:GetRagdollEntity()
+			end
 		end
+		
+		if not IsValid(ragdoll) then return end
+		
+		-- Update the organism if available
+		if playerRef.organism then
+			playerRef.organism.spine3 = 1
+		end
+		
+		-- Play sound on the ragdoll
+		ragdoll:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+
+		-- Lookup bones and validate
+		local headBoneName = "ValveBiped.Bip01_Head1"
+		local spineBoneName = "ValveBiped.Bip01_Spine2"
+		
+		local headBoneId = ragdoll:LookupBone(headBoneName)
+		local spineBoneId = ragdoll:LookupBone(spineBoneName)
+		
+		if not headBoneId or not spineBoneId then
+			return
+		end
+		
+		local headPhysBone = ragdoll:TranslateBoneToPhysBone(headBoneId)
+		local spinePhysBone = ragdoll:TranslateBoneToPhysBone(spineBoneId)
+		
+		if headPhysBone == -1 or spinePhysBone == -1 then
+			return
+		end
+		
+		-- Remove internal constraint on head
+		ragdoll:RemoveInternalConstraint(headPhysBone)
+
+		local pspine = ragdoll:GetPhysicsObjectNum(spinePhysBone)
+		local phead = ragdoll:GetPhysicsObjectNum(headPhysBone)
+
+		if not IsValid(pspine) or not IsValid(phead) then
+			return
+		end
+
+		-- Calculate local position for the constraint
+		local lpos, _ = WorldToLocal(phead:GetPos() + phead:GetAngles():Forward() * -2 + phead:GetAngles():Up() * -1.5, angle_zero, pspine:GetPos(), pspine:GetAngles())
+		
+		-- Reposition head for visual effect
+		phead:SetPos(pspine:GetPos() + pspine:GetAngles():Forward() * 12.9 + pspine:GetAngles():Right() * -1)
+		phead:Wake()
+		pspine:Wake()
+
+		-- Add floppy neck constraint with appropriate limits
+		constraint.AdvBallsocket(ragdoll, ragdoll, spinePhysBone, headPhysBone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
 	end)
+end
+
+local limb_bones = {
+    larm = {parent = "ValveBiped.Bip01_Spine4", child = "ValveBiped.Bip01_L_UpperArm"},
+    rarm = {parent = "ValveBiped.Bip01_Spine4", child = "ValveBiped.Bip01_R_UpperArm"},
+    lleg = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_L_Thigh"},
+    rleg = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_R_Thigh"},
+	spine0 = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_Spine"},
+    spine1 = {parent = "ValveBiped.Bip01_Spine", child = "ValveBiped.Bip01_Spine1"},
+    spine2 = {parent = "ValveBiped.Bip01_Spine1", child = "ValveBiped.Bip01_Spine2"},
+    spine3 = {parent = "ValveBiped.Bip01_Spine2", child = "ValveBiped.Bip01_Spine4"},
+}
+
+-- Limb-specific constraint limits for better floppy physics
+-- More generous limits for noticeably floppy but still realistic movement
+local limb_constraint_limits = {
+    -- Arms: wider roll limits for natural arm hang/flop
+    larm = {minYaw = -120, minRoll = -150, minPitch = -120, maxYaw = 120, maxRoll = 70, maxPitch = 120},
+    rarm = {minYaw = -120, minRoll = -70, minPitch = -120, maxYaw = 120, maxRoll = 150, maxPitch = 120},
+    -- Legs: wider limits for noticeable limp/flop
+    lleg = {minYaw = -90, minRoll = -110, minPitch = -90, maxYaw = 90, maxRoll = 70, maxPitch = 90},
+    rleg = {minYaw = -90, minRoll = -70, minPitch = -90, maxYaw = 90, maxRoll = 110, maxPitch = 90},
+}
+
+function hg.BreakLimb(ent, limb)
+    if not IsValid(ent) then return end
+    if not limb_bones[limb] then return end
+
+    local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+    local playerRef = ply
+    
+    -- Use a longer delay to ensure ragdoll exists (for death cases)
+    timer.Simple(0.15, function()
+        -- Get the ragdoll - try multiple sources
+        local ragdoll = nil
+        
+        if IsValid(ent) and ent:IsRagdoll() then
+            ragdoll = ent
+        elseif IsValid(playerRef) then
+            ragdoll = playerRef:GetNWEntity("RagdollDeath")
+            if not IsValid(ragdoll) then
+                ragdoll = playerRef:GetRagdollEntity()
+            end
+            -- Also check FakeRagdoll for fake/unconscious ragdolls
+            if not IsValid(ragdoll) then
+                ragdoll = playerRef:GetNWEntity("FakeRagdoll")
+            end
+        end
+        
+        if not IsValid(ragdoll) then return end
+
+        local bone_info = limb_bones[limb]
+        if not bone_info then return end
+        
+        local parent_bone_name = bone_info.parent
+        local child_bone_name = bone_info.child
+
+        local parent_bone_id = ragdoll:LookupBone(parent_bone_name)
+        local child_bone_id = ragdoll:LookupBone(child_bone_name)
+
+        if not parent_bone_id or not child_bone_id then return end
+
+        local child_phys_bone = ragdoll:TranslateBoneToPhysBone(child_bone_id)
+        if child_phys_bone == -1 then return end
+        
+        -- Remove internal constraint on the child bone
+        ragdoll:RemoveInternalConstraint(child_phys_bone)
+
+        local parent_phys_bone = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
+        if parent_phys_bone == -1 then return end
+
+        local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys_bone)
+        local p_child = ragdoll:GetPhysicsObjectNum(child_phys_bone)
+
+        if not IsValid(p_parent) or not IsValid(p_child) then return end
+        
+        -- Calculate local position for proper constraint placement
+        local lpos = WorldToLocal(p_child:GetPos(), angZero, p_parent:GetPos(), p_parent:GetAngles())
+        
+        -- Keep limb attached at natural position
+        p_child:Wake()
+        p_parent:Wake()
+
+        -- Get limb-specific limits or use defaults
+        local limits = limb_constraint_limits[limb] or limb_constraint_limits.larm
+        
+        -- Add a ballsocket constraint to make the limb floppy with appropriate limits
+        -- Format: (ent1, ent2, bone1, bone2, localPos, localAng, minYaw, minRoll, minPitch, maxYaw, maxRoll, maxPitch, ...)
+        constraint.AdvBallsocket(
+            ragdoll, ragdoll, 
+            parent_phys_bone, child_phys_bone, 
+            lpos, nil, 
+            0, 0,  -- friction
+            limits.minYaw, limits.minRoll, limits.minPitch,  -- min limits
+            limits.maxYaw, limits.maxRoll, limits.maxPitch,  -- max limits
+            0, 0, 0, 0, 0  -- unused params
+        )
+    end)
 end
 
 hook.Add("OnAmputateLimb", "amputate_cuffs", function(org, ent, limb)
@@ -1763,7 +1974,6 @@ end)
 --function PLAYER:ApplyPain(number)
 	--self.organism.painadd = self.organism.painadd + number
 --end
-
 function hg.VehicleHitFunc(ent, tr, bullet, details)
 	local maxdmg = 0
 	local penetration = true

@@ -6,55 +6,58 @@ local statusIconCache = {}
 
 local IND_SIZE_BASE = 120
 local IND_SIZE_MAX = 170
-local BACKDROP_OFFSET_X = -20
-local BACKDROP_OFFSET_Y = 37
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local PULSE_DURATION = 8
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
 local FRACTURE_BLINK_SPEED = 10
-local POS_VISIBLE_X = 0
-local POS_HIDDEN_X = -400
+local SOLID_RED_DURATION = 1
 
-local currentX = nil
 local pulseStartTime = 0
-local limbStates = {}
+local boneStates = {}
 local boneCache = {}
 local lastLifeState = nil
 local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
+local lastKnownFacingAngle = 0
 
-local limbBones = {
-    lleg = "ValveBiped.Bip01_L_Thigh",
-    rleg = "ValveBiped.Bip01_R_Thigh",
-    larm = "ValveBiped.Bip01_L_UpperArm",
-    rarm = "ValveBiped.Bip01_R_UpperArm"
+local majorBones = {
+    pelvis = { organ = "stomach", bone = "ValveBiped.Bip01_Pelvis" },
+    spine1 = { organ = "spine", bone = "ValveBiped.Bip01_Spine1" },
+    spine2 = { organ = "spine", bone = "ValveBiped.Bip01_Spine2" },
+    chest_spine = { organ = "chest", bone = "ValveBiped.Bip01_Spine4" },
+    chest_ribs = { organ = "chest", bone = "ValveBiped.Bip01_Ribcage" },
+    neck = { organ = "neck", bone = "ValveBiped.Bip01_Neck1" },
+    skull = { organ = "head", bone = "ValveBiped.Bip01_Head1" },
+    l_clavicle = { organ = "larm", bone = "ValveBiped.Bip01_L_Clavicle" },
+    r_clavicle = { organ = "rarm", bone = "ValveBiped.Bip01_R_Clavicle" },
+    l_upperarm = { organ = "larm", bone = "ValveBiped.Bip01_L_UpperArm", canAmputate = true, ampBone = "ValveBiped.Bip01_L_Forearm" },
+    r_upperarm = { organ = "rarm", bone = "ValveBiped.Bip01_R_UpperArm", canAmputate = true, ampBone = "ValveBiped.Bip01_R_Forearm" },
+    l_forearm = { organ = "larm", bone = "ValveBiped.Bip01_L_Forearm" },
+    r_forearm = { organ = "rarm", bone = "ValveBiped.Bip01_R_Forearm" },
+    l_hand = { organ = "larm", bone = "ValveBiped.Bip01_L_Hand" },
+    r_hand = { organ = "rarm", bone = "ValveBiped.Bip01_R_Hand" },
+    l_thigh = { organ = "lleg", bone = "ValveBiped.Bip01_L_Thigh", canAmputate = true, ampBone = "ValveBiped.Bip01_L_Calf" },
+    r_thigh = { organ = "rleg", bone = "ValveBiped.Bip01_R_Thigh", canAmputate = true, ampBone = "ValveBiped.Bip01_R_Calf" },
+    l_calf = { organ = "lleg", bone = "ValveBiped.Bip01_L_Calf" },
+    r_calf = { organ = "rleg", bone = "ValveBiped.Bip01_R_Calf" },
+    l_foot = { organ = "lleg", bone = "ValveBiped.Bip01_L_Foot" },
+    r_foot = { organ = "rleg", bone = "ValveBiped.Bip01_R_Foot" },
 }
 
-local amputationBones = {
-    lleg = "ValveBiped.Bip01_L_Calf",
-    rleg = "ValveBiped.Bip01_R_Calf",
-    larm = "ValveBiped.Bip01_L_Forearm",
-    rarm = "ValveBiped.Bip01_R_Forearm"
+-- OPTIMIZATION: Reduced from 8 to 4 offsets. Cuts extra model draws by 50% for massive lag reduction.
+local outlineOffsets = {
+    Vector(0, 1.5, 1.5), 
+    Vector(0, -1.5, -1.5),
+    Vector(0, 1.5, -1.5), 
+    Vector(0, -1.5, 1.5)
 }
 
 local function ScreenScaleFixed(size)
     return size * (ScrH() / 480)
-end
-
-local function SetBoneScaleRecursive(ent, boneName, scale)
-    local boneID = ent:LookupBone(boneName)
-    if not boneID then return end
-    
-    ent:ManipulateBoneScale(boneID, scale)
-    
-    local children = ent:GetChildBones(boneID)
-    for _, childID in pairs(children) do
-        ent:ManipulateBoneScale(childID, scale)
-    end
 end
 
 local function ScaleBoneAndChildren(ent, boneID, scale)
@@ -86,7 +89,7 @@ local function ResetModels(ply)
     end
     healthModel = nil
     blinkModel = nil
-    limbStates = {}
+    boneStates = {}
     pulseStartTime = 0
     iconsVisibility = 0
     iconsAppearTime = 0
@@ -94,7 +97,96 @@ local function ResetModels(ply)
     cachedAfflictionIcons = {}
 end
 
-local function DrawHealthAccessories(healthModel, ply)
+-- Reusable matrices for optimization
+local scaleZeroMat = Matrix()
+scaleZeroMat:Scale(Vector(0.001, 0.001, 0.001))
+
+local function SyncBonesCallback(ent, numbones)
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
+    
+    local src = ply
+    local isRag = false
+    local fakeRag = ply:GetNWEntity("FakeRagdoll")
+    local deathRag = ply:GetNWEntity("RagdollDeath")
+    
+    if IsValid(fakeRag) then src = fakeRag; isRag = true
+    elseif IsValid(deathRag) then src = deathRag; isRag = true
+    elseif IsValid(ply:GetRagdollEntity()) then src = ply:GetRagdollEntity(); isRag = true end
+
+    if not IsValid(src) then return end
+    
+    local srcPos = src:GetPos()
+    local srcAng = src:GetAngles()
+
+    -- FIX: Ragdoll drooping and north-facing issues
+    if isRag then
+        local pelvis = src:LookupBone("ValveBiped.Bip01_Pelvis")
+        if pelvis then
+            local pMat = src:GetBoneMatrix(pelvis)
+            if pMat then
+                -- Anchor ragdolls to the pelvis so they don't fall out of view
+                srcPos = pMat:GetTranslation()
+            end
+        end
+        -- Prevent snapping North: Use last known facing angle or player eye angles
+        -- When ragdoll angles are zeroed/invalid, use stored angle or player eye angles
+        local ragYaw = srcAng.y
+        if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
+            -- Ragdoll angles are likely default/invalid, use last known good angle or player eye angles
+            local eyeAng = ply:EyeAngles()
+            if lastKnownFacingAngle ~= 0 then
+                srcAng = Angle(0, lastKnownFacingAngle, 0)
+            else
+                srcAng = Angle(0, eyeAng.y, 0)
+            end
+        else
+            -- Use ragdoll's actual yaw but update our stored angle
+            srcAng = Angle(0, ragYaw, 0)
+            lastKnownFacingAngle = ragYaw
+        end
+    else
+        -- FIX: Prevent the model from leaning backward/forward when you look up/down
+        local eyeAng = ply:EyeAngles()
+        srcAng = Angle(0, eyeAng.y, 0)
+        lastKnownFacingAngle = eyeAng.y
+    end
+    
+    local srcWorld = Matrix()
+    srcWorld:SetTranslation(srcPos)
+    srcWorld:SetAngles(srcAng)
+    local srcInv = srcWorld:GetInverseTR()
+    
+    local entTransform = Matrix()
+    entTransform:SetTranslation(Vector(0, 0, 0))
+    entTransform:SetAngles(Angle(0, 0, 0))
+    
+    for i = 0, numbones - 1 do
+        local name = ent:GetBoneName(i)
+        local srcBone = src:LookupBone(name)
+        if srcBone then
+            local mat = src:GetBoneMatrix(srcBone)
+            if mat then
+                local manipScale = ent:GetManipulateBoneScale(i)
+                
+                local localMat = srcInv * mat
+                local finalMat = entTransform * localMat
+                
+                if manipScale == Vector(0,0,0) then
+                    finalMat = finalMat * scaleZeroMat
+                elseif manipScale ~= Vector(1,1,1) then
+                    local scaleMat = Matrix()
+                    scaleMat:Scale(manipScale)
+                    finalMat = finalMat * scaleMat
+                end
+                
+                ent:SetBoneMatrix(i, finalMat)
+            end
+        end
+    end
+end
+
+local function DrawHealthAccessories(healthModel, ply, baseCol)
     local accessories = ply:GetNetVar("Accessories")
     if not accessories then 
         if healthModel.accessories then
@@ -140,11 +232,6 @@ local function DrawHealthAccessories(healthModel, ply)
                 model:AddEffects(EF_BONEMERGE)
             end
             
-            if accessData.bSetColor then
-                local col = ply:GetPlayerColor() or Vector(1,1,1)
-                model:SetColor(col:ToColor())
-            end
-            
             if accessData.SubMat then
                 model:SetSubMaterial(0, accessData.SubMat)
             end
@@ -170,7 +257,15 @@ local function DrawHealthAccessories(healthModel, ply)
                 if model:GetParent() ~= healthModel then
                     model:SetParent(healthModel, bone)
                 end
-                
+
+                render.SetColorModulation(1, 1, 1)
+                for _, offset in ipairs(outlineOffsets) do
+                    model:SetRenderOrigin(pos + offset)
+                    model:DrawModel()
+                end
+
+                render.SetColorModulation(0.5, 0.5, 0.5)
+                model:SetRenderOrigin(pos)
                 model:DrawModel()
             end
         end
@@ -210,167 +305,7 @@ local function GetStatusIcon(iconName)
     return mat
 end
 
-local function CollectAfflictionIcons(ply, org)
-    local icons = {}
-    local seen = {}
-    local function add(iconName, severity)
-        severity = math.Clamp(severity or 0.5, 0.05, 1)
-        if seen[iconName] then
-            seen[iconName].severity = math.max(seen[iconName].severity, severity)
-            return
-        end
-        local mat = GetStatusIcon(iconName)
-        if not mat then return end
-        local entry = {mat = mat, severity = severity}
-        seen[iconName] = entry
-        icons[#icons + 1] = entry
-    end
-
-    if not org then
-        return icons
-    end
-
-    local wounds = ply.wounds or ply:GetNetVar("wounds")
-    local arterialwounds = ply.arterialwounds or ply:GetNetVar("arterialwounds")
-    local woundsCount = istable(wounds) and #wounds or 0
-    local arterialCount = istable(arterialwounds) and #arterialwounds or 0
-
-    if woundsCount > 0 then
-        add("open-wound", math.min(1, woundsCount / 6))
-    end
-
-    if arterialCount > 0 then
-        add("deepwound", math.min(1, 0.7 + arterialCount * 0.2))
-    end
-
-    local bleed = GetOrgValueNumber(org.bleed)
-    if bleed > 0 then
-        add("bleed", math.min(1, bleed / 8))
-    end
-
-    local hasBrokenLimb = (org.lleg and org.lleg >= 1) or (org.rleg and org.rleg >= 1) or (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1)
-    local hasDislocation = org.llegdislocation or org.rlegdislocation or org.larmdislocation or org.rarmdislocation or org.jawdislocation
-    local hasAmputation = org.llegamputated or org.rlegamputated or org.larmamputated or org.rarmamputated or org.headamputated
-    if hasBrokenLimb or hasDislocation or hasAmputation then
-        local sev = hasAmputation and 1 or (hasDislocation and 0.65 or 0.5)
-        add("broken", sev)
-    end
-
-    local concussion = GetOrgValueNumber(org.concussion)
-    if concussion > 0 then
-        add("concussion", math.min(1, concussion))
-    end
-
-    if org.blindness then
-        add("blind", 0.7)
-    end
-
-    local assimilated = GetOrgValueNumber(org.assimilated)
-    if assimilated > 0 then
-        add("wither", math.min(1, assimilated))
-    end
-
-    if org.incapacitated then
-        add("incap", 1)
-    end
-
-    if org.berserkActive2 then
-        add("bloodlust", 0.45)
-    end
-
-    if org.noradrenalineActive then
-        add("haste", 0.45)
-    end
-
-    local despair = GetOrgValueNumber(org.despair)
-    if despair > 0.25 then
-        add("anagenthasdied", math.min(1, despair))
-    end
-
-    if org.critical then
-        add("warning", 1)
-    end
-
-    if (not org.canmove) or GetOrgValueNumber(org.immobilization) > 0 then
-        add("hindered", 0.65)
-    end
-
-    if GetOrgValueNumber(org.pain) > 60 or GetOrgValueNumber(org.shock) > 0.5 then
-        add("stunned", math.min(1, math.max(GetOrgValueNumber(org.pain) / 120, GetOrgValueNumber(org.shock))))
-    end
-
-    if GetOrgValueNumber(org.CO) > 0.1 then
-        add("poison-gas", math.min(1, GetOrgValueNumber(org.CO) / 4))
-    end
-
-    local o2 = GetOrgValueNumber(org.o2)
-    if o2 > 0 and o2 < 20 then
-        add("exhaust", math.min(1, (20 - o2) / 20))
-    end
-
-    local temperature = GetOrgValueNumber(org.temperature)
-    if temperature > 39 then
-        add("discharge", math.min(1, (temperature - 39) / 2))
-    elseif temperature > 0 and temperature < 34.5 then
-        add("frozen", math.min(1, (34.5 - temperature) / 3))
-    end
-
-    return icons
-end
-
-local function DrawAfflictionIcons(iconEntries, centerX, bottomY, visibility, appearTime, timeNow)
-    if not iconEntries or #iconEntries == 0 or visibility <= 0.01 then return end
-
-    local iconSize = math.max(math.floor(ScreenScaleFixed(26)), 18)
-    local bgSize = math.max(math.floor(iconSize * 1.35), iconSize + 8)
-    local spacing = math.max(math.floor(ScreenScaleFixed(2)), 1)
-    local iconInset = math.floor((bgSize - iconSize) * 0.5)
-    local horizontalSpace = ScrW() - ScreenScaleFixed(ICONS_SCREEN_EDGE_MARGIN) * 2
-    local maxPerRow = math.max(1, math.floor((horizontalSpace + spacing) / (bgSize + spacing)))
-    local rows = math.ceil(#iconEntries / maxPerRow)
-    local appearFrac = math.Clamp((timeNow - (appearTime or timeNow)) / 0.35, 0, 1)
-    local shakeMul = (1 - appearFrac) * visibility
-    local baseAlpha = math.floor(255 * visibility)
-
-    for row = 1, rows do
-        local rowStart = (row - 1) * maxPerRow + 1
-        local rowCount = math.min(maxPerRow, #iconEntries - rowStart + 1)
-        local rowWidth = rowCount * bgSize + (rowCount - 1) * spacing
-        local x = centerX - rowWidth * 0.5
-        local y = bottomY - row * bgSize - (row - 1) * spacing
-
-        if y < 0 then
-            break
-        end
-
-        for col = 1, rowCount do
-            local idx = rowStart + col - 1
-            local entry = iconEntries[idx]
-            local severity = entry.severity or 0.5
-            local pulse = 1 + math.sin(timeNow * (4 + severity * 9) + idx * 1.4) * (0.05 + severity * 0.08) * visibility
-            local shakeAmp = ScreenScaleFixed(2 + severity * 2) * shakeMul
-            local shakeX = math.sin(timeNow * (95 + idx * 7)) * shakeAmp
-            local shakeY = math.cos(timeNow * (110 + idx * 9)) * shakeAmp
-            local drawX = x + (col - 1) * (bgSize + spacing)
-            local drawY = y
-            local centerDrawX = drawX + bgSize * 0.5 + shakeX
-            local centerDrawY = drawY + bgSize * 0.5 + shakeY
-            local bgDrawSize = bgSize * pulse
-            local iconDrawSize = iconSize * pulse
-            local bgAlpha = math.floor((160 + severity * 95) * visibility)
-
-            surface.SetMaterial(statusCircleMat)
-            surface.SetDrawColor(8, 8, 8, bgAlpha)
-            surface.DrawTexturedRect(centerDrawX - bgDrawSize * 0.5, centerDrawY - bgDrawSize * 0.5, bgDrawSize, bgDrawSize)
-
-            surface.SetMaterial(entry.mat)
-            surface.SetDrawColor(255, 255, 255, baseAlpha)
-            surface.DrawTexturedRect(centerDrawX - iconDrawSize * 0.5, centerDrawY - iconDrawSize * 0.5, iconDrawSize, iconDrawSize)
-        end
-    end
-end
-
-hook.Add("HUDPaint", "HG_HealthIndicator", function()
+function HUD_DrawDynamicIndicator()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
     
@@ -387,40 +322,20 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
         healthModel = ClientsideModel(ply:GetModel(), RENDERGROUP_OTHER)
         healthModel:SetNoDraw(true)
         healthModel:SetIK(false)
-        local seq = healthModel:LookupSequence("idle_suitcase")
-        if seq then
-            healthModel:SetSequence(seq)
-            healthModel:SetCycle(0)
-        end
+        healthModel:AddCallback("BuildBonePositions", SyncBonesCallback)
     end
     
     if not IsValid(blinkModel) then
         blinkModel = ClientsideModel(ply:GetModel(), RENDERGROUP_OTHER)
         blinkModel:SetNoDraw(true)
         blinkModel:SetIK(false)
-        local seq = blinkModel:LookupSequence("idle_suitcase")
-        if seq then
-            blinkModel:SetSequence(seq)
-            blinkModel:SetCycle(0)
-        end
         InitBlinkModel(blinkModel)
+        blinkModel:AddCallback("BuildBonePositions", SyncBonesCallback)
     end
 
     if healthModel:GetModel() ~= ply:GetModel() then
         healthModel:SetModel(ply:GetModel())
         blinkModel:SetModel(ply:GetModel())
-        
-        local seq = healthModel:LookupSequence("idle_suitcase")
-        if seq then
-            healthModel:SetSequence(seq)
-            healthModel:SetCycle(0)
-        end
-        local seq2 = blinkModel:LookupSequence("idle_suitcase")
-        if seq2 then
-            blinkModel:SetSequence(seq2)
-            blinkModel:SetCycle(0)
-        end
-
         InitBlinkModel(blinkModel)
         limbStates = {}
         
@@ -433,38 +348,38 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
     end
 
     local consciousness = 1
-    local otrub = false
     local org = ply.organism
     
-    if org then
-        if org.consciousness then consciousness = org.consciousness end
-        if org.otrub then otrub = org.otrub end
+    if org and org.consciousness then 
+        consciousness = org.consciousness 
     end
     
     local time = CurTime()
-    local hasActiveLimbAffliction = false
-    local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
+    local damagedBones = {}
+    
     if org then
-        for limb, boneName in pairs(limbBones) do
-            local isAmputated = org[limb.."amputated"]
-            local isBroken = (org[limb] and org[limb] >= 1)
-            local isDislocated = org[limb.."dislocation"]
-            if isAmputated or isBroken or isDislocated then
-                hasActiveLimbAffliction = true
-            end
-            
-            if not limbStates[limb] then
-                limbStates[limb] = { 
-                    amputated = false, 
-                    blinking = false, 
+        for key, data in pairs(majorBones) do
+            local organName = data.organ
+            if not org[organName] then continue end
+
+            local boneName = data.bone
+            local isAmputated = data.canAmputate and org[organName .. "amputated"]
+            local isBroken = (GetOrgValueNumber(org[organName]) >= 1)
+            local isDislocated = org[organName .. "dislocation"]
+
+            if not boneStates[key] then
+                boneStates[key] = {
+                    amputated = false,
+                    blinking = false,
                     blinkEnd = 0,
-                    fractured = false
+                    fractured = false,
+                    fractureTime = 0
                 }
             end
-            
-            local state = limbStates[limb]
-            local ampBoneName = amputationBones[limb] or boneName
-            
+
+            local state = boneStates[key]
+            local ampBoneName = data.ampBone or boneName
+
             if state.amputated and not isAmputated then
                 state.amputated = false
                 state.blinking = false
@@ -473,7 +388,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
                 local blinkBoneID = blinkModel:LookupBone(ampBoneName)
                 if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
             end
-            
+
             if state.fractured and not (isBroken or isDislocated) then
                 state.fractured = false
                 if not state.amputated then
@@ -517,6 +432,7 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
             elseif (isBroken or isDislocated) then
                 if not state.fractured then
                     state.fractured = true
+                    state.fractureTime = time
                     pulseStartTime = time
                     local blinkBoneID = blinkModel:LookupBone(boneName)
                     if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
@@ -525,169 +441,188 @@ hook.Add("HUDPaint", "HG_HealthIndicator", function()
                     if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
                 end
             end
+
+            local damageValue = GetOrgValueNumber(org[organName])
+            if damageValue > 0 and damageValue < 1 and not state.fractured and not state.amputated then
+                table.insert(damagedBones, {key = key, damage = damageValue})
+            end
         end
     end
     
-    local shouldShowIndicator = admiring and not otrub
-    local targetX = shouldShowIndicator and POS_VISIBLE_X or POS_HIDDEN_X
-    local targetXScaled = ScreenScaleFixed(targetX)
-    
-    if not currentX then currentX = ScreenScaleFixed(POS_HIDDEN_X) end
-    currentX = Lerp(FrameTime() * 2, currentX, targetXScaled)
-
     local size = IND_SIZE_BASE
-    
     local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
-    local y = ScrH() - h - ScreenScaleFixed(20)
-    if ply.PlayerClassName == "Combine" or ply.PlayerClassName == "Gordon" then
-        y = ScreenScaleFixed(20)
-    end
+    local viewX = ScreenScaleFixed(10) 
+    local viewY = ScreenScaleFixed(10)
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)
-    
-    local renderX = currentX
-    
-    local SILHOUETTE_OFFSET_X = -15
-    local SILHOUETTE_OFFSET_Y = 15
-    
-    local viewX = renderX + ScreenScaleFixed(SILHOUETTE_OFFSET_X)
-    local viewY = y + ScreenScaleFixed(SILHOUETTE_OFFSET_Y)
-    
-    local modelOffset = Vector(0, 0, 0)
-    
-    local backdropX = currentX + ScreenScaleFixed(BACKDROP_OFFSET_X)
-    local backdropY = y + ScreenScaleFixed(BACKDROP_OFFSET_Y)
-    local backdropW = w * 0.92
-    local backdropH = h * 0.92
-    
-    draw.RoundedBox(6, backdropX, backdropY, backdropW, backdropH, Color(0, 0, 0, 90))
-    surface.SetDrawColor(120, 120, 120, 170)
-    surface.DrawOutlinedRect(backdropX, backdropY, backdropW, backdropH, 1)
-    
-    if shouldShowIndicator then
-        cachedAfflictionIcons = CollectAfflictionIcons(ply, org)
-        if not iconsTargetVisible then
-            iconsAppearTime = time
-        end
-    end
 
-    iconsVisibility = Lerp(FrameTime() * 10, iconsVisibility, shouldShowIndicator and 1 or 0)
-    iconsTargetVisible = shouldShowIndicator
-
-    if iconsVisibility > 0.01 and #cachedAfflictionIcons > 0 then
-        local iconsX = ScrW() * 0.5
-        local iconsBottom = ScrH() - ScreenScaleFixed(ICONS_SCREEN_MARGIN_Y)
-        DrawAfflictionIcons(cachedAfflictionIcons, iconsX, iconsBottom, iconsVisibility, iconsAppearTime, time)
-    elseif not shouldShowIndicator and iconsVisibility <= 0.01 then
-        cachedAfflictionIcons = {}
-    end
-    
-    local camRenderX = viewX
-    if camRenderX < 0 then
-        local dist = camPos.x
-        local fov = 50
-        local visibleHeight = 2 * dist * math.tan(math.rad(fov) / 2)
-        local unitsPerPixel = visibleHeight / h
-        
-        local pixelShift = camRenderX 
-        local unitShift = pixelShift * unitsPerPixel 
-        
-        modelOffset = Vector(0, unitShift, 0)
-        camRenderX = 0
-    end
-    
-    cam.Start3D(camPos, lookAng, 50, camRenderX, viewY, w, h)
+    cam.Start3D(camPos, lookAng, 50, viewX, viewY, w, h)
         render.SuppressEngineLighting(true)
         render.MaterialOverride(whiteMat)
         
         local col = math.Clamp(consciousness, 0, 1)
-        render.SetColorModulation(col, col, col)
         
+        local srcEnt = ply
+        local isRagdoll = false
+        local fakeRag = ply:GetNWEntity("FakeRagdoll")
+        local deathRag = ply:GetNWEntity("RagdollDeath")
+        
+        if IsValid(fakeRag) then
+            srcEnt = fakeRag
+            isRagdoll = true
+        elseif IsValid(deathRag) then
+            srcEnt = deathRag
+            isRagdoll = true
+        elseif IsValid(ply:GetRagdollEntity()) then
+            srcEnt = ply:GetRagdollEntity()
+            isRagdoll = true
+        end
+
+        local modelOffset
+        if isRagdoll then
+            -- Because we bound the ragdoll root to the pelvis in SyncBonesCallback, 
+            -- offset it so the pelvis aligns vertically inside the UI viewport
+            -- Increased offset to prevent clipping below the indicator
+            modelOffset = Vector(0, 0, 55)
+        else
+            modelOffset = Vector(0, 0, 10)
+        end
+
+        local drawAng = Angle(0, 0, 0)
+
+        if not isRagdoll then
+            healthModel:SetSequence(srcEnt:GetSequence())
+            healthModel:SetCycle(srcEnt:GetCycle())
+            blinkModel:SetSequence(srcEnt:GetSequence())
+            blinkModel:SetCycle(srcEnt:GetCycle())
+        end
+
         healthModel:SetPos(modelOffset)
-        healthModel:SetAngles(Angle(0, 0, 0))
-        
+        healthModel:SetAngles(drawAng)
+        blinkModel:SetAngles(drawAng)
+
         for i = 0, ply:GetNumBodyGroups() - 1 do
             healthModel:SetBodygroup(i, ply:GetBodygroup(i))
         end
         healthModel:SetSkin(ply:GetSkin())
-        
+
         healthModel:SetupBones()
+
+        local base_col = math.max(0.2, consciousness)
+
+        render.SetColorModulation(base_col, base_col, base_col)
+        for _, offset in ipairs(outlineOffsets) do
+            healthModel:SetPos(modelOffset + offset)
+            healthModel:DrawModel()
+        end
+
+        render.SetColorModulation(base_col, base_col, base_col)
+        healthModel:SetPos(modelOffset)
         healthModel:DrawModel()
         
-        DrawHealthAccessories(healthModel, ply)
-        
+        DrawHealthAccessories(healthModel, ply, base_col)
+
+        local function DrawDamageBlinkState(blinkModel, r, g, b)
+            blinkModel:SetupBones()
+
+            render.SetColorModulation(r, g, b)
+            for _, offset in ipairs(outlineOffsets) do
+                blinkModel:SetPos(modelOffset + offset)
+                blinkModel:DrawModel()
+            end
+
+            render.SetColorModulation(r, g, b)
+            blinkModel:SetPos(modelOffset)
+            blinkModel:DrawModel()
+        end
+
+        -- DAMAGE COLORS LOGIC (Verified Working: 0.0=White -> 0.5=Yellow -> 0.75=Orange -> 1.0=Red)
+        for _, data in ipairs(damagedBones) do
+            local boneName = majorBones[data.key].bone
+            local bID = blinkModel:LookupBone(boneName)
+            if bID then
+                local r, g, b
+                local damage = data.damage
+                if damage <= 0.5 then
+                    local prog = damage / 0.5
+                    r, g, b = 1, 1, 1 - prog
+                elseif damage <= 0.75 then
+                    local prog = (damage - 0.5) / 0.25
+                    r, g, b = 1, 1 - 0.5 * prog, 0
+                elseif damage <= 0.99 then
+                    local prog = (damage - 0.75) / 0.24
+                    r, g, b = 1, 0.5 - 0.5 * prog, 0
+                else
+                    r, g, b = 1, 0, 0
+                end
+
+                ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE)
+                DrawDamageBlinkState(blinkModel, r, g, b)
+                ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0))
+            end
+        end
+
         local hasAmputationBlink = false
         local hasFractureBlink = false
-        
-        for _, state in pairs(limbStates) do
+        local solidRedBones = {}
+        local blinkingRedBones = {}
+
+        for key, state in pairs(boneStates) do
             if state.blinking then hasAmputationBlink = true end
-            if state.fractured then hasFractureBlink = true end
+            if state.fractured then
+                hasFractureBlink = true
+                if (time - state.fractureTime) < SOLID_RED_DURATION then
+                    table.insert(solidRedBones, key)
+                else
+                    table.insert(blinkingRedBones, key)
+                end
+            end
         end
-        
+
         if hasAmputationBlink then
             local val = (math.sin(time * 10) + 1) / 2
-            render.SetColorModulation(val, 0, 0)
-            
-            if hasFractureBlink then
-                for l, s in pairs(limbStates) do
-                    if s.fractured then
-                        local bID = blinkModel:LookupBone(limbBones[l])
-                        if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
-                    end
-                end
-            end
-            
-            blinkModel:SetPos(modelOffset)
-            blinkModel:SetAngles(Angle(0, 0, 0))
-            blinkModel:SetupBones()
-            blinkModel:DrawModel()
-            
-            if hasFractureBlink then
-                for l, s in pairs(limbStates) do
-                    if s.fractured then
-                        local bID = blinkModel:LookupBone(limbBones[l])
-                        if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
-                    end
-                end
-            end
+            DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val)
         end
-        
-        if hasFractureBlink then
+
+        if #solidRedBones > 0 then
+            for _, key in ipairs(blinkingRedBones) do
+                local boneName = majorBones[key].bone
+                local bID = blinkModel:LookupBone(boneName)
+                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
+            end
+
+            for _, key in ipairs(solidRedBones) do
+                local boneName = majorBones[key].bone
+                local bID = blinkModel:LookupBone(boneName)
+                if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
+            end
+
+            DrawDamageBlinkState(blinkModel, 1, 0, 0)
+        end
+
+        if #blinkingRedBones > 0 then
+            for _, key in ipairs(solidRedBones) do
+                local boneName = majorBones[key].bone
+                local bID = blinkModel:LookupBone(boneName)
+                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
+            end
+
+            for _, key in ipairs(blinkingRedBones) do
+                local boneName = majorBones[key].bone
+                local bID = blinkModel:LookupBone(boneName)
+                if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
+            end
+
             local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
-            render.SetColorModulation(val, 0, 0)
-            
-            if hasAmputationBlink then
-                for l, s in pairs(limbStates) do
-                    if s.blinking then
-                        local ampBoneName = amputationBones[l] or limbBones[l]
-                        local bID = blinkModel:LookupBone(ampBoneName)
-                        if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
-                    end
-                end
-            end
-            
-            blinkModel:SetPos(modelOffset)
-            blinkModel:SetAngles(Angle(0, 0, 0))
-            blinkModel:SetupBones()
-            blinkModel:DrawModel()
-            
-            if hasAmputationBlink then
-                for l, s in pairs(limbStates) do
-                    if s.blinking then
-                        local ampBoneName = amputationBones[l] or limbBones[l]
-                        local bID = blinkModel:LookupBone(ampBoneName)
-                        if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
-                    end
-                end
-            end
+            DrawDamageBlinkState(blinkModel, val, 0, 0)
         end
         
         render.MaterialOverride(nil)
         render.SetColorModulation(1, 1, 1)
         render.SuppressEngineLighting(false)
     cam.End3D()
-end)
+end
 
 hook.Add("OnRemove", "HG_CleanupHealthIndicator", function()
     if IsValid(healthModel) then healthModel:Remove() end

@@ -99,7 +99,9 @@ function SWEP:GetZoomPos(recoilZoomPos, view, eyePos)
 		if self:HasAttachment("sight","optic") then
 			posZoom = posZoom - recoilZoomPos * 0.25 - ang2:Forward() * (self.AdditionalPos2[1]) * 0.5 + ang2:Forward() * 1
 		else
-			local _, hitpos, dist = util.DistanceToLine(posZoom, posZoom + (self:GetOwner():EyeAngles()):Forward(), eyePos)
+			local owner = self:GetOwner()
+			local aimForward = IsValid(owner) and owner.GetAimVector and owner:GetAimVector() or view.angles:Forward()
+			local _, hitpos, dist = util.DistanceToLine(posZoom, posZoom + aimForward, eyePos)
 			dist = dist - 1
 			posZoom = posZoom + ang2:Forward() * dist - recoilZoomPos * 0.5
 		end
@@ -182,8 +184,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	--print(self:GetNetVar("shootgunReload", 0))
 	local posZoom, angPos = self:GetZoomPos(recoilZoomPos, view, eyePos)
 	
-	local inpain = ply.organism and ply.organism.pain and ply.organism.pain > 50
-	local painmul = 0.5 - math.Clamp((((ply.organism.pain or 0) - 50) / 50), 0, 0.5)
+	local org = ply.organism or {}
+	local inpain = org.pain and org.pain > 50
+	local painmul = 0.5 - math.Clamp((((org.pain or 0) - 50) / 50), 0, 0.5)
 	
 	painmul = painmul * 2
 	--local noZoomHelmet = (ply.armors and (not ply.armors["head"] or not hg.armor.head[ply.armors["head"]] or not hg.armor.head[ply.armors["head"]].cantsight or self:IsPistolHoldType()))
@@ -206,7 +209,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	randomPosL = LerpFT(0.05 * (inpain and 25 - (24 * painmul) or 1), randomPosL, randomPos)
 	
-	scopedLerpAddvec = LerpVectorFT(((false or self.shot2 == 1) and 1 or 0.05) * (cocking and 0.25 or 1) * (inpain and 1 or 1), scopedLerpAddvec, (cocking and 1 or 1) * (justzoomed and 0.5 or 1) * (self.shot2 == 1 and 0.5 or 1) * 3 * randomPosL * slowlyZooming)
+	scopedLerpAddvec = LerpVectorFT(((false or self.shot2 == 1) and 1 or 0.02) * (cocking and 0.25 or 1) * (inpain and 1 or 1), scopedLerpAddvec, (cocking and 1 or 1) * (justzoomed and 0.5 or 1) * (self.shot2 == 1 and 0.5 or 1) * 3 * randomPosL * slowlyZooming)
 	if !hg_oldsights:GetBool() then
 		if not (ply:IsSuperAdmin() and hg_setzoompos:GetBool()) then
 			posZoom:Add(scopedLerpAddvec)
@@ -282,7 +285,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	--local shootLerp = self.Anim_RecoilLerp
 	--view.fov = Lerp(shootLerp,view.fov,view.fov - 5 * self.Penetration / 15)
 	local outputPos, outputAng
-	local animpos = (self.AdditionalAng or Angle(0, 0, 0))[2] / 20 + (self.AdditionalAng2 or Angle(0, 0, 0))[2] / 20 --:GetAnimShoot2()
+	local animpos = (self.AdditionalAng or Angle(0, 0, 0))[2] / 20 + (self.AdditionalAng2 or Angle(0, 0, 0))[2] / 20 - self.AdditionalPos2[2] / 10 --:GetAnimShoot2()
 	local eyeSpray = -(-self.EyeSpray)
 	local mult = (hg.GunPositions[ply] and hg.GunPositions[ply][1] and (hg.GunPositions[ply][1] / 4 + 1) / 2 + 1 or 1) / 2
 	
@@ -293,7 +296,14 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	//angIdle:Add(-angle_difference*2)
 	//angZoom:Add(-angle_difference*1)
 
+	local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
+	local timeScale = math.max(game.GetTimeScale(), 0.001)
+	local shit = 0.2 * mulhuy / timeScale
+	local animpos3 = self:GetAnimShoot2(shit, true) / shit
+	local weight = math.max(self.weight or 1, 0.001)
+	local shit2 = (1 / weight) * (self.NumBullet or 3) / 3
 	angZoom:Add(self.prankang or angle_zero)
+	posZoom:Add(VectorRand(-0.1, 0.1) * animpos3 * shit2)
 
 	local fraction2 = math.ease.InCubic(self:GetAnimPos_Shoot2(self.lastShoot or 0, 1))
 	

@@ -41,24 +41,13 @@ module[1] = function(org)
 	end
 
 	org.hemotransfusionshock = 0
+	org.ischemia = 0
 
 	org.survivalchance = 1
 	org.hemothorax = false
-	org.stamina_damage = 0
-
-	org.bleedingmul = 1.0
-	org.coagulation_multiplier = 1.0
-	org.blood_regeneration_multiplier = 1.0
-	org.hemothorax = false
-	org.stamina_damage = 0
 end
 
-local internalbleed_phrases = {
-	"That's... that's blood I just vomited...",
-	"Oh, that's blood...",
-	"Fuck, I just puked blood...",
-	"Oh shit... I don't feel good...",
-}
+
 
 local about_to_puke = {
 	"I feel like I'm gonna puke any second now...",
@@ -70,16 +59,26 @@ local about_to_puke = {
 local vecZero = Vector(0, 0, 0)
 module[2] = function(owner, org, mulTime)
 	local adrenaline = math.min(org.adrenaline, 2)
-
-    if owner:IsPlayer() then
-        local endurance = owner:GetStat("Endurance")
-        local endurance_bonus = 1 + (endurance - 10) * 0.05
-        org.coagulation_multiplier = endurance_bonus
-        org.blood_regeneration_multiplier = endurance_bonus
+	    if owner:IsPlayer() then
+        org.coagulation_multiplier = 1
+        org.blood_regeneration_multiplier = 1
     else
         org.coagulation_multiplier = 1
         org.blood_regeneration_multiplier = 1
     end
+
+	org.bleedingmul = 1.0
+
+	if org.liver > 0 then
+		org.coagulation_multiplier = org.coagulation_multiplier * (1 - org.liver * 0.5)
+		org.blood_regeneration_multiplier = org.blood_regeneration_multiplier * (1 - org.liver * 0.75)
+		org.bleedingmul = org.bleedingmul * (1 + org.liver * 0.5)
+		org.internalBleed = org.internalBleed + (org.liver * mulTime * 0.05)
+	else
+		org.coagulation_multiplier = 1.2
+		org.blood_regeneration_multiplier = 1.2
+		org.bleedingmul = 0.8
+	end
 
 	if org.vomitInThroat then
 		local ent = hg.GetCurrentCharacter(owner)
@@ -111,14 +110,16 @@ module[2] = function(owner, org, mulTime)
 
 	if org.hemotransfusionshock > 0 then
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 200,0)
-		org.internalBleed = org.internalBleed + mulTime / 30
+		org.internalBleed = org.internalBleed + mulTime / 15
+		org.ischemia = org.ischemia + mulTime / 7.5
+        org.infection = org.infection + (org.hemotransfusionshock * mulTime * 0.01)
 	end
 
-	if org.arteria == 1 then
-		org.o2[1] = math.max(org.o2[1] - mulTime * 5,0)
+	if org.internalBleed > 1 then
+		org.ischemia = org.ischemia + (org.internalBleed - 1) * mulTime / 20
 	end
 
-	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
+	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3250, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
@@ -132,7 +133,7 @@ module[2] = function(owner, org, mulTime)
 			local rand1 = math.Rand(4, 10) * 1
 			local rand2 = math.Rand(0.5, 1) * 1
 			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04 * org.coagulation_multiplier-- / #org.wounds
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * org.coagulation_multiplier-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
 			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
 			
@@ -140,6 +141,7 @@ module[2] = function(owner, org, mulTime)
 			//if wound[5] + beatsPerSecond * 2 < time then
 				wound[5] = time
 				org.blood = max(org.blood - bleed, 1)
+                org.infection = org.infection + (bleed * 0.001)
 				
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					hg.organism.BloodDroplet2(owner, org, wound, ent:GetVelocity() + VectorRand(-15, 15), false)
@@ -157,8 +159,8 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.liver > 0.5 then
-		//org.blood = math.max(org.blood - mulTime * 10 * org.pulse / 70 * org.liver,0)
-		//bleedoutspeed = bleedoutspeed + mulTime * 10 * org.pulse / 70 * org.liver
+		org.blood = math.max(org.blood - mulTime * 10 * org.pulse / 70 * org.liver,0)
+		bleedoutspeed = bleedoutspeed + mulTime * 10 * org.pulse / 70 * org.liver
 	end
 
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
@@ -173,6 +175,7 @@ module[2] = function(owner, org, mulTime)
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
 			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80, 1)
+			org.infection = org.infection + (wound[1] * mulTime * 0.005)
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 				local dir = wound[6]
 				local len = dir:Length()
@@ -191,7 +194,12 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	if org.blood < (2400 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
+	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
+
+	-- Ischemia kicks in below 2500 blood
+	if org.blood < 2500 then
+		org.ischemia = math.min(org.ischemia + mulTime * 0.02, 1.0)
+	end
 
 	local bleed = org.internalBleed / 14 -- + org.lungsR[3] + org.lungsL[3]
 	org.internalBleed = math.Approach(org.internalBleed, 0, org.internalBleedHeal > 0 and mulTime / 2 or mulTime / 55)
@@ -199,16 +207,9 @@ module[2] = function(owner, org, mulTime)
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)
 	
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 10 * org.pulse / 70, 1) end
-
+	
 	if org.internalBleed > 0.1 then
-		local chance = (org.internalBleed - 0.1) * 0.005 -- 0.5% chance at 1.1 internal bleeding
-		if math.random() < chance * mulTime then
-			org.hemothorax = true
-		end
-	end
-
-	if org.internalBleed > 0.1 then
-		local chance = (org.internalBleed - 0.1) * 0.005 -- 0.5% chance at 1.1 internal bleeding
+		local chance = (org.internalBleed - 0.1) * 0.0005 -- 0.05% chance at 1.1 internal bleeding (reduced from 0.2%)
 		if math.random() < chance * mulTime then
 			org.hemothorax = true
 		end
@@ -227,20 +228,20 @@ module[2] = function(owner, org, mulTime)
 	if org.wantToVomit > 1 then
 		org.wantToVomit = 0
 
-		if org.isPly then owner:Notify(internalbleed_phrases[math.random(#internalbleed_phrases)], 15, "internalbleed") end
+		if org.isPly then owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed") end
 
 		hg.organism.Vomit(owner)
 	end
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)--в секунду
 	
-	local timetouncon = (org.blood - 2500) / org.bleed
+	local timetouncon = (org.blood - 2750) / org.bleed
 	
 	local bleeding_will_stop = (timetouncon ~= timetouncon) or ((coagulatespeed * timetouncon - org.bleed) > 0)
 	local canwakeup_pain = ((org.pain - 5) / (org.painlessen)) < timetouncon
 	org.timetouncon = (timetouncon ~= timetouncon) and timetouncon or Lerp(hg.lerpFrameTime2(0.01,mulTime), org.timetouncon or 10000, timetouncon)
 	
-	if org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 3000)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) then
+	if org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 3250)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) then
 		org.incapacitated = true
 	else
 		org.incapacitated = false
@@ -252,10 +253,55 @@ module[2] = function(owner, org, mulTime)
 		org.critical = false
 	end
 
-	org.bleed = (bleedoutspeed + bleedoutspeed2)
+	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
 end
 
 util.AddNetworkString("bloodsquirt2")
+util.AddNetworkString("vomitsquirt2")
+
+local function GetVomitDecal()
+	return math.random(6) == 1 and "Organism.VomitMedium" or "Organism.VomitSmall"
+end
+
+local function VomitDecalSpray(owner, ent, mat)
+	if not IsValid(ent) or not mat then return end
+
+	local basePos = mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1
+	local forward = mat:GetAngles():Right()
+	local step = 0
+	local steps = 4
+	local timerName = "hg_vomit_decal_" .. owner:EntIndex() .. "_" .. math.floor(CurTime() * 1000) .. "_" .. math.random(1000, 9999)
+	timer.Create(timerName, 0.025, steps, function()
+		if not IsValid(owner) or not IsValid(ent) then timer.Remove(timerName) return end
+		step = step + 1
+
+		local spread = VectorRand(-0.14, 0.14)
+		spread[3] = spread[3] * 0.3
+		local dir = (forward * 0.58 + Vector(0, 0, -0.72) + spread):GetNormalized()
+		local endPos = basePos + dir * (130 + step * 85)
+		local tr = util.TraceLine({
+			start = basePos,
+			endpos = endPos,
+			filter = {ent, owner, owner.FakeRagdoll},
+			mask = MASK_SOLID_BRUSHONLY
+		})
+
+		if tr.Hit then
+			util.Decal(GetVomitDecal(), tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, tr.Entity)
+		else
+			local trDown = util.TraceLine({
+				start = endPos,
+				endpos = endPos + Vector(0, 0, -360),
+				filter = {ent, owner, owner.FakeRagdoll},
+				mask = MASK_SOLID_BRUSHONLY
+			})
+
+			if trDown.Hit then
+				util.Decal(GetVomitDecal(), trDown.HitPos + trDown.HitNormal, trDown.HitPos - trDown.HitNormal, trDown.Entity)
+			end
+		end
+	end)
+end
 
 function hg.organism.Vomit(owner, snd)
 	if !hg.IsValidPlayer(owner) then return end
@@ -277,8 +323,7 @@ function hg.organism.Vomit(owner, snd)
 
 	owner:SetNetVar("vomiting", CurTime() + 1.5)
 
-	ent:EmitSound(snd or "zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "female" or "male").."_cough"..math.random(4)..".mp3")
-	if !on_spine then ent:EmitSound("vomit/vomit5.mp3") end
+	ent:EmitSound(snd or "vomit/vomit5.mp3")
 	
 	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
 		owner:SetNetVar("zableval_masku", true)
@@ -291,6 +336,58 @@ function hg.organism.Vomit(owner, snd)
 			net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
 			net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
 			net.Broadcast()
+		end
+	end
+end
+
+function hg.organism.VomitNormal(owner, snd)
+	if !hg.IsValidPlayer(owner) then return end
+
+	local org = owner.organism
+	local ent = hg.GetCurrentCharacter(owner)
+
+	local bon = "ValveBiped.Bip01_Head1"
+	local bone = ent:LookupBone(bon)
+	local mat = ent:GetBoneMatrix(bone)
+
+	if not mat then return end
+
+	local on_spine = mat:GetAngles():Right()[3] > 0.25
+	if on_spine then
+		org.vomitInThroat = true
+	end
+
+	owner:SetNetVar("vomiting", CurTime() + 1.5)
+	org.disorientation = math.min((org.disorientation or 0) + 1.5, 6)
+	org.consciousness = math.max((org.consciousness or 1) - 0.08, 0)
+	org.hungry = math.min(math.max((org.hungry or 0) + 7, 0), 100)
+	org.satiety = math.max((org.satiety or 0) - 20, 0)
+
+	ent:EmitSound(snd or "vomit/vomit5.mp3")
+
+	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
+		owner:SetNetVar("zableval_masku", true)
+	else
+		if !on_spine then
+			net.Start("vomitsquirt2")
+			net.WriteEntity(ent)
+			net.WriteString(bon)
+			net.WriteMatrix(mat)
+			net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
+			net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
+			net.Broadcast()
+
+			local name = "hg_normal_vomit_" .. owner:EntIndex()
+			timer.Create(name, 0.09, 2, function()
+				if not IsValid(owner) then return end
+				local entNow = hg.GetCurrentCharacter(owner)
+				if not IsValid(entNow) then return end
+				local boneNow = entNow:LookupBone(bon)
+				if not boneNow then return end
+				local matNow = entNow:GetBoneMatrix(boneNow)
+				if not matNow then return end
+				VomitDecalSpray(owner, entNow, matNow)
+			end)
 		end
 	end
 end

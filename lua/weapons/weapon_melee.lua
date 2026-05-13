@@ -49,13 +49,13 @@ SWEP.ismelee2 = true
 SWEP.AttackTime = 0.2
 SWEP.DrawAnimTime = 1.25
 SWEP.EquipTime = 1
-SWEP.AnimTime1 = 1.05
-SWEP.WaitTime1 = 0.75
+SWEP.AnimTime1 = 0.7
+SWEP.WaitTime1 = 0.5
 SWEP.AttackLen1 = 55
 
 SWEP.Attack2Time = 0.1
-SWEP.AnimTime2 = 0.9
-SWEP.WaitTime2 = 0.6
+SWEP.AnimTime2 = 0.6
+SWEP.WaitTime2 = 0.4
 SWEP.AttackLen2 = 45 
 
 SWEP.DamageType = DMG_SLASH
@@ -112,6 +112,8 @@ SWEP.HeavyAttackDelay = 0.5 -- Slower swing
 SWEP.HeavyAttackTimeLength = 0.4 -- Longer hit window
 SWEP.HeavyAttackViewPunch = Angle(2, 2, 0)
 SWEP.HeavyAttackMaxChargeTime = 2.0 -- Time to reach max damage
+SWEP.HeavyAttackAfterGetupCooldown = 2.0
+SWEP.HeavyAttackGetupNWKey = "HGHeavyGetupCooldown"
 
 SWEP.HeavyAttackSwingAng = 0
 SWEP.HeavyAttackRads = 65
@@ -192,6 +194,8 @@ end
 
 SWEP.modelscale = 1
 SWEP.modelscale2 = 1
+
+
 if CLIENT then
     function PrintBones( entity )
         for i = 0, entity:GetBoneCount() - 1 do
@@ -230,7 +234,8 @@ if CLIENT then
         if ent:IsNPC() then
 			local RHand = ent:LookupBone("ValveBiped.Bip01_R_Hand")
 			if not RHand then return end
-			local matrixR = ent:GetBoneMatrix(RHand) or ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Forearm"))
+			local RForearm = ent:LookupBone("ValveBiped.Bip01_R_Forearm")
+			local matrixR = ent:GetBoneMatrix(RHand) or (RForearm and ent:GetBoneMatrix(RForearm) or nil)
 			if not matrixR then 
 				//matrixR = Matrix()
 				//local att = ent:GetAttachment(ent:LookupAttachment("anim_attachment_RH"))
@@ -329,8 +334,7 @@ if CLIENT then
                 WorldModel:SetCycle(timing)
             end
 
-            if WorldModel:GetModel() ~= self.WorldModelReal then WorldModel:SetModel(self.WorldModelReal) end
-            
+
             local pos, ang = self:ModelAnim(WorldModel)
 
             self.ShakePos = self.ShakePos or Vector(0, 0, 0)
@@ -351,12 +355,11 @@ if CLIENT then
             ang = ang + self.ShakeAng
 
 			WorldModel:SetRenderOrigin(pos)
+            WorldModel:SetRenderOrigin(pos)
 			WorldModel:SetRenderAngles(ang)
             WorldModel:SetPos(pos)
             WorldModel:SetAngles(ang)
 		else
-            if WorldModel:GetModel() ~= self.WorldModel then WorldModel:SetModel(self.WorldModel) end
-			
             WorldModel:SetRenderOrigin(self:GetPos())
 			WorldModel:SetRenderAngles(self:GetAngles())
             WorldModel:SetPos(self:GetPos())
@@ -385,6 +388,7 @@ if CLIENT then
             WorldModel:SetAngles(ang)
 
             local bon = WorldModel:LookupBone("ValveBiped.Bip01_R_Hand")
+            if not bon then return end
             local matW = WorldModel:GetBoneMatrix(bon)
 
             if !matW then return end
@@ -751,7 +755,10 @@ function SWEP:SetHandPos(noset)
 	self.rhandik = self.setrh and IsValid(owner)//self.setrh
 	self.lhandik = self.setlh and IsValid(owner) and (ply:GetTable().ChatGestureWeight < 0.1) and hg.CanUseLeftHand(ply) and !(owner.suiciding and self.SuicideNoLH)
 
-    local rhmat, lhmat = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Hand")), ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_L_Hand"))
+    local rhBone = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+    local lhBone = ent:LookupBone("ValveBiped.Bip01_L_Hand")
+    local rhmat = rhBone and ent:GetBoneMatrix(rhBone) or nil
+    local lhmat = lhBone and ent:GetBoneMatrix(lhBone) or nil
 
 	ply.rhold = rhmat
 	ply.lhold = lhmat
@@ -787,6 +794,7 @@ function SWEP:SetHandPos(noset)
             local ply_spine_index = ply:LookupBone("ValveBiped.Bip01_Spine4")
             if !ply_spine_index then return end
             local ply_spine_matrix = ply:GetBoneMatrix(ply_spine_index)
+            if !ply_spine_matrix then return end
             local wmpos = ply_spine_matrix:GetTranslation() - ply:EyeAngles():Right() * 5
 
             local tr = {}
@@ -930,7 +938,7 @@ if CLIENT then
 
         mul = math.max( (math.max(math.min(mul,self.MinSensivity or 0.35),0)) - (self.MinSensivity/10) ,0 )
         mul = 1-(mul)
-		if wep.GetBlocking and wep:GetBlocking() then
+		if self.GetBlocking and self:GetBlocking() then
 			mul = math.Clamp(mul * 0.35, 0.2, 1)
 		end
 
@@ -940,6 +948,19 @@ if CLIENT then
         return IsValid(ent) and ent:IsPlayer() and sensitivity
     end
 
+end
+
+SWEP.BrokenArmPenalty = {
+    DamageMultiplier = 0.5, -- 50% damage
+    StaminaMultiplier = 1.5, -- 50% more stamina
+    SwingSpeedMultiplier = 0.5, -- 50% slower
+    BlockDurationMultiplier = 0.5 -- 50% shorter block
+}
+
+function SWEP:HasBrokenArm(owner)
+    if not IsValid(owner) or not owner.organism then return false end
+    local org = owner.organism
+    return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.rarmdislocation
 end
 
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)
@@ -955,31 +976,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     end
 
     if owner:IsBerserk() then
-        mul = mul * (1 + math.min(owner.organism.berserk, 2)) -- Cap berserk bonus to 2 (3x damage)
-    end
-
-
-    if owner.organism then
-        local org = owner.organism
-        local damage_multiplier = 1.0
-
-        local function get_arm_debuff(is_broken, is_dislocated)
-            if is_broken then return 0.4 end -- 60% damage reduction for broken arm
-            if is_dislocated then return 0.7 end -- 30% damage reduction for dislocated arm
-            return 1.0
-        end
-
-        if self.TwoHanded or self.weight > 2 then
-            damage_multiplier = damage_multiplier * get_arm_debuff(org.larm == 1, org.larmdislocated)
-            damage_multiplier = damage_multiplier * get_arm_debuff(org.rarm == 1, org.rarmdislocated)
-        else
-            if self.setrh then -- Right-handed
-                damage_multiplier = damage_multiplier * get_arm_debuff(org.rarm == 1, org.rarmdislocated)
-            elseif self.setlh then -- Left-handed
-                damage_multiplier = damage_multiplier * get_arm_debuff(org.larm == 1, org.larmdislocated)
-            end
-        end
-        mul = mul * damage_multiplier
+        mul = mul * (1 + owner.organism.berserk)
     end
 
     if self:GetAttackType() == 3 then
@@ -997,67 +994,19 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
         mul = mul * (1.0 + swayBonus)
     end
 
-    local strength = 10
-    if IsValid(owner) and owner.GetStat then
-        strength = owner:GetStat("Strength") or 10
+    if self:HasBrokenArm(owner) then
+        local multiplier = self.BrokenArmPenalty.DamageMultiplier
+        local org = owner.organism
+        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+            multiplier = multiplier * 0.75 -- Even less damage
+        end
+        mul = mul * multiplier
     end
-    mul = mul * (1 + (strength - 10) * 0.025)
 
     return mul
 end
 
-function SWEP:ArmPainEffect(owner)
-    if not IsValid(owner) or not owner:IsPlayer() or not owner.organism then return end
-
-    local org = owner.organism
-    local pain_intensity = 0
-
-    local function get_arm_pain(is_broken, is_dislocated)
-        if is_broken then return 3 end
-        if is_dislocated then return 1.5 end
-        return 0
-    end
-
-    if self.TwoHanded then
-        pain_intensity = pain_intensity + get_arm_pain(org.larm == 1, org.larmdislocated)
-        pain_intensity = pain_intensity + get_arm_pain(org.rarm == 1, org.rarmdislocated)
-    else
-        if self.setrh then
-            pain_intensity = pain_intensity + get_arm_pain(org.rarm == 1, org.rarmdislocated)
-        elseif self.setlh then
-            pain_intensity = pain_intensity + get_arm_pain(org.larm == 1, org.larmdislocated)
-        end
-    end
-
-    if pain_intensity > 0 then
-        owner:ViewPunch(Angle(math.Rand(-1, 1) * pain_intensity, math.Rand(-1, 1) * pain_intensity, math.Rand(-1, 1) * pain_intensity))
-        owner:EmitSound("physics/flesh/flesh_impact_bullet"..math.random(1,4)..".wav", 70, 90 + pain_intensity * 2)
-    end
-end
-
-
-
-
 function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
-    if SERVER and owner.organism and owner.organism.stamina and owner.organism.stamina[1] < 45 then
-        local fear = owner.organism.fear or 0
-        if fear > 0 then
-            local intelligence = owner:GetStat("Intelligence") or 10
-            local chance = fear * 3 -- 3% chance per fear point
-            if intelligence < 10 then
-                chance = chance * (1 + (10 - intelligence) * 0.1) -- 10% more chance per point below 10
-            end
-
-            if math.random(100) < chance then
-                owner:DropWeapon(self)
-                return
-            end
-        end
-    end
-
-    if SERVER then
-        self:ArmPainEffect(owner)
-    end
     //if SERVER then owner:SetNetVar("slowDown", owner:GetNetVar("slowDown", 0) + (attacktype and self.DamageSecondary or self.DamagePrimary)) end
     
     if not self.FirstAttackTick then 
@@ -1074,9 +1023,19 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             if attacktype == 3 then pitch = pitch - 20 end
             owner:EmitSound(self.SwingSound or self.AttackSwing or "weapons/slam/throw.wav",50,pitch)
             
-            if owner.organism and attacktype ~= 3 then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + ((attacktype and self.StaminaSecondary or self.StaminaPrimary)) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+            local staminaCost = (attacktype and self.StaminaSecondary or self.StaminaPrimary)
+        if self:HasBrokenArm(owner) then
+            local multiplier = self.BrokenArmPenalty.StaminaMultiplier
+            local org = owner.organism
+            if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+                multiplier = multiplier * 1.5 -- More severe
             end
+            staminaCost = staminaCost * multiplier
+        end
+
+        if owner.organism and attacktype ~= 3 then
+            owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+        end
 
             if attacktype == 3 then
                 -- heavy attack custom logic if needed
@@ -1282,23 +1241,22 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
             local defenderBlockTier = wep.BlockTier or 1
             local attackerBlockTier = self.BlockTier or 1
 
-
-            if SERVER and wep.ArmPainEffect then
-                wep:ArmPainEffect(ent)
-            end
-
             if defenderBlockTier >= attackerBlockTier then
                 if attacktype == 3 then
-                    ent:EmitSound("blockbreak.ogg", 65, 112)
-                    if SERVER then
-                        hg.drop(ent)
-                        
-                        net.Start("MeleeBlockEffect")
-                        net.WriteVector(trace.HitPos)
-                        net.WriteString((wep.MeleeMaterial or "none") .. "_broken")
-                        net.Broadcast()
+                    local defenderStamina = ent.organism and ent.organism.stamina and ent.organism.stamina[1] or 0
+                    local heavyBreakChance = math.Clamp(attackerBlockTier * 0.12, 0, 0.35)
+                    if defenderStamina < 65 and math.random() <= heavyBreakChance then
+                        ent:EmitSound("blockbreak.ogg", 65, 112)
+                        if SERVER then
+                            hg.drop(ent)
+                            
+                            net.Start("MeleeBlockEffect")
+                            net.WriteVector(trace.HitPos)
+                            net.WriteString((wep.MeleeMaterial or "none") .. "_broken")
+                            net.Broadcast()
+                        end
+                        return 1
                     end
-                    return 1
                 end
 
                 if wep.BlockImpactSound then
@@ -1320,23 +1278,30 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
                 end
 
-				local parry_bonus = ((ent:GetStat("Dexterity") or 10) - 10) * 0.01 + ((ent:GetStat("Intelligence") or 10) - 10) * 0.01
-                local perfectblock = CurTime() - wep:GetStartedBlocking() < (0.5 + parry_bonus)
+                local perfectblock_window = 0.5
+                if wep:HasBrokenArm(ent) then
+                    perfectblock_window = perfectblock_window * (wep.BrokenArmPenalty.BlockDurationMultiplier or 1)
+                end
+                local perfectblock = CurTime() - wep:GetStartedBlocking() < perfectblock_window
                 
+                local heavyBlockedNoBreak = attacktype == 3
+                local staminaLossMul = heavyBlockedNoBreak and 1.75 or 1
+                local blockerViewPunchMul = heavyBlockedNoBreak and 1.8 or 1
+
                 if perfectblock then
                     ent:EmitSound("parry.ogg", 75)
                 else
                     if ent.organism then
-                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15
+                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15 * staminaLossMul
                     end
                 end
 
-                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1)
+                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1) * staminaLossMul
 
                 if not owner:IsNPC() then
                     self:PunchPlayer(owner, attacktype, -owner:GetAimVector(), selfdmg / 2)
                 end
-                self:PunchPlayer(ent, attacktype, owner:GetAimVector(), selfdmg / 2)
+                self:PunchPlayer(ent, attacktype, owner:GetAimVector(), (selfdmg / 2) * blockerViewPunchMul)
                 
                 if perfectblock then
                     -- ent:EmitSound("tasty/empty.wav")
@@ -1420,7 +1385,11 @@ function SWEP:CustomThink()
                 local org = owner.organism
                 local ent = hg.GetCurrentCharacter(owner)
                 
-                local ang = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Neck1")):GetAngles()
+                local neckBone = ent:LookupBone("ValveBiped.Bip01_Neck1")
+                if not neckBone then return end
+                local neckMat = ent:GetBoneMatrix(neckBone)
+                if not neckMat then return end
+                local ang = neckMat:GetAngles()
                 local _, ang = LocalToWorld(vector_origin, Angle(0, -60, 0), vector_origin, ang)
                 
                 hg.organism.input_list["arteria"](org, 0, 5, dmgInfo, nil, -ang:Forward())
@@ -1470,44 +1439,29 @@ function SWEP:CustomThink()
     if self.CanHeavyAttack then
         local state = self.GetChargeState and self:GetChargeState() or self:GetDTInt(6)
         local nextState = self.GetNextChargeStateTime and self:GetNextChargeStateTime() or self:GetDTFloat(9)
+        if CLIENT then
+            nextState = math.max(nextState or 0, self.HeavyChargeNextStateLocal or 0)
+        end
         local curTime = CurTime()
         local attackDown = hg.KeyDown(owner, IN_ATTACK)
         local useDown = hg.KeyDown(owner, IN_USE)
         local feintPressed = owner.KeyPressed and owner:KeyPressed(IN_ATTACK2)
-
-        if self.HeavyAttackFeintBlockUntilRelease and not attackDown then
-            self.HeavyAttackFeintBlockUntilRelease = false
-        end
-
-        if not IsValid(owner) or not owner:Alive() or owner.fake or (owner.organism and (owner.organism.fake or owner.organism.otrub)) or IsValid(owner.FakeRagdoll) then
-            if state ~= 0 then
-                if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
-                self.HeavyAttackStaminaDeducted = false
-                self.HeavyAttackFeintBlockUntilRelease = false
-                self.HeavyChargeStaminaDrainAcc = 0
-                self.HeavyChargeStaminaDrainTick = curTime
-                if CLIENT then
-                    self.ShakePos = Vector(0,0,0)
-                    self.ShakeAng = Angle(0,0,0)
-                end
-                
-                -- Stop charge effects
-                owner:StopSound("pwb2/weapons/mac11/draw.wav")
-                self:PlayAnim("idle", 1, false, nil, false)
-            end
-        elseif (state == 1 or state == 2) and useDown and attackDown and feintPressed and not self:GetInAttack() then
-            local cancelTime = self.HeavyAttackAnimTimeBegin
-            if state == 1 then
-                local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
-                cancelTime = math.Clamp(curTime - startTime, 0.05, self.HeavyAttackAnimTimeBegin)
-            end
+        local heavyGetupCooldownDuration = self.HeavyAttackAfterGetupCooldown or 2
+        local heavyGetupCooldownEnd = owner:GetNWFloat(self.HeavyAttackGetupNWKey or "HGHeavyGetupCooldown", 0)
+        heavyGetupCooldownEnd = math.max(heavyGetupCooldownEnd, (owner.LastFakeUp or 0) + heavyGetupCooldownDuration)
+        local heavyGetupBlocked = curTime < heavyGetupCooldownEnd
+        local function cancelHeavyChargeWithFeintAnim(cancelTime)
+            cancelTime = math.Clamp(cancelTime or self.HeavyAttackAnimTimeBegin, 0.05, self.HeavyAttackAnimTimeBegin)
             local feintLockTime = math.max(cancelTime, 0.5)
-            self:PlayAnim(self.Attack_Charge_Begin, cancelTime, false, nil, true, false)
+            self:PlayAnim(self.Attack_Charge_Begin, cancelTime, false, nil, true, true)
             if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
             if self.SetNextChargeStateTime then self:SetNextChargeStateTime(0) else self:SetDTFloat(9, 0) end
+            self.HeavyChargeNextStateLocal = 0
+            self.HeavyChargeStartLocal = 0
             self.HeavyAttackStaminaDeducted = false
             self.HeavyChargeStaminaDrainAcc = 0
             self.HeavyChargeStaminaDrainTick = curTime
+            self.HeavyChargeBeginAnimEnd = 0
             self.HeavyAttackFeintLockEndTime = curTime + feintLockTime
             self.HeavyAttackFeintBlockUntilRelease = true
             self:SetInAttack(false)
@@ -1519,24 +1473,84 @@ function SWEP:CustomThink()
                 self.ShakePos = Vector(0,0,0)
                 self.ShakeAng = Angle(0,0,0)
             end
+        end
+
+        if self.HeavyAttackFeintBlockUntilRelease and not attackDown then
+            self.HeavyAttackFeintBlockUntilRelease = false
+        end
+
+        local inFakeState = IsValid(owner) and (owner.fake or (owner.organism and owner.organism.fake) or IsValid(owner.FakeRagdoll))
+        if not IsValid(owner) or not owner:Alive() or owner.fake or (owner.organism and (owner.organism.fake or owner.organism.otrub)) or IsValid(owner.FakeRagdoll) then
+            if state ~= 0 then
+                if (state == 1 or state == 2) and IsValid(owner) then
+                    local cancelTime = self.HeavyAttackAnimTimeBegin
+                    if state == 1 then
+                        local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
+                        cancelTime = math.Clamp(curTime - startTime, 0.05, self.HeavyAttackAnimTimeBegin)
+                    elseif state == 2 then
+                        cancelTime = self.HeavyAttackAnimTimeBegin
+                    end
+                    cancelHeavyChargeWithFeintAnim(cancelTime)
+                    state = 0
+                else
+                    if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
+                    self.HeavyAttackStaminaDeducted = false
+                    self.HeavyAttackFeintBlockUntilRelease = false
+                    self.HeavyChargeNextStateLocal = 0
+                    self.HeavyChargeStartLocal = 0
+                    self.HeavyChargeStaminaDrainAcc = 0
+                    self.HeavyChargeStaminaDrainTick = curTime
+                    self.HeavyChargeBeginAnimEnd = 0
+                    if CLIENT then
+                        self.ShakePos = Vector(0,0,0)
+                        self.ShakeAng = Angle(0,0,0)
+                    end
+                    if IsValid(owner) then
+                        owner:StopSound("pwb2/weapons/mac11/draw.wav")
+                    end
+                    if not inFakeState then
+                        self:PlayAnim("idle", 1, false, nil, false)
+                    end
+                end
+            elseif CLIENT then
+                self.HeavyChargeNextStateLocal = 0
+                self.HeavyChargeStartLocal = 0
+                if not inFakeState then
+                    self:PlayAnim("idle", 1, false, nil, false, true)
+                end
+            end
+        elseif (state == 1 or state == 2) and useDown and attackDown and feintPressed and not self:GetInAttack() then
+            local cancelTime = self.HeavyAttackAnimTimeBegin
+            if state == 1 then
+                local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
+                cancelTime = math.Clamp(curTime - startTime, 0.05, self.HeavyAttackAnimTimeBegin)
+            end
+            cancelHeavyChargeWithFeintAnim(cancelTime)
             state = 0
         elseif state == 0 then
             self.HeavyChargeStaminaDrainAcc = 0
             self.HeavyChargeStaminaDrainTick = curTime
-            if useDown and attackDown and not self.HeavyAttackFeintBlockUntilRelease and not self:GetInAttack() and (self:GetLastAttack() + self:GetAttackWait() < curTime) and not self:GetBlocking() and not self:IsEquipLocked() then
+            if useDown and attackDown and not heavyGetupBlocked and not self.HeavyAttackFeintBlockUntilRelease and not self:GetInAttack() and (self:GetLastAttack() + self:GetAttackWait() < curTime) and not self:GetBlocking() and not self:IsEquipLocked() then
                 if owner.organism and owner.organism.stamina and owner.organism.stamina[1] and owner.organism.stamina[1] < 80 then return end
                 if self.SetChargeState then self:SetChargeState(1) else self:SetDTInt(6, 1) end
                 self.HeavyAttackStaminaDeducted = false
                 if self.SetNextChargeStateTime then self:SetNextChargeStateTime(curTime + self.HeavyAttackAnimTimeBegin) else self:SetDTFloat(9, curTime + self.HeavyAttackAnimTimeBegin) end
                 if self.SetChargeStartTime then self:SetChargeStartTime(curTime) else self:SetDTFloat(10, curTime) end
-                self:PlayAnim(self.Attack_Charge_Begin, self.HeavyAttackAnimTimeBegin, false, nil, false)
+                self.HeavyChargeNextStateLocal = curTime + self.HeavyAttackAnimTimeBegin
+                self.HeavyChargeStartLocal = curTime
+                self:PlayAnim(self.Attack_Charge_Begin, self.HeavyAttackAnimTimeBegin, false, nil, false, true)
+                self.HeavyChargeBeginAnimEnd = curTime + self.HeavyAttackAnimTimeBegin
                 
                 -- Play cloth sound on begin
                 owner:EmitSound("pwb2/weapons/mac11/draw.wav", 55, 100)
             end
         elseif state == 1 then
              local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
+             if CLIENT then
+                startTime = math.max(startTime or 0, self.HeavyChargeStartLocal or 0)
+             end
              local chargeProgress = math.min((curTime - startTime) / self.HeavyAttackMaxChargeTime, 1.0)
+             local beginEndTime = startTime + self.HeavyAttackAnimTimeBegin
              
              if CLIENT then
                 local shake = chargeProgress * 0.01 -- Reduced from 0.05
@@ -1544,10 +1558,11 @@ function SWEP:CustomThink()
                 self.ShakeAng = self.ShakeAng + AngleRand() * (shake * 0.5)
              end
 
-            if curTime >= nextState then
+            if curTime >= beginEndTime then
                 if not hg.KeyDown(owner, IN_ATTACK) then
                      -- Released during charge? Go straight to attack
                     if self.SetChargeState then self:SetChargeState(3) else self:SetDTInt(6, 3) end
+                    self.HeavyChargeNextStateLocal = 0
                     
                     self.HitEnts = nil
                     self.FirstAttackTick = false
@@ -1558,7 +1573,7 @@ function SWEP:CustomThink()
                     mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
                 end
 
-                self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false)
+                self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
                     owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
@@ -1586,11 +1601,16 @@ function SWEP:CustomThink()
                 else
                     if self.SetChargeState then self:SetChargeState(2) else self:SetDTInt(6, 2) end
                     if self.SetNextChargeStateTime then self:SetNextChargeStateTime(curTime + self.HeavyAttackAnimTimeIdle) else self:SetDTFloat(9, curTime + self.HeavyAttackAnimTimeIdle) end
-                    self:PlayAnim(self.Attack_Charge_Idle, self.HeavyAttackAnimTimeIdle, true, nil, false)
+                    self.HeavyChargeNextStateLocal = curTime + self.HeavyAttackAnimTimeIdle
+                    self.HeavyChargeBeginAnimEnd = 0
+                    self:PlayAnim(self.Attack_Charge_Idle, self.HeavyAttackAnimTimeIdle, true, nil, false, true)
                 end
             end
         elseif state == 2 then
              local startTime = self.GetChargeStartTime and self:GetChargeStartTime() or self:GetDTFloat(10)
+             if CLIENT then
+                startTime = math.max(startTime or 0, self.HeavyChargeStartLocal or 0)
+             end
              local chargeProgress = math.min((curTime - startTime) / self.HeavyAttackMaxChargeTime, 1.0)
 
              if CLIENT then
@@ -1602,6 +1622,7 @@ function SWEP:CustomThink()
             if not hg.KeyDown(owner, IN_ATTACK) then
                 -- Trigger Attack
                 if self.SetChargeState then self:SetChargeState(3) else self:SetDTInt(6, 3) end
+                self.HeavyChargeNextStateLocal = 0
                 
                 local mul = 1
                 if owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
@@ -1612,7 +1633,7 @@ function SWEP:CustomThink()
                 self.FirstAttackTick = false
                 self.AttackHitPlayed = false
                 
-                self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false)
+                self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
                     owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
@@ -1641,12 +1662,15 @@ function SWEP:CustomThink()
             elseif curTime >= nextState then
                  -- Loop idle
                  if self.SetNextChargeStateTime then self:SetNextChargeStateTime(curTime + self.HeavyAttackAnimTimeIdle) else self:SetDTFloat(9, curTime + self.HeavyAttackAnimTimeIdle) end
-                 self:PlayAnim(self.Attack_Charge_Idle, self.HeavyAttackAnimTimeIdle, true, nil, false)
+                 self.HeavyChargeNextStateLocal = curTime + self.HeavyAttackAnimTimeIdle
+                 self:PlayAnim(self.Attack_Charge_Idle, self.HeavyAttackAnimTimeIdle, true, nil, false, true)
             end
         elseif state == 3 then
              -- Attack logic is handled by GetInAttack() block
+             self.HeavyChargeNextStateLocal = 0
              self.HeavyChargeStaminaDrainAcc = 0
              self.HeavyChargeStaminaDrainTick = curTime
+             self.HeavyChargeBeginAnimEnd = 0
              if not self:GetInAttack() then
                  if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
              end
@@ -1679,7 +1703,11 @@ function SWEP:CustomThink()
         local oldblocking = self:GetBlocking()
         local now = CurTime()
         local feintLockActive = (self.HeavyAttackFeintLockEndTime or 0) > now
-        local blocking = not feintLockActive and ((now - self:GetStartedBlocking()) > 1 or oldblocking) and owner.organism and owner.organism.stamina and owner.organism.stamina[1] and owner.organism.stamina[1] > 90 and !self:GetInAttack() and (self:GetAttackTime() - now - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2)
+                local blockDuration = 1
+        if self:HasBrokenArm(owner) then
+            blockDuration = blockDuration * self.BrokenArmPenalty.BlockDurationMultiplier
+        end
+        local blocking = not feintLockActive and ((now - self:GetStartedBlocking()) > blockDuration or oldblocking) and owner.organism and owner.organism.stamina and owner.organism.stamina[1] and owner.organism.stamina[1] > 90 and !self:GetInAttack() and (self:GetAttackTime() - now - 0) < 0 and self:CanBlock() and hg.KeyDown(owner, IN_ATTACK2)
         --if self:CutDuct() then return end
         self:SetBlocking(blocking)
         
@@ -2218,14 +2246,22 @@ function SWEP:PrimaryAttack()
     local ent = hg.GetCurrentCharacter(ply)
 
     if !self:InUse() then return end
-    if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
+        if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
     if self.lastattack and (self.lastattack + self.attackwait) > CurTime() then return end
     
     local mul = 1
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
-    mul = mul * (1 + ((ply:GetStat("Strength") or 10) - 10) * 0.025)
+
+    if self:HasBrokenArm(ply) then
+        local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
+        local org = ply.organism
+        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+            multiplier = multiplier * 0.5 -- More severe (even slower)
+        end
+        mul = mul * multiplier
+    end
 
     
     self.HitEnts = nil
@@ -2336,14 +2372,22 @@ function SWEP:SecondaryAttack(override)
 
     if !self:InUse() then return end
     if (hg.KeyDown(ply, IN_USE) and not IsValid(ply.FakeRagdoll)) then return end
-    if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
+        if (self:GetLastAttack() + self:GetAttackWait()) > CurTime() then return end
     if self.lastattack and (self.lastattack + self.attackwait) > CurTime() then return end
 
     local mul = 1
     if ply.organism and ply.organism.stamina and ply.organism.stamina[1] then
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
-    mul = mul * (1 + ((ply:GetStat("Strength") or 10) - 10) * 0.025)
+
+    if self:HasBrokenArm(ply) then
+        local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
+        local org = ply.organism
+        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+            multiplier = multiplier * 0.5 -- More severe (even slower)
+        end
+        mul = mul * multiplier
+    end
 
     self.HitEnts = nil
     self.FirstAttackTick = false
@@ -2665,8 +2709,11 @@ function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient)
 		end
 		return
 	end
-    self.tries = 10
 
+    local mdl = self:GetWM()
+    self.tries = 10
+    local mdl = self:GetWM()
+    self.tries = 10
     if self:GetWM():GetModel() ~= self.WorldModelReal then self:GetWM():SetModel(self.WorldModelReal) end
     
     self:GetWM():SetSequence(self.AnimList[anim] or anim)
@@ -3028,3 +3075,4 @@ end
 
     return true
 end]]
+

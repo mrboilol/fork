@@ -2,11 +2,17 @@ local min, max, Round, halfValue2 = math.min, math.max, math.Round, util.halfVal
 --local Organism = hg.organism
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
+
+
+
 module[1] = function(org)
 	org.heart = 0
 	org.heartstop = false
 	org.pulse = 70 -- that's the blood pressure
 	org.heartbeat = 70
+		org.bloodpressure = 93
+	org.systolic = 120
+	org.diastolic = 80
 
 	org.tempchanging = 0
 	org.heatbuff = 30 -- seconds of heat supply
@@ -14,7 +20,7 @@ module[1] = function(org)
 end
 
 function hg.organism.should_gain_fear(org)
-	return ((org.pain > 30) or (org.blood < 3000) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
+	return ((org.pain > 30) or (org.blood < 3750) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
 end
 
 module[2] = function(owner, org, timeValue)
@@ -63,6 +69,87 @@ module[2] = function(owner, org, timeValue)
 	if org.heartbeat > 300 then -- fibrillation into cardiac arrest
 		org.heartstop = true
 	end
+	
+	local blood = math.Clamp(org.blood or 5000, 0, 5000)
+	local bloodK = math.Clamp((blood - 2000) / 2000, 0, 1)
+	local o2K = math.Clamp(o2, 0, 1)
+	local heartK = math.Clamp(1 - org.heart, 0, 1)
+	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
+	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
+	local hypertensionMul = 1 + math.Clamp(org.adrenaline, 0, 5) * 0.06 + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
+	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
+	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.55)
+
+	local compensation = 1 + math.Clamp((2875 - blood) / 2300, 0, 1) * 0.16
+	compensation = compensation * (1 - math.Clamp((2200 - blood) / 1200, 0, 1) * 0.5)
+	compensation = math.Clamp(compensation, 0.35, 1.2)
+
+	local cardiacK = heartK * bloodK * o2K * brainK * hypothermiaK
+    local pulse_multiplier = math.Clamp(math.Remap(org.heartbeat, 60, 140, 0.9, 1.2), 0.8, 1.3)
+	local map = 93 * cardiacK * hypertensionMul * compensation * pulse_multiplier
+	map = org.alive and map or 0
+
+	if org.heartstop then
+		map = 0
+	end
+
+	map = math.Clamp(map, 0, 190)
+	org.bloodpressure = math.Approach(org.bloodpressure or 93, map, timeValue * (map > (org.bloodpressure or 93) and 14 or 10))
+
+	local pulsePressure = 40 * heartK * math.max(bloodK, 0.3)
+	pulsePressure = pulsePressure * (1 + math.Clamp((org.heartbeat - 70) / 180, -0.2, 0.6))
+	pulsePressure = math.Clamp(pulsePressure, 8, 95)
+
+	local targetDiastolic = math.Clamp(org.bloodpressure - pulsePressure * 0.5, 0, 180)
+	local targetSystolic = math.Clamp(targetDiastolic + pulsePressure, 0, 260)
+
+	org.diastolic = math.Approach(org.diastolic or 80, targetDiastolic, timeValue * 16)
+	org.systolic = math.Approach(org.systolic or 120, targetSystolic, timeValue * 16)
+
+    if org.bloodpressure < 50 then
+        local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
+        local damage = timeValue * ischemiaK * 0.005
+        org.brain = math.min(org.brain + damage, 1)
+        org.heart = math.min(org.heart + damage, 1)
+        org.liver = math.min(org.liver + damage * 0.5, 1)
+        org.stomach = math.min(org.stomach + damage * 0.3, 1)
+        org.intestines = math.min(org.intestines + damage * 0.3, 1)
+    end
+
+	if org.ischemia > 0 then
+		if org.ischemia > 1 then
+			local ischemiaK = math.Clamp((org.ischemia - 1) / 5, 0, 1)
+			local damage = timeValue * ischemiaK * 0.007
+			org.brain = math.min(org.brain + damage, 1)
+			org.heart = math.min(org.heart + damage, 1)
+			org.liver = math.min(org.liver + damage * 0.5, 1)
+			org.stomach = math.min(org.stomach + damage * 0.3, 1)
+			org.intestines = math.min(org.intestines + damage * 0.3, 1)
+		end
+
+		org.ischemia = math.max(org.ischemia - timeValue / 10, 0)
+	end
+
+	if org.bloodpressure < 65 then
+		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
+		org.disorientation = math.max(org.disorientation, 0.8 + lowK * 2.2)
+		org.shock = math.Approach(org.shock, 20 + lowK * 45, timeValue * (1 + lowK * 2.5))
+		org.stamina[1] = math.max(org.stamina[1] - timeValue * (2 + lowK * 10), 0)
+
+		if org.bloodpressure < 55 then
+				org.consciousness = math.Approach(org.consciousness, 0.45, timeValue * (0.08 + lowK * 0.11))
+			end
+		end
+
+		if org.bloodpressure < 25 then
+
+			org.needotrub = true
+	elseif org.bloodpressure > 115 then
+		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
+		org.disorientation = math.max(org.disorientation, highK * 1.4)
+		org.painadd = math.min(org.painadd + timeValue * (0.6 + highK * 1.8), 150)
+		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + highK * 20), timeValue * (0.4 + highK * 1.4))
+	end
 
 	if org.heartstop then
 		org.heartbeat = 0
@@ -78,7 +165,7 @@ module[2] = function(owner, org, timeValue)
 	local adrenK = max(1 + org.adrenaline, 1)
 	local adren = org.adrenaline
 
-	if org.pulse < 10 or org.brain >= 0.6 then org.heartstop = true end
+	if org.pulse < 10 or org.brain >= 0.6 or org.bloodpressure < 25 then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
@@ -126,6 +213,18 @@ module[2] = function(owner, org, timeValue)
 		
 		org.lastsoundtime = CurTime() + math.random(25,35)
 	end
+
+	if org.fear > 1.5 then
+        if not org._fear_check_time or CurTime() > org._fear_check_time then
+            org._fear_check_time = CurTime() + 1 -- check every second
+
+            local chance = (org.fear - 1.5) / 0.5 * 0.025 -- at 2.0 fear, 2.5% chance
+            if math.random() < chance then
+                org.heartstop = true
+                org.lungsfunction = false
+            end
+        end
+    end
 end
 
 --if org.heartstop then org.needotrub = true end --не совсем...

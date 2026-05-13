@@ -13,35 +13,38 @@ function PLAYER:LegAttack()
     if isMidAir and self.organism.stamina[1] < 85 then return end
 
     local dmg = 15
-    dmg = dmg * (1 + (self:GetStat("Strength") - 10) * 0.1)
 
     local anim = "kick_pistol_base"
     anim = (self:KeyDown(IN_DUCK) or self:Crouching()) and "kick_pistol_base_crouch" or self:EyeAngles()[1] > 60 and "curbstomp_base" or self:EyeAngles()[1] > 35 and "kick_pistol_25_base" or self:EyeAngles()[1] > 20 and "kick_pistol_45_base" or anim
 
     if isMidAir then
         anim = self:EyeAngles()[1] > 60 and "curbstomp_midair" or self:EyeAngles()[1] > 35 and "kick_midair_25" or self:EyeAngles()[1] > 20 and "kick_midair_45" or "kick_midair"
+        self:EmitSound("HOYAA.mp3", 75, 100)
     end
 
     self:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav",65)
 
     local org = self.organism
-    org.stamina.subadd = org.stamina.subadd + (anim == "curbstomp_base" and 12 or 20)
+    org.stamina.subadd = org.stamina.subadd + ((string.find(anim, "curbstomp")) and 8 or 30)
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
-    local speed = 1.5 * speedmul
+    local speed = 1.42 * speedmul
     local animstopAdjust = 0.3 * speedmul
-    
+    local dmg = anim == "curbstomp_base" and 24 or 10 * (2 - speedmul)
+    local kickNerf = 0.9
 
-    if isMidAir then
-        local vel = self:GetVelocity():Length()
-        local mult = Lerp(math.Clamp(vel / 700, 0, 1), 1.25, 2.25)
-        dmg = dmg * mult
-    end
+    local vel = self:GetVelocity():Length()
+    local mult = Lerp(math.Clamp(vel / 800, 0, 1), 1.0, 3.5)
+    dmg = dmg * mult
 
     dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
     
     if isMidAir then
-        dmg = math.min(dmg, 42)
+        dmg = math.min(dmg, 75)
+    else
+        dmg = math.min(dmg, 50)
     end
+    dmg = dmg * (self.KickDamageMul or 1)
+    dmg = dmg * kickNerf
     --print(dmg)
     --print(speedmul)
     self:PlayCustomAnims(anim, true, speed, true, animstopAdjust, {
@@ -59,7 +62,7 @@ function PLAYER:LegAttack()
                 filter = {hg.GetCurrentCharacter(self),self}
             })
             if tr.Hit and (self:IsOnGround() or isMidAir) then
-                self:SetVelocity(ang:Forward() * -300)
+                self:SetVelocity(ang:Forward() * (isMidAir and -120 or -300))
             end
         end,
         [0.21] = function(self)
@@ -81,7 +84,7 @@ function PLAYER:LegAttack()
             })
             if tr.Hit and (self:IsOnGround() or isMidAir) then
                 --self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
-                self:SetVelocity(ang:Forward() * -150)
+                self:SetVelocity(ang:Forward() * (isMidAir and -70 or -150))
             end
         end,
         [0.33] = function(self) -- kick moment
@@ -214,12 +217,12 @@ function PLAYER:LegAttack()
 					MaxPenLenGlobal = 1
                     
                     local horizSpeed = Vector(velocity.x, velocity.y, 0):Length()
-                    local forceMult = math.max(500, 700 - horizSpeed / 6)
+                    local forceMult = math.max(500, 700 - horizSpeed / 6) * (isMidAir and 0.9 or 1) * kickNerf
                     hg.AddForceRag(ent, tr.PhysicsBone or 0, normal * dmg * forceMult, 0.25)
                     ent:TakeDamageInfo(dmginfo)
                     
                     if IsValid(phys) then
-                        local forceOffsetMult = math.max(110, 150 - horizSpeed / 70)
+                        local forceOffsetMult = math.max(110, 150 - horizSpeed / 70) * (isMidAir and 0.9 or 1) * kickNerf
                         phys:ApplyForceOffset(normal * dmg * forceOffsetMult, tr.HitPos)
                     end
 
@@ -228,15 +231,17 @@ function PLAYER:LegAttack()
 					end
 
                     if ent:IsPlayer() then
-                        if math.random(1,5) > 3 then
+                        local didRagdoll = math.random(1,10) <= (isMidAir and 3 or 2)
+                        local baseKnockback = math.max(95, 145 - horizSpeed / 20) * (isMidAir and 1.35 or 1)
+                        ent:SetVelocity(normal * baseKnockback)
+                        if didRagdoll then
                             timer.Simple(0,function()
                                 hg.Fake(ent)
                             end)
+                        else
+                            local pushKnockback = math.max(150, 230 - horizSpeed / 16) * (isMidAir and 1.7 or 1)
+                            ent:SetVelocity(normal * pushKnockback)
                         end
-
-                        local horizSpeed = Vector(velocity.x, velocity.y, 0):Length()
-                        local knockback = math.max(10, 20 - horizSpeed / 70) 
-                        ent:SetVelocity(normal * knockback)
                     end
                     if hgIsDoor(ent) and !ent:GetNoDraw() then
                         ent.HP = ent.HP or 200

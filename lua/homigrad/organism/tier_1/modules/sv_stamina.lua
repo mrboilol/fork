@@ -1,5 +1,7 @@
 
-local min, max, Round = math.min, math.max, math.Round
+local hg_infstamina = CreateConVar("hg_infstamina", "0", {FCVAR_REPLICATED, FCVAR_HIDDEN})
+
+local min, max, Round = math.min, math.max, Round
 local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_mul","1",{FCVAR_ARCHIVE,FCVAR_NOTIFY,FCVAR_NEVER_AS_STRING},"Multiply stamina drain when sprinting",0,10)
 --local Organism = hg.organism
 hg.organism.module.stamina = {}
@@ -27,7 +29,6 @@ module[1] = function(org)
 	org.moveMaxSpeed = IsValid(owner) and owner:IsPlayer() and owner:GetMaxSpeed() or 250
 end
 
-local hg_infstamina = CreateConVar("hg_infstamina", "0", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Toggle infinite stamina (excausts only from other organism effects, not from running/attacking)", 0, 1)
 module[2] = function(owner, org, timeValue)
 	local stamina = org.stamina
 	
@@ -67,6 +68,7 @@ module[2] = function(owner, org, timeValue)
 		org.lungsR[2] = math.min(org.lungsR[2] + stamina.sub / 200 * org.chest, 1)
 	end
 
+
 	stamina.sub = stamina.sub + stamina.subadd + (org.painkiller > 1.6 and (stamina[1] > 10 and 0.8 or 0) or 0) + (org.analgesia > 1.7 and (stamina[1] > 10 and 2 or 0) or 0)
 	stamina.sub = stamina.sub + org.stamina_damage
 	org.stamina_damage = 0
@@ -74,10 +76,12 @@ module[2] = function(owner, org, timeValue)
 	org.stamina_damage = 0
 	stamina.sub = stamina.sub * (owner.StaminaExhaustMul or 1)
 	stamina.sub = stamina.sub / (1 + org.berserk)
-	
-	if org.o2[1] < 10 then
+		if org.o2[1] < 10 then
 		stamina.sub = 0
 	end
+	local despair = math.Clamp(org.despair or 0, 0, 1)
+	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
+	stamina.sub = stamina.sub * (1 + despair * 0.6) * (1 - goodmood * 0.5)
 
 	stamina.subadd = 0
 	stamina.weight = owner:IsPlayer() and math.Clamp((1 / hg.CalculateWeight(owner,250)) - 1,0,1) or 0
@@ -85,15 +89,15 @@ module[2] = function(owner, org, timeValue)
 	stamina.sub = stamina.sub + stamina.sub * stamina.weight * (muffed and 2 or 1)
 	org.hungry = org.hungry or 0
 	stamina.max = (org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65)
-    stamina[1] = max(stamina[1] - stamina.sub * timeValue * 16 * (2 - (org.o2[1] / org.o2.range)), 0)
-    --//org.o2[1] = org.o2[1] - min(stamina.sub * timeValue, org.o2.regen * timeValue)
-    local despair = org.despair or 0
-    if stamina.max > 100 then
-        stamina.max = Lerp(despair, stamina.max, 100)
-    end
-    
-    --//local old = stamina[1]
-    stamina[1] = min(stamina[1] + stamina.regen * timeValue * 8 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5), stamina.max)
+	    stamina[1] = max(stamina[1] - stamina.sub * timeValue * 16 * (2 - (org.o2[1] / org.o2.range)), 0)
+	if stamina.max > 100 then
+		stamina.max = Lerp(despair, stamina.max, 100)
+	end
+	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
+	
+	//local old = stamina[1]
+	local pulseMultiplier = math.Clamp((org.heartbeat or 70) / 70, 0.8, 1.5)
+	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 8 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * (1 + goodmood * 0.5), stamina.max)
 
 	-- local painfrommoving = (stamina[1] < 150 and 1 or 0) * (stamina[1] - old) * (org.chest)
 	-- org.painadd = org.painadd + painfrommoving * timeValue * 5
@@ -107,8 +111,7 @@ module[2] = function(owner, org, timeValue)
 	-- 		org.owner:Notify("Breathing is painful. Something is wrong with my ribs.", 60, "painfromribs", 0, nil, Color(255, 210, 210))
 	-- 	end
 	-- end
-
-	if hg_infstamina:GetBool() then
+		if hg_infstamina:GetBool() then
 		stamina.sub = 0
 		stamina[1] = stamina.max
 	end
@@ -139,6 +142,7 @@ hook.Add("FinishMove", "!homigrad-organism", function(ply, move)
 	local vel = move:GetFinalJumpVelocity()
 
 	if !ply.organism then return end
+
 	if vel ~= vecZero then ply.organism.stamina[1] = max(ply.organism.stamina[1] - ply:GetJumpPower() / 10,0) end
 	ply.organism.moveMaxSpeed = move:GetMaxSpeed()
 end)

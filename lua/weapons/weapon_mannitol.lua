@@ -89,6 +89,13 @@ if SERVER then
 		org.mannitol = math.Approach(org.mannitol, 4, self.modeValues[1] * 2)
 		self.modeValues[1] = 0
 
+		-- Reverse stroke effects
+		org.stroke_meter = math.max(org.stroke_meter - 0.5, 0)
+		org.is_stroking = false
+		org.stroke_active = false
+		org.disorientation = math.max(org.disorientation - 2, 0)
+		org.consciousness = math.min(org.consciousness + 0.3, 1)
+
 		if self.poisoned2 then
 			org.poison4 = CurTime()
 

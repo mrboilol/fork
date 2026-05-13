@@ -40,10 +40,9 @@ function SWEP:InitializeAdd()
 	}
 
 	if SERVER then
-		if math.random(2) == 1 then
+		self.bloodtype = "o-"
+		if math.random(10) == 1 then
 			self.modeValues[1] = 1
-			//local val,index = table.Random(hg.organism.bloodtypes)
-			self.bloodtype = "o-"
 		end
 	end
 end
@@ -139,7 +138,8 @@ if SERVER then
 		if self:GetNetVar("mode",2) == 2 then
 			if self.modeValues[1] != 1 then
 				if owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2) then
-					local ent = owner:KeyDown(IN_ATTACK) and owner or hg.eyeTrace(self:GetOwner()).Entity
+					local takingSelf = owner:KeyDown(IN_ATTACK)
+					local ent = takingSelf and owner or hg.eyeTrace(self:GetOwner()).Entity
 					if not ent.organism then return end
 					local ent = hg.GetCurrentCharacter(ent)
 					if ent:GetVelocity():LengthSqr() < 25 and ent.organism.blood > 2000 and (not self.bloodtype or ent.organism.bloodtype == self.bloodtype) then
@@ -171,6 +171,9 @@ if SERVER then
 					local ent = owner:KeyDown(IN_ATTACK) and owner or hg.eyeTrace(self:GetOwner()).Entity
 					if not ent.organism then return end
 					local ent = hg.GetCurrentCharacter(ent)
+					if ent.organism and (ent.organism.pneumothorax > 0 or ent.organism.hemothorax) then
+						ent.organism.needle = 1
+					end
 					if ent:GetVelocity():LengthSqr() < 1000 then
 						local old = -(-ent.organism.blood)
 						local good_type = hg.organism.bloodtypes[self.bloodtype or "o-"][ent.organism.bloodtype or "o-"]

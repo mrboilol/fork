@@ -32,6 +32,7 @@ end
 SWEP.sprayAngles = Angle(0,0,0)
 
 SWEP.weaponSway = Angle(0,0,0)
+local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 1)
 
 function SWEP:PrimarySpread()
 	self.Primary.Force2 = (hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Force) or self.Primary.Force
@@ -63,6 +64,7 @@ function SWEP:PrimarySpread()
 		mul = mul * (((organism.larm or 0) + (organism.rarm or 0) + 2) / 1 + ((organism.larmamputated and 5 or 0) + (organism.rarmamputated and 5 or 0)))
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
+		mul = mul * (1 + (organism.fear or 0) * 0.5)
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
@@ -101,7 +103,7 @@ function SWEP:PrimarySpread()
 			
 			local angpopa = angrand2 * mul
 			angpopa[3] = 0
-			ViewPunch(angpopa)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1))-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 
