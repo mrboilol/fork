@@ -16,6 +16,7 @@ hook.Add("Org Clear", "Main", function(org)
 	module.metabolism[1](org)
 	module.concussion[1](org)
 	module.random_events[1](org)
+	module.infection[1](org)
 	org.brain = 0
 	org.consciousness = 1
 	org.disorientation = 0
@@ -561,6 +562,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.metabolism[2](owner, org, timeValue)
 		module.concussion[2](owner, org, timeValue)
 		module.random_events[2](owner, org, timeValue)
+		module.infection[2](owner, org, timeValue)
 	end
 
 
@@ -1205,3 +1207,17 @@ hook.Add("OnEntityWaterLevelChanged", "ClearBlood", function(ent, old, new)
 		ent:RemoveAllDecals()
 	end
 end)
+
+function hg.organism.RadDamage(org, dmg, dmgInfo)
+	hg.organism.GasDamage(org, dmg, dmgInfo)
+
+	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
+end
+
+function hg.organism.InfectionDamage(org, dmg, dmgInfo)
+	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
+	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
+end

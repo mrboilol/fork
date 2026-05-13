@@ -64,6 +64,7 @@ if SERVER then
 		"materials/vgui/hud/bleeding_max.png",
 		"materials/vgui/hud/heavybleeding.png",
 		"materials/vgui/hud/sepsis.png",
+		"materials/vgui/hud/infection.png",
 
 		"materials/vgui/hud/status_adrenaline.png",
 		"materials/vgui/hud/status_shock.png",
@@ -481,6 +482,7 @@ local status_sprites = {
 	hypoventilation = nil,
 	concussion = nil,
 	sepsis = nil,
+	infection = nil,
 	bleeding_small = nil,
 	bleeding_max = nil,
 	bleeding_heavy = nil,
@@ -602,360 +604,378 @@ end
 local tooltipTexts = {
 	ru = {
 		pain = {
-			[4] = "Агония - Невыносимая боль. Движения ограничены. Смерть сейчас звучит заманчиво.",
-			[3] = "Сильная боль - Полусознателен, разум затуманен сильной болью.",
-			[2] = "Боль - Довольно сильная боль.",
-			[1] = "Небольшая боль - Ощущается легкая боль."
+			[4] = {title = "Агония", text = "Невыносимая боль. Движения ограничены. Смерть сейчас звучит заманчиво."},
+			[3] = {title = "Сильная боль", text = "Полусознателен, разум затуманен сильной болью."},
+			[2] = {title = "Боль", text = "Довольно сильная боль."},
+			[1] = {title = "Небольшая боль", text = "Ощущается легкая боль."}
 		},
 		bleeding = {
-			[4] = "Кровоизлияние - Вы быстро истекаете кровью. Смерть неизбежна без немедленного медицинского вмешательства.",
-			[3] = "Сильное кровотечение - Кровь свободно течет из серьезной раны. Требуется немедленная помощь.",
-			[2] = "Умеренное кровотечение - Вы теряете заметное количество крови. Следует скоро обработать.",
-			[1] = "Незначительное кровотечение - Небольшая рана вызывает некоторую потерю крови. Вряд ли это станет серьезной проблемой."
+			[4] = {title = "Кровоизлияние", text = "Вы быстро истекаете кровью. Смерть неизбежна без немедленного медицинского вмешательства."},
+			[3] = {title = "Сильное кровотечение", text = "Кровь свободно течет из серьезной раны. Требуется немедленная помощь."},
+			[2] = {title = "Умеренное кровотечение", text = "Вы теряете заметное количество крови. Следует скоро обработать."},
+			[1] = {title = "Незначительное кровотечение", text = "Небольшая рана вызывает некоторую потерю крови. Вряд ли это станет серьезной проблемой."}
 		},
-		internal_bleed = "Внутреннее кровотечение - Как выяснилось, кишки и легкие — это явно НЕ место для твоей крови. Крайне рекомендуется лечение.",
+		internal_bleed = {title = "Внутреннее кровотечение", text = "Как выяснилось, кишки и легкие — это явно НЕ место для твоей крови. Крайне рекомендуется лечение."},
 		conscious = {
-			[4] = "Без сознания - Нет реакции ни на какие внешние раздражители. Ты в отключке.",
-			[3] = "Обморок - Едва в сознании, чувствуя, что можешь упасть в любой момент.",
-			[2] = "Растерян - Чувство растерянности и головокружения, трудности с восприятием окружающего мира.",
-			[1] = "Запутан - Слегка дезориентирован с легким головокружением."
+			[4] = {title = "Без сознания", text = "Нет реакции ни на какие внешние раздражители. Ты в отключке."},
+			[3] = {title = "Обморок", text = "Едва в сознании, чувствуя, что можешь упасть в любой момент."},
+			[2] = {title = "Растерян", text = "Чувство растерянности и головокружения, трудности с восприятием окружающего мира."},
+			[1] = {title = "Запутан", text = "Слегка дезориентирован с легким головокружением."}
 		},
 		stamina = {
-			[4] = "Совершенно измотан - Кое-как способен дышать.",
-			[3] = "Сильно выдохся - Практически не можешь двигаться.",
-			[2] = "Выдохся - Испытываешь дискомфорт и усталость, с трудом двигаешься и работаешь.",
-			[1] = "Слегка устал - Незначительное физическое напряжение."
+			[4] = {title = "Совершенно измотан", text = "Кое-как способен дышать."},
+			[3] = {title = "Сильно выдохся", text = "Практически не можешь двигаться."},
+			[2] = {title = "Выдохся", text = "Испытываешь дискомфорт и усталость, с трудом двигаешься и работаешь."},
+			[1] = {title = "Слегка устал", text = "Незначительное физическое напряжение."}
 		},
-		spine_fracture = "Сломаный позвоночник - Сломан позвоночник. Если спинной мозг не оборван, считай это удачей.",
-		fracture = "Перелом конечности - У тебя сломана рука или нога. Движение повреждённой конечностью затруднено и причиняет сильную боль.",
+		spine_fracture = {title = "Сломаный позвоночник", text = "Сломан позвоночник. Если спинной мозг не оборван, считай это удачей."},
+		fracture = {title = "Перелом конечности", text = "У тебя сломана рука или нога. Движение повреждённой конечностью затруднено и причиняет сильную боль."},
 		organ_damage = {
-			[3] = "Тяжёлое повреждение органов - Ваши внутренние органы в критическом состоянии. Срочно обратитесь за медицинской помощью.",
-			[2] = "Повреждение органов - Ваши внутренние органы повреждены. Это вызывает боль и дискомфорт.",
-			[1] = "Незначительное повреждение органов - Некоторые из ваших внутренних органов получили незначительные повреждения.",
+			[3] = {title = "Тяжёлое повреждение органов", text = "Ваши внутренние органы в критическом состоянии. Срочно обратитесь за медицинской помощью."},
+			[2] = {title = "Повреждение органов", text = "Ваши внутренние органы повреждены. Это вызывает боль и дискомфорт."},
+			[1] = {title = "Незначительное повреждение органов", text = "Некоторые из ваших внутренних органов получили незначительные повреждения."},
 		},
-		dislocation = "Вывих сустава - Ты вывихнул конечность. Постарайся не использовать поврежденную конечность и найди способ ее вправить.",
-		amputant = "Ампутант - Одна из твоих конечностей была оторвана. Травмирующе. Очевидно, ты навсегда утратил возможность пользоваться оторванной конечностью.",
+		dislocation = {title = "Вывих сустава", text = "Ты вывихнул конечность. Постарайся не использовать поврежденную конечность и найди способ ее вправить."},
+		amputant = {title = "Ампутант", text = "Одна из твоих конечностей была оторвана. Травмирующе. Очевидно, ты навсегда утратил возможность пользоваться оторванной конечностью."},
 		blood_loss = {
-			[4] = "Обескровлен - Угрожающая жизни потеря крови. Еще чуть-чуть, и сердце остановится. Смерть неизбежна.",
-			[3] = "Критическая гиповолемия - Сильная потеря крови. Полусознателен. Ты нечетко видишь... Необходимо лечение.",
-			[2] = "Гиповолемия - Слабость и дезориентация вследствие кровопотери. Ты чувствуешь себя очень плохо. Рекомендуется лечение.",
-			[1] = "Бледен - Незначительная потеря крови. Артериальное давление понижено. Ты чувствуваешь небольшую слабость, кожа бледная."
+			[4] = {title = "Обескровлен", text = "Угрожающая жизни потеря крови. Еще чуть-чуть, и сердце остановится. Смерть неизбежна."},
+			[3] = {title = "Критическая гиповолемия", text = "Сильная потеря крови. Полусознателен. Ты нечетко видишь... Необходимо лечение."},
+			[2] = {title = "Гиповолемия", text = "Слабость и дезориентация вследствие кровопотери. Ты чувствуешь себя очень плохо. Рекомендуется лечение."},
+			[1] = {title = "Бледен", text = "Незначительная потеря крови. Артериальное давление понижено. Ты чувствуваешь небольшую слабость, кожа бледная."}
 		},
-		cardiac_arrest = "Остановка сердца - Твоё сердце перестало биться, а значит кислород в мозг больше не поступает.",
+		cardiac_arrest = {title = "Остановка сердца", text = "Твоё сердце перестало биться, а значит кислород в мозг больше не поступает."},
 		cold = {
-			[4] = "Замерзание до смерти - По неизвестной причине тебе становится тепло...",
-			[3] = "Гипотермия - Опасно низкая температура, тело и разум изнемогают от холода.",
-			[2] = "Холодно - Неприятно холодно. Твой организм замедляется.",
-			[1] = "Прохладно - Немного прохладно для комфорта."
+			[4] = {title = "Замерзание до смерти", text = "По неизвестной причине тебе становится тепло..."},
+			[3] = {title = "Гипотермия", text = "Опасно низкая температура, тело и разум изнемогают от холода."},
+			[2] = {title = "Холодно", text = "Неприятно холодно. Твой организм замедляется."},
+			[1] = {title = "Прохладно", text = "Немного прохладно для комфорта."}
 		},
 		heat = {
-			[4] = "Тепловой удар - Твой организм явно долго не протянет в такую жару.",
-			[3] = "Гипертермия - Опасно жарко. Тебе тяжело выдерживать жару...",
-			[2] = "Жарко - Неприятно жарко.",
-			[1] = "Тепло - Немного жарковато для комфорта."
+			[4] = {title = "Тепловой удар", text = "Твой организм явно долго не протянет в такую жару."},
+			[3] = {title = "Гипертермия", text = "Опасно жарко. Тебе тяжело выдерживать жару..."},
+			[2] = {title = "Жарко", text = "Неприятно жарко."},
+			[1] = {title = "Тепло", text = "Немного жарковато для комфорта."}
 		},
 		hemothorax = {
-			[4] = "Критический гемоторакс - Лёгкие пытаются зачерпнуть хоть каплю кислорода, но всё четно... Спокойной ночи.",
-			[3] = "Сильнейший гемоторакс - Грудная клетка очень сильно болит. Кровь уже заполнила лёгкие больше, чем на половину.",
-			[2] = "Серьёзный гемоторакс - Кровь скопилась до такого уровня, что дышать стало труднее.",
-			[1] = "Гемоторакс - В плевральной полости скапливается кровь из-за внутреннего кровотечения или прокола лёгких. У тебя болит грудь... Требуется лечение."
+			[4] = {title = "Критический гемоторакс", text = "Лёгкие пытаются зачерпнуть хоть каплю кислорода, но всё четно... Спокойной ночи."},
+			[3] = {title = "Сильнейший гемоторакс", text = "Грудная клетка очень сильно болит. Кровь уже заполнила лёгкие больше, чем на половину."},
+			[2] = {title = "Серьёзный гемоторакс", text = "Кровь скопилась до такого уровня, что дышать стало труднее."},
+			[1] = {title = "Гемоторакс", text = "В плевральной полости скапливается кровь из-за внутреннего кровотечения или прокола лёгких. У тебя болит грудь... Требуется лечение."}
 		},
-		lungs_failure = "Отказ лёгких - лёгкие перестали работать в связи с повреждением, долгим отсутсвием цикла дыхания или по другой причине.",
+		lungs_failure = {title = "Отказ лёгких", text = "Лёгкие перестали работать в связи с повреждением, долгим отсутсвием цикла дыхания или по другой причине."},
 		overdose = {
-			[4] = "Фатальная передозировка - Дыхательная недостаточность. Ты покидаешь этот мир в состоянии эйфории, вызванной наркотиками, но тебе уже глубоко наплевать.",
-			[3] = "Передозировка - Дышать тяжело, в голове царит эйфория. Это определенно плохо для организма. Если бы только это могло длиться вечно...",
-			[2] = "Средняя доза - Очень расслаблен и спокоен, но легкие ощущаются тяжелыми. Устаешь немного быстрее обычного. Чувствуешь себя отлично, пока что...",
-			[1] = "Доза - Расслаблен и спокоен. Тело чувствуется онемевшим."
+			[4] = {title = "Фатальная передозировка", text = "Дыхательная недостаточность. Ты покидаешь этот мир в состоянии эйфории, вызванной наркотиками, но тебе уже глубоко наплевать."},
+			[3] = {title = "Передозировка", text = "Дышать тяжело, в голове царит эйфория. Это определенно плохо для организма. Если бы только это могло длиться вечно..."},
+			[2] = {title = "Средняя доза", text = "Очень расслаблен и спокоен, но легкие ощущаются тяжелыми. Устаешь немного быстрее обычного. Чувствуешь себя отлично, пока что..."},
+			[1] = {title = "Доза", text = "Расслаблен и спокоен. Тело чувствуется онемевшим."}
 		},
 		oxygen = {
-			[4] = "Аноксемия - Мозг отмирает от кислородного голодания. Весь организм стремительно отказывает. Смерть неизбежна.",
-			[3] = "Асфиксия - Теряешь сознание. Ткани лишены кислорода.",
-			[2] = "Сильная гипоксемия - Недостаточно кислорода в организме. Головокружение и онемение конечностей. Что-то ЯВНО не так.",
-			[1] = "Гипоксемия - Понижен уровень кислорода в крови. Немного запутан, кожа вялая. Что-то не так..."
+			[4] = {title = "Аноксемия", text = "Мозг отмирает от кислородного голодания. Весь организм стремительно отказывает. Смерть неизбежна."},
+			[3] = {title = "Асфиксия", text = "Теряешь сознание. Ткани лишены кислорода."},
+			[2] = {title = "Сильная гипоксемия", text = "Недостаточно кислорода в организме. Головокружение и онемение конечностей. Что-то ЯВНО не так."},
+			[1] = {title = "Гипоксемия", text = "Понижен уровень кислорода в крови. Немного запутан, кожа вялая. Что-то не так..."}
 		},
 		vomit = {
-			[4] = "Ужасная тошнота - Опасная тошнота. Внутри что-то ОЧЕНЬ не так.",
-			[3] = "Сильная тошнота - Сильный дискомфорт. Сильная склонность к рвоте.",
-			[2] = "Тошнота - Дискомфорт в области желудка. Склонность к рвоте.",
-			[1] = "Подташнивает - Чувствуешь дискомфорт. Немного плохо. Небольшая склонность к рвоте."
+			[4] = {title = "Ужасная тошнота", text = "Опасная тошнота. Внутри что-то ОЧЕНЬ не так."},
+			[3] = {title = "Сильная тошнота", text = "Сильный дискомфорт. Сильная склонность к рвоте."},
+			[2] = {title = "Тошнота", text = "Дискомфорт в области желудка. Склонность к рвоте."},
+			[1] = {title = "Подташнивает", text = "Чувствуешь дискомфорт. Немного плохо. Небольшая склонность к рвоте."}
 		},
 		brain_damage = {
-			[4] = "Кома - Едва цепляясь за жизнь, ты страдаешь от cильнейшего повреждения мозга. Ты - овощ. Восстановление маловероятно.",
-			[3] = "Тяжелое нейрофизиологическое ухудшение - Сильно умственно отстал, едва способный мыслить разумно и оставаться в сознании. Серьёзная мозговая травма",
-			[2] = "Неврологические повреждения - Тяжелый ментальный дефицит. Ограничена способность к интеллектуальному мышлению и самодостаточности. Серьезные повреждения головного мозга.",
-			[1] = "Когнитивные нарушения - Психические расстройства вследствие повреждения головного мозга. Ты чувствуешь странную растерянность..."
+			[4] = {title = "Кома", text = "Едва цепляясь за жизнь, ты страдаешь от cильнейшего повреждения мозга. Ты - овощ. Восстановление маловероятно."},
+			[3] = {title = "Тяжелое нейрофизиологическое ухудшение", text = "Сильно умственно отстал, едва способный мыслить разумно и оставаться в сознании. Серьёзная мозговая травма"},
+			[2] = {title = "Неврологические повреждения", text = "Тяжелый ментальный дефицит. Ограничена способность к интеллектуальному мышлению и самодостаточности. Серьезные повреждения головного мозга."},
+			[1] = {title = "Когнитивные нарушения", text = "Психические расстройства вследствие повреждения головного мозга. Ты чувствуешь странную растерянность..."}
 		},
 		adrenaline = {
-			[4] = "Адреналин - Сердце работает на износ качая кровь. Практически полное отсутствие боли, прилив сил, и увеличенная стойкость.",
-			[3] = "Адреналин - Почти не чувствуешь боль. Выносливость увеличилась в разы.",
-			[2] = "Адреналин - Боль притупилась. Состояние повышенной готовности",
-			[1] = "Адреналин - Ты чувствуешь небольшой прилив сил."
+			[4] = {title = "Адреналин", text = "Сердце работает на износ качая кровь. Практически полное отсутствие боли, прилив сил, и увеличенная стойкость."},
+			[3] = {title = "Адреналин", text = "Почти не чувствуешь боль. Выносливость увеличилась в разы."},
+			[2] = {title = "Адреналин", text = "Боль притупилась. Состояние повышенной готовности"},
+			[1] = {title = "Адреналин", text = "Ты чувствуешь небольшой прилив сил."}
 		},
 		shock = {
-			[4] = "Шок - Организм включает самый лучший защитный механизм, чтобы справится с этой болью. Сладких снов.",
-			[3] = "Шок - Сильнейшая боль в твоей жизни туманит разум и рассудок делая из тебя животное.",
-			[2] = "Шок - Агонизирующая боль прорезает каждую клеточку твоего тела.",
-			[1] = "Шок - Входишь в состояние шока"
+			[4] = {title = "Шок", text = "Организм включает самый лучший защитный механизм, чтобы справится с этой болью. Сладких снов."},
+			[3] = {title = "Шок", text = "Сильнейшая боль в твоей жизни туманит разум и рассудок делая из тебя животное."},
+			[2] = {title = "Шок", text = "Агонизирующая боль прорезает каждую клеточку твоего тела."},
+			[1] = {title = "Шок", text = "Входишь в состояние шока"}
 		},
 		trauma = {
-			[4] = "Контужен - Ужас и Беспомощность.",
-			[3] = "Сильная дезориентация - Звон в ушах и мир, как на карусели.",
-			[2] = "Серьёзная дезориентация - Голова кружится и всё кругом плывёт.",
-			[1] = "Лёгкая дезориентация - Чувствуешь себя сонным."
+			[4] = {title = "Контужен", text = "Ужас и Беспомощность."},
+			[3] = {title = "Сильная дезориентация", text = "Звон в ушах и мир, как на карусели."},
+			[2] = {title = "Серьёзная дезориентация", text = "Голова кружится и всё кругом плывёт."},
+			[1] = {title = "Лёгкая дезориентация", text = "Чувствуешь себя сонным."}
 		},
-		death = "Смерть - Пермаментная и грустная или весёлая, а впрочем уже не важно.",
+		death = {title = "Смерть", text = "Пермаментная и грустная или весёлая, а впрочем уже не важно."},
 		berserk = {
-			[4] = "Берсерк - Невообразимая сила, регенерация, и стойкость. Ты машина для убийств.",
-			[3] = "Берсерк - Невообразимая сила, регенерация, и стойкость. Ты машина для убийств.",
-			[2] = "Берсерк - Невообразимая сила, регенерация, и стойкость. Ты машина для убийств.",
-			[1] = "Берсерк - Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."
+			[4] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
+			[3] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
+			[2] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
+			[1] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."}
 		},
-		berserk_brain_damage = "Повреждение мозга - ЧУТЬ ЧУТЬ ОТЛЕЖУСЬ И НОРМАЛЬНО.",
-		berserk_fracture = "Перелом - МНЕ РАЗВЕ ДОЛЖНО БЫТЬ НЕ БОЛЬНО... А ПОХУЙ ВООБЩЕМ.",
-		berserk_dislocation = "Вывих - ДА КОГО ОН ЁБЕТ ВООБЩЕ.",
-		berserk_adrenaline = "Адреналин - ПРИЯТНЫЙ БОНУС.",
-		berserk_oxygen = "Кислородное голодание - ОДНА ВЕЩЬ, КОТОРАЯ МЕНЯ ПУГАЕТ.",
-		berserk_trauma = "Дезориентация - ЭТО ОЧЕНЬ ЗАВОРАЖИВАЕТ.",
-		berserk_amputant = "Ампутант - МЕНЯ ЭТО ДОЛЖНО ОСТАНОВИТЬ?",
-		berserk_cardiac_arrest = "Остановка сердца - ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО.",
-		berserk_lungs_failure = "Отказ лёгких - ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО.",
+		berserk_brain_damage = {title = "Повреждение мозга", text = "ЧУТЬ ЧУТЬ ОТЛЕЖУСЬ И НОРМАЛЬНО."},
+		berserk_fracture = {title = "Перелом", text = "МНЕ РАЗВЕ ДОЛЖНО БЫТЬ НЕ БОЛЬНО... А ПОХУЙ ВООБЩЕМ."},
+		berserk_dislocation = {title = "Вывих", text = "ДА КОГО ОН ЁБЕТ ВООБЩЕ."},
+		berserk_adrenaline = {title = "Адреналин", text = "ПРИЯТНЫЙ БОНУС."},
+		berserk_oxygen = {title = "Кислородное голодание", text = "ОДНА ВЕЩЬ, КОТОРАЯ МЕНЯ ПУГАЕТ."},
+		berserk_trauma = {title = "Дезориентация", text = "ЭТО ОЧЕНЬ ЗАВОРАЖИВАЕТ."},
+		berserk_amputant = {title = "Ампутант", text = "МЕНЯ ЭТО ДОЛЖНО ОСТАНОВИТЬ?"},
+		berserk_cardiac_arrest = {title = "Остановка сердца", text = "ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО."},
+		berserk_lungs_failure = {title = "Отказ лёгких", text = "ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО."},
 		stroke = {
-			[4] = "Инсульт - Клетки мозга умирают. Вы теряете сознание, внутреннее кровотечение, и едва можете дышать.",
-			[3] = "Высокий риск инсульта - Сильная головная боль и спутанность сознания. Кто-нибудь чувствует запах железа?",
-			[2] = "Риск инсульта - Головная боль и головокружение.",
-			[1] = "Низкий риск инсульта - Легкая головная боль."
+			[4] = {title = "Инсульт", text = "Клетки мозга умирают. Вы теряете сознание, внутреннее кровотечение, и едва можете дышать."},
+			[3] = {title = "Высокий риск инсульта", text = "Сильная головная боль и спутанность сознания. Кто-нибудь чувствует запах железа?"},
+			[2] = {title = "Риск инсульта", text = "Головная боль и головокружение."},
+			[1] = {title = "Низкий риск инсульта", text = "Легкая головная боль."}
 		},
 		palpitations = {
-            [4] = "Фибрилляция - Ваше сердце бьется хаотично. Немедленная медицинская помощь обязательна.",
-            [3] = "Тяжелые сердцебиения - Очень быстрое и неровное сердцебиение. Вы чувствуете слабость.",
-            [2] = "Учащенное сердцебиение - Ваше сердце колотится. Это вызывает дискомфорт.",
-            [1] = "Легкое сердцебиение - Вы ощущаете, как ваше сердце бьется быстрее, чем обычно."
+            [4] = {title = "Фибрилляция", text = "Ваше сердце бьется хаотично. Немедленная медицинская помощь обязательна."},
+            [3] = {title = "Тяжелые сердцебиения", text = "Очень быстрое и неровное сердцебиение. Вы чувствуете слабость."},
+            [2] = {title = "Учащенное сердцебиение", text = "Ваше сердце колотится. Это вызывает дискомфорт."},
+            [1] = {title = "Легкое сердцебиение", text = "Вы ощущаете, как ваше сердце бьется быстрее, чем обычно."}
         },
         hypoventilation = {
-            [4] = "Тяжелая гиповентиляция - Вы почти не дышите. Потеря сознания неизбежна.",
-            [3] = "Гиповентиляция - Вам очень трудно дышать. Нехватка кислорода вызывает головокружение.",
-            [2] = "Затрудненное дыхание - Вы дышите с трудом. Вам не хватает воздуха.",
-            [1] = "Поверхностное дыхание - Вы дышите неглубоко. Это вызывает легкий дискомфорт."
+            [4] = {title = "Тяжелая гиповентиляция", text = "Вы почти не дышите. Потеря сознания неизбежна."},
+            [3] = {title = "Гиповентиляция", text = "Вам очень трудно дышать. Нехватка кислорода вызывает головокружение."},
+            [2] = {title = "Затрудненное дыхание", text = "Вы дышите с трудом. Вам не хватает воздуха."},
+            [1] = {title = "Поверхностное дыхание", text = "Вы дышите неглубоко. Это вызывает легкий дискомфорт."}
         },
         concussion = {
-            [4] = "Тяжелое сотрясение мозга - Вы в замешательстве и не можете ясно мыслить. Возможна потеря памяти.",
-            [3] = "Сотрясение мозга - Сильная головная боль, головокружение и тошнота.",
-            [2] = "Легкое сотрясение мозга - Головная боль и чувствительность к свету и звуку.",
-            [1] = "Слабое сотрясение мозга - Легкая головная боль и головокружение."
+            [4] = {title = "Тяжелое сотрясение мозга", text = "Вы в замешательстве и не можете ясно мыслить. Возможна потеря памяти."},
+            [3] = {title = "Сотрясение мозга", text = "Сильная головная боль, головокружение и тошнота."},
+            [2] = {title = "Легкое сотрясение мозга", text = "Головная боль и чувствительность к свету и звуку."},
+            [1] = {title = "Слабое сотрясение мозга", text = "Легкая головная боль и головокружение."}
         },
 		dislocated_jaw = {
-			[1] = "Dislocated jaw",
-			[2] = "Broken jaw",
-			[3] = "Broken skull",
-			[4] = "Broken skull and damaged jaw"
+			[1] = {title = "Вывих челюсти", text = "Dislocated jaw"},
+			[2] = {title = "Сломанная челюсть", text = "Broken jaw"},
+			[3] = {title = "Проломленный череп", text = "Broken skull"},
+			[4] = {title = "Обезображен", text = "Broken skull and damaged jaw"}
 		},
 		broken_ribs = {
-			[1] = "Broken ribs but nothing puncturing lungs",
-			[2] = "Broken ribs, puncturing lungs",
-			[3] = "Severely broken ribs",
-			[4] = "Completely broken ribs"
+			[1] = {title = "Боль в груди", text = "Broken ribs but nothing puncturing lungs"},
+			[2] = {title = "Сломанные ребра", text = "Broken ribs, puncturing lungs"},
+			[3] = {title = "Проникающее ранение", text = "Severely broken ribs"},
+			[4] = {title = "Раздробленные ребра", text = "Completely broken ribs"}
 		},
 		encumbered = {
-			[1] = "Weight but no impact to speed",
-			[2] = "Weight with impact to speed",
-			[3] = "Weight, and incredibly great impact to speed",
-			[4] = "You move extremely slowly due to weight"
+			[1] = {title = "Отягощен", text = "Weight but no impact to speed"},
+			[2] = {title = "Перегружен", text = "Weight with impact to speed"},
+			[3] = {title = "Сильный перегруз", text = "Weight, and incredibly great impact to speed"},
+			[4] = {title = "Абсолютный перегруз", text = "You move extremely slowly due to weight"}
 		},
-		sepsis = "Сепсис - опасное для жизни состояние, вызванное подавляющей реакцией организма на инфекцию. Может привести к повреждению тканей, отказу органов и смерти.",
-		chip = "Чип - -(тест:) )."
+		sepsis = {title = "Сепсис", text = "Опасное для жизни состояние, вызванное подавляющей реакцией организма на инфекцию. Может привести к повреждению тканей, отказу органов и смерти."},
+		infection = {title = "Инфекция", text = "В ваши раны попала инфекция, стоит обработать их как можно скорее"},
+		chip = {title = "Чип", text = "-(тест:) )."}
 	},
 	
 	en = {
 		pain = {
-			[4] = "JESUS FUCKING CHRIST, I JUST WANT TO PASS OUT RIGHT NOW",
-			[3] = "Severe Pain - Its starting to hurt real bad now, something is totally wrong...",
-			[2] = "Pain - Its probably just a headache...",
-			[1] = "Mild pain - Your average tuesday."
+			[4] = {title = "Agony", text = "JESUS FUCKING CHRIST, I JUST WANT TO PASS OUT RIGHT NOW"},
+			[3] = {title = "Severe Pain", text = "Its starting to hurt real bad now, something is totally wrong..."},
+			[2] = {title = "Pain", text = "Its probably just a headache..."},
+			[1] = {title = "Mild pain", text = "Your average tuesday."}
 		},
 		bleeding = {
-			[4] = "FUCK- IM BLEEDING OUT, IM ACTUALLY BLEEDING OUT",
-			[3] = "Severe Bleeding - Blood is pouring out of you like a fire hose!",
-			[2] = "Moderate Bleeding - This is severe enough to where you should start worrying about it.",
-			[1] = "Minor Bleeding - Blood is pouring out of a wound at a small rate."
+			[4] = {title = "Critical Hemorrhage", text = "FUCK- IM BLEEDING OUT, IM ACTUALLY BLEEDING OUT"},
+			[3] = {title = "Severe Bleeding", text = "Blood is pouring out of you like a fire hose!"},
+			[2] = {title = "Moderate Bleeding", text = "This is severe enough to where you should start worrying about it."},
+			[1] = {title = "Minor Bleeding", text = "Blood is pouring out of a wound at a small rate."}
 		},
-		internal_bleed = "Internal bleeding - Something inside broke and you are starting to lose blood inside, while not usually lethal on its own you should get it fixed to prevent complications.",
+		internal_bleed = {title = "Internal bleeding", text = "Something inside broke and you are starting to lose blood inside, while not usually lethal on its own you should get it fixed to prevent complications."},
 		conscious = {
-			[4] = "...",
-			[3] = "Fainting - Your body and mind are severely affected by something, you feel extremely sleepy.",
-			[2] = "Confused - Confused and disoriented, you are starting to feel drowsy.",
-			[1] = "Disoriented - Feeling kind of sleepy right now."
+			[4] = {title = "Unconscious", text = "..."},
+			[3] = {title = "Fainting", text = "Your body and mind are severely affected by something, you feel extremely sleepy."},
+			[2] = {title = "Confused", text = "Confused and disoriented, you are starting to feel drowsy."},
+			[1] = {title = "Disoriented", text = "Feeling kind of sleepy right now."}
 		},
 		stamina = {
-			[4] = "I CANT BREATHE NOR MOVE, LETS TAKE A BREAK...",
-			[3] = "Very exhausted - Okay, now its REALLY time to stop doing what you are doing...",
-			[2] = "Exhausted - You are starting to feel tired, its time to stop fatiguing yourself.",
-			[1] = "Slightly tired - Strained from activity, you can keep going a little."
+			[4] = {title = "Exhausted", text = "I CANT BREATHE NOR MOVE, LETS TAKE A BREAK..."},
+			[3] = {title = "Very exhausted", text = "Okay, now its REALLY time to stop doing what you are doing..."},
+			[2] = {title = "Tired", text = "You are starting to feel tired, its time to stop fatiguing yourself."},
+			[1] = {title = "Slightly tired", text = "Strained from activity, you can keep going a little."}
 		},
-		spine_fracture = "? - Something is wrong, my back feels split in half and I cant feel something on my body.",
-		fracture = "Fracture - One of your limbs is broken, you should probably put it in a bandage.",
+		spine_fracture = {title = "Spine fracture", text = "Something is wrong, my back feels split in half and I cant feel something on my body."},
+		fracture = {title = "Fracture", text = "One of your limbs is broken, you should probably put it in a bandage."},
 		organ_damage = {
-			[3] = "Severe Internal Damage - One or more of your important bits are heavily damaged, all hope is lost.",
-			[2] = "Internal Damage - One or more of your internal organs are destroyed completely, just hope its not your liver.",
-			[1] = "Minor Internal Damage - Some of your internal organs are damaged.",
+			[3] = {title = "Severe Internal Damage", text = "One or more of your important bits are heavily damaged, all hope is lost."},
+			[2] = {title = "Internal Damage", text = "One or more of your internal organs are destroyed completely, just hope its not your liver."},
+			[1] = {title = "Minor Internal Damage", text = "Some of your internal organs are damaged."},
 		},
-		dislocation = "Joint dislocation - One of your limb's socket was dislocated, its best to put that back.",
-		amputant = "Amputation - One of your limbs was torn off, Accept the reality you'll never use it again.",
+		dislocation = {title = "Joint dislocation", text = "One of your limb's socket was dislocated, its best to put that back."},
+		amputant = {title = "Amputation", text = "One of your limbs was torn off, Accept the reality you'll never use it again."},
 		blood_loss = {
-			[4] = "This is the end, your body has not enough blood to live and ischemia is taking a toll on you.",
-			[3] = "Severely Hypovolemic - Ugh... i can barely feel anything...",
-			[2] = "Hypovolemia - Feeling weak, and the low blood is starting to take a toll on you.",
-			[1] = "Pale - You can keep going but your heart is starting to work overtime."
+			[4] = {title = "Exsanguination", text = "This is the end, your body has not enough blood to live and ischemia is taking a toll on you."},
+			[3] = {title = "Severely Hypovolemic", text = "Ugh... i can barely feel anything..."},
+			[2] = {title = "Hypovolemia", text = "Feeling weak, and the low blood is starting to take a toll on you."},
+			[1] = {title = "Pale", text = "You can keep going but your heart is starting to work overtime."}
 		},
-		cardiac_arrest = "Your body already worked hard enough, lets rest for now.",
+		cardiac_arrest = {title = "Cardiac arrest", text = "Your body already worked hard enough, lets rest for now."},
 		cold = {
-			[4] = "Its so warm all of a sudden, and i feel a calming presence over me.",
-			[3] = "Hypothermia - Its so, SO COLD...",
-			[2] = "Cold - Its unusually cold, now is a good time to start to take shelter.",
-			[1] = "Chilly - Is it me or is it cold outside?"
+			[4] = {title = "Freezing to death", text = "Its so warm all of a sudden, and i feel a calming presence over me."},
+			[3] = {title = "Hypothermia", text = "Its so, SO COLD..."},
+			[2] = {title = "Cold", text = "Its unusually cold, now is a good time to start to take shelter."},
+			[1] = {title = "Chilly", text = "Is it me or is it cold outside?"}
 		},
 		heat = {
-			[4] = "I WOULD KILL FOR SOME WATER RIGHT NOW",
-			[3] = "Hyperthermia - Ughhh i want to throw up...",
-			[2] = "Hot - It feels too hot!",
-			[1] = "Warm - Its not nice outside!"
+			[4] = {title = "Heat stroke", text = "I WOULD KILL FOR SOME WATER RIGHT NOW"},
+			[3] = {title = "Hyperthermia", text = "Ughhh i want to throw up..."},
+			[2] = {title = "Hot", text = "It feels too hot!"},
+			[1] = {title = "Warm", text = "Its not nice outside!"}
 		},
 		hemothorax = {
-			[4] = "Breathing is too hard, I want to breathe I WANT TO BREATHE....",
-			[3] = "Severe Pleural Pressure - It hurts so much, and i can barely even breathe...",
-			[2] = "Pleural Pressure - Something is building up in my chest, and it makes it hard to breathe.",
-			[1] = "Lung Discomfort - Its not this hard to catch your breath usually..."
+			[4] = {title = "Critical hemothorax", text = "Breathing is too hard, I want to breathe I WANT TO BREATHE...."},
+			[3] = {title = "Severe Pleural Pressure", text = "It hurts so much, and i can barely even breathe..."},
+			[2] = {title = "Pleural Pressure", text = "Something is building up in my chest, and it makes it hard to breathe."},
+			[1] = {title = "Lung Discomfort", text = "Its not this hard to catch your breath usually..."}
 		},
-		lungs_failure = "Your body decided to enter respiratory failure due to an absence of oxygen.",
+		lungs_failure = {title = "Lung failure", text = "Your body decided to enter respiratory failure due to an absence of oxygen."},
 		overdose = {
-			[4] = "Oooh yeah... thats the stuff dude...",
-			[3] = "Drugged - I really like what im feeling...",
-			[2] = "Opiated - You definitively took more than recommended, but it feels great...",
-			[1] = "Numbed - You feel less overall."
+			[4] = {title = "Fatal overdose", text = "Oooh yeah... thats the stuff dude..."},
+			[3] = {title = "Drugged", text = "I really like what im feeling..."},
+			[2] = {title = "Opiated", text = "You definitively took more than recommended, but it feels great..."},
+			[1] = {title = "Numbed", text = "You feel less overall."}
 		},
 		oxygen = {
-			[4] = "What you need the most is gone, all your systems are slowly dying bit by bit...",
-			[3] = "Asphyxia - You're losing consciousness. Tissues are deprived of oxygen. Inevitable brain damage.",
-			[2] = "Severe hypoxemia - Insufficient oxygen in the body. Dizziness and numbness in extremities. Something is DEFINITELY wrong.",
-			[1] = "Hypoxemia - Low blood oxygen level. Slightly confused, skin is sluggish. Something's not right..."
+			[4] = {title = "Anoxemia", text = "What you need the most is gone, all your systems are slowly dying bit by bit..."},
+			[3] = {title = "Asphyxia", text = "You're losing consciousness. Tissues are deprived of oxygen. Inevitable brain damage."},
+			[2] = {title = "Severe hypoxemia", text = "Insufficient oxygen in the body. Dizziness and numbness in extremities. Something is DEFINITELY wrong."},
+			[1] = {title = "Hypoxemia", text = "Low blood oxygen level. Slightly confused, skin is sluggish. Something's not right..."}
 		},
 		vomit = {
-			[4] = "Terrible nausea - Dangerous nausea. Something is VERY wrong inside.",
-			[3] = "Severe nausea - Severe discomfort. Strong tendency to vomit.",
-			[2] = "Nausea - Discomfort in the stomach area. Tendency to vomit.",
-			[1] = "Queasy - You feel discomfort. Slightly unwell. Slight tendency to vomit."
+			[4] = {title = "Terrible nausea", text = "Dangerous nausea. Something is VERY wrong inside."},
+			[3] = {title = "Severe nausea", text = "Severe discomfort. Strong tendency to vomit."},
+			[2] = {title = "Nausea", text = "Discomfort in the stomach area. Tendency to vomit."},
+			[1] = {title = "Queasy", text = "You feel discomfort. Slightly unwell. Slight tendency to vomit."}
 		},
 		brain_damage = {
-			[4] = "Coma - Barely clinging to life, you suffer from severe brain damage. You're a vegetable. Recovery is unlikely.",
-			[3] = "Severe neurophysiological deterioration - Severely mentally impaired, barely able to think rationally and remain conscious. Serious brain injury.",
-			[2] = "Neurological damage - Severe mental deficit. Limited ability for intellectual thinking and self-sufficiency. Serious brain damage.",
-			[1] = "Cognitive impairment - Mental disorders due to brain damage. You feel strange confusion..."
+			[4] = {title = "Coma", text = "Barely clinging to life, you suffer from severe brain damage. You're a vegetable. Recovery is unlikely."},
+			[3] = {title = "Severe neurophysiological deterioration", text = "Severely mentally impaired, barely able to think rationally and remain conscious. Serious brain injury."},
+			[2] = {title = "Neurological damage", text = "Severe mental deficit. Limited ability for intellectual thinking and self-sufficiency. Serious brain damage."},
+			[1] = {title = "Cognitive impairment", text = "Mental disorders due to brain damage. You feel strange confusion..."}
 		},
 		adrenaline = {
-			[4] = "Focused - Heart working overtime pumping blood. Almost complete absence of pain, surge of strength, and increased resilience.",
-			[3] = "Fight or Flight - Almost no pain felt. Stamina increased dramatically.",
-			[2] = "Alert - Pain dulled. State of heightened alertness.",
-			[1] = "Tense - You feel a slight surge of strength."
+			[4] = {title = "Focused", text = "Heart working overtime pumping blood. Almost complete absence of pain, surge of strength, and increased resilience."},
+			[3] = {title = "Fight or Flight", text = "Almost no pain felt. Stamina increased dramatically."},
+			[2] = {title = "Alert", text = "Pain dulled. State of heightened alertness."},
+			[1] = {title = "Tense", text = "You feel a slight surge of strength."}
 		},
 		shock = {
-			[4] = "The best response your body has is to go unconscious, good night.",
-			[3] = "Traumatic Shock - You definitively dont feel good, you feel horrible and unfocused.",
-			[2] = "Vasovagal Response - Sweaty, Dizzy and drowsy. You feel faint.",
-			[1] = "Vasovagal Response - Your body is responding to whats happening to you."
+			[4] = {title = "Shock", text = "The best response your body has is to go unconscious, good night."},
+			[3] = {title = "Traumatic Shock", text = "You definitively dont feel good, you feel horrible and unfocused."},
+			[2] = {title = "Vasovagal Response", text = "Sweaty, Dizzy and drowsy. You feel faint."},
+			[1] = {title = "Vasovagal Response", text = "Your body is responding to whats happening to you."}
 		},
 		trauma = {
-			[4] = "Im scared and disoriented. This is hopeless.",
-			[3] = "Severe disorientation - Ringing in ears and the world like a carousel.",
-			[2] = "Serious disorientation - Head spinning and everything floating around.",
-			[1] = "Mild disorientation - Feeling sleepy."
+			[4] = {title = "Shell-shocked", text = "Im scared and disoriented. This is hopeless."},
+			[3] = {title = "Severe disorientation", text = "Ringing in ears and the world like a carousel."},
+			[2] = {title = "Serious disorientation", text = "Head spinning and everything floating around."},
+			[1] = {title = "Mild disorientation", text = "Feeling sleepy."}
 		},
-		death = "Death - You are dead. Observe what's happening.",
+		death = {title = "Death", text = "You are dead. Observe what's happening."},
 		berserk = {
-			[4] = "Berserk - Unimaginable strength, regeneration, and resilience. You are a killing machine.",
-			[3] = "Berserk - Unimaginable strength, regeneration, and resilience. You are a killing machine.",
-			[2] = "Berserk - Unimaginable strength, regeneration, and resilience. You are a killing machine.",
-			[1] = "Berserk - Unimaginable strength, regeneration, and resilience. You are a killing machine."
+			[4] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
+			[3] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
+			[2] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
+			[1] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."}
 		},
-		berserk_brain_damage = "Brain damage - Even in rage, your damaged brain affects you.",
-		berserk_fracture = "Fracture - Adrenaline numbs the pain, but the bone is still broken.",
-		berserk_dislocation = "Dislocation - The joint is out of place, but rage allows you to ignore it.",
-		berserk_adrenaline = "Adrenaline - Your body is working at its limit.",
-		berserk_oxygen = "Oxygen deprivation - Your brain lacks oxygen, even in berserk mode.",
-		berserk_trauma = "Disorientation - The world is spinning, but rage drives you forward.",
-		berserk_amputant = "Amputation - The limb is gone, but nothing will stop you.",
-		berserk_cardiac_arrest = "Cardiac arrest - You are already dead, but rage still drives you.",
-		berserk_lungs_failure = "Lung failure - No air to breathe, but berserk won't let you fall.",
+		berserk_brain_damage = {title = "Brain damage", text = "Even in rage, your damaged brain affects you."},
+		berserk_fracture = {title = "Fracture", text = "Adrenaline numbs the pain, but the bone is still broken."},
+		berserk_dislocation = {title = "Dislocation", text = "The joint is out of place, but rage allows you to ignore it."},
+		berserk_adrenaline = {title = "Adrenaline", text = "Your body is working at its limit."},
+		berserk_oxygen = {title = "Oxygen deprivation", text = "Your brain lacks oxygen, even in berserk mode."},
+		berserk_trauma = {title = "Disorientation", text = "The world is spinning, but rage drives you forward."},
+		berserk_amputant = {title = "Amputation", text = "The limb is gone, but nothing will stop you."},
+		berserk_cardiac_arrest = {title = "Cardiac arrest", text = "You are already dead, but rage still drives you."},
+		berserk_lungs_failure = {title = "Lung failure", text = "No air to breathe, but berserk won't let you fall."},
 		stroke = {
-			[4] = "Stroke - Brain cells are dying. You are losing consciousness, bleeding internally, and can barely breathe.",
-			[3] = "High Stroke Risk - Severe headache and confusion. Does anyone smell iron?",
-			[2] = "Dizzyness - Does anyone smell iron?",
-			[1] = "Confusion - My brain feels funny..."
+			[4] = {title = "Stroke", text = "Brain cells are dying. You are losing consciousness, bleeding internally, and can barely breathe."},
+			[3] = {title = "High Stroke Risk", text = "Severe headache and confusion. Does anyone smell iron?"},
+			[2] = {title = "Dizzyness", text = "Does anyone smell iron?"},
+			[1] = {title = "Confusion", text = "My brain feels funny..."}
 		},
 		palpitations = {
-            [4] = "Atrial Fibrilation - Really fast and irregular to keep up with your abysmal performance, but this wont do, your heart will fail soon.",
-            [3] = "Palpitations - Irregular and fast, your heart is beating too hard to keep up with your low blood pressure.",
-            [2] = "Flutter - Your heart is beating unusually fast, and it does not feel good.",
-            [1] = "Tachycardia - Probably just a workout."
+            [4] = {title = "Atrial Fibrillation", text = "Really fast and irregular to keep up with your abysmal performance, but this wont do, your heart will fail soon."},
+            [3] = {title = "Palpitations", text = "Irregular and fast, your heart is beating too hard to keep up with your low blood pressure."},
+            [2] = {title = "Flutter", text = "Your heart is beating unusually fast, and it does not feel good."},
+            [1] = {title = "Tachycardia", text = "Probably just a workout."}
         },
         hypoventilation = {
-            [4] = "I CANT CATCH A SINGLE GOOD BREATH OF AIR",
-            [3] = "Hypoventilation - Its very hard to catch my breath...",
-            [2] = "Shallow Breathing - You can breathe, but theres nothing coming in.",
-            [1] = "Shortness of Breath - Discomfort, maybe you exercised too much."
+            [4] = {title = "Severe Hypoventilation", text = "I CANT CATCH A SINGLE GOOD BREATH OF AIR"},
+            [3] = {title = "Hypoventilation", text = "Its very hard to catch my breath..."},
+            [2] = {title = "Shallow Breathing", text = "You can breathe, but theres nothing coming in."},
+            [1] = {title = "Shortness of Breath", text = "Discomfort, maybe you exercised too much."}
         },
         concussion = {
-            [4] = "Cerebral Bruising - You probably got hit so bad it caused some brain damage.",
-            [3] = "Concussion - My world is spinning around so fast...",
-            [2] = "Lightheaded - My brain is acting funny.",
-            [1] = "Headache - That hurt more than it should have."
+            [4] = {title = "Cerebral Bruising", text = "You probably got hit so bad it caused some brain damage."},
+            [3] = {title = "Concussion", text = "My world is spinning around so fast..."},
+            [2] = {title = "Lightheaded", text = "My brain is acting funny."},
+            [1] = {title = "Headache", text = "That hurt more than it should have."}
         },
 		dislocated_jaw = {
-			[1] = "Dislocated Jaw - Your jaw got set out of place and your muscles are tugging at it violently, its best to keep your mouth shut.",
-			[2] = "Broken Jaw - Unlike dislocating it, this one is permanent!",
-			[3] = "Broken Skull - Your skull shards are poking at your brain!",
-			[4] = "Disfigured - Your skull and jaw are damaged, making it so that your face is unrecognizeable."
+			[1] = {title = "Dislocated Jaw", text = "Your jaw got set out of place and your muscles are tugging at it violently, its best to keep your mouth shut."},
+			[2] = {title = "Broken Jaw", text = "Unlike dislocating it, this one is permanent!"},
+			[3] = {title = "Broken Skull", text = "Your skull shards are poking at your brain!"},
+			[4] = {title = "Disfigured", text = "Your skull and jaw are damaged, making it so that your face is unrecognizeable."}
 		},
 		broken_ribs = {
-			[1] = "Chest Pains - You better hope its nothing bad.",
-			[2] = "Broken Ribs - Definitively, a rib broke. You should pray it never pokes your lungs.",
-			[3] = "Penetrating Injury - This one totally poked a lung, you can barely breathe without paining.",
-			[4] = "Crushed ribs - All of them are gone, hope you dont have any enemies."
+			[1] = {title = "Chest Pains", text = "You better hope its nothing bad."},
+			[2] = {title = "Broken Ribs", text = "Definitively, a rib broke. You should pray it never pokes your lungs."},
+			[3] = {title = "Penetrating Injury", text = "This one totally poked a lung, you can barely breathe without paining."},
+			[4] = {title = "Crushed ribs", text = "All of them are gone, hope you dont have any enemies."}
 		},
 		encumbered = {
-			[1] = "Weighted - Nothing bad, but lay off those burgers.",
-			[2] = "Encumbered - Your gear is limiting your movement somewhat, but not severely.",
-			[3] = "Engulfed - Too much gear, walking sounds like a real workout.",
-			[4] = "Completely Weighted - WAAAY too much gear, how about you take it off and stop LARPING?"
+			[1] = {title = "Weighted", text = "Nothing bad, but lay off those burgers."},
+			[2] = {title = "Encumbered", text = "Your gear is limiting your movement somewhat, but not severely."},
+			[3] = {title = "Engulfed", text = "Too much gear, walking sounds like a real workout."},
+			[4] = {title = "Completely Weighted", text="WAAAY too much gear, how about you take it off and stop LARPING?"}
 		},
-		sepsis = "??? - Something in your body feels funny.",
-		chip = "Chip - -(test:) )."
+		sepsis = {title = "Sepsis", text = "Something in your body feels funny."},
+		infection = {title = "Infection", text = "Your wounds are infected, you should clean them as soon as possible"},
+		chip = {title = "Chip", text = "-(test:) )."}
 	}
 }
 
-local function getTooltipText(statusName, pos, berserkActive)
+local function getTooltipTitle(statusName, pos, berserkActive)
 	local lang = LANGUAGE
 	local texts = tooltipTexts[lang] or tooltipTexts.en
 	
 	if berserkActive then
 		local berserkKey = "berserk_" .. statusName
 		if texts[berserkKey] then
-			return texts[berserkKey]
+			return texts[berserkKey].title
 		end
 	end
 	
-	if statusName == "pain" or statusName == "conscious" or statusName == "stamina" or 
-	   statusName == "bleeding" or statusName == "blood_loss" or statusName == "cold" or statusName == "heat" or
-	   statusName == "hemothorax" or statusName == "overdose" or statusName == "oxygen" or
-	   statusName == "vomit" or statusName == "brain_damage" or statusName == "adrenaline" or
-	   statusName == "shock" or statusName == "trauma" or statusName == "berserk" or statusName == "organ_damage" or statusName == "stroke" or
-       statusName == "palpitations" or statusName == "hypoventilation" or statusName == "concussion" or
-	   statusName == "dislocated_jaw" or statusName == "broken_ribs" or statusName == "encumbered" or statusName == "sepsis" then
-		
-		local levelTexts = texts[statusName]
-		if levelTexts and type(levelTexts) == "table" then
-			return levelTexts[pos.level_num] or levelTexts[1] or ""
+	local statusData = texts[statusName]
+	if not statusData then return statusName end
+	
+	if pos and pos.level_num and statusData[pos.level_num] then
+		return statusData[pos.level_num].title
+	elseif statusData.title then
+		return statusData.title
+	end
+	
+	return statusName
+end
+
+local function getTooltipDescription(statusName, pos, berserkActive)
+	local lang = LANGUAGE
+	local texts = tooltipTexts[lang] or tooltipTexts.en
+	
+	if berserkActive then
+		local berserkKey = "berserk_" .. statusName
+		if texts[berserkKey] then
+			return texts[berserkKey].text
 		end
-	else
-		return texts[statusName] or ""
+	end
+	
+	local statusData = texts[statusName]
+	if not statusData then return "" end
+	
+	if pos and pos.level_num and statusData[pos.level_num] then
+		return statusData[pos.level_num].text
+	elseif statusData.text then
+		return statusData.text
 	end
 	
 	return ""
@@ -1038,6 +1058,7 @@ local function load_status_sprites()
 	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix)
 	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
 	status_sprites.sepsis = loadMaterial("vgui/hud/sepsis.png", suffix)
+	status_sprites.infection = loadMaterial("vgui/hud/infection.png", suffix)
 	status_sprites.bleeding_small = loadMaterial("vgui/hud/smallbleeding.png", suffix)
 	status_sprites.bleeding_max = loadMaterial("vgui/hud/maxbleeding.png", suffix)
 	status_sprites.bleeding_heavy = loadMaterial("vgui/hud/heavybleeding.png", suffix)
@@ -1136,7 +1157,8 @@ local function draw_bar()
 	smooth.stroke_meter = Lerp(s * dt, smooth.stroke_meter or 0, getOrgVal(org, "stroke_meter", 0))
 	smooth.concussion = Lerp(s * dt, smooth.concussion or 0, getOrgVal(org, "concussion", 0))
 	smooth.ischemia = Lerp(s * dt, smooth.ischemia or 0, getOrgVal(org, "ischemia", 0))
-	smooth.hemotransfusionshock = Lerp(s * dt, smooth.hemotransfusionshock or 0, getOrgVal(org, "hemotransfusionshock", 0))
+    smooth.hemotransfusionshock = Lerp(s * dt, smooth.hemotransfusionshock or 0, getOrgVal(org, "hemotransfusionshock", 0))
+    smooth.infection = Lerp(s * dt, smooth.infection or 0, getOrgVal(org, "infection", 0))
 	
 	update_stability(smooth.blood or 5000, smooth.pulse or 70)
 	
@@ -1582,6 +1604,18 @@ local function draw_status_effects()
 						value = math_floor(ischemia_val * 100)
 					})
 					currentEffectNames["sepsis"] = true
+				end
+
+				local infection_val = smooth.infection or getOrgVal(org, "infection", 0)
+				if infection_val > 0.1 then
+					table.insert(effects, {
+						name = "infection",
+						level_num = 1,
+						has_levels = true,
+						priority = 0.8,
+						value = math_floor(infection_val * 100)
+					})
+					currentEffectNames["infection"] = true
 				end
 
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
@@ -2410,28 +2444,38 @@ local function draw_status_tooltips()
     end
     
     if hoveredStatus and hoveredPos then
-        local tooltipText = getTooltipText(hoveredStatus, hoveredPos, berserkActive)
+        local title = getTooltipTitle(hoveredStatus, hoveredPos, berserkActive)
+        local description = getTooltipDescription(hoveredStatus, hoveredPos, berserkActive)
         
-        if tooltipText and tooltipText ~= "" then
-
-            -- Apply Brain Distortion Corruption if enabled
+        if title and description and description ~= "" then
             if brainDamage > 0.1 and HUD.brain_distortion_enabled then
                 local seed = string.len(hoveredStatus) * 100 + (hoveredPos.level_num or 1) * 10 + math.floor(brainDamage * 100)
-                tooltipText = corruptText(tooltipText, brainDamage, seed)
+                title = corruptText(title, brainDamage, seed)
+                description = corruptText(description, brainDamage, seed + 1)
             end
-
-            local font = "DermaDefault"
+            
+            local titleFont = "DermaDefaultBold"
+            local descFont = "DermaDefault"
             if berserkActive then
-                font = "HuyFont"
+                titleFont = "HuyFont"
+                descFont = "HuyFont"
             end
             
-            surface.SetFont(font)
-            local textW, textH = surface.GetTextSize(tooltipText)
+            surface.SetFont(titleFont)
+            local titleW, titleH = surface.GetTextSize(title)
             
-            local baseTooltipX = hoveredPos.x - textW - 30
-            local baseTooltipY = hoveredPos.y + (hoveredPos.size - textH) / 2
+            surface.SetFont(descFont)
+            local descW, descH = surface.GetTextSize(description)
             
-            local centerX = hoveredPos.x - textW / 2 - 10
+            local padding = 10
+            local spacing = 4
+            local totalW = math.max(titleW, descW) + padding * 2
+            local totalH = titleH + descH + spacing + padding * 2
+            
+            local baseTooltipX = hoveredPos.x - totalW - 10
+            local baseTooltipY = hoveredPos.y + (hoveredPos.size - totalH) / 2
+            
+            local centerX = hoveredPos.x - totalW / 2 - 10
             local centerY = hoveredPos.y + hoveredPos.size / 2
             local distX = mx - centerX
             local distY = my - centerY
@@ -2445,17 +2489,21 @@ local function draw_status_tooltips()
             
             if tooltipX < 10 then tooltipX = 10 end
             if tooltipY < 10 then tooltipY = 10 end
-            if tooltipY + textH > ScrH() - 10 then tooltipY = ScrH() - textH - 10 end
+            if tooltipY + totalH > ScrH() - 10 then tooltipY = ScrH() - totalH - 10 end
             
-            local padding = 8
-            
+            -- Tooltip BG
             surface.SetDrawColor(25, 25, 35, 240)
-            surface.DrawRect(tooltipX - padding, tooltipY - padding, textW + padding * 2, textH + padding * 2)
+            surface.DrawRect(tooltipX - padding, tooltipY - padding, totalW, totalH)
             
+            -- Tooltip Outline
             surface.SetDrawColor(255, 50, 50, 255)
-            surface.DrawOutlinedRect(tooltipX - padding, tooltipY - padding, textW + padding * 2, textH + padding * 2)
+            surface.DrawOutlinedRect(tooltipX - padding, tooltipY - padding, totalW, totalH)
             
-            draw.SimpleText(tooltipText, font, tooltipX, tooltipY, Color(255, 255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            local titleColor = Color(255, 255, 255, 255)
+            local descColor = Color(200, 200, 200, 255)
+            
+            draw.SimpleText(title, titleFont, tooltipX, tooltipY, titleColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            draw.SimpleText(description, descFont, tooltipX, tooltipY + titleH + spacing, descColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
         end
     end
 end

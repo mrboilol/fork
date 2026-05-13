@@ -743,6 +743,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BURN) then
 			org.burns = org.burns + 1
+			org.infection = org.infection + (dmgInfo:GetDamage() * 0.002)
 		end
 
 		if dmgInfo:IsDamageType(DMG_BLAST) then

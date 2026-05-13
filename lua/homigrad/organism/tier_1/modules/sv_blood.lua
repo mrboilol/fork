@@ -112,6 +112,7 @@ module[2] = function(owner, org, mulTime)
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 200,0)
 		org.internalBleed = org.internalBleed + mulTime / 15
 		org.ischemia = org.ischemia + mulTime / 7.5
+        org.infection = org.infection + (org.hemotransfusionshock * mulTime * 0.01)
 	end
 
 	if org.internalBleed > 1 then
@@ -140,6 +141,7 @@ module[2] = function(owner, org, mulTime)
 			//if wound[5] + beatsPerSecond * 2 < time then
 				wound[5] = time
 				org.blood = max(org.blood - bleed, 1)
+                org.infection = org.infection + (bleed * 0.001)
 				
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					hg.organism.BloodDroplet2(owner, org, wound, ent:GetVelocity() + VectorRand(-15, 15), false)
@@ -173,6 +175,7 @@ module[2] = function(owner, org, mulTime)
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
 			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80, 1)
+			org.infection = org.infection + (wound[1] * mulTime * 0.005)
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 				local dir = wound[6]
 				local len = dir:Length()
