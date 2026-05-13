@@ -22,6 +22,7 @@ local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
+local lastKnownFacingAngle = 0
 
 local majorBones = {
     pelvis = { organ = "stomach", bone = "ValveBiped.Bip01_Pelvis" },
@@ -128,15 +129,27 @@ local function SyncBonesCallback(ent, numbones)
                 srcPos = pMat:GetTranslation()
             end
         end
-        -- Prevent snapping North: Use player's yaw if ragdoll angles are zeroed out
-        if srcAng.y == 0 and srcAng.p == 0 and srcAng.r == 0 then
-            srcAng = Angle(0, ply:GetAngles().y, 0)
+        -- Prevent snapping North: Use last known facing angle or player eye angles
+        -- When ragdoll angles are zeroed/invalid, use stored angle or player eye angles
+        local ragYaw = srcAng.y
+        if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
+            -- Ragdoll angles are likely default/invalid, use last known good angle or player eye angles
+            local eyeAng = ply:EyeAngles()
+            if lastKnownFacingAngle ~= 0 then
+                srcAng = Angle(0, lastKnownFacingAngle, 0)
+            else
+                srcAng = Angle(0, eyeAng.y, 0)
+            end
         else
-            srcAng = Angle(0, srcAng.y, 0)
+            -- Use ragdoll's actual yaw but update our stored angle
+            srcAng = Angle(0, ragYaw, 0)
+            lastKnownFacingAngle = ragYaw
         end
     else
         -- FIX: Prevent the model from leaning backward/forward when you look up/down
-        srcAng = Angle(0, ply:GetAngles().y, 0) 
+        local eyeAng = ply:EyeAngles()
+        srcAng = Angle(0, eyeAng.y, 0)
+        lastKnownFacingAngle = eyeAng.y
     end
     
     local srcWorld = Matrix()
@@ -470,7 +483,8 @@ function HUD_DrawDynamicIndicator()
         if isRagdoll then
             -- Because we bound the ragdoll root to the pelvis in SyncBonesCallback, 
             -- offset it so the pelvis aligns vertically inside the UI viewport
-            modelOffset = Vector(0, 0, 45)
+            -- Increased offset to prevent clipping below the indicator
+            modelOffset = Vector(0, 0, 55)
         else
             modelOffset = Vector(0, 0, 10)
         end

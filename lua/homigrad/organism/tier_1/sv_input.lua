@@ -1701,35 +1701,77 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 end
 
 function hg.BreakNeck(ent)
-	if !IsValid(ent) then return end
+	if not IsValid(ent) then return end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	if ply:Alive() then ply:Kill() end
+	local wasAlive = ply:Alive()
+	if wasAlive then ply:Kill() end
 
-	ent.organism.spine3 = 1
-	ent:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
-	local target = ent
+	-- Store the player reference for later
+	local playerRef = ply
 	
-	timer.Simple(0.1, function()
-		if not IsValid(target) then return end
-
-		local ent = target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
-
-		if IsValid(ent) then
-			ent:RemoveInternalConstraint(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1")))
-
-			local spine = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Spine2"))
-			local head = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1"))
-
-			local pspine = ent:GetPhysicsObjectNum(spine)
-			local phead = ent:GetPhysicsObjectNum(head)
-
-			local lpos, lang = WorldToLocal(phead:GetPos() + phead:GetAngles():Forward() * -2 + phead:GetAngles():Up() * -1.5, angle_zero, pspine:GetPos(), pspine:GetAngles())
-			
-			phead:SetPos(pspine:GetPos() + pspine:GetAngles():Forward() * 12.9 + pspine:GetAngles():Right() * -1)
-
-			local cons = constraint.AdvBallsocket(ent, ent, spine, head, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+	-- Use a longer delay to ensure ragdoll is created and networked
+	timer.Simple(0.2, function()
+		-- Get the ragdoll - try multiple sources
+		local ragdoll = nil
+		
+		if IsValid(ent) and ent:IsRagdoll() then
+			ragdoll = ent
+		elseif IsValid(playerRef) then
+			ragdoll = playerRef:GetNWEntity("RagdollDeath")
+			if not IsValid(ragdoll) then
+				ragdoll = playerRef:GetRagdollEntity()
+			end
 		end
+		
+		if not IsValid(ragdoll) then return end
+		
+		-- Update the organism if available
+		if playerRef.organism then
+			playerRef.organism.spine3 = 1
+		end
+		
+		-- Play sound on the ragdoll
+		ragdoll:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+
+		-- Lookup bones and validate
+		local headBoneName = "ValveBiped.Bip01_Head1"
+		local spineBoneName = "ValveBiped.Bip01_Spine2"
+		
+		local headBoneId = ragdoll:LookupBone(headBoneName)
+		local spineBoneId = ragdoll:LookupBone(spineBoneName)
+		
+		if not headBoneId or not spineBoneId then
+			return
+		end
+		
+		local headPhysBone = ragdoll:TranslateBoneToPhysBone(headBoneId)
+		local spinePhysBone = ragdoll:TranslateBoneToPhysBone(spineBoneId)
+		
+		if headPhysBone == -1 or spinePhysBone == -1 then
+			return
+		end
+		
+		-- Remove internal constraint on head
+		ragdoll:RemoveInternalConstraint(headPhysBone)
+
+		local pspine = ragdoll:GetPhysicsObjectNum(spinePhysBone)
+		local phead = ragdoll:GetPhysicsObjectNum(headPhysBone)
+
+		if not IsValid(pspine) or not IsValid(phead) then
+			return
+		end
+
+		-- Calculate local position for the constraint
+		local lpos, _ = WorldToLocal(phead:GetPos() + phead:GetAngles():Forward() * -2 + phead:GetAngles():Up() * -1.5, angle_zero, pspine:GetPos(), pspine:GetAngles())
+		
+		-- Reposition head for visual effect
+		phead:SetPos(pspine:GetPos() + pspine:GetAngles():Forward() * 12.9 + pspine:GetAngles():Right() * -1)
+		phead:Wake()
+		pspine:Wake()
+
+		-- Add floppy neck constraint with appropriate limits
+		constraint.AdvBallsocket(ragdoll, ragdoll, spinePhysBone, headPhysBone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
 	end)
 end
 
@@ -1744,53 +1786,90 @@ local limb_bones = {
     spine3 = {parent = "ValveBiped.Bip01_Spine2", child = "ValveBiped.Bip01_Spine4"},
 }
 
+-- Limb-specific constraint limits for better floppy physics
+-- More generous limits for noticeably floppy but still realistic movement
+local limb_constraint_limits = {
+    -- Arms: wider roll limits for natural arm hang/flop
+    larm = {minYaw = -120, minRoll = -150, minPitch = -120, maxYaw = 120, maxRoll = 70, maxPitch = 120},
+    rarm = {minYaw = -120, minRoll = -70, minPitch = -120, maxYaw = 120, maxRoll = 150, maxPitch = 120},
+    -- Legs: wider limits for noticeable limp/flop
+    lleg = {minYaw = -90, minRoll = -110, minPitch = -90, maxYaw = 90, maxRoll = 70, maxPitch = 90},
+    rleg = {minYaw = -90, minRoll = -70, minPitch = -90, maxYaw = 90, maxRoll = 110, maxPitch = 90},
+}
+
 function hg.BreakLimb(ent, limb)
     if not IsValid(ent) then return end
     if not limb_bones[limb] then return end
 
     local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-    -- The user doesn't want to kill the player when a limb is broken
-    -- if ply:Alive() then ply:Kill() end 
-
-    timer.Simple(0.1, function()
-        local ragdoll = ent:IsRagdoll() and ent or ent:GetNWEntity("RagdollDeath")
-
-        if IsValid(ragdoll) then
-            local bone_info = limb_bones[limb]
-            local parent_bone_name = bone_info.parent
-            local child_bone_name = bone_info.child
-
-            local parent_bone_id = ragdoll:LookupBone(parent_bone_name)
-            local child_bone_id = ragdoll:LookupBone(child_bone_name)
-
-            if not parent_bone_id or not child_bone_id then return end
-
-            ragdoll:RemoveInternalConstraint(ragdoll:TranslateBoneToPhysBone(child_bone_id))
-
-            local parent_phys_bone = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
-            local child_phys_bone = ragdoll:TranslateBoneToPhysBone(child_bone_id)
-            
-            if parent_phys_bone == -1 or child_phys_bone == -1 then return end
-
-            local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys_bone)
-            local p_child = ragdoll:GetPhysicsObjectNum(child_phys_bone)
-
-            if not IsValid(p_parent) or not IsValid(p_child) then return end
-            
-            -- Prevent stretching. This is a bit of a guess, might need refinement.
-            local lpos, lang = WorldToLocal(p_child:GetPos(), angZero, p_parent:GetPos(), p_parent:GetAngles())
-            if lpos then
-                local new_pos, _ = LocalToWorld(lpos, angZero, p_parent:GetPos(), p_parent:GetAngles())
-                if new_pos then
-                    p_child:SetPos(new_pos)
-                end
+    local playerRef = ply
+    
+    -- Use a longer delay to ensure ragdoll exists (for death cases)
+    timer.Simple(0.15, function()
+        -- Get the ragdoll - try multiple sources
+        local ragdoll = nil
+        
+        if IsValid(ent) and ent:IsRagdoll() then
+            ragdoll = ent
+        elseif IsValid(playerRef) then
+            ragdoll = playerRef:GetNWEntity("RagdollDeath")
+            if not IsValid(ragdoll) then
+                ragdoll = playerRef:GetRagdollEntity()
             end
-
-
-            -- Add a ballsocket constraint to make the limb floppy
-            -- The limits are just copied from BreakNeck, they might need to be adjusted for each limb.
-            constraint.AdvBallsocket(ragdoll, ragdoll, parent_phys_bone, child_phys_bone, lpos, nil, 0, 0, -80, -135, -75, 80, 50, 75, 0, 0, 0, 0, 0)
+            -- Also check FakeRagdoll for fake/unconscious ragdolls
+            if not IsValid(ragdoll) then
+                ragdoll = playerRef:GetNWEntity("FakeRagdoll")
+            end
         end
+        
+        if not IsValid(ragdoll) then return end
+
+        local bone_info = limb_bones[limb]
+        if not bone_info then return end
+        
+        local parent_bone_name = bone_info.parent
+        local child_bone_name = bone_info.child
+
+        local parent_bone_id = ragdoll:LookupBone(parent_bone_name)
+        local child_bone_id = ragdoll:LookupBone(child_bone_name)
+
+        if not parent_bone_id or not child_bone_id then return end
+
+        local child_phys_bone = ragdoll:TranslateBoneToPhysBone(child_bone_id)
+        if child_phys_bone == -1 then return end
+        
+        -- Remove internal constraint on the child bone
+        ragdoll:RemoveInternalConstraint(child_phys_bone)
+
+        local parent_phys_bone = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
+        if parent_phys_bone == -1 then return end
+
+        local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys_bone)
+        local p_child = ragdoll:GetPhysicsObjectNum(child_phys_bone)
+
+        if not IsValid(p_parent) or not IsValid(p_child) then return end
+        
+        -- Calculate local position for proper constraint placement
+        local lpos = WorldToLocal(p_child:GetPos(), angZero, p_parent:GetPos(), p_parent:GetAngles())
+        
+        -- Keep limb attached at natural position
+        p_child:Wake()
+        p_parent:Wake()
+
+        -- Get limb-specific limits or use defaults
+        local limits = limb_constraint_limits[limb] or limb_constraint_limits.larm
+        
+        -- Add a ballsocket constraint to make the limb floppy with appropriate limits
+        -- Format: (ent1, ent2, bone1, bone2, localPos, localAng, minYaw, minRoll, minPitch, maxYaw, maxRoll, maxPitch, ...)
+        constraint.AdvBallsocket(
+            ragdoll, ragdoll, 
+            parent_phys_bone, child_phys_bone, 
+            lpos, nil, 
+            0, 0,  -- friction
+            limits.minYaw, limits.minRoll, limits.minPitch,  -- min limits
+            limits.maxYaw, limits.maxRoll, limits.maxPitch,  -- max limits
+            0, 0, 0, 0, 0  -- unused params
+        )
     end)
 end
 

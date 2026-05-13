@@ -639,13 +639,15 @@ end
 
 local hg, LocalToWorld = hg, LocalToWorld
 local durachok = "models/epangelmatikes/e3_elite_suit.mdl"
+-- TPIK bones for broken/dislocated limbs: {limb, boneName, side, ampBase, offBase}
+-- Increased ampBase and offBase for more noticeable flopping
 local injuryTpikBones = {
-	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 26.4, 13.2},
-	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 26.4, 13.2},
-	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 14.4, 7.2},
-	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 14.4, 7.2},
-	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 25.6, 12.6},
-	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 25.6, 12.6},
+	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 38.0, 18.0},  -- was 26.4, 13.2
+	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 38.0, 18.0}, -- was 26.4, 13.2
+	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 22.0, 12.0},  -- was 14.4, 7.2
+	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 22.0, 12.0}, -- was 14.4, 7.2
+	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 36.0, 18.0},  -- was 25.6, 12.6
+	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 36.0, 18.0}, -- was 25.6, 12.6
 }
 
 local function injuryTpikMotion(state, ent, owner)
@@ -706,16 +708,19 @@ local function applyInjuryTPIK(ent, ply)
 	end
 
 	state.motion = math.Approach(state.motion or 0, motion and 1 or 0, FrameTime() * 3.2)
-	local target = (can and active) and (0.28 + state.motion * 0.67) or 0
+	-- Increased base blend and motion response for more noticeable flopping
+	local target = (can and active) and (0.35 + state.motion * 0.72) or 0
 	state.blend = math.Approach(state.blend or 0, target, FrameTime() * 4.8)
 
 	if (state.blend or 0) <= 0.001 then return end
 
-	state.phase = (state.phase or 0) + FrameTime() * (4.6 + math.min(ent:GetVelocity():Length2D(), 300) * 0.015)
-	state.microphase = (state.microphase or 0) + FrameTime() * (9 + math.min(ent:GetVelocity():Length2D(), 260) * 0.01)
+	-- Faster phase for more dynamic/noticeable movement
+	state.phase = (state.phase or 0) + FrameTime() * (5.2 + math.min(ent:GetVelocity():Length2D(), 350) * 0.018)
+	state.microphase = (state.microphase or 0) + FrameTime() * (10 + math.min(ent:GetVelocity():Length2D(), 300) * 0.012)
 	local wave1 = math.sin(state.phase)
 	local wave2 = math.cos(state.phase * 1.37)
-	local motionMul = 0.62 + state.motion * 0.34
+	-- Increased motion multiplier for more pronounced flopping when moving
+	local motionMul = 0.68 + state.motion * 0.38
 	local holdMulLeg = reducedForWeapon and 0.28 or 1
 	local holdMulArm = reducedForWeapon and 0.09 or 1
 	local holdOffArm = reducedForWeapon and 0.45 or 1
@@ -738,12 +743,14 @@ local function applyInjuryTPIK(ent, ply)
 
 		local ang = mat:GetAngles()
 		local wmul = arm and holdMulArm or holdMulLeg
-		local amp = ampBase * state.blend * motionMul * wmul
-		local micro = (math.sin(state.microphase + i * 1.7) * 0.12 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.07) * (0.1 + math.min(state.blend, 1) * 0.14) * wmul
-		local off = offBase * (0.25 + math.min(state.blend, 1) * 0.75) * (arm and holdOffArm or 1)
+		-- Increased amplitude and micro-movement for more noticeable flopping
+		local amp = ampBase * state.blend * motionMul * wmul * 1.15  -- 15% more amplitude
+		local micro = (math.sin(state.microphase + i * 1.7) * 0.15 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.09) * (0.12 + math.min(state.blend, 1) * 0.16) * wmul
+		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1)  -- Increased offset base
+		-- Apply rotations with increased intensity
 		ang:RotateAroundAxis(mat:GetRight(), (off + wave1 * amp + micro) * side)
-		ang:RotateAroundAxis(mat:GetForward(), (wave2 * amp * 0.85 + micro * 0.6) * side)
-		ang:RotateAroundAxis(mat:GetUp(), micro * 0.35 * side)
+		ang:RotateAroundAxis(mat:GetForward(), (wave2 * amp * 0.9 + micro * 0.7) * side)  -- Slightly increased forward rotation
+		ang:RotateAroundAxis(mat:GetUp(), micro * 0.4 * side)  -- Increased up rotation
 		mat:SetAngles(ang)
 
 		hg.bone_apply_matrix(ent, bone, mat)

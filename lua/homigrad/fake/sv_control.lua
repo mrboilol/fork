@@ -76,21 +76,88 @@ end
 
 hg.realPhysNum = realPhysNum
 local oldtime
+
+-- Physics bone to limb mapping for broken limb detection
+local physBoneToLimb = {
+    [2] = "rarm", -- R_UpperArm
+    [3] = "larm", -- L_UpperArm  
+    [4] = "larm", -- L_Forearm
+    [5] = "larm", -- L_Hand
+    [6] = "rarm", -- R_Forearm
+    [7] = "rarm", -- R_Hand
+    [8] = "rleg", -- R_Thigh
+    [9] = "rleg", -- R_Calf
+    [11] = "lleg", -- L_Thigh
+    [12] = "lleg", -- L_Calf
+}
+
+-- Check if a physics bone belongs to a broken/dislocated limb and return damage severity
+-- Returns: isAffected (bool), severityMultiplier (number)
+-- Severity tiers:
+--   1.00 = normal (0% reduction)
+--   0.50 = just broken (50% reduction)
+--   0.65 = just dislocated (35% reduction)
+--   0.15 = broken AND dislocated (85% reduction)
+local function GetLimbDamageMultiplier(ragdoll, physNumber)
+    local ply = hg.RagdollOwner(ragdoll)
+    if not IsValid(ply) or not ply.organism then return false, 1.0 end
+    
+    local limb = physBoneToLimb[physNumber]
+    if not limb then return false, 1.0 end
+    
+    local org = ply.organism
+    local isBroken = org[limb] and org[limb] >= 1
+    local isDislocated = org[limb .. "dislocation"]
+    
+    -- Broken AND dislocated = 85% reduction (most floppy)
+    if isBroken and isDislocated then
+        return true, 0.15
+    end
+    
+    -- Just dislocated = 35% reduction
+    if isDislocated then
+        return true, 0.65
+    end
+    
+    -- Just broken = 50% reduction
+    if isBroken then
+        return true, 0.50
+    end
+    
+    return false, 1.0
+end
+
 function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp)
-	physNumber = realPhysNum(ragdoll, physNumber) or 0
-	local phys = ragdoll:GetPhysicsObjectNum(physNumber)
+    physNumber = realPhysNum(ragdoll, physNumber) or 0
+    local phys = ragdoll:GetPhysicsObjectNum(physNumber)
+    if not IsValid(phys) then return end
 
-	shadowparams.secondstoarrive = ss
-	shadowparams.angle = ang
-	shadowparams.maxangular = maxang and maxang * (ragdoll.power or 1)-- * (hg.IdealMassPlayer[physNumber] and hg.IdealMassPlayer[physNumber] / phys:GetMass() or 0)
-	shadowparams.maxangulardamp = maxangdamp
-	shadowparams.pos = pos
-	shadowparams.maxspeed = maxspeed and maxspeed * (ragdoll.power or 1)
-	shadowparams.maxspeeddamp = maxspeeddamp
-	shadowparams.dampfactor = 0.9
+    -- Check if this bone belongs to a broken/dislocated limb and get severity
+    local isDamaged, damageMultiplier = GetLimbDamageMultiplier(ragdoll, physNumber)
+    
+    -- For damaged limbs, reduce shadow control to let physics constraints work naturally
+    -- Dislocated = 85% reduction (multiplier 0.15), Broken = 50% reduction (multiplier 0.50)
+    local power = (ragdoll.power or 1) * damageMultiplier
 
-	phys:Wake()
-	phys:ComputeShadowControl(shadowparams)
+    shadowparams.secondstoarrive = ss
+    shadowparams.angle = ang
+    shadowparams.maxangular = maxang and maxang * power
+    shadowparams.maxangulardamp = maxangdamp and maxangdamp * (isDamaged and 0.5 or 1) -- Less damping for damaged limbs
+    shadowparams.pos = pos
+    shadowparams.maxspeed = maxspeed and maxspeed * power
+    shadowparams.maxspeeddamp = maxspeeddamp and maxspeeddamp * (isDamaged and 0.5 or 1)
+    shadowparams.dampfactor = isDamaged and 0.7 or 0.9 -- More damping for damaged limbs
+
+    phys:Wake()
+    
+    -- For completely damaged limbs with position control, skip shadow control entirely
+    -- Let the AdvBallsocket constraint handle the floppy physics naturally
+    if isDamaged and pos and not ang then
+        -- Only wake physics, don't apply shadow control - let constraint do the work
+        return
+    end
+    
+    phys:ComputeShadowControl(shadowparams)
 end
 
 local shadowControl = hg.ShadowControl
