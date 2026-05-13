@@ -2527,8 +2527,10 @@ local function draw_sprites()
 	local dt = FrameTime() * HUD.limb_fade_speed
 
 	local isFurry
-	if indMode == 0 or indMode == 1 then
+	if indMode == 0 then
 		isFurry = isPlayerFurry(ply)
+	elseif indMode == 1 then
+		isFurry = false
 	elseif indMode == 2 then
 		isFurry = true
 	elseif indMode == 3 then

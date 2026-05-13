@@ -403,8 +403,12 @@ hook.Add("InitPostEntity", "zcity_repair_map_prop_collision", function()
 	timer.Simple(0, repairBrokenMapPropCollisions)
 end)
 
-hook.Add("PostCleanupMap", "zcity_repair_map_prop_collision", function()
-	timer.Simple(0.5, repairBrokenMapPropCollisions)
+hook.Add("PostCleanupMap", "zcity_cleanup_map_prop_collision", function()
+	for _, ent in ipairs(ents.GetAll()) do
+		if ent.hg_collision_repaired then
+			clearFurnitureRepair(ent)
+		end
+	end
 end)
 
 hook.Add("OnEntityCreated", "zcity_repair_map_prop_collision", function(ent)
