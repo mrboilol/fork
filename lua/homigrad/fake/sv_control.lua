@@ -225,6 +225,64 @@ hook.Add("Think", "Fake", function()
 		end
 		ensureFakeRagdollCache(ragdoll)
 
+		-- Fake ragdoll bodyblock logic (optimized - only check every other tick)
+		local now = curTime
+		if not ply:Alive() or IsLiveManagedRagdoll(ragdoll) then
+			-- Optimization: Only check bodyblock every other tick (0.033s)
+			ragdoll.hg_fakeLegBlockCheckTime = ragdoll.hg_fakeLegBlockCheckTime or 0
+			if ragdoll.hg_fakeLegBlockCheckTime > now then
+				ragdoll.hg_fakeLegBlockCheckTime = ragdoll.hg_fakeLegBlockCheckTime - 0.033
+			else
+				ragdoll.hg_fakeLegBlockCheckTime = 0.033
+				
+				local velocity = ragdoll:GetVelocity()
+				local horizontalVelocity = Vector(velocity.x, velocity.y, 0)
+				local speed = horizontalVelocity:Length()
+				
+				if speed >= 75 then
+					ragdoll.hg_fakeLegBlockCooldown = ragdoll.hg_fakeLegBlockCooldown or 0
+					if ragdoll.hg_fakeLegBlockCooldown <= now then
+						local ragPos = ragdoll:GetPos()
+						local moveDir = speed > 0 and horizontalVelocity / speed or nil
+						local radius = math.Clamp(18 + speed * 0.015, 22, 30)
+
+						-- Optimization: Use cached player list instead of ents.FindInSphere
+						for _, target in ipairs(hg.humans_cached or player.GetAll()) do
+							if not IsValid(target) or not target:Alive() or target == ply then continue end
+							if IsValid(target.FakeRagdoll) then continue end
+
+							local targetPos = target:GetPos()
+							local distSqr = ragPos:DistToSqr(targetPos)
+							if distSqr > radius * radius then continue end
+							if math.abs((ragPos.z + 12) - targetPos.z) > 52 then continue end
+
+							local toTarget = targetPos - ragPos
+							local horizontalToTarget = Vector(toTarget.x, toTarget.y, 0)
+							local horizontalDistanceSqr = horizontalToTarget:LengthSqr()
+
+							if moveDir and horizontalDistanceSqr > 1 then
+								local towardTarget = horizontalToTarget:GetNormalized()
+								if moveDir:Dot(towardTarget) < -0.1 then continue end
+							end
+
+							local awayDir
+							if horizontalDistanceSqr > 1 then
+								awayDir = -horizontalToTarget:GetNormalized()
+							elseif moveDir then
+								awayDir = -moveDir
+							else
+								awayDir = Vector(0, 0, 0)
+							end
+
+							ragdoll.hg_fakeLegBlockCooldown = now + 0.1
+							PushManagedRagdollAway(ragdoll, awayDir, math.Clamp(speed * 0.9, 90, 160))
+							break
+						end
+					end
+				end
+			end
+		end
+
 		local torso = ragdoll.ZCSpine2Bone
 		if torso then
 			local torsopos, ang = ragdoll:GetBonePosition(torso)

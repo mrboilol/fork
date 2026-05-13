@@ -521,6 +521,13 @@ hg.ConVars = hg.ConVars or {}
 		if IsValid(ply) and ply:Alive() and not IsValid(ply.bull) and SERVER then
 			timer.Simple(1, function()
 				if not IsValid(ply) or not ply:Alive() then return end
+				
+				-- Check edict limit before creating bullseye
+				if ents.GetCount() >= 8100 then
+					print("[HG] Warning: Edict count too high, skipping bullseye creation for player "..ply:Name())
+					return
+				end
+				
 				ply.bull = ents.Create("npc_bullseye")
 				local bull = ply.bull
 				if not IsValid(bull) then return end

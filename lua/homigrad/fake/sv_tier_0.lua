@@ -115,7 +115,18 @@ local fixbones = {
 }
 
 function hg.Ragdoll_Create(ply)
+	-- Check edict limit before creating entities
+	local edictCount = ents.GetCount()
+	if edictCount >= 8100 then
+		print("[HG] Warning: Edict count too high ("..edictCount.."/8192), skipping ragdoll creation")
+		return nil
+	end
+
 	local ragdoll = ents.Create("prop_ragdoll")
+	if not IsValid(ragdoll) then
+		print("[HG] Failed to create ragdoll entity")
+		return nil
+	end
 
 	ragdoll:SetPos(ply:GetPos())
 	ragdoll:SetAngles(ply:GetAngles())
@@ -136,45 +147,50 @@ function hg.Ragdoll_Create(ply)
 	cacheFakeRagdollData(ragdoll)
 
 	if IsValid(ply.bull) then ply.bull:Remove() ply.bull = nil end
-	ragdoll.bull = ents.Create("npc_bullseye")
-	local bull = ragdoll.bull
-	bull.ply = ply
-	bull.rag = ragdoll
-	local bodyphy = ragdoll:GetPhysicsObjectNum(10)
-	if !bodyphy then return end
-	bull:SetPos(bodyphy:GetPos()+bodyphy:GetAngles():Right()*7)
-	--bull:SetPos( eyeatt.Pos + eyeatt.Ang:Up() * 3.5 )
-	bull:SetAngles( ragdoll:GetAngles() )
-	bull:SetMoveType(MOVETYPE_OBSERVER)
-	--bull:SetCollisionGroup(COLLISION_GROUP_BREAKABLE_GLASS)
-	bull:SetKeyValue( "targetname", "Bullseye" )
-	--bull:SetParent(ragdoll, ragdoll:LookupAttachment("eyes"))
-	bull:SetKeyValue( "health","9999" )
-	bull:SetKeyValue( "spawnflags","256" )
-	bull:Spawn()
-	bull:Activate()
-	bull:SetNotSolid(true)
 	
-	--bull:SetCollisionBoundsWS(-Vector(5,5,5),Vector(5,5,5))
-	--bull:SetSurroundingBounds(-Vector(50,50,50),Vector(50,50,50))
-	--[[local enta = ents.Create("prop_dynamic")
-	enta:SetPos(bull:GetPos())
-	enta:SetAngles(bull:GetAngles())
-	enta:SetModel("models/props_junk/metal_paintcan001a.mdl")
-	enta:SetParent(bull)
-	enta:Spawn()
-	enta:SetNotSolid(true)
-	bull:CallOnRemove("asdsad",function() enta:Remove() end)--]]
-	
-	for i, ent in ipairs(ents.FindByClass("npc_*")) do
-		if not IsValid(ent) or not ent.AddEntityRelationship then continue end
-		ent:AddEntityRelationship(bull, ent:Disposition(ply))
-	end
+	-- Check edict limit again before creating bullseye
+	if ents.GetCount() >= 8100 then
+		print("[HG] Warning: Edict count too high, skipping bullseye creation for ragdoll")
+	else
+		ragdoll.bull = ents.Create("npc_bullseye")
+		local bull = ragdoll.bull
+		bull.ply = ply
+		bull.rag = ragdoll
+		local bodyphy = ragdoll:GetPhysicsObjectNum(10)
+		if !bodyphy then return end
+		bull:SetPos(bodyphy:GetPos()+bodyphy:GetAngles():Right()*7)
+		--bull:SetPos( eyeatt.Pos + eyeatt.Ang:Up() * 3.5 )
+		bull:SetAngles( ragdoll:GetAngles() )
+		bull:SetMoveType(MOVETYPE_OBSERVER)
+		--bull:SetCollisionGroup(COLLISION_GROUP_BREAKABLE_GLASS)
+		bull:SetKeyValue( "targetname", "Bullseye" )
+		--bull:SetParent(ragdoll, ragdoll:LookupAttachment("eyes"))
+		bull:SetKeyValue( "health","9999" )
+		bull:SetKeyValue( "spawnflags","256" )
+		bull:Spawn()
+		bull:Activate()
+		bull:SetNotSolid(true)
+		
+		--bull:SetCollisionBoundsWS(-Vector(5,5,5),Vector(5,5,5))
+		--bull:SetSurroundingBounds(-Vector(50,50,50),Vector(50,50,50))
+		--[[local enta = ents.Create("prop_dynamic")
+		enta:SetPos(bull:GetPos())
+		enta:SetAngles(bull:GetAngles())
+		enta:SetModel("models/props_junk/metal_paintcan001a.mdl")
+		enta:SetParent(bull)
+		enta:Spawn()
+		enta:SetNotSolid(true)
+		bull:CallOnRemove("asdsad",function() enta:Remove() end)--]]
+		
+		for i, ent in ipairs(ents.FindByClass("npc_*")) do
+			if not IsValid(ent) or not ent.AddEntityRelationship then continue end
+			ent:AddEntityRelationship(bull, ent:Disposition(ply))
+		end
 
-
-	for i, ent in ipairs(ents.FindByClass("terminator_*")) do
-		if not IsValid(ent) or not ent.AddEntityRelationship then continue end
-		ent:AddEntityRelationship(bull, ent:Disposition(ply))
+		for i, ent in ipairs(ents.FindByClass("terminator_*")) do
+			if not IsValid(ent) or not ent.AddEntityRelationship then continue end
+			ent:AddEntityRelationship(bull, ent:Disposition(ply))
+		end
 	end
 
 	ragdoll:CallOnRemove("removeBull", function()
@@ -889,8 +905,51 @@ function hg.GetCurrentCharacter(ply)
 	return (IsValid(rag) and rag) or ply
 end
 
-hook.Add("PlayerDisconnected", "Fake", function(ply) hg.ragdollFake[ply] = nil end)
+hook.Add("PlayerDisconnected", "Fake", function(ply) 
+	hg.ragdollFake[ply] = nil
+	-- Clean up player's bullseye entity
+	if IsValid(ply.bull) then
+		ply.bull:Remove()
+		ply.bull = nil
+	end
+end)
 hook.Add("PlayerFootstep", "CustomFootstep", function(ply) if IsValid(ply.FakeRagdoll) then return true end end)
+
+-- Periodic cleanup of orphaned entities
+local function CleanupOrphanedEntities()
+	if ents.GetCount() < 7000 then return end
+	
+	local cleaned = 0
+	
+	-- Clean up orphaned bullseye entities (ones without valid parent)
+	for _, ent in ipairs(ents.FindByClass("npc_bullseye")) do
+		if IsValid(ent) then
+			local hasValidParent = false
+			
+			-- Check if this bullseye belongs to a valid player
+			if IsValid(ent.ply) and ent.ply:IsPlayer() then
+				hasValidParent = true
+			end
+			
+			-- Check if this bullseye belongs to a valid ragdoll
+			if IsValid(ent.rag) then
+				hasValidParent = true
+			end
+			
+			if not hasValidParent then
+				ent:Remove()
+				cleaned = cleaned + 1
+			end
+		end
+	end
+	
+	if cleaned > 0 then
+		print("[HG] Cleanup: Removed "..cleaned.." orphaned bullseye entities. Edict count: "..ents.GetCount())
+	end
+end
+
+-- Run cleanup every 30 seconds
+timer.Create("HG_EntityCleanup", 30, 0, CleanupOrphanedEntities)
 function hg.RagdollOwner(ragdoll)
 	if not IsValid(ragdoll) then return end
 	local ply = ragdoll.ply
@@ -1207,7 +1266,7 @@ end)]]
 
 local mRandom = math.random
 local IsLiveManagedRagdoll
-local function PushManagedRagdollAway(rag, awayDir, speed)
+PushManagedRagdollAway = function(rag, awayDir, speed)
 	if not IsValid(rag) then return end
 	if awayDir:LengthSqr() <= 0.0001 then return end
 
