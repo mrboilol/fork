@@ -157,7 +157,7 @@ function MODE.BreakOtherNeck(ply, other_ply, aim_ent)
 			if IsValid(ent) then
 				ent:RemoveInternalConstraint(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1")))
 
-				local spine = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Spine2"))
+				local spine = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Neck1"))
 				local head = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1"))
 
 				local pspine = ent:GetPhysicsObjectNum(spine)

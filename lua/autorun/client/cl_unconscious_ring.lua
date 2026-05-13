@@ -133,13 +133,16 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
         
         -- If fibrillating (low BP causing irregular rhythm), skip phases and use curve-like spikes
         if fibrillationFactor > 0.5 and bloodpressure and bloodpressure < 80 then
-            -- Fibrillation pattern: multiple curve-like spikes instead of proper P-QRS-T
-            local spikePhase = (phase * 8) % 1  -- More frequent spikes
-            local spike = math.sin(spikePhase * math.pi) * 0.4 * scale
-            h = spike * (0.5 + math.random() * 0.3)  -- Reduced amplitude with slight variation
-            -- Add subtle noise
-            local noiseIntensity = fibrillationFactor * 0.08 * scale
-            h = h + (math.random() - 0.5) * 2 * noiseIntensity
+            -- Fibrillation pattern: continuous chaotic waves instead of static noise
+            -- Use combinations of sine waves to create smooth but chaotic large waves
+            local wave1 = math.sin(phase * math.pi * 14) * 0.4
+            local wave2 = math.sin(phase * math.pi * 25) * 0.25
+            local wave3 = math.sin(phase * math.pi * 9) * 0.35
+            
+            -- Smooth amplitude variation
+            local amplitudeVariation = 0.6 + math.sin(phase * math.pi * 4) * 0.4
+            
+            h = (wave1 + wave2 + wave3) * scale * amplitudeVariation * 0.8
         else
             -- Normal ECG waveform with possible mild noise
             if phase > 0.05 and phase < 0.15 then
@@ -169,8 +172,9 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
             
             -- Add mild noise only when moderately abnormal
             if fibrillationFactor > 0.2 and fibrillationFactor <= 0.5 then
-                local noiseIntensity = fibrillationFactor * 0.05 * scale
-                h = h + (math.random() - 0.5) * 2 * noiseIntensity
+                local noiseIntensity = fibrillationFactor * 0.08 * scale
+                local smoothNoise = math.sin(phase * math.pi * 40) * 0.5 + math.sin(phase * math.pi * 65) * 0.5
+                h = h + smoothNoise * noiseIntensity
             end
         end
         

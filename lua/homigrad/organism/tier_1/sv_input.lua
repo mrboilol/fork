@@ -1736,7 +1736,7 @@ function hg.BreakNeck(ent)
 
 		-- Lookup bones and validate
 		local headBoneName = "ValveBiped.Bip01_Head1"
-		local spineBoneName = "ValveBiped.Bip01_Spine2"
+		local spineBoneName = "ValveBiped.Bip01_Neck1"
 		
 		local headBoneId = ragdoll:LookupBone(headBoneName)
 		local spineBoneId = ragdoll:LookupBone(spineBoneName)

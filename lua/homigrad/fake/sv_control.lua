@@ -78,18 +78,52 @@ hg.realPhysNum = realPhysNum
 local oldtime
 
 -- Physics bone to limb mapping for broken limb detection
-local physBoneToLimb = {
-    [2] = "rarm", -- R_UpperArm
-    [3] = "larm", -- L_UpperArm  
-    [4] = "larm", -- L_Forearm
-    [5] = "larm", -- L_Hand
-    [6] = "rarm", -- R_Forearm
-    [7] = "rarm", -- R_Hand
-    [8] = "rleg", -- R_Thigh
-    [9] = "rleg", -- R_Calf
-    [11] = "lleg", -- L_Thigh
-    [12] = "lleg", -- L_Calf
-}
+-- Dynamically built per ragdoll to support different models and avoid hardcoded mapping bugs
+local function GetPhysBoneToLimbMap(ragdoll)
+    if not IsValid(ragdoll) then return {} end
+    if ragdoll.physBoneToLimbCache then return ragdoll.physBoneToLimbCache end
+
+    local map = {}
+    
+    local function addBoneAndChildren(boneName, limbName)
+        local boneId = ragdoll:LookupBone(boneName)
+        if not boneId then return end
+        
+        -- Map this bone
+        local physBone = ragdoll:TranslateBoneToPhysBone(boneId)
+        if physBone and physBone ~= -1 then
+            map[physBone] = limbName
+        end
+        
+        -- Map all children
+        local children = ragdoll:GetChildBones(boneId) or {}
+        for _, childId in ipairs(children) do
+            local childPhys = ragdoll:TranslateBoneToPhysBone(childId)
+            if childPhys and childPhys ~= -1 then
+                map[childPhys] = limbName
+            end
+            
+            -- Recursively get children's children
+            local subChildren = ragdoll:GetChildBones(childId) or {}
+            for _, subId in ipairs(subChildren) do
+                local subPhys = ragdoll:TranslateBoneToPhysBone(subId)
+                if subPhys and subPhys ~= -1 then
+                    map[subPhys] = limbName
+                end
+            end
+        end
+    end
+
+    addBoneAndChildren("ValveBiped.Bip01_R_UpperArm", "rarm")
+    addBoneAndChildren("ValveBiped.Bip01_L_UpperArm", "larm")
+    addBoneAndChildren("ValveBiped.Bip01_R_Thigh", "rleg")
+    addBoneAndChildren("ValveBiped.Bip01_L_Thigh", "lleg")
+    addBoneAndChildren("ValveBiped.Bip01_Head1", "head")
+    addBoneAndChildren("ValveBiped.Bip01_Neck1", "head")
+
+    ragdoll.physBoneToLimbCache = map
+    return map
+end
 
 -- Check if a physics bone belongs to a broken/dislocated limb and return damage severity
 -- Returns: isAffected (bool), severityMultiplier (number)
@@ -102,10 +136,20 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
     local ply = hg.RagdollOwner(ragdoll)
     if not IsValid(ply) or not ply.organism then return false, 1.0 end
     
-    local limb = physBoneToLimb[physNumber]
+    local map = GetPhysBoneToLimbMap(ragdoll)
+    local limb = map[physNumber]
     if not limb then return false, 1.0 end
     
     local org = ply.organism
+    
+    -- Special case for neck/head
+    if limb == "head" then
+        if org.spine3 and org.spine3 >= 1 then
+            return true, 0.15
+        end
+        return false, 1.0
+    end
+    
     local isBroken = org[limb] and org[limb] >= 1
     local isDislocated = org[limb .. "dislocation"]
     

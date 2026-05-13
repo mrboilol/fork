@@ -451,8 +451,30 @@ function HUD_DrawDynamicIndicator()
     
     local size = IND_SIZE_BASE
     local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
-    local viewX = ScreenScaleFixed(10) 
-    local viewY = ScreenScaleFixed(10)
+    
+    -- Check if we should position at top right (hg_indicator == 1)
+    local hg_indicator = GetConVar("hg_indicator")
+    local indMode = hg_indicator and hg_indicator:GetInt() or 0
+    local viewX, viewY
+    
+    if indMode == 1 then
+        -- Position at top right
+        viewX = ScrW() - w - ScreenScaleFixed(10)
+        viewY = ScreenScaleFixed(10)
+    else
+        -- Default top left
+        viewX = ScreenScaleFixed(10)
+        viewY = ScreenScaleFixed(10)
+    end
+    
+    -- Store indicator position and size for moodle adjustment
+    HUD.dynamicIndicator = {
+        x = viewX,
+        y = viewY,
+        w = w,
+        h = h,
+        active = true
+    }
     
     local camPos = Vector(95, 0, 65) 
     local lookAng = Angle(11, 180, 0)

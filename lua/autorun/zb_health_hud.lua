@@ -1269,6 +1269,18 @@ local function draw_status_effects()
 	local org = ply.organism
 	local base_x = ScrW() + HUD.status_effects_x
 	local base_y = HUD.status_effects_y
+	
+	-- Adjust moodle position when dynamic indicator is at top right (hg_indicator == 1)
+	local hg_indicator = GetConVar("hg_indicator")
+	local indMode = hg_indicator and hg_indicator:GetInt() or 0
+	if indMode == 1 and HUD.dynamicIndicator and HUD.dynamicIndicator.active then
+		-- Shift moodles down to not overlap with the dynamic indicator at top right
+		local indicatorBottom = HUD.dynamicIndicator.y + HUD.dynamicIndicator.h + ScreenScaleFixed(10)
+		if base_y < indicatorBottom then
+			base_y = indicatorBottom
+		end
+	end
+	
 	local spacing = HUD.status_effects_spacing
 	local size = HUD.status_effects_size
 	local currentTime = CurTime()
