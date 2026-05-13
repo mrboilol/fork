@@ -2310,6 +2310,7 @@ local function draw_status_effects()
 		elseif effect.name == "broken_ribs" then icon_mat = status_sprites.broken_ribs
 		elseif effect.name == "encumbered" then icon_mat = status_sprites.encumbered
 		elseif effect.name == "chip" then icon_mat = status_sprites.chip
+		elseif effect.name == "infection" then icon_mat = status_sprites.infection
 
 		else icon_mat = status_sprites[effect.name] end
 		

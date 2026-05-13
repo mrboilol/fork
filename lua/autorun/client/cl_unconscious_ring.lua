@@ -103,35 +103,75 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
     state.sweepPos = (state.sweepPos + dt * sweepSpeed) % width
 
     local amplitudeScale = math.Clamp((bloodpressure or 93) / 93, 0.1, 1.5)
+    
+    -- Calculate fibrillation/messiness based on pulse, blood pressure, and heartbeat ratio
+    local pulseAbnormal = 0
+    if pulse < 40 then
+        pulseAbnormal = (40 - pulse) / 40  -- 0 to 1 for low pulse
+    elseif pulse > 120 then
+        pulseAbnormal = (pulse - 120) / 80  -- 0 to 1 for high pulse
+    end
+    
+    local bpAbnormal = 0
+    if bloodpressure then
+        if bloodpressure < 70 then
+            bpAbnormal = (70 - bloodpressure) / 50
+        elseif bloodpressure > 140 then
+            bpAbnormal = (bloodpressure - 140) / 60
+        end
+    end
+    
+    local heartbeatRatio = pulse / 70  -- Normalized around 70 BPM
+    local ratioAbnormal = math.abs(heartbeatRatio - 1) * 2  -- 0 when normal, higher when abnormal
+    
+    -- Combined fibrillation factor (0 = clean, 1 = maximum fibrillation)
+    local fibrillationFactor = math.Clamp((pulseAbnormal * 0.4 + bpAbnormal * 0.3 + ratioAbnormal * 0.3), 0, 1)
 
     local function getH(phase, scale)
         phase = phase % 1
         local h = 0
         
-        -- Improved Medical ECG Waveform
-        if phase > 0.05 and phase < 0.15 then
-            -- P wave: Smooth exponential bell curve
-            local p = (phase - 0.1) / 0.05
-            h = math.exp(-p * p * 5) * 0.12 * scale
-        elseif phase > 0.2 and phase < 0.32 then
-            -- QRS complex: Sharp spikes
-            local p = (phase - 0.2) / 0.12
-            if p < 0.15 then 
-                -- Q dip
-                h = -math.sin(p / 0.15 * math.pi) * 0.15 * scale
-            elseif p < 0.5 then 
-                -- R spike
-                local rp = (p - 0.15) / 0.35
-                h = math.sin(rp * math.pi) * 1.1 * scale
-            else 
-                -- S dip
-                local sp = (p - 0.5) / 0.5
-                h = -math.sin(sp * math.pi) * 0.25 * scale
+        -- If fibrillating (low BP causing irregular rhythm), skip phases and use curve-like spikes
+        if fibrillationFactor > 0.5 and bloodpressure and bloodpressure < 80 then
+            -- Fibrillation pattern: multiple curve-like spikes instead of proper P-QRS-T
+            local spikePhase = (phase * 8) % 1  -- More frequent spikes
+            local spike = math.sin(spikePhase * math.pi) * 0.4 * scale
+            h = spike * (0.5 + math.random() * 0.3)  -- Reduced amplitude with slight variation
+            -- Add subtle noise
+            local noiseIntensity = fibrillationFactor * 0.08 * scale
+            h = h + (math.random() - 0.5) * 2 * noiseIntensity
+        else
+            -- Normal ECG waveform with possible mild noise
+            if phase > 0.05 and phase < 0.15 then
+                -- P wave: Smooth exponential bell curve
+                local p = (phase - 0.1) / 0.05
+                h = math.exp(-p * p * 5) * 0.12 * scale
+            elseif phase > 0.2 and phase < 0.32 then
+                -- QRS complex: Sharp spikes
+                local p = (phase - 0.2) / 0.12
+                if p < 0.15 then 
+                    -- Q dip
+                    h = -math.sin(p / 0.15 * math.pi) * 0.15 * scale
+                elseif p < 0.5 then 
+                    -- R spike
+                    local rp = (p - 0.15) / 0.35
+                    h = math.sin(rp * math.pi) * 1.1 * scale
+                else 
+                    -- S dip
+                    local sp = (p - 0.5) / 0.5
+                    h = -math.sin(sp * math.pi) * 0.25 * scale
+                end
+            elseif phase > 0.45 and phase < 0.65 then
+                -- T wave: Asymmetric bell curve
+                local p = (phase - 0.55) / 0.1
+                h = math.exp(-p * p * 4) * 0.22 * scale
             end
-        elseif phase > 0.45 and phase < 0.65 then
-            -- T wave: Asymmetric bell curve
-            local p = (phase - 0.55) / 0.1
-            h = math.exp(-p * p * 4) * 0.22 * scale
+            
+            -- Add mild noise only when moderately abnormal
+            if fibrillationFactor > 0.2 and fibrillationFactor <= 0.5 then
+                local noiseIntensity = fibrillationFactor * 0.05 * scale
+                h = h + (math.random() - 0.5) * 2 * noiseIntensity
+            end
         end
         
         return h

@@ -32,6 +32,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.stroke_meter = 0
 	org.oxygen_deprivation = 0
 
+	org.tranexamic_acid = 0
+
 	org.thiamine = 0
 	org.thiamine_timer = 0
 	org.thiamine_healed = false
@@ -447,8 +449,8 @@ end)
 hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     local ramp_rate = 0
 
-    -- Ramp up on high blood pressure (>115)
-    if org.bloodpressure > 115 then
+    -- Ramp up on high blood pressure (>115), but prevent if tranexamic acid is active
+    if org.bloodpressure > 115 and org.tranexamic_acid <= 0 then
         local bp_effect = (org.bloodpressure - 115) / 35 -- Normalize pressure effect
         ramp_rate = ramp_rate + (0.008 * bp_effect) -- Reduced from 0.025 to 0.008 (3x slower)
     end
@@ -460,6 +462,11 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     local decay_rate = 0.005
     if org.internalBleed and org.internalBleed > 0 then
         decay_rate = 0.001
+    end
+
+    -- Tranexamic acid slowly regresses stroke
+    if org.tranexamic_acid > 0 then
+        decay_rate = decay_rate + 0.02 -- Additional decay when tranexamic acid is active
     end
 
     org.stroke_meter = math.max((org.stroke_meter or 0) - timeValue * decay_rate, 0)
@@ -599,6 +606,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
 	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
+	org.tranexamic_acid = math.Approach(org.tranexamic_acid, 0, timeValue / 120) -- Tranexamic acid decays over 2 minutes
 
 	if org.berserk > 0 and !org.berserkActive then
 		org.berserkActive = true

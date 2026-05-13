@@ -51,14 +51,41 @@ if SERVER then
 		local owner = self:GetOwner()
 
 		if self.modeValues[1] == 0 then return end
+		
 		local internalBleed = org.internalBleed - org.internalBleedHeal
+		local stroke_meter = org.stroke_meter or 0
+		local infection = org.infection or 0
+		
+		local canHeal = false
 
+		-- Heal internal bleeding
 		if internalBleed > 0 then
 			local healed = math.max(internalBleed - self.modeValues[1], 0)
 			self.modeValues[1] = self.modeValues[1] - (internalBleed - healed) * (owner.Profession == "doctor" and 0.5 or 1)
 			org.internalBleedHeal = org.internalBleedHeal + (internalBleed - healed)
-			org.stroke_meter = math.max(org.stroke_meter - 0.25, 0)
-			org.infection = math.max(org.infection - 0.4, 0)
+			org.tranexamic_acid = math.min(org.tranexamic_acid + 5, 10)
+			canHeal = true
+		end
+
+		-- Heal stroke
+		if stroke_meter > 0 and self.modeValues[1] > 0 then
+			local healed = math.max(stroke_meter - self.modeValues[1] * 0.5, 0)
+			local amountUsed = (stroke_meter - healed) * 2
+			self.modeValues[1] = math.max(self.modeValues[1] - amountUsed * (owner.Profession == "doctor" and 0.5 or 1), 0)
+			org.stroke_meter = healed
+			canHeal = true
+		end
+
+		-- Heal infection
+		if infection > 0 and self.modeValues[1] > 0 then
+			local healed = math.max(infection - 0.4, 0)
+			local amountUsed = 2
+			self.modeValues[1] = math.max(self.modeValues[1] - amountUsed * (owner.Profession == "doctor" and 0.5 or 1), 0)
+			org.infection = healed
+			canHeal = true
+		end
+
+		if canHeal then
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
 		end
 

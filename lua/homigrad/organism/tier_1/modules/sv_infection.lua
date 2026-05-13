@@ -8,9 +8,9 @@ end
 module[2] = function(owner, org, mulTime)
     if org.infection > 0 then
         if org.infection > 0.25 then
-            org.infection = math.min(org.infection + (mulTime / 150), 1.0) -- Cap at 1.0
+            org.infection = math.min(org.infection + (mulTime / 100), 1.0) -- Cap at 1.0 (faster growth: 150 -> 100)
         else
-            org.infection = org.infection - (mulTime / 200)
+            org.infection = org.infection - (mulTime / 250) -- Slower decay: 200 -> 250
         end
     end
 

@@ -953,7 +953,7 @@ end
 SWEP.BrokenArmPenalty = {
     DamageMultiplier = 0.5, -- 50% damage
     StaminaMultiplier = 1.5, -- 50% more stamina
-    SwingSpeedMultiplier = 1.5, -- 50% slower
+    SwingSpeedMultiplier = 0.5, -- 50% slower
     BlockDurationMultiplier = 0.5 -- 50% shorter block
 }
 
@@ -2258,7 +2258,7 @@ function SWEP:PrimaryAttack()
         local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
         local org = ply.organism
         if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
-            multiplier = multiplier * 1.5 -- More severe
+            multiplier = multiplier * 0.5 -- More severe (even slower)
         end
         mul = mul * multiplier
     end
@@ -2384,7 +2384,7 @@ function SWEP:SecondaryAttack(override)
         local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
         local org = ply.organism
         if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
-            multiplier = multiplier * 1.5 -- More severe
+            multiplier = multiplier * 0.5 -- More severe (even slower)
         end
         mul = mul * multiplier
     end
