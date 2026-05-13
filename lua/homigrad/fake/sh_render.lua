@@ -62,6 +62,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 	local ARMOR_RENDER_DIST_SQR = 1450 * 1450
 	local DETAIL_RENDER_DIST_SQR = 2000 * 2000
 	local angfuck = Angle()
+	local hg_no_camera_in_cars = CreateConVar("hg_no_camera_in_cars","0",FCVAR_ARCHIVE + FCVAR_REPLICATED, "disables camera in cars", 0, 1)
 	function DrawPlayerRagdoll(ent, ply) --// actually not only ragdoll render but player too
 		if ply.prevragdoll_index != nil and ply.prevragdoll_index != ply.ragdoll_index and ply.ragdoll_index == 0 then
 			//print(ply.ragdoll_index, ply.prevragdoll_index, Entity(ply.ragdoll_index))
@@ -138,8 +139,10 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 			if fullPoseRender then
 				local mat = ent:GetBoneMatrix(lkp)
 				if mat then
-					if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
-						mat:SetScale(wawanted)
+					if !(Glide and Glide.Camera and !Glide.Camera.isInFirstPerson and lply == ply and lply:InVehicle() and hg_no_camera_in_cars:GetBool()) then
+						if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
+							mat:SetScale(wawanted)
+						end
 					end
 					--angfuck[3] = -GetViewPunchAngles2()[2] - GetViewPunchAngles3()[2]
 
