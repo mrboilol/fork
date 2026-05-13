@@ -109,7 +109,7 @@ end)
 
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
-	if org.otrub or org.fake or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood < 2900) or org.consciousness <= 0.4 then
+	if org.otrub or org.fake or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood < 2750) or org.consciousness <= 0.4 then
 		return false
 	end
 end)
@@ -450,7 +450,7 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     -- Ramp up on high blood pressure (>115)
     if org.bloodpressure > 115 then
         local bp_effect = (org.bloodpressure - 115) / 35 -- Normalize pressure effect
-        ramp_rate = ramp_rate + (0.025 * bp_effect) -- Proportional to how high the blood pressure is
+        ramp_rate = ramp_rate + (0.008 * bp_effect) -- Reduced from 0.025 to 0.008 (3x slower)
     end
 
     if ramp_rate > 0 then
@@ -463,6 +463,11 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     end
 
     org.stroke_meter = math.max((org.stroke_meter or 0) - timeValue * decay_rate, 0)
+
+    -- Need otrub if stroke meter is above 1.025
+    if (org.stroke_meter or 0) > 1.025 then
+        org.needotrub = true
+    end
 
     if org.stroke_meter >= 1.15 and not org.is_stroking then
         org.is_stroking = true
@@ -667,8 +672,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		despairAdd = despairAdd + math.Clamp((org.bleed - 2) / 14, 0, 1) * timeValue * 0.007
 	end
 
-	if (org.blood or 5000) < 3200 then
-		despairAdd = despairAdd + math.Clamp((3200 - org.blood) / 2200, 0, 1) * timeValue * 0.009
+	if (org.blood or 5000) < 3750 then
+		despairAdd = despairAdd + math.Clamp((3750 - org.blood) / 2200, 0, 1) * timeValue * 0.009
 	end
 
 	if (org.consciousness or 1) < 0.7 then
@@ -786,7 +791,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-	if (org.blood < 2700) then org.needfake = true end
+	if (org.blood < 2750) then org.needfake = true end
 	if org.neckslit and not org.otrub then org.needfake = true end
 
 	local just_went_uncon = not org.otrub and org.needotrub

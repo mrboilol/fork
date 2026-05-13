@@ -20,7 +20,7 @@ module[1] = function(org)
 end
 
 function hg.organism.should_gain_fear(org)
-	return ((org.pain > 30) or (org.blood < 3250) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
+	return ((org.pain > 30) or (org.blood < 3750) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
 end
 
 module[2] = function(owner, org, timeValue)

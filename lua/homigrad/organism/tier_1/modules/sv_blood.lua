@@ -119,7 +119,7 @@ module[2] = function(owner, org, mulTime)
 		org.ischemia = org.ischemia + (org.internalBleed - 1) * mulTime / 20
 	end
 
-	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
+	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3250, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
@@ -194,7 +194,12 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	if org.blood < (2400 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
+	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
+
+	-- Ischemia kicks in below 2500 blood
+	if org.blood < 2500 then
+		org.ischemia = math.min(org.ischemia + mulTime * 0.02, 1.0)
+	end
 
 	local bleed = org.internalBleed / 14 -- + org.lungsR[3] + org.lungsL[3]
 	org.internalBleed = math.Approach(org.internalBleed, 0, org.internalBleedHeal > 0 and mulTime / 2 or mulTime / 55)
@@ -204,14 +209,7 @@ module[2] = function(owner, org, mulTime)
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 10 * org.pulse / 70, 1) end
 	
 	if org.internalBleed > 0.1 then
-		local chance = (org.internalBleed - 0.1) * 0.002 -- 0.2% chance at 1.1 internal bleeding
-		if math.random() < chance * mulTime then
-			org.hemothorax = true
-		end
-	end
-
-	if org.internalBleed > 0.1 then
-		local chance = (org.internalBleed - 0.1) * 0.002 -- 0.2% chance at 1.1 internal bleeding
+		local chance = (org.internalBleed - 0.1) * 0.0005 -- 0.05% chance at 1.1 internal bleeding (reduced from 0.2%)
 		if math.random() < chance * mulTime then
 			org.hemothorax = true
 		end
@@ -237,13 +235,13 @@ module[2] = function(owner, org, mulTime)
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)--в секунду
 	
-	local timetouncon = (org.blood - 2500) / org.bleed
+	local timetouncon = (org.blood - 2750) / org.bleed
 	
 	local bleeding_will_stop = (timetouncon ~= timetouncon) or ((coagulatespeed * timetouncon - org.bleed) > 0)
 	local canwakeup_pain = ((org.pain - 5) / (org.painlessen)) < timetouncon
 	org.timetouncon = (timetouncon ~= timetouncon) and timetouncon or Lerp(hg.lerpFrameTime2(0.01,mulTime), org.timetouncon or 10000, timetouncon)
 	
-	if org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 3000)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) then
+	if org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 3250)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) then
 		org.incapacitated = true
 	else
 		org.incapacitated = false

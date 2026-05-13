@@ -1597,24 +1597,35 @@ local function draw_status_effects()
 
 				local ischemia_val = smooth.ischemia or getOrgVal(org, "ischemia", 0)
 				local hemotransfusionshock_val = smooth.hemotransfusionshock or getOrgVal(org, "hemotransfusionshock", 0)
+				local infection_val = smooth.infection or getOrgVal(org, "infection", 0)
+				
+				-- Sepsis moodle: triggers from ischemia or hemotransfusionshock (not infection)
 				if ischemia_val > 0.1 or hemotransfusionshock_val > 0.1 then
+					local level_num = 1
+					if ischemia_val > 0.5 or hemotransfusionshock_val > 0.3 then level_num = 2 end
+					if ischemia_val > 1.0 or hemotransfusionshock_val > 0.5 then level_num = 3 end
+					
 					table.insert(effects, {
 						name = "sepsis",
-                        level_num = 1,
+                        level_num = level_num,
                         has_levels = true,
-						priority = 0.8,
-						value = math_floor(ischemia_val * 100)
+						priority = 0.85,
+						value = math_floor(math.max(ischemia_val, hemotransfusionshock_val) * 100)
 					})
 					currentEffectNames["sepsis"] = true
 				end
 
-				local infection_val = smooth.infection or getOrgVal(org, "infection", 0)
+				-- Infection moodle: shows for infections only (not sepsis)
 				if infection_val > 0.1 then
+					local level_num = 1
+					if infection_val >= 0.5 then level_num = 2 end
+					if infection_val >= 0.75 then level_num = 3 end
+					
 					table.insert(effects, {
 						name = "infection",
-						level_num = 1,
+						level_num = level_num,
 						has_levels = true,
-						priority = 0.8,
+						priority = 0.75,
 						value = math_floor(infection_val * 100)
 					})
 					currentEffectNames["infection"] = true

@@ -133,7 +133,20 @@ module[2] = function(owner, org, timeValue)
 
 	org.adrenalineAdd = Approach(org.adrenalineAdd, 0, org.adrenalineAdd < 0 and timeValue / 30 or timeValue / 5)
 
-	org.adrenaline = Approach(org.adrenaline, 0, timeValue / (org.otrub and 5 or 25))
+	-- Faster adrenaline decay when coming off berserk or noradrenaline
+	local fastAdrenalineDecay = false
+	if org._berserkEndTime and CurTime() < org._berserkEndTime then
+		fastAdrenalineDecay = true
+	elseif org._noradrenalineEndTime and CurTime() < org._noradrenalineEndTime then
+		fastAdrenalineDecay = true
+	end
+
+	local adrenalineDecayRate = timeValue / (org.otrub and 5 or 25)
+	if fastAdrenalineDecay then
+		adrenalineDecayRate = timeValue / 5 -- Much faster decay
+	end
+
+	org.adrenaline = Approach(org.adrenaline, 0, adrenalineDecayRate)
 
 	if org.lleg < 1 and !org.llegamputated then
 		org.lleg = max(org.lleg - timeValue / 240, 0)

@@ -262,7 +262,13 @@ module[2] = function(owner, org, timeValue)
 			regenerate = regenerate * 0.1 -- 90% penalty
 			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue, 0) -- recovers over time
 		end
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 3500, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 3750, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
+
+		-- Below 2500 blood, keep dropping O2
+		if org.blood < 2500 then
+			local o2DropRate = (2500 - org.blood) / 2500 -- 0 to 1 based on how far below 2500
+			o2[1] = max(o2[1] - timeValue * o2DropRate * 2, 0)
+		end
 
 		o2.curregen = regenerate
 
