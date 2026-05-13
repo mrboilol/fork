@@ -211,9 +211,6 @@ function hg.GenerateLoot(ply,ent,func)
 				ply:ChatPrint("sv_lootspawn: MUL = "..mul.." TIME/"..div.." = "..(time/div).." TIME = "..time)
 			end)
 		end
-	if IsValid(ply) then
-		ply:ChatPrint("Your loot multiplier is: " .. mul)
-	end
 	end
 	--[[
 		Weapons

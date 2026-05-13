@@ -84,14 +84,14 @@ local function LoadModes()
             end
         end
 
-	zb.modes[name] = MODE
-	zb.modes[name].saved = saved
+	zb.modes[MODE.name] = MODE
+	zb.modes[MODE.name].saved = saved
 
 	if SERVER then
 		if MODE.SetupChances then
 			MODE:SetupChances()
 		else
-			zb.ModesChances[name] = zb.ModesChances[name] or MODE.Chance
+			zb.ModesChances[MODE.name] = zb.ModesChances[MODE.name] or MODE.Chance
 		end
 	end
 
