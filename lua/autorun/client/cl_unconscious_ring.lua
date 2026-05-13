@@ -21,6 +21,24 @@ local function DrawArc(x, y, radius, thickness, start_ang, end_ang, roughness, c
     end
 end
 
+-- Custom thick line function for buttery smooth ECG rendering
+local function DrawThickLine(x1, y1, x2, y2, thickness)
+    local dx = x2 - x1
+    local dy = y2 - y1
+    local len = math.sqrt(dx * dx + dy * dy)
+    if len == 0 then return end
+    
+    local nx = (dy / len) * thickness * 0.5
+    local ny = (-dx / len) * thickness * 0.5
+    
+    surface.DrawPoly({
+        { x = x1 + nx, y = y1 + ny },
+        { x = x2 + nx, y = y2 + ny },
+        { x = x2 - nx, y = y2 - ny },
+        { x = x1 - nx, y = y1 - ny }
+    })
+end
+
 surface.CreateFont("UnconsciousDots", {
     font = "Bahnschrift",
     size = 120,
@@ -78,8 +96,6 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
     local dt = time - state.lastUpdate
     state.lastUpdate = time
     
-    -- Increment heart phase based on pulse
-    -- pulse is BPM, so pulse/60 is beats per second
     state.phase = state.phase + dt * (pulse / 60)
     
     local sweepSpeed = width / 4
@@ -88,27 +104,34 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
 
     local amplitudeScale = math.Clamp((bloodpressure or 93) / 93, 0.1, 1.5)
 
-    -- Fill all indices between oldSweepPos and newSweepPos to ensure no gaps
     local function getH(phase, scale)
         phase = phase % 1
         local h = 0
         
-        -- P wave: small bump
+        -- Improved Medical ECG Waveform
         if phase > 0.05 and phase < 0.15 then
-            h = h + math.sin((phase - 0.05) / 0.1 * math.pi) * 0.12 * scale
-        -- QRS complex: the main spike
+            -- P wave: Smooth exponential bell curve
+            local p = (phase - 0.1) / 0.05
+            h = math.exp(-p * p * 5) * 0.12 * scale
         elseif phase > 0.2 and phase < 0.32 then
+            -- QRS complex: Sharp spikes
             local p = (phase - 0.2) / 0.12
-            if p < 0.15 then -- Q
-                h = h - math.sin(p / 0.15 * math.pi) * 0.15 * scale
-            elseif p < 0.5 then -- R
-                h = h + math.sin((p - 0.15) / 0.35 * math.pi) * 1.0 * scale
-            else -- S
-                h = h - math.sin((p - 0.5) / 0.5 * math.pi) * 0.25 * scale
+            if p < 0.15 then 
+                -- Q dip
+                h = -math.sin(p / 0.15 * math.pi) * 0.15 * scale
+            elseif p < 0.5 then 
+                -- R spike
+                local rp = (p - 0.15) / 0.35
+                h = math.sin(rp * math.pi) * 1.1 * scale
+            else 
+                -- S dip
+                local sp = (p - 0.5) / 0.5
+                h = -math.sin(sp * math.pi) * 0.25 * scale
             end
-        -- T wave: medium bump
         elseif phase > 0.45 and phase < 0.65 then
-            h = h + math.sin((phase - 0.45) / 0.2 * math.pi) * 0.22 * scale
+            -- T wave: Asymmetric bell curve
+            local p = (phase - 0.55) / 0.1
+            h = math.exp(-p * p * 4) * 0.22 * scale
         end
         
         return h
@@ -119,35 +142,18 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
 
     for i = 0, steps do
         local p = (oldSweepPos + i) % width
-        -- Interpolate heartPhase for this specific pixel
         local p_phase = state.phase - (dt * (pulse / 60) * (1 - i/steps))
         state.points[math.floor(p)] = getH(p_phase, amplitudeScale)
     end
     
-    -- Clear a small gap ahead of the sweepPos
+    -- Clear a gap ahead of the sweepPos
     local gap = 12
     for i = 1, gap do
         state.points[math.floor((state.sweepPos + i) % width)] = nil
     end
     
-    -- Draw the buffered points
     local startX = centerX - width / 2
     local lastX, lastY
-    
-    -- Move drawSegment outside for efficiency
-    local function drawSegment(sx, sy, slastX, slastY, sthick)
-        if slastX then
-            local sdy = sy - slastY
-            if math.abs(sdy) > 1 then
-                local ssy = sdy > 0 and slastY or sy
-                surface.DrawRect(sx - sthick, ssy, sthick * 2 + 1, math.abs(sdy) + 1)
-            else
-                surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
-            end
-        else
-            surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
-        end
-    end
 
     for i = 0, width - 1 do
         local h_val = state.points[i]
@@ -162,9 +168,8 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
         local dist = state.sweepPos - i
         if dist < 0 then dist = dist + width end
         
-        -- Matching the reference image: bright leading edge with a long, dim persistent tail
-        local alphaMult = math.exp(-dist / (width * 0.08)) -- Sharp initial drop
-        alphaMult = math.max(alphaMult, math.Clamp(0.18 * (1 - dist / width), 0, 0.18)) -- Long dim tail
+        local alphaMult = math.exp(-dist / (width * 0.08))
+        alphaMult = math.max(alphaMult, math.Clamp(0.18 * (1 - dist / width), 0, 0.18))
         
         local currentAlpha = color.a * alphaMult
         local shadowAlpha = 180 * alphaMult * ringAlpha
@@ -172,13 +177,18 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
         draw.NoTexture()
         local thick = 2
         
-        -- Draw Shadow first
-        surface.SetDrawColor(0, 0, 0, shadowAlpha)
-        drawSegment(x, y, lastX, lastY, thick + 1)
+        if lastX and lastY then
+            -- Distance check prevents the line from connecting across the gap
+            if math.abs(x - lastX) < (width / 2) then
+                -- Shadow
+                surface.SetDrawColor(0, 0, 0, shadowAlpha)
+                DrawThickLine(lastX, lastY, x, y, thick + 1.5)
 
-        -- Draw Main Line
-        surface.SetDrawColor(color.r, color.g, color.b, currentAlpha)
-        drawSegment(x, y, lastX, lastY, thick)
+                -- Main Line
+                surface.SetDrawColor(color.r, color.g, color.b, currentAlpha)
+                DrawThickLine(lastX, lastY, x, y, thick)
+            end
+        end
         
         lastX, lastY = x, y
     end
@@ -220,17 +230,18 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         if currentShock > peakShock then
             peakShock = currentShock
         end
-        ringAlpha = math.Approach(ringAlpha, 1, FrameTime() * 2)
+        -- Smooth Alpha lerping
+        ringAlpha = Lerp(FrameTime() * 4, ringAlpha, 1)
         dotBeat = math.floor(CurTime()) % 3
     else
-        ringAlpha = math.Approach(ringAlpha, 0, FrameTime() * 3)
-        if ringAlpha <= 0 then
+        ringAlpha = Lerp(FrameTime() * 6, ringAlpha, 0)
+        if ringAlpha <= 0.01 then
+            ringAlpha = 0
             peakShock = 40
             centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
         end
     end
     
-    -- Evaluate states BEFORE returning early to fix the conscious rendering!
     local showTopLeftECG = false
     local showPulseCheckECG = false
 
@@ -249,19 +260,18 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         showPulseCheckECG = true
     end
 
-    -- TopLeftECG overrides
     if (admiring or (pulse < 40 or pulse > 150)) and not isUnconscious then
         showTopLeftECG = true
     end
 
-    -- The corrected safety early return
     if ringAlpha <= 0 and not showTopLeftECG and not showPulseCheckECG then return end
     
-    -- Unconscious center ring & ECG rendering block
-    if ringAlpha > 0 then
-        lerpBrain = math.Approach(lerpBrain, org.brain or 0, FrameTime() * 2)
-        lerpShock = math.Approach(lerpShock, org.shock or 0, FrameTime() * 50)
-        lerpConsciousness = math.Approach(lerpConsciousness, org.consciousness or 0, FrameTime() * 2)
+    -- Unconscious center ring & ECG
+    if ringAlpha > 0.01 then
+        -- Smooth easing values using Lerp instead of Math.Approach
+        lerpBrain = Lerp(FrameTime() * 3, lerpBrain, org.brain or 0)
+        lerpShock = Lerp(FrameTime() * 6, lerpShock, org.shock or 0)
+        lerpConsciousness = Lerp(FrameTime() * 3, lerpConsciousness, org.consciousness or 0)
         
         local scrW, scrH = ScrW(), ScrH()
         local centerX, centerY = scrW / 2, scrH / 2
@@ -305,14 +315,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    -- Pulse Checking UI Box (Bottom center)
+    -- Pulse Checking UI Box
     if showPulseCheckECG then
-        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 1, FrameTime() * 0.5)
+        ecgAlphaPulseCheck = Lerp(FrameTime() * 4, ecgAlphaPulseCheck, 1)
     else
-        ecgAlphaPulseCheck = math.Approach(ecgAlphaPulseCheck, 0, FrameTime() * 1)
+        ecgAlphaPulseCheck = Lerp(FrameTime() * 6, ecgAlphaPulseCheck, 0)
     end
 
-    if ecgAlphaPulseCheck > 0 then
+    if ecgAlphaPulseCheck > 0.01 then
         local boxW, boxH = 300, 150
         local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 20
 
@@ -327,7 +337,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local target_brain = target_org.brain or 0
         local target_isCritical = (target_org.critical == true) or (target_pulse < 1 and target_brain >= 0.02) or (target_brain >= 0.34)
 
-        -- Target Counting Logic Execution
         if g_PulseCheckData and not g_PulseCheckData.completed then
             if target_org.heartstop or target_pulse <= 0 then
                 g_PulseCheckData.completed = true
@@ -371,14 +380,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
-    -- TopLeft ECG UI Box (Self admiring / Abnormal Heart)
+    -- TopLeft ECG UI Box
     if showTopLeftECG then
-        ecgAlpha = math.Approach(ecgAlpha, 1, FrameTime() * 0.5)
+        ecgAlpha = Lerp(FrameTime() * 4, ecgAlpha, 1)
     else
-        ecgAlpha = math.Approach(ecgAlpha, 0, FrameTime() * 1)
+        ecgAlpha = Lerp(FrameTime() * 6, ecgAlpha, 0)
     end
 
-    if ecgAlpha > 0 then
+    if ecgAlpha > 0.01 then
         local boxW, boxH = 300, 150
         local boxX, boxY = 20, 20
 
@@ -387,7 +396,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
-        -- Purely renders the EKG, no counting logic needed here for the user's monitor!
         DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, pulse, Color(255, 255, 255, 255), ecgAlpha, bloodpressure)
     else
         topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
