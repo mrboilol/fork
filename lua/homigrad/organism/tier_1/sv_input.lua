@@ -1915,27 +1915,6 @@ local limb_constraint_limits = {
     rleg = {minYaw = -70, minRoll = -50, minPitch = -70, maxYaw = 70, maxRoll = 80, maxPitch = 70},
 }
 
--- Matrix cache for bind pose calculations
-local matrix_cache = {}
-
-local function getBoneMatrix(rag, boneID)
-    local model = rag:GetModel()
-    if not matrix_cache[model] then
-        local _, tab = util.GetModelMeshes(model)
-        if not tab then return end
-
-        matrix_cache[model] = {}
-        for i = 0, rag:GetPhysicsObjectCount() - 1 do
-            local id = rag:TranslatePhysBoneToBone(i)
-            if tab[id] and tab[id].matrix then
-                local mat = tab[id].matrix:GetInverse()
-                matrix_cache[model][id] = mat
-            end
-        end
-    end
-    return matrix_cache[model] and matrix_cache[model][boneID]
-end
-
 -- OLD LUA STYLE: Create floppy limb constraint using phys_ragdollconstraint
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     if not IsValid(rag) or not rag:IsRagdoll() then return false end
@@ -1943,10 +1922,6 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     local bone1 = rag:LookupBone(bone1Name)
     local bone2 = rag:LookupBone(bone2Name)
     if not bone1 or not bone2 then return false end
-
-    local matrix = getBoneMatrix(rag, bone1)
-    local matrix_par = getBoneMatrix(rag, bone2)
-    if not matrix or not matrix_par then return false end
 
     local phys1 = rag:TranslateBoneToPhysBone(bone1)
     local phys2 = rag:TranslateBoneToPhysBone(bone2)
@@ -1963,35 +1938,20 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     -- Remove existing rigid constraint
     pcall(function() rag:RemoveInternalConstraint(phys1) end)
 
-    -- Save current state
-    local pos_ori = pBone1:GetPos()
-    local pos_ori_par = pBone2:GetPos()
-    local ang_ori = pBone1:GetAngles()
-    local ang_ori_par = pBone2:GetAngles()
-    local vel_ori = pBone1:GetVelocity()
-    local vel_ori_par = pBone2:GetVelocity()
-    local avel_ori = pBone1:GetAngleVelocity()
-    local avel_ori_par = pBone2:GetAngleVelocity()
-
-    -- Move to bind pose for accurate constraint creation
-    local m_translation = rag:LocalToWorld(matrix:GetTranslation())
-    local p_translation = rag:LocalToWorld(matrix_par:GetTranslation())
-
-    pBone1:SetPos(m_translation)
-    pBone1:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
-    pBone2:SetPos(p_translation)
-    pBone2:SetAngles(rag:LocalToWorldAngles(matrix_par:GetAngles()))
-
-    -- Wake and enable
+    -- Wake and enable (DON'T teleport to bind pose - causes face sticking!)
     pBone1:Wake()
     pBone2:Wake()
     pBone1:EnableMotion(true)
     pBone2:EnableMotion(true)
 
-    -- OLD LUA: Use phys_ragdollconstraint with spawnflags 1 (no collision between constrained parts)
+    -- Create constraint at CURRENT position (not bind pose)
+    -- This prevents limbs from teleporting through head/face
+    local consPos = pBone1:GetPos()
+
+    -- BONE BUSTER STYLE: Use phys_ragdollconstraint WITHOUT spawnflags 1
+    -- This keeps collision between bones so they don't pass through each other
     local cons = ents.Create("phys_ragdollconstraint")
-    cons:SetPos(m_translation)
-    cons:SetKeyValue("spawnflags", 1)
+    cons:SetPos(consPos)
     cons:SetKeyValue("xmin", limits[0][1])
     cons:SetKeyValue("xmax", limits[0][0])
     cons:SetKeyValue("ymin", limits[1][1])
@@ -2001,21 +1961,6 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     cons:SetPhysConstraintObjects(pBone1, pBone2)
     cons:Spawn()
     cons:Activate()
-
-    -- Restore original state
-    pBone1:SetPos(pos_ori)
-    pBone1:SetAngles(ang_ori)
-    pBone2:SetPos(pos_ori_par)
-    pBone2:SetAngles(ang_ori_par)
-
-    pBone1:SetVelocityInstantaneous(vel_ori)
-    pBone1:SetVelocity(vel_ori)
-    pBone2:SetVelocityInstantaneous(vel_ori_par)
-    pBone2:SetVelocity(vel_ori_par)
-    pBone1:SetAngleVelocityInstantaneous(avel_ori)
-    pBone1:SetAngleVelocity(avel_ori)
-    pBone2:SetAngleVelocityInstantaneous(avel_ori_par)
-    pBone2:SetAngleVelocity(avel_ori_par)
 
     return cons and IsValid(cons) and cons
 end
