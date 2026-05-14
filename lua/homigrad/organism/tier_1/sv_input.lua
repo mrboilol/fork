@@ -1915,54 +1915,110 @@ local limb_constraint_limits = {
     rleg = {minYaw = -70, minRoll = -50, minPitch = -70, maxYaw = 70, maxRoll = 80, maxPitch = 70},
 }
 
--- OLD LUA STYLE: Create floppy limb constraint using phys_ragdollconstraint
+-- Bone Buster style matrix cache for bind pose
+local bb_matrix_cache = {}
+
+local function getBoneMatrixBB(rag, boneID)
+    local model = rag:GetModel()
+    if not bb_matrix_cache[model] then
+        local _, tab = util.GetModelMeshes(model)
+        if not tab then return nil end
+
+        bb_matrix_cache[model] = {}
+        for i = 0, rag:GetPhysicsObjectCount() - 1 do
+            local id = rag:TranslatePhysBoneToBone(i)
+            if tab[id] and tab[id].matrix then
+                bb_matrix_cache[model][id] = tab[id].matrix
+            end
+        end
+    end
+    return bb_matrix_cache[model] and bb_matrix_cache[model][boneID]
+end
+
+-- BONE BUSTER STYLE: Create floppy limb constraint
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     if not IsValid(rag) or not rag:IsRagdoll() then return false end
 
-    local bone1 = rag:LookupBone(bone1Name)
-    local bone2 = rag:LookupBone(bone2Name)
-    if not bone1 or not bone2 then return false end
+    local bone1ID = rag:LookupBone(bone1Name)
+    local bone2ID = rag:LookupBone(bone2Name)
+    if not bone1ID or not bone2ID then return false end
 
-    local phys1 = rag:TranslateBoneToPhysBone(bone1)
-    local phys2 = rag:TranslateBoneToPhysBone(bone2)
+    local phys1 = rag:TranslateBoneToPhysBone(bone1ID)
+    local phys2 = rag:TranslateBoneToPhysBone(bone2ID)
     if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then return false end
 
-    local pBone1 = rag:GetPhysicsObjectNum(phys1)
-    local pBone2 = rag:GetPhysicsObjectNum(phys2)
-    if not (IsValid(pBone1) and IsValid(pBone2)) then return false end
+    local phys = rag:GetPhysicsObjectNum(phys1)
+    local phys_parent = rag:GetPhysicsObjectNum(phys2)
+    if not (IsValid(phys) and IsValid(phys_parent)) then return false end
 
-    -- Check for limits
+    -- Get Bone Buster style limits
     local limits = bb_constraints_limit[bone1Name]
     if not limits then return false end
 
     -- Remove existing rigid constraint
     pcall(function() rag:RemoveInternalConstraint(phys1) end)
 
-    -- Wake and enable (DON'T teleport to bind pose - causes face sticking!)
-    pBone1:Wake()
-    pBone2:Wake()
-    pBone1:EnableMotion(true)
-    pBone2:EnableMotion(true)
+    -- Get bind pose matrices
+    local matrix = getBoneMatrixBB(rag, bone1ID)
+    local matrix_par = getBoneMatrixBB(rag, bone2ID)
+    if not matrix or not matrix_par then return false end
 
-    -- Create constraint at CURRENT position (not bind pose)
-    -- This prevents limbs from teleporting through head/face
-    local consPos = pBone1:GetPos()
+    -- BONE BUSTER: Save current state
+    local pos_ori = phys:GetPos()
+    local pos_ori_par = phys_parent:GetPos()
+    local ang_ori = phys:GetAngles()
+    local ang_ori_par = phys_parent:GetAngles()
+    local vel_ori = phys:GetVelocity()
+    local vel_ori_par = phys_parent:GetVelocity()
+    local avel_ori = phys:GetAngleVelocity()
+    local avel_ori_par = phys_parent:GetAngleVelocity()
 
-    -- BONE BUSTER STYLE: Use phys_ragdollconstraint WITHOUT spawnflags 1
-    -- This keeps collision between bones so they don't pass through each other
+    -- BONE BUSTER: Move to bind pose for accurate constraint creation
+    local m_translation = rag:LocalToWorld(matrix:GetTranslation())
+    local p_translation = rag:LocalToWorld(matrix_par:GetTranslation())
+
+    phys:SetPos(m_translation)
+    phys:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
+    phys_parent:SetPos(p_translation)
+    phys_parent:SetAngles(rag:LocalToWorldAngles(matrix_par:GetAngles()))
+
+    phys:Wake()
+    phys_parent:Wake()
+    phys:EnableMotion(true)
+    phys_parent:EnableMotion(true)
+
+    -- BONE BUSTER: Create constraint at bind pose position
     local cons = ents.Create("phys_ragdollconstraint")
-    cons:SetPos(consPos)
+    cons:SetPos(m_translation)
     cons:SetKeyValue("xmin", limits[0][1])
     cons:SetKeyValue("xmax", limits[0][0])
     cons:SetKeyValue("ymin", limits[1][1])
     cons:SetKeyValue("ymax", limits[1][0])
     cons:SetKeyValue("zmin", limits[2][1])
     cons:SetKeyValue("zmax", limits[2][0])
-    cons:SetPhysConstraintObjects(pBone1, pBone2)
+    cons:SetPhysConstraintObjects(phys, phys_parent)
     cons:Spawn()
     cons:Activate()
 
-    return cons and IsValid(cons) and cons
+    -- BONE BUSTER: Restore original state
+    phys:SetPos(pos_ori)
+    phys:SetAngles(ang_ori)
+    phys_parent:SetPos(pos_ori_par)
+    phys_parent:SetAngles(ang_ori_par)
+
+    phys:SetVelocityInstantaneous(vel_ori)
+    phys:SetVelocity(vel_ori)
+    phys_parent:SetVelocityInstantaneous(vel_ori_par)
+    phys_parent:SetVelocity(vel_ori_par)
+    phys:SetAngleVelocityInstantaneous(avel_ori)
+    phys:SetAngleVelocity(avel_ori)
+    phys_parent:SetAngleVelocityInstantaneous(avel_ori_par)
+    phys_parent:SetAngleVelocity(avel_ori_par)
+
+    -- BONE BUSTER: THIS IS THE KEY - prevent stretching!
+    rag:SetSaveValue("m_ragdoll.allowStretch", false)
+
+    return IsValid(cons) and cons
 end
 
 function hg.BreakLimb(ent, limb, segmentOverride)
