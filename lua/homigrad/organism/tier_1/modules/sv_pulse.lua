@@ -146,9 +146,11 @@ module[2] = function(owner, org, timeValue)
 			org.needotrub = true
 	elseif org.bloodpressure > 115 then
 		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
-		org.disorientation = math.max(org.disorientation, highK * 1.4)
-		org.painadd = math.min(org.painadd + timeValue * (0.6 + highK * 1.8), 150)
-		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + highK * 20), timeValue * (0.4 + highK * 1.4))
+		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.5
+		local effectiveHighK = highK * (1 - adrenalineMitigation)
+		org.disorientation = math.max(org.disorientation, effectiveHighK * 1.4)
+		org.painadd = math.min(org.painadd + timeValue * (0.6 + effectiveHighK * 1.8), 150)
+		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
 	end
 
 	if org.heartstop then

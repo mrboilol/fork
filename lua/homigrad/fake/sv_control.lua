@@ -173,30 +173,25 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
     local phys = ragdoll:GetPhysicsObjectNum(physNumber)
     if not IsValid(phys) then return end
 
-    -- Check if this bone belongs to a broken/dislocated limb and get severity
-    local isDamaged, damageMultiplier = GetLimbDamageMultiplier(ragdoll, physNumber)
-    
-    -- For damaged limbs, reduce shadow control to let physics constraints work naturally
-    -- Dislocated = 85% reduction (multiplier 0.15), Broken = 50% reduction (multiplier 0.50)
-    local power = (ragdoll.power or 1) * damageMultiplier
+    -- Check if this bone belongs to a broken/dislocated limb
+    -- OLD LUA STYLE: Completely skip shadow control on broken/dislocated limbs
+    -- Let physics handle them naturally - don't fight the floppy constraints
+    local isDamaged, _ = GetLimbDamageMultiplier(ragdoll, physNumber)
+    if isDamaged then
+        phys:Wake()
+        return -- Don't apply ANY shadow control to broken/dislocated limbs
+    end
 
     shadowparams.secondstoarrive = ss
     shadowparams.angle = ang
-    shadowparams.maxangular = maxang and maxang * power
-    shadowparams.maxangulardamp = maxangdamp and maxangdamp * (isDamaged and 0.5 or 1) -- Less damping for damaged limbs
+    shadowparams.maxangular = maxang and maxang * (ragdoll.power or 1)
+    shadowparams.maxangulardamp = maxangdamp
     shadowparams.pos = pos
-    shadowparams.maxspeed = maxspeed and maxspeed * power
-    shadowparams.maxspeeddamp = maxspeeddamp and maxspeeddamp * (isDamaged and 0.5 or 1)
-    shadowparams.dampfactor = isDamaged and 0.7 or 0.9 -- More damping for damaged limbs
+    shadowparams.maxspeed = maxspeed and maxspeed * (ragdoll.power or 1)
+    shadowparams.maxspeeddamp = maxspeeddamp
+    shadowparams.dampfactor = 0.9
 
     phys:Wake()
-    
-    -- For completely damaged limbs with position control, skip shadow control entirely
-    -- Let the AdvBallsocket constraint handle the floppy physics naturally
-    if isDamaged and pos and not ang then
-        -- Only wake physics, don't apply shadow control - let constraint do the work
-        return
-    end
     
     phys:ComputeShadowControl(shadowparams)
 end

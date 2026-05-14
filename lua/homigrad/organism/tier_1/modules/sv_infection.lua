@@ -1,23 +1,25 @@
 hg.organism.module.infection = {}
 local module = hg.organism.module.infection
 
+local hg_infections = ConVarExists("hg_infections") and GetConVar("hg_infections") or CreateConVar("hg_infections",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable infections system",0,1)
+
 module[1] = function(org)
     org.infection = 0
     org.infection_organs_affected = {} -- Track which organs are affected by sepsis
 end
 
 module[2] = function(owner, org, mulTime)
+    if not hg_infections:GetBool() then return end
     if org.infection > 0 then
         -- Faster infection progression, especially once established
-        if org.infection > 0.2 then -- Lowered threshold for progression
-            local progression_rate = mulTime / 75 -- Faster growth (100 -> 75)
-            -- Accelerated progression above 0.5
+        if org.infection > 0.25 then
+            local progression_rate = mulTime / 600
             if org.infection > 0.5 then
-                progression_rate = progression_rate * (1 + (org.infection - 0.5) * 2)
+                progression_rate = progression_rate * (1 + (org.infection - 0.5) * 0.5)
             end
-            org.infection = math.min(org.infection + progression_rate, 1.0) -- Cap at 1.0 for severe sepsis
+            org.infection = math.min(org.infection + progression_rate, 1.5)
         else
-            org.infection = org.infection - (mulTime / 400) -- Slower natural decay
+            org.infection = org.infection - (mulTime / 200) -- Natural decay
         end
     end
 
@@ -35,10 +37,14 @@ module[2] = function(owner, org, mulTime)
         org.consciousness = math.max(org.consciousness - (org.infection - 0.5) * 0.02, 0.3)
         org.painadd = math.min(org.painadd + (org.infection - 0.5) * 0.15, 75)
 
-        -- Fever - raises body temperature
-        local base_temp = 37.0 + (org.infection - 0.5) * 3
-        local temp_spike = math.sin(CurTime() * 0.1) * (org.infection - 0.5) * 0.5 -- Temperature fluctuation
-        org.temperature = math.max(org.temperature or 36.7, base_temp + temp_spike)
+        -- Fever - raises body temperature toward a target based on infection severity
+        local fever_intensity = (org.infection - 0.5) * 1.5
+        if org.infection >= 0.75 then
+            fever_intensity = fever_intensity + (org.infection - 0.75) * 1.0
+        end
+        local base_temp = 37.0 + fever_intensity
+        local temp_spike = math.sin(CurTime() * 0.05) * (org.infection - 0.5) * 0.3 -- Temperature fluctuation
+        org.temperature = math.max(org.temperature or 36.7, math.min(base_temp + temp_spike, 40.5))
 
         -- Delirium/confusion with fever
         if org.consciousness < 0.6 or (org.temperature and org.temperature > 38.5) then
@@ -66,8 +72,7 @@ module[2] = function(owner, org, mulTime)
             end
         end
 
-        -- High fever complications (additional temp rise from sepsis)
-        org.temperature = math.min(org.temperature + (org.infection - 0.75) * 0.5, 40.5) -- Dangerous hyperthermia
+        -- High fever complications handled in moderate infection block above
     end
 
     -- Critical sepsis (1.0+)

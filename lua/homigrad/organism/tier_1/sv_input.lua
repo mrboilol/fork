@@ -743,7 +743,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BURN) then
 			org.burns = org.burns + 1
-			org.infection = org.infection + (dmgInfo:GetDamage() * 0.005) -- Increased from 0.002
+			org.infection = org.infection + (dmgInfo:GetDamage() * 0.0005)
 			-- Severe burns cause immune suppression
 			if dmgInfo:GetDamage() > 20 then
 				org.immunesuppression = math.min((org.immunesuppression or 0) + dmgInfo:GetDamage() * 0.01, 1)
@@ -1606,6 +1606,7 @@ local function velocityDamage(ent, data)
 		if hitgroup == HITGROUP_HEAD then
 			local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
 			
+			local oldBrain = org.brain
 			hg.organism.input_list.skull(org, bone, dmg * 4 * (hadhelmet and 0.2 or 1), dmgInfo)
 			
 			
@@ -1626,6 +1627,7 @@ local function velocityDamage(ent, data)
 					net.WriteFloat(flash_intensity)
 					net.WriteInt(flash_duration, 20)
 
+					local brainDelta = org.brain - oldBrain
 					local is_critical = (org.brain > 0.5 and brainDelta > 0.05) or org.skull == 1
 					net.WriteBool(is_critical)
 
@@ -1803,40 +1805,233 @@ function hg.BreakNeck(ent)
 	end)
 end
 
-local limb_bones = {
-    larm = {parent = "ValveBiped.Bip01_L_UpperArm", child = "ValveBiped.Bip01_L_Forearm"},
-    rarm = {parent = "ValveBiped.Bip01_R_UpperArm", child = "ValveBiped.Bip01_R_Forearm"},
-    lleg = {parent = "ValveBiped.Bip01_L_Thigh", child = "ValveBiped.Bip01_L_Calf"},
-    rleg = {parent = "ValveBiped.Bip01_R_Thigh", child = "ValveBiped.Bip01_R_Calf"},
-	spine0 = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_Spine"},
-    spine1 = {parent = "ValveBiped.Bip01_Spine", child = "ValveBiped.Bip01_Spine1"},
-    spine2 = {parent = "ValveBiped.Bip01_Spine1", child = "ValveBiped.Bip01_Spine2"},
-    spine3 = {parent = "ValveBiped.Bip01_Spine2", child = "ValveBiped.Bip01_Spine4"},
+-- Limb bone mapping for floppy effects - OLD LUA STYLE
+-- Each limb has 3 segments, we pick one randomly to break
+local limb_segments = {
+    larm = {
+        {"ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_Spine2"},    -- upper arm to spine
+        {"ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_UpperArm"}, -- forearm to upper arm (ELBOW)
+        {"ValveBiped.Bip01_L_Hand", "ValveBiped.Bip01_L_Forearm"}      -- hand to forearm
+    },
+    rarm = {
+        {"ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_Spine2"},    -- upper arm to spine
+        {"ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_UpperArm"}, -- forearm to upper arm (ELBOW)
+        {"ValveBiped.Bip01_R_Hand", "ValveBiped.Bip01_R_Forearm"}      -- hand to forearm
+    },
+    lleg = {
+        {"ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_Pelvis"},       -- thigh to pelvis
+        {"ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Thigh"},       -- calf to thigh (KNEE)
+        {"ValveBiped.Bip01_L_Foot", "ValveBiped.Bip01_L_Calf"}         -- foot to calf
+    },
+    rleg = {
+        {"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_Pelvis"},       -- thigh to pelvis
+        {"ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Thigh"},       -- calf to thigh (KNEE)
+        {"ValveBiped.Bip01_R_Foot", "ValveBiped.Bip01_R_Calf"}         -- foot to calf
+    }
+}
+
+-- OLD LUA: Bone Buster angle limits for ragdoll constraints
+local bb_constraints_limit = {
+    ["ValveBiped.Bip01_R_UpperArm"] = {
+        [0] = { [0] = "100", [1] = "-100" },
+        [1] = { [0] = "50",  [1] = "-50" },
+        [2] = { [0] = "30",  [1] = "-30" },
+    },
+    ["ValveBiped.Bip01_L_UpperArm"] = {
+        [0] = { [0] = "100", [1] = "-100" },
+        [1] = { [0] = "50",  [1] = "-50" },
+        [2] = { [0] = "30",  [1] = "-30" },
+    },
+    ["ValveBiped.Bip01_L_Forearm"] = {
+        [0] = { [0] = "90",  [1] = "-135" },
+        [1] = { [0] = "45",  [1] = "-45" },
+        [2] = { [0] = "90",  [1] = "-90" },
+    },
+    ["ValveBiped.Bip01_R_Forearm"] = {
+        [0] = { [0] = "90",  [1] = "-135" },
+        [1] = { [0] = "45",  [1] = "-45" },
+        [2] = { [0] = "90",  [1] = "-90" },
+    },
+    ["ValveBiped.Bip01_L_Hand"] = {
+        [0] = { [0] = "90",  [1] = "-90" },
+        [1] = { [0] = "90",  [1] = "-90" },
+        [2] = { [0] = "90",  [1] = "-90" },
+    },
+    ["ValveBiped.Bip01_R_Hand"] = {
+        [0] = { [0] = "90",  [1] = "-90" },
+        [1] = { [0] = "90",  [1] = "-90" },
+        [2] = { [0] = "90",  [1] = "-90" },
+    },
+    ["ValveBiped.Bip01_R_Thigh"] = {
+        [0] = { [0] = "100", [1] = "-60" },
+        [1] = { [0] = "10",  [1] = "-60" },
+        [2] = { [0] = "45",  [1] = "-5" },
+    },
+    ["ValveBiped.Bip01_R_Calf"] = {
+        [0] = { [0] = "60",  [1] = "-135" },
+        [1] = { [0] = "20",  [1] = "-45" },
+        [2] = { [0] = "45",  [1] = "-5" },
+    },
+    ["ValveBiped.Bip01_L_Thigh"] = {
+        [0] = { [0] = "100", [1] = "-60" },
+        [1] = { [0] = "60",  [1] = "-10" },
+        [2] = { [0] = "5",   [1] = "-45" },
+    },
+    ["ValveBiped.Bip01_L_Calf"] = {
+        [0] = { [0] = "60",  [1] = "-135" },
+        [1] = { [0] = "45",  [1] = "-20" },
+        [2] = { [0] = "5",   [1] = "-45" },
+    },
+    ["ValveBiped.Bip01_L_Foot"] = {
+        [0] = { [0] = "45",  [1] = "-45" },
+        [1] = { [0] = "45",  [1] = "-45" },
+        [2] = { [0] = "45",  [1] = "-45" },
+    },
+    ["ValveBiped.Bip01_R_Foot"] = {
+        [0] = { [0] = "45",  [1] = "-45" },
+        [1] = { [0] = "45",  [1] = "-45" },
+        [2] = { [0] = "45",  [1] = "-45" },
+    },
+    ["ValveBiped.Bip01_Spine2"] = {
+        [0] = { [0] = "40",  [1] = "-40" },
+        [1] = { [0] = "30",  [1] = "-30" },
+        [2] = { [0] = "20",  [1] = "-20" },
+    },
+    ["ValveBiped.Bip01_Pelvis"] = {
+        [0] = { [0] = "90",  [1] = "-90" },
+        [1] = { [0] = "90",  [1] = "-90" },
+        [2] = { [0] = "90",  [1] = "-90" },
+    },
 }
 
 -- Limb-specific constraint limits for better floppy physics
 -- More generous limits for noticeably floppy but still realistic movement
 local limb_constraint_limits = {
-    -- Arms: wider roll limits for natural arm hang/flop
-    larm = {minYaw = -120, minRoll = -150, minPitch = -120, maxYaw = 120, maxRoll = 70, maxPitch = 120},
-    rarm = {minYaw = -120, minRoll = -70, minPitch = -120, maxYaw = 120, maxRoll = 150, maxPitch = 120},
-    -- Legs: wider limits for noticeable limp/flop
-    lleg = {minYaw = -90, minRoll = -110, minPitch = -90, maxYaw = 90, maxRoll = 70, maxPitch = 90},
-    rleg = {minYaw = -90, minRoll = -70, minPitch = -90, maxYaw = 90, maxRoll = 110, maxPitch = 90},
+    -- Arms: moderate limits for floppy but not insane arm hang/flop
+    larm = {minYaw = -90, minRoll = -100, minPitch = -90, maxYaw = 90, maxRoll = 50, maxPitch = 90},
+    rarm = {minYaw = -90, minRoll = -50, minPitch = -90, maxYaw = 90, maxRoll = 100, maxPitch = 90},
+    -- Legs: moderate limits for noticeable limp/flop without spinning wildly
+    lleg = {minYaw = -70, minRoll = -80, minPitch = -70, maxYaw = 70, maxRoll = 50, maxPitch = 70},
+    rleg = {minYaw = -70, minRoll = -50, minPitch = -70, maxYaw = 70, maxRoll = 80, maxPitch = 70},
 }
 
-function hg.BreakLimb(ent, limb)
+-- Matrix cache for bind pose calculations
+local matrix_cache = {}
+
+local function getBoneMatrix(rag, boneID)
+    local model = rag:GetModel()
+    if not matrix_cache[model] then
+        local _, tab = util.GetModelMeshes(model)
+        if not tab then return end
+
+        matrix_cache[model] = {}
+        for i = 0, rag:GetPhysicsObjectCount() - 1 do
+            local id = rag:TranslatePhysBoneToBone(i)
+            if tab[id] and tab[id].matrix then
+                local mat = tab[id].matrix:GetInverse()
+                matrix_cache[model][id] = mat
+            end
+        end
+    end
+    return matrix_cache[model] and matrix_cache[model][boneID]
+end
+
+-- OLD LUA STYLE: Create floppy limb constraint using phys_ragdollconstraint
+local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
+    if not IsValid(rag) or not rag:IsRagdoll() then return false end
+
+    local bone1 = rag:LookupBone(bone1Name)
+    local bone2 = rag:LookupBone(bone2Name)
+    if not bone1 or not bone2 then return false end
+
+    local matrix = getBoneMatrix(rag, bone1)
+    local matrix_par = getBoneMatrix(rag, bone2)
+    if not matrix or not matrix_par then return false end
+
+    local phys1 = rag:TranslateBoneToPhysBone(bone1)
+    local phys2 = rag:TranslateBoneToPhysBone(bone2)
+    if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then return false end
+
+    local pBone1 = rag:GetPhysicsObjectNum(phys1)
+    local pBone2 = rag:GetPhysicsObjectNum(phys2)
+    if not (IsValid(pBone1) and IsValid(pBone2)) then return false end
+
+    -- Check for limits
+    local limits = bb_constraints_limit[bone1Name]
+    if not limits then return false end
+
+    -- Remove existing rigid constraint
+    pcall(function() rag:RemoveInternalConstraint(phys1) end)
+
+    -- Save current state
+    local pos_ori = pBone1:GetPos()
+    local pos_ori_par = pBone2:GetPos()
+    local ang_ori = pBone1:GetAngles()
+    local ang_ori_par = pBone2:GetAngles()
+    local vel_ori = pBone1:GetVelocity()
+    local vel_ori_par = pBone2:GetVelocity()
+    local avel_ori = pBone1:GetAngleVelocity()
+    local avel_ori_par = pBone2:GetAngleVelocity()
+
+    -- Move to bind pose for accurate constraint creation
+    local m_translation = rag:LocalToWorld(matrix:GetTranslation())
+    local p_translation = rag:LocalToWorld(matrix_par:GetTranslation())
+
+    pBone1:SetPos(m_translation)
+    pBone1:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
+    pBone2:SetPos(p_translation)
+    pBone2:SetAngles(rag:LocalToWorldAngles(matrix_par:GetAngles()))
+
+    -- Wake and enable
+    pBone1:Wake()
+    pBone2:Wake()
+    pBone1:EnableMotion(true)
+    pBone2:EnableMotion(true)
+
+    -- OLD LUA: Use phys_ragdollconstraint with spawnflags 1 (no collision between constrained parts)
+    local cons = ents.Create("phys_ragdollconstraint")
+    cons:SetPos(m_translation)
+    cons:SetKeyValue("spawnflags", 1)
+    cons:SetKeyValue("xmin", limits[0][1])
+    cons:SetKeyValue("xmax", limits[0][0])
+    cons:SetKeyValue("ymin", limits[1][1])
+    cons:SetKeyValue("ymax", limits[1][0])
+    cons:SetKeyValue("zmin", limits[2][1])
+    cons:SetKeyValue("zmax", limits[2][0])
+    cons:SetPhysConstraintObjects(pBone1, pBone2)
+    cons:Spawn()
+    cons:Activate()
+
+    -- Restore original state
+    pBone1:SetPos(pos_ori)
+    pBone1:SetAngles(ang_ori)
+    pBone2:SetPos(pos_ori_par)
+    pBone2:SetAngles(ang_ori_par)
+
+    pBone1:SetVelocityInstantaneous(vel_ori)
+    pBone1:SetVelocity(vel_ori)
+    pBone2:SetVelocityInstantaneous(vel_ori_par)
+    pBone2:SetVelocity(vel_ori_par)
+    pBone1:SetAngleVelocityInstantaneous(avel_ori)
+    pBone1:SetAngleVelocity(avel_ori)
+    pBone2:SetAngleVelocityInstantaneous(avel_ori_par)
+    pBone2:SetAngleVelocity(avel_ori_par)
+
+    return cons and IsValid(cons) and cons
+end
+
+function hg.BreakLimb(ent, limb, segmentOverride)
     if not IsValid(ent) then return end
-    if not limb_bones[limb] then return end
+    if not limb_segments[limb] then return end
 
     local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
     local playerRef = ply
-    
-    -- Use a longer delay to ensure ragdoll exists (for death cases)
-    timer.Simple(0.15, function()
+
+    -- OLD LUA: Use delay to ensure ragdoll exists
+    timer.Simple(0.1, function()
         -- Get the ragdoll - try multiple sources
         local ragdoll = nil
-        
+
         if IsValid(ent) and ent:IsRagdoll() then
             ragdoll = ent
         elseif IsValid(playerRef) then
@@ -1844,97 +2039,53 @@ function hg.BreakLimb(ent, limb)
             if not IsValid(ragdoll) then
                 ragdoll = playerRef:GetRagdollEntity()
             end
-            -- Also check FakeRagdoll for fake/unconscious ragdolls
             if not IsValid(ragdoll) then
                 ragdoll = playerRef:GetNWEntity("FakeRagdoll")
             end
         end
-        
+
         if not IsValid(ragdoll) then return end
 
-        local bone_info = limb_bones[limb]
-        if not bone_info then return end
-        
-        local parent_bone_name = bone_info.parent
-        local child_bone_name = bone_info.child
+        local segments = limb_segments[limb]
+        if not segments then return end
 
-        local parent_bone_id = ragdoll:LookupBone(parent_bone_name)
-        local child_bone_id = ragdoll:LookupBone(child_bone_name)
+        -- OLD LUA: Pick random segment to make floppy (or use override for elbow/knee preference)
+        -- segmentOverride = 2 for elbow/knee, 1 for shoulder/hip, 3 for wrist/ankle
+        local randomSegment = segmentOverride or math.random(1, 3)
+        local selectedSegment = segments[randomSegment]
+        if not selectedSegment then return end
 
-        if not parent_bone_id or not child_bone_id then return end
+        local bone1Name, bone2Name = selectedSegment[1], selectedSegment[2]
 
-        local child_phys_bone = ragdoll:TranslateBoneToPhysBone(child_bone_id)
-        if child_phys_bone == -1 then return end
-        
-        local parent_phys_bone = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
-        if parent_phys_bone == -1 then return end
+        -- Check bones exist
+        local bone1 = ragdoll:LookupBone(bone1Name)
+        local bone2 = ragdoll:LookupBone(bone2Name)
+        if not bone1 or not bone2 then return end
 
-        -- Remove internal constraint on the child bone
-        ragdoll:RemoveInternalConstraint(child_phys_bone)
-
-        local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys_bone)
-        local p_child = ragdoll:GetPhysicsObjectNum(child_phys_bone)
-
-        if not IsValid(p_parent) or not IsValid(p_child) then return end
-        
-        -- Remove any existing floppy constraints for this limb to prevent stacking
-        if ragdoll.FloppyConstraints then
-            local existing = ragdoll.FloppyConstraints[limb]
-            if IsValid(existing) then existing:Remove() end
-            local existingBs = ragdoll.FloppyConstraints[limb .. "_bs"]
-            if IsValid(existingBs) then existingBs:Remove() end
-        end
-
-        -- Get physics object positions (pivot points are at the joints)
-        local parent_pos = p_parent:GetPos()
-        local parent_ang = p_parent:GetAngles()
-        local child_pos = p_child:GetPos()
-
-        -- Reposition child if it's too far from parent (prevent excessive stretching on creation)
-        local current_dist = parent_pos:Distance(child_pos)
-        if current_dist > 20 then
-            local dir = (child_pos - parent_pos):GetNormalized()
-            child_pos = parent_pos + dir * 12
-            p_child:SetPos(child_pos)
-            p_child:SetAngles(parent_ang)
-        end
-
-        p_child:Wake()
-        p_parent:Wake()
-
-        -- Calculate the local position for the constraint at the child's pivot point
-        -- The child's physics object pivot is located at the joint (elbow/knee)
-        local lpos = WorldToLocal(child_pos, angZero, parent_pos, parent_ang)
-
-        -- Get limb-specific limits or use defaults
-        local limits = limb_constraint_limits[limb] or limb_constraint_limits.larm
-        
-        -- Add a ballsocket to keep the joint anchored (prevents stretching)
-        local bsConstraint = constraint.Ballsocket(ragdoll, ragdoll, parent_phys_bone, child_phys_bone, lpos, vecZero, 0, 0, 0)
-
-        -- Add an AdvBallsocket to make the limb floppy with appropriate angular limits
-        local newConstraint = constraint.AdvBallsocket(
-            ragdoll, ragdoll,
-            parent_phys_bone, child_phys_bone,
-            lpos, vecZero,
-            0, 0,  -- friction
-            limits.minYaw, limits.minRoll, limits.minPitch,  -- min limits
-            limits.maxYaw, limits.maxRoll, limits.maxPitch,  -- max limits
-            0, 0, 0, 0, 0  -- unused params
-        )
-
-        -- Track the constraints to prevent duplicates
-        if newConstraint or bsConstraint then
-            ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
-            if newConstraint then ragdoll.FloppyConstraints[limb] = newConstraint end
-            if bsConstraint then ragdoll.FloppyConstraints[limb .. "_bs"] = bsConstraint end
+        local cons = createFloppyLimbConstraint(ragdoll, bone1Name, bone2Name, limb)
+        if cons then
+            -- Store floppy data for healing restoration
+            ragdoll.floppyLimbs = ragdoll.floppyLimbs or {}
+            ragdoll.floppyLimbs[limb] = {
+                segment = randomSegment,
+                bone1 = bone1Name,
+                bone2 = bone2Name,
+                constraint = cons
+            }
+            
+            -- OLD LUA: Persist segment across ragdolls on the player
+            if IsValid(playerRef) and playerRef:IsPlayer() then
+                playerRef.HG_FloppyPersistSeg = playerRef.HG_FloppyPersistSeg or {}
+                playerRef.HG_FloppyPersistSeg[limb] = randomSegment
+                playerRef.HG_FloppyPersist = playerRef.HG_FloppyPersist or {}
+                playerRef.HG_FloppyPersist[limb] = true
+            end
         end
     end)
 end
 
 function hg.RemoveLimbConstraints(ent, limb)
     if not IsValid(ent) then return end
-    if not limb_bones[limb] then return end
 
     local ragdoll = ent:IsRagdoll() and ent or nil
     if not IsValid(ragdoll) and ent:IsPlayer() then
@@ -1944,34 +2095,20 @@ function hg.RemoveLimbConstraints(ent, limb)
         end
     end
     if not IsValid(ragdoll) then return end
-    if not ragdoll.FloppyConstraints then return end
 
-    local existing = ragdoll.FloppyConstraints[limb]
-    if IsValid(existing) then existing:Remove() end
-    ragdoll.FloppyConstraints[limb] = nil
-
-    local existingBs = ragdoll.FloppyConstraints[limb .. "_bs"]
-    if IsValid(existingBs) then existingBs:Remove() end
-    ragdoll.FloppyConstraints[limb .. "_bs"] = nil
-
-    -- Reattach with a stiff weld since the original internal constraint can't be restored
-    local bone_info = limb_bones[limb]
-    if bone_info then
-        local parent_bone_id = ragdoll:LookupBone(bone_info.parent)
-        local child_bone_id = ragdoll:LookupBone(bone_info.child)
-        if parent_bone_id and child_bone_id then
-            local parent_phys = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
-            local child_phys = ragdoll:TranslateBoneToPhysBone(child_bone_id)
-            if parent_phys ~= -1 and child_phys ~= -1 then
-                local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys)
-                local p_child = ragdoll:GetPhysicsObjectNum(child_phys)
-                if IsValid(p_parent) and IsValid(p_child) then
-                    local weld = constraint.Weld(ragdoll, ragdoll, parent_phys, child_phys, 0, true)
-                    if weld then
-                        ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
-                        ragdoll.FloppyConstraints[limb .. "_healed"] = weld
-                    end
-                end
+    -- OLD LUA STYLE: Restore limb using floppyLimbs data
+    if ragdoll.floppyLimbs and ragdoll.floppyLimbs[limb] then
+        local floppyData = ragdoll.floppyLimbs[limb]
+        local bone1 = ragdoll:LookupBone(floppyData.bone1)
+        local bone2 = ragdoll:LookupBone(floppyData.bone2)
+        if bone1 and bone2 then
+            local phys1 = ragdoll:TranslateBoneToPhysBone(bone1)
+            local phys2 = ragdoll:TranslateBoneToPhysBone(bone2)
+            if phys1 and phys2 then
+                -- Remove floppy constraint
+                pcall(function() ragdoll:RemoveInternalConstraint(phys1) end)
+                if IsValid(floppyData.constraint) then floppyData.constraint:Remove() end
+                ragdoll.floppyLimbs[limb] = nil
             end
         end
     end
@@ -2016,6 +2153,30 @@ hook.Add("OnAmputateLimb", "amputate_flashlight", function(org, ent, limb)
 	end
 end)
 
+hook.Add("OnAmputateLimb", "amputate_remove_floppy", function(org, ent, limb)
+	if not IsValid(ent) then return end
+
+	if limb == "head" then
+		local ragdoll = ent:IsRagdoll() and ent or nil
+		if not IsValid(ragdoll) and ent:IsPlayer() then
+			ragdoll = ent:GetNWEntity("FakeRagdoll")
+			if not IsValid(ragdoll) then
+				ragdoll = ent:GetNWEntity("RagdollDeath")
+			end
+			if not IsValid(ragdoll) then
+				ragdoll = ent:GetRagdollEntity()
+			end
+		end
+		if IsValid(ragdoll) and ragdoll.FloppyConstraints then
+			local neckCons = ragdoll.FloppyConstraints.neck
+			if IsValid(neckCons) then neckCons:Remove() end
+			ragdoll.FloppyConstraints.neck = nil
+		end
+	else
+		hg.RemoveLimbConstraints(ent, limb)
+	end
+end)
+
 hg.velocityDamage = velocityDamage
 
 hook.Add("Ragdoll Collide", "organism", function(ragdoll, data)
@@ -2041,19 +2202,61 @@ hook.Add("Player Spawn", "huyhuyhuy22", function(ply)
 
 	ply.wounds = {}
 	ply.arterialwounds = {}
+	
+	-- OLD LUA: Clear floppy persistence on spawn so player starts fresh
+	ply.HG_FloppyPersist = nil
+	ply.HG_FloppyPersistSeg = nil
 end)
 
 -- Clean up floppy constraints when a ragdoll is removed
 hook.Add("EntityRemoved", "CleanupFloppyConstraints", function(ent)
 	if not ent:IsRagdoll() then return end
+	-- OLD LUA STYLE: Cleanup floppyLimbs
+	if ent.floppyLimbs then
+		for limb, data in pairs(ent.floppyLimbs) do
+			if IsValid(data.constraint) then data.constraint:Remove() end
+			-- Also remove internal constraint
+			local bone1 = ent:LookupBone(data.bone1)
+			if bone1 then
+				local phys1 = ent:TranslateBoneToPhysBone(bone1)
+				if phys1 then
+					pcall(function() ent:RemoveInternalConstraint(phys1) end)
+				end
+			end
+		end
+		ent.floppyLimbs = nil
+	end
+	-- Legacy cleanup
 	if ent.FloppyConstraints then
 		for limb, cons in pairs(ent.FloppyConstraints) do
-			if IsValid(cons) then
-				cons:Remove()
-			end
+			if IsValid(cons) then cons:Remove() end
 		end
 		ent.FloppyConstraints = nil
 	end
+end)
+
+-- OLD LUA: Heal/respawn cleanup via organism clearing
+hook.Add("Org Clear", "HG_ResetFloppyOnOrgClear", function(org)
+    if not org or not IsValid(org.owner) then return end
+    local ply = org.owner
+    -- Clear persistence flags to fully reset visuals
+    ply.HG_FloppyPersist = nil
+    ply.HG_FloppyPersistSeg = nil
+    -- Clear any active ragdoll floppy constraints
+    local rag = ply:GetNWEntity("RagdollDeath")
+    if not IsValid(rag) then rag = ply:GetNWEntity("FakeRagdoll") end
+    if not IsValid(rag) and IsValid(ply.FakeRagdoll) then rag = ply.FakeRagdoll end
+    if IsValid(rag) and rag.floppyLimbs then
+        for limb, data in pairs(rag.floppyLimbs) do
+            if IsValid(data.constraint) then data.constraint:Remove() end
+            local bone1 = rag:LookupBone(data.bone1)
+            if bone1 then
+                local phys1 = rag:TranslateBoneToPhysBone(bone1)
+                if phys1 then pcall(function() rag:RemoveInternalConstraint(phys1) end) end
+            end
+        end
+        rag.floppyLimbs = nil
+    end
 end)
 
 hook.Add("Player Getup", "huyhhgss", function(ply)

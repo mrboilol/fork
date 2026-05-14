@@ -122,6 +122,7 @@ util.AddNetworkString("organism_sendply")
 local CurTime = CurTime
 local nullTbl = {}
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
+local hg_strokes = ConVarExists("hg_strokes") and GetConVar("hg_strokes") or CreateConVar("hg_strokes",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable strokes system",0,1)
 local function send_organism(org, ply)
 	if not IsValid(org.owner) then return end
 	local sendtable = {}
@@ -448,6 +449,7 @@ end)
 
 
 hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
+    if not hg_strokes:GetBool() then return end
     local ramp_rate = 0
 
     -- Ramp up on high blood pressure (>115), more aggressive scaling
@@ -566,6 +568,7 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
 end)
 
 hook.Add("Org Think", "StrokeEffects", function(owner, org, timeValue)
+    if not hg_strokes:GetBool() then return end
     if org.stroke_meter and org.stroke_meter > 0.4 then -- Lowered threshold
         local effect_scale = (org.stroke_meter - 0.4) / (1.15 - 0.4)
         org.disorientation = math.max(org.disorientation or 0, 5 * effect_scale)

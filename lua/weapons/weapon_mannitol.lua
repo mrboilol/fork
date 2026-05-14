@@ -105,8 +105,6 @@ if SERVER then
 		-- Head trauma reduction
 		org.headtrauma = 0
 
-		-- Notify player
-		owner:Notify("My mind clears... the paralysis fades...", 0, "medical", 3)
 
 		if self.poisoned2 then
 			org.poison4 = CurTime()

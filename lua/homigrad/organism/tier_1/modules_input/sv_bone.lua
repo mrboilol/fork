@@ -1,5 +1,4 @@
 --local Organism = hg.organism
-local hg_floppy_limbs = GetConVar("hg_floppy_limbs")
 
 local function PlayBoneBreakSound(entity)
     if math.random() < 0.5 then
@@ -107,15 +106,6 @@ local function hasClimbGripActive(owner)
 	return (IsValid(rag.ConsLH) and rag.ConsLH.ZCClimbGrip) or (IsValid(rag.ConsRH) and rag.ConsRH.ZCClimbGrip)
 end
 
-local function hasClimbGripActive(owner)
-	if not IsValid(owner) or not owner:IsPlayer() then return false end
-
-	local rag = owner.FakeRagdoll
-	if not IsValid(rag) then return false end
-
-	return (IsValid(rag.ConsLH) and rag.ConsLH.ZCClimbGrip) or (IsValid(rag.ConsRH) and rag.ConsRH.ZCClimbGrip)
-end
-
 local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
 	local dmg = dmg * 3.25
@@ -142,9 +132,8 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
 		org[key.."dislocation"] = true
-		org[key.."dislocation"] = true
 
-		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			hg.BreakLimb(org.owner, key)
 		end
 
@@ -162,7 +151,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--//org[key] = 0.5
 		org[key.."dislocation"] = true
 
-		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			hg.BreakLimb(org.owner, key)
 		end
 
@@ -191,11 +180,6 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	if climbGrip and (dmgInfo:IsDamageType(DMG_CRUSH) or dmgInfo:IsDamageType(DMG_FALL)) then
 		dmg = dmg * 0.35
 	end
-	local climbGrip = hasClimbGripActive(org.owner)
-
-	if climbGrip and (dmgInfo:IsDamageType(DMG_CRUSH) or dmgInfo:IsDamageType(DMG_FALL)) then
-		dmg = dmg * 0.35
-	end
 	
 	if dmgInfo:IsDamageType(DMG_CRUSH) and dmg > 4 and !org[key.."amputated"] then
 		hg.organism.AmputateLimb(org, key)
@@ -209,11 +193,9 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	local dmg = org[key]
 	local dislocationThreshold = climbGrip and 0.82 or 0.6
-	local dislocationThreshold = climbGrip and 0.82 or 0.6
 	
 	org[key] = org[key] * 0.5
 
-	if dmg < dislocationThreshold then return 0 end
 	if dmg < dislocationThreshold then return 0 end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) then return 0 end
 
@@ -223,7 +205,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		org[key] = 1
 		org[key.."dislocation"] = true
 
-		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			hg.BreakLimb(org.owner, key)
 		end
 
@@ -239,13 +221,12 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	else
 		org[key.."dislocation"] = true
 
-		if hg_floppy_limbs and hg_floppy_limbs:GetBool() then
+		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			hg.BreakLimb(org.owner, key)
 		end
 
 		--//org[key] = 0.5
 
-		org.painadd = org.painadd + (climbGrip and 20 or 35)
 		org.painadd = org.painadd + (climbGrip and 20 or 35)
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5
@@ -583,6 +564,7 @@ input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 
 hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
     if not IsValid(ply) or not ply.organism then return end
+    if not (ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool()) then return end
 
     local org = ply.organism
     local limbs = {"larm", "rarm", "lleg", "rleg"}
@@ -591,7 +573,9 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
         local isBroken = org[limb] and org[limb] >= 1
         local isDislocated = org[limb .. "dislocation"]
         if isBroken or isDislocated then
-            hg.BreakLimb(ragdoll, limb)
+            -- OLD LUA: Use persisted segment if available (so same elbow stays broken across ragdolls)
+            local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
+            hg.BreakLimb(ragdoll, limb, segment)
         elseif IsValid(ragdoll) then
             -- Limb has healed while we were up; make sure no stale floppy constraints remain
             hg.RemoveLimbConstraints(ragdoll, limb)

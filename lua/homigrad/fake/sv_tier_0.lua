@@ -60,6 +60,17 @@ ValveBiped.Bip01_R_Foot 2.3848159313202
 
 hg = hg or {}
 
+function IsLiveManagedRagdoll(rag)
+	if not IsValid(rag) then return false end
+
+	local owner = hg.RagdollOwner(rag)
+	if not IsValid(owner) then
+		owner = rag:GetNWEntity("ply")
+	end
+
+	return IsValid(owner) and owner:IsPlayer() and owner:Alive()
+end
+
 hg.cachedmodels = {}
 
 local function cacheModel(ragdoll)
@@ -495,7 +506,9 @@ hook.Add("DoPlayerDeath", "Fake", function(ply)
 		local limbs = {"larm", "rarm", "lleg", "rleg"}
 		for _, limb in ipairs(limbs) do
 			if (org[limb] and org[limb] >= 1) or org[limb .. "dislocation"] then
-				hg.BreakLimb(ragdoll, limb)
+				-- OLD LUA: Use persisted segment for consistent floppy location
+				local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
+				hg.BreakLimb(ragdoll, limb, segment)
 			end
 		end
 	end
@@ -1345,17 +1358,6 @@ local hg_corpse_settle_delay = ConVarExists("hg_corpse_settle_delay") and GetCon
 local hg_corpse_cleanup_max = ConVarExists("hg_corpse_cleanup_max") and GetConVar("hg_corpse_cleanup_max") or CreateConVar("hg_corpse_cleanup_max", "18", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Maximum amount of inactive corpse ragdolls before oldest ones start getting cleaned up. 0 disables corpse culling.", 0, 128)
 local hg_corpse_cleanup_age = ConVarExists("hg_corpse_cleanup_age") and GetConVar("hg_corpse_cleanup_age") or CreateConVar("hg_corpse_cleanup_age", "45", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Minimum corpse age before the automatic ragdoll cleanup can remove it.", 0, 1800)
 local hg_corpse_cleanup_player_radius = ConVarExists("hg_corpse_cleanup_player_radius") and GetConVar("hg_corpse_cleanup_player_radius") or CreateConVar("hg_corpse_cleanup_player_radius", "350", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Corpses near living players are preserved by the automatic ragdoll cleanup.", 0, 5000)
-
-IsLiveManagedRagdoll = function(rag)
-	if not IsValid(rag) then return false end
-
-	local owner = hg.RagdollOwner(rag)
-	if not IsValid(owner) then
-		owner = rag:GetNWEntity("ply")
-	end
-
-	return IsValid(owner) and owner:IsPlayer() and owner:Alive()
-end
 
 timer.Create("hg_fake_ragdoll_bodyblock", 0.04, 0, function()
 	return

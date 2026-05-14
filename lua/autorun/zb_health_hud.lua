@@ -366,7 +366,7 @@ end
 
 
 --кладкорды
-local HUD = {
+HUD = {
 	enabled = cvar_enabled:GetBool(),
 	bar_y = 4440,
 	bar_scale = 0,
@@ -433,7 +433,7 @@ local HUD = {
 	bleeding_threshold = 0.1,
 	internal_bleed_threshold = 0.1,
 	
-	blood_loss_threshold = 4700,
+	hypotension_threshold = 90,
 	cardiac_arrest_threshold = true,
 	cold_threshold = 36,
 	heat_threshold = 37,
@@ -469,7 +469,7 @@ local status_sprites = {
 	broken_ribs = nil,
 	encumbered = nil,
 	
-	blood_loss = nil,
+	hypotension = nil,
 	cardiac_arrest = nil,
 	cold = nil,
 	heat = nil,
@@ -639,11 +639,11 @@ local tooltipTexts = {
 		},
 		dislocation = {title = "Вывих сустава", text = "Ты вывихнул конечность. Постарайся не использовать поврежденную конечность и найди способ ее вправить."},
 		amputant = {title = "Ампутант", text = "Одна из твоих конечностей была оторвана. Травмирующе. Очевидно, ты навсегда утратил возможность пользоваться оторванной конечностью."},
-		blood_loss = {
-			[4] = {title = "Обескровлен", text = "Угрожающая жизни потеря крови. Еще чуть-чуть, и сердце остановится. Смерть неизбежна."},
-			[3] = {title = "Критическая гиповолемия", text = "Сильная потеря крови. Полусознателен. Ты нечетко видишь... Необходимо лечение."},
-			[2] = {title = "Гиповолемия", text = "Слабость и дезориентация вследствие кровопотери. Ты чувствуешь себя очень плохо. Рекомендуется лечение."},
-			[1] = {title = "Бледен", text = "Незначительная потеря крови. Артериальное давление понижено. Ты чувствуваешь небольшую слабость, кожа бледная."}
+		hypotension = {
+			[4] = {title = "Критическая гипотензия", text = "Артериальное давление рухнуло. Органы отказывают. Смерть неизбежна."},
+			[3] = {title = "Тяжелая гипотензия", text = "Полусознателен. Едва что-то чувствуешь... Необходимо лечение."},
+			[2] = {title = "Гипотензия", text = "Слабость и дезориентация от низкого давления. Ты чувствуешь себя очень плохо. Рекомендуется лечение."},
+			[1] = {title = "Головокружение", text = "Артериальное давление понижено. Ты чувствуешь небольшую слабость, кружится голова."}
 		},
 		cardiac_arrest = {title = "Остановка сердца", text = "Твоё сердце перестало биться, а значит кислород в мозг больше не поступает."},
 		cold = {
@@ -805,11 +805,11 @@ local tooltipTexts = {
 		},
 		dislocation = {title = "Joint dislocation", text = "One of your limb's socket was dislocated, its best to put that back."},
 		amputant = {title = "Amputation", text = "One of your limbs was torn off, Accept the reality you'll never use it again."},
-		blood_loss = {
-			[4] = {title = "Exsanguination", text = "This is the end, your body has not enough blood to live and ischemia is taking a toll on you."},
-			[3] = {title = "Severely Hypovolemic", text = "Ugh... i can barely feel anything..."},
-			[2] = {title = "Hypovolemia", text = "Feeling weak, and the low blood is starting to take a toll on you."},
-			[1] = {title = "Pale", text = "You can keep going but your heart is starting to work overtime."}
+		hypotension = {
+			[4] = {title = "Critical Hypotension", text = "Your blood pressure has collapsed. Organs are failing. Death is imminent."},
+			[3] = {title = "Severe Hypotension", text = "Barely conscious. You can barely feel anything..."},
+			[2] = {title = "Hypotension", text = "Feeling weak and dizzy. Your blood pressure is dangerously low."},
+			[1] = {title = "Lightheaded", text = "You feel faint. Your heart is struggling to maintain pressure."}
 		},
 		cardiac_arrest = {title = "Cardiac arrest", text = "Your body already worked hard enough, lets rest for now."},
 		cold = {
@@ -1045,7 +1045,7 @@ local function load_status_sprites()
 	status_sprites.spine_fracture = loadMaterial("vgui/hud/status_spine_fracture.png", suffix)
 	status_sprites.fracture = loadMaterial("vgui/hud/status_leg_fracture.png", suffix)
 	
-	status_sprites.blood_loss = loadMaterial("vgui/hud/status_blood_loss.png", suffix)
+	status_sprites.hypotension = loadMaterial("vgui/hud/status_blood_loss.png", suffix)
 	status_sprites.cardiac_arrest = loadMaterial("vgui/hud/status_cardiac_arrest.png", suffix)
 	status_sprites.cold = loadMaterial("vgui/hud/status_cold.png", suffix)
 	status_sprites.heat = loadMaterial("vgui/hud/status_heat.png", suffix)
@@ -1777,21 +1777,21 @@ local function draw_status_effects()
 				currentEffectNames["dislocation"] = true
 			end
 			
-			local blood_val = smooth.blood or getOrgVal(org, "blood", 5000)
-			if blood_val < HUD.blood_loss_threshold then
+			local bp_val = smooth.bloodpressure or getOrgVal(org, "bloodpressure", 93)
+			if bp_val < HUD.hypotension_threshold then
 				local level_num = 1
-				if blood_val < 2500 then level_num = 4
-				elseif blood_val < 3600 then level_num = 3
-				elseif blood_val < 4500 then level_num = 2 end
+				if bp_val < 35 then level_num = 4
+				elseif bp_val < 55 then level_num = 3
+				elseif bp_val < 75 then level_num = 2 end
 				
 				table.insert(effects, {
-					name = "blood_loss",
+					name = "hypotension",
 					level_num = level_num,
 					has_levels = true,
 					priority = 0.1,
-					value = math_floor(blood_val)
+					value = math_floor(bp_val)
 				})
-				currentEffectNames["blood_loss"] = true
+				currentEffectNames["hypotension"] = true
 			end
 			
 			if org.heartstop == true then
@@ -2233,7 +2233,7 @@ local function draw_status_effects()
 				bg_color = Color(180, 30, 30, 220)
 			elseif effect.name == "internal_bleed" then
 				bg_color = Color(200, 50, 100, 220)
-			elseif effect.name == "blood_loss" then
+			elseif effect.name == "hypotension" then
 				bg_color = Color(150, 0, 0, 220)
 			elseif effect.name == "cardiac_arrest" then
 				bg_color = Color(100, 0, 100, 220)
@@ -2297,7 +2297,7 @@ local function draw_status_effects()
 				icon_mat = status_sprites.bleeding_icon
 			end
 		elseif effect.name == "internal_bleed" then icon_mat = status_sprites.internal_bleed_icon
-		elseif effect.name == "blood_loss" then icon_mat = status_sprites.blood_loss
+		elseif effect.name == "hypotension" then icon_mat = status_sprites.hypotension
 		elseif effect.name == "cardiac_arrest" then icon_mat = status_sprites.cardiac_arrest
 		elseif effect.name == "cold" then icon_mat = status_sprites.cold
 		elseif effect.name == "heat" then icon_mat = status_sprites.heat
@@ -2366,9 +2366,9 @@ local function draw_status_effects()
 			elseif effect.name == "internal_bleed" then
 				letter = "IB"
 				value_text = effect.value .. "%"
-			elseif effect.name == "blood_loss" then
-				letter = "BL"
-				value_text = effect.value .. "ml"
+			elseif effect.name == "hypotension" then
+				letter = "HT"
+				value_text = effect.value .. "mmHg"
 			elseif effect.name == "cardiac_arrest" then
 				letter = "CA"
 			elseif effect.name == "cold" then
@@ -2785,7 +2785,7 @@ concommand.Add("mzb_nopixelicons", function(ply, cmd, args)
 		dislocation = nil,
 		spine_fracture = nil,
 		fracture = nil,
-		blood_loss = nil,
+		hypotension = nil,
 		cardiac_arrest = nil,
 		cold = nil,
 		heat = nil,
