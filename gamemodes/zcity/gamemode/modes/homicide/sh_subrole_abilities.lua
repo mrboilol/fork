@@ -155,19 +155,53 @@ function MODE.BreakOtherNeck(ply, other_ply, aim_ent)
 			local ent = other_ply:GetNWEntity("RagdollDeath")
 
 			if IsValid(ent) then
-				ent:RemoveInternalConstraint(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1")))
+				local headBoneName = "ValveBiped.Bip01_Head1"
+				local spineBoneName = "ValveBiped.Bip01_Neck1"
+				
+				local headBoneId = ent:LookupBone(headBoneName)
+				local spineBoneId = ent:LookupBone(spineBoneName)
+				
+				if not headBoneId or not spineBoneId then return end
+				
+				local headPhysBone = ent:TranslateBoneToPhysBone(headBoneId)
+				local spinePhysBone = ent:TranslateBoneToPhysBone(spineBoneId)
+				
+				if headPhysBone == -1 or spinePhysBone == -1 then return end
+				
+				ent:RemoveInternalConstraint(headPhysBone)
 
-				local spine = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Neck1"))
-				local head = ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_Head1"))
+				local pspine = ent:GetPhysicsObjectNum(spinePhysBone)
+				local phead = ent:GetPhysicsObjectNum(headPhysBone)
+				
+				if not IsValid(pspine) or not IsValid(phead) then return end
+				
+				-- Remove any existing neck constraint to prevent stacking
+				if ent.FloppyConstraints and ent.FloppyConstraints.neck then
+					local existing = ent.FloppyConstraints.neck
+					if IsValid(existing) then
+						existing:Remove()
+					end
+				end
 
-				local pspine = ent:GetPhysicsObjectNum(spine)
-				local phead = ent:GetPhysicsObjectNum(head)
-
-				local lpos, lang = WorldToLocal(phead:GetPos() + phead:GetAngles():Forward() * -2 + phead:GetAngles():Up() * -1.5, angle_zero, pspine:GetPos(), pspine:GetAngles())
+				-- Use physics object positions for constraint placement
+				local spine_pos = pspine:GetPos()
+				local spine_ang = pspine:GetAngles()
+				local head_pos = phead:GetPos()
+				local head_ang = phead:GetAngles()
+				
+				local lpos = WorldToLocal(head_pos + head_ang:Forward() * -2 + head_ang:Up() * -1.5, angle_zero, spine_pos, spine_ang)
                 
-				phead:SetPos(pspine:GetPos() + pspine:GetAngles():Forward() * 12.9 + pspine:GetAngles():Right() * -1)
+				phead:SetPos(spine_pos + spine_ang:Forward() * 12.9 + spine_ang:Right() * -1)
+				phead:Wake()
+				pspine:Wake()
 
-				local cons = constraint.AdvBallsocket(ent, ent, spine, head, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+				local cons = constraint.AdvBallsocket(ent, ent, spinePhysBone, headPhysBone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+				
+				-- Track the constraint to prevent duplicates
+				if cons then
+					ent.FloppyConstraints = ent.FloppyConstraints or {}
+					ent.FloppyConstraints.neck = cons
+				end
 			end
 		end)
 	end

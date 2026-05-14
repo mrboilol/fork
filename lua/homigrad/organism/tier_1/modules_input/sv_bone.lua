@@ -588,8 +588,13 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
     local limbs = {"larm", "rarm", "lleg", "rleg"}
 
     for _, limb in ipairs(limbs) do
-        if (org[limb] and org[limb] >= 1) or org[limb .. "dislocation"] then
+        local isBroken = org[limb] and org[limb] >= 1
+        local isDislocated = org[limb .. "dislocation"]
+        if isBroken or isDislocated then
             hg.BreakLimb(ragdoll, limb)
+        elseif IsValid(ragdoll) then
+            -- Limb has healed while we were up; make sure no stale floppy constraints remain
+            hg.RemoveLimbConstraints(ragdoll, limb)
         end
     end
 end)

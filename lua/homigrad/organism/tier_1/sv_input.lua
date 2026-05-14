@@ -1770,24 +1770,44 @@ function hg.BreakNeck(ent)
 			return
 		end
 
-		-- Calculate local position for the constraint
-		local lpos, _ = WorldToLocal(phead:GetPos() + phead:GetAngles():Forward() * -2 + phead:GetAngles():Up() * -1.5, angle_zero, pspine:GetPos(), pspine:GetAngles())
+		-- Remove any existing neck constraint to prevent stacking
+		if ragdoll.FloppyConstraints and ragdoll.FloppyConstraints.neck then
+			local existing = ragdoll.FloppyConstraints.neck
+			if IsValid(existing) then
+				existing:Remove()
+			end
+		end
+
+		-- Use physics object positions for constraint placement
+		local spine_pos = pspine:GetPos()
+		local spine_ang = pspine:GetAngles()
+		local head_pos = phead:GetPos()
+		local head_ang = phead:GetAngles()
 		
-		-- Reposition head for visual effect
-		phead:SetPos(pspine:GetPos() + pspine:GetAngles():Forward() * 12.9 + pspine:GetAngles():Right() * -1)
+		-- Offset slightly from head position for natural neck pivot
+		local lpos = WorldToLocal(head_pos + head_ang:Forward() * -2 + head_ang:Up() * -1.5, angle_zero, spine_pos, spine_ang)
+		
+		-- Reposition head for visual effect (angled slightly)
+		phead:SetPos(spine_pos + spine_ang:Forward() * 12.9 + spine_ang:Right() * -1)
 		phead:Wake()
 		pspine:Wake()
 
 		-- Add floppy neck constraint with appropriate limits
-		constraint.AdvBallsocket(ragdoll, ragdoll, spinePhysBone, headPhysBone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, spinePhysBone, headPhysBone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+		
+		-- Track the constraint to prevent duplicates
+		if newConstraint then
+			ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
+			ragdoll.FloppyConstraints.neck = newConstraint
+		end
 	end)
 end
 
 local limb_bones = {
-    larm = {parent = "ValveBiped.Bip01_Spine4", child = "ValveBiped.Bip01_L_UpperArm"},
-    rarm = {parent = "ValveBiped.Bip01_Spine4", child = "ValveBiped.Bip01_R_UpperArm"},
-    lleg = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_L_Thigh"},
-    rleg = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_R_Thigh"},
+    larm = {parent = "ValveBiped.Bip01_L_UpperArm", child = "ValveBiped.Bip01_L_Forearm"},
+    rarm = {parent = "ValveBiped.Bip01_R_UpperArm", child = "ValveBiped.Bip01_R_Forearm"},
+    lleg = {parent = "ValveBiped.Bip01_L_Thigh", child = "ValveBiped.Bip01_L_Calf"},
+    rleg = {parent = "ValveBiped.Bip01_R_Thigh", child = "ValveBiped.Bip01_R_Calf"},
 	spine0 = {parent = "ValveBiped.Bip01_Pelvis", child = "ValveBiped.Bip01_Spine"},
     spine1 = {parent = "ValveBiped.Bip01_Spine", child = "ValveBiped.Bip01_Spine1"},
     spine2 = {parent = "ValveBiped.Bip01_Spine1", child = "ValveBiped.Bip01_Spine2"},
@@ -1846,39 +1866,115 @@ function hg.BreakLimb(ent, limb)
         local child_phys_bone = ragdoll:TranslateBoneToPhysBone(child_bone_id)
         if child_phys_bone == -1 then return end
         
-        -- Remove internal constraint on the child bone
-        ragdoll:RemoveInternalConstraint(child_phys_bone)
-
         local parent_phys_bone = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
         if parent_phys_bone == -1 then return end
+
+        -- Remove internal constraint on the child bone
+        ragdoll:RemoveInternalConstraint(child_phys_bone)
 
         local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys_bone)
         local p_child = ragdoll:GetPhysicsObjectNum(child_phys_bone)
 
         if not IsValid(p_parent) or not IsValid(p_child) then return end
         
-        -- Calculate local position for proper constraint placement
-        local lpos = WorldToLocal(p_child:GetPos(), angZero, p_parent:GetPos(), p_parent:GetAngles())
-        
-        -- Keep limb attached at natural position
+        -- Remove any existing floppy constraints for this limb to prevent stacking
+        if ragdoll.FloppyConstraints then
+            local existing = ragdoll.FloppyConstraints[limb]
+            if IsValid(existing) then existing:Remove() end
+            local existingBs = ragdoll.FloppyConstraints[limb .. "_bs"]
+            if IsValid(existingBs) then existingBs:Remove() end
+        end
+
+        -- Get physics object positions (pivot points are at the joints)
+        local parent_pos = p_parent:GetPos()
+        local parent_ang = p_parent:GetAngles()
+        local child_pos = p_child:GetPos()
+
+        -- Reposition child if it's too far from parent (prevent excessive stretching on creation)
+        local current_dist = parent_pos:Distance(child_pos)
+        if current_dist > 20 then
+            local dir = (child_pos - parent_pos):GetNormalized()
+            child_pos = parent_pos + dir * 12
+            p_child:SetPos(child_pos)
+            p_child:SetAngles(parent_ang)
+        end
+
         p_child:Wake()
         p_parent:Wake()
+
+        -- Calculate the local position for the constraint at the child's pivot point
+        -- The child's physics object pivot is located at the joint (elbow/knee)
+        local lpos = WorldToLocal(child_pos, angZero, parent_pos, parent_ang)
 
         -- Get limb-specific limits or use defaults
         local limits = limb_constraint_limits[limb] or limb_constraint_limits.larm
         
-        -- Add a ballsocket constraint to make the limb floppy with appropriate limits
-        -- Format: (ent1, ent2, bone1, bone2, localPos, localAng, minYaw, minRoll, minPitch, maxYaw, maxRoll, maxPitch, ...)
-        constraint.AdvBallsocket(
-            ragdoll, ragdoll, 
-            parent_phys_bone, child_phys_bone, 
-            lpos, nil, 
+        -- Add a ballsocket to keep the joint anchored (prevents stretching)
+        local bsConstraint = constraint.Ballsocket(ragdoll, ragdoll, parent_phys_bone, child_phys_bone, lpos, vecZero, 0, 0, 0)
+
+        -- Add an AdvBallsocket to make the limb floppy with appropriate angular limits
+        local newConstraint = constraint.AdvBallsocket(
+            ragdoll, ragdoll,
+            parent_phys_bone, child_phys_bone,
+            lpos, vecZero,
             0, 0,  -- friction
             limits.minYaw, limits.minRoll, limits.minPitch,  -- min limits
             limits.maxYaw, limits.maxRoll, limits.maxPitch,  -- max limits
             0, 0, 0, 0, 0  -- unused params
         )
+
+        -- Track the constraints to prevent duplicates
+        if newConstraint or bsConstraint then
+            ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
+            if newConstraint then ragdoll.FloppyConstraints[limb] = newConstraint end
+            if bsConstraint then ragdoll.FloppyConstraints[limb .. "_bs"] = bsConstraint end
+        end
     end)
+end
+
+function hg.RemoveLimbConstraints(ent, limb)
+    if not IsValid(ent) then return end
+    if not limb_bones[limb] then return end
+
+    local ragdoll = ent:IsRagdoll() and ent or nil
+    if not IsValid(ragdoll) and ent:IsPlayer() then
+        ragdoll = ent:GetNWEntity("FakeRagdoll")
+        if not IsValid(ragdoll) then
+            ragdoll = ent:GetNWEntity("RagdollDeath")
+        end
+    end
+    if not IsValid(ragdoll) then return end
+    if not ragdoll.FloppyConstraints then return end
+
+    local existing = ragdoll.FloppyConstraints[limb]
+    if IsValid(existing) then existing:Remove() end
+    ragdoll.FloppyConstraints[limb] = nil
+
+    local existingBs = ragdoll.FloppyConstraints[limb .. "_bs"]
+    if IsValid(existingBs) then existingBs:Remove() end
+    ragdoll.FloppyConstraints[limb .. "_bs"] = nil
+
+    -- Reattach with a stiff weld since the original internal constraint can't be restored
+    local bone_info = limb_bones[limb]
+    if bone_info then
+        local parent_bone_id = ragdoll:LookupBone(bone_info.parent)
+        local child_bone_id = ragdoll:LookupBone(bone_info.child)
+        if parent_bone_id and child_bone_id then
+            local parent_phys = ragdoll:TranslateBoneToPhysBone(parent_bone_id)
+            local child_phys = ragdoll:TranslateBoneToPhysBone(child_bone_id)
+            if parent_phys ~= -1 and child_phys ~= -1 then
+                local p_parent = ragdoll:GetPhysicsObjectNum(parent_phys)
+                local p_child = ragdoll:GetPhysicsObjectNum(child_phys)
+                if IsValid(p_parent) and IsValid(p_child) then
+                    local weld = constraint.Weld(ragdoll, ragdoll, parent_phys, child_phys, 0, true)
+                    if weld then
+                        ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
+                        ragdoll.FloppyConstraints[limb .. "_healed"] = weld
+                    end
+                end
+            end
+        end
+    end
 end
 
 hook.Add("OnAmputateLimb", "amputate_cuffs", function(org, ent, limb)
@@ -1945,6 +2041,19 @@ hook.Add("Player Spawn", "huyhuyhuy22", function(ply)
 
 	ply.wounds = {}
 	ply.arterialwounds = {}
+end)
+
+-- Clean up floppy constraints when a ragdoll is removed
+hook.Add("EntityRemoved", "CleanupFloppyConstraints", function(ent)
+	if not ent:IsRagdoll() then return end
+	if ent.FloppyConstraints then
+		for limb, cons in pairs(ent.FloppyConstraints) do
+			if IsValid(cons) then
+				cons:Remove()
+			end
+		end
+		ent.FloppyConstraints = nil
+	end
 end)
 
 hook.Add("Player Getup", "huyhhgss", function(ply)

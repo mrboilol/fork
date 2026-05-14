@@ -1049,10 +1049,16 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 
 	local regen = timeValue / 120 * org.berserk
 
+	local oldLleg, oldRleg, oldRarm, oldLarm = org.lleg, org.rleg, org.rarm, org.larm
 	org.lleg = math.max(org.lleg - regen, 0)
 	org.rleg = math.max(org.rleg - regen, 0)
 	org.rarm = math.max(org.rarm - regen, 0)
 	org.larm = math.max(org.larm - regen, 0)
+	-- Remove floppy constraints if a broken limb healed while ragdolled
+	if oldLleg >= 1 and org.lleg < 1 and not org.llegdislocation then hg.RemoveLimbConstraints(org.owner, "lleg") end
+	if oldRleg >= 1 and org.rleg < 1 and not org.rlegdislocation then hg.RemoveLimbConstraints(org.owner, "rleg") end
+	if oldRarm >= 1 and org.rarm < 1 and not org.rarmdislocation then hg.RemoveLimbConstraints(org.owner, "rarm") end
+	if oldLarm >= 1 and org.larm < 1 and not org.larmdislocation then hg.RemoveLimbConstraints(org.owner, "larm") end
 	org.chest = math.max(org.chest - regen, 0)
 	org.pelvis = math.max(org.pelvis - regen, 0)
 	org.spine1 = math.max(org.spine1 - regen, 0)
@@ -1224,6 +1230,7 @@ local finally_fixed = {
 local function fixlimb(org, key, fixer)
 	if math.random(100) > (97 + (fixer != org.owner and (fixer.organism and fixer.organism.pain or 0) or 0) - (org.analgesia * 50 + org.painkiller * 15) - (fixer != org.owner and 30 or 0) - (fixer.tries or 0) * 10 - (fixer.Profession == "doctor" and 100 or 0) - (org.owner == fixer and (IsValid(org.owner.FakeRagdoll) or (org.owner.Crouching and org.owner:Crouching())) and 10 or 0)) then
 		org[key.."dislocation"] = false
+		hg.RemoveLimbConstraints(org.owner, key)
 		org.painadd = org.painadd + 5 * math.random(1, 3)
 		org.fearadd = org.fearadd + 0.1
 
