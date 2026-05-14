@@ -428,9 +428,11 @@ function HUD_DrawDynamicIndicator()
                 end
             end
 
+            local damageValue = GetOrgValueNumber(org[organName])
+            
             -- Handle fading out when bone is fully healed
             local prevFade = fadingBones[key]
-            if damageValue > 0 then
+            if damageValue and damageValue > 0 then
                 -- Bone is damaged, remove from fading if it was there
                 if prevFade then
                     fadingBones[key] = nil
@@ -484,10 +486,9 @@ function HUD_DrawDynamicIndicator()
                 end
             end
 
-            local damageValue = GetOrgValueNumber(org[organName])
-            if damageValue > 0 and damageValue < 1 and not state.fractured and not state.amputated then
+            if damageValue and damageValue > 0 and damageValue < 1 and not state.fractured and not state.amputated then
                 table.insert(damagedBones, {key = key, damage = damageValue, fading = false})
-            elseif damageValue == 0 and not state.fractured and not state.amputated then
+            elseif damageValue and damageValue == 0 and not state.fractured and not state.amputated then
                 -- Bone was damaged but is now healed - start fade out if not already fading
                 local prevDamage = prevFade and prevFade.lastDamage or 0
                 if prevDamage > 0 and not fadingBones[key] then
