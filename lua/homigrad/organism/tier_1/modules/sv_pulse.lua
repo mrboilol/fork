@@ -59,7 +59,7 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + 40 * math.max(0, org.fear)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
-	heartbeat = heartbeat + 40 * math.min(org.adrenaline, 3)
+	heartbeat = heartbeat + 25 * math.min(org.adrenaline, 3)
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
@@ -76,7 +76,7 @@ module[2] = function(owner, org, timeValue)
 	local heartK = math.Clamp(1 - org.heart, 0, 1)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
-	local hypertensionMul = 1 + math.Clamp(org.adrenaline, 0, 5) * 0.06 + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
+	local hypertensionMul = 1 + math.Clamp(org.adrenaline, 0, 5) * 0.04 + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.55)
 

@@ -39,7 +39,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	if #hg.bloodparticles1 > 500 then table.remove(hg.bloodparticles1, 1) end
+	if #hg.bloodparticles1 > 800 then table.remove(hg.bloodparticles1, 1) end
 	
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
@@ -47,7 +47,7 @@ end
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
-	time = time or 30
+	time = time or 60
 
 	pos = pos + vecZero
 	vel = vel + vecZero
@@ -55,7 +55,7 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	if #hg.bloodparticles2 > 500 then table.remove(hg.bloodparticles2, 1) end
+	if #hg.bloodparticles2 > 800 then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 

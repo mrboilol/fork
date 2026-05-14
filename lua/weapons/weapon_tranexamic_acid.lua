@@ -67,18 +67,24 @@ if SERVER then
 			canHeal = true
 		end
 
-		-- Heal stroke
+		-- Heal stroke - tranexamic acid is a good remedy
 		if stroke_meter > 0 and self.modeValues[1] > 0 then
-			local healed = math.max(stroke_meter - self.modeValues[1] * 0.5, 0)
-			local amountUsed = (stroke_meter - healed) * 2
+			local efficacy = stroke_meter > 0.85 and 0.6 or 0.8 -- Good efficacy, even on severe strokes
+			local healed = math.max(stroke_meter - self.modeValues[1] * efficacy, 0)
+			local amountUsed = (stroke_meter - healed) * 1.5
 			self.modeValues[1] = math.max(self.modeValues[1] - amountUsed * (owner.Profession == "doctor" and 0.5 or 1), 0)
 			org.stroke_meter = healed
+			-- Clear TIA warning if stroke meter drops enough
+			if org.stroke_meter < 0.6 then
+				org.tia_warning = false
+			end
 			canHeal = true
 		end
 
-		-- Heal infection
+		-- Heal infection - tranexamic acid helps fight infection
 		if infection > 0 and self.modeValues[1] > 0 then
-			local healed = math.max(infection - 0.4, 0)
+			local reduction = infection >= 0.75 and 0.3 or (infection >= 0.5 and 0.5 or 0.7) -- Good reduction
+			local healed = math.max(infection - reduction, 0)
 			local amountUsed = 2
 			self.modeValues[1] = math.max(self.modeValues[1] - amountUsed * (owner.Profession == "doctor" and 0.5 or 1), 0)
 			org.infection = healed

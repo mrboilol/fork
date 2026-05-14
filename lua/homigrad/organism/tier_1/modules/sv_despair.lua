@@ -27,6 +27,7 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org.despair = 0
 	org._despairLastAdrenaline = 0
 	org._despairNextCorpseCheck = 0
+	org._corpseAdrenalineGiven = 0
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -140,6 +141,15 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 		if corpsesSeen > 0 then
 			add = add + timeValue * 0.12 * corpsesSeen
+
+			-- Give some adrenaline from seeing corpses, but cap total contribution
+			local maxCorpseAdrenaline = 1.5
+			local given = org._corpseAdrenalineGiven or 0
+			if given < maxCorpseAdrenaline then
+				local boost = min(0.15 * corpsesSeen, maxCorpseAdrenaline - given)
+				org.adrenalineAdd = (org.adrenalineAdd or 0) + boost
+				org._corpseAdrenalineGiven = given + boost
+			end
 		end
 	end
 

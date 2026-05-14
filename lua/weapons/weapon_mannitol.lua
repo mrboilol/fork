@@ -89,12 +89,24 @@ if SERVER then
 		org.mannitol = math.Approach(org.mannitol, 4, self.modeValues[1] * 2)
 		self.modeValues[1] = 0
 
-		-- Reverse stroke effects
-		org.stroke_meter = math.max(org.stroke_meter - 0.5, 0)
+		-- Reverse ALL stroke effects (mannitol is rare/hard to find)
+		org.stroke_meter = 0
 		org.is_stroking = false
 		org.stroke_active = false
-		org.disorientation = math.max(org.disorientation - 2, 0)
-		org.consciousness = math.min(org.consciousness + 0.3, 1)
+		org.tia_warning = false
+		org.hemiparesis = 0
+		org.stroke_permanent_damage = 0
+		org.disorientation = math.max(org.disorientation - 3, 0)
+		org.consciousness = math.min(org.consciousness + 0.5, 1)
+
+		-- Restore movement if stroke was causing incapacitation
+		org.needfake = false
+
+		-- Head trauma reduction
+		org.headtrauma = 0
+
+		-- Notify player
+		owner:Notify("My mind clears... the paralysis fades...", 0, "medical", 3)
 
 		if self.poisoned2 then
 			org.poison4 = CurTime()

@@ -25,8 +25,8 @@ local math_max = math.max
 
 local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
 local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_blood_sprites") or CreateClientConVar("hg_blood_sprites", 1, true, nil, "blood is sprites or trails", 0, 1)
-local BLOOD_DRAW_SOFT_CAP = 240
-local BLOOD_PARTICLE_HARD_CAP = 380
+local BLOOD_DRAW_SOFT_CAP = 400
+local BLOOD_PARTICLE_HARD_CAP = 600
 local BLOOD_POSITION_RESET_CAP = 2500
 local BLOOD_DECALS_PER_POS = 3
 local BLOOD_POOL_DECAL_THRESHOLD = 18
@@ -210,7 +210,7 @@ bloodparticles_hook[2] = function(mul)
 			continue
 		end
 		
-		if time - part[7] >= 30 then
+		if time - part[7] >= 60 then
 			table_remove(hg.bloodparticles1, i)
 
 			continue

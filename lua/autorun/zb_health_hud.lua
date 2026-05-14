@@ -41,8 +41,8 @@ if SERVER then
 		"materials/vgui/hud/status_dislocation.png",
 		"materials/vgui/hud/status_spine_fracture.png",
 		"materials/vgui/hud/status_leg_fracture.png",
- 		"materials/vgui/hud/dislocated_jaw.png",
-		"materials/vgui/hud/broken_ribs.png",
+ 		"materials/vgui/hud/dislocatedjaw.png",
+		"materials/vgui/hud/brokenribs.png",
 		"materials/vgui/hud/encumbered.png",
 
 		
@@ -56,15 +56,15 @@ if SERVER then
 		"materials/vgui/hud/status_oxygen.png",          
 		"materials/vgui/hud/status_vomit.png",           
 		"materials/vgui/hud/status_brain_damage.png",
-		"materials/vgui/hud/status_stroke.png",
+		"materials/vgui/hud/stroke.png",
 		"materials/vgui/hud/palpitations.png",
 		"materials/vgui/hud/hypoventilation.png",
 		"materials/vgui/hud/concussion.png",
-		"materials/vgui/hud/bleeding_small.png",
-		"materials/vgui/hud/bleeding_max.png",
+		"materials/vgui/hud/smallbleeding.png",
+		"materials/vgui/hud/maxbleeding.png",
 		"materials/vgui/hud/heavybleeding.png",
 		"materials/vgui/hud/sepsis.png",
-		"materials/vgui/hud/infection.png",
+		"materials/vgui/hud/infected.png",
 
 		"materials/vgui/hud/status_adrenaline.png",
 		"materials/vgui/hud/status_shock.png",
@@ -1060,7 +1060,7 @@ local function load_status_sprites()
 	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix)
 	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
 	status_sprites.sepsis = loadMaterial("vgui/hud/sepsis.png", suffix)
-	status_sprites.infection = loadMaterial("vgui/hud/infection.png", suffix)
+	status_sprites.infection = loadMaterial("vgui/hud/infected.png", suffix)
 	status_sprites.bleeding_small = loadMaterial("vgui/hud/smallbleeding.png", suffix)
 	status_sprites.bleeding_max = loadMaterial("vgui/hud/maxbleeding.png", suffix)
 	status_sprites.bleeding_heavy = loadMaterial("vgui/hud/heavybleeding.png", suffix)
@@ -1076,7 +1076,7 @@ local function load_status_sprites()
 	status_sprites.broken_ribs = loadMaterial("vgui/hud/brokenribs.png", suffix)
 	status_sprites.encumbered = loadMaterial("vgui/hud/encumbered.png", suffix)
 	
-	status_sprites.chip = loadMaterial("materials/vgui/hud/status_chip.png", suffix)
+	status_sprites.chip = loadMaterial("vgui/hud/status_chip.png", suffix)
 end
 
 local function update_stability(blood_val, pulse_val)

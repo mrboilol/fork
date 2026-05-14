@@ -743,7 +743,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BURN) then
 			org.burns = org.burns + 1
-			org.infection = org.infection + (dmgInfo:GetDamage() * 0.002)
+			org.infection = org.infection + (dmgInfo:GetDamage() * 0.005) -- Increased from 0.002
+			-- Severe burns cause immune suppression
+			if dmgInfo:GetDamage() > 20 then
+				org.immunesuppression = math.min((org.immunesuppression or 0) + dmgInfo:GetDamage() * 0.01, 1)
+			end
 		end
 
 		if dmgInfo:IsDamageType(DMG_BLAST) then
@@ -765,12 +769,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			if !IsValid(ent) then return end
 
 			-- Exit wound blood spray
-			net.Start("hg_bloodimpact")
-			net.WriteVector(outputHole[#outputHole])
-			net.WriteVector((-outputDir):GetNormalized() * 2 + VectorRand(-0.5, 0.5))
-			net.WriteFloat(dmg * 2)
-			net.WriteInt(math.min(2, 255), 8)
-			net.Broadcast()
+			if hg_bloodimpacts:GetBool() then
+				net.Start("hg_bloodimpact")
+				net.WriteVector(outputHole[#outputHole])
+				net.WriteVector((-outputDir):GetNormalized() * 2 + VectorRand(-0.5, 0.5))
+				net.WriteFloat(dmg * 2)
+				net.WriteInt(math.min(2, 255), 8)
+				net.Broadcast()
+			end
 
 			/*if IsValid(ent) then
 				timer.Create("Blood_burst"..ent:EntIndex(),0.02,1,function()
@@ -884,20 +890,22 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		timer.Simple(0, function()
 			timer.Create("Blood_burst_input"..ent:EntIndex(), 0.02, 1, function()
 				if not IsValid(ent) then return end
-				net.Start("hg_bloodimpact")
-				net.WriteVector(inputHole[1])
-				net.WriteVector(dir / 2)
-				net.WriteFloat(dmg)
-				net.WriteInt(1, 8)
-				net.Broadcast()
-
-				for i = 1, 3 do
+				if hg_bloodimpacts:GetBool() then
 					net.Start("hg_bloodimpact")
 					net.WriteVector(inputHole[1])
-					net.WriteVector(dir / 4 + VectorRand(-100, 100))
-					net.WriteFloat(dmg / 2)
-					net.WriteInt(math.random(1,2), 8)
+					net.WriteVector(dir / 2)
+					net.WriteFloat(dmg)
+					net.WriteInt(1, 8)
 					net.Broadcast()
+
+					for i = 1, 3 do
+						net.Start("hg_bloodimpact")
+						net.WriteVector(inputHole[1])
+						net.WriteVector(dir / 4 + VectorRand(-0.5, 0.5))
+						net.WriteFloat(dmg / 2)
+						net.WriteInt(math.random(1,2), 8)
+						net.Broadcast()
+					end
 				end
 				
 				ent.bloodamt2 = 0
@@ -1205,7 +1213,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	-- EFFECT
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
-		if dmgBlood > 1 and #inputHole > 0 then
+		if dmgBlood > 1 and #inputHole > 0 and hg_bloodimpacts:GetBool() then
 			net.Start("hg_bloodimpact")
 			net.WriteVector(dmgPos)
 			net.WriteVector(dirCool / 15)

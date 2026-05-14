@@ -23,13 +23,15 @@ local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
 local lastKnownFacingAngle = 0
+local fadingBones = {} -- Track bones that are fading out after being healed
+local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
 local majorBones = {
     pelvis = { organ = "stomach", bone = "ValveBiped.Bip01_Pelvis" },
     spine1 = { organ = "spine", bone = "ValveBiped.Bip01_Spine1" },
     spine2 = { organ = "spine", bone = "ValveBiped.Bip01_Spine2" },
     chest_spine = { organ = "chest", bone = "ValveBiped.Bip01_Spine4" },
-    chest_ribs = { organ = "chest", bone = "ValveBiped.Bip01_Ribcage" },
+    chest_ribs = { organ = "chest", bone = "ValveBiped.Bip01_Ribcage", name = "Ribcage" },
     neck = { organ = "neck", bone = "ValveBiped.Bip01_Neck1" },
     skull = { organ = "head", bone = "ValveBiped.Bip01_Head1" },
     l_clavicle = { organ = "larm", bone = "ValveBiped.Bip01_L_Clavicle" },
@@ -357,6 +359,11 @@ function HUD_DrawDynamicIndicator()
     local time = CurTime()
     local damagedBones = {}
     
+    -- Check spine damage levels for cascading limb damage
+    local spine1Broken = org and GetOrgValueNumber(org.spine1 or 0) >= 1
+    local spine2Broken = org and GetOrgValueNumber(org.spine2 or 0) >= 1
+    local spine3Broken = org and GetOrgValueNumber(org.spine3 or 0) >= 1
+
     if org then
         for key, data in pairs(majorBones) do
             local organName = data.organ
@@ -366,6 +373,27 @@ function HUD_DrawDynamicIndicator()
             local isAmputated = data.canAmputate and org[organName .. "amputated"]
             local isBroken = (GetOrgValueNumber(org[organName]) >= 1)
             local isDislocated = org[organName .. "dislocation"]
+
+            -- SPINE DAMAGE CASCADING: Apply spine damage to limbs
+            -- spine1 broken = both legs black
+            -- spine2 broken = chest, legs, arms black
+            -- spine3 broken = everything black
+            if spine3Broken then
+                -- Everything is broken
+                isBroken = true
+            elseif spine2Broken then
+                -- Chest, legs, and arms are broken
+                if organName == "chest" or organName == "lleg" or organName == "rleg" or
+                   organName == "larm" or organName == "rarm" or organName == "stomach" or
+                   organName == "pelvis" then
+                    isBroken = true
+                end
+            elseif spine1Broken then
+                -- Both legs are broken
+                if organName == "lleg" or organName == "rleg" or organName == "pelvis" then
+                    isBroken = true
+                end
+            end
 
             if not boneStates[key] then
                 boneStates[key] = {
@@ -397,6 +425,20 @@ function HUD_DrawDynamicIndicator()
                     
                     local boneID = healthModel:LookupBone(boneName)
                     if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
+                end
+            end
+
+            -- Handle fading out when bone is fully healed
+            local prevFade = fadingBones[key]
+            if damageValue > 0 then
+                -- Bone is damaged, remove from fading if it was there
+                if prevFade then
+                    fadingBones[key] = nil
+                end
+            elseif prevFade then
+                -- Bone was fading, check if fade is complete
+                if time > prevFade.endTime then
+                    fadingBones[key] = nil
                 end
             end
 
@@ -444,7 +486,27 @@ function HUD_DrawDynamicIndicator()
 
             local damageValue = GetOrgValueNumber(org[organName])
             if damageValue > 0 and damageValue < 1 and not state.fractured and not state.amputated then
-                table.insert(damagedBones, {key = key, damage = damageValue})
+                table.insert(damagedBones, {key = key, damage = damageValue, fading = false})
+            elseif damageValue == 0 and not state.fractured and not state.amputated then
+                -- Bone was damaged but is now healed - start fade out if not already fading
+                local prevDamage = prevFade and prevFade.lastDamage or 0
+                if prevDamage > 0 and not fadingBones[key] then
+                    fadingBones[key] = {
+                        key = key,
+                        lastDamage = prevDamage,
+                        startTime = time,
+                        endTime = time + FADE_DURATION
+                    }
+                end
+                -- Add to damagedBones for rendering during fade
+                if fadingBones[key] then
+                    table.insert(damagedBones, {key = key, damage = fadingBones[key].lastDamage, fading = true})
+                end
+            end
+            
+            -- Store current damage for next frame comparison
+            if fadingBones[key] then
+                fadingBones[key].lastDamage = damageValue
             end
         end
     end
@@ -505,8 +567,8 @@ function HUD_DrawDynamicIndicator()
         if isRagdoll then
             -- Because we bound the ragdoll root to the pelvis in SyncBonesCallback, 
             -- offset it so the pelvis aligns vertically inside the UI viewport
-            -- Increased offset to prevent clipping below the indicator
-            modelOffset = Vector(0, 0, 55)
+            -- Increased offset to prevent clipping below the indicator and prevent drooping
+            modelOffset = Vector(0, 0, 70)
         else
             modelOffset = Vector(0, 0, 10)
         end
@@ -564,7 +626,7 @@ function HUD_DrawDynamicIndicator()
             local boneName = majorBones[data.key].bone
             local bID = blinkModel:LookupBone(boneName)
             if bID then
-                local r, g, b
+                local r, g, b, alpha
                 local damage = data.damage
                 if damage <= 0.5 then
                     local prog = damage / 0.5
@@ -579,8 +641,15 @@ function HUD_DrawDynamicIndicator()
                     r, g, b = 1, 0, 0
                 end
 
+                -- Apply fade alpha if bone is fading out after being healed
+                alpha = 1
+                if data.fading and fadingBones[data.key] then
+                    local fadeProgress = 1 - math.Clamp((time - fadingBones[data.key].startTime) / FADE_DURATION, 0, 1)
+                    alpha = fadeProgress
+                end
+
                 ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE)
-                DrawDamageBlinkState(blinkModel, r, g, b)
+                DrawDamageBlinkState(blinkModel, r * alpha, g * alpha, b * alpha)
                 ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0))
             end
         end

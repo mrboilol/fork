@@ -935,7 +935,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		tab["$pp_colour_mulr"] = 0
 		tab["$pp_colour_mulg"] = 0
 		tab["$pp_colour_mulb"] = 0
-		end
+	end
 
 	if despair >= 0.35 then
 		if not IsValid(despairSound) and not despairSoundLoading then

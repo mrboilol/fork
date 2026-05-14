@@ -47,6 +47,13 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	
 	if !nodmgchange then dmgInfo:ScaleDamage(1 - (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone))) end
 
+	org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.15, 1.15)
+
+	-- Track head trauma for long-term stroke risk
+	if key == "skull" then
+		org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.5, 2.0)
+	end
+
 	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8)
 end
 
@@ -472,18 +479,35 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			org.owner:Notify(huyasd["skull"],true,"skull",4)
 		end
 
-		if dir then
+		if dir and hg_bloodimpacts:GetBool() then
+			local dmgPos = dmgInfo:GetDamagePosition()
+			local dirNorm = dir:GetNormalized()
+			-- Main blood spray
 			net.Start("hg_bloodimpact")
-			net.WriteVector(dmgInfo:GetDamagePosition())
+			net.WriteVector(dmgPos)
 			net.WriteVector(dir / 10)
 			net.WriteFloat(3)
-			net.WriteInt(1,8)
+			net.WriteInt(2, 8)
 			net.Broadcast()
+			-- Additional spray when skull just broke (oldDmg != 1)
+			if oldDmg ~= 1 then
+				for i = 1, 3 do
+					net.Start("hg_bloodimpact")
+					net.WriteVector(dmgPos + VectorRand(-2, 2))
+					net.WriteVector(dirNorm * 1.5 + VectorRand(-0.8, 0.8))
+					net.WriteFloat(2)
+					net.WriteInt(2, 8)
+					net.Broadcast()
+				end
+			end
 		end
 	end
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
-    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 1.5, 1.15)
+    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.5, 1.15)
+
+	-- Accumulate head trauma for long-term stroke risk
+	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.3, 2.0)
 
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand

@@ -131,20 +131,20 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
         phase = phase % 1
         local h = 0
         
-        -- If fibrillating (low BP causing irregular rhythm), skip phases and use curve-like spikes
+        -- If fibrillating (low BP causing irregular rhythm), use smooth undulating waves
         if fibrillationFactor > 0.5 and bloodpressure and bloodpressure < 80 then
-            -- Fibrillation pattern: continuous chaotic waves instead of static noise
-            -- Use combinations of sine waves to create smooth but chaotic large waves
-            local wave1 = math.sin(phase * math.pi * 14) * 0.4
-            local wave2 = math.sin(phase * math.pi * 25) * 0.25
-            local wave3 = math.sin(phase * math.pi * 9) * 0.35
+            -- Fibrillation pattern: smooth rolling waves, no sharp spikes
+            local t = phase * math.pi * 2
+            local wave1 = math.sin(t * 3.7) * 0.35
+            local wave2 = math.sin(t * 2.3 + 1.2) * 0.3
+            local wave3 = math.sin(t * 5.1 + 0.7) * 0.15
             
-            -- Smooth amplitude variation
-            local amplitudeVariation = 0.6 + math.sin(phase * math.pi * 4) * 0.4
+            -- Slow amplitude envelope for natural breathing-like modulation
+            local envelope = 0.5 + math.sin(t * 0.8) * 0.3 + math.sin(t * 1.3 + 2.0) * 0.2
             
-            h = (wave1 + wave2 + wave3) * scale * amplitudeVariation * 0.8
+            h = (wave1 + wave2 + wave3) * scale * envelope * 0.7
         else
-            -- Normal ECG waveform with possible mild noise
+            -- Normal ECG waveform (clean, no noise)
             if phase > 0.05 and phase < 0.15 then
                 -- P wave: Smooth exponential bell curve
                 local p = (phase - 0.1) / 0.05
@@ -168,13 +168,6 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
                 -- T wave: Asymmetric bell curve
                 local p = (phase - 0.55) / 0.1
                 h = math.exp(-p * p * 4) * 0.22 * scale
-            end
-            
-            -- Add mild noise only when moderately abnormal
-            if fibrillationFactor > 0.2 and fibrillationFactor <= 0.5 then
-                local noiseIntensity = fibrillationFactor * 0.08 * scale
-                local smoothNoise = math.sin(phase * math.pi * 40) * 0.5 + math.sin(phase * math.pi * 65) * 0.5
-                h = h + smoothNoise * noiseIntensity
             end
         end
         

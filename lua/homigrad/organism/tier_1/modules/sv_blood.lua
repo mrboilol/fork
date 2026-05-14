@@ -109,10 +109,10 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.hemotransfusionshock > 0 then
-		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 200,0)
-		org.internalBleed = org.internalBleed + mulTime / 15
-		org.ischemia = org.ischemia + mulTime / 7.5
-        org.infection = org.infection + (org.hemotransfusionshock * mulTime * 0.01)
+		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 150,0)
+		org.internalBleed = org.internalBleed + mulTime / 20
+		org.ischemia = org.ischemia + mulTime / 15
+        org.infection = org.infection + (org.hemotransfusionshock * mulTime * 0.005)
 	end
 
 	if org.internalBleed > 1 then
@@ -141,7 +141,7 @@ module[2] = function(owner, org, mulTime)
 			//if wound[5] + beatsPerSecond * 2 < time then
 				wound[5] = time
 				org.blood = max(org.blood - bleed, 1)
-                org.infection = org.infection + (bleed * 0.001)
+                org.infection = org.infection + (bleed * 0.003) -- Increased from 0.001
 				
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					hg.organism.BloodDroplet2(owner, org, wound, ent:GetVelocity() + VectorRand(-15, 15), false)
@@ -198,7 +198,7 @@ module[2] = function(owner, org, mulTime)
 
 	-- Ischemia kicks in below 2500 blood
 	if org.blood < 2500 then
-		org.ischemia = math.min(org.ischemia + mulTime * 0.02, 1.0)
+		org.ischemia = math.min(org.ischemia + mulTime * 0.015, 1.0)
 	end
 
 	local bleed = org.internalBleed / 14 -- + org.lungsR[3] + org.lungsL[3]

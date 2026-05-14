@@ -127,11 +127,11 @@ end
 
 -- Check if a physics bone belongs to a broken/dislocated limb and return damage severity
 -- Returns: isAffected (bool), severityMultiplier (number)
--- Severity tiers:
+-- Severity tiers for ballsocket effect (ragdoll):
 --   1.00 = normal (0% reduction)
---   0.50 = just broken (50% reduction)
---   0.65 = just dislocated (35% reduction)
---   0.15 = broken AND dislocated (85% reduction)
+--   0.75 = just broken (25% effect)
+--   0.15 = just dislocated (85% effect)
+--   -0.10 = broken AND dislocated (110% effect, 0.75 + 0.15 = 0.90, but clamped to allow extra floppy)
 local function GetLimbDamageMultiplier(ragdoll, physNumber)
     local ply = hg.RagdollOwner(ragdoll)
     if not IsValid(ply) or not ply.organism then return false, 1.0 end
@@ -153,19 +153,16 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
     local isBroken = org[limb] and org[limb] >= 1
     local isDislocated = org[limb .. "dislocation"]
     
-    -- Broken AND dislocated = 85% reduction (most floppy)
-    if isBroken and isDislocated then
-        return true, 0.15
-    end
+    -- Calculate damage multiplier: dislocated = 85%, broken = 25%, both = 110%
+    local damageMultiplier = 1.0
+    if isDislocated then damageMultiplier = damageMultiplier - 0.85 end  -- 15% remaining = 85% effect
+    if isBroken then damageMultiplier = damageMultiplier - 0.75 end      -- 25% remaining = 25% effect when only broken
     
-    -- Just dislocated = 35% reduction
-    if isDislocated then
-        return true, 0.65
-    end
+    -- If both, we want 110% effect which means negative multiplier (allows more movement)
+    -- -0.10 = 110% effect
     
-    -- Just broken = 50% reduction
-    if isBroken then
-        return true, 0.50
+    if isBroken or isDislocated then
+        return true, math.max(damageMultiplier, -0.10)  -- Cap at -0.10 for 110% max effect
     end
     
     return false, 1.0

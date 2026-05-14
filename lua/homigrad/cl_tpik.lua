@@ -690,7 +690,8 @@ local function applyInjuryTPIK(ent, ply)
 	local owner = ent:IsPlayer() and ent or ply
 	local standing = ent:IsPlayer() and ent:Alive() and !org.otrub and !org.fake and !IsValid(ent.FakeRagdoll)
 	local fake = ent:IsRagdoll() and IsValid(owner) and owner:IsPlayer() and ((owner.FakeRagdoll == ent) or (owner:GetNWEntity("FakeRagdoll") == ent))
-	local can = standing or fake
+	if fake then return end -- Ballsocket constraints handle broken limbs on ragdolls
+	local can = standing
 	local motion = can and injuryTpikMotion(state, ent, owner)
 	local wep = IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon()
 	local reducedForWeapon = false
@@ -733,7 +734,19 @@ local function applyInjuryTPIK(ent, ply)
 		local offBase = injuryTpikBones[i][5]
 		local arm = limb == "larm" or limb == "rarm"
 
-		if org[limb.."amputated"] or ((org[limb] or 0) < 1 and !org[limb.."dislocation"]) then continue end
+		if org[limb.."amputated"] then continue end
+
+		-- Check limb damage states
+		local isBroken = (org[limb] or 0) >= 1
+		local isDislocated = org[limb.."dislocation"]
+
+		-- Skip if neither broken nor dislocated
+		if not isBroken and not isDislocated then continue end
+
+		-- Calculate damage multiplier: dislocated = 25%, broken = 80%, both = 105% (25+80)
+		local damageMultiplier = 0
+		if isDislocated then damageMultiplier = damageMultiplier + 0.25 end
+		if isBroken then damageMultiplier = damageMultiplier + 0.80 end
 
 		local bone = ent:LookupBone(boneName)
 		if !bone then continue end
@@ -743,14 +756,14 @@ local function applyInjuryTPIK(ent, ply)
 
 		local ang = mat:GetAngles()
 		local wmul = arm and holdMulArm or holdMulLeg
-		-- Increased amplitude and micro-movement for more noticeable flopping
-		local amp = ampBase * state.blend * motionMul * wmul * 1.15  -- 15% more amplitude
-		local micro = (math.sin(state.microphase + i * 1.7) * 0.15 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.09) * (0.12 + math.min(state.blend, 1) * 0.16) * wmul
-		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1)  -- Increased offset base
-		-- Apply rotations with increased intensity
+		-- Apply damage multiplier to TPIK effect
+		local amp = ampBase * state.blend * motionMul * wmul * 1.15 * damageMultiplier
+		local micro = (math.sin(state.microphase + i * 1.7) * 0.15 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.09) * (0.12 + math.min(state.blend, 1) * 0.16) * wmul * damageMultiplier
+		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1) * damageMultiplier
+		-- Apply rotations with intensity based on damage state
 		ang:RotateAroundAxis(mat:GetRight(), (off + wave1 * amp + micro) * side)
-		ang:RotateAroundAxis(mat:GetForward(), (wave2 * amp * 0.9 + micro * 0.7) * side)  -- Slightly increased forward rotation
-		ang:RotateAroundAxis(mat:GetUp(), micro * 0.4 * side)  -- Increased up rotation
+		ang:RotateAroundAxis(mat:GetForward(), (wave2 * amp * 0.9 + micro * 0.7) * side)
+		ang:RotateAroundAxis(mat:GetUp(), micro * 0.4 * side)
 		mat:SetAngles(ang)
 
 		hg.bone_apply_matrix(ent, bone, mat)
