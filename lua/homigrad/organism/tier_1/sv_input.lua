@@ -1748,7 +1748,7 @@ function hg.BreakNeck(ent)
 
 		-- Lookup bones and validate
 		local headBoneName = "ValveBiped.Bip01_Head1"
-		local spineBoneName = "ValveBiped.Bip01_Neck1"
+		local spineBoneName = "ValveBiped.Bip01_Spine2"
 		
 		local headBoneId = ragdoll:LookupBone(headBoneName)
 		local spineBoneId = ragdoll:LookupBone(spineBoneName)
@@ -1760,12 +1760,12 @@ function hg.BreakNeck(ent)
 		local headPhysBone = ragdoll:TranslateBoneToPhysBone(headBoneId)
 		local spinePhysBone = ragdoll:TranslateBoneToPhysBone(spineBoneId)
 		
-		if headPhysBone == -1 or spinePhysBone == -1 then
-			return
-		end
+		if headPhysBone == -1 or spinePhysBone == -1 then return end
+		if headPhysBone == spinePhysBone then return end
+		if headPhysBone == 0 then return end
 		
 		-- Remove internal constraint on head
-		ragdoll:RemoveInternalConstraint(headPhysBone)
+		pcall(function() ragdoll:RemoveInternalConstraint(headPhysBone) end)
 
 		local pspine = ragdoll:GetPhysicsObjectNum(spinePhysBone)
 		local phead = ragdoll:GetPhysicsObjectNum(headPhysBone)
@@ -1917,41 +1917,134 @@ local limb_constraint_limits = {
     rleg = {minYaw = -70, minRoll = -50, minPitch = -70, maxYaw = 70, maxRoll = 80, maxPitch = 70},
 }
 
+local matrix_cache = {}
+
+local function getBoneMatrix(rag, boneID)
+    local model = rag:GetModel()
+    if not matrix_cache[model] then
+        local _, tab = util.GetModelMeshes(model)
+        if not tab then return end
+
+        matrix_cache[model] = {}
+        for i = 0, rag:GetPhysicsObjectCount() - 1 do
+            local id = rag:TranslatePhysBoneToBone(i)
+            if tab[id] and tab[id].matrix then
+                local mat = tab[id].matrix:GetInverse()
+                matrix_cache[model][id] = mat
+            end
+        end
+    end
+    return matrix_cache[model] and matrix_cache[model][boneID]
+end
+
 -- Create floppy limb constraint at current pose
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     if not IsValid(rag) or not rag:IsRagdoll() then return false end
+
+    rag:SetupBones()
 
     local bone1ID = rag:LookupBone(bone1Name)
     local bone2ID = rag:LookupBone(bone2Name)
     if not bone1ID or not bone2ID then return false end
 
+    local matrix = getBoneMatrix(rag, bone1ID)
+    local matrix_par = getBoneMatrix(rag, bone2ID)
+    if not matrix or not matrix_par then return false end
+
     local phys1 = rag:TranslateBoneToPhysBone(bone1ID)
     local phys2 = rag:TranslateBoneToPhysBone(bone2ID)
     if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then return false end
+    
+    if phys1 == phys2 then return false end -- Prevent breaking same physics bone (e.g. Hand to Forearm if Hand has no phys)
+    if phys1 == 0 then return false end -- Prevent breaking root bone
 
-    local phys = rag:GetPhysicsObjectNum(phys1)
-    local phys_parent = rag:GetPhysicsObjectNum(phys2)
-    if not (IsValid(phys) and IsValid(phys_parent)) then return false end
+    local pBone1 = rag:GetPhysicsObjectNum(phys1)
+    local pBone2 = rag:GetPhysicsObjectNum(phys2)
+    if not (IsValid(pBone1) and IsValid(pBone2)) then return false end
 
     -- Get Bone Buster style limits
     local limits = bb_constraints_limit[bone1Name]
     if not limits then return false end
 
+    -- Helper to remove any conflicting constraints (like stiffness hinges) between these bones
+    if rag.Constraints then
+        for k, v in pairs(rag.Constraints) do
+            if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
+                if IsValid(v.Constraint) then v.Constraint:Remove() end
+                rag.Constraints[k] = nil
+            end
+        end
+    end
+
     -- Remove existing rigid constraint
     pcall(function() rag:RemoveInternalConstraint(phys1) end)
 
-    -- Create constraint at current pose
+    -- Save current state
+    local pos_ori = pBone1:GetPos()
+    local pos_ori_par = pBone2:GetPos()
+    local ang_ori = pBone1:GetAngles()
+    local ang_ori_par = pBone2:GetAngles()
+
+    local vel_ori = pBone1:GetVelocity()
+    local vel_ori_par = pBone2:GetVelocity()
+    local avel_ori = pBone1:GetAngleVelocity()
+    local avel_ori_par = pBone2:GetAngleVelocity()
+
+    -- Move to bind pose for accurate constraint creation
+    local matrix = rag:GetBoneMatrix(bone1ID)
+    local matrix_par = rag:GetBoneMatrix(bone2ID)
+    
+    if matrix and matrix_par then
+        local m_translation = rag:LocalToWorld(matrix:GetTranslation())
+        local p_translation = rag:LocalToWorld(matrix_par:GetTranslation())
+
+        pBone1:SetPos(m_translation)
+        pBone1:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
+        pBone2:SetPos(p_translation)
+        pBone2:SetAngles(rag:LocalToWorldAngles(matrix_par:GetAngles()))
+    end
+
+    if pBone1.EnableCollisions then pBone1:EnableCollisions(true) end
+    if pBone2.EnableCollisions then pBone2:EnableCollisions(true) end
+    if pBone1.Wake then pBone1:Wake() end
+    if pBone2.Wake then pBone2:Wake() end
+    pBone1:EnableMotion(true)
+    pBone2:EnableMotion(true)
+
+    -- Bone Buster-style ragdoll constraint
     local cons = ents.Create("phys_ragdollconstraint")
-    cons:SetPos(phys:GetPos())
+    
+    local pos, _ = rag:GetBonePosition(bone1ID)
+    if not pos and matrix then pos = rag:LocalToWorld(matrix:GetTranslation()) end
+    if not pos then pos = pBone1:GetPos() end
+    cons:SetPos(pos)
+    cons:SetKeyValue("spawnflags", 1) -- disable collision between constrained parts
     cons:SetKeyValue("xmin", limits[0][1])
     cons:SetKeyValue("xmax", limits[0][0])
     cons:SetKeyValue("ymin", limits[1][1])
     cons:SetKeyValue("ymax", limits[1][0])
     cons:SetKeyValue("zmin", limits[2][1])
     cons:SetKeyValue("zmax", limits[2][0])
-    cons:SetPhysConstraintObjects(phys, phys_parent)
+
+    cons:SetPhysConstraintObjects(pBone1, pBone2)
     cons:Spawn()
     cons:Activate()
+
+    -- Restore original state
+    pBone1:SetPos(pos_ori)
+    pBone1:SetAngles(ang_ori)
+    pBone2:SetPos(pos_ori_par)
+    pBone2:SetAngles(ang_ori_par)
+
+    if pBone1.SetVelocityInstantaneous then pBone1:SetVelocityInstantaneous(vel_ori) end
+    pBone1:SetVelocity(vel_ori)
+    if pBone2.SetVelocityInstantaneous then pBone2:SetVelocityInstantaneous(vel_ori_par) end
+    pBone2:SetVelocity(vel_ori_par)
+    
+    if pBone1.SetAngleVelocityInstantaneous then pBone1:SetAngleVelocityInstantaneous(avel_ori) end
+    pBone1:SetAngleVelocity(avel_ori)
+    if pBone2.SetAngleVelocityInstantaneous then pBone2:SetAngleVelocityInstantaneous(avel_ori_par) end
+    pBone2:SetAngleVelocity(avel_ori_par)
 
     -- Prevent stretching
     rag:SetSaveValue("m_ragdoll.allowStretch", false)

@@ -1275,7 +1275,7 @@ local function draw_status_effects()
 	local indMode = hg_indicator and hg_indicator:GetInt() or 0
 	if indMode == 1 and HUD.dynamicIndicator and HUD.dynamicIndicator.active then
 		-- Shift moodles down to not overlap with the dynamic indicator at top right
-		local indicatorBottom = HUD.dynamicIndicator.y + HUD.dynamicIndicator.h + ScreenScaleFixed(10)
+		local indicatorBottom = HUD.dynamicIndicator.y + HUD.dynamicIndicator.h + (10 * (ScrH() / 480))
 		if base_y < indicatorBottom then
 			base_y = indicatorBottom
 		end

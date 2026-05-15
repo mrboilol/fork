@@ -756,6 +756,28 @@ local function CopyRight( text, font, x, y, color, ang, scale )
 end
 
 
+local cached_trace
+local cached_trace_time = 0
+
+local function getCachedHudTrace()
+	if not IsValid(lply) then return {trace = nil, size = 0} end
+    if RealTime() > cached_trace_time then
+        local trace = lply:GetEyeTrace()
+        cached_trace = {
+            trace = trace,
+            size = 1 - math.Clamp(trace.HitPos:Distance(lply:EyePos()) / 150, 0, 1)
+        }
+        cached_trace_time = RealTime() + 0.1
+    end
+    return cached_trace
+end
+
+local function getCachedHudTraceScreen(trace)
+    if not trace then return nil, nil end
+    local pos = trace.HitPos:ToScreen()
+    return pos.x, pos.y
+end
+
 hook.Add("HUDPaint","Identifier",function()
 	if lply.organism and lply.organism.otrub then return end
 	if !lply:Alive() then return end

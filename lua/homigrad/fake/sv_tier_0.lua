@@ -1292,7 +1292,6 @@ hook.Add("Move","PushAwayRagdolls",function(ply, mv)
 end)]]
 
 local mRandom = math.random
-local IsLiveManagedRagdoll
 PushManagedRagdollAway = function(rag, awayDir, speed)
 	if not IsValid(rag) then return end
 	if awayDir:LengthSqr() <= 0.0001 then return end
