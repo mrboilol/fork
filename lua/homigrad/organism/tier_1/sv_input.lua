@@ -2092,9 +2092,8 @@ function hg.BreakLimb(ent, limb, segmentOverride)
         local segments = limb_segments[limb]
         if not segments then return end
 
-        -- OLD LUA: Pick random segment to make floppy (or use override for elbow/knee preference)
-        -- segmentOverride = 2 for elbow/knee, 1 for shoulder/hip, 3 for wrist/ankle
-        local randomSegment = segmentOverride or math.random(1, 3)
+        -- ALWAYS break at elbows and knees (segment 2) for better predictability
+        local randomSegment = 2
         local selectedSegment = segments[randomSegment]
         if not selectedSegment then return end
 
