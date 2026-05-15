@@ -131,7 +131,6 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
-		org[key.."dislocation"] = true
 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			hg.BreakLimb(org.owner, key)
@@ -203,7 +202,6 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
-		org[key.."dislocation"] = true
 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			hg.BreakLimb(org.owner, key)
