@@ -140,13 +140,13 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 
 		if corpsesSeen > 0 then
-			add = add + timeValue * 0.12 * corpsesSeen
+			add = add + timeValue * 0.03 * corpsesSeen
 
-			-- Give some adrenaline from seeing corpses, but cap total contribution
-			local maxCorpseAdrenaline = 1.5
+			-- Give a tiny bit of adrenaline from seeing corpses, but cap total contribution
+			local maxCorpseAdrenaline = 0.3
 			local given = org._corpseAdrenalineGiven or 0
 			if given < maxCorpseAdrenaline then
-				local boost = min(0.15 * corpsesSeen, maxCorpseAdrenaline - given)
+				local boost = min(0.02 * corpsesSeen, maxCorpseAdrenaline - given)
 				org.adrenalineAdd = (org.adrenalineAdd or 0) + boost
 				org._corpseAdrenalineGiven = given + boost
 			end

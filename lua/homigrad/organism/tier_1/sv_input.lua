@@ -743,7 +743,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BURN) then
 			org.burns = org.burns + 1
-			org.infection = org.infection + (dmgInfo:GetDamage() * 0.0005)
+			if ConVarExists("hg_infections") and GetConVar("hg_infections"):GetBool() then
+				org.infection = org.infection + (dmgInfo:GetDamage() * 0.0005)
+			end
 			-- Severe burns cause immune suppression
 			if dmgInfo:GetDamage() > 20 then
 				org.immunesuppression = math.min((org.immunesuppression or 0) + dmgInfo:GetDamage() * 0.01, 1)

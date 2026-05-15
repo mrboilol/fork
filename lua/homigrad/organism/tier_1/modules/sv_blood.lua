@@ -4,6 +4,7 @@ local max, min, Round = math.max, math.min, math.Round
 --local Organism = hg.organism
 hg.organism.module.blood = {}
 local module = hg.organism.module.blood
+local hg_infections = ConVarExists("hg_infections") and GetConVar("hg_infections") or CreateConVar("hg_infections",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable infections system",0,1)
 
 hg.organism.bloodtypes = {
 	["o-"] = {["o-"] = true,["o+"] = true,["a-"] = true,["a+"] = true,["b-"] = true,["b+"] = true,["ab-"] = true,["ab+"] = true},
@@ -105,14 +106,16 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier, 5000)
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110), 5000)
 	end
 
 	if org.hemotransfusionshock > 0 then
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 150,0)
 		org.internalBleed = org.internalBleed + mulTime / 20
 		org.ischemia = org.ischemia + mulTime / 15
-        org.infection = org.infection + (org.hemotransfusionshock * mulTime * 0.0005)
+		if hg_infections:GetBool() then
+			org.infection = org.infection + (org.hemotransfusionshock * mulTime * 0.0005)
+		end
 	end
 
 	if org.internalBleed > 1 then
@@ -141,7 +144,9 @@ module[2] = function(owner, org, mulTime)
 			//if wound[5] + beatsPerSecond * 2 < time then
 				wound[5] = time
 				org.blood = max(org.blood - bleed, 1)
-                org.infection = org.infection + (bleed * 0.0003)
+			if hg_infections:GetBool() then
+				org.infection = org.infection + (bleed * 0.0003)
+			end
 				
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					hg.organism.BloodDroplet2(owner, org, wound, ent:GetVelocity() + VectorRand(-15, 15), false)
@@ -175,7 +180,9 @@ module[2] = function(owner, org, mulTime)
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
 			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80, 1)
-			org.infection = org.infection + (wound[1] * mulTime * 0.0005)
+			if hg_infections:GetBool() then
+				org.infection = org.infection + (wound[1] * mulTime * 0.0005)
+			end
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 				local dir = wound[6]
 				local len = dir:Length()

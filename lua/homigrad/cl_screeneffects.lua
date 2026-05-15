@@ -903,7 +903,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
 
 	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
-	if despairFx > 0.7 then
+	if despairFx > 0.05 then
 		local despairShock = despairFx ^ 0.7
         if not (lply:IsBerserk() or lply:IsStimulated()) then
     		render.UpdateScreenEffectTexture()

@@ -449,33 +449,36 @@ end)
 
 
 hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
-    if not hg_strokes:GetBool() then return end
+    local strokes_enabled = hg_strokes:GetBool()
     local ramp_rate = 0
 
-    -- Ramp up on high blood pressure (>115), more aggressive scaling
-    if org.bloodpressure > 115 and org.tranexamic_acid <= 0 then
-        local bp_effect = (org.bloodpressure - 115) / 35
-        ramp_rate = ramp_rate + (0.015 * bp_effect * bp_effect) -- Exponential scaling with BP
-    end
+    -- Only ramp up if strokes are enabled
+    if strokes_enabled then
+        -- Ramp up on high blood pressure (>115), gentler scaling
+        if org.bloodpressure > 115 and org.tranexamic_acid <= 0 then
+            local bp_effect = (org.bloodpressure - 115) / 35
+            ramp_rate = ramp_rate + (0.004 * bp_effect) -- Linear scaling with BP
+        end
 
-    -- Additional stroke risk from high cholesterol/fat buildup (if exists)
-    if org.fatbuildup and org.fatbuildup > 0.3 then
-        ramp_rate = ramp_rate + (org.fatbuildup - 0.3) * 0.002
-    end
+        -- Additional stroke risk from high cholesterol/fat buildup (if exists)
+        if org.fatbuildup and org.fatbuildup > 0.3 then
+            ramp_rate = ramp_rate + (org.fatbuildup - 0.3) * 0.0005
+        end
 
-    -- Dehydration increases stroke risk
-    if org.dehydration and org.dehydration > 0.5 then
-        ramp_rate = ramp_rate + (org.dehydration - 0.5) * 0.003
-    end
+        -- Dehydration increases stroke risk
+        if org.dehydration and org.dehydration > 0.5 then
+            ramp_rate = ramp_rate + (org.dehydration - 0.5) * 0.0008
+        end
 
-    -- Repeated head trauma causes cumulative stroke risk
-    if org.headtrauma and org.headtrauma > 0 then
-        ramp_rate = ramp_rate + org.headtrauma * 0.005
-        org.headtrauma = math.max(org.headtrauma - timeValue * 0.01, 0) -- Slowly heal trauma
-    end
+        -- Repeated head trauma causes cumulative stroke risk
+        if org.headtrauma and org.headtrauma > 0 then
+            ramp_rate = ramp_rate + org.headtrauma * 0.001
+            org.headtrauma = math.max(org.headtrauma - timeValue * 0.01, 0) -- Slowly heal trauma
+        end
 
-    if ramp_rate > 0 then
-        org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.15)
+        if ramp_rate > 0 then
+            org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.15)
+        end
     end
 
     -- Decay rate - slower to recover, especially with internal bleeding
@@ -813,7 +816,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 
 		if corpsesSeen > 0 then
-			despairAdd = despairAdd + timeValue * 0.028 * corpsesSeen
+			despairAdd = despairAdd + timeValue * 0.008 * corpsesSeen
 		end
 	end
 
