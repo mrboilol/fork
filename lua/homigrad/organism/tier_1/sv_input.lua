@@ -1917,27 +1917,7 @@ local limb_constraint_limits = {
     rleg = {minYaw = -70, minRoll = -50, minPitch = -70, maxYaw = 70, maxRoll = 80, maxPitch = 70},
 }
 
--- Bone Buster style matrix cache for bind pose
-local bb_matrix_cache = {}
-
-local function getBoneMatrixBB(rag, boneID)
-    local model = rag:GetModel()
-    if not bb_matrix_cache[model] then
-        local _, tab = util.GetModelMeshes(model)
-        if not tab then return nil end
-
-        bb_matrix_cache[model] = {}
-        for i = 0, rag:GetPhysicsObjectCount() - 1 do
-            local id = rag:TranslatePhysBoneToBone(i)
-            if tab[id] and tab[id].matrix then
-                bb_matrix_cache[model][id] = tab[id].matrix
-            end
-        end
-    end
-    return bb_matrix_cache[model] and bb_matrix_cache[model][boneID]
-end
-
--- BONE BUSTER STYLE: Create floppy limb constraint
+-- Create floppy limb constraint at current pose
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     if not IsValid(rag) or not rag:IsRagdoll() then return false end
 
@@ -1960,38 +1940,9 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     -- Remove existing rigid constraint
     pcall(function() rag:RemoveInternalConstraint(phys1) end)
 
-    -- Get bind pose matrices
-    local matrix = getBoneMatrixBB(rag, bone1ID)
-    local matrix_par = getBoneMatrixBB(rag, bone2ID)
-    if not matrix or not matrix_par then return false end
-
-    -- BONE BUSTER: Save current state
-    local pos_ori = phys:GetPos()
-    local pos_ori_par = phys_parent:GetPos()
-    local ang_ori = phys:GetAngles()
-    local ang_ori_par = phys_parent:GetAngles()
-    local vel_ori = phys:GetVelocity()
-    local vel_ori_par = phys_parent:GetVelocity()
-    local avel_ori = phys:GetAngleVelocity()
-    local avel_ori_par = phys_parent:GetAngleVelocity()
-
-    -- BONE BUSTER: Move to bind pose for accurate constraint creation
-    local m_translation = rag:LocalToWorld(matrix:GetTranslation())
-    local p_translation = rag:LocalToWorld(matrix_par:GetTranslation())
-
-    phys:SetPos(m_translation)
-    phys:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
-    phys_parent:SetPos(p_translation)
-    phys_parent:SetAngles(rag:LocalToWorldAngles(matrix_par:GetAngles()))
-
-    phys:Wake()
-    phys_parent:Wake()
-    phys:EnableMotion(true)
-    phys_parent:EnableMotion(true)
-
-    -- BONE BUSTER: Create constraint at bind pose position
+    -- Create constraint at current pose
     local cons = ents.Create("phys_ragdollconstraint")
-    cons:SetPos(m_translation)
+    cons:SetPos(phys:GetPos())
     cons:SetKeyValue("xmin", limits[0][1])
     cons:SetKeyValue("xmax", limits[0][0])
     cons:SetKeyValue("ymin", limits[1][1])
@@ -2002,22 +1953,7 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     cons:Spawn()
     cons:Activate()
 
-    -- BONE BUSTER: Restore original state
-    phys:SetPos(pos_ori)
-    phys:SetAngles(ang_ori)
-    phys_parent:SetPos(pos_ori_par)
-    phys_parent:SetAngles(ang_ori_par)
-
-    phys:SetVelocityInstantaneous(vel_ori)
-    phys:SetVelocity(vel_ori)
-    phys_parent:SetVelocityInstantaneous(vel_ori_par)
-    phys_parent:SetVelocity(vel_ori_par)
-    phys:SetAngleVelocityInstantaneous(avel_ori)
-    phys:SetAngleVelocity(avel_ori)
-    phys_parent:SetAngleVelocityInstantaneous(avel_ori_par)
-    phys_parent:SetAngleVelocity(avel_ori_par)
-
-    -- BONE BUSTER: THIS IS THE KEY - prevent stretching!
+    -- Prevent stretching
     rag:SetSaveValue("m_ragdoll.allowStretch", false)
 
     return IsValid(cons) and cons
@@ -2029,6 +1965,8 @@ function hg.BreakLimb(ent, limb, segmentOverride)
 
     local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
     local playerRef = ply
+
+    print("[HG Floppy] BreakLimb called: ent=" .. tostring(ent) .. " limb=" .. tostring(limb) .. " seg=" .. tostring(segmentOverride))
 
     -- OLD LUA: Use delay to ensure ragdoll exists
     timer.Simple(0.1, function()
@@ -2047,7 +1985,10 @@ function hg.BreakLimb(ent, limb, segmentOverride)
             end
         end
 
-        if not IsValid(ragdoll) then return end
+        if not IsValid(ragdoll) then
+            print("[HG Floppy] BreakLimb timer: no ragdoll found for limb=" .. tostring(limb))
+            return
+        end
 
         local segments = limb_segments[limb]
         if not segments then return end
@@ -2060,13 +2001,19 @@ function hg.BreakLimb(ent, limb, segmentOverride)
 
         local bone1Name, bone2Name = selectedSegment[1], selectedSegment[2]
 
+        print("[HG Floppy] BreakLimb timer: ragdoll=" .. tostring(ragdoll) .. " limb=" .. tostring(limb) .. " seg=" .. tostring(randomSegment) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name))
+
         -- Check bones exist
         local bone1 = ragdoll:LookupBone(bone1Name)
         local bone2 = ragdoll:LookupBone(bone2Name)
-        if not bone1 or not bone2 then return end
+        if not bone1 or not bone2 then
+            print("[HG Floppy] BreakLimb timer: bone lookup failed bone1=" .. tostring(bone1) .. " bone2=" .. tostring(bone2))
+            return
+        end
 
         local cons = createFloppyLimbConstraint(ragdoll, bone1Name, bone2Name, limb)
         if cons then
+            print("[HG Floppy] BreakLimb timer: constraint created successfully")
             -- Store floppy data for healing restoration
             ragdoll.floppyLimbs = ragdoll.floppyLimbs or {}
             ragdoll.floppyLimbs[limb] = {
@@ -2083,6 +2030,8 @@ function hg.BreakLimb(ent, limb, segmentOverride)
                 playerRef.HG_FloppyPersist = playerRef.HG_FloppyPersist or {}
                 playerRef.HG_FloppyPersist[limb] = true
             end
+        else
+            print("[HG Floppy] BreakLimb timer: constraint creation FAILED")
         end
     end)
 end
