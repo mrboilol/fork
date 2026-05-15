@@ -1990,6 +1990,12 @@ function hg.BreakLimb(ent, limb, segmentOverride)
             return
         end
 
+        -- Prevent duplicate floppy constraints on the same limb/ragdoll
+        if ragdoll.floppyLimbs and ragdoll.floppyLimbs[limb] and IsValid(ragdoll.floppyLimbs[limb].constraint) then
+            print("[HG Floppy] BreakLimb timer: limb already floppy, skipping")
+            return
+        end
+
         local segments = limb_segments[limb]
         if not segments then return end
 
@@ -2125,7 +2131,32 @@ hook.Add("OnAmputateLimb", "amputate_remove_floppy", function(org, ent, limb)
 			ragdoll.FloppyConstraints.neck = nil
 		end
 	else
+		-- Remove from current entity if it's a ragdoll
 		hg.RemoveLimbConstraints(ent, limb)
+
+		-- Also remove from all player ragdolls and clear persistence so it never comes back
+		local ply = ent:IsPlayer() and ent or nil
+		if not IsValid(ply) then ply = hg.RagdollOwner(ent) end
+
+		if IsValid(ply) then
+			local ragdolls = {
+				ply:GetNWEntity("FakeRagdoll"),
+				ply:GetNWEntity("RagdollDeath"),
+				ply:GetRagdollEntity()
+			}
+			for _, rag in ipairs(ragdolls) do
+				if IsValid(rag) then
+					hg.RemoveLimbConstraints(rag, limb)
+				end
+			end
+
+			if ply.HG_FloppyPersist then
+				ply.HG_FloppyPersist[limb] = nil
+			end
+			if ply.HG_FloppyPersistSeg then
+				ply.HG_FloppyPersistSeg[limb] = nil
+			end
+		end
 	end
 end)
 

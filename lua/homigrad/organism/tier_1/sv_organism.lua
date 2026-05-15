@@ -542,7 +542,10 @@ hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
     -- Ongoing stroke damage - more severe
     if org.is_stroking then
         org.brain = math.max(org.brain - timeValue / 80, 0) -- Faster brain deterioration
-        org.ischemia = org.ischemia + timeValue * 0.02 -- Organ ischemia from stroke
+        local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+        if totalAdrenaline <= 0.5 then
+            org.ischemia = org.ischemia + timeValue * 0.02 -- Organ ischemia from stroke
+        end
 
         -- During active stroke, player loses control of body (needfake)
         org.needfake = true

@@ -54,7 +54,10 @@ module[2] = function(owner, org, mulTime)
 
     -- Severe infection - septic effects (0.75+)
     if org.infection >= 0.75 then
-        org.ischemia = org.ischemia + (org.infection - 0.75) * 0.02
+        local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+        if totalAdrenaline <= 0.5 then
+            org.ischemia = org.ischemia + (org.infection - 0.75) * 0.02
+        end
 
         -- Septic shock - more dangerous than regular shock
         local sepsis_shock_rate = (org.infection - 0.75) * 0.06

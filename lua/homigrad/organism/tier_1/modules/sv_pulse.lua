@@ -116,8 +116,11 @@ module[2] = function(owner, org, timeValue)
         org.intestines = math.min(org.intestines + damage * 0.3, 1)
     end
 
+	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+	local adrenalineStabilizer = totalAdrenaline > 0.5
+
 	if org.ischemia > 0 then
-		if org.ischemia > 1 then
+		if org.ischemia > 1 and not adrenalineStabilizer then
 			local ischemiaK = math.Clamp((org.ischemia - 1) / 5, 0, 1)
 			local damage = timeValue * ischemiaK * 0.007
 			org.brain = math.min(org.brain + damage, 1)
@@ -127,7 +130,9 @@ module[2] = function(owner, org, timeValue)
 			org.intestines = math.min(org.intestines + damage * 0.3, 1)
 		end
 
-		org.ischemia = math.max(org.ischemia - timeValue / 10, 0)
+		-- Epinephrine/adrenaline above 0.5 accelerates ischemia regression
+		local decayRate = adrenalineStabilizer and timeValue / 3 or timeValue / 10
+		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 
 	if org.bloodpressure < 65 then

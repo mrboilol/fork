@@ -179,9 +179,13 @@ input_list.heart = function(org, bone, dmg, dmgInfo)
 	local result = damageOrgan(org, dmg * 0.3, dmgInfo, "heart")
 
 	hg.AddHarmToAttacker(dmgInfo, (org.heart - oldDmg) * 10, "Heart damage harm")
-	
+
 	org.shock = org.shock + dmg * 20
 	org.internalBleed = org.internalBleed + (org.heart - oldDmg) * 10
+
+	if math.random() < 0.4 then
+		hitArtery("spineartery", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Spine2", dmgInfo:GetDamageForce():GetNormalized(), dmgInfo:GetDamagePosition())
+	end
 
 	return result
 end

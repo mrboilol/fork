@@ -72,7 +72,7 @@ bloodparticles_hook[4] = function(mul)
 
 		if radiusSqr < hitPos:LengthSqr() then table_remove(hg.bloodparticles2, i) continue end
 
-        if result.Hit or part[7] - time <= 0 then
+        if part[7] - time <= 0 then
             table_remove(hg.bloodparticles2, i)
             
             --util.Decal("Water.Blood", pos + result.HitNormal, pos - result.HitNormal, ents.FindInSphere(pos, 1))

@@ -62,6 +62,7 @@ hg = hg or {}
 
 function IsLiveManagedRagdoll(rag)
 	if not IsValid(rag) then return false end
+	if not hg.RagdollOwner then return false end
 
 	local owner = hg.RagdollOwner(rag)
 	if not IsValid(owner) then
@@ -1397,6 +1398,7 @@ local function SettleCorpseRagdoll(rag)
 	end
 end
 
+local _IsLiveManagedRagdoll = IsLiveManagedRagdoll
 timer.Create("hg_corpse_optimizer", 5, 0, function()
 	local corpses = {}
 	local now = CurTime()
@@ -1406,7 +1408,7 @@ timer.Create("hg_corpse_optimizer", 5, 0, function()
 
 		rag.hg_corpseSpawnTime = rag.hg_corpseSpawnTime or now
 
-		if IsLiveManagedRagdoll(rag) or IsValid(rag:GetParent()) or rag:GetCustomCollisionCheck() then
+		if _IsLiveManagedRagdoll(rag) or IsValid(rag:GetParent()) or rag:GetCustomCollisionCheck() then
 			rag.hg_corpseSettled = nil
 
 			if rag:GetCollisionGroup() == COLLISION_GROUP_DEBRIS then

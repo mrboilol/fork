@@ -150,20 +150,9 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
                 local p = (phase - 0.1) / 0.05
                 h = math.exp(-p * p * 5) * 0.12 * scale
             elseif phase > 0.2 and phase < 0.32 then
-                -- QRS complex: Sharp spikes
+                -- QRS complex: single clean spike, no extra dips
                 local p = (phase - 0.2) / 0.12
-                if p < 0.15 then 
-                    -- Q dip
-                    h = -math.sin(p / 0.15 * math.pi) * 0.15 * scale
-                elseif p < 0.5 then 
-                    -- R spike
-                    local rp = (p - 0.15) / 0.35
-                    h = math.sin(rp * math.pi) * 1.1 * scale
-                else 
-                    -- S dip
-                    local sp = (p - 0.5) / 0.5
-                    h = -math.sin(sp * math.pi) * 0.25 * scale
-                end
+                h = math.sin(p * math.pi) * 1.0 * scale
             elseif phase > 0.45 and phase < 0.65 then
                 -- T wave: Asymmetric bell curve
                 local p = (phase - 0.55) / 0.1

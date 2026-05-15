@@ -896,9 +896,9 @@ local tooltipTexts = {
 			[1] = {title = "Confusion", text = "My brain feels funny..."}
 		},
 		palpitations = {
-            [4] = {title = "Atrial Fibrillation", text = "Really fast and irregular to keep up with your abysmal performance, but this wont do, your heart will fail soon."},
-            [3] = {title = "Palpitations", text = "Irregular and fast, your heart is beating too hard to keep up with your low blood pressure."},
-            [2] = {title = "Flutter", text = "Your heart is beating unusually fast, and it does not feel good."},
+            [4] = {title = "Ventricular Flutter", text = "Really fast and irregular to keep up with your abysmal performance, but this wont do, your heart will fail soon."},
+            [3] = {title = "Ventricular Fibrillation", text = "Irregular and fast, your heart is beating too hard to keep up with your low blood pressure."},
+            [2] = {title = "Palpitations", text = "Your heart is beating unusually fast, and it does not feel good."},
             [1] = {title = "Tachycardia", text = "Probably just a workout."}
         },
         hypoventilation = {

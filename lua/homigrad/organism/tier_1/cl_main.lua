@@ -537,6 +537,8 @@ hook.Add("RenderScreenspaceEffects", "organism-effects", function()
 
 		if ((disorientation and disorientation > 3) or (brain and brain > 0.2) or lply.PlayerClassName == "headcrabzombie" or lply:GetNetVar("headcrab")) and lply:Alive() then
 			lply:SetDSP(130)
+		elseif lply.tinnitus and lply.tinnitus > CurTime() and lply:Alive() then
+			lply:SetDSP(32)
 		else
 			lply:SetDSP(0)
 		end

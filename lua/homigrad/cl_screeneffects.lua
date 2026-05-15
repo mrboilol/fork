@@ -1151,13 +1151,16 @@ net.Receive("headtrauma_flash", function()
     local is_critical = net.ReadBool()
     local play_knockout_sound = net.ReadBool()
 
+    local lply = LocalPlayer()
+
     if is_critical then
         surface.PlaySound("tinnituslong.wav")
+        if IsValid(lply) then lply:AddTinnitus(5) end
     else
         surface.PlaySound("tinnitus.wav")
+        if IsValid(lply) then lply:AddTinnitus(2.5) end
     end
 
-    local lply = LocalPlayer()
     if not IsValid(lply) then return end
 
     if lply.organism and lply.organism.otrub then
