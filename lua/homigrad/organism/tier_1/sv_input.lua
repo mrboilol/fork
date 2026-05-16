@@ -2076,12 +2076,9 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     print("[HG Floppy] createFloppyLimbConstraint: pBone1 pos=" .. tostring(pos1) .. " pBone2 pos=" .. tostring(pos2) .. " jointPos=" .. tostring(jointPos))
 
     -- Use constraint.AdvBallsocket like the neck constraint (more reliable)
-    -- Get local position for constraint (like neck constraint does)
-    local pos, _ = rag:GetBonePosition(bone1ID)
-    if not pos then
-        pos = pBone1:GetPos()
-    end
-    local lpos = WorldToLocal(pos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
+    -- Calculate local positions for both physics objects at the joint
+    local lpos = WorldToLocal(jointPos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
+    local lpos2 = WorldToLocal(jointPos, angle_zero, pBone2:GetPos(), pBone2:GetAngles())
 
     -- Convert limits to numbers for AdvBallsocket
     local minPitch = tonumber(limits[0][1]) or -45
@@ -2093,15 +2090,14 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
 
     print("[HG Floppy] createFloppyLimbConstraint: Creating AdvBallsocket with limits: pitch[" .. minPitch .. "," .. maxPitch .. "] yaw[" .. minYaw .. "," .. maxYaw .. "] roll[" .. minRoll .. "," .. maxRoll .. "]")
 
-    -- Create constraint at pBone1's position with local offset (like neck constraint)
-    -- ent1, ent2, bone1, bone2, localPos, localPos2, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, friction
-    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, nil, 0, 0, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, 0, 0, 0, 0, 0)
+    -- Create constraint at joint position on both bones (matching neck constraint style)
+    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, 0, 0, 0, 0, 0)
 
-    if IsValid(cons) and cons:EntIndex() > 0 then
-        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: AdvBallsocket created, entIndex=" .. cons:EntIndex() .. " for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
+    if IsValid(cons) then
+        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: AdvBallsocket created for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
         return cons
     else
-        print("[HG Floppy] createFloppyLimbConstraint FAIL: constraint.AdvBallsocket returned invalid or entIndex=0")
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: constraint.AdvBallsocket returned invalid")
         return false
     end
 end

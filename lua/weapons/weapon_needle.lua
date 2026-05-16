@@ -89,10 +89,6 @@ if SERVER then
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 
-		if org.trachea and org.trachea > 0.7 then
-			org.trachea = math.max(org.trachea, 0.65)
-		end
-
 		--org.lungsR[2] = 0
 		--org.lungsL[2] = 0
 		org.needle = 1

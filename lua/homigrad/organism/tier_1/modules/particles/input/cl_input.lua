@@ -69,7 +69,7 @@ local Rand = math.Rand
 
 local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
-	local iters = math.ceil(math.random(1, max) * 5)
+	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
 	
 	addBloodPart2(pos + velnorm, -vel + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.8)
@@ -77,8 +77,8 @@ local function impact(pos,vel,mul)
 	addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.8)
 
 	for i = 1, iters do
-		local size = 1--math.random(2, 4) * 1
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-40, 40), Rand(-40, 40), Rand(-10, 10)), mat_huy, size, size, false, false)
+		local size = math.Rand(2, 4)
+		addBloodPart(pos + VectorRand(-0.5, 0.5), -vel * math.Rand(0.3, 1.0) + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-5, 5)), mat_huy, size, size, false, false)
 	end
 end
 
