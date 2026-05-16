@@ -2099,11 +2099,7 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     end
     print("[HG Floppy] createFloppyLimbConstraint: Existing floppy constraints on ragdoll: " .. existingConstraints)
 
-    -- Constrain parent first, then child (upper arm, then forearm)
-    -- phys_ragdollconstraint expects: SetPhysConstraintObjects(phys1, phys2) where phys1 is parent, phys2 is child
-    print("[HG Floppy] createFloppyLimbConstraint: Setting constraint objects: pBone2(phys" .. phys2 .. ",parent) -> pBone1(phys" .. phys1 .. ",child)")
-    cons:SetPhysConstraintObjects(pBone2, pBone1)
-    
+    -- Spawn the constraint entity first (without physics objects set yet)
     cons:Spawn()
     
     -- Debug: Check if spawn succeeded
@@ -2114,6 +2110,11 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
         print("[HG Floppy] createFloppyLimbConstraint FAIL: Entity failed to spawn (entIndex=0 or invalid)")
         return false
     end
+    
+    -- Now set physics objects AFTER spawning
+    -- phys_ragdollconstraint expects: SetPhysConstraintObjects(phys1, phys2) where phys1 is parent, phys2 is child
+    print("[HG Floppy] createFloppyLimbConstraint: Setting constraint objects: pBone2(phys" .. phys2 .. ",parent) -> pBone1(phys" .. phys1 .. ",child)")
+    cons:SetPhysConstraintObjects(pBone2, pBone1)
     
     cons:Activate()
     
