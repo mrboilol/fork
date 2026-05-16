@@ -1975,6 +1975,18 @@ end
 -- Create floppy limb constraint at current pose
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     print("[HG Floppy] createFloppyLimbConstraint START: rag=" .. tostring(rag) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name) .. " limbType=" .. tostring(limbType))
+    
+    -- Debug: List first few physics objects on this ragdoll
+    local physCount = rag:GetPhysicsObjectCount()
+    print("[HG Floppy] createFloppyLimbConstraint: Ragdoll has " .. physCount .. " physics objects")
+    for i = 0, math.min(physCount - 1, 15) do
+        local phys = rag:GetPhysicsObjectNum(i)
+        if IsValid(phys) then
+            local pos = phys:GetPos()
+            local name = phys.GetName and phys:GetName() or "unnamed"
+            print("[HG Floppy]   phys[" .. i .. "]=" .. name .. " pos=" .. math.floor(pos.x) .. "," .. math.floor(pos.y) .. "," .. math.floor(pos.z))
+        end
+    end
 
     if not IsValid(rag) or not rag:IsRagdoll() then
         print("[HG Floppy] createFloppyLimbConstraint FAIL: rag invalid or not ragdoll")
@@ -1988,6 +2000,10 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
         return false
     end
     print("[HG Floppy] createFloppyLimbConstraint: bone1ID=" .. tostring(bone1ID) .. " bone2ID=" .. tostring(bone2ID))
+    -- Debug: Show actual bone names from the ragdoll
+    local actualBone1Name = bone1ID and rag:GetBoneName(bone1ID) or "nil"
+    local actualBone2Name = bone2ID and rag:GetBoneName(bone2ID) or "nil"
+    print("[HG Floppy] createFloppyLimbConstraint: actual bone names from ragdoll: bone1=" .. actualBone1Name .. " bone2=" .. actualBone2Name)
 
     local matrix = getBoneMatrix(rag, bone1ID)
     local matrix_par = getBoneMatrix(rag, bone2ID)
@@ -2070,7 +2086,19 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     cons:SetKeyValue("zmin", limits[2][1])
     cons:SetKeyValue("zmax", limits[2][0])
 
-    -- Try swapping bone order - parent first, then child (upper arm, then forearm)
+    -- Check existing floppy constraints on this ragdoll to detect conflicts
+    local existingConstraints = 0
+    if rag.floppyLimbs then
+        for l, data in pairs(rag.floppyLimbs) do
+            if IsValid(data.constraint) then
+                existingConstraints = existingConstraints + 1
+            end
+        end
+    end
+    print("[HG Floppy] createFloppyLimbConstraint: Existing floppy constraints on ragdoll: " .. existingConstraints)
+
+    -- Constrain parent first, then child (upper arm, then forearm)
+    print("[HG Floppy] createFloppyLimbConstraint: Setting constraint objects: pBone2(phys" .. phys2 .. ") -> pBone1(phys" .. phys1 .. ")")
     cons:SetPhysConstraintObjects(pBone2, pBone1)
     cons:Spawn()
     cons:Activate()
@@ -2079,7 +2107,8 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     rag:SetSaveValue("m_ragdoll.allowStretch", false)
 
     if IsValid(cons) then
-        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: phys_ragdollconstraint created for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
+        local consIndex = cons:EntIndex()
+        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: phys_ragdollconstraint created, entIndex=" .. consIndex .. " for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
         return cons
     else
         print("[HG Floppy] createFloppyLimbConstraint FAIL: entity invalid after spawn")
