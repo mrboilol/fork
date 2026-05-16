@@ -266,7 +266,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	
 	if name == "spine3" and org.spine3 > 0.75 and oldDmg <= 0.75 then
 		if math.random() < 0.5 then
-			hg.BreakNeck(org.owner)
+			hg.BreakNeck(org.owner, true)
 			return result, vecrand
 		end
 	end
@@ -578,5 +578,15 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
             -- Limb has healed while we were up; make sure no stale floppy constraints remain
             hg.RemoveLimbConstraints(ragdoll, limb)
         end
+    end
+
+    -- Reapply neck floppy if spine3 is broken (neck broken)
+    if org.spine3 and org.spine3 >= 0.8 and IsValid(ragdoll) then
+        -- Use timer to ensure ragdoll physics are ready
+        timer.Simple(0.1, function()
+            if IsValid(ragdoll) and IsValid(ply) then
+                hg.BreakNeck(ragdoll)
+            end
+        end)
     end
 end)

@@ -1616,7 +1616,7 @@ local function velocityDamage(ent, data)
 				local flash_duration = 100
 			
 			//if dmg > 0.5 then
-						hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1) * intel_multiplier, dmgInfo)
+						hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1), dmgInfo)
 						
 						flash_intensity = 1.2
 						flash_duration = 150
@@ -1655,7 +1655,7 @@ local function velocityDamage(ent, data)
 			end
 
 			if neck_not_broken and org.spine3 >= 0.8 then
-				hg.BreakNeck(ent)
+				hg.BreakNeck(ent, true)
 			end
 		end
 	else
@@ -1712,12 +1712,15 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 	//end
 end
 
-function hg.BreakNeck(ent)
+function hg.BreakNeck(ent, fromDamage)
 	if not IsValid(ent) then return end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	local wasAlive = ply:Alive()
-	if wasAlive then ply:Kill() end
+	
+	-- Only kill player if called from damage and they're alive
+	if fromDamage and ply:Alive() then
+		ply:Kill()
+	end
 
 	-- Store the player reference for later
 	local playerRef = ply
@@ -1743,61 +1746,61 @@ function hg.BreakNeck(ent)
 			playerRef.organism.spine3 = 1
 		end
 		
-		-- Play sound on the ragdoll
-		ragdoll:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+		-- Play sound on the ragdoll (only if from damage, not reapplication)
+		if fromDamage then
+			ragdoll:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+		end
 
 		-- Lookup bones and validate
 		local headBoneName = "ValveBiped.Bip01_Head1"
-		local spineBoneName = "ValveBiped.Bip01_Spine2"
+		local neckBoneName = "ValveBiped.Bip01_Neck1"
 		
 		local headBoneId = ragdoll:LookupBone(headBoneName)
-		local spineBoneId = ragdoll:LookupBone(spineBoneName)
+		local neckBoneId = ragdoll:LookupBone(neckBoneName)
 		
-		if not headBoneId or not spineBoneId then
+		if not headBoneId or not neckBoneId then
 			return
 		end
 		
 		local headPhysBone = ragdoll:TranslateBoneToPhysBone(headBoneId)
-		local spinePhysBone = ragdoll:TranslateBoneToPhysBone(spineBoneId)
+		local neckPhysBone = ragdoll:TranslateBoneToPhysBone(neckBoneId)
 		
-		if headPhysBone == -1 or spinePhysBone == -1 then return end
-		if headPhysBone == spinePhysBone then return end
+		if headPhysBone == -1 or neckPhysBone == -1 then return end
+		if headPhysBone == neckPhysBone then return end
 		if headPhysBone == 0 then return end
+		
+		-- Check if neck already floppy on this ragdoll
+		if ragdoll.FloppyConstraints and ragdoll.FloppyConstraints.neck and IsValid(ragdoll.FloppyConstraints.neck) then
+			return -- Already has neck floppy, don't reapply
+		end
 		
 		-- Remove internal constraint on head
 		pcall(function() ragdoll:RemoveInternalConstraint(headPhysBone) end)
 
-		local pspine = ragdoll:GetPhysicsObjectNum(spinePhysBone)
+		local pneck = ragdoll:GetPhysicsObjectNum(neckPhysBone)
 		local phead = ragdoll:GetPhysicsObjectNum(headPhysBone)
 
-		if not IsValid(pspine) or not IsValid(phead) then
+		if not IsValid(pneck) or not IsValid(phead) then
 			return
 		end
 
-		-- Remove any existing neck constraint to prevent stacking
-		if ragdoll.FloppyConstraints and ragdoll.FloppyConstraints.neck then
-			local existing = ragdoll.FloppyConstraints.neck
-			if IsValid(existing) then
-				existing:Remove()
-			end
-		end
-
-		-- Use physics object positions for constraint placement
-		local spine_pos = pspine:GetPos()
-		local spine_ang = pspine:GetAngles()
-		local head_pos = phead:GetPos()
-		local head_ang = phead:GetAngles()
-		
-		-- Offset slightly from head position for natural neck pivot
-		local lpos = WorldToLocal(head_pos + head_ang:Forward() * -2 + head_ang:Up() * -1.5, angle_zero, spine_pos, spine_ang)
-		
-		-- Reposition head for visual effect (angled slightly)
-		phead:SetPos(spine_pos + spine_ang:Forward() * 12.9 + spine_ang:Right() * -1)
+		-- Wake physics objects
 		phead:Wake()
-		pspine:Wake()
+		pneck:Wake()
+		phead:EnableMotion(true)
+		pneck:EnableMotion(true)
 
-		-- Add floppy neck constraint with appropriate limits
-		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, spinePhysBone, headPhysBone, lpos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+		-- Create constraint at current pose for natural floppy behavior
+		-- Get current head position for constraint placement
+		local head_pos = phead:GetPos()
+		local neck_pos = pneck:GetPos()
+		local neck_ang = pneck:GetAngles()
+		
+		-- Calculate local position on neck for constraint anchor
+		local lpos = WorldToLocal(head_pos, angle_zero, neck_pos, neck_ang)
+
+		-- Add floppy neck constraint with generous limits for floppy head
+		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos, nil, 0, 0, -80, -120, -80, 80, 120, 80, 0, 0, 0, 0, 0)
 		
 		-- Track the constraint to prevent duplicates
 		if newConstraint then
@@ -1941,8 +1944,6 @@ end
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     if not IsValid(rag) or not rag:IsRagdoll() then return false end
 
-    rag:SetupBones()
-
     local bone1ID = rag:LookupBone(bone1Name)
     local bone2ID = rag:LookupBone(bone2Name)
     if not bone1ID or not bone2ID then return false end
@@ -1979,31 +1980,6 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     -- Remove existing rigid constraint
     pcall(function() rag:RemoveInternalConstraint(phys1) end)
 
-    -- Save current state
-    local pos_ori = pBone1:GetPos()
-    local pos_ori_par = pBone2:GetPos()
-    local ang_ori = pBone1:GetAngles()
-    local ang_ori_par = pBone2:GetAngles()
-
-    local vel_ori = pBone1:GetVelocity()
-    local vel_ori_par = pBone2:GetVelocity()
-    local avel_ori = pBone1:GetAngleVelocity()
-    local avel_ori_par = pBone2:GetAngleVelocity()
-
-    -- Move to bind pose for accurate constraint creation
-    local matrix = rag:GetBoneMatrix(bone1ID)
-    local matrix_par = rag:GetBoneMatrix(bone2ID)
-    
-    if matrix and matrix_par then
-        local m_translation = rag:LocalToWorld(matrix:GetTranslation())
-        local p_translation = rag:LocalToWorld(matrix_par:GetTranslation())
-
-        pBone1:SetPos(m_translation)
-        pBone1:SetAngles(rag:LocalToWorldAngles(matrix:GetAngles()))
-        pBone2:SetPos(p_translation)
-        pBone2:SetAngles(rag:LocalToWorldAngles(matrix_par:GetAngles()))
-    end
-
     if pBone1.EnableCollisions then pBone1:EnableCollisions(true) end
     if pBone2.EnableCollisions then pBone2:EnableCollisions(true) end
     if pBone1.Wake then pBone1:Wake() end
@@ -2011,12 +1987,14 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     pBone1:EnableMotion(true)
     pBone2:EnableMotion(true)
 
-    -- Bone Buster-style ragdoll constraint
-    local cons = ents.Create("phys_ragdollconstraint")
-    
+    -- Get current bone position for constraint placement
     local pos, _ = rag:GetBonePosition(bone1ID)
-    if not pos and matrix then pos = rag:LocalToWorld(matrix:GetTranslation()) end
-    if not pos then pos = pBone1:GetPos() end
+    if not pos then
+        pos = pBone1:GetPos()
+    end
+
+    -- Bone Buster-style ragdoll constraint - created at current pose for floppy behavior
+    local cons = ents.Create("phys_ragdollconstraint")
     cons:SetPos(pos)
     cons:SetKeyValue("spawnflags", 1) -- disable collision between constrained parts
     cons:SetKeyValue("xmin", limits[0][1])
@@ -2029,22 +2007,6 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     cons:SetPhysConstraintObjects(pBone1, pBone2)
     cons:Spawn()
     cons:Activate()
-
-    -- Restore original state
-    pBone1:SetPos(pos_ori)
-    pBone1:SetAngles(ang_ori)
-    pBone2:SetPos(pos_ori_par)
-    pBone2:SetAngles(ang_ori_par)
-
-    if pBone1.SetVelocityInstantaneous then pBone1:SetVelocityInstantaneous(vel_ori) end
-    pBone1:SetVelocity(vel_ori)
-    if pBone2.SetVelocityInstantaneous then pBone2:SetVelocityInstantaneous(vel_ori_par) end
-    pBone2:SetVelocity(vel_ori_par)
-    
-    if pBone1.SetAngleVelocityInstantaneous then pBone1:SetAngleVelocityInstantaneous(avel_ori) end
-    pBone1:SetAngleVelocity(avel_ori)
-    if pBone2.SetAngleVelocityInstantaneous then pBone2:SetAngleVelocityInstantaneous(avel_ori_par) end
-    pBone2:SetAngleVelocity(avel_ori_par)
 
     -- Prevent stretching
     rag:SetSaveValue("m_ragdoll.allowStretch", false)
