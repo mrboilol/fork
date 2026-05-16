@@ -39,15 +39,15 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	if #hg.bloodparticles1 > 8000 then table.remove(hg.bloodparticles1, 1) end
+	if #hg.bloodparticles1 > 50000 then table.remove(hg.bloodparticles1, 1) end
 	
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
 
-local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
+local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
-	time = time or 60
+	time = time or 90
 
 	pos = pos + vecZero
 	vel = vel + vecZero
@@ -55,11 +55,11 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	if #hg.bloodparticles2 > 6000 then table.remove(hg.bloodparticles2, 1) end
+	if #hg.bloodparticles2 > 50000 then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
-	hg.bloodparticles2[#hg.bloodparticles2 + 1] = {pos, pos2, vel, mat or cloudmat, w or 60, h or 60, CurTime() + time, time, water = water, owner = owner, color = color}
+	hg.bloodparticles2[#hg.bloodparticles2 + 1] = {pos, pos2, vel, mat or cloudmat, w or 60, h or 60, CurTime() + time, time, water = water, owner = owner}
 end
 
 hg.addBloodPart = addBloodPart
@@ -67,18 +67,22 @@ hg.addBloodPart2 = addBloodPart2
 
 local Rand = math.Rand
 
+local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
+
 local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
 	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
 	
-	addBloodPart2(pos + velnorm, -vel + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.8)
-	addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.8)
-	addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-20, 20)) * 5, nil, 25, 25, 0.8)
+	if hg_bloodimpacts:GetBool() then
+		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+	end
 
 	for i = 1, iters do
-		local size = math.Rand(2, 4)
-		addBloodPart(pos + VectorRand(-0.5, 0.5), -vel * math.Rand(0.3, 1.0) + Vector(Rand(-20, 20), Rand(-20, 20), Rand(-5, 5)), mat_huy, size, size, false, false)
+		local size = 1--math.random(2, 4) * 1
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
 	end
 end
 
@@ -87,11 +91,11 @@ net.Receive("hg_bloodimpact", function()
 	local vel = net.ReadVector() * 500
 	local mul = net.ReadFloat()
 	local amt = net.ReadInt(8)
+	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
-	for i = 1, amt * 2 do impact(pos,vel,mul) end
+	for i = 1, amt do impact(pos,vel,mul) end
 end)
-
-net.Receive("hg_brainmist", function()
+	net.Receive("hg_brainmist", function()
 	local ent = net.ReadEntity()
 	local pos = net.ReadVector()
 	local ang = net.ReadAngle()

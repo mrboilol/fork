@@ -25,6 +25,16 @@ end
 local sw, sh = CLIENT and ScrW() or nil, CLIENT and ScrH() or nil
 CLASS.NoGloves = true
 
+local function GetExpieModel(ply)
+	local Appearance = ply.CurAppearance
+	if Appearance and hg.Appearance.PlayerModels[2][Appearance.AModel] then
+		return "models/assassingecko/geckoexpie/femgeckoexpie.mdl"
+	elseif Appearance and hg.Appearance.PlayerModels[1][Appearance.AModel] then
+		return "models/assassingecko/geckoexpie/geckoexpie.mdl"
+	end
+	return math.random(2) == 1 and "models/assassingecko/geckoexpie/femgeckoexpie.mdl" or "models/assassingecko/geckoexpie/geckoexpie.mdl"
+end
+
 function CLASS.On(self, data)
 	if SERVER then
 		if eightbit and eightbit.EnableEffect and self.UserID then
@@ -56,7 +66,7 @@ for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) e
 
 		self:SetNWString("PlayerName", name)
 		Appearance.AName = name
-		self:SetModel("models/blop/expie/gecko_expie.mdl")
+		self:SetModel(GetExpieModel(self))
 	end
 
 	if data.instant then
@@ -64,12 +74,12 @@ for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) e
 			self:SetNWInt("SpeedGainClassMul", self.SpeedGainClassMul)
 			self.armors = {}
 			self:SyncArmor()
-			self:SetModel("models/blop/expie/gecko_expie.mdl")
+			self:SetModel(GetExpieModel(self))
 			self:SetSkin(0)
 			self:SetSubMaterial(0,"")
             self:SetNetVar("Accessories", "")
 		end
-		self:SetModel("models/blop/expie/gecko_expie.mdl")
+		self:SetModel(GetExpieModel(self))
 		self:SetSubMaterial(0,"")
 		self:SetNetVar("Accessories", "")
 		if self.SetNetVar then

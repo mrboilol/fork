@@ -1972,21 +1972,37 @@ local function getBoneMatrix(rag, boneID)
     return matrix_cache[model] and matrix_cache[model][boneID]
 end
 
--- Create floppy limb constraint at current pose
-local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
-    print("[HG Floppy] createFloppyLimbConstraint START: rag=" .. tostring(rag) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name) .. " limbType=" .. tostring(limbType))
-    
-    -- Debug: List first few physics objects on this ragdoll
-    local physCount = rag:GetPhysicsObjectCount()
-    print("[HG Floppy] createFloppyLimbConstraint: Ragdoll has " .. physCount .. " physics objects")
-    for i = 0, math.min(physCount - 1, 15) do
-        local phys = rag:GetPhysicsObjectNum(i)
-        if IsValid(phys) then
-            local pos = phys:GetPos()
-            local name = phys.GetName and phys:GetName() or "unnamed"
-            print("[HG Floppy]   phys[" .. i .. "]=" .. name .. " pos=" .. math.floor(pos.x) .. "," .. math.floor(pos.y) .. "," .. math.floor(pos.z))
+-- Helper: reliably map an animation bone to its physics bone index.
+-- TranslateBoneToPhysBone is unreliable on some ragdolls, so we build a
+-- reverse lookup with TranslatePhysBoneToBone and fall back to distance.
+local function getPhysBoneForAnimationBone(rag, boneID)
+    if not boneID then return nil end
+    -- Method 1: reverse mapping via TranslatePhysBoneToBone
+    for i = 0, rag:GetPhysicsObjectCount() - 1 do
+        if rag:TranslatePhysBoneToBone(i) == boneID then
+            return i
         end
     end
+    -- Method 2: closest physics object by world position
+    local bonePos = rag:GetBonePosition(boneID)
+    if not bonePos then return nil end
+    local bestPhys, bestDist = -1, math.huge
+    for i = 0, rag:GetPhysicsObjectCount() - 1 do
+        local phys = rag:GetPhysicsObjectNum(i)
+        if IsValid(phys) then
+            local dist = phys:GetPos():DistToSqr(bonePos)
+            if dist < bestDist then
+                bestDist = dist
+                bestPhys = i
+            end
+        end
+    end
+    return bestPhys
+end
+
+--- Create floppy limb constraint at current pose
+local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
+    print("[HG Floppy] createFloppyLimbConstraint START: rag=" .. tostring(rag) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name) .. " limbType=" .. tostring(limbType))
 
     if not IsValid(rag) or not rag:IsRagdoll() then
         print("[HG Floppy] createFloppyLimbConstraint FAIL: rag invalid or not ragdoll")
@@ -2012,8 +2028,8 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
         return false
     end
 
-    local phys1 = rag:TranslateBoneToPhysBone(bone1ID)
-    local phys2 = rag:TranslateBoneToPhysBone(bone2ID)
+    local phys1 = getPhysBoneForAnimationBone(rag, bone1ID)
+    local phys2 = getPhysBoneForAnimationBone(rag, bone2ID)
     if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then
         print("[HG Floppy] createFloppyLimbConstraint FAIL: phys bone invalid phys1=" .. tostring(phys1) .. " phys2=" .. tostring(phys2))
         return false
@@ -2203,8 +2219,8 @@ function hg.RemoveLimbConstraints(ent, limb)
         local bone1 = ragdoll:LookupBone(floppyData.bone1)
         local bone2 = ragdoll:LookupBone(floppyData.bone2)
         if bone1 and bone2 then
-            local phys1 = ragdoll:TranslateBoneToPhysBone(bone1)
-            local phys2 = ragdoll:TranslateBoneToPhysBone(bone2)
+            local phys1 = getPhysBoneForAnimationBone(ragdoll, bone1)
+            local phys2 = getPhysBoneForAnimationBone(ragdoll, bone2)
             if phys1 and phys2 then
                 -- Remove floppy constraint
                 pcall(function() ragdoll:RemoveInternalConstraint(phys1) end)
