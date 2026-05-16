@@ -2052,30 +2052,37 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     pBone1:EnableMotion(true)
     pBone2:EnableMotion(true)
 
-    -- Get current bone position for constraint placement (local to pBone1)
-    local pos, _ = rag:GetBonePosition(bone1ID)
-    if not pos then
-        pos = pBone1:GetPos()
-    end
-    local lpos = WorldToLocal(pos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
+    -- Set constraint position to the joint location (between the two connected bones)
+    -- This is where the elbow/knee actually is - midpoint between the two physics objects
+    local pos1 = pBone1:GetPos()
+    local pos2 = pBone2:GetPos()
+    local jointPos = (pos1 + pos2) / 2
+    print("[HG Floppy] createFloppyLimbConstraint: pBone1 pos=" .. tostring(pos1) .. " pBone2 pos=" .. tostring(pos2) .. " jointPos=" .. tostring(jointPos))
 
-    -- Convert limits strings to numbers for AdvBallsocket
-    local minPitch = tonumber(limits[0][1]) or -45
-    local maxPitch = tonumber(limits[0][0]) or 45
-    local minYaw = tonumber(limits[1][1]) or -45
-    local maxYaw = tonumber(limits[1][0]) or 45
-    local minRoll = tonumber(limits[2][1]) or -45
-    local maxRoll = tonumber(limits[2][0]) or 45
+    -- Bone Buster-style ragdoll constraint - created at joint position for natural floppy behavior
+    local cons = ents.Create("phys_ragdollconstraint")
+    cons:SetPos(jointPos)
+    cons:SetKeyValue("spawnflags", 1) -- disable collision between constrained parts
+    cons:SetKeyValue("xmin", limits[0][1])
+    cons:SetKeyValue("xmax", limits[0][0])
+    cons:SetKeyValue("ymin", limits[1][1])
+    cons:SetKeyValue("ymax", limits[1][0])
+    cons:SetKeyValue("zmin", limits[2][1])
+    cons:SetKeyValue("zmax", limits[2][0])
 
-    -- Use AdvBallsocket like the neck constraint (more reliable than phys_ragdollconstraint)
-    -- ent1, ent2, bone1, bone2, localPos, localPos2, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, friction
-    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, nil, 0, 0, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, 0, 0, 0, 0, 0)
+    -- Try swapping bone order - parent first, then child (upper arm, then forearm)
+    cons:SetPhysConstraintObjects(pBone2, pBone1)
+    cons:Spawn()
+    cons:Activate()
+
+    -- Prevent stretching
+    rag:SetSaveValue("m_ragdoll.allowStretch", false)
 
     if IsValid(cons) then
-        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: AdvBallsocket created for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
+        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: phys_ragdollconstraint created for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
         return cons
     else
-        print("[HG Floppy] createFloppyLimbConstraint FAIL: constraint.AdvBallsocket returned nil")
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: entity invalid after spawn")
         return false
     end
 end
@@ -2155,47 +2162,6 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
                 playerRef.HG_FloppyPersistSeg[limb] = randomSegment
                 playerRef.HG_FloppyPersist = playerRef.HG_FloppyPersist or {}
                 playerRef.HG_FloppyPersist[limb] = true
-            end
-
-            -- Apply offset for dislocated limbs so they hang off to the side
-            if isDislocated then
-                timer.Simple(0.05, function()
-                    if not IsValid(ragdoll) then return end
-                    local bone1ID = ragdoll:LookupBone(bone1Name)
-                    if not bone1ID then return end
-                    local physBone1 = ragdoll:TranslateBoneToPhysBone(bone1ID)
-                    if not physBone1 or physBone1 < 0 then return end
-                    local physObj1 = ragdoll:GetPhysicsObjectNum(physBone1)
-                    if not IsValid(physObj1) then return end
-
-                    -- Calculate random offset angle based on limb type (30-60 degrees off to side)
-                    local offsetAngle = Angle(
-                        math.Rand(-30, 30),  -- Pitch: up/down variation
-                        math.Rand(-60, 60),  -- Yaw: side to side (main dislocation look)
-                        math.Rand(-30, 30)   -- Roll: twist variation
-                    )
-                    
-                    -- Apply additional offset for specific limbs to make them hang naturally
-                    if limb == "larm" then
-                        offsetAngle.y = offsetAngle.y + math.Rand(20, 45)  -- Hang outward
-                    elseif limb == "rarm" then
-                        offsetAngle.y = offsetAngle.y - math.Rand(20, 45)  -- Hang outward
-                    elseif limb == "lleg" then
-                        offsetAngle.y = offsetAngle.y + math.Rand(10, 30)  -- Splay outward
-                        offsetAngle.p = offsetAngle.p + math.Rand(10, 25) -- Dangle forward
-                    elseif limb == "rleg" then
-                        offsetAngle.y = offsetAngle.y - math.Rand(10, 30)  -- Splay outward
-                        offsetAngle.p = offsetAngle.p + math.Rand(10, 25) -- Dangle forward
-                    end
-
-                    local currentAng = physObj1:GetAngles()
-                    local newAng = currentAng + offsetAngle
-                    
-                    physObj1:SetAngles(newAng)
-                    physObj1:Wake()
-                    physObj1:EnableMotion(true)
-                    print("[HG Floppy] BreakLimb timer: Applied dislocation offset to " .. limb .. " angle=" .. tostring(offsetAngle))
-                end)
             end
         else
             print("[HG Floppy] BreakLimb timer: constraint creation FAILED")
