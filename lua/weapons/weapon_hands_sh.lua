@@ -70,7 +70,8 @@ SWEP.blockinganim = 0
 
 local clawClasses = {
 	["furry"] = 0.5,
-	["headcrabzombie"] = 1.5
+	["headcrabzombie"] = 1.5,
+	["expie"] = 1
 }
 
 local function qerp(delta, a, b)
@@ -1619,6 +1620,12 @@ local customClassInfo = {
 		handsDesc = "furry",
 		Instructions = "LMB - raise paws\nRELOAD - lower paws\n\nIn the raised state:\nLMB - strike\nRMB - block\n\n<color=91,121,229>As a bearer of a pathowogen infection, you have new abilities.\n\nIn lowered state, hold RMB to grab uninfected prey, then hold LMB to assimilate them.\n\nYou can press LMB to lick your fellow mates, doing so helps them alleviate their pain.\n\n:3<color=180,180,180>"
 	},
+	["expie"] = {
+		PrintName = "Paws",
+		WepSelectIcon = Material("entities/vguizcitysuffix/expiepawvgui.png"),
+		handsDesc = "expie",
+		Instructions = "LMB - raise paws\nRELOAD - lower paws\n\nIn the raised state:\nLMB - strike\nRMB - block\n\n<color=91,121,229>"
+	},
 	["headcrabzombie"] = {
 		PrintName = "Claws",
 		WepSelectIcon = Material("vgui/wep_jack_hmcd_zombhands"),
@@ -1959,7 +1966,7 @@ function SWEP:AttackFront(special_attack, rand)
 				local snd = "Flesh.ImpactSoft"
 				if isZomb then
 					snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
-				elseif owner.PlayerClassName == "furry" then
+				elseif owner.PlayerClassName == "furry" or owner.PlayerClassName == "expie" then
 					snd = "pwb/weapons/knife/hit"..math.random(4)..".wav"
 				end
 				sound.Play(snd, HitPos, 65, math.random(90, 110))
@@ -1970,7 +1977,7 @@ function SWEP:AttackFront(special_attack, rand)
 				local snd = "Flesh.ImpactHard"
 				if isZomb then
 					snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
-				elseif owner.PlayerClassName == "furry" then
+				elseif owner.PlayerClassName == "furry" or owner.PlayerClassName == "expie" then
 					snd = "pwb/weapons/knife/hit"..math.random(4)..".wav"
 				end
 				sound.Play(snd, HitPos, 65, math.random(90, 110))
@@ -1993,7 +2000,7 @@ function SWEP:AttackFront(special_attack, rand)
 			local snd = "Flesh.ImpactSoft"
 			if isZomb then
 				snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
-			elseif owner.PlayerClassName == "furry" then
+			elseif owner.PlayerClassName == "furry" or owner.PlayerClassName == "expie" then
 				snd = "pwb/weapons/knife/hitwall.wav"
 			end
 			sound.Play(snd, HitPos, 65, math.random(90, 110))

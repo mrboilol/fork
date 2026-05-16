@@ -289,7 +289,7 @@ function PANEL:Init()
     self.LogoY = ScreenScaleH(20)
     
     surface.SetFont("ZC_MM_Title")
-    local _, th = surface.GetTextSize("meleecity: delicacy")
+    local _, th = surface.GetTextSize("huytown: guppy slaughter")
     self.LogoH = th
 
     self.MenuTop = self.LogoY + self.LogoH + ScreenScaleH(60)
@@ -2505,7 +2505,7 @@ function PANEL:Paint(w,h)
     end
     
     -- Title Transition Logic
-    local text1 = "meleecity: delicacy"
+    local text1 = "huytown: guppy slaughter"
     
     surface.SetFont("ZC_MM_Title")
     
@@ -3085,7 +3085,7 @@ function PANEL:Init()
     self.LogoY = ScreenScaleH(20)
     
     surface.SetFont("ZC_MM_Title")
-    local _, th = surface.GetTextSize("meleecity: delicacy")
+    local _, th = surface.GetTextSize("huytown: guppy slaughter")
     self.LogoH = th
 
     self.MenuTop = self.LogoY + self.LogoH + ScreenScaleH(60)
@@ -5301,7 +5301,7 @@ function PANEL:Paint(w,h)
     end
     
     -- Title Transition Logic
-    local text1 = "meleecity: delicacy"
+    local text1 = "huytown: guppy slaughter"
     
     surface.SetFont("ZC_MM_Title")
     
