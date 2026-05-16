@@ -39,7 +39,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	if #hg.bloodparticles1 > 3000 then table.remove(hg.bloodparticles1, 1) end
+	if #hg.bloodparticles1 > 8000 then table.remove(hg.bloodparticles1, 1) end
 	
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
@@ -55,7 +55,7 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, color)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	if #hg.bloodparticles2 > 3000 then table.remove(hg.bloodparticles2, 1) end
+	if #hg.bloodparticles2 > 6000 then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
@@ -87,7 +87,6 @@ net.Receive("hg_bloodimpact", function()
 	local vel = net.ReadVector() * 500
 	local mul = net.ReadFloat()
 	local amt = net.ReadInt(8)
-	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
 	for i = 1, amt * 2 do impact(pos,vel,mul) end
 end)

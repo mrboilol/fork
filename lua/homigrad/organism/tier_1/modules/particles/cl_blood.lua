@@ -19,17 +19,11 @@ local render_DrawSprite = render.DrawSprite
 local render_DrawBeam = render.DrawBeam
 local render_GetLightColor = render.GetLightColor
 local render_ComputeLighting = render.ComputeLighting
-local math_ceil = math.ceil
 local math_min = math.min
 local math_max = math.max
 
 local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
 local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_blood_sprites") or CreateClientConVar("hg_blood_sprites", 1, true, nil, "blood is sprites or trails", 0, 1)
-local BLOOD_DRAW_SOFT_CAP = 1200
-local BLOOD_PARTICLE_HARD_CAP = 1500
-local BLOOD_POSITION_RESET_CAP = 2500
-local BLOOD_DECALS_PER_POS = 3
-local BLOOD_POOL_DECAL_THRESHOLD = 18
 local BLOOD_LIGHT_UPDATE_INTERVAL = 0.08
 
 hook.Add("PostCleanupMap","removeblooddroplets",function()
@@ -49,9 +43,8 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 	local eyeForward = lply:EyeAngles():Forward()
 	local dstsqr = int * int
 	local particleCount = #hg.bloodparticles1
-	local step = particleCount > BLOOD_DRAW_SOFT_CAP and math_ceil(particleCount / BLOOD_DRAW_SOFT_CAP) or 1
 	local curTime = CurTime()
-	for i = 1, particleCount, step do
+	for i = 1, particleCount do
 		local part = hg.bloodparticles1[i]
 		if not part then continue end
 		local startPos = part[1]
@@ -101,11 +94,11 @@ local function decalBlood(pos, normal, tr, artery, owner)
 
 	hg.bloodcount = hg.bloodcount + 1
 	
-	if hg.bloodcount > 25000 then
+	if hg.bloodcount > 50000 then
 		hg.bloodpositions = {}
 		hg.bloodcount = 0
 	end
-
+	
 	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
 	if artery then
