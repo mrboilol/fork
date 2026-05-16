@@ -2076,8 +2076,10 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     print("[HG Floppy] createFloppyLimbConstraint: pBone1 pos=" .. tostring(pos1) .. " pBone2 pos=" .. tostring(pos2) .. " jointPos=" .. tostring(jointPos))
 
     -- Bone Buster-style ragdoll constraint - created at joint position for natural floppy behavior
+    -- CRITICAL: Must set owner to the ragdoll before spawning
     local cons = ents.Create("phys_ragdollconstraint")
     cons:SetPos(jointPos)
+    cons:SetOwner(rag) -- Set owner to ragdoll so constraint is properly associated
     cons:SetKeyValue("spawnflags", 1) -- disable collision between constrained parts
     cons:SetKeyValue("xmin", limits[0][1])
     cons:SetKeyValue("xmax", limits[0][0])
@@ -2098,20 +2100,34 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     print("[HG Floppy] createFloppyLimbConstraint: Existing floppy constraints on ragdoll: " .. existingConstraints)
 
     -- Constrain parent first, then child (upper arm, then forearm)
-    print("[HG Floppy] createFloppyLimbConstraint: Setting constraint objects: pBone2(phys" .. phys2 .. ") -> pBone1(phys" .. phys1 .. ")")
+    -- phys_ragdollconstraint expects: SetPhysConstraintObjects(phys1, phys2) where phys1 is parent, phys2 is child
+    print("[HG Floppy] createFloppyLimbConstraint: Setting constraint objects: pBone2(phys" .. phys2 .. ",parent) -> pBone1(phys" .. phys1 .. ",child)")
     cons:SetPhysConstraintObjects(pBone2, pBone1)
+    
     cons:Spawn()
+    
+    -- Debug: Check if spawn succeeded
+    local checkIndex = cons:EntIndex()
+    print("[HG Floppy] createFloppyLimbConstraint: After Spawn(), entIndex=" .. checkIndex .. " valid=" .. tostring(IsValid(cons)))
+    
+    if not IsValid(cons) or checkIndex == 0 then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: Entity failed to spawn (entIndex=0 or invalid)")
+        return false
+    end
+    
     cons:Activate()
+    
+    -- Debug: Check after Activate
+    print("[HG Floppy] createFloppyLimbConstraint: After Activate(), valid=" .. tostring(IsValid(cons)) .. " entIndex=" .. cons:EntIndex())
 
     -- Prevent stretching
     rag:SetSaveValue("m_ragdoll.allowStretch", false)
 
-    if IsValid(cons) then
-        local consIndex = cons:EntIndex()
-        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: phys_ragdollconstraint created, entIndex=" .. consIndex .. " for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
+    if IsValid(cons) and cons:EntIndex() > 0 then
+        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: phys_ragdollconstraint created, entIndex=" .. cons:EntIndex() .. " for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
         return cons
     else
-        print("[HG Floppy] createFloppyLimbConstraint FAIL: entity invalid after spawn")
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: entity invalid after Activate")
         return false
     end
 end
