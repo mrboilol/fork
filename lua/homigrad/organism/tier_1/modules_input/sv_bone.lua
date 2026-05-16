@@ -132,7 +132,10 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
 
+		print("[HG Bone] LEG BROKEN: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
+
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+			print("[HG Bone] Calling hg.BreakLimb for leg: key=" .. tostring(key))
 			hg.BreakLimb(org.owner, key)
 		end
 
@@ -150,7 +153,10 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--//org[key] = 0.5
 		org[key.."dislocation"] = true
 
+		print("[HG Bone] LEG DISLOCATED: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
+
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+			print("[HG Bone] Calling hg.BreakLimb for dislocated leg: key=" .. tostring(key))
 			hg.BreakLimb(org.owner, key)
 		end
 
@@ -203,7 +209,10 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
 
+		print("[HG Bone] ARM BROKEN: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
+
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+			print("[HG Bone] Calling hg.BreakLimb for arm: key=" .. tostring(key))
 			hg.BreakLimb(org.owner, key)
 		end
 
@@ -219,7 +228,10 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	else
 		org[key.."dislocation"] = true
 
+		print("[HG Bone] ARM DISLOCATED: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
+
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+			print("[HG Bone] Calling hg.BreakLimb for dislocated arm: key=" .. tostring(key))
 			hg.BreakLimb(org.owner, key)
 		end
 
@@ -265,9 +277,13 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
 	
 	if name == "spine3" and org.spine3 > 0.75 and oldDmg <= 0.75 then
+		print("[HG Bone] SPINE3 threshold crossed: spine3=" .. tostring(org.spine3) .. " oldDmg=" .. tostring(oldDmg))
 		if math.random() < 0.5 then
+			print("[HG Bone] NECK BREAK TRIGGERED from spine damage")
 			hg.BreakNeck(org.owner, true)
 			return result, vecrand
+		else
+			print("[HG Bone] Neck break RANDOM FAIL - spine3=" .. tostring(org.spine3))
 		end
 	end
 	
@@ -567,25 +583,35 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
     local org = ply.organism
     local limbs = {"larm", "rarm", "lleg", "rleg"}
 
+    print("[HG Bone] Fake hook START: ply=" .. tostring(ply) .. " ragdoll=" .. tostring(ragdoll))
+    print("[HG Bone] Org limb states: larm=" .. tostring(org["larm"]) .. " rarm=" .. tostring(org["rarm"]) .. " lleg=" .. tostring(org["lleg"]) .. " rleg=" .. tostring(org["rleg"]))
+    print("[HG Bone] Org dislocation states: larm=" .. tostring(org["larmdislocation"]) .. " rarm=" .. tostring(org["rarmdislocation"]) .. " lleg=" .. tostring(org["llegdislocation"]) .. " rleg=" .. tostring(org["rlegdislocation"]))
+
     for _, limb in ipairs(limbs) do
         local isBroken = org[limb] and org[limb] >= 1
         local isDislocated = org[limb .. "dislocation"]
+        print("[HG Bone] Checking limb " .. limb .. ": isBroken=" .. tostring(isBroken) .. " isDislocated=" .. tostring(isDislocated))
         if isBroken or isDislocated then
             -- OLD LUA: Use persisted segment if available (so same elbow stays broken across ragdolls)
             local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
+            print("[HG Bone] Reapplying floppy for " .. limb .. " with segment=" .. tostring(segment))
             hg.BreakLimb(ragdoll, limb, segment)
         elseif IsValid(ragdoll) then
             -- Limb has healed while we were up; make sure no stale floppy constraints remain
+            print("[HG Bone] Removing stale constraints for healed limb " .. limb)
             hg.RemoveLimbConstraints(ragdoll, limb)
         end
     end
 
     -- Reapply neck floppy if spine3 is broken (neck broken)
-    if org.spine3 and org.spine3 >= 0.8 and IsValid(ragdoll) then
+    -- Use same threshold as damage code (> 0.75) for consistency
+    if org.spine3 and org.spine3 > 0.75 and IsValid(ragdoll) then
+        print("[HG Bone] Fake hook: Reapplying neck floppy, spine3=" .. tostring(org.spine3))
         -- Use timer to ensure ragdoll physics are ready
         timer.Simple(0.1, function()
             if IsValid(ragdoll) and IsValid(ply) then
-                hg.BreakNeck(ragdoll)
+                print("[HG Bone] Fake hook timer: Calling BreakNeck for ragdoll")
+                hg.BreakNeck(ragdoll, false) -- false = don't kill player, just reapply constraint
             end
         end)
     end

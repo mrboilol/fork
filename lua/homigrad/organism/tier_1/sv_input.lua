@@ -1713,12 +1713,18 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 end
 
 function hg.BreakNeck(ent, fromDamage)
-	if not IsValid(ent) then return end
+	print("[HG Floppy] BreakNeck called: ent=" .. tostring(ent) .. " fromDamage=" .. tostring(fromDamage))
+	if not IsValid(ent) then
+		print("[HG Floppy] BreakNeck FAIL: ent invalid")
+		return
+	end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+	print("[HG Floppy] BreakNeck: ply=" .. tostring(ply) .. " isRagdoll=" .. tostring(ent:IsRagdoll()))
 	
 	-- Only kill player if called from damage and they're alive
 	if fromDamage and ply:Alive() then
+		print("[HG Floppy] BreakNeck: Killing player from damage")
 		ply:Kill()
 	end
 
@@ -1727,23 +1733,32 @@ function hg.BreakNeck(ent, fromDamage)
 	
 	-- Use a longer delay to ensure ragdoll is created and networked
 	timer.Simple(0.2, function()
+		print("[HG Floppy] BreakNeck timer START")
 		-- Get the ragdoll - try multiple sources
 		local ragdoll = nil
 		
 		if IsValid(ent) and ent:IsRagdoll() then
 			ragdoll = ent
+			print("[HG Floppy] BreakNeck timer: using ent as ragdoll")
 		elseif IsValid(playerRef) then
 			ragdoll = playerRef:GetNWEntity("RagdollDeath")
+			print("[HG Floppy] BreakNeck timer: RagdollDeath=" .. tostring(ragdoll))
 			if not IsValid(ragdoll) then
 				ragdoll = playerRef:GetRagdollEntity()
+				print("[HG Floppy] BreakNeck timer: GetRagdollEntity=" .. tostring(ragdoll))
 			end
 		end
 		
-		if not IsValid(ragdoll) then return end
+		if not IsValid(ragdoll) then
+			print("[HG Floppy] BreakNeck timer FAIL: no valid ragdoll found")
+			return
+		end
+		print("[HG Floppy] BreakNeck timer: ragdoll valid")
 		
 		-- Update the organism if available
 		if playerRef.organism then
 			playerRef.organism.spine3 = 1
+			print("[HG Floppy] BreakNeck timer: set spine3 = 1")
 		end
 		
 		-- Play sound on the ragdoll (only if from damage, not reapplication)
@@ -1757,20 +1772,33 @@ function hg.BreakNeck(ent, fromDamage)
 		
 		local headBoneId = ragdoll:LookupBone(headBoneName)
 		local neckBoneId = ragdoll:LookupBone(neckBoneName)
+		print("[HG Floppy] BreakNeck timer: headBoneId=" .. tostring(headBoneId) .. " neckBoneId=" .. tostring(neckBoneId))
 		
 		if not headBoneId or not neckBoneId then
+			print("[HG Floppy] BreakNeck timer FAIL: bone lookup failed")
 			return
 		end
 		
 		local headPhysBone = ragdoll:TranslateBoneToPhysBone(headBoneId)
 		local neckPhysBone = ragdoll:TranslateBoneToPhysBone(neckBoneId)
+		print("[HG Floppy] BreakNeck timer: headPhysBone=" .. tostring(headPhysBone) .. " neckPhysBone=" .. tostring(neckPhysBone))
 		
-		if headPhysBone == -1 or neckPhysBone == -1 then return end
-		if headPhysBone == neckPhysBone then return end
-		if headPhysBone == 0 then return end
+		if headPhysBone == -1 or neckPhysBone == -1 then
+			print("[HG Floppy] BreakNeck timer FAIL: phys bone -1")
+			return
+		end
+		if headPhysBone == neckPhysBone then
+			print("[HG Floppy] BreakNeck timer FAIL: headPhysBone == neckPhysBone")
+			return
+		end
+		if headPhysBone == 0 then
+			print("[HG Floppy] BreakNeck timer FAIL: headPhysBone == 0")
+			return
+		end
 		
 		-- Check if neck already floppy on this ragdoll
 		if ragdoll.FloppyConstraints and ragdoll.FloppyConstraints.neck and IsValid(ragdoll.FloppyConstraints.neck) then
+			print("[HG Floppy] BreakNeck timer: neck already floppy, skipping")
 			return -- Already has neck floppy, don't reapply
 		end
 		
@@ -1781,6 +1809,7 @@ function hg.BreakNeck(ent, fromDamage)
 		local phead = ragdoll:GetPhysicsObjectNum(headPhysBone)
 
 		if not IsValid(pneck) or not IsValid(phead) then
+			print("[HG Floppy] BreakNeck timer FAIL: physics object invalid")
 			return
 		end
 
@@ -1806,6 +1835,9 @@ function hg.BreakNeck(ent, fromDamage)
 		if newConstraint then
 			ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
 			ragdoll.FloppyConstraints.neck = newConstraint
+			print("[HG Floppy] BreakNeck timer SUCCESS: neck constraint created")
+		else
+			print("[HG Floppy] BreakNeck timer FAIL: constraint.AdvBallsocket returned nil")
 		end
 	end)
 end
@@ -1942,30 +1974,59 @@ end
 
 -- Create floppy limb constraint at current pose
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
-    if not IsValid(rag) or not rag:IsRagdoll() then return false end
+    print("[HG Floppy] createFloppyLimbConstraint START: rag=" .. tostring(rag) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name) .. " limbType=" .. tostring(limbType))
+
+    if not IsValid(rag) or not rag:IsRagdoll() then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: rag invalid or not ragdoll")
+        return false
+    end
 
     local bone1ID = rag:LookupBone(bone1Name)
     local bone2ID = rag:LookupBone(bone2Name)
-    if not bone1ID or not bone2ID then return false end
+    if not bone1ID or not bone2ID then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: bone lookup failed bone1ID=" .. tostring(bone1ID) .. " bone2ID=" .. tostring(bone2ID))
+        return false
+    end
+    print("[HG Floppy] createFloppyLimbConstraint: bone1ID=" .. tostring(bone1ID) .. " bone2ID=" .. tostring(bone2ID))
 
     local matrix = getBoneMatrix(rag, bone1ID)
     local matrix_par = getBoneMatrix(rag, bone2ID)
-    if not matrix or not matrix_par then return false end
+    if not matrix or not matrix_par then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: matrix missing matrix=" .. tostring(matrix) .. " matrix_par=" .. tostring(matrix_par))
+        return false
+    end
 
     local phys1 = rag:TranslateBoneToPhysBone(bone1ID)
     local phys2 = rag:TranslateBoneToPhysBone(bone2ID)
-    if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then return false end
+    if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: phys bone invalid phys1=" .. tostring(phys1) .. " phys2=" .. tostring(phys2))
+        return false
+    end
+    print("[HG Floppy] createFloppyLimbConstraint: phys1=" .. tostring(phys1) .. " phys2=" .. tostring(phys2))
     
-    if phys1 == phys2 then return false end -- Prevent breaking same physics bone (e.g. Hand to Forearm if Hand has no phys)
-    if phys1 == 0 then return false end -- Prevent breaking root bone
+    if phys1 == phys2 then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: phys1 == phys2")
+        return false
+    end
+    if phys1 == 0 then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: phys1 == 0 (root bone)")
+        return false
+    end
 
     local pBone1 = rag:GetPhysicsObjectNum(phys1)
     local pBone2 = rag:GetPhysicsObjectNum(phys2)
-    if not (IsValid(pBone1) and IsValid(pBone2)) then return false end
+    if not (IsValid(pBone1) and IsValid(pBone2)) then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: physics object invalid pBone1=" .. tostring(pBone1) .. " pBone2=" .. tostring(pBone2))
+        return false
+    end
 
     -- Get Bone Buster style limits
     local limits = bb_constraints_limit[bone1Name]
-    if not limits then return false end
+    if not limits then
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: no limits for bone1Name=" .. tostring(bone1Name))
+        return false
+    end
+    print("[HG Floppy] createFloppyLimbConstraint: limits found for " .. bone1Name)
 
     -- Helper to remove any conflicting constraints (like stiffness hinges) between these bones
     if rag.Constraints then
@@ -2011,7 +2072,13 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     -- Prevent stretching
     rag:SetSaveValue("m_ragdoll.allowStretch", false)
 
-    return IsValid(cons) and cons
+    if IsValid(cons) then
+        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: constraint created for " .. bone1Name .. " -> " .. bone2Name)
+        return cons
+    else
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: constraint entity invalid after spawn")
+        return false
+    end
 end
 
 function hg.BreakLimb(ent, limb, segmentOverride)
