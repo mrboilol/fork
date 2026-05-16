@@ -136,7 +136,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			print("[HG Bone] Calling hg.BreakLimb for leg: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key)
+			hg.BreakLimb(org.owner, key, nil, false) -- false = broken (not dislocated)
 		end
 
 		org.painadd = org.painadd + 55
@@ -157,7 +157,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			print("[HG Bone] Calling hg.BreakLimb for dislocated leg: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key)
+			hg.BreakLimb(org.owner, key, nil, true) -- true = dislocated (will apply offset)
 		end
 
 		org.painadd = org.painadd + 35
@@ -213,7 +213,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			print("[HG Bone] Calling hg.BreakLimb for arm: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key)
+			hg.BreakLimb(org.owner, key, nil, false) -- false = broken (not dislocated)
 		end
 
 		org.painadd = org.painadd + 55
@@ -232,7 +232,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 			print("[HG Bone] Calling hg.BreakLimb for dislocated arm: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key)
+			hg.BreakLimb(org.owner, key, nil, true) -- true = dislocated (will apply offset)
 		end
 
 		--//org[key] = 0.5
@@ -594,8 +594,8 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
         if isBroken or isDislocated then
             -- OLD LUA: Use persisted segment if available (so same elbow stays broken across ragdolls)
             local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
-            print("[HG Bone] Reapplying floppy for " .. limb .. " with segment=" .. tostring(segment))
-            hg.BreakLimb(ragdoll, limb, segment)
+            print("[HG Bone] Reapplying floppy for " .. limb .. " with segment=" .. tostring(segment) .. " isDislocated=" .. tostring(isDislocated))
+            hg.BreakLimb(ragdoll, limb, segment, isDislocated)
         elseif IsValid(ragdoll) then
             -- Limb has healed while we were up; make sure no stale floppy constraints remain
             print("[HG Bone] Removing stale constraints for healed limb " .. limb)

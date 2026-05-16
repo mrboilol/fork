@@ -2019,6 +2019,10 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
         print("[HG Floppy] createFloppyLimbConstraint FAIL: physics object invalid pBone1=" .. tostring(pBone1) .. " pBone2=" .. tostring(pBone2))
         return false
     end
+    -- Debug: Get bone names from physics objects to verify we're targeting the right bones
+    local debugName1 = pBone1.GetName and pBone1:GetName() or "unknown"
+    local debugName2 = pBone2.GetName and pBone2:GetName() or "unknown"
+    print("[HG Floppy] createFloppyLimbConstraint: pBone1 name=" .. debugName1 .. " pBone2 name=" .. debugName2)
 
     -- Get Bone Buster style limits
     local limits = bb_constraints_limit[bone1Name]
@@ -2048,47 +2052,42 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     pBone1:EnableMotion(true)
     pBone2:EnableMotion(true)
 
-    -- Get current bone position for constraint placement
+    -- Get current bone position for constraint placement (local to pBone1)
     local pos, _ = rag:GetBonePosition(bone1ID)
     if not pos then
         pos = pBone1:GetPos()
     end
+    local lpos = WorldToLocal(pos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
 
-    -- Bone Buster-style ragdoll constraint - created at current pose for floppy behavior
-    local cons = ents.Create("phys_ragdollconstraint")
-    cons:SetPos(pos)
-    cons:SetKeyValue("spawnflags", 1) -- disable collision between constrained parts
-    cons:SetKeyValue("xmin", limits[0][1])
-    cons:SetKeyValue("xmax", limits[0][0])
-    cons:SetKeyValue("ymin", limits[1][1])
-    cons:SetKeyValue("ymax", limits[1][0])
-    cons:SetKeyValue("zmin", limits[2][1])
-    cons:SetKeyValue("zmax", limits[2][0])
+    -- Convert limits strings to numbers for AdvBallsocket
+    local minPitch = tonumber(limits[0][1]) or -45
+    local maxPitch = tonumber(limits[0][0]) or 45
+    local minYaw = tonumber(limits[1][1]) or -45
+    local maxYaw = tonumber(limits[1][0]) or 45
+    local minRoll = tonumber(limits[2][1]) or -45
+    local maxRoll = tonumber(limits[2][0]) or 45
 
-    cons:SetPhysConstraintObjects(pBone1, pBone2)
-    cons:Spawn()
-    cons:Activate()
-
-    -- Prevent stretching
-    rag:SetSaveValue("m_ragdoll.allowStretch", false)
+    -- Use AdvBallsocket like the neck constraint (more reliable than phys_ragdollconstraint)
+    -- ent1, ent2, bone1, bone2, localPos, localPos2, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, friction
+    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, nil, 0, 0, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, 0, 0, 0, 0, 0)
 
     if IsValid(cons) then
-        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: constraint created for " .. bone1Name .. " -> " .. bone2Name)
+        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: AdvBallsocket created for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
         return cons
     else
-        print("[HG Floppy] createFloppyLimbConstraint FAIL: constraint entity invalid after spawn")
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: constraint.AdvBallsocket returned nil")
         return false
     end
 end
 
-function hg.BreakLimb(ent, limb, segmentOverride)
+function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
     if not IsValid(ent) then return end
     if not limb_segments[limb] then return end
 
     local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
     local playerRef = ply
 
-    print("[HG Floppy] BreakLimb called: ent=" .. tostring(ent) .. " limb=" .. tostring(limb) .. " seg=" .. tostring(segmentOverride))
+    print("[HG Floppy] BreakLimb called: ent=" .. tostring(ent) .. " limb=" .. tostring(limb) .. " seg=" .. tostring(segmentOverride) .. " isDislocated=" .. tostring(isDislocated))
 
     -- OLD LUA: Use delay to ensure ragdoll exists
     timer.Simple(0.1, function()
@@ -2157,6 +2156,47 @@ function hg.BreakLimb(ent, limb, segmentOverride)
                 playerRef.HG_FloppyPersist = playerRef.HG_FloppyPersist or {}
                 playerRef.HG_FloppyPersist[limb] = true
             end
+
+            -- Apply offset for dislocated limbs so they hang off to the side
+            if isDislocated then
+                timer.Simple(0.05, function()
+                    if not IsValid(ragdoll) then return end
+                    local bone1ID = ragdoll:LookupBone(bone1Name)
+                    if not bone1ID then return end
+                    local physBone1 = ragdoll:TranslateBoneToPhysBone(bone1ID)
+                    if not physBone1 or physBone1 < 0 then return end
+                    local physObj1 = ragdoll:GetPhysicsObjectNum(physBone1)
+                    if not IsValid(physObj1) then return end
+
+                    -- Calculate random offset angle based on limb type (30-60 degrees off to side)
+                    local offsetAngle = Angle(
+                        math.Rand(-30, 30),  -- Pitch: up/down variation
+                        math.Rand(-60, 60),  -- Yaw: side to side (main dislocation look)
+                        math.Rand(-30, 30)   -- Roll: twist variation
+                    )
+                    
+                    -- Apply additional offset for specific limbs to make them hang naturally
+                    if limb == "larm" then
+                        offsetAngle.y = offsetAngle.y + math.Rand(20, 45)  -- Hang outward
+                    elseif limb == "rarm" then
+                        offsetAngle.y = offsetAngle.y - math.Rand(20, 45)  -- Hang outward
+                    elseif limb == "lleg" then
+                        offsetAngle.y = offsetAngle.y + math.Rand(10, 30)  -- Splay outward
+                        offsetAngle.p = offsetAngle.p + math.Rand(10, 25) -- Dangle forward
+                    elseif limb == "rleg" then
+                        offsetAngle.y = offsetAngle.y - math.Rand(10, 30)  -- Splay outward
+                        offsetAngle.p = offsetAngle.p + math.Rand(10, 25) -- Dangle forward
+                    end
+
+                    local currentAng = physObj1:GetAngles()
+                    local newAng = currentAng + offsetAngle
+                    
+                    physObj1:SetAngles(newAng)
+                    physObj1:Wake()
+                    physObj1:EnableMotion(true)
+                    print("[HG Floppy] BreakLimb timer: Applied dislocation offset to " .. limb .. " angle=" .. tostring(offsetAngle))
+                end)
+            end
         else
             print("[HG Floppy] BreakLimb timer: constraint creation FAILED")
         end
@@ -2178,6 +2218,7 @@ function hg.RemoveLimbConstraints(ent, limb)
     -- OLD LUA STYLE: Restore limb using floppyLimbs data
     if ragdoll.floppyLimbs and ragdoll.floppyLimbs[limb] then
         local floppyData = ragdoll.floppyLimbs[limb]
+        print("[HG Floppy] RemoveLimbConstraints: Removing " .. limb .. " constraint, bone1=" .. tostring(floppyData.bone1) .. " bone2=" .. tostring(floppyData.bone2))
         local bone1 = ragdoll:LookupBone(floppyData.bone1)
         local bone2 = ragdoll:LookupBone(floppyData.bone2)
         if bone1 and bone2 then
@@ -2186,10 +2227,21 @@ function hg.RemoveLimbConstraints(ent, limb)
             if phys1 and phys2 then
                 -- Remove floppy constraint
                 pcall(function() ragdoll:RemoveInternalConstraint(phys1) end)
-                if IsValid(floppyData.constraint) then floppyData.constraint:Remove() end
+                if IsValid(floppyData.constraint) then 
+                    floppyData.constraint:Remove() 
+                    print("[HG Floppy] RemoveLimbConstraints: Removed constraint for " .. limb)
+                else
+                    print("[HG Floppy] RemoveLimbConstraints: Constraint for " .. limb .. " was already invalid")
+                end
                 ragdoll.floppyLimbs[limb] = nil
+            else
+                print("[HG Floppy] RemoveLimbConstraints: Failed to get phys bones for " .. limb)
             end
+        else
+            print("[HG Floppy] RemoveLimbConstraints: Failed to lookup bones for " .. limb)
         end
+    else
+        print("[HG Floppy] RemoveLimbConstraints: No floppy data for " .. limb .. " (may have been removed already)")
     end
 end
 

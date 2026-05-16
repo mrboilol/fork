@@ -506,10 +506,12 @@ hook.Add("DoPlayerDeath", "Fake", function(ply)
 		local org = ply.organism
 		local limbs = {"larm", "rarm", "lleg", "rleg"}
 		for _, limb in ipairs(limbs) do
-			if (org[limb] and org[limb] >= 1) or org[limb .. "dislocation"] then
+			local isBroken = org[limb] and org[limb] >= 1
+			local isDislocated = org[limb .. "dislocation"]
+			if isBroken or isDislocated then
 				-- OLD LUA: Use persisted segment for consistent floppy location
 				local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
-				hg.BreakLimb(ragdoll, limb, segment)
+				hg.BreakLimb(ragdoll, limb, segment, isDislocated)
 			end
 		end
 	end
