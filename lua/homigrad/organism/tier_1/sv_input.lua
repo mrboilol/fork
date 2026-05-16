@@ -2075,60 +2075,33 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     local jointPos = (pos1 + pos2) / 2
     print("[HG Floppy] createFloppyLimbConstraint: pBone1 pos=" .. tostring(pos1) .. " pBone2 pos=" .. tostring(pos2) .. " jointPos=" .. tostring(jointPos))
 
-    -- Bone Buster-style ragdoll constraint - created at joint position for natural floppy behavior
-    -- CRITICAL: Must set owner to the ragdoll before spawning
-    local cons = ents.Create("phys_ragdollconstraint")
-    cons:SetPos(jointPos)
-    cons:SetOwner(rag) -- Set owner to ragdoll so constraint is properly associated
-    cons:SetKeyValue("spawnflags", 1) -- disable collision between constrained parts
-    cons:SetKeyValue("xmin", limits[0][1])
-    cons:SetKeyValue("xmax", limits[0][0])
-    cons:SetKeyValue("ymin", limits[1][1])
-    cons:SetKeyValue("ymax", limits[1][0])
-    cons:SetKeyValue("zmin", limits[2][1])
-    cons:SetKeyValue("zmax", limits[2][0])
-
-    -- Check existing floppy constraints on this ragdoll to detect conflicts
-    local existingConstraints = 0
-    if rag.floppyLimbs then
-        for l, data in pairs(rag.floppyLimbs) do
-            if IsValid(data.constraint) then
-                existingConstraints = existingConstraints + 1
-            end
-        end
+    -- Use constraint.AdvBallsocket like the neck constraint (more reliable)
+    -- Get local position for constraint (like neck constraint does)
+    local pos, _ = rag:GetBonePosition(bone1ID)
+    if not pos then
+        pos = pBone1:GetPos()
     end
-    print("[HG Floppy] createFloppyLimbConstraint: Existing floppy constraints on ragdoll: " .. existingConstraints)
+    local lpos = WorldToLocal(pos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
 
-    -- Spawn the constraint entity first (without physics objects set yet)
-    cons:Spawn()
-    
-    -- Debug: Check if spawn succeeded
-    local checkIndex = cons:EntIndex()
-    print("[HG Floppy] createFloppyLimbConstraint: After Spawn(), entIndex=" .. checkIndex .. " valid=" .. tostring(IsValid(cons)))
-    
-    if not IsValid(cons) or checkIndex == 0 then
-        print("[HG Floppy] createFloppyLimbConstraint FAIL: Entity failed to spawn (entIndex=0 or invalid)")
-        return false
-    end
-    
-    -- Now set physics objects AFTER spawning
-    -- phys_ragdollconstraint expects: SetPhysConstraintObjects(phys1, phys2) where phys1 is parent, phys2 is child
-    print("[HG Floppy] createFloppyLimbConstraint: Setting constraint objects: pBone2(phys" .. phys2 .. ",parent) -> pBone1(phys" .. phys1 .. ",child)")
-    cons:SetPhysConstraintObjects(pBone2, pBone1)
-    
-    cons:Activate()
-    
-    -- Debug: Check after Activate
-    print("[HG Floppy] createFloppyLimbConstraint: After Activate(), valid=" .. tostring(IsValid(cons)) .. " entIndex=" .. cons:EntIndex())
+    -- Convert limits to numbers for AdvBallsocket
+    local minPitch = tonumber(limits[0][1]) or -45
+    local maxPitch = tonumber(limits[0][0]) or 45
+    local minYaw = tonumber(limits[1][1]) or -45
+    local maxYaw = tonumber(limits[1][0]) or 45
+    local minRoll = tonumber(limits[2][1]) or -45
+    local maxRoll = tonumber(limits[2][0]) or 45
 
-    -- Prevent stretching
-    rag:SetSaveValue("m_ragdoll.allowStretch", false)
+    print("[HG Floppy] createFloppyLimbConstraint: Creating AdvBallsocket with limits: pitch[" .. minPitch .. "," .. maxPitch .. "] yaw[" .. minYaw .. "," .. maxYaw .. "] roll[" .. minRoll .. "," .. maxRoll .. "]")
+
+    -- Create constraint at pBone1's position with local offset (like neck constraint)
+    -- ent1, ent2, bone1, bone2, localPos, localPos2, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, friction
+    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, nil, 0, 0, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, 0, 0, 0, 0, 0)
 
     if IsValid(cons) and cons:EntIndex() > 0 then
-        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: phys_ragdollconstraint created, entIndex=" .. cons:EntIndex() .. " for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
+        print("[HG Floppy] createFloppyLimbConstraint SUCCESS: AdvBallsocket created, entIndex=" .. cons:EntIndex() .. " for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
         return cons
     else
-        print("[HG Floppy] createFloppyLimbConstraint FAIL: entity invalid after Activate")
+        print("[HG Floppy] createFloppyLimbConstraint FAIL: constraint.AdvBallsocket returned invalid or entIndex=0")
         return false
     end
 end
