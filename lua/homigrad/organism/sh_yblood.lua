@@ -224,7 +224,7 @@ if CLIENT then
     hg.bloodparticles1 = hg.bloodparticles1 or {}
     hg.bloodparticles2 = hg.bloodparticles2 or {}
     
-    function hg.addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
+    function hg.addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
         if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
         local pos2 = Vector()
@@ -233,9 +233,10 @@ if CLIENT then
         if #hg.bloodparticles1 > 200 then table.remove(hg.bloodparticles1, 1) end
         
         hg.bloodparticles1[#hg.bloodparticles1 + 1] = {
-            pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), 
-            artery = artery, kishki = kishki, owner = owner, 
-            start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin
+            pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(),
+            artery = artery, kishki = kishki, owner = owner,
+            start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin,
+            impact = impact
         }
     end
 
@@ -267,7 +268,7 @@ if CLIENT then
 
         for i = 1, iters do
             local size = 1
-            hg.addBloodPart(pos, -vel * i / iters + Vector(math.Rand(-20, 20), math.Rand(-20, 20), 0), mat_huy, size, size, false, false, owner)
+            hg.addBloodPart(pos, -vel * i / iters + Vector(math.Rand(-20, 20), math.Rand(-20, 20), 0), mat_huy, size, size, false, false, owner, true)
         end
     end
 

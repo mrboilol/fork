@@ -27,7 +27,7 @@ hg.bloodparticles2 = hg.bloodparticles2 or {}
 local vecZero = Vector(0, 0, 0)
 local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
-local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
+local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
 	--local fps = 1 / hg_blood_fps:GetInt() * 1
 	--if lastplaced + fps > SysTime() then return end
 	--lastplaced = SysTime()
@@ -41,7 +41,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 
 	if #hg.bloodparticles1 > 50000 then table.remove(hg.bloodparticles1, 1) end
 	
-	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
+	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact}
 end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
@@ -82,7 +82,7 @@ local function impact(pos,vel,mul)
 
 	for i = 1, iters do
 		local size = 1--math.random(2, 4) * 1
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false, nil, true)
 	end
 end
 
