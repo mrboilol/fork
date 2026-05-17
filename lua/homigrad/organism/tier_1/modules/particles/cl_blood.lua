@@ -74,7 +74,22 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 					local len = 1 / mul / 24 * 0.5
 					render_DrawBeam(pos - dir * len, pos + dir * len, 1, 0, 1, part[9] or lightcolor)
 				else
-					render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor)
+					-- Clamp the per-frame movement vector so high-velocity particles
+					-- don't render as long stretched streaks. This matches the
+					-- old "len < 2 and normalized*N or diff" behavior that was
+					-- previously commented out.
+					local diff = part[2] - part[1]
+					local diffLen = diff:Length()
+					local maxDiff = 6
+					if diffLen > maxDiff then
+						diff = diff * (maxDiff / diffLen)
+					elseif diffLen < 0.5 then
+						-- Tiny per-frame movement: render as a small fixed dot
+						local d = diff:GetNormalized()
+						if d:IsZero() then d = Vector(0, 0, 1) end
+						diff = d * 0.5
+					end
+					render_DrawBeam(pos - diff * 1 / mul / 24 * 0.5, pos + diff * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor)
 				end
 
 				--lightcolor.r = lightcolor.r * 0.25
