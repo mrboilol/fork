@@ -268,7 +268,11 @@ if CLIENT then
 
         for i = 1, iters do
             local size = 1
-            hg.addBloodPart(pos, -vel * i / iters + Vector(math.Rand(-20, 20), math.Rand(-20, 20), 0), mat_huy, size, size, false, false, owner, true)
+            local frac = i / iters
+            local baseVel = -vel * frac * 1.5
+            local ang = (-vel):Angle()
+            local wave = ang:Right() * 20 * math.sin(i * 1.5) * math.cos(i * 2.5) + ang:Up() * 15 * math.sin(i * 2) * math.cos(i * 1.5)
+            hg.addBloodPart(pos, baseVel + wave + Vector(math.Rand(-15, 15), math.Rand(-15, 15), math.Rand(-10, 10)), mat_huy, size, size, false, false, owner, true)
         end
     end
 

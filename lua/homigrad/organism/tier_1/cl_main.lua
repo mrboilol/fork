@@ -1073,11 +1073,27 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							hg.addBloodPart(pos, VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70, nil, size, size, true, nil, ent)
+							local pulseMul = (org.pulse or 70) / 70
+							local bpMul = (org.bloodpressure or 93) / 93
+							local bloodMul = math.Clamp((org.blood or 5000) / 5000, 0.1, 1)
+							local hb = (org.heartbeat or 70) / 60
+							local heartbeatBeat = math.abs(math.sin(CurTime() * hb * math.pi * 2))
+							local forceMul = pulseMul * bpMul * bloodMul * (1 + heartbeatBeat * 0.5)
+							local wave = math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4
+
+							hg.addBloodPart(pos,
+								VectorRand(-1, 1) * pulseMul * bpMul * bloodMul
+								+ dir * 8 * forceMul * wave * 0.1
+								+ dir:Angle():Right() * 35 * forceMul * math.sin(CurTime() * 2) * math.cos(CurTime() * 4)
+								+ ang:Up() * 35 * forceMul * math.sin(CurTime() * 3) * math.cos(CurTime() * 1)
+								+ VectorRand(-1, 1) * pulseMul * bpMul * bloodMul,
+								nil, size, size, true, nil, ent)
+
 							if wound[7] == "arteria" then
-								hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-12, 12) + dir * 0.1, nil, 18, 18, 0.2, false, ent)
-								hg.addBloodPart(pos + VectorRand(-1, 1), dir * 0.3 + VectorRand(-6, 6), nil, 1, 1, true, nil, ent)
-								hg.addBloodPart(pos + VectorRand(-1, 1), dir * 0.4 + VectorRand(-8, 8), nil, 1, 1, true, nil, ent)
+								local arteriaForce = forceMul * 2
+								hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-12, 12) + dir * 0.1 * arteriaForce, nil, 18, 18, 0.2, false, ent)
+								hg.addBloodPart(pos + VectorRand(-1, 1), dir * 0.3 * arteriaForce + VectorRand(-6, 6), nil, 1, 1, true, nil, ent)
+								hg.addBloodPart(pos + VectorRand(-1, 1), dir * 0.4 * arteriaForce + VectorRand(-8, 8), nil, 1, 1, true, nil, ent)
 							end
 						end
 

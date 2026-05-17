@@ -82,7 +82,11 @@ local function impact(pos,vel,mul)
 
 	for i = 1, iters do
 		local size = 1--math.random(2, 4) * 1
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false, nil, true)
+		local frac = i / iters
+		local baseVel = -vel * frac * 1.5
+		local ang = (-vel):Angle()
+		local wave = ang:Right() * 20 * math.sin(i * 1.5) * math.cos(i * 2.5) + ang:Up() * 15 * math.sin(i * 2) * math.cos(i * 1.5)
+		addBloodPart(pos, baseVel + wave + Vector(Rand(-15, 15), Rand(-15, 15), Rand(-10, 10)), mat_huy, size, size, false, false, nil, true)
 	end
 end
 
