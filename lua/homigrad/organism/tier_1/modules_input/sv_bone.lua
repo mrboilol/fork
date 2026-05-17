@@ -286,7 +286,18 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 			print("[HG Bone] Neck break RANDOM FAIL - spine3=" .. tostring(org.spine3))
 		end
 	end
-	
+
+	-- Trigger spine floppy when spine1 or spine2 reach their break threshold
+	-- (broken-back / broken-pelvis effect)
+	if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+		if (name == "spine1" or name == "spine2") and org[name] >= hg.organism[name2] and oldDmg < hg.organism[name2] then
+			print("[HG Bone] " .. string.upper(name) .. " threshold crossed: calling BreakSpine")
+			if hg.BreakSpine then
+				hg.BreakSpine(org.owner, name, false)
+			end
+		end
+	end
+
 	hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 5, "Spine bone damage harm")
 	
 	if (name == "spine3" || name == "spine2") then
@@ -561,6 +572,16 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 		org.owner:Notify("FUCKING HELL- MY ASS IS BACKWARDS, LITERALLY!", true, "pelvis", 4)
 	end
 
+	-- Pelvis broken -> apply spine1 floppy (pelvis & lower spine flop loose)
+	if org.pelvis >= 1 and oldDmg < 1 then
+		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+			print("[HG Bone] PELVIS BROKEN: calling BreakSpine for spine1 (pelvis floppy)")
+			if hg.BreakSpine then
+				hg.BreakSpine(org.owner, "spine1", false)
+			end
+		end
+	end
+
 	return result
 end
 
@@ -614,5 +635,20 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
                 hg.BreakNeck(ragdoll, false) -- false = don't kill player, just reapply constraint
             end
         end)
+    end
+
+    -- Reapply spine1 / spine2 floppy if their thresholds are crossed
+    -- spine1 covers the pelvis & lower spine, spine2 covers the back.
+    if hg.BreakSpine and IsValid(ragdoll) then
+        local fake1 = hg.organism and hg.organism.fake_spine1 or 1
+        local fake2 = hg.organism and hg.organism.fake_spine2 or 1
+        if (org.spine1 and org.spine1 >= fake1) or (org.pelvis and org.pelvis >= 1) then
+            print("[HG Bone] Fake hook: Reapplying spine1 floppy")
+            hg.BreakSpine(ragdoll, "spine1", false)
+        end
+        if org.spine2 and org.spine2 >= fake2 then
+            print("[HG Bone] Fake hook: Reapplying spine2 floppy")
+            hg.BreakSpine(ragdoll, "spine2", false)
+        end
     end
 end)

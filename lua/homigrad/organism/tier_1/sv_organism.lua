@@ -933,9 +933,25 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			"lleg", "rleg", "larm", "rarm"
 		}
 
+		local oldSpine1 = org.spine1 or 0
+		local oldSpine2 = org.spine2 or 0
+		local oldPelvis = org.pelvis or 0
+
 		for _, organ in ipairs(organs_to_heal) do
 			if org[organ] and org[organ] > 0 then
 				org[organ] = math.Approach(org[organ], 0, thiamineHealRate)
+			end
+		end
+
+		-- Remove spine floppy constraints when spine heals below break threshold
+		if hg.RemoveSpineConstraints then
+			local fake1 = hg.organism and hg.organism.fake_spine1 or 1
+			local fake2 = hg.organism and hg.organism.fake_spine2 or 1
+			if (oldSpine1 >= fake1 and org.spine1 < fake1) or (oldPelvis >= 1 and org.pelvis < 1) then
+				hg.RemoveSpineConstraints(org.owner, "spine1")
+			end
+			if oldSpine2 >= fake2 and org.spine2 < fake2 then
+				hg.RemoveSpineConstraints(org.owner, "spine2")
 			end
 		end
 
@@ -1069,10 +1085,24 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	if oldRarm >= 1 and org.rarm < 1 and not org.rarmdislocation then hg.RemoveLimbConstraints(org.owner, "rarm") end
 	if oldLarm >= 1 and org.larm < 1 and not org.larmdislocation then hg.RemoveLimbConstraints(org.owner, "larm") end
 	org.chest = math.max(org.chest - regen, 0)
+	local oldPelvis = org.pelvis
 	org.pelvis = math.max(org.pelvis - regen, 0)
+	local oldSpine1 = org.spine1
+	local oldSpine2 = org.spine2
 	org.spine1 = math.max(org.spine1 - regen, 0)
 	org.spine2 = math.max(org.spine2 - regen, 0)
 	org.spine3 = math.max(org.spine3 - regen, 0)
+	-- Remove spine floppy constraints when spine heals below break threshold
+	if hg.RemoveSpineConstraints then
+		local fake1 = hg.organism and hg.organism.fake_spine1 or 1
+		local fake2 = hg.organism and hg.organism.fake_spine2 or 1
+		if (oldSpine1 >= fake1 and org.spine1 < fake1) or (oldPelvis >= 1 and org.pelvis < 1) then
+			hg.RemoveSpineConstraints(org.owner, "spine1")
+		end
+		if oldSpine2 >= fake2 and org.spine2 < fake2 then
+			hg.RemoveSpineConstraints(org.owner, "spine2")
+		end
+	end
 	org.skull = math.max(org.skull - regen, 0)
 
 	org.liver = math.max(org.liver - regen, 0)

@@ -348,6 +348,13 @@ hook.Add("PlayerSpawn", "hg_forsaken_deathscene_reset", function(ply)
 	org.brainBurstLast = 0
 end)
 
+hook.Add("PlayerSpawn", "hg_spine_floppy_reset", function(ply)
+	ply.HG_SpineFloppyPersist = nil
+	if hg.RemoveSpineConstraints then
+		hg.RemoveSpineConstraints(ply)
+	end
+end)
+
 hook.Add("PlayerDeath", "hg_forsaken_deathscene", function(victim)
 	local org = victim.organism
 	if not org then return end
@@ -1712,6 +1719,40 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 	//end
 end
 
+-- Apply a small bone manipulation offset to make a broken bone look
+-- displaced/out-of-place rather than just a freely moving joint.
+-- Stores prior values so they can be restored on heal. Declared before
+-- hg.BreakNeck because BreakNeck calls it (Lua resolves free variables
+-- lexically at parse time, so the local must already be in scope).
+local function applyFloppyBoneOffset(rag, boneName, offsetPos, offsetAng, key)
+    if not IsValid(rag) then return end
+    local boneID = rag:LookupBone(boneName)
+    if not boneID then return end
+    rag.FloppyBoneOffsets = rag.FloppyBoneOffsets or {}
+    rag.FloppyBoneOffsets[key] = rag.FloppyBoneOffsets[key] or {}
+    -- Avoid stacking offsets if the same offset was already applied
+    if rag.FloppyBoneOffsets[key][boneName] then return end
+    rag.FloppyBoneOffsets[key][boneName] = {
+        pos = rag:GetManipulateBonePosition(boneID),
+        ang = rag:GetManipulateBoneAngles(boneID),
+    }
+    if offsetPos then rag:ManipulateBonePosition(boneID, offsetPos) end
+    if offsetAng then rag:ManipulateBoneAngles(boneID, offsetAng) end
+end
+
+local function removeFloppyBoneOffset(rag, key)
+    if not IsValid(rag) then return end
+    if not rag.FloppyBoneOffsets or not rag.FloppyBoneOffsets[key] then return end
+    for boneName, prev in pairs(rag.FloppyBoneOffsets[key]) do
+        local boneID = rag:LookupBone(boneName)
+        if boneID then
+            rag:ManipulateBonePosition(boneID, prev.pos or vector_origin)
+            rag:ManipulateBoneAngles(boneID, prev.ang or angle_zero)
+        end
+    end
+    rag.FloppyBoneOffsets[key] = nil
+end
+
 function hg.BreakNeck(ent, fromDamage)
 	print("[HG Floppy] BreakNeck called: ent=" .. tostring(ent) .. " fromDamage=" .. tostring(fromDamage))
 	if not IsValid(ent) then
@@ -1835,6 +1876,14 @@ function hg.BreakNeck(ent, fromDamage)
 		if newConstraint then
 			ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
 			ragdoll.FloppyConstraints.neck = newConstraint
+
+			-- Slight offset to indicate the neck/head is out of place,
+			-- not just freely flopping around.
+			applyFloppyBoneOffset(ragdoll, "ValveBiped.Bip01_Head1",
+				Vector(0, -1, -1), Angle(-12, 0, 6), "neck")
+			applyFloppyBoneOffset(ragdoll, "ValveBiped.Bip01_Neck1",
+				Vector(0, -0.5, -0.5), Angle(-6, 0, 3), "neck")
+
 			print("[HG Floppy] BreakNeck timer SUCCESS: neck constraint created")
 		else
 			print("[HG Floppy] BreakNeck timer FAIL: constraint.AdvBallsocket returned nil")
@@ -1951,6 +2000,43 @@ local limb_constraint_limits = {
     lleg = {minYaw = -70, minRoll = -80, minPitch = -70, maxYaw = 70, maxRoll = 50, maxPitch = 70},
     rleg = {minYaw = -70, minRoll = -50, minPitch = -70, maxYaw = 70, maxRoll = 80, maxPitch = 70},
 }
+
+-- Spine segment mapping for floppy effects
+-- The HL2 player ragdoll only has one physical spine joint (between
+-- physbone 0 = Pelvis and physbone 1 = Spine2), so all spine segments
+-- break the same joint but with distinct constraint limits, anchor bias
+-- and bone-offset directions to give visually distinct effects.
+-- bone1 must be the non-root physbone side (Spine2) because createFloppyLimbConstraint
+-- bails out if phys1 == 0.
+local spine_segments = {
+    -- spine1 / pelvis: pelvis flops loose; lower spine sags forward.
+    spine1 = {
+        bone1 = "ValveBiped.Bip01_Spine2",
+        bone2 = "ValveBiped.Bip01_Pelvis",
+        limits = {minPitch = -45, maxPitch = 45, minYaw = -50, maxYaw = 50, minRoll = -45, maxRoll = 45},
+        -- Bias the constraint anchor towards the pelvis end of the joint
+        anchorBias = 0.85,
+        offsetBones = {
+            {name = "ValveBiped.Bip01_Pelvis", pos = Vector(0, 0, -1.5),  ang = Angle(6, 0, 4)},
+            {name = "ValveBiped.Bip01_Spine",  pos = Vector(0, 0.5, -0.5), ang = Angle(4, 0, 2)},
+        },
+    },
+    -- spine2: back is snapped; chest hangs back/loose ("broken back").
+    spine2 = {
+        bone1 = "ValveBiped.Bip01_Spine2",
+        bone2 = "ValveBiped.Bip01_Pelvis",
+        limits = {minPitch = -75, maxPitch = 30, minYaw = -40, maxYaw = 40, minRoll = -25, maxRoll = 25},
+        -- Bias the constraint anchor towards the chest end of the joint
+        anchorBias = 0.15,
+        offsetBones = {
+            {name = "ValveBiped.Bip01_Spine2", pos = Vector(0, -1, 1.5),  ang = Angle(-10, 0, 0)},
+            {name = "ValveBiped.Bip01_Spine4", pos = Vector(0, -0.5, 1), ang = Angle(-6, 0, 0)},
+        },
+    },
+}
+
+-- (applyFloppyBoneOffset / removeFloppyBoneOffset are declared above
+--  hg.BreakNeck because BreakNeck references them; see top of this section.)
 
 local matrix_cache = {}
 
@@ -2178,6 +2264,21 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
         local cons = createFloppyLimbConstraint(ragdoll, bone1Name, bone2Name, limb)
         if cons then
             print("[HG Floppy] BreakLimb timer: constraint created successfully")
+            -- Apply a slight offset to the broken bone so it visually looks
+            -- displaced/out-of-place rather than just a freely moving joint.
+            -- Dislocated limbs get a slightly larger offset than clean breaks.
+            local offsetScale = isDislocated and 1.5 or 1.0
+            local limbOffsets = {
+                larm = {pos = Vector(0, -1, -1) * offsetScale,  ang = Angle(0, -6, -6) * offsetScale},
+                rarm = {pos = Vector(0,  1, -1) * offsetScale,  ang = Angle(0,  6,  6) * offsetScale},
+                lleg = {pos = Vector(0, -0.5, -1.5) * offsetScale, ang = Angle(0, -4, -4) * offsetScale},
+                rleg = {pos = Vector(0,  0.5, -1.5) * offsetScale, ang = Angle(0,  4,  4) * offsetScale},
+            }
+            local off = limbOffsets[limb]
+            if off then
+                applyFloppyBoneOffset(ragdoll, bone1Name, off.pos, off.ang, "limb_" .. limb)
+            end
+
             -- Store floppy data for healing restoration
             ragdoll.floppyLimbs = ragdoll.floppyLimbs or {}
             ragdoll.floppyLimbs[limb] = {
@@ -2240,6 +2341,174 @@ function hg.RemoveLimbConstraints(ent, limb)
     else
         print("[HG Floppy] RemoveLimbConstraints: No floppy data for " .. limb .. " (may have been removed already)")
     end
+
+    -- Restore the bone offset that was applied for this limb
+    removeFloppyBoneOffset(ragdoll, "limb_" .. limb)
+end
+
+-- Create a floppy spine constraint using explicit limits/anchor bias from
+-- spine_segments. Mirrors createFloppyLimbConstraint but tailored for spine.
+local function createFloppySpineConstraint(rag, segData)
+    if not IsValid(rag) or not rag:IsRagdoll() then return false end
+    if not segData then return false end
+
+    local bone1ID = rag:LookupBone(segData.bone1)
+    local bone2ID = rag:LookupBone(segData.bone2)
+    if not bone1ID or not bone2ID then
+        print("[HG Floppy] createFloppySpineConstraint FAIL: bone lookup failed")
+        return false
+    end
+
+    local phys1 = getPhysBoneForAnimationBone(rag, bone1ID)
+    local phys2 = getPhysBoneForAnimationBone(rag, bone2ID)
+    if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then
+        print("[HG Floppy] createFloppySpineConstraint FAIL: phys bone invalid")
+        return false
+    end
+    if phys1 == phys2 then
+        print("[HG Floppy] createFloppySpineConstraint FAIL: same physbone")
+        return false
+    end
+    if phys1 == 0 then
+        print("[HG Floppy] createFloppySpineConstraint FAIL: phys1 == 0 (root)")
+        return false
+    end
+
+    local pBone1 = rag:GetPhysicsObjectNum(phys1)
+    local pBone2 = rag:GetPhysicsObjectNum(phys2)
+    if not (IsValid(pBone1) and IsValid(pBone2)) then return false end
+
+    -- Remove any conflicting constraints between these two bones
+    if rag.Constraints then
+        for k, v in pairs(rag.Constraints) do
+            if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
+                if IsValid(v.Constraint) then v.Constraint:Remove() end
+                rag.Constraints[k] = nil
+            end
+        end
+    end
+
+    pcall(function() rag:RemoveInternalConstraint(phys1) end)
+
+    if pBone1.EnableCollisions then pBone1:EnableCollisions(true) end
+    if pBone2.EnableCollisions then pBone2:EnableCollisions(true) end
+    if pBone1.Wake then pBone1:Wake() end
+    if pBone2.Wake then pBone2:Wake() end
+    pBone1:EnableMotion(true)
+    pBone2:EnableMotion(true)
+
+    -- Anchor lerped between the two physics bones according to anchorBias
+    -- 0 = at pBone1 (chest), 1 = at pBone2 (pelvis)
+    local bias = segData.anchorBias or 0.5
+    local pos1 = pBone1:GetPos()
+    local pos2 = pBone2:GetPos()
+    local jointPos = LerpVector(bias, pos1, pos2)
+
+    local lpos = WorldToLocal(jointPos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
+    local lpos2 = WorldToLocal(jointPos, angle_zero, pBone2:GetPos(), pBone2:GetAngles())
+
+    local l = segData.limits
+    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0,
+        l.minPitch, l.maxPitch, l.minYaw, l.maxYaw, l.minRoll, l.maxRoll,
+        0, 0, 0, 0, 0)
+    if IsValid(cons) then
+        print("[HG Floppy] createFloppySpineConstraint SUCCESS")
+        return cons
+    end
+    return false
+end
+
+function hg.BreakSpine(ent, segment, isDislocated)
+    if not IsValid(ent) then return end
+    local segData = spine_segments[segment]
+    if not segData then
+        print("[HG Floppy] BreakSpine: unknown segment " .. tostring(segment))
+        return
+    end
+
+    local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+    local playerRef = ply
+
+    print("[HG Floppy] BreakSpine called: ent=" .. tostring(ent) .. " segment=" .. tostring(segment) .. " isDislocated=" .. tostring(isDislocated))
+
+    timer.Simple(0.1, function()
+        local ragdoll = nil
+
+        if IsValid(ent) and ent:IsRagdoll() then
+            ragdoll = ent
+        elseif IsValid(playerRef) then
+            ragdoll = playerRef:GetNWEntity("RagdollDeath")
+            if not IsValid(ragdoll) then
+                ragdoll = playerRef:GetRagdollEntity()
+            end
+            if not IsValid(ragdoll) then
+                ragdoll = playerRef:GetNWEntity("FakeRagdoll")
+            end
+        end
+
+        if not IsValid(ragdoll) then
+            print("[HG Floppy] BreakSpine timer: no ragdoll found for segment=" .. tostring(segment))
+            return
+        end
+
+        ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
+        if IsValid(ragdoll.FloppyConstraints[segment]) then
+            print("[HG Floppy] BreakSpine timer: segment already floppy, skipping")
+            return
+        end
+
+        local cons = createFloppySpineConstraint(ragdoll, segData)
+        if cons then
+            ragdoll.FloppyConstraints[segment] = cons
+
+            -- Apply visual offsets to the configured offset bones
+            local offsetScale = isDislocated and 1.4 or 1.0
+            for _, ob in ipairs(segData.offsetBones) do
+                applyFloppyBoneOffset(ragdoll, ob.name,
+                    ob.pos * offsetScale, ob.ang * offsetScale,
+                    "spine_" .. segment)
+            end
+
+            if IsValid(playerRef) and playerRef:IsPlayer() then
+                playerRef.HG_SpineFloppyPersist = playerRef.HG_SpineFloppyPersist or {}
+                playerRef.HG_SpineFloppyPersist[segment] = true
+            end
+            print("[HG Floppy] BreakSpine SUCCESS for " .. segment)
+        else
+            print("[HG Floppy] BreakSpine FAIL: constraint creation failed for " .. segment)
+        end
+    end)
+end
+
+function hg.RemoveSpineConstraints(ent, segment)
+    if not IsValid(ent) then return end
+
+    local ragdoll = ent:IsRagdoll() and ent or nil
+    if not IsValid(ragdoll) and ent:IsPlayer() then
+        ragdoll = ent:GetNWEntity("FakeRagdoll")
+        if not IsValid(ragdoll) then
+            ragdoll = ent:GetNWEntity("RagdollDeath")
+        end
+    end
+    if not IsValid(ragdoll) then return end
+
+    local segments = segment and {segment} or {"spine1", "spine2"}
+    for _, seg in ipairs(segments) do
+        local segData = spine_segments[seg]
+        if segData and ragdoll.FloppyConstraints and IsValid(ragdoll.FloppyConstraints[seg]) then
+            local bone1ID = ragdoll:LookupBone(segData.bone1)
+            if bone1ID then
+                local phys1 = getPhysBoneForAnimationBone(ragdoll, bone1ID)
+                if phys1 then
+                    pcall(function() ragdoll:RemoveInternalConstraint(phys1) end)
+                end
+            end
+            ragdoll.FloppyConstraints[seg]:Remove()
+            ragdoll.FloppyConstraints[seg] = nil
+            removeFloppyBoneOffset(ragdoll, "spine_" .. seg)
+            print("[HG Floppy] RemoveSpineConstraints: removed " .. seg)
+        end
+    end
 end
 
 hook.Add("OnAmputateLimb", "amputate_cuffs", function(org, ent, limb)
@@ -2299,6 +2568,9 @@ hook.Add("OnAmputateLimb", "amputate_remove_floppy", function(org, ent, limb)
 			local neckCons = ragdoll.FloppyConstraints.neck
 			if IsValid(neckCons) then neckCons:Remove() end
 			ragdoll.FloppyConstraints.neck = nil
+		end
+		if IsValid(ragdoll) then
+			removeFloppyBoneOffset(ragdoll, "neck")
 		end
 	else
 		-- Remove from current entity if it's a ragdoll
@@ -2395,20 +2667,35 @@ hook.Add("Org Clear", "HG_ResetFloppyOnOrgClear", function(org)
     -- Clear persistence flags to fully reset visuals
     ply.HG_FloppyPersist = nil
     ply.HG_FloppyPersistSeg = nil
+    ply.HG_SpineFloppyPersist = nil
     -- Clear any active ragdoll floppy constraints
     local rag = ply:GetNWEntity("RagdollDeath")
     if not IsValid(rag) then rag = ply:GetNWEntity("FakeRagdoll") end
     if not IsValid(rag) and IsValid(ply.FakeRagdoll) then rag = ply.FakeRagdoll end
-    if IsValid(rag) and rag.floppyLimbs then
-        for limb, data in pairs(rag.floppyLimbs) do
-            if IsValid(data.constraint) then data.constraint:Remove() end
-            local bone1 = rag:LookupBone(data.bone1)
-            if bone1 then
-                local phys1 = rag:TranslateBoneToPhysBone(bone1)
-                if phys1 then pcall(function() rag:RemoveInternalConstraint(phys1) end) end
+    if IsValid(rag) then
+        if rag.floppyLimbs then
+            for limb, data in pairs(rag.floppyLimbs) do
+                if IsValid(data.constraint) then data.constraint:Remove() end
+                local bone1 = rag:LookupBone(data.bone1)
+                if bone1 then
+                    local phys1 = rag:TranslateBoneToPhysBone(bone1)
+                    if phys1 then pcall(function() rag:RemoveInternalConstraint(phys1) end) end
+                end
+            end
+            rag.floppyLimbs = nil
+        end
+        if rag.FloppyConstraints then
+            for seg, cons in pairs(rag.FloppyConstraints) do
+                if IsValid(cons) then cons:Remove() end
+                removeFloppyBoneOffset(rag, "spine_" .. seg)
+            end
+            rag.FloppyConstraints = nil
+        end
+        if rag.FloppyBoneOffsets then
+            for key, _ in pairs(rag.FloppyBoneOffsets) do
+                removeFloppyBoneOffset(rag, key)
             end
         end
-        rag.floppyLimbs = nil
     end
 end)
 
