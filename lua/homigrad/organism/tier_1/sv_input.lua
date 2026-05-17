@@ -1712,6 +1712,40 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 	//end
 end
 
+-- Apply a small bone manipulation offset to make a broken bone look
+-- displaced/out-of-place rather than just a freely moving joint.
+-- Stores prior values so they can be restored on heal. Declared before
+-- hg.BreakNeck because BreakNeck calls it (Lua resolves free variables
+-- lexically at parse time, so the local must already be in scope).
+local function applyFloppyBoneOffset(rag, boneName, offsetPos, offsetAng, key)
+    if not IsValid(rag) then return end
+    local boneID = rag:LookupBone(boneName)
+    if not boneID then return end
+    rag.FloppyBoneOffsets = rag.FloppyBoneOffsets or {}
+    rag.FloppyBoneOffsets[key] = rag.FloppyBoneOffsets[key] or {}
+    -- Avoid stacking offsets if the same offset was already applied
+    if rag.FloppyBoneOffsets[key][boneName] then return end
+    rag.FloppyBoneOffsets[key][boneName] = {
+        pos = rag:GetManipulateBonePosition(boneID),
+        ang = rag:GetManipulateBoneAngles(boneID),
+    }
+    if offsetPos then rag:ManipulateBonePosition(boneID, offsetPos) end
+    if offsetAng then rag:ManipulateBoneAngles(boneID, offsetAng) end
+end
+
+local function removeFloppyBoneOffset(rag, key)
+    if not IsValid(rag) then return end
+    if not rag.FloppyBoneOffsets or not rag.FloppyBoneOffsets[key] then return end
+    for boneName, prev in pairs(rag.FloppyBoneOffsets[key]) do
+        local boneID = rag:LookupBone(boneName)
+        if boneID then
+            rag:ManipulateBonePosition(boneID, prev.pos or vector_origin)
+            rag:ManipulateBoneAngles(boneID, prev.ang or angle_zero)
+        end
+    end
+    rag.FloppyBoneOffsets[key] = nil
+end
+
 function hg.BreakNeck(ent, fromDamage)
 	print("[HG Floppy] BreakNeck called: ent=" .. tostring(ent) .. " fromDamage=" .. tostring(fromDamage))
 	if not IsValid(ent) then
@@ -1994,37 +2028,8 @@ local spine_segments = {
     },
 }
 
--- Apply a small bone manipulation offset to make a broken bone look
--- displaced/out-of-place rather than just a freely moving joint.
--- Stores prior values so they can be restored on heal.
-local function applyFloppyBoneOffset(rag, boneName, offsetPos, offsetAng, key)
-    if not IsValid(rag) then return end
-    local boneID = rag:LookupBone(boneName)
-    if not boneID then return end
-    rag.FloppyBoneOffsets = rag.FloppyBoneOffsets or {}
-    rag.FloppyBoneOffsets[key] = rag.FloppyBoneOffsets[key] or {}
-    -- Avoid stacking offsets if the same offset was already applied
-    if rag.FloppyBoneOffsets[key][boneName] then return end
-    rag.FloppyBoneOffsets[key][boneName] = {
-        pos = rag:GetManipulateBonePosition(boneID),
-        ang = rag:GetManipulateBoneAngles(boneID),
-    }
-    if offsetPos then rag:ManipulateBonePosition(boneID, offsetPos) end
-    if offsetAng then rag:ManipulateBoneAngles(boneID, offsetAng) end
-end
-
-local function removeFloppyBoneOffset(rag, key)
-    if not IsValid(rag) then return end
-    if not rag.FloppyBoneOffsets or not rag.FloppyBoneOffsets[key] then return end
-    for boneName, prev in pairs(rag.FloppyBoneOffsets[key]) do
-        local boneID = rag:LookupBone(boneName)
-        if boneID then
-            rag:ManipulateBonePosition(boneID, prev.pos or vector_origin)
-            rag:ManipulateBoneAngles(boneID, prev.ang or angle_zero)
-        end
-    end
-    rag.FloppyBoneOffsets[key] = nil
-end
+-- (applyFloppyBoneOffset / removeFloppyBoneOffset are declared above
+--  hg.BreakNeck because BreakNeck references them; see top of this section.)
 
 local matrix_cache = {}
 
