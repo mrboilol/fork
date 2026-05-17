@@ -224,17 +224,17 @@ net.Receive("bloodsquirt", function()
 	local name = "squirtblood"..ent:EntIndex()..dir[1]
 	local i = 250
 	local maxI = i
-	local vechuy = Vector(0,0,0)
 	timer.Create(name, 0.01 * game.GetTimeScale(), i + 10, function()
 		if not IsValid(ent) then timer.Remove(name) return end
 		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
 		local amt = i / maxI
 		local mat = ent:GetBoneMatrix(bone)
 		if not mat then timer.Remove(name) return end
-		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
-		dir = dir:Forward() * len
-		vechuy = vechuy + VectorRand(-amt * 5,amt * 5)
-		addBloodPart(pos, dir * amt * 90 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+		local pos, dirAng = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
+		local dir = dirAng:Forward() * len
+		local t = CurTime() * 12
+		local osc = dirAng:Right() * math.sin(t + i * 0.4) * 4 + dirAng:Up() * math.cos(t * 0.85 + i * 0.3) * 3
+		addBloodPart(pos, dir * amt * 90 + osc * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
 		i = i - 1
 	end)
 	timer.Adjust(name, 0)

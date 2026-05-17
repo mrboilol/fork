@@ -60,13 +60,12 @@ self:SetSubMaterial(0,"")
 		local Appearance = self.CurAppearance or hg.Appearance.GetRandomAppearance()
 
 		local name = "Experiment #" .. math.random(1, 999)
-//for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) end local bgs = table.Copy(self:GetBodyGroups() or {}) for i = 1, math.random(3, 4) do if #bgs == 0 then break end local idx = math.random(#bgs) local bg = table.remove(bgs, idx) self:SetBodygroup(bg.id, math.random(0, bg.num - 1)) end
-//bodygroups buggy with fake sys cuz salat is a NOOOB LOLOOLOLO NOOOB LIGMA
-for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) end self:SetSkin(0) //femboy set by default for some reason so needs a reset
-
 		self:SetNWString("PlayerName", name)
 		Appearance.AName = name
 		self:SetModel(GetExpieModel(self))
+//for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) end local bgs = table.Copy(self:GetBodyGroups() or {}) for i = 1, math.random(3, 4) do if #bgs == 0 then break end local idx = math.random(#bgs) local bg = table.remove(bgs, idx) self:SetBodygroup(bg.id, math.random(0, bg.num - 1)) end
+//bodygroups buggy with fake sys cuz salat is a NOOOB LOLOOLOLO NOOOB LIGMA
+for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) end self:SetSkin(0) //femboy set by default for some reason so needs a reset
 	end
 
 	if data.instant then
@@ -78,6 +77,7 @@ for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) e
 			self:SetSkin(0)
 			self:SetSubMaterial(0,"")
             self:SetNetVar("Accessories", "")
+			for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) end
 		end
 		self:SetModel(GetExpieModel(self))
 		self:SetSubMaterial(0,"")
@@ -85,6 +85,8 @@ for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) e
 		if self.SetNetVar then
 			self:SetNetVar("Accessories", "")
 		end
+		for _, bg in ipairs(self:GetBodyGroups() or {}) do self:SetBodygroup(bg.id, 0) end
+		self:SetSkin(0)
 
 		for i = 1, self:GetFlexNum() - 1 do
 			self:SetFlexWeight(i, 0)
