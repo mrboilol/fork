@@ -348,6 +348,13 @@ hook.Add("PlayerSpawn", "hg_forsaken_deathscene_reset", function(ply)
 	org.brainBurstLast = 0
 end)
 
+hook.Add("PlayerSpawn", "hg_spine_floppy_reset", function(ply)
+	ply.HG_SpineFloppyPersist = nil
+	if hg.RemoveSpineConstraints then
+		hg.RemoveSpineConstraints(ply)
+	end
+end)
+
 hook.Add("PlayerDeath", "hg_forsaken_deathscene", function(victim)
 	local org = victim.organism
 	if not org then return end
@@ -2660,20 +2667,35 @@ hook.Add("Org Clear", "HG_ResetFloppyOnOrgClear", function(org)
     -- Clear persistence flags to fully reset visuals
     ply.HG_FloppyPersist = nil
     ply.HG_FloppyPersistSeg = nil
+    ply.HG_SpineFloppyPersist = nil
     -- Clear any active ragdoll floppy constraints
     local rag = ply:GetNWEntity("RagdollDeath")
     if not IsValid(rag) then rag = ply:GetNWEntity("FakeRagdoll") end
     if not IsValid(rag) and IsValid(ply.FakeRagdoll) then rag = ply.FakeRagdoll end
-    if IsValid(rag) and rag.floppyLimbs then
-        for limb, data in pairs(rag.floppyLimbs) do
-            if IsValid(data.constraint) then data.constraint:Remove() end
-            local bone1 = rag:LookupBone(data.bone1)
-            if bone1 then
-                local phys1 = rag:TranslateBoneToPhysBone(bone1)
-                if phys1 then pcall(function() rag:RemoveInternalConstraint(phys1) end) end
+    if IsValid(rag) then
+        if rag.floppyLimbs then
+            for limb, data in pairs(rag.floppyLimbs) do
+                if IsValid(data.constraint) then data.constraint:Remove() end
+                local bone1 = rag:LookupBone(data.bone1)
+                if bone1 then
+                    local phys1 = rag:TranslateBoneToPhysBone(bone1)
+                    if phys1 then pcall(function() rag:RemoveInternalConstraint(phys1) end) end
+                end
+            end
+            rag.floppyLimbs = nil
+        end
+        if rag.FloppyConstraints then
+            for seg, cons in pairs(rag.FloppyConstraints) do
+                if IsValid(cons) then cons:Remove() end
+                removeFloppyBoneOffset(rag, "spine_" .. seg)
+            end
+            rag.FloppyConstraints = nil
+        end
+        if rag.FloppyBoneOffsets then
+            for key, _ in pairs(rag.FloppyBoneOffsets) do
+                removeFloppyBoneOffset(rag, key)
             end
         end
-        rag.floppyLimbs = nil
     end
 end)
 
