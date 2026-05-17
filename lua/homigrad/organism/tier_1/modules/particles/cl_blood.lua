@@ -55,14 +55,14 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 
 		if part.kishki then
 			render_SetMaterial(part[4])
-			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+			lightcolor.r = math.min((part.artery and 65 or 10) * light[1], 255)
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
 			--if len > 1 * 1 then
 				render_SetMaterial(mat_huy)
-				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+				lightcolor.r = math.min((part.artery and 65 or 20) * light[1], 255)
 				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
 				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
