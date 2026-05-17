@@ -603,6 +603,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if isClubMelee then
 		dmgInfo:ScaleDamage(1.65)
 	end
+
+	local isMeleeDmg = dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH + DMG_CRUSH) and
+		(inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee" or
+		 inflictorClass == "weapon_hands_sh" or inflictorClass == "weapon_hg_coolhands")
+	if isMeleeDmg then
+		dmgInfo:ScaleDamage(0.8)
+	end
 	
 	local dmg = dmgInfo:GetDamage()
 
