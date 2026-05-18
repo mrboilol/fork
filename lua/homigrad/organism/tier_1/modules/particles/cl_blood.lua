@@ -10,8 +10,6 @@ local col_red = Color(200,0,0)
 local vecDown = Vector(0, 0, -40)
 local vecZero = Vector(0, 0, 0)
 local LerpVector = LerpVector
-local FrameTime = FrameTime
-local LerpFT = function(frac, from, to) return Lerp(math.min(frac * FrameTime(), 1), from, to) end
 local math_random = math.random
 local table_remove = table.remove
 local util_Decal = util.Decal
@@ -57,37 +55,20 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 
 		if part.kishki then
 			render_SetMaterial(part[4])
-			lightcolor.r = math.min((part.artery and 65 or 10) * light[1], 255)
+			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
-			render_SetMaterial(mat_huy)
-			lightcolor.r = math.min((part.artery and 65 or 20) * light[1], 255)
-			part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
-			if part.impact then
-				local diff = part[2] - part[1]
-				local dir = diff:GetNormalized()
-				local len = 1 / mul / 24 * 0.5
-				render_DrawBeam(pos - dir * len, pos + dir * len, part.lerpedshit or 1, 0, 1, part[9] or lightcolor)
-			else
-				-- Clamp the per-frame movement vector so high-velocity particles
-				-- don't render as long stretched streaks. This matches the
-				-- old "len < 2 and normalized*N or diff" behavior that was
-				-- previously commented out.
-				local diff = part[2] - part[1]
-				local diffLen = diff:Length()
-				local maxDiff = 6
-				if diffLen > maxDiff then
-					diff = diff * (maxDiff / diffLen)
-				elseif diffLen < 0.5 then
-					-- Tiny per-frame movement: render as a small fixed dot
-					local d = diff:GetNormalized()
-					if d:IsZero() then d = Vector(0, 0, 1) end
-					diff = d * 0.5
-				end
-				render_DrawBeam(pos - diff * 1 / mul / 24 * 0.5, pos + diff * 1 / mul / 24 * 0.5, part.lerpedshit or 1, 0, 1, part[9] or lightcolor)
-			end
+			--if len > 1 * 1 then
+				render_SetMaterial(mat_huy)
+				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
+				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
+				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
+				
+				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
+				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
 
 				--lightcolor.r = lightcolor.r * 0.25
 				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	

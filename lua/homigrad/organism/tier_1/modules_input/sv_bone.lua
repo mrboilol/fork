@@ -46,7 +46,9 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	
 	if !nodmgchange then dmgInfo:ScaleDamage(1 - (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone))) end
 
-	org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.15, 1.15)
+	if ConVarExists("hg_strokes") and GetConVar("hg_strokes"):GetBool() then
+		org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.15, 1.15)
+	end
 
 	-- Track head trauma for long-term stroke risk
 	if key == "skull" then
@@ -510,7 +512,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
-    org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.5, 1.15)
+	if ConVarExists("hg_strokes") and GetConVar("hg_strokes"):GetBool() then
+		org.stroke_meter = math.min((org.stroke_meter or 0) + dmg * 0.5, 1.15)
+	end
 
 	-- Accumulate head trauma for long-term stroke risk
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.3, 2.0)

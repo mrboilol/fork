@@ -82,11 +82,7 @@ local function impact(pos,vel,mul)
 
 	for i = 1, iters do
 		local size = 1--math.random(2, 4) * 1
-		local frac = i / iters
-		local baseVel = -vel * frac * 1.5
-		local ang = (-vel):Angle()
-		local wave = ang:Right() * 20 * math.sin(i * 1.5) * math.cos(i * 2.5) + ang:Up() * 15 * math.sin(i * 2) * math.cos(i * 1.5)
-		addBloodPart(pos, baseVel + wave + Vector(Rand(-15, 15), Rand(-15, 15), Rand(-10, 10)), mat_huy, size, size, false, false, nil, true)
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
 	end
 end
 
@@ -230,11 +226,19 @@ net.Receive("bloodsquirt", function()
 		local amt = i / maxI
 		local mat = ent:GetBoneMatrix(bone)
 		if not mat then timer.Remove(name) return end
-		local pos, dirAng = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
-		local dir = dirAng:Forward() * len
-		local t = CurTime() * 12
-		local osc = dirAng:Right() * math.sin(t + i * 0.4) * 4 + dirAng:Up() * math.cos(t * 0.85 + i * 0.3) * 3
-		addBloodPart(pos, dir * amt * 90 + osc * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
+		dir = dir:Forward() * len
+
+		-- Realistic arterial pulse and oscillation
+		local step = maxI - i
+		local pulse = 1 + math.sin(step * 0.25) * 0.35
+		local oscillation = Vector(
+			math.sin(step * 0.5) * 6 * amt,
+			math.cos(step * 0.4) * 6 * amt,
+			math.sin(step * 0.3) * 3 * amt
+		)
+
+		addBloodPart(pos, dir * amt * 50 * pulse + oscillation, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
 		i = i - 1
 	end)
 	timer.Adjust(name, 0)
@@ -300,7 +304,6 @@ net.Receive("bloodsquirt2", function()
 	end)
 	timer.Adjust(name, 0)
 end)
-
 net.Receive("vomitsquirt2", function()
 	local ent = net.ReadEntity()
 	
