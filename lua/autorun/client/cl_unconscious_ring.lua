@@ -45,6 +45,14 @@ local critSound = nil
 local asystoleSound = nil
 local heartPhase = 0
 
+local nearDeathClasses = {
+    ["furry"] = true,
+    ["Gordon"] = true,
+    ["Combine"] = true,
+}
+
+local lastAlertPlay = 0
+
 local g_PulseCheckTarget = nil
 local g_PulseCheckData = nil
 
@@ -211,6 +219,28 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local shock = org.shock or 0
     local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain >= 0.34)
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
+    
+    local className = ply.PlayerClassName
+    local isNearDeathClass = nearDeathClasses[className] == true
+    
+    local isInBadHealth = isCritical
+        or org.heartstop
+        or (org.trachea and org.trachea >= 0.6)
+        or (org.skull and org.skull >= 1)
+        or (org.heart and org.heart > 0.6)
+        or (org.blood and org.blood < 3000)
+        or (org.o2 and org.o2[1] and org.o2[1] < 10)
+        or (org.infection and org.infection >= 0.75)
+        or (org.bloodpressure and org.bloodpressure < 50)
+        or (heartbeat < 30 or heartbeat > 170)
+    
+    if isNearDeathClass and isInBadHealth and CurTime() - lastAlertPlay > 5 then
+        sound.PlayFile("sound/health/alert.ogg", "noblock noplay", function(s)
+            if IsValid(s) then s:Play() end
+        end)
+        lastAlertPlay = CurTime()
+    end
+    
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
     if isUnconscious then
@@ -247,7 +277,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         showPulseCheckECG = true
     end
 
-    if (admiring or (heartbeat < 40 or heartbeat > 150)) and not isUnconscious then
+    if (admiring or (heartbeat < 30 or heartbeat > 170)) and not isUnconscious then
         showTopLeftECG = true
     end
 
@@ -406,10 +436,33 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             if currentHeartBeat > lastHeartBeat then
                 lastHeartBeat = currentHeartBeat
 
-                local isSevere = heartbeat > 175 or (bloodpressure or 93) > 140
-                local soundFile = isSevere and "critbeat.ogg" or "beat.ogg"
+                local soundFile
+                if isNearDeathClass and not isUnconscious then
+                    soundFile = "healthbeat.ogg"
+                else
+                    local isSevere = heartbeat > 175 or (bloodpressure or 93) > 140
+                    soundFile = isSevere and "critbeat.ogg" or "beat.ogg"
+                end
                 sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
             end
+        end
+    end
+    
+    if isNearDeathClass and isInBadHealth then
+        local flashCycle = math.floor(CurTime() / 0.65)
+        local isVisible = flashCycle % 2 == 0
+        if isVisible then
+            local msgGroup = math.floor((flashCycle % 8) / 4)
+            local msg = msgGroup == 0 and "VITALS CRITICAL" or "SEEK MEDICAL ATTENTION"
+            local font = "HomigradFontLarge"
+            if className == "Combine" then
+                font = "CMBFontSmall"
+            elseif className == "Gordon" then
+                font = "HEVFontSmall"
+            elseif className == "furry" then
+                font = "ZB_ProotOSMedium"
+            end
+            draw.SimpleText(msg, font, ScrW() / 2, ScrH() * 0.88, Color(255, 0, 0, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
     end
 end)
