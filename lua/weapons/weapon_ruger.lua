@@ -177,6 +177,18 @@ SWEP.lengthSub = 25
 SWEP.handsAng = Angle(1, -1.5, 0)
 SWEP.DistSound = "m9/m9_dist.wav"
 
+SWEP.availableAttachments = {
+	barrel = {
+		[1] = {"supressor1", Vector(-2, 0, 0), {}},
+		[2] = {"supressor6", Vector(-1.5, 0, 0), {}},
+		[3] = {"supressor7", Vector(-1.8, 0, 0), {}},
+	},
+	sight = {
+		["mountType"] = "picatinny_small",
+		["mount"] = Vector(-20, 5, 0.1),
+	},
+}
+
 
 
 SWEP.weight = 3

@@ -19,6 +19,7 @@ hook.Add("RagdollDeath","headcrab",function(ply,rag)
     rag:SetNetVar("headcrab", ply:GetNetVar("headcrab"))
     ply:SetNetVar("headcrab", false)
 	ply.organism.noHead = false
+	ply.noHead = false
 end)
 
 hook.Add("Org Clear", "removeheadcrab", function(org)
@@ -26,6 +27,7 @@ hook.Add("Org Clear", "removeheadcrab", function(org)
 	org.headcrabevent = false
 	if IsValid(org.owner) then
 		org.owner:SetNetVar("headcrab", false)
+		org.owner.noHead = false
 	end
 	org.noHead = false
 end)

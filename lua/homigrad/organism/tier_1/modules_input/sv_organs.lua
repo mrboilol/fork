@@ -145,12 +145,12 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 	org[key] = math.Round(math.min(org[key] + dmg * (isCrush(dmgInfo) and 1 or 3), 1), 3)
 		local damage_dealt = org[key] - oldval
 	if damage_dealt > 0 then
-		org.internalBleed = org.internalBleed + damage_dealt * 0.5 -- Base internal bleeding for any organ damage
+		org.internalBleed = org.internalBleed + damage_dealt * 1.0 -- Base internal bleeding for any organ damage (increased from 0.5)
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
 
 		if abdominal_organs[key] then
 			--local multiplier = (oldval >= 1) and 3.5 or 2.0 -- Extra penalty if already destroyed
-			org.internalBleed = org.internalBleed + damage_dealt * 1.5
+			org.internalBleed = org.internalBleed + damage_dealt * 2.5 -- Increased from 1.5
 			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 25
 			org.disorientation = (org.disorientation or 0) + damage_dealt * 1
 
@@ -387,11 +387,13 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 
 	local bonea = owner:LookupBone(boneindex)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
-	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), dir2 * 100, artery})
+	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), (dir2 or Vector(0,0,1)) * 100, artery})
 	owner:SetNetVar("arterialwounds", org.arterialwounds)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
 end
+
+hg.hitArtery = hitArtery
 
 input_list.arteria = function(org, bone, dmg, dmgInfo, boneindex, dir, hit)
 	return hitArtery("arteria", org, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit)

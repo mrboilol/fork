@@ -429,7 +429,7 @@ hook.Add("Think", "Fake", function()
 		local inmove = false
 		
 		local ragdollcombat = hg.RagdollCombatInUse(ply)
-		if !ragdollcombat and ragdoll == ply.FakeRagdoll then
+		if !ragdollcombat and ragdoll == ply.FakeRagdoll and (not ply.lastFake or ply.lastFake <= CurTime()) then
 			hg.SetFreemove(ply, false)
 		end
 
@@ -455,10 +455,10 @@ hook.Add("Think", "Fake", function()
 						p.secondstoarrive = 0.01
 						p.pos = bonepos
 						p.angle = boneang
-						p.maxangular = 250 * (ragdollcombat and 1 or 0.25) * mass * power * amt_impulse
-						p.maxangulardamp = 100 * (ragdollcombat and 1 or 0.75) * mass * power * amt_impulse
-						p.maxspeed = 250 * (ragdollcombat and 1 or 0.25) * mass * power * amt_impulse
-						p.maxspeeddamp = 100 * (ragdollcombat and 1 or 0.75) * mass * amt_impulse
+						p.maxangular = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse
+						p.maxangulardamp = 100 * (ragdollcombat and 1 or 0.9) * mass * power * amt_impulse
+						p.maxspeed = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse
+						p.maxspeeddamp = 100 * (ragdollcombat and 1 or 0.9) * mass * amt_impulse
 						p.teleportdistance = 0
 
 						physobj:Wake()
@@ -1031,7 +1031,7 @@ hook.Add("Think", "Fake", function()
 		local keyRight = false
 		local isNeckSlitRolling = false
 		
-		if org and org.neckslit and not org.otrub and ply:Alive() and not ply:InVehicle() then
+		if org and org.neckslit and not org.otrub and ply:Alive() and not ply:InVehicle() and org.fear > 0.85 then
 			local hasInput = ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK) or ply:KeyDown(IN_MOVELEFT) or ply:KeyDown(IN_MOVERIGHT)
 			if not hasInput then
 				local phase = (CurTime() * 1.5) % 4

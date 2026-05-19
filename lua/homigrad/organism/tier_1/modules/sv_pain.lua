@@ -54,9 +54,20 @@ module[2] = function(owner, org, timeValue)
 	local add = math.min(timeValue * 20, org.painadd)
 	local sub = (add <= 0.2) and (timeValue * 2 * (org.otrub and 2 or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
 
-	if adrenaline > 0.5 then
-		sub = sub * math.max(1 - adrenaline, 0.05) / 1.5// / (adrenaline >= 2 and 16 or 8)
-		add = add * math.max(1 - adrenaline, 0.05) / 1.5// / (adrenaline >= 2 and 16 or 8)
+	if adrenaline > 0 then
+		if adrenaline < 0.5 then
+			-- below 0.5: slight numbing effect, no strong delaying
+			sub = sub * math.max(1 - adrenaline, 0.9)
+			add = add * math.max(1 - adrenaline, 0.9)
+		elseif adrenaline < 1.0 then
+			-- below 1.0: kicks in like normal
+			sub = sub * math.max(1 - adrenaline, 0.05) / 1.5
+			add = add * math.max(1 - adrenaline, 0.05) / 1.5
+		else
+			-- 1.0 and above: incredible numbing
+			sub = sub * math.max(1 - adrenaline, 0.05) / 2.5
+			add = add * math.max(1 - adrenaline, 0.05) / 2.5
+		end
 	end
 
 	if org.pain > 60 and not org.otrub then
@@ -103,7 +114,7 @@ module[2] = function(owner, org, timeValue)
 	if !org.lasthit or org.lasthit + 1 < CurTime() then org.avgpain = max(org.avgpain - sub, 0) end
 	org.painlessen = sub
 
-	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - org.analgesia, 0)
+	org.pain = org.avgpain * math.max(1 - adrenaline / 2.5, 0.4) * math.max(1 - org.analgesia, 0)
 
 	org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
 
@@ -144,6 +155,11 @@ module[2] = function(owner, org, timeValue)
 	local adrenalineDecayRate = timeValue / (org.otrub and 5 or 25)
 	if fastAdrenalineDecay then
 		adrenalineDecayRate = timeValue / 5 -- Much faster decay
+	end
+
+	-- When in fear, adrenaline decays faster
+	if org.fear and org.fear > 0 then
+		adrenalineDecayRate = adrenalineDecayRate * (1 + org.fear * 0.5)
 	end
 
 	org.adrenaline = Approach(org.adrenaline, 0, adrenalineDecayRate)

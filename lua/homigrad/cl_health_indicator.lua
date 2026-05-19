@@ -123,12 +123,24 @@ local function SyncBonesCallback(ent, numbones)
 
     -- FIX: Ragdoll drooping and north-facing issues
     if isRag then
+        local minZ = math.huge
+        for i = 0, src:GetBoneCount() - 1 do
+            local mat = src:GetBoneMatrix(i)
+            if mat then
+                local pos = mat:GetTranslation()
+                if pos.z < minZ then minZ = pos.z end
+            end
+        end
+        
         local pelvis = src:LookupBone("ValveBiped.Bip01_Pelvis")
         if pelvis then
             local pMat = src:GetBoneMatrix(pelvis)
             if pMat then
-                -- Anchor ragdolls to the pelvis so they don't fall out of view
+                -- Anchor ragdolls to the pelvis x/y but lowest bone z
                 srcPos = pMat:GetTranslation()
+                if minZ ~= math.huge then
+                    srcPos.z = minZ
+                end
             end
         end
         -- Prevent snapping North: Use last known facing angle or player eye angles
@@ -566,10 +578,8 @@ function HUD_DrawDynamicIndicator()
 
         local modelOffset
         if isRagdoll then
-            -- Because we bound the ragdoll root to the pelvis in SyncBonesCallback, 
-            -- offset it so the pelvis aligns vertically inside the UI viewport
-            -- Increased offset to prevent clipping below the indicator and prevent drooping
-            modelOffset = Vector(0, 0, 70)
+            -- With the ragdoll lowest-Z fix, we no longer need a huge offset
+            modelOffset = Vector(0, 0, 10)
         else
             modelOffset = Vector(0, 0, 10)
         end

@@ -150,6 +150,14 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 				PlayBoneBreakSound(org.owner)
+
+		-- Small chance to puncture artery at break site
+		if math.random() < 0.12 then
+			local safeDir = dir or vector_origin
+			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
+			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit) end
+		end
 		//broken
 	else
 		--//org[key] = 0.5
@@ -171,6 +179,14 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		PlayBoneBreakSound(org.owner)
+
+		-- Even smaller chance to puncture artery at dislocation site
+		if math.random() < 0.04 then
+			local safeDir = dir or vector_origin
+			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
+			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit) end
+		end
 		//dislocated
 	end
 
@@ -226,6 +242,14 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
+
+		-- Small chance to puncture artery at break site
+		if math.random() < 0.12 then
+			local safeDir = dir or vector_origin
+			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
+			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit) end
+		end
 		//broken
 	else
 		org[key.."dislocation"] = true
@@ -247,6 +271,14 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
+
+		-- Even smaller chance to puncture artery at dislocation site
+		if math.random() < 0.04 then
+			local safeDir = dir or vector_origin
+			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
+			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit) end
+		end
 		//dislocated
 	end
 
@@ -276,12 +308,32 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	if org[name] >= hg.organism[name2] then return 0 end
 	local oldDmg = org[name]
 
+	-- Heavy collision check for neck damage transfer to skull
+	if name == "spine3" and isCrush(dmgInfo) and dmg > 0.3 and math.random() < 0.4 then
+		-- Transfer half damage to skull instead of neck
+		local skullDmg = dmg * 0.5
+		org.spine3 = oldDmg -- Reset spine3 damage
+		print("[HG Bone] Heavy collision: neck damage transferred to skull (halved), original dmg=" .. tostring(dmg) .. " skull dmg=" .. tostring(skullDmg))
+		
+		-- Apply damage to skull
+		local skullResult, skullVec = damageBone(org, 0.25, skullDmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+		hg.AddHarmToAttacker(dmgInfo, (org.skull - (org.skull - skullResult * 0.25)) * 2, "Skull damage from neck collision transfer")
+		
+		return skullResult, skullVec
+	end
+
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
 	
 	if name == "spine3" and org.spine3 > 0.75 and oldDmg <= 0.75 then
 		print("[HG Bone] SPINE3 threshold crossed: spine3=" .. tostring(org.spine3) .. " oldDmg=" .. tostring(oldDmg))
 		if math.random() < 0.5 then
 			print("[HG Bone] NECK BREAK TRIGGERED from spine damage")
+			-- Bigger chance to puncture neck artery on neck break
+			if math.random() < 0.35 then
+				local safeDir = dir or vector_origin
+				local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
+				if hg.hitArtery then hg.hitArtery("arteria", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Neck1", safeDir, safeHit) end
+			end
 			hg.BreakNeck(org.owner, true)
 			return result, vecrand
 		else
@@ -563,7 +615,7 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	local oldDmg = org.pelvis
 	org.painadd = org.painadd + dmg * 1.5
 	org.shock = org.shock + dmg * 1.5
-	org.internalBleed = (org.internalBleed or 0) + dmg * 1.5
+	org.internalBleed = (org.internalBleed or 0) + dmg * 4.0
 	org.o2[1] = math.max(org.o2[1] - dmg * 3, 0)
 	org.stamina_damage = (org.stamina_damage or 0) + dmg * 15
 	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 5

@@ -51,7 +51,8 @@ local nearDeathClasses = {
     ["Combine"] = true,
 }
 
-local lastAlertPlay = 0
+local alertPlayed = false
+local alertSound = nil
 
 local g_PulseCheckTarget = nil
 local g_PulseCheckData = nil
@@ -234,11 +235,20 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or (org.bloodpressure and org.bloodpressure < 50)
         or (heartbeat < 30 or heartbeat > 170)
     
-    if isNearDeathClass and isInBadHealth and CurTime() - lastAlertPlay > 5 then
+    if not ply:Alive() or isUnconscious or not isInBadHealth then
+        if alertPlayed then
+            if IsValid(alertSound) then alertSound:Stop() end
+            alertPlayed = false
+            alertSound = nil
+        end
+    elseif isNearDeathClass and isInBadHealth and not alertPlayed then
         sound.PlayFile("sound/health/alert.ogg", "noblock noplay", function(s)
-            if IsValid(s) then s:Play() end
+            if IsValid(s) then
+                s:Play()
+                alertSound = s
+            end
         end)
-        lastAlertPlay = CurTime()
+        alertPlayed = true
     end
     
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)

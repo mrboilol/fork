@@ -187,7 +187,14 @@ function CLASS.Off(self)
 	if IsValid(self.organism) then
 		self.organism.brain = 0
 		self.organism.disorientation = 0
+		self.organism.noHead = false
 	end
+
+	self.noHead = false
+	self:SetNWString("PlayerName", "")
+	self:SetBodyGroups("00000000000000000000")
+	self:SetSubMaterial()
+	self:SetPlayerColor(Vector(1, 1, 1))
 
 	hook.Remove("OnEntityCreated", "relation_shipdo"..self:EntIndex())
 end
@@ -201,6 +208,15 @@ function CLASS.PlayerDeath(self)
             v:AddEntityRelationship(self, D_HT, 99)
         end
     end
+
+	if IsValid(self.organism) then
+		self.organism.noHead = false
+	end
+	self.noHead = false
+	self:SetNWString("PlayerName", "")
+	self:SetBodyGroups("00000000000000000000")
+	self:SetSubMaterial()
+	self:SetPlayerColor(Vector(1, 1, 1))
 
     hook.Remove("OnEntityCreated", "relation_shipdo" .. self:EntIndex())
 end

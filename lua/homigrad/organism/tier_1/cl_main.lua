@@ -1073,7 +1073,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							local pulseMul = (org.pulse or 70) / 70
+							local pulse = org.pulse or 70
+							local pulseMul = pulse / 70
 							local bpMul = (org.bloodpressure or 93) / 93
 							local bloodMul = math.Clamp((org.blood or 5000) / 5000, 0.1, 1)
 							local hb = (org.heartbeat or 70) / 60
@@ -1083,24 +1084,30 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local right = dir:Angle():Right()
 							local up = ang:Up()
 
+							-- Pulse-based behavior: low pulse = messy, high pulse = straight with oscillation
+							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1) -- 0 at 35 pulse, 1 at 70 pulse
+							local lowPulseFactor = 1 - pulseFactor -- 1 at low pulse, 0 at high pulse
+
 							-- Consistent forward push for all particles in this heartbeat
 							local baseForward = dir * 6 * forceMul
 
-							-- Perpendicular heartbeat oscillation (stream wobbles side-to-side and up-down together)
-							local streamOsc = right * 20 * forceMul * math.sin(CurTime() * hb * 2.5) + up * 12 * forceMul * math.cos(CurTime() * hb * 2.5)
+							-- Oscillation increases with pulse (straighter stream wobbles more at high pulse)
+							local oscMul = pulseFactor * forceMul
+							local streamOsc = right * 20 * oscMul * math.sin(CurTime() * hb * 2.5) + up * 12 * oscMul * math.cos(CurTime() * hb * 2.5)
 
-							-- Tiny per-particle jitter, only perpendicular to stream direction
-							local spread = right * math.Rand(-3, 3) * pulseMul * bloodMul + up * math.Rand(-2, 2) * pulseMul * bloodMul
+							-- Spread increases at low pulse (messy stream at low pressure)
+							local spreadMul = lowPulseFactor * 2.5 + 0.5 -- More spread at low pulse, some at high pulse
+							local spread = right * math.Rand(-3, 3) * spreadMul * bloodMul + up * math.Rand(-2, 2) * spreadMul * bloodMul
 
 							hg.addBloodPart(pos, baseForward + streamOsc + spread, nil, size, size, true, nil, ent)
 
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 2.5
-								local arteriaForward = dir * 9 * arteriaForce
-								local arteriaOsc = right * 28 * arteriaForce * math.sin(CurTime() * hb * 2.5) + up * 16 * arteriaForce * math.cos(CurTime() * hb * 2.5)
-								hg.addBloodPart2(pos + right * math.Rand(-1, 1) + up * math.Rand(-1, 1), arteriaOsc * 0.4 + dir * 0.25 * arteriaForce + right * math.Rand(-4, 4) + up * math.Rand(-4, 4), nil, 18, 18, 0.2, false, ent)
-								hg.addBloodPart(pos + right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5), arteriaForward + arteriaOsc + right * math.Rand(-3, 3) + up * math.Rand(-2, 2), nil, 1, 1, true, nil, ent)
-								hg.addBloodPart(pos + right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5), arteriaForward * 1.1 + arteriaOsc + right * math.Rand(-3, 3) + up * math.Rand(-2, 2), nil, 1, 1, true, nil, ent)
+								local arteriaForward = dir * 8 * arteriaForce
+								local arteriaOsc = right * 28 * oscMul * arteriaForce * math.sin(CurTime() * hb * 2.5) + up * 16 * oscMul * arteriaForce * math.cos(CurTime() * hb * 2.5)
+								local arteriaSpread = right * math.Rand(-2, 2) * spreadMul + up * math.Rand(-2, 2) * spreadMul
+								hg.addBloodPart2(pos + right * math.Rand(-1, 1) + up * math.Rand(-1, 1), arteriaOsc * 0.4 + dir * 0.25 * arteriaForce + arteriaSpread, nil, 18, 18, 0.2, false, ent)
+								hg.addBloodPart(pos + right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5), arteriaForward + arteriaOsc + arteriaSpread, nil, 1, 1, true, nil, ent)
 							end
 						end
 
