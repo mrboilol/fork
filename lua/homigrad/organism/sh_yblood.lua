@@ -2,23 +2,16 @@ local function chekExpie(ent)
     return IsValid(ent) and (ent:GetModel() == "models/blop/expie/expie.mdl" or ent.PlayerClassName == "expie" or ent.IsExpie) or false
 end
 
-local hg_yblood
-if SERVER then
-    hg_yblood = ConVarExists("hg_yblood") and GetConVar("hg_yblood") or CreateConVar("hg_yblood", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable yblood/expie blood override system", 0, 1)
-else
-    hg_yblood = ConVarExists("hg_yblood") and GetConVar("hg_yblood") or CreateConVar("hg_yblood", 0, FCVAR_ARCHIVE, "Enable yblood/expie blood override system", 0, 1)
-end
-
-//god this shit is so complicated for no reason
 local function inityblood()
-    if not hg_yblood:GetBool() then return end
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
     util.AddNetworkString("addfountain")
 
     hook.Add("EntityTakeDamage", "Expied", function(ent, dmginfo)
         if chekExpie(ent) then
-            ent:SetBloodColor(BLOOD_COLOR_YELLOW) 
+            ent:SetBloodColor(BLOOD_COLOR_YELLOW)
+        else
+            ent:SetBloodColor(BLOOD_COLOR_RED)
         end
     end)
 

@@ -110,8 +110,8 @@ if CLIENT then
 	local lerpthing = 1
 	local colBrown = Color(40,40,40)
 	SWEP.showstats = true
-	SWEP.ofsV = Vector(10,-2,1)
-	SWEP.ofsA = Angle(-90,-40,270)
+	SWEP.ofsV = Vector(0,5,2)
+	SWEP.ofsA = Angle(0,90,90)
 	local vector_one = Vector(1,1,1)
 	function SWEP:DrawHUD()
 		local owner = self:GetOwner()
@@ -142,43 +142,88 @@ if CLIENT then
 		self:DrawWorldModel2(true)
 		local p,a = mdl:GetPos(), mdl:GetAngles()
 		local pos,ang = LocalToWorld(self.ofsV,self.ofsA,p,a)
+		
+		-- Check if position is on screen
+		local screenPos = pos:ToScreen()
+		local onScreen = screenPos.visible and screenPos.x > 0 and screenPos.x < ScrW() and screenPos.y > 0 and screenPos.y < ScrH()
+		
 		if self.showstats and self.modeValues and istable(self.modeValues) then
-			//cam.Start3D()
-				//cam.Start3D2D(pos,ang,0.01)
-				render.PushFilterMag( TEXFILTER.LINEAR )
-				render.PushFilterMin( TEXFILTER.LINEAR )
-				local m = Matrix()
-				m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
-				m:Scale( vector_one * 0.5 )
+			if onScreen then
+				-- Draw 3D text in world space
+				cam.Start3D()
+					cam.Start3D2D(pos,ang,0.025)
+					render.PushFilterMag( TEXFILTER.LINEAR )
+					render.PushFilterMin( TEXFILTER.LINEAR )
+					local m = Matrix()
+					m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
+					m:Scale( vector_one * 1.2 )
 
-				cam.PushModelMatrix( m, true )
-					for i, val in ipairs(self.modeValues) do
-						if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
-						local val = math.Round(val / self.modeValuesdef[i][1] * 100)
-						local x,y = 0, i * ScrH() / 20
-						local reveal = 1//math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
-						colBrown.a = reveal * 185
-						draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25 + (#self.modeValues > 0 and 0 or 0),colBrown)
-						surface.SetFont("ZCity_Small")
-						surface.SetTextPos(x,y)
-						surface.SetTextColor(255,255,255,255 * reveal)
-						local txt = string.NiceName(tostring(self.modeNames[i]))
-						local w, h = surface.GetTextSize(txt)
-						--surface.DrawText(tostring(self.modeNames[i]))
-						colBrown.a = reveal * 255
-						draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+					cam.PushModelMatrix( m, true )
+						for i, val in ipairs(self.modeValues) do
+							if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
+							local val = math.Round(val / self.modeValuesdef[i][1] * 100)
+							local x,y = 0, i * ScrH() / 20
+							local reveal = 1
+							colBrown.a = reveal * 200
+							draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25 + (#self.modeValues > 0 and 0 or 0),colBrown)
+							surface.SetFont("ZCity_Small")
+							surface.SetTextPos(x,y)
+							surface.SetTextColor(255,255,255,255 * reveal)
+							local txt = string.NiceName(tostring(self.modeNames[i]))
+							local w, h = surface.GetTextSize(txt)
+							surface.DrawText(tostring(self.modeNames[i]))
+							colBrown.a = reveal * 255
+							draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 2, colBrown)
+						
+							surface.SetDrawColor(0,100,0,255 * reveal)
+							surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)
+							surface.SetDrawColor(0,0,0,255 * reveal)
+							surface.DrawOutlinedRect(x + ScreenScale(210),y,ScrW() / 10,ScrH() / 25, 4)
+						end
+					cam.PopModelMatrix()
+
+					render.PopFilterMag()
+					render.PopFilterMin()
+					cam.End3D2D()
+				cam.End3D()
+			else
+				-- Draw on screen edge when out of view
+				local screenX = math.Clamp(screenPos.x, 50, ScrW() - 50)
+				local screenY = math.Clamp(screenPos.y, 50, ScrH() - 50)
+				
+				-- Calculate direction to position
+				local centerX, centerY = ScrW() / 2, ScrH() / 2
+				local dirX = screenPos.x - centerX
+				local dirY = screenPos.y - centerY
+				
+				-- Project to screen edge
+				if screenPos.x <= 0 or screenPos.x >= ScrW() then
+					screenX = screenPos.x <= 0 and 50 or ScrW() - 50
+					screenY = centerY + (dirY / math.abs(dirX)) * (screenX - centerX)
+					screenY = math.Clamp(screenY, 50, ScrH() - 50)
+				elseif screenPos.y <= 0 or screenPos.y >= ScrH() then
+					screenY = screenPos.y <= 0 and 50 or ScrH() - 50
+					screenX = centerX + (dirX / math.abs(dirY)) * (screenY - centerY)
+					screenX = math.Clamp(screenX, 50, ScrW() - 50)
+				end
+				
+				-- Draw screen-edge indicator
+				for i, val in ipairs(self.modeValues) do
+					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
+					local val = math.Round(val / self.modeValuesdef[i][1] * 100)
+					local x,y = screenX, screenY + (i - 1) * 25
+					local reveal = 1
+					colBrown.a = reveal * 200
+					draw.RoundedBox(2,x,y,ScreenScale(210) + ScrW() / 10,ScrH() / 25,colBrown)
+					local txt = string.NiceName(tostring(self.modeNames[i]))
+					draw.SimpleTextOutlined(txt, "ZCity_Small", x + 5, y + 2, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 2, colBrown)
 					
-						surface.SetDrawColor(0,100,0,255 * reveal)
-						surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)
-						surface.SetDrawColor(0,0,0,255 * reveal)
-						surface.DrawOutlinedRect(x + ScreenScale(210),y,ScrW() / 10,ScrH() / 25, 4)
-					end
-				cam.PopModelMatrix()
-
-				render.PopFilterMag()
-				render.PopFilterMin()
-				//cam.End3D2D()
-			//cam.End3D()
+					surface.SetDrawColor(0,100,0,255 * reveal)
+					surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)
+					surface.SetDrawColor(0,0,0,255 * reveal)
+					surface.DrawOutlinedRect(x + ScreenScale(210),y,ScrW() / 10,ScrH() / 25, 4)
+				end
+			end
 		end
 	end
 end

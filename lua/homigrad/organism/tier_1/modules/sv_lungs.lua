@@ -139,12 +139,28 @@ local not_enough_intake = {
 	//"I gotta take a break...",
 	//"Need a break from this... to breathe...",
 	//"Resting sounds like a nice idea.",
-	"I need to breathe...",
-	"I'm struggling to breathe...",
-	"Why is it so hard to breathe...",
-	"I cant find a way to get a good breath of air.",
-	"I cant breathe right.",
-	"Im struggling to catch my breath...",
+	"Its like taking shallow sips of nothing...",
+	"I cant- I cant breathe...",
+	"I think I might pass out if I dont get some air soon...",
+	"I dont know how much more I can last without air...",
+	"I cant breathe right...",
+	"Theres not enough air for me...",
+}
+
+local barely_breathing = {
+	"I can barely breathe...",
+	"Every breath is a struggle...",
+	"Theres barely enough air for me to survive.",
+	"I'm struggling to breathe.",
+	"It's too hard to get air...",
+}
+
+local low_stamina = {
+	"Im tired, im really tired...",
+	"I can barely keep moving...",
+	"I need to rest...",
+	"I am REALLY, REALLY TIRED.",
+	"I need to stop and rest...",
 }
 
 local drop_mask = {
@@ -294,7 +310,7 @@ module[2] = function(owner, org, timeValue)
 			end
 		else
 			if o2[1] < 25 and o2[1] > 12 then
-				org.owner:Notify(not_enough_intake[math.random(#not_enough_intake)], 61, "oxygen_lowintake", 0)
+				org.owner:Notify(not_enough_intake[math.random(#not_enough_intake)], 61, "oxygen_lowintake", 3)
 			end
 		end
 
@@ -307,6 +323,16 @@ module[2] = function(owner, org, timeValue)
 				org.owner:Notify("Oxygen... please...", 30, "lowoxy2", 0, nil, color_red)
 			end
 		end
+	end
+
+	-- Barely breathing (low curregen but just enough) - 2nd priority, bypassed if choking
+	if org.isPly and not org.otrub and not org.choking and o2.curregen >= losing_oxy and o2.curregen < losing_oxy * 1.3 and org.analgesia <= 1.5 and !org.heartstop then
+		org.owner:Notify(barely_breathing[math.random(#barely_breathing)], 45, "barely_breathing", 2)
+	end
+
+	-- Low stamina - 3rd priority, bypassed if choking
+	if org.isPly and not org.otrub and not org.choking and org.stamina[1] < 30 and org.stamina[1] > 10 and org.analgesia <= 1.5 and !org.heartstop then
+		org.owner:Notify(low_stamina[math.random(#low_stamina)], 50, "low_stamina", 3)
 	end
 
 	if org.analgesia > 1.5 then

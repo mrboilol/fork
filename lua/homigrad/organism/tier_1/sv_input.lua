@@ -245,6 +245,34 @@ end
 
 --hg.organism.AmputateLimb(Entity(2).organism, "rarm")
 
+function hg.organism.CompleteDislocationFix(org, limb, ply)
+	if not org[limb .. "dislocation"] then return end
+
+	org[limb .. "dislocation"] = false
+	org.painadd = (org.painadd or 0) + 6
+	org.fearadd = (org.fearadd or 0) + 0.1
+
+	if IsValid(org.owner) then
+		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.wav", 65)
+	end
+
+	-- Reapply floppy limb constraints if the limb is broken
+	if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+		if org[limb] and org[limb] >= 1 then
+			local ent = hg.GetCurrentCharacter(org.owner)
+			if IsValid(ent) then
+				hg.BreakLimb(ent, limb, nil, false)
+			end
+		else
+			-- Remove floppy constraints if the limb is no longer broken
+			local ent = hg.GetCurrentCharacter(org.owner)
+			if IsValid(ent) then
+				hg.RemoveLimbConstraints(ent, limb)
+			end
+		end
+	end
+end
+
 function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHole, outputHole)
 	local org = ent.organism
 	if org.superfighter then return end
