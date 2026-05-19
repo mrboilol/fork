@@ -2,6 +2,7 @@ local healthModel
 local blinkModel
 local whiteMat = Material("models/debug/debugwhite")
 local statusCircleMat = Material("sef_icons/statuseffectcircle.png", "smooth")
+local bleedIconMat = Material("zcity_delta/unitmenu/status/bleeding.png", "smooth")
 local statusIconCache = {}
 
 local IND_SIZE_BASE = 120
@@ -351,7 +352,8 @@ function HUD_DrawDynamicIndicator()
         healthModel:SetModel(ply:GetModel())
         blinkModel:SetModel(ply:GetModel())
         InitBlinkModel(blinkModel)
-        limbStates = {}
+        boneStates = {}
+        fadingBones = {}
         
         if healthModel.accessories then
             for _, v in pairs(healthModel.accessories) do
@@ -379,6 +381,17 @@ function HUD_DrawDynamicIndicator()
     if org then
         for key, data in pairs(majorBones) do
             local organName = data.organ
+            -- Initialize bone state even if organ data doesn't exist yet
+            if not boneStates[key] then
+                boneStates[key] = {
+                    amputated = false,
+                    blinking = false,
+                    blinkEnd = 0,
+                    fractured = false,
+                    fractureTime = 0
+                }
+            end
+
             if not org[organName] then continue end
 
             local boneName = data.bone
@@ -405,16 +418,6 @@ function HUD_DrawDynamicIndicator()
                 if organName == "lleg" or organName == "rleg" or organName == "pelvis" then
                     isBroken = true
                 end
-            end
-
-            if not boneStates[key] then
-                boneStates[key] = {
-                    amputated = false,
-                    blinking = false,
-                    blinkEnd = 0,
-                    fractured = false,
-                    fractureTime = 0
-                }
             end
 
             local state = boneStates[key]
@@ -527,20 +530,11 @@ function HUD_DrawDynamicIndicator()
     local size = IND_SIZE_BASE
     local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
     
-    -- Check if we should position at top right (hg_indicator == 1)
-    local hg_indicator = GetConVar("hg_indicator")
-    local indMode = hg_indicator and hg_indicator:GetInt() or 0
     local viewX, viewY
     
-    if indMode == 1 then
-        -- Position at top right
-        viewX = ScrW() - w - ScreenScaleFixed(10)
-        viewY = ScreenScaleFixed(10)
-    else
-        -- Default top left
-        viewX = ScreenScaleFixed(10)
-        viewY = ScreenScaleFixed(10)
-    end
+    -- Position within moodles area
+    viewX = ScrW() - w - ScreenScaleFixed(20) -- Move more left so it's not right on the edge
+    viewY = ScreenScaleFixed(220) -- Position at moodle y level to fit within moodles
     
     -- Store indicator position and size for moodle adjustment
     HUD.dynamicIndicator = {
@@ -586,12 +580,11 @@ function HUD_DrawDynamicIndicator()
 
         local drawAng = Angle(0, 0, 0)
 
-        if not isRagdoll then
-            healthModel:SetSequence(srcEnt:GetSequence())
-            healthModel:SetCycle(srcEnt:GetCycle())
-            blinkModel:SetSequence(srcEnt:GetSequence())
-            blinkModel:SetCycle(srcEnt:GetCycle())
-        end
+        -- Always update sequence and cycle for proper animation sync
+        healthModel:SetSequence(srcEnt:GetSequence())
+        healthModel:SetCycle(srcEnt:GetCycle())
+        blinkModel:SetSequence(srcEnt:GetSequence())
+        blinkModel:SetCycle(srcEnt:GetCycle())
 
         healthModel:SetPos(modelOffset)
         healthModel:SetAngles(drawAng)
@@ -603,6 +596,12 @@ function HUD_DrawDynamicIndicator()
         healthModel:SetSkin(ply:GetSkin())
 
         healthModel:SetupBones()
+
+        -- Ensure skull (head) is always visible
+        local skullBoneID = healthModel:LookupBone("ValveBiped.Bip01_Head1")
+        if skullBoneID then
+            ScaleBoneAndChildren(healthModel, skullBoneID, Vector(1, 1, 1))
+        end
 
         local base_col = math.max(0.2, consciousness)
 
@@ -665,10 +664,30 @@ function HUD_DrawDynamicIndicator()
             end
         end
 
+        local function DrawBleedSpriteState(blinkModel)
+            blinkModel:SetupBones()
+
+            -- Same rendering style as DrawDamageBlinkState but using our bleed material instead
+            render.MaterialOverride(bleedIconMat)
+            render.SetColorModulation(1, 0, 0)
+            
+            for _, offset in ipairs(outlineOffsets) do
+                blinkModel:SetPos(modelOffset + offset)
+                blinkModel:DrawModel()
+            end
+
+            render.SetColorModulation(1, 0, 0)
+            blinkModel:SetPos(modelOffset)
+            blinkModel:DrawModel()
+            
+            render.MaterialOverride(whiteMat)
+        end
+
         local hasAmputationBlink = false
         local hasFractureBlink = false
         local solidRedBones = {}
         local blinkingRedBones = {}
+        local bleedingBones = {}
 
         for key, state in pairs(boneStates) do
             if state.blinking then hasAmputationBlink = true end
@@ -680,6 +699,31 @@ function HUD_DrawDynamicIndicator()
                     table.insert(blinkingRedBones, key)
                 end
             end
+        end
+
+        if org.wounds or org.arterialwounds then
+            local function CheckWoundList(list)
+                if not list then return end
+                for i = 1, #list do
+                    local wound = list[i]
+                    if type(wound) == "table" and (wound[1] or 0) > 0.01 then
+                        local boneName = wound[4]
+                        if type(boneName) == "string" then
+                            -- Check against major bones
+                            for key, data in pairs(majorBones) do
+                                if data.bone == boneName then
+                                    table.insert(bleedingBones, key)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            
+            local netWounds = ply:GetNetVar("wounds", nil)
+            local netArterial = ply:GetNetVar("arterialwounds", nil)
+            CheckWoundList(netWounds or org.wounds)
+            CheckWoundList(netArterial or org.arterialwounds)
         end
 
         if hasAmputationBlink then
@@ -718,6 +762,80 @@ function HUD_DrawDynamicIndicator()
 
             local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
             DrawDamageBlinkState(blinkModel, val, 0, 0)
+        end
+
+        if #bleedingBones > 0 then
+            -- Hide fracture models if any
+            for _, key in ipairs(solidRedBones) do
+                local boneName = majorBones[key].bone
+                local bID = blinkModel:LookupBone(boneName)
+                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
+            end
+            for _, key in ipairs(blinkingRedBones) do
+                local boneName = majorBones[key].bone
+                local bID = blinkModel:LookupBone(boneName)
+                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
+            end
+
+            for _, key in ipairs(bleedingBones) do
+                local boneName = majorBones[key].bone
+                local bID = blinkModel:LookupBone(boneName)
+                if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
+            end
+
+            -- Calculate total bleeding severity
+            local totalBleed = 0
+            local netWounds = ply:GetNetVar("wounds", nil)
+            local netArterial = ply:GetNetVar("arterialwounds", nil)
+            
+            local function GetBleedSeverity(list)
+                if not list then return 0 end
+                local total = 0
+                for i = 1, #list do
+                    local wound = list[i]
+                    if type(wound) == "table" then
+                        total = total + (wound[1] or 0)
+                    end
+                end
+                return total
+            end
+            
+            totalBleed = GetBleedSeverity(netWounds or org.wounds) + GetBleedSeverity(netArterial or org.arterialwounds)
+            
+            -- Color based on severity: 0.5=white -> 1.0=yellow -> 2.0=orange -> 3.0+=red
+            local r, g, b
+            if totalBleed <= 0.5 then
+                local prog = totalBleed / 0.5
+                r, g, b = 1, 1, 1 - prog
+            elseif totalBleed <= 1.0 then
+                local prog = (totalBleed - 0.5) / 0.5
+                r, g, b = 1, 1 - 0.5 * prog, 0
+            elseif totalBleed <= 2.0 then
+                local prog = (totalBleed - 1.0) / 1.0
+                r, g, b = 1, 0.5 - 0.5 * prog, 0
+            else
+                r, g, b = 1, 0, 0
+            end
+
+            -- Pulse effect for bleeding
+            local val = (math.sin(time * 5) + 1) / 2
+            render.SetBlend(0.5 + val * 0.5)
+            
+            blinkModel:SetupBones()
+            render.MaterialOverride(bleedIconMat)
+            render.SetColorModulation(r, g, b)
+            
+            for _, offset in ipairs(outlineOffsets) do
+                blinkModel:SetPos(modelOffset + offset)
+                blinkModel:DrawModel()
+            end
+
+            render.SetColorModulation(r, g, b)
+            blinkModel:SetPos(modelOffset)
+            blinkModel:DrawModel()
+            
+            render.MaterialOverride(whiteMat)
+            render.SetBlend(1)
         end
         
         render.MaterialOverride(nil)

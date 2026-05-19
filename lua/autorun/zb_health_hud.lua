@@ -430,8 +430,8 @@ HUD = {
 	organ_damage_threshold = 0.3,
 	fracture_threshold = 0.95,
 	
-	bleeding_threshold = 0.1,
-	internal_bleed_threshold = 0.1,
+	bleeding_threshold = 0.05,
+	internal_bleed_threshold = 0.05,
 	
 	hypotension_threshold = 90,
 	cardiac_arrest_threshold = true,
@@ -2537,15 +2537,9 @@ end
 local function draw_sprites()
 	if not HUD.enabled then return end
 
-	local hg_indicator = GetConVar("hg_indicator")
-	local indMode = hg_indicator and hg_indicator:GetInt() or 0
-
-	if indMode == 1 then
-		HUD_DrawDynamicIndicator()
-		return
-	end
-
-	if indMode ~= 0 and indMode ~= 2 and indMode ~= 3 then return end
+	-- Always use dynamic indicator, remove sprite-based health indication
+	HUD_DrawDynamicIndicator()
+	return
 	
 	local ply = LocalPlayer()
 	if not IsValid(ply) or not ply.organism then return end

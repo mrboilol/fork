@@ -169,9 +169,8 @@ end
 SWEP.usetime = 2
 local math = math
 function SWEP:ShouldUseCircleMinigame()
-	local owner = self:GetOwner()
-	if not IsValid(owner) or not owner:IsPlayer() then return false end
-	return circleMinigameClasses[self:GetClass()] == true
+	-- Disabled to prefer the new medical minigame over the old circle minigame
+	return false
 end
 
 function SWEP:GetCircleMinigameRequiredLoops()

@@ -1872,16 +1872,16 @@ function hg.BreakNeck(ent, fromDamage)
 		pneck:EnableMotion(true)
 
 		-- Create constraint at current pose for natural floppy behavior
-		-- Get current head position for constraint placement
 		local head_pos = phead:GetPos()
 		local neck_pos = pneck:GetPos()
-		local neck_ang = pneck:GetAngles()
+		local jointPos = (head_pos + neck_pos) / 2
 		
-		-- Calculate local position on neck for constraint anchor
-		local lpos = WorldToLocal(head_pos, angle_zero, neck_pos, neck_ang)
+		-- Calculate local positions for both physics objects
+		local lpos1 = WorldToLocal(jointPos, angle_zero, pneck:GetPos(), pneck:GetAngles())
+		local lpos2 = WorldToLocal(jointPos, angle_zero, phead:GetPos(), phead:GetAngles())
 
 		-- Add floppy neck constraint with generous limits for floppy head
-		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos, nil, 0, 0, -80, -120, -80, 80, 120, 80, 0, 0, 0, 0, 0)
+		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -80, -80, -80, 80, 80, 80, 0, 0, 0, 0, 0)
 		
 		-- Track the constraint to prevent duplicates
 		if newConstraint then
@@ -2204,7 +2204,7 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     print("[HG Floppy] createFloppyLimbConstraint: Creating AdvBallsocket with limits: pitch[" .. minPitch .. "," .. maxPitch .. "] yaw[" .. minYaw .. "," .. maxYaw .. "] roll[" .. minRoll .. "," .. maxRoll .. "]")
 
     -- Create constraint at joint position on both bones (matching neck constraint style)
-    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0, minPitch, maxPitch, minYaw, maxYaw, minRoll, maxRoll, 0, 0, 0, 0, 0)
+    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0, minPitch, minYaw, minRoll, maxPitch, maxYaw, maxRoll, 0, 0, 0, 0, 0)
 
     if IsValid(cons) then
         print("[HG Floppy] createFloppyLimbConstraint SUCCESS: AdvBallsocket created for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
@@ -2420,7 +2420,7 @@ local function createFloppySpineConstraint(rag, segData)
 
     local l = segData.limits
     local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0,
-        l.minPitch, l.maxPitch, l.minYaw, l.maxYaw, l.minRoll, l.maxRoll,
+        l.minPitch, l.minYaw, l.minRoll, l.maxPitch, l.maxYaw, l.maxRoll,
         0, 0, 0, 0, 0)
     if IsValid(cons) then
         print("[HG Floppy] createFloppySpineConstraint SUCCESS")
