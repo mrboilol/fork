@@ -16,7 +16,6 @@ hook.Add("Org Clear", "Main", function(org)
 	module.metabolism[1](org)
 	module.concussion[1](org)
 	module.random_events[1](org)
-	module.infection[1](org)
 	org.brain = 0
 	org.consciousness = 1
 	org.disorientation = 0
@@ -29,7 +28,6 @@ hook.Add("Org Clear", "Main", function(org)
 	org.skull = 0
 	org.stomach = 0
 	org.intestines = 0
-	org.stroke_meter = 0
 	org.headtrauma = 0
 	org.oxygen_deprivation = 0
 
@@ -122,7 +120,6 @@ util.AddNetworkString("organism_sendply")
 local CurTime = CurTime
 local nullTbl = {}
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
-local hg_strokes = ConVarExists("hg_strokes") and GetConVar("hg_strokes") or CreateConVar("hg_strokes",1,FCVAR_ARCHIVE + FCVAR_NOTIFY,"Enable strokes system",0,1)
 local function send_organism(org, ply)
 	if not IsValid(org.owner) then return end
 	local sendtable = {}
@@ -177,7 +174,6 @@ local function send_organism(org, ply)
 	sendtable.lungsfunction = org.lungsfunction
 	sendtable.consciousness = org.consciousness
 	sendtable.concussion = org.concussion
-	sendtable.stroke_meter = org.stroke_meter
 	sendtable.oxygen_deprivation = org.oxygen_deprivation
 	sendtable.assimilated = org.assimilated
 	sendtable.berserk = org.berserk
@@ -190,7 +186,6 @@ local function send_organism(org, ply)
 	sendtable.incapacitated = org.incapacitated
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
-	sendtable.stroke_meter = org.stroke_meter
 
 	sendtable.superfighter = org.superfighter
 
@@ -448,156 +443,6 @@ end)
 
 
 
-hook.Add("Org Think", "StrokeMeter", function(owner, org, timeValue)
-    local strokes_enabled = hg_strokes:GetBool()
-    local ramp_rate = 0
-
-    -- Only ramp up if strokes are enabled
-    if strokes_enabled then
-        -- Ramp up on high blood pressure (>115), gentler scaling
-        if org.bloodpressure > 115 and org.tranexamic_acid <= 0 then
-            local bp_effect = (org.bloodpressure - 115) / 35
-            ramp_rate = ramp_rate + (0.004 * bp_effect) -- Linear scaling with BP
-        end
-
-        -- Additional stroke risk from high cholesterol/fat buildup (if exists)
-        if org.fatbuildup and org.fatbuildup > 0.3 then
-            ramp_rate = ramp_rate + (org.fatbuildup - 0.3) * 0.0005
-        end
-
-        -- Dehydration increases stroke risk
-        if org.dehydration and org.dehydration > 0.5 then
-            ramp_rate = ramp_rate + (org.dehydration - 0.5) * 0.0008
-        end
-
-        -- Repeated head trauma causes cumulative stroke risk
-        if org.headtrauma and org.headtrauma > 0 then
-            ramp_rate = ramp_rate + org.headtrauma * 0.001
-            org.headtrauma = math.max(org.headtrauma - timeValue * 0.01, 0) -- Slowly heal trauma
-        end
-
-        if ramp_rate > 0 then
-            org.stroke_meter = math.min((org.stroke_meter or 0) + timeValue * ramp_rate, 1.15)
-        end
-    end
-
-    -- Decay rate - slower to recover, especially with internal bleeding
-    local decay_rate = 0.003
-    if org.internalBleed and org.internalBleed > 0 then
-        decay_rate = 0.0005 -- Nearly no recovery with internal bleeding
-    end
-
-    -- Tranexamic acid helps but less effectively now
-    if org.tranexamic_acid > 0 then
-        decay_rate = decay_rate + 0.015
-    end
-
-    org.stroke_meter = math.max((org.stroke_meter or 0) - timeValue * decay_rate, 0)
-
-    -- TIA (mini-stroke) warning phase at 0.65-0.85
-    if (org.stroke_meter or 0) > 0.65 and (org.stroke_meter or 0) < 0.85 and not org.tia_warning then
-        org.tia_warning = true
-        owner:Notify("My vision is blurring... my arm feels weak...", 2, "stroke", 4)
-        org.tia_timer = CurTime() + 30 -- 30 second warning window
-    elseif (org.stroke_meter or 0) < 0.6 then
-        org.tia_warning = false
-    end
-
-    -- TIA effects temporary if treated quickly
-    if org.tia_timer and CurTime() > org.tia_timer and org.tia_warning then
-        org.tia_warning = false
-        org.stroke_meter = math.max(org.stroke_meter - 0.3, 0) -- Natural recovery if survived
-        owner:Notify("The symptoms are fading...", 0, "stroke", 3)
-    end
-
-    -- Need otrub if stroke meter is above 0.75 (lowered threshold)
-    if (org.stroke_meter or 0) > 0.75 then
-        org.needotrub = true
-    end
-
-    -- Full stroke at 1.15
-    if org.stroke_meter >= 1.15 and not org.is_stroking then
-        org.is_stroking = true
-        org.stroke_active = true
-        org.stroke_permanent_damage = (org.stroke_meter - 1.15) * 50 -- Permanent damage based on severity
-        org.o2[1] = 2
-        org.alive = false
-        org.tia_warning = false
-        owner:Notify("MY HEAD! I CAN'T MOVE!", 1, "stroke", 5)
-
-        owner:SetMoodle("stroke", true)
-        org.brain = math.max(org.brain - 35, 0) -- Increased immediate brain damage
-
-        -- Hemiparesis (one-sided weakness) - 50% chance
-        org.hemiparesis = math.random() > 0.5 and 1 or 0
-
-    elseif org.stroke_meter < 1.15 and org.is_stroking then
-        org.is_stroking = false
-        if org.alive then
-            org.heartstop = true
-            org.lungsfunction = false
-        end
-    end
-
-    -- Ongoing stroke damage - more severe
-    if org.is_stroking then
-        org.brain = math.max(org.brain - timeValue / 80, 0) -- Faster brain deterioration
-        local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-        if totalAdrenaline <= 0.5 then
-            org.ischemia = org.ischemia + timeValue * 0.02 -- Organ ischemia from stroke
-        end
-
-        -- During active stroke, player loses control of body (needfake)
-        org.needfake = true
-        org.canmove = false
-        org.canmovehead = false
-        org.incapacitated = true
-    end
-
-    -- Persistent stroke effects even after meter drops
-    if org.stroke_active and not org.is_stroking then
-        -- Lingering effects from permanent damage
-        if org.stroke_permanent_damage and org.stroke_permanent_damage > 0 then
-            local damage_factor = math.min(org.stroke_permanent_damage / 100, 1)
-            org.disorientation = math.max(org.disorientation or 0, damage_factor * 3)
-
-            -- Hemiparesis affects movement
-            if org.hemiparesis and org.hemiparesis > 0 then
-                org.immobilization = math.min(org.immobilization + damage_factor * 5, 15)
-                -- Can't move properly with hemiparesis
-                org.canmove = false
-                org.canmovehead = false
-                org.needfake = true
-            end
-        end
-    end
-end)
-
-hook.Add("Org Think", "StrokeEffects", function(owner, org, timeValue)
-    if not hg_strokes:GetBool() then return end
-    if org.stroke_meter and org.stroke_meter > 0.4 then -- Lowered threshold
-        local effect_scale = (org.stroke_meter - 0.4) / (1.15 - 0.4)
-        org.disorientation = math.max(org.disorientation or 0, 5 * effect_scale)
-
-        if org.consciousness then
-            local min_consciousness = (org.stroke_meter or 0) < 0.85 and 0.25 or 0 -- Lower min consciousness
-            org.consciousness = math.max(org.consciousness - (0.15 * effect_scale) * timeValue, min_consciousness)
-        end
-
-        if org.o2 and org.o2[1] then
-             org.o2[1] = math.max(org.o2[1] - (0.3 * effect_scale) * timeValue, 0) -- Faster oxygen drop
-        end
-    end
-
-    -- TIA temporary effects
-    if org.tia_warning then
-        org.disorientation = math.max(org.disorientation or 0, 2)
-        if math.random() < 0.1 then -- Random temporary paralysis episodes
-            org.immobilization = math.min(org.immobilization + 2, 10)
-        end
-    end
-end)
-
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if not IsValid(owner) then
 		hg.organism.list[owner] = nil
@@ -660,7 +505,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.metabolism[2](owner, org, timeValue)
 		module.concussion[2](owner, org, timeValue)
 		module.random_events[2](owner, org, timeValue)
-		module.infection[2](owner, org, timeValue)
 	end
 
 

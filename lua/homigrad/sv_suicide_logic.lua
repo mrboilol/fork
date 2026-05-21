@@ -1,5 +1,4 @@
 if SERVER then
-    CreateConVar("huyside", "0", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "0 = cutscene, 1 = no cutscene", 0, 1)
     resource.AddFile("resource/fonts/arnopro.ttf")
     util.AddNetworkString("HG_SuicideCutscene")
 
@@ -13,12 +12,6 @@ if SERVER then
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
 
-        if GetConVar("huyside"):GetInt() == 1 then
-            ply.suiciding = not ply.suiciding
-            return
-        end
-
-        -- huyside == 0
         local wep = ply:GetActiveWeapon()
         local has_gun = IsValid(wep) and wep.ishgweapon and not wep.ismelee and not wep.ismelee2 and wep:Clip1() > 0
 
@@ -81,6 +74,16 @@ if SERVER then
                 end
             end
         end)
+    end)
+
+    net.Receive("HG_SuicideCutscene", function(len, ply)
+        local cancel = net.ReadBool()
+        if cancel and ply.suicideCutscene then
+            -- Client rejected cutscene, continue normal suicide like non-gun behavior
+            ply.suicideCutscene = false
+            ply.suicideCutsceneWep = nil
+            ply.suiciding = not ply.suiciding
+        end
     end)
 
     hook.Add("PlayerDeath", "HG_ResetSuicideCutscene", function(ply)

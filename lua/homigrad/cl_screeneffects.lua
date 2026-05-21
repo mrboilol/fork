@@ -570,7 +570,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	shockLerp = LerpFT(0.01, shockLerp or 0, shock)
 	consciousnessLerp = LerpFT(org.consciousness < (consciousnessLerp or 1) and 1 or 0.01, consciousnessLerp or 1, org.consciousness)
 	-- local immobilization = org.immobilization
-	PainLerp = LerpFT(0.05, PainLerp, math.max(pain * (org.otrub and 0.2 or 1), 0))
+	PainLerp = LerpFT(0.05, PainLerp, math.max(pain * (org.otrub and 0.05 or 1), 0))
 	assimilatedLerp = LerpFT(0.01, assimilatedLerp, (org.assimilated or 0))
 
 	if assimilatedLerp > 0.001 then

@@ -7,6 +7,12 @@ local function drop(ply, wep, newWeapon, vel)
 	if ply:GetNWFloat("willsuicide", 0) > 0 then return end -- you cant escape.
 	local eyeAngles = ply:LocalEyeAngles()
 	local isWep = wep.ismelee2 or ishgweapon(wep)
+	
+	-- Check for accidental discharge chance when ragdolled
+	local isRagdoll = ply:IsRagdoll()
+	local dischargeChance = isRagdoll and 0.4 or 0.1 -- Higher chance when ragdolled
+	local shouldDischarge = isWep and math.random() < dischargeChance and wep:Clip1() > 0
+	
 	ply:DoAnimationEvent(ACT_GMOD_GESTURE_MELEE_SHOVE_1HAND)
 	ply:ViewPunch(vpang)
 	timer.Simple(isWep and 0.0 or 0.0,function()
@@ -29,6 +35,17 @@ local function drop(ply, wep, newWeapon, vel)
 		
 		wep.init = true
 		wep.IsSpawned = true
+
+		-- Accidental discharge
+		if shouldDischarge and IsValid(wep) then
+			wep:SetOwner(ply) -- Temporarily set owner back to allow firing
+			timer.Simple(0.05, function()
+				if IsValid(wep) and IsValid(ply) then
+					wep:PrimaryAttack()
+					wep:SetOwner() -- Remove owner after firing
+				end
+			end)
+		end
 
 		timer.Simple(0,function()
 			if pos and ang then
