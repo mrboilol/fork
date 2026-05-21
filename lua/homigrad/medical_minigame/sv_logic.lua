@@ -266,7 +266,7 @@ local function GetMedicalMinigameType(wep)
         return nil
     end
 
-    if class == "weapon_bruicekit" or (class == "weapon_medkit_sh" and wep.mode == 1) then
+    if class == "weapon_bruicekit" or class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or (class == "weapon_medkit_sh" and wep.mode == 1) then
         return "bandage"
     end
 

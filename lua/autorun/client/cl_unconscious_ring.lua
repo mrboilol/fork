@@ -51,6 +51,14 @@ local nearDeathClasses = {
     ["Combine"] = true,
 }
 
+local function GetHeartbeatVolume(org)
+    if not org then return 0.2 end
+    local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
+         + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
+         + math.Clamp(org.brain or 0, 0, 1) * 0.2
+    return math.Clamp(0.2 + hurt, 0.2, 1.0)
+end
+
 local alertPlayed = false
 local alertSound = nil
 
@@ -244,6 +252,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     elseif isNearDeathClass and isInBadHealth and not alertPlayed then
         sound.PlayFile("sound/health/alert.ogg", "noblock noplay", function(s)
             if IsValid(s) then
+                s:EnableLooping(true)
+                s:SetVolume(1.0)
                 s:Play()
                 alertSound = s
             end
@@ -378,8 +388,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     if target_heartbeat < 1 then
                         sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
                     else
-                        local soundFile = target_isCritical and "critbeat.ogg" or "beat.ogg"
-                        sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
+                        local vol = GetHeartbeatVolume(target_org)
+                        sound.PlayFile("sound/heartbeat/heartbeat_single.wav", "noblock noplay", function(s) if IsValid(s) then s:SetVolume(vol) s:Play() end end)
                     end
                 end
             end
@@ -446,14 +456,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             if currentHeartBeat > lastHeartBeat then
                 lastHeartBeat = currentHeartBeat
 
-                local soundFile
-                if isNearDeathClass and not isUnconscious then
-                    soundFile = "healthbeat.ogg"
-                else
-                    local isSevere = heartbeat > 175 or (bloodpressure or 93) > 140
-                    soundFile = isSevere and "critbeat.ogg" or "beat.ogg"
-                end
-                sound.PlayFile("sound/health/" .. soundFile, "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
+                local vol = GetHeartbeatVolume(org)
+                sound.PlayFile("sound/heartbeat/heartbeat_single.wav", "noblock noplay", function(station) if IsValid(station) then station:SetVolume(vol) station:Play() end end)
             end
         end
     end

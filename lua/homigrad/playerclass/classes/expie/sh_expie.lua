@@ -9,6 +9,7 @@ function CLASS.Off(self)
 		self.organism.bloodtype = self.oldbloodtype or "o-"
 		hg.ClearArmorRestrictions(self)
 		self.IsExpie = false
+		self:SetBloodColor(BLOOD_COLOR_RED)
 	end
 
 	if eightbit and eightbit.EnableEffect and self.UserID then
@@ -41,7 +42,8 @@ function CLASS.On(self, data)
             eightbit.EnableEffect(self:UserID(), eightbit.EFF_PROOT)
 		end
 		self.IsExpie = true
-self:SetSubMaterial(0,"")
+		self:SetBloodColor(BLOOD_COLOR_YELLOW)
+		self:SetSubMaterial(0,"")
         local Appearance = self.CurAppearance or hg.Appearance.GetRandomAppearance()
 		Appearance.AAttachments = ""
 		Appearance.AColthes = ""
@@ -51,7 +53,7 @@ self:SetSubMaterial(0,"")
         self:SetSubMaterial(0,"")
 		if self.organism then
 			self.oldbloodtype = self.organism.bloodtype
-			self.organism.bloodtype = "yellow blood" //lol kill your teammates to survive idk
+			self.organism.bloodtype = "c-"
 		end
         	if self.FakeRagdoll then hg.FakeUp(self,true) end
         	self.JumpPowerMul = 1.5

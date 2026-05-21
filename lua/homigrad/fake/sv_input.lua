@@ -23,6 +23,12 @@ hook.Add("PlayerCollide", "Fake", function(ply, ent, data)
 		timer.Simple(0,function()
 			hg.LightStunPlayer(ply, 2)
 		end)
+		
+		-- Inflict fear from fast moving objects
+		if ply.organism then
+			local fearAmount = math.Clamp(data.Speed / 500, 0.2, 1.5)
+			ply.organism.fearadd = (ply.organism.fearadd or 0) + fearAmount
+		end
 	end
 end)
 
@@ -57,6 +63,28 @@ hook.Add("OnPlayerHitGround","fallStun",function(ply,inwater,onfloater,speed)
 
 	if speed > 600 then
 		hg.LightStunPlayer(ply,2)
+	end
+	
+	-- Accidental weapon discharge on impact
+	if speed > 300 then
+		local wep = ply:GetActiveWeapon()
+		if IsValid(wep) and wep:IsWeapon() then
+			-- Check if weapon has ammo/clip
+			local clip1 = wep:Clip1()
+			local clip2 = wep:Clip2()
+			local hasAmmo = clip1 > 0 or clip2 > 0
+			
+			if hasAmmo then
+				-- Chance based on impact speed: higher speed = higher chance
+				-- Speed 300 = 1% chance, Speed 1000 = 10% chance
+				local dischargeChance = math.Clamp((speed - 300) / 7000, 0.01, 0.10)
+				
+				if math.random() < dischargeChance then
+					-- Fire the weapon
+					wep:PrimaryAttack()
+				end
+			end
+		end
 	end
 end)
 

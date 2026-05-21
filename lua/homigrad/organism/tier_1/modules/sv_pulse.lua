@@ -107,20 +107,27 @@ module[2] = function(owner, org, timeValue)
 	org.systolic = math.Approach(org.systolic or 120, targetSystolic, timeValue * 16)
 
     if org.bloodpressure < 50 then
-        local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
-        local damage = timeValue * ischemiaK * 0.005
-        org.brain = math.min(org.brain + damage, 1)
-        org.heart = math.min(org.heart + damage, 1)
-        org.liver = math.min(org.liver + damage * 0.5, 1)
-        org.stomach = math.min(org.stomach + damage * 0.3, 1)
-        org.intestines = math.min(org.intestines + damage * 0.3, 1)
+        -- Tranexamic acid and thiamine prevent ischemia from low blood pressure
+        local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
+        if not hasAntiIschemia then
+            local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
+            local damage = timeValue * ischemiaK * 0.005
+            org.brain = math.min(org.brain + damage, 1)
+            org.heart = math.min(org.heart + damage, 1)
+            org.liver = math.min(org.liver + damage * 0.5, 1)
+            org.stomach = math.min(org.stomach + damage * 0.3, 1)
+            org.intestines = math.min(org.intestines + damage * 0.3, 1)
+        end
     end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
 	local adrenalineStabilizer = totalAdrenaline > 0.5
+	
+	-- Tranexamic acid and thiamine accelerate ischemia regression
+	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 
 	if org.ischemia > 0 then
-		if org.ischemia > 1 and not adrenalineStabilizer then
+		if org.ischemia > 1 and not adrenalineStabilizer and not hasAntiIschemia then
 			local ischemiaK = math.Clamp((org.ischemia - 1) / 5, 0, 1)
 			local damage = timeValue * ischemiaK * 0.007
 			org.brain = math.min(org.brain + damage, 1)
@@ -131,7 +138,8 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		-- Epinephrine/adrenaline above 0.5 accelerates ischemia regression
-		local decayRate = adrenalineStabilizer and timeValue / 3 or timeValue / 10
+		-- Tranexamic acid and thiamine also accelerate ischemia regression
+		local decayRate = (adrenalineStabilizer or hasAntiIschemia) and timeValue / 2 or timeValue / 10
 		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 

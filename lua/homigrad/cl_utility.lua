@@ -266,8 +266,8 @@ players : 1 humans, 0 bots (20 max)
 			if not isVisible then dist = dist * 2 end
 
 			Suppress(dist * 25)
-			ViewPunch(AngleRand(-1,1) * dist / 100)
-			ViewPunch2(AngleRand(-1,1) * dist / 100)
+			ViewPunch(AngleRand(-1,1) * dist / 30)
+			ViewPunch2(AngleRand(-1,1) * dist / 30)
 		end)
 
 		local anguse = Angle(0,0,0)
@@ -344,8 +344,8 @@ players : 1 humans, 0 bots (20 max)
 			local ang_yaw = localpos:Dot(lply:EyeAngles():Right())
 			local ang_pitch = localpos:Dot(lply:EyeAngles():Up())
 
-			anguse[2] = -ang_yaw / (dist * 30)
-			anguse[1] = -ang_pitch / (dist * 30)
+			anguse[2] = -ang_yaw / (dist * 8)
+			anguse[1] = -ang_pitch / (dist * 8)
 
 			local badass = lply.organism and lply.organism.recoilmul or 1
 			local bulletdmg = math.max(bullet.Damage / 15,1)

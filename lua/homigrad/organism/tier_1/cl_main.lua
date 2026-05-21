@@ -917,7 +917,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		local checkingplayer = (IsValid(carryent) and carryent.organism == ply.organism and !cantcheck and checkpulsebones[carryent:GetBoneName(carryent:TranslateBoneToPhysBone(carrybone))])
 		
 		if dist < 64 * 64 and (ply == lply or checkingplayer) then
-			local vol = checkingplayer and 2 or ((pain > 60 and ply == lply) and 1 or (pulse > 200 and ((200 - 95) / 50 + 0.12 - (pulse - 200) / 1000) or pulse > 95 and (pulse - 95) / 50 + 0.12 or 0.12))
+			local hurtFactor = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
+				+ math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
+				+ math.Clamp(org.brain or 0, 0, 1) * 0.2
+			local vol = checkingplayer and 2 or math.Clamp(0.12 + hurtFactor, 0.12, 1.0)
 			
 			--ply:EmitSound("heartbeat/heartbeat_single.wav", 55, 60, vol)
 			if ent:GetVelocity():LengthSqr() < 10 then
@@ -1088,8 +1091,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1) -- 0 at 35 pulse, 1 at 70 pulse
 							local lowPulseFactor = 1 - pulseFactor -- 1 at low pulse, 0 at high pulse
 
-							-- Consistent forward push for all particles in this heartbeat
-							local baseForward = dir * 6 * forceMul
+							-- Consistent forward push for all particles in this heartbeat (0.8x distance)
+							local baseForward = dir * 6 * forceMul * 0.8
 
 							-- Oscillation increases with pulse (straighter stream wobbles more at high pulse)
 							local oscMul = pulseFactor * forceMul
@@ -1103,10 +1106,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 2.5
-								local arteriaForward = dir * 8 * arteriaForce
+								local arteriaForward = dir * 8 * arteriaForce * 0.8 -- 0.8x distance
 								local arteriaOsc = right * 28 * oscMul * arteriaForce * math.sin(CurTime() * hb * 2.5) + up * 16 * oscMul * arteriaForce * math.cos(CurTime() * hb * 2.5)
 								local arteriaSpread = right * math.Rand(-2, 2) * spreadMul + up * math.Rand(-2, 2) * spreadMul
-								hg.addBloodPart2(pos + right * math.Rand(-1, 1) + up * math.Rand(-1, 1), arteriaOsc * 0.4 + dir * 0.25 * arteriaForce + arteriaSpread, nil, 18, 18, 0.2, false, ent)
+								-- Single stream to prevent duplicate spraying
 								hg.addBloodPart(pos + right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5), arteriaForward + arteriaOsc + arteriaSpread, nil, 1, 1, true, nil, ent)
 							end
 						end

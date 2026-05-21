@@ -238,7 +238,7 @@ net.Receive("bloodsquirt", function()
 			math.sin(step * 0.3) * 3 * amt
 		)
 
-		addBloodPart(pos, dir * amt * 50 * pulse + oscillation, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+		addBloodPart(pos, dir * amt * 120 * pulse + oscillation, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
 		i = i - 1
 	end)
 	timer.Adjust(name, 0)

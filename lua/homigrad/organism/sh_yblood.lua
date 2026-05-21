@@ -1,19 +1,11 @@
 local function chekExpie(ent)
-    return IsValid(ent) and (ent:GetModel() == "models/blop/expie/expie.mdl" or ent.PlayerClassName == "expie" or ent.IsExpie) or false
+    return IsValid(ent) and (ent:GetModel() == "models/blop/expie/expie.mdl" or ent.PlayerClassName == "expie" or ent.IsExpie or ent.PlayerClassName == "furry") or false
 end
 
 local function inityblood()
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
     util.AddNetworkString("addfountain")
-
-    hook.Add("EntityTakeDamage", "Expied", function(ent, dmginfo)
-        if chekExpie(ent) then
-            ent:SetBloodColor(BLOOD_COLOR_YELLOW)
-        else
-            ent:SetBloodColor(BLOOD_COLOR_RED)
-        end
-    end)
 
     function ClearDecalToEnt(ent)
         if ent.decalshuy then
@@ -189,25 +181,7 @@ end
 end
 
 if CLIENT then
-    -- Removed BloodImpact bypass for expie to allow normal blood particle system to work
-    -- Yellow blood color is now handled in the rendering hook instead
-
-    local bloodDecals = {["Blood"] = true, ["RedBlood"] = true, ["Arterial.Blood"] = true, ["Normal.Blood"] = true}
-    local oldDecal = util.Decal
-    function util.Decal(name, start, finish, ent)
-        if chekExpie(ent) then
-            local isBlood = bloodDecals[name]
-            if not isBlood then
-                for prefix, _ in pairs(bloodDecals) do
-                    if string.StartWith(name, prefix) then isBlood = true break end
-                end
-            end
-            if isBlood and not string.StartWith(name, "Y") then
-                name = "Y" .. name
-            end
-        end
-        return oldDecal(name, start, finish, ent)
-    end
+    -- Yellow blood for expies is handled via SetBloodColor on the entity
 
     local mat_expie_drop = Material("effects/droplets/drop2")
     

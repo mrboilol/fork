@@ -701,7 +701,7 @@ function HUD_DrawDynamicIndicator()
             end
         end
 
-        if org.wounds or org.arterialwounds then
+        if org and (org.wounds or org.arterialwounds) then
             local function CheckWoundList(list)
                 if not list then return end
                 for i = 1, #list do

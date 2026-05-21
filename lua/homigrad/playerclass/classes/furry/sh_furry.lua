@@ -12,6 +12,7 @@ function CLASS.Off(self)
 
 	if SERVER then
 		self.organism.bloodtype = self.oldbloodtype or "o-"
+		self:SetBloodColor(BLOOD_COLOR_RED)
 		
 		hg.ClearArmorRestrictions(self)
 	end
@@ -91,6 +92,7 @@ function CLASS.On(self, data)
 			self.oldbloodtype = self.organism.bloodtype
 			self.organism.bloodtype = "c-"
 		end
+		self:SetBloodColor(BLOOD_COLOR_YELLOW)
 
 		local Appearance = self.CurAppearance or hg.Appearance.GetRandomAppearance()
 

@@ -96,8 +96,13 @@ function SWEP:Heal(ent, mode)
 	local org = ent.organism
 	if not org then return end
 	
-	-- Check if there are arterial wounds to heal before using tourniquet
-	if not (org.arterialwounds and #org.arterialwounds > 0) then return end
+	-- Check if there's anything to use tourniquet on (arterial wounds, regular wounds, bleeding, or limb damage)
+	local hasArterialWounds = org.arterialwounds and #org.arterialwounds > 0
+	local hasWounds = org.wounds and #org.wounds > 0
+	local hasBleeding = (tonumber(org.bleed) or 0) > 0
+	local hasLimbDamage = org.lleg == 1 or org.rleg == 1 or org.rarm == 1 or org.larm == 1
+	
+	if not (hasArterialWounds or hasWounds or hasBleeding or hasLimbDamage) then return end
 	
 	if self:Tourniquet(ent, nil) then self.modeValues[1] = 0 self:GetOwner():SelectWeapon("weapon_hands_sh") self:Remove() end
 end

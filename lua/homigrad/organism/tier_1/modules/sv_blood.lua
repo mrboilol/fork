@@ -47,6 +47,7 @@ module[1] = function(org)
 
 	org.survivalchance = 1
 	org.hemothorax = false
+	org.lastBleedTime = CurTime()
 end
 
 
@@ -107,7 +108,9 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110), 5000)
+		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
+		local regenBoost = 1 + math.Clamp(timeSinceBleed / 30, 0, 2)
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -116,7 +119,9 @@ module[2] = function(owner, org, mulTime)
 	if org.hemotransfusionshock > 0 then
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 150,0)
 		org.internalBleed = org.internalBleed + mulTime / 20
-		if not adrenalineStabilizer then
+		-- Tranexamic acid and thiamine prevent ischemia from hemotransfusion shock
+		local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
+		if not adrenalineStabilizer and not hasAntiIschemia then
 			org.ischemia = org.ischemia + mulTime / 15
 		end
 		if hg_infections:GetBool() then
@@ -133,7 +138,9 @@ module[2] = function(owner, org, mulTime)
 
 	-- Ischemia from prolonged untreated internal bleeding
 	-- 15 second grace period, then scales with duration and severity
-	if org.internalBleed > 0 and not adrenalineStabilizer then
+	-- Tranexamic acid and thiamine prevent this ischemia
+	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
+	if org.internalBleed > 0 and not adrenalineStabilizer and not hasAntiIschemia then
 		local untreatedTime = math.max((org.internalBleedDuration or 0) - 15, 0)
 		if untreatedTime > 0 then
 			local durationFactor = untreatedTime / 45
@@ -223,7 +230,9 @@ module[2] = function(owner, org, mulTime)
 	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
 
 	-- Ischemia kicks in below 2500 blood (blocked by epinephrine/adrenaline > 0.5)
-	if org.blood < 2500 and not adrenalineStabilizer then
+	-- Tranexamic acid and thiamine also prevent this ischemia
+	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
+	if org.blood < 2500 and not adrenalineStabilizer and not hasAntiIschemia then
 		org.ischemia = math.min(org.ischemia + mulTime * 0.015, 1.0)
 	end
 
@@ -260,7 +269,9 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)--в секунду
-	
+
+	if org.bleed > 0 then org.lastBleedTime = CurTime() end
+
 	local timetouncon = (org.blood - 2750) / org.bleed
 	
 	local bleeding_will_stop = (timetouncon ~= timetouncon) or ((coagulatespeed * timetouncon - org.bleed) > 0)
