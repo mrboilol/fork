@@ -189,13 +189,8 @@ end
 end
 
 if CLIENT then
-    local oldEffect = util.Effect
-    function util.Effect(name, data, ...)
-        if name == "BloodImpact" or name == "bloodspray" then
-            if chekExpie(data:GetEntity()) then return end
-        end
-        return oldEffect(name, data, ...)
-    end
+    -- Removed BloodImpact bypass for expie to allow normal blood particle system to work
+    -- Yellow blood color is now handled in the rendering hook instead
 
     local bloodDecals = {["Blood"] = true, ["RedBlood"] = true, ["Arterial.Blood"] = true, ["Normal.Blood"] = true}
     local oldDecal = util.Decal
@@ -232,7 +227,7 @@ if CLIENT then
         local pos2 = Vector()
         pos2:Set(pos)
 
-        if #hg.bloodparticles1 > 200 then table.remove(hg.bloodparticles1, 1) end
+        if #hg.bloodparticles1 > 50000 then table.remove(hg.bloodparticles1, 1) end
         
         hg.bloodparticles1[#hg.bloodparticles1 + 1] = {
             pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(),
@@ -248,7 +243,7 @@ if CLIENT then
         local pos2 = Vector()
         pos2:Set(pos)
         
-        if #hg.bloodparticles2 > 200 then table.remove(hg.bloodparticles2, 1) end
+        if #hg.bloodparticles2 > 50000 then table.remove(hg.bloodparticles2, 1) end
         hg.bloodparticles2[#hg.bloodparticles2 + 1] = {
             pos, pos2, vel, mat or cloudmat, w or 60, h or 60, CurTime() + time, time, 
             water = water, owner = owner
@@ -468,6 +463,12 @@ if CLIENT then
         local time = CurTime()
         local gravvec = Vector(0, 0, -40) * mul * (math.max(0.0, grav))
 
+        -- Cap check with FIFO deletion
+        local cap = 50000
+        while #hg.bloodparticles1 > cap do
+            table.remove(hg.bloodparticles1, 1)
+        end
+
         for i = #hg.bloodparticles1, 1, -1 do
             local part = hg.bloodparticles1[i]
             if not part then table.remove(hg.bloodparticles1, i) continue end
@@ -488,11 +489,6 @@ if CLIENT then
             
             if bit.band(util.PointContents(hitPos), CONTENTS_WATER) == CONTENTS_WATER then
                 hg.addBloodPart2(hitPos, part[3] / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, part.owner)
-                table.remove(hg.bloodparticles1, i)
-                continue
-            end
-            
-            if time - part[7] >= 30 then
                 table.remove(hg.bloodparticles1, i)
                 continue
             end

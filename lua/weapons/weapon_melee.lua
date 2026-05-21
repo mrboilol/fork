@@ -122,6 +122,7 @@ SWEP.HeavyAttackDamageType = nil -- Damage type for heavy attack (nil = use Prim
 SWEP.CanHeavyAttack = false
 local MELEE_GLOBAL_KNOCKBACK_MUL = 0.7
 local MELEE_GLOBAL_ACCURACY_MUL = 0.75
+local MELEE_GLOBAL_DAMAGE_MUL = 0.85
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")
@@ -969,6 +970,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     end
     mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
     mul = mul * (ent ~= owner and 0.75 or 1)
+    mul = mul * MELEE_GLOBAL_DAMAGE_MUL
     mul = mul * (owner.MeleeDamageMul or 1)
 
     if owner.organism.superfighter then

@@ -49,6 +49,12 @@ bloodparticles_hook[4] = function(mul)
     local time = CurTime()
     local grav = gravity:GetInt() / 30
 
+    -- Cap check with FIFO deletion
+    local cap = 50000
+    while #hg.bloodparticles2 > cap do
+        table_remove(hg.bloodparticles2, 1)
+    end
+
     for i = #hg.bloodparticles2, 1, -1 do
         local part = hg.bloodparticles2[i]
         if not part then table_remove(hg.bloodparticles2, i) continue end
@@ -66,7 +72,7 @@ bloodparticles_hook[4] = function(mul)
 
 		if radiusSqr < hitPos:LengthSqr() then table_remove(hg.bloodparticles2, i) continue end
 
-        if result.Hit or part[7] - time <= 0 then
+        if result.Hit then
             table_remove(hg.bloodparticles2, i)
             
             --util.Decal("Water.Blood", pos + result.HitNormal, pos - result.HitNormal, ents.FindInSphere(pos, 1))

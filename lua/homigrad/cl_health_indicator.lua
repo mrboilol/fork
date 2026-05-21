@@ -532,9 +532,9 @@ function HUD_DrawDynamicIndicator()
     
     local viewX, viewY
     
-    -- Position within moodles area
+    -- Position between top and moodles
     viewX = ScrW() - w - ScreenScaleFixed(20) -- Move more left so it's not right on the edge
-    viewY = ScreenScaleFixed(220) -- Position at moodle y level to fit within moodles
+    viewY = ScreenScaleFixed(100) -- Position between top and moodles for visibility
     
     -- Store indicator position and size for moodle adjustment
     HUD.dynamicIndicator = {

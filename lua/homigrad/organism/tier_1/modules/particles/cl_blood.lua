@@ -169,6 +169,13 @@ bloodparticles_hook[2] = function(mul)
 	local grav = gravity:GetInt() / 10
     local time = CurTime()
 	local gravvec = vecDown * mul * (math.max(0.0, grav))
+	
+	-- Cap check with FIFO deletion
+	local cap = 50000
+	while #hg.bloodparticles1 > cap do
+		table_remove(hg.bloodparticles1, 1)
+	end
+	
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
 		if not part then table_remove(hg.bloodparticles1, i) continue end
@@ -189,12 +196,6 @@ bloodparticles_hook[2] = function(mul)
 			hg.addBloodPart2(hitPos, part[3] / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true)
 
 			table_remove(hg.bloodparticles1, i)
-			continue
-		end
-		
-		if time - part[7] >= 90 then
-			table_remove(hg.bloodparticles1, i)
-
 			continue
 		end
 
