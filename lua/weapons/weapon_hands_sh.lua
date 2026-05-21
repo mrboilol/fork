@@ -1578,11 +1578,11 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     -- ent:EmitSound("tasty/empty.wav")
                 else
                     if ent.organism then
-                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15
+                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15 * 1.25
                     end
                 end
 
-                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1)
+                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1) * 1.25
 
                 if wep.SetLastBlocked then
                     -- wep:SetLastBlocked(CurTime()) -- Removing this to ensure block doesn't stop
@@ -2086,7 +2086,7 @@ function SWEP:AttackFront(special_attack, rand)
 	end
 
 	if SERVER then
-		owner.organism.stamina.subadd = owner.organism.stamina.subadd + 4
+		owner.organism.stamina.subadd = owner.organism.stamina.subadd + 4 * 1.25
 	end
 
 	owner:LagCompensation(false)

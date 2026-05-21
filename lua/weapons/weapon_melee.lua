@@ -1036,7 +1036,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         end
 
         if owner.organism and attacktype ~= 3 then
-            owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+            owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * math.Clamp(vellen / 200, 1, 1.25) * 1.25
         end
 
             if attacktype == 3 then
@@ -1294,11 +1294,11 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     ent:EmitSound("parry.ogg", 75)
                 else
                     if ent.organism then
-                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15 * staminaLossMul
+                        ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15 * staminaLossMul * 1.25
                     end
                 end
 
-                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1) * staminaLossMul
+                ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1) * staminaLossMul * 1.25
 
                 if not owner:IsNPC() then
                     self:PunchPlayer(owner, attacktype, -owner:GetAimVector(), selfdmg / 2)
@@ -1578,7 +1578,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * 1.25
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -1638,7 +1638,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * 1.25
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -1686,7 +1686,7 @@ function SWEP:CustomThink()
 
                 if owner.organism and owner.organism.stamina then
                     while self.HeavyChargeStaminaDrainAcc >= 1 do
-                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5)
+                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5) * 1.25
                         self.HeavyChargeStaminaDrainAcc = self.HeavyChargeStaminaDrainAcc - 1
                     end
                 else

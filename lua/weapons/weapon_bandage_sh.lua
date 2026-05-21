@@ -686,11 +686,12 @@ if SERVER then
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
-					local healedWound = math.max(biggestWound - self.modeValues[1], 0)
-					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)-- * ((owner.Profession == "doctor") and 0.33 or 1)
-					org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
+					local healAmount = math.min(2 * self.modeValues[1], biggestWound)
+					local healedWound = biggestWound - healAmount
+					local consumption = 4.5 * healAmount
+					org.bleed = math.max(org.bleed - healAmount, 0)
 					org.wounds[1][1] = healedWound
-					self.modeValues[1] = woundHeal > 0.1 and woundHeal or 0
+					self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
 					
 					if (biggestWound - healedWound) > 0.1 then
 						bandaged = true
@@ -722,13 +723,14 @@ if SERVER then
 				if self.modeValues[1] ~= 0 and #bonewounds > 0 then
 					if org.wounds[bonewounds[1]] then
 						local biggestWound = org.wounds[bonewounds[1]][1]
-						local healedWound = math.max(biggestWound - self.modeValues[1], 0)
-						local woundHeal = self.modeValues[1] - (biggestWound - healedWound)
-						org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
+						local healAmount = math.min(2 * self.modeValues[1], biggestWound)
+						local healedWound = biggestWound - healAmount
+						local consumption = 4.5 * healAmount
+						org.bleed = math.max(org.bleed - healAmount, 0)
 						org.wounds[bonewounds[1]][1] = healedWound
-						self.modeValues[1] = woundHeal
+						self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
 
-						org.pain = math.max(org.pain - (biggestWound - healedWound) / 4, 0)
+						org.pain = math.max(org.pain - healAmount / 4, 0)
 
 						if (biggestWound - healedWound) > 0.1 then
 							bandaged = true
@@ -758,54 +760,54 @@ if SERVER then
 
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
-		local amt = 25 * mul
+		local amt = 112.5 * mul
 		if org.skull >= 0.6 and self.modeValues[1] >= amt then
 			org.skull = 0.59
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.bandagedskull = true
-			org.pain = math.max(org.pain - 7, 0)
+			org.pain = math.max(org.pain - 14, 0)
 			done = true
 		end
 
 		if org.chest == 1 and self.modeValues[1] >= amt then
-			org.chest = org.chest - 0.05
+			org.chest = org.chest - 0.1
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
+			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
 		end
 
 		if org.lleg == 1 and self.modeValues[1] >= amt and !org.llegamputated then
-			org.lleg = org.lleg - 0.05
+			org.lleg = org.lleg - 0.1
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
+			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
 		end
 
 		if org.rleg == 1 and self.modeValues[1] >= amt and !org.rlegamputated then
-			org.rleg = org.rleg - 0.05
+			org.rleg = org.rleg - 0.1
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
+			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
 		end
 
 		if org.rarm == 1 and self.modeValues[1] >= amt and !org.rarmamputated then
-			org.rarm = org.rarm - 0.05
+			org.rarm = org.rarm - 0.1
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
+			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
 		end
 
 		if org.larm == 1 and self.modeValues[1] >= amt and !org.larmamputated then
-			org.larm = org.larm - 0.05
+			org.larm = org.larm - 0.1
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 7, 0)
+			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
 		end
 
 		if not done and (tonumber(org.bleed) or 0) > 0 and self.modeValues[1] > 0 then
-			local bleedHeal = math.min(tonumber(org.bleed) or 0, self.modeValues[1])
+			local bleedHeal = math.min(tonumber(org.bleed) or 0, 2 * self.modeValues[1])
 			org.bleed = math.max((tonumber(org.bleed) or 0) - bleedHeal, 0)
-			self.modeValues[1] = math.max(self.modeValues[1] - bleedHeal, 0)
+			self.modeValues[1] = math.max(self.modeValues[1] - 4.5 * bleedHeal, 0)
 			done = bleedHeal > 0
 		end
 

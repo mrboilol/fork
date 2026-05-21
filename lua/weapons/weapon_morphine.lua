@@ -47,8 +47,10 @@ SWEP.showstats = true
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
 
 function SWEP:Think()
-	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
-		self:SetHolding(math.max(self:GetHolding() - 4, 0))
+	if hg_healanims:GetBool() then
+		if self.modeValues[1] <= 0 or (not self:GetOwner():KeyDown(IN_ATTACK) and self:GetHolding() < 100) then
+			self:SetHolding(math.max(self:GetHolding() - 4, 0))
+		end
 	end
 end
 
@@ -89,9 +91,9 @@ if SERVER then
 
 		local owner = self:GetOwner()
 		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
-			self:SetHolding(math.Clamp(self:GetHolding() + 100, 0, 50))
+			self:SetHolding(math.min(self:GetHolding() + 10, 100))
 
-			--if self:GetHolding() < 100 then return end
+			if self:GetHolding() < 100 then return end
 		end
 
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
