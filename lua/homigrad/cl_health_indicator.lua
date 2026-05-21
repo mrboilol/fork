@@ -601,6 +601,7 @@ function HUD_DrawDynamicIndicator()
         local skullBoneID = healthModel:LookupBone("ValveBiped.Bip01_Head1")
         if skullBoneID then
             ScaleBoneAndChildren(healthModel, skullBoneID, Vector(1, 1, 1))
+            healthModel:SetupBones()
         end
 
         local base_col = math.max(0.2, consciousness)
@@ -687,7 +688,7 @@ function HUD_DrawDynamicIndicator()
         local hasFractureBlink = false
         local solidRedBones = {}
         local blinkingRedBones = {}
-        local bleedingBones = {}
+        local bleedingBones = {} -- key -> severity
 
         for key, state in pairs(boneStates) do
             if state.blinking then hasAmputationBlink = true end
@@ -712,7 +713,7 @@ function HUD_DrawDynamicIndicator()
                             -- Check against major bones
                             for key, data in pairs(majorBones) do
                                 if data.bone == boneName then
-                                    table.insert(bleedingBones, key)
+                                    bleedingBones[key] = (bleedingBones[key] or 0) + (wound[1] or 0)
                                 end
                             end
                         end
@@ -764,78 +765,45 @@ function HUD_DrawDynamicIndicator()
             DrawDamageBlinkState(blinkModel, val, 0, 0)
         end
 
-        if #bleedingBones > 0 then
-            -- Hide fracture models if any
-            for _, key in ipairs(solidRedBones) do
-                local boneName = majorBones[key].bone
-                local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
-            end
-            for _, key in ipairs(blinkingRedBones) do
-                local boneName = majorBones[key].bone
-                local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
-            end
-
-            for _, key in ipairs(bleedingBones) do
-                local boneName = majorBones[key].bone
-                local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
-            end
-
-            -- Calculate total bleeding severity
-            local totalBleed = 0
-            local netWounds = ply:GetNetVar("wounds", nil)
-            local netArterial = ply:GetNetVar("arterialwounds", nil)
+        -- Draw bleeding icons as sprites hovering over affected body parts
+        if next(bleedingBones) then
+            render.MaterialOverride(nil)
+            render.SetBlend(1)
+            render.SetColorModulation(1, 1, 1)
             
-            local function GetBleedSeverity(list)
-                if not list then return 0 end
-                local total = 0
-                for i = 1, #list do
-                    local wound = list[i]
-                    if type(wound) == "table" then
-                        total = total + (wound[1] or 0)
+            for key, severity in pairs(bleedingBones) do
+                local boneName = majorBones[key].bone
+                local boneID = healthModel:LookupBone(boneName)
+                if boneID then
+                    local mat = healthModel:GetBoneMatrix(boneID)
+                    if mat then
+                        local pos = mat:GetTranslation()
+                        pos = pos + Vector(0, 0, 1.5) -- hover slightly above bone
+                        
+                        local r, g, b
+                        if severity <= 0.5 then
+                            local prog = severity / 0.5
+                            r, g, b = 1, 1, 1 - prog
+                        elseif severity <= 1.0 then
+                            local prog = (severity - 0.5) / 0.5
+                            r, g, b = 1, 1 - 0.5 * prog, 0
+                        elseif severity <= 2.0 then
+                            local prog = (severity - 1.0) / 1.0
+                            r, g, b = 1, 0.5 - 0.5 * prog, 0
+                        else
+                            r, g, b = 1, 0, 0
+                        end
+                        
+                        local pulse = (math.sin(time * 5 + #key) + 1) / 2
+                        local alpha = 0.7 + pulse * 0.3
+                        
+                        render.SetMaterial(bleedIconMat)
+                        render.DrawSprite(pos, 8, 8, Color(r * 255, g * 255, b * 255, alpha * 255))
                     end
                 end
-                return total
             end
-            
-            totalBleed = GetBleedSeverity(netWounds or org.wounds) + GetBleedSeverity(netArterial or org.arterialwounds)
-            
-            -- Color based on severity: 0.5=white -> 1.0=yellow -> 2.0=orange -> 3.0+=red
-            local r, g, b
-            if totalBleed <= 0.5 then
-                local prog = totalBleed / 0.5
-                r, g, b = 1, 1, 1 - prog
-            elseif totalBleed <= 1.0 then
-                local prog = (totalBleed - 0.5) / 0.5
-                r, g, b = 1, 1 - 0.5 * prog, 0
-            elseif totalBleed <= 2.0 then
-                local prog = (totalBleed - 1.0) / 1.0
-                r, g, b = 1, 0.5 - 0.5 * prog, 0
-            else
-                r, g, b = 1, 0, 0
-            end
-
-            -- Pulse effect for bleeding
-            local val = (math.sin(time * 5) + 1) / 2
-            render.SetBlend(0.5 + val * 0.5)
-            
-            blinkModel:SetupBones()
-            render.MaterialOverride(bleedIconMat)
-            render.SetColorModulation(r, g, b)
-            
-            for _, offset in ipairs(outlineOffsets) do
-                blinkModel:SetPos(modelOffset + offset)
-                blinkModel:DrawModel()
-            end
-
-            render.SetColorModulation(r, g, b)
-            blinkModel:SetPos(modelOffset)
-            blinkModel:DrawModel()
             
             render.MaterialOverride(whiteMat)
-            render.SetBlend(1)
         end
         
         render.MaterialOverride(nil)
