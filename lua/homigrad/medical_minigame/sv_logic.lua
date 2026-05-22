@@ -378,7 +378,9 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
     local class = wep:GetClass()
     local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
     if class == "weapon_morphine" or class == "weapon_fentanyl" then
-        org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + consumedAmount, 4)
+        local mul = class == "weapon_fentanyl" and 5 or 1
+        local cap = class == "weapon_fentanyl" and 25 or 4
+        org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + consumedAmount * mul, cap)
 
         owner.injectedinto = owner.injectedinto or {}
         owner.injectedinto[org.owner] = owner.injectedinto[org.owner] or 0

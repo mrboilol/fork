@@ -306,10 +306,10 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 
 	-- Heavy collision check for neck damage transfer to skull
 	if name == "spine3" and isCrush(dmgInfo) and dmg > 0.3 and math.random() < 0.4 then
-		-- Transfer 1/3 damage to skull instead of neck (2/3x reduction)
-		local skullDmg = dmg / 3
+		-- Transfer 1/2 damage to skull instead of neck (1/2x reduction)
+		local skullDmg = dmg / 2
 		org.spine3 = oldDmg -- Reset spine3 damage
-		print("[HG Bone] Heavy collision: neck damage transferred to skull (2/3x reduced), original dmg=" .. tostring(dmg) .. " skull dmg=" .. tostring(skullDmg))
+		print("[HG Bone] Heavy collision: neck damage transferred to skull (1/2x reduced), original dmg=" .. tostring(dmg) .. " skull dmg=" .. tostring(skullDmg))
 		
 		-- Apply damage to skull
 		local skullResult, skullVec = damageBone(org, 0.25, skullDmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)

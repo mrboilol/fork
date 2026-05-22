@@ -147,9 +147,11 @@ function ENT:PhysicsCollide(data, phys)
 	end
 	if self.noStuck then return end
 
-	-- Chance-based lodging: 40% base chance to stick, plus speed factor?
-	-- For now, just a flat chance to reduce lodging frequency as requested
-	local lodgeChance = 0.4 
+	-- Chance-based lodging: scales with speed and damage
+	-- Base 50% + up to 25% from speed + up to 25% from damage
+	local speedFactor = math.Clamp((data.Speed - 100) / 900, 0, 0.25)
+	local damageFactor = math.Clamp((self.damage or 20) / 80, 0, 0.25)
+	local lodgeChance = 0.5 + speedFactor + damageFactor
 	
 	-- If it's a person/ragdoll, check chance
 	local shouldLodge = false
@@ -163,8 +165,12 @@ function ENT:PhysicsCollide(data, phys)
 			end
 		end
 	elseif data.TheirSurfaceProps != 76 then
-		local wallChance = self.wallLodgeChance
-		if wallChance == nil then wallChance = 0.7 end
+		-- Wall lodging: scales with speed and damage
+		-- Base 55% + up to 25% from speed + up to 25% from damage
+		local speedFactor = math.Clamp((data.Speed - 100) / 900, 0, 0.25)
+		local damageFactor = math.Clamp((self.damage or 20) / 80, 0, 0.25)
+		local wallChance = 0.55 + speedFactor + damageFactor
+		if self.wallLodgeChance then wallChance = self.wallLodgeChance end
 		shouldLodge = math.random() < wallChance
 		if not hitSoundPlayed then self:EmitSound(self.AttackHit, 65) end
 	end

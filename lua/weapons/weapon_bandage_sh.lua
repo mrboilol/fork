@@ -686,9 +686,9 @@ if SERVER then
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
-					local healAmount = math.min(2 * self.modeValues[1], biggestWound)
+					local healAmount = math.min(6 * self.modeValues[1], biggestWound)
 					local healedWound = biggestWound - healAmount
-					local consumption = 4.5 * healAmount
+					local consumption = 12.5 * healAmount
 					org.bleed = math.max(org.bleed - healAmount, 0)
 					org.wounds[1][1] = healedWound
 					self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
@@ -723,9 +723,9 @@ if SERVER then
 				if self.modeValues[1] ~= 0 and #bonewounds > 0 then
 					if org.wounds[bonewounds[1]] then
 						local biggestWound = org.wounds[bonewounds[1]][1]
-						local healAmount = math.min(2 * self.modeValues[1], biggestWound)
+						local healAmount = math.min(6 * self.modeValues[1], biggestWound)
 						local healedWound = biggestWound - healAmount
-						local consumption = 4.5 * healAmount
+						local consumption = 12.5 * healAmount
 						org.bleed = math.max(org.bleed - healAmount, 0)
 						org.wounds[bonewounds[1]][1] = healedWound
 						self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
@@ -805,9 +805,9 @@ if SERVER then
 		end
 
 		if not done and (tonumber(org.bleed) or 0) > 0 and self.modeValues[1] > 0 then
-			local bleedHeal = math.min(tonumber(org.bleed) or 0, 2 * self.modeValues[1])
+			local bleedHeal = math.min(tonumber(org.bleed) or 0, 6 * self.modeValues[1])
 			org.bleed = math.max((tonumber(org.bleed) or 0) - bleedHeal, 0)
-			self.modeValues[1] = math.max(self.modeValues[1] - 4.5 * bleedHeal, 0)
+			self.modeValues[1] = math.max(self.modeValues[1] - 12.5 * bleedHeal, 0)
 			done = bleedHeal > 0
 		end
 
@@ -1001,20 +1001,19 @@ if SERVER then
 			local bonewounds = {}
 			if not bone then
 				for i,wound in pairs(org.arterialwounds) do
-					if wound[7] != "arteria" then 
-						pw = i 
-						for i1,tbl in pairs(org.wounds) do
-							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
-							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
-							--print(1,bonename,sec_bonename)
-							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
-								--print(2,bonename,sec_bonename)
-								table.insert(bonewounds,i1)
-							end
+					pw = i 
+					for i1,tbl in pairs(org.wounds) do
+						if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
+						local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
+						local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
+						--print(1,bonename,sec_bonename)
+						if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
+							--print(2,bonename,sec_bonename)
+							table.insert(bonewounds,i1)
 						end
-						--PrintTable(bonewounds)
-					break end
+					end
+					--PrintTable(bonewounds)
+				break
 				end
 				
 			else

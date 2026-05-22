@@ -90,7 +90,9 @@ local function scrape_blood(self, trace, len, len_before)
 			local effect_data = EffectData()
 			
 			effect_data:SetOrigin(trace.HitPos)
-			util.Effect("BloodImpact", effect_data)
+			if not (IsValid(trace.Entity) and (trace.Entity.PlayerClassName == "expie" or trace.Entity.IsExpie or trace.Entity.PlayerClassName == "furry")) then
+				util.Effect("BloodImpact", effect_data)
+			end
 		end
 	end
 	

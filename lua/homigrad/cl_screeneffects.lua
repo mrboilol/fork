@@ -255,6 +255,7 @@ local PainLerp = 0
 local O2Lerp = 0
 local assimilatedLerp = 0
 local tempLerp = 36.6
+local headtraumaSaturation = 0
 
 local show_image_time = 0
 local show_some_images_time = 0
@@ -971,6 +972,11 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 		end
 	end
+
+	if (headtraumaSaturation or 0) > 0 then
+		tab["$pp_colour_colour"] = 1 + headtraumaSaturation
+		headtraumaSaturation = math.max(headtraumaSaturation - FrameTime() * 1.2, 0)
+	end
 end)
 
 hook.Add("Player_Death", "ItDoesntNow", function(ply)
@@ -1169,6 +1175,7 @@ net.Receive("headtrauma_flash", function()
     end
 
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
+    headtraumaSaturation = math.min(time * 0.5, 1.5)
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     else

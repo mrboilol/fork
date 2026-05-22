@@ -176,7 +176,9 @@ function SWEP:PrimaryAttack()
 	ent.dont_account_for_placement = true
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then
-		phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
+		local throwVel = ply:GetAimVector() * ent.MaxSpeed
+		local playerVel = ply:GetVelocity()
+		phys:SetVelocity(throwVel + playerVel * 0.5)
 		phys:AddAngleVelocity(Vector(0,0, -ent.MaxSpeed) )
 	end
 	ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))

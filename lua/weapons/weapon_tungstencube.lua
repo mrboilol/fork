@@ -2,7 +2,7 @@ if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_base"
 SWEP.Author = "Linnaeus"
-SWEP.Purpose = "I got bored, okay?"
+SWEP.Purpose = "Small but mighty"
 SWEP.PrintName = "Tungsten Cube"
 SWEP.Category = "Weapons - Other"
 SWEP.Spawnable = true
@@ -12,6 +12,18 @@ SWEP.AdminOnly = false
 SWEP.ViewModel = "models/linnaeus/weaps/v_tungsten.mdl"
 SWEP.WorldModel = "models/linnaeus/weaps/w_tungsten.mdl"
 SWEP.HoldType = "melee"
+
+SWEP.modelscale = 1.0
+SWEP.HoldPos = Vector(-5, 2, -2)
+SWEP.HoldAng = Angle(-10, 0, 0)
+SWEP.basebone = 94
+SWEP.weaponPos = Vector(0, 0, 0)
+SWEP.weaponAng = Angle(0, -90, 0)
+SWEP.AnimList = {
+	["idle"] = "Idle",
+	["deploy"] = "Draw",
+	["attack"] = "Throw",
+}
 
 SWEP.Primary.ClipSize = -1
 SWEP.Primary.DefaultClip = -1
@@ -53,20 +65,28 @@ function SWEP:PrimaryAttack()
     ent.damage = 100
     ent.MaxSpeed = 1500
     ent.DamageType = DMG_CLUB
-    ent.AttackHit = "Concrete.ImpactHard"
+    ent.AttackHit = "phx/hmetal" .. math.random(1, 3) .. ".wav"
     ent.AttackHitFlesh = "Flesh.ImpactHard"
     ent.noStuck = true
+    ent.modelscale = self.modelscale or 1.0
 
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
 		phys:SetMass(200)
-        phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
+        local throwVel = ply:GetAimVector() * ent.MaxSpeed
+        local playerVel = ply:GetVelocity()
+        phys:SetVelocity(throwVel + playerVel * 0.5)
         phys:AddAngleVelocity(VectorRand() * 300)
+        
+        -- Apply model scale if set
+        if ent.modelscale and ent.modelscale ~= 1.0 then
+            ent:SetModelScale(ent.modelscale, 0)
+        end
     end
 
-    ply:EmitSound("weapons/slam/throw.wav", 50, math.random(95, 105))
-    ply:ViewPunch(Angle(-5, 0, -8))
+    ply:EmitSound("weapons/slam/throw.wav", 75, math.random(95, 105))
+    ply:ViewPunch(Angle(-8, 0, -10))
     
     ply:SelectWeapon("weapon_hands_sh")
     self:Remove()

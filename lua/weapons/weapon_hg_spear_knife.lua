@@ -126,7 +126,9 @@ function SWEP:CustomAttack2()
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-        phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
+        local throwVel = ply:GetAimVector() * ent.MaxSpeed
+        local playerVel = ply:GetVelocity()
+        phys:SetVelocity(throwVel + playerVel * 0.5)
         phys:AddAngleVelocity(Vector(0,0,0))
     end
 

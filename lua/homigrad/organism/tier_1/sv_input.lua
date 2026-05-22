@@ -513,6 +513,20 @@ function hg.ExplodeHead(ent)
 		end]]
 
 		Gib_Input(ent, ent:LookupBone("ValveBiped.Bip01_Head1"))
+
+		-- Remove neck floppy constraints when head is amputated
+		if IsValid(ent) then
+			if ent.FloppyConstraints then
+				local neckCons = ent.FloppyConstraints.neck
+				if IsValid(neckCons) then neckCons:Remove() end
+				ent.FloppyConstraints.neck = nil
+			end
+			local neckBoneId = ent:LookupBone("ValveBiped.Bip01_Neck1")
+			if neckBoneId then
+				ent:ManipulateBonePosition(neckBoneId, vector_origin)
+				ent:ManipulateBoneAngles(neckBoneId, angle_zero)
+			end
+		end
 		
 		ent.organism.headamputated = true
 		ent.headexploded = true
@@ -1820,16 +1834,22 @@ function hg.BreakNeck(ent, fromDamage)
 
 		-- Lookup bones and validate
 		local headBoneName = "ValveBiped.Bip01_Head1"
-		local neckBoneName = "ValveBiped.Bip01_Neck1"
 		
 		local headBoneId = ragdoll:LookupBone(headBoneName)
-		local neckBoneId = ragdoll:LookupBone(neckBoneName)
-		print("[HG Floppy] BreakNeck timer: headBoneId=" .. tostring(headBoneId) .. " neckBoneId=" .. tostring(neckBoneId))
-		
-		if not headBoneId or not neckBoneId then
-			print("[HG Floppy] BreakNeck timer FAIL: bone lookup failed")
+		if not headBoneId then
+			print("[HG Floppy] BreakNeck timer FAIL: head bone lookup failed")
 			return
 		end
+		
+		-- Use the head's parent bone (neck/upper spine) instead of hardcoded Bip01_Neck1.
+		-- This avoids incorrect physics bone mappings on models where Neck1 maps weirdly.
+		local neckBoneId = ragdoll:GetBoneParent(headBoneId)
+		if not neckBoneId or neckBoneId == -1 then
+			print("[HG Floppy] BreakNeck timer FAIL: neck bone (parent of head) not found")
+			return
+		end
+		local neckBoneName = ragdoll:GetBoneName(neckBoneId)
+		print("[HG Floppy] BreakNeck timer: headBoneId=" .. tostring(headBoneId) .. " neckBoneId=" .. tostring(neckBoneId) .. " neckBoneName=" .. tostring(neckBoneName))
 		
 		local headPhysBone = ragdoll:TranslateBoneToPhysBone(headBoneId)
 		local neckPhysBone = ragdoll:TranslateBoneToPhysBone(neckBoneId)
@@ -1890,9 +1910,9 @@ function hg.BreakNeck(ent, fromDamage)
 
 			-- Slight offset to indicate the neck/head is out of place,
 			-- not just freely flopping around.
-			applyFloppyBoneOffset(ragdoll, "ValveBiped.Bip01_Head1",
+			applyFloppyBoneOffset(ragdoll, headBoneName,
 				Vector(0, -1, -1), Angle(-12, 0, 6), "neck")
-			applyFloppyBoneOffset(ragdoll, "ValveBiped.Bip01_Neck1",
+			applyFloppyBoneOffset(ragdoll, neckBoneName,
 				Vector(0, -0.5, -0.5), Angle(-6, 0, 3), "neck")
 
 			print("[HG Floppy] BreakNeck timer SUCCESS: neck constraint created")

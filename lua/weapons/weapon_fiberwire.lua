@@ -996,7 +996,7 @@ function SWEP:CustomThink()
             org.o2[1] = math.max(org.o2[1] - 6 * dt, 0)
         end]]
         if org.stamina and org.stamina.subadd ~= nil then
-            org.stamina.subadd = org.stamina.subadd + 6 * dt * 1.25
+            org.stamina.subadd = org.stamina.subadd + 6 * dt
         end
     end
 

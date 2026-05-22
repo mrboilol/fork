@@ -490,7 +490,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 		local selfdmg = self.DamagePrimary * 0.2
 
 		if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
-			ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math_Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math_Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1) * 1.25
+			ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math_Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math_Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1)
 
 			wep:SetLastBlocked(CurTime())
 
@@ -849,7 +849,7 @@ function SWEP:AttackFront(special_attack, rand)
 	end
 
 	if SERVER then
-		owner.organism.stamina.subadd = owner.organism.stamina.subadd + 6 * 1.25
+		owner.organism.stamina.subadd = owner.organism.stamina.subadd + 6
 	end
 
 	owner:LagCompensation(false)

@@ -9,9 +9,7 @@ for i = 1, 6 do
 end
 
 --local mat_huy = Material("sprites/mat_jack_irregularcircle")
-local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
 local mat_huy = Material("effects/blood_core")
-mat_huy:SetTexture("$basetexture",texture)
 
 local cloudmat = Material("effects/smoke_b")
 local vomitColorPrimary = Color(229, 220, 148, 140)

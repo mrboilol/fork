@@ -184,10 +184,7 @@ if CLIENT then
     -- Yellow blood for expies is handled via SetBloodColor on the entity
 
     local mat_expie_drop = Material("effects/droplets/drop2")
-    
-    local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
     local mat_huy = Material("effects/blood_core")
-    mat_huy:SetTexture("$basetexture", texture)
 
     local cloudmat = Material("effects/smoke_b")
     

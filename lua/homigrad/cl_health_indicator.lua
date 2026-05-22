@@ -702,7 +702,7 @@ function HUD_DrawDynamicIndicator()
             end
         end
 
-        if org and (org.wounds or org.arterialwounds) then
+        if IsValid(ply) then
             local function CheckWoundList(list)
                 if not list then return end
                 for i = 1, #list do
@@ -723,8 +723,8 @@ function HUD_DrawDynamicIndicator()
             
             local netWounds = ply:GetNetVar("wounds", nil)
             local netArterial = ply:GetNetVar("arterialwounds", nil)
-            CheckWoundList(netWounds or org.wounds)
-            CheckWoundList(netArterial or org.arterialwounds)
+            CheckWoundList((netWounds and #netWounds > 0) and netWounds or ply.wounds)
+            CheckWoundList((netArterial and #netArterial > 0) and netArterial or ply.arterialwounds)
         end
 
         if hasAmputationBlink then
