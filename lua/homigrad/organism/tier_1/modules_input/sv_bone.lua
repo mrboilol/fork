@@ -48,7 +48,18 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 
 	-- Track head trauma for long-term stroke risk
 	if key == "skull" then
-		org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.5, 2.0)
+		local oldHeadTrauma = org.headtrauma or 0
+		org.headtrauma = math.min(oldHeadTrauma + dmg * 1.0, 2.0)
+		-- Trigger headtrauma flash when headtrauma increases significantly
+		if oldHeadTrauma < 0.5 and org.headtrauma >= 0.5 then
+			net.Start("headtrauma_flash")
+			net.WriteVector(dmgInfo:GetDamagePosition())
+			net.WriteFloat(1.5)
+			net.WriteInt(200, 20)
+			net.WriteBool(false)
+			net.WriteBool(false)
+			net.Send(org.owner)
+		end
 	end
 
 	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8)
@@ -58,7 +69,7 @@ local huyasd = {
 	["spine1"] = "My legs- i... i cant feel my legs...",
 	["spine2"] = "I cant move my chest nor my legs, i think i broke something.",
 	["spine3"] = "I cant move at all, much less breathe...",
-	["skull"] = "My head is throbbing so bad, i think i broke something.",
+	["skull"] = "My head hurts, my head hurts... why wont it stop...",
 }
 
 local broke_arm = {
@@ -530,7 +541,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	
 	org.shock = org.shock + (dmg > 1 and 40 or dmg * 8)
 
-	if org.skull == 1 then
+	if org.skull > 0.6 and oldDmg <= 0.6 then
 		if org.isPly then
 			org.owner:Notify(huyasd["skull"],true,"skull",4)
 		end
@@ -562,7 +573,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
 
 	-- Accumulate head trauma for long-term stroke risk
-	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.3, 2.0)
+	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
 
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand
@@ -597,6 +608,27 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
 					PlayBoneBreakSound(org.owner)
+			
+			-- Chance to puncture lung when ribs break
+			local punctureChance = 0.25 + (org.brokenribs * 0.1) -- 25% base + 10% per broken rib
+			if math.random() < punctureChance then
+				local lungSide = math.random(2) == 1 and "lungsL" or "lungsR"
+				local punctureSeverity = math.Rand(0.3, 0.7)
+				org[lungSide][1] = math.min(org[lungSide][1] + punctureSeverity, 1)
+				
+				-- Chance to cause pneumothorax (collapsed lung)
+				if math.random() < 0.4 then
+					org[lungSide][2] = 1
+					org.owner:Notify("I can't breathe- my lung collapsed!", 8, "pneumothorax", 3)
+				else
+					org.owner:Notify("Something sharp pierced my lung!", 6, "lungpuncture", 3)
+				end
+				
+				-- Additional pain and shock from lung puncture
+				org.painadd = org.painadd + 30
+				org.shock = org.shock + 20
+			end
+			
 			return math.min(0, result)
 		end
 	end

@@ -68,6 +68,9 @@ local tab = {
 }
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
+local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only", 0, 4)
+local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=altpain.ogg no shake, 4=itsallcomingtoanend only", 0, 4)
+local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg", 0, 1)
 local hook_Run = hook.Run
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
@@ -335,6 +338,26 @@ local function stopthings()
 		RealityStation = nil
 	end
 
+	if IsValid(AgonyStation) then
+		AgonyStation:Stop()
+		AgonyStation = nil
+	end
+
+	if IsValid(AltpainStation) then
+		AltpainStation:Stop()
+		AltpainStation = nil
+	end
+
+	if IsValid(DyingStation) then
+		DyingStation:Stop()
+		DyingStation = nil
+	end
+
+	if IsValid(AltotrubStation) then
+		AltotrubStation:Stop()
+		AltotrubStation = nil
+	end
+
 	if IsValid(EndStation) then
 		EndStation:Stop()
 		EndStation = nil
@@ -489,6 +512,8 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		//ViewPunch2(Angle(-amt * 1, amt2 * 1,0))
 	end
 	
+	local painMode = hg_painsound:GetInt()
+
 	if !IsValid(PainStation) or PainStation:GetState() != GMOD_CHANNEL_PLAYING then
 		sound.PlayFile("sound/zbattle/pain_beat.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -508,6 +533,54 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				RealityStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(AgonyStation) or AgonyStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/agony.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				AgonyStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(AltpainStation) or AltpainStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/altpain.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				AltpainStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(DyingStation) or DyingStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/dying.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				DyingStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(AltotrubStation) or AltotrubStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/altotrub.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				AltotrubStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -706,11 +779,78 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 		
 		//if pain > 10 then
-			if IsValid(PainStation) then
-				PainStation:SetVolume(math.Clamp(math.Remap(pain, 0, 120, 0, 2), 0, 2))
-			end
-			if IsValid(RealityStation) then
-				RealityStation:SetVolume(math.Clamp(math.Remap(pain, 0, 120, 0, 2), 0, 2))
+			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 2), 0, 2)
+
+			if painMode == 0 then
+				-- Default: both pain_beat and reality play
+				if IsValid(PainStation) then
+					PainStation:SetVolume(painVol)
+				end
+				if IsValid(RealityStation) then
+					RealityStation:SetVolume(painVol)
+				end
+				if IsValid(AgonyStation) then
+					AgonyStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+			elseif painMode == 1 then
+				-- Only pain_beat at same volume as reality.mp3
+				if IsValid(PainStation) then
+					PainStation:SetVolume(painVol)
+				end
+				if IsValid(RealityStation) then
+					RealityStation:SetVolume(0)
+				end
+				if IsValid(AgonyStation) then
+					AgonyStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+			elseif painMode == 2 then
+				-- Only agony.mp3 instead of reality or painbeat
+				if IsValid(PainStation) then
+					PainStation:SetVolume(0)
+				end
+				if IsValid(RealityStation) then
+					RealityStation:SetVolume(0)
+				end
+				if IsValid(AgonyStation) then
+					AgonyStation:SetVolume(painVol)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+			elseif painMode == 3 then
+				-- Only altpain.ogg instead of reality or painbeat
+				if IsValid(PainStation) then
+					PainStation:SetVolume(0)
+				end
+				if IsValid(RealityStation) then
+					RealityStation:SetVolume(0)
+				end
+				if IsValid(AgonyStation) then
+					AgonyStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(painVol)
+				end
+			elseif painMode == 4 then
+				-- Only reality.mp3
+				if IsValid(PainStation) then
+					PainStation:SetVolume(0)
+				end
+				if IsValid(RealityStation) then
+					RealityStation:SetVolume(painVol)
+				end
+				if IsValid(AgonyStation) then
+					AgonyStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
 			end
 		//else
 		//	if IsValid(PainStation) then
@@ -828,6 +968,8 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		render.DrawScreenQuad()
 		
 		if o2 > 50 and !org.otrub then
+			local dyingMode = hg_dyingsound:GetInt()
+
 			if !IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING then
 				sound.PlayFile("sound/zbattle/conscioustypebeat.ogg", "noblock noplay", function(station)
 					if IsValid(station) then
@@ -851,15 +993,80 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 					end
 				end)
 			end
-			
+
 			local consciousVol = math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 0.25)
 			hg.consciousBeatIntensity = consciousVol
-			
-			if IsValid(NoiseStation2) then
-				NoiseStation2:SetVolume(consciousVol)
-			end
-			if IsValid(EndStation) then
-				EndStation:SetVolume(consciousVol)
+
+			if dyingMode == 0 then
+				-- Default: both conscioustypebeat and itsallcomingtoanend play
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(consciousVol)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(consciousVol)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+			elseif dyingMode == 1 then
+				-- Only conscioustypebeat at same volume as itsallcomingtoanend
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(consciousVol)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+			elseif dyingMode == 2 then
+				-- Only dying.ogg, no screen shake
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(consciousVol)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+			elseif dyingMode == 3 then
+				-- Only altpain.ogg, no screen shake
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(consciousVol)
+				end
+			elseif dyingMode == 4 then
+				-- Only itsallcomingtoanend, no screen shake
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(consciousVol)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
 			end
 		else
 			hg.consciousBeatIntensity = 0
@@ -869,9 +1076,17 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			if IsValid(EndStation) then
 				EndStation:SetVolume(0)
 			end
+			if IsValid(DyingStation) then
+				DyingStation:SetVolume(0)
+			end
+			if IsValid(AltpainStation) then
+				AltpainStation:SetVolume(0)
+			end
 		end
 		
 		if o2 > 20 and org.otrub then
+			local otrubMode = hg_otrubsound:GetInt()
+
 			if !IsValid(NoiseStation) or NoiseStation:GetState() != GMOD_CHANNEL_PLAYING then
 				sound.PlayFile("sound/zbattle/unconscious_type_beat.ogg", "noblock noplay", function(station)
 					if IsValid(station) then
@@ -884,12 +1099,43 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
-			if IsValid(NoiseStation) then
-				NoiseStation:SetVolume(math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1))
+			if !IsValid(AltotrubStation) or AltotrubStation:GetState() != GMOD_CHANNEL_PLAYING then
+				sound.PlayFile("sound/altotrub.ogg", "noblock noplay", function(station)
+					if IsValid(station) then
+						station:SetVolume(0)
+						station:Play()
+						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
+						AltotrubStation = station
+						station:EnableLooping(true)
+					end
+				end)
+			end
+
+			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
+
+			if otrubMode == 0 then
+				-- Default: unconscious_type_beat
+				if IsValid(NoiseStation) then
+					NoiseStation:SetVolume(otrubVol)
+				end
+				if IsValid(AltotrubStation) then
+					AltotrubStation:SetVolume(0)
+				end
+			elseif otrubMode == 1 then
+				-- Use altotrub.ogg instead
+				if IsValid(NoiseStation) then
+					NoiseStation:SetVolume(0)
+				end
+				if IsValid(AltotrubStation) then
+					AltotrubStation:SetVolume(otrubVol)
+				end
 			end
 		else
 			if IsValid(NoiseStation) then
 				NoiseStation:SetVolume(0)
+			end
+			if IsValid(AltotrubStation) then
+				AltotrubStation:SetVolume(0)
 			end
 		end
 	else
@@ -1076,18 +1322,22 @@ end)
 
 local function GetConsciousBeatPulse()
 	if not IsValid(lply) or not lply:Alive() then return 0 end
-	
+
+	local dyingMode = hg_dyingsound:GetInt()
+	-- Disable screen shake for modes 2, 3, and 4
+	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 then return 0 end
+
 	local intensity = hg.consciousBeatIntensity or 0
 	if intensity <= 0.01 then return 0 end
-	
+
 	-- Only trigger the pulse if the sound is actually playing and hasn't been stopped
 	if not IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING or NoiseStation2:GetVolume() <= 0.01 then return 0 end
-	
+
 	local time = NoiseStation2:GetTime()
-	
+
 	local phase = time % 1.85
 	local pulse = math.exp(-phase * 5) -- sharp spike that quickly fades
-	
+
 	return pulse * intensity
 end
 
@@ -1175,7 +1425,7 @@ net.Receive("headtrauma_flash", function()
     end
 
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
-    headtraumaSaturation = math.min(time * 0.5, 1.5)
+    headtraumaSaturation = math.min(time * 1.0, 2.5)
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     else

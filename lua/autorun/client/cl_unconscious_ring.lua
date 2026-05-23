@@ -457,7 +457,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 lastHeartBeat = currentHeartBeat
 
                 local vol = GetHeartbeatVolume(org)
-                sound.PlayFile("sound/heartbeat/heartbeat_single.wav", "noblock noplay", function(station) if IsValid(station) then station:SetVolume(vol) station:Play() end end)
+                local hasHealthHUD = (className == "Gordon" or className == "Combine" or className == "furry")
+                local soundFile = (abnormalPulse and hasHealthHUD) and "sound/healthbeat.ogg" or "sound/heartbeat/heartbeat_single.wav"
+                sound.PlayFile(soundFile, "noblock noplay", function(station) if IsValid(station) then station:SetVolume(vol) station:Play() end end)
             end
         end
     end

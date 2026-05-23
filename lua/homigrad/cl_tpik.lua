@@ -695,8 +695,10 @@ local function applyInjuryTPIK(ent, ply)
 	local motion = can and injuryTpikMotion(state, ent, owner)
 	local wep = IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon()
 	local reducedForWeapon = false
+	local isPistol = false
 	if IsValid(wep) then
 		reducedForWeapon = wep.Base == "weapon_base" or wep.Base == "weapon_melee" or wep.Base == "homigrad_base" or wep:GetClass() == "weapon_melee" or wep.ismelee or wep.supportTPIK
+		isPistol = wep.IsPistolHoldType and wep:IsPistolHoldType()
 	end
 	local active = false
 
@@ -723,8 +725,9 @@ local function applyInjuryTPIK(ent, ply)
 	-- Increased motion multiplier for more pronounced flopping when moving
 	local motionMul = 0.68 + state.motion * 0.38
 	local holdMulLeg = reducedForWeapon and 0.28 or 1
-	local holdMulArm = reducedForWeapon and 0.09 or 1
-	local holdOffArm = reducedForWeapon and 0.45 or 1
+	-- Increase arm sway when holding pistol (one-handed) to follow arm movement
+	local holdMulArm = (reducedForWeapon and not isPistol) and 0.09 or (isPistol and 1.5 or 1)
+	local holdOffArm = (reducedForWeapon and not isPistol) and 0.45 or (isPistol and 1.2 or 1)
 
 	for i = 1, #injuryTpikBones do
 		local limb = injuryTpikBones[i][1]

@@ -922,11 +922,15 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				+ math.Clamp(org.brain or 0, 0, 1) * 0.2
 			local vol = checkingplayer and 2 or math.Clamp(0.12 + hurtFactor, 0.12, 1.0)
 			
+			local abnormalPulse = (pulse < 40 and pulse >= 1) or pulse > 100
+			local hasHealthHUD = (ply.PlayerClassName == "Gordon" or ply.PlayerClassName == "Combine" or ply.PlayerClassName == "furry")
+			local soundFile = (abnormalPulse and hasHealthHUD) and "healthbeat.ogg" or "heartbeat/heartbeat_single.wav"
+			
 			--ply:EmitSound("heartbeat/heartbeat_single.wav", 55, 60, vol)
 			if ent:GetVelocity():LengthSqr() < 10 then
-				sound.Play("heartbeat/heartbeat_single.wav", ply:EyePos(), 55, 60, vol)
+				sound.Play(soundFile, ply:EyePos(), 55, 60, vol)
 			else
-				EmitSound("heartbeat/heartbeat_single.wav", ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
+				EmitSound(soundFile, ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
 			end
 		end
 	end

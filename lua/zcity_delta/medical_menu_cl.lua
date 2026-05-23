@@ -1,4 +1,4 @@
-if SERVER then return end
+--[[if SERVER then return end
 
 local function GetMedicalTarget()
     local ply = LocalPlayer()
@@ -70,4 +70,4 @@ hook.Add("radialOptions", "zcity_delta_medical_amputation", function()
         end,
         [2] = "Medical"
     }
-end)
+end)]]

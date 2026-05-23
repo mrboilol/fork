@@ -923,7 +923,7 @@ local tooltipTexts = {
 			[1] = {title = "Chest Pains", text = "You better hope its nothing bad."},
 			[2] = {title = "Broken Ribs", text = "Definitively, a rib broke. You should pray it never pokes your lungs."},
 			[3] = {title = "Penetrating Injury", text = "This one totally poked a lung, you can barely breathe without paining."},
-			[4] = {title = "Crushed ribs", text = "All of them are gone, hope you dont have any enemies."}
+			[4] = {title = "Crushed ribs", text = "All of them are gone, leaving your chest soft and squishy."}
 		},
 		encumbered = {
 			[1] = {title = "Weighted", text = "Nothing bad, but lay off those burgers."},
@@ -1396,9 +1396,9 @@ local function draw_status_effects()
 				currentEffectNames["fracture"] = true
 			end
 			
+			-- General dislocation moodle for limbs only (jaw handled separately)
 			if org.llegdislocation or org.rlegdislocation or 
-			   org.larmdislocation or org.rarmdislocation or 
-			   org.jawdislocation then
+			   org.larmdislocation or org.rarmdislocation then
 				table.insert(effects, {name = "dislocation", priority = 5})
 				currentEffectNames["dislocation"] = true
 			end
@@ -1519,15 +1519,6 @@ local function draw_status_effects()
 				currentEffectNames["encumbered"] = true
 			end
 
-				if org.jawdislocation then
-					table.insert(effects, {
-						name = "dislocated_jaw",
-						priority = 8,
-						value = nil
-					})
-					currentEffectNames["dislocated_jaw"] = true
-				end
-
 				local chest_val = getOrgVal(org, "chest", 0)
 				if chest_val > 0.3 then
 					local level_num = 1
@@ -1605,6 +1596,53 @@ local function draw_status_effects()
 						value = math_floor(concussion_val * 100)
 					})
 					currentEffectNames["concussion"] = true
+				end
+
+				local skull_val = smooth.skull or getOrgVal(org, "skull", 0)
+				local jaw_val = smooth.jaw or getOrgVal(org, "jaw", 0)
+				local jaw_dislocated = org.jawdislocation
+				
+				-- Unified dislocated_jaw moodle handling all skull/jaw states
+				if skull_val > 0.6 and (jaw_val > 0.6 or jaw_dislocated) then
+					-- Level 4: Disfigured (both skull and jaw damaged)
+					table.insert(effects, {
+						name = "dislocated_jaw",
+						level_num = 4,
+						has_levels = true,
+						priority = 0.79,
+						value = math_floor(skull_val * 100)
+					})
+					currentEffectNames["dislocated_jaw"] = true
+				elseif skull_val > 0.6 then
+					-- Level 3: Broken Skull (only skull broken)
+					table.insert(effects, {
+						name = "dislocated_jaw",
+						level_num = 3,
+						has_levels = true,
+						priority = 0.78,
+						value = math_floor(skull_val * 100)
+					})
+					currentEffectNames["dislocated_jaw"] = true
+				elseif jaw_val > 0.6 then
+					-- Level 2: Broken Jaw (only jaw broken)
+					table.insert(effects, {
+						name = "dislocated_jaw",
+						level_num = 2,
+						has_levels = true,
+						priority = 0.77,
+						value = math_floor(jaw_val * 100)
+					})
+					currentEffectNames["dislocated_jaw"] = true
+				elseif jaw_dislocated then
+					-- Level 1: Dislocated Jaw (jaw dislocated but not broken)
+					table.insert(effects, {
+						name = "dislocated_jaw",
+						level_num = 1,
+						has_levels = true,
+						priority = 0.76,
+						value = nil
+					})
+					currentEffectNames["dislocated_jaw"] = true
 				end
 
 				local ischemia_val = smooth.ischemia or getOrgVal(org, "ischemia", 0)
@@ -1770,9 +1808,9 @@ local function draw_status_effects()
 				currentEffectNames["organ_damage"] = true
 			end
 			
+			-- General dislocation moodle for limbs only (jaw handled separately)
 			if org.llegdislocation or org.rlegdislocation or 
-			   org.larmdislocation or org.rarmdislocation or 
-			   org.jawdislocation then
+			   org.larmdislocation or org.rarmdislocation then
 				table.insert(effects, {name = "dislocation", priority = 5})
 				currentEffectNames["dislocation"] = true
 			end

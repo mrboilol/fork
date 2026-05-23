@@ -1707,8 +1707,8 @@ local function velocityDamage(ent, data)
 		hook.Run("Org Think Call", ply, org)
 		
 if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
-			if org.skull == 1 then
-				//ent:SetNWString("PlayerName", "Unidentifiable person")
+			if org.skull >= 0.6 and org.jaw == 1 then
+				ent:SetNWString("PlayerName", "disfigured nigga")
 			end
 			
 			ply:ScreenFade(0, color_black, 1, 1)

@@ -51,6 +51,9 @@ hg.AddOptionPanel( "hg_weaponshotblur_mul", "slider", {desc = "Multiplicates the
 -- hg.AddOptionPanel( "hg_bulletholes", "slider", {desc = "Amount of bullet hole effects (Rainbow Six Siege-like)",min = 0,max = 500,decimals = 0}, "optimization" )
 hg.AddOptionPanel( "hg_maxsmoketrails", "slider", {desc = "Max amount of smoke trail effects (lags after 10)",min = 0,max = 30,decimals = 0}, "optimization" )
 hg.AddOptionPanel( "hg_optimise_scopes", "slider", {desc = "Enable this if scoping makes your fps cry (1 - lowers quality of props around you, 2 - \"disables\" main render)",min = 0,max = 2,decimals = 0}, "optimization" )
+hg.AddOptionPanel( "hg_painsound", "slider", {desc = "What sound to play when paining: 0=default, 1=no creepy sound thing, 2=scav prototype, 3=pixelated sound, 4=scary sound only",min = 0,max = 4,decimals = 0}, "other" )
+hg.AddOptionPanel( "hg_dyingsound", "slider", {desc = "What sound to play when dying: 0=default, 1=no creepy sound thing, 2=scav prototype, 3=pixelated sound, 4=scary sound only",min = 0,max = 4,decimals = 0}, "other" )
+hg.AddOptionPanel( "hg_otrubsound", "slider", {desc = "What sound to play when unconscious and dying: 0=default, 1=pixelated sound",min = 0,max = 1,decimals = 0}, "other" )
 
 local red = Color(75,25,25)
 local redselected = Color(150,0,0)
