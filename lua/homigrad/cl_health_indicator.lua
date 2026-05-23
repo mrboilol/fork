@@ -27,6 +27,17 @@ local lastKnownFacingAngle = 0
 local fadingBones = {} -- Track bones that are fading out after being healed
 local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
+local expieModels = {
+    ["models/blop/expie/expie.mdl"] = true,
+    ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
+    ["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
+}
+
+local function IsExpie(ent)
+    if not IsValid(ent) then return false end
+    return expieModels[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or false
+end
+
 local majorBones = {
     pelvis = { organ = "stomach", bone = "ValveBiped.Bip01_Pelvis" },
     spine1 = { organ = "spine", bone = "ValveBiped.Bip01_Spine1" },
@@ -396,7 +407,7 @@ function HUD_DrawDynamicIndicator()
 
             local boneName = data.bone
             local isAmputated = data.canAmputate and org[organName .. "amputated"]
-            local isBroken = (GetOrgValueNumber(org[organName]) >= 1)
+            local isBroken = (organName == "skull" and GetOrgValueNumber(org[organName]) >= 0.6) or (GetOrgValueNumber(org[organName]) >= 1)
             local isDislocated = org[organName .. "dislocation"]
 
             -- SPINE DAMAGE CASCADING: Apply spine damage to limbs
@@ -597,7 +608,7 @@ function HUD_DrawDynamicIndicator()
 
         healthModel:SetupBones()
 
-        -- Ensure skull (head) is always visible
+        -- Ensure skull (head) is always visible for everyone
         local skullBoneID = healthModel:LookupBone("ValveBiped.Bip01_Head1")
         if skullBoneID then
             ScaleBoneAndChildren(healthModel, skullBoneID, Vector(1, 1, 1))
@@ -707,7 +718,7 @@ function HUD_DrawDynamicIndicator()
                 if not list then return end
                 for i = 1, #list do
                     local wound = list[i]
-                    if type(wound) == "table" and (wound[1] or 0) > 0.01 then
+                    if type(wound) == "table" and (wound[1] or 0) > 0.001 then
                         local boneName = wound[4]
                         if type(boneName) == "string" then
                             -- Check against major bones

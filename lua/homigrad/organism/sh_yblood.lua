@@ -1,5 +1,12 @@
+local expieModels = {
+    ["models/blop/expie/expie.mdl"] = true,
+    ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
+    ["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
+}
+
 local function chekExpie(ent)
-    return IsValid(ent) and (ent:GetModel() == "models/blop/expie/expie.mdl" or ent.PlayerClassName == "expie" or ent.IsExpie or ent.PlayerClassName == "furry") or false
+    if not IsValid(ent) then return false end
+    return expieModels[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or ent.PlayerClassName == "furry" or false
 end
 
 local function inityblood()

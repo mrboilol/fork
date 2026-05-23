@@ -709,6 +709,17 @@ players : 1 humans, 0 bots (20 max)
 
 		local cachedLerp = Lerp
 
+		local expieModels = {
+			["models/blop/expie/expie.mdl"] = true,
+			["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
+			["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
+		}
+
+		local function IsExpie(ent)
+			if not IsValid(ent) then return false end
+			return expieModels[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or false
+		end
+
 		local function mouthmove(ply)
 			ply:SetVoiceVolumeScale(!hg.muteall and (!hg.mutespect or ply:Alive()) and (hg.playerInfo[ply:SteamID()] and hg.playerInfo[ply:SteamID()][2] or 1) or 0)
 
@@ -738,8 +749,18 @@ players : 1 humans, 0 bots (20 max)
 			local weight = (ply:IsSpeaking() and math.Clamp( ply:VoiceVolume() * 5, 0, 2 )) or 0
 
 			for k = 1, #flexes do
-				v = flexes[ k ]
-				ent:SetFlexWeight( v, weight )
+				local v = flexes[ k ]
+				if v and v ~= -1 then
+					ent:SetFlexWeight( v, weight )
+				end
+			end
+
+			-- Expie mouth flex fallback
+			if IsExpie(ent) then
+				local mouthOpen = ent:GetFlexIDByName("Mouth_open")
+				if mouthOpen and mouthOpen ~= -1 then
+					ent:SetFlexWeight(mouthOpen, weight)
+				end
 			end
 
 			local org = ent.organism
@@ -765,16 +786,19 @@ players : 1 humans, 0 bots (20 max)
 				ent.Blinking = 1
 			end
 			
-			if ent:GetFlexIDByName("blink") then
-				ent:SetFlexWeight(ent:GetFlexIDByName("blink"), ent.Blinking or 0)
+			local blinkId = ent:GetFlexIDByName("blink")
+			if blinkId and blinkId ~= -1 then
+				ent:SetFlexWeight(blinkId, ent.Blinking or 0)
 			end
 
-			if ent:GetFlexIDByName("wrinkler") then
-				ent:SetFlexWeight(ent:GetFlexIDByName("wrinkler"), ent.Blinking or 0)
+			local wrinklerId = ent:GetFlexIDByName("wrinkler")
+			if wrinklerId and wrinklerId ~= -1 then
+				ent:SetFlexWeight(wrinklerId, ent.Blinking or 0)
 			end
 
-			if ent:GetFlexIDByName("half_closed") then
-				ent:SetFlexWeight(ent:GetFlexIDByName("half_closed"), ent.Blinking or 0)
+			local halfClosedId = ent:GetFlexIDByName("half_closed")
+			if halfClosedId and halfClosedId ~= -1 then
+				ent:SetFlexWeight(halfClosedId, ent.Blinking or 0)
 			end
 		end
 
