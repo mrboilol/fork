@@ -34,16 +34,25 @@ local lerpShock = 0
 local lerpConsciousness = 0
 local peakShock = 40
 local dotBeat = 0
-local flatlinePlayed = false
-local flatlineSound
 
 local ecgAlpha = 0
 local ecgAlphaPulseCheck = 0
 local lastHeartBeat = 0
-local beatSound = nil
-local critSound = nil
-local asystoleSound = nil
 local heartPhase = 0
+
+-- Better sound system from oldring
+local SOUND_HEART = "hg_unconscious/heartthump-heavy.ogg"
+local SOUND_FLATLINE = "hg_unconscious/flatline.ogg"
+
+local lastPhaseMod = 0
+local wasUnconsciousState = false
+local flatlinePlayedThisUnconscious = false
+local soundGen = 0
+local heartStations = {}
+local heartStationsLoading = false
+local heartStationNext = 1
+local flatlineStation = nil
+local flatlineLoading = false
 
 local nearDeathClasses = {
     ["furry"] = true,
@@ -57,6 +66,159 @@ local function GetHeartbeatVolume(org)
          + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
          + math.Clamp(org.brain or 0, 0, 1) * 0.2
     return math.Clamp(0.2 + hurt, 0.2, 1.0)
+end
+
+-- Phase crossing detection from oldring
+local function PhaseCrossed(prev, curr, threshold)
+    if prev <= curr then
+        return prev < threshold and curr >= threshold
+    end
+    return prev < threshold or curr >= threshold
+end
+
+-- Audio reset function from oldring
+local function ResetRingAudio()
+    soundGen = soundGen + 1
+    wasUnconsciousState = false
+    flatlinePlayedThisUnconscious = false
+
+    for i = 1, #heartStations do
+        local st = heartStations[i]
+        if IsValid(st) then
+            st:Stop()
+        end
+    end
+
+    heartStations = {}
+    heartStationsLoading = false
+    heartStationNext = 1
+
+    if IsValid(flatlineStation) then
+        flatlineStation:Stop()
+    end
+    flatlineStation = nil
+    flatlineLoading = false
+end
+
+-- Ensure heart sound stations are loaded (pooling)
+local function EnsureHeartStations()
+    if heartStationsLoading or (#heartStations > 0) then return end
+    heartStationsLoading = true
+
+    local gen = soundGen
+    local filePath = "sound/" .. SOUND_HEART
+
+    for i = 1, 4 do
+        sound.PlayFile(filePath, "noblock noplay", function(station)
+            if gen ~= soundGen then
+                if IsValid(station) then station:Stop() end
+                return
+            end
+            if IsValid(station) then
+                station:SetVolume(0)
+                heartStations[i] = station
+            end
+            if i == 4 then
+                heartStationsLoading = false
+            end
+        end)
+    end
+end
+
+-- Ensure flatline sound station is loaded
+local function EnsureFlatlineStation()
+    if flatlineLoading or IsValid(flatlineStation) then return end
+    flatlineLoading = true
+
+    local gen = soundGen
+    local filePath = "sound/" .. SOUND_FLATLINE
+
+    sound.PlayFile(filePath, "noblock noplay", function(station)
+        flatlineLoading = false
+        if gen ~= soundGen then
+            if IsValid(station) then station:Stop() end
+            return
+        end
+        if IsValid(station) then
+            station:SetVolume(0)
+            flatlineStation = station
+        end
+    end)
+end
+
+-- Play a sound station with volume
+local function PlayStation(station, volume)
+    if not IsValid(station) then return end
+    station:SetTime(0)
+    station:SetVolume(math.Clamp(volume or 1, 0, 1))
+    station:Play()
+end
+
+-- Emit ring sound with station pooling from oldring
+local function EmitRingSound(soundPath, volume)
+    if hg_unconsciousclassic:GetBool() then return end
+    if soundPath == SOUND_HEART then
+        EnsureHeartStations()
+
+        local st = heartStations[heartStationNext]
+        heartStationNext = (heartStationNext % 4) + 1
+
+        if IsValid(st) then
+            PlayStation(st, volume)
+        else
+            sound.PlayFile("sound/" .. soundPath, "noblock noplay", function(station)
+                if IsValid(station) then
+                    PlayStation(station, volume)
+                end
+            end)
+        end
+    elseif soundPath == SOUND_FLATLINE then
+        EnsureFlatlineStation()
+
+        if IsValid(flatlineStation) then
+            PlayStation(flatlineStation, volume)
+        else
+            sound.PlayFile("sound/" .. soundPath, "noblock noplay", function(station)
+                if IsValid(station) then
+                    PlayStation(station, volume)
+                end
+            end)
+        end
+    else
+        sound.PlayFile("sound/" .. soundPath, "noblock noplay", function(station)
+            if IsValid(station) then
+                PlayStation(station, volume)
+            end
+        end)
+    end
+end
+
+-- Update ring audio with phase-based triggering from oldring
+local function UpdateRingAudio(pulse, ringAlpha, org)
+    if pulse < 1 or ringAlpha <= 0 then return end
+
+    local prev = lastPhaseMod
+    local curr = (lastPhaseMod + FrameTime() * (pulse / 60)) % 1
+    lastPhaseMod = curr
+
+    local beatVolume = math.Clamp(0.35 * ringAlpha, 0, 1)
+    if PhaseCrossed(prev, curr, 0.239) then
+        -- Use heartthump for abnormal heart rates or high stress, normal heartbeat otherwise
+        local abnormalPulse = (pulse < 40 and pulse >= 1) or pulse > 100
+        local highStress = false
+        if org then
+            local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
+                 + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
+                 + math.Clamp(org.brain or 0, 0, 1) * 0.2
+            highStress = hurt > 0.3
+        end
+
+        if abnormalPulse or highStress then
+            EmitRingSound(SOUND_HEART, beatVolume)
+        else
+            EmitRingSound("sound/heartbeat/heartbeat_single.wav", beatVolume)
+        end
+    end
 end
 
 local alertPlayed = false
@@ -202,6 +364,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not hg_unconsciousring:GetBool() then
         ringAlpha = 0
         peakShock = 40
+        lastPhaseMod = 0
+        ResetRingAudio()
         return
     end
 
@@ -209,6 +373,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not IsValid(ply) or not ply:Alive() then 
         ringAlpha = 0
         peakShock = 40
+        lastPhaseMod = 0
+        ResetRingAudio()
         return 
     end
     
@@ -216,6 +382,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not org then 
         ringAlpha = 0
         peakShock = 40
+        lastPhaseMod = 0
+        ResetRingAudio()
         return 
     end
     
@@ -264,6 +432,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
     if isUnconscious then
+        if not wasUnconsciousState then
+            flatlinePlayedThisUnconscious = false
+        end
+
         local currentShock = org.shock or 0
         if currentShock > peakShock then
             peakShock = currentShock
@@ -271,13 +443,17 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         ringAlpha = Lerp(FrameTime() * 4, ringAlpha, 1)
         dotBeat = math.floor(CurTime()) % 3
     else
+        flatlinePlayedThisUnconscious = false
         ringAlpha = Lerp(FrameTime() * 6, ringAlpha, 0)
         if ringAlpha <= 0.01 then
             ringAlpha = 0
             peakShock = 40
             centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+            lastPhaseMod = 0
+            ResetRingAudio()
         end
     end
+    wasUnconsciousState = isUnconscious
     
     local showTopLeftECG = false
     local showPulseCheckECG = false
@@ -333,6 +509,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
         
         if hg_unconsciousclassic:GetBool() then
+            lastPhaseMod = 0
+            flatlinePlayedThisUnconscious = false
             local beat = dotBeat
             local dotText = ""
 
@@ -346,6 +524,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             
             draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         else
+            local isFlatline = heartbeat < 1
+            if isFlatline and not flatlinePlayedThisUnconscious and ringAlpha > 0 then
+                EmitRingSound(SOUND_FLATLINE, math.Clamp(0.8 * ringAlpha, 0, 1))
+                flatlinePlayedThisUnconscious = true
+            end
+            UpdateRingAudio(heartbeat, ringAlpha, org)
             DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, dotColor, ringAlpha)
         end
     end
@@ -386,10 +570,16 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     local dynamicRate = math.max(target_heartbeat, 1)
                     g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
                     if target_heartbeat < 1 then
-                        sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(s) if IsValid(s) then s:Play() end end)
+                        EmitRingSound(SOUND_FLATLINE, 0.8)
                     else
                         local vol = GetHeartbeatVolume(target_org)
-                        sound.PlayFile("sound/heartbeat/heartbeat_single.wav", "noblock noplay", function(s) if IsValid(s) then s:SetVolume(vol) s:Play() end end)
+                        local abnormalPulse = (target_heartbeat < 40 and target_heartbeat >= 1) or target_heartbeat > 100
+                        local highStress = vol > 0.5
+                        if abnormalPulse or highStress then
+                            EmitRingSound(SOUND_HEART, vol)
+                        else
+                            EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
+                        end
                     end
                 end
             end
@@ -437,29 +627,36 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     if heartbeat < 1 then
-        if not IsValid(asystoleSound) then
-            sound.PlayFile("sound/health/gg.ogg", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:Play()
-                    asystoleSound = station
-                end
-            end)
+        -- Only play global flatline sound when NOT in unconscious ring EKG mode (ring handles it)
+        if not (isUnconscious and ringAlpha > 0.01 and not hg_unconsciousclassic:GetBool()) then
+            if not IsValid(flatlineStation) then
+                EnsureFlatlineStation()
+            end
+            if IsValid(flatlineStation) and not flatlineStation:IsPlaying() then
+                PlayStation(flatlineStation, 0.8)
+            end
         end
     else
-        if IsValid(asystoleSound) then
-            asystoleSound:Stop()
-            asystoleSound = nil
+        if IsValid(flatlineStation) and flatlineStation:IsPlaying() then
+            flatlineStation:Stop()
         end
 
         if admiring or isUnconscious or abnormalPulse or isCheckingPulse then
-            local currentHeartBeat = math.floor(heartPhase)
-            if currentHeartBeat > lastHeartBeat then
-                lastHeartBeat = currentHeartBeat
+            -- Skip oldring sound system when unconscious ring is active with EKG mode
+            if not (isUnconscious and ringAlpha > 0.01 and not hg_unconsciousclassic:GetBool()) then
+                local currentHeartBeat = math.floor(heartPhase)
+                if currentHeartBeat > lastHeartBeat then
+                    lastHeartBeat = currentHeartBeat
 
-                local vol = GetHeartbeatVolume(org)
-                local hasHealthHUD = (className == "Gordon" or className == "Combine" or className == "furry")
-                local soundFile = (abnormalPulse and hasHealthHUD) and "sound/healthbeat.ogg" or "sound/heartbeat/heartbeat_single.wav"
-                sound.PlayFile(soundFile, "noblock noplay", function(station) if IsValid(station) then station:SetVolume(vol) station:Play() end end)
+                    local vol = GetHeartbeatVolume(org)
+                    local hasHealthHUD = (className == "Gordon" or className == "Combine" or className == "furry")
+                    local highStress = vol > 0.5
+                    if (abnormalPulse and hasHealthHUD) or highStress then
+                        EmitRingSound(SOUND_HEART, vol)
+                    else
+                        EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
+                    end
+                end
             end
         end
     end
