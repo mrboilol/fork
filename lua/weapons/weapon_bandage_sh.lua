@@ -348,13 +348,14 @@ if CLIENT then
 		
 		if self.showstats and self.modeValues and istable(self.modeValues) then
 			if onScreen then
-				-- Draw 3D text in world space
+				-- Draw 3D text in world space, positioned in front of the object
+				local textPos = pos + ang:Forward() * 10 + ang:Up() * 5
 				cam.Start3D()
-					cam.Start3D2D(pos,ang,0.025)
+					cam.Start3D2D(textPos, ang, 0.025)
 					render.PushFilterMag( TEXFILTER.LINEAR )
 					render.PushFilterMin( TEXFILTER.LINEAR )
 					local m = Matrix()
-					m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
+					m:Translate( Vector( -ScreenScale(60), ScreenScaleH(125), 0 ) )
 					m:Scale( vector_one * 1.2 )
 
 					cam.PushModelMatrix( m, true )
@@ -386,31 +387,14 @@ if CLIENT then
 					cam.End3D2D()
 				cam.End3D()
 			else
-				-- Draw on screen edge when out of view
-				local screenX = math.Clamp(screenPos.x, 50, ScrW() - 50)
-				local screenY = math.Clamp(screenPos.y, 50, ScrH() - 50)
+				-- Draw middle-bottom 2D HUD when out of view
+				local centerX, centerY = ScrW() / 2, ScrH() - 100
 				
-				-- Calculate direction to position
-				local centerX, centerY = ScrW() / 2, ScrH() / 2
-				local dirX = screenPos.x - centerX
-				local dirY = screenPos.y - centerY
-				
-				-- Project to screen edge
-				if screenPos.x <= 0 or screenPos.x >= ScrW() then
-					screenX = screenPos.x <= 0 and 50 or ScrW() - 50
-					screenY = centerY + (dirY / math.abs(dirX)) * (screenX - centerX)
-					screenY = math.Clamp(screenY, 50, ScrH() - 50)
-				elseif screenPos.y <= 0 or screenPos.y >= ScrH() then
-					screenY = screenPos.y <= 0 and 50 or ScrH() - 50
-					screenX = centerX + (dirX / math.abs(dirY)) * (screenY - centerY)
-					screenX = math.Clamp(screenX, 50, ScrW() - 50)
-				end
-				
-				-- Draw screen-edge indicator
+				-- Draw middle-bottom indicator
 				for i, val in ipairs(self.modeValues) do
 					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
 					local val = math.Round(val / self.modeValuesdef[i][1] * 100)
-					local x,y = screenX, screenY + (i - 1) * 25
+					local x,y = centerX - ScreenScale(105), centerY + (i - 1) * 25
 					local reveal = 1
 					colBrown.a = reveal * 200
 					draw.RoundedBox(2,x,y,ScreenScale(210) + ScrW() / 10,ScrH() / 25,colBrown)
@@ -686,9 +670,9 @@ if SERVER then
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
-					local healAmount = math.min(6 * self.modeValues[1], biggestWound)
+					local healAmount = math.min(9 * self.modeValues[1], biggestWound)
 					local healedWound = biggestWound - healAmount
-					local consumption = 12.5 * healAmount
+					local consumption = 5 * healAmount
 					org.bleed = math.max(org.bleed - healAmount, 0)
 					org.wounds[1][1] = healedWound
 					self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
@@ -723,9 +707,9 @@ if SERVER then
 				if self.modeValues[1] ~= 0 and #bonewounds > 0 then
 					if org.wounds[bonewounds[1]] then
 						local biggestWound = org.wounds[bonewounds[1]][1]
-						local healAmount = math.min(6 * self.modeValues[1], biggestWound)
+						local healAmount = math.min(2.5 * self.modeValues[1], biggestWound)
 						local healedWound = biggestWound - healAmount
-						local consumption = 12.5 * healAmount
+						local consumption = 5 * healAmount
 						org.bleed = math.max(org.bleed - healAmount, 0)
 						org.wounds[bonewounds[1]][1] = healedWound
 						self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
@@ -778,6 +762,7 @@ if SERVER then
 
 		if org.lleg == 1 and self.modeValues[1] >= amt and !org.llegamputated then
 			org.lleg = org.lleg - 0.1
+
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
@@ -785,6 +770,7 @@ if SERVER then
 
 		if org.rleg == 1 and self.modeValues[1] >= amt and !org.rlegamputated then
 			org.rleg = org.rleg - 0.1
+
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
@@ -792,6 +778,7 @@ if SERVER then
 
 		if org.rarm == 1 and self.modeValues[1] >= amt and !org.rarmamputated then
 			org.rarm = org.rarm - 0.1
+
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
@@ -799,15 +786,16 @@ if SERVER then
 
 		if org.larm == 1 and self.modeValues[1] >= amt and !org.larmamputated then
 			org.larm = org.larm - 0.1
+
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
 		end
 
 		if not done and (tonumber(org.bleed) or 0) > 0 and self.modeValues[1] > 0 then
-			local bleedHeal = math.min(tonumber(org.bleed) or 0, 6 * self.modeValues[1])
+			local bleedHeal = math.min(tonumber(org.bleed) or 0, 7.25 * self.modeValues[1])
 			org.bleed = math.max((tonumber(org.bleed) or 0) - bleedHeal, 0)
-			self.modeValues[1] = math.max(self.modeValues[1] - 12.5 * bleedHeal, 0)
+			self.modeValues[1] = math.max(self.modeValues[1] - 10 * bleedHeal, 0)
 			done = bleedHeal > 0
 		end
 

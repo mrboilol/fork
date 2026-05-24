@@ -149,13 +149,14 @@ if CLIENT then
 		
 		if self.showstats and self.modeValues and istable(self.modeValues) then
 			if onScreen then
-				-- Draw 3D text in world space
+				-- Draw 3D text in world space, positioned in front of the object
+				local textPos = pos + ang:Forward() * 10 + ang:Up() * 5
 				cam.Start3D()
-					cam.Start3D2D(pos,ang,0.025)
+					cam.Start3D2D(textPos, ang, 0.025)
 					render.PushFilterMag( TEXFILTER.LINEAR )
 					render.PushFilterMin( TEXFILTER.LINEAR )
 					local m = Matrix()
-					m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
+					m:Translate( Vector( -ScreenScale(60), ScreenScaleH(125), 0 ) )
 					m:Scale( vector_one * 1.2 )
 
 					cam.PushModelMatrix( m, true )
@@ -187,31 +188,14 @@ if CLIENT then
 					cam.End3D2D()
 				cam.End3D()
 			else
-				-- Draw on screen edge when out of view
-				local screenX = math.Clamp(screenPos.x, 50, ScrW() - 50)
-				local screenY = math.Clamp(screenPos.y, 50, ScrH() - 50)
+				-- Draw middle-bottom 2D HUD when out of view
+				local centerX, centerY = ScrW() / 2, ScrH() - 100
 				
-				-- Calculate direction to position
-				local centerX, centerY = ScrW() / 2, ScrH() / 2
-				local dirX = screenPos.x - centerX
-				local dirY = screenPos.y - centerY
-				
-				-- Project to screen edge
-				if screenPos.x <= 0 or screenPos.x >= ScrW() then
-					screenX = screenPos.x <= 0 and 50 or ScrW() - 50
-					screenY = centerY + (dirY / math.abs(dirX)) * (screenX - centerX)
-					screenY = math.Clamp(screenY, 50, ScrH() - 50)
-				elseif screenPos.y <= 0 or screenPos.y >= ScrH() then
-					screenY = screenPos.y <= 0 and 50 or ScrH() - 50
-					screenX = centerX + (dirX / math.abs(dirY)) * (screenY - centerY)
-					screenX = math.Clamp(screenX, 50, ScrW() - 50)
-				end
-				
-				-- Draw screen-edge indicator
+				-- Draw middle-bottom indicator
 				for i, val in ipairs(self.modeValues) do
 					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
 					local val = math.Round(val / self.modeValuesdef[i][1] * 100)
-					local x,y = screenX, screenY + (i - 1) * 25
+					local x,y = centerX - ScreenScale(105), centerY + (i - 1) * 25
 					local reveal = 1
 					colBrown.a = reveal * 200
 					draw.RoundedBox(2,x,y,ScreenScale(210) + ScrW() / 10,ScrH() / 25,colBrown)
