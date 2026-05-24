@@ -88,17 +88,6 @@ local function PatchWeapon(class)
     if not istable(stored) then return false end
     if stored.__hg_med_minigame_patched then return true end
 
-    -- Skip patching if weapon already has its own minigame system
-    -- Check for circle minigame (used by bandages)
-    if stored.ShouldUseCircleMinigame and stored:ShouldUseCircleMinigame() then
-        return false
-    end
-
-    -- Check for TryStartCircleMinigame method
-    if stored.TryStartCircleMinigame then
-        return false
-    end
-
     stored.__hg_med_minigame_patched = true
     stored.__hg_med_minigame_primary = stored.PrimaryAttack
     stored.__hg_med_minigame_secondary = stored.SecondaryAttack

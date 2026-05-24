@@ -499,22 +499,6 @@ hook.Add("DoPlayerDeath", "Fake", function(ply)
 	ragdoll:SetNetVar("wounds", ply:GetNetVar("wounds"))
 	ragdoll:SetNetVar("arterialwounds", ply:GetNetVar("arterialwounds"))
 	ply.RagdollDeath = ragdoll
-
-	-- Reapply broken/dislocated limb constraints to death ragdoll
-	local hg_floppy_limbs = ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs")
-	if hg_floppy_limbs and hg_floppy_limbs:GetBool() and ply.organism then
-		local org = ply.organism
-		local limbs = {"larm", "rarm", "lleg", "rleg"}
-		for _, limb in ipairs(limbs) do
-			local isBroken = org[limb] and org[limb] >= 1
-			local isDislocated = org[limb .. "dislocation"]
-			if isBroken or isDislocated then
-				-- OLD LUA: Use persisted segment for consistent floppy location
-				local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
-				hg.BreakLimb(ragdoll, limb, segment, isDislocated)
-			end
-		end
-	end
 end)
 
 hook.Add("PostPlayerDeath", "Garbage", function(ply)

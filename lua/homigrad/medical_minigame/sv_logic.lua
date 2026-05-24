@@ -257,15 +257,6 @@ end)
 local function GetMedicalMinigameType(wep)
     local class = wep:GetClass()
 
-    -- Skip weapons that have their own circle minigame system (existing bandages)
-    if wep.ShouldUseCircleMinigame and wep:ShouldUseCircleMinigame() then
-        return nil
-    end
-
-    if wep.TryStartCircleMinigame then
-        return nil
-    end
-
     if class == "weapon_bruicekit" or class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or (class == "weapon_medkit_sh" and wep.mode == 1) then
         return "bandage"
     end
@@ -440,6 +431,8 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
             return
         end
 
+        if minigameType == "tourniquet" then return end
+
         local healAmount = 55 * progressDelta
         local modeValueIndex = GetMinigameModeValueIndex(wep, "bandage")
         if wep.modeValues and wep.modeValues[modeValueIndex] then
@@ -525,10 +518,6 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         local target = dislocationSession.target
         local limb = dislocationSession.limb
         if not CanUseMedicalMinigameTarget(ply, target) or not limb then return end
-        if not target.organism[limb .. "dislocation"] then
-            hg.MedicalMinigame.DislocationSessions[ply] = nil
-            return
-        end
 
         dislocationSession.progress = math.max(dislocationSession.progress or 0, reportedProgress)
         if (dislocationSession.progress or 0) < 0.999 then return end
@@ -558,25 +547,22 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
 
         if minigameType == "tourniquet" then
             local modeValueIndex = GetMinigameModeValueIndex(wep, minigameType)
-            local mode = wep.mode
-            local done = wep:Heal(target, mode)
+            local done = IsValid(wep) and wep.Tourniquet and wep:Tourniquet(target, nil)
 
             if IsValid(wep) and done and wep.PostHeal then
-                wep:PostHeal(target, mode)
+                wep:PostHeal(target, wep.mode)
             end
 
-            if IsValid(wep) and not done and wep.modeValues and wep.modeValues[modeValueIndex] then
-                wep.modeValues[modeValueIndex] = 0
+            if IsValid(wep) then
+                if wep.modeValues then
+                    wep.modeValues[modeValueIndex] = 0
+                    wep:SetNetVar("modeValues", table.Copy(wep.modeValues))
+                end
 
                 if wep:GetClass() == "weapon_tourniquet" and wep.ShouldDeleteOnFullUse then
                     ply:SelectWeapon("weapon_hands_sh")
                     wep:Remove()
-                    return
                 end
-            end
-
-            if IsValid(wep) and wep.modeValues then
-                wep:SetNetVar("modeValues", table.Copy(wep.modeValues))
             end
 
             return

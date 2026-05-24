@@ -110,7 +110,7 @@ if SERVER then
 		if heal <= 0 then return false end
 
 		local v = tonumber(org[key] or 0) or 0
-		org[key] = math.max(v - (heal / 40), 0)
+		org[key] = math.max(v - (heal / 16), 0)
 		self.modeValues[1] = math.max((tonumber(self.modeValues[1]) or 0) - heal, 0)
 
 		owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))

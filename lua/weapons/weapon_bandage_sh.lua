@@ -39,32 +39,6 @@ SWEP.offsetVec = Vector(4, -3.5, 0)
 SWEP.offsetAng = Angle(90, 90, 0)
 
 local hg_healanims = CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
-local circleMinigameClasses = {
-	["weapon_bandage_sh"] = true,
-	["weapon_bigbandage_sh"] = true,
-}
-local circleNetDone = "hg_bandage_circle_done"
-local circleNetStart = "hg_bandage_circle_start"
-if CLIENT and (not hg or not hg.MouseMinigame or not hg.MouseMinigame.Start) then
-	include("autorun/sh_hg_mouse_minigame.lua")
-end
-
-local function ResolveBandageTargetServer(ent)
-	if not IsValid(ent) then return nil end
-	if hg and hg.GetCurrentCharacter then
-		local chr = hg.GetCurrentCharacter(ent)
-		if IsValid(chr) then return chr end
-	end
-	return ent
-end
-
-local function CanApplyBandageServer(ent)
-	local target = ResolveBandageTargetServer(ent)
-	if not IsValid(target) then return false end
-	local org = target.organism
-	if not org then return false end
-	return (#org.wounds > 0) or (istable(org.arterialwounds) and #org.arterialwounds > 0) or (tonumber(org.bleed) or 0) > 0 or org.lleg == 1 or org.rleg == 1 or org.skull >= 0.6 or org.chest == 1 or org.rarm == 1 or org.larm == 1
-end
 
 modelshuy = modelshuy or {}
 
@@ -167,56 +141,6 @@ function SWEP:Animation()
 end
 
 SWEP.usetime = 2
-local math = math
-function SWEP:ShouldUseCircleMinigame()
-	-- Disabled to prefer the new medical minigame over the old circle minigame
-	return false
-end
-
-function SWEP:GetCircleMinigameRequiredLoops()
-	local mode = self.mode or 1
-	local amount = self.modeValues and self.modeValues[mode] or 0
-	if not isnumber(amount) or amount <= 0 then return 1 end
-	return math.Clamp(math.ceil(amount / 30), 1, 8)
-end
-
-if CLIENT then
-	function SWEP:TryStartCircleMinigame(attackType)
-		local owner = self:GetOwner()
-		if not IsValid(owner) or owner ~= LocalPlayer() then return false end
-		if not self:ShouldUseCircleMinigame() then return false end
-		if not hg or not hg.MouseMinigame then return false end
-		if (self.nextCircleMinigameStart or 0) > CurTime() then return false end
-		if hg.MouseMinigame.TryStartBandageSession then
-			local started = hg.MouseMinigame:TryStartBandageSession(self, attackType or 1)
-			if not started then
-				self.nextCircleMinigameStart = CurTime() + 0.05
-			end
-			return started
-		end
-		return false
-	end
-
-	function SWEP:HandleCircleMinigameInput()
-		if not self:ShouldUseCircleMinigame() then return end
-		if not hg or not hg.MouseMinigame then return end
-		local owner = self:GetOwner()
-		if not IsValid(owner) or owner ~= LocalPlayer() then return end
-		if owner:GetActiveWeapon() ~= self then return end
-
-		local lmbDown = input.IsMouseDown(MOUSE_LEFT)
-		if lmbDown and not self.circleLMBDown then
-			self:TryStartCircleMinigame(1)
-		end
-		self.circleLMBDown = lmbDown
-
-		local rmbDown = input.IsMouseDown(MOUSE_RIGHT)
-		if rmbDown and not self.circleRMBDown then
-			self:TryStartCircleMinigame(2)
-		end
-		self.circleRMBDown = rmbDown
-	end
-end
 
 function SWEP:Think()
 	self:SetHold(self.HoldType)
@@ -271,22 +195,6 @@ function SWEP:Think()
 end
 SWEP.net_cooldown2 = 0
 function SWEP:PrimaryAttack()
-	if self:ShouldUseCircleMinigame() then
-		if SERVER then
-			local owner = self:GetOwner()
-			if IsValid(owner) and owner:IsPlayer() and CanApplyBandageServer(owner) then
-				net.Start(circleNetStart)
-				net.WriteEntity(self)
-				net.WriteUInt(1, 2)
-				net.Send(owner)
-			end
-		end
-		if CLIENT then
-			self:TryStartCircleMinigame(1)
-		end
-		return
-	end
-
 	if SERVER then--and not self.modeValuesdef[self.mode][2] then
 
 		self.healbuddy = self:GetOwner()
@@ -309,8 +217,8 @@ if CLIENT then
 	local lerpthing = 1
 	local colBrown = Color(40,40,40)
 	SWEP.showstats = true
-	SWEP.ofsV = Vector(0,5,2)
-	SWEP.ofsA = Angle(0,90,90)
+	SWEP.ofsV = Vector(0,0,0)
+	SWEP.ofsA = Angle(0,0,0)
 	local vector_one = Vector(1,1,1)
 	function SWEP:DrawHUD()
 		local owner = self:GetOwner()
@@ -476,24 +384,6 @@ end
 
 function SWEP:SecondaryAttack()
 	--self:SetHolding(math.min(self:GetHolding() + 9, 100))
-	if self:ShouldUseCircleMinigame() then
-		if SERVER then
-			local owner = self:GetOwner()
-			local target = IsValid(owner) and hg and hg.eyeTrace and hg.eyeTrace(owner).Entity or nil
-			target = ResolveBandageTargetServer(target)
-			if IsValid(owner) and owner:IsPlayer() and IsValid(target) and ResolveBandageTargetServer(owner) ~= target and CanApplyBandageServer(target) then
-				net.Start(circleNetStart)
-				net.WriteEntity(self)
-				net.WriteUInt(2, 2)
-				net.Send(owner)
-			end
-		end
-		if CLIENT then
-			self:TryStartCircleMinigame(2)
-		end
-		return
-	end
-
 	if SERVER then
 		if IsValid(self:GetNWEntity("fakeGun")) then return end
 		local ent = hg.eyeTrace(self:GetOwner()).Entity
@@ -514,22 +404,9 @@ end
 
 if SERVER then
 	util.AddNetworkString("select_mode")
-	util.AddNetworkString(circleNetDone)
-	util.AddNetworkString(circleNetStart)
 else
 	net.Receive("select_mode",function()
 		net.ReadEntity().mode = net.ReadInt(4)
-	end)
-	net.Receive(circleNetStart, function()
-		local wep = net.ReadEntity()
-		local attackType = net.ReadUInt(2)
-		if not IsValid(wep) then return end
-		if not hg or not hg.MouseMinigame then return end
-		if hg.MouseMinigame.TryStartBandageSession then
-			hg.MouseMinigame:TryStartBandageSession(wep, attackType)
-		elseif wep.TryStartCircleMinigame then
-			wep:TryStartCircleMinigame(attackType)
-		end
 	end)
 end
 
@@ -553,35 +430,6 @@ if CLIENT then
 	end)
 end
 
-if SERVER then
-	net.Receive(circleNetDone, function(_, ply)
-		local wep = net.ReadEntity()
-		local attackType = net.ReadUInt(2)
-		if not IsValid(wep) then return end
-		if not wep.IsWeapon or not wep:IsWeapon() then return end
-		if wep:GetOwner() ~= ply then return end
-		if ply:GetActiveWeapon() ~= wep then return end
-		if not wep.ShouldUseCircleMinigame or not wep:ShouldUseCircleMinigame() then return end
-		if (wep.nextCircleApply or 0) > CurTime() then return end
-
-		local target = ResolveBandageTargetServer(ply)
-		if attackType == 2 then
-			target = ResolveBandageTargetServer(hg.eyeTrace(ply).Entity)
-			if not IsValid(target) then return end
-			if target == ResolveBandageTargetServer(ply) then return end
-		end
-		if not CanApplyBandageServer(target) then return end
-
-		wep.nextCircleApply = CurTime() + 0.06
-		wep.healbuddy = target
-		local done = wep:Heal(target, wep.mode)
-		if done and wep.PostHeal then
-			wep:PostHeal(target, wep.mode)
-		end
-
-		wep:SetNetVar("modeValues", wep.modeValues)
-	end)
-end
 
 local function PhysCallback(ent, data)
 	if data.DeltaTime < 0.2 then return end
@@ -670,7 +518,7 @@ if SERVER then
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
-					local healAmount = math.min(9 * self.modeValues[1], biggestWound)
+					local healAmount = math.min(22.5 * self.modeValues[1], biggestWound)
 					local healedWound = biggestWound - healAmount
 					local consumption = 5 * healAmount
 					org.bleed = math.max(org.bleed - healAmount, 0)
@@ -707,7 +555,7 @@ if SERVER then
 				if self.modeValues[1] ~= 0 and #bonewounds > 0 then
 					if org.wounds[bonewounds[1]] then
 						local biggestWound = org.wounds[bonewounds[1]][1]
-						local healAmount = math.min(2.5 * self.modeValues[1], biggestWound)
+						local healAmount = math.min(6.25 * self.modeValues[1], biggestWound)
 						local healedWound = biggestWound - healAmount
 						local consumption = 5 * healAmount
 						org.bleed = math.max(org.bleed - healAmount, 0)
@@ -744,7 +592,7 @@ if SERVER then
 
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
-		local amt = 112.5 * mul
+		local amt = 281.25 * mul
 		if org.skull >= 0.6 and self.modeValues[1] >= amt then
 			org.skull = 0.59
 			self.modeValues[1] = self.modeValues[1] - amt
@@ -793,7 +641,7 @@ if SERVER then
 		end
 
 		if not done and (tonumber(org.bleed) or 0) > 0 and self.modeValues[1] > 0 then
-			local bleedHeal = math.min(tonumber(org.bleed) or 0, 7.25 * self.modeValues[1])
+			local bleedHeal = math.min(tonumber(org.bleed) or 0, 18.125 * self.modeValues[1])
 			org.bleed = math.max((tonumber(org.bleed) or 0) - bleedHeal, 0)
 			self.modeValues[1] = math.max(self.modeValues[1] - 10 * bleedHeal, 0)
 			done = bleedHeal > 0

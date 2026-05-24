@@ -1707,7 +1707,7 @@ local function velocityDamage(ent, data)
 		hook.Run("Org Think Call", ply, org)
 		
 if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
-			if org.skull >= 0.6 and org.jaw == 1 then
+			if org.skull >= 0.6 or org.jaw == 1 then
 				ent:SetNWString("PlayerName", "disfigured nigga")
 			end
 			
@@ -1874,9 +1874,6 @@ function hg.BreakNeck(ent, fromDamage)
 			return -- Already has neck floppy, don't reapply
 		end
 		
-		-- Remove internal constraint on head
-		pcall(function() ragdoll:RemoveInternalConstraint(headPhysBone) end)
-
 		local pneck = ragdoll:GetPhysicsObjectNum(neckPhysBone)
 		local phead = ragdoll:GetPhysicsObjectNum(headPhysBone)
 
@@ -1909,6 +1906,8 @@ function hg.BreakNeck(ent, fromDamage)
 		
 		-- Track the constraint to prevent duplicates
 		if newConstraint then
+			-- Only remove the internal constraint AFTER the replacement is confirmed valid.
+			pcall(function() ragdoll:RemoveInternalConstraint(headPhysBone) end)
 			ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
 			ragdoll.FloppyConstraints.neck = newConstraint
 
@@ -2185,21 +2184,6 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     end
     print("[HG Floppy] createFloppyLimbConstraint: limits found for " .. bone1Name)
 
-    -- Helper to remove any conflicting constraints (like stiffness hinges) between these bones
-    if rag.Constraints then
-        for k, v in pairs(rag.Constraints) do
-            if v.Ent1 == rag and v.Ent2 == rag then
-                if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
-                    if IsValid(v.Constraint) then v.Constraint:Remove() end
-                    rag.Constraints[k] = nil
-                end
-            end
-        end
-    end
-
-    -- Remove existing rigid constraint
-    pcall(function() rag:RemoveInternalConstraint(phys1) end)
-
     if pBone1.EnableCollisions then pBone1:EnableCollisions(true) end
     if pBone2.EnableCollisions then pBone2:EnableCollisions(true) end
     if pBone1.Wake then pBone1:Wake() end
@@ -2237,6 +2221,20 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0, minPitch, minYaw, minRoll, maxPitch, maxYaw, maxRoll, 0, 0, 0, 0, 0)
 
     if IsValid(cons) then
+        -- Only remove the internal constraint AFTER the replacement is confirmed valid.
+        -- Removing it beforehand and having AdvBallsocket fail leaves the bone unconstrained,
+        -- which causes it to stretch infinitely when the ragdoll is moved.
+        if rag.Constraints then
+            for k, v in pairs(rag.Constraints) do
+                if v.Ent1 == rag and v.Ent2 == rag then
+                    if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
+                        if IsValid(v.Constraint) and v.Constraint ~= cons then v.Constraint:Remove() end
+                        rag.Constraints[k] = nil
+                    end
+                end
+            end
+        end
+        pcall(function() rag:RemoveInternalConstraint(phys1) end)
         print("[HG Floppy] createFloppyLimbConstraint SUCCESS: AdvBallsocket created for " .. bone1Name .. " (phys" .. phys1 .. ") -> " .. bone2Name .. " (phys" .. phys2 .. ")")
         return cons
     else
@@ -2446,19 +2444,6 @@ local function createFloppySpineConstraint(rag, segData)
     if not (IsValid(pBone1) and IsValid(pBone2)) then return false end
 
     -- Remove any conflicting constraints between these two bones
-    if rag.Constraints then
-        for k, v in pairs(rag.Constraints) do
-            if v.Ent1 == rag and v.Ent2 == rag then
-                if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
-                    if IsValid(v.Constraint) then v.Constraint:Remove() end
-                    rag.Constraints[k] = nil
-                end
-            end
-        end
-    end
-
-    pcall(function() rag:RemoveInternalConstraint(phys1) end)
-
     if pBone1.EnableCollisions then pBone1:EnableCollisions(true) end
     if pBone2.EnableCollisions then pBone2:EnableCollisions(true) end
     if pBone1.Wake then pBone1:Wake() end
@@ -2481,6 +2466,18 @@ local function createFloppySpineConstraint(rag, segData)
         l.minPitch, l.minYaw, l.minRoll, l.maxPitch, l.maxYaw, l.maxRoll,
         0, 0, 0, 0, 0)
     if IsValid(cons) then
+        -- Only remove the internal constraint AFTER the replacement is confirmed valid.
+        if rag.Constraints then
+            for k, v in pairs(rag.Constraints) do
+                if v.Ent1 == rag and v.Ent2 == rag then
+                    if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
+                        if IsValid(v.Constraint) and v.Constraint ~= cons then v.Constraint:Remove() end
+                        rag.Constraints[k] = nil
+                    end
+                end
+            end
+        end
+        pcall(function() rag:RemoveInternalConstraint(phys1) end)
         print("[HG Floppy] createFloppySpineConstraint SUCCESS")
         return cons
     end

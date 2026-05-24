@@ -30,6 +30,7 @@ MODE.LootTable = {
 		{3,"hg_flashlight"},
 		{3,"weapon_bigbandage_sh"},
 		{1.2,"weapon_medkit_sh"},
+		{1.5,"weapon_bruicekit"},
 
 		{1,"weapon_matches"},
 		{1,"weapon_zippo_tpik"},
@@ -141,6 +142,7 @@ MODE.LootTableStandard = {
 		{5,"weapon_ducttape"},
 		{4.5,"weapon_painkillers"},
 		{3.5,"weapon_bloodbag"},
+		{1.5,"weapon_bruicekit"},
 		{2.5,"hg_flashlight"},
 		{0.8,"weapon_matches"},
 	}},

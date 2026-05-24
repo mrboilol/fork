@@ -619,9 +619,9 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				-- Chance to cause pneumothorax (collapsed lung)
 				if math.random() < 0.4 then
 					org[lungSide][2] = 1
-					org.owner:Notify("I can't breathe- my lung collapsed!", 8, "pneumothorax", 3)
+					org.owner:Notify("My lung hurts a lot for some reason...", 8, "pneumothorax", 3)
 				else
-					org.owner:Notify("Something sharp pierced my lung!", 6, "lungpuncture", 3)
+					org.owner:Notify("I felt it- i felt the rib poke my lung...", 6, "lungpuncture", 3)
 				end
 				
 				-- Additional pain and shock from lung puncture

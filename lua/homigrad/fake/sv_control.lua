@@ -569,6 +569,7 @@ hook.Add("Think", "Fake", function()
 		time = CurTime()
 
 		--huy
+		org.neckslitBleedingReduction = 1.0
 		if org.neckslit and not org.otrub and org.arterialwounds and not table.IsEmpty(org.arterialwounds) then
 			local neckwound
 			for i, wound in pairs(org.arterialwounds) do

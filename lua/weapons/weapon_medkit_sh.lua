@@ -30,8 +30,8 @@ SWEP.modeNames = {
 	[4] = "tourniquet",
 	[5] = "decompression needle",
 }
-SWEP.ofsV = Vector(-2,-10,8)
-SWEP.ofsA = Angle(90,-90,90)
+SWEP.ofsV = Vector(0,0,0)
+SWEP.ofsA = Angle(0,0,0)
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 

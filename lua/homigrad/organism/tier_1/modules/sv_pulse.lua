@@ -107,8 +107,9 @@ module[2] = function(owner, org, timeValue)
 	org.systolic = math.Approach(org.systolic or 120, targetSystolic, timeValue * 16)
 
     if org.bloodpressure < 50 then
-        -- Tranexamic acid and thiamine prevent ischemia from low blood pressure
-        local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
+        -- Adrenaline, tranexamic acid and thiamine prevent organ damage from low blood pressure
+        local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+        local hasAntiIschemia = totalAdrenaline > 0.5 or (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
         if not hasAntiIschemia then
             local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
             local damage = timeValue * ischemiaK * 0.005
@@ -125,6 +126,17 @@ module[2] = function(owner, org, timeValue)
 	
 	-- Tranexamic acid and thiamine accelerate ischemia regression
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
+
+	-- High infection drives ischemia (sepsis); adrenaline, tranexamic acid and thiamine suppress this
+	local infection = org.infection or 0
+	if infection > 0.5 and not adrenalineStabilizer and not hasAntiIschemia then
+		local infectionK = math.Clamp((infection - 0.5) / 0.5, 0, 1)
+		org.ischemia = math.min(org.ischemia + timeValue * infectionK * 0.006, 3)
+	elseif infection > 0.5 and (adrenalineStabilizer or hasAntiIschemia) then
+		-- Drugs/adrenaline greatly reduce but do not fully stop septic ischemia at very high infection
+		local infectionK = math.Clamp((infection - 0.5) / 0.5, 0, 1)
+		org.ischemia = math.min(org.ischemia + timeValue * infectionK * 0.001, 3)
+	end
 
 	if org.ischemia > 0 then
 		if org.ischemia > 1 and not adrenalineStabilizer and not hasAntiIschemia then
@@ -202,10 +214,13 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
-		local chance = math.Clamp(adren * 25,0,25)
+		-- Scale chance with adrenaline level: low dose gives a modest chance, high dose is near-certain
+		-- Capped at 75% per tick so even max adrenaline still has a small failure chance each attempt
+		local chance = math.Clamp(adren * 20 + adren * adren * 3, 0, 75)
 		local rand = math.random(100)
 
-		org.adrenaline_try = CurTime() + 0.1
+		-- High adrenaline retries faster (0.05s at adren>=3, 0.1s otherwise)
+		org.adrenaline_try = CurTime() + (adren >= 3 and 0.05 or 0.1)
 
 		if chance > rand then org.heartstop = false end
 	end

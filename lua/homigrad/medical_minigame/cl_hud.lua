@@ -545,7 +545,6 @@ function PANEL:Init()
         self.AmputationFillSpeedCap = 520
     end
 
-    self:StartMusic()
 end
 
 function PANEL:StartMusic()

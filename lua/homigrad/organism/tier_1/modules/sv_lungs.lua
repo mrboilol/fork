@@ -276,15 +276,20 @@ module[2] = function(owner, org, timeValue)
 		local pulseMultiplier = math.Clamp((org.heartbeat or 70) / 70, 0.8, 1.5)
 		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * pulseMultiplier * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * (1 - (org.CO / 30))
 		if org.oxygen_deprivation and org.oxygen_deprivation > 0 then
-			regenerate = regenerate * 0.1 -- 90% penalty
-			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue, 0) -- recovers over time
+			local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+			local hasStabilizer = totalAdrenaline > 0.5 or (org.thiamine or 0) > 0 or (org.tranexamic_acid or 0) > 0
+			regenerate = regenerate * (hasStabilizer and 0.4 or 0.1) -- drugs reduce penalty from 90% to 60%
+			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue * (hasStabilizer and 2 or 1), 0) -- drugs clear O2 deprivation faster
 		end
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 3750, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
 
 		-- Below 2500 blood, keep dropping O2
+		-- Adrenaline, thiamine and tranexamic acid partially resist this to help kickstart recovery
 		if org.blood < 2500 then
 			local o2DropRate = (2500 - org.blood) / 2500 -- 0 to 1 based on how far below 2500
-			o2[1] = max(o2[1] - timeValue * o2DropRate * 2, 0)
+			local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+			local hasStabilizer = totalAdrenaline > 0.5 or (org.thiamine or 0) > 0 or (org.tranexamic_acid or 0) > 0
+			o2[1] = max(o2[1] - timeValue * o2DropRate * (hasStabilizer and 0.6 or 2), 0)
 		end
 
 		o2.curregen = regenerate

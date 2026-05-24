@@ -110,8 +110,8 @@ if CLIENT then
 	local lerpthing = 1
 	local colBrown = Color(40,40,40)
 	SWEP.showstats = true
-	SWEP.ofsV = Vector(0,5,2)
-	SWEP.ofsA = Angle(0,90,90)
+	SWEP.ofsV = Vector(0,0,0)
+	SWEP.ofsA = Angle(0,0,0)
 	local vector_one = Vector(1,1,1)
 	function SWEP:DrawHUD()
 		local owner = self:GetOwner()
