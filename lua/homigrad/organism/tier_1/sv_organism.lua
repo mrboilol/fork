@@ -16,6 +16,7 @@ hook.Add("Org Clear", "Main", function(org)
 	module.metabolism[1](org)
 	module.concussion[1](org)
 	module.random_events[1](org)
+	module.goodmood[1](org)
 	org.brain = 0
 	org.consciousness = 1
 	org.disorientation = 0
@@ -161,6 +162,7 @@ local function send_organism(org, ply)
 	sendtable.canmove = org.canmove
 	sendtable.fear = org.fear
 	sendtable.despair = org.despair
+	sendtable.goodmood = org.goodmood
 	sendtable.llegdislocation = org.llegdislocation
 	sendtable.rlegdislocation = org.rlegdislocation
 	sendtable.rarmdislocation = org.rarmdislocation
@@ -505,6 +507,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.metabolism[2](owner, org, timeValue)
 		module.concussion[2](owner, org, timeValue)
 		module.random_events[2](owner, org, timeValue)
+		module.goodmood[2](owner, org, timeValue)
 	end
 
 

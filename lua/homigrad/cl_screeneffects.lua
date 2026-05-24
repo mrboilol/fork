@@ -70,7 +70,7 @@ local tab = {
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only", 0, 4)
 local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=altpain.ogg no shake, 4=itsallcomingtoanend only", 0, 4)
-local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg", 0, 1)
+local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg", 0, 2)
 local hook_Run = hook.Run
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
@@ -358,6 +358,16 @@ local function stopthings()
 		AltotrubStation = nil
 	end
 
+	if IsValid(SleepyStation) then
+		SleepyStation:Stop()
+		SleepyStation = nil
+	end
+
+	if IsValid(ConsciousnessWhiteNoise) then
+		ConsciousnessWhiteNoise:Stop()
+		ConsciousnessWhiteNoise = nil
+	end
+
 	if IsValid(EndStation) then
 		EndStation:Stop()
 		EndStation = nil
@@ -586,6 +596,29 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
+	if !IsValid(SleepyStation) or SleepyStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/sleepy.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				SleepyStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(ConsciousnessWhiteNoise) or ConsciousnessWhiteNoise:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/homigrad/whitenoise.wav", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				ConsciousnessWhiteNoise = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
 	local LerpFT = LerpFT or Lerp
 
 	if !org or !org.o2 or !isnumber(org.o2[1]) or !org.analgesia then stopthings() return end
@@ -685,7 +718,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		local consciousness = 1 - consciousnessLerp
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
-		
+
 		grainMat:SetFloat("$c0_x", CurTime()) -- time
 		grainMat:SetFloat("$c0_y", 0.5) -- gate
 		grainMat:SetFloat("$c0_z", consciousness * 3) -- Pixelize
@@ -696,9 +729,23 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		grainMat:SetFloat("$c2_y", 0) -- g
 		grainMat:SetFloat("$c2_z", 0) -- b
 		grainMat:SetFloat("$c3_x", 0) -- ImageIntensity
-	
+
 		render.SetMaterial(grainMat)
 		render.DrawScreenQuad()
+	end
+
+	-- Consciousness whitenoise: ramps up from 0 at 0.95 consciousness to full at 0.1
+	if not org.otrub and (org.consciousness or 1) < 0.95 then
+		local consciousnessVol = math.Remap(org.consciousness, 0.95, 0.1, 0, 1)
+		consciousnessVol = math.Clamp(consciousnessVol, 0, 1)
+
+		if IsValid(ConsciousnessWhiteNoise) then
+			ConsciousnessWhiteNoise:SetVolume(consciousnessVol)
+		end
+	else
+		if IsValid(ConsciousnessWhiteNoise) then
+			ConsciousnessWhiteNoise:SetVolume(0)
+		end
 	end
 
 	if org.consciousness < 0.5 then
@@ -1111,6 +1158,18 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
+			if !IsValid(SleepyStation) or SleepyStation:GetState() != GMOD_CHANNEL_PLAYING then
+				sound.PlayFile("sound/sleepy.ogg", "noblock noplay", function(station)
+					if IsValid(station) then
+						station:SetVolume(0)
+						station:Play()
+						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
+						SleepyStation = station
+						station:EnableLooping(true)
+					end
+				end)
+			end
+
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if otrubMode == 0 then
@@ -1121,6 +1180,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltotrubStation) then
 					AltotrubStation:SetVolume(0)
 				end
+				if IsValid(SleepyStation) then
+					SleepyStation:SetVolume(0)
+				end
 			elseif otrubMode == 1 then
 				-- Use altotrub.ogg instead
 				if IsValid(NoiseStation) then
@@ -1129,6 +1191,20 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltotrubStation) then
 					AltotrubStation:SetVolume(otrubVol)
 				end
+				if IsValid(SleepyStation) then
+					SleepyStation:SetVolume(0)
+				end
+			elseif otrubMode == 2 then
+				-- Use sleepy.ogg instead
+				if IsValid(NoiseStation) then
+					NoiseStation:SetVolume(0)
+				end
+				if IsValid(AltotrubStation) then
+					AltotrubStation:SetVolume(0)
+				end
+				if IsValid(SleepyStation) then
+					SleepyStation:SetVolume(otrubVol)
+				end
 			end
 		else
 			if IsValid(NoiseStation) then
@@ -1136,6 +1212,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 			if IsValid(AltotrubStation) then
 				AltotrubStation:SetVolume(0)
+			end
+			if IsValid(SleepyStation) then
+				SleepyStation:SetVolume(0)
 			end
 		end
 	else

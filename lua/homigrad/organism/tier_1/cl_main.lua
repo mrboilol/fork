@@ -585,6 +585,19 @@ hook.Add("RenderScreenspaceEffects", "organism-effects", function()
 		end
 	end
 
+	-- Pain-based screen shake
+	if pain > 55 and lply:Alive() then
+		local painShakeIntensity = math.Clamp((pain - 55) / (120 - 55), 0, 1)
+		local shakeMul = painShakeIntensity * 0.5
+		local time = CurTime() * (4 + painShakeIntensity * 4)
+
+		ang1[1] = math.sin(time) * shakeMul
+		ang1[2] = math.cos(time * 0.7) * shakeMul
+		ang1[3] = math.Rand(-1, 1) * shakeMul * 0.5
+
+		ViewPunch(ang1)
+	end
+
 	if (org.consciousness < 0.7) then
 		lerpblood = LerpFT(0.01, lerpblood or 0, math.Clamp((0.7 - org.consciousness) * 5, 0, 1) * 255)
 		local lowblood = (3600 - blood) / 600
@@ -1106,8 +1119,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local spreadMul = lowPulseFactor * 2.5 + 0.5 -- More spread at low pulse, some at high pulse
 							local spread = right * math.Rand(-3, 3) * spreadMul * bloodMul + up * math.Rand(-2, 2) * spreadMul * bloodMul
 
-							hg.addBloodPart(pos, baseForward + streamOsc + spread, nil, size, size, true, nil, ent)
-
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 2.5
 								local arteriaForward = dir * 8 * arteriaForce * 0.8 -- 0.8x distance
@@ -1115,6 +1126,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 								local arteriaSpread = right * math.Rand(-2, 2) * spreadMul + up * math.Rand(-2, 2) * spreadMul
 								-- Single stream to prevent duplicate spraying
 								hg.addBloodPart(pos + right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5), arteriaForward + arteriaOsc + arteriaSpread, nil, 1, 1, true, nil, ent)
+							else
+								hg.addBloodPart(pos, baseForward + streamOsc + spread, nil, size, size, true, nil, ent)
 							end
 						end
 

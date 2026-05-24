@@ -1894,7 +1894,11 @@ function hg.BreakNeck(ent, fromDamage)
 		-- Create constraint at current pose for natural floppy behavior
 		local head_pos = phead:GetPos()
 		local neck_pos = pneck:GetPos()
-		local jointPos = (head_pos + neck_pos) / 2
+		
+		local jointPos = ragdoll:GetBonePosition(headBoneId)
+		if not jointPos or jointPos == ragdoll:GetPos() then
+			jointPos = head_pos
+		end
 		
 		-- Calculate local positions for both physics objects
 		local lpos1 = WorldToLocal(jointPos, angle_zero, pneck:GetPos(), pneck:GetAngles())
@@ -2184,9 +2188,11 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     -- Helper to remove any conflicting constraints (like stiffness hinges) between these bones
     if rag.Constraints then
         for k, v in pairs(rag.Constraints) do
-            if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
-                if IsValid(v.Constraint) then v.Constraint:Remove() end
-                rag.Constraints[k] = nil
+            if v.Ent1 == rag and v.Ent2 == rag then
+                if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
+                    if IsValid(v.Constraint) then v.Constraint:Remove() end
+                    rag.Constraints[k] = nil
+                end
             end
         end
     end
@@ -2202,11 +2208,15 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     pBone2:EnableMotion(true)
 
     -- Set constraint position to the joint location (between the two connected bones)
-    -- This is where the elbow/knee actually is - midpoint between the two physics objects
-    local pos1 = pBone1:GetPos()
-    local pos2 = pBone2:GetPos()
-    local jointPos = (pos1 + pos2) / 2
-    print("[HG Floppy] createFloppyLimbConstraint: pBone1 pos=" .. tostring(pos1) .. " pBone2 pos=" .. tostring(pos2) .. " jointPos=" .. tostring(jointPos))
+    -- We use the actual animation bone position for the first bone (the child), which corresponds to the joint
+    local jointPos = rag:GetBonePosition(bone1ID)
+    if not jointPos or jointPos == rag:GetPos() then
+        -- Fallback to the midpoint between the two physics objects
+        local pos1 = pBone1:GetPos()
+        local pos2 = pBone2:GetPos()
+        jointPos = (pos1 + pos2) / 2
+    end
+    print("[HG Floppy] createFloppyLimbConstraint: jointPos=" .. tostring(jointPos))
 
     -- Use constraint.AdvBallsocket like the neck constraint (more reliable)
     -- Calculate local positions for both physics objects at the joint
@@ -2362,6 +2372,32 @@ function hg.RemoveLimbConstraints(ent, limb)
                 else
                     print("[HG Floppy] RemoveLimbConstraints: Constraint for " .. limb .. " was already invalid")
                 end
+                
+                -- Recreate a stiff joint to prevent stretching, using original limits and friction
+                local pBone1 = ragdoll:GetPhysicsObjectNum(phys1)
+                local pBone2 = ragdoll:GetPhysicsObjectNum(phys2)
+                if IsValid(pBone1) and IsValid(pBone2) then
+                    local jointPos = ragdoll:GetBonePosition(bone1)
+                    if not jointPos or jointPos == ragdoll:GetPos() then
+                        jointPos = (pBone1:GetPos() + pBone2:GetPos()) / 2
+                    end
+                    local lpos1 = WorldToLocal(jointPos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
+                    local lpos2 = WorldToLocal(jointPos, angle_zero, pBone2:GetPos(), pBone2:GetAngles())
+                    
+                    local limits = bb_constraints_limit[floppyData.bone1]
+                    if limits then
+                        local minPitch = tonumber(limits[0][1]) or -45
+                        local maxPitch = tonumber(limits[0][0]) or 45
+                        local minYaw = tonumber(limits[1][1]) or -45
+                        local maxYaw = tonumber(limits[1][0]) or 45
+                        local minRoll = tonumber(limits[2][1]) or -45
+                        local maxRoll = tonumber(limits[2][0]) or 45
+                        
+                        -- Use friction = 50 to make it act like a normal stiff ragdoll joint
+                        constraint.AdvBallsocket(ragdoll, ragdoll, phys1, phys2, lpos1, lpos2, 0, 0, minPitch, minYaw, minRoll, maxPitch, maxYaw, maxRoll, 50, 50, 50, 0, 0)
+                    end
+                end
+                
                 ragdoll.floppyLimbs[limb] = nil
             else
                 print("[HG Floppy] RemoveLimbConstraints: Failed to get phys bones for " .. limb)
@@ -2412,9 +2448,11 @@ local function createFloppySpineConstraint(rag, segData)
     -- Remove any conflicting constraints between these two bones
     if rag.Constraints then
         for k, v in pairs(rag.Constraints) do
-            if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
-                if IsValid(v.Constraint) then v.Constraint:Remove() end
-                rag.Constraints[k] = nil
+            if v.Ent1 == rag and v.Ent2 == rag then
+                if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
+                    if IsValid(v.Constraint) then v.Constraint:Remove() end
+                    rag.Constraints[k] = nil
+                end
             end
         end
     end

@@ -193,6 +193,10 @@ local function SyncBonesCallback(ent, numbones)
         if srcBone then
             local mat = src:GetBoneMatrix(srcBone)
             if mat then
+                -- CRITICAL: Skip bone manipulation for the local player's actual model
+                -- This prevents the health indicator's bone scaling from wrecking the bone tracing system
+                if ent == ply then continue end
+
                 local manipScale = ent:GetManipulateBoneScale(i)
                 
                 local localMat = srcInv * mat
@@ -608,10 +612,10 @@ function HUD_DrawDynamicIndicator()
 
         healthModel:SetupBones()
 
-        -- Ensure skull (head) is always visible for everyone
+        -- Ensure skull (head) is always visible for the health indicator
         local skullBoneID = healthModel:LookupBone("ValveBiped.Bip01_Head1")
         if skullBoneID then
-            ScaleBoneAndChildren(healthModel, skullBoneID, Vector(1, 1, 1))
+            healthModel:ManipulateBoneScale(skullBoneID, Vector(1, 1, 1))
             healthModel:SetupBones()
         end
 

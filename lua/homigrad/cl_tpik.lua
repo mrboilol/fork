@@ -737,6 +737,8 @@ local function applyInjuryTPIK(ent, ply)
 		local offBase = injuryTpikBones[i][5]
 		local arm = limb == "larm" or limb == "rarm"
 
+		if arm and reducedForWeapon then continue end
+
 		if org[limb.."amputated"] then continue end
 
 		-- Check limb damage states

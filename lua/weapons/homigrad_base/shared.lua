@@ -1806,15 +1806,39 @@ function SWEP:GetAdditionalValues()
 	self.AdditionalPosPreLerp[2] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and 1 - add or 0
 	self.AdditionalPosPreLerp[3] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and -0.5 or 0
 
-	if ply.organism and (ply.organism.larm and !self:IsPistolHoldType()) and ply.organism.rarm and (ply.organism.larm > 0.99 or ply.organism.rarm > 0.99) then
+	if ply.organism and ply.organism.rarm and (ply.organism.larm and ply.organism.larm > 0.99 and not self:IsPistolHoldType() or ply.organism.rarm > 0.99) then
 		--ply.posture = 1
-		self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 12 * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
-		self.AdditionalPosPreLerp[1] = (self.AdditionalPosPreLerp[1] - (ply.organism.rarmamputated and -1 or 6)) + 0 * math.Clamp((ply:EyeAngles()[1] - 25) / 25, 0, 1)
-		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 3) * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.2, 1)
+		
+		-- Use smaller positional offsets to keep the arm from overstretching and breaking the IK solver
+		self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 3 * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
+		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + (ply.organism.rarmamputated and -1 or 2)
+		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 1)
+		
+		-- Add a heavy angular droop to visually indicate the arm is weak
+		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 25
+		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] - 10
+		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] - 15
 
 		if hg.KeyDown(ply, IN_ATTACK2) then
-			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 8
-			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 3
+			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 2
+			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 1
+			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] - 10
+		end
+		
+		-- Add additional sway for broken arms
+		local t = CurTime() * 4
+		local swayAmount = 2
+		local swayPosAmount = 0.5
+		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * swayAmount
+		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * swayAmount
+		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * swayAmount * 0.5
+		
+		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 0.7) * swayPosAmount
+		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.cos(t * 0.9) * swayPosAmount
+		
+		if CLIENT and self:IsLocal2() then
+			local viewSway = Angle(math.sin(t * 1.1) * 0.008, math.cos(t * 0.85) * 0.008, math.sin(t * 0.9) * 0.003)
+			ViewPunch2(viewSway)
 		end
 	end
 

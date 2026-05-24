@@ -41,7 +41,7 @@ local lastHeartBeat = 0
 local heartPhase = 0
 
 -- Better sound system from oldring
-local SOUND_HEART = "hg_unconscious/heartthump-heavy.ogg"
+local SOUND_HEART = "health/critbeat.ogg"
 local SOUND_FLATLINE = "hg_unconscious/flatline.ogg"
 
 local lastPhaseMod = 0

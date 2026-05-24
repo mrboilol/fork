@@ -666,21 +666,19 @@ if SERVER then
 			local bonewounds = {}
 			if not bone then
 				for i,wound in pairs(org.arterialwounds) do
-					if wound[7] != "arteria" then 
-						pw = i 
-						for i1,tbl in pairs(org.wounds) do
-							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
-							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
-							--print(1,bonename,sec_bonename)
-							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
-								--print(2,bonename,sec_bonename)
-								table.insert(bonewounds,i1)
-							end
+					pw = i 
+					for i1,tbl in pairs(org.wounds) do
+						if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
+						local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
+						local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
+						--print(1,bonename,sec_bonename)
+						if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
+							--print(2,bonename,sec_bonename)
+							table.insert(bonewounds,i1)
 						end
-						--PrintTable(bonewounds)
-					break end
-				end
+					end
+					--PrintTable(bonewounds)
+				break end
 				
 			else
 				for i,wound in pairs(org.arterialwounds) do
