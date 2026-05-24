@@ -29,7 +29,18 @@ hook.Add("PostCleanupMap","removeblooddroplets",function()
 end)
 
 local mat_huy = Material("effects/blood_core")
+local mat_expie_drop = Material("effects/droplets/drop2")
 local lightcolor = Color(0, 0, 0, 255)
+
+local expieModels_b = {
+	["models/blop/expie/expie.mdl"] = true,
+	["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
+	["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
+}
+local function isExpieOwner(owner)
+	if not IsValid(owner) then return false end
+	return expieModels_b[owner:GetModel()] or owner.PlayerClassName == "expie" or owner.IsExpie or false
+end
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
 	local int = hg_blood_draw_distance:GetInt()
@@ -53,26 +64,33 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 
 		local light = (light1 + light2 + light3) * 3
 
+		local isExpie = isExpieOwner(part.owner)
+
 		if part.kishki then
 			render_SetMaterial(part[4])
-			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+			if isExpie then
+				lightcolor.r = math.min(255 * light[1], 255)
+				lightcolor.g = math.min(255 * light[2], 255)
+				lightcolor.b = 0
+			else
+				lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+				lightcolor.g = 0
+				lightcolor.b = 0
+			end
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
-			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
-			--if len > 1 * 1 then
-				render_SetMaterial(mat_huy)
+			render_SetMaterial(isExpie and mat_expie_drop or mat_huy)
+			if isExpie then
+				lightcolor.r = math.min(255 * light[1], 255)
+				lightcolor.g = math.min(255 * light[2], 255)
+				lightcolor.b = 0
+			else
 				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
-				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
-				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
-				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
-				
-				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
-				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
-
-				--lightcolor.r = lightcolor.r * 0.25
-				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	
-			--end
+				lightcolor.g = 0
+				lightcolor.b = 0
+			end
+			render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
 		end
 	end
 	--render.OverrideBlend( false )
@@ -94,6 +112,8 @@ local function decalBlood(pos, normal, tr, artery, owner)
 
 	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
+	local prefix = isExpieOwner(owner) and "Y" or ""
+
 	if artery then
 		if !hg_old_blood:GetBool() then
 			local howmuch = 1
@@ -101,7 +121,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 			//timer.Simple(0.1, function()
 				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
 				if hg.bloodpositions[vec] < 6 then
-					util.Decal("Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
+					util.Decal(prefix .. "Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
 				end
 				sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
 				if tr.MatType == MAT_METAL then
@@ -109,7 +129,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 				end
 			//end)
 		else
-			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
+			util.Decal(prefix .. "Arterial.Blood1", pos + normal, pos - normal, owner)
 			sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
 			if tr.MatType == MAT_METAL then
 				sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
@@ -128,16 +148,16 @@ local function decalBlood(pos, normal, tr, artery, owner)
 				end
 
 				if hg.bloodpositions[vec] < 6 then
-					util.Decal("Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
+					util.Decal(prefix .. "Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
 				end
 
 				if hg.bloodpositions[vec] == 50 then
-					util.Decal("Blood", pos + normal, pos - normal, owner)
+					util.Decal(prefix .. "Blood", pos + normal, pos - normal, owner)
 				end
 
 			//end)
 		else
-			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
+			util.Decal(prefix .. "Normal.Blood1", pos + normal, pos - normal, owner)
 			sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
 			if tr.MatType == MAT_METAL then
 				sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))

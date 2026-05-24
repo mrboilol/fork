@@ -778,7 +778,7 @@ local tooltipTexts = {
 			[1] = {title = "Mild pain", text = "Your average tuesday."}
 		},
 		bleeding = {
-			[4] = {title = "Critical Hemorrhage", text = "FUCK- IM BLEEDING OUT, IM ACTUALLY BLEEDING OUT"},
+			[4] = {title = "Critical Hemorrhage", text = "There so much blood, you better get help now."},
 			[3] = {title = "Severe Bleeding", text = "Blood is pouring out of you like a fire hose!"},
 			[2] = {title = "Moderate Bleeding", text = "This is severe enough to where you should start worrying about it."},
 			[1] = {title = "Minor Bleeding", text = "Blood is pouring out of a wound at a small rate."}
@@ -1684,9 +1684,9 @@ local function draw_status_effects()
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
 			if bleed_val > HUD.bleeding_threshold then
 				local level_num = 1
-				if bleed_val > 0.7 then level_num = 2 end
-				if bleed_val > 1.4 then level_num = 3 end
-				if bleed_val > 2.1 then level_num = 4 end
+				if bleed_val > 0.2 then level_num = 2 end
+				if bleed_val > 0.5 then level_num = 3 end
+				if bleed_val > 1.0 then level_num = 4 end
 				
 				table.insert(effects, {
 					name = "bleeding",

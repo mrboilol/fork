@@ -82,6 +82,22 @@ local function ScaleBoneAndChildren(ent, boneID, scale)
     end
 end
 
+local function ScaleBoneOnly(ent, boneID, scale)
+    ent:ManipulateBoneScale(boneID, scale)
+end
+
+local function IsChestBoneName(boneName)
+    return boneName == "ValveBiped.Bip01_Spine1" or boneName == "ValveBiped.Bip01_Spine2"
+end
+
+local function ScaleBone(ent, boneID, scale, boneName)
+    if boneName and IsChestBoneName(boneName) then
+        ScaleBoneOnly(ent, boneID, scale)
+    else
+        ScaleBoneAndChildren(ent, boneID, scale)
+    end
+end
+
 local function InitBlinkModel(ent)
     ent:SetupBones()
     for i = 0, ent:GetBoneCount() - 1 do
@@ -442,19 +458,19 @@ function HUD_DrawDynamicIndicator()
                 state.amputated = false
                 state.blinking = false
                 local boneID = healthModel:LookupBone(ampBoneName)
-                if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
+                if boneID then ScaleBone(healthModel, boneID, Vector(1, 1, 1), ampBoneName) end
                 local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
+                if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), ampBoneName) end
             end
 
             if state.fractured and not (isBroken or isDislocated) then
                 state.fractured = false
                 if not state.amputated then
                     local blinkBoneID = blinkModel:LookupBone(boneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
+                    if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), boneName) end
                     
                     local boneID = healthModel:LookupBone(boneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
+                    if boneID then ScaleBone(healthModel, boneID, Vector(1, 1, 1), boneName) end
                 end
             end
 
@@ -478,10 +494,10 @@ function HUD_DrawDynamicIndicator()
                 if state.fractured then
                      state.fractured = false
                      local blinkBoneID = blinkModel:LookupBone(boneName)
-                     if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
+                     if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), boneName) end
                      
                      local boneID = healthModel:LookupBone(boneName)
-                     if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(1, 1, 1)) end
+                     if boneID then ScaleBone(healthModel, boneID, Vector(1, 1, 1), boneName) end
                 end
 
                 if not state.amputated then
@@ -491,16 +507,16 @@ function HUD_DrawDynamicIndicator()
                     pulseStartTime = time
                     
                     local boneID = healthModel:LookupBone(ampBoneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
+                    if boneID then ScaleBone(healthModel, boneID, Vector(0, 0, 0), ampBoneName) end
                     
                     local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
+                    if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, BLINK_SCALE, ampBoneName) end
                 end
                 
                 if state.blinking and time > state.blinkEnd then
                     state.blinking = false
                     local blinkBoneID = blinkModel:LookupBone(ampBoneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, Vector(0, 0, 0)) end
+                    if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), ampBoneName) end
                 end
                 
             elseif (isBroken or isDislocated) then
@@ -509,10 +525,10 @@ function HUD_DrawDynamicIndicator()
                     state.fractureTime = time
                     pulseStartTime = time
                     local blinkBoneID = blinkModel:LookupBone(boneName)
-                    if blinkBoneID then ScaleBoneAndChildren(blinkModel, blinkBoneID, BLINK_SCALE) end
+                    if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, BLINK_SCALE, boneName) end
                     
                     local boneID = healthModel:LookupBone(boneName)
-                    if boneID then ScaleBoneAndChildren(healthModel, boneID, Vector(0, 0, 0)) end
+                    if boneID then ScaleBone(healthModel, boneID, Vector(0, 0, 0), boneName) end
                 end
             end
 
@@ -674,9 +690,9 @@ function HUD_DrawDynamicIndicator()
                     alpha = fadeProgress
                 end
 
-                ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE)
+                ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
                 DrawDamageBlinkState(blinkModel, r * alpha, g * alpha, b * alpha)
-                ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0))
+                ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
             end
         end
 
@@ -751,13 +767,13 @@ function HUD_DrawDynamicIndicator()
             for _, key in ipairs(blinkingRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
+                if bID then ScaleBone(blinkModel, bID, Vector(0,0,0), boneName) end
             end
 
             for _, key in ipairs(solidRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
+                if bID then ScaleBone(blinkModel, bID, BLINK_SCALE, boneName) end
             end
 
             DrawDamageBlinkState(blinkModel, 1, 0, 0)
@@ -767,25 +783,22 @@ function HUD_DrawDynamicIndicator()
             for _, key in ipairs(solidRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBoneAndChildren(blinkModel, bID, Vector(0,0,0)) end
+                if bID then ScaleBone(blinkModel, bID, Vector(0,0,0), boneName) end
             end
 
             for _, key in ipairs(blinkingRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBoneAndChildren(blinkModel, bID, BLINK_SCALE) end
+                if bID then ScaleBone(blinkModel, bID, BLINK_SCALE, boneName) end
             end
 
             local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
             DrawDamageBlinkState(blinkModel, val, 0, 0)
         end
 
-        -- Draw bleeding icons as sprites hovering over affected body parts
+        -- Collect bleeding icon screen positions for 2D overlay after cam.End3D
+        local bleedScreen2D = {}
         if next(bleedingBones) then
-            render.MaterialOverride(nil)
-            render.SetBlend(1)
-            render.SetColorModulation(1, 1, 1)
-            
             for key, severity in pairs(bleedingBones) do
                 local boneName = majorBones[key].bone
                 local boneID = healthModel:LookupBone(boneName)
@@ -793,38 +806,48 @@ function HUD_DrawDynamicIndicator()
                     local mat = healthModel:GetBoneMatrix(boneID)
                     if mat then
                         local pos = mat:GetTranslation()
-                        pos = pos + Vector(0, 0, 1.5) -- hover slightly above bone
-                        
-                        local r, g, b
-                        if severity <= 0.5 then
-                            local prog = severity / 0.5
-                            r, g, b = 1, 1, 1 - prog
-                        elseif severity <= 1.0 then
-                            local prog = (severity - 0.5) / 0.5
-                            r, g, b = 1, 1 - 0.5 * prog, 0
-                        elseif severity <= 2.0 then
-                            local prog = (severity - 1.0) / 1.0
-                            r, g, b = 1, 0.5 - 0.5 * prog, 0
-                        else
-                            r, g, b = 1, 0, 0
+                        pos = pos + Vector(0, 0, 1.5)
+                        local sx, sy, sz = pos:ToScreen()
+                        if sz > 0 then
+                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = severity, key = key})
                         end
-                        
-                        local pulse = (math.sin(time * 5 + #key) + 1) / 2
-                        local alpha = 0.7 + pulse * 0.3
-                        
-                        render.SetMaterial(bleedIconMat)
-                        render.DrawSprite(pos, 8, 8, Color(r * 255, g * 255, b * 255, alpha * 255))
                     end
                 end
             end
-            
-            render.MaterialOverride(whiteMat)
         end
-        
+
         render.MaterialOverride(nil)
         render.SetColorModulation(1, 1, 1)
         render.SuppressEngineLighting(false)
     cam.End3D()
+
+    -- Draw bleeding icons as 2D overlays so they always render on top of model bones
+    if #bleedScreen2D > 0 then
+        local iconSize = ScreenScaleFixed(14)
+        for _, data in ipairs(bleedScreen2D) do
+            local severity = data.severity
+            local r, g, b
+            if severity <= 0.5 then
+                local prog = severity / 0.5
+                r, g, b = 255, 255, math.floor((1 - prog) * 255)
+            elseif severity <= 1.0 then
+                local prog = (severity - 0.5) / 0.5
+                r, g, b = 255, math.floor((1 - 0.5 * prog) * 255), 0
+            elseif severity <= 2.0 then
+                local prog = (severity - 1.0) / 1.0
+                r, g, b = 255, math.floor((0.5 - 0.5 * prog) * 255), 0
+            else
+                r, g, b = 255, 0, 0
+            end
+
+            local pulse = (math.sin(time * 5 + #data.key) + 1) / 2
+            local alpha = math.floor((0.7 + pulse * 0.3) * 255)
+
+            surface.SetDrawColor(r, g, b, alpha)
+            surface.SetMaterial(bleedIconMat)
+            surface.DrawTexturedRect(data.sx - iconSize * 0.5, data.sy - iconSize * 0.5, iconSize, iconSize)
+        end
+    end
 end
 
 hook.Add("OnRemove", "HG_CleanupHealthIndicator", function()

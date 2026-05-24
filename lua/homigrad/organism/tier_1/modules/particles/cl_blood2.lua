@@ -20,6 +20,16 @@ local surface_SetDrawColor = surface.SetDrawColor
 
 local color = Color(90,0,0,122)
 
+local expieModels_b2 = {
+    ["models/blop/expie/expie.mdl"] = true,
+    ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
+    ["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
+}
+local function isExpieOwner(owner)
+    if not IsValid(owner) then return false end
+    return expieModels_b2[owner:GetModel()] or owner.PlayerClassName == "expie" or owner.IsExpie or false
+end
+
 bloodparticles_hook[3] = function(anim_pos)
     local time = CurTime()
 
@@ -27,8 +37,18 @@ bloodparticles_hook[3] = function(anim_pos)
         local part = hg.bloodparticles2[i]
         if not part then continue end
         local animpos = math.max((part[7] - time) / part[8], 0)
-        color.a = part.water and (200 * animpos) or (122 * animpos)
+        local alpha = part.water and (200 * animpos) or (122 * animpos)
         local sizeing = part.water and math.max((1 - animpos), 0.1) or 1
+        if isExpieOwner(part.owner) then
+            color.r = 90
+            color.g = 85
+            color.b = 0
+        else
+            color.r = 90
+            color.g = 0
+            color.b = 0
+        end
+        color.a = alpha
         render_SetMaterial(part[4])
         render_DrawSprite(LerpVector(anim_pos,part[2],part[1]),part[5] * sizeing, part[6] * sizeing, color)
     end

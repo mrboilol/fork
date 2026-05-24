@@ -826,7 +826,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 		
 		//if pain > 10 then
-			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 2), 0, 2)
+			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 3), 0, 3)
 
 			if painMode == 0 then
 				-- Default: both pain_beat and reality play
@@ -1041,7 +1041,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
-			local consciousVol = math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 0.25)
+			local consciousVol = math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
 			hg.consciousBeatIntensity = consciousVol
 
 			if dyingMode == 0 then
@@ -1170,7 +1170,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
-			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
+			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
 
 			if otrubMode == 0 then
 				-- Default: unconscious_type_beat

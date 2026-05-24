@@ -150,6 +150,19 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 					--mat:SetAngles(ang)
 
 					hg.bone_apply_matrix(ent, lkp, mat)
+
+					if wawanted == vector_small and (ply.IsExpie or ply.PlayerClassName == "expie") then
+						local children = ent:GetChildBones(lkp)
+						if children then
+							for _, childID in ipairs(children) do
+								local cmat = ent:GetBoneMatrix(childID)
+								if cmat then
+									cmat:SetScale(vector_small)
+									hg.bone_apply_matrix(ent, childID, cmat)
+								end
+							end
+						end
+					end
 				end
 			end
 		--end

@@ -128,19 +128,19 @@ end)
 	end
 end)
 
-local function explode(pos, size, force)
+local function explode(pos, size, force, owner)
 	size = size or 1
 	local xx, yy = 12, 12
 	local w, h = 360 / xx, 360 / yy
 	for x = 1, xx * size do
 		for y = 1, yy * size do
-			addBloodPart2(pos + VectorRand(-10,10), VectorRand(-100,100) * size, cloudmat, 25, 25, 1)
+			addBloodPart2(pos + VectorRand(-10,10), VectorRand(-100,100) * size, cloudmat, 25, 25, 1, false, owner)
 			
 			local dir = Vector(0, 0, -1)
 			dir:Rotate(Angle(h * y * Rand(0.9, 1.1), w * x * Rand(0.9, 1.1), 0))
 			dir[3] = dir[3] + Rand(0.5, 1.5)
 			dir:Mul(250 * size)
-			addBloodPart(pos, force * 0.2 + dir, mat_huy, math.Rand(5,10), math.Rand(5,10), false, true)
+			addBloodPart(pos, force * 0.2 + dir, mat_huy, math.Rand(5,10), math.Rand(5,10), false, true, owner)
 		end
 	end
 end
@@ -170,7 +170,7 @@ hook.Add("HG_OrganismChanged", "explodelegs", function(oldorg, org)
 				local mat = ent:GetBoneMatrix(bone)
 
 				if mat then
-					explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, Vector())
+					explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, Vector(), ent)
 				end
 			end
 		end
@@ -193,7 +193,7 @@ net.Receive("addfountain",function()
 	if bone then
 		local mat = ent:GetBoneMatrix(bone)
 		if mat then
-			explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, force)
+			explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, force, ent)
 		end
 	end
 end)

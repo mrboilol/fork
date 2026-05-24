@@ -3,7 +3,6 @@ local module = hg.organism.module.goodmood
 
 module[1] = function(org)
     org.goodmood = 0
-    org.lastkill = 0
 end
 
 module[2] = function(owner, org, timeValue)
@@ -40,25 +39,9 @@ module[2] = function(owner, org, timeValue)
         goodmood_add = goodmood_add - timeValue * 0.04 * org.despair
     end
 
-    -- Decrease goodmood when recently killed someone (guilt)
-    if (CurTime() - org.lastkill) < 60 then
-        local guiltFactor = 1 - ((CurTime() - org.lastkill) / 60)
-        goodmood_add = goodmood_add - timeValue * 0.1 * guiltFactor
-    end
-
     org.goodmood = math.Clamp(org.goodmood + goodmood_add, 0, 1)
     org.goodmood = math.Approach(org.goodmood, 0, timeValue / 240)
 end
-
-hook.Add("PlayerDeath", "GoodMood_PlayerDeath", function(victim, inflictor, attacker)
-    if not IsValid(attacker) or not attacker:IsPlayer() then return end
-    if attacker == victim then return end
-
-    local org = attacker.organism
-    if not org then return end
-
-    org.lastkill = CurTime()
-end)
 
 -- Decrease goodmood when taking damage
 hook.Add("HomigradDamage", "GoodMood_OnDamage", function(ply, dmgInfo, hitgroup, ent)

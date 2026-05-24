@@ -325,227 +325,228 @@ if CLIENT then
         end
     end)
 
-    bloodparticles_hook = bloodparticles_hook or {}
-    local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
-    
-    hook.Add("PostCleanupMap", "removeblooddroplets", function()
-        hg.bloodparticles1 = {}
-        hg.bloodpositions = {}
-        hg.bloodcount = 0
-    end)
-
-    local lightcolor = Color(0, 0, 0, 255)
-    
-    bloodparticles_hook[1] = function(anim_pos, mul)
-        local int = hg_blood_draw_distance:GetInt()
-        local lplypos = LocalPlayer():EyePos()
-        local dstsqr = int * int
-        local lplyang = LocalPlayer():EyeAngles():Forward()
-        
-        for i = 1, #hg.bloodparticles1 do
-            local part = hg.bloodparticles1[i]
-            if not part then continue end
-            if (part[1] - lplypos):Dot(lplyang) < 0 then continue end
-            if (part[2] - lplypos):LengthSqr() > dstsqr then continue end
-            
-            local pos = LerpVector(anim_pos, part[2], part[1])
-            local light = (render.GetLightColor(pos) + render.ComputeLighting(pos, Vector(0,0,1)) + render.ComputeDynamicLighting(pos, Vector(0,0,1))) * 3
-
-            local isExpie = chekExpie(part.owner)
-
-            if isExpie then
-                lightcolor.r = math.min(255 * light[1], 255)
-                lightcolor.g = math.min(255 * light[2], 255)
-                lightcolor.b = 0
-            else
-                lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
-                lightcolor.g = 0
-                lightcolor.b = 0
-            end
-
-            if part.kishki then
-                render.SetMaterial(part[4])
-                render.DrawSprite(pos, part[5], part[6], lightcolor)
-            else
-                render.SetMaterial(isExpie and mat_expie_drop or mat_huy)
-                render.DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5, pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, lightcolor)
-            end
-        end
-    end
-
-    local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
-
-    hg.bloodpositions = hg.bloodpositions or {}
-    hg.bloodcount = hg.bloodcount or 0
-    
-    local function decalBlood(pos, normal, tr, artery, owner)
-        local vec = tostring(math.Round(pos[1])) .. tostring(math.Round(pos[2])) .. tostring(math.Round(pos[3]))
-        hg.bloodcount = hg.bloodcount + 1
-        
-        if hg.bloodcount > 10000 then
-            hg.bloodpositions = {}
-            hg.bloodcount = 0
-        end
-
-        local prefix = chekExpie(owner) and "Y" or ""
-
-        if artery then
-            if !hg_old_blood:GetBool() then
-                hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-                if hg.bloodpositions[vec] < 6 then
-                    util.Decal(prefix .. "Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
-                end
-            else
-                util.Decal(prefix .. "Arterial.Blood1", pos + normal, pos - normal, owner)
-            end
-        else
-            if !hg_old_blood:GetBool() then
-                hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-                if hg.bloodpositions[vec] < 6 then
-                    util.Decal(prefix .. "Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
-                end
-                if hg.bloodpositions[vec] == 50 then
-                    util.Decal(prefix .. "Blood", pos + normal, pos - normal, owner)
-                end
-            else
-                util.Decal(prefix .. "Normal.Blood1", pos + normal, pos - normal, owner)
-            end
-        end
-        
-        sound.Play("homigrad/blooddrip" .. math.random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-        if tr.MatType == MAT_METAL then
-            sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), math.random(100, 120))
-        end
-    end
-
-    local tr2 = { collisiongroup = COLLISION_GROUP_WORLD, output = {} }
-    function util.IsInWorld( pos )
-        tr2.start = pos
-        tr2.endpos = pos
-        return not util.TraceLine( tr2 ).HitWorld
-    end
-
-    local gravity = GetConVar("sv_gravity")
-    local radius = 20000
-    local radiusSqr = radius * radius
-
-    hook.Add("InitPostEntity", "sizeget", function()
-        if hg and hg.GetWorldSize then
-            radius = hg.GetWorldSize()
-            radiusSqr = radius * radius
-        end
-    end)
-
-    bloodparticles_hook[2] = function(mul)
-        local grav = gravity:GetInt() / 10
-        local time = CurTime()
-        local gravvec = Vector(0, 0, -40) * mul * (math.max(0.0, grav))
-
-        -- Cap check with FIFO deletion
-        local cap = 50000
-        while #hg.bloodparticles1 > cap do
-            table.remove(hg.bloodparticles1, 1)
-        end
-
-        for i = #hg.bloodparticles1, 1, -1 do
-            local part = hg.bloodparticles1[i]
-            if not part then table.remove(hg.bloodparticles1, i) continue end
-            
-            local pos = part[1]
-            local posSet = part[2]
-
-            local trData = {
-                start = posSet,
-                endpos = posSet + part[3] * mul,
-                collisiongroup = part.kishki and COLLISION_GROUP_WORLD or COLLISION_GROUP_NONE
-            }
-
-            local result = util.TraceLine(trData)
-            local hitPos = result.HitPos
-            
-            if radiusSqr < hitPos:LengthSqr() then table.remove(hg.bloodparticles1, i) continue end
-            
-            if bit.band(util.PointContents(hitPos), CONTENTS_WATER) == CONTENTS_WATER then
-                hg.addBloodPart2(hitPos, part[3] / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, part.owner)
-                table.remove(hg.bloodparticles1, i)
-                continue
-            end
-
-            if result.Hit and result.Entity:IsWorld() then
-                table.remove(hg.bloodparticles1, i)
-                decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
-                continue
-            else
-                local ph = 0
-                local shouldhit = true
-
-                if IsValid(result.Entity) then
-                    ph = result.Entity:TranslatePhysBoneToBone(result.PhysicsBone)
-                    ph = ph != -1 and ph or 0
-                    local nam = result.Entity:GetBoneName(ph)
-                    shouldhit = !(result.Entity.organism and hg.amputatedlimbs2 and hg.amputatedlimbs2[nam] and result.Entity.organism[hg.amputatedlimbs2[nam].."amputated"])
-                end
-                
-                result.Hit = result.Hit and shouldhit
-
-                if result.Hit then
-                    local down = result.HitNormal
-                    local nextpos = (result.Normal + down):GetNormalized() * 5
-                    local insolid = result.StartSolid and IsValid(result.Entity)
-                    
-                    if !insolid and (part.nextput or 0) < CurTime() then
-                        part.nextput = CurTime() + 1
-                        decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
-                    end
-
-                    if insolid then
-                        if result.Entity:IsVehicle() then
-                            table.remove(hg.bloodparticles1, i)
-                            continue
-                        end
-
-                        local center = result.Entity:GetBoneMatrix(ph)
-                        local len = result.Entity:BoneLength(ph + 1)
-                        if center then
-                            center = center:GetTranslation() + (len and center:GetAngles():Forward() * len or Vector(0,0,0)) * 0.5
-                            nextpos = -(center - hitPos - Vector(0,0,-40) * 1):GetNormalized() * 5
-                        end
-                    end
-
-                    local pulldown = (-Vector(0,0,1) * (grav / 600)):Cross(-result.HitNormal:Angle():Right())
-                    nextpos:Add(pulldown)
-                    part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
-                    
-                    if part.lerpedmove:LengthSqr() < 0.1 * mul then
-                        decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
-                        table.remove(hg.bloodparticles1, i)
-                        continue
-                    end
-
-                    pos:Set(posSet + part.start_velocity * mul)
-                    posSet:Set(hitPos + part.lerpedmove + part.start_velocity * mul)
-                    part.hashitsomething = true
-                else
-                    if part.hashitsomething then
-                        part.hashitsomething = nil
-                        part[3] = (posSet - pos) / mul * 1
-                        pos:Set(posSet)
-                        posSet:Set(posSet)
-                    else
-                        pos:Set(posSet + part.start_velocity * mul)
-                        posSet:Set(trData.start + part[3] * mul + part.start_velocity * mul)
-                    end
-                end
-
-                part.lasthit = result.Hit
-            end
-
-            part[3] = LerpVector(0.25 * mul, part[3], Vector(0,0,0))
-            if !(result.Hit) then
-                part[3]:Add(gravvec)
-            end
-        end
-    end//jaws
+    --[[ Yellow blood rendering is now handled by tier-1 cl_blood.lua ]]
+    --bloodparticles_hook = bloodparticles_hook or {}
+    --local hg_blood_draw_distance = ConVarExists("hg_blood_draw_distance") and GetConVar("hg_blood_draw_distance") or CreateClientConVar("hg_blood_draw_distance", 1024, true, nil, "distance to draw blood", 0, 4096)
+    --
+    --hook.Add("PostCleanupMap", "removeblooddroplets", function()
+    --    hg.bloodparticles1 = {}
+    --    hg.bloodpositions = {}
+    --    hg.bloodcount = 0
+    --end)
+    --
+    --local lightcolor = Color(0, 0, 0, 255)
+    --
+    --bloodparticles_hook[1] = function(anim_pos, mul)
+    --    local int = hg_blood_draw_distance:GetInt()
+    --    local lplypos = LocalPlayer():EyePos()
+    --    local dstsqr = int * int
+    --    local lplyang = LocalPlayer():EyeAngles():Forward()
+    --    
+    --    for i = 1, #hg.bloodparticles1 do
+    --        local part = hg.bloodparticles1[i]
+    --        if not part then continue end
+    --        if (part[1] - lplypos):Dot(lplyang) < 0 then continue end
+    --        if (part[2] - lplypos):LengthSqr() > dstsqr then continue end
+    --        
+    --        local pos = LerpVector(anim_pos, part[2], part[1])
+    --        local light = (render.GetLightColor(pos) + render.ComputeLighting(pos, Vector(0,0,1)) + render.ComputeDynamicLighting(pos, Vector(0,0,1))) * 3
+    --
+    --        local isExpie = chekExpie(part.owner)
+    --
+    --        if isExpie then
+    --            lightcolor.r = math.min(255 * light[1], 255)
+    --            lightcolor.g = math.min(255 * light[2], 255)
+    --            lightcolor.b = 0
+    --        else
+    --            lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+    --            lightcolor.g = 0
+    --            lightcolor.b = 0
+    --        end
+    --
+    --        if part.kishki then
+    --            render.SetMaterial(part[4])
+    --            render.DrawSprite(pos, part[5], part[6], lightcolor)
+    --        else
+    --            render.SetMaterial(isExpie and mat_expie_drop or mat_huy)
+    --            render.DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5, pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, lightcolor)
+    --        end
+    --    end
+    --end
+    --
+    --local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
+    --
+    --hg.bloodpositions = hg.bloodpositions or {}
+    --hg.bloodcount = hg.bloodcount or 0
+    --
+    --local function decalBlood(pos, normal, tr, artery, owner)
+    --    local vec = tostring(math.Round(pos[1])) .. tostring(math.Round(pos[2])) .. tostring(math.Round(pos[3]))
+    --    hg.bloodcount = hg.bloodcount + 1
+    --    
+    --    if hg.bloodcount > 10000 then
+    --        hg.bloodpositions = {}
+    --        hg.bloodcount = 0
+    --    end
+    --
+    --    local prefix = chekExpie(owner) and "Y" or ""
+    --
+    --    if artery then
+    --        if !hg_old_blood:GetBool() then
+    --            hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
+    --            if hg.bloodpositions[vec] < 6 then
+    --                util.Decal(prefix .. "Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
+    --            end
+    --        else
+    --            util.Decal(prefix .. "Arterial.Blood1", pos + normal, pos - normal, owner)
+    --        end
+    --    else
+    --        if !hg_old_blood:GetBool() then
+    --            hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
+    --            if hg.bloodpositions[vec] < 6 then
+    --                util.Decal(prefix .. "Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
+    --            end
+    --            if hg.bloodpositions[vec] == 50 then
+    --                util.Decal(prefix .. "Blood", pos + normal, pos - normal, owner)
+    --            end
+    --        else
+    --            util.Decal(prefix .. "Normal.Blood1", pos + normal, pos - normal, owner)
+    --        end
+    --    end
+    --    
+    --    sound.Play("homigrad/blooddrip" .. math.random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+    --    if tr.MatType == MAT_METAL then
+    --        sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), math.random(100, 120))
+    --    end
+    --end
+    --
+    --local tr2 = { collisiongroup = COLLISION_GROUP_WORLD, output = {} }
+    --function util.IsInWorld( pos )
+    --    tr2.start = pos
+    --    tr2.endpos = pos
+    --    return not util.TraceLine( tr2 ).HitWorld
+    --end
+    --
+    --local gravity = GetConVar("sv_gravity")
+    --local radius = 20000
+    --local radiusSqr = radius * radius
+    --
+    --hook.Add("InitPostEntity", "sizeget", function()
+    --    if hg and hg.GetWorldSize then
+    --        radius = hg.GetWorldSize()
+    --        radiusSqr = radius * radius
+    --    end
+    --end)
+    --
+    --bloodparticles_hook[2] = function(mul)
+    --    local grav = gravity:GetInt() / 10
+    --    local time = CurTime()
+    --    local gravvec = Vector(0, 0, -40) * mul * (math.max(0.0, grav))
+    --
+    --    -- Cap check with FIFO deletion
+    --    local cap = 50000
+    --    while #hg.bloodparticles1 > cap do
+    --        table.remove(hg.bloodparticles1, 1)
+    --    end
+    --
+    --    for i = #hg.bloodparticles1, 1, -1 do
+    --        local part = hg.bloodparticles1[i]
+    --        if not part then table.remove(hg.bloodparticles1, i) continue end
+    --        
+    --        local pos = part[1]
+    --        local posSet = part[2]
+    --
+    --        local trData = {
+    --            start = posSet,
+    --            endpos = posSet + part[3] * mul,
+    --            collisiongroup = part.kishki and COLLISION_GROUP_WORLD or COLLISION_GROUP_NONE
+    --        }
+    --
+    --        local result = util.TraceLine(trData)
+    --        local hitPos = result.HitPos
+    --        
+    --        if radiusSqr < hitPos:LengthSqr() then table.remove(hg.bloodparticles1, i) continue end
+    --        
+    --        if bit.band(util.PointContents(hitPos), CONTENTS_WATER) == CONTENTS_WATER then
+    --            hg.addBloodPart2(hitPos, part[3] / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true, part.owner)
+    --            table.remove(hg.bloodparticles1, i)
+    --            continue
+    --        end
+    --
+    --        if result.Hit and result.Entity:IsWorld() then
+    --            table.remove(hg.bloodparticles1, i)
+    --            decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+    --            continue
+    --        else
+    --            local ph = 0
+    --            local shouldhit = true
+    --
+    --            if IsValid(result.Entity) then
+    --                ph = result.Entity:TranslatePhysBoneToBone(result.PhysicsBone)
+    --                ph = ph != -1 and ph or 0
+    --                local nam = result.Entity:GetBoneName(ph)
+    --                shouldhit = !(result.Entity.organism and hg.amputatedlimbs2 and hg.amputatedlimbs2[nam] and result.Entity.organism[hg.amputatedlimbs2[nam].."amputated"])
+    --            end
+    --            
+    --            result.Hit = result.Hit and shouldhit
+    --
+    --            if result.Hit then
+    --                local down = result.HitNormal
+    --                local nextpos = (result.Normal + down):GetNormalized() * 5
+    --                local insolid = result.StartSolid and IsValid(result.Entity)
+    --                
+    --                if !insolid and (part.nextput or 0) < CurTime() then
+    --                    part.nextput = CurTime() + 1
+    --                    decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+    --                end
+    --
+    --                if insolid then
+    --                    if result.Entity:IsVehicle() then
+    --                        table.remove(hg.bloodparticles1, i)
+    --                        continue
+    --                    end
+    --
+    --                    local center = result.Entity:GetBoneMatrix(ph)
+    --                    local len = result.Entity:BoneLength(ph + 1)
+    --                    if center then
+    --                        center = center:GetTranslation() + (len and center:GetAngles():Forward() * len or Vector(0,0,0)) * 0.5
+    --                        nextpos = -(center - hitPos - Vector(0,0,-40) * 1):GetNormalized() * 5
+    --                    end
+    --                end
+    --
+    --                local pulldown = (-Vector(0,0,1) * (grav / 600)):Cross(-result.HitNormal:Angle():Right())
+    --                nextpos:Add(pulldown)
+    --                part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
+    --                
+    --                if part.lerpedmove:LengthSqr() < 0.1 * mul then
+    --                    decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+    --                    table.remove(hg.bloodparticles1, i)
+    --                    continue
+    --                end
+    --
+    --                pos:Set(posSet + part.start_velocity * mul)
+    --                posSet:Set(hitPos + part.lerpedmove + part.start_velocity * mul)
+    --                part.hashitsomething = true
+    --            else
+    --                if part.hashitsomething then
+    --                    part.hashitsomething = nil
+    --                    part[3] = (posSet - pos) / mul * 1
+    --                    pos:Set(posSet)
+    --                    posSet:Set(posSet)
+    --                else
+    --                    pos:Set(posSet + part.start_velocity * mul)
+    --                    posSet:Set(trData.start + part[3] * mul + part.start_velocity * mul)
+    --                end
+    --            end
+    --
+    --            part.lasthit = result.Hit
+    --        end
+    --
+    --        part[3] = LerpVector(0.25 * mul, part[3], Vector(0,0,0))
+    --        if !(result.Hit) then
+    --            part[3]:Add(gravvec)
+    --        end
+    --    end
+    --end//jaws
 end
 if SERVER then
 

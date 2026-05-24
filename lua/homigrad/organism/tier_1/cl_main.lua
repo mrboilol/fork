@@ -933,11 +933,20 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			local hurtFactor = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
 				+ math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
 				+ math.Clamp(org.brain or 0, 0, 1) * 0.2
-			local vol = checkingplayer and 2 or math.Clamp(0.12 + hurtFactor, 0.12, 1.0)
+			
+			-- Scale volume based on pulse deviation from normal (60-100)
+			local pulseFactor = 0
+			if pulse < 60 then
+				pulseFactor = (60 - pulse) / 60 * 0.5
+			elseif pulse > 100 then
+				pulseFactor = (pulse - 100) / 200 * 0.5
+			end
+			
+			local vol = checkingplayer and 2 or math.Clamp(0.12 + hurtFactor + pulseFactor, 0.12, 1.0)
 			
 			local abnormalPulse = (pulse < 40 and pulse >= 1) or pulse > 100
 			local hasHealthHUD = (ply.PlayerClassName == "Gordon" or ply.PlayerClassName == "Combine" or ply.PlayerClassName == "furry")
-			local soundFile = (abnormalPulse and hasHealthHUD) and "healthbeat.ogg" or "heartbeat/heartbeat_single.wav"
+			local soundFile = (abnormalPulse and hasHealthHUD) and "health/healthbeat.ogg" or "heartbeat/heartbeat_single.wav"
 			
 			--ply:EmitSound("heartbeat/heartbeat_single.wav", 55, 60, vol)
 			if ent:GetVelocity():LengthSqr() < 10 then
@@ -1151,6 +1160,15 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 end)
 
 local grub = Model("models/grub_nugget_small.mdl")
+local expieModels_gore = {
+	["models/blop/expie/expie.mdl"] = true,
+	["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
+	["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
+}
+local function isExpieEnt(ent)
+	if not IsValid(ent) then return false end
+	return expieModels_gore[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or false
+end
 --ValveBiped.Bip01_R_Hand
 --ValveBiped.Bip01_R_Forearm
 --ValveBiped.Bip01_R_Foot
@@ -1243,6 +1261,7 @@ function hg.GoreCalc(ent, ply)
 		end
 
 		if !modelPlacements[fem][nam] then continue end
+		if isExpieEnt(ent) or isExpieEnt(ply) then continue end
 
 		local pos, ang = LocalToWorld(modelPlacements[fem][nam][1], modelPlacements[fem][nam][2], mat2:GetTranslation(), mat2:GetAngles())
 		

@@ -18,22 +18,22 @@ if CLIENT then
 		end
 	end
 
-	-- Head visibility disabled - expies now show their heads to others
-	-- hook.Add("PrePlayerDraw", "ExpieHideHead", function(ply)
-	-- 	if chekExpie(ply) then
-	-- 		local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
-	-- 		if headBone then
-	-- 			ScaleBoneAndChildren(ply, headBone, Vector(0, 0, 0))
-	-- 		end
-	-- 	end
-	-- end)
+	-- Hide head and all child bones (eyes, mouth, etc.) only for the local player's own first-person view
+	hook.Add("PrePlayerDraw", "ExpieHideHead", function(ply)
+		if ply == LocalPlayer() and chekExpie(ply) then
+			local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
+			if headBone then
+				ScaleBoneAndChildren(ply, headBone, Vector(0, 0, 0))
+			end
+		end
+	end)
 
-	-- hook.Add("PostPlayerDraw", "ExpieRestoreHead", function(ply)
-	-- 	if chekExpie(ply) then
-	-- 		local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
-	-- 		if headBone then
-	-- 			ScaleBoneAndChildren(ply, headBone, Vector(1, 1, 1))
-	-- 		end
-	-- 	end
-	-- end)
+	hook.Add("PostPlayerDraw", "ExpieRestoreHead", function(ply)
+		if ply == LocalPlayer() and chekExpie(ply) then
+			local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
+			if headBone then
+				ScaleBoneAndChildren(ply, headBone, Vector(1, 1, 1))
+			end
+		end
+	end)
 end
