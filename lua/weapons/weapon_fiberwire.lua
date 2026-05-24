@@ -378,7 +378,7 @@ local function StartStrangle(self, victim)
 
     -- upfront stamina cost for starting choke
     if owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
-        owner.organism.stamina[1] = math.max(owner.organism.stamina[1] - 50 * 2.5, 0)
+        owner.organism.stamina[1] = math.max(owner.organism.stamina[1] - 50, 0)
     end
 
     -- play start then loop (no callback passed over net)
