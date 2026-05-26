@@ -954,13 +954,20 @@ end
 SWEP.BrokenArmPenalty = {
     DamageMultiplier = 0.5, -- 50% damage
     StaminaMultiplier = 1.5, -- 50% more stamina
-    SwingSpeedMultiplier = 0.5, -- 50% slower
+    SwingSpeedMultiplier = 0.75, -- 25% slower
     BlockDurationMultiplier = 0.5 -- 50% shorter block
 }
 
 function SWEP:HasBrokenArm(owner)
     if not IsValid(owner) or not owner.organism then return false end
     local org = owner.organism
+    
+    -- For one-handed weapons, only check right arm
+    if not self.TwoHanded then
+        return (org.rarm and org.rarm >= 1) or org.rarmdislocation
+    end
+    
+    -- For two-handed weapons, check both arms
     return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.rarmdislocation
 end
 
