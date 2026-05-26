@@ -195,7 +195,18 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local justzoomed = zooming and !oldzoom
 	lastzoom = (justzoomed or (cocking or self.shot2 == 1)) and CurTime() or lastzoom
 
+	local rhandBroken = organism.rarm == 1
+	local rhandDislocated = organism.rarmdislocated
+	local lhandBroken = organism.larm == 1
+	local lhandDislocated = organism.larmdislocated
+	local rhandIssue = rhandBroken or rhandDislocated
+	local lhandIssue = lhandBroken or lhandDislocated
+
 	local tta = math.Clamp(self.weight / 4, 0.25, 1) * 0.5
+	-- Slower sight alignment with broken/dislocated hands
+	if rhandIssue or lhandIssue then
+		tta = tta * ((rhandBroken or lhandBroken) and 2.2 or 1.6)
+	end
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
@@ -254,6 +265,18 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local shakeMul = (((larm > 0.75 and (larm - 0.75) * (ply.posture != 7 and ply.posture != 8 and 1 or 0)) or 0)
 		+ ((rarm > 0.1 and (rarm - 0.1)) or 0)) / 4
+
+	-- Extra shake from broken/dislocated hands when holding a weapon
+	local rhandBroken = organism.rarm == 1
+	local rhandDislocated = organism.rarmdislocated
+	local lhandBroken = organism.larm == 1
+	local lhandDislocated = organism.larmdislocated
+	if rhandBroken or rhandDislocated then
+		shakeMul = shakeMul + (rhandBroken and 0.08 or 0.04)
+	end
+	if lhandBroken or lhandDislocated then
+		shakeMul = shakeMul + (lhandBroken and 0.06 or 0.03)
+	end
 
 	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * (organism.holdingbreath and 0.1 or 1)
 	addview[3] = 0

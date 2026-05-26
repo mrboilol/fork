@@ -640,14 +640,14 @@ end
 local hg, LocalToWorld = hg, LocalToWorld
 local durachok = "models/epangelmatikes/e3_elite_suit.mdl"
 -- TPIK bones for broken/dislocated limbs: {limb, boneName, side, ampBase, offBase}
--- Increased ampBase and offBase for more noticeable flopping
+-- Reduced ampBase and offBase to prevent wild swinging while keeping visible movement
 local injuryTpikBones = {
-	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 38.0, 18.0},  -- was 26.4, 13.2
-	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 38.0, 18.0}, -- was 26.4, 13.2
-	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 22.0, 12.0},  -- was 14.4, 7.2
-	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 22.0, 12.0}, -- was 14.4, 7.2
-	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 36.0, 18.0},  -- was 25.6, 12.6
-	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 36.0, 18.0}, -- was 25.6, 12.6
+	{"lleg", "ValveBiped.Bip01_L_Calf", 1, 22.0, 10.0},
+	{"rleg", "ValveBiped.Bip01_R_Calf", -1, 22.0, 10.0},
+	{"larm", "ValveBiped.Bip01_L_UpperArm", 1, 14.0, 7.0},
+	{"rarm", "ValveBiped.Bip01_R_UpperArm", -1, 14.0, 7.0},
+	{"larm", "ValveBiped.Bip01_L_Forearm", 1, 20.0, 10.0},
+	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 20.0, 10.0},
 }
 
 local function injuryTpikMotion(state, ent, owner)
@@ -704,7 +704,7 @@ local function applyInjuryTPIK(ent, ply)
 
 	for i = 1, #injuryTpikBones do
 		local limb = injuryTpikBones[i][1]
-		if !org[limb.."amputated"] and (((org[limb] or 0) >= 0.85) or org[limb.."dislocation"]) then
+		if !org[limb.."amputated"] and (((org[limb] or 0) >= 0.85) or org[limb.."dislocated"]) then
 			active = true
 			break
 		end
@@ -725,9 +725,9 @@ local function applyInjuryTPIK(ent, ply)
 	-- Increased motion multiplier for more pronounced flopping when moving
 	local motionMul = 0.68 + state.motion * 0.38
 	local holdMulLeg = reducedForWeapon and 0.28 or 1
-	-- Increase arm sway when holding pistol (one-handed) to follow arm movement
-	local holdMulArm = (reducedForWeapon and not isPistol) and 0.09 or (isPistol and 1.5 or 1)
-	local holdOffArm = (reducedForWeapon and not isPistol) and 0.45 or (isPistol and 1.2 or 1)
+	-- Reduce arm sway when holding any weapon to keep it manageable
+	local holdMulArm = reducedForWeapon and 0.15 or 1
+	local holdOffArm = reducedForWeapon and 0.35 or 1
 
 	for i = 1, #injuryTpikBones do
 		local limb = injuryTpikBones[i][1]
@@ -743,14 +743,14 @@ local function applyInjuryTPIK(ent, ply)
 
 		-- Check limb damage states
 		local isBroken = (org[limb] or 0) >= 1
-		local isDislocated = org[limb.."dislocation"]
+		local isDislocated = org[limb.."dislocated"]
 
 		-- Skip if neither broken nor dislocated
 		if not isBroken and not isDislocated then continue end
 
-		-- Calculate damage multiplier: dislocated = 25%, broken = 80%, both = 105% (25+80)
+		-- Calculate damage multiplier: broken = 80%, dislocated = 50% for arms (more severe), 25% for legs
 		local damageMultiplier = 0
-		if isDislocated then damageMultiplier = damageMultiplier + 0.25 end
+		if isDislocated then damageMultiplier = damageMultiplier + (arm and 0.50 or 0.25) end
 		if isBroken then damageMultiplier = damageMultiplier + 0.80 end
 
 		local bone = ent:LookupBone(boneName)
@@ -765,10 +765,14 @@ local function applyInjuryTPIK(ent, ply)
 		local amp = ampBase * state.blend * motionMul * wmul * 1.15 * damageMultiplier
 		local micro = (math.sin(state.microphase + i * 1.7) * 0.15 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.09) * (0.12 + math.min(state.blend, 1) * 0.16) * wmul * damageMultiplier
 		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1) * damageMultiplier
-		-- Apply rotations with intensity based on damage state
-		ang:RotateAroundAxis(mat:GetRight(), (off + wave1 * amp + micro) * side)
-		ang:RotateAroundAxis(mat:GetForward(), (wave2 * amp * 0.9 + micro * 0.7) * side)
-		ang:RotateAroundAxis(mat:GetUp(), micro * 0.4 * side)
+		-- Clamp maximum rotation per axis to prevent wild swinging
+		local maxRot = 18 * damageMultiplier
+		local rotRight = math.Clamp((off + wave1 * amp + micro) * side, -maxRot, maxRot)
+		local rotForward = math.Clamp((wave2 * amp * 0.9 + micro * 0.7) * side, -maxRot, maxRot)
+		local rotUp = math.Clamp(micro * 0.4 * side, -maxRot * 0.5, maxRot * 0.5)
+		ang:RotateAroundAxis(mat:GetRight(), rotRight)
+		ang:RotateAroundAxis(mat:GetForward(), rotForward)
+		ang:RotateAroundAxis(mat:GetUp(), rotUp)
 		mat:SetAngles(ang)
 
 		hg.bone_apply_matrix(ent, bone, mat)

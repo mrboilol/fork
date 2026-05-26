@@ -1256,6 +1256,22 @@ function SWEP:CoreStep()
 		end
 	end
 
+	-- Aiming too long with a broken right hand causes pain
+	if SERVER and IsValid(owner) and owner:IsPlayer() and owner.organism then
+		local org = owner.organism
+		local rhandBroken = org.rarm == 1
+		local rhandDislocated = org.rarmdislocated
+		if self:IsZoom() and (rhandBroken or rhandDislocated) then
+			self.brokenRHandAimTime = (self.brokenRHandAimTime or 0) + FrameTime()
+			local threshold = rhandBroken and 3 or 5
+			if self.brokenRHandAimTime > threshold then
+				org.painadd = math.min(org.painadd + (rhandBroken and 0.4 or 0.2) * FrameTime(), 150)
+			end
+		else
+			self.brokenRHandAimTime = 0
+		end
+	end
+
 	if SERVER then
 		self.Supressor = (self:HasAttachment("barrel", "supressor") and true) or self.SetSupressor
 		
@@ -1455,8 +1471,8 @@ function SWEP:CoreStep()
 			if org then
 				local shake_intensity = 0
 				local function get_arm_shake(is_broken, is_dislocated)
-					if is_broken then return 0.1 end
-					if is_dislocated then return 0.05 end
+					if is_broken then return 0.3 end
+					if is_dislocated then return 0.15 end
 					return 0
 				end
 
@@ -2222,9 +2238,9 @@ SWEP.anglefinger = Angle()
 function SWEP:SetHandPos(noset)
 	self.addvec = self.addvec or veczero
 	self.rhandik = self.setrhik
-	self.lhandik = self.setlhik
 	
 	local ply = self:GetOwner()
+	self.lhandik = self.setlhik and not (ply.organism and (ply.organism.larm == 1 or ply.organism.larmdislocated))
 
     if not IsValid(ply) or not IsValid(self.worldModel) then return end
     if not ply.shouldTransmit or ply.NotSeen then return end
