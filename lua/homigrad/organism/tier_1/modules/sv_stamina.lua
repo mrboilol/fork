@@ -160,7 +160,7 @@ module[2] = function(owner, org, timeValue)
 
 	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 
-	stamina.sub = stamina.sub * (1 + despair * 0.6) * (1 - goodmood * 0.5)
+	stamina.sub = stamina.sub * (1 + despair * 0.6)
 
 
 
@@ -174,7 +174,7 @@ module[2] = function(owner, org, timeValue)
 
 	org.hungry = org.hungry or 0
 
-	stamina.max = (org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65)
+	stamina.max = (org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) * (1 + goodmood * 0.5)
 	    stamina[1] = max(stamina[1] - stamina.sub * timeValue * 16 * (2 - (org.o2[1] / org.o2.range)), 0)
 	if stamina.max > 100 then
 
@@ -182,10 +182,8 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
-
 	
-
+	
 	//local old = stamina[1]
 
 	local pulseMultiplier = math.Clamp((org.heartbeat or 70) / 70, 0.8, 1.5)
@@ -194,7 +192,7 @@ module[2] = function(owner, org, timeValue)
 	local lungDamage = (org.lungsL[1] + org.lungsR[1]) / 2
 	local lungRecoveryMultiplier = math.max(1 - lungDamage, 0.3)
 
-	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * (1 + goodmood * 0.5) * lungRecoveryMultiplier, stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3 * 1.5 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier, stamina.max)
 
 
 

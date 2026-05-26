@@ -1,4 +1,4 @@
--- uzelezz smart UwU
+﻿-- uzelezz smart UwU
 local TPIKBones = {
     "ValveBiped.Bip01_L_Wrist",
     "ValveBiped.Bip01_L_Ulna",
@@ -594,7 +594,7 @@ local cached_huy = {}
 local vector_small = Vector(0,0,0)
 local vector_small2 = Vector(0.001,0.001,0.001)
 
---[[local gloves = {
+local gloves = {
 	[0] = Model("models/weapons/c_arms_citizen.mdl"),
 	[1] = Model("models/weapons/c_arms_combine.mdl"),
 	[2] = Model("models/epangelmatikes/e3_elite_suit.mdl"),
@@ -647,102 +647,89 @@ local function injuryTpikMotion(state, ent, owner)
 end
 
 local function applyInjuryTPIK(ent, ply)
-	local org = ent.organism or (IsValid(ply) and ply.organism)
-	if !org then return end
+local org = ent.organism or (IsValid(ply) and ply.organism)
+if !org then return end
 
-	local state = ent.hg_injury_tpik or {}
-	ent.hg_injury_tpik = state
+local state = ent.hg_injury_tpik or {}
+ent.hg_injury_tpik = state
 
-	local owner = ent:IsPlayer() and ent or ply
-	local standing = ent:IsPlayer() and ent:Alive() and !org.otrub and !org.fake and !IsValid(ent.FakeRagdoll)
-	local fake = ent:IsRagdoll() and IsValid(owner) and owner:IsPlayer() and ((owner.FakeRagdoll == ent) or (owner:GetNWEntity("FakeRagdoll") == ent))
-	if fake then return end -- Ballsocket constraints handle broken limbs on ragdolls
-	local can = standing
-	local motion = can and injuryTpikMotion(state, ent, owner)
-	local wep = IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon()
-	local reducedForWeapon = false
-	local isPistol = false
-	if IsValid(wep) then
-		reducedForWeapon = wep.Base == "weapon_base" or wep.Base == "weapon_melee" or wep.Base == "homigrad_base" or wep:GetClass() == "weapon_melee" or wep.ismelee or wep.supportTPIK
-		isPistol = wep.IsPistolHoldType and wep:IsPistolHoldType()
-	end
-	local active = false
+local owner = ent:IsPlayer() and ent or ply
+local standing = ent:IsPlayer() and ent:Alive() and !org.otrub and !org.fake and !IsValid(ent.FakeRagdoll)
+local fake = ent:IsRagdoll() and IsValid(owner) and owner:IsPlayer() and ((owner.FakeRagdoll == ent) or (owner:GetNWEntity('FakeRagdoll') == ent))
+if fake then return end -- Ballsocket constraints handle broken limbs on ragdolls
+local can = standing
+local motion = can and injuryTpikMotion(state, ent, owner)
+local wep = IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon()
+local reducedForWeapon = false
+local isPistol = false
+if IsValid(wep) then
+reducedForWeapon = wep.Base == 'weapon_base' or wep.Base == 'weapon_melee' or wep.Base == 'homigrad_base' or wep:GetClass() == 'weapon_melee' or wep.ismelee or wep.supportTPIK
+isPistol = wep.IsPistolHoldType and wep:IsPistolHoldType()
+end
+local active = false
 
-	for i = 1, #injuryTpikBones do
-		local limb = injuryTpikBones[i][1]
-		if !org[limb.."amputated"] and (((org[limb] or 0) >= 0.85) or org[limb.."dislocated"]) then
-			active = true
-			break
-		end
-	end
+for i = 1, #injuryTpikBones do
+local limb = injuryTpikBones[i][1]
+if !org[limb..'amputated'] and (((org[limb] or 0) >= 0.85) or org[limb..'dislocated']) then
+active = true
+break
+end
+end
 
-	state.motion = math.Approach(state.motion or 0, motion and 1 or 0, FrameTime() * 3.2)
-	-- Increased base blend and motion response for more noticeable flopping
-	local target = (can and active) and (0.35 + state.motion * 0.72) or 0
-	state.blend = math.Approach(state.blend or 0, target, FrameTime() * 4.8)
+state.motion = math.Approach(state.motion or 0, motion and 1 or 0, FrameTime() * 3.2)
+local target = (can and active) and (0.15 + state.motion * 0.3) or 0
+state.blend = math.Approach(state.blend or 0, target, FrameTime() * 4.8)
 
-	if (state.blend or 0) <= 0.001 then return end
+if (state.blend or 0) <= 0.001 then return end
 
-	-- Faster phase for more dynamic/noticeable movement
-	state.phase = (state.phase or 0) + FrameTime() * (5.2 + math.min(ent:GetVelocity():Length2D(), 350) * 0.018)
-	state.microphase = (state.microphase or 0) + FrameTime() * (10 + math.min(ent:GetVelocity():Length2D(), 300) * 0.012)
-	local wave1 = math.sin(state.phase)
-	local wave2 = math.cos(state.phase * 1.37)
-	-- Increased motion multiplier for more pronounced flopping when moving
-	local motionMul = 0.68 + state.motion * 0.38
-	local holdMulLeg = reducedForWeapon and 0.28 or 1
-	-- Reduce arm sway when holding any weapon to keep it manageable
-	local holdMulArm = reducedForWeapon and 0.15 or 1
-	local holdOffArm = reducedForWeapon and 0.35 or 1
+state.phase = (state.phase or 0) + FrameTime() * (2.0 + math.min(ent:GetVelocity():Length2D(), 350) * 0.01)
+state.microphase = (state.microphase or 0) + FrameTime() * (4.0 + math.min(ent:GetVelocity():Length2D(), 300) * 0.01)
+local wave1 = math.sin(state.phase)
+local wave2 = math.cos(state.phase * 1.37)
+local motionMul = 0.5 + state.motion * 0.5
+local holdMulLeg = reducedForWeapon and 0.5 or 1
+local holdMulArm = reducedForWeapon and 0.2 or 1
+local holdOffArm = reducedForWeapon and 0.2 or 1
 
-	for i = 1, #injuryTpikBones do
-		local limb = injuryTpikBones[i][1]
-		local boneName = injuryTpikBones[i][2]
-		local side = injuryTpikBones[i][3]
-		local ampBase = injuryTpikBones[i][4]
-		local offBase = injuryTpikBones[i][5]
-		local arm = limb == "larm" or limb == "rarm"
+for i = 1, #injuryTpikBones do
+local limb = injuryTpikBones[i][1]
+local boneName = injuryTpikBones[i][2]
+local side = injuryTpikBones[i][3]
+local ampBase = injuryTpikBones[i][4]
+local offBase = injuryTpikBones[i][5]
+local arm = limb == 'larm' or limb == 'rarm'
 
-		if arm and reducedForWeapon then continue end
+if arm and reducedForWeapon then continue end
 
-		if org[limb.."amputated"] then continue end
+if org[limb..'amputated'] then continue end
 
-		-- Check limb damage states
-		local isBroken = (org[limb] or 0) >= 1
-		local isDislocated = org[limb.."dislocated"]
+local isBroken = (org[limb] or 0) >= 1
+local isDislocated = org[limb..'dislocated']
 
-		-- Skip if neither broken nor dislocated
-		if not isBroken and not isDislocated then continue end
+if not isBroken and not isDislocated then continue end
 
-		-- Calculate damage multiplier: broken = 80%, dislocated = 50% for arms (more severe), 25% for legs
-		local damageMultiplier = 0
-		if isDislocated then damageMultiplier = damageMultiplier + (arm and 0.50 or 0.25) end
-		if isBroken then damageMultiplier = damageMultiplier + 0.80 end
+local damageMultiplier = 1
 
-		local bone = ent:LookupBone(boneName)
-		if !bone then continue end
+local bone = ent:LookupBone(boneName)
+if !bone then continue end
 
-		local mat = ent:GetBoneMatrix(bone)
-		if !mat then continue end
+local mat = ent:GetBoneMatrix(bone)
+if !mat then continue end
 
-		local ang = mat:GetAngles()
-		local wmul = arm and holdMulArm or holdMulLeg
-		-- Apply damage multiplier to TPIK effect
-		local amp = ampBase * state.blend * motionMul * wmul * 1.15 * damageMultiplier
-		local micro = (math.sin(state.microphase + i * 1.7) * 0.15 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.09) * (0.12 + math.min(state.blend, 1) * 0.16) * wmul * damageMultiplier
-		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1) * damageMultiplier
-		-- Clamp maximum rotation per axis to prevent wild swinging
-		local maxRot = 18 * damageMultiplier
-		local rotRight = math.Clamp((off + wave1 * amp + micro) * side, -maxRot, maxRot)
-		local rotForward = math.Clamp((wave2 * amp * 0.9 + micro * 0.7) * side, -maxRot, maxRot)
-		local rotUp = math.Clamp(micro * 0.4 * side, -maxRot * 0.5, maxRot * 0.5)
-		ang:RotateAroundAxis(mat:GetRight(), rotRight)
-		ang:RotateAroundAxis(mat:GetForward(), rotForward)
-		ang:RotateAroundAxis(mat:GetUp(), rotUp)
-		mat:SetAngles(ang)
+local ang = mat:GetAngles()
+local wmul = arm and holdMulArm or holdMulLeg
 
-		hg.bone_apply_matrix(ent, bone, mat)
-	end
+local amp = ampBase * state.blend * motionMul * wmul * damageMultiplier
+local micro = (math.sin(state.microphase + i * 1.7) * 0.15 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.09) * (0.12 + math.min(state.blend, 1) * 0.16) * wmul * damageMultiplier
+local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1) * damageMultiplier
+
+ang:RotateAroundAxis(mat:GetRight(), (off + wave1 * amp + micro) * side)
+ang:RotateAroundAxis(mat:GetForward(), (wave2 * amp * 0.9 + micro * 0.7) * side)
+ang:RotateAroundAxis(mat:GetUp(), micro * 0.4 * side)
+mat:SetAngles(ang)
+
+hg.bone_apply_matrix(ent, bone, mat)
+end
 end
 
 local blackmans = {
@@ -757,7 +744,7 @@ local blackmans = {
 	["models/monolithservers/mpd/male_01.mdl"] = true,
 	["models/monolithservers/mpd/male_03.mdl"] = true,
 	["models/monolithservers/mpd/female_03.mdl"] = true,
-}]]
+}
 
 local hg, LocalToWorld = hg, LocalToWorld
 local durachok = "models/epangelmatikes/e3_elite_suit.mdl"
@@ -1322,7 +1309,7 @@ function hg.DoTPIK(ply, ent)
             local hand = ply_l_hand_matrix:GetTranslation()
             local add = (hand - segments[1].Pos):GetNormalized() * 5 + eyeang:Right() * -5 + eyeang:Forward() * ((ply.lerp_hand or 0) - 0.5) * 10
 
-            if ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
+            if false and ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
                 segments[3].Pos = LerpVector(!(ishgweapon(self) and self:IsPistolHoldType()) and 0.05 or 0.01, segments[3].Pos + (-vector_up * 0.6 + eyeang:Forward() * 0.4 + ((ishgweapon(self) and !self:IsPistolHoldType()) and eyeang:Right() * 0.7 or vector_origin) + ent:GetVelocity() / 400) * 0.5, hand)
             else
@@ -1383,7 +1370,7 @@ function hg.DoTPIK(ply, ent)
 
         ply_l_forearm_matrix:SetAngles(ang)
 
-        if ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
+        if false and ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
             local ang = ang//qt:Angle()
             ang:RotateAroundAxis(ang:Forward(), 95)
             ply_l_hand_matrix:SetAngles(LerpAngle(0.5, ply_l_hand_matrix:GetAngles(), ang))
