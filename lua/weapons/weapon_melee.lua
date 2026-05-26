@@ -122,7 +122,7 @@ SWEP.HeavyAttackDamageType = nil -- Damage type for heavy attack (nil = use Prim
 SWEP.CanHeavyAttack = false
 local MELEE_GLOBAL_KNOCKBACK_MUL = 0.7
 local MELEE_GLOBAL_ACCURACY_MUL = 0.75
-local MELEE_GLOBAL_DAMAGE_MUL = 0.85
+local MELEE_GLOBAL_DAMAGE_MUL = 0.6
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")

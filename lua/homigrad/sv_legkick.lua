@@ -30,7 +30,7 @@ function PLAYER:LegAttack()
     local speed = 1.42 * speedmul
     local animstopAdjust = 0.3 * speedmul
     local dmg = anim == "curbstomp_base" and 24 or 10 * (2 - speedmul)
-    local kickNerf = 0.9
+    local kickNerf = 0.80
 
     local vel = self:GetVelocity():Length()
     local mult = Lerp(math.Clamp(vel / 800, 0, 1), 1.0, 3.5)
