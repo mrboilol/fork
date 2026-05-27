@@ -4,13 +4,14 @@ local VectorRand = VectorRand
 local Angle = Angle
 
 local CHANCE, FORCE, VIBRATION = 0.35, 1200, 150
+local FLEXION_FORCE = 400
 local POSTURING_PARTIAL_UPPER_CHANCE = 0.4
 local posturingDur, rigorDur, seizureDur = {5, 10}, {8, 14}, {10, 20}
 local RIGOR_DAMP = 8
 local INSTANT_KO_WINDOW = 0.35
 local INSTANT_KO_COOLDOWN = 2
 
-local spasmTypes = {{"posturing", 65}, {"rigor", 20}, {"seizure", 15}} --;; Че хотите добавляйте изменяйте
+local spasmTypes = {{"extend", 40}, {"flexion", 25}, {"rigor", 20}, {"seizure", 15}} --;; Че хотите добавляйте изменяйте
 
 local handBones = {5, 7}
 
@@ -37,6 +38,23 @@ local postureBones = {
 	"ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_L_Thigh",
 	"ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_L_Calf",
 	"ValveBiped.Bip01_R_Foot", "ValveBiped.Bip01_L_Foot",
+}
+
+local extendBones = {
+	["ValveBiped.Bip01_R_Hand"] = true, ["ValveBiped.Bip01_L_Hand"] = true,
+	["ValveBiped.Bip01_R_Foot"] = true, ["ValveBiped.Bip01_L_Foot"] = true,
+	["ValveBiped.Bip01_R_Forearm"] = true, ["ValveBiped.Bip01_L_Forearm"] = true,
+	["ValveBiped.Bip01_R_Calf"] = true, ["ValveBiped.Bip01_L_Calf"] = true,
+	["ValveBiped.Bip01_R_UpperArm"] = true, ["ValveBiped.Bip01_L_UpperArm"] = true,
+	["ValveBiped.Bip01_R_Thigh"] = true, ["ValveBiped.Bip01_L_Thigh"] = true,
+}
+
+local flexionBones = {
+	{"ValveBiped.Bip01_R_Hand", "ValveBiped.Bip01_Spine2", 1.2},
+	{"ValveBiped.Bip01_L_Hand", "ValveBiped.Bip01_Spine2", 1.2},
+	{"ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_Spine2", 1.0},
+	{"ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_Spine2", 1.0},
+	{"ValveBiped.Bip01_Head1", "ValveBiped.Bip01_Spine2", 0.6},
 }
 
 local straightBonesAll = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
@@ -68,7 +86,7 @@ local function getRandomSpasm()
 		cur = cur + spasmTypes[i][2]
 		if roll <= cur then return spasmTypes[i][1] end
 	end
-	return "posturing"
+	return "extend"
 end
 
 hg.getRandomSpasm = getRandomSpasm
@@ -81,14 +99,17 @@ end
 
 local function applySpasm(rag, stype, useFencing)
 	if not IsValid(rag) then return end
-	local dur = stype == "posturing" and posturingDur or stype == "seizure" and seizureDur or rigorDur
+	if stype == "posturing" then
+		stype = (math_random() < 0.55) and "extend" or "flexion"
+	end
+	local dur = (stype == "extend" or stype == "flexion") and posturingDur or stype == "seizure" and seizureDur or rigorDur
 	dur = math_rand(dur[1], dur[2])
 	local org = rag.organism
 	local brainFactor = getBrainFactor(org)
 	rag.spasmStiffness = brainFactor
 	rag.spasmWear = 0
 	dur = dur * (1 + brainFactor * 0.4)
-	if stype == "posturing" or stype == "seizure" then
+	if stype == "extend" or stype == "flexion" or stype == "seizure" then
 		rag.spasmBreathAt = CurTime() + math_rand(2, 3)
 		rag.spasmBreathPlayed = false
 	end
@@ -96,7 +117,7 @@ local function applySpasm(rag, stype, useFencing)
 	rag.spasm, rag.spasmType, rag.spasmDur, rag.spasmForce = true, stype, dur, FORCE
 	rag.spasmEnd, rag.spasmStart = CurTime() + dur, CurTime()
 	rag.spasmFencing = useFencing and true or nil
-	rag.spasmUpperBodyOnly = (stype == "posturing" and math_random() < POSTURING_PARTIAL_UPPER_CHANCE) and true or nil
+	rag.spasmUpperBodyOnly = ((stype == "extend" or stype == "flexion") and math_random() < POSTURING_PARTIAL_UPPER_CHANCE) and true or nil
 	
 	if stype == "rigor" then
 		rag.rigorActive = true
@@ -183,31 +204,50 @@ local function processSeizure(rag, fade)
 	applyFingerCurl(rag, math_sin(CurTime() * 15) * 0.5 + 0.5)
 end
 
-local function processPosturing(rag, fade)
-	if not IsValid(rag) or not rag.organism then return end
-	local spine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
-	if not spine2 then return end
-	local phys = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(spine2))
-	if not IsValid(phys) then return end
-	local ang = phys:GetAngles()
-	ang:Add(AngleRand(-5, 5))
-	ang:RotateAroundAxis(ang:Up(), 180)
-	local mul = 1000 * rag.organism.pulse / 70
-	local damp = 50
-	local ss = 0.001
-	shadowControl(rag, 3, ss, ang, mul, damp, vector_zero, 0, 0)
-	shadowControl(rag, 4, ss, ang, mul, damp, vector_zero, 0, 0)
-	shadowControl(rag, 5, ss, ang, mul, damp, vector_zero, 0, 0)
-	shadowControl(rag, 2, ss, ang, mul, damp, vector_zero, 0, 0)
-	if not rag.spasmFencing then
-		shadowControl(rag, 6, ss, ang, mul, damp, vector_zero, 0, 0)
-		shadowControl(rag, 7, ss, ang, mul, damp, vector_zero, 0, 0)
+local function applyPosturingDamping(rag, fade)
+	local damp = 2 + 10 * fade
+	for i = 0, rag:GetPhysicsObjectCount() - 1 do
+		local phys = rag:GetPhysicsObjectNum(i)
+		if IsValid(phys) then
+			phys:SetDamping(0.8, damp)
+		end
 	end
-	if not rag.spasmUpperBodyOnly then
-		shadowControl(rag, 8, ss, ang, mul, damp, vector_zero, 0, 0)
-		shadowControl(rag, 9, ss, ang, mul, damp, vector_zero, 0, 0)
-		shadowControl(rag, 11, ss, ang, mul, damp, vector_zero, 0, 0)
-		shadowControl(rag, 12, ss, ang, mul, damp, vector_zero, 0, 0)
+end
+
+local function processExtend(rag, fade)
+	applyPosturingDamping(rag, fade)
+	local scale = getSpasmScale(rag)
+	local stiff = getStiffnessScale(rag)
+	local force = (rag.spasmForce or FORCE) * scale * stiff
+	local pulse = 0.7 + math_sin(CurTime() * 8) * 0.3
+	local pelvis = rag:LookupBone("ValveBiped.Bip01_Pelvis")
+	if not pelvis then return end
+	local pelvisPos = rag:GetBonePosition(pelvis)
+	
+	for name in pairs(extendBones) do
+		local bone = rag:LookupBone(name)
+		if not bone then continue end
+		local phys = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(bone))
+		if not IsValid(phys) then continue end
+		local dir = (rag:GetBonePosition(bone) - pelvisPos):GetNormalized()
+		phys:ApplyForceCenter((dir * force * fade * pulse) + VectorRand(-VIBRATION, VIBRATION) * fade)
+	end
+end
+
+local function processFlexion(rag, fade)
+	applyPosturingDamping(rag, fade)
+	local scale = getSpasmScale(rag)
+	local stiff = getStiffnessScale(rag)
+	local force = FLEXION_FORCE * scale * stiff
+	local pulse = 0.8 + math_sin(CurTime() * 5) * 0.2
+	for i = 1, #flexionBones do
+		local d = flexionBones[i]
+		local bone, targetBone = rag:LookupBone(d[1]), rag:LookupBone(d[2])
+		if not bone or not targetBone then continue end
+		local phys = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(bone))
+		if not IsValid(phys) then continue end
+		local dir = (rag:GetBonePosition(targetBone) - rag:GetBonePosition(bone)):GetNormalized()
+		phys:ApplyForceCenter((dir * force * d[3] * fade * pulse) + VectorRand(-30, 30) * fade)
 	end
 end
 
@@ -400,14 +440,14 @@ hook.Add("Org Think", "BrainfuckThink", function(owner, org, timeValue)
 		else
 			local fade = math_clamp((deathRag.spasmEnd - CurTime()) / (deathRag.spasmDur or 5), 0.1, 1)
 			local fadeIn = math_clamp((CurTime() - (deathRag.spasmStart or CurTime())) / 4, 0, 1)
-			local stype = deathRag.spasmType or "posturing"
-			if stype == "posturing" then
+			local stype = deathRag.spasmType or "extend"
+			if stype == "extend" or stype == "flexion" then
 				local slowFadeIn = math_clamp((CurTime() - (deathRag.spasmStart or CurTime())) / 7, 0, 1)
 				fade = fade * slowFadeIn * slowFadeIn
 			elseif stype == "seizure" then
 				fade = fade * fadeIn
 			end
-			if (stype == "posturing" or stype == "seizure") and deathRag.spasmBreathAt and not deathRag.spasmBreathPlayed and CurTime() >= deathRag.spasmBreathAt then
+			if (stype == "extend" or stype == "flexion" or stype == "seizure") and deathRag.spasmBreathAt and not deathRag.spasmBreathPlayed and CurTime() >= deathRag.spasmBreathAt then
 				deathRag.spasmBreathPlayed = true
 				if not (deathRag.noHead or (org and org.noHead) or (owner and owner.noHead)) and math_random() > 0.5 then
 					local isAlive = true
@@ -425,13 +465,16 @@ hook.Add("Org Think", "BrainfuckThink", function(owner, org, timeValue)
 				end
 			end
 
-			if stype == "posturing" then
+			if stype == "extend" then
 				if deathRag.spasmFencing then processFencing(deathRag, fade) end
-				processPosturing(deathRag, fade)
+				processExtend(deathRag, fade)
+			elseif stype == "flexion" then
+				if deathRag.spasmFencing then processFencing(deathRag, fade) end
+				processFlexion(deathRag, fade)
 			elseif stype == "seizure" then processSeizure(deathRag, fade)
 			elseif stype == "rigor" then processRigor(deathRag, fade)
 			end
-			local target = (stype == "posturing") and 1 or 0
+			local target = (stype == "extend" or stype == "flexion") and 1 or 0
 			if stype == "seizure" then target = 0 end -- seizure handles its own finger curling
 			if stype ~= "seizure" then updateFingerCurl(deathRag, target, timeValue) end
 		end
