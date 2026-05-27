@@ -733,3 +733,11 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
         end
     end
 end)
+
+-- Reapply floppy/broken constraints to the corpse when the player dies
+hook.Add("RagdollDeath", "ReapplyBrokenLimbConstraintsDeath", function(ply, ragdoll)
+    local fakeHook = hook.GetTable()["Fake"] and hook.GetTable()["Fake"]["ReapplyBrokenLimbConstraints"]
+    if fakeHook then
+        fakeHook(ply, ragdoll)
+    end
+end)

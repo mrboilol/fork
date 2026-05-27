@@ -1122,7 +1122,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 							-- Oscillation increases with pulse (straighter stream wobbles more at high pulse)
 							local oscMul = pulseFactor * forceMul
-							local streamOsc = right * 20 * oscMul * math.sin(CurTime() * hb * 2.5) + up * 12 * oscMul * math.cos(CurTime() * hb * 2.5)
+							local oscTime = CurTime() * hb * 0.6
+							local oscAmpRight = baseForward:Length() * 0.25 * pulseFactor
+							local oscAmpUp = baseForward:Length() * 0.15 * pulseFactor
+							local streamOsc = right * oscAmpRight * math.sin(oscTime) + up * oscAmpUp * math.cos(oscTime)
 
 							-- Spread increases at low pulse (messy stream at low pressure)
 							local spreadMul = lowPulseFactor * 2.5 + 0.5 -- More spread at low pulse, some at high pulse
@@ -1131,7 +1134,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 2.5
 								local arteriaForward = dir * 8 * arteriaForce * 0.8 -- 0.8x distance
-								local arteriaOsc = right * 28 * oscMul * arteriaForce * math.sin(CurTime() * hb * 2.5) + up * 16 * oscMul * arteriaForce * math.cos(CurTime() * hb * 2.5)
+								local arteriaOscAmpRight = arteriaForward:Length() * 0.3 * pulseFactor
+								local arteriaOscAmpUp = arteriaForward:Length() * 0.18 * pulseFactor
+								local arteriaOsc = right * arteriaOscAmpRight * math.sin(oscTime) + up * arteriaOscAmpUp * math.cos(oscTime)
 								local arteriaSpread = right * math.Rand(-2, 2) * spreadMul + up * math.Rand(-2, 2) * spreadMul
 								-- Single stream to prevent duplicate spraying
 								hg.addBloodPart(pos + right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5), arteriaForward + arteriaOsc + arteriaSpread, nil, 1, 1, true, nil, ent)

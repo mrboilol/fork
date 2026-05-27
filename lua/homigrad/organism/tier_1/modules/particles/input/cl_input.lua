@@ -67,20 +67,20 @@ local Rand = math.Rand
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
 
-local function impact(pos,vel,mul)
+local function impact(pos,vel,mul,owner)
 	local max = math.min(mul,8)
 	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
 	
 	if hg_bloodimpacts:GetBool() then
-		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3, false, owner)
+		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3, false, owner)
+		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3, false, owner)
 	end
 
 	for i = 1, iters do
 		local size = 1--math.random(2, 4) * 1
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false, owner)
 	end
 end
 
@@ -91,7 +91,16 @@ net.Receive("hg_bloodimpact", function()
 	local amt = net.ReadInt(8)
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
-	for i = 1, amt do impact(pos,vel,mul) end
+	
+	local owner = nil
+	for _, v in ipairs(ents.FindInSphere(pos, 40)) do
+		if v:IsPlayer() or v:IsNPC() or v:IsNextBot() or v:IsRagdoll() then 
+			owner = v 
+			break 
+		end
+	end
+
+	for i = 1, amt do impact(pos,vel,mul,owner) end
 end)
 	net.Receive("hg_brainmist", function()
 	local ent = net.ReadEntity()

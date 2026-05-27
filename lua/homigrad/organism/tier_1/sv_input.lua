@@ -1749,6 +1749,7 @@ end
 -- Stores prior values so they can be restored on heal. Declared before
 -- hg.BreakNeck because BreakNeck calls it (Lua resolves free variables
 -- lexically at parse time, so the local must already be in scope).
+local getPhysBoneForAnimationBone
 local function applyFloppyBoneOffset(rag, boneName, offsetPos, offsetAng, key)
     if not IsValid(rag) then return end
     local boneID = rag:LookupBone(boneName)
@@ -1851,12 +1852,12 @@ function hg.BreakNeck(ent, fromDamage)
 		local neckBoneName = ragdoll:GetBoneName(neckBoneId)
 		print("[HG Floppy] BreakNeck timer: headBoneId=" .. tostring(headBoneId) .. " neckBoneId=" .. tostring(neckBoneId) .. " neckBoneName=" .. tostring(neckBoneName))
 		
-		local headPhysBone = ragdoll:TranslateBoneToPhysBone(headBoneId)
-		local neckPhysBone = ragdoll:TranslateBoneToPhysBone(neckBoneId)
+		local headPhysBone = getPhysBoneForAnimationBone(ragdoll, headBoneId)
+		local neckPhysBone = getPhysBoneForAnimationBone(ragdoll, neckBoneId)
 		print("[HG Floppy] BreakNeck timer: headPhysBone=" .. tostring(headPhysBone) .. " neckPhysBone=" .. tostring(neckPhysBone))
 		
-		if headPhysBone == -1 or neckPhysBone == -1 then
-			print("[HG Floppy] BreakNeck timer FAIL: phys bone -1")
+		if not headPhysBone or not neckPhysBone or headPhysBone == -1 or neckPhysBone == -1 then
+			print("[HG Floppy] BreakNeck timer FAIL: phys bone invalid")
 			return
 		end
 		if headPhysBone == neckPhysBone then
@@ -1892,14 +1893,12 @@ function hg.BreakNeck(ent, fromDamage)
 		local head_pos = phead:GetPos()
 		local neck_pos = pneck:GetPos()
 		
-		local jointPos = ragdoll:GetBonePosition(headBoneId)
-		if not jointPos or jointPos == ragdoll:GetPos() then
-			jointPos = head_pos
-		end
+		-- Use child physical origin as jointPos to eliminate physical mismatch and stretching
+		local jointPos = head_pos
 		
 		-- Calculate local positions for both physics objects
 		local lpos1 = WorldToLocal(jointPos, angle_zero, pneck:GetPos(), pneck:GetAngles())
-		local lpos2 = WorldToLocal(jointPos, angle_zero, phead:GetPos(), phead:GetAngles())
+		local lpos2 = vector_origin
 
 		-- Add floppy neck constraint with generous limits for floppy head
 		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -80, -80, -80, 80, 80, 80, 0, 0, 0, 0, 0)
@@ -2095,7 +2094,7 @@ end
 -- Helper: reliably map an animation bone to its physics bone index.
 -- TranslateBoneToPhysBone is unreliable on some ragdolls, so we build a
 -- reverse lookup with TranslatePhysBoneToBone and fall back to distance.
-local function getPhysBoneForAnimationBone(rag, boneID)
+getPhysBoneForAnimationBone = function(rag, boneID)
     if not boneID then return nil end
     -- Method 1: reverse mapping via TranslatePhysBoneToBone
     for i = 0, rag:GetPhysicsObjectCount() - 1 do
@@ -2191,20 +2190,14 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     pBone1:EnableMotion(true)
     pBone2:EnableMotion(true)
 
-    -- Set constraint position to the joint location (between the two connected bones)
-    -- We use the actual animation bone position for the first bone (the child), which corresponds to the joint
-    local jointPos = rag:GetBonePosition(bone1ID)
-    if not jointPos or jointPos == rag:GetPos() then
-        -- Fallback to the midpoint between the two physics objects
-        local pos1 = pBone1:GetPos()
-        local pos2 = pBone2:GetPos()
-        jointPos = (pos1 + pos2) / 2
-    end
+    -- Set constraint position to the child bone's physical origin, which is exactly the joint location in Source ragdolls.
+    -- This prevents any mismatch between the animated skeleton and simulated physics objects, eliminating stretch.
+    local jointPos = pBone1:GetPos()
     print("[HG Floppy] createFloppyLimbConstraint: jointPos=" .. tostring(jointPos))
 
     -- Use constraint.AdvBallsocket like the neck constraint (more reliable)
     -- Calculate local positions for both physics objects at the joint
-    local lpos = WorldToLocal(jointPos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
+    local lpos = vector_origin
     local lpos2 = WorldToLocal(jointPos, angle_zero, pBone2:GetPos(), pBone2:GetAngles())
 
     -- Convert limits to numbers for AdvBallsocket
@@ -2375,11 +2368,18 @@ function hg.RemoveLimbConstraints(ent, limb)
                 local pBone1 = ragdoll:GetPhysicsObjectNum(phys1)
                 local pBone2 = ragdoll:GetPhysicsObjectNum(phys2)
                 if IsValid(pBone1) and IsValid(pBone2) then
-                    local jointPos = ragdoll:GetBonePosition(bone1)
-                    if not jointPos or jointPos == ragdoll:GetPos() then
-                        jointPos = (pBone1:GetPos() + pBone2:GetPos()) / 2
+                    -- Prevent physical explosion when healing by gently snapping bones back if they stretched too far
+                    local pos1 = pBone1:GetPos()
+                    local pos2 = pBone2:GetPos()
+                    if pos1:Distance(pos2) > 25 then
+                        local dir = (pos1 - pos2):GetNormalized()
+                        pBone1:SetPos(pos2 + dir * 15)
+                        pBone1:Wake()
                     end
-                    local lpos1 = WorldToLocal(jointPos, angle_zero, pBone1:GetPos(), pBone1:GetAngles())
+
+                    -- Use child physical origin as the jointPos for perfect alignment
+                    local jointPos = pBone1:GetPos()
+                    local lpos1 = vector_origin
                     local lpos2 = WorldToLocal(jointPos, angle_zero, pBone2:GetPos(), pBone2:GetAngles())
                     
                     local limits = bb_constraints_limit[floppyData.bone1]
@@ -2391,8 +2391,8 @@ function hg.RemoveLimbConstraints(ent, limb)
                         local minRoll = tonumber(limits[2][1]) or -45
                         local maxRoll = tonumber(limits[2][0]) or 45
                         
-                        -- Use friction = 50 to make it act like a normal stiff ragdoll joint
-                        constraint.AdvBallsocket(ragdoll, ragdoll, phys1, phys2, lpos1, lpos2, 0, 0, minPitch, minYaw, minRoll, maxPitch, maxYaw, maxRoll, 50, 50, 50, 0, 0)
+                        -- Use friction = 0.1 to act like a normal stable GMod ragdoll joint and prevent spazzing/freaking out
+                        constraint.AdvBallsocket(ragdoll, ragdoll, phys1, phys2, lpos1, lpos2, 0, 0, minPitch, minYaw, minRoll, maxPitch, maxYaw, maxRoll, 0.1, 0.1, 0.1, 0, 0)
                     end
                 end
                 
