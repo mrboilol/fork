@@ -552,6 +552,17 @@ function SWEP:PrimaryAttack(broadcast)
 	local huy = self:Shoot() ~= false
 	
 	if SERVER and huy then
+		local owner = self:GetOwner()
+		if IsValid(owner) and owner:IsPlayer() and owner.organism then
+			local org = owner.organism
+			local rhandBroken = (org.rarm or 0) >= 1
+			local rhandDislocated = org.rarmdislocated
+			if rhandBroken or rhandDislocated then
+				local shootPain = rhandBroken and 12 or 4
+				org.painadd = math.min(org.painadd + shootPain, 250)
+			end
+		end
+
 		net.Start("hgwep shoot", true)
 		net.WriteEntity(self)
 		net.WriteBool(huy)
@@ -1259,13 +1270,23 @@ function SWEP:CoreStep()
 	-- Aiming too long with a broken right hand causes pain
 	if SERVER and IsValid(owner) and owner:IsPlayer() and owner.organism then
 		local org = owner.organism
-		local rhandBroken = org.rarm == 1
+		local rhandBroken = (org.rarm or 0) >= 1
 		local rhandDislocated = org.rarmdislocated
 		if self:IsZoom() and (rhandBroken or rhandDislocated) then
 			self.brokenRHandAimTime = (self.brokenRHandAimTime or 0) + FrameTime()
-			local threshold = rhandBroken and 3 or 5
+			
+			local isPistol = self:IsPistolHoldType()
+			local threshold = 0 -- Default for two-handed (hurts immediately)
+			if isPistol then
+				threshold = rhandBroken and 3 or 5 -- One-handed gets a grace period
+			end
+			
 			if self.brokenRHandAimTime > threshold then
-				org.painadd = math.min(org.painadd + (rhandBroken and 0.4 or 0.2) * FrameTime(), 150)
+				local painMultiplier = isPistol and 1 or 3
+				if rhandDislocated and not rhandBroken then
+					painMultiplier = painMultiplier * 0.4 -- Dislocations are less severe
+				end
+				org.painadd = math.min(org.painadd + (0.4 * painMultiplier) * FrameTime() * 15, 200)
 			end
 		else
 			self.brokenRHandAimTime = 0
@@ -1822,38 +1843,70 @@ function SWEP:GetAdditionalValues()
 	self.AdditionalPosPreLerp[2] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and 1 - add or 0
 	self.AdditionalPosPreLerp[3] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and -0.5 or 0
 
-	if ply.organism and ply.organism.rarm and (ply.organism.larm and ply.organism.larm > 0.99 and not self:IsPistolHoldType() or ply.organism.rarm > 0.99) then
-		--ply.posture = 1
-		
-		-- Use smaller positional offsets to keep the arm from overstretching and breaking the IK solver
-		self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 3 * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
-		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + (ply.organism.rarmamputated and -1 or 2)
-		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 1)
-		
-		-- Add a heavy angular droop to visually indicate the arm is weak
-		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 25
-		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] - 10
-		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] - 15
+	-- Calculate aiming fatigue
+	if self:IsZoom() then
+		self.aimFatigue = math.Approach(self.aimFatigue or 0, 1, FrameTime() * 0.1) -- takes 10 seconds to fully fatigue
+	else
+		self.aimFatigue = math.Approach(self.aimFatigue or 0, 0, FrameTime() * 0.2) -- recovers in 5 seconds
+	end
 
-		if hg.KeyDown(ply, IN_ATTACK2) then
-			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 2
-			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 1
-			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] - 10
+	local rarm_broken = ply.organism and ((ply.organism.rarm or 0) >= 1)
+	local rarm_dislocated = ply.organism and ply.organism.rarmdislocated
+	local larm_broken = ply.organism and ((ply.organism.larm or 0) >= 1)
+	local larm_dislocated = ply.organism and ply.organism.larmdislocated
+
+	local handSway = 0
+	if rarm_broken or rarm_dislocated then
+		-- Right hand is bad. We only hold with it if we don't prioritize left hand.
+		-- We prioritize left hand only if left hand is completely fine.
+		local prioritize_left = not (larm_broken or larm_dislocated or (ply.organism and ply.organism.larmamputated))
+		if not prioritize_left then
+			handSway = rarm_broken and 4 or 1.5
+			if larm_broken then
+				handSway = handSway + 3.5 -- Both broken = massive sway!
+			elseif larm_dislocated then
+				handSway = handSway + 1.2
+			end
 		end
+	elseif larm_broken or larm_dislocated then
+		-- Right hand is fine, but left hand is bad. So left hand is set aside, right hand holds it.
+		-- Right hand is fine, but we only have 1 hand, so some light sway.
+		handSway = larm_broken and 1 or 0.4
+	end
+
+	local fatigueSwayVal = (self.aimFatigue or 0) * 1.5
+	local totalSway = handSway + fatigueSwayVal
+	local totalSwayPos = handSway * 0.15 + (self.aimFatigue or 0) * 0.3
+
+	if totalSway > 0 then
+		local t = CurTime() * (4 + (self.aimFatigue or 0) * 2)
+		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * totalSway
+		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * totalSway
+		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * totalSway * 0.5
 		
-		-- Add additional sway for broken arms
-		local t = CurTime() * 4
-		local swayAmount = 2
-		local swayPosAmount = 0.5
-		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * swayAmount
-		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * swayAmount
-		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * swayAmount * 0.5
+		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 0.7) * totalSwayPos
+		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.cos(t * 0.9) * totalSwayPos
 		
-		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 0.7) * swayPosAmount
-		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.cos(t * 0.9) * swayPosAmount
-		
+		if handSway > 1 then
+			-- Use smaller positional offsets to keep the arm from overstretching and breaking the IK solver
+			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 3 * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
+			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + (ply.organism.rarmamputated and -1 or 2)
+			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 1)
+			
+			-- Add a heavy angular droop to visually indicate the arm is weak
+			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 20 * (rarm_broken and 1 or 0.4)
+			self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] - 8 * (rarm_broken and 1 or 0.4)
+			self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] - 12 * (rarm_broken and 1 or 0.4)
+
+			if hg.KeyDown(ply, IN_ATTACK2) then
+				self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 2
+				self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 1
+				self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] - 10
+			end
+		end
+
 		if CLIENT and self:IsLocal2() then
-			local viewSway = Angle(math.sin(t * 1.1) * 0.008, math.cos(t * 0.85) * 0.008, math.sin(t * 0.9) * 0.003)
+			local viewSway = Angle(math.sin(t * 1.1) * 0.003 * totalSway, math.cos(t * 0.85) * 0.003 * totalSway, math.sin(t * 0.9) * 0.001 * totalSway)
 			ViewPunch2(viewSway)
 		end
 	end
@@ -2353,6 +2406,10 @@ function SWEP:SetHandPos(noset)
 			addvec_fem:Add(ply:GetAimVector():Angle():Right() * 0.3)
 		end
 
+		local rarm_bad = ent.organism and ((ent.organism.rarm or 0) >= 1 or ent.organism.rarmdislocated or ent.organism.rarmamputated)
+		local larm_bad = ent.organism and ((ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated or ent.organism.larmamputated)
+		local prioritize_left = rarm_bad and not larm_bad
+
 		local angs = ply:EyeAngles()
 		for bone1 = 0, mdl:GetBoneCount() - 1 do
 			local name = mdl:GetBoneName(bone1)
@@ -2360,11 +2417,11 @@ function SWEP:SetHandPos(noset)
 			if !(TPIKBonesLHDict[name] or TPIKBonesRHDict[name]) then continue end
 			if (TPIKBonesLHDict[name] and (!canuseleft or !self.lhandik)) then continue end
 			if (TPIKBonesRHDict[name] and (!canuseright or !self.rhandik)) then continue end
-			--[[if ent.organism and ent.organism.rarmamputated then
+			if prioritize_left then
 				name = TPIKBonesRHDictTranslate[name]
 
 				if !name then continue end
-			end--]]
+			end
 
 			//if name != "ValveBiped.Bip01_L_Hand" then continue end
 			--print(name)
@@ -2381,7 +2438,7 @@ function SWEP:SetHandPos(noset)
 			wm_bonematrix:SetTranslation(wm_bonematrix:GetTranslation() + (TPIKBonesLHDict[name] and addvec_fem or vector_origin))
 			if name == "ValveBiped.Bip01_R_Finger12" then wm_bonematrix:SetAngles(wm_bonematrix:GetAngles() + self.anglefinger) end
 
-			--[[if ent.organism and ent.organism.rarmamputated then
+			if prioritize_left then
 				local mirrormat = mdl:GetBoneMatrix(mdl:LookupBone("ValveBiped.Bip01_R_Hand"))
 				
 				local pos = wm_bonematrix:GetTranslation()
@@ -2389,7 +2446,7 @@ function SWEP:SetHandPos(noset)
 				
 				pos = pos + angs:Right() * -(pos - mirrorpos):Dot(angs:Right())
 				wm_bonematrix:SetTranslation(pos)
-			end--]]
+			end
 
 			ent:SetBoneMatrix(ply_boneindex, wm_bonematrix)
 			if ply:LookupBone(ply:GetBoneName(ply_boneindex)) then ply:SetBoneMatrix(ply_boneindex, wm_bonematrix) end

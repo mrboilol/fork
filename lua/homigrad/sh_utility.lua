@@ -1477,7 +1477,7 @@ local IsValid = IsValid
 	function hg.CanUseLeftHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
-		if ent.organism and ent.organism.larmamputated then
+		if ent.organism and (ent.organism.larmamputated or (ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated) then
 			return false
 		end
 
@@ -1504,8 +1504,16 @@ local IsValid = IsValid
 	function hg.CanUseRightHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
-		if ent.organism and ent.organism.rarmamputated then
-			return false
+		if ent.organism then
+			if ent.organism.rarmamputated then
+				return false
+			end
+			-- if right arm is bad but left arm is fine, prioritize left hand (so return false for right hand)
+			local rarm_bad = (ent.organism.rarm or 0) >= 1 or ent.organism.rarmdislocated
+			local larm_bad = (ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated
+			if rarm_bad and not larm_bad then
+				return false
+			end
 		end
 
 		return true
