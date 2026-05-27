@@ -69,8 +69,17 @@ bloodparticles_hook[4] = function(mul)
     local time = CurTime()
     local grav = gravity:GetInt() / 30
 
-    -- Cap check with FIFO deletion
-    local cap = 50000
+    -- Age-based deletion (90 seconds)
+    local maxAge = 90
+    for i = #hg.bloodparticles2, 1, -1 do
+        local part = hg.bloodparticles2[i]
+        if part and part.spawnTime and (time - part.spawnTime) > maxAge then
+            table_remove(hg.bloodparticles2, i)
+        end
+    end
+
+    -- Emergency cap only when very high
+    local cap = 100000
     while #hg.bloodparticles2 > cap do
         table_remove(hg.bloodparticles2, 1)
     end

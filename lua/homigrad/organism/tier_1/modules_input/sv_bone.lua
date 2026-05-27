@@ -158,8 +158,8 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 				PlayBoneBreakSound(org.owner)
 
-		-- Small chance to puncture artery at break site
-		if math.random() < 0.12 then
+		-- Chance to puncture artery at break site
+		if math.random() < 0.25 then
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
@@ -187,8 +187,8 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		PlayBoneBreakSound(org.owner)
 
-		-- Even smaller chance to puncture artery at dislocation site
-		if math.random() < 0.04 then
+		-- Chance to puncture artery at dislocation site
+		if math.random() < 0.10 then
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
@@ -250,8 +250,8 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
 
-		-- Small chance to puncture artery at break site
-		if math.random() < 0.12 then
+		-- Chance to puncture artery at break site
+		if math.random() < 0.25 then
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)
@@ -279,8 +279,8 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
 
-		-- Even smaller chance to puncture artery at dislocation site
-		if math.random() < 0.04 then
+		-- Chance to puncture artery at dislocation site
+		if math.random() < 0.10 then
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)

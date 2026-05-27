@@ -1845,9 +1845,9 @@ function SWEP:GetAdditionalValues()
 
 	-- Calculate aiming fatigue
 	if self:IsZoom() then
-		self.aimFatigue = math.Approach(self.aimFatigue or 0, 1, FrameTime() * 0.1) -- takes 10 seconds to fully fatigue
+		self.aimFatigue = math.Approach(self.aimFatigue or 0, 1, FrameTime() * 0.04) -- takes 25 seconds of continuous aiming to fully fatigue
 	else
-		self.aimFatigue = math.Approach(self.aimFatigue or 0, 0, FrameTime() * 0.2) -- recovers in 5 seconds
+		self.aimFatigue = math.Approach(self.aimFatigue or 0, 0, FrameTime() * 0.1) -- recovers in 10 seconds
 	end
 
 	local rarm_broken = ply.organism and ((ply.organism.rarm or 0) >= 1)
@@ -1861,25 +1861,30 @@ function SWEP:GetAdditionalValues()
 		-- We prioritize left hand only if left hand is completely fine.
 		local prioritize_left = not (larm_broken or larm_dislocated or (ply.organism and ply.organism.larmamputated))
 		if not prioritize_left then
-			handSway = rarm_broken and 4 or 1.5
+			-- Both are bad! Fallback to using the bad right hand.
+			handSway = rarm_broken and 3.5 or 1.2
 			if larm_broken then
-				handSway = handSway + 3.5 -- Both broken = massive sway!
+				handSway = handSway + 2.0 -- Both broken = massive sway!
 			elseif larm_dislocated then
-				handSway = handSway + 1.2
+				handSway = handSway + 0.8
 			end
+		else
+			-- Right arm is bad, but left arm is completely fine. So we prioritize left hand.
+			-- Left hand is LESS DOMINANT than right hand, so we have higher sway when using just the left hand!
+			handSway = rarm_broken and 1.8 or 0.7
 		end
 	elseif larm_broken or larm_dislocated then
-		-- Right hand is fine, but left hand is bad. So left hand is set aside, right hand holds it.
-		-- Right hand is fine, but we only have 1 hand, so some light sway.
-		handSway = larm_broken and 1 or 0.4
+		-- Right hand is fine, but left hand is bad. Left hand is set aside, right hand holds it.
+		-- Right hand is DOMINANT and fine, so we have excellent control and very small, steady sway.
+		handSway = larm_broken and 0.8 or 0.3
 	end
 
 	local fatigueSwayVal = (self.aimFatigue or 0) * 1.5
 	local totalSway = handSway + fatigueSwayVal
-	local totalSwayPos = handSway * 0.15 + (self.aimFatigue or 0) * 0.3
+	local totalSwayPos = handSway * 0.12 + (self.aimFatigue or 0) * 0.3
 
 	if totalSway > 0 then
-		local t = CurTime() * (4 + (self.aimFatigue or 0) * 2)
+		local t = CurTime() * (2.2 + (self.aimFatigue or 0) * 1.5) -- Slower frequency to make it smooth instead of fast shaking
 		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * totalSway
 		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * totalSway
 		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * totalSway * 0.5

@@ -88,7 +88,9 @@ hook.Add("Org Think", "PepperSprayRegression", function(ply, org, dt)
     if isPhase1 or isPhase2 then
         ply.PS_NextPainTick = ply.PS_NextPainTick or 0
         if CurTime() >= ply.PS_NextPainTick then
-            local painAdd = isPhase2 and 0.3 or 0.12
+            -- Pain scales with exposure amount
+            local exposureMultiplier = math.Clamp(exposure / SPRAY_THRESHOLD, 0.5, 3)
+            local painAdd = isPhase2 and (0.3 * exposureMultiplier) or (0.12 * exposureMultiplier)
             org.painadd = (org.painadd or 0) + painAdd
             ply.PS_NextPainTick = CurTime() + PAIN_TICK_DELAY
         end

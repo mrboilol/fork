@@ -110,11 +110,13 @@ module[2] = function(owner, org, mulTime)
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
 		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
 		local regenBoost = 1 + math.Clamp(timeSinceBleed / 30, 0, 2)
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost, 5000)
+		local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
+		local goodmoodBonus = 1 + goodmood * 0.3
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost * goodmoodBonus, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-	local adrenalineStabilizer = totalAdrenaline > 0.5
+	local adrenalineStabilizer = totalAdrenaline > 0.2 -- Lowered threshold for better protection
 
 	if org.hemotransfusionshock > 0 then
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 150,0)
@@ -230,11 +232,19 @@ module[2] = function(owner, org, mulTime)
 
 	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
 
-	-- Ischemia kicks in below 2500 blood (blocked by epinephrine/adrenaline > 0.5)
+	-- Ischemia kicks in below 2500 blood (blocked by epinephrine/adrenaline > 0.2)
 	-- Tranexamic acid and thiamine also prevent this ischemia
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 	if org.blood < 2500 and not adrenalineStabilizer and not hasAntiIschemia then
 		org.ischemia = math.min(org.ischemia + mulTime * 0.015, 1.0)
+	end
+	
+	-- Active ischemia reduction from tranexamic acid, thiamine, and adrenaline
+	if hasAntiIschemia then
+		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.02, 0)
+	end
+	if adrenalineStabilizer then
+		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.01 * totalAdrenaline, 0)
 	end
 
 	local bleed = org.internalBleed / 14 -- + org.lungsR[3] + org.lungsL[3]

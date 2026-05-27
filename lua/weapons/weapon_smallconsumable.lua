@@ -91,6 +91,15 @@ if SERVER then
 			org.satiety = org.satiety + 20
 		end
 
+		-- Stamina regeneration boost
+		if org.stamina and org.stamina[1] then
+			org.stamina[1] = math.min(org.stamina[1] + 15, org.stamina.max or 180)
+		end
+		
+		-- Pain relief
+		org.pain = math.max((org.pain or 0) - 5, 0)
+		org.painadd = math.max((org.painadd or 0) - 3, 0)
+
 		if org.hungry < 20 and org.thirst < 20 then
 			org.satiety = org.satiety + 10
 			org.hydration = org.hydration + 10

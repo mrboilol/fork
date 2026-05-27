@@ -327,23 +327,45 @@ function SWEP:ApplyForce()
 					if (self.CPRThink or 0) < CurTime() then
 						self.CPRThink = CurTime() + (1 / 120) * 60
 						if org.alive then
-							//org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 2 * (ply.Profession == "doctor" and 2 or 1), org.o2.range)
-							org.pulse = math.min(org.pulse + 5 * (ply.Profession == "doctor" and 2 or 1),70)
-							org.CO = math.Approach(org.CO, 0, (ply.Profession == "doctor" and 2 or 1))
-							org.COregen = math.Approach(org.COregen, 0, (ply.Profession == "doctor" and 2 or 1))
-
-							if math_random(3) == 1 then
+							local skillMult = ply.Profession == "doctor" and 2 or 1
+							
+							-- Improved oxygenation
+							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)
+							
+							-- Better pulse restoration
+							org.pulse = math.min(org.pulse + 8 * skillMult, 70)
+							
+							-- Blood pressure restoration
+							local targetBP = org.pulse * 1.2
+							org.bloodpressure = math.Approach(org.bloodpressure or 0, targetBP, 2 * skillMult)
+							
+							-- CO removal
+							org.CO = math.Approach(org.CO, 0, skillMult)
+							org.COregen = math.Approach(org.COregen, 0, skillMult)
+							
+							-- Blood regeneration boost during CPR
+							if org.blood < 5000 and org.bleed < 1 then
+								org.blood = math.min(org.blood + 2 * skillMult, 5000)
+							end
+							
+							-- Lungs function restoration
+							if math.random(2) == 1 then
 								org.lungsfunction = true
 							end
-
-							if math_random(50) == 1 and (ply.Profession != "doctor") then
+							
+							-- Reduced chest damage chance for doctors
+							if math.random(50) == 1 and (ply.Profession != "doctor") then
 								local dmginfo = DamageInfo()
 								dmginfo:SetDamageType(DMG_CRUSH)
 								dmginfo:SetInflictor(self)
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
-
-							if org.pulse > 15 then org.heartstop = false end
+							
+							-- More reliable heart restart
+							if org.pulse > 10 then org.heartstop = false end
+							
+							-- Reduce ischemia during CPR
+							org.ischemia = math.max((org.ischemia or 0) - 0.5 * skillMult, 0)
 						end
 
 						phys:ApplyForceCenter(-vector_up * 6000)

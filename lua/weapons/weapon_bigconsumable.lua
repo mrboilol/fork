@@ -140,6 +140,16 @@ if SERVER then
 		if self.CDEating > CurTime() then return end
 
 		org.satiety = org.satiety + 50/5
+		
+		-- Stamina regeneration boost
+		if org.stamina and org.stamina[1] then
+			org.stamina[1] = math.min(org.stamina[1] + 20, org.stamina.max or 180)
+		end
+		
+		-- Pain relief
+		org.pain = math.max((org.pain or 0) - 8, 0)
+		org.painadd = math.max((org.painadd or 0) - 5, 0)
+		
 		local ply = self:GetOwner()
 		ply:ViewPunch(Angle(3,0,0))
 		

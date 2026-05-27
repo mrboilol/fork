@@ -1063,8 +1063,12 @@ function hg.DoTPIK(ply, ent)
 
 	local self = ply:GetActiveWeapon()
 
-    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply)
-    local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
+	local larm_bad = ply.organism and ((ply.organism.larm or 0) >= 1 or ply.organism.larmdislocated)
+	local rarm_bad = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated)
+	local prioritize_left = rarm_bad and not larm_bad
+
+    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle()) and (hg.CanUseLeftHand(ply) or larm_bad)
+    local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and (hg.CanUseRightHand(ply) or prioritize_left)
     
     local shouldrebuild = false
     if (ply.nextrebuild or 0) < CurTime() then
@@ -1172,6 +1176,19 @@ function hg.DoTPIK(ply, ent)
             ply.leftClicking = LerpFT(0.05, ply.leftClicking or 0, (ishgweapon(self) and hg.KeyDown(ply, IN_ATTACK)) and 1 or 0.05)
 
             local hand = ply_r_hand_matrix:GetTranslation()
+            if prioritize_left then
+                local shoulder = ply_r_upperarm_matrix:GetTranslation()
+                local up = ply_spine_matrix:GetAngles():Up()
+                local forward = ply_spine_matrix:GetAngles():Forward()
+                local right = ply_spine_matrix:GetAngles():Right()
+                
+                hand = shoulder - up * (limblength * 1.5) - forward * 3 + right * 3
+                
+                local rest_ang = ply_spine_matrix:GetAngles()
+                rest_ang:RotateAroundAxis(rest_ang:Forward(), -90)
+                ply_r_hand_matrix:SetAngles(rest_ang)
+                ply_r_hand_matrix:SetTranslation(hand)
+            end
 
             if false and !ishgweapon(self) and ply.organism and ply.organism.rarm and ply.organism.rarm > 0.99 then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
@@ -1307,6 +1324,19 @@ function hg.DoTPIK(ply, ent)
             end
 
             local hand = ply_l_hand_matrix:GetTranslation()
+            if larm_bad then
+                local shoulder = ply_l_upperarm_matrix:GetTranslation()
+                local up = ply_spine_matrix:GetAngles():Up()
+                local forward = ply_spine_matrix:GetAngles():Forward()
+                local right = ply_spine_matrix:GetAngles():Right()
+                
+                hand = shoulder - up * (limblength * 1.5) - forward * 3 - right * 3
+                
+                local rest_ang = ply_spine_matrix:GetAngles()
+                rest_ang:RotateAroundAxis(rest_ang:Forward(), 90)
+                ply_l_hand_matrix:SetAngles(rest_ang)
+                ply_l_hand_matrix:SetTranslation(hand)
+            end
             local add = (hand - segments[1].Pos):GetNormalized() * 5 + eyeang:Right() * -5 + eyeang:Forward() * ((ply.lerp_hand or 0) - 0.5) * 10
 
             if false and ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then

@@ -433,7 +433,7 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
 
         if minigameType == "tourniquet" then return end
 
-        local healAmount = 55 * progressDelta
+        local healAmount = 68.75 * progressDelta
         local modeValueIndex = GetMinigameModeValueIndex(wep, "bandage")
         if wep.modeValues and wep.modeValues[modeValueIndex] then
             if #org.wounds > 0 then
@@ -444,11 +444,11 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
 
                 org.wounds[1][1] = org.wounds[1][1] - healed
                 org.bleed = math.max(org.bleed - healed, 0)
-                wep.modeValues[modeValueIndex] = math.max(wep.modeValues[modeValueIndex] - (healed * 0.6), 0)
+                wep.modeValues[modeValueIndex] = math.max(wep.modeValues[modeValueIndex] - (healed * 0.9), 0)
                 wep:SetNetVar("modeValues", table.Copy(wep.modeValues))
                 ply:SetNetVar("wounds", org.wounds)
             else
-                local attemptedUse = healAmount * 0.6
+                local attemptedUse = healAmount * 0.9
                 wep.modeValues[modeValueIndex] = math.max(wep.modeValues[modeValueIndex] - attemptedUse, 0)
                 wep:SetNetVar("modeValues", table.Copy(wep.modeValues))
             end

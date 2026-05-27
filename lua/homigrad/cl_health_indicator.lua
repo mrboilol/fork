@@ -808,7 +808,7 @@ function HUD_DrawDynamicIndicator()
                         local pos = mat:GetTranslation()
                         pos = pos + Vector(0, 0, 1.5)
                         local sx, sy, sz = pos:ToScreen()
-                        if sz > 0 then
+                        if sz and sz > 0 then
                             table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = severity, key = key})
                         end
                     end

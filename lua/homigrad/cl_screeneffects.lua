@@ -71,6 +71,7 @@ local tab = {
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only", 0, 4)
 local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=altpain.ogg no shake, 4=itsallcomingtoanend only", 0, 4)
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg", 0, 2)
+local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hook_Run = hook.Run
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
@@ -1401,6 +1402,9 @@ end)
 
 local function GetConsciousBeatPulse()
 	if not IsValid(lply) or not lply:Alive() then return 0 end
+
+	-- Check if dying pulse detection is enabled
+	if not hg_dyingpulse:GetBool() then return 0 end
 
 	local dyingMode = hg_dyingsound:GetInt()
 	-- Disable screen shake for modes 2, 3, and 4

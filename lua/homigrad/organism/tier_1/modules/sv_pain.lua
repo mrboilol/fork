@@ -35,6 +35,8 @@ module[2] = function(owner, org, timeValue)
 	local adrenaline = org.adrenaline
 	local analgesiaMul = (org.analgesia * 4 + 1)
 	local painkillerMul = (org.painkiller * 0.5 + 1)
+	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
+	local goodmoodResistance = 1 - goodmood * 0.25
 
 	org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 
@@ -51,7 +53,7 @@ module[2] = function(owner, org, timeValue)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
 	
-	local add = math.min(timeValue * 20, org.painadd)
+	local add = math.min(timeValue * 20, org.painadd) * goodmoodResistance
 	local sub = (add <= 0.2) and (timeValue * 2 * (org.otrub and 5 or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
 
 	if adrenaline > 0 then
@@ -85,7 +87,7 @@ module[2] = function(owner, org, timeValue)
 	org.disorientation = math.min(org.disorientation, 10)
 
 	if org.pain > 80 then
-		org.shock = math.Approach(org.shock, 70, timeValue * 4)
+		org.shock = math.Approach(org.shock, 70 * goodmoodResistance, timeValue * 4)
 	end
 
 	

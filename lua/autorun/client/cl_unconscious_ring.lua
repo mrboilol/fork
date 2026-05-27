@@ -47,6 +47,7 @@ local SOUND_FLATLINE = "hg_unconscious/flatline.ogg"
 local lastPhaseMod = 0
 local wasUnconsciousState = false
 local flatlinePlayedThisUnconscious = false
+local wasHeartbeatZero = false
 local soundGen = 0
 local heartStations = {}
 local heartStationsLoading = false
@@ -81,6 +82,7 @@ local function ResetRingAudio()
     soundGen = soundGen + 1
     wasUnconsciousState = false
     flatlinePlayedThisUnconscious = false
+    wasHeartbeatZero = false
 
     for i = 1, #heartStations do
         local st = heartStations[i]
@@ -396,6 +398,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local shock = org.shock or 0
     local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain >= 0.34)
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
+
+    -- Detect heartbeat transition to zero to reset flatline flag
+    if heartbeat < 1 and not wasHeartbeatZero then
+        flatlinePlayedThisUnconscious = false
+    end
+    wasHeartbeatZero = heartbeat < 1
     
     local className = ply.PlayerClassName
     local isNearDeathClass = nearDeathClasses[className] == true

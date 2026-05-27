@@ -1113,33 +1113,28 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local right = dir:Angle():Right()
 							local up = ang:Up()
 
-							-- Pulse-based behavior: low pulse = messy, high pulse = straight with oscillation
-							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1) -- 0 at 35 pulse, 1 at 70 pulse
-							local lowPulseFactor = 1 - pulseFactor -- 1 at low pulse, 0 at high pulse
+							-- Single clean stream with slow, smooth movement
+							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1)
 
-							-- Consistent forward push for all particles in this heartbeat (0.8x distance)
+							-- Consistent forward push
 							local baseForward = dir * 6 * forceMul * 0.8
 
-							-- Oscillation increases with pulse (straighter stream wobbles more at high pulse)
-							local oscMul = pulseFactor * forceMul
-							local oscTime = CurTime() * hb * 0.6
-							local oscAmpRight = baseForward:Length() * 0.25 * pulseFactor
-							local oscAmpUp = baseForward:Length() * 0.15 * pulseFactor
+							-- Very slow oscillation for smooth, gradual movement
+							local oscTime = CurTime() * hb * 0.15
+							local oscAmpRight = baseForward:Length() * 0.12 * pulseFactor
+							local oscAmpUp = baseForward:Length() * 0.08 * pulseFactor
 							local streamOsc = right * oscAmpRight * math.sin(oscTime) + up * oscAmpUp * math.cos(oscTime)
 
-							-- Spread increases at low pulse (messy stream at low pressure)
-							local spreadMul = lowPulseFactor * 2.5 + 0.5 -- More spread at low pulse, some at high pulse
-							local spread = right * math.Rand(-3, 3) * spreadMul * bloodMul + up * math.Rand(-2, 2) * spreadMul * bloodMul
+							-- Minimal spread for clean single-stream look
+							local spread = right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5)
 
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 2.5
-								local arteriaForward = dir * 8 * arteriaForce * 0.8 -- 0.8x distance
-								local arteriaOscAmpRight = arteriaForward:Length() * 0.3 * pulseFactor
-								local arteriaOscAmpUp = arteriaForward:Length() * 0.18 * pulseFactor
+								local arteriaForward = dir * 8 * arteriaForce * 0.6
+								local arteriaOscAmpRight = arteriaForward:Length() * 0.15 * pulseFactor
+								local arteriaOscAmpUp = arteriaForward:Length() * 0.1 * pulseFactor
 								local arteriaOsc = right * arteriaOscAmpRight * math.sin(oscTime) + up * arteriaOscAmpUp * math.cos(oscTime)
-								local arteriaSpread = right * math.Rand(-2, 2) * spreadMul + up * math.Rand(-2, 2) * spreadMul
-								-- Single stream to prevent duplicate spraying
-								hg.addBloodPart(pos + right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5), arteriaForward + arteriaOsc + arteriaSpread, nil, 1, 1, true, nil, ent)
+								hg.addBloodPart(pos, arteriaForward + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
 							else
 								hg.addBloodPart(pos, baseForward + streamOsc + spread, nil, size, size, true, nil, ent)
 							end

@@ -10,37 +10,37 @@ module[2] = function(owner, org, timeValue)
 
     -- Increase goodmood when in good condition
     if org.despair < 0.1 and org.fear < 0.1 then
-        goodmood_add = goodmood_add + timeValue * 0.015
+        goodmood_add = goodmood_add + timeValue * 0.005
     end
 
     if org.satiety > 80 and org.hydration > 80 then
-        goodmood_add = goodmood_add + timeValue * 0.015
+        goodmood_add = goodmood_add + timeValue * 0.005
     end
 
     if org.pain < 10 then
-        goodmood_add = goodmood_add + timeValue * 0.01
+        goodmood_add = goodmood_add + timeValue * 0.003
     end
 
     -- Increase goodmood when on opioids/analgesia
     if org.analgesia > 1 then
-        goodmood_add = goodmood_add + timeValue * 0.02 * math.Clamp(org.analgesia, 0, 5)
+        goodmood_add = goodmood_add + timeValue * 0.007 * math.Clamp(org.analgesia, 0, 5)
     end
 
     if org.painkiller > 1 then
-        goodmood_add = goodmood_add + timeValue * 0.015 * math.Clamp(org.painkiller, 0, 5)
+        goodmood_add = goodmood_add + timeValue * 0.005 * math.Clamp(org.painkiller, 0, 5)
     end
 
     -- Decrease goodmood when in fear or despair
     if org.fear > 0.2 then
-        goodmood_add = goodmood_add - timeValue * 0.03 * org.fear
+        goodmood_add = goodmood_add - timeValue * 0.01 * org.fear
     end
 
     if org.despair > 0.2 then
-        goodmood_add = goodmood_add - timeValue * 0.04 * org.despair
+        goodmood_add = goodmood_add - timeValue * 0.015 * org.despair
     end
 
     org.goodmood = math.Clamp(org.goodmood + goodmood_add, 0, 1)
-    org.goodmood = math.Approach(org.goodmood, 0, timeValue / 240)
+    org.goodmood = math.Approach(org.goodmood, 0, timeValue / 480)
 end
 
 -- Decrease goodmood when taking damage
@@ -51,7 +51,7 @@ hook.Add("HomigradDamage", "GoodMood_OnDamage", function(ply, dmgInfo, hitgroup,
 
     local damage = dmgInfo:GetDamage()
     if damage > 5 then
-        org.goodmood = math.Clamp(org.goodmood - (damage * 0.005), 0, 1)
+        org.goodmood = math.Clamp(org.goodmood - (damage * 0.002), 0, 1)
     end
 end)
 
@@ -64,12 +64,12 @@ hook.Add("PostHeal", "GoodMood_OnHeal", function(wep, target, mode)
     local owner = wep:GetOwner()
     if IsValid(owner) and owner == target then
         -- Self-healing gives more mood boost
-        org.goodmood = math.Clamp(org.goodmood + 0.05, 0, 1)
+        org.goodmood = math.Clamp(org.goodmood + 0.02, 0, 1)
     elseif IsValid(owner) then
         -- Healing others gives mood boost to healer
         local healerOrg = owner.organism
         if healerOrg then
-            healerOrg.goodmood = math.Clamp(healerOrg.goodmood + 0.03, 0, 1)
+            healerOrg.goodmood = math.Clamp(healerOrg.goodmood + 0.01, 0, 1)
         end
     end
 end)

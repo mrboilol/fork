@@ -25,6 +25,7 @@ local hg_blood_sprites = ConVarExists("hg_blood_sprites") and GetConVar("hg_bloo
 hook.Add("PostCleanupMap","removeblooddroplets",function()
 	hg.bloodparticles1 = {}
 	hg.bloodpositions = {}
+	hg.bloodpositionOrder = {}
 	hg.bloodcount = 0
 end)
 
@@ -99,15 +100,30 @@ end
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
 
 hg.bloodpositions = hg.bloodpositions or {}
+hg.bloodpositionOrder = hg.bloodpositionOrder or {}
 hg.bloodcount = hg.bloodcount or 0
 local function decalBlood(pos, normal, tr, artery, owner)
 	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))
 
 	hg.bloodcount = hg.bloodcount + 1
 	
+	-- Track order for FIFO deletion
+	if not hg.bloodpositions[vec] then
+		hg.bloodpositionOrder[#hg.bloodpositionOrder + 1] = vec
+	end
+	
+	-- Delete oldest entries when cap reached
 	if hg.bloodcount > 500000 then
-		hg.bloodpositions = {}
-		hg.bloodcount = 0
+		local toRemove = hg.bloodcount - 500000
+		for i = 1, toRemove do
+			if #hg.bloodpositionOrder > 0 then
+				local oldVec = table.remove(hg.bloodpositionOrder, 1)
+				if oldVec then
+					hg.bloodpositions[oldVec] = nil
+					hg.bloodcount = hg.bloodcount - 1
+				end
+			end
+		end
 	end
 
 	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
@@ -190,8 +206,17 @@ bloodparticles_hook[2] = function(mul)
     local time = CurTime()
 	local gravvec = vecDown * mul * (math.max(0.0, grav))
 	
-	-- Cap check with FIFO deletion
-	local cap = 50000
+	-- Age-based deletion (90 seconds)
+	local maxAge = 90
+	for i = #hg.bloodparticles1, 1, -1 do
+		local part = hg.bloodparticles1[i]
+		if part and part.spawnTime and (time - part.spawnTime) > maxAge then
+			table_remove(hg.bloodparticles1, i)
+		end
+	end
+	
+	-- Emergency cap only when very high
+	local cap = 100000
 	while #hg.bloodparticles1 > cap do
 		table_remove(hg.bloodparticles1, 1)
 	end
