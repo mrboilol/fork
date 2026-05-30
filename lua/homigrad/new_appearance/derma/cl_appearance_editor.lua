@@ -845,11 +845,28 @@ function PANEL:PostInit()
             if previewAccessory[3] then main.AppearanceTable.AAttachments[3] = originalAccessory[3]; previewAccessory[3] = nil end
             main.modelPosID = "All"
         end
-        function menu:OnFocusChanged(gained) if !gained then self:Close() end end
-    end)
 
-    -- Clothes
-    CreateControlBtn("UPPER BODY", function()
+        function bodySelectorMenu:OnFocusChanged(gained)
+            if !gained then self:Close() end
+        end
+    end
+
+    local bodyMatSelector = vgui.Create("DButton",viewer)
+    bodyMatSelector:SetSize(ScreenScale(100),ScreenScale(16))
+    bodyMatSelector:SetFont("ZCity_Tiny")
+    bodyMatSelector:SetText("Jacket")
+    function bodyMatSelector:Think()
+        if funpos3x then
+            bodyMatSelector:SetPos(sizeX * 0.5 - funpos3x, sizeY * 0.2)
+        end
+    end
+    function bodyMatSelector:Paint(w,h)
+        draw.RoundedBox(4,0,0,w,h,colors.secondary)
+        surface.SetDrawColor(colors.scrollbarBorder)
+        surface.DrawOutlinedRect(0,0,w,h,1)
+    end
+    bodyMatSelector:SetPos(sizeX * 0.5, sizeY * 0.5)
+    function bodyMatSelector:DoClick()
         main.modelPosID = "Torso"
         CloseAllOpenMenus()
         local menu = CreateStyledListMenu("Upper Body")
@@ -871,16 +888,40 @@ function PANEL:PostInit()
             if hg.Appearance.ClothesDesc[k] then
                 mater:SetTooltip(hg.Appearance.ClothesDesc[k].desc)
                 if hg.Appearance.ClothesDesc[k].link then
-                    function mater:DoRightClick() gui.OpenURL(hg.Appearance.ClothesDesc[k].link) end
+                    function mater:DoRightClick()
+                        gui.OpenURL(hg.Appearance.ClothesDesc[k].link)
+                    end
                 end
             end
         end
-        if IsValid(menu) then
-            function menu:OnRemove() if IsValid(main) then main.modelPosID = "All" end end
+        local colorSelector = vgui.Create("DColorCombo",bodyMatSelectorMenu)
+        function colorSelector:OnValueChanged(clr)
+            main.AppearanceTable.AColor = clr
         end
-    end)
+        colorSelector:SetColor(main.AppearanceTable.AColor)
+        bodyMatSelectorMenu:AddPanel(colorSelector)
+        bodyMatSelectorMenu:Open()
+        function bodyMatSelectorMenu:OnRemove()
+            main.modelPosID = "All"
+        end
+    end
 
-    CreateControlBtn("LOWER BODY", function()
+    local legsMatSelector = vgui.Create("DButton",viewer)
+    legsMatSelector:SetSize(ScreenScale(100),ScreenScale(16))
+    legsMatSelector:SetFont("ZCity_Tiny")
+    legsMatSelector:SetText("Pants")
+    function legsMatSelector:Think()
+        if funpos3x then
+            legsMatSelector:SetPos(sizeX * 0.5 - funpos3x, sizeY * 0.2 + ScreenScale(32))
+        end
+    end
+    function legsMatSelector:Paint(w,h)
+        draw.RoundedBox(4,0,0,w,h,colors.secondary)
+        surface.SetDrawColor(colors.scrollbarBorder)
+        surface.DrawOutlinedRect(0,0,w,h,1)
+    end
+    legsMatSelector:SetPos(sizeX * 0.5, sizeY * 0.5)
+    function legsMatSelector:DoClick()
         main.modelPosID = "Legs"
         CloseAllOpenMenus()
         local menu = CreateStyledListMenu("Lower Body")
@@ -893,16 +934,34 @@ function PANEL:PostInit()
             if hg.Appearance.ClothesDesc[k] then
                 mater:SetTooltip(hg.Appearance.ClothesDesc[k].desc)
                 if hg.Appearance.ClothesDesc[k].link then
-                    function mater:DoRightClick() gui.OpenURL(hg.Appearance.ClothesDesc[k].link) end
+                    function mater:DoRightClick()
+                        gui.OpenURL(hg.Appearance.ClothesDesc[k].link)
+                    end
                 end
             end
         end
-        if IsValid(menu) then
-            function menu:OnRemove() if IsValid(main) then main.modelPosID = "All" end end
+        legsMatSelectorMenu:Open()
+        function legsMatSelectorMenu:OnRemove()
+            main.modelPosID = "All"
         end
-    end)
+    end
 
-    CreateControlBtn("FOOTWEAR", function()
+    local bootsMatSelector = vgui.Create("DButton",viewer)
+    bootsMatSelector:SetSize(ScreenScale(100),ScreenScale(16))
+    bootsMatSelector:SetFont("ZCity_Tiny")
+    bootsMatSelector:SetText("Boots")
+    function bootsMatSelector:Think()
+        if funpos3x then
+            bootsMatSelector:SetPos(sizeX * 0.5 - funpos3x, sizeY * 0.2 + ScreenScale(64))
+        end
+    end
+    function bootsMatSelector:Paint(w,h)
+        draw.RoundedBox(4,0,0,w,h,colors.secondary)
+        surface.SetDrawColor(colors.scrollbarBorder)
+        surface.DrawOutlinedRect(0,0,w,h,1)
+    end
+    bootsMatSelector:SetPos(sizeX * 0.5, sizeY * 0.5)
+    function bootsMatSelector:DoClick()
         main.modelPosID = "Boots"
         CloseAllOpenMenus()
         local menu = CreateStyledListMenu("Footwear")
@@ -912,13 +971,37 @@ function PANEL:PostInit()
             local mater = menu:AddOption(clothName,function()
                 main.AppearanceTable.AClothes.boots = k
             end)
+            if hg.Appearance.ClothesDesc[k] then
+                mater:SetTooltip(hg.Appearance.ClothesDesc[k].desc)
+                if hg.Appearance.ClothesDesc[k].link then
+                    function mater:DoRightClick()
+                        gui.OpenURL(hg.Appearance.ClothesDesc[k].link)
+                    end
+                end
+            end
         end
-        if IsValid(menu) then
-            function menu:OnRemove() if IsValid(main) then main.modelPosID = "All" end end
+        bootsMatSelectorMenu:Open()
+        function bootsMatSelectorMenu:OnRemove()
+            main.modelPosID = "All"
         end
-    end)
+    end
 
-    CreateControlBtn("GLOVES", function()
+    local glovesSelector = vgui.Create("DButton",viewer)
+    glovesSelector:SetSize(ScreenScale(100),ScreenScale(16))
+    glovesSelector:SetFont("ZCity_Tiny")
+    glovesSelector:SetText("Gloves")
+    function glovesSelector:Think()
+        if funpos3x then
+            glovesSelector:SetPos(sizeX * 0.5 - funpos3x, sizeY * 0.2 + ScreenScale(96))
+        end
+    end
+    function glovesSelector:Paint(w,h)
+        draw.RoundedBox(4,0,0,w,h,colors.secondary)
+        surface.SetDrawColor(colors.scrollbarBorder)
+        surface.DrawOutlinedRect(0,0,w,h,1)
+    end
+    glovesSelector:SetPos(sizeX * 0.5, sizeY * 0.5)
+    function glovesSelector:DoClick()
         main.modelPosID = "Hands"
         CloseAllOpenMenus()
         local menu = CreateStyledListMenu("Gloves")
@@ -939,164 +1022,65 @@ function PANEL:PostInit()
         if IsValid(menu) then
             function menu:OnRemove() if IsValid(main) then main.modelPosID = "All" end end
         end
-    end)
-    
-    -- Spacer
-    local spacer = vgui.Create("DPanel", content)
-    spacer:SetTall(ScreenScale(20))
-    spacer:Dock(TOP)
-    spacer.Paint = function() end
-
-    -- Fixed Return Button (Bottom Left)
-    local returnBtn = vgui.Create("DLabel", self)
-    returnBtn:SetText("return")
-    returnBtn:SetMouseInputEnabled(true)
-    returnBtn:SetFont("ZCity_Veteran")
-    returnBtn:SetTall(ScreenScale(18))
-    returnBtn:SizeToContents()
-    local padding = ScreenScale(4)
-    returnBtn:SetWide(returnBtn:GetWide() + padding * 2)
-    returnBtn:SetPos(ScreenScale(20), ScrH() - ScreenScale(40))
-    returnBtn:SetTextColor(Color(255, 255, 255))
-    
-    returnBtn.DoClick = function()
-        if main.Close then
-            main:Close()
-        end
-        sound.PlayFile("sound/press.mp3", "noblock", function(station) if IsValid(station) then station:Play() end end)
     end
 
-    -- Paint (Copied from Main Menu for consistency)
-    returnBtn.Paint = function(self, w, h)
-        local font = self:GetFont()
-        local text = self:GetText()
-        surface.SetFont(font)
-        local tw, th = surface.GetTextSize(text)
-
-        if self:IsHovered() then
-            if not self.HoveredSoundPlayed then
-                sound.PlayFile("sound/hover.ogg", "noblock", function(station) if IsValid(station) then station:Play() end end)
-                self.HoveredSoundPlayed = true
-            end
-            
-            local alpha = 255
-            if math.random() > 0.9 then alpha = math.random(50, 200) end
-            
-            surface.SetDrawColor(255, 255, 255, alpha)
-            surface.DrawRect(padding, 0, tw, h)
-            self:SetTextColor(Color(0, 0, 0, alpha))
-        else
-            self.HoveredSoundPlayed = false
-            self:SetTextColor(Color(255, 255, 255))
+    local faceMatSelector = vgui.Create("DButton",viewer)
+    faceMatSelector:SetSize(ScreenScale(100),ScreenScale(16))
+    faceMatSelector:SetFont("ZCity_Tiny")
+    faceMatSelector:SetText("Facemap")
+    function faceMatSelector:Think()
+        if funpos3x then
+            faceMatSelector:SetPos(sizeX * 0.5 - funpos3x, sizeY * 0.2 + ScreenScale(96 + 32))
         end
-        
-        local offX, offY = 0, 0
-        if math.random() > 0.9 then
-             offX = math.random(-2, 2)
-             offY = math.random(-2, 2)
-        end
-        
-        draw.SimpleText(text, font, padding + offX, h/2 + offY, self:GetTextColor(), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        
-        if self:IsHovered() and math.random() > 0.7 then
-            local offsetX = math.random(-5, 5)
-            local offsetY = math.random(-2, 2)
-            draw.SimpleText(text, font, padding + offsetX, h/2 + offsetY, Color(0, 0, 0, math.random(50, 150)), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        end
-        return true
     end
-
-    -- Presets (Right Side)
-    local presetNameEntry = vgui.Create("DTextEntry", presetContent)
-    presetNameEntry:Dock(TOP)
-    presetNameEntry:SetTall(ScreenScale(20))
-    presetNameEntry:DockMargin(0,0,0,ScreenScale(5))
-    presetNameEntry:SetFont("ZCity_Tiny")
-    presetNameEntry:SetPlaceholderText("Preset name...")
-    presetNameEntry.Paint = function(s, w, h)
-        surface.SetDrawColor(0, 0, 0, 200)
-        surface.DrawRect(0, 0, w, h)
-        surface.SetDrawColor(255, 255, 255, 50)
-        surface.DrawOutlinedRect(0, 0, w, h, 1)
-        s:DrawTextEntryText(Color(255, 255, 255), Color(255, 0, 0), Color(255, 255, 255))
+    function faceMatSelector:Paint(w,h)
+        draw.RoundedBox(4,0,0,w,h,colors.secondary)
+        surface.SetDrawColor(colors.scrollbarBorder)
+        surface.DrawOutlinedRect(0,0,w,h,1)
     end
+    faceMatSelector:SetPos(sizeX * 0.5, sizeY * 0.5)
+    function faceMatSelector:DoClick()
+        main.modelPosID = "Face"
+        faceMatSelectorMenu = DermaMenu()
+        for k, v in SortedPairs(hg.Appearance.FacemapsSlots[hg.Appearance.FacemapsModels[tMdl.mdl]]) do
+            local mater = faceMatSelectorMenu:AddOption(k,function()
+				surface.PlaySound("player/weapon_draw_0"..math.random(2, 5)..".wav")
+                main.AppearanceTable.AFacemap = k
+            end)
+        end
+        faceMatSelectorMenu:Open()
+        function faceMatSelectorMenu:OnRemove()
+            main.modelPosID = "All"
+        end
+    end
+    --backViewButton:
 
-    CreateControlBtn("SAVE PRESET", function()
-        local presetName = presetNameEntry:GetValue()
-        if presetName == "" or #presetName < 2 then
-            surface.PlaySound("buttons/button10.wav")
-            notification.AddLegacy("Enter a preset name (min 2 chars)", NOTIFY_ERROR, 3)
-            return
-        end
-        presetName = string.gsub(presetName, "[^%w%s_-]", "")
-        SavePreset(presetName, main.AppearanceTable)
-        surface.PlaySound("buttons/button14.wav")
-        notification.AddLegacy("Preset '" .. presetName .. "' saved!", NOTIFY_GENERIC, 3)
-    end, presetContent)
-
-    CreateControlBtn("LOAD PRESET", function()
-        local presetList = GetPresetList()
-        if #presetList == 0 then
-            surface.PlaySound("buttons/button10.wav")
-            notification.AddLegacy("No presets saved yet!", NOTIFY_ERROR, 3)
-            return
-        end
-        
-        local presetMenu = vgui.Create("DFrame")
-        presetMenu:SetTitle("Load Preset")
-        presetMenu:SetSize(ScreenScale(120), ScreenScale(100))
-        presetMenu:Center()
-        presetMenu:MakePopup()
-        presetMenu:SetDraggable(false)
-        
-        function presetMenu:Paint(w, h)
-            draw.RoundedBox(8, 0, 0, w, h, Color(20, 20, 28, 250))
-            surface.SetDrawColor(colors.presetBorder)
-            surface.DrawOutlinedRect(0, 0, w, h, 2)
-        end
-        
-        local scroll = CreateStyledScrollPanel(presetMenu)
-        scroll:Dock(FILL)
-        scroll:DockMargin(ScreenScale(2), ScreenScale(2), ScreenScale(2), ScreenScale(2))
-        
-        for _, presetName in ipairs(presetList) do
-            local presetBtn = vgui.Create("DButton", scroll)
-            presetBtn:Dock(TOP)
-            presetBtn:DockMargin(2, 2, 2, 0)
-            presetBtn:SetTall(ScreenScale(14))
-            presetBtn:SetFont("ZCity_Tiny")
-            presetBtn:SetText(presetName)
-            presetBtn:SetTextColor(colors.mainText)
-            
-            function presetBtn:Paint(w, h)
-                if self:IsHovered() then
-                    surface.SetDrawColor(200, 220, 220, 255)
-                    surface.DrawRect(0, 0, w, h)
-                    self:SetTextColor(Color(0, 0, 0))
-                else
-                    surface.SetDrawColor(0, 0, 0, 150)
-                    surface.DrawRect(0, 0, w, h)
-                    self:SetTextColor(colors.mainText)
-                end
-            end
-            
-            function presetBtn:DoClick()
-                local loadedPreset = LoadPreset(presetName)
-                if loadedPreset then
-                    main.AppearanceTable = loadedPreset
-                    NameEntry:SetText(loadedPreset.AName or "")
-                    modelSelector:SetText(loadedPreset.AModel or "Male 01")
-                    presetNameEntry:SetText(presetName)
-                    surface.PlaySound("buttons/button14.wav")
-                    notification.AddLegacy("Preset '" .. presetName .. "' loaded!", NOTIFY_GENERIC, 3)
-                else
-                    surface.PlaySound("buttons/button10.wav")
-                    notification.AddLegacy("Failed to load preset!", NOTIFY_ERROR, 3)
-                end
-                presetMenu:Close()
-            end
-        end
-    end, presetContent)
+    local oldClose = self.Close
+    function self:Close()
+        CloseAllAccessoryMenus()
+        if oldClose then oldClose(self) end
+    end
+    self:CallbackAppearance()
 end
 
-vgui.Register("ZAppearance", PANEL, "DFrame")
+vgui.Register( "HG_AppearanceMenu", PANEL, "ZFrame")
+
+concommand.Add("hg_appearance_menu",function()
+    print('use esc menu')
+end)
+
+function hg.CreateApperanceMenu(ParentPanel)
+    if hg.Appearance.PrecacheModels then
+        hg.Appearance.PrecacheModels()
+    end
+
+    hg.PointShop:SendNET( "SendPointShopVars", nil, function( data )
+        if IsValid(zpan) then
+            zpan:Close()
+        end
+        zpan = vgui.Create("HG_AppearanceMenu",ParentPanel)
+        zpan:SetSize(ParentPanel:GetWide(),ParentPanel:GetTall())
+        zpan:SetPos(0,0)
+    end)
+    
+end
