@@ -156,12 +156,12 @@ module[2] = function(owner, org, timeValue)
 
 	if org.bloodpressure < 65 then
 		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
-		org.disorientation = math.max(org.disorientation, 0.8 + lowK * 2.2)
+		org.disorientation = math.max(org.disorientation, 0.8 + lowK * 1.25)
 		org.shock = math.Approach(org.shock, 20 + lowK * 45, timeValue * (1 + lowK * 2.5))
 		org.stamina[1] = math.max(org.stamina[1] - timeValue * (2 + lowK * 10), 0)
 
 		if org.bloodpressure < 55 then
-			org.consciousness = math.Approach(org.consciousness, 0.25, timeValue * (0.08 + lowK * 0.11))
+			org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
 		end
 	end
 
@@ -169,7 +169,7 @@ module[2] = function(owner, org, timeValue)
 		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
 		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.5
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
-		org.disorientation = math.max(org.disorientation, effectiveHighK * 1.4)
+		org.disorientation = math.max(org.disorientation, effectiveHighK * 1)
 		org.painadd = math.min(org.painadd + timeValue * (0.6 + effectiveHighK * 1.8), 150)
 		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
 	end
@@ -210,9 +210,9 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
-		-- Scale chance with adrenaline level: low dose gives a modest chance, high dose is near-certain
-		-- Capped at 90% per tick so even max adrenaline still has a small failure chance each attempt
-		local chance = math.Clamp(adren * 30 + adren * adren * 4, 0, 90)
+		-- Scale chance with adrenaline level: significantly improved effectiveness
+		-- Low dose (1): ~40% chance, Medium dose (2): ~80% chance, High dose (4+): near-certain
+		local chance = math.Clamp(adren * 40 + adren * adren * 5, 0, 98)
 		local rand = math.random(100)
 
 		-- High adrenaline retries faster (0.03s at adren>=3, 0.06s otherwise)

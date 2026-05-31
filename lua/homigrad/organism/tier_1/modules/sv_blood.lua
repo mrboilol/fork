@@ -181,7 +181,7 @@ module[2] = function(owner, org, mulTime)
 			end
 				
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					hg.organism.BloodDroplet2(owner, org, wound, ent:GetVelocity() + VectorRand(-15, 15), false)
+					hg.organism.BloodDroplet2(owner, org, wound, ent:GetVelocity() + VectorRand(-50, 50), false)
 					wound[1] = max(wound[1] - coagulate, 0)
 				end
 

@@ -238,8 +238,14 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	
 	if lastPosSelected + 0.1 * (inpain and 0.1 or 1) < CurTime() then
 		lastPosSelected = CurTime()
-		--randomPos = 0.75 * VectorRand(-0.75, 0.75)
-		randomPos = (inpain and 1.5 - (1 * painmul) or 1) * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(math.random(2) == 1 and math.Rand(-0.75, -0.5) or math.Rand(0.5, 0.75), math.random(2) == 1 and math.Rand(-0.75, -0.5) or math.Rand(0.5, 0.75), math.random(2) == 1 and math.Rand(-0.75, -0.5) or math.Rand(0.5, 0.75))
+		-- Smooth sine wave sway instead of random jitter
+		local time = CurTime()
+		local fearMult = (ply.organism and math.Clamp(ply.organism.fear or 0, 0, 2) or 0) + 1
+		local healthyArmMult = (not rarm_bad and not larm_bad) and 0.6 or 1
+		local swayX = math.sin(time * 1.5) * 0.5 + math.sin(time * 2.7) * 0.25
+		local swayY = math.cos(time * 1.8) * 0.5 + math.cos(time * 3.1) * 0.25
+		local swayZ = math.sin(time * 2.2) * 0.5 + math.cos(time * 2.9) * 0.25
+		randomPos = (inpain and 1.5 - (1 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(swayX, swayY, swayZ)
 	end
 
 	randomPosL = LerpFT(0.05 * (inpain and 25 - (24 * painmul) or 1), randomPosL, randomPos)

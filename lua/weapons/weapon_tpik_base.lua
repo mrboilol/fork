@@ -430,8 +430,8 @@ function SWEP:SetHandPos(noset)
 	local rhmat = rhBone and ent:GetBoneMatrix(rhBone) or nil
 	local lhmat = lhBone and ent:GetBoneMatrix(lhBone) or nil
 
-	ply.rhold = (not prioritize_left) and rhmat or nil
-	ply.lhold = (not prioritize_left) and lhmat or nil
+	ply.rhold = (not rarm_bad) and rhmat or nil
+	ply.lhold = (not larm_bad) and lhmat or nil
 
 	if self.lhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) and hg.CanUseLeftHand(ply) and not prioritize_left then
 		for _, bone in ipairs(bones) do

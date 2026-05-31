@@ -699,7 +699,7 @@ local ampBase = injuryTpikBones[i][4]
 local offBase = injuryTpikBones[i][5]
 local arm = limb == 'larm' or limb == 'rarm'
 
-if arm and reducedForWeapon then continue end
+-- allow broken arm sway even when holding weapons, just with reduced amplitude
 
 if org[limb..'amputated'] then continue end
 
@@ -1181,10 +1181,10 @@ function hg.DoTPIK(ply, ent)
                 local down = Vector(0, 0, -1)
                 local right = ent:GetAngles():Right()
                 
-                hand = shoulder + down * (limblength * 1.5) + right * 5
+                hand = shoulder + down * (limblength * 1.3) + right * 5
                 
                 local rest_ang = ent:GetAngles()
-                rest_ang:RotateAroundAxis(rest_ang:Right(), -90)
+                rest_ang:RotateAroundAxis(rest_ang:Right(), -135)
                 ply_r_hand_matrix:SetAngles(rest_ang)
                 ply_r_hand_matrix:SetTranslation(hand)
             end
@@ -1193,7 +1193,7 @@ function hg.DoTPIK(ply, ent)
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
                 segments[3].Pos = LerpVector(ply.leftClicking, segments[3].Pos + (-vector_up * 0.8 + eyeang:Forward() * 0.4 + ent:GetVelocity() / 400) * 0.5, hand)
             else
-                segments[3] = {Pos = Lerp(1 - lerp_rh, ply.last_rh and ply.last_rh:GetTranslation() or segments[3].Pos, ply_r_hand_matrix_old and ply_r_hand_matrix_old:GetTranslation() or hand), Len = 12}
+                segments[3] = {Pos = Lerp(1 - lerp_rh, ply.last_rh and ply.last_rh:GetTranslation() or segments[3].Pos, (not prioritize_left and ply_r_hand_matrix_old) and ply_r_hand_matrix_old:GetTranslation() or hand), Len = 12}
             end
 
             if lply:IsSuperAdmin() then
@@ -1328,20 +1328,20 @@ function hg.DoTPIK(ply, ent)
                 local down = Vector(0, 0, -1)
                 local right = ent:GetAngles():Right()
                 
-                hand = shoulder + down * (limblength * 1.5) - right * 5
+                hand = shoulder + down * (limblength * 1.3) - right * 5
                 
                 local rest_ang = ent:GetAngles()
-                rest_ang:RotateAroundAxis(rest_ang:Right(), -90)
+                rest_ang:RotateAroundAxis(rest_ang:Right(), -135)
                 ply_l_hand_matrix:SetAngles(rest_ang)
                 ply_l_hand_matrix:SetTranslation(hand)
             end
             local add = (hand - segments[1].Pos):GetNormalized() * 5 + eyeang:Right() * -5 + eyeang:Forward() * ((ply.lerp_hand or 0) - 0.5) * 10
 
-            if false and ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
+            if ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
                 segments[3].Pos = LerpVector(!(ishgweapon(self) and self:IsPistolHoldType()) and 0.05 or 0.01, segments[3].Pos + (-vector_up * 0.6 + eyeang:Forward() * 0.4 + ((ishgweapon(self) and !self:IsPistolHoldType()) and eyeang:Right() * 0.7 or vector_origin) + ent:GetVelocity() / 400) * 0.5, hand)
             else
-                segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, ply_l_hand_matrix_old and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
+                segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, (not larm_bad and ply_l_hand_matrix_old) and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
             end
 
             if lply:IsSuperAdmin() then
@@ -1398,7 +1398,7 @@ function hg.DoTPIK(ply, ent)
 
         ply_l_forearm_matrix:SetAngles(ang)
 
-        if false and ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
+        if ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
             local ang = ang//qt:Angle()
             ang:RotateAroundAxis(ang:Forward(), 95)
             ply_l_hand_matrix:SetAngles(LerpAngle(0.5, ply_l_hand_matrix:GetAngles(), ang))

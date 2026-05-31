@@ -508,9 +508,9 @@ local function get_status_message(ply)
 
 		-- nga imc ooked
 		local lowO2 = o2Val < 10
-		local lowBlood = bloodVal < 2200 or bp < 55
-		local badHeart = org.heartstop or heartbeat < 30
-		local brainDamage = brain >= 0.3 or org.critical == true
+		local lowBlood = bloodVal < 3000 or bp < 45
+		local badHeart = org.heartstop or heartbeat < 30 or heartbeat > 250
+		local brainDamage = brain >= 0.15 or org.critical == true
 
 	
 		if (lowO2 and lowBlood) or (lowBlood and badHeart) or (lowO2 and badHeart) or brainDamage then
@@ -569,6 +569,11 @@ function hg.is_traumatic_message(ply)
 
 	-- huy nigga 67 or sum liek that
 	if org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3) then
+		return true
+	end
+
+	-- Check for arterial wounds (immediate O2 debuff)
+	if org.arterialwounds and #org.arterialwounds > 0 then
 		return true
 	end
 

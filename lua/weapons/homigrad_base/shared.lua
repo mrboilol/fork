@@ -2390,8 +2390,8 @@ function SWEP:SetHandPos(noset)
 	local rhmat = ent:GetBoneMatrix(rh)
 	local lhmat = ent:GetBoneMatrix(lh)
 
-	ply.rhold = rhmat
-	ply.lhold = lhmat
+	ply.rhold = (not rarm_bad) and rhmat or nil
+	ply.lhold = (not larm_bad) and lhmat or nil
 
 	if not rhmat or not lhmat then return end
 
@@ -2414,11 +2414,19 @@ function SWEP:SetHandPos(noset)
 		rhmat:SetAngles(ang1)
 	
 		if SERVER or CLIENT and self:IsLocal() then
-			addvec = LerpFT(0.1, addvec, VectorRand(-0.03,0.03) * (ply.organism and ply.organism.holdingbreath and 0 or 1) * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 3) / 5)
-			addvec2 = LerpFT(0.05 * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 1) * 15, addvec2, addvec)
+			local fearMult = (ent.organism and math.Clamp(ent.organism.fear or 0, 0, 2) or 0)
+			local baseShake = ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 3 + fearMult * 2) / 5
+			local healthyArmMult = (not rarm_bad) and 0.5 or 1
+			local time = CurTime()
+			-- Smooth sine wave sway instead of random jitter
+			local swayX = math.sin(time * 2) * 0.03 + math.sin(time * 3.7) * 0.02
+			local swayY = math.cos(time * 2.3) * 0.03 + math.cos(time * 4.1) * 0.02
+			local swayZ = math.sin(time * 1.9) * 0.03 + math.cos(time * 3.3) * 0.02
+			addvec = LerpFT(0.1, addvec, Vector(swayX, swayY, swayZ) * (ply.organism and ply.organism.holdingbreath and 0 or 1) * baseShake * healthyArmMult)
+			addvec2 = LerpFT(0.05 * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 1 + fearMult) * 15, addvec2, addvec)
 		end
 
-		if not ply.holdingWeapon or ply.holdingWeapon ~= self then
+		if (not ply.holdingWeapon or ply.holdingWeapon ~= self) and not rarm_bad then
 			hg.bone_apply_matrix(ent, rh, rhmat)
 			--ent:SetBoneMatrix(rh, rhmat)
 			

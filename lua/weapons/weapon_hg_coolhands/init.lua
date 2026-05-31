@@ -332,12 +332,12 @@ function SWEP:ApplyForce()
 							-- Improved oxygenation
 							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)
 							
-							-- Better pulse restoration
-							org.pulse = math.min(org.pulse + 8 * skillMult, 70)
+							-- Much better pulse restoration - works even from 0
+							org.pulse = math.min(org.pulse + 15 * skillMult, 70)
 							
 							-- Blood pressure restoration
 							local targetBP = org.pulse * 1.2
-							org.bloodpressure = math.Approach(org.bloodpressure or 0, targetBP, 2 * skillMult)
+							org.bloodpressure = math.Approach(org.bloodpressure or 0, targetBP, 3 * skillMult)
 							
 							-- CO removal
 							org.CO = math.Approach(org.CO, 0, skillMult)
@@ -361,8 +361,13 @@ function SWEP:ApplyForce()
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
 							
-							-- More reliable heart restart
-							if org.pulse > 10 then org.heartstop = false end
+							-- Much more reliable heart restart - pulse threshold lowered, and direct chance based on pulse
+							if org.pulse > 5 then
+								org.heartstop = false
+							elseif org.pulse > 0 and math.random(100) < (org.pulse * 10 * skillMult) then
+								-- Even with low pulse, have a chance to restart based on current pulse level
+								org.heartstop = false
+							end
 							
 							-- Reduce ischemia during CPR
 							org.ischemia = math.max((org.ischemia or 0) - 0.5 * skillMult, 0)
