@@ -183,7 +183,7 @@ input_list.heart = function(org, bone, dmg, dmgInfo)
 	org.shock = org.shock + dmg * 20
 	org.internalBleed = org.internalBleed + (org.heart - oldDmg) * 10
 
-	if math.random() < 0.4 then
+	if math.random() < 0.75 then
 		hitArtery("spineartery", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Spine2", dmgInfo:GetDamageForce():GetNormalized(), dmgInfo:GetDamagePosition())
 	end
 

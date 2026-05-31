@@ -1067,8 +1067,8 @@ function hg.DoTPIK(ply, ent)
 	local rarm_bad = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated)
 	local prioritize_left = rarm_bad and not larm_bad
 
-    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle()) and (hg.CanUseLeftHand(ply) or larm_bad)
-    local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and (hg.CanUseRightHand(ply) or prioritize_left)
+    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle()) and (hg.CanUseLeftHand(ply) or prioritize_left)
+    local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle() or prioritize_left) and (hg.CanUseRightHand(ply) or prioritize_left)
     
     local shouldrebuild = false
     if (ply.nextrebuild or 0) < CurTime() then

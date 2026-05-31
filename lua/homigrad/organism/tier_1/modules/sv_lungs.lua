@@ -292,6 +292,12 @@ module[2] = function(owner, org, timeValue)
 			o2[1] = max(o2[1] - timeValue * o2DropRate * (hasStabilizer and 0.6 or 2), 0)
 		end
 
+		-- Low blood pressure slowly lowers O2 to 0 if very low
+		if org.bloodpressure and org.bloodpressure < 40 then
+			local bp_o2DropRate = (40 - org.bloodpressure) / 40
+			o2[1] = max(o2[1] - timeValue * bp_o2DropRate * 1.5, 0)
+		end
+
 		o2.curregen = regenerate
 
 		o2[1] = max(o2[1] - (org.CO > 0 and o2.curregen * 1.1 * (org.CO / 30) or 0),0)

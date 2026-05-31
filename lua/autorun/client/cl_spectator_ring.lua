@@ -22,6 +22,14 @@ local function DrawArc(x, y, radius, thickness, start_ang, end_ang, roughness, c
     end
 end
 
+surface.CreateFont("HomigradCriticalWarning", {
+    font = "Bahnschrift",
+    size = ScreenScaleH(14),
+    weight = 800,
+    antialias = true,
+    shadow = true
+})
+
 local ringAlpha = 0
 local lerpBrain = 0
 local lerpShock = 0
@@ -35,19 +43,23 @@ local sweepPos = 0
 local lastSweepUpdate = 0
 local heartPhase = 0
 
-local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha)
+local function DrawEKG(centerX, centerY, width, height, heartbeat, pulse, color, ringAlpha)
     local time = CurTime()
     if lastSweepUpdate == 0 then lastSweepUpdate = time end
     local dt = time - lastSweepUpdate
     lastSweepUpdate = time
     
-    -- Increment heart phase based on pulse
-    -- pulse is BPM, so pulse/60 is beats per second
-    heartPhase = heartPhase + dt * (pulse / 60)
+    -- Increment heart phase based on heartbeat
+    heartPhase = heartPhase + dt * (heartbeat / 60)
     
     local sweepSpeed = width / 4
     local oldSweepPos = sweepPos
     sweepPos = (sweepPos + dt * sweepSpeed) % width
+
+    -- Calculate morph factor for high heartbeat & low pulse (looks like a sinewave)
+    local hbFactor = math.Clamp((heartbeat - 90) / 60, 0, 1)
+    local pulseFactor = math.Clamp((65 - pulse) / 35, 0, 1)
+    local sineMorphFactor = hbFactor * pulseFactor
 
     -- Fill all indices between oldSweepPos and newSweepPos to ensure no gaps
     local function getH(phase)
@@ -72,6 +84,11 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha)
             h = h + math.sin((phase - 0.45) / 0.2 * math.pi) * 0.22
         end
         
+        if sineMorphFactor > 0 then
+            local sineH = math.sin(phase * 2 * math.pi) * 0.35
+            h = Lerp(sineMorphFactor, h, sineH)
+        end
+        
         return h
     end
 
@@ -81,7 +98,7 @@ local function DrawEKG(centerX, centerY, width, height, pulse, color, ringAlpha)
     for i = 0, steps do
         local p = (oldSweepPos + i) % width
         -- Interpolate heartPhase for this specific pixel
-        local p_phase = heartPhase - (dt * (pulse / 60) * (1 - i/steps))
+        local p_phase = heartPhase - (dt * (heartbeat / 60) * (1 - i/steps))
         ekgPoints[math.floor(p)] = getH(p_phase)
     end
     
@@ -249,6 +266,6 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
         
         draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     else
-        DrawEKG(centerX, centerY, 540, 140, pulse, dotColor, ringAlpha)
+        DrawEKG(centerX, centerY, 540, 140, org.heartbeat or 70, org.pulse or 70, dotColor, ringAlpha)
     end
 end)

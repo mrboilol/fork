@@ -570,7 +570,7 @@ hook.Add("Think", "Fake", function()
 
 		--huy
 		org.neckslitBleedingReduction = 1.0
-		if org.neckslit and not org.otrub and org.arterialwounds and not table.IsEmpty(org.arterialwounds) then
+		if org.neckslit and not org.otrub and org.arterialwounds and not table.IsEmpty(org.arterialwounds) and IsValid(ply.FakeRagdoll) then
 			local neckwound
 			for i, wound in pairs(org.arterialwounds) do
 				if wound[7] == "arteria" then
@@ -579,7 +579,7 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 
-			if neckwound and ragdoll:LookupBone(neckwound[4]) then
+			if neckwound and ragdoll:LookupBone(neckwound[4]) and ply:KeyDown(IN_USE) then
 				local bone = ragdoll:LookupBone(neckwound[4])
 				local neckpos, neckang = ragdoll:GetBonePosition(bone)
 				if neckpos and neckang then
@@ -603,9 +603,9 @@ hook.Add("Think", "Fake", function()
 					end
 
 					if handsOnNeck == 2 then
-						org.neckslitBleedingReduction = 0.2
+						org.neckslitBleedingReduction = 0.1
 					elseif handsOnNeck == 1 then
-						org.neckslitBleedingReduction = 0.6
+						org.neckslitBleedingReduction = 0.4
 					else
 						org.neckslitBleedingReduction = 1.0
 					end
@@ -1032,25 +1032,8 @@ hook.Add("Think", "Fake", function()
 		local keyRight = false
 		local isNeckSlitRolling = false
 		
-		if org and org.neckslit and not org.otrub and ply:Alive() and not ply:InVehicle() and org.fear > 0.85 then
-			local hasInput = ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK) or ply:KeyDown(IN_MOVELEFT) or ply:KeyDown(IN_MOVERIGHT)
-			if not hasInput then
-				local phase = (CurTime() * 1.5) % 4
-				if phase < 1 then
-					keyLeft = true
-					isNeckSlitRolling = true
-				elseif phase >= 2 and phase < 3 then
-					keyRight = true
-					isNeckSlitRolling = true
-				end
-			else
-				keyLeft = ply:KeyDown(IN_MOVELEFT)
-				keyRight = ply:KeyDown(IN_MOVERIGHT)
-			end
-		else
-			keyLeft = ply:KeyDown(IN_MOVELEFT)
-			keyRight = ply:KeyDown(IN_MOVERIGHT)
-		end
+		keyLeft = ply:KeyDown(IN_MOVELEFT)
+		keyRight = ply:KeyDown(IN_MOVERIGHT)
 
 		if keyLeft and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
 			if org.canmove then

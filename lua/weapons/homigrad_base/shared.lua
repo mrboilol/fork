@@ -1845,43 +1845,46 @@ function SWEP:GetAdditionalValues()
 
 	-- Calculate aiming fatigue
 	if self:IsZoom() then
-		self.aimFatigue = math.Approach(self.aimFatigue or 0, 1, FrameTime() * 0.04) -- takes 25 seconds of continuous aiming to fully fatigue
+		self.aimFatigueTimer = (self.aimFatigueTimer or 0) + FrameTime()
+		if self.aimFatigueTimer > 20 then
+			self.aimFatigue = math.Approach(self.aimFatigue or 0, 1, FrameTime() * 0.05) -- takes 20 seconds of continuous aiming to fully fatigue after immunity
+		end
 	else
+		self.aimFatigueTimer = math.Approach(self.aimFatigueTimer or 0, 0, FrameTime() * 2)
 		self.aimFatigue = math.Approach(self.aimFatigue or 0, 0, FrameTime() * 0.1) -- recovers in 10 seconds
 	end
 
-	local rarm_broken = ply.organism and ((ply.organism.rarm or 0) >= 1)
+	local rarm_health = ply.organism and ply.organism.rarm or 0
+	local larm_health = ply.organism and ply.organism.larm or 0
+	local rarm_broken = rarm_health >= 1
 	local rarm_dislocated = ply.organism and ply.organism.rarmdislocated
-	local larm_broken = ply.organism and ((ply.organism.larm or 0) >= 1)
+	local larm_broken = larm_health >= 1
 	local larm_dislocated = ply.organism and ply.organism.larmdislocated
 
 	local handSway = 0
 	if rarm_broken or rarm_dislocated then
-		-- Right hand is bad. We only hold with it if we don't prioritize left hand.
-		-- We prioritize left hand only if left hand is completely fine.
 		local prioritize_left = not (larm_broken or larm_dislocated or (ply.organism and ply.organism.larmamputated))
 		if not prioritize_left then
-			-- Both are bad! Fallback to using the bad right hand.
-			handSway = rarm_broken and 3.5 or 1.2
+			handSway = (rarm_broken and 3.5 or 1.2) + rarm_health * 0.5
 			if larm_broken then
-				handSway = handSway + 2.0 -- Both broken = massive sway!
+				handSway = handSway + 2.0 + larm_health * 0.5
 			elseif larm_dislocated then
-				handSway = handSway + 0.8
+				handSway = handSway + 0.8 + larm_health * 0.5
 			end
 		else
-			-- Right arm is bad, but left arm is completely fine. So we prioritize left hand.
-			-- Left hand is LESS DOMINANT than right hand, so we have higher sway when using just the left hand!
-			handSway = rarm_broken and 1.8 or 0.7
+			handSway = (rarm_broken and 1.8 or 0.7) + larm_health * 0.8
 		end
 	elseif larm_broken or larm_dislocated then
-		-- Right hand is fine, but left hand is bad. Left hand is set aside, right hand holds it.
-		-- Right hand is DOMINANT and fine, so we have excellent control and very small, steady sway.
-		handSway = larm_broken and 0.8 or 0.3
+		handSway = (larm_broken and 0.8 or 0.3) + rarm_health * 0.2
+	else
+		-- Both arms are functionally fine, but calculate baseline health sway
+		handSway = rarm_health * 0.3 + larm_health * 0.5
 	end
 
-	local fatigueSwayVal = (self.aimFatigue or 0) * 1.5
+	-- Left arm struggles more with aim when used as dominant
+	local fatigueSwayVal = (self.aimFatigue or 0) * (self.aimFatigue or 0) * 8.0 -- Very severe at last stage (quadratic scaling)
 	local totalSway = handSway + fatigueSwayVal
-	local totalSwayPos = handSway * 0.12 + (self.aimFatigue or 0) * 0.3
+	local totalSwayPos = handSway * 0.12 + (self.aimFatigue or 0) * (self.aimFatigue or 0) * 1.5
 
 	if totalSway > 0 then
 		local t = CurTime() * (2.2 + (self.aimFatigue or 0) * 1.5) -- Slower frequency to make it smooth instead of fast shaking
@@ -2421,7 +2424,7 @@ function SWEP:SetHandPos(noset)
 			
 			if !(TPIKBonesLHDict[name] or TPIKBonesRHDict[name]) then continue end
 			if (TPIKBonesLHDict[name] and (!canuseleft or !self.lhandik)) then continue end
-			if (TPIKBonesRHDict[name] and (!canuseright or !self.rhandik)) then continue end
+			if (TPIKBonesRHDict[name] and (!canuseright or (!self.rhandik and not prioritize_left))) then continue end
 			if prioritize_left then
 				name = TPIKBonesRHDictTranslate[name]
 

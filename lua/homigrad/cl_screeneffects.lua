@@ -741,7 +741,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		consciousnessVol = math.Clamp(consciousnessVol, 0, 1)
 
 		if IsValid(ConsciousnessWhiteNoise) then
-			ConsciousnessWhiteNoise:SetVolume(consciousnessVol)
+			ConsciousnessWhiteNoise:SetVolume(consciousnessVol * 0.5)
 		end
 	else
 		if IsValid(ConsciousnessWhiteNoise) then
@@ -768,7 +768,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
     if IsValid(WhiteNoiseStation) then
         local vol = math.Remap(org.consciousness, 0, 0.5, 0.6, 0)
-        WhiteNoiseStation:SetVolume(vol)
+        WhiteNoiseStation:SetVolume(vol * 0.5)
     end
 
 	local tempo = math.Clamp((5 - (tempLerp - 29)) * 0.5 - 5 * (org.heartbeat < 1 and 1 or 0), 0, 5)

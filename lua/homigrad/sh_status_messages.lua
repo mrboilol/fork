@@ -334,6 +334,19 @@ local heatvomit_phraselist = {
 	"Fuuck.. Oughhh.. I don't feel-"
 }
 
+local cooked_phrases = {
+    "My body... everything is failing...",
+    "I'm slipping away... I can't stay awake...",
+    "So cold... everything is going numb...",
+    "I can't feel my limbs... I'm fading...",
+    "Is this it? I can't breathe, my heart...",
+    "Everything is going pitch black...",
+    "My heart is fluttering... I'm collapsing...",
+    "I can't take a breath... my vision is fading...",
+    "I'm losing my grip on consciousness...",
+    "Everything feels so distant... so cold..."
+}
+
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
 
 function string.Random(length)
@@ -423,8 +436,7 @@ local function get_status_message(ply)
         end
     end
 
-	    if broken_dislocated and org.just_damaged_bone then
-        hg.status_messages.Send(ply, "Your ".. (org.just_damaged_bone_limb or "limb") .." is broken.", 3)
+	if broken_dislocated and org.just_damaged_bone then
         org.just_damaged_bone = nil
     end
 	
@@ -437,20 +449,6 @@ local function get_status_message(ply)
 	local str = ""
 
 	local most_wanted_phraselist
-	
-	    if temperature < 35 then
-        if temperature < 30 then
-            hg.status_messages.Send(ply, "You are freezing.", 3)
-        else
-            hg.status_messages.Send(ply, "You are cold.", 2)
-        end
-    elseif temperature > 38 then
-        if temperature > 40 then
-            hg.status_messages.Send(ply, "You are burning up.", 3)
-        else
-            hg.status_messages.Send(ply, "You are hot.", 2)
-        end
-    end
 
 	if not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
 		most_wanted_phraselist = despair_phrases
@@ -497,46 +495,34 @@ local function get_status_message(ply)
 	elseif hg.nothing_happening(ply) then
 		//most_wanted_phraselist = random_phrase
 
-		    if hungry and hungry > 25 then
-        if hungry > 75 then
-            hg.status_messages.Send(ply, "You are starving.", 3)
-        elseif hungry > 50 then
-            hg.status_messages.Send(ply, "You are very hungry.", 2)
-        else
-            hg.status_messages.Send(ply, "You are hungry.", 1)
-        end
-    end
-
-    if thirst and thirst > 25 then
-        if thirst > 75 then
-            hg.status_messages.Send(ply, "You are dying of thirst.", 3)
-        elseif thirst > 50 then
-            hg.status_messages.Send(ply, "You are very thirsty.", 2)
-        else
-            hg.status_messages.Send(ply, "You are thirsty.", 1)
-        end
-    end
-
-    if goodmood and goodmood > 0.8 and math.random(5) == 1 then
-        most_wanted_phraselist = good_mood_phrases
-    end
+		if goodmood and goodmood > 0.8 and math.random(5) == 1 then
+			most_wanted_phraselist = good_mood_phrases
+		end
 	elseif hg.fearful(ply) then
-        if positive_thinking and math.random(3) == 1 then
-            most_wanted_phraselist = near_death_positive
-        else
-		    most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
-        end
+		if positive_thinking and math.random(3) == 1 then
+			most_wanted_phraselist = near_death_positive
+		else
+			most_wanted_phraselist = ((IsAimedAt(ply) > 0.9) and is_aimed_at_phrases or (math.random(10) == 1 and fear_hurt_ironic or fear_phrases))
+		end
 	end
 
-	    if brain > 0.1 then
-        if brain > 0.5 then
-            hg.status_messages.Send(ply, "Your head feels like it's about to split open.", 4)
-        elseif brain > 0.3 then
-            hg.status_messages.Send(ply, "Your head is pounding.", 3)
-        else
-            hg.status_messages.Send(ply, "You have a headache.", 2)
-        end
-    end
+	if not org.otrub then
+		local o2Val = (org.o2 and org.o2[1]) or 30
+		local bloodVal = org.blood or 5000
+		local bp = org.bloodpressure or 93
+		local heartbeat = org.heartbeat or 70
+
+		-- If you are incredibly cooked (combination of severe failing conditions)
+		local lowO2 = o2Val < 10
+		local lowBlood = bloodVal < 2200 or bp < 55
+		local badHeart = org.heartstop or heartbeat < 30
+		local brainDamage = brain >= 0.3 or org.critical == true
+
+		-- Bypasses the standard separate messages if a combination of severe issues is occurring (i.e. you are incredibly cooked)
+		if (lowO2 and lowBlood) or (lowBlood and badHeart) or (lowO2 and badHeart) or brainDamage then
+			most_wanted_phraselist = cooked_phrases
+		end
+	end
 	
 	if most_wanted_phraselist then
 		str = most_wanted_phraselist[math.random(#most_wanted_phraselist)]

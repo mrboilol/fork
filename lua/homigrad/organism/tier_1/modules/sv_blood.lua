@@ -131,6 +131,10 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
+	if org.arteria == 1 then
+		org.o2[1] = math.max(org.o2[1] - mulTime * 5, 0)
+	end
+
 	-- Track how long internal bleed has been untreated
 	if org.internalBleed > 0 then
 		org.internalBleedDuration = (org.internalBleedDuration or 0) + mulTime

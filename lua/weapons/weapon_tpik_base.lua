@@ -403,7 +403,11 @@ function SWEP:SetHandPos(noset)
 	if !IsValid(wm) then return end
 	-- ent:SetupBones()
 
-	self.rhandik = self.setrh
+	local rarm_bad = ent.organism and ((ent.organism.rarm or 0) >= 1 or ent.organism.rarmdislocated or ent.organism.rarmamputated)
+	local larm_bad = ent.organism and ((ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated or ent.organism.larmamputated)
+	local prioritize_left = rarm_bad and not larm_bad
+
+	self.rhandik = self.setrh and not prioritize_left
 	self.lhandik = self.setlh and (ply:GetTable().ChatGestureWeight < 0.1)
 
 	local rhBone = cachedOwnerBone(ent, "ValveBiped.Bip01_R_Hand")
@@ -411,10 +415,10 @@ function SWEP:SetHandPos(noset)
 	local rhmat = rhBone and ent:GetBoneMatrix(rhBone) or nil
 	local lhmat = lhBone and ent:GetBoneMatrix(lhBone) or nil
 
-	ply.rhold = rhmat
-	ply.lhold = lhmat
+	ply.rhold = (not prioritize_left) and rhmat or nil
+	ply.lhold = (not prioritize_left) and lhmat or nil
 
-	if self.lhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) and hg.CanUseLeftHand(ply) then
+	if self.lhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) and hg.CanUseLeftHand(ply) and not prioritize_left then
 		for _, bone in ipairs(bones) do
 			local wm_boneindex = cachedWorldBone(wm, bone)
 			if !wm_boneindex then continue end
@@ -444,14 +448,19 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesRH
 
-	if self.rhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) then
+	if (self.rhandik or prioritize_left) and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) then
 		for _, bone in ipairs(bones) do
 			local wm_boneindex = cachedWorldBone(wm, bone)
 			if !wm_boneindex then continue end
 			local wm_bonematrix = wm:GetBoneMatrix(wm_boneindex)
 			if !wm_bonematrix then continue end
 			
-			local ply_boneindex = cachedOwnerBone(ent, bone)
+			local ply_bone = bone
+			if prioritize_left then
+				ply_bone = hg.TPIKBonesRHDictTranslate[bone] or bone
+			end
+
+			local ply_boneindex = cachedOwnerBone(ent, ply_bone)
 			if !ply_boneindex then continue end
 			local ply_bonematrix = ent:GetBoneMatrix(ply_boneindex)
 			if !ply_bonematrix then continue end
@@ -462,6 +471,15 @@ function SWEP:SetHandPos(noset)
 			bonepos.x = math.Clamp(bonepos.x, wmpos.x - 38, wmpos.x + 38)
 			bonepos.y = math.Clamp(bonepos.y, wmpos.y - 38, wmpos.y + 38)
 			bonepos.z = math.Clamp(bonepos.z, wmpos.z - 38, wmpos.z + 38)
+
+			if prioritize_left then
+				local mirrormat = wm:GetBoneMatrix(cachedWorldBone(wm, "ValveBiped.Bip01_R_Hand"))
+				local pos = wm_bonematrix:GetTranslation()
+				local mirrorpos = mirrormat:GetTranslation() - ply:EyeAngles():Right() * 1
+				
+				pos = pos + ply:EyeAngles():Right() * -(pos - mirrorpos):Dot(ply:EyeAngles():Right())
+				bonepos = pos
+			end
 
 			ply_bonematrix:SetTranslation(bonepos)
 			ply_bonematrix:SetAngles(boneang)

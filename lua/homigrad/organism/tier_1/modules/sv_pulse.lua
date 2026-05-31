@@ -84,9 +84,8 @@ module[2] = function(owner, org, timeValue)
 	compensation = compensation * (1 - math.Clamp((2200 - blood) / 1200, 0, 1) * 0.5)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 
-	local cardiacK = heartK * bloodK * o2K * brainK * hypothermiaK
-    local pulse_multiplier = math.Clamp(math.Remap(org.heartbeat, 60, 140, 0.9, 1.2), 0.8, 1.3)
-	local map = 93 * cardiacK * hypertensionMul * compensation * pulse_multiplier
+	local pulse_factor = org.pulse / 70
+	local map = 93 * pulse_factor * hypertensionMul * compensation
 	map = org.alive and map or 0
 
 	if org.heartstop then
@@ -162,14 +161,11 @@ module[2] = function(owner, org, timeValue)
 		org.stamina[1] = math.max(org.stamina[1] - timeValue * (2 + lowK * 10), 0)
 
 		if org.bloodpressure < 55 then
-				org.consciousness = math.Approach(org.consciousness, 0.45, timeValue * (0.08 + lowK * 0.11))
-			end
+			org.consciousness = math.Approach(org.consciousness, 0.25, timeValue * (0.08 + lowK * 0.11))
 		end
+	end
 
-		if org.bloodpressure < 25 then
-
-			org.needotrub = true
-	elseif org.bloodpressure > 115 then
+	if org.bloodpressure > 115 then
 		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
 		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.5
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
@@ -215,12 +211,12 @@ module[2] = function(owner, org, timeValue)
 
 	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
 		-- Scale chance with adrenaline level: low dose gives a modest chance, high dose is near-certain
-		-- Capped at 75% per tick so even max adrenaline still has a small failure chance each attempt
-		local chance = math.Clamp(adren * 20 + adren * adren * 3, 0, 75)
+		-- Capped at 90% per tick so even max adrenaline still has a small failure chance each attempt
+		local chance = math.Clamp(adren * 30 + adren * adren * 4, 0, 90)
 		local rand = math.random(100)
 
-		-- High adrenaline retries faster (0.05s at adren>=3, 0.1s otherwise)
-		org.adrenaline_try = CurTime() + (adren >= 3 and 0.05 or 0.1)
+		-- High adrenaline retries faster (0.03s at adren>=3, 0.06s otherwise)
+		org.adrenaline_try = CurTime() + (adren >= 3 and 0.03 or 0.06)
 
 		if chance > rand then org.heartstop = false end
 	end
@@ -228,11 +224,11 @@ module[2] = function(owner, org, timeValue)
 	if org.heartstop then
 		org.heartstoptime = org.heartstoptime or CurTime()
 		if org.isPly then
-			//org.owner:Notify("I'm feeling dizzy...", true, "heartstop", 10)
+	        org.owner:Notify("I'm feeling dizzy...", true, "heartstop", 10)
 		end
 	else
 		if org.isPly then
-			//org.owner:ResetNotification("heartstop")
+			org.owner:ResetNotification("heartstop")
 		end
 		org.heartstoptime = nil
 	end

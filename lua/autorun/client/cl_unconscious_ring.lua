@@ -28,6 +28,14 @@ surface.CreateFont("UnconsciousDots", {
     antialias = true
 })
 
+surface.CreateFont("HomigradCriticalWarning", {
+    font = "Bahnschrift",
+    size = ScreenScaleH(14),
+    weight = 800,
+    antialias = true,
+    shadow = true
+})
+
 local ringAlpha = 0
 local lerpBrain = 0
 local lerpShock = 0
@@ -253,18 +261,23 @@ local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 
-local function DrawEKG(state, centerX, centerY, width, height, pulse, color, ringAlpha)
+local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse, color, ringAlpha)
     local time = CurTime()
     if state.lastUpdate == 0 then state.lastUpdate = time end
     local dt = time - state.lastUpdate
     state.lastUpdate = time
 
-    -- Increment heart phase based on pulse (BPM to beats per second)
-    state.phase = state.phase + dt * (pulse / 60)
+    -- Increment heart phase based on heartbeat (BPM to beats per second)
+    state.phase = state.phase + dt * (heartbeat / 60)
 
     local sweepSpeed = width / 4
     local oldSweepPos = state.sweepPos
     state.sweepPos = (state.sweepPos + dt * sweepSpeed) % width
+
+    -- Calculate morph factor for high heartbeat & low pulse (looks like a sinewave)
+    local hbFactor = math.Clamp((heartbeat - 90) / 60, 0, 1)
+    local pulseFactor = math.Clamp((65 - pulse) / 35, 0, 1)
+    local sineMorphFactor = hbFactor * pulseFactor
 
     -- Clean ECG waveform (P-QRS-T complex) from oldring
     local function getH(phase)
@@ -289,6 +302,11 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
             h = h + math.sin((phase - 0.45) / 0.2 * math.pi) * 0.22
         end
 
+        if sineMorphFactor > 0 then
+            local sineH = math.sin(phase * 2 * math.pi) * 0.35
+            h = Lerp(sineMorphFactor, h, sineH)
+        end
+
         return h
     end
 
@@ -299,7 +317,7 @@ local function DrawEKG(state, centerX, centerY, width, height, pulse, color, rin
     for i = 0, steps do
         local p = (oldSweepPos + i) % width
         -- Interpolate heartPhase for this specific pixel
-        local p_phase = state.phase - (dt * (pulse / 60) * (1 - i/steps))
+        local p_phase = state.phase - (dt * (heartbeat / 60) * (1 - i/steps))
         state.points[math.floor(p)] = getH(p_phase)
     end
 
@@ -538,7 +556,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 flatlinePlayedThisUnconscious = true
             end
             UpdateRingAudio(heartbeat, ringAlpha, org)
-            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, dotColor, ringAlpha)
+            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, dotColor, ringAlpha)
         end
     end
 
@@ -593,7 +611,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         end
 
-        DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, Color(255, 255, 255, 255), ecgAlphaPulseCheck)
+        DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck)
 
         local displayText = ""
         if g_PulseCheckData then
@@ -628,7 +646,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
-        DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, heartbeat, Color(255, 255, 255, 255), ecgAlpha)
+        DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, heartbeat, pulse, Color(255, 255, 255, 255), ecgAlpha)
     else
         topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
