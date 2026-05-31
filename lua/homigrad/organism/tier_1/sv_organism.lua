@@ -264,6 +264,8 @@ local function send_bareinfo(org)
 	sendtable.lungsfunction = org.lungsfunction
 	sendtable.eyeL = org.eyeL
 	sendtable.eyeR = org.eyeR
+	sendtable.eyeL = org.eyeL
+	sendtable.eyeR = org.eyeR
 	sendtable.lleg = org.lleg
 	sendtable.rleg = org.rleg
 	sendtable.rarm = org.rarm
