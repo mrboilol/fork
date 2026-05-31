@@ -195,17 +195,41 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local justzoomed = zooming and !oldzoom
 	lastzoom = (justzoomed or (cocking or self.shot2 == 1)) and CurTime() or lastzoom
 
-	local rhandBroken = organism.rarm == 1
-	local rhandDislocated = organism.rarmdislocated
-	local lhandBroken = organism.larm == 1
-	local lhandDislocated = organism.larmdislocated
-	local rhandIssue = rhandBroken or rhandDislocated
-	local lhandIssue = lhandBroken or lhandDislocated
+	local organism = ply.organism or {}
+	local rarm_health = organism.rarm or 0
+	local larm_health = organism.larm or 0
+	local rarm_broken = rarm_health >= 1
+	local rarm_dislocated = organism.rarmdislocated
+	local larm_broken = larm_health >= 1
+	local larm_dislocated = organism.larmdislocated
+	local rarm_amputated = organism.rarmamputated
+	local larm_amputated = organism.larmamputated
 
-	local tta = math.Clamp(self.weight / 4, 0.25, 1) * 0.5
-	-- Slower sight alignment with broken/dislocated hands
-	if rhandIssue or lhandIssue then
-		tta = tta * ((rhandBroken or lhandBroken) and 2.2 or 1.6)
+	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
+	local larm_bad = larm_broken or larm_dislocated or larm_amputated
+
+	local tta = math.Clamp(self.weight / 4, 0.25, 1) * 0.7 -- Slower base sight alignment (0.7 instead of 0.5) so healthy arms take somewhat more time to align
+
+	local healthy_arms = not rarm_bad and not larm_bad
+	local only_left_arm = rarm_amputated and not larm_bad
+	local broken_right_arm = rarm_broken and not larm_bad
+	local only_right_arm = larm_amputated and not rarm_bad
+	local right_arm_broken_left = not rarm_bad and (larm_broken or larm_dislocated) and not larm_amputated
+
+	if healthy_arms then
+		-- Base alignment time is used
+	elseif only_right_arm then
+		tta = tta * 1.8
+	elseif only_left_arm then
+		tta = tta * 3.5
+	elseif broken_right_arm then
+		tta = tta * 4.0
+	elseif right_arm_broken_left then
+		tta = tta * (larm_broken and 2.2 or 1.6)
+	else
+		if rarm_bad or larm_bad then
+			tta = tta * ((rarm_broken or larm_broken) and 2.5 or 1.8)
+		end
 	end
 	if isvector(vellen) then
 		vellen = vellen:Length()

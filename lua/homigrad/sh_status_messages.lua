@@ -74,20 +74,21 @@ local sharp_pain = {
 hg.sharp_pain = sharp_pain
 
 local random_phrase = {
-	"It's kinda chilly in here...",
-	"Everything seems too quiet...",
-	"Breathing feels oddly satisfying right now.",
-	"What if this quiet lasts forever?",
-	"Why isn't anything happening?",
+	"Nothing ever happens.",
+	"Damn, I forgot to pay my child support.",
+	"I wonder when rent is due.",
+	"Isn't there like a homicide happening?",
+	"This is why I never leave the house.",
 }
 
 local fear_hurt_ironic = {
-	"I bet there's a lesson in this... if I survive.",
-	"My future biographer won't believe this part.",
-	"Well, this is a stupid way to go.",
+	"My friends will NEVER believe this story.",
+	"This isnt a bad place to die.",
+	"How did I get to this point?",
 	"At least my life wasn't boring.",
-	"Note to self: Never do this again.",
+	"I guess this is what happens when you dont pay your bills.",
 	"This isn't the worst day to die.",
+	"This is actually pretty funny.",
 }
 
 local fear_phrases = {
@@ -166,21 +167,21 @@ local near_death_positive = {
 }
 
 local broken_limb = {
-	"Shit, i heard it- i heard it snap...",
-	"I can feel the pieces moving, i think i broke it.",
-	"Its- My limb, i heard it snap...",
-	"I broke it, i actually broke it...",
-	"The angle of my limb is so off, i think its broken.",
+	"God damn it, I think I broke something.",
+	"I can feel the pieces moving, I think I broke it.",
+	"I heard something break.",
+	"Jesus christ, I think I actually broke something...",
+	"The angle of my limb is so off, I think its broken.",
 	"Oh fuck. It is snapped.",
-	"Fuck me, i think i broke something.",
+	"Fuck me, I think I broke something.",
 }
 
 local dislocated_limb = {
-	"Its out of place- i can see the bulge where its out of place...",
+	"I think my bone is out of place.",
 	"I have to get this bone back in.",
-	"I can feel the bone grinding against the joiny...",
-	"It just hurts so much there. I might need a check up.",
-	"My limb is out of place.",
+	"I heard the bone pop like a gunshot...",
+	"Its out of the socket, I can see the bulge...",
+	"Dont look, dont- oh god... its out of place.",
 }
 
 local hungry_a_bit = {
@@ -335,16 +336,9 @@ local heatvomit_phraselist = {
 }
 
 local cooked_phrases = {
-    "My body... everything is failing...",
-    "I'm slipping away... I can't stay awake...",
-    "So cold... everything is going numb...",
-    "I can't feel my limbs... I'm fading...",
-    "Is this it? I can't breathe, my heart...",
-    "Everything is going pitch black...",
-    "My heart is fluttering... I'm collapsing...",
-    "I can't take a breath... my vision is fading...",
-    "I'm losing my grip on consciousness...",
-    "Everything feels so distant... so cold..."
+    "its so over 😭",
+    "son im cooked 😭🙏",
+    "nga im so fried 🥹",
 }
 
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
@@ -493,7 +487,7 @@ local function get_status_message(ply)
 	elseif after_unconscious_notify then
 		most_wanted_phraselist = after_unconscious
 	elseif hg.nothing_happening(ply) then
-		//most_wanted_phraselist = random_phrase
+		most_wanted_phraselist = random_phrase
 
 		if goodmood and goodmood > 0.8 and math.random(5) == 1 then
 			most_wanted_phraselist = good_mood_phrases
@@ -512,13 +506,13 @@ local function get_status_message(ply)
 		local bp = org.bloodpressure or 93
 		local heartbeat = org.heartbeat or 70
 
-		-- If you are incredibly cooked (combination of severe failing conditions)
+		-- nga imc ooked
 		local lowO2 = o2Val < 10
 		local lowBlood = bloodVal < 2200 or bp < 55
 		local badHeart = org.heartstop or heartbeat < 30
 		local brainDamage = brain >= 0.3 or org.critical == true
 
-		-- Bypasses the standard separate messages if a combination of severe issues is occurring (i.e. you are incredibly cooked)
+	
 		if (lowO2 and lowBlood) or (lowBlood and badHeart) or (lowO2 and badHeart) or brainDamage then
 			most_wanted_phraselist = cooked_phrases
 		end
@@ -566,4 +560,32 @@ function hg.get_status_message(ply)
 	local txt = get_status_message(ply)
 
 	return txt
+end
+
+function hg.is_traumatic_message(ply)
+	if not IsValid(ply) then return false end
+	local org = ply.organism
+	if not org then return false end
+
+	-- huy nigga 67 or sum liek that
+	if org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3) then
+		return true
+	end
+
+	local o2Val = (org.o2 and org.o2[1]) or 30
+	local bloodVal = org.blood or 5000
+	local bp = org.bloodpressure or 93
+	local heartbeat = org.heartbeat or 70
+	local brain = org.brain or 0
+
+	local lowO2 = o2Val < 10
+	local lowBlood = bloodVal < 2200 or bp < 55
+	local badHeart = org.heartstop or heartbeat < 30
+	local brainDamage = brain >= 0.3 or org.critical == true
+
+	if (lowO2 and lowBlood) or (lowBlood and badHeart) or (lowO2 and badHeart) or brainDamage then
+		return true
+	end
+
+	return false
 end

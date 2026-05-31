@@ -148,7 +148,7 @@ if CLIENT then
 
 	local defaultShowTimer = 3
 
-	local function CreateNotification(msg, showTimer, clr)
+	local function CreateNotification(msg, showTimer, clr, traumatic)
 		if hg_furcity:GetBool() or lply.PlayerClassName == "furry" then
 			msg = hg.FurrifyPhrase(msg)
 		end
@@ -157,10 +157,10 @@ if CLIENT then
 			return
 		end
 
-		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255)})
+		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255), traumatic or false})
 	end
 
-	local function CreateNotificationBerserk(msg, showTimer, clr, noChatPrint)
+	local function CreateNotificationBerserk(msg, showTimer, clr, noChatPrint, traumatic)
 		if hg_furcity:GetBool() or lply.PlayerClassName == "furry" then
 			msg = hg.FurrifyPhrase(msg) -- uhhhh... hate to break it to you but-
 		end
@@ -175,7 +175,7 @@ if CLIENT then
 		hg.currentNotification = nil
 		hg.notifications = {}
 
-		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255)})
+		table.insert(hg.notifications, {msg, (showTimer or defaultShowTimer), clr or Color(255, 255, 255, 255), traumatic or false})
 	end
 
 	local PLAYER = FindMetaTable("Player")
@@ -191,20 +191,22 @@ if CLIENT then
 	net.Receive("HGNotificate",function()
 		local msg = net.ReadString()
 		local clr = net.ReadColor()
+		local traumatic = net.ReadBool()
 
 		if msg == "" then return end
 
-		CreateNotification(msg, showtime, clr)
+		CreateNotification(msg, showtime, clr, traumatic)
 	end)
 
 	net.Receive("HGNotificateBerserk",function()
 		local msg = net.ReadString()
 		local clr = net.ReadColor()
 		local noChatPrint = net.ReadBool()
+		local traumatic = net.ReadBool()
 
 		if msg == "" then return end
 
-		CreateNotificationBerserk(msg, showtime, clr, noChatPrint)
+		CreateNotificationBerserk(msg, showtime, clr, noChatPrint, traumatic)
 	end)
 
 	hg.CreateNotification = CreateNotification
@@ -233,7 +235,7 @@ if CLIENT then
 				hg.currentNotification = nil
 			end*/
 
-			hg.currentNotification = {tbl[1], time_spent, tbl[2], tbl[3]}
+			hg.currentNotification = {tbl[1], time_spent, tbl[2], tbl[3], tbl[4] or false}
 
 			table.remove(hg.notifications,1)
 		end--показываем только одну нотификацию за раз (остальные держим в уме....)
@@ -271,7 +273,7 @@ if CLIENT then
 		local tbl = hg.currentNotification
 
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
-			local msg, time, timeshow, clr = tbl[1], tbl[2], tbl[3], tbl[4]
+			local msg, time, timeshow, clr, traumatic = tbl[1], tbl[2], tbl[3], tbl[4], tbl[5]
 
 			local mul = ((org.brain > 0.1 or org.pulse < 50) and 3 or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
 			local time_one_symbol = 0.06 * mul//(lply.organism and lply.organism.fear >= 0.5 and 0.5 or 1)
@@ -321,6 +323,23 @@ if CLIENT then
 				col.a = 255 * (last_time and (last_time + 2 - time_spent) or part2)
 				colBrown.a = 255 * (last_time and (last_time + 2 - time_spent) or part2)
 
+				-- Traumatic shake and fade effect
+				local shakeX = 0
+				local shakeY = 0
+				local fadeAlpha = 1
+				
+				if traumatic then
+					-- Shake intensity based on time since notification started
+					local shakeIntensity = math.Clamp((time_spent - time) / 0.5, 0, 1) * 5
+					shakeX = math.Rand(-shakeIntensity, shakeIntensity)
+					shakeY = math.Rand(-shakeIntensity, shakeIntensity)
+					
+					-- Fade in effect for first 0.3 seconds
+					fadeAlpha = math.Clamp((time_spent - time) / 0.3, 0, 1)
+					col.a = col.a * fadeAlpha
+					colBrown.a = colBrown.a * fadeAlpha
+				end
+
 				if hg.underberserk2 then
 					local scale = 1
 
@@ -358,12 +377,12 @@ if CLIENT then
 
 					render.PopFilterMag()
 				elseif lply.PlayerClassName == "furry" then
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2), ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)
+					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeX, ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeY
 
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x + 2, y + 2, ColorAlpha(color_black, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x, y, ColorAlpha(bluewhite, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				else
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2), ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2)
+					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeX, ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeY
 
 					draw.SimpleTextOutlined(last_message or txt, font, x, y, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
 				end

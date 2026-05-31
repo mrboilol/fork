@@ -1843,10 +1843,48 @@ function SWEP:GetAdditionalValues()
 	self.AdditionalPosPreLerp[2] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and 1 - add or 0
 	self.AdditionalPosPreLerp[3] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and -0.5 or 0
 
+	local rarm_health = ply.organism and ply.organism.rarm or 0
+	local larm_health = ply.organism and ply.organism.larm or 0
+	local rarm_broken = rarm_health >= 1
+	local rarm_dislocated = ply.organism and ply.organism.rarmdislocated
+	local larm_broken = larm_health >= 1
+	local larm_dislocated = ply.organism and ply.organism.larmdislocated
+	local rarm_amputated = ply.organism and ply.organism.rarmamputated
+	local larm_amputated = ply.organism and ply.organism.larmamputated
+
+	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
+	local larm_bad = larm_broken or larm_dislocated or larm_amputated
+
 	-- Calculate aiming fatigue
 	if self:IsZoom() then
 		self.aimFatigueTimer = (self.aimFatigueTimer or 0) + FrameTime()
-		if self.aimFatigueTimer > 20 then
+		
+		-- Calculate dynamic fatigue threshold based on weapon type, weight, and arm condition
+		local baseFatigueTime = self:IsPistolHoldType() and 20 or 10 -- pistols: 20s, rifles: 10s
+		
+		-- Adjust for weapon weight (heavier weapons fatigue faster)
+		local weightMultiplier = 1 + ((self.weight or 1) - 1) * 0.3 -- 30% faster per additional weight unit
+		local adjustedFatigueTime = baseFatigueTime / weightMultiplier
+		
+		-- One-handed (left arm not supporting) or left arm issues
+		if not self.lhandik or larm_broken or larm_dislocated or larm_amputated then
+			adjustedFatigueTime = adjustedFatigueTime * 0.6 -- 40% faster fatigue
+		end
+		
+		-- Right arm issues (dominant arm)
+		if rarm_broken or rarm_amputated then
+			adjustedFatigueTime = adjustedFatigueTime * 0.3 -- 70% faster fatigue
+		elseif rarm_dislocated then
+			adjustedFatigueTime = adjustedFatigueTime * 0.5 -- 50% faster fatigue
+		elseif rarm_health > 0 then
+			-- Partial damage to right arm
+			adjustedFatigueTime = adjustedFatigueTime * (1 - rarm_health * 0.3) -- up to 30% faster
+		end
+		
+		-- Ensure minimum fatigue time of 2 seconds
+		adjustedFatigueTime = math.max(adjustedFatigueTime, 2)
+		
+		if self.aimFatigueTimer > adjustedFatigueTime then
 			self.aimFatigue = math.Approach(self.aimFatigue or 0, 1, FrameTime() * 0.05) -- takes 20 seconds of continuous aiming to fully fatigue after immunity
 		end
 	else
@@ -1854,31 +1892,35 @@ function SWEP:GetAdditionalValues()
 		self.aimFatigue = math.Approach(self.aimFatigue or 0, 0, FrameTime() * 0.1) -- recovers in 10 seconds
 	end
 
-	local rarm_health = ply.organism and ply.organism.rarm or 0
-	local larm_health = ply.organism and ply.organism.larm or 0
-	local rarm_broken = rarm_health >= 1
-	local rarm_dislocated = ply.organism and ply.organism.rarmdislocated
-	local larm_broken = larm_health >= 1
-	local larm_dislocated = ply.organism and ply.organism.larmdislocated
-
 	local handSway = 0
-	if rarm_broken or rarm_dislocated then
-		local prioritize_left = not (larm_broken or larm_dislocated or (ply.organism and ply.organism.larmamputated))
-		if not prioritize_left then
-			handSway = (rarm_broken and 3.5 or 1.2) + rarm_health * 0.5
-			if larm_broken then
-				handSway = handSway + 2.0 + larm_health * 0.5
-			elseif larm_dislocated then
-				handSway = handSway + 0.8 + larm_health * 0.5
-			end
-		else
-			handSway = (rarm_broken and 1.8 or 0.7) + larm_health * 0.8
-		end
-	elseif larm_broken or larm_dislocated then
-		handSway = (larm_broken and 0.8 or 0.3) + rarm_health * 0.2
-	else
+	local healthy_arms = not rarm_bad and not larm_bad
+	local only_left_arm = rarm_amputated and not larm_bad
+	local broken_right_arm = rarm_broken and not larm_bad
+	local only_right_arm = larm_amputated and not rarm_bad
+	local right_arm_broken_left = not rarm_bad and (larm_broken or larm_dislocated) and not larm_amputated
+
+	if healthy_arms then
 		-- Both arms are functionally fine, but calculate baseline health sway
-		handSway = rarm_health * 0.3 + larm_health * 0.5
+		handSway = 0.15 + rarm_health * 0.3 + larm_health * 0.5
+	elseif only_left_arm then
+		handSway = 2.5
+	elseif broken_right_arm then
+		handSway = 3.0
+	elseif only_right_arm then
+		handSway = 1.0
+	elseif right_arm_broken_left then
+		handSway = (larm_broken and 0.8 or 0.3) + rarm_health * 0.2 + 0.15
+	else
+		-- Fallback logic for complex combinations of broken/dislocated/amputated arms
+		if rarm_bad and larm_bad then
+			handSway = (rarm_broken and 3.5 or 1.2) + (larm_broken and 2.0 or 0.8) + rarm_health * 0.5 + larm_health * 0.5
+		elseif rarm_bad then
+			handSway = rarm_dislocated and 1.2 or 1.8
+		elseif larm_bad then
+			handSway = larm_dislocated and 0.45 or 0.85
+		else
+			handSway = 0.15 + rarm_health * 0.3 + larm_health * 0.5
+		end
 	end
 
 	-- Left arm struggles more with aim when used as dominant
@@ -2298,9 +2340,14 @@ local veczero = Vector(0, 0, 0)
 SWEP.anglefinger = Angle()
 function SWEP:SetHandPos(noset)
 	self.addvec = self.addvec or veczero
-	self.rhandik = self.setrhik
 	
 	local ply = self:GetOwner()
+	local rarm_bad = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated or ply.organism.rarmamputated)
+	local larm_bad = ply.organism and ((ply.organism.larm or 0) >= 1 or ply.organism.larmdislocated or ply.organism.larmamputated)
+	local prioritize_left = rarm_bad and not larm_bad
+
+	local rarm_broken_or_dislocated = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated)
+	self.rhandik = self.setrhik and not prioritize_left and not rarm_broken_or_dislocated
 	self.lhandik = self.setlhik and not (ply.organism and (ply.organism.larm == 1 or ply.organism.larmdislocated))
 
     if not IsValid(ply) or not IsValid(self.worldModel) then return end

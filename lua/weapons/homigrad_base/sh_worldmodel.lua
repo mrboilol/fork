@@ -646,11 +646,15 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 		
 		-- if not should then ent:SetupBones() end
 		
-		local RHand = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+		local rarm_bad = owner.organism and ((owner.organism.rarm or 0) >= 1 or owner.organism.rarmdislocated or owner.organism.rarmamputated)
+		local larm_bad = owner.organism and ((owner.organism.larm or 0) >= 1 or owner.organism.larmdislocated or owner.organism.larmamputated)
+		local prioritize_left = rarm_bad and not larm_bad
+
+		local RHand = ent:LookupBone(prioritize_left and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 		
 		if not RHand then return end
 
-		local matrixR = ent:GetBoneMatrix(RHand) or ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_R_Forearm"))
+		local matrixR = ent:GetBoneMatrix(RHand) or ent:GetBoneMatrix(ent:LookupBone(prioritize_left and "ValveBiped.Bip01_L_Forearm" or "ValveBiped.Bip01_R_Forearm"))
 		
 		if not matrixR then 
 			//matrixR = Matrix()

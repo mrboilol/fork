@@ -1063,11 +1063,11 @@ function hg.DoTPIK(ply, ent)
 
 	local self = ply:GetActiveWeapon()
 
-	local larm_bad = ply.organism and ((ply.organism.larm or 0) >= 1 or ply.organism.larmdislocated)
-	local rarm_bad = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated)
+	local larm_bad = ply.organism and ((ply.organism.larm or 0) >= 1 or ply.organism.larmdislocated or ply.organism.larmamputated)
+	local rarm_bad = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated or ply.organism.rarmamputated)
 	local prioritize_left = rarm_bad and not larm_bad
 
-    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle()) and (hg.CanUseLeftHand(ply) or prioritize_left)
+    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle() or larm_bad) and (hg.CanUseLeftHand(ply) or prioritize_left or larm_bad)
     local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle() or prioritize_left) and (hg.CanUseRightHand(ply) or prioritize_left)
     
     local shouldrebuild = false
@@ -1178,14 +1178,13 @@ function hg.DoTPIK(ply, ent)
             local hand = ply_r_hand_matrix:GetTranslation()
             if prioritize_left then
                 local shoulder = ply_r_upperarm_matrix:GetTranslation()
-                local up = ply_spine_matrix:GetAngles():Up()
-                local forward = ply_spine_matrix:GetAngles():Forward()
-                local right = ply_spine_matrix:GetAngles():Right()
+                local down = Vector(0, 0, -1)
+                local right = ent:GetAngles():Right()
                 
-                hand = shoulder - up * (limblength * 1.5) - forward * 3 + right * 3
+                hand = shoulder + down * (limblength * 1.5) + right * 5
                 
-                local rest_ang = ply_spine_matrix:GetAngles()
-                rest_ang:RotateAroundAxis(rest_ang:Forward(), -90)
+                local rest_ang = ent:GetAngles()
+                rest_ang:RotateAroundAxis(rest_ang:Right(), -90)
                 ply_r_hand_matrix:SetAngles(rest_ang)
                 ply_r_hand_matrix:SetTranslation(hand)
             end
@@ -1326,14 +1325,13 @@ function hg.DoTPIK(ply, ent)
             local hand = ply_l_hand_matrix:GetTranslation()
             if larm_bad then
                 local shoulder = ply_l_upperarm_matrix:GetTranslation()
-                local up = ply_spine_matrix:GetAngles():Up()
-                local forward = ply_spine_matrix:GetAngles():Forward()
-                local right = ply_spine_matrix:GetAngles():Right()
+                local down = Vector(0, 0, -1)
+                local right = ent:GetAngles():Right()
                 
-                hand = shoulder - up * (limblength * 1.5) - forward * 3 - right * 3
+                hand = shoulder + down * (limblength * 1.5) - right * 5
                 
-                local rest_ang = ply_spine_matrix:GetAngles()
-                rest_ang:RotateAroundAxis(rest_ang:Forward(), 90)
+                local rest_ang = ent:GetAngles()
+                rest_ang:RotateAroundAxis(rest_ang:Right(), -90)
                 ply_l_hand_matrix:SetAngles(rest_ang)
                 ply_l_hand_matrix:SetTranslation(hand)
             end

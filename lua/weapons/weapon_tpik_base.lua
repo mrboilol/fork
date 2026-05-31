@@ -244,11 +244,24 @@ if CLIENT then
 		end
 
 		if IsValid(owner) and not (ent == owner or hg.KeyDown(owner,IN_USE) or (owner:GetNetVar("lastFake",0) > CurTime())) then
-			local bon = cachedOwnerBone(ent, "ValveBiped.Bip01_R_Hand")
+			local rarm_bad = ent.organism and ((ent.organism.rarm or 0) >= 1 or ent.organism.rarmdislocated or ent.organism.rarmamputated)
+			local larm_bad = ent.organism and ((ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated or ent.organism.larmamputated)
+			local prioritize_left = rarm_bad and not larm_bad
+
+			local bon = cachedOwnerBone(ent, prioritize_left and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 			if not bon then return end
 			local mat = ent:GetBoneMatrix(bon)
 			if not mat then return end
-            local pos,ang = LocalToWorld(self.lpos or vector_origin,self.lang or angle_zero,mat:GetTranslation(),mat:GetAngles())
+
+			local lpos = self.lpos or vector_origin
+			local lang = self.lang or angle_zero
+			
+			if prioritize_left then
+				lpos = Vector(lpos.x, -lpos.y, lpos.z)
+				lang = Angle(lang.p, lang.y, -lang.r)
+			end
+
+            local pos,ang = LocalToWorld(lpos,lang,mat:GetTranslation(),mat:GetAngles())
             WorldModel:SetRenderOrigin(pos)
 			WorldModel:SetRenderAngles(ang)
         end
@@ -407,8 +420,10 @@ function SWEP:SetHandPos(noset)
 	local larm_bad = ent.organism and ((ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated or ent.organism.larmamputated)
 	local prioritize_left = rarm_bad and not larm_bad
 
-	self.rhandik = self.setrh and not prioritize_left
-	self.lhandik = self.setlh and (ply:GetTable().ChatGestureWeight < 0.1)
+	local rarm_broken_or_dislocated = ent.organism and ((ent.organism.rarm or 0) >= 1 or ent.organism.rarmdislocated)
+	self.rhandik = self.setrh and not prioritize_left and not rarm_broken_or_dislocated
+	local larm_broken_or_dislocated = ent.organism and ((ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated)
+	self.lhandik = self.setlh and (ply:GetTable().ChatGestureWeight < 0.1) and not larm_broken_or_dislocated
 
 	local rhBone = cachedOwnerBone(ent, "ValveBiped.Bip01_R_Hand")
 	local lhBone = cachedOwnerBone(ent, "ValveBiped.Bip01_L_Hand")

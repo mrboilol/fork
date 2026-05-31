@@ -722,6 +722,15 @@ function SWEP:FireBullet()
 	bullet.Damage = bullet.Damage * (self.Supressor and 0.9 or 1) * (self.DamageMultiplier or 1)
 
 	bullet.Spread = (ammotype.Spread or self.Primary.Spread or 0) * 3
+	if isply then
+		local organism = owner.organism or {}
+		local rarm_amputated = organism.rarmamputated
+		local larm_health = organism.larm or 0
+		local larm_bad = (larm_health >= 1) or organism.larmdislocated or organism.larmamputated
+		if rarm_amputated and not larm_bad then
+			bullet.Spread = bullet.Spread * 2.5
+		end
+	end
 	bullet.Num = 1
 	
 	bullet.AmmoType = primary.Ammo

@@ -162,7 +162,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit) end
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit, true) end
 		end
 		//broken
 	else
@@ -191,7 +191,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit) end
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit, true) end
 		end
 		//dislocated
 	end
@@ -253,7 +253,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit) end
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit, true) end
 		end
 		//broken
 	else
@@ -282,7 +282,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 			local safeDir = dir or vector_origin
 			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
 			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit) end
+			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit, true) end
 		end
 		//dislocated
 	end
@@ -337,7 +337,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 			if math.random() < 0.35 then
 				local safeDir = dir or vector_origin
 				local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
-				if hg.hitArtery then hg.hitArtery("arteria", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Neck1", safeDir, safeHit) end
+				if hg.hitArtery then hg.hitArtery("arteria", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Neck1", safeDir, safeHit, true) end
 			end
 			hg.BreakNeck(org.owner, true)
 			return result, vecrand

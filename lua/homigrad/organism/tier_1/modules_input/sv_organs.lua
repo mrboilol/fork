@@ -334,19 +334,26 @@ local arteryMessages ={
 	"ITS BLEEDING- WHY IS MY NECK BLEEDING SO MUCH"
 }
 
-local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
-	if isCrush(dmgInfo) then return 1 end
-	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
-	
-	local wep = dmgInfo:GetInflictor()
-	local chance = (IsValid(wep) and wep.ArteryChance) or 0
-	if dmgInfo:IsDamageType(DMG_SLASH) then
-		local baseChance = (dmg < 2) and 0.2 or 1.0
-		local totalChance = baseChance + chance
-		if totalChance < 1 and math.random() > totalChance then return end
+local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, forceHit)
+	-- Skip damage type checks if forceHit is true (e.g., from bone breaking)
+	if not forceHit then
+		if isCrush(dmgInfo) then return 1 end
+		if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
+		
+		local wep = dmgInfo:GetInflictor()
+		local chance = (IsValid(wep) and wep.ArteryChance) or 0
+		if dmgInfo:IsDamageType(DMG_SLASH) then
+			local baseChance = (dmg < 2) and 0.2 or 1.0
+			local totalChance = baseChance + chance
+			if totalChance < 1 and math.random() > totalChance then return end
+		end
 	end
 	
 	org.painadd = org.painadd + dmg * 1
+	
+	-- Immediate O2 debuff when artery is hit
+	org.o2[1] = math.max(org.o2[1] - dmg * 8, 0)
+	
 	if org[artery] == 1 then return 0 end
 	if org[string.Replace(artery, "artery", "").."amputated"] then return end
 	local owner = org.owner
