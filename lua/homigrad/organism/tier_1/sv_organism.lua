@@ -18,6 +18,8 @@ hook.Add("Org Clear", "Main", function(org)
 	module.goodmood[1](org)
 	if module.teeth and module.teeth[1] then module.teeth[1](org) end
 	org.brain = 0
+	org.eyeL = 0
+	org.eyeR = 0
 	org.consciousness = 1
 	org.disorientation = 0
 	org.jaw = 0
@@ -197,6 +199,8 @@ local function send_organism(org, ply)
 	sendtable.larmamputated = org.larmamputated
 	sendtable.headamputated = org.headamputated
 	sendtable.lungsfunction = org.lungsfunction
+	sendtable.eyeL = org.eyeL
+	sendtable.eyeR = org.eyeR
 	sendtable.consciousness = org.consciousness
 	sendtable.concussion = org.concussion
 	sendtable.oxygen_deprivation = org.oxygen_deprivation
@@ -258,6 +262,8 @@ local function send_bareinfo(org)
 	sendtable.despair = org.despair
 	sendtable.superfighter = org.superfighter
 	sendtable.lungsfunction = org.lungsfunction
+	sendtable.eyeL = org.eyeL
+	sendtable.eyeR = org.eyeR
 	sendtable.lleg = org.lleg
 	sendtable.rleg = org.rleg
 	sendtable.rarm = org.rarm
@@ -693,6 +699,18 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if isPly or org.fakePlayer then
 		module.lungs[2](owner, org, timeValue)
+	end
+
+	local eyeL = org.eyeL or 0
+	local eyeR = org.eyeR or 0
+	if eyeL < 1 and eyeR < 1 then
+		org.blindness = nil
+	elseif eyeL >= 1 and eyeR < 1 then
+		org.blindness = 2
+	elseif eyeR >= 1 and eyeL < 1 then
+		org.blindness = 1
+	elseif eyeL >= 1 and eyeR >= 1 then
+		org.blindness = 0
 	end
 
 	if isPly then
@@ -1182,8 +1200,10 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.stomach = math.max(org.stomach - regen, 0)
 	org.lungsR[1] = math.max(org.lungsR[1] - regen, 0)
 	org.lungsL[1] = math.max(org.lungsL[1] - regen, 0)
-	org.lungsR[2] = math.max(org.lungsR[2] - regen, 0)
-	org.lungsL[2] = math.max(org.lungsL[2] - regen, 0)
+	org.lungsR[2] = math.max((org.lungsR[2] or 0) - regen, 0)
+	org.lungsL[2] = math.max((org.lungsL[2] or 0) - regen, 0)
+	org.eyeL = math.max((org.eyeL or 0) - regen, 0)
+	org.eyeR = math.max((org.eyeR or 0) - regen, 0)
 	org.brain = math.max(org.brain - regen, 0)
 
 	org.hungry = 0
@@ -1209,8 +1229,10 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 
 	org.lungsR[1] = math.max(org.lungsR[1] - regen, 0)
 	org.lungsL[1] = math.max(org.lungsL[1] - regen, 0)
-	org.lungsR[2] = math.max(org.lungsR[2] - regen, 0)
-	org.lungsL[2] = math.max(org.lungsL[2] - regen, 0)
+	org.lungsR[2] = math.max((org.lungsR[2] or 0) - regen, 0)
+	org.lungsL[2] = math.max((org.lungsL[2] or 0) - regen, 0)
+	org.eyeL = math.max((org.eyeL or 0) - regen, 0)
+	org.eyeR = math.max((org.eyeR or 0) - regen, 0)
 
 	org.hungry = 0
 

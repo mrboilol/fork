@@ -56,20 +56,20 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(255, 0, 255)
 	},
 	{
-		"eyeL",
-		nil,
-		Vector(4.45, -3.55, 1.55),
+		"eyeL", --left eye
+		0.1,
+		Vector(4.5, -4.8, 1.2),
 		Angle(0, 0, 0),
-		Vector(1.55, 0.95, 1.05),
-		Color(40, 210, 255)
+		Vector(0.7, 0.7, 0.7),
+		Color(255, 255, 255)
 	},
 	{
-		"eyeR",
-		nil,
-		Vector(4.45, -3.55, -1.55),
+		"eyeR", --right eye
+		0.1,
+		Vector(4.5, -4.8, -1.2),
 		Angle(0, 0, 0),
-		Vector(1.55, 0.95, 1.05),
-		Color(40, 210, 255)
+		Vector(0.7, 0.7, 0.7),
+		Color(255, 255, 255)
 	},
 }
 
@@ -335,20 +335,20 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(255, 0, 255)
 	},
 	{
-		"eyeL",
-		nil,
-		Vector(3.85, -3.1, 1.5),
+		"eyeL", --left eye
+		0.1,
+		Vector(3.5, -3.3, 1.2),
 		Angle(0, 0, 0),
-		Vector(1.5, 0.95, 1.05),
-		Color(40, 210, 255)
+		Vector(0.7, 0.7, 0.7),
+		Color(255, 255, 255)
 	},
 	{
-		"eyeR",
-		nil,
-		Vector(3.85, -3.1, -1.5),
+		"eyeR", --right eye
+		0.1,
+		Vector(3.5, -3.3, -1.2),
 		Angle(0, 0, 0),
-		Vector(1.5, 0.95, 1.05),
-		Color(40, 210, 255)
+		Vector(0.7, 0.7, 0.7),
+		Color(255, 255, 255)
 	},
 }
 

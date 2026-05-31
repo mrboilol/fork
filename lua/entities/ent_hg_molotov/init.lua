@@ -26,18 +26,16 @@ function ENT:PhysicsCollide(data, physobj)
 	if data.DeltaTime > .2 and data.Speed > 25 then
 		
 		self.Velocity = data.OurOldVelocity
-		if data.Speed > 200 and not self.Exploded then
-			local hitNormal = data.HitNormal
-			local isWall = math.abs(hitNormal.z) < 0.7
-			if isWall and math.random(1, 100) <= 30 then
-				local bounceVel = data.OurOldVelocity * -0.6
-				bounceVel = bounceVel + hitNormal * data.Speed * 0.4
-				physobj:SetVelocity(bounceVel)
-				self:EmitSound("physics/glass/glass_bottle_impact_hard" .. math.random(1, 3) .. ".wav", 75, math.random(95, 105))
-				return
+		if data.Speed > 200 and not self.Exploded then 
+			local isWall = math.abs(data.HitNormal.z) < 0.5
+			local detonateChance = isWall and 25 or 90
+			
+			if math.random(1, 100) <= detonateChance then
+				self:Detonate()
+				self:EmitSound("weapons/molotov/molotov_detonate.wav")
+			else
+				self:EmitSound("physics/glass/glass_bottle_impact_hard" .. math.random(1, 3) .. ".wav", 75, math.random(90, 110))
 			end
-			self:Detonate()
-			self:EmitSound("weapons/molotov/molotov_detonate.wav")
 		end
 	end
 end
@@ -61,7 +59,11 @@ function ENT:OnTakeDamage(dmginfo)
 end
 
 function ENT:Think()
-	if self:GetPhysicsObject():GetVelocity():Length() < 50 or self:WaterLevel() > 0 and not self.Exploded then
+	local cookTime = self.timer or CurTime()
+	if CurTime() > cookTime + (self.timeToBoom or 5) and not self.Exploded then
+		self:Detonate()
+		self:EmitSound("weapons/molotov/molotov_detonate.wav")
+	elseif self:WaterLevel() > 0 and not self.Exploded then
 		local ent = ents.Create("weapon_hg_molotov_tpik")
 		ent:SetPos(self:GetPos())
 		ent:SetAngles(self:GetAngles())
@@ -84,6 +86,11 @@ function ENT:Detonate()
 	if self.Exploded then return end
 	self.Exploded = true
 	local SelfPos, Owner = self:LocalToWorld(self:OBBCenter()), self:GetOwner() or self
+	
+	local effectdata = EffectData()
+	effectdata:SetOrigin(SelfPos)
+	util.Effect("GlassImpact", effectdata)
+	
 	--local Boom = ents.Create("env_explosion")
 	--Boom:SetPos(SelfPos)
 	--Boom:SetKeyValue("imagnitude", "50")
