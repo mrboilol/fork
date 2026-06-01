@@ -1063,12 +1063,8 @@ function hg.DoTPIK(ply, ent)
 
 	local self = ply:GetActiveWeapon()
 
-	local larm_bad = ply.organism and ((ply.organism.larm or 0) >= 1 or ply.organism.larmdislocated or ply.organism.larmamputated)
-	local rarm_bad = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated or ply.organism.rarmamputated)
-	local prioritize_left = rarm_bad and not larm_bad
-
-    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle() or larm_bad) and (hg.CanUseLeftHand(ply) or prioritize_left or larm_bad)
-    local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle() or prioritize_left) and (hg.CanUseRightHand(ply) or prioritize_left)
+    local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply)
+    local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
     
     local shouldrebuild = false
     if (ply.nextrebuild or 0) < CurTime() then
@@ -1176,24 +1172,12 @@ function hg.DoTPIK(ply, ent)
             ply.leftClicking = LerpFT(0.05, ply.leftClicking or 0, (ishgweapon(self) and hg.KeyDown(ply, IN_ATTACK)) and 1 or 0.05)
 
             local hand = ply_r_hand_matrix:GetTranslation()
-            if prioritize_left then
-                local shoulder = ply_r_upperarm_matrix:GetTranslation()
-                local down = Vector(0, 0, -1)
-                local right = ent:GetAngles():Right()
-                
-                hand = shoulder + down * (limblength * 1.3) + right * 5
-                
-                local rest_ang = ent:GetAngles()
-                rest_ang:RotateAroundAxis(rest_ang:Right(), -135)
-                ply_r_hand_matrix:SetAngles(rest_ang)
-                ply_r_hand_matrix:SetTranslation(hand)
-            end
 
             if false and !ishgweapon(self) and ply.organism and ply.organism.rarm and ply.organism.rarm > 0.99 then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
                 segments[3].Pos = LerpVector(ply.leftClicking, segments[3].Pos + (-vector_up * 0.8 + eyeang:Forward() * 0.4 + ent:GetVelocity() / 400) * 0.5, hand)
             else
-                segments[3] = {Pos = Lerp(1 - lerp_rh, ply.last_rh and ply.last_rh:GetTranslation() or segments[3].Pos, (not prioritize_left and ply_r_hand_matrix_old) and ply_r_hand_matrix_old:GetTranslation() or hand), Len = 12}
+                segments[3] = {Pos = Lerp(1 - lerp_rh, ply.last_rh and ply.last_rh:GetTranslation() or segments[3].Pos, ply_r_hand_matrix_old and ply_r_hand_matrix_old:GetTranslation() or hand), Len = 12}
             end
 
             if lply:IsSuperAdmin() then
@@ -1323,25 +1307,13 @@ function hg.DoTPIK(ply, ent)
             end
 
             local hand = ply_l_hand_matrix:GetTranslation()
-            if larm_bad then
-                local shoulder = ply_l_upperarm_matrix:GetTranslation()
-                local down = Vector(0, 0, -1)
-                local right = ent:GetAngles():Right()
-                
-                hand = shoulder + down * (limblength * 1.3) - right * 5
-                
-                local rest_ang = ent:GetAngles()
-                rest_ang:RotateAroundAxis(rest_ang:Right(), -135)
-                ply_l_hand_matrix:SetAngles(rest_ang)
-                ply_l_hand_matrix:SetTranslation(hand)
-            end
             local add = (hand - segments[1].Pos):GetNormalized() * 5 + eyeang:Right() * -5 + eyeang:Forward() * ((ply.lerp_hand or 0) - 0.5) * 10
 
             if ply.organism and ply.organism.larm and ply.organism.larm > 0.99 and ishgweapon(self) and !self.reload and ishgweapon(self) then
                 segments[3] = segments[3] or {Pos = hand, Len = limblength}
                 segments[3].Pos = LerpVector(!(ishgweapon(self) and self:IsPistolHoldType()) and 0.05 or 0.01, segments[3].Pos + (-vector_up * 0.6 + eyeang:Forward() * 0.4 + ((ishgweapon(self) and !self:IsPistolHoldType()) and eyeang:Right() * 0.7 or vector_origin) + ent:GetVelocity() / 400) * 0.5, hand)
             else
-                segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, (not larm_bad and ply_l_hand_matrix_old) and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
+                segments[3] = {Pos = Lerp(1 - lerp_lh, ply.last_lh and ply.last_lh:GetTranslation() or segments[3].Pos, ply_l_hand_matrix_old and ply_l_hand_matrix_old:GetTranslation() or hand), Len = 12}
             end
 
             if lply:IsSuperAdmin() then

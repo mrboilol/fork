@@ -1504,16 +1504,10 @@ local IsValid = IsValid
 	function hg.CanUseRightHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
-		if ent.organism then
-			if ent.organism.rarmamputated then
-				return false
-			end
-			-- if right arm is bad but left arm is fine, prioritize left hand (so return false for right hand)
-			local rarm_bad = (ent.organism.rarm or 0) >= 1 or ent.organism.rarmdislocated
-			local larm_bad = (ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated
-			if rarm_bad and not larm_bad then
-				return false
-			end
+		-- A broken or dislocated right arm still holds the weapon (just lowered / weaker).
+		-- Only a full amputation forces the left hand to take over.
+		if ent.organism and ent.organism.rarmamputated then
+			return false
 		end
 
 		return true

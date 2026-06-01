@@ -1855,6 +1855,11 @@ function SWEP:GetAdditionalValues()
 	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
 	local larm_bad = larm_broken or larm_dislocated or larm_amputated
 
+	-- How heavy the weapon is, used to limit how high a damaged arm can lift it.
+	-- 0 = light (pistols / SMGs, can still be raised), 1 = heavy (rifles / MGs, stays lowered).
+	local baseWeight = self.hg_base_weight or self.weight or 1
+	local weightFactor = math.Clamp((baseWeight - 1.5) / 3.5, 0, 1)
+
 	-- Calculate aiming fatigue
 	if self:IsZoom() then
 		self.aimFatigueTimer = (self.aimFatigueTimer or 0) + FrameTime()
@@ -1866,8 +1871,11 @@ function SWEP:GetAdditionalValues()
 		local weightMultiplier = 1 + ((self.weight or 1) - 1) * 0.3 -- 30% faster per additional weight unit
 		local adjustedFatigueTime = baseFatigueTime / weightMultiplier
 		
+		-- Two-handed weapon bonus (left arm supporting, healthy)
+		if self.lhandik and not larm_broken and not larm_dislocated and not larm_amputated then
+			adjustedFatigueTime = adjustedFatigueTime * 1.3 -- 30% slower fatigue
 		-- One-handed (left arm not supporting) or left arm issues
-		if not self.lhandik or larm_broken or larm_dislocated or larm_amputated then
+		elseif not self.lhandik or larm_broken or larm_dislocated or larm_amputated then
 			adjustedFatigueTime = adjustedFatigueTime * 0.6 -- 40% faster fatigue
 		end
 		
@@ -1909,7 +1917,8 @@ function SWEP:GetAdditionalValues()
 	elseif only_right_arm then
 		handSway = 1.0
 	elseif right_arm_broken_left then
-		handSway = (larm_broken and 0.8 or 0.3) + rarm_health * 0.2 + 0.15
+		-- A broken support (left) arm also forces a heavy gun to stay lowered.
+		handSway = (larm_broken and 1.2 or 0.3) + rarm_health * 0.2 + 0.15
 	else
 		-- Fallback logic for complex combinations of broken/dislocated/amputated arms
 		if rarm_bad and larm_bad then
@@ -1924,12 +1933,12 @@ function SWEP:GetAdditionalValues()
 	end
 
 	-- Left arm struggles more with aim when used as dominant
-	local fatigueSwayVal = (self.aimFatigue or 0) * (self.aimFatigue or 0) * 8.0 -- Very severe at last stage (quadratic scaling)
+	local fatigueSwayVal = (self.aimFatigue or 0) * (self.aimFatigue or 0) * 12.0 -- Larger amplitude for more noticeable sway (quadratic scaling)
 	local totalSway = handSway + fatigueSwayVal
-	local totalSwayPos = handSway * 0.12 + (self.aimFatigue or 0) * (self.aimFatigue or 0) * 1.5
+	local totalSwayPos = handSway * 0.12 + (self.aimFatigue or 0) * (self.aimFatigue or 0) * 2.5
 
 	if totalSway > 0 then
-		local t = CurTime() * (2.2 + (self.aimFatigue or 0) * 1.5) -- Slower frequency to make it smooth instead of fast shaking
+		local t = CurTime() * (2.2 + (self.aimFatigue or 0) * 0.5) -- Slower frequency increase for swaying instead of fast shaking
 		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * totalSway
 		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * totalSway
 		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * totalSway * 0.5
@@ -1938,8 +1947,12 @@ function SWEP:GetAdditionalValues()
 		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.cos(t * 0.9) * totalSwayPos
 		
 		if handSway > 1 then
+			-- A damaged arm lets the gun sag. A heavy weapon sags hard (can barely be lifted),
+			-- while a light one barely droops and can still be raised normally.
+			local droop = 0.4 + weightFactor * 1.6 -- light ~0.4x, heavy ~2x
+
 			-- Use smaller positional offsets to keep the arm from overstretching and breaking the IK solver
-			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 3 * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
+			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 3 * droop * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
 			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + (ply.organism.rarmamputated and -1 or 2)
 			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 1)
 			
@@ -1947,6 +1960,13 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 20 * (rarm_broken and 1 or 0.4)
 			self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] - 8 * (rarm_broken and 1 or 0.4)
 			self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] - 12 * (rarm_broken and 1 or 0.4)
+
+			-- While aiming, a weighty gun can only be lifted a little with a damaged arm;
+			-- a light gun can still be brought up to the sights.
+			if self:IsZoom() then
+				self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 6 * weightFactor * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
+				self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 14 * weightFactor
+			end
 
 			if hg.KeyDown(ply, IN_ATTACK2) then
 				self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 2
@@ -2342,13 +2362,11 @@ function SWEP:SetHandPos(noset)
 	self.addvec = self.addvec or veczero
 	
 	local ply = self:GetOwner()
-	local rarm_bad = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated or ply.organism.rarmamputated)
-	local larm_bad = ply.organism and ((ply.organism.larm or 0) >= 1 or ply.organism.larmdislocated or ply.organism.larmamputated)
-	local prioritize_left = rarm_bad and not larm_bad
 
-	local rarm_broken_or_dislocated = ply.organism and ((ply.organism.rarm or 0) >= 1 or ply.organism.rarmdislocated)
-	self.rhandik = self.setrhik and not prioritize_left and not rarm_broken_or_dislocated
-	self.lhandik = self.setlhik and not (ply.organism and (ply.organism.larm == 1 or ply.organism.larmdislocated))
+	-- A broken / dislocated arm still grips the weapon (the gun is just lowered and
+	-- can only be lifted a little when aiming). Only a full amputation drops a hand.
+	self.rhandik = self.setrhik and not (ply.organism and ply.organism.rarmamputated)
+	self.lhandik = self.setlhik and not (ply.organism and ply.organism.larmamputated)
 
     if not IsValid(ply) or not IsValid(self.worldModel) then return end
     if not ply.shouldTransmit or ply.NotSeen then return end
@@ -2469,22 +2487,13 @@ function SWEP:SetHandPos(noset)
 			addvec_fem:Add(ply:GetAimVector():Angle():Right() * 0.3)
 		end
 
-		local rarm_bad = ent.organism and ((ent.organism.rarm or 0) >= 1 or ent.organism.rarmdislocated or ent.organism.rarmamputated)
-		local larm_bad = ent.organism and ((ent.organism.larm or 0) >= 1 or ent.organism.larmdislocated or ent.organism.larmamputated)
-		local prioritize_left = rarm_bad and not larm_bad
-
 		local angs = ply:EyeAngles()
 		for bone1 = 0, mdl:GetBoneCount() - 1 do
 			local name = mdl:GetBoneName(bone1)
 			
 			if !(TPIKBonesLHDict[name] or TPIKBonesRHDict[name]) then continue end
 			if (TPIKBonesLHDict[name] and (!canuseleft or !self.lhandik)) then continue end
-			if (TPIKBonesRHDict[name] and (!canuseright or (!self.rhandik and not prioritize_left))) then continue end
-			if prioritize_left then
-				name = TPIKBonesRHDictTranslate[name]
-
-				if !name then continue end
-			end
+			if (TPIKBonesRHDict[name] and (!canuseright or !self.rhandik)) then continue end
 
 			//if name != "ValveBiped.Bip01_L_Hand" then continue end
 			--print(name)
@@ -2500,16 +2509,6 @@ function SWEP:SetHandPos(noset)
 			
 			wm_bonematrix:SetTranslation(wm_bonematrix:GetTranslation() + (TPIKBonesLHDict[name] and addvec_fem or vector_origin))
 			if name == "ValveBiped.Bip01_R_Finger12" then wm_bonematrix:SetAngles(wm_bonematrix:GetAngles() + self.anglefinger) end
-
-			if prioritize_left then
-				local mirrormat = mdl:GetBoneMatrix(mdl:LookupBone("ValveBiped.Bip01_R_Hand"))
-				
-				local pos = wm_bonematrix:GetTranslation()
-				local mirrorpos = mirrormat:GetTranslation() - angs:Right() * 1
-				
-				pos = pos + angs:Right() * -(pos - mirrorpos):Dot(angs:Right())
-				wm_bonematrix:SetTranslation(pos)
-			end
 
 			ent:SetBoneMatrix(ply_boneindex, wm_bonematrix)
 			if ply:LookupBone(ply:GetBoneName(ply_boneindex)) then ply:SetBoneMatrix(ply_boneindex, wm_bonematrix) end

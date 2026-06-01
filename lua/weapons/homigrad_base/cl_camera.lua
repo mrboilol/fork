@@ -245,10 +245,10 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		local swayX = math.sin(time * 1.5) * 0.5 + math.sin(time * 2.7) * 0.25
 		local swayY = math.cos(time * 1.8) * 0.5 + math.cos(time * 3.1) * 0.25
 		local swayZ = math.sin(time * 2.2) * 0.5 + math.cos(time * 2.9) * 0.25
-		randomPos = (inpain and 1.5 - (1 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(swayX, swayY, swayZ)
+		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(swayX, swayY, swayZ)
 	end
 
-	randomPosL = LerpFT(0.05 * (inpain and 25 - (24 * painmul) or 1), randomPosL, randomPos)
+	randomPosL = LerpFT(0.05 * (inpain and 12.5 - (12 * painmul) or 1), randomPosL, randomPos)
 	
 	scopedLerpAddvec = LerpVectorFT(((false or self.shot2 == 1) and 1 or 0.02) * (cocking and 0.25 or 1) * (inpain and 1 or 1), scopedLerpAddvec, (cocking and 1 or 1) * (justzoomed and 0.5 or 1) * (self.shot2 == 1 and 0.5 or 1) * 3 * randomPosL * slowlyZooming)
 	if !hg_oldsights:GetBool() then
