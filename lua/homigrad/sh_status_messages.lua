@@ -417,7 +417,7 @@ local function get_status_message(ply)
 	local pain = org.pain
 	local brain = org.brain
 	local temperature = org.temperature
-	local blood = org.blood
+	local blood = org.blood or 5000
 	local hungry = org.hungry
 	local thirst = org.thirst
 	local goodmood = org.goodmood
@@ -444,22 +444,6 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 
-
-	if not org.otrub then
-		local o2Val = (org.o2 and org.o2[1]) or 30
-		local bloodVal = org.blood or 5000
-		local bp = org.bloodpressure or 93
-		local heartbeat = org.heartbeat or 70
-
-		local lowO2 = o2Val < 12
-		local lowBlood = bloodVal < 3250 or bp < 45
-		local badHeart = org.heartstop or heartbeat < 30 or heartbeat > 250
-		local brainDamage = brain >= 0.10 or org.critical == true
-
-		if (lowO2 and lowBlood) or (lowBlood and badHeart) or (lowO2 and badHeart) or brainDamage then
-			most_wanted_phraselist = cooked_phrases
-		end
-	end
 
 	if not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
 		most_wanted_phraselist = despair_phrases
