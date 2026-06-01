@@ -616,120 +616,69 @@ local injuryTpikBones = {
 	{"rarm", "ValveBiped.Bip01_R_Forearm", -1, 20.0, 10.0},
 }
 
-local function injuryTpikMotion(state, ent, owner)
-	local moving = ent:GetVelocity():LengthSqr() > (35 * 35)
-	local swaying = false
-
-	if IsValid(owner) and owner:IsPlayer() then
-		local eye = owner:EyeAngles()
-		local lastEye = state.lastEye
-
-		if lastEye then
-			local swayPitch = math.abs(math.AngleDifference(eye[1], lastEye[1]))
-			local swayYaw = math.abs(math.AngleDifference(eye[2], lastEye[2]))
-			swaying = (swayPitch + swayYaw) > 0.2
-		end
-
-		state.lastEye = Angle(eye[1], eye[2], 0)
-	end
-
-	if !swaying and ent:IsRagdoll() then
-		local head = ent:LookupBone("ValveBiped.Bip01_Head1")
-		local physBone = head and ent:TranslateBoneToPhysBone(head)
-		local phys = physBone and ent:GetPhysicsObjectNum(physBone)
-
-		if IsValid(phys) then
-			swaying = phys:GetAngleVelocity():Length() > 10
-		end
-	end
-
-	return moving or swaying
-end
-
 local function applyInjuryTPIK(ent, ply)
-local org = ent.organism or (IsValid(ply) and ply.organism)
-if !org then return end
+	local org = ent.organism or (IsValid(ply) and ply.organism)
+	if !org then return end
 
-local state = ent.hg_injury_tpik or {}
-ent.hg_injury_tpik = state
+	local state = ent.hg_injury_tpik or {}
+	ent.hg_injury_tpik = state
 
-local owner = ent:IsPlayer() and ent or ply
-local standing = ent:IsPlayer() and ent:Alive() and !org.otrub and !org.fake and !IsValid(ent.FakeRagdoll)
-local fake = ent:IsRagdoll() and IsValid(owner) and owner:IsPlayer() and ((owner.FakeRagdoll == ent) or (owner:GetNWEntity('FakeRagdoll') == ent))
-if fake then return end -- Ballsocket constraints handle broken limbs on ragdolls
-local can = standing
-local motion = can and injuryTpikMotion(state, ent, owner)
-local wep = IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon()
-local reducedForWeapon = false
-local isPistol = false
-if IsValid(wep) then
-reducedForWeapon = wep.Base == 'weapon_base' or wep.Base == 'weapon_melee' or wep.Base == 'homigrad_base' or wep:GetClass() == 'weapon_melee' or wep.ismelee or wep.supportTPIK
-isPistol = wep.IsPistolHoldType and wep:IsPistolHoldType()
-end
-local active = false
+	local owner = ent:IsPlayer() and ent or ply
+	local standing = ent:IsPlayer() and ent:Alive() and !org.otrub and !org.fake and !IsValid(ent.FakeRagdoll)
+	local fake = ent:IsRagdoll() and IsValid(owner) and owner:IsPlayer() and ((owner.FakeRagdoll == ent) or (owner:GetNWEntity('FakeRagdoll') == ent))
+	if fake then return end
+	local can = standing
+	local wep = IsValid(owner) and owner.GetActiveWeapon and owner:GetActiveWeapon()
+	local reducedForWeapon = false
+	if IsValid(wep) then
+		reducedForWeapon = wep.Base == 'weapon_base' or wep.Base == 'weapon_melee' or wep.Base == 'homigrad_base' or wep:GetClass() == 'weapon_melee' or wep.ismelee or wep.supportTPIK
+	end
+	local active = false
 
-for i = 1, #injuryTpikBones do
-local limb = injuryTpikBones[i][1]
-if !org[limb..'amputated'] and (((org[limb] or 0) >= 0.85) or org[limb..'dislocated']) then
-active = true
-break
-end
-end
+	for i = 1, #injuryTpikBones do
+		local limb = injuryTpikBones[i][1]
+		if !org[limb..'amputated'] and (((org[limb] or 0) >= 0.85) or org[limb..'dislocated']) then
+			active = true
+			break
+		end
+	end
 
-state.motion = math.Approach(state.motion or 0, motion and 1 or 0, FrameTime() * 3.2)
-local target = (can and active) and (0.15 + state.motion * 0.3) or 0
-state.blend = math.Approach(state.blend or 0, target, FrameTime() * 4.8)
+	local target = (can and active) and 0.45 or 0
+	state.blend = math.Approach(state.blend or 0, target, FrameTime() * 4.8)
 
-if (state.blend or 0) <= 0.001 then return end
+	if (state.blend or 0) <= 0.001 then return end
 
-state.phase = (state.phase or 0) + FrameTime() * (2.0 + math.min(ent:GetVelocity():Length2D(), 350) * 0.01)
-state.microphase = (state.microphase or 0) + FrameTime() * (4.0 + math.min(ent:GetVelocity():Length2D(), 300) * 0.01)
-local wave1 = math.sin(state.phase)
-local wave2 = math.cos(state.phase * 1.37)
-local motionMul = 0.5 + state.motion * 0.5
-local holdMulLeg = reducedForWeapon and 0.5 or 1
-local holdMulArm = reducedForWeapon and 0.2 or 1
-local holdOffArm = reducedForWeapon and 0.2 or 1
+	local holdOffArm = reducedForWeapon and 0.2 or 1
 
-for i = 1, #injuryTpikBones do
-local limb = injuryTpikBones[i][1]
-local boneName = injuryTpikBones[i][2]
-local side = injuryTpikBones[i][3]
-local ampBase = injuryTpikBones[i][4]
-local offBase = injuryTpikBones[i][5]
-local arm = limb == 'larm' or limb == 'rarm'
+	for i = 1, #injuryTpikBones do
+		local limb = injuryTpikBones[i][1]
+		local boneName = injuryTpikBones[i][2]
+		local side = injuryTpikBones[i][3]
+		local offBase = injuryTpikBones[i][5]
+		local arm = limb == 'larm' or limb == 'rarm'
 
--- allow broken arm sway even when holding weapons, just with reduced amplitude
+		if org[limb..'amputated'] then continue end
 
-if org[limb..'amputated'] then continue end
+		local isBroken = (org[limb] or 0) >= 1
+		local isDislocated = org[limb..'dislocated']
 
-local isBroken = (org[limb] or 0) >= 1
-local isDislocated = org[limb..'dislocated']
+		if not isBroken and not isDislocated then continue end
 
-if not isBroken and not isDislocated then continue end
+		local bone = ent:LookupBone(boneName)
+		if !bone then continue end
 
-local damageMultiplier = 1
+		local mat = ent:GetBoneMatrix(bone)
+		if !mat then continue end
 
-local bone = ent:LookupBone(boneName)
-if !bone then continue end
+		local ang = mat:GetAngles()
 
-local mat = ent:GetBoneMatrix(bone)
-if !mat then continue end
+		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1)
 
-local ang = mat:GetAngles()
-local wmul = arm and holdMulArm or holdMulLeg
+		ang:RotateAroundAxis(mat:GetRight(), off * side)
 
-local amp = ampBase * state.blend * motionMul * wmul * damageMultiplier
-local micro = (math.sin(state.microphase + i * 1.7) * 0.15 + math.cos(state.microphase * 1.35 + i * 0.9) * 0.09) * (0.12 + math.min(state.blend, 1) * 0.16) * wmul * damageMultiplier
-local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1) * damageMultiplier
-
-ang:RotateAroundAxis(mat:GetRight(), (off + wave1 * amp + micro) * side)
-ang:RotateAroundAxis(mat:GetForward(), (wave2 * amp * 0.9 + micro * 0.7) * side)
-ang:RotateAroundAxis(mat:GetUp(), micro * 0.4 * side)
-mat:SetAngles(ang)
-
-hg.bone_apply_matrix(ent, bone, mat)
-end
+		mat:SetAngles(ang)
+		hg.bone_apply_matrix(ent, bone, mat)
+	end
 end
 
 local blackmans = {
@@ -998,7 +947,7 @@ function hg.DoTPIK(ply, ent)
         if applyInjuryTPIK then
             applyInjuryTPIK(ent, ply)
         end
-    local ply_spine_index = ent:LookupBone("ValveBiped.Bip01_Head1")
+        local ply_spine_index = ent:LookupBone("ValveBiped.Bip01_Head1")
     if !ply_spine_index then return end
     local ply_spine_matrix = ent:GetBoneMatrix(ply_spine_index)
 

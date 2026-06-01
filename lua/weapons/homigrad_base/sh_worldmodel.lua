@@ -688,21 +688,6 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 			--self.lastTpikAng = desiredAng
 		end
 		
-		-- Prevent sideways gun movement with broken/dislocated right hand
-		local org = owner.organism
-		if org and (org.rarm == 1 or org.rarmdislocated) then
-			local expectedRoll = owner:EyeAngles()[3]
-			local rollDiff = math.AngleDifference(desiredAng[3], expectedRoll)
-			local maxRollDiff = org.rarm == 1 and 6 or 12
-			desiredAng[3] = expectedRoll + math.Clamp(rollDiff, -maxRollDiff, maxRollDiff)
-			
-			-- Add weapon sway when broken/dislocated
-			local swayTime = CurTime() * 2
-			local swayAmount = org.rarm == 1 and 2.5 or 1.2
-			desiredAng[1] = desiredAng[1] + math.sin(swayTime) * swayAmount * 0.3
-			desiredAng[2] = desiredAng[2] + math.cos(swayTime * 0.8) * swayAmount * 0.5
-		end
-		
 		--self.fuckhands = LerpFT(0.1, self.fuckhands, self.setrhik and 1 or 0)
 
 		--desiredPos = LerpVector(self.fuckhands, oldPos, self.lastTpikPos or desiredPos)

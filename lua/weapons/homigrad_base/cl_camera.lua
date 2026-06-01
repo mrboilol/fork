@@ -293,19 +293,18 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local sp2  = isnumber(organism.spine2) and organism.spine2 or 0
 	local sp3  = isnumber(organism.spine3) and organism.spine3 or 0
 
-	local shakeMul = (((larm > 0.75 and (larm - 0.75) * (ply.posture != 7 and ply.posture != 8 and 1 or 0)) or 0)
-		+ ((rarm > 0.1 and (rarm - 0.1)) or 0)) / 4
+	-- Proportional decimal arm damage effect on aiming fatigue
+	local larmShake = larm * 0.06 * (ply.posture != 7 and ply.posture != 8 and 1 or 0)
+	local rarmShake = rarm * 0.08
+	local shakeMul = larmShake + rarmShake
 
-	-- Extra shake from broken/dislocated hands when holding a weapon
-	local rhandBroken = organism.rarm == 1
-	local rhandDislocated = organism.rarmdislocated
-	local lhandBroken = organism.larm == 1
-	local lhandDislocated = organism.larmdislocated
-	if rhandBroken or rhandDislocated then
-		shakeMul = shakeMul + (rhandBroken and 0.08 or 0.04)
+	-- 2.5 second grace period before aiming fatigue kicks in, unless arms are broken/heavily damaged
+	local armsBad = larm >= 0.75 or rarm >= 0.75 or organism.larmdislocated or organism.rarmdislocated or organism.larmamputated or organism.rarmamputated or larm >= 1 or rarm >= 1
+	if zooming and justzoomed then
+		ply.aimGraceStart = CurTime()
 	end
-	if lhandBroken or lhandDislocated then
-		shakeMul = shakeMul + (lhandBroken and 0.06 or 0.03)
+	if not armsBad and ply.aimGraceStart and (CurTime() - ply.aimGraceStart) < 2.5 then
+		shakeMul = 0
 	end
 
 	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * (organism.holdingbreath and 0.1 or 1)
