@@ -1940,8 +1940,6 @@ function SWEP:GetAdditionalValues()
 	if totalSway > 0 then
 		local t = CurTime() * (2.2 + (self.aimFatigue or 0) * 0.5) -- Slower frequency increase for swaying instead of fast shaking
 		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * totalSway
-		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * totalSway
-		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * totalSway * 0.5
 		
 		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 0.7) * totalSwayPos
 		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.cos(t * 0.9) * totalSwayPos
@@ -1958,8 +1956,6 @@ function SWEP:GetAdditionalValues()
 			
 			-- Add a heavy angular droop to visually indicate the arm is weak
 			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 20 * (rarm_broken and 1 or 0.4)
-			self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] - 8 * (rarm_broken and 1 or 0.4)
-			self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] - 12 * (rarm_broken and 1 or 0.4)
 
 			-- While aiming, a weighty gun can only be lifted a little with a damaged arm;
 			-- a light gun can still be brought up to the sights.
