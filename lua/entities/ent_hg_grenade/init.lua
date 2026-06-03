@@ -2,6 +2,19 @@ AddCSLuaFile("cl_init.lua")
 AddCSLuaFile("shared.lua")
 include("shared.lua")
 
+local CUSTOM_EXPLOSION_SOUNDS = {
+	"explosions/explode3.wav",
+	"explosions/explode4.wav",
+	"explosions/explode5.wav"
+}
+local CUSTOM_EXPLOSION_PITCH_MIN = 110
+local CUSTOM_EXPLOSION_PITCH_MAX = 120
+local CUSTOM_EXPLOSION_VOLUME = 1
+local CUSTOM_EXPLOSION_LEVEL = 140
+local GRENADE_BLAST_RADIUS_MULT = 1.5
+local GRENADE_BLAST_DAMAGE = 20
+local GRENADE_DISORIENTATION_RADIUS = 12
+
 function ENT:InitAdd()
 end
 
@@ -305,6 +318,7 @@ function ENT:Explode()
 	end
 
 	EmitSound(self.Sound[math.random(#self.Sound)], self:GetPos(), self:EntIndex() + 100, CHAN_STATIC, 1, 140, nil, math.random(75, 85))
+	EmitSound(table.Random(CUSTOM_EXPLOSION_SOUNDS), self:GetPos(), self:EntIndex() + 104, CHAN_STATIC, CUSTOM_EXPLOSION_VOLUME, CUSTOM_EXPLOSION_LEVEL, nil, math.random(CUSTOM_EXPLOSION_PITCH_MIN, CUSTOM_EXPLOSION_PITCH_MAX))
 
 	if self:WaterLevel() > 0 then
 		self:EmitSound(self.SoundWater, 100, 100, 1, CHAN_WEAPON)
@@ -330,86 +344,11 @@ function ENT:Explode()
 		EmitSound(self.DebrisSounds[math.random(#self.DebrisSounds)], self:GetPos(), self:EntIndex(), CHAN_AUTO, 1, 80)
 	end
 
-		local blastRadius = self.BlastDis / 0.01905
-	local nearRadius = 200
-	local damage = 55
-	local attacker = IsValid(self.owner) and self.owner or self
-
-	for _, ent in ipairs(ents.FindInSphere(selfPos, nearRadius)) do
-		if ent:IsPlayer() then
-			local tr = util.TraceLine({
-				start = selfPos,
-				endpos = ent:BodyTarget(selfPos),
-				filter = {self, ent}
-			})
-			if tr.HitWorld or (IsValid(tr.Entity) and tr.Entity ~= ent) then
-				local dmgInfo = DamageInfo()
-				dmgInfo:SetDamage(damage / 2)
-				dmgInfo:SetAttacker(attacker)
-				dmgInfo:SetInflictor(self)
-				dmgInfo:SetDamageType(DMG_BLAST)
-				dmgInfo:SetDamagePosition(selfPos)
-				ent:TakeDamageInfo(dmgInfo)
-
-				hg.LightStunPlayer(ent, 5)
-				if not IsValid(ent.FakeRagdoll) then
-					hg.Fake(ent)
-				end
-			end
-		end
-	end
-
-	util.BlastDamage(self, attacker, selfPos, blastRadius, damage)
-
-	local blastRadius = self.BlastDis / 0.01905
-	local nearRadius = 200
-	local damage = 55
-	local attacker = IsValid(self.owner) and self.owner or self
-
-	for _, ent in ipairs(ents.FindInSphere(selfPos, nearRadius)) do
-		if ent:IsPlayer() then
-			local tr = util.TraceLine({
-				start = selfPos,
-				endpos = ent:BodyTarget(selfPos),
-				filter = {self, ent}
-			})
-			if tr.HitWorld or (IsValid(tr.Entity) and tr.Entity ~= ent) then
-				local dmgInfo = DamageInfo()
-				dmgInfo:SetDamage(damage / 2)
-				dmgInfo:SetAttacker(attacker)
-				dmgInfo:SetInflictor(self)
-				dmgInfo:SetDamageType(DMG_BLAST)
-				dmgInfo:SetDamagePosition(selfPos)
-				ent:TakeDamageInfo(dmgInfo)
-
-				hg.LightStunPlayer(ent, 5)
-				if not IsValid(ent.FakeRagdoll) then
-					hg.Fake(ent)
-				end
-			end
-		end
-	end
-
-	util.BlastDamage(self, attacker, selfPos, blastRadius, damage)
+	util.BlastDamage(self, IsValid(self.owner) and self.owner or self, selfPos, self.BlastDis / 0.01905 * GRENADE_BLAST_RADIUS_MULT, GRENADE_BLAST_DAMAGE)
 
 	--;; Расскажу вам тайну но у нас трассировка делалась просто ужасно
-	local dis = self.BlastDis / 0.01905
-	local disorientation_dis = 6 / 0.01905
-	local nearbyPlayerCount = 0
-	for _, ply in ipairs(player.GetHumans()) do
-		if not IsValid(ply) or not ply:Alive() then continue end
-		if ply:GetPos():DistToSqr(selfPos) <= disorientation_dis * disorientation_dis then
-			nearbyPlayerCount = nearbyPlayerCount + 1
-		end
-	end
-
-	local nearbyEntityCap = GRENADE_NEARBY_ENTITY_CAP
-	if nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD_EXTREME then
-		nearbyEntityCap = GRENADE_CROWD_ENTITY_CAP_EXTREME
-	elseif nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD then
-		nearbyEntityCap = GRENADE_CROWD_ENTITY_CAP
-	end
-
+	local dis = self.BlastDis / 0.01905 * GRENADE_BLAST_RADIUS_MULT
+	local disorientation_dis = GRENADE_DISORIENTATION_RADIUS / 0.01905
 	local entsCount = 0
 	local processedEnts = 0
 	for i, enta in ipairs(ents.FindInSphere(selfPos, disorientation_dis)) do
@@ -433,8 +372,7 @@ function ENT:Explode()
 		local forceadd = force * physics_frac * 110000  
 
 		if enta.organism then
-			local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
-			if IsValid(enta.organism.owner) and enta.organism.owner:IsPlayer() and not behindwall then
+			if IsValid(enta.organism.owner) and enta.organism.owner:IsPlayer() then
 				hg.ExplosionDisorientation(enta, 5 * frac, 6 * frac)
 				hg.RunZManipAnim(enta.organism.owner, "shieldexplosion")
 			end
