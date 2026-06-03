@@ -36,7 +36,7 @@ local blur = Material("pp/blurscreen")
 local blur2 = Material("effects/shaders/zb_blur" )
 local sw, sh = ScrW(), ScrH()
 
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Bahnschrift"
+local font = function()
     local usefont = "Verily Serif Mono"
 
     if hg_font:GetString() != "" and hg_font:GetString() != "Bahnschrift" then
@@ -45,6 +45,33 @@ local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Bahnschr
 
     return usefont
 end
+
+local function MenuUnit(num)
+    return math.floor(num * math.min(ScrW(), ScrH()) / 1000)
+end
+
+local function CreateSettingsFonts()
+    local usefont = font()
+    local scale = math.min(ScrW(), ScrH()) / 1000
+
+    surface.CreateFont("ZCity_Settings_Medium", {
+        font = usefont,
+        size = math.max(16, math.floor(32 * scale)),
+        weight = 300,
+    })
+    surface.CreateFont("ZCity_Settings_Small", {
+        font = usefont,
+        size = math.max(14, math.floor(22 * scale)),
+        weight = 300,
+    })
+    surface.CreateFont("ZCity_Settings_Tiny", {
+        font = usefont,
+        size = math.max(12, math.floor(16 * scale)),
+        weight = 300,
+    })
+end
+hook.Add("OnScreenSizeChanged", "ZCity_Settings_Fonts", CreateSettingsFonts)
+CreateSettingsFonts()
 
 surface.CreateFont("ZCity_setiings_tiny", {
 	font = font(),
@@ -71,8 +98,6 @@ hg.settings:AddOpt("Gameplay","hg_showthoughts", "Show thoughts")
 hg.settings:AddOpt("Gameplay","hg_hints", "Show hints")
 hg.settings:AddOpt("Gameplay","hg_gary", "HG GARY")
 hg.settings:AddOpt("Gameplay","hg_deathfadeout", "Death fade out")
---hg_gary
---hg_deathfadeout
 if not game.IsDedicated() then
 	hg.settings:AddOpt("Server-side settings","hg_toughnpcs", "Tough npcs")
 	hg.settings:AddOpt("Server-side settings","hg_thirdperson", "Thirdperson (WIP)")
@@ -89,10 +114,6 @@ if not game.IsDedicated() then
 	hg.settings:AddOpt("Server-side settings","hg_ixanims", "Toggle Helix-like animations on NPC models for players. Experimental")
     hg.settings:AddOpt("Server-side settings","homicide_traitoramount", "Homicide: Traitor Amount", nil, nil, "int")
 end
---hg_appearance_access_for_all
---hg_furcity
---hg_legacycam
---hg_toughnpcs
 
 hg.settings:AddOpt("Debug","hg_show_hitposmuzzle", "Show weapon hitpos")
 hg.settings:AddOpt("Debug","hg_setzoompos", "Edit weapon zoompos, check console for results")

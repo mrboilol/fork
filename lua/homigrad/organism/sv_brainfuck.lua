@@ -140,13 +140,18 @@ end
 hg.applyFencingToPlayer = applyFencingToPlayer
 
 local function processFencing(rag, fade, ease)
+local function processFencing(rag, fade, ease)
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end
 	local spine2 = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(boneSpine2))
 	if not IsValid(spine2) then return end
 
+
 	local spineAng = spine2:GetAngles()
 	local spinePos = spine2:GetPos()
+
+	local t = math_clamp((fade - 0.1) / 0.9, 0, 1) * (ease or 1)
+
 
 	local t = math_clamp((fade - 0.1) / 0.9, 0, 1) * (ease or 1)
 
@@ -156,6 +161,11 @@ local function processFencing(rag, fade, ease)
 
 	local targetPosChest = LerpVector(t, restPos, chestPos)
 	local targetPosExt = LerpVector(t, restPos, extendPos)
+	local shake = Vector(
+		math.sin(CurTime() * SHAKE_FREQ_FENCING) * SHAKE_AMP_FENCING,
+		math.sin(CurTime() * (SHAKE_FREQ_FENCING + 0.7)) * SHAKE_AMP_FENCING,
+		math.sin(CurTime() * (SHAKE_FREQ_FENCING + 1.3)) * SHAKE_AMP_FENCING
+	) * t
 	local shake = Vector(
 		math.sin(CurTime() * SHAKE_FREQ_FENCING) * SHAKE_AMP_FENCING,
 		math.sin(CurTime() * (SHAKE_FREQ_FENCING + 0.7)) * SHAKE_AMP_FENCING,
@@ -214,14 +224,19 @@ end
 hg.applyCushingToPlayer = applyCushingToPlayer
 
 local function processDecorticate(rag, fade, ease)
+local function processDecorticate(rag, fade, ease)
 	local org = rag.organism
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end
 	local spine2 = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(boneSpine2))
 	if not IsValid(spine2) then return end
 
+
 	local spineAng = spine2:GetAngles()
 	local spinePos = spine2:GetPos()
+
+	local t = math_clamp((fade - 0.1) / 0.9, 0, 1) * (ease or 1)
+
 
 	local t = math_clamp((fade - 0.1) / 0.9, 0, 1) * (ease or 1)
 
@@ -229,6 +244,7 @@ local function processDecorticate(rag, fade, ease)
 	local timeElapsed = dur * (1 - fade)
 	local easeIn = math_clamp(timeElapsed / 2.5, 0, 1)
 	t = t * easeIn
+
 
 	local chestPos = spinePos + spineAng:Forward() * 5 + spineAng:Up() * 10
 	local restPos = spinePos + spineAng:Up() * 5
@@ -239,12 +255,25 @@ local function processDecorticate(rag, fade, ease)
 		math.sin(CurTime() * (SHAKE_FREQ_DECORT + 0.7)) * SHAKE_AMP_DECORT,
 		math.sin(CurTime() * (SHAKE_FREQ_DECORT + 1.3)) * SHAKE_AMP_DECORT
 	) * t
+	local shake = Vector(
+		math.sin(CurTime() * SHAKE_FREQ_DECORT) * SHAKE_AMP_DECORT,
+		math.sin(CurTime() * (SHAKE_FREQ_DECORT + 0.7)) * SHAKE_AMP_DECORT,
+		math.sin(CurTime() * (SHAKE_FREQ_DECORT + 1.3)) * SHAKE_AMP_DECORT
+	) * t
 	targetPos = targetPos + shake
+
 
 	local mul = (org and org.pulse and (600 * org.pulse / 70) or 400) * t
 	local damp = 40
 
+
 	local legAng = spine2:GetAngles()
+	legAng:Add(Angle(
+		math.sin(CurTime() * 3) * SHAKE_ANG_AMP * t,
+		math.sin(CurTime() * 2.5) * SHAKE_ANG_AMP * t,
+		math.sin(CurTime() * 2.8) * SHAKE_ANG_AMP * t
+	))
+	legAng:RotateAroundAxis(legAng:Up(), 180)
 	legAng:Add(Angle(
 		math.sin(CurTime() * 3) * SHAKE_ANG_AMP * t,
 		math.sin(CurTime() * 2.5) * SHAKE_ANG_AMP * t,
@@ -268,6 +297,7 @@ local function processDecorticate(rag, fade, ease)
 end
 
 local function processLazarus(rag, fade, ease)
+local function processLazarus(rag, fade, ease)
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end
 	local spine2 = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(boneSpine2))
@@ -276,6 +306,7 @@ local function processLazarus(rag, fade, ease)
 	local spineAng = spine2:GetAngles()
 	local spinePos = spine2:GetPos()
 
+	local t = math_clamp((fade - 0.1) / 0.9, 0, 1) * (ease or 1)
 	local t = math_clamp((fade - 0.1) / 0.9, 0, 1) * (ease or 1)
 	local legEase = t * t * (3 - 2 * t)
 
@@ -300,6 +331,11 @@ local function processLazarus(rag, fade, ease)
 		math.sin(CurTime() * (SHAKE_FREQ_LAZARUS + 0.7)) * SHAKE_AMP_LAZARUS,
 		math.sin(CurTime() * (SHAKE_FREQ_LAZARUS + 1.3)) * SHAKE_AMP_LAZARUS
 	) * t
+	local shake = Vector(
+		math.sin(CurTime() * SHAKE_FREQ_LAZARUS) * SHAKE_AMP_LAZARUS,
+		math.sin(CurTime() * (SHAKE_FREQ_LAZARUS + 0.7)) * SHAKE_AMP_LAZARUS,
+		math.sin(CurTime() * (SHAKE_FREQ_LAZARUS + 1.3)) * SHAKE_AMP_LAZARUS
+	) * t
 	armPos = armPos + shake
 
 	local mul = (900 * lift + 120) * t
@@ -317,6 +353,7 @@ local function processLazarus(rag, fade, ease)
 end
 
 local function processCushing(rag, fade, ease)
+local function processCushing(rag, fade, ease)
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end
 	local spine2 = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(boneSpine2))
@@ -326,12 +363,18 @@ local function processCushing(rag, fade, ease)
 	local spinePos = spine2:GetPos()
 
 	local t = math_clamp((fade - 0.05) / 0.95, 0, 1) * (ease or 1)
+	local t = math_clamp((fade - 0.05) / 0.95, 0, 1) * (ease or 1)
 	local legEase = t * t * (3 - 2 * t)
 
 	local archAng = Angle(spineAng.pitch + 30 * t, spineAng.yaw, spineAng.roll)
 	local legAng = Angle(spineAng.pitch + 18 * t, spineAng.yaw + 180, spineAng.roll)
 
 	local armPos = spinePos + archAng:Up() * 15
+	local shake = Vector(
+		math.sin(CurTime() * SHAKE_FREQ_CUSHING) * SHAKE_AMP_CUSHING,
+		math.sin(CurTime() * (SHAKE_FREQ_CUSHING + 0.7)) * SHAKE_AMP_CUSHING,
+		math.sin(CurTime() * (SHAKE_FREQ_CUSHING + 1.3)) * SHAKE_AMP_CUSHING
+	) * t
 	local shake = Vector(
 		math.sin(CurTime() * SHAKE_FREQ_CUSHING) * SHAKE_AMP_CUSHING,
 		math.sin(CurTime() * (SHAKE_FREQ_CUSHING + 0.7)) * SHAKE_AMP_CUSHING,

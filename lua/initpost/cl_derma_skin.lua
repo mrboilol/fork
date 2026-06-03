@@ -3,6 +3,9 @@ hg.VGUI = hg.VGUI or {}
 hg.VGUI.MainColor = Color(85, 85, 85)
 hg.VGUI.SecondaryColor = Color(65, 65, 65, 240)
 hg.VGUI.BackgroundColor = Color(20, 20, 20, 220)
+hg.VGUI.MainColor = Color(150, 150, 150)
+hg.VGUI.SecondaryColor = Color(155,155,155,240)
+hg.VGUI.BackgroundColor = Color(25,25,35,220)
 hg.VGUI.MainSkin = "ZCity"
 
 function hg.GetMainSkin()
@@ -133,6 +136,7 @@ SKIN.Colours.MenuLabel = color_white
 SKIN.Colours.DarkerBackground = Color(0, 0, 0, 77)
 
 SKIN.Colours.Outline = Color(85, 85, 85, 255)
+SKIN.Colours.Outline = Color(155, 155, 155, 255)
 SKIN.Colours.Background = Color(0, 0, 0, 205)
 
 SKIN.Colours.SegmentedProgress = {}
