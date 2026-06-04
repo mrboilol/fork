@@ -298,6 +298,21 @@ module[2] = function(owner, org, timeValue)
 			o2[1] = max(o2[1] - timeValue * bp_o2DropRate * 1.5, 0)
 		end
 
+		-- Trachea damage from breathing - damages trachea when breathing, more breathing = more damage
+		-- Needle prevents trachea damage
+		if org.trachea < 1.0 and org.needle <= 0 then
+			local breatheAmount = regenerate * 10 -- scale with how much O2 is being regenerated
+			if breatheAmount > 0.1 then
+				org.trachea = min(org.trachea + breatheAmount * timeValue * 0.5, 1)
+			end
+		end
+
+		-- O2 drain when trachea is damaged (> 0.5)
+		if org.trachea > 0.5 then
+			local tracheaDrain = (org.trachea - 0.5) * 2 -- 0 at 0.5, up to 1 at 1.0
+			o2[1] = max(o2[1] - timeValue * tracheaDrain, 0)
+		end
+
 		o2.curregen = regenerate
 
 		o2[1] = max(o2[1] - (org.CO > 0 and o2.curregen * 1.1 * (org.CO / 30) or 0),0)
@@ -398,6 +413,25 @@ module[2] = function(owner, org, timeValue)
 			org.owner:Notify("I'm really struggling to breathe.", true, "pneumothorax3", 5)
 		else
 			org.owner:ResetNotification("pneumothorax3")
+		end
+
+		-- Trachea damage notifications
+		if org.trachea > 0.3 and org.trachea <= 0.5 then
+			org.owner:Notify("My throat feels like it has a hole in it.", true, "trachea1", 15)
+		else
+			org.owner:ResetNotification("trachea1")
+		end
+
+		if org.trachea > 0.5 and org.trachea < 1.0 then
+			org.owner:Notify("I can't get any air through my trachea...", true, "trachea2", 5)
+		else
+			org.owner:ResetNotification("trachea2")
+		end
+
+		if org.trachea >= 1.0 then
+			org.owner:Notify("MY TRACHEA IS COMPLETELY DESTROYED!", true, "trachea_critical", 0, nil, color_red)
+		else
+			org.owner:ResetNotification("trachea_critical")
 		end
 	end
 

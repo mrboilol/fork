@@ -948,22 +948,24 @@ players : 1 humans, 0 bots (20 max)
 --\\ Tinnitus function
 	if CLIENT then
 		local lply = LocalPlayer()
-		local function AddTinnitus(time, needSound)
+		local function AddTinnitus(time, needSound, brainDamage)
 			lply = LocalPlayer()
 			lply.tinnitus = CurTime() + time * 4
+			lply.tinnitusBrainDamage = brainDamage or false
 			lply:SetDSP(32)
 		end
 
 		local plymeta = FindMetaTable("Player")
-		function plymeta:AddTinnitus(time,needSound)
+		function plymeta:AddTinnitus(time,needSound,brainDamage)
 			needSound = needSound or false
-			AddTinnitus(time,needSound)
+			AddTinnitus(time,needSound,brainDamage)
 		end
 
 		net.Receive("send_tinnitus",function()
 			local time = net.ReadFloat()
 			local bool = net.ReadBool()
-			AddTinnitus(time,bool)
+			local brainDamage = net.ReadBool()
+			AddTinnitus(time,bool,brainDamage)
 		end)
 	end
 --//

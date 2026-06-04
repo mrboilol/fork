@@ -1676,6 +1676,9 @@ local function velocityDamage(ent, data)
 					end
 					net.WriteBool(play_knockout_sound)
 
+					local hasBrainDamage = org.brain > 0.1
+					net.WriteBool(hasBrainDamage)
+
 					net.Send(org.owner)
 				
 								org.consciousness = math.Approach(org.consciousness, 0, dmg * 2 * (hadhelmet and 0.2 or 1))

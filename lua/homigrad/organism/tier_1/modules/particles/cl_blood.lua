@@ -206,8 +206,8 @@ bloodparticles_hook[2] = function(mul)
     local time = CurTime()
 	local gravvec = vecDown * mul * (math.max(0.0, grav))
 	
-	-- Age-based deletion (90 seconds)
-	local maxAge = 90
+	-- Age-based deletion (60 seconds)
+	local maxAge = 60
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
 		if part and part.spawnTime and (time - part.spawnTime) > maxAge then

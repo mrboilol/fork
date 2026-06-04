@@ -2041,6 +2041,12 @@ function SWEP:GetAdditionalValues()
 	if not self.inspect then
 		func(self, ply, huya)
 	end
+
+	-- Kill yaw/roll from posture functions when arms are damaged (fixes sideways gun when not aiming)
+	if not healthy_arms then
+		self.AdditionalAngPreLerp[2] = 0
+		self.AdditionalAngPreLerp[3] = 0
+	end
 	
 	local willsuicide = ply:GetNWFloat("willsuicide", 0)
 	if ply.suiciding then

@@ -69,8 +69,8 @@ bloodparticles_hook[4] = function(mul)
     local time = CurTime()
     local grav = gravity:GetInt() / 30
 
-    -- Age-based deletion (90 seconds)
-    local maxAge = 90
+    -- Age-based deletion (60 seconds)
+    local maxAge = 60
     for i = #hg.bloodparticles2, 1, -1 do
         local part = hg.bloodparticles2[i]
         if part and part.spawnTime and (time - part.spawnTime) > maxAge then

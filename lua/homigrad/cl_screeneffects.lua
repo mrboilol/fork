@@ -476,8 +476,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
         end
         render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", adrenalineShock * 0.4)
-		vignetteMat:SetFloat("$c1_y", adrenalineShock * 0.5)
+		vignetteMat:SetFloat("$c0_z", adrenalineShock * 0.6)
+		vignetteMat:SetFloat("$c1_y", adrenalineShock * 0.8)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
     end
@@ -741,7 +741,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		consciousnessVol = math.Clamp(consciousnessVol, 0, 1)
 
 		if IsValid(ConsciousnessWhiteNoise) then
-			ConsciousnessWhiteNoise:SetVolume(consciousnessVol * 0.5)
+			ConsciousnessWhiteNoise:SetVolume(consciousnessVol * 0.333)
 		end
 	else
 		if IsValid(ConsciousnessWhiteNoise) then
@@ -790,8 +790,8 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		render.UpdateScreenEffectTexture()
 
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 40 + math.max(shock - 5, 0) / 3)) //ColorIntensity
-		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 40 + math.max(shock - 5, 0) / 3)) //Vignette
+		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 30 + math.max(shock - 5, 0) / 2)) //ColorIntensity
+		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 30 + math.max(shock - 5, 0) / 2)) //Vignette
 
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
@@ -949,9 +949,19 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	end
 
 	//if brain > 0.1 and not org.otrub and show_some_images_time > 0 and false then
-	if lply.tinnitus and lply.tinnitus > CurTime() and lply:Alive() then
+	if lply.tinnitus and lply.tinnitus > CurTime() and lply:Alive() and lply.tinnitusBrainDamage then
 		if !IsValid(Tinnitus) or Tinnitus:GetState() != GMOD_CHANNEL_PLAYING  then
-			sound.PlayFile("sound/zcitysnd/real_sonar/tinnitus"..math.random(3)..".mp3", "noblock noplay", function(station, err)
+			local choice = math.random(5)
+			local soundFile
+			if choice == 1 then
+				soundFile = "sound/tinnitus.wav"
+			elseif choice == 2 then
+				soundFile = "sound/tinnituslong.wav"
+			else
+				soundFile = "sound/zcitysnd/real_sonar/tinnitus"..math.random(3)..".mp3"
+			end
+
+			sound.PlayFile(soundFile, "noblock noplay", function(station, err)
 				if IsValid(station) then
 					station:SetVolume(0)
 					station:Play()
@@ -1489,15 +1499,16 @@ net.Receive("headtrauma_flash", function()
     local size = net.ReadInt(20)
     local is_critical = net.ReadBool()
     local play_knockout_sound = net.ReadBool()
+    local hasBrainDamage = net.ReadBool()
 
     local lply = LocalPlayer()
 
     if is_critical then
         surface.PlaySound("tinnituslong.wav")
-        if IsValid(lply) then lply:AddTinnitus(5) end
+        if IsValid(lply) then lply:AddTinnitus(5, false, hasBrainDamage) end
     else
         surface.PlaySound("tinnitus.wav")
-        if IsValid(lply) then lply:AddTinnitus(2.5) end
+        if IsValid(lply) then lply:AddTinnitus(2.5, false, hasBrainDamage) end
     end
 
     if not IsValid(lply) then return end
@@ -1508,7 +1519,7 @@ net.Receive("headtrauma_flash", function()
     end
 
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
-    headtraumaSaturation = math.min(time * 1.0, 2.5)
+    headtraumaSaturation = math.min(time * 1.5, 2.5)
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     else
