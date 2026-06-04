@@ -648,7 +648,7 @@ local function applyInjuryTPIK(ent, ply)
 
 	if (state.blend or 0) <= 0.001 then return end
 
-	local holdOffArm = reducedForWeapon and 0.2 or 1
+	local holdOffArm = reducedForWeapon and 0 or 1
 
 	for i = 1, #injuryTpikBones do
 		local limb = injuryTpikBones[i][1]
@@ -769,9 +769,6 @@ function hg.MainTPIKFunction(ent, ply, wpn)
         hg.DoZManip(ent, ply)
         //local systime = SysTime()
         hg.DoTPIK(ply, ent)
-        if applyInjuryTPIK then
-            applyInjuryTPIK(ent, ply)
-        end
         --hg._DeprecatedDoTPIK(ply, ent)
         //print("DoTPIK: ", SysTime() - systime)
     end

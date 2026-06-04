@@ -1513,7 +1513,9 @@ function SWEP:CoreStep()
 
 				if shake_intensity > 0 then
 					local time = CurTime() * 10
-					local random_shake = Angle(math.sin(time) * shake_intensity, math.cos(time * 0.8) * shake_intensity, 0)
+					-- Only shake pitch for broken arms; yaw causes sideways gun
+					local yawMul = (shake_intensity >= 0.3) and 0 or 1
+					local random_shake = Angle(math.sin(time) * shake_intensity, math.cos(time * 0.8) * shake_intensity * yawMul, 0)
 					self.AdditionalAngPreLerp:Add(random_shake)
 				end
 			end
@@ -1940,6 +1942,10 @@ function SWEP:GetAdditionalValues()
 	if totalSway > 0 then
 		local t = CurTime() * (2.2 + (self.aimFatigue or 0) * 0.5) -- Slower frequency increase for swaying instead of fast shaking
 		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * totalSway
+		-- Eliminate sideways sway for damaged arms so the gun stays forward while still sagging
+		local sidewaysMul = healthy_arms and 1 or 0
+		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * totalSway * sidewaysMul
+		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * totalSway * 0.5 * sidewaysMul
 		
 		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 0.7) * totalSwayPos
 		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.cos(t * 0.9) * totalSwayPos
