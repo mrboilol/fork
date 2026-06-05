@@ -88,7 +88,7 @@ local fear_hurt_ironic = {
 	"At least my life wasn't boring.",
 	"I guess this is what happens when you dont pay your bills.",
 	"This isn't the worst day to die.",
-	"This is actually pretty funny.",
+	"This is actually pretty funny... right?",
 }
 
 local fear_phrases = {
@@ -111,7 +111,16 @@ local fear_phrases = {
 	"Why is this happening to me...",
 	"I think im going to die here.",
 	"I cant see the end.",
+	"This is it.",
 	"Calm breaths. Deep breaths...",
+	"I should have stayed home today.",
+	"I should have stayed in bed.",
+	"I should have never come to this place.",
+	"Why did I come here?",
+	"I dont want my last thought to be fear.",
+	"I regret so much.",
+	"There's so much I haven't done.",
+	"I wish I had more time.",
 
 }
 
@@ -132,17 +141,17 @@ local is_aimed_at_phrases = {
 }
 
 local near_death_poetic = {
-	"Trying to stand... but I just can't...",
-	"Breathing's just shallow sips of nothing...",
-	"Can't tell if my eyes are open or not anymore...",
-	"Last thing I'll taste is my own blood and copper.",
-	"Eyes keep sliding off things.",
-	"Can't remember how standing works.",
-	"Everything echoes inside my skull.",
-	"Blinking takes too long to come back.",
-	"Fingers won't close around anything.",
-	"Lungs refuse to be full.",
-	"Regrets are pointless now.",
+	"My legs are giving out.",
+	"I dont want to die like this.",
+	"Please... someone help me...",
+	"The only thing I can feel is the taste of my blood.",
+	"Why won't my body listen to me?",
+	"I dont want to die I dont want to die...",
+	"Please do something...",
+	"My lungs arent doing anything useful.",
+	"Im barely clinging to my life.",
+	"I cant grab stuff properly.",
+	"Its pointless isnt it?",
 }
 
 local near_death_positive = {
@@ -181,7 +190,7 @@ local dislocated_limb = {
 	"I have to get this bone back in.",
 	"I heard the bone pop like a gunshot...",
 	"Its out of the socket, I can see the bulge...",
-	"Dont look, dont- oh god... its out of place.",
+	"I can feel it grinding against the joint...",
 }
 
 local hungry_a_bit = {

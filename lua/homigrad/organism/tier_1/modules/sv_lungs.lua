@@ -133,6 +133,7 @@ local lowoxy = {
 	"I CANT BREATHE- WHY CANT I BREATHE...",
 	"MY CHEST HURTS SO MUCH, I NEED AIR...",
 	"THERES NOT ENOUGH OXYGEN, I NEED TO BREATHE..."
+	"son im cooked 😭✌️"
 }
 
 local not_enough_intake = {
@@ -146,6 +147,7 @@ local not_enough_intake = {
 	"I dont know how much more I can last without air...",
 	"I cant breathe right...",
 	"Theres not enough air for me...",
+	
 }
 
 local barely_breathing = {

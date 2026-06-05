@@ -122,8 +122,77 @@ if CLIENT then
 		outline = false,
 	})
 
+	surface.CreateFont("EmojiFont", {
+		font = "Segoe UI Emoji",
+		extended = true,
+		size = ScreenScale(9),
+		weight = 0,
+		blursize = 0,
+		scanlines = 0,
+		antialias = true,
+		strikeout = false,
+		shadow = false,
+		outline = false,
+	})
+
 	hg.notifications = hg.notifications or {}
 	hg.notificationFont = "HuyFont"
+
+	local function hasEmoji(str)
+		if not str then return false end
+		for i, code in utf8.codes(str) do
+			if (code >= 0x1F300 and code <= 0x1F9FF) or
+			   (code >= 0x2600 and code <= 0x26FF) or
+			   (code >= 0x2700 and code <= 0x27BF) or
+			   (code >= 0xFE00 and code <= 0xFE0F) then
+				return true
+			end
+		end
+		return false
+	end
+
+	local function drawTextWithEmoji(text, x, y, color, outlineColor)
+		if not hasEmoji(text) then
+			draw.SimpleTextOutlined(text, hg.notificationFont, x, y, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, outlineColor)
+			return
+		end
+
+		local segments = {}
+		local currentText = ""
+		local currentIsEmoji = false
+
+		for i, code in utf8.codes(text) do
+			local char = utf8.char(code)
+			local isEmoji = (code >= 0x1F300 and code <= 0x1F9FF) or
+			               (code >= 0x2600 and code <= 0x26FF) or
+			               (code >= 0x2700 and code <= 0x27BF) or
+			               (code >= 0xFE00 and code <= 0xFE0F)
+
+			if currentText == "" then
+				currentIsEmoji = isEmoji
+				currentText = char
+			elseif isEmoji == currentIsEmoji then
+				currentText = currentText .. char
+			else
+				table.insert(segments, {text = currentText, isEmoji = currentIsEmoji})
+				currentIsEmoji = isEmoji
+				currentText = char
+			end
+		end
+
+		if currentText ~= "" then
+			table.insert(segments, {text = currentText, isEmoji = currentIsEmoji})
+		end
+
+		local currentX = x
+		for _, seg in ipairs(segments) do
+			local font = seg.isEmoji and "EmojiFont" or hg.notificationFont
+			surface.SetFont(font)
+			local w, h = surface.GetTextSize(seg.text)
+			draw.SimpleTextOutlined(seg.text, font, currentX, y, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, outlineColor)
+			currentX = currentX + w
+		end
+	end
 
 	hook.Add("Player_Death","removeNotifications",function(ply)
 		if ply != lply then return end
@@ -384,7 +453,7 @@ if CLIENT then
 				else
 					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeX, ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeY
 
-					draw.SimpleTextOutlined(last_message or txt, font, x, y, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
+					drawTextWithEmoji(last_message or txt, x, y, col, colBrown)
 				end
 			else
 				local tbl = hg.currentNotification
