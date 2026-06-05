@@ -375,22 +375,51 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
     local ply_r_upperarm_pos, ply_r_forearm_pos, ply_r_upperarm_angle, ply_r_forearm_angle
 
     local org = ply.organism
+    local rarmImpair = 1
+    local larmImpair = 1
+    local spineImpair = 1
     if org then
         local rarmHealth = org.rarm or 0
         local larmHealth = org.larm or 0
-        local prevRarm = ply._prevRarmHealth or 0
-        local prevLarm = ply._prevLarmHealth or 0
-        if prevRarm >= 1 and rarmHealth < 1 and not org.rarmdislocation then
+        local rarmDis = org.rarmdislocation
+        local larmDis = org.larmdislocation
+        local spineHealth = (org.spine1 or 0) + (org.spine2 or 0) + (org.spine3 or 0) + (org.pelvis or 0)
+        spineHealth = spineHealth / 4
+
+        -- Clear cached positions when arm is damaged to prevent sideways drift
+        -- The arm will just have weak control without position interpolation
+        if rarmHealth >= 0.25 or rarmDis then
             ply.last_rh_pos = nil
             ply.last_rh_pos2 = nil
         end
-        if prevLarm >= 1 and larmHealth < 1 and not org.larmdislocation then
+        if larmHealth >= 0.25 or larmDis then
             ply.last_lh_pos = nil
             ply.last_lh_pos2 = nil
         end
-        ply._prevRarmHealth = rarmHealth
-        ply._prevLarmHealth = larmHealth
+
+        -- Calculate impairment: 0.25 damage = 75% control, 1.0 damage = 25% control, dislocated = additional -25%
+        if rarmHealth >= 0.25 then
+            rarmImpair = 1.0 - (rarmHealth - 0.25) * 0.8
+        end
+        if rarmDis then rarmImpair = rarmImpair - 0.25 end
+        rarmImpair = math.max(rarmImpair, 0)
+
+        if larmHealth >= 0.25 then
+            larmImpair = 1.0 - (larmHealth - 0.25) * 0.8
+        end
+        if larmDis then larmImpair = larmImpair - 0.25 end
+        larmImpair = math.max(larmImpair, 0)
+
+        -- Spine impairment
+        if spineHealth >= 0.25 then
+            spineImpair = 1.0 - (spineHealth - 0.25) * 0.8
+        end
+        spineImpair = math.max(spineImpair, 0)
     end
+
+    -- Apply impairment to TPIK blend
+    local effective_lerp_rh = ply.lerp_rh * rarmImpair * spineImpair
+    local effective_lerp_lh = ply.lerp_lh * larmImpair * spineImpair
 
     if not rhik2 then
         local lpos, _ = WorldToLocal(ply_r_hand_matrix:GetTranslation(), angle_zero, eyepos, eyeang)
@@ -398,15 +427,15 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
 
         if ply.last_rh_pos2 then
             local pos, _ = LocalToWorld(ply.last_rh_pos2, angle_zero, eyepos, eyeang)
-            ply_r_hand_matrix:SetTranslation(Lerp(ply.lerp_rh, ply_r_hand_matrix:GetTranslation(), pos))
+            ply_r_hand_matrix:SetTranslation(Lerp(effective_lerp_rh, ply_r_hand_matrix:GetTranslation(), pos))
         end
     else
         local lpos, _ = WorldToLocal(ply_r_hand_matrix:GetTranslation(), angle_zero, eyepos, eyeang)
         ply.last_rh_pos2 = lpos
-        
+
         if ply.last_rh_pos then
             local pos, _ = LocalToWorld(ply.last_rh_pos, angle_zero, eyepos, eyeang)
-            ply_r_hand_matrix:SetTranslation(Lerp(ply.lerp_rh, pos, ply_r_hand_matrix:GetTranslation()))
+            ply_r_hand_matrix:SetTranslation(Lerp(effective_lerp_rh, pos, ply_r_hand_matrix:GetTranslation()))
         end
     end
 
@@ -430,9 +459,9 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
     end
     ply_r_forearm_angle:RotateAroundAxis(ply_r_forearm_angle:Forward(), -45)
 
-    ply_r_upperarm_matrix:SetAngles(LerpAngle(ply.lerp_rh, ply_r_upperarm_matrix:GetAngles(), ply_r_upperarm_angle))
-    ply_r_forearm_matrix:SetAngles(LerpAngle(ply.lerp_rh, ply_r_forearm_matrix:GetAngles(), ply_r_forearm_angle))
-    ply_r_forearm_matrix:SetTranslation(LerpVector(ply.lerp_rh, ply_r_forearm_matrix:GetTranslation(), ply_r_upperarm_pos))
+    ply_r_upperarm_matrix:SetAngles(LerpAngle(effective_lerp_rh, ply_r_upperarm_matrix:GetAngles(), ply_r_upperarm_angle))
+    ply_r_forearm_matrix:SetAngles(LerpAngle(effective_lerp_rh, ply_r_forearm_matrix:GetAngles(), ply_r_forearm_angle))
+    ply_r_forearm_matrix:SetTranslation(LerpVector(effective_lerp_rh, ply_r_forearm_matrix:GetTranslation(), ply_r_upperarm_pos))
 
     if rhik then
         hg.bone_apply_matrix(ent, ply_r_upperarm_index, ply_r_upperarm_matrix, ply_r_forearm_index)
@@ -469,9 +498,9 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
         
         if ply.last_lh_pos2 then
             local pos, _ = LocalToWorld(ply.last_lh_pos2, angle_zero, eyepos, eyeang)
-            
-            local lerp = ply.lerp_lh
-            
+
+            local lerp = effective_lerp_lh
+
             if ply.pullingTowards then
                 if not IsValid(self) or not self.GetWM or not IsValid(self:GetWM()) || self != ply.pullingTowardsWeapon || (ply.pullingTowardsStart and ((ply.pullingTowardsStart + ply.pullingTowardsTime) < CurTime())) then
                     if ply.pullingTowardsCallback and IsValid(self) and self.GetWM and IsValid(self:GetWM()) and self == ply.pullingTowardsWeapon then
@@ -520,16 +549,16 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
                 end
             else
                 local pos, _ = LocalToWorld(ply.last_lh_pos2, angle_zero, eyepos, eyeang)
-                ply_l_hand_matrix:SetTranslation(Lerp(ply.lerp_lh, ply_l_hand_matrix:GetTranslation(), pos))
+                ply_l_hand_matrix:SetTranslation(Lerp(effective_lerp_lh, ply_l_hand_matrix:GetTranslation(), pos))
             end
         end
     else
         local lpos, _ = WorldToLocal(ply_l_hand_matrix:GetTranslation(), angle_zero, eyepos, eyeang)
         ply.last_lh_pos2 = lpos
-        
+
         if ply.last_lh_pos then
             local pos, _ = LocalToWorld(ply.last_lh_pos, angle_zero, eyepos, eyeang)
-            ply_l_hand_matrix:SetTranslation(LerpVector(ply.lerp_lh, pos, ply_l_hand_matrix:GetTranslation()))
+            ply_l_hand_matrix:SetTranslation(LerpVector(effective_lerp_lh, pos, ply_l_hand_matrix:GetTranslation()))
         end
     end
 
@@ -566,9 +595,9 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
         ply_l_upperarm_angle = ply_l_upperarm_angle + prikolAng * 1
     end
     
-    ply_l_upperarm_matrix:SetAngles(LerpAngle(ply.lerp_lh, ply_l_upperarm_matrix:GetAngles(), ply_l_upperarm_angle))
-    ply_l_forearm_matrix:SetAngles(LerpAngle(ply.lerp_lh, ply_l_forearm_matrix:GetAngles(), ply_l_forearm_angle))
-    ply_l_forearm_matrix:SetTranslation(LerpVector(ply.lerp_lh, ply_l_forearm_matrix:GetTranslation(), ply_l_upperarm_pos))
+    ply_l_upperarm_matrix:SetAngles(LerpAngle(effective_lerp_lh, ply_l_upperarm_matrix:GetAngles(), ply_l_upperarm_angle))
+    ply_l_forearm_matrix:SetAngles(LerpAngle(effective_lerp_lh, ply_l_forearm_matrix:GetAngles(), ply_l_forearm_angle))
+    ply_l_forearm_matrix:SetTranslation(LerpVector(effective_lerp_lh, ply_l_forearm_matrix:GetTranslation(), ply_l_upperarm_pos))
 
     //debugoverlay.Line(l_arm_startingpos, ply_l_upperarm_pos, 1, color_white)
     //debugoverlay.Line(ply_l_upperarm_pos, ply_l_forearm_pos, 1, color_white)
@@ -1031,21 +1060,44 @@ function hg.DoTPIK(ply, ent)
     local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
 
     local org = ply.organism
+    local rarmImpair2 = 1
+    local larmImpair2 = 1
+    local spineImpair2 = 1
     if org then
         local rarmHealth = org.rarm or 0
         local larmHealth = org.larm or 0
-        local prevRarm = ply._prevRarmHealth2 or 0
-        local prevLarm = ply._prevLarmHealth2 or 0
-        if prevRarm >= 1 and rarmHealth < 1 and not org.rarmdislocation then
+        local rarmDis = org.rarmdislocation
+        local larmDis = org.larmdislocation
+        local spineHealth = (org.spine1 or 0) + (org.spine2 or 0) + (org.spine3 or 0) + (org.pelvis or 0)
+        spineHealth = spineHealth / 4
+
+        -- Clear cached positions when arm is damaged to prevent sideways drift
+        if rarmHealth >= 0.25 or rarmDis then
             ply.last_rh = nil
             ply.segmentsr = {}
         end
-        if prevLarm >= 1 and larmHealth < 1 and not org.larmdislocation then
+        if larmHealth >= 0.25 or larmDis then
             ply.last_lh = nil
             ply.segmentsl = {}
         end
-        ply._prevRarmHealth2 = rarmHealth
-        ply._prevLarmHealth2 = larmHealth
+
+        -- Calculate impairment
+        if rarmHealth >= 0.25 then
+            rarmImpair2 = 1.0 - (rarmHealth - 0.25) * 0.8
+        end
+        if rarmDis then rarmImpair2 = rarmImpair2 - 0.25 end
+        rarmImpair2 = math.max(rarmImpair2, 0)
+
+        if larmHealth >= 0.25 then
+            larmImpair2 = 1.0 - (larmHealth - 0.25) * 0.8
+        end
+        if larmDis then larmImpair2 = larmImpair2 - 0.25 end
+        larmImpair2 = math.max(larmImpair2, 0)
+
+        if spineHealth >= 0.25 then
+            spineImpair2 = 1.0 - (spineHealth - 0.25) * 0.8
+        end
+        spineImpair2 = math.max(spineImpair2, 0)
     end
 
     local shouldrebuild = false
@@ -1078,8 +1130,8 @@ function hg.DoTPIK(ply, ent)
     ply.lerp_lh = math.Approach(ply.lerp_lh or 0, lhik2 and 1 or 0, FrameTime() * 2.0 * game.GetTimeScale())//LerpFT(0.1, ply.lerp_lh or 1, lhik2 and 1 or 0)
     ply.lerp_rh = math.Approach(ply.lerp_rh or 0, rhik2 and 1 or 0, FrameTime() * 2.0 * game.GetTimeScale())//LerpFT(0.1, ply.lerp_rh or 1, rhik2 and 1 or 0)
 
-    local lerp_lh = math.ease.InOutSine(ply.lerp_lh)
-    local lerp_rh = math.ease.InOutSine(ply.lerp_rh)
+    local lerp_lh = math.ease.InOutSine(ply.lerp_lh) * larmImpair2 * spineImpair2
+    local lerp_rh = math.ease.InOutSine(ply.lerp_rh) * rarmImpair2 * spineImpair2
 
     //if lerp_rh == 0 and lerp_lh == 0 then return end
 

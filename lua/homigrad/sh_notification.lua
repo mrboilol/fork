@@ -138,13 +138,20 @@ if CLIENT then
 	hg.notifications = hg.notifications or {}
 	hg.notificationFont = "HuyFont"
 
+	local function isEmojiCode(code)
+		return (code >= 0x1F300 and code <= 0x1F9FF) or
+		       (code >= 0x1F1E0 and code <= 0x1F1FF) or
+		       (code >= 0x1F200 and code <= 0x1F2FF) or
+		       (code >= 0x1FA00 and code <= 0x1FAFF) or
+		       (code >= 0x2600 and code <= 0x26FF) or
+		       (code >= 0x2700 and code <= 0x27BF) or
+		       (code >= 0xFE00 and code <= 0xFE0F)
+	end
+
 	local function hasEmoji(str)
 		if not str then return false end
 		for i, code in utf8.codes(str) do
-			if (code >= 0x1F300 and code <= 0x1F9FF) or
-			   (code >= 0x2600 and code <= 0x26FF) or
-			   (code >= 0x2700 and code <= 0x27BF) or
-			   (code >= 0xFE00 and code <= 0xFE0F) then
+			if isEmojiCode(code) then
 				return true
 			end
 		end
@@ -163,10 +170,7 @@ if CLIENT then
 
 		for i, code in utf8.codes(text) do
 			local char = utf8.char(code)
-			local isEmoji = (code >= 0x1F300 and code <= 0x1F9FF) or
-			               (code >= 0x2600 and code <= 0x26FF) or
-			               (code >= 0x2700 and code <= 0x27BF) or
-			               (code >= 0xFE00 and code <= 0xFE0F)
+			local isEmoji = isEmojiCode(code)
 
 			if currentText == "" then
 				currentIsEmoji = isEmoji
