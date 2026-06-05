@@ -301,9 +301,9 @@ module[2] = function(owner, org, timeValue)
 		-- Trachea damage from breathing - damages trachea when breathing, more breathing = more damage
 		-- Needle prevents trachea damage
 		if org.trachea < 1.0 and org.needle <= 0 then
-			local breatheAmount = regenerate * 10 -- scale with how much O2 is being regenerated
+			local breatheAmount = regenerate * 0.5 -- scale with how much O2 is being regenerated
 			if breatheAmount > 0.1 then
-				org.trachea = min(org.trachea + breatheAmount * timeValue * 0.5, 1)
+				org.trachea = min(org.trachea + breatheAmount, 1)
 			end
 		end
 
@@ -311,6 +311,18 @@ module[2] = function(owner, org, timeValue)
 		if org.trachea > 0.5 then
 			local tracheaDrain = (org.trachea - 0.5) * 2 -- 0 at 0.5, up to 1 at 1.0
 			o2[1] = max(o2[1] - timeValue * tracheaDrain, 0)
+		end
+
+		-- Drain trachea/heart when there's positive O2 regen but no needle (trachea damage continues to worsen)
+		-- Needle prevents drain when trachea is very damaged (> 0.5)
+		if org.trachea > 0 and org.trachea < 1.0 and regenerate > 0 then
+			local hasNeedle = org.needle > 0
+			local veryDamaged = org.trachea > 0.5
+			if not (hasNeedle and veryDamaged) then
+				local drainRate = regenerate * 0.3
+				org.trachea = min(org.trachea + drainRate, 1)
+				org.heart = min(org.heart + drainRate * 0.2, 1)
+			end
 		end
 
 		o2.curregen = regenerate

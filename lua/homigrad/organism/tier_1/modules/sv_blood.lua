@@ -299,7 +299,11 @@ module[2] = function(owner, org, mulTime)
 		org.incapacitated = false
 	end
 
-	if (org.brain > 0.4) or (org.heart > 0.6) or (org.trachea >= 0.6) then
+	local noNeedle = org.needle <= 0
+	local tracheaBlocking = org.trachea > 0.5 and noNeedle
+	local tracheaNoO2Regen = org.trachea > 0.5 and (org.o2.curregen or 0) <= 0
+
+	if (org.brain > 0.4) or (org.heart > 0.6) or tracheaBlocking or tracheaNoO2Regen then
 		org.critical = true
 	else
 		org.critical = false
