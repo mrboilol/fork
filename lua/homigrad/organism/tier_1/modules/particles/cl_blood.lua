@@ -107,14 +107,13 @@ local function decalBlood(pos, normal, tr, artery, owner)
 
 	hg.bloodcount = hg.bloodcount + 1
 	
-	-- Track order for FIFO deletion
 	if not hg.bloodpositions[vec] then
 		hg.bloodpositionOrder[#hg.bloodpositionOrder + 1] = vec
 	end
 	
-	-- Delete oldest entries when cap reached
-	if hg.bloodcount > 500000 then
-		local toRemove = hg.bloodcount - 500000
+	local cap = 50000
+	if hg.bloodcount > cap then
+		local toRemove = hg.bloodcount - cap
 		for i = 1, toRemove do
 			if #hg.bloodpositionOrder > 0 then
 				local oldVec = table.remove(hg.bloodpositionOrder, 1)
@@ -126,58 +125,37 @@ local function decalBlood(pos, normal, tr, artery, owner)
 		end
 	end
 
-	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
-
 	local prefix = isExpieOwner(owner) and "Y" or ""
+	local matType = tr.MatType
+	local isMetal = matType == MAT_METAL
+	local vol = math.random(10, 60)
+	local pitch = isMetal and math.random(100, 120) or math.random(80, 120)
+	
+	sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, vol, pitch)
+	if isMetal then
+		sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), pitch)
+	end
 
 	if artery then
-		if !hg_old_blood:GetBool() then
-			local howmuch = 1
-			
-			//timer.Simple(0.1, function()
-				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-				if hg.bloodpositions[vec] < 6 then
-					util.Decal(prefix .. "Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
-				end
-				sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-				if tr.MatType == MAT_METAL then
-					sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-				end
-			//end)
+		if not hg_old_blood:GetBool() then
+			hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
+			if hg.bloodpositions[vec] < 6 then
+				util.Decal(prefix .. "Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
+			end
 		else
 			util.Decal(prefix .. "Arterial.Blood1", pos + normal, pos - normal, owner)
-			sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-			if tr.MatType == MAT_METAL then
-				sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-			end
 		end
 	else
-		if !hg_old_blood:GetBool() then
-			local howmuch = 1
-			
-			//timer.Simple(0.1, function()
-				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-				
-				sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-				if tr.MatType == MAT_METAL then
-					sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-				end
-
-				if hg.bloodpositions[vec] < 6 then
-					util.Decal(prefix .. "Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
-				end
-
-				if hg.bloodpositions[vec] == 50 then
-					util.Decal(prefix .. "Blood", pos + normal, pos - normal, owner)
-				end
-
-			//end)
+		if not hg_old_blood:GetBool() then
+			hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
+			if hg.bloodpositions[vec] < 6 then
+				util.Decal(prefix .. "Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
+			end
+			if hg.bloodpositions[vec] == 50 then
+				util.Decal(prefix .. "Blood", pos + normal, pos - normal, owner)
+			end
 		else
 			util.Decal(prefix .. "Normal.Blood1", pos + normal, pos - normal, owner)
-			sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-			if tr.MatType == MAT_METAL then
-				sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
-			end
 		end
 	end
 end
@@ -216,7 +194,7 @@ bloodparticles_hook[2] = function(mul)
 	end
 	
 	-- Emergency cap only when very high
-	local cap = 100000
+	local cap = 50000
 	while #hg.bloodparticles1 > cap do
 		table_remove(hg.bloodparticles1, 1)
 	end

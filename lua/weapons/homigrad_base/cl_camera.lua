@@ -298,16 +298,33 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local rarmShake = rarm * 0.08
 	local shakeMul = larmShake + rarmShake
 
-	-- 2.5 second grace period before aiming fatigue kicks in, unless arms are broken/heavily damaged
+	-- Grace period before aiming fatigue kicks in, extended by stable states (crouching, still, ragdolling, holding breath)
 	local armsBad = larm >= 0.75 or rarm >= 0.75 or organism.larmdislocated or organism.rarmdislocated or organism.larmamputated or organism.rarmamputated or larm >= 1 or rarm >= 1
+	local plyVel = ply:GetVelocity()
+	local isStationary = isvector(plyVel) and plyVel:Length() < 10
+	local isRagdolled = IsValid(ply.FakeRagdoll)
+	local isHoldingBreath = organism.holdingbreath
+	local isStable = ply:Crouching() or isStationary or isRagdolled or isHoldingBreath
+	local gracePeriod = isStable and 5 or 2.5
 	if zooming and justzoomed then
 		ply.aimGraceStart = CurTime()
 	end
-	if not armsBad and ply.aimGraceStart and (CurTime() - ply.aimGraceStart) < 2.5 then
+	if not armsBad and ply.aimGraceStart and (CurTime() - ply.aimGraceStart) < gracePeriod then
 		shakeMul = 0
 	end
 
-	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * (organism.holdingbreath and 0.1 or 1)
+	local stabilityMult = 1
+	if isRagdolled then
+		stabilityMult = 0.5
+	elseif ply:Crouching() then
+		stabilityMult = 0.7
+	elseif isStationary then
+		stabilityMult = 0.85
+	end
+	if isHoldingBreath then
+		stabilityMult = stabilityMult - 0.15
+	end
+	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * stabilityMult
 	addview[3] = 0
 
 	if ply == LocalPlayer() then

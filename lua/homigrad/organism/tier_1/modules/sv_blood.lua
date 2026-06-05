@@ -62,13 +62,9 @@ local about_to_puke = {
 local vecZero = Vector(0, 0, 0)
 module[2] = function(owner, org, mulTime)
 	local adrenaline = math.min(org.adrenaline, 2)
-	    if owner:IsPlayer() then
-        org.coagulation_multiplier = 1
-        org.blood_regeneration_multiplier = 1
-    else
-        org.coagulation_multiplier = 1
-        org.blood_regeneration_multiplier = 1
-    end
+	local isPlayer = owner:IsPlayer()
+	org.coagulation_multiplier = 1
+	org.blood_regeneration_multiplier = 1
 
 	org.bleedingmul = 1.0
 
@@ -116,13 +112,12 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-	local adrenalineStabilizer = totalAdrenaline > 0.2 -- Lowered threshold for better protection
+	local adrenalineStabilizer = totalAdrenaline > 0.2
+	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 
 	if org.hemotransfusionshock > 0 then
 		org.hemotransfusionshock = math.max(org.hemotransfusionshock - mulTime / 150,0)
 		org.internalBleed = org.internalBleed + mulTime / 20
-		-- Tranexamic acid and thiamine prevent ischemia from hemotransfusion shock
-		local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 		if not adrenalineStabilizer and not hasAntiIschemia then
 			org.ischemia = org.ischemia + mulTime / 15
 		end
@@ -142,10 +137,6 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedDuration = 0
 	end
 
-	-- Ischemia from prolonged untreated internal bleeding
-	-- 15 second grace period, then scales with duration and severity
-	-- Tranexamic acid and thiamine prevent this ischemia
-	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 	if org.internalBleed > 0 and not adrenalineStabilizer and not hasAntiIschemia then
 		local untreatedTime = math.max((org.internalBleedDuration or 0) - 15, 0)
 		if untreatedTime > 0 then
@@ -161,32 +152,35 @@ module[2] = function(owner, org, mulTime)
 
 	local coagulatespeed = 0
 	local bleedoutspeed = 0
+	local pulse = org.pulse
+	local bleedMul = org.bleedingmul
+	local coagMul = org.coagulation_multiplier
+	local isAlive = isPlayer and owner:Alive()
+	
 	if #org.wounds > 0 then
 		local ent = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+		local entVel = ent:GetVelocity()
 		
 		for i, wound in pairs(org.wounds) do
-			local rand1 = math.Rand(4, 10) * 1
-			local rand2 = math.Rand(0.5, 1) * 1
-			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * org.coagulation_multiplier-- / #org.wounds
-			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
-			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
+			local rand1 = math.Rand(4, 10)
+			local rand2 = math.Rand(0.5, 1)
+			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * coagMul
+			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3
+			coagulatespeed = coagulatespeed + coagulate / rand2
 			
-			local rand = math.Rand(0, 2) * 2
-			//if wound[5] + beatsPerSecond * 2 < time then
-				wound[5] = time
-				org.blood = max(org.blood - bleed, 1)
+			wound[5] = time
+			org.blood = max(org.blood - bleed, 1)
 			if hg_infections:GetBool() then
 				org.infection = org.infection + (bleed * 0.0003)
 			end
 				
-				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					hg.organism.BloodDroplet2(owner, org, wound, ent:GetVelocity() + VectorRand(-50, 50), false)
-					wound[1] = max(wound[1] - coagulate, 0)
-				end
+			if isAlive or not isPlayer then
+				hg.organism.BloodDroplet2(owner, org, wound, entVel + VectorRand(-50, 50), false)
+				wound[1] = max(wound[1] - coagulate, 0)
+			end
 
-				if wound[1] == 0 then table.remove(org.wounds, i) owner:SetNetVar("wounds",org.wounds) end
-			//end
+			if wound[1] == 0 then table.remove(org.wounds, i) owner:SetNetVar("wounds",org.wounds) end
 		end
 	end
 
@@ -203,25 +197,26 @@ module[2] = function(owner, org, mulTime)
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
 
 	local bleedoutspeed2 = 0
-	local next_arterypump = 1 / math.max(org.pulse, 10)
-	local ent = owner:IsPlayer() and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+	local next_arterypump = 1 / math.max(pulse, 10)
+	local ent = isPlayer and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+	local ownerVel = owner:GetVelocity()
 	for i, wound in pairs(org.arterialwounds) do
 		local neckMul = (wound[7] == "arteria") and (org.neckslitBleedingReduction or 1.0) or 1.0
-		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.2 * math.max(org.pulse, 20) / 80 * neckMul
+		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.2 * math.max(pulse, 20) / 80 * neckMul
 
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80 * neckMul, 1)
+			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(pulse, 20) / 80 * neckMul, 1)
 			if hg_infections:GetBool() then
 				org.infection = org.infection + (wound[1] * mulTime * 0.0005)
 			end
-			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
+			if isAlive or not isPlayer then
 				local dir = wound[6]
 				local len = dir:Length()
 				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
 				dir = -dir:Forward() * len
-				hg.organism.BloodDroplet2(owner, org, wound, owner:GetVelocity() + VectorRand(-10, 10) + dir, true)
+				hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
 			end
 
 			if wound[1] == 0 then
@@ -236,14 +231,10 @@ module[2] = function(owner, org, mulTime)
 
 	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
 
-	-- Ischemia kicks in below 2500 blood (blocked by epinephrine/adrenaline > 0.2)
-	-- Tranexamic acid and thiamine also prevent this ischemia
-	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 	if org.blood < 2500 and not adrenalineStabilizer and not hasAntiIschemia then
 		org.ischemia = math.min(org.ischemia + mulTime * 0.015, 1.0)
 	end
 	
-	-- Active ischemia reduction from tranexamic acid, thiamine, and adrenaline
 	if hasAntiIschemia then
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.02, 0)
 	end

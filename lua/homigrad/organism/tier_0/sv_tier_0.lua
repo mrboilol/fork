@@ -14,8 +14,18 @@ function hg.organism.Add(ent)
 end
 
 function hg.organism.Clear(org)
-	hook_Run("Org Clear", org)//.owner.organism_internal)
-	if IsValid(org.owner) then org.owner.fullsend = true end
+	hook_Run("Org Clear", org)
+	if not IsValid(org.owner) then return end
+	
+	local owner = org.owner
+	if owner:IsPlayer() then
+		local lastDeathTime = owner.lastDeathTime or 0
+		if CurTime() - lastDeathTime < 2 then
+			return
+		end
+	end
+	
+	owner.fullsend = true
 	hg.send_organism(org)
 end
 
@@ -29,6 +39,15 @@ hook.Add("PlayerInitialSpawn", "homigrad-organism", function(ply) hg.organism.Ad
 hook.Add("Player Spawn", "homigrad-organism", function(ply) hg.organism.Clear(ply.organism) end)
 hook.Add("PlayerDisconnected", "homigrad-organism", function(ply) hg.organism.Remove(ply) end)
 hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
+	ply.lastDeathTime = CurTime()
+	
+	local entIdx = ply:EntIndex()
+	for k, v in pairs(timer.GetTable()) do
+		if string.find(k, entIdx) then
+			timer.Remove(k)
+		end
+	end
+	
 	local ragdoll = ply:GetNWEntity("RagdollDeath")
 	
 	if not IsValid(ragdoll) then ragdoll = ply.FakeRagdoll end

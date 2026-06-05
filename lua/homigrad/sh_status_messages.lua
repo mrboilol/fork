@@ -446,6 +446,7 @@ local function get_status_message(ply)
 	local broken_notify = (org.rarm == 1) or (org.larm == 1) or (org.rleg == 1) or (org.lleg == 1)
 	local dislocated_notify = (org.rarm == 0.5) or (org.larm == 0.5) or (org.rleg == 0.5) or (org.lleg == 0.5)
 	local after_unconscious_notify = org.after_otrub
+	local heartbeat = org.heartbeat or 70
 
 	if not isnumber(pain) then return "" end
 
@@ -580,7 +581,7 @@ function hg.is_traumatic_message(ply)
 	local badHeart = org.heartstop or heartbeat < 30
 	local brainDamage = brain >= 0.3 or org.critical == true
 
-	if (lowO2 and lowBlood) or (lowBlood and badHeart) or (lowO2 and badHeart) or brainDamage then
+	if lowBlood or lowO2 and badHeart or brainDamage then
 		return true
 	end
 

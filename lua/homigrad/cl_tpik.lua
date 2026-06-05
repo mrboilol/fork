@@ -374,6 +374,24 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
 
     local ply_r_upperarm_pos, ply_r_forearm_pos, ply_r_upperarm_angle, ply_r_forearm_angle
 
+    local org = ply.organism
+    if org then
+        local rarmHealth = org.rarm or 0
+        local larmHealth = org.larm or 0
+        local prevRarm = ply._prevRarmHealth or 0
+        local prevLarm = ply._prevLarmHealth or 0
+        if prevRarm >= 1 and rarmHealth < 1 and not org.rarmdislocation then
+            ply.last_rh_pos = nil
+            ply.last_rh_pos2 = nil
+        end
+        if prevLarm >= 1 and larmHealth < 1 and not org.larmdislocation then
+            ply.last_lh_pos = nil
+            ply.last_lh_pos2 = nil
+        end
+        ply._prevRarmHealth = rarmHealth
+        ply._prevLarmHealth = larmHealth
+    end
+
     if not rhik2 then
         local lpos, _ = WorldToLocal(ply_r_hand_matrix:GetTranslation(), angle_zero, eyepos, eyeang)
         ply.last_rh_pos = lpos
@@ -1011,7 +1029,25 @@ function hg.DoTPIK(ply, ent)
 
     local lhik2 = ((IsValid(self) and self.lhandik) or ply:InVehicle()) and hg.CanUseLeftHand(ply)
     local rhik2 = ((IsValid(self) and self.rhandik) or ply:InVehicle()) and hg.CanUseRightHand(ply)
-    
+
+    local org = ply.organism
+    if org then
+        local rarmHealth = org.rarm or 0
+        local larmHealth = org.larm or 0
+        local prevRarm = ply._prevRarmHealth2 or 0
+        local prevLarm = ply._prevLarmHealth2 or 0
+        if prevRarm >= 1 and rarmHealth < 1 and not org.rarmdislocation then
+            ply.last_rh = nil
+            ply.segmentsr = {}
+        end
+        if prevLarm >= 1 and larmHealth < 1 and not org.larmdislocation then
+            ply.last_lh = nil
+            ply.segmentsl = {}
+        end
+        ply._prevRarmHealth2 = rarmHealth
+        ply._prevLarmHealth2 = larmHealth
+    end
+
     local shouldrebuild = false
     if (ply.nextrebuild or 0) < CurTime() then
         ply.nextrebuild = CurTime() + 0.0

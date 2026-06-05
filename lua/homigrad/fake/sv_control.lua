@@ -84,88 +84,110 @@ local function GetPhysBoneToLimbMap(ragdoll)
     if ragdoll.physBoneToLimbCache then return ragdoll.physBoneToLimbCache end
 
     local map = {}
-    
+
     local function addBoneAndChildren(boneName, limbName)
         local boneId = ragdoll:LookupBone(boneName)
         if not boneId then return end
-        
+
         -- Map this bone
         local physBone = ragdoll:TranslateBoneToPhysBone(boneId)
         if physBone and physBone ~= -1 then
             map[physBone] = limbName
         end
-        
-        -- Map all children
-        local children = ragdoll:GetChildBones(boneId) or {}
-        for _, childId in ipairs(children) do
-            local childPhys = ragdoll:TranslateBoneToPhysBone(childId)
-            if childPhys and childPhys ~= -1 then
-                map[childPhys] = limbName
-            end
-            
-            -- Recursively get children's children
-            local subChildren = ragdoll:GetChildBones(childId) or {}
-            for _, subId in ipairs(subChildren) do
-                local subPhys = ragdoll:TranslateBoneToPhysBone(subId)
-                if subPhys and subPhys ~= -1 then
-                    map[subPhys] = limbName
+
+        -- Map all children recursively
+        local function mapChildren(parentId, depth)
+            if depth > 10 then return end
+            local children = ragdoll:GetChildBones(parentId) or {}
+            for _, childId in ipairs(children) do
+                local childPhys = ragdoll:TranslateBoneToPhysBone(childId)
+                if childPhys and childPhys ~= -1 and not map[childPhys] then
+                    map[childPhys] = limbName
                 end
+                mapChildren(childId, depth + 1)
             end
         end
+
+        mapChildren(boneId, 0)
     end
 
+    -- Right arm: upperarm, forearm, hand
     addBoneAndChildren("ValveBiped.Bip01_R_UpperArm", "rarm")
+    addBoneAndChildren("ValveBiped.Bip01_R_Forearm", "rarm")
+    addBoneAndChildren("ValveBiped.Bip01_R_Hand", "rarm")
+    -- Left arm: upperarm, forearm, hand
     addBoneAndChildren("ValveBiped.Bip01_L_UpperArm", "larm")
+    addBoneAndChildren("ValveBiped.Bip01_L_Forearm", "larm")
+    addBoneAndChildren("ValveBiped.Bip01_L_Hand", "larm")
+    -- Right leg: thigh, calf, foot
     addBoneAndChildren("ValveBiped.Bip01_R_Thigh", "rleg")
+    addBoneAndChildren("ValveBiped.Bip01_R_Calf", "rleg")
+    addBoneAndChildren("ValveBiped.Bip01_R_Foot", "rleg")
+    -- Left leg: thigh, calf, foot
     addBoneAndChildren("ValveBiped.Bip01_L_Thigh", "lleg")
+    addBoneAndChildren("ValveBiped.Bip01_L_Calf", "lleg")
+    addBoneAndChildren("ValveBiped.Bip01_L_Foot", "lleg")
+    -- Spine/head
     addBoneAndChildren("ValveBiped.Bip01_Head1", "head")
     addBoneAndChildren("ValveBiped.Bip01_Neck1", "head")
+    addBoneAndChildren("ValveBiped.Bip01_Spine1", "spine")
+    addBoneAndChildren("ValveBiped.Bip01_Spine2", "spine")
+    addBoneAndChildren("ValveBiped.Bip01_Spine3", "spine")
+    addBoneAndChildren("ValveBiped.Bip01_Spine4", "spine")
 
     ragdoll.physBoneToLimbCache = map
     return map
 end
 
--- Check if a physics bone belongs to a broken/dislocated limb and return damage severity
--- Returns: isAffected (bool), severityMultiplier (number)
--- Severity tiers for ballsocket effect (ragdoll):
---   1.00 = normal (0% reduction)
---   0.75 = just broken (25% effect)
---   0.15 = just dislocated (85% effect)
---   -0.10 = broken AND dislocated (110% effect, 0.75 + 0.15 = 0.90, but clamped to allow extra floppy)
+-- Check if a physics bone belongs to a damaged limb and return control reduction
+-- Returns: isAffected (bool), controlMultiplier (number 0-1)
+-- Control scales with damage: 0.25 damage = 75% control, 1.0 damage = 25% control
+-- Dislocation adds additional -25% (so 1.0 damage + dislocated = 0% control)
 local function GetLimbDamageMultiplier(ragdoll, physNumber)
     local ply = hg.RagdollOwner(ragdoll)
     if not IsValid(ply) or not ply.organism then return false, 1.0 end
-    
+
     local map = GetPhysBoneToLimbMap(ragdoll)
     local limb = map[physNumber]
     if not limb then return false, 1.0 end
-    
+
     local org = ply.organism
-    
-    -- Special case for neck/head
-    if limb == "head" then
-        if org.spine3 and org.spine3 >= 1 then
+
+    -- Special case for spine/head
+    if limb == "head" or limb == "spine" then
+        local damage = limb == "head" and (org.spine3 or 0) or (org[limb] or 0)
+        if damage >= 1 then
             return true, 0.15
+        elseif damage >= 0.25 then
+            return true, 1.0 - (damage - 0.25) * (0.85 / 0.75)
         end
         return false, 1.0
     end
-    
-    local isBroken = org[limb] and org[limb] >= 1
+
+    local damage = org[limb] or 0
     local isDislocated = org[limb .. "dislocation"]
-    
-    -- Calculate damage multiplier: dislocated = 85%, broken = 25%, both = 110%
-    local damageMultiplier = 1.0
-    if isDislocated then damageMultiplier = damageMultiplier - 0.85 end  -- 15% remaining = 85% effect
-    if isBroken then damageMultiplier = damageMultiplier - 0.75 end      -- 25% remaining = 25% effect when only broken
-    
-    -- If both, we want 110% effect which means negative multiplier (allows more movement)
-    -- -0.10 = 110% effect
-    
-    if isBroken or isDislocated then
-        return true, math.max(damageMultiplier, -0.10)  -- Cap at -0.10 for 110% max effect
+
+    -- Start impairing at 0.25 damage
+    if damage < 0.25 and not isDislocated then
+        return false, 1.0
     end
-    
-    return false, 1.0
+
+    -- Calculate control: 0.25 damage = 75%, 1.0 damage = 25%
+    -- Formula: control = 1.0 - (damage - 0.25) * 0.8
+    local controlMultiplier = 1.0
+    if damage >= 0.25 then
+        controlMultiplier = 1.0 - (damage - 0.25) * 0.8
+    end
+
+    -- Dislocation adds additional -25% control
+    if isDislocated then
+        controlMultiplier = controlMultiplier - 0.25
+    end
+
+    -- Clamp: minimum 0% control (fully limp)
+    controlMultiplier = math.max(controlMultiplier, 0)
+
+    return true, controlMultiplier
 end
 
 function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp)
@@ -173,26 +195,31 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
     local phys = ragdoll:GetPhysicsObjectNum(physNumber)
     if not IsValid(phys) then return end
 
-    -- Check if this bone belongs to a broken/dislocated limb
-    -- OLD LUA STYLE: Completely skip shadow control on broken/dislocated limbs
-    -- Let physics handle them naturally - don't fight the floppy constraints
-    local isDamaged, _ = GetLimbDamageMultiplier(ragdoll, physNumber)
-    if isDamaged then
+    -- Check if this bone belongs to a damaged limb and get control multiplier
+    local isDamaged, controlMult = GetLimbDamageMultiplier(ragdoll, physNumber)
+
+    -- Apply reduced control for damaged limbs (0 = no control, 1 = full control)
+    if isDamaged and controlMult <= 0 then
         phys:Wake()
-        return -- Don't apply ANY shadow control to broken/dislocated limbs
+        return -- No control for fully broken limbs
+    end
+
+    local powerMult = ragdoll.power or 1
+    if isDamaged then
+        powerMult = powerMult * controlMult
     end
 
     shadowparams.secondstoarrive = ss
     shadowparams.angle = ang
-    shadowparams.maxangular = maxang and maxang * (ragdoll.power or 1)
+    shadowparams.maxangular = maxang and maxang * powerMult
     shadowparams.maxangulardamp = maxangdamp
     shadowparams.pos = pos
-    shadowparams.maxspeed = maxspeed and maxspeed * (ragdoll.power or 1)
+    shadowparams.maxspeed = maxspeed and maxspeed * powerMult
     shadowparams.maxspeeddamp = maxspeeddamp
     shadowparams.dampfactor = 0.9
 
     phys:Wake()
-    
+
     phys:ComputeShadowControl(shadowparams)
 end
 
