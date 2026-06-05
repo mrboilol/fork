@@ -12,6 +12,7 @@ module[1] = function(org)
 	org.trachea = 0
 	org.pneumothorax = 0
 	org.needle = 0
+	org.tracheaPath = nil -- "trachea" or "pneumothorax" determined when first > 0.5
 	org.nextCough = nil
 	org.o2 = {
 		range = 30,
@@ -299,12 +300,22 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		-- Trachea damage from breathing - damages trachea when breathing, more breathing = more damage
-		-- Needle prevents trachea damage
-		if org.trachea < 1.0 and org.needle <= 0 then
-			local breatheAmount = regenerate * 0.5 -- scale with how much O2 is being regenerated
-			if breatheAmount > 0.1 then
+		-- Needle prevents trachea damage, only triggers when trachea > 0.5
+		if org.trachea > 0.5 and org.trachea < 1.0 and org.needle <= 0 then
+			local breatheAmount = regenerate * 0.01
+			if breatheAmount > 0.01 then
 				org.trachea = min(org.trachea + breatheAmount, 1)
 			end
+		end
+
+		-- O2 impairment when trachea is damaged
+		if org.trachea > 0 and org.trachea <= 0.5 then
+			local impairment = org.trachea * 0.5 -- up to 25% O2 reduction at 0.5
+			regenerate = regenerate * (1 - impairment)
+		elseif org.trachea > 0.5 then
+			-- Much worse impairment above 0.5 (50% to 100% reduction)
+			local impairment = 0.5 + (org.trachea - 0.5) * 1.0 -- 50% at 0.5, up to 100% at 1.0
+			regenerate = regenerate * (1 - impairment)
 		end
 
 		-- O2 drain when trachea is damaged (> 0.5)
@@ -313,15 +324,21 @@ module[2] = function(owner, org, timeValue)
 			o2[1] = max(o2[1] - timeValue * tracheaDrain, 0)
 		end
 
-		-- Drain trachea/heart when there's positive O2 regen but no needle (trachea damage continues to worsen)
-		-- Needle prevents drain when trachea is very damaged (> 0.5)
-		if org.trachea > 0 and org.trachea < 1.0 and regenerate > 0 then
-			local hasNeedle = org.needle > 0
-			local veryDamaged = org.trachea > 0.5
-			if not (hasNeedle and veryDamaged) then
-				local drainRate = regenerate * 0.3
+		-- Trachea > 0.5: determine path once, then stick with it
+		-- Needle prevents both
+		if org.trachea > 0.5 and org.trachea < 1.0 and org.needle <= 0 and regenerate > 0 then
+			-- First time above 0.5: choose path
+			if not org.tracheaPath then
+				org.tracheaPath = math.random() < 0.5 and "trachea" or "pneumothorax"
+			end
+
+			local damageSeverity = (org.trachea - 0.5) * 2
+			local drainRate = regenerate * 0.005 * damageSeverity
+
+			if org.tracheaPath == "trachea" then
 				org.trachea = min(org.trachea + drainRate, 1)
-				org.heart = min(org.heart + drainRate * 0.2, 1)
+			else
+				org.pneumothorax = min(org.pneumothorax + drainRate * 0.5, 1)
 			end
 		end
 
