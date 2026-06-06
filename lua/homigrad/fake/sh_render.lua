@@ -62,7 +62,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 	local ARMOR_RENDER_DIST_SQR = 1450 * 1450
 	local DETAIL_RENDER_DIST_SQR = 2000 * 2000
 	local angfuck = Angle()
-	local hg_no_camera_in_cars = CreateConVar("hg_no_camera_in_cars","0",FCVAR_ARCHIVE + FCVAR_REPLICATED, "disables camera in cars", 0, 1)
+
 	function DrawPlayerRagdoll(ent, ply) --// actually not only ragdoll render but player too
 		if ply.prevragdoll_index != nil and ply.prevragdoll_index != ply.ragdoll_index and ply.ragdoll_index == 0 then
 			//print(ply.ragdoll_index, ply.prevragdoll_index, Entity(ply.ragdoll_index))
