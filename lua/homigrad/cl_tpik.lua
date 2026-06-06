@@ -1033,8 +1033,7 @@ function hg.DoTPIK(ply, ent)
     if !ply_l_hand_index then return end
     if !ply_r_hand_index then return end
 
-    local _, angarrws = LocalToWorld(vector_origin, ply:InVehicle() and LerpAngle(0.5, ply:EyeAngles(), angle_zero) or ply:EyeAngles(), vector_origin, (IsValid(ply:GetVehicle()) and hg.IsLocal(ply) and ply:GetVehicle():GetAngles() or angle_zero))
-    local eyepos, eyeang = ply:EyePos(), angarrws//ply:GetAimVector():Angle()
+    local eyepos, eyeang = ply:EyePos(), ply:EyeAngles() + (IsValid(ply:GetVehicle()) and hg.IsLocal(ply) and ply:GetVehicle():GetAngles() or angle_zero)//ply:GetAimVector():Angle()
     local headpos = ply_head_matrix:GetTranslation()
 
     local ply_r_upperarm_matrix = ent:GetBoneMatrix(ply_r_upperarm_index)
@@ -1044,7 +1043,7 @@ function hg.DoTPIK(ply, ent)
     local ply_r_clavicle_matrix = ent:GetBoneMatrix(ply_r_clavicle_index)
     local ply_r_ulna_matrix 
     local ply_r_wrist_matrix
-    if ply_l_ulna_index and ply_r_wrist_matrixthen then
+    if ply_l_ulna_index and ply_r_wrist_matrix then
         ply_r_ulna_matrix = ent:GetBoneMatrix(ply_l_ulna_index)
         ply_r_wrist_matrix = ent:GetBoneMatrix(ply_r_wrist_index)
     end
@@ -1187,17 +1186,7 @@ function hg.DoTPIK(ply, ent)
             eyeang.p = math.NormalizeAngle(eyeang.p) * 0.5
             segments[1].Pos = ply_r_upperarm_matrix:GetTranslation()
             segments[1].Len = limblength
-            -- When the right arm is broken and the player is aiming, pull the IK pole
-            -- forward so the arm points straight rather than sideways.
-            local rarmBroken = org and (org.rarm or 0) >= 1
-            local isAimingNow = IsValid(self) and self.IsZoom and self:IsZoom()
-            if rarmBroken and isAimingNow then
-                -- Aiming with broken right arm: elbow pole is roughly behind/below the hand,
-                -- keeping the arm pointed forward with reduced sideways deflection.
-                segments[2].Pos = spinepos + eyeang:Forward() * 10 + eyeang:Right() * 8 - eyeang:Up() * 15
-            else
-                segments[2].Pos = spinepos + eyeang:Right() * 25 - eyeang:Up() * 20 - eyeang:Forward() * 20
-            end
+            segments[2].Pos = spinepos + eyeang:Right() * 25 - eyeang:Up() * 20 - eyeang:Forward() * 20
             segments[2].Len = limblength
 
             local tr = util.TraceLine({
@@ -1291,15 +1280,6 @@ function hg.DoTPIK(ply, ent)
 
         local ang = q:Angle()
         ply_r_forearm_matrix:SetAngles(ang)
-
-        -- When right arm is broken, correct the wrist to face forward.
-        if ply.organism and ply.organism.rarm and ply.organism.rarm > 0.99 then
-            local rarmAng = ang
-            rarmAng:RotateAroundAxis(rarmAng:Forward(), -95)
-            local isAimingNow2 = IsValid(self) and self.IsZoom and self:IsZoom()
-            local blend = isAimingNow2 and 0.8 or 0.35
-            ply_r_hand_matrix:SetAngles(LerpAngle(blend, ply_r_hand_matrix:GetAngles(), rarmAng))
-        end
 
         hg.bone_apply_matrix(ent, ply_r_upperarm_index, ply_r_upperarm_matrix, ply_r_forearm_index)
         hg.bone_apply_matrix(ent, ply_r_forearm_index, ply_r_forearm_matrix, ply_r_hand_index)

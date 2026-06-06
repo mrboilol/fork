@@ -210,6 +210,10 @@ function hg.organism.AmputateLimb(org, limb)
 
 	org[limb.."amputated"] = true
 
+	-- Track that this limb was previously amputated for stable healing approach
+	org.owner.HG_PreviouslyAmputated = org.owner.HG_PreviouslyAmputated or {}
+	org.owner.HG_PreviouslyAmputated[limb] = true
+
 	for i = 1, 5 do
 		hg.organism.AddWoundManual(org.owner, 50, vec + VectorRand(-2, 2), ang, boneup, CurTime() + math.Rand(0, 2))
 	end
@@ -257,17 +261,27 @@ function hg.organism.CompleteDislocationFix(org, limb, ply)
 	end
 
 	-- Reapply floppy limb constraints if the limb is broken
+	-- Skip if limb is amputated
 	if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-		if org[limb] and org[limb] >= 1 then
+		local isAmputated = org[limb .. "amputated"]
+		if isAmputated then
+			-- Don't apply constraints to amputated limbs
+		elseif org[limb] and org[limb] >= 1 then
 			local ent = hg.GetCurrentCharacter(org.owner)
 			if IsValid(ent) then
 				hg.BreakLimb(ent, limb, nil, false)
 			end
 		else
 			-- Remove floppy constraints if the limb is no longer broken
-			local ent = hg.GetCurrentCharacter(org.owner)
-			if IsValid(ent) then
-				hg.RemoveLimbConstraints(ent, limb)
+			-- But if it was previously amputated, use stable approach - don't mess with it
+			local wasAmputated = org.owner.HG_PreviouslyAmputated and org.owner.HG_PreviouslyAmputated[limb]
+			if wasAmputated then
+				-- Let the organism stabilize naturally
+			else
+				local ent = hg.GetCurrentCharacter(org.owner)
+				if IsValid(ent) then
+					hg.RemoveLimbConstraints(ent, limb)
+				end
 			end
 		end
 	end
@@ -530,6 +544,10 @@ function hg.ExplodeHead(ent)
 		
 		ent.organism.headamputated = true
 		ent.headexploded = true
+
+		-- Track that head was previously amputated for stable healing approach
+		ent.organism.owner.HG_PreviouslyAmputated = ent.organism.owner.HG_PreviouslyAmputated or {}
+		ent.organism.owner.HG_PreviouslyAmputated["head"] = true
 
 		ent.organism.owner.fullsend = true
 		hg.send_bareinfo(ent.organism)
@@ -1114,7 +1132,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
-	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 100 or 135 -- easier decapitation
+	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 40 or 135 -- easier decapitation
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)

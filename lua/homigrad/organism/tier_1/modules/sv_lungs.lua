@@ -141,12 +141,12 @@ local not_enough_intake = {
 	//"I gotta take a break...",
 	//"Need a break from this... to breathe...",
 	//"Resting sounds like a nice idea.",
-	"Its like taking shallow sips of nothing...",
-	"I cant- I cant breathe...",
-	"I think I might pass out if I dont get some air soon...",
-	"I dont know how much more I can last without air...",
-	"I cant breathe right...",
-	"Theres not enough air for me...",
+	"Im breathing very shallowly...",
+	"I cant breathe properly...",
+	"Its hard to breathe...",
+	"I have less air than usual...",
+	"Breathing is a unusual struggle...",
+	"Im winded...",
 	
 }
 

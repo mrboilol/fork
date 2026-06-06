@@ -1087,11 +1087,19 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 						if !should then continue end
 						
-						local mat = ent:GetBoneMatrix(woundBone)
-						if not mat then continue end
-						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
-						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
+						local pos
+						-- Check if this is a world position (from bone break) vs local position (from artery hit)
+						if wound[8] == true then
+							-- World position - use directly
+							pos = wound[2]
+						else
+							-- Local position - convert to world
+							local mat = ent:GetBoneMatrix(woundBone)
+							if not mat then continue end
+							local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
+							if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
+							pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
+						end
 
 						local dir = wound[6]
 						local len = dir:Length() * (org.pulse or 70) / 70

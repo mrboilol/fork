@@ -992,10 +992,15 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.rarm = math.max(org.rarm - regen, 0)
 	org.larm = math.max(org.larm - regen, 0)
 	-- Remove floppy constraints if a broken limb healed while ragdolled
-	if oldLleg >= 1 and org.lleg < 1 and not org.llegdislocation then hg.RemoveLimbConstraints(org.owner, "lleg") end
-	if oldRleg >= 1 and org.rleg < 1 and not org.rlegdislocation then hg.RemoveLimbConstraints(org.owner, "rleg") end
-	if oldRarm >= 1 and org.rarm < 1 and not org.rarmdislocation then hg.RemoveLimbConstraints(org.owner, "rarm") end
-	if oldLarm >= 1 and org.larm < 1 and not org.larmdislocation then hg.RemoveLimbConstraints(org.owner, "larm") end
+	-- Skip if limb was amputated (use stable approach - don't mess with it)
+	local function shouldRemoveLimbConstraint(limb)
+		local wasAmputated = org.owner and org.owner.HG_PreviouslyAmputated and org.owner.HG_PreviouslyAmputated[limb]
+		return not wasAmputated
+	end
+	if oldLleg >= 1 and org.lleg < 1 and not org.llegdislocation and shouldRemoveLimbConstraint("lleg") then hg.RemoveLimbConstraints(org.owner, "lleg") end
+	if oldRleg >= 1 and org.rleg < 1 and not org.rlegdislocation and shouldRemoveLimbConstraint("rleg") then hg.RemoveLimbConstraints(org.owner, "rleg") end
+	if oldRarm >= 1 and org.rarm < 1 and not org.rarmdislocation and shouldRemoveLimbConstraint("rarm") then hg.RemoveLimbConstraints(org.owner, "rarm") end
+	if oldLarm >= 1 and org.larm < 1 and not org.larmdislocation and shouldRemoveLimbConstraint("larm") then hg.RemoveLimbConstraints(org.owner, "larm") end
 	org.chest = math.max(org.chest - regen, 0)
 	local oldPelvis = org.pelvis
 	org.pelvis = math.max(org.pelvis - regen, 0)
@@ -1006,6 +1011,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.spine2 = math.max(org.spine2 - regen, 0)
 	org.spine3 = math.max(org.spine3 - regen, 0)
 	-- Remove spine floppy constraints when spine heals below break threshold
+	-- Skip if head is amputated
 	if hg.RemoveSpineConstraints then
 		local fake1 = hg.organism and hg.organism.fake_spine1 or 1
 		local fake2 = hg.organism and hg.organism.fake_spine2 or 1
@@ -1016,7 +1022,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 		if oldSpine2 >= fake2 and org.spine2 < fake2 then
 			hg.RemoveSpineConstraints(org.owner, "spine2")
 		end
-		if oldSpine3 >= fake3 and org.spine3 < fake3 then
+		if oldSpine3 >= fake3 and org.spine3 < fake3 and not org.headamputated then
 			hg.RemoveNeckConstraints(org.owner)
 		end
 	end

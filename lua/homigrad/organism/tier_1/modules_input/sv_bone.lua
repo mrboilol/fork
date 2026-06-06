@@ -593,7 +593,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if math.random() < explodeChance then
 			org.headExploded = true
 			org.headamputated = true  -- Mark as amputated too
-			
+
+			-- Track that head was previously amputated for stable healing approach
+			org.owner.HG_PreviouslyAmputated = org.owner.HG_PreviouslyAmputated or {}
+			org.owner.HG_PreviouslyAmputated["head"] = true
+
 			local headPos = org.owner:GetBonePosition(org.owner:LookupBone("ValveBiped.Bip01_Head"))
 			if headPos then
 				-- Big initial explosion
@@ -755,24 +759,36 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
     print("[HG Bone] Org dislocation states: larm=" .. tostring(org["larmdislocation"]) .. " rarm=" .. tostring(org["rarmdislocation"]) .. " lleg=" .. tostring(org["llegdislocation"]) .. " rleg=" .. tostring(org["rlegdislocation"]))
 
     for _, limb in ipairs(limbs) do
+        local isAmputated = org[limb .. "amputated"]
         local isBroken = org[limb] and org[limb] >= 1
         local isDislocated = org[limb .. "dislocation"]
-        print("[HG Bone] Checking limb " .. limb .. ": isBroken=" .. tostring(isBroken) .. " isDislocated=" .. tostring(isDislocated))
-        if isBroken or isDislocated then
+        print("[HG Bone] Checking limb " .. limb .. ": isAmputated=" .. tostring(isAmputated) .. " isBroken=" .. tostring(isBroken) .. " isDislocated=" .. tostring(isDislocated))
+
+        -- Skip constraints for amputated limbs
+        if isAmputated then
+            print("[HG Bone] Skipping " .. limb .. " - limb is amputated")
+        elseif isBroken or isDislocated then
             -- OLD LUA: Use persisted segment if available (so same elbow stays broken across ragdolls)
             local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
             print("[HG Bone] Reapplying floppy for " .. limb .. " with segment=" .. tostring(segment) .. " isDislocated=" .. tostring(isDislocated))
             hg.BreakLimb(ragdoll, limb, segment, isDislocated)
         elseif IsValid(ragdoll) then
             -- Limb has healed while we were up; make sure no stale floppy constraints remain
-            print("[HG Bone] Removing stale constraints for healed limb " .. limb)
-            hg.RemoveLimbConstraints(ragdoll, limb)
+            -- But if it was previously amputated, use stable approach - don't mess with it
+            local wasAmputated = ply.HG_PreviouslyAmputated and ply.HG_PreviouslyAmputated[limb]
+            if wasAmputated then
+                print("[HG Bone] Skipping " .. limb .. " - was previously amputated, letting organism stabilize naturally")
+            else
+                print("[HG Bone] Removing stale constraints for healed limb " .. limb)
+                hg.RemoveLimbConstraints(ragdoll, limb)
+            end
         end
     end
 
     -- Reapply neck floppy if spine3 is broken (neck broken)
     -- Use same threshold as damage code (> 0.75) for consistency
-    if org.spine3 and org.spine3 > 0.75 and IsValid(ragdoll) then
+    -- Skip if head is amputated
+    if org.spine3 and org.spine3 > 0.75 and IsValid(ragdoll) and not org.headamputated then
         print("[HG Bone] Fake hook: Reapplying neck floppy, spine3=" .. tostring(org.spine3))
         -- Use timer to ensure ragdoll physics are ready
         timer.Simple(0.1, function()
