@@ -391,10 +391,12 @@ function hg._DeprecatedDoTPIK(ply, ent, rhmat, lhmat)
         if rarmHealth >= 0.25 or rarmDis then
             ply.last_rh_pos = nil
             ply.last_rh_pos2 = nil
+            ply.segmentsr = {}
         end
         if larmHealth >= 0.25 or larmDis then
             ply.last_lh_pos = nil
             ply.last_lh_pos2 = nil
+            ply.segmentsl = {}
         end
 
         -- Calculate impairment: 0.25 damage = 75% control, 1.0 damage = 25% control, dislocated = additional -25%
@@ -695,6 +697,8 @@ local function applyInjuryTPIK(ent, ply)
 
 	if (state.blend or 0) <= 0.001 then return end
 
+	-- Only apply injury rotation during hipfire, not when aiming with weapon
+	-- This prevents sideways drift while aiming
 	local holdOffArm = reducedForWeapon and 0 or 1
 
 	for i = 1, #injuryTpikBones do
@@ -1231,6 +1235,8 @@ function hg.DoTPIK(ply, ent)
             ply.segmentsr = segments
         end
 
+        if not segments or not segments[3] or not segments[3].Pos then return end
+
         local new = -(-segments[3].Pos)
 
         ply_r_upperarm_matrix:SetTranslation(segments[1].Pos)
@@ -1366,6 +1372,8 @@ function hg.DoTPIK(ply, ent)
             
             ply.segmentsl = segments
         end
+
+        if not segments or not segments[3] or not segments[3].Pos then return end
 
         local new = -(-segments[3].Pos)
 

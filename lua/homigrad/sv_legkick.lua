@@ -45,6 +45,10 @@ function PLAYER:LegAttack()
     end
     dmg = dmg * (self.KickDamageMul or 1)
     dmg = dmg * kickNerf
+    -- Apply legstrength penalty from spine1 damage
+    if org.legstrength and org.legstrength < 1 then
+        dmg = dmg * org.legstrength
+    end
     --print(dmg)
     --print(speedmul)
     self:PlayCustomAnims(anim, true, speed, true, animstopAdjust, {

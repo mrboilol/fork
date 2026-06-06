@@ -433,7 +433,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or (org.heart and org.heart > 0.6)
         or (org.blood and org.blood < 3000)
         or (org.o2 and org.o2[1] and org.o2[1] < 10)
-        or (org.infection and org.infection >= 0.75)
         or (org.bloodpressure and org.bloodpressure < 50)
         or (heartbeat < 30 or heartbeat > 170)
     
@@ -501,6 +500,19 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     if (admiring or (heartbeat < 30 or heartbeat > 170)) and not isUnconscious then
         showTopLeftECG = true
+    end
+
+    -- Play flatline when heartbeat is 0, regardless of other conditions
+    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 170
+    if heartbeat < 1 then
+        if not (isUnconscious and ringAlpha > 0.01 and not hg_unconsciousclassic:GetBool()) then
+            if not IsValid(flatlineStation) then
+                EnsureFlatlineStation()
+            end
+            if IsValid(flatlineStation) and not flatlineStation:IsPlaying() then
+                PlayStation(flatlineStation, 0.8)
+            end
+        end
     end
 
     if ringAlpha <= 0 and not showTopLeftECG and not showPulseCheckECG then return end
@@ -652,17 +664,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
-    if heartbeat < 1 then
-        -- Only play global flatline sound when NOT in unconscious ring EKG mode (ring handles it)
-        if not (isUnconscious and ringAlpha > 0.01 and not hg_unconsciousclassic:GetBool()) then
-            if not IsValid(flatlineStation) then
-                EnsureFlatlineStation()
-            end
-            if IsValid(flatlineStation) and not flatlineStation:IsPlaying() then
-                PlayStation(flatlineStation, 0.8)
-            end
-        end
-    else
+    if heartbeat >= 1 then
         if IsValid(flatlineStation) and flatlineStation:IsPlaying() then
             flatlineStation:Stop()
         end

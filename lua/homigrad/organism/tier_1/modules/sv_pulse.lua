@@ -126,17 +126,6 @@ module[2] = function(owner, org, timeValue)
 	-- Tranexamic acid and thiamine accelerate ischemia regression
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
 
-	-- High infection drives ischemia (sepsis); adrenaline, tranexamic acid and thiamine suppress this
-	local infection = org.infection or 0
-	if infection > 0.5 and not adrenalineStabilizer and not hasAntiIschemia then
-		local infectionK = math.Clamp((infection - 0.5) / 0.5, 0, 1)
-		org.ischemia = math.min(org.ischemia + timeValue * infectionK * 0.006, 3)
-	elseif infection > 0.5 and (adrenalineStabilizer or hasAntiIschemia) then
-		-- Drugs/adrenaline greatly reduce but do not fully stop septic ischemia at very high infection
-		local infectionK = math.Clamp((infection - 0.5) / 0.5, 0, 1)
-		org.ischemia = math.min(org.ischemia + timeValue * infectionK * 0.001, 3)
-	end
-
 	if org.ischemia > 0 then
 		if org.ischemia > 1 and not adrenalineStabilizer and not hasAntiIschemia then
 			local ischemiaK = math.Clamp((org.ischemia - 1) / 5, 0, 1)

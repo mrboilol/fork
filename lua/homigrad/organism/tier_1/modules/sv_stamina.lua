@@ -191,8 +191,10 @@ module[2] = function(owner, org, timeValue)
 	-- Slower stamina recovery with damaged lungs
 	local lungDamage = (org.lungsL[1] + org.lungsR[1]) / 2
 	local lungRecoveryMultiplier = math.max(1 - lungDamage, 0.3)
+	-- Apply breathing penalty from spine3 damage
+	local breathingMul = org.breathing or 1
 
-	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3.75 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier, stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3.75 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
 
 
 

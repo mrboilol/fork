@@ -800,8 +800,9 @@ function hg.applyFountain(pos, ang, mul, mul2, forward, ent)
 		hg.addBloodPart2(pos + VectorRand(-1,1), ang:Forward() * forward * 0.25 + VectorRand(-10,10) * mul2, nil, nil, nil, nil, true, ent)
 	else
 		hg.addBloodPart(pos, ang:Forward() * forward * 2 * math.abs(math.sin(CurTime() * 3) + math.cos(CurTime() * 5) + math.sin(CurTime() * 2) + 4) * 0.1 + ang:Right() * 15 * (math.sin(CurTime()) * 1) + ang:Right() * math.sin(CurTime() * 2) * 15 + VectorRand(-3, 3),nil,nil,nil,true)
-		hg.addBloodPart(pos + VectorRand(-1,1), ang:Forward() * 55 + VectorRand(-25,25) * mul2,nil,nil,nil,nil, nil, ent)
-		hg.addBloodPart(pos + VectorRand(-1,1), ang:Forward() * 55 + VectorRand(-25,25) * mul2,nil,nil,nil,nil, nil, ent)
+		-- Increased forward velocity for gunshot wounds (55 -> 90)
+		hg.addBloodPart(pos + VectorRand(-1,1), ang:Forward() * 90 + VectorRand(-25,25) * mul2,nil,nil,nil,nil, nil, ent)
+		hg.addBloodPart(pos + VectorRand(-1,1), ang:Forward() * 90 + VectorRand(-25,25) * mul2,nil,nil,nil,nil, nil, ent)
 	end
 end
 
@@ -1129,14 +1130,16 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local spread = right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5)
 
 							if wound[7] == "arteria" then
-								local arteriaForce = forceMul * 2.5
-								local arteriaForward = dir * 8 * arteriaForce * 0.6
+								local arteriaForce = forceMul * 3.5
+								local arteriaForward = dir * 12 * arteriaForce * 0.7
 								local arteriaOscAmpRight = arteriaForward:Length() * 0.15 * pulseFactor
 								local arteriaOscAmpUp = arteriaForward:Length() * 0.1 * pulseFactor
 								local arteriaOsc = right * arteriaOscAmpRight * math.sin(oscTime) + up * arteriaOscAmpUp * math.cos(oscTime)
 								hg.addBloodPart(pos, arteriaForward + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
 							else
-								hg.addBloodPart(pos, baseForward + streamOsc + spread, nil, size, size, true, nil, ent)
+								local normalForce = forceMul * 1.8
+								local normalForward = dir * 10 * normalForce * 0.9
+								hg.addBloodPart(pos, normalForward + streamOsc + spread, nil, size, size, true, nil, ent)
 							end
 						end
 

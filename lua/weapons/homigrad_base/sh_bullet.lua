@@ -730,6 +730,10 @@ function SWEP:FireBullet()
 		if organism.rarmamputated then spreadMul = spreadMul + 1.0 end
 		if organism.larmamputated then spreadMul = spreadMul + 0.5 end
 		if organism.rarmdislocated or organism.larmdislocated then spreadMul = spreadMul + 0.3 end
+		-- Apply armstrength penalty from spine2 damage (further reduces accuracy)
+		if organism.armstrength and organism.armstrength < 1 then
+			spreadMul = spreadMul * (1 / organism.armstrength)
+		end
 		bullet.Spread = bullet.Spread * spreadMul
 	end
 	bullet.Num = 1

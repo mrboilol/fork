@@ -351,8 +351,10 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, forceHi
 	
 	org.painadd = org.painadd + dmg * 1
 	
-	-- Immediate O2 debuff when artery is hit
-	org.o2[1] = math.max(org.o2[1] - dmg * 8, 0)
+	-- Mark arteria for gradual O2 drain (direct pathway to brain)
+	if artery == "arteria" then
+		org.arteriaO2Drain = true
+	end
 	
 	if org[artery] == 1 then return 0 end
 	if org[string.Replace(artery, "artery", "").."amputated"] then return end
@@ -396,6 +398,39 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, forceHi
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
 	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), (dir2 or Vector(0,0,1)) * 100, artery})
 	owner:SetNetVar("arterialwounds", org.arterialwounds)
+
+	-- Spawn amputation stump when arterial damage occurs from non-bullet wounds
+	if forceHit and hit then
+		local woundPos = isbool(hit) and localPos or hit
+		local flowDir = dir2 or Vector(0, 0, 1)
+		
+		-- Spawn stump prop oriented towards blood flow direction
+		local stump = ents.Create("prop_physics")
+		stump:SetModel("models/props_junk/watermelon01_chunk02a.mdl")
+		stump:SetPos(woundPos)
+		local angle = flowDir:Angle()
+		stump:SetAngles(angle)
+		stump:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+		local phys = stump:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:EnableCollisions(false)
+			phys:EnableMotion(false)
+		end
+		stump:Spawn()
+		stump:Activate()
+		
+		-- Keep it attached to the entity
+		local ent = hg.GetCurrentCharacter(owner)
+		if IsValid(ent) then
+			stump:SetParent(ent, bonea)
+		end
+		
+		-- Remove stump after a while
+		timer.Simple(30, function()
+			if IsValid(stump) then stump:Remove() end
+		end)
+	end
+
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
 end

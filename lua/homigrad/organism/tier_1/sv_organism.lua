@@ -60,7 +60,9 @@ hook.Add("Org Clear", "Main", function(org)
 	org.canmove = true
 	org.recoilmul = 1
 	org.legstrength = 1
+	org.armstrength = 1
 	org.meleespeed = 1
+	org.breathing = 1
 	org.temperature = 36.7
 	org.superfighter = false
 	org.CantCheckPulse = nil
@@ -158,6 +160,9 @@ local function send_organism(org, ply)
 	sendtable.arteria = org.arteria
 	sendtable.recoilmul = org.recoilmul
 	sendtable.meleespeed = org.meleespeed
+	sendtable.legstrength = org.legstrength
+	sendtable.armstrength = org.armstrength
+	sendtable.breathing = org.breathing
 	sendtable.temperature = org.temperature
 	sendtable.canmove = org.canmove
 	sendtable.fear = org.fear
@@ -755,6 +760,42 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	
+	-- Spine damage effects: reduce capabilities based on which part is damaged
+	-- spine1 = lower spine (legs), spine2 = chest (arms), spine3 = neck (breathing + everything)
+	-- Effects start at spine damage > 0.4 (broken at 0.8), never go below 0.1
+	local fake1 = hg.organism and hg.organism.fake_spine1 or 1
+	local fake2 = hg.organism and hg.organism.fake_spine2 or 1
+	local fake3 = hg.organism and hg.organism.fake_spine3 or 0.75
+	local threshold = 0.4
+	
+	-- Default values
+	org.legstrength = 1
+	org.armstrength = 1
+	org.meleespeed = 1
+	org.breathing = 1
+	
+	-- spine1 damage (> 0.4) reduces leg strength - affects walk/run/jump/kick
+	if org.spine1 and org.spine1 > threshold then
+		local damageFactor = (org.spine1 - threshold) / (fake1 - threshold)
+		org.legstrength = math.max(1 - damageFactor * 0.9, 0.1)
+	end
+	
+	-- spine2 damage (> 0.4) reduces arm strength and melee speed - affects weapon control/dragging/melee
+	if org.spine2 and org.spine2 > threshold then
+		local damageFactor = (org.spine2 - threshold) / (fake2 - threshold)
+		org.armstrength = math.max(1 - damageFactor * 0.9, 0.1)
+		org.meleespeed = math.max(1 - damageFactor * 0.6, 0.4)
+	end
+	
+	-- spine3 damage (> 0.4) reduces breathing and overall strength
+	if org.spine3 and org.spine3 > threshold then
+		local damageFactor = (org.spine3 - threshold) / (fake3 - threshold)
+		org.breathing = math.max(1 - damageFactor * 0.7, 0.1)
+		-- spine3 also affects leg and arm strength when severe
+		org.legstrength = org.legstrength * math.max(1 - damageFactor * 0.5, 0.1)
+		org.armstrength = org.armstrength * math.max(1 - damageFactor * 0.5, 0.1)
+	end
+	
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
 	if (org.blood < 2750) then org.needfake = true end
 
@@ -960,6 +1001,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.pelvis = math.max(org.pelvis - regen, 0)
 	local oldSpine1 = org.spine1
 	local oldSpine2 = org.spine2
+	local oldSpine3 = org.spine3
 	org.spine1 = math.max(org.spine1 - regen, 0)
 	org.spine2 = math.max(org.spine2 - regen, 0)
 	org.spine3 = math.max(org.spine3 - regen, 0)
@@ -967,11 +1009,15 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	if hg.RemoveSpineConstraints then
 		local fake1 = hg.organism and hg.organism.fake_spine1 or 1
 		local fake2 = hg.organism and hg.organism.fake_spine2 or 1
+		local fake3 = hg.organism and hg.organism.fake_spine3 or 0.75
 		if (oldSpine1 >= fake1 and org.spine1 < fake1) or (oldPelvis >= 1 and org.pelvis < 1) then
 			hg.RemoveSpineConstraints(org.owner, "spine1")
 		end
 		if oldSpine2 >= fake2 and org.spine2 < fake2 then
 			hg.RemoveSpineConstraints(org.owner, "spine2")
+		end
+		if oldSpine3 >= fake3 and org.spine3 < fake3 then
+			hg.RemoveNeckConstraints(org.owner)
 		end
 	end
 	org.skull = math.max(org.skull - regen, 0)

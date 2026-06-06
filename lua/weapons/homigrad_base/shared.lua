@@ -1857,6 +1857,14 @@ function SWEP:GetAdditionalValues()
 	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
 	local larm_bad = larm_broken or larm_dislocated or larm_amputated
 
+	-- Spine health affects overall stability and aiming fatigue grace period
+	local spine_health = 0
+	if ply.organism then
+		spine_health = ((ply.organism.spine1 or 0) + (ply.organism.spine2 or 0) + (ply.organism.spine3 or 0) + (ply.organism.pelvis or 0)) / 4
+	end
+	local spine_broken = spine_health >= 1
+	local spine_damaged = spine_health >= 0.25
+
 	-- How heavy the weapon is, used to limit how high a damaged arm can lift it.
 	-- 0 = light (pistols / SMGs, can still be raised), 1 = heavy (rifles / MGs, stays lowered).
 	local baseWeight = self.hg_base_weight or self.weight or 1
@@ -1890,7 +1898,14 @@ function SWEP:GetAdditionalValues()
 			-- Partial damage to right arm
 			adjustedFatigueTime = adjustedFatigueTime * (1 - rarm_health * 0.3) -- up to 30% faster
 		end
-		
+
+		-- Spine damage reduces grace period (faster fatigue)
+		if spine_broken then
+			adjustedFatigueTime = adjustedFatigueTime * 0.3
+		elseif spine_damaged then
+			adjustedFatigueTime = adjustedFatigueTime * (1 - (spine_health - 0.25) * 0.6)
+		end
+
 		-- Ensure minimum fatigue time of 2 seconds
 		adjustedFatigueTime = math.max(adjustedFatigueTime, 2)
 		
@@ -1932,6 +1947,13 @@ function SWEP:GetAdditionalValues()
 		else
 			handSway = 0.15 + rarm_health * 0.3 + larm_health * 0.5
 		end
+	end
+
+	-- Add spine damage to overall sway
+	if spine_broken then
+		handSway = handSway + 2.5
+	elseif spine_damaged then
+		handSway = handSway + (spine_health - 0.25) * 2.0
 	end
 
 	-- Left arm struggles more with aim when used as dominant

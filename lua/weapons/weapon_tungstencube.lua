@@ -13,7 +13,7 @@ SWEP.ViewModel = "models/linnaeus/weaps/v_tungsten.mdl"
 SWEP.WorldModel = "models/linnaeus/weaps/w_tungsten.mdl"
 SWEP.HoldType = "melee"
 
-SWEP.modelscale = 1.0
+SWEP.modelscale = 1.4
 SWEP.HoldPos = Vector(-5, 2, -2)
 SWEP.HoldAng = Angle(-10, 0, 0)
 SWEP.basebone = 94
@@ -62,18 +62,20 @@ function SWEP:PrimaryAttack()
     ent.localshit = Vector(0,0,0)
     ent.wep = self:GetClass()
     ent.owner = ply
-    ent.damage = 100
-    ent.MaxSpeed = 1500
+    ent.damage = 25
+    ent.MaxSpeed = 1200
     ent.DamageType = DMG_CLUB
-    ent.AttackHit = "phx/hmetal" .. math.random(1, 3) .. ".wav"
+    ent.AttackHit = "physics/metal/metal_solid_impact_soft" .. math.random(1, 3) .. ".wav"
     ent.AttackHitFlesh = "Flesh.ImpactHard"
     ent.noStuck = true
     ent.modelscale = self.modelscale or 1.0
+    ent.Bounce = 0.6
 
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-		phys:SetMass(200)
+		phys:SetMass(50)
+		phys:SetMaterial("metal_bouncy")
         local throwVel = ply:GetAimVector() * ent.MaxSpeed
         local playerVel = ply:GetVelocity()
         phys:SetVelocity(throwVel + playerVel * 0.5)

@@ -326,6 +326,24 @@ module[2] = function(owner, org, timeValue)
 			o2[1] = max(o2[1] - timeValue * tracheaDrain, 0)
 		end
 
+		-- Gradual O2 drain for arteria wounds (direct pathway to brain)
+		if org.arteriaO2Drain and org.arterialwounds then
+			local arteriaOpen = false
+			for _, wound in pairs(org.arterialwounds) do
+				if wound[7] == "arteria" and wound[1] > 0 then
+					arteriaOpen = true
+					break
+				end
+			end
+			if not arteriaOpen then
+				org.arteriaO2Drain = false
+			else
+				local pulseMultiplier = math.Clamp((org.pulse or 70) / 70, 0.8, 1.5)
+				local arteriaDrain = timeValue * 0.15 * pulseMultiplier
+				o2[1] = max(o2[1] - arteriaDrain, 0)
+			end
+		end
+
 		-- Trachea > 0.5: determine path once, then stick with it
 		-- Needle prevents both
 		if org.trachea > 0.5 and org.trachea < 1.0 and org.needle <= 0 and regenerate > 0 then
@@ -415,6 +433,15 @@ module[2] = function(owner, org, timeValue)
 
 	if org.trachea >= 1.0 then
 		org.lungsfunction = false
+	end
+
+	-- Spine3 (neck) damage affects breathing capability
+	if org.spine3 and org.spine3 > 0.5 then
+		local fake3 = hg.organism and hg.organism.fake_spine3 or 0.75
+		local spine3BreathingPenalty = (org.spine3 - 0.5) / (fake3 - 0.5)
+		if math.random() < spine3BreathingPenalty * 0.1 then
+			org.lungsfunction = false
+		end
 	end
 
 	--[[if (pneumothorax or org.trachea >= 0.6 or org.lungsR[1] >= 0.6 or org.lungsL[1] >= 0.6) and org.alive and o2[1] > 0 then

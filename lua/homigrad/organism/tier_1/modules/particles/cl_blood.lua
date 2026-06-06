@@ -111,7 +111,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 		hg.bloodpositionOrder[#hg.bloodpositionOrder + 1] = vec
 	end
 	
-	local cap = 50000
+	local cap = 150000
 	if hg.bloodcount > cap then
 		local toRemove = hg.bloodcount - cap
 		for i = 1, toRemove do
@@ -193,8 +193,8 @@ bloodparticles_hook[2] = function(mul)
 		end
 	end
 	
-	-- Emergency cap only when very high
-	local cap = 50000
+	-- Emergency cap only when very high (raised to 150000)
+	local cap = 150000
 	while #hg.bloodparticles1 > cap do
 		table_remove(hg.bloodparticles1, 1)
 	end

@@ -89,19 +89,6 @@ if SERVER then
 		org.mannitol = math.Approach(org.mannitol, 4, self.modeValues[1] * 2)
 		self.modeValues[1] = 0
 
-		-- Reverse ALL stroke effects (mannitol is rare/hard to find)
-		org.stroke_meter = 0
-		org.is_stroking = false
-		org.stroke_active = false
-		org.tia_warning = false
-		org.hemiparesis = 0
-		org.stroke_permanent_damage = 0
-		org.disorientation = math.max(org.disorientation - 3, 0)
-		org.consciousness = math.min(org.consciousness + 0.5, 1)
-
-		-- Restore movement if stroke was causing incapacitation
-		org.needfake = false
-
 		-- Head trauma reduction
 		org.headtrauma = 0
 

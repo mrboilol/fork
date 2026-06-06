@@ -799,9 +799,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BURN) then
 			org.burns = org.burns + 1
-			if ConVarExists("hg_infections") and GetConVar("hg_infections"):GetBool() then
-				org.infection = org.infection + (dmgInfo:GetDamage() * 0.0005)
-			end
 			-- Severe burns cause immune suppression
 			if dmgInfo:GetDamage() > 20 then
 				org.immunesuppression = math.min((org.immunesuppression or 0) + dmgInfo:GetDamage() * 0.01, 1)
@@ -1644,14 +1641,14 @@ local function velocityDamage(ent, data)
 			hg.organism.input_list.skull(org, bone, dmg * 4 * (hadhelmet and 0.2 or 1), dmgInfo)
 			
 			
-							local flash_intensity = 0.5
-				local flash_duration = 100
+							local flash_intensity = 2.0
+				local flash_duration = 300
 			
 			//if dmg > 0.5 then
 						hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1), dmgInfo)
 						
-						flash_intensity = 1.2
-						flash_duration = 150
+						flash_intensity = 3.5
+						flash_duration = 500
 						if IsValid(org.owner) and org.owner:IsPlayer() then
 							org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
 						end
@@ -1863,10 +1860,6 @@ function hg.BreakNeck(ent, fromDamage)
 			print("[HG Floppy] BreakNeck timer FAIL: phys bone invalid")
 			return
 		end
-		if headPhysBone == neckPhysBone then
-			print("[HG Floppy] BreakNeck timer FAIL: headPhysBone == neckPhysBone")
-			return
-		end
 		if headPhysBone == 0 then
 			print("[HG Floppy] BreakNeck timer FAIL: headPhysBone == 0")
 			return
@@ -1876,6 +1869,26 @@ function hg.BreakNeck(ent, fromDamage)
 		if ragdoll.FloppyConstraints and ragdoll.FloppyConstraints.neck and IsValid(ragdoll.FloppyConstraints.neck) then
 			print("[HG Floppy] BreakNeck timer: neck already floppy, skipping")
 			return -- Already has neck floppy, don't reapply
+		end
+		
+		-- Can't create constraint between same physics bone - try alternative approach
+		if headPhysBone == neckPhysBone then
+			print("[HG Floppy] BreakNeck timer: head and neck share physics bone, attempting alternative method")
+			-- Try using the next parent bone (spine2) as the anchor instead
+			local spine2BoneId = ragdoll:GetBoneParent(neckBoneId)
+			if not spine2BoneId or spine2BoneId == -1 then
+				print("[HG Floppy] BreakNeck timer FAIL: spine2 bone not found")
+				return
+			end
+			local spine2PhysBone = getPhysBoneForAnimationBone(ragdoll, spine2BoneId)
+			if not spine2PhysBone or spine2PhysBone == -1 or spine2PhysBone == headPhysBone then
+				print("[HG Floppy] BreakNeck timer FAIL: spine2 phys bone invalid or same as head")
+				return
+			end
+			
+			-- Use spine2 as the anchor for the neck constraint
+			neckPhysBone = spine2PhysBone
+			print("[HG Floppy] BreakNeck timer: using spine2 as anchor, neckPhysBone=" .. tostring(neckPhysBone))
 		end
 		
 		local pneck = ragdoll:GetPhysicsObjectNum(neckPhysBone)
@@ -2049,24 +2062,24 @@ local spine_segments = {
     spine1 = {
         bone1 = "ValveBiped.Bip01_Spine2",
         bone2 = "ValveBiped.Bip01_Pelvis",
-        limits = {minPitch = -45, maxPitch = 45, minYaw = -50, maxYaw = 50, minRoll = -45, maxRoll = 45},
+        limits = {minPitch = -90, maxPitch = 90, minYaw = -90, maxYaw = 90, minRoll = -90, maxRoll = 90},
         -- Bias the constraint anchor towards the pelvis end of the joint
         anchorBias = 0.85,
         offsetBones = {
-            {name = "ValveBiped.Bip01_Pelvis", pos = Vector(0, 0, -1.5),  ang = Angle(6, 0, 4)},
-            {name = "ValveBiped.Bip01_Spine",  pos = Vector(0, 0.5, -0.5), ang = Angle(4, 0, 2)},
+            {name = "ValveBiped.Bip01_Pelvis", pos = Vector(0, 0, -4),  ang = Angle(15, 0, 10)},
+            {name = "ValveBiped.Bip01_Spine",  pos = Vector(0, 1.5, -1.5), ang = Angle(10, 0, 5)},
         },
     },
     -- spine2: back is snapped; chest hangs back/loose ("broken back").
     spine2 = {
         bone1 = "ValveBiped.Bip01_Spine2",
         bone2 = "ValveBiped.Bip01_Pelvis",
-        limits = {minPitch = -75, maxPitch = 30, minYaw = -40, maxYaw = 40, minRoll = -25, maxRoll = 25},
+        limits = {minPitch = -120, maxPitch = 60, minYaw = -80, maxYaw = 80, minRoll = -60, maxRoll = 60},
         -- Bias the constraint anchor towards the chest end of the joint
         anchorBias = 0.15,
         offsetBones = {
-            {name = "ValveBiped.Bip01_Spine2", pos = Vector(0, -1, 1.5),  ang = Angle(-10, 0, 0)},
-            {name = "ValveBiped.Bip01_Spine4", pos = Vector(0, -0.5, 1), ang = Angle(-6, 0, 0)},
+            {name = "ValveBiped.Bip01_Spine2", pos = Vector(0, -3, 4),  ang = Angle(-25, 0, 0)},
+            {name = "ValveBiped.Bip01_Spine4", pos = Vector(0, -1.5, 3), ang = Angle(-15, 0, 0)},
         },
     },
 }
@@ -2619,28 +2632,35 @@ hook.Add("OnAmputateLimb", "amputate_flashlight", function(org, ent, limb)
 	end
 end)
 
+function hg.RemoveNeckConstraints(ent)
+	if not IsValid(ent) then return end
+
+	local ragdoll = ent:IsRagdoll() and ent or nil
+	if not IsValid(ragdoll) and ent:IsPlayer() then
+		ragdoll = ent:GetNWEntity("FakeRagdoll")
+		if not IsValid(ragdoll) then
+			ragdoll = ent:GetNWEntity("RagdollDeath")
+		end
+		if not IsValid(ragdoll) then
+			ragdoll = ent:GetRagdollEntity()
+		end
+	end
+	if IsValid(ragdoll) and ragdoll.FloppyConstraints then
+		local neckCons = ragdoll.FloppyConstraints.neck
+		if IsValid(neckCons) then neckCons:Remove() end
+		ragdoll.FloppyConstraints.neck = nil
+	end
+	if IsValid(ragdoll) then
+		removeFloppyBoneOffset(ragdoll, "neck")
+	end
+	print("[HG Floppy] RemoveNeckConstraints: removed neck floppy from " .. tostring(ent))
+end
+
 hook.Add("OnAmputateLimb", "amputate_remove_floppy", function(org, ent, limb)
 	if not IsValid(ent) then return end
 
 	if limb == "head" then
-		local ragdoll = ent:IsRagdoll() and ent or nil
-		if not IsValid(ragdoll) and ent:IsPlayer() then
-			ragdoll = ent:GetNWEntity("FakeRagdoll")
-			if not IsValid(ragdoll) then
-				ragdoll = ent:GetNWEntity("RagdollDeath")
-			end
-			if not IsValid(ragdoll) then
-				ragdoll = ent:GetRagdollEntity()
-			end
-		end
-		if IsValid(ragdoll) and ragdoll.FloppyConstraints then
-			local neckCons = ragdoll.FloppyConstraints.neck
-			if IsValid(neckCons) then neckCons:Remove() end
-			ragdoll.FloppyConstraints.neck = nil
-		end
-		if IsValid(ragdoll) then
-			removeFloppyBoneOffset(ragdoll, "neck")
-		end
+		hg.RemoveNeckConstraints(ent)
 	else
 		-- Remove from current entity if it's a ragdoll
 		hg.RemoveLimbConstraints(ent, limb)

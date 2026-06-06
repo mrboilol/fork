@@ -229,6 +229,12 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		mul = mul[1]
 
+		-- Apply legstrength penalty from spine1 damage
+		local org = ply.organism
+		if org and org.legstrength and org.legstrength < 1 then
+			mul = mul * org.legstrength
+		end
+
 		if mul <= 0.01 then
 			mul = 0.01
 		end
@@ -490,7 +496,12 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
 		ply:SetMaxSpeed(math.max(100, inertia_len))
-		ply:SetJumpPower(DEFAULT_JUMP_POWER * math.min(k, 1.1) * (not ply:GetNWBool("TauntStopMoving", false) and 1 or 0) * (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1))
+		local jumpPowerMul = (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1)
+		-- Apply legstrength penalty from spine1 damage
+		if ply.organism and ply.organism.legstrength and ply.organism.legstrength < 1 then
+			jumpPowerMul = jumpPowerMul * ply.organism.legstrength
+		end
+		ply:SetJumpPower(DEFAULT_JUMP_POWER * math.min(k, 1.1) * (not ply:GetNWBool("TauntStopMoving", false) and 1 or 0) * jumpPowerMul)
 
 		if(CLIENT)then
 			local fwangs = math.rad(GetViewPunchAngles2()[2] + GetViewPunchAngles3()[2])

@@ -484,7 +484,6 @@ local status_sprites = {
 	hypoventilation = nil,
 	concussion = nil,
 	sepsis = nil,
-	infection = nil,
 	bleeding_small = nil,
 	bleeding_max = nil,
 	bleeding_heavy = nil,
@@ -525,7 +524,6 @@ local smooth = {
 	adrenaline = 0,
 	shock = 0,
 	disorientation = 0,
-	stroke_meter = 0,
 	concussion = 0,
 	ischemia = 0,
 	hemotransfusionshock = 0,
@@ -766,7 +764,6 @@ local tooltipTexts = {
 			[4] = {title = "Абсолютный перегруз", text = "You move extremely slowly due to weight"}
 		},
 		sepsis = {title = "Сепсис", text = "Опасное для жизни состояние, вызванное подавляющей реакцией организма на инфекцию. Может привести к повреждению тканей, отказу органов и смерти."},
-		infection = {title = "Инфекция", text = "В ваши раны попала инфекция, стоит обработать их как можно скорее"},
 		chip = {title = "Чип", text = "-(тест:) )."}
 	},
 	
@@ -932,7 +929,6 @@ local tooltipTexts = {
 			[4] = {title = "Completely Weighted", text="WAAAY too much gear, how about you take it off and stop LARPING?"}
 		},
 		sepsis = {title = "Sepsis", text = "Something in your body feels funny."},
-		infection = {title = "Infection", text = "Your wounds are infected, you should clean them as soon as possible"},
 		chip = {title = "Chip", text = "-(test:) )."}
 	}
 }
@@ -1060,7 +1056,6 @@ local function load_status_sprites()
 	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix)
 	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
 	status_sprites.sepsis = loadMaterial("vgui/hud/sepsis.png", suffix)
-	status_sprites.infection = loadMaterial("vgui/hud/infected.png", suffix)
 	status_sprites.bleeding_small = loadMaterial("vgui/hud/smallbleeding.png", suffix)
 	status_sprites.bleeding_max = loadMaterial("vgui/hud/maxbleeding.png", suffix)
 	status_sprites.bleeding_heavy = loadMaterial("vgui/hud/heavybleeding.png", suffix)
@@ -1156,11 +1151,9 @@ local function draw_bar()
 	smooth.adrenaline = Lerp(s * dt, smooth.adrenaline or 0, getOrgVal(org, "adrenaline", 0))
 	smooth.shock = Lerp(s * dt, smooth.shock or 0, getOrgVal(org, "shock", 0))
 	smooth.disorientation = Lerp(s * dt, smooth.disorientation or 0, getOrgVal(org, "disorientation", 0))
-	smooth.stroke_meter = Lerp(s * dt, smooth.stroke_meter or 0, getOrgVal(org, "stroke_meter", 0))
 	smooth.concussion = Lerp(s * dt, smooth.concussion or 0, getOrgVal(org, "concussion", 0))
 	smooth.ischemia = Lerp(s * dt, smooth.ischemia or 0, getOrgVal(org, "ischemia", 0))
     smooth.hemotransfusionshock = Lerp(s * dt, smooth.hemotransfusionshock or 0, getOrgVal(org, "hemotransfusionshock", 0))
-    smooth.infection = Lerp(s * dt, smooth.infection or 0, getOrgVal(org, "infection", 0))
 	
 	update_stability(smooth.blood or 5000, smooth.pulse or 70)
 	
@@ -1458,31 +1451,6 @@ local function draw_status_effects()
 					table.insert(effects, {name = "amputant", priority = 8})
 					currentEffectNames["amputant"] = true
 				end
-
-				local stroke_val = smooth.stroke_meter or getOrgVal(org, "stroke_meter", 0)
-				if stroke_val > 0.5 then
-					local level_num = 1
-					if stroke_val > 0.95 then level_num = 4
-					elseif stroke_val > 0.75 then level_num = 3
-					elseif stroke_val > 0.6 then level_num = 2 end
-
-					table.insert(effects, {
-						name = "stroke",
-						level_num = level_num,
-						has_levels = true,
-						priority = 0.8,
-						value = math_floor(stroke_val)
-					})
-					currentEffectNames["stroke"] = true
-					if level_num == 4 and not currentEffectNames["internal_bleed"] then
-						table.insert(effects, {
-							name = "internal_bleed",
-							priority = 0.4,
-							value = nil
-						})
-						currentEffectNames["internal_bleed"] = true
-					end
-				end
 			
 			if org.heartstop == true then
 				table.insert(effects, {name = "cardiac_arrest", priority = 0.15})
@@ -1647,9 +1615,8 @@ local function draw_status_effects()
 
 				local ischemia_val = smooth.ischemia or getOrgVal(org, "ischemia", 0)
 				local hemotransfusionshock_val = smooth.hemotransfusionshock or getOrgVal(org, "hemotransfusionshock", 0)
-				local infection_val = smooth.infection or getOrgVal(org, "infection", 0)
 				
-				-- Sepsis moodle: triggers from ischemia or hemotransfusionshock (not infection)
+				-- Sepsis moodle: triggers from ischemia or hemotransfusionshock
 				if ischemia_val > 0.1 or hemotransfusionshock_val > 0.1 then
 					local level_num = 1
 					if ischemia_val > 0.5 or hemotransfusionshock_val > 0.3 then level_num = 2 end
@@ -1663,22 +1630,6 @@ local function draw_status_effects()
 						value = math_floor(math.max(ischemia_val, hemotransfusionshock_val) * 100)
 					})
 					currentEffectNames["sepsis"] = true
-				end
-
-				-- Infection moodle: shows for infections only (not sepsis)
-				if infection_val > 0.1 then
-					local level_num = 1
-					if infection_val >= 0.5 then level_num = 2 end
-					if infection_val >= 0.75 then level_num = 3 end
-					
-					table.insert(effects, {
-						name = "infection",
-						level_num = level_num,
-						has_levels = true,
-						priority = 0.75,
-						value = math_floor(infection_val * 100)
-					})
-					currentEffectNames["infection"] = true
 				end
 
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
@@ -2360,7 +2311,6 @@ local function draw_status_effects()
 		elseif effect.name == "broken_ribs" then icon_mat = status_sprites.broken_ribs
 		elseif effect.name == "encumbered" then icon_mat = status_sprites.encumbered
 		elseif effect.name == "chip" then icon_mat = status_sprites.chip
-		elseif effect.name == "infection" then icon_mat = status_sprites.infection
 
 		else icon_mat = status_sprites[effect.name] end
 		

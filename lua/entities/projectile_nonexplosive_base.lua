@@ -252,6 +252,32 @@ if SERVER then
 
 			-- Check for organ damage based on bone location
 			if boneToOrgans[boneName] then
+				-- Calculate extraction position and direction for blood flow
+				local boneIdx = ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0)
+				local bonePos = ent:GetBonePosition(ent:LookupBone(boneName))
+				local extractPos = bonePos
+				local extractDir = Vector(0, 0, 1)
+				
+				-- Calculate outward direction from bone center to extraction point
+				if bonePos and tbl.OffsetPos then
+					local worldOffset = tbl.OffsetPos
+					local boneAng = ent:GetBoneAngle(ent:LookupBone(boneName))
+					if boneAng then
+						local worldOffsetRotated = worldOffset.x * boneAng:Right() + worldOffset.y * boneAng:Up() + worldOffset.z * boneAng:Forward()
+						if worldOffsetRotated:Length() > 0.01 then
+							extractDir = worldOffsetRotated:GetNormalized()
+							extractPos = bonePos + worldOffsetRotated
+						else
+							-- Default direction based on limb type
+							if string.find(boneName, "L_") then
+								extractDir = Vector(-1, 0, 0)
+							elseif string.find(boneName, "R_") then
+								extractDir = Vector(1, 0, 0)
+							end
+						end
+					end
+				end
+				
 				for _, organData in ipairs(boneToOrgans[boneName]) do
 					local organName, minChance, maxChance = organData[1], organData[2], organData[3]
 					local damageChance = math.Rand(minChance, maxChance)
@@ -278,15 +304,20 @@ if SERVER then
 						elseif organName == "intestines" then
 							org.intestines = math.min(org.intestines + math.Rand(0.1, 0.2), 1)
 						elseif organName == "arteria" then
-							org.arteria = 1
+							-- Call hitArtery to create proper arterial wound with blood stream
+							if hg.hitArtery then hg.hitArtery("arteria", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
 						elseif organName == "larmartery" then
-							org.larmartery = 1
+							-- Call hitArtery to create proper arterial wound with blood stream
+							if hg.hitArtery then hg.hitArtery("larmartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
 						elseif organName == "rarmartery" then
-							org.rarmartery = 1
+							-- Call hitArtery to create proper arterial wound with blood stream
+							if hg.hitArtery then hg.hitArtery("rarmartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
 						elseif organName == "llegartery" then
-							org.llegartery = 1
+							-- Call hitArtery to create proper arterial wound with blood stream
+							if hg.hitArtery then hg.hitArtery("llegartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
 						elseif organName == "rlegartery" then
-							org.rlegartery = 1
+							-- Call hitArtery to create proper arterial wound with blood stream
+							if hg.hitArtery then hg.hitArtery("rlegartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
 						end
 						
 						-- Add additional bleeding from organ damage

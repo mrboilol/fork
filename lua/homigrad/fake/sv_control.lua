@@ -461,7 +461,7 @@ hook.Add("Think", "Fake", function()
 		end
 
 		if (org.lightstun < CurTime()) and (tracehuy.Hit or ply.FakeRagdoll ~= ragdoll) and org.spine1 < hg.organism.fake_spine1 and org.canmove and ((ply.lastFake and (ply.lastFake) > CurTime()) or ply.FakeRagdoll ~= ragdoll) and !ply.jumpedfake then
-			local power = 1
+			local power = org.legstrength or 1
 			inmove = true
 			
 			local ragbonecount = ragdoll.ZCPhysicsObjectCount or ragdoll:GetPhysicsObjectCount()
@@ -679,7 +679,7 @@ hook.Add("Think", "Fake", function()
 		end
 		
 		if not wep.RagdollFunc then
-			local force = math.max(1 - org.larm / 1.3, 0)
+			local force = math.max(1 - org.larm / 1.3, 0) * (org.armstrength or 1)
 			if !IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2))) then// || ply:InVehicle() then
 				if org.canmove then
 					//if !ply:InVehicle() then
@@ -793,7 +793,7 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 
-			local force = math.max(1 - org.rarm / 1.3, 0)
+			local force = math.max(1 - org.rarm / 1.3, 0) * (org.armstrength or 1)
 
 			if !IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or ((ishgweapon(wep) or wep.ismelee2) and ply:KeyDown(IN_USE)) then// || ply:InVehicle() then
 				if org.canmove then

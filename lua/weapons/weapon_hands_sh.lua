@@ -1235,6 +1235,11 @@ function SWEP:ApplyForce()
 			mul = mul * (1 + ply.organism.berserk / 5)
 		end
 
+		-- Apply armstrength penalty from spine2 damage
+		if ply.organism and ply.organism.armstrength and ply.organism.armstrength < 1 then
+			mul = mul * ply.organism.armstrength
+		end
+
 		local avec = vec * len * 8 - phys:GetVelocity()
 
 		local Force = avec * mul

@@ -12,8 +12,8 @@ local function CheckConcussionFlash(org, old_concussion, dmgInfo)
     if old_concussion < 1.5 and org.concussion >= 1.5 then
         net.Start("headtrauma_flash")
         net.WriteVector(dmgInfo:GetDamagePosition())
-        net.WriteFloat(2.0) -- flash_intensity
-        net.WriteInt(300, 20) -- flash_duration
+        net.WriteFloat(3.0) -- flash_intensity - more severe
+        net.WriteInt(450, 20) -- flash_duration - longer
         net.WriteBool(true) -- is_critical
         net.WriteBool(false) -- play_knockout_sound
         net.Send(org.owner)
@@ -50,13 +50,13 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	if key == "skull" then
 		local oldHeadTrauma = org.headtrauma or 0
 		org.headtrauma = math.min(oldHeadTrauma + dmg * 1.0, 2.0)
-		-- Trigger headtrauma flash when headtrauma increases significantly
+		-- Trigger severe headtrauma flash when headtrauma increases significantly
 		if oldHeadTrauma < 0.5 and org.headtrauma >= 0.5 then
 			net.Start("headtrauma_flash")
 			net.WriteVector(dmgInfo:GetDamagePosition())
-			net.WriteFloat(1.5)
-			net.WriteInt(200, 20)
-			net.WriteBool(false)
+			net.WriteFloat(2.5)
+			net.WriteInt(350, 20)
+			net.WriteBool(true)
 			net.WriteBool(false)
 			net.Send(org.owner)
 		end
@@ -573,15 +573,82 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	-- Accumulate head trauma for long-term stroke risk
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
 
+	-- Head KABOOM when severely damaged from injury or repeated hits
+	local headSeverelyDamaged = (org.skull and org.skull >= 1) or (org.brain and org.brain >= 1)
+	local jawDestroyed = org.jaw and org.jaw >= 1
+	
+	-- Track consecutive head hits for explosion buildup
+	org.headHitCount = org.headHitCount or 0
+	if dmg > 0.05 then
+		org.headHitCount = org.headHitCount + 1
+	end
+	
+	-- Head explosion (kaboom) when severely damaged
+	if headSeverelyDamaged and org.isPly and not org.headExploded then
+		-- Calculate chance based on severity and repeated hits
+		local explodeChance = 0.20  -- Base 20% when severely damaged
+		if jawDestroyed then explodeChance = explodeChance + 0.10 end  -- +10% if jaw destroyed
+		explodeChance = explodeChance + (org.headHitCount * 0.025)  -- +2.5% per hit
+		
+		if math.random() < explodeChance then
+			org.headExploded = true
+			org.headamputated = true  -- Mark as amputated too
+			
+			local headPos = org.owner:GetBonePosition(org.owner:LookupBone("ValveBiped.Bip01_Head"))
+			if headPos then
+				-- Big initial explosion
+				net.Start("hg_bloodimpact")
+				net.WriteVector(headPos)
+				net.WriteVector(Vector(0, 0, 1))
+				net.WriteFloat(12)
+				net.WriteInt(4, 8)
+				net.Broadcast()
+				
+				-- Massive blood spray burst
+				for i = 1, 10 do
+					timer.Simple(i * 0.03, function()
+						net.Start("hg_bloodimpact")
+						net.WriteVector(headPos + VectorRand(-5, 5))
+						net.WriteVector(VectorRand(-1, 1):GetNormalized())
+						net.WriteFloat(6)
+						net.WriteInt(3, 8)
+						net.Broadcast()
+					end)
+				end
+			end
+			
+			-- KABOOM effects - player is dead
+			org.owner:EmitSound("explosionextra/explode_" .. math.random(1, 9) .. ".wav", 120, math.random(95, 105))
+			org.shock = 100
+			org.consciousness = 0
+			org.brain = 1.0
+			org.skull = 1
+			org.alive = false
+		end
+	end
+
+	-- Trigger severe headtrauma flash on ANY brain damage from head hits
+	local brainDamage = org.brain > 0
+	if brainDamage and org.isPly then
+		net.Start("headtrauma_flash")
+		net.WriteVector(dmgInfo:GetDamagePosition())
+		net.WriteFloat(3.5) -- More severe flash intensity
+		net.WriteInt(500, 20) -- Longer flash duration
+		net.WriteBool(true) -- is_critical
+		net.WriteBool(false) -- play_knockout_sound
+		net.WriteBool(true) -- hasBrainDamage - always true since we have brain damage
+		net.Send(org.owner)
+	end
+
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
 	return result,vecrand
 end
 
 local ribs = {
-	"I- I felt my torso snapping.",
+	"I felt my torso snapping.",
 	"I feel something sharp poking inside...",
-	"I think i heard my chest break...",
-	"I broke a rib- I think i actually broke a rib...",
+	"I heard my chest break.",
+	"I think one of my ribs is broken.",
 }
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	

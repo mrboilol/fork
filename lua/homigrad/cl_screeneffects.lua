@@ -818,14 +818,6 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
 		end
 		
-		if org.stroke_active then
-			local flashMat = Material("effects/flashlight001")  -- Use existing flash material
-			local alpha = math.min(org.stroke_meter / 100, 1)  -- Fade in based on stroke meter
-			surface.SetDrawColor(0, 0, 0, 255 * alpha)  -- Tint to black
-			surface.SetMaterial(flashMat)
-			surface.DrawTexturedRect(ScrW() / 4, ScrH() / 4, ScrW() / 2, ScrH() / 2)  -- Position a large "flash" as black spot
-		end
-		
 		//if pain > 10 then
 			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 3), 0, 3)
 

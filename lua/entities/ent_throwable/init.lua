@@ -45,6 +45,12 @@ end
 function ENT:PhysicsCollide(data, phys)
 	if data.Speed < 400 then return end
 	if self.removed then return end
+
+	if self.Bounce then
+		local bounce = math.min(self.Bounce, 1)
+		local newVel = data.OurOldVelocity * -bounce
+		phys:SetVelocity(newVel)
+	end
 	local pos,_ = LocalToWorld(self.localshit,angle_zero,self:GetPos(),self:GetAngles())
 	local tr = {}
 	tr.start = pos
@@ -64,6 +70,8 @@ function ENT:PhysicsCollide(data, phys)
 
 	if data.HitEntity.organism then
 		self:EmitSound(self.AttackHitFlesh, 65)
+	elseif self.AttackHit then
+		self:EmitSound(self.AttackHit, 65)
 	end
 
 	if (data.HitEntity.organism) and ((self.DamageType or DMG_SLASH) == DMG_SLASH) and !self.shouldntlodge then

@@ -121,9 +121,6 @@ module[2] = function(owner, org, mulTime)
 		if not adrenalineStabilizer and not hasAntiIschemia then
 			org.ischemia = org.ischemia + mulTime / 15
 		end
-		if hg_infections:GetBool() then
-			org.infection = org.infection + (org.hemotransfusionshock * mulTime * 0.0005)
-		end
 	end
 
 	if org.arteria == 1 then
@@ -171,9 +168,6 @@ module[2] = function(owner, org, mulTime)
 			
 			wound[5] = time
 			org.blood = max(org.blood - bleed, 1)
-			if hg_infections:GetBool() then
-				org.infection = org.infection + (bleed * 0.0003)
-			end
 				
 			if isAlive or not isPlayer then
 				hg.organism.BloodDroplet2(owner, org, wound, entVel + VectorRand(-50, 50), false)
@@ -208,9 +202,6 @@ module[2] = function(owner, org, mulTime)
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
 			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(pulse, 20) / 80 * neckMul, 1)
-			if hg_infections:GetBool() then
-				org.infection = org.infection + (wound[1] * mulTime * 0.0005)
-			end
 			if isAlive or not isPlayer then
 				local dir = wound[6]
 				local len = dir:Length()
