@@ -1,4 +1,4 @@
-SWEP.Base = "weapon_base"
+﻿SWEP.Base = "weapon_base"
 SWEP.PrintName = "base_hg"
 SWEP.Category = "Other"
 SWEP.Spawnable = false
@@ -557,7 +557,12 @@ function SWEP:PrimaryAttack(broadcast)
 			local org = owner.organism
 			local rhandBroken = (org.rarm or 0) >= 1
 			local rhandDislocated = org.rarmdislocated
-			if rhandBroken or rhandDislocated then
+			local rarmAmputated = org.rarmamputated
+			local larmBrokenOrDis = (org.larm or 0) >= 1 or org.larmdislocation
+			-- No pain from shooting with an amputated right arm unless the left arm is also
+			-- broken (then the player is straining a bad arm to compensate).
+			local applyShootPain = (rhandBroken or rhandDislocated) and (not rarmAmputated or larmBrokenOrDis)
+			if applyShootPain then
 				local shootPain = rhandBroken and 12 or 4
 				org.painadd = math.min(org.painadd + shootPain, 250)
 			end
@@ -1267,12 +1272,18 @@ function SWEP:CoreStep()
 		end
 	end
 
-	-- Aiming too long with a broken right hand causes pain
+	-- Aiming too long with a broken right hand causes pain.
+	-- Exception: if the right arm is amputated the player isn't holding with a broken arm,
+	-- so skip the pain (unless left arm is broken too, meaning they're straining it).
 	if SERVER and IsValid(owner) and owner:IsPlayer() and owner.organism then
 		local org = owner.organism
 		local rhandBroken = (org.rarm or 0) >= 1
 		local rhandDislocated = org.rarmdislocated
-		if self:IsZoom() and (rhandBroken or rhandDislocated) then
+		local rarmAmputated2 = org.rarmamputated
+		local larmBrokenForTimer = (org.larm or 0) >= 1 or org.larmdislocation
+		-- Only apply aim-pain when the arm is bad AND (not amputated OR left arm is also bad)
+		local shouldAimPain = (rhandBroken or rhandDislocated) and (not rarmAmputated2 or larmBrokenForTimer)
+		if self:IsZoom() and shouldAimPain then
 			self.brokenRHandAimTime = (self.brokenRHandAimTime or 0) + FrameTime()
 			
 			local isPistol = self:IsPistolHoldType()
@@ -2393,10 +2404,13 @@ function SWEP:SetHandPos(noset)
 	
 	local ply = self:GetOwner()
 
-	-- A broken / dislocated arm still grips the weapon (the gun is just lowered and
-	-- can only be lifted a little when aiming). Only a full amputation drops a hand.
+	-- A broken left arm should fall away from the gun to the side (it can no longer support).
+	-- A broken right arm still grips the gun (it droops/lowers but stays attached).
+	-- Only a full amputation drops a hand entirely.
+	local larmBroken = ply.organism and (ply.organism.larm or 0) >= 1
+	local larmAmputated = ply.organism and ply.organism.larmamputated
 	self.rhandik = self.setrhik and not (ply.organism and ply.organism.rarmamputated)
-	self.lhandik = self.setlhik and not (ply.organism and ply.organism.larmamputated)
+	self.lhandik = self.setlhik and not larmAmputated and not larmBroken
 
     if not IsValid(ply) or not IsValid(self.worldModel) then return end
     if not ply.shouldTransmit or ply.NotSeen then return end

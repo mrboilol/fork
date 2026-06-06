@@ -697,9 +697,11 @@ local function applyInjuryTPIK(ent, ply)
 
 	if (state.blend or 0) <= 0.001 then return end
 
-	-- Only apply injury rotation during hipfire, not when aiming with weapon
-	-- This prevents sideways drift while aiming
-	local holdOffArm = reducedForWeapon and 0 or 1
+	-- Determine if the owner is aiming (zoom/ironsights) with a gun weapon
+	local isAiming = false
+	if IsValid(wep) and reducedForWeapon and wep.IsZoom then
+		isAiming = wep:IsZoom()
+	end
 
 	for i = 1, #injuryTpikBones do
 		local limb = injuryTpikBones[i][1]
@@ -723,7 +725,11 @@ local function applyInjuryTPIK(ent, ply)
 
 		local ang = mat:GetAngles()
 
-		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * (arm and holdOffArm or 1)
+		-- Arms always droop/rotate away from the gun when broken.
+		-- Aiming partially stabilises arms (reduces rotation by ~50%) but never zeroes it.
+		-- Legs are unaffected by weapon aiming.
+		local aimReduce = (arm and isAiming) and 0.5 or 1
+		local off = offBase * (0.3 + math.min(state.blend, 1) * 0.8) * aimReduce
 
 		ang:RotateAroundAxis(mat:GetRight(), off * side)
 
@@ -1180,7 +1186,17 @@ function hg.DoTPIK(ply, ent)
             eyeang.p = math.NormalizeAngle(eyeang.p) * 0.5
             segments[1].Pos = ply_r_upperarm_matrix:GetTranslation()
             segments[1].Len = limblength
-            segments[2].Pos = spinepos + eyeang:Right() * 25 - eyeang:Up() * 20 - eyeang:Forward() * 20
+            -- When the right arm is broken and the player is aiming, pull the IK pole
+            -- forward so the arm points straight rather than sideways.
+            local rarmBroken = org and (org.rarm or 0) >= 1
+            local isAimingNow = IsValid(self) and self.IsZoom and self:IsZoom()
+            if rarmBroken and isAimingNow then
+                -- Aiming with broken right arm: elbow pole is roughly behind/below the hand,
+                -- keeping the arm pointed forward with reduced sideways deflection.
+                segments[2].Pos = spinepos + eyeang:Forward() * 10 + eyeang:Right() * 8 - eyeang:Up() * 15
+            else
+                segments[2].Pos = spinepos + eyeang:Right() * 25 - eyeang:Up() * 20 - eyeang:Forward() * 20
+            end
             segments[2].Len = limblength
 
             local tr = util.TraceLine({
@@ -1275,10 +1291,13 @@ function hg.DoTPIK(ply, ent)
         local ang = q:Angle()
         ply_r_forearm_matrix:SetAngles(ang)
 
-        if false and ply.organism and ply.organism.rarm and ply.organism.rarm > 0.99 then
-            local ang = ang//qt:Angle()
-            ang:RotateAroundAxis(ang:Forward(), -95)
-            ply_r_hand_matrix:SetAngles(LerpAngle(math_Clamp(ply.leftClicking * 2, 0, 1), ang, ply_r_hand_matrix:GetAngles()))
+        -- When right arm is broken, correct the wrist to face forward.
+        if ply.organism and ply.organism.rarm and ply.organism.rarm > 0.99 then
+            local rarmAng = ang
+            rarmAng:RotateAroundAxis(rarmAng:Forward(), -95)
+            local isAimingNow2 = IsValid(self) and self.IsZoom and self:IsZoom()
+            local blend = isAimingNow2 and 0.8 or 0.35
+            ply_r_hand_matrix:SetAngles(LerpAngle(blend, ply_r_hand_matrix:GetAngles(), rarmAng))
         end
 
         hg.bone_apply_matrix(ent, ply_r_upperarm_index, ply_r_upperarm_matrix, ply_r_forearm_index)
