@@ -5,7 +5,15 @@ local max, min, Clamp, Approach = math.max, math.min, math.Clamp, math.Approach
 hg.organism.module.pain = {}
 
 local module = hg.organism.module.pain
-
+local consciousness_otrub_threshold = 0.06
+local consciousness_fake_threshold = 0.35
+local shock_consciousness_target = 0.12
+local otrub_consciousness_target = 0.02
+local shock_consciousness_drain = 5
+local otrub_consciousness_drain = 3
+local consciousness_recovery_speed = 18
+local low_consciousness_recovery_speed = 28
+local otrub_consciousness_recovery_speed = 36
 module[1] = function(org)
 
 	org.shock = 0
@@ -198,20 +206,11 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if org.shock > (30 * analgesiaMul) then
-
-		local prevConsciousness = org.consciousness or 1
-
-		org.consciousness = math.Approach(org.consciousness, 0.25, timeValue / 5)
-
-		if prevConsciousness > 0.5 and org.consciousness < 0.5 then
-
-			org.goodmood = math.Clamp((org.goodmood or 1) - 0.1, 0, 1)
-
-		end
-
+	if org.otrub then
+		org.consciousness = Approach(org.consciousness, otrub_consciousness_target, timeValue / otrub_consciousness_drain)
+	elseif org.shock > (30 * analgesiaMul) then
+		org.consciousness = Approach(org.consciousness, shock_consciousness_target, timeValue / shock_consciousness_drain)
 	end
-
 
 	if org.tranquilizer > 0 then
 
@@ -222,9 +221,14 @@ module[2] = function(owner, org, timeValue)
 		org.consciousness = math.Approach(org.consciousness, 0, timeValue / 30 * org.tranquilizer)
 
 	else
-
-		org.consciousness = math.Approach(org.consciousness, org.blood < 2500 and math.Clamp((org.blood - 2000) / 500, 0, 1) or 1, timeValue / 15)
-
+		local target = org.blood < 3000 and (org.blood - 2500) / 500 or 1
+		local recovery_speed = consciousness_recovery_speed
+		if org.otrub then
+			recovery_speed = otrub_consciousness_recovery_speed
+		elseif org.consciousness < consciousness_fake_threshold then
+			recovery_speed = low_consciousness_recovery_speed
+		end
+		org.consciousness = Approach(org.consciousness, target, timeValue / recovery_speed)
 	end
 
 
@@ -243,40 +247,14 @@ module[2] = function(owner, org, timeValue)
 	end
 
 
-	if org.consciousness < 0.1 then
-
-		org.needotrub = true
-
-	elseif org.consciousness > 0.4 and (org.blood or 5000) > 2500 and (org.o2 and org.o2[1] or 30) > 15 and (org.shock or 0) < 50 and (org.brain or 0) < 0.325 and (org.tranquilizer or 0) <= 0 then
-
-		org.needotrub = false
-
-	end
-
-
-
-	-- Critical blood loss triggers unconsciousness
-
-	if (org.blood or 5000) < 2200 then
-
+	if org.consciousness < consciousness_otrub_threshold then
 		org.needotrub = true
 
 	end
 
 
 
-	-- Critical oxygen deprivation triggers unconsciousness
-
-	if org.o2 and org.o2[1] and org.o2[1] < 10 then
-
-		org.needotrub = true
-
-	end
-
-
-
-	if org.consciousness < 0.4 then
-
+	if org.consciousness < consciousness_fake_threshold then
 		org.needfake = true
 
 	end

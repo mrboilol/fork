@@ -3,6 +3,7 @@ local math_min, math_clamp, math_rand, math_random, math_sin = math.min, math.Cl
 local VectorRand = VectorRand
 
 local CHANCE, FORCE, VIBRATION = 0.12, 1200, 150
+local CHANCE, FORCE, VIBRATION = 0.12, 1200, 150
 local extendDur, rigorDur, flexionDur = {4, 10}, {10, 20}, {6, 12}
 local RIGOR_DAMP, FLEXION_FORCE = 8, 400
 local postureOrder = {"cushing", "lazarus", "decorticate", "fencing"}
@@ -12,6 +13,12 @@ local REACTION_EASE_IN = 1.5
 local SHAKE_FREQ_FENCING, SHAKE_FREQ_DECORT, SHAKE_FREQ_LAZARUS, SHAKE_FREQ_CUSHING = 4, 3, 3.2, 3.5
 local SHAKE_AMP_FENCING, SHAKE_AMP_DECORT, SHAKE_AMP_LAZARUS, SHAKE_AMP_CUSHING = 1.2, 0.5, 0.5, 0.5
 local SHAKE_ANG_AMP = 0.8
+
+local BRAIN_DEATH_THRESHOLD = 1
+local BRAIN_DEATH_GRAV_DELAY = 0.35
+local BRAIN_DEATH_GRAV_DURATION = 0.6
+local BRAIN_DEATH_GRAV_MULT = 5
+local BRAIN_DEATH_GRAV_BONE_FORCE = 1500
 
 local BRAIN_DEATH_THRESHOLD = 1
 local BRAIN_DEATH_GRAV_DELAY = 0.35
@@ -534,6 +541,25 @@ local function applyBrainDeathGravityBurst(org, rag)
 	org._brainDeathBurstRag = rag
 end
 
+local function processBrainDeathGravityBurst(rag)
+	if not IsValid(rag) then return end
+	local physCount = rag:GetPhysicsObjectCount()
+	for i = 0, physCount - 1 do
+		local phys = rag:GetPhysicsObjectNum(i)
+		if not IsValid(phys) then continue end
+		local mass = phys:GetMass()
+		phys:ApplyForceCenter(Vector(0, 0, -(BRAIN_DEATH_GRAV_BONE_FORCE + mass * 100 * BRAIN_DEATH_GRAV_MULT)))
+	end
+end
+
+local function applyBrainDeathGravityBurst(org, rag)
+	if org._brainDeathBurstTriggered then return end
+	org._brainDeathBurstTriggered = true
+	org._brainDeathBurstStart = CurTime() + BRAIN_DEATH_GRAV_DELAY
+	org._brainDeathBurstEnd = org._brainDeathBurstStart + BRAIN_DEATH_GRAV_DURATION
+	org._brainDeathBurstRag = rag
+end
+
 hook.Add("Should Fake Up", "BrainfuckFencing", function(ply)
 	local org = ply.organism
 	if org and org.fencing and org.fencingEnd and CurTime() < org.fencingEnd then
@@ -589,6 +615,10 @@ hook.Add("RagdollDeath", "BrainfuckStart", function(ply, rag)
 		if (org.brain or 0) >= BRAIN_DEATH_THRESHOLD then
 			applyBrainDeathGravityBurst(org, rag)
 		end
+
+		if (org.brain or 0) >= BRAIN_DEATH_THRESHOLD then
+			applyBrainDeathGravityBurst(org, rag)
+		end
 	end)
 end)
 
@@ -609,6 +639,13 @@ hook.Add("Org Think", "BrainfuckThink", function(owner)
 			elseif stype == "rigor" then processRigor(deathRag, fade)
 			elseif stype == "flexion" then processFlexion(deathRag, fade)
 			elseif stype == "fencing" then processFencing(deathRag, fade) end
+		end
+	end
+
+	if org._brainDeathBurstStart and CurTime() >= org._brainDeathBurstStart and CurTime() < org._brainDeathBurstEnd then
+		local burstRag = IsValid(org._brainDeathBurstRag) and org._brainDeathBurstRag or (IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or (owner:IsRagdoll() and owner or nil))
+		if IsValid(burstRag) then
+			processBrainDeathGravityBurst(burstRag)
 		end
 	end
 

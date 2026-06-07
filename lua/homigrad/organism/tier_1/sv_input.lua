@@ -9,6 +9,11 @@ hg.organism.input_list = hg.organism.input_list or {}
 local vecZero, angZero = Vector(), Angle()
 local hook_Run = hook.Run
 local input_list = hg.organism.input_list
+local head_otrub_min_damage = 0.05
+local head_otrub_chance_mul = 1.25
+local head_otrub_max_chance = 0.35
+local head_consciousness_mul = 28
+local head_otrub_consciousness_cap = 0.04
 local bonetohitgroup, hitgrouptolimb
 
 local bulletTraumaOrganTargets = {
@@ -132,7 +137,6 @@ function hg.organism.ApplyBulletTrauma(org, dmg, dmgInfo, context)
 
 	org._bulletTraumaApplying = false
 end
-
 local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	dmg = dmgInfo:GetDamage() / 25
 	local organ = box[6] and organs[box[6]][box[7]]
@@ -1993,95 +1997,21 @@ local function velocityDamage(ent, data)
 
 		if hitgroup == HITGROUP_HEAD then
 			local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
-
-			local oldSkull = org.skull or 0
-			local oldBrain = org.brain
-			local oldConcussion = org.concussion or 0
-			local oldHeadTrauma = org.headtrauma or 0
-			hg.organism.input_list.skull(org, bone, dmg * 4 * (hadhelmet and 0.2 or 1), dmgInfo)
-
-			local skullDelta = math.max((org.skull or 0) - oldSkull, 0)
-			local flashTime = math.Clamp(0.3 + skullDelta * 0.9, 0.3, 1.2)
-			local flashSize = math.Clamp(1400 + skullDelta * 1600, 1400, 3000)
-
-			if dmg > 0.15 then
-				hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1), dmgInfo)
-				if IsValid(org.owner) and org.owner:IsPlayer() then
-					org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
-				end
-			end
-
-			local targetPlayer = org.owner
-			if IsValid(org.owner.FakeRagdoll) then
-				local ragdoll = org.owner.FakeRagdoll
-				if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-			end
-			if IsValid(targetPlayer) and targetPlayer:IsPlayer() and (dmg >= 0.35 or skullDelta > 0.02) then
-				targetPlayer.HeadDisorientFlashCooldown = targetPlayer.HeadDisorientFlashCooldown or 0
-				if targetPlayer.HeadDisorientFlashCooldown < CurTime() then
-					local eyePos = targetPlayer:EyePos()
-					local ang = targetPlayer:EyeAngles()
-					local incomingPos = dmgInfo:GetDamagePosition()
-					local worldPos = eyePos + ang:Forward() * 16
-					if incomingPos and incomingPos ~= vector_origin then
-						local incDir = (incomingPos - eyePos):GetNormalized()
-						local dotRight = ang:Right():Dot(incDir)
-						worldPos = eyePos + ang:Right() * (dotRight * 160) + ang:Forward() * 16
-					end
-
-					net.Start("headtrauma_flash")
-					net.WriteVector(worldPos)
-					net.WriteFloat(flashTime)
-					net.WriteInt(flashSize, 20)
-
-					local brainDelta = org.brain - oldBrain
-					local is_critical = (org.brain > 0.5 and brainDelta > 0.05) or org.skull == 1 or (oldHeadTrauma < 0.5 and org.headtrauma >= 0.5)
-					net.WriteBool(is_critical)
-
-					local play_knockout_sound = false
-					if org.otrub then
-						if not org.played_knockout_sound then
-							play_knockout_sound = true
-							org.played_knockout_sound = true
-						end
-					else
-						org.played_knockout_sound = false
-					end
-					net.WriteBool(play_knockout_sound)
-
-					local hasBrainDamage = org.brain > 0.1 and oldBrain <= 0.1
-					net.WriteBool(hasBrainDamage)
-
-					local hasConcussion = org.concussion >= 1.5 and org.concussion > oldConcussion
-					net.WriteBool(hasConcussion)
-
-					local trigger_tinnitus = is_critical or hasBrainDamage or hasConcussion
-					net.WriteBool(trigger_tinnitus)
-
-					net.Send(targetPlayer)
-					targetPlayer.HeadDisorientFlashCooldown = CurTime() + 0.2
-				end
-			end
-				
-			local traumaLoad = math.Clamp(
-				dmg * 1.8 +
-				(org.brain or 0) * 1.25 +
-				(org.skull or 0) * 0.9 +
-				(org.concussion or 0) * 0.12 +
-				(org.jaw or 0) * 0.35 +
-				(oldHeadTrauma or 0) * 0.25,
-				0,
-				2.5
-			)
-			org.consciousness = math.Approach(org.consciousness, 0, traumaLoad * (hadhelmet and 0.55 or 1.15))
-				
-				local neck_not_broken = org.spine3 < 0.8
-			local knockoutChance = math.Clamp((traumaLoad - 0.55) * 0.34 + (skullDelta * 0.95), 0, 0.85)
-			local hardHeadImpact = dmg > 0.55 and traumaLoad > 0.95
-			if (hardHeadImpact and !hadhelmet) or math.Rand(0, 1) < knockoutChance then
-				org.otrub = true
+			local head_otrub_chance = math.Clamp((dmg - head_otrub_min_damage) * head_otrub_chance_mul, 0, head_otrub_max_chance)
+			
+			hg.organism.input_list.skull(org, bone, dmg * 6 * (hadhelmet and 0.2 or 1), dmgInfo)
+			
+			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * (hadhelmet and 0.2 or 1))
+			
+			local neck_not_broken = org.spine3 < 0.8
+			
+			//if dmg > 0.5 then
+				hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1), dmgInfo)
+			//end
+			if dmg > head_otrub_min_damage and !hadhelmet and math.Rand(0, 1) < head_otrub_chance then
 				org.needotrub = true
-				org.shock = org.shock + 10 + traumaLoad * 8
+				org.shock = org.shock + 10
+				org.consciousness = math.min(org.consciousness, head_otrub_consciousness_cap)
 			end
 
 			if neck_not_broken and org.spine3 >= 0.8 then
