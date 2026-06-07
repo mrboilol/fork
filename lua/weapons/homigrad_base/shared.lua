@@ -1,4 +1,4 @@
-﻿SWEP.Base = "weapon_base"
+SWEP.Base = "weapon_base"
 SWEP.PrintName = "base_hg"
 SWEP.Category = "Other"
 SWEP.Spawnable = false
@@ -116,15 +116,12 @@ function SWEP:Initialize()
 	self:SetClip1(self.Primary.DefaultClip)
 	self:Draw()
 
-    self:SetJammed(false)
-
 	self.AdditionalPos = Vector(0,0,0)
 	self.AdditionalPos2 = Vector(0,0,0)
 	self.AdditionalAng = Angle(0,0,0)
 	self.AdditionalAng2 = Angle(0,0,0)
 
 	if CLIENT then
-		self.StatsMarkup = nil
 		self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>".. self.PrintName .."</font>\n<font=ZCity_SuperTiny><colour=125,125,125>".. self.HowToUseInstructions .."</colour></font>",450)
 	end
 
@@ -165,8 +162,6 @@ function SWEP:Initialize()
 				self.flashlight = nil
 			end
 		end)
-
-
 	end
 
 	self:AddCallback("PhysicsCollide", function(ent, data)
@@ -301,12 +296,13 @@ function SWEP:IsZoom()
 	--print( (owner.armors and (hg.armor.head[owner.armors["head"]] and not hg.armor.head[owner.armors["head"]].cantsight)))
 	return self:CanUse() and
 		(!hg_aimtoshoot:GetBool() or self:GetNWBool("aiming")) and
-		((self:GetButtstockAttack() or 0) - CurTime() < -1) and 
+		(self:GetButtstockAttack() - CurTime() < -1) and 
 		(self:GetOwner():IsPlayer() and self:KeyDown(IN_ATTACK2) and not self:IsSprinting()) and
 		!(self:IsSprinting() and !IsValid(owner.FakeRagdoll)) and
 		((IsValid(owner.FakeRagdoll) and (self:KeyDown(IN_USE) or hg.RagdollCombatInUse(owner))) or
 		(owner:IsOnGround() or owner:InVehicle())) and 
-		not owner.suiciding and !(owner.organism and (owner.organism.larm and !self:IsPistolHoldType()) and owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99))
+		not owner.suiciding and !(owner.organism and (owner.organism.larm and !self:IsPistolHoldType())
+		and owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99))
 		
 		-- and owner.posture ~= 1 and owner.posture ~= 3-- and (not IsValid(owner.FakeRagdoll) or self:KeyDown(IN_JUMP))
 end
@@ -364,25 +360,22 @@ function SWEP:PlaySnd(snd, server, chan, vol, pitch, entity, tripleaffirmative)
 		local time = owner:GetPos():Distance(view.origin) / 17836
 		local playsnd1 = function()
 			if not IsValid(self) then return end
-			local owner = self:GetOwner()
-			if not IsValid(owner) then return end
-			local ent = hg.GetCurrentCharacter(owner)
-			local ownerPos = owner:GetPos()
+			local ent = hg.GetCurrentCharacter(self:GetOwner())
 
 			if type(snd) == "table" then
 				local rand = math.random(-5,5)
-				EmitSound( snd[1], ownerPos, (entity or owner:EntIndex()) + owner:EntIndex(), CHAN_WEAPON, vol, snd[2] or (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
+				EmitSound( snd[1], owner:GetPos(), (entity or owner:EntIndex()) + owner:EntIndex(), CHAN_WEAPON, vol, snd[2] or (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
 				if tripleaffirmative and !hg_quietshots:GetBool() then
-					EmitSound( snd[1], ownerPos-vector_up, (entity or owner:EntIndex()) + 1 + owner:EntIndex(), CHAN_WEAPON, vol, snd[2] or (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
-					EmitSound( snd[1], ownerPos, (entity or owner:EntIndex()) + 2 + owner:EntIndex(), CHAN_WEAPON, vol, (snd[2] or (self.Supressor and 75 or 75)) + 1, nil, (pitch or 100) + rand, dsproom)
+					EmitSound( snd[1], owner:GetPos()-vector_up, (entity or owner:EntIndex()) + 1 + owner:EntIndex(), CHAN_WEAPON, vol, snd[2] or (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
+					EmitSound( snd[1], owner:GetPos(), (entity or owner:EntIndex()) + 2 + owner:EntIndex(), CHAN_WEAPON, vol, (snd[2] or (self.Supressor and 75 or 75)) + 1, nil, (pitch or 100) + rand, dsproom)
 				end
 				-- self:EmitSound(snd[1], (snd[2] or (self.Supressor and 75 or 75)), (pitch or 100) + rand, vol, CHAN_AUTO)
 			else
 				local rand = math.random(-5,5)
-				EmitSound( snd, ownerPos, (entity or owner:EntIndex()) + owner:EntIndex(), CHAN_WEAPON, vol, (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
+				EmitSound( snd, owner:GetPos(), (entity or owner:EntIndex()) + owner:EntIndex(), CHAN_WEAPON, vol, (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
 				if tripleaffirmative and !hg_quietshots:GetBool() then
-					EmitSound( snd, ownerPos-vector_up, (entity or owner:EntIndex()) + 1 + owner:EntIndex(), CHAN_WEAPON, vol, (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
-					EmitSound( snd, ownerPos, (entity or owner:EntIndex()) + 2 + owner:EntIndex(), CHAN_WEAPON, vol, ((self.Supressor and 75 or 75)) + 1, nil, (pitch or 100) + rand, dsproom)
+					EmitSound( snd, owner:GetPos()-vector_up, (entity or owner:EntIndex()) + 1 + owner:EntIndex(), CHAN_WEAPON, vol, (self.Supressor and 75 or 75), nil, (pitch or 100) + rand, dsproom)
+					EmitSound( snd, owner:GetPos(), (entity or owner:EntIndex()) + 2 + owner:EntIndex(), CHAN_WEAPON, vol, ((self.Supressor and 75 or 75)) + 1, nil, (pitch or 100) + rand, dsproom)
 				end
 				-- self:EmitSound(snd[1], ((self.Supressor and 75 or 75)), (pitch or 100) + rand, vol, CHAN_AUTO)
 			end
@@ -442,7 +435,6 @@ local matrix, matrixSet
 local math_random = math.random
 local primary
 local weapons_Get = weapons.Get
-local RecipientFilter = RecipientFilter
 if SERVER then util.AddNetworkString("hgwep shoot") end
 
 local CantDoIt = {
@@ -493,33 +485,6 @@ function SWEP:Shoot(override)
 	if !override and !self:CanUse() then return false end
 	if CLIENT and owner != LocalPlayer() and !override then return false end
 
-    if self:GetJammed() then
-        if SERVER then
-            self:GetOwner():Notify("Fuck, the thing jammed!", 2)
-        end
-        self:EmitSound(self.Primary.SoundEmpty, true, CHAN_AUTO)
-        return false
-    end
-
-    if SERVER and self.Primary.Ammo and hg.ammotypes[self.Primary.Ammo] then
-        local jamChance = (12 / hg.ammotypes[self.Primary.Ammo].BulletSettings.Diameter)
-
-        if IsValid(owner) and owner:IsPlayer() and owner.organism then
-            local fear = owner.organism.fear or 0
-            if fear > 0 then
-                jamChance = jamChance + fear * 0.5 -- 0.5 bonus chance per fear point
-            end
-            
-
-        end
-
-        if math.random(1, 2000) < jamChance then
-            self:SetJammed(true)
-            self:EmitSound(self.Primary.SoundEmpty, true, CHAN_AUTO)
-            return false
-        end
-    end
-
 	local primary = self.Primary
 	if override then self.drawBullet = true end
 	
@@ -552,37 +517,11 @@ function SWEP:PrimaryAttack(broadcast)
 	local huy = self:Shoot() ~= false
 	
 	if SERVER and huy then
-		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() and owner.organism then
-			local org = owner.organism
-			local rhandBroken = (org.rarm or 0) >= 1
-			local rhandDislocated = org.rarmdislocated
-			local rarmAmputated = org.rarmamputated
-			local larmBrokenOrDis = (org.larm or 0) >= 1 or org.larmdislocation
-			-- No pain from shooting with an amputated right arm unless the left arm is also
-			-- broken (then the player is straining a bad arm to compensate).
-			local applyShootPain = (rhandBroken or rhandDislocated) and (not rarmAmputated or larmBrokenOrDis)
-			if applyShootPain then
-				local shootPain = rhandBroken and 12 or 4
-				org.painadd = math.min(org.painadd + shootPain, 250)
-			end
-		end
-
 		net.Start("hgwep shoot", true)
 		net.WriteEntity(self)
 		net.WriteBool(huy)
 		net.WriteBool(broadcast)
-		local owner = self:GetOwner()
-		if IsValid(owner) then
-			local rf = RecipientFilter()
-			rf:AddPVS(owner:GetPos())
-			if owner:IsPlayer() then
-				rf:AddPlayer(owner)
-			end
-			net.Send(rf)
-		else
-			net.Broadcast()
-		end
+		net.Broadcast()
 	end
 end
 
@@ -751,16 +690,6 @@ function SWEP:EmitShoot()
 	else
 		self:PlaySnd(self.Supressor and (self.SupressedSound or (self:IsPistolHoldType() and "homigrad/weapons/pistols/sil.wav" or "m4a1/m4a1_suppressed_fp.wav")) or self.Primary.Sound, nil, nil, vol, nil, 55533, not self.Supressor)
 	end
-	local primaryAmmo = self.Primary and self.Primary.Ammo or ""
-	local suppressedSound = self.SupressedSound
-	local suppressedSoundPath = istable(suppressedSound) and suppressedSound[1] or suppressedSound
-	local isSilencedShotgun = self.Supressor and (
-		(isstring(primaryAmmo) and (string.find(primaryAmmo, "gauge", 1, true) or string.find(primaryAmmo, "23x75", 1, true))) or
-		(isstring(suppressedSoundPath) and string.find(suppressedSoundPath, "toz_shotgun/", 1, true))
-	)
-	if isSilencedShotgun then
-		self:PlaySnd("silencedshotgunfire.wav", nil, nil, vol, nil, 55534, false)
-	end
 	if !self.Supressor then
 		self:PlaySndDist(self.DistSound, nil, nil, nil, nil, 55511, not self.Supressor)
 	end
@@ -809,15 +738,6 @@ if CLIENT then
 		size = ScreenScale(16),
 		extended = true,
 		weight = 500,
-		antialias = true
-	})
-
-	surface.CreateFont("HG_StatsFont",{
-		font = "Courier New",
-		size = ScreenScale(10),
-		extended = true,
-		shadow = true,
-		weight = 700,
 		antialias = true
 	})
 
@@ -1097,18 +1017,6 @@ hook.Add("Player Think", "suicidingaa", function(ply)
 end)
 
 function SWEP:Think()
-    local owner = self:GetOwner()
-    if IsValid(owner) and owner:IsPlayer() and owner.organism then
-        local fear = owner.organism.fear or 0
-        if fear > 0 and self.ishgweapon and self:GetNWFloat("reload", 0) > CurTime() and SERVER then
-            local chance = fear * 2
-
-            if math.random(100) < chance then
-                owner:DropWeapon(self)
-            end
-        end
-    end
-
 	if SERVER then
 		self:Step()
 	end
@@ -1222,10 +1130,6 @@ function SWEP:CoreStep()
 		self:WorldModel_Transform()
 	end
 	
-    if self:GetIsUnjamming() then
-        self.inspect = true
-    end
-
 	if SERVER and (not IsValid(owner) or (IsValid(actwep) and self != actwep)) then
 		self:SetNWBool("IsResting", false)
 
@@ -1246,13 +1150,7 @@ function SWEP:CoreStep()
 		end
 	//end
 
-	if CLIENT and IsValid(self:GetWM()) then
-		local wm = self:GetWM()
-		local seqCount = wm.GetSequenceCount and wm:GetSequenceCount() or 0
-		if not wm.ZCAnimAssigned and (wm.ZCSequenceReadyAt or 0) <= CurTime() and seqCount > 0 and wm:GetSequence() == 0 then
-			self:PlayAnim("idle", 0, not self.NoIdleLoop)
-		end
-	end
+	if CLIENT and IsValid(self:GetWM()) and (self:GetWM():GetSequence() == 0) then self:PlayAnim("idle", 0, not self.NoIdleLoop) end
 	
 	if SERVER and self.deploy then
 		owner.suiciding = false
@@ -1269,38 +1167,6 @@ function SWEP:CoreStep()
 		if willsuicide and owner:GetNWFloat("willsuicide", 0) < CurTime() - 0.1 then
 			self:PrimaryAttack(true)
 			owner:SetNWFloat("willsuicide", 0)
-		end
-	end
-
-	-- Aiming too long with a broken right hand causes pain.
-	-- Exception: if the right arm is amputated the player isn't holding with a broken arm,
-	-- so skip the pain (unless left arm is broken too, meaning they're straining it).
-	if SERVER and IsValid(owner) and owner:IsPlayer() and owner.organism then
-		local org = owner.organism
-		local rhandBroken = (org.rarm or 0) >= 1
-		local rhandDislocated = org.rarmdislocated
-		local rarmAmputated2 = org.rarmamputated
-		local larmBrokenForTimer = (org.larm or 0) >= 1 or org.larmdislocation
-		-- Only apply aim-pain when the arm is bad AND (not amputated OR left arm is also bad)
-		local shouldAimPain = (rhandBroken or rhandDislocated) and (not rarmAmputated2 or larmBrokenForTimer)
-		if self:IsZoom() and shouldAimPain then
-			self.brokenRHandAimTime = (self.brokenRHandAimTime or 0) + FrameTime()
-			
-			local isPistol = self:IsPistolHoldType()
-			local threshold = 0 -- Default for two-handed (hurts immediately)
-			if isPistol then
-				threshold = rhandBroken and 3 or 5 -- One-handed gets a grace period
-			end
-			
-			if self.brokenRHandAimTime > threshold then
-				local painMultiplier = isPistol and 1 or 3
-				if rhandDislocated and not rhandBroken then
-					painMultiplier = painMultiplier * 0.4 -- Dislocations are less severe
-				end
-				org.painadd = math.min(org.painadd + (0.4 * painMultiplier) * FrameTime() * 15, 200)
-			end
-		else
-			self.brokenRHandAimTime = 0
 		end
 	end
 
@@ -1497,39 +1363,6 @@ function SWEP:CoreStep()
 				//self:PlaySnd({"pwb2/weapons/matebahomeprotection/mateba_cloth.wav",60,80,120},false,CHAN_BODY)
 			end
 			self.zoomsound = nil
-		end
-		if self:IsLocal() then
-			local org = owner.organism
-			if org then
-				local shake_intensity = 0
-				local function get_arm_shake(is_broken, is_dislocated)
-					if is_broken then return 0.3 end
-					if is_dislocated then return 0.15 end
-					return 0
-				end
-
-				if self:IsPistolHoldType() then
-					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
-				else
-					shake_intensity = shake_intensity + get_arm_shake(org.larm == 1, org.larmdislocated)
-					shake_intensity = shake_intensity + get_arm_shake(org.rarm == 1, org.rarmdislocated)
-				end
-
-
-
-                local fear = owner.organism.fear or 0
-                if fear > 0 then
-                    shake_intensity = shake_intensity + fear * 0.005 -- 0.5% more shake per fear point
-                end
-
-				if shake_intensity > 0 then
-					local time = CurTime() * 10
-					-- Only shake pitch for broken arms; yaw causes sideways gun
-					local yawMul = (shake_intensity >= 0.3) and 0 or 1
-					local random_shake = Angle(math.sin(time) * shake_intensity, math.cos(time * 0.8) * shake_intensity * yawMul, 0)
-					self.AdditionalAngPreLerp:Add(random_shake)
-				end
-			end
 		end
 	end
 
@@ -1856,163 +1689,15 @@ function SWEP:GetAdditionalValues()
 	self.AdditionalPosPreLerp[2] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and 1 - add or 0
 	self.AdditionalPosPreLerp[3] = (CLIENT and !self:IsLocal2()) and self:IsZoom() and -0.5 or 0
 
-	local rarm_health = ply.organism and ply.organism.rarm or 0
-	local larm_health = ply.organism and ply.organism.larm or 0
-	local rarm_broken = rarm_health >= 1
-	local rarm_dislocated = ply.organism and ply.organism.rarmdislocated
-	local larm_broken = larm_health >= 1
-	local larm_dislocated = ply.organism and ply.organism.larmdislocated
-	local rarm_amputated = ply.organism and ply.organism.rarmamputated
-	local larm_amputated = ply.organism and ply.organism.larmamputated
+	if ply.organism and (ply.organism.larm and !self:IsPistolHoldType()) and ply.organism.rarm and (ply.organism.larm > 0.99 or ply.organism.rarm > 0.99) then
+		--ply.posture = 1
+		self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 12 * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
+		self.AdditionalPosPreLerp[1] = (self.AdditionalPosPreLerp[1] - (ply.organism.rarmamputated and -1 or 6)) + 0 * math.Clamp((ply:EyeAngles()[1] - 25) / 25, 0, 1)
+		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 3) * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.2, 1)
 
-	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
-	local larm_bad = larm_broken or larm_dislocated or larm_amputated
-
-	-- Spine health affects overall stability and aiming fatigue grace period
-	local spine_health = 0
-	if ply.organism then
-		spine_health = ((ply.organism.spine1 or 0) + (ply.organism.spine2 or 0) + (ply.organism.spine3 or 0) + (ply.organism.pelvis or 0)) / 4
-	end
-	local spine_broken = spine_health >= 1
-	local spine_damaged = spine_health >= 0.25
-
-	-- How heavy the weapon is, used to limit how high a damaged arm can lift it.
-	-- 0 = light (pistols / SMGs, can still be raised), 1 = heavy (rifles / MGs, stays lowered).
-	local baseWeight = self.hg_base_weight or self.weight or 1
-	local weightFactor = math.Clamp((baseWeight - 1.5) / 3.5, 0, 1)
-
-	-- Calculate aiming fatigue
-	if self:IsZoom() then
-		self.aimFatigueTimer = (self.aimFatigueTimer or 0) + FrameTime()
-		
-		-- Calculate dynamic fatigue threshold based on weapon type, weight, and arm condition
-		local baseFatigueTime = self:IsPistolHoldType() and 20 or 10 -- pistols: 20s, rifles: 10s
-		
-		-- Adjust for weapon weight (heavier weapons fatigue faster)
-		local weightMultiplier = 1 + ((self.weight or 1) - 1) * 0.3 -- 30% faster per additional weight unit
-		local adjustedFatigueTime = baseFatigueTime / weightMultiplier
-		
-		-- Two-handed weapon bonus (left arm supporting, healthy)
-		if self.lhandik and not larm_broken and not larm_dislocated and not larm_amputated then
-			adjustedFatigueTime = adjustedFatigueTime * 1.3 -- 30% slower fatigue
-		-- One-handed (left arm not supporting) or left arm issues
-		elseif not self.lhandik or larm_broken or larm_dislocated or larm_amputated then
-			adjustedFatigueTime = adjustedFatigueTime * 0.6 -- 40% faster fatigue
-		end
-		
-		-- Right arm issues (dominant arm)
-		if rarm_broken or rarm_amputated then
-			adjustedFatigueTime = adjustedFatigueTime * 0.3 -- 70% faster fatigue
-		elseif rarm_dislocated then
-			adjustedFatigueTime = adjustedFatigueTime * 0.5 -- 50% faster fatigue
-		elseif rarm_health > 0 then
-			-- Partial damage to right arm
-			adjustedFatigueTime = adjustedFatigueTime * (1 - rarm_health * 0.3) -- up to 30% faster
-		end
-
-		-- Spine damage reduces grace period (faster fatigue)
-		if spine_broken then
-			adjustedFatigueTime = adjustedFatigueTime * 0.3
-		elseif spine_damaged then
-			adjustedFatigueTime = adjustedFatigueTime * (1 - (spine_health - 0.25) * 0.6)
-		end
-
-		-- Ensure minimum fatigue time of 2 seconds
-		adjustedFatigueTime = math.max(adjustedFatigueTime, 2)
-		
-		if self.aimFatigueTimer > adjustedFatigueTime then
-			self.aimFatigue = math.Approach(self.aimFatigue or 0, 1, FrameTime() * 0.05) -- takes 20 seconds of continuous aiming to fully fatigue after immunity
-		end
-	else
-		self.aimFatigueTimer = math.Approach(self.aimFatigueTimer or 0, 0, FrameTime() * 2)
-		self.aimFatigue = math.Approach(self.aimFatigue or 0, 0, FrameTime() * 0.1) -- recovers in 10 seconds
-	end
-
-	local handSway = 0
-	local healthy_arms = not rarm_bad and not larm_bad
-	local only_left_arm = rarm_amputated and not larm_bad
-	local broken_right_arm = rarm_broken and not larm_bad
-	local only_right_arm = larm_amputated and not rarm_bad
-	local right_arm_broken_left = not rarm_bad and (larm_broken or larm_dislocated) and not larm_amputated
-
-	if healthy_arms then
-		-- Both arms are functionally fine, but calculate baseline health sway
-		handSway = 0.15 + rarm_health * 0.3 + larm_health * 0.5
-	elseif only_left_arm then
-		handSway = 2.5
-	elseif broken_right_arm then
-		handSway = 3.0
-	elseif only_right_arm then
-		handSway = 1.0
-	elseif right_arm_broken_left then
-		-- A broken support (left) arm also forces a heavy gun to stay lowered.
-		handSway = (larm_broken and 1.2 or 0.3) + rarm_health * 0.2 + 0.15
-	else
-		-- Fallback logic for complex combinations of broken/dislocated/amputated arms
-		if rarm_bad and larm_bad then
-			handSway = (rarm_broken and 3.5 or 1.2) + (larm_broken and 2.0 or 0.8) + rarm_health * 0.5 + larm_health * 0.5
-		elseif rarm_bad then
-			handSway = rarm_dislocated and 1.2 or 1.8
-		elseif larm_bad then
-			handSway = larm_dislocated and 0.45 or 0.85
-		else
-			handSway = 0.15 + rarm_health * 0.3 + larm_health * 0.5
-		end
-	end
-
-	-- Add spine damage to overall sway
-	if spine_broken then
-		handSway = handSway + 2.5
-	elseif spine_damaged then
-		handSway = handSway + (spine_health - 0.25) * 2.0
-	end
-
-	-- Left arm struggles more with aim when used as dominant
-	local fatigueSwayVal = (self.aimFatigue or 0) * (self.aimFatigue or 0) * 12.0 -- Larger amplitude for more noticeable sway (quadratic scaling)
-	local totalSway = handSway + fatigueSwayVal
-	local totalSwayPos = handSway * 0.12 + (self.aimFatigue or 0) * (self.aimFatigue or 0) * 2.5
-
-	if totalSway > 0 then
-		local t = CurTime() * (2.2 + (self.aimFatigue or 0) * 0.5) -- Slower frequency increase for swaying instead of fast shaking
-		self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t) * totalSway
-		-- Eliminate sideways sway for damaged arms so the gun stays forward while still sagging
-		local sidewaysMul = healthy_arms and 1 or 0
-		self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 0.8) * totalSway * sidewaysMul
-		self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 1.2) * totalSway * 0.5 * sidewaysMul
-		
-		self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 0.7) * totalSwayPos
-		self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.cos(t * 0.9) * totalSwayPos
-		
-		if handSway > 1 then
-			-- A damaged arm lets the gun sag. A heavy weapon sags hard (can barely be lifted),
-			-- while a light one barely droops and can still be raised normally.
-			local droop = 0.4 + weightFactor * 1.6 -- light ~0.4x, heavy ~2x
-
-			-- Use smaller positional offsets to keep the arm from overstretching and breaking the IK solver
-			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 3 * droop * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
-			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + (ply.organism.rarmamputated and -1 or 2)
-			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + (ply.organism.rarmamputated and -6 or 1)
-			
-			-- Add a heavy angular droop to visually indicate the arm is weak
-			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 20 * (rarm_broken and 1 or 0.4)
-
-			-- While aiming, a weighty gun can only be lifted a little with a damaged arm;
-			-- a light gun can still be brought up to the sights.
-			if self:IsZoom() then
-				self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - 6 * weightFactor * math.Clamp((-ply:EyeAngles()[1] + 75) / 45, 0.5, 1)
-				self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + 14 * weightFactor
-			end
-
-			if hg.KeyDown(ply, IN_ATTACK2) then
-				self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 2
-				self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 1
-				self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] - 10
-			end
-		end
-
-		if CLIENT and self:IsLocal2() then
-			local viewSway = Angle(math.sin(t * 1.1) * 0.003 * totalSway, math.cos(t * 0.85) * 0.003 * totalSway, math.sin(t * 0.9) * 0.001 * totalSway)
-			ViewPunch2(viewSway)
+		if hg.KeyDown(ply, IN_ATTACK2) then
+			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + 8
+			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - 3
 		end
 	end
 
@@ -2069,16 +1754,10 @@ function SWEP:GetAdditionalValues()
 
 	local posture = ((animpos < 0.2 and self:IsSprinting()) or animpos > (self:IsPistolHoldType() and 0.5 or 0.2)) and (self:IsPistolHoldType() and 3 or 4) or ply.posture
 
-	local func = hg.postureFunctions2[ply:GetNWFloat("InLegKick", 0) > CurTime() and "legkicking" and 0 or (self:IsSprinting() or huya) and (self:GetButtstockAttack() - CurTime() < -1) and ((ply.posture == 3 and 3) or (ply.posture == 3 and 3) or (self:IsPistolHoldType() and 3 or 3)) or ply.posture] or funcNil
-
+	local func = hg.postureFunctions2[(self:IsSprinting() or huya) and (self:GetButtstockAttack() - CurTime() < -1) and ((ply.posture == 3 and 3) or (ply.posture == 3 and 3) or (self:IsPistolHoldType() and 3 or 3)) or ply.posture] or funcNil
+	func = ply:GetNWFloat("InLegKick", 0) > CurTime() and hg.postureFunctions2["legkicking"] or func
 	if not self.inspect then
 		func(self, ply, huya)
-	end
-
-	-- Kill yaw/roll from posture functions when arms are damaged (fixes sideways gun when not aiming)
-	if not healthy_arms then
-		self.AdditionalAngPreLerp[2] = 0
-		self.AdditionalAngPreLerp[3] = 0
 	end
 	
 	local willsuicide = ply:GetNWFloat("willsuicide", 0)
@@ -2254,8 +1933,8 @@ function SWEP:GetAdditionalValues()
 	self.pitch = Lerp(hg.lerpFrameTime(0.001,dtime), self.pitch, ply:GetNWFloat("InLegKick",0) > CurTime() and 0.5 or suiciding and 1 or huypitch and 0.65 or (self.reload and self.ReloadNoPitch) and 0.75 or 0)
 	
 	if not huypitch then
-		local torso = IsValid(ent) and ent:LookupBone("ValveBiped.Bip01_Spine1") or nil
-		local tmat = torso and ent:GetBoneMatrix(torso) or nil
+		local torso = ply:LookupBone("ValveBiped.Bip01_Spine1")
+		local tmat = ent:GetBoneMatrix(torso)
 		
 		if tmat then
 			local ang2 = tmat:GetAngles():Forward()
@@ -2267,30 +1946,28 @@ function SWEP:GetAdditionalValues()
 		end
 	end
 
-	local skillissue = (ply.organism and ply.organism.recoilmul) or 1
-
+	local skillissue = ply.organism and ply.organism.recoilmul or 1
 
 
 	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)
 	
 	if not suiciding and !self.norecoil then
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
-		local timeScale = math.max(host_timescale(), 0.001)
-		local animpos = self:GetAnimShoot2(0.09 * mulhuy / timeScale, true)
-		local shit = 0.2 * mulhuy / timeScale
+		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
+		local shit = 0.2 * mulhuy / host_timescale()
 		local animpos3 = self:GetAnimShoot2(shit, true) / shit
 		
 		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1)
 		animpos = animpos * math.min((self.Primary.Force2 or self.Primary.Force) / 40,3) * ((self.NumBullet or 1) * 3 or 1) * (self.animposmul or 1) // * 4
 
 		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
-		local weight = math.max(self.weight or 1, 0.001)
-		local shit2 = (1 / weight) * (self.NumBullet or 3) / 3
+		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5
 		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
 		
-		self.AdditionalPos2:Add(VectorRand(-0.1, 0.1) * animpos3 * shit2)
+		self.AdditionalPos2:Add(VectorRand(-0.07, 0.07) * animpos3 * shit2)
+
 		//self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * ply.offsetView[2] * 0.2
 		
 		if self.podkid or self:IsPistolHoldType() then
@@ -2401,16 +2078,10 @@ local veczero = Vector(0, 0, 0)
 SWEP.anglefinger = Angle()
 function SWEP:SetHandPos(noset)
 	self.addvec = self.addvec or veczero
+	self.rhandik = self.setrhik
+	self.lhandik = self.setlhik
 	
 	local ply = self:GetOwner()
-
-	-- A broken left arm should fall away from the gun to the side (it can no longer support).
-	-- A broken right arm still grips the gun (it droops/lowers but stays attached).
-	-- Only a full amputation drops a hand entirely.
-	local larmBroken = ply.organism and (ply.organism.larm or 0) >= 1
-	local larmAmputated = ply.organism and ply.organism.larmamputated
-	self.rhandik = self.setrhik and not (ply.organism and ply.organism.rarmamputated)
-	self.lhandik = self.setlhik and not larmAmputated and not larmBroken
 
     if not IsValid(ply) or not IsValid(self.worldModel) then return end
     if not ply.shouldTransmit or ply.NotSeen then return end
@@ -2426,12 +2097,7 @@ function SWEP:SetHandPos(noset)
 	end
 	
 	if (ent ~= ply and ent ~= ply.OldRagdoll and !hg.RagdollCombatInUse(ply)) then
-		local leftFingerHeld = false
-		local leftFingerBone = ent:LookupBone("ValveBiped.Bip01_L_Finger11")
-		if leftFingerBone then
-			leftFingerHeld = ent:GetManipulateBoneAngles(leftFingerBone)[2] < 0
-		end
-		self.lhandik = self.lhandik and !((hg.KeyDown(ply, IN_FORWARD + IN_BACK) or leftFingerHeld) and !self.reload and !ply:InVehicle())
+		self.lhandik = self.lhandik and !((hg.KeyDown(ply, IN_FORWARD + IN_BACK) or ent:GetManipulateBoneAngles(ent:LookupBone("ValveBiped.Bip01_L_Finger11"))[2] < 0) and !self.reload and !ply:InVehicle())
 	end
 
 	--ply:SetIK(false)
@@ -2452,8 +2118,8 @@ function SWEP:SetHandPos(noset)
 	local rhmat = ent:GetBoneMatrix(rh)
 	local lhmat = ent:GetBoneMatrix(lh)
 
-	ply.rhold = (not rarm_bad) and rhmat or nil
-	ply.lhold = (not larm_bad) and lhmat or nil
+	ply.rhold = rhmat
+	ply.lhold = lhmat
 
 	if not rhmat or not lhmat then return end
 
@@ -2476,19 +2142,11 @@ function SWEP:SetHandPos(noset)
 		rhmat:SetAngles(ang1)
 	
 		if SERVER or CLIENT and self:IsLocal() then
-			local fearMult = (ent.organism and math.Clamp(ent.organism.fear or 0, 0, 2) or 0)
-			local baseShake = ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 3 + fearMult * 2) / 5
-			local healthyArmMult = (not rarm_bad) and 0.5 or 1
-			local time = CurTime()
-			-- Smooth sine wave sway instead of random jitter
-			local swayX = math.sin(time * 2) * 0.03 + math.sin(time * 3.7) * 0.02
-			local swayY = math.cos(time * 2.3) * 0.03 + math.cos(time * 4.1) * 0.02
-			local swayZ = math.sin(time * 1.9) * 0.03 + math.cos(time * 3.3) * 0.02
-			addvec = LerpFT(0.1, addvec, Vector(swayX, swayY, swayZ) * (ply.organism and ply.organism.holdingbreath and 0 or 1) * baseShake * healthyArmMult)
-			addvec2 = LerpFT(0.05 * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 1 + fearMult) * 15, addvec2, addvec)
+			addvec = LerpFT(0.1, addvec, VectorRand(-0.03,0.03) * (ply.organism and ply.organism.holdingbreath and 0 or 1) * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 3) / 5)
+			addvec2 = LerpFT(0.05 * ((ent.organism and (ent.organism.adrenaline or 0) + (36.6 - (ent.organism.temperature or 36.6)) or 0) + 1) * 15, addvec2, addvec)
 		end
 
-		if (not ply.holdingWeapon or ply.holdingWeapon ~= self) and not rarm_bad then
+		if not ply.holdingWeapon or ply.holdingWeapon ~= self then
 			hg.bone_apply_matrix(ent, rh, rhmat)
 			--ent:SetBoneMatrix(rh, rhmat)
 			
@@ -2538,6 +2196,11 @@ function SWEP:SetHandPos(noset)
 			if !(TPIKBonesLHDict[name] or TPIKBonesRHDict[name]) then continue end
 			if (TPIKBonesLHDict[name] and (!canuseleft or !self.lhandik)) then continue end
 			if (TPIKBonesRHDict[name] and (!canuseright or !self.rhandik)) then continue end
+			--[[if ent.organism and ent.organism.rarmamputated then
+				name = TPIKBonesRHDictTranslate[name]
+
+				if !name then continue end
+			end--]]
 
 			//if name != "ValveBiped.Bip01_L_Hand" then continue end
 			--print(name)
@@ -2553,6 +2216,16 @@ function SWEP:SetHandPos(noset)
 			
 			wm_bonematrix:SetTranslation(wm_bonematrix:GetTranslation() + (TPIKBonesLHDict[name] and addvec_fem or vector_origin))
 			if name == "ValveBiped.Bip01_R_Finger12" then wm_bonematrix:SetAngles(wm_bonematrix:GetAngles() + self.anglefinger) end
+
+			--[[if ent.organism and ent.organism.rarmamputated then
+				local mirrormat = mdl:GetBoneMatrix(mdl:LookupBone("ValveBiped.Bip01_R_Hand"))
+				
+				local pos = wm_bonematrix:GetTranslation()
+				local mirrorpos = mirrormat:GetTranslation() - angs:Right() * 1
+				
+				pos = pos + angs:Right() * -(pos - mirrorpos):Dot(angs:Right())
+				wm_bonematrix:SetTranslation(pos)
+			end--]]
 
 			ent:SetBoneMatrix(ply_boneindex, wm_bonematrix)
 			if ply:LookupBone(ply:GetBoneName(ply_boneindex)) then ply:SetBoneMatrix(ply_boneindex, wm_bonematrix) end
@@ -2609,35 +2282,12 @@ function SWEP:OnVarChanged(name, old, new)
 	//end
 end
 
-if SERVER then
-    util.AddNetworkString("hg_clear_jam")
-
-    net.Receive("hg_clear_jam", function(len, ply)
-        local wep = ply:GetActiveWeapon()
-        if not IsValid(wep) or not wep.ishgweapon or not wep:GetJammed() then return end
-
-        wep:SetIsUnjamming(true)
-
-        local clearTime = math.random(2, 5) + (ply.organism and ply.organism.fear or 0)
-        timer.Simple(clearTime, function()
-            if IsValid(wep) then
-                wep:SetJammed(false)
-                wep:SetIsUnjamming(false)
-                wep:RejectShell(wep.ShellEject)
-                ply:ViewPunch(Angle(math.random(-2, 2), math.random(-2, 2), math.random(-2, 2)))
-            end
-        end)
-    end)
-end
-
 function SWEP:SetupDataTables()
 	self:NetworkVar( "Float", 0, "Holster" )
 	self:NetworkVar( "Float", 1, "Deploy" )
 	self:NetworkVar( "Entity", 2, "HolsterWep" )
 	self:NetworkVar( "Angle", 3, "OffsetView" )
 	self:NetworkVar( "Float", 4, "ButtstockAttack" )
-    self:NetworkVar("Bool", 5, "Jammed")
-    self:NetworkVar("Bool", 6, "IsUnjamming")
 
 	//if (SERVER) then
 		//self:NetworkVarNotify( "OffsetView", self.OnVarChanged )
@@ -2727,23 +2377,9 @@ function SWEP:PlayAnim(anim, data, cycling, callback, reverse, sendtoclient)
 	end
 	
 	local mdl = self:GetWM()
-    if (mdl.ZCSequenceReadyAt or 0) > CurTime() or ((mdl.GetSequenceCount and mdl:GetSequenceCount()) or 0) <= 0 then
-		local delay = math.max((mdl.ZCSequenceReadyAt or 0) - CurTime(), 0.03)
-		timer.Simple(delay,function()
-            if not IsValid(self) then return end
-			self:PlayAnim(anim, data, cycling, callback, reverse)
-		end)
-		return
-	end
 	self.tries = 10
-	local seq = self.AnimList[anim] or anim
-	if isstring(seq) then
-		seq = mdl:LookupSequence(seq)
-	end
-	if not isnumber(seq) or seq < 0 or (mdl.GetSequenceCount and seq >= mdl:GetSequenceCount()) then return end
-	self.seq = seq
-	mdl.ZCAnimAssigned = true
-	mdl:SetSequence(seq)
+	self.seq = self.AnimList[anim] or anim
+	mdl:SetSequence(self.seq)
     self.animtime = CurTime() + time - start
     self.animspeed = time
     self.cycling = cycling
@@ -2867,11 +2503,6 @@ function SWEP:RestWeapon()
     bon = bon == -1 and 0 or bon
 
     local mat = trace.Entity:IsWorld() and Matrix() or trace.Entity:GetBoneMatrix(bon)
-    if not mat then
-        mat = Matrix()
-        mat:SetTranslation(trace.Entity:GetPos())
-        mat:SetAngles(trace.Entity:GetAngles())
-    end
 
     local lpos, _ = WorldToLocal(trace.HitPos, angle_zero, mat:GetTranslation(), mat:GetAngles())
 
@@ -2890,20 +2521,11 @@ end
 
 function SWEP:GetBipodPosAng()
 	local restent = self:GetNWEntity("RestEntity")
-	if not IsValid(restent) then
-		local entPos = self:GetNWVector("EntPos")
-		return entPos, self:GetNWAngle("RestAng"), angle_zero
-	end
 
 	local restbone = self:GetNWInt("RestPBone")
 	restbone = restbone == -1 and 0 or restbone
 
 	local mat = restent:IsWorld() and Matrix() or restent:GetBoneMatrix(restbone)
-	if not mat then
-		mat = Matrix()
-		mat:SetTranslation(restent:GetPos())
-		mat:SetAngles(restent:GetAngles())
-	end
 
 	local posa, anga2 = mat:GetTranslation(), mat:GetAngles()
 

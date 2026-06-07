@@ -244,78 +244,26 @@ function SWEP:PickupFunc(ply)
     return false
 end
 
-local function getGrenadeOwner(self)
-	local thrower = self.Thrower
-	if IsValid(thrower) then return thrower end
-
-	local owner = self:GetOwner()
-	if IsValid(owner) then return owner end
-
-	local lastOwner = self.lastOwner
-	if IsValid(lastOwner) then return lastOwner end
-end
-
-local function getGrenadeCharacter(owner)
-	if not IsValid(owner) then return nil end
-
-	local fake = owner.FakeRagdoll
-	if IsValid(fake) then return fake end
-
-	local char = hg.GetCurrentCharacter and hg.GetCurrentCharacter(owner) or nil
-	if IsValid(char) then return char end
-
-	return owner
-end
-
-local function getGrenadeBoneMatrix(ent, boneName)
-	if not IsValid(ent) or not ent.LookupBone or not ent.GetBoneMatrix then return nil end
-
-	local bone = ent:LookupBone(boneName)
-	if not isnumber(bone) then return nil end
-
-	return ent:GetBoneMatrix(bone)
-end
-
-local function getGrenadeThrowOrigin(self, owner)
-	local _, _, headm = self:GetEyeTrace()
-	if headm and headm.GetTranslation then
-		local headPos = headm:GetTranslation()
-		if isvector(headPos) then return headPos end
-	end
-
-	local char = getGrenadeCharacter(owner)
-	local charHead = getGrenadeBoneMatrix(char, "ValveBiped.Bip01_Neck1")
-	if charHead and charHead.GetTranslation then
-		local headPos = charHead:GetTranslation()
-		if isvector(headPos) then return headPos end
-	end
-
-	if IsValid(owner) and owner.EyePos then
-		return owner:EyePos()
-	end
-
-	return self:GetPos()
-end
-
 function SWEP:Throw(mul, time, nosound, throwPosAdjust, throwAngAdjust)
 	if not self.ENT then return end
 
-	local owner = getGrenadeOwner(self)
+	local owner = self.Thrower or self:GetOwner()
 	local ent = ents.Create(self.ENT)
-	local entOwner = getGrenadeCharacter(owner)
+	local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or IsValid(owner) and owner
 	throwPosAdjust = throwPosAdjust or Vector(0,0,5)
 	throwAngAdjust = throwAngAdjust or Angle(0,0,0)
 	--throwPosAdjust[2] = throwPosAdjust[2] + 2
-	local eyepos = getGrenadeThrowOrigin(self, owner)
+	local _,_,headm = self:GetEyeTrace()
+	local eyepos = headm:GetTranslation() or false
 	local ang = IsValid(entOwner) and owner:EyeAngles() or self:GetAngles()
-	local hand = eyepos + ang:Forward() * throwPosAdjust[1] + ang:Right() * (throwPosAdjust[2] + 2) + ang:Up() * throwPosAdjust[3]
+	local hand = eyepos and eyepos + ang:Forward() * throwPosAdjust[1] + ang:Right() * (throwPosAdjust[2] + 2) + ang:Up() * throwPosAdjust[3] or self:GetPos()
 
 	if IsValid(entOwner) then
 		ent:SetOwner(entOwner or game.GetWorld())
 	end
 	
-	ent.team = IsValid(owner) and owner.Team and owner:Team() or nil
-	ent.steamid = IsValid(owner) and owner.SteamID and owner:SteamID() or nil
+	ent.team = owner:Team()
+	ent.steamid = owner:SteamID()
 
 	if not nosound and IsValid(entOwner) then
 		entOwner:EmitSound(self.throwsound or "weapons/m67/m67_throw_01.wav", 90, math.random(95, 105))
@@ -365,10 +313,10 @@ function SWEP:Throw(mul, time, nosound, throwPosAdjust, throwAngAdjust)
 	ent:SetAngles(angThrow)
 	local phys = ent:GetPhysicsObject()
 	if phys then 
-		local real_ent = IsValid(owner) and hg.GetCurrentCharacter(owner) or nil
+		real_ent = hg.GetCurrentCharacter(owner)
 		phys:SetVelocity(IsValid(real_ent) and (owner:GetAimVector() * mul/1.5) + real_ent:GetVelocity() or Vector(0,0,0)) 
 	end
-	if IsValid(owner) and owner.IsOnGround and owner:IsOnGround() then
+	if owner:IsOnGround() then
 		owner:SetVelocity(owner:GetVelocity() - owner:GetVelocity()/2)
 	end
 	ent.timer = time
@@ -404,17 +352,12 @@ if CLIENT then
 	function SWEP:DrawHUD()
 		if GetViewEntity() ~= lply then return end
 		if lply:InVehicle() then return end
-		local char = hg.GetCurrentCharacter(lply)
-		if not IsValid(char) then return end
-		if char:IsRagdoll() then return end
+		if hg.GetCurrentCharacter(lply):IsRagdoll() then return end
 
 		local tr = self:GetEyeTrace()
-		if not tr or not tr.HitPos then return end
 		local toScreen = tr.HitPos:ToScreen()
 
-		local eyeTrace = hg.eyeTrace(lply)
-		local canTrap = eyeTrace and eyeTrace.Hit and not lply:IsSprinting() and not self.NoTrap
-		lerpthing = Lerp(0.1, lerpthing, canTrap and 1 or 0)
+		lerpthing = Lerp(0.1, lerpthing, (hg.eyeTrace(lply).Hit and not lply:IsSprinting() and not self.NoTrap) and 1 or 0)
 		colWhite.a = 255 * lerpthing
 		surface.SetDrawColor(colWhite)
 		surface.DrawRect(toScreen.x-2.5, toScreen.y-2.5, 5, 5)
@@ -541,15 +484,12 @@ function SWEP:CreateSpoon(entownr)
 	local entasd
 	if not self.spoon then return end
 	if IsValid(entownr) then
-		local char = getGrenadeCharacter(entownr)
-		local hand = getGrenadeBoneMatrix(char, "ValveBiped.Bip01_R_Hand")
-		local pos = hand and hand.GetTranslation and hand:GetTranslation() or entownr:EyePos()
-		local ang = hand and hand.GetAngles and hand:GetAngles() or entownr:EyeAngles()
+		local hand = entownr:GetBoneMatrix(entownr:LookupBone("ValveBiped.Bip01_R_Hand"))
 
 		entasd = ents.Create("ent_hg_spoon")
 		entasd:SetModel(self.spoon)
-		entasd:SetPos(pos)
-		entasd:SetAngles(ang)
+		entasd:SetPos(hand:GetTranslation())
+		entasd:SetAngles(hand:GetAngles())
 		entasd:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 		entasd:Spawn()
 
@@ -582,7 +522,7 @@ function SWEP:CreateSpoon(entownr)
 
 		if self.SpoonSounds then
 			for k,v in ipairs(self.SpoonSounds) do
-				self:GetOwner():EmitSound(v[1], v[2], v[3])
+				self:GetOwner():EmitSound(v[1], v[2], v[3], v[5])
 
 				if v[4] then
 					local effectData = EffectData()
