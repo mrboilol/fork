@@ -223,7 +223,6 @@ bloodparticles_hook[2] = function(mul)
 		end
 
 		if result.Hit and result.Entity:IsWorld() then
-			table_remove(hg.bloodparticles1, i)
 			local dir = result.HitNormal
 			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 			
@@ -231,7 +230,7 @@ bloodparticles_hook[2] = function(mul)
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
 			--sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", hitPos, math.random(10, 60), math.random(80, 120))
 			
-			continue
+			-- Keep particle alive - will despawn via age or hardcap
 		else
 			local ph = 0
 			local shouldhit = true
@@ -280,7 +279,10 @@ bloodparticles_hook[2] = function(mul)
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
 					
-					table_remove(hg.bloodparticles1, i)
+					-- Keep particle alive - will despawn via age or hardcap
+					-- Reset velocity to keep it moving slightly
+					part[3] = VectorRand(-1, 1)
+					part.lerpedmove = VectorRand(-2, 2)
 					
 					continue
 				end

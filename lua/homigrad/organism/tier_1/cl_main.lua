@@ -1138,7 +1138,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local spread = right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5)
 
 							if wound[7] == "arteria" then
-								local arteriaForce = forceMul * 3.5
+								local arteriaForce = forceMul * 3.5 * 0.5
 								local arteriaForward = dir * 12 * arteriaForce * 0.7
 								local arteriaOscAmpRight = arteriaForward:Length() * 0.15 * pulseFactor
 								local arteriaOscAmpUp = arteriaForward:Length() * 0.1 * pulseFactor

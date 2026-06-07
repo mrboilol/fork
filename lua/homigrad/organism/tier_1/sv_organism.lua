@@ -196,6 +196,8 @@ local function send_organism(org, ply)
 	sendtable.incapacitated = org.incapacitated
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
+	sendtable.aiming_fatigue = org.aiming_fatigue
+	sendtable.hand_dominance = org.hand_dominance
 
 	sendtable.superfighter = org.superfighter
 
@@ -491,8 +493,42 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		local isAiming = IsValid(wep) and wep.IsZoom and wep:IsZoom()
 
 		if isAiming then
-			org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5, 10)
+			if not org.aiming_start_time then
+				org.aiming_start_time = CurTime()
+			end
+			local duration = CurTime() - org.aiming_start_time
+			if duration >= 1.5 then
+				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5, 10)
+
+				local rarm_broken = (org.rarm and org.rarm >= 1) or org.rarmamputated
+				local larm_broken = (org.larm and org.larm >= 1) or org.larmamputated
+				local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
+				local larm_dislocated = org.larmdislocated or org.larmdislocation
+
+				local pain_threshold = 4.0
+				if rarm_broken then
+					pain_threshold = 1.5
+				elseif rarm_dislocated then
+					pain_threshold = 2.5
+				end
+
+				if duration > pain_threshold then
+					local pain_rate = timeValue * 1.5
+					if rarm_broken then
+						pain_rate = pain_rate * 3.0
+					elseif rarm_dislocated then
+						pain_rate = pain_rate * 1.8
+					end
+
+					if larm_broken then
+						pain_rate = pain_rate * 1.5
+					end
+
+					org.painadd = org.painadd + pain_rate
+				end
+			end
 		else
+			org.aiming_start_time = nil
 			org.aiming_fatigue = math.max((org.aiming_fatigue or 0) - timeValue * 0.3, 0)
 		end
 	end

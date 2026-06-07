@@ -262,7 +262,17 @@ end
 function SWEP:Reload(time)
 	--print(self:GetNetVar("shootgunReload",0))
 	local ply = self:GetOwner()
-	if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end
+
+	-- Check for left arm missing - can't rack one-handed
+	if ply.organism and ply.organism.larmamputated then
+		if self.drawBullet == false then
+			if SERVER then
+				ply:Notify("You need both arms to rack the bolt. Use floor reload.", 1)
+			end
+			return
+		end
+	end
+
 	if self.AnimStart_Draw > CurTime() - 0.5 then return end
 	if not self:CanUse() then return end
 	if self.reloadCoolDown > CurTime() then return end
@@ -276,6 +286,13 @@ function SWEP:Reload(time)
 	end
 
 	if not self:CanReload() then return end
+
+	-- Apply arm penalties for reload
+	local armPain, armSpeedMul = self:GetReloadArmPenalty()
+	if armPain > 0 and ply.organism then
+		ply.organism.painadd = (ply.organism.painadd or 0) + armPain
+	end
+
 	--self:GetWM():ManipulateBoneScale(47, vector_full)
 	if SERVER then
 		self:SetNetVar("shootgunReload",CurTime() + (self:Clip1() == 0 and 2.1 or 1.1))

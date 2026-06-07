@@ -54,6 +54,15 @@ function SWEP:PrimarySpread()
 		if owner:IsNPC() then return end
 		local org = owner.organism
 		if org then
+			local force = self.Primary.Force2 or self.Primary.Force or 30
+			local numB = self.NumBullet or 1
+			local calForce = force * numB
+
+			local rarm_broken = (org.rarm and org.rarm >= 1) or org.rarmamputated
+			local larm_broken = (org.larm and org.larm >= 1) or org.larmamputated
+			local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
+			local larm_dislocated = org.larmdislocated or org.larmdislocation
+
 			-- Pain from shooting based on hand dominance
 			local dominance = org.hand_dominance or "right"
 			local pain_mult = 0
@@ -74,7 +83,72 @@ function SWEP:PrimarySpread()
 				end
 			end
 
-			org.painadd = org.painadd + pain_mult * self.Primary.Force / 20 * (self.NumBullet or 1)
+			org.painadd = org.painadd + pain_mult * force / 20 * numB
+
+			-- Left arm gone check (amputated or broken)
+			local left_arm_gone = larm_broken
+
+			if left_arm_gone then
+				-- Act like weapon is held one handed: high calibers can break/dislocate the right arm
+				if calForce >= 45 and not org.rarmamputated then
+					if not rarm_broken and not rarm_dislocated then
+						local rand = math.random()
+						local dislocate_chance = math.Clamp((calForce - 40) * 0.005, 0.05, 0.20)
+						local break_chance = math.Clamp((calForce - 40) * 0.001, 0.01, 0.05)
+						if rand < break_chance then
+							org.rarm = 1
+							org.painadd = org.painadd + 55
+							owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
+							if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+								hg.BreakLimb(owner, "rarm", nil, false)
+							end
+							owner:Notify("Your right arm snapped under the recoil!", 1, "rarm_recoil_snap", 1, nil, nil)
+						elseif rand < (break_chance + dislocate_chance) then
+							org.rarmdislocation = true
+							org.painadd = org.painadd + 35
+							owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
+							if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+								hg.BreakLimb(owner, "rarm", nil, true)
+							end
+							owner:Notify("Your right shoulder dislocated from the recoil!", 1, "rarm_recoil_dislocate", 1, nil, nil)
+						end
+					end
+				end
+			end
+
+			-- Right arm broken shooting checks
+			if rarm_broken then
+				local extra_broken_pain = calForce * 1.5
+				if larm_broken then
+					extra_broken_pain = extra_broken_pain * 1.5
+				end
+				org.painadd = org.painadd + extra_broken_pain
+
+				if not rarm_dislocated then
+					-- small chance to dislocate
+					local disl_chance = 0.05 * (calForce / 30)
+					if larm_broken then
+						disl_chance = disl_chance * 2
+					end
+					if math.random() < disl_chance then
+						org.rarmdislocation = true
+						org.painadd = org.painadd + 35
+						owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
+						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+							hg.BreakLimb(owner, "rarm", nil, true)
+						end
+						owner:Notify("Your broken right arm dislocated from shooting!", 1, "rarm_broken_dislocate", 1, nil, nil)
+					end
+				else
+					-- already dislocated: add a bunch of pain and a bone breaking sound
+					local extra_disl_pain = 35 + calForce * 1.5
+					if larm_broken then
+						extra_disl_pain = extra_disl_pain * 1.5
+					end
+					org.painadd = org.painadd + extra_disl_pain
+					owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
+				end
+			end
 		end
 	end
 
@@ -92,18 +166,61 @@ function SWEP:PrimarySpread()
 			-- Right hand dominant: right arm damage affects more
 			arm_debuff = (organism.rarm or 0) * 2 + (organism.larm or 0) * 0.5
 			amputate_debuff = (organism.rarmamputated and 3 or 0) + (organism.larmamputated and 1 or 0)
-			arm_debuff = arm_debuff + (organism.rarmdislocation and 0.5 or 0) + (organism.larmdislocation and 0.2 or 0)
+			arm_debuff = arm_debuff + ((organism.rarmdislocation or organism.rarmdislocated) and 0.5 or 0) + ((organism.larmdislocation or organism.larmdislocated) and 0.2 or 0)
 		else
 			-- Left hand dominant: left arm damage affects more
 			arm_debuff = (organism.larm or 0) * 2 + (organism.rarm or 0) * 0.5
 			amputate_debuff = (organism.larmamputated and 3 or 0) + (organism.rarmamputated and 1 or 0)
-			arm_debuff = arm_debuff + (organism.larmdislocation and 0.5 or 0) + (organism.rarmdislocation and 0.2 or 0)
+			arm_debuff = arm_debuff + ((organism.larmdislocation or organism.larmdislocated) and 0.5 or 0) + ((organism.rarmdislocation or organism.rarmdislocated) and 0.2 or 0)
 		end
 
 		-- Apply aiming fatigue penalty
 		arm_debuff = arm_debuff + (organism.aiming_fatigue or 0) * 0.15
 
+		-- Explicit broken arm recoil penalty (beyond proportional damage)
+		local rarm_broken = (organism.rarm and organism.rarm >= 1) or organism.rarmamputated
+		local larm_broken = (organism.larm and organism.larm >= 1) or organism.larmamputated
+		local broken_arm_recoil_mult = 1
+		if rarm_broken then
+			broken_arm_recoil_mult = broken_arm_recoil_mult * 1.5
+		end
+		if larm_broken then
+			broken_arm_recoil_mult = broken_arm_recoil_mult * 1.35
+		end
+
+		-- Mitigation calculation for overall control / handling
+		local plyVel = owner:GetVelocity()
+		local isStandingStill = isvector(plyVel) and plyVel:LengthSqr() < 100
+		local isCrouching = owner:Crouching()
+		local isRagdolled = IsValid(owner.FakeRagdoll)
+		local isHoldingBreath = organism.holdingbreath
+
+		local mitigation_mult = 1
+		if isRagdolled then
+			mitigation_mult = mitigation_mult * 0.6
+		elseif isCrouching then
+			mitigation_mult = mitigation_mult * 0.75
+		elseif isStandingStill then
+			mitigation_mult = mitigation_mult * 0.9
+		end
+
+		if isHoldingBreath then
+			mitigation_mult = mitigation_mult - 0.15
+		end
+
+		-- Broken arms bypass this mitigation
+		local bypass_mitigation = (organism.rarm and organism.rarm >= 1) or (organism.larm and organism.larm >= 1) or organism.rarmamputated or organism.larmamputated
+		if bypass_mitigation then
+			mitigation_mult = 1
+		end
+
+		if not bypass_mitigation then
+			arm_debuff = arm_debuff * mitigation_mult
+			amputate_debuff = amputate_debuff * mitigation_mult
+		end
+
 		mul = mul * ((2 + arm_debuff) / 1 + amputate_debuff)
+		mul = mul * broken_arm_recoil_mult
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
 		mul = mul * (owner:Crouching() and 0.75 or 1)

@@ -199,16 +199,62 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local rarm_health = organism.rarm or 0
 	local larm_health = organism.larm or 0
 	local rarm_broken = rarm_health >= 1
-	local rarm_dislocated = organism.rarmdislocated
+	local rarm_dislocated = organism.rarmdislocated or organism.rarmdislocation
 	local larm_broken = larm_health >= 1
-	local larm_dislocated = organism.larmdislocated
+	local larm_dislocated = organism.larmdislocated or organism.larmdislocation
 	local rarm_amputated = organism.rarmamputated
 	local larm_amputated = organism.larmamputated
 
 	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
 	local larm_bad = larm_broken or larm_dislocated or larm_amputated
 
-	local tta = math.Clamp(self.weight / 4, 0.25, 1) * 0.7 -- Slower base sight alignment (0.7 instead of 0.5) so healthy arms take somewhat more time to align
+	-- Mitigation calculation for overall control (weight, sway, alignment, control)
+	local plyVel = ply:GetVelocity()
+	local isStandingStill = isvector(plyVel) and plyVel:LengthSqr() < 100
+	local isCrouching = ply:Crouching()
+	local isRagdolled = IsValid(ply.FakeRagdoll)
+	local isHoldingBreath = organism.holdingbreath
+
+	local mitigation_mult = 1
+	if isRagdolled then
+		mitigation_mult = mitigation_mult * 0.6
+	elseif isCrouching then
+		mitigation_mult = mitigation_mult * 0.75
+	elseif isStandingStill then
+		mitigation_mult = mitigation_mult * 0.9
+	end
+
+	if isHoldingBreath then
+		mitigation_mult = mitigation_mult - 0.15
+	end
+
+	-- Broken arms bypass this mitigation
+	local bypass_mitigation = rarm_broken or larm_broken or rarm_amputated or larm_amputated
+	if bypass_mitigation then
+		mitigation_mult = 1
+	end
+
+	-- Broken arms/dislocations make the weapon heavier (more weighty things)
+	local arm_weight_penalty = 0
+	if rarm_broken or rarm_amputated then
+		arm_weight_penalty = arm_weight_penalty + 4.5
+	elseif rarm_dislocated then
+		arm_weight_penalty = arm_weight_penalty + 2.5
+	end
+
+	if larm_broken or larm_amputated then
+		arm_weight_penalty = arm_weight_penalty + 3.0
+	elseif larm_dislocated then
+		arm_weight_penalty = arm_weight_penalty + 1.5
+	end
+
+	if not bypass_mitigation then
+		arm_weight_penalty = arm_weight_penalty * mitigation_mult
+	end
+
+	local effective_weight = (self.weight or self.Weight or 5) + arm_weight_penalty
+
+	local tta = math.Clamp(effective_weight / 4, 0.25, 1) * 0.7
 
 	local healthy_arms = not rarm_bad and not larm_bad
 	local only_left_arm = rarm_amputated and not larm_bad
@@ -216,21 +262,28 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local only_right_arm = larm_amputated and not rarm_bad
 	local right_arm_broken_left = not rarm_bad and (larm_broken or larm_dislocated) and not larm_amputated
 
+	local tta_multiplier = 1
 	if healthy_arms then
 		-- Base alignment time is used
 	elseif only_right_arm then
-		tta = tta * 1.8
+		tta_multiplier = 1.8
 	elseif only_left_arm then
-		tta = tta * 3.5
+		tta_multiplier = 3.5
 	elseif broken_right_arm then
-		tta = tta * 4.0
+		tta_multiplier = 4.0
 	elseif right_arm_broken_left then
-		tta = tta * (larm_broken and 2.2 or 1.6)
+		tta_multiplier = larm_broken and 2.2 or 1.6
 	else
 		if rarm_bad or larm_bad then
-			tta = tta * ((rarm_broken or larm_broken) and 2.5 or 1.8)
+			tta_multiplier = (rarm_broken or larm_broken) and 2.5 or 1.5
 		end
 	end
+
+	if tta_multiplier > 1 and not bypass_mitigation then
+		tta_multiplier = 1 + (tta_multiplier - 1) * mitigation_mult
+	end
+	tta = tta * tta_multiplier
+
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
@@ -245,7 +298,33 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		local swayX = math.sin(time * 1.5) * 0.5 + math.sin(time * 2.7) * 0.25
 		local swayY = math.cos(time * 1.8) * 0.5 + math.cos(time * 3.1) * 0.25
 		local swayZ = math.sin(time * 2.2) * 0.5 + math.cos(time * 2.9) * 0.25
-		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(swayX, swayY, swayZ)
+
+		local arm_sway_debuff = 0
+		if rarm_broken or rarm_amputated then
+			arm_sway_debuff = arm_sway_debuff + 2.0
+		elseif rarm_dislocated then
+			arm_sway_debuff = arm_sway_debuff + 0.8
+		end
+
+		if larm_broken or larm_amputated then
+			arm_sway_debuff = arm_sway_debuff + 1.2
+		elseif larm_dislocated then
+			arm_sway_debuff = arm_sway_debuff + 0.5
+		end
+
+		local fatigue = organism.aiming_fatigue or 0
+		local fatigue_debuff = fatigue * 0.4
+
+		local final_arm_sway = arm_sway_debuff
+		local final_fatigue_sway = fatigue_debuff
+		if not bypass_mitigation then
+			final_arm_sway = final_arm_sway * mitigation_mult
+			final_fatigue_sway = final_fatigue_sway * mitigation_mult
+		end
+
+		local sway_scale = 1 + final_arm_sway + final_fatigue_sway
+
+		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(swayX, swayY, swayZ) * sway_scale
 	end
 
 	randomPosL = LerpFT(0.05 * (inpain and 12.5 - (12 * painmul) or 1), randomPosL, randomPos)
@@ -293,19 +372,56 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local sp2  = isnumber(organism.spine2) and organism.spine2 or 0
 	local sp3  = isnumber(organism.spine3) and organism.spine3 or 0
 
-	-- Proportional decimal arm damage effect on aiming fatigue
+	-- Proportional decimal arm damage effect on aiming fatigue/shaking
 	local larmShake = larm * 0.06 * (ply.posture != 7 and ply.posture != 8 and 1 or 0)
 	local rarmShake = rarm * 0.08
-	local shakeMul = larmShake + rarmShake
+	local arm_shake_penalty = larmShake + rarmShake
 
-	-- Grace period before aiming fatigue kicks in, extended by stable states (crouching, still, ragdolling, holding breath)
-	local armsBad = larm >= 0.75 or rarm >= 0.75 or organism.larmdislocated or organism.rarmdislocated or organism.larmamputated or organism.rarmamputated or larm >= 1 or rarm >= 1
+	if larm >= 1 or organism.larmamputated then
+		arm_shake_penalty = arm_shake_penalty + 0.05
+	elseif organism.larmdislocated or organism.larmdislocation then
+		arm_shake_penalty = arm_shake_penalty + 0.02
+	end
+
+	if rarm >= 1 or organism.rarmamputated then
+		arm_shake_penalty = arm_shake_penalty + 0.07
+	elseif organism.rarmdislocated or organism.rarmdislocation then
+		arm_shake_penalty = arm_shake_penalty + 0.03
+	end
+
+	local fatigue_shake = (organism.aiming_fatigue or 0) * 0.015
+	local total_shake_debuff = arm_shake_penalty + fatigue_shake
+
+	-- Mitigation calculation for overall control (shake)
 	local plyVel = ply:GetVelocity()
-	local isStationary = isvector(plyVel) and plyVel:Length() < 10
+	local isStationary = isvector(plyVel) and plyVel:LengthSqr() < 100
 	local isRagdolled = IsValid(ply.FakeRagdoll)
 	local isHoldingBreath = organism.holdingbreath
-	local isStable = ply:Crouching() or isStationary or isRagdolled or isHoldingBreath
-	local gracePeriod = isStable and 5 or 2.5
+
+	local mitigation_mult = 1
+	if isRagdolled then
+		mitigation_mult = mitigation_mult * 0.6
+	elseif ply:Crouching() then
+		mitigation_mult = mitigation_mult * 0.75
+	elseif isStationary then
+		mitigation_mult = mitigation_mult * 0.9
+	end
+
+	if isHoldingBreath then
+		mitigation_mult = mitigation_mult - 0.15
+	end
+
+	-- Broken arms bypass this mitigation
+	local bypass_mitigation = (larm >= 1) or (rarm >= 1) or organism.larmamputated or organism.rarmamputated
+	if bypass_mitigation then
+		mitigation_mult = 1
+	end
+
+	local shakeMul = total_shake_debuff * mitigation_mult
+
+	-- Grace period of 1.5 seconds for aiming fatigue/shaking
+	local armsBad = larm >= 1 or rarm >= 1 or organism.larmamputated or organism.rarmamputated
+	local gracePeriod = 1.5
 	if zooming and justzoomed then
 		ply.aimGraceStart = CurTime()
 	end
@@ -313,18 +429,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		shakeMul = 0
 	end
 
-	local stabilityMult = 1
-	if isRagdolled then
-		stabilityMult = 0.5
-	elseif ply:Crouching() then
-		stabilityMult = 0.7
-	elseif isStationary then
-		stabilityMult = 0.85
-	end
-	if isHoldingBreath then
-		stabilityMult = stabilityMult - 0.15
-	end
-	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * stabilityMult
+	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01)
 	addview[3] = 0
 
 	if ply == LocalPlayer() then

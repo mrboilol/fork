@@ -952,23 +952,47 @@ if CLIENT then
 end
 
 SWEP.BrokenArmPenalty = {
-    DamageMultiplier = 0.5, -- 50% damage
+    DamageMultiplier = 0.65, -- 65% damage (35% reduction)
     StaminaMultiplier = 1.5, -- 50% more stamina
     SwingSpeedMultiplier = 0.75, -- 25% slower
-    BlockDurationMultiplier = 0.5 -- 50% shorter block
+    BlockDurationMultiplier = 0.5, -- 50% shorter block
+    PainOnBlock = 8, -- pain when blocking with damaged arms
+    PainOnHit = 12 -- pain when hitting with damaged arms
 }
 
 function SWEP:HasBrokenArm(owner)
     if not IsValid(owner) or not owner.organism then return false end
     local org = owner.organism
     
-    -- For one-handed weapons, only check right arm
+    -- For one-handed weapons, check both arms (left arm breakage affects one-handed grip too)
     if not self.TwoHanded then
-        return (org.rarm and org.rarm >= 1) or org.rarmdislocation
+        return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.rarmdislocation
     end
     
     -- For two-handed weapons, check both arms
     return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.rarmdislocation
+end
+
+function SWEP:GetArmDamagePercent(owner)
+    if not IsValid(owner) or not owner.organism then return 0 end
+    local org = owner.organism
+    local damage = 0
+    
+    if not self.TwoHanded then
+        -- For one-handed: check both arms, use the worse one
+        local larmDamage = (org.larm or 0)
+        local rarmDamage = (org.rarm or 0)
+        local larmDisloc = org.larmdislocation and 0.5 or 0
+        local rarmDisloc = org.rarmdislocation and 0.5 or 0
+        damage = math.max(larmDamage + larmDisloc, rarmDamage + rarmDisloc)
+    else
+        -- For two-handed: average both arms
+        local larmDamage = (org.larm or 0) + (org.larmdislocation and 0.5 or 0)
+        local rarmDamage = (org.rarm or 0) + (org.rarmdislocation and 0.5 or 0)
+        damage = (larmDamage + rarmDamage) / 2
+    end
+    
+    return math.min(damage, 1)
 end
 
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)
@@ -1006,10 +1030,10 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     if self:HasBrokenArm(owner) then
         local multiplier = self.BrokenArmPenalty.DamageMultiplier
         local org = owner.organism
-        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
-            multiplier = multiplier * 0.75 -- Even less damage
-        end
-        mul = mul * multiplier
+        local armDamage = self:GetArmDamagePercent(owner)
+        -- Scale damage penalty based on arm damage (up to -35% at full damage)
+        local damagePenalty = 1 - (armDamage * 0.35)
+        mul = mul * math.max(multiplier, damagePenalty)
     end
 
     return mul
@@ -1305,6 +1329,13 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                     end
                 end
 
+                -- Add pain when blocking with damaged arms
+                if wep:HasBrokenArm(ent) and ent.organism then
+                    local painAmount = wep.BrokenArmPenalty.PainOnBlock or 8
+                    local armDamage = wep:GetArmDamagePercent(ent)
+                    ent.organism.painadd = (ent.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
+                end
+
                 ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (perfectblock and 0 or 1) * staminaLossMul
 
                 if not owner:IsNPC() then
@@ -1431,14 +1462,16 @@ function SWEP:CustomThink()
 
     self:SetHold(owner.suiciding and self.SuicideHoldType or self.HoldType)
 
-    if SERVER and owner.organism and owner.organism.rarmamputated then
+    if SERVER and owner.organism and owner.organism.rarmamputated and not owner.organism.larmamputated then
         self:RemoveFake()
-		
+
 		hg.drop(owner)
 
         return
     end
 
+    -- Allow holding two-handed weapons with both arms broken (but not amputated)
+    -- Only prevent if one arm is amputated
     if owner.organism and owner.organism.larmamputated and self.TwoHanded then return end
 
     self:ThinkAdd()
@@ -1935,7 +1968,14 @@ function SWEP:CustomThink()
 
                 self.attackedOnce = true
                 self.slash = nil
-                
+
+                -- Add pain to attacker when hitting with damaged arms
+                if self:HasBrokenArm(owner) and owner.organism then
+                    local painAmount = self.BrokenArmPenalty.PainOnHit or 12
+                    local armDamage = self:GetArmDamagePercent(owner)
+                    owner.organism.painadd = (owner.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
+                end
+
                 self:PrimaryAttackAdd(ent, trace)
             end
 
@@ -2069,6 +2109,13 @@ function SWEP:CustomThink()
                 self.attackedOnce = true
                 self.slash = nil
 
+                -- Add pain to attacker when hitting with damaged arms
+                if self:HasBrokenArm(owner) and owner.organism then
+                    local painAmount = self.BrokenArmPenalty.PainOnHit or 12
+                    local armDamage = self:GetArmDamagePercent(owner)
+                    owner.organism.painadd = (owner.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
+                end
+
                 self:SecondaryAttackAdd(ent, trace)
             end
 
@@ -2186,7 +2233,14 @@ function SWEP:CustomThink()
 
                 self.attackedOnce = true
                 self.slash = nil
-                
+
+                -- Add pain to attacker when hitting with damaged arms
+                if self:HasBrokenArm(owner) and owner.organism then
+                    local painAmount = self.BrokenArmPenalty.PainOnHit or 12
+                    local armDamage = self:GetArmDamagePercent(owner)
+                    owner.organism.painadd = (owner.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
+                end
+
                 self:PrimaryAttackAdd(ent, trace)
             end
 
@@ -2238,7 +2292,9 @@ function SWEP:PrimaryAttack()
 
     if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or self:GetChargeState() > 0) and not (ply.fake or (ply.organism and (ply.organism.fake or ply.organism.otrub)) or IsValid(ply.FakeRagdoll)) then return end
 
+    -- Allow attacking with both arms broken (but not amputated)
     if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
+    if ply.organism and ply.organism.rarmamputated and ply.organism.larmamputated and self.TwoHanded then return end
     if !hg.KeyDown(self:GetOwner(), IN_ATTACK2) and not self:CanPrimaryAttack() then return end
     
     if self:GetLastBlocked() + 1 > CurTime() then
@@ -2354,7 +2410,9 @@ end
 function SWEP:SecondaryAttack(override)
     local ply = self:GetOwner()
     if self:IsEquipLocked() then return end
+    -- Allow attacking with both arms broken (but not both amputated)
     if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
+    if ply.organism and ply.organism.rarmamputated and ply.organism.larmamputated and self.TwoHanded then return end
 
     if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or self:GetChargeState() > 0) then return end
 

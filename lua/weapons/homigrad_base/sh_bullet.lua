@@ -729,11 +729,44 @@ function SWEP:FireBullet()
 		local spreadMul = 1 + rarm * 1.5 + larm * 0.5
 		if organism.rarmamputated then spreadMul = spreadMul + 1.0 end
 		if organism.larmamputated then spreadMul = spreadMul + 0.5 end
-		if organism.rarmdislocated or organism.larmdislocated then spreadMul = spreadMul + 0.3 end
+		if organism.rarmdislocated or organism.larmdislocated or organism.rarmdislocation or organism.larmdislocation then spreadMul = spreadMul + 0.3 end
 		-- Apply armstrength penalty from spine2 damage (further reduces accuracy)
 		if organism.armstrength and organism.armstrength < 1 then
 			spreadMul = spreadMul * (1 / organism.armstrength)
 		end
+
+		-- Mitigation calculation for overall control (spread)
+		local plyVel = owner:GetVelocity()
+		local isStandingStill = isvector(plyVel) and plyVel:LengthSqr() < 100
+		local isCrouching = owner:Crouching()
+		local isRagdolled = IsValid(owner.FakeRagdoll)
+		local isHoldingBreath = organism.holdingbreath
+
+		local mitigation_mult = 1
+		if isRagdolled then
+			mitigation_mult = mitigation_mult * 0.6
+		elseif isCrouching then
+			mitigation_mult = mitigation_mult * 0.75
+		elseif isStandingStill then
+			mitigation_mult = mitigation_mult * 0.9
+		end
+
+		if isHoldingBreath then
+			mitigation_mult = mitigation_mult - 0.15
+		end
+
+		-- Broken arms bypass this mitigation
+		local bypass_mitigation = (rarm >= 1) or (larm >= 1) or organism.rarmamputated or organism.larmamputated
+		if bypass_mitigation then
+			mitigation_mult = 1
+		end
+
+		if not bypass_mitigation then
+			local debuff_portion = spreadMul - 1
+			debuff_portion = debuff_portion * mitigation_mult
+			spreadMul = 1 + debuff_portion
+		end
+
 		bullet.Spread = bullet.Spread * spreadMul
 	end
 	bullet.Num = 1

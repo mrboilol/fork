@@ -102,18 +102,10 @@ bloodparticles_hook[4] = function(mul)
 		if radiusSqr < hitPos:LengthSqr() then table_remove(hg.bloodparticles2, i) continue end
 
         if result.Hit then
-            table_remove(hg.bloodparticles2, i)
-            
-            --util.Decal("Water.Blood", pos + result.HitNormal, pos - result.HitNormal, ents.FindInSphere(pos, 1))
-
-            --local newvec = result.Normal:Angle()
-            --newvec:RotateAroundAxis(result.HitNormal, 180)
-            --newvec = newvec:Forward() * part[3] * mul
---
-            --pos:Set(posSet)
-            --posSet:Set(hitPos + newvec)
-
-            continue
+            -- Keep particle alive - will despawn via age or hardcap
+            -- Reset position to keep it visible
+            pos:Set(posSet)
+            posSet:Set(hitPos + VectorRand(-5, 5))
         else
             pos:Set(posSet)
             posSet:Set(hitPos)

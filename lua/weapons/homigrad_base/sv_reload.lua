@@ -1,23 +1,113 @@
 --
 local CurTime = CurTime
 util.AddNetworkString("hgwep reload")
+
+SWEP.ArmReloadPenalty = {
+    PainOnReload = 6, -- pain when reloading with broken left arm
+    MissingRightArmSpeedMul = 0.4, -- 60% slower when right arm is missing
+    MissingRightArmPain = 15, -- pain when right arm missing + left arm broken
+    LeftArmBrokenReloadSlow = 1.5 -- extra multiplier when left arm is broken
+}
+
+function SWEP:CanRackWithOneHand()
+    local ply = self:GetOwner()
+    if not IsValid(ply) or not ply.organism then return true end
+    local org = ply.organism
+
+    -- Can't rack one-handed if left arm is missing
+    if org.larmamputated then return false end
+
+    return true
+end
+
+function SWEP:HasRightArmMissing()
+    local ply = self:GetOwner()
+    if not IsValid(ply) or not ply.organism then return false end
+    return ply.organism.rarmamputated
+end
+
+function SWEP:GetReloadArmPenalty()
+    local ply = self:GetOwner()
+    if not IsValid(ply) or not ply.organism then return 0, 1 end
+    local org = ply.organism
+    local pain = 0
+    local speedMul = 1
+
+    -- Check right arm health
+    local rightArmHealthy = org.rarm and org.rarm < 1 and not org.rarmdislocation and not org.rarmamputated
+    local leftArmBroken = (org.larm and org.larm > 0) or org.larmdislocation
+
+    -- Pain from left arm broken during reload (always applies)
+    if leftArmBroken then
+        pain = pain + (self.ArmReloadPenalty.PainOnReload or 6) * (org.larm or 0)
+        if org.larmdislocation then
+            pain = pain + 4
+        end
+    end
+
+    -- Speed: only slow down if right arm is also damaged/missing
+    -- If right arm is healthy, reload is fast even with left arm broken
+    if leftArmBroken and not rightArmHealthy then
+        speedMul = speedMul * (1 + (self.ArmReloadPenalty.LeftArmBrokenReloadSlow or 0.5))
+    end
+
+    -- Very hard to use two-handed guns when right arm is missing
+    if org.rarmamputated and not org.larmamputated then
+        speedMul = speedMul * (self.ArmReloadPenalty.MissingRightArmSpeedMul or 0.4)
+        -- Extra pain if left arm is also damaged
+        if leftArmBroken then
+            pain = pain + (self.ArmReloadPenalty.MissingRightArmPain or 15)
+        end
+    end
+
+    return pain, speedMul
+end
+
 function SWEP:Reload(time)
 	if self.reload then return end
 	if IsValid(self:GetOwner().FakeRagdoll) and self:GetOwner().FakeRagdoll.ConsLH then return end
 	if not self:CanUse() or not self:CanReload() then self:OnCantReload() return end
+
+	-- Check for left arm missing - can't rack one-handed bolt actions
+	local ply = self:GetOwner()
+	if ply.organism and ply.organism.larmamputated then
+		-- If weapon needs racking (drawBullet == false), force floor reload
+		if self.drawBullet == false then
+			if SERVER then
+				ply:Notify("You need both arms to rack the bolt. Use floor reload.", 1)
+			end
+			self:OnCantReload()
+			return
+		end
+	end
+
 	self.LastReload = CurTime()
 	self:ReloadStart()
 	self:ReloadStartPost()
 	local org = self:GetOwner().organism
+
+	-- Get arm-related penalties
+	local armPain, armSpeedMul = self:GetReloadArmPenalty()
+
 	self.StaminaReloadMul = (org and ((2 - (self:GetOwner().organism.stamina[1] / 180)) + ((org.pain / 40) + (org.larm / 3) + (org.rarm / 5)) - (1 - math.Clamp(org.recoilmul or 1,0.45,1.4))) or 1)
     if org and org.fear and org.fear > 0 then
         self.StaminaReloadMul = self.StaminaReloadMul * (1 + org.fear * 0.05) -- 5% longer reload per fear point
     end
 	self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)
+
+	-- Apply arm speed penalty
+	self.StaminaReloadMul = self.StaminaReloadMul * armSpeedMul
+
 	self.StaminaReloadTime = self.ReloadTime * self.StaminaReloadMul
 	self.StaminaReloadTime = (self.StaminaReloadTime + (self:Clip1() > 0 and -self.StaminaReloadTime/3 or 0 ))
 	self.reload = self.LastReload + self.StaminaReloadTime
 	self.dwr_reverbDisable = true
+
+	-- Add pain from arm damage
+	if armPain > 0 and org then
+		org.painadd = (org.painadd or 0) + armPain
+	end
+
 	net.Start("hgwep reload")
 		net.WriteEntity(self)
 		net.WriteFloat(self.LastReload)
@@ -79,6 +169,32 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 	local limbs = org.rarmamputated or org.larmamputated
 	local clip, maxclip, ammocount = ent:Clip1(), ent:GetMaxClip1(), ply:GetAmmoCount(ent.Primary.Ammo)
 
+	-- Calculate arm bonuses/penalties for floor reload
+	local rightArmHealthy = org.rarm and org.rarm < 1 and not org.rarmdislocation and not org.rarmamputated
+	local leftArmBroken = (org.larm and org.larm > 0) or org.larmdislocation
+
+	-- Add pain when left arm is broken during floor reload
+	if leftArmBroken then
+		local painAmount = 6 * (org.larm or 0) + (org.larmdislocation and 4 or 0)
+		org.painadd = (org.painadd or 0) + painAmount
+	end
+
+	-- Speed multiplier: faster when right arm is healthy
+	local speedMult = 1.0
+	if rightArmHealthy and not leftArmBroken then
+		speedMult = 0.7 -- 30% faster with healthy right arm
+	elseif leftArmBroken and rightArmHealthy then
+		speedMult = 1.0 -- normal speed
+	elseif leftArmBroken then
+		speedMult = 1.5 -- slower when left arm broken and right arm also damaged
+	end
+
+	-- Drop chance: lower when right arm is healthy
+	local dropChanceMult = 1.0
+	if rightArmHealthy then
+		dropChanceMult = 0.5 -- 50% less likely to drop
+	end
+
 	if clip >= maxclip then return end
 
 	if limbs and clip < maxclip or (ammocount > 0 or (isshotgun and clip > 0 and not ent.drawBullet)) then
@@ -97,10 +213,13 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 				if not SafeCheck(ply, ent, dist) then FailSafe(ply) return end
 
 				if isnumber(i) then
-					timer.Simple(i * mRand(3.2, 3.6) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1), function()
+					timer.Simple(i * mRand(3.2, 3.6) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1) * speedMult, function()
 						if not SafeCheck(ply, ent, dist) then FailSafe(ply) return end
 
-						if mRandom(10 * org.consciousness) == (5 * org.consciousness) then
+						-- Adjusted drop chance based on right arm health
+						local dropCheck = mRandom(10 * org.consciousness / dropChanceMult)
+						local dropThreshold = (5 * org.consciousness)
+						if dropCheck == dropThreshold then
 							if IsValid(ply:GetNetVar("carryent2")) then
 								local ent2 = ply:GetNetVar("carryent2")
 								ply:SetNetVar("carryent2",NULL)
@@ -127,7 +246,7 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 			end
 		end
 
-		timer.Create("FloorReload_"..ply:SteamID64(), (ent.ReloadTime + mRand(0.8, 1.8) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1)) or 5, 1, function()
+		timer.Create("FloorReload_"..ply:SteamID64(), (ent.ReloadTime + mRand(0.8, 1.8) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1) * speedMult) or 5, 1, function()
 			if not SafeCheck(ply, ent, dist) then FailSafe(ply) return end
 
 			ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".wav", 55)

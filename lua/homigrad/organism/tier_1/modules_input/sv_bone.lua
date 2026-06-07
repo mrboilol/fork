@@ -156,14 +156,6 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 				PlayBoneBreakSound(org.owner)
-
-		-- Chance to puncture artery at break site
-		if math.random() < 0.25 then
-			local safeDir = dir or vector_origin
-			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
-			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit, true) end
-		end
 		//broken
 	else
 		--//org[key] = 0.5
@@ -185,14 +177,6 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		PlayBoneBreakSound(org.owner)
-
-		-- Chance to puncture artery at dislocation site
-		if math.random() < 0.10 then
-			local safeDir = dir or vector_origin
-			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
-			local safeBone = boneindex or (key == "rleg" and "ValveBiped.Bip01_R_Calf" or key == "lleg" and "ValveBiped.Bip01_L_Calf" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit, true) end
-		end
 		//dislocated
 	end
 
@@ -247,14 +231,6 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
-
-		-- Chance to puncture artery at break site
-		if math.random() < 0.25 then
-			local safeDir = dir or vector_origin
-			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
-			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.3, dmgInfo, safeBone, safeDir, safeHit, true) end
-		end
 		//broken
 	else
 		org[key.."dislocation"] = true
@@ -276,14 +252,6 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
-
-		-- Chance to puncture artery at dislocation site
-		if math.random() < 0.10 then
-			local safeDir = dir or vector_origin
-			local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
-			local safeBone = boneindex or (key == "rarm" and "ValveBiped.Bip01_R_Forearm" or key == "larm" and "ValveBiped.Bip01_L_Forearm" or nil)
-			if hg.hitArtery then hg.hitArtery(key .. "artery", org, dmg * 0.2, dmgInfo, safeBone, safeDir, safeHit, true) end
-		end
 		//dislocated
 	end
 
@@ -333,12 +301,6 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		print("[HG Bone] SPINE3 threshold crossed: spine3=" .. tostring(org.spine3) .. " oldDmg=" .. tostring(oldDmg))
 		if math.random() < 0.5 then
 			print("[HG Bone] NECK BREAK TRIGGERED from spine damage")
-			-- Bigger chance to puncture neck artery on neck break
-			if math.random() < 0.35 then
-				local safeDir = dir or vector_origin
-				local safeHit = (hit and not isbool(hit)) and hit or dmgInfo:GetDamagePosition()
-				if hg.hitArtery then hg.hitArtery("arteria", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Neck1", safeDir, safeHit, true) end
-			end
 			hg.BreakNeck(org.owner, true)
 			return result, vecrand
 		else
@@ -572,64 +534,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	-- Accumulate head trauma for long-term stroke risk
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
-
-	-- Head KABOOM when severely damaged from injury or repeated hits
-	local headSeverelyDamaged = (org.skull and org.skull >= 1) or (org.brain and org.brain >= 1)
-	local jawDestroyed = org.jaw and org.jaw >= 1
-	
-	-- Track consecutive head hits for explosion buildup
-	org.headHitCount = org.headHitCount or 0
-	if dmg > 0.05 then
-		org.headHitCount = org.headHitCount + 1
-	end
-	
-	-- Head explosion (kaboom) when severely damaged
-	if headSeverelyDamaged and org.isPly and not org.headExploded then
-		-- Calculate chance based on severity and repeated hits
-		local explodeChance = 0.20  -- Base 20% when severely damaged
-		if jawDestroyed then explodeChance = explodeChance + 0.10 end  -- +10% if jaw destroyed
-		explodeChance = explodeChance + (org.headHitCount * 0.025)  -- +2.5% per hit
-		
-		if math.random() < explodeChance then
-			org.headExploded = true
-			org.headamputated = true  -- Mark as amputated too
-
-			-- Track that head was previously amputated for stable healing approach
-			org.owner.HG_PreviouslyAmputated = org.owner.HG_PreviouslyAmputated or {}
-			org.owner.HG_PreviouslyAmputated["head"] = true
-
-			local headPos = org.owner:GetBonePosition(org.owner:LookupBone("ValveBiped.Bip01_Head"))
-			if headPos then
-				-- Big initial explosion
-				net.Start("hg_bloodimpact")
-				net.WriteVector(headPos)
-				net.WriteVector(Vector(0, 0, 1))
-				net.WriteFloat(12)
-				net.WriteInt(4, 8)
-				net.Broadcast()
-				
-				-- Massive blood spray burst
-				for i = 1, 10 do
-					timer.Simple(i * 0.03, function()
-						net.Start("hg_bloodimpact")
-						net.WriteVector(headPos + VectorRand(-5, 5))
-						net.WriteVector(VectorRand(-1, 1):GetNormalized())
-						net.WriteFloat(6)
-						net.WriteInt(3, 8)
-						net.Broadcast()
-					end)
-				end
-			end
-			
-			-- KABOOM effects - player is dead
-			org.owner:EmitSound("explosionextra/explode_" .. math.random(1, 9) .. ".wav", 120, math.random(95, 105))
-			org.shock = 100
-			org.consciousness = 0
-			org.brain = 1.0
-			org.skull = 1
-			org.alive = false
-		end
-	end
 
 	-- Trigger severe headtrauma flash on ANY brain damage from head hits
 	local brainDamage = org.brain > 0
