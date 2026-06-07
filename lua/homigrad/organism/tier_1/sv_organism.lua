@@ -92,6 +92,9 @@ hook.Add("Org Clear", "Main", function(org)
 	org.noradrenaline = 0
 	org.blindness = nil
 
+	-- Hand dominance for limb impairment calculations
+	org.hand_dominance = "right"
+
 	if IsValid(org.owner) then
 		if org.owner:IsPlayer() and org.owner:Alive() then
 			org.owner:SetHealth(100)
@@ -481,6 +484,18 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.timeValue = timeValue
 	org.incapacitated = false
 	org.critical = false
+
+	-- Aiming fatigue tracking (affects recoil multipliers)
+	if isPly then
+		local wep = owner:GetActiveWeapon()
+		local isAiming = IsValid(wep) and wep.IsZoom and wep:IsZoom()
+
+		if isAiming then
+			org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5, 10)
+		else
+			org.aiming_fatigue = math.max((org.aiming_fatigue or 0) - timeValue * 0.3, 0)
+		end
+	end
 
 	if isPly then
 		module.stamina[2](owner, org, timeValue)

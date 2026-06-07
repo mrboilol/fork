@@ -32,6 +32,7 @@ end
 SWEP.sprayAngles = Angle(0,0,0)
 
 SWEP.weaponSway = Angle(0,0,0)
+
 local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 1)
 
 function SWEP:PrimarySpread()
@@ -53,18 +54,58 @@ function SWEP:PrimarySpread()
 		if owner:IsNPC() then return end
 		local org = owner.organism
 		if org then
-			org.painadd = org.painadd + (org.larm * 0 + org.rarm * 2) * self.Primary.Force / 20 * (self.NumBullet or 1)
+			-- Pain from shooting based on hand dominance
+			local dominance = org.hand_dominance or "right"
+			local pain_mult = 0
+
+			if dominance == "right" then
+				-- Right hand dominant: no pain if right arm amputated, unless left arm is broken
+				if org.rarmamputated then
+					pain_mult = org.larm >= 1 and org.larm * 2 or 0
+				else
+					pain_mult = org.rarm * 2
+				end
+			else
+				-- Left hand dominant: no pain if left arm amputated, unless right arm is broken
+				if org.larmamputated then
+					pain_mult = org.rarm >= 1 and org.rarm * 2 or 0
+				else
+					pain_mult = org.larm * 2
+				end
+			end
+
+			org.painadd = org.painadd + pain_mult * self.Primary.Force / 20 * (self.NumBullet or 1)
 		end
 	end
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
 		local organism = owner.organism or {}
-		
+
 		local force = self.Primary.Damage / 100 * self.addSprayMul * (self.NumBullet or 1) * math.min(sprayI / 30,0.6)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
-		mul = mul * (((organism.larm or 0) + (organism.rarm or 0) + 2) / 1 + ((organism.larmamputated and 5 or 0) + (organism.rarmamputated and 5 or 0)))
+
+		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
+		local dominance = organism.hand_dominance or "right"
+		local arm_debuff = 0
+		local amputate_debuff = 0
+
+		if dominance == "right" then
+			-- Right hand dominant: right arm damage affects more
+			arm_debuff = (organism.rarm or 0) * 2 + (organism.larm or 0) * 0.5
+			amputate_debuff = (organism.rarmamputated and 3 or 0) + (organism.larmamputated and 1 or 0)
+			arm_debuff = arm_debuff + (organism.rarmdislocation and 0.5 or 0) + (organism.larmdislocation and 0.2 or 0)
+		else
+			-- Left hand dominant: left arm damage affects more
+			arm_debuff = (organism.larm or 0) * 2 + (organism.rarm or 0) * 0.5
+			amputate_debuff = (organism.larmamputated and 3 or 0) + (organism.rarmamputated and 1 or 0)
+			arm_debuff = arm_debuff + (organism.larmdislocation and 0.5 or 0) + (organism.rarmdislocation and 0.2 or 0)
+		end
+
+		-- Apply aiming fatigue penalty
+		arm_debuff = arm_debuff + (organism.aiming_fatigue or 0) * 0.15
+
+		mul = mul * ((2 + arm_debuff) / 1 + amputate_debuff)
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
-		mul = mul * (1 + (organism.fear or 0) * 0.5)
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
