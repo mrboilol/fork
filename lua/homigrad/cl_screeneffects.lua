@@ -351,6 +351,9 @@ local lobotomy_mats = {
 	[8] = Material("overlays/tallflash3.png")
 }
 
+local consciousnessTypeBeatVolume = 0.18
+local dying2Volume = 0.2
+
 local function getLobotomyMemoryMat()
 	local screens = hg and hg.screens
 	if not screens then return end
@@ -424,6 +427,11 @@ local function stopthings()
 	if IsValid(NoiseStation2) then
 		NoiseStation2:Stop()
 		NoiseStation2 = nil
+	end
+
+	if IsValid(NoiseStation2Dying) then
+		NoiseStation2Dying:Stop()
+		NoiseStation2Dying = nil
 	end
 
 	if IsValid(BrainTraumaStation) then
@@ -1375,6 +1383,24 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
+			if !IsValid(NoiseStation2Dying) or NoiseStation2Dying:GetState() != GMOD_CHANNEL_PLAYING then
+				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
+					if IsValid(station) then
+						station:SetVolume(0)
+						station:Play()
+						NoiseStation2Dying = station
+						station:EnableLooping(true)
+					end
+				end)
+			end
+			
+			if IsValid(NoiseStation2) then
+				NoiseStation2:SetVolume(math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, consciousnessTypeBeatVolume))
+			end
+
+			if IsValid(NoiseStation2Dying) then
+				NoiseStation2Dying:SetVolume(math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, dying2Volume))
+
 			if canRetrySound("EndStation", EndStation) then
 				sound.PlayFile("sound/itsallcomingtoanend.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
@@ -1609,6 +1635,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			hg.consciousBeatIntensity = 0
 			if IsValid(NoiseStation2) then
 				NoiseStation2:SetVolume(0)
+			end
+
+			if IsValid(NoiseStation2Dying) then
+				NoiseStation2Dying:SetVolume(0)
 			end
 			if IsValid(EndStation) then
 				EndStation:SetVolume(0)
@@ -2197,6 +2227,7 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	lply.blindflash:SetAngles(Ang)
 	lply.blindflash:Update()
 end)
+
 
 local function GetConsciousBeatPulse()
 	if not IsValid(lply) or not lply:Alive() then return 0 end
