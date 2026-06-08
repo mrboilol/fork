@@ -873,7 +873,7 @@ function PANEL:ThinkTourniquet(mx, my)
                 if quarterTurns > (self.TourniquetTurnCount or 0) then
                     self.TourniquetTurnCount = quarterTurns
                     -- Send pain to server - increases with each turn
-                    local painAmount = 2 + (quarterTurns * 1.5) -- Base 2 pain, +1.5 per quarter-turn
+                    local painAmount = (2 + (quarterTurns * 1.5)) * 0.3 -- Base 2 pain, +1.5 per quarter-turn, multiplied by 0.3
                     net.Start("hg_medical_minigame_tourniquet_pain")
                     net.WriteFloat(painAmount)
                     net.SendToServer()
@@ -1337,6 +1337,8 @@ function PANEL:OnRemove()
     if hg and hg.MedicalMinigame and hg.MedicalMinigame.Panel == self then
         hg.MedicalMinigame.Panel = nil
     end
+
+    gui.EnableScreenClicker(false)
 end
 
 function PANEL:DrawCommonOverlays(progress, showBleedIndicator)

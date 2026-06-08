@@ -1263,10 +1263,10 @@ local function draw_status_effects()
 	local base_x = ScrW() + HUD.status_effects_x
 	local base_y = HUD.status_effects_y
 	
-	-- Adjust moodle position when dynamic indicator is at top right (hg_indicator == 1)
+	-- Adjust moodle position when dynamic indicator is at top right (hg_indicator == 1 and indicator is in top-right quadrant)
 	local hg_indicator = GetConVar("hg_indicator")
 	local indMode = hg_indicator and hg_indicator:GetInt() or 0
-	if indMode == 1 and HUD.dynamicIndicator and HUD.dynamicIndicator.active then
+	if indMode == 1 and HUD.dynamicIndicator and HUD.dynamicIndicator.active and HUD.dynamicIndicator.x > ScrW() * 0.6 and HUD.dynamicIndicator.y < ScrH() * 0.4 then
 		-- Shift moodles down to not overlap with the dynamic indicator at top right
 		local indicatorBottom = HUD.dynamicIndicator.y + HUD.dynamicIndicator.h + (10 * (ScrH() / 480))
 		if base_y < indicatorBottom then

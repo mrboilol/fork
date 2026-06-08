@@ -91,8 +91,8 @@ if SERVER then
 		org.autoResuscitatorArmed = true
 		org.autoResuscitatorTry = 0
 
-		self.modeValues[1] = 0
-		if self.modeValues[1] == 0 then
+		if self.modeValues[1] > 0 then
+			self.modeValues[1] = 0
 			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end

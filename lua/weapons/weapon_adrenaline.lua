@@ -87,7 +87,6 @@ if SERVER then
 		local entOwner = IsValid(org.owner.FakeRagdoll) and org.owner.FakeRagdoll or org.owner
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, 4, self.modeValues[1] * 4)
-		self.modeValues[1] = 0
 
 		if self.poisoned2 then
 			org.poison4 = CurTime()
@@ -95,7 +94,8 @@ if SERVER then
 			self.poisoned2 = nil
 		end
 
-		if self.modeValues[1] == 0 then
+		if self.modeValues[1] > 0 then
+			self.modeValues[1] = 0
 			owner:SelectWeapon("weapon_hands_sh")
 			--!! self:SpawnGarbage() add this when port dayz models
 			self:Remove()

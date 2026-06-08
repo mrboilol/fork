@@ -107,8 +107,8 @@ if SERVER then
 
 		org.analgesiaAdd = math.min(org.analgesiaAdd + self.modeValues[1] * 0.4, 4)
 
-		self.modeValues[1] = 0
-		if self.modeValues[1] == 0 then
+		if self.modeValues[1] > 0 then
+			self.modeValues[1] = 0
 			owner:SelectWeapon("weapon_hands_sh")
 			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
 			self:Remove()

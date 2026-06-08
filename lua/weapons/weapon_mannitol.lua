@@ -87,7 +87,6 @@ if SERVER then
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 
 		org.mannitol = math.Approach(org.mannitol, 4, self.modeValues[1] * 2)
-		self.modeValues[1] = 0
 
 		-- Head trauma reduction
 		org.headtrauma = 0
@@ -99,7 +98,8 @@ if SERVER then
 			self.poisoned2 = nil
 		end
 
-		if self.modeValues[1] == 0 then
+		if self.modeValues[1] > 0 then
+			self.modeValues[1] = 0
 			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end

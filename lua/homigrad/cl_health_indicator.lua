@@ -837,6 +837,27 @@ function HUD_DrawDynamicIndicator()
         -- Collect bleeding icon screen positions for 2D overlay after cam.End3D
         local bleedScreen2D = {}
         if next(bleedingBones) then
+            local function Project3DToIndicator2D(pos, camPos, lookAng, viewX, viewY, w, h, fov)
+                local localPos = pos - camPos
+                local forward = lookAng:Forward()
+                local right = lookAng:Right()
+                local up = lookAng:Up()
+                
+                local zDist = localPos:Dot(forward)
+                if zDist <= 0.1 then return nil, nil end
+                
+                local xDist = localPos:Dot(right)
+                local yDist = localPos:Dot(up)
+                
+                local fovRad = math.rad(fov)
+                local halfW = zDist * math.tan(fovRad * 0.5)
+                
+                local sx = viewX + w * 0.5 - (xDist / halfW) * (w * 0.5)
+                local sy = viewY + h * 0.5 - (yDist / halfW) * (h * 0.5)
+                
+                return sx, sy
+            end
+
             for key, data in pairs(bleedingBones) do
                 local boneName = majorBones[key].bone
                 local boneID = healthModel:LookupBone(boneName)
@@ -845,8 +866,8 @@ function HUD_DrawDynamicIndicator()
                     if mat then
                         local pos = mat:GetTranslation()
                         pos = pos + Vector(0, 0, 1.5)
-                        local sx, sy, sz = pos:ToScreen()
-                        if sz and sz > 0 then
+                        local sx, sy = Project3DToIndicator2D(pos, camPos, lookAng, viewX, viewY, w, h, 50)
+                        if sx and sy then
                             table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, key = key})
                         end
                     end
