@@ -185,7 +185,15 @@ function hg.DoZManip(ent, ply)
 		ply.zmodel:SetNoDraw(true)
 	end
 
-	if not ply.zmanipstart or IsValid(ply:GetNetVar("carryent2")) or (ply.organism and ply.organism.larmamputated) then return end
+	-- Allow zmanip if either arm is available (prioritize healthy arm)
+	local org = ply.organism
+	local leftArmUsable = not (org and org.larmamputated)
+	local rightArmUsable = not (org and org.rarmamputated)
+
+	-- If neither arm is usable, don't do zmanip
+	if not leftArmUsable and not rightArmUsable then return end
+
+	if not ply.zmanipstart or IsValid(ply:GetNetVar("carryent2")) then return end
 	
 	local time = (math.Clamp((CurTime() - ply.zmanipstart) / ply.zmaniptime, 0, 1))
 	
@@ -265,9 +273,15 @@ function hg.DoZManip(ent, ply)
         end
     end
 
-	local lh = ent:LookupBone("ValveBiped.Bip01_L_Hand")
+	-- Determine which arm to use based on availability (prioritize healthy arm or right arm, if using a right arm all of these things become better overall, bypass right arm priority)
+	local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(ply)
+	local useRightArm = isRight
+	local handBone = useRightArm and "ValveBiped.Bip01_R_Hand" or "ValveBiped.Bip01_L_Hand"
+	local bones = useRightArm and hg.TPIKBonesRH or hg.TPIKBonesLH
+
+	local lh = ent:LookupBone(handBone)
 	local lhmat = ent:GetBoneMatrix(lh)
-	local wmlh = WorldModel:LookupBone("ValveBiped.Bip01_L_Hand")
+	local wmlh = WorldModel:LookupBone(handBone)
 	local wmlhmat = WorldModel:GetBoneMatrix(wmlh)
 
 	local lpos, lang = WorldToLocal(lhmat:GetTranslation(), lhmat:GetAngles(), wmlhmat:GetTranslation(), angle_zero)
@@ -275,8 +289,6 @@ function hg.DoZManip(ent, ply)
 	if ply.zmanipdrawFunc then
 		ply.zmanipdrawFunc(ent, ply, WorldModel, time)
 	end
-
-	local bones = hg.TPIKBonesLH
 	for _, bone in ipairs(bones) do
 		local wm_boneindex = WorldModel:LookupBone(bone)
 		if !wm_boneindex then continue end

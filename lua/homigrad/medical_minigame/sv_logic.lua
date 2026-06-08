@@ -230,6 +230,32 @@ function hg.MedicalMinigame.StartDislocationMinigame(ply, ent, group)
     return true
 end
 
+function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
+    local target = ResolveMinigameTarget(ent) or ply
+    if not CanUseMedicalMinigameTarget(ply, target) then return false end
+
+    local existingSession = hg.MedicalMinigame.BandageSessions[ply]
+    if not existingSession or existingSession.target ~= target then
+        existingSession = {
+            target = target,
+            progress = 0,
+            completions = 0,
+            requiredCompletions = 3 -- Need 3 full wraps to heal
+        }
+        hg.MedicalMinigame.BandageSessions[ply] = existingSession
+    end
+
+    net.Start("hg_medical_minigame_start")
+    net.WriteString("bandage")
+    net.WriteEntity(target)
+    net.WriteFloat(math.Clamp(existingSession.progress or 0, 0, 1))
+    net.WriteInt(existingSession.completions or 0, 8)
+    net.WriteInt(existingSession.requiredCompletions or 3, 8)
+    net.Send(ply)
+
+    return true
+end
+
 net.Receive("hg_medical_minigame_request_amputation", function(len, ply)
     local ent = net.ReadEntity()
     local limb = net.ReadString()
@@ -433,6 +459,15 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
 
         if minigameType == "tourniquet" then return end
 
+        -- Bandage uses threshold-based healing - track completions instead of incremental healing
+        if minigameType == "bandage" then
+            local session = hg.MedicalMinigame.BandageSessions[ply]
+            if session then
+                session.progress = math.min((session.progress or 0) + progressDelta, 1)
+            end
+            return
+        end
+
         local healAmount = 68.75 * progressDelta
         local modeValueIndex = GetMinigameModeValueIndex(wep, "bandage")
         if wep.modeValues and wep.modeValues[modeValueIndex] then
@@ -487,6 +522,28 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
     end
 end)
 
+net.Receive("hg_medical_minigame_tourniquet_pain", function(len, ply)
+    local painAmount = net.ReadFloat()
+    local wep = ply:GetActiveWeapon()
+    if not IsValid(wep) then return end
+    
+    local target = wep.healbuddy or ply
+    if not IsValid(target) or not target.organism then return end
+    
+    target.organism.painadd = (target.organism.painadd or 0) + painAmount
+end)
+
+net.Receive("hg_medical_minigame_dislocation_pain", function(len, ply)
+    local painAmount = net.ReadFloat()
+    local wep = ply:GetActiveWeapon()
+    if not IsValid(wep) then return end
+    
+    local target = wep.healbuddy or ply
+    if not IsValid(target) or not target.organism then return end
+    
+    target.organism.painadd = (target.organism.painadd or 0) + painAmount
+end)
+
 net.Receive("hg_medical_minigame_finish", function(len, ply)
     local requestedType = net.ReadString()
     local reportedProgress = math.Clamp(net.ReadFloat() or 0, 0, 1)
@@ -508,6 +565,29 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
 
         hg.MedicalMinigame.AmputationSessions[ply] = nil
         hg.organism.AmputateLimb(target.organism, limb)
+        return
+    end
+
+    if requestedType == "bandage" then
+        local bandageSession = hg.MedicalMinigame.BandageSessions[ply]
+        if not bandageSession then return end
+
+        local target = bandageSession.target
+        if not CanUseMedicalMinigameTarget(ply, target) then return end
+
+        local wep = ply:GetActiveWeapon()
+        if not IsValid(wep) then return end
+
+        -- Apply healing when required completions reached
+        local done = wep:Heal(target, wep.mode)
+        if done and wep.PostHeal then
+            wep:PostHeal(target, wep.mode)
+        end
+        if wep.net_cooldown2 < CurTime() then
+            wep:SetNetVar("modeValues", wep.modeValues)
+        end
+
+        hg.MedicalMinigame.BandageSessions[ply] = nil
         return
     end
 

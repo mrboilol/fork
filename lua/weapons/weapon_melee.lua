@@ -964,9 +964,9 @@ function SWEP:HasBrokenArm(owner)
     if not IsValid(owner) or not owner.organism then return false end
     local org = owner.organism
     
-    -- For one-handed weapons, check both arms (left arm breakage affects one-handed grip too)
+    -- For one-handed weapons, only check right arm (left arm doesn't affect one-handed grip)
     if not self.TwoHanded then
-        return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.rarmdislocation
+        return (org.rarm and org.rarm >= 1) or org.rarmdislocation
     end
     
     -- For two-handed weapons, check both arms
@@ -979,12 +979,10 @@ function SWEP:GetArmDamagePercent(owner)
     local damage = 0
     
     if not self.TwoHanded then
-        -- For one-handed: check both arms, use the worse one
-        local larmDamage = (org.larm or 0)
+        -- For one-handed: only check right arm (left arm doesn't affect one-handed grip)
         local rarmDamage = (org.rarm or 0)
-        local larmDisloc = org.larmdislocation and 0.5 or 0
         local rarmDisloc = org.rarmdislocation and 0.5 or 0
-        damage = math.max(larmDamage + larmDisloc, rarmDamage + rarmDisloc)
+        damage = rarmDamage + rarmDisloc
     else
         -- For two-handed: average both arms
         local larmDamage = (org.larm or 0) + (org.larmdislocation and 0.5 or 0)
@@ -1060,7 +1058,9 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         if self:HasBrokenArm(owner) then
             local multiplier = self.BrokenArmPenalty.StaminaMultiplier
             local org = owner.organism
-            if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+            local checkLeft = self.TwoHanded and (org.larm and org.larm >= 1 and org.larmdislocation)
+            local checkRight = (org.rarm and org.rarm >= 1 and org.rarmdislocation)
+            if org and (checkLeft or checkRight) then
                 multiplier = multiplier * 1.5 -- More severe
             end
             staminaCost = staminaCost * multiplier
@@ -2322,7 +2322,9 @@ function SWEP:PrimaryAttack()
     if self:HasBrokenArm(ply) then
         local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
         local org = ply.organism
-        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+        local checkLeft = self.TwoHanded and (org.larm and org.larm >= 1 and org.larmdislocation)
+        local checkRight = (org.rarm and org.rarm >= 1 and org.rarmdislocation)
+        if org and (checkLeft or checkRight) then
             multiplier = multiplier * 0.5 -- More severe (even slower)
         end
         mul = mul * multiplier
@@ -2450,7 +2452,9 @@ function SWEP:SecondaryAttack(override)
     if self:HasBrokenArm(ply) then
         local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
         local org = ply.organism
-        if org and ((org.larm and org.larm >= 1 and org.larmdislocation) or (org.rarm and org.rarm >= 1 and org.rarmdislocation)) then
+        local checkLeft = self.TwoHanded and (org.larm and org.larm >= 1 and org.larmdislocation)
+        local checkRight = (org.rarm and org.rarm >= 1 and org.rarmdislocation)
+        if org and (checkLeft or checkRight) then
             multiplier = multiplier * 0.5 -- More severe (even slower)
         end
         mul = mul * multiplier

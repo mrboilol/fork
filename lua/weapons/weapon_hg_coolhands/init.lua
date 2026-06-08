@@ -58,24 +58,39 @@ function SWEP:Deploy()
 end
 
 function SWEP:SecondaryAttack()
-	if self:GetOwner():InVehicle() then return end
+	local owner = self:GetOwner()
+	if owner:InVehicle() then return end
 	if not IsFirstTimePredicted() then return end
-	if self:GetFists() and self:GetOwner().PlayerClassName == "sc_infiltrator" then
+	if self:GetFists() and owner.PlayerClassName == "sc_infiltrator" then
 		self:PrimaryAttack(true)
 	end
 	if self:GetFists() then return end
-	if self:GetOwner():GetNetVar("handcuffed",false) then return end
+	if owner:GetNetVar("handcuffed",false) then return end
+
+	-- Prevent grabbing and using stuff at same time if one arm is missing
+	local org = owner.organism
+	if org and (org.larmamputated or org.rarmamputated) then
+		if IsValid(owner:GetNetVar("carryent")) or IsValid(owner:GetNetVar("carryent2")) then return end
+		if owner:KeyDown(IN_USE) then return end
+	end
+
 	if SERVER then
 		self:SetCarrying()
-		local ply = self:GetOwner()
-		local pos = hg.eye(self:GetOwner())
-		local tr = util.QuickTrace(pos, self:GetOwner():GetAimVector() * self.ReachDistance, {self:GetOwner()})
+		local ply = owner
+		local pos = hg.eye(owner)
+		local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(owner)
+		local reachDist = self.ReachDistance
+		if isRight then
+			reachDist = reachDist * 1.25 -- 25% better reach with right arm!
+		end
+
+		local tr = util.QuickTrace(pos, owner:GetAimVector() * reachDist, {owner})
 
 		if ply.PlayerClassName == "furry" then
 			tr = util.TraceHull({
 				start = pos,
-				endpos = pos + self:GetOwner():GetAimVector() * self.ReachDistance,
-				filter = {self:GetOwner()},
+				endpos = pos + owner:GetAimVector() * reachDist,
+				filter = {owner},
 				mins = Vector(-5, -5, -5),
 				maxs = Vector(5, 5, 5),
 			})
@@ -83,12 +98,22 @@ function SWEP:SecondaryAttack()
 
 		--if (IsValid(tr.Entity) or game.GetWorld() == tr.Entity) and self:CanPickup(tr.Entity) and not tr.Entity:IsPlayer() then
 		if (IsValid(tr.Entity)) and self:CanPickup(tr.Entity) and not tr.Entity:IsPlayer() then
-			local Dist = (select(1, hg.eye(self:GetOwner())) - tr.HitPos):Length()
+			local Dist = (select(1, hg.eye(owner)) - tr.HitPos):Length()
 			--if Dist < self.ReachDistance then
-				sound.Play("weapons/melee/blunt_light"..math_random(8)..".wav", self:GetOwner():GetShootPos(), 65, math_random(90, 110))
+				sound.Play("weapons/melee/blunt_light"..math_random(8)..".wav", owner:GetShootPos(), 65, math_random(90, 110))
 				self:SetCarrying(tr.Entity, tr.PhysicsBone, tr.HitPos, Dist)
 				tr.Entity.Touched = true
 				self:ApplyForce()
+
+				if isBroken and org then
+					local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
+					local disloc = isRight and org.rarmdislocation or org.larmdislocation
+					local painAmount = armVal * 12 + (disloc and 8 or 0)
+					if isRight then
+						painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
+					end
+					org.painadd = (org.painadd or 0) + painAmount
+				end
 			--end
 		elseif IsValid(tr.Entity) and tr.Entity:IsPlayer() then
 			local Dist = (select(1, hg.eye(self:GetOwner())) - tr.HitPos):Length()

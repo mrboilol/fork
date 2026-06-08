@@ -498,15 +498,28 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			end
 			local duration = CurTime() - org.aiming_start_time
 			if duration >= 1.5 then
-				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5, 10)
-
-				local rarm_broken = (org.rarm and org.rarm >= 1) or org.rarmamputated
-				local larm_broken = (org.larm and org.larm >= 1) or org.larmamputated
+				-- Define debuff variables (include amputated arms)
+				local rarm_broken_debuff = (org.rarm and org.rarm >= 1) or org.rarmamputated
+				local larm_broken_debuff = (org.larm and org.larm >= 1) or org.larmamputated
+				-- Define pain variables (exclude amputated arms)
+				local rarm_broken_pain = (org.rarm and org.rarm >= 1) and not org.rarmamputated
+				local larm_broken_pain = (org.larm and org.larm >= 1) and not org.larmamputated
 				local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
 				local larm_dislocated = org.larmdislocated or org.larmdislocation
 
+				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5, 10)
+
+				-- Increase aiming fatigue accumulation for broken/amputated arms
+				if rarm_broken_debuff or larm_broken_debuff then
+					local fatigue_multiplier = 1.5
+					if org.rarmamputated or org.larmamputated then
+						fatigue_multiplier = 2.0 -- More severe for amputated arms
+					end
+					org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5 * fatigue_multiplier, 10)
+				end
+
 				local pain_threshold = 4.0
-				if rarm_broken then
+				if rarm_broken_pain then
 					pain_threshold = 1.5
 				elseif rarm_dislocated then
 					pain_threshold = 2.5
@@ -514,13 +527,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 				if duration > pain_threshold then
 					local pain_rate = timeValue * 1.5
-					if rarm_broken then
+					if rarm_broken_pain then
 						pain_rate = pain_rate * 3.0
 					elseif rarm_dislocated then
 						pain_rate = pain_rate * 1.8
 					end
 
-					if larm_broken then
+					if larm_broken_pain then
 						pain_rate = pain_rate * 1.5
 					end
 

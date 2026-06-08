@@ -1329,6 +1329,40 @@ function SWEP:CoreStep()
 		self:SetNWBool("aiming", false)
 	end
 
+	-- Pain when aiming with broken arm - only if the arm holding the gun is broken
+	if SERVER and self:KeyDown(IN_ATTACK2) and IsValid(owner) and owner.organism then
+		local org = owner.organism
+		local dominance = org.hand_dominance or "right"
+
+		-- Check if the arm being used is actually broken
+		local arm_broken = false
+		local arm_dislocated = false
+
+		if dominance == "right" then
+			-- Right hand dominant: check if right arm is broken
+			arm_broken = (org.rarm and org.rarm >= 1)
+			arm_dislocated = org.rarmdislocation
+		else
+			-- Left hand dominant: check if left arm is broken
+			arm_broken = (org.larm and org.larm >= 1)
+			arm_dislocated = org.larmdislocation
+		end
+
+		-- Only add pain if the arm is actually broken or dislocated
+		if arm_broken or arm_dislocated then
+			local pain_amount = 0
+			if dominance == "right" then
+				pain_amount = (org.rarm or 0) * 1.5 + (org.rarmdislocation and 2 or 0)
+			else
+				pain_amount = (org.larm or 0) * 1.5 + (org.larmdislocation and 2 or 0)
+			end
+
+			if pain_amount > 0 then
+				org.painadd = (org.painadd or 0) + pain_amount * 0.1
+			end
+		end
+	end
+
 	if self:KeyDown(IN_SPEED) then
 		if !self.aiminghuuuy then
 			self.aiminghuuuy = true

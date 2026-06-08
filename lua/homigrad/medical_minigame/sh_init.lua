@@ -4,6 +4,8 @@ if SERVER then
     util.AddNetworkString("hg_medical_minigame_finish")
     util.AddNetworkString("hg_medical_minigame_cancel")
     util.AddNetworkString("hg_medical_minigame_request_amputation")
+    util.AddNetworkString("hg_medical_minigame_tourniquet_pain")
+    util.AddNetworkString("hg_medical_minigame_dislocation_pain")
 end
 
 hg.MedicalMinigame = hg.MedicalMinigame or {}

@@ -606,7 +606,10 @@ hook.Add("Think", "Fake", function()
 				end
 			end
 
-			if neckwound and ragdoll:LookupBone(neckwound[4]) and ply:KeyDown(IN_USE) then
+			-- Check if player is standing up - if so, no bleeding prevention
+			local isStanding = ply.posture and (ply.posture == 1 or ply.posture == 2 or ply.posture == 3 or ply.posture == 4 or ply.posture == 5 or ply.posture == 6)
+
+			if neckwound and ragdoll:LookupBone(neckwound[4]) and ply:KeyDown(IN_USE) and not isStanding then
 				local bone = ragdoll:LookupBone(neckwound[4])
 				local neckpos, neckang = ragdoll:GetBonePosition(bone)
 				if neckpos and neckang then

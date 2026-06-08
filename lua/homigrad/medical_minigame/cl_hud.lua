@@ -448,6 +448,8 @@ function PANEL:Init()
     self.WrapAngle = 0
     self.GameType = (hg and hg.MedicalMinigame and hg.MedicalMinigame.NextType) or "bandage"
     self.TargetTurns = hg.MedicalMinigame.RequiredTurns or 6
+    self.BandageCompletions = hg.MedicalMinigame.NextCompletions or 0
+    self.BandageRequiredCompletions = hg.MedicalMinigame.NextRequiredCompletions or 3
     
     self.CenterX = ScrW() / 2
     self.CenterY = ScrH() / 2
@@ -471,9 +473,10 @@ function PANEL:Init()
     self.TourniquetStrapGrabbed = false
     self.TourniquetTubeAccumulatedAngle = 0
     self.TourniquetTubeRotation = 0
-    self.TourniquetTubeRequiredTurns = 2.25
+    self.TourniquetTubeRequiredTurns = 4.5 -- Increased for harder turning
     self.TourniquetLastTubeAngle = nil
     self.TourniquetStageSwitchUntil = 0
+    self.TourniquetTurnCount = 0 -- Track turns for increasing pain
 
     self.SyringeGrabbed = false
     self.SyringeGrabOffsetY = 0
@@ -810,7 +813,11 @@ function PANEL:CompleteWrap()
         net.SendToServer()
     end
 
-    if self:GetRemainingBandage() <= 0 then
+    -- Increment completions for threshold-based healing
+    self.BandageCompletions = (self.BandageCompletions or 0) + 1
+
+    -- Check if required completions reached
+    if self.BandageCompletions >= (self.BandageRequiredCompletions or 3) then
         self:Finish()
         return
     end
@@ -857,8 +864,20 @@ function PANEL:ThinkTourniquet(mx, my)
 
             if self.TourniquetLastTubeAngle then
                 local diff = NormalizeAngleDiff(angle - self.TourniquetLastTubeAngle)
+                local prevAccumulated = self.TourniquetTubeAccumulatedAngle
                 self.TourniquetTubeAccumulatedAngle = self.TourniquetTubeAccumulatedAngle + math.abs(diff)
                 self.TourniquetTubeRotation = self.TourniquetTubeRotation + math.deg(diff)
+
+                -- Track quarter-turns for pain
+                local quarterTurns = math.floor(self.TourniquetTubeAccumulatedAngle / (math.pi / 2))
+                if quarterTurns > (self.TourniquetTurnCount or 0) then
+                    self.TourniquetTurnCount = quarterTurns
+                    -- Send pain to server - increases with each turn
+                    local painAmount = 2 + (quarterTurns * 1.5) -- Base 2 pain, +1.5 per quarter-turn
+                    net.Start("hg_medical_minigame_tourniquet_pain")
+                    net.WriteFloat(painAmount)
+                    net.SendToServer()
+                end
 
                 if self.TourniquetTubeAccumulatedAngle >= (2 * math.pi * self.TourniquetTubeRequiredTurns) then
                     self:Finish()
@@ -1031,6 +1050,20 @@ function PANEL:ThinkDislocation(mx, my)
         self.DislocationAppliedForce = math.Clamp(len / maxLen, 0, 1.6)
         self.DislocationVelX = 0
         self.DislocationVelY = 0
+
+        -- Apply pain when attempting relocation
+        if not self.DislocationLastPainTime or now - self.DislocationLastPainTime > 0.5 then
+            local painAmount = 3 + (self.DislocationAppliedForce * 5) -- Base 3 pain, +5 based on force
+            net.Start("hg_medical_minigame_dislocation_pain")
+            net.WriteFloat(painAmount)
+            net.SendToServer()
+            self.DislocationLastPainTime = now
+
+            -- Play body hitting sound
+            if LocalPlayer() then
+                LocalPlayer():EmitSound("physics/flesh/flesh_impact_hard" .. math.random(1, 6) .. ".wav", 55, math.random(90, 110))
+            end
+        end
     else
         local drag = math.exp(-dt * (self.DislocationDrag or 2.6))
         self.DislocationVelX = (self.DislocationVelX or 0) * drag
@@ -1503,8 +1536,7 @@ function PANEL:PaintTourniquet(w, h)
 
         draw.RoundedBox(8, knobX - 72, knobY - 72, 144, 144, Color(30, 30, 30, 245))
         draw.RoundedBox(6, knobX - 28, knobY - 28, 56, 56, Color(175, 175, 175, 255))
-        DrawRotatedBar(knobX, knobY, 116, 18, self.TourniquetTubeRotation, Color(245, 245, 245, 255))
-        DrawRotatedBar(knobX, knobY, 18, 116, self.TourniquetTubeRotation, Color(245, 245, 245, 255))
+        DrawRotatedBar(knobX, knobY, 116, 18, self.TourniquetTubeRotation, Color(245, 245, 245, 255)) -- Single stick instead of cross
 
         if self.TourniquetStageSwitchUntil > CurTime() then
             local alpha = math.Clamp((self.TourniquetStageSwitchUntil - CurTime()) / 0.25, 0, 1) * 180
@@ -1701,7 +1733,7 @@ function PANEL:Paint(w, h)
     local drawAngleRad = math.rad(self.CurrentAngleObj.y)
     local bx = self.CenterX + math.cos(drawAngleRad) * self.Radius
     local by = self.CenterY + math.sin(drawAngleRad) * self.Radius
-    
+
     -- Draw the white bandage circle under the hand
     local circleRadius = 55 -- Increased from 35
     surface.SetDrawColor(wrapCol.r, wrapCol.g, wrapCol.b, 255)
@@ -1712,6 +1744,13 @@ function PANEL:Paint(w, h)
         table.insert(circlePoly, { x = bx + math.cos(a) * circleRadius, y = by + math.sin(a) * circleRadius })
     end
     surface.DrawPoly(circlePoly)
+
+    -- Draw completion counter in center
+    local completions = self.BandageCompletions or 0
+    local required = self.BandageRequiredCompletions or 3
+    local counterText = completions .. "/" .. required
+    local counterColor = Color(255, 255, 255, 255)
+    draw.DrawText(counterText, "HomigradFontLarge", self.CenterX, self.CenterY - 20, counterColor, TEXT_ALIGN_CENTER)
 
     self:DrawCommonOverlays(self.Progress, true)
 end
@@ -1742,6 +1781,8 @@ net.Receive("hg_medical_minigame_start", function()
     hg.MedicalMinigame.NextTarget = nil
     hg.MedicalMinigame.NextLimb = nil
     hg.MedicalMinigame.NextDislocationSide = nil
+    hg.MedicalMinigame.NextCompletions = nil
+    hg.MedicalMinigame.NextRequiredCompletions = nil
 
     if hg.MedicalMinigame.NextType == "amputation" then
         hg.MedicalMinigame.NextTarget = net.ReadEntity()
@@ -1752,6 +1793,11 @@ net.Receive("hg_medical_minigame_start", function()
         hg.MedicalMinigame.NextLimb = net.ReadString()
         hg.MedicalMinigame.NextProgress = net.ReadFloat()
         hg.MedicalMinigame.NextDislocationSide = net.ReadInt(3)
+    elseif hg.MedicalMinigame.NextType == "bandage" then
+        hg.MedicalMinigame.NextTarget = net.ReadEntity()
+        hg.MedicalMinigame.NextProgress = net.ReadFloat()
+        hg.MedicalMinigame.NextCompletions = net.ReadInt(8)
+        hg.MedicalMinigame.NextRequiredCompletions = net.ReadInt(8)
     end
 
     hg.MedicalMinigame.Panel = vgui.Create("hg_medical_minigame")

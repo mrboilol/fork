@@ -198,9 +198,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local organism = ply.organism or {}
 	local rarm_health = organism.rarm or 0
 	local larm_health = organism.larm or 0
-	local rarm_broken = rarm_health >= 1
+	local rarm_broken = rarm_health >= 1 and not organism.rarmamputated
 	local rarm_dislocated = organism.rarmdislocated or organism.rarmdislocation
-	local larm_broken = larm_health >= 1
+	local larm_broken = larm_health >= 1 and not organism.larmamputated
 	local larm_dislocated = organism.larmdislocated or organism.larmdislocation
 	local rarm_amputated = organism.rarmamputated
 	local larm_amputated = organism.larmamputated
@@ -235,14 +235,19 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 
 	-- Broken arms/dislocations make the weapon heavier (more weighty things)
+	-- Amputated arms have more severe penalty than broken arms
 	local arm_weight_penalty = 0
-	if rarm_broken or rarm_amputated then
+	if rarm_amputated then
+		arm_weight_penalty = arm_weight_penalty + 6.0 -- More severe for amputated
+	elseif rarm_broken then
 		arm_weight_penalty = arm_weight_penalty + 4.5
 	elseif rarm_dislocated then
 		arm_weight_penalty = arm_weight_penalty + 2.5
 	end
 
-	if larm_broken or larm_amputated then
+	if larm_amputated then
+		arm_weight_penalty = arm_weight_penalty + 4.5 -- More severe for amputated
+	elseif larm_broken then
 		arm_weight_penalty = arm_weight_penalty + 3.0
 	elseif larm_dislocated then
 		arm_weight_penalty = arm_weight_penalty + 1.5

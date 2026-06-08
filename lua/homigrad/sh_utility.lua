@@ -1998,3 +1998,37 @@ end
 --\\
 	hg_suppression_viewpunch = CreateConVar("hg_suppression_viewpunch", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Enable viewpunching when you on suppressed", 0, 1)
 --//
+
+--\\ GetPrioritizedArm
+	function hg.GetPrioritizedArm(ply)
+		if not IsValid(ply) or not ply.organism then return "right", false, false end
+		local org = ply.organism
+
+		local rightArmUsable = not org.rarmamputated
+		local leftArmUsable = not org.larmamputated
+
+		local rightArmHealthy = rightArmUsable and not ((org.rarm and org.rarm >= 1) or org.rarmdislocation)
+		local leftArmHealthy = leftArmUsable and not ((org.larm and org.larm >= 1) or org.larmdislocation)
+
+		local chosenArm = "right"
+		if leftArmHealthy and not rightArmHealthy and leftArmUsable then
+			chosenArm = "left"
+		elseif rightArmHealthy and rightArmUsable then
+			chosenArm = "right"
+		elseif rightArmUsable then
+			chosenArm = "right"
+		elseif leftArmUsable then
+			chosenArm = "left"
+		end
+
+		local isRight = (chosenArm == "right")
+		local isBroken = false
+		if isRight then
+			isBroken = ((org.rarm and org.rarm >= 1) or org.rarmdislocation) == true
+		else
+			isBroken = ((org.larm and org.larm >= 1) or org.larmdislocation) == true
+		end
+
+		return chosenArm, isRight, isBroken
+	end
+--//

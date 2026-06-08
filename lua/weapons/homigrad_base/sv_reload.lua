@@ -3,10 +3,11 @@ local CurTime = CurTime
 util.AddNetworkString("hgwep reload")
 
 SWEP.ArmReloadPenalty = {
-    PainOnReload = 6, -- pain when reloading with broken left arm
+    PainOnReload = 35, -- pain when reloading with broken left arm (increased from 12)
     MissingRightArmSpeedMul = 0.4, -- 60% slower when right arm is missing
-    MissingRightArmPain = 15, -- pain when right arm missing + left arm broken
-    LeftArmBrokenReloadSlow = 1.5 -- extra multiplier when left arm is broken
+    MissingRightArmPain = 55, -- pain when right arm missing + left arm broken (increased from 20)
+    LeftArmBrokenReloadSlow = 1.5, -- extra multiplier when left arm is broken
+    BrokenArmPickupPain = 20 -- pain when using broken arm to pick up items
 }
 
 function SWEP:CanRackWithOneHand()
@@ -35,13 +36,13 @@ function SWEP:GetReloadArmPenalty()
 
     -- Check right arm health
     local rightArmHealthy = org.rarm and org.rarm < 1 and not org.rarmdislocation and not org.rarmamputated
-    local leftArmBroken = (org.larm and org.larm > 0) or org.larmdislocation
+    local leftArmBroken = ((org.larm and org.larm > 0) or org.larmdislocation) and not org.larmamputated
 
-    -- Pain from left arm broken during reload (always applies)
-    if leftArmBroken then
-        pain = pain + (self.ArmReloadPenalty.PainOnReload or 6) * (org.larm or 0)
+    -- Pain from left arm broken during reload (only if not amputated)
+    if leftArmBroken and not org.larmamputated then
+        pain = pain + (self.ArmReloadPenalty.PainOnReload or 35) * (org.larm or 0)
         if org.larmdislocation then
-            pain = pain + 4
+            pain = pain + 15
         end
     end
 
@@ -56,7 +57,7 @@ function SWEP:GetReloadArmPenalty()
         speedMul = speedMul * (self.ArmReloadPenalty.MissingRightArmSpeedMul or 0.4)
         -- Extra pain if left arm is also damaged
         if leftArmBroken then
-            pain = pain + (self.ArmReloadPenalty.MissingRightArmPain or 15)
+            pain = pain + (self.ArmReloadPenalty.MissingRightArmPain or 55)
         end
     end
 
@@ -65,11 +66,26 @@ end
 
 function SWEP:Reload(time)
 	if self.reload then return end
-	if IsValid(self:GetOwner().FakeRagdoll) and self:GetOwner().FakeRagdoll.ConsLH then return end
+
+	-- Check if left arm is broken (but not amputated) - allow reload but add pain
+	local ply = self:GetOwner()
+	local org = ply.organism
+	local leftArmBroken = org and ((org.larm and org.larm >= 1) or org.larmdislocation) and not org.larmamputated
+
+	-- Bypass ConsLH check if left arm is broken (but not amputated), add pain instead
+	if IsValid(ply.FakeRagdoll) and ply.FakeRagdoll.ConsLH then
+		if leftArmBroken then
+			-- Add pain for using broken left arm to reload
+			local painAmount = (org.larm or 0) * 15 + (org.larmdislocation and 10 or 0)
+			org.painadd = (org.painadd or 0) + painAmount
+		else
+			return
+		end
+	end
+
 	if not self:CanUse() or not self:CanReload() then self:OnCantReload() return end
 
 	-- Check for left arm missing - can't rack one-handed bolt actions
-	local ply = self:GetOwner()
 	if ply.organism and ply.organism.larmamputated then
 		-- If weapon needs racking (drawBullet == false), force floor reload
 		if self.drawBullet == false then
@@ -169,30 +185,38 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 	local limbs = org.rarmamputated or org.larmamputated
 	local clip, maxclip, ammocount = ent:Clip1(), ent:GetMaxClip1(), ply:GetAmmoCount(ent.Primary.Ammo)
 
-	-- Calculate arm bonuses/penalties for floor reload
-	local rightArmHealthy = org.rarm and org.rarm < 1 and not org.rarmdislocation and not org.rarmamputated
-	local leftArmBroken = (org.larm and org.larm > 0) or org.larmdislocation
+	-- Calculate prioritized arm and penalties for floor reload
+	local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(ply)
 
-	-- Add pain when left arm is broken during floor reload
-	if leftArmBroken then
-		local painAmount = 6 * (org.larm or 0) + (org.larmdislocation and 4 or 0)
+	-- Add pain when using broken arm during floor reload (overall hurt more!)
+	if isBroken then
+		local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
+		local disloc = isRight and org.rarmdislocation or org.larmdislocation
+		local painAmount = 25 * armVal + (disloc and 15 or 0)
+
+		-- Using right arm makes things better overall (reduce pain from a broken arm)
+		if isRight then
+			painAmount = painAmount * 0.7
+		end
 		org.painadd = (org.painadd or 0) + painAmount
 	end
 
-	-- Speed multiplier: faster when right arm is healthy
+	-- Speed multiplier: faster when chosen arm is healthy.
+	-- If using right arm, things are even better overall!
 	local speedMult = 1.0
-	if rightArmHealthy and not leftArmBroken then
-		speedMult = 0.7 -- 30% faster with healthy right arm
-	elseif leftArmBroken and rightArmHealthy then
-		speedMult = 1.0 -- normal speed
-	elseif leftArmBroken then
-		speedMult = 1.5 -- slower when left arm broken and right arm also damaged
+	if not isBroken then
+		speedMult = isRight and 0.5 or 0.8 -- Right arm healthy is super fast (0.5), Left arm healthy is fast (0.8)
+	else
+		speedMult = isRight and 1.1 or 1.6 -- Right arm broken is slightly slower (1.1), Left arm broken is much slower (1.6)
 	end
 
-	-- Drop chance: lower when right arm is healthy
+	-- Drop chance: lower when chosen arm is healthy.
+	-- If using right arm, things are even better overall!
 	local dropChanceMult = 1.0
-	if rightArmHealthy then
-		dropChanceMult = 0.5 -- 50% less likely to drop
+	if not isBroken then
+		dropChanceMult = isRight and 0.4 or 0.7 -- Right arm healthy has 60% less drop chance, Left arm healthy has 30% less
+	else
+		dropChanceMult = isRight and 1.0 or 1.5 -- Right arm broken is normal drop chance, Left arm broken is 1.5x drop chance
 	end
 
 	if clip >= maxclip then return end

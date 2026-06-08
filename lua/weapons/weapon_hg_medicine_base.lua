@@ -650,7 +650,7 @@ if SERVER then
 			local bonewounds = {}
 			if not bone then
 				for i,wound in pairs(org.arterialwounds) do
-					pw = i 
+					pw = i
 					for i1,tbl in pairs(org.wounds) do
 						if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
 						local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
@@ -663,7 +663,7 @@ if SERVER then
 					end
 					--PrintTable(bonewounds)
 				break end
-				
+
 			else
 				for i,wound in pairs(org.arterialwounds) do
 					if ent:GetBoneName(ent:LookupBone(wound[4])) == bone then pw = i break end
@@ -674,12 +674,12 @@ if SERVER then
 						table.insert(bonewounds,i)
 					end
 				end
-			end		
+			end
 			pw = pw or math.random(#org.arterialwounds)
 
 			local wound = org.arterialwounds[pw]
 			if not wound then return false end
-			
+
 			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
 			org[wound[7]] = 0
 

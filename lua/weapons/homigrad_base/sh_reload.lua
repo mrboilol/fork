@@ -10,7 +10,20 @@ SWEP.Notified = false
 function SWEP:CanReload()
 	local ply = self:GetOwner()
 	local char = hg.GetCurrentCharacter(ply)
-	if IsValid(char) and char:IsRagdoll() and IsValid(char.ConsLH) then return end
+
+	-- Check if left arm is broken (but not amputated)
+	local org = ply.organism
+	local leftArmBroken = org and ((org.larm and org.larm >= 1) or org.larmdislocation) and not org.larmamputated
+
+	-- Bypass ConsLH check if left arm is broken (but not amputated), add pain instead
+	if IsValid(char) and char:IsRagdoll() and IsValid(char.ConsLH) then
+		if leftArmBroken then
+			-- Allow reload but pain will be added server-side
+		else
+			return
+		end
+	end
+
 	if self:LastShootTime() + 0.1 > CurTime() then return end
 	if IsValid(ply:GetNetVar("carryent2")) then
 		if SERVER then

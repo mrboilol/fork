@@ -58,35 +58,37 @@ function SWEP:PrimarySpread()
 			local numB = self.NumBullet or 1
 			local calForce = force * numB
 
-			local rarm_broken = (org.rarm and org.rarm >= 1) or org.rarmamputated
-			local larm_broken = (org.larm and org.larm >= 1) or org.larmamputated
+			local rarm_broken = (org.rarm and org.rarm >= 1) and not org.rarmamputated
+			local larm_broken = (org.larm and org.larm >= 1) and not org.larmamputated
 			local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
 			local larm_dislocated = org.larmdislocated or org.larmdislocation
 
-			-- Pain from shooting based on hand dominance
+			-- Pain from shooting based on hand dominance - only if arm is actually broken
 			local dominance = org.hand_dominance or "right"
 			local pain_mult = 0
 
 			if dominance == "right" then
-				-- Right hand dominant: no pain if right arm amputated, unless left arm is broken
-				if org.rarmamputated then
-					pain_mult = org.larm >= 1 and org.larm * 2 or 0
-				else
+				-- Right hand dominant: only hurt if right arm is broken (>=1) or dislocated
+				if rarm_broken then
 					pain_mult = org.rarm * 2
+				elseif rarm_dislocated then
+					pain_mult = 2
 				end
+				-- If right arm amputated, no pain (using left arm instead)
 			else
-				-- Left hand dominant: no pain if left arm amputated, unless right arm is broken
-				if org.larmamputated then
-					pain_mult = org.rarm >= 1 and org.rarm * 2 or 0
-				else
+				-- Left hand dominant: only hurt if left arm is broken (>=1) or dislocated
+				if larm_broken then
 					pain_mult = org.larm * 2
+				elseif larm_dislocated then
+					pain_mult = 2
 				end
+				-- If left arm amputated, no pain (using right arm instead)
 			end
 
 			org.painadd = org.painadd + pain_mult * force / 20 * numB
 
 			-- Left arm gone check (amputated or broken)
-			local left_arm_gone = larm_broken
+			local left_arm_gone = larm_broken or org.larmamputated
 
 			if left_arm_gone then
 				-- Act like weapon is held one handed: high calibers can break/dislocate the right arm
@@ -178,14 +180,17 @@ function SWEP:PrimarySpread()
 		arm_debuff = arm_debuff + (organism.aiming_fatigue or 0) * 0.15
 
 		-- Explicit broken arm recoil penalty (beyond proportional damage)
-		local rarm_broken = (organism.rarm and organism.rarm >= 1) or organism.rarmamputated
-		local larm_broken = (organism.larm and organism.larm >= 1) or organism.larmamputated
+		-- Debuff variables include amputated arms for recoil penalties
+		local rarm_broken_debuff = (organism.rarm and organism.rarm >= 1) or organism.rarmamputated
+		local larm_broken_debuff = (organism.larm and organism.larm >= 1) or organism.larmamputated
 		local broken_arm_recoil_mult = 1
-		if rarm_broken then
-			broken_arm_recoil_mult = broken_arm_recoil_mult * 1.5
+		if rarm_broken_debuff then
+			local multiplier = organism.rarmamputated and 2.0 or 1.5
+			broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
 		end
-		if larm_broken then
-			broken_arm_recoil_mult = broken_arm_recoil_mult * 1.35
+		if larm_broken_debuff then
+			local multiplier = organism.larmamputated and 2.0 or 1.35
+			broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
 		end
 
 		-- Mitigation calculation for overall control / handling

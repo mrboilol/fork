@@ -195,19 +195,12 @@ function SWEP:Think()
 end
 SWEP.net_cooldown2 = 0
 function SWEP:PrimaryAttack()
-	if SERVER then--and not self.modeValuesdef[self.mode][2] then
-
-		self.healbuddy = self:GetOwner()
-		local done = self:Heal(self.healbuddy, self.mode)
-		
-		if(done and self.PostHeal)then
-			self:PostHeal(self.healbuddy, self.mode)
+	if CLIENT then
+		-- Start bandage minigame
+		if hg and hg.MedicalMinigame then
+			hg.MedicalMinigame.StartBandageMinigame(LocalPlayer(), self.healbuddy)
 		end
-
-		if self.net_cooldown2 < CurTime() then
-			self:SetNetVar("modeValues",self.modeValues)
-			--self.net_cooldown2 = CurTime() + 0.1
-		end
+		return
 	end
 end
 
@@ -320,13 +313,15 @@ if CLIENT then
 end
 
 SWEP.mode = 1
-SWEP.modes = 1
+SWEP.modes = 2
 SWEP.modeNames = {
-	[1] = "bandaging"
+	[1] = "bandaging",
+	[2] = "splinting"
 }
 
 function SWEP:InitializeAdd()
 	self.ModelScale = 0.9
+	self.minigameCompletions = 0
 end
 
 SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
@@ -342,6 +337,7 @@ function SWEP:Initialize()
 
 	self.modeValues = {
 		[1] = 40,
+		[2] = 1,
 	}
 
 	if CLIENT then
@@ -364,6 +360,7 @@ end
 
 SWEP.modeValuesdef = {
 	[1] = {40,true},
+	[2] = {1,true},
 }
 
 function SWEP:GetInfo()
@@ -505,6 +502,11 @@ if SERVER then
 		local org = ent.organism
 		local owner = self:GetOwner()
 		if not org then return end
+		
+		-- Splinting mode for broken limbs
+		if self.mode == 2 then
+			return self:Splint(ent, bone)
+		end
 		
 		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
 		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or (istable(org.arterialwounds) and #org.arterialwounds > 0) or (tonumber(org.bleed) or 0) > 0 or org.lleg == 1 or org.rleg == 1 or org.skull >= 0.6 or org.chest == 1 or org.rarm == 1 or org.larm == 1) then return end
@@ -660,6 +662,54 @@ if SERVER then
 		return done
 	end
 
+	function SWEP:Splint(ent, bone)
+		local org = ent.organism
+		local owner = self:GetOwner()
+		if not org then return end
+		
+		-- Check for broken limbs (lleg, rleg, larm, rarm >= 1)
+		local brokenLimbs = {}
+		if org.lleg >= 1 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
+		if org.rleg >= 1 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
+		if org.larm >= 1 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
+		if org.rarm >= 1 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
+		
+		if #brokenLimbs == 0 then return false end
+		
+		-- Apply splint to first broken limb
+		local limbToSplint = brokenLimbs[1]
+		if bone then
+			-- If specific bone targeted, find matching limb
+			for _, limb in ipairs(brokenLimbs) do
+				local limbBone = limb == "lleg" and "ValveBiped.Bip01_L_Calf" or
+								   limb == "rleg" and "ValveBiped.Bip01_R_Calf" or
+								   limb == "larm" and "ValveBiped.Bip01_L_Forearm" or
+								   limb == "rarm" and "ValveBiped.Bip01_R_Forearm" or nil
+				if limbBone and ent:GetBoneName(ent:LookupBone(limbBone)) == bone then
+					limbToSplint = limb
+					break
+				end
+			end
+		end
+		
+		-- Heal the broken limb partially
+		local healAmount = 0.3
+		org[limbToSplint] = math.max(org[limbToSplint] - healAmount, 0)
+		org.avgpain = math.max(org.avgpain - 5, 0)
+		
+		-- Mark as splinted
+		ent.splinted_limbs = ent.splinted_limbs or {}
+		ent.splinted_limbs[limbToSplint] = true
+		ent:SetNetVar("splinted_limbs", ent.splinted_limbs)
+		
+		-- Consume splint
+		self.modeValues[2] = 0
+		
+		owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
+		
+		return true
+	end
+
 	function SWEP:Heal(ent, mode, bone)
 		if ent:IsNPC() then
 			self:NPCHeal(ent, 0.15, "snd_jack_hmcd_bandage.wav")
@@ -676,7 +726,7 @@ if SERVER then
 		end
 
 		local done = self:Bandage(ent, bone)
-		if self.modeValues[1] <= 0 and self.ShouldDeleteOnFullUse then
+		if self.modeValues[1] <= 0 and self.modeValues[2] <= 0 and self.ShouldDeleteOnFullUse then
 			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end
@@ -867,7 +917,11 @@ if SERVER then
 
 			local wound = org.arterialwounds[pw]
 			if not wound then return false end
-			
+
+			-- Prevent tourniquet on amputated arm arteries
+			if wound[7] == "rarmartery" and org.rarmamputated then return false end
+			if wound[7] == "larmartery" and org.larmamputated then return false end
+
 			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
 			org[wound[7]] = 0
 

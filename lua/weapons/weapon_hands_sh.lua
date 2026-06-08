@@ -1074,16 +1074,29 @@ function SWEP:SecondaryAttack()
 	end--]]
 	if owner:GetNetVar("handcuffed",false) then return end
 
+	-- Prevent grabbing and using stuff at same time if one arm is missing
+	local org = owner.organism
+	if org and (org.larmamputated or org.rarmamputated) then
+		if IsValid(owner:GetNetVar("carryent")) or IsValid(owner:GetNetVar("carryent2")) then return end
+		if owner:KeyDown(IN_USE) then return end
+	end
+
 	if SERVER then
 		self:SetCarrying()
 		local ply = owner
 		local pos = hg.eye(ply)
-		local tr = util.QuickTrace(pos, owner:GetAimVector() * self.ReachDistance, {owner})
+		local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(owner)
+		local reachDist = self.ReachDistance
+		if isRight then
+			reachDist = reachDist * 1.25 -- 25% better reach with right arm!
+		end
+
+		local tr = util.QuickTrace(pos, owner:GetAimVector() * reachDist, {owner})
 
 		if clawClasses[ply.PlayerClassName] then
 			tr = util.TraceHull({
 				start = pos,
-				endpos = pos + owner:GetAimVector() * self.ReachDistance,
+				endpos = pos + owner:GetAimVector() * reachDist,
 				filter = {ply, hg.GetCurrentCharacter(ply)},
 				mins = trMinsClaws,
 				maxs = trMaxsClaws,
@@ -1091,7 +1104,7 @@ function SWEP:SecondaryAttack()
 		else
 			tr = util.TraceHull({
 				start = pos,
-				endpos = pos + owner:GetAimVector() * self.ReachDistance,
+				endpos = pos + owner:GetAimVector() * reachDist,
 				filter = {ply, hg.GetCurrentCharacter(ply)},
 				mins = trMins,
 				maxs = trMaxs,
@@ -1106,6 +1119,16 @@ function SWEP:SecondaryAttack()
 				self:SetCarrying(tr.Entity, tr.PhysicsBone, tr.HitPos, Dist)
 				tr.Entity.Touched = true
 				self:ApplyForce()
+
+				if isBroken and org then
+					local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
+					local disloc = isRight and org.rarmdislocation or org.larmdislocation
+					local painAmount = armVal * 12 + (disloc and 8 or 0)
+					if isRight then
+						painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
+					end
+					org.painadd = (org.painadd or 0) + painAmount
+				end
 			--end
 		elseif IsValid(tr.Entity) and tr.Entity:IsPlayer() then
 			local Dist = (select(1, hg.eye(owner)) - tr.HitPos):Length()
