@@ -45,8 +45,8 @@ MouseMinigame.MaterialSets.circle = MouseMinigame.MaterialSets.circle or {
 	LoadMinigameMaterial("mouseminigame/pc_mouse_circle_5.png"),
 }
 local bandageCircleClasses = {
-	["weapon_bandage_sh"] = true,
-	["weapon_bigbandage_sh"] = true,
+	--["weapon_bandage_sh"] = true,
+	--["weapon_bigbandage_sh"] = true,
 }
 local bandageNetDone = "hg_bandage_circle_done"
 local bandageLMBDown = false

@@ -726,10 +726,32 @@ function SWEP:FireBullet()
 		local organism = owner.organism or {}
 		local rarm = organism.rarm or 0
 		local larm = organism.larm or 0
+		local rarm_broken = rarm >= 1 and not organism.rarmamputated
+		local larm_broken = larm >= 1 and not organism.larmamputated
+		local rarm_dislocated = organism.rarmdislocated or organism.rarmdislocation
+		local larm_dislocated = organism.larmdislocated or organism.larmdislocation
+		local rarm_amputated = organism.rarmamputated
+		local larm_amputated = organism.larmamputated
+
+		-- Partial arm damage detection (0.25-0.99 damage range)
+		local rarm_partial = rarm >= 0.25 and rarm < 1 and not rarm_amputated
+		local larm_partial = larm >= 0.25 and larm < 1 and not larm_amputated
+
 		local spreadMul = 1 + rarm * 1.5 + larm * 0.5
-		if organism.rarmamputated then spreadMul = spreadMul + 1.0 end
-		if organism.larmamputated then spreadMul = spreadMul + 0.5 end
-		if organism.rarmdislocated or organism.larmdislocated or organism.rarmdislocation or organism.larmdislocation then spreadMul = spreadMul + 0.3 end
+		if rarm_amputated then spreadMul = spreadMul + 1.0 end
+		if larm_amputated then spreadMul = spreadMul + 0.5 end
+		if rarm_dislocated or larm_dislocated then spreadMul = spreadMul + 0.3 end
+
+		-- Add partial damage spread penalty
+		if rarm_partial then
+			local partial_severity = (rarm - 0.25) / 0.75
+			spreadMul = spreadMul + 0.1 + partial_severity * 0.4 -- 0.1 to 0.5 extra spread
+		end
+		if larm_partial then
+			local partial_severity = (larm - 0.25) / 0.75
+			spreadMul = spreadMul + 0.05 + partial_severity * 0.2 -- 0.05 to 0.25 extra spread
+		end
+
 		-- Apply armstrength penalty from spine2 damage (further reduces accuracy)
 		if organism.armstrength and organism.armstrength < 1 then
 			spreadMul = spreadMul * (1 / organism.armstrength)
@@ -756,7 +778,7 @@ function SWEP:FireBullet()
 		end
 
 		-- Broken arms bypass this mitigation
-		local bypass_mitigation = (rarm >= 1) or (larm >= 1) or organism.rarmamputated or organism.larmamputated
+		local bypass_mitigation = rarm_broken or larm_broken or rarm_amputated or larm_amputated
 		if bypass_mitigation then
 			mitigation_mult = 1
 		end

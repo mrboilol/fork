@@ -202,6 +202,56 @@ function SWEP:Initialize()
 	self:SetBlocking(false)
 end
 
+-- Helper function to get arm damage multiplier for item interaction
+-- Returns a multiplier from 1.0 (healthy) to 0.0 (useless)
+function SWEP:GetArmDamageMultiplier()
+	local owner = self:GetOwner()
+	if not IsValid(owner) or not owner:IsPlayer() then return 1.0 end
+
+	local org = owner.organism
+	if not org then return 1.0 end
+
+	local rarm = org.rarm or 0
+	local larm = org.larm or 0
+	local rarm_amputated = org.rarmamputated
+	local larm_amputated = org.larmamputated
+	local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
+	local larm_dislocated = org.larmdislocated or org.larmdislocation
+
+	-- Check for partial damage (0.25-0.99 range)
+	local rarm_partial = rarm >= 0.25 and rarm < 1 and not rarm_amputated
+	local larm_partial = larm >= 0.25 and larm < 1 and not larm_amputated
+
+	-- Calculate right arm effectiveness
+	local rarm_effectiveness = 1.0
+	if rarm_amputated then
+		rarm_effectiveness = 0.0
+	elseif rarm >= 1 then
+		rarm_effectiveness = 0.2
+	elseif rarm_dislocated then
+		rarm_effectiveness = 0.4
+	elseif rarm_partial then
+		local severity = (rarm - 0.25) / 0.75
+		rarm_effectiveness = 1.0 - severity * 0.5 -- 0.5 to 1.0
+	end
+
+	-- Calculate left arm effectiveness
+	local larm_effectiveness = 1.0
+	if larm_amputated then
+		larm_effectiveness = 0.0
+	elseif larm >= 1 then
+		larm_effectiveness = 0.2
+	elseif larm_dislocated then
+		larm_effectiveness = 0.4
+	elseif larm_partial then
+		local severity = (larm - 0.25) / 0.75
+		larm_effectiveness = 1.0 - severity * 0.5 -- 0.5 to 1.0
+	end
+
+	-- Use the better arm for item interaction
+	return math.max(rarm_effectiveness, larm_effectiveness)
+end
+
 function SWEP:ClearSuperadminGrab()
 	local owner = self:GetOwner()
 	local victim = self.AdminGrabVictim
@@ -1081,6 +1131,13 @@ function SWEP:SecondaryAttack()
 		if owner:KeyDown(IN_USE) then return end
 	end
 
+	-- Check for partial arm damage affecting item interaction
+	local arm_mult = self:GetArmDamageMultiplier()
+	if arm_mult < 0.3 then
+		-- Very damaged arms - prevent heavy lifting
+		if IsValid(owner:GetNetVar("carryent")) or IsValid(owner:GetNetVar("carryent2")) then return end
+	end
+
 	if SERVER then
 		self:SetCarrying()
 		local ply = owner
@@ -1128,6 +1185,17 @@ function SWEP:SecondaryAttack()
 						painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
 					end
 					org.painadd = (org.painadd or 0) + painAmount
+				elseif not isBroken and org then
+					-- Partial damage also causes pain, but less severe
+					local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
+					if armVal >= 0.25 and armVal < 1 then
+						local severity = (armVal - 0.25) / 0.75
+						local painAmount = severity * 5 -- Scale from 0 to 5 pain
+						if isRight then
+							painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
+						end
+						org.painadd = (org.painadd or 0) + painAmount
+					end
 				end
 			--end
 		elseif IsValid(tr.Entity) and tr.Entity:IsPlayer() then
@@ -1214,6 +1282,19 @@ function SWEP:ApplyForce()
 	local target = self:GetOwner():GetAimVector() * (self.CarryDist or 50) + select(1, hg.eye(ply))
 	if not IsValid(self.CarryEnt) or self.CarryBone == nil then return end
 	local phys = self.CarryEnt:GetPhysicsObjectNum(self.CarryBone)
+
+	-- Apply arm damage multiplier to carrying force
+	local arm_mult = self:GetArmDamageMultiplier()
+	if arm_mult < 1.0 then
+		-- Reduce carrying capability based on arm damage
+		if not IsValid(phys) then return end
+		local mass = phys:GetMass()
+		if mass > 15 * arm_mult then
+			-- Too heavy for damaged arms
+			self:SetCarrying()
+			return
+		end
+	end
 
 	if ply.organism and ply.organism.rarmamputated and ply:IsTyping() then
 		self:SetCarrying()

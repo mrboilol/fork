@@ -227,10 +227,19 @@ bloodparticles_hook[2] = function(mul)
 			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 			
 			
-			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
+			sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
 			--sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", hitPos, math.random(10, 60), math.random(80, 120))
 			
-			-- Keep particle alive - will despawn via age or hardcap
+			-- Keep impact particles (gunshot wounds) alive, despawn regular bleeding
+			if part.impact then
+				-- Reset velocity to keep it moving slightly
+				part[3] = VectorRand(-0.5, 0.5)
+				part.lerpedmove = VectorRand(-1, 1)
+			else
+				table_remove(hg.bloodparticles1, i)
+			end
+			
+			continue
 		else
 			local ph = 0
 			local shouldhit = true
@@ -279,10 +288,13 @@ bloodparticles_hook[2] = function(mul)
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
 					
-					-- Keep particle alive - will despawn via age or hardcap
-					-- Reset velocity to keep it moving slightly
-					part[3] = VectorRand(-1, 1)
-					part.lerpedmove = VectorRand(-2, 2)
+					-- Keep impact particles alive, despawn regular bleeding
+					if part.impact then
+						part[3] = VectorRand(-0.5, 0.5)
+						part.lerpedmove = VectorRand(-1, 1)
+					else
+						table_remove(hg.bloodparticles1, i)
+					end
 					
 					continue
 				end

@@ -2011,10 +2011,10 @@ end
 		local leftArmHealthy = leftArmUsable and not ((org.larm and org.larm >= 1) or org.larmdislocation)
 
 		local chosenArm = "right"
-		if leftArmHealthy and not rightArmHealthy and leftArmUsable then
-			chosenArm = "left"
-		elseif rightArmHealthy and rightArmUsable then
+		if rightArmHealthy and rightArmUsable then
 			chosenArm = "right"
+		elseif leftArmHealthy and leftArmUsable then
+			chosenArm = "left"
 		elseif rightArmUsable then
 			chosenArm = "right"
 		elseif leftArmUsable then

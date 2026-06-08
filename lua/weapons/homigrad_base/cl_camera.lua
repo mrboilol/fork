@@ -208,6 +208,10 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
 	local larm_bad = larm_broken or larm_dislocated or larm_amputated
 
+	-- Partial arm damage detection (0.25-0.99 damage range)
+	local rarm_partial = rarm_health >= 0.25 and rarm_health < 1 and not rarm_amputated
+	local larm_partial = larm_health >= 0.25 and larm_health < 1 and not larm_amputated
+
 	-- Mitigation calculation for overall control (weight, sway, alignment, control)
 	local plyVel = ply:GetVelocity()
 	local isStandingStill = isvector(plyVel) and plyVel:LengthSqr() < 100
@@ -236,6 +240,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	-- Broken arms/dislocations make the weapon heavier (more weighty things)
 	-- Amputated arms have more severe penalty than broken arms
+	-- Partial damage (0.25-0.99) adds scaled penalty based on damage severity
 	local arm_weight_penalty = 0
 	if rarm_amputated then
 		arm_weight_penalty = arm_weight_penalty + 6.0 -- More severe for amputated
@@ -243,6 +248,10 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		arm_weight_penalty = arm_weight_penalty + 4.5
 	elseif rarm_dislocated then
 		arm_weight_penalty = arm_weight_penalty + 2.5
+	elseif rarm_partial then
+		-- Partial damage: scale penalty from 0.5 (at 0.25 damage) to 2.0 (at 0.99 damage)
+		local partial_severity = (rarm_health - 0.25) / 0.75
+		arm_weight_penalty = arm_weight_penalty + 0.5 + partial_severity * 1.5
 	end
 
 	if larm_amputated then
@@ -251,6 +260,10 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		arm_weight_penalty = arm_weight_penalty + 3.0
 	elseif larm_dislocated then
 		arm_weight_penalty = arm_weight_penalty + 1.5
+	elseif larm_partial then
+		-- Partial damage: scale penalty from 0.3 (at 0.25 damage) to 1.2 (at 0.99 damage)
+		local partial_severity = (larm_health - 0.25) / 0.75
+		arm_weight_penalty = arm_weight_penalty + 0.3 + partial_severity * 0.9
 	end
 
 	if not bypass_mitigation then
@@ -261,11 +274,15 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local tta = math.Clamp(effective_weight / 4, 0.25, 1) * 0.7
 
-	local healthy_arms = not rarm_bad and not larm_bad
-	local only_left_arm = rarm_amputated and not larm_bad
-	local broken_right_arm = rarm_broken and not larm_bad
-	local only_right_arm = larm_amputated and not rarm_bad
-	local right_arm_broken_left = not rarm_bad and (larm_broken or larm_dislocated) and not larm_amputated
+	local healthy_arms = not rarm_bad and not larm_bad and not rarm_partial and not larm_partial
+	local only_left_arm = rarm_amputated and not larm_bad and not larm_partial
+	local broken_right_arm = rarm_broken and not larm_bad and not larm_partial
+	local only_right_arm = larm_amputated and not rarm_bad and not rarm_partial
+	local right_arm_broken_left = not rarm_bad and not rarm_partial and (larm_broken or larm_dislocated) and not larm_amputated
+
+	-- Calculate partial damage severity for TTA multiplier
+	local rarm_partial_severity = rarm_partial and ((rarm_health - 0.25) / 0.75) or 0
+	local larm_partial_severity = larm_partial and ((larm_health - 0.25) / 0.75) or 0
 
 	local tta_multiplier = 1
 	if healthy_arms then
@@ -278,6 +295,17 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		tta_multiplier = 4.0
 	elseif right_arm_broken_left then
 		tta_multiplier = larm_broken and 2.2 or 1.6
+	elseif rarm_partial or larm_partial then
+		-- Partial damage: scale multiplier based on severity
+		-- Right arm partial is worse than left arm partial
+		if rarm_partial and not larm_partial then
+			tta_multiplier = 1.0 + rarm_partial_severity * 1.5 -- 1.0 to 2.5
+		elseif larm_partial and not rarm_partial then
+			tta_multiplier = 1.0 + larm_partial_severity * 0.8 -- 1.0 to 1.8
+		else
+			-- Both arms partially damaged
+			tta_multiplier = 1.0 + (rarm_partial_severity * 1.5 + larm_partial_severity * 0.8) * 0.7
+		end
 	else
 		if rarm_bad or larm_bad then
 			tta_multiplier = (rarm_broken or larm_broken) and 2.5 or 1.5
@@ -299,7 +327,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		-- Smooth sine wave sway instead of random jitter
 		local time = CurTime()
 		local fearMult = (ply.organism and math.Clamp(ply.organism.fear or 0, 0, 2) or 0) + 1
-		local healthyArmMult = (not rarm_bad and not larm_bad) and 0.6 or 1
+		local healthyArmMult = (not rarm_bad and not larm_bad and not rarm_partial and not larm_partial) and 0.6 or 1
 		local swayX = math.sin(time * 1.5) * 0.5 + math.sin(time * 2.7) * 0.25
 		local swayY = math.cos(time * 1.8) * 0.5 + math.cos(time * 3.1) * 0.25
 		local swayZ = math.sin(time * 2.2) * 0.5 + math.cos(time * 2.9) * 0.25
@@ -309,12 +337,18 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 			arm_sway_debuff = arm_sway_debuff + 2.0
 		elseif rarm_dislocated then
 			arm_sway_debuff = arm_sway_debuff + 0.8
+		elseif rarm_partial then
+			-- Partial damage: scale sway from 0.2 (at 0.25 damage) to 0.7 (at 0.99 damage)
+			arm_sway_debuff = arm_sway_debuff + 0.2 + rarm_partial_severity * 0.5
 		end
 
 		if larm_broken or larm_amputated then
 			arm_sway_debuff = arm_sway_debuff + 1.2
 		elseif larm_dislocated then
 			arm_sway_debuff = arm_sway_debuff + 0.5
+		elseif larm_partial then
+			-- Partial damage: scale sway from 0.1 (at 0.25 damage) to 0.4 (at 0.99 damage)
+			arm_sway_debuff = arm_sway_debuff + 0.1 + larm_partial_severity * 0.3
 		end
 
 		local fatigue = organism.aiming_fatigue or 0

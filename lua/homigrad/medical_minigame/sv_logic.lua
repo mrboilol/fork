@@ -231,29 +231,8 @@ function hg.MedicalMinigame.StartDislocationMinigame(ply, ent, group)
 end
 
 function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
-    local target = ResolveMinigameTarget(ent) or ply
-    if not CanUseMedicalMinigameTarget(ply, target) then return false end
-
-    local existingSession = hg.MedicalMinigame.BandageSessions[ply]
-    if not existingSession or existingSession.target ~= target then
-        existingSession = {
-            target = target,
-            progress = 0,
-            completions = 0,
-            requiredCompletions = 3 -- Need 3 full wraps to heal
-        }
-        hg.MedicalMinigame.BandageSessions[ply] = existingSession
-    end
-
-    net.Start("hg_medical_minigame_start")
-    net.WriteString("bandage")
-    net.WriteEntity(target)
-    net.WriteFloat(math.Clamp(existingSession.progress or 0, 0, 1))
-    net.WriteInt(existingSession.completions or 0, 8)
-    net.WriteInt(existingSession.requiredCompletions or 3, 8)
-    net.Send(ply)
-
-    return true
+    -- Disabled - bandages now use rotation-based system directly in weapon
+    return false
 end
 
 net.Receive("hg_medical_minigame_request_amputation", function(len, ply)

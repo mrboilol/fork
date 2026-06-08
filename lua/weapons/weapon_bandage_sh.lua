@@ -196,10 +196,8 @@ end
 SWEP.net_cooldown2 = 0
 function SWEP:PrimaryAttack()
 	if CLIENT then
-		-- Start bandage minigame
-		if hg and hg.MedicalMinigame then
-			hg.MedicalMinigame.StartBandageMinigame(LocalPlayer(), self.healbuddy)
-		end
+		-- Start rotation-based bandaging
+		self:StartBandageRotation()
 		return
 	end
 end
@@ -322,6 +320,18 @@ SWEP.modeNames = {
 function SWEP:InitializeAdd()
 	self.ModelScale = 0.9
 	self.minigameCompletions = 0
+	
+	-- Rotation-based bandaging
+	self.bandageRotation = {
+		active = false,
+		accumulatedAngle = 0,
+		lastAngle = nil,
+		completedLoops = 0,
+		requiredLoops = 1,
+		startTime = 0,
+		lastMouseX = nil,
+		lastMouseY = nil
+	}
 end
 
 SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
@@ -330,6 +340,203 @@ SWEP.FallSnd = "physics/body/body_medium_impact_soft5.wav"
 
 if CLIENT then
 	SWEP.HowToUseInstructions = "<font=ZCity_Tiny>"..string.upper( (input.LookupBinding("+use") or "BIND YOUR +USE KEY PLEASE. WRITE \"bind e +use\" IN CONSOLE FOR THE LOVE OF GOD") ).." to pickup</font>"
+	
+	local function NormalizeAngleDelta(delta)
+		if delta > 180 then
+			return delta - 360
+		end
+		if delta < -180 then
+			return delta + 360
+		end
+		return delta
+	end
+	
+	local function AngleFromDelta(dx, dy)
+		if dx == 0 and dy == 0 then return 0 end
+		if dx == 0 then
+			return dy > 0 and 90 or 270
+		end
+		
+		local ang = math.deg(math.atan(dy / dx))
+		if dx < 0 then
+			ang = ang + 180
+		elseif dy < 0 then
+			ang = ang + 360
+		end
+		
+		return ang
+	end
+	
+	function SWEP:StartBandageRotation()
+		local owner = self:GetOwner()
+		if not IsValid(owner) or owner ~= LocalPlayer() then return end
+		
+		-- Calculate required loops based on bandage amount and injuries
+		local loops = 1
+		if self.modeValues and self.modeValues[1] then
+			loops = math.Clamp(math.ceil(self.modeValues[1] / 30), 1, 8)
+		end
+		
+		-- Check target for injuries to increase required loops
+		local target = hg.eyeTrace(owner).Entity
+		if IsValid(target) and target.organism then
+			local org = target.organism
+			local injuryScore = 0
+			if istable(org.wounds) then injuryScore = injuryScore + #org.wounds end
+			if istable(org.arterialwounds) then injuryScore = injuryScore + (#org.arterialwounds * 2) end
+			if isnumber(org.bleed) then injuryScore = injuryScore + math.Clamp(math.floor(org.bleed / 35), 0, 6) end
+			loops = math.Clamp(loops + math.ceil(injuryScore * 0.1), 1, 8)
+		elseif IsValid(target) and target.GetNetVar then
+			-- Check net vars for ragdolls
+			local bleed = tonumber(target:GetNetVar("bleed", 0) or 0) or 0
+			local wounds = target:GetNetVar("wounds", nil)
+			local arterial = target:GetNetVar("arterialwounds", nil)
+			local injuryScore = 0
+			if bleed > 0 then injuryScore = injuryScore + math.Clamp(math.floor(bleed / 35), 0, 6) end
+			if istable(wounds) then injuryScore = injuryScore + #wounds end
+			if istable(arterial) then injuryScore = injuryScore + (#arterial * 2) end
+			loops = math.Clamp(loops + math.ceil(injuryScore * 0.1), 1, 8)
+		end
+		
+		self.bandageRotation.active = true
+		self.bandageRotation.accumulatedAngle = 0
+		self.bandageRotation.lastAngle = nil
+		self.bandageRotation.completedLoops = 0
+		self.bandageRotation.requiredLoops = loops
+		self.bandageRotation.startTime = CurTime()
+		self.bandageRotation.lastMouseX = gui.MouseX()
+		self.bandageRotation.lastMouseY = gui.MouseY()
+		
+		gui.EnableScreenClicker(true)
+	end
+	
+	function SWEP:UpdateBandageRotation()
+		if not self.bandageRotation.active then return end
+		
+		local owner = self:GetOwner()
+		if not IsValid(owner) or owner ~= LocalPlayer() then
+			self:CancelBandageRotation()
+			return
+		end
+		
+		if not owner:KeyDown(IN_ATTACK) then
+			self:CancelBandageRotation()
+			return
+		end
+		
+		local curX, curY = gui.MouseX(), gui.MouseY()
+		local lastX = self.bandageRotation.lastMouseX or curX
+		local lastY = self.bandageRotation.lastMouseY or curY
+		
+		self.bandageRotation.lastMouseX = curX
+		self.bandageRotation.lastMouseY = curY
+		
+		local dx = curX - lastX
+		local dy = curY - lastY
+		
+		if dx ~= 0 or dy ~= 0 then
+			local currentAngle = AngleFromDelta(dx, dy)
+			
+			if self.bandageRotation.lastAngle then
+				local delta = NormalizeAngleDelta(currentAngle - self.bandageRotation.lastAngle)
+				delta = math.Clamp(delta, -28, 28)
+				
+				if delta > 0 then
+					self.bandageRotation.accumulatedAngle = self.bandageRotation.accumulatedAngle + delta
+				elseif delta < 0 then
+					self.bandageRotation.accumulatedAngle = math.max(self.bandageRotation.accumulatedAngle + delta * 0.06, 0)
+				end
+				
+				if self.bandageRotation.accumulatedAngle >= 360 then
+					self.bandageRotation.accumulatedAngle = self.bandageRotation.accumulatedAngle - 360
+					self.bandageRotation.completedLoops = self.bandageRotation.completedLoops + 1
+					
+					if self.bandageRotation.completedLoops >= self.bandageRotation.requiredLoops then
+						self:CompleteBandageRotation()
+						return
+					end
+				end
+			else
+				self.bandageRotation.lastAngle = currentAngle
+			end
+			
+			self.bandageRotation.lastAngle = currentAngle
+		end
+	end
+	
+	function SWEP:CancelBandageRotation()
+		self.bandageRotation.active = false
+		gui.EnableScreenClicker(false)
+	end
+	
+	function SWEP:CompleteBandageRotation()
+		self.bandageRotation.active = false
+		gui.EnableScreenClicker(false)
+		
+		net.Start("hg_bandage_rotation_done")
+		net.WriteEntity(self)
+		net.SendToServer()
+	end
+	
+	hook.Add("Think", "bandage_rotation_think", function()
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+		local wep = ply:GetActiveWeapon()
+		if IsValid(wep) and wep:GetClass() == "weapon_bandage_sh" then
+			wep:UpdateBandageRotation()
+		end
+	end)
+	
+	hook.Add("HUDPaint", "bandage_rotation_hud", function()
+		local ply = LocalPlayer()
+		if not IsValid(ply) then return end
+		local wep = ply:GetActiveWeapon()
+		if not IsValid(wep) or wep:GetClass() ~= "weapon_bandage_sh" then return end
+		if not wep.bandageRotation or not wep.bandageRotation.active then return end
+		
+		local centerX, centerY = ScrW() / 2, ScrH() / 2
+		local radius = 100
+		local progress = wep.bandageRotation.accumulatedAngle / 360
+		local totalProgress = (wep.bandageRotation.completedLoops + progress) / wep.bandageRotation.requiredLoops
+		
+		-- Draw circle
+		surface.SetDrawColor(50, 50, 50, 200)
+		draw.NoTexture()
+		surface.DrawCircle(centerX, centerY, radius, 50, 50, 50, 200)
+		
+		-- Draw progress arc
+		local startAngle = -90
+		local endAngle = startAngle + (totalProgress * 360)
+		surface.SetDrawColor(0, 150, 0, 255)
+		
+		for i = 0, math.floor(totalProgress * 360) do
+			local angle = math.rad(startAngle + i)
+			local x = centerX + math.cos(angle) * radius
+			local y = centerY + math.sin(angle) * radius
+			surface.DrawRect(x, y, 2, 2)
+		end
+		
+		-- Draw text
+		draw.SimpleText(
+			wep.bandageRotation.completedLoops .. "/" .. wep.bandageRotation.requiredLoops,
+			"ZCity_Veteran",
+			centerX,
+			centerY + radius + 20,
+			Color(255, 255, 255, 255),
+			TEXT_ALIGN_CENTER,
+			TEXT_ALIGN_TOP
+		)
+		
+		draw.SimpleText(
+			"ROTATE MOUSE TO BANDAGE",
+			"ZCity_Small",
+			centerX,
+			centerY - radius - 20,
+			Color(255, 255, 255, 255),
+			TEXT_ALIGN_CENTER,
+			TEXT_ALIGN_BOTTOM
+		)
+	end)
 end
 
 function SWEP:Initialize()
@@ -381,26 +588,35 @@ end
 
 function SWEP:SecondaryAttack()
 	--self:SetHolding(math.min(self:GetHolding() + 9, 100))
-	if SERVER then
-		if IsValid(self:GetNWEntity("fakeGun")) then return end
-		local ent = hg.eyeTrace(self:GetOwner()).Entity
-		self.healbuddy = ent
-		if !IsValid(self.healbuddy) then return end
-		if hg.GetCurrentCharacter(self.healbuddy) == hg.GetCurrentCharacter(self:GetOwner()) then return end
-		local done = self:Heal(self.healbuddy, self.mode)
-		if(done and self.PostHeal)then
-			self:PostHeal(self.healbuddy, self.mode)
-		end		
-
-		if self.net_cooldown2 < CurTime() then
-			self:SetNetVar("modeValues",self.modeValues)
-			--self.net_cooldown2 = CurTime() + 0.1 * game.GetTimeScale()
-		end
+	if CLIENT then
+		-- Start rotation-based bandaging for others
+		self:StartBandageRotation()
+		return
 	end
 end
 
 if SERVER then
 	util.AddNetworkString("select_mode")
+	util.AddNetworkString("hg_bandage_rotation_done")
+	
+	net.Receive("hg_bandage_rotation_done", function(len, ply)
+		local wep = net.ReadEntity()
+		if not IsValid(wep) or wep:GetOwner() ~= ply then return end
+		
+		local target = hg.eyeTrace(ply).Entity
+		if not IsValid(target) then target = hg.GetCurrentCharacter(ply) end
+		if not IsValid(target) then return end
+		
+		wep.healbuddy = target
+		local done = wep:Heal(target, wep.mode)
+		if done and wep.PostHeal then
+			wep:PostHeal(target, wep.mode)
+		end
+		
+		if wep.net_cooldown2 < CurTime() then
+			wep:SetNetVar("modeValues", wep.modeValues)
+		end
+	end)
 else
 	net.Receive("select_mode",function()
 		net.ReadEntity().mode = net.ReadInt(4)

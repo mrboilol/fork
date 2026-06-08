@@ -1015,9 +1015,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
 			local headpos, headang = ent:GetBonePosition(bone)
 			if headpos then
-				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-35, 35) + headang:Forward() * -15, nil, 34, 34, 0.6, true, ent)
-				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-25, 25), nil, 26, 26, 0.45, true, ent)
-				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-20, 20), nil, 20, 20, 0.35, true, ent)
+				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-35, 35) + headang:Forward() * -15, nil, math.Rand(8, 15), math.Rand(8, 15), 0.6, true, ent)
+				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-25, 25), nil, math.Rand(5, 12), math.Rand(5, 12), 0.45, true, ent)
+				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-20, 20), nil, math.Rand(3, 8), math.Rand(3, 8), 0.35, true, ent)
 				hg.addBloodPart(headpos + VectorRand(-1, 1), VectorRand(-20, 20) + headang:Forward() * -10, nil, 2, 2, true, nil, ent)
 				hg.addBloodPart(headpos + VectorRand(-1, 1), VectorRand(-25, 25), nil, 2, 2, true, nil, ent)
 			end
