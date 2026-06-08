@@ -917,7 +917,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	local org = ent.organism or {}
 	local owner = ent
 	
-	local beatsPerSecond = math.max(min(30 / math.max(org.pulse or 70,2), 4), 0.1) * (!hg_old_blood:GetBool() and 0.3 or 1)
+	local beatsPerSecond = math.max(min(30 / math.max(org.pulse or 70,2), 4), 0.1) * (!hg_old_blood:GetBool() and 0.5 or 1)
 		
 	if org.pulse and org.heartbeat > 30 and (org.lastpulse or 0) + (1 / math.Clamp(org.heartbeat, 1, 600)) * 60 < CurTime() then
 		org.lastpulse = CurTime()
@@ -1074,7 +1074,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
+			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.5 or 0.06
 			local woundBone = cachedClientThinkBone(ent, wound[4])
 			if wound[5] + addtime < time and woundBone then
 				local pos, ang = ent:GetBonePosition(woundBone)
@@ -1117,7 +1117,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local bloodMul = math.Clamp((org.blood or 5000) / 5000, 0.1, 1)
 							local hb = (org.heartbeat or 70) / 60
 							local heartbeatBeat = math.abs(math.sin(CurTime() * hb * math.pi * 2))
-							local forceMul = pulseMul * bpMul * bloodMul * (1 + heartbeatBeat * 0.5)
+							local healthyBoost = 1 + math.Clamp(1 - math.abs(pulse - 70) / 30, 0, 0.4)
+							local forceMul = pulseMul * bpMul * bloodMul * (1 + heartbeatBeat * 0.5) * healthyBoost
 
 							local right = dir:Angle():Right()
 							local up = ang:Up()
@@ -1125,8 +1126,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							-- Single clean stream with slow, smooth movement
 							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1)
 
-							-- Consistent forward push
-							local baseForward = dir * 6 * forceMul * 0.8
+							-- Consistent forward push - increased for longer spray distance
+							local baseForward = dir * 12 * forceMul * 0.8
 
 							-- Very slow oscillation for smooth, gradual movement
 							local oscTime = CurTime() * hb * 0.15
@@ -1139,14 +1140,14 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 3.5 * 0.5
-								local arteriaForward = dir * 12 * arteriaForce * 0.7
+								local arteriaForward = dir * 25 * arteriaForce * 0.7
 								local arteriaOscAmpRight = arteriaForward:Length() * 0.15 * pulseFactor
 								local arteriaOscAmpUp = arteriaForward:Length() * 0.1 * pulseFactor
 								local arteriaOsc = right * arteriaOscAmpRight * math.sin(oscTime) + up * arteriaOscAmpUp * math.cos(oscTime)
 								hg.addBloodPart(pos, arteriaForward + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
 							else
 								local normalForce = forceMul * 1.8
-								local normalForward = dir * 10 * normalForce * 0.9
+								local normalForward = dir * 20 * normalForce * 0.9
 								hg.addBloodPart(pos, normalForward + streamOsc + spread, nil, size, size, true, nil, ent)
 							end
 						end
