@@ -631,6 +631,9 @@ function hg.MainTPIKFunction(ent, ply, wpn)
     if not ply:IsPlayer() then return end
     if not ply.InVehicle then return end
     
+    ply:SetIK(false)
+    if IsValid(ent) then ent:SetIK(false) end
+    
     //local systime = SysTime()
     local should = hg.ShouldTPIK(ply)
     //print("shouldtpik func: ", SysTime() - systime)
@@ -910,8 +913,8 @@ function hg.DoTPIK(ply, ent)
     local ply_r_clavicle_matrix = ent:GetBoneMatrix(ply_r_clavicle_index)
     local ply_r_ulna_matrix 
     local ply_r_wrist_matrix
-    if ply_l_ulna_index and ply_r_wrist_matrixthen then
-        ply_r_ulna_matrix = ent:GetBoneMatrix(ply_l_ulna_index)
+    if ply_r_ulna_index and ply_r_wrist_index then
+        ply_r_ulna_matrix = ent:GetBoneMatrix(ply_r_ulna_index)
         ply_r_wrist_matrix = ent:GetBoneMatrix(ply_r_wrist_index)
     end
 

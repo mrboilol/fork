@@ -421,7 +421,7 @@ HUD = {
 	stable_time = 15,
 	
 	status_effects_x = -10,
-	status_effects_y = 220,
+	status_effects_y = 80,
 	status_effects_spacing = 55,
 	status_effects_size = 58,
 	show_status_effects = cvar_status_effects:GetBool(),
@@ -1994,7 +1994,7 @@ local function draw_status_effects()
 	local effectsToDraw = {}
 	for _, effect in ipairs(effects) do
 	    local timeActive = currentTime - (statusEffectAppearance[effect.name] or 0)
-	    if isAdmiring or timeActive < 10 then
+	    if isAdmiring or timeActive < 25 then
 	        table.insert(effectsToDraw, effect)
 	    end
 	end
@@ -2140,16 +2140,23 @@ local function draw_status_effects()
 		scale = scale * beatScale
 		
 		local shakeOffset = 0
+		local fadeAlpha = 255
+		local moveAwayOffset = 0
 		local appearanceTime = statusEffectAppearance[effect.name]
 		if appearanceTime then
 			local timeActive = currentTime - appearanceTime
 			if timeActive < 1.5 then
 				local easeOut = (1 - timeActive) ^ 3
 				shakeOffset = math_sin(timeActive * 18) * easeOut * 30
+			elseif timeActive > 20 then
+				local fadeProgress = (timeActive - 20) / 5
+				fadeProgress = math_min(fadeProgress, 1)
+				fadeAlpha = 255 * (1 - fadeProgress)
+				moveAwayOffset = fadeProgress * 50
 			end
 		end
 		
-		local final_x = base_x_pos + repelX + shakeOffset + totalShakeX
+		local final_x = base_x_pos + repelX + shakeOffset + totalShakeX - moveAwayOffset
 		local final_y = base_y_pos + repelY + totalShakeY
 		
 
@@ -2196,7 +2203,7 @@ local function draw_status_effects()
 		end
 		
 		if bg_mat and not bg_mat:IsError() then
-			surface_SetDrawColor(255, 255, 255, 220)
+			surface_SetDrawColor(255, 255, 255, fadeAlpha * 0.86)
 			surface_SetMaterial(bg_mat)
 			
 			local bgDrawSize = drawSize
@@ -2265,7 +2272,7 @@ local function draw_status_effects()
 				else bg_color = Color(80, 200, 100, 220) end
 			end
 			
-			surface_SetDrawColor(bg_color.r, bg_color.g, bg_color.b, bg_color.a)
+			surface_SetDrawColor(bg_color.r, bg_color.g, bg_color.b, fadeAlpha * 0.86)
 			surface_DrawRect(drawX, drawY, drawSize, drawSize)
 		end
 		
@@ -2315,7 +2322,7 @@ local function draw_status_effects()
 		else icon_mat = status_sprites[effect.name] end
 		
 		if icon_mat and not icon_mat:IsError() then
-				surface_SetDrawColor(255, 255, 255, 255)
+				surface_SetDrawColor(255, 255, 255, fadeAlpha)
 				surface_SetMaterial(icon_mat)
 				
 				local iconDrawSize = (drawSize - 4) * effect_scale

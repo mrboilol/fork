@@ -1350,16 +1350,28 @@ function SWEP:CoreStep()
 
 		-- Only add pain if the arm is actually broken or dislocated
 		if arm_broken or arm_dislocated then
-			local pain_amount = 0
-			if dominance == "right" then
-				pain_amount = (org.rarm or 0) * 1.5 + (org.rarmdislocation and 2 or 0)
-			else
-				pain_amount = (org.larm or 0) * 1.5 + (org.larmdislocation and 2 or 0)
-			end
+			-- Track aiming start time for grace period
+			org.aimPainGraceStart = org.aimPainGraceStart or CurTime()
+			local gracePeriod = 3
 
-			if pain_amount > 0 then
-				org.painadd = (org.painadd or 0) + pain_amount * 0.1
+			-- Only apply pain after grace period
+			if CurTime() - org.aimPainGraceStart >= gracePeriod then
+				local pain_amount = 0
+				if dominance == "right" then
+					pain_amount = (org.rarm or 0) * 1.5 + (org.rarmdislocation and 2 or 0)
+				else
+					pain_amount = (org.larm or 0) * 1.5 + (org.larmdislocation and 2 or 0)
+				end
+
+				if pain_amount > 0 then
+					org.painadd = (org.painadd or 0) + pain_amount * 0.1
+				end
 			end
+		end
+	else
+		-- Reset grace period when not aiming
+		if SERVER and IsValid(owner) and owner.organism then
+			owner.organism.aimPainGraceStart = nil
 		end
 	end
 

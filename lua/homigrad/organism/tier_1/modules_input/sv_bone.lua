@@ -464,6 +464,12 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.brain = math.min(org.brain + 0.1, 1)
 	end
 
+	-- Trigger brain bleed for severe skull damage
+	if org.skull >= 0.8 and (org.brainBleed or 0) < 0.5 then
+		org.brainBleed = math.min((org.brainBleed or 0) + 0.5, 1.0)
+		org.brain = math.min((org.brain or 0) + 0.08, 1.0)
+	end
+
 	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
 		--hg.applyFencingToPlayer(org.owner, org)
 		org.shock = 70

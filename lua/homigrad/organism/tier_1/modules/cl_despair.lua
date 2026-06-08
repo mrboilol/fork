@@ -28,6 +28,23 @@ local despairTextLerp = 0
 local despairSound
 local despairSoundVol = 0
 local despairSoundLoading = false
+local panicSound
+local panicSoundVol = 0
+local panicSoundLoading = false
+local panicThoughtLerp = 0
+
+local panicThoughts = {
+	"Im hopeless.",
+	"boi im cooked 😭",
+	"I dont want to be here anymore.",
+	"Everything is wrong.",
+	"I cant take this anymore.",
+	"Why wont it stop...",
+	"Why is this happening to me...",
+	"I'm losing control.",
+	"Help me...",
+	"This is not real...",
+}
 
 local function get_target_organism()
 	local ply = IsValid(lply) and lply or LocalPlayer()
@@ -53,6 +70,22 @@ local function stop_despair_sound(force)
 	end
 end
 
+local function stop_panic_sound(force)
+	if not IsValid(panicSound) then return end
+	if force then
+		panicSound:Stop()
+		panicSound = nil
+		panicSoundVol = 0
+		return
+	end
+	panicSoundVol = math.max(panicSoundVol - FrameTime() * 0.5, 0)
+	panicSound:SetVolume(panicSoundVol)
+	if panicSoundVol <= 0.001 then
+		panicSound:Stop()
+		panicSound = nil
+	end
+end
+
 hook.Add("Post Post Processing", "hg_despair_effect", function()
 	local ply = IsValid(lply) and lply or LocalPlayer()
 	if not IsValid(ply) then return end
@@ -60,12 +93,14 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		despairLerp = 0
 		despairTextLerp = 0
 		stop_despair_sound(true)
+		stop_panic_sound(true)
 		return
 	end
 	if not ply:Alive() then
 		despairLerp = 0
 		despairTextLerp = 0
 		stop_despair_sound(true)
+		stop_panic_sound(true)
 		return
 	end
 
@@ -76,6 +111,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		despairLerp = 0
 		despairTextLerp = 0
 		stop_despair_sound(true)
+		stop_panic_sound(true)
 	end
 
 	despairLerp = LerpFT(0.04, despairLerp, despair)
@@ -115,12 +151,37 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	else
 		stop_despair_sound(false)
 	end
+
+	-- Panic attack sound
+	local panicAttack = (org and org.panicAttack) or false
+	if panicAttack then
+		if not IsValid(panicSound) and not panicSoundLoading then
+			panicSoundLoading = true
+			sound.PlayFile("sound/panic.mp3", "noblock noplay", function(channel)
+				panicSoundLoading = false
+				if not IsValid(channel) then return end
+				channel:SetVolume(0)
+				channel:Play()
+				channel:EnableLooping(true)
+				panicSound = channel
+			end)
+		end
+
+		local targetVol = 1
+		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 2)
+		if IsValid(panicSound) then
+			panicSound:SetVolume(panicSoundVol)
+		end
+	else
+		stop_panic_sound(false)
+	end
 end)
 
 hook.Add("DrawOverlay", "hg_despair_text", function()
 	local org = get_target_organism()
 	if org and org.otrub then
 		despairTextLerp = 0
+		panicThoughtLerp = 0
 		return
 	end
 	local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
@@ -139,14 +200,43 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	draw.SimpleText("im so fucking scared", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
+local panicThoughtIndex = 0
+local panicThoughtNextTime = 0
+
+hook.Add("Think", "hg_panic_thoughts_notify", function()
+	local org = get_target_organism()
+	if not org then return end
+	
+	local panicAttack = org.panicAttack or false
+	local time = CurTime()
+
+	if panicAttack then
+		if time >= panicThoughtNextTime then
+			panicThoughtIndex = (panicThoughtIndex % #panicThoughts) + 1
+			local thought = panicThoughts[panicThoughtIndex]
+			
+			if hg and hg.CreateNotification then
+				hg.CreateNotification(thought, 2, Color(255, 100, 100), true)
+			end
+			
+			panicThoughtNextTime = time + 2
+		end
+	else
+		panicThoughtIndex = 0
+		panicThoughtNextTime = 0
+	end
+end)
+
 hook.Add("Player_Death", "hg_despair_cleanup", function(ply)
 	if not IsValid(lply) then return end
 	if ply ~= lply and ply ~= lply:GetNWEntity("spect") then return end
 	stop_despair_sound(true)
+	stop_panic_sound(true)
 end)
 
 hook.Add("Player Spawn", "hg_despair_cleanup", function(ply)
 	if not IsValid(lply) then return end
 	if ply ~= lply then return end
 	stop_despair_sound(true)
+	stop_panic_sound(true)
 end)

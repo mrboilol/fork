@@ -44,6 +44,8 @@ module[1] = function(org)
 	org.hemotransfusionshock = 0
 	org.ischemia = 0
 	org.internalBleedDuration = 0
+	org.brainBleed = 0
+	org.brainBleedDuration = 0
 
 	org.survivalchance = 1
 	org.hemothorax = false
@@ -132,6 +134,18 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedDuration = (org.internalBleedDuration or 0) + mulTime
 	else
 		org.internalBleedDuration = 0
+	end
+
+	-- Track brain bleed duration
+	if org.brainBleed > 0 then
+		org.brainBleedDuration = (org.brainBleedDuration or 0) + mulTime
+	else
+		org.brainBleedDuration = 0
+	end
+
+	-- Brain bleed contributes to internal bleeding
+	if org.brainBleed > 0 then
+		org.internalBleed = org.internalBleed + org.brainBleed * mulTime * 0.1
 	end
 
 	if org.internalBleed > 0 and not adrenalineStabilizer and not hasAntiIschemia then
@@ -227,7 +241,7 @@ module[2] = function(owner, org, mulTime)
 	end
 	
 	if hasAntiIschemia then
-		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.02, 0)
+		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.05, 0)
 	end
 	if adrenalineStabilizer then
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.01 * totalAdrenaline, 0)
@@ -237,6 +251,10 @@ module[2] = function(owner, org, mulTime)
 	org.internalBleed = math.Approach(org.internalBleed, 0, org.internalBleedHeal > 0 and mulTime / 2 or mulTime / 55)
 	coagulatespeed = coagulatespeed + mulTime
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)
+
+	-- Brain bleed healing: faster with tranexamic acid, slower with time
+	local brainBleedHealRate = (org.tranexamic_acid or 0) > 0 and mulTime / 10 or mulTime / 45
+	org.brainBleed = math.Approach(org.brainBleed, 0, brainBleedHealRate)
 	
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 10 * org.pulse / 70, 1) end
 	

@@ -34,6 +34,9 @@ hook.Add("Org Clear", "Main", function(org)
 
 	org.tranexamic_acid = 0
 
+	org.brainBleed = 0
+	org.brainBleedDuration = 0
+
 	org.thiamine = 0
 	org.thiamine_timer = 0
 	org.thiamine_healed = false
@@ -85,6 +88,9 @@ hook.Add("Org Clear", "Main", function(org)
 	org.despair = 0
 	org._despairLastAdrenaline = 0
 	org._despairNextCorpseCheck = 0
+	org.panicAttack = false
+	org._panicAttackEndTime = 0
+	org._panicAttackCheckTime = 0
 	--//
 
 	org.assimilated = 0
@@ -507,13 +513,24 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 				local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
 				local larm_dislocated = org.larmdislocated or org.larmdislocation
 
+				-- Check for left hand mitigation: working left hand + damaged right hand
+				-- Mitigation applies unless one-handing or left arm is damaged
+				local leftHandHealthy = not org.larmamputated and not (org.larm and org.larm >= 1) and not (org.larmdislocation or org.larmdislocated)
+				local rightHandDamaged = (org.rarm and org.rarm >= 1) or (org.rarmdislocation or org.rarmdislocated) or org.rarmamputated
+				local isOneHanding = IsValid(wep) and wep.TwoHanded == false
+				
+				local debuffMitigation = 1
+				if leftHandHealthy and rightHandDamaged and not isOneHanding then
+					debuffMitigation = 0.6 -- Slightly mitigate debuffs (40% reduction)
+				end
+
 				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5, 10)
 
 				-- Increase aiming fatigue accumulation for broken/amputated arms
 				if rarm_broken_debuff or larm_broken_debuff then
-					local fatigue_multiplier = 1.5
+					local fatigue_multiplier = 1.5 * debuffMitigation
 					if org.rarmamputated or org.larmamputated then
-						fatigue_multiplier = 2.0 -- More severe for amputated arms
+						fatigue_multiplier = 2.0 * debuffMitigation -- More severe for amputated arms
 					end
 					org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5 * fatigue_multiplier, 10)
 				end
@@ -528,9 +545,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 				if duration > pain_threshold then
 					local pain_rate = timeValue * 1.5
 					if rarm_broken_pain then
-						pain_rate = pain_rate * 3.0
+						pain_rate = pain_rate * 3.0 * debuffMitigation
 					elseif rarm_dislocated then
-						pain_rate = pain_rate * 1.8
+						pain_rate = pain_rate * 1.8 * debuffMitigation
 					end
 
 					if larm_broken_pain then

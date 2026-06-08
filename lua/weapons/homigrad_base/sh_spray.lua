@@ -70,9 +70,9 @@ function SWEP:PrimarySpread()
 			if dominance == "right" then
 				-- Right hand dominant: only hurt if right arm is broken (>=1) or dislocated
 				if rarm_broken then
-					pain_mult = org.rarm * 2
+					pain_mult = org.rarm * 5 -- Increased from 2 to 5
 				elseif rarm_dislocated then
-					pain_mult = 2
+					pain_mult = 5 -- Increased from 2 to 5
 				end
 				-- If right arm amputated, no pain (using left arm instead)
 			else
@@ -120,7 +120,7 @@ function SWEP:PrimarySpread()
 
 			-- Right arm broken shooting checks
 			if rarm_broken then
-				local extra_broken_pain = calForce * 1.5
+				local extra_broken_pain = calForce * 3.0 -- Increased from 1.5 to 3.0
 				if larm_broken then
 					extra_broken_pain = extra_broken_pain * 1.5
 				end
@@ -143,7 +143,7 @@ function SWEP:PrimarySpread()
 					end
 				else
 					-- already dislocated: add a bunch of pain and a bone breaking sound
-					local extra_disl_pain = 35 + calForce * 1.5
+					local extra_disl_pain = 50 + calForce * 3.0 -- Increased from 35 + 1.5 to 50 + 3.0
 					if larm_broken then
 						extra_disl_pain = extra_disl_pain * 1.5
 					end

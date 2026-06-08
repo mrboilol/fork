@@ -71,7 +71,7 @@ local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodi
 
 local function impact(pos,vel,mul,owner)
 	local max = math.min(mul,8)
-	local iters = math.ceil(math.random(1, max) * 2.5)
+	local iters = math.ceil(math.random(1, max) * 1.0) -- Reduced from 2.5 to 1.0
 	local velnorm = -vel:GetNormalized() * 5
 	
 	if hg_bloodimpacts:GetBool() then

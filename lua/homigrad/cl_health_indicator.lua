@@ -3,10 +3,11 @@ local blinkModel
 local whiteMat = Material("models/debug/debugwhite")
 local statusCircleMat = Material("sef_icons/statuseffectcircle.png", "smooth")
 local bleedIconMat = Material("zcity_delta/unitmenu/status/bleeding.png", "smooth")
+local bigBleedIconMat = Material("zcity_delta/unitmenu/status/bigbleeding.png", "smooth")
 local statusIconCache = {}
 
-local IND_SIZE_BASE = 120
-local IND_SIZE_MAX = 170
+local IND_SIZE_BASE = 180
+local IND_SIZE_MAX = 240
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local PULSE_DURATION = 8
@@ -46,6 +47,7 @@ local majorBones = {
     chest_ribs = { organ = "chest", bone = "ValveBiped.Bip01_Spine1", name = "Ribcage" },
     neck = { organ = "neck", bone = "ValveBiped.Bip01_Neck1" },
     skull = { organ = "skull", bone = "ValveBiped.Bip01_Head1" },
+    jaw = { organ = "jaw", bone = "ValveBiped.Bip01_Head1" },
     l_clavicle = { organ = "larm", bone = "ValveBiped.Bip01_L_Clavicle" },
     r_clavicle = { organ = "rarm", bone = "ValveBiped.Bip01_R_Clavicle" },
     l_upperarm = { organ = "larm", bone = "ValveBiped.Bip01_L_UpperArm", canAmputate = true, ampBone = "ValveBiped.Bip01_L_Forearm" },
@@ -563,9 +565,9 @@ function HUD_DrawDynamicIndicator()
     
     local viewX, viewY
     
-    -- Position between top and moodles
-    viewX = ScrW() - w - ScreenScaleFixed(20) -- Move more left so it's not right on the edge
-    viewY = ScreenScaleFixed(100) -- Position between top and moodles for visibility
+    -- Position at middle bottom of screen
+    viewX = ScrW() / 2 - w / 2 -- Center horizontally
+    viewY = ScrH() - h - ScreenScaleFixed(50) -- Position at bottom with margin
     
     -- Store indicator position and size for moodle adjustment
     HUD.dynamicIndicator = {
@@ -690,36 +692,36 @@ function HUD_DrawDynamicIndicator()
                     alpha = fadeProgress
                 end
 
+                local isHeadBone = (boneName == "ValveBiped.Bip01_Head1")
+                if isHeadBone then
+                    local headPos = healthModel:GetBoneMatrix(bID):GetTranslation()
+                    local splitZ = headPos.z - 1.0
+                    local normal, distance
+                    if data.key == "skull" then
+                        normal = Vector(0, 0, 1)
+                        distance = normal:Dot(Vector(0, 0, splitZ))
+                    else -- jaw
+                        normal = Vector(0, 0, -1)
+                        distance = normal:Dot(Vector(0, 0, splitZ))
+                    end
+                    render.PushCustomClipPlane(normal, distance)
+                end
+
                 ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
                 DrawDamageBlinkState(blinkModel, r * alpha, g * alpha, b * alpha)
                 ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
+
+                if isHeadBone then
+                    render.PopCustomClipPlane()
+                end
             end
-        end
-
-        local function DrawBleedSpriteState(blinkModel)
-            blinkModel:SetupBones()
-
-            -- Same rendering style as DrawDamageBlinkState but using our bleed material instead
-            render.MaterialOverride(bleedIconMat)
-            render.SetColorModulation(1, 0, 0)
-            
-            for _, offset in ipairs(outlineOffsets) do
-                blinkModel:SetPos(modelOffset + offset)
-                blinkModel:DrawModel()
-            end
-
-            render.SetColorModulation(1, 0, 0)
-            blinkModel:SetPos(modelOffset)
-            blinkModel:DrawModel()
-            
-            render.MaterialOverride(whiteMat)
         end
 
         local hasAmputationBlink = false
         local hasFractureBlink = false
         local solidRedBones = {}
         local blinkingRedBones = {}
-        local bleedingBones = {} -- key -> severity
+        local bleedingBones = {} -- key -> {severity = num, isArterial = bool}
 
         for key, state in pairs(boneStates) do
             if state.blinking then hasAmputationBlink = true end
@@ -734,7 +736,7 @@ function HUD_DrawDynamicIndicator()
         end
 
         if IsValid(ply) then
-            local function CheckWoundList(list)
+            local function CheckWoundList(list, isArterial)
                 if not list then return end
                 for i = 1, #list do
                     local wound = list[i]
@@ -744,7 +746,13 @@ function HUD_DrawDynamicIndicator()
                             -- Check against major bones
                             for key, data in pairs(majorBones) do
                                 if data.bone == boneName then
-                                    bleedingBones[key] = (bleedingBones[key] or 0) + (wound[1] or 0)
+                                    if not bleedingBones[key] then
+                                        bleedingBones[key] = {severity = 0, isArterial = false}
+                                    end
+                                    bleedingBones[key].severity = bleedingBones[key].severity + (wound[1] or 0)
+                                    if isArterial then
+                                        bleedingBones[key].isArterial = true
+                                    end
                                 end
                             end
                         end
@@ -754,8 +762,8 @@ function HUD_DrawDynamicIndicator()
             
             local netWounds = ply:GetNetVar("wounds", nil)
             local netArterial = ply:GetNetVar("arterialwounds", nil)
-            CheckWoundList((netWounds and #netWounds > 0) and netWounds or ply.wounds)
-            CheckWoundList((netArterial and #netArterial > 0) and netArterial or ply.arterialwounds)
+            CheckWoundList((netWounds and #netWounds > 0) and netWounds or ply.wounds, false)
+            CheckWoundList((netArterial and #netArterial > 0) and netArterial or ply.arterialwounds, true)
         end
 
         if hasAmputationBlink then
@@ -764,42 +772,72 @@ function HUD_DrawDynamicIndicator()
         end
 
         if #solidRedBones > 0 then
-            for _, key in ipairs(blinkingRedBones) do
-                local boneName = majorBones[key].bone
-                local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBone(blinkModel, bID, Vector(0,0,0), boneName) end
-            end
-
             for _, key in ipairs(solidRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBone(blinkModel, bID, BLINK_SCALE, boneName) end
-            end
+                if bID then
+                    local isHeadBone = (boneName == "ValveBiped.Bip01_Head1")
+                    if isHeadBone then
+                        local headPos = healthModel:GetBoneMatrix(bID):GetTranslation()
+                        local splitZ = headPos.z - 1.0
+                        local normal, distance
+                        if key == "skull" then
+                            normal = Vector(0, 0, 1)
+                            distance = normal:Dot(Vector(0, 0, splitZ))
+                        else -- jaw
+                            normal = Vector(0, 0, -1)
+                            distance = normal:Dot(Vector(0, 0, splitZ))
+                        end
+                        render.PushCustomClipPlane(normal, distance)
+                    end
 
-            DrawDamageBlinkState(blinkModel, 1, 0, 0)
+                    ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
+                    DrawDamageBlinkState(blinkModel, 1, 0, 0)
+                    ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
+
+                    if isHeadBone then
+                        render.PopCustomClipPlane()
+                    end
+                end
+            end
         end
 
         if #blinkingRedBones > 0 then
-            for _, key in ipairs(solidRedBones) do
-                local boneName = majorBones[key].bone
-                local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBone(blinkModel, bID, Vector(0,0,0), boneName) end
-            end
-
+            local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
             for _, key in ipairs(blinkingRedBones) do
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
-                if bID then ScaleBone(blinkModel, bID, BLINK_SCALE, boneName) end
-            end
+                if bID then
+                    local isHeadBone = (boneName == "ValveBiped.Bip01_Head1")
+                    if isHeadBone then
+                        local headPos = healthModel:GetBoneMatrix(bID):GetTranslation()
+                        local splitZ = headPos.z - 1.0
+                        local normal, distance
+                        if key == "skull" then
+                            normal = Vector(0, 0, 1)
+                            distance = normal:Dot(Vector(0, 0, splitZ))
+                        else -- jaw
+                            normal = Vector(0, 0, -1)
+                            distance = normal:Dot(Vector(0, 0, splitZ))
+                        end
+                        render.PushCustomClipPlane(normal, distance)
+                    end
 
-            local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
-            DrawDamageBlinkState(blinkModel, val, 0, 0)
+                    ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
+                    DrawDamageBlinkState(blinkModel, val, 0, 0)
+                    ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
+
+                    if isHeadBone then
+                        render.PopCustomClipPlane()
+                    end
+                end
+            end
         end
 
         -- Collect bleeding icon screen positions for 2D overlay after cam.End3D
         local bleedScreen2D = {}
         if next(bleedingBones) then
-            for key, severity in pairs(bleedingBones) do
+            for key, data in pairs(bleedingBones) do
                 local boneName = majorBones[key].bone
                 local boneID = healthModel:LookupBone(boneName)
                 if boneID then
@@ -809,7 +847,7 @@ function HUD_DrawDynamicIndicator()
                         pos = pos + Vector(0, 0, 1.5)
                         local sx, sy, sz = pos:ToScreen()
                         if sz and sz > 0 then
-                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = severity, key = key})
+                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, key = key})
                         end
                     end
                 end
@@ -826,26 +864,52 @@ function HUD_DrawDynamicIndicator()
         local iconSize = ScreenScaleFixed(14)
         for _, data in ipairs(bleedScreen2D) do
             local severity = data.severity
-            local r, g, b
-            if severity <= 0.5 then
-                local prog = severity / 0.5
-                r, g, b = 255, 255, math.floor((1 - prog) * 255)
-            elseif severity <= 1.0 then
-                local prog = (severity - 0.5) / 0.5
-                r, g, b = 255, math.floor((1 - 0.5 * prog) * 255), 0
-            elseif severity <= 2.0 then
-                local prog = (severity - 1.0) / 1.0
-                r, g, b = 255, math.floor((0.5 - 0.5 * prog) * 255), 0
+            local isArterial = data.isArterial
+            local r, g, b, mat
+            
+            if severity >= 1.0 or isArterial then
+                -- Show bigbleeding.png
+                mat = bigBleedIconMat
+                -- Dark yellow to dark red depending on badness
+                -- Default: Dark Yellow (160, 140, 0) -> Dark Red (140, 0, 0)
+                local progress = math.Clamp((severity - 0.5) / 1.5, 0, 1)
+                r = math.floor(160 - 20 * progress)
+                g = math.floor(140 * (1 - progress))
+                b = 0
             else
-                r, g, b = 255, 0, 0
+                -- Show bleeding.png
+                mat = bleedIconMat
+                -- White to really red depending on bleeding
+                -- White (255, 255, 255) -> Red (255, 0, 0)
+                local progress = math.Clamp(severity / 0.8, 0, 1)
+                r = 255
+                g = math.floor(255 * (1 - progress))
+                b = math.floor(255 * (1 - progress))
             end
 
             local pulse = (math.sin(time * 5 + #data.key) + 1) / 2
             local alpha = math.floor((0.7 + pulse * 0.3) * 255)
 
+            local sx, sy = data.sx, data.sy
+            
+            -- Prevent clipping outside the indicator circle boundaries
+            local centerX = viewX + w * 0.5
+            local centerY = viewY + h * 0.5
+            local maxRadius = w * 0.45 -- Keep it slightly inside the edge
+            
+            local dx = sx - centerX
+            local dy = sy - centerY
+            local dist = math.sqrt(dx * dx + dy * dy)
+            
+            if dist > maxRadius then
+                local scale = maxRadius / dist
+                sx = centerX + dx * scale
+                sy = centerY + dy * scale
+            end
+
             surface.SetDrawColor(r, g, b, alpha)
-            surface.SetMaterial(bleedIconMat)
-            surface.DrawTexturedRect(data.sx - iconSize * 0.5, data.sy - iconSize * 0.5, iconSize, iconSize)
+            surface.SetMaterial(mat)
+            surface.DrawTexturedRect(sx - iconSize * 0.5, sy - iconSize * 0.5, iconSize, iconSize)
         end
     end
 end

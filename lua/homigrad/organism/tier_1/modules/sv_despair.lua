@@ -28,6 +28,11 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._despairLastAdrenaline = 0
 	org._despairNextCorpseCheck = 0
 	org._corpseAdrenalineGiven = 0
+	org.panicAttack = false
+	org._panicAttackEndTime = 0
+	org._panicAttackCheckTime = 0
+	org._panicAttackStartTime = 0
+	org._hadGoodMood = false
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -50,7 +55,12 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	org.despair = Clamp(org.despair or 0, 0, 1)
-	org.despair = math.Approach(org.despair, 0, timeValue / 120)
+	org.despair = math.Approach(org.despair, 0, timeValue / 180)
+
+	-- Track if player had goodmood
+	if (org.goodmood or 0) > 0.3 then
+		org._hadGoodMood = true
+	end
 
 	local add = 0
 	local adrenaline = org.adrenaline or 0
@@ -72,7 +82,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if (org.fear or 0) > 0 then
-		add = add + Clamp(org.fear, 0, 2) * timeValue * 0.028
+		add = add + Clamp(org.fear, 0, 2) * timeValue * 0.08
 	end
 
 	if (org.pain or 0) > 45 then
@@ -140,7 +150,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 
 		if corpsesSeen > 0 then
-			add = add + timeValue * 0.03 * corpsesSeen
+			add = add + timeValue * 0.08 * corpsesSeen
 
 			-- Give a tiny bit of adrenaline from seeing corpses, but cap total contribution
 			local maxCorpseAdrenaline = 0.3
@@ -154,7 +164,19 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if add > 0 then
+		-- Chip away at goodmood first before adding despair
+		local goodmood = org.goodmood or 0
+		if goodmood > 0 then
+			local goodmoodLoss = min(add, goodmood)
+			org.goodmood = goodmood - goodmoodLoss
+			add = add - goodmoodLoss
+		end
 		org.despair = min(org.despair + add, 1)
+	end
+
+	-- Cap despair at 0.5 if player had goodmood and still has some goodmood left
+	if org._hadGoodMood and (org.goodmood or 0) > 0 then
+		org.despair = min(org.despair, 0.5)
 	end
 
 	if org.despair >= 0.8 then
@@ -172,4 +194,63 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
             end
         end
     end
+
+	-- Panic attack logic
+	local time = CurTime()
+	if org.panicAttack then
+		-- Decrease despair slowly during panic attack
+		org.despair = math.Approach(org.despair, 0, timeValue * 0.3)
+		
+		-- Check if panic attack should end
+		if time > org._panicAttackEndTime then
+			org.panicAttack = false
+		else
+			-- Small chance of heart attack during panic attack
+			if not org._panicHeartAttackCheck or time > org._panicHeartAttackCheck then
+				org._panicHeartAttackCheck = time + 2
+				if math.random() < 0.02 then -- 2% chance every 2 seconds during panic attack
+					org.heartstop = true
+					org.lungsfunction = false
+				end
+			end
+		end
+	else
+		-- Check if panic attack should trigger (despair > 0.75)
+		if org.despair > 0.75 then
+			-- Start tracking time if not already tracking
+			if not org._panicAttackStartTime then
+				org._panicAttackStartTime = time
+			end
+
+			-- Check if 30 seconds have passed (guaranteed trigger)
+			if time - org._panicAttackStartTime >= 30 then
+				org.panicAttack = true
+				org._panicAttackEndTime = time + math.random(8, 15)
+				org._panicHeartAttackCheck = 0
+				org._panicAttackStartTime = nil
+			-- Before 30 seconds, use random chance
+			elseif not org._panicAttackCheckTime or time > org._panicAttackCheckTime then
+				org._panicAttackCheckTime = time + 1
+				local triggerChance = (org.despair - 0.75) / 0.25 * 0.03 -- up to 3% chance per second at max despair
+				if math.random() < triggerChance then
+					org.panicAttack = true
+					org._panicAttackEndTime = time + math.random(8, 15)
+					org._panicHeartAttackCheck = 0
+					org._panicAttackStartTime = nil
+				end
+			end
+		else
+			-- Reset timer if despair drops below threshold
+			org._panicAttackStartTime = nil
+		end
+	end
+end)
+
+hook.Add("HG_MovementCalc_2", "hg_panic_attack_slow", function(mul, ply, cmd, mv)
+	local org = ply.organism
+	if not org then return end
+	
+	if org.panicAttack then
+		mul[1] = mul[1] * 0.3 -- reduce movement speed to 30% during panic attack
+	end
 end)

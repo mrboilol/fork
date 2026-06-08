@@ -18,6 +18,12 @@ module[2] = function(ply, org, timeValue)
              org.needfake = true
              -- Apply disorientation (set to 2)
              org.disorientation = math.max(org.disorientation or 0, 2)
+
+             -- Trigger brain bleed for severe concussion
+             if org.concussion >= 2.5 and (org.brainBleed or 0) < 0.3 then
+                 org.brainBleed = math.min((org.brainBleed or 0) + 0.4, 1.0)
+                 org.brain = math.min((org.brain or 0) + 0.05, 1.0)
+             end
         end
     end
 end

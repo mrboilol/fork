@@ -102,7 +102,16 @@ function SWEP:DrawWorldModel2(nodraw)
 end
 
 function SWEP:OnRemove()
-	if SERVER then return end
+	if CLIENT then
+		self:CancelBandageRotation()
+	end
+end
+
+function SWEP:Holster()
+	if CLIENT then
+		self:CancelBandageRotation()
+	end
+	return true
 end
 
 function SWEP:SetHold(value)
@@ -328,9 +337,7 @@ function SWEP:InitializeAdd()
 		lastAngle = nil,
 		completedLoops = 0,
 		requiredLoops = 1,
-		startTime = 0,
-		lastMouseX = nil,
-		lastMouseY = nil
+		startTime = 0
 	}
 end
 
@@ -425,27 +432,21 @@ if CLIENT then
 		end
 		
 		local curX, curY = gui.MouseX(), gui.MouseY()
-		local lastX = self.bandageRotation.lastMouseX or curX
-		local lastY = self.bandageRotation.lastMouseY or curY
+		local centerX, centerY = ScrW() / 2, ScrH() / 2
 		
-		self.bandageRotation.lastMouseX = curX
-		self.bandageRotation.lastMouseY = curY
+		-- Calculate angle from center of screen to mouse position
+		local dx = curX - centerX
+		local dy = curY - centerY
+		local currentAngle = math.deg(math.atan2(dy, dx))
 		
-		local dx = curX - lastX
-		local dy = curY - lastY
-		
-		if dx ~= 0 or dy ~= 0 then
-			local currentAngle = AngleFromDelta(dx, dy)
+		if self.bandageRotation.lastAngle then
+			local delta = NormalizeAngleDelta(currentAngle - self.bandageRotation.lastAngle)
 			
-			if self.bandageRotation.lastAngle then
-				local delta = NormalizeAngleDelta(currentAngle - self.bandageRotation.lastAngle)
-				delta = math.Clamp(delta, -28, 28)
-				
-				if delta > 0 then
-					self.bandageRotation.accumulatedAngle = self.bandageRotation.accumulatedAngle + delta
-				elseif delta < 0 then
-					self.bandageRotation.accumulatedAngle = math.max(self.bandageRotation.accumulatedAngle + delta * 0.06, 0)
-				end
+			-- Only accumulate if moving in a consistent direction (rotation)
+			if math.abs(delta) > 0.5 then
+				-- Positive delta = clockwise, negative = counter-clockwise
+				-- We want to accumulate absolute rotation regardless of direction
+				self.bandageRotation.accumulatedAngle = self.bandageRotation.accumulatedAngle + math.abs(delta)
 				
 				if self.bandageRotation.accumulatedAngle >= 360 then
 					self.bandageRotation.accumulatedAngle = self.bandageRotation.accumulatedAngle - 360
@@ -456,12 +457,12 @@ if CLIENT then
 						return
 					end
 				end
-			else
-				self.bandageRotation.lastAngle = currentAngle
 			end
-			
+		else
 			self.bandageRotation.lastAngle = currentAngle
 		end
+		
+		self.bandageRotation.lastAngle = currentAngle
 	end
 	
 	function SWEP:CancelBandageRotation()
@@ -613,9 +614,8 @@ if SERVER then
 			wep:PostHeal(target, wep.mode)
 		end
 		
-		if wep.net_cooldown2 < CurTime() then
-			wep:SetNetVar("modeValues", wep.modeValues)
-		end
+		-- Always sync modeValues after healing attempt
+		wep:SetNetVar("modeValues", wep.modeValues)
 	end)
 else
 	net.Receive("select_mode",function()

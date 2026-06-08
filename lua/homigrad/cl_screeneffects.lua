@@ -787,11 +787,19 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp / 2
 		pain = PainLerp + strobe
 		shock = shockLerp
+		
+		-- Extreme pain flickering effect (> 90)
+		local extremePainFlicker = 0
+		if pain > 90 then
+			local flickerIntensity = (pain - 90) / 30 -- 0 to 1 as pain goes from 90 to 120
+			extremePainFlicker = math.abs(math.sin(CurTime() * 15)) * flickerIntensity * 0.5
+		end
+		
 		render.UpdateScreenEffectTexture()
 
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 30 + math.max(shock - 5, 0) / 2)) //ColorIntensity
-		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 30 + math.max(shock - 5, 0) / 2)) //Vignette
+		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 30 + math.max(shock - 5, 0) / 2 + extremePainFlicker)) //ColorIntensity
+		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 30 + math.max(shock - 5, 0) / 2 + extremePainFlicker)) //Vignette
 
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
@@ -800,15 +808,15 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
 		painMat:SetFloat("$c2_x", CurTime() + 10000) //Time
 		painMat:SetFloat("$c0_y", 0.8) //Gate
-		painMat:SetFloat("$c0_z", 1) //ColorIntensity
-		painMat:SetFloat("$c1_x", math.Clamp(pain / 90, 0, 0.75)) //Lerp
-		painMat:SetFloat("$c1_y", math.Clamp(pain / 90, 0, 0.75)) //Vignette
+		painMat:SetFloat("$c0_z", 1 + extremePainFlicker) //ColorIntensity
+		painMat:SetFloat("$c1_x", math.Clamp(pain / 90 + extremePainFlicker, 0, 0.85)) //Lerp
+		painMat:SetFloat("$c1_y", math.Clamp(pain / 90 + extremePainFlicker, 0, 0.85)) //Vignette
 
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100, 0, 0.25))
+		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100 + extremePainFlicker * 0.3, 0, 0.35))
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
@@ -819,7 +827,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 		
 		//if pain > 10 then
-			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 3), 0, 3)
+			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 6), 0, 6)
 
 			if painMode == 0 then
 				-- Default: both pain_beat and reality play

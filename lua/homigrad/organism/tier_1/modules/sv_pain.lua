@@ -38,6 +38,22 @@ module[2] = function(owner, org, timeValue)
 	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 	local goodmoodResistance = 1 - goodmood * 0.25
 
+	-- Check for left hand mitigation: working left hand + damaged right hand
+	-- Mitigation applies unless one-handing or left arm is damaged
+	local leftHandHealthy = not org.larmamputated and not (org.larm and org.larm >= 1) and not (org.larmdislocation or org.larmdislocated)
+	local rightHandDamaged = (org.rarm and org.rarm >= 1) or (org.rarmdislocation or org.rarmdislocated) or org.rarmamputated
+	local isOneHanding = false
+	
+	if IsValid(owner) and owner:IsPlayer() then
+		local wep = owner:GetActiveWeapon()
+		isOneHanding = IsValid(wep) and wep.TwoHanded == false
+	end
+	
+	local painMitigation = 1
+	if leftHandHealthy and rightHandDamaged and not isOneHanding then
+		painMitigation = 0.5 -- Halve pain
+	end
+
 	org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 
 	if org.shock > org.shock_turn * 1.5 * analgesiaMul * painkillerMul then
@@ -53,7 +69,7 @@ module[2] = function(owner, org, timeValue)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
 	
-	local add = math.min(timeValue * 20, org.painadd) * goodmoodResistance
+	local add = math.min(timeValue * 20, org.painadd) * goodmoodResistance * painMitigation
 	local sub = (add <= 0.2) and (timeValue * 2 * (org.otrub and 5 or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
 
 	if adrenaline > 0 then
