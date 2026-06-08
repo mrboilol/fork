@@ -829,7 +829,27 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		//if pain > 10 then
 			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 6), 0, 6)
 
-			if painMode == 0 then
+			-- Panic attack and despair override pain sounds (except brain damage)
+			local panicAttack = (org.panicAttack or false)
+			local despair = (org.despair or 0)
+			local brain = (org.brain or 0)
+			local overridePainSounds = (panicAttack or despair > 0.5) and brain < 0.01
+
+			if overridePainSounds then
+				-- Suppress pain sounds during panic/despair
+				if IsValid(PainStation) then
+					PainStation:SetVolume(0)
+				end
+				if IsValid(RealityStation) then
+					RealityStation:SetVolume(0)
+				end
+				if IsValid(AgonyStation) then
+					AgonyStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+			elseif painMode == 0 then
 				-- Default: both pain_beat and reality play
 				if IsValid(PainStation) then
 					PainStation:SetVolume(painVol)

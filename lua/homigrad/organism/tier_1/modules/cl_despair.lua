@@ -11,6 +11,8 @@ surface.CreateFont(despairFont, {
 })
 
 local heatMat = Material("effects/shaders/zb_heat")
+local chromaticMat = Material("effects/shaders/merc_chromaticaberration")
+local vignetteMat = Material("effects/shaders/zb_vignette")
 local despairTab = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
@@ -130,7 +132,24 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		DrawColorModify(despairTab)
 	end
 
-	if despair >= 0.35 then
+	-- Panic attack chromatic aberration and vignette
+	local panicAttack = (org and org.panicAttack) or false
+	if panicAttack then
+		render.UpdateScreenEffectTexture()
+		chromaticMat:SetFloat("$c0_x", 0.15 + math.sin(CurTime() * 8) * 0.05)
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", 2.5)
+		vignetteMat:SetFloat("$c1_y", 3.0)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+	end
+
+	if despair >= 0.25 then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
 			sound.PlayFile("sound/despair.ogg", "noblock noplay", function(channel)
@@ -143,7 +162,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = math.Remap(despair, 0.35, 1, 0.08, 1)
+		local targetVol = math.Remap(despair, 0.25, 1, 0.15, 1)
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)

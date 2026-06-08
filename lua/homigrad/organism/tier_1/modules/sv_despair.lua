@@ -33,6 +33,7 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._panicAttackCheckTime = 0
 	org._panicAttackStartTime = 0
 	org._hadGoodMood = false
+	org._despairLastGainedTime = 0
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -49,13 +50,31 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 	end
 
 	org.despair = min((org.despair or 0) + add, 1)
+	org._despairLastGainedTime = CurTime()
 end)
 
 hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	org.despair = Clamp(org.despair or 0, 0, 1)
-	org.despair = math.Approach(org.despair, 0, timeValue / 180)
+	-- Despair budge less unless despair hasn't been gained for a little bit
+	local timeSinceGain = CurTime() - (org._despairLastGainedTime or 0)
+	local despairDecay = timeValue / 180
+	-- Slower decay if despair was gained recently (within 30 seconds)
+	if timeSinceGain < 30 then
+		if org.despair > 0.7 then
+			despairDecay = timeValue / 360 -- Half decay rate when despair is high and recently gained
+		elseif org.despair > 0.5 then
+			despairDecay = timeValue / 270 -- Slower decay when despair is moderate and recently gained
+		else
+			despairDecay = timeValue / 240 -- Slower decay when recently gained
+		end
+	elseif org.despair > 0.7 then
+		despairDecay = timeValue / 360 -- Half decay rate when despair is high
+	elseif org.despair > 0.5 then
+		despairDecay = timeValue / 270 -- Slower decay when despair is moderate
+	end
+	org.despair = math.Approach(org.despair, 0, despairDecay)
 
 	-- Track if player had goodmood
 	if (org.goodmood or 0) > 0.3 then
@@ -82,7 +101,16 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if (org.fear or 0) > 0 then
-		add = add + Clamp(org.fear, 0, 2) * timeValue * 0.08
+		-- Transfer capped fear to despair at a very lessened rate
+		local fear = org.fear
+		local fearTransferRate = 0.08
+		-- If fear is high (near cap of 2), transfer at much lessened rate
+		if fear > 1.5 then
+			fearTransferRate = 0.02 -- Much slower transfer when fear is capped
+		elseif fear > 1.0 then
+			fearTransferRate = 0.04 -- Slower transfer when fear is high
+		end
+		add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate
 	end
 
 	if (org.pain or 0) > 45 then
@@ -95,6 +123,38 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 	if (org.bleed or 0) > 2 then
 		add = add + Clamp((org.bleed - 2) / 14, 0, 1) * timeValue * 0.045
+	end
+
+	-- Despair from unhealed injuries (persistent bleeding/wounds)
+	if (org.bleed or 0) > 0 then
+		add = add + Clamp(org.bleed, 0, 5) * timeValue * 0.02
+	end
+
+	-- Despair from dying state (critical health/blood)
+	if (org.blood or 5000) < 2500 then
+		add = add + Clamp((2500 - org.blood) / 2500, 0, 1) * timeValue * 0.08
+	end
+
+	-- Despair from lack of goodmood (if goodmood has been low for a while)
+	local goodmood = org.goodmood or 0
+	if goodmood < 0.3 then
+		org._lowGoodMoodTime = (org._lowGoodMoodTime or 0) + timeValue
+		-- After 60 seconds of low goodmood, start adding despair
+		if org._lowGoodMoodTime > 60 then
+			add = add + (0.3 - goodmood) * timeValue * 0.01
+		end
+	else
+		org._lowGoodMoodTime = 0
+	end
+
+	-- Despair from boredom (no events, low activity for extended time)
+	local time = CurTime()
+	if not org._lastActivityTime then
+		org._lastActivityTime = time
+	end
+	-- If no damage, no fear, no despair gain for 5 minutes, start adding despair
+	if time - org._despairLastGainedTime > 300 and (org.fear or 0) < 0.1 and (org.pain or 0) < 10 then
+		add = add + timeValue * 0.005
 	end
 
 	if (org.blood or 5000) < 3200 then
@@ -172,6 +232,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			add = add - goodmoodLoss
 		end
 		org.despair = min(org.despair + add, 1)
+		org._despairLastGainedTime = CurTime()
 	end
 
 	-- Cap despair at 0.5 if player had goodmood and still has some goodmood left

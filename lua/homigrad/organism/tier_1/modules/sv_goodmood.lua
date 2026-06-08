@@ -2,23 +2,33 @@ hg.organism.module.goodmood = {}
 local module = hg.organism.module.goodmood
 
 module[1] = function(org)
-    org.goodmood = 0
+    org.goodmood = 1.0
 end
 
 module[2] = function(owner, org, timeValue)
     local goodmood_add = 0
 
-    -- Increase goodmood when in good condition
-    if org.despair < 0.1 and org.fear < 0.1 then
-        goodmood_add = goodmood_add + timeValue * 0.005
+    -- Natural mood decay towards 0
+    org.goodmood = math.Approach(org.goodmood, 0, timeValue / 600)
+
+    -- Increase goodmood when in good condition (pristine, no fear/despair)
+    if org.despair < 0.1 and org.fear < 0.1 and org.pain < 10 then
+        goodmood_add = goodmood_add + timeValue * 0.008
     end
 
+    -- Good diet (satiety and hydration)
     if org.satiety > 80 and org.hydration > 80 then
-        goodmood_add = goodmood_add + timeValue * 0.005
+        goodmood_add = goodmood_add + timeValue * 0.006
     end
 
-    if org.pain < 10 then
-        goodmood_add = goodmood_add + timeValue * 0.003
+    -- Low pain
+    if org.pain < 5 then
+        goodmood_add = goodmood_add + timeValue * 0.004
+    end
+
+    -- Good health (high blood, no bleeding)
+    if (org.blood or 5000) > 4500 and (org.bleed or 0) < 1 then
+        goodmood_add = goodmood_add + timeValue * 0.005
     end
 
     -- Increase goodmood when on opioids/analgesia
@@ -40,7 +50,6 @@ module[2] = function(owner, org, timeValue)
     end
 
     org.goodmood = math.Clamp(org.goodmood + goodmood_add, 0, 1)
-    org.goodmood = math.Approach(org.goodmood, 0, timeValue / 480)
 end
 
 -- Decrease goodmood when taking damage
@@ -53,6 +62,30 @@ hook.Add("HomigradDamage", "GoodMood_OnDamage", function(ply, dmgInfo, hitgroup,
     if damage > 5 then
         org.goodmood = math.Clamp(org.goodmood - (damage * 0.002), 0, 1)
     end
+end)
+
+-- Increase goodmood when overcoming fear/despair
+hook.Add("Org Think", "GoodMood_OvercomeFear", function(owner, org, timeValue)
+    if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+
+    -- Track previous fear/despair for overcoming moments
+    local prevFear = org._prevFear or 0
+    local prevDespair = org._prevDespair or 0
+    local currentFear = org.fear or 0
+    local currentDespair = org.despair or 0
+
+    -- If fear was high (>0.8) and is now low (<0.2), give goodmood boost
+    if prevFear > 0.8 and currentFear < 0.2 then
+        org.goodmood = math.Clamp(org.goodmood + 0.15, 0, 1)
+    end
+
+    -- If despair was high (>0.7) and is now low (<0.2), give goodmood boost
+    if prevDespair > 0.7 and currentDespair < 0.2 then
+        org.goodmood = math.Clamp(org.goodmood + 0.2, 0, 1)
+    end
+
+    org._prevFear = currentFear
+    org._prevDespair = currentDespair
 end)
 
 -- Increase goodmood when healing (bandaging wounds)

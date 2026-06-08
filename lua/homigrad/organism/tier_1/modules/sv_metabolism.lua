@@ -6,40 +6,84 @@ local max, min, Round, Lerp, halfValue2 = math.max, math.min, math.Round, Lerp, 
 hg.organism.module.metabolism = {}
 local module = hg.organism.module.metabolism
 module[1] = function(org)
-	org.satiety = 0
+	org.satiety = 100
     org.hungry = 0
     org.hungryDmgCd = 0
-    org.hydration = 0
+    org._satietyLastClimbed = 0
+    org._starvingStartTime = 0
+    org.hydration = 100
     org.thirst = 0
     org.thirstDmgCd = 0
 end
 
 local colorRed = Color(125,25,25)
 module[2] = function(owner, org, timeValue)
-    if org.satiety <= 0 and hg_hungersystem:GetBool() then 
-        org.hungry = min(max(org.hungry + timeValue * 0.01, 0),100)
-        //if org.isPly and not org.otrub and org.hungry > 25 and org.hungry < 45 then org.owner:Notify(table.Random(pharse),60,"hungry",6) end
-        org.hungryDmgCd = org.hungryDmgCd or 0
-        if org.alive and org.hungryDmgCd < CurTime() and org.hungry > 45 then
-            //org.owner:Notify(table.Random(veryPharse),20,"hungry",6,nil,colorRed)
-            org.painadd = org.painadd + 25 * (org.hungry/45)
-            org.hungryDmgCd = CurTime() + (math.random(40,55) - (org.hungry/5.5))
-            //owner:TakeDamage(5,owner,owner)
-            if org.hungry > 80 then
-                org.stomach = math.min(org.stomach + 0.1,1)
-                if org.stomach > 0.85 and org.heart < 0.3 then
-                    org.heart = org.heart + 0.1
-                end
-                if org.heart > 0.3 then
-                    org.o2.regen = 0
-                end
-                //owner:TakeDamage(15,owner,owner)
+    -- Satiety mechanics
+    local satiety = org.satiety or 0
+    local timeSinceClimbed = CurTime() - (org._satietyLastClimbed or 0)
+    
+    -- Satiety slowly regains over time
+    if satiety < 100 then
+        org.satiety = min(satiety + timeValue * 0.05, 100)
+    end
+    
+    -- Track when satiety increases (eating)
+    if satiety > (org._prevSatiety or 0) then
+        org._satietyLastClimbed = CurTime()
+    end
+    org._prevSatiety = org.satiety
+    
+    -- Hunger mechanics based on satiety
+    local hungerRate = 0
+    
+    -- If satiety is high (>60) and recently climbed (<2 minutes), prevent hunger loss
+    if satiety > 60 and timeSinceClimbed < 120 then
+        hungerRate = 0
+    -- If satiety is moderate (30-60), mostly prevent hunger loss
+    elseif satiety > 30 then
+        hungerRate = timeValue * 0.015
+    -- If satiety is low (0-30), start getting hungry
+    elseif satiety > 0 then
+        hungerRate = timeValue * 0.045
+    -- If satiety is 0, get hungry at higher pace
+    else
+        hungerRate = timeValue * 0.075
+    end
+    
+    org.hungry = min(max((org.hungry or 0) + hungerRate, 0), 100)
+    org.hungry = Round(org.hungry or 0, 3)
+    
+    -- Pain and O2 loss when really hungry (>70) - only if hunger system enabled
+    if hg_hungersystem:GetBool() then
+        if org.hungry > 70 then
+            local painAdd = (org.hungry - 70) / 30 * timeValue * 2
+            org.painadd = (org.painadd or 0) + painAdd
+            
+            -- Slight O2 loss
+            if org.o2 and org.o2[1] then
+                org.o2[1] = max(org.o2[1] - timeValue * 0.1, 0)
             end
         end
-    else
-        org.hungry = min(max(org.hungry - timeValue * 2, 0),100)
+        
+        -- Flatlining chance when starving (>90) for a good minute
+        if org.hungry > 90 then
+            if not org._starvingStartTime then
+                org._starvingStartTime = CurTime()
+            end
+            
+            local starvingDuration = CurTime() - org._starvingStartTime
+            if starvingDuration > 60 then
+                -- Chance increases the longer you starve
+                local flatlineChance = math.min((starvingDuration - 60) / 300 * 0.02, 0.1)
+                if math.random() < flatlineChance then
+                    org.heartstop = true
+                    org.lungsfunction = false
+                end
+            end
+        else
+            org._starvingStartTime = nil
+        end
     end
-    org.hungry = Round(org.hungry or 0,3)
 
     if org.hydration <= 0 and hg_thirstsystem:GetBool() then
         org.thirst = min(max(org.thirst + timeValue * 0.015, 0), 100)
