@@ -447,7 +447,7 @@ function PANEL:Init()
     self.AccumulatedAngle = 0
     self.WrapAngle = 0
     self.GameType = (hg and hg.MedicalMinigame and hg.MedicalMinigame.NextType) or "bandage"
-    self.TargetTurns = hg.MedicalMinigame.RequiredTurns or 6
+    self.TargetTurns = (self.GameType == "bandage") and 1 or (hg.MedicalMinigame.RequiredTurns or 6)
     self.BandageCompletions = hg.MedicalMinigame.NextCompletions or 0
     self.BandageRequiredCompletions = hg.MedicalMinigame.NextRequiredCompletions or 3
     

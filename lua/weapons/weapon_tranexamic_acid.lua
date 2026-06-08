@@ -8,8 +8,8 @@ SWEP.Primary.Wait = 1
 SWEP.Primary.Next = 0
 SWEP.HoldType = "normal"
 SWEP.ViewModel = ""
-SWEP.WorldModel = "models/weapons/w_models/w_jyringe_jroj.mdl"
-SWEP.Model = "models/weapons/w_models/w_jyringe_jroj.mdl"
+SWEP.WorldModel = "models/morphine_syrette/morphine.mdl"
+SWEP.Model = "models/morphine_syrette/morphine.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/icons/ico_manitol.png")
 	SWEP.IconOverride = "vgui/icons/ico_manitol.png"
@@ -21,14 +21,14 @@ SWEP.AutoSwitchFrom = false
 SWEP.Slot = 3
 SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
-SWEP.offsetVec = Vector(4, -0.5, -3)
-SWEP.offsetAng = Angle(-30, 20, 90)
+SWEP.offsetVec = Vector(4, -1.5, 0)
+SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modes = 1
 SWEP.modeNames = {
 	[1] = "tranexamic acid",
 }
-SWEP.ofsV = Vector(-2,-10,8)
-SWEP.ofsA = Angle(90,-90,90)
+SWEP.ofsV = Vector(0,8,-3)
+SWEP.ofsA = Angle(-90,-90,90)
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 
@@ -43,6 +43,20 @@ SWEP.modeValuesdef = {
 }
 SWEP.ShouldDeleteOnFullUse = true
 
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
+
+function SWEP:Think()
+	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+		self:SetHolding(math.max(self:GetHolding() - 4, 0))
+	end
+end
+
+function SWEP:Animation()
+	local hold = self:GetHolding()
+    self:BoneSet("r_upperarm", vector_origin, Angle(0, -hold + (100 * (hold / 100)), 0))
+    self:BoneSet("r_forearm", vector_origin, Angle(-hold / 6, -hold * 2, -15))
+end
+
 if SERVER then
 	function SWEP:Heal(ent, mode)
 		local org = ent.organism
@@ -52,6 +66,10 @@ if SERVER then
 
 		if self.modeValues[1] == 0 then return end
 		
+		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+			self:SetHolding(math.Clamp(self:GetHolding() + 100, 0, 50))
+		end
+
 		local internalBleed = org.internalBleed - org.internalBleedHeal
 		
 		local canHeal = false

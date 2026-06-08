@@ -76,6 +76,10 @@ local function StartMinigame(wep, owner, minigameType, target)
     wep.healbuddy = target or owner
     wep.HGMedicalMinigameStartValue = startValue
 
+    if minigameType == "bandage" and hg and hg.MedicalMinigame and hg.MedicalMinigame.StartBandageMinigame then
+        return hg.MedicalMinigame.StartBandageMinigame(owner, wep.healbuddy)
+    end
+
     net.Start("hg_medical_minigame_start")
         net.WriteString(minigameType)
     net.Send(owner)

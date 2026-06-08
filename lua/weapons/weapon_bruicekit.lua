@@ -29,12 +29,12 @@ function SWEP:InitializeAdd()
 	self.ModelScale = 1
 
 	self.modeValues = {
-		[1] = 60,
+		[1] = 1.0,
 	}
 end
 
 SWEP.modeValuesdef = {
-	[1] = {60, true},
+	[1] = {1.0, false},
 }
 
 SWEP.ShouldDeleteOnFullUse = true
@@ -53,6 +53,9 @@ if SERVER then
 		"skull",
 	}
 
+	local brokenLimbsList = { "lleg", "rleg", "larm", "rarm" }
+	local complexBonesList = { "spine3", "spine2", "spine1", "pelvis", "chest", "skull" }
+
 	local function CanHealKey(org, key)
 		local v = tonumber(org[key] or 0) or 0
 		if key == "larm" and org.larmamputated then return false end
@@ -62,29 +65,38 @@ if SERVER then
 		return v > 0.05
 	end
 
-	local function FindMostDamagedKey(org)
-		local bestKey = nil
-		local bestVal = 0
+	function SWEP:GetHealData(org)
+		local totalRotations = 1 -- Base 1 rotation
+		local totalCost = 0
+		local bonesToHeal = {}
+		local availableResource = self.modeValues[1] or 0
 
+		-- Prioritize based on conditionPriority order
 		for _, key in ipairs(conditionPriority) do
 			if CanHealKey(org, key) then
-				local v = tonumber(org[key] or 0) or 0
-				if v > bestVal then
-					bestVal = v
-					bestKey = key
+				local isComplex = table.HasValue(complexBonesList, key)
+				local cost = isComplex and 0.25 or 0.15
+				local rotations = isComplex and 3 or 2
+				
+				if totalCost + cost <= availableResource + 0.001 then
+					totalCost = totalCost + cost
+					totalRotations = totalRotations + rotations
+					table.insert(bonesToHeal, {key = key, cost = cost, heal = 0.25})
 				end
 			end
 		end
 
-		return bestKey, bestVal
+		return totalRotations, totalCost, bonesToHeal
 	end
 
 	function SWEP:CanHeal(ent)
 		local org = ent and ent.organism
 		if not org then return false end
-		if (self.modeValues and self.modeValues[1] or 0) <= 0 then return false end
+		local available = self.modeValues and self.modeValues[1] or 0
+		if available <= 0 then return false end
 
-		return FindMostDamagedKey(org) ~= nil
+		local _, totalCost, bones = self:GetHealData(org)
+		return #bones > 0
 	end
 
 	function SWEP:Heal(ent, mode, bone)
@@ -101,17 +113,23 @@ if SERVER then
 			if self:GetHolding() < 100 then return end
 		end
 
-		if not self:CanHeal(ent) then return false end
+		local totalRotations, totalCost, bones = self:GetHealData(org)
+		if #bones == 0 then return false end
 
-		local key = FindMostDamagedKey(org)
-		if not key then return false end
+		-- Heal the bones and spend bruise kit
+		local amountHealed = 0
+		for _, data in ipairs(bones) do
+			local key = data.key
+			local v = tonumber(org[key] or 0) or 0
+			org[key] = math.max(v - data.heal, 0)
+			amountHealed = amountHealed + data.heal
+		end
 
-		local heal = math.min(tonumber(self.modeValues[1] or 0) or 0, 15)
-		if heal <= 0 then return false end
+		self.modeValues[1] = math.max((self.modeValues[1] or 0) - totalCost, 0)
 
-		local v = tonumber(org[key] or 0) or 0
-		org[key] = math.max(v - (heal / 16), 0)
-		self.modeValues[1] = math.max((tonumber(self.modeValues[1]) or 0) - heal, 0)
+		-- gain slight analgesia per total use (0.2-0.4 depending how much one healed)
+		local analgesiaAdd = math.Clamp(amountHealed * 0.4, 0.2, 0.4)
+		org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + analgesiaAdd, 4)
 
 		owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
 

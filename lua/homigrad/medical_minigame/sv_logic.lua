@@ -3,6 +3,7 @@ if CLIENT then return end
 hg.MedicalMinigame = hg.MedicalMinigame or {}
 hg.MedicalMinigame.AmputationSessions = hg.MedicalMinigame.AmputationSessions or {}
 hg.MedicalMinigame.DislocationSessions = hg.MedicalMinigame.DislocationSessions or {}
+hg.MedicalMinigame.BandageSessions = hg.MedicalMinigame.BandageSessions or {}
 
 local amputationLimbNames = {
     larm = "Left Arm",
@@ -175,6 +176,16 @@ local function ClearDislocationSessionsForPlayer(ply)
     end
 end
 
+local function ClearBandageSessionsForPlayer(ply)
+    hg.MedicalMinigame.BandageSessions[ply] = nil
+
+    for healer, session in pairs(hg.MedicalMinigame.BandageSessions) do
+        if session and session.target == ply then
+            hg.MedicalMinigame.BandageSessions[healer] = nil
+        end
+    end
+end
+
 function hg.MedicalMinigame.StartAmputationMinigame(ply, ent, limb)
     local target = ResolveMinigameTarget(ent) or ply
     if not CanUseMedicalMinigameTarget(ply, target) then return false end
@@ -231,8 +242,61 @@ function hg.MedicalMinigame.StartDislocationMinigame(ply, ent, group)
 end
 
 function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
-    -- Disabled - bandages now use rotation-based system directly in weapon
-    return false
+    local target = ResolveMinigameTarget(ent) or ply
+    if not CanUseMedicalMinigameTarget(ply, target) then return false end
+
+    local wep = ply:GetActiveWeapon()
+    local completions = 0
+    local requiredCompletions = 3
+    if IsValid(wep) then
+        completions = wep.minigameCompletions or 0
+        local class = wep:GetClass()
+        if class == "weapon_bruicekit" then
+            local org = target.organism
+            if org then
+                local totalRotations, _, _ = wep:GetHealData(org)
+                requiredCompletions = totalRotations
+            else
+                requiredCompletions = 1
+            end
+        else
+            local mode = wep.mode or 1
+            local amount = wep.modeValues and wep.modeValues[mode] or 0
+            local baseLoops = (isnumber(amount) and amount > 0) and math.Clamp(math.ceil(amount / 30), 1, 8) or 1
+            local injuryScore = 0
+            local org = target.organism
+            if org then
+                if istable(org.wounds) then injuryScore = injuryScore + #org.wounds end
+                if istable(org.arterialwounds) then injuryScore = injuryScore + (#org.arterialwounds * 2) end
+                if isnumber(org.bleed) then injuryScore = injuryScore + math.Clamp(math.floor(org.bleed / 35), 0, 6) end
+                -- Make sure it does not skip steps such as bandaging the broken bones instead of just only affecting bleeding
+                if org.lleg >= 1 and not org.llegamputated then injuryScore = injuryScore + 2 end
+                if org.rleg >= 1 and not org.rlegamputated then injuryScore = injuryScore + 2 end
+                if org.larm >= 1 and not org.larmamputated then injuryScore = injuryScore + 2 end
+                if org.rarm >= 1 and not org.rarmamputated then injuryScore = injuryScore + 2 end
+            end
+            requiredCompletions = math.Clamp(baseLoops + math.ceil(injuryScore * 0.1), 1, 8)
+        end
+    end
+
+    local existingSession = hg.MedicalMinigame.BandageSessions[ply]
+    if not existingSession or existingSession.target ~= target then
+        existingSession = {
+            target = target,
+            progress = 0
+        }
+        hg.MedicalMinigame.BandageSessions[ply] = existingSession
+    end
+
+    net.Start("hg_medical_minigame_start")
+    net.WriteString("bandage")
+    net.WriteEntity(target)
+    net.WriteFloat(math.Clamp(existingSession.progress or 0, 0, 1))
+    net.WriteInt(completions, 8)
+    net.WriteInt(requiredCompletions, 8)
+    net.Send(ply)
+
+    return true
 end
 
 net.Receive("hg_medical_minigame_request_amputation", function(len, ply)
@@ -252,11 +316,17 @@ net.Receive("hg_medical_minigame_cancel", function(len, ply)
         ClearDislocationSessionsForPlayer(ply)
         return
     end
+
+    if minigameType == "bandage" then
+        ClearBandageSessionsForPlayer(ply)
+        return
+    end
 end)
 
 hook.Add("PlayerDeath", "hg_medical_minigame_clear_amputation_progress", function(ply)
     ClearAmputationSessionsForPlayer(ply)
     ClearDislocationSessionsForPlayer(ply)
+    ClearBandageSessionsForPlayer(ply)
 end)
 
 local function GetMedicalMinigameType(wep)
@@ -277,58 +347,6 @@ end
 
 -- Expose function for external use (e.g., zcity_delta weapon patch)
 hg.MedicalMinigame.GetMedicalMinigameType = GetMedicalMinigameType
-
-local function ApplyBruiceKitProgress(wep, ply, target, progressDelta)
-    local org = target.organism
-    if not org then return end
-    if not wep.modeValues or not wep.modeValues[1] then return end
-
-    local requested = math.max(progressDelta or 0, 0) * 40
-    if requested <= 0 then return end
-
-    local currentAmount = math.max(tonumber(wep.modeValues[1]) or 0, 0)
-    local consumed = math.min(requested, currentAmount)
-    if consumed <= 0 then return end
-
-    wep.modeValues[1] = math.max(currentAmount - consumed, 0)
-
-    local heal = consumed / 40
-    local keys = {
-        "larm",
-        "rarm",
-        "lleg",
-        "rleg",
-        "pelvis",
-        "spine1",
-        "spine2",
-        "spine3",
-        "chest",
-        "skull"
-    }
-
-    local bestKey = nil
-    local bestVal = 0
-    for i = 1, #keys do
-        local key = keys[i]
-        local skip = (key == "larm" and org.larmamputated)
-            or (key == "rarm" and org.rarmamputated)
-            or (key == "lleg" and org.llegamputated)
-            or (key == "rleg" and org.rlegamputated)
-        if not skip then
-            local v = tonumber(org[key] or 0) or 0
-            if v > bestVal then
-                bestVal = v
-                bestKey = key
-            end
-        end
-    end
-
-    if bestKey and bestVal > 0.01 then
-        org[bestKey] = math.max(bestVal - heal, 0)
-    end
-
-    wep:SetNetVar("modeValues", table.Copy(wep.modeValues))
-end
 
 local function GetMinigameModeValueIndex(wep, minigameType)
     if minigameType == "tourniquet" then
@@ -428,11 +446,6 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
 
         if minigameType == "syringe" then
             ApplySyringeProgress(wep, ply, target, progressDelta)
-            return
-        end
-
-        if minigameType == "bandage" and wep:GetClass() == "weapon_bruicekit" then
-            ApplyBruiceKitProgress(wep, ply, target, progressDelta)
             return
         end
 

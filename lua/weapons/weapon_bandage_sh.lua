@@ -204,11 +204,6 @@ function SWEP:Think()
 end
 SWEP.net_cooldown2 = 0
 function SWEP:PrimaryAttack()
-	if CLIENT then
-		-- Start rotation-based bandaging
-		self:StartBandageRotation()
-		return
-	end
 end
 
 if CLIENT then
@@ -320,25 +315,14 @@ if CLIENT then
 end
 
 SWEP.mode = 1
-SWEP.modes = 2
+SWEP.modes = 1
 SWEP.modeNames = {
 	[1] = "bandaging",
-	[2] = "splinting"
 }
 
 function SWEP:InitializeAdd()
 	self.ModelScale = 0.9
 	self.minigameCompletions = 0
-	
-	-- Rotation-based bandaging
-	self.bandageRotation = {
-		active = false,
-		accumulatedAngle = 0,
-		lastAngle = nil,
-		completedLoops = 0,
-		requiredLoops = 1,
-		startTime = 0
-	}
 end
 
 SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
@@ -347,197 +331,6 @@ SWEP.FallSnd = "physics/body/body_medium_impact_soft5.wav"
 
 if CLIENT then
 	SWEP.HowToUseInstructions = "<font=ZCity_Tiny>"..string.upper( (input.LookupBinding("+use") or "BIND YOUR +USE KEY PLEASE. WRITE \"bind e +use\" IN CONSOLE FOR THE LOVE OF GOD") ).." to pickup</font>"
-	
-	local function NormalizeAngleDelta(delta)
-		if delta > 180 then
-			return delta - 360
-		end
-		if delta < -180 then
-			return delta + 360
-		end
-		return delta
-	end
-	
-	local function AngleFromDelta(dx, dy)
-		if dx == 0 and dy == 0 then return 0 end
-		if dx == 0 then
-			return dy > 0 and 90 or 270
-		end
-		
-		local ang = math.deg(math.atan(dy / dx))
-		if dx < 0 then
-			ang = ang + 180
-		elseif dy < 0 then
-			ang = ang + 360
-		end
-		
-		return ang
-	end
-	
-	function SWEP:StartBandageRotation()
-		local owner = self:GetOwner()
-		if not IsValid(owner) or owner ~= LocalPlayer() then return end
-		
-		-- Calculate required loops based on bandage amount and injuries
-		local loops = 1
-		if self.modeValues and self.modeValues[1] then
-			loops = math.Clamp(math.ceil(self.modeValues[1] / 30), 1, 8)
-		end
-		
-		-- Check target for injuries to increase required loops
-		local target = hg.eyeTrace(owner).Entity
-		if IsValid(target) and target.organism then
-			local org = target.organism
-			local injuryScore = 0
-			if istable(org.wounds) then injuryScore = injuryScore + #org.wounds end
-			if istable(org.arterialwounds) then injuryScore = injuryScore + (#org.arterialwounds * 2) end
-			if isnumber(org.bleed) then injuryScore = injuryScore + math.Clamp(math.floor(org.bleed / 35), 0, 6) end
-			loops = math.Clamp(loops + math.ceil(injuryScore * 0.1), 1, 8)
-		elseif IsValid(target) and target.GetNetVar then
-			-- Check net vars for ragdolls
-			local bleed = tonumber(target:GetNetVar("bleed", 0) or 0) or 0
-			local wounds = target:GetNetVar("wounds", nil)
-			local arterial = target:GetNetVar("arterialwounds", nil)
-			local injuryScore = 0
-			if bleed > 0 then injuryScore = injuryScore + math.Clamp(math.floor(bleed / 35), 0, 6) end
-			if istable(wounds) then injuryScore = injuryScore + #wounds end
-			if istable(arterial) then injuryScore = injuryScore + (#arterial * 2) end
-			loops = math.Clamp(loops + math.ceil(injuryScore * 0.1), 1, 8)
-		end
-		
-		self.bandageRotation.active = true
-		self.bandageRotation.accumulatedAngle = 0
-		self.bandageRotation.lastAngle = nil
-		self.bandageRotation.completedLoops = 0
-		self.bandageRotation.requiredLoops = loops
-		self.bandageRotation.startTime = CurTime()
-		self.bandageRotation.lastMouseX = gui.MouseX()
-		self.bandageRotation.lastMouseY = gui.MouseY()
-		
-		gui.EnableScreenClicker(true)
-	end
-	
-	function SWEP:UpdateBandageRotation()
-		if not self.bandageRotation.active then return end
-		
-		local owner = self:GetOwner()
-		if not IsValid(owner) or owner ~= LocalPlayer() then
-			self:CancelBandageRotation()
-			return
-		end
-		
-		if not owner:KeyDown(IN_ATTACK) then
-			self:CancelBandageRotation()
-			return
-		end
-		
-		local curX, curY = gui.MouseX(), gui.MouseY()
-		local centerX, centerY = ScrW() / 2, ScrH() / 2
-		
-		-- Calculate angle from center of screen to mouse position
-		local dx = curX - centerX
-		local dy = curY - centerY
-		local currentAngle = math.deg(math.atan2(dy, dx))
-		
-		if self.bandageRotation.lastAngle then
-			local delta = NormalizeAngleDelta(currentAngle - self.bandageRotation.lastAngle)
-			
-			-- Only accumulate if moving in a consistent direction (rotation)
-			if math.abs(delta) > 0.5 then
-				-- Positive delta = clockwise, negative = counter-clockwise
-				-- We want to accumulate absolute rotation regardless of direction
-				self.bandageRotation.accumulatedAngle = self.bandageRotation.accumulatedAngle + math.abs(delta)
-				
-				if self.bandageRotation.accumulatedAngle >= 360 then
-					self.bandageRotation.accumulatedAngle = self.bandageRotation.accumulatedAngle - 360
-					self.bandageRotation.completedLoops = self.bandageRotation.completedLoops + 1
-					
-					if self.bandageRotation.completedLoops >= self.bandageRotation.requiredLoops then
-						self:CompleteBandageRotation()
-						return
-					end
-				end
-			end
-		else
-			self.bandageRotation.lastAngle = currentAngle
-		end
-		
-		self.bandageRotation.lastAngle = currentAngle
-	end
-	
-	function SWEP:CancelBandageRotation()
-		self.bandageRotation.active = false
-		gui.EnableScreenClicker(false)
-	end
-	
-	function SWEP:CompleteBandageRotation()
-		self.bandageRotation.active = false
-		gui.EnableScreenClicker(false)
-		
-		net.Start("hg_bandage_rotation_done")
-		net.WriteEntity(self)
-		net.SendToServer()
-	end
-	
-	hook.Add("Think", "bandage_rotation_think", function()
-		local ply = LocalPlayer()
-		if not IsValid(ply) then return end
-		local wep = ply:GetActiveWeapon()
-		if IsValid(wep) and wep:GetClass() == "weapon_bandage_sh" then
-			wep:UpdateBandageRotation()
-		end
-	end)
-	
-	hook.Add("HUDPaint", "bandage_rotation_hud", function()
-		local ply = LocalPlayer()
-		if not IsValid(ply) then return end
-		local wep = ply:GetActiveWeapon()
-		if not IsValid(wep) or wep:GetClass() ~= "weapon_bandage_sh" then return end
-		if not wep.bandageRotation or not wep.bandageRotation.active then return end
-		
-		local centerX, centerY = ScrW() / 2, ScrH() / 2
-		local radius = 100
-		local progress = wep.bandageRotation.accumulatedAngle / 360
-		local totalProgress = (wep.bandageRotation.completedLoops + progress) / wep.bandageRotation.requiredLoops
-		
-		-- Draw circle
-		surface.SetDrawColor(50, 50, 50, 200)
-		draw.NoTexture()
-		surface.DrawCircle(centerX, centerY, radius, 50, 50, 50, 200)
-		
-		-- Draw progress arc
-		local startAngle = -90
-		local endAngle = startAngle + (totalProgress * 360)
-		surface.SetDrawColor(0, 150, 0, 255)
-		
-		for i = 0, math.floor(totalProgress * 360) do
-			local angle = math.rad(startAngle + i)
-			local x = centerX + math.cos(angle) * radius
-			local y = centerY + math.sin(angle) * radius
-			surface.DrawRect(x, y, 2, 2)
-		end
-		
-		-- Draw text
-		draw.SimpleText(
-			wep.bandageRotation.completedLoops .. "/" .. wep.bandageRotation.requiredLoops,
-			"ZCity_Veteran",
-			centerX,
-			centerY + radius + 20,
-			Color(255, 255, 255, 255),
-			TEXT_ALIGN_CENTER,
-			TEXT_ALIGN_TOP
-		)
-		
-		draw.SimpleText(
-			"ROTATE MOUSE TO BANDAGE",
-			"ZCity_Small",
-			centerX,
-			centerY - radius - 20,
-			Color(255, 255, 255, 255),
-			TEXT_ALIGN_CENTER,
-			TEXT_ALIGN_BOTTOM
-		)
-	end)
 end
 
 function SWEP:Initialize()
@@ -545,7 +338,6 @@ function SWEP:Initialize()
 
 	self.modeValues = {
 		[1] = 40,
-		[2] = 1,
 	}
 
 	if CLIENT then
@@ -568,7 +360,6 @@ end
 
 SWEP.modeValuesdef = {
 	[1] = {40,true},
-	[2] = {1,true},
 }
 
 function SWEP:GetInfo()
@@ -588,35 +379,12 @@ function SWEP:SetInfo(info)
 end
 
 function SWEP:SecondaryAttack()
-	--self:SetHolding(math.min(self:GetHolding() + 9, 100))
-	if CLIENT then
-		-- Start rotation-based bandaging for others
-		self:StartBandageRotation()
-		return
-	end
 end
 
 if SERVER then
 	util.AddNetworkString("select_mode")
-	util.AddNetworkString("hg_bandage_rotation_done")
 	
-	net.Receive("hg_bandage_rotation_done", function(len, ply)
-		local wep = net.ReadEntity()
-		if not IsValid(wep) or wep:GetOwner() ~= ply then return end
-		
-		local target = hg.eyeTrace(ply).Entity
-		if not IsValid(target) then target = hg.GetCurrentCharacter(ply) end
-		if not IsValid(target) then return end
-		
-		wep.healbuddy = target
-		local done = wep:Heal(target, wep.mode)
-		if done and wep.PostHeal then
-			wep:PostHeal(target, wep.mode)
-		end
-		
-		-- Always sync modeValues after healing attempt
-		wep:SetNetVar("modeValues", wep.modeValues)
-	end)
+	-- No old rotation done net receive needed
 else
 	net.Receive("select_mode",function()
 		net.ReadEntity().mode = net.ReadInt(4)
@@ -719,17 +487,56 @@ if SERVER then
 		local owner = self:GetOwner()
 		if not org then return end
 		
-		-- Splinting mode for broken limbs
-		if self.mode == 2 then
-			return self:Splint(ent, bone)
-		end
-		
-		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
-		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or (istable(org.arterialwounds) and #org.arterialwounds > 0) or (tonumber(org.bleed) or 0) > 0 or org.lleg == 1 or org.rleg == 1 or org.skull >= 0.6 or org.chest == 1 or org.rarm == 1 or org.larm == 1) then return end
-		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
+		local hasInjuries = #org.wounds > 0 
+			or (istable(org.arterialwounds) and #org.arterialwounds > 0) 
+			or (tonumber(org.bleed) or 0) > 0 
+			or org.skull >= 0.6 
+			or org.chest == 1
+			or (org.lleg >= 1 and not org.llegamputated)
+			or (org.rleg >= 1 and not org.rlegamputated)
+			or (org.larm >= 1 and not org.larmamputated)
+			or (org.rarm >= 1 and not org.rarmamputated)
+			or org.lleg == 1 or org.rleg == 1 or org.rarm == 1 or org.larm == 1
+
+		if self.modeValues[1] <= 0 or not hasInjuries then return end
 		
 		local done = false
 		local bandaged = false
+
+		-- Splinting check/logic (bandaging and splinting are now the same thing)
+		local brokenLimbs = {}
+		if org.lleg >= 1 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
+		if org.rleg >= 1 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
+		if org.larm >= 1 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
+		if org.rarm >= 1 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
+
+		if #brokenLimbs > 0 and self.modeValues[1] > 0 then
+			local limbToSplint = brokenLimbs[1]
+			if bone then
+				for _, limb in ipairs(brokenLimbs) do
+					local limbBone = limb == "lleg" and "ValveBiped.Bip01_L_Calf" or
+									   limb == "rleg" and "ValveBiped.Bip01_R_Calf" or
+									   limb == "larm" and "ValveBiped.Bip01_L_Forearm" or
+									   limb == "rarm" and "ValveBiped.Bip01_R_Forearm" or nil
+					if limbBone and ent:GetBoneName(ent:LookupBone(limbBone)) == bone then
+						limbToSplint = limb
+						break
+					end
+				end
+			end
+			
+			local healAmount = 0.3
+			org[limbToSplint] = math.max(org[limbToSplint] - healAmount, 0)
+			org.avgpain = math.max(org.avgpain - 5, 0)
+			
+			ent.splinted_limbs = ent.splinted_limbs or {}
+			ent.splinted_limbs[limbToSplint] = true
+			ent:SetNetVar("splinted_limbs", ent.splinted_limbs)
+			
+			-- Consume some bandage value for splinting
+			self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
+			done = true
+		end
 		
 		if not bone then
 			--print(#org.wounds)
@@ -878,54 +685,6 @@ if SERVER then
 		return done
 	end
 
-	function SWEP:Splint(ent, bone)
-		local org = ent.organism
-		local owner = self:GetOwner()
-		if not org then return end
-		
-		-- Check for broken limbs (lleg, rleg, larm, rarm >= 1)
-		local brokenLimbs = {}
-		if org.lleg >= 1 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
-		if org.rleg >= 1 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
-		if org.larm >= 1 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
-		if org.rarm >= 1 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
-		
-		if #brokenLimbs == 0 then return false end
-		
-		-- Apply splint to first broken limb
-		local limbToSplint = brokenLimbs[1]
-		if bone then
-			-- If specific bone targeted, find matching limb
-			for _, limb in ipairs(brokenLimbs) do
-				local limbBone = limb == "lleg" and "ValveBiped.Bip01_L_Calf" or
-								   limb == "rleg" and "ValveBiped.Bip01_R_Calf" or
-								   limb == "larm" and "ValveBiped.Bip01_L_Forearm" or
-								   limb == "rarm" and "ValveBiped.Bip01_R_Forearm" or nil
-				if limbBone and ent:GetBoneName(ent:LookupBone(limbBone)) == bone then
-					limbToSplint = limb
-					break
-				end
-			end
-		end
-		
-		-- Heal the broken limb partially
-		local healAmount = 0.3
-		org[limbToSplint] = math.max(org[limbToSplint] - healAmount, 0)
-		org.avgpain = math.max(org.avgpain - 5, 0)
-		
-		-- Mark as splinted
-		ent.splinted_limbs = ent.splinted_limbs or {}
-		ent.splinted_limbs[limbToSplint] = true
-		ent:SetNetVar("splinted_limbs", ent.splinted_limbs)
-		
-		-- Consume splint
-		self.modeValues[2] = 0
-		
-		owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
-		
-		return true
-	end
-
 	function SWEP:Heal(ent, mode, bone)
 		if ent:IsNPC() then
 			self:NPCHeal(ent, 0.15, "snd_jack_hmcd_bandage.wav")
@@ -942,7 +701,7 @@ if SERVER then
 		end
 
 		local done = self:Bandage(ent, bone)
-		if self.modeValues[1] <= 0 and self.modeValues[2] <= 0 and self.ShouldDeleteOnFullUse then
+		if self.modeValues[1] <= 0 and self.ShouldDeleteOnFullUse then
 			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end

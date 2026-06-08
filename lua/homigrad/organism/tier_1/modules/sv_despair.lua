@@ -34,6 +34,7 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._panicAttackStartTime = 0
 	org._hadGoodMood = false
 	org._despairLastGainedTime = 0
+	org._despairLastPain = 0
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -152,6 +153,15 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not org._lastActivityTime then
 		org._lastActivityTime = time
 	end
+
+	-- Track pain events as activity (getting hurt)
+	local currentPain = org.pain or 0
+	if currentPain > (org._despairLastPain or 0) + 5 then
+		-- Pain increased significantly, count as activity
+		org._despairLastGainedTime = time
+		org._despairLastPain = currentPain
+	end
+
 	-- If no damage, no fear, no despair gain for 5 minutes, start adding despair
 	if time - org._despairLastGainedTime > 300 and (org.fear or 0) < 0.1 and (org.pain or 0) < 10 then
 		add = add + timeValue * 0.005
