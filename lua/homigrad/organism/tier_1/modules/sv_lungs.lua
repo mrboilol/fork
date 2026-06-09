@@ -510,7 +510,8 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if o2[1] < 4 then
-		org.needotrub = true
+		local o2Severity = math.Clamp((4 - o2[1]) / 4, 0.1, 1)
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * o2Severity * 0.8, 0)
 	end
 
 	if org.lungsR[1] < 0.5 then
@@ -545,7 +546,8 @@ module[2] = function(owner, org, timeValue)
 			end
 		end
 
-		org.needotrub = true
+		local brainSeverity = math.Clamp((org.brain - 0.35) / 0.65, 0.1, 1)
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)
 	end
 
 	local death_from_braindamage = false

@@ -272,7 +272,11 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	-- Cap despair at 0.5 if player had goodmood and still has some goodmood left
-	if org._hadGoodMood and (org.goodmood or 0) > 0 then
+	-- BUT: Allow despair to exceed 0.5 during the 30-second penalty window after losing goodmood
+	local timeSinceLoss = CurTime() - (org._goodmoodLostTime or 0)
+	local inPenaltyWindow = timeSinceLoss < 30
+
+	if org._hadGoodMood and (org.goodmood or 0) > 0 and not inPenaltyWindow then
 		org.despair = min(org.despair, 0.5)
 	end
 

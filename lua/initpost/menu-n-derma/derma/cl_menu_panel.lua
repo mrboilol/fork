@@ -272,6 +272,7 @@ function PANEL:Init()
         sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
             if IsValid(station) then
                 station:SetVolume(1)
+                station:EnableLooping(false)
                 station:Play()
             end
         end)
@@ -3076,6 +3077,7 @@ function PANEL:Init()
         sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
             if IsValid(station) then
                 station:SetVolume(1)
+                station:EnableLooping(false)
                 station:Play()
             end
         end)

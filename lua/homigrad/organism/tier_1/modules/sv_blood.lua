@@ -241,7 +241,10 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then org.needotrub = true end
+	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then
+		local bloodSeverity = math.Clamp(((2500 / (adrenaline / 3 + 1)) - org.blood) / 1000, 0.1, 1)
+		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 0.5, 0)
+	end
 
 	if org.blood < 2500 and not adrenalineStabilizer and not hasAntiIschemia then
 		org.ischemia = math.min(org.ischemia + mulTime * 0.015, 1.0)
@@ -263,7 +266,7 @@ module[2] = function(owner, org, mulTime)
 	local brainBleedHealRate = (org.tranexamic_acid or 0) > 0 and mulTime / 10 or mulTime / 45
 	org.brainBleed = math.Approach(org.brainBleed, 0, brainBleedHealRate)
 	
-	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 10 * org.pulse / 70, 1) end
+	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 	
 	if org.internalBleed > 0.1 then
 		local chance = (org.internalBleed - 0.1) * 0.0005 -- 0.05% chance at 1.1 internal bleeding (reduced from 0.2%)

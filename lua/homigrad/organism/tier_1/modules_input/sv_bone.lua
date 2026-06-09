@@ -683,15 +683,8 @@ hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
             print("[HG Bone] Reapplying floppy for " .. limb .. " with segment=" .. tostring(segment) .. " isDislocated=" .. tostring(isDislocated))
             hg.BreakLimb(ragdoll, limb, segment, isDislocated)
         elseif IsValid(ragdoll) then
-            -- Limb has healed while we were up; make sure no stale floppy constraints remain
-            -- But if it was previously amputated, use stable approach - don't mess with it
-            local wasAmputated = ply.HG_PreviouslyAmputated and ply.HG_PreviouslyAmputated[limb]
-            if wasAmputated then
-                print("[HG Bone] Skipping " .. limb .. " - was previously amputated, letting organism stabilize naturally")
-            else
-                print("[HG Bone] Removing stale constraints for healed limb " .. limb)
-                hg.RemoveLimbConstraints(ragdoll, limb)
-            end
+            -- Constraints persist until next ragdoll - do not remove when limbs heal
+            print("[HG Bone] Skipping constraint removal for healed limb " .. limb .. " - constraints persist until next ragdoll")
         end
     end
 

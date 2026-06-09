@@ -378,6 +378,19 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
     local owner = wep:GetOwner()
     if not IsValid(owner) then return end
 
+    -- For one-time use items (tranexamic acid, horse tranq), don't consume during minigame - only consume on completion
+    local class = wep:GetClass()
+    if class == "weapon_tranexamic_acid" or class == "weapon_horse_tranq" then
+        -- Just play sound during minigame, don't consume
+        local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+        if class == "weapon_horse_tranq" then
+            entOwner:EmitSound("pshiksnd")
+        else
+            entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
+        end
+        return
+    end
+
     local configuredValue = wep.modeValuesdef and wep.modeValuesdef[modeValueIndex]
     local maxValue = wep.HGMedicalMinigameStartValue or (istable(configuredValue) and configuredValue[1] or configuredValue) or 1
     local requestedAmount = math.max(progressDelta, 0) * math.max(tonumber(maxValue) or 0, 0)
@@ -641,6 +654,33 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         end
 
         wep.HGMedicalMinigameStartValue = nil
+
+        -- Call Heal for syringe-type weapons that are NOT handled incrementally in ApplySyringeProgress
+        local class = wep:GetClass()
+        local handledIncrementally = (class == "weapon_morphine" or class == "weapon_fentanyl" or
+                                      (class == "weapon_medkit_sh" and wep.mode == 3))
+
+        if wep.Heal and not handledIncrementally then
+            local done = wep:Heal(target, wep.mode)
+            if done and wep.PostHeal then
+                wep:PostHeal(target, wep.mode)
+            end
+            if wep.net_cooldown2 and wep.net_cooldown2 < CurTime() then
+                wep:SetNetVar("modeValues", wep.modeValues)
+            end
+        end
+
+        -- Remove one-time use syringe items after minigame completion
+        if minigameType == "syringe" then
+            if class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_horse_tranq" or
+               class == "weapon_tranexamic_acid" or class == "weapon_adrenaline" or class == "weapon_naloxone" or
+               class == "weapon_mannitol" or class == "weapon_thiamine" or class == "weapon_betablock" or
+               class == "weapon_painkillers" or class == "weapon_needle" then
+                ply:SelectWeapon("weapon_hands_sh")
+                wep:Remove()
+                return
+            end
+        end
 
         if wep.modeValues then
             local allEmpty = true
