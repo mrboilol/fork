@@ -504,6 +504,7 @@ local statusEffectPositions = {}
 local tooltipHoverTime = {}
 local lastHoveredStatus = nil
 local lastStatusEffectLevels = {}
+local wasAdmiring = false
 
 local smooth = {
 	blood = 5000,
@@ -1991,6 +1992,15 @@ local function draw_status_effects()
 	end
 	
 	local isAdmiring = LocalPlayer():GetNWBool("mcd_admiring", false)
+	
+	-- Reset moodle fade timer when player starts admiring afflictions
+	if isAdmiring and not wasAdmiring then
+		for _, effect in ipairs(effects) do
+			statusEffectAppearance[effect.name] = currentTime
+		end
+	end
+	wasAdmiring = isAdmiring
+	
 	local effectsToDraw = {}
 	for _, effect in ipairs(effects) do
 	    local timeActive = currentTime - (statusEffectAppearance[effect.name] or 0)

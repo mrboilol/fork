@@ -67,7 +67,9 @@ if SERVER then
 		if self.modeValues[1] == 0 then return end
 		
 		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
-			self:SetHolding(math.Clamp(self:GetHolding() + 100, 0, 50))
+			self:SetHolding(math.min(self:GetHolding() + 4, 100))
+
+			if self:GetHolding() < 100 then return end
 		end
 
 		local internalBleed = org.internalBleed - org.internalBleedHeal

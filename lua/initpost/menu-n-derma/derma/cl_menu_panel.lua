@@ -156,14 +156,14 @@ local function ZCityResumeMainMusic()
         if seekTime > 0 then
             ZCityMainMenuMusic:SetTime(seekTime)
         end
-        ZCityMainMenuMusic:SetVolume(0.5)
+        ZCityMainMenuMusic:SetVolume(0.25)
         return
     end
 
-    sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station)
+    sound.PlayFile("sound/quehice.ogg", "noblock", function(station)
         if not IsValid(station) then return end
         station:EnableLooping(true)
-        station:SetVolume(0.5)
+        station:SetVolume(0.25)
         station:Play()
         if seekTime > 0 then
             station:SetTime(seekTime)
@@ -326,12 +326,12 @@ function PANEL:Init()
     -- Play Background Music (Persistent)
     if IsValid(ZCityMainMenuMusic) then
         ZCityMainMenuMusic:Play()
-        ZCityMainMenuMusic:SetVolume(0.5) -- Lower volume
+        ZCityMainMenuMusic:SetVolume(0.25) -- Lower volume
     else
-        sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station, errCode, errStr)
+        sound.PlayFile("sound/quehice.ogg", "noblock", function(station, errCode, errStr)
             if IsValid(station) then
                 station:EnableLooping(true)
-                station:SetVolume(0.5) -- Lower volume
+                station:SetVolume(0.25) -- Lower volume
                 station:Play()
                 ZCityMainMenuMusic = station
             else
@@ -2960,14 +2960,14 @@ local function ZCityResumeMainMusic()
         if seekTime > 0 then
             ZCityMainMenuMusic:SetTime(seekTime)
         end
-        ZCityMainMenuMusic:SetVolume(0.5)
+        ZCityMainMenuMusic:SetVolume(0.25)
         return
     end
 
-    sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station)
+    sound.PlayFile("sound/quehice.ogg", "noblock", function(station)
         if not IsValid(station) then return end
         station:EnableLooping(true)
-        station:SetVolume(0.5)
+        station:SetVolume(0.25)
         station:Play()
         if seekTime > 0 then
             station:SetTime(seekTime)
@@ -3130,12 +3130,12 @@ function PANEL:Init()
     -- Play Background Music (Persistent)
     if IsValid(ZCityMainMenuMusic) then
         ZCityMainMenuMusic:Play()
-        ZCityMainMenuMusic:SetVolume(0.5) -- Lower volume
+        ZCityMainMenuMusic:SetVolume(0.25) -- Lower volume
     else
-        sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station, errCode, errStr)
+        sound.PlayFile("sound/quehice.ogg", "noblock", function(station, errCode, errStr)
             if IsValid(station) then
                 station:EnableLooping(true)
-                station:SetVolume(0.5) -- Lower volume
+                station:SetVolume(0.25) -- Lower volume
                 station:Play()
                 ZCityMainMenuMusic = station
             else

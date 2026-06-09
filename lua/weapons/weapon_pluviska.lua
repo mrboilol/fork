@@ -79,6 +79,14 @@ if SERVER then
 	function SWEP:Heal(ent, mode, bone)
 		local org = ent.organism
 		if not org then return end
+		local owner = self:GetOwner()
+		
+		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+			self:SetHolding(math.min(self:GetHolding() + 10, 100))
+
+			if self:GetHolding() < 100 then return end
+		end
+		
 		self.Eating = self.Eating or 0
 		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end
@@ -91,7 +99,7 @@ if SERVER then
 
 		self.CDEating = CurTime() + 0.5
 		self.Eating = self.Eating + 1
-		--self:SetHolding(0.98)
+		self:SetHolding(0)
 		if self.Eating > 50 then
 			self:GetOwner():SelectWeapon("weapon_hands_sh")
 			self:Remove()

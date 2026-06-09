@@ -143,15 +143,28 @@ module[2] = function(owner, org, timeValue)
 		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 
-	if org.bloodpressure < 65 then
-		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
-		org.disorientation = math.max(org.disorientation, 0.8 + lowK * 1.25)
-		org.shock = math.Approach(org.shock, 20 + lowK * 45, timeValue * (1 + lowK * 2.5))
-		org.stamina[1] = math.max(org.stamina[1] - timeValue * (2 + lowK * 10), 0)
+	-- Disorientation: 0.75 at BP 75, 1.50 at BP 60
+	if org.bloodpressure < 75 then
+		local disorientK = math.Clamp((75 - org.bloodpressure) / 15, 0, 1)
+		org.disorientation = math.max(org.disorientation, 0.75 + disorientK * 0.75)
+	end
 
-		if org.bloodpressure < 55 then
-			org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
-		end
+	-- Stamina loss: starts at BP 80, small/slow, builds to 2/3 at BP 50
+	if org.bloodpressure < 80 then
+		local staminaK = math.Clamp((80 - org.bloodpressure) / 30, 0, 1)
+		local staminaLoss = staminaK * staminaK * (org.stamina.max * 2 / 3) / 60 -- scales quadratically, reaches 2/3 over ~60 seconds at BP 50
+		org.stamina[1] = math.max(org.stamina[1] - timeValue * staminaLoss, 0)
+	end
+
+	-- Shock: only starts at BP 45, slower buildup
+	if org.bloodpressure < 45 then
+		local shockK = math.Clamp((45 - org.bloodpressure) / 30, 0, 1)
+		org.shock = math.Approach(org.shock, 20 + shockK * 45, timeValue * (0.5 + shockK * 1.5))
+	end
+
+	if org.bloodpressure < 55 then
+		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
+		org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
 	end
 
 	if org.bloodpressure > 115 then
