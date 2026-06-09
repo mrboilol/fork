@@ -1,6 +1,8 @@
 local min, max, Clamp = math.min, math.max, math.Clamp
 if hg and hg.despair_server_builtin then return end
 
+local hg_despair = CreateConVar("hg_despair", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Set despair level (0-1)", 0, 1)
+
 local function get_despair_org(ent)
 	if not IsValid(ent) then return nil end
 	if ent:IsPlayer() then return ent.organism end
@@ -56,6 +58,13 @@ end)
 
 hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+
+	-- Apply convar override if set
+	local convarValue = hg_despair:GetFloat()
+	if convarValue > 0 then
+		org.despair = Clamp(convarValue, 0, 1)
+		return
+	end
 
 	org.despair = Clamp(org.despair or 0, 0, 1)
 	-- Despair budge less unless despair hasn't been gained for a little bit
@@ -129,6 +138,23 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	-- Despair from unhealed injuries (persistent bleeding/wounds)
 	if (org.bleed or 0) > 0 then
 		add = add + Clamp(org.bleed, 0, 5) * timeValue * 0.02
+	end
+
+	-- Despair from damaged limbs (broken bones, fractures)
+	local brokenLimbs = 0
+	if (org.lleg or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.rleg or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.larm or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.rarm or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.pelvis or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.skull or 0) >= 0.6 then brokenLimbs = brokenLimbs + 1 end
+	if (org.chest or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.spine1 or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.spine2 or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+	if (org.spine3 or 0) >= 1 then brokenLimbs = brokenLimbs + 1 end
+
+	if brokenLimbs > 0 then
+		add = add + brokenLimbs * timeValue * 0.015
 	end
 
 	-- Despair from dying state (critical health/blood)

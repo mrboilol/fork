@@ -40,9 +40,16 @@ function SWEP:InitializeAdd()
 	}
 
 	if SERVER then
-		local types = {"o+", "a-", "a+", "b-", "b+", "ab-", "ab+"}
-		self.bloodtype = math.random(100) <= 75 and "o-" or types[math.random(#types)]
-		if math.random(10) == 1 then
+		local roll = math.random(100)
+		if roll <= 75 then
+			self.bloodtype = "o-"
+			self.modeValues[1] = 1
+		elseif roll <= 95 then
+			self.bloodtype = nil
+			self.modeValues[1] = 0
+		else
+			local types = {"o+", "a-", "a+", "b-", "b+", "ab-", "ab+"}
+			self.bloodtype = types[math.random(#types)]
 			self.modeValues[1] = 1
 		end
 	end
