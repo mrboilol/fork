@@ -272,7 +272,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local effective_weight = (self.weight or self.Weight or 5) + arm_weight_penalty
 
-	local tta = math.Clamp(effective_weight / 4, 0.25, 1) * 0.7
+	local tta = math.Clamp(effective_weight / 4, 0.25, 1) * 1.0
 
 	local healthy_arms = not rarm_bad and not larm_bad and not rarm_partial and not larm_partial
 	local only_left_arm = rarm_amputated and not larm_bad and not larm_partial
@@ -288,27 +288,27 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if healthy_arms then
 		-- Base alignment time is used
 	elseif only_right_arm then
-		tta_multiplier = 1.8
+		tta_multiplier = 2.5
 	elseif only_left_arm then
-		tta_multiplier = 3.5
+		tta_multiplier = 4.5
 	elseif broken_right_arm then
-		tta_multiplier = 4.0
+		tta_multiplier = 5.0
 	elseif right_arm_broken_left then
-		tta_multiplier = larm_broken and 2.2 or 1.6
+		tta_multiplier = larm_broken and 3.0 or 2.2
 	elseif rarm_partial or larm_partial then
 		-- Partial damage: scale multiplier based on severity
 		-- Right arm partial is worse than left arm partial
 		if rarm_partial and not larm_partial then
-			tta_multiplier = 1.0 + rarm_partial_severity * 1.5 -- 1.0 to 2.5
+			tta_multiplier = 1.0 + rarm_partial_severity * 2.5 -- 1.0 to 3.5
 		elseif larm_partial and not rarm_partial then
-			tta_multiplier = 1.0 + larm_partial_severity * 0.8 -- 1.0 to 1.8
+			tta_multiplier = 1.0 + larm_partial_severity * 1.5 -- 1.0 to 2.5
 		else
 			-- Both arms partially damaged
-			tta_multiplier = 1.0 + (rarm_partial_severity * 1.5 + larm_partial_severity * 0.8) * 0.7
+			tta_multiplier = 1.0 + (rarm_partial_severity * 2.5 + larm_partial_severity * 1.5) * 0.7
 		end
 	else
 		if rarm_bad or larm_bad then
-			tta_multiplier = (rarm_broken or larm_broken) and 2.5 or 1.5
+			tta_multiplier = (rarm_broken or larm_broken) and 3.5 or 2.2
 		end
 	end
 

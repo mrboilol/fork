@@ -222,23 +222,11 @@ bloodparticles_hook[2] = function(mul)
 			continue
 		end
 
-		if result.Hit and result.Entity:IsWorld() then
+		if result.Hit then
 			local dir = result.HitNormal
 			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 			
-			
-			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
-			--sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", hitPos, math.random(10, 60), math.random(80, 120))
-			
-			-- Keep impact particles (gunshot wounds) alive, despawn regular bleeding
-			if part.impact then
-				-- Reset velocity to keep it moving slightly
-				part[3] = VectorRand(-0.5, 0.5)
-				part.lerpedmove = VectorRand(-1, 1)
-			else
-				table_remove(hg.bloodparticles1, i)
-			end
-			
+			table_remove(hg.bloodparticles1, i)
 			continue
 		else
 			local ph = 0
@@ -254,60 +242,15 @@ bloodparticles_hook[2] = function(mul)
 			result.Hit = result.Hit and shouldhit
 
 			if result.Hit then
-				--local down = vecDown * mul * (math.max(0, grav))
-				local down = result.HitNormal
-				local nextpos = (result.Normal + down):GetNormalized() * 5
+				local dir = result.HitNormal
+				decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 				
-				if !insolid and (part.nextput or 0) < CurTime() then
-					part.nextput = CurTime() + 1
-
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
-				end
-
-				local insolid = result.StartSolid and IsValid(result.Entity)
-				if insolid then
-					if result.Entity:IsVehicle() then
-						table_remove(hg.bloodparticles1, i)
-					
-						continue
-					end
-
-					local center = result.Entity:GetBoneMatrix(ph)
-					local len = result.Entity:BoneLength(ph + 1)
-
-					if center then
-						center = center:GetTranslation() + (len and center:GetAngles():Forward() * len or vector_origin) * 0.5
-						nextpos = -(center - hitPos - vecDown * 1):GetNormalized() * 5
-					end
-				end
-
-				local pulldown = (-vector_up * (grav / 600)):Cross(-result.HitNormal:Angle():Right())
-				nextpos:Add(pulldown)
-				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
-				
-				if part.lerpedmove:LengthSqr() < 0.1 * mul then
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
-					
-					-- Keep impact particles alive, despawn regular bleeding
-					if part.impact then
-						part[3] = VectorRand(-0.5, 0.5)
-						part.lerpedmove = VectorRand(-1, 1)
-					else
-						table_remove(hg.bloodparticles1, i)
-					end
-					
-					continue
-				end
-
-				pos:Set(posSet + part.start_velocity * mul)
-				posSet:Set(hitPos + part.lerpedmove + part.start_velocity * mul)
-				part.hashitsomething = true
+				table_remove(hg.bloodparticles1, i)
+				continue
 			else
 				if part.hashitsomething then
 					part.hashitsomething = nil
-					--part[3][3] = 0
-					part[3] = (posSet - pos) / mul * 1--part.lerpedmove / mul
-					--part.lerpedmove = nil
+					part[3] = (posSet - pos) / mul * 1
 					pos:Set(posSet)
 					posSet:Set(posSet)
 				else

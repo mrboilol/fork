@@ -850,6 +850,18 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 	if !org then return end
 
+	-- Override heartbeat to 87 BPM when altberserk is enabled and in berserk mode
+	local altberserk = GetConVar("hg_altberserk")
+	if altberserk and altberserk:GetBool() and hg.underberserk2 then
+		org.heartbeat = 87
+	end
+
+	-- Override heartbeat to 87 BPM when altnoradrenaline is enabled and active
+	local altnoradrenaline = GetConVar("hg_altnoradrenaline")
+	if altnoradrenaline and altnoradrenaline:GetBool() and hg.noradrenalineAltActive then
+		org.heartbeat = 87
+	end
+
 	if org and org.pulse and org.o2 and org.o2[1] then
 		local pulse = org.heartbeat
 		org.pulsethink = org.pulsethink or 0
@@ -1139,15 +1151,15 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local spread = right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5)
 
 							if wound[7] == "arteria" then
-								local arteriaForce = forceMul * 3.5 * 0.5
-								local arteriaForward = dir * 25 * arteriaForce * 0.7
-								local arteriaOscAmpRight = arteriaForward:Length() * 0.15 * pulseFactor
-								local arteriaOscAmpUp = arteriaForward:Length() * 0.1 * pulseFactor
+								local arteriaForce = forceMul * 2.0 * 0.5
+								local arteriaForward = dir * 12 * arteriaForce * 0.7
+								local arteriaOscAmpRight = 1.5 * pulseFactor
+								local arteriaOscAmpUp = 1.0 * pulseFactor
 								local arteriaOsc = right * arteriaOscAmpRight * math.sin(oscTime) + up * arteriaOscAmpUp * math.cos(oscTime)
 								hg.addBloodPart(pos, arteriaForward + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
 							else
 								local normalForce = forceMul * 1.8
-								local normalForward = dir * 20 * normalForce * 0.9
+								local normalForward = dir * 12 * normalForce * 0.9
 								hg.addBloodPart(pos, normalForward + streamOsc + spread, nil, size, size, true, nil, ent)
 							end
 						end

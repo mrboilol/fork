@@ -149,10 +149,12 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		render.DrawScreenQuad()
 	end
 
-	if despair >= 0.25 then
+	-- Panic attack overrides despair sound
+	local panicAttack = (org and org.panicAttack) or false
+	if despair >= 0.25 and not panicAttack then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
-			sound.PlayFile("sound/despair.ogg", "noblock noplay", function(channel)
+			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(channel)
 				despairSoundLoading = false
 				if not IsValid(channel) then return end
 				channel:SetVolume(0)

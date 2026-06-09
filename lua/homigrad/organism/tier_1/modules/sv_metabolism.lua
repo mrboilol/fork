@@ -37,7 +37,7 @@ module[2] = function(owner, org, timeValue)
     local hungerRate = 0
     
     -- If satiety is high (>60) and recently climbed (<2 minutes), prevent hunger loss
-    if satiety > 60 and timeSinceClimbed < 120 then
+    if satiety > 60 and timeSinceClimbed < 45 then
         hungerRate = 0
     -- If satiety is moderate (30-60), mostly prevent hunger loss
     elseif satiety > 30 then

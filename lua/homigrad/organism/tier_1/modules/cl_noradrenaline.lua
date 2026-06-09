@@ -1,6 +1,10 @@
 hg.undernoradrenaline = hg.undernoradrenaline or false
 hg.noradrenalineStartTime = hg.noradrenalineStartTime or 0
 hg.noradrenalineStation = hg.noradrenalineStation or nil
+hg.noradrenalineAltStartTime = hg.noradrenalineAltStartTime or 0
+hg.noradrenalineAltActive = hg.noradrenalineAltActive or false
+
+local altnoradrenaline = CreateClientConVar("hg_altnoradrenaline", "0", true, false, "Enable alternative noradrenaline mode (11s delay, 87 BPM heartbeat, screen beat)", 0, 1)
 
 local tab = {
 	[ "$pp_colour_addr" ] = 0,
@@ -54,6 +58,11 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 
 		hg.noradrenalineStartTime = SysTime()
 
+		if altnoradrenaline:GetBool() then
+			hg.noradrenalineAltStartTime = SysTime()
+			hg.noradrenalineAltActive = false
+		end
+
 		for i = 1, 90 do
 			timer.Simple(i/120,function()
 				ViewPunch(AngleRand(-1,1))
@@ -67,6 +76,14 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 		hg.noradrenalineIntensity = 0
 
 		hg.undernoradrenaline = false
+		hg.noradrenalineAltActive = false
+	end
+
+	-- Check if 11 seconds have passed for alt mode
+	if altnoradrenaline:GetBool() and hg.undernoradrenaline and not hg.noradrenalineAltActive then
+		if SysTime() - hg.noradrenalineAltStartTime >= 11 then
+			hg.noradrenalineAltActive = true
+		end
 	end
 end)
 
@@ -110,6 +127,51 @@ hook.Add("Post Post Processing", "noradrenalineEffect", function()
 	
 		render.SetMaterial(grainMat)
 		render.DrawScreenQuad()
+	end
+end)
+
+-- Screen beat effect for altnoradrenaline at 87 BPM
+hook.Add("RenderScreenspaceEffects", "noradrenalineBeatEffect", function()
+	if not (altnoradrenaline:GetBool() and hg.noradrenalineAltActive) then return end
+	if not IsValid(lply) or not lply:Alive() then return end
+
+	local org = lply.organism
+	if not org then return end
+
+	-- Calculate beat intensity at 87 BPM
+	local time = CurTime()
+	local beatPhase = (time * 87 / 60) % 1
+	local beatIntensity = math.abs(math.sin(beatPhase * math.pi * 2))
+
+	-- Apply screen beat effect
+	tab2[ "$pp_colour_mulr" ] = beatIntensity * 0.3 * hg.noradrenalineClamped
+	tab2[ "$pp_colour_addr" ] = beatIntensity * 0.1 * hg.noradrenalineClamped
+	tab2[ "$pp_colour_contrast" ] = 1 + beatIntensity * 0.2 * hg.noradrenalineClamped
+	tab2[ "$pp_colour_colour" ] = 1 - beatIntensity * 0.1 * hg.noradrenalineClamped
+
+	DrawColorModify(tab2)
+	DrawBloom(0.65, beatIntensity * 0.5 * hg.noradrenalineClamped, 9, 9, 1, 1, beatIntensity * 0.05, 0.2, 0.2)
+end)
+
+hook.Add("HG_CalcView", "noradrenalineBeatShake", function(ply, pos, angles, fova)
+	if not (altnoradrenaline:GetBool() and hg.noradrenalineAltActive) then return end
+	if not IsValid(lply) or not lply:Alive() then return end
+
+	local org = lply.organism
+	if not org then return end
+
+	-- Calculate beat intensity at 87 BPM
+	local time = CurTime()
+	local beatPhase = (time * 87 / 60) % 1
+	local beatIntensity = math.abs(math.sin(beatPhase * math.pi * 2))
+
+	-- Apply camera shake on beat
+	if beatIntensity > 0.8 then
+		local shakeAmt = beatIntensity * 1.5 * hg.noradrenalineClamped
+		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
+		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
+		angles.r = angles.r + math.Rand(-shakeAmt, shakeAmt)
+		fova[1] = (fova[1] or 0) - (beatIntensity * 5 * hg.noradrenalineClamped)
 	end
 end)
 

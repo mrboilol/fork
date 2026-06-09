@@ -33,6 +33,7 @@ local cc = Material( "effects/shaders/merc_chromaticaberration" )
 local offset = CreateClientConVar("berserk_offset", "0.85", true, false, "Set berserk music offset from start", 0, 5)
 local bpm = CreateClientConVar("berserk_bpm", "70", true, false, "Set berserk effect bpm", 1, 280)
 local path = CreateClientConVar("berserk_path", "sound/zbattle/pharmacia.mp3", true, false, "Set berserk effect music path")
+local altberserk = CreateClientConVar("hg_altberserk", "0", true, false, "Enable alternative berserk mode (11 min disoriented, NIGGARUN.ogg, 87 BPM)", 0, 1)
 
 hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	local organism = lply:Alive() and lply.organism
@@ -58,7 +59,11 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 	if berserk > 0.0001 and (!hg.underberserk and !hg.underberserk2) then
 		hg.underberserk = true
-		surface.PlaySound("zbattle/deathsample.ogg")
+		if altberserk:GetBool() then
+			surface.PlaySound("NIGGARUN.ogg")
+		else
+			surface.PlaySound("zbattle/deathsample.ogg")
+		end
 
 		hg.berserkStartTime = SysTime()
 
@@ -68,7 +73,8 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.notifications = {}
 		hg.CreateNotificationBerserk("I feel...")
 
-		timer.Simple(3.95, function()
+		local disorientedDuration = altberserk:GetBool() and 660 or 3.95
+		timer.Simple(disorientedDuration, function()
 			if IsValid(part) then
 				part:StopEmission( false, true, false )
 			end
@@ -81,7 +87,8 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 			hg.underberserk = false
 			hg.underberserk2 = true
-			sound.PlayFile(path:GetString(), "noblock", function(channel)
+			local musicPath = altberserk:GetBool() and "sound/NIGGARUN.ogg" or path:GetString()
+			sound.PlayFile(musicPath, "noblock", function(channel)
 				hg.berserkStation = channel
 				channel:EnableLooping(true)
 				-- atlaschat.font:SetString("BerserkChatFont")
@@ -124,7 +131,8 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	if hg.underberserk2 and IsValid(hg.berserkStation) then
 		--local intensity = ((hg.berserkStartTime2 + SysTime()) / 60) * 70 % 1
 		--intensity = math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
-		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * bpm:GetInt())
+		local currentBpm = altberserk:GetBool() and 87 or bpm:GetInt()
+		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * currentBpm)
 		intensity = (intensity - math.Round(intensity)) % 1
 		--intensity = math.sqrt(math.sqrt(intensity))
 		intensity = math.Clamp((intensity * 0.25 + 0.75), 0, 1)
@@ -194,7 +202,8 @@ end)
 
 hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 	if ply:Alive() and hg.underberserk2 and IsValid(hg.berserkStation) and hg.berserkClamped then
-		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * bpm:GetInt())
+		local currentBpm = altberserk:GetBool() and 87 or bpm:GetInt()
+		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * currentBpm)
 		angles[1] = angles[1] - hg.berserkIntensity * 0.2
 		angles[3] = math.cos(CurTime() * 0.3) * hg.berserkClamped + hg.berserkIntensity * 2 * (intensity % 2 > 1 and 1 or -1)
 		--print(fova)

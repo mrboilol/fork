@@ -68,8 +68,8 @@ local tab = {
 }
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
-local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only", 0, 4)
-local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=altpain.ogg no shake, 4=itsallcomingtoanend only", 0, 4)
+local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3", 0, 5)
+local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=altpain.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3", 0, 5)
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg", 0, 2)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hook_Run = hook.Run
@@ -349,9 +349,19 @@ local function stopthings()
 		AltpainStation = nil
 	end
 
+	if IsValid(SillypainStation) then
+		SillypainStation:Stop()
+		SillypainStation = nil
+	end
+
 	if IsValid(DyingStation) then
 		DyingStation:Stop()
 		DyingStation = nil
+	end
+
+	if IsValid(SillydyingStation) then
+		SillydyingStation:Stop()
+		SillydyingStation = nil
 	end
 
 	if IsValid(AltotrubStation) then
@@ -573,6 +583,18 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
+	if !IsValid(SillypainStation) or SillypainStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/sillypain.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				SillypainStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
 	if !IsValid(DyingStation) or DyingStation:GetState() != GMOD_CHANNEL_PLAYING then
 		sound.PlayFile("sound/dying.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -580,6 +602,18 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				DyingStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(SillydyingStation) or SillydyingStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/sillydying.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				SillydyingStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -849,6 +883,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
 				end
+				if IsValid(SillypainStation) then
+					SillypainStation:SetVolume(0)
+				end
 			elseif painMode == 0 then
 				-- Default: both pain_beat and reality play
 				if IsValid(PainStation) then
@@ -862,6 +899,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillypainStation) then
+					SillypainStation:SetVolume(0)
 				end
 			elseif painMode == 1 then
 				-- Only pain_beat at same volume as reality.mp3
@@ -877,6 +917,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
 				end
+				if IsValid(SillypainStation) then
+					SillypainStation:SetVolume(0)
+				end
 			elseif painMode == 2 then
 				-- Only agony.mp3 instead of reality or painbeat
 				if IsValid(PainStation) then
@@ -890,6 +933,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillypainStation) then
+					SillypainStation:SetVolume(0)
 				end
 			elseif painMode == 3 then
 				-- Only altpain.ogg instead of reality or painbeat
@@ -905,6 +951,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(painVol)
 				end
+				if IsValid(SillypainStation) then
+					SillypainStation:SetVolume(0)
+				end
 			elseif painMode == 4 then
 				-- Only reality.mp3
 				if IsValid(PainStation) then
@@ -918,6 +967,26 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillypainStation) then
+					SillypainStation:SetVolume(0)
+				end
+			elseif painMode == 5 then
+				-- Only sillypain.mp3
+				if IsValid(PainStation) then
+					PainStation:SetVolume(0)
+				end
+				if IsValid(RealityStation) then
+					RealityStation:SetVolume(0)
+				end
+				if IsValid(AgonyStation) then
+					AgonyStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillypainStation) then
+					SillypainStation:SetVolume(painVol)
 				end
 			end
 		//else
@@ -1089,6 +1158,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
 				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
 			elseif dyingMode == 1 then
 				-- Only conscioustypebeat at same volume as itsallcomingtoanend
 				if IsValid(NoiseStation2) then
@@ -1102,6 +1174,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
 				end
 			elseif dyingMode == 2 then
 				-- Only dying.ogg, no screen shake
@@ -1117,6 +1192,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
 				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
 			elseif dyingMode == 3 then
 				-- Only altpain.ogg, no screen shake
 				if IsValid(NoiseStation2) then
@@ -1130,6 +1208,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(consciousVol)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
 				end
 			elseif dyingMode == 4 then
 				-- Only itsallcomingtoanend, no screen shake
@@ -1145,6 +1226,26 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(AltpainStation) then
 					AltpainStation:SetVolume(0)
 				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+			elseif dyingMode == 5 then
+				-- Only sillydying.mp3, no screen shake
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(consciousVol)
+				end
 			end
 		else
 			hg.consciousBeatIntensity = 0
@@ -1159,6 +1260,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 			if IsValid(AltpainStation) then
 				AltpainStation:SetVolume(0)
+			end
+			if IsValid(SillydyingStation) then
+				SillydyingStation:SetVolume(0)
 			end
 		end
 		
@@ -1297,7 +1401,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	if despair >= 0.35 then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
-			sound.PlayFile("sound/despair.ogg", "noblock noplay", function(station)
+			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(station)
 				despairSoundLoading = false
 				if not IsValid(station) then return end
 				station:SetVolume(0)
@@ -1437,8 +1541,8 @@ local function GetConsciousBeatPulse()
 	if not hg_dyingpulse:GetBool() then return 0 end
 
 	local dyingMode = hg_dyingsound:GetInt()
-	-- Disable screen shake for modes 2, 3, and 4
-	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 then return 0 end
+	-- Disable screen shake for modes 2, 3, 4, and 5
+	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 then return 0 end
 
 	local intensity = hg.consciousBeatIntensity or 0
 	if intensity <= 0.01 then return 0 end

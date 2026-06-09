@@ -146,6 +146,8 @@ module[2] = function(owner, org, mulTime)
 	-- Brain bleed contributes to internal bleeding
 	if org.brainBleed > 0 then
 		org.internalBleed = org.internalBleed + org.brainBleed * mulTime * 0.1
+		-- Brain bleed causes brain damage over time
+		org.brain = math.min((org.brain or 0) + org.brainBleed * mulTime * 0.02, 1.0)
 	end
 
 	if org.internalBleed > 0 and not adrenalineStabilizer and not hasAntiIschemia then

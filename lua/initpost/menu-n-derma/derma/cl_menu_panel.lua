@@ -160,7 +160,7 @@ local function ZCityResumeMainMusic()
         return
     end
 
-    sound.PlayFile("sound/mainmenu.mp3", "noblock", function(station)
+    sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station)
         if not IsValid(station) then return end
         station:EnableLooping(true)
         station:SetVolume(0.5)
@@ -267,6 +267,14 @@ function PANEL:Init()
     -- Check for Intro Mode
     if not ZCityHasSeenIntro then
         self.IsIntro = true
+        
+        -- Play valve.mp3 at intro start
+        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+            if IsValid(station) then
+                station:SetVolume(1)
+                station:Play()
+            end
+        end)
     end
     
     self.CurrentState = "Main"
@@ -320,7 +328,7 @@ function PANEL:Init()
         ZCityMainMenuMusic:Play()
         ZCityMainMenuMusic:SetVolume(0.5) -- Lower volume
     else
-        sound.PlayFile("sound/mainmenu.mp3", "noblock", function(station, errCode, errStr)
+        sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station, errCode, errStr)
             if IsValid(station) then
                 station:EnableLooping(true)
                 station:SetVolume(0.5) -- Lower volume
@@ -2956,7 +2964,7 @@ local function ZCityResumeMainMusic()
         return
     end
 
-    sound.PlayFile("sound/mainmenu.mp3", "noblock", function(station)
+    sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station)
         if not IsValid(station) then return end
         station:EnableLooping(true)
         station:SetVolume(0.5)
@@ -3063,6 +3071,14 @@ function PANEL:Init()
     -- Check for Intro Mode
     if not ZCityHasSeenIntro then
         self.IsIntro = true
+        
+        -- Play valve.mp3 at intro start
+        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+            if IsValid(station) then
+                station:SetVolume(1)
+                station:Play()
+            end
+        end)
     end
     
     self.CurrentState = "Main"
@@ -3116,7 +3132,7 @@ function PANEL:Init()
         ZCityMainMenuMusic:Play()
         ZCityMainMenuMusic:SetVolume(0.5) -- Lower volume
     else
-        sound.PlayFile("sound/mainmenu.mp3", "noblock", function(station, errCode, errStr)
+        sound.PlayFile("sound/sorrymud.mp3", "noblock", function(station, errCode, errStr)
             if IsValid(station) then
                 station:EnableLooping(true)
                 station:SetVolume(0.5) -- Lower volume
