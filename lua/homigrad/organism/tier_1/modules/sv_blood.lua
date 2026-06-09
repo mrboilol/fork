@@ -81,6 +81,11 @@ module[2] = function(owner, org, mulTime)
 		org.bleedingmul = 0.8
 	end
 
+	-- Internal bleeding increases external wound bleeding rate
+	if org.internalBleed > 0 then
+		org.bleedingmul = org.bleedingmul * (1 + org.internalBleed * 0.15)
+	end
+
 	if org.vomitInThroat then
 		local ent = hg.GetCurrentCharacter(owner)
 		

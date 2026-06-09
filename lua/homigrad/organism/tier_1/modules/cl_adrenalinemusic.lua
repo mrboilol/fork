@@ -96,14 +96,14 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		shouldPlay = true
 	end
 
-	-- Also play if currently has high adrenaline or fear
-	if adrenalineAdd > 0.5 or despair > 0.3 then
+	-- Also play if currently has adrenaline or fear
+	if adrenalineAdd > 0.25 or despair > 0.3 then
 		shouldPlay = true
 	end
 
 	if shouldPlay then
 		start_adrenaline_music()
-		local targetVol = 0.25
+		local targetVol = math.Clamp(math.max((adrenalineAdd - 0.25) / 1.25, despair / 0.3), 0, 1)
 		hg.adrenalineMusicVol = math.Approach(hg.adrenalineMusicVol, targetVol, FrameTime() * 0.3)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
