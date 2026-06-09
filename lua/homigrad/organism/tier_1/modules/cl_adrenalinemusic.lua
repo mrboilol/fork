@@ -27,7 +27,7 @@ local function start_adrenaline_music()
 	if not hg_adrenalinemusic:GetBool() then return end
 	if IsValid(hg.adrenalineMusicStation) then return end
 	if hg.adrenalineMusicLoading then return end
-	
+
 	hg.adrenalineMusicLoading = true
 	sound.PlayFile("sound/sorrymud.ogg", "noblock noplay", function(channel)
 		hg.adrenalineMusicLoading = false
@@ -35,7 +35,9 @@ local function start_adrenaline_music()
 		channel:SetVolume(0)
 		channel:Play()
 		channel:EnableLooping(true)
+		channel:SetTime(10) -- Skip 10 seconds
 		hg.adrenalineMusicStation = channel
+		hg.adrenalineMusicEndTime = nil
 	end)
 end
 
@@ -107,6 +109,14 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		hg.adrenalineMusicVol = math.Approach(hg.adrenalineMusicVol, targetVol, FrameTime() * 0.3)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
+			-- Get song length and loop back to 10 seconds when near end
+			if not hg.adrenalineMusicEndTime then
+				hg.adrenalineMusicEndTime = hg.adrenalineMusicStation:GetLength()
+			end
+			local currentTime = hg.adrenalineMusicStation:GetTime()
+			if currentTime > hg.adrenalineMusicEndTime - 20 then
+				hg.adrenalineMusicStation:SetTime(10)
+			end
 		end
 	else
 		stop_adrenaline_music(false)
