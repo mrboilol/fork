@@ -505,13 +505,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     -- Play flatline when heartbeat is 0, regardless of other conditions
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 170
     if heartbeat < 1 then
-        if not (isUnconscious and ringAlpha > 0.01 and not hg_unconsciousclassic:GetBool()) then
-            if not IsValid(flatlineStation) then
-                EnsureFlatlineStation()
-            end
-            if IsValid(flatlineStation) and not flatlineStation:IsPlaying() then
-                PlayStation(flatlineStation, 0.8)
-            end
+        if not IsValid(flatlineStation) then
+            EnsureFlatlineStation()
+        end
+        if IsValid(flatlineStation) and not flatlineStation:IsPlaying() then
+            PlayStation(flatlineStation, 0.8)
         end
     end
 

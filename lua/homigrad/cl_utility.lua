@@ -350,8 +350,8 @@ players : 1 humans, 0 bots (20 max)
 			local badass = lply.organism and lply.organism.recoilmul or 1
 			local bulletdmg = math.max(bullet.Damage / 15,1)
 			if hg_suppression_viewpunch and hg_suppression_viewpunch:GetBool() then
-				ViewPunch(anguse * badass * bulletdmg)
-				ViewPunch2((anguse * badass * bulletdmg)/-2)
+				ViewPunch(anguse * badass * bulletdmg * 2)
+				ViewPunch2((anguse * badass * bulletdmg * 2)/-2)
 			end
 			Suppress((dist * 45) * badass * bulletdmg)
 		end)

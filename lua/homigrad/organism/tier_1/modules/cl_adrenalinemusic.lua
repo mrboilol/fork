@@ -80,6 +80,9 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	local shouldPlay = false
 	local adrenalineAdd = org.adrenalineAdd or 0
 	local despair = org.despair or 0
+	local adrenaline = org.adrenaline or 0
+	local fear = org.fear or 0
+	local pain = org.pain or 0
 
 	-- Check if adrenaline increased
 	if adrenalineAdd > hg.lastAdrenalineAdd + 0.1 then
@@ -98,14 +101,14 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		shouldPlay = true
 	end
 
-	-- Also play if currently has adrenaline or fear
-	if adrenalineAdd > 0.25 or despair > 0.3 then
+	-- Also play if currently has adrenaline, fear, pain, or despair
+	if adrenalineAdd > 0.25 or despair > 0.3 or adrenaline > 0.5 or fear > 0.5 or pain > 30 then
 		shouldPlay = true
 	end
 
 	if shouldPlay then
 		start_adrenaline_music()
-		local targetVol = math.Clamp(math.max((adrenalineAdd - 0.25) / 1.25, despair / 0.3), 0, 1)
+		local targetVol = math.Clamp(math.max((adrenalineAdd - 0.25) / 1.25, despair / 0.3, (adrenaline - 0.5) / 2, fear / 2, (pain - 30) / 70), 0, 1)
 		hg.adrenalineMusicVol = math.Approach(hg.adrenalineMusicVol, targetVol, FrameTime() * 0.3)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
