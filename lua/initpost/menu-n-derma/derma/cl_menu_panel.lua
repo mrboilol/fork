@@ -268,14 +268,6 @@ function PANEL:Init()
     if not ZCityHasSeenIntro then
         self.IsIntro = true
         
-        -- Play valve.mp3 at intro start
-        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-            if IsValid(station) then
-                station:SetVolume(1)
-                station:EnableLooping(false)
-                station:Play()
-            end
-        end)
     end
     
     self.CurrentState = "Main"
@@ -463,6 +455,14 @@ function PANEL:Think()
         if input.IsKeyDown(KEY_ENTER) then
             self.IntroSequenceActive = true
             self.IntroStartTime = CurTime()
+            -- Play valve.mp3 sound
+            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:SetVolume(1)
+                    station:EnableLooping(false)
+                    station:Play()
+                end
+            end)
             -- Play "itbegins" sound
             sound.PlayFile("sound/itbegins.mp3", "noblock", function(station, errCode, errStr)
                 if IsValid(station) then
@@ -3073,14 +3073,6 @@ function PANEL:Init()
     if not ZCityHasSeenIntro then
         self.IsIntro = true
         
-        -- Play valve.mp3 at intro start
-        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-            if IsValid(station) then
-                station:SetVolume(1)
-                station:EnableLooping(false)
-                station:Play()
-            end
-        end)
     end
     
     self.CurrentState = "Main"
@@ -3268,6 +3260,14 @@ function PANEL:Think()
         if input.IsKeyDown(KEY_ENTER) then
             self.IntroSequenceActive = true
             self.IntroStartTime = CurTime()
+            -- Play valve.mp3 sound
+            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:SetVolume(1)
+                    station:EnableLooping(false)
+                    station:Play()
+                end
+            end)
             -- Play "itbegins" sound
             sound.PlayFile("sound/itbegins.mp3", "noblock", function(station, errCode, errStr)
                 if IsValid(station) then
