@@ -1979,6 +1979,13 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated then return end
 
+	-- Prevent punching if both arms are broken or dislocated
+	if owner.organism then
+		local rarm_broken = (owner.organism.rarm and owner.organism.rarm >= 1) or owner.organism.rarmdislocation or owner.organism.rarmdislocated
+		local larm_broken = (owner.organism.larm and owner.organism.larm >= 1) or owner.organism.larmdislocation or owner.organism.larmdislocated
+		if rarm_broken and larm_broken then return end
+	end
+
 	if owner.organism and owner.organism.larmamputated then
 		rand = 1
 		side = "fists_right"

@@ -717,11 +717,11 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 					-- Do nothing, keeps bleeding
 				elseif isHands then
 					-- Slap both hands
-					hg.DragHandsToPos(ply, wpn, pos + ang:Right() * -3 + ang:Forward() * 2 - ang:Up() * 1, true, 6, ang:Right(), ang_head1, ang_head2)
+					hg.DragHandsToPos(ply, wpn, pos + ang:Right() * -2 + ang:Forward() * 1 - ang:Up() * 0.5, true, 4, ang:Right(), ang_head1, ang_head2)
 				else
-					-- Slap left hand
+					-- Slap left hand only
 					if wpn then wpn.lhandik = true end
-					hg.DragLeftHand_Ex(ply, wpn, pos + ang:Right() * -3 + ang:Forward() * 2 - ang:Up() * 1, ang, ang_head1)
+					hg.DragLeftHand_Ex(ply, wpn, pos + ang:Right() * -2 + ang:Forward() * 1 - ang:Up() * 0.5, ang, ang_head1)
 				end
 			end
 		end

@@ -69,13 +69,14 @@ function SWEP:PrimaryAttack()
     ent.AttackHitFlesh = "Flesh.ImpactHard"
     ent.noStuck = true
     ent.modelscale = self.modelscale or 1.0
-    ent.Bounce = 0.6
+    ent.Bounce = 0.2
 
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
 		phys:SetMass(50)
-		phys:SetMaterial("metal_bouncy")
+		phys:SetMaterial("metal")
+		phys:SetDamping(0.1, 0.1)
         local throwVel = ply:GetAimVector() * ent.MaxSpeed
         local playerVel = ply:GetVelocity()
         phys:SetVelocity(throwVel + playerVel * 0.5)

@@ -62,10 +62,13 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	if berserk > 0.0001 and (!hg.underberserk and !hg.underberserk2) then
 		hg.underberserk = true
 		hg.berserkMusicPlayed = false
-		if altberserk:GetBool() then
-			surface.PlaySound("NIGGARUN.ogg")
-		else
-			surface.PlaySound("zbattle/deathsample.ogg")
+		if not hg.berserkActivationSoundPlayed then
+			hg.berserkActivationSoundPlayed = true
+			if altberserk:GetBool() then
+				surface.PlaySound("NIGGARUN.ogg")
+			else
+				surface.PlaySound("zbattle/deathsample.ogg")
+			end
 		end
 
 		hg.berserkStartTime = SysTime()
@@ -95,11 +98,17 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 			if not hg.berserkMusicPlayed then
 				hg.berserkMusicPlayed = true
 				local musicPath = altberserk:GetBool() and "sound/NIGGARUN.ogg" or path:GetString()
-				sound.PlayFile(musicPath, "noblock", function(channel)
-					hg.berserkStation = channel
-					channel:EnableLooping(true)
-					-- atlaschat.font:SetString("BerserkChatFont")
-				end)
+				if IsValid(hg.berserkStation) then
+					hg.berserkStation:SetVolume(1)
+					hg.berserkFadeOut = false
+				else
+					sound.PlayFile(musicPath, "noblock", function(channel)
+						hg.berserkStation = channel
+						channel:EnableLooping(true)
+						channel:SetVolume(1)
+						-- atlaschat.font:SetString("BerserkChatFont")
+					end)
+				end
 			end
 
 			hg.currentNotification = nil
@@ -111,6 +120,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	elseif berserk < 0.0001 then
 		hg.underberserk = false
 		hg.underberserk2 = false
+		hg.berserkActivationSoundPlayed = false
 		if IsValid(hg.berserkStation) and not hg.berserkFadeOut then
 			hg.berserkFadeOut = true
 			hg.berserkFadeOutStartTime = SysTime()
@@ -169,7 +179,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 	if IsValid(hg.berserkStation) then
 		if hg.berserkFadeOut then
-			local fadeProgress = (SysTime() - hg.berserkFadeOutStartTime) / 15
+			local fadeProgress = (SysTime() - hg.berserkFadeOutStartTime) / 30
 			local volume = math.max(0, 1 - fadeProgress)
 			hg.berserkStation:SetVolume(volume)
 			if fadeProgress >= 1 then
@@ -329,6 +339,7 @@ hook.Add("Player_Death", "berserkCleanup", function(ply)
 
 	hg.underberserk = false
 	hg.underberserk2 = false
+	hg.berserkActivationSoundPlayed = false
 
 	if IsValid(hg.berserkStation) then
 		hg.berserkStation:Stop()

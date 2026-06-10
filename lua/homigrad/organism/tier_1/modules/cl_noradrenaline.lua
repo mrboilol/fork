@@ -59,12 +59,24 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 		surface.PlaySound("shitty/music/mi_deathcam.mp3")
 
 		if altnoradrenaline:GetBool() then
-			sound.PlayFile("sound/NIGGARUN.ogg", "noblock", function(channel)
-				hg.noradrenalineStation = channel
-				channel:EnableLooping(true)
-			end)
+			if IsValid(hg.noradrenalineStation) then
+				hg.noradrenalineStation:SetVolume(1)
+				hg.noradrenalineFadeOut = false
+			else
+				sound.PlayFile("sound/NIGGARUN.ogg", "noblock", function(channel)
+					hg.noradrenalineStation = channel
+					channel:EnableLooping(true)
+					channel:SetVolume(1)
+				end)
+			end
 		else
-			hg.DynamicMusicV2.Player.Start("overdose")
+			if hg.DynamicMusicV2 and hg.DynamicMusicV2.Player then
+				hg.DynamicMusicV2.Player.Start("overdose")
+				hg.DynamicMusicV2.Player.SetVolume(1)
+				hg.noradrenalineFadeOut = false
+			else
+				hg.DynamicMusicV2.Player.Start("overdose")
+			end
 		end
 
 		hg.noradrenalineStartTime = SysTime()
@@ -103,9 +115,9 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 		end
 	end
 
-	-- Handle fade out for noradrenaline music
+	-- Handle fade out for noradrenaline music (slower fade: 30 seconds)
 	if hg.noradrenalineFadeOut then
-		local fadeProgress = (SysTime() - hg.noradrenalineFadeOutStartTime) / 15
+		local fadeProgress = (SysTime() - hg.noradrenalineFadeOutStartTime) / 30
 		if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
 			local volume = math.max(0, 1 - fadeProgress)
 			hg.noradrenalineStation:SetVolume(volume)
@@ -181,14 +193,7 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineBeatEffect", function()
 	local beatPhase = (time * 88 / 60) % 1
 	local beatIntensity = math.abs(math.sin(beatPhase * math.pi * 2))
 
-	-- Apply screen beat effect
-	tab2[ "$pp_colour_mulr" ] = beatIntensity * 0.3 * hg.noradrenalineClamped
-	tab2[ "$pp_colour_addr" ] = beatIntensity * 0.1 * hg.noradrenalineClamped
-	tab2[ "$pp_colour_contrast" ] = 1 + beatIntensity * 0.2 * hg.noradrenalineClamped
-	tab2[ "$pp_colour_colour" ] = 1 - beatIntensity * 0.1 * hg.noradrenalineClamped
-
-	DrawColorModify(tab2)
-	DrawBloom(0.65, beatIntensity * 0.5 * hg.noradrenalineClamped, 9, 9, 1, 1, beatIntensity * 0.05, 0.2, 0.2)
+	-- Removed red flashes and bloom, keeping only subtle screen shake (handled in noradrenalineBeatShake)
 end)
 
 hook.Add("HG_CalcView", "noradrenalineBeatShake", function(ply, pos, angles, fova)

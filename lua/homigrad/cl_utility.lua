@@ -314,8 +314,6 @@ players : 1 humans, 0 bots (20 max)
 			local dist = pos:Distance(eyePos)
 			local shooterdist = tr.StartPos:Distance(eyePos)
 			local mr = math.random(9)
-
-			if not IsLookingAt(self:GetOwner(),eyePos) then return end
 			local SND = subsonic and "weapons/bullets/fx/subsonic_0" .. mr .. ".wav"
 				or bullet.Damage >= 50 and "cracks/" .. "heavy/heav" .. "_crack_0" .. mr .. ".ogg"
 				or bullet.Damage >= 30 and "cracks/" .. "medium/med" .. "_crack_0" .. mr .. ".ogg"

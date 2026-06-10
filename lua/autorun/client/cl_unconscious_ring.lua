@@ -577,11 +577,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     flatlinePlayedThisUnconscious = true
                 end
                 UpdateRingAudio(heartbeat, otrubECGAlpha, org)
-                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, Color(255, 255, 255, 255 * otrubECGAlpha), otrubECGAlpha)
+                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ringColor, otrubECGAlpha)
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
-            local ecgColor = Color(255, 255, 255, 255 * otrubECGAlpha)
+            local ecgColor = isCritical and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
             DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
         end
     end

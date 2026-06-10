@@ -233,7 +233,7 @@ module[2] = function(owner, org, mulTime)
 		if handsOnNeck == 2 then
 			org.neckslitBleedingReduction = 0.1
 		elseif handsOnNeck == 1 then
-			org.neckslitBleedingReduction = 0.4
+			org.neckslitBleedingReduction = 0.55
 		else
 			org.neckslitBleedingReduction = 1.0
 		end

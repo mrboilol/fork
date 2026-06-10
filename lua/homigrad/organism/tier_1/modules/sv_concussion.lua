@@ -20,6 +20,7 @@ module[2] = function(ply, org, timeValue)
         -- Apply 2 points of disorientation when concussion climbs 2.5 points
         if (org.concussionTracker or 0) >= 2.5 then
             org.disorientation = (org.disorientation or 0) + 2
+            org.brain = math.min((org.brain or 0) + 0.01, 1.0)
             org.concussionTracker = 0
         end
 
