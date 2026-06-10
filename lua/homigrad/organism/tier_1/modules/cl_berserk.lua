@@ -115,11 +115,11 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 	if hg.underberserk then
 		local intensity = (SysTime() - hg.berserkStartTime)
-		tab[ "$pp_colour_contrast" ] = intensity / 2
-		tab[ "$pp_colour_addr" ] = intensity / 10
-		tab[ "$pp_colour_brightness" ] = intensity / 10
+		tab[ "$pp_colour_contrast" ] = intensity / 4
+		tab[ "$pp_colour_addr" ] = intensity / 20
+		tab[ "$pp_colour_brightness" ] = intensity / 20
 		DrawColorModify(tab)
-		DrawBloom( 0.65, intensity * 4, 9, 9, 1, 1, intensity / 16, 0.2, 0.2 )
+		DrawBloom( 0.65, intensity * 2, 9, 9, 1, 1, intensity / 32, 0.2, 0.2 )
 
 		render.UpdateScreenEffectTexture()
 			cc:SetFloat("$c0_x", 3.5 - intensity)
