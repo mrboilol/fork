@@ -448,7 +448,7 @@ local function DrawWorldModel(self, force)
 		local brainDamage = owner.organism and owner.organism.brain or 0
 		
 		if isLocal and isAiming and not hasSight and brainDamage <= 0.055 and hg_shittytwoeyes:GetBool() then
-			render.SetBlend(0.85)
+			render.SetBlend(0.6)
 			self.worldModel:DrawModel()
 			render.SetBlend(1)
 		else

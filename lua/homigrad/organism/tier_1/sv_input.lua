@@ -1892,21 +1892,34 @@ function hg.BreakNeck(ent, fromDamage)
 		-- Can't create constraint between same physics bone - try alternative approach
 		if headPhysBone == neckPhysBone then
 			print("[HG Floppy] BreakNeck timer: head and neck share physics bone, attempting alternative method")
-			-- Try using the next parent bone (spine2) as the anchor instead
-			local spine2BoneId = ragdoll:GetBoneParent(neckBoneId)
-			if not spine2BoneId or spine2BoneId == -1 then
-				print("[HG Floppy] BreakNeck timer FAIL: spine2 bone not found")
-				return
+			-- Traverse up the bone hierarchy to find a valid anchor with different physics bone
+			local currentBoneId = neckBoneId
+			local anchorBoneId = nil
+			local anchorPhysBone = nil
+			
+			for i = 1, 10 do -- Try up to 10 bones up the hierarchy
+				currentBoneId = ragdoll:GetBoneParent(currentBoneId)
+				if not currentBoneId or currentBoneId == -1 then
+					break
+				end
+				
+				local currentPhysBone = getPhysBoneForAnimationBone(ragdoll, currentBoneId)
+				if currentPhysBone and currentPhysBone ~= -1 and currentPhysBone ~= headPhysBone then
+					anchorBoneId = currentBoneId
+					anchorPhysBone = currentPhysBone
+					print("[HG Floppy] BreakNeck timer: found anchor bone " .. ragdoll:GetBoneName(currentBoneId) .. " with physBone=" .. tostring(currentPhysBone))
+					break
+				end
 			end
-			local spine2PhysBone = getPhysBoneForAnimationBone(ragdoll, spine2BoneId)
-			if not spine2PhysBone or spine2PhysBone == -1 or spine2PhysBone == headPhysBone then
-				print("[HG Floppy] BreakNeck timer FAIL: spine2 phys bone invalid or same as head")
+			
+			if not anchorPhysBone then
+				print("[HG Floppy] BreakNeck timer FAIL: could not find valid anchor bone with different physics bone")
 				return
 			end
 			
-			-- Use spine2 as the anchor for the neck constraint
-			neckPhysBone = spine2PhysBone
-			print("[HG Floppy] BreakNeck timer: using spine2 as anchor, neckPhysBone=" .. tostring(neckPhysBone))
+			-- Use the found anchor as the neck constraint anchor
+			neckPhysBone = anchorPhysBone
+			print("[HG Floppy] BreakNeck timer: using anchor as neckPhysBone=" .. tostring(neckPhysBone))
 		end
 		
 		local pneck = ragdoll:GetPhysicsObjectNum(neckPhysBone)

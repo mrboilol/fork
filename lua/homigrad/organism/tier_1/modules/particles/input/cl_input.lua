@@ -40,7 +40,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
 	-- Only cap when very high to prevent memory issues (raised to 150000)
 	if #hg.bloodparticles1 > 150000 then table.remove(hg.bloodparticles1, 1) end
 	
-	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime(), attachedToOwner = artery}
+	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime()}
 end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, impact)

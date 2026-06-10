@@ -6,6 +6,7 @@ hg.berserkStation = hg.berserkStation or nil
 hg.berserkMusicPlayed = hg.berserkMusicPlayed or false
 hg.berserkFadeOut = hg.berserkFadeOut or false
 hg.berserkFadeOutStartTime = hg.berserkFadeOutStartTime or 0
+hg.berserkLastActivationTime = hg.berserkLastActivationTime or 0
 
 local tab = {
 	[ "$pp_colour_addr" ] = 0,
@@ -60,8 +61,14 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	local berserkClamped = math.Clamp(berserk, 0, 3) * (organism.consciousness or 1)
 
 	if berserk > 0.0001 and (!hg.underberserk and !hg.underberserk2) then
+		-- Prevent re-activation within 15 seconds of last activation
+		if SysTime() - hg.berserkLastActivationTime < 15 then
+			return
+		end
+
 		hg.underberserk = true
 		hg.berserkMusicPlayed = false
+		hg.berserkLastActivationTime = SysTime()
 		if not hg.berserkActivationSoundPlayed then
 			hg.berserkActivationSoundPlayed = true
 			if altberserk:GetBool() then
@@ -121,6 +128,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.underberserk = false
 		hg.underberserk2 = false
 		hg.berserkActivationSoundPlayed = false
+		hg.berserkLastActivationTime = 0
 		if IsValid(hg.berserkStation) and not hg.berserkFadeOut then
 			hg.berserkFadeOut = true
 			hg.berserkFadeOutStartTime = SysTime()
@@ -132,14 +140,15 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 	if hg.underberserk then
 		local intensity = (SysTime() - hg.berserkStartTime)
-		tab[ "$pp_colour_contrast" ] = intensity / 4
-		tab[ "$pp_colour_addr" ] = intensity / 20
-		tab[ "$pp_colour_brightness" ] = intensity / 20
+		local altMultiplier = altberserk:GetBool() and 0.25 or 1
+		tab[ "$pp_colour_contrast" ] = (intensity / 4) * altMultiplier
+		tab[ "$pp_colour_addr" ] = (intensity / 20) * altMultiplier
+		tab[ "$pp_colour_brightness" ] = (intensity / 20) * altMultiplier
 		DrawColorModify(tab)
-		DrawBloom( 0.65, intensity * 2, 9, 9, 1, 1, intensity / 32, 0.2, 0.2 )
+		DrawBloom( 0.65, (intensity * 2) * altMultiplier, 9, 9, 1, 1, (intensity / 32) * altMultiplier, 0.2, 0.2 )
 
 		render.UpdateScreenEffectTexture()
-			cc:SetFloat("$c0_x", 3.5 - intensity)
+			cc:SetFloat("$c0_x", (3.5 - intensity) * altMultiplier)
 			cc:SetInt("$c0_y", 1)
 			render.SetMaterial(cc)
 		render.DrawScreenQuad()

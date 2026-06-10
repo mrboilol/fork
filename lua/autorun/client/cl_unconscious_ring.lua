@@ -62,6 +62,11 @@ local heartStationNext = 1
 local flatlineStation = nil
 local flatlineLoading = false
 
+-- Track consciousness loss for sudden drop detection
+local lastConsciousness = 1
+local consciousnessDropTime = 0
+local consciousnessDropAmount = 0
+
 local nearDeathClasses = {
     ["furry"] = true,
     ["Gordon"] = true,
@@ -388,12 +393,15 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     local ply = LocalPlayer()
-    if not IsValid(ply) or not ply:Alive() then 
+    if not IsValid(ply) or not ply:Alive() then
         ringAlpha = 0
         peakShock = 40
         lastPhaseMod = 0
+        lastConsciousness = 1
+        consciousnessDropTime = 0
+        consciousnessDropAmount = 0
         ResetRingAudio()
-        return 
+        return
     end
     
     local org = ply.organism
@@ -414,6 +422,18 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local shock = org.shock or 0
     local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain >= 0.34)
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
+
+    -- Track sudden consciousness loss
+    local consciousnessDelta = lastConsciousness - consciousness
+    if consciousnessDelta > 0.1 then
+        -- Significant drop detected
+        consciousnessDropTime = CurTime()
+        consciousnessDropAmount = consciousnessDelta
+    end
+    lastConsciousness = consciousness
+
+    -- Check if consciousness loss was recent and sudden (within 5 seconds)
+    local recentSuddenDrop = (CurTime() - consciousnessDropTime) < 5 and consciousnessDropAmount > 0.15
 
     -- Detect heartbeat transition to zero to reset flatline flag
     if heartbeat < 1 and not wasHeartbeatZero then
@@ -454,7 +474,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
-    local lowConsciousness = (org.consciousness or 1) < 0.5 and not isUnconscious
+    local lowConsciousness = (org.consciousness or 1) < 0.4 and not isUnconscious
     local isCritical = (org.critical == true) or (heartbeat < 1 and lerpBrain >= 0.02) or (lerpBrain >= 0.34) or lowConsciousness
     
     if isUnconscious then
@@ -512,16 +532,24 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring) then return end
-    
-    -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring)
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop) then return end
+
+    -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
-    local showOtrubECG = isUnconscious or lowConsciousness or (not isUnconscious and (abnormalPulse or admiring))
-    
+    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring))
+
     local otrubECGAlpha = ringAlpha
-    if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring) then
-        -- Show at low opacity for awake players with abnormal heartbeat or admiring
+    if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop) then
+        -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop
         otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.3)
+    end
+
+    -- Fade away if consciousness is between 0.4-0.75 and not going down
+    if consciousness >= 0.4 and consciousness < 0.75 and not recentSuddenDrop and not isUnconscious and not lowConsciousness and not abnormalPulse and not admiring then
+        -- Check if consciousness is stable (not dropping)
+        if consciousnessDelta >= -0.01 then
+            otrubECGAlpha = Lerp(FrameTime() * 2, otrubECGAlpha, 0)
+        end
     end
     
     if otrubECGAlpha > 0.01 then

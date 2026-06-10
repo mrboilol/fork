@@ -73,6 +73,13 @@ local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dyi
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg", 0, 2)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hook_Run = hook.Run
+
+hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
+	if ply == LocalPlayer() then
+		RunConsoleCommand("hg_painsound", math.random(0, 5))
+		RunConsoleCommand("hg_dyingsound", math.random(0, 5))
+	end
+end)
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
 	tab["$pp_colour_contrast"] = 1
@@ -1409,7 +1416,8 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		tab["$pp_colour_mulb"] = 0
 	end
 
-	if despair >= 0.35 then
+	local blood = org.blood or 5000
+	if blood <= 4000 then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
 			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(station)
@@ -1422,7 +1430,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end)
 		end
 
-		local targetVol = math.Remap(despair, 0.35, 1, 0.08, 1)
+		local targetVol = math.Remap(blood, 4000, 0, 0.08, 1)
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)

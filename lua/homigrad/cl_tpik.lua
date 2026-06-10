@@ -706,22 +706,27 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 		end
 
 		if neckBleeding and not ply:GetNetVar("Otrub") and not ply:GetNetVar("fake") then
-			local bone_matrix = ent:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Neck1") or ply:LookupBone("ValveBiped.Bip01_Head1"))
-			if bone_matrix then
-				local pos, ang = bone_matrix:GetTranslation(), bone_matrix:GetAngles()
-				
-				local isHands = not IsValid(wpn) or wpn:GetClass() == "weapon_hands_sh"
-				local twohands = IsValid(wpn) and (wpn.TwoHands or (wpn.HoldType and (wpn.HoldType == "ar2" or wpn.HoldType == "shotgun" or wpn.HoldType == "smg" or wpn.HoldType == "crossbow" or wpn.HoldType == "rpg")))
-				
-				if twohands then
-					-- Do nothing, keeps bleeding
-				elseif isHands then
-					-- Slap both hands
-					hg.DragHandsToPos(ply, wpn, pos + ang:Right() * -2 + ang:Forward() * 1 - ang:Up() * 0.5, true, 4, ang:Right(), ang_head1, ang_head2)
-				else
-					-- Slap left hand only
-					if wpn then wpn.lhandik = true end
-					hg.DragLeftHand_Ex(ply, wpn, pos + ang:Right() * -2 + ang:Forward() * 1 - ang:Up() * 0.5, ang, ang_head1)
+			-- Check if player is standing up - if so, no TPIK hands to neck
+			local isStanding = ply.posture and (ply.posture == 1 or ply.posture == 2 or ply.posture == 3 or ply.posture == 4 or ply.posture == 5 or ply.posture == 6)
+			
+			if not isStanding then
+				local bone_matrix = ent:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Neck1") or ply:LookupBone("ValveBiped.Bip01_Head1"))
+				if bone_matrix then
+					local pos, ang = bone_matrix:GetTranslation(), bone_matrix:GetAngles()
+					
+					local isHands = not IsValid(wpn) or wpn:GetClass() == "weapon_hands_sh"
+					local twohands = IsValid(wpn) and (wpn.TwoHands or (wpn.HoldType and (wpn.HoldType == "ar2" or wpn.HoldType == "shotgun" or wpn.HoldType == "smg" or wpn.HoldType == "crossbow" or wpn.HoldType == "rpg")))
+					
+					if twohands then
+						-- Do nothing, keeps bleeding
+					elseif isHands then
+						-- Slap both hands
+						hg.DragHandsToPos(ply, wpn, pos + ang:Right() * -2 + ang:Forward() * 1 - ang:Up() * 0.5, true, 4, ang:Right(), ang_head1, ang_head2)
+					else
+						-- Slap left hand only
+						if wpn then wpn.lhandik = true end
+						hg.DragLeftHand_Ex(ply, wpn, pos + ang:Right() * -2 + ang:Forward() * 1 - ang:Up() * 0.5, ang, ang_head1)
+					end
 				end
 			end
 		end
