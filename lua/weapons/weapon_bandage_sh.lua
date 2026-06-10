@@ -526,12 +526,12 @@ if SERVER then
 			totalRotations = totalRotations + bleedRotations
 		end
 
-		-- Count fractures (2 rotations each)
+		-- Count fractures (2 rotations each) - only at 1.0 health
 		local brokenLimbs = {"lleg", "rleg", "larm", "rarm"}
 		for _, limb in ipairs(brokenLimbs) do
-			if CanHealKey(org, limb) then
+			if org[limb] == 1 and not (limb == "lleg" and org.llegamputated) and not (limb == "rleg" and org.rlegamputated) and not (limb == "larm" and org.larmamputated) and not (limb == "rarm" and org.rarmamputated) then
 				totalRotations = totalRotations + 2
-				table.insert(fracturesToHeal, {key = limb, heal = 0.05})
+				table.insert(fracturesToHeal, {key = limb, heal = 0.1})
 			end
 		end
 
@@ -566,43 +566,8 @@ if SERVER then
 		local done = false
 		local bandaged = false
 
-		-- Heal fractures with 0.05 to trigger natural regen (2 rotations per fracture)
-		local brokenLimbs = {}
-		if org.lleg >= 0.05 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
-		if org.rleg >= 0.05 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
-		if org.larm >= 0.05 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
-		if org.rarm >= 0.05 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
-
-		if #brokenLimbs > 0 and self.modeValues[1] > 0 then
-			local limbToSplint = brokenLimbs[1]
-			if bone then
-				for _, limb in ipairs(brokenLimbs) do
-					local limbBone = limb == "lleg" and "ValveBiped.Bip01_L_Calf" or
-									   limb == "rleg" and "ValveBiped.Bip01_R_Calf" or
-									   limb == "larm" and "ValveBiped.Bip01_L_Forearm" or
-									   limb == "rarm" and "ValveBiped.Bip01_R_Forearm" or nil
-					if limbBone and ent:GetBoneName(ent:LookupBone(limbBone)) == bone then
-						limbToSplint = limb
-						break
-					end
-				end
-			end
-			
-			local healAmount = 0.05 -- Heal 0.05 to trigger natural regen
-			org[limbToSplint] = math.max(org[limbToSplint] - healAmount, 0)
-			org.avgpain = math.max(org.avgpain - 5, 0)
-			
-			ent.splinted_limbs = ent.splinted_limbs or {}
-			ent.splinted_limbs[limbToSplint] = true
-			ent:SetNetVar("splinted_limbs", ent.splinted_limbs)
-			
-			-- Consume bandage value for fracture healing
-			self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
-			done = true
-		end
-		
+		-- Prioritize bleeding wounds first
 		if not bone then
-			--print(#org.wounds)
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
@@ -677,6 +642,42 @@ if SERVER then
 				hg.RagdollOwner(ent):SetNetVar("bandaged_limbs",ent.bandaged_limbs)
 			end
 		end)
+
+		-- Heal fractures only at 1.0 health (2 rotations per fracture)
+		local brokenLimbs = {}
+		if org.lleg == 1 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
+		if org.rleg == 1 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
+		if org.larm == 1 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
+		if org.rarm == 1 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
+
+		if #brokenLimbs > 0 and self.modeValues[1] > 0 then
+			local limbToSplint = brokenLimbs[1]
+			if bone then
+				for _, limb in ipairs(brokenLimbs) do
+					local limbBone = limb == "lleg" and "ValveBiped.Bip01_L_Calf" or
+									   limb == "rleg" and "ValveBiped.Bip01_R_Calf" or
+									   limb == "larm" and "ValveBiped.Bip01_L_Forearm" or
+									   limb == "rarm" and "ValveBiped.Bip01_R_Forearm" or nil
+					if limbBone and ent:GetBoneName(ent:LookupBone(limbBone)) == bone then
+						limbToSplint = limb
+						break
+					end
+				end
+			end
+			
+			local healAmount = 0.1 -- Heal 0.1 when at 1.0 health
+			org[limbToSplint] = math.max(org[limbToSplint] - healAmount, 0)
+			org.avgpain = math.max(org.avgpain - 5, 0)
+			
+			ent.splinted_limbs = ent.splinted_limbs or {}
+			ent.splinted_limbs[limbToSplint] = true
+			ent:SetNetVar("splinted_limbs", ent.splinted_limbs)
+			
+			-- Consume bandage value for fracture healing
+			self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
+			done = true
+		end
+		
 
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)

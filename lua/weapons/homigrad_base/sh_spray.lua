@@ -87,37 +87,6 @@ function SWEP:PrimarySpread()
 
 			org.painadd = org.painadd + pain_mult * force / 20 * numB
 
-			-- Left arm gone check (amputated or broken)
-			local left_arm_gone = larm_broken or org.larmamputated
-
-			if left_arm_gone then
-				-- Act like weapon is held one handed: high calibers can break/dislocate the right arm
-				if calForce >= 45 and not org.rarmamputated then
-					if not rarm_broken and not rarm_dislocated then
-						local rand = math.random()
-						local dislocate_chance = math.Clamp((calForce - 40) * 0.005, 0.05, 0.20)
-						local break_chance = math.Clamp((calForce - 40) * 0.001, 0.01, 0.05)
-						if rand < break_chance then
-							org.rarm = 1
-							org.painadd = org.painadd + 55
-							owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
-							if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-								hg.BreakLimb(owner, "rarm", nil, false)
-							end
-							owner:Notify("Your right arm snapped under the recoil!", 1, "rarm_recoil_snap", 1, nil, nil)
-						elseif rand < (break_chance + dislocate_chance) then
-							org.rarmdislocation = true
-							org.painadd = org.painadd + 35
-							owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
-							if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-								hg.BreakLimb(owner, "rarm", nil, true)
-							end
-							owner:Notify("Your right shoulder dislocated from the recoil!", 1, "rarm_recoil_dislocate", 1, nil, nil)
-						end
-					end
-				end
-			end
-
 			-- Right arm broken shooting checks
 			if rarm_broken then
 				local extra_broken_pain = calForce * 3.0 -- Increased from 1.5 to 3.0
@@ -149,6 +118,35 @@ function SWEP:PrimarySpread()
 					end
 					org.painadd = org.painadd + extra_disl_pain
 					owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
+
+					-- High caliber weapons can break the arm again when already dislocated
+					if calForce >= 50 and not org.rarmamputated then
+						local break_again_chance = 0.02 * (calForce / 50)
+						if math.random() < break_again_chance then
+							org.painadd = org.painadd + 80
+							owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
+							-- Permanent aiming impairment
+							org.permanent_aim_impairment = (org.permanent_aim_impairment or 0) + 0.15
+							owner:Notify("Your right arm shattered again - your aim will never be the same!", 1, "rarm_shattered", 1, nil, nil)
+						end
+					end
+				end
+			end
+
+			-- Right arm dislocated shooting checks (not broken yet)
+			if rarm_dislocated and not rarm_broken then
+				-- High caliber weapons can break a dislocated arm
+				if calForce >= 50 and not org.rarmamputated then
+					local break_chance = 0.03 * (calForce / 50)
+					if math.random() < break_chance then
+						org.rarm = 1
+						org.painadd = org.painadd + 65
+						owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
+						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+							hg.BreakLimb(owner, "rarm", nil, false)
+						end
+						owner:Notify("Your dislocated right arm snapped from the recoil!", 1, "rarm_dislocated_snap", 1, nil, nil)
+					end
 				end
 			end
 		end
@@ -178,6 +176,9 @@ function SWEP:PrimarySpread()
 
 		-- Apply aiming fatigue penalty
 		arm_debuff = arm_debuff + (organism.aiming_fatigue or 0) * 0.15
+
+		-- Apply permanent aiming impairment
+		arm_debuff = arm_debuff + (organism.permanent_aim_impairment or 0) * 3
 
 		-- Explicit broken arm recoil penalty (beyond proportional damage)
 		-- Debuff variables include amputated arms for recoil penalties

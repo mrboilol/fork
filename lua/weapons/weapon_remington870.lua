@@ -307,13 +307,18 @@ function SWEP:Reload(time)
 	if ply.organism and ply.organism.larmamputated then
 		if self.drawBullet == false then
 			if SERVER then
-				ply:Notify("You need both arms to rack the bolt. Use floor reload.", 1)
+				ply:Notify("I can't cycle it with one hand.", 1)
 			end
 			return
 		end
 	end
 
 	if self.drawBullet == false and SERVER then
+		-- Add pain if left arm is broken when pumping shotgun
+		if ply.organism and ((ply.organism.larm and ply.organism.larm >= 1) or ply.organism.larmdislocation) and not ply.organism.larmamputated then
+			local painAmount = (ply.organism.larm or 0) * 20 + (ply.organism.larmdislocation and 15 or 0)
+			ply.organism.painadd = (ply.organism.painadd or 0) + painAmount
+		end
 		cock(self,1)
 		self:SetNetVar("shootgunReload",CurTime() + 0.5)
 		self:PlayAnim(self.AnimList["cycle"] or "cycle", 1, false, nil, false, true)

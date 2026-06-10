@@ -3,6 +3,8 @@ hg.noradrenalineStartTime = hg.noradrenalineStartTime or 0
 hg.noradrenalineStation = hg.noradrenalineStation or nil
 hg.noradrenalineAltStartTime = hg.noradrenalineAltStartTime or 0
 hg.noradrenalineAltActive = hg.noradrenalineAltActive or false
+hg.noradrenalineFadeOut = hg.noradrenalineFadeOut or false
+hg.noradrenalineFadeOutStartTime = hg.noradrenalineFadeOutStartTime or 0
 
 local altnoradrenaline = CreateClientConVar("hg_altnoradrenaline", "0", true, false, "Enable alternative noradrenaline mode (11s delay, 87 BPM heartbeat, screen beat)", 0, 1)
 
@@ -35,13 +37,9 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 	local organism = lply:Alive() and lply.organism
 	
 	if !organism then
-		if hg.undernoradrenaline then
-			if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
-				hg.noradrenalineStation:Stop()
-				hg.noradrenalineStation = nil
-			else
-				hg.DynamicMusicV2.Player.Stop()
-			end
+		if hg.undernoradrenaline and not hg.noradrenalineFadeOut then
+			hg.noradrenalineFadeOut = true
+			hg.noradrenalineFadeOutStartTime = SysTime()
 		end
 
 		hg.undernoradrenaline = false
@@ -83,11 +81,12 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 		end
 	elseif noradrenaline < 0.0001 then
 		if hg.undernoradrenaline then
-			if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
-				hg.noradrenalineStation:Stop()
-				hg.noradrenalineStation = nil
-			else
-				hg.DynamicMusicV2.Player.Stop()
+			if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) and not hg.noradrenalineFadeOut then
+				hg.noradrenalineFadeOut = true
+				hg.noradrenalineFadeOutStartTime = SysTime()
+			elseif not altnoradrenaline:GetBool() and not hg.noradrenalineFadeOut then
+				hg.noradrenalineFadeOut = true
+				hg.noradrenalineFadeOutStartTime = SysTime()
 			end
 		end
 
@@ -101,6 +100,27 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 	if altnoradrenaline:GetBool() and hg.undernoradrenaline and not hg.noradrenalineAltActive then
 		if SysTime() - hg.noradrenalineAltStartTime >= 11 then
 			hg.noradrenalineAltActive = true
+		end
+	end
+
+	-- Handle fade out for noradrenaline music
+	if hg.noradrenalineFadeOut then
+		local fadeProgress = (SysTime() - hg.noradrenalineFadeOutStartTime) / 15
+		if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
+			local volume = math.max(0, 1 - fadeProgress)
+			hg.noradrenalineStation:SetVolume(volume)
+			if fadeProgress >= 1 then
+				hg.noradrenalineStation:Stop()
+				hg.noradrenalineStation = nil
+				hg.noradrenalineFadeOut = false
+			end
+		elseif not altnoradrenaline:GetBool() and hg.DynamicMusicV2 and hg.DynamicMusicV2.Player then
+			local volume = math.max(0, 1 - fadeProgress)
+			hg.DynamicMusicV2.Player.SetVolume(volume)
+			if fadeProgress >= 1 then
+				hg.DynamicMusicV2.Player.Stop()
+				hg.noradrenalineFadeOut = false
+			end
 		end
 	end
 end)
@@ -208,13 +228,9 @@ end
 hook.Add("Player_Death", "noradrenalineCleanup", function(ply)
 	if ply ~= LocalPlayer() then return end
 
-	if hg.undernoradrenaline then
-		if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
-			hg.noradrenalineStation:Stop()
-			hg.noradrenalineStation = nil
-		else
-			hg.DynamicMusicV2.Player.Stop()
-		end
+	if hg.undernoradrenaline and not hg.noradrenalineFadeOut then
+		hg.noradrenalineFadeOut = true
+		hg.noradrenalineFadeOutStartTime = SysTime()
 	end
 
 	hg.undernoradrenaline = false

@@ -43,9 +43,7 @@ local lerpConsciousness = 0
 local peakShock = 40
 local dotBeat = 0
 
-local ecgAlpha = 0
 local ecgAlphaPulseCheck = 0
-local abnormalECGAlpha = 0
 local lastHeartBeat = 0
 local heartPhase = 0
 
@@ -259,8 +257,6 @@ local draw = draw
 local Color = Color
 
 local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
-local topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
-local abnormalECGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 
 local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse, color, ringAlpha)
@@ -516,9 +512,19 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if ringAlpha <= 0 and not showPulseCheckECG then return end
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring) then return end
     
-    if ringAlpha > 0.01 then
+    -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring)
+    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
+    local showOtrubECG = isUnconscious or lowConsciousness or (not isUnconscious and (abnormalPulse or admiring))
+    
+    local otrubECGAlpha = ringAlpha
+    if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring) then
+        -- Show at low opacity for awake players with abnormal heartbeat or admiring
+        otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.3)
+    end
+    
+    if otrubECGAlpha > 0.01 then
         lerpBrain = Lerp(FrameTime() * 3, lerpBrain, org.brain or 0)
         lerpShock = Lerp(FrameTime() * 6, lerpShock, org.shock or 0)
         lerpConsciousness = Lerp(FrameTime() * 3, lerpConsciousness, org.consciousness or 0)
@@ -526,50 +532,57 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local scrW, scrH = ScrW(), ScrH()
         local centerX, centerY = scrW / 2, scrH / 2
         
-        surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
-        surface.DrawRect(0, 0, scrW, scrH)
-        
-        local ringColor = isCritical and Color(200, 0, 0, 255 * ringAlpha) or Color(220, 220, 220, 255 * ringAlpha)
-        local dotColor = isCritical and ringColor or Color(255, 255, 255, 255 * ringAlpha)
-        
-        local progress = 0
-        if isCritical then
-            progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
-        else
-            local shockProgress = math.Clamp((peakShock - lerpShock) / (peakShock - 0.02), 0, 1)
-            local consciousnessProgress = math.Clamp(lerpConsciousness / 0.10, 0, 1)
-            progress = math.min(shockProgress, consciousnessProgress)
-        end
-        
-        local radius = 280
-        local thickness = 12
-        
-        DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * ringAlpha))
-        DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
-        
-        if hg_unconsciousclassic:GetBool() then
-            lastPhaseMod = 0
-            flatlinePlayedThisUnconscious = false
-            local beat = dotBeat
-            local dotText = ""
-
+        -- Only draw dark background and ring for unconscious players
+        if isUnconscious or lowConsciousness then
+            surface.SetDrawColor(0, 0, 0, 90 * otrubECGAlpha)
+            surface.DrawRect(0, 0, scrW, scrH)
+            
+            local ringColor = isCritical and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(220, 220, 220, 255 * otrubECGAlpha)
+            local dotColor = isCritical and ringColor or Color(255, 255, 255, 255 * otrubECGAlpha)
+            
+            local progress = 0
             if isCritical then
-                local redDots = {".!", "..!", "...!"}
-                dotText = redDots[beat + 1]
+                progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
             else
-                local whiteDots = {".", "..", "..."}
-                dotText = whiteDots[beat + 1]
+                local shockProgress = math.Clamp((peakShock - lerpShock) / (peakShock - 0.02), 0, 1)
+                local consciousnessProgress = math.Clamp(lerpConsciousness / 0.10, 0, 1)
+                progress = math.min(shockProgress, consciousnessProgress)
             end
             
-            draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        else
-            local isFlatline = heartbeat < 1
-            if isFlatline and not flatlinePlayedThisUnconscious and ringAlpha > 0 then
-                EmitRingSound(SOUND_FLATLINE, math.Clamp(0.8 * ringAlpha, 0, 1))
-                flatlinePlayedThisUnconscious = true
+            local radius = 280
+            local thickness = 12
+            
+            DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * otrubECGAlpha))
+            DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
+            
+            if hg_unconsciousclassic:GetBool() then
+                lastPhaseMod = 0
+                flatlinePlayedThisUnconscious = false
+                local beat = dotBeat
+                local dotText = ""
+
+                if isCritical then
+                    local redDots = {".!", "..!", "...!"}
+                    dotText = redDots[beat + 1]
+                else
+                    local whiteDots = {".", "..", "..."}
+                    dotText = whiteDots[beat + 1]
+                end
+                
+                draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            else
+                local isFlatline = heartbeat < 1
+                if isFlatline and not flatlinePlayedThisUnconscious and otrubECGAlpha > 0 then
+                    EmitRingSound(SOUND_FLATLINE, math.Clamp(0.8 * otrubECGAlpha, 0, 1))
+                    flatlinePlayedThisUnconscious = true
+                end
+                UpdateRingAudio(heartbeat, otrubECGAlpha, org)
+                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, Color(255, 255, 255, 255 * otrubECGAlpha), otrubECGAlpha)
             end
-            UpdateRingAudio(heartbeat, ringAlpha, org)
-            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, dotColor, ringAlpha)
+        else
+            -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
+            local ecgColor = Color(255, 255, 255, 255 * otrubECGAlpha)
+            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
         end
     end
 
@@ -644,29 +657,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
-    -- Abnormal heart rate ECG at unconscious position with lowered opacity
-    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 300
-    local showAbnormalECG = abnormalPulse or admiring
-
-    if showAbnormalECG then
-        abnormalECGAlpha = Lerp(FrameTime() * 4, abnormalECGAlpha, 0.5)
-    else
-        abnormalECGAlpha = Lerp(FrameTime() * 6, abnormalECGAlpha, 0)
-    end
-
-    if abnormalECGAlpha > 0.01 then
-        local boxW, boxH = 400, 200
-        local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() / 2 - boxH / 2
-
-        surface.SetDrawColor(0, 0, 0, 150 * abnormalECGAlpha)
-        surface.DrawRect(boxX, boxY, boxW, boxH)
-        surface.SetDrawColor(255, 255, 255, 200 * abnormalECGAlpha)
-        surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
-
-        DrawEKG(abnormalECGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, heartbeat, pulse, Color(255, 255, 255, 255), abnormalECGAlpha)
-    else
-        abnormalECGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
-    end
 
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     if heartbeat >= 1 then

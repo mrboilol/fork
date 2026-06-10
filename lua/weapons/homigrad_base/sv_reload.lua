@@ -90,7 +90,7 @@ function SWEP:Reload(time)
 		-- If weapon needs racking (drawBullet == false), force floor reload
 		if self.drawBullet == false then
 			if SERVER then
-				ply:Notify("You need both arms to rack the bolt. Use floor reload.", 1)
+				ply:Notify("I can't cycle it with one hand.", 1)
 			end
 			self:OnCantReload()
 			return

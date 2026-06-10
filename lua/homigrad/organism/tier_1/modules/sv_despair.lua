@@ -173,6 +173,15 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		add = add + Clamp((3200 - org.blood) / 3200, 0, 1) * timeValue * 0.12
 	end
 
+	-- Despair from bleeding out (low blood + active bleeding - won't clot)
+	local blood = org.blood or 5000
+	local bleed = org.bleed or 0
+	if blood < 3500 and bleed > 0 then
+		local bleedSeverity = Clamp((3500 - blood) / 3500, 0, 1)
+		-- Higher despair gain when actively bleeding out (blood won't clot)
+		add = add + bleedSeverity * timeValue * 0.25
+	end
+
 	-- Despair from lack of goodmood (if goodmood has been low for a while)
 	local goodmood = org.goodmood or 0
 	if goodmood < 0.3 then

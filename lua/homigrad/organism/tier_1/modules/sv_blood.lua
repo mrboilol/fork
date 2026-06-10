@@ -115,7 +115,7 @@ module[2] = function(owner, org, mulTime)
 		local regenBoost = 1 + math.Clamp(timeSinceBleed / 30, 0, 2)
 		local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 		local goodmoodBonus = 1 + goodmood * 0.3
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.5 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost * goodmoodBonus, 5000)
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 3 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost * goodmoodBonus, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -215,6 +215,30 @@ module[2] = function(owner, org, mulTime)
 	local next_arterypump = 1 / math.max(pulse, 10)
 	local ent = isPlayer and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 	local ownerVel = owner:GetVelocity()
+	
+	if isPlayer and not IsValid(owner.FakeRagdoll) and org.neckslit then
+		local wep = owner:GetActiveWeapon()
+		local handsOnNeck = 0
+		if not IsValid(wep) or wep:GetClass() == "weapon_hands_sh" then
+			handsOnNeck = 2
+		else
+			local twohands = wep.TwoHands or (wep.HoldType and (wep.HoldType == "ar2" or wep.HoldType == "shotgun" or wep.HoldType == "smg" or wep.HoldType == "crossbow" or wep.HoldType == "rpg"))
+			if twohands then
+				handsOnNeck = 0
+			else
+				handsOnNeck = 1
+			end
+		end
+		
+		if handsOnNeck == 2 then
+			org.neckslitBleedingReduction = 0.1
+		elseif handsOnNeck == 1 then
+			org.neckslitBleedingReduction = 0.4
+		else
+			org.neckslitBleedingReduction = 1.0
+		end
+	end
+
 	for i, wound in pairs(org.arterialwounds) do
 		local neckMul = (wound[7] == "arteria") and (org.neckslitBleedingReduction or 1.0) or 1.0
 		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.2 * math.max(pulse, 20) / 80 * neckMul
@@ -241,7 +265,7 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	local bloodCap = (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1)
+	local bloodCap = (2500 / (adrenaline / 5 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1)
 	if org.blood < bloodCap then
 		local bloodSeverity = math.Clamp((bloodCap - org.blood) / 1000, 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 0.5, 0)

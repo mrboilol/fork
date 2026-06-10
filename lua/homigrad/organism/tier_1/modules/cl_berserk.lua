@@ -3,6 +3,9 @@ hg.underberserk2 = hg.underberserk2 or false
 hg.berserkStartTime = hg.berserkStartTime or 0
 hg.berserkStartTime2 = hg.berserkStartTime2 or 0
 hg.berserkStation = hg.berserkStation or nil
+hg.berserkMusicPlayed = hg.berserkMusicPlayed or false
+hg.berserkFadeOut = hg.berserkFadeOut or false
+hg.berserkFadeOutStartTime = hg.berserkFadeOutStartTime or 0
 
 local tab = {
 	[ "$pp_colour_addr" ] = 0,
@@ -42,10 +45,9 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.underberserk = false
 		hg.underberserk2 = false
 
-		if IsValid(hg.berserkStation) then
-			hg.berserkStation:Stop()
-			hg.berserkStation = nil
-			-- atlaschat.font:SetString("atlaschat.theme.text")
+		if IsValid(hg.berserkStation) and not hg.berserkFadeOut then
+			hg.berserkFadeOut = true
+			hg.berserkFadeOutStartTime = SysTime()
 		end
 
 		hg.notificationFont = "HuyFont"
@@ -59,6 +61,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 	if berserk > 0.0001 and (!hg.underberserk and !hg.underberserk2) then
 		hg.underberserk = true
+		hg.berserkMusicPlayed = false
 		if altberserk:GetBool() then
 			surface.PlaySound("NIGGARUN.ogg")
 		else
@@ -87,12 +90,17 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 			hg.underberserk = false
 			hg.underberserk2 = true
-			local musicPath = altberserk:GetBool() and "sound/NIGGARUN.ogg" or path:GetString()
-			sound.PlayFile(musicPath, "noblock", function(channel)
-				hg.berserkStation = channel
-				channel:EnableLooping(true)
-				-- atlaschat.font:SetString("BerserkChatFont")
-			end)
+
+			-- Prevent music from playing again if it already played during this berserk session
+			if not hg.berserkMusicPlayed then
+				hg.berserkMusicPlayed = true
+				local musicPath = altberserk:GetBool() and "sound/NIGGARUN.ogg" or path:GetString()
+				sound.PlayFile(musicPath, "noblock", function(channel)
+					hg.berserkStation = channel
+					channel:EnableLooping(true)
+					-- atlaschat.font:SetString("BerserkChatFont")
+				end)
+			end
 
 			hg.currentNotification = nil
 			hg.notifications = {}
@@ -103,10 +111,9 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	elseif berserk < 0.0001 then
 		hg.underberserk = false
 		hg.underberserk2 = false
-		if IsValid(hg.berserkStation) then
-			hg.berserkStation:Stop()
-			hg.berserkStation = nil
-			-- atlaschat.font:SetString("atlaschat.theme.text")
+		if IsValid(hg.berserkStation) and not hg.berserkFadeOut then
+			hg.berserkFadeOut = true
+			hg.berserkFadeOutStartTime = SysTime()
 		end
 
 		hg.notificationFont = "HuyFont"
@@ -161,7 +168,19 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	end
 
 	if IsValid(hg.berserkStation) then
-		hg.berserkStation:SetVolume(math.min(1, (organism.otrub and 0) or berserkClamped))
+		if hg.berserkFadeOut then
+			local fadeProgress = (SysTime() - hg.berserkFadeOutStartTime) / 15
+			local volume = math.max(0, 1 - fadeProgress)
+			hg.berserkStation:SetVolume(volume)
+			if fadeProgress >= 1 then
+				hg.berserkStation:Stop()
+				hg.berserkStation = nil
+				hg.berserkFadeOut = false
+				hg.berserkMusicPlayed = false
+			end
+		else
+			hg.berserkStation:SetVolume(math.min(1, (organism.otrub and 0) or berserkClamped))
+		end
 	end
 end)
 

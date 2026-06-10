@@ -101,6 +101,9 @@ hook.Add("Org Clear", "Main", function(org)
 	-- Hand dominance for limb impairment calculations
 	org.hand_dominance = "right"
 
+	-- Permanent aiming impairment from repeated arm trauma
+	org.permanent_aim_impairment = 0
+
 	if IsValid(org.owner) then
 		if org.owner:IsPlayer() and org.owner:Alive() then
 			org.owner:SetHealth(100)
@@ -204,6 +207,7 @@ local function send_organism(org, ply)
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.aiming_fatigue = org.aiming_fatigue
 	sendtable.hand_dominance = org.hand_dominance
+	sendtable.permanent_aim_impairment = org.permanent_aim_impairment
 
 	sendtable.superfighter = org.superfighter
 
@@ -261,6 +265,7 @@ local function send_bareinfo(org)
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.CantCheckPulse = org.CantCheckPulse
 	sendtable.noradrenalineActive = org.noradrenalineActive
+	sendtable.permanent_aim_impairment = org.permanent_aim_impairment
 
 	local rf = RecipientFilter()
 	--rf:AddAllPlayers()
@@ -975,6 +980,54 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			if IsValid(wep) and wep.TwoHanded ~= false then
 				org.recoilmul = org.recoilmul * 1.3
 				org.armstrength = org.armstrength * 0.75
+			end
+
+			-- Chance to dislocate wrist when using one-handed weapons
+			-- Higher chance for two-handed weapons used one-handed
+			if IsValid(wep) then
+				local isTwoHandedWeapon = wep.TwoHanded ~= false
+				
+				-- Get caliber info for damage calculation
+				local ammoType = wep:GetPrimaryAmmoType()
+				local ammoData = hg.ammotypes and hg.ammotypes[game.GetAmmoName(ammoType)]
+				local caliberWeight = 0
+				local calForce = 0
+				
+				if ammoData and ammoData.BulletSettings then
+					local bullet = ammoData.BulletSettings
+					local force = bullet.Force or 0
+					local mass = bullet.Mass or 0
+					local diameter = bullet.Diameter or 0
+					local numB = wep.NumBullet or 1
+					calForce = force * numB
+					caliberWeight = (force / 200) + (mass / 20) + (diameter / 15)
+				end
+				
+				-- Base dislocation chance (per think tick)
+				local dislocationChance = isTwoHandedWeapon and 0.002 or 0.0005
+				
+				-- Increase chance based on caliber weight (heavy calibers are more dangerous)
+				if caliberWeight > 0.8 then
+					dislocationChance = dislocationChance * (1 + caliberWeight * 0.5)
+				end
+				
+				-- Increase chance based on current arm damage
+				local rarmDamage = org.rarm or 0
+				dislocationChance = dislocationChance * (1 + rarmDamage * 2)
+				
+				if math.random() < dislocationChance and not org.rarmamputated then
+					local oldRarm = org.rarm or 0
+					if oldRarm < 0.8 then
+						org.rarm = math.min(oldRarm + 0.3, 1)
+						if org.rarm >= 0.8 then
+							org.rarmdislocation = true
+							org.painadd = (org.painadd or 0) + 35
+							owner:AddNaturalAdrenaline(0.5)
+							org.fearadd = (org.fearadd or 0) + 0.5
+							owner:DropWeapon(wep)
+						end
+					end
+				end
 			end
 		end
 	end

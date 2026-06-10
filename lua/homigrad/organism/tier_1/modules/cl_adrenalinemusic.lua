@@ -167,7 +167,10 @@ hook.Add("EntityTakeDamage", "hg_adrenalinemusic_combat", function(ent, dmgInfo)
 	if not IsValid(ent) or not ent:Alive() then return end
 	
 	local attacker = dmgInfo:GetAttacker()
-	if IsValid(attacker) and (attacker:IsPlayer() or attacker:IsNPC()) then
+	local damage = dmgInfo:GetDamage()
+	
+	-- Trigger combat time for any significant damage from any source
+	if damage > 0 then
 		hg.lastCombatTime = CurTime()
 	end
 end)

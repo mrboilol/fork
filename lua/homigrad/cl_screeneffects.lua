@@ -1144,6 +1144,17 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			local consciousVol = math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
 			hg.consciousBeatIntensity = consciousVol
 
+			-- Dying ambience when bleeding out (low blood + active bleeding)
+			local blood = org.blood or 5000
+			local bleed = org.bleed or 0
+			local bleedingOut = blood < 3500 and bleed > 0
+
+			if bleedingOut then
+				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
+				consciousVol = math.max(consciousVol, bleedSeverity * 2)
+				hg.consciousBeatIntensity = math.max(hg.consciousBeatIntensity, bleedSeverity * 2)
+			end
+
 			if dyingMode == 0 then
 				-- Default: both conscioustypebeat and itsallcomingtoanend play
 				if IsValid(NoiseStation2) then

@@ -206,6 +206,31 @@ bloodparticles_hook[2] = function(mul)
 		local pos = part[1]
 		local posSet = part[2]
 
+		-- Attached particles follow owner movement instead of independent world velocity
+		if part.attachedToOwner and IsValid(part.owner) then
+			local ownerVel = part.owner:GetVelocity()
+			local ownerDelta = ownerVel * mul
+			
+			-- Update positions following owner
+			pos:Set(pos + ownerDelta)
+			posSet:Set(posSet + ownerDelta)
+			
+			-- Apply minimal local velocity for oscillation effect
+			pos:Set(posSet + part[3] * mul * 0.1)
+			posSet:Set(posSet + part[3] * mul * 0.1)
+			
+			-- Decay velocity quickly to keep particles near owner
+			part[3] = LerpVector(0.5 * mul, part[3], vecZero)
+			
+			-- Remove attached particles after short time
+			if part.spawnTime and (time - part.spawnTime) > 2 then
+				table_remove(hg.bloodparticles1, i)
+				continue
+			end
+			
+			continue
+		end
+
 		tr.start = posSet
 		tr.endpos = tr.start + part[3] * mul
 		tr.collisiongroup = part.kishki and COLLISION_GROUP_WORLD or COLLISION_GROUP_NONE

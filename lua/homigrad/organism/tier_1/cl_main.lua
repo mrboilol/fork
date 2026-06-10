@@ -1128,39 +1128,37 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local right = dir:Angle():Right()
 							local up = ang:Up()
 
-							-- Multi-frequency oscillation for smooth arterial spray (z-city-main style)
+							-- Single smooth stream with heartbeat-based pumping
 							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1)
 
-							-- Strong forward push for good spray distance
-							local baseForward = dir * 35 * forceMul
+							-- Minimal forward distance - particles stay near organism
+							local baseForward = dir * 3 * forceMul
 
-							-- Complex oscillation with multiple frequencies for smooth, organic movement
+							-- Heartbeat pump detection - 2x blood during pump, 0.75x between pumps
+							local inPump = heartbeatBeat > 0.5
+							local pumpMultiplier = inPump and 2.0 or 0.75
+
+							-- Smooth single-stream oscillation
 							local t = CurTime()
-							local osc1 = math.sin(t * 2) + math.cos(t * (5 + i * 2)) + math.sin(t * (1 + i))
-							local osc2 = math.sin(t * 2) * math.cos(t * 4)
-							local osc3 = math.sin(t * 3) * math.cos(t * 1)
-							
-							local oscAmpRight = 25 * pulseFactor
-							local oscAmpUp = 25 * pulseFactor
-							local streamOsc = right * oscAmpRight * osc2 + up * oscAmpUp * osc3
+							local oscSpeed = hb * 0.4
+							local oscAmp = 4 * pulseFactor
+							local streamOsc = right * oscAmp * math.sin(t * oscSpeed) + up * oscAmp * math.cos(t * oscSpeed * 0.7)
 
-							-- Pulsing forward component
-							local pulseOsc = (osc1 * 0.6 + math.sin(t * 2) + 4) * 0.1
-							local forwardPulse = baseForward * (1 + pulseOsc)
+							-- Pump-based forward velocity (minimal to keep particles attached)
+							local forwardVel = baseForward * pumpMultiplier
 
 							-- Minimal spread for clean single-stream look
-							local spread = VectorRand(-1, 1) * pulseFactor
+							local spread = VectorRand(-0.2, 0.2) * pulseFactor
 
 							if wound[7] == "arteria" then
-								local arteriaForce = forceMul * 2.0
-								local arteriaForward = dir * 40 * arteriaForce * (1 + pulseOsc)
-								local arteriaOscAmpRight = 30 * pulseFactor
-								local arteriaOscAmpUp = 30 * pulseFactor
-								local arteriaOsc = right * arteriaOscAmpRight * osc2 + up * arteriaOscAmpUp * osc3
+								local arteriaForce = forceMul * 1.5
+								local arteriaForward = dir * 4 * arteriaForce * pumpMultiplier
+								local arteriaOscAmp = 5 * pulseFactor
+								local arteriaOsc = right * arteriaOscAmp * math.sin(t * oscSpeed) + up * arteriaOscAmp * math.cos(t * oscSpeed * 0.7)
 								hg.addBloodPart(pos, arteriaForward + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
 							else
-								local normalForce = forceMul * 1.8
-								local normalForward = dir * 35 * normalForce * (1 + pulseOsc)
+								local normalForce = forceMul * 1.2
+								local normalForward = dir * 3 * normalForce * pumpMultiplier
 								hg.addBloodPart(pos, normalForward + streamOsc + spread, nil, size, size, true, nil, ent)
 							end
 						end

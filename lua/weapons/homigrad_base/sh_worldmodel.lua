@@ -6,6 +6,8 @@ SWEP.WorldPos = Vector(13, -0.3, 3.4)
 SWEP.WorldAng = Angle(5, 0, 180)
 SWEP.UseCustomWorldModel = false
 
+local hg_shittytwoeyes = CreateClientConVar("hg_shittytwoeyes", "1", true, false, "Enable 2-eye aiming transparency effect", 0, 1)
+
 function SWEP:ShouldUseFakeModel()
 	return self.WorldModelFake// and IsValid(self:GetOwner())
 end
@@ -438,12 +440,14 @@ local function DrawWorldModel(self, force)
 		--hg.StartCaptureRender()
 		self.worldModel:SetupBones()
 		
-		-- Apply slight transparency when aiming (2-eye aiming effect)
+		-- Apply slight transparency when aiming (2-eye aiming effect) - only for guns without sight
 		local owner = self:GetOwner()
-		local isAiming = owner:IsPlayer() and IsAiming(owner)
+		local isLocal = self:IsLocal2()
+		local hasSight = self:HasAttachment("sight", "optic")
+		local isAiming = owner:IsPlayer() and IsAimingNoScope(owner)
 		local brainDamage = owner.organism and owner.organism.brain or 0
 		
-		if isAiming and brainDamage <= 0.055 then
+		if isLocal and isAiming and not hasSight and brainDamage <= 0.055 and hg_shittytwoeyes:GetBool() then
 			render.SetBlend(0.85)
 			self.worldModel:DrawModel()
 			render.SetBlend(1)

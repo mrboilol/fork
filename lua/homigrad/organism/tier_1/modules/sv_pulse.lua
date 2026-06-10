@@ -59,7 +59,7 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + 40 * math.max(0, org.fear)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
-	heartbeat = heartbeat + 25 * math.min(org.adrenaline, 3)
+	heartbeat = heartbeat + 15 * math.min(org.adrenaline, 3)
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
@@ -76,9 +76,9 @@ module[2] = function(owner, org, timeValue)
 	local heartK = math.Clamp(1 - org.heart, 0, 1)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
-	local hypertensionMul = 1 + math.Clamp(org.adrenaline, 0, 5) * 0.04 + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
+	local hypertensionMul = 1 + math.Clamp(org.adrenaline, 0, 5) * 0.15 + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
-	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.55)
+	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 2.0)
 
 	local compensation = 1 + math.Clamp((2875 - blood) / 2300, 0, 1) * 0.16
 	compensation = compensation * (1 - math.Clamp((2200 - blood) / 1200, 0, 1) * 0.5)
@@ -143,10 +143,10 @@ module[2] = function(owner, org, timeValue)
 		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 
-	-- Disorientation: 0.75 at BP 75, 1.50 at BP 60
+	-- Disorientation: 0.5 at BP 75, 1.5 at BP 40
 	if org.bloodpressure < 75 then
-		local disorientK = math.Clamp((75 - org.bloodpressure) / 15, 0, 1)
-		org.disorientation = math.max(org.disorientation, 0.75 + disorientK * 0.75)
+		local disorientK = math.Clamp((75 - org.bloodpressure) / 35, 0, 1)
+		org.disorientation = math.max(org.disorientation, 0.5 + disorientK * 1.0)
 	end
 
 	-- Stamina loss: starts at BP 80, small/slow, builds to 2/3 at BP 50
@@ -213,14 +213,18 @@ module[2] = function(owner, org, timeValue)
 
 	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
 		-- Scale chance with adrenaline level: significantly improved effectiveness
-		-- Low dose (1): ~40% chance, Medium dose (2): ~80% chance, High dose (4+): near-certain
-		local chance = math.Clamp(adren * 40 + adren * adren * 5, 0, 98)
+		-- Low dose (1): ~70% chance, Medium dose (2): ~90% chance, High dose (4+): near-certain
+		local chance = math.Clamp(adren * 50 + adren * adren * 10, 0, 99)
 		local rand = math.random(100)
 
-		-- High adrenaline retries faster (0.03s at adren>=3, 0.06s otherwise)
-		org.adrenaline_try = CurTime() + (adren >= 3 and 0.03 or 0.06)
+		-- High adrenaline retries faster (0.02s at adren>=3, 0.04s otherwise)
+		org.adrenaline_try = CurTime() + (adren >= 3 and 0.02 or 0.04)
 
-		if chance > rand then org.heartstop = false end
+		if chance > rand then
+			org.heartstop = false
+			-- Reset heartbeat to a safe range when restarting to prevent immediate fibrillation
+			org.heartbeat = math.Clamp(org.heartbeat, 80, 140)
+		end
 	end
 
 	if org.heartstop then

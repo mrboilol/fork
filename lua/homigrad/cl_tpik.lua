@@ -694,6 +694,38 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 			hg.DragHandsToPos(ply, ply:GetActiveWeapon(), pos + ang:Right() * 7 - ang:Forward() * 5, true, 5.5, ang:Right(), ang_head1, ang_head2)
 		end
         
+		local wounds = ply:GetNetVar("arterialwounds")
+		local neckBleeding = false
+		if wounds then
+			for k, v in pairs(wounds) do
+				if v[7] == "arteria" then
+					neckBleeding = true
+					break
+				end
+			end
+		end
+
+		if neckBleeding and not ply:GetNetVar("Otrub") and not ply:GetNetVar("fake") then
+			local bone_matrix = ent:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Neck1") or ply:LookupBone("ValveBiped.Bip01_Head1"))
+			if bone_matrix then
+				local pos, ang = bone_matrix:GetTranslation(), bone_matrix:GetAngles()
+				
+				local isHands = not IsValid(wpn) or wpn:GetClass() == "weapon_hands_sh"
+				local twohands = IsValid(wpn) and (wpn.TwoHands or (wpn.HoldType and (wpn.HoldType == "ar2" or wpn.HoldType == "shotgun" or wpn.HoldType == "smg" or wpn.HoldType == "crossbow" or wpn.HoldType == "rpg")))
+				
+				if twohands then
+					-- Do nothing, keeps bleeding
+				elseif isHands then
+					-- Slap both hands
+					hg.DragHandsToPos(ply, wpn, pos + ang:Right() * -3 + ang:Forward() * 2 - ang:Up() * 1, true, 6, ang:Right(), ang_head1, ang_head2)
+				else
+					-- Slap left hand
+					if wpn then wpn.lhandik = true end
+					hg.DragLeftHand_Ex(ply, wpn, pos + ang:Right() * -3 + ang:Forward() * 2 - ang:Up() * 1, ang, ang_head1)
+				end
+			end
+		end
+
         //print("DragHands: ", SysTime() - systime)
         hg.DoZManip(ent, ply)
         //local systime = SysTime()

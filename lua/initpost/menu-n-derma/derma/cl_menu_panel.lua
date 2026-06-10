@@ -268,6 +268,14 @@ function PANEL:Init()
     if not ZCityHasSeenIntro then
         self.IsIntro = true
         
+        -- Play valve sound once when intro screen shows up
+        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+            if IsValid(station) then
+                station:EnableLooping(false)
+                station:SetVolume(1)
+                station:Play()
+            end
+        end)
     end
     
     self.CurrentState = "Main"
@@ -3072,6 +3080,14 @@ function PANEL:Init()
     if not ZCityHasSeenIntro then
         self.IsIntro = true
         
+        -- Play valve sound once when intro screen shows up
+        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+            if IsValid(station) then
+                station:EnableLooping(false)
+                station:SetVolume(1)
+                station:Play()
+            end
+        end)
     end
     
     self.CurrentState = "Main"
