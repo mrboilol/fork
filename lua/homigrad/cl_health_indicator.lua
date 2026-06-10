@@ -888,19 +888,19 @@ function HUD_DrawDynamicIndicator()
             local isArterial = data.isArterial
             local r, g, b, mat
             
-            if severity >= 1.0 or isArterial then
-                -- Show bigbleeding.png for arterial or serious wounds
+            if severity >= 0.8 or isArterial then
+                -- Show bigbleeding.png for severe bleeding (~200ml/min+) or arterial wounds
                 mat = bigBleedIconMat
-                -- Dark yellow to dark red depending on severity
+                -- Dark yellow to dark red based on severity
                 -- Dark Yellow (180, 160, 0) -> Dark Red (120, 0, 0)
-                local progress = math.Clamp((severity - 0.5) / 1.5, 0, 1)
+                local progress = math.Clamp((severity - 0.8) / 2.0, 0, 1)
                 r = math.floor(180 - 60 * progress)
                 g = math.floor(160 * (1 - progress))
                 b = 0
             else
                 -- Show bleeding.png for normal bleeding wounds
                 mat = bleedIconMat
-                -- White to red depending on severity
+                -- White to red based on severity
                 -- White (255, 255, 255) -> Red (255, 0, 0)
                 local progress = math.Clamp(severity / 0.8, 0, 1)
                 r = 255

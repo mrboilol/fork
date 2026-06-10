@@ -81,7 +81,7 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 
 	-- Check if 11 seconds have passed for alt mode
 	if altnoradrenaline:GetBool() and hg.undernoradrenaline and not hg.noradrenalineAltActive then
-		if SysTime() - hg.noradrenalineAltStartTime >= 11 then
+		if SysTime() - hg.noradrenalineAltStartTime >= 12 then
 			hg.noradrenalineAltActive = true
 		end
 	end
@@ -186,3 +186,16 @@ local META2 = FindMetaTable("Entity")
 function META2:IsStimulated()
 	return false
 end
+
+hook.Add("Player_Death", "noradrenalineCleanup", function(ply)
+	if ply ~= LocalPlayer() then return end
+
+	if hg.undernoradrenaline then
+		hg.DynamicMusicV2.Player.Stop()
+	end
+
+	hg.undernoradrenaline = false
+	hg.noradrenalineAltActive = false
+	hg.noradrenalineIntensity = 0
+	hg.noradrenalineClamped = 0
+end)

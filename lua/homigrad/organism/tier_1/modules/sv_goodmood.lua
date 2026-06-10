@@ -4,6 +4,7 @@ local module = hg.organism.module.goodmood
 module[1] = function(org)
     org.goodmood = 1.0
     org._goodmoodLostTime = 0
+    org._fearDuration = 0
 end
 
 module[2] = function(owner, org, timeValue)
@@ -11,6 +12,14 @@ module[2] = function(owner, org, timeValue)
 
     -- Natural mood decay towards 0
     org.goodmood = math.Approach(org.goodmood, 0, timeValue / 600)
+
+    -- Track fear duration for cumulative penalty
+    local fear = org.fear or 0
+    if fear > 0.1 then
+        org._fearDuration = (org._fearDuration or 0) + timeValue
+    else
+        org._fearDuration = math.max((org._fearDuration or 0) - timeValue * 0.5, 0)
+    end
 
     -- Track when goodmood is lost (drops below 0.3)
     if (org.goodmood or 0) < 0.3 and (org._prevGoodMood or 1) >= 0.3 then
@@ -63,8 +72,10 @@ module[2] = function(owner, org, timeValue)
     end
 
     -- Decrease goodmood when in fear or despair
+    -- Fear penalty scales with both current fear level and accumulated fear duration
     if org.fear > 0.2 then
-        goodmood_add = goodmood_add - timeValue * 0.01 * org.fear
+        local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 2) -- Up to 3x multiplier after 60 seconds of fear
+        goodmood_add = goodmood_add - timeValue * 0.02 * org.fear * fearDurationMultiplier
     end
 
     if org.despair > 0.2 then

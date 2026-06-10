@@ -79,41 +79,67 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
+	-- Prevent playing if under noradrenaline influence (fury-13)
+	if (org.noradrenaline or 0) > 0.0001 then
+		stop_adrenaline_music(true)
+		return
+	end
+
+	-- Prevent playing if under berserk influence
+	if (org.berserk or 0) > 0.0001 then
+		stop_adrenaline_music(true)
+		return
+	end
+
 	local shouldPlay = false
 	local adrenalineAdd = org.adrenalineAdd or 0
 	local despair = org.despair or 0
 	local adrenaline = org.adrenaline or 0
 	local fear = org.fear or 0
 	local pain = org.pain or 0
+	local blood = org.blood or 0
+	local o2 = org.o2 and org.o2.curregen or 0
+	local pulse = org.pulse or 0
 
-	-- Check if adrenaline increased
-	if adrenalineAdd > hg.lastAdrenalineAdd + 0.1 then
-		shouldPlay = true
+	-- Prevent playing if in big pain or dying
+	if pain > 50 then
+		stop_adrenaline_music(true)
+		return
 	end
-	hg.lastAdrenalineAdd = adrenalineAdd
 
-	-- Check if fear increased
-	if fear > (hg.lastFear or 0) + 0.05 then
-		shouldPlay = true
+	-- Prevent playing if bleeding out (low blood)
+	if blood < 4000 then
+		stop_adrenaline_music(true)
+		return
 	end
-	hg.lastFear = fear
-	hg.lastDespair = despair
 
-	-- Check if in combat (recent damage or weapon fire)
+	-- Prevent playing if great drop in o2 (oxygen regeneration)
+	if o2 < 0.3 then
+		stop_adrenaline_music(true)
+		return
+	end
+
+	-- Prevent playing if great drop in pulse (too low or critically high)
+	if pulse < 40 or pulse > 180 then
+		stop_adrenaline_music(true)
+		return
+	end
+
+	-- Only play if triggered by combat (recent damage or weapon fire)
 	if CurTime() - hg.lastCombatTime < 15 then
 		shouldPlay = true
 	end
 
-	-- Also play if currently has adrenaline or fear
-	if adrenalineAdd > 0.25 or adrenaline > 0.5 or fear > 0.5 then
-		shouldPlay = true
-	end
+	-- Track values for other systems but don't use them for triggering
+	hg.lastAdrenalineAdd = adrenalineAdd
+	hg.lastFear = fear
+	hg.lastDespair = despair
 
 	if shouldPlay then
 		start_adrenaline_music()
 		local combatFactor = math.max(0, (15 - (CurTime() - hg.lastCombatTime)) / 15) * 0.4
 		local threadedFactor = math.Clamp(hg.adrenalineMusicThreaded / 100, 0, 0.5)
-		local targetVol = math.Clamp(math.max((adrenalineAdd - 0.25) / 1.25, (adrenaline - 0.5) / 2, fear / 2, combatFactor, despair / 0.3, (pain - 30) / 70, threadedFactor), 0, 1)
+		local targetVol = math.Clamp(math.max(combatFactor, threadedFactor), 0, 1)
 		hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, targetVol)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)

@@ -1086,7 +1086,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.5 or 0.06
+			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
 			local woundBone = cachedClientThinkBone(ent, wound[4])
 			if wound[5] + addtime < time and woundBone then
 				local pos, ang = ent:GetBonePosition(woundBone)
@@ -1128,31 +1128,39 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local right = dir:Angle():Right()
 							local up = ang:Up()
 
-							-- Single clean stream with slow, smooth movement
+							-- Multi-frequency oscillation for smooth arterial spray (z-city-main style)
 							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1)
 
-							-- Consistent forward push - increased for longer spray distance
-							local baseForward = dir * 12 * forceMul * 0.8
+							-- Strong forward push for good spray distance
+							local baseForward = dir * 35 * forceMul
 
-							-- Very slow oscillation for smooth, gradual movement with wider range
-							local oscTime = CurTime() * hb * 0.08
-							local oscAmpRight = baseForward:Length() * 0.25 * pulseFactor
-							local oscAmpUp = baseForward:Length() * 0.18 * pulseFactor
-							local streamOsc = right * oscAmpRight * math.sin(oscTime) + up * oscAmpUp * math.cos(oscTime)
+							-- Complex oscillation with multiple frequencies for smooth, organic movement
+							local t = CurTime()
+							local osc1 = math.sin(t * 2) + math.cos(t * (5 + i * 2)) + math.sin(t * (1 + i))
+							local osc2 = math.sin(t * 2) * math.cos(t * 4)
+							local osc3 = math.sin(t * 3) * math.cos(t * 1)
+							
+							local oscAmpRight = 25 * pulseFactor
+							local oscAmpUp = 25 * pulseFactor
+							local streamOsc = right * oscAmpRight * osc2 + up * oscAmpUp * osc3
+
+							-- Pulsing forward component
+							local pulseOsc = (osc1 * 0.6 + math.sin(t * 2) + 4) * 0.1
+							local forwardPulse = baseForward * (1 + pulseOsc)
 
 							-- Minimal spread for clean single-stream look
-							local spread = right * math.Rand(-0.5, 0.5) + up * math.Rand(-0.5, 0.5)
+							local spread = VectorRand(-1, 1) * pulseFactor
 
 							if wound[7] == "arteria" then
-								local arteriaForce = forceMul * 2.0 * 0.5
-								local arteriaForward = dir * 12 * arteriaForce * 0.7
-								local arteriaOscAmpRight = arteriaForward:Length() * 0.3 * pulseFactor
-								local arteriaOscAmpUp = arteriaForward:Length() * 0.22 * pulseFactor
-								local arteriaOsc = right * arteriaOscAmpRight * math.sin(oscTime) + up * arteriaOscAmpUp * math.cos(oscTime)
+								local arteriaForce = forceMul * 2.0
+								local arteriaForward = dir * 40 * arteriaForce * (1 + pulseOsc)
+								local arteriaOscAmpRight = 30 * pulseFactor
+								local arteriaOscAmpUp = 30 * pulseFactor
+								local arteriaOsc = right * arteriaOscAmpRight * osc2 + up * arteriaOscAmpUp * osc3
 								hg.addBloodPart(pos, arteriaForward + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
 							else
 								local normalForce = forceMul * 1.8
-								local normalForward = dir * 12 * normalForce * 0.9
+								local normalForward = dir * 35 * normalForce * (1 + pulseOsc)
 								hg.addBloodPart(pos, normalForward + streamOsc + spread, nil, size, size, true, nil, ent)
 							end
 						end

@@ -45,7 +45,7 @@ hook.Add("Think", "hg_hunger_thoughts_notify", function()
 			local thought = hungerThoughts[hungerThoughtIndex]
 			
 			-- More frequent thoughts as hunger increases
-			local thoughtInterval = math.Remap(hungry, 30, 100, 15, 3)
+			local thoughtInterval = math.Remap(hungry, 30, 100, 30, 10)
 			
 			if hg and hg.CreateNotification then
 				hg.CreateNotification(thought, 2, Color(255, 165, 0), true)

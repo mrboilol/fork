@@ -487,30 +487,43 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 		isHeavyCaliber = caliberWeight > 0.8
 	end
 
-	-- Add pain when shooting with broken right arm
-	local rightArmBroken = (org.rarm and org.rarm >= 1) or org.rarmdislocation or org.rarmdislocated
-	if rightArmBroken and not org.rarmamputated then
-		local armVal = org.rarm or 0
-		local disloc = org.rarmdislocation or org.rarmdislocated
-		local painAmount = armVal * 8 + (disloc and 6 or 0)
-		-- Scale pain by caliber weight (heavier weapons cause more pain)
-		painAmount = painAmount * (1 + caliberWeight * 0.5)
-		org.painadd = (org.painadd or 0) + painAmount
-	end
-
 	-- Check if left arm is damaged or amputated (one-handed condition)
 	local leftArmDamaged = (org.larm and org.larm >= 1) or org.larmamputated or (org.larmdislocation or org.larmdislocated)
 	if not leftArmDamaged then return end
+
+	-- Check if right arm is dislocated - can't fire one-handed with dislocated arm
+	local rightArmDislocated = org.rarmdislocation or org.rarmdislocated
+	if rightArmDislocated then
+		ent:DropWeapon(wep)
+		return
+	end
 
 	-- Apply wrist damage for heavy calibers when one-handed
 	if isHeavyCaliber then
 		local wristDamage = caliberWeight * 0.15
 		-- Damage the right arm (the only usable arm)
 		if not org.rarmamputated then
-			org.rarm = math.min((org.rarm or 0) + wristDamage, 1)
+			local oldRarm = org.rarm or 0
+			org.rarm = math.min(oldRarm + wristDamage, 1)
+
+			-- Check if arm dislocates from the damage (threshold around 0.8)
+			if oldRarm < 0.8 and org.rarm >= 0.8 then
+				org.rarmdislocation = true
+				-- Drop the weapon when arm dislocates
+				ent:DropWeapon(wep)
+			end
 		end
 		-- Add pain
 		org.painadd = (org.painadd or 0) + wristDamage * 10
+	end
+
+	-- Chance to drop weapon based on caliber weight and arm damage
+	if not org.rarmamputated then
+		local armDamage = org.rarm or 0
+		local dropChance = caliberWeight * 0.1 + armDamage * 0.15
+		if math.random() < dropChance then
+			ent:DropWeapon(wep)
+		end
 	end
 
 	-- Apply reduced control for one-handed usage

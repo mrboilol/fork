@@ -73,7 +73,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.notifications = {}
 		hg.CreateNotificationBerserk("I feel...")
 
-		local disorientedDuration = altberserk:GetBool() and 660 or 3.95
+		local disorientedDuration = altberserk:GetBool() and 12 or 3.95
 		timer.Simple(disorientedDuration, function()
 			if IsValid(part) then
 				part:StopEmission( false, true, false )
@@ -132,11 +132,16 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		--local intensity = ((hg.berserkStartTime2 + SysTime()) / 60) * 70 % 1
 		--intensity = math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
 		local currentBpm = altberserk:GetBool() and 87 or bpm:GetInt()
-		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * currentBpm)
+		local stationTime = hg.berserkStation:GetTime()
+		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
+		-- Guard against NaN from invalid station time
+		if intensity ~= intensity then intensity = 0 end
 		intensity = (intensity - math.Round(intensity)) % 1
 		--intensity = math.sqrt(math.sqrt(intensity))
 		intensity = math.Clamp((intensity * 0.25 + 0.75), 0, 1)
 		intensity = math.ease.InExpo(intensity) * berserkClamped * 2--math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
+		-- Guard against NaN from easing function
+		if intensity ~= intensity then intensity = 0 end
 
 		tab2[ "$pp_colour_mulr" ] = (1.5 * math.min(1, berserk * 4)) + (intensity / 5)
 		tab2[ "$pp_colour_addr" ] = (0.1 * math.min(1, berserk * 4)) + intensity / 64
@@ -203,7 +208,13 @@ end)
 hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 	if ply:Alive() and hg.underberserk2 and IsValid(hg.berserkStation) and hg.berserkClamped then
 		local currentBpm = altberserk:GetBool() and 87 or bpm:GetInt()
-		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * currentBpm)
+		local stationTime = hg.berserkStation:GetTime()
+		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
+		-- Guard against NaN
+		if intensity ~= intensity then intensity = 0 end
+		if hg.berserkIntensity ~= hg.berserkIntensity then hg.berserkIntensity = 0 end
+		if hg.berserkClamped ~= hg.berserkClamped then hg.berserkClamped = 0 end
+		
 		angles[1] = angles[1] - hg.berserkIntensity * 0.2
 		angles[3] = math.cos(CurTime() * 0.3) * hg.berserkClamped + hg.berserkIntensity * 2 * (intensity % 2 > 1 and 1 or -1)
 		--print(fova)
@@ -277,7 +288,12 @@ hook.Add("PostDrawTranslucentRenderables", "berserkSky", function(depth, drawsky
 		if sun_info != nil then HM_sky_material:SetVector("$sunnormal", sun_info.direction) end
 		--alphacolor.a = hg.berserkIntensity
 		HM_sky_material:SetFloat("$duskscale",math.abs(math.sin(CurTime()*1.5))*1)
-		HM_sky_material:SetFloat("$duskintensity",0.2*hg.berserkIntensity/(hg.berserkIntensity/3))
+		-- Fix division by zero / NaN
+		local duskIntensity = 0
+		if hg.berserkIntensity and hg.berserkIntensity > 0.001 then
+			duskIntensity = 0.2 * hg.berserkIntensity / (hg.berserkIntensity / 3)
+		end
+		HM_sky_material:SetFloat("$duskintensity", duskIntensity)
 
 		--print(hg.berserkIntensity)
 		cam.Start3D(vector_origin, EyeAngles())
@@ -287,5 +303,21 @@ hook.Add("PostDrawTranslucentRenderables", "berserkSky", function(depth, drawsky
 			cam.IgnoreZ(false)
 		cam.End3D()
 	end
+end)
+
+hook.Add("Player_Death", "berserkCleanup", function(ply)
+	if ply ~= LocalPlayer() then return end
+
+	hg.underberserk = false
+	hg.underberserk2 = false
+
+	if IsValid(hg.berserkStation) then
+		hg.berserkStation:Stop()
+		hg.berserkStation = nil
+	end
+
+	hg.notificationFont = "HuyFont"
+	hg.berserkIntensity = 0
+	hg.berserkClamped = 0
 end)
 

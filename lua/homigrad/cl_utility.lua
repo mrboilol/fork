@@ -746,12 +746,38 @@ players : 1 humans, 0 bots (20 max)
 				[6] = ent:GetFlexIDByName( "lower_lip" )
 			}
 
-			local weight = (ply:IsSpeaking() and math.Clamp( ply:VoiceVolume() * 5, 0, 2 )) or 0
+			local org = ent.organism
+			local jawDislocated = org and (org.jawdislocation or org.jaw == 1)
+			local weight
+			
+			if jawDislocated then
+				-- Jaw dislocation effect: twitch randomly when speaking
+				local twitchWeight = ply:IsSpeaking() and math.Rand(0.3, 1.2) or 0.4
+				local twitchAngle = math.Rand(-0.5, 0.5)
+				weight = twitchWeight
+				
+				for k = 1, #flexes do
+					local v = flexes[ k ]
+					if v and v ~= -1 then
+						local randomOffset = math.Rand(-0.2, 0.2)
+						ent:SetFlexWeight( v, math.Clamp(twitchWeight + randomOffset, 0, 1) )
+					end
+				end
+				
+				-- Manipulate head bone to show dislocation
+				local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+				if headBone and ply:IsSpeaking() then
+					local twitchAng = Angle(math.Rand(-2, 2), math.Rand(-2, 2), math.Rand(-3, 3))
+					hg.bone.Set(ent, headBone, vector_origin, twitchAng, "jawdislocation", 0.1, FrameTime())
+				end
+			else
+				weight = (ply:IsSpeaking() and math.Clamp( ply:VoiceVolume() * 5, 0, 2 )) or 0
 
-			for k = 1, #flexes do
-				local v = flexes[ k ]
-				if v and v ~= -1 then
-					ent:SetFlexWeight( v, weight )
+				for k = 1, #flexes do
+					local v = flexes[ k ]
+					if v and v ~= -1 then
+						ent:SetFlexWeight( v, weight )
+					end
 				end
 			end
 

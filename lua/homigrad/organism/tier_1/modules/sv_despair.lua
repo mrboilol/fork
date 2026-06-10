@@ -37,6 +37,7 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._hadGoodMood = false
 	org._despairLastGainedTime = 0
 	org._despairLastPain = 0
+	org._fearDuration = 0
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -86,6 +87,14 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 	org.despair = math.Approach(org.despair, 0, despairDecay)
 
+	-- Track fear duration for cumulative despair induction
+	local fear = org.fear or 0
+	if fear > 0.1 then
+		org._fearDuration = (org._fearDuration or 0) + timeValue
+	else
+		org._fearDuration = math.max((org._fearDuration or 0) - timeValue * 0.5, 0)
+	end
+
 	-- Track if player had goodmood
 	if (org.goodmood or 0) > 0.3 then
 		org._hadGoodMood = true
@@ -120,7 +129,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		elseif fear > 1.0 then
 			fearTransferRate = 0.04 -- Slower transfer when fear is high
 		end
-		add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate
+		-- Scale transfer rate with fear duration - up to 3x multiplier after 60 seconds of fear
+		local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 2)
+		add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate * fearDurationMultiplier
 	end
 
 	if (org.pain or 0) > 45 then

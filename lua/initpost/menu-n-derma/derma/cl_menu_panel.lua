@@ -455,23 +455,6 @@ function PANEL:Think()
         if input.IsKeyDown(KEY_ENTER) then
             self.IntroSequenceActive = true
             self.IntroStartTime = CurTime()
-            -- Play valve.mp3 sound
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:SetVolume(1)
-                    station:EnableLooping(false)
-                    station:Play()
-                end
-            end)
-            -- Play "itbegins" sound
-            sound.PlayFile("sound/itbegins.mp3", "noblock", function(station, errCode, errStr)
-                if IsValid(station) then
-                    ZCityIntroMusic = station
-                    station:Play()
-                else
-                    print("Error playing intro sound:", errCode, errStr)
-                end
-            end)
             
             -- Fade out background music if playing
             if IsValid(ZCityMainMenuMusic) then
@@ -2587,6 +2570,15 @@ function PANEL:Paint(w,h)
             
             if elapsedTime >= duration then
                 self:Close()
+                
+                -- Play valve.mp3 sound when exiting intro
+                sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                    if IsValid(station) then
+                        station:SetVolume(1)
+                        station:EnableLooping(false)
+                        station:Play()
+                    end
+                end)
                 
                 -- Create Fade Out Panel (Black -> Clear)
                 local fadePanel = vgui.Create("DPanel")
@@ -3267,23 +3259,6 @@ function PANEL:Think()
         if input.IsKeyDown(KEY_ENTER) then
             self.IntroSequenceActive = true
             self.IntroStartTime = CurTime()
-            -- Play valve.mp3 sound
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:SetVolume(1)
-                    station:EnableLooping(false)
-                    station:Play()
-                end
-            end)
-            -- Play "itbegins" sound
-            sound.PlayFile("sound/itbegins.mp3", "noblock", function(station, errCode, errStr)
-                if IsValid(station) then
-                    ZCityIntroMusic = station
-                    station:Play()
-                else
-                    print("Error playing intro sound:", errCode, errStr)
-                end
-            end)
             
             -- Fade out background music if playing
             if IsValid(ZCityMainMenuMusic) then
@@ -5399,6 +5374,15 @@ function PANEL:Paint(w,h)
             
             if elapsedTime >= duration then
                 self:Close()
+                
+                -- Play valve.mp3 sound when exiting intro
+                sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                    if IsValid(station) then
+                        station:SetVolume(1)
+                        station:EnableLooping(false)
+                        station:Play()
+                    end
+                end)
                 
                 -- Create Fade Out Panel (Black -> Clear)
                 local fadePanel = vgui.Create("DPanel")
