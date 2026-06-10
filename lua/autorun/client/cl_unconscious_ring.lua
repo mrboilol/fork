@@ -45,6 +45,7 @@ local dotBeat = 0
 
 local ecgAlpha = 0
 local ecgAlphaPulseCheck = 0
+local abnormalECGAlpha = 0
 local lastHeartBeat = 0
 local heartPhase = 0
 
@@ -259,6 +260,7 @@ local Color = Color
 
 local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+local abnormalECGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 
 local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse, color, ringAlpha)
@@ -456,6 +458,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
+    local lowConsciousness = (org.consciousness or 1) < 0.5 and not isUnconscious
+    local isCritical = (org.critical == true) or (heartbeat < 1 and lerpBrain >= 0.02) or (lerpBrain >= 0.34) or lowConsciousness
+    
     if isUnconscious then
         if not wasUnconsciousState then
             flatlinePlayedThisUnconscious = false
@@ -466,6 +471,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             peakShock = currentShock
         end
         ringAlpha = Lerp(FrameTime() * 4, ringAlpha, 1)
+        dotBeat = math.floor(CurTime()) % 3
+    elseif lowConsciousness then
+        ringAlpha = Lerp(FrameTime() * 4, ringAlpha, 0.4)
         dotBeat = math.floor(CurTime()) % 3
     else
         flatlinePlayedThisUnconscious = false
@@ -480,7 +488,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     wasUnconsciousState = isUnconscious
     
-    local showTopLeftECG = false
     local showPulseCheckECG = false
 
     local isCheckingPulse = false
@@ -498,10 +505,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         showPulseCheckECG = true
     end
 
-    if (admiring or (heartbeat < 30 or heartbeat > 170)) and not isUnconscious then
-        showTopLeftECG = true
-    end
-
     -- Play flatline when heartbeat is 0, regardless of other conditions
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 170
     if heartbeat < 1 then
@@ -513,7 +516,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    if ringAlpha <= 0 and not showTopLeftECG and not showPulseCheckECG then return end
+    if ringAlpha <= 0 and not showPulseCheckECG then return end
     
     if ringAlpha > 0.01 then
         lerpBrain = Lerp(FrameTime() * 3, lerpBrain, org.brain or 0)
@@ -641,24 +644,28 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
-    if showTopLeftECG then
-        ecgAlpha = Lerp(FrameTime() * 4, ecgAlpha, 1)
+    -- Abnormal heart rate ECG at unconscious position with lowered opacity
+    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 170
+    local showAbnormalECG = abnormalPulse and not isUnconscious
+
+    if showAbnormalECG then
+        abnormalECGAlpha = Lerp(FrameTime() * 4, abnormalECGAlpha, 0.5)
     else
-        ecgAlpha = Lerp(FrameTime() * 6, ecgAlpha, 0)
+        abnormalECGAlpha = Lerp(FrameTime() * 6, abnormalECGAlpha, 0)
     end
 
-    if ecgAlpha > 0.01 then
-        local boxW, boxH = 300, 150
-        local boxX, boxY = 60, 60
+    if abnormalECGAlpha > 0.01 then
+        local boxW, boxH = 400, 200
+        local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() / 2 - boxH / 2
 
-        surface.SetDrawColor(0, 0, 0, 150 * ecgAlpha)
+        surface.SetDrawColor(0, 0, 0, 150 * abnormalECGAlpha)
         surface.DrawRect(boxX, boxY, boxW, boxH)
-        surface.SetDrawColor(255, 255, 255, 200 * ecgAlpha)
+        surface.SetDrawColor(255, 255, 255, 200 * abnormalECGAlpha)
         surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
-        DrawEKG(topLeftEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, heartbeat, pulse, Color(255, 255, 255, 255), ecgAlpha)
+        DrawEKG(abnormalECGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, heartbeat, pulse, Color(255, 255, 255, 255), abnormalECGAlpha)
     else
-        topLeftEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+        abnormalECGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
 
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100

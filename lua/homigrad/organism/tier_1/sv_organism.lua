@@ -459,6 +459,78 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 	end
 end)
 
+-- One-handed behavior: wrist damage from heavy calibers and reduced control
+hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
+	if not IsValid(ent) or not ent:IsPlayer() then return end
+	local org = ent.organism
+	if not org or org.otrub then return end
+
+	-- Get weapon info
+	local wep = ent:GetActiveWeapon()
+	if not IsValid(wep) then return end
+
+	-- Determine if caliber is heavy based on ammo type
+	local ammoType = wep:GetPrimaryAmmoType()
+	local ammoData = hg.ammotypes[game.GetAmmoName(ammoType)]
+	local isHeavyCaliber = false
+	local caliberWeight = 0
+
+	if ammoData and ammoData.BulletSettings then
+		local bullet = ammoData.BulletSettings
+		-- Heavy caliber criteria: high force, mass, or diameter
+		local force = bullet.Force or 0
+		local mass = bullet.Mass or 0
+		local diameter = bullet.Diameter or 0
+
+		-- Calculate caliber weight score
+		caliberWeight = (force / 200) + (mass / 20) + (diameter / 15)
+		isHeavyCaliber = caliberWeight > 0.8
+	end
+
+	-- Add pain when shooting with broken right arm
+	local rightArmBroken = (org.rarm and org.rarm >= 1) or org.rarmdislocation or org.rarmdislocated
+	if rightArmBroken and not org.rarmamputated then
+		local armVal = org.rarm or 0
+		local disloc = org.rarmdislocation or org.rarmdislocated
+		local painAmount = armVal * 8 + (disloc and 6 or 0)
+		-- Scale pain by caliber weight (heavier weapons cause more pain)
+		painAmount = painAmount * (1 + caliberWeight * 0.5)
+		org.painadd = (org.painadd or 0) + painAmount
+	end
+
+	-- Check if left arm is damaged or amputated (one-handed condition)
+	local leftArmDamaged = (org.larm and org.larm >= 1) or org.larmamputated or (org.larmdislocation or org.larmdislocated)
+	if not leftArmDamaged then return end
+
+	-- Apply wrist damage for heavy calibers when one-handed
+	if isHeavyCaliber then
+		local wristDamage = caliberWeight * 0.15
+		-- Damage the right arm (the only usable arm)
+		if not org.rarmamputated then
+			org.rarm = math.min((org.rarm or 0) + wristDamage, 1)
+		end
+		-- Add pain
+		org.painadd = (org.painadd or 0) + wristDamage * 10
+	end
+
+	-- Apply reduced control for one-handed usage
+	-- Increase recoil multiplier based on caliber weight and one-handed status
+	local oneHandedPenalty = 1 + (caliberWeight * 0.5)
+	org.recoilmul = (org.recoilmul or 1) * oneHandedPenalty
+
+	-- Reduce arm strength for one-handed usage
+	local armStrengthPenalty = 1 - (caliberWeight * 0.2)
+	org.armstrength = (org.armstrength or 1) * armStrengthPenalty
+
+	-- Apply worse control for one-handed postures (if weapon is two-handed but being used one-handed)
+	local isTwoHandedWeapon = wep.TwoHanded ~= false
+	if isTwoHandedWeapon then
+		-- Additional penalty for using two-handed weapons one-handed
+		org.recoilmul = org.recoilmul * 1.5
+		org.armstrength = org.armstrength * 0.7
+	end
+end)
+
 
 
 hook.Add("Org Think", "Main", function(owner, org, timeValue)
@@ -876,7 +948,24 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.legstrength = org.legstrength * math.max(1 - damageFactor * 0.5, 0.1)
 		org.armstrength = org.armstrength * math.max(1 - damageFactor * 0.5, 0.1)
 	end
-	
+
+	-- One-handed posture penalties (continuous effects when left arm is damaged/amputated)
+	if isPly then
+		local leftArmDamaged = (org.larm and org.larm >= 1) or org.larmamputated or (org.larmdislocation or org.larmdislocated)
+		if leftArmDamaged then
+			-- General reduced control for one-handed posture
+			org.recoilmul = (org.recoilmul or 1) * 1.15
+			org.armstrength = (org.armstrength or 1) * 0.85
+
+			-- Additional penalty if holding a two-handed weapon
+			local wep = owner:GetActiveWeapon()
+			if IsValid(wep) and wep.TwoHanded ~= false then
+				org.recoilmul = org.recoilmul * 1.3
+				org.armstrength = org.armstrength * 0.75
+			end
+		end
+	end
+
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
 	if (org.blood < 2750) then org.needfake = true end
 

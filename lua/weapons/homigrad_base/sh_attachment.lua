@@ -311,8 +311,20 @@ function SWEP:Attachment_Transform(model,pos,ang,plc,att,attdata,available)
 	model:SetupBones()
 	local addred = string.find(att[1], "supressor") and 5 * self.dmgStack2 / 30 or 0
 	render.SetColorModulation(1 + addred,1,1)
+	
+	-- Apply slight transparency when aiming (2-eye aiming effect)
+	local owner = self:GetOwner()
+	local isAiming = owner:IsPlayer() and IsAiming(owner)
+	local brainDamage = owner.organism and owner.organism.brain or 0
+	
 	if (IsValid(self:GetOwner()) and attdata.norenderWhenDrop) or not attdata.norenderWhenDrop then
-		model:DrawModel()
+		if isAiming and brainDamage <= 0.055 then
+			render.SetBlend(0.85)
+			model:DrawModel()
+			render.SetBlend(1)
+		else
+			model:DrawModel()
+		end
 	end
 	render.SetColorModulation(1,1,1)
 

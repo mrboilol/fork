@@ -714,6 +714,7 @@ function SWEP:SetHandPos(noset)
 	-- ply:SetupBones()
 
 	local ent = self:GetNWEntity("carryent")
+	local twohands = (owner:GetNetVar("carrymass",0) ~= 0 and owner:GetNetVar("carrymass",0) or owner:GetNetVar("carrymass2",0)) > 15
 	self.rhandik = (self:GetFists()) or (IsValid(ent) and twohands)
 	self.lhandik = (self:GetFists() and hg.CanUseLeftHand(ply)) or IsValid(ent)
 
@@ -1142,10 +1143,54 @@ function SWEP:SecondaryAttack()
 		self:SetCarrying()
 		local ply = owner
 		local pos = hg.eye(ply)
-		local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(owner)
+		local org = owner.organism
+
+		-- Determine which hands to use for picking up
+		local useBothHands = false
+		local useRightHand = true
+		local useLeftHand = true
+		local isRightBroken = false
+		local isLeftBroken = false
+		local bothArmsBroken = false
+
+		if org then
+			isRightBroken = (org.rarm and org.rarm >= 1) or org.rarmamputated or org.rarmdislocation or org.rarmdislocated
+			isLeftBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
+			bothArmsBroken = isRightBroken and isLeftBroken
+
+			if not isRightBroken and not isLeftBroken then
+				-- Both healthy, use both hands (strongest grip)
+				useBothHands = true
+				useRightHand = true
+				useLeftHand = true
+			elseif isRightBroken and not isLeftBroken then
+				-- Right broken, use only left hand
+				useBothHands = false
+				useRightHand = false
+				useLeftHand = true
+			elseif isLeftBroken and not isRightBroken then
+				-- Left broken, use only right hand (slightly stronger)
+				useBothHands = false
+				useRightHand = true
+				useLeftHand = false
+			elseif bothArmsBroken then
+				-- Both broken, prioritize right hand with pain
+				useBothHands = false
+				useRightHand = true
+				useLeftHand = false
+			end
+		else
+			-- No organism, default to both hands
+			useBothHands = true
+			useRightHand = true
+			useLeftHand = true
+		end
+
 		local reachDist = self.ReachDistance
-		if isRight then
-			reachDist = reachDist * 1.25 -- 25% better reach with right arm!
+		if useRightHand and not useLeftHand then
+			reachDist = reachDist * 1.25 -- 25% better reach with right arm only
+		elseif useBothHands then
+			reachDist = reachDist * 1.15 -- 15% better reach with both hands
 		end
 
 		local tr = util.QuickTrace(pos, owner:GetAimVector() * reachDist, {owner})
@@ -1177,23 +1222,52 @@ function SWEP:SecondaryAttack()
 				tr.Entity.Touched = true
 				self:ApplyForce()
 
-				if isBroken and org then
-					local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
-					local disloc = isRight and org.rarmdislocation or org.larmdislocation
-					local painAmount = armVal * 12 + (disloc and 8 or 0)
-					if isRight then
-						painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
-					end
-					org.painadd = (org.painadd or 0) + painAmount
-				elseif not isBroken and org then
-					-- Partial damage also causes pain, but less severe
-					local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
-					if armVal >= 0.25 and armVal < 1 then
-						local severity = (armVal - 0.25) / 0.75
-						local painAmount = severity * 5 -- Scale from 0 to 5 pain
-						if isRight then
-							painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
+				-- Apply pain based on arm damage and which hands are being used
+				if org then
+					local painAmount = 0
+
+					if bothArmsBroken then
+						-- Both arms broken, using right hand - add significant pain
+						if not org.rarmamputated then
+							painAmount = (org.rarm or 0) * 15 + (org.rarmdislocation or org.rarmdislocated and 10 or 0)
 						end
+						if not org.larmamputated then
+							painAmount = painAmount + (org.larm or 0) * 15 + (org.larmdislocation or org.larmdislocated and 10 or 0)
+						end
+						-- Right hand is slightly better, reduce pain slightly
+						painAmount = painAmount * 0.85
+					elseif isRightBroken and useLeftHand then
+						-- Right broken, using left hand only
+						if not org.larmamputated then
+							local armVal = org.larm or 0
+							local disloc = org.larmdislocation or org.larmdislocated
+							if armVal >= 1 or disloc then
+								painAmount = armVal * 12 + (disloc and 8 or 0)
+							elseif armVal >= 0.25 and armVal < 1 then
+								local severity = (armVal - 0.25) / 0.75
+								painAmount = severity * 5
+							end
+						end
+					elseif isLeftBroken and useRightHand then
+						-- Left broken, using right hand only (slightly stronger)
+						if not org.rarmamputated then
+							local armVal = org.rarm or 0
+							local disloc = org.rarmdislocation or org.rarmdislocated
+							if armVal >= 1 or disloc then
+								painAmount = armVal * 12 + (disloc and 8 or 0)
+								painAmount = painAmount * 0.7 -- right hand is better (less pain)
+							elseif armVal >= 0.25 and armVal < 1 then
+								local severity = (armVal - 0.25) / 0.75
+								painAmount = severity * 5
+								painAmount = painAmount * 0.7
+							end
+						end
+					elseif useBothHands then
+						-- Both hands healthy, minimal pain from strain
+						painAmount = 0
+					end
+
+					if painAmount > 0 then
 						org.painadd = (org.painadd or 0) + painAmount
 					end
 				end
@@ -2223,6 +2297,38 @@ function SWEP:AttackFront(special_attack, rand)
 
 	if SERVER then
 		owner.organism.stamina.subadd = owner.organism.stamina.subadd + 4
+
+		-- Apply pain when punching with broken or dislocated arm
+		local org = owner.organism
+		if org then
+			local rarm_broken = org.rarm >= 1
+			local larm_broken = org.larm >= 1
+			local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
+			local larm_dislocated = org.larmdislocation or org.larmdislocated
+
+			local using_right_arm = rand
+			local pain_amount = 0
+
+			if using_right_arm then
+				if rarm_broken then
+					pain_amount = pain_amount + 8
+				elseif rarm_dislocated then
+					pain_amount = pain_amount + 4
+				end
+			else
+				if larm_broken then
+					pain_amount = pain_amount + 8
+				elseif larm_dislocated then
+					pain_amount = pain_amount + 4
+				end
+			end
+
+			if pain_amount > 0 then
+				org.painadd = (org.painadd or 0) + pain_amount
+				org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.5, 150)
+				org.lasthit = CurTime()
+			end
+		end
 	end
 
 	owner:LagCompensation(false)

@@ -79,34 +79,11 @@ if SERVER then
 
 		local internalBleed = org.internalBleed - org.internalBleedHeal
 
-		local canHeal = false
-
-		-- Heal internal bleeding (same as medkit tranexamic acid)
 		if internalBleed > 0 then
 			local healed = math.max(internalBleed - self.modeValues[1], 0)
 			self.modeValues[1] = self.modeValues[1] - (internalBleed - healed) * (owner.Profession == "doctor" and 0.5 or 1)
 			org.internalBleedHeal = org.internalBleedHeal + (internalBleed - healed)
 			org.tranexamic_acid = math.min(org.tranexamic_acid + 5, 10)
-			canHeal = true
-		end
-
-		-- Help with external bleeding
-		if org.bleed > 0 then
-			local bleedHeal = math.min(org.bleed, self.modeValues[1] * 0.5)
-			org.bleed = org.bleed - bleedHeal
-			self.modeValues[1] = self.modeValues[1] - bleedHeal * 2
-			canHeal = true
-		end
-
-		-- Help with ischemia (low blood flow)
-		if org.blood and org.blood < 4000 then
-			local bloodAdd = math.min(self.modeValues[1] * 50, 4000 - org.blood)
-			org.blood = org.blood + bloodAdd
-			self.modeValues[1] = self.modeValues[1] - (bloodAdd / 50)
-			canHeal = true
-		end
-
-		if canHeal then
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
 		end
 

@@ -437,7 +437,19 @@ local function DrawWorldModel(self, force)
 		end
 		--hg.StartCaptureRender()
 		self.worldModel:SetupBones()
-		self.worldModel:DrawModel()
+		
+		-- Apply slight transparency when aiming (2-eye aiming effect)
+		local owner = self:GetOwner()
+		local isAiming = owner:IsPlayer() and IsAiming(owner)
+		local brainDamage = owner.organism and owner.organism.brain or 0
+		
+		if isAiming and brainDamage <= 0.055 then
+			render.SetBlend(0.85)
+			self.worldModel:DrawModel()
+			render.SetBlend(1)
+		else
+			self.worldModel:DrawModel()
+		end
 		
 		if self.GetDebug and LocalPlayer():IsSuperAdmin() and self:ShouldUseFakeModel() and IsValid(self:GetWM()) then
 			self:DrawModel()

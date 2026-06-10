@@ -691,7 +691,7 @@ hook.Add("Think", "Fake", function()
 						ang2:RotateAroundAxis(angles:Right(), lower and -20 or 0)
 						ang2:RotateAroundAxis(angles:Up(), lower and 20 or 10)
 						ang2:RotateAroundAxis(angles:Forward(), -45)
-						
+
 
 						shadowControl(ragdoll, 3, 0.002, ang2, forceArm * force, forceArm_dump)
 						shadowControl(ragdoll, 4, 0.002, ang2, forceArm * force, forceArm_dump)
@@ -885,31 +885,53 @@ hook.Add("Think", "Fake", function()
 				end
 
 				local wepinreload = wep and wep.reload
+
+				phys = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 7))
+
+				if (ragdoll.cooldownRH or 0) < time and not IsValid(ragdoll.ConsRH) and not wepinreload then
+					local usetrace = util_TraceHull({
+						start = phys:GetPos(),
+						endpos = phys:GetPos(),
+						maxs = vector_usehull,
+						mins = -vector_usehull,
+						filter = {ragdoll, game.GetWorld()},
+						mask = MASK_SOLID
+					})
+
+					local useent = (IsValid(usetrace.Entity) and usetrace.Entity) or false
+					if useent and not useent:IsVehicle() and hook.Run("PlayerUse", ply, useent) then useent:Use(ply) end
+					local wep = useent and useent:IsWeapon() and useent or false
+					ply.force_pickup = true
+					if IsValid(wep) and hook.Run("PlayerCanPickupWeapon", ply, wep) then ply:PickupWeapon(wep) end
+					ply.force_pickup = nil
+				end
+
 				phys = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 5))
+
 				if (ragdoll.cooldownLH or 0) < time and not IsValid(ragdoll.ConsLH) and not wepinreload then
 
-					--\\ Find Use Entity in ragdoll
-						local usetrace = util_TraceHull({
-							start = phys:GetPos(),
-							endpos = phys:GetPos(),
-							maxs = vector_usehull,
-							mins = -vector_usehull,
-							filter = {ragdoll, game.GetWorld()},
-							mask = MASK_SOLID
-						})
+				--\\ Find Use Entity in ragdoll
+					local usetrace = util_TraceHull({
+						start = phys:GetPos(),
+						endpos = phys:GetPos(),
+						maxs = vector_usehull,
+						mins = -vector_usehull,
+						filter = {ragdoll, game.GetWorld()},
+						mask = MASK_SOLID
+					})
 
-						local useent = (IsValid(usetrace.Entity) and usetrace.Entity) or false
-						if useent and not useent:IsVehicle() and hook.Run("PlayerUse", ply, useent) then useent:Use(ply) end
-						local wep = useent and useent:IsWeapon() and useent or false
-						ply.force_pickup = true
-						if IsValid(wep) and hook.Run("PlayerCanPickupWeapon", ply, wep) then ply:PickupWeapon(wep) end
-						ply.force_pickup = nil
-					--//
+					local useent = (IsValid(usetrace.Entity) and usetrace.Entity) or false
+					if useent and not useent:IsVehicle() and hook.Run("PlayerUse", ply, useent) then useent:Use(ply) end
+					local wep = useent and useent:IsWeapon() and useent or false
+					ply.force_pickup = true
+					if IsValid(wep) and hook.Run("PlayerCanPickupWeapon", ply, wep) then ply:PickupWeapon(wep) end
+					ply.force_pickup = nil
+				--//
 
-					local trace
-					for i = 1,3 do
-						if trace and trace.Hit and not trace.HitSky then continue end
-						tr.start = phys:GetPos()
+				local trace
+				for i = 1,3 do
+					if trace and trace.Hit and not trace.HitSky then continue end
+					tr.start = phys:GetPos()
 						tr.endpos = phys:GetPos() + phys:GetAngles():Right() * 6 + phys:GetAngles():Up() * (i - 2) * 3
 						tr.filter = ragdoll
 						tr.mask = MASK_SOLID

@@ -1,11 +1,13 @@
-local hg_adrenalinemusic = CreateClientConVar("hg_adrenalinemusic", "0", true, false, "Enable adrenaline combat music (sorrymud.ogg)", 0, 1)
+local hg_adrenalinemusic = CreateClientConVar("hg_adrenalinemusic", "1", true, false, "Enable adrenaline combat music (sorrymud.mp3)", 0, 1)
 
 hg.adrenalineMusicStation = hg.adrenalineMusicStation or nil
 hg.adrenalineMusicVol = hg.adrenalineMusicVol or 0
 hg.adrenalineMusicLoading = false
 hg.lastAdrenalineAdd = hg.lastAdrenalineAdd or 0
 hg.lastDespair = hg.lastDespair or 0
+hg.lastFear = hg.lastFear or 0
 hg.lastCombatTime = hg.lastCombatTime or 0
+hg.adrenalineMusicThreaded = hg.adrenalineMusicThreaded or 0
 
 local function stop_adrenaline_music(force)
 	if not IsValid(hg.adrenalineMusicStation) then return end
@@ -15,7 +17,7 @@ local function stop_adrenaline_music(force)
 		hg.adrenalineMusicVol = 0
 		return
 	end
-	hg.adrenalineMusicVol = math.max(hg.adrenalineMusicVol - FrameTime() * 0.5, 0)
+	hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, 0)
 	hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
 	if hg.adrenalineMusicVol <= 0.001 then
 		hg.adrenalineMusicStation:Stop()
@@ -29,13 +31,13 @@ local function start_adrenaline_music()
 	if hg.adrenalineMusicLoading then return end
 
 	hg.adrenalineMusicLoading = true
-	sound.PlayFile("sound/sorrymud.ogg", "noblock noplay", function(channel)
+	sound.PlayFile("sound/sorrymud.mp3", "mono noblock noplay", function(channel)
 		hg.adrenalineMusicLoading = false
 		if not IsValid(channel) then return end
 		channel:SetVolume(0)
 		channel:Play()
 		channel:EnableLooping(true)
-		channel:SetTime(10) -- Skip 10 seconds
+		channel:SetTime(22) -- Skip 22 seconds
 		hg.adrenalineMusicStation = channel
 		hg.adrenalineMusicEndTime = nil
 	end)
@@ -91,39 +93,45 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	hg.lastAdrenalineAdd = adrenalineAdd
 
 	-- Check if fear increased
-	if despair > hg.lastDespair + 0.05 then
+	if fear > (hg.lastFear or 0) + 0.05 then
 		shouldPlay = true
 	end
+	hg.lastFear = fear
 	hg.lastDespair = despair
 
 	-- Check if in combat (recent damage or weapon fire)
-	if CurTime() - hg.lastCombatTime < 5 then
+	if CurTime() - hg.lastCombatTime < 15 then
 		shouldPlay = true
 	end
 
-	-- Also play if currently has adrenaline, fear, pain, or despair
-	if adrenalineAdd > 0.25 or despair > 0.3 or adrenaline > 0.5 or fear > 0.5 or pain > 30 then
+	-- Also play if currently has adrenaline or fear
+	if adrenalineAdd > 0.25 or adrenaline > 0.5 or fear > 0.5 then
 		shouldPlay = true
 	end
 
 	if shouldPlay then
 		start_adrenaline_music()
-		local targetVol = math.Clamp(math.max((adrenalineAdd - 0.25) / 1.25, despair / 0.3, (adrenaline - 0.5) / 2, fear / 2, (pain - 30) / 70), 0, 1)
-		hg.adrenalineMusicVol = math.Approach(hg.adrenalineMusicVol, targetVol, FrameTime() * 0.3)
+		local combatFactor = math.max(0, (15 - (CurTime() - hg.lastCombatTime)) / 15) * 0.4
+		local threadedFactor = math.Clamp(hg.adrenalineMusicThreaded / 100, 0, 0.5)
+		local targetVol = math.Clamp(math.max((adrenalineAdd - 0.25) / 1.25, (adrenaline - 0.5) / 2, fear / 2, combatFactor, despair / 0.3, (pain - 30) / 70, threadedFactor), 0, 1)
+		hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, targetVol)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
-			-- Get song length and loop back to 10 seconds when near end
+			-- Get song length and loop back to 22 seconds when near end
 			if not hg.adrenalineMusicEndTime then
 				hg.adrenalineMusicEndTime = hg.adrenalineMusicStation:GetLength()
 			end
 			local currentTime = hg.adrenalineMusicStation:GetTime()
 			if currentTime > hg.adrenalineMusicEndTime - 20 then
-				hg.adrenalineMusicStation:SetTime(10)
+				hg.adrenalineMusicStation:SetTime(22)
 			end
 		end
 	else
 		stop_adrenaline_music(false)
 	end
+
+	-- Decay threaded intensity over time
+	hg.adrenalineMusicThreaded = math.max(hg.adrenalineMusicThreaded - FrameTime() * 10, 0)
 end)
 
 -- Detect combat situations via damage taken
@@ -159,5 +167,33 @@ hook.Add("Player Spawn", "hg_adrenalinemusic_cleanup", function(ply)
 	stop_adrenaline_music(true)
 	hg.lastAdrenalineAdd = 0
 	hg.lastDespair = 0
+	hg.lastFear = 0
 	hg.lastCombatTime = 0
+	hg.adrenalineMusicThreaded = 0
+end)
+
+if SERVER then
+	util.AddNetworkString("hg_adrenalinemusic_panic")
+
+	function hg.AddAdrenalineMusicPanic(ply, amount)
+		net.Start("hg_adrenalinemusic_panic")
+			net.WriteFloat(amount)
+		net.Send(ply)
+	end
+elseif CLIENT then
+	net.Receive("hg_adrenalinemusic_panic", function()
+		local amount = net.ReadFloat()
+		hg.adrenalineMusicThreaded = hg.adrenalineMusicThreaded + amount
+	end)
+end
+
+hook.Add("HomigradDamage", "hg_adrenalinemusic_panic", function(ply, dmgInfo, hitgroup, ent, harm, hitBoxs, inputHole)
+	if SERVER and ent:IsPlayer() then
+		local damage = dmgInfo:GetDamage()
+		hg.AddAdrenalineMusicPanic(ply, damage * 25)
+		local attacker = dmgInfo:GetAttacker()
+		if IsValid(attacker) and attacker:IsPlayer() then
+			hg.AddAdrenalineMusicPanic(attacker, damage * 5)
+		end
+	end
 end)

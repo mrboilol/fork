@@ -132,12 +132,12 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if (org.bleed or 0) > 2 then
-		add = add + Clamp((org.bleed - 2) / 14, 0, 1) * timeValue * 0.045
+		add = add + Clamp((org.bleed - 2) / 14, 0, 1) * timeValue * 0.08
 	end
 
 	-- Despair from unhealed injuries (persistent bleeding/wounds)
 	if (org.bleed or 0) > 0 then
-		add = add + Clamp(org.bleed, 0, 5) * timeValue * 0.02
+		add = add + Clamp(org.bleed, 0, 5) * timeValue * 0.04
 	end
 
 	-- Despair from damaged limbs (broken bones, fractures)
@@ -158,8 +158,8 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	-- Despair from dying state (critical health/blood)
-	if (org.blood or 5000) < 2500 then
-		add = add + Clamp((2500 - org.blood) / 2500, 0, 1) * timeValue * 0.08
+	if (org.blood or 5000) < 3200 then
+		add = add + Clamp((3200 - org.blood) / 3200, 0, 1) * timeValue * 0.12
 	end
 
 	-- Despair from lack of goodmood (if goodmood has been low for a while)
@@ -193,9 +193,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		add = add + timeValue * 0.005
 	end
 
-	if (org.blood or 5000) < 3200 then
-		add = add + Clamp((3200 - org.blood) / 2200, 0, 1) * timeValue * 0.06
-	end
 
 	if (org.consciousness or 1) < 0.7 then
 		add = add + Clamp((0.7 - org.consciousness) / 0.7, 0, 1) * timeValue * 0.05
@@ -207,14 +204,14 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 	if org.o2 and org.o2[1] then
 		local o2 = org.o2[1]
-		if o2 < 14 then
-			add = add + Clamp((14 - o2) / 14, 0, 1) * timeValue * 0.17
+		if o2 < 18 then
+			add = add + Clamp((18 - o2) / 18, 0, 1) * timeValue * 0.25
 		end
 
 		local curregen = org.o2.curregen or 0
 		local losing = org.losing_oxy or 0
 		if curregen < losing then
-			add = add + Clamp(losing - curregen, 0, 2) * timeValue * 0.038
+			add = add + Clamp(losing - curregen, 0, 2) * timeValue * 0.08
 		end
 	end
 

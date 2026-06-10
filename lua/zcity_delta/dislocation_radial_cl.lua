@@ -3,7 +3,7 @@ if SERVER then return end
 hook.Add("radialOptions", "zcity_delta_dislocation_minigame", function()
     local ply = LocalPlayer()
     if not IsValid(ply) or not ply:Alive() or not ply.organism or ply.organism.otrub then return end
-    if not hg or not hg.radialOptions or not hg.eyeTrace then return end
+    if not hg or not hg.radialOptions then return end
 
     local org = ply.organism
     if not org.canmove or not org.canmovehead then return end

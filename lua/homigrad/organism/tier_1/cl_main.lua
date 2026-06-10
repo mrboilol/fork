@@ -1099,19 +1099,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 						if !should then continue end
 						
-						local pos
-						-- Check if this is a world position (from bone break) vs local position (from artery hit)
-						if wound[8] == true then
-							-- World position - use directly
-							pos = wound[2]
-						else
-							-- Local position - convert to world
-							local mat = ent:GetBoneMatrix(woundBone)
-							if not mat then continue end
-							local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-							if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
-							pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
-						end
+						-- Local position - convert to world
+					local mat = ent:GetBoneMatrix(woundBone)
+					if not mat then continue end
+					local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
+					if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
+					local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local dir = wound[6]
 						local len = dir:Length() * (org.pulse or 70) / 70
@@ -1141,10 +1134,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							-- Consistent forward push - increased for longer spray distance
 							local baseForward = dir * 12 * forceMul * 0.8
 
-							-- Very slow oscillation for smooth, gradual movement
-							local oscTime = CurTime() * hb * 0.15
-							local oscAmpRight = baseForward:Length() * 0.12 * pulseFactor
-							local oscAmpUp = baseForward:Length() * 0.08 * pulseFactor
+							-- Very slow oscillation for smooth, gradual movement with wider range
+							local oscTime = CurTime() * hb * 0.08
+							local oscAmpRight = baseForward:Length() * 0.25 * pulseFactor
+							local oscAmpUp = baseForward:Length() * 0.18 * pulseFactor
 							local streamOsc = right * oscAmpRight * math.sin(oscTime) + up * oscAmpUp * math.cos(oscTime)
 
 							-- Minimal spread for clean single-stream look
@@ -1153,8 +1146,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 2.0 * 0.5
 								local arteriaForward = dir * 12 * arteriaForce * 0.7
-								local arteriaOscAmpRight = 1.5 * pulseFactor
-								local arteriaOscAmpUp = 1.0 * pulseFactor
+								local arteriaOscAmpRight = arteriaForward:Length() * 0.3 * pulseFactor
+								local arteriaOscAmpUp = arteriaForward:Length() * 0.22 * pulseFactor
 								local arteriaOsc = right * arteriaOscAmpRight * math.sin(oscTime) + up * arteriaOscAmpUp * math.cos(oscTime)
 								hg.addBloodPart(pos, arteriaForward + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
 							else

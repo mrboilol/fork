@@ -1923,7 +1923,12 @@ function hg.BreakNeck(ent, fromDamage)
 		phead:EnableMotion(true)
 		pneck:EnableMotion(true)
 
-		-- Create constraint at current pose for natural floppy behavior
+		-- Check if organism is dead - use stiff constraint to prevent stretching
+		local org = IsValid(playerRef) and playerRef.organism
+		local isDead = org and not org.alive
+		print("[HG Floppy] BreakNeck timer: isDead=" .. tostring(isDead))
+
+		-- Create constraint at current pose
 		local head_pos = phead:GetPos()
 		local neck_pos = pneck:GetPos()
 		
@@ -1934,8 +1939,16 @@ function hg.BreakNeck(ent, fromDamage)
 		local lpos1 = WorldToLocal(jointPos, angle_zero, pneck:GetPos(), pneck:GetAngles())
 		local lpos2 = vector_origin
 
-		-- Add floppy neck constraint with generous limits for floppy head
-		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -80, -80, -80, 80, 80, 80, 0, 0, 0, 0, 0)
+		local newConstraint
+		if isDead then
+			-- Use stiff constraint with very limited movement to prevent stretching
+			newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -5, -5, -5, 5, 5, 5, 0, 0, 0, 0, 0)
+			print("[HG Floppy] BreakNeck timer: Created stiff neck constraint for dead organism")
+		else
+			-- Add floppy neck constraint with generous limits for floppy head
+			newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -80, -80, -80, 80, 80, 80, 0, 0, 0, 0, 0)
+			print("[HG Floppy] BreakNeck timer: Created floppy neck constraint")
+		end
 		
 		-- Track the constraint to prevent duplicates
 		if newConstraint then
@@ -2153,6 +2166,67 @@ getPhysBoneForAnimationBone = function(rag, boneID)
     return bestPhys
 end
 
+--- Create stiff constraint to prevent limb stretching (used for dead organisms or broken necks)
+local function createStiffLimbConstraint(rag, bone1Name, bone2Name)
+    print("[HG Floppy] createStiffLimbConstraint START: rag=" .. tostring(rag) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name))
+
+    if not IsValid(rag) or not rag:IsRagdoll() then
+        print("[HG Floppy] createStiffLimbConstraint FAIL: rag invalid or not ragdoll")
+        return false
+    end
+
+    local bone1ID = rag:LookupBone(bone1Name)
+    local bone2ID = rag:LookupBone(bone2Name)
+    if not bone1ID or not bone2ID then
+        print("[HG Floppy] createStiffLimbConstraint FAIL: bone lookup failed")
+        return false
+    end
+
+    local phys1 = getPhysBoneForAnimationBone(rag, bone1ID)
+    local phys2 = getPhysBoneForAnimationBone(rag, bone2ID)
+    if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then
+        print("[HG Floppy] createStiffLimbConstraint FAIL: phys bone invalid")
+        return false
+    end
+
+    if phys1 == phys2 or phys1 == 0 then
+        print("[HG Floppy] createStiffLimbConstraint FAIL: invalid phys bone")
+        return false
+    end
+
+    local pBone1 = rag:GetPhysicsObjectNum(phys1)
+    local pBone2 = rag:GetPhysicsObjectNum(phys2)
+    if not (IsValid(pBone1) and IsValid(pBone2)) then
+        print("[HG Floppy] createStiffLimbConstraint FAIL: physics object invalid")
+        return false
+    end
+
+    -- Wake physics objects
+    pBone1:Wake()
+    pBone2:Wake()
+    pBone1:EnableMotion(true)
+    pBone2:EnableMotion(true)
+
+    -- Get joint position
+    local jointPos = pBone1:GetPos()
+    local lpos = vector_origin
+    local lpos2 = WorldToLocal(jointPos, angle_zero, pBone2:GetPos(), pBone2:GetAngles())
+
+    -- Create stiff constraint with very limited movement to prevent stretching
+    -- Use very small angular limits (±5 degrees) to keep limbs from stretching
+    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0, -5, -5, -5, 5, 5, 5, 0, 0, 0, 0, 0)
+
+    if IsValid(cons) then
+        -- Remove internal constraint after replacement is valid
+        pcall(function() rag:RemoveInternalConstraint(phys1) end)
+        print("[HG Floppy] createStiffLimbConstraint SUCCESS: stiff constraint created")
+        return cons
+    else
+        print("[HG Floppy] createStiffLimbConstraint FAIL: constraint creation failed")
+        return false
+    end
+end
+
 --- Create floppy limb constraint at current pose
 local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     print("[HG Floppy] createFloppyLimbConstraint START: rag=" .. tostring(rag) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name) .. " limbType=" .. tostring(limbType))
@@ -2327,7 +2401,20 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
             return
         end
 
-        local cons = createFloppyLimbConstraint(ragdoll, bone1Name, bone2Name, limb)
+        -- Check if organism is dead or has broken neck - use stiff constraints to prevent stretching
+        local org = IsValid(playerRef) and playerRef.organism
+        local isDead = org and not org.alive
+        local hasBrokenNeck = org and org.spine3 and org.spine3 > 0.75
+        local useStiffConstraint = isDead or hasBrokenNeck
+
+        print("[HG Floppy] BreakLimb timer: isDead=" .. tostring(isDead) .. " hasBrokenNeck=" .. tostring(hasBrokenNeck) .. " useStiffConstraint=" .. tostring(useStiffConstraint))
+
+        local cons
+        if useStiffConstraint then
+            cons = createStiffLimbConstraint(ragdoll, bone1Name, bone2Name)
+        else
+            cons = createFloppyLimbConstraint(ragdoll, bone1Name, bone2Name, limb)
+        end
         if cons then
             print("[HG Floppy] BreakLimb timer: constraint created successfully")
             -- Apply a slight offset to the broken bone so it visually looks

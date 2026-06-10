@@ -1612,6 +1612,36 @@ local IsValid = IsValid
 
 		ply.PickUpCooldown = CurTime() + 0.15
 	end)
+
+--\\ Arm damage check for standing player E key interaction
+	hook.Add("PlayerUse","ArmDamageUseCheck",function(ply,ent)
+		-- Only apply when player is standing (not in fake ragdoll)
+		if IsValid(ply.FakeRagdoll) then return end
+
+		local org = ply.organism
+		if not org then return end
+
+		-- Check arm damage states
+		local rightArmBroken = (org.rarm and org.rarm >= 1) or org.rarmamputated or org.rarmdislocation or org.rarmdislocated
+		local leftArmBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
+		local bothArmsBroken = rightArmBroken and leftArmBroken
+
+		-- Add pain if using damaged arm for interaction
+		if bothArmsBroken and not org.rarmamputated then
+			-- Both broken, using right hand causes pain
+			local painAmount = (org.rarm or 0) * 5 + (org.rarmdislocation or org.rarmdislocated and 3 or 0)
+			org.painadd = (org.painadd or 0) + painAmount
+		elseif rightArmBroken and not leftArmBroken and not org.larmamputated then
+			-- Right broken, using left hand causes pain
+			local painAmount = (org.larm or 0) * 5 + (org.larmdislocation or org.larmdislocated and 3 or 0)
+			org.painadd = (org.painadd or 0) + painAmount
+		elseif leftArmBroken and not rightArmBroken and not org.rarmamputated then
+			-- Left broken, using right hand causes less pain (right is stronger)
+			local painAmount = (org.rarm or 0) * 5 + (org.rarmdislocation or org.rarmdislocated and 3 or 0)
+			painAmount = painAmount * 0.7
+			org.painadd = (org.painadd or 0) + painAmount
+		end
+	end)
 --//
 --\\ set hull
 	hook.Add("Player Activate","SetHull",function(ply)

@@ -148,9 +148,12 @@ if CLIENT then
 		local onScreen = screenPos.visible and screenPos.x > 0 and screenPos.x < ScrW() and screenPos.y > 0 and screenPos.y < ScrH()
 		
 		if self.showstats and self.modeValues and istable(self.modeValues) then
-			if onScreen then
-				-- Draw 3D text in world space, positioned in front of the object
-				local textPos = pos + ang:Forward() * 10 + ang:Up() * 5
+			-- Draw 3D text in world space, positioned in front of the object
+			local textPos = pos + ang:Forward() * 10 + ang:Up() * 5
+			local hudScreenPos = textPos:ToScreen()
+			local hudOnScreen = hudScreenPos.visible and hudScreenPos.x > 0 and hudScreenPos.x < ScrW() and hudScreenPos.y > 0 and hudScreenPos.y < ScrH()
+			
+			if hudOnScreen then
 				cam.Start3D()
 					cam.Start3D2D(textPos, ang, 0.025)
 					render.PushFilterMag( TEXFILTER.LINEAR )

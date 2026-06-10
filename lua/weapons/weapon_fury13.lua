@@ -192,14 +192,15 @@ if SERVER then
 		end
 
 
+		self.modeValues[1] = 0
+
 		if self.poisoned2 then
 			org.poison4 = CurTime()
 
 			self.poisoned2 = nil
 		end
 
-		if self.modeValues[1] > 0 then
-			self.modeValues[1] = 0
+		if self.modeValues[1] == 0 then
 			owner:SelectWeapon("weapon_hands_sh")
 			self:SpawnGarbage(nil, nil, nil, self.Color, "2211")
 			self:Remove()

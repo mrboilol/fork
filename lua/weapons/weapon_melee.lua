@@ -1970,10 +1970,34 @@ function SWEP:CustomThink()
                 self.slash = nil
 
                 -- Add pain to attacker when hitting with damaged arms
-                if self:HasBrokenArm(owner) and owner.organism then
-                    local painAmount = self.BrokenArmPenalty.PainOnHit or 12
-                    local armDamage = self:GetArmDamagePercent(owner)
-                    owner.organism.painadd = (owner.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
+                if owner.organism then
+                    local org = owner.organism
+                    local rarm_broken = org.rarm >= 1
+                    local larm_broken = org.larm >= 1
+                    local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
+                    local larm_dislocated = org.larmdislocation or org.larmdislocated
+
+                    local pain_amount = 0
+
+                    if self:HasBrokenArm(owner) then
+                        local painAmount = self.BrokenArmPenalty.PainOnHit or 12
+                        local armDamage = self:GetArmDamagePercent(owner)
+                        pain_amount = pain_amount + (painAmount * (0.5 + armDamage * 0.5))
+                    end
+
+                    -- Add extra pain for dislocated arms (less than broken but still hurts)
+                    if rarm_dislocated then
+                        pain_amount = pain_amount + 6
+                    end
+                    if larm_dislocated then
+                        pain_amount = pain_amount + 6
+                    end
+
+                    if pain_amount > 0 then
+                        org.painadd = (org.painadd or 0) + pain_amount
+                        org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.3, 150)
+                        org.lasthit = CurTime()
+                    end
                 end
 
                 self:PrimaryAttackAdd(ent, trace)
@@ -2110,10 +2134,34 @@ function SWEP:CustomThink()
                 self.slash = nil
 
                 -- Add pain to attacker when hitting with damaged arms
-                if self:HasBrokenArm(owner) and owner.organism then
-                    local painAmount = self.BrokenArmPenalty.PainOnHit or 12
-                    local armDamage = self:GetArmDamagePercent(owner)
-                    owner.organism.painadd = (owner.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
+                if owner.organism then
+                    local org = owner.organism
+                    local rarm_broken = org.rarm >= 1
+                    local larm_broken = org.larm >= 1
+                    local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
+                    local larm_dislocated = org.larmdislocation or org.larmdislocated
+
+                    local pain_amount = 0
+
+                    if self:HasBrokenArm(owner) then
+                        local painAmount = self.BrokenArmPenalty.PainOnHit or 12
+                        local armDamage = self:GetArmDamagePercent(owner)
+                        pain_amount = pain_amount + (painAmount * (0.5 + armDamage * 0.5))
+                    end
+
+                    -- Add extra pain for dislocated arms (less than broken but still hurts)
+                    if rarm_dislocated then
+                        pain_amount = pain_amount + 6
+                    end
+                    if larm_dislocated then
+                        pain_amount = pain_amount + 6
+                    end
+
+                    if pain_amount > 0 then
+                        org.painadd = (org.painadd or 0) + pain_amount
+                        org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.3, 150)
+                        org.lasthit = CurTime()
+                    end
                 end
 
                 self:SecondaryAttackAdd(ent, trace)
@@ -2235,10 +2283,34 @@ function SWEP:CustomThink()
                 self.slash = nil
 
                 -- Add pain to attacker when hitting with damaged arms
-                if self:HasBrokenArm(owner) and owner.organism then
-                    local painAmount = self.BrokenArmPenalty.PainOnHit or 12
-                    local armDamage = self:GetArmDamagePercent(owner)
-                    owner.organism.painadd = (owner.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
+                if owner.organism then
+                    local org = owner.organism
+                    local rarm_broken = org.rarm >= 1
+                    local larm_broken = org.larm >= 1
+                    local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
+                    local larm_dislocated = org.larmdislocation or org.larmdislocated
+
+                    local pain_amount = 0
+
+                    if self:HasBrokenArm(owner) then
+                        local painAmount = self.BrokenArmPenalty.PainOnHit or 12
+                        local armDamage = self:GetArmDamagePercent(owner)
+                        pain_amount = pain_amount + (painAmount * (0.5 + armDamage * 0.5))
+                    end
+
+                    -- Add extra pain for dislocated arms (less than broken but still hurts)
+                    if rarm_dislocated then
+                        pain_amount = pain_amount + 6
+                    end
+                    if larm_dislocated then
+                        pain_amount = pain_amount + 6
+                    end
+
+                    if pain_amount > 0 then
+                        org.painadd = (org.painadd or 0) + pain_amount
+                        org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.3, 150)
+                        org.lasthit = CurTime()
+                    end
                 end
 
                 self:PrimaryAttackAdd(ent, trace)

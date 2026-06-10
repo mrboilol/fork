@@ -420,7 +420,7 @@ if CLIENT then
         if not self:GetNetVar("HEVSuit") then return end
         --HP
         local FRT = FrameTime() * 5
-        local pos, size = drawBGPanel(0.065,0.98)
+        local pos, size = drawBGPanel(0.065,0.15)
         surface.SetFont("HEVFontDefault")
         local _,txtSizeY = surface.GetTextSize(math.Round(lply:GetNetVar("HEVMedicine",600)/6,0))
         hpTxt = math.min(hpTxt + 1, math.Round(lply:GetNetVar("HEVMedicine",600)/6,0))
@@ -441,7 +441,7 @@ if CLIENT then
         
         local armor = self:GetNetVar("HEVPower") or 0
         armorlerp = Lerp(FRT,armorlerp,armor > 1 and 1 or 0)
-        local pos, size = drawBGPanel(0.17,0.98,125 * (armor > 1 and 1 or 0))
+        local pos, size = drawBGPanel(0.17,0.15,125 * (armor > 1 and 1 or 0))
         surface.SetFont("HEVFontDefault")
         local _,txtSizeY = surface.GetTextSize(armor)
         local color_bg = BGColor
@@ -479,7 +479,7 @@ if CLIENT then
         if IsValid(wep) and wep.Clip1 then
             local FRT = FrameTime() * 5
             ammolerp = Lerp(FRT,ammolerp,wep:Clip1() < 0 and 0 or 1)
-            local pos, size = drawBGPanel(0.93,0.98)
+            local pos, size = drawBGPanel(0.93,0.15)
             surface.SetFont("HEVFontDefault")
             local _,txtSizeY = surface.GetTextSize(self:Armor())
             local color_bg = BGColor
@@ -497,7 +497,7 @@ if CLIENT then
             draw.DrawText( "Ammo", "HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/1.8),color_ar,TEXT_ALIGN_LEFT)
         end
         --Blood
-        local pos, size = drawBGPanel(0.035,0.93)
+        local pos, size = drawBGPanel(0.035,0.25)
         surface.SetFont("HEVFontSmall")
         if not self.organism or not self.organism.blood then return end
         bloodlerp = Lerp(FRT,bloodlerp,self.organism.blood > 4900 and 0 or 1)

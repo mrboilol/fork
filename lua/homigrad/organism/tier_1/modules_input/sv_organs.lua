@@ -397,9 +397,8 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, forceHi
 	local bonea = owner:LookupBone(boneindex)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)
 	
-	-- Store world position directly instead of local position to fix broken bone bleeding position
-	local worldPos = (hit and not isbool(hit)) and hit or localPos
-	table.insert(org.arterialwounds, {arterySize[artery], worldPos, localAng, boneindex, CurTime(), (dir2 or Vector(0,0,1)) * 100, artery, true}) -- true = isWorldPos flag
+	-- Store local position relative to bone so it follows organism movement
+	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), (dir2 or Vector(0,0,1)) * 5, artery, false}) -- false = local position
 	owner:SetNetVar("arterialwounds", org.arterialwounds)
 
 	-- Spawn amputation stump when arterial damage occurs from non-bullet wounds

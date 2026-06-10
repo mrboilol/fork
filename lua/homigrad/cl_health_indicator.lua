@@ -565,8 +565,8 @@ function HUD_DrawDynamicIndicator()
     
     local viewX, viewY
     
-    -- Position at middle bottom of screen
-    viewX = ScrW() / 2 - w / 2 -- Center horizontally
+    -- Position at bottom left of screen
+    viewX = ScreenScaleFixed(50) -- Left margin
     viewY = ScrH() - h - ScreenScaleFixed(50) -- Position at bottom with margin
     
     -- Store indicator position and size for moodle adjustment
@@ -882,25 +882,25 @@ function HUD_DrawDynamicIndicator()
 
     -- Draw bleeding icons as 2D overlays so they always render on top of model bones
     if #bleedScreen2D > 0 then
-        local iconSize = ScreenScaleFixed(14)
+        local iconSize = ScreenScaleFixed(24)
         for _, data in ipairs(bleedScreen2D) do
             local severity = data.severity
             local isArterial = data.isArterial
             local r, g, b, mat
             
             if severity >= 1.0 or isArterial then
-                -- Show bigbleeding.png
+                -- Show bigbleeding.png for arterial or serious wounds
                 mat = bigBleedIconMat
-                -- Dark yellow to dark red depending on badness
-                -- Default: Dark Yellow (160, 140, 0) -> Dark Red (140, 0, 0)
+                -- Dark yellow to dark red depending on severity
+                -- Dark Yellow (180, 160, 0) -> Dark Red (120, 0, 0)
                 local progress = math.Clamp((severity - 0.5) / 1.5, 0, 1)
-                r = math.floor(160 - 20 * progress)
-                g = math.floor(140 * (1 - progress))
+                r = math.floor(180 - 60 * progress)
+                g = math.floor(160 * (1 - progress))
                 b = 0
             else
-                -- Show bleeding.png
+                -- Show bleeding.png for normal bleeding wounds
                 mat = bleedIconMat
-                -- White to really red depending on bleeding
+                -- White to red depending on severity
                 -- White (255, 255, 255) -> Red (255, 0, 0)
                 local progress = math.Clamp(severity / 0.8, 0, 1)
                 r = 255
