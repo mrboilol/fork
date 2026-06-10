@@ -80,13 +80,13 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	end
 
 	-- Prevent playing if under noradrenaline influence (fury-13)
-	if (org.noradrenaline or 0) > 0.0001 then
+	if (org.noradrenaline or 0) > 0.25 then
 		stop_adrenaline_music(true)
 		return
 	end
 
 	-- Prevent playing if under berserk influence
-	if (org.berserk or 0) > 0.0001 then
+	if (org.berserk or 0) > 0.25 then
 		stop_adrenaline_music(true)
 		return
 	end
@@ -108,7 +108,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	end
 
 	-- Prevent playing if bleeding out (low blood)
-	if blood < 4000 then
+	if blood < 3500 then
 		stop_adrenaline_music(true)
 		return
 	end
@@ -119,8 +119,8 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
-	-- Prevent playing if great drop in pulse (too low or critically high)
-	if pulse < 40 or pulse > 180 then
+	-- Prevent playing if great drop in pulse (too low)
+	if pulse < 40 then
 		stop_adrenaline_music(true)
 		return
 	end
@@ -137,7 +137,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 
 	if shouldPlay then
 		start_adrenaline_music()
-		local combatFactor = math.max(0, (15 - (CurTime() - hg.lastCombatTime)) / 15) * 0.4
+		local combatFactor = math.max(0, (15 - (CurTime() - hg.lastCombatTime)) / 15) * 1.0
 		local threadedFactor = math.Clamp(hg.adrenalineMusicThreaded / 100, 0, 0.5)
 		local targetVol = math.Clamp(math.max(combatFactor, threadedFactor), 0, 1)
 		hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, targetVol)

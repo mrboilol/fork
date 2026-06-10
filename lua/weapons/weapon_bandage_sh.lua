@@ -484,7 +484,68 @@ end
 
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
+
 if SERVER then
+	local function CanHealKey(org, key)
+		local v = tonumber(org[key] or 0) or 0
+		if key == "larm" and org.larmamputated then return false end
+		if key == "rarm" and org.rarmamputated then return false end
+		if key == "lleg" and org.llegamputated then return false end
+		if key == "rleg" and org.rlegamputated then return false end
+		return v >= 0.05
+	end
+
+	function SWEP:GetHealData(org)
+		local totalRotations = 1 -- Base 1 rotation
+		local totalCost = 0
+		local woundsToHeal = {}
+		local fracturesToHeal = {}
+		local availableResource = self.modeValues[1] or 0
+
+		-- Count bleeding wounds (1 rotation each)
+		if istable(org.wounds) then
+			for i, wound in ipairs(org.wounds) do
+				if wound[1] > 0 then
+					totalRotations = totalRotations + 1
+					table.insert(woundsToHeal, {index = i, size = wound[1]})
+				end
+			end
+		end
+
+		-- Count arterial wounds (1 rotation each)
+		if istable(org.arterialwounds) then
+			for i, wound in ipairs(org.arterialwounds) do
+				totalRotations = totalRotations + 1
+				table.insert(woundsToHeal, {arterial = true, index = i})
+			end
+		end
+
+		-- Count general bleeding (1 rotation per significant amount)
+		if tonumber(org.bleed) and org.bleed > 35 then
+			local bleedRotations = math.floor(org.bleed / 35)
+			totalRotations = totalRotations + bleedRotations
+		end
+
+		-- Count fractures (2 rotations each)
+		local brokenLimbs = {"lleg", "rleg", "larm", "rarm"}
+		for _, limb in ipairs(brokenLimbs) do
+			if CanHealKey(org, limb) then
+				totalRotations = totalRotations + 2
+				table.insert(fracturesToHeal, {key = limb, heal = 0.05})
+			end
+		end
+
+		-- Count severe injuries (skull, chest)
+		if org.skull >= 0.6 then
+			totalRotations = totalRotations + 1
+		end
+		if org.chest >= 0.6 then
+			totalRotations = totalRotations + 1
+		end
+
+		return totalRotations, totalCost, woundsToHeal, fracturesToHeal
+	end
+
 	function SWEP:Bandage(ent, bone)
 		local org = ent.organism
 		local owner = self:GetOwner()
@@ -495,23 +556,22 @@ if SERVER then
 			or (tonumber(org.bleed) or 0) > 0 
 			or org.skull >= 0.6 
 			or org.chest == 1
-			or (org.lleg >= 1 and not org.llegamputated)
-			or (org.rleg >= 1 and not org.rlegamputated)
-			or (org.larm >= 1 and not org.larmamputated)
-			or (org.rarm >= 1 and not org.rarmamputated)
-			or org.lleg == 1 or org.rleg == 1 or org.rarm == 1 or org.larm == 1
+			or (org.lleg >= 0.05 and not org.llegamputated)
+			or (org.rleg >= 0.05 and not org.rlegamputated)
+			or (org.larm >= 0.05 and not org.larmamputated)
+			or (org.rarm >= 0.05 and not org.rarmamputated)
 
 		if self.modeValues[1] <= 0 or not hasInjuries then return end
 		
 		local done = false
 		local bandaged = false
 
-		-- Splinting check/logic (bandaging and splinting are now the same thing)
+		-- Heal fractures with 0.05 to trigger natural regen (2 rotations per fracture)
 		local brokenLimbs = {}
-		if org.lleg >= 1 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
-		if org.rleg >= 1 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
-		if org.larm >= 1 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
-		if org.rarm >= 1 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
+		if org.lleg >= 0.05 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
+		if org.rleg >= 0.05 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
+		if org.larm >= 0.05 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
+		if org.rarm >= 0.05 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
 
 		if #brokenLimbs > 0 and self.modeValues[1] > 0 then
 			local limbToSplint = brokenLimbs[1]
@@ -528,7 +588,7 @@ if SERVER then
 				end
 			end
 			
-			local healAmount = 0.3
+			local healAmount = 0.05 -- Heal 0.05 to trigger natural regen
 			org[limbToSplint] = math.max(org[limbToSplint] - healAmount, 0)
 			org.avgpain = math.max(org.avgpain - 5, 0)
 			
@@ -536,7 +596,7 @@ if SERVER then
 			ent.splinted_limbs[limbToSplint] = true
 			ent:SetNetVar("splinted_limbs", ent.splinted_limbs)
 			
-			-- Consume some bandage value for splinting
+			-- Consume bandage value for fracture healing
 			self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
 			done = true
 		end

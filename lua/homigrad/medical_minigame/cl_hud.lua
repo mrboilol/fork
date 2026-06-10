@@ -488,6 +488,13 @@ function PANEL:Init()
     self.ShakeX = 0
     self.ShakeY = 0
 
+    -- Rotation completion effects
+    self.RotationFlashAlpha = 0
+    self.RotationShakeIntensity = 0
+    self.RotationShakeOffsetX = 0
+    self.RotationShakeOffsetY = 0
+    self.LastRotationAngle = nil
+
     if self.GameType == "syringe" then
         local currentAmount, totalAmount = self:GetSyringeAmounts()
         self.SyringeTotalAmount = totalAmount
@@ -663,7 +670,9 @@ function PANEL:OnMousePressed(code)
         self.TargetAngleObj.y = ang
         
         if not self.Started then
-            self.CurrentAngleObj.y = ang
+            -- Start from top (-90 degrees) and go counterclockwise
+            self.CurrentAngleObj.y = -90
+            self.TargetAngleObj.y = -90
             self.Started = true
         end
     elseif code == MOUSE_RIGHT then
@@ -815,6 +824,13 @@ function PANEL:CompleteWrap()
 
     -- Increment completions for threshold-based healing
     self.BandageCompletions = (self.BandageCompletions or 0) + 1
+
+    -- Play faint bandaging sound on rotation completion
+    surface.PlaySound("snd_jack_hmcd_bandage.wav")
+
+    -- Trigger red flash and shake effects
+    self.RotationFlashAlpha = 180
+    self.RotationShakeIntensity = 5
 
     -- Check if required completions reached
     if self.BandageCompletions >= (self.BandageRequiredCompletions or 3) then
@@ -1191,6 +1207,19 @@ function PANEL:Think()
     self.HandAngle = Lerp(FrameTime() * 5, self.HandAngle, targetTilt)
     
     self.LastMX, self.LastMY = mx, my
+
+    -- Decay rotation completion effects
+    self.RotationFlashAlpha = math.max(self.RotationFlashAlpha - FrameTime() * 300, 0)
+    self.RotationShakeIntensity = math.max(self.RotationShakeIntensity - FrameTime() * 10, 0)
+    
+    -- Apply shake offset
+    if self.RotationShakeIntensity > 0.1 then
+        self.RotationShakeOffsetX = math.random(-self.RotationShakeIntensity, self.RotationShakeIntensity)
+        self.RotationShakeOffsetY = math.random(-self.RotationShakeIntensity, self.RotationShakeIntensity)
+    else
+        self.RotationShakeOffsetX = 0
+        self.RotationShakeOffsetY = 0
+    end
 
     if self.GameType == "dislocation" then
         self:ThinkDislocation(mx, my)
@@ -1705,6 +1734,18 @@ function PANEL:Paint(w, h)
     surface.SetDrawColor(0, 0, 0, 240)
     surface.DrawRect(0, 0, w, h)
     
+    -- Apply red flash effect on rotation completion
+    if self.RotationFlashAlpha > 0 then
+        surface.SetDrawColor(255, 50, 50, self.RotationFlashAlpha)
+        surface.DrawRect(0, 0, w, h)
+    end
+    
+    -- Apply shake offset to center
+    local shakeX = self.RotationShakeOffsetX or 0
+    local shakeY = self.RotationShakeOffsetY or 0
+    local drawCenterX = self.CenterX + shakeX
+    local drawCenterY = self.CenterY + shakeY
+    
     -- Central part of the limb
     surface.SetDrawColor(40, 30, 25, 255)
     draw.NoTexture()
@@ -1713,7 +1754,7 @@ function PANEL:Paint(w, h)
     local poly = {}
     for i = 0, segments do
         local a = math.rad((i / segments) * 360)
-        table.insert(poly, { x = self.CenterX + math.cos(a) * limbRadius, y = self.CenterY + math.sin(a) * limbRadius })
+        table.insert(poly, { x = drawCenterX + math.cos(a) * limbRadius, y = drawCenterY + math.sin(a) * limbRadius })
     end
     surface.DrawPoly(poly)
     
@@ -1733,8 +1774,8 @@ function PANEL:Paint(w, h)
 
     -- Coordinates of the current delayed bandage position
     local drawAngleRad = math.rad(self.CurrentAngleObj.y)
-    local bx = self.CenterX + math.cos(drawAngleRad) * self.Radius
-    local by = self.CenterY + math.sin(drawAngleRad) * self.Radius
+    local bx = drawCenterX + math.cos(drawAngleRad) * self.Radius
+    local by = drawCenterY + math.sin(drawAngleRad) * self.Radius
 
     -- Draw the white bandage circle under the hand
     local circleRadius = 55 -- Increased from 35
@@ -1752,7 +1793,7 @@ function PANEL:Paint(w, h)
     local required = self.BandageRequiredCompletions or 3
     local counterText = completions .. "/" .. required
     local counterColor = Color(255, 255, 255, 255)
-    draw.DrawText(counterText, "HomigradFontLarge", self.CenterX, self.CenterY - 20, counterColor, TEXT_ALIGN_CENTER)
+    draw.DrawText(counterText, "HomigradFontLarge", drawCenterX, drawCenterY - 20, counterColor, TEXT_ALIGN_CENTER)
 
     self:DrawCommonOverlays(self.Progress, true)
 end

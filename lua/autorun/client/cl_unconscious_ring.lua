@@ -645,8 +645,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     -- Abnormal heart rate ECG at unconscious position with lowered opacity
-    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 170
-    local showAbnormalECG = abnormalPulse and not isUnconscious
+    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 300
+    local showAbnormalECG = abnormalPulse or admiring
 
     if showAbnormalECG then
         abnormalECGAlpha = Lerp(FrameTime() * 4, abnormalECGAlpha, 0.5)

@@ -62,7 +62,7 @@ if SERVER then
 		if key == "rarm" and org.rarmamputated then return false end
 		if key == "lleg" and org.llegamputated then return false end
 		if key == "rleg" and org.rlegamputated then return false end
-		return v > 0.05
+		return v >= 0.05
 	end
 
 	function SWEP:GetHealData(org)
@@ -74,9 +74,10 @@ if SERVER then
 		-- Prioritize based on conditionPriority order
 		for _, key in ipairs(conditionPriority) do
 			if CanHealKey(org, key) then
+				local isBroken = table.HasValue(brokenLimbsList, key)
 				local isComplex = table.HasValue(complexBonesList, key)
-				local cost = isComplex and 0.25 or 0.15
-				local rotations = isComplex and 3 or 2
+				local cost = 0.25 -- 0.25 regen per bone
+				local rotations = isBroken and 2 or 1 -- 2 rotations for broken bones, 1 for others
 				
 				if totalCost + cost <= availableResource + 0.001 then
 					totalCost = totalCost + cost

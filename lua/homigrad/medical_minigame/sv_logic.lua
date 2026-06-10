@@ -251,31 +251,30 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     if IsValid(wep) then
         completions = wep.minigameCompletions or 0
         local class = wep:GetClass()
-        if class == "weapon_bruicekit" then
-            local org = target.organism
-            if org then
+        local org = target.organism
+        if org then
+            if class == "weapon_bruicekit" then
                 local totalRotations, _, _ = wep:GetHealData(org)
                 requiredCompletions = totalRotations
+            elseif class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" then
+                local totalRotations, _, _, _ = wep:GetHealData(org)
+                requiredCompletions = totalRotations
             else
-                requiredCompletions = 1
-            end
-        else
-            local mode = wep.mode or 1
-            local amount = wep.modeValues and wep.modeValues[mode] or 0
-            local baseLoops = (isnumber(amount) and amount > 0) and math.Clamp(math.ceil(amount / 30), 1, 8) or 1
-            local injuryScore = 0
-            local org = target.organism
-            if org then
+                local mode = wep.mode or 1
+                local amount = wep.modeValues and wep.modeValues[mode] or 0
+                local baseLoops = (isnumber(amount) and amount > 0) and math.Clamp(math.ceil(amount / 30), 1, 8) or 1
+                local injuryScore = 0
                 if istable(org.wounds) then injuryScore = injuryScore + #org.wounds end
                 if istable(org.arterialwounds) then injuryScore = injuryScore + (#org.arterialwounds * 2) end
                 if isnumber(org.bleed) then injuryScore = injuryScore + math.Clamp(math.floor(org.bleed / 35), 0, 6) end
-                -- Make sure it does not skip steps such as bandaging the broken bones instead of just only affecting bleeding
                 if org.lleg >= 1 and not org.llegamputated then injuryScore = injuryScore + 2 end
                 if org.rleg >= 1 and not org.rlegamputated then injuryScore = injuryScore + 2 end
                 if org.larm >= 1 and not org.larmamputated then injuryScore = injuryScore + 2 end
                 if org.rarm >= 1 and not org.rarmamputated then injuryScore = injuryScore + 2 end
+                requiredCompletions = math.Clamp(baseLoops + math.ceil(injuryScore * 0.1), 1, 8)
             end
-            requiredCompletions = math.Clamp(baseLoops + math.ceil(injuryScore * 0.1), 1, 8)
+        else
+            requiredCompletions = 1
         end
     end
 

@@ -155,7 +155,7 @@ module[2] = function(owner, org, mulTime)
 		org.brain = math.min((org.brain or 0) + org.brainBleed * mulTime * 0.02, 1.0)
 	end
 
-	if org.internalBleed > 0 and not adrenalineStabilizer and not hasAntiIschemia then
+	if org.internalBleed > 2.5 and not adrenalineStabilizer and not hasAntiIschemia then
 		local untreatedTime = math.max((org.internalBleedDuration or 0) - 15, 0)
 		if untreatedTime > 0 then
 			local durationFactor = untreatedTime / 45
@@ -247,7 +247,7 @@ module[2] = function(owner, org, mulTime)
 		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 0.5, 0)
 	end
 
-	if org.blood < 2500 and not adrenalineStabilizer and not hasAntiIschemia then
+	if org.blood < 2000 and not adrenalineStabilizer and not hasAntiIschemia then
 		org.ischemia = math.min(org.ischemia + mulTime * 0.015, 1.0)
 	end
 	

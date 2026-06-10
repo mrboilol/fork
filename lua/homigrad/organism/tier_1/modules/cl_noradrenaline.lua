@@ -36,7 +36,12 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 	
 	if !organism then
 		if hg.undernoradrenaline then
-			hg.DynamicMusicV2.Player.Stop()
+			if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
+				hg.noradrenalineStation:Stop()
+				hg.noradrenalineStation = nil
+			else
+				hg.DynamicMusicV2.Player.Stop()
+			end
 		end
 
 		hg.undernoradrenaline = false
@@ -54,7 +59,15 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 	if noradrenaline > 0.0001 and !hg.undernoradrenaline then
 		hg.undernoradrenaline = true
 		surface.PlaySound("shitty/music/mi_deathcam.mp3")
-		hg.DynamicMusicV2.Player.Start("overdose")
+
+		if altnoradrenaline:GetBool() then
+			sound.PlayFile("sound/NIGGARUN.ogg", "noblock", function(channel)
+				hg.noradrenalineStation = channel
+				channel:EnableLooping(true)
+			end)
+		else
+			hg.DynamicMusicV2.Player.Start("overdose")
+		end
 
 		hg.noradrenalineStartTime = SysTime()
 
@@ -70,7 +83,12 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 		end
 	elseif noradrenaline < 0.0001 then
 		if hg.undernoradrenaline then
-			hg.DynamicMusicV2.Player.Stop()
+			if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
+				hg.noradrenalineStation:Stop()
+				hg.noradrenalineStation = nil
+			else
+				hg.DynamicMusicV2.Player.Stop()
+			end
 		end
 
 		hg.noradrenalineIntensity = 0
@@ -81,7 +99,7 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 
 	-- Check if 11 seconds have passed for alt mode
 	if altnoradrenaline:GetBool() and hg.undernoradrenaline and not hg.noradrenalineAltActive then
-		if SysTime() - hg.noradrenalineAltStartTime >= 12 then
+		if SysTime() - hg.noradrenalineAltStartTime >= 11 then
 			hg.noradrenalineAltActive = true
 		end
 	end
@@ -138,9 +156,9 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineBeatEffect", function()
 	local org = lply.organism
 	if not org then return end
 
-	-- Calculate beat intensity at 87 BPM
+	-- Calculate beat intensity at 88 BPM
 	local time = CurTime()
-	local beatPhase = (time * 87 / 60) % 1
+	local beatPhase = (time * 88 / 60) % 1
 	local beatIntensity = math.abs(math.sin(beatPhase * math.pi * 2))
 
 	-- Apply screen beat effect
@@ -160,9 +178,9 @@ hook.Add("HG_CalcView", "noradrenalineBeatShake", function(ply, pos, angles, fov
 	local org = lply.organism
 	if not org then return end
 
-	-- Calculate beat intensity at 87 BPM
+	-- Calculate beat intensity at 88 BPM
 	local time = CurTime()
-	local beatPhase = (time * 87 / 60) % 1
+	local beatPhase = (time * 88 / 60) % 1
 	local beatIntensity = math.abs(math.sin(beatPhase * math.pi * 2))
 
 	-- Apply camera shake on beat
@@ -191,7 +209,12 @@ hook.Add("Player_Death", "noradrenalineCleanup", function(ply)
 	if ply ~= LocalPlayer() then return end
 
 	if hg.undernoradrenaline then
-		hg.DynamicMusicV2.Player.Stop()
+		if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) then
+			hg.noradrenalineStation:Stop()
+			hg.noradrenalineStation = nil
+		else
+			hg.DynamicMusicV2.Player.Stop()
+		end
 	end
 
 	hg.undernoradrenaline = false

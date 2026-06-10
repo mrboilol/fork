@@ -73,7 +73,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.notifications = {}
 		hg.CreateNotificationBerserk("I feel...")
 
-		local disorientedDuration = altberserk:GetBool() and 12 or 3.95
+		local disorientedDuration = altberserk:GetBool() and 11 or 3.95
 		timer.Simple(disorientedDuration, function()
 			if IsValid(part) then
 				part:StopEmission( false, true, false )
@@ -131,7 +131,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	if hg.underberserk2 and IsValid(hg.berserkStation) then
 		--local intensity = ((hg.berserkStartTime2 + SysTime()) / 60) * 70 % 1
 		--intensity = math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
-		local currentBpm = altberserk:GetBool() and 87 or bpm:GetInt()
+		local currentBpm = altberserk:GetBool() and 88 or bpm:GetInt()
 		local stationTime = hg.berserkStation:GetTime()
 		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
 		-- Guard against NaN from invalid station time
@@ -207,7 +207,7 @@ end)
 
 hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 	if ply:Alive() and hg.underberserk2 and IsValid(hg.berserkStation) and hg.berserkClamped then
-		local currentBpm = altberserk:GetBool() and 87 or bpm:GetInt()
+		local currentBpm = altberserk:GetBool() and 88 or bpm:GetInt()
 		local stationTime = hg.berserkStation:GetTime()
 		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
 		-- Guard against NaN
