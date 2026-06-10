@@ -59,6 +59,7 @@ function DMusic:Stop()
 end
 
 local hg_sound = ConVarExists("hg_dmusic") and GetConVar("hg_dmusic") or CreateClientConVar("hg_dmusic","1",true,false,"Enable dynamic music (Enable music in gmod settings)",0,1)
+local hg_adrenalinemusic = ConVarExists("hg_adrenalinemusic") and GetConVar("hg_adrenalinemusic") or CreateClientConVar("hg_adrenalinemusic","1",true,false,"Enable adrenaline combat music",0,1)
 
 concommand.Add("hg_dmusic_skip",function()
     if not DMusic.Tracks then return end 
@@ -89,12 +90,17 @@ hook.Add( "Think", "DMusic.Think", function()
         --print(math.Round(threaded,1))
         --print(adr)
         --print(threaded, ( Keys[i+1] or 5 ),threaded < ( Keys[i+1] or 5 ))
+        -- Skip combat tracks if adrenaline music is enabled
+        local isCombatTrack = adr > 0
+        local adrenalineEnabled = hg_adrenalinemusic:GetBool()
+        
         if DMusic.threaded < ( Keys[i+1] or 5 ) and
             DMusic.threaded >= adr and 
             ply:Alive() and not 
             ply.organism.otrub and
             hg_sound:GetBool() and 
-            (song[3]) 
+            (song[3]) and
+            not (adrenalineEnabled and isCombatTrack)
         then
             if song[1]:GetTime() > song[1]:GetLength() - 1 then
                 --song[3] = song[3] + 1
