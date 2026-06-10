@@ -873,7 +873,7 @@ function PANEL:ThinkTourniquet(mx, my)
                 if quarterTurns > (self.TourniquetTurnCount or 0) then
                     self.TourniquetTurnCount = quarterTurns
                     -- Send pain to server - increases with each turn
-                    local painAmount = (2 + (quarterTurns * 1.5)) * 0.1 -- Base 2 pain, +1.5 per quarter-turn, multiplied by 0.1 (reduced by 3x)
+                    local painAmount = (1 + (quarterTurns * 0.5)) * 0.1 -- Base 1 pain, +0.5 per quarter-turn, multiplied by 0.1
                     net.Start("hg_medical_minigame_tourniquet_pain")
                     net.WriteFloat(painAmount)
                     net.SendToServer()

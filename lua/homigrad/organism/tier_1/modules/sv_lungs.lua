@@ -509,8 +509,9 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	if o2[1] < 4 then
-		local o2Severity = math.Clamp((4 - o2[1]) / 4, 0.1, 1)
+	local o2Cap = 4
+	if o2[1] < o2Cap then
+		local o2Severity = math.Clamp((o2Cap - o2[1]) / o2Cap, 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * o2Severity * 0.8, 0)
 	end
 
@@ -546,7 +547,8 @@ module[2] = function(owner, org, timeValue)
 			end
 		end
 
-		local brainSeverity = math.Clamp((org.brain - 0.35) / 0.65, 0.1, 1)
+		local brainCap = 0.35
+		local brainSeverity = math.Clamp((org.brain - brainCap) / (1 - brainCap), 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)
 	end
 
@@ -577,6 +579,7 @@ module[2] = function(owner, org, timeValue)
 			end
 		end
 		
-		org.brain = min(org.brain + timeValue / (org.brain < 0.3 and 300 or 120) * math.min(((org.o2[1] < 0.25 and 1 or 0) + org.skull), 1), 1)
+		local hypoxiaResistance = not org.otrub and 0.3 or 1
+		org.brain = min(org.brain + timeValue / (org.brain < 0.3 and 300 or 120) * math.min(((org.o2[1] < 0.25 and 1 or 0) + org.skull), 1) * hypoxiaResistance, 1)
 	end --~120 seconds to fully die (0.3 of 300 and 0.4 of 60 seconds after)
 end

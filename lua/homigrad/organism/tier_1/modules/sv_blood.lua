@@ -150,7 +150,7 @@ module[2] = function(owner, org, mulTime)
 
 	-- Brain bleed contributes to internal bleeding
 	if org.brainBleed > 0 then
-		org.internalBleed = org.internalBleed + org.brainBleed * mulTime * 0.1
+		org.internalBleed = org.internalBleed + org.brainBleed * mulTime * 0.075
 		-- Brain bleed causes brain damage over time
 		org.brain = math.min((org.brain or 0) + org.brainBleed * mulTime * 0.02, 1.0)
 	end
@@ -241,8 +241,9 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	if org.blood < (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) then
-		local bloodSeverity = math.Clamp(((2500 / (adrenaline / 3 + 1)) - org.blood) / 1000, 0.1, 1)
+	local bloodCap = (2500 / (adrenaline / 3 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1)
+	if org.blood < bloodCap then
+		local bloodSeverity = math.Clamp((bloodCap - org.blood) / 1000, 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 0.5, 0)
 	end
 

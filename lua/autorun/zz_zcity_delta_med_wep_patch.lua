@@ -16,7 +16,6 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_naloxone",
     "weapon_tranexamic_acid",
     "weapon_betablock",
-    "weapon_bloodbag",
     "weapon_autoresuscitator",
     "weapon_horse_tranq",
     "weapon_fury13",
@@ -50,7 +49,7 @@ local function GetMinigameType(wep)
         return "syringe"
     end
 
-    if class == "weapon_bloodbag" or class == "weapon_autoresuscitator" then
+    if class == "weapon_autoresuscitator" then
         return "syringe"
     end
 

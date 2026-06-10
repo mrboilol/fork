@@ -112,7 +112,7 @@ module[2] = function(owner, org, timeValue)
         if not hasAntiIschemia then
             local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
             local damage = timeValue * ischemiaK * 0.005
-            org.brain = math.min(org.brain + damage, 1)
+            org.brain = math.min(org.brain + damage * 0.2, 1)
             org.heart = math.min(org.heart + damage, 1)
             org.liver = math.min(org.liver + damage * 0.5, 1)
             org.stomach = math.min(org.stomach + damage * 0.3, 1)
@@ -130,7 +130,7 @@ module[2] = function(owner, org, timeValue)
 		if org.ischemia > 1 and not adrenalineStabilizer and not hasAntiIschemia then
 			local ischemiaK = math.Clamp((org.ischemia - 1) / 5, 0, 1)
 			local damage = timeValue * ischemiaK * 0.007
-			org.brain = math.min(org.brain + damage, 1)
+			org.brain = math.min(org.brain + damage * 0.2, 1)
 			org.heart = math.min(org.heart + damage, 1)
 			org.liver = math.min(org.liver + damage * 0.5, 1)
 			org.stomach = math.min(org.stomach + damage * 0.3, 1)

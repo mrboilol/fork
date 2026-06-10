@@ -144,7 +144,8 @@ module[2] = function(owner, org, timeValue)
 	//org.painkiller = Approach(org.painkiller, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 
 	if hg.organism.paincheck(org) then
-		local shockSeverity = math.Clamp((org.shock - (org.shock_turn * 4 * ((org.analgesia * 4 + 1)))) / 50, 0.1, 1)
+		local shockCap = org.shock_turn * 4 * ((org.analgesia * 4 + 1))
+		local shockSeverity = math.Clamp((org.shock - shockCap) / 50, 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.4, 0)
 	end
 	

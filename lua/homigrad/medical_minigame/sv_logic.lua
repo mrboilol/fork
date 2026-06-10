@@ -378,13 +378,18 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
     local owner = wep:GetOwner()
     if not IsValid(owner) then return end
 
-    -- For one-time use items (tranexamic acid, horse tranq), don't consume during minigame - only consume on completion
+    -- For one-time use items (tranexamic acid, horse tranq, fury, adrenaline, etc.), don't consume during minigame - only consume on completion
     local class = wep:GetClass()
-    if class == "weapon_tranexamic_acid" or class == "weapon_horse_tranq" then
+    local isIncremental = (class == "weapon_morphine" or class == "weapon_fentanyl" or
+                           (class == "weapon_medkit_sh" and wep.mode == 3))
+
+    if not isIncremental then
         -- Just play sound during minigame, don't consume
         local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-        if class == "weapon_horse_tranq" then
+        if class == "weapon_horse_tranq" or class == "weapon_fury13" or class == "weapon_fury16" then
             entOwner:EmitSound("pshiksnd")
+        elseif class == "weapon_painkillers" then
+            -- Painkillers don't play injection sound
         else
             entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
         end
@@ -584,6 +589,9 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         if not IsValid(wep) then return end
 
         -- Apply healing when required completions reached
+        if wep.SetHolding then
+            wep:SetHolding(100)
+        end
         local done = wep:Heal(target, wep.mode)
         if done and wep.PostHeal then
             wep:PostHeal(target, wep.mode)
@@ -661,6 +669,9 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
                                       (class == "weapon_medkit_sh" and wep.mode == 3))
 
         if wep.Heal and not handledIncrementally then
+            if wep.SetHolding then
+                wep:SetHolding(100)
+            end
             local done = wep:Heal(target, wep.mode)
             if done and wep.PostHeal then
                 wep:PostHeal(target, wep.mode)
@@ -675,7 +686,8 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
             if class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_horse_tranq" or
                class == "weapon_tranexamic_acid" or class == "weapon_adrenaline" or class == "weapon_naloxone" or
                class == "weapon_mannitol" or class == "weapon_thiamine" or class == "weapon_betablock" or
-               class == "weapon_painkillers" or class == "weapon_needle" then
+               class == "weapon_painkillers" or class == "weapon_needle" or class == "weapon_fury13" or
+               class == "weapon_fury16" or class == "weapon_autoresuscitator" then
                 ply:SelectWeapon("weapon_hands_sh")
                 wep:Remove()
                 return
