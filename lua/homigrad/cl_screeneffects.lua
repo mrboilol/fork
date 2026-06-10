@@ -1147,7 +1147,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			-- Dying ambience when bleeding out (low blood + active bleeding)
 			local blood = org.blood or 5000
 			local bleed = org.bleed or 0
-			local bleedingOut = blood < 3500 and bleed > 0
+			local bleedingOut = blood < 4000 and bleed > 0
 
 			if bleedingOut then
 				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
