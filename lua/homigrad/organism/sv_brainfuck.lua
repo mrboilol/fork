@@ -11,7 +11,7 @@ local RIGOR_DAMP = 8
 local INSTANT_KO_WINDOW = 0.35
 local INSTANT_KO_COOLDOWN = 2
 
-local spasmTypes = {{"extend", 40}, {"flexion", 25}, {"rigor", 20}, {"seizure", 15}} --;; Че хотите добавляйте изменяйте
+local spasmTypes = {{"extend", 30}, {"flexion", 20}, {"posturing", 25}, {"rigor", 15}, {"seizure", 10}} --;; Че хотите добавляйте изменяйте
 
 local handBones = {5, 7}
 
@@ -86,7 +86,7 @@ local function getRandomSpasm()
 		cur = cur + spasmTypes[i][2]
 		if roll <= cur then return spasmTypes[i][1] end
 	end
-	return "extend"
+	return "posturing"
 end
 
 hg.getRandomSpasm = getRandomSpasm
@@ -99,17 +99,14 @@ end
 
 local function applySpasm(rag, stype, useFencing)
 	if not IsValid(rag) then return end
-	if stype == "posturing" then
-		stype = (math_random() < 0.55) and "extend" or "flexion"
-	end
-	local dur = (stype == "extend" or stype == "flexion") and posturingDur or stype == "seizure" and seizureDur or rigorDur
+	local dur = (stype == "extend" or stype == "flexion" or stype == "posturing") and posturingDur or stype == "seizure" and seizureDur or rigorDur
 	dur = math_rand(dur[1], dur[2])
 	local org = rag.organism
 	local brainFactor = getBrainFactor(org)
 	rag.spasmStiffness = brainFactor
 	rag.spasmWear = 0
 	dur = dur * (1 + brainFactor * 0.4)
-	if stype == "extend" or stype == "flexion" or stype == "seizure" then
+	if stype == "extend" or stype == "flexion" or stype == "posturing" or stype == "seizure" then
 		rag.spasmBreathAt = CurTime() + math_rand(2, 3)
 		rag.spasmBreathPlayed = false
 	end
@@ -117,7 +114,7 @@ local function applySpasm(rag, stype, useFencing)
 	rag.spasm, rag.spasmType, rag.spasmDur, rag.spasmForce = true, stype, dur, FORCE
 	rag.spasmEnd, rag.spasmStart = CurTime() + dur, CurTime()
 	rag.spasmFencing = useFencing and true or nil
-	rag.spasmUpperBodyOnly = ((stype == "extend" or stype == "flexion") and math_random() < POSTURING_PARTIAL_UPPER_CHANCE) and true or nil
+	rag.spasmUpperBodyOnly = ((stype == "extend" or stype == "flexion" or stype == "posturing") and math_random() < POSTURING_PARTIAL_UPPER_CHANCE) and true or nil
 	
 	if stype == "rigor" then
 		rag.rigorActive = true
@@ -248,6 +245,34 @@ local function processFlexion(rag, fade)
 		if not IsValid(phys) then continue end
 		local dir = (rag:GetBonePosition(targetBone) - rag:GetBonePosition(bone)):GetNormalized()
 		phys:ApplyForceCenter((dir * force * d[3] * fade * pulse) + VectorRand(-30, 30) * fade)
+	end
+end
+
+local function processPosturing(rag, fade)
+	if not IsValid(rag) or not rag.organism then return end
+	local spine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
+	if not spine2 then return end
+	local phys = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(spine2))
+	if not IsValid(phys) then return end
+	local ang = phys:GetAngles()
+	ang:Add(AngleRand(-5, 5))
+	ang:RotateAroundAxis(ang:Up(), 180)
+	local mul = 1000 * rag.organism.pulse / 70
+	local damp = 50
+	local ss = 0.001
+	shadowControl(rag, 3, ss, ang, mul, damp, vector_zero, 0, 0)
+	shadowControl(rag, 4, ss, ang, mul, damp, vector_zero, 0, 0)
+	shadowControl(rag, 5, ss, ang, mul, damp, vector_zero, 0, 0)
+	shadowControl(rag, 2, ss, ang, mul, damp, vector_zero, 0, 0)
+	if not rag.spasmFencing then
+		shadowControl(rag, 6, ss, ang, mul, damp, vector_zero, 0, 0)
+		shadowControl(rag, 7, ss, ang, mul, damp, vector_zero, 0, 0)
+	end
+	if not rag.spasmUpperBodyOnly then
+		shadowControl(rag, 8, ss, ang, mul, damp, vector_zero, 0, 0)
+		shadowControl(rag, 9, ss, ang, mul, damp, vector_zero, 0, 0)
+		shadowControl(rag, 11, ss, ang, mul, damp, vector_zero, 0, 0)
+		shadowControl(rag, 12, ss, ang, mul, damp, vector_zero, 0, 0)
 	end
 end
 
@@ -441,13 +466,13 @@ hook.Add("Org Think", "BrainfuckThink", function(owner, org, timeValue)
 			local fade = math_clamp((deathRag.spasmEnd - CurTime()) / (deathRag.spasmDur or 5), 0.1, 1)
 			local fadeIn = math_clamp((CurTime() - (deathRag.spasmStart or CurTime())) / 4, 0, 1)
 			local stype = deathRag.spasmType or "extend"
-			if stype == "extend" or stype == "flexion" then
+			if stype == "extend" or stype == "flexion" or stype == "posturing" then
 				local slowFadeIn = math_clamp((CurTime() - (deathRag.spasmStart or CurTime())) / 7, 0, 1)
 				fade = fade * slowFadeIn * slowFadeIn
 			elseif stype == "seizure" then
 				fade = fade * fadeIn
 			end
-			if (stype == "extend" or stype == "flexion" or stype == "seizure") and deathRag.spasmBreathAt and not deathRag.spasmBreathPlayed and CurTime() >= deathRag.spasmBreathAt then
+			if (stype == "extend" or stype == "flexion" or stype == "posturing" or stype == "seizure") and deathRag.spasmBreathAt and not deathRag.spasmBreathPlayed and CurTime() >= deathRag.spasmBreathAt then
 				deathRag.spasmBreathPlayed = true
 				if not (deathRag.noHead or (org and org.noHead) or (owner and owner.noHead)) and math_random() > 0.5 then
 					local isAlive = true
@@ -471,10 +496,13 @@ hook.Add("Org Think", "BrainfuckThink", function(owner, org, timeValue)
 			elseif stype == "flexion" then
 				if deathRag.spasmFencing then processFencing(deathRag, fade) end
 				processFlexion(deathRag, fade)
+			elseif stype == "posturing" then
+				if deathRag.spasmFencing then processFencing(deathRag, fade) end
+				processPosturing(deathRag, fade)
 			elseif stype == "seizure" then processSeizure(deathRag, fade)
 			elseif stype == "rigor" then processRigor(deathRag, fade)
 			end
-			local target = (stype == "extend" or stype == "flexion") and 1 or 0
+			local target = (stype == "extend" or stype == "flexion" or stype == "posturing") and 1 or 0
 			if stype == "seizure" then target = 0 end -- seizure handles its own finger curling
 			if stype ~= "seizure" then updateFingerCurl(deathRag, target, timeValue) end
 		end

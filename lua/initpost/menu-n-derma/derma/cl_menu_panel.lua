@@ -452,33 +452,31 @@ function PANEL:Think()
     end
     
     if self.IsIntro and not self.IntroSequenceActive then
-        if input.IsKeyDown(KEY_ENTER) then
-            self.IntroSequenceActive = true
-            self.IntroStartTime = CurTime()
+        self.IntroSequenceActive = true
+        self.IntroStartTime = CurTime()
+        
+        -- Fade out background music if playing
+        if IsValid(ZCityMainMenuMusic) then
+            local music = ZCityMainMenuMusic
+            local duration = 3
+            local startTime = CurTime()
+            local startVol = music:GetVolume()
             
-            -- Fade out background music if playing
-            if IsValid(ZCityMainMenuMusic) then
-                local music = ZCityMainMenuMusic
-                local duration = 3
-                local startTime = CurTime()
-                local startVol = music:GetVolume()
+            local id = "ZCityMusicFadeOut"
+            hook.Add("Think", id, function()
+                if not IsValid(music) then hook.Remove("Think", id) return end
                 
-                local id = "ZCityMusicFadeOut"
-                hook.Add("Think", id, function()
-                    if not IsValid(music) then hook.Remove("Think", id) return end
-                    
-                    local elapsed = CurTime() - startTime
-                    local progress = elapsed / duration
-                    
-                    if progress >= 1 then
-                        music:SetVolume(0)
-                        music:Pause()
-                        hook.Remove("Think", id)
-                    else
-                        music:SetVolume(startVol * (1 - progress))
-                    end
-                end)
-            end
+                local elapsed = CurTime() - startTime
+                local progress = elapsed / duration
+                
+                if progress >= 1 then
+                    music:SetVolume(0)
+                    music:Pause()
+                    hook.Remove("Think", id)
+                else
+                    music:SetVolume(startVol * (1 - progress))
+                end
+            end)
         end
     end
     
@@ -2520,49 +2518,53 @@ function PANEL:Paint(w,h)
     end
     
     local titleY = self.LogoY
-    if self.TargetState == "Appearance" or (self.TargetState == "Main" and self.CurrentState == "Appearance") then
-        titleY = self.LogoY - ScrH() * progress
-    elseif self.TargetState == "TraitorMenu" or (self.TargetState == "Main" and self.CurrentState == "TraitorMenu") or self.TargetState == "TraitorPresets" or (self.TargetState == "Main" and self.CurrentState == "TraitorPresets") then
-        titleY = self.LogoY + ScrH() * progress
-        
-        if (self.TargetState == "TraitorPresets" and self.CurrentState == "TraitorMenu") or (self.TargetState == "TraitorMenu" and self.CurrentState == "TraitorPresets") then
-            titleY = self.LogoY + ScrH()
-        end
-    end
+    local titleX = self.LogoX
     
-    if self.CurrentState ~= "Main" and self.TargetState ~= "Main" then
-        if (self.CurrentState == "TraitorMenu" or self.CurrentState == "TraitorPresets") and (self.TargetState == "TraitorMenu" or self.TargetState == "TraitorPresets") then
-            -- Leave titleY as is (it was set above)
-        else
-            titleY = self.LogoY - ScrH()
-            if self.CurrentState == "Settings" or self.TargetState == "Settings" or self.CurrentState == "Achievements" or self.TargetState == "Achievements" then
-                titleY = self.LogoY
+    if self.IsIntro then
+        -- Position title at bottom middle for intro
+        surface.SetFont("ZC_MM_Title")
+        local tw, th = surface.GetTextSize(text1)
+        titleX = (w - tw) / 2
+        titleY = h - th - ScreenScale(50)
+        
+        -- Fade out title during intro sequence
+        if self.IntroSequenceActive then
+            local elapsedTime = CurTime() - self.IntroStartTime
+            local duration = 5
+            local fadeAlpha = math.Clamp(1 - (elapsedTime / duration), 0, 1)
+            surface.SetTextColor(255, color_val, color_val, 255 * fadeAlpha)
+        end
+    else
+        if self.TargetState == "Appearance" or (self.TargetState == "Main" and self.CurrentState == "Appearance") then
+            titleY = self.LogoY - ScrH() * progress
+        elseif self.TargetState == "TraitorMenu" or (self.TargetState == "Main" and self.CurrentState == "TraitorMenu") or self.TargetState == "TraitorPresets" or (self.TargetState == "Main" and self.CurrentState == "TraitorPresets") then
+            titleY = self.LogoY + ScrH() * progress
+            
+            if (self.TargetState == "TraitorPresets" and self.CurrentState == "TraitorMenu") or (self.TargetState == "TraitorMenu" and self.CurrentState == "TraitorPresets") then
+                titleY = self.LogoY + ScrH()
+            end
+        end
+        
+        if self.CurrentState ~= "Main" and self.TargetState ~= "Main" then
+            if (self.CurrentState == "TraitorMenu" or self.CurrentState == "TraitorPresets") and (self.TargetState == "TraitorMenu" or self.TargetState == "TraitorPresets") then
+                -- Leave titleY as is (it was set above)
+            else
+                titleY = self.LogoY - ScrH()
+                if self.CurrentState == "Settings" or self.TargetState == "Settings" or self.CurrentState == "Achievements" or self.TargetState == "Achievements" then
+                    titleY = self.LogoY
+                end
             end
         end
     end
 
-    surface.SetTextPos(self.LogoX + textShakeX, titleY + textShakeY)
+    surface.SetTextPos(titleX + textShakeX, titleY + textShakeY)
     surface.DrawText(text1)
     
     if self.IsIntro then
-        local enterText = "press enter"
-        surface.SetFont("ZCity_Veteran")
-        local tw, th = surface.GetTextSize(enterText)
-        local tx = w - tw - ScreenScale(20)
-        local ty = h - th - ScreenScale(20)
-        
-        -- Blink logic
-        local blinkSpeed = 2
-        local alpha = math.abs(math.sin(CurTime() * blinkSpeed)) * 255
-        
-        surface.SetTextColor(255, 0, 0, alpha)
-        surface.SetTextPos(tx, ty)
-        surface.DrawText(enterText)
-        
         -- Intro Sequence Fade to Black
         if self.IntroSequenceActive then
             local elapsedTime = CurTime() - self.IntroStartTime
-            local duration = 3 -- Fade out duration
+            local duration = 5 -- Fade out duration
             local fadeAlpha = math.Clamp((elapsedTime / duration) * 255, 0, 255)
             
             surface.SetDrawColor(0, 0, 0, fadeAlpha)
@@ -2570,15 +2572,6 @@ function PANEL:Paint(w,h)
             
             if elapsedTime >= duration then
                 self:Close()
-                
-                -- Play valve.mp3 sound when exiting intro
-                sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                    if IsValid(station) then
-                        station:SetVolume(1)
-                        station:EnableLooping(false)
-                        station:Play()
-                    end
-                end)
                 
                 -- Create Fade Out Panel (Black -> Clear)
                 local fadePanel = vgui.Create("DPanel")
@@ -2738,6 +2731,15 @@ hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
     -- Use a timer to ensure everything is fully loaded before opening
     timer.Simple(1, function()
         if not ZCityHasSeenIntro then
+            -- Play valve.mp3 ONCE on load
+            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:SetVolume(1)
+                    station:EnableLooping(false)
+                    station:Play()
+                end
+            end)
+            
             -- Open the menu automatically on join
             if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
             MainMenu = vgui.Create("ZMainMenu")
@@ -2783,6 +2785,15 @@ hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
     -- Use a timer to ensure everything is fully loaded before opening
     timer.Simple(1, function()
         if not ZCityHasSeenIntro then
+            -- Play valve.mp3 ONCE on load
+            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:SetVolume(1)
+                    station:EnableLooping(false)
+                    station:Play()
+                end
+            end)
+            
             -- Open the menu automatically on join
             if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
             MainMenu = vgui.Create("ZMainMenu")
@@ -3256,33 +3267,31 @@ function PANEL:Think()
     end
     
     if self.IsIntro and not self.IntroSequenceActive then
-        if input.IsKeyDown(KEY_ENTER) then
-            self.IntroSequenceActive = true
-            self.IntroStartTime = CurTime()
+        self.IntroSequenceActive = true
+        self.IntroStartTime = CurTime()
+        
+        -- Fade out background music if playing
+        if IsValid(ZCityMainMenuMusic) then
+            local music = ZCityMainMenuMusic
+            local duration = 3
+            local startTime = CurTime()
+            local startVol = music:GetVolume()
             
-            -- Fade out background music if playing
-            if IsValid(ZCityMainMenuMusic) then
-                local music = ZCityMainMenuMusic
-                local duration = 3
-                local startTime = CurTime()
-                local startVol = music:GetVolume()
+            local id = "ZCityMusicFadeOut"
+            hook.Add("Think", id, function()
+                if not IsValid(music) then hook.Remove("Think", id) return end
                 
-                local id = "ZCityMusicFadeOut"
-                hook.Add("Think", id, function()
-                    if not IsValid(music) then hook.Remove("Think", id) return end
-                    
-                    local elapsed = CurTime() - startTime
-                    local progress = elapsed / duration
-                    
-                    if progress >= 1 then
-                        music:SetVolume(0)
-                        music:Pause()
-                        hook.Remove("Think", id)
-                    else
-                        music:SetVolume(startVol * (1 - progress))
-                    end
-                end)
-            end
+                local elapsed = CurTime() - startTime
+                local progress = elapsed / duration
+                
+                if progress >= 1 then
+                    music:SetVolume(0)
+                    music:Pause()
+                    hook.Remove("Think", id)
+                else
+                    music:SetVolume(startVol * (1 - progress))
+                end
+            end)
         end
     end
     
@@ -5324,49 +5333,53 @@ function PANEL:Paint(w,h)
     end
     
     local titleY = self.LogoY
-    if self.TargetState == "Appearance" or (self.TargetState == "Main" and self.CurrentState == "Appearance") then
-        titleY = self.LogoY - ScrH() * progress
-    elseif self.TargetState == "TraitorMenu" or (self.TargetState == "Main" and self.CurrentState == "TraitorMenu") or self.TargetState == "TraitorPresets" or (self.TargetState == "Main" and self.CurrentState == "TraitorPresets") then
-        titleY = self.LogoY + ScrH() * progress
-        
-        if (self.TargetState == "TraitorPresets" and self.CurrentState == "TraitorMenu") or (self.TargetState == "TraitorMenu" and self.CurrentState == "TraitorPresets") then
-            titleY = self.LogoY + ScrH()
-        end
-    end
+    local titleX = self.LogoX
     
-    if self.CurrentState ~= "Main" and self.TargetState ~= "Main" then
-        if (self.CurrentState == "TraitorMenu" or self.CurrentState == "TraitorPresets") and (self.TargetState == "TraitorMenu" or self.TargetState == "TraitorPresets") then
-            -- Leave titleY as is (it was set above)
-        else
-            titleY = self.LogoY - ScrH()
-            if self.CurrentState == "Settings" or self.TargetState == "Settings" or self.CurrentState == "Achievements" or self.TargetState == "Achievements" then
-                titleY = self.LogoY
+    if self.IsIntro then
+        -- Position title at bottom middle for intro
+        surface.SetFont("ZC_MM_Title")
+        local tw, th = surface.GetTextSize(text1)
+        titleX = (w - tw) / 2
+        titleY = h - th - ScreenScale(50)
+        
+        -- Fade out title during intro sequence
+        if self.IntroSequenceActive then
+            local elapsedTime = CurTime() - self.IntroStartTime
+            local duration = 5
+            local fadeAlpha = math.Clamp(1 - (elapsedTime / duration), 0, 1)
+            surface.SetTextColor(255, color_val, color_val, 255 * fadeAlpha)
+        end
+    else
+        if self.TargetState == "Appearance" or (self.TargetState == "Main" and self.CurrentState == "Appearance") then
+            titleY = self.LogoY - ScrH() * progress
+        elseif self.TargetState == "TraitorMenu" or (self.TargetState == "Main" and self.CurrentState == "TraitorMenu") or self.TargetState == "TraitorPresets" or (self.TargetState == "Main" and self.CurrentState == "TraitorPresets") then
+            titleY = self.LogoY + ScrH() * progress
+            
+            if (self.TargetState == "TraitorPresets" and self.CurrentState == "TraitorMenu") or (self.TargetState == "TraitorMenu" and self.CurrentState == "TraitorPresets") then
+                titleY = self.LogoY + ScrH()
+            end
+        end
+        
+        if self.CurrentState ~= "Main" and self.TargetState ~= "Main" then
+            if (self.CurrentState == "TraitorMenu" or self.CurrentState == "TraitorPresets") and (self.TargetState == "TraitorMenu" or self.TargetState == "TraitorPresets") then
+                -- Leave titleY as is (it was set above)
+            else
+                titleY = self.LogoY - ScrH()
+                if self.CurrentState == "Settings" or self.TargetState == "Settings" or self.CurrentState == "Achievements" or self.TargetState == "Achievements" then
+                    titleY = self.LogoY
+                end
             end
         end
     end
 
-    surface.SetTextPos(self.LogoX + textShakeX, titleY + textShakeY)
+    surface.SetTextPos(titleX + textShakeX, titleY + textShakeY)
     surface.DrawText(text1)
     
     if self.IsIntro then
-        local enterText = "press enter"
-        surface.SetFont("ZCity_Veteran")
-        local tw, th = surface.GetTextSize(enterText)
-        local tx = w - tw - ScreenScale(20)
-        local ty = h - th - ScreenScale(20)
-        
-        -- Blink logic
-        local blinkSpeed = 2
-        local alpha = math.abs(math.sin(CurTime() * blinkSpeed)) * 255
-        
-        surface.SetTextColor(255, 0, 0, alpha)
-        surface.SetTextPos(tx, ty)
-        surface.DrawText(enterText)
-        
         -- Intro Sequence Fade to Black
         if self.IntroSequenceActive then
             local elapsedTime = CurTime() - self.IntroStartTime
-            local duration = 3 -- Fade out duration
+            local duration = 5 -- Fade out duration
             local fadeAlpha = math.Clamp((elapsedTime / duration) * 255, 0, 255)
             
             surface.SetDrawColor(0, 0, 0, fadeAlpha)
@@ -5374,15 +5387,6 @@ function PANEL:Paint(w,h)
             
             if elapsedTime >= duration then
                 self:Close()
-                
-                -- Play valve.mp3 sound when exiting intro
-                sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                    if IsValid(station) then
-                        station:SetVolume(1)
-                        station:EnableLooping(false)
-                        station:Play()
-                    end
-                end)
                 
                 -- Create Fade Out Panel (Black -> Clear)
                 local fadePanel = vgui.Create("DPanel")
@@ -5542,6 +5546,15 @@ hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
     -- Use a timer to ensure everything is fully loaded before opening
     timer.Simple(1, function()
         if not ZCityHasSeenIntro then
+            -- Play valve.mp3 ONCE on load
+            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:SetVolume(1)
+                    station:EnableLooping(false)
+                    station:Play()
+                end
+            end)
+            
             -- Open the menu automatically on join
             if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
             MainMenu = vgui.Create("ZMainMenu")
@@ -5587,6 +5600,15 @@ hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
     -- Use a timer to ensure everything is fully loaded before opening
     timer.Simple(1, function()
         if not ZCityHasSeenIntro then
+            -- Play valve.mp3 ONCE on load
+            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+                if IsValid(station) then
+                    station:SetVolume(1)
+                    station:EnableLooping(false)
+                    station:Play()
+                end
+            end)
+            
             -- Open the menu automatically on join
             if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
             MainMenu = vgui.Create("ZMainMenu")

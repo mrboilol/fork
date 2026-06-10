@@ -70,7 +70,7 @@ local tab = {
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3", 0, 5)
 local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=altpain.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3", 0, 5)
-local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg", 0, 2)
+local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=fuck.mp3", 0, 3)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hook_Run = hook.Run
 
@@ -379,6 +379,11 @@ local function stopthings()
 	if IsValid(SleepyStation) then
 		SleepyStation:Stop()
 		SleepyStation = nil
+	end
+
+	if IsValid(FuckStation) then
+		FuckStation:Stop()
+		FuckStation = nil
 	end
 
 	if IsValid(ConsciousnessWhiteNoise) then
@@ -1323,6 +1328,18 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
+			if !IsValid(FuckStation) or FuckStation:GetState() != GMOD_CHANNEL_PLAYING then
+				sound.PlayFile("sound/fuck.mp3", "noblock noplay", function(station)
+					if IsValid(station) then
+						station:SetVolume(0)
+						station:Play()
+						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
+						FuckStation = station
+						station:EnableLooping(true)
+					end
+				end)
+			end
+
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
 
 			if otrubMode == 0 then
@@ -1336,6 +1353,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(SleepyStation) then
 					SleepyStation:SetVolume(0)
 				end
+				if IsValid(FuckStation) then
+					FuckStation:SetVolume(0)
+				end
 			elseif otrubMode == 1 then
 				-- Use altotrub.ogg instead
 				if IsValid(NoiseStation) then
@@ -1346,6 +1366,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end
 				if IsValid(SleepyStation) then
 					SleepyStation:SetVolume(0)
+				end
+				if IsValid(FuckStation) then
+					FuckStation:SetVolume(0)
 				end
 			elseif otrubMode == 2 then
 				-- Use sleepy.ogg instead
@@ -1358,6 +1381,23 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(SleepyStation) then
 					SleepyStation:SetVolume(otrubVol)
 				end
+				if IsValid(FuckStation) then
+					FuckStation:SetVolume(0)
+				end
+			elseif otrubMode == 3 then
+				-- Use fuck.mp3 instead
+				if IsValid(NoiseStation) then
+					NoiseStation:SetVolume(0)
+				end
+				if IsValid(AltotrubStation) then
+					AltotrubStation:SetVolume(0)
+				end
+				if IsValid(SleepyStation) then
+					SleepyStation:SetVolume(0)
+				end
+				if IsValid(FuckStation) then
+					FuckStation:SetVolume(otrubVol)
+				end
 			end
 		else
 			if IsValid(NoiseStation) then
@@ -1368,6 +1408,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 			if IsValid(SleepyStation) then
 				SleepyStation:SetVolume(0)
+			end
+			if IsValid(FuckStation) then
+				FuckStation:SetVolume(0)
 			end
 		end
 	else

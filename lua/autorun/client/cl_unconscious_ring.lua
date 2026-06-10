@@ -36,6 +36,14 @@ surface.CreateFont("HomigradCriticalWarning", {
     shadow = true
 })
 
+surface.CreateFont("OtrubCriticalMessage", {
+    font = "Veteran Typewriter",
+    size = ScreenScaleH(16),
+    weight = 800,
+    antialias = true,
+    shadow = true
+})
+
 local ringAlpha = 0
 local lerpBrain = 0
 local lerpShock = 0
@@ -521,17 +529,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         showPulseCheckECG = true
     end
 
-    -- Play flatline when heartbeat is 0, regardless of other conditions
-    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 170
-    if heartbeat < 1 then
-        if not IsValid(flatlineStation) then
-            EnsureFlatlineStation()
-        end
-        if IsValid(flatlineStation) and not flatlineStation:IsPlaying() then
-            PlayStation(flatlineStation, 0.8)
-        end
-    end
-
     if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop) then return end
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
@@ -728,5 +725,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
             draw.SimpleText(msg, font, ScrW() / 2, ScrH() * 0.88, Color(255, 0, 0, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
+    end
+
+    -- Show "Theres nothing you can do." when otrub and critical
+    if isUnconscious and isCritical and otrubECGAlpha > 0.01 then
+        draw.SimpleText("Theres nothing you can do.", "OtrubCriticalMessage", ScrW() / 2, ScrH() * 0.92, Color(255, 0, 0, 255 * otrubECGAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 end)

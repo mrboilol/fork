@@ -108,7 +108,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	end
 
 	-- Prevent playing if bleeding out (low blood)
-	if blood < 3500 then
+	if blood < 4000 then
 		stop_adrenaline_music(true)
 		return
 	end
@@ -125,8 +125,12 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
-	-- Only play if triggered by combat (recent damage or weapon fire)
-	if CurTime() - hg.lastCombatTime < 15 then
+	-- Play if triggered by adrenaline, fear, or panic (recent damage)
+	local adrenalineTrigger = (adrenaline or 0) > 0.25
+	local fearTrigger = (fear or 0) > 0.25
+	local panicTrigger = CurTime() - hg.lastCombatTime < 15
+	
+	if adrenalineTrigger or fearTrigger or panicTrigger then
 		shouldPlay = true
 	end
 

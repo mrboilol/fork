@@ -1063,7 +1063,14 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 							end
 						else
-							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, false, nil, ent)
+							-- Calculate spray direction from wound angle
+							local sprayDir = -ang:Forward()
+							local pulse = org.pulse or 70
+							local pulseMul = pulse / 70
+							
+							-- Outward velocity based on pulse
+							local bleedVel = sprayDir * 10 * pulseMul + VectorRand(-5, 5)
+							hg.addBloodPart(pos, bleedVel, nil, size, size, false, nil, ent)
 						end
 
 						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
