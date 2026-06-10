@@ -1993,6 +1993,7 @@ hook.Add("Think", "Fake", function()
 						if IsValid(wep) and hook.Run("PlayerCanPickupWeapon", ply, wep) then ply:PickupWeapon(wep) end
 
 						ply.force_pickup = nil
+					end
 
 					--//
 

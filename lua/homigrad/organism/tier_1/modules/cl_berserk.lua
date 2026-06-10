@@ -102,9 +102,10 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 			hg.underberserk2 = true
 
 			-- Prevent music from playing again if it already played during this berserk session
-			if not hg.berserkMusicPlayed then
+			-- Skip secondary track for altberserk since it already played at activation
+			if not hg.berserkMusicPlayed and not altberserk:GetBool() then
 				hg.berserkMusicPlayed = true
-				local musicPath = altberserk:GetBool() and "sound/NIGGARUN.ogg" or path:GetString()
+				local musicPath = path:GetString()
 				if IsValid(hg.berserkStation) then
 					hg.berserkStation:SetVolume(1)
 					hg.berserkFadeOut = false
