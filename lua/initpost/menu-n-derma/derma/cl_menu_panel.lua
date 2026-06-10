@@ -2707,6 +2707,13 @@ function PANEL:AddSelect( pParent, strTitle, tbl )
 end
 
 function PANEL:Close()
+    sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+        if IsValid(station) then
+            station:SetVolume(1)
+            station:EnableLooping(false)
+            station:Play()
+        end
+    end)
     self:AlphaTo( 0, 0.1, 0, function() self:Remove() end)
     self:SetKeyboardInputEnabled(false)
     self:SetMouseInputEnabled(false)
@@ -5512,6 +5519,13 @@ function PANEL:AddSelect( pParent, strTitle, tbl )
 end
 
 function PANEL:Close()
+    sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+        if IsValid(station) then
+            station:SetVolume(1)
+            station:EnableLooping(false)
+            station:Play()
+        end
+    end)
     self:AlphaTo( 0, 0.1, 0, function() self:Remove() end)
     self:SetKeyboardInputEnabled(false)
     self:SetMouseInputEnabled(false)

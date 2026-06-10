@@ -714,7 +714,7 @@ function SWEP:SetHandPos(noset)
 	-- ply:SetupBones()
 
 	local ent = self:GetNWEntity("carryent")
-	local twohands = (owner:GetNetVar("carrymass",0) ~= 0 and owner:GetNetVar("carrymass",0) or owner:GetNetVar("carrymass2",0)) > 15
+	local twohands = (ply:GetNetVar("carrymass",0) ~= 0 and ply:GetNetVar("carrymass",0) or ply:GetNetVar("carrymass2",0)) > 15
 	self.rhandik = (self:GetFists()) or (IsValid(ent) and twohands)
 	self.lhandik = (self:GetFists() and hg.CanUseLeftHand(ply)) or IsValid(ent)
 
