@@ -928,6 +928,8 @@ function PANEL:Think()
 
             end)
 
+            ZCityHasSeenIntro = true
+
             -- Play "itbegins" sound
 
             sound.PlayFile("sound/itbegins.mp3", "noblock", function(station, errCode, errStr)
@@ -6511,6 +6513,8 @@ function PANEL:Think()
                 end
 
             end)
+
+            ZCityHasSeenIntro = true
 
             -- Play "itbegins" sound
 

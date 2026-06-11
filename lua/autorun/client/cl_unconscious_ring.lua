@@ -576,11 +576,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local otrubECGAlpha = ringAlpha
     if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then
         -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop or fibrillating
-        -- But prevent red ECG (isCritical) unless org.critical == true
-        if isCritical and not org.critical then
-            otrubECGAlpha = 0
-        else
+        -- Only when the organism is in a org.critical state
+        if org.critical then
             otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.3)
+        else
+            otrubECGAlpha = 0
         end
     end
 
