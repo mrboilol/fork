@@ -2719,12 +2719,12 @@ hook.Add("OnPauseMenuShow","OpenMainMenu",function()
     return false
 end)
 
-
+-- Play valve.mp3 ONCE on intro start, mark as played
+local valvePlayed = false
 hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
-    -- Use a timer to ensure everything is fully loaded before opening
     timer.Simple(1, function()
-        if not ZCityHasSeenIntro then
-            -- Play valve.mp3 ONCE on load
+        if not ZCityHasSeenIntro and not valvePlayed then
+            valvePlayed = true
             sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
                 if IsValid(station) then
                     station:SetVolume(1)
@@ -2733,87 +2733,14 @@ hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
                 end
             end)
             
-            -- Open the menu automatically on join
             if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
             MainMenu = vgui.Create("ZMainMenu")
             MainMenu:MakePopup()
-            -- Force intro state
             MainMenu.IsIntro = true
-            MainMenu:SetAlpha(255) -- Force visible immediately
+            MainMenu:SetAlpha(255)
         end
     end)
 end)
-
--- Force open on file refresh for testing (if not seen intro)
-timer.Simple(0.1, function()
-    if not ZCityHasSeenIntro and (not MainMenu or not IsValid(MainMenu)) then
-        MainMenu = vgui.Create("ZMainMenu")
-        MainMenu:MakePopup()
-        MainMenu.IsIntro = true
-        MainMenu:SetAlpha(255)
-    end
-end)
-hook.Add("OnPauseMenuShow","OpenMainMenu",function()
-    local run = hook.Run("OnShowZCityPause")
-    if run then
-        return run
-    end
-
-    if MainMenu and IsValid(MainMenu) then
-        if MainMenu.IsIntro then
-            return false -- Prevent closing intro menu with ESC
-        end
-        MainMenu:Close()
-        MainMenu = nil
-        return false
-    end
-
-    MainMenu = vgui.Create("ZMainMenu")
-    MainMenu:MakePopup()
-    return false
-end)
-
-
-hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
-    -- Use a timer to ensure everything is fully loaded before opening
-    timer.Simple(1, function()
-        if not ZCityHasSeenIntro then
-            -- Play valve.mp3 ONCE on load
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:SetVolume(1)
-                    station:EnableLooping(false)
-                    station:Play()
-                end
-            end)
-            
-            -- Open the menu automatically on join
-            if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
-            MainMenu = vgui.Create("ZMainMenu")
-            MainMenu:MakePopup()
-            -- Force intro state
-            MainMenu.IsIntro = true
-            MainMenu:SetAlpha(255) -- Force visible immediately
-        end
-    end)
-end)
-
--- Force open on file refresh for testing (if not seen intro)
-timer.Simple(0.1, function()
-    if not ZCityHasSeenIntro and (not MainMenu or not IsValid(MainMenu)) then
-        MainMenu = vgui.Create("ZMainMenu")
-        MainMenu:MakePopup()
-        MainMenu.IsIntro = true
-        MainMenu:SetAlpha(255)
-    end
-end)----
-local PANEL = {}
-
-local red_select = Color(200,200,200)
-
-local Selects = {
-    {Title = "return", Func = function(luaMenu) luaMenu:Close() end},
-    {Title = "main menu", Func = function(luaMenu) gui.ActivateGameUI() luaMenu:Close() end},
     {Title = "settings", Func = function(luaMenu) luaMenu:SwitchToSettings() end},
     {Title = "discord", Func = function(luaMenu) luaMenu:Close() gui.OpenURL("https://discord.gg/ZXUCAwuke2")  end},
     {Title = "achievements", Func = function(luaMenu) luaMenu:SwitchToAchievements() end},
@@ -5525,93 +5452,4 @@ hook.Add("OnPauseMenuShow","OpenMainMenu",function()
     MainMenu = vgui.Create("ZMainMenu")
     MainMenu:MakePopup()
     return false
-end)
-
-
-hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
-    -- Use a timer to ensure everything is fully loaded before opening
-    timer.Simple(1, function()
-        if not ZCityHasSeenIntro then
-            -- Play valve.mp3 ONCE on load
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:SetVolume(1)
-                    station:EnableLooping(false)
-                    station:Play()
-                end
-            end)
-            
-            -- Open the menu automatically on join
-            if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
-            MainMenu = vgui.Create("ZMainMenu")
-            MainMenu:MakePopup()
-            -- Force intro state
-            MainMenu.IsIntro = true
-            MainMenu:SetAlpha(255) -- Force visible immediately
-        end
-    end)
-end)
-
--- Force open on file refresh for testing (if not seen intro)
-timer.Simple(0.1, function()
-    if not ZCityHasSeenIntro and (not MainMenu or not IsValid(MainMenu)) then
-        MainMenu = vgui.Create("ZMainMenu")
-        MainMenu:MakePopup()
-        MainMenu.IsIntro = true
-        MainMenu:SetAlpha(255)
-    end
-end)
-hook.Add("OnPauseMenuShow","OpenMainMenu",function()
-    local run = hook.Run("OnShowZCityPause")
-    if run then
-        return run
-    end
-
-    if MainMenu and IsValid(MainMenu) then
-        if MainMenu.IsIntro then
-            return false -- Prevent closing intro menu with ESC
-        end
-        MainMenu:Close()
-        MainMenu = nil
-        return false
-    end
-
-    MainMenu = vgui.Create("ZMainMenu")
-    MainMenu:MakePopup()
-    return false
-end)
-
-
-hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
-    -- Use a timer to ensure everything is fully loaded before opening
-    timer.Simple(1, function()
-        if not ZCityHasSeenIntro then
-            -- Play valve.mp3 ONCE on load
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:SetVolume(1)
-                    station:EnableLooping(false)
-                    station:Play()
-                end
-            end)
-            
-            -- Open the menu automatically on join
-            if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
-            MainMenu = vgui.Create("ZMainMenu")
-            MainMenu:MakePopup()
-            -- Force intro state
-            MainMenu.IsIntro = true
-            MainMenu:SetAlpha(255) -- Force visible immediately
-        end
-    end)
-end)
-
--- Force open on file refresh for testing (if not seen intro)
-timer.Simple(0.1, function()
-    if not ZCityHasSeenIntro and (not MainMenu or not IsValid(MainMenu)) then
-        MainMenu = vgui.Create("ZMainMenu")
-        MainMenu:MakePopup()
-        MainMenu.IsIntro = true
-        MainMenu:SetAlpha(255)
-    end
 end)

@@ -200,8 +200,7 @@ module[2] = function(owner, org, mulTime)
 	local ent = isPlayer and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 	local ownerVel = owner:GetVelocity()
 	
-	-- Commented out: Neck bleeding reduction when not ragdolled
-	--[[
+	-- Neck bleeding reduction based on hands
 	if isPlayer and not IsValid(owner.FakeRagdoll) and org.neckslit then
 		local wep = owner:GetActiveWeapon()
 		local handsOnNeck = 0
@@ -224,7 +223,6 @@ module[2] = function(owner, org, mulTime)
 			org.neckslitBleedingReduction = 1.0
 		end
 	end
-	]]
 
 	for i, wound in pairs(org.arterialwounds) do
 		local neckMul = (wound[7] == "arteria") and (org.neckslitBleedingReduction or 1.0) or 1.0

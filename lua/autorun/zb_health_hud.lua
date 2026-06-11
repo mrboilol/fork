@@ -136,6 +136,7 @@ if SERVER then
 end
 
 include("homigrad/cl_health_indicator.lua")
+include("homigrad/cl_ik_foot.lua")
 
 local math_min, math_max, math_floor, math_sin, math_abs, math_cos, math_sqrt = math.min, math.max, math.floor, math.sin, math.abs, math.cos, math.sqrt
 local Color = Color

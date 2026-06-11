@@ -125,7 +125,29 @@ module[2] = function(owner, org, timeValue)
 		org.consciousness = math.Approach(org.consciousness, org.blood < 3000 and (org.blood - 2500) / 500 or 1, timeValue / 15)
 	end
 
+	-- Brain damage tanks consciousness above 0.35
+	if (org.brain or 0) > 0.35 then
+		local brainSeverity = (org.brain - 0.35) / 0.65 -- 0 to 1 scaling
+		local consciousnessDrain = brainSeverity * timeValue * 0.3 -- Up to 0.3 per second at max brain damage
+		org.consciousness = math.max((org.consciousness or 1) - consciousnessDrain, 0)
+	end
+
 	if org.consciousness < 0.1 then
+		org.needotrub = true
+	end
+
+	-- Critical blood loss triggers unconsciousness
+	if (org.blood or 5000) < 2500 then
+		org.needotrub = true
+	end
+
+	-- Critical oxygen deprivation triggers unconsciousness
+	if org.o2 and org.o2[1] and org.o2[1] < 10 then
+		org.needotrub = true
+	end
+
+	-- Severe shock triggers unconsciousness
+	if (org.shock or 0) > 80 then
 		org.needotrub = true
 	end
 

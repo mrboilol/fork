@@ -119,18 +119,18 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 
 
 	-- Play if triggered by adrenaline, adrenalineAdd, fear, or panic (recent damage)
-	local adrenalineTrigger = (adrenaline or 0) > 0.05
-	local adrenalineAddTrigger = (adrenalineAdd or 0) > 0.05
-	local fearTrigger = (fear or 0) > 0.05
+	local adrenalineTrigger = (adrenaline or 0) > 0
+	local adrenalineAddTrigger = (adrenalineAdd or 0) > 0
+	local fearTrigger = (fear or 0) > 0
 	local panicTrigger = CurTime() - hg.lastCombatTime < 15
 	
 	if adrenalineTrigger or adrenalineAddTrigger or fearTrigger or panicTrigger then
 		shouldPlay = true
 	end
 	
-	-- Debug output every 2 seconds
-	if CurTime() % 2 < 0.1 then
-		MsgN("[AdrenalineMusic] Triggers - adr:", adrenaline, " adrAdd:", adrenalineAdd, " fear:", fear, " combat:", panicTrigger, " shouldPlay:", shouldPlay)
+	-- Debug output every 0.5 seconds
+	if CurTime() % 0.5 < 0.1 then
+		MsgN("[AdrenalineMusic] Triggers - adr:", adrenaline, " adrAdd:", adrenalineAdd, " fear:", fear, " combat:", panicTrigger, " shouldPlay:", shouldPlay, " org valid:", org ~= nil)
 	end
 
 	-- Track values for other systems but don't use them for triggering

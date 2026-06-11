@@ -648,6 +648,14 @@ function hg.MainTPIKFunction(ent, ply, wpn)
             wpn:SetHandPos()
         end
 
+        //local systime = SysTime()
+        -- IK Foot System (TPIK-compatible, uses bone matrix)
+        local ikResult = hg.CalculateIKFoot(ply, ent)
+        if ikResult then
+            hg.ApplyIKFoot(ent, ikResult)
+        end
+        //print("IK Foot: ", SysTime() - systime)
+
         //print("sethandpos: ", SysTime() - systime)
         
         if ply:InVehicle() then
@@ -694,7 +702,8 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 			hg.DragHandsToPos(ply, ply:GetActiveWeapon(), pos + ang:Right() * 7 - ang:Forward() * 5, true, 5.5, ang:Right(), ang_head1, ang_head2)
 		end
         
-		local wounds = ply:GetNetVar("arterialwounds")
+		-- shit tpiss thing
+		--[[local wounds = ply:GetNetVar("arterialwounds")
 		local neckBleeding = false
 		if wounds then
 			for k, v in pairs(wounds) do
@@ -729,7 +738,7 @@ function hg.MainTPIKFunction(ent, ply, wpn)
 					end
 				end
 			end
-		end
+		end]]
 
         //print("DragHands: ", SysTime() - systime)
         hg.DoZManip(ent, ply)

@@ -50,10 +50,10 @@ module[2] = function(owner, org, timeValue)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
-	-- Convert excess fearadd to despair
+	-- Convert excess fearadd to despair (reduced rate to prevent spam)
 	if org.fearadd > 1.5 then
 		local excessFear = org.fearadd - 1.5
-		local despairConversion = excessFear * timeValue * 0.075
+		local despairConversion = excessFear * timeValue * 0.02
 		org.despair = math.min((org.despair or 0) + despairConversion, 1)
 		org.fearadd = math.max(org.fearadd - despairConversion, 1.5)
 	end

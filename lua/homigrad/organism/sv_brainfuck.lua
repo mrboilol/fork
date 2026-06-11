@@ -3,7 +3,7 @@ local math_min, math_max, math_clamp, math_rand, math_random, math_sin, math_abs
 local VectorRand = VectorRand
 local Angle = Angle
 
-local CHANCE, FORCE, VIBRATION = 0.35, 1200, 150
+local CHANCE, FORCE, VIBRATION = 0.65, 1200, 150
 local FLEXION_FORCE = 400
 local POSTURING_PARTIAL_UPPER_CHANCE = 0.4
 local posturingDur, rigorDur, seizureDur = {5, 10}, {8, 14}, {10, 20}
@@ -410,7 +410,7 @@ hook.Add("RagdollDeath", "BrainfuckStart", function(ply, rag)
 		local forceFencingPosturing = recentClubHit or recentBulletHit
 		local headshot = hadBrainDamage or hadSkullDamage or hadHeadDamage or recentHeadshot
 		local brainFactor = getBrainFactor(org)
-		local chance = math_clamp(CHANCE + brainFactor * 0.6, 0, 1)
+		local chance = math_clamp(CHANCE + brainFactor * 1.5, 0, 1)
 		if not headshot and not forceFencingPosturing and (rag.noHead or org.noHead or ply.noHead) then return end
 		
 		if (headshot and (recentHeadshot or hadHeadDamage or math_random() < chance)) or forceFencingPosturing then

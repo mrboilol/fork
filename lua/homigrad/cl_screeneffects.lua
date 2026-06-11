@@ -69,15 +69,15 @@ local tab = {
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3", 0, 5)
-local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3", 0, 5)
-local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=fuck.mp3, 4=oromi.mp3 (immediate)", 0, 4)
+local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3", 0, 6)
+local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3", 0, 3)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hook_Run = hook.Run
 
 hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
 	if ply == LocalPlayer() then
 		RunConsoleCommand("hg_painsound", math.random(0, 5))
-		RunConsoleCommand("hg_dyingsound", math.random(0, 5))
+		RunConsoleCommand("hg_dyingsound", math.random(0, 6))
 	end
 end)
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
@@ -371,6 +371,11 @@ local function stopthings()
 		SillydyingStation = nil
 	end
 
+	if IsValid(ItssooverStation) then
+		ItssooverStation:Stop()
+		ItssooverStation = nil
+	end
+
 	if IsValid(AltotrubStation) then
 		AltotrubStation:Stop()
 		AltotrubStation = nil
@@ -384,11 +389,6 @@ local function stopthings()
 	if IsValid(FuckStation) then
 		FuckStation:Stop()
 		FuckStation = nil
-	end
-
-	if IsValid(OromiStation) then
-		OromiStation:Stop()
-		OromiStation = nil
 	end
 
 	if IsValid(NoisesStation) then
@@ -646,6 +646,18 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
+	if !IsValid(ItssooverStation) or ItssooverStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/fuck.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				ItssooverStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
 	if !IsValid(Alto2Station) or Alto2Station:GetState() != GMOD_CHANNEL_PLAYING then
 		sound.PlayFile("sound/alto2.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -688,18 +700,6 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				station:SetVolume(0)
 				station:Play()
 				ConsciousnessWhiteNoise = station
-				station:EnableLooping(true)
-			end
-		end)
-	end
-
-	if !IsValid(OromiStation) or OromiStation:GetState() != GMOD_CHANNEL_PLAYING then
-		sound.PlayFile("sound/oromi.mp3", "noblock noplay", function(station)
-			if IsValid(station) then
-				station:SetVolume(0)
-				station:Play()
-				station:SetTime(0) -- Start from beginning immediately
-				OromiStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -1320,6 +1320,26 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(consciousVol)
 				end
+			elseif dyingMode == 6 then
+				-- Only itssoover.mp3, no screen shake
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(consciousVol)
+				end
 			end
 		else
 			hg.consciousBeatIntensity = 0
@@ -1337,6 +1357,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 			if IsValid(SillydyingStation) then
 				SillydyingStation:SetVolume(0)
+			end
+			if IsValid(ItssooverStation) then
+				ItssooverStation:SetVolume(0)
 			end
 		end
 		
@@ -1380,7 +1403,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 
 			if !IsValid(FuckStation) or FuckStation:GetState() != GMOD_CHANNEL_PLAYING then
-				sound.PlayFile("sound/fuck.mp3", "noblock noplay", function(station)
+				sound.PlayFile("sound/itssoover.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
 						station:Play()
@@ -1449,26 +1472,6 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(FuckStation) then
 					FuckStation:SetVolume(otrubVol)
 				end
-				if IsValid(OromiStation) then
-					OromiStation:SetVolume(0)
-				end
-			elseif otrubMode == 4 then
-				-- Use oromi.mp3 (plays immediately from start)
-				if IsValid(NoiseStation) then
-					NoiseStation:SetVolume(0)
-				end
-				if IsValid(AltotrubStation) then
-					AltotrubStation:SetVolume(0)
-				end
-				if IsValid(SleepyStation) then
-					SleepyStation:SetVolume(0)
-				end
-				if IsValid(FuckStation) then
-					FuckStation:SetVolume(0)
-				end
-				if IsValid(OromiStation) then
-					OromiStation:SetVolume(0.75) -- 0.75 volume immediately
-				end
 			end
 		else
 			if IsValid(NoiseStation) then
@@ -1482,9 +1485,6 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 			if IsValid(FuckStation) then
 				FuckStation:SetVolume(0)
-			end
-			if IsValid(OromiStation) then
-				OromiStation:SetVolume(0)
 			end
 		end
 	else
@@ -1692,8 +1692,8 @@ local function GetConsciousBeatPulse()
 	if not hg_dyingpulse:GetBool() then return 0 end
 
 	local dyingMode = hg_dyingsound:GetInt()
-	-- Disable screen shake for modes 2, 3, 4, and 5
-	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 then return 0 end
+	-- Disable screen shake for modes 2, 3, 4, 5, and 6
+	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 or dyingMode == 6 then return 0 end
 
 	local intensity = hg.consciousBeatIntensity or 0
 	if intensity <= 0.01 then return 0 end
