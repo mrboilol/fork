@@ -145,7 +145,6 @@ function hg.CalculateIKFoot(ply, ent)
 	reqDrop = math.Clamp(reqDrop, 0, legLength * 0.8)
 	
 	-- Smooth body drop
-	state.bodyDrop, state.bodyDropVel = LerpVector(smoothing, state.bodyDrop, reqDrop), 0
 	state.bodyDrop = Lerp(smoothing, state.bodyDrop, reqDrop)
 	
 	-- Calculate knee bends

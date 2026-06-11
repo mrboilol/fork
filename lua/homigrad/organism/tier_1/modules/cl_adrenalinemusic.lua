@@ -118,13 +118,23 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	local pulse = org.pulse or 0
 
 
-	-- Play if triggered by adrenaline, adrenalineAdd, fear, or panic (recent damage)
-	local adrenalineTrigger = (adrenaline or 0) > 0
-	local adrenalineAddTrigger = (adrenalineAdd or 0) > 0
-	local fearTrigger = (fear or 0) > 0
+	-- Play if triggered by adrenaline, fear, or panic (recent damage)
 	local panicTrigger = CurTime() - hg.lastCombatTime < 15
 	
-	if adrenalineTrigger or adrenalineAddTrigger or fearTrigger or panicTrigger then
+	-- Fear > 0.75: always play
+	if fear > 0.75 then
+		shouldPlay = true
+	-- Fear > 0.5 AND adrenaline > 0.5: play
+	elseif fear > 0.5 and adrenaline > 0.5 then
+		shouldPlay = true
+	-- Fear > 0.25 AND adrenaline >= 1.0: play
+	elseif fear > 0.25 and adrenaline >= 1.0 then
+		shouldPlay = true
+	-- Adrenaline >= 1.5: always play
+	elseif adrenaline >= 1.5 then
+		shouldPlay = true
+	-- Panic trigger (recent combat)
+	elseif panicTrigger then
 		shouldPlay = true
 	end
 	
