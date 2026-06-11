@@ -564,11 +564,6 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	
 	realangle = realangle or lply:EyeAngles()
 
-	-- Skip viewpunch when GUI is visible to prevent freezing
-	if gui.IsGameUIVisible() then
-		vpang = angleZero
-	end
-
 	if GetCoolCameraBool() then
 		view.angles = realangle + GetViewPunchAngles() * 0.4 + vpang
 		view.angles[3] = view.angles[3] - GetViewPunchAngles4()[3]

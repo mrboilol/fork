@@ -50,7 +50,7 @@ local IsValid = IsValid
 		function hg.InGame()
 			local x, y = input.GetCursorPos()
 
-			return !(vgui.CursorVisible() or (x == 0 and y == 0))
+			return !(x == 0 and y == 0)
 		end
 
 		hook.Add("Think", "vp_think", function()
