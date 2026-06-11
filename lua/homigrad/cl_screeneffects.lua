@@ -1180,6 +1180,10 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		if o2 > 50 and !org.otrub then
 			local dyingMode = hg_dyingsound:GetInt()
 
+			-- Check if despair overrides dying sound
+			local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
+			local despairOverride = despair > 0.3
+
 			if !IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING then
 				sound.PlayFile("sound/zbattle/conscioustypebeat.ogg", "noblock noplay", function(station)
 					if IsValid(station) then
@@ -1216,6 +1220,11 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
 				consciousVol = math.max(consciousVol, bleedSeverity * 2)
 				hg.consciousBeatIntensity = math.max(hg.consciousBeatIntensity, bleedSeverity * 2)
+			end
+
+			-- Despair overrides dying sounds
+			if despairOverride then
+				consciousVol = 0
 			end
 
 			if dyingMode == 0 then

@@ -20,7 +20,7 @@ module[1] = function(org)
 end
 
 function hg.organism.should_gain_fear(org)
-	return ((org.pain > 30) or (org.blood < 3750) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
+	return ((org.pain > 30) or (org.blood < 4000) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
 end
 
 module[2] = function(owner, org, timeValue)
@@ -53,7 +53,7 @@ module[2] = function(owner, org, timeValue)
 	-- Convert excess fearadd to despair (reduced rate to prevent spam)
 	if org.fearadd > 1.5 then
 		local excessFear = org.fearadd - 1.5
-		local despairConversion = excessFear * timeValue * 0.02
+		local despairConversion = excessFear * timeValue * 0.005
 		org.despair = math.min((org.despair or 0) + despairConversion, 1)
 		org.fearadd = math.max(org.fearadd - despairConversion, 1.5)
 	end
@@ -88,8 +88,8 @@ module[2] = function(owner, org, timeValue)
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 2.0)
 
-	local compensation = 1 + math.Clamp((2875 - blood) / 2300, 0, 1) * 0.16
-	compensation = compensation * (1 - math.Clamp((2200 - blood) / 1200, 0, 1) * 0.5)
+	local compensation = 1 + math.Clamp((3500 - blood) / 1500, 0, 1) * 0.16
+	compensation = compensation * (1 - math.Clamp((2500 - blood) / 500, 0, 1) * 0.5)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 
 	local pulse_factor = org.pulse / 70

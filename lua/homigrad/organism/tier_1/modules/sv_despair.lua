@@ -135,8 +135,8 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		-- Transfer fear to despair - moderate rate regardless of fearAdd
 		local fear = org.fear
 		local fearTransferRate = 0.025 -- Base transfer rate
-		-- Scale transfer rate with fear duration - up to 3x multiplier after 60 seconds of fear
-		local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 2)
+		-- Scale transfer rate with fear duration - up to 3x multiplier after 30 seconds of fear
+		local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 30, 2)
 		add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate * fearDurationMultiplier
 	end
 

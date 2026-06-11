@@ -147,7 +147,7 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	org.consciousness = math.min(org.consciousness, math.min(org.blood / 3250, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
+	org.consciousness = math.min(org.consciousness, math.min(org.blood / 4000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
@@ -250,7 +250,7 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	local bloodCap = (2500 / (adrenaline / 5 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1)
+	local bloodCap = (2000 / (adrenaline / 5 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1)
 	if org.blood < bloodCap then
 		local bloodSeverity = math.Clamp((bloodCap - org.blood) / 1000, 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 0.5, 0)
@@ -303,13 +303,13 @@ module[2] = function(owner, org, mulTime)
 
 	if org.bleed > 0 then org.lastBleedTime = CurTime() end
 
-	local timetouncon = (org.blood - 2750) / org.bleed
+	local timetouncon = (org.blood - 2000) / org.bleed
 	
 	local bleeding_will_stop = (timetouncon ~= timetouncon) or ((coagulatespeed * timetouncon - org.bleed) > 0)
 	local canwakeup_pain = ((org.pain - 5) / (org.painlessen)) < timetouncon
 	org.timetouncon = (timetouncon ~= timetouncon) and timetouncon or Lerp(hg.lerpFrameTime2(0.01,mulTime), org.timetouncon or 10000, timetouncon)
 	
-	if org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 3250)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) then
+	if org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 2000)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) then
 		org.incapacitated = true
 	else
 		org.incapacitated = false

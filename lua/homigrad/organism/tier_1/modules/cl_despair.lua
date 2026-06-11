@@ -174,7 +174,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = math.Remap(despair, 0, 1, 0.6, 0.75)
+		local targetVol = despair > 0.3 and 1.0 or math.Remap(despair, 0, 1, 0.6, 0.75)
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)

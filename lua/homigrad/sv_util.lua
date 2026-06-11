@@ -496,13 +496,11 @@ hook.Add("PostEntityFireBullets","bulletsuppression",function(ent,bullet)
 		if !org.otrub then
 			--print(1 * dmg / math.max(dist / 2,10) / 1)
 			ply:AddNaturalAdrenaline(0.05 * dmg / math.max(dist / 2,10) / 1)
-			org.fearadd = org.fearadd + 0.2
+			org.fearadd = org.fearadd + 0.4
 			
-			-- Add slight despair when getting shot at with high fear
-			if (org.fear or 0) > 1.0 then
-				org.despair = math.Clamp((org.despair or 0) + 0.02 * (dmg / math.max(dist / 2, 10)), 0, 1)
-				org._despairLastGainedTime = CurTime()
-			end
+			-- Add despair when getting shot at
+			org.despair = math.Clamp((org.despair or 0) + 0.05 * (dmg / math.max(dist / 2, 10)), 0, 1)
+			org._despairLastGainedTime = CurTime()
 		end
 	end
 end)

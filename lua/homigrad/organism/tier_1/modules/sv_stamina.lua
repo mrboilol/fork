@@ -194,7 +194,11 @@ module[2] = function(owner, org, timeValue)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
 
-	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3.75 * math.max(org.stamina[1] / org.stamina.max, 0.2) ^ 0.5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
+	-- When winded (low stamina), recovery is much slower
+	local staminaRatio = org.stamina[1] / org.stamina.max
+	local windedRecoveryMultiplier = math.max(staminaRatio, 0.1) ^ 0.5 -- slower recovery when low stamina
+
+	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3.75 * windedRecoveryMultiplier * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
 
 
 

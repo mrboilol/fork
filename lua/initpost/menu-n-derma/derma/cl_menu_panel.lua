@@ -906,97 +906,55 @@ function PANEL:Think()
 
     if self.IsIntro and not self.IntroSequenceActive then
 
-        if input.IsKeyDown(KEY_ENTER) then
+        -- Auto-start intro sequence immediately
+        self.IntroSequenceActive = true
+        self.IntroStartTime = CurTime()
 
-            self.IntroSequenceActive = true
-
-            self.IntroStartTime = CurTime()
-
-            -- Play valve.mp3 sound
-
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-
-                if IsValid(station) then
-
-                    station:SetVolume(1)
-
-                    station:EnableLooping(false)
-
-                    station:Play()
-
-                end
-
-            end)
-
-            ZCityHasSeenIntro = true
-
-            -- Play "itbegins" sound
-
-            sound.PlayFile("sound/itbegins.mp3", "noblock", function(station, errCode, errStr)
-
-                if IsValid(station) then
-
-                    ZCityIntroMusic = station
-
-                    station:Play()
-
-                else
-
-                    print("Error playing intro sound:", errCode, errStr)
-
-                end
-
-            end)
-
-            
-
-            -- Fade out background music if playing
-
-            if IsValid(ZCityMainMenuMusic) then
-
-                local music = ZCityMainMenuMusic
-
-                local duration = 3
-
-                local startTime = CurTime()
-
-                local startVol = music:GetVolume()
-
-                
-
-                local id = "ZCityMusicFadeOut"
-
-                hook.Add("Think", id, function()
-
-                    if not IsValid(music) then hook.Remove("Think", id) return end
-
-                    
-
-                    local elapsed = CurTime() - startTime
-
-                    local progress = elapsed / duration
-
-                    
-
-                    if progress >= 1 then
-
-                        music:SetVolume(0)
-
-                        music:Pause()
-
-                        hook.Remove("Think", id)
-
-                    else
-
-                        music:SetVolume(startVol * (1 - progress))
-
-                    end
-
-                end)
-
+        -- Play valve.mp3 sound
+        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+            if IsValid(station) then
+                station:SetVolume(1)
+                station:EnableLooping(false)
+                station:Play()
             end
+        end)
 
+        ZCityHasSeenIntro = true
+
+        -- Fade out background music if playing
+        if IsValid(ZCityMainMenuMusic) then
+            local music = ZCityMainMenuMusic
+            local duration = 3
+            local startTime = CurTime()
+            local startVol = music:GetVolume()
+
+            local id = "ZCityMusicFadeOut"
+            hook.Add("Think", id, function()
+                if not IsValid(music) then hook.Remove("Think", id) return end
+
+                local elapsed = CurTime() - startTime
+                local progress = elapsed / duration
+
+                if progress >= 1 then
+                    music:SetVolume(0)
+                    music:Pause()
+                    hook.Remove("Think", id)
+                else
+                    music:SetVolume(startVol * (1 - progress))
+                end
+            end)
         end
+
+        -- Auto-fade intro after 5 seconds
+        timer.Simple(5, function()
+            if IsValid(self) then
+                self:AlphaTo(0, 1, 0, function()
+                    if IsValid(self) then
+                        self:Close()
+                    end
+                end)
+            end
+        end)
 
     end
 
@@ -5517,15 +5475,6 @@ hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
 
         if not ZCityHasSeenIntro then
 
-            -- Play valve.mp3 ONCE on load
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:SetVolume(1)
-                    station:EnableLooping(false)
-                    station:Play()
-                end
-            end)
-            
             -- Open the menu automatically on join
 
             if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
@@ -5539,6 +5488,10 @@ hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
             MainMenu.IsIntro = true
 
             MainMenu:SetAlpha(255) -- Force visible immediately
+
+            -- Auto-start intro sequence
+            MainMenu.IntroSequenceActive = true
+            MainMenu.IntroStartTime = CurTime()
 
         end
 
@@ -6492,97 +6445,55 @@ function PANEL:Think()
 
     if self.IsIntro and not self.IntroSequenceActive then
 
-        if input.IsKeyDown(KEY_ENTER) then
+        -- Auto-start intro sequence immediately
+        self.IntroSequenceActive = true
+        self.IntroStartTime = CurTime()
 
-            self.IntroSequenceActive = true
-
-            self.IntroStartTime = CurTime()
-
-            -- Play valve.mp3 sound
-
-            sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-
-                if IsValid(station) then
-
-                    station:SetVolume(1)
-
-                    station:EnableLooping(false)
-
-                    station:Play()
-
-                end
-
-            end)
-
-            ZCityHasSeenIntro = true
-
-            -- Play "itbegins" sound
-
-            sound.PlayFile("sound/itbegins.mp3", "noblock", function(station, errCode, errStr)
-
-                if IsValid(station) then
-
-                    ZCityIntroMusic = station
-
-                    station:Play()
-
-                else
-
-                    print("Error playing intro sound:", errCode, errStr)
-
-                end
-
-            end)
-
-            
-
-            -- Fade out background music if playing
-
-            if IsValid(ZCityMainMenuMusic) then
-
-                local music = ZCityMainMenuMusic
-
-                local duration = 3
-
-                local startTime = CurTime()
-
-                local startVol = music:GetVolume()
-
-                
-
-                local id = "ZCityMusicFadeOut"
-
-                hook.Add("Think", id, function()
-
-                    if not IsValid(music) then hook.Remove("Think", id) return end
-
-                    
-
-                    local elapsed = CurTime() - startTime
-
-                    local progress = elapsed / duration
-
-                    
-
-                    if progress >= 1 then
-
-                        music:SetVolume(0)
-
-                        music:Pause()
-
-                        hook.Remove("Think", id)
-
-                    else
-
-                        music:SetVolume(startVol * (1 - progress))
-
-                    end
-
-                end)
-
+        -- Play valve.mp3 sound
+        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
+            if IsValid(station) then
+                station:SetVolume(1)
+                station:EnableLooping(false)
+                station:Play()
             end
+        end)
 
+        ZCityHasSeenIntro = true
+
+        -- Fade out background music if playing
+        if IsValid(ZCityMainMenuMusic) then
+            local music = ZCityMainMenuMusic
+            local duration = 3
+            local startTime = CurTime()
+            local startVol = music:GetVolume()
+
+            local id = "ZCityMusicFadeOut"
+            hook.Add("Think", id, function()
+                if not IsValid(music) then hook.Remove("Think", id) return end
+
+                local elapsed = CurTime() - startTime
+                local progress = elapsed / duration
+
+                if progress >= 1 then
+                    music:SetVolume(0)
+                    music:Pause()
+                    hook.Remove("Think", id)
+                else
+                    music:SetVolume(startVol * (1 - progress))
+                end
+            end)
         end
+
+        -- Auto-fade intro after 5 seconds
+        timer.Simple(5, function()
+            if IsValid(self) then
+                self:AlphaTo(0, 1, 0, function()
+                    if IsValid(self) then
+                        self:Close()
+                    end
+                end)
+            end
+        end)
 
     end
 
