@@ -602,6 +602,8 @@ function PANEL:PostInit()
     local CloseSelectorPanel
     local savedAppearanceSnapshot
     local unsavedOverlay
+    local savedAppearanceSnapshot
+    local unsavedOverlay
 
     local function CloseAllAccessoryMenus()
     end
@@ -1352,6 +1354,8 @@ function PANEL:PostInit()
 
     savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
 
+    savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
+
     CreateAppearanceTextButton(sidebar, "Model", function() OpenModelMenu() end, function() return main.ActiveSection == "Model" end)
     CreateAppearanceTextButton(sidebar, "Hat", function() OpenAccessorySlot(1, "Hat", {head = true, ears = true}) end, function() return main.ActiveSection == "Hat" end)
     CreateAppearanceTextButton(sidebar, "Face", function() OpenAccessorySlot(2, "Face", {face = true}) end, function() return main.ActiveSection == "Face" end)
@@ -1376,6 +1380,7 @@ function PANEL:PostInit()
     returnBtn.LineLerp = 0
     returnBtn.HoverScale = 0.008
     function returnBtn:DoClick()
+        TryExitAppearance()
         TryExitAppearance()
     end
     function returnBtn:Think()
@@ -1446,6 +1451,7 @@ function PANEL:PostInit()
     deletePresetBtn.HoverScale = 0.008
 
     function self:Close()
+        TryExitAppearance()
         TryExitAppearance()
     end
     self:CallbackAppearance()

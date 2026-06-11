@@ -7,13 +7,15 @@ hg.organism.module.pain = {}
 local module = hg.organism.module.pain
 local consciousness_otrub_threshold = 0.08
 local consciousness_fake_threshold = 0.38
-local shock_consciousness_target = 0.18
+local shock_consciousness_target = 0.24
 local otrub_consciousness_target = 0.08
-local shock_consciousness_drain = 7
+local shock_consciousness_drain = 10
 local otrub_consciousness_drain = 8
 local consciousness_recovery_speed = 12
 local low_consciousness_recovery_speed = 16
 local otrub_consciousness_recovery_speed = 20
+local shock_unconsciousness_threshold = 45
+local shock_paincheck_multiplier = 5
 module[1] = function(org)
 
 	org.shock = 0
@@ -64,8 +66,7 @@ function hg.organism.paincheck(org)
 
 
 
-	return (org.shock > org.shock_turn * 4 * analgesiaMul)
-
+	return (org.shock > org.shock_turn * shock_paincheck_multiplier * analgesiaMul)
 end
 
 
@@ -208,7 +209,7 @@ module[2] = function(owner, org, timeValue)
 
 	if org.otrub then
 		org.consciousness = Approach(org.consciousness, otrub_consciousness_target, timeValue / otrub_consciousness_drain)
-	elseif org.shock > (30 * analgesiaMul) then
+	elseif org.shock > (shock_unconsciousness_threshold * analgesiaMul * painkillerMul) then
 		org.consciousness = Approach(org.consciousness, shock_consciousness_target, timeValue / shock_consciousness_drain)
 	end
 
