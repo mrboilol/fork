@@ -26,14 +26,28 @@ local function stop_adrenaline_music(force)
 end
 
 local function start_adrenaline_music()
-	if not hg_adrenalinemusic:GetBool() then return end
-	if IsValid(hg.adrenalineMusicStation) then return end
-	if hg.adrenalineMusicLoading then return end
+	if not hg_adrenalinemusic:GetBool() then 
+		MsgN("[AdrenalineMusic] Convar disabled")
+		return 
+	end
+	if IsValid(hg.adrenalineMusicStation) then 
+		MsgN("[AdrenalineMusic] Station already exists")
+		return 
+	end
+	if hg.adrenalineMusicLoading then 
+		MsgN("[AdrenalineMusic] Already loading")
+		return 
+	end
 
+	MsgN("[AdrenalineMusic] Starting music...")
 	hg.adrenalineMusicLoading = true
-	sound.PlayFile("sound/sorrymud.mp3", "mono noblock noplay", function(channel)
+	sound.PlayFile("sound/sorrymud.mp3", "mono noblock noplay", function(channel, err)
 		hg.adrenalineMusicLoading = false
-		if not IsValid(channel) then return end
+		if not IsValid(channel) then 
+			MsgN("[AdrenalineMusic] Failed to load sound: ", err or "unknown error")
+			return 
+		end
+		MsgN("[AdrenalineMusic] Sound loaded successfully")
 		channel:SetVolume(0)
 		channel:Play()
 		channel:EnableLooping(true)
@@ -82,12 +96,14 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	-- Prevent playing if under noradrenaline influence (fury-13)
 	if (org.noradrenaline or 0) > 0.01 then
 		stop_adrenaline_music(true)
+		MsgN("[AdrenalineMusic] Blocked: noradrenaline = ", org.noradrenaline)
 		return
 	end
 
 	-- Prevent playing if under berserk influence
 	if (org.berserk or 0) > 0.01 then
 		stop_adrenaline_music(true)
+		MsgN("[AdrenalineMusic] Blocked: berserk = ", org.berserk)
 		return
 	end
 
@@ -101,38 +117,20 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	local o2 = org.o2 and org.o2.curregen or 0
 	local pulse = org.pulse or 0
 
-	-- Prevent playing if in big pain or dying
-	if pain > 50 then
-		stop_adrenaline_music(true)
-		return
-	end
-
-	-- Prevent playing if bleeding out (low blood)
-	if blood < 4000 then
-		stop_adrenaline_music(true)
-		return
-	end
-
-	-- Prevent playing if great drop in o2 (oxygen regeneration)
-	if o2 < 0.3 then
-		stop_adrenaline_music(true)
-		return
-	end
-
-	-- Prevent playing if great drop in pulse (too low)
-	if pulse < 40 then
-		stop_adrenaline_music(true)
-		return
-	end
 
 	-- Play if triggered by adrenaline, adrenalineAdd, fear, or panic (recent damage)
-	local adrenalineTrigger = (adrenaline or 0) > 0.25
-	local adrenalineAddTrigger = (adrenalineAdd or 0) > 0.25
-	local fearTrigger = (fear or 0) > 0.25
+	local adrenalineTrigger = (adrenaline or 0) > 0.05
+	local adrenalineAddTrigger = (adrenalineAdd or 0) > 0.05
+	local fearTrigger = (fear or 0) > 0.05
 	local panicTrigger = CurTime() - hg.lastCombatTime < 15
 	
 	if adrenalineTrigger or adrenalineAddTrigger or fearTrigger or panicTrigger then
 		shouldPlay = true
+	end
+	
+	-- Debug output every 2 seconds
+	if CurTime() % 2 < 0.1 then
+		MsgN("[AdrenalineMusic] Triggers - adr:", adrenaline, " adrAdd:", adrenalineAdd, " fear:", fear, " combat:", panicTrigger, " shouldPlay:", shouldPlay)
 	end
 
 	-- Track values for other systems but don't use them for triggering

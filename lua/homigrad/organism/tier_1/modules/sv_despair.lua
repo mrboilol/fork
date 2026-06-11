@@ -107,8 +107,8 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	local adrenalineDelta = max(adrenaline - prevAdrenaline, 0)
 	org._despairLastAdrenaline = adrenaline
 
-	if adrenaline > 3 then
-		add = add + (adrenaline - 3) * timeValue * 0.045
+	if adrenaline > 2.5 then
+		add = add + (adrenaline - 2.5) * timeValue * 0.045
 	end
 
 	if adrenalineAdd > 0.35 then
@@ -120,14 +120,15 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if (org.fear or 0) > 0 then
-		-- Transfer capped fear to despair at a very lessened rate
+		-- Transfer fear to despair - higher rate if high fear with excess fearAdd, otherwise slow
 		local fear = org.fear
-		local fearTransferRate = 0.08
-		-- If fear is high (near cap of 2), transfer at much lessened rate
-		if fear > 1.5 then
-			fearTransferRate = 0.02 -- Much slower transfer when fear is capped
-		elseif fear > 1.0 then
-			fearTransferRate = 0.04 -- Slower transfer when fear is high
+		local fearAdd = org.fearAdd or 0
+		local fearTransferRate = 0.03 -- Default slow transfer
+		-- Higher transfer rate if fear is high AND excess fearAdd is happening
+		if fear > 1.0 and fearAdd > 0.5 then
+			fearTransferRate = 0.15 -- Fast transfer when high fear + excess fearAdd
+		elseif fear > 1.5 then
+			fearTransferRate = 0.02 -- Very slow transfer when fear is capped without excess fearAdd
 		end
 		-- Scale transfer rate with fear duration - up to 3x multiplier after 60 seconds of fear
 		local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 2)
@@ -142,13 +143,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		add = add + Clamp((org.shock - 20) / 50, 0, 1) * timeValue * 0.04
 	end
 
-	if (org.bleed or 0) > 2 then
-		add = add + Clamp((org.bleed - 2) / 14, 0, 1) * timeValue * 0.08
-	end
-
-	-- Despair from unhealed injuries (persistent bleeding/wounds)
 	if (org.bleed or 0) > 0 then
-		add = add + Clamp(org.bleed, 0, 5) * timeValue * 0.04
+		-- Bleeding despair - 2 is severe bleeding (pouring blood)
+		local bleedSeverity = Clamp(org.bleed / 2, 0, 1)
+		add = add + bleedSeverity * timeValue * 0.12
 	end
 
 	-- Despair from damaged limbs (broken bones, fractures)
@@ -169,15 +167,15 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	-- Despair from dying state (critical health/blood)
-	if (org.blood or 5000) < 3200 then
-		add = add + Clamp((3200 - org.blood) / 3200, 0, 1) * timeValue * 0.2
+	if (org.blood or 5000) < 3750 then
+		add = add + Clamp((3750 - org.blood) / 3750, 0, 1) * timeValue * 0.2
 	end
 
 	-- Despair from bleeding out (low blood + active bleeding - won't clot)
 	local blood = org.blood or 5000
 	local bleed = org.bleed or 0
-	if blood < 4000 and bleed > 0 then
-		local bleedSeverity = Clamp((3500 - blood) / 3500, 0, 1)
+	if blood < 3750 and bleed > 0 then
+		local bleedSeverity = Clamp((3750 - blood) / 3750, 0, 1)
 		-- Higher despair gain when actively bleeding out (blood won't clot)
 		add = add + bleedSeverity * timeValue * 0.4
 	end
@@ -194,24 +192,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		org._lowGoodMoodTime = 0
 	end
 
-	-- Despair from boredom (no events, low activity for extended time)
-	local time = CurTime()
-	if not org._lastActivityTime then
-		org._lastActivityTime = time
-	end
-
-	-- Track pain events as activity (getting hurt)
-	local currentPain = org.pain or 0
-	if currentPain > (org._despairLastPain or 0) + 5 then
-		-- Pain increased significantly, count as activity
-		org._despairLastGainedTime = time
-		org._despairLastPain = currentPain
-	end
-
-	-- If no damage, no fear, no despair gain for 5 minutes, start adding despair
-	if time - org._despairLastGainedTime > 300 and (org.fear or 0) < 0.1 and (org.pain or 0) < 10 then
-		add = add + timeValue * 0.005
-	end
 
 
 	if (org.consciousness or 1) < 0.7 then

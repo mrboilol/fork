@@ -832,7 +832,8 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	end
 
 	-- Consciousness whitenoise: ramps up from 0 at 0.95 consciousness to full at 0.1
-	if not org.otrub and (org.consciousness or 1) < 0.95 then
+	-- Despair overrides this sound
+	if not org.otrub and (org.consciousness or 1) < 0.95 and (org.despair or 0) <= 0 then
 		local consciousnessVol = math.Remap(org.consciousness, 0.95, 0.1, 0, 1)
 		consciousnessVol = math.Clamp(consciousnessVol, 0, 1)
 
@@ -845,7 +846,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 	end
 
-	if org.consciousness < 0.5 then
+	if org.consciousness < 0.5 and (org.despair or 0) <= 0 then
         if not IsValid(WhiteNoiseStation) then
             sound.PlayFile("sound/whitenoise.wav", "noblock noplay", function(station)
                 if IsValid(station) then
@@ -1546,7 +1547,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	end
 
 	local blood = org.blood or 5000
-	if blood <= 4000 then
+	local bleed = org.bleed or 0
+	-- Play O2 theme when below 3750 health AND actively bleeding out
+	if blood < 3750 and bleed > 0 then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
 			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(station)
@@ -1559,7 +1562,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end)
 		end
 
-		local targetVol = math.Remap(blood, 4000, 0, 0.08, 1)
+		local targetVol = math.Remap(blood, 3750, 0, 0.4, 1)
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)

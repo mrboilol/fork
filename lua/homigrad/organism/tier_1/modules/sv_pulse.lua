@@ -53,7 +53,7 @@ module[2] = function(owner, org, timeValue)
 	-- Convert excess fearadd to despair
 	if org.fearadd > 1.5 then
 		local excessFear = org.fearadd - 1.5
-		local despairConversion = excessFear * timeValue * 0.3
+		local despairConversion = excessFear * timeValue * 0.075
 		org.despair = math.min((org.despair or 0) + despairConversion, 1)
 		org.fearadd = math.max(org.fearadd - despairConversion, 1.5)
 	end
