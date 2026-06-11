@@ -28,6 +28,11 @@ SWEP.modeNames = {
 SWEP.DeploySnd = ""
 SWEP.HolsterSnd = ""
 
+function SWEP:SetupDataTables()
+    self:NetworkVar("Float",0,"Holding")
+    self:NetworkVar("Float",1,"RemainingAmount")
+end
+
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 
@@ -39,6 +44,7 @@ end
 
 SWEP.ofsV = Vector(0,8,-3)
 SWEP.ofsA = Angle(-90,-90,90)
+
 SWEP.modeValuesdef = {
 	[1] = {1, true},
 }
@@ -51,6 +57,14 @@ local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") 
 function SWEP:Think()
 	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 4, 0))
+	end
+	
+	-- Update model scale based on remaining amount (use networked value on client)
+	local remaining = SERVER and self.modeValues[1] or self:GetRemainingAmount()
+	if self.modeValuesdef and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
+		self.ModelScale = math.Clamp(remaining / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
+	else
+		self.ModelScale = self.ModelScale or 1
 	end
 end
 
@@ -109,16 +123,15 @@ if SERVER then
 			self.poisoned2 = nil
 		end
 
+		-- Sync remaining amount to client
+		self:SetRemainingAmount(self.modeValues[1])
+		
 		if self.modeValues[1] != 0 then
 			entOwner:EmitSound("pshiksnd")
 		else
-			//owner:SelectWeapon("weapon_hands_sh")
-			//self:Remove()
-		end
-		
-		-- Update model scale based on remaining amount
-		if self.modeValuesdef and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
-			self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
+			-- No deletion - syringe stays even when empty
+			-- owner:SelectWeapon("weapon_hands_sh")
+			-- self:Remove()
 		end
 	end
 end

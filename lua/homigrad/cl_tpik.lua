@@ -649,13 +649,8 @@ function hg.MainTPIKFunction(ent, ply, wpn)
         end
 
         //local systime = SysTime()
-        -- IK Foot System (TPIK-compatible, uses bone matrix)
-        local ikResult = hg.CalculateIKFoot(ply, ent)
-        if ikResult then
-            hg.ApplyIKFoot(ent, ikResult)
-        end
-        //print("IK Foot: ", SysTime() - systime)
-
+        -- IK Foot System now runs in its own PostPlayerDraw hook (cl_ik_foot.lua)
+        // This prevents conflicts with organism and health indicator systems
         //print("sethandpos: ", SysTime() - systime)
         
         if ply:InVehicle() then

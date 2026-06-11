@@ -332,9 +332,16 @@ end
 --//
 
 --
-local matPistolAmmo = "vgui/hud/bullets/low_caliber"
-local matRfileAmmo = "vgui/hud/bullets/high_caliber"
-local matShotgunAmmo = "vgui/hud/bullets/buck_caliber"
+hg.matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
+hg.matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
+hg.matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
+hg.matPistolAmmoAlt = Material("low_caliberalt.png")
+hg.matRfileAmmoAlt = Material("high_caliberalt.png")
+hg.matShotgunAmmoAlt = Material("buck_caliberalt.png")
+
+local matPistolAmmo = hg.matPistolAmmo
+local matRfileAmmo = hg.matRfileAmmo
+local matShotgunAmmo = hg.matShotgunAmmo
 hg.ammotypes = {
 	["5.56x45mm"] = {
 		name = "5.56x45 mm",
@@ -432,7 +439,7 @@ hg.ammotypes = {
 			Speed = 980,
 			Diameter = 5.56,
 			Mass = 4,
-			Icon = "vgui/hud/556apzcity"
+			Icon = "vgui/hud/hmcd_round_556"
 		}
 	},
 	["7.62x39mmsp"] = {
@@ -466,7 +473,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = "vgui/hud/762spzcity"
+			Icon = "vgui/hud/hmcd_round_556"
 		}
 	},
 	["7.62x39mm"] = {
@@ -500,7 +507,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = "vgui/hud/hmcd_round_76239"
+			Icon = "vgui/hud/hmcd_round_556"
 		}
 	},
 	["7.62x39mmbp"] = {
@@ -534,7 +541,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = "vgui/hud/762bpzcity"
+			Icon = "vgui/hud/hmcd_round_556"
 		}
 	},
 	[".366tkm"] = {
@@ -568,7 +575,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 9.58,
 			Mass = 13.5,
-			Icon = "vgui/hud/762spzcity"
+			Icon = "vgui/hud/hmcd_round_556"
 		}
 	},
 	["5.45x39mm"] = {
@@ -601,7 +608,7 @@ hg.ammotypes = {
 			Speed = 850,
 			Diameter = 5.45,
 			Mass = 4.5,
-			Icon = "vgui/hud/545zcity"
+			Icon = "vgui/hud/hmcd_round_556"
 		}
 	},
 	["metal_debris"] = {
@@ -672,7 +679,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12/8,
 			Mass = 32/8,
-			Icon = "vgui/hud/hmcd_round_12",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(255,0,0)
 		}
 	},
@@ -746,7 +753,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00015,
 			Diameter = 12,
 			Mass = 30,
-			Icon = "vgui/hud/12_70slugzcity",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(12,75,12)
 		}
 	},
@@ -784,7 +791,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00015,
 			Diameter = 12,
 			Mass = 30,
-			Icon = "vgui/hud/bullets/buck_caliber",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(50,110,90)
 		}
 	},
@@ -821,7 +828,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12/8,
 			Mass = 32/8,
-			Icon = "vgui/hud/12_70blankzcity",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(75,75,155),
 			IsBlank = true
 		}
@@ -859,7 +866,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0007,
 			Diameter = 23/10,
 			Mass = 32/10,
-			Icon = "vgui/hud/bullets/buck_caliber",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(255,185,0)
 		}
 	},
@@ -896,7 +903,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0007,
 			Diameter = 23/25,
 			Mass = 32/25,
-			Icon = "vgui/hud/bullets/buck_caliber",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(130,130,130)
 		}
 	},
@@ -933,7 +940,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0009,
 			Diameter = 23,
 			Mass = 40,
-			Icon = "vgui/hud/bullets/buck_caliber",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(255,185,0)
 		}
 	},
@@ -970,7 +977,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12/8,
 			Mass = 32/8,
-			Icon = "vgui/hud/12_70blankzcity",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(255,185,0),
 			Distance = 32,
 		}
@@ -1045,7 +1052,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00025,
 			Diameter = 20/6,
 			Mass = 26/6,
-			Icon = "vgui/hud/bullets/buck_caliber",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(255,150,0)
 		}
 	},
@@ -1082,7 +1089,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00025,
 			Diameter = 20/6,
 			Mass = 26/6,
-			Icon = "vgui/hud/bullets/buck_caliber",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(12,75,12)
 		}
 	},
@@ -1119,7 +1126,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00025,
 			Diameter = 20/6,
 			Mass = 26/6,
-			Icon = "vgui/hud/bullets/buck_caliber",
+			Icon = matShotgunAmmo,
 			ShellColor = Color(195,143,0),
 		}
 	},
@@ -1219,7 +1226,7 @@ hg.ammotypes = {
 			Speed = 352,
 			Diameter = 9,
 			Mass = 7,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["9x19mmqm"] = {
@@ -1285,7 +1292,7 @@ hg.ammotypes = {
 			Speed = 352,
 			Diameter = 9,
 			Mass = 7,
-			Icon = "vgui/hud/75117zcity"
+			Icon = matPistolAmmo
 		}
 	},
 	[".40sw"] = {
@@ -1318,7 +1325,7 @@ hg.ammotypes = {
 			Speed = 256,
 			Diameter = 11.18,
 			Mass = 15,
-			Icon = "vgui/hud/40swzcity"
+			Icon = matPistolAmmo
 		}
 	},
 	[".45acp"] = {
@@ -1417,7 +1424,7 @@ hg.ammotypes = {
 			Speed = 376,
 			Diameter = 10,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["9x19mmgreentracer"] = {
@@ -1484,7 +1491,7 @@ hg.ammotypes = {
 			Speed = 259,
 			Diameter = 11.19,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["9mmpakblank"] = {
@@ -1519,7 +1526,7 @@ hg.ammotypes = {
 			Diameter = 11.19,
 			Distance = 32,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["9mmpakflashdefense"] = {
@@ -1554,7 +1561,7 @@ hg.ammotypes = {
 			Diameter = 11.19,
 			Distance = 32,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["18x45mmtraumatic"] = {
@@ -1600,7 +1607,7 @@ hg.ammotypes = {
 			Speed = 250,
 			Diameter = 18,
 			Mass = 22,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["18x45mmflashdefense"] = {
@@ -1635,7 +1642,7 @@ hg.ammotypes = {
 			Diameter = 18,
 			Distance = 32,
 			Mass = 1180,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["4.6x30mm"] = {
@@ -1733,7 +1740,7 @@ hg.ammotypes = {
 			Speed = 472,
 			Diameter = 10.9,
 			Mass = 13,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	[".357magnum"] = {
@@ -1766,7 +1773,7 @@ hg.ammotypes = {
 			Speed = 450,
 			Diameter = 9,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	[".38special"] = {
@@ -1799,7 +1806,7 @@ hg.ammotypes = {
 			Speed = 290,
 			Diameter = 9.1,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["14.5x114mmb32"] = { -- Салат ты у нас тут балансище, сделаешь конфетку 
@@ -1917,7 +1924,7 @@ hg.ammotypes = {
 			Speed = 440,
 			Diameter = 12.7,
 			Mass = 19,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	[".50actionexpresscopper"] = {
@@ -1950,7 +1957,7 @@ hg.ammotypes = {
 			Speed = 460,
 			Diameter = 12.7,
 			Mass = 19,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	[".50actionexpressjhp"] = {
@@ -1983,7 +1990,7 @@ hg.ammotypes = {
 			Speed = 440,
 			Diameter = 12.7,
 			Mass = 19,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["7.62x51mm"] = {
@@ -2147,7 +2154,7 @@ hg.ammotypes = {
 			Speed = 335,
 			Diameter = 5.72,
 			Mass = 2.5,
-			Icon = "vgui/hud/bullets/low_caliber"
+			Icon = matPistolAmmo
 		}
 	},
 	["rpg-7projectile"] = {
@@ -2501,7 +2508,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0002,
 			Diameter = 9,
 			Mass = 18,
-			Icon = "vgui/hud/bullets/low_caliber",
+			Icon = matPistolAmmo,
 			tranquilizer = true,
 		}
 	},

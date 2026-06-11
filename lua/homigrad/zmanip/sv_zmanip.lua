@@ -13,7 +13,7 @@ end
 hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
 	--print(ent,ent.Use)
 	local org = ply.organism
-	if org and (org.larmamputated or org.rarmamputated) then
+	if org and org.larmamputated then
 		if IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2")) then
 			return false
 		end
@@ -23,20 +23,15 @@ hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
 		if string.find(ent:GetClass(), "prop") or string.find(ent:GetClass(), "breakable") or string.find(ent:GetClass(), "ladder") then return end
 		
 		local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(ply)
-		ply.ZManipInteractCD = CurTime() + (isRight and 0.55 or 0.95)
+		ply.ZManipInteractCD = CurTime() + 0.95
 		ply.ZManipOldUse = ply:KeyDown(IN_USE)
 		local anim = (ent:IsWeapon() or ent.IsZPickup) and "interact" or "use"
 
 		-- Add pain if using broken arm to interact/pickup (only for the arm being used)
 		if org and isBroken then
-			local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
-			local disloc = isRight and org.rarmdislocation or org.larmdislocation
+			local armVal = org.larm or 0
+			local disloc = org.larmdislocation
 			local painAmount = armVal * 12 + (disloc and 8 or 0)
-
-			-- Using right arm makes things better overall (less pain from a broken arm)
-			if isRight then
-				painAmount = painAmount * 0.7
-			end
 			org.painadd = (org.painadd or 0) + painAmount
 		end
 

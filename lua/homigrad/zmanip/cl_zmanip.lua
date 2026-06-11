@@ -185,13 +185,12 @@ function hg.DoZManip(ent, ply)
 		ply.zmodel:SetNoDraw(true)
 	end
 
-	-- Allow zmanip if either arm is available (prioritize healthy arm)
+	-- Allow zmanip if left arm is available
 	local org = ply.organism
 	local leftArmUsable = not (org and org.larmamputated)
-	local rightArmUsable = not (org and org.rarmamputated)
 
-	-- If neither arm is usable, don't do zmanip
-	if not leftArmUsable and not rightArmUsable then return end
+	-- If left arm is not usable, don't do zmanip
+	if not leftArmUsable then return end
 
 	if not ply.zmanipstart or IsValid(ply:GetNetVar("carryent2")) then return end
 	
@@ -273,11 +272,10 @@ function hg.DoZManip(ent, ply)
         end
     end
 
-	-- Determine which arm to use based on availability (prioritize healthy arm or right arm, if using a right arm all of these things become better overall, bypass right arm priority)
+	-- Always use left arm
 	local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(ply)
-	local useRightArm = isRight
-	local handBone = useRightArm and "ValveBiped.Bip01_R_Hand" or "ValveBiped.Bip01_L_Hand"
-	local bones = useRightArm and hg.TPIKBonesRH or hg.TPIKBonesLH
+	local handBone = "ValveBiped.Bip01_L_Hand"
+	local bones = hg.TPIKBonesLH
 
 	local lh = ent:LookupBone(handBone)
 	local lhmat = ent:GetBoneMatrix(lh)

@@ -38,21 +38,9 @@ module[2] = function(owner, org, timeValue)
 	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 	local goodmoodResistance = 1 - goodmood * 0.25
 
-	-- Check for left hand mitigation: working left hand + damaged right hand
-	-- Mitigation applies unless one-handing or left arm is damaged
+	-- Pain mitigation based on left arm health
 	local leftHandHealthy = not org.larmamputated and not (org.larm and org.larm >= 1) and not (org.larmdislocation or org.larmdislocated)
-	local rightHandDamaged = (org.rarm and org.rarm >= 1) or (org.rarmdislocation or org.rarmdislocated) or org.rarmamputated
-	local isOneHanding = false
-	
-	if IsValid(owner) and owner:IsPlayer() then
-		local wep = owner:GetActiveWeapon()
-		isOneHanding = IsValid(wep) and wep.TwoHanded == false
-	end
-	
-	local painMitigation = 1
-	if leftHandHealthy and rightHandDamaged and not isOneHanding then
-		painMitigation = 0.5 -- Halve pain
-	end
+	local painMitigation = leftHandHealthy and 1 or 0.5
 
 	org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 
@@ -134,6 +122,8 @@ module[2] = function(owner, org, timeValue)
 
 	if org.consciousness < 0.1 then
 		org.needotrub = true
+	elseif org.consciousness > 0.4 and (org.blood or 5000) > 3000 and (org.o2 and org.o2[1] or 30) > 15 and (org.shock or 0) < 50 then
+		org.needotrub = false
 	end
 
 	-- Critical blood loss triggers unconsciousness

@@ -1621,24 +1621,12 @@ local IsValid = IsValid
 		local org = ply.organism
 		if not org then return end
 
-		-- Check arm damage states
-		local rightArmBroken = (org.rarm and org.rarm >= 1) or org.rarmamputated or org.rarmdislocation or org.rarmdislocated
-		local leftArmBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
-		local bothArmsBroken = rightArmBroken and leftArmBroken
+		-- Check left arm damage state
+		local leftArmBroken = (org.larm and org.larm >= 1) or org.larmdislocation or org.larmdislocated
 
-		-- Add pain if using damaged arm for interaction
-		if bothArmsBroken and not org.rarmamputated then
-			-- Both broken, using right hand causes pain
-			local painAmount = (org.rarm or 0) * 5 + ((org.rarmdislocation or org.rarmdislocated) and 3 or 0)
-			org.painadd = (org.painadd or 0) + painAmount
-		elseif rightArmBroken and not leftArmBroken and not org.larmamputated then
-			-- Right broken, using left hand causes pain
-			local painAmount = (org.larm or 0) * 5 + ((org.larmdislocation or org.larmdislocated) and 3 or 0)
-			org.painadd = (org.painadd or 0) + painAmount
-		elseif leftArmBroken and not rightArmBroken and not org.rarmamputated then
-			-- Left broken, using right hand causes less pain (right is stronger)
-			local painAmount = (org.rarm or 0) * 5 + ((org.rarmdislocation or org.rarmdislocated) and 3 or 0)
-			painAmount = painAmount * 0.7
+		-- Add pain if using damaged left arm for interaction
+		if leftArmBroken then
+			local painAmount = (org.larm or 0) * 12 + ((org.larmdislocation or org.larmdislocated) and 8 or 0)
 			org.painadd = (org.painadd or 0) + painAmount
 		end
 	end)
@@ -2031,33 +2019,15 @@ end
 
 --\\ GetPrioritizedArm
 	function hg.GetPrioritizedArm(ply)
-		if not IsValid(ply) or not ply.organism then return "right", false, false end
+		if not IsValid(ply) or not ply.organism then return "left", false, false end
 		local org = ply.organism
 
-		local rightArmUsable = not org.rarmamputated
 		local leftArmUsable = not org.larmamputated
-
-		local rightArmHealthy = rightArmUsable and not ((org.rarm and org.rarm >= 1) or org.rarmdislocation)
 		local leftArmHealthy = leftArmUsable and not ((org.larm and org.larm >= 1) or org.larmdislocation)
 
-		local chosenArm = "right"
-		if rightArmHealthy and rightArmUsable then
-			chosenArm = "right"
-		elseif leftArmHealthy and leftArmUsable then
-			chosenArm = "left"
-		elseif rightArmUsable then
-			chosenArm = "right"
-		elseif leftArmUsable then
-			chosenArm = "left"
-		end
-
-		local isRight = (chosenArm == "right")
-		local isBroken = false
-		if isRight then
-			isBroken = ((org.rarm and org.rarm >= 1) or org.rarmdislocation) == true
-		else
-			isBroken = ((org.larm and org.larm >= 1) or org.larmdislocation) == true
-		end
+		local chosenArm = "left"
+		local isRight = false
+		local isBroken = ((org.larm and org.larm >= 1) or org.larmdislocation) == true
 
 		return chosenArm, isRight, isBroken
 	end

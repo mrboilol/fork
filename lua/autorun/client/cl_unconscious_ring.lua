@@ -566,22 +566,17 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         showPulseCheckECG = true
     end
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then return end
-
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     local fibrillating = heartbeat > 250
+
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then return end
     local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring or fibrillating))
 
     local otrubECGAlpha = ringAlpha
     if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then
         -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop or fibrillating
-        -- Only when the organism is in a org.critical state
-        if org.critical then
-            otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.15)
-        else
-            otrubECGAlpha = 0
-        end
+        otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.15)
     end
 
     -- Fade away if consciousness is between 0.4-0.75 and not going down
@@ -649,8 +644,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
-            -- Always use white color when awake (shows consciousness, not brain health)
-            local ecgColor = Color(255, 255, 255, 255 * otrubECGAlpha)
+            -- Use white color when awake, red only if organism is in immediate critical state (not brain damage)
+            local awakeCritical = org.critical or org.heartstop or (heartbeat < 1 and brain >= 0.02)
+            local ecgColor = awakeCritical and Color(255, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
             DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
             
             -- Add consciousness meter ring for low opacity ECG when consciousness is low or recently dropped
@@ -787,6 +783,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Show "Theres nothing you can do." when otrub and critical
     if isUnconscious and isCritical and otrubECGAlpha > 0.01 then
-        draw.SimpleText("Theres nothing you can do.", "OtrubCriticalMessage", ScrW() / 2, ScrH() * 0.92, Color(255, 0, 0, 255 * otrubECGAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        -- Calculate fade-in based on how critical the condition is (progress from brain damage)
+        local criticalProgress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
+        local textAlpha = 255 * otrubECGAlpha * criticalProgress
+        draw.SimpleText("Theres nothing you can do.", "OtrubCriticalMessage", ScrW() / 2, ScrH() * 0.35, Color(255, 0, 0, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 end)

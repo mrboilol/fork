@@ -29,6 +29,12 @@ SWEP.modeNames = {
 }
 SWEP.ofsV = Vector(0,8,-3)
 SWEP.ofsA = Angle(-90,-90,90)
+
+function SWEP:SetupDataTables()
+    self:NetworkVar("Float",0,"Holding")
+    self:NetworkVar("Float",1,"RemainingAmount")
+end
+
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 
@@ -49,6 +55,14 @@ local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") 
 function SWEP:Think()
 	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 4, 0))
+	end
+	
+	-- Update model scale based on remaining amount (use networked value on client)
+	local remaining = SERVER and self.modeValues[1] or self:GetRemainingAmount()
+	if self.modeValuesdef and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
+		self.ModelScale = math.Clamp(remaining / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
+	else
+		self.ModelScale = self.ModelScale or 1
 	end
 end
 
@@ -88,14 +102,13 @@ if SERVER then
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
 		end
 
-		if self.modeValues[1] <= 0 and self.ShouldDeleteOnFullUse then
-			owner:SelectWeapon("weapon_hands_sh")
-			self:Remove()
-		end
+		-- Sync remaining amount to client
+		self:SetRemainingAmount(self.modeValues[1])
 		
-		-- Update model scale based on remaining amount
-		if self.modeValuesdef and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
-			self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
-		end
+		-- No deletion - syringe stays even when empty
+		-- if self.modeValues[1] <= 0 and self.ShouldDeleteOnFullUse then
+		-- 	owner:SelectWeapon("weapon_hands_sh")
+		-- 	self:Remove()
+		-- end
 	end
 end

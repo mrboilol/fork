@@ -195,16 +195,11 @@ hook.Add("EntityTakeDamage", "hg_adrenalinemusic_combat", function(ent, dmgInfo)
 	local damage = dmgInfo:GetDamage()
 	local damageType = dmgInfo:GetDamageType()
 	
-	-- Only trigger for damage from players, NPCs, or suppression
-	-- Exclude fall damage, burn damage, and other natural causes
-	local validAttacker = IsValid(attacker) and (attacker:IsPlayer() or attacker:IsNPC())
-	local isSuppressionDamage = damageType == DMG_CRUSH or damageType == DMG_BLAST
-	local isCombatDamage = validAttacker or isSuppressionDamage
-	
 	-- Exclude fall damage (DMG_FALL) and burn damage (DMG_BURN, DMG_SLOWBURN)
 	local isNaturalDamage = damageType == DMG_FALL or damageType == DMG_BURN or damageType == DMG_SLOWBURN
 	
-	if damage > 0 and isCombatDamage and not isNaturalDamage then
+	-- Trigger combat for any damage that isn't natural (fall/burn)
+	if damage > 0 and not isNaturalDamage then
 		hg.lastCombatTime = CurTime()
 	end
 end)

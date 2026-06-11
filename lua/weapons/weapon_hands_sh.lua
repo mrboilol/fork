@@ -714,9 +714,17 @@ function SWEP:SetHandPos(noset)
 	-- ply:SetupBones()
 
 	local ent = self:GetNWEntity("carryent")
-	local twohands = (ply:GetNetVar("carrymass",0) ~= 0 and ply:GetNetVar("carrymass",0) or ply:GetNetVar("carrymass2",0)) > 15
-	self.rhandik = (self:GetFists()) or (IsValid(ent) and twohands)
-	self.lhandik = (self:GetFists() and hg.CanUseLeftHand(ply)) or IsValid(ent)
+	
+	-- Use the actual hand usage state from pickup logic
+	if IsValid(ent) then
+		-- When carrying, use the stored hand usage state
+		self.rhandik = self.UsingRightHand or false
+		self.lhandik = self.UsingLeftHand or false
+	else
+		-- When not carrying, use fists state
+		self.rhandik = self:GetFists()
+		self.lhandik = self:GetFists() and hg.CanUseLeftHand(ply)
+	end
 
 	local bones2 = hg.TPIKBonesOther
 
@@ -1429,7 +1437,12 @@ function SWEP:ApplyForce()
 		if self.UsingBothHands then
 			mul = mul * 1.4 -- Both hands are significantly stronger
 		elseif self.UsingRightHand and not self.UsingLeftHand then
-			mul = mul * 1.15 -- Right hand is slightly stronger than normal
+			if self.BothArmsBroken then
+				-- Both arms broken, using right arm with normal strength
+				mul = mul * 1.0
+			else
+				mul = mul * 1.15 -- Right hand is slightly stronger than normal
+			end
 		elseif self.UsingLeftHand and not self.UsingRightHand then
 			mul = mul * 0.9 -- Left hand is slightly weaker than normal
 		end

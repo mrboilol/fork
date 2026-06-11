@@ -277,7 +277,7 @@ module[2] = function(owner, org, mulTime)
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.01 * totalAdrenaline, 0)
 	end
 
-	local bleed = org.internalBleed / 14 -- + org.lungsR[3] + org.lungsL[3]
+	local bleed = org.internalBleed / 28 -- + org.lungsR[3] + org.lungsL[3]
 	org.internalBleed = math.Approach(org.internalBleed, 0, org.internalBleedHeal > 0 and mulTime / 2 or mulTime / 55)
 	coagulatespeed = coagulatespeed + mulTime
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)

@@ -33,8 +33,8 @@ hg.IKFootConfig = {
 	enabled = CreateConVar("hg_ik_foot_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable IK Foot system"),
 	groundDistance = CreateClientConVar("hg_ik_foot_ground_dist", "70", true, false, "Ground trace distance"),
 	legLength = CreateClientConVar("hg_ik_foot_leg_length", "45", true, false, "Leg length for IK"),
-	smoothing = CreateClientConVar("hg_ik_foot_smoothing", "17", true, false, "Smoothing factor (1-50)"),
-	rotationSmoothing = CreateClientConVar("hg_ik_foot_rotation_smoothing", "20", true, false, "Rotation smoothing (1-60)"),
+	smoothing = CreateClientConVar("hg_ik_foot_smoothing", "30", true, false, "Smoothing factor (1-50)"),
+	rotationSmoothing = CreateClientConVar("hg_ik_foot_rotation_smoothing", "40", true, false, "Rotation smoothing (1-60)"),
 	bodyDrop = CreateClientConVar("hg_ik_foot_body_drop", "0.3", true, false, "Body drop amount (flat)"),
 	bodyDropUneven = CreateClientConVar("hg_ik_foot_body_drop_uneven", "1.2", true, false, "Body drop amount (uneven)"),
 	unevenDropScale = CreateClientConVar("hg_ik_foot_uneven_drop_scale", "0.15", true, false, "Height diff multiplier"),
@@ -718,6 +718,9 @@ function hg.CalculateIKFoot(ply, ent)
 	if not hg.IKFootConfig.enabled:GetBool() then return nil end
 	if ply:InVehicle() then return nil end
 	
+	-- Don't run IK if organism is in critical state to avoid animation conflicts
+	if ply.organism and (ply.organism.otrub or ply.organism.brain > 0.1) then return nil end
+	
 	local state = GetIKState(ply)
 	local dt = math.Clamp(FrameTime(), 1/300, 1/20)
 	
@@ -1061,16 +1064,16 @@ function hg.CalculateIKFoot(ply, ent)
 		desiredDrop = math.Clamp(desiredDrop, 0, math.max(dropCap, 2))
 		
 		if state.bodyDrop then
-			local maxStep = math.max(10 * dt * 60, 1.5)
+			local maxStep = math.max(5 * dt * 60, 0.8)
 			if stairRuntime.mode then
 				local adaptiveBoost = stairRuntime.eventHeight * math.Clamp(stairStepMul, 0.25, 2)
-				maxStep = maxStep + math.Clamp(adaptiveBoost * 0.55, 0, 24)
+				maxStep = maxStep + math.Clamp(adaptiveBoost * 0.3, 0, 12)
 				if stairRuntime.downHeight > stairRuntime.upHeight then
-					maxStep = maxStep * 0.82
+					maxStep = maxStep * 0.7
 				end
 			end
 			if crouch.inTransition then
-				maxStep = maxStep * 0.35
+				maxStep = maxStep * 0.25
 				local transitionBlend = math.Clamp(crouch.transitionTime / CROUCH_BLEND_TIME, 0, 1)
 				desiredDrop = desiredDrop * transitionBlend
 			end
@@ -1190,7 +1193,7 @@ function hg.CalculateIKFoot(ply, ent)
 	}
 end
 
--- Apply IK using blended bone manipulation with spring smoothing
+-- Apply IK using blended bone manipulation with spring smoothing (compatible with organism/health indicator)
 function hg.ApplyIKFoot(ent, ikResult)
 	if not ikResult then return end
 	
@@ -1259,7 +1262,7 @@ concommand.Add("hg_ik_foot_reset", function()
 	chat.AddText(Color(100, 255, 100), "[HG IK Foot] ", Color(255, 255, 255), "Reset complete")
 end)
 
--- Spring smoothing for smooth bone movement
+-- Spring smoothing for smooth bone movement (from iker foot reference)
 local function IsFiniteNumber(value)
 	return isnumber(value) and value == value and value > -math.huge and value < math.huge
 end
@@ -1407,7 +1410,7 @@ local function StripIKFromBones(ply, bones)
 	local posEntry = blendState.pos[0]
 	if posEntry and posEntry.applied and posEntry.final then
 		local current = GetCurrentBonePosition(ply, 0)
-		if VecNear(current, posEntry.final, STRIP_POS_EPS or 0.1) then
+		if VecNear(current, posEntry.final, 0.1) then
 			SetBonePosition(ply, 0, current - posEntry.applied)
 		end
 	end
@@ -1418,7 +1421,7 @@ local function StripIKFromBones(ply, bones)
 			local angEntry = blendState.ang[bone]
 			if angEntry and angEntry.applied and angEntry.final then
 				local current = GetCurrentBoneAngles(ply, bone)
-				if AngNear(current, angEntry.final, STRIP_ANG_EPS or 0.15) then
+				if AngNear(current, angEntry.final, 0.15) then
 					SetBoneAngles(ply, bone, Angle(current.p - angEntry.applied.p, current.y - angEntry.applied.y, current.r - angEntry.applied.r))
 				end
 			end
@@ -1449,7 +1452,7 @@ end
 
 local RESET_COOLDOWN = 0.5
 
--- Main IK hook - runs every frame for every player
+-- Main IK hook - runs every frame for every player (compatible with organism/health indicator)
 hook.Add("PostPlayerDraw", "HG_IKFoot_PostPlayerDraw", function(ply)
 	if not IsValid(ply) then return end
 
@@ -1472,6 +1475,12 @@ hook.Add("PostPlayerDraw", "HG_IKFoot_PostPlayerDraw", function(ply)
 	end
 
 	if ply:InVehicle() then
+		hg.ResetIKFoot(ply)
+		return
+	end
+
+	-- Don't run IK if organism is in critical state to avoid animation conflicts
+	if ply.organism and (ply.organism.otrub or ply.organism.brain > 0.1) then
 		hg.ResetIKFoot(ply)
 		return
 	end

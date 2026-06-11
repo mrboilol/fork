@@ -951,7 +951,23 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
-		local ammotype = (hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon) or matPistolAmmo
+		local ammotype = (hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon) or hg.matPistolAmmoAlt
+		if isstring(ammotype) then
+			local success, mat = pcall(Material, ammotype)
+			if success and mat then
+				ammotype = mat
+			else
+				-- Fallback to alt materials based on ammo type
+				local ammoName = self.Primary.Ammo
+				if string.find(ammoName, "12/70") or string.find(ammoName, "23x75") or string.find(ammoName, "20/70") then
+					ammotype = hg.matShotgunAmmoAlt
+				elseif string.find(ammoName, "5.56") or string.find(ammoName, "7.62") or string.find(ammoName, "5.45") or string.find(ammoName, ".50") or string.find(ammoName, "14.5") then
+					ammotype = hg.matRfileAmmoAlt
+				else
+					ammotype = hg.matPistolAmmoAlt
+				end
+			end
+		end
 		self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
 		
 		self.isscoping = false
