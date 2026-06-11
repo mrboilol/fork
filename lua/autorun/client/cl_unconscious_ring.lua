@@ -576,7 +576,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local otrubECGAlpha = ringAlpha
     if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then
         -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop or fibrillating
-        otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.3)
+        -- But prevent red ECG (isCritical) unless org.critical == true
+        if isCritical and not org.critical then
+            otrubECGAlpha = 0
+        else
+            otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.3)
+        end
     end
 
     -- Fade away if consciousness is between 0.4-0.75 and not going down

@@ -140,7 +140,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	
 	-- Debug output every 0.5 seconds
 	if CurTime() % 0.5 < 0.1 then
-		MsgN("[AdrenalineMusic] Triggers - adr:", adrenaline, " adrAdd:", adrenalineAdd, " fear:", fear, " combat:", panicTrigger, " shouldPlay:", shouldPlay, " org valid:", org ~= nil)
+		MsgN("[AdrenalineMusic] Triggers - adr:", adrenaline, " adrAdd:", adrenalineAdd, " fear:", fear, " combat:", panicTrigger, " shouldPlay:", shouldPlay, " org valid:", org ~= nil, " station valid:", IsValid(hg.adrenalineMusicStation), " vol:", hg.adrenalineMusicVol, " convar:", hg_adrenalinemusic:GetBool())
 	end
 
 	-- Track values for other systems but don't use them for triggering
