@@ -41,7 +41,6 @@ SWEP.ofsA = Angle(-90,-90,90)
 SWEP.modeValuesdef = {
 	[1] = {1, true},
 }
-SWEP.ShouldDeleteOnFullUse = true
 
 SWEP.showstats = true
 
@@ -67,7 +66,7 @@ function SWEP:OwnerChanged()
 	end
 end
 
-if SERVER then
+	if SERVER then
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage()
@@ -88,25 +87,25 @@ if SERVER then
 
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 
-		-- Apply full dose at once (one-time use)
-		local dose = self.modeValues[1]
+		-- Apply dose incrementally (proportional to usage)
+		local injected = math.min(FrameTime() * 1, self.modeValues[1])
 
 		-- Big analgesia: 1 dose = 20 analgesia
-		org.analgesia = math.min(org.analgesia + dose * 20, 20)
+		org.analgesia = math.min(org.analgesia + injected * 20, 20)
 
 		-- Tranquilizer effect: 1 dose = 50 tranquilizer
-		org.tranquilizer = math.min(org.tranquilizer + dose * 50, 50)
+		org.tranquilizer = math.min(org.tranquilizer + injected * 50, 50)
 
-		self.modeValues[1] = 0
+		self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)
 
 		owner.injectedinto = owner.injectedinto or {}
 		owner.injectedinto[org.owner] = owner.injectedinto[org.owner] or 0
-		owner.injectedinto[org.owner] = owner.injectedinto[org.owner] + dose
+		owner.injectedinto[org.owner] = owner.injectedinto[org.owner] + injected
 
-		if owner.injectedinto[org.owner] > 1 and dose > 0 then
+		if owner.injectedinto[org.owner] > 1 and injected > 0 then
 			local dmgInfo = DamageInfo()
 			dmgInfo:SetAttacker(owner)
-			hook.Run("HomigradDamage", org.owner, dmgInfo, HITGROUP_RIGHTARM, hg.GetCurrentCharacter(org.owner), dose * (zb.MaximumHarm or 10))
+			hook.Run("HomigradDamage", org.owner, dmgInfo, HITGROUP_RIGHTARM, hg.GetCurrentCharacter(org.owner), injected * (zb.MaximumHarm or 10))
 		end
 
 		if self.poisoned2 then
@@ -115,11 +114,13 @@ if SERVER then
 			self.poisoned2 = nil
 		end
 
-		entOwner:EmitSound("pshiksnd")
-
-		if self.ShouldDeleteOnFullUse then
-			owner:SelectWeapon("weapon_hands_sh")
-			self:Remove()
+		if self.modeValues[1] != 0 then
+			entOwner:EmitSound("pshiksnd")
+		else
+			if self.ShouldDeleteOnFullUse then
+				owner:SelectWeapon("weapon_hands_sh")
+				self:Remove()
+			end
 		end
 	end
 end

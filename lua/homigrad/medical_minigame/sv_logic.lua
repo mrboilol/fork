@@ -381,15 +381,15 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
     local owner = wep:GetOwner()
     if not IsValid(owner) then return end
 
-    -- For one-time use items (tranexamic acid, horse tranq, fury, adrenaline, etc.), don't consume during minigame - only consume on completion
+    -- For one-time use items (tranexamic acid, fury, adrenaline, etc.), don't consume during minigame - only consume on completion
     local class = wep:GetClass()
-    local isIncremental = (class == "weapon_morphine" or class == "weapon_fentanyl" or
+    local isIncremental = (class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_horse_tranq" or
                            (class == "weapon_medkit_sh" and wep.mode == 3))
 
     if not isIncremental then
         -- Just play sound during minigame, don't consume
         local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-        if class == "weapon_horse_tranq" or class == "weapon_fury13" or class == "weapon_fury16" then
+        if class == "weapon_fury13" or class == "weapon_fury16" then
             entOwner:EmitSound("pshiksnd")
         elseif class == "weapon_painkillers" then
             -- Painkillers don't play injection sound
@@ -428,6 +428,25 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
             local overdoseMul = class == "weapon_fentanyl" and (zb and zb.MaximumHarm or 10) or (zb and zb.MaximumHarm or 1)
             local character = (hg and hg.GetCurrentCharacter) and hg.GetCurrentCharacter(org.owner) or org.owner
             hook.Run("HomigradDamage", org.owner, dmgInfo, HITGROUP_RIGHTARM, character, consumedAmount * overdoseMul)
+        end
+
+        entOwner:EmitSound("pshiksnd")
+    elseif class == "weapon_horse_tranq" then
+        -- Big analgesia: 1 dose = 20 analgesia
+        org.analgesia = math.min(org.analgesia + consumedAmount * 20, 20)
+
+        -- Tranquilizer effect: 1 dose = 50 tranquilizer
+        org.tranquilizer = math.min(org.tranquilizer + consumedAmount * 50, 50)
+
+        owner.injectedinto = owner.injectedinto or {}
+        owner.injectedinto[org.owner] = owner.injectedinto[org.owner] or 0
+        owner.injectedinto[org.owner] = owner.injectedinto[org.owner] + consumedAmount
+
+        if owner.injectedinto[org.owner] > 1 and consumedAmount > 0 then
+            local dmgInfo = DamageInfo()
+            dmgInfo:SetAttacker(owner)
+            local character = (hg and hg.GetCurrentCharacter) and hg.GetCurrentCharacter(org.owner) or org.owner
+            hook.Run("HomigradDamage", org.owner, dmgInfo, HITGROUP_RIGHTARM, character, consumedAmount * (zb and zb.MaximumHarm or 10))
         end
 
         entOwner:EmitSound("pshiksnd")
@@ -668,7 +687,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
 
         -- Call Heal for syringe-type weapons that are NOT handled incrementally in ApplySyringeProgress
         local class = wep:GetClass()
-        local handledIncrementally = (class == "weapon_morphine" or class == "weapon_fentanyl" or
+        local handledIncrementally = (class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_horse_tranq" or
                                       (class == "weapon_medkit_sh" and wep.mode == 3))
 
         if wep.Heal and not handledIncrementally then

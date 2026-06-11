@@ -62,6 +62,23 @@ PLUGIN.SurfaceHardness = {
 	[MAT_GLASS] = 0.6,
 }
 
+PLUGIN.SurfaceImpactSounds = {
+	[MAT_METAL] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
+	[MAT_COMPUTER] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
+	[MAT_VENT] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
+	[MAT_GRATE] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
+	[MAT_FLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
+	[MAT_ALIENFLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
+	[MAT_SAND] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
+	[MAT_DIRT] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
+	[MAT_WOOD] = {"ric_wood1.ogg", "ric_wood2.ogg", "ric_wood3.ogg", "ric_wood4.ogg"},
+	[MAT_FOLIAGE] = {"ric_wood1.ogg", "ric_wood2.ogg", "ric_wood3.ogg", "ric_wood4.ogg"},
+	[MAT_CONCRETE] = {"ric_stone1.ogg", "ric_stone2.ogg", "ric_stone3.ogg"},
+	[MAT_TILE] = {"ric_stone1.ogg", "ric_stone2.ogg", "ric_stone3.ogg"},
+	[MAT_GLASS] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
+	[MAT_PLASTIC] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
+}
+
 PLUGIN.Bullet_StandartMask = MASK_SHOT
 
 --\\Misc
@@ -738,13 +755,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			len_before = len_before - math.min(resist_mul * self.AirResistMul * 140 * len_subtract_frac * len_before * len_before, len_before)	--; Не подтверждено ни чем
 			len = math.min(len, len_before)
 			
-			if(SERVER)then
-				local rnd = math.random(12)
-				if rnd == 8 then rnd = 9 end
-				sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
-				--sound.Play("snd_jack_hmcd_ricochet_" .. math.random(1, 2) .. ".wav", trace.HitPos, 75, math.random(90, 110))
-				--sound.Play("weapons/arccw/ricochet0" .. math.random(1, 5) .. "_quiet.wav", trace.HitPos, 75, math.random(90, 110))
-			end
+			PLUGIN.PlayImpactSound(trace, true)
 			
 			if(self.PostRicochet)then
 				self:PostRicochet(new_vel_normal, len, ricochet, ang_diff, len_before, trace)
@@ -770,6 +781,8 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			end
 			
 			if(stopped)then
+				PLUGIN.PlayImpactSound(trace, false)
+				
 				if(self.OnStopped) then
 					self:OnStopped(nil, "hit", trace)
 				end
@@ -874,6 +887,37 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 --\\Calculations
 	function PLUGIN.CalcMaterialResist(material, mul)
 		return (PLUGIN.SurfaceHardness[material] or PLUGIN.DefaultSurfaceHardness) * (mul or 0.01)
+	end
+
+	function PLUGIN.PlayImpactSound(trace, is_ricochet)
+		if(SERVER)then
+			local mat_type = trace.MatType
+			local sounds = PLUGIN.SurfaceImpactSounds[mat_type]
+			
+			if(sounds and #sounds > 0)then
+				local sound_file = sounds[math.random(1, #sounds)]
+				local sound_path = "bullet/" .. sound_file
+				
+				if(is_ricochet)then
+					if(math.random(1, 3) == 1)then
+						sound.Play(sound_path, trace.HitPos, 75, math.random(90, 110))
+						return true
+					end
+				else
+					if(math.random(1, 3) == 1)then
+						sound.Play(sound_path, trace.HitPos, 75, math.random(90, 110))
+						return true
+					end
+				end
+			end
+			
+			if(is_ricochet)then
+				local rnd = math.random(4)
+				sound.Play("bullet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
+			end
+		end
+		
+		return false
 	end
 
 	function PLUGIN.CalcVelocityLostInMaterial(material, dist, len_before)

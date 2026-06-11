@@ -635,8 +635,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             else
                 local isFlatline = heartbeat < 1
-                if isFlatline and not flatlinePlayedThisUnconscious and otrubECGAlpha > 0 then
-                    EmitRingSound(SOUND_FLATLINE, math.Clamp(0.8 * otrubECGAlpha, 0, 1))
+                if isFlatline and not flatlinePlayedThisUnconscious then
+                    EmitRingSound(SOUND_FLATLINE, 1.0)
                     flatlinePlayedThisUnconscious = true
                 end
                 UpdateRingAudio(heartbeat, otrubECGAlpha, org, admiring)
