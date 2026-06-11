@@ -108,16 +108,6 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
-	-- Prevent playing if recently recovered from severe pain (within 30 seconds)
-	if pain > 70 then
-		hg.lastSeverePainTime = CurTime()
-	end
-	if (hg.lastSeverePainTime or 0) > CurTime() - 30 then
-		stop_adrenaline_music(true)
-		MsgN("[AdrenalineMusic] Blocked: recently recovered from severe pain")
-		return
-	end
-
 	local shouldPlay = false
 	local adrenalineAdd = org.adrenalineAdd or 0
 	local despair = org.despair or 0
@@ -127,6 +117,16 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	local blood = org.blood or 0
 	local o2 = org.o2 and org.o2.curregen or 0
 	local pulse = org.pulse or 0
+
+	-- Prevent playing if recently recovered from severe pain (within 30 seconds)
+	if pain > 70 then
+		hg.lastSeverePainTime = CurTime()
+	end
+	if (hg.lastSeverePainTime or 0) > CurTime() - 30 then
+		stop_adrenaline_music(true)
+		MsgN("[AdrenalineMusic] Blocked: recently recovered from severe pain")
+		return
+	end
 
 
 	-- Play if triggered by adrenaline, fear, or panic (recent damage from player/NPC/suppression)
