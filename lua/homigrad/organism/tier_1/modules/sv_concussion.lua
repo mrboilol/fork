@@ -4,7 +4,6 @@ local module = hg.organism.module.concussion
 module[1] = function(org)
     org.concussion = 0
     org.concussionTracker = 0
-    org.brainBleedTriggered = false
 end
 
 module[2] = function(ply, org, timeValue)
@@ -33,16 +32,6 @@ module[2] = function(ply, org, timeValue)
 
         if org.concussion > 3 then
              org.needfake = true
-
-             -- Trigger brain bleed for severe concussion (one-time per event)
-             if org.concussion >= 3 and not org.brainBleedTriggered then
-                 org.brainBleed = math.min((org.brainBleed or 0) + 0.4, 1.0)
-                 org.brain = math.min((org.brain or 0) + 0.025, 1.0)
-                 org.brainBleedTriggered = true
-             end
-        else
-             -- Reset trigger when concussion drops below 3
-             org.brainBleedTriggered = false
         end
     end
 end

@@ -80,13 +80,13 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	end
 
 	-- Prevent playing if under noradrenaline influence (fury-13)
-	if (org.noradrenaline or 0) > 0.25 then
+	if (org.noradrenaline or 0) > 0.01 then
 		stop_adrenaline_music(true)
 		return
 	end
 
 	-- Prevent playing if under berserk influence
-	if (org.berserk or 0) > 0.25 then
+	if (org.berserk or 0) > 0.01 then
 		stop_adrenaline_music(true)
 		return
 	end
@@ -125,12 +125,13 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
-	-- Play if triggered by adrenaline, fear, or panic (recent damage)
+	-- Play if triggered by adrenaline, adrenalineAdd, fear, or panic (recent damage)
 	local adrenalineTrigger = (adrenaline or 0) > 0.25
+	local adrenalineAddTrigger = (adrenalineAdd or 0) > 0.25
 	local fearTrigger = (fear or 0) > 0.25
 	local panicTrigger = CurTime() - hg.lastCombatTime < 15
 	
-	if adrenalineTrigger or fearTrigger or panicTrigger then
+	if adrenalineTrigger or adrenalineAddTrigger or fearTrigger or panicTrigger then
 		shouldPlay = true
 	end
 

@@ -381,12 +381,13 @@ function HUD_DrawDynamicIndicator()
         blinkModel:AddCallback("BuildBonePositions", SyncBonesCallback)
     end
 
-    if healthModel:GetModel() ~= ply:GetModel() then
+    if healthModel:GetModel() ~= ply:GetModel() or (ply.PlayerClassName ~= healthModel.lastPlayerClassName) then
         healthModel:SetModel(ply:GetModel())
         blinkModel:SetModel(ply:GetModel())
         InitBlinkModel(blinkModel)
         boneStates = {}
         fadingBones = {}
+        healthModel.lastPlayerClassName = ply.PlayerClassName
         
         if healthModel.accessories then
             for _, v in pairs(healthModel.accessories) do
@@ -448,7 +449,7 @@ function HUD_DrawDynamicIndicator()
                 end
             elseif spine1Broken then
                 -- Both legs are broken
-                if organName == "lleg" or organName == "rleg" or organName == "pelvis" then
+                if organName == "lleg" or organName == "rleg" then
                     isBroken = true
                 end
             end
@@ -566,7 +567,7 @@ function HUD_DrawDynamicIndicator()
     local viewX, viewY
     
     -- Position at bottom left of screen
-    viewX = ScreenScaleFixed(50) -- Left margin
+    viewX = ScreenScaleFixed(30) -- Left margin
     viewY = ScrH() - h - ScreenScaleFixed(50) -- Position at bottom with margin
     
     -- Store indicator position and size for moodle adjustment
@@ -882,18 +883,18 @@ function HUD_DrawDynamicIndicator()
 
     -- Draw bleeding icons as 2D overlays so they always render on top of model bones
     if #bleedScreen2D > 0 then
-        local iconSize = ScreenScaleFixed(24)
+        local iconSize = ScreenScaleFixed(36)
         for _, data in ipairs(bleedScreen2D) do
             local severity = data.severity
             local isArterial = data.isArterial
             local r, g, b, mat
             
-            if severity >= 0.8 or isArterial then
+            if severity >= 1.5 or isArterial then
                 -- Show bigbleeding.png for severe bleeding (~200ml/min+) or arterial wounds
                 mat = bigBleedIconMat
                 -- Dark yellow to dark red based on severity
                 -- Dark Yellow (180, 160, 0) -> Dark Red (120, 0, 0)
-                local progress = math.Clamp((severity - 0.8) / 2.0, 0, 1)
+                local progress = math.Clamp((severity - 1.5) / 2.0, 0, 1)
                 r = math.floor(180 - 60 * progress)
                 g = math.floor(160 * (1 - progress))
                 b = 0

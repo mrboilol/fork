@@ -50,6 +50,14 @@ module[2] = function(owner, org, timeValue)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
+	-- Convert excess fearadd to despair
+	if org.fearadd > 1.5 then
+		local excessFear = org.fearadd - 1.5
+		local despairConversion = excessFear * timeValue * 0.3
+		org.despair = math.min((org.despair or 0) + despairConversion, 1)
+		org.fearadd = math.max(org.fearadd - despairConversion, 1.5)
+	end
+
 	local heartbeat = org.pulse < 70 and 70 + (70 - org.pulse) * 4 or org.pulse
 
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
@@ -165,6 +173,12 @@ module[2] = function(owner, org, timeValue)
 	if org.bloodpressure < 55 then
 		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
 		org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
+	end
+
+	-- Low pulse affects consciousness (below 40 BPM)
+	if org.pulse < 40 then
+		local pulseK = math.Clamp((40 - org.pulse) / 40, 0, 1)
+		org.consciousness = math.max(org.consciousness - timeValue * pulseK * 0.15, 0)
 	end
 
 	if org.bloodpressure > 115 then

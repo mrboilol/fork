@@ -89,6 +89,33 @@ local function GetHeartbeatVolume(org)
     return math.Clamp(0.2 + hurt, 0.2, 1.0)
 end
 
+local function GetHeartbeatVolumeAdmiring(org, admiring)
+    if not org then return 0.2 end
+    if admiring then
+        -- When admiring self, make heartbeats loud and clear with abnormal heart rate
+        local abnormalPulse = (org.heartbeat < 40 and org.heartbeat >= 1) or org.heartbeat > 100
+        if abnormalPulse then
+            return 1.0 -- Maximum volume when admiring with abnormal heart rate
+        end
+    end
+    -- Normal volume calculation
+    local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
+         + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
+         + math.Clamp(org.brain or 0, 0, 1) * 0.2
+    
+    -- Movement-based volume modifier - heartbeats should be louder when moving
+    local ply = LocalPlayer()
+    local movementBonus = 0
+    if IsValid(ply) and ply:Alive() then
+        local vel = ply:GetVelocity()
+        local speed = vel:Length()
+        -- Add volume based on movement speed (0 to 0.3 bonus)
+        movementBonus = math.Clamp(speed / 200, 0, 0.3)
+    end
+    
+    return math.Clamp(0.2 + hurt + movementBonus, 0.2, 1.0)
+end
+
 -- Phase crossing detection from oldring
 local function PhaseCrossed(prev, curr, threshold)
     if prev <= curr then
@@ -216,7 +243,7 @@ local function EmitRingSound(soundPath, volume)
 end
 
 -- Update ring audio with phase-based triggering from oldring
-local function UpdateRingAudio(pulse, ringAlpha, org)
+local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
     if pulse < 1 or ringAlpha <= 0 then return end
 
     local prev = lastPhaseMod
@@ -233,6 +260,11 @@ local function UpdateRingAudio(pulse, ringAlpha, org)
                  + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
                  + math.Clamp(org.brain or 0, 0, 1) * 0.2
             highStress = hurt > 0.3
+        end
+
+        -- When admiring with abnormal pulse, use full volume
+        if admiring and abnormalPulse then
+            beatVolume = 1.0
         end
 
         if abnormalPulse or highStress then
@@ -449,6 +481,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     wasHeartbeatZero = heartbeat < 1
     
+    -- Reset flatline flag when becoming unconscious to ensure asystole plays
+    if isUnconscious and not wasUnconsciousState then
+        flatlinePlayedThisUnconscious = false
+    end
+    
     local className = ply.PlayerClassName
     local isNearDeathClass = nearDeathClasses[className] == true
     
@@ -529,20 +566,21 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         showPulseCheckECG = true
     end
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop) then return end
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then return end
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
-    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring))
+    local fibrillating = heartbeat > 250
+    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring or fibrillating))
 
     local otrubECGAlpha = ringAlpha
-    if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop) then
-        -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop
+    if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then
+        -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop or fibrillating
         otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.3)
     end
 
     -- Fade away if consciousness is between 0.4-0.75 and not going down
-    if consciousness >= 0.4 and consciousness < 0.75 and not recentSuddenDrop and not isUnconscious and not lowConsciousness and not abnormalPulse and not admiring then
+    if consciousness >= 0.4 and consciousness < 0.75 and not recentSuddenDrop and not isUnconscious and not lowConsciousness and not abnormalPulse and not admiring and not fibrillating then
         -- Check if consciousness is stable (not dropping)
         if consciousnessDelta >= -0.01 then
             otrubECGAlpha = Lerp(FrameTime() * 2, otrubECGAlpha, 0)
@@ -601,13 +639,26 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     EmitRingSound(SOUND_FLATLINE, math.Clamp(0.8 * otrubECGAlpha, 0, 1))
                     flatlinePlayedThisUnconscious = true
                 end
-                UpdateRingAudio(heartbeat, otrubECGAlpha, org)
+                UpdateRingAudio(heartbeat, otrubECGAlpha, org, admiring)
                 DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ringColor, otrubECGAlpha)
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
             local ecgColor = isCritical and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
             DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
+            
+            -- Add consciousness meter ring for low opacity ECG when consciousness is low or recently dropped
+            if recentSuddenDrop or consciousness < 0.6 then
+                local ringRadius = 280
+                local ringThickness = 12
+                local consciousnessProgress = math.Clamp(lerpConsciousness, 0, 1)
+                local ringColor = isCritical and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(220, 220, 220, 255 * otrubECGAlpha)
+                
+                -- Draw background ring
+                DrawArc(centerX, centerY, ringRadius, ringThickness, 0, 360, 60, Color(40, 40, 40, 100 * otrubECGAlpha))
+                -- Draw consciousness progress ring (1.0 = full circle, 0 = empty)
+                DrawArc(centerX, centerY, ringRadius, ringThickness, 90, 90 - (consciousnessProgress * 360), 80, ringColor)
+            end
         end
     end
 
@@ -696,10 +747,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 if currentHeartBeat > lastHeartBeat then
                     lastHeartBeat = currentHeartBeat
 
-                    local vol = GetHeartbeatVolume(org)
+                    local vol = GetHeartbeatVolumeAdmiring(org, admiring)
                     local hasHealthHUD = (className == "Gordon" or className == "Combine" or className == "furry")
                     local highStress = vol > 0.5
-                    if (abnormalPulse and hasHealthHUD) or highStress then
+                    if (abnormalPulse and hasHealthHUD) or highStress or admiring then
                         EmitRingSound(SOUND_HEART, vol)
                     else
                         EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)

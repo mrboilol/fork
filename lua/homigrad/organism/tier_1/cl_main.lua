@@ -372,7 +372,6 @@ hook.Add("radialOptions", "DislocatedJaw", function()
 end)
 
 hook.Add("PostRender", "screenshot_think", function()
-	do return end
 	local org = lply.organism
 	
 	if not org or not org.brain or org.otrub or !lply:Alive() then return end
@@ -413,7 +412,6 @@ local lerpedpart = 0
 local lerpedbrain = 0
 
 hook.Add("Post Pre Post Processing", "ShowScreens", function()
-	do return end
 	local org = lply.organism
 	
 	if !lply:Alive() then return end
@@ -421,21 +419,41 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 
 	local part = CurTime() - braindeathstart
 
-	local show_multiki = org.brain > 0.1 and org.otrub
+	-- Show memories when brain damage is present (more severe = more frequent)
+	-- Works both when unconscious (otrub) and awake with brain damage
+	local show_multiki = org.brain > 0.05
 
 	if show_multiki then
 		lerpedbrain = LerpFT(0.05, lerpedbrain, org.brain)
-		local time = 40 - (lerpedbrain - 0.1) * 20
-		if part % time > time / 3 and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
+		
+		-- Scale timing based on brain damage: higher damage = faster cycling
+		-- When otrub: faster cycling (20-40s range)
+		-- When awake: slower cycling (30-60s range) but still shows
+		local baseTime = org.otrub and 40 or 60
+		local time = baseTime - (lerpedbrain * 30) -- 40-10s when otrub, 60-30s when awake
+		time = math.max(time, 8) -- Minimum 8 seconds between cycles
+		
+		-- Show for longer duration with more brain damage
+		local showDuration = time / 3 + (lerpedbrain * 5)
+		showDuration = math.min(showDuration, time * 0.7) -- Max 70% of cycle
+		
+		if part % time > time - showDuration and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
 			switch = true
-			local part2 = math.ease.InOutSine(math.sin(((part % time) - time / 3) / (time / 3 * 2) * math.pi))
+			local part2 = math.ease.InOutSine(math.sin(((part % time) - (time - showDuration)) / showDuration * math.pi))
 			lerpedpart = LerpFT(0.1, lerpedpart, part2)
 			
-			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 50, 0, 255))
+			-- More opaque with higher brain damage
+			-- When awake (not otrub), show at lower opacity
+			local awakeMultiplier = org.otrub and 1 or 0.4
+			local alpha = math.Clamp(lerpedpart * (30 + lerpedbrain * 70) * awakeMultiplier, 0, 255)
+			surface.SetDrawColor(255, 255, 255, alpha)
 			surface.SetMaterial(screens[curscreen])
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 
-			DrawToyTown(4, ScrH())
+			-- More severe effects with higher brain damage
+			if org.otrub or lerpedbrain > 0.2 then
+				DrawToyTown(4 + lerpedbrain * 4, ScrH())
+			end
 		else
 			if switch then
 				curscreen = curscreen == #screens and 1 or curscreen + 1
@@ -1155,7 +1173,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 							if wound[7] == "arteria" then
 								local arteriaForce = forceMul * 1.5
-								local arteriaVel = sprayDir * 25 * arteriaForce * pumpMultiplier
+								local arteriaVel = sprayDir * 62.5 * arteriaForce * pumpMultiplier
 								local arteriaOscAmp = 10 * pulseFactor
 								local arteriaOsc = right * arteriaOscAmp * math.sin(t * oscSpeed) + up * arteriaOscAmp * math.cos(t * oscSpeed * 0.7)
 								hg.addBloodPart(pos, arteriaVel + arteriaOsc + spread, nil, 1, 1, true, nil, ent)

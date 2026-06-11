@@ -72,7 +72,13 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		if not hg.berserkActivationSoundPlayed then
 			hg.berserkActivationSoundPlayed = true
 			if altberserk:GetBool() then
-				surface.PlaySound("NIGGARUN.ogg")
+				-- Start looping music immediately for altberserk to avoid duplicate at 11 seconds
+				sound.PlayFile("sound/NIGGARUN.ogg", "noblock", function(channel)
+					hg.berserkStation = channel
+					channel:EnableLooping(true)
+					channel:SetVolume(1)
+					hg.berserkMusicPlayed = true
+				end)
 			else
 				surface.PlaySound("zbattle/deathsample.ogg")
 			end
@@ -102,10 +108,9 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 			hg.underberserk2 = true
 
 			-- Prevent music from playing again if it already played during this berserk session
-			-- Skip secondary track for altberserk since it already played at activation
-			if not hg.berserkMusicPlayed and not altberserk:GetBool() then
+			if not hg.berserkMusicPlayed then
 				hg.berserkMusicPlayed = true
-				local musicPath = path:GetString()
+				local musicPath = altberserk:GetBool() and "sound/NIGGARUN.ogg" or path:GetString()
 				if IsValid(hg.berserkStation) then
 					hg.berserkStation:SetVolume(1)
 					hg.berserkFadeOut = false

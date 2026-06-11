@@ -1646,7 +1646,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-			if !IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or ((ishgweapon(wep) or wep.ismelee2) and ply:KeyDown(IN_USE)) then// || ply:InVehicle() then
+			if !IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) then// || ply:InVehicle() then
 
 				if org.canmove then
 

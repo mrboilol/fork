@@ -148,12 +148,7 @@ if SERVER then
 		if not org then return end
 		local owner = self:GetOwner()
 		
-		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
-			self:SetHolding(math.min(self:GetHolding() + 25, 100))
-
-			if self:GetHolding() < 100 then return end
-		end
-		
+			
 		self.Eating = self.Eating or 0
 		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end

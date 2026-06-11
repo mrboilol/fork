@@ -69,8 +69,8 @@ local tab = {
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3", 0, 5)
-local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=altpain.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3", 0, 5)
-local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=fuck.mp3", 0, 3)
+local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3", 0, 5)
+local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=fuck.mp3, 4=oromi.mp3 (immediate)", 0, 4)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hook_Run = hook.Run
 
@@ -386,6 +386,16 @@ local function stopthings()
 		FuckStation = nil
 	end
 
+	if IsValid(OromiStation) then
+		OromiStation:Stop()
+		OromiStation = nil
+	end
+
+	if IsValid(NoisesStation) then
+		NoisesStation:Stop()
+		NoisesStation = nil
+	end
+
 	if IsValid(ConsciousnessWhiteNoise) then
 		ConsciousnessWhiteNoise:Stop()
 		ConsciousnessWhiteNoise = nil
@@ -399,6 +409,11 @@ local function stopthings()
         WhiteNoiseStation:Stop()
         WhiteNoiseStation = nil
     end
+
+	if IsValid(Alto2Station) then
+		Alto2Station:Stop()
+		Alto2Station = nil
+	end
 end
 
 local stations = {
@@ -631,6 +646,18 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
+	if !IsValid(Alto2Station) or Alto2Station:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/alto2.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				Alto2Station = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
 	if !IsValid(AltotrubStation) or AltotrubStation:GetState() != GMOD_CHANNEL_PLAYING then
 		sound.PlayFile("sound/altotrub.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -661,6 +688,29 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				station:SetVolume(0)
 				station:Play()
 				ConsciousnessWhiteNoise = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(OromiStation) or OromiStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/oromi.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(0) -- Start from beginning immediately
+				OromiStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if !IsValid(NoisesStation) or NoisesStation:GetState() != GMOD_CHANNEL_PLAYING then
+		sound.PlayFile("sound/noises.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				NoisesStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -1219,7 +1269,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 					SillydyingStation:SetVolume(0)
 				end
 			elseif dyingMode == 3 then
-				-- Only altpain.ogg, no screen shake
+				-- Only alto2.ogg, no screen shake
 				if IsValid(NoiseStation2) then
 					NoiseStation2:SetVolume(0)
 				end
@@ -1229,8 +1279,8 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(DyingStation) then
 					DyingStation:SetVolume(0)
 				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(consciousVol)
+				if IsValid(Alto2Station) then
+					Alto2Station:SetVolume(consciousVol)
 				end
 				if IsValid(SillydyingStation) then
 					SillydyingStation:SetVolume(0)
@@ -1281,8 +1331,8 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			if IsValid(DyingStation) then
 				DyingStation:SetVolume(0)
 			end
-			if IsValid(AltpainStation) then
-				AltpainStation:SetVolume(0)
+			if IsValid(Alto2Station) then
+				Alto2Station:SetVolume(0)
 			end
 			if IsValid(SillydyingStation) then
 				SillydyingStation:SetVolume(0)
@@ -1398,6 +1448,26 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				if IsValid(FuckStation) then
 					FuckStation:SetVolume(otrubVol)
 				end
+				if IsValid(OromiStation) then
+					OromiStation:SetVolume(0)
+				end
+			elseif otrubMode == 4 then
+				-- Use oromi.mp3 (plays immediately from start)
+				if IsValid(NoiseStation) then
+					NoiseStation:SetVolume(0)
+				end
+				if IsValid(AltotrubStation) then
+					AltotrubStation:SetVolume(0)
+				end
+				if IsValid(SleepyStation) then
+					SleepyStation:SetVolume(0)
+				end
+				if IsValid(FuckStation) then
+					FuckStation:SetVolume(0)
+				end
+				if IsValid(OromiStation) then
+					OromiStation:SetVolume(0.75) -- 0.75 volume immediately
+				end
 			end
 		else
 			if IsValid(NoiseStation) then
@@ -1412,6 +1482,9 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			if IsValid(FuckStation) then
 				FuckStation:SetVolume(0)
 			end
+			if IsValid(OromiStation) then
+				OromiStation:SetVolume(0)
+			end
 		end
 	else
 		if IsValid(NoiseStation) then
@@ -1423,6 +1496,19 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	local despair = org.otrub and 0 or math.Clamp(org.despair or 0, 0, 1)
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
+
+	-- Play noises.ogg when brain health is between 0.6 and 0.7
+	if brain >= 0.6 and brain <= 0.7 and not org.otrub then
+		local noisesVol = math.Remap(brain, 0.6, 0.7, 0, 0.75)
+		noisesVol = math.Clamp(noisesVol, 0, 0.75)
+		if IsValid(NoisesStation) then
+			NoisesStation:SetVolume(noisesVol)
+		end
+	else
+		if IsValid(NoisesStation) then
+			NoisesStation:SetVolume(0)
+		end
+	end
 
 	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
 	if despairFx > 0.05 then

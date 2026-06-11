@@ -41,6 +41,13 @@ net.Receive("setupclass", function()
 	local data = net.ReadTable()
 	old = classList[ply.PlayerClassNameOld]
 	if old and old.Off then old.Off(ply) end
+	
+	-- Reset all bone scales to prevent limb vanishing when changing playerclasses
+	for i = 0, ply:GetBoneCount() - 1 do
+		ply:ManipulateBoneScale(i, Vector(1, 1, 1))
+	end
+	ply:SetupBones()
+	
 	ply:PlayerClassEvent("On", data)
 end)
 

@@ -19,6 +19,7 @@ hook.Add("Org Clear", "Main", function(org)
 	module.goodmood[1](org)
 	org.brain = 0
 	org.consciousness = 1
+	org.consciousnessTracker = 0
 	org.disorientation = 0
 	org.jaw = 0
 	org.spine1 = 0
@@ -33,9 +34,6 @@ hook.Add("Org Clear", "Main", function(org)
 	org.oxygen_deprivation = 0
 
 	org.tranexamic_acid = 0
-
-	org.brainBleed = 0
-	org.brainBleedDuration = 0
 
 	org.thiamine = 0
 	org.thiamine_timer = 0
@@ -582,6 +580,22 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.timeValue = timeValue
 	org.incapacitated = false
 	org.critical = false
+
+	-- Track consciousness increases for brain damage
+	if org.consciousness then
+		local prevConsciousness = org.prevConsciousness or 0
+		org.prevConsciousness = org.consciousness
+
+		if org.consciousness > prevConsciousness then
+			org.consciousnessTracker = (org.consciousnessTracker or 0) + (org.consciousness - prevConsciousness)
+		end
+
+		-- Apply 0.015 brain damage when consciousness rises by 2.5
+		if (org.consciousnessTracker or 0) >= 2.5 then
+			org.brain = math.min((org.brain or 0) + 0.015, 1.0)
+			org.consciousnessTracker = 0
+		end
+	end
 
 	-- Aiming fatigue tracking (affects recoil multipliers)
 	if isPly then

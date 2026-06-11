@@ -512,7 +512,7 @@ module[2] = function(owner, org, timeValue)
 	local o2Cap = 4
 	if o2[1] < o2Cap then
 		local o2Severity = math.Clamp((o2Cap - o2[1]) / o2Cap, 0.1, 1)
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * o2Severity * 0.8, 0)
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * o2Severity * 1.2, 0)
 	end
 
 	if org.lungsR[1] < 0.5 then

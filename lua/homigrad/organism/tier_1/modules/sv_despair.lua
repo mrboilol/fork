@@ -48,7 +48,7 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 	local dmg = (dmgInfo and dmgInfo.GetDamage and dmgInfo:GetDamage()) or 0
 	if dmg <= 0 then return end
 
-	local add = Clamp(dmg / 240, 0.01, 0.12)
+	local add = Clamp(dmg / 240, 0.01, 0.18)
 	if dmgInfo and dmgInfo.IsDamageType and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_BURN + DMG_SLASH + DMG_CLUB) then
 		add = add * 1.2
 	end
@@ -135,7 +135,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if (org.pain or 0) > 45 then
-		add = add + Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.055
+		add = add + Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.12
 	end
 
 	if (org.shock or 0) > 20 then
@@ -170,7 +170,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 	-- Despair from dying state (critical health/blood)
 	if (org.blood or 5000) < 3200 then
-		add = add + Clamp((3200 - org.blood) / 3200, 0, 1) * timeValue * 0.12
+		add = add + Clamp((3200 - org.blood) / 3200, 0, 1) * timeValue * 0.2
 	end
 
 	-- Despair from bleeding out (low blood + active bleeding - won't clot)
@@ -179,7 +179,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if blood < 4000 and bleed > 0 then
 		local bleedSeverity = Clamp((3500 - blood) / 3500, 0, 1)
 		-- Higher despair gain when actively bleeding out (blood won't clot)
-		add = add + bleedSeverity * timeValue * 0.25
+		add = add + bleedSeverity * timeValue * 0.4
 	end
 
 	-- Despair from lack of goodmood (if goodmood has been low for a while)

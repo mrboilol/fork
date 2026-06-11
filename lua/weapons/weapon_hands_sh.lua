@@ -1146,7 +1146,7 @@ function SWEP:SecondaryAttack()
 		local org = owner.organism
 
 		-- Determine which hands to use for picking up
-		local useBothHands = false
+		local useBothHands = true
 		local useRightHand = true
 		local useLeftHand = true
 		local isRightBroken = false
@@ -1158,27 +1158,24 @@ function SWEP:SecondaryAttack()
 			isLeftBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
 			bothArmsBroken = isRightBroken and isLeftBroken
 
-			if not isRightBroken and not isLeftBroken then
-				-- Both healthy, use both hands (strongest grip)
-				useBothHands = true
-				useRightHand = true
-				useLeftHand = true
-			elseif isRightBroken and not isLeftBroken then
-				-- Right broken, use only left hand
+			-- Use both hands by default, fallback to single hand if one is broken/dislocated
+			if isRightBroken and not isLeftBroken then
+				-- Right broken/dislocated, use only left hand
 				useBothHands = false
 				useRightHand = false
 				useLeftHand = true
 			elseif isLeftBroken and not isRightBroken then
-				-- Left broken, use only right hand (slightly stronger)
+				-- Left broken/dislocated, use only right hand
 				useBothHands = false
 				useRightHand = true
 				useLeftHand = false
 			elseif bothArmsBroken then
-				-- Both broken, prioritize right hand with pain
+				-- Both broken/dislocated, use right hand with pain
 				useBothHands = false
 				useRightHand = true
 				useLeftHand = false
 			end
+			-- If neither is broken, use both hands (default)
 		else
 			-- No organism, default to both hands
 			useBothHands = true
@@ -1188,9 +1185,11 @@ function SWEP:SecondaryAttack()
 
 		local reachDist = self.ReachDistance
 		if useRightHand and not useLeftHand then
-			reachDist = reachDist * 1.25 -- 25% better reach with right arm only
+			reachDist = reachDist * 1.1 -- Right hand has slightly better reach
+		elseif useLeftHand and not useRightHand then
+			reachDist = reachDist * 0.95 -- Left hand has slightly worse reach
 		elseif useBothHands then
-			reachDist = reachDist * 1.15 -- 15% better reach with both hands
+			reachDist = reachDist * 1.2 -- Both hands have best reach
 		end
 
 		local tr = util.QuickTrace(pos, owner:GetAimVector() * reachDist, {owner})
@@ -1270,6 +1269,14 @@ function SWEP:SecondaryAttack()
 					if painAmount > 0 then
 						org.painadd = (org.painadd or 0) + painAmount
 					end
+
+					-- Store hand usage info for continuous pain while holding
+					self.UsingBothHands = useBothHands
+					self.UsingRightHand = useRightHand
+					self.UsingLeftHand = useLeftHand
+					self.IsRightBroken = isRightBroken
+					self.IsLeftBroken = isLeftBroken
+					self.BothArmsBroken = bothArmsBroken
 				end
 			--end
 		elseif IsValid(tr.Entity) and tr.Entity:IsPlayer() then
@@ -1416,6 +1423,60 @@ function SWEP:ApplyForce()
 		-- Apply armstrength penalty from spine2 damage
 		if ply.organism and ply.organism.armstrength and ply.organism.armstrength < 1 then
 			mul = mul * ply.organism.armstrength
+		end
+
+		-- Apply strength multiplier based on which hands are being used
+		if self.UsingBothHands then
+			mul = mul * 1.4 -- Both hands are significantly stronger
+		elseif self.UsingRightHand and not self.UsingLeftHand then
+			mul = mul * 1.15 -- Right hand is slightly stronger than normal
+		elseif self.UsingLeftHand and not self.UsingRightHand then
+			mul = mul * 0.9 -- Left hand is slightly weaker than normal
+		end
+
+		-- Add continuous pain when holding with damaged hands
+		if ply.organism and (self.BothArmsBroken or (self.IsRightBroken and self.UsingLeftHand) or (self.IsLeftBroken and self.UsingRightHand)) then
+			local org = ply.organism
+			local continuousPain = 0
+
+			if self.BothArmsBroken then
+				-- Both arms broken, holding with right hand causes continuous pain
+				if not org.rarmamputated then
+					continuousPain = (org.rarm or 0) * 2 + (org.rarmdislocation or org.rarmdislocated and 1.5 or 0)
+				end
+				if not org.larmamputated then
+					continuousPain = continuousPain + (org.larm or 0) * 2 + (org.larmdislocation or org.larmdislocated and 1.5 or 0)
+				end
+				continuousPain = continuousPain * 0.5
+			elseif self.IsRightBroken and self.UsingLeftHand then
+				-- Right broken, using left hand only
+				if not org.larmamputated then
+					local armVal = org.larm or 0
+					local disloc = org.larmdislocation or org.larmdislocated
+					if armVal >= 1 or disloc then
+						continuousPain = armVal * 1.5 + (disloc and 1 or 0)
+					elseif armVal >= 0.25 and armVal < 1 then
+						local severity = (armVal - 0.25) / 0.75
+						continuousPain = severity * 0.8
+					end
+				end
+			elseif self.IsLeftBroken and self.UsingRightHand then
+				-- Left broken, using right hand only
+				if not org.rarmamputated then
+					local armVal = org.rarm or 0
+					local disloc = org.rarmdislocation or org.rarmdislocated
+					if armVal >= 1 or disloc then
+						continuousPain = (armVal * 1.5 + (disloc and 1 or 0)) * 0.6 -- right hand is better
+					elseif armVal >= 0.25 and armVal < 1 then
+						local severity = (armVal - 0.25) / 0.75
+						continuousPain = severity * 0.8 * 0.6
+					end
+				end
+			end
+
+			if continuousPain > 0 then
+				org.painadd = (org.painadd or 0) + continuousPain
+			end
 		end
 
 		local avec = vec * len * 8 - phys:GetVelocity()
@@ -1738,6 +1799,14 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 		self.CarryBone = nil
 		self.CarryPos = nil
 		self.CarryDist = nil
+
+		-- Clear hand usage info when dropping
+		self.UsingBothHands = nil
+		self.UsingRightHand = nil
+		self.UsingLeftHand = nil
+		self.IsRightBroken = nil
+		self.IsLeftBroken = nil
+		self.BothArmsBroken = nil
 	end
 end
 
