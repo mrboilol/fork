@@ -35,7 +35,7 @@ module[1] = function(org)
 end
 
 function hg.organism.OxygenateBlood(org)
-	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea * 0.8)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)// * (1 - org.pneumothorax)
+	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.15) * (1 - org.trachea * 0.8)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)// * (1 - org.pneumothorax)
 end
 
 function hg.organism.CanBreath(org)
@@ -290,13 +290,13 @@ module[2] = function(owner, org, timeValue)
 		end
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 4000, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
 
-		-- Below 3500 blood, keep dropping O2
+		-- Below 2500 blood: O2 drops slowly unless problem is solved (blood restored or stabilized)
 		-- Adrenaline, thiamine and tranexamic acid partially resist this to help kickstart recovery
-		if org.blood < 3500 then
-			local o2DropRate = (3500 - org.blood) / 3500 -- 0 to 1 based on how far below 3500
+		if org.blood < 2500 then
+			local o2DropRate = (2500 - org.blood) / 2500 -- 0 to 1 based on how far below 2500
 			local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
 			local hasStabilizer = totalAdrenaline > 0.5 or (org.thiamine or 0) > 0 or (org.tranexamic_acid or 0) > 0
-			o2[1] = max(o2[1] - timeValue * o2DropRate * (hasStabilizer and 0.6 or 2), 0)
+			o2[1] = max(o2[1] - timeValue * o2DropRate * (hasStabilizer and 0.3 or 0.8), 0)
 		end
 
 		-- Low blood pressure slowly lowers O2 to 0 if very low

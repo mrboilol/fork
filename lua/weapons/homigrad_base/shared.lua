@@ -957,12 +957,22 @@ if CLIENT then
 			if success and mat then
 				ammotype = mat
 			else
-				-- Fallback to alt materials based on ammo type
-				local ammoName = self.Primary.Ammo
-				if string.find(ammoName, "12/70") or string.find(ammoName, "23x75") or string.find(ammoName, "20/70") then
-					ammotype = hg.matShotgunAmmoAlt
-				elseif string.find(ammoName, "5.56") or string.find(ammoName, "7.62") or string.find(ammoName, "5.45") or string.find(ammoName, ".50") or string.find(ammoName, "14.5") then
-					ammotype = hg.matRfileAmmoAlt
+				-- Fallback to alt materials based on bullet properties
+				local bulletSettings = hg.ammotypeshuy[self.Primary.Ammo].BulletSettings
+				if bulletSettings then
+					local numBullet = bulletSettings.NumBullet or 1
+					local damage = bulletSettings.Damage or 0
+					
+					-- Shotgun: multiple bullets or high damage single shot
+					if numBullet > 1 or (damage > 100 and numBullet == 1) then
+						ammotype = hg.matShotgunAmmoAlt
+					-- Rifle: high damage single bullet
+					elseif damage > 40 then
+						ammotype = hg.matRfileAmmoAlt
+					-- Pistol: lower damage
+					else
+						ammotype = hg.matPistolAmmoAlt
+					end
 				else
 					ammotype = hg.matPistolAmmoAlt
 				end

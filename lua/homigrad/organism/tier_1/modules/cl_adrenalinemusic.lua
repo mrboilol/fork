@@ -128,24 +128,15 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
-
-	-- Play if triggered by adrenaline, fear, or panic (recent damage from player/NPC/suppression)
-	local panicTrigger = CurTime() - hg.lastCombatTime < 15
+	-- Play if triggered by combat (damage by player, damage to player, or suppression/weapon fire)
+	-- Timer is fueled by fear and adrenaline (extends duration)
+	local baseDuration = 20
+	local fearExtension = fear * 10  -- Fear adds up to 10 seconds
+	local adrenalineExtension = adrenaline * 5  -- Adrenaline adds up to 12.5 seconds (at 2.5)
+	local totalDuration = baseDuration + fearExtension + adrenalineExtension
+	local panicTrigger = CurTime() - hg.lastCombatTime < totalDuration
 	
-	-- Fear > 0.75: always play (but only if from combat sources)
-	if fear > 0.75 and panicTrigger then
-		shouldPlay = true
-	-- Fear > 0.5 AND adrenaline > 0.5: play (but only if from combat sources)
-	elseif fear > 0.5 and adrenaline > 0.5 and panicTrigger then
-		shouldPlay = true
-	-- Fear > 0.25 AND adrenaline >= 1.0: play (but only if from combat sources)
-	elseif fear > 0.25 and adrenaline >= 1.0 and panicTrigger then
-		shouldPlay = true
-	-- Adrenaline >= 1.5: always play (but only if from combat sources)
-	elseif adrenaline >= 1.5 and panicTrigger then
-		shouldPlay = true
-	-- Panic trigger (recent combat)
-	elseif panicTrigger then
+	if panicTrigger then
 		shouldPlay = true
 	end
 	
@@ -161,10 +152,9 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 
 	if shouldPlay then
 		start_adrenaline_music()
-		local combatFactor = math.max(0, (15 - (CurTime() - hg.lastCombatTime)) / 15) * 1.0
-		local threadedFactor = math.Clamp(hg.adrenalineMusicThreaded / 100, 0, 0.5)
-		local fearFactor = math.Clamp(fear, 0, 0.5)
-		local targetVol = math.Clamp(math.max(combatFactor, threadedFactor, fearFactor), 0.1, 1)
+		-- Volume depends on remaining time in timer (full at start, fades to 0 at end)
+		local timeRemaining = totalDuration - (CurTime() - hg.lastCombatTime)
+		local targetVol = math.Clamp(timeRemaining / totalDuration, 0, 1)
 		hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, targetVol)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)

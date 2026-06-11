@@ -475,8 +475,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     -- Check if consciousness loss was recent and sudden (within 5 seconds)
     local recentSuddenDrop = (CurTime() - consciousnessDropTime) < 5 and consciousnessDropAmount > 0.15
 
-    -- Detect heartbeat transition to zero to reset flatline flag
-    if heartbeat < 1 and not wasHeartbeatZero then
+    -- Reset flatline flag when heartbeat recovers from flatline
+    if heartbeat >= 1 and wasHeartbeatZero then
         flatlinePlayedThisUnconscious = false
     end
     wasHeartbeatZero = heartbeat < 1

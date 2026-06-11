@@ -72,7 +72,10 @@ module[2] = function(owner, org, mulTime)
 		org.coagulation_multiplier = org.coagulation_multiplier * (1 - org.liver * 0.5)
 		org.blood_regeneration_multiplier = org.blood_regeneration_multiplier * (1 - org.liver * 0.75)
 		org.bleedingmul = org.bleedingmul * (1 + org.liver * 0.5)
-		org.internalBleed = org.internalBleed + (org.liver * mulTime * 0.05)
+		-- Liver-induced internal bleeding stops when tranexamic acid is administered
+		if (org.tranexamic_acid or 0) <= 0 then
+			org.internalBleed = org.internalBleed + (org.liver * mulTime * 0.05)
+		end
 	else
 		org.coagulation_multiplier = 1.2
 		org.blood_regeneration_multiplier = 1.2
@@ -157,7 +160,12 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	org.consciousness = math.min(org.consciousness, math.min(org.blood / 4000, 1) * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
+	-- At 2500 blood: reduced consciousness and dizziness
+	local bloodConsciousnessCap = 1
+	if org.blood < 2500 then
+		bloodConsciousnessCap = math.max(org.blood / 2500, 0.5)
+	end
+	org.consciousness = math.min(org.consciousness, bloodConsciousnessCap * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
@@ -263,7 +271,8 @@ module[2] = function(owner, org, mulTime)
 	local bloodCap = (2000 / (adrenaline / 5 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1)
 	if org.blood < bloodCap then
 		local bloodSeverity = math.Clamp((bloodCap - org.blood) / 1000, 0.1, 1)
-		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 0.5, 0)
+		-- At 2000 blood: pass out and start dying from blood loss (increased consciousness drain)
+		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 1.5, 0)
 	end
 
 	if org.blood < 2000 and not adrenalineStabilizer and not hasAntiIschemia then
@@ -277,8 +286,12 @@ module[2] = function(owner, org, mulTime)
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.01 * totalAdrenaline, 0)
 	end
 
-	local bleed = org.internalBleed / 28 -- + org.lungsR[3] + org.lungsL[3]
-	org.internalBleed = math.Approach(org.internalBleed, 0, org.internalBleedHeal > 0 and mulTime / 2 or mulTime / 55)
+	local bleed = org.internalBleed / 35 -- + org.lungsR[3] + org.lungsL[3]
+	
+	-- Damaged liver prevents natural internal bleeding healing
+	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
+	
+	org.internalBleed = math.Approach(org.internalBleed, 0, (org.internalBleedHeal > 0 and canHealInternalBleed) and mulTime / 2 or mulTime / 55)
 	coagulatespeed = coagulatespeed + mulTime
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)
 

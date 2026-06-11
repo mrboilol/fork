@@ -332,9 +332,9 @@ end
 --//
 
 --
-hg.matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
-hg.matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
-hg.matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
+hg.matPistolAmmo = Material("hud/bullets/low_caliber.png")
+hg.matRfileAmmo = Material("hud/bullets/high_caliber.png")
+hg.matShotgunAmmo = Material("hud/bullets/buck_caliber.png")
 hg.matPistolAmmoAlt = Material("low_caliberalt.png")
 hg.matRfileAmmoAlt = Material("high_caliberalt.png")
 hg.matShotgunAmmoAlt = Material("buck_caliberalt.png")
@@ -373,7 +373,7 @@ hg.ammotypes = {
 			Speed = 890,
 			Diameter = 5.56,
 			Mass = 4,
-			Icon = "vgui/hud/hmcd_round_556"
+			Icon = "hud/hmcd_round_556"
 		}
 	},
 	["5.56x45mmm856"] = {
@@ -406,7 +406,7 @@ hg.ammotypes = {
 			Speed = 860,
 			Diameter = 5.56,
 			Mass = 4,
-			Icon = "vgui/hud/556m856zcity"
+			Icon = "hud/556m856zcity"
 		}
 	},
 	["5.56x45mmap"] = {
@@ -439,7 +439,7 @@ hg.ammotypes = {
 			Speed = 980,
 			Diameter = 5.56,
 			Mass = 4,
-			Icon = "vgui/hud/hmcd_round_556"
+			Icon = "hud/hmcd_round_556"
 		}
 	},
 	["7.62x39mmsp"] = {
@@ -473,7 +473,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = "vgui/hud/hmcd_round_556"
+			Icon = "hud/hmcd_round_556"
 		}
 	},
 	["7.62x39mm"] = {
@@ -507,7 +507,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = "vgui/hud/hmcd_round_556"
+			Icon = "hud/hmcd_round_556"
 		}
 	},
 	["7.62x39mmbp"] = {
@@ -541,7 +541,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = "vgui/hud/hmcd_round_556"
+			Icon = "hud/hmcd_round_556"
 		}
 	},
 	[".366tkm"] = {
@@ -575,7 +575,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 9.58,
 			Mass = 13.5,
-			Icon = "vgui/hud/hmcd_round_556"
+			Icon = "hud/hmcd_round_556"
 		}
 	},
 	["5.45x39mm"] = {
@@ -608,7 +608,7 @@ hg.ammotypes = {
 			Speed = 850,
 			Diameter = 5.45,
 			Mass = 4.5,
-			Icon = "vgui/hud/hmcd_round_556"
+			Icon = "hud/hmcd_round_556"
 		}
 	},
 	["metal_debris"] = {
@@ -716,7 +716,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12,
 			Mass = 20,
-			Icon = "vgui/hud/hmcd_round_beanbag",
+			Icon = "hud/hmcd_round_beanbag",
 			ShellColor = Color(122,122,122)
 		}
 	},
@@ -1015,7 +1015,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0008,
 			Diameter = 23,
 			Mass = 20,
-			Icon = "vgui/hud/hmcd_round_beanbag",
+			Icon = "hud/hmcd_round_beanbag",
 			ShellColor = Color(255,185,0)
 		}
 	},
@@ -1160,7 +1160,7 @@ hg.ammotypes = {
 			Speed = 309,
 			Diameter = 9,
 			Mass = 7,
-			Icon = "vgui/hud/hmcd_round_918"
+			Icon = "hud/hmcd_round_918"
 		}
 	},
 	["9x17mm"] = {
@@ -1193,7 +1193,7 @@ hg.ammotypes = {
 			Speed = 309,
 			Diameter = 9,
 			Mass = 7,
-			Icon = "vgui/hud/hmcd_round_918"
+			Icon = "hud/hmcd_round_918"
 		}
 	},
 	["9x19mmparabellum"] = {
@@ -1259,7 +1259,7 @@ hg.ammotypes = {
 			Speed = 291,
 			Diameter = 9,
 			Mass = 7,
-			Icon = "vgui/hud/9x19quakemakerzcity"
+			Icon = "hud/9x19quakemakerzcity"
 		}
 	},
 	["7.65x17mm"] = {
@@ -1358,7 +1358,7 @@ hg.ammotypes = {
 			Speed = 259,
 			Diameter = 11.19,
 			Mass = 14,
-			Icon = "vgui/hud/45acpzcity"
+			Icon = "hud/45acpzcity"
 		}
 	},
 	[".45acphydroshock"] = {
@@ -1391,7 +1391,7 @@ hg.ammotypes = {
 			Speed = 259,
 			Diameter = 11.19,
 			Mass = 14,
-			Icon = "vgui/hud/45acphydroshockzcity"
+			Icon = "hud/45acphydroshockzcity"
 		}
 	},
 	["7.62x25mm"] = {
@@ -1457,7 +1457,7 @@ hg.ammotypes = {
 			Speed = 352,
 			Diameter = 9,
 			Mass = 7,
-			Icon = "vgui/hud/9x19greentracerzcity"
+			Icon = "hud/9x19greentracerzcity"
 		}
 	},
 	[".45rubber"] = {
@@ -1675,7 +1675,7 @@ hg.ammotypes = {
 			Speed = 734,
 			Diameter = 4.6,
 			Mass = 1.6,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	["5.7x28mm"] = {
@@ -1708,7 +1708,7 @@ hg.ammotypes = {
 			Speed = 853,
 			Diameter = 5.7,
 			Mass = 2,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	[".44remingtonmagnum"] = {
@@ -1827,7 +1827,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 14.5,
 			Mass = 64,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	["14.5x114mmbztm"] = { -- это тоже самое что и выше просто с трасером :D
@@ -1859,7 +1859,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 14.5,
 			Mass = 64,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	["9x39mm"] = {
@@ -1891,7 +1891,7 @@ hg.ammotypes = {
 			Speed = 300,
 			Diameter = 9,
 			Mass = 16,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	[".50actionexpress"] = {
@@ -2023,7 +2023,7 @@ hg.ammotypes = {
 			Speed = 840,
 			Diameter = 7.62,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	["7.62x51mmm993"] = {
@@ -2056,7 +2056,7 @@ hg.ammotypes = {
 			Speed = 930,
 			Diameter = 7.62,
 			Mass = 18,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	["7.62x54mm"] = {
@@ -2089,7 +2089,7 @@ hg.ammotypes = {
 			Speed = 860,
 			Diameter = 7.62,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	[".338lapuamagnum"] = {
@@ -2121,7 +2121,7 @@ hg.ammotypes = {
 			Speed = 880,
 			Diameter = 8.6,
 			Mass = 16,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	[".22longrifle"] = {
@@ -2197,7 +2197,7 @@ hg.ammotypes = {
 			Speed = 820,
 			Diameter = 12.7,
 			Mass = 48,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	["12.7x55mm"] = {
@@ -2229,7 +2229,7 @@ hg.ammotypes = {
 			Speed = 315, --asha it's subsonic rifle... deka you are stupid
 			Diameter = 12.7,
 			Mass = 20,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		}
 	},
 	["nails"] = {
@@ -2258,7 +2258,7 @@ hg.ammotypes = {
 		},
 		BulletSettings = {
 			Mass = 200,
-			Icon = "vgui/hud/bullets/high_caliber",
+			Icon = "hud/bullets/high_caliber",
 			Damage = 256.8,
 			Force = 30.9,
 			Penetration = 50,
@@ -2296,7 +2296,7 @@ hg.ammotypes = {
 		},
 		BulletSettings = {
 			Mass = 40,
-			Icon = "vgui/hud/bullets/high_caliber",
+			Icon = "hud/bullets/high_caliber",
 			Damage = 35,
 			Speed = 5,
 			PhysPenetrationMul = 0.0,
@@ -2337,7 +2337,7 @@ hg.ammotypes = {
 			Speed = 55,	--; Comically slow
 			LifeTime = 15,
 			Shell = "12guage",
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		},
 		FunctionInfo = {
 			Model = "models/Items/AR2_Grenade.mdl",
@@ -2378,7 +2378,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 10,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/high_caliber",
+			Icon = "hud/bullets/high_caliber",
 			noricochet = true,
 		}
 	},
@@ -2413,7 +2413,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 10,
 			Mass = 10,
-			Icon = "vgui/hud/bullets/high_caliber"
+			Icon = "hud/bullets/high_caliber"
 		},
 		BulletFunctions = {
 			-- Hit = hit_blood,
@@ -2473,7 +2473,7 @@ hg.ammotypes = {
 			Speed = 170,
 			Diameter = 20,
 			Mass = 50,
-			Icon = "vgui/hud/bullets/buck_caliber"
+			Icon = "hud/bullets/buck_caliber"
 		}
 	},
 	["tranquilizerdarts"] = {
@@ -2517,65 +2517,65 @@ hg.ammotypes = {
 local ammotypes = hg.ammotypes
 local ammoents = {
 	["5.56x45mm"] = {
-		Icon = "vgui/hud/hmcd_round_556",
+		Icon = "hud/hmcd_round_556",
 		Material = "models/hmcd_ammobox_556",
 		Scale = 1
 	},
 	["5.56x45mmap"] = {
-		Icon = "vgui/hud/556apzcity",
+		Icon = "hud/556apzcity",
 		Model = "models/zcity/ammo/ammo_556x45_ap.mdl",
 		Scale = 1,
 	},
 	["5.56x45mmm856"] = {
-		Icon = "vgui/hud/556m856zcity",
+		Icon = "hud/556m856zcity",
 		Material = "models/hmcd_ammobox_556",
 		Scale = 1,
 		Color = Color(255,0,0)
 	},
 	["7.62x39mm"] = {
-		Icon = "vgui/hud/hmcd_round_76239",
+		Icon = "hud/hmcd_round_76239",
 		Model = "models/items/ammo_76239.mdl",
 		Scale = 1
 	},
 	["7.62x51mm"] = {  
-		Icon = "vgui/hud/hmcd_round_792",
+		Icon = "hud/hmcd_round_792",
 		Model = "models/items/ammo_76251.mdl",
 		Scale = 1,
 		Count = 25,
 	},
 	["7.62x51mmm993"] = {  
-		Icon = "vgui/hud/76251m993zcity",
+		Icon = "hud/76251m993zcity",
 		Model = "models/items/ammo_76251.mdl",
 		Scale = 1,
 		Count = 25,
 	},
 	["7.62x54mm"] = {
-		Icon = "vgui/hud/76254zcity",
+		Icon = "hud/76254zcity",
 		Model = "models/zcity/ammo/ammo_762x54_7h1.mdl",
 		Scale = 1,
 		Count = 25,
 	},
 	["7.62x39mmsp"] = {
-		Icon = "vgui/hud/762spzcity",
+		Icon = "hud/762spzcity",
 		Model = "models/zcity/ammo/ammo_762x54_7h1.mdl",
 		Scale = 1,
 		Count = 25,
 		Color = Color(14,54,22)
 	},
 	["7.62x39mmbp"] = {
-		Icon = "vgui/hud/762bpzcity",
+		Icon = "hud/762bpzcity",
 		Model = "models/zcity/ammo/ammo_762x54_7h1.mdl",
 		Scale = 1,
 		Count = 25,
 		Color = Color(14,54,22)
 	},
 	[".366tkm"] = {
-		Icon = "vgui/hud/762spzcity",
+		Icon = "hud/762spzcity",
 		Model = "models/items/ammo_76239.mdl",
 		Scale = 1
 	},
 	["5.45x39mm"] = {
-		Icon = "vgui/hud/545zcity",
+		Icon = "hud/545zcity",
 		Model = "models/zcity/ammo/ammo_545x39_fmj.mdl",
 		Scale = 1,
 	},
@@ -2586,218 +2586,218 @@ local ammoents = {
 		Spawnable = false
 	},
 	["12/70gauge"] = {
-		Icon = "vgui/hud/hmcd_round_12",
+		Icon = "hud/hmcd_round_12",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.1,
 		Count = 12,
 	},
 	["12/70beanbag"] = {
-		Icon = "vgui/hud/hmcd_round_beanbag",
+		Icon = "hud/hmcd_round_beanbag",
 		Model = "models/ammo/beanbag12_ammo.mdl",
 		Scale = 1,
 		Count = 12,
 	},
 	["12/70slug"] = {
-		Icon = "vgui/hud/12_70slugzcity",
+		Icon = "hud/12_70slugzcity",
 		Model = "models/zcity/ammo/ammo_12x76_zhekan.mdl",
 		Scale = 1.1,
 		Count = 12,
 		Color = Color(125, 155, 95)
 	},
 	["12/70rip"] = {
-		Icon = "vgui/hud/bullets/buck_caliber.png",
+		Icon = "hud/bullets/buck_caliber.png",
 		Model = "models/zcity/ammo/ammo_12x76_zhekan.mdl",
 		Scale = 1.1,
 		Count = 12,
 		Color = Color(22, 168, 221)
 	},
 	["12/70blank"] = {
-		Icon = "vgui/hud/12_70blankzcity",
+		Icon = "hud/12_70blankzcity",
 		Model = "models/ammo/beanbag12_ammo.mdl",
 		Scale = 1,
 		Count = 12,
 		Color = Color(22, 168, 221)
 	},
 	["23x75sh10"] = {
-		Icon = "vgui/hud/bullets/buck_caliber.png",
+		Icon = "hud/bullets/buck_caliber.png",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.2,
 		Count = 12,
 	},
 	["23x75sh25"] = {
-		Icon = "vgui/hud/bullets/buck_caliber.png",
+		Icon = "hud/bullets/buck_caliber.png",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.2,
 		Count = 12,
 	},
 	["23x75barricade"] = {
-		Icon = "vgui/hud/bullets/buck_caliber.png",
+		Icon = "hud/bullets/buck_caliber.png",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.2,
 		Count = 12,
 	},
 	["23x75zvezda"] = {
-		Icon = "vgui/hud/12_70blankzcity",
+		Icon = "hud/12_70blankzcity",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.2,
 		Count = 12,
 	},
 	["23x75waver"] = {
-		Icon = "vgui/hud/hmcd_round_beanbag",
+		Icon = "hud/hmcd_round_beanbag",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.2,
 		Count = 12,
 	},
 	["20/70gauge"] = {
-		Icon = "vgui/hud/bullets/buck_caliber.png",
+		Icon = "hud/bullets/buck_caliber.png",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.1,
 		Count = 12,
 		Color = Color(255,150,0)
 	},
 	["20/70slug"] = {
-		Icon = "vgui/hud/bullets/buck_caliber.png",
+		Icon = "hud/bullets/buck_caliber.png",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.1,
 		Count = 12,
 		Color(0,84,0)
 	},
 	["20/70flechette"] = {
-		Icon = "vgui/hud/bullets/buck_caliber.png",
+		Icon = "hud/bullets/buck_caliber.png",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.1,
 		Count = 12,
 		Color = Color(154,154,154)
 	},
 	["9x18mm"] = {
-		Icon = "vgui/hud/hmcd_round_918",
+		Icon = "hud/hmcd_round_918",
 		Model = "models/zcity/ammo/ammo_9x18_pmm.mdl",
 		Scale = 1
 	},
 	["9x17mm"] = {
-		Icon = "vgui/hud/hmcd_round_918",
+		Icon = "hud/hmcd_round_918",
 		Model = "models/zcity/ammo/ammo_9x18_pmm.mdl",
 		Scale = 1
 	},
 	["9x19mmparabellum"] = {
-		Icon = "vgui/hud/hmcd_round_9",
+		Icon = "hud/hmcd_round_9",
 		Material = "models/hmcd_ammobox_9",
 		Scale = 0.8,
 	},
 	["9x19mmgreentracer"] = {
-		Icon = "vgui/hud/9x19greentracerzcity",
+		Icon = "hud/9x19greentracerzcity",
 		Color = Color(0, 255, 0),
 		Scale = 0.8
 	},
 	["9x19mmqm"] = {
-		Icon = "vgui/hud/9x19quakemakerzcity",
+		Icon = "hud/9x19quakemakerzcity",
 		Material = "models/hmcd_ammobox_9",
 		Color = Color(0, 26, 255),
 		Scale = 0.8
 	},
 	[".45rubber"] = {
-		Icon = "vgui/hud/hmcd_round_beanshot9",
+		Icon = "hud/hmcd_round_beanshot9",
 		Model = "models/ammo/beanbag9_ammo.mdl",
 		Scale = 1
 	},
 	["9mmpakblank"] = {
-		Icon = "vgui/hud/hmcd_round_beanshot9",
+		Icon = "hud/hmcd_round_beanshot9",
 		Model = "models/ammo/beanbag9_ammo.mdl",
 		Scale = 1
 	},
 	["9mmpakflashdefense"] = {
-		Icon = "vgui/hud/hmcd_round_beanshot9",
+		Icon = "hud/hmcd_round_beanshot9",
 		Model = "models/ammo/beanbag9_ammo.mdl",
 		Scale = 1
 	},
 	["18x45mmtraumatic"] = {
-		Icon = "vgui/hud/hmcd_round_beanshot9",
+		Icon = "hud/hmcd_round_beanshot9",
 		Model = "models/zcity/ammo/ammo_12x70_buck.mdl",
 		Scale = 0.8,
 		Color = Color(87, 110, 82),
 		Count = 4,
 	},
 	["18x45mmflashdefense"] = {
-		Icon = "vgui/hud/hmcd_round_beanshot9",
+		Icon = "hud/hmcd_round_beanshot9",
 		Model = "models/zcity/ammo/ammo_12x76_dart.mdl",
 		Scale = 0.8,
 		Color = Color(119, 47, 47),
 		Count = 4,
 	},
 	["4.6x30mm"] = {
-		Icon = "vgui/hud/hmcd_round_4630",
+		Icon = "hud/hmcd_round_4630",
 		Model = "models/4630_ammobox.mdl",
 		Scale = 1,
 	},
 	[".44remingtonmagnum"] = {
-		Icon = "vgui/hud/44remzcity",
+		Icon = "hud/44remzcity",
 		Material = "models/hmcd_ammobox_22",
 		Color = Color(125, 155, 95),
 		Scale = 0.8,
 		Count = 20,
 	},
 	[".357magnum"] = {
-		Icon = "vgui/hud/357zcity",
+		Icon = "hud/357zcity",
 		Model = "models/Items/357ammobox.mdl",
 		Scale = 0.5,
 		Count = 20,
 	},
 	[".38special"] = {
-		Icon = "vgui/hud/hmcd_round_38",
+		Icon = "hud/hmcd_round_38",
 		Material = "models/hmcd_ammobox_38",
 		Color = Color(255, 255, 255),
 		Scale = 0.8,
 		Count = 20,
 	},
 	["9x39mm"] = {
-		Icon = "vgui/hud/939zcity",
+		Icon = "hud/939zcity",
 		Model = "models/zcity/ammo/ammo_9x39_sp5.mdl",
 		Scale = 1,
 		Count = 20,
 	},
 	["5.7x28mm"] = {
-		Icon = "vgui/hud/5x7zity",
+		Icon = "hud/5x7zity",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1.2,
 		Color = Color(125, 155, 95)
 	},
 	[".50actionexpress"] = {
-		Icon = "vgui/hud/50aezcity",
+		Icon = "hud/50aezcity",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1,
 		Color = Color(255, 255, 125),
 		Count = 20,
 	},
 	[".50actionexpressjhp"] = {
-		Icon = "vgui/hud/50aenotphzcity",
+		Icon = "hud/50aenotphzcity",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1,
 		Color = Color(73, 73, 32),
 		Count = 20,
 	},
 	[".50actionexpresscopper"] = {
-		Icon = "vgui/hud/50aenotphzcity",
+		Icon = "hud/50aenotphzcity",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1,
 		Color = Color(245, 149, 5),
 		Count = 20,
 	},
 	["14.5x114mmbztm"] = {
-		Icon = "vgui/hud/bztmzcity",
+		Icon = "hud/bztmzcity",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1,
 		Color = Color(246, 129, 5),
 		Count = 20,
 	},
 	["14.5x114mmb32"] = {
-		Icon = "vgui/hud/hmcd_round_145",
+		Icon = "hud/hmcd_round_145",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1,
 		Color = Color(55, 55, 2),
 		Count = 20,
 	},
 	[".338lapuamagnum"] = {
-		Icon = "vgui/hud/388zcity",
+		Icon = "hud/388zcity",
 		Material = "models/hmcd_ammobox_792",
 		Scale = 1,
 		Color = Color(125, 255, 125),
@@ -2816,7 +2816,7 @@ local ammoents = {
 		Count = 20,
 	},
 	[".22longrifle"] = {
-		Icon = "vgui/hud/hmcd_round_22",
+		Icon = "hud/hmcd_round_22",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1
 	},
@@ -2826,39 +2826,39 @@ local ammoents = {
 		Count = 1
 	},
 	["nails"] = {
-		Icon = "vgui/hud/hmcd_nail",
+		Icon = "hud/hmcd_nail",
 		Material = "models/fello/f_matchboxtex", -- "models/hmcd_nails"
 		Scale = 1,
 		Count = 3,
 	},
 	["armature"] = {
-		Icon = "vgui/hud/hmcd_crossbow_bolt",
+		Icon = "hud/hmcd_crossbow_bolt",
 		Model = "models/Items/CrossbowRounds.mdl",
 		Count = 5
 	},
 	["arrow"] = {
-		Icon = "vgui/hud/hmcd_round_arrow",
+		Icon = "hud/hmcd_round_arrow",
 		Model = "models/z_city/nmrih/items/arrow/ammo_arrow_box.mdl",
 		Count = 5
 	},
 	["grenade_30x29mm"] = {
-		Icon = "vgui/hud/ahuetzcity",
+		Icon = "hud/ahuetzcity",
 		Model = "models/Items/BoxMRounds.mdl",
 		Count = 15
 	},
 	["pulse"] = {
-		Icon = "vgui/hud/hmcd_round_impulse",
+		Icon = "hud/hmcd_round_impulse",
 		Model = "models/Items/combine_rifle_cartridge01.mdl",
 		Count = 30
 	},
 	["tasercartridge"] = {
-		Icon = "vgui/hud/hmcd_taser_cartridge",
+		Icon = "hud/hmcd_taser_cartridge",
 		Model = "models/ammo/taser_ammo.mdl",
 		Count = 1,
 		Material = "models/defcon/taser/taser",
 	},
 	[".45acp"] = {
-		Icon = "vgui/hud/45acpzcity",
+		Icon = "hud/45acpzcity",
 		Model = "models/zcity/ammo/ammo_1143x23_fmj.mdl"
 	},
 	["7.62x25mm"] = {
@@ -2867,25 +2867,25 @@ local ammoents = {
 		Color = Color(155, 149, 95)
 	},
 	[".45acphydroshock"] = {
-		Icon = "vgui/hud/45acphydroshockzcity",
+		Icon = "hud/45acphydroshockzcity",
 		Model = "models/zcity/ammo/ammo_1143x23_hydro.mdl"
 	},
 	["7.65x17mm"] = {
-		Icon = "vgui/hud/75117zcity",
+		Icon = "hud/75117zcity",
 		Model = "models/zcity/ammo/ammo_1143x23_fmj.mdl"
 	},
 	[".40sw"] = {
-		Icon = "vgui/hud/40swzcity",
+		Icon = "hud/40swzcity",
 		Model = "models/zcity/ammo/ammo_1143x23_hydro.mdl"
 	},
 	["20mm"] = {
-		Icon = "vgui/hud/musketballzcity",
+		Icon = "hud/musketballzcity",
 		Material = "models/props_c17/paper01",
 		Scale = 0.8,
 		Count = 4,
 	},
 	["tranquilizerdarts"] = {
-		Icon = "vgui/hud/bullets/low_caliber.png",
+		Icon = "hud/bullets/low_caliber.png",
 		Material = "models/hmcd_ammobox_9",
 		Scale = 0.8,
 	},
@@ -3170,11 +3170,11 @@ if CLIENT then
                     -- Caliber-based fallback
                     local diameter = ammoType and ammoType.BulletSettings and ammoType.BulletSettings.Diameter or 0
                     if diameter >= 12 then
-                        iconPath = "vgui/hud/bullets/buck_caliberalt"
+                        iconPath = "hud/bullets/buck_caliberalt"
                     elseif diameter >= 6 then
-                        iconPath = "vgui/hud/bullets/high_caliberalt"
+                        iconPath = "hud/bullets/high_caliberalt"
                     else
-                        iconPath = "vgui/hud/bullets/low_caliberalt"
+                        iconPath = "hud/bullets/low_caliberalt"
                     end
                 end
             end
@@ -3188,11 +3188,11 @@ if CLIENT then
                     -- Ultimate fallback to generic icons
                     local diameter = ammoType and ammoType.BulletSettings and ammoType.BulletSettings.Diameter or 0
                     if diameter >= 12 then
-                        DermaButton.icon = Material("vgui/hud/bullets/buck_caliber")
+                        DermaButton.icon = Material("hud/bullets/buck_caliber")
                     elseif diameter >= 6 then
-                        DermaButton.icon = Material("vgui/hud/bullets/high_caliber")
+                        DermaButton.icon = Material("hud/bullets/high_caliber")
                     else
-                        DermaButton.icon = Material("vgui/hud/bullets/low_caliber")
+                        DermaButton.icon = Material("hud/bullets/low_caliber")
                     end
                 end
             end	
