@@ -429,19 +429,11 @@ local tempolerp = 0
 local despairLerp = 0
 local despairVisualLerp = 0
 local despairTextLerp = 0
-local despairSound
-local despairSoundVol = 0
-local despairSoundLoading = false
 local WhiteNoiseStation
 hook.Add("Post Post Processing", "ItHurts", function()
 	if not IsValid(lply) then return end
 	if IsValid(lply:GetNWEntity("spect")) then
 		stopthings()
-		if IsValid(despairSound) then
-			despairSound:Stop()
-			despairSound = nil
-		end
-		despairSoundVol = 0
 		despairLerp = 0
 		despairVisualLerp = 0
 		despairTextLerp = 0
@@ -452,11 +444,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 	if not lply:Alive() then
 		stopthings()
-		if IsValid(despairSound) then
-			despairSound:Stop()
-			despairSound = nil
-		end
-		despairSoundVol = 0
 		despairLerp = 0
 		despairVisualLerp = 0
 		despairTextLerp = 0
@@ -933,21 +920,22 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			local overridePainSounds = (panicAttack or despair > 0.5) and brain < 0.01
 
 			if overridePainSounds then
-				-- Suppress pain sounds during panic/despair
+				-- Lower pain sounds during panic/despair (instead of suppressing)
+				local loweredVol = painVol * 0.6
 				if IsValid(PainStation) then
-					PainStation:SetVolume(0)
+					PainStation:SetVolume(loweredVol)
 				end
 				if IsValid(RealityStation) then
-					RealityStation:SetVolume(0)
+					RealityStation:SetVolume(loweredVol)
 				end
 				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(0)
+					AgonyStation:SetVolume(loweredVol)
 				end
 				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
+					AltpainStation:SetVolume(loweredVol)
 				end
 				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(0)
+					SillypainStation:SetVolume(loweredVol)
 				end
 			elseif painMode == 0 then
 				-- Default: both pain_beat and reality play
@@ -1549,7 +1537,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 	end
 
-	local despair = org.otrub and 0 or math.Clamp(org.despair or 0, 0, 1)
+	local despair = math.Clamp(org.despair or 0, 0, 1)
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
 
@@ -1601,43 +1589,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		tab["$pp_colour_mulb"] = 0
 	end
 
-	local blood = org.blood or 5000
-	local bleed = org.bleed or 0
-	-- Play O2 theme when below 3750 health AND actively bleeding out
-	if blood < 3750 and bleed > 0 then
-		if not IsValid(despairSound) and not despairSoundLoading then
-			despairSoundLoading = true
-			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(station)
-				despairSoundLoading = false
-				if not IsValid(station) then return end
-				station:SetVolume(0)
-				station:Play()
-				station:EnableLooping(true)
-				despairSound = station
-			end)
-		end
-
-		local targetVol = math.Remap(blood, 3750, 0, 0.4, 1)
-		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
-		if IsValid(despairSound) then
-			despairSound:SetVolume(despairSoundVol)
-		end
-	else
-		if IsValid(despairSound) then
-			if org.otrub then
-				despairSound:Stop()
-				despairSound = nil
-				despairSoundVol = 0
-			else
-				despairSoundVol = math.max(despairSoundVol - FrameTime() * 0.4, 0)
-				despairSound:SetVolume(despairSoundVol)
-				if despairSoundVol <= 0.001 then
-					despairSound:Stop()
-					despairSound = nil
-				end
-			end
-		end
-	end
+	-- Despair sound is handled by cl_despair.lua module
 
 	if (headtraumaSaturation or 0) > 0 then
 		tab["$pp_colour_colour"] = 1 + headtraumaSaturation
@@ -1651,11 +1603,6 @@ hook.Add("Player_Death", "ItDoesntNow", function(ply)
 	if !((ply == me) or (ply == me:GetNWEntity("spect"))) then return end
 
 	stopthings()
-	if IsValid(despairSound) then
-		despairSound:Stop()
-			despairSound = nil
-	end
-	despairSoundVol = 0
 end)
 
 hook.Add("Player Spawn", "ItDoesntNow", function(ply)
@@ -1663,11 +1610,6 @@ hook.Add("Player Spawn", "ItDoesntNow", function(ply)
 	if not IsValid(me) or ply != me then return end
 
 	stopthings()
-	if IsValid(despairSound) then
-		despairSound:Stop()
-			despairSound = nil
-	end
-	despairSoundVol = 0
 end)
 
 hook.Add("DrawOverlay", "despair_text", function()
@@ -1784,27 +1726,8 @@ hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, z
 end)
 
 local function GetDespairCamPulse()
-	local ply = IsValid(lply) and lply or LocalPlayer()
-	if not IsValid(ply) then return 0, 0 end
-	local spect = IsValid(ply:GetNWEntity("spect")) and ply:GetNWEntity("spect")
-	if !ply:Alive() and !IsValid(spect) then return 0, 0 end
-	if !ply:Alive() and viewmode != 1 then return 0, 0 end
-
-	local org = ply:Alive() and (ply.new_organism or ply.organism) or (IsValid(spect) and (spect.new_organism or spect.organism))
-	if not org then return 0, 0 end
-
-	local despair = math.Clamp(org.despair or 0, 0, 1)
-	local intensity = math.Clamp((despair - 0.35) / 0.65, 0, 1)
-	if intensity <= 0 then return 0, 0 end
-
-	local time = CurTime()
-	local cycle = 1.5
-	local phase = (time % cycle) / cycle
-	local pushPull = math.sin(phase * math.pi * 2) * intensity
-	local step = math.floor(time / cycle)
-	local jitter = (math.sin(time * 13 + step * 1.7) + math.cos(time * 11.5 + step * 2.3)) * 0.5 * intensity
-
-	return pushPull, jitter
+	-- Screen shaking disabled when in despair
+	return 0, 0
 end
 
 hook.Add("TranslateFOV", "DespairBreathFov", function(ply, fov)
@@ -1849,7 +1772,7 @@ net.Receive("headtrauma_flash", function()
     end
 
     hg.AddFlash(lply:EyePos(), 1, pos, time, size)
-    headtraumaSaturation = math.min(time * 1.5, 2.5)
+    headtraumaSaturation = math.min(time * 3, 5)
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     else

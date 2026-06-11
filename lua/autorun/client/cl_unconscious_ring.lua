@@ -531,14 +531,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         if currentShock > peakShock then
             peakShock = currentShock
         end
-        ringAlpha = Lerp(FrameTime() * 4, ringAlpha, 1)
+        ringAlpha = Lerp(FrameTime() * 2, ringAlpha, 1)
         dotBeat = math.floor(CurTime()) % 3
     elseif lowConsciousness then
-        ringAlpha = Lerp(FrameTime() * 4, ringAlpha, 0.4)
+        ringAlpha = Lerp(FrameTime() * 2, ringAlpha, 0.4)
         dotBeat = math.floor(CurTime()) % 3
     else
         flatlinePlayedThisUnconscious = false
-        ringAlpha = Lerp(FrameTime() * 6, ringAlpha, 0)
+        ringAlpha = Lerp(FrameTime() * 3, ringAlpha, 0)
         if ringAlpha <= 0.01 then
             ringAlpha = 0
             peakShock = 40
@@ -578,7 +578,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop or fibrillating
         -- Only when the organism is in a org.critical state
         if org.critical then
-            otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.3)
+            otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.15)
         else
             otrubECGAlpha = 0
         end
@@ -649,7 +649,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
-            local ecgColor = isCritical and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
+            -- Always use white color when awake (shows consciousness, not brain health)
+            local ecgColor = Color(255, 255, 255, 255 * otrubECGAlpha)
             DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
             
             -- Add consciousness meter ring for low opacity ECG when consciousness is low or recently dropped
@@ -657,7 +658,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 local ringRadius = 280
                 local ringThickness = 12
                 local consciousnessProgress = math.Clamp(lerpConsciousness, 0, 1)
-                local ringColor = isCritical and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(220, 220, 220, 255 * otrubECGAlpha)
+                -- Always use white color when awake (shows consciousness, not brain health)
+                local ringColor = Color(220, 220, 220, 255 * otrubECGAlpha)
                 
                 -- Draw background ring
                 DrawArc(centerX, centerY, ringRadius, ringThickness, 0, 360, 60, Color(40, 40, 40, 100 * otrubECGAlpha))

@@ -607,7 +607,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 				org.aiming_start_time = CurTime()
 			end
 			local duration = CurTime() - org.aiming_start_time
-			if duration >= 1.5 then
+			if duration >= 0.5 then
 				-- Define debuff variables (include amputated arms)
 				local rarm_broken_debuff = (org.rarm and org.rarm >= 1) or org.rarmamputated
 				local larm_broken_debuff = (org.larm and org.larm >= 1) or org.larmamputated
@@ -628,7 +628,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 					debuffMitigation = 0.6 -- Slightly mitigate debuffs (40% reduction)
 				end
 
-				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5, 10)
+				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.7, 10)
 
 				-- Increase aiming fatigue accumulation for broken/amputated arms
 				if rarm_broken_debuff or larm_broken_debuff then
@@ -636,7 +636,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 					if org.rarmamputated or org.larmamputated then
 						fatigue_multiplier = 2.0 * debuffMitigation -- More severe for amputated arms
 					end
-					org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.5 * fatigue_multiplier, 10)
+					org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.7 * fatigue_multiplier, 10)
 				end
 
 				local pain_threshold = 4.0
@@ -652,10 +652,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 						pain_rate = pain_rate * 3.0 * debuffMitigation
 					elseif rarm_dislocated then
 						pain_rate = pain_rate * 1.8 * debuffMitigation
-					end
-
-					if larm_broken_pain then
-						pain_rate = pain_rate * 1.5
 					end
 
 					org.painadd = org.painadd + pain_rate
@@ -793,6 +789,12 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if (org.pain or 0) > 45 then
 		despairAdd = despairAdd + math.Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.008
+	end
+
+	-- Synergistic despair: extreme pain while at maximum fear compounds into despair
+	if (org.fear or 0) >= 1.0 and (org.pain or 0) > 45 then
+		local painIntensity = math.Clamp((org.pain - 45) / 85, 0, 1)
+		despairAdd = despairAdd + painIntensity * timeValue * 0.015
 	end
 
 	if (org.shock or 0) > 20 then

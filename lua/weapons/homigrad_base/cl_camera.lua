@@ -317,6 +317,11 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 	tta = tta * tta_multiplier
 
+	-- Aiming fatigue slows down sight realignment
+	local fatigue = organism.aiming_fatigue or 0
+	local fatigue_realignment_penalty = 1 + fatigue * 0.15
+	tta = tta * fatigue_realignment_penalty
+
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end

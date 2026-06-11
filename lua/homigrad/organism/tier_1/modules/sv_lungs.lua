@@ -460,21 +460,36 @@ module[2] = function(owner, org, timeValue)
 
 	if org.isPly then
 		if org.pneumothorax > 0 then
-			org.owner:Notify("I can feel something filling my lungs.", true, "pneumothorax1",10) // delay of 10 seconds before typing that
+			org.nextPneumothoraxNotify1 = org.nextPneumothoraxNotify1 or (CurTime() + 10)
+			if org.nextPneumothoraxNotify1 < CurTime() then
+				org.owner:Notify("I can feel something filling my lungs.", true, "pneumothorax1",10)
+				org.nextPneumothoraxNotify1 = CurTime() + 10
+			end
 		else
 			org.owner:ResetNotification("pneumothorax1")
+			org.nextPneumothoraxNotify1 = nil
 		end
 
 		if org.pneumothorax > 0.3 then
-			org.owner:Notify("It's getting harder to breathe.", true, "pneumothorax2", 5)
+			org.nextPneumothoraxNotify2 = org.nextPneumothoraxNotify2 or (CurTime() + 5)
+			if org.nextPneumothoraxNotify2 < CurTime() then
+				org.owner:Notify("It's getting harder to breathe.", true, "pneumothorax2", 5)
+				org.nextPneumothoraxNotify2 = CurTime() + 5
+			end
 		else
 			org.owner:ResetNotification("pneumothorax2")
+			org.nextPneumothoraxNotify2 = nil
 		end
 
 		if org.pneumothorax > 0.5 then
-			org.owner:Notify("I'm really struggling to breathe.", true, "pneumothorax3", 5)
+			org.nextPneumothoraxNotify3 = org.nextPneumothoraxNotify3 or (CurTime() + 5)
+			if org.nextPneumothoraxNotify3 < CurTime() then
+				org.owner:Notify("I'm really struggling to breathe.", true, "pneumothorax3", 5)
+				org.nextPneumothoraxNotify3 = CurTime() + 5
+			end
 		else
 			org.owner:ResetNotification("pneumothorax3")
+			org.nextPneumothoraxNotify3 = nil
 		end
 
 		-- Trachea damage notifications

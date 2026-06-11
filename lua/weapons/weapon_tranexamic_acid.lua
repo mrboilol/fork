@@ -21,7 +21,7 @@ SWEP.AutoSwitchFrom = false
 SWEP.Slot = 3
 SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
-SWEP.offsetVec = Vector(4, -1.5, 0)
+SWEP.offsetVec = Vector(8, -1.5, 0)
 SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modes = 1
 SWEP.modeNames = {
@@ -36,12 +36,13 @@ function SWEP:InitializeAdd()
 		[1] = 10,
 	}
 	self.mode = 1
+	self.ModelScale = 1
 end
 
 SWEP.modeValuesdef = {
 	[1] = {10,true},
 }
-SWEP.ShouldDeleteOnFullUse = true
+SWEP.ShouldDeleteOnFullUse = false
 
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
 
@@ -90,6 +91,11 @@ if SERVER then
 		if self.modeValues[1] <= 0 and self.ShouldDeleteOnFullUse then
 			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()
+		end
+		
+		-- Update model scale based on remaining amount
+		if self.modeValuesdef and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
+			self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
 		end
 	end
 end

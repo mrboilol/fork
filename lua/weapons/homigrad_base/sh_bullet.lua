@@ -900,6 +900,25 @@ function SWEP:FireBullet()
 end
 
 function SWEP:PostFireBullet()
+	if SERVER then
+		local owner = self:GetOwner()
+		if IsValid(owner) and owner:IsPlayer() and owner.organism then
+			local org = owner.organism
+			local fatigue_gain = 0.3
+			local rarm_broken = (org.rarm and org.rarm >= 1) or org.rarmamputated
+			local larm_broken = (org.larm and org.larm >= 1) or org.larmamputated
+			local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
+			local larm_dislocated = org.larmdislocated or org.larmdislocation
+
+			if rarm_broken or larm_broken then
+				fatigue_gain = fatigue_gain * 1.5
+			elseif rarm_dislocated or larm_dislocated then
+				fatigue_gain = fatigue_gain * 1.2
+			end
+
+			org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + fatigue_gain, 10)
+		end
+	end
 end
 
 if CLIENT then

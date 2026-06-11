@@ -1600,41 +1600,9 @@ function hg.DragHands(ply,self)
 end
 
 function hg.DragRightHand(ply,self,pos,norm,anglh)
-    if not IsValid(ply) then return end   	
-
-	local ply_spine_index = ply:LookupBone("ValveBiped.Bip01_Spine4")
-	if !ply_spine_index then return end
-	local ply_spine_matrix = ply:GetBoneMatrix(ply_spine_index)
-	local wmpos = ply_spine_matrix:GetTranslation()
-
-	--local ent = IsValid(ply:GetNetVar("carryent")) and ply:GetNetVar("carryent") or IsValid(ply:GetNetVar("carryent2")) and ply:GetNetVar("carryent2")
-	--local pos = IsValid(ent) and ent:GetPos() or false
-	--local bon = ply:GetNetVar("carrybone",0) ~= 0 and ply:GetNetVar("carrybone",0) or ply:GetNetVar("carrybone2",0)
-	--local lpos = IsValid(ent) and (ply:GetNetVar("carrypos",nil) and ent:LocalToWorld(ply:GetNetVar("carrypos",nil)) or ply:GetNetVar("carrypos2",nil) and ent:LocalToWorld(ply:GetNetVar("carrypos2",nil)))
-	--local twohands = (ply:GetNetVar("carrymass",0) ~= 0 and ply:GetNetVar("carrymass",0) or ply:GetNetVar("carrymass2",0)) > 15
-	
-	local norm = norm
-
-	local rh = ply:LookupBone("ValveBiped.Bip01_R_Hand")
-	local rhmat = ply:GetBoneMatrix(rh)
-    
-    self.rhandik = true
-    
-	if pos then
-        local oldpos = rhmat:GetTranslation()
-        pos.x = math_Clamp(pos.x, oldpos.x - 38, oldpos.x + 38)
-        pos.y = math_Clamp(pos.y, oldpos.y - 38, oldpos.y + 38)
-        pos.z = math_Clamp(pos.z, oldpos.z - 38, oldpos.z + 38)
-
-        if norm then
-            local pos,newang = LocalToWorld(vecZero, anglh or angZero,pos,norm:Angle())
-            rhmat:SetTranslation(pos)
-            rhmat:SetAngles(newang)
-        end
-
-        hg.bone_apply_matrix(ply,rh,rhmat)
-        ply.oldposrh = pos - oldpos
-    end
+    -- Disabled: right hand should remain occupied with holding weapons
+    -- Left hand handles all pickups and interactions
+    return
 end
 
 function hg.DragLeftHand(ply, self, pos, norm, anglh)
@@ -1706,33 +1674,9 @@ function hg.DragLeftHand_Ex(ply, self, pos, ang, anglh)
 end
 
 function hg.DragRightHand_Ex(ply, self, pos, ang, angrh)
-    if not IsValid(ply) then return end
-
-	local ply_spine_index = ply:LookupBone("ValveBiped.Bip01_Spine4")
-	if !ply_spine_index then return end
-	local ply_spine_matrix = ply:GetBoneMatrix(ply_spine_index)
-	local wmpos = ply_spine_matrix:GetTranslation()
-
-	local rh = ply:LookupBone("ValveBiped.Bip01_R_Hand")
-	local rhmat = ply:GetBoneMatrix(rh)
-    
-    self.rhandik = true
-    
-	if pos then
-        local oldpos = rhmat:GetTranslation()
-        pos.x = math_Clamp(pos.x, oldpos.x - 38, oldpos.x + 38)
-        pos.y = math_Clamp(pos.y, oldpos.y - 38, oldpos.y + 38)
-        pos.z = math_Clamp(pos.z, oldpos.z - 38, oldpos.z + 38)
-
-        if ang then
-            local pos,newang = LocalToWorld(vecZero, angrh or angZero,pos,ang)
-            rhmat:SetTranslation(pos)
-            rhmat:SetAngles(newang)
-        end
-
-        hg.bone_apply_matrix(ply,rh,rhmat)
-        ply.oldposrh = pos - oldpos
-    end
+    -- Disabled: right hand should remain occupied with holding weapons
+    -- Left hand handles all pickups and interactions
+    return
 end
 
 function hg.DragHandsToPos(ply,self,pos,twohanded,twohanddist,norm,angrh,anglh)
@@ -1763,26 +1707,11 @@ function hg.DragHandsToPos(ply,self,pos,twohanded,twohanddist,norm,angrh,anglh)
     self.lhandik = true
     
 	if pos then
-        if twohanded then
-            self.rhandik = true
-
-            local oldpos = rhmat:GetTranslation()
-            --pos = pos + LerpFT(0.01,ply.oldposrh or (pos - oldpos),pos - oldpos)
-            pos.x = math_Clamp(pos.x, oldpos.x - 38, oldpos.x + 38)
-            pos.y = math_Clamp(pos.y, oldpos.y - 38, oldpos.y + 38)
-            pos.z = math_Clamp(pos.z, oldpos.z - 38, oldpos.z + 38)
-
-            rhmat:SetTranslation(pos)
-
-            if norm then
-                local pos,newang = LocalToWorld(Vector(0, -twohanddist or -5,0),angrh or Angle(0,0,180),pos,norm:Angle())
-                rhmat:SetTranslation(pos)
-                rhmat:SetAngles(newang)
-            end
-            
-            hg.bone_apply_matrix(ply,rh,rhmat)
-            ply.oldposrh = pos - oldpos
-        end
+        -- Disabled two-handed pickup for right hand - only left hand handles pickups
+        -- if twohanded then
+        --     self.rhandik = true
+        --     ... (right hand manipulation code removed)
+        -- end
 
 
         local oldpos = lhmat:GetTranslation()

@@ -1629,15 +1629,15 @@ local IsValid = IsValid
 		-- Add pain if using damaged arm for interaction
 		if bothArmsBroken and not org.rarmamputated then
 			-- Both broken, using right hand causes pain
-			local painAmount = (org.rarm or 0) * 5 + (org.rarmdislocation or org.rarmdislocated and 3 or 0)
+			local painAmount = (org.rarm or 0) * 5 + ((org.rarmdislocation or org.rarmdislocated) and 3 or 0)
 			org.painadd = (org.painadd or 0) + painAmount
 		elseif rightArmBroken and not leftArmBroken and not org.larmamputated then
 			-- Right broken, using left hand causes pain
-			local painAmount = (org.larm or 0) * 5 + (org.larmdislocation or org.larmdislocated and 3 or 0)
+			local painAmount = (org.larm or 0) * 5 + ((org.larmdislocation or org.larmdislocated) and 3 or 0)
 			org.painadd = (org.painadd or 0) + painAmount
 		elseif leftArmBroken and not rightArmBroken and not org.rarmamputated then
 			-- Left broken, using right hand causes less pain (right is stronger)
-			local painAmount = (org.rarm or 0) * 5 + (org.rarmdislocation or org.rarmdislocated and 3 or 0)
+			local painAmount = (org.rarm or 0) * 5 + ((org.rarmdislocation or org.rarmdislocated) and 3 or 0)
 			painAmount = painAmount * 0.7
 			org.painadd = (org.painadd or 0) + painAmount
 		end

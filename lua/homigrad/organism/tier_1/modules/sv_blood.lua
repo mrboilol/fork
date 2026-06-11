@@ -129,7 +129,17 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.arteria == 1 then
-		org.o2[1] = math.max(org.o2[1] - mulTime * 5, 0)
+		local o2DebuffRate = 5
+		-- Stronger O2 debuff when blood reaches 3750 or below
+		if org.blood <= 3750 then
+			o2DebuffRate = 15 -- Triple the debuff rate
+			-- Notify player about severe oxygen deprivation from arterial bleeding
+			if org.isPly and not org.otrub and (org._arteriaO2NotifyTime or 0) + 30 < CurTime() then
+				org.owner:Notify("I can't breathe... my throat is bleeding...", 30, "arteria_o2", 0)
+				org._arteriaO2NotifyTime = CurTime()
+			end
+		end
+		org.o2[1] = math.max(org.o2[1] - mulTime * o2DebuffRate, 0)
 	end
 
 	-- Track how long internal bleed has been untreated

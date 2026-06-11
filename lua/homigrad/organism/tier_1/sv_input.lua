@@ -813,6 +813,41 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_CLUB+DMG_GENERIC) then
 			org.bruises = org.bruises + 1
+			
+			-- Blunt hits have a chance to open wounds based on damage
+			local bluntDamage = dmgInfo:GetDamage()
+			local woundChance = math.Clamp(bluntDamage / 100, 0, 0.5) -- 0-50% chance based on damage
+			
+			if math.random() < woundChance then
+				local physBone = bone != -1 and bone or math.random(0, ent:GetPhysicsObjectCount() - 1)
+				local boneIndex = ent:TranslatePhysBoneToBone(physBone)
+				local boneName = ent:GetBoneName(boneIndex)
+				local bonePos, boneAng = ent:GetBonePosition(boneIndex)
+				
+				if bonePos then
+					local localPos, localAng = WorldToLocal(dmgPos, dmgInfo:GetDamageForce():GetNormalized():Angle(), bonePos, boneAng)
+					local woundSeverity = math.Clamp(bluntDamage / 20, 1, 10) -- Wound size based on damage
+					
+					if #org.wounds < 30 then
+						table.insert(org.wounds, {woundSeverity, localPos, localAng, boneName, CurTime()})
+					else
+						if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + woundSeverity end
+					end
+					
+					table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
+					
+					if #org.wounds <= 30 then
+						local wounds = org.wounds
+						timer.Create("WoundsSend"..ent:EntIndex(), 0.1, 1, function()
+							local ent = org.owner
+							if IsValid(ent) then
+								ent:SetNetVar("wounds", wounds)
+								if IsValid(ent.RagdollDeath) then ent.RagdollDeath:SetNetVar("wounds", wounds) end
+							end
+						end)
+					end
+				end
+			end
 		end
 
 		if dmgInfo:IsDamageType(DMG_BURN) then
@@ -1776,12 +1811,27 @@ local function applyFloppyBoneOffset(rag, boneName, offsetPos, offsetAng, key)
     rag.FloppyBoneOffsets[key] = rag.FloppyBoneOffsets[key] or {}
     -- Avoid stacking offsets if the same offset was already applied
     if rag.FloppyBoneOffsets[key][boneName] then return end
+    
+    -- Get current bone manipulation values
+    local currentPos = rag:GetManipulateBonePosition(boneID)
+    local currentAng = rag:GetManipulateBoneAngles(boneID)
+    
+    -- Validate that values are not NaN before storing
+    local isValidPos = currentPos and not (currentPos.x ~= currentPos.x or currentPos.y ~= currentPos.y or currentPos.z ~= currentPos.z)
+    local isValidAng = currentAng and not (currentAng.p ~= currentAng.p or currentAng.y ~= currentAng.y or currentAng.r ~= currentAng.r)
+    
     rag.FloppyBoneOffsets[key][boneName] = {
-        pos = rag:GetManipulateBonePosition(boneID),
-        ang = rag:GetManipulateBoneAngles(boneID),
+        pos = isValidPos and currentPos or vector_origin,
+        ang = isValidAng and currentAng or angle_zero,
     }
-    if offsetPos then rag:ManipulateBonePosition(boneID, offsetPos) end
-    if offsetAng then rag:ManipulateBoneAngles(boneID, offsetAng) end
+    
+    -- Only apply offset if the offset values themselves are valid
+    if offsetPos and not (offsetPos.x ~= offsetPos.x or offsetPos.y ~= offsetPos.y or offsetPos.z ~= offsetPos.z) then
+        rag:ManipulateBonePosition(boneID, offsetPos)
+    end
+    if offsetAng and not (offsetAng.p ~= offsetAng.p or offsetAng.y ~= offsetAng.y or offsetAng.r ~= offsetAng.r) then
+        rag:ManipulateBoneAngles(boneID, offsetAng)
+    end
 end
 
 local function removeFloppyBoneOffset(rag, key)
@@ -1790,8 +1840,19 @@ local function removeFloppyBoneOffset(rag, key)
     for boneName, prev in pairs(rag.FloppyBoneOffsets[key]) do
         local boneID = rag:LookupBone(boneName)
         if boneID then
-            rag:ManipulateBonePosition(boneID, prev.pos or vector_origin)
-            rag:ManipulateBoneAngles(boneID, prev.ang or angle_zero)
+            -- Validate stored values before restoring
+            local restorePos = prev.pos
+            local restoreAng = prev.ang
+            
+            if restorePos and (restorePos.x ~= restorePos.x or restorePos.y ~= restorePos.y or restorePos.z ~= restorePos.z) then
+                restorePos = vector_origin
+            end
+            if restoreAng and (restoreAng.p ~= restoreAng.p or restoreAng.y ~= restoreAng.y or restoreAng.r ~= restoreAng.r) then
+                restoreAng = angle_zero
+            end
+            
+            rag:ManipulateBonePosition(boneID, restorePos or vector_origin)
+            rag:ManipulateBoneAngles(boneID, restoreAng or angle_zero)
         end
     end
     rag.FloppyBoneOffsets[key] = nil

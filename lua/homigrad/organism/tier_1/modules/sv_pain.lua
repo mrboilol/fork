@@ -110,7 +110,7 @@ module[2] = function(owner, org, timeValue)
 
 	if (org.shock > (30 * analgesiaMul)) or org.otrub then
 		local prevConsciousness = org.consciousness or 1
-		org.consciousness = math.Approach(org.consciousness, 0.1, timeValue / 5)
+		org.consciousness = math.Approach(org.consciousness, 0, timeValue / 5)
 		-- Reduce goodmood when going unconscious
 		if prevConsciousness > 0.5 and org.consciousness < 0.5 then
 			org.goodmood = math.Clamp((org.goodmood or 1) - 0.1, 0, 1)

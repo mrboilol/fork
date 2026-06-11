@@ -332,9 +332,9 @@ end
 --//
 
 --
-local matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
-local matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
-local matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
+local matPistolAmmo = "vgui/hud/bullets/low_caliber"
+local matRfileAmmo = "vgui/hud/bullets/high_caliber"
+local matShotgunAmmo = "vgui/hud/bullets/buck_caliber"
 hg.ammotypes = {
 	["5.56x45mm"] = {
 		name = "5.56x45 mm",
@@ -366,7 +366,7 @@ hg.ammotypes = {
 			Speed = 890,
 			Diameter = 5.56,
 			Mass = 4,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/hmcd_round_556"
 		}
 	},
 	["5.56x45mmm856"] = {
@@ -399,7 +399,7 @@ hg.ammotypes = {
 			Speed = 860,
 			Diameter = 5.56,
 			Mass = 4,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/556m856zcity"
 		}
 	},
 	["5.56x45mmap"] = {
@@ -432,7 +432,7 @@ hg.ammotypes = {
 			Speed = 980,
 			Diameter = 5.56,
 			Mass = 4,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/556apzcity"
 		}
 	},
 	["7.62x39mmsp"] = {
@@ -466,7 +466,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/762spzcity"
 		}
 	},
 	["7.62x39mm"] = {
@@ -500,7 +500,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/hmcd_round_76239"
 		}
 	},
 	["7.62x39mmbp"] = {
@@ -534,7 +534,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 7.62,
 			Mass = 8.5,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/762bpzcity"
 		}
 	},
 	[".366tkm"] = {
@@ -568,7 +568,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00011,
 			Diameter = 9.58,
 			Mass = 13.5,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/762spzcity"
 		}
 	},
 	["5.45x39mm"] = {
@@ -601,7 +601,7 @@ hg.ammotypes = {
 			Speed = 850,
 			Diameter = 5.45,
 			Mass = 4.5,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/545zcity"
 		}
 	},
 	["metal_debris"] = {
@@ -672,7 +672,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12/8,
 			Mass = 32/8,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/hmcd_round_12",
 			ShellColor = Color(255,0,0)
 		}
 	},
@@ -709,7 +709,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12,
 			Mass = 20,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/hmcd_round_beanbag",
 			ShellColor = Color(122,122,122)
 		}
 	},
@@ -746,7 +746,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00015,
 			Diameter = 12,
 			Mass = 30,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/12_70slugzcity",
 			ShellColor = Color(12,75,12)
 		}
 	},
@@ -784,7 +784,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00015,
 			Diameter = 12,
 			Mass = 30,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/bullets/buck_caliber",
 			ShellColor = Color(50,110,90)
 		}
 	},
@@ -821,7 +821,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12/8,
 			Mass = 32/8,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/12_70blankzcity",
 			ShellColor = Color(75,75,155),
 			IsBlank = true
 		}
@@ -859,7 +859,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0007,
 			Diameter = 23/10,
 			Mass = 32/10,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/bullets/buck_caliber",
 			ShellColor = Color(255,185,0)
 		}
 	},
@@ -896,7 +896,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0007,
 			Diameter = 23/25,
 			Mass = 32/25,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/bullets/buck_caliber",
 			ShellColor = Color(130,130,130)
 		}
 	},
@@ -933,7 +933,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0009,
 			Diameter = 23,
 			Mass = 40,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/bullets/buck_caliber",
 			ShellColor = Color(255,185,0)
 		}
 	},
@@ -970,7 +970,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0003,
 			Diameter = 12/8,
 			Mass = 32/8,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/12_70blankzcity",
 			ShellColor = Color(255,185,0),
 			Distance = 32,
 		}
@@ -1008,7 +1008,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0008,
 			Diameter = 23,
 			Mass = 20,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/hmcd_round_beanbag",
 			ShellColor = Color(255,185,0)
 		}
 	},
@@ -1045,7 +1045,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00025,
 			Diameter = 20/6,
 			Mass = 26/6,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/bullets/buck_caliber",
 			ShellColor = Color(255,150,0)
 		}
 	},
@@ -1082,7 +1082,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00025,
 			Diameter = 20/6,
 			Mass = 26/6,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/bullets/buck_caliber",
 			ShellColor = Color(12,75,12)
 		}
 	},
@@ -1119,7 +1119,7 @@ hg.ammotypes = {
 			AirResistMul = 0.00025,
 			Diameter = 20/6,
 			Mass = 26/6,
-			Icon = matShotgunAmmo,
+			Icon = "vgui/hud/bullets/buck_caliber",
 			ShellColor = Color(195,143,0),
 		}
 	},
@@ -1153,7 +1153,7 @@ hg.ammotypes = {
 			Speed = 309,
 			Diameter = 9,
 			Mass = 7,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/hmcd_round_918"
 		}
 	},
 	["9x17mm"] = {
@@ -1186,7 +1186,7 @@ hg.ammotypes = {
 			Speed = 309,
 			Diameter = 9,
 			Mass = 7,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/hmcd_round_918"
 		}
 	},
 	["9x19mmparabellum"] = {
@@ -1219,7 +1219,7 @@ hg.ammotypes = {
 			Speed = 352,
 			Diameter = 9,
 			Mass = 7,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["9x19mmqm"] = {
@@ -1252,7 +1252,7 @@ hg.ammotypes = {
 			Speed = 291,
 			Diameter = 9,
 			Mass = 7,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/9x19quakemakerzcity"
 		}
 	},
 	["7.65x17mm"] = {
@@ -1285,7 +1285,7 @@ hg.ammotypes = {
 			Speed = 352,
 			Diameter = 9,
 			Mass = 7,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/75117zcity"
 		}
 	},
 	[".40sw"] = {
@@ -1318,7 +1318,7 @@ hg.ammotypes = {
 			Speed = 256,
 			Diameter = 11.18,
 			Mass = 15,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/40swzcity"
 		}
 	},
 	[".45acp"] = {
@@ -1351,7 +1351,7 @@ hg.ammotypes = {
 			Speed = 259,
 			Diameter = 11.19,
 			Mass = 14,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/45acpzcity"
 		}
 	},
 	[".45acphydroshock"] = {
@@ -1384,7 +1384,7 @@ hg.ammotypes = {
 			Speed = 259,
 			Diameter = 11.19,
 			Mass = 14,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/45acphydroshockzcity"
 		}
 	},
 	["7.62x25mm"] = {
@@ -1417,7 +1417,7 @@ hg.ammotypes = {
 			Speed = 376,
 			Diameter = 10,
 			Mass = 10,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["9x19mmgreentracer"] = {
@@ -1450,7 +1450,7 @@ hg.ammotypes = {
 			Speed = 352,
 			Diameter = 9,
 			Mass = 7,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/9x19greentracerzcity"
 		}
 	},
 	[".45rubber"] = {
@@ -1484,7 +1484,7 @@ hg.ammotypes = {
 			Speed = 259,
 			Diameter = 11.19,
 			Mass = 10,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["9mmpakblank"] = {
@@ -1519,7 +1519,7 @@ hg.ammotypes = {
 			Diameter = 11.19,
 			Distance = 32,
 			Mass = 10,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["9mmpakflashdefense"] = {
@@ -1554,7 +1554,7 @@ hg.ammotypes = {
 			Diameter = 11.19,
 			Distance = 32,
 			Mass = 10,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["18x45mmtraumatic"] = {
@@ -1600,7 +1600,7 @@ hg.ammotypes = {
 			Speed = 250,
 			Diameter = 18,
 			Mass = 22,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["18x45mmflashdefense"] = {
@@ -1635,7 +1635,7 @@ hg.ammotypes = {
 			Diameter = 18,
 			Distance = 32,
 			Mass = 1180,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["4.6x30mm"] = {
@@ -1668,7 +1668,7 @@ hg.ammotypes = {
 			Speed = 734,
 			Diameter = 4.6,
 			Mass = 1.6,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	["5.7x28mm"] = {
@@ -1701,7 +1701,7 @@ hg.ammotypes = {
 			Speed = 853,
 			Diameter = 5.7,
 			Mass = 2,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	[".44remingtonmagnum"] = {
@@ -1733,7 +1733,7 @@ hg.ammotypes = {
 			Speed = 472,
 			Diameter = 10.9,
 			Mass = 13,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	[".357magnum"] = {
@@ -1766,7 +1766,7 @@ hg.ammotypes = {
 			Speed = 450,
 			Diameter = 9,
 			Mass = 10,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	[".38special"] = {
@@ -1799,7 +1799,7 @@ hg.ammotypes = {
 			Speed = 290,
 			Diameter = 9.1,
 			Mass = 10,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["14.5x114mmb32"] = { -- Салат ты у нас тут балансище, сделаешь конфетку 
@@ -1820,7 +1820,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 14.5,
 			Mass = 64,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	["14.5x114mmbztm"] = { -- это тоже самое что и выше просто с трасером :D
@@ -1852,7 +1852,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 14.5,
 			Mass = 64,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	["9x39mm"] = {
@@ -1884,7 +1884,7 @@ hg.ammotypes = {
 			Speed = 300,
 			Diameter = 9,
 			Mass = 16,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	[".50actionexpress"] = {
@@ -1917,7 +1917,7 @@ hg.ammotypes = {
 			Speed = 440,
 			Diameter = 12.7,
 			Mass = 19,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	[".50actionexpresscopper"] = {
@@ -1950,7 +1950,7 @@ hg.ammotypes = {
 			Speed = 460,
 			Diameter = 12.7,
 			Mass = 19,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	[".50actionexpressjhp"] = {
@@ -1983,7 +1983,7 @@ hg.ammotypes = {
 			Speed = 440,
 			Diameter = 12.7,
 			Mass = 19,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["7.62x51mm"] = {
@@ -2016,7 +2016,7 @@ hg.ammotypes = {
 			Speed = 840,
 			Diameter = 7.62,
 			Mass = 10,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	["7.62x51mmm993"] = {
@@ -2049,7 +2049,7 @@ hg.ammotypes = {
 			Speed = 930,
 			Diameter = 7.62,
 			Mass = 18,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	["7.62x54mm"] = {
@@ -2082,7 +2082,7 @@ hg.ammotypes = {
 			Speed = 860,
 			Diameter = 7.62,
 			Mass = 10,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	[".338lapuamagnum"] = {
@@ -2114,7 +2114,7 @@ hg.ammotypes = {
 			Speed = 880,
 			Diameter = 8.6,
 			Mass = 16,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	[".22longrifle"] = {
@@ -2147,7 +2147,7 @@ hg.ammotypes = {
 			Speed = 335,
 			Diameter = 5.72,
 			Mass = 2.5,
-			Icon = matPistolAmmo
+			Icon = "vgui/hud/bullets/low_caliber"
 		}
 	},
 	["rpg-7projectile"] = {
@@ -2190,7 +2190,7 @@ hg.ammotypes = {
 			Speed = 820,
 			Diameter = 12.7,
 			Mass = 48,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	["12.7x55mm"] = {
@@ -2222,7 +2222,7 @@ hg.ammotypes = {
 			Speed = 315, --asha it's subsonic rifle... deka you are stupid
 			Diameter = 12.7,
 			Mass = 20,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		}
 	},
 	["nails"] = {
@@ -2251,7 +2251,7 @@ hg.ammotypes = {
 		},
 		BulletSettings = {
 			Mass = 200,
-			Icon = matRfileAmmo,
+			Icon = "vgui/hud/bullets/high_caliber",
 			Damage = 256.8,
 			Force = 30.9,
 			Penetration = 50,
@@ -2289,7 +2289,7 @@ hg.ammotypes = {
 		},
 		BulletSettings = {
 			Mass = 40,
-			Icon = matRfileAmmo,
+			Icon = "vgui/hud/bullets/high_caliber",
 			Damage = 35,
 			Speed = 5,
 			PhysPenetrationMul = 0.0,
@@ -2330,7 +2330,7 @@ hg.ammotypes = {
 			Speed = 55,	--; Comically slow
 			LifeTime = 15,
 			Shell = "12guage",
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		},
 		FunctionInfo = {
 			Model = "models/Items/AR2_Grenade.mdl",
@@ -2371,7 +2371,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 10,
 			Mass = 10,
-			Icon = matRfileAmmo,
+			Icon = "vgui/hud/bullets/high_caliber",
 			noricochet = true,
 		}
 	},
@@ -2406,7 +2406,7 @@ hg.ammotypes = {
 			Speed = 1000,
 			Diameter = 10,
 			Mass = 10,
-			Icon = matRfileAmmo
+			Icon = "vgui/hud/bullets/high_caliber"
 		},
 		BulletFunctions = {
 			-- Hit = hit_blood,
@@ -2466,7 +2466,7 @@ hg.ammotypes = {
 			Speed = 170,
 			Diameter = 20,
 			Mass = 50,
-			Icon = matShotgunAmmo
+			Icon = "vgui/hud/bullets/buck_caliber"
 		}
 	},
 	["tranquilizerdarts"] = {
@@ -2501,7 +2501,7 @@ hg.ammotypes = {
 			AirResistMul = 0.0002,
 			Diameter = 9,
 			Mass = 18,
-			Icon = matPistolAmmo,
+			Icon = "vgui/hud/bullets/low_caliber",
 			tranquilizer = true,
 		}
 	},
@@ -3150,7 +3150,45 @@ if CLIENT then
 
         for k,v in pairs(ammos) do
             local DermaButton = vgui.Create( "DButton", DPanel ) 
-            DermaButton:SetText( game.GetAmmoName( k )..": "..v )	
+            local ammoName = game.GetAmmoName(k)
+            local ammoType = hg.ammotypes[ammoName]
+            local iconPath = ammoType and ammoType.BulletSettings and ammoType.BulletSettings.Icon or nil
+            
+            -- Fallback logic: try spawnmenu icon, then caliber-based fallback
+            if not iconPath then
+                local spawnmenuIcon = hg.ammoents and hg.ammoents[ammoName] and hg.ammoents[ammoName].Icon
+                if spawnmenuIcon then
+                    iconPath = spawnmenuIcon
+                else
+                    -- Caliber-based fallback
+                    local diameter = ammoType and ammoType.BulletSettings and ammoType.BulletSettings.Diameter or 0
+                    if diameter >= 12 then
+                        iconPath = "vgui/hud/bullets/buck_caliberalt"
+                    elseif diameter >= 6 then
+                        iconPath = "vgui/hud/bullets/high_caliberalt"
+                    else
+                        iconPath = "vgui/hud/bullets/low_caliberalt"
+                    end
+                end
+            end
+            
+            DermaButton:SetText( "  "..ammoName..": "..v )
+            if iconPath then
+                local success, mat = pcall(Material, iconPath)
+                if success and mat then
+                    DermaButton.icon = mat
+                else
+                    -- Ultimate fallback to generic icons
+                    local diameter = ammoType and ammoType.BulletSettings and ammoType.BulletSettings.Diameter or 0
+                    if diameter >= 12 then
+                        DermaButton.icon = Material("vgui/hud/bullets/buck_caliber")
+                    elseif diameter >= 6 then
+                        DermaButton.icon = Material("vgui/hud/bullets/high_caliber")
+                    else
+                        DermaButton.icon = Material("vgui/hud/bullets/low_caliber")
+                    end
+                end
+            end	
             DermaButton:SetTextColor( Color(255,255,255) )	
 			DermaButton:SetFont("HomigradFontVSmall")
             DermaButton:SetPos( 0, 0 )	
@@ -3163,6 +3201,11 @@ if CLIENT then
                 DermaButton.a = Lerp(0.1,DermaButton.a or 100,DermaButton:IsHovered() and 180 or 100)
 				draw.RoundedBox(0, 0, 0, w, h, Color(red.r,red.g,red.b,DermaButton.a))
                 --BlurBackground(DermaButton)
+                if self.icon then
+                    surface.SetMaterial(self.icon)
+                    surface.SetDrawColor(255, 255, 255, 255)
+                    surface.DrawTexturedRect(5, 5, 16, 16)
+                end
             end				
             DermaButton.DoClick = function()
                 --print( math.min(ammodrop,v),game.GetAmmoName( k ))				
@@ -3246,3 +3289,5 @@ if SERVER then
 		ply:SetNetVar("Inventory",ply.inventory)
     end)
 end
+
+

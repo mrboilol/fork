@@ -298,13 +298,25 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
 	
 	if name == "spine3" and org.spine3 > 0.75 and oldDmg <= 0.75 then
-		print("[HG Bone] SPINE3 threshold crossed: spine3=" .. tostring(org.spine3) .. " oldDmg=" .. tostring(oldDmg))
-		if math.random() < 0.5 then
-			print("[HG Bone] NECK BREAK TRIGGERED from spine damage")
+		print("[HG Bone] SPINE3 threshold crossed: spine3=" .. tostring(org.spine3) .. " oldDmg=" .. tostring(oldDmg) .. " dmg=" .. tostring(dmg))
+		
+		-- Calculate neck break death chance based on force (damage amount)
+		-- Low force (just crossing threshold) = low chance, high force = high chance
+		local forceMultiplier = isCrush(dmgInfo) and 2 or 1
+		local effectiveDmg = dmg * forceMultiplier
+		
+		-- Scale chance: 0.2 (20%) at minimum force, up to 1.0 (100%) at high force
+		-- Using a curve that gives meaningful variation across force ranges
+		local deathChance = math.Clamp(0.2 + (effectiveDmg - 0.1) * 1.5, 0.2, 1.0)
+		
+		print("[HG Bone] Neck break death chance: " .. tostring(deathChance * 100) .. "% (effectiveDmg=" .. tostring(effectiveDmg) .. ")")
+		
+		if math.random() < deathChance then
+			print("[HG Bone] NECK BREAK TRIGGERED from spine damage (fatal)")
 			hg.BreakNeck(org.owner, true)
 			return result, vecrand
 		else
-			print("[HG Bone] Neck break RANDOM FAIL - spine3=" .. tostring(org.spine3))
+			print("[HG Bone] Neck break SURVIVED - spine3=" .. tostring(org.spine3))
 		end
 	end
 

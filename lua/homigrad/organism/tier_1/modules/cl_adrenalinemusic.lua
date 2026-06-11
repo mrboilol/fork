@@ -8,6 +8,7 @@ hg.lastDespair = hg.lastDespair or 0
 hg.lastFear = hg.lastFear or 0
 hg.lastCombatTime = hg.lastCombatTime or 0
 hg.adrenalineMusicThreaded = hg.adrenalineMusicThreaded or 0
+hg.lastSeverePainTime = hg.lastSeverePainTime or 0
 
 local function stop_adrenaline_music(force)
 	if not IsValid(hg.adrenalineMusicStation) then return end
@@ -107,6 +108,16 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
+	-- Prevent playing if recently recovered from severe pain (within 30 seconds)
+	if pain > 70 then
+		hg.lastSeverePainTime = CurTime()
+	end
+	if (hg.lastSeverePainTime or 0) > CurTime() - 30 then
+		stop_adrenaline_music(true)
+		MsgN("[AdrenalineMusic] Blocked: recently recovered from severe pain")
+		return
+	end
+
 	local shouldPlay = false
 	local adrenalineAdd = org.adrenalineAdd or 0
 	local despair = org.despair or 0
@@ -118,20 +129,20 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	local pulse = org.pulse or 0
 
 
-	-- Play if triggered by adrenaline, fear, or panic (recent damage)
+	-- Play if triggered by adrenaline, fear, or panic (recent damage from player/NPC/suppression)
 	local panicTrigger = CurTime() - hg.lastCombatTime < 15
 	
-	-- Fear > 0.75: always play
-	if fear > 0.75 then
+	-- Fear > 0.75: always play (but only if from combat sources)
+	if fear > 0.75 and panicTrigger then
 		shouldPlay = true
-	-- Fear > 0.5 AND adrenaline > 0.5: play
-	elseif fear > 0.5 and adrenaline > 0.5 then
+	-- Fear > 0.5 AND adrenaline > 0.5: play (but only if from combat sources)
+	elseif fear > 0.5 and adrenaline > 0.5 and panicTrigger then
 		shouldPlay = true
-	-- Fear > 0.25 AND adrenaline >= 1.0: play
-	elseif fear > 0.25 and adrenaline >= 1.0 then
+	-- Fear > 0.25 AND adrenaline >= 1.0: play (but only if from combat sources)
+	elseif fear > 0.25 and adrenaline >= 1.0 and panicTrigger then
 		shouldPlay = true
-	-- Adrenaline >= 1.5: always play
-	elseif adrenaline >= 1.5 then
+	-- Adrenaline >= 1.5: always play (but only if from combat sources)
+	elseif adrenaline >= 1.5 and panicTrigger then
 		shouldPlay = true
 	-- Panic trigger (recent combat)
 	elseif panicTrigger then
@@ -152,7 +163,8 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		start_adrenaline_music()
 		local combatFactor = math.max(0, (15 - (CurTime() - hg.lastCombatTime)) / 15) * 1.0
 		local threadedFactor = math.Clamp(hg.adrenalineMusicThreaded / 100, 0, 0.5)
-		local targetVol = math.Clamp(math.max(combatFactor, threadedFactor), 0, 1)
+		local fearFactor = math.Clamp(fear, 0, 0.5)
+		local targetVol = math.Clamp(math.max(combatFactor, threadedFactor, fearFactor), 0.1, 1)
 		hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, targetVol)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
@@ -173,7 +185,7 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	hg.adrenalineMusicThreaded = math.max(hg.adrenalineMusicThreaded - FrameTime() * 10, 0)
 end)
 
--- Detect combat situations via damage taken
+-- Detect combat situations via damage taken from players, NPCs, or suppression
 hook.Add("EntityTakeDamage", "hg_adrenalinemusic_combat", function(ent, dmgInfo)
 	if not hg_adrenalinemusic:GetBool() then return end
 	if ent ~= LocalPlayer() then return end
@@ -181,9 +193,18 @@ hook.Add("EntityTakeDamage", "hg_adrenalinemusic_combat", function(ent, dmgInfo)
 	
 	local attacker = dmgInfo:GetAttacker()
 	local damage = dmgInfo:GetDamage()
+	local damageType = dmgInfo:GetDamageType()
 	
-	-- Trigger combat time for any significant damage from any source
-	if damage > 0 then
+	-- Only trigger for damage from players, NPCs, or suppression
+	-- Exclude fall damage, burn damage, and other natural causes
+	local validAttacker = IsValid(attacker) and (attacker:IsPlayer() or attacker:IsNPC())
+	local isSuppressionDamage = damageType == DMG_CRUSH or damageType == DMG_BLAST
+	local isCombatDamage = validAttacker or isSuppressionDamage
+	
+	-- Exclude fall damage (DMG_FALL) and burn damage (DMG_BURN, DMG_SLOWBURN)
+	local isNaturalDamage = damageType == DMG_FALL or damageType == DMG_BURN or damageType == DMG_SLOWBURN
+	
+	if damage > 0 and isCombatDamage and not isNaturalDamage then
 		hg.lastCombatTime = CurTime()
 	end
 end)
@@ -212,6 +233,7 @@ hook.Add("Player Spawn", "hg_adrenalinemusic_cleanup", function(ply)
 	hg.lastFear = 0
 	hg.lastCombatTime = 0
 	hg.adrenalineMusicThreaded = 0
+	hg.lastSeverePainTime = 0
 end)
 
 if SERVER then

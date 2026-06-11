@@ -30,7 +30,7 @@ local SAMPLE_WEIGHTS = {
 
 -- Configuration
 hg.IKFootConfig = {
-	enabled = CreateClientConVar("hg_ik_foot_enabled", "1", true, false, "Enable IK Foot system"),
+	enabled = CreateConVar("hg_ik_foot_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable IK Foot system"),
 	groundDistance = CreateClientConVar("hg_ik_foot_ground_dist", "70", true, false, "Ground trace distance"),
 	legLength = CreateClientConVar("hg_ik_foot_leg_length", "45", true, false, "Leg length for IK"),
 	smoothing = CreateClientConVar("hg_ik_foot_smoothing", "17", true, false, "Smoothing factor (1-50)"),
@@ -119,11 +119,21 @@ function hg.ResetIKFoot(ply)
 	local id = ply:EntIndex()
 	hg.IKFootState[id] = nil
 	ResetDynSole(ply)
+	ply.IKApplyState = nil
+	ply.IKBlendState = nil
+	ply.IKBones = nil
 end
 
 function hg.HardResetIKFoot()
 	hg.IKFootState = {}
 	DynSoleState = {}
+	for _, ply in ipairs(player.GetAll()) do
+		if IsValid(ply) then
+			ply.IKApplyState = nil
+			ply.IKBlendState = nil
+			ply.IKBones = nil
+		end
+	end
 end
 
 -- Multi-point ground sampling (advanced)
@@ -1180,106 +1190,317 @@ function hg.CalculateIKFoot(ply, ent)
 	}
 end
 
--- Apply IK using bone matrix manipulation (TPIK-compatible)
+-- Apply IK using blended bone manipulation with spring smoothing
 function hg.ApplyIKFoot(ent, ikResult)
 	if not ikResult then return end
 	
+	local ply = ent
 	local drop = ikResult.bodyDrop or 0
 	local bones = ikResult.bones
+	local s = EnsureApplyState(ply)
+	local dt = math.Clamp(FrameTime(), 1 / 300, 1 / 20)
 	
-	-- Apply body drop to pelvis (bone 0)
-	local pelvisMat = ent:GetBoneMatrix(0)
-	if pelvisMat then
-		local newPos = pelvisMat:GetTranslation() + Vector(0, 0, -drop)
-		pelvisMat:SetTranslation(newPos)
-		
-		-- Apply lean angle if enabled
-		if ikResult.leanAng then
-			local ang = pelvisMat:GetAngles()
-			ang:RotateAroundAxis(ang:Forward(), ikResult.leanAng.p)
-			ang:RotateAroundAxis(ang:Right(), ikResult.leanAng.y)
-			ang:RotateAroundAxis(ang:Up(), ikResult.leanAng.r)
-			pelvisMat:SetAngles(ang)
-		end
-		
-		ent:SetBoneMatrix(0, pelvisMat)
+	local smoothing = math.Clamp(hg.IKFootConfig.smoothing:GetFloat(), 1, 50)
+	local rotSmoothing = math.Clamp(hg.IKFootConfig.rotationSmoothing:GetFloat(), 1, 60)
+	local posST = math.max(0.02, 0.28 / math.max(smoothing, 1))
+	local rotST = math.max(0.02, 0.28 / math.max(rotSmoothing, 1))
+	
+	local targets = {
+		leftThigh = ikResult.leftThighAngle,
+		leftCalf = ikResult.leftCalfAngle,
+		leftFoot = ikResult.leftFootAngle,
+		rightThigh = ikResult.rightThighAngle,
+		rightCalf = ikResult.rightCalfAngle,
+		rightFoot = ikResult.rightFootAngle,
+		lean = ikResult.leanAng or Angle(),
+	}
+	
+	-- Spring smooth all angles
+	for _, name in ipairs(SPRING_FIELDS) do
+		s[name], s[name .. "Vel"] = SpringAngle(s[name], s[name .. "Vel"], targets[name], rotST, dt)
 	end
 	
-	-- Apply leg angles using bone matrix
+	-- Apply body drop to pelvis (bone 0)
+	ApplyBlendedBonePosition(ent, 0, Vector(0, 0, -drop))
+	
+	-- Apply lean angle if enabled
+	if ikResult.leanAng then
+		ApplyBlendedBoneAngles(ent, 0, s.lean)
+	end
+	
+	-- Apply leg angles using blended manipulation
 	if bones.lThigh then
-		local mat = ent:GetBoneMatrix(bones.lThigh)
-		if mat then
-			local ang = mat:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), ikResult.leftThighAngle.p)
-			ang:RotateAroundAxis(ang:Up(), ikResult.leftThighAngle.y)
-			ang:RotateAroundAxis(ang:Forward(), ikResult.leftThighAngle.r)
-			mat:SetAngles(ang)
-			ent:SetBoneMatrix(bones.lThigh, mat)
-		end
+		ApplyBlendedBoneAngles(ent, bones.lThigh, s.leftThigh)
 	end
 	
 	if bones.lCalf then
-		local mat = ent:GetBoneMatrix(bones.lCalf)
-		if mat then
-			local ang = mat:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), ikResult.leftCalfAngle.p)
-			ang:RotateAroundAxis(ang:Up(), ikResult.leftCalfAngle.y)
-			ang:RotateAroundAxis(ang:Forward(), ikResult.leftCalfAngle.r)
-			mat:SetAngles(ang)
-			ent:SetBoneMatrix(bones.lCalf, mat)
-		end
+		ApplyBlendedBoneAngles(ent, bones.lCalf, s.leftCalf)
 	end
 	
 	if bones.lFoot then
-		local mat = ent:GetBoneMatrix(bones.lFoot)
-		if mat and ikResult.leftFootAngle then
-			local ang = mat:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), ikResult.leftFootAngle.p)
-			ang:RotateAroundAxis(ang:Up(), ikResult.leftFootAngle.y)
-			ang:RotateAroundAxis(ang:Forward(), ikResult.leftFootAngle.r)
-			mat:SetAngles(ang)
-			ent:SetBoneMatrix(bones.lFoot, mat)
-		end
+		ApplyBlendedBoneAngles(ent, bones.lFoot, s.leftFoot)
 	end
 	
 	if bones.rThigh then
-		local mat = ent:GetBoneMatrix(bones.rThigh)
-		if mat then
-			local ang = mat:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), ikResult.rightThighAngle.p)
-			ang:RotateAroundAxis(ang:Up(), ikResult.rightThighAngle.y)
-			ang:RotateAroundAxis(ang:Forward(), ikResult.rightThighAngle.r)
-			mat:SetAngles(ang)
-			ent:SetBoneMatrix(bones.rThigh, mat)
-		end
+		ApplyBlendedBoneAngles(ent, bones.rThigh, s.rightThigh)
 	end
 	
 	if bones.rCalf then
-		local mat = ent:GetBoneMatrix(bones.rCalf)
-		if mat then
-			local ang = mat:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), ikResult.rightCalfAngle.p)
-			ang:RotateAroundAxis(ang:Up(), ikResult.rightCalfAngle.y)
-			ang:RotateAroundAxis(ang:Forward(), ikResult.rightCalfAngle.r)
-			mat:SetAngles(ang)
-			ent:SetBoneMatrix(bones.rCalf, mat)
-		end
+		ApplyBlendedBoneAngles(ent, bones.rCalf, s.rightCalf)
 	end
 	
 	if bones.rFoot then
-		local mat = ent:GetBoneMatrix(bones.rFoot)
-		if mat and ikResult.rightFootAngle then
-			local ang = mat:GetAngles()
-			ang:RotateAroundAxis(ang:Right(), ikResult.rightFootAngle.p)
-			ang:RotateAroundAxis(ang:Up(), ikResult.rightFootAngle.y)
-			ang:RotateAroundAxis(ang:Forward(), ikResult.rightFootAngle.r)
-			mat:SetAngles(ang)
-			ent:SetBoneMatrix(bones.rFoot, mat)
-		end
+		ApplyBlendedBoneAngles(ent, bones.rFoot, s.rightFoot)
 	end
 end
 
 concommand.Add("hg_ik_foot_reset", function()
 	hg.HardResetIKFoot()
 	chat.AddText(Color(100, 255, 100), "[HG IK Foot] ", Color(255, 255, 255), "Reset complete")
+end)
+
+-- Spring smoothing for smooth bone movement
+local function IsFiniteNumber(value)
+	return isnumber(value) and value == value and value > -math.huge and value < math.huge
+end
+
+local function IsFiniteVector(vec)
+	return isvector(vec)
+		and IsFiniteNumber(vec.x)
+		and IsFiniteNumber(vec.y)
+		and IsFiniteNumber(vec.z)
+end
+
+local function SpringScalar(current, velocity, target, smoothTime, dt)
+	if not (IsFiniteNumber(current) and IsFiniteNumber(velocity) and IsFiniteNumber(target)) then
+		return IsFiniteNumber(target) and target or 0, 0
+	end
+	smoothTime = math.max(smoothTime, 0.0001)
+	local omega = 2 / smoothTime
+	local x = omega * dt
+	local exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
+	local change = current - target
+	local temp = (velocity + omega * change) * dt
+	local newVelocity = (velocity - omega * temp) * exp
+	local newValue = target + (change + temp) * exp
+	if not IsFiniteNumber(newValue) then return IsFiniteNumber(target) and target or 0, 0 end
+	if not IsFiniteNumber(newVelocity) then newVelocity = 0 end
+	return newValue, newVelocity
+end
+
+local function SpringAngle(current, velocity, target, smoothTime, dt)
+	local targetP = current.p + math.AngleDifference(target.p, current.p)
+	local targetY = current.y + math.AngleDifference(target.y, current.y)
+	local targetR = current.r + math.AngleDifference(target.r, current.r)
+	local p, pv = SpringScalar(current.p, velocity.p, targetP, smoothTime, dt)
+	local y, yv = SpringScalar(current.y, velocity.y, targetY, smoothTime, dt)
+	local r, rv = SpringScalar(current.r, velocity.r, targetR, smoothTime, dt)
+	return Angle(p, y, r), Angle(pv, yv, rv)
+end
+
+local SPRING_FIELDS = {"leftThigh", "leftCalf", "leftFoot", "rightThigh", "rightCalf", "rightFoot", "lean"}
+
+local function EnsureApplyState(ply)
+	if not ply.IKApplyState then
+		local s = {
+			basePos = Vector(), basePosVel = Vector(),
+			baseAng = Angle(), baseAngVel = Angle(),
+		}
+		for _, name in ipairs(SPRING_FIELDS) do
+			s[name] = Angle()
+			s[name .. "Vel"] = Angle()
+		end
+		ply.IKApplyState = s
+	end
+	return ply.IKApplyState
+end
+
+-- Blend state tracking to prevent bone drift
+local function GetIKBlendState(ply)
+	ply.IKBlendState = ply.IKBlendState or { pos = {}, ang = {} }
+	return ply.IKBlendState
+end
+
+local NEAR_EPS_VEC = 0.01
+local NEAR_EPS_ANG = 0.05
+
+local function VecNear(a, b, eps)
+	eps = eps or NEAR_EPS_VEC
+	return math.abs(a.x - b.x) <= eps
+		and math.abs(a.y - b.y) <= eps
+		and math.abs(a.z - b.z) <= eps
+end
+
+local function AngNear(a, b, eps)
+	eps = eps or NEAR_EPS_ANG
+	return math.abs(math.AngleDifference(a.p, b.p)) <= eps
+		and math.abs(math.AngleDifference(a.y, b.y)) <= eps
+		and math.abs(math.AngleDifference(a.r, b.r)) <= eps
+end
+
+local function GetCurrentBonePosition(ply, bone)
+	if bone == nil then return Vector() end
+	return Vector(ply:GetManipulateBonePosition(bone) or Vector())
+end
+
+local function GetCurrentBoneAngles(ply, bone)
+	if bone == nil then return Angle() end
+	return Angle(ply:GetManipulateBoneAngles(bone) or Angle())
+end
+
+local function SetBonePosition(ply, bone, pos)
+	if bone == nil then return end
+	ply:ManipulateBonePosition(bone, pos)
+end
+
+local function SetBoneAngles(ply, bone, ang)
+	if bone == nil then return end
+	ply:ManipulateBoneAngles(bone, ang)
+end
+
+local function ApplyBlendedBonePosition(ply, bone, offset)
+	if bone == nil then return end
+	local state = GetIKBlendState(ply)
+	local entry = state.pos[bone]
+	if not entry then
+		entry = { applied = Vector(), final = nil }
+		state.pos[bone] = entry
+	end
+
+	local current = GetCurrentBonePosition(ply, bone)
+	local base = current
+	if entry.final and VecNear(current, entry.final) then
+		base = current - entry.applied
+	end
+
+	local final = base + offset
+	SetBonePosition(ply, bone, final)
+	entry.applied = Vector(offset)
+	entry.final = Vector(final)
+end
+
+local function ApplyBlendedBoneAngles(ply, bone, offset)
+	if bone == nil then return end
+	local state = GetIKBlendState(ply)
+	local entry = state.ang[bone]
+	if not entry then
+		entry = { applied = Angle(), final = nil }
+		state.ang[bone] = entry
+	end
+
+	local current = GetCurrentBoneAngles(ply, bone)
+	local base = current
+	if entry.final and AngNear(current, entry.final) then
+		base = Angle(current.p - entry.applied.p, current.y - entry.applied.y, current.r - entry.applied.r)
+	end
+
+	local final = Angle(base.p + offset.p, base.y + offset.y, base.r + offset.r)
+	SetBoneAngles(ply, bone, final)
+	entry.applied = Angle(offset)
+	entry.final = Angle(final)
+end
+
+local function StripIKFromBones(ply, bones)
+	local blendState = GetIKBlendState(ply)
+	if not blendState then return end
+
+	local posEntry = blendState.pos[0]
+	if posEntry and posEntry.applied and posEntry.final then
+		local current = GetCurrentBonePosition(ply, 0)
+		if VecNear(current, posEntry.final, STRIP_POS_EPS or 0.1) then
+			SetBonePosition(ply, 0, current - posEntry.applied)
+		end
+	end
+
+	local allBones = {0, bones.lThigh, bones.rThigh, bones.lCalf, bones.rCalf, bones.lFoot, bones.rFoot}
+	for _, bone in ipairs(allBones) do
+		if bone then
+			local angEntry = blendState.ang[bone]
+			if angEntry and angEntry.applied and angEntry.final then
+				local current = GetCurrentBoneAngles(ply, bone)
+				if AngNear(current, angEntry.final, STRIP_ANG_EPS or 0.15) then
+					SetBoneAngles(ply, bone, Angle(current.p - angEntry.applied.p, current.y - angEntry.applied.y, current.r - angEntry.applied.r))
+				end
+			end
+		end
+	end
+end
+
+local function GetIKBones(ply)
+	local model = ply:GetModel()
+	local bones = ply.IKBones
+	if bones and bones.model == model then return bones end
+
+	if bones then ply.IKBlendState = nil end
+
+	bones = {
+		model = model,
+		lFoot = ply:LookupBone("ValveBiped.Bip01_L_Foot"),
+		rFoot = ply:LookupBone("ValveBiped.Bip01_R_Foot"),
+		lCalf = ply:LookupBone("ValveBiped.Bip01_L_Calf"),
+		rCalf = ply:LookupBone("ValveBiped.Bip01_R_Calf"),
+		lThigh = ply:LookupBone("ValveBiped.Bip01_L_Thigh"),
+		rThigh = ply:LookupBone("ValveBiped.Bip01_R_Thigh"),
+	}
+
+	ply.IKBones = bones
+	return bones
+end
+
+local RESET_COOLDOWN = 0.5
+
+-- Main IK hook - runs every frame for every player
+hook.Add("PostPlayerDraw", "HG_IKFoot_PostPlayerDraw", function(ply)
+	if not IsValid(ply) then return end
+
+	local alive = ply:Alive()
+	if ply.IKWasAlive == false and alive then
+		hg.HardResetIKFoot(ply)
+		ply.IKWasAlive = alive
+		return
+	end
+	ply.IKWasAlive = alive
+
+	if not alive then
+		hg.ResetIKFoot(ply)
+		return
+	end
+
+	if not hg.IKFootConfig.enabled:GetBool() then
+		hg.ResetIKFoot(ply)
+		return
+	end
+
+	if ply:InVehicle() then
+		hg.ResetIKFoot(ply)
+		return
+	end
+
+	local bones = GetIKBones(ply)
+	if not bones.lFoot or not bones.rFoot or not bones.lCalf or not bones.rCalf or not bones.lThigh or not bones.rThigh then
+		hg.ResetIKFoot(ply)
+		return
+	end
+
+	StripIKFromBones(ply, bones)
+	ply:SetupBones()
+
+	local ok, errOrResult = pcall(function()
+		local ikResult = hg.CalculateIKFoot(ply, ply)
+		if not ikResult then return nil end
+		hg.ApplyIKFoot(ply, ikResult)
+		return ikResult
+	end)
+
+	if not ok then
+		ply.IKFailCount = (ply.IKFailCount or 0) + 1
+		if ply.IKFailCount >= 10 and (ply.IKLastResetTime or 0) + RESET_COOLDOWN <= CurTime() then
+			hg.HardResetIKFoot(ply)
+			ply.IKLastResetTime = CurTime()
+			ply.IKFailCount = 0
+		end
+		return
+	end
+
+	ply.IKFailCount = 0
 end)

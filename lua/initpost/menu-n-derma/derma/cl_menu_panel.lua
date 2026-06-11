@@ -5394,22 +5394,7 @@ end
 
 function PANEL:Close()
 
-    -- Only play valve.mp3 when closing main menu, not intro menu
-    if not self.IsIntro then
-        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-
-            if IsValid(station) then
-
-                station:SetVolume(1)
-
-                station:EnableLooping(false)
-
-                station:Play()
-
-            end
-
-        end)
-    end
+    -- Removed valve.mp3 playback on menu close
 
     self:AlphaTo( 0, 0.1, 0, function() self:Remove() end)
 
@@ -5467,15 +5452,14 @@ end)
 
 
 
-hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
+hook.Add("PlayerSpawn", "ZCityOpenIntroMenu", function()
 
-    -- Use a timer to ensure everything is fully loaded before opening
-
-    timer.Simple(1, function()
+    -- Show intro on first spawn
+    timer.Simple(0.5, function()
 
         if not ZCityHasSeenIntro then
 
-            -- Open the menu automatically on join
+            -- Open the menu automatically on spawn
 
             if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
 
@@ -10933,22 +10917,7 @@ end
 
 function PANEL:Close()
 
-    -- Only play valve.mp3 when closing main menu, not intro menu
-    if not self.IsIntro then
-        sound.PlayFile("sound/valve.mp3", "noblock noplay", function(station)
-
-            if IsValid(station) then
-
-                station:SetVolume(1)
-
-                station:EnableLooping(false)
-
-                station:Play()
-
-            end
-
-        end)
-    end
+    -- Removed valve.mp3 playback on menu close
 
     self:AlphaTo( 0, 0.1, 0, function() self:Remove() end)
 

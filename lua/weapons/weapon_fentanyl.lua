@@ -19,7 +19,7 @@ SWEP.AutoSwitchFrom = false
 SWEP.Slot = 5
 SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
-SWEP.offsetVec = Vector(4, -1.5, 0)
+SWEP.offsetVec = Vector(8, -1.5, 0)
 SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modeNames = {
 	[1] = "analgesic"
@@ -34,6 +34,7 @@ function SWEP:InitializeAdd()
 	self.modeValues = {
 		[1] = 1,
 	}
+	self.ModelScale = 1
 end
 
 SWEP.ofsV = Vector(0,8,-3)
@@ -41,6 +42,7 @@ SWEP.ofsA = Angle(-90,-90,90)
 SWEP.modeValuesdef = {
 	[1] = {1, true},
 }
+SWEP.ShouldDeleteOnFullUse = false
 
 SWEP.showstats = true
 
@@ -112,6 +114,11 @@ if SERVER then
 		else
 			//owner:SelectWeapon("weapon_hands_sh")
 			//self:Remove()
+		end
+		
+		-- Update model scale based on remaining amount
+		if self.modeValuesdef and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
+			self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
 		end
 	end
 end
