@@ -458,7 +458,12 @@ input_list.lungsL = function(org, bone, dmg, dmgInfo)
 	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsL[2] = math.min(org.lungsL[2] + dmg * 1, 1) end
 
 	org.internalBleed = org.internalBleed + (org.lungsL[1] - oldval) * 2
-	
+
+	-- Expel air when lung is hit
+	if org.o2 and org.o2[1] then
+		org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2, 5), 15) -- Cap at -5 O2 per hit, minimum 15 overall
+	end
+
 	dmgInfo:ScaleDamage(0.8)
 
 	return 0//isCrush(dmgInfo) and 1 or prot
@@ -473,6 +478,11 @@ input_list.lungsR = function(org, bone, dmg, dmgInfo)
 	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsR[2] = math.min(org.lungsR[2] + dmg * 1, 1) end
 
 	org.internalBleed = org.internalBleed + (org.lungsR[1] - oldval) * 2
+
+	-- Expel air when lung is hit
+	if org.o2 and org.o2[1] then
+		org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2, 5), 15) -- Cap at -5 O2 per hit, minimum 15 overall
+	end
 
 	dmgInfo:ScaleDamage(0.8)
 
