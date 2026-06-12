@@ -1445,6 +1445,10 @@ local IsValid = IsValid
 	function hg.CanUseLeftHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 
+		if IsValid(ply.FakeRagdoll) and ply:GetNWBool("hg_hold_wound_manual", false) then
+			return false
+		end
+
 		if ent.organism and ent.organism.larmamputated then
 			return false
 		end
@@ -1471,6 +1475,10 @@ local IsValid = IsValid
 
 	function hg.CanUseRightHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
+
+		if IsValid(ply.FakeRagdoll) and ply:GetNWBool("hg_hold_wound_right", false) then
+			return false
+		end
 
 		-- A broken or dislocated right arm still holds the weapon (just lowered / weaker).
 		-- Only a full amputation forces the left hand to take over.
@@ -2058,6 +2066,7 @@ end
 --\\
 	hg_suppression_viewpunch = CreateConVar("hg_suppression_viewpunch", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Enable viewpunching when you on suppressed", 0, 1)
 --//
+
 
 --\\ GetPrioritizedArm
 	function hg.GetPrioritizedArm(ply)

@@ -601,6 +601,12 @@ end
 
 
 function SWEP:CanUse()
+    local owner = self:GetOwner()
+	if not IsValid(owner) then return true end
+    if owner:IsNPC() then return true end
+	if owner:IsPlayer() and owner:GetNWBool("hg_hold_wound_twohand", false) then return false end
+	if owner.organism and owner.organism.rarmamputated and !self:IsPistolHoldType() then return false end
+	return not (self.reload or self.deploy or (owner:IsPlayer() and (self:IsSprinting() or (owner.organism and owner.organism.otrub))))
 	local owner = self:GetOwner()
 
 	if not IsValid(owner) then
@@ -1137,7 +1143,7 @@ local hg_3dzity
 local hg_weird_mags
 if CLIENT then
 	surface.CreateFont("AmmoFont",{
-		font = "Bahnschrift",
+		font = "Courier Prime",
 		size = ScreenScale(16),
 		extended = true,
 		weight = 500,
@@ -1145,7 +1151,7 @@ if CLIENT then
 	})
 
 	surface.CreateFont("DescFont",{
-		font = "Bahnschrift",
+		font = "Courier Prime",
 		size = ScreenScale(8),
 		extended = true,
 		shadow = true,
@@ -3347,3 +3353,4 @@ hook.Add("HG_MovementCalc_2", "moveWithWeapon", function(mul, ply, cmd, mv)
         end
     end
 end)
+

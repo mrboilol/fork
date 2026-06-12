@@ -161,54 +161,25 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 end
 
 local huyasd = {
-	["spine1"] = "My legs- i... i cant feel my legs...",
-	["spine2"] = "I cant move my chest nor my legs, i think i broke something.",
-	["spine3"] = "I cant move at all, much less breathe...",
-	["skull"] = "My head hurts, my head hurts... why wont it stop...",
+	["spine1"] = "Your lower spine is broken.",
+	["spine2"] = "Your upper spine is broken.",
+	["spine3"] = "Your neck is broken.",
+	["skull"] = "Your skull is fractured.",
 }
 
-local broke_arm = {
-	"AAAAH OH GOD, IT'S BROKEN! MY ARM! IT'S BROKEN!",
-	"FUCK MY FUCKING ARM IS BROKEN!",
-	"NONONO MY ARM IS BENT ALL WRONG!",
-	"IT'S.. MY ARM.. SNAPPED- I HEARD IT SNAP!",
-	"MY ARM IS NOT SUPPOSED TO BEND IN HALF!",
+local broken_messages = {
+	["larm"] = "Your left arm is broken.",
+	["rarm"] = "Your right arm is broken.",
+	["lleg"] = "Your left leg is broken.",
+	["rleg"] = "Your right leg is broken.",
 }
 
-local dislocated_arm = {
-	"MY ARM- GOD, IT'S POPPED OUT OF THE SOCKET!",
-	"FUCK- THE SHOULDER'S JUST- HANGING LOOSE!",
-	"MY ARM..! IT'S DISLOCATED! I CAN SEE THE BULGE WHERE IT'S WRONG!",
-	"THE ARM'S JUST- DEAD WEIGHT- IT'S NOT ATTACHED RIGHT!",
-	"SHIT! I CAN FEEL THE BONE OUT OF PLACE!",
+local dislocated_messages = {
+	["larm"] = "Your left arm is dislocated.",
+	["rarm"] = "Your right arm is dislocated.",
+	["lleg"] = "Your left leg is dislocated.",
+	["rleg"] = "Your right leg is dislocated.",
 }
-
-local broke_leg = {
-	"MY LEG- FUCK, IT'S BROKEN- I HEARD THE SNAP!",
-	"FUCK! THE SHIN'S SNAPPED CLEAN THROUGH!",
-	"THE KNEE'S WRONG- THE WHOLE LEG'S TWISTED WRONG!",
-	"MY LEG..! IT'S JUST- HANGING BY MUSCLE AND SKIN!",
-	"THE PAIN'S SHOOTING UP TO MY HIP- FUCK, IT'S BAD!",
-	"I CAN'T MOVE MY FOOT- THE ANKLE'S BROKEN TOO!",
-}
-
-local dislocated_leg = {
-	"MY LEG- FUCK, IT'S DISLOCATED AT THE KNEE!",
-	"I CAN SEE THE KNEECAP IN THE WRONG PLACE!",
-	"AGHH- THE HIP'S POPPED OUT- IT'S STUCK OUTWARD!",
-	"IT'S BENT BACKWARD- THE KNEE SHOULDN'T BEND THIS WAY!",
-	"FUCK! THE HIP'S DISLOCATED!",
-	"THE ANKLE'S TWISTED- BUT THE KNEE'S THE REAL PROBLEM!",
-}
-
-local function hasClimbGripActive(owner)
-	if not IsValid(owner) or not owner:IsPlayer() then return false end
-
-	local rag = owner.FakeRagdoll
-	if not IsValid(rag) then return false end
-
-	return (IsValid(rag.ConsLH) and rag.ConsLH.ZCClimbGrip) or (IsValid(rag.ConsRH) and rag.ConsRH.ZCClimbGrip)
-end
 
 local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
@@ -251,7 +222,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		org.immobilization = org.immobilization + dmg * 25
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
+		if org.isPly and !org[key.."amputated"] then org.owner:Notify(broken_messages[key], true, "broke" .. key, 1) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 				PlayBoneBreakSound(org.owner)
@@ -272,7 +243,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		org.immobilization = org.immobilization + dmg * 10
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_leg[math.random(#dislocated_leg)], 1, "dislocated"..key, 1, nil, nil) end
+		if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_messages[key], true, "dislocated" .. key, 1) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		PlayBoneBreakSound(org.owner)
@@ -330,7 +301,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
+		if org.isPly and !org[key.."amputated"] then org.owner:Notify(broken_messages[key], true, "broke" .. key, 1) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
@@ -351,7 +322,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
+		if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_messages[key], true, "dislocated" .. key, 1) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 				PlayBoneBreakSound(org.owner)
@@ -465,15 +436,11 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 end
 
 local jaw_broken_msg = {
-	"MY JAW, MY JAW IS BROKEN IN PIECES!",
-	"MY JAW IS FUCKING FLOATING IN MY HEAD",
-	"IM DISFIGURED- MY JAW IS ALL OVER THE PLACE!",
+	"Your jaw is broken.",
 }
 
 local jaw_dislocated_msg = {
-	"JESUS CHRIST- I CAN FEEL MY JAW MUSCLES TUGGING AT MY SKULL",
-	"MY JAW- I CANT MOVE MY JAW IT FUCKING HURTS",
-	"MY JAW IS PAINING SO BAD, I CANT MOVE IT WITHOUT AGONIZINGLY HURTING",
+	"Your jaw is dislocated.",
 	//"I CANT EVEN SPEAK, I NEED TO PUNCH IT BACK IN PLACE... BUT IT HURTS REAL BAD",
 }
 
@@ -576,17 +543,10 @@ PlayBoneBreakSound(org.owner)
 end
 
 hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isChat, teamonly, text)
-	if IsValid(output) and output:Alive() and (output.organism.jaw == 1 or output.organism.jawdislocation) and (output:IsSpeaking() or isChat) then
-        local pain_multiplier = 1
-        if output.organism.jaw == 1 and output.organism.jawdislocation then
-            pain_multiplier = 2.5 -- more pain
-        end
-        output.organism.painadd = output.organism.painadd + (2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))) * pain_multiplier
-        if pain_multiplier > 1 then
-            output:Notify("I CAN BARELY SPEAK WITH MY JAW LIKE THIS...", 60, "painfromjawspeak", 0, nil, Color(255, 150, 150))
-        else
-            output:Notify("FUUUUCK- IT HURTS REAL BAD WHEN SPEAKING", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
-        end
+	if IsValid(output) and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
+		-- and !isChat and output:IsSpeaking()
+		output.organism.painadd = output.organism.painadd + 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))
+		output:Notify("Your jaw hurts when you speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
 	end
 end)
 
@@ -879,72 +839,3 @@ input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ric
 input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 1, boneindex, dir, hit, ricochet) end
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
 input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 3, boneindex, dir, hit, ricochet) end
-
-hook.Add("Fake", "ReapplyBrokenLimbConstraints", function(ply, ragdoll)
-    if not IsValid(ply) or not ply.organism then return end
-    if not (ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool()) then return end
-
-    local org = ply.organism
-    local limbs = {"larm", "rarm", "lleg", "rleg"}
-
-    print("[HG Bone] Fake hook START: ply=" .. tostring(ply) .. " ragdoll=" .. tostring(ragdoll))
-    print("[HG Bone] Org limb states: larm=" .. tostring(org["larm"]) .. " rarm=" .. tostring(org["rarm"]) .. " lleg=" .. tostring(org["lleg"]) .. " rleg=" .. tostring(org["rleg"]))
-    print("[HG Bone] Org dislocation states: larm=" .. tostring(org["larmdislocation"]) .. " rarm=" .. tostring(org["rarmdislocation"]) .. " lleg=" .. tostring(org["llegdislocation"]) .. " rleg=" .. tostring(org["rlegdislocation"]))
-
-    for _, limb in ipairs(limbs) do
-        local isAmputated = org[limb .. "amputated"]
-        local isBroken = org[limb] and org[limb] >= 1
-        local isDislocated = org[limb .. "dislocation"]
-        print("[HG Bone] Checking limb " .. limb .. ": isAmputated=" .. tostring(isAmputated) .. " isBroken=" .. tostring(isBroken) .. " isDislocated=" .. tostring(isDislocated))
-
-        -- Skip constraints for amputated limbs
-        if isAmputated then
-            print("[HG Bone] Skipping " .. limb .. " - limb is amputated")
-        elseif isBroken or isDislocated then
-            -- OLD LUA: Use persisted segment if available (so same elbow stays broken across ragdolls)
-            local segment = ply.HG_FloppyPersistSeg and ply.HG_FloppyPersistSeg[limb]
-            print("[HG Bone] Reapplying floppy for " .. limb .. " with segment=" .. tostring(segment) .. " isDislocated=" .. tostring(isDislocated))
-            hg.BreakLimb(ragdoll, limb, segment, isDislocated)
-        elseif IsValid(ragdoll) then
-            -- Constraints persist until next ragdoll - do not remove when limbs heal
-            print("[HG Bone] Skipping constraint removal for healed limb " .. limb .. " - constraints persist until next ragdoll")
-        end
-    end
-
-    -- Reapply neck floppy if spine3 is broken (neck broken)
-    -- Use same threshold as damage code (> 0.75) for consistency
-    -- Skip if head is amputated
-    if org.spine3 and org.spine3 > 0.75 and IsValid(ragdoll) and not org.headamputated then
-        print("[HG Bone] Fake hook: Reapplying neck floppy, spine3=" .. tostring(org.spine3))
-        -- Use timer to ensure ragdoll physics are ready
-        timer.Simple(0.1, function()
-            if IsValid(ragdoll) and IsValid(ply) then
-                print("[HG Bone] Fake hook timer: Calling BreakNeck for ragdoll")
-                hg.BreakNeck(ragdoll, false) -- false = don't kill player, just reapply constraint
-            end
-        end)
-    end
-
-    -- Reapply spine1 / spine2 floppy if their thresholds are crossed
-    -- spine1 covers the pelvis & lower spine, spine2 covers the back.
-    if hg.BreakSpine and IsValid(ragdoll) then
-        local fake1 = hg.organism and hg.organism.fake_spine1 or 1
-        local fake2 = hg.organism and hg.organism.fake_spine2 or 1
-        if (org.spine1 and org.spine1 >= fake1) or (org.pelvis and org.pelvis >= 1) then
-            print("[HG Bone] Fake hook: Reapplying spine1 floppy")
-            hg.BreakSpine(ragdoll, "spine1", false)
-        end
-        if org.spine2 and org.spine2 >= fake2 then
-            print("[HG Bone] Fake hook: Reapplying spine2 floppy")
-            hg.BreakSpine(ragdoll, "spine2", false)
-        end
-    end
-end)
-
--- Reapply floppy/broken constraints to the corpse when the player dies
-hook.Add("RagdollDeath", "ReapplyBrokenLimbConstraintsDeath", function(ply, ragdoll)
-    local fakeHook = hook.GetTable()["Fake"] and hook.GetTable()["Fake"]["ReapplyBrokenLimbConstraints"]
-    if fakeHook then
-        fakeHook(ply, ragdoll)
-    end
-end)

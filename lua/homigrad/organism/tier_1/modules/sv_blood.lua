@@ -34,6 +34,8 @@ module[1] = function(org)
 	org.bleedStart = 0
 	org.wounds = {}
 	org.arterialwounds = {}
+	org.holdWound = nil
+	org.holdWoundArterial = nil
 	org.wantToVomit = 0
 	org.vomitInThroat = nil
 
@@ -54,6 +56,11 @@ module[1] = function(org)
 end
 
 
+end
+
+local internalbleed_phrases = {
+	"You are vomiting blood."
+}
 
 local about_to_puke = {
 	"I feel like I'm gonna puke any second now...",
@@ -76,6 +83,87 @@ local o2DebuffArteries = {
 	subclavianL = 0.7,
 	spineartery = 0.85,
 }
+
+local hold_wound_size_threshold = 4
+local hold_wound_pain_threshold = 72
+local hold_wound_painadd_threshold = 8
+local hold_wound_bleed_threshold = 0.35
+local hold_wound_bleed_slow_mul = 0.72
+local hold_wound_bleed_slow_twohand_mul = 0.55
+local hold_wound_arterial_slow_mul = 0.2
+
+local function hasWound(wounds, target)
+	if not target or not wounds then return false end
+
+	for i, wound in pairs(wounds) do
+		if wound == target then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function getLargestWound(wounds)
+	local best
+	local bestSize = 0
+
+	for i, wound in pairs(wounds or {}) do
+		local size = wound[1] or 0
+		if size > bestSize then
+			best = wound
+			bestSize = size
+		end
+	end
+
+	return best, bestSize
+end
+
+local function updateHoldWound(org)
+	local arteryWound = getLargestWound(org.arterialwounds)
+	if arteryWound then
+		org.holdWound = arteryWound
+		org.holdWoundArterial = true
+		return
+	end
+
+	if org.holdWoundArterial then
+		org.holdWound = nil
+		org.holdWoundArterial = nil
+	end
+
+	if org.holdWound and hasWound(org.wounds, org.holdWound) then
+		return
+	end
+
+	org.holdWound = nil
+	org.holdWoundArterial = nil
+
+	local wound, woundSize = getLargestWound(org.wounds)
+	if not wound then return end
+
+	local intensePain = org.pain >= hold_wound_pain_threshold or org.painadd >= hold_wound_painadd_threshold
+	local profuseBleeding = org.bleed >= hold_wound_bleed_threshold
+
+	if woundSize >= hold_wound_size_threshold and (intensePain or profuseBleeding) then
+		org.holdWound = wound
+		org.holdWoundArterial = false
+	end
+end
+
+local function getHeldWoundBleedMul(org, wound)
+	if not org.manualHoldWound or org.manualHoldWoundTarget != wound then return 1 end
+
+	if org.manualHoldWoundArterial then
+		return hold_wound_arterial_slow_mul
+	end
+
+	if (org.manualHoldWoundHands or 0) >= 2 then
+		return hold_wound_bleed_slow_twohand_mul
+	end
+
+	return hold_wound_bleed_slow_mul
+end
 
 module[2] = function(owner, org, mulTime)
 	local adrenaline = math.min(org.adrenaline, 2)
@@ -127,6 +215,7 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.isPly and not org.otrub and org.blood < 2200 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "nga im fried 😭") or "I feel too numb...",60,"blood2",0) end
+	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "You are losing too much blood." or (math.random(2) == 1 and "You are close to blacking out." or "Your blood loss is critical."),60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
 		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
@@ -355,6 +444,13 @@ module[2] = function(owner, org, mulTime)
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3
 			coagulatespeed = coagulatespeed + coagulate / rand2
+			local rand1 = math.Rand(4, 10) * 1
+			local rand2 = math.Rand(0.5, 1) * 1
+			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02
+			bleed = bleed * getHeldWoundBleedMul(org, wound)
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04-- / #org.wounds
+			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
+			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
 			
 			wound[5] = time
 			org.blood = max(org.blood - bleed, 1)
@@ -397,12 +493,19 @@ module[2] = function(owner, org, mulTime)
 	local arterialToRemove = {}
 	for i, wound in pairs(org.arterialwounds) do
 		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.14 * math.max(pulse, 20) / 80
+		local arterialBleed = wound[1] * mulTime * 0.2 * math.max(org.pulse, 20) / 80
+		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
+		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
 
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
 			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * math.max(pulse, 20) / 80, 1)
 			if isAlive or not isPlayer then
+			local pumpBleed = wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80
+			pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
+			org.blood = max(org.blood - pumpBleed, 1)
+			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 				local dir = wound[6]
 				local len = dir:Length()
 				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
@@ -535,6 +638,8 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
+	org.bleed = (bleedoutspeed + bleedoutspeed2)
+	updateHoldWound(org)
 end
 
 util.AddNetworkString("bloodsquirt2")
@@ -698,3 +803,4 @@ end
 function hg.organism.BloodDroplet2(owner, org, wound, dir, artery)
 	hook.Run("HG_BloodParticleStartedDropping", owner, org, wound, dir, artery)
 end
+

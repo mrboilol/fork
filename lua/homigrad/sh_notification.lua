@@ -97,9 +97,9 @@ if CLIENT then
 	})
 
 	surface.CreateFont("HuyFont", {
-		font = "BudgetLabel",
+		font = "Courier Prime",
 		extended = true,
-		size = ScreenScale(9),
+		size = ScreenScale(12),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -123,9 +123,9 @@ if CLIENT then
 	})
 
 	surface.CreateFont("SmallHuyFont", {
-		font = "BudgetLabel",
+		font = "Courier Prime",
 		extended = true,
-		size = ScreenScale(7),
+		size = ScreenScale(12),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -268,7 +268,12 @@ if CLIENT then
 		hg.notifications = {}
 	end)
 
-	local defaultShowTimer = 3
+	local defaultShowTimer = 1.2
+	local notificationTypeSpeed = 0.038
+	local notificationSlowMul = 2
+	local notificationWaitDiv = 4
+	local notificationMinWait = 0.3
+	local notificationMaxWait = 1
 
 	local function CreateNotification(msg, showTimer, clr, traumatic)
 		if not IsValid(lply) then return end
@@ -400,41 +405,10 @@ if CLIENT then
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
 			local msg, time, timeshow, clr, traumatic = tbl[1], tbl[2], tbl[3], tbl[4], tbl[5]
 
-			local pain = org.pain or 0
-			local shock = org.shock or 0
-			local adrenaline = org.adrenaline or 0
-			local fear = org.fear or 0
-			local despair = org.despair or 0
-			local analgesia = org.analgesia or 0
-			local consciousness = org.consciousness or 1
-			local o2 = (org.o2 and org.o2[1]) or 30
-			local pulse = org.pulse or 70
-			local blood = org.blood or 5000
-			local lasthit = org.lasthit or 0
-			local recentDamage = lasthit > 0 and (time_spent - lasthit) < 3
-
-			local dying = (o2 < 12) or (pulse < 40 and pulse > 0) or (blood < 3750)
-			local inPain = pain > 30 or recentDamage
-			local inDespair = despair > 0.5
-			local inShock = shock > 20
-			local inAdrenalineOrFear = (adrenaline > 0.5) or (fear > 0.5)
-			local highAnalgesia = analgesia > 1.0
-			local lowConsciousness = consciousness < 0.6
-
-			local speedMul = 1
-			if dying or lowConsciousness then
-				speedMul = 2.5
-			elseif org.brain > 0.1 or pulse < 50 then
-				speedMul = 3
-			elseif inShock then
-				speedMul = 1.4
-			elseif inAdrenalineOrFear then
-				speedMul = 0.75
-			end
-
-			local time_one_symbol = 0.06 * speedMul
+			local mul = ((org.brain > 0.1 or org.pulse < 50) and notificationSlowMul or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
+			local time_one_symbol = notificationTypeSpeed * mul//(lply.organism and lply.organism.fear >= 0.5 and 0.5 or 1)
 			local time_to_read = (utf8.len(msg) * time_one_symbol)
-			local wait = math.Clamp(time_to_read / 3 * math.Clamp(1 - #hg.notifications / 1, 0.25, 1), 1, 4) + timeshow
+			local wait = math.Clamp(time_to_read / notificationWaitDiv * math.Clamp(1 - #hg.notifications / 1, 0.25, 1), notificationMinWait, notificationMaxWait) + timeshow
 
 			if (time + time_to_read + wait > time_spent) then
 				local part = math.min(1 - (time + time_to_read - time_spent) / time_to_read, 1)

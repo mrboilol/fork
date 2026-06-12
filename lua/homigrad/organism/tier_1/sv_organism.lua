@@ -1127,10 +1127,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.likely_phrase = 0
 
 			local str = hg.get_status_message(owner)
-			local traumatic = hg.is_traumatic_message(owner)
+			local msgKey = hg.get_status_message_notify_key(owner)
+			local msgDelay = hg.get_status_message_notify_delay(owner)
 			//print(str)
-			-- (msg, delay, msgKey, showTime, func, clr, traumatic)
-			owner:Notify(str, 1, "phrase", 1, nil, hg.get_notify_color(owner), traumatic)
+			-- (msg, delay, msgKey, showTime, func, clr)
+			owner:Notify(str, msgDelay, msgKey, 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
 		end
 	end
 
@@ -1318,13 +1319,14 @@ end)
 hook.Add("HG_OnWakeOtrub", "afterOtrub", function( owner )
 	owner.organism.after_otrub = true
 	local str = hg.get_status_message(owner)
-	local traumatic = hg.is_traumatic_message(owner)
+	local msgKey = hg.get_status_message_notify_key(owner)
 	owner.organism.after_otrub = nil
 	//print(str)
 	-- (msg, delay, msgKey, showTime, func, clr, traumatic)
 	timer.Simple(0.1,function()
 		if not IsValid(owner) then return end
-		owner:Notify(str, 1, "wake", 1, nil, hg.get_notify_color(owner), traumatic)
+		if msgKey != "phrase" or str == "" then return end
+		owner:Notify(str, 1, "wake", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255)) )
 	end)
 
 	owner.organism.fearadd = owner.organism.fearadd + 5
@@ -1365,7 +1367,7 @@ local finally_fixed = {
 local function fixlimb(org, key, fixer)
 	if math.random(100) > (97 + (fixer != org.owner and (fixer.organism and fixer.organism.pain or 0) or 0) - (org.analgesia * 50 + org.painkiller * 15) - (fixer != org.owner and 30 or 0) - (fixer.tries or 0) * 10 - (fixer.Profession == "doctor" and 100 or 0) - (org.owner == fixer and (IsValid(org.owner.FakeRagdoll) or (org.owner.Crouching and org.owner:Crouching())) and 10 or 0)) then
 		org[key.."dislocation"] = false
-		hg.RemoveLimbConstraints(org.owner, key)
+		org.owner:ResetNotification("dislocated" .. key)
 		org.painadd = org.painadd + 5 * math.random(1, 3)
 		org.fearadd = org.fearadd + 0.1
 
@@ -1439,17 +1441,3 @@ hook.Add("OnEntityWaterLevelChanged", "ClearBlood", function(ent, old, new)
 		ent:RemoveAllDecals()
 	end
 end)
-
-function hg.organism.RadDamage(org, dmg, dmgInfo)
-	hg.organism.GasDamage(org, dmg, dmgInfo)
-
-	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
-	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
-	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
-end
-
-function hg.organism.InfectionDamage(org, dmg, dmgInfo)
-	hg.organism.input_list.liver(org,nil,dmg / 20,dmgInfo)
-	hg.organism.input_list.stomach(org,nil,dmg / 20,dmgInfo)
-	hg.organism.input_list.intestines(org,nil,dmg / 20,dmgInfo)
-end

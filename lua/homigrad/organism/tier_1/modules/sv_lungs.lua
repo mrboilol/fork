@@ -261,22 +261,10 @@ end)
 
 
 local lowoxy = {
-
-	"IM GONNA FAINT, I REALLY NEED SOME AIR",
-
-	"DARK- EVERYTHING IS GOING DARK...",
-
-	"I CANT BREATHE- WHY CANT I BREATHE...",
-
-	"MY CHEST HURTS SO MUCH, I NEED AIR...",
-
-	"THERES NOT ENOUGH OXYGEN, I NEED TO BREATHE...",
-
-	"son im cooked 😭✌️"
-
+	"Your oxygen intake is low.",
+	"You are running out of oxygen.",
+	"You are struggling to breathe.",
 }
-
-
 
 local not_enough_intake = {
 
@@ -287,67 +275,13 @@ local not_enough_intake = {
 	//"Need a break from this... to breathe...",
 
 	//"Resting sounds like a nice idea.",
-
-	"Im breathing very shallowly...",
-
-	"I cant breathe properly...",
-
-	"Its hard to breathe...",
-
-	"I have less air than usual...",
-
-	"Breathing is a unusual struggle...",
-
-	"Im winded...",
-
-	
-
+	"Your breathing is restricted.",
+	"You need more air.",
 }
-
-
-
-local barely_breathing = {
-
-	"I can barely breathe...",
-
-	"Every breath is a struggle...",
-
-	"Theres barely enough air for me to survive.",
-
-	"I'm struggling to breathe.",
-
-	"It's too hard to get air...",
-
-}
-
-
-
-local low_stamina = {
-
-	"Im tired, im really tired...",
-
-	"I can barely keep moving...",
-
-	"I need to rest...",
-
-	"I am REALLY, REALLY TIRED.",
-
-	"I need to stop and rest...",
-
-}
-
-
 
 local drop_mask = {
-
-	"I can't breathe in this mask... I need to take it off.",
-
-	"Drop the mask, it's not worth it...",
-
-	"It's fucking disgusting... and I surely can't breathe in this...",
-
-	"Fucking stinks... Gotta take this mask off...",
-
+	"You cannot breathe in this mask.",
+	"Remove the mask now.",
 }
 
 
@@ -1010,19 +944,8 @@ module[2] = function(owner, org, timeValue)
 	if org.isPly then
 
 		if org.pneumothorax > 0 then
-
-			org.nextPneumothoraxNotify1 = org.nextPneumothoraxNotify1 or (CurTime() + 10)
-
-			if org.nextPneumothoraxNotify1 < CurTime() then
-
-				org.owner:Notify("I can feel something filling my lungs.", true, "pneumothorax1",10)
-
-				org.nextPneumothoraxNotify1 = CurTime() + 10
-
-			end
-
+			org.owner:Notify("Air is building up in your chest.", true, "pneumothorax1",10)
 		else
-
 			org.owner:ResetNotification("pneumothorax1")
 
 			org.nextPneumothoraxNotify1 = nil
@@ -1032,17 +955,7 @@ module[2] = function(owner, org, timeValue)
 
 
 		if org.pneumothorax > 0.3 then
-
-			org.nextPneumothoraxNotify2 = org.nextPneumothoraxNotify2 or (CurTime() + 5)
-
-			if org.nextPneumothoraxNotify2 < CurTime() then
-
-				org.owner:Notify("It's getting harder to breathe.", true, "pneumothorax2", 5)
-
-				org.nextPneumothoraxNotify2 = CurTime() + 5
-
-			end
-
+			org.owner:Notify("Your breathing is getting worse.", true, "pneumothorax2", 5)
 		else
 
 			org.owner:ResetNotification("pneumothorax2")
@@ -1054,17 +967,7 @@ module[2] = function(owner, org, timeValue)
 
 
 		if org.pneumothorax > 0.5 then
-
-			org.nextPneumothoraxNotify3 = org.nextPneumothoraxNotify3 or (CurTime() + 5)
-
-			if org.nextPneumothoraxNotify3 < CurTime() then
-
-				org.owner:Notify("I'm really struggling to breathe.", true, "pneumothorax3", 5)
-
-				org.nextPneumothoraxNotify3 = CurTime() + 5
-
-			end
-
+			org.owner:Notify("You can barely breathe.", true, "pneumothorax3", 5)
 		else
 
 			org.owner:ResetNotification("pneumothorax3")
@@ -1227,9 +1130,7 @@ module[2] = function(owner, org, timeValue)
 	if org.isPly then
 
 		if org.brain > 0.1 and org.brain < 0.3 then
-
-			org.owner:Notify(math.random(2) == 1 and "My head hurts..." or "Where am I?", true, "brain", 5)
-
+			org.owner:Notify(math.random(2) == 1 and "Your brain is damaged." or "You are disoriented.", true, "brain", 5)
 		else
 
 			org.owner:ResetNotification("brain") 
