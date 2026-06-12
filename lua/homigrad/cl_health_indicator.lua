@@ -148,6 +148,20 @@ local function SyncBonesCallback(ent, numbones)
 
     if not IsValid(src) then return end
     
+    -- FIX: Temporarily reset bone manipulations to get original bone matrices
+    -- This prevents IK foot system from interfering with bone tracing
+    local savedBonePositions = {}
+    local savedBoneAngles = {}
+    if src == ply then
+        for i = 0, src:GetBoneCount() - 1 do
+            savedBonePositions[i] = src:GetManipulateBonePosition(i)
+            savedBoneAngles[i] = src:GetManipulateBoneAngles(i)
+            src:ManipulateBonePosition(i, Vector())
+            src:ManipulateBoneAngles(i, Angle())
+        end
+        src:SetupBones()
+    end
+    
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
 
@@ -231,6 +245,19 @@ local function SyncBonesCallback(ent, numbones)
                 ent:SetBoneMatrix(i, finalMat)
             end
         end
+    end
+    
+    -- FIX: Restore bone manipulations after reading bone matrices
+    if src == ply then
+        for i = 0, src:GetBoneCount() - 1 do
+            if savedBonePositions[i] then
+                src:ManipulateBonePosition(i, savedBonePositions[i])
+            end
+            if savedBoneAngles[i] then
+                src:ManipulateBoneAngles(i, savedBoneAngles[i])
+            end
+        end
+        src:SetupBones()
     end
 end
 

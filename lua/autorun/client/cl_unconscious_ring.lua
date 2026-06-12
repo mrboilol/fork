@@ -250,7 +250,7 @@ local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
     local curr = (lastPhaseMod + FrameTime() * (pulse / 60)) % 1
     lastPhaseMod = curr
 
-    local beatVolume = math.Clamp(0.35 * ringAlpha, 0, 1)
+    local beatVolume = GetHeartbeatVolumeAdmiring(org, admiring) * ringAlpha
     if PhaseCrossed(prev, curr, 0.239) then
         -- Use heartthump for abnormal heart rates or high stress, normal heartbeat otherwise
         local abnormalPulse = (pulse < 40 and pulse >= 1) or pulse > 100
@@ -644,8 +644,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
-            -- Use white color when awake, red only if organism is in immediate critical state (not brain damage)
-            local awakeCritical = org.critical or org.heartstop or (heartbeat < 1 and brain >= 0.02)
+            -- Always white when awake, unless org.critical is true (then show red)
+            local awakeCritical = org.critical == true
             local ecgColor = awakeCritical and Color(255, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
             DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
             

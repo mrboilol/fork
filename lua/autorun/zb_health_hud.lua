@@ -74,7 +74,6 @@ if SERVER then
 		"materials/vgui/hud/status_berserk.png",
 		"materials/vgui/hud/status_amputant.png",
 
-		"materials/vgui/hud/status_chip.png",
 		
 		"materials/vgui/hud/status_adrenalinealt.png",
 		"materials/vgui/hud/status_amputantalt.png",
@@ -120,7 +119,6 @@ if SERVER then
 		"materials/vgui/hud/stroke.png",
 		"materials/vgui/hud/palpitations.png",
 
-		"materials/vgui/hud/status_chipalt.png",
 	}
 	
 	for _, path in ipairs(SPRITES) do resource.AddFile(path) end
@@ -155,7 +153,7 @@ local gui = gui
 local cvar_enabled = CreateClientConVar("mzb_MoodleHud_enabled", "1", true, false)
 local cvar_limbs_always = CreateClientConVar("mzb_popalimbs", "0", true, false)
 local cvar_alt_icons = CreateClientConVar("mzb_nopixelicons", "0", true, false)
-local cvar_status_effects = CreateClientConVar("mzb_Disable_moodle", "1", true, false)
+local cvar_status_effects = CreateClientConVar("mzb_Disable_moodle", "0", true, false)
 local cvar_language = CreateClientConVar("mzb_language", "eng", true, false)
 local cvar_brain_distortion = CreateClientConVar("mzb_brain_distortion", "1", true, false)
 
@@ -496,7 +494,6 @@ local status_sprites = {
 	death = nil,
 	berserk = nil,
 	amputant = nil,
-	chip = nil,
 }
 local status_sprites_loaded = false
 local debug_done = false
@@ -766,7 +763,6 @@ local tooltipTexts = {
 			[4] = {title = "Абсолютный перегруз", text = "You move extremely slowly due to weight"}
 		},
 		sepsis = {title = "Сепсис", text = "Опасное для жизни состояние, вызванное подавляющей реакцией организма на инфекцию. Может привести к повреждению тканей, отказу органов и смерти."},
-		chip = {title = "Чип", text = "-(тест:) )."}
 	},
 	
 	en = {
@@ -931,7 +927,6 @@ local tooltipTexts = {
 			[4] = {title = "Completely Weighted", text="WAAAY too much gear, how about you take it off and stop LARPING?"}
 		},
 		sepsis = {title = "Sepsis", text = "Something in your body feels funny."},
-		chip = {title = "Chip", text = "-(test:) )."}
 	}
 }
 
@@ -1073,7 +1068,6 @@ local function load_status_sprites()
 	status_sprites.broken_ribs = loadMaterial("vgui/hud/brokenribs.png", suffix)
 	status_sprites.encumbered = loadMaterial("vgui/hud/encumbered.png", suffix)
 	
-	status_sprites.chip = loadMaterial("vgui/hud/status_chip.png", suffix)
 end
 
 local function update_stability(blood_val, pulse_val)
@@ -1313,16 +1307,7 @@ local function draw_status_effects()
 		currentEffectNames["death"] = true
 	else
 
-		-- Chip moodle
-		if GetConVar("hg_indicator"):GetInt() == 2 or isPlayerFurry(ply) then
-			table.insert(effects, {
-				name = "chip",
-				priority = -2,
-				value = nil
-			})
-			currentEffectNames["chip"] = true
-		end
-
+	
 		local pain_val = smooth.pain or getOrgVal(org, "pain", 0)
 		if pain_val > 10 and not berserkActive then
 			local level_num = 1
@@ -2274,8 +2259,6 @@ local function draw_status_effects()
 				bg_color = Color(80, 40, 40, 220)
 			elseif effect.name == "fracture" then
 				bg_color = Color(200, 100, 0, 220)
-			elseif effect.name == "chip" then
-				bg_color = Color(0, 200, 255, 220)
 			elseif effect.has_levels then
 				if effect.level_num == 4 then bg_color = Color(180, 30, 30, 220)
 				elseif effect.level_num == 3 then bg_color = Color(220, 60, 30, 220)
@@ -2328,7 +2311,6 @@ local function draw_status_effects()
 		elseif effect.name == "dislocated_jaw" then icon_mat = status_sprites.dislocated_jaw
 		elseif effect.name == "broken_ribs" then icon_mat = status_sprites.broken_ribs
 		elseif effect.name == "encumbered" then icon_mat = status_sprites.encumbered
-		elseif effect.name == "chip" then icon_mat = status_sprites.chip
 
 		else icon_mat = status_sprites[effect.name] end
 		
@@ -2421,8 +2403,6 @@ local function draw_status_effects()
 				letter = "✂"
 			elseif effect.name == "fracture" then
 				letter = "F"
-			elseif effect.name == "chip" then
-				letter = "🐾"
 			else
 				local letters = {spine_fracture = "SF", organ_damage = "OD", dislocation = "D"}
 				letter = letters[effect.name] or "?"
@@ -2657,7 +2637,6 @@ concommand.Add("mzb_nopixelicons", function(ply, cmd, args)
 		death = nil,
 		berserk = nil,
 		amputant = nil,
-		chip = nil,
 	}
 	
 	local status = USE_ALT_ICONS and "ON" or "OFF"

@@ -74,8 +74,26 @@ module[2] = function(owner, org, timeValue)
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
-	if org.heartbeat > 300 then -- fibrillation into cardiac arrest
-		org.heartstop = true
+	-- Probabilistic heartstop based on heart rate
+	if not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time then
+		org._heart_rate_check_time = CurTime() + 1 -- check every second
+
+		local hb = org.heartbeat
+		local chance = 0
+
+		if hb >= 375 then
+			chance = 1 -- guaranteed
+		elseif hb >= 350 then
+			chance = 0.15 -- 15% chance per second
+		elseif hb >= 300 then
+			chance = 0.03 -- 3% chance per second
+		elseif hb >= 200 then
+			chance = 0.002 -- 0.2% chance per second
+		end
+
+		if chance > 0 and math.random() < chance then
+			org.heartstop = true
+		end
 	end
 	
 	local blood = math.Clamp(org.blood or 5000, 0, 5000)
