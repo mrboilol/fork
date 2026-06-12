@@ -69,6 +69,9 @@ end
 hook.Add("Think", "hg_adrenalinemusic_check", function()
 	if not hg_adrenalinemusic:GetBool() then
 		stop_adrenaline_music(true)
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Convar disabled")
+		end
 		return
 	end
 
@@ -76,21 +79,33 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	if not IsValid(ply) then return end
 	if IsValid(ply:GetNWEntity("spect")) then
 		stop_adrenaline_music(true)
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Blocked: spectating")
+		end
 		return
 	end
 	if not ply:Alive() then
 		stop_adrenaline_music(true)
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Blocked: dead")
+		end
 		return
 	end
 
 	local org = get_target_organism()
 	if not org then
 		stop_adrenaline_music(true)
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Blocked: no organism")
+		end
 		return
 	end
 
 	if org.otrub then
 		stop_adrenaline_music(true)
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Blocked: otrub")
+		end
 		return
 	end
 
@@ -124,18 +139,20 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	end
 	if (hg.lastSeverePainTime or 0) > CurTime() - 30 then
 		stop_adrenaline_music(true)
-		MsgN("[AdrenalineMusic] Blocked: recently recovered from severe pain")
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Blocked: recently recovered from severe pain")
+		end
 		return
 	end
 
 	-- Play if triggered by combat (damage by player, damage to player, or suppression/weapon fire)
 	-- Timer is fueled by fear and adrenaline (extends duration)
-	local baseDuration = 20
+	local baseDuration = 10
 	local fearExtension = fear * 10  -- Fear adds up to 10 seconds
 	local adrenalineExtension = adrenaline * 5  -- Adrenaline adds up to 12.5 seconds (at 2.5)
 	local totalDuration = baseDuration + fearExtension + adrenalineExtension
 	local panicTrigger = CurTime() - hg.lastCombatTime < totalDuration
-	
+
 	if panicTrigger then
 		shouldPlay = true
 	end
@@ -152,9 +169,15 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 
 	if shouldPlay then
 		start_adrenaline_music()
-		-- Volume depends on remaining time in timer (full at start, fades to 0 at end)
+		-- Volume: 0.75 during main duration, fades to 0 during last 20 seconds
 		local timeRemaining = totalDuration - (CurTime() - hg.lastCombatTime)
-		local targetVol = math.Clamp(timeRemaining / totalDuration, 0, 1)
+		local targetVol
+		if timeRemaining > 20 then
+			targetVol = 0.75
+		else
+			targetVol = 0.75 * (timeRemaining / 20)
+		end
+		targetVol = math.Clamp(targetVol, 0, 1)
 		hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, targetVol)
 		if IsValid(hg.adrenalineMusicStation) then
 			hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
@@ -180,17 +203,20 @@ hook.Add("EntityTakeDamage", "hg_adrenalinemusic_combat", function(ent, dmgInfo)
 	if not hg_adrenalinemusic:GetBool() then return end
 	if ent ~= LocalPlayer() then return end
 	if not IsValid(ent) or not ent:Alive() then return end
-	
+
 	local attacker = dmgInfo:GetAttacker()
 	local damage = dmgInfo:GetDamage()
 	local damageType = dmgInfo:GetDamageType()
-	
+
 	-- Exclude fall damage (DMG_FALL) and burn damage (DMG_BURN, DMG_SLOWBURN)
 	local isNaturalDamage = damageType == DMG_FALL or damageType == DMG_BURN or damageType == DMG_SLOWBURN
-	
+
+	MsgN("[AdrenalineMusic] Damage taken - dmg:", damage, " type:", damageType, " natural:", isNaturalDamage, " attacker:", IsValid(attacker) and attacker:GetClass() or "invalid")
+
 	-- Trigger combat for any damage that isn't natural (fall/burn)
 	if damage > 0 and not isNaturalDamage then
 		hg.lastCombatTime = CurTime()
+		MsgN("[AdrenalineMusic] Combat triggered by damage")
 	end
 end)
 
@@ -199,8 +225,9 @@ hook.Add("EntityFireBullets", "hg_adrenalinemusic_weaponfire", function(ent, dat
 	if not hg_adrenalinemusic:GetBool() then return end
 	if ent ~= LocalPlayer() then return end
 	if not IsValid(ent) or not ent:Alive() then return end
-	
+
 	hg.lastCombatTime = CurTime()
+	MsgN("[AdrenalineMusic] Combat triggered by weapon fire")
 end)
 
 hook.Add("Player_Death", "hg_adrenalinemusic_cleanup", function(ply)

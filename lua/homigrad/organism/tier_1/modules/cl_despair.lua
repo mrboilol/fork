@@ -34,6 +34,7 @@ local panicSound
 local panicSoundVol = 0
 local panicSoundLoading = false
 local panicThoughtLerp = 0
+local musicVolume = GetConVar("snd_musicvolume")
 
 local panicThoughts = {
 	"Im hopeless.",
@@ -166,15 +167,15 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 					return 
 				end
 				MsgN("[Despair] Sound loaded successfully")
-				channel:SetVolume(0.5)
+				channel:SetVolume(0.5 * musicVolume:GetFloat())
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 0.5
+				despairSoundVol = 0.5 * musicVolume:GetFloat()
 			end)
 		end
 
-		local targetVol = despair > 0.3 and 1.0 or math.Remap(despair, 0, 1, 0.6, 0.75)
+		local targetVol = (despair > 0.3 and 1.0 or math.Remap(despair, 0, 1, 0.6, 0.75)) * musicVolume:GetFloat()
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
@@ -198,7 +199,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = 1
+		local targetVol = 1 * musicVolume:GetFloat()
 		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 2)
 		if IsValid(panicSound) then
 			panicSound:SetVolume(panicSoundVol)

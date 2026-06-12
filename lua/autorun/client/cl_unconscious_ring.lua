@@ -57,7 +57,7 @@ local heartPhase = 0
 
 -- Better sound system from oldring
 local SOUND_HEART = "health/critbeat.ogg"
-local SOUND_FLATLINE = "hg_unconscious/flatline.ogg"
+local SOUND_FLATLINE = "gg.ogg"
 
 local lastPhaseMod = 0
 local wasUnconsciousState = false
