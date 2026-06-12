@@ -3,6 +3,12 @@
 -- Integrates advanced features from iker foot: stair detection, procedural stepping, anti-clip, dynamic sole
 local hg = hg or {}
 
+-- PAC3 compatibility check (from iker foot)
+local function UsePAC()
+	return istable(pac) and pac.IsEnabled and pac.IsEnabled()
+		and isfunction(pac.ManipulateBonePosition) and isfunction(pac.ManipulateBoneAngles)
+end
+
 -- Constants
 local MAX_KNEE_BEND = 68
 local MIN_KNEE_BEND = -30
@@ -1231,29 +1237,30 @@ function hg.ApplyIKFoot(ent, ikResult)
 		ApplyBlendedBoneAngles(ent, 0, s.lean)
 	end
 	
-	-- Apply leg angles using blended manipulation
+	-- Apply leg angles using blended manipulation with proper endBone for bone chain
+	-- Bone chain: lThigh -> lCalf -> lFoot (and same for right)
 	if bones.lThigh then
-		ApplyBlendedBoneAngles(ent, bones.lThigh, s.leftThigh)
+		ApplyBlendedBoneAngles(ent, bones.lThigh, s.leftThigh, bones.lCalf)
 	end
 	
 	if bones.lCalf then
-		ApplyBlendedBoneAngles(ent, bones.lCalf, s.leftCalf)
+		ApplyBlendedBoneAngles(ent, bones.lCalf, s.leftCalf, bones.lFoot)
 	end
 	
 	if bones.lFoot then
-		ApplyBlendedBoneAngles(ent, bones.lFoot, s.leftFoot)
+		ApplyBlendedBoneAngles(ent, bones.lFoot, s.leftFoot, nil)
 	end
 	
 	if bones.rThigh then
-		ApplyBlendedBoneAngles(ent, bones.rThigh, s.rightThigh)
+		ApplyBlendedBoneAngles(ent, bones.rThigh, s.rightThigh, bones.rCalf)
 	end
 	
 	if bones.rCalf then
-		ApplyBlendedBoneAngles(ent, bones.rCalf, s.rightCalf)
+		ApplyBlendedBoneAngles(ent, bones.rCalf, s.rightCalf, bones.rFoot)
 	end
 	
 	if bones.rFoot then
-		ApplyBlendedBoneAngles(ent, bones.rFoot, s.rightFoot)
+		ApplyBlendedBoneAngles(ent, bones.rFoot, s.rightFoot, nil)
 	end
 end
 
@@ -1353,12 +1360,39 @@ end
 
 local function SetBonePosition(ply, bone, pos)
 	if bone == nil then return end
-	ply:ManipulateBonePosition(bone, pos)
+	if UsePAC() then
+		pac.ManipulateBonePosition(ply, bone, pos)
+	else
+		ply:ManipulateBonePosition(bone, pos)
+	end
 end
 
 local function SetBoneAngles(ply, bone, ang)
 	if bone == nil then return end
-	ply:ManipulateBoneAngles(bone, ang)
+	if UsePAC() then
+		pac.ManipulateBoneAngles(ply, bone, ang)
+	else
+		ply:ManipulateBoneAngles(bone, ang)
+	end
+end
+
+-- TPIK-style bone matrix application for proper child bone handling
+local function ApplyBoneMatrix(ply, bone, newMatrix, endBone)
+	if bone == nil then return end
+	if not isfunction(hg.bone_apply_matrix) then
+		local mat = ply:GetBoneMatrix(bone)
+		if mat then
+			ply:SetBoneMatrix(bone, newMatrix)
+		end
+		return
+	end
+	hg.bone_apply_matrix(ply, bone, newMatrix, endBone)
+end
+
+-- Get current bone matrix for blending
+local function GetBoneMatrix(ply, bone)
+	if bone == nil then return nil end
+	return ply:GetBoneMatrix(bone)
 end
 
 local function ApplyBlendedBonePosition(ply, bone, offset)
@@ -1366,7 +1400,7 @@ local function ApplyBlendedBonePosition(ply, bone, offset)
 	local state = GetIKBlendState(ply)
 	local entry = state.pos[bone]
 	if not entry then
-		entry = { applied = Vector(), final = nil }
+		entry = { applied = Vector(), final = nil, matrix = nil }
 		state.pos[bone] = entry
 	end
 
@@ -1377,17 +1411,31 @@ local function ApplyBlendedBonePosition(ply, bone, offset)
 	end
 
 	local final = base + offset
+	
+	-- Use TPIK bone_apply_matrix if available for proper child bone handling
+	if isfunction(hg.bone_apply_matrix) and bone == 0 then
+		local mat = ply:GetBoneMatrix(bone)
+		if mat then
+			local newMat = Matrix()
+			newMat:SetTranslation(final)
+			newMat:SetAngles(mat:GetAngles())
+			newMat:SetScale(mat:GetScale())
+			ApplyBoneMatrix(ply, bone, newMat)
+			entry.matrix = newMat
+		end
+	end
+	
 	SetBonePosition(ply, bone, final)
 	entry.applied = Vector(offset)
 	entry.final = Vector(final)
 end
 
-local function ApplyBlendedBoneAngles(ply, bone, offset)
+local function ApplyBlendedBoneAngles(ply, bone, offset, endBone)
 	if bone == nil then return end
 	local state = GetIKBlendState(ply)
 	local entry = state.ang[bone]
 	if not entry then
-		entry = { applied = Angle(), final = nil }
+		entry = { applied = Angle(), final = nil, matrix = nil }
 		state.ang[bone] = entry
 	end
 
@@ -1398,6 +1446,20 @@ local function ApplyBlendedBoneAngles(ply, bone, offset)
 	end
 
 	local final = Angle(base.p + offset.p, base.y + offset.y, base.r + offset.r)
+	
+	-- Use TPIK bone_apply_matrix for proper child bone handling
+	if isfunction(hg.bone_apply_matrix) then
+		local mat = ply:GetBoneMatrix(bone)
+		if mat then
+			local newMat = Matrix()
+			newMat:SetTranslation(mat:GetTranslation())
+			newMat:SetAngles(final)
+			newMat:SetScale(mat:GetScale())
+			ApplyBoneMatrix(ply, bone, newMat, endBone)
+			entry.matrix = newMat
+		end
+	end
+	
 	SetBoneAngles(ply, bone, final)
 	entry.applied = Angle(offset)
 	entry.final = Angle(final)
@@ -1452,9 +1514,24 @@ end
 
 local RESET_COOLDOWN = 0.5
 
--- Main IK hook - runs every frame for every player (compatible with organism/health indicator)
+-- Main IK hook - runs every frame for every player (compatible with organism/health indicator/TPIK)
 hook.Add("PostPlayerDraw", "HG_IKFoot_PostPlayerDraw", function(ply)
 	if not IsValid(ply) then return end
+
+	-- Skip local player in first person to avoid conflicts with health indicator
+	local lp = LocalPlayer()
+	local thirdPerson = hg_thirdperson and hg_thirdperson:GetBool() or false
+	if ply == lp and not thirdPerson then
+		return
+	end
+
+	-- Check if TPIK is active and skip if hands are being manipulated
+	if ply == lp and isfunction(hg.ShouldTPIK) and hg.ShouldTPIK(ply) then
+		local wpn = ply:GetActiveWeapon()
+		if IsValid(wpn) and (wpn.lhandik or wpn.rhandik) then
+			return
+		end
+	end
 
 	local alive = ply:Alive()
 	if ply.IKWasAlive == false and alive then

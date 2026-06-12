@@ -845,9 +845,9 @@ if CLIENT then
 
 	local coloruse = Color(255,255,255,255)
 
-	local matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
-	local matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
-	local matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
+	local matPistolAmmo = Material("hud/bullets/low_caliber.png")
+	local matRfileAmmo = Material("hud/bullets/high_caliber.png")
+	local matShotgunAmmo = Material("hud/bullets/buck_caliber.png")
 	local lerpAmmoCheck = 0
 	local ammoCheck = 0
 	local color_bg = Color(0,0,0,150)

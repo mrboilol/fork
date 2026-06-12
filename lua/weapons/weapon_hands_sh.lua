@@ -713,7 +713,7 @@ function SWEP:SetHandPos(noset)
 	if IsValid(ply) and (not ply.shouldTransmit or ply.NotSeen) then return end
 	-- ply:SetupBones()
 
-	local ent = self:GetNWEntity("carryent")
+	local ent = self.CarryEnt
 	
 	-- Use the actual hand usage state from pickup logic
 	if IsValid(ent) then
@@ -1166,24 +1166,42 @@ function SWEP:SecondaryAttack()
 			isLeftBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
 			bothArmsBroken = isRightBroken and isLeftBroken
 
-			-- Use both hands by default, fallback to single hand if one is broken/dislocated
-			if isRightBroken and not isLeftBroken then
-				-- Right broken/dislocated, use only left hand
+			local alreadyHolding = IsValid(owner:GetNetVar("carryent2"))
+			local hasRightArm = not org.rarmamputated
+			local hasLeftArm = not org.larmamputated
+
+			if alreadyHolding then
+				-- Already passive-holding something, use left hand only for new grab
+				useBothHands = false
+				useRightHand = false
+				useLeftHand = hasLeftArm
+			elseif not hasRightArm then
+				-- Missing right arm, must use left
+				useBothHands = false
+				useRightHand = false
+				useLeftHand = hasLeftArm
+			elseif not hasLeftArm then
+				-- Missing left arm, must use right
+				useBothHands = false
+				useRightHand = hasRightArm
+				useLeftHand = false
+			elseif bothArmsBroken then
+				-- Both arms broken, default to right hand with pain
+				useBothHands = false
+				useRightHand = true
+				useLeftHand = false
+			elseif isRightBroken and not isLeftBroken then
+				-- Right broken, left healthy -- use healthy left hand
 				useBothHands = false
 				useRightHand = false
 				useLeftHand = true
 			elseif isLeftBroken and not isRightBroken then
-				-- Left broken/dislocated, use only right hand
-				useBothHands = false
-				useRightHand = true
-				useLeftHand = false
-			elseif bothArmsBroken then
-				-- Both broken/dislocated, use right hand with pain
+				-- Left broken, right healthy -- use healthy right hand
 				useBothHands = false
 				useRightHand = true
 				useLeftHand = false
 			end
-			-- If neither is broken, use both hands (default)
+			-- If both healthy and not already holding, use both hands (default)
 		else
 			-- No organism, default to both hands
 			useBothHands = true
@@ -1233,45 +1251,39 @@ function SWEP:SecondaryAttack()
 				if org then
 					local painAmount = 0
 
-					if bothArmsBroken then
-						-- Both arms broken, using right hand - add significant pain
+					if bothArmsBroken and useRightHand then
+						-- Both arms broken, using right hand - significant pain
 						if not org.rarmamputated then
 							painAmount = (org.rarm or 0) * 15 + (org.rarmdislocation or org.rarmdislocated and 10 or 0)
 						end
 						if not org.larmamputated then
 							painAmount = painAmount + (org.larm or 0) * 15 + (org.larmdislocation or org.larmdislocated and 10 or 0)
 						end
-						-- Right hand is slightly better, reduce pain slightly
 						painAmount = painAmount * 0.85
-					elseif isRightBroken and useLeftHand then
-						-- Right broken, using left hand only
+					elseif isLeftBroken and useLeftHand then
+						-- Using broken left arm (passive hold or missing right arm) - moderate pain
 						if not org.larmamputated then
 							local armVal = org.larm or 0
 							local disloc = org.larmdislocation or org.larmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = armVal * 12 + (disloc and 8 or 0)
+								painAmount = armVal * 8 + (disloc and 5 or 0)
 							elseif armVal >= 0.25 and armVal < 1 then
 								local severity = (armVal - 0.25) / 0.75
-								painAmount = severity * 5
+								painAmount = severity * 3
 							end
 						end
-					elseif isLeftBroken and useRightHand then
-						-- Left broken, using right hand only (slightly stronger)
+					elseif isRightBroken and useRightHand then
+						-- Using broken right arm - moderate pain (less than both broken)
 						if not org.rarmamputated then
 							local armVal = org.rarm or 0
 							local disloc = org.rarmdislocation or org.rarmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = armVal * 12 + (disloc and 8 or 0)
-								painAmount = painAmount * 0.7 -- right hand is better (less pain)
+								painAmount = armVal * 10 + (disloc and 6 or 0)
 							elseif armVal >= 0.25 and armVal < 1 then
 								local severity = (armVal - 0.25) / 0.75
-								painAmount = severity * 5
-								painAmount = painAmount * 0.7
+								painAmount = severity * 4
 							end
 						end
-					elseif useBothHands then
-						-- Both hands healthy, minimal pain from strain
-						painAmount = 0
 					end
 
 					if painAmount > 0 then
@@ -1435,34 +1447,51 @@ function SWEP:ApplyForce()
 
 		-- Apply strength multiplier based on which hands are being used
 		if self.UsingBothHands then
-			mul = mul * 1.4 -- Both hands are significantly stronger
+			mul = mul * 1.5 -- Both hands are significantly stronger
 		elseif self.UsingRightHand and not self.UsingLeftHand then
 			if self.BothArmsBroken then
-				-- Both arms broken, using right arm with normal strength
-				mul = mul * 1.0
+				-- Both arms broken, using right hand - much weaker
+				mul = mul * 0.6
 			else
-				mul = mul * 1.15 -- Right hand is slightly stronger than normal
+				mul = mul * 1.25 -- Right hand is stronger when sole hand
 			end
 		elseif self.UsingLeftHand and not self.UsingRightHand then
-			mul = mul * 0.9 -- Left hand is slightly weaker than normal
+			if self.IsLeftBroken then
+				-- Broken left arm being used (passive hold or missing right arm) - very weak
+				mul = mul * 0.5
+			else
+				mul = mul * 0.85 -- Healthy left hand is weaker than right, but not by much
+			end
 		end
 
 		-- Add continuous pain when holding with damaged hands
-		if ply.organism and (self.BothArmsBroken or (self.IsRightBroken and self.UsingLeftHand) or (self.IsLeftBroken and self.UsingRightHand)) then
+		if ply.organism then
 			local org = ply.organism
 			local continuousPain = 0
 
-			if self.BothArmsBroken then
-				-- Both arms broken, holding with right hand causes continuous pain
+			if self.BothArmsBroken and self.UsingRightHand then
+				-- Both arms broken, using right hand - most pain
 				if not org.rarmamputated then
-					continuousPain = (org.rarm or 0) * 2 + (org.rarmdislocation or org.rarmdislocated and 1.5 or 0)
+					continuousPain = (org.rarm or 0) * 3 + (org.rarmdislocation or org.rarmdislocated and 2 or 0)
 				end
 				if not org.larmamputated then
 					continuousPain = continuousPain + (org.larm or 0) * 2 + (org.larmdislocation or org.larmdislocated and 1.5 or 0)
 				end
 				continuousPain = continuousPain * 0.5
-			elseif self.IsRightBroken and self.UsingLeftHand then
-				-- Right broken, using left hand only
+			elseif self.IsRightBroken and self.UsingRightHand then
+				-- Using broken right arm
+				if not org.rarmamputated then
+					local armVal = org.rarm or 0
+					local disloc = org.rarmdislocation or org.rarmdislocated
+					if armVal >= 1 or disloc then
+						continuousPain = armVal * 2 + (disloc and 1.5 or 0)
+					elseif armVal >= 0.25 and armVal < 1 then
+						local severity = (armVal - 0.25) / 0.75
+						continuousPain = severity * 1
+					end
+				end
+			elseif self.IsLeftBroken and self.UsingLeftHand then
+				-- Using broken left arm (passive hold or missing right arm) - less pain than right
 				if not org.larmamputated then
 					local armVal = org.larm or 0
 					local disloc = org.larmdislocation or org.larmdislocated
@@ -1470,19 +1499,7 @@ function SWEP:ApplyForce()
 						continuousPain = armVal * 1.5 + (disloc and 1 or 0)
 					elseif armVal >= 0.25 and armVal < 1 then
 						local severity = (armVal - 0.25) / 0.75
-						continuousPain = severity * 0.8
-					end
-				end
-			elseif self.IsLeftBroken and self.UsingRightHand then
-				-- Left broken, using right hand only
-				if not org.rarmamputated then
-					local armVal = org.rarm or 0
-					local disloc = org.rarmdislocation or org.rarmdislocated
-					if armVal >= 1 or disloc then
-						continuousPain = (armVal * 1.5 + (disloc and 1 or 0)) * 0.6 -- right hand is better
-					elseif armVal >= 0.25 and armVal < 1 then
-						local severity = (armVal - 0.25) / 0.75
-						continuousPain = severity * 0.8 * 0.6
+						continuousPain = severity * 0.6
 					end
 				end
 			end
@@ -1514,7 +1531,7 @@ function SWEP:ApplyForce()
 				end
 				self.CarryEnt.welds = nil
 			end
-			if (ply:GetGroundEntity() == self.CarryEnt) or (ply:GetEntityInUse() == self.CarryEnt) or IsValid(ply.FakeRagdoll) or self.CarryEnt:IsPlayerHolding() then
+			if (ply:GetGroundEntity() == self.CarryEnt) or (ply:GetEntityInUse() == self.CarryEnt) or self.CarryEnt:IsPlayerHolding() then
 				self:SetCarrying()
 				return
 			end
@@ -2517,6 +2534,12 @@ function SWEP:Reload()
 	end
 
 	if SERVER then
+		local org = owner.organism
+		if org and (org.larmamputated or org.rarmamputated) then
+			-- Single arm amputated: cannot passive-hold and equip something else at the same time
+			return
+		end
+
 		local target,_ = WorldToLocal(self:GetOwner():GetAimVector() * (self.CarryDist or 50) + self:GetOwner():GetShootPos(),angle_zero,self:GetOwner():EyePos(),self:GetOwner():EyeAngles())
 
 		if IsValid(ent) then
@@ -2555,7 +2578,7 @@ if SERVER then
 			local ent, ply, dist, target, bone, pos, lang = tbl[1], tbl[2], tbl[3], tbl[4], tbl[5], tbl[6], tbl[7]
 			local phys = ent:GetPhysicsObjectNum(bone)
 
-			if not IsValid(phys) or not IsValid(ply) or not IsValid(ent) or not ply:Alive() or (ply:GetGroundEntity() == ent) or (ply:GetEntityInUse() == ent) or IsValid(ply.FakeRagdoll) or ply:KeyPressed(IN_RELOAD) then
+			if not IsValid(phys) or not IsValid(ply) or not IsValid(ent) or not ply:Alive() or (ply:GetGroundEntity() == ent) or (ply:GetEntityInUse() == ent) or ply:KeyPressed(IN_RELOAD) then
 				hg.SetCarryEnt2(ply)
 				heldents[i] = nil
 

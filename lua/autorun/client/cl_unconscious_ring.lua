@@ -52,12 +52,15 @@ local peakShock = 40
 local dotBeat = 0
 
 local ecgAlphaPulseCheck = 0
+local awakeECGAlpha = 0
 local lastHeartBeat = 0
 local heartPhase = 0
 
 -- Better sound system from oldring
 local SOUND_HEART = "health/critbeat.ogg"
-local SOUND_FLATLINE = "gg.ogg"
+local SOUND_FLATLINE = "health/gg.ogg"
+local SOUND_FIBRILLATION = "criticalbeats.ogg"
+local CRITBEAT_VOLUME_SCALE = 0.6
 
 local lastPhaseMod = 0
 local wasUnconsciousState = false
@@ -102,18 +105,8 @@ local function GetHeartbeatVolumeAdmiring(org, admiring)
     local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
          + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
          + math.Clamp(org.brain or 0, 0, 1) * 0.2
-    
-    -- Movement-based volume modifier - heartbeats should be louder when moving
-    local ply = LocalPlayer()
-    local movementBonus = 0
-    if IsValid(ply) and ply:Alive() then
-        local vel = ply:GetVelocity()
-        local speed = vel:Length()
-        -- Add volume based on movement speed (0 to 0.3 bonus)
-        movementBonus = math.Clamp(speed / 200, 0, 0.3)
-    end
-    
-    return math.Clamp(0.2 + hurt + movementBonus, 0.2, 1.0)
+
+    return math.Clamp(0.2 + hurt, 0.2, 1.0)
 end
 
 -- Phase crossing detection from oldring
@@ -267,8 +260,11 @@ local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
             beatVolume = 1.0
         end
 
-        if abnormalPulse or highStress then
-            EmitRingSound(SOUND_HEART, beatVolume)
+        local fibrillating = pulse > 250
+        if fibrillating then
+            EmitRingSound(SOUND_FIBRILLATION, beatVolume)
+        elseif abnormalPulse or highStress then
+            EmitRingSound(SOUND_HEART, beatVolume * CRITBEAT_VOLUME_SCALE)
         else
             EmitRingSound("sound/heartbeat/heartbeat_single.wav", beatVolume)
         end
@@ -520,7 +516,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
     local lowConsciousness = (org.consciousness or 1) < 0.4 and not isUnconscious
-    local isCritical = (org.critical == true) or (heartbeat < 1 and lerpBrain >= 0.02) or (lerpBrain >= 0.34) or lowConsciousness
+    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain >= 0.34) or lowConsciousness
+    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
+    local fibrillating = heartbeat > 250
+
+    local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical)
     
     if isUnconscious then
         if not wasUnconsciousState then
@@ -539,7 +539,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     else
         flatlinePlayedThisUnconscious = false
         ringAlpha = Lerp(FrameTime() * 3, ringAlpha, 0)
-        if ringAlpha <= 0.01 then
+        if ringAlpha <= 0.01 and not showAwakeECG then
             ringAlpha = 0
             peakShock = 40
             centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
@@ -548,6 +548,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
     wasUnconsciousState = isUnconscious
+
+    -- Update persistent awake ECG alpha
+    if showAwakeECG then
+        awakeECGAlpha = Lerp(FrameTime() * 4, awakeECGAlpha, 0.15)
+    else
+        awakeECGAlpha = Lerp(FrameTime() * 2, awakeECGAlpha, 0)
+    end
     
     local showPulseCheckECG = false
 
@@ -567,25 +574,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
-    local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
-    local fibrillating = heartbeat > 250
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then return end
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical) then return end
     local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring or fibrillating))
 
-    local otrubECGAlpha = ringAlpha
-    if not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating) then
-        -- Show at low opacity for awake players with abnormal heartbeat or admiring or recent sudden drop or fibrillating
-        otrubECGAlpha = Lerp(FrameTime() * 4, otrubECGAlpha, 0.15)
-    end
-
-    -- Fade away if consciousness is between 0.4-0.75 and not going down
-    if consciousness >= 0.4 and consciousness < 0.75 and not recentSuddenDrop and not isUnconscious and not lowConsciousness and not abnormalPulse and not admiring and not fibrillating then
-        -- Check if consciousness is stable (not dropping)
-        if consciousnessDelta >= -0.01 then
-            otrubECGAlpha = Lerp(FrameTime() * 2, otrubECGAlpha, 0)
-        end
-    end
+    local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
     
     if otrubECGAlpha > 0.01 then
         lerpBrain = Lerp(FrameTime() * 3, lerpBrain, org.brain or 0)
@@ -644,9 +637,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
-            -- Always white when awake, unless org.critical is true (then show red)
-            local awakeCritical = org.critical == true
-            local ecgColor = awakeCritical and Color(255, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
+            local ecgColor = isCritical and Color(255, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
             DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
             
             -- Add consciousness meter ring for low opacity ECG when consciousness is low or recently dropped
@@ -706,8 +697,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                         local vol = GetHeartbeatVolume(target_org)
                         local abnormalPulse = (target_heartbeat < 40 and target_heartbeat >= 1) or target_heartbeat > 100
                         local highStress = vol > 0.5
-                        if abnormalPulse or highStress then
-                            EmitRingSound(SOUND_HEART, vol)
+                        local fibrillating = target_heartbeat > 250
+                        if fibrillating then
+                            EmitRingSound(SOUND_FIBRILLATION, vol)
+                        elseif abnormalPulse or highStress then
+                            EmitRingSound(SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
                         else
                             EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
                         end
@@ -753,8 +747,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     local vol = GetHeartbeatVolumeAdmiring(org, admiring)
                     local hasHealthHUD = (className == "Gordon" or className == "Combine" or className == "furry")
                     local highStress = vol > 0.5
+                    local fibrillating = heartbeat > 250
                     if (abnormalPulse and hasHealthHUD) or highStress or admiring then
-                        EmitRingSound(SOUND_HEART, vol)
+                        local soundToPlay = fibrillating and SOUND_FIBRILLATION or SOUND_HEART
+                        local volScale = fibrillating and 1 or CRITBEAT_VOLUME_SCALE
+                        EmitRingSound(soundToPlay, vol * volScale)
                     else
                         EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
                     end

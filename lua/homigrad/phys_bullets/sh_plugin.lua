@@ -912,8 +912,13 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			end
 			
 			if(is_ricochet)then
-				local rnd = math.random(4)
-				sound.Play("bullet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
+				if math.random(2) == 1 then
+					local rnd = math.random(4)
+					sound.Play("bullet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
+				else
+					local rnd = math.random(5)
+					sound.Play("weapons/fx/rics/ric" .. rnd .. ".wav", trace.HitPos, 75, math.random(90, 110))
+				end
 			end
 		end
 		

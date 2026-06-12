@@ -306,27 +306,30 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		-- Trachea damage from breathing - damages trachea when breathing, more breathing = more damage
-		-- Needle prevents trachea damage, only triggers when trachea > 0.5
-		if org.trachea > 0.5 and org.trachea < 1.0 and org.needle <= 0 then
-			local breatheAmount = regenerate * 0.01
-			if breatheAmount > 0.01 then
+		-- Needle prevents trachea damage, only triggers when trachea > 0.65
+		if org.trachea > 0.65 and org.trachea < 1.0 and org.needle <= 0 then
+			local breatheAmount = regenerate * 0.008
+			if breatheAmount > 0.005 then
 				org.trachea = min(org.trachea + breatheAmount, 1)
 			end
 		end
 
-		-- O2 impairment when trachea is damaged
-		if org.trachea > 0 and org.trachea <= 0.5 then
-			local impairment = org.trachea * 0.5 -- up to 25% O2 reduction at 0.5
-			regenerate = regenerate * (1 - impairment)
-		elseif org.trachea > 0.5 then
-			-- Much worse impairment above 0.5 (50% to 100% reduction)
-			local impairment = 0.5 + (org.trachea - 0.5) * 1.0 -- 50% at 0.5, up to 100% at 1.0
-			regenerate = regenerate * (1 - impairment)
+		-- Trachea gradual deterioration from 0.5+ based on lung function (hyperventilating = more damage)
+		if org.trachea >= 0.5 and org.trachea < 1.0 and org.needle <= 0 then
+			local breatheIntensity = math.max((regenerate / math.max(timeValue, 0.001)) / (o2.regen or 4), 0.1) * math.Clamp((org.pulse or 70) / 70, 0.8, 2.0)
+			local damageFactor = (org.trachea - 0.4) / 0.6
+			org.trachea = min(org.trachea + timeValue * 0.06 * breatheIntensity * damageFactor, 1)
 		end
 
-		-- O2 drain when trachea is damaged (> 0.5)
-		if org.trachea > 0.5 then
-			local tracheaDrain = (org.trachea - 0.5) * 2 -- 0 at 0.5, up to 1 at 1.0
+		-- O2 impairment when trachea is damaged (smooth curve, no sharp cliff at 0.5)
+		if org.trachea > 0 then
+			local impairment = org.trachea * 0.3 + org.trachea * org.trachea * 0.7 -- 0 at 0, ~32% at 0.5, 100% at 1.0
+			regenerate = regenerate * (1 - math.min(impairment, 1))
+		end
+
+		-- O2 drain when trachea is damaged (starts immediately but scales gently)
+		if org.trachea > 0 then
+			local tracheaDrain = org.trachea * org.trachea * 0.4 -- 0 at 0, 0.1 at 0.5, 0.4 at 1.0
 			o2[1] = max(o2[1] - timeValue * tracheaDrain, 0)
 		end
 
@@ -348,16 +351,16 @@ module[2] = function(owner, org, timeValue)
 			end
 		end
 
-		-- Trachea > 0.5: determine path once, then stick with it
+		-- Trachea > 0.65: determine path once, then stick with it
 		-- Needle prevents both
-		if org.trachea > 0.5 and org.trachea < 1.0 and org.needle <= 0 and regenerate > 0 then
-			-- First time above 0.5: choose path
+		if org.trachea > 0.65 and org.trachea < 1.0 and org.needle <= 0 and regenerate > 0 then
+			-- First time above 0.65: choose path
 			if not org.tracheaPath then
 				org.tracheaPath = math.random() < 0.5 and "trachea" or "pneumothorax"
 			end
 
-			local damageSeverity = (org.trachea - 0.5) * 2
-			local drainRate = regenerate * 0.005 * damageSeverity
+			local damageSeverity = (org.trachea - 0.65) / 0.35
+			local drainRate = regenerate * 0.003 * damageSeverity
 
 			if org.tracheaPath == "trachea" then
 				org.trachea = min(org.trachea + drainRate, 1)
@@ -367,6 +370,12 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		o2.curregen = regenerate
+
+		-- Struggling to catch breath: when curregen can't match O2 demand, extra drain from shallow breathing
+		if o2.curregen >= 0 and o2.curregen < losing_oxy then
+			local struggleRatio = 1 - (o2.curregen / losing_oxy)
+			o2[1] = max(o2[1] - timeValue * struggleRatio * 0.5, 0)
+		end
 
 		o2[1] = max(o2[1] - (org.CO > 0 and o2.curregen * 1.1 * (org.CO / 30) or 0),0)
 
@@ -493,13 +502,13 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		-- Trachea damage notifications
-		if org.trachea > 0.3 and org.trachea <= 0.5 then
+		if org.trachea > 0.3 and org.trachea <= 0.6 then
 			org.owner:Notify("My throat feels like it has a hole in it.", true, "trachea1", 15)
 		else
 			org.owner:ResetNotification("trachea1")
 		end
 
-		if org.trachea > 0.5 and org.trachea < 1.0 then
+		if org.trachea > 0.6 and org.trachea < 1.0 then
 			org.owner:Notify("I can't get any air through my trachea...", true, "trachea2", 5)
 		else
 			org.owner:ResetNotification("trachea2")

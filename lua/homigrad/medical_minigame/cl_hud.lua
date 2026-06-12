@@ -825,12 +825,12 @@ function PANEL:CompleteWrap()
     -- Increment completions for threshold-based healing
     self.BandageCompletions = (self.BandageCompletions or 0) + 1
 
-    -- Play faint bandaging sound on rotation completion
-    surface.PlaySound("snd_jack_hmcd_bandage.wav")
+    -- Play shawarma sound on intermediate wraps; final wrap plays normal bandage sound in Finish()
+    surface.PlaySound("shawarma.ogg")
 
-    -- Trigger red flash and shake effects
-    self.RotationFlashAlpha = 180
-    self.RotationShakeIntensity = 5
+    -- Reduced shake effect on wrap completion, no red flash
+    self.RotationFlashAlpha = 0
+    self.RotationShakeIntensity = 2
 
     -- Check if required completions reached
     if self.BandageCompletions >= (self.BandageRequiredCompletions or 3) then
