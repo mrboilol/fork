@@ -1,13 +1,44 @@
 local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vector, AngleRand, VectorRand, math, hook, util, game
 local IsValid, math_Clamp = IsValid, math.Clamp
 
+local function FindHeadBone(ent)
+	-- Try standard ValveBiped bone first
+	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+	if headBone then return headBone end
+
+	-- Try protogen-specific bone names
+	local protogenBones = {
+		"Head",
+		"head",
+		"Head1",
+		"Bip01_Head",
+		"skull",
+		"SKULL"
+	}
+
+	for _, boneName in ipairs(protogenBones) do
+		headBone = ent:LookupBone(boneName)
+		if headBone then return headBone end
+	end
+
+	-- Fallback: search for any bone containing "head" in the name
+	for i = 0, ent:GetBoneCount() - 1 do
+		local boneName = ent:GetBoneName(i)
+		if string.lower(boneName):find("head") then
+			return i
+		end
+	end
+
+	return nil
+end
+
 --\\ Smooth UnRagdoll
 	local vecSmall = Vector(0.01, 0.01, 0.01)
 	function hg.SmoothUnfake(ent, ply)
 		if ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0 and IsValid(ply) then
 			local headBone = ent.ZCHeadBoneRender
 			if headBone == nil and ent.LookupBone then
-				headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+				headBone = FindHeadBone(ent)
 				ent.ZCHeadBoneRender = headBone or false
 			end
 			headBone = headBone == false and nil or headBone
@@ -77,7 +108,7 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 
 		local lkp = ent.ZCHeadBoneRender
 		if lkp == nil and ent.LookupBone then
-			lkp = ent:LookupBone("ValveBiped.Bip01_Head1")
+			lkp = FindHeadBone(ent)
 			ent.ZCHeadBoneRender = lkp or false
 		end
 		lkp = lkp == false and nil or lkp
@@ -140,7 +171,10 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 				local mat = ent:GetBoneMatrix(lkp)
 				if mat then
 					if !(Glide and Glide.Camera and !Glide.Camera.isInFirstPerson and lply == ply and lply:InVehicle() and hg_no_camera_in_cars:GetBool()) then
-						if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
+						-- For expie models, always hide head in first-person view
+						if (ply.IsExpie or ply.PlayerClassName == "expie") and (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) then
+							mat:SetScale(vector_small)
+						elseif (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
 							mat:SetScale(wawanted)
 						end
 					end
@@ -151,7 +185,8 @@ local IsValid, math_Clamp = IsValid, math.Clamp
 
 					hg.bone_apply_matrix(ent, lkp, mat)
 
-					if wawanted == vector_small and (ply.IsExpie or ply.PlayerClassName == "expie") then
+					-- Always hide head children for expie models when head is hidden
+					if (wawanted == vector_small or (ply.IsExpie or ply.PlayerClassName == "expie")) and (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) then
 						local children = ent:GetChildBones(lkp)
 						if children then
 							for _, childID in ipairs(children) do

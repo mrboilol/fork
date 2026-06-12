@@ -567,7 +567,7 @@ function HUD_DrawDynamicIndicator()
     local viewX, viewY
     
     -- Position at bottom left of screen
-    viewX = ScreenScaleFixed(30) -- Left margin
+    viewX = ScreenScaleFixed(10) -- Left margin
     viewY = ScrH() - h - ScreenScaleFixed(50) -- Position at bottom with margin
     
     -- Store indicator position and size for moodle adjustment
@@ -869,7 +869,33 @@ function HUD_DrawDynamicIndicator()
                         pos = pos + Vector(0, 0, 1.5)
                         local sx, sy = Project3DToIndicator2D(pos, camPos, lookAng, viewX, viewY, w, h, 50)
                         if sx and sy then
-                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, key = key})
+                            -- Check if this is a neck artery (arteria) wound
+                            local isNeckArtery = false
+                            local netArterial = ply:GetNetVar("arterialwounds", nil)
+                            local arterialList = (netArterial and #netArterial > 0) and netArterial or ply.arterialwounds
+                            if arterialList and data.isArterial then
+                                for _, wound in ipairs(arterialList) do
+                                    if type(wound) == "table" and wound[4] == boneName and wound[7] == "arteria" then
+                                        isNeckArtery = true
+                                        break
+                                    end
+                                end
+                            end
+
+                            -- Calculate bleeding rate to determine if non-arterial wounds bleed at arterial level
+                            -- Arterial wounds bleed at ~wound[1] * 4.5 * pulse / 80 ml per beat
+                            -- Regular wounds bleed at ~wound[1] * 7 * 2.0 * pulse / 70 ml per beat (avg rand1=7)
+                            -- Neck artery (arteria) typically has wound[1] around 2.0
+                            -- Regular arterial wounds typically have wound[1] around 1.0
+                            local pulse = org and org.pulse or 70
+                            local arterialBleedRate = 1.0 * 4.5 * pulse / 80 -- ~3.94 ml/beat at pulse 70
+                            local neckArteryBleedRate = 2.0 * 4.5 * pulse / 80 -- ~7.88 ml/beat at pulse 70
+                            local currentBleedRate = data.severity * 7 * 2.0 * pulse / 70 -- Approx regular wound rate
+
+                            local bleedsAtArterialLevel = (currentBleedRate >= arterialBleedRate * 0.8) or data.isArterial
+                            local bleedsAtNeckArteryLevel = (currentBleedRate >= neckArteryBleedRate * 0.8) or isNeckArtery
+
+                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, isNeckArtery = isNeckArtery, bleedsAtArterialLevel = bleedsAtArterialLevel, bleedsAtNeckArteryLevel = bleedsAtNeckArteryLevel, key = key})
                         end
                     end
                 end
@@ -886,24 +912,27 @@ function HUD_DrawDynamicIndicator()
         local iconSize = ScreenScaleFixed(36)
         for _, data in ipairs(bleedScreen2D) do
             local severity = data.severity
-            local isArterial = data.isArterial
+            local bleedsAtArterialLevel = data.bleedsAtArterialLevel
+            local bleedsAtNeckArteryLevel = data.bleedsAtNeckArteryLevel
             local r, g, b, mat
             
-            if severity >= 1.5 or isArterial then
-                -- Show bigbleeding.png for severe bleeding (~200ml/min+) or arterial wounds
+            if bleedsAtNeckArteryLevel then
+                -- Neck artery level: Dark Red (80, 0, 0)
                 mat = bigBleedIconMat
-                -- Dark yellow to dark red based on severity
-                -- Dark Yellow (180, 160, 0) -> Dark Red (120, 0, 0)
-                local progress = math.Clamp((severity - 1.5) / 2.0, 0, 1)
-                r = math.floor(180 - 60 * progress)
-                g = math.floor(160 * (1 - progress))
-                b = 0
+                r, g, b = 80, 0, 0
+            elseif bleedsAtArterialLevel then
+                -- Arterial level: Dark Yellow (160, 140, 0)
+                mat = bigBleedIconMat
+                r, g, b = 160, 140, 0
+            elseif severity >= 1.5 then
+                -- Near arterial level: Max Red (255, 0, 0)
+                mat = bigBleedIconMat
+                r, g, b = 255, 0, 0
             else
-                -- Show bleeding.png for normal bleeding wounds
+                -- Normal bleeding: White to red based on severity
+                -- White (255, 255, 255) for small cuts -> Red (255, 0, 0) for heavy bleeding
                 mat = bleedIconMat
-                -- White to red based on severity
-                -- White (255, 255, 255) -> Red (255, 0, 0)
-                local progress = math.Clamp(severity / 0.8, 0, 1)
+                local progress = math.Clamp(severity / 1.5, 0, 1)
                 r = 255
                 g = math.floor(255 * (1 - progress))
                 b = math.floor(255 * (1 - progress))

@@ -100,6 +100,13 @@ module[2] = function(owner, org, timeValue)
 		map = 0
 	end
 
+	-- High velocity reduces blood pressure (falling or fast vehicle movement)
+	local velocity = owner:GetVelocity():Length()
+	if velocity > 800 then
+		local velocityPenalty = math.Clamp((velocity - 800) / 400, 0, 0.4) -- Up to 40% reduction at very high speeds
+		map = map * (1 - velocityPenalty)
+	end
+
 	map = math.Clamp(map, 0, 190)
 	org.bloodpressure = math.Approach(org.bloodpressure or 93, map, timeValue * (map > (org.bloodpressure or 93) and 14 or 10))
 

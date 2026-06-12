@@ -301,13 +301,13 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		print("[HG Bone] SPINE3 threshold crossed: spine3=" .. tostring(org.spine3) .. " oldDmg=" .. tostring(oldDmg) .. " dmg=" .. tostring(dmg))
 		
 		-- Calculate neck break death chance based on force (damage amount)
-		-- Low force (just crossing threshold) = low chance, high force = high chance
+		-- Much higher force required to kill vs paralyze
 		local forceMultiplier = isCrush(dmgInfo) and 2 or 1
 		local effectiveDmg = dmg * forceMultiplier
 		
-		-- Scale chance: 0.2 (20%) at minimum force, up to 1.0 (100%) at high force
-		-- Using a curve that gives meaningful variation across force ranges
-		local deathChance = math.Clamp(0.2 + (effectiveDmg - 0.1) * 1.5, 0.2, 1.0)
+		-- Scale chance: 0.05 (5%) at minimum force, up to 1.0 (100%) at very high force
+		-- Requires significantly more force to reach lethal levels
+		local deathChance = math.Clamp(0.05 + (effectiveDmg - 0.5) * 0.8, 0.05, 1.0)
 		
 		print("[HG Bone] Neck break death chance: " .. tostring(deathChance * 100) .. "% (effectiveDmg=" .. tostring(effectiveDmg) .. ")")
 		
@@ -585,6 +585,23 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.o2[1] = math.max(org.o2[1] - dmg * 12, 0)
 	org.stamina_damage = (org.stamina_damage or 0) + dmg * 45
 	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 25
+
+	-- Rare chance of cardiac arrest from chest blunt trauma
+	if dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH + DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) then
+		local heartStopChance = 0
+		if dmg >= 3 then
+			heartStopChance = 0.025 -- 2.5% for hard blunt impacts
+		else
+			heartStopChance = 0.002 -- 0.2% for small hits
+		end
+		
+		if math.random() < heartStopChance then
+			org.heartstop = true
+			if org.isPly then
+				org.owner:Notify("My heart... it stopped...", 8, "heartstop", 0)
+			end
+		end
+	end
 
 	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 3))) then
 		org.brokenribs = math.Round(org.chest * 3)
