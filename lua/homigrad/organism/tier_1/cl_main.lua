@@ -980,11 +980,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			local soundFile = (abnormalPulse and hasHealthHUD) and "health/healthbeat.ogg" or "heartbeat/heartbeat_single.wav"
 			
 			--ply:EmitSound("heartbeat/heartbeat_single.wav", 55, 60, vol)
-			if ent:GetVelocity():LengthSqr() < 10 then
-				sound.Play(soundFile, ply:EyePos(), 55, 60, vol)
-			else
-				EmitSound(soundFile, ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
-			end
+			EmitSound(soundFile, ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
 		end
 	end
 
