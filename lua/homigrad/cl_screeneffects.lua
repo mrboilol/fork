@@ -588,6 +588,11 @@ local function stopthings()
 		NoiseStation2Dying = nil
 	end
 
+	if IsValid(PainStationOverlay) then
+		PainStationOverlay:Stop()
+		PainStationOverlay = nil
+	end
+
 	if IsValid(BrainTraumaStation) then
 		BrainTraumaStation:Stop()
 		BrainTraumaStation = nil

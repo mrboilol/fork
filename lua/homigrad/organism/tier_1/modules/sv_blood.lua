@@ -59,7 +59,10 @@ end
 end
 
 local internalbleed_phrases = {
-	"You are vomiting blood."
+	"That's... that's blood I just vomited...",
+	"Oh, that's blood...",
+	"Fuck, I just puked blood...",
+	"Oh shit... I don't feel good...",
 }
 
 local about_to_puke = {
@@ -214,8 +217,7 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	if org.isPly and not org.otrub and org.blood < 2200 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "nga im fried 😭") or "I feel too numb...",60,"blood2",0) end
-	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "You are losing too much blood." or (math.random(2) == 1 and "You are close to blacking out." or "Your blood loss is critical."),60,"blood2",0) end
+	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
 		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
