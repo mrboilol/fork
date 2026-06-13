@@ -145,7 +145,24 @@ if CLIENT then
 		       (code >= 0x1FA00 and code <= 0x1FAFF) or
 		       (code >= 0x2600 and code <= 0x26FF) or
 		       (code >= 0x2700 and code <= 0x27BF) or
-		       (code >= 0xFE00 and code <= 0xFE0F)
+		       (code >= 0xFE00 and code <= 0xFE0F) or
+		       (code >= 0x2190 and code <= 0x21FF) or
+		       (code >= 0x2300 and code <= 0x23FF) or
+		       (code >= 0x25A0 and code <= 0x25FF) or
+		       (code >= 0x2900 and code <= 0x297F) or
+		       (code >= 0x2B00 and code <= 0x2BFF) or
+		       (code >= 0x1F000 and code <= 0x1F02F) or
+		       (code >= 0x1F0A0 and code <= 0x1F0FF) or
+		       (code >= 0x1F100 and code <= 0x1F1DF) or
+		       code == 0x200D or
+		       code == 0x20E3 or
+		       code == 0x24C2 or
+		       code == 0x2122 or
+		       code == 0x2139 or
+		       code == 0x3030 or
+		       code == 0x303D or
+		       code == 0x3297 or
+		       code == 0x3299
 	end
 
 	local function hasEmoji(str)
