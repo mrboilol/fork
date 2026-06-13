@@ -886,48 +886,61 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if isPly then
-		local aimed = false
-		local aimedPos = nil
-		local aimedDist = nil
-		local ownerPos = owner:EyePos()
-		local aimThreshold = -0.9
-		local maxDistance = 800
+		owner.aimed_at = owner.aimed_at or 0
+		local aimed_at_target = owner.aimed_at_target
 
-		for _, ent in ipairs(player.GetAll()) do
-			if ent == owner then continue end
-			if not ent:Alive() then continue end
+		if (org._nextAimedAtCheck or 0) <= CurTime() then
+			org._nextAimedAtCheck = CurTime() + 0.15
+			local aimed = false
+			local aimedPos = nil
+			local aimedDist = nil
+			local ownerPos = owner:EyePos()
+			local aimThreshold = -0.9
+			local maxDistance = 800
 
-			local wep = ent:GetActiveWeapon()
-			if not ishgweapon(wep) then continue end
+			for _, ent in ipairs(player.GetAll()) do
+				if ent == owner then continue end
+				if not ent:Alive() then continue end
 
-			local entPos = ent:EyePos()
-			local dist = ownerPos:Distance(entPos)
-			if dist > maxDistance then continue end
+				local wep = ent:GetActiveWeapon()
+				if not ishgweapon(wep) then continue end
 
-			local toTarget = (ownerPos - entPos):GetNormalized()
-			local aimDot = ent:GetAimVector():Dot(toTarget)
+				local entPos = ent:EyePos()
+				local dist = ownerPos:Distance(entPos)
+				if dist > maxDistance then continue end
 
-			if aimDot < aimThreshold then
-				aimed = true
-				aimedPos = entPos
-				aimedDist = dist
-				break
+				local toTarget = (ownerPos - entPos):GetNormalized()
+				local aimDot = ent:GetAimVector():Dot(toTarget)
+
+				if aimDot < aimThreshold then
+					aimed = true
+					aimedPos = entPos
+					aimedDist = dist
+					break
+				end
+			end
+
+			if aimed and aimedPos then
+				local canSee = util.TraceLine({
+					start = ownerPos,
+					endpos = aimedPos,
+					filter = owner,
+					mask = MASK_VISIBLE
+				}).Fraction > 0.5
+
+				if canSee or aimedDist < 200 then
+					owner.aimed_at_target = true
+				else
+					owner.aimed_at_target = false
+				end
+			else
+				owner.aimed_at_target = false
 			end
 		end
 
-		owner.aimed_at = owner.aimed_at or 0
-		if aimed and aimedPos then
-			local canSee = util.TraceLine({
-				start = ownerPos,
-				endpos = aimedPos,
-				filter = owner,
-				mask = MASK_VISIBLE
-			}).Fraction > 0.5
-
-			if canSee or aimedDist < 200 then
-				owner.aimed_at = math.Approach(owner.aimed_at, 1, timeValue / 3)
-				org.fearadd = org.fearadd + timeValue * 1.5
-			end
+		if owner.aimed_at_target then
+			owner.aimed_at = math.Approach(owner.aimed_at, 1, timeValue / 3)
+			org.fearadd = org.fearadd + timeValue * 1.5
 		else
 			owner.aimed_at = math.Approach(owner.aimed_at, 0, timeValue / 5)
 		end

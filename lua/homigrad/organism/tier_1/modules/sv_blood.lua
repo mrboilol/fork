@@ -187,6 +187,7 @@ module[2] = function(owner, org, mulTime)
 		local ent = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		local entVel = ent:GetVelocity()
 		
+		local woundsToRemove = {}
 		for i, wound in pairs(org.wounds) do
 			local rand1 = math.Rand(4, 10)
 			local rand2 = math.Rand(0.5, 1)
@@ -205,7 +206,16 @@ module[2] = function(owner, org, mulTime)
 				wound[1] = max(wound[1] - coagulate, 0)
 			end
 
-			if wound[1] == 0 then table.remove(org.wounds, i) owner:SetNetVar("wounds",org.wounds) end
+			if wound[1] == 0 then
+				table.insert(woundsToRemove, i)
+			end
+		end
+
+		for idx = #woundsToRemove, 1, -1 do
+			table.remove(org.wounds, woundsToRemove[idx])
+		end
+		if #woundsToRemove > 0 then
+			owner:SetNetVar("wounds", org.wounds)
 		end
 	end
 
@@ -257,6 +267,7 @@ module[2] = function(owner, org, mulTime)
 		org.pressingWoundMul = 1.0
 	end
 
+	local arterialToRemove = {}
 	for i, wound in pairs(org.arterialwounds) do
 		local neckMul = (wound[7] == "arteria") and (org.neckslitBleedingReduction or 1.0) or 1.0
 		local isPressed = org.pressingWound and (wound[7] == org.pressingWoundTarget)
@@ -276,12 +287,17 @@ module[2] = function(owner, org, mulTime)
 			end
 
 			if wound[1] == 0 then
-				table.remove(org.arterialwounds, i)
-				owner:SetNetVar("arterialwounds", org.arterialwounds)
-
+				table.insert(arterialToRemove, i)
 				org[wound[7]] = 0
 			end
 		end
+	end
+
+	for idx = #arterialToRemove, 1, -1 do
+		table.remove(org.arterialwounds, arterialToRemove[idx])
+	end
+	if #arterialToRemove > 0 then
+		owner:SetNetVar("arterialwounds", org.arterialwounds)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 

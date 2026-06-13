@@ -61,33 +61,25 @@ local function IsWeaponCompatible(ply)
 end
 
 local function CalculateEfficiency(org, target)
-	local larm = org.larm or 0
-	local larmAmputated = org.larmamputated
-	local larmDislocated = org.larmdislocation or org.larmdislocated
-	local rarmAmputated = org.rarmamputated
-
-	local base = 1.0
-
-	if larmAmputated then
-		base = 0.0
-	elseif larm >= 1 then
-		base = 0.3
-	elseif larmDislocated then
-		base = 0.6
-	elseif larm >= 0.25 then
-		local severity = (larm - 0.25) / 0.75
-		base = 1.0 - severity * 0.5
+	local function getArmEff(armVal, amputated, dislocated, dislocation)
+		if amputated then return 0.0 end
+		if armVal >= 1 then return 0.3 end
+		if dislocated or dislocation then return 0.6 end
+		if armVal >= 0.25 then
+			local severity = (armVal - 0.25) / 0.75
+			return 1.0 - severity * 0.5
+		end
+		return 1.0
 	end
+
+	local larmEff = getArmEff(org.larm or 0, org.larmamputated, org.larmdislocated, org.larmdislocation)
+	local rarmEff = getArmEff(org.rarm or 0, org.rarmamputated, org.rarmdislocated, org.rarmdislocation)
 
 	if target == "arteria" then
-		if rarmAmputated and larmAmputated then
-			base = 0.0
-		elseif rarmAmputated then
-			base = base * 0.5
-		end
+		return math.Clamp((larmEff + rarmEff) / 2, 0, 1)
 	end
 
-	return math.Clamp(base, 0, 1)
+	return math.Clamp(math.max(larmEff, rarmEff), 0, 1)
 end
 
 local function DisableWoundPressure(ply, org)

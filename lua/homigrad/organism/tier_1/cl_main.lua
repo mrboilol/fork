@@ -842,6 +842,8 @@ local muffedClasses = {
 }
 
 local hg_heartbeat_volume = ConVarExists("hg_heartbeat_volume") and GetConVar("hg_heartbeat_volume") or CreateClientConVar("hg_heartbeat_volume", 1, true, nil, "heartbeat loudness", 0, 4)
+local hg_altberserk = GetConVar("hg_altberserk")
+local hg_altnoradrenaline = GetConVar("hg_altnoradrenaline")
 
 local function cachedClientThinkBone(ent, boneName)
 	ent.ZCClientThinkBones = ent.ZCClientThinkBones or {}
@@ -869,14 +871,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	if !org then return end
 
 	-- Override heartbeat to 87 BPM when altberserk is enabled and in berserk mode
-	local altberserk = GetConVar("hg_altberserk")
-	if altberserk and altberserk:GetBool() and hg.underberserk2 then
+	if hg_altberserk and hg_altberserk:GetBool() and hg.underberserk2 then
 		org.heartbeat = 87
 	end
 
 	-- Override heartbeat to 87 BPM when altnoradrenaline is enabled and active
-	local altnoradrenaline = GetConVar("hg_altnoradrenaline")
-	if altnoradrenaline and altnoradrenaline:GetBool() and hg.noradrenalineAltActive then
+	if hg_altnoradrenaline and hg_altnoradrenaline:GetBool() and hg.noradrenalineAltActive then
 		org.heartbeat = 87
 	end
 
@@ -1108,8 +1108,9 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
 			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
-			local woundBone = cachedClientThinkBone(ent, wound[4])
-			if wound[5] + addtime < time and woundBone then
+			if wound[5] + addtime < time then
+				local woundBone = cachedClientThinkBone(ent, wound[4])
+				if woundBone then
 				local pos, ang = ent:GetBonePosition(woundBone)
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5)

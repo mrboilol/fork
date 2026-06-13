@@ -70,6 +70,7 @@ local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain 
 local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3", 0, 6)
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3", 0, 3)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
+local snd_musicvolume = GetConVar("snd_musicvolume")
 local hook_Run = hook.Run
 
 hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
@@ -211,22 +212,6 @@ local haloents = {
 	["weapon_hg_f1_tpik"] = true
 }
 
-hook.Add( "PreDrawHalos", "AddPropHalos", function() -- вариант с подсветкой всего в радиусе
-	local pickuphalo = {}
-	 
-	local lpos = lply:GetPos()
-	for _, ent in ipairs(ents.FindInSphere(lpos, 256)) do
-		if IsValid(ent) and (haloents[ent.Base] or haloents[ent:GetClass()]) and not IsValid(ent:GetOwner()) then
-		table.insert(pickuphalo, ent)
-		local dist = lpos:Distance(ent:GetPos()) * 0.02
-		--print(dist)
-		color_red.r = Lerp(FrameTime()*5,color_red.r,56 / dist)
-		color_red.g = Lerp(FrameTime()*5,color_red.g,43 / dist)
-		end
-	end
-	halo.Add( pickuphalo, color_red, 1, 1, 1 )
-end )
-
 hook.Add( "PreDrawHalos", "AddPropHalos", function() -- вариант с подсвечиванием только когда смотришь
 	local pickuphalo = {}
 	 
@@ -259,6 +244,7 @@ local heatMat = Material("effects/shaders/zb_heat")
 local chromaticMat = Material("effects/shaders/merc_chromaticaberration")
 local blindMat = Material("effects/shaders/zb_blind")
 local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
+local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
 -- White vignette materials for give-up effect
 local whiteVignetteR = Material("vgui/gradient-r")
@@ -439,6 +425,14 @@ local despairLerp = 0
 local despairVisualLerp = 0
 local despairTextLerp = 0
 local WhiteNoiseStation
+local soundRetry = {}
+local function canRetrySound(key, station)
+	if IsValid(station) and station:GetState() == GMOD_CHANNEL_PLAYING then return false end
+	local nextTry = soundRetry[key] or 0
+	if CurTime() < nextTry then return false end
+	soundRetry[key] = CurTime() + 2.5
+	return true
+end
 hook.Add("Post Post Processing", "ItHurts", function()
 	if not IsValid(lply) then return end
 	if IsValid(lply:GetNWEntity("spect")) then
@@ -542,9 +536,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 	end
 
-
-local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
-
 	if (org.consciousness < 0.7) then
 		lerpblood = LerpFT(0.01, lerpblood or 0, math.Clamp((0.7 - org.consciousness) * 5, 0, 1) * 255)
 		local lowblood = (3600 - (org.blood or 5000)) / 600
@@ -568,7 +559,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	
 	local painMode = hg_painsound:GetInt()
 
-	if !IsValid(PainStation) or PainStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("PainStation", PainStation) then
 		sound.PlayFile("sound/zbattle/pain_beat.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -580,7 +571,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(RealityStation) or RealityStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("RealityStation", RealityStation) then
 		sound.PlayFile("sound/reality.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -592,7 +583,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(AgonyStation) or AgonyStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("AgonyStation", AgonyStation) then
 		sound.PlayFile("sound/agony.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -604,7 +595,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(AltpainStation) or AltpainStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("AltpainStation", AltpainStation) then
 		sound.PlayFile("sound/altpain.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -616,7 +607,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(SillypainStation) or SillypainStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("SillypainStation", SillypainStation) then
 		sound.PlayFile("sound/sillypain.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -628,7 +619,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(DyingStation) or DyingStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("DyingStation", DyingStation) then
 		sound.PlayFile("sound/dying.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -640,7 +631,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(SillydyingStation) or SillydyingStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("SillydyingStation", SillydyingStation) then
 		sound.PlayFile("sound/sillydying.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -652,7 +643,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(ItssooverStation) or ItssooverStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("ItssooverStation", ItssooverStation) then
 		sound.PlayFile("sound/fuck.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -664,7 +655,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(Alto2Station) or Alto2Station:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("Alto2Station", Alto2Station) then
 		sound.PlayFile("sound/alto2.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -676,7 +667,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(AltotrubStation) or AltotrubStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("AltotrubStation", AltotrubStation) then
 		sound.PlayFile("sound/altotrub.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -688,7 +679,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(SleepyStation) or SleepyStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("SleepyStation", SleepyStation) then
 		sound.PlayFile("sound/sleepy.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -700,7 +691,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(ConsciousnessWhiteNoise) or ConsciousnessWhiteNoise:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("ConsciousnessWhiteNoise", ConsciousnessWhiteNoise) then
 		sound.PlayFile("sound/homigrad/whitenoise.wav", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -711,7 +702,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end)
 	end
 
-	if !IsValid(NoisesStation) or NoisesStation:GetState() != GMOD_CHANNEL_PLAYING then
+	if canRetrySound("NoisesStation", NoisesStation) then
 		sound.PlayFile("sound/noises.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -794,7 +785,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		assimilationMat:SetFloat("$c1_y", val)
 		assimilationMat:SetFloat("$c1_x", val2 - 0.5)
 
-		if !IsValid(AssimilationStation) or AssimilationStation:GetState() != GMOD_CHANNEL_PLAYING then
+		if canRetrySound("AssimilationStation", AssimilationStation) then
 			sound.PlayFile("sound/zbattle/furry/conversion/assimilation_noise3.ogg", "noblock noplay", function(station, err)
 				if IsValid(station) then
 					station:SetVolume(0)
@@ -803,7 +794,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 					station:EnableLooping(true)
 				end
 			end)
-		else
+		elseif IsValid(AssimilationStation) then
 			AssimilationStation:SetVolume(assimilatedLerp * 2)
 			//AssimilationStation:SetPlaybackRate(assimilatedLerp * 1)
 		end
@@ -853,7 +844,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	end
 
 	if org.consciousness < 0.5 and (org.despair or 0) <= 0 then
-        if not IsValid(WhiteNoiseStation) then
+        if canRetrySound("WhiteNoiseStation", WhiteNoiseStation) then
             sound.PlayFile("sound/whitenoise.wav", "noblock noplay", function(station)
                 if IsValid(station) then
                     station:EnableLooping(true)
@@ -1000,7 +991,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			end
 		end
 	
-		if !IsValid(BrainTraumaStation) or choosera != chooser or BrainTraumaStation:GetState() != GMOD_CHANNEL_PLAYING then
+		if choosera != chooser or canRetrySound("BrainTraumaStation", BrainTraumaStation) then
 			if IsValid(BrainTraumaStation) then
 				BrainTraumaStation:Stop()
 				BrainTraumaStation = nil
@@ -1029,7 +1020,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
 	//if brain > 0.1 and not org.otrub and show_some_images_time > 0 and false then
 	if lply.tinnitus and lply.tinnitus > CurTime() and lply:Alive() and lply.tinnitusBrainDamage then
-		if !IsValid(Tinnitus) or Tinnitus:GetState() != GMOD_CHANNEL_PLAYING  then
+		if canRetrySound("Tinnitus", Tinnitus) then
 			local choice = math.random(5)
 			local soundFile
 			if choice == 1 then
@@ -1111,7 +1102,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
 			local despairOverride = despair > 0.3
 
-			if !IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING then
+			if canRetrySound("NoiseStation2", NoiseStation2) then
 				sound.PlayFile("sound/zbattle/conscioustypebeat.ogg", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -1123,7 +1114,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
-			if !IsValid(EndStation) or EndStation:GetState() != GMOD_CHANNEL_PLAYING then
+			if canRetrySound("EndStation", EndStation) then
 				sound.PlayFile("sound/itsallcomingtoanend.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -1348,7 +1339,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		if o2 > 20 and org.otrub then
 			local otrubMode = hg_otrubsound:GetInt()
 
-			if !IsValid(NoiseStation) or NoiseStation:GetState() != GMOD_CHANNEL_PLAYING then
+			if canRetrySound("NoiseStation", NoiseStation) then
 				sound.PlayFile("sound/zbattle/unconscious_type_beat.ogg", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -1360,7 +1351,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
-			if !IsValid(AltotrubStation) or AltotrubStation:GetState() != GMOD_CHANNEL_PLAYING then
+			if canRetrySound("AltotrubStation", AltotrubStation) then
 				sound.PlayFile("sound/altotrub.ogg", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -1372,7 +1363,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
-			if !IsValid(SleepyStation) or SleepyStation:GetState() != GMOD_CHANNEL_PLAYING then
+			if canRetrySound("SleepyStation", SleepyStation) then
 				sound.PlayFile("sound/sleepy.ogg", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -1384,7 +1375,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 				end)
 			end
 
-			if !IsValid(FuckStation) or FuckStation:GetState() != GMOD_CHANNEL_PLAYING then
+			if canRetrySound("FuckStation", FuckStation) then
 				sound.PlayFile("sound/itssoover.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -1546,7 +1537,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		if IsValid(NoisesStation) then NoisesStation:SetVolume(0) end
 
 		-- Play itssofuckingover.mp3
-		if !IsValid(GivingUpStation) or GivingUpStation:GetState() != GMOD_CHANNEL_PLAYING then
+		if canRetrySound("GivingUpStation", GivingUpStation) then
 			sound.PlayFile("sound/itssofuckingover.mp3", "noblock noplay", function(station)
 				if IsValid(station) then
 					station:SetVolume(0)
@@ -1559,7 +1550,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 
 		if IsValid(GivingUpStation) then
-			GivingUpStation:SetVolume(1 * (GetConVar("snd_musicvolume"):GetFloat()))
+			GivingUpStation:SetVolume(1 * snd_musicvolume:GetFloat())
 		end
 
 		-- White vignette around screen edges
