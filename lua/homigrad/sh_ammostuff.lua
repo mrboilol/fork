@@ -332,12 +332,12 @@ end
 --//
 
 --
-hg.matPistolAmmo = Material("hud/bullets/low_caliber.png")
-hg.matRfileAmmo = Material("hud/bullets/high_caliber.png")
-hg.matShotgunAmmo = Material("hud/bullets/buck_caliber.png")
-hg.matPistolAmmoAlt = Material("hud/bullets/low_caliber.png")
-hg.matRfileAmmoAlt = Material("hud/bullets/high_caliber.png")
-hg.matShotgunAmmoAlt = Material("hud/bullets/buck_caliber.png")
+hg.matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
+hg.matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
+hg.matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
+hg.matPistolAmmoAlt = Material("vgui/hud/bullets/low_caliber.png")
+hg.matRfileAmmoAlt = Material("vgui/hud/bullets/high_caliber.png")
+hg.matShotgunAmmoAlt = Material("vgui/hud/bullets/buck_caliber.png")
 
 local matPistolAmmo = hg.matPistolAmmo
 local matRfileAmmo = hg.matRfileAmmo

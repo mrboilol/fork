@@ -1392,7 +1392,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-			if !IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2))) then// || ply:InVehicle() then
+			if !IsValid(ragdoll.ConsLH) and ((ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2)))) then// || ply:InVehicle() then
 
 				if org.canmove then
 
@@ -1855,6 +1855,12 @@ hook.Add("Think", "Fake", function()
 						-- Both broken, use right hand but add pain
 
 						useRightHandForE = true
+
+					elseif ply:KeyDown(IN_ATTACK) and not ply:KeyDown(IN_ATTACK2) then
+
+						-- Player is actively reaching with left hand, use left hand
+
+						useRightHandForE = false
 
 					else
 

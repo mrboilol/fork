@@ -167,7 +167,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	-- Panic attack overrides despair sound
-	if despair > 0 and not panicAttack then
+	if despair > 0.25 and not panicAttack then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
 			MsgN("[Despair] Attempting to load sound, despair:", despair, " panicAttack:", panicAttack)

@@ -517,8 +517,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
         DrawToyTown(blurAmount, ScrH() / 2)
     end
 
-	if org.blindness or amtflashed >= 0.8 then
-		local blindness = ((org.blindness and math.Round(org.blindness) == 0) or amtflashed >= 0.8) and 0 or (org.blindness)
+	local bothEyesGone = (org.eyeL or 0) >= 1 and (org.eyeR or 0) >= 1
+	if org.blindness or amtflashed >= 0.8 or bothEyesGone then
+		local blindness = ((org.blindness and math.Round(org.blindness) == 0) or amtflashed >= 0.8 or bothEyesGone) and 0 or (org.blindness)
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
 		
@@ -1584,8 +1585,9 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	local organism = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
 	if not organism or isbool(organism) then return end
 
-	if !(organism.blindness or (amtflashed or 0) >= 0.8) then removeflash() return end
-	local blindness = ((organism.blindness and math.Round(organism.blindness) == 0) or amtflashed >= 0.8) and 0 or (organism.blindness)
+	local bothEyesGone = (organism.eyeL or 0) >= 1 and (organism.eyeR or 0) >= 1
+	if !(organism.blindness or (amtflashed or 0) >= 0.8 or bothEyesGone) then removeflash() return end
+	local blindness = ((organism.blindness and math.Round(organism.blindness) == 0) or amtflashed >= 0.8 or bothEyesGone) and 0 or (organism.blindness)
 
 	local eyesmode = math.Round(blindness)
 	
