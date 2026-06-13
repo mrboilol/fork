@@ -226,7 +226,7 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
     local brain = org.brain or 0
     local consciousness = org.consciousness or 0
     local shock = org.shock or 0
-    local isCritical = (org.critical == true) or (pulse < 1 and brain >= 0.02) or (brain >= 0.34)
+    local isCritical = (org.critical == true) or (pulse < 1 and brain >= 0.02) or (brain > 0.4)
     
     local scrW, scrH = ScrW(), ScrH()
     local centerX, centerY = scrW / 2, scrH / 2

@@ -19,8 +19,6 @@ surface.CreateFont("ZCity_Despair_Text", {
 	weight = 700,
 	antialias = true
 })
-hg.despair_builtin = true
-
 hg.postprocess = hg.postprocess or {}
 local postprs = hg.postprocess
 postprs.addtiveLayer = {
@@ -460,6 +458,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 	if IsValid(RealityStation) then
 		RealityStation:SetVolume(0)
+	end
+	if IsValid(AgonyStation) then
+		AgonyStation:SetVolume(0)
+	end
+	if IsValid(AltpainStation) then
+		AltpainStation:SetVolume(0)
+	end
+	if IsValid(SillypainStation) then
+		SillypainStation:SetVolume(0)
 	end
 	
 	if !lply:Alive() and !IsValid(spect) then stopthings() return end
@@ -919,127 +926,47 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 			local brain = (org.brain or 0)
 			local overridePainSounds = (panicAttack or despair > 0.5) and brain < 0.01
 
-			if overridePainSounds then
-				-- Lower pain sounds during panic/despair (instead of suppressing)
-				local loweredVol = painVol * 0.6
-				if IsValid(PainStation) then
-					PainStation:SetVolume(loweredVol)
-				end
-				if IsValid(RealityStation) then
-					RealityStation:SetVolume(loweredVol)
-				end
-				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(loweredVol)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(loweredVol)
-				end
-				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(loweredVol)
-				end
-			elseif painMode == 0 then
+			local targetPainVol = 0
+			local targetRealityVol = 0
+			local targetAgonyVol = 0
+			local targetAltpainVol = 0
+			local targetSillypainVol = 0
+
+			if painMode == 0 then
 				-- Default: both pain_beat and reality play
-				if IsValid(PainStation) then
-					PainStation:SetVolume(painVol)
-				end
-				if IsValid(RealityStation) then
-					RealityStation:SetVolume(painVol)
-				end
-				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
-				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(0)
-				end
+				targetPainVol = painVol
+				targetRealityVol = painVol
 			elseif painMode == 1 then
 				-- Only pain_beat at same volume as reality.mp3
-				if IsValid(PainStation) then
-					PainStation:SetVolume(painVol)
-				end
-				if IsValid(RealityStation) then
-					RealityStation:SetVolume(0)
-				end
-				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
-				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(0)
-				end
+				targetPainVol = painVol
 			elseif painMode == 2 then
 				-- Only agony.mp3 instead of reality or painbeat
-				if IsValid(PainStation) then
-					PainStation:SetVolume(0)
-				end
-				if IsValid(RealityStation) then
-					RealityStation:SetVolume(0)
-				end
-				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(painVol)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
-				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(0)
-				end
+				targetAgonyVol = painVol
 			elseif painMode == 3 then
 				-- Only altpain.ogg instead of reality or painbeat
-				if IsValid(PainStation) then
-					PainStation:SetVolume(0)
-				end
-				if IsValid(RealityStation) then
-					RealityStation:SetVolume(0)
-				end
-				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(painVol)
-				end
-				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(0)
-				end
+				targetAltpainVol = painVol
 			elseif painMode == 4 then
 				-- Only reality.mp3
-				if IsValid(PainStation) then
-					PainStation:SetVolume(0)
-				end
-				if IsValid(RealityStation) then
-					RealityStation:SetVolume(painVol)
-				end
-				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
-				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(0)
-				end
+				targetRealityVol = painVol
 			elseif painMode == 5 then
 				-- Only sillypain.mp3
-				if IsValid(PainStation) then
-					PainStation:SetVolume(0)
-				end
-				if IsValid(RealityStation) then
-					RealityStation:SetVolume(0)
-				end
-				if IsValid(AgonyStation) then
-					AgonyStation:SetVolume(0)
-				end
-				if IsValid(AltpainStation) then
-					AltpainStation:SetVolume(0)
-				end
-				if IsValid(SillypainStation) then
-					SillypainStation:SetVolume(painVol)
-				end
+				targetSillypainVol = painVol
 			end
+
+			-- Panic attack and despair lower the active pain sound(s)
+			if overridePainSounds then
+				targetPainVol = targetPainVol * 0.6
+				targetRealityVol = targetRealityVol * 0.6
+				targetAgonyVol = targetAgonyVol * 0.6
+				targetAltpainVol = targetAltpainVol * 0.6
+				targetSillypainVol = targetSillypainVol * 0.6
+			end
+
+			if IsValid(PainStation) then PainStation:SetVolume(targetPainVol) end
+			if IsValid(RealityStation) then RealityStation:SetVolume(targetRealityVol) end
+			if IsValid(AgonyStation) then AgonyStation:SetVolume(targetAgonyVol) end
+			if IsValid(AltpainStation) then AltpainStation:SetVolume(targetAltpainVol) end
+			if IsValid(SillypainStation) then SillypainStation:SetVolume(targetSillypainVol) end
 		//else
 		//	if IsValid(PainStation) then
 		//		PainStation:Stop()

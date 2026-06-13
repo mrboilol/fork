@@ -656,14 +656,13 @@ function HUD_DrawDynamicIndicator()
         end
         healthModel:SetSkin(ply:GetSkin())
 
-        healthModel:SetupBones()
-
         -- Ensure skull (head) is always visible for the health indicator
         local skullBoneID = healthModel:LookupBone("ValveBiped.Bip01_Head1")
         if skullBoneID then
-            healthModel:ManipulateBoneScale(skullBoneID, Vector(1, 1, 1))
-            healthModel:SetupBones()
+            ScaleBoneAndChildren(healthModel, skullBoneID, Vector(1, 1, 1))
         end
+
+        healthModel:SetupBones()
 
         local base_col = math.max(0.2, consciousness)
 

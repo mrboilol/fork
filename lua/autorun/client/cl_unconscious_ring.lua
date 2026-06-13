@@ -456,7 +456,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local bloodpressure = org.bloodpressure or 93
     local consciousness = org.consciousness or 0
     local shock = org.shock or 0
-    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain >= 0.34)
+    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4)
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
 
     -- Track sudden consciousness loss
@@ -516,7 +516,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
     local lowConsciousness = (org.consciousness or 1) < 0.4 and not isUnconscious
-    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain >= 0.34) or lowConsciousness
+    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4)
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     local fibrillating = heartbeat > 250
 
@@ -676,7 +676,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local target_pulse = target_org.pulse or 70
         local target_bp = target_org.bloodpressure or 93
         local target_brain = target_org.brain or 0
-        local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain >= 0.34)
+        local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4)
 
         if g_PulseCheckData and not g_PulseCheckData.completed then
             if target_org.heartstop or target_heartbeat <= 0 then

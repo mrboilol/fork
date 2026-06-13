@@ -430,7 +430,7 @@ function ENT:Explode()
 		force:Div(len)
 		local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1)  
 		local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)  
-		local forceadd = force * physics_frac * 50000  
+		local forceadd = force * physics_frac * 75000  
 
 		if enta.organism then
 			local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
@@ -506,8 +506,8 @@ function ENT:Explode()
 						bullet.Diameter = ammotype.Diameter or 1
 						bullet.Src = selfPos
 						bullet.Spread = vecCone
-						bullet.Force = 20
-						bullet.Damage = 40
+						bullet.Force = 35
+						bullet.Damage = 55
 						bullet.AmmoType = ammo
 						bullet.Attacker = self.owner
 						bullet.Inflictor = self

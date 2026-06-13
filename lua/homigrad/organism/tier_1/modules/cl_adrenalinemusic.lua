@@ -260,6 +260,7 @@ elseif CLIENT then
 	net.Receive("hg_adrenalinemusic_panic", function()
 		local amount = net.ReadFloat()
 		hg.adrenalineMusicThreaded = hg.adrenalineMusicThreaded + amount
+		hg.lastCombatTime = CurTime()
 	end)
 end
 

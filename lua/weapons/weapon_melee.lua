@@ -952,12 +952,12 @@ if CLIENT then
 end
 
 SWEP.BrokenArmPenalty = {
-    DamageMultiplier = 0.65, -- 65% damage (35% reduction)
+    DamageMultiplier = 0.4, -- 40% damage (60% reduction)
     StaminaMultiplier = 1.5, -- 50% more stamina
-    SwingSpeedMultiplier = 0.75, -- 25% slower
+    SwingSpeedMultiplier = 0.5, -- 50% slower
     BlockDurationMultiplier = 0.5, -- 50% shorter block
     PainOnBlock = 8, -- pain when blocking with damaged arms
-    PainOnHit = 12 -- pain when hitting with damaged arms
+    PainOnHit = 5 -- pain when hitting with damaged arms
 }
 
 function SWEP:HasBrokenArm(owner)
@@ -1029,8 +1029,8 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
         local multiplier = self.BrokenArmPenalty.DamageMultiplier
         local org = owner.organism
         local armDamage = self:GetArmDamagePercent(owner)
-        -- Scale damage penalty based on arm damage (up to -35% at full damage)
-        local damagePenalty = 1 - (armDamage * 0.35)
+        -- Scale damage penalty based on arm damage (up to -60% at full damage)
+        local damagePenalty = 1 - (armDamage * 0.6)
         mul = mul * math.max(multiplier, damagePenalty)
     end
 
@@ -1069,6 +1069,12 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
         if owner.organism and attacktype ~= 3 then
             owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
         end
+
+            -- Small pain when swinging with damaged arms
+            if self:HasBrokenArm(owner) and owner.organism then
+                local org = owner.organism
+                org.painadd = (org.painadd or 0) + 3
+            end
 
             if attacktype == 3 then
                 -- heavy attack custom logic if needed

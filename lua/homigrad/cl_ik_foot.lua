@@ -1,6 +1,4 @@
--- TPIK-Compatible IK Foot System (Advanced)
--- Uses bone matrix manipulation to avoid conflicts with health indicator
--- Integrates advanced features from iker foot: stair detection, procedural stepping, anti-clip, dynamic sole
+if true then return end
 local hg = hg or {}
 
 -- PAC3 compatibility check (from iker foot)

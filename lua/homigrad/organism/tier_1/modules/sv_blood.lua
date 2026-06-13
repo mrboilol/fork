@@ -48,6 +48,12 @@ module[1] = function(org)
 	org.survivalchance = 1
 	org.hemothorax = false
 	org.lastBleedTime = CurTime()
+
+	org.pressingWound = false
+	org.pressingWoundTarget = nil
+	org.pressingWoundEfficiency = 0
+	org.pressingWoundMul = 1.0
+	org.pressingWoundNextToggle = 0
 end
 
 
@@ -186,11 +192,13 @@ module[2] = function(owner, org, mulTime)
 			local rand2 = math.Rand(0.5, 1)
 			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.04 * coagMul
-			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3
+			local isPressed = org.pressingWound and (wound[4] == org.pressingWoundTarget)
+			local pressureMul = isPressed and (org.pressingWoundMul or 1.0) or 1.0
+			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3 * pressureMul
 			coagulatespeed = coagulatespeed + coagulate / rand2
 			
 			wound[5] = time
-			org.blood = max(org.blood - bleed, 1)
+			org.blood = max(org.blood - bleed * pressureMul, 1)
 				
 			if isAlive or not isPlayer then
 				hg.organism.BloodDroplet2(owner, org, wound, entVel + VectorRand(-50, 50), false)
@@ -242,14 +250,23 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
+	-- Explicit wound pressure reduction (Alt+E)
+	if isPlayer and not IsValid(owner.FakeRagdoll) and org.pressingWound then
+		org.pressingWoundMul = 1.0 - (0.6 * math.Clamp(org.pressingWoundEfficiency or 0, 0, 1))
+	else
+		org.pressingWoundMul = 1.0
+	end
+
 	for i, wound in pairs(org.arterialwounds) do
 		local neckMul = (wound[7] == "arteria") and (org.neckslitBleedingReduction or 1.0) or 1.0
-		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.2 * math.max(pulse, 20) / 80 * neckMul
+		local isPressed = org.pressingWound and (wound[7] == org.pressingWoundTarget)
+		local pressureMul = isPressed and (org.pressingWoundMul or 1.0) or 1.0
+		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.2 * math.max(pulse, 20) / 80 * neckMul * pressureMul
 
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(pulse, 20) / 80 * neckMul, 1)
+			org.blood = max(org.blood - wound[1] * mulTime * 4.5 * math.max(pulse, 20) / 80 * neckMul * pressureMul, 1)
 			if isAlive or not isPlayer then
 				local dir = wound[6]
 				local len = dir:Length()

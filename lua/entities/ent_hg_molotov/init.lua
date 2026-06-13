@@ -26,7 +26,16 @@ function ENT:PhysicsCollide(data, physobj)
 	if data.DeltaTime > .2 and data.Speed > 25 then
 		
 		self.Velocity = data.OurOldVelocity
-		if data.Speed > 200 and not self.Exploded then 
+		if data.Speed > 200 and not self.Exploded then
+			local hitNormal = data.HitNormal
+			local isWall = math.abs(hitNormal.z) < 0.7
+			if isWall and math.random(1, 100) <= 30 then
+				local bounceVel = data.OurOldVelocity * -0.6
+				bounceVel = bounceVel + hitNormal * data.Speed * 0.4
+				physobj:SetVelocity(bounceVel)
+				self:EmitSound("physics/glass/glass_bottle_impact_hard" .. math.random(1, 3) .. ".wav", 75, math.random(95, 105))
+				return
+			end
 			self:Detonate()
 			self:EmitSound("weapons/molotov/molotov_detonate.wav")
 		end
