@@ -1,7 +1,7 @@
 local min, max, Clamp = math.min, math.max, math.Clamp
 if hg and hg.despair_server_builtin then return end
 
-local hg_despair = CreateConVar("hg_despair", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Set despair level (0-1)", 0, 1)
+local hg_despair_override = CreateConVar("hg_despair_override", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Global despair override (0-1)", 0, 1)
 
 local function get_despair_org(ent)
 	if not IsValid(ent) then return nil end
@@ -38,6 +38,8 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._despairLastGainedTime = 0
 	org._despairLastPain = 0
 	org._fearDuration = 0
+	org.givingUp = false
+	org._giveUpCheckTime = 0
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -60,8 +62,44 @@ end)
 hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
+	-- Give up mechanic: chance to give up when dying or bleeding out
+	if not org.givingUp then
+		local o2val = org.o2 and org.o2[1] or 0
+		local blood = org.blood or 5000
+		local bleed = org.bleed or 0
+
+		local isDying = (o2val > 50 and not org.otrub)
+		local isBleedingOut = blood < 4000 and bleed > 0
+		local isUnconsciousDying = org.otrub and o2val > 20
+
+		if isDying or isBleedingOut or isUnconsciousDying then
+			org._giveUpCheckTime = org._giveUpCheckTime or 0
+			if CurTime() > org._giveUpCheckTime then
+				org._giveUpCheckTime = CurTime() + 1
+
+				local chance = 0.02 -- 2% per second base
+				if isDying and isBleedingOut then
+					chance = 0.05 -- 5% if both dying and bleeding out
+				end
+
+				if math.random() < chance then
+					org.givingUp = true
+				end
+			end
+		else
+			org._giveUpCheckTime = 0
+		end
+	else
+		org.despair = 0.25
+		org.panicAttack = false
+		org._panicAttackEndTime = 0
+		org._panicAttackStartTime = nil
+		org._panicAttackCheckTime = nil
+		return
+	end
+
 	-- Apply convar override if set
-	local convarValue = hg_despair:GetFloat()
+	local convarValue = hg_despair_override:GetFloat()
 	if convarValue > 0 then
 		org.despair = Clamp(convarValue, 0, 1)
 		return
@@ -355,5 +393,67 @@ hook.Add("HG_MovementCalc_2", "hg_panic_attack_slow", function(mul, ply, cmd, mv
 	
 	if org.panicAttack then
 		mul[1] = mul[1] * 0.3 -- reduce movement speed to 30% during panic attack
+	end
+end)
+
+concommand.Add("hg_despair", function(ply, cmd, args)
+	if not IsValid(ply) or not ply:IsPlayer() then return end
+	if not ply:IsAdmin() then return end
+
+	local val = tonumber(args[1])
+	if val == nil then
+		ply:ChatPrint("Usage: hg_despair <0-1>")
+		return
+	end
+
+	local org = ply.organism
+	if not org then return end
+
+	org.despair = Clamp(val, 0, 1)
+	ply:ChatPrint("[Debug] Despair set to " .. tostring(org.despair))
+end)
+
+concommand.Add("hg_panic", function(ply, cmd, args)
+	if not IsValid(ply) or not ply:IsPlayer() then return end
+	if not ply:IsAdmin() then return end
+
+	local val = tobool(args[1])
+	local org = ply.organism
+	if not org then return end
+
+	if val then
+		org.despair = 1.0
+		org.panicAttack = true
+		org._panicAttackEndTime = CurTime() + math.random(8, 15)
+		org._panicHeartAttackCheck = 0
+		org._panicAttackStartTime = nil
+		ply:ChatPrint("[Debug] Panic attack triggered. Set despair level to 1.0 to create a panic attack.")
+	else
+		org.panicAttack = false
+		org._panicAttackEndTime = 0
+		org._panicAttackStartTime = nil
+		org._panicAttackCheckTime = nil
+		ply:ChatPrint("[Debug] Panic attack ended.")
+	end
+end)
+
+concommand.Add("hg_giveup", function(ply, cmd, args)
+	if not IsValid(ply) or not ply:IsPlayer() then return end
+	if not ply:IsAdmin() then return end
+
+	local val = tobool(args[1])
+	local org = ply.organism
+	if not org then return end
+
+	if val then
+		org.blood = 3000
+		org.bleed = 1
+		org.despair = 0.85
+		org.givingUp = true
+		ply:ChatPrint("[Debug] Give up triggered. Reduced blood to 3000 to create dying/bleeding out state, added some despair, and initiated give up (itssofuckingover.mp3).")
+	else
+		org.givingUp = false
+		org._giveUpCheckTime = 0
+		ply:ChatPrint("[Debug] Give up ended.")
 	end
 end)

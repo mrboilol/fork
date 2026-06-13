@@ -87,6 +87,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org._despairLastAdrenaline = 0
 	org._despairNextCorpseCheck = 0
 	org.panicAttack = false
+	org.givingUp = false
 	org._panicAttackEndTime = 0
 	org._panicAttackCheckTime = 0
 	--//
@@ -206,6 +207,7 @@ local function send_organism(org, ply)
 	sendtable.aiming_fatigue = org.aiming_fatigue
 	sendtable.hand_dominance = org.hand_dominance
 	sendtable.permanent_aim_impairment = org.permanent_aim_impairment
+	sendtable.givingUp = org.givingUp
 
 	sendtable.superfighter = org.superfighter
 
@@ -264,6 +266,7 @@ local function send_bareinfo(org)
 	sendtable.CantCheckPulse = org.CantCheckPulse
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.permanent_aim_impairment = org.permanent_aim_impairment
+	sendtable.givingUp = org.givingUp
 
 	local rf = RecipientFilter()
 	--rf:AddAllPlayers()

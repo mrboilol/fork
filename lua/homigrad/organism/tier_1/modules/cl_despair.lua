@@ -37,8 +37,7 @@ local panicThoughtLerp = 0
 local musicVolume = GetConVar("snd_musicvolume")
 
 -- Debug convars
-CreateConVar("hg_despair", "0", FCVAR_ARCHIVE, "Debug despair value (0-1)")
-CreateConVar("hg_panic", "0", FCVAR_ARCHIVE, "Debug panic (0-1, 1 = true)")
+CreateConVar("hg_panic_debug", "0", FCVAR_ARCHIVE, "Debug panic (0-1, 1 = true)")
 
 local panicThoughts = {
 	"Im hopeless.",
@@ -116,12 +115,12 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	local panicAttack = (org and org.panicAttack) or false
 	
 	-- Debug convar overrides
-	local debugDespair = GetConVar("hg_despair"):GetFloat()
+	local debugDespair = GetConVar("hg_despair_override"):GetFloat()
 	if debugDespair > 0 then
 		despair = debugDespair
 	end
 	
-	local debugPanic = GetConVar("hg_panic"):GetFloat()
+	local debugPanic = GetConVar("hg_panic_debug"):GetFloat()
 	if debugPanic >= 1 then
 		panicAttack = true
 	end
@@ -130,6 +129,12 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		despair = 0
 		despairLerp = 0
 		despairTextLerp = 0
+		stop_despair_sound(true)
+		stop_panic_sound(true)
+	end
+
+	local givingUp = org and org.givingUp
+	if givingUp then
 		stop_despair_sound(true)
 		stop_panic_sound(true)
 	end
@@ -167,7 +172,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	-- Panic attack overrides despair sound
-	if despair > 0.25 and not panicAttack then
+	if despair > 0.25 and not panicAttack and not givingUp then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
 			MsgN("[Despair] Attempting to load sound, despair:", despair, " panicAttack:", panicAttack)
@@ -200,7 +205,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	-- Panic attack sound
-	if panicAttack then
+	if panicAttack and not givingUp then
 		if not IsValid(panicSound) and not panicSoundLoading then
 			panicSoundLoading = true
 			sound.PlayFile("sound/panic.mp3", "noblock noplay", function(channel)
@@ -230,10 +235,15 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 		panicThoughtLerp = 0
 		return
 	end
+	if org and org.givingUp then
+		despairTextLerp = 0
+		panicThoughtLerp = 0
+		return
+	end
 	local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
 	
 	-- Debug convar override
-	local debugDespair = GetConVar("hg_despair"):GetFloat()
+	local debugDespair = GetConVar("hg_despair_override"):GetFloat()
 	if debugDespair > 0 then
 		despair = debugDespair
 	end
@@ -262,14 +272,14 @@ hook.Add("Think", "hg_panic_thoughts_notify", function()
 	local panicAttack = org.panicAttack or false
 	
 	-- Debug convar override
-	local debugPanic = GetConVar("hg_panic"):GetFloat()
+	local debugPanic = GetConVar("hg_panic_debug"):GetFloat()
 	if debugPanic >= 1 then
 		panicAttack = true
 	end
 	
 	local time = CurTime()
 
-	if panicAttack then
+	if panicAttack and not org.givingUp then
 		if time >= panicThoughtNextTime then
 			panicThoughtIndex = (panicThoughtIndex % #panicThoughts) + 1
 			local thought = panicThoughts[panicThoughtIndex]

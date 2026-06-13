@@ -260,6 +260,12 @@ local chromaticMat = Material("effects/shaders/merc_chromaticaberration")
 local blindMat = Material("effects/shaders/zb_blind")
 local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 
+-- White vignette materials for give-up effect
+local whiteVignetteR = Material("vgui/gradient-r")
+local whiteVignetteL = Material("vgui/gradient-l")
+local whiteVignetteU = Material("vgui/gradient-u")
+local whiteVignetteD = Material("vgui/gradient-d")
+
 local PainLerp = 0
 local O2Lerp = 0
 local assimilatedLerp = 0
@@ -411,6 +417,11 @@ local function stopthings()
 	if IsValid(Alto2Station) then
 		Alto2Station:Stop()
 		Alto2Station = nil
+	end
+
+	if IsValid(GivingUpStation) then
+		GivingUpStation:Stop()
+		GivingUpStation = nil
 	end
 end
 
@@ -1465,7 +1476,7 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 		end
 	end
 
-	local despair = math.Clamp(org.despair or 0, 0, 1)
+	local despair = org.givingUp and 0 or math.Clamp(org.despair or 0, 0, 1)
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
 
@@ -1518,6 +1529,58 @@ local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 	end
 
 	-- Despair sound is handled by cl_despair.lua module
+
+	-- Give up mechanic: white vignette and itssofuckingover.mp3
+	if org.givingUp then
+		-- Suppress all other dying/otrubsound/despair music
+		if IsValid(NoiseStation2) then NoiseStation2:SetVolume(0) end
+		if IsValid(EndStation) then EndStation:SetVolume(0) end
+		if IsValid(DyingStation) then DyingStation:SetVolume(0) end
+		if IsValid(Alto2Station) then Alto2Station:SetVolume(0) end
+		if IsValid(SillydyingStation) then SillydyingStation:SetVolume(0) end
+		if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+		if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+		if IsValid(AltotrubStation) then AltotrubStation:SetVolume(0) end
+		if IsValid(SleepyStation) then SleepyStation:SetVolume(0) end
+		if IsValid(FuckStation) then FuckStation:SetVolume(0) end
+		if IsValid(NoisesStation) then NoisesStation:SetVolume(0) end
+
+		-- Play itssofuckingover.mp3
+		if !IsValid(GivingUpStation) or GivingUpStation:GetState() != GMOD_CHANNEL_PLAYING then
+			sound.PlayFile("sound/itssofuckingover.mp3", "noblock noplay", function(station)
+				if IsValid(station) then
+					station:SetVolume(0)
+					station:Play()
+					station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+					GivingUpStation = station
+					station:EnableLooping(true)
+				end
+			end)
+		end
+
+		if IsValid(GivingUpStation) then
+			GivingUpStation:SetVolume(1 * (GetConVar("snd_musicvolume"):GetFloat()))
+		end
+
+		-- White vignette around screen edges
+		local w, h = ScrW(), ScrH()
+		local edgeW = w * 0.4
+		local edgeH = h * 0.4
+		local alpha = 220
+
+		surface.SetDrawColor(255, 255, 255, alpha)
+		surface.SetMaterial(whiteVignetteR)
+		surface.DrawTexturedRect(0, 0, edgeW, h)
+		surface.SetMaterial(whiteVignetteL)
+		surface.DrawTexturedRect(w - edgeW, 0, edgeW, h)
+		surface.SetMaterial(whiteVignetteD)
+		surface.DrawTexturedRect(0, 0, w, edgeH)
+		surface.SetMaterial(whiteVignetteU)
+		surface.DrawTexturedRect(0, h - edgeH, w, edgeH)
+
+		-- Suppress regular despair visual effects
+		despairVisualLerp = 0
+	end
 
 	if (headtraumaSaturation or 0) > 0 then
 		tab["$pp_colour_colour"] = 1 + headtraumaSaturation
