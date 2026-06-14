@@ -51,11 +51,11 @@ module[2] = function(owner, org, timeValue)
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
 	-- Convert excess fearadd to despair (reduced rate to prevent spam)
-	if org.fearadd > 1.5 then
-		local excessFear = org.fearadd - 1.5
-		local despairConversion = excessFear * timeValue * 0.005
+	if org.fearadd > 2.0 then
+		local excessFear = org.fearadd - 2.0
+		local despairConversion = excessFear * timeValue * 0.002
 		org.despair = math.min((org.despair or 0) + despairConversion, 1)
-		org.fearadd = math.max(org.fearadd - despairConversion, 1.5)
+		org.fearadd = math.max(org.fearadd - despairConversion, 2.0)
 	end
 
 	local heartbeat = org.pulse < 70 and 70 + (70 - org.pulse) * 4 or org.pulse

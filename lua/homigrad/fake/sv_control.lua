@@ -2003,7 +2003,11 @@ hook.Add("Think", "Fake", function()
 
 					--//
 
+					end
 
+					if (ragdoll.cooldownLH or 0) < time and not IsValid(ragdoll.ConsLH) then
+
+					local lhphys = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 5))
 
 					local trace
 
@@ -2011,9 +2015,9 @@ hook.Add("Think", "Fake", function()
 
 						if trace and trace.Hit and not trace.HitSky then continue end
 
-						tr.start = phys:GetPos()
+						tr.start = lhphys:GetPos()
 
-						tr.endpos = phys:GetPos() + phys:GetAngles():Right() * 6 + phys:GetAngles():Up() * (i - 2) * 3
+						tr.endpos = lhphys:GetPos() + lhphys:GetAngles():Right() * 6 + lhphys:GetAngles():Up() * (i - 2) * 3
 
 						tr.filter = ragdoll
 

@@ -202,15 +202,15 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 					return 
 				end
 				MsgN("[Despair] Sound loaded successfully")
-				channel:SetVolume(0.75 * musicVolume:GetFloat())
+				channel:SetVolume(2.0 * musicVolume:GetFloat())
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 0.75 * musicVolume:GetFloat()
+				despairSoundVol = 2.0 * musicVolume:GetFloat()
 			end)
 		end
 
-		local targetVol = (despair > 0.3 and 1.5 or math.Remap(despair, 0, 1, 0.9, 1.125)) * musicVolume:GetFloat()
+		local targetVol = (despair > 0.3 and 3.5 or math.Remap(despair, 0.25, 1, 2.0, 3.5)) * musicVolume:GetFloat()
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)

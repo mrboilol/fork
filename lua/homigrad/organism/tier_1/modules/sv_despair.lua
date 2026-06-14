@@ -201,25 +201,29 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	local adrenalineDelta = max(adrenaline - prevAdrenaline, 0)
 	org._despairLastAdrenaline = adrenaline
 
-	if adrenaline > 2.5 then
-		add = add + (adrenaline - 2.5) * timeValue * 0.045
-	end
+	-- During a panic attack the body is flooded with adrenaline and fear as the
+	-- panic response itself - feeding those back into despair creates a runaway loop.
+	if not org.panicAttack then
+		if adrenaline > 2.5 then
+			add = add + (adrenaline - 2.5) * timeValue * 0.045
+		end
 
-	if adrenalineAdd > 0.35 then
-		add = add + min(adrenalineAdd, 2) * timeValue * 0.03
-	end
+		if adrenalineAdd > 0.35 then
+			add = add + min(adrenalineAdd, 2) * timeValue * 0.03
+		end
 
-	if adrenalineDelta > 0 then
-		add = add + min(adrenalineDelta * 0.25, 0.08)
-	end
+		if adrenalineDelta > 0 then
+			add = add + min(adrenalineDelta * 0.25, 0.03)
+		end
 
-	if (org.fear or 0) > 0 then
-		-- Transfer fear to despair - moderate rate regardless of fearAdd
-		local fear = org.fear
-		local fearTransferRate = 0.025 -- Base transfer rate
-		-- Scale transfer rate with fear duration - up to 3x multiplier after 30 seconds of fear
-		local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 30, 2)
-		add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate * fearDurationMultiplier
+		if (org.fear or 0) > 0 then
+			-- Transfer fear to despair - moderate rate regardless of fearAdd
+			local fear = org.fear
+			local fearTransferRate = 0.008 -- Base transfer rate
+			-- Scale transfer rate with fear duration - up to 2x multiplier after 60 seconds of sustained fear
+			local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 1)
+			add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate * fearDurationMultiplier
+		end
 	end
 
 	if (org.pain or 0) > 45 then
@@ -329,16 +333,17 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 
 		if corpsesSeen > 0 then
-			add = add + timeValue * 0.15 * corpsesSeen
+			add = add + timeValue * 0.06 * math.min(corpsesSeen, 2)
 
-			-- Give a tiny bit of adrenaline from seeing corpses, but cap total contribution
 			local maxCorpseAdrenaline = 0.3
 			local given = org._corpseAdrenalineGiven or 0
 			if given < maxCorpseAdrenaline then
-				local boost = min(0.02 * corpsesSeen, maxCorpseAdrenaline - given)
+				local boost = min(0.008 * corpsesSeen, maxCorpseAdrenaline - given)
 				org.adrenalineAdd = (org.adrenalineAdd or 0) + boost
 				org._corpseAdrenalineGiven = given + boost
 			end
+		else
+			org._corpseAdrenalineGiven = math.max((org._corpseAdrenalineGiven or 0) - 0.015, 0)
 		end
 	end
 
@@ -435,7 +440,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				org._panicHeartAttackCheck = 0
 				org._panicAttackStartTime = nil
 				if not org._panicAdrenalineGiven then
-					org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+					local reserve = min(org.adrenaline or 0, 0.75)
+					org.adrenaline = (org.adrenaline or 0) - reserve
+					org.adrenalineAdd = (org.adrenalineAdd or 0) + 0.75
 					org._panicAdrenalineGiven = true
 				end
 			-- Before 30 seconds, use random chance
@@ -448,7 +455,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 					org._panicHeartAttackCheck = 0
 					org._panicAttackStartTime = nil
 					if not org._panicAdrenalineGiven then
-						org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+						local reserve = min(org.adrenaline or 0, 0.75)
+						org.adrenaline = (org.adrenaline or 0) - reserve
+						org.adrenalineAdd = (org.adrenalineAdd or 0) + 0.75
 						org._panicAdrenalineGiven = true
 					end
 				end
@@ -501,7 +510,9 @@ concommand.Add("hg_panic", function(ply, cmd, args)
 		org._panicHeartAttackCheck = 0
 		org._panicAttackStartTime = nil
 		if not org._panicAdrenalineGiven then
-			org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+			local reserve = min(org.adrenaline or 0, 0.75)
+			org.adrenaline = (org.adrenaline or 0) - reserve
+			org.adrenalineAdd = (org.adrenalineAdd or 0) + 0.75
 			org._panicAdrenalineGiven = true
 		end
 		ply:ChatPrint("[Debug] Panic attack triggered. Set despair level to 1.0 to create a panic attack.")
