@@ -564,6 +564,7 @@ local function stopthings()
 	stopSeizureEffects()
 	
 	if IsValid(PainStation) then
+	if IsValid(PainStation) then
 		PainStation:Stop()
 		PainStation = nil
 	end
@@ -902,6 +903,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	if canRetrySound("PainStation", PainStation) then
 		sound.PlayFile("sound/zbattle/pain_beat.ogg", "noblock noplay", function(station)
+			PainStationLoading = false
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1287,6 +1289,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 		if canRetrySound("AssimilationStation", AssimilationStation) then
 			sound.PlayFile("sound/zbattle/furry/conversion/assimilation_noise3.ogg", "noblock noplay", function(station, err)
+				AssimilationStationLoading = false
 				if IsValid(station) then
 					station:SetVolume(0)
 					station:Play()
@@ -1511,7 +1514,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				BrainTraumaStation = nil
 			end
 
+			BrainTraumaStationLoading = true
 			sound.PlayFile("sound/zcitysnd/real_sonar/brainhemorrhagestage"..chooser..".mp3", "noblock noplay", function(station, err)
+				BrainTraumaStationLoading = false
 				if IsValid(station) then
 					station:SetVolume(0)
 					station:Play()
@@ -1678,6 +1683,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 			if dyingMode == 8 and (!IsValid(NoiseStation2Dying) or NoiseStation2Dying:GetState() != GMOD_CHANNEL_PLAYING) then
 				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
+					NoiseStation2DyingLoading = false
 					if IsValid(station) then
 						station:SetVolume(0)
 						station:Play()

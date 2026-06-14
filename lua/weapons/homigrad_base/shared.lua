@@ -600,7 +600,7 @@ function SWEP:IsZoom()
 end
 
 
-function SWEP:CanUse()
+function SWEP:CanUse(ignoreSprint)
     local owner = self:GetOwner()
 	if not IsValid(owner) then return true end
     if owner:IsNPC() then return true end
@@ -629,6 +629,7 @@ function SWEP:CanUse()
 	local blockedState = self.reload or self.deploy or sprinting or otrub
 
 	return not blockedState
+	return not (self.reload or self.deploy or (owner:IsPlayer() and ((!ignoreSprint and self:IsSprinting()) or (owner.organism and owner.organism.otrub))))
 end
 
 function SWEP:IsSprinting()
@@ -812,7 +813,7 @@ function SWEP:Shoot(override)
 	if owner:IsNPC() then self.drawBullet = true end
 
 	if !override and !self:CanPrimaryAttack() then return false end
-	if !override and !self:CanUse() then return false end
+	if !override and !self:CanUse(true) then return false end
 	if CLIENT and owner != LocalPlayer() and !override then return false end
 
 	local primary = self.Primary

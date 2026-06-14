@@ -14,6 +14,8 @@ local head_otrub_chance_mul = 1.25
 local head_otrub_max_chance = 0.35
 local head_consciousness_mul = 28
 local head_otrub_consciousness_cap = 0.04
+local player_limb_gib_threshold = 160
+local player_head_gib_threshold = 175
 local bonetohitgroup, hitgrouptolimb
 
 local bulletTraumaOrganTargets = {
@@ -1464,6 +1466,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
+	local hitgroup_max = 100
+	if org.isPly then
+		hitgroup_max = hitgroup == HITGROUP_HEAD and player_head_gib_threshold or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup_max
+	end
 	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 40 or 135 -- easier decapitation
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
