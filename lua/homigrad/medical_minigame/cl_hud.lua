@@ -825,8 +825,8 @@ function PANEL:CompleteWrap()
     -- Increment completions for threshold-based healing
     self.BandageCompletions = (self.BandageCompletions or 0) + 1
 
-    -- Play shawarma sound on intermediate wraps; final wrap plays normal bandage sound in Finish()
-    surface.PlaySound("shawarma.ogg")
+  
+    surface.PlaySound("tape_friction" .. math.random(3) .. ".mp3")
 
     -- Reduced shake effect on wrap completion, no red flash
     self.RotationFlashAlpha = 0

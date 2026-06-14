@@ -40,6 +40,9 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._fearDuration = 0
 	org.givingUp = false
 	org._giveUpCheckTime = 0
+	org._panicAdrenalineGiven = false
+	org._postPanicEndTime = 0
+	org._giveUpHeartStopCheck = 0
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -62,6 +65,8 @@ end)
 hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
+	local time = CurTime()
+
 	-- Give up mechanic: chance to give up when dying or bleeding out
 	if not org.givingUp then
 		local o2val = org.o2 and org.o2[1] or 0
@@ -81,21 +86,60 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				if isDying and isBleedingOut then
 					chance = 0.05 -- 5% if both dying and bleeding out
 				end
+				-- After a panic attack ends, the body is more likely to give up
+				if org._postPanicEndTime and (CurTime() - org._postPanicEndTime) < 20 then
+					chance = chance + 0.03 * (1 - (CurTime() - org._postPanicEndTime) / 20)
+				end
 
 				if math.random() < chance then
 					org.givingUp = true
+					org._panicAdrenalineGiven = false
 				end
 			end
 		else
 			org._giveUpCheckTime = 0
 		end
 	else
-		org.despair = 0.25
-		org.panicAttack = false
-		org._panicAttackEndTime = 0
-		org._panicAttackStartTime = nil
-		org._panicAttackCheckTime = nil
-		return
+		local o2val = org.o2 and org.o2[1] or 0
+		local blood = org.blood or 5000
+		local bleed = org.bleed or 0
+
+		local isDying = (o2val > 50 and not org.otrub)
+		local isBleedingOut = blood < 4000 and bleed > 0
+		local isUnconsciousDying = org.otrub and o2val > 20
+
+		if not isDying and not isBleedingOut and not isUnconsciousDying then
+			org.givingUp = false
+			org._giveUpCheckTime = 0
+			org._giveUpHeartStopCheck = 0
+			-- Recovery: treated or no longer dying, despair fades and goodmood returns
+			org.goodmood = math.min((org.goodmood or 0) + timeValue * 0.03, 1)
+			org._postPanicEndTime = 0
+		else
+			org.despair = math.max(org.despair, 0.25)
+			org.panicAttack = false
+			org._panicAttackEndTime = 0
+			org._panicAttackStartTime = nil
+			org._panicAttackCheckTime = nil
+			org._panicAdrenalineGiven = false
+			-- Giving up: body lowers vitals; if too low, heart may stop
+			if not org._giveUpHeartStopCheck or time > org._giveUpHeartStopCheck then
+				org._giveUpHeartStopCheck = time + 3
+				local bp = org.bloodpressure or 93
+				local hb = org.heartbeat or 70
+				if bp < 35 or hb < 40 then
+					local stopChance = 0.08
+					local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+					if totalAdrenaline > 0.5 then
+						stopChance = stopChance * math.max(0, 1 - (totalAdrenaline - 0.5) * 0.25)
+					end
+					if math.random() < stopChance then
+						org.heartstop = true
+					end
+				end
+			end
+			return
+		end
 	end
 
 	-- Apply convar override if set
@@ -258,7 +302,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 	end
 
-	local time = CurTime()
 	if (org._despairNextCorpseCheck or 0) <= time then
 		org._despairNextCorpseCheck = time + 0.25
 
@@ -329,6 +372,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
             org._despair_check_time = CurTime() + 1 -- check every second
 
             local chance = (org.despair - 0.9) / 0.1 * 0.05 -- at 1.0 despair, 5% chance
+            local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+            if totalAdrenaline > 1.0 then
+                chance = chance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.4)
+            end
             if math.random() < chance then
                 org.heartstop = true
                 org.lungsfunction = false
@@ -337,19 +384,37 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
     end
 
 	-- Panic attack logic
-	local time = CurTime()
 	if org.panicAttack then
 		-- Decrease despair slowly during panic attack
-		org.despair = math.Approach(org.despair, 0, timeValue * 0.3)
+		org.despair = math.Approach(org.despair, 0.75, timeValue * 0.3)
 		
-		-- Check if panic attack should end
+		-- Check if panic attack should end (timed out or recovered)
 		if time > org._panicAttackEndTime then
 			org.panicAttack = false
 		else
-			-- Small chance of heart attack during panic attack
-			if not org._panicHeartAttackCheck or time > org._panicHeartAttackCheck then
+			-- Check recovery: healed / no longer dying
+			local o2val = org.o2 and org.o2[1] or 0
+			local blood = org.blood or 5000
+			local bleed = org.bleed or 0
+			local isDying = (o2val > 50 and not org.otrub)
+			local isBleedingOut = blood < 4000 and bleed > 0
+			local isUnconsciousDying = org.otrub and o2val > 20
+
+			if not isDying and not isBleedingOut and not isUnconsciousDying then
+				org.panicAttack = false
+				org._panicAttackEndTime = 0
+				org._panicAttackStartTime = nil
+				org._panicAttackCheckTime = nil
+				org._panicAdrenalineGiven = false
+				org._postPanicEndTime = time
+			elseif not org._panicHeartAttackCheck or time > org._panicHeartAttackCheck then
 				org._panicHeartAttackCheck = time + 2
-				if math.random() < 0.02 then -- 2% chance every 2 seconds during panic attack
+				local heartAttackChance = 0.05 -- 5% chance every 2 seconds during panic attack
+				local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+				if totalAdrenaline > 1.5 then
+					heartAttackChance = heartAttackChance * math.max(0.1, 1 - (totalAdrenaline - 1.5) * 0.3)
+				end
+				if math.random() < heartAttackChance then
 					org.heartstop = true
 					org.lungsfunction = false
 				end
@@ -369,6 +434,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				org._panicAttackEndTime = time + math.random(8, 15)
 				org._panicHeartAttackCheck = 0
 				org._panicAttackStartTime = nil
+				if not org._panicAdrenalineGiven then
+					org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+					org._panicAdrenalineGiven = true
+				end
 			-- Before 30 seconds, use random chance
 			elseif not org._panicAttackCheckTime or time > org._panicAttackCheckTime then
 				org._panicAttackCheckTime = time + 1
@@ -378,6 +447,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 					org._panicAttackEndTime = time + math.random(8, 15)
 					org._panicHeartAttackCheck = 0
 					org._panicAttackStartTime = nil
+					if not org._panicAdrenalineGiven then
+						org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+						org._panicAdrenalineGiven = true
+					end
 				end
 			end
 		else
@@ -427,12 +500,18 @@ concommand.Add("hg_panic", function(ply, cmd, args)
 		org._panicAttackEndTime = CurTime() + math.random(8, 15)
 		org._panicHeartAttackCheck = 0
 		org._panicAttackStartTime = nil
+		if not org._panicAdrenalineGiven then
+			org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+			org._panicAdrenalineGiven = true
+		end
 		ply:ChatPrint("[Debug] Panic attack triggered. Set despair level to 1.0 to create a panic attack.")
 	else
 		org.panicAttack = false
 		org._panicAttackEndTime = 0
 		org._panicAttackStartTime = nil
 		org._panicAttackCheckTime = nil
+		org._panicAdrenalineGiven = false
+		org._postPanicEndTime = CurTime()
 		ply:ChatPrint("[Debug] Panic attack ended.")
 	end
 end)
@@ -450,10 +529,14 @@ concommand.Add("hg_giveup", function(ply, cmd, args)
 		org.bleed = 1
 		org.despair = 0.85
 		org.givingUp = true
+		org._panicAdrenalineGiven = false
+		org._panicAttackEndTime = 0
+		org.panicAttack = false
 		ply:ChatPrint("[Debug] Give up triggered. Reduced blood to 3000 to create dying/bleeding out state, added some despair, and initiated give up (itssofuckingover.mp3).")
 	else
 		org.givingUp = false
 		org._giveUpCheckTime = 0
+		org._giveUpHeartStopCheck = 0
 		ply:ChatPrint("[Debug] Give up ended.")
 	end
 end)

@@ -14,6 +14,12 @@ module[2] = function(ply, org, timeValue)
         -- Track concussion increases for disorientation (when it climbs, not decreases)
         if org.concussion > prevConcussion then
             org.concussionTracker = (org.concussionTracker or 0) + (org.concussion - prevConcussion)
+
+            -- Chance to induce vomiting from severe concussion
+            if org.isPly and org.concussion >= 3 and math.random() < (org.concussion - prevConcussion) * 0.25 then
+                org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.2, 0.5)
+                org.vomitTypeHeadTrauma = math.random(10) == 1
+            end
         end
 
         -- Apply 2 points of disorientation when concussion climbs 2.5 points

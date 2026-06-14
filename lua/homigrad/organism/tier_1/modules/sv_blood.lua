@@ -350,9 +350,17 @@ module[2] = function(owner, org, mulTime)
 	if org.wantToVomit > 1 then
 		org.wantToVomit = 0
 
-		if org.isPly then owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed") end
-
-		hg.organism.Vomit(owner)
+		if org.vomitTypeHeadTrauma then
+			org.vomitTypeHeadTrauma = nil
+			if math.random(6) == 1 then
+				hg.organism.Vomit(owner)
+			else
+				hg.organism.VomitNormal(owner)
+			end
+		else
+			if org.isPly then owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed") end
+			hg.organism.Vomit(owner)
+		end
 	end
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)--в секунду

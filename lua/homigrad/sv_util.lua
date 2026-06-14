@@ -505,6 +505,116 @@ hook.Add("PostEntityFireBullets","bulletsuppression",function(ent,bullet)
 	end
 end)
 
+-- Fast-moving object fear system
+-- Applies fear when physics bullets, grenades, or other fast objects fly near a player
+
+local fastObjectFearNextCheck = 0
+local fastObjectFearCooldown = {}
+
+hook.Add("PlayerDisconnected", "FastObjectFearCleanup", function(ply)
+	fastObjectFearCooldown[ply] = nil
+end)
+
+timer.Create("FastObjectFear", 0.05, 0, function()
+	local time = CurTime()
+	if time < fastObjectFearNextCheck then return end
+	fastObjectFearNextCheck = time + 0.05
+
+	local players = player.GetHumans()
+	local physBullets = hg.PhysBullet and hg.PhysBullet.BulletsTable
+
+	-- Physics bullets
+	if physBullets then
+		for _, bullet in pairs(physBullets) do
+			if not bullet.Pos or not bullet.Vel then continue end
+			if bullet.Vel:Length() < 1000 then continue end
+
+			local bulletPos = bullet.Pos
+			local shooter = bullet.Shooter
+
+			for _, ply in ipairs(players) do
+				if not IsValid(ply) or not ply:Alive() then continue end
+				if ply == shooter then continue end
+
+				local nextFear = fastObjectFearCooldown[ply] or 0
+				if time < nextFear then continue end
+
+				local eyePos = ply:EyePos()
+				local distSqr = eyePos:DistToSqr(bulletPos)
+				if distSqr > 360000 then continue end -- 600 units
+
+				-- Line of sight check
+				local tr = util.TraceLine({
+					start = bulletPos,
+					endpos = eyePos,
+					filter = {shooter, ply},
+					mask = MASK_SHOT
+				})
+				if tr.Hit and tr.Entity ~= ply then continue end
+
+				local org = ply.organism
+				if org and not org.otrub then
+					local dist = math.sqrt(distSqr)
+					local fearAmount = math.Clamp((600 - dist) / 600, 0.05, 0.3)
+					org.fearadd = (org.fearadd or 0) + fearAmount
+					fastObjectFearCooldown[ply] = time + 0.15
+				end
+			end
+		end
+	end
+
+	-- Fast entities (grenades, projectiles, thrown props, etc.)
+	for _, ply in ipairs(players) do
+		if not IsValid(ply) or not ply:Alive() then continue end
+
+		local nextFear = fastObjectFearCooldown[ply] or 0
+		if time < nextFear then continue end
+
+		local org = ply.organism
+		if not org or org.otrub then continue end
+
+		local eyePos = ply:EyePos()
+
+		for _, ent in ipairs(ents.FindInSphere(ply:GetPos(), 300)) do
+			if ent == ply then continue end
+			if ent:IsPlayer() then continue end
+
+			-- Ignore held items and player-owned vehicles
+			if ent:IsPlayerHolding() then continue end
+			if ply:GetVehicle() == ent then continue end
+			if ent:GetOwner() == ply then continue end
+
+			local vel = ent:GetVelocity():Length()
+			if vel < 350 then
+				local phys = ent:GetPhysicsObject()
+				if IsValid(phys) then
+					vel = phys:GetVelocity():Length()
+				end
+			end
+			if vel < 350 then continue end
+
+			local entPos = ent:WorldSpaceCenter()
+			local distSqr = eyePos:DistToSqr(entPos)
+			if distSqr > 90000 then continue end -- 300 units
+
+			-- Line of sight check
+			local tr = util.TraceLine({
+				start = entPos,
+				endpos = eyePos,
+				filter = {ent, ply},
+				mask = MASK_SHOT
+			})
+			if tr.Hit and tr.Entity ~= ply then continue end
+
+			local dist = math.sqrt(distSqr)
+			local fearAmount = math.Clamp((300 - dist) / 300 * vel / 2000, 0.05, 0.5)
+			org.fearadd = (org.fearadd or 0) + fearAmount
+			fastObjectFearCooldown[ply] = time + 0.2
+			break -- one scare per tick per player is enough
+		end
+	end
+end)
+
 --//
 
 function hg.StunPlayer(ply,time)

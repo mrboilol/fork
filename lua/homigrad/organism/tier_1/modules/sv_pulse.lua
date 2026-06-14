@@ -67,10 +67,14 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + 40 * math.max(0, org.fear)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
-	heartbeat = heartbeat + 15 * math.min(org.adrenaline, 3)
+	local adrenalineHeartBoost = 15 * math.min(org.adrenaline, 3)
+	if org.givingUp then adrenalineHeartBoost = adrenalineHeartBoost * 0.3 end
+	heartbeat = heartbeat + adrenalineHeartBoost
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
+	if org.panicAttack then heartbeat = heartbeat + 50 end
+	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
@@ -102,7 +106,9 @@ module[2] = function(owner, org, timeValue)
 	local heartK = math.Clamp(1 - org.heart, 0, 1)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
-	local hypertensionMul = 1 + math.Clamp(org.adrenaline, 0, 5) * 0.15 + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
+	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.15
+	if org.givingUp then adrenalineHyperMul = adrenalineHyperMul * 0.3 end
+	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 2.0)
 
@@ -124,6 +130,8 @@ module[2] = function(owner, org, timeValue)
 		local velocityPenalty = math.Clamp((velocity - 800) / 400, 0, 0.4) -- Up to 40% reduction at very high speeds
 		map = map * (1 - velocityPenalty)
 	end
+
+	if org.givingUp then map = map * 0.5 end
 
 	map = math.Clamp(map, 0, 190)
 	org.bloodpressure = math.Approach(org.bloodpressure or 93, map, timeValue * (map > (org.bloodpressure or 93) and 14 or 10))
@@ -224,7 +232,9 @@ module[2] = function(owner, org, timeValue)
 	-- if no fear, in 3 minutes become slightly talkative, so would say random phrases to calm themselves in a current situation
 	local gainfear = hg.organism.should_gain_fear(org)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
-	org.fearadd = math.Approach(org.fearadd, 1, gainfear and timeValue / 5 or 0)
+	local fearGainRate = gainfear and timeValue / 5 or 0
+	if org.givingUp then fearGainRate = fearGainRate * 0.25 end
+	org.fearadd = math.Approach(org.fearadd, 1, fearGainRate)
 	
 	local adrenK = max(1 + org.adrenaline, 1)
 	local adren = org.adrenaline
@@ -290,6 +300,10 @@ module[2] = function(owner, org, timeValue)
             org._fear_check_time = CurTime() + 1 -- check every second
 
             local chance = (org.fear - 1.5) / 0.5 * 0.025 -- at 2.0 fear, 2.5% chance
+            local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+            if totalAdrenaline > 1.0 then
+                chance = chance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.35)
+            end
             if math.random() < chance then
                 org.heartstop = true
                 org.lungsfunction = false

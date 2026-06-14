@@ -42,16 +42,29 @@ local hg_despair_override_convar = GetConVar("hg_despair_override")
 local hg_panic_debug_convar = GetConVar("hg_panic_debug")
 
 local panicThoughts = {
-	"Im hopeless.",
-	"boi im cooked 😭",
-	"I dont want to be here anymore.",
-	"Everything is wrong.",
-	"I cant take this anymore.",
+	"I have to keep going.",
+	"Not like this... not now.",
+	"I need to stay alive.",
+	"Focus. Breathe. Survive.",
+	"Everything hurts but I cant stop.",
 	"Why wont it stop...",
-	"Why is this happening to me...",
+	"I can get through this.",
 	"I'm losing control.",
 	"Help me...",
 	"This is not real...",
+}
+
+local givingUpThoughts = {
+	"Its over...",
+	"I just want to rest...",
+	"No point anymore...",
+	"Let it end...",
+	"I give up...",
+	"Theres nothing left...",
+	"So tired...",
+	"Just make it stop...",
+	"I cant go on...",
+	"Its all fading...",
 }
 
 local function get_target_organism()
@@ -151,9 +164,9 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		render.SetMaterial(heatMat)
 		render.DrawScreenQuad()
 
-		despairTab["$pp_colour_brightness"] = -0.03 - despairLerp * 0.16
-		despairTab["$pp_colour_contrast"] = 1 - despairLerp * 0.15
-		despairTab["$pp_colour_colour"] = 1 - despairLerp * 0.85
+		despairTab["$pp_colour_brightness"] = -0.03 - despairLerp * 0.08
+		despairTab["$pp_colour_contrast"] = 1 - despairLerp * 0.08
+		despairTab["$pp_colour_colour"] = 1 - despairLerp * 0.5
 		DrawColorModify(despairTab)
 	end
 
@@ -189,15 +202,15 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 					return 
 				end
 				MsgN("[Despair] Sound loaded successfully")
-				channel:SetVolume(0.5 * musicVolume:GetFloat())
+				channel:SetVolume(0.75 * musicVolume:GetFloat())
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 0.5 * musicVolume:GetFloat()
+				despairSoundVol = 0.75 * musicVolume:GetFloat()
 			end)
 		end
 
-		local targetVol = (despair > 0.3 and 1.0 or math.Remap(despair, 0, 1, 0.6, 0.75)) * musicVolume:GetFloat()
+		local targetVol = (despair > 0.3 and 1.5 or math.Remap(despair, 0, 1, 0.9, 1.125)) * musicVolume:GetFloat()
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
@@ -220,7 +233,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = 1 * musicVolume:GetFloat()
+		local targetVol = 2.5 * musicVolume:GetFloat()
 		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 2)
 		if IsValid(panicSound) then
 			panicSound:SetVolume(panicSoundVol)
@@ -295,6 +308,32 @@ hook.Add("Think", "hg_panic_thoughts_notify", function()
 	else
 		panicThoughtIndex = 0
 		panicThoughtNextTime = 0
+	end
+end)
+
+local giveUpThoughtIndex = 0
+local giveUpThoughtNextTime = 0
+
+hook.Add("Think", "hg_givingup_thoughts_notify", function()
+	local org = get_target_organism()
+	if not org then return end
+
+	local time = CurTime()
+
+	if org.givingUp then
+		if time >= giveUpThoughtNextTime then
+			giveUpThoughtIndex = (giveUpThoughtIndex % #givingUpThoughts) + 1
+			local thought = givingUpThoughts[giveUpThoughtIndex]
+
+			if hg and hg.CreateNotification then
+				hg.CreateNotification(thought, 2, Color(150, 150, 150), true)
+			end
+
+			giveUpThoughtNextTime = time + 4
+		end
+	else
+		giveUpThoughtIndex = 0
+		giveUpThoughtNextTime = 0
 	end
 end)
 

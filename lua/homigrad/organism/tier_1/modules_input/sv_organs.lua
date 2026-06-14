@@ -247,6 +247,12 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		org.owner:EmitSound(soundFile, 60, math.random(90, 120))
 	end
 
+	-- Chance to induce vomiting from brain trauma
+	if org.isPly and brainDelta > 0 and math.random() < brainDelta * 0.4 then
+		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.3, 0.7)
+		org.vomitTypeHeadTrauma = math.random(6) == 1
+	end
+
 	-- Brain chunks logic
 	if org.skull and org.skull >= 1 and org.brain > 0.55 then
 		local multiplier = 0

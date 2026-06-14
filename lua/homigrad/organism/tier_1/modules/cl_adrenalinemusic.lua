@@ -123,6 +123,24 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		return
 	end
 
+	-- Prevent playing if panicking
+	if org.panicAttack then
+		stop_adrenaline_music(true)
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Blocked: panicAttack")
+		end
+		return
+	end
+
+	-- Prevent playing if giving up
+	if org.givingUp then
+		stop_adrenaline_music(true)
+		if CurTime() % 1 < 0.1 then
+			MsgN("[AdrenalineMusic] Blocked: givingUp")
+		end
+		return
+	end
+
 	local shouldPlay = false
 	local adrenalineAdd = org.adrenalineAdd or 0
 	local despair = org.despair or 0

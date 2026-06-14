@@ -704,7 +704,12 @@ local tooltipTexts = {
 			[2] = {title = "Серьёзная дезориентация", text = "Голова кружится и всё кругом плывёт."},
 			[1] = {title = "Лёгкая дезориентация", text = "Чувствуешь себя сонным."}
 		},
-		death = {title = "Смерть", text = "Пермаментная и грустная или весёлая, а впрочем уже не важно."},
+		death = {
+			[4] = {title = "Смерть", text = "Пермаментная и грустная или весёлая, а впрочем уже не важно."},
+			[3] = {title = "Сдаюсь", text = "Тело сдаётся. Сердце замедляется, и тьма приближается."},
+			[2] = {title = "Паника", text = "Сердце колотится, адреналин бьёт ключом. Ты пытаешься выжить."},
+			[1] = {title = "Отчаяние", text = "Всё идёт не так. Надежда тает, но ещё не пропала."}
+		},
 		berserk = {
 			[4] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
 			[3] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
@@ -845,10 +850,10 @@ local tooltipTexts = {
 			[1] = {title = "Queasy", text = "You feel discomfort. Slightly unwell. Slight tendency to vomit."}
 		},
 		brain_damage = {
-			[4] = {title = "Coma", text = "Barely clinging to life, you suffer from severe brain damage. You're a vegetable. Recovery is unlikely."},
-			[3] = {title = "Severe neurophysiological deterioration", text = "Severely mentally impaired, barely able to think rationally and remain conscious. Serious brain injury."},
-			[2] = {title = "Neurological damage", text = "Severe mental deficit. Limited ability for intellectual thinking and self-sufficiency. Serious brain damage."},
-			[1] = {title = "Cognitive impairment", text = "Mental disorders due to brain damage. You feel strange confusion..."}
+			[4] = {title = "Catastrophic cerebral trauma", text = "Little chance of survival, your bodily functions are failing and you are essentially a vegetable."},
+			[3] = {title = "Severe neurophysiological deterioration", text = "Unable to form coherent thoughts, aphasia is evident and memory and balance is severely impaired."},
+			[2] = {title = "Neurocognitive impairment", text = "Limited in your ability of speech, memory and balance due to a traumatic brain injury."},
+			[1] = {title = "Concussion", text = "Bruised brain, a small mental deficit."}
 		},
 		adrenaline = {
 			[4] = {title = "Focused", text = "Heart working overtime pumping blood. Almost complete absence of pain, surge of strength, and increased resilience."},
@@ -868,7 +873,12 @@ local tooltipTexts = {
 			[2] = {title = "Serious disorientation", text = "Head spinning and everything floating around."},
 			[1] = {title = "Mild disorientation", text = "Feeling sleepy."}
 		},
-		death = {title = "Death", text = "You are dead. Observe what's happening."},
+		death = {
+			[4] = {title = "Death", text = "You are dead. Observe what's happening."},
+			[3] = {title = "Giving Up", text = "Your body is shutting down. The heartbeat slows and darkness approaches."},
+			[2] = {title = "Panic", text = "Your heart is racing, adrenaline surging. You are fighting to stay alive."},
+			[1] = {title = "Despair", text = "Things are going wrong. Hope is fading, but not yet gone."}
+		},
 		berserk = {
 			[4] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
 			[3] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
@@ -1301,11 +1311,41 @@ local function draw_status_effects()
 	if dead then
 		table.insert(effects, {
 			name = "death",
+			has_levels = true,
+			level_num = 4,
 			priority = -1000,
 			value = nil
 		})
 		currentEffectNames["death"] = true
 	else
+		if org.givingUp then
+			table.insert(effects, {
+				name = "death",
+				has_levels = true,
+				level_num = 3,
+				priority = -900,
+				value = nil
+			})
+			currentEffectNames["death"] = true
+		elseif org.panicAttack then
+			table.insert(effects, {
+				name = "death",
+				has_levels = true,
+				level_num = 2,
+				priority = -800,
+				value = nil
+			})
+			currentEffectNames["death"] = true
+		elseif (org.despair or 0) >= 0.5 then
+			table.insert(effects, {
+				name = "death",
+				has_levels = true,
+				level_num = 1,
+				priority = -700,
+				value = math_floor(org.despair * 100)
+			})
+			currentEffectNames["death"] = true
+		end
 
 	
 		local pain_val = smooth.pain or getOrgVal(org, "pain", 0)
@@ -2251,8 +2291,6 @@ local function draw_status_effects()
 				bg_color = Color(100, 100, 200, 220)
 			elseif effect.name == "trauma" then
 				bg_color = Color(150, 50, 150, 220)
-			elseif effect.name == "death" then
-				bg_color = Color(0, 0, 0, 220)
 			elseif effect.name == "berserk" then
 				bg_color = Color(180, 0, 0, 220)
 			elseif effect.name == "amputant" then
@@ -2396,6 +2434,9 @@ local function draw_status_effects()
 				value_text = effect.value .. "%"
 			elseif effect.name == "death" then
 				letter = "☠"
+				if effect.value then
+					value_text = effect.value .. "%"
+				end
 			elseif effect.name == "berserk" then
 				letter = "⚡"
 				value_text = effect.value .. ""

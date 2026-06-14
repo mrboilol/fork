@@ -424,6 +424,7 @@ local tempolerp = 0
 local despairLerp = 0
 local despairVisualLerp = 0
 local despairTextLerp = 0
+local giveUpWhiteLerp = 0
 local WhiteNoiseStation
 local soundRetry = {}
 local function canRetrySound(key, station)
@@ -1511,9 +1512,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
     		render.DrawScreenQuad()
         end
 
-		tab["$pp_colour_brightness"] = -(despairShock ^ 1.2) * 0.58
-		tab["$pp_colour_contrast"] = 1 - despairShock * 0.5
-		tab["$pp_colour_colour"] = 1 - despairShock * 1.15
+		tab["$pp_colour_brightness"] = -(despairShock ^ 1.2) * 0.35
+		tab["$pp_colour_contrast"] = 1 - despairShock * 0.3
+		tab["$pp_colour_colour"] = 1 - despairShock * 0.7
 		tab["$pp_colour_mulr"] = 0
 		tab["$pp_colour_mulg"] = 0
 		tab["$pp_colour_mulb"] = 0
@@ -1542,7 +1543,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(station) then
 					station:SetVolume(0)
 					station:Play()
-					station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 					GivingUpStation = station
 					station:EnableLooping(true)
 				end
@@ -1550,27 +1550,26 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		if IsValid(GivingUpStation) then
-			GivingUpStation:SetVolume(1 * snd_musicvolume:GetFloat())
+			GivingUpStation:SetVolume(2.5 * snd_musicvolume:GetFloat())
+			if GivingUpStation:GetTime() >= 120 then
+				GivingUpStation:SetTime(0)
+			end
 		end
 
-		-- White vignette around screen edges
-		local w, h = ScrW(), ScrH()
-		local edgeW = w * 0.4
-		local edgeH = h * 0.4
-		local alpha = 220
-
-		surface.SetDrawColor(255, 255, 255, alpha)
-		surface.SetMaterial(whiteVignetteR)
-		surface.DrawTexturedRect(0, 0, edgeW, h)
-		surface.SetMaterial(whiteVignetteL)
-		surface.DrawTexturedRect(w - edgeW, 0, edgeW, h)
-		surface.SetMaterial(whiteVignetteD)
-		surface.DrawTexturedRect(0, 0, w, edgeH)
-		surface.SetMaterial(whiteVignetteU)
-		surface.DrawTexturedRect(0, h - edgeH, w, edgeH)
+		-- Slight white hue that slowly fades in (not all the way)
+		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
+		local whiteHue = giveUpWhiteLerp * 0.12
+		tab["$pp_colour_addr"] = whiteHue
+		tab["$pp_colour_addg"] = whiteHue
+		tab["$pp_colour_addb"] = whiteHue
 
 		-- Suppress regular despair visual effects
 		despairVisualLerp = 0
+	else
+		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 0, FrameTime() * 0.3)
+		tab["$pp_colour_addr"] = 0
+		tab["$pp_colour_addg"] = 0
+		tab["$pp_colour_addb"] = 0
 	end
 
 	if (headtraumaSaturation or 0) > 0 then

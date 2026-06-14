@@ -391,6 +391,12 @@ if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
 	org.shock = org.shock + dmg * 3
 	    org.concussion = math.min((org.concussion or 0) + dmg * 8, 10) -- Increased from 4 to 8
 
+	-- Chance to induce vomiting from jaw trauma
+	if org.isPly and math.random() < dmg * 0.2 then
+		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.2, 0.5)
+		org.vomitTypeHeadTrauma = math.random(10) == 1
+	end
+
     -- Slight disorientation and consciousness loss
     org.disorientation = org.disorientation + dmg * 1.5 -- Increased from 0.5 to 1.5
     org.consciousness = math.max(org.consciousness - dmg * 0.15, 0) -- Increased from 0.05 to 0.15
@@ -452,7 +458,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldDmg = org.skull
 	local old_concussion = org.concussion or 0
 	
-	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.5, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 
@@ -466,6 +472,12 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.shock = org.shock + dmg * 3
 
 	org.concussion = math.min((org.concussion or 0) + dmg * 6, 10)
+
+	-- Chance to induce vomiting from head trauma
+	if org.isPly and math.random() < dmg * 0.3 then
+		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.25, 0.6)
+		org.vomitTypeHeadTrauma = math.random(8) == 1
+	end
 
 	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 1.5 or 0)
@@ -561,7 +573,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
-	return result,vecrand
+	return result * 0.75, vecrand
 end
 
 local ribs = {
@@ -576,7 +588,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if dmgInfo:IsDamageType(DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT) and math.random(5) == 1 then return 0, vector_origin end --random chance it passed through ribs
 
-	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
+	local result, vecrand = damageBone(org, 0.25, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 
@@ -635,7 +647,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	return result * 0.5, vecrand
+	return result * 0.75, vecrand
 end
 
 input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
@@ -647,7 +659,7 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	org.stamina_damage = (org.stamina_damage or 0) + dmg * 15
 	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 5
 
-	local result = damageBone(org, bone, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
+	local result = damageBone(org, 0.35, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 
@@ -665,7 +677,7 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 		end
 	end
 
-	return result
+	return result * 0.75
 end
 
 input_list.rarmup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return arms(org, bone * 1.25, dmg, dmgInfo, "rarm", boneindex, dir, hit, ricochet) end
