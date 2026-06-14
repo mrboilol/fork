@@ -304,7 +304,7 @@ if CLIENT then
 					surface.DrawOutlinedRect(45, rowY + 2, 30, 6)
 				end
 			cam.End3D2D()
-		elseif self.showstats and self.modeValues and istable(self.modeValues) then
+			elseif self.showstats and self.modeValues and istable(self.modeValues) then
 			render.PushFilterMag( TEXFILTER.LINEAR )
 			render.PushFilterMin( TEXFILTER.LINEAR )
 			local m = Matrix()

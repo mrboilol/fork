@@ -1195,6 +1195,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						wound[5] = time + (water and 2 or 0)
 					end
 				end
+				end
 			end
 		end
 	end

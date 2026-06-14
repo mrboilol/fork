@@ -5452,32 +5452,28 @@ end)
 
 
 
-hook.Add("PlayerSpawn", "ZCityOpenIntroMenu", function()
+hook.Add("InitPostEntity", "ZCityOpenIntroMenu", function()
 
-    -- Show intro on first spawn
+    -- Show intro once when the player first enters the game
+    if ZCityHasSeenIntro then return end
+
     timer.Simple(0.5, function()
 
-        if not ZCityHasSeenIntro then
+        if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
 
-            -- Open the menu automatically on spawn
+        MainMenu = vgui.Create("ZMainMenu")
 
-            if MainMenu and IsValid(MainMenu) then MainMenu:Remove() end
+        MainMenu:MakePopup()
 
-            MainMenu = vgui.Create("ZMainMenu")
+        -- Force intro state
 
-            MainMenu:MakePopup()
+        MainMenu.IsIntro = true
 
-            -- Force intro state
+        MainMenu:SetAlpha(255) -- Force visible immediately
 
-            MainMenu.IsIntro = true
-
-            MainMenu:SetAlpha(255) -- Force visible immediately
-
-            -- Auto-start intro sequence
-            MainMenu.IntroSequenceActive = true
-            MainMenu.IntroStartTime = CurTime()
-
-        end
+        -- Auto-start intro sequence
+        MainMenu.IntroSequenceActive = true
+        MainMenu.IntroStartTime = CurTime()
 
     end)
 
