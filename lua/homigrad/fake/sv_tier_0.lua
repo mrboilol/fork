@@ -584,6 +584,8 @@ function hg.ApplyPoses(ply)
 	end
 end
 
+local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, FCVAR_REPLICATED, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
+
 function hg.Fake(ply, huyragdoll, no_freemove, force)
 	if not IsValid(ply) then return end
 	ply.switchingseat = nil
@@ -616,6 +618,16 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 	end
 
 	//if ragdoll:GetVelocity():LengthSqr() < (200 * 200) or ply:InVehicle() then hg.SetFreemove(ply,not no_freemove) end
+
+	if not no_freemove and not force and not hg_ragdollcombat:GetBool() then
+		local org = ply.organism
+		local isDiving = (ply.lastInJump or 0) + 0.15 > CurTime() and (ply.lastInDuck or 0) + 0.15 > CurTime()
+		local isGrabbingWound = org and org.pressingWound
+		if not isDiving and not isGrabbingWound then
+			hg.SetFreemove(ply, true)
+			ply.lastFake = CurTime() + 0.5
+		end
+	end
 
 	hg.ragdollFake[ply] = ragdoll
 	ply.ActiveWeapon = ply:GetActiveWeapon()
@@ -656,8 +668,6 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		end)
 	end
 end
-
-local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, FCVAR_REPLICATED, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
 
 local veczero = Vector(0,0,0)
 function hg.SetFreemove(ply, set)
@@ -796,8 +806,8 @@ function hg.FakeUp(ply, forced, instant)
 
 	if IsValid(ragdoll) and ragdoll:IsOnFire() then
 		timer.Simple(0.1,function()
-			--ply.fires = ragdoll.fires
-			--ply:Ignite(30 * ((ply.shouldburn or 0) + 1),16)
+			ply.fires = ragdoll.fires
+			ply:Ignite(30 * ((ply.shouldburn or 0) + 1),16)
 			if ragdoll.fires then
 				for fire, pos in pairs(ragdoll.fires) do
 					fire:Remove()
@@ -902,11 +912,11 @@ function hg.FakeUp(ply, forced, instant)
 	if IsValid(ragdoll) then ragdoll:SetNWEntity("ply", NULL) end
 	if ply.oldCanUseFlashlight and not ply:CanUseFlashlight() then ply:AllowFlashlight(true) end
 	local time = (ply.lastFake or 0) > 0 and 0.1 or 1.5
-	--[[timer.Simple(time,function()
+	timer.Simple(time,function()
 		if IsValid(ply) then
 			ply:ConCommand("-duck")
 		end
-	end)--]]
+	end)
 
 	return true
 end

@@ -147,21 +147,11 @@ local function SyncBonesCallback(ent, numbones)
     elseif IsValid(ply:GetRagdollEntity()) then src = ply:GetRagdollEntity(); isRag = true end
 
     if not IsValid(src) then return end
-    
-    -- FIX: Temporarily reset bone manipulations to get original bone matrices
-    -- This prevents IK foot system from interfering with bone tracing
-    local savedBonePositions = {}
-    local savedBoneAngles = {}
-    if src == ply then
-        for i = 0, src:GetBoneCount() - 1 do
-            savedBonePositions[i] = src:GetManipulateBonePosition(i)
-            savedBoneAngles[i] = src:GetManipulateBoneAngles(i)
-            src:ManipulateBonePosition(i, Vector())
-            src:ManipulateBoneAngles(i, Angle())
-        end
-        src:SetupBones()
-    end
-    
+
+    -- Flush current-frame bone manipulations (IK foot, TPIK, etc.) into src's bone matrices
+    -- before we read them. Without this, GetBoneMatrix returns stale pre-IK positions.
+    src:SetupBones()
+
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
 
@@ -225,10 +215,6 @@ local function SyncBonesCallback(ent, numbones)
         if srcBone then
             local mat = src:GetBoneMatrix(srcBone)
             if mat then
-                -- CRITICAL: Skip bone manipulation for the local player's actual model
-                -- This prevents the health indicator's bone scaling from wrecking the bone tracing system
-                if ent == ply then continue end
-
                 local manipScale = ent:GetManipulateBoneScale(i)
                 
                 local localMat = srcInv * mat
@@ -247,18 +233,6 @@ local function SyncBonesCallback(ent, numbones)
         end
     end
     
-    -- FIX: Restore bone manipulations after reading bone matrices
-    if src == ply then
-        for i = 0, src:GetBoneCount() - 1 do
-            if savedBonePositions[i] then
-                src:ManipulateBonePosition(i, savedBonePositions[i])
-            end
-            if savedBoneAngles[i] then
-                src:ManipulateBoneAngles(i, savedBoneAngles[i])
-            end
-        end
-        src:SetupBones()
-    end
 end
 
 local function DrawHealthAccessories(healthModel, ply, baseCol)

@@ -141,19 +141,73 @@ if CLIENT then
 		local mdl = modelshuy[self.Model or self.WorldModel]
 		self:DrawWorldModel2(true)
 		local p,a = mdl:GetPos(), mdl:GetAngles()
-		local pos,ang = LocalToWorld(self.ofsV,self.ofsA,p,a)
-		
-		-- Check if position is on screen
-		local screenPos = pos:ToScreen()
-		local onScreen = screenPos.visible and screenPos.x > 0 and screenPos.x < ScrW() and screenPos.y > 0 and screenPos.y < ScrH()
-		
+		local pos3d = p + a:Up() * 3
+
+		local useScreenHUD = false
 		if self.showstats and self.modeValues and istable(self.modeValues) then
+			local screenPos = pos3d:ToScreen()
+			if not screenPos.visible then
+				useScreenHUD = true
+			else
+				local tr = util.TraceLine({start = EyePos(), endpos = pos3d, filter = owner})
+				if tr.Hit and tr.Fraction < 0.95 then
+					useScreenHUD = true
+				end
+			end
+			if not useScreenHUD then
+				local ply = LocalPlayer()
+				if IsValid(ply) then
+					local org = ply.new_organism or ply.organism
+					if org then
+						if org.otrub then
+							useScreenHUD = true
+						elseif org.blindness or ((org.eyeL or 0) >= 1 and (org.eyeR or 0) >= 1) then
+							useScreenHUD = true
+						elseif (org.consciousness or 1) < 0.3 then
+							useScreenHUD = true
+						elseif (org.despair or 0) > 0.5 then
+							useScreenHUD = true
+						else
+							local pain = math.max((org.pain or 0) - 15, 0)
+							local shock = (org.shock or 0) + (1 - (org.consciousness or 1)) * 40
+							if pain > 60 or shock > 15 then
+								useScreenHUD = true
+							end
+						end
+					end
+				end
+			end
+		end
+
+		if self.showstats and self.modeValues and istable(self.modeValues) and not useScreenHUD then
+			local ang3d = EyeAngles()
+			ang3d:RotateAroundAxis(ang3d:Up(), -90)
+			ang3d:RotateAroundAxis(ang3d:Forward(), 90)
+			local dist = EyePos():Distance(pos3d)
+			local s = math.Clamp(dist * 0.0012, 0.015, 0.06)
+
+			cam.Start3D2D(pos3d, ang3d, s)
+				local reveal = 1
+				for i, val in ipairs(self.modeValues) do
+					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
+					local pct = math.Round(val / self.modeValuesdef[i][1] * 100)
+					local rowY = (i - 1) * 12
+					colBrown.a = reveal * 185
+					draw.RoundedBox(2, 0, rowY, 80, 10, colBrown)
+					colBrown.a = reveal * 255
+					draw.SimpleTextOutlined(string.NiceName(tostring(self.modeNames[i])), "ZCity_Small", 2, rowY + 1, Color(255, i == self.mode and 0 or 255, i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, colBrown)
+					surface.SetDrawColor(0, 100, 0, 255 * reveal)
+					surface.DrawRect(45, rowY + 2, 30 * pct / 100, 6)
+					surface.SetDrawColor(0, 0, 0, 255 * reveal)
+					surface.DrawOutlinedRect(45, rowY + 2, 30, 6)
+				end
+			cam.End3D2D()
+		elseif self.showstats and self.modeValues and istable(self.modeValues) then
 			render.PushFilterMag( TEXFILTER.LINEAR )
 			render.PushFilterMin( TEXFILTER.LINEAR )
 			local m = Matrix()
-			m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
+			m:Translate( Vector( ScrW() / 2 - ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
 			m:Scale( vector_one * 0.6 )
-
 			cam.PushModelMatrix( m, true )
 				for i, val in ipairs(self.modeValues) do
 					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
@@ -169,14 +223,12 @@ if CLIENT then
 					local w, h = surface.GetTextSize(txt)
 					colBrown.a = reveal * 255
 					draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
-				
 					surface.SetDrawColor(0,100,0,255 * reveal)
 					surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)
 					surface.SetDrawColor(0,0,0,255 * reveal)
 					surface.DrawOutlinedRect(x + ScreenScale(210),y,ScrW() / 10,ScrH() / 25, 4)
 				end
 			cam.PopModelMatrix()
-
 			render.PopFilterMag()
 			render.PopFilterMin()
 		end
