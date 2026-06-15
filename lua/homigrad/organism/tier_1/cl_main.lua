@@ -1133,52 +1133,15 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						local _, dirAng = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)
 						local sprayDir = -dirAng:Forward()
 
+						local pulse = org.pulse or 70
+						local pulseMul = pulse / 70
+						dir = sprayDir * len * pulseMul
+
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							local pulse = org.pulse or 70
-							local pulseMul = pulse / 70
-							local bpMul = (org.bloodpressure or 93) / 93
-							local bloodMul = math.Clamp((org.blood or 5000) / 5000, 0.1, 1)
-							local hb = (org.heartbeat or 70) / 60
-							local heartbeatBeat = math.abs(math.sin(CurTime() * hb * math.pi * 2))
-							local healthyBoost = 1 + math.Clamp(1 - math.abs(pulse - 70) / 30, 0, 0.4)
-							local forceMul = pulseMul * bpMul * bloodMul * (1 + heartbeatBeat * 0.5) * healthyBoost
-
-							local right = dir:Angle():Right()
-							local up = ang:Up()
-
-							-- Single smooth stream with heartbeat-based pumping
-							local pulseFactor = math.Clamp((pulse - 35) / 35, 0, 1)
-
-							-- Heartbeat pump detection - 2x blood during pump, 0.75x between pumps
-							local inPump = heartbeatBeat > 0.5
-							local pumpMultiplier = inPump and 2.0 or 0.75
-
-							-- Smooth single-stream oscillation
-							local t = CurTime()
-							local oscSpeed = hb * 0.4
-							local oscAmp = 8 * pulseFactor
-							local streamOsc = right * oscAmp * math.sin(t * oscSpeed) + up * oscAmp * math.cos(t * oscSpeed * 0.7)
-
-							-- Base outward velocity from wound
-							local baseVel = sprayDir * 20 * forceMul * pumpMultiplier
-
-							-- Minimal spread for clean single-stream look
-							local spread = VectorRand(-0.5, 0.5) * pulseFactor
-
-							if wound[7] == "arteria" then
-								local arteriaForce = forceMul * 1.5
-								local arteriaVel = sprayDir * 62.5 * arteriaForce * pumpMultiplier
-								local arteriaOscAmp = 10 * pulseFactor
-								local arteriaOsc = right * arteriaOscAmp * math.sin(t * oscSpeed) + up * arteriaOscAmp * math.cos(t * oscSpeed * 0.7)
-								hg.addBloodPart(pos, arteriaVel + arteriaOsc + spread, nil, 1, 1, true, nil, ent)
-							else
-								local normalForce = forceMul * 1.2
-								local normalVel = sprayDir * 20 * normalForce * pumpMultiplier
-								hg.addBloodPart(pos, normalVel + streamOsc + spread, nil, size, size, true, nil, ent)
-							end
+							hg.addBloodPart(pos, VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70, nil, size, size, true, nil, ent)
 						end
 
 						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))
