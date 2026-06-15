@@ -134,7 +134,6 @@ if SERVER then
 end
 
 include("homigrad/cl_health_indicator.lua")
-include("homigrad/cl_ik_foot.lua")
 
 local math_min, math_max, math_floor, math_sin, math_abs, math_cos, math_sqrt = math.min, math.max, math.floor, math.sin, math.abs, math.cos, math.sqrt
 local Color = Color
@@ -1260,12 +1259,12 @@ local function draw_status_effects()
 	end
 	
 	local ply = LocalPlayer()
-	if not IsValid(ply) or not ply.organism then 
+	if not IsValid(ply) or not (ply.new_organism or ply.organism) then 
 		statusEffectPositions = {}
 		return 
 	end
 	
-	local org = ply.organism
+	local org = ply.new_organism or ply.organism
 	local base_x = ScrW() + HUD.status_effects_x
 	local base_y = HUD.status_effects_y
 	

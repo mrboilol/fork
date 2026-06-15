@@ -155,6 +155,23 @@ local function SyncBonesCallback(ent, numbones)
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
 
+    -- FIX: For live players (non-ragdoll) the IK system drops the pelvis bone below the
+    -- player origin. Using src:GetPos() (ground) as the transform anchor makes all bones
+    -- appear to come from the floor. Use the pelvis bone Z instead so the indicator
+    -- displays the skeleton at its actual IK-adjusted height.
+    if not isRag then
+        local pelvisBone = src:LookupBone("ValveBiped.Bip01_Pelvis")
+        if pelvisBone then
+            local pMat = src:GetBoneMatrix(pelvisBone)
+            if pMat then
+                local pPos = pMat:GetTranslation()
+                -- Keep X/Y from player origin (facing/position is correct there),
+                -- only take Z from the actual pelvis bone so body drop is accounted for.
+                srcPos = Vector(srcPos.x, srcPos.y, pPos.z)
+            end
+        end
+    end
+
     -- FIX: Ragdoll drooping and north-facing issues
     if isRag then
         local minZ = math.huge

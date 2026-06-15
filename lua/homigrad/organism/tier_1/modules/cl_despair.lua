@@ -156,32 +156,45 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 
+	-- Despair subsides faster when panicking and not in a dangerous state
+	local isNotDying = true
+	if org then
+		local o2val = org.o2 and org.o2[1] or 0
+		local blood = org.blood or 5000
+		local bleed = org.bleed or 0
+		isNotDying = not (o2val > 50 or (blood < 4000 and bleed > 0) or org.otrub)
+	end
+	if panicAttack and isNotDying then
+		despairLerp = LerpFT(0.15, despairLerp, 0)
+	end
+
 	if despairLerp > 0.001 then
 		render.UpdateScreenEffectTexture()
 		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-		heatMat:SetFloat("$c0_y", 0.012 + despairLerp * 0.05)
-		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (0.25 + despairLerp))
+		heatMat:SetFloat("$c0_y", 0.008 + despairLerp * 0.03)
+		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (0.15 + despairLerp * 0.7))
 		render.SetMaterial(heatMat)
 		render.DrawScreenQuad()
 
-		despairTab["$pp_colour_brightness"] = -0.03 - despairLerp * 0.08
-		despairTab["$pp_colour_contrast"] = 1 - despairLerp * 0.08
-		despairTab["$pp_colour_colour"] = 1 - despairLerp * 0.5
+		despairTab["$pp_colour_brightness"] = -0.015 - despairLerp * 0.04
+		despairTab["$pp_colour_contrast"] = 1 - despairLerp * 0.05
+		despairTab["$pp_colour_colour"] = 1 - despairLerp * 0.28
 		DrawColorModify(despairTab)
 	end
 
 	-- Panic attack chromatic aberration and vignette
 	if panicAttack then
 		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", 0.15 + math.sin(CurTime() * 8) * 0.05)
+		-- Heavy chromatic aberration during panic, pulsing but not overwhelming
+		chromaticMat:SetFloat("$c0_x", 0.09 + math.sin(CurTime() * 7) * 0.03)
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", 2.5)
-		vignetteMat:SetFloat("$c1_y", 3.0)
+		vignetteMat:SetFloat("$c0_z", 1.8)
+		vignetteMat:SetFloat("$c1_y", 2.2)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 	end

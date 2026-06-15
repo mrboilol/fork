@@ -1,5 +1,6 @@
+-- DEPRECATED: This file has been superseded by the modular ik_foot/ system.
+-- See: lua/autorun/ik_foot_init.lua and lua/ik_foot/
 if true then return end
-local hg = hg or {}
 
 -- PAC3 compatibility check (from iker foot)
 local function UsePAC()

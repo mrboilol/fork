@@ -946,19 +946,20 @@ if SERVER then
 			local bonewounds = {}
 			if not bone then
 				for i,wound in pairs(org.arterialwounds) do
-					pw = i 
-					for i1,tbl in pairs(org.wounds) do
-						if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
-						local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-						local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
-						--print(1,bonename,sec_bonename)
-						if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
-							--print(2,bonename,sec_bonename)
-							table.insert(bonewounds,i1)
+					if wound[7] != "arteria" then 
+						pw = i 
+						for i1,tbl in pairs(org.wounds) do
+							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
+							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
+							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
+							--print(1,bonename,sec_bonename)
+							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
+								--print(2,bonename,sec_bonename)
+								table.insert(bonewounds,i1)
+							end
 						end
-					end
-					--PrintTable(bonewounds)
-				break
+						--PrintTable(bonewounds)
+					break end
 				end
 				
 			else
@@ -976,11 +977,7 @@ if SERVER then
 
 			local wound = org.arterialwounds[pw]
 			if not wound then return false end
-
-			-- Prevent tourniquet on amputated arm arteries
-			if wound[7] == "rarmartery" and org.rarmamputated then return false end
-			if wound[7] == "larmartery" and org.larmamputated then return false end
-
+			
 			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
 			org[wound[7]] = 0
 

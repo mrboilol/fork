@@ -1485,36 +1485,42 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
+	local panicAttack = org and org.panicAttack or false
 	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
+	-- When panicking, the gray effect partially subsides
+	local despairGrayFx = panicAttack and despairFx * 0.35 or despairFx
 	if despairFx > 0.05 then
 		local despairShock = despairFx ^ 0.7
+		local despairGrayShock = despairGrayFx ^ 0.7
         if not (lply:IsBerserk() or lply:IsStimulated()) then
     		render.UpdateScreenEffectTexture()
     		heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
-    		heatMat:SetFloat("$c0_y", despairShock * 0.02)
-    		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 0.2))
+    		heatMat:SetFloat("$c0_y", despairShock * 0.015)
+    		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.75) - 1.5) * (despairShock * 0.15))
     		render.SetMaterial(heatMat)
     		render.DrawScreenQuad()
         end
 
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", despairShock * 0.5)
-		vignetteMat:SetFloat("$c1_y", despairShock * 0.8)
+		vignetteMat:SetFloat("$c0_z", despairShock * 0.35)
+		vignetteMat:SetFloat("$c1_y", despairShock * 0.55)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
         if not (lply:IsBerserk() or lply:IsStimulated()) then
+			-- Panic: heavier chromatic aberration, despair: lighter
+			local chromAmt = panicAttack and (0.04 + despairShock * 0.09 + math.sin(CurTime() * 6) * 0.015) or (despairShock * 0.035)
     		render.UpdateScreenEffectTexture()
-    		chromaticMat:SetFloat("$c0_x", despairShock * 0.05)
+    		chromaticMat:SetFloat("$c0_x", chromAmt)
     		chromaticMat:SetInt("$c0_y", 1)
     		render.SetMaterial(chromaticMat)
     		render.DrawScreenQuad()
         end
 
-		tab["$pp_colour_brightness"] = -(despairShock ^ 1.2) * 0.35
-		tab["$pp_colour_contrast"] = 1 - despairShock * 0.3
-		tab["$pp_colour_colour"] = 1 - despairShock * 0.7
+		tab["$pp_colour_brightness"] = -(despairGrayShock ^ 1.2) * 0.2
+		tab["$pp_colour_contrast"] = 1 - despairGrayShock * 0.18
+		tab["$pp_colour_colour"] = 1 - despairGrayShock * 0.45
 		tab["$pp_colour_mulr"] = 0
 		tab["$pp_colour_mulg"] = 0
 		tab["$pp_colour_mulb"] = 0
@@ -1556,12 +1562,25 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		end
 
-		-- Slight white hue that slowly fades in (not all the way)
+		-- White desaturation as background (replaces dark graying)
 		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
-		local whiteHue = giveUpWhiteLerp * 0.12
-		tab["$pp_colour_addr"] = whiteHue
-		tab["$pp_colour_addg"] = whiteHue
-		tab["$pp_colour_addb"] = whiteHue
+		local whiteAmt = giveUpWhiteLerp * 0.55
+		-- Draw white vignette as a background layer behind other effects
+		surface.SetDrawColor(255, 255, 255, math.floor(giveUpWhiteLerp * 60))
+		surface.SetMaterial(whiteVignetteR)
+		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+		surface.SetMaterial(whiteVignetteL)
+		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+		surface.SetMaterial(whiteVignetteU)
+		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+		surface.SetMaterial(whiteVignetteD)
+		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
+		-- Apply white tint additively (colour increases toward white, not black)
+		tab["$pp_colour_addr"] = whiteAmt * 0.18
+		tab["$pp_colour_addg"] = whiteAmt * 0.18
+		tab["$pp_colour_addb"] = whiteAmt * 0.18
+		tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.3)
+		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.12
 
 		-- Suppress regular despair visual effects
 		despairVisualLerp = 0
@@ -1619,8 +1638,8 @@ hook.Add("DrawOverlay", "despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText("Your mind is in despair.", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("im so fucking scared.", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText("im so fucking scared.", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local function removeflash()

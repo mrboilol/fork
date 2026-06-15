@@ -50,12 +50,18 @@ module[2] = function(owner, org, timeValue)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
-	-- Convert excess fearadd to despair (reduced rate to prevent spam)
+	-- Convert excess fearadd to despair only when in incredible pain or dying
 	if org.fearadd > 2.0 then
 		local excessFear = org.fearadd - 2.0
-		local despairConversion = excessFear * timeValue * 0.002
-		org.despair = math.min((org.despair or 0) + despairConversion, 1)
-		org.fearadd = math.max(org.fearadd - despairConversion, 2.0)
+		local pain = org.pain or 0
+		local blood = org.blood or 5000
+		local o2val = org.o2 and org.o2[1] or 100
+		local dyingOrAgony = pain > 70 or blood < 3000 or o2val > 60
+		if dyingOrAgony then
+			local despairConversion = excessFear * timeValue * 0.002
+			org.despair = math.min((org.despair or 0) + despairConversion, 1)
+			org.fearadd = math.max(org.fearadd - despairConversion, 2.0)
+		end
 	end
 
 	local heartbeat = org.pulse < 70 and 70 + (70 - org.pulse) * 4 or org.pulse

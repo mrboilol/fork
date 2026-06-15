@@ -269,9 +269,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		if(runnin and velLen >= 10)then
 			local targetSpeed = (ply.move or ply:GetRunSpeed()) * mul
 			if isSprinting then
-				targetSpeed = targetSpeed * 1.3
+				targetSpeed = targetSpeed * 1.2
 			elseif isJogging then
-				targetSpeed = targetSpeed * 0.85
+				targetSpeed = targetSpeed * 0.72
 			end
 			ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, targetSpeed, delta_time * ply.SpeedGainMul)
 		else

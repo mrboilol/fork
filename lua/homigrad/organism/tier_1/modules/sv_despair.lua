@@ -150,9 +150,18 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	org.despair = Clamp(org.despair or 0, 0, 1)
+	-- Berserk and noradrenaline block and remove despair
+	if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then
+		org.despair = 0
+		return
+	end
 	-- Despair budge less unless despair hasn't been gained for a little bit
 	local timeSinceGain = CurTime() - (org._despairLastGainedTime or 0)
 	local despairDecay = timeValue / 180
+	-- Faster decay when unconscious (otrub) - unconsciousness helps despair go away
+	if org.otrub then
+		despairDecay = despairDecay * 3
+	end
 	-- Slower decay if despair was gained recently (within 30 seconds)
 	if timeSinceGain < 30 then
 		if org.despair > 0.7 then
@@ -217,27 +226,33 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 
 		if (org.fear or 0) > 0 then
-			-- Transfer fear to despair - moderate rate regardless of fearAdd
-			local fear = org.fear
-			local fearTransferRate = 0.008 -- Base transfer rate
-			-- Scale transfer rate with fear duration - up to 2x multiplier after 60 seconds of sustained fear
-			local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 1)
-			add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate * fearDurationMultiplier
+			-- Transfer fear to despair only when in incredible pain or dying
+			local pain = org.pain or 0
+			local blood = org.blood or 5000
+			local o2val = org.o2 and org.o2[1] or 100
+			local dyingOrAgony = pain > 70 or blood < 3000 or o2val > 60
+			if dyingOrAgony then
+				local fear = org.fear
+				local fearTransferRate = 0.004 -- Base transfer rate
+				-- Scale transfer rate with fear duration - up to 2x multiplier after 60 seconds of sustained fear
+				local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 1)
+				add = add + Clamp(fear, 0, 2) * timeValue * fearTransferRate * fearDurationMultiplier
+			end
 		end
 	end
 
 	if (org.pain or 0) > 45 then
-		add = add + Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.25
+		add = add + Clamp((org.pain - 45) / 85, 0, 1) * timeValue * 0.14
 	end
 
 	if (org.shock or 0) > 20 then
-		add = add + Clamp((org.shock - 20) / 50, 0, 1) * timeValue * 0.12
+		add = add + Clamp((org.shock - 20) / 50, 0, 1) * timeValue * 0.07
 	end
 
 	if (org.bleed or 0) > 0 then
 		-- Bleeding despair - 2 is severe bleeding (pouring blood)
 		local bleedSeverity = Clamp(org.bleed / 2, 0, 1)
-		add = add + bleedSeverity * timeValue * 0.25
+		add = add + bleedSeverity * timeValue * 0.14
 	end
 
 	-- Despair from damaged limbs (broken bones, fractures)
@@ -259,7 +274,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 	-- Despair from dying state (critical health/blood)
 	if (org.blood or 5000) < 3750 then
-		add = add + Clamp((3750 - org.blood) / 3750, 0, 1) * timeValue * 0.35
+		add = add + Clamp((3750 - org.blood) / 3750, 0, 1) * timeValue * 0.18
 	end
 
 	-- Despair from bleeding out (low blood + active bleeding - won't clot)
@@ -268,7 +283,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if blood < 3750 and bleed > 0 then
 		local bleedSeverity = Clamp((3750 - blood) / 3750, 0, 1)
 		-- Higher despair gain when actively bleeding out (blood won't clot)
-		add = add + bleedSeverity * timeValue * 0.4
+		add = add + bleedSeverity * timeValue * 0.2
 	end
 
 	-- Despair from lack of goodmood (if goodmood has been low for a while)
@@ -296,7 +311,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if org.o2 and org.o2[1] then
 		local o2 = org.o2[1]
 		if o2 < 18 then
-			add = add + Clamp((18 - o2) / 18, 0, 1) * timeValue * 0.4
+			add = add + Clamp((18 - o2) / 18, 0, 1) * timeValue * 0.22
 		end
 
 		local curregen = org.o2.curregen or 0

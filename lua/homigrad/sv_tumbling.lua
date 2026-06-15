@@ -178,7 +178,6 @@ hook.Add("Think", "stanleytumbler", function()
                     if math.random() < breakChance then
                         -- Limb break
                                                 PlayBoneBreakSound(ply)
-                        org.painadd = (org.painadd or 0) + 70 -- More pain for a break
 
                         if tripType == "wall" then
                             if trHighHit then
@@ -202,7 +201,6 @@ hook.Add("Think", "stanleytumbler", function()
                     elseif math.random() < dislocationChance then
                         -- Limb dislocation
                                                 PlayBoneBreakSound(ply)
-                        org.painadd = (org.painadd or 0) + 35
 
                         if tripType == "wall" then
                             if trHighHit then

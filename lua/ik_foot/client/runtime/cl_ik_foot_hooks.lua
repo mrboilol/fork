@@ -10,13 +10,6 @@ hook.Add("PostPlayerDraw", "IKFoot_PostPlayerDraw", function(ply)
 
 	local lp = LocalPlayer()
 
-	-- skip local player in first person; health indicator handles that view
-	if ply == lp then
-		local hg_thirdperson = ConVarExists("hg_thirdperson") and GetConVar("hg_thirdperson")
-		local thirdPerson = hg_thirdperson and hg_thirdperson:GetBool() or false
-		if not thirdPerson then return end
-	end
-
 	-- skip when TPIK has active hand IK to avoid fighting with arm bones
 	if ply == lp and isfunction(hg and hg.ShouldTPIK) and hg.ShouldTPIK(ply) then
 		local wpn = ply:GetActiveWeapon()
@@ -130,6 +123,52 @@ hook.Add("PostPlayerDraw", "IKFoot_PostPlayerDraw", function(ply)
 	local debugCvar = RT.CVars.debug
 	if debugCvar and debugCvar:GetInt() > 0 then
 		RT.Controller.DrawDebug(ply, result)
+	end
+end)
+
+-- PostPlayerDraw does not fire for the local player when their body is hidden
+-- in first-person view. Run the same IK pipeline from PreDrawViewModels so
+-- that bone manipulations stay current for shadows, accessories and the
+-- health indicator bone sync even when the body is not rendered.
+hook.Add("PreDrawViewModels", "IKFoot_FirstPersonBones", function()
+	local ply = LocalPlayer()
+	if not IsValid(ply) then return end
+	if not ply:Alive() then return end
+
+	-- only needed when the local player body is NOT being drawn (first-person)
+	-- when the body is drawn, PostPlayerDraw already handles it
+	local hg_thirdperson = ConVarExists("hg_thirdperson") and GetConVar("hg_thirdperson")
+	local thirdPerson = hg_thirdperson and hg_thirdperson:GetBool() or false
+	if thirdPerson then return end
+
+	if not RT.GetIKParamBool(ply, "enabled") then return end
+
+	if ply.organism and (ply.organism.otrub or (ply.organism.brain or 0) > 0.1) then return end
+
+	if not RT.CanManipulateBones(ply) then return end
+
+	local bones = RT.GetIKBones(ply)
+	if not bones.lFoot or not bones.rFoot or not bones.lCalf or not bones.rCalf or not bones.lThigh or not bones.rThigh then return end
+
+	RT.Apply.StripIKFromBones(ply, bones)
+	ply:SetupBones()
+
+	local ok = pcall(function()
+		local skeleton = RT.Apply.BuildSkeleton(ply, bones)
+		if not skeleton then return end
+		local result = RT.Controller.Calculate(ply, skeleton)
+		if not result then return end
+		RT.Apply.ApplyResult(ply, bones, result)
+	end)
+
+	if not ok then
+		ply.IKFPFailCount = (ply.IKFPFailCount or 0) + 1
+		if ply.IKFPFailCount >= 10 then
+			RT.Apply.HardResetPlayer(ply)
+			ply.IKFPFailCount = 0
+		end
+	else
+		ply.IKFPFailCount = 0
 	end
 end)
 

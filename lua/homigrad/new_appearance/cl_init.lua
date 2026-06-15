@@ -236,6 +236,7 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 		local bone = ent:LookupBone(accessData["bone"])
 		if not bone then return end
 		if ent:GetManipulateBoneScale(bone):LengthSqr() < 0.1 then return end
+		ent:SetupBones()
 		local matrix = ent:GetBoneMatrix(bone)
 		if not matrix then return end
 
