@@ -874,33 +874,6 @@ local IsValid = IsValid
 --//
 
 	--\\ Suicide
-	if SERVER then
-		local hg_huyside = CreateConVar("hg_huyside", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "enable cutscene thijng", 0, 1)
-		concommand.Add("suicide", function(ply)
-			if not hg.CanSuicide(ply) then
-				ply:ChatPrint("no nigga")
-				return
-			end
-
-			local wep = ply:GetActiveWeapon()
-			local is_gun_for_cutscene = IsValid(wep) and wep.ishgweapon and not wep.ismelee and not wep.ismelee2
-
-			if hg_huyside:GetBool() then -- huyside == 1, cutscene logic
-				if is_gun_for_cutscene then
-					if ply.organism and (ply.organism.despair or 0) >= 0.95 then
-						ply.suiciding = !ply.suiciding
-					else
-						ply:ChatPrint("You are not in despair enough to do that.")
-					end
-				else -- Not a gun for cutscene, but CanSuicide is true (e.g. melee) -> normal suicide
-					ply.suiciding = !ply.suiciding
-				end
-			else -- huyside == 0, normal suicide logic for any weapon that passed CanSuicide
-				ply.suiciding = !ply.suiciding
-			end
-		end)
-	end
-
 	function hg.CanSuicide(ply)
 		if not IsValid(ply) or not ply:Alive() or not ply.GetActiveWeapon then return false end
 		local wep = ply:GetActiveWeapon()
@@ -910,13 +883,7 @@ local IsValid = IsValid
 		local is_gun = not wep.ismelee and not wep.ismelee2
 
 		if is_gun then
-			local hg_huyside_convar = GetConVar("hg_huyside")
-			-- If convar exists and is 0, allow any gun. Otherwise, require ishgweapon.
-			if hg_huyside_convar and hg_huyside_convar:GetInt() == 0 then
-				return true
-			else
-				return wep.ishgweapon
-			end
+			return wep.ishgweapon
 		end
 
 		-- it's a melee weapon, and CanSuicide is true.

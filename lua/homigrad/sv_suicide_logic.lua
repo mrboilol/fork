@@ -2,20 +2,14 @@ if SERVER then
     resource.AddFile("resource/fonts/arnopro.ttf")
     util.AddNetworkString("HG_SuicideCutscene")
 
-    hg = hg or {}
-    function hg.CanSuicide(ply)
-        if not IsValid(ply) or not ply:GetActiveWeapon() then return false end
-        local wep = ply:GetActiveWeapon()
-        return wep.ishgweapon and wep.CanSuicide and not wep.reload
-    end
-
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
+        if not hg.CanSuicide(ply) then return end
 
         local wep = ply:GetActiveWeapon()
         local has_gun = IsValid(wep) and wep.ishgweapon and not wep.ismelee and not wep.ismelee2 and wep:Clip1() > 0
 
-        if not has_gun then
+        if not has_gun or ply:GetInfoNum("hg_cutscene", 1) == 0 then
             ply.suiciding = not ply.suiciding
             return
         end
