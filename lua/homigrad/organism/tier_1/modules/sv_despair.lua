@@ -3,6 +3,7 @@ if hg and hg.despair_server_builtin then return end
 hg.despair_server_builtin = true
 
 local hg_despair_override = CreateConVar("hg_despair_override", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Global despair override (0-1)", 0, 1)
+local hg_despairsystem = CreateConVar("hg_despairsystem", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Despair system mode (0 = normal, 1 = giving-up only: despair/panic disabled, give up driven by fear and dying severity)", 0, 1)
 
 local function get_despair_org(ent)
 	if not IsValid(ent) then return nil end
@@ -51,6 +52,7 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 	local org = get_despair_org(ply)
 	if not org then return end
 	if org.otrub then return end
+	if hg_despairsystem:GetInt() == 1 then return end
 
 	local dmg = (dmgInfo and dmgInfo.GetDamage and dmgInfo:GetDamage()) or 0
 	if dmg <= 0 then return end
@@ -68,6 +70,16 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	local time = CurTime()
+	local simpleMode = hg_despairsystem:GetInt() == 1
+
+	-- In simple mode despair and panic are fully disabled
+	if simpleMode then
+		org.despair = 0
+		org.panicAttack = false
+		org._panicAttackEndTime = 0
+		org._panicAttackStartTime = nil
+		org._panicAttackCheckTime = nil
+	end
 
 	-- Give up mechanic: chance to give up when dying or bleeding out
 	-- Cannot give up during a panic attack (panic and giving up must not stack)
@@ -90,8 +102,21 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 					chance = 0.05 -- 5% if both dying and bleeding out
 				end
 				-- After a panic attack ends, the body is more likely to give up
-				if org._postPanicEndTime and (CurTime() - org._postPanicEndTime) < 20 then
+				if not simpleMode and org._postPanicEndTime and (CurTime() - org._postPanicEndTime) < 20 then
 					chance = chance + 0.03 * (1 - (CurTime() - org._postPanicEndTime) / 20)
+				end
+
+				-- Fear and how badly the player is dying push them toward giving up.
+				-- In simple mode this fully replaces the despair/panic-driven path.
+				local fearFactor = Clamp((org.fear or 0) / 2, 0, 1)
+				local severity = 0
+				if isDying then severity = max(severity, Clamp((o2val - 50) / 50, 0, 1)) end
+				if isBleedingOut then severity = max(severity, Clamp((3250 - blood) / 250, 0, 1)) end
+				if isUnconsciousDying then severity = max(severity, Clamp((o2val - 20) / 80, 0, 1)) end
+				if simpleMode then
+					chance = 0.015 + severity * 0.05 + fearFactor * 0.04
+				else
+					chance = chance + fearFactor * severity * 0.02
 				end
 
 				if math.random() < chance then
@@ -148,6 +173,13 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				end
 			end
 		end
+	end
+
+	-- Simple mode: despair and panic are disabled, only giving up remains
+	if simpleMode then
+		org.despair = 0
+		org.panicAttack = false
+		return
 	end
 
 	-- Apply convar override if set

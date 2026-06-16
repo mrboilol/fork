@@ -72,6 +72,11 @@ local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otr
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local hook_Run = hook.Run
+local hg_despairsystem_convar
+local function despair_system_mode()
+	if not hg_despairsystem_convar then hg_despairsystem_convar = GetConVar("hg_despairsystem") end
+	return hg_despairsystem_convar and hg_despairsystem_convar:GetInt() or 0
+end
 
 hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
 	if ply == LocalPlayer() then
@@ -1530,18 +1535,22 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	-- Give up mechanic: white vignette and itssofuckingover.mp3
 	if org.givingUp then
-		-- Suppress all other dying/otrubsound/despair music
-		if IsValid(NoiseStation2) then NoiseStation2:SetVolume(0) end
-		if IsValid(EndStation) then EndStation:SetVolume(0) end
-		if IsValid(DyingStation) then DyingStation:SetVolume(0) end
-		if IsValid(Alto2Station) then Alto2Station:SetVolume(0) end
-		if IsValid(SillydyingStation) then SillydyingStation:SetVolume(0) end
-		if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
-		if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-		if IsValid(AltotrubStation) then AltotrubStation:SetVolume(0) end
-		if IsValid(SleepyStation) then SleepyStation:SetVolume(0) end
-		if IsValid(FuckStation) then FuckStation:SetVolume(0) end
-		if IsValid(NoisesStation) then NoisesStation:SetVolume(0) end
+		local simpleMode = despair_system_mode() == 1
+		-- In normal mode the give-up theme replaces all other dying/despair music.
+		-- In simple mode it instead layers on top in the background at big volume.
+		if not simpleMode then
+			if IsValid(NoiseStation2) then NoiseStation2:SetVolume(0) end
+			if IsValid(EndStation) then EndStation:SetVolume(0) end
+			if IsValid(DyingStation) then DyingStation:SetVolume(0) end
+			if IsValid(Alto2Station) then Alto2Station:SetVolume(0) end
+			if IsValid(SillydyingStation) then SillydyingStation:SetVolume(0) end
+			if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+			if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+			if IsValid(AltotrubStation) then AltotrubStation:SetVolume(0) end
+			if IsValid(SleepyStation) then SleepyStation:SetVolume(0) end
+			if IsValid(FuckStation) then FuckStation:SetVolume(0) end
+			if IsValid(NoisesStation) then NoisesStation:SetVolume(0) end
+		end
 
 		-- Play itssofuckingover.mp3
 		if canRetrySound("GivingUpStation", GivingUpStation) then
@@ -1565,6 +1574,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		-- White desaturation as background (replaces dark graying)
 		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
 		local whiteAmt = giveUpWhiteLerp * 0.35
+		-- Flat white over the whole screen: very low opacity but noticeable
+		draw.NoTexture()
+		surface.SetDrawColor(255, 255, 255, math.floor(giveUpWhiteLerp * 30))
+		surface.DrawRect(0, 0, ScrW(), ScrH())
 		-- Draw white vignette as a background layer behind other effects
 		surface.SetDrawColor(255, 255, 255, math.floor(giveUpWhiteLerp * 35))
 		surface.SetMaterial(whiteVignetteR)
@@ -1589,6 +1602,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_addr"] = 0
 		tab["$pp_colour_addg"] = 0
 		tab["$pp_colour_addb"] = 0
+		-- Stop the give-up theme once no longer giving up
+		if IsValid(GivingUpStation) then
+			GivingUpStation:Stop()
+			GivingUpStation = nil
+		end
 	end
 
 	if (headtraumaSaturation or 0) > 0 then

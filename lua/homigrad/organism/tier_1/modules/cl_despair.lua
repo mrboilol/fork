@@ -41,6 +41,11 @@ local musicVolume = GetConVar("snd_musicvolume")
 CreateConVar("hg_panic_debug", "0", FCVAR_ARCHIVE, "Debug panic (0-1, 1 = true)")
 local hg_despair_override_convar = GetConVar("hg_despair_override")
 local hg_panic_debug_convar = GetConVar("hg_panic_debug")
+local hg_despairsystem_convar
+local function despair_system_mode()
+	if not hg_despairsystem_convar then hg_despairsystem_convar = GetConVar("hg_despairsystem") end
+	return hg_despairsystem_convar and hg_despairsystem_convar:GetInt() or 0
+end
 
 local panicThoughts = {
 	"I have to keep going.",
@@ -140,7 +145,18 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	if debugPanic >= 1 then
 		panicAttack = true
 	end
-	
+
+	-- Simple mode: despair and panic visuals/sounds are fully disabled
+	if despair_system_mode() == 1 then
+		despair = 0
+		panicAttack = false
+		despairLerp = 0
+		despairTextLerp = 0
+		stop_despair_sound(true)
+		stop_panic_sound(true)
+		return
+	end
+
 	if org and org.otrub then
 		despair = 0
 		despairLerp = 0

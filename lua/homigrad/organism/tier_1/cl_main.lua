@@ -1055,9 +1055,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	if org and org.blood and org.blood > 10 and wounds and #wounds > 0 then
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			for i, wound in pairs(wounds) do
-				local size = math.random(0, 1) * math.max(math.min(wound[1], 1), 0.5)
-				
-				if wound[5] + beatsPerSecond < time then
+				if (wound[5] or 0) < time then
 					local woundBone = cachedClientThinkBone(ent, wound[4])
 					if seen and woundBone then
 						local bone = wound[4]
@@ -1073,32 +1071,66 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
-							if wound[5] + 1 < time then
+							if (wound[5] or 0) + 1 < time then
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 							end
+							wound[5] = time + 2
 						else
-							-- Calculate spray direction from wound angle
 							local sprayDir = -ang:Forward()
 							local pulse = org.pulse or 70
 							local pulseMul = pulse / 70
+							local severity = wound[1] or 1.0
+							local severityFactor = severity * pulseMul
 							
-							-- Outward velocity based on pulse
-							local bleedVel = sprayDir * 10 * pulseMul + VectorRand(-5, 5)
+							local size = math.Rand(0.4, 0.8) * math.max(math.min(severity, 1.2), 0.4)
+							local bleedVel, delay
+							
+							if severityFactor > 1.2 then
+								local spraySpeed = Lerp(math.min((severityFactor - 1.2) / 3, 1), 35, 160)
+								local spread = Lerp(math.min((severityFactor - 1.2) / 3, 1), 6, 25)
+								bleedVel = sprayDir * spraySpeed + VectorRand(-spread, spread)
+								delay = math.Rand(0.02, 0.08) / (severityFactor - 0.8)
+							else
+								local spraySpeed = Lerp(severityFactor / 1.2, 2, 15)
+								local spread = Lerp(severityFactor / 1.2, 1, 5)
+								bleedVel = sprayDir * spraySpeed + VectorRand(-spread, spread)
+								delay = math.Rand(0.6, 2.0) / severityFactor
+							end
+							
+							delay = math.Clamp(delay, 0.015, 8.0)
 							hg.addBloodPart(pos, bleedVel, nil, size, size, false, nil, ent)
+							wound[5] = time + delay
 						end
-
-						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
 					else
 						local pos = ent:GetPos()
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
+							wound[5] = time + 2
 						else
-							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, false, nil, ent)
+							local pulse = org.pulse or 70
+							local pulseMul = pulse / 70
+							local severity = wound[1] or 1.0
+							local severityFactor = severity * pulseMul
+							
+							local size = math.Rand(0.4, 0.8) * math.max(math.min(severity, 1.2), 0.4)
+							local bleedVel, delay
+							
+							if severityFactor > 1.2 then
+								local spraySpeed = Lerp(math.min((severityFactor - 1.2) / 3, 1), 25, 100)
+								bleedVel = VectorRand(-spraySpeed, spraySpeed)
+								bleedVel[3] = math.max(bleedVel[3], -10)
+								delay = math.Rand(0.02, 0.08) / (severityFactor - 0.8)
+							else
+								bleedVel = VectorRand(-10, 10)
+								delay = math.Rand(0.6, 2.0) / severityFactor
+							end
+							
+							delay = math.Clamp(delay, 0.015, 8.0)
+							hg.addBloodPart(pos, bleedVel, nil, size, size, false, nil, ent)
+							wound[5] = time + delay
 						end
-
-						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
 					end
 				end
 			end
@@ -1107,7 +1139,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
+			local addtime = seen and (1 / math.Clamp(org.pulse or 70, 1,15) * 0.25) / 1.75 or (0.06 / 1.75)
 			if wound[5] + addtime < time then
 				local woundBone = cachedClientThinkBone(ent, wound[4])
 				if woundBone then
@@ -1141,10 +1173,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							hg.addBloodPart(pos, VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70, nil, size, size, true, nil, ent)
+							hg.addBloodPart(pos, (VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70) * 1.75, nil, size, size, true, nil, ent)
 						end
 
-						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))
+						wound[5] = time + (water and 2 or ((0.5 * 1 / hg_blood_fps:GetInt()) / 1.75))
 					else
 						local pos = ent:GetPos()
 						
