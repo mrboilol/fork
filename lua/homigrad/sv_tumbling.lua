@@ -19,8 +19,6 @@ local GAP_CHECK_DIST = 30
 local WALL_CHECK_DIST = 20
 local WALL_CHECK_HEIGHT = 10
 
-local hg_ik_foot_enabled = ConVarExists("hg_ik_foot_enabled") and GetConVar("hg_ik_foot_enabled") or CreateConVar("hg_ik_foot_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable IK Foot system") 
-
 local BASE_TRIP_CHANCE = 0.1
 local MAX_TRIP_CHANCE = 0.8
 
@@ -32,8 +30,6 @@ hook.Add("Think", "stanleytumbler", function()
         
         if ply:GetMoveType() == MOVETYPE_NOCLIP or not ply:IsOnGround() then continue end
         
-        if hg_ik_foot_enabled:GetBool() then continue end
-
         if (ply.nextTumbleCheck or 0) > CurTime() then continue end
         ply.nextTumbleCheck = CurTime() + 0.1
         local velocity = ply:GetVelocity()
