@@ -212,14 +212,14 @@ local haloents = {
 	["weapon_hg_f1_tpik"] = true
 }
 
+local pickuphalo = {}
 hook.Add( "PreDrawHalos", "AddPropHalos", function() -- вариант с подсвечиванием только когда смотришь
-	local pickuphalo = {}
-	 
+	pickuphalo[1] = nil
+
 	local tr = hg.eyeTrace(lply,72)
 	if IsValid(tr.Entity) and haloents[tr.Entity.Base] then
-		table.insert(pickuphalo, tr.Entity)
+		pickuphalo[1] = tr.Entity
 		local dist = lply:GetPos():Distance(tr.Entity:GetPos()) * 0.03
-		--print(dist)
 		color_red.r = Lerp(FrameTime()*2,color_red.r,56 / dist)
 		color_red.g = Lerp(FrameTime()*2,color_red.g,43 / dist)
 	else

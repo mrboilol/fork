@@ -313,19 +313,23 @@ surface.CreateFont(
 	}
 )
 
+local goProText = ""
+local goProNameText = ""
 hook.Add("HUDPaint", "HUDPaint_DrawABox", function() -- этот код старше вас, не судите строго
 	local lply = LocalPlayer()
 	if lply:Alive() and hg_gopro:GetBool() then
 		local specPly = lply
 		if not specPly:IsValid() then return end
-		local Text = "GoPro #" .. math.Round(util.SharedRandom(specPly:SteamID(),1000,9999,1),0)
+		goProText = "GoPro #" .. math.Round(util.SharedRandom(specPly:SteamID(),1000,9999,1),0)
+		goProNameText = specPly:GetName()
+		local Text = goProText
 		draw.DrawText(Text, "BODYCAMFONT", ScrW() * 0.905 + 2, ScrH() * 0.035 + 2, Color(0, 0, 0), TEXT_ALIGN_CENTER)
 		draw.DrawText(Text, "BODYCAMFONT", ScrW() * 0.905, ScrH() * 0.035, Color(255, 255, 255), TEXT_ALIGN_CENTER)
 		draw.RoundedBox(0, ScrW() * 0.85, ScrH() * 0.085, 50, 28, Color(0, 173, 255))
 		draw.RoundedBox(0, ScrW() * 0.85 + 58, ScrH() * 0.085, 50, 28, Color(0, 173, 255))
 		draw.RoundedBox(0, ScrW() * 0.85 + 58 * 2, ScrH() * 0.085, 50, 28, Color(0, 70, 103))
 		draw.RoundedBox(0, ScrW() * 0.85 + 58 * 3, ScrH() * 0.085, 50, 28, color_white)
-		Text = specPly:GetName()
+		Text = goProNameText
 		draw.DrawText(Text, "BODYCAMFONT", ScrW() * 0.905 + 2, ScrH() * 0.11 + 2, Color(0, 0, 0), TEXT_ALIGN_CENTER)
 		draw.DrawText(Text, "BODYCAMFONT", ScrW() * 0.905, ScrH() * 0.11, Color(255, 255, 255), TEXT_ALIGN_CENTER)
 		DrawBloom(0.8, 1, 9, 9, 1, 1.2, 0.8, 0.8, 1.2)
@@ -756,7 +760,7 @@ hook.Add( "CreateMove", "flipmove", function( cmd )
 	end
 end)
 
---local hg_norenderoverride = ConVarExists("hg_norenderoverride") and GetConVar("hg_norenderoverride") or CreateClientConVar("hg_norenderoverride", 0, true, false, "if you have lags you can try turning that on", 0, 1)
+local hg_norenderoverride = ConVarExists("hg_norenderoverride") and GetConVar("hg_norenderoverride") or CreateClientConVar("hg_norenderoverride", 0, true, false, "Disable the RenderScene override (better FPS at cost of some camera effects)", 0, 1)
 local mapswithfog = { -- Надо от сервер сайда сделать...
 	--["gm_freespace_09_super_extended_night"] = 5500,
 	--["gm_white_forest_countryside"] = 6000,
@@ -769,7 +773,8 @@ local mapswithfog = { -- Надо от сервер сайда сделать...
 --GlobalRenderOverideTickOFF = true
 local zfar = mapswithfog[game.GetMap()] or 0
 local map = game.GetMap()
-local scrw,scrh = ScrW(),ScrH()
+local scrw, scrh = ScrW(), ScrH()
+hook.Add("OnScreenSizeChanged", "cl_camera_scrsize", function() scrw, scrh = ScrW(), ScrH() end)
 local entmeta = FindMetaTable("Entity")
 local eyepos = entmeta.EyePos
 local eyeangles = entmeta.EyeAngles
@@ -834,15 +839,15 @@ local function renderscene(pos, angle, fov)
 end
 
 
---[[cvars.AddChangeCallback( "hg_norenderoverride", function(cvar, old, new)
-	if tonumber(new) == 0 then
-		hook.Add("RenderScene", "jopa", renderscene)
+local function updateRenderSceneHook()
+	if hg_norenderoverride:GetBool() then
+		hook.Remove("RenderScene", "jopa")
 	else
-		--hook.Remove("RenderScene", "jopa")
+		hook.Add("RenderScene", "jopa", renderscene)
 	end
-end, "huynuck")]]
-
-hook.Add("RenderScene", "jopa", renderscene)
+end
+cvars.AddChangeCallback("hg_norenderoverride", function() updateRenderSceneHook() end, "cl_camera_norenderoverride")
+updateRenderSceneHook()
 
 local vector_zero = Vector(0,0,0)
 net.Receive("LookAway",function()

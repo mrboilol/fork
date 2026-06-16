@@ -1,9 +1,5 @@
 local hg = hg or {}
 
-if CLIENT then
-	print("Concussion module loaded.")
-end
-
 local concussion_smooth = 0
 local last_concussion = 0
 local concussion_sound = nil

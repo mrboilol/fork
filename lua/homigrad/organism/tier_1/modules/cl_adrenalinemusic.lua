@@ -18,6 +18,7 @@ local function stop_adrenaline_music(force)
 		hg.adrenalineMusicVol = 0
 		return
 	end
+
 	hg.adrenalineMusicVol = LerpFT(0.02, hg.adrenalineMusicVol, 0)
 	hg.adrenalineMusicStation:SetVolume(hg.adrenalineMusicVol)
 	if hg.adrenalineMusicVol <= 0.001 then
@@ -27,28 +28,14 @@ local function stop_adrenaline_music(force)
 end
 
 local function start_adrenaline_music()
-	if not hg_adrenalinemusic:GetBool() then 
-		MsgN("[AdrenalineMusic] Convar disabled")
-		return 
-	end
-	if IsValid(hg.adrenalineMusicStation) then 
-		MsgN("[AdrenalineMusic] Station already exists")
-		return 
-	end
-	if hg.adrenalineMusicLoading then 
-		MsgN("[AdrenalineMusic] Already loading")
-		return 
-	end
+	if not hg_adrenalinemusic:GetBool() then return end
+	if IsValid(hg.adrenalineMusicStation) then return end
+	if hg.adrenalineMusicLoading then return end
 
-	MsgN("[AdrenalineMusic] Starting music...")
 	hg.adrenalineMusicLoading = true
 	sound.PlayFile("sound/sorrymud.mp3", "mono noblock noplay", function(channel, err)
 		hg.adrenalineMusicLoading = false
-		if not IsValid(channel) then 
-			MsgN("[AdrenalineMusic] Failed to load sound: ", err or "unknown error")
-			return 
-		end
-		MsgN("[AdrenalineMusic] Sound loaded successfully")
+		if not IsValid(channel) then return end
 		channel:SetVolume(0)
 		channel:Play()
 		channel:EnableLooping(true)
@@ -69,9 +56,6 @@ end
 hook.Add("Think", "hg_adrenalinemusic_check", function()
 	if not hg_adrenalinemusic:GetBool() then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Convar disabled")
-		end
 		return
 	end
 
@@ -79,65 +63,41 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	if not IsValid(ply) then return end
 	if IsValid(ply:GetNWEntity("spect")) then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Blocked: spectating")
-		end
 		return
 	end
 	if not ply:Alive() then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Blocked: dead")
-		end
 		return
 	end
 
 	local org = get_target_organism()
 	if not org then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Blocked: no organism")
-		end
 		return
 	end
 
 	if org.otrub then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Blocked: otrub")
-		end
 		return
 	end
 
-	-- Prevent playing if under noradrenaline influence (fury-13)
 	if (org.noradrenaline or 0) > 0.01 then
 		stop_adrenaline_music(true)
-		MsgN("[AdrenalineMusic] Blocked: noradrenaline = ", org.noradrenaline)
 		return
 	end
 
-	-- Prevent playing if under berserk influence
 	if (org.berserk or 0) > 0.01 then
 		stop_adrenaline_music(true)
-		MsgN("[AdrenalineMusic] Blocked: berserk = ", org.berserk)
 		return
 	end
 
-	-- Prevent playing if panicking
 	if org.panicAttack then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Blocked: panicAttack")
-		end
 		return
 	end
 
-	-- Prevent playing if giving up
 	if org.givingUp then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Blocked: givingUp")
-		end
 		return
 	end
 
@@ -151,15 +111,11 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	local o2 = org.o2 and org.o2.curregen or 0
 	local pulse = org.pulse or 0
 
-	-- Prevent playing if recently recovered from severe pain (within 30 seconds)
 	if pain > 70 then
 		hg.lastSeverePainTime = CurTime()
 	end
 	if (hg.lastSeverePainTime or 0) > CurTime() - 30 then
 		stop_adrenaline_music(true)
-		if CurTime() % 1 < 0.1 then
-			MsgN("[AdrenalineMusic] Blocked: recently recovered from severe pain")
-		end
 		return
 	end
 
@@ -175,11 +131,6 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 		shouldPlay = true
 	end
 	
-	-- Debug output every 0.5 seconds
-	if CurTime() % 0.5 < 0.1 then
-		MsgN("[AdrenalineMusic] Triggers - adr:", adrenaline, " adrAdd:", adrenalineAdd, " fear:", fear, " combat:", panicTrigger, " shouldPlay:", shouldPlay, " org valid:", org ~= nil, " station valid:", IsValid(hg.adrenalineMusicStation), " vol:", hg.adrenalineMusicVol, " convar:", hg_adrenalinemusic:GetBool())
-	end
-
 	-- Track values for other systems but don't use them for triggering
 	hg.lastAdrenalineAdd = adrenalineAdd
 	hg.lastFear = fear
@@ -229,12 +180,8 @@ hook.Add("EntityTakeDamage", "hg_adrenalinemusic_combat", function(ent, dmgInfo)
 	-- Exclude fall damage (DMG_FALL) and burn damage (DMG_BURN, DMG_SLOWBURN)
 	local isNaturalDamage = damageType == DMG_FALL or damageType == DMG_BURN or damageType == DMG_SLOWBURN
 
-	MsgN("[AdrenalineMusic] Damage taken - dmg:", damage, " type:", damageType, " natural:", isNaturalDamage, " attacker:", IsValid(attacker) and attacker:GetClass() or "invalid")
-
-	-- Trigger combat for any damage that isn't natural (fall/burn)
 	if damage > 0 and not isNaturalDamage then
 		hg.lastCombatTime = CurTime()
-		MsgN("[AdrenalineMusic] Combat triggered by damage")
 	end
 end)
 
@@ -245,7 +192,6 @@ hook.Add("EntityFireBullets", "hg_adrenalinemusic_weaponfire", function(ent, dat
 	if not IsValid(ent) or not ent:Alive() then return end
 
 	hg.lastCombatTime = CurTime()
-	MsgN("[AdrenalineMusic] Combat triggered by weapon fire")
 end)
 
 hook.Add("Player_Death", "hg_adrenalinemusic_cleanup", function(ply)
