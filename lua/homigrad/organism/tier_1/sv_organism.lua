@@ -472,7 +472,29 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 
 	-- Check if left arm is damaged or amputated (one-handed condition)
 	local leftArmDamaged = (org.larm and org.larm >= 1) or org.larmamputated or (org.larmdislocation or org.larmdislocated)
-	if not leftArmDamaged then return end
+	local isPostureOneHanded = IsValid(wep) and wep.TwoHanded == false
+	if not leftArmDamaged and not isPostureOneHanded then return end
+
+	-- Posture-only one-handing (healthy left arm, weapon set TwoHanded = false): only penalize for heavy calibers
+	if not leftArmDamaged and isPostureOneHanded then
+		if not isHeavyCaliber then return end
+		local rightArmDislocated = org.rarmdislocation or org.rarmdislocated
+		if rightArmDislocated then
+			ent:DropWeapon(wep)
+			return
+		end
+		if not org.rarmamputated then
+			local wristDamage = caliberWeight * 0.10
+			local oldRarm = org.rarm or 0
+			org.rarm = math.min(oldRarm + wristDamage, 1)
+			if oldRarm < 0.8 and org.rarm >= 0.8 then
+				org.rarmdislocation = true
+				ent:DropWeapon(wep)
+			end
+		end
+		org.painadd = (org.painadd or 0) + caliberWeight * 7
+		return
+	end
 
 	-- Check if right arm is dislocated - can't fire one-handed with dislocated arm
 	local rightArmDislocated = org.rarmdislocation or org.rarmdislocated

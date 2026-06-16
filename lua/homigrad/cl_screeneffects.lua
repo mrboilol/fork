@@ -1556,7 +1556,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		if IsValid(GivingUpStation) then
-			GivingUpStation:SetVolume(2.5 * snd_musicvolume:GetFloat())
+			GivingUpStation:SetVolume(1.0 * snd_musicvolume:GetFloat())
 			if GivingUpStation:GetTime() >= 120 then
 				GivingUpStation:SetTime(0)
 			end

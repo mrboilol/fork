@@ -282,6 +282,11 @@ module[2] = function(owner, org, timeValue)
 			org.heartstop = false
 			-- Reset heartbeat to a safe range when restarting to prevent immediate fibrillation
 			org.heartbeat = math.Clamp(org.heartbeat, 80, 140)
+			-- Also attempt to restore O2 to a minimum survivable level so breathing can resume
+			if org.o2 then
+				local o2Restore = math.Clamp(adren * 2, 2, 8)
+				org.o2[1] = math.max(org.o2[1], o2Restore)
+			end
 		end
 	end
 

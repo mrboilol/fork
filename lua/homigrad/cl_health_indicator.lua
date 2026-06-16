@@ -6,8 +6,8 @@ local bleedIconMat = Material("zcity_delta/unitmenu/status/bleeding.png", "smoot
 local bigBleedIconMat = Material("zcity_delta/unitmenu/status/bigbleeding.png", "smooth")
 local statusIconCache = {}
 
-local IND_SIZE_BASE = 180
-local IND_SIZE_MAX = 240
+local IND_SIZE_BASE = 220
+local IND_SIZE_MAX = 290
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local PULSE_DURATION = 8
@@ -27,6 +27,13 @@ local cachedAfflictionIcons = {}
 local lastKnownFacingAngle = 0
 local fadingBones = {} -- Track bones that are fading out after being healed
 local FADE_DURATION = 2 -- Seconds for damage color to fade out
+
+-- Post-TPIK bone matrix cache: populated after DrawPlayerRagdoll/MainTPIKFunction runs
+-- so SyncBonesCallback reads IK-resolved poses, not raw animation-only poses.
+local tpikBoneCache = nil
+local tpikBoneCacheSrcPos = nil
+local tpikBoneCacheSrcAng = nil
+local tpikBoneCacheIsRag = false
 
 local expieModels = {
     ["models/blop/expie/expie.mdl"] = true,
@@ -133,53 +140,34 @@ end
 local scaleZeroMat = Matrix()
 scaleZeroMat:Scale(Vector(0.001, 0.001, 0.001))
 
-local function SyncBonesCallback(ent, numbones)
-    local ply = LocalPlayer()
-    if not IsValid(ply) then return end
-    
-    local src = ply
-    local isRag = false
-    local fakeRag = ply:GetNWEntity("FakeRagdoll")
-    local deathRag = ply:GetNWEntity("RagdollDeath")
-    
-    if IsValid(fakeRag) then src = fakeRag; isRag = true
-    elseif IsValid(deathRag) then src = deathRag; isRag = true
-    elseif IsValid(ply:GetRagdollEntity()) then src = ply:GetRagdollEntity(); isRag = true end
+local function CaptureTPIKBoneCache(ply)
+    local src = hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)
+    if not IsValid(src) then src = ply end
 
-    if not IsValid(src) then return end
-
-    src:SetupBones()
-
+    local isRag = (src ~= ply)
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
 
-    -- FIX: Ragdoll drooping and north-facing issues
     if isRag then
         local minZ = math.huge
-        for i = 0, src:GetBoneCount() - 1 do
+        local boneCount = src:GetBoneCount()
+        for i = 0, boneCount - 1 do
             local mat = src:GetBoneMatrix(i)
             if mat then
                 local pos = mat:GetTranslation()
                 if pos.z < minZ then minZ = pos.z end
             end
         end
-        
         local pelvis = src:LookupBone("ValveBiped.Bip01_Pelvis")
         if pelvis then
             local pMat = src:GetBoneMatrix(pelvis)
             if pMat then
-                -- Anchor ragdolls to the pelvis x/y but lowest bone z
                 srcPos = pMat:GetTranslation()
-                if minZ ~= math.huge then
-                    srcPos.z = minZ
-                end
+                if minZ ~= math.huge then srcPos.z = minZ end
             end
         end
-        -- Prevent snapping North: Use last known facing angle or player eye angles
-        -- When ragdoll angles are zeroed/invalid, use stored angle or player eye angles
         local ragYaw = srcAng.y
         if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
-            -- Ragdoll angles are likely default/invalid, use last known good angle or player eye angles
             local eyeAng = ply:EyeAngles()
             if lastKnownFacingAngle ~= 0 then
                 srcAng = Angle(0, lastKnownFacingAngle, 0)
@@ -187,50 +175,117 @@ local function SyncBonesCallback(ent, numbones)
                 srcAng = Angle(0, eyeAng.y, 0)
             end
         else
-            -- Use ragdoll's actual yaw but update our stored angle
             srcAng = Angle(0, ragYaw, 0)
             lastKnownFacingAngle = ragYaw
         end
     else
-        -- FIX: Prevent the model from leaning backward/forward when you look up/down
         local eyeAng = ply:EyeAngles()
         srcAng = Angle(0, eyeAng.y, 0)
         lastKnownFacingAngle = eyeAng.y
     end
-    
+
+    tpikBoneCache = tpikBoneCache or {}
+    local boneCount = src:GetBoneCount()
+    for i = 0, boneCount - 1 do
+        local name = src:GetBoneName(i)
+        if name then
+            tpikBoneCache[name] = src:GetBoneMatrix(i)
+        end
+    end
+    tpikBoneCacheSrcPos = srcPos
+    tpikBoneCacheSrcAng = srcAng
+    tpikBoneCacheIsRag = isRag
+end
+
+hook.Add("PostDrawPlayerRagdolls", "HealthIndicator_CacheTPIKBones", function()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not ply:Alive() then return end
+    CaptureTPIKBoneCache(ply)
+end)
+
+local function SyncBonesCallback(ent, numbones)
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
+
+    -- Use post-TPIK cache if available; fall back to live SetupBones only as a last resort
+    local cache = tpikBoneCache
+    local srcPos = tpikBoneCacheSrcPos
+    local srcAng = tpikBoneCacheSrcAng
+
+    if not cache or not srcPos then
+        -- Cache not yet populated this session; fall back to direct read
+        local src = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)) or ply
+        if not IsValid(src) then return end
+        src:SetupBones()
+        local isRag = (src ~= ply)
+        srcPos = src:GetPos()
+        srcAng = src:GetAngles()
+        if isRag then
+            local minZ = math.huge
+            for i = 0, src:GetBoneCount() - 1 do
+                local mat = src:GetBoneMatrix(i)
+                if mat then
+                    local pos = mat:GetTranslation()
+                    if pos.z < minZ then minZ = pos.z end
+                end
+            end
+            local pelvis = src:LookupBone("ValveBiped.Bip01_Pelvis")
+            if pelvis then
+                local pMat = src:GetBoneMatrix(pelvis)
+                if pMat then
+                    srcPos = pMat:GetTranslation()
+                    if minZ ~= math.huge then srcPos.z = minZ end
+                end
+            end
+            local ragYaw = srcAng.y
+            if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
+                local eyeAng = ply:EyeAngles()
+                srcAng = Angle(0, lastKnownFacingAngle ~= 0 and lastKnownFacingAngle or eyeAng.y, 0)
+            else
+                srcAng = Angle(0, ragYaw, 0)
+                lastKnownFacingAngle = ragYaw
+            end
+        else
+            local eyeAng = ply:EyeAngles()
+            srcAng = Angle(0, eyeAng.y, 0)
+            lastKnownFacingAngle = eyeAng.y
+        end
+        cache = {}
+        for i = 0, src:GetBoneCount() - 1 do
+            local name = src:GetBoneName(i)
+            if name then cache[name] = src:GetBoneMatrix(i) end
+        end
+    end
+
     local srcWorld = Matrix()
     srcWorld:SetTranslation(srcPos)
     srcWorld:SetAngles(srcAng)
     local srcInv = srcWorld:GetInverseTR()
-    
+
     local entTransform = Matrix()
     entTransform:SetTranslation(Vector(0, 0, 0))
     entTransform:SetAngles(Angle(0, 0, 0))
-    
+
     for i = 0, numbones - 1 do
         local name = ent:GetBoneName(i)
-        local srcBone = src:LookupBone(name)
-        if srcBone then
-            local mat = src:GetBoneMatrix(srcBone)
-            if mat then
-                local manipScale = ent:GetManipulateBoneScale(i)
-                
-                local localMat = srcInv * mat
-                local finalMat = entTransform * localMat
-                
-                if manipScale == Vector(0,0,0) then
-                    finalMat = finalMat * scaleZeroMat
-                elseif manipScale ~= Vector(1,1,1) then
-                    local scaleMat = Matrix()
-                    scaleMat:Scale(manipScale)
-                    finalMat = finalMat * scaleMat
-                end
-                
-                ent:SetBoneMatrix(i, finalMat)
+        local mat = cache[name]
+        if mat then
+            local manipScale = ent:GetManipulateBoneScale(i)
+
+            local localMat = srcInv * mat
+            local finalMat = entTransform * localMat
+
+            if manipScale == Vector(0,0,0) then
+                finalMat = finalMat * scaleZeroMat
+            elseif manipScale ~= Vector(1,1,1) then
+                local scaleMat = Matrix()
+                scaleMat:Scale(manipScale)
+                finalMat = finalMat * scaleMat
             end
+
+            ent:SetBoneMatrix(i, finalMat)
         end
     end
-    
 end
 
 local function DrawHealthAccessories(healthModel, ply, baseCol)
@@ -566,7 +621,7 @@ function HUD_DrawDynamicIndicator()
     local viewX, viewY
     
     -- Position at bottom left of screen
-    viewX = ScreenScaleFixed(10) -- Left margin
+    viewX = ScreenScaleFixed(-30) -- Left margin
     viewY = ScrH() - h - ScreenScaleFixed(50) -- Position at bottom with margin
     
     -- Store indicator position and size for moodle adjustment
@@ -890,8 +945,8 @@ function HUD_DrawDynamicIndicator()
                             local neckArteryBleedRate = 2.0 * 4.5 * pulse / 80 -- ~7.88 ml/beat at pulse 70
                             local currentBleedRate = data.severity * 7 * 2.0 * pulse / 70 -- Approx regular wound rate
 
-                            local bleedsAtArterialLevel = (currentBleedRate >= arterialBleedRate * 0.8) or data.isArterial
-                            local bleedsAtNeckArteryLevel = (currentBleedRate >= neckArteryBleedRate * 0.8) or isNeckArtery
+                            local bleedsAtArterialLevel = (currentBleedRate >= arterialBleedRate) or data.isArterial
+                            local bleedsAtNeckArteryLevel = (currentBleedRate >= neckArteryBleedRate) or isNeckArtery
 
                             table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, isNeckArtery = isNeckArtery, bleedsAtArterialLevel = bleedsAtArterialLevel, bleedsAtNeckArteryLevel = bleedsAtNeckArteryLevel, key = key})
                         end
@@ -907,7 +962,7 @@ function HUD_DrawDynamicIndicator()
 
     -- Draw bleeding icons as 2D overlays so they always render on top of model bones
     if #bleedScreen2D > 0 then
-        local iconSize = ScreenScaleFixed(36)
+        local iconSize = ScreenScaleFixed(52)
         for _, data in ipairs(bleedScreen2D) do
             local severity = data.severity
             local bleedsAtArterialLevel = data.bleedsAtArterialLevel
@@ -915,22 +970,18 @@ function HUD_DrawDynamicIndicator()
             local r, g, b, mat
             
             if bleedsAtNeckArteryLevel then
-                -- Neck artery level: Dark Red (80, 0, 0)
+                -- Neck artery / most severe: Dark Red (80, 0, 0)
                 mat = bigBleedIconMat
                 r, g, b = 80, 0, 0
             elseif bleedsAtArterialLevel then
-                -- Arterial level: Dark Yellow (160, 140, 0)
+                -- True arterial level: Dark Yellow (160, 140, 0)
                 mat = bigBleedIconMat
                 r, g, b = 160, 140, 0
-            elseif severity >= 1.5 then
-                -- Near arterial level: Max Red (255, 0, 0)
-                mat = bigBleedIconMat
-                r, g, b = 255, 0, 0
             else
-                -- Normal bleeding: White to red based on severity
-                -- White (255, 255, 255) for small cuts -> Red (255, 0, 0) for heavy bleeding
+                -- Normal bleeding (will likely clot): White -> Red approaching arterial
                 mat = bleedIconMat
-                local progress = math.Clamp(severity / 1.5, 0, 1)
+                local arterialThresh = (1.0 * 4.5 * (org and org.pulse or 70) / 80)
+                local progress = math.Clamp((data.severity * 7 * 2.0 * (org and org.pulse or 70) / 70) / arterialThresh, 0, 1)
                 r = 255
                 g = math.floor(255 * (1 - progress))
                 b = math.floor(255 * (1 - progress))
@@ -966,4 +1017,16 @@ end
 hook.Add("OnRemove", "HG_CleanupHealthIndicator", function()
     if IsValid(healthModel) then healthModel:Remove() end
     if IsValid(blinkModel) then blinkModel:Remove() end
+end)
+
+hook.Add("PlayerSpawn", "HG_HealthIndicator_RespawnReset", function(ply)
+    if ply ~= LocalPlayer() then return end
+    ResetModels(ply)
+    lastLifeState = nil
+end)
+
+hook.Add("PlayerDeath", "HG_HealthIndicator_DeathReset", function(ply)
+    if ply ~= LocalPlayer() then return end
+    ResetModels(ply)
+    lastLifeState = false
 end)

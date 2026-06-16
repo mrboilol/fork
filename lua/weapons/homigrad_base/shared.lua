@@ -1355,26 +1355,36 @@ function SWEP:CoreStep()
 		self:SetNWBool("aiming", false)
 	end
 
-	-- Pain when aiming with broken arm - only right arm should cause pain
+	-- Pain when aiming with a broken/dislocated gun arm.
+	-- Right arm causes pain when broken/dislocated (it's the primary trigger hand).
+	-- Left arm only causes pain when the right hand is amputated (forced to sole-hold with broken left).
 	if SERVER and self:KeyDown(IN_ATTACK2) and IsValid(owner) and owner.organism then
 		local org = owner.organism
 
-		-- Only check right arm for aiming pain
 		local rarm_broken = (org.rarm and org.rarm >= 1)
 		local rarm_dislocated = org.rarmdislocation
+		local rarm_amputated = org.rarmamputated
+		local larm_broken = (org.larm and org.larm >= 1)
+		local larm_dislocated = org.larmdislocation
 
-		-- Only add pain if right arm is broken or dislocated
-		if rarm_broken or rarm_dislocated then
-			-- Track aiming start time for grace period
+		local shouldPain = (rarm_broken or rarm_dislocated) or
+			(rarm_amputated and (larm_broken or larm_dislocated))
+
+		if shouldPain then
 			org.aimPainGraceStart = org.aimPainGraceStart or CurTime()
-			local gracePeriod = 3
+			local gracePeriod = 5
 
-			-- Only apply pain after grace period
 			if CurTime() - org.aimPainGraceStart >= gracePeriod then
-				local pain_amount = (org.rarm or 0) * 1.5 + (org.rarmdislocation and 2 or 0)
+				local pain_amount
+				if rarm_amputated and not (rarm_broken or rarm_dislocated) then
+					-- Sole left-hand hold: scale off left arm damage
+					pain_amount = (org.larm or 0) * 1.5 + (org.larmdislocation and 2 or 0)
+				else
+					pain_amount = (org.rarm or 0) * 1.5 + (org.rarmdislocation and 2 or 0)
+				end
 
 				if pain_amount > 0 then
-					org.painadd = (org.painadd or 0) + pain_amount * 0.1
+					org.painadd = (org.painadd or 0) + pain_amount * 0.06
 				end
 			end
 		end

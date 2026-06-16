@@ -221,15 +221,15 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local mitigation_mult = 1
 	if isRagdolled then
-		mitigation_mult = mitigation_mult * 0.6
+		mitigation_mult = mitigation_mult * 0.85
 	elseif isCrouching then
-		mitigation_mult = mitigation_mult * 0.75
+		mitigation_mult = mitigation_mult * 0.90
 	elseif isStandingStill then
-		mitigation_mult = mitigation_mult * 0.9
+		mitigation_mult = mitigation_mult * 0.95
 	end
 
 	if isHoldingBreath then
-		mitigation_mult = mitigation_mult - 0.15
+		mitigation_mult = mitigation_mult - 0.05
 	end
 
 	-- Broken arms bypass this mitigation
@@ -292,7 +292,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	elseif only_left_arm then
 		tta_multiplier = 4.5
 	elseif broken_right_arm then
-		tta_multiplier = 5.0
+		tta_multiplier = 3.2
 	elseif right_arm_broken_left then
 		tta_multiplier = larm_broken and 3.0 or 2.2
 	elseif rarm_partial or larm_partial then
@@ -332,28 +332,28 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		-- Smooth sine wave sway instead of random jitter
 		local time = CurTime()
 		local fearMult = (ply.organism and math.Clamp(ply.organism.fear or 0, 0, 2) or 0) + 1
-		local healthyArmMult = (not rarm_bad and not larm_bad and not rarm_partial and not larm_partial) and 0.6 or 1
-		local swayX = math.sin(time * 1.5) * 0.5 + math.sin(time * 2.7) * 0.25
-		local swayY = math.cos(time * 1.8) * 0.5 + math.cos(time * 3.1) * 0.25
-		local swayZ = math.sin(time * 2.2) * 0.5 + math.cos(time * 2.9) * 0.25
+		local healthyArmMult = (not rarm_bad and not larm_bad and not rarm_partial and not larm_partial) and 0.8 or 1
+		local swayX = math.sin(time * 1.5) * 0.65 + math.sin(time * 2.7) * 0.35
+		local swayY = math.cos(time * 1.8) * 0.65 + math.cos(time * 3.1) * 0.35
+		local swayZ = math.sin(time * 2.2) * 0.65 + math.cos(time * 2.9) * 0.35
 
 		local arm_sway_debuff = 0
 		if rarm_broken or rarm_amputated then
-			arm_sway_debuff = arm_sway_debuff + 2.0
+			arm_sway_debuff = arm_sway_debuff + 2.5
 		elseif rarm_dislocated then
-			arm_sway_debuff = arm_sway_debuff + 0.8
+			arm_sway_debuff = arm_sway_debuff + 1.2
 		elseif rarm_partial then
-			-- Partial damage: scale sway from 0.2 (at 0.25 damage) to 0.7 (at 0.99 damage)
-			arm_sway_debuff = arm_sway_debuff + 0.2 + rarm_partial_severity * 0.5
+			-- Partial damage: scale sway from 0.3 (at 0.25 damage) to 1.0 (at 0.99 damage)
+			arm_sway_debuff = arm_sway_debuff + 0.3 + rarm_partial_severity * 0.7
 		end
 
 		if larm_broken or larm_amputated then
-			arm_sway_debuff = arm_sway_debuff + 1.2
+			arm_sway_debuff = arm_sway_debuff + 1.6
 		elseif larm_dislocated then
-			arm_sway_debuff = arm_sway_debuff + 0.5
+			arm_sway_debuff = arm_sway_debuff + 0.8
 		elseif larm_partial then
-			-- Partial damage: scale sway from 0.1 (at 0.25 damage) to 0.4 (at 0.99 damage)
-			arm_sway_debuff = arm_sway_debuff + 0.1 + larm_partial_severity * 0.3
+			-- Partial damage: scale sway from 0.15 (at 0.25 damage) to 0.6 (at 0.99 damage)
+			arm_sway_debuff = arm_sway_debuff + 0.15 + larm_partial_severity * 0.45
 		end
 
 		local fatigue = organism.aiming_fatigue or 0

@@ -92,13 +92,12 @@ if SERVER then
 			self.poisoned2 = nil
 		end
 
-		local internalBleed = org.internalBleed - org.internalBleedHeal
-
-		if internalBleed > 0 then
-			local healed = math.max(internalBleed - self.modeValues[1], 0)
-			self.modeValues[1] = self.modeValues[1] - (internalBleed - healed) * (owner.Profession == "doctor" and 0.5 or 1)
-			org.internalBleedHeal = org.internalBleedHeal + (internalBleed - healed)
-			org.tranexamic_acid = math.min(org.tranexamic_acid + 5, 10)
+		local efficiency = owner.Profession == "doctor" and 0.5 or 1
+		local dose = self.modeValues[1]
+		if dose > 0 then
+			org.internalBleedHeal = org.internalBleedHeal + dose / efficiency
+			org.tranexamic_acid = math.min(org.tranexamic_acid + dose, 10)
+			self.modeValues[1] = 0
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
 		end
 

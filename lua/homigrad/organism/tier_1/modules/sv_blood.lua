@@ -115,7 +115,7 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "nga im fried 😭") or "I feel too numb...",60,"blood2",0) end
+	if org.isPly and not org.otrub and org.blood < 2200 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "nga im fried 😭") or "I feel too numb...",60,"blood2",0) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
 		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
@@ -166,12 +166,94 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	-- At 2500 blood: reduced consciousness and dizziness
+	-- Tiered blood loss progression
+	-- 4500: first symptoms - lightheaded, faint nausea
+	-- 4000: slight systemic debuffs begin (O2, pulse, consciousness soft-cap 0.95)
+	-- 3500: bigger debuffs, compensatory tachycardia, consciousness cap 0.7
+	-- 3000: body struggling hard, HR spikes toward 225, big O2 debuff, consciousness held at 0.7
+	-- 2500: slow ischemia onset, O2 steadily draining, pulse destabilizing
+	-- 2000: full ischemic collapse (handled below)
 	local bloodConsciousnessCap = 1
-	if org.blood < 2500 then
-		bloodConsciousnessCap = math.max(org.blood / 2500, 0.5)
+	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
+
+	if org.blood < 4500 then
+		-- First symptoms: periodic notify
+		if org.isPly and not org.otrub and (org._blood4500NotifyTime or 0) + 90 < CurTime() then
+			org.owner:Notify("I feel a little lightheaded...", 15, "blood_4500", 0)
+			org._blood4500NotifyTime = CurTime()
+		end
 	end
-	org.consciousness = math.min(org.consciousness, bloodConsciousnessCap * math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1))
+
+	if org.blood < 4000 then
+		-- Mild O2 debuff: reduced O2 delivery (slight)
+		org.o2[1] = math.max(org.o2[1] - mulTime * 0.4, 0)
+		-- Compensatory: slight pulse nudge upward toward 85
+		if org.pulse < 85 and not adrenalineStabilizer then
+			org.pulse = math.min(org.pulse + mulTime * 0.3, 85)
+		end
+		-- Soft consciousness cap at 0.95
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
+		if org.isPly and not org.otrub and (org._blood4000NotifyTime or 0) + 60 < CurTime() then
+			org.owner:Notify("I'm starting to feel weak...", 15, "blood_4000", 0)
+			org._blood4000NotifyTime = CurTime()
+		end
+	end
+
+	if org.blood < 3500 then
+		-- Moderate O2 debuff: body struggling to deliver O2
+		org.o2[1] = math.max(org.o2[1] - mulTime * 1.2, 0)
+		-- Compensatory tachycardia: heart races to compensate
+		if org.pulse < 105 and not adrenalineStabilizer then
+			org.pulse = math.min(org.pulse + mulTime * 0.8, 105)
+		end
+		-- Consciousness cap drops to 0.7
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.7)
+		if org.isPly and not org.otrub and (org._blood3500NotifyTime or 0) + 45 < CurTime() then
+			org.owner:Notify("My head is spinning... I can barely focus.", 15, "blood_3500", 0)
+			org._blood3500NotifyTime = CurTime()
+		end
+	end
+
+	if org.blood < 3000 then
+		-- Big O2 debuff: body really struggling for blood
+		org.o2[1] = math.max(org.o2[1] - mulTime * 2.5, 0)
+		-- Heart rate spikes hard toward 225 BPM (maximum compensatory tachycardia - heart trying desperately to compensate)
+		if not adrenalineStabilizer then
+			org.pulse = math.min(org.pulse + mulTime * 3.0, 225)
+		end
+		-- Consciousness held at 0.7 cap (no worse yet, just sustained impairment)
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.7)
+		if org.isPly and not org.otrub and (org._blood3000NotifyTime or 0) + 30 < CurTime() then
+			org.owner:Notify("I can't... get enough air. Everything is heavy.", 15, "blood_3000", 0)
+			org._blood3000NotifyTime = CurTime()
+		end
+	end
+
+	if org.blood < 2500 then
+		-- Steady O2 drain accelerates - hemoglobin too low for organ delivery
+		org.o2[1] = math.max(org.o2[1] - mulTime * 4.0, 0)
+		-- Pulse now destabilizing: starts to drop from overexertion
+		if not adrenalineStabilizer then
+			org.pulse = math.max(org.pulse - mulTime * 0.8, 40)
+		end
+		-- Slow ischemia creep begins
+		if not adrenalineStabilizer and not hasAntiIschemia then
+			org.ischemia = math.min(org.ischemia + mulTime * 0.004, 1.0)
+		end
+		-- Consciousness slips lower: cap now 0.55
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.55)
+		if org.isPly and not org.otrub and (org._blood2500NotifyTime or 0) + 20 < CurTime() then
+			org.owner:Notify("I feel cold... I can't think straight.", 15, "blood_2500", 0)
+			org._blood2500NotifyTime = CurTime()
+		end
+	end
+
+	-- Hard floor: at 2100 begin collapsing to 0 by 2000
+	if org.blood < 2100 then
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((org.blood - 2000) / 100, 0))
+	end
+
+	org.consciousness = math.min(org.consciousness, bloodConsciousnessCap * tempMul)
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
@@ -301,15 +383,28 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	local bloodCap = (2000 / (adrenaline / 5 + 1)) * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1)
-	if org.blood < bloodCap then
-		local bloodSeverity = math.Clamp((bloodCap - org.blood) / 1000, 0.1, 1)
-		-- At 2000 blood: pass out and start dying from blood loss (increased consciousness drain)
-		org.consciousness = math.max((org.consciousness or 1) - mulTime * bloodSeverity * 1.5, 0)
-	end
-
-	if org.blood < 2000 and not adrenalineStabilizer and not hasAntiIschemia then
-		org.ischemia = math.min(org.ischemia + mulTime * 0.015, 1.0)
+	-- At 2000: ischemic collapse begins - O2 starved, heart under stress, consciousness crashes
+	if org.blood <= 2000 then
+		local ischemicDepth = math.Clamp((2000 - org.blood) / 2000, 0, 1) -- 0 at 2000, 1 at 0
+		local ischemicRate = 0.025 + ischemicDepth * 0.10 -- ramps from 0.025 to 0.125/s
+		if not adrenalineStabilizer and not hasAntiIschemia then
+			org.ischemia = math.min(org.ischemia + mulTime * ischemicRate, 1.0)
+		end
+		-- O2 delivery collapses: blood cant carry enough oxygen
+		org.o2[1] = math.max(org.o2[1] - mulTime * (3 + ischemicDepth * 12), 0)
+		-- Heart under ischemic stress: rate destabilizes
+		if not adrenalineStabilizer then
+			org.pulse = math.max(org.pulse - mulTime * (1 + ischemicDepth * 4), 0)
+		end
+		-- Consciousness drain at 2000 (already handled by cap above, extra drain below 1800)
+		if org.blood < 1800 then
+			org.consciousness = math.max((org.consciousness or 1) - mulTime * (0.5 + ischemicDepth * 2.0), 0)
+		end
+		-- Notify once entering ischemic threshold
+		if org.isPly and not org.otrub and (org._ischemicNotifyTime or 0) + 20 < CurTime() then
+			org.owner:Notify("My chest... I can't breathe right...", 20, "ischemic_collapse", 0)
+			org._ischemicNotifyTime = CurTime()
+		end
 	end
 	
 	if hasAntiIschemia then

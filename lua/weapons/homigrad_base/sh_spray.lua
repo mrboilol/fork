@@ -18,7 +18,7 @@ end
 SWEP.SprayRand = {Angle(0, 0, 0), Angle(0, 0, 0)}
 SWEP.addSprayMul = 1
 
-SWEP.RecoilMul = 0.8
+SWEP.RecoilMul = 1.0
 
 local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
 function SWEP:GetPrimaryMul()
@@ -150,6 +150,10 @@ function SWEP:PrimarySpread()
 				end
 			end
 		end
+
+		-- Base shooting pain: minimum 17.5, scales upward with caliber/force
+		local baseShootPain = math.max(17.5, calForce * 0.35)
+		org.painadd = org.painadd + baseShootPain
 	end
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
@@ -203,15 +207,15 @@ function SWEP:PrimarySpread()
 
 		local mitigation_mult = 1
 		if isRagdolled then
-			mitigation_mult = mitigation_mult * 0.6
+			mitigation_mult = mitigation_mult * 0.85
 		elseif isCrouching then
-			mitigation_mult = mitigation_mult * 0.75
+			mitigation_mult = mitigation_mult * 0.90
 		elseif isStandingStill then
-			mitigation_mult = mitigation_mult * 0.9
+			mitigation_mult = mitigation_mult * 0.95
 		end
 
 		if isHoldingBreath then
-			mitigation_mult = mitigation_mult - 0.15
+			mitigation_mult = mitigation_mult - 0.05
 		end
 
 		-- Broken arms bypass this mitigation
@@ -225,7 +229,7 @@ function SWEP:PrimarySpread()
 			amputate_debuff = amputate_debuff * mitigation_mult
 		end
 
-		mul = mul * ((2 + arm_debuff) / 1 + amputate_debuff)
+		mul = mul * ((2.5 + arm_debuff) / 1 + amputate_debuff)
 		mul = mul * broken_arm_recoil_mult
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul

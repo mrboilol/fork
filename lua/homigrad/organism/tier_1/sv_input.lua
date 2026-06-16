@@ -1757,6 +1757,13 @@ local function velocityDamage(ent, data)
 	local att = data.HitObject:GetEntity():GetPhysicsAttacker(15)
 	att = IsValid(att) and att or ent:GetPhysicsAttacker(15)
 	dmgInfo:SetAttacker(IsValid(att) and att or IsValid(dmgInfo:GetAttacker()) and dmgInfo:GetAttacker() or game.GetWorld())
+
+	-- Slam bonus: if a player launched this ragdoll and it hit the world (wall/curb/floor), deal extra damage
+	if data.HitObject:GetEntity():IsWorld() and IsValid(att) and att:IsPlayer() then
+		local slamMul = math.Clamp(speed / 600, 1.0, 2.5)
+		dmgInfo:ScaleDamage(slamMul)
+	end
+
 	att.harm = dmgInfo:GetDamage() / 15
 	-- 100 is kil
 	
@@ -1850,7 +1857,7 @@ local function velocityDamage(ent, data)
 					local hasBrainDamage = org.brain > 0.1
 					net.WriteBool(hasBrainDamage)
 
-					net.Send(org.owner)
+					if IsValid(org.owner) and org.owner:IsPlayer() then net.Send(org.owner) end
 				
 								org.consciousness = math.Approach(org.consciousness, 0, dmg * 2 * (hadhelmet and 0.2 or 1))
 				

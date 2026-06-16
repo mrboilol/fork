@@ -749,26 +749,47 @@ players : 1 humans, 0 bots (20 max)
 			local weight
 			
 			if jawDislocated then
-				-- Jaw dislocation effect: twitch randomly when speaking
-				local twitchWeight = ply:IsSpeaking() and math.Rand(0.3, 1.2) or 0.4
-				local twitchAngle = math.Rand(-0.5, 0.5)
-				weight = twitchWeight
-				
-				for k = 1, #flexes do
-					local v = flexes[ k ]
-					if v and v ~= -1 then
-						local randomOffset = math.Rand(-0.2, 0.2)
-						ent:SetFlexWeight( v, math.Clamp(twitchWeight + randomOffset, 0, 1) )
-					end
+				-- Jaw dislocation: jaw offset to one side, not hanging open
+				if not ent.jawDislocationSide then
+					ent.jawDislocationSide = math.random(2) == 1 and "left" or "right"
 				end
-				
-				-- Manipulate head bone to show dislocation
+
+				local sideWeight = math.Clamp(0.7 + math.Rand(-0.08, 0.08), 0, 1)
+				local dropWeight = math.Clamp(0.12 + math.Rand(-0.05, 0.05), 0, 1)
+				local speakingExtra = ply:IsSpeaking() and math.Clamp(ply:VoiceVolume() * 1.5, 0, 0.3) or 0
+				weight = dropWeight
+
+				local jawDrop    = flexes[1]
+				local leftPart   = flexes[2]
+				local rightPart  = flexes[3]
+				local leftDrop   = flexes[4]
+				local rightDrop  = flexes[5]
+				local lowerLip   = flexes[6]
+
+				if jawDrop  and jawDrop  ~= -1 then ent:SetFlexWeight(jawDrop,  dropWeight + speakingExtra) end
+				if lowerLip and lowerLip ~= -1 then ent:SetFlexWeight(lowerLip, dropWeight * 0.5) end
+
+				if ent.jawDislocationSide == "left" then
+					if leftPart  and leftPart  ~= -1 then ent:SetFlexWeight(leftPart,  sideWeight) end
+					if rightPart and rightPart ~= -1 then ent:SetFlexWeight(rightPart, 0) end
+					if leftDrop  and leftDrop  ~= -1 then ent:SetFlexWeight(leftDrop,  dropWeight * 0.6) end
+					if rightDrop and rightDrop ~= -1 then ent:SetFlexWeight(rightDrop, 0) end
+				else
+					if leftPart  and leftPart  ~= -1 then ent:SetFlexWeight(leftPart,  0) end
+					if rightPart and rightPart ~= -1 then ent:SetFlexWeight(rightPart, sideWeight) end
+					if leftDrop  and leftDrop  ~= -1 then ent:SetFlexWeight(leftDrop,  0) end
+					if rightDrop and rightDrop ~= -1 then ent:SetFlexWeight(rightDrop, dropWeight * 0.6) end
+				end
+
+				-- Subtle head tilt toward the dislocated side when speaking
 				local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
 				if headBone and ply:IsSpeaking() then
-					local twitchAng = Angle(math.Rand(-2, 2), math.Rand(-2, 2), math.Rand(-3, 3))
+					local rollDir = ent.jawDislocationSide == "left" and 1 or -1
+					local twitchAng = Angle(math.Rand(-1, 1), 0, rollDir * math.Rand(1, 3))
 					hg.bone.Set(ent, headBone, vector_origin, twitchAng, "jawdislocation", 0.1, FrameTime())
 				end
 			else
+				ent.jawDislocationSide = nil
 				weight = (ply:IsSpeaking() and math.Clamp( ply:VoiceVolume() * 5, 0, 2 )) or 0
 
 				for k = 1, #flexes do

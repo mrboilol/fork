@@ -70,6 +70,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	local time = CurTime()
 
 	-- Give up mechanic: chance to give up when dying or bleeding out
+	-- Cannot give up during a panic attack (panic and giving up must not stack)
 	if not org.givingUp then
 		local o2val = org.o2 and org.o2[1] or 0
 		local blood = org.blood or 5000
@@ -79,7 +80,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		local isBleedingOut = blood >= 3000 and blood <= 3250 and bleed > 0
 		local isUnconsciousDying = org.otrub and o2val > 20
 
-		if isDying or isBleedingOut or isUnconsciousDying then
+		if (isDying or isBleedingOut or isUnconsciousDying) and not org.panicAttack then
 			org._giveUpCheckTime = org._giveUpCheckTime or 0
 			if CurTime() > org._giveUpCheckTime then
 				org._giveUpCheckTime = CurTime() + 1
@@ -124,23 +125,28 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org._panicAttackStartTime = nil
 			org._panicAttackCheckTime = nil
 			org._panicAdrenalineGiven = false
-			-- Giving up: body lowers vitals; if too low, heart may stop
+			-- Giving up: chance of heartstop every few seconds; not a guaranteed death
 			if not org._giveUpHeartStopCheck or time > org._giveUpHeartStopCheck then
-				org._giveUpHeartStopCheck = time + 3
+				org._giveUpHeartStopCheck = time + 4
 				local bp = org.bloodpressure or 93
 				local hb = org.heartbeat or 70
-				if bp < 35 or hb < 40 then
-					local stopChance = 0.08
-					local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
-					if totalAdrenaline > 0.5 then
-						stopChance = stopChance * math.max(0, 1 - (totalAdrenaline - 0.5) * 0.25)
-					end
-					if math.random() < stopChance then
-						org.heartstop = true
-					end
+				-- Base 6% chance every 4 seconds; scales up with critically low vitals
+				local stopChance = 0.06
+				if bp < 50 then
+					stopChance = stopChance + (50 - bp) / 50 * 0.10
+				end
+				if hb < 50 then
+					stopChance = stopChance + (50 - hb) / 50 * 0.08
+				end
+				local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+				if totalAdrenaline > 0.5 then
+					stopChance = stopChance * math.max(0.1, 1 - (totalAdrenaline - 0.5) * 0.3)
+				end
+				if math.random() < stopChance then
+					org.heartstop = true
+					org.lungsfunction = false
 				end
 			end
-			return
 		end
 	end
 
@@ -418,11 +424,25 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	-- Panic attack logic
 	if org.panicAttack then
 		-- Decrease despair slowly during panic attack
-		org.despair = math.Approach(org.despair, 0.75, timeValue * 0.3)
+		org.despair = math.Approach(org.despair, 0.65, timeValue * 0.3)
 		
 		-- Check if panic attack should end (timed out or recovered)
 		if time > org._panicAttackEndTime then
 			org.panicAttack = false
+			org._panicAttackEndTime = 0
+			org._panicAttackStartTime = nil
+			org._panicAttackCheckTime = nil
+			org._panicAdrenalineGiven = false
+			org._postPanicEndTime = time
+			-- Panic didn't save them: chance to give up after panic ends if still in danger
+			local o2val = org.o2 and org.o2[1] or 0
+			local blood = org.blood or 5000
+			local bleed = org.bleed or 0
+			local stillDying = (o2val > 50 and not org.otrub) or (blood >= 3000 and blood <= 3250 and bleed > 0) or (org.otrub and o2val > 20)
+			if stillDying and math.random() < 0.55 then
+				org.givingUp = true
+				org._panicAdrenalineGiven = false
+			end
 		else
 			-- Check recovery: healed / no longer dying
 			local o2val = org.o2 and org.o2[1] or 0
@@ -439,53 +459,60 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				org._panicAttackCheckTime = nil
 				org._panicAdrenalineGiven = false
 				org._postPanicEndTime = time
-			elseif not org._panicHeartAttackCheck or time > org._panicHeartAttackCheck then
-				org._panicHeartAttackCheck = time + 2
-				local heartAttackChance = 0.05 -- 5% chance every 2 seconds during panic attack
-				local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
-				if totalAdrenaline > 1.5 then
-					heartAttackChance = heartAttackChance * math.max(0.1, 1 - (totalAdrenaline - 1.5) * 0.3)
-				end
-				if math.random() < heartAttackChance then
-					org.heartstop = true
-					org.lungsfunction = false
-				end
 			end
+			-- No heartstop chance during panic
 		end
 	else
-		-- Check if panic attack should trigger (despair > 0.85)
-		if org.despair > 0.85 then
+		-- Check if panic attack should trigger (despair > 0.7)
+		if org.despair > 0.7 then
 			-- Start tracking time if not already tracking
 			if not org._panicAttackStartTime then
 				org._panicAttackStartTime = time
 			end
 
-			-- Check if 30 seconds have passed (guaranteed trigger)
-			if time - org._panicAttackStartTime >= 30 then
-				org.panicAttack = true
-				org._panicAttackEndTime = time + math.random(8, 15)
-				org._panicHeartAttackCheck = 0
-				org._panicAttackStartTime = nil
-				if not org._panicAdrenalineGiven then
-					local reserve = min(org.adrenaline or 0, 0.75)
-					org.adrenaline = (org.adrenaline or 0) - reserve
-					org.adrenalineAdd = (org.adrenalineAdd or 0) + 0.75
-					org._panicAdrenalineGiven = true
-				end
-			-- Before 30 seconds, use random chance
-			elseif not org._panicAttackCheckTime or time > org._panicAttackCheckTime then
+			if not org._panicAttackCheckTime or time > org._panicAttackCheckTime then
 				org._panicAttackCheckTime = time + 1
-				local triggerChance = (org.despair - 0.85) / 0.15 * 0.1 -- up to 10% chance per second at max despair
-				if math.random() < triggerChance then
-					org.panicAttack = true
-					org._panicAttackEndTime = time + math.random(8, 15)
-					org._panicHeartAttackCheck = 0
-					org._panicAttackStartTime = nil
-					if not org._panicAdrenalineGiven then
-						local reserve = min(org.adrenaline or 0, 0.75)
-						org.adrenaline = (org.adrenaline or 0) - reserve
-						org.adrenalineAdd = (org.adrenalineAdd or 0) + 0.75
-						org._panicAdrenalineGiven = true
+
+				-- Small chance to skip panic entirely and go straight to giving up
+				local skipToPanic = math.random() > 0.12 -- 12% chance to skip panic, 88% to panic
+
+				-- Guaranteed panic after 20 seconds at despair > 0.7
+				local triggerChance = (org.despair - 0.7) / 0.3 * 0.18 -- up to 18% chance per second at max despair
+				local forceTrigger = (time - org._panicAttackStartTime >= 20)
+
+				if forceTrigger or math.random() < triggerChance then
+					if skipToPanic then
+						org.panicAttack = true
+						org._panicAttackEndTime = time + math.random(8, 18)
+						org._panicAttackStartTime = nil
+						if not org._panicAdrenalineGiven then
+							local reserve = min(org.adrenaline or 0, 1.5)
+							org.adrenaline = (org.adrenaline or 0) - reserve
+							org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+							org._panicAdrenalineGiven = true
+						end
+					else
+						-- Skip to giving up only if in a dying state
+						local o2val = org.o2 and org.o2[1] or 0
+						local blood = org.blood or 5000
+						local bleed = org.bleed or 0
+						local isDying = (o2val > 50 and not org.otrub) or (blood >= 3000 and blood <= 3250 and bleed > 0) or (org.otrub and o2val > 20)
+						if isDying then
+							org.givingUp = true
+							org._panicAdrenalineGiven = false
+							org._panicAttackStartTime = nil
+						else
+							-- Not dying, just panic normally
+							org.panicAttack = true
+							org._panicAttackEndTime = time + math.random(8, 18)
+							org._panicAttackStartTime = nil
+							if not org._panicAdrenalineGiven then
+								local reserve = min(org.adrenaline or 0, 1.5)
+								org.adrenaline = (org.adrenaline or 0) - reserve
+								org.adrenalineAdd = (org.adrenalineAdd or 0) + 1.5
+								org._panicAdrenalineGiven = true
+							end
+						end
 					end
 				end
 			end

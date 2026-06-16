@@ -150,10 +150,6 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	local givingUp = org and org.givingUp
-	if givingUp then
-		stop_despair_sound(true)
-		stop_panic_sound(true)
-	end
 
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 
@@ -200,22 +196,25 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		render.DrawScreenQuad()
 	end
 
-	-- Panic attack overrides despair sound
-	if despair > 0.25 and not panicAttack and not givingUp then
+	-- Despair theme plays in the background whenever despair is above threshold,
+	-- including during panic attacks and giving up (does not get overridden)
+	if despair > 0.25 then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
 			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(channel, err)
 				despairSoundLoading = false
 				if err or not IsValid(channel) then return end
-				channel:SetVolume(4.0 * musicVolume:GetFloat())
+				channel:SetVolume(1.0 * musicVolume:GetFloat())
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 4.0 * musicVolume:GetFloat()
+				despairSoundVol = 1.0 * musicVolume:GetFloat()
 			end)
 		end
 
-		local targetVol = (despair > 0.3 and 5.5 or math.Remap(despair, 0.25, 1, 3.0, 5.5)) * musicVolume:GetFloat()
+		-- During panic, push volume lower so panic track stays prominent
+		local volScale = panicAttack and 0.55 or 1.0
+		local targetVol = (despair > 0.5 and 1.0 or math.Remap(despair, 0.25, 1, 0.7, 1.0)) * musicVolume:GetFloat() * volScale
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
@@ -238,7 +237,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = 2.5 * musicVolume:GetFloat()
+		local targetVol = 1.0 * musicVolume:GetFloat()
 		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 2)
 		if IsValid(panicSound) then
 			panicSound:SetVolume(panicSoundVol)
