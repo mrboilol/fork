@@ -1,7 +1,7 @@
 local function DrawSunEffect()
 	local sun = util.GetSunInfo()
 	if not sun then return end
-	if not sun.obstruction == 0 or sun.obstruction == 0 then return end
+	if sun.obstruction == 0 then return end
 	local sunpos = EyePos() + sun.direction * 1024 * 4
 	local scrpos = sunpos:ToScreen()
 	local dot = (sun.direction:Dot(EyeVector()) - 0.8) * 5

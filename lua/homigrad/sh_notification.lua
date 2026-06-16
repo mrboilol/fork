@@ -216,6 +216,7 @@ if CLIENT then
 	end
 
 	hook.Add("Player_Death","removeNotifications",function(ply)
+		if not IsValid(lply) then return end
 		if ply != lply then return end
 
 		//hg.currentNotification = nil
@@ -223,6 +224,7 @@ if CLIENT then
 	end)
 
 	hook.Add("Player Spawn","removeNotificationsa",function(ply)
+		if not IsValid(lply) then return end
 		if ply != lply then return end
 
 		hg.currentNotification = nil
@@ -230,6 +232,7 @@ if CLIENT then
 	end)
 
 	hook.Add("HG_OnOtrub","removeNotificationsb",function(ply)
+		if not IsValid(lply) then return end
 		if ply != lply then return end
 
 		//hg.currentNotification = nil
@@ -239,6 +242,7 @@ if CLIENT then
 	local defaultShowTimer = 3
 
 	local function CreateNotification(msg, showTimer, clr, traumatic)
+		if not IsValid(lply) then return end
 		if hg_furcity:GetBool() or lply.PlayerClassName == "furry" then
 			msg = hg.FurrifyPhrase(msg)
 		end
@@ -251,6 +255,7 @@ if CLIENT then
 	end
 
 	local function CreateNotificationBerserk(msg, showTimer, clr, noChatPrint, traumatic)
+		if not IsValid(lply) then return end
 		if hg_furcity:GetBool() or lply.PlayerClassName == "furry" then
 			msg = hg.FurrifyPhrase(msg) -- uhhhh... hate to break it to you but-
 		end
@@ -309,6 +314,7 @@ if CLIENT then
 		//if hg.currentNotification or #hg.notifications == 0 then return end
 		if #hg.notifications == 0 then return end
 		if hg.currentNotification then return end
+		if not IsValid(lply) then return end
 		if !lply:Alive() then hg.notifications = {} return end
 		if lply.organism and lply.organism.otrub then return end
 		local tbl = hg.notifications[1]

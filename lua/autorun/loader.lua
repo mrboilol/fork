@@ -81,7 +81,6 @@ hook.Add("InitPostEntity", "zcity", function()
 	IncludeDir("initpost")
 	print("Loading initpost...")
 end)
-if initpost then Run() end
 Run()
 
 timer.Simple(5, function()

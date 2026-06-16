@@ -1,5 +1,6 @@
 local despairFont = "ZCity_Despair_Text"
 if hg and hg.despair_builtin then return end
+hg.despair_builtin = true
 local despair_font = function()
 	return "Mx437 IBM PS/55 re."
 end

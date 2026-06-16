@@ -1,5 +1,6 @@
 local min, max, Clamp = math.min, math.max, math.Clamp
 if hg and hg.despair_server_builtin then return end
+hg.despair_server_builtin = true
 
 local hg_despair_override = CreateConVar("hg_despair_override", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Global despair override (0-1)", 0, 1)
 
