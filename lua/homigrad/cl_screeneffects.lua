@@ -1828,8 +1828,14 @@ hook.Add("HG_OnOtrub", "FUCKINGSHITOW", function(ply)
     end
 end)
 
-local function IsSkullBrokenFully(ent)
+local function IsSkullBrokenFully(ent, visited)
 	if not IsValid(ent) then return false end
+
+	-- Guard against cyclic references (player <-> ragdoll point at each other)
+	visited = visited or {}
+	if visited[ent] then return false end
+	visited[ent] = true
+
 	if ent:GetNWBool("SkullBrokenFully") then return true end
 
 	-- Check organism
@@ -1845,16 +1851,16 @@ local function IsSkullBrokenFully(ent)
 		end
 		-- Check their fake ragdoll or death ragdoll
 		local fakeRag = ent:GetNWEntity("FakeRagdoll")
-		if IsValid(fakeRag) and IsSkullBrokenFully(fakeRag) then
+		if IsValid(fakeRag) and IsSkullBrokenFully(fakeRag, visited) then
 			return true
 		end
 		local deathRag = ent:GetNWEntity("RagdollDeath")
-		if IsValid(deathRag) and IsSkullBrokenFully(deathRag) then
+		if IsValid(deathRag) and IsSkullBrokenFully(deathRag, visited) then
 			return true
 		end
 	elseif ent:IsRagdoll() then
 		local ply = ent:GetNWEntity("ply")
-		if IsValid(ply) and IsSkullBrokenFully(ply) then
+		if IsValid(ply) and IsSkullBrokenFully(ply, visited) then
 			return true
 		end
 	end

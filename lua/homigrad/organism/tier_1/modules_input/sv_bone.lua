@@ -560,8 +560,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
 
-	return result,vecrand
-		-- Accumulate head trauma for long-term stroke risk
+	-- Accumulate head trauma for long-term stroke risk
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
 
 	-- Trigger severe headtrauma flash on ANY brain damage from head hits
