@@ -1564,9 +1564,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 		-- White desaturation as background (replaces dark graying)
 		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
-		local whiteAmt = giveUpWhiteLerp * 0.55
+		local whiteAmt = giveUpWhiteLerp * 0.35
 		-- Draw white vignette as a background layer behind other effects
-		surface.SetDrawColor(255, 255, 255, math.floor(giveUpWhiteLerp * 60))
+		surface.SetDrawColor(255, 255, 255, math.floor(giveUpWhiteLerp * 35))
 		surface.SetMaterial(whiteVignetteR)
 		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 		surface.SetMaterial(whiteVignetteL)
@@ -1576,11 +1576,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		surface.SetMaterial(whiteVignetteD)
 		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 		-- Apply white tint additively (colour increases toward white, not black)
-		tab["$pp_colour_addr"] = whiteAmt * 0.18
-		tab["$pp_colour_addg"] = whiteAmt * 0.18
-		tab["$pp_colour_addb"] = whiteAmt * 0.18
-		tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.3)
-		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.12
+		tab["$pp_colour_addr"] = whiteAmt * 0.10
+		tab["$pp_colour_addg"] = whiteAmt * 0.10
+		tab["$pp_colour_addb"] = whiteAmt * 0.10
+		tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.18)
+		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.07
 
 		-- Suppress regular despair visual effects
 		despairVisualLerp = 0

@@ -75,7 +75,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		local bleed = org.bleed or 0
 
 		local isDying = (o2val > 50 and not org.otrub)
-		local isBleedingOut = blood < 4000 and bleed > 0
+		local isBleedingOut = blood >= 3000 and blood <= 3250 and bleed > 0
 		local isUnconsciousDying = org.otrub and o2val > 20
 
 		if isDying or isBleedingOut or isUnconsciousDying then
@@ -106,7 +106,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		local bleed = org.bleed or 0
 
 		local isDying = (o2val > 50 and not org.otrub)
-		local isBleedingOut = blood < 4000 and bleed > 0
+		local isBleedingOut = blood >= 3000 and blood <= 3250 and bleed > 0
 		local isUnconsciousDying = org.otrub and o2val > 20
 
 		if not isDying and not isBleedingOut and not isUnconsciousDying then

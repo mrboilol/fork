@@ -55,16 +55,16 @@ local panicThoughts = {
 }
 
 local givingUpThoughts = {
-	"Its over...",
+	"Maybe it's not that bad...",
 	"I just want to rest...",
-	"No point anymore...",
+	"Just let it happen...",
 	"Let it end...",
 	"I give up...",
-	"Theres nothing left...",
-	"So tired...",
-	"Just make it stop...",
-	"I cant go on...",
-	"Its all fading...",
+	"I just want it to stop.",
+	"I want to go home...",
+	"Maybe if I close my eyes, it will all be over...",
+	"It's warm suddenly...",
+	"I can see the light...",
 }
 
 local function get_target_organism()
