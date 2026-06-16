@@ -2125,10 +2125,15 @@ function hg.BreakNeck(ent, fromDamage)
 		phead:EnableMotion(true)
 		pneck:EnableMotion(true)
 
-		-- Check if organism is dead - use stiff constraint to prevent stretching
+		-- When the organism is dead, leave the normal GMod ragdoll neck
+		-- constraints untouched instead of applying the floppy neck effect.
 		local org = IsValid(playerRef) and playerRef.organism
 		local isDead = org and not org.alive
 		print("[HG Floppy] BreakNeck timer: isDead=" .. tostring(isDead))
+		if isDead then
+			print("[HG Floppy] BreakNeck timer: organism dead, leaving normal neck constraints")
+			return
+		end
 
 		-- Create constraint at current pose
 		local head_pos = phead:GetPos()
@@ -2141,16 +2146,10 @@ function hg.BreakNeck(ent, fromDamage)
 		local lpos1 = WorldToLocal(jointPos, angle_zero, pneck:GetPos(), pneck:GetAngles())
 		local lpos2 = vector_origin
 
-		local newConstraint
-		if isDead then
-			-- Use stiff constraint with very limited movement to prevent stretching
-			newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -5, -5, -5, 5, 5, 5, 0, 0, 0, 0, 0)
-			print("[HG Floppy] BreakNeck timer: Created stiff neck constraint for dead organism")
-		else
-			-- Add floppy neck constraint with generous limits for floppy head
-			newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -80, -80, -80, 80, 80, 80, 0, 0, 0, 0, 0)
-			print("[HG Floppy] BreakNeck timer: Created floppy neck constraint")
-		end
+		-- Neck break: keep it less stretchy than a full floppy limb (tighter
+		-- angular range) but still very noticeable via the bone offset below.
+		local newConstraint = constraint.AdvBallsocket(ragdoll, ragdoll, neckPhysBone, headPhysBone, lpos1, lpos2, 0, 0, -45, -45, -45, 45, 45, 45, 0, 0, 0, 0, 0)
+		print("[HG Floppy] BreakNeck timer: Created floppy neck constraint")
 		
 		-- Track the constraint to prevent duplicates
 		if newConstraint then
@@ -2159,12 +2158,12 @@ function hg.BreakNeck(ent, fromDamage)
 			ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
 			ragdoll.FloppyConstraints.neck = newConstraint
 
-			-- Slight offset to indicate the neck/head is out of place,
-			-- not just freely flopping around.
+			-- Very noticeable head tilt with no positional offset so the neck
+			-- looks clearly snapped without any stretched appearance.
 			applyFloppyBoneOffset(ragdoll, headBoneName,
-				Vector(0, -1, -1), Angle(-12, 0, 6), "neck")
+				vector_origin, Angle(-35, 0, 25), "neck")
 			applyFloppyBoneOffset(ragdoll, neckBoneName,
-				Vector(0, -0.5, -0.5), Angle(-6, 0, 3), "neck")
+				vector_origin, Angle(-18, 0, 12), "neck")
 
 			print("[HG Floppy] BreakNeck timer SUCCESS: neck constraint created")
 		else
@@ -2546,6 +2545,77 @@ local function createFloppyLimbConstraint(rag, bone1Name, bone2Name, limbType)
     end
 end
 
+--- Create a semi-stiff "dislocated" limb constraint. The joint can still move
+--- freely like a floppy bone, but a tight angular range plus high friction make
+--- it hard to move, so the limb looks jammed out of place rather than limp.
+local function createDislocatedLimbConstraint(rag, bone1Name, bone2Name, limbType)
+    print("[HG Floppy] createDislocatedLimbConstraint START: rag=" .. tostring(rag) .. " bone1=" .. tostring(bone1Name) .. " bone2=" .. tostring(bone2Name))
+
+    if not IsValid(rag) or not rag:IsRagdoll() then return false end
+
+    local bone1ID = rag:LookupBone(bone1Name)
+    local bone2ID = rag:LookupBone(bone2Name)
+    if not bone1ID or not bone2ID then
+        print("[HG Floppy] createDislocatedLimbConstraint FAIL: bone lookup failed")
+        return false
+    end
+
+    local phys1 = getPhysBoneForAnimationBone(rag, bone1ID)
+    local phys2 = getPhysBoneForAnimationBone(rag, bone2ID)
+    if not phys1 or not phys2 or phys1 < 0 or phys2 < 0 then
+        print("[HG Floppy] createDislocatedLimbConstraint FAIL: phys bone invalid")
+        return false
+    end
+    if phys1 == phys2 or phys1 == 0 then
+        print("[HG Floppy] createDislocatedLimbConstraint FAIL: invalid phys bone")
+        return false
+    end
+
+    local pBone1 = rag:GetPhysicsObjectNum(phys1)
+    local pBone2 = rag:GetPhysicsObjectNum(phys2)
+    if not (IsValid(pBone1) and IsValid(pBone2)) then
+        print("[HG Floppy] createDislocatedLimbConstraint FAIL: physics object invalid")
+        return false
+    end
+
+    if pBone1.EnableCollisions then pBone1:EnableCollisions(true) end
+    if pBone2.EnableCollisions then pBone2:EnableCollisions(true) end
+    pBone1:Wake()
+    pBone2:Wake()
+    pBone1:EnableMotion(true)
+    pBone2:EnableMotion(true)
+
+    -- Anchor at the child bone's physical origin (the joint) so it can't stretch.
+    local jointPos = pBone1:GetPos()
+    local lpos = vector_origin
+    local lpos2 = WorldToLocal(jointPos, angle_zero, pBone2:GetPos(), pBone2:GetAngles())
+
+    -- Tight angular range + high rotational friction = semi-stiff. The joint
+    -- still moves, but strongly resists, so it stays at its abnormal angle.
+    local lim = 30
+    local fric = 8
+    local cons = constraint.AdvBallsocket(rag, rag, phys1, phys2, lpos, lpos2, 0, 0,
+        -lim, -lim, -lim, lim, lim, lim, fric, fric, fric, 0, 0)
+
+    if IsValid(cons) then
+        if rag.Constraints then
+            for k, v in pairs(rag.Constraints) do
+                if v.Ent1 == rag and v.Ent2 == rag then
+                    if (v.Bone1 == phys1 and v.Bone2 == phys2) or (v.Bone1 == phys2 and v.Bone2 == phys1) then
+                        if IsValid(v.Constraint) and v.Constraint ~= cons then v.Constraint:Remove() end
+                        rag.Constraints[k] = nil
+                    end
+                end
+            end
+        end
+        pcall(function() rag:RemoveInternalConstraint(phys1) end)
+        print("[HG Floppy] createDislocatedLimbConstraint SUCCESS for " .. bone1Name)
+        return cons
+    end
+    print("[HG Floppy] createDislocatedLimbConstraint FAIL: constraint creation failed")
+    return false
+end
+
 function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
     if not IsValid(ent) then return end
     if not limb_segments[limb] then return end
@@ -2603,35 +2673,54 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
             return
         end
 
-        -- Check if organism is dead or has broken neck - use stiff constraints to prevent stretching
+        -- When the organism is dead, leave the normal GMod ragdoll constraints
+        -- untouched instead of applying floppy/dislocation effects.
         local org = IsValid(playerRef) and playerRef.organism
         local isDead = org and not org.alive
-        local hasBrokenNeck = org and org.spine3 and org.spine3 > 0.75
-        local useStiffConstraint = isDead or hasBrokenNeck
 
-        print("[HG Floppy] BreakLimb timer: isDead=" .. tostring(isDead) .. " hasBrokenNeck=" .. tostring(hasBrokenNeck) .. " useStiffConstraint=" .. tostring(useStiffConstraint))
+        print("[HG Floppy] BreakLimb timer: isDead=" .. tostring(isDead) .. " isDislocated=" .. tostring(isDislocated))
+
+        if isDead then
+            print("[HG Floppy] BreakLimb timer: organism dead, leaving normal constraints")
+            return
+        end
 
         local cons
-        if useStiffConstraint then
-            cons = createStiffLimbConstraint(ragdoll, bone1Name, bone2Name)
+        if isDislocated then
+            -- Dislocations are semi-stiff: still movable but resists motion,
+            -- and visually jammed at an abnormal angle (offset below).
+            cons = createDislocatedLimbConstraint(ragdoll, bone1Name, bone2Name, limb)
         else
             cons = createFloppyLimbConstraint(ragdoll, bone1Name, bone2Name, limb)
         end
         if cons then
             print("[HG Floppy] BreakLimb timer: constraint created successfully")
-            -- Apply a slight offset to the broken bone so it visually looks
-            -- displaced/out-of-place rather than just a freely moving joint.
-            -- Dislocated limbs get a slightly larger offset than clean breaks.
-            local offsetScale = isDislocated and 1.5 or 1.0
-            local limbOffsets = {
-                larm = {pos = Vector(0, -1, -1) * offsetScale,  ang = Angle(0, -6, -6) * offsetScale},
-                rarm = {pos = Vector(0,  1, -1) * offsetScale,  ang = Angle(0,  6,  6) * offsetScale},
-                lleg = {pos = Vector(0, -0.5, -1.5) * offsetScale, ang = Angle(0, -4, -4) * offsetScale},
-                rleg = {pos = Vector(0,  0.5, -1.5) * offsetScale, ang = Angle(0,  4,  4) * offsetScale},
-            }
-            local off = limbOffsets[limb]
-            if off then
-                applyFloppyBoneOffset(ragdoll, bone1Name, off.pos, off.ang, "limb_" .. limb)
+            if isDislocated then
+                -- Dislocations: noticeable positional displacement + abnormal
+                -- angle so the joint clearly looks out of its socket.
+                local dislocOffsets = {
+                    larm = {pos = Vector(-1.5, -2, -1.5), ang = Angle(0, -35, -30)},
+                    rarm = {pos = Vector(-1.5,  2, -1.5), ang = Angle(0,  35,  30)},
+                    lleg = {pos = Vector(0, -2, -2),      ang = Angle(0, -25, -30)},
+                    rleg = {pos = Vector(0,  2, -2),      ang = Angle(0,  25,  30)},
+                }
+                local off = dislocOffsets[limb]
+                if off then
+                    applyFloppyBoneOffset(ragdoll, bone1Name, off.pos, off.ang, "limb_" .. limb)
+                end
+            else
+                -- Broken bones: angle-only offset so the limb hangs at a wrong
+                -- angle without any stretched/elongated appearance.
+                local breakAngles = {
+                    larm = Angle(0, -10, -10),
+                    rarm = Angle(0,  10,  10),
+                    lleg = Angle(0,  -6, -10),
+                    rleg = Angle(0,   6, -10),
+                }
+                local ang = breakAngles[limb]
+                if ang then
+                    applyFloppyBoneOffset(ragdoll, bone1Name, vector_origin, ang, "limb_" .. limb)
+                end
             end
 
             -- Store floppy data for healing restoration
@@ -2837,6 +2926,14 @@ function hg.BreakSpine(ent, segment, isDislocated)
 
         if not IsValid(ragdoll) then
             print("[HG Floppy] BreakSpine timer: no ragdoll found for segment=" .. tostring(segment))
+            return
+        end
+
+        -- When the organism is dead, leave the normal GMod ragdoll constraints
+        -- untouched instead of applying the floppy spine effect.
+        local org = IsValid(playerRef) and playerRef.organism
+        if org and not org.alive then
+            print("[HG Floppy] BreakSpine timer: organism dead, leaving normal constraints")
             return
         end
 
