@@ -226,9 +226,6 @@ end
 
 input_list.brain = function(org, bone, dmg, dmgInfo)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
-	-- Skull absorbs brain damage proportionally to its remaining health; intact skull (0) blocks nearly all, shattered skull (1) blocks nothing
-	local skullProtection = 1 - math.max(org.skull or 0, 0)
-	dmg = dmg * skullProtection
 	local oldDmg = org.brain
 	local result = damageOrgan(org, dmg * 1, dmgInfo, "brain")
 	local brainDelta = org.brain - oldDmg

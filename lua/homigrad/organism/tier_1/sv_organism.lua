@@ -232,6 +232,9 @@ end
 
 local function send_bareinfo(org)
 	if not IsValid(org.owner) then return end
+
+	org.owner:SetNWBool("SkullBrokenFully", (org.skull or 0) >= 1)
+
 	local sendtable = {}
 
 	sendtable.alive = org.alive

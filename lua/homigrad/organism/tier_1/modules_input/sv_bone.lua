@@ -456,22 +456,24 @@ end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.skull
-	local old_concussion = org.concussion or 0
+		local old_concussion = org.concussion or 0
 	
-	local result, vecrand = damageBone(org, 0.5, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.35, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 
 	if org.skull == 1 then
-		org.shock = org.shock + dmg * 20
+		org.shock = org.shock + dmg * 30
 		org.avgpain = org.avgpain + dmg * 30
 
 		if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
+		if IsValid(org.owner) then
+			org.owner:SetNWBool("SkullBrokenFully", true)
+		end
 	end
 
 	org.shock = org.shock + dmg * 3
-
-	org.concussion = math.min((org.concussion or 0) + dmg * 6, 10)
+		org.concussion = math.min((org.concussion or 0) + dmg * 6, 10)
 
 	-- Chance to induce vomiting from head trauma
 	if org.isPly and math.random() < dmg * 0.3 then
@@ -480,7 +482,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
-	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 1.5 or 0)
+	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
 
@@ -494,6 +496,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 		timer.Simple(0.1, function()
 			local rag = hg.GetCurrentCharacter(org.owner)
+
 
 			if rag:IsRagdoll() then
 				local stype = hg.getRandomSpasm()
@@ -510,7 +513,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			end)
 		end
 	end
-	if dmg > 0 and dmgInfo:IsDamageType(DMG_CLUB) and math.random(3) == 1 then
+		if dmg > 0 and dmgInfo:IsDamageType(DMG_CLUB) and math.random(3) == 1 then
 		local effectEnt = hg.GetCurrentCharacter(org.owner)
 		if not IsValid(effectEnt) then effectEnt = org.owner end
 		net.Start("hg_brainmist")
@@ -523,12 +526,13 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		net.Broadcast()
 	end
 	
-	org.shock = org.shock + (dmg > 1 and 40 or dmg * 8)
+	org.shock = org.shock + (dmg > 1 and 45 or dmg * 9)
 
 	if org.skull > 0.6 and oldDmg <= 0.6 then
 		if org.isPly then
 			org.owner:Notify(huyasd["skull"],true,"skull",4)
 		end
+
 
 		if dir and hg_bloodimpacts:GetBool() then
 			local dmgPos = dmgInfo:GetDamagePosition()
@@ -556,7 +560,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
 
-	-- Accumulate head trauma for long-term stroke risk
+	return result,vecrand
+		-- Accumulate head trauma for long-term stroke risk
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
 
 	-- Trigger severe headtrauma flash on ANY brain damage from head hits
@@ -588,7 +593,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if dmgInfo:IsDamageType(DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT) and math.random(5) == 1 then return 0, vector_origin end --random chance it passed through ribs
 
-	local result, vecrand = damageBone(org, 0.25, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.15, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 
@@ -610,7 +615,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if math.random() < heartStopChance then
 			org.heartstop = true
 			if org.isPly then
-				org.owner:Notify("My heart... it stopped...", 8, "heartstop", 0)
+				org.owner:Notify("o shittings", 8, "heartstop", 0)
 			end
 		end
 	end
@@ -642,12 +647,12 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				org.painadd = org.painadd + 30
 				org.shock = org.shock + 20
 			end
-			
+
 			return math.min(0, result)
 		end
 	end
 
-	return result * 0.75, vecrand
+	return result * 0.6, vecrand
 end
 
 input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)

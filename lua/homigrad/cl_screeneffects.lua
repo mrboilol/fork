@@ -1079,7 +1079,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		else
 			brain_motionblur = false
-			show_some_images_time = math.random(1200) < (brain * 15) and 250 or 0
+			local chance = (brain or 0) * 15
+			if (org.skull or 0) >= 1 then
+				chance = chance + 6
+			end
+			if (org.jaw or 0) >= 1 then
+				chance = chance + 3
+			end
+			show_some_images_time = math.random(1200) < chance and 250 or 0
 		end
 	else
 		brain_motionblur = false
@@ -1820,3 +1827,120 @@ hook.Add("HG_OnOtrub", "FUCKINGSHITOW", function(ply)
         sound.PlayFile("sound/owfuck.ogg", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
     end
 end)
+
+local function IsSkullBrokenFully(ent)
+	if not IsValid(ent) then return false end
+	if ent:GetNWBool("SkullBrokenFully") then return true end
+
+	-- Check organism
+	if ent.organism and (ent.organism.skull or 0) >= 1 then
+		return true
+	end
+
+	-- Check if ent is player and has organism
+	if ent:IsPlayer() then
+		local org = ent.organism or ent.new_organism
+		if org and (org.skull or 0) >= 1 then
+			return true
+		end
+		-- Check their fake ragdoll or death ragdoll
+		local fakeRag = ent:GetNWEntity("FakeRagdoll")
+		if IsValid(fakeRag) and IsSkullBrokenFully(fakeRag) then
+			return true
+		end
+		local deathRag = ent:GetNWEntity("RagdollDeath")
+		if IsValid(deathRag) and IsSkullBrokenFully(deathRag) then
+			return true
+		end
+	elseif ent:IsRagdoll() then
+		local ply = ent:GetNWEntity("ply")
+		if IsValid(ply) and IsSkullBrokenFully(ply) then
+			return true
+		end
+	end
+
+	return false
+end
+
+hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
+	local localPlayer = LocalPlayer()
+	if not IsValid(localPlayer) then return end
+
+	local camPos = EyePos()
+	local camAngles = EyeAngles()
+
+	for _, ply in ipairs(player.GetAll()) do
+		-- Determine the active entity representing this player (could be player themselves, or their fake ragdoll, or death ragdoll)
+		local ent = ply
+		if not ply:Alive() then
+			local deathRag = ply:GetNWEntity("RagdollDeath")
+			if IsValid(deathRag) then
+				ent = deathRag
+			else
+				local clRag = ply:GetRagdollEntity()
+				if IsValid(clRag) then
+					ent = clRag
+				end
+			end
+		else
+			local fakeRag = ply:GetNWEntity("FakeRagdoll")
+			if IsValid(fakeRag) then
+				ent = fakeRag
+			end
+		end
+
+		if IsValid(ent) then
+			if ent == localPlayer and not localPlayer:ShouldDrawLocalPlayer() then continue end
+
+			if IsSkullBrokenFully(ent) then
+				-- Find head bone
+				local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
+				if bone then
+					local matrix = ent:GetBoneMatrix(bone)
+					if matrix then
+						local headPos = matrix:GetTranslation()
+						local headAng = matrix:GetAngles()
+
+						-- We want to check if the face is visible (looking at their face)
+						-- Forward vector points out of the face for standard ValveBiped skeletal models.
+						-- Apply rotations consistent with hat/helmet alignment
+						headAng:RotateAroundAxis(headAng:Up(), -90)
+						headAng:RotateAroundAxis(headAng:Forward(), -90)
+						headAng:RotateAroundAxis(headAng:Right(), 15)
+						local faceForward = headAng:Forward()
+
+						-- Check dot product of face forward vector and direction to camera.
+						local dirToCam = (camPos - headPos):GetNormalized()
+						local dot = faceForward:Dot(dirToCam)
+
+						-- If dot > 0.15, their face is pointing towards us (we are looking at their face, not the back of their head)
+						if dot > 0.15 then
+							-- Line-of-sight check to make sure head is not obscured by a wall
+							local tr = util.TraceLine({
+								start = camPos,
+								endpos = headPos,
+								filter = {localPlayer, ent},
+								mask = MASK_VISIBLE
+							})
+
+							if not tr.Hit then
+								-- Project head position to 2D screen coordinates
+								local screenData = headPos:ToScreen()
+								if screenData.visible then
+									-- Calculate size of the square based on distance to maintain visual coverage of the head/face area
+									local screenPosOffset = (headPos + camAngles:Up() * 5):ToScreen()
+									local size = math.max(4, math.abs(screenData.y - screenPosOffset.y) * 2.5) -- Multiply by 2.5 to perfectly cover the face area
+
+									-- Draw a 2D black square over their head/face
+									surface.SetDrawColor(0, 0, 0, 255)
+									surface.DrawRect(screenData.x - size / 2, screenData.y - size / 2, size, size)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end)
+
