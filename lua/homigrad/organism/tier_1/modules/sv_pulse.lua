@@ -80,6 +80,9 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
 	if org.panicAttack then heartbeat = heartbeat + 50 end
+	local despairHeartBoost = math.Clamp((org.despair or 0) - 0.3, 0, 0.7) / 0.7 * 35
+	if org.panicAttack then despairHeartBoost = despairHeartBoost * 0.5 end -- already covered by panic +50
+	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
@@ -132,8 +135,8 @@ module[2] = function(owner, org, timeValue)
 
 	-- High velocity reduces blood pressure (falling or fast vehicle movement)
 	local velocity = owner:GetVelocity():Length()
-	if velocity > 800 then
-		local velocityPenalty = math.Clamp((velocity - 800) / 400, 0, 0.4) -- Up to 40% reduction at very high speeds
+	if velocity > 500 then
+		local velocityPenalty = math.Clamp((velocity - 500) / 300, 0, 0.65) -- Up to 65% reduction at very high speeds
 		map = map * (1 - velocityPenalty)
 	end
 
@@ -316,6 +319,21 @@ module[2] = function(owner, org, timeValue)
             end
         end
     end
+
+	-- Small heartstop chance from despair alone (not panic-only)
+	if (org.despair or 0) > 0.4 and not org.panicAttack then
+		if not org._despair_pulse_check or CurTime() > org._despair_pulse_check then
+			org._despair_pulse_check = CurTime() + 5 -- check every 5 seconds
+			local despairChance = math.Clamp((org.despair - 0.4) / 0.6, 0, 1) * 0.008 -- up to 0.8% per 5s at max despair
+			local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+			if totalAdrenaline > 1.0 then
+				despairChance = despairChance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.4)
+			end
+			if math.random() < despairChance then
+				org.heartstop = true
+			end
+		end
+	end
 end
 
 --if org.heartstop then org.needotrub = true end --не совсем...

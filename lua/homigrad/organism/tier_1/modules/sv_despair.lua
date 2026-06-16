@@ -43,6 +43,7 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._panicAdrenalineGiven = false
 	org._postPanicEndTime = 0
 	org._giveUpHeartStopCheck = 0
+	org._despairLastBP = nil
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -249,10 +250,21 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		add = add + Clamp((org.shock - 20) / 50, 0, 1) * timeValue * 0.07
 	end
 
-	if (org.bleed or 0) > 0 then
+	local currentBP = org.bloodpressure or 93
+	local lastBP = org._despairLastBP or currentBP
+	local bpRising = currentBP > lastBP
+	org._despairLastBP = currentBP
+
+	local bleedRate = org.bleed or 0
+	local bleedStopped = bleedRate < 0.05 -- negligible bleed rate (clotted/stopped)
+
+	if bleedRate > 0 and not bleedStopped and not bpRising then
 		-- Bleeding despair - 2 is severe bleeding (pouring blood)
-		local bleedSeverity = Clamp(org.bleed / 2, 0, 1)
+		local bleedSeverity = Clamp(bleedRate / 2, 0, 1)
 		add = add + bleedSeverity * timeValue * 0.14
+	elseif bleedStopped or bpRising then
+		-- Bleeding stopped or cardiac recovering: relieve despair
+		org.despair = math.max((org.despair or 0) - timeValue * 0.15, 0)
 	end
 
 	-- Despair from damaged limbs (broken bones, fractures)
@@ -272,15 +284,14 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		add = add + brokenLimbs * timeValue * 0.04
 	end
 
-	-- Despair from dying state (critical health/blood)
-	if (org.blood or 5000) < 3750 then
-		add = add + Clamp((3750 - org.blood) / 3750, 0, 1) * timeValue * 0.18
+	-- Despair from dying state (critical health/blood) - only while still bleeding
+	local blood = org.blood or 5000
+	if blood < 3750 and not bleedStopped then
+		add = add + Clamp((3750 - blood) / 3750, 0, 1) * timeValue * 0.18
 	end
 
 	-- Despair from bleeding out (low blood + active bleeding - won't clot)
-	local blood = org.blood or 5000
-	local bleed = org.bleed or 0
-	if blood < 3750 and bleed > 0 then
+	if blood < 3750 and bleedRate > 0 and not bleedStopped and not bpRising then
 		local bleedSeverity = Clamp((3750 - blood) / 3750, 0, 1)
 		-- Higher despair gain when actively bleeding out (blood won't clot)
 		add = add + bleedSeverity * timeValue * 0.2

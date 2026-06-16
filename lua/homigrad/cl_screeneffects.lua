@@ -1521,9 +1521,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_brightness"] = -(despairGrayShock ^ 1.2) * 0.2
 		tab["$pp_colour_contrast"] = 1 - despairGrayShock * 0.18
 		tab["$pp_colour_colour"] = 1 - despairGrayShock * 0.45
-		tab["$pp_colour_mulr"] = 0
-		tab["$pp_colour_mulg"] = 0
-		tab["$pp_colour_mulb"] = 0
+		tab["$pp_colour_mulr"] = -despairGrayShock * 0.06
+		tab["$pp_colour_mulg"] = -despairGrayShock * 0.04
+		tab["$pp_colour_mulb"] = -despairGrayShock * 0.02
 	end
 
 	-- Despair sound is handled by cl_despair.lua module

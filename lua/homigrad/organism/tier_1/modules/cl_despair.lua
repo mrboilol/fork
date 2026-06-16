@@ -203,27 +203,18 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	if despair > 0.25 and not panicAttack and not givingUp then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
-			MsgN("[Despair] Attempting to load sound, despair:", despair, " panicAttack:", panicAttack)
 			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(channel, err)
 				despairSoundLoading = false
-				if err then
-					MsgN("[Despair] Sound error: ", err)
-					return
-				end
-				if not IsValid(channel) then 
-					MsgN("[Despair] Channel invalid after load")
-					return 
-				end
-				MsgN("[Despair] Sound loaded successfully")
-				channel:SetVolume(2.0 * musicVolume:GetFloat())
+				if err or not IsValid(channel) then return end
+				channel:SetVolume(4.0 * musicVolume:GetFloat())
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 2.0 * musicVolume:GetFloat()
+				despairSoundVol = 4.0 * musicVolume:GetFloat()
 			end)
 		end
 
-		local targetVol = (despair > 0.3 and 3.5 or math.Remap(despair, 0.25, 1, 2.0, 3.5)) * musicVolume:GetFloat()
+		local targetVol = (despair > 0.3 and 5.5 or math.Remap(despair, 0.25, 1, 3.0, 5.5)) * musicVolume:GetFloat()
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
