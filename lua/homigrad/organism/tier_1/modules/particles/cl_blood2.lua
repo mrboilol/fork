@@ -1,3 +1,4 @@
+hg = hg or {}
 hg.bloodparticles2 = hg.bloodparticles2 or {}
 bloodparticles_hook = bloodparticles_hook or {}
 
@@ -61,8 +62,10 @@ local radius = 20000
 local radiusSqr = radius * radius
 
 hook.Add("InitPostEntity", "sizeget2", function()
-	radius = hg.GetWorldSize()
-    radiusSqr = radius * radius
+	if hg and hg.GetWorldSize then
+		radius = hg.GetWorldSize()
+		radiusSqr = radius * radius
+	end
 end)
 
 bloodparticles_hook[4] = function(mul)

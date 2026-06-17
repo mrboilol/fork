@@ -20,6 +20,7 @@ local vomitColorSecondary = Color(238, 235, 210, 130)
 	mats[i-3] = Material("homigrad/decals/bld" .. i)
 end]]
 local countmats = #mats
+hg = hg or {}
 hg.bloodparticles1 = hg.bloodparticles1 or {}
 hg.bloodparticles2 = hg.bloodparticles2 or {}
 local vecZero = Vector(0, 0, 0)
@@ -45,7 +46,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
 		end
 	end
 	if flyingCount > 2000 then
-		for i = 1, #hg.bloodparticles1 do
+		for i = #hg.bloodparticles1, 1, -1 do
 			local part = hg.bloodparticles1[i]
 			if part and not part.landed then
 				table.remove(hg.bloodparticles1, i)

@@ -1,4 +1,5 @@
-﻿hg.bloodparticles1 = hg.bloodparticles1 or {}
+﻿hg = hg or {}
+hg.bloodparticles1 = hg.bloodparticles1 or {}
 bloodparticles_hook = bloodparticles_hook or {}
 
 local tr = {
@@ -251,8 +252,10 @@ local radius = 20000
 local radiusSqr = radius * radius
 
 hook.Add("InitPostEntity", "sizeget", function()
-	radius = hg.GetWorldSize()
-    radiusSqr = radius * radius
+	if hg and hg.GetWorldSize then
+		radius = hg.GetWorldSize()
+		radiusSqr = radius * radius
+	end
 end)
 
 local function landBloodParticle(part, result, i)
@@ -335,7 +338,7 @@ bloodparticles_hook[2] = function(mul)
 	local landedCap = 15000
 	if landedCount > landedCap then
 		local toRemove = landedCount - landedCap
-		for i = 1, #hg.bloodparticles1 do
+		for i = #hg.bloodparticles1, 1, -1 do
 			if toRemove <= 0 then break end
 			local part = hg.bloodparticles1[i]
 			if part and part.landed then
