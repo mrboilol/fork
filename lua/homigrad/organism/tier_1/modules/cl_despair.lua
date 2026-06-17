@@ -199,7 +199,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	if panicAttack then
 		render.UpdateScreenEffectTexture()
 		-- Heavy chromatic aberration during panic, pulsing but not overwhelming
-		chromaticMat:SetFloat("$c0_x", 0.09 + math.sin(CurTime() * 7) * 0.03)
+		chromaticMat:SetFloat("$c0_x", (0.09 + math.sin(CurTime() * 7) * 0.03) * 1.5)
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()

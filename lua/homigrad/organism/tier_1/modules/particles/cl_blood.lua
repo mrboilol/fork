@@ -143,8 +143,8 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 
 		local isExpie = isExpieOwner(part.owner)
 
-		if part.kishki then
-			render_SetMaterial(part[4])
+		if part.landed or part.kishki or hg_blood_sprites:GetBool() then
+			render_SetMaterial(part[4] or (isExpie and mat_expie_drop or mat_huy))
 			if isExpie then
 				lightcolor.r = math.min(255 * light[1], 255)
 				lightcolor.g = math.min(255 * light[2], 255)
@@ -255,29 +255,116 @@ hook.Add("InitPostEntity", "sizeget", function()
     radiusSqr = radius * radius
 end)
 
+local function landBloodParticle(part, result, i)
+	local hitPos = result.HitPos
+	local nearbyCount = 0
+	for j = 1, #hg.bloodparticles1 do
+		local other = hg.bloodparticles1[j]
+		if other and other.landed then
+			local distSqr = other[1]:DistToSqr(hitPos)
+			if distSqr < 144 then -- 12 units radius
+				nearbyCount = nearbyCount + 1
+			end
+		end
+	end
+	
+	if nearbyCount >= 5 then
+		-- Falls on a big puddle of blood, landing wouldn't provide much impact so it despawns (absorbs)
+		table_remove(hg.bloodparticles1, i)
+		return true
+	elseif nearbyCount > 0 then
+		-- Landing on a bunch of particles should move on to the next empty space!
+		local slideDir = (part[3]:Cross(result.HitNormal)):Cross(result.HitNormal):GetNormalized()
+		if slideDir:LengthSqr() < 0.1 then
+			slideDir = result.HitNormal:Angle():Right()
+		end
+		local slideOffset = slideDir * math.Rand(6, 12)
+		local testPos = hitPos + slideOffset
+		
+		local testTr = {
+			start = testPos + result.HitNormal * 5,
+			endpos = testPos - result.HitNormal * 10,
+			mask = MASK_SOLID_BRUSHONLY
+		}
+		local testResult = util_TraceLine(testTr)
+		if testResult.Hit then
+			hitPos = testResult.HitPos
+		end
+	end
+	
+	part.landed = true
+	part[1] = hitPos + result.HitNormal * 0.1 -- slightly offset from surface to avoid z-fighting
+	part[2] = part[1]
+	part[3] = Vector(0, 0, 0) -- zero velocity
+	
+	-- Increase its size slightly when on the ground to look like a splat/puddle
+	part[5] = part[5] * math.Rand(1.8, 2.5)
+	part[6] = part[5]
+	return false
+end
+
 bloodparticles_hook[2] = function(mul)
 	local grav = gravity:GetInt() / 10
     local time = CurTime()
 	local gravvec = vecDown * mul * (math.max(0.0, grav))
 	
-	-- Age-based deletion
+	-- Age-based deletion for flying particles only
 	local maxAge = 30
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
-		if part and part.spawnTime and (time - part.spawnTime) > maxAge then
+		if part and not part.landed and part.spawnTime and (time - part.spawnTime) > maxAge then
 			table_remove(hg.bloodparticles1, i)
 		end
 	end
 	
-	-- Emergency cap to prevent client overload/crash
-	local cap = 4000
-	while #hg.bloodparticles1 > cap do
-		table_remove(hg.bloodparticles1, 1)
+	-- Count flying vs landed particles
+	local landedCount = 0
+	local flyingCount = 0
+	for i = 1, #hg.bloodparticles1 do
+		local part = hg.bloodparticles1[i]
+		if part then
+			if part.landed then
+				landedCount = landedCount + 1
+			else
+				flyingCount = flyingCount + 1
+			end
+		end
+	end
+
+	-- Cap landed particles to prevent memory issues
+	local landedCap = 15000
+	if landedCount > landedCap then
+		local toRemove = landedCount - landedCap
+		for i = 1, #hg.bloodparticles1 do
+			if toRemove <= 0 then break end
+			local part = hg.bloodparticles1[i]
+			if part and part.landed then
+				table_remove(hg.bloodparticles1, i)
+				toRemove = toRemove - 1
+			end
+		end
+	end
+
+	-- Cap mid-air particles to prevent CPU lag
+	local flyingCap = 2000
+	if flyingCount > flyingCap then
+		local toRemove = flyingCount - flyingCap
+		for i = #hg.bloodparticles1, 1, -1 do
+			if toRemove <= 0 then break end
+			local part = hg.bloodparticles1[i]
+			if part and not part.landed then
+				table_remove(hg.bloodparticles1, i)
+				toRemove = toRemove - 1
+			end
+		end
 	end
 	
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
 		if not part then table_remove(hg.bloodparticles1, i) continue end
+		
+		-- Skip physics if already landed on the floor
+		if part.landed then continue end
 		
 		local pos = part[1]
 		local posSet = part[2]
@@ -302,7 +389,7 @@ bloodparticles_hook[2] = function(mul)
 			local dir = result.HitNormal
 			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 			
-			table_remove(hg.bloodparticles1, i)
+			if landBloodParticle(part, result, i) then continue end
 			continue
 		else
 			local ph = 0
@@ -321,7 +408,7 @@ bloodparticles_hook[2] = function(mul)
 				local dir = result.HitNormal
 				decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 				
-				table_remove(hg.bloodparticles1, i)
+				if landBloodParticle(part, result, i) then continue end
 				continue
 			else
 				if part.hashitsomething then

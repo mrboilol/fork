@@ -149,11 +149,17 @@ function SWEP:PrimarySpread()
 					end
 				end
 			end
-		end
+			-- Base shooting pain only applies when firing with a damaged firing arm.
+			-- Right arm broken/dislocated, or (right arm missing AND left arm broken/dislocated).
+			local rarm_amputated = org.rarmamputated
+			local shouldShootPain = (rarm_broken or rarm_dislocated) or
+				(rarm_amputated and (larm_broken or larm_dislocated))
 
-		-- Base shooting pain: minimum 17.5, scales upward with caliber/force
-		local baseShootPain = math.max(17.5, calForce * 0.35)
-		org.painadd = org.painadd + baseShootPain
+			if shouldShootPain then
+				local baseShootPain = math.max(17.5, calForce * 0.35)
+				org.painadd = org.painadd + baseShootPain
+			end
+		end
 	end
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then

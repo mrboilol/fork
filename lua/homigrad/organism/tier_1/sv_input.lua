@@ -1821,45 +1821,47 @@ local function velocityDamage(ent, data)
 			local oldBrain = org.brain
 			hg.organism.input_list.skull(org, bone, dmg * 4 * (hadhelmet and 0.2 or 1), dmgInfo)
 			
-			
-							local flash_intensity = 2.0
-				local flash_duration = 300
-			
-			//if dmg > 0.5 then
-						hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1), dmgInfo)
-						
-						flash_intensity = 3.5
-						flash_duration = 500
-						if IsValid(org.owner) and org.owner:IsPlayer() then
-							org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
-						end
-			//end
-								net.Start("headtrauma_flash")
-					net.WriteVector(dmgInfo:GetDamagePosition())
-					net.WriteFloat(flash_intensity)
-					net.WriteInt(flash_duration, 20)
-
-					local brainDelta = org.brain - oldBrain
-					local is_critical = (org.brain > 0.5 and brainDelta > 0.05) or org.skull == 1
-					net.WriteBool(is_critical)
-
-					local play_knockout_sound = false
-					if org.otrub then
-						if not org.played_knockout_sound then
-							play_knockout_sound = true
-							org.played_knockout_sound = true
-						end
-					else
-						org.played_knockout_sound = false
-					end
-					net.WriteBool(play_knockout_sound)
-
-					local hasBrainDamage = org.brain > 0.1
-					net.WriteBool(hasBrainDamage)
-
-					if IsValid(org.owner) and org.owner:IsPlayer() then net.Send(org.owner) end
+			if dmg >= 0.04 then
+				local flash_intensity = math.Clamp(dmg * 6, 0.5, 4.5)
+				local flash_duration = math.Clamp(dmg * 800, 100, 600)
 				
-								org.consciousness = math.Approach(org.consciousness, 0, dmg * 2 * (hadhelmet and 0.2 or 1))
+				if dmg > 0.15 then
+					hg.organism.input_list.spine3(org, bone, dmg * 5 * (hadhelmet and 0.5 or 1), dmgInfo)
+					if IsValid(org.owner) and org.owner:IsPlayer() then
+						org.owner:ViewPunch(Angle(math.Rand(-25, 25), math.Rand(-15, 15), math.Rand(-5, 5)))
+					end
+				end
+
+				net.Start("headtrauma_flash")
+				net.WriteVector(dmgInfo:GetDamagePosition())
+				net.WriteFloat(flash_intensity)
+				net.WriteInt(flash_duration, 20)
+
+				local brainDelta = org.brain - oldBrain
+				local is_critical = (org.brain > 0.5 and brainDelta > 0.05) or org.skull == 1
+				net.WriteBool(is_critical)
+
+				local play_knockout_sound = false
+				if org.otrub then
+					if not org.played_knockout_sound then
+						play_knockout_sound = true
+						org.played_knockout_sound = true
+					end
+				else
+					org.played_knockout_sound = false
+				end
+				net.WriteBool(play_knockout_sound)
+
+				local hasBrainDamage = org.brain > 0.1
+				net.WriteBool(hasBrainDamage)
+
+				local trigger_tinnitus = dmg >= 0.12
+				net.WriteBool(trigger_tinnitus)
+
+				if IsValid(org.owner) and org.owner:IsPlayer() then net.Send(org.owner) end
+			end
+				
+			org.consciousness = math.Approach(org.consciousness, 0, dmg * 2 * (hadhelmet and 0.2 or 1))
 				
 				local neck_not_broken = org.spine3 < 0.8
 			if dmg * 10 > 1.0 and !hadhelmet then

@@ -1085,19 +1085,22 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local size = math.Rand(0.4, 0.8) * math.max(math.min(severity, 1.2), 0.4)
 							local bleedVel, delay
 							
-							if severityFactor > 1.2 then
-								local spraySpeed = Lerp(math.min((severityFactor - 1.2) / 3, 1), 35, 160)
-								local spread = Lerp(math.min((severityFactor - 1.2) / 3, 1), 6, 25)
-								bleedVel = sprayDir * spraySpeed + VectorRand(-spread, spread)
-								delay = math.Rand(0.02, 0.08) / (severityFactor - 0.8)
+							delay = 1.5 / (severityFactor ^ 1.1)
+							delay = math.Clamp(delay, 0.015, 3.5)
+							
+							local spraySpeed, spread
+							if severityFactor > 15 then
+								local frac = math.min((severityFactor - 15) / 35, 1)
+								spraySpeed = Lerp(frac, 30, 200)
+								spread = Lerp(frac, 3, 10)
 							else
-								local spraySpeed = Lerp(severityFactor / 1.2, 2, 15)
-								local spread = Lerp(severityFactor / 1.2, 1, 5)
-								bleedVel = sprayDir * spraySpeed + VectorRand(-spread, spread)
-								delay = math.Rand(0.6, 2.0) / severityFactor
+								local frac = severityFactor / 15
+								spraySpeed = Lerp(frac, 1, 30)
+								spread = Lerp(frac, 1, 4)
 							end
 							
-							delay = math.Clamp(delay, 0.015, 8.0)
+							bleedVel = sprayDir * spraySpeed + VectorRand(-spread, spread)
+							
 							hg.addBloodPart(pos, bleedVel, nil, size, size, false, nil, ent)
 							wound[5] = time + delay
 						end
@@ -1117,17 +1120,21 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							local size = math.Rand(0.4, 0.8) * math.max(math.min(severity, 1.2), 0.4)
 							local bleedVel, delay
 							
-							if severityFactor > 1.2 then
-								local spraySpeed = Lerp(math.min((severityFactor - 1.2) / 3, 1), 25, 100)
-								bleedVel = VectorRand(-spraySpeed, spraySpeed)
-								bleedVel[3] = math.max(bleedVel[3], -10)
-								delay = math.Rand(0.02, 0.08) / (severityFactor - 0.8)
+							delay = 1.5 / (severityFactor ^ 1.1)
+							delay = math.Clamp(delay, 0.015, 3.5)
+							
+							local spraySpeed
+							if severityFactor > 15 then
+								local frac = math.min((severityFactor - 15) / 35, 1)
+								spraySpeed = Lerp(frac, 20, 150)
 							else
-								bleedVel = VectorRand(-10, 10)
-								delay = math.Rand(0.6, 2.0) / severityFactor
+								local frac = severityFactor / 15
+								spraySpeed = Lerp(frac, 1, 20)
 							end
 							
-							delay = math.Clamp(delay, 0.015, 8.0)
+							bleedVel = VectorRand(-spraySpeed, spraySpeed)
+							bleedVel[3] = math.max(bleedVel[3], -10)
+							
 							hg.addBloodPart(pos, bleedVel, nil, size, size, false, nil, ent)
 							wound[5] = time + delay
 						end
@@ -1173,7 +1180,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, ent)
 						else
-							hg.addBloodPart(pos, (VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70) * 1.75, nil, size, size, true, nil, ent)
+							hg.addBloodPart(pos, (VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 45 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 8 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 8 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70) * 1.75, nil, size, size, true, nil, ent)
 						end
 
 						wound[5] = time + (water and 2 or ((0.5 * 1 / hg_blood_fps:GetInt()) / 1.75))

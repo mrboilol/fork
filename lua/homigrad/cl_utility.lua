@@ -1046,14 +1046,17 @@ players : 1 humans, 0 bots (20 max)
 
 	local blackout_mat = Material("sprites/mat_jack_hmcd_narrow")
 
-	function hg.AddFlash(eyepos, dot, pos, time, size)
+	function hg.AddFlash(eyepos, dot, pos, time, size, is_headtrauma)
 		time = time or 20
 		size = size or 1000--pixels
+		if is_headtrauma then
+			size = size * 2.0
+		end
 		size = size / math.max(pos:Distance(eyepos) / 64,0.01) * (dot^2)
 		local taint = math.max(200 - size,0) / 200 * time * 0.9
 		local scr = pos:ToScreen()
 
-		table.insert(hg.flashes,{x = scr.x, y = scr.y, time = CurTime() + time - taint, lentime = time, size = size})
+		table.insert(hg.flashes,{x = scr.x, y = scr.y, time = CurTime() + time - taint, lentime = time, size = size, is_headtrauma = is_headtrauma})
 	end
 
 	local flash
@@ -1113,6 +1116,7 @@ players : 1 humans, 0 bots (20 max)
 
 		for i = 1, #hg.flashes do
 			flash = hg.flashes[i]
+			if flash.is_headtrauma then continue end
 			
 			local animpos = flash.animpos
 			local size = flash.size
@@ -1120,6 +1124,27 @@ players : 1 humans, 0 bots (20 max)
 			local huy = (1 - animpos) * -100
 			surface.SetMaterial(mat)
 			surface.SetDrawColor(255, 255, 255, (animpos * 255 + math.Rand(-10,10) * animpos) * (0.5 / #hg.flashes) * (amtflashed < 0.8 and 1.5 or 1))
+			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
+			surface.SetMaterial(mat2)
+			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
+		end
+	end)
+
+	hook.Add("DrawOverlay", "headtrauma_flashes", function()
+		if !IsValid(lply) or !lply:Alive() then return end
+		if #hg.flashes <= 0 then return end
+
+		for i = 1, #hg.flashes do
+			local flash = hg.flashes[i]
+			if not flash or not flash.is_headtrauma then continue end
+
+			local animpos = flash.animpos or ((flash.time - CurTime()) / flash.lentime)
+			if animpos <= 0 then continue end
+			local size = flash.size
+
+			local huy = (1 - animpos) * -100
+			surface.SetMaterial(mat)
+			surface.SetDrawColor(255, 255, 255, (animpos * 255 + math.Rand(-10,10) * animpos) * (0.5 / #hg.flashes) * 1.5)
 			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
 			surface.SetMaterial(mat2)
 			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)

@@ -94,7 +94,7 @@ end
 	local DETAIL_RENDER_DIST_SQR = 2000 * 2000
 	local angfuck = Angle()
 
-	function DrawPlayerRagdoll(ent, ply) --// actually not only ragdoll render but player too
+	function DrawPlayerRagdoll(ent, ply, fromRender) --// actually not only ragdoll render but player too
 		if ply.prevragdoll_index != nil and ply.prevragdoll_index != ply.ragdoll_index and ply.ragdoll_index == 0 then
 			//print(ply.ragdoll_index, ply.prevragdoll_index, Entity(ply.ragdoll_index))
 
@@ -162,9 +162,12 @@ end
 		end
 
 		-- Snapshot the fully TPIK-resolved bone pose for the local player so the
-		-- health indicator can mirror real bone positions (fired before the
-		-- first-person head-hiding manip below so the head stays visible).
-		if fullPoseRender and ply == lply then
+		-- health indicator can mirror real bone positions. Only fire from the
+		-- world-space render path (fromRender); inside the BuildBonePositions
+		-- callback the matrices are not finalized to world space yet. Fired
+		-- before the first-person head-hiding manip below so the head stays
+		-- visible in the indicator.
+		if fromRender and fullPoseRender and ply == lply then
 			hook.Run("PostDrawPlayerRagdolls", ent, ply)
 		end
 

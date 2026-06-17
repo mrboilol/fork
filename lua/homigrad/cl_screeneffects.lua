@@ -511,7 +511,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
             render.DrawScreenQuad()
 
             render.UpdateScreenEffectTexture()
-            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.04)
+            chromaticMat:SetFloat("$c0_x", adrenalineShock * 0.04 * 1.5)
             chromaticMat:SetInt("$c0_y", 1)
             render.SetMaterial(chromaticMat)
             render.DrawScreenQuad()
@@ -916,7 +916,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100 + extremePainFlicker * 0.3, 0, 0.35))
+		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100 + extremePainFlicker * 0.3, 0, 0.35) * 1.5)
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
@@ -1524,7 +1524,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			-- Panic: heavier chromatic aberration, despair: lighter
 			local chromAmt = panicAttack and (0.04 + despairShock * 0.09 + math.sin(CurTime() * 6) * 0.015) or (despairShock * 0.035)
     		render.UpdateScreenEffectTexture()
-    		chromaticMat:SetFloat("$c0_x", chromAmt)
+    		chromaticMat:SetFloat("$c0_x", chromAmt * 1.5)
     		chromaticMat:SetInt("$c0_y", 1)
     		render.SetMaterial(chromaticMat)
     		render.DrawScreenQuad()
@@ -1779,15 +1779,18 @@ net.Receive("headtrauma_flash", function()
     local is_critical = net.ReadBool()
     local play_knockout_sound = net.ReadBool()
     local hasBrainDamage = net.ReadBool()
+    local trigger_tinnitus = net.ReadBool()
 
     local lply = LocalPlayer()
 
-    if is_critical then
-        surface.PlaySound("tinnituslong.wav")
-        if IsValid(lply) then lply:AddTinnitus(5, false, hasBrainDamage) end
-    else
-        surface.PlaySound("tinnitus.wav")
-        if IsValid(lply) then lply:AddTinnitus(2.5, false, hasBrainDamage) end
+    if trigger_tinnitus then
+        if is_critical then
+            surface.PlaySound("tinnituslong.wav")
+            if IsValid(lply) then lply:AddTinnitus(5, false, hasBrainDamage) end
+        else
+            surface.PlaySound("tinnitus.wav")
+            if IsValid(lply) then lply:AddTinnitus(2.5, false, hasBrainDamage) end
+        end
     end
 
     if not IsValid(lply) then return end
@@ -1797,7 +1800,7 @@ net.Receive("headtrauma_flash", function()
         return
     end
 
-    hg.AddFlash(lply:EyePos(), 1, pos, time, size)
+    hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
     headtraumaSaturation = math.min(time * 3, 5)
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
@@ -1820,7 +1823,7 @@ function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
         sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
         last_knocked_sound_time = CurTime()
     end
-    hg.AddFlash(lply:EyePos(), 1, pos, time, size)
+    hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
 end
 hook.Add("HG_OnOtrub", "FUCKINGSHITOW", function(ply)
     if ply == LocalPlayer() then

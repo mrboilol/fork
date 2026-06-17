@@ -154,7 +154,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		DrawBloom( 0.65, (intensity * 2) * altMultiplier, 9, 9, 1, 1, (intensity / 32) * altMultiplier, 0.2, 0.2 )
 
 		render.UpdateScreenEffectTexture()
-			cc:SetFloat("$c0_x", (3.5 - intensity) * altMultiplier)
+			cc:SetFloat("$c0_x", ((3.5 - intensity) * altMultiplier) * 1.5)
 			cc:SetInt("$c0_y", 1)
 			render.SetMaterial(cc)
 		render.DrawScreenQuad()

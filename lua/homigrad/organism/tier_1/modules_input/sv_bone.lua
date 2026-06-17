@@ -16,6 +16,8 @@ local function CheckConcussionFlash(org, old_concussion, dmgInfo)
         net.WriteInt(450, 20) -- flash_duration - longer
         net.WriteBool(true) -- is_critical
         net.WriteBool(false) -- play_knockout_sound
+        net.WriteBool(org.brain > 0.1) -- hasBrainDamage
+        net.WriteBool(true) -- trigger_tinnitus
         net.Send(org.owner)
     end
 end
@@ -58,6 +60,8 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 			net.WriteInt(350, 20)
 			net.WriteBool(true)
 			net.WriteBool(false)
+			net.WriteBool(org.brain > 0.1)
+			net.WriteBool(true)
 			net.Send(org.owner)
 		end
 	end
@@ -573,6 +577,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		net.WriteBool(true) -- is_critical
 		net.WriteBool(false) -- play_knockout_sound
 		net.WriteBool(true) -- hasBrainDamage - always true since we have brain damage
+		net.WriteBool(true) -- trigger_tinnitus
 		net.Send(org.owner)
 	end
 

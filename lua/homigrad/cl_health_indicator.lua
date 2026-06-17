@@ -945,8 +945,8 @@ function HUD_DrawDynamicIndicator()
                             local neckArteryBleedRate = 2.0 * 4.5 * pulse / 80 -- ~7.88 ml/beat at pulse 70
                             local currentBleedRate = data.severity * 7 * 2.0 * pulse / 70 -- Approx regular wound rate
 
-                            local bleedsAtArterialLevel = (currentBleedRate >= arterialBleedRate) or data.isArterial
-                            local bleedsAtNeckArteryLevel = (currentBleedRate >= neckArteryBleedRate) or isNeckArtery
+                            local bleedsAtArterialLevel = data.isArterial and not isNeckArtery
+                            local bleedsAtNeckArteryLevel = data.isArterial and isNeckArtery
 
                             table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, isNeckArtery = isNeckArtery, bleedsAtArterialLevel = bleedsAtArterialLevel, bleedsAtNeckArteryLevel = bleedsAtNeckArteryLevel, key = key})
                         end

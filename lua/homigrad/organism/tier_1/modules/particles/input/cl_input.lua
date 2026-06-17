@@ -37,8 +37,22 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	-- Hard cap to prevent client overload/crash (each particle traces + draws every frame)
-	if #hg.bloodparticles1 > 10000 then table.remove(hg.bloodparticles1, 1) end
+	-- Hard cap to prevent client overload/crash of mid-air particles
+	local flyingCount = 0
+	for i = 1, #hg.bloodparticles1 do
+		if hg.bloodparticles1[i] and not hg.bloodparticles1[i].landed then
+			flyingCount = flyingCount + 1
+		end
+	end
+	if flyingCount > 2000 then
+		for i = 1, #hg.bloodparticles1 do
+			local part = hg.bloodparticles1[i]
+			if part and not part.landed then
+				table.remove(hg.bloodparticles1, i)
+				break
+			end
+		end
+	end
 	
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime()}
 end

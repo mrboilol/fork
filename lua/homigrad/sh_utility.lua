@@ -655,7 +655,7 @@ local IsValid = IsValid
 		--local drawornot = hook_Run("PreDrawPlayer2", ent, self) // true means nodraw
 		--if drawornot then return end
 
-		DrawPlayerRagdoll(ent, self)
+		DrawPlayerRagdoll(ent, self, true)
 		RenderAccessoriesCool(ent, self)
 		hook_Run("CoolPostDrawAppearance", ent, self)
 		//hg.HomigradBones(self, CurTime(), FrameTime())
