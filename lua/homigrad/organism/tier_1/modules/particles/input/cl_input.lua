@@ -37,8 +37,8 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	-- Only cap when very high to prevent memory issues (raised to 150000)
-	if #hg.bloodparticles1 > 150000 then table.remove(hg.bloodparticles1, 1) end
+	-- Hard cap to prevent client overload/crash (each particle traces + draws every frame)
+	if #hg.bloodparticles1 > 10000 then table.remove(hg.bloodparticles1, 1) end
 	
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime()}
 end
@@ -54,8 +54,8 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, impact)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	-- Only cap when very high to prevent memory issues (raised to 150000)
-	if #hg.bloodparticles2 > 150000 then table.remove(hg.bloodparticles2, 1) end
+	-- Hard cap to prevent client overload/crash (each particle traces + draws every frame)
+	if #hg.bloodparticles2 > 4000 then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 

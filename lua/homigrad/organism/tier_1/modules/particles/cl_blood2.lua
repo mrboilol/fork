@@ -69,8 +69,8 @@ bloodparticles_hook[4] = function(mul)
     local time = CurTime()
     local grav = gravity:GetInt() / 30
 
-    -- Age-based deletion (60 seconds)
-    local maxAge = 60
+    -- Age-based deletion
+    local maxAge = 45
     for i = #hg.bloodparticles2, 1, -1 do
         local part = hg.bloodparticles2[i]
         if part and part.spawnTime and (time - part.spawnTime) > maxAge then
@@ -78,8 +78,8 @@ bloodparticles_hook[4] = function(mul)
         end
     end
 
-    -- Emergency cap only when very high
-    local cap = 100000
+    -- Emergency cap to prevent client overload/crash
+    local cap = 10000
     while #hg.bloodparticles2 > cap do
         table_remove(hg.bloodparticles2, 1)
     end

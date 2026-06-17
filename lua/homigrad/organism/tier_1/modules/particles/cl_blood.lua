@@ -187,7 +187,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 		hg.bloodpositionOrder[#hg.bloodpositionOrder + 1] = vec
 	end
 	
-	local cap = 150000
+	local cap = 10000
 	if hg.bloodcount > cap then
 		local toRemove = hg.bloodcount - cap
 		for i = 1, toRemove do
@@ -260,8 +260,8 @@ bloodparticles_hook[2] = function(mul)
     local time = CurTime()
 	local gravvec = vecDown * mul * (math.max(0.0, grav))
 	
-	-- Age-based deletion (60 seconds)
-	local maxAge = 60
+	-- Age-based deletion
+	local maxAge = 30
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
 		if part and part.spawnTime and (time - part.spawnTime) > maxAge then
@@ -269,8 +269,8 @@ bloodparticles_hook[2] = function(mul)
 		end
 	end
 	
-	-- Emergency cap only when very high (raised to 150000)
-	local cap = 150000
+	-- Emergency cap to prevent client overload/crash
+	local cap = 4000
 	while #hg.bloodparticles1 > cap do
 		table_remove(hg.bloodparticles1, 1)
 	end
