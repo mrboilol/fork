@@ -100,15 +100,14 @@ module[2] = function(owner, org, timeValue)
 		local chance = 0
 		if hb >= 400 then
 			chance = 0.25
-	    elseif	
-		if hb >= 375 then
-			chance = 0.1 -- guaranteed
+		elseif hb >= 375 then
+			chance = 0.1
 		elseif hb >= 350 then
 			chance = 0.075
 		elseif hb >= 300 then
-			chance = 0.05 -- 3% chance per second
+			chance = 0.05
 		elseif hb >= 200 then
-			chance = 0.025 -- 0.2% chance per second
+			chance = 0.025
 		end
 
 		if chance > 0 and math.random() < chance then

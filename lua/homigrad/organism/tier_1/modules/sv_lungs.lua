@@ -563,7 +563,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.brain >= 0.3 then
-		if org.brain >= 0.35 then
+		if org.brain >= 0.4 then
 			if math.random(120) == 1 then
 				org.heartstop = true
 			end
