@@ -728,10 +728,10 @@ local render_RenderView = render.RenderView
 local renderView = {
 	x = 0,
 	y = 0,
-	drawhud = true,
+	drawhud = false,
 	drawviewmodel = true,
 	dopostprocess = true,
-	drawmonitors = true,
+	drawmonitors = false,
 	fov = 100
 }
 local fliprt = GetRenderTarget( "fb_flipped", ScrW(), ScrH(), false )
