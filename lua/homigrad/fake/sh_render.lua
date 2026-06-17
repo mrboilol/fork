@@ -157,11 +157,21 @@ end
 			hg.RenderTourniquets(ent, ply)
 		end
 
-		if fullPoseRender then
-			hg.GoreCalc(ent, ply)
+	if fullPoseRender then
+		hg.GoreCalc(ent, ply)
+	end
+
+		-- Snapshot the fully TPIK-resolved bone pose for the local player so the
+		-- health indicator can mirror real bone positions. Only fire from the
+		-- world-space render path (fromRender); inside the BuildBonePositions
+		-- callback the matrices are not finalized to world space yet. Fired
+		-- before the first-person head-hiding manip below so the head stays
+		-- visible in the indicator.
+		if fromRender and fullPoseRender and ply == lply then
+			hook.Run("PostDrawPlayerRagdolls", ent, ply)
 		end
 
-		--local current = ent:GetManipulateBoneScale(lkp)
+	--local current = ent:GetManipulateBoneScale(lkp)
 		local fountains = GetNetVar("fountains") or {}
 		local wawanted = (GetViewEntity() != ply) and !fountains[ent] and (!(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1) and !(hg_firstperson_death:GetBool() and follow == ent)) and vector_full or vector_small
 		--print(ent, wawanted, GetViewEntity(), ply, (GetViewEntity() != ply), !fountains[ent], !(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1))
