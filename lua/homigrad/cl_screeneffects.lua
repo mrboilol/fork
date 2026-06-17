@@ -1,6 +1,7 @@
 local function DrawSunEffect()
 	local sun = util.GetSunInfo()
 	if not sun then return end
+	if not sun.direction then return end
 	if sun.obstruction == 0 then return end
 	local sunpos = EyePos() + sun.direction * 1024 * 4
 	local scrpos = sunpos:ToScreen()
@@ -70,6 +71,7 @@ local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain 
 local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3", 0, 6)
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3", 0, 3)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
+local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local hook_Run = hook.Run
 local hg_despairsystem_convar
@@ -1872,6 +1874,8 @@ local function IsSkullBrokenFully(ent, visited)
 end
 
 hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
+	if hg_laivlik:GetInt() == 0 then return end
+	
 	local localPlayer = LocalPlayer()
 	if not IsValid(localPlayer) then return end
 
@@ -1908,42 +1912,26 @@ hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
 					local matrix = ent:GetBoneMatrix(bone)
 					if matrix then
 						local headPos = matrix:GetTranslation()
-						local headAng = matrix:GetAngles()
 
-						-- We want to check if the face is visible (looking at their face)
-						-- Forward vector points out of the face for standard ValveBiped skeletal models.
-						-- Apply rotations consistent with hat/helmet alignment
-						headAng:RotateAroundAxis(headAng:Up(), -90)
-						headAng:RotateAroundAxis(headAng:Forward(), -90)
-						headAng:RotateAroundAxis(headAng:Right(), 15)
-						local faceForward = headAng:Forward()
+						-- Line-of-sight check to make sure head is not obscured by a wall
+						local tr = util.TraceLine({
+							start = camPos,
+							endpos = headPos,
+							filter = {localPlayer, ent},
+							mask = MASK_VISIBLE
+						})
 
-						-- Check dot product of face forward vector and direction to camera.
-						local dirToCam = (camPos - headPos):GetNormalized()
-						local dot = faceForward:Dot(dirToCam)
+						if not tr.Hit then
+							-- Project head position to 2D screen coordinates
+							local screenData = headPos:ToScreen()
+							if screenData.visible then
+								-- Calculate size of the square based on distance to maintain visual coverage of the head/face area
+								local screenPosOffset = (headPos + camAngles:Up() * 5):ToScreen()
+								local size = math.max(4, math.abs(screenData.y - screenPosOffset.y) * 4) -- Increased from 2.5 to 4 for larger square
 
-						-- If dot > 0.15, their face is pointing towards us (we are looking at their face, not the back of their head)
-						if dot > 0.15 then
-							-- Line-of-sight check to make sure head is not obscured by a wall
-							local tr = util.TraceLine({
-								start = camPos,
-								endpos = headPos,
-								filter = {localPlayer, ent},
-								mask = MASK_VISIBLE
-							})
-
-							if not tr.Hit then
-								-- Project head position to 2D screen coordinates
-								local screenData = headPos:ToScreen()
-								if screenData.visible then
-									-- Calculate size of the square based on distance to maintain visual coverage of the head/face area
-									local screenPosOffset = (headPos + camAngles:Up() * 5):ToScreen()
-									local size = math.max(4, math.abs(screenData.y - screenPosOffset.y) * 2.5) -- Multiply by 2.5 to perfectly cover the face area
-
-									-- Draw a 2D black square over their head/face
-									surface.SetDrawColor(0, 0, 0, 255)
-									surface.DrawRect(screenData.x - size / 2, screenData.y - size / 2, size, size)
-								end
+								-- Draw a 2D black square over their head (shows from all directions)
+								surface.SetDrawColor(0, 0, 0, 255)
+								surface.DrawRect(screenData.x - size / 2, screenData.y - size / 2, size, size)
 							end
 						end
 					end

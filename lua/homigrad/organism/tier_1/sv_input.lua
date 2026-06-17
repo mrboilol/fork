@@ -1342,13 +1342,15 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				return
 			end
 
-			should = org.dmgstack[hitgroup][1] > hitgroup_max
+			should = org.dmgstack[hitgroup] and org.dmgstack[hitgroup][1] > hitgroup_max
 			--print(rag, should, hitgroup == HITGROUP_HEAD, bonename, hitgroup, HITGROUP_HEAD)
 			if should and hitgroup == HITGROUP_HEAD then
 				hg.ExplodeHead(ent)
 
-				org.dmgstack[hitgroup][1] = nil
-				org.dmgstack[hitgroup][2] = nil
+				if org.dmgstack[hitgroup] then
+					org.dmgstack[hitgroup][1] = nil
+					org.dmgstack[hitgroup][2] = nil
+				end
 			end
 			
 			if IsValid(rag) then
