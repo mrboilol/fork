@@ -84,6 +84,9 @@ local nearDeathClasses = {
     ["Combine"] = true,
 }
 
+local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
+local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
+
 local function GetHeartbeatVolume(org)
     if not org then return 0.2 end
     local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
@@ -198,7 +201,7 @@ end
 
 -- Emit ring sound with station pooling from oldring
 local function EmitRingSound(soundPath, volume)
-    if hg_unconsciousclassic:GetBool() then return end
+    if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then return end
     if soundPath == SOUND_HEART then
         EnsureHeartStations()
 
@@ -287,9 +290,6 @@ usermessage.Hook("hg_StartPulseCheckECG", function(msg)
         finalBPM = 0
     }
 end)
-
-local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
-local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
 
 -- Local variables for faster access
 local math = math
@@ -611,7 +611,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * otrubECGAlpha))
             DrawArc(centerX, centerY, radius, thickness, 90, 90 - (progress * 360), 80, ringColor)
             
-            if hg_unconsciousclassic:GetBool() then
+            if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
                 lastPhaseMod = 0
                 flatlinePlayedThisUnconscious = false
                 local beat = dotBeat
@@ -739,7 +739,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
         if admiring or isUnconscious or abnormalPulse or isCheckingPulse then
             -- Skip oldring sound system when unconscious ring is active with EKG mode
-            if not (isUnconscious and ringAlpha > 0.01 and not hg_unconsciousclassic:GetBool()) then
+            if not (isUnconscious and ringAlpha > 0.01 and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool())) then
                 local currentHeartBeat = math.floor(heartPhase)
                 if currentHeartBeat > lastHeartBeat then
                     lastHeartBeat = currentHeartBeat

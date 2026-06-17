@@ -7,7 +7,6 @@ local coltransparent = Color(0, 0, 0, 0)
 
 local center = Vector()
 local timershit = 0
-local visibleHoleCount = 0
 
 hg.ConVars = hg.ConVars or {}
 
@@ -21,28 +20,21 @@ hook.Add("PostRender", "sadasdsad", function()
 
     if !holes then return end
     local any = false
-    visibleHoleCount = 0
-    local viewForward = view.angles:Forward()
 
     for i = 1, #holes do
         local tbl = holes[i]
 
-        if !tbl.pos1 then
-            tbl.visibleThisFrame = nil
-            continue
-        end
+        if !tbl.pos1 then continue end
         local normf = tbl.dir:Forward()
         local dot = (tbl.pos1 - view.origin):GetNormalized():Dot(normf)
         --if dot < 0 then continue end
-        local dot2 = viewForward:Dot(normf)
+        local dot2 = view.angles:Forward():Dot(normf)
 
         tbl.dot = dot
         tbl.dot2 = dot2
-        tbl.visibleThisFrame = dot > 0.5 and dot2 > 0.5
 
-        if tbl.visibleThisFrame then
+        if dot > 0.5 and dot2 > 0.5 then
             any = true
-            visibleHoleCount = visibleHoleCount + 1
         end
     end
     
@@ -92,7 +84,6 @@ hook.Add("PreDrawEffects","bulletholes-test",function()
     
     if !holes then return end
     if drawing then return end
-    if visibleHoleCount <= 0 then return end
 
     local view = render.GetViewSetup()
 
@@ -119,7 +110,6 @@ hook.Add("PreDrawEffects","bulletholes-test",function()
     
     for i = 1, #holes do
         local tbl = holes[i]
-        if !tbl.visibleThisFrame then continue end
         local ent = tbl[6]
         if !(IsValid(ent) or (ent and ent:IsWorld())) then continue end
         local pos, dir, pen, hitnormal, pen2 = tbl[1], tbl[2], tbl[3], tbl[4], tbl[5]
@@ -189,7 +179,6 @@ hook.Add("PreDrawEffects","bulletholes-test",function()
     for i = 1, #holes do
         local tbl = holes[i]
 
-        if !tbl.visibleThisFrame then continue end
         if !tbl.dot then continue end
         local normf = tbl.hitnormal:Forward()
         local dot = tbl.dot

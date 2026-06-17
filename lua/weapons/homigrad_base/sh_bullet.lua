@@ -50,27 +50,6 @@ end
 local bulletHit
 local timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game = timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game
 local hg_bulletholes = CreateConVar("hg_bulletholes", "0", FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED, "Enable R6S bulletholes feature", 0, 1)
-local ents_FindByClass = ents.FindByClass
-local areaportalCache
-
-local function getAreaPortalByTarget(targetName)
-	if targetName == "" then return nil end
-	if not areaportalCache then
-		areaportalCache = {}
-		for _, enta in ipairs(ents_FindByClass("func_areaportal")) do
-			areaportalCache[enta:GetInternalVariable("target") or ""] = enta
-		end
-	end
-	local enta = areaportalCache[targetName]
-	if IsValid(enta) then return enta end
-	areaportalCache = nil
-	for _, enta2 in ipairs(ents_FindByClass("func_areaportal")) do
-		if enta2:GetInternalVariable("target") == targetName then
-			return enta2
-		end
-	end
-	return nil
-end
 
 local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	if CLIENT then return end
@@ -198,10 +177,14 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 					table.insert(hg.bulletholes, {hitPos2, dir2, dist, hitNormal2, size, ent})
 
 					if hgIsDoor(ent) then -- open the areaportal so it can be seen through
-						local enta = getAreaPortalByTarget(ent:GetName())
-						if enta then
-							enta:SetKeyValue("target", "")
-							enta:Fire("Open")
+						for i, enta in ipairs(ents.FindByClass("func_areaportal")) do
+							if enta:GetInternalVariable("target") == ent:GetName() then
+								enta:SetKeyValue("target", "")
+								enta:Fire("Open")
+								-- that door is now always "open"
+								-- fuck your optimisation mr mapping guy!!!
+								break
+							end
 						end
 					end
 

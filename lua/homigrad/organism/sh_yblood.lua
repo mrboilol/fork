@@ -232,6 +232,9 @@ local meatModels = {
 local gibRemoveTime = 60
 local psmg = SpawnMeatGore
 
+hg.organism.input_list = hg.organism.input_list or {}
+local input_list = hg.organism.input_list
+
 input_list.brain = function(org, bone, dmg, dmgInfo)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
 	local oldDmg = org.brain

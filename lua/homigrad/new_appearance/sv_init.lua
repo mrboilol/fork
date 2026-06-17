@@ -7,6 +7,11 @@ local APmodule = hg.Appearance
 hg.PointShop = hg.PointShop or {}
 local PSmodule = hg.PointShop
 
+-- Stub function for permamodel check (not implemented)
+function APmodule.IsPermamodelEnabled(ply)
+    return false
+end
+
 local function CheckAttachments(ply,tbl)
     if !IsValid(ply) or !ply:IsPlayer() then return end
     --print(ply:PS_HasItem(uid))

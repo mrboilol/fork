@@ -42,9 +42,11 @@ hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 	ply.lastDeathTime = CurTime()
 	
 	local entIdx = ply:EntIndex()
-	for k, v in pairs(timer.GetTable()) do
-		if string.find(k, entIdx) then
-			timer.Remove(k)
+	if timer.GetTable then
+		for k, v in pairs(timer.GetTable()) do
+			if string.find(k, entIdx) then
+				timer.Remove(k)
+			end
 		end
 	end
 	

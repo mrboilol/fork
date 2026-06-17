@@ -9,7 +9,6 @@ AddCSLuaFile("zcity_delta/medical_menu_cl.lua")
 AddCSLuaFile("zcity_delta/medical_properties_cl.lua")
 AddCSLuaFile("zcity_delta/commands_cl.lua")
 AddCSLuaFile("zcity_delta/dislocation_radial_cl.lua")
-AddCSLuaFile("zcity_delta/unitmenu_cl.lua")
 
 local loaded = hg.__zcity_delta_server_boot
 
