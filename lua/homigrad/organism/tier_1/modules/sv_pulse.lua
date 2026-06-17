@@ -25,7 +25,8 @@ end
 
 module[2] = function(owner, org, timeValue)
 	local heart = 1 - org.heart
-	local brain = math.Clamp(1 - org.brain * 1.5,0,1)
+	-- Brain damage weakens the heart but never fully stops it (floor keeps a baseline pulse)
+	local brain = math.Clamp(1 - org.brain * 1.5,0.35,1)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
@@ -85,6 +86,10 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
+	-- Brain damage drags the heart rate down (weaker pumping) but never to zero
+	local brainHeartMul = math.Clamp(1 - org.brain, 0.35, 1)
+	heartbeat = heartbeat * brainHeartMul
+
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
 	-- Probabilistic heartstop based on heart rate
@@ -93,15 +98,17 @@ module[2] = function(owner, org, timeValue)
 
 		local hb = org.heartbeat
 		local chance = 0
-
+		if hb >= 400 then
+			chance = 0.25
+	    elseif	
 		if hb >= 375 then
-			chance = 1 -- guaranteed
+			chance = 0.1 -- guaranteed
 		elseif hb >= 350 then
-			chance = 0.15 -- 15% chance per second
+			chance = 0.075
 		elseif hb >= 300 then
-			chance = 0.03 -- 3% chance per second
+			chance = 0.05 -- 3% chance per second
 		elseif hb >= 200 then
-			chance = 0.002 -- 0.2% chance per second
+			chance = 0.025 -- 0.2% chance per second
 		end
 
 		if chance > 0 and math.random() < chance then
@@ -248,7 +255,7 @@ module[2] = function(owner, org, timeValue)
 	local adrenK = max(1 + org.adrenaline, 1)
 	local adren = org.adrenaline
 
-	if org.pulse < 10 or org.brain >= 0.6 or org.bloodpressure < 25 then org.heartstop = true end
+	if org.pulse < 10 or org.brain >= 0.85 or org.bloodpressure < 25 then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
