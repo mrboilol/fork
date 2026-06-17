@@ -1089,12 +1089,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							delay = math.Clamp(delay, 0.015, 3.5)
 							
 							local spraySpeed, spread
-							if severityFactor > 15 then
-								local frac = math.min((severityFactor - 15) / 35, 1)
+							if severityFactor > 30 then
+								local frac = math.min((severityFactor - 30) / 40, 1)
 								spraySpeed = Lerp(frac, 30, 200)
 								spread = Lerp(frac, 3, 10)
 							else
-								local frac = severityFactor / 15
+								local frac = severityFactor / 30
 								spraySpeed = Lerp(frac, 1, 30)
 								spread = Lerp(frac, 1, 4)
 							end
@@ -1124,11 +1124,11 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							delay = math.Clamp(delay, 0.015, 3.5)
 							
 							local spraySpeed
-							if severityFactor > 15 then
-								local frac = math.min((severityFactor - 15) / 35, 1)
+							if severityFactor > 30 then
+								local frac = math.min((severityFactor - 30) / 40, 1)
 								spraySpeed = Lerp(frac, 20, 150)
 							else
-								local frac = severityFactor / 15
+								local frac = severityFactor / 30
 								spraySpeed = Lerp(frac, 1, 20)
 							end
 							

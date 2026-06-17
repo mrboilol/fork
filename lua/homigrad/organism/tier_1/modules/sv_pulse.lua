@@ -65,6 +65,14 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
+	-- If goodmood was fully chipped away by fear and we got some excess fearadd, add it to despair at a slow rate
+	if (org.goodmood or 0) <= 0 and org.fearadd > 1.0 then
+		local excessFear = org.fearadd - 1.0
+		local despairConversion = excessFear * timeValue * 0.005
+		org.despair = math.min((org.despair or 0) + despairConversion, 1)
+		org.fearadd = math.max(org.fearadd - despairConversion, 1.0)
+	end
+
 	local heartbeat = org.pulse < 70 and 70 + (70 - org.pulse) * 4 or org.pulse
 
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))

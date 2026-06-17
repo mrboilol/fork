@@ -385,7 +385,7 @@ bloodparticles_hook[2] = function(mul)
 			continue
 		end
 
-		if result.Hit then
+		if result.Hit and result.Entity:IsWorld() then
 			local dir = result.HitNormal
 			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 			
@@ -405,11 +405,47 @@ bloodparticles_hook[2] = function(mul)
 			result.Hit = result.Hit and shouldhit
 
 			if result.Hit then
-				local dir = result.HitNormal
-				decalBlood(result.HitPos, dir, result, part.artery, part.owner)
+				local down = result.HitNormal
+				local nextpos = (result.Normal + down):GetNormalized() * 5
 				
-				if landBloodParticle(part, result, i) then continue end
-				continue
+				local insolid = result.StartSolid and IsValid(result.Entity)
+				if not insolid and (part.nextput or 0) < CurTime() then
+					part.nextput = CurTime() + 1
+
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+				end
+
+				if insolid then
+					if result.Entity:IsVehicle() then
+						table_remove(hg.bloodparticles1, i)
+					
+						continue
+					end
+
+					local center = result.Entity:GetBoneMatrix(ph)
+					local len = result.Entity:BoneLength(ph + 1)
+
+					if center then
+						center = center:GetTranslation() + (len and center:GetAngles():Forward() * len or vector_origin) * 0.5
+						nextpos = -(center - hitPos - vecDown * 1):GetNormalized() * 5
+					end
+				end
+
+				local pulldown = (-vector_up * (grav / 600)):Cross(-result.HitNormal:Angle():Right())
+				nextpos:Add(pulldown)
+				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
+				
+				if part.lerpedmove:LengthSqr() < 0.1 * mul then
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+					
+					table_remove(hg.bloodparticles1, i)
+					
+					continue
+				end
+
+				pos:Set(posSet + part.start_velocity * mul)
+				posSet:Set(hitPos + part.lerpedmove + part.start_velocity * mul)
+				part.hashitsomething = true
 			else
 				if part.hashitsomething then
 					part.hashitsomething = nil

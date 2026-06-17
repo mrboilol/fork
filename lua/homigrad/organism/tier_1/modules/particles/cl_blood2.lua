@@ -88,6 +88,11 @@ bloodparticles_hook[4] = function(mul)
         local part = hg.bloodparticles2[i]
         if not part then table_remove(hg.bloodparticles2, i) continue end
 
+        if part[7] - time <= 0 then
+            table_remove(hg.bloodparticles2, i)
+            continue
+        end
+
         local pos = part[1]
         local posSet = part[2]
         
@@ -103,7 +108,7 @@ bloodparticles_hook[4] = function(mul)
 
         if result.Hit then
             -- Keep impact particles alive, despawn regular bleeding
-            if part.impact then
+            if part.impact and result.HitWorld then
                 pos:Set(posSet)
                 posSet:Set(hitPos + VectorRand(-3, 3))
             else

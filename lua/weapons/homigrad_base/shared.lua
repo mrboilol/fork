@@ -845,9 +845,9 @@ if CLIENT then
 
 	local coloruse = Color(255,255,255,255)
 
-	local matPistolAmmo = Material("hud/bullets/low_caliber.png")
-	local matRfileAmmo = Material("hud/bullets/high_caliber.png")
-	local matShotgunAmmo = Material("hud/bullets/buck_caliber.png")
+	local matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
+	local matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
+	local matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
 	local lerpAmmoCheck = 0
 	local ammoCheck = 0
 	local color_bg = Color(0,0,0,150)
@@ -953,12 +953,29 @@ if CLIENT then
 		if not IsValid(self:GetOwner()) then return end
 		local ammotype = (hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon) or hg.matPistolAmmoAlt
 		if isstring(ammotype) then
-			local success, mat = pcall(Material, ammotype)
-			if success and mat then
-				ammotype = mat
+			local try_paths = { ammotype }
+			if not string.StartWith(ammotype, "vgui/") then
+				table.insert(try_paths, 1, "vgui/" .. ammotype)
+				table.insert(try_paths, 2, "vgui/" .. ammotype .. ".png")
+			end
+			if not string.EndsWith(ammotype, ".png") then
+				table.insert(try_paths, ammotype .. ".png")
+			end
+
+			local loaded_mat = nil
+			for _, path in ipairs(try_paths) do
+				local success, mat = pcall(Material, path)
+				if success and mat and not mat:IsError() then
+					loaded_mat = mat
+					break
+				end
+			end
+
+			if loaded_mat then
+				ammotype = loaded_mat
 			else
 				-- Fallback to alt materials based on bullet properties
-				local bulletSettings = hg.ammotypeshuy[self.Primary.Ammo].BulletSettings
+				local bulletSettings = hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings
 				if bulletSettings then
 					local numBullet = bulletSettings.NumBullet or 1
 					local damage = bulletSettings.Damage or 0

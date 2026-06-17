@@ -28,13 +28,6 @@ local lastKnownFacingAngle = 0
 local fadingBones = {} -- Track bones that are fading out after being healed
 local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
--- Post-TPIK bone matrix cache: populated after DrawPlayerRagdoll/MainTPIKFunction runs
--- so SyncBonesCallback reads IK-resolved poses, not raw animation-only poses.
-local tpikBoneCache = nil
-local tpikBoneCacheSrcPos = nil
-local tpikBoneCacheSrcAng = nil
-local tpikBoneCacheIsRag = false
-
 local expieModels = {
     ["models/blop/expie/expie.mdl"] = true,
     ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
@@ -140,18 +133,29 @@ end
 local scaleZeroMat = Matrix()
 scaleZeroMat:Scale(Vector(0.001, 0.001, 0.001))
 
-local function CaptureTPIKBoneCache(ply)
-    local src = hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)
-    if not IsValid(src) then src = ply end
+local function SyncBonesCallback(ent, numbones)
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
 
-    local isRag = (src ~= ply)
+    local src = ply
+    local isRag = false
+    local fakeRag = ply:GetNWEntity("FakeRagdoll")
+    local deathRag = ply:GetNWEntity("RagdollDeath")
+    if IsValid(fakeRag) then src = fakeRag; isRag = true
+    elseif IsValid(deathRag) then src = deathRag; isRag = true
+    elseif IsValid(ply:GetRagdollEntity()) then src = ply:GetRagdollEntity(); isRag = true end
+    if not IsValid(src) then return end
+
+    -- Flush current-frame bone manipulations (IK foot, TPIK, etc.) into src's bone matrices
+    -- before we read them. Without this, GetBoneMatrix returns stale pre-IK positions.
+    src:SetupBones()
+
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
 
     if isRag then
         local minZ = math.huge
-        local boneCount = src:GetBoneCount()
-        for i = 0, boneCount - 1 do
+        for i = 0, src:GetBoneCount() - 1 do
             local mat = src:GetBoneMatrix(i)
             if mat then
                 local pos = mat:GetTranslation()
@@ -169,11 +173,7 @@ local function CaptureTPIKBoneCache(ply)
         local ragYaw = srcAng.y
         if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
             local eyeAng = ply:EyeAngles()
-            if lastKnownFacingAngle ~= 0 then
-                srcAng = Angle(0, lastKnownFacingAngle, 0)
-            else
-                srcAng = Angle(0, eyeAng.y, 0)
-            end
+            srcAng = Angle(0, lastKnownFacingAngle ~= 0 and lastKnownFacingAngle or eyeAng.y, 0)
         else
             srcAng = Angle(0, ragYaw, 0)
             lastKnownFacingAngle = ragYaw
@@ -182,79 +182,6 @@ local function CaptureTPIKBoneCache(ply)
         local eyeAng = ply:EyeAngles()
         srcAng = Angle(0, eyeAng.y, 0)
         lastKnownFacingAngle = eyeAng.y
-    end
-
-    tpikBoneCache = tpikBoneCache or {}
-    local boneCount = src:GetBoneCount()
-    for i = 0, boneCount - 1 do
-        local name = src:GetBoneName(i)
-        if name then
-            tpikBoneCache[name] = src:GetBoneMatrix(i)
-        end
-    end
-    tpikBoneCacheSrcPos = srcPos
-    tpikBoneCacheSrcAng = srcAng
-    tpikBoneCacheIsRag = isRag
-end
-
-hook.Add("PostDrawPlayerRagdolls", "HealthIndicator_CacheTPIKBones", function()
-    local ply = LocalPlayer()
-    if not IsValid(ply) or not ply:Alive() then return end
-    CaptureTPIKBoneCache(ply)
-end)
-
-local function SyncBonesCallback(ent, numbones)
-    local ply = LocalPlayer()
-    if not IsValid(ply) then return end
-
-    -- Use post-TPIK cache if available; fall back to live SetupBones only as a last resort
-    local cache = tpikBoneCache
-    local srcPos = tpikBoneCacheSrcPos
-    local srcAng = tpikBoneCacheSrcAng
-
-    if not cache or not srcPos then
-        -- Cache not yet populated this session; fall back to direct read
-        local src = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply)) or ply
-        if not IsValid(src) then return end
-        src:SetupBones()
-        local isRag = (src ~= ply)
-        srcPos = src:GetPos()
-        srcAng = src:GetAngles()
-        if isRag then
-            local minZ = math.huge
-            for i = 0, src:GetBoneCount() - 1 do
-                local mat = src:GetBoneMatrix(i)
-                if mat then
-                    local pos = mat:GetTranslation()
-                    if pos.z < minZ then minZ = pos.z end
-                end
-            end
-            local pelvis = src:LookupBone("ValveBiped.Bip01_Pelvis")
-            if pelvis then
-                local pMat = src:GetBoneMatrix(pelvis)
-                if pMat then
-                    srcPos = pMat:GetTranslation()
-                    if minZ ~= math.huge then srcPos.z = minZ end
-                end
-            end
-            local ragYaw = srcAng.y
-            if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
-                local eyeAng = ply:EyeAngles()
-                srcAng = Angle(0, lastKnownFacingAngle ~= 0 and lastKnownFacingAngle or eyeAng.y, 0)
-            else
-                srcAng = Angle(0, ragYaw, 0)
-                lastKnownFacingAngle = ragYaw
-            end
-        else
-            local eyeAng = ply:EyeAngles()
-            srcAng = Angle(0, eyeAng.y, 0)
-            lastKnownFacingAngle = eyeAng.y
-        end
-        cache = {}
-        for i = 0, src:GetBoneCount() - 1 do
-            local name = src:GetBoneName(i)
-            if name then cache[name] = src:GetBoneMatrix(i) end
-        end
     end
 
     local srcWorld = Matrix()
@@ -268,8 +195,10 @@ local function SyncBonesCallback(ent, numbones)
 
     for i = 0, numbones - 1 do
         local name = ent:GetBoneName(i)
-        local mat = cache[name]
-        if mat then
+        local srcBone = src:LookupBone(name)
+        if srcBone then
+            local mat = src:GetBoneMatrix(srcBone)
+            if mat then
             local manipScale = ent:GetManipulateBoneScale(i)
 
             local localMat = srcInv * mat
@@ -284,6 +213,7 @@ local function SyncBonesCallback(ent, numbones)
             end
 
             ent:SetBoneMatrix(i, finalMat)
+        end
         end
     end
 end
@@ -935,20 +865,27 @@ function HUD_DrawDynamicIndicator()
                                 end
                             end
 
-                            -- Calculate bleeding rate to determine if non-arterial wounds bleed at arterial level
-                            -- Arterial wounds bleed at ~wound[1] * 4.5 * pulse / 80 ml per beat
-                            -- Regular wounds bleed at ~wound[1] * 7 * 2.0 * pulse / 70 ml per beat (avg rand1=7)
-                            -- Neck artery (arteria) typically has wound[1] around 2.0
-                            -- Regular arterial wounds typically have wound[1] around 1.0
+                            -- Calculate bleeding rate using server-side formulas:
+                            -- Regular wound bleed per second: rand1(avg 7) * severity * pulse/70 * 2.0 * 0.02 * 60
+                            -- Arterial bleed per second: severity * 0.2 * pulse/80
+                            -- Neck artery (arteria) uses larger typical severity and neckMul
                             local pulse = org and org.pulse or 70
-                            local arterialBleedRate = 1.0 * 4.5 * pulse / 80 -- ~3.94 ml/beat at pulse 70
-                            local neckArteryBleedRate = 2.0 * 4.5 * pulse / 80 -- ~7.88 ml/beat at pulse 70
-                            local currentBleedRate = data.severity * 7 * 2.0 * pulse / 70 -- Approx regular wound rate
+                            local regularBleedPerSec = data.severity * 7 * 2.0 * (pulse / 70) * 0.02 * 60
+                            local arterialBleedPerSec = 1.0 * 0.2 * (pulse / 80)
+                            local neckArteryBleedPerSec = 2.0 * 0.2 * (pulse / 80) * 2.0 -- neck artery is roughly 2x an arterial wound
 
                             local bleedsAtArterialLevel = data.isArterial and not isNeckArtery
                             local bleedsAtNeckArteryLevel = data.isArterial and isNeckArtery
+                            -- Normal wounds bleeding fast enough to match arterial/neck-arterial rates also count as severe
+                            if not data.isArterial then
+                                if regularBleedPerSec >= neckArteryBleedPerSec then
+                                    bleedsAtNeckArteryLevel = true
+                                elseif regularBleedPerSec >= arterialBleedPerSec then
+                                    bleedsAtArterialLevel = true
+                                end
+                            end
 
-                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, isNeckArtery = isNeckArtery, bleedsAtArterialLevel = bleedsAtArterialLevel, bleedsAtNeckArteryLevel = bleedsAtNeckArteryLevel, key = key})
+                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, isNeckArtery = isNeckArtery, bleedsAtArterialLevel = bleedsAtArterialLevel, bleedsAtNeckArteryLevel = bleedsAtNeckArteryLevel, key = key, regularBleedPerSec = regularBleedPerSec, arterialBleedPerSec = arterialBleedPerSec, neckArteryBleedPerSec = neckArteryBleedPerSec})
                         end
                     end
                 end
@@ -969,42 +906,50 @@ function HUD_DrawDynamicIndicator()
             local bleedsAtNeckArteryLevel = data.bleedsAtNeckArteryLevel
             local r, g, b, mat
             
-            if bleedsAtNeckArteryLevel then
-                -- Neck artery / most severe: Dark Red (80, 0, 0)
-                mat = bigBleedIconMat
-                r, g, b = 80, 0, 0
-            elseif bleedsAtArterialLevel then
-                -- True arterial level: Dark Yellow (160, 140, 0)
-                mat = bigBleedIconMat
-                r, g, b = 160, 140, 0
-            else
-                -- Normal bleeding (will likely clot): White -> Red approaching arterial
-                mat = bleedIconMat
-                local arterialThresh = (1.0 * 4.5 * (org and org.pulse or 70) / 80)
-                local progress = math.Clamp((data.severity * 7 * 2.0 * (org and org.pulse or 70) / 70) / arterialThresh, 0, 1)
-                r = 255
-                g = math.floor(255 * (1 - progress))
-                b = math.floor(255 * (1 - progress))
-            end
-
             local pulse = (math.sin(time * 5 + #data.key) + 1) / 2
             local alpha = math.floor((0.7 + pulse * 0.3) * 255)
-
             local sx, sy = data.sx, data.sy
-            
+
             -- Prevent clipping outside the indicator circle boundaries
             local centerX = viewX + w * 0.5
             local centerY = viewY + h * 0.5
             local maxRadius = w * 0.45 -- Keep it slightly inside the edge
-            
+
             local dx = sx - centerX
             local dy = sy - centerY
             local dist = math.sqrt(dx * dx + dy * dy)
-            
+
             if dist > maxRadius then
                 local scale = maxRadius / dist
                 sx = centerX + dx * scale
                 sy = centerY + dy * scale
+            end
+
+            if bleedsAtNeckArteryLevel then
+                -- Neck artery level / most severe: dark red, largest icon, drawn higher
+                mat = bigBleedIconMat
+                local progress = math.Clamp((data.regularBleedPerSec or data.severity) / (data.neckArteryBleedPerSec or 1), 0, 1)
+                r = math.floor(Lerp(progress, 160, 80))
+                g = math.floor(Lerp(progress, 140, 0))
+                b = 0
+                iconSize = iconSize * 1.25
+                sy = sy - iconSize * 0.15
+            elseif bleedsAtArterialLevel then
+                -- Arterial level: dark yellow -> dark red based on severity
+                mat = bigBleedIconMat
+                local progress = math.Clamp((data.regularBleedPerSec or data.severity) / (data.neckArteryBleedPerSec or 1), 0, 1)
+                r = math.floor(Lerp(progress, 160, 80))
+                g = math.floor(Lerp(progress, 140, 0))
+                b = 0
+                iconSize = iconSize * 1.1
+                sy = sy - iconSize * 0.08
+            else
+                -- Normal bleeding: white -> yellow -> red approaching arterial threshold
+                mat = bleedIconMat
+                local progress = math.Clamp((data.regularBleedPerSec or 0) / (data.arterialBleedPerSec or 1), 0, 1)
+                r = 255
+                g = math.floor(255 * (1 - progress))
+                b = math.floor(255 * (1 - progress))
             end
 
             surface.SetDrawColor(r, g, b, alpha)

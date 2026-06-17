@@ -195,30 +195,45 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		org.despair = 0
 		return
 	end
+
+	-- If they just gained despair, make it hard for it to go away
+	local currentDespair = org.despair or 0
+	local lastDespair = org._lastDespair or 0
+	if currentDespair > lastDespair then
+		-- Lock decay based on the amount of despair gained (e.g., if it went all the way up to 1.0, lock for 30 seconds)
+		local gained = currentDespair - lastDespair
+		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + (gained * 30))
+	end
+	local isLocked = CurTime() < (org._despairLockUntil or 0)
+
 	-- Despair budge less unless despair hasn't been gained for a little bit
 	local timeSinceGain = CurTime() - (org._despairLastGainedTime or 0)
 	local despairDecay = timeValue / 180
-	-- Faster decay when unconscious (otrub) - unconsciousness helps despair go away
-	if org.otrub then
-		despairDecay = despairDecay * 3
-	end
-	-- Slower decay if despair was gained recently (within 30 seconds)
-	if timeSinceGain < 30 then
-		if org.despair > 0.7 then
-			despairDecay = timeValue / 360 -- Half decay rate when despair is high and recently gained
-		elseif org.despair > 0.5 then
-			despairDecay = timeValue / 270 -- Slower decay when despair is moderate and recently gained
-		else
-			despairDecay = timeValue / 240 -- Slower decay when recently gained
+	if isLocked then
+		despairDecay = 0
+	else
+		-- Faster decay when unconscious (otrub) - unconsciousness helps despair go away
+		if org.otrub then
+			despairDecay = despairDecay * 3
 		end
-	elseif org.despair > 0.7 then
-		despairDecay = timeValue / 360 -- Half decay rate when despair is high
-	elseif org.despair > 0.5 then
-		despairDecay = timeValue / 270 -- Slower decay when despair is moderate
-	end
-	-- Faster decay if despair hasn't been gained in a while (60+ seconds)
-	if timeSinceGain > 60 then
-		despairDecay = despairDecay * (1 + (timeSinceGain - 60) / 60) -- Up to 2x faster after 120 seconds
+		-- Slower decay if despair was gained recently (within 30 seconds)
+		if timeSinceGain < 30 then
+			if org.despair > 0.7 then
+				despairDecay = timeValue / 360 -- Half decay rate when despair is high and recently gained
+			elseif org.despair > 0.5 then
+				despairDecay = timeValue / 270 -- Slower decay when despair is moderate and recently gained
+			else
+				despairDecay = timeValue / 240 -- Slower decay when recently gained
+			end
+		elseif org.despair > 0.7 then
+			despairDecay = timeValue / 360 -- Half decay rate when despair is high
+		elseif org.despair > 0.5 then
+			despairDecay = timeValue / 270 -- Slower decay when despair is moderate
+		end
+		-- Faster decay if despair hasn't been gained in a while (60+ seconds)
+		if timeSinceGain > 60 then
+			despairDecay = despairDecay * (1 + (timeSinceGain - 60) / 60) -- Up to 2x faster after 120 seconds
+		end
 	end
 	org.despair = math.Approach(org.despair, 0, despairDecay)
 
@@ -227,6 +242,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	local analgesiaAdd = org.analgesiaAdd or 0
 	if analgesia > 0.5 or analgesiaAdd > 0.5 then
 		local opiateRelief = (analgesia + analgesiaAdd) * timeValue * 0.05
+		if isLocked then
+			opiateRelief = 0
+		end
 		org.despair = math.max(org.despair - opiateRelief, 0)
 	end
 
@@ -303,7 +321,11 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		add = add + bleedSeverity * timeValue * 0.14
 	elseif bleedStopped or bpRising then
 		-- Bleeding stopped or cardiac recovering: relieve despair
-		org.despair = math.max((org.despair or 0) - timeValue * 0.15, 0)
+		local relief = timeValue * 0.15
+		if CurTime() < (org._despairLockUntil or 0) then
+			relief = 0
+		end
+		org.despair = math.max((org.despair or 0) - relief, 0)
 	end
 
 	-- Despair from damaged limbs (broken bones, fractures)
@@ -553,6 +575,8 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org._panicAttackStartTime = nil
 		end
 	end
+
+	org._lastDespair = org.despair
 end)
 
 hook.Add("HG_MovementCalc_2", "hg_panic_attack_slow", function(mul, ply, cmd, mv)
