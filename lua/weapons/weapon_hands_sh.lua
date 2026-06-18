@@ -1667,6 +1667,9 @@ function SWEP:ApplyForce()
 						if org.alive then
 							local skillMult = ply.Profession == "doctor" and 2 or 1
 							
+							-- Track CPR duration
+							self.CPRDuration = (self.CPRDuration or 0) + (1 / 120) * 60
+							
 							-- Improved oxygenation
 							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)
 							
@@ -1699,11 +1702,19 @@ function SWEP:ApplyForce()
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
 							
-							-- Much more reliable heart restart - pulse threshold lowered, and direct chance based on pulse
-							if org.pulse > 5 then
+							-- Heart restart based on CPR duration and pulse
+							-- Longer CPR = higher chance, even with 0 pulse
+							local durationChance = math.Clamp(self.CPRDuration / 10, 0, 0.8) * skillMult -- Up to 80% chance after 10 seconds (160% for doctors)
+							local pulseChance = math.Clamp(org.pulse / 70, 0, 1) * 0.5 * skillMult -- Up to 50% chance from pulse alone
+							local totalChance = durationChance + pulseChance
+							
+							if org.heartstop and math.random() < totalChance then
+								org.heartstop = false
+								-- Reset heartbeat to safe range
+								org.heartbeat = math.Clamp(org.heartbeat, 80, 140)
+							elseif org.pulse > 5 then
 								org.heartstop = false
 							elseif org.pulse > 0 and math.random(100) < (org.pulse * 10 * skillMult) then
-								-- Even with low pulse, have a chance to restart based on current pulse level
 								org.heartstop = false
 							end
 							
@@ -1719,6 +1730,7 @@ function SWEP:ApplyForce()
 			else
 				self.firstTimePrint = true
 				self.firstTimePrint2 = true
+				self.CPRDuration = 0
 			end
 
 			if ply:KeyDown(IN_ATTACK) and ply.PlayerClassName == "furry" and org ~= nil and org.alive and org.owner.PlayerClassName != "furry" and !(org.owner.IsBerserk and org.owner:IsBerserk()) then

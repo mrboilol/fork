@@ -165,6 +165,7 @@ if SERVER then
 		if self.CDEating > CurTime() then return end
 
 		org.satiety = org.satiety + 50/5
+		org.hungry = math.max((org.hungry or 0) - 15, 0)
 		
 		-- Stamina regeneration boost
 		if org.stamina and org.stamina[1] then

@@ -534,13 +534,12 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	
 	org.shock = org.shock + (dmg > 1 and 45 or dmg * 9)
 
-	if org.skull > 0.6 and oldDmg <= 0.6 then
-		if org.isPly then
+	if org.skull > 0.6 then
+		if oldDmg <= 0.6 and org.isPly then
 			org.owner:Notify(huyasd["skull"],true,"skull",4)
 		end
 
-
-		if dir and hg_bloodimpacts:GetBool() then
+		if dir and hg_bloodimpacts:GetBool() and (oldDmg <= 0.6 or math.random() < 0.25) then
 			local dmgPos = dmgInfo:GetDamagePosition()
 			local dirNorm = dir:GetNormalized()
 			-- Main blood spray
@@ -551,7 +550,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			net.WriteInt(2, 8)
 			net.Broadcast()
 			-- Additional spray when skull just broke (oldDmg != 1)
-			if oldDmg ~= 1 then
+			if oldDmg <= 0.6 and oldDmg ~= 1 then
 				for i = 1, 3 do
 					net.Start("hg_bloodimpact")
 					net.WriteVector(dmgPos + VectorRand(-2, 2))

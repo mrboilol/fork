@@ -80,7 +80,7 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	local heartbeat = org.pulse < 70 and 70 + (70 - org.pulse) * 4 or org.pulse
+	local heartbeat = org.pulse < 70 and (org.brain > 0 and org.pulse or 70 + (70 - org.pulse) * 4) or org.pulse
 
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
 	org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)

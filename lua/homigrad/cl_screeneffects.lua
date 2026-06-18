@@ -1207,7 +1207,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					DyingStation:SetVolume(consciousVol)
 
 					-- Sound peak detection for screen shake
-					if hg_dyingpulse:GetInt() == 1 and DyingStation:GetState() == GMOD_CHANNEL_PLAYING then
+					if hg_dyingpulse:GetInt() == 1 and IsValid(DyingStation) and DyingStation.GetFFT and DyingStation:GetState() == GMOD_CHANNEL_PLAYING then
 						local fft = DyingStation:GetFFT(512)
 						if fft then
 							local peakSum = 0
@@ -1307,7 +1307,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					ItssooverStation:SetVolume(consciousVol)
 
 					-- Sound peak detection for screen shake
-					if hg_dyingpulse:GetInt() == 1 and IsValid(ItssooverStation) and ItssooverStation:GetState() == GMOD_CHANNEL_PLAYING then
+					if hg_dyingpulse:GetInt() == 1 and IsValid(ItssooverStation) and ItssooverStation.GetFFT and ItssooverStation:GetState() == GMOD_CHANNEL_PLAYING then
 						local fft = ItssooverStation:GetFFT(512)
 						if fft then
 							local peakSum = 0
@@ -1865,6 +1865,11 @@ local function IsSkullBrokenFully(ent, visited)
 			return true
 		end
 	elseif ent:IsRagdoll() then
+		-- Check ragdoll's own organism first (works even after death when ply NWEntity is NULL)
+		if ent.organism and (ent.organism.skull or 0) >= 1 then
+			return true
+		end
+		-- Also check linked player if still valid
 		local ply = ent:GetNWEntity("ply")
 		if IsValid(ply) and IsSkullBrokenFully(ply, visited) then
 			return true

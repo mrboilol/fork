@@ -36,12 +36,12 @@ module[2] = function(owner, org, timeValue)
     -- Hunger mechanics based on satiety
     local hungerRate = 0
     
-    -- If satiety is high (>60) and recently climbed (<2 minutes), prevent hunger loss
+    -- If satiety is high (>60) and recently climbed (<2 minutes), reduce hunger
     if satiety > 60 and timeSinceClimbed < 45 then
-        hungerRate = 0
-    -- If satiety is moderate (30-60), mostly prevent hunger loss
+        hungerRate = -timeValue * 0.1
+    -- If satiety is moderate (30-60), slowly reduce hunger
     elseif satiety > 30 then
-        hungerRate = timeValue * 0.015
+        hungerRate = -timeValue * 0.05
     -- If satiety is low (0-30), start getting hungry
     elseif satiety > 0 then
         hungerRate = timeValue * 0.045

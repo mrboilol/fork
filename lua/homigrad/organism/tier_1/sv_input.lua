@@ -1377,8 +1377,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 				end
 			end
 
-			org.dmgstack[hitgroup][1] = nil
-			org.dmgstack[hitgroup][2] = nil
+			if org.dmgstack[hitgroup] then
+				org.dmgstack[hitgroup][1] = nil
+				org.dmgstack[hitgroup][2] = nil
+			end
 
 			org.owner.fullsend = true
 			hg.send_bareinfo(org)

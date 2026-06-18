@@ -467,6 +467,8 @@ function PANEL:Init()
     
     self.TrailPoints = {}
     self.CompletedWraps = 0
+    self.StartAngleRad = -math.pi / 2 -- Start at -90 degrees (top)
+    self.StartAngleReached = false
 
     self.TourniquetStage = 1
     self.TourniquetStrapProgress = 0
@@ -1263,6 +1265,18 @@ function PANEL:Think()
                         currentRad,
                         math.rad(1.5)
                     )
+                end
+
+                -- Check if bandage has moved away from start position
+                local distFromStart = math.abs(NormalizeAngleDiff(currentRad - self.StartAngleRad))
+                if distFromStart > 0.1 then
+                    self.StartAngleReached = true
+                end
+
+                -- Check if bandage has returned to start position after moving away
+                if self.StartAngleReached and distFromStart < 0.15 then
+                    self:CommitVisualWrap()
+                    self.StartAngleReached = false
                 end
 
                 while self.WrapAngle >= (2 * math.pi) do

@@ -128,6 +128,7 @@ if SERVER then
 			org.hydration = org.hydration + 30
 		else
 			org.satiety = org.satiety + 20
+			org.hungry = math.max((org.hungry or 0) - 10, 0)
 		end
 
 		-- Stamina regeneration boost

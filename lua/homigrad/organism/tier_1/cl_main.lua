@@ -895,12 +895,13 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			local sin = (math.sin(org.pulsethink) + 1) * 0.5
 			local amt = 0.05 * sin * math.max(org.pulse / 70, 0.5)
 			
-			local size = 1 + amt
-			vecTorso[1] = size
-			vecTorso[2] = size
-			vecTorso[3] = size
-			
-			ent:ManipulateBoneScale(torso, vecTorso)
+			-- Disabled bone scaling to prevent stretchiness
+			-- local size = 1 + amt
+			-- vecTorso[1] = size
+			-- vecTorso[2] = size
+			-- vecTorso[3] = size
+			-- 
+			-- ent:ManipulateBoneScale(torso, vecTorso)
 			//ent:ManipulateBoneAngles(torso, Angle(0, amt, 0))
 
 			vecTorso[1] = 0
