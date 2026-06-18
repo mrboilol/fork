@@ -1,3 +1,5 @@
+local hg = hg
+
 hg.bonetohitgroup = {
 	["ValveBiped.Bip01_Head1"] = HITGROUP_HEAD,
 	["ValveBiped.Bip01_L_UpperArm"] = HITGROUP_LEFTARM,
@@ -305,7 +307,7 @@ hook.Add("radialOptions", "DislocatedJoint", function()
 					RunConsoleCommand("hg_fixdislocation", 1, 1)
 				end,
 				"Fix "..ent:GetPlayerName().."'s dislocation (leg)"
-			end
+			}
 			hg.radialOptions[#hg.radialOptions + 1] = tbl
 		end
     end
@@ -336,7 +338,7 @@ hook.Add("radialOptions", "DislocatedJoint2", function()
 					RunConsoleCommand("hg_fixdislocation", 2, 1)
 				end,
 				"Fix "..ent:GetPlayerName().."'s dislocation (arm)"
-			end
+			}
 			hg.radialOptions[#hg.radialOptions + 1] = tbl
 		end
     end
@@ -367,7 +369,7 @@ hook.Add("radialOptions", "DislocatedJaw", function()
 					RunConsoleCommand("hg_fixdislocation", 3, 1)
 				end,
 				"Fix "..ent:GetPlayerName().."'s dislocation (jaw)"
-			end
+			}
 			hg.radialOptions[#hg.radialOptions + 1] = tbl
 		end
     end
@@ -850,7 +852,7 @@ local muffedClasses = {
 }
 
 local hg_heartbeat_volume = ConVarExists("hg_heartbeat_volume") and GetConVar("hg_heartbeat_volume") or CreateClientConVar("hg_heartbeat_volume", 1, true, nil, "heartbeat loudness", 0, 4)
-ocal hg_altberserk = GetConVar("hg_altberserk")
+local hg_altberserk = GetConVar("hg_altberserk")
 local hg_altnoradrenaline = GetConVar("hg_altnoradrenaline")
 
 local function cachedClientThinkBone(ent, boneName)
