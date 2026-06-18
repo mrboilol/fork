@@ -149,12 +149,16 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 				lightcolor.g = math.min(255 * light[2], 255)
 				lightcolor.b = 0
 			else
-
-		if part.kishki then
-			render_SetMaterial(part[4])
-			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
-							lightcolor.g = 0
-				lightcolor.b = 0
+				if part.kishki then
+					render_SetMaterial(part[4])
+					lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+					lightcolor.g = 0
+					lightcolor.b = 0
+				else
+					lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+					lightcolor.g = 0
+					lightcolor.b = 0
+				end
 			end
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else

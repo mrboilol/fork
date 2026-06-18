@@ -1300,4 +1300,4 @@ hook.Add("HG.InputMouseApply","zzzzzzzzzzzzbrain_death",function(tbl)
 	cmd:SetViewAngles(angle)
 
 	return true--]]
-end)```
+end)
