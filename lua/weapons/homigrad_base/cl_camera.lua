@@ -322,6 +322,12 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local fatigue_realignment_penalty = 1 + fatigue * 0.15
 	tta = tta * fatigue_realignment_penalty
 
+	-- Brain damage makes weapons feel heavier and harder to control
+	-- 0.1 brain damage adds 0.5 seconds to sight alignment time
+	local brain = organism.brain or 0
+	local brain_alignment_penalty = brain * 5
+	tta = tta + brain_alignment_penalty
+
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
@@ -359,14 +365,21 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		local fatigue = organism.aiming_fatigue or 0
 		local fatigue_debuff = fatigue * 0.4
 
+		-- Brain damage increases sway multiplier
+		-- 0.1 brain damage adds 0.25x to sway multiplier
+		local brain = organism.brain or 0
+		local brain_sway_debuff = brain * 2.5
+
 		local final_arm_sway = arm_sway_debuff
 		local final_fatigue_sway = fatigue_debuff
+		local final_brain_sway = brain_sway_debuff
 		if not bypass_mitigation then
 			final_arm_sway = final_arm_sway * mitigation_mult
 			final_fatigue_sway = final_fatigue_sway * mitigation_mult
+			final_brain_sway = final_brain_sway * mitigation_mult
 		end
 
-		local sway_scale = 1 + final_arm_sway + final_fatigue_sway
+		local sway_scale = 1 + final_arm_sway + final_fatigue_sway + final_brain_sway
 
 		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(swayX, swayY, swayZ) * sway_scale
 	end

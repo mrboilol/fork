@@ -5,7 +5,7 @@ hook.Add("radialOptions", "zcity_delta_dislocation_minigame", function()
     if not IsValid(ply) or not ply:Alive() or not ply.organism or ply.organism.otrub then return end
     if not hg or not hg.radialOptions then return end
 
-    local org = ply.organism
+    local org = ply.new_organism or ply.organism
     if not org.canmove or not org.canmovehead then return end
     if (org.pain or 0) > 60 then return end
     if (ply.tried_fixing_limb or 0) > CurTime() then return end

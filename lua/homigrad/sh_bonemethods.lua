@@ -406,6 +406,9 @@ function hg.bone.Set(ply, lookup_name, vec, ang, layer, lerp, dtime2)
 		end
 		
 		local oldpos, oldang = hg.bone.Get(ply, boneID)
+		-- If bone manipulation not yet initialized, use zero values to prevent NaN
+		oldpos = oldpos or vector_origin
+		oldang = oldang or angle_zero
 		--print(oldang)
 		local setPos = oldpos - ply.manipulated[boneID].layers[layer].Pos + vec
 		local setAng = oldang - ply.manipulated[boneID].layers[layer].Ang + ang

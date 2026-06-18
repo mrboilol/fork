@@ -264,6 +264,7 @@ local O2Lerp = 0
 local assimilatedLerp = 0
 local tempLerp = 36.6
 local headtraumaSaturation = 0
+local addtime = CurTime()
 
 local show_image_time = 0
 local show_some_images_time = 0

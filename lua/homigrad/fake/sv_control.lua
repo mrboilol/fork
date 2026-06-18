@@ -1488,7 +1488,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.rarm == 1 or org.rarmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 5
+						org.painadd = org.painadd + ragdoll.dtime * 0.5
 
 					end
 
@@ -1532,7 +1532,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.larm == 1 or org.larmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 5
+						org.painadd = org.painadd + ragdoll.dtime * 0.5
 
 					end
 
@@ -1576,7 +1576,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.rarm == 1 or org.rarmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 5
+						org.painadd = org.painadd + ragdoll.dtime * 0.5
 
 					end
 
@@ -1608,7 +1608,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.larm == 1 or org.larmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 5
+						org.painadd = org.painadd + ragdoll.dtime * 0.5
 
 					end
 
