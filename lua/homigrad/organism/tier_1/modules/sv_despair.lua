@@ -202,7 +202,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if currentDespair > lastDespair then
 		-- Lock decay based on the amount of despair gained (e.g., if it went all the way up to 1.0, lock for 30 seconds)
 		local gained = currentDespair - lastDespair
-		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + (gained * 30))
+		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + 10 + (gained * 30))
 	end
 	local isLocked = CurTime() < (org._despairLockUntil or 0)
 

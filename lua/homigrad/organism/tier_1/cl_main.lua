@@ -458,13 +458,13 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 				DrawToyTown(4 + lerpedbrain * 4, ScrH())
 			end
 
-			-- Subtle vignette when memories show while awake and brain damaged
+			-- Stronger vignette when memories show while awake and brain damaged
 			if not org.otrub then
-				local vignetteAlpha = math.Clamp(lerpedpart * (15 + lerpedbrain * 45), 0, 60)
+				local vignetteAlpha = math.Clamp(lerpedpart * (25 + lerpedbrain * 75), 0, 100)
 				render.UpdateScreenEffectTexture()
 				memory_vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-				memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 30)
-				memory_vignetteMat:SetFloat("$c1_y", vignetteAlpha / 30)
+				memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 20)
+				memory_vignetteMat:SetFloat("$c1_y", vignetteAlpha / 20)
 				render.SetMaterial(memory_vignetteMat)
 				render.DrawScreenQuad()
 			end

@@ -410,7 +410,7 @@ function HUD_DrawDynamicIndicator()
     -- Check spine damage levels for cascading limb damage
     local spine1Broken = org and GetOrgValueNumber(org.spine1 or 0) >= 1
     local spine2Broken = org and GetOrgValueNumber(org.spine2 or 0) >= 1
-    local spine3Broken = org and GetOrgValueNumber(org.spine3 or 0) >= 1
+    local spine3Broken = org and GetOrgValueNumber(org.spine3 or 0) >= 0.8
 
     if org then
         for key, data in pairs(majorBones) do
