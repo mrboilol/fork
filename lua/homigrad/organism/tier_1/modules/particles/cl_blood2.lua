@@ -1,4 +1,3 @@
-hg = hg or {}
 hg.bloodparticles2 = hg.bloodparticles2 or {}
 bloodparticles_hook = bloodparticles_hook or {}
 
@@ -20,8 +19,9 @@ local render_DrawSprite = render.DrawSprite
 local surface_SetDrawColor = surface.SetDrawColor
 
 local color = Color(90,0,0,122)
-
 local expieModels_b2 = {
+    ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
+    ["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
     ["models/blop/expie/expie.mdl"] = true,
     ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
     ["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
@@ -38,9 +38,9 @@ bloodparticles_hook[3] = function(anim_pos)
         local part = hg.bloodparticles2[i]
         if not part then continue end
         local animpos = math.max((part[7] - time) / part[8], 0)
-        local alpha = part.water and (200 * animpos) or (122 * animpos)
+        color.a = part.water and (200 * animpos) or (122 * animpos)
         local sizeing = part.water and math.max((1 - animpos), 0.1) or 1
-        if isExpieOwner(part.owner) then
+                if isExpieOwner(part.owner) then
             color.r = 90
             color.g = 85
             color.b = 0
@@ -49,7 +49,6 @@ bloodparticles_hook[3] = function(anim_pos)
             color.g = 0
             color.b = 0
         end
-        color.a = alpha
         render_SetMaterial(part[4])
         render_DrawSprite(LerpVector(anim_pos,part[2],part[1]),part[5] * sizeing, part[6] * sizeing, color)
     end
@@ -62,39 +61,17 @@ local radius = 20000
 local radiusSqr = radius * radius
 
 hook.Add("InitPostEntity", "sizeget2", function()
-	if hg and hg.GetWorldSize then
-		radius = hg.GetWorldSize()
-		radiusSqr = radius * radius
-	end
+	radius = hg.GetWorldSize()
+    radiusSqr = radius * radius
 end)
 
 bloodparticles_hook[4] = function(mul)
     local time = CurTime()
     local grav = gravity:GetInt() / 30
 
-    -- Age-based deletion
-    local maxAge = 45
-    for i = #hg.bloodparticles2, 1, -1 do
-        local part = hg.bloodparticles2[i]
-        if part and part.spawnTime and (time - part.spawnTime) > maxAge then
-            table_remove(hg.bloodparticles2, i)
-        end
-    end
-
-    -- Emergency cap to prevent client overload/crash
-    local cap = 10000
-    while #hg.bloodparticles2 > cap do
-        table_remove(hg.bloodparticles2, 1)
-    end
-
     for i = #hg.bloodparticles2, 1, -1 do
         local part = hg.bloodparticles2[i]
         if not part then table_remove(hg.bloodparticles2, i) continue end
-
-        if part[7] - time <= 0 then
-            table_remove(hg.bloodparticles2, i)
-            continue
-        end
 
         local pos = part[1]
         local posSet = part[2]
@@ -109,14 +86,8 @@ bloodparticles_hook[4] = function(mul)
 
 		if radiusSqr < hitPos:LengthSqr() then table_remove(hg.bloodparticles2, i) continue end
 
-        if result.Hit then
-            -- Keep impact particles alive, despawn regular bleeding
-            if part.impact and result.HitWorld then
-                pos:Set(posSet)
-                posSet:Set(hitPos + VectorRand(-3, 3))
-            else
-                table_remove(hg.bloodparticles2, i)
-            end
+        if result.Hit or part[7] - time <= 0 then
+            table_remove(hg.bloodparticles2, i)
             
             --util.Decal("Water.Blood", pos + result.HitNormal, pos - result.HitNormal, ents.FindInSphere(pos, 1))
 

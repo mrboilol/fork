@@ -1,5 +1,4 @@
-﻿hg = hg or {}
-hg.bloodparticles1 = hg.bloodparticles1 or {}
+﻿hg.bloodparticles1 = hg.bloodparticles1 or {}
 bloodparticles_hook = bloodparticles_hook or {}
 
 local tr = {
@@ -119,6 +118,7 @@ local function isExpieOwner(owner)
 	if not IsValid(owner) then return false end
 	return expieModels_b[owner:GetModel()] or owner.PlayerClassName == "expie" or owner.IsExpie or false
 end
+
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
 	local int = hg_blood_draw_distance:GetInt()
@@ -141,24 +141,25 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 		local light3 = render.ComputeDynamicLighting(pos, vector_up * 1)
 
 		local light = (light1 + light2 + light3) * 3
-
-		local isExpie = isExpieOwner(part.owner)
-
-		if part.landed or part.kishki or hg_blood_sprites:GetBool() then
+				local isExpie = isExpieOwner(part.owner)
+						if part.landed or part.kishki or hg_blood_sprites:GetBool() then
 			render_SetMaterial(part[4] or (isExpie and mat_expie_drop or mat_huy))
 			if isExpie then
 				lightcolor.r = math.min(255 * light[1], 255)
 				lightcolor.g = math.min(255 * light[2], 255)
 				lightcolor.b = 0
 			else
-				lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
-				lightcolor.g = 0
+
+		if part.kishki then
+			render_SetMaterial(part[4])
+			lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+							lightcolor.g = 0
 				lightcolor.b = 0
 			end
-						render_DrawSprite(pos, part[5], part[6], lightcolor)
+			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
-			local speed = part[3] and math.sqrt(part[3]:LengthSqr()) or 0
+						local speed = part[3] and math.sqrt(part[3]:LengthSqr()) or 0
 			-- Thicker, brighter beams for fast-moving (high-bleed) particles so they look like a stream
 			local beamWidth = math.max(part[5] * 0.4, 0.6) * (1 + math.min(speed / 120, 1.5))
 			local intensity = (part.artery and 45 or 20) + math.min(speed * 0.35, 80)
@@ -172,7 +173,20 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 				lightcolor.g = 0
 								lightcolor.b = 0
 			end
-			render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, beamWidth, 0, 1, part[9] or lightcolor )
+			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
+			--if len > 1 * 1 then
+				render_SetMaterial(mat_huy)
+				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+				--part.lerpedshit = LerpFT(!part.lasthit and 1 or mul * 1, part.lerpedshit or 1, part.lasthit and 7 or 1)
+				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * part.lerpedshit or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, part.lerpedshit, 0, 1, part[9] or lightcolor )
+				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
+				
+				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
+				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
+
+				--lightcolor.r = lightcolor.r * 0.25
+				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	
+			--end
 		end
 	end
 	--render.OverrideBlend( false )
@@ -181,62 +195,67 @@ end
 local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
 
 hg.bloodpositions = hg.bloodpositions or {}
-hg.bloodpositionOrder = hg.bloodpositionOrder or {}
 hg.bloodcount = hg.bloodcount or 0
 local function decalBlood(pos, normal, tr, artery, owner)
 	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))
 
 	hg.bloodcount = hg.bloodcount + 1
 	
-	if not hg.bloodpositions[vec] then
-		hg.bloodpositionOrder[#hg.bloodpositionOrder + 1] = vec
-	end
-	
-	local cap = 10000
-	if hg.bloodcount > cap then
-		local toRemove = hg.bloodcount - cap
-		for i = 1, toRemove do
-			if #hg.bloodpositionOrder > 0 then
-				local oldVec = table.remove(hg.bloodpositionOrder, 1)
-				if oldVec then
-					hg.bloodpositions[oldVec] = nil
-					hg.bloodcount = hg.bloodcount - 1
-				end
-			end
-		end
+	if hg.bloodcount > 10000 then
+		hg.bloodpositions = {}
+		hg.bloodcount = 0
 	end
 
-	local prefix = isExpieOwner(owner) and "Y" or ""
-	local matType = tr.MatType
-	local isMetal = matType == MAT_METAL
-	local vol = math.random(10, 60)
-	local pitch = isMetal and math.random(100, 120) or math.random(80, 120)
-	
-	sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, vol, pitch)
-	if isMetal then
-		sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), pitch)
-	end
+	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
 	if artery then
-		if not hg_old_blood:GetBool() then
-			hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-			if hg.bloodpositions[vec] < 6 then
-				util.Decal(prefix .. "Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
-			end
+		if !hg_old_blood:GetBool() then
+			local howmuch = 1
+			
+			//timer.Simple(0.1, function()
+				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
+				if hg.bloodpositions[vec] < 6 then
+					util.Decal("Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
+				end
+				sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+				if tr.MatType == MAT_METAL then
+					sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+				end
+			//end)
 		else
-			util.Decal(prefix .. "Arterial.Blood1", pos + normal, pos - normal, owner)
+			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
+			sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+			if tr.MatType == MAT_METAL then
+				sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+			end
 		end
 	else
-		if not hg_old_blood:GetBool() then
-			hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-			if hg.bloodpositions[vec] < 6 then
-				util.Decal(prefix .. "Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
-			end
-			if hg.bloodpositions[vec] == 50 then
-				util.Decal(prefix .. "Blood", pos + normal, pos - normal, owner)
-			end
+		if !hg_old_blood:GetBool() then
+			local howmuch = 1
+			
+			//timer.Simple(0.1, function()
+				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
+				
+				sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+				if tr.MatType == MAT_METAL then
+					sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+				end
+
+				if hg.bloodpositions[vec] < 6 then
+					util.Decal("Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
+				end
+
+				if hg.bloodpositions[vec] == 50 then
+					util.Decal("Blood", pos + normal, pos - normal, owner)
+				end
+
+			//end)
 		else
-			util.Decal(prefix .. "Normal.Blood1", pos + normal, pos - normal, owner)
+			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
+			sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+			if tr.MatType == MAT_METAL then
+				sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+			end
 		end
 	end
 end
@@ -256,141 +275,23 @@ local radius = 20000
 local radiusSqr = radius * radius
 
 hook.Add("InitPostEntity", "sizeget", function()
-	if hg and hg.GetWorldSize then
-		radius = hg.GetWorldSize()
-		radiusSqr = radius * radius
-	end
+	radius = hg.GetWorldSize()
+    radiusSqr = radius * radius
 end)
-
-local function landBloodParticle(part, result, i)
-	local hitPos = result.HitPos
-	local nearbyCount = 0
-	for j = 1, #hg.bloodparticles1 do
-		local other = hg.bloodparticles1[j]
-		if other and other.landed then
-			local distSqr = other[1]:DistToSqr(hitPos)
-			if distSqr < 144 then -- 12 units radius
-				nearbyCount = nearbyCount + 1
-			end
-		end
-	end
-	
-	if nearbyCount >= 5 then
-		-- Falls on a big puddle of blood, landing wouldn't provide much impact so it despawns (absorbs)
-		table_remove(hg.bloodparticles1, i)
-		return true
-	elseif nearbyCount > 0 then
-		-- Landing on a bunch of particles should move on to the next empty space!
-		local slideDir = (part[3]:Cross(result.HitNormal)):Cross(result.HitNormal):GetNormalized()
-		if slideDir:LengthSqr() < 0.1 then
-			slideDir = result.HitNormal:Angle():Right()
-		end
-		local slideOffset = slideDir * math.Rand(6, 12)
-		local testPos = hitPos + slideOffset
-		
-		local testTr = {
-			start = testPos + result.HitNormal * 5,
-			endpos = testPos - result.HitNormal * 10,
-			mask = MASK_SOLID_BRUSHONLY
-		}
-		local testResult = util_TraceLine(testTr)
-		if testResult.Hit then
-			hitPos = testResult.HitPos
-		end
-	end
-	
-	part.landed = true
-	part[1] = hitPos + result.HitNormal * 0.1 -- slightly offset from surface to avoid z-fighting
-	part[2] = part[1]
-	part[3] = Vector(0, 0, 0) -- zero velocity
-	
-	-- Increase its size slightly when on the ground to look like a splat/puddle
-	part[5] = part[5] * math.Rand(1.8, 2.5)
-	part[6] = part[5]
-	return false
-end
 
 bloodparticles_hook[2] = function(mul)
 	local grav = gravity:GetInt() / 10
     local time = CurTime()
 	local gravvec = vecDown * mul * (math.max(0.0, grav))
-	
-	-- Age-based deletion for flying particles only
-	local maxAge = 30
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
-		if part and not part.landed and part.spawnTime and (time - part.spawnTime) > maxAge then
-			table_remove(hg.bloodparticles1, i)
-		end
-	end
-	
-	-- Count flying vs landed particles
-	local landedCount = 0
-	local flyingCount = 0
-	for i = 1, #hg.bloodparticles1 do
-		local part = hg.bloodparticles1[i]
-		if part then
-			if part.landed then
-				landedCount = landedCount + 1
-			else
-				flyingCount = flyingCount + 1
-			end
-		end
-	end
-
-	-- Cap landed particles to prevent memory issues
-	local landedCap = 15000
-	if landedCount > landedCap then
-		local toRemove = landedCount - landedCap
-		for i = #hg.bloodparticles1, 1, -1 do
-			if toRemove <= 0 then break end
-			local part = hg.bloodparticles1[i]
-			if part and part.landed then
-				table_remove(hg.bloodparticles1, i)
-				toRemove = toRemove - 1
-			end
-		end
-	end
-
-	-- Cap mid-air particles to prevent CPU lag
-	local flyingCap = 2000
-	if flyingCount > flyingCap then
-		local toRemove = flyingCount - flyingCap
-		for i = #hg.bloodparticles1, 1, -1 do
-			if toRemove <= 0 then break end
-			local part = hg.bloodparticles1[i]
-			if part and not part.landed then
-				table_remove(hg.bloodparticles1, i)
-				toRemove = toRemove - 1
-			end
-		end
-	end
-	
-	for i = #hg.bloodparticles1, 1, -1 do
-				local part = hg.bloodparticles1[i]
 		if not part then table_remove(hg.bloodparticles1, i) continue end
-		
-		-- Skip physics if already landed on the floor
-		if part.landed then continue end
-		
-		-- Fade out inherited owner velocity so it doesn't push particles away from surfaces forever
-		if part.start_velocity and part.start_velocity:LengthSqr() > 0.01 then
-			part.start_velocity:Mul(0.92)
-			if part.start_velocity:LengthSqr() < 1 then
-				part.start_velocity = vector_origin
-			end
-		end
 		
 		local pos = part[1]
 		local posSet = part[2]
 
 		tr.start = posSet
-		-- Ensure the trace always reaches far enough to hit nearby surfaces, even when velocity is tiny.
-		local traceStep = part[3] * mul
-		if traceStep:LengthSqr() < 16 then
-			traceStep = traceStep + Vector(0, 0, -4)
-		end
-		tr.endpos = tr.start + traceStep
+		tr.endpos = tr.start + part[3] * mul
 		tr.collisiongroup = part.kishki and COLLISION_GROUP_WORLD or COLLISION_GROUP_NONE
 
 		result = util_TraceLine(tr)
@@ -404,12 +305,22 @@ bloodparticles_hook[2] = function(mul)
 			table_remove(hg.bloodparticles1, i)
 			continue
 		end
+		
+		if time - part[7] >= 30 then
+			table_remove(hg.bloodparticles1, i)
+
+			continue
+		end
 
 		if result.Hit and result.Entity:IsWorld() then
+			table_remove(hg.bloodparticles1, i)
 			local dir = result.HitNormal
 			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
 			
-			if landBloodParticle(part, result, i) then continue end
+			
+			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
+			--sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", hitPos, math.random(10, 60), math.random(80, 120))
+			
 			continue
 		else
 			local ph = 0
@@ -425,16 +336,17 @@ bloodparticles_hook[2] = function(mul)
 			result.Hit = result.Hit and shouldhit
 
 			if result.Hit then
+				--local down = vecDown * mul * (math.max(0, grav))
 				local down = result.HitNormal
 				local nextpos = (result.Normal + down):GetNormalized() * 5
 				
-				local insolid = result.StartSolid and IsValid(result.Entity)
-				if not insolid and (part.nextput or 0) < CurTime() then
+				if !insolid and (part.nextput or 0) < CurTime() then
 					part.nextput = CurTime() + 1
 
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
 				end
 
+				local insolid = result.StartSolid and IsValid(result.Entity)
 				if insolid then
 					if result.Entity:IsVehicle() then
 						table_remove(hg.bloodparticles1, i)
@@ -451,82 +363,43 @@ bloodparticles_hook[2] = function(mul)
 					end
 				end
 
-				-- Project gravity onto the hit surface so blood slides DOWN the organism instead of floating horizontally.
-				local hitRight = result.HitNormal:Angle():Right()
-				local pulldown = (-vector_up * (grav / 60)):Cross(hitRight)
-				pulldown:Cross(result.HitNormal)
-				if pulldown:LengthSqr() < 0.001 then
-					pulldown = -vector_up * (grav / 60)
-				end
+				local pulldown = (-vector_up * (grav / 600)):Cross(-result.HitNormal:Angle():Right())
 				nextpos:Add(pulldown)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
-
-								-- Stuck-safety: if a particle has been sliding on an entity for several frames
-				-- without making meaningful progress, land it as a decal/splat instead of hovering forever.
-				local moveSqr = part.lerpedmove:LengthSqr()
-				if moveSqr < 0.1 * mul then
+				
+				if part.lerpedmove:LengthSqr() < 0.1 * mul then
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
-
-					local landResult = {
-						HitPos = result.HitPos,
-						HitNormal = result.HitNormal
-					}
-					if not landBloodParticle(part, landResult, i) then
-						part.entSurface = result.Entity -- remember what we landed on
-					end
+					
+					table_remove(hg.bloodparticles1, i)
+					
 					continue
-				elseif moveSqr < 4 * mul then
-					part.stuckframes = (part.stuckframes or 0) + 1
-					if part.stuckframes > 8 then
-						part.lerpedmove:Add(-vector_up * math.Rand(2, 4) * mul)
-						part.stuckframes = 0
-					end
-				else
-					part.stuckframes = 0
 				end
 
-								pos:Set(posSet + (part.start_velocity or vector_origin) * mul)
-				posSet:Set(hitPos + part.lerpedmove + (part.start_velocity or vector_origin) * mul)
+				pos:Set(posSet + part.start_velocity * mul)
+				posSet:Set(hitPos + part.lerpedmove + part.start_velocity * mul)
 				part.hashitsomething = true
-						else
-				-- Ground-seeking: if a particle has been airborne for several seconds with very low velocity,
-				-- force a downward trace so it doesn't hover just above a surface forever.
-				if part.spawnTime and (time - part.spawnTime) > 2.5 and part[3]:LengthSqr() < 64 then
-					local seekTr = {
-						start = posSet,
-						endpos = posSet + Vector(0, 0, -128),
-						collisiongroup = part.kishki and COLLISION_GROUP_WORLD or COLLISION_GROUP_NONE
-					}
-					local seekResult = util_TraceLine(seekTr)
-					if seekResult.Hit and seekResult.Entity:IsWorld() then
-						decalBlood(seekResult.HitPos, seekResult.HitNormal, seekResult, part.artery, part.owner)
-						if landBloodParticle(part, seekResult, i) then continue end
-						continue
-					elseif seekResult.Hit then
-						-- Hit an entity; give it a strong downward nudge to encourage landing next frame
-						part[3]:Add(Vector(0, 0, -math.Rand(8, 16)))
-					end
-				end
-
+			else
 				if part.hashitsomething then
 					part.hashitsomething = nil
-					part[3] = (posSet - pos) / mul * 1
+					--part[3][3] = 0
+					part[3] = (posSet - pos) / mul * 1--part.lerpedmove / mul
+					--part.lerpedmove = nil
 					pos:Set(posSet)
 					posSet:Set(posSet)
 				else
-					pos:Set(posSet + (part.start_velocity or vector_origin) * mul)
-					posSet:Set(tr.start + part[3] * mul + (part.start_velocity or vector_origin) * mul)
+					pos:Set(posSet + part.start_velocity * mul)
+					posSet:Set(tr.start + part[3] * mul + part.start_velocity * mul)
 				end
 			end
 
 			part.lasthit = result.Hit
 		end
 
-		-- Always pull velocity toward gravity, even on impact frames, so particles never lose their downward tendency.
-		local gravTarget = Vector(0, 0, -grav * 4)
-		part[3] = LerpVector(0.25 * mul, part[3], gravTarget)
+		part[3] = LerpVector(0.25 * mul, part[3], vecZero)
 		if !(result.Hit) then
 			part[3]:Add(gravvec)
+		--else
+			--part[3]:Set(vecDown * mul * (math.max(0.1, grav)))
 		end
 	end
 end

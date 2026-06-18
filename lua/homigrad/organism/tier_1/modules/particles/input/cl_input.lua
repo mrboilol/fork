@@ -9,7 +9,9 @@ for i = 1, 6 do
 end
 
 --local mat_huy = Material("sprites/mat_jack_irregularcircle")
+local texture = Material("decals/z_blood1"):GetTexture("$basetexture")
 local mat_huy = Material("effects/blood_core")
+mat_huy:SetTexture("$basetexture",texture)
 
 local cloudmat = Material("effects/smoke_b")
 local vomitColorPrimary = Color(229, 220, 148, 140)
@@ -20,13 +22,12 @@ local vomitColorSecondary = Color(238, 235, 210, 130)
 	mats[i-3] = Material("homigrad/decals/bld" .. i)
 end]]
 local countmats = #mats
-hg = hg or {}
 hg.bloodparticles1 = hg.bloodparticles1 or {}
 hg.bloodparticles2 = hg.bloodparticles2 or {}
 local vecZero = Vector(0, 0, 0)
 local lastplaced = SysTime()
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
-local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
+local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	--local fps = 1 / hg_blood_fps:GetInt() * 1
 	--if lastplaced + fps > SysTime() then return end
 	--lastplaced = SysTime()
@@ -38,69 +39,15 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	-- Hard cap to prevent client overload/crash of mid-air particles
-	local flyingCount = 0
-	for i = 1, #hg.bloodparticles1 do
-		if hg.bloodparticles1[i] and not hg.bloodparticles1[i].landed then
-			flyingCount = flyingCount + 1
-		end
-	end
-	if flyingCount > 2000 then
-		for i = #hg.bloodparticles1, 1, -1 do
-			local part = hg.bloodparticles1[i]
-			if part and not part.landed then
-				table.remove(hg.bloodparticles1, i)
-				break
-			end
-		end
-	end
+	if #hg.bloodparticles1 > 200 then table.remove(hg.bloodparticles1, 1) end
 	
-	-- Infer bleed severity from the velocity the caller supplied.
-	-- The wound spawner caps the values it sends, so we amplify high-bleed particles here
-	-- to make 15.00 bleed look like a fire hose while 0.05 bleed stays as a small drip.
-	local speed = vel:Length()
-	local inferredSeverity = math.Clamp((speed - 5) / 55, 0, 1)
-	if artery then inferredSeverity = math.min(inferredSeverity + 0.15, 1.0) end
-	local isFireHose = inferredSeverity > 0.5
-
-	if inferredSeverity > 0.05 then
-		local scaleMul = 1 + inferredSeverity * 2.5 -- up to 3.5x velocity
-		vel:Mul(scaleMul)
-		w = (w or 2) * (0.85 + inferredSeverity * 1.3) -- up to 2.15x size
-		h = (h or 2) * (0.85 + inferredSeverity * 1.3)
-	end
-
-	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime()}
-
-	-- Burst extra particles for true fire-hose feel without touching the spawner
-	if isFireHose then
-		local extraCount = math.min(math.floor((inferredSeverity - 0.35) * 5), 3)
-		for _ = 1, extraCount do
-			local burstPos = Vector()
-			burstPos:Set(pos + VectorRand(-1, 1))
-			local burstPos2 = Vector()
-			burstPos2:Set(burstPos)
-			local spreadMag = math.max(speed * 0.12, 4)
-			local burstVel = vel * math.Rand(0.75, 1.05) + VectorRand(-spreadMag, spreadMag)
-
-			-- Re-check cap for each burst particle
-			local currentFlying = 0
-			for k = 1, #hg.bloodparticles1 do
-				if hg.bloodparticles1[k] and not hg.bloodparticles1[k].landed then
-					currentFlying = currentFlying + 1
-				end
-			end
-			if currentFlying > 2000 then break end
-
-			hg.bloodparticles1[#hg.bloodparticles1 + 1] = {burstPos, burstPos2, burstVel, mat or mat_huy, (w or 2) * math.Rand(0.7, 1.1), (h or 2) * math.Rand(0.7, 1.1), CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime()}
-		end
-	end
+	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
 
-local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, impact)
+local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	if LocalPlayer():GetNetVar("disappearance", nil) or (IsValid(owner) and owner:GetNetVar("disappearance", nil)) then return end
 
-	time = time or 90
+	time = time or 30
 
 	pos = pos + vecZero
 	vel = vel + vecZero
@@ -108,12 +55,11 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, impact)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	-- Hard cap to prevent client overload/crash (each particle traces + draws every frame)
-	if #hg.bloodparticles2 > 4000 then table.remove(hg.bloodparticles2, 1) end
+	if #hg.bloodparticles2 > 5000 then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 
-	hg.bloodparticles2[#hg.bloodparticles2 + 1] = {pos, pos2, vel, mat or cloudmat, w or Rand(5, 15), h or Rand(5, 15), CurTime() + time, time, water = water, owner = owner, spawnTime = CurTime(), impact = impact}
+	hg.bloodparticles2[#hg.bloodparticles2 + 1] = {pos, pos2, vel, mat or cloudmat, w or 60, h or 60, CurTime() + time, time, water = water, owner = owner}
 end
 
 hg.addBloodPart = addBloodPart
@@ -123,20 +69,20 @@ local Rand = math.Rand
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
 
-local function impact(pos,vel,mul,owner)
+local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
-	local iters = math.ceil(math.random(1, max) * 1.0) -- Reduced from 2.5 to 1.0
+	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
 	
 	if hg_bloodimpacts:GetBool() then
-		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, Rand(10, 25), Rand(10, 25), 0.3, false, owner, true)
-		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, Rand(8, 20), Rand(8, 20), 0.3, false, owner, true)
-		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, Rand(5, 15), Rand(5, 15), 0.3, false, owner, true)
+		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
+		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, 25, 25, 0.3)
 	end
 
 	for i = 1, iters do
-		local size = Rand(1, 3)
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false, owner, true)
+		local size = 1--math.random(2, 4) * 1
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
 	end
 end
 
@@ -147,7 +93,7 @@ net.Receive("hg_bloodimpact", function()
 	local amt = net.ReadInt(8)
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
-	
+		
 	local owner = nil
 	for _, v in ipairs(ents.FindInSphere(pos, 40)) do
 		if v:IsPlayer() or v:IsNPC() or v:IsNextBot() or v:IsRagdoll() then 
@@ -155,7 +101,6 @@ net.Receive("hg_bloodimpact", function()
 			break 
 		end
 	end
-
 	for i = 1, amt do impact(pos,vel,mul,owner) end
 end)
 	net.Receive("hg_brainmist", function()
@@ -199,13 +144,13 @@ local function explode(pos, size, force, owner)
 	local w, h = 360 / xx, 360 / yy
 	for x = 1, xx * size do
 		for y = 1, yy * size do
-			addBloodPart2(pos + VectorRand(-10,10), VectorRand(-100,100) * size, cloudmat, Rand(8, 15), Rand(8, 15), 1, false, owner)
+			addBloodPart2(pos + VectorRand(-10,10), VectorRand(-100,100) * size, cloudmat, 25, 25, 1)
 			
 			local dir = Vector(0, 0, -1)
 			dir:Rotate(Angle(h * y * Rand(0.9, 1.1), w * x * Rand(0.9, 1.1), 0))
 			dir[3] = dir[3] + Rand(0.5, 1.5)
 			dir:Mul(250 * size)
-			addBloodPart(pos, force * 0.2 + dir, mat_huy, math.Rand(5,10), math.Rand(5,10), false, true, owner)
+			addBloodPart(pos, force * 0.2 + dir, mat_huy, math.Rand(5,10), math.Rand(5,10), false, true)
 		end
 	end
 end
@@ -235,7 +180,7 @@ hook.Add("HG_OrganismChanged", "explodelegs", function(oldorg, org)
 				local mat = ent:GetBoneMatrix(bone)
 
 				if mat then
-					explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, Vector(), ent)
+					explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, Vector())
 				end
 			end
 		end
@@ -258,7 +203,7 @@ net.Receive("addfountain",function()
 	if bone then
 		local mat = ent:GetBoneMatrix(bone)
 		if mat then
-			explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, force, ent)
+			explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, force)
 		end
 	end
 end)
@@ -283,6 +228,7 @@ net.Receive("bloodsquirt", function()
 	local name = "squirtblood"..ent:EntIndex()..dir[1]
 	local i = 250
 	local maxI = i
+	local vechuy = Vector(0,0,0)
 	timer.Create(name, 0.01 * game.GetTimeScale(), i + 10, function()
 		if not IsValid(ent) then timer.Remove(name) return end
 		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
@@ -291,17 +237,9 @@ net.Receive("bloodsquirt", function()
 		if not mat then timer.Remove(name) return end
 		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
 		dir = dir:Forward() * len
-
-		-- Realistic arterial pulse and oscillation
-		local step = maxI - i
-		local pulse = 1 + math.sin(step * 0.25) * 0.35
-		local oscillation = Vector(
-			math.sin(step * 0.5) * 6 * amt,
-			math.cos(step * 0.4) * 6 * amt,
-			math.sin(step * 0.3) * 3 * amt
-		)
-
-		addBloodPart(pos, dir * amt * 120 * pulse + oscillation, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
+		
+		vechuy = vechuy + VectorRand(-amt * 5,amt * 5)
+		addBloodPart(pos, dir * amt * 90 + vechuy * amt, mat_huy, math.Rand(3,3), math.Rand(3,3), true, false)
 		i = i - 1
 	end)
 	timer.Adjust(name, 0)
