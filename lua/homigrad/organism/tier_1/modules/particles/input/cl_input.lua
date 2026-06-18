@@ -55,7 +55,46 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner, impact)
 		end
 	end
 	
+	-- Infer bleed severity from the velocity the caller supplied.
+	-- The wound spawner caps the values it sends, so we amplify high-bleed particles here
+	-- to make 15.00 bleed look like a fire hose while 0.05 bleed stays as a small drip.
+	local speed = vel:Length()
+	local inferredSeverity = math.Clamp((speed - 5) / 55, 0, 1)
+	if artery then inferredSeverity = math.min(inferredSeverity + 0.15, 1.0) end
+	local isFireHose = inferredSeverity > 0.5
+
+	if inferredSeverity > 0.05 then
+		local scaleMul = 1 + inferredSeverity * 2.5 -- up to 3.5x velocity
+		vel:Mul(scaleMul)
+		w = (w or 2) * (0.85 + inferredSeverity * 1.3) -- up to 2.15x size
+		h = (h or 2) * (0.85 + inferredSeverity * 1.3)
+	end
+
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime()}
+
+	-- Burst extra particles for true fire-hose feel without touching the spawner
+	if isFireHose then
+		local extraCount = math.min(math.floor((inferredSeverity - 0.35) * 5), 3)
+		for _ = 1, extraCount do
+			local burstPos = Vector()
+			burstPos:Set(pos + VectorRand(-1, 1))
+			local burstPos2 = Vector()
+			burstPos2:Set(burstPos)
+			local spreadMag = math.max(speed * 0.12, 4)
+			local burstVel = vel * math.Rand(0.75, 1.05) + VectorRand(-spreadMag, spreadMag)
+
+			-- Re-check cap for each burst particle
+			local currentFlying = 0
+			for k = 1, #hg.bloodparticles1 do
+				if hg.bloodparticles1[k] and not hg.bloodparticles1[k].landed then
+					currentFlying = currentFlying + 1
+				end
+			end
+			if currentFlying > 2000 then break end
+
+			hg.bloodparticles1[#hg.bloodparticles1 + 1] = {burstPos, burstPos2, burstVel, mat or mat_huy, (w or 2) * math.Rand(0.7, 1.1), (h or 2) * math.Rand(0.7, 1.1), CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, impact = impact, spawnTime = CurTime()}
+		end
+	end
 end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner, impact)

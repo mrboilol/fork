@@ -155,20 +155,24 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 				lightcolor.g = 0
 				lightcolor.b = 0
 			end
-			render_DrawSprite(pos, part[5], part[6], lightcolor)
+						render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
+			local speed = part[3] and math.sqrt(part[3]:LengthSqr()) or 0
+			-- Thicker, brighter beams for fast-moving (high-bleed) particles so they look like a stream
+			local beamWidth = math.max(part[5] * 0.4, 0.6) * (1 + math.min(speed / 120, 1.5))
+			local intensity = (part.artery and 45 or 20) + math.min(speed * 0.35, 80)
 			render_SetMaterial(isExpie and mat_expie_drop or mat_huy)
 			if isExpie then
 				lightcolor.r = math.min(255 * light[1], 255)
 				lightcolor.g = math.min(255 * light[2], 255)
 				lightcolor.b = 0
 			else
-				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+				lightcolor.r = math.min(intensity * light[1], 255)
 				lightcolor.g = 0
-				lightcolor.b = 0
+								lightcolor.b = 0
 			end
-			render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
+			render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, beamWidth, 0, 1, part[9] or lightcolor )
 		end
 	end
 	--render.OverrideBlend( false )
@@ -363,17 +367,30 @@ bloodparticles_hook[2] = function(mul)
 	end
 	
 	for i = #hg.bloodparticles1, 1, -1 do
-		local part = hg.bloodparticles1[i]
+				local part = hg.bloodparticles1[i]
 		if not part then table_remove(hg.bloodparticles1, i) continue end
 		
 		-- Skip physics if already landed on the floor
 		if part.landed then continue end
 		
+		-- Fade out inherited owner velocity so it doesn't push particles away from surfaces forever
+		if part.start_velocity and part.start_velocity:LengthSqr() > 0.01 then
+			part.start_velocity:Mul(0.92)
+			if part.start_velocity:LengthSqr() < 1 then
+				part.start_velocity = vector_origin
+			end
+		end
+		
 		local pos = part[1]
 		local posSet = part[2]
 
 		tr.start = posSet
-		tr.endpos = tr.start + part[3] * mul
+		-- Ensure the trace always reaches far enough to hit nearby surfaces, even when velocity is tiny.
+		local traceStep = part[3] * mul
+		if traceStep:LengthSqr() < 16 then
+			traceStep = traceStep + Vector(0, 0, -4)
+		end
+		tr.endpos = tr.start + traceStep
 		tr.collisiongroup = part.kishki and COLLISION_GROUP_WORLD or COLLISION_GROUP_NONE
 
 		result = util_TraceLine(tr)
@@ -444,14 +461,19 @@ bloodparticles_hook[2] = function(mul)
 				nextpos:Add(pulldown)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
 
-				-- Stuck-safety: if a particle has been sliding on an entity for several frames
-				-- without making meaningful progress, force it down so it doesn't hover forever.
+								-- Stuck-safety: if a particle has been sliding on an entity for several frames
+				-- without making meaningful progress, land it as a decal/splat instead of hovering forever.
 				local moveSqr = part.lerpedmove:LengthSqr()
 				if moveSqr < 0.1 * mul then
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
 
-					table_remove(hg.bloodparticles1, i)
-
+					local landResult = {
+						HitPos = result.HitPos,
+						HitNormal = result.HitNormal
+					}
+					if not landBloodParticle(part, landResult, i) then
+						part.entSurface = result.Entity -- remember what we landed on
+					end
 					continue
 				elseif moveSqr < 4 * mul then
 					part.stuckframes = (part.stuckframes or 0) + 1
@@ -463,18 +485,37 @@ bloodparticles_hook[2] = function(mul)
 					part.stuckframes = 0
 				end
 
-				pos:Set(posSet + part.start_velocity * mul)
-				posSet:Set(hitPos + part.lerpedmove + part.start_velocity * mul)
+								pos:Set(posSet + (part.start_velocity or vector_origin) * mul)
+				posSet:Set(hitPos + part.lerpedmove + (part.start_velocity or vector_origin) * mul)
 				part.hashitsomething = true
-			else
+						else
+				-- Ground-seeking: if a particle has been airborne for several seconds with very low velocity,
+				-- force a downward trace so it doesn't hover just above a surface forever.
+				if part.spawnTime and (time - part.spawnTime) > 2.5 and part[3]:LengthSqr() < 64 then
+					local seekTr = {
+						start = posSet,
+						endpos = posSet + Vector(0, 0, -128),
+						collisiongroup = part.kishki and COLLISION_GROUP_WORLD or COLLISION_GROUP_NONE
+					}
+					local seekResult = util_TraceLine(seekTr)
+					if seekResult.Hit and seekResult.Entity:IsWorld() then
+						decalBlood(seekResult.HitPos, seekResult.HitNormal, seekResult, part.artery, part.owner)
+						if landBloodParticle(part, seekResult, i) then continue end
+						continue
+					elseif seekResult.Hit then
+						-- Hit an entity; give it a strong downward nudge to encourage landing next frame
+						part[3]:Add(Vector(0, 0, -math.Rand(8, 16)))
+					end
+				end
+
 				if part.hashitsomething then
 					part.hashitsomething = nil
 					part[3] = (posSet - pos) / mul * 1
 					pos:Set(posSet)
 					posSet:Set(posSet)
 				else
-					pos:Set(posSet + part.start_velocity * mul)
-					posSet:Set(tr.start + part[3] * mul + part.start_velocity * mul)
+					pos:Set(posSet + (part.start_velocity or vector_origin) * mul)
+					posSet:Set(tr.start + part[3] * mul + (part.start_velocity or vector_origin) * mul)
 				end
 			end
 
