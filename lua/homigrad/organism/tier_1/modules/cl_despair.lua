@@ -228,9 +228,9 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		-- During panic, push volume lower so panic track stays prominent
-		local volScale = panicAttack and 0.55 or 1.0
-		local targetVol = (despair > 0.5 and 1.0 or math.Remap(despair, 0.25, 1, 0.7, 1.0)) * musicVolume:GetFloat() * volScale
+		-- Despair theme stays at full file volume as a background layer;
+		-- it does not duck or override other sounds (panic, ambience, etc.)
+		local targetVol = (despair > 0.5 and 1.0 or math.Remap(despair, 0.25, 1, 0.7, 1.0)) * musicVolume:GetFloat()
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
