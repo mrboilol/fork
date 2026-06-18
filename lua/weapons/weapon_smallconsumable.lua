@@ -43,7 +43,7 @@ SWEP.FoodModelsKCNNeutralizers = {
 }
 
 SWEP.FoodModels = {
-	"models/jorddrink/7upcan01a.mdl", 
+	"models/jorddrink/7upcan01a.mdl",
 	"models/jorddrink/barqcan1a.mdl",
 	"models/jorddrink/cozcan01a.mdl",
 	"models/jorddrink/crucan01a.mdl",
@@ -63,7 +63,7 @@ SWEP.FoodModels = {
 }
 
 SWEP.WaterModel = {
-	["models/jorddrink/7upcan01a.mdl"] = true, 
+	["models/jorddrink/7upcan01a.mdl"] = true,
 	["models/jorddrink/barqcan1a.mdl"] = true,
 	["models/jorddrink/cozcan01a.mdl"] = true,
 	["models/jorddrink/crucan01a.mdl"] = true,
@@ -76,6 +76,20 @@ SWEP.WaterModel = {
 	["models/jorddrink/sprcan01a.mdl"] = true,
 	["models/foodnhouseholditems/juicesmall.mdl"] = true
 }
+
+function SWEP:PrimaryAttack()
+	if CLIENT then return end
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	self:Heal(hg.GetCurrentCharacter(owner) or owner)
+end
+
+function SWEP:SecondaryAttack()
+	if CLIENT then return end
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	self:Heal(hg.GetCurrentCharacter(owner) or owner)
+end
 
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
 
@@ -104,8 +118,8 @@ if SERVER then
 		local org = ent.organism
 		if not org then return end
 		local owner = self:GetOwner()
-		
-			
+
+
 		self.Eating = self.Eating or 0
 		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end
@@ -120,7 +134,7 @@ if SERVER then
 		if org.stamina and org.stamina[1] then
 			org.stamina[1] = math.min(org.stamina[1] + 15, org.stamina.max or 180)
 		end
-		
+
 		-- Pain relief
 		org.pain = math.max((org.pain or 0) - 5, 0)
 		org.painadd = math.max((org.painadd or 0) - 3, 0)
@@ -132,9 +146,9 @@ if SERVER then
 
 		local ply = self:GetOwner()
 		ply:ViewPunch(Angle(3,0,0))
-		
+
 		ent:EmitSound( self.WaterModel[self.WorldModel] and "snd_jack_hmcd_drink"..math.random(3)..".wav" or "snd_jack_hmcd_eat"..math.random(4)..".wav", 60, math.random(95, 105))
-		
+
 		self.CDEating = CurTime() + 0.5
 		self.Eating = self.Eating + 1
 		self:SetHolding(0)
@@ -142,7 +156,7 @@ if SERVER then
 			self:GetOwner():SelectWeapon("weapon_hands_sh")
 			self:Remove()
 		end
-		
+
 		return true
 	end
 end

@@ -566,20 +566,15 @@ hook.Add("HG_OnOtrub", "resetshit", function(ply)
 end)
 
 hook.Add( "PlayerBindPress", "PlayerBindPressExample2huy", function( ply, bind, pressed )
-	if string.find(bind, "+menu") then
-
+	if bind == "+menu" then
 		if (lply.organism and lply.organism.otrub) then
-			return (bind == "+menu") or nil
+			return true
 		end
 
-		if (bind == "+menu") then
-			if pressed and !IsValid(MENUPANELHUYHUY) then
-				CreateRadialMenu()
-			else
-				PressRadialMenu(1)
-			end
+		if pressed and !IsValid(MENUPANELHUYHUY) then
+			CreateRadialMenu()
 		else
-			if lply:IsAdmin() then return end
+			PressRadialMenu(1)
 		end
 
 		return true

@@ -1306,7 +1306,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					ItssooverStation:SetVolume(consciousVol)
 
 					-- Sound peak detection for screen shake
-					if hg_dyingpulse:GetInt() == 1 and ItssooverStation:GetState() == GMOD_CHANNEL_PLAYING then
+					if hg_dyingpulse:GetInt() == 1 and IsValid(ItssooverStation) and ItssooverStation:GetState() == GMOD_CHANNEL_PLAYING then
 						local fft = ItssooverStation:GetFFT(512)
 						if fft then
 							local peakSum = 0

@@ -117,7 +117,18 @@ function SWEP:InitializeAdd()
 	end
 end
 
+function SWEP:PrimaryAttack()
+	if CLIENT then return end
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	self:Heal(hg.GetCurrentCharacter(owner) or owner)
+end
+
 function SWEP:SecondaryAttack()
+	if CLIENT then return end
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	self:Heal(hg.GetCurrentCharacter(owner) or owner)
 end
 
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)

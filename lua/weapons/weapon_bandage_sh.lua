@@ -101,6 +101,10 @@ function SWEP:DrawWorldModel2(nodraw)
 	end
 end
 
+function SWEP:CancelBandageRotation()
+	-- Cleanup for rotation effects if needed
+end
+
 function SWEP:OnRemove()
 	if CLIENT then
 		self:CancelBandageRotation()

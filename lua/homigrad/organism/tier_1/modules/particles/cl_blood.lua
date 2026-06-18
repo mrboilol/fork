@@ -434,16 +434,33 @@ bloodparticles_hook[2] = function(mul)
 					end
 				end
 
-				local pulldown = (-vector_up * (grav / 600)):Cross(-result.HitNormal:Angle():Right())
+				-- Project gravity onto the hit surface so blood slides DOWN the organism instead of floating horizontally.
+				local hitRight = result.HitNormal:Angle():Right()
+				local pulldown = (-vector_up * (grav / 60)):Cross(hitRight)
+				pulldown:Cross(result.HitNormal)
+				if pulldown:LengthSqr() < 0.001 then
+					pulldown = -vector_up * (grav / 60)
+				end
 				nextpos:Add(pulldown)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
-				
-				if part.lerpedmove:LengthSqr() < 0.1 * mul then
+
+				-- Stuck-safety: if a particle has been sliding on an entity for several frames
+				-- without making meaningful progress, force it down so it doesn't hover forever.
+				local moveSqr = part.lerpedmove:LengthSqr()
+				if moveSqr < 0.1 * mul then
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
-					
+
 					table_remove(hg.bloodparticles1, i)
-					
+
 					continue
+				elseif moveSqr < 4 * mul then
+					part.stuckframes = (part.stuckframes or 0) + 1
+					if part.stuckframes > 8 then
+						part.lerpedmove:Add(-vector_up * math.Rand(2, 4) * mul)
+						part.stuckframes = 0
+					end
+				else
+					part.stuckframes = 0
 				end
 
 				pos:Set(posSet + part.start_velocity * mul)
@@ -464,11 +481,11 @@ bloodparticles_hook[2] = function(mul)
 			part.lasthit = result.Hit
 		end
 
-		part[3] = LerpVector(0.25 * mul, part[3], vecZero)
+		-- Always pull velocity toward gravity, even on impact frames, so particles never lose their downward tendency.
+		local gravTarget = Vector(0, 0, -grav * 4)
+		part[3] = LerpVector(0.25 * mul, part[3], gravTarget)
 		if !(result.Hit) then
 			part[3]:Add(gravvec)
-		--else
-			--part[3]:Set(vecDown * mul * (math.max(0.1, grav)))
 		end
 	end
 end

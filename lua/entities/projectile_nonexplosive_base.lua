@@ -261,7 +261,8 @@ if SERVER then
 				-- Calculate outward direction from bone center to extraction point
 				if bonePos and tbl.OffsetPos then
 					local worldOffset = tbl.OffsetPos
-					local boneAng = ent:GetBoneAngle(ent:LookupBone(boneName))
+					local boneMat = ent:GetBoneMatrix(ent:LookupBone(boneName))
+					local boneAng = boneMat and boneMat:GetAngles()
 					if boneAng then
 						local worldOffsetRotated = worldOffset.x * boneAng:Right() + worldOffset.y * boneAng:Up() + worldOffset.z * boneAng:Forward()
 						if worldOffsetRotated:Length() > 0.01 then
