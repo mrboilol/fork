@@ -147,6 +147,7 @@ surface.CreateFont("ZCity_Veteran_Forsaken", {
 
 local mat1 = Material("vgui/gradient-u")
 local mat2 = Material("vgui/gradient-d")
+local memory_vignetteMat = Material("effects/shaders/zb_vignette")
 
 local ang1 = Angle()
 local ang2 = Angle()
@@ -304,7 +305,7 @@ hook.Add("radialOptions", "DislocatedJoint", function()
 					RunConsoleCommand("hg_fixdislocation", 1, 1)
 				end,
 				"Fix "..ent:GetPlayerName().."'s dislocation (leg)"
-			}
+			end
 			hg.radialOptions[#hg.radialOptions + 1] = tbl
 		end
     end
@@ -335,7 +336,7 @@ hook.Add("radialOptions", "DislocatedJoint2", function()
 					RunConsoleCommand("hg_fixdislocation", 2, 1)
 				end,
 				"Fix "..ent:GetPlayerName().."'s dislocation (arm)"
-			}
+			end
 			hg.radialOptions[#hg.radialOptions + 1] = tbl
 		end
     end
@@ -366,7 +367,7 @@ hook.Add("radialOptions", "DislocatedJaw", function()
 					RunConsoleCommand("hg_fixdislocation", 3, 1)
 				end,
 				"Fix "..ent:GetPlayerName().."'s dislocation (jaw)"
-			}
+			end
 			hg.radialOptions[#hg.radialOptions + 1] = tbl
 		end
     end
@@ -453,6 +454,17 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 			-- More severe effects with higher brain damage
 			if org.otrub or lerpedbrain > 0.2 then
 				DrawToyTown(4 + lerpedbrain * 4, ScrH())
+			end
+
+			-- Subtle vignette when memories show while awake and brain damaged
+			if not org.otrub then
+				local vignetteAlpha = math.Clamp(lerpedpart * (15 + lerpedbrain * 45), 0, 60)
+				render.UpdateScreenEffectTexture()
+				memory_vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+				memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 30)
+				memory_vignetteMat:SetFloat("$c1_y", vignetteAlpha / 30)
+				render.SetMaterial(memory_vignetteMat)
+				render.DrawScreenQuad()
 			end
 		else
 			if switch then
@@ -1286,4 +1298,4 @@ hook.Add("HG.InputMouseApply","zzzzzzzzzzzzbrain_death",function(tbl)
 	cmd:SetViewAngles(angle)
 
 	return true--]]
-end)
+end)```
