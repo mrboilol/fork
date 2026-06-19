@@ -10,7 +10,6 @@ function PLAYER:CreateRagdoll()
 end
 
 local hook_Run = hook.Run
-local hg_duckonstandup = ConVarExists("hg_duckonstandup") and GetConVar("hg_duckonstandup") or CreateConVar("hg_duckonstandup", "0", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Duck when standing up from fake ragdoll", 0, 1)
 hook.Add("OnEntityCreated", "bull_add", function(npc)
 	timer.Simple(0, function()
 		if IsValid(npc) then
@@ -797,13 +796,6 @@ function hg.FakeUp(ply, forced, instant)
 	ply.OldRagdoll = ragdoll
 	ply:SetNWEntity("FakeRagdollOld", ragdoll)
 	ply.FakeRagdoll = nil
-	
-	ply:ConCommand("+duck")
-	timer.Simple(0.5,function()
-		if IsValid(ply) then
-			ply:ConCommand("-duck")
-		end
-	end)
 
 	if IsValid(ragdoll) and ragdoll:IsOnFire() then
 		timer.Simple(0.1,function()
@@ -912,13 +904,6 @@ function hg.FakeUp(ply, forced, instant)
 
 	if IsValid(ragdoll) then ragdoll:SetNWEntity("ply", NULL) end
 	if ply.oldCanUseFlashlight and not ply:CanUseFlashlight() then ply:AllowFlashlight(true) end
-	local time = (ply.lastFake or 0) > 0 and 0.1 or 1.5
-	timer.Simple(time,function()
-		if IsValid(ply) and hg_duckonstandup:GetBool() then
-			ply:ConCommand("+duck")
-		end
-	end)
-
 	return true
 end
 

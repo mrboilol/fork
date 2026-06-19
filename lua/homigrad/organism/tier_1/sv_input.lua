@@ -9,6 +9,7 @@ hg.organism.input_list = hg.organism.input_list or {}
 local vecZero, angZero = Vector(), Angle()
 local hook_Run = hook.Run
 local input_list = hg.organism.input_list
+local bonetohitgroup, hitgrouptolimb
 local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	dmg = dmgInfo:GetDamage() / 25
 	local organ = box[6] and organs[box[6]][box[7]]
@@ -86,7 +87,7 @@ local RagdollForceBoneMul = {
 	[HITGROUP_HEAD] = 0.5
 }
 
-local bonetohitgroup = {
+bonetohitgroup = {
 	["ValveBiped.Bip01_Head1"] = HITGROUP_HEAD,
 	["ValveBiped.Bip01_L_UpperArm"] = HITGROUP_LEFTARM,
 	["ValveBiped.Bip01_L_Forearm"] = HITGROUP_LEFTARM,
@@ -107,7 +108,7 @@ local bonetohitgroup = {
 	["ValveBiped.Bip01_R_Foot"] = HITGROUP_RIGHTLEG
 }
 
-local hitgrouptolimb = {
+hitgrouptolimb = {
 	[HITGROUP_LEFTLEG] = "lleg",
 	[HITGROUP_RIGHTLEG] = "rleg",
 	[HITGROUP_LEFTARM] = "larm",

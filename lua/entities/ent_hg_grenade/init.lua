@@ -488,7 +488,7 @@ function ENT:Explode()
 		self.ShrapnelDone = false
 		self.ShrapnelCoroutine = coroutine.create(function()
 			for i = 1, sampleCount do
-				local shrapnelStart = SysTime()
+				local LastShrapnel = SysTime()
 
 					local dir = VectorRand(-1,1):GetNormalized()--vector_up
 					dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
@@ -530,7 +530,7 @@ function ENT:Explode()
 			self.ShrapnelDone = true
 		end)
 
-		coroutine.resume(co)
+		coroutine.resume(self.ShrapnelCoroutine)
 
 		local index = self:EntIndex()
 
@@ -539,7 +539,7 @@ function ENT:Explode()
 				timer.Remove("GrenadeCheck_" .. index)
 			end
 
-			coroutine.resume(co)
+			coroutine.resume(self.ShrapnelCoroutine)
 
 			if self.ShrapnelDone then
 				SafeRemoveEntity(self)
