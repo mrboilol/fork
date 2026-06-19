@@ -252,11 +252,11 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Brain damage tanks consciousness above 0.35
+	-- Brain damage tanks consciousness above 0.325
 
-	if (org.brain or 0) > 0.35 then
+	if (org.brain or 0) > 0.325 then
 
-		local brainSeverity = (org.brain - 0.35) / 0.65 -- 0 to 1 scaling
+		local brainSeverity = (org.brain - 0.325) / 0.675 -- 0 to 1 scaling
 
 		local consciousnessDrain = brainSeverity * timeValue * 0.3 -- Up to 0.3 per second at max brain damage
 
@@ -270,7 +270,7 @@ module[2] = function(owner, org, timeValue)
 
 		org.needotrub = true
 
-	elseif org.consciousness > 0.4 and (org.blood or 5000) > 3000 and (org.o2 and org.o2[1] or 30) > 15 and (org.shock or 0) < 50 and (org.brain or 0) < 0.35 and (org.tranquilizer or 0) <= 0 then
+	elseif org.consciousness > 0.4 and (org.blood or 5000) > 3000 and (org.o2 and org.o2[1] or 30) > 15 and (org.shock or 0) < 50 and (org.brain or 0) < 0.325 and (org.tranquilizer or 0) <= 0 then
 
 		org.needotrub = false
 

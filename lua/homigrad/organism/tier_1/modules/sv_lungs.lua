@@ -569,13 +569,13 @@ module[2] = function(owner, org, timeValue)
 			end
 		end
 
-		if org.brain > 0.35 and !org.heartstop then
+		if org.brain > 0.325 and !org.heartstop then
 			if math.random(60) == 1 then
 				org.lungsfunction = true
 			end
 		end
 
-		local brainCap = 0.35
+		local brainCap = 0.325
 		local brainSeverity = math.Clamp((org.brain - brainCap) / (1 - brainCap), 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)
 	end

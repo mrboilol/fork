@@ -487,6 +487,14 @@ function SWEP:Shoot(override)
 
 	local primary = self.Primary
 	if override then self.drawBullet = true end
+
+	if !override and self:GetJammed() then
+		self.LastPrimaryDryFire = CurTime()
+		self:PrimaryShootEmpty()
+		primary.Automatic = false
+
+		return false
+	end
 	
 	if !self.drawBullet or (self:Clip1() == 0 and !override) then
 		self.LastPrimaryDryFire = CurTime()
@@ -569,6 +577,10 @@ function SWEP:PrimaryShoot()
 	self.shot = self.shot or 0
 	self.shot = math.min(3, self.shot + (self.NumBullet or 1))
 	self.shot2 = math.min(1, self.shot2 + 1)
+
+	if SERVER then
+		self:TryJam()
+	end
 	
 	if not (CLIENT and self:GetOwner():IsNPC()) then
 		self:TakePrimaryAmmo(1)

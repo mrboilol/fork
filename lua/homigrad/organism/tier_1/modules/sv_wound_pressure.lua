@@ -59,7 +59,7 @@ end
 local function IsWeaponCompatible(ply)
 	return IsWeaponEntityCompatible(ply:GetActiveWeapon())
 end
-
+-- calc is short for calculator
 local function CalculateEfficiency(org, target)
 	local function getArmEff(armVal, amputated, dislocated, dislocation)
 		if amputated then return 0.0 end

@@ -374,14 +374,14 @@ function SWEP:SetDrum(drum)
 end
 
 local phrases = {
-	"Didn't fire...",
-	"Lucky me...",
-	"I thought that was it...",
-	"Still not dead...",
-	"I knew it wasn't there! I really did!..",
-	"FUCK- Thought it would fire...",
-	"HELL YEAH!",
-	"Luck is on my side!",
+	"JESUS FUCKING CHRIST",
+	"IM DEAD..!",
+	"STOP-",
+	"AAAAAGHH!",
+	"WHAT THE FUCK IS WRONG WITH YOU",
+	"STOP PULLING THE DAMN TRIGGER",
+	"JESUS CHRIST",
+	"FUCKING SHIT..!",
 }
 
 function SWEP:Shoot(override)

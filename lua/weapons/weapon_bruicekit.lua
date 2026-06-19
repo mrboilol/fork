@@ -122,8 +122,14 @@ if SERVER then
 		for _, data in ipairs(bones) do
 			local key = data.key
 			local v = tonumber(org[key] or 0) or 0
-			org[key] = math.max(v - data.heal, 0)
-			amountHealed = amountHealed + data.heal
+			local newVal = math.max(v - data.heal, 0)
+
+			if key == "skull" and v >= 0.6 then
+				newVal = 0.55
+			end
+
+			org[key] = newVal
+			amountHealed = amountHealed + (v - newVal)
 		end
 
 		self.modeValues[1] = math.max((self.modeValues[1] or 0) - totalCost, 0)

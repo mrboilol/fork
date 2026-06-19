@@ -710,7 +710,7 @@ if SERVER then
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
 		local amt = 281.25 * mul
 		if org.skull >= 0.6 and self.modeValues[1] >= amt then
-			org.skull = 0.59
+			org.skull = 0.55
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.bandagedskull = true
 			org.pain = math.max(org.pain - 14, 0)

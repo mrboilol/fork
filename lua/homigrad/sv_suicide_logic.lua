@@ -9,8 +9,15 @@ if SERVER then
         local wep = ply:GetActiveWeapon()
         local has_gun = IsValid(wep) and wep.ishgweapon and not wep.ismelee and not wep.ismelee2 and wep:Clip1() > 0
 
-        if not has_gun or ply:GetInfoNum("hg_cutscene", 1) == 0 then
+        if not has_gun then
             ply.suiciding = not ply.suiciding
+            return
+        end
+
+        if ply:GetInfoNum("hg_cutscene", 1) == 0 then
+            -- Cutscene disabled: toggle normal suicide mode immediately, no cutscene or forced firing
+            ply.suiciding = not ply.suiciding
+            ply.startsuicide = ply.suiciding and (CurTime() - 2) or nil
             return
         end
 

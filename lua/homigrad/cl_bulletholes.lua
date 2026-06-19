@@ -43,7 +43,7 @@ hook.Add("PostRender", "sadasdsad", function()
         
         local tr = {
             start = view.origin,
-            endpos = view.angles:Forward() * 8000,
+            endpos = view.origin + view.angles:Forward() * 8000,
             mins = -vecHull,
             maxs = vecHull,
             filter = {lply},

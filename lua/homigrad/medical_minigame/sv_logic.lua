@@ -67,7 +67,10 @@ local function CanUseMedicalMinigameTarget(ply, target)
     if not IsValid(ply) or not ply:Alive() then return false end
     if not IsValid(target) or not target:IsPlayer() or not target:Alive() then return false end
     if not target.organism then return false end
-    if target ~= ply and ply:GetPos():DistToSqr(target:GetPos()) > 10000 then return false end
+    if target ~= ply then
+        local targetChar = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(target)) or target
+        if ply:GetPos():DistToSqr(targetChar:GetPos()) > 10000 then return false end
+    end
     return true
 end
 
@@ -343,7 +346,7 @@ local function GetMedicalMinigameType(wep)
        class == "weapon_painkillers" or class == "weapon_adrenaline" or class == "weapon_thiamine" or
        class == "weapon_mannitol" or class == "weapon_naloxone" or class == "weapon_tranexamic_acid" or
        class == "weapon_betablock" or class == "weapon_autoresuscitator" or class == "weapon_horse_tranq" or
-       class == "weapon_fury13" or class == "weapon_fury16" or (class == "weapon_medkit_sh" and wep.mode == 3) then
+       class == "weapon_fury13" or class == "weapon_fury16" or (class == "weapon_medkit_sh" and (wep.mode == 2 or wep.mode == 3 or wep.mode == 5)) then
         return "syringe"
     end
 end
@@ -362,7 +365,7 @@ local function GetMinigameModeValueIndex(wep, minigameType)
 
     if minigameType == "syringe" then
         if wep:GetClass() == "weapon_medkit_sh" then
-            return 3
+            return wep.mode or 3
         end
 
         return 1
@@ -758,7 +761,10 @@ local function ResolveEyeTarget(ply)
     end
     if not IsValid(ent) then return nil end
     if not ent:IsPlayer() or not ent:Alive() or not ent.organism then return nil end
-    if ent ~= ply and ply:GetPos():DistToSqr(ent:GetPos()) > 10000 then return nil end
+    if ent ~= ply then
+        local entChar = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent)) or ent
+        if ply:GetPos():DistToSqr(entChar:GetPos()) > 10000 then return nil end
+    end
     return ent
 end
 

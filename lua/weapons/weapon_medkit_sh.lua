@@ -109,7 +109,6 @@ if SERVER then
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		if self.mode == 2 then
 			if self.modeValues[2] == 0 then return end
-			if ent ~= owner and not org.otrub then return end
 			//org.painkiller = math.min(org.painkiller + self.modeValues[2], 3)
 			//self.modeValues[2] = 0
 			org.analgesiaAdd = math.min(org.analgesiaAdd + self.modeValues[2] * 0.3, 4)

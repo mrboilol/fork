@@ -55,7 +55,7 @@ local function GetMinigameType(wep)
 
     if class == "weapon_medkit_sh" then
         if wep.mode == 1 then return "bandage" end
-        if wep.mode == 3 then return "syringe" end
+        if wep.mode == 2 or wep.mode == 3 or wep.mode == 5 then return "syringe" end
         if wep.mode == 4 then return "tourniquet" end
     end
 
@@ -66,7 +66,7 @@ local function GetModeValueIndex(wep, minigameType)
     if not IsValid(wep) then return 1 end
     if wep:GetClass() ~= "weapon_medkit_sh" then return 1 end
 
-    if minigameType == "syringe" then return 3 end
+    if minigameType == "syringe" then return wep.mode or 3 end
     if minigameType == "tourniquet" then return 4 end
     return 1
 end
@@ -82,7 +82,10 @@ local function ResolveSecondaryTarget(owner)
     end
 
     if not IsValid(ent) or not ent:IsPlayer() or not ent:Alive() or not ent.organism then return nil end
-    if ent ~= owner and owner:GetPos():DistToSqr(ent:GetPos()) > 10000 then return nil end
+    if ent ~= owner then
+        local entChar = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent)) or ent
+        if owner:GetPos():DistToSqr(entChar:GetPos()) > 10000 then return nil end
+    end
     return ent
 end
 

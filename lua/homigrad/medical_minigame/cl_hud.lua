@@ -750,7 +750,7 @@ function PANEL:GetRemainingBandage()
 
     if self.GameType == "syringe" then
         if wep:GetClass() == "weapon_medkit_sh" then
-            return tonumber(modeValues[3]) or 0
+            return tonumber(modeValues[wep.mode or 3]) or 0
         end
 
         return tonumber(modeValues[1]) or 0
@@ -779,7 +779,7 @@ function PANEL:GetSyringeAmounts()
     local wep = ply:GetActiveWeapon()
     if not IsValid(wep) then return 0, 1 end
 
-    local modeValueIndex = (wep:GetClass() == "weapon_medkit_sh") and 3 or 1
+    local modeValueIndex = (wep:GetClass() == "weapon_medkit_sh") and (wep.mode or 3) or 1
     local modeValues = wep.GetNetVar and wep:GetNetVar("modeValues", wep.modeValues or {}) or wep.modeValues or {}
     local currentAmount = math.max(tonumber(modeValues[modeValueIndex]) or 0, 0)
     local configuredValue = wep.modeValuesdef and wep.modeValuesdef[modeValueIndex]
