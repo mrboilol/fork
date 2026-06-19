@@ -438,6 +438,9 @@ if SERVER then
 		org.owner:SetNetVar("wounds",org.wounds)
 		timer.Create("bandage_limbs"..ent:EntIndex(),0.1,1,function()
 			ent:SetNetVar("bandaged_limbs",ent.bandaged_limbs)
+			if IsValid(ent.FakeRagdoll) then
+				ent.FakeRagdoll:SetNetVar("bandaged_limbs",ent.bandaged_limbs)
+			end
 			if ent:IsRagdoll() and hg.RagdollOwner(ent) and hg.RagdollOwner(ent):Alive() then
 				hg.RagdollOwner(ent):SetNetVar("bandaged_limbs",ent.bandaged_limbs)
 			end
@@ -858,11 +861,16 @@ else
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_tourniquets", function(ent,ply)
 	function hg.RenderTourniquets(ent, ply)
-		if !ply.tourniquets or !next(ply.tourniquets) then return end
-		for i, wound in ipairs(ply.tourniquets) do
-			ply.tourniquetsM = ply.tourniquetsM or {}
-			ply.tourniquetsM[i] = IsValid(ply.tourniquetsM[i]) and ply.tourniquetsM[i] or ClientsideModel("models/tourniquet/tourniquet_put.mdl")
-			local model = ply.tourniquetsM[i]
+		local tourniquets = ent.tourniquets
+		if not tourniquets or not next(tourniquets) then
+			tourniquets = ply.tourniquets
+			if not tourniquets or not next(tourniquets) then return end
+		end
+		local tourniquetsM = ent.tourniquetsM or {}
+		ent.tourniquetsM = tourniquetsM
+		for i, wound in ipairs(tourniquets) do
+			tourniquetsM[i] = IsValid(tourniquetsM[i]) and tourniquetsM[i] or ClientsideModel("models/tourniquet/tourniquet_put.mdl")
+			local model = tourniquetsM[i]
 			model:SetNoDraw(true)
 
 			if not IsValid(model) then return end

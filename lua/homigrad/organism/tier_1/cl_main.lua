@@ -87,13 +87,15 @@ local function plyCommand(ply,cmd)
 	local time = CurTime()
 	ply.cmdtimer = ply.cmdtimer or time
 
-	if cmd == "soundfade 100 99999" then
-		if IsValid(hg.chat) then
+	if cmd == "soundfade 100 0" then
+		if IsValid(hg.chat) and not timer.Exists("otrubhuy") then
 			hg.chat:SetRealAlpha(0)
 
 			timer.Create("otrubhuy", 1, 1, function()
-				if lply.organism and not lply.organism.otrub then lply:ConCommand("soundfade 0 1") end
-				hg.chat:AnimateRealAlpha(255)
+				if not (lply.organism and lply.organism.otrub) then
+					lply:ConCommand("soundfade 0 1")
+					if IsValid(hg.chat) then hg.chat:AnimateRealAlpha(255) end
+				end
 			end)
 		end
 	end
@@ -102,6 +104,16 @@ local function plyCommand(ply,cmd)
 		ply.cmdtimer = time + 0.1
 
 		ply:ConCommand(cmd)
+	end
+end
+
+local function forceOtrubSoundFade(ply)
+	local time = CurTime()
+	ply.cmdtimer = ply.cmdtimer or time
+
+	if ply.cmdtimer < time then
+		ply.cmdtimer = time + 0.1
+		ply:ConCommand("soundfade 100 0")
 	end
 end
 local clr_black1 = Color( 0, 0, 0, 255)
@@ -146,6 +158,20 @@ surface.CreateFont("ZCity_Veteran_Forsaken", {
 	weight = 700,
 	antialias = true
 })
+
+local function getNormalDSP()
+	local cvar = hg_gopro or (ConVarExists("hg_gopro") and GetConVar("hg_gopro"))
+	return cvar and cvar:GetBool() and 55 or 0
+end
+
+local function resetPlayerSound(ply)
+	if not IsValid(ply) then return end
+	ply:SetDSP(getNormalDSP(), true)
+	ply:ConCommand("soundfade 0 0")
+	if IsValid(hg.chat) then
+		hg.chat:AnimateRealAlpha(255)
+	end
+end
 
 local mat1 = Material("vgui/gradient-u")
 local mat2 = Material("vgui/gradient-d")
@@ -210,17 +236,17 @@ hook.Add("DrawOverlay", "hg.forsaken.deathscene", function()
 	draw.SimpleText(forsaken_text, "ZCity_Veteran_Forsaken", ScrW() * 0.5 + shakeX, ScrH() * 0.5 + shakeY, Color(255, 255, 255, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
-hook.Add("HG_OnOtrub", "adsadsadhuy!!", function(ply)	
+hook.Add("HG_OnOtrub", "adsadsadhuy!!", function(ply)
 	if ply == LocalPlayer() then
-		lply:SetDSP(17)
-		plyCommand(lply,"soundfade 100 99999")
+		lply:SetDSP(17, true)
+		plyCommand(lply,"soundfade 100 0")
 	end
 end)
 
-hook.Add("Player_Death", "adsadsadhuy!!", function(ply)	
+hook.Add("Player_Death", "adsadsadhuy!!", function(ply)
 	if ply == LocalPlayer() then
-		lply:SetDSP(17)
-		plyCommand(lply,"soundfade 100 99999")
+		lply:SetDSP(17, true)
+		plyCommand(lply,"soundfade 100 0")
 	end
 end)
 
@@ -229,7 +255,13 @@ hook.Add("Player Spawn", "hg.forsaken.deathscene.reset", function(ply)
 	forsaken_scene_start = 0
 	forsaken_scene_end = 0
 	forsaken_soundfade_release_until = 0
-		forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
+	forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
+	resetPlayerSound(ply)
+end)
+
+hook.Add("HG_OnWakeOtrub", "adsadsadhuy!!", function(ply)
+	if ply ~= LocalPlayer() then return end
+	resetPlayerSound(ply)
 end)
 
 
@@ -544,7 +576,8 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	
 	--maybe 56, 30?
 	local normaldsp = hg_gopro:GetBool() and 55 or 0
-	lply:SetDSP(normaldsp)
+	local target_dsp = normaldsp
+	local dsp_fast = false
 
 	if otrub or ((fakeTimer and fakeTimer - 2 > CurTime()) and GetConVar("hg_deathfadeout"):GetBool()) then
 		--if otrub or (fakeTimer and fakeTimer - 2 > CurTime()) then
@@ -553,21 +586,24 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		--lply:ScreenFade( SCREENFADE.IN, Color(0,0,0,255), 2, 0.5 )
 		
 		if isnumber(zb.ROUND_STATE) and (zb.ROUND_STATE ~= 1) then
-			lply:SetDSP(normaldsp)
+			target_dsp = normaldsp
 			plyCommand(lply,"soundfade "..tinnitusSoundFactor2.." 25")
 		elseif lply:Alive() then
-			lply:SetDSP(17)
-			plyCommand(lply,"soundfade 100 25")
+			target_dsp = 17
+			dsp_fast = true
+			forceOtrubSoundFade(lply)
 		end
 	else
 		plyCommand(lply,"soundfade "..tinnitusSoundFactor2.." 25")
 
 		if ((disorientation and disorientation > 3) or (brain and brain > 0.2) or lply.PlayerClassName == "headcrabzombie" or lply:GetNetVar("headcrab")) and lply:Alive() then
-			lply:SetDSP(130)
-		else
-			lply:SetDSP((lply.suiciding and lply:Alive()) and 130 or normaldsp)
+			target_dsp = 130
+		elseif lply.suiciding and lply:Alive() then
+			target_dsp = 130
 		end
 	end
+
+	lply:SetDSP(target_dsp, dsp_fast)
 
 	if not alive then
 		return false

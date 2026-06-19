@@ -31,17 +31,20 @@ hook.Add("RenderScreenspaceEffects", "hg_concussion_effects", function()
 	concussion_smooth = math.Approach(concussion_smooth, concussion, FrameTime() * 2)
 
 	-- Handle end of concussion or otrub
-	if (concussion <= 0 and concussion_smooth <= 0.01) or org.otrub then 
+	if (concussion <= 0 and concussion_smooth <= 0.01) or org.otrub then
 		concussion_smooth = 0
 		if ply.hg_concussion_dsp then
-			ply:SetDSP(0, false) -- Reset sound
+			-- Don't reset DSP when otrub; let the otrub underwater effect stay
+			if not org.otrub then
+				ply:SetDSP(0, false) -- Reset sound
+			end
 			ply.hg_concussion_dsp = nil
 		end
 		if concussion_sound then
 			concussion_sound:FadeOut(1)
 			concussion_sound = nil
 		end
-		return 
+		return
 	end
 	
 	-- Sound Logic (Shellshock)

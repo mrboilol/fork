@@ -648,6 +648,7 @@ function hg.ExplodeHead(ent)
 		end]]
 
 		Gib_Input(ent, ent:LookupBone("ValveBiped.Bip01_Head1"))
+		hook.Run("HG_HeadExploded", ent, ply)
 
 		-- Remove neck floppy constraints when head is amputated
 		if IsValid(ent) then
@@ -1416,7 +1417,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			end
 			
 			ply:ScreenFade(0, color_black, 1, 1)
-			ply:ConCommand("soundfade 100 99999")
+			ply:ConCommand("soundfade 100 0")
 		end
 	end
 
@@ -1764,7 +1765,7 @@ local function velocityDamage(ent, data)
 
 	-- Slam bonus: if a player launched this ragdoll and it hit the world (wall/curb/floor), deal extra damage
 	if data.HitObject:GetEntity():IsWorld() and IsValid(att) and att:IsPlayer() then
-		local slamMul = math.Clamp(speed / 600, 1.0, 2.5)
+		local slamMul = math.Clamp(speed / 500, 1.5, 4.0)
 		dmgInfo:ScaleDamage(slamMul)
 	end
 
@@ -1899,7 +1900,7 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 			end
 			
 			ply:ScreenFade(0, color_black, 1, 1)
-			ply:ConCommand("soundfade 100 99999")
+			ply:ConCommand("soundfade 100 0")
 		end
 	end
 

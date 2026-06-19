@@ -1,3 +1,4 @@
+-- ai coded despair im so fucking scared
 local min, max, Clamp = math.min, math.max, math.Clamp
 if hg and hg.despair_server_builtin then return end
 hg.despair_server_builtin = true
@@ -659,5 +660,110 @@ concommand.Add("hg_giveup", function(ply, cmd, args)
 		org._giveUpCheckTime = 0
 		org._giveUpHeartStopCheck = 0
 		ply:ChatPrint("[Debug] Give up ended.")
+	end
+end)
+
+local function hg_GetKiller(victim)
+	if not IsValid(victim) then return nil end
+
+	local maxHarm = 0
+	local killer = nil
+	if zb and zb.HarmDone then
+		for attacker, harm in pairs(zb.HarmDone[victim] or {}) do
+			if IsValid(attacker) and harm > maxHarm then
+				maxHarm = harm
+				killer = attacker
+			end
+		end
+	end
+
+	return killer
+end
+
+local function hg_IsTraitor(ply)
+	if not IsValid(ply) then return false end
+	if ply.isTraitor then return true end
+	if ply.PlayerClassName == "traitor" then return true end
+	return false
+end
+
+hook.Add("HG_HeadExploded", "hg_despair_head_explosion", function(rag, victim)
+	if not IsValid(rag) then return end
+
+	local pos = rag:WorldSpaceCenter()
+	local now = CurTime()
+	local killer = hg_GetKiller(victim)
+
+	for _, ply in ipairs(player.GetAll()) do
+		if not IsValid(ply) or not ply:Alive() then continue end
+		if ply == victim or ply == killer or hg_IsTraitor(ply) then continue end
+
+		local org = ply.organism
+		if not org or org.otrub then continue end
+		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then continue end
+		if (org._despairNextHeadExplosion or 0) > now then continue end
+
+		local eyePos = ply:EyePos()
+		local dist = eyePos:Distance(pos)
+		if dist > 900 then continue end
+
+		local tr = util.TraceLine({
+			start = eyePos,
+			endpos = pos,
+			filter = ply
+		})
+		if tr.Hit and tr.Entity ~= rag then continue end
+
+		local dir = (pos - eyePos):GetNormalized()
+		if ply:GetAimVector():Dot(dir) < 0.35 then continue end
+
+		local add = math.Clamp(1 - dist / 900, 0, 1) * 0.25
+		if add <= 0 then continue end
+
+		org.despair = math.min((org.despair or 0) + add, 1)
+		org._despairLastGainedTime = now
+		org._despairNextHeadExplosion = now + 0.5
+		-- Traumatic events stick around: lock despair decay for a good while
+		org._despairLockUntil = math.max(org._despairLockUntil or 0, now + 30)
+	end
+end)
+
+hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
+	if not IsValid(rag) then return end
+
+	local pos = rag:WorldSpaceCenter()
+	local now = CurTime()
+	local killer = hg_GetKiller(victim)
+
+	for _, ply in ipairs(player.GetAll()) do
+		if not IsValid(ply) or not ply:Alive() then continue end
+		if ply == victim or ply == killer or hg_IsTraitor(ply) then continue end
+
+		local org = ply.organism
+		if not org or org.otrub then continue end
+		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then continue end
+		if (org._despairNextDeathWitness or 0) > now then continue end
+
+		local eyePos = ply:EyePos()
+		local dist = eyePos:Distance(pos)
+		if dist > 900 then continue end
+
+		local tr = util.TraceLine({
+			start = eyePos,
+			endpos = pos,
+			filter = ply
+		})
+		if tr.Hit and tr.Entity ~= rag then continue end
+
+		local dir = (pos - eyePos):GetNormalized()
+		if ply:GetAimVector():Dot(dir) < 0.35 then continue end
+
+		local add = math.Clamp(1 - dist / 900, 0, 1) * 0.15
+		if add <= 0 then continue end
+
+		org.despair = math.min((org.despair or 0) + add, 1)
+		org._despairLastGainedTime = now
+		org._despairNextDeathWitness = now + 0.5
+		org._despairLockUntil = math.max(org._despairLockUntil or 0, now + 30)
 	end
 end)

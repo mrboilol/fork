@@ -18,7 +18,7 @@ if CLIENT then
 		CreateChat()
 	end)
 
-	hook.Add("PlayerStartVoice","RemoveVoicePanles",function()
+	hook.Add("PlayerStartVoice","RemoveVoicePanles",function(ply)
 		if !IsValid(ply) then return end
 
 		local other_alive = (ply:Alive() and LocalPlayer() != ply) or (ply.organism and (ply.organism.otrub or (ply.organism.brain and ply.organism.brain > 0.05)))
@@ -32,6 +32,10 @@ if CLIENT then
 		bind = bind:lower()
 
 		if (bind:find("messagemode") and pressed) then
+			if not IsValid(hg.chat) then
+				CreateChat()
+			end
+
 			if IsValid(hg.chat) then
 				hg.chat:SetActive(true)
 			end
