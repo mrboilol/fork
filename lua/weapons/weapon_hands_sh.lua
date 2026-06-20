@@ -208,48 +208,8 @@ function SWEP:GetArmDamageMultiplier()
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return 1.0 end
 
-	local org = owner.organism
-	if not org then return 1.0 end
-
-	local rarm = org.rarm or 0
-	local larm = org.larm or 0
-	local rarm_amputated = org.rarmamputated
-	local larm_amputated = org.larmamputated
-	local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
-	local larm_dislocated = org.larmdislocated or org.larmdislocation
-
-	-- Check for partial damage (0.25-0.99 range)
-	local rarm_partial = rarm >= 0.25 and rarm < 1 and not rarm_amputated
-	local larm_partial = larm >= 0.25 and larm < 1 and not larm_amputated
-
-	-- Calculate right arm effectiveness
-	local rarm_effectiveness = 1.0
-	if rarm_amputated then
-		rarm_effectiveness = 0.0
-	elseif rarm >= 1 then
-		rarm_effectiveness = 0.2
-	elseif rarm_dislocated then
-		rarm_effectiveness = 0.4
-	elseif rarm_partial then
-		local severity = (rarm - 0.25) / 0.75
-		rarm_effectiveness = 1.0 - severity * 0.5 -- 0.5 to 1.0
-	end
-
-	-- Calculate left arm effectiveness
-	local larm_effectiveness = 1.0
-	if larm_amputated then
-		larm_effectiveness = 0.0
-	elseif larm >= 1 then
-		larm_effectiveness = 0.2
-	elseif larm_dislocated then
-		larm_effectiveness = 0.4
-	elseif larm_partial then
-		local severity = (larm - 0.25) / 0.75
-		larm_effectiveness = 1.0 - severity * 0.5 -- 0.5 to 1.0
-	end
-
-	-- Use the better arm for item interaction
-	return math.max(rarm_effectiveness, larm_effectiveness)
+	-- Use the better arm for item interaction (heavy-lifting threshold)
+	return math.max(hg.GetArmEffectiveness(owner, "rarm"), hg.GetArmEffectiveness(owner, "larm"))
 end
 
 function SWEP:ClearSuperadminGrab()
@@ -1166,42 +1126,53 @@ function SWEP:SecondaryAttack()
 			isLeftBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
 			bothArmsBroken = isRightBroken and isLeftBroken
 
+			local rightEff = hg.GetArmEffectiveness(owner, "rarm")
+			local leftEff = hg.GetArmEffectiveness(owner, "larm")
 			local alreadyHolding = IsValid(owner:GetNetVar("carryent2"))
 			local hasRightArm = not org.rarmamputated
 			local hasLeftArm = not org.larmamputated
+
+			local rightUsable = hasRightArm and rightEff > 0
+			local leftUsable = hasLeftArm and leftEff > 0
+			local rightStrong = rightEff >= 0.5
+			local leftStrong = leftEff >= 0.5
 
 			if alreadyHolding then
 				-- Already passive-holding something, use left hand only for new grab
 				useBothHands = false
 				useRightHand = false
-				useLeftHand = hasLeftArm
-			elseif not hasRightArm then
-				-- Missing right arm, must use left
+				useLeftHand = leftUsable
+			elseif not rightUsable then
+				-- Right arm unusable, must use left
 				useBothHands = false
 				useRightHand = false
-				useLeftHand = hasLeftArm
-			elseif not hasLeftArm then
-				-- Missing left arm, must use right
-				useBothHands = false
-				useRightHand = hasRightArm
-				useLeftHand = false
-			elseif bothArmsBroken then
-				-- Both arms broken, default to right hand with pain
+				useLeftHand = leftUsable
+			elseif not leftUsable then
+				-- Left arm unusable, must use right
 				useBothHands = false
 				useRightHand = true
 				useLeftHand = false
-			elseif isRightBroken and not isLeftBroken then
-				-- Right broken, left healthy -- use healthy left hand
+			elseif not rightStrong and not leftStrong then
+				-- Both arms are too weak to work together, default to right hand
+				useBothHands = false
+				useRightHand = true
+				useLeftHand = false
+			elseif not rightStrong then
+				-- Right arm weak, use the stronger left hand
 				useBothHands = false
 				useRightHand = false
 				useLeftHand = true
-			elseif isLeftBroken and not isRightBroken then
-				-- Left broken, right healthy -- use healthy right hand
+			elseif not leftStrong then
+				-- Left arm weak, use the stronger right hand
 				useBothHands = false
 				useRightHand = true
 				useLeftHand = false
+			else
+				-- Both arms are strong, use both for best grip
+				useBothHands = true
+				useRightHand = true
+				useLeftHand = true
 			end
-			-- If both healthy and not already holding, use both hands (default)
 		else
 			-- No organism, default to both hands
 			useBothHands = true
@@ -1297,6 +1268,8 @@ function SWEP:SecondaryAttack()
 					self.IsRightBroken = isRightBroken
 					self.IsLeftBroken = isLeftBroken
 					self.BothArmsBroken = bothArmsBroken
+					self.RightArmEff = rightEff
+					self.LeftArmEff = leftEff
 				end
 			--end
 		elseif IsValid(tr.Entity) and tr.Entity:IsPlayer() then
@@ -1445,23 +1418,24 @@ function SWEP:ApplyForce()
 			mul = mul * ply.organism.armstrength
 		end
 
-		-- Apply strength multiplier based on which hands are being used
+		-- Apply strength multiplier based on which hands are being used and their effectiveness
+		local rightEff = self.RightArmEff or hg.GetArmEffectiveness(ply, "rarm")
+		local leftEff = self.LeftArmEff or hg.GetArmEffectiveness(ply, "larm")
+		rightEff = math.max(rightEff, 0.01)
+		leftEff = math.max(leftEff, 0.01)
+
 		if self.UsingBothHands then
-			mul = mul * 1.5 -- Both hands are significantly stronger
+			mul = mul * 1.5 * ((rightEff + leftEff) / 2)
 		elseif self.UsingRightHand and not self.UsingLeftHand then
-			if self.BothArmsBroken then
-				-- Both arms broken, using right hand - much weaker
-				mul = mul * 0.6
-			else
-				mul = mul * 1.25 -- Right hand is stronger when sole hand
-			end
+			mul = mul * 1.25 * rightEff
 		elseif self.UsingLeftHand and not self.UsingRightHand then
-			if self.IsLeftBroken then
-				-- Broken left arm being used (passive hold or missing right arm) - very weak
-				mul = mul * 0.5
-			else
-				mul = mul * 0.85 -- Healthy left hand is weaker than right, but not by much
-			end
+			mul = mul * 0.85 * leftEff
+		end
+
+		-- Apply leg tourniquet penalty to dragging effectiveness
+		if hg.HasTourniquetOnLimb then
+			if hg.HasTourniquetOnLimb(ply, "lleg") then mul = mul * 0.85 end
+			if hg.HasTourniquetOnLimb(ply, "rleg") then mul = mul * 0.85 end
 		end
 
 		-- Add continuous pain when holding with damaged hands

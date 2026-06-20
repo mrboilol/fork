@@ -134,6 +134,38 @@ if SERVER then
 
 		self.modeValues[1] = math.max((self.modeValues[1] or 0) - totalCost, 0)
 
+		-- Add a green bandage on the healed joint/chest so the treatment is visible
+		if amountHealed > 0 then
+			local bruisemap = {
+				larm = "ValveBiped.Bip01_L_Forearm",
+				rarm = "ValveBiped.Bip01_R_Forearm",
+				lleg = "ValveBiped.Bip01_L_Calf",
+				rleg = "ValveBiped.Bip01_R_Calf",
+				chest = "ValveBiped.Bip01_Spine2",
+				pelvis = "ValveBiped.Bip01_Spine2",
+				spine1 = "ValveBiped.Bip01_Spine2",
+				spine2 = "ValveBiped.Bip01_Spine2",
+				spine3 = "ValveBiped.Bip01_Spine2",
+			}
+			local spearmint = Color(0, 255, 150)
+
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			for _, data in ipairs(bones) do
+				local boneName = bruisemap[data.key]
+				if boneName and not ent.bandaged_limbs[boneName] then
+					ent.bandaged_limbs[boneName] = { pos = vector_origin, ang = angle_zero, color = spearmint }
+				end
+			end
+
+			ent:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
+			if IsValid(ent.FakeRagdoll) then
+				ent.FakeRagdoll:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
+			end
+			if ent:IsRagdoll() and hg.RagdollOwner(ent) and hg.RagdollOwner(ent):Alive() then
+				hg.RagdollOwner(ent):SetNetVar("bandaged_limbs", ent.bandaged_limbs)
+			end
+		end
+
 		-- gain slight analgesia per total use (0.2-0.4 depending how much one healed)
 		local analgesiaAdd = math.Clamp(amountHealed * 0.4, 0.2, 0.4)
 		org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + analgesiaAdd, 4)

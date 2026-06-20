@@ -97,6 +97,31 @@ end
 
 SWEP.CanSuicide = true
 
+function SWEP:GetFearAdrenalineFactors()
+	local owner = self:GetOwner()
+	local org = IsValid(owner) and owner.organism or nil
+	local fear = math.Clamp(org and org.fear or 0, 0, 2)
+	local adrenaline = math.Clamp(org and org.adrenaline or 0, 0, 2)
+	local jitter = math.max(0, adrenaline - 1.25)
+	local stabilizer = math.min(adrenaline, 1.25) * 0.05
+	return fear, adrenaline, jitter, stabilizer
+end
+
+function SWEP:GetFearRecoilMul()
+	local fear, _, jitter, stabilizer = self:GetFearAdrenalineFactors()
+	return 1 + fear * 0.15 + jitter * 0.1 - stabilizer
+end
+
+function SWEP:GetFearSpreadMul()
+	local fear, _, jitter, stabilizer = self:GetFearAdrenalineFactors()
+	return 1 + fear * 0.3 + jitter * 0.2 - stabilizer
+end
+
+function SWEP:GetFearHandlingMul()
+	local fear, _, jitter, stabilizer = self:GetFearAdrenalineFactors()
+	return 1 + fear * 0.15 + jitter * 0.1 - stabilizer
+end
+
 game.AddParticles("particles/tfa_smoke.pcf")
 PrecacheParticleSystem("smoke_trail_tfa")
 PrecacheParticleSystem("smoke_trail_wild")

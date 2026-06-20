@@ -131,6 +131,17 @@ local function IsLocalPlayerUnconscious()
     return IsValid(lp) and lp.organism and lp.organism.otrub
 end
 
+local function GetBandageStressFactors()
+    local lp = LocalPlayer()
+    if not IsValid(lp) or not lp.organism then return 0, 0, 0, 0 end
+    local org = lp.organism
+    local fear = math.Clamp(org.fear or 0, 0, 2)
+    local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
+    local jitter = math.max(0, adrenaline - 1.25)
+    local stabilizer = math.min(adrenaline, 1.25) * 0.05
+    return fear, adrenaline, jitter, stabilizer
+end
+
 for i = 1, 3 do
     syringePlungerFrames[i] = LoadHudMaterial("homigrad/syringe/s1_" .. i .. ".png", "homigrad/syringe/s1_" .. i)
 end
@@ -454,11 +465,17 @@ function PANEL:Init()
     self.CenterX = ScrW() / 2
     self.CenterY = ScrH() / 2
     self.Radius = 150
-    self.MaxBandageDistance = 345
-    self.BandageFollowSpeed = 2.2
-    self.WrapSpeedMultiplier = 0.6
+    self.MaxBandageDistance = 365
+    self.BandageFollowSpeed = 1.9
+    self.WrapSpeedMultiplier = 0.55
     self.VisualWrapThicknessStep = 1.5
-    
+
+    -- Fear/adrenaline bandage state
+    self.BandageNextStutter = 0
+    self.BandageStutterEnd = 0
+    self.BandageStutterAngle = 0
+    self.BandageStressFactor = 0
+
     self.LastProgressSent = 0
     self.FluidVisualProgress = 0
     
@@ -891,7 +908,7 @@ function PANEL:ThinkTourniquet(mx, my)
                 if quarterTurns > (self.TourniquetTurnCount or 0) then
                     self.TourniquetTurnCount = quarterTurns
                     -- Send pain to server - increases with each turn
-                    local painAmount = (1 + (quarterTurns * 0.5)) * 0.1 -- Base 1 pain, +0.5 per quarter-turn, multiplied by 0.1
+                    local painAmount = (1 + (quarterTurns * 0.5)) * 0.3 -- Base 1 pain, +0.5 per quarter-turn, multiplied by 0.3
                     net.Start("hg_medical_minigame_tourniquet_pain")
                     net.WriteFloat(painAmount)
                     net.SendToServer()
@@ -1188,6 +1205,29 @@ end
 
 function PANEL:Think()
     local mx, my = self:CursorPos()
+
+    local fear, adrenaline, jitter, stabilizer = GetBandageStressFactors()
+    local stress = fear + jitter * 1.5
+    self.BandageStressFactor = stress
+
+    -- Faster rotation when afraid or high on adrenaline, but easier baseline
+    local speedBoost = 1 + stress * 0.35 - stabilizer * 0.5
+    local selfBandageFollowSpeed = self.BandageFollowSpeed or 1.9
+    local selfWrapSpeedMultiplier = self.WrapSpeedMultiplier or 0.55
+    local followSpeed = selfBandageFollowSpeed * speedBoost
+    local wrapSpeed = selfWrapSpeedMultiplier * speedBoost
+
+    -- Stutter timing: more frequent and longer as stress increases
+    local now = CurTime()
+    if now >= self.BandageNextStutter and stress > 0.1 then
+        local stutterFreq = math.max(0.2, 1.5 - stress * 0.5)
+        local stutterDuration = math.min(0.15 + stress * 0.15, 0.5)
+        self.BandageNextStutter = now + stutterFreq + math.random() * stutterFreq
+        self.BandageStutterEnd = now + stutterDuration
+        self.BandageStutterAngle = math.random() * 2 * math.pi
+    end
+    local isStuttering = now < self.BandageStutterEnd
+
     if self.GameType == "bandage" then
         local currentBandageRad = math.rad(self.CurrentAngleObj.y)
         local bandageX = self.CenterX + math.cos(currentBandageRad) * self.Radius
@@ -1212,7 +1252,11 @@ function PANEL:Think()
 
     -- Decay rotation completion effects
     self.RotationFlashAlpha = math.max(self.RotationFlashAlpha - FrameTime() * 300, 0)
-    self.RotationShakeIntensity = math.max(self.RotationShakeIntensity - FrameTime() * 10, 0)
+    if isStuttering then
+        self.RotationShakeIntensity = math.min(self.RotationShakeIntensity + FrameTime() * 80, 8 + self.BandageStressFactor * 4)
+    else
+        self.RotationShakeIntensity = math.max(self.RotationShakeIntensity - FrameTime() * 10, 0)
+    end
     
     -- Apply shake offset
     if self.RotationShakeIntensity > 0.1 then
@@ -1244,16 +1288,22 @@ function PANEL:Think()
                 self.TargetAngleObj.y = ang
             end
 
-            local bandageLerpSpeed = FrameTime() * self.BandageFollowSpeed
+            -- Apply stutter: briefly jitter the target angle so the bandage seems to jam
+            if isStuttering then
+                local stutterMag = math.min(30 + self.BandageStressFactor * 25, 90)
+                self.TargetAngleObj.y = self.TargetAngleObj.y + math.sin(now * 20 + self.BandageStutterAngle) * stutterMag * FrameTime() * 5
+            end
+
+            local bandageLerpSpeed = FrameTime() * followSpeed
             self.CurrentAngleObj = LerpAngle(bandageLerpSpeed, self.CurrentAngleObj, self.TargetAngleObj)
-            
+
             local currentRad = math.rad(self.CurrentAngleObj.y)
-            
+
             if self.LastAngle then
                 local diff = NormalizeAngleDiff(currentRad - self.LastAngle)
 
                 -- Only count wrapping progress when rotating to the left.
-                local leftDiff = math.max(-diff, 0) * self.WrapSpeedMultiplier
+                local leftDiff = math.max(-diff, 0) * wrapSpeed
 
                 self.AccumulatedAngle = self.AccumulatedAngle + leftDiff
                 self.WrapAngle = self.WrapAngle + leftDiff

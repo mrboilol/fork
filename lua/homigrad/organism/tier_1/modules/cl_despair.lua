@@ -147,7 +147,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	-- Simple mode: despair and panic visuals/sounds are fully disabled
-	if despair_system_mode() == 1 then
+	if despair_system_mode() == 0 then
 		despair = 0
 		panicAttack = false
 		despairLerp = 0
@@ -220,17 +220,17 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(channel, err)
 				despairSoundLoading = false
 				if err or not IsValid(channel) then return end
-				channel:SetVolume(1.0 * musicVolume:GetFloat())
+				channel:SetVolume(1.5 * musicVolume:GetFloat())
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 1.0 * musicVolume:GetFloat()
+				despairSoundVol = 1.5 * musicVolume:GetFloat()
 			end)
 		end
 
-		-- Despair theme stays at full file volume as a background layer;
+		-- Despair theme stays loud and clear as a background layer;
 		-- it does not duck or override other sounds (panic, ambience, etc.)
-		local targetVol = (despair > 0.5 and 1.0 or math.Remap(despair, 0.25, 1, 0.7, 1.0)) * musicVolume:GetFloat()
+		local targetVol = 1.5 * musicVolume:GetFloat()
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
@@ -243,9 +243,9 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	if panicAttack and not givingUp then
 		if not IsValid(panicSound) and not panicSoundLoading then
 			panicSoundLoading = true
-			sound.PlayFile("sound/panic.mp3", "noblock noplay", function(channel)
+			sound.PlayFile("sound/panic.mp3", "noblock noplay", function(channel, err)
 				panicSoundLoading = false
-				if not IsValid(channel) then return end
+				if err or not IsValid(channel) then return end
 				channel:SetVolume(0)
 				channel:Play()
 				channel:EnableLooping(true)
@@ -253,7 +253,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = 1.0 * musicVolume:GetFloat()
+		local targetVol = 1.5 * musicVolume:GetFloat()
 		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 2)
 		if IsValid(panicSound) then
 			panicSound:SetVolume(panicSoundVol)

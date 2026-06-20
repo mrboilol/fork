@@ -612,8 +612,9 @@ if SERVER then
 					end
 					ent.bandaged_limbs = ent.bandaged_limbs or {}
 					local bone_name = org.wounds[1][4]
+					local wound = org.wounds[1]
 					if not ent.bandaged_limbs[bone_name] then
-						ent.bandaged_limbs[bone_name] = true
+						ent.bandaged_limbs[bone_name] = { pos = wound[2] or vector_origin, ang = wound[3] or angle_zero }
 						done = true
 					end
 					if org.wounds[1][1] == 0 then table.remove(org.wounds, 1) end
@@ -647,9 +648,10 @@ if SERVER then
 
 						ent.bandaged_limbs = ent.bandaged_limbs or {}
 						local bone_name = ent:GetBoneName(ent:LookupBone(org.wounds[bonewounds[1]][4]))
+						local wound = org.wounds[bonewounds[1]]
 						
 						if not ent.bandaged_limbs[bone_name] then
-							ent.bandaged_limbs[bone_name] = true
+							ent.bandaged_limbs[bone_name] = { pos = wound[2] or vector_origin, ang = wound[3] or angle_zero }
 							done = true
 						end
 
@@ -1186,8 +1188,15 @@ else
 	function remove_bandages(ent)
 		if IsValid(ent.bandagesModel) then
 			ent.bandagesModel:Remove()
+			ent.bandagesModel = nil
 		end
-		ent.bandagesModel = nil
+		if not ent.bandagesModels then return end
+		for _, model in pairs(ent.bandagesModels) do
+			if IsValid(model) then
+				model:Remove()
+			end
+		end
+		ent.bandagesModels = nil
 	end
 
 	hook.Add("OnNetVarSet","bandage_netvar",function(index, key, var)
@@ -1245,48 +1254,56 @@ else
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_bandages", function(ent,ply)
 	function hg.RenderBandages(ent, ply)
-		--PrintTable(ent.bandaged_limbs)
 		if not ent.bandaged_limbs then return end
-		if !next(ent.bandaged_limbs) then return end
-		if not IsValid( ent.bandagesModel ) then
-			ent.bandagesModel = (ThatPlyIsFemale(ent) and ClientsideModel(BadagesModelFemale) or ClientsideModel(BadagesModelMale))
-			local model = ent.bandagesModel
-			ent:CallOnRemove("removebandages",function()
-				if IsValid(model) then
-					model:Remove()
-					model = nil
-				end
-			end)
-		end
-		
-		local model = ent.bandagesModel
-		model:SetNoDraw(true)
-		model:SetPos(ent:GetPos() + vector_up * 1)
-		model:SetParent(ent)
-		model:AddEffects(EF_BONEMERGE)
-		local dontmakehands = false
-		if !hg.Appearance.FuckYouModels[1][ent:GetModel()] and !hg.Appearance.FuckYouModels[2][ent:GetModel()] then dontmakehands = true end
-		
-		if not model.BodygroupsApplied then 
-			for k, v in pairs(ent.bandaged_limbs) do
-				if dontmakehands and (k == "ValveBiped.Bip01_L_Hand" or k == "ValveBiped.Bip01_R_Hand") then continue end -- ez
-				model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[k] or BodyGroupsMale[k] or ""), 1)
-			end
+		if not next(ent.bandaged_limbs) then return end
 
-			for k, v in pairs(hg.amputatedlimbs2) do
-				local children = hg.get_children(ent, k)
-				table.insert(children, k)
-				
-				for k2, v2 in ipairs(children) do
-					if ent.bandaged_limbs[v2] and ent.organism and ent.organism[hg.amputatedlimbs2[v2].."amputated"] then
-						model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[v2] or BodyGroupsMale[v2] or ""), 0)
+		ent.bandagesModels = ent.bandagesModels or {}
+		local models = ent.bandagesModels
+		local idx = 1
+
+		for bone, info in pairs(ent.bandaged_limbs) do
+			if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
+
+			local model = models[idx]
+			if not IsValid(model) then
+				model = ClientsideModel("models/bandages.mdl")
+				models[idx] = model
+			end
+			model:SetNoDraw(true)
+
+			local boneid = ent:LookupBone(bone)
+			if boneid then
+				local matrix = ent:GetBoneMatrix(boneid)
+				if matrix then
+					local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
+					local offset = (isvector(info) and info) or (info and info.pos) or vector_origin
+					local offsetAng = (isangle(info) and info) or (info and info.ang) or angle_zero
+					local pos, ang = LocalToWorld(offset, offsetAng, bonePos, boneAng)
+					model:SetRenderOrigin(pos)
+					model:SetRenderAngles(ang)
+					model:SetModelScale(0.2)
+					model:SetupBones()
+
+					local col = info and info.color
+					if IsColor(col) or (istable(col) and col.r and col.g and col.b) then
+						render.SetColorModulation((col.r or 255) / 255, (col.g or 255) / 255, (col.b or 255) / 255)
 					end
+
+					model:DrawModel()
+
+					render.SetColorModulation(1, 1, 1)
 				end
 			end
 
-			model.BodygroupsApplied = true
+			idx = idx + 1
 		end
-		model:DrawModel()
+
+		for i = idx, #models do
+			if IsValid(models[i]) then
+				models[i]:Remove()
+			end
+			models[i] = nil
+		end
 	end
 	--end)
 end

@@ -2,6 +2,18 @@
 local CurTime = CurTime
 util.AddNetworkString("hgwep reload")
 
+local function GetFearReloadFactors(ply)
+	local org = IsValid(ply) and ply.organism or nil
+	local fear = math.Clamp(org and org.fear or 0, 0, 2)
+	local adrenaline = math.Clamp(org and org.adrenaline or 0, 0, 2)
+	local jitter = math.max(0, adrenaline - 1.25)
+	local stabilizer = math.min(adrenaline, 1.25) * 0.05
+	local speedFactor = (1 + fear * 0.15 + jitter * 0.05) / (1 + stabilizer)
+	local dropFactor = 1 + fear * 0.2 + jitter * 0.1
+	local fumbleChance = math.min((fear + jitter) * 0.03, 0.25)
+	return speedFactor, dropFactor, fumbleChance
+end
+
 SWEP.ArmReloadPenalty = {
     PainOnReload = 35, -- pain when reloading with broken left arm (increased from 12)
     MissingRightArmSpeedMul = 0.4, -- 60% slower when right arm is missing
@@ -106,9 +118,8 @@ function SWEP:Reload(time)
 	local armPain, armSpeedMul = self:GetReloadArmPenalty()
 
 	self.StaminaReloadMul = (org and ((2 - (self:GetOwner().organism.stamina[1] / 180)) + ((org.pain / 40) + (org.larm / 3) + (org.rarm / 5)) - (1 - math.Clamp(org.recoilmul or 1,0.45,1.4))) or 1)
-    if org and org.fear and org.fear > 0 then
-        self.StaminaReloadMul = self.StaminaReloadMul * (1 + org.fear * 0.05) -- 5% longer reload per fear point
-    end
+	local fearSpeedFactor = GetFearReloadFactors(self:GetOwner())
+	self.StaminaReloadMul = self.StaminaReloadMul * fearSpeedFactor
 	self.StaminaReloadMul = math.Clamp(self.StaminaReloadMul,0.65,1.5)
 
 	-- Apply arm speed penalty
@@ -219,6 +230,11 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 		dropChanceMult = isRight and 1.0 or 1.5 -- Right arm broken is normal drop chance, Left arm broken is 1.5x drop chance
 	end
 
+	-- Fear and adrenaline make floor reloads clumsier
+	local fearSpeedFactor, fearDropFactor, fumbleChance = GetFearReloadFactors(ply)
+	speedMult = speedMult * fearSpeedFactor
+	dropChanceMult = dropChanceMult * fearDropFactor
+
 	if clip >= maxclip then return end
 
 	if limbs and clip < maxclip or (ammocount > 0 or (isshotgun and clip > 0 and not ent.drawBullet)) then
@@ -237,7 +253,12 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 				if not SafeCheck(ply, ent, dist) then FailSafe(ply) return end
 
 				if isnumber(i) then
-					timer.Simple(i * mRand(3.2, 3.6) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1) * speedMult, function()
+					local fumbleDelay = 0
+					if math.random() < fumbleChance then
+						fumbleDelay = mRand(0.15, 0.45)
+						ply:ViewPunch(AngleRand(-1, 1))
+					end
+					timer.Simple(i * mRand(3.2, 3.6) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1) * speedMult + fumbleDelay, function()
 						if not SafeCheck(ply, ent, dist) then FailSafe(ply) return end
 
 						-- Adjusted drop chance based on right arm health
@@ -270,7 +291,12 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 			end
 		end
 
-		timer.Create("FloorReload_"..ply:SteamID64(), (ent.ReloadTime + mRand(0.8, 1.8) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1) * speedMult) or 5, 1, function()
+		local mainFumbleDelay = 0
+		if math.random() < fumbleChance then
+			mainFumbleDelay = mRand(0.2, 0.6)
+			ply:ViewPunch(AngleRand(-1.5, 1.5))
+		end
+		timer.Create("FloorReload_"..ply:SteamID64(), (ent.ReloadTime + mRand(0.8, 1.8) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1) * speedMult + mainFumbleDelay) or 5, 1, function()
 			if not SafeCheck(ply, ent, dist) then FailSafe(ply) return end
 
 			ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".wav", 55)

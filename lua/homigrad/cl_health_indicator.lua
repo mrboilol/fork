@@ -883,30 +883,45 @@ function HUD_DrawDynamicIndicator()
 
     -- Draw bleeding icons as 2D overlays so they always render on top of model bones
     if #bleedScreen2D > 0 then
-        local iconSize = ScreenScaleFixed(36)
+        local iconSize = ScreenScaleFixed(54)
         for _, data in ipairs(bleedScreen2D) do
             local severity = data.severity
             local isArterial = data.isArterial
             local r, g, b, mat
             
-            if severity >= 1.5 or isArterial then
-                -- Show bigbleeding.png for severe bleeding (~200ml/min+) or arterial wounds
-                mat = bigBleedIconMat
-                -- Dark yellow to dark red based on severity
-                -- Dark Yellow (180, 160, 0) -> Dark Red (120, 0, 0)
-                local progress = math.Clamp((severity - 1.5) / 2.0, 0, 1)
-                r = math.floor(180 - 60 * progress)
-                g = math.floor(160 * (1 - progress))
-                b = 0
+            if severity >= 4.25 or isArterial then
+               -- the severity is bullshite
+                -- Dark yellow -> dark orange -> dark red based on severity
+                -- 4.25 = dark yellow (180, 160, 0), 7.125 = dark orange (180, 80, 0), 10.0+ = dark red (120, 0, 0)
+                local progress = math.Clamp((severity - 4.25) / 5.75, 0, 1)
+                if progress <= 0.5 then
+                    local p = progress / 0.5
+                    r = 180
+                    g = math.floor(160 - 80 * p)
+                    b = 0
+                else
+                    local p = (progress - 0.5) / 0.5
+                    r = math.floor(180 - 60 * p)
+                    g = math.floor(80 - 80 * p)
+                    b = 0
+                end
             else
                 -- Show bleeding.png for normal bleeding wounds
                 mat = bleedIconMat
-                -- White to red based on severity
-                -- White (255, 255, 255) -> Red (255, 0, 0)
-                local progress = math.Clamp(severity / 0.8, 0, 1)
-                r = 255
-                g = math.floor(255 * (1 - progress))
-                b = math.floor(255 * (1 - progress))
+                -- 0.01 to 4.25: white -> yellow -> really red
+                -- 0.01 = white (255, 255, 255), 2.13 = yellow (255, 255, 0), 4.25 = red (255, 0, 0)
+                local progress = math.Clamp((severity - 0.01) / 4.24, 0, 1)
+                if progress <= 0.5 then
+                    local p = progress / 0.5
+                    r = 255
+                    g = 255
+                    b = math.floor(255 * (1 - p))
+                else
+                    local p = (progress - 0.5) / 0.5
+                    r = 255
+                    g = math.floor(255 * (1 - p))
+                    b = 0
+                end
             end
 
             local pulse = (math.sin(time * 5 + #data.key) + 1) / 2

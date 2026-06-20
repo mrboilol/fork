@@ -336,9 +336,11 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
 
 
 
+    local hasTourniquet = hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(ragdoll, limb)
+
     -- Start impairing at 0.25 damage
 
-    if damage < 0.25 and not isDislocated then
+    if damage < 0.25 and not isDislocated and not hasTourniquet then
 
         return false, 1.0
 
@@ -365,6 +367,14 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
     if isDislocated then
 
         controlMultiplier = controlMultiplier - 0.25
+
+    end
+
+    -- Tourniquet reduces control by 15%
+
+    if hasTourniquet then
+
+        controlMultiplier = controlMultiplier - 0.15
 
     end
 

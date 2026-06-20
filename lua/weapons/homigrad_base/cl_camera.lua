@@ -187,6 +187,12 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local org = ply.organism or {}
 	local inpain = org.pain and org.pain > 50
 	local painmul = 0.5 - math.Clamp((((org.pain or 0) - 50) / 50), 0, 0.5)
+
+	local fear = math.Clamp(org.fear or 0, 0, 2)
+	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
+	local adrenalineJitter = math.max(0, adrenaline - 1.25)
+	local adrenalineStabilizer = math.min(adrenaline, 1.25) * 0.05
+	local stressFactor = fear + adrenalineJitter * 1.5
 	
 	painmul = painmul * 2
 	--local noZoomHelmet = (ply.armors and (not ply.armors["head"] or not hg.armor.head[ply.armors["head"]] or not hg.armor.head[ply.armors["head"]].cantsight or self:IsPistolHoldType()))
@@ -315,6 +321,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if tta_multiplier > 1 and not bypass_mitigation then
 		tta_multiplier = 1 + (tta_multiplier - 1) * mitigation_mult
 	end
+	tta_multiplier = tta_multiplier * (1 + fear * 0.15 + adrenalineJitter * 0.1) / (1 + adrenalineStabilizer)
 	tta = tta * tta_multiplier
 
 	-- Aiming fatigue slows down sight realignment
@@ -338,6 +345,15 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		-- Smooth sine wave sway instead of random jitter
 		local time = CurTime()
 		local fearMult = (ply.organism and math.Clamp(ply.organism.fear or 0, 0, 2) or 0) + 1
+		local swayStressFactor = fear + adrenalineJitter * 1.5
+		local swayStabilizer = adrenalineStabilizer
+		fearMult = fearMult * (1 + swayStressFactor * 0.2) / (1 + swayStabilizer * 2)
+		-- Add jittery high-frequency sway when fear or high adrenaline is present
+		local jitterSway = Vector(
+			math.sin(time * 12) * 0.1 + math.sin(time * 23) * 0.05,
+			math.cos(time * 14) * 0.1 + math.cos(time * 19) * 0.05,
+			math.sin(time * 17) * 0.08 + math.cos(time * 29) * 0.04
+		) * swayStressFactor
 		local healthyArmMult = (not rarm_bad and not larm_bad and not rarm_partial and not larm_partial) and 0.8 or 1
 		local swayX = math.sin(time * 1.5) * 0.65 + math.sin(time * 2.7) * 0.35
 		local swayY = math.cos(time * 1.8) * 0.65 + math.cos(time * 3.1) * 0.35
@@ -381,7 +397,8 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 		local sway_scale = 1 + final_arm_sway + final_fatigue_sway + final_brain_sway
 
-		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * Vector(swayX, swayY, swayZ) * sway_scale
+		local jitterMult = (stressFactor > 0.1) and (1 + stressFactor * 0.5) or 1
+		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale + jitterSway * jitterMult)
 	end
 
 	randomPosL = LerpFT(0.05 * (inpain and 12.5 - (12 * painmul) or 1), randomPosL, randomPos)
@@ -447,7 +464,8 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 
 	local fatigue_shake = (organism.aiming_fatigue or 0) * 0.015
-	local total_shake_debuff = arm_shake_penalty + fatigue_shake
+	local fear_shake = stressFactor * 0.04
+	local total_shake_debuff = arm_shake_penalty + fatigue_shake + fear_shake
 
 	-- Mitigation calculation for overall control (shake)
 	local plyVel = ply:GetVelocity()
@@ -493,7 +511,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		ViewPunch2(addview)
 	end
 
-	local k4 = ((organism.adrenaline or 0) * 0.01)
+	local k4 = stressFactor * 0.02
 	local angRand = AngleRand(-k4 * 2, k4 * 2) * 0.2
 	lerpedAdren:Add(angRand)
 	lerpedAdren = LerpFT(0.1, lerpedAdren, angle_zero)

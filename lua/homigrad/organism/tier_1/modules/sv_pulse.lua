@@ -91,9 +91,9 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
-	if org.panicAttack then heartbeat = heartbeat + 50 end
+	if org.panicAttack then heartbeat = heartbeat + 20 end -- adrenaline handles most of the boost
 	local despairHeartBoost = math.Clamp((org.despair or 0) - 0.3, 0, 0.7) / 0.7 * 35
-	if org.panicAttack then despairHeartBoost = despairHeartBoost * 0.5 end -- already covered by panic +50
+	if org.panicAttack then despairHeartBoost = despairHeartBoost * 0.5 end
 	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
@@ -120,6 +120,9 @@ module[2] = function(owner, org, timeValue)
 		elseif hb >= 200 then
 			chance = 0.025
 		end
+
+		if org.panicAttack then chance = chance * 0.5 end
+		if org.givingUp then chance = chance * 1.5 end
 
 		if chance > 0 and math.random() < chance then
 			org.heartstop = true
@@ -347,6 +350,7 @@ module[2] = function(owner, org, timeValue)
 		if not org._despair_pulse_check or CurTime() > org._despair_pulse_check then
 			org._despair_pulse_check = CurTime() + 5 -- check every 5 seconds
 			local despairChance = math.Clamp((org.despair - 0.4) / 0.6, 0, 1) * 0.008 -- up to 0.8% per 5s at max despair
+			if org.givingUp then despairChance = despairChance * 1.5 end
 			local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
 			if totalAdrenaline > 1.0 then
 				despairChance = despairChance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.4)

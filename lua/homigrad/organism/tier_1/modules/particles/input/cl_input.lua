@@ -170,12 +170,6 @@ hook.Add("HG_OrganismChanged", "explodelegs", function(oldorg, org)
 		if !oldorg[ind.."amputated"] and org[ind.."amputated"] then
 			local bone = ent:LookupBone(nam)
 
-			timer.Simple(0, function()
-				if IsValid(ent.bandagesModel) and ent.bandagesModel.BodygroupsApplied then
-					ent.bandagesModel.BodygroupsApplied = false
-				end
-			end)
-
 			if bone then
 				local mat = ent:GetBoneMatrix(bone)
 

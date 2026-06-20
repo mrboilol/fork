@@ -1479,6 +1479,77 @@ local IsValid = IsValid
 
 		return true
 	end
+
+	local tourniquetBoneToLimb = {
+		["ValveBiped.Bip01_L_UpperArm"] = "larm",
+		["ValveBiped.Bip01_L_Forearm"] = "larm",
+		["ValveBiped.Bip01_L_Hand"] = "larm",
+		["ValveBiped.Bip01_R_UpperArm"] = "rarm",
+		["ValveBiped.Bip01_R_Forearm"] = "rarm",
+		["ValveBiped.Bip01_R_Hand"] = "rarm",
+		["ValveBiped.Bip01_L_Thigh"] = "lleg",
+		["ValveBiped.Bip01_L_Calf"] = "lleg",
+		["ValveBiped.Bip01_L_Foot"] = "lleg",
+		["ValveBiped.Bip01_R_Thigh"] = "rleg",
+		["ValveBiped.Bip01_R_Calf"] = "rleg",
+		["ValveBiped.Bip01_R_Foot"] = "rleg",
+	}
+
+	function hg.GetTourniquetLimbs(ent)
+		if not IsValid(ent) then return {} end
+
+		local tourniquets = ent:GetNetVar("Tourniquets", ent.tourniquets or {})
+		local limbs = {}
+
+		for _, t in ipairs(tourniquets) do
+			local bone = t[3]
+			local limb = bone and tourniquetBoneToLimb[bone]
+			if limb then limbs[limb] = true end
+		end
+
+		return limbs
+	end
+
+	function hg.HasTourniquetOnLimb(ent, limb)
+		return hg.GetTourniquetLimbs(ent)[limb] == true
+	end
+
+	function hg.GetArmEffectiveness(ent, side)
+		if not IsValid(ent) then return 1 end
+
+		local limb = side
+		if limb == "left" or limb == "l" then
+			limb = "larm"
+		elseif limb == "right" or limb == "r" then
+			limb = "rarm"
+		end
+		if limb ~= "larm" and limb ~= "rarm" then return 1 end
+
+		local org = ent.organism
+		if not org then return 1 end
+
+		if org[limb .. "amputated"] then return 0 end
+
+		local effectiveness = 1
+		local val = org[limb] or 0
+
+		if val >= 1 then
+			effectiveness = math.min(effectiveness, 0.2)
+		elseif val >= 0.25 then
+			local severity = (val - 0.25) / 0.75
+			effectiveness = math.min(effectiveness, 1 - severity * 0.5)
+		end
+
+		if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
+			effectiveness = math.min(effectiveness, 0.4)
+		end
+
+		if hg.HasTourniquetOnLimb(ent, limb) then
+			effectiveness = math.min(effectiveness, 0.85)
+		end
+
+		return effectiveness
+	end
 --//
 --\\ custom eargrab anim
 	function hg.earanim(ply)

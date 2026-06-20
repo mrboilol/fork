@@ -25,7 +25,7 @@ function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local mul = ((0.5) + math_max(self.Primary.Force / 110 - 1, 0)) * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
 	self:ApplyForce(mul)
-	mul = (mul or 0) * (self.Supressor and 0.75 or 1) * (owner.organism and owner.organism.recoilmul or 1)
+	mul = (mul or 0) * (self.Supressor and 0.75 or 1) * (owner.organism and owner.organism.recoilmul or 1) * self:GetFearRecoilMul()
 	return mul
 end
 
@@ -235,6 +235,16 @@ function SWEP:PrimarySpread()
 			amputate_debuff = amputate_debuff * mitigation_mult
 		end
 
+		-- Apply tourniquet handling penalty
+		local tourniquet_debuff = 0
+		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "larm") then
+			tourniquet_debuff = tourniquet_debuff + 0.3
+		end
+		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "rarm") then
+			tourniquet_debuff = tourniquet_debuff + 0.45
+		end
+		arm_debuff = arm_debuff + tourniquet_debuff
+
 		mul = mul * ((2.5 + arm_debuff) / 1 + amputate_debuff)
 		mul = mul * broken_arm_recoil_mult
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
@@ -298,7 +308,7 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		owner:SetEyeAngles(eyeang + sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.25)
+		owner:SetEyeAngles(eyeang + sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.25 * self:GetFearRecoilMul())
 		
 		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
 		ViewPunch2(Angle(2 * rnd1,2 * rnd2,0) * mul * 0.5)

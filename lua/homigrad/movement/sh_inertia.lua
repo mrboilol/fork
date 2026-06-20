@@ -84,8 +84,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			cmd:RemoveKey(IN_JUMP)
 			mv:RemoveKey(IN_JUMP)
 
-			cmd:AddKey(IN_DUCK)
-			mv:AddKey(IN_DUCK)
+			cmd:RemoveKey(IN_DUCK)
+			mv:RemoveKey(IN_DUCK)
 
 			if ply.MovementInertia then
 				ply.MovementInertia:Zero()
@@ -428,6 +428,10 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		k = k * (adrenalineMoveBoost + 1)
 		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
 		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
+		if hg.HasTourniquetOnLimb then
+			if hg.HasTourniquetOnLimb(ply, "lleg") then k = k * 0.85 end
+			if hg.HasTourniquetOnLimb(ply, "rleg") then k = k * 0.85 end
+		end
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		k = k * ((IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) and math.Clamp(50 / math.max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
 		k = k * math.Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
@@ -578,6 +582,11 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 	hook.Add("StartCommand", "HG_AntiGmodPVP", function(ply, cmd)
 		ply.NowCrouched = cmd:KeyDown(IN_DUCK)
 		ply.OldCrouched = ply.OldCrouched or cmd:KeyDown(IN_DUCK)
+
+		if IsValid(ply.FakeRagdoll) and not hg.RagdollCombatInUse(ply) then
+			ply.OldCrouched = cmd:KeyDown(IN_DUCK)
+			return
+		end
 
 		if not ply:OnGround() and ply:WaterLevel() < 2 and ply:GetMoveType() == MOVETYPE_WALK and ply.OldCrouched != ply.NowCrouched then
 			cmd:AddKey(IN_DUCK)

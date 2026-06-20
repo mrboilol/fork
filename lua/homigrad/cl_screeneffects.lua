@@ -1114,9 +1114,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if o2 > 50 and !org.otrub then
 			local dyingMode = hg_dyingsound:GetInt()
 
-			-- Check if despair overrides dying sound
-			local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
-			local despairOverride = despair > 0.3
+			-- Despair is handled by the cl_despair theme; dying sounds keep playing in the background
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
 				sound.PlayFile("sound/zbattle/conscioustypebeat.ogg", "noblock noplay", function(station)
@@ -1154,11 +1152,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
 				consciousVol = math.max(consciousVol, bleedSeverity * 2)
 				hg.consciousBeatIntensity = math.max(hg.consciousBeatIntensity, bleedSeverity * 2)
-			end
-
-			-- Despair overrides dying sounds
-			if despairOverride then
-				consciousVol = 0
 			end
 
 			if dyingMode == 0 then
@@ -1545,37 +1538,22 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	-- Give up mechanic: white vignette and itssofuckingover.mp3
 	if org.givingUp then
-		local simpleMode = despair_system_mode() == 1
-		-- In normal mode the give-up theme replaces all other dying/despair music.
-		-- In simple mode it instead layers on top in the background at big volume.
-		if not simpleMode then
-			if IsValid(NoiseStation2) then NoiseStation2:SetVolume(0) end
-			if IsValid(EndStation) then EndStation:SetVolume(0) end
-			if IsValid(DyingStation) then DyingStation:SetVolume(0) end
-			if IsValid(Alto2Station) then Alto2Station:SetVolume(0) end
-			if IsValid(SillydyingStation) then SillydyingStation:SetVolume(0) end
-			if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
-			if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-			if IsValid(AltotrubStation) then AltotrubStation:SetVolume(0) end
-			if IsValid(SleepyStation) then SleepyStation:SetVolume(0) end
-			if IsValid(FuckStation) then FuckStation:SetVolume(0) end
-			if IsValid(NoisesStation) then NoisesStation:SetVolume(0) end
-		end
+		-- Give-up theme layers in the background alongside other dying/despair music.
+		-- It does not override or mute any other themes.
 
 		-- Play itssofuckingover.mp3
 		if canRetrySound("GivingUpStation", GivingUpStation) then
-			sound.PlayFile("sound/itssofuckingover.mp3", "noblock noplay", function(station)
-				if IsValid(station) then
-					station:SetVolume(0)
-					station:Play()
-					GivingUpStation = station
-					station:EnableLooping(true)
-				end
+			sound.PlayFile("sound/itssofuckingover.mp3", "noblock noplay", function(station, err)
+				if err or not IsValid(station) then return end
+				station:SetVolume(0)
+				station:Play()
+				GivingUpStation = station
+				station:EnableLooping(true)
 			end)
 		end
 
 		if IsValid(GivingUpStation) then
-			GivingUpStation:SetVolume(1.0 * snd_musicvolume:GetFloat())
+			GivingUpStation:SetVolume(1.5 * snd_musicvolume:GetFloat())
 			if GivingUpStation:GetTime() >= 120 then
 				GivingUpStation:SetTime(0)
 			end

@@ -536,6 +536,12 @@ hook.Add("PlayerDeath", "hg_forsaken_deathscene", function(victim)
 	org.brainBurstDamage = 0
 	org.brainBurstWindowStart = 0
 	org.brainBurstLast = 0
+
+	if (math.Round(victim:GetInfoNum("hg_deathfadeout", 1)) == 1) and (org.skull >= 0.6 or org.jaw == 1) then
+		victim:SetNWString("PlayerName", "disfigured nigga")
+		local rag = IsValid(victim:GetNWEntity("RagdollDeath")) and victim:GetNWEntity("RagdollDeath") or victim.FakeRagdoll
+		if IsValid(rag) then rag:SetNWString("PlayerName", "disfigured nigga") end
+	end
 end)
 
 --util.AddNetworkString("tracePosesSend")
@@ -1898,6 +1904,10 @@ local function velocityDamage(ent, data)
 if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
 			if org.skull >= 0.6 or org.jaw == 1 then
 				ent:SetNWString("PlayerName", "disfigured nigga")
+				if IsValid(ply) and ply ~= ent then ply:SetNWString("PlayerName", "disfigured nigga") end
+
+				local body = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
+				if IsValid(body) and body ~= ent then body:SetNWString("PlayerName", "disfigured nigga") end
 			end
 			
 			ply:ScreenFade(0, color_black, 1, 1)
@@ -2753,6 +2763,19 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
     end)
 end
 
+local function IsPlayerOwnedRagdoll(ent)
+    if not IsValid(ent) then return false end
+    if ent:IsPlayer() then return true end
+    if ent:IsRagdoll() then
+        local owner = hg.RagdollOwner and hg.RagdollOwner(ent)
+        if not IsValid(owner) then
+            owner = ent:GetNWEntity("ply")
+        end
+        return IsValid(owner) and owner:IsPlayer()
+    end
+    return false
+end
+
 function hg.RemoveLimbConstraints(ent, limb)
     if not IsValid(ent) then return end
 
@@ -2764,6 +2787,13 @@ function hg.RemoveLimbConstraints(ent, limb)
         end
     end
     if not IsValid(ragdoll) then return end
+
+    -- Don't tear constraints out from under a player-owned ragdoll.
+    -- The next time they ragdoll the constraints will match the current organism state.
+    if IsPlayerOwnedRagdoll(ragdoll) then
+        print("[HG Floppy] RemoveLimbConstraints: skipped player-owned ragdoll, limb=" .. tostring(limb))
+        return
+    end
 
     -- OLD LUA STYLE: Restore limb using floppyLimbs data
     if ragdoll.floppyLimbs and ragdoll.floppyLimbs[limb] then
@@ -2986,6 +3016,13 @@ function hg.RemoveSpineConstraints(ent, segment)
     end
     if not IsValid(ragdoll) then return end
 
+    -- Don't tear constraints out from under a player-owned ragdoll.
+    -- The next time they ragdoll the constraints will match the current organism state.
+    if IsPlayerOwnedRagdoll(ragdoll) then
+        print("[HG Floppy] RemoveSpineConstraints: skipped player-owned ragdoll, segment=" .. tostring(segment))
+        return
+    end
+
     local segments = segment and {segment} or {"spine1", "spine2"}
     for _, seg in ipairs(segments) do
         local segData = spine_segments[seg]
@@ -3173,7 +3210,10 @@ hook.Add("Org Clear", "HG_ResetFloppyOnOrgClear", function(org)
     local rag = ply:GetNWEntity("RagdollDeath")
     if not IsValid(rag) then rag = ply:GetNWEntity("FakeRagdoll") end
     if not IsValid(rag) and IsValid(ply.FakeRagdoll) then rag = ply.FakeRagdoll end
-    if IsValid(rag) then
+    if IsValid(rag) and not IsPlayerOwnedRagdoll(rag) then
+        -- Player-owned ragdolls are left alone on organism reset/death.
+        -- The next ragdoll will use the reset organism state, avoiding the stretch caused by
+        -- removing internal constraints while the ragdoll is still active/visible.
         if rag.floppyLimbs then
             for limb, data in pairs(rag.floppyLimbs) do
                 if IsValid(data.constraint) then data.constraint:Remove() end

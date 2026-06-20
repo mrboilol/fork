@@ -258,7 +258,8 @@ module[2] = function(owner, org, timeValue)
 
 		local brainSeverity = (org.brain - 0.325) / 0.675 -- 0 to 1 scaling
 
-		local consciousnessDrain = brainSeverity * timeValue * 0.3 -- Up to 0.3 per second at max brain damage
+		-- At 0.325: drains to 0 in ~10s; at max brain damage: drains to 0 in ~6s
+		local consciousnessDrain = (0.17 + brainSeverity * 0.06) * timeValue
 
 		org.consciousness = math.max((org.consciousness or 1) - consciousnessDrain, 0)
 

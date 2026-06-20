@@ -629,6 +629,8 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		end
 	end
 
+	ply:UnDuck()
+
 	hg.ragdollFake[ply] = ragdoll
 	ply.ActiveWeapon = ply:GetActiveWeapon()
 	hook_Run("Fake", ply, ragdoll, listArmor)
