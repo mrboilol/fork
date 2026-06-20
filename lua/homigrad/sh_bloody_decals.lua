@@ -1,6 +1,24 @@
 
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
+    util.AddNetworkString("hg_head_blood_decal")
+
+    local function ReapplyHeadBloodDecal(ply)
+        if not IsValid(ply) then return end
+        if ply.HG_HeadBloodDecal then
+            net.Start("hg_head_blood_decal")
+            net.WriteEntity(ply)
+            net.Broadcast()
+        end
+    end
+
+    hook.Add("Fake", "HG_HeadBloodDecal_Fake", function(ply, ragdoll)
+        ReapplyHeadBloodDecal(ply)
+    end)
+
+    hook.Add("RagdollDeath", "HG_HeadBloodDecal_Death", function(ply, ragdoll)
+        ReapplyHeadBloodDecal(ply)
+    end)
 
     return
 end
@@ -127,6 +145,17 @@ net.Receive("bloody_decal_1", function()
 			AddDecalToEnt2(mdl, self:EntIndex(), matBlood, false, nil, nil, nil, nil, self.DamageType != DMG_SLASH and 100)
 		end
 	end
+end)
+
+net.Receive("hg_head_blood_decal", function()
+	local ply = net.ReadEntity()
+	if not IsValid(ply) then return end
+
+	local ent = hg.GetCurrentCharacter(ply)
+	if not IsValid(ent) then return end
+
+	-- Apply a strong, non-clearing blood decal to the current character (player/ragdoll)
+	AddDecalToEnt2(ent, ent:EntIndex(), matBlood, false, nil, nil, nil, nil, 255)
 end)
 
 --[[

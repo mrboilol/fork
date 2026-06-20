@@ -131,6 +131,12 @@ local function IsLocalPlayerUnconscious()
     return IsValid(lp) and lp.organism and lp.organism.otrub
 end
 
+local function IsHelpingOtherPlayer()
+    local target = hg.MedicalMinigame.NextTarget
+    local lp = LocalPlayer()
+    return IsValid(target) and target ~= lp and target:IsPlayer()
+end
+
 local function GetBandageStressFactors()
     local lp = LocalPlayer()
     if not IsValid(lp) or not lp.organism then return 0, 0, 0, 0 end
@@ -492,7 +498,7 @@ function PANEL:Init()
     self.TourniquetStrapGrabbed = false
     self.TourniquetTubeAccumulatedAngle = 0
     self.TourniquetTubeRotation = 0
-    self.TourniquetTubeRequiredTurns = 4.5 -- Increased for harder turning
+    self.TourniquetTubeRequiredTurns = 4.5 * (IsHelpingOtherPlayer() and 0.7 or 1)
     self.TourniquetLastTubeAngle = nil
     self.TourniquetStageSwitchUntil = 0
     self.TourniquetTurnCount = 0 -- Track turns for increasing pain
@@ -908,7 +914,8 @@ function PANEL:ThinkTourniquet(mx, my)
                 if quarterTurns > (self.TourniquetTurnCount or 0) then
                     self.TourniquetTurnCount = quarterTurns
                     -- Send pain to server - increases with each turn
-                    local painAmount = (1 + (quarterTurns * 0.5)) * 0.3 -- Base 1 pain, +0.5 per quarter-turn, multiplied by 0.3
+                    local otherMul = IsHelpingOtherPlayer() and 0.5 or 1
+                    local painAmount = (1 + (quarterTurns * 0.5)) * 0.3 * otherMul
                     net.Start("hg_medical_minigame_tourniquet_pain")
                     net.WriteFloat(painAmount)
                     net.SendToServer()
@@ -1905,6 +1912,8 @@ net.Receive("hg_medical_minigame_start", function()
         hg.MedicalMinigame.NextProgress = net.ReadFloat()
         hg.MedicalMinigame.NextCompletions = net.ReadInt(8)
         hg.MedicalMinigame.NextRequiredCompletions = net.ReadInt(8)
+    elseif hg.MedicalMinigame.NextType == "tourniquet" or hg.MedicalMinigame.NextType == "syringe" then
+        hg.MedicalMinigame.NextTarget = net.ReadEntity()
     end
 
     hg.MedicalMinigame.Panel = vgui.Create("hg_medical_minigame")

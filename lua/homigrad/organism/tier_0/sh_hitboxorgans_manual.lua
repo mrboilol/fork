@@ -47,6 +47,22 @@ male["ValveBiped.Bip01_Head1"] = {
 		Vector(1.6, 2.1, 1.7),
 		Color(255, 0, 255)
 	},
+	{
+		"eyeL",
+		nil,
+		Vector(4.1, -3.4, 1.5),
+		Angle(0, 0, 0),
+		Vector(1.3, 1.3, 1.3),
+		Color(100, 180, 255)
+	},
+	{
+		"eyeR",
+		nil,
+		Vector(4.1, -3.4, -1.5),
+		Angle(0, 0, 0),
+		Vector(1.3, 1.3, 1.3),
+		Color(100, 180, 255)
+	},
 }
 
 local spine = 0.25
@@ -300,6 +316,22 @@ female["ValveBiped.Bip01_Head1"] = {
 		Vector(1.6, 2.1, 1.7),
 		Color(255, 0, 255)
 	},
+	{
+		"eyeL",
+		nil,
+		Vector(3.6, -3.0, 1.5),
+		Angle(0, 0, 0),
+		Vector(1.3, 1.3, 1.3),
+		Color(100, 180, 255)
+	},
+	{
+		"eyeR",
+		nil,
+		Vector(3.6, -3.0, -1.5),
+		Angle(0, 0, 0),
+		Vector(1.3, 1.3, 1.3),
+		Color(100, 180, 255)
+	},
 }
 
 female["ValveBiped.Bip01_Neck1"] = {
@@ -370,6 +402,8 @@ hg.organism.translationTbl = {
 	["skull"] = "Skull",
 	["jaw"] = "Jaw",
 	["brain"] = "Brain",
+	["eyeL"] = "Left eye",
+	["eyeR"] = "Right eye",
 	["arteria"] = "Carotid artery",
 	["larmdown"] = "Left forearm",
 	["larmartery"] = "Left arm artery",

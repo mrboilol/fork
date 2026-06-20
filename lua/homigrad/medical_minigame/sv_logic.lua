@@ -4,6 +4,17 @@ hg.MedicalMinigame = hg.MedicalMinigame or {}
 hg.MedicalMinigame.AmputationSessions = hg.MedicalMinigame.AmputationSessions or {}
 hg.MedicalMinigame.DislocationSessions = hg.MedicalMinigame.DislocationSessions or {}
 hg.MedicalMinigame.BandageSessions = hg.MedicalMinigame.BandageSessions or {}
+hg.MedicalMinigame.TourniquetSessions = hg.MedicalMinigame.TourniquetSessions or {}
+
+local function GetMedicalMinigameOtherMultiplier(ply, target)
+    if not IsValid(ply) or not IsValid(target) or target == ply then return 1 end
+    return 0.5
+end
+
+local function GetMedicalMinigameOtherSpeedMultiplier(ply, target)
+    if not IsValid(ply) or not IsValid(target) or target == ply then return 1 end
+    return 0.7
+end
 
 local amputationLimbNames = {
     larm = "Left Arm",
@@ -89,13 +100,13 @@ local function ApplyAmputationProgress(ply, session, progressDelta, swipeSpeed)
     local speed = math.max(swipeSpeed or 0, 0)
     local normalizedSpeed = math.Clamp(speed / 700, 0, 1.9)
     local painScale = 0.08 + (normalizedSpeed ^ 1.55) * 2.7
-    local painAmount = (0.1 + delta * 5.8) * painScale
+    local painAmount = (0.1 + delta * 5.8) * painScale * GetMedicalMinigameOtherMultiplier(ply, target)
     org.painadd = (org.painadd or 0) + painAmount
 
     local tooFastThreshold = 900
     if speed >= tooFastThreshold then
         local overSpeed = speed - tooFastThreshold
-        org.painadd = (org.painadd or 0) + math.Clamp((overSpeed / 115) ^ 1.2, 4, 24)
+        org.painadd = (org.painadd or 0) + math.Clamp((overSpeed / 115) ^ 1.2, 4, 24) * GetMedicalMinigameOtherMultiplier(ply, target)
 
         local dmgInfo = DamageInfo()
         local inflictor = game.GetWorld()
@@ -122,21 +133,23 @@ local function ApplyDislocationProgress(ply, session, progressDelta, appliedForc
     local force = math.max(appliedForce or 0, 0)
     local forceScale = math.Clamp(force, 0, 1.6)
 
+    local otherMul = GetMedicalMinigameOtherMultiplier(ply, target)
+
     if delta <= 0 then
         if forceScale <= 0 then return end
 
         local org = target.organism
         local pushPain = 0.6 + (forceScale ^ 1.65) * 3.6
-        local instantPart = pushPain * 0.9
-        local slowPart = pushPain - instantPart
+        local instantPart = pushPain * 0.9 * otherMul
+        local slowPart = (pushPain - instantPart) * otherMul
         org.avgpain = math.min((org.avgpain or 0) + instantPart, 150)
         org.painadd = (org.painadd or 0) + slowPart
         org.lasthit = CurTime()
 
         if forceScale > 0.95 then
             local extra = math.Clamp((forceScale - 0.95) * 8.5, 0.6, 6.5)
-            org.avgpain = math.min((org.avgpain or 0) + extra * 0.9, 150)
-            org.painadd = (org.painadd or 0) + extra * 0.1
+            org.avgpain = math.min((org.avgpain or 0) + extra * 0.9 * otherMul, 150)
+            org.painadd = (org.painadd or 0) + extra * 0.1 * otherMul
             org.lasthit = CurTime()
         end
 
@@ -146,13 +159,13 @@ local function ApplyDislocationProgress(ply, session, progressDelta, appliedForc
     session.progress = math.Clamp((session.progress or 0) + delta, 0, 1)
 
     local org = target.organism
-    local painAmount = (0.12 + delta * 2.6) * (0.65 + (forceScale ^ 1.85) * 3.0)
+    local painAmount = (0.12 + delta * 2.6) * (0.65 + (forceScale ^ 1.85) * 3.0) * otherMul
     org.avgpain = math.min((org.avgpain or 0) + painAmount * 0.25, 150)
     org.painadd = (org.painadd or 0) + painAmount * 0.75
     org.lasthit = CurTime()
 
     if force > 0.95 then
-        local extra = math.Clamp((force - 0.95) * 9, 0.7, 6.5)
+        local extra = math.Clamp((force - 0.95) * 9, 0.7, 6.5) * otherMul
         org.avgpain = math.min((org.avgpain or 0) + extra * 0.25, 150)
         org.painadd = (org.painadd or 0) + extra * 0.75
         org.lasthit = CurTime()
@@ -185,6 +198,16 @@ local function ClearBandageSessionsForPlayer(ply)
     for healer, session in pairs(hg.MedicalMinigame.BandageSessions) do
         if session and session.target == ply then
             hg.MedicalMinigame.BandageSessions[healer] = nil
+        end
+    end
+end
+
+local function ClearTourniquetSessionsForPlayer(ply)
+    hg.MedicalMinigame.TourniquetSessions[ply] = nil
+
+    for healer, session in pairs(hg.MedicalMinigame.TourniquetSessions) do
+        if session and session.target == ply then
+            hg.MedicalMinigame.TourniquetSessions[healer] = nil
         end
     end
 end
@@ -281,6 +304,8 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
         end
     end
 
+    requiredCompletions = math.max(math.ceil(requiredCompletions * GetMedicalMinigameOtherSpeedMultiplier(ply, target)), 1)
+
     local existingSession = hg.MedicalMinigame.BandageSessions[ply]
     if not existingSession or existingSession.target ~= target then
         existingSession = {
@@ -296,6 +321,26 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     net.WriteFloat(math.Clamp(existingSession.progress or 0, 0, 1))
     net.WriteInt(completions, 8)
     net.WriteInt(requiredCompletions, 8)
+    net.Send(ply)
+
+    return true
+end
+
+function hg.MedicalMinigame.StartTourniquetMinigame(ply, ent)
+    local target = ResolveMinigameTarget(ent) or ply
+    if not CanUseMedicalMinigameTarget(ply, target) then return false end
+
+    local existingSession = hg.MedicalMinigame.TourniquetSessions[ply]
+    if not existingSession or existingSession.target ~= target then
+        existingSession = {
+            target = target
+        }
+        hg.MedicalMinigame.TourniquetSessions[ply] = existingSession
+    end
+
+    net.Start("hg_medical_minigame_start")
+    net.WriteString("tourniquet")
+    net.WriteEntity(target)
     net.Send(ply)
 
     return true
@@ -323,12 +368,18 @@ net.Receive("hg_medical_minigame_cancel", function(len, ply)
         ClearBandageSessionsForPlayer(ply)
         return
     end
+
+    if minigameType == "tourniquet" then
+        ClearTourniquetSessionsForPlayer(ply)
+        return
+    end
 end)
 
 hook.Add("PlayerDeath", "hg_medical_minigame_clear_amputation_progress", function(ply)
     ClearAmputationSessionsForPlayer(ply)
     ClearDislocationSessionsForPlayer(ply)
     ClearBandageSessionsForPlayer(ply)
+    ClearTourniquetSessionsForPlayer(ply)
 end)
 
 local function GetMedicalMinigameType(wep)
@@ -566,13 +617,17 @@ end)
 
 net.Receive("hg_medical_minigame_tourniquet_pain", function(len, ply)
     local painAmount = net.ReadFloat()
-    local wep = ply:GetActiveWeapon()
-    if not IsValid(wep) then return end
-    
-    local target = wep.healbuddy or ply
+    local session = hg.MedicalMinigame.TourniquetSessions[ply]
+    local target = session and session.target
+
     if not IsValid(target) or not target.organism then return end
-    
-    target.organism.painadd = (target.organism.painadd or 0) + painAmount
+    if not CanUseMedicalMinigameTarget(ply, target) then
+        hg.MedicalMinigame.TourniquetSessions[ply] = nil
+        return
+    end
+
+    local otherMul = GetMedicalMinigameOtherMultiplier(ply, target)
+    target.organism.painadd = (target.organism.painadd or 0) + painAmount * otherMul
 end)
 
 net.Receive("hg_medical_minigame_dislocation_pain", function(len, ply)
@@ -677,6 +732,15 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         if target ~= ply and ply:GetPos():DistToSqr(target:GetPos()) > 10000 then return end
 
         if minigameType == "tourniquet" then
+            local tourniquetSession = hg.MedicalMinigame.TourniquetSessions[ply]
+            if tourniquetSession then
+                target = tourniquetSession.target
+                hg.MedicalMinigame.TourniquetSessions[ply] = nil
+            end
+
+            if not IsValid(target) or not target.organism then return end
+            if target ~= ply and ply:GetPos():DistToSqr(target:GetPos()) > 10000 then return end
+
             local modeValueIndex = GetMinigameModeValueIndex(wep, minigameType)
             local done = IsValid(wep) and wep.Tourniquet and wep:Tourniquet(target, nil)
 
@@ -798,8 +862,14 @@ local function StartWeaponMinigameFromCommand(ply, requestedType, useTarget)
     wep.healbuddy = target
     wep.HGMedicalMinigameStartValue = startValue
 
+    if minigameType == "tourniquet" then
+        hg.MedicalMinigame.StartTourniquetMinigame(ply, target)
+        return
+    end
+
     net.Start("hg_medical_minigame_start")
         net.WriteString(minigameType)
+        net.WriteEntity(target)
     net.Send(ply)
 end
 

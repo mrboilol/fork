@@ -619,7 +619,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 
 	//if ragdoll:GetVelocity():LengthSqr() < (200 * 200) or ply:InVehicle() then hg.SetFreemove(ply,not no_freemove) end
 
-	if not no_freemove and not force and not hg_ragdollcombat:GetBool() then
+	if not no_freemove and not force then
 		-- Freemove removed on fake-in: keep the player in NOCLIP so the ragdoll doesn't freeze against the world.
 		ply:SetMoveType(MOVETYPE_NOCLIP)
 		local hull = Vector(1, 1, 1)

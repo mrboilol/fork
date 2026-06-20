@@ -1046,6 +1046,28 @@ players : 1 humans, 0 bots (20 max)
 
 	local blackout_mat = Material("sprites/mat_jack_hmcd_narrow")
 
+	local function clampToScreen(x, y)
+		local w, h = ScrW(), ScrH()
+		local cx, cy = w / 2, h / 2
+		x = math.Clamp(x, 0, w)
+		y = math.Clamp(y, 0, h)
+		local dx, dy = x - cx, y - cy
+		if dx == 0 and dy == 0 then return cx, cy end
+		local ang = math.atan2(dy, dx)
+		local cos = math.cos(ang)
+		local sin = math.sin(ang)
+		local maxDist
+		if math.abs(cos) < 0.001 then
+			maxDist = cy / math.abs(sin)
+		elseif math.abs(sin) < 0.001 then
+			maxDist = cx / math.abs(cos)
+		else
+			maxDist = math.min(cx / math.abs(cos), cy / math.abs(sin))
+		end
+		local dist = math.min(math.sqrt(dx * dx + dy * dy), maxDist)
+		return cx + math.cos(ang) * dist, cy + math.sin(ang) * dist
+	end
+
 	function hg.AddFlash(eyepos, dot, pos, time, size, is_headtrauma)
 		time = time or 20
 		size = size or 1000--pixels
@@ -1055,6 +1077,12 @@ players : 1 humans, 0 bots (20 max)
 		size = size / math.max(pos:Distance(eyepos) / 64,0.01) * (dot^2)
 		local taint = math.max(200 - size,0) / 200 * time * 0.9
 		local scr = pos:ToScreen()
+
+		if is_headtrauma then
+			if not scr.visible or scr.x < 0 or scr.x > ScrW() or scr.y < 0 or scr.y > ScrH() then
+				scr.x, scr.y = clampToScreen(scr.x, scr.y)
+			end
+		end
 
 		table.insert(hg.flashes,{x = scr.x, y = scr.y, time = CurTime() + time - taint, lentime = time, size = size, is_headtrauma = is_headtrauma})
 	end
@@ -1095,6 +1123,8 @@ players : 1 humans, 0 bots (20 max)
 			flash = hg.flashes[i]
 
 			if (flash.time or 0) < CurTime() then table.remove(hg.flashes[i]) continue end
+
+			if flash.is_headtrauma then continue end
 
 			local animpos = (flash.time - CurTime()) / flash.lentime
 			local size = flash.size
@@ -1143,11 +1173,14 @@ players : 1 humans, 0 bots (20 max)
 			local size = flash.size
 
 			local huy = (1 - animpos) * -100
+			local alpha = math.min(animpos * 255 + math.Rand(-10, 10) * animpos, 255)
 			surface.SetMaterial(mat)
-			surface.SetDrawColor(255, 255, 255, (animpos * 255 + math.Rand(-10,10) * animpos) * (0.5 / #hg.flashes) * 1.5)
+			surface.SetDrawColor(255, 255, 255, alpha)
 			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
 			surface.SetMaterial(mat2)
-			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
+			surface.SetDrawColor(255, 255, 255, alpha)
+			local glowSize = size * 1.5
+			surface.DrawTexturedRect(flash.x - glowSize / 2 + huy, flash.y - glowSize / 2 + huy, glowSize, glowSize)
 		end
 	end)
 --//

@@ -103,8 +103,13 @@ local function StartMinigame(wep, owner, minigameType, target)
         return hg.MedicalMinigame.StartBandageMinigame(owner, wep.healbuddy)
     end
 
+    if minigameType == "tourniquet" and hg and hg.MedicalMinigame and hg.MedicalMinigame.StartTourniquetMinigame then
+        return hg.MedicalMinigame.StartTourniquetMinigame(owner, wep.healbuddy)
+    end
+
     net.Start("hg_medical_minigame_start")
         net.WriteString(minigameType)
+        net.WriteEntity(wep.healbuddy)
     net.Send(owner)
 
     return true

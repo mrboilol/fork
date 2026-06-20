@@ -922,6 +922,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		hg.organism.BlastTrace(dmgInfo:GetDamagePosition(), (ent:GetPos() - dmgInfo:GetDamagePosition()):Length() / 200, dmg * 2, boxs, organs, Trace_Blast, ent.organism, organs, dmg / 300, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
+
+		if math.random(100) <= 25 then
+			local which = (math.random(2) == 1) and "eyeL" or "eyeR"
+			local eyeFunc = hg.organism.input_list[which]
+			if eyeFunc then
+				eyeFunc(org, 1, dmgInfo:GetDamage() / 50, dmgInfo)
+			end
+		end
 	end
 
 	if attacker:IsPlayer() then
@@ -1868,6 +1876,8 @@ local function velocityDamage(ent, data)
 
 				local hasBrainDamage = org.brain > 0.1
 				net.WriteBool(hasBrainDamage)
+
+				net.WriteBool((org.concussion or 0) > 0)
 
 				local trigger_tinnitus = dmg >= 0.12
 				net.WriteBool(trigger_tinnitus)

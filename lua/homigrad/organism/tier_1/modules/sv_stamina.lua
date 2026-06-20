@@ -116,7 +116,7 @@ module[2] = function(owner, org, timeValue)
 			if owner.hg_moveMode == 2 then
 				sprintMul = 2.0
 			elseif owner.hg_moveMode == 1 then
-				sprintMul = 1.1
+				sprintMul = 1.35
 			end
 
 			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * sprintMul

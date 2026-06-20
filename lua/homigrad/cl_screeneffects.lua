@@ -1753,6 +1753,34 @@ hook.Add("HG_CalcView", "DespairBreathShake", function(ply, pos, angles, fova, z
 	fova[1] = (fova[1] or 0) + pushPull * 2.8
 end)
 
+local HEADHIT_VOLUME = 1
+local CONCUSSION_VOLUME = 0.45
+local CONCUSSION_SOUND_PATH = "sound/concussion"
+local last_headhit_sound = 0
+local last_concussion_sound = 0
+
+local function PlayHeadhitSound()
+    if CurTime() < last_headhit_sound + 0.15 then return end
+    last_headhit_sound = CurTime()
+    sound.PlayFile("sound/headhit.mp3", "noblock noplay", function(station)
+        if IsValid(station) then
+            station:SetVolume(HEADHIT_VOLUME)
+            station:Play()
+        end
+    end)
+end
+
+local function PlayConcussionSound()
+    if CurTime() < last_concussion_sound + 0.15 then return end
+    last_concussion_sound = CurTime()
+    sound.PlayFile(CONCUSSION_SOUND_PATH .. math.random(1, 4) .. ".mp3", "noblock noplay", function(station)
+        if IsValid(station) then
+            station:SetVolume(CONCUSSION_VOLUME)
+            station:Play()
+        end
+    end)
+end
+
 net.Receive("headtrauma_flash", function()
     local pos = net.ReadVector()
     local time = net.ReadFloat()
@@ -1760,6 +1788,7 @@ net.Receive("headtrauma_flash", function()
     local is_critical = net.ReadBool()
     local play_knockout_sound = net.ReadBool()
     local hasBrainDamage = net.ReadBool()
+    local hasConcussion = net.ReadBool()
     local trigger_tinnitus = net.ReadBool()
 
     local lply = LocalPlayer()
@@ -1783,15 +1812,18 @@ net.Receive("headtrauma_flash", function()
 
     hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
     headtraumaSaturation = math.min(time * 3, 5)
+
+    PlayHeadhitSound()
+    if is_critical or hasBrainDamage or hasConcussion then
+        PlayConcussionSound()
+    end
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
-    else
-        sound.PlayFile("sound/headhit.mp3", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
     end
 end)
 
 local showing_otrub_headtrauma = false
-local last_knocked_sound_time = 0
+local last_otrub_concussion_time = 0
 function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
     if showing_otrub_headtrauma then return end
     showing_otrub_headtrauma = true
@@ -1800,9 +1832,15 @@ function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
     local lply = LocalPlayer()
     if not IsValid(lply) or not lply:Alive() then return end
 
-    if CurTime() > last_knocked_sound_time + 5 then
-        sound.PlayFile("sound/knocked.wav", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
-        last_knocked_sound_time = CurTime()
+    PlayHeadhitSound()
+    if CurTime() > last_otrub_concussion_time + 5 then
+        sound.PlayFile(CONCUSSION_SOUND_PATH .. math.random(1, 4) .. ".mp3", "noblock noplay", function(station)
+            if IsValid(station) then
+                station:SetVolume(CONCUSSION_VOLUME)
+                station:Play()
+            end
+        end)
+        last_otrub_concussion_time = CurTime()
     end
     hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
 end

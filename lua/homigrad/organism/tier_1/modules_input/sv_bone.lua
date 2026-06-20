@@ -19,6 +19,7 @@ local function CheckConcussionFlash(org, old_concussion, dmgInfo)
         net.WriteBool(true) -- is_critical
         net.WriteBool(false) -- play_knockout_sound
         net.WriteBool(org.brain > 0.1) -- hasBrainDamage
+        net.WriteBool(true)
         net.WriteBool(true) -- trigger_tinnitus
         net.Send(org.owner)
     end
@@ -63,6 +64,7 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 			net.WriteBool(true)
 			net.WriteBool(false)
 			net.WriteBool(org.brain > 0.1)
+			net.WriteBool((org.concussion or 0) > 0)
 			net.WriteBool(true)
 			net.Send(org.owner)
 		end
@@ -543,11 +545,24 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.shock = org.shock + (dmg > 1 and 45 or dmg * 9)
 
 	if org.skull > 0.6 then
-		if oldDmg <= 0.6 and org.isPly then
-			org.owner:Notify(huyasd["skull"],true,"skull",4)
+		if oldDmg <= 0.6 then
+			if org.isPly then org.owner:Notify(huyasd["skull"],true,"skull",4) end
+
+			-- Really loud bonebreak on initial skull fracture
+			if IsValid(org.owner) then
+				org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 110, math.random(95, 115), 1, CHAN_AUTO)
+			end
+
+			-- Persistent head blood decal for severe skull damage
+			if IsValid(org.owner) then
+				org.owner.HG_HeadBloodDecal = true
+				net.Start("hg_head_blood_decal")
+				net.WriteEntity(org.owner)
+				net.Broadcast()
+			end
 		end
 
-		if dir and hg_bloodimpacts:GetBool() and (oldDmg <= 0.6 or math.random() < 0.25) then
+		if dir and hg_bloodimpacts:GetBool() and (oldDmg <= 0.6 or math.random() < 0.75) then
 			local dmgPos = dmgInfo:GetDamagePosition()
 			local dirNorm = dir:GetNormalized()
 			-- Main blood spray
@@ -568,6 +583,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 					net.Broadcast()
 				end
 			end
+
+			-- Bonebreak sound on every skull blood spray
+			if IsValid(org.owner) then
+				org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 85, math.random(120, 135), 1, CHAN_AUTO)
+			end
 		end
 	end
 
@@ -586,11 +606,28 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		net.WriteBool(true) -- is_critical
 		net.WriteBool(false) -- play_knockout_sound
 		net.WriteBool(true) -- hasBrainDamage - always true since we have brain damage
+		net.WriteBool((org.concussion or 0) > 0)
 		net.WriteBool(true) -- trigger_tinnitus
 		net.Send(org.owner)
 	end
 
 	CheckConcussionFlash(org, old_concussion, dmgInfo)
+
+    local eyeChance = 0
+    if dmgInfo:IsDamageType(DMG_SLASH) then
+        eyeChance = 45
+    elseif dmgInfo:IsDamageType(DMG_BULLET) or dmgInfo:IsDamageType(DMG_BUCKSHOT) then
+        eyeChance = 35
+    elseif dmgInfo:IsDamageType(DMG_CLUB) or dmgInfo:IsDamageType(DMG_GENERIC) or dmgInfo:IsDamageType(DMG_CRUSH) then
+        eyeChance = 12
+    end
+
+    if eyeChance > 0 and math.random(100) <= eyeChance then
+        local which = (math.random(2) == 1) and "eyeL" or "eyeR"
+        local eyeFunc = hg.organism.input_list[which]
+        if eyeFunc then eyeFunc(org, 1, dmg, dmgInfo) end
+    end
+
 	return result * 0.75, vecrand
 end
 

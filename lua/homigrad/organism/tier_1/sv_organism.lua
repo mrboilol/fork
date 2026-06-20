@@ -27,6 +27,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.chest = 0
 	org.pelvis = 0
 	org.skull = 0
+	org.eyeL = 0
+	org.eyeR = 0
 	org.stomach = 0
 	org.intestines = 0
 	org.headtrauma = 0

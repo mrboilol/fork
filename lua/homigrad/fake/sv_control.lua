@@ -1030,14 +1030,6 @@ hook.Add("Think", "Fake", function()
 
 
 
-			if ragdollcombat then
-
-				hg.SetFreemove(ply, true)
-
-			end
-
-
-
 			if ply:InVehicle() then
 
 				ply:SetPos(vector_origin)

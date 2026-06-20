@@ -312,6 +312,13 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 	org.disorientation = org.disorientation + dmg * 1
 	org.shock = org.shock + dmg * 3
 	org.painadd = org.painadd + dmg * 10
+
+    if (dmgInfo:IsDamageType(DMG_BULLET) or dmgInfo:IsDamageType(DMG_BUCKSHOT) or dmgInfo:IsDamageType(DMG_SLASH)) and math.random(100) <= 5 then
+        local which = (math.random(2) == 1) and "eyeL" or "eyeR"
+        local eyeFunc = input_list[which]
+        if eyeFunc then eyeFunc(org, 1, dmg, dmgInfo) end
+    end
+
 	return result
 end
 
@@ -526,4 +533,60 @@ input_list.trachea = function(org, bone, dmg, dmgInfo)
 	org.internalBleed = org.internalBleed + dmg * 2
 
 	return result
+end
+
+input_list.eyeL = function(org, bone, dmg, dmgInfo)
+    local oldDmg = org.eyeL or 0
+    local result = damageOrgan(org, dmg * 1.5, dmgInfo, "eyeL")
+
+    hg.AddHarmToAttacker(dmgInfo, math.max(org.eyeL - oldDmg, 0) * 6, "Left eye damage harm")
+
+    if hg.organism.enhancedPain then
+        hg.organism.enhancedPain.applyPain(org, dmg * 35, dmgInfo, "eyeL", false)
+    else
+        org.painadd = org.painadd + dmg * 35
+    end
+    org.shock = org.shock + dmg * 10
+    org.disorientation = org.disorientation + dmg * 2
+
+    org.bleed = org.bleed + dmg * 0.8
+
+    org.pulse = math.min(org.pulse + dmg * 8, 180)
+
+    if oldDmg < 1 and org.eyeL >= 1 then
+        if IsValid(org.owner) then
+            org.owner:EmitSound("cuteye.ogg", 75, 100, 1, CHAN_AUTO)
+            org.owner:Notify("My left eye... it's destroyed.", true, "eyeLlost", 1)
+        end
+    end
+
+    return result
+end
+
+input_list.eyeR = function(org, bone, dmg, dmgInfo)
+    local oldDmg = org.eyeR or 0
+    local result = damageOrgan(org, dmg * 1.5, dmgInfo, "eyeR")
+
+    hg.AddHarmToAttacker(dmgInfo, math.max(org.eyeR - oldDmg, 0) * 6, "Right eye damage harm")
+
+    if hg.organism.enhancedPain then
+        hg.organism.enhancedPain.applyPain(org, dmg * 35, dmgInfo, "eyeR", false)
+    else
+        org.painadd = org.painadd + dmg * 35
+    end
+    org.shock = org.shock + dmg * 10
+    org.disorientation = org.disorientation + dmg * 2
+
+    org.bleed = org.bleed + dmg * 0.8
+
+    org.pulse = math.min(org.pulse + dmg * 8, 180)
+
+    if oldDmg < 1 and org.eyeR >= 1 then
+        if IsValid(org.owner) then
+            org.owner:EmitSound("cuteye.ogg", 75, 100, 1, CHAN_AUTO)
+            org.owner:Notify("My right eye... it's destroyed.", true, "eyeRlost", 1)
+        end
+    end
+
+    return result
 end
