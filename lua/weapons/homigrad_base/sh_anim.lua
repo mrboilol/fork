@@ -503,9 +503,24 @@ hook.Add("Bones", "homigrad-lean-bone", function(ply, dtime)
 end)
 
 function SWEP:Step_Inspect(time)
-	if self.inspect == nil or self.reload ~= nil then return end
-	if self:KeyDown(IN_RELOAD) or self:KeyDown(IN_ATTACK) or self:KeyDown(IN_ATTACK2) then
+	if self.reload ~= nil then return end
+
+	local jamClearing = self:IsJamClearing()
+	if self.inspect == nil and not jamClearing then return end
+	if not jamClearing and (self:KeyDown(IN_RELOAD) or self:KeyDown(IN_ATTACK) or self:KeyDown(IN_ATTACK2)) then
 		self.inspect = nil
+		return
+	end
+
+	if jamClearing then
+		local startTime = self.jamclear_start or self:GetJamClearStart() or time
+		local loopDuration = self.JamClearInspectLoop or 2.0
+		local elapsed = time - startTime
+		local part = (elapsed % loopDuration) / loopDuration
+
+		part = math.ease.InOutQuad(part)
+		self:AnimationInspect(part)
+		return
 	end
 
 	local time2 = self.inspect

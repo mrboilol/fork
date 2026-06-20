@@ -11006,3 +11006,16 @@ hook.Add("OnPauseMenuShow","OpenMainMenu",function()
 
 end)
 
+
+timer.Simple(0, function()
+
+    if not ZCityHasSeenIntro and not (MainMenu and IsValid(MainMenu)) and LocalPlayer and IsValid(LocalPlayer()) then
+
+        MainMenu = vgui.Create("ZMainMenu")
+
+        MainMenu:MakePopup()
+
+    end
+
+end)
+

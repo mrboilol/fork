@@ -629,7 +629,11 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		end
 	end
 
-	ply:UnDuck()
+	if isfunction(ply.UnDuck) then
+		ply:UnDuck()
+	elseif FL_DUCKING then
+		ply:RemoveFlags(FL_DUCKING)
+	end
 
 	hg.ragdollFake[ply] = ragdoll
 	ply.ActiveWeapon = ply:GetActiveWeapon()

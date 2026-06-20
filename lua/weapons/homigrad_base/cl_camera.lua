@@ -235,7 +235,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 
 	if isHoldingBreath then
-		mitigation_mult = mitigation_mult - 0.05
+		mitigation_mult = mitigation_mult - 0.35
 	end
 
 	-- Broken arms bypass this mitigation
@@ -361,21 +361,21 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 		local arm_sway_debuff = 0
 		if rarm_broken or rarm_amputated then
-			arm_sway_debuff = arm_sway_debuff + 2.5
+			arm_sway_debuff = arm_sway_debuff + 4.5
 		elseif rarm_dislocated then
-			arm_sway_debuff = arm_sway_debuff + 1.2
+			arm_sway_debuff = arm_sway_debuff + 2.2
 		elseif rarm_partial then
-			-- Partial damage: scale sway from 0.3 (at 0.25 damage) to 1.0 (at 0.99 damage)
-			arm_sway_debuff = arm_sway_debuff + 0.3 + rarm_partial_severity * 0.7
+			-- Partial damage: scale sway from 0.8 (at 0.25 damage) to 2.0 (at 0.99 damage)
+			arm_sway_debuff = arm_sway_debuff + 0.8 + rarm_partial_severity * 1.2
 		end
 
 		if larm_broken or larm_amputated then
-			arm_sway_debuff = arm_sway_debuff + 1.6
+			arm_sway_debuff = arm_sway_debuff + 3.0
 		elseif larm_dislocated then
-			arm_sway_debuff = arm_sway_debuff + 0.8
+			arm_sway_debuff = arm_sway_debuff + 1.5
 		elseif larm_partial then
-			-- Partial damage: scale sway from 0.15 (at 0.25 damage) to 0.6 (at 0.99 damage)
-			arm_sway_debuff = arm_sway_debuff + 0.15 + larm_partial_severity * 0.45
+			-- Partial damage: scale sway from 0.5 (at 0.25 damage) to 1.4 (at 0.99 damage)
+			arm_sway_debuff = arm_sway_debuff + 0.5 + larm_partial_severity * 0.9
 		end
 
 		local fatigue = organism.aiming_fatigue or 0
@@ -398,7 +398,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		local sway_scale = 1 + final_arm_sway + final_fatigue_sway + final_brain_sway
 
 		local jitterMult = (stressFactor > 0.1) and (1 + stressFactor * 0.5) or 1
-		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * ((lastzoom - CurTime() + tta) < 0 and ply.organism and ply.organism.holdingbreath and 0.25 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale + jitterSway * jitterMult)
+		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * (isHoldingBreath and 0.1 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale + jitterSway * jitterMult)
 	end
 
 	randomPosL = LerpFT(0.05 * (inpain and 12.5 - (12 * painmul) or 1), randomPosL, randomPos)

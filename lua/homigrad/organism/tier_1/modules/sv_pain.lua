@@ -352,15 +352,18 @@ module[2] = function(owner, org, timeValue)
 	org.analgesia =  Approach(org.analgesia, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 
 	-- Brain damage from high analgesia
-	if org.analgesia > 0.75 then
-		-- Guaranteed damage above 0.75: 0.05 per second at 5.0 analgesia
-		local brainDamageRate = (org.analgesia - 0.75) * timeValue * 0.0118
-		org.brain = (org.brain or 0) + brainDamageRate
-	elseif org.analgesia > 0.5 then
-		-- Chance-based damage between 0.5 and 0.75
-		local damageChance = (org.analgesia - 0.5) / 0.25 * 0.02 -- Up to 2% chance per tick at 0.75
-		if math.random() < damageChance then
-			org.brain = (org.brain or 0) + 0.001
+	local noradrenalineProtected = org.noradrenaline > 0 or (org.noradrenalineEndTime and org.noradrenalineEndTime + 20 > CurTime())
+	if not noradrenalineProtected then
+		if org.analgesia > 0.75 then
+			-- Guaranteed damage above 0.75: 0.05 per second at 5.0 analgesia
+			local brainDamageRate = (org.analgesia - 0.75) * timeValue * 0.0118 * 0.75
+			org.brain = (org.brain or 0) + brainDamageRate
+		elseif org.analgesia > 0.5 then
+			-- Chance-based damage between 0.5 and 0.75
+			local damageChance = (org.analgesia - 0.5) / 0.25 * 0.02 -- Up to 2% chance per tick at 0.75
+			if math.random() < damageChance then
+				org.brain = (org.brain or 0) + 0.001 * 0.75
+			end
 		end
 	end
 

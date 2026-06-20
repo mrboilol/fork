@@ -97,6 +97,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.assimilated = 0
 	org.berserk = 0
 	org.noradrenaline = 0
+	org.noradrenalineEndTime = nil
 	org.blindness = nil
 
 	-- Hand dominance for limb impairment calculations
@@ -746,9 +747,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		owner.BerserkKills = nil
 	end
 
-	if org.noradrenaline > 0 and !org.noradrenalineActive then
+	if org.noradrenaline > 0 then
 		org.noradrenalineActive = true
+		org.noradrenalineEndTime = nil
 	elseif org.noradrenaline <= 0 then
+		if org.noradrenalineActive then
+			org.noradrenalineEndTime = CurTime()
+		end
 		org.noradrenalineActive = false
 	end
 

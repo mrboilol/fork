@@ -337,6 +337,7 @@ function SWEP:CanUse()
 	if not IsValid(owner) then return true end
     if owner:IsNPC() then return true end
 	if owner.organism and owner.organism.rarmamputated and !self:IsPistolHoldType() then return false end
+	if self:IsJamClearing() then return false end
 	return not (self.reload or self.deploy or (owner:IsPlayer() and (self:IsSprinting() or (owner.organism and owner.organism.otrub))))
 end
 
@@ -1213,6 +1214,10 @@ function SWEP:CoreStep()
 	if SERVER and (not IsValid(owner) or (IsValid(actwep) and self != actwep)) then
 		self:SetNWBool("IsResting", false)
 
+		if self:IsJamClearing() then
+			self:CancelJamClear()
+		end
+
 		return
 	end
 
@@ -1344,10 +1349,17 @@ function SWEP:CoreStep()
 		self:MuzzleEffect(time2)
 	end
 
-	if not IsValid(owner) or (IsValid(actwep) and self != actwep) then return end
+	if not IsValid(owner) or (IsValid(actwep) and self != actwep) then
+		if self:IsJamClearing() then
+			self:CancelJamClear()
+		end
+
+		return
+	end
 
 	self:Step_Inspect(time)
 	self:Step_Reload(time)
+	self:Step_JamClear(time)
 	self:ClearAnims()
 	-- self:Animation(time)
 
@@ -1876,7 +1888,7 @@ function SWEP:GetAdditionalValues()
 
 	local func = hg.postureFunctions2[(self:IsSprinting() or huya) and (self:GetButtstockAttack() - CurTime() < -1) and ((ply.posture == 3 and 3) or (ply.posture == 3 and 3) or (self:IsPistolHoldType() and 3 or 3)) or ply.posture] or funcNil
 	func = ply:GetNWFloat("InLegKick", 0) > CurTime() and hg.postureFunctions2["legkicking"] or func
-	if not self.inspect then
+	if not self.inspect and not self:IsJamClearing() then
 		func(self, ply, huya)
 	end
 	
