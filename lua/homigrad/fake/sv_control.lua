@@ -924,15 +924,7 @@ hook.Add("Think", "Fake", function()
 
 		local ragdollcombat = hg.RagdollCombatInUse(ply)
 
-		if !ragdollcombat and ragdoll == ply.FakeRagdoll and (not ply.lastFake or ply.lastFake <= CurTime()) then
-
-			hg.SetFreemove(ply, false)
-
-		end
-
-
-
-		if (org.lightstun < CurTime()) and (tracehuy.Hit or ply.FakeRagdoll ~= ragdoll) and org.spine1 < hg.organism.fake_spine1 and org.canmove and ((ply.lastFake and (ply.lastFake) > CurTime()) or ply.FakeRagdoll ~= ragdoll) and !ply.jumpedfake then
+		if (org.lightstun < CurTime()) and (tracehuy.Hit or ply.FakeRagdoll ~= ragdoll) and org.spine1 < hg.organism.fake_spine1 and org.canmove and !ply.jumpedfake then
 
 			local power = org.legstrength or 1
 

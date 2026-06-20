@@ -253,6 +253,11 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		org.vomitTypeHeadTrauma = math.random(6) == 1
 	end
 
+	-- Nosebleed from brain trauma
+	if brainDelta > 0.05 and hg.applyNosebleed and math.random() < brainDelta * 1.5 then
+		hg.applyNosebleed(org.owner, brainDelta * 30)
+	end
+
 	-- Brain chunks logic
 	if org.skull and org.skull >= 1 and org.brain > 0.55 then
 		local multiplier = 0

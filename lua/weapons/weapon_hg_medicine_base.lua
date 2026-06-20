@@ -859,6 +859,10 @@ else
 			ent.bandagesModel:Remove()
 			ent.bandagesModel = nil
 		end
+		if IsValid(ent.bruiseWrapModel) then
+			ent.bruiseWrapModel:Remove()
+			ent.bruiseWrapModel = nil
+		end
 		if not ent.bandagesModels then return end
 		for _, model in pairs(ent.bandagesModels) do
 			if IsValid(model) then
@@ -930,8 +934,20 @@ else
 		local models = ent.bandagesModels
 		local idx = 1
 
+		local coloredBones = {}
+		local coloredColor
+
 		for bone, info in pairs(ent.bandaged_limbs) do
 			if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
+
+			local col = istable(info) and info.color
+			if IsColor(col) or (istable(col) and col.r and col.g and col.b) then
+				coloredBones[#coloredBones + 1] = bone
+				if not coloredColor then
+					coloredColor = col
+				end
+				continue
+			end
 
 			local model = models[idx]
 			if not IsValid(model) then
@@ -945,22 +961,14 @@ else
 				local matrix = ent:GetBoneMatrix(boneid)
 				if matrix then
 					local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
-					local offset = (isvector(info) and info) or (info and info.pos) or vector_origin
-					local offsetAng = (isangle(info) and info) or (info and info.ang) or angle_zero
+					local offset = (isvector(info) and info) or (istable(info) and info.pos) or vector_origin
+					local offsetAng = (isangle(info) and info) or (istable(info) and info.ang) or angle_zero
 					local pos, ang = LocalToWorld(offset, offsetAng, bonePos, boneAng)
 					model:SetRenderOrigin(pos)
 					model:SetRenderAngles(ang)
 					model:SetModelScale(0.2)
 					model:SetupBones()
-
-					local col = info and info.color
-					if IsColor(col) or (istable(col) and col.r and col.g and col.b) then
-						render.SetColorModulation((col.r or 255) / 255, (col.g or 255) / 255, (col.b or 255) / 255)
-					end
-
 					model:DrawModel()
-
-					render.SetColorModulation(1, 1, 1)
 				end
 			end
 
@@ -972,6 +980,69 @@ else
 				models[i]:Remove()
 			end
 			models[i] = nil
+		end
+
+		if #coloredBones > 0 then
+			if not IsValid(ent.bruiseWrapModel) then
+				local isFemale = ThatPlyIsFemale(ent)
+				local mdlPath = isFemale and BadagesModelFemale or BadagesModelMale
+				local model = ClientsideModel(mdlPath)
+				ent.bruiseWrapModel = model
+				model:SetNoDraw(true)
+				model:SetPos(ent:GetPos() + vector_up * 1)
+				model:SetParent(ent)
+				model:AddEffects(EF_BONEMERGE)
+
+				local mapping = isFemale and BodyGroupsFemale or BodyGroupsMale
+				local dontmakehands = false
+				if not hg.Appearance.FuckYouModels[1][ent:GetModel()] and not hg.Appearance.FuckYouModels[2][ent:GetModel()] then
+					dontmakehands = true
+				end
+
+				model.wrapBodygroups = {}
+				for bone, bgName in pairs(mapping) do
+					if dontmakehands and (bone == "ValveBiped.Bip01_L_Hand" or bone == "ValveBiped.Bip01_R_Hand") then continue end
+					local bgID = model:FindBodygroupByName(bgName)
+					if bgID and bgID >= 0 then
+						model.wrapBodygroups[bone] = bgID
+					end
+				end
+
+				ent:CallOnRemove("remove_bruise_wrap", function()
+					if IsValid(model) then
+						model:Remove()
+					end
+				end)
+			end
+
+			local model = ent.bruiseWrapModel
+
+			local hasActiveBodygroup = false
+			if model.wrapBodygroups then
+				for bone, bgID in pairs(model.wrapBodygroups) do
+					model:SetBodygroup(bgID, 0)
+				end
+				for _, bone in ipairs(coloredBones) do
+					if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
+					local bgID = model.wrapBodygroups[bone]
+					if bgID then
+						model:SetBodygroup(bgID, 1)
+						hasActiveBodygroup = true
+					end
+				end
+			end
+
+			if hasActiveBodygroup then
+				if coloredColor then
+					render.SetColorModulation((coloredColor.r or 255) / 255, (coloredColor.g or 255) / 255, (coloredColor.b or 255) / 255)
+				end
+
+				model:DrawModel()
+				render.SetColorModulation(1, 1, 1)
+			end
+		elseif IsValid(ent.bruiseWrapModel) then
+			ent.bruiseWrapModel:Remove()
+			ent.bruiseWrapModel = nil
 		end
 	end
 	--end)

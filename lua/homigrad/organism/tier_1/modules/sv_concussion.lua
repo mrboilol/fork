@@ -31,10 +31,12 @@ module[2] = function(ply, org, timeValue)
 
         org.concussion = math.max(org.concussion - timeValue, 0)
 
-        -- Drain consciousness (0.05 * concussion per second)
-		if org.consciousness then
-			org.consciousness = math.max(org.consciousness - (org.concussion * 0.032) * timeValue, 0)
-		end
+        -- Heavy consciousness drain that scales with concussion (much heavier above 4)
+        if org.consciousness then
+            local baseDrain = org.concussion * 0.05
+            local heavyDrain = org.concussion > 4 and (org.concussion - 4) * 0.1 or 0
+            org.consciousness = math.max(org.consciousness - (baseDrain + heavyDrain) * timeValue, 0)
+        end
 
         if org.concussion > 3 then
              org.needfake = true

@@ -38,6 +38,7 @@ hook.Add("Think", "stanleytumbler", function()
         local consciousness = org.consciousness or 1
         local fear = org.fear or 0
         local despair = org.despair or 0
+        local disorientation = org.disorientation or 0
         local stamina = org.stamina and org.stamina[1] or 100
         local effectiveThreshold = TUMBLE_SPEED_THRESHOLD
         effectiveThreshold = effectiveThreshold * math.Clamp(consciousness, 0.5, 1.0)
@@ -45,6 +46,9 @@ hook.Add("Think", "stanleytumbler", function()
         if stamina < 20 then
             effectiveThreshold = effectiveThreshold * 0.8
         end
+
+        -- Disorientation lowers the speed required to tumble (max 50% reduction at 10 disorientation)
+        effectiveThreshold = effectiveThreshold * math.Clamp(1 - disorientation * 0.05, 0.5, 1.0)
 
         if speed < effectiveThreshold then continue end
 
@@ -139,6 +143,9 @@ hook.Add("Think", "stanleytumbler", function()
         end
         if despair > 0.1 then
             tripChance = tripChance + despair * 0.25
+        end
+        if disorientation > 0.1 then
+            tripChance = tripChance + disorientation * 0.05
         end
 
         local maxStamina = (org.stamina and org.stamina.max) or 100

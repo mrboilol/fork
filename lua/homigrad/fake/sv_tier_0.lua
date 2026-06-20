@@ -620,13 +620,14 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 	//if ragdoll:GetVelocity():LengthSqr() < (200 * 200) or ply:InVehicle() then hg.SetFreemove(ply,not no_freemove) end
 
 	if not no_freemove and not force and not hg_ragdollcombat:GetBool() then
-		local org = ply.organism
-		local isDiving = (ply.lastInJump or 0) + 0.15 > CurTime() and (ply.lastInDuck or 0) + 0.15 > CurTime()
-		local isGrabbingWound = org and org.pressingWound
-		if not isDiving and not isGrabbingWound then
-			hg.SetFreemove(ply, true)
-			ply.lastFake = CurTime() + 0.5
-		end
+		-- Freemove removed on fake-in: keep the player in NOCLIP so the ragdoll doesn't freeze against the world.
+		ply:SetMoveType(MOVETYPE_NOCLIP)
+		local hull = Vector(1, 1, 1)
+		local hull2 = Vector(1, 1, 0)
+		ply:SetHull(-hull2, hull)
+		ply:SetHullDuck(-hull2, hull)
+		ply:SetViewOffset(vector_up)
+		ply:SetViewOffsetDucked(vector_up)
 	end
 
 	if isfunction(ply.UnDuck) then

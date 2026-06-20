@@ -655,13 +655,14 @@ function HUD_DrawDynamicIndicator()
         local function DrawDamageBlinkState(blinkModel, r, g, b)
             blinkModel:SetupBones()
 
-            render.SetColorModulation(r, g, b)
+            local dimR, dimG, dimB = r * base_col, g * base_col, b * base_col
+            render.SetColorModulation(dimR, dimG, dimB)
             for _, offset in ipairs(outlineOffsets) do
                 blinkModel:SetPos(modelOffset + offset)
                 blinkModel:DrawModel()
             end
 
-            render.SetColorModulation(r, g, b)
+            render.SetColorModulation(dimR, dimG, dimB)
             blinkModel:SetPos(modelOffset)
             blinkModel:DrawModel()
         end
@@ -890,6 +891,7 @@ function HUD_DrawDynamicIndicator()
             local r, g, b, mat
             
             if severity >= 4.25 or isArterial then
+                mat = bigBleedIconMat
                -- the severity is bullshite
                 -- Dark yellow -> dark orange -> dark red based on severity
                 -- 4.25 = dark yellow (180, 160, 0), 7.125 = dark orange (180, 80, 0), 10.0+ = dark red (120, 0, 0)

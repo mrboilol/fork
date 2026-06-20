@@ -395,7 +395,7 @@ if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
 	end
 
 	org.shock = org.shock + dmg * 3
-	    org.concussion = math.min((org.concussion or 0) + dmg * 8, 10) -- Increased from 4 to 8
+	org.concussion = (org.concussion or 0) + dmg * 12 -- Jaw hits cause strong concussion
 
 	-- Chance to induce vomiting from jaw trauma
 	if org.isPly and math.random() < dmg * 0.2 then
@@ -403,14 +403,22 @@ if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
 		org.vomitTypeHeadTrauma = math.random(10) == 1
 	end
 
-    -- Slight disorientation and consciousness loss
-    org.disorientation = org.disorientation + dmg * 1.5 -- Increased from 0.5 to 1.5
-    org.consciousness = math.max(org.consciousness - dmg * 0.15, 0) -- Increased from 0.05 to 0.15
+	-- Significant disorientation and consciousness loss from jaw trauma
+	org.disorientation = org.disorientation + dmg * 2
+	org.consciousness = math.max(org.consciousness - dmg * 0.25, 0)
 
-    -- Add more concussion for significant damage
-    if dmg > 0.2 then
-        org.concussion = math.min((org.concussion or 0) + dmg * 4, 10) -- Increased from 2 to 4
-    end
+	-- Add extra concussion for significant blows and when the jaw actually breaks or dislocates
+	if dmg > 0.2 then
+		org.concussion = (org.concussion or 0) + dmg * 6
+	end
+
+	if org.jaw == 1 and (org.jaw - oldDmg) > 0 then
+		org.concussion = (org.concussion or 0) + 2
+	end
+
+	if dislocated then
+		org.concussion = (org.concussion or 0) + 1.5
+	end
 
 	if dislocated then
 		org.shock = org.shock + dmg * 20

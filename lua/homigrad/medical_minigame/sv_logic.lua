@@ -579,10 +579,16 @@ net.Receive("hg_medical_minigame_dislocation_pain", function(len, ply)
     local painAmount = net.ReadFloat()
     local wep = ply:GetActiveWeapon()
     if not IsValid(wep) then return end
-    
-    local target = wep.healbuddy or ply
+
+    local session = hg.MedicalMinigame.DislocationSessions[ply]
+    local target = session and session.target or nil
+
+    if not IsValid(target) or not target.organism then
+        target = wep.healbuddy or ply
+    end
+
     if not IsValid(target) or not target.organism then return end
-    
+
     target.organism.painadd = (target.organism.painadd or 0) + painAmount
 end)
 

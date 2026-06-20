@@ -25,7 +25,7 @@ function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local mul = ((0.5) + math_max(self.Primary.Force / 110 - 1, 0)) * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
 	self:ApplyForce(mul)
-	mul = (mul or 0) * (self.Supressor and 0.75 or 1) * (owner.organism and owner.organism.recoilmul or 1) * self:GetFearRecoilMul()
+	mul = (mul or 0) * (self.Supressor and 0.75 or 1) * (owner.organism and owner.organism.recoilmul or 1) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul() * self:GetWeaponWeightHandlingMul()
 	return mul
 end
 

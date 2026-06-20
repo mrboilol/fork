@@ -1318,8 +1318,8 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 end
 
                 local perfectblock_window = 0.5
-                if wep:HasBrokenArm(ent) then
-                    perfectblock_window = perfectblock_window * (wep.BrokenArmPenalty.BlockDurationMultiplier or 1)
+                if IsValid(wep) and wep.HasBrokenArm and wep:HasBrokenArm(ent) then
+                    perfectblock_window = perfectblock_window * ((wep.BrokenArmPenalty and wep.BrokenArmPenalty.BlockDurationMultiplier) or 1)
                 end
                 local perfectblock = CurTime() - wep:GetStartedBlocking() < perfectblock_window
                 
@@ -1336,9 +1336,9 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 end
 
                 -- Add pain when blocking with damaged arms
-                if wep:HasBrokenArm(ent) and ent.organism then
-                    local painAmount = wep.BrokenArmPenalty.PainOnBlock or 8
-                    local armDamage = wep:GetArmDamagePercent(ent)
+                if IsValid(wep) and wep.HasBrokenArm and wep:HasBrokenArm(ent) and ent.organism then
+                    local painAmount = (wep.BrokenArmPenalty and wep.BrokenArmPenalty.PainOnBlock) or 8
+                    local armDamage = wep.GetArmDamagePercent and wep:GetArmDamagePercent(ent) or 0
                     ent.organism.painadd = (ent.organism.painadd or 0) + (painAmount * (0.5 + armDamage * 0.5))
                 end
 

@@ -193,6 +193,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local adrenalineJitter = math.max(0, adrenaline - 1.25)
 	local adrenalineStabilizer = math.min(adrenaline, 1.25) * 0.05
 	local stressFactor = fear + adrenalineJitter * 1.5
+	local handlingMul = self:GetCognitiveHandlingMul()
 	
 	painmul = painmul * 2
 	--local noZoomHelmet = (ply.armors and (not ply.armors["head"] or not hg.armor.head[ply.armors["head"]] or not hg.armor.head[ply.armors["head"]].cantsight or self:IsPistolHoldType()))
@@ -321,7 +322,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if tta_multiplier > 1 and not bypass_mitigation then
 		tta_multiplier = 1 + (tta_multiplier - 1) * mitigation_mult
 	end
-	tta_multiplier = tta_multiplier * (1 + fear * 0.15 + adrenalineJitter * 0.1) / (1 + adrenalineStabilizer)
+	tta_multiplier = tta_multiplier * (1 + fear * 0.15 + adrenalineJitter * 0.1) / (1 + adrenalineStabilizer) * handlingMul
 	tta = tta * tta_multiplier
 
 	-- Aiming fatigue slows down sight realignment
@@ -395,7 +396,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 			final_brain_sway = final_brain_sway * mitigation_mult
 		end
 
-		local sway_scale = 1 + final_arm_sway + final_fatigue_sway + final_brain_sway
+		local sway_scale = (1 + final_arm_sway + final_fatigue_sway + final_brain_sway) * handlingMul
 
 		local jitterMult = (stressFactor > 0.1) and (1 + stressFactor * 0.5) or 1
 		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * (isHoldingBreath and 0.1 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale + jitterSway * jitterMult)

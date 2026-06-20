@@ -3,7 +3,7 @@ if CLIENT then
     local startTime = 0
     local suicideSound = nil
     
-    CreateClientConVar("hg_cutscene", "1", true, false, "Enable suicide cutscene (1 = enabled, 0 = disabled)", 0, 1)
+    CreateClientConVar("hg_cutscene", "1", true, true, "Enable suicide cutscene (1 = enabled, 0 = disabled)", 0, 1)
     
     net.Receive("HG_SuicideCutscene", function()
         local start = net.ReadBool()

@@ -142,8 +142,8 @@ if SERVER then
 				lleg = "ValveBiped.Bip01_L_Calf",
 				rleg = "ValveBiped.Bip01_R_Calf",
 				chest = "ValveBiped.Bip01_Spine2",
-				pelvis = "ValveBiped.Bip01_Spine2",
-				spine1 = "ValveBiped.Bip01_Spine2",
+				pelvis = "ValveBiped.Bip01_Pelvis",
+				spine1 = "ValveBiped.Bip01_Spine1",
 				spine2 = "ValveBiped.Bip01_Spine2",
 				spine3 = "ValveBiped.Bip01_Spine2",
 			}

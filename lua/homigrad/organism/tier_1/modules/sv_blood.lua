@@ -166,12 +166,18 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
+	-- Nosebleed from severe internal bleeding
+	if org.internalBleed > 0.75 and hg.applyNosebleed and math.random() < org.internalBleed * 0.02 * mulTime then
+		hg.applyNosebleed(owner, org.internalBleed * 8)
+	end
+
 	-- Tiered blood loss progression
 	-- 4500: first symptoms - lightheaded, faint nausea
-	-- 4000: slight systemic debuffs begin (O2, pulse, consciousness soft-cap 0.95)
-	-- 3500: bigger debuffs, compensatory tachycardia, consciousness cap 0.7
-	-- 3000: body struggling hard, HR spikes toward 225, big O2 debuff, consciousness held at 0.7
-	-- 2500: slow ischemia onset, O2 steadily draining, pulse destabilizing
+	-- 4000: slight systemic debuffs begin (O2, consciousness soft-cap 0.95)
+	-- 3500: moderate O2 debuff, consciousness cap 0.85 (compensation delayed)
+	-- 3000: compensation tachycardia begins, heart rate rises toward 125
+	-- 2750: heavy compensation kicks in, HR spikes toward 190, blood-based heartstop risk begins
+	-- 2500: pulse destabilizes, O2 drains hard, ischemia begins
 	-- 2000: full ischemic collapse (handled below)
 	local bloodConsciousnessCap = 1
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
@@ -187,10 +193,6 @@ module[2] = function(owner, org, mulTime)
 	if org.blood < 4000 then
 		-- Mild O2 debuff: reduced O2 delivery (slight)
 		org.o2[1] = math.max(org.o2[1] - mulTime * 0.4, 0)
-		-- Compensatory: slight pulse nudge upward toward 85
-		if org.pulse < 85 and not adrenalineStabilizer then
-			org.pulse = math.min(org.pulse + mulTime * 0.3, 85)
-		end
 		-- Soft consciousness cap at 0.95
 		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
 		if org.isPly and not org.otrub and (org._blood4000NotifyTime or 0) + 60 < CurTime() then
@@ -201,13 +203,13 @@ module[2] = function(owner, org, mulTime)
 
 	if org.blood < 3500 then
 		-- Moderate O2 debuff: body struggling to deliver O2
-		org.o2[1] = math.max(org.o2[1] - mulTime * 1.2, 0)
-		-- Compensatory tachycardia: heart races to compensate
-		if org.pulse < 105 and not adrenalineStabilizer then
-			org.pulse = math.min(org.pulse + mulTime * 0.8, 105)
+		org.o2[1] = math.max(org.o2[1] - mulTime * 0.8, 0)
+		-- Delayed compensation: only mild pulse nudge toward 90
+		if org.pulse < 90 and not adrenalineStabilizer then
+			org.pulse = math.min(org.pulse + mulTime * 0.4, 90)
 		end
-		-- Consciousness cap drops to 0.7
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.7)
+		-- Consciousness cap drops to 0.85
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.85)
 		if org.isPly and not org.otrub and (org._blood3500NotifyTime or 0) + 45 < CurTime() then
 			org.owner:Notify("My head is spinning... I can barely focus.", 15, "blood_3500", 0)
 			org._blood3500NotifyTime = CurTime()
@@ -215,17 +217,43 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.blood < 3000 then
-		-- Big O2 debuff: body really struggling for blood
-		org.o2[1] = math.max(org.o2[1] - mulTime * 2.5, 0)
-		-- Heart rate spikes hard toward 225 BPM (maximum compensatory tachycardia - heart trying desperately to compensate)
-		if not adrenalineStabilizer then
-			org.pulse = math.min(org.pulse + mulTime * 3.0, 225)
+		-- Moderate O2 debuff: body really struggling for blood
+		org.o2[1] = math.max(org.o2[1] - mulTime * 1.5, 0)
+		-- Compensation tachycardia begins, heart rate rises toward 125
+		if org.pulse < 125 and not adrenalineStabilizer then
+			org.pulse = math.min(org.pulse + mulTime * 1.0, 125)
 		end
-		-- Consciousness held at 0.7 cap (no worse yet, just sustained impairment)
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.7)
+		-- Consciousness cap drops to 0.75
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.75)
 		if org.isPly and not org.otrub and (org._blood3000NotifyTime or 0) + 30 < CurTime() then
 			org.owner:Notify("I can't... get enough air. Everything is heavy.", 15, "blood_3000", 0)
 			org._blood3000NotifyTime = CurTime()
+		end
+	end
+
+	if org.blood < 2750 then
+		-- Heavy compensation: heart races desperately to compensate
+		org.o2[1] = math.max(org.o2[1] - mulTime * 2.0, 0)
+		if org.pulse < 190 and not adrenalineStabilizer then
+			org.pulse = math.min(org.pulse + mulTime * 2.0, 190)
+		end
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.7)
+
+		-- Blood-based heartstop: big chance only in the 2750-2000 range
+		if org.blood >= 2000 then
+			if not org._blood_heartstop_check or CurTime() > org._blood_heartstop_check then
+				org._blood_heartstop_check = CurTime() + 1
+				local depth = math.Clamp((2750 - org.blood) / 750, 0, 1) -- 0 at 2750, 1 at 2000
+				local chance = 0.05 + depth * 0.15 -- 5% to 20% per second
+				-- Adrenaline stabilizes the heart during compensation
+				if adrenalineStabilizer then
+					chance = chance * math.max(0, 1 - math.min(totalAdrenaline * 0.25, 0.8))
+				end
+				if org.givingUp then chance = chance * 1.5 end
+				if chance > 0 and math.random() < chance then
+					org.heartstop = true
+				end
+			end
 		end
 	end
 

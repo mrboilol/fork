@@ -772,7 +772,7 @@ function SWEP:FireBullet()
 			spreadMul = 1 + debuff_portion
 		end
 
-		bullet.Spread = bullet.Spread * spreadMul * self:GetFearSpreadMul()
+		bullet.Spread = bullet.Spread * spreadMul * self:GetFearSpreadMul() * self:GetCognitiveHandlingMul() * self:GetWeaponWeightHandlingMul()
 	end
 	bullet.Num = 1
 	

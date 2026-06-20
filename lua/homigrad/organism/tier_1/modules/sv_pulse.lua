@@ -43,7 +43,7 @@ module[2] = function(owner, org, timeValue)
 	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
 	
 	--local k = heart * o2 * (1 / math.Clamp((org.blood - 2000) / 3000,0.2,1)) * brain * (org.heartstop and 0.1 or 1) --* halfValue2(stamina[2], stamina.fatigueRange, stamina.fatigueK)
-	local k = heart * o2 * (math.Clamp((org.blood - 1000) / 4000,0,1)) * brain * (org.heartstop and 0.1 or 1)
+	local k = heart * o2 * (math.Clamp((org.blood - 1500) / 3500, 0.5, 1)) * brain * (org.heartstop and 0.1 or 1)
 	pulse = pulse * k
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
 	
@@ -141,8 +141,8 @@ module[2] = function(owner, org, timeValue)
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 2.0)
 
-	local compensation = 1 + math.Clamp((3500 - blood) / 1500, 0, 1) * 0.16
-	compensation = compensation * (1 - math.Clamp((2500 - blood) / 500, 0, 1) * 0.5)
+	local compensation = 1 + math.Clamp((3000 - blood) / 1000, 0, 1) * 0.16
+	compensation = compensation * (1 - math.Clamp((2250 - blood) / 500, 0, 1) * 0.5)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 
 	local pulse_factor = org.pulse / 70

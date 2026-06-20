@@ -17,6 +17,7 @@ if SERVER then
         if ply:GetInfoNum("hg_cutscene", 1) == 0 then
             -- Cutscene disabled: toggle normal suicide mode immediately, no cutscene or forced firing
             ply.suiciding = not ply.suiciding
+            ply:SetNWBool("suiciding", ply.suiciding)
             ply.startsuicide = ply.suiciding and (CurTime() - 2) or nil
             return
         end
@@ -84,6 +85,8 @@ if SERVER then
             ply.suicideCutscene = false
             ply.suicideCutsceneWep = nil
             ply.suiciding = not ply.suiciding
+            ply:SetNWBool("suiciding", ply.suiciding)
+            ply.startsuicide = ply.suiciding and (CurTime() - 2) or nil
         end
     end)
 

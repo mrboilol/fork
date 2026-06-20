@@ -413,6 +413,8 @@ local function applyNosebleed(ent, harm, ignoreCooldown)
 	return true
 end
 
+hg.applyNosebleed = applyNosebleed
+
 hook.Add("HomigradDamage", "ZCity_BluntFaceNosebleed", function(ent, dmgInfo, hitgroup, attackerEnt, harm)
 	if not isBluntFaceHit(dmgInfo, hitgroup, harm) then return end
 

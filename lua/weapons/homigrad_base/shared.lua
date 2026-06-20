@@ -122,6 +122,22 @@ function SWEP:GetFearHandlingMul()
 	return 1 + fear * 0.15 + jitter * 0.1 - stabilizer
 end
 
+function SWEP:GetCognitiveHandlingMul()
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return 1 end
+
+	local org = owner.organism or {}
+	local consciousness = math.Clamp(org.consciousness or 1, 0, 1)
+	local disorientation = math.Clamp(org.disorientation or 0, 0, 1)
+
+	return 1 + (1 - consciousness) * 0.5 + disorientation * 0.4
+end
+
+function SWEP:GetWeaponWeightHandlingMul()
+	local w = self.weight or self.Weight or 5
+	return math.Clamp(1 + (w - 2) * 0.15, 0.7, 2.0)
+end
+
 game.AddParticles("particles/tfa_smoke.pcf")
 PrecacheParticleSystem("smoke_trail_tfa")
 PrecacheParticleSystem("smoke_trail_wild")
@@ -494,7 +510,10 @@ end
 if SERVER then
 	hook.Add("Player Think","huyhuy",function(ply)
 		local wep = ply:GetActiveWeapon()
-		if (!wep.ishgweapon and !wep.ismelee2) or !wep.CanSuicide then ply.suiciding = false end
+		if (!wep.ishgweapon and !wep.ismelee2) or !wep.CanSuicide then
+			ply.suiciding = false
+			ply:SetNWBool("suiciding", false)
+		end
 	end)
 end
 
