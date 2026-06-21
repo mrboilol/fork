@@ -54,6 +54,7 @@ module[1] = function(org)
 	org.pressingWoundEfficiency = 0
 	org.pressingWoundMul = 1.0
 	org.pressingWoundNextToggle = 0
+	org.neckslitStandUpSuppressed = false
 end
 
 
@@ -346,8 +347,20 @@ module[2] = function(owner, org, mulTime)
 	local ent = isPlayer and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 	local ownerVel = owner:GetVelocity()
 	
+	-- Track stand-up from ragdoll: suppress neck bleeding reduction until ragdolled again
+	if isPlayer then
+		local isRagdoll = IsValid(owner.FakeRagdoll)
+		if org._wasRagdoll and not isRagdoll then
+			org.neckslitStandUpSuppressed = true
+		end
+		if isRagdoll then
+			org.neckslitStandUpSuppressed = false
+		end
+		org._wasRagdoll = isRagdoll
+	end
+	
 	-- Neck bleeding reduction based on hands
-	if isPlayer and not IsValid(owner.FakeRagdoll) and org.neckslit then
+	if isPlayer and not IsValid(owner.FakeRagdoll) and org.neckslit and not org.neckslitStandUpSuppressed then
 		local wep = owner:GetActiveWeapon()
 		local handsOnNeck = 0
 		if not IsValid(wep) or wep:GetClass() == "weapon_hands_sh" then

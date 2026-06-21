@@ -20,10 +20,15 @@ local HIGH_SPEED_DISLOCATION_CHANCE = 0.2
 local FAILED_BREACH_DISLOCATION_CHANCE = 0.3
 
 local function apply_dislocation(owner, limb, limb_name)
-    if limb == "lleg" then owner.organism.llegdislocation = true
-    elseif limb == "rleg" then owner.organism.rlegdislocation = true
-    elseif limb == "larm" then owner.organism.larmdislocation = true
-    elseif limb == "rarm" then owner.organism.rarmdislocation = true
+    local dislocation_map = {
+        lleg = "llegdislocation",
+        rleg = "rlegdislocation",
+        larm = "larmdislocation",
+        rarm = "rarmdislocation"
+    }
+    local key = dislocation_map[limb]
+    if key and not owner.organism[key] then
+        owner.organism[key] = true
     end
     --owner:Notify("Your " .. limb_name .. " was dislocated from the impact!", 1, limb .. "_dislocated", 5)
 end

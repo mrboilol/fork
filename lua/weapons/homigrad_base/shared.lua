@@ -808,11 +808,12 @@ if CLIENT then
 	})
 
 	dynamicmags = CreateClientConVar("hg_dynamic_mags", "0", true, false, "Enables dynamic ammo show when shooting",0,1)
+	dzity = CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps",0,1)
 	instructions = CreateClientConVar("hg_instructions","1", true, false, "Enables gun instructions",0,1)
 end
 
-function SWEP:DrawHUDAdd()
-end
+local scale = 1
+local developer = GetConVar("developer")
 
 local blur = Material( "pp/blurscreen" )
 local function DrawBlurRect(x, y, w, h, dens, alpha)
@@ -823,67 +824,55 @@ local function DrawBlurRect(x, y, w, h, dens, alpha)
    	surface.SetDrawColor(0,0,0)
 end
 
-	--local clipsize = (self:GetMaxClip1() + (self.OpenBolt and 0 or 1))
-	--local owner = self:GetOwner()
-	--local attpos = self:GetMuzzleAtt(nil, true, true).Pos
-	--local posX,posY = dynamicmags:GetBool() and attpos:ToScreen().x + 50 or ScrW() - ScrW() / 4, dynamicmags:GetBool() and attpos:ToScreen().y + 90 or ScrH() - ScrH() / 6
-	--local sizeX,sizeY =  (clipsize == 1 and ScrH() / 15 or ScrW() / 40) * scale, (clipsize == 1 and ScrH() / 80 or ScrH() / 10) * scale
---
---
-	--lerpAmmoCheck = Lerp(owner:KeyDown(IN_RELOAD) and 0.5 or 0.02, lerpAmmoCheck, self:KeyDown(IN_RELOAD) and 1 or (dynamicmags:GetBool() and 0 or 0.0))
-	--colBlack.a = 125 * lerpAmmoCheck
-	--colWhite.a = 255 * lerpAmmoCheck
-	--local ammoLeft = math.ceil(self:Clip1() / clipsize * sizeY)
-	--local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
-	--local magCount = math.ceil(ammo / clipsize)
---
-	--col:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
-	--col.a = 255 * lerpAmmoCheck
-	--if col.a > 1 then
-	--	DrawBlurRect(posX-sizeX*(clipsize ~= 1 and .2 or .3),posY-sizeY*(clipsize ~= 1 and .1 or .7),(sizeX+sizeX*(clipsize ~= 1 and .12 or .2)) * (math.max(math.min(magCount+1,(clipsize ~= 1 and 5 or 4)),1.3)), sizeY + (clipsize ~= 1 and 20 or 60),7,col.a*5)
-	--end
-	--
-	--local color = col
-	--surface.SetDrawColor(color)
-	--surface.DrawRect(posX,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
-	--surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
---
-	--local posX,posY = posX + (clipsize == 1 and ScrW() / 40 or ScrW() / 50), posY + (clipsize == 1 and ScrH()/70 or ScrH() / 20)
-	--local sizeX,sizeY = sizeX / 2,sizeY / 2
---
-	--for i = 1,magCount do
-	--	if i > 3 then continue end
-	--	local ammoasd = math.min(clipsize,ammo)
-	--	ammo = ammo - ammoasd
-	--	
-	--	local ammoLeft = math.ceil(ammoasd / clipsize * sizeY)
-	--	
-	--	col2:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
-	--	col2.a = 255 * lerpAmmoCheck
-	--	surface.SetDrawColor(col2)
-	--	surface.DrawRect(posX + (sizeX + 15) * i,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
-	--	surface.DrawOutlinedRect(posX - 5 + (sizeX + 15) * i,posY - 5, sizeX + 10, sizeY + 10, 1)
-	--end
---
-	--if magCount > 3 then
-	--	draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 + 1, posY + sizeX/2 + 1,Color(0,0,0,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
-	--	draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 , posY + sizeX/2,Color(255,255,255,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
-	--end
-	
+function SWEP:DrawHUDAdd()
+	local clipsize = (self:GetMaxClip1() + (self.OpenBolt and 0 or 1))
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	local attpos = self:GetMuzzleAtt(nil, true, true).Pos
+	local posX,posY = dynamicmags:GetBool() and attpos:ToScreen().x + 50 or ScrW() - ScrW() / 4, dynamicmags:GetBool() and attpos:ToScreen().y + 90 or ScrH() - ScrH() / 6
+	local sizeX,sizeY =  (clipsize == 1 and ScrH() / 15 or ScrW() / 40) * scale, (clipsize == 1 and ScrH() / 80 or ScrH() / 10) * scale
 
-	--self.hudinspect = self.hudinspect or 0
-	--if instructions:GetBool() and self.hudinspect - (CurTime()-6) > 0 then
-	--	self.InfoAlpha = Lerp(FrameTime() * 10,self.InfoAlpha or 0,math.min(self.hudinspect - (CurTime() - 5),1)*255)
-	--	local txt = self.Instructions
-	--	if not self.InfoMarkup1 then
-	--		self.InfoMarkup1 = markup.Parse( "<font=DescFont>"..txt.."</font>", 450 )
-	--	end
-	--	DrawBlurRect(posX - 5 - self.InfoMarkup1:GetWidth() - ScrW()*0.05, posY - self.InfoMarkup1:GetHeight()/2 - 5, self.InfoMarkup1:GetWidth()+10, self.InfoMarkup1:GetHeight()+10, 8, self.InfoAlpha)
-	--	self.InfoMarkup1:Draw(posX- ScrW()*0.05,posY,TEXT_ALIGN_RIGHT,TEXT_ALIGN_CENTER,self.InfoAlpha)
-	--end
+	local show = owner:KeyDown(IN_RELOAD) or dynamicmags:GetBool() or dzity:GetBool()
+	lerpAmmoCheck = Lerp(0.1, lerpAmmoCheck, show and 1 or 0)
+	colBlack.a = 125 * lerpAmmoCheck
+	colWhite.a = 255 * lerpAmmoCheck
+	local ammoLeft = math.ceil(self:Clip1() / clipsize * sizeY)
+	local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
+	local magCount = math.ceil(ammo / clipsize)
 
-local scale = 1
-local developer = GetConVar("developer")
+	col:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
+	col.a = 255 * lerpAmmoCheck
+	if col.a > 1 then
+		DrawBlurRect(posX-sizeX*(clipsize ~= 1 and .2 or .3),posY-sizeY*(clipsize ~= 1 and .1 or .7),(sizeX+sizeX*(clipsize ~= 1 and .12 or .2)) * (math.max(math.min(magCount+1,(clipsize ~= 1 and 5 or 4)),1.3)), sizeY + (clipsize ~= 1 and 20 or 60),7,col.a*5)
+	end
+
+	local color = col
+	surface.SetDrawColor(color)
+	surface.DrawRect(posX,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
+	surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
+
+	posX,posY = posX + (clipsize == 1 and ScrW() / 40 or ScrW() / 50), posY + (clipsize == 1 and ScrH()/70 or ScrH() / 20)
+	sizeX,sizeY = sizeX / 2,sizeY / 2
+
+	for i = 1,magCount do
+		if i > 3 then continue end
+		local ammoasd = math.min(clipsize,ammo)
+		ammo = ammo - ammoasd
+		
+		local ammoLeft = math.ceil(ammoasd / clipsize * sizeY)
+		
+		col2:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
+		col2.a = 255 * lerpAmmoCheck
+		surface.SetDrawColor(col2)
+		surface.DrawRect(posX + (sizeX + 15) * i,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
+		surface.DrawOutlinedRect(posX - 5 + (sizeX + 15) * i,posY - 5, sizeX + 10, sizeY + 10, 1)
+	end
+
+	if magCount > 3 then
+		draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 + 1, posY + sizeX/2 + 1,Color(0,0,0,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+		draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 , posY + sizeX/2,Color(255,255,255,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+	end
+end
 
 
 local function DrawBullet(matIcon, x, y, size, cColor)

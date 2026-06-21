@@ -6,8 +6,19 @@ ENT.Spawnable = false
 ENT.IconOverride = "entities/ent_jack_gmod_ezarmor_sc_kappa.png"
 
 ENT.Model = "models/props_junk/wood_crate001a.mdl"
-ENT.LootTable = {}
-ENT.CanGenerate = false
+ENT.LootTable = {
+    {class = "weapon_bandage_sh"},
+    {class = "weapon_painkillers"},
+    {class = "weapon_tourniquet"},
+    {class = "weapon_smallconsumable"},
+    {class = "weapon_bigconsumable"},
+    {class = "weapon_ducttape"},
+    {class = "weapon_zippo_tpik"},
+    {class = "weapon_adrenaline"},
+    {class = "weapon_morphine"},
+    {class = "weapon_medkit_sh"},
+}
+ENT.CanGenerate = true
 
 function ENT:Initialize()
 	self:PhysicsInit(SOLID_VPHYSICS)

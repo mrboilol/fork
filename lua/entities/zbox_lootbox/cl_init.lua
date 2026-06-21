@@ -58,20 +58,25 @@ local function OpenContainer( ent )
 	local use3D = hg_3dzity:GetBool()
 	zbContainerMenu:SetTitle("")
 	zbContainerMenu:SetSize(sizeX, sizeY)
-    zbContainerMenu:SetPos(0, 500)
-	--zbContainerMenu:Center()
-	zbContainerMenu:MakePopup()
-	zbContainerMenu:SetKeyBoardInputEnabled(false)
 	zbContainerMenu:ShowCloseButton(true)
+	zbContainerMenu:SetKeyBoardInputEnabled(false)
 	zbContainerMenu:SetVisible(not use3D)
 	zbContainerMenu:SetMouseInputEnabled(not use3D)
 	zbContainerMenu.Created = CurTime()
     zbContainerMenu:SetAlpha(0)
-    zbContainerMenu.OnClose = function() zbContainerMenu = nil end 
+    zbContainerMenu.OnClose = function() zbContainerMenu = nil end
 
-    zbContainerMenu:MoveTo(0,0, 0.5, 0, 0.3, function()
-    end)
-    zbContainerMenu:AlphaTo( 255, 0.2, 0.1, nil )
+    if use3D then
+        zbContainerMenu:SetPos(0, 500)
+        zbContainerMenu:MoveTo(0, 0, 0.5, 0, 0.3)
+    else
+        local cx, cy = (ScrW() - sizeX) / 2, (ScrH() - sizeY) / 2
+        zbContainerMenu:SetPos(cx, cy + 100)
+        zbContainerMenu:MoveTo(cx, cy, 0.5, 0, 0.3)
+    end
+
+    zbContainerMenu:MakePopup()
+    zbContainerMenu:AlphaTo(255, 0.2, 0.1, nil)
 
     function zbContainerMenu:Close()
 		self.Closing = true
@@ -147,8 +152,8 @@ local function OpenContainer( ent )
 	grid:SetColWide(sizeX / 5 - sizeX / 16 / 9)
 	grid:SetRowHeight(sizeY / 6.5 + sizeY / 32)
 
-    for k,item in pairs(ent.Loot) do 
-        local button = vgui.Create("DButton", plyMenu)
+    for k,item in pairs(ent.Loot) do
+        local button = vgui.Create("DButton", zbContainerMenu)
 		button:SetText("")
 		button:DockMargin(5, 0, 2, 0)
 		--button:SetSize(0,0)
@@ -235,24 +240,38 @@ local modelOffset = {
 }
 
 local offsetVec1,offsetAng1 = Vector(25,0,15),Angle(0,90,0)
+
+local function GetContainerPanelBase(ent)
+    local off = modelOffset[ent:GetModel()]
+    if off then
+        return LocalToWorld(off[1], off[2], ent:GetPos(), ent:GetAngles()), off[2]
+    else
+        local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
+        local front = Vector(0, 0, 25)
+        if mins and maxs then
+            front.x = maxs.x + 5
+            front.y = (mins.y + maxs.y) / 2
+            front.z = maxs.z + 5
+        end
+        return LocalToWorld(front, Angle(0, 90, 0), ent:GetPos(), ent:GetAngles()), Angle(0, 90, 0)
+    end
+end
+
 local lerpang = Angle(0,0,0)
 hook.Add("PostDrawOpaqueRenderables","Draw3D2DFrameContainer",function()
     if not hg_3dzity:GetBool() then return end
     local ent = hg.OpenedContainer
 
 	if IsValid(ent) and IsValid(zbContainerMenu) and !zbContainerMenu.Closing then
-        --print(ent:GetModel())
-		local pos,ang = LocalToWorld(modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][1] or offsetVec1, modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][2] or offsetAng1, ent:GetPos(), ent:GetAngles())
+        local pos, baseAng = GetContainerPanelBase(ent)
         local veiwSetup = render.GetViewSetup()
-        local angle = ( pos - veiwSetup.origin ):GetNormalized():Angle()
-        --angle.y
-        lerpang = LerpAngleFT( 0.1, EyeAngles(), angle )
+        local angle = (pos - veiwSetup.origin):GetNormalized():Angle()
+        lerpang = LerpAngleFT(0.1, EyeAngles(), angle)
         lerpang[3] = 0
         LocalPlayer():SetEyeAngles(lerpang)
-        ang = Angle(0,angle.y,veiwSetup.angles[1]) - (modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][2] or offsetAng1)
+        local ang = Angle(0, angle.y, veiwSetup.angles[1]) - baseAng
 		vgui.Start3D2D(pos + ang:Forward() * -12.7 - ang:Right() * 7 + ang:Up() * 5, ang, 0.04)
             zbContainerMenu:Paint3D2D()
-            --print("asd")
 		vgui.End3D2D()
 	end
 end)

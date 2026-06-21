@@ -140,7 +140,7 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	local add = math.min(timeValue * 20, org.painadd) * goodmoodResistance * painMitigation
+	local add = math.min(timeValue * 100, org.painadd) * goodmoodResistance * painMitigation
 
 	local sub = (add <= 0.2) and (timeValue * 2 * (org.otrub and 5 or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
 
@@ -148,31 +148,11 @@ module[2] = function(owner, org, timeValue)
 
 	if adrenaline > 0 then
 
-		if adrenaline < 0.5 then
+		local suppression = math.max(1 - adrenaline / 2, 0.1)
 
-			-- below 0.5: slight numbing effect, no strong delaying
+		sub = sub * suppression
 
-			sub = sub * math.max(1 - adrenaline, 0.9)
-
-			add = add * math.max(1 - adrenaline, 0.9)
-
-		elseif adrenaline < 1.0 then
-
-			-- below 1.0: kicks in like normal
-
-			sub = sub * math.max(1 - adrenaline, 0.05) / 1.5
-
-			add = add * math.max(1 - adrenaline, 0.05) / 1.5
-
-		else
-
-			-- 1.0 and above: incredible numbing
-
-			sub = sub * math.max(1 - adrenaline, 0.05) / 2.5
-
-			add = add * math.max(1 - adrenaline, 0.05) / 2.5
-
-		end
+		add = add * suppression
 
 	end
 
@@ -325,7 +305,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - adrenaline / 2.5, 0.4) * math.max(1 - org.analgesia, 0)
+	org.pain = org.avgpain * math.max(1 - adrenaline / 16, 0.75) * math.max(1 - org.analgesia, 0)
 
 
 

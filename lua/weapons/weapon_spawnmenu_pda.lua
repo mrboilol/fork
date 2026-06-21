@@ -168,6 +168,7 @@ if SERVER then
                 ent:SetMaterial("models/mat_jack_aidbox")
                 ent:SetModel("models/props_junk/wood_crate001a.mdl")
                 ent:SetPos(tr.HitPos + tr.HitNormal * 15)
+                ent.CanGenerate = false
                 ent:Spawn()
 
                 for k,item in pairs(Cart) do

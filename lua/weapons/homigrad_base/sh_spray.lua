@@ -6,9 +6,11 @@ end
 
 local function SharedAngleRand(seed, min, max)
     local a = Angle()
-    a[1] = util.SharedRandom(seed .. "p", min, max)
-    a[2] = util.SharedRandom(seed .. "y", min, max)
-    a[3] = util.SharedRandom(seed .. "r", min, max)
+    local minAng = isangle(min) and min
+    local maxAng = isangle(max) and max
+    a[1] = util.SharedRandom(seed .. "p", minAng and minAng[1] or min, maxAng and maxAng[1] or max)
+    a[2] = util.SharedRandom(seed .. "y", minAng and minAng[2] or min, maxAng and maxAng[2] or max)
+    a[3] = util.SharedRandom(seed .. "r", minAng and minAng[3] or min, maxAng and maxAng[3] or max)
     return a
 end
 

@@ -18,20 +18,29 @@ function ENT:Initialize()
 	end
 
     self.Loot = {
-        --[[ 
-            [ ID ] = { 
+        --[[
+            [ ID ] = {
                 class = "ИМЯ КЛАССА",
                 entData = {
                     DataETC = "ДАТА" --| Для контейнеров игроков, где можно хранить вещи.
                     --| Кстати с помощью этого можно делать уникальные ентити которые будут иметь свои приколы, хоть по суте один и тот-же класс
                 }
-            }, 
+            },
         --]]
     }
     self.ShowContainer = {
         --| Игроки которые открыли контейнер
 
     }
+
+    self.CanGenerate = self.CanGenerate ~= false
+    if self.CanGenerate then
+        timer.Simple(0, function()
+            if IsValid(self) then
+                self:GenerateLoot()
+            end
+        end)
+    end
 end
 
 local loottypes = {
@@ -143,18 +152,22 @@ end
 
 function ENT:GenerateLoot()
     if not self.CanGenerate then return end
-    local count = 0
-    local ammout = math.random( 1, self.LootCountMul or 3)
+    local tbl = self.LootTable
+    if not tbl or table.IsEmpty(tbl) then return end
+    local ammout = math.random(1, self.LootCountMul or 3)
     for i = 1, ammout do
-        if #self.Loot > 6 then return end
-        local item = table.Random(self.LootTable)
-		
-		if(istable(item))then
-			_, item = hg.WeightedRandomSelect(tab, mul)
-		end
-		
-        if count >= ammout then return end
-        count = count + 1
+        if #self.Loot >= 6 then return end
+        local item
+        if istable(tbl[1]) and isnumber(tbl[1][1]) then
+            _, item = hg.WeightedRandomSelect(tbl, 1)
+        else
+            item = table.Random(tbl)
+        end
+        if not item then continue end
+        if isstring(item) then
+            item = {class = item}
+        end
+        if not item.class then continue end
         self.Loot[#self.Loot + 1] = { class = item.class }
     end
     self.LastLootGenerate = CurTime()

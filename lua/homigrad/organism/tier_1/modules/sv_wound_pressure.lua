@@ -37,6 +37,19 @@ local function GetMostSevereWound(org)
 	local target = nil
 	local targetPart = nil
 
+	-- Prioritize neck (carotid artery) wounds if any are bleeding
+	for _, wound in pairs(org.arterialwounds) do
+		if wound[7] == "arteria" and wound[1] > maxSeverity then
+			maxSeverity = wound[1]
+			target = wound[7]
+			targetPart = GetWoundBodyPart(wound)
+		end
+	end
+
+	if target then
+		return target, targetPart, maxSeverity
+	end
+
 	for _, wound in pairs(org.arterialwounds) do
 		if wound[1] > maxSeverity then
 			maxSeverity = wound[1]
@@ -89,6 +102,10 @@ local function DisableWoundPressure(ply, org)
 	org.pressingWoundPart = nil
 	org.pressingWoundEfficiency = 0
 	org.pressingWoundRecalc = nil
+	if org.pressingWoundOldPosture ~= nil then
+		ply.posture = org.pressingWoundOldPosture
+		org.pressingWoundOldPosture = nil
+	end
 end
 
 local function IsWeaponEntityCompatible(wep)
@@ -206,8 +223,10 @@ hook.Add("StartCommand", "HG_WoundPressure", function(ply, cmd)
 	org.pressingWoundPart = targetPart
 	org.pressingWoundEfficiency = efficiency
 
+	-- Make the weapon one-handed while pressing the wound
 	local wep = ply:GetActiveWeapon()
-	if IsValid(wep) and wep.IsPistolHoldType and wep:IsPistolHoldType() then
+	if IsValid(wep) then
+		org.pressingWoundOldPosture = ply.posture
 		ply.posture = 8
 	end
 end)

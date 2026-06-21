@@ -918,7 +918,7 @@ hook.Add("Think", "Fake", function()
 
 		local ragdollcombat = hg.RagdollCombatInUse(ply)
 
-		if (org.lightstun < CurTime()) and (tracehuy.Hit or ply.FakeRagdoll ~= ragdoll) and org.spine1 < hg.organism.fake_spine1 and org.canmove and !ply.jumpedfake then
+		if ragdollcombat and (org.lightstun < CurTime()) and (tracehuy.Hit or ply.FakeRagdoll ~= ragdoll) and org.spine1 < hg.organism.fake_spine1 and org.canmove and !ply.jumpedfake then
 
 			local power = org.legstrength or 1
 
@@ -1204,7 +1204,7 @@ hook.Add("Think", "Fake", function()
 
 			-- Check if player is standing up - if so, no bleeding prevention
 
-			local isStanding = ply.posture and (ply.posture == 1 or ply.posture == 2 or ply.posture == 3 or ply.posture == 4 or ply.posture == 5 or ply.posture == 6)
+			local isStanding = ply.posture and (ply.posture == 1 or ply.posture == 2 or ply.posture == 3 or ply.posture == 4 or ply.posture == 5 or ply.posture == 6 or ply.posture == 8)
 
 
 
@@ -2313,6 +2313,21 @@ hook.Add("Think", "Fake", function()
 
 		keyRight = ply:KeyDown(IN_MOVERIGHT)
 
+		-- Rolling behavior: ragdoll rolls for the first 5 seconds after creation, then responds to input
+		ragdoll.rollStartTime = ragdoll.rollStartTime or CurTime()
+		local rollElapsed = CurTime() - ragdoll.rollStartTime
+		local isFirstFiveSeconds = rollElapsed < 5
+		isNeckSlitRolling = isFirstFiveSeconds or org.neckslit
+
+		local rollMultiplier = 1.0
+		if isNeckSlitRolling then
+			if isFirstFiveSeconds then
+				rollMultiplier = 0.5 -- slow down rolling for the first 5 seconds
+			else
+				rollMultiplier = 1.5 -- normal speed after 5 seconds when input is received
+			end
+		end
+
 
 
 		if keyLeft and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
@@ -2321,7 +2336,7 @@ hook.Add("Think", "Fake", function()
 
 				local angle = spine:GetAngles()
 
-				angle[3] = angle[3] - 20 * ((ragdoll:IsOnFire() or isNeckSlitRolling) and 1.5 or 1)
+				angle[3] = angle[3] - 20 * ((ragdoll:IsOnFire() or isNeckSlitRolling) and rollMultiplier or 1)
 
 				--ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp
 
@@ -2375,7 +2390,7 @@ hook.Add("Think", "Fake", function()
 
 				local angle = spine:GetAngles()
 
-				angle[3] = angle[3] + 20 * ((ragdoll:IsOnFire() or isNeckSlitRolling) and 1.5 or 1)
+				angle[3] = angle[3] + 20 * ((ragdoll:IsOnFire() or isNeckSlitRolling) and rollMultiplier or 1)
 
 				shadowControl(ragdoll, 1, 0.001, angle, 490, 90)
 
@@ -2660,6 +2675,11 @@ hook.Add("Think", "Fake", function()
 			end
 
 		end*/
+
+		-- MCity autonomous ragdoll reactions (brain posturing, burning, drowning, tripping, flailing, injury, protective, stagger)
+		if isfunction(hg.ProcessReactions) and IsValid(ply) and IsValid(ragdoll) and ply.organism then
+			hg.ProcessReactions(ragdoll, ply, ply.organism)
+		end
 
 	end
 

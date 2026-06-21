@@ -1259,11 +1259,7 @@ function PANEL:Think()
 
     -- Decay rotation completion effects
     self.RotationFlashAlpha = math.max(self.RotationFlashAlpha - FrameTime() * 300, 0)
-    if isStuttering then
-        self.RotationShakeIntensity = math.min(self.RotationShakeIntensity + FrameTime() * 80, 8 + self.BandageStressFactor * 4)
-    else
-        self.RotationShakeIntensity = math.max(self.RotationShakeIntensity - FrameTime() * 10, 0)
-    end
+    self.RotationShakeIntensity = math.max(self.RotationShakeIntensity - FrameTime() * 10, 0)
     
     -- Apply shake offset
     if self.RotationShakeIntensity > 0.1 then

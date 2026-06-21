@@ -504,6 +504,28 @@ if CLIENT then
     local colGray = Color(200, 200, 200, 200)
     local lerpthing = 1
 
+    local function DrawBatteryStats(self, x, y, alpha)
+        local battery = self:Clip1()
+        local maxBat = self.Config.BatteryMax
+        local pct = math.Clamp(battery / maxBat, 0, 1)
+        local val = math.Round(pct * 100)
+        local textWidth = 150
+        local barWidth = 100
+        local barHeight = 25
+        local mode = self:GetMode()
+        local txt = string.NiceName(tostring(self.modeNames[mode])) .. " (" .. val .. "%)"
+
+        colBrown.a = alpha * 185
+        draw.RoundedBox(2, x, y, textWidth + barWidth, barHeight, colBrown)
+        surface.SetFont("ZCity_Small")
+        draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255, 255, 255, alpha * 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+
+        surface.SetDrawColor(0, 100, 0, alpha * 255)
+        surface.DrawRect(x + textWidth, y, barWidth * val / 100, barHeight)
+        surface.SetDrawColor(0, 0, 0, alpha * 255)
+        surface.DrawOutlinedRect(x + textWidth, y, barWidth, barHeight, 4)
+    end
+
     function SWEP:DrawHUD()
         local owner = self:GetOwner()
         if not IsValid(owner) or not owner:IsPlayer() then return end
@@ -538,38 +560,30 @@ if CLIENT then
         end
 
         self:DrawWorldModel2(true)
-        local p, a = mdl:GetPos(), mdl:GetAngles()
-        local pos, ang = LocalToWorld(self.ofsV, self.ofsA, p, a)
         if use3D then
+            local pos = mdl:GetPos()
+            local mins, maxs = mdl:OBBMins(), mdl:OBBMaxs()
+            local dist = 10
+            if mins and maxs then
+                dist = math.max((maxs - mins):Length() * 0.5 + 2, 8)
+            end
+            local dir = (EyePos() - pos):GetNormalized()
+            pos = pos + dir * dist
+            local ang = (EyePos() - pos):Angle()
+            ang.p = 0
+            ang.r = 0
             cam.Start3D()
                 cam.Start3D2D(pos, ang, 0.01)
                 render.PushFilterMag(TEXFILTER.LINEAR)
                 render.PushFilterMin(TEXFILTER.LINEAR)
-                    local battery = self:Clip1()
-                    local maxBat = self.Config.BatteryMax
-                    local pct = math.Clamp(battery / maxBat, 0, 1)
-                    local val = math.Round(pct * 100)
-                    local textWidth = 150
-                    local barWidth = 100
-                    local barHeight = 25
-                    local mode = self:GetMode()
-                    local txt = string.NiceName(tostring(self.modeNames[mode])) .. " (" .. val .. "%)"
-
-                    colBrown.a = 185
-                    draw.RoundedBox(2, 0, 0, textWidth + barWidth, barHeight, colBrown)
-                    surface.SetFont("ZCity_Small")
-                    surface.SetTextPos(0, 0)
-                    surface.SetTextColor(255, 255, 255, 255)
-                    draw.SimpleTextOutlined(txt, "ZCity_Small", 0, 0, Color(255, 255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
-
-                    surface.SetDrawColor(0, 100, 0, 255)
-                    surface.DrawRect(textWidth, 0, barWidth * val / 100, barHeight)
-                    surface.SetDrawColor(0, 0, 0, 255)
-                    surface.DrawOutlinedRect(textWidth, 0, barWidth, barHeight, 4)
+                    DrawBatteryStats(self, 0, 0, 1)
                 render.PopFilterMag()
                 render.PopFilterMin()
             cam.End3D2D()
-        cam.End3D()
+            cam.End3D()
+        else
+            local x2d, y2d = ScrW() / 2 - 125, ScrH() / 2 + 50
+            DrawBatteryStats(self, x2d, y2d, 1)
         end
     end
 

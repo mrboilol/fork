@@ -35,6 +35,9 @@ local panicSound
 local panicSoundVol = 0
 local panicSoundLoading = false
 local panicThoughtLerp = 0
+local corpseVignetteLerp = 0
+local corpseTarget = 0
+local lastCorpseCheck = 0
 local themeVolume = CreateClientConVar("hg_theme_volume", "1", true, false, "Volume multiplier for despair, panic, and giving-up themes", 0, 2)
 
 -- Debug convars
@@ -81,6 +84,21 @@ local function get_target_organism()
 	return ply.new_organism or ply.organism
 end
 
+local function is_corpse_ragdoll(ent)
+	if not IsValid(ent) or not ent:IsRagdoll() then return false end
+	if hg.RagdollOwner then
+		local owner = hg.RagdollOwner(ent)
+		if IsValid(owner) and owner:Alive() then return false end
+	end
+	return true
+end
+
+local function apply_despair_adrenaline_mitigation(despair, org)
+	if not org then return despair end
+	local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+	return despair * (1 - math.Clamp(totalAdrenaline / 4, 0, 0.35))
+end
+
 local function stop_despair_sound(force)
 	if not IsValid(despairSound) then return end
 	if force then
@@ -119,6 +137,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	if IsValid(ply:GetNWEntity("spect")) then
 		despairLerp = 0
 		despairTextLerp = 0
+		corpseVignetteLerp = 0
 		stop_despair_sound(true)
 		stop_panic_sound(true)
 		return
@@ -126,6 +145,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	if not ply:Alive() then
 		despairLerp = 0
 		despairTextLerp = 0
+		corpseVignetteLerp = 0
 		stop_despair_sound(true)
 		stop_panic_sound(true)
 		return
@@ -164,6 +184,9 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		stop_despair_sound(true)
 		stop_panic_sound(true)
 	end
+
+	-- Adrenaline dampens the perceived intensity of despair effects
+	despair = apply_despair_adrenaline_mitigation(despair, org)
 
 	local givingUp = org and org.givingUp
 
@@ -208,6 +231,18 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
 		vignetteMat:SetFloat("$c0_z", 1.8)
 		vignetteMat:SetFloat("$c1_y", 2.2)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+	end
+
+	-- Corpse-witness vignette
+	corpseVignetteLerp = LerpFT(0.05, corpseVignetteLerp, corpseTarget)
+
+	if corpseVignetteLerp > 0.001 then
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", corpseVignetteLerp * 1.2)
+		vignetteMat:SetFloat("$c1_y", corpseVignetteLerp * 1.6)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 	end
@@ -282,6 +317,8 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	if debugDespair > 0 then
 		despair = debugDespair
 	end
+	-- Adrenaline dampens the perceived intensity of despair effects
+	despair = apply_despair_adrenaline_mitigation(despair, org)
 	local target = math.Clamp((despair - 0.5) / 0.5, 0, 1)
 	despairTextLerp = LerpFT(0.03, despairTextLerp, target)
 
@@ -355,6 +392,54 @@ hook.Add("Think", "hg_givingup_thoughts_notify", function()
 		giveUpThoughtIndex = 0
 		giveUpThoughtNextTime = 0
 	end
+end)
+
+hook.Add("Think", "hg_despair_corpse_vignette", function()
+	local time = CurTime()
+	if time < lastCorpseCheck + 0.15 then return end
+	lastCorpseCheck = time
+
+	local org = get_target_organism()
+	if not org or org.otrub then
+		corpseTarget = 0
+		return
+	end
+
+	if despair_system_mode() == 0 then
+		corpseTarget = 0
+		return
+	end
+
+	local ply = IsValid(lply) and lply or LocalPlayer()
+	if not IsValid(ply) or not ply:Alive() then
+		corpseTarget = 0
+		return
+	end
+
+	local eyePos = ply:EyePos()
+	local aim = ply:GetAimVector()
+	local rag = ply.FakeRagdoll
+	local traceFilter = IsValid(rag) and {ply, rag} or ply
+	local corpsesSeen = 0
+
+	for _, ent in ipairs(ents.FindInCone(eyePos, aim, 1024, math.cos(math.rad(26)))) do
+		if ent == ply or ent == rag then continue end
+		if not is_corpse_ragdoll(ent) then continue end
+
+		local tr = util.TraceLine({
+			start = eyePos,
+			endpos = ent:WorldSpaceCenter(),
+			filter = traceFilter
+		})
+
+		if tr.Entity == ent or not tr.Hit then
+			corpsesSeen = corpsesSeen + 1
+		end
+
+		if corpsesSeen >= 3 then break end
+	end
+
+	corpseTarget = math.min(corpsesSeen, 2) / 2 * 0.8
 end)
 
 hook.Add("Player_Death", "hg_despair_cleanup", function(ply)

@@ -1957,16 +1957,6 @@ hook.Add("OnEntityCreated", "FunnySimfphys", function(ent)
 	end
 end)
 
-util.AddNetworkString("send_tinnitus")
-function plymeta:AddTinnitus(time,needSound)
-	needSound = needSound or false
-
-	net.Start("send_tinnitus")
-		net.WriteFloat(time)
-		net.WriteBool(needSound)
-	net.Send(self)
-end
-
 local hook_Run = hook.Run
 
 hook.Add("PlayerTick", "ilovefurries", function(ply)

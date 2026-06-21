@@ -154,9 +154,14 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	-- High velocity reduces blood pressure (falling or fast vehicle movement)
-	local velocity = owner:GetVelocity():Length()
-	if velocity > 500 then
-		local velocityPenalty = math.Clamp((velocity - 500) / 300, 0, 0.65) -- Up to 65% reduction at very high speeds
+	local velocity = owner:GetVelocity()
+	local speed = velocity:Length()
+	if speed > 350 then
+		local velocityPenalty = math.Clamp((speed - 350) / 450, 0, 0.85) -- Up to 85% reduction at very high speeds
+		local fallSpeed = math.max(0, -velocity.z)
+		if fallSpeed > 200 then
+			velocityPenalty = math.min(velocityPenalty + math.Clamp((fallSpeed - 200) / 500, 0, 0.15), 0.95)
+		end
 		map = map * (1 - velocityPenalty)
 	end
 
@@ -247,8 +252,7 @@ module[2] = function(owner, org, timeValue)
 		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
 		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.5
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
-		org.disorientation = math.max(org.disorientation, effectiveHighK * 1)
-		org.painadd = math.min(org.painadd + timeValue * (0.6 + effectiveHighK * 1.8), 150)
+		org.disorientation = math.max(org.disorientation, effectiveHighK * 2.5)
 		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
 	end
 

@@ -453,6 +453,24 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 	end
 
+	-- Despair from high velocity / falling (G-force stress)
+	local velocity = owner:GetVelocity()
+	local speed = velocity:Length()
+	local fallSpeed = -velocity.z
+	if speed > 500 or fallSpeed > 300 then
+		local speedFactor = 0
+		if speed > 500 then
+			speedFactor = math.max(speedFactor, Clamp((speed - 500) / 700, 0, 1))
+		end
+		if fallSpeed > 300 then
+			speedFactor = math.max(speedFactor, Clamp((fallSpeed - 300) / 400, 0, 1))
+		end
+		local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
+		-- Adrenaline helps the body cope with G-force stress
+		speedFactor = speedFactor * math.max(0, 1 - Clamp(totalAdrenaline / 3, 0, 0.5))
+		add = add + timeValue * 0.08 * speedFactor
+	end
+
 	if add > 0 then
 		-- Chip away at goodmood first before adding despair
 		local goodmood = org.goodmood or 0
