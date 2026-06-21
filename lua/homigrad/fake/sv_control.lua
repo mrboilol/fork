@@ -865,13 +865,7 @@ hook.Add("Think", "Fake", function()
 
 
 		if hook_Run("CanControlFake", ply, ragdoll) ~= nil then
-
-			ply.lastFake = 0
-
-			//ply:SetNetVar("lastFake",0)
-
 			continue
-
 		end
 
 

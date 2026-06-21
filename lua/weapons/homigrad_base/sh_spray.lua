@@ -1,4 +1,17 @@
 AddCSLuaFile()
+
+local function SharedRand(seed, min, max)
+    return util.SharedRandom(seed, min, max)
+end
+
+local function SharedAngleRand(seed, min, max)
+    local a = Angle()
+    a[1] = util.SharedRandom(seed .. "p", min, max)
+    a[2] = util.SharedRandom(seed .. "y", min, max)
+    a[3] = util.SharedRandom(seed .. "r", min, max)
+    return a
+end
+
 --
 function SWEP:Initialize_Spray()
 	self.EyeSpray = Angle(0, 0, 0)
@@ -35,6 +48,166 @@ SWEP.weaponSway = Angle(0,0,0)
 
 local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 1)
 
+function SWEP:ComputePrimaryRecoil(mul, recoilForce, sprayI)
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	if not owner:IsPlayer() then return end
+
+	local organism = owner.organism or {}
+
+	local dominance = organism.hand_dominance or "right"
+	local arm_debuff = 0
+	local amputate_debuff = 0
+
+	if dominance == "right" then
+		arm_debuff = (organism.rarm or 0) * 2 + (organism.larm or 0) * 0.5
+		amputate_debuff = (organism.rarmamputated and 3 or 0) + (organism.larmamputated and 1 or 0)
+		arm_debuff = arm_debuff + ((organism.rarmdislocation or organism.rarmdislocated) and 0.5 or 0) + ((organism.larmdislocation or organism.larmdislocated) and 0.2 or 0)
+	else
+		arm_debuff = (organism.larm or 0) * 2 + (organism.rarm or 0) * 0.5
+		amputate_debuff = (organism.larmamputated and 3 or 0) + (organism.rarmamputated and 1 or 0)
+		arm_debuff = arm_debuff + ((organism.larmdislocation or organism.larmdislocated) and 0.5 or 0) + ((organism.rarmdislocation or organism.rarmdislocated) and 0.2 or 0)
+	end
+
+	arm_debuff = arm_debuff + (organism.aiming_fatigue or 0) * 0.15
+	arm_debuff = arm_debuff + (organism.permanent_aim_impairment or 0) * 3
+
+	local rarm_broken_debuff = (organism.rarm and organism.rarm >= 1) or organism.rarmamputated
+	local larm_broken_debuff = (organism.larm and organism.larm >= 1) or organism.larmamputated
+	local broken_arm_recoil_mult = 1
+	if rarm_broken_debuff then
+		local multiplier = organism.rarmamputated and 2.0 or 1.5
+		broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
+	end
+	if larm_broken_debuff then
+		local multiplier = organism.larmamputated and 2.0 or 1.35
+		broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
+	end
+
+	local plyVel = owner:GetVelocity()
+	local isStandingStill = isvector(plyVel) and plyVel:LengthSqr() < 100
+	local isCrouching = owner:Crouching()
+	local isRagdolled = IsValid(owner.FakeRagdoll)
+	local isHoldingBreath = organism.holdingbreath
+
+	local mitigation_mult = 1
+	if isRagdolled then
+		mitigation_mult = mitigation_mult * 0.85
+	elseif isCrouching then
+		mitigation_mult = mitigation_mult * 0.90
+	elseif isStandingStill then
+		mitigation_mult = mitigation_mult * 0.95
+	end
+
+	if isHoldingBreath then
+		mitigation_mult = mitigation_mult - 0.05
+	end
+
+	local bypass_mitigation = (organism.rarm and organism.rarm >= 1) or (organism.larm and organism.larm >= 1) or organism.rarmamputated or organism.larmamputated
+	if bypass_mitigation then
+		mitigation_mult = 1
+	end
+
+	if not bypass_mitigation then
+		arm_debuff = arm_debuff * mitigation_mult
+		amputate_debuff = amputate_debuff * mitigation_mult
+	end
+
+	local tourniquet_debuff = 0
+	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "larm") then
+		tourniquet_debuff = tourniquet_debuff + 0.3
+	end
+	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "rarm") then
+		tourniquet_debuff = tourniquet_debuff + 0.45
+	end
+	arm_debuff = arm_debuff + tourniquet_debuff
+
+	mul = mul * ((2.5 + arm_debuff) / 1 + amputate_debuff)
+	mul = mul * broken_arm_recoil_mult
+	mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
+	mul = mul * self.RecoilMul
+	mul = mul * (owner:Crouching() and 0.75 or 1)
+	mul = mul * (self:IsResting() and 0.1 or 1)
+
+	local seed = "hg_recoil_" .. self:EntIndex() .. "_" .. sprayI
+
+	local angRand = SharedAngleRand(seed .. "_angRand", 0.03, 0.05)
+	angRand[1] = -math.abs(angRand[1])
+	angRand[2] = (SharedRand(seed .. "_ySign", 0, 1) >= 0.5 and 1 or -1) * angRand[2]
+	angRand[3] = 0
+
+	local spray
+	if sprayI < 3 then
+		spray = angRand
+	else
+		spray = self.Spray[sprayI] or Angle(0.01, 0)
+	end
+
+	local angranda = SharedAngleRand(seed .. "_angranda", self.SprayRand[1], self.SprayRand[2])
+	angranda[3] = 0
+	spray = spray + angranda * self.addSprayMul * mul * (self.randmul or 1)
+
+	local angrand2 = SharedAngleRand(seed .. "_angrand2", -recoilForce, recoilForce)
+	local angrand3 = -(-angrand2)
+	angrand3[3] = 0
+
+	local huyang, angpopa
+	if not self.SprayRandOnly then
+		angrand2[1] = math.Clamp(-math.abs(angrand2[1]), -10, -recoilForce/1.5)
+		angrand2[2] = math.Clamp(angrand2[2], -1, 1)
+		angrand2[3] = -angrand2[2] * 1
+		local mulhuy = GetGlobalBool("FullRealismMode", false) and 10 or 1
+		mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
+
+		huyang = angrand2 * mul / 2 * mulhuy
+		huyang[3] = 0
+
+		angpopa = angrand2 * mul
+		angpopa[3] = 0
+
+		spray = spray + angRand * 2 * (self.randmul or 1)
+	end
+
+	local prank3 = SharedRand(seed .. "_prank3", -self.Primary.Force2, self.Primary.Force2) / (self.Primary.Force2 != 0 and self.Primary.Force2 or 1) * 2
+
+	local viewMul = mul * self.Primary.Force2 / 100 * (self:IsPistolHoldType() and 2 or 1) * (self.NumBullet and self.NumBullet * 3 or 1)
+
+	local eyeang = owner:EyeAngles()
+	local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 8 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
+	sprayAng[3] = 0
+
+	sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
+	sprayAng.roll = 0
+
+	local eyeKick = sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 1.0 * self:GetFearRecoilMul()
+	owner:SetEyeAngles(eyeang + eyeKick)
+
+	local rnd1 = SharedRand(seed .. "_rnd1", 1, 2)
+	local rnd2 = SharedRand(seed .. "_rnd2", -1, 1)
+
+	local max_clip1 = self:GetMaxClip1()
+	if max_clip1 == 0 then max_clip1 = 1 end
+
+	local sprayvel = spray * mul * math.max(sprayI / max_clip1, 0.5) * self.addSprayMul * (self.cameraShakeMul or 1) * 10 * 1.2
+
+	self.sprayAngles[3] = self.sprayAngles[3] + math.max((self.Primary.Damage or 1) / 100, 1) * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 40
+
+	self:ApplyEyeSprayVel(sprayvel * 1)
+
+	local viewPunchAngle = Angle()
+	if huyang then
+		viewPunchAngle:Add(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.25)
+	end
+	if angpopa then
+		viewPunchAngle:Add(angpopa * (hg_coolcamera:GetBool() and 3 or 1))
+	end
+	viewPunchAngle:Add(Angle(-1.5 * rnd1, -1.5 * rnd2, 0) * viewMul)
+
+	self.LastShotRecoil = viewPunchAngle * 1.5
+
+	return huyang, angpopa, viewMul, rnd1, rnd2, seed
+end
+
 function SWEP:PrimarySpread()
 	self.Primary.Force2 = (hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Force) or self.Primary.Force
 	self:SetLastShootTime(CurTime())
@@ -49,6 +222,9 @@ function SWEP:PrimarySpread()
 	self.dmgStack = self.dmgStack + self.Primary.Damage
 	self.dmgStack2 = math.min(self.dmgStack2 + 0.2, 60)
 	local sprayI = self.SprayI
+
+	local recoilForce = (self.Primary.Damage or 1) / 100 * self.addSprayMul * (self.NumBullet or 1) * math.min(sprayI / 30, 0.6)
+	local huyang, angpopa, viewMul, rnd1, rnd2, seed = self:ComputePrimaryRecoil(mul, recoilForce, sprayI)
 	
 	if SERVER then
 		if owner:IsNPC() then return end
@@ -163,171 +339,31 @@ function SWEP:PrimarySpread()
 	end
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
-		local organism = owner.organism or {}
-
-		local force = self.Primary.Damage / 100 * self.addSprayMul * (self.NumBullet or 1) * math.min(sprayI / 30,0.6)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
-
-		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
-		local dominance = organism.hand_dominance or "right"
-		local arm_debuff = 0
-		local amputate_debuff = 0
-
-		if dominance == "right" then
-			-- Right hand dominant: right arm damage affects more
-			arm_debuff = (organism.rarm or 0) * 2 + (organism.larm or 0) * 0.5
-			amputate_debuff = (organism.rarmamputated and 3 or 0) + (organism.larmamputated and 1 or 0)
-			arm_debuff = arm_debuff + ((organism.rarmdislocation or organism.rarmdislocated) and 0.5 or 0) + ((organism.larmdislocation or organism.larmdislocated) and 0.2 or 0)
-		else
-			-- Left hand dominant: left arm damage affects more
-			arm_debuff = (organism.larm or 0) * 2 + (organism.rarm or 0) * 0.5
-			amputate_debuff = (organism.larmamputated and 3 or 0) + (organism.rarmamputated and 1 or 0)
-			arm_debuff = arm_debuff + ((organism.larmdislocation or organism.larmdislocated) and 0.5 or 0) + ((organism.rarmdislocation or organism.rarmdislocated) and 0.2 or 0)
+		if huyang then
+			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.25)
+		end
+		if angpopa then
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1))
 		end
 
-		-- Apply aiming fatigue penalty
-		arm_debuff = arm_debuff + (organism.aiming_fatigue or 0) * 0.15
+		ViewPunch2(Angle(-1 * rnd1, -1 * rnd2, 0) * viewMul)
+		ViewPunch(Angle(-1 * rnd1, -1 * rnd2, 0) * viewMul / -2)
 
-		-- Apply permanent aiming impairment
-		arm_debuff = arm_debuff + (organism.permanent_aim_impairment or 0) * 3
+		timer.Simple(0.01, function()
+			if not IsValid(self) then return end
+			local rnd1b = SharedRand(seed .. "_t1", 1, 2)
+			local rnd2b = SharedRand(seed .. "_t1y", -1, 1)
+			ViewPunch2(Angle(-1 * rnd1b, 1 * rnd2b, 0) * viewMul)
+		end)
 
-		-- Explicit broken arm recoil penalty (beyond proportional damage)
-		-- Debuff variables include amputated arms for recoil penalties
-		local rarm_broken_debuff = (organism.rarm and organism.rarm >= 1) or organism.rarmamputated
-		local larm_broken_debuff = (organism.larm and organism.larm >= 1) or organism.larmamputated
-		local broken_arm_recoil_mult = 1
-		if rarm_broken_debuff then
-			local multiplier = organism.rarmamputated and 2.0 or 1.5
-			broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
-		end
-		if larm_broken_debuff then
-			local multiplier = organism.larmamputated and 2.0 or 1.35
-			broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
-		end
+		timer.Simple(0.02, function()
+			if not IsValid(self) then return end
+			local rnd1c = SharedRand(seed .. "_t2", 1, 2.4)
+			ViewPunch2(Angle(1 * rnd1c, 0, 0) * viewMul)
+		end)
 
-		-- Mitigation calculation for overall control / handling
-		local plyVel = owner:GetVelocity()
-		local isStandingStill = isvector(plyVel) and plyVel:LengthSqr() < 100
-		local isCrouching = owner:Crouching()
-		local isRagdolled = IsValid(owner.FakeRagdoll)
-		local isHoldingBreath = organism.holdingbreath
-
-		local mitigation_mult = 1
-		if isRagdolled then
-			mitigation_mult = mitigation_mult * 0.85
-		elseif isCrouching then
-			mitigation_mult = mitigation_mult * 0.90
-		elseif isStandingStill then
-			mitigation_mult = mitigation_mult * 0.95
-		end
-
-		if isHoldingBreath then
-			mitigation_mult = mitigation_mult - 0.05
-		end
-
-		-- Broken arms bypass this mitigation
-		local bypass_mitigation = (organism.rarm and organism.rarm >= 1) or (organism.larm and organism.larm >= 1) or organism.rarmamputated or organism.larmamputated
-		if bypass_mitigation then
-			mitigation_mult = 1
-		end
-
-		if not bypass_mitigation then
-			arm_debuff = arm_debuff * mitigation_mult
-			amputate_debuff = amputate_debuff * mitigation_mult
-		end
-
-		-- Apply tourniquet handling penalty
-		local tourniquet_debuff = 0
-		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "larm") then
-			tourniquet_debuff = tourniquet_debuff + 0.3
-		end
-		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "rarm") then
-			tourniquet_debuff = tourniquet_debuff + 0.45
-		end
-		arm_debuff = arm_debuff + tourniquet_debuff
-
-		mul = mul * ((2.5 + arm_debuff) / 1 + amputate_debuff)
-		mul = mul * broken_arm_recoil_mult
-		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
-		mul = mul * self.RecoilMul
-		mul = mul * (owner:Crouching() and 0.75 or 1)
-		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
-		mul = mul * (self:IsResting() and 0.1 or 1)
-
-		local angRand = AngleRand(0.03, 0.05)
-		angRand[1] = -math.abs(angRand[1])
-		angRand[2] = (math.random(2) == 1 and 1 or -1) * angRand[2]
-		angRand[3] = 0
-		local spray
-
-		if sprayI < 3 then
-			spray = angRand
-		else
-			spray = self.Spray[sprayI] or Angle(0.01, 0)
-		end
-		
-		local angranda = AngleRand(self.SprayRand[1], self.SprayRand[2])
-		angranda[3] = 0
-		spray = spray + angranda * self.addSprayMul * mul * (self.randmul or 1)
-
-		local angrand2 = AngleRand(-force, force)
-		
-		local angrand3 = -(-angrand2)
-		angrand3[3] = 0
-		if not self.SprayRandOnly then
-			angrand2[1] = math.Clamp(-math.abs(angrand2[1]),-10,-force/1.5)
-			angrand2[2] = math.Clamp(angrand2[2],-1,1)
-			angrand2[3] = -angrand2[2] * 1
-			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
-			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
-			
-			local huyang = angrand2 * mul / 2 * mulhuy
-			huyang[3] = 0
-			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.25)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
-			
-			local angpopa = angrand2 * mul
-			angpopa[3] = 0
-			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1))-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
-			spray = spray + angRand * 2 * (self.randmul or 1)
-		end
-
-		local prank3 = math.Rand(-self.Primary.Force2,self.Primary.Force2) / (self.Primary.Force2 != 0 and self.Primary.Force2 or 1) * 2
-		local angleprikol = Angle(0,0,prank3)
-
-		//ViewPunch2(angleprikol)
-
-		local mul = mul * self.Primary.Force2 / 100 * (self:IsPistolHoldType() and 2 or 1) * (self.NumBullet and self.NumBullet * 3 or 1)
-		ViewPunch2(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul)
-		ViewPunch(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul / -2)
-		timer.Simple(0.01, function() ViewPunch2(Angle(-1 * math.Rand(1,2),1 * math.Rand(-1,1),0) * mul) end)
-		timer.Simple(0.02, function() ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul) end)
-
-		local eyeang = owner:EyeAngles()
-		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 8 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
-		sprayAng[3] = 0
-
-		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
-		sprayAng.roll = 0
-
-		owner:SetEyeAngles(eyeang + sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.25 * self:GetFearRecoilMul())
-		
-		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
-		ViewPunch2(Angle(2 * rnd1,2 * rnd2,0) * mul * 0.5)
-		ViewPunch(Angle(-2 * rnd1,-2 *rnd2,0) * mul)
-
-		local max_clip1 = self:GetMaxClip1()
-		
-		if(max_clip1 == 0)then
-			max_clip1 = 1
-		end
-		
-		local sprayvel = spray * mul * math.max(sprayI / max_clip1, 0.5) * self.addSprayMul * (self.cameraShakeMul or 1) * 10 * 1.2//(self.Primary.Automatic and 1 or 1)
-		
-		--self.weaponSway = self.weaponSway + sprayvel
-
-		self.sprayAngles[3] = self.sprayAngles[3] + math.max(self.Primary.Damage / 100,1) * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 40
-
-		self:ApplyEyeSprayVel(sprayvel * 1)
-		--self:AnimApply_RecoilCameraZoom()
+		ViewPunch2(Angle(2 * rnd1, 2 * rnd2, 0) * viewMul * 0.5)
+		ViewPunch(Angle(-2 * rnd1, -2 * rnd2, 0) * viewMul)
 	end
 end
 
@@ -370,11 +406,10 @@ end
 
 function SWEP:Step_Spray(time,dtime)
 	if self.Primary.Next + 0.3 < time then self.SprayI = 0 end
-	
-	if SERVER then return end
 
 	local eyeSpray = self.EyeSpray
 	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
 	local eyeang = owner:EyeAngles()
 
 	owner:SetEyeAngles(eyeang + (eyeSpray * (eyeang.z == 180 and -1 or 1)))

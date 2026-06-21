@@ -256,7 +256,7 @@ players : 1 humans, 0 bots (20 max)
 			local pos = net.ReadVector()
 			local eyePos = LocalPlayer():EyePos()
 			local dist = pos:Distance(eyePos)
-			if dist > 500 then return end
+			if dist > 1500 then return end
 			local isVisible = not util.TraceLine({
 				start = pos,
 				endpos = eyePos,
@@ -266,8 +266,8 @@ players : 1 humans, 0 bots (20 max)
 			if not isVisible then dist = dist * 2 end
 
 			Suppress(dist * 25)
-			ViewPunch(AngleRand(-1,1) * dist / 30)
-			ViewPunch2(AngleRand(-1,1) * dist / 30)
+			ViewPunch(AngleRand(-1,1) * dist / 15)
+			ViewPunch2(AngleRand(-1,1) * dist / 15)
 		end)
 
 		local anguse = Angle(0,0,0)
@@ -319,7 +319,7 @@ players : 1 humans, 0 bots (20 max)
 				or bullet.Damage >= 30 and "cracks/" .. "medium/med" .. "_crack_0" .. mr .. ".ogg"
 				or "cracks/" .. "light/light" .. "_crack_0" .. mr .. ".ogg"
 
-			if dist < 250 then
+			if dist < 500 then
 				timer.Simple(0.02,function()
 					EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
 				end)
@@ -348,8 +348,8 @@ players : 1 humans, 0 bots (20 max)
 			local badass = lply.organism and lply.organism.recoilmul or 1
 			local bulletdmg = math.max(bullet.Damage / 15,1)
 			if hg_suppression_viewpunch and hg_suppression_viewpunch:GetBool() then
-				ViewPunch(anguse * badass * bulletdmg * 4)
-				ViewPunch2((anguse * badass * bulletdmg * 4)/-2)
+				ViewPunch(anguse * badass * bulletdmg * 8)
+				ViewPunch2((anguse * badass * bulletdmg * 8)/-2)
 			end
 			Suppress((dist * 45) * badass * bulletdmg)
 		end)

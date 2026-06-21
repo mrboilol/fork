@@ -185,7 +185,7 @@ function SWEP:ClearJam()
 end
 
 function SWEP:Step_JamClear(time)
-	if CLIENT then return end
+	if not SERVER then return end
 	if not self:IsJamClearing() then return end
 
 	local endTime = self:GetJamClearEnd()

@@ -35,7 +35,7 @@ local panicSound
 local panicSoundVol = 0
 local panicSoundLoading = false
 local panicThoughtLerp = 0
-local musicVolume = GetConVar("snd_musicvolume")
+local themeVolume = CreateClientConVar("hg_theme_volume", "1", true, false, "Volume multiplier for despair, panic, and giving-up themes", 0, 2)
 
 -- Debug convars
 CreateConVar("hg_panic_debug", "0", FCVAR_ARCHIVE, "Debug panic (0-1, 1 = true)")
@@ -220,17 +220,17 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(channel, err)
 				despairSoundLoading = false
 				if err or not IsValid(channel) then return end
-				channel:SetVolume(1.5 * musicVolume:GetFloat())
+				channel:SetVolume(1.5 * themeVolume:GetFloat())
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 1.5 * musicVolume:GetFloat()
+				despairSoundVol = 1.5 * themeVolume:GetFloat()
 			end)
 		end
 
 		-- Despair theme stays loud and clear as a background layer;
 		-- it does not duck or override other sounds (panic, ambience, etc.)
-		local targetVol = 1.5 * musicVolume:GetFloat()
+		local targetVol = 1.5 * themeVolume:GetFloat()
 		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
@@ -253,7 +253,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = 1.5 * musicVolume:GetFloat()
+		local targetVol = 1.5 * themeVolume:GetFloat()
 		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 2)
 		if IsValid(panicSound) then
 			panicSound:SetVolume(panicSoundVol)

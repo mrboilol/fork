@@ -619,15 +619,25 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 
 	//if ragdoll:GetVelocity():LengthSqr() < (200 * 200) or ply:InVehicle() then hg.SetFreemove(ply,not no_freemove) end
 
-	if not no_freemove and not force then
-		-- Freemove removed on fake-in: keep the player in NOCLIP so the ragdoll doesn't freeze against the world.
-		ply:SetMoveType(MOVETYPE_NOCLIP)
-		local hull = Vector(1, 1, 1)
-		local hull2 = Vector(1, 1, 0)
-		ply:SetHull(-hull2, hull)
-		ply:SetHullDuck(-hull2, hull)
-		ply:SetViewOffset(vector_up)
-		ply:SetViewOffsetDucked(vector_up)
+	-- Freemove removed on fake-in: keep the player in NOCLIP so the ragdoll doesn't freeze against the world.
+	-- Ragdoll combat mode still needs WALK for ground-based movement.
+	if not ply:InVehicle() then
+		if hg_ragdollcombat:GetBool() then
+			ply:SetMoveType(MOVETYPE_WALK)
+			local hull = Vector(5, 5, 5)
+			ply:SetHull(-Vector(hull, hull, 0), Vector(hull, hull, 72))
+			ply:SetHullDuck(-Vector(hull, hull, 0), Vector(hull, hull, 36))
+			ply:SetViewOffset(Vector(0, 0, 64))
+			ply:SetViewOffsetDucked(Vector(0, 0, 34))
+		else
+			ply:SetMoveType(MOVETYPE_NOCLIP)
+			local hull = Vector(1, 1, 1)
+			local hull2 = Vector(1, 1, 0)
+			ply:SetHull(-hull2, hull)
+			ply:SetHullDuck(-hull2, hull)
+			ply:SetViewOffset(vector_up)
+			ply:SetViewOffsetDucked(vector_up)
+		end
 	end
 
 	if isfunction(ply.UnDuck) then
@@ -677,34 +687,6 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 end
 
 local veczero = Vector(0,0,0)
-function hg.SetFreemove(ply, set)
-	if ply:InVehicle() or IsValid(ply.OldRagdoll) then return end
-	if set then
-		ply.lastFakeTime = hg_ragdollcombat:GetBool() and 9999 or 1
-		ply.lastFake = CurTime() + ply.lastFakeTime
-		//ply:SetNetVar("lastFake", ply.lastFake)
-		ply:SetMoveType(MOVETYPE_WALK)
-		local hull = Vector(5,5,5)
-		ply:SetHull(-Vector(hull,hull,0),Vector(hull,hull,72))
-		ply:SetHullDuck(-Vector(hull,hull,0),Vector(hull,hull,36))
-		ply:SetViewOffset(Vector(0,0,64))
-		ply:SetViewOffsetDucked(Vector(0,0,34))
-	else
-		ply.lastFake = 0
-		ply.lastFakeTime = 0
-		//ply:SetNetVar("lastFake",0)
-		//if ply:GetMoveType() != (ply:InVehicle() and MOVETYPE_NOCLIP or MOVETYPE_NONE) then
-			//ply:SetMoveType(ply:InVehicle() and MOVETYPE_NOCLIP or MOVETYPE_NONE)
-		//end
-		ply:SetMoveType(MOVETYPE_NOCLIP)
-		local hull = Vector(1, 1, 1)
-		local hull2 = Vector(1, 1, 0)
-		ply:SetHull(-hull2, hull)
-		ply:SetHullDuck(-hull2, hull)
-		ply:SetViewOffset(vector_up)
-		ply:SetViewOffsetDucked(vector_up)
-	end
-end
 
 local CurTime = CurTime
 

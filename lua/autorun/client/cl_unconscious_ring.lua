@@ -733,7 +733,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     if heartbeat >= 1 then
-        if IsValid(flatlineStation) and flatlineStation:IsPlaying() then
+        if IsValid(flatlineStation) and flatlineStation:GetState() == GMOD_CHANNEL_PLAYING then
             flatlineStation:Stop()
         end
 

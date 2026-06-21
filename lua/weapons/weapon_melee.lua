@@ -42,6 +42,12 @@ function SWEP:CanSecondaryAttack()
 	return true
 end
 
+function SWEP:GetStaminaWeightDamageMultiplier(attacktype)
+    local weight = self.weight or self.Weight or 0
+    local damage = attacktype == true and self.DamageSecondary or self.DamagePrimary or 0
+    return 1 + weight * 0.08 + damage * 0.008
+end
+
 SWEP.supportTPIK = true
 SWEP.ismelee = true
 SWEP.ismelee2 = true
@@ -1066,6 +1072,8 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             staminaCost = staminaCost * multiplier
         end
 
+        staminaCost = staminaCost * self:GetStaminaWeightDamageMultiplier(attacktype)
+
         if owner.organism and attacktype ~= 3 then
             owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
         end
@@ -1624,7 +1632,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * self:GetStaminaWeightDamageMultiplier(3)
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -1684,7 +1692,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * self:GetStaminaWeightDamageMultiplier(3)
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -1732,7 +1740,7 @@ function SWEP:CustomThink()
 
                 if owner.organism and owner.organism.stamina then
                     while self.HeavyChargeStaminaDrainAcc >= 1 do
-                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5)
+                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5) * self:GetStaminaWeightDamageMultiplier(3)
                         self.HeavyChargeStaminaDrainAcc = self.HeavyChargeStaminaDrainAcc - 1
                     end
                 else

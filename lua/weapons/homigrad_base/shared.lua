@@ -614,6 +614,7 @@ function SWEP:PrimaryShoot()
 	end
 
 	self:EmitShoot()
+	self:PrimarySpread()
 	--if SERVER or self:IsClient() then
 		self:FireBullet()
 	--end
@@ -634,7 +635,6 @@ function SWEP:PrimaryShoot()
 
 	self.drawBullet = false
 	if self.AutomaticDraw then self:Draw() end
-	self:PrimarySpread()
 end
 
 SWEP.SightSlideOffset = 1
@@ -1489,8 +1489,8 @@ function SWEP:CoreStep()
 		self.aiminghuuuy = nil
 	end
 
-	if self:IsClient() then self:Step_Spray(time, dtime) end
-	if self:IsClient() then self:Step_SprayVel(dtime) end
+	self:Step_Spray(time, dtime)
+	self:Step_SprayVel(dtime)
 	self.dtimethink = SysTime()
 	//self:ThinkAtt()
 	if self.ThinkAdd then self:ThinkAdd() end

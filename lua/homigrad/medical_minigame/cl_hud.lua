@@ -1866,7 +1866,7 @@ function PANEL:Paint(w, h)
     local counterColor = Color(255, 255, 255, 255)
     draw.DrawText(counterText, "HomigradFontLarge", drawCenterX, drawCenterY - 20, counterColor, TEXT_ALIGN_CENTER)
 
-    self:DrawCommonOverlays(self.Progress, true)
+    self:DrawCommonOverlays(self.Progress, false)
 end
 
 vgui.Register("hg_medical_minigame", PANEL, "DFrame")

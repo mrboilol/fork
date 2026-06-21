@@ -73,6 +73,7 @@ local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otr
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
+local themeVolume = CreateClientConVar("hg_theme_volume", "1", true, false, "Volume multiplier for despair, panic, and giving-up themes", 0, 2)
 local hook_Run = hook.Run
 local hg_despairsystem_convar
 local function despair_system_mode()
@@ -1553,7 +1554,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		if IsValid(GivingUpStation) then
-			GivingUpStation:SetVolume(1.5 * snd_musicvolume:GetFloat())
+			GivingUpStation:SetVolume(1.5 * themeVolume:GetFloat())
 			if GivingUpStation:GetTime() >= 120 then
 				GivingUpStation:SetTime(0)
 			end

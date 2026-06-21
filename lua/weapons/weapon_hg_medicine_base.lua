@@ -105,6 +105,7 @@ end
 --// i think it's better to rewrite all of ts stuff below..
 
 if CLIENT then
+	local hg_3dzity = CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 	local colWhite = Color(255, 255, 255, 255)
 	local colGray = Color(200, 200, 200, 200)
 	local lerpthing = 1
@@ -121,9 +122,10 @@ if CLIENT then
 		if not IsValid(modelshuy[self.Model or self.WorldModel]) then return end
 		local Tr = hg.eyeTrace(owner)
 		if !Tr then return end
+		local use3D = hg_3dzity:GetBool()
 		local Size = math.max(math.min(1 - Tr.Fraction, 0.5), 0.1)
 		local x, y = Tr.HitPos:ToScreen().x, Tr.HitPos:ToScreen().y
-		if Tr.Hit then
+		if not use3D and Tr.Hit then
 			lerpthing = Lerp(0.1, lerpthing, 1)
 			colWhite.a = 255 * Size
 			surface.SetDrawColor(colGray)
@@ -142,7 +144,7 @@ if CLIENT then
 		self:DrawWorldModel2(true)
 		local p,a = mdl:GetPos(), mdl:GetAngles()
 		local pos,ang = LocalToWorld(self.ofsV,self.ofsA,p,a)
-		if self.showstats and self.modeValues and istable(self.modeValues) then
+		if use3D and self.modeValues and istable(self.modeValues) then
 			cam.Start3D()
 				cam.Start3D2D(pos,ang,0.01)
 				render.PushFilterMag( TEXFILTER.LINEAR )
@@ -929,61 +931,26 @@ else
 			if not bandaged_limbs or not next(bandaged_limbs) then return end
 		end
 
-		ent.bandagesModels = ent.bandagesModels or {}
-		local models = ent.bandagesModels
-		local idx = 1
-
-		local coloredBones = {}
-		local coloredColor
+		local bandagedBones = {}
+		local bandageColor
 
 		for bone, info in pairs(bandaged_limbs) do
 			if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
 
+			bandagedBones[#bandagedBones + 1] = bone
+
 			local col = istable(info) and info.color
 			if IsColor(col) or (istable(col) and col.r and col.g and col.b) then
-				coloredBones[#coloredBones + 1] = bone
-				if not coloredColor then
-					coloredColor = col
-				end
-				continue
-			end
-
-			local model = models[idx]
-			if not IsValid(model) then
-				model = ClientsideModel("models/bandages.mdl")
-				models[idx] = model
-			end
-			model:SetNoDraw(true)
-
-			local boneid = ent:LookupBone(bone)
-			if boneid then
-				local matrix = ent:GetBoneMatrix(boneid)
-				if matrix then
-					local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
-					local offset = (isvector(info) and info) or (istable(info) and info.pos) or vector_origin
-					local offsetAng = (isangle(info) and info) or (istable(info) and info.ang) or angle_zero
-					local pos, ang = LocalToWorld(offset, offsetAng, bonePos, boneAng)
-					model:SetRenderOrigin(pos)
-					model:SetRenderAngles(ang)
-					model:SetModelScale(0.2)
-					model:SetupBones()
-					model:DrawModel()
+				if not bandageColor then
+					bandageColor = col
 				end
 			end
-
-			idx = idx + 1
 		end
 
-		for i = idx, #models do
-			if IsValid(models[i]) then
-				models[i]:Remove()
-			end
-			models[i] = nil
-		end
-
-		if #coloredBones > 0 then
+		if #bandagedBones > 0 then
 			if not IsValid(ent.bruiseWrapModel) then
-				local isFemale = ThatPlyIsFemale(ent)
+				local sexEnt = IsValid(ply) and ply or ent
+				local isFemale = ThatPlyIsFemale(sexEnt)
 				local mdlPath = isFemale and BadagesModelFemale or BadagesModelMale
 				local model = ClientsideModel(mdlPath)
 				ent.bruiseWrapModel = model
@@ -1021,7 +988,7 @@ else
 				for bone, bgID in pairs(model.wrapBodygroups) do
 					model:SetBodygroup(bgID, 0)
 				end
-				for _, bone in ipairs(coloredBones) do
+				for _, bone in ipairs(bandagedBones) do
 					if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
 					local bgID = model.wrapBodygroups[bone]
 					if bgID then
@@ -1032,8 +999,8 @@ else
 			end
 
 			if hasActiveBodygroup then
-				if coloredColor then
-					render.SetColorModulation((coloredColor.r or 255) / 255, (coloredColor.g or 255) / 255, (coloredColor.b or 255) / 255)
+				if bandageColor then
+					render.SetColorModulation((bandageColor.r or 255) / 255, (bandageColor.g or 255) / 255, (bandageColor.b or 255) / 255)
 				end
 
 				model:DrawModel()

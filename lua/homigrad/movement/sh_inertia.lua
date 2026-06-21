@@ -70,16 +70,19 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		end
 
 		if !hg.RagdollCombatInUse(ply) and (IsValid(ply.FakeRagdoll) or IsValid(ply:GetNWEntity("FakeRagdollOld"))) then
-			if IsValid(ply.FakeRagdoll) then
-				cmd:SetForwardMove(0)
-				cmd:SetSideMove(0)
+			-- Only zero movement while stuck in WALK; if the player is in NOCLIP, let them move.
+			if ply:GetMoveType() ~= MOVETYPE_NOCLIP then
+				if IsValid(ply.FakeRagdoll) then
+					cmd:SetForwardMove(0)
+					cmd:SetSideMove(0)
 
-				mv:SetForwardSpeed(0)
-				mv:SetSideSpeed(0)
+					mv:SetForwardSpeed(0)
+					mv:SetSideSpeed(0)
+				end
+
+				mv:SetForwardSpeed(math.min(mv:GetForwardSpeed(), 50))
+				mv:SetSideSpeed(math.min(mv:GetSideSpeed(), 50))
 			end
-
-			mv:SetForwardSpeed(math.min(mv:GetForwardSpeed(), 50))
-			mv:SetSideSpeed(math.min(mv:GetSideSpeed(), 50))
 
 			cmd:RemoveKey(IN_JUMP)
 			mv:RemoveKey(IN_JUMP)

@@ -444,10 +444,19 @@ module[2] = function(owner, org, mulTime)
 
 	local bleed = org.internalBleed / 35 -- + org.lungsR[3] + org.lungsL[3]
 	
-	-- Damaged liver prevents natural internal bleeding healing
+	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
 	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
-	
-	org.internalBleed = math.Approach(org.internalBleed, 0, (org.internalBleedHeal > 0 and canHealInternalBleed) and mulTime / 2 or mulTime / 55)
+	local internalBleedHeal = org.internalBleedHeal or 0
+
+	-- internalBleedHeal actively helps against internal bleeding; natural healing works if liver is healthy or acid is present
+	local healRate = (internalBleedHeal > 0 or canHealInternalBleed) and mulTime / 2 or mulTime / 55
+
+	-- Excess internalBleedHeal significantly accelerates healing
+	if internalBleedHeal > org.internalBleed then
+		healRate = healRate * math.min(1 + (internalBleedHeal - org.internalBleed) * 0.5, 4)
+	end
+
+	org.internalBleed = math.Approach(org.internalBleed, 0, healRate)
 	coagulatespeed = coagulatespeed + mulTime
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)
 

@@ -124,6 +124,40 @@ local fear_phrases = {
 
 }
 
+local situation_fear_phrases = {
+	"This is not a good situation.",
+	"This is really bad.",
+	"I don't like where this is going.",
+	"Something is about to go wrong.",
+	"I need to get out of here.",
+	"This place isn't safe.",
+	"I have a really bad feeling about this.",
+	"I'm getting shot at, I need to move.",
+	"I need to get away from here.",
+	"I'm being shot at!",
+	"This is about to turn into a nightmare.",
+	"I need to find better cover.",
+	"This is not going to end well.",
+	"My friend got shot.",
+	"I just saw someone get shot.",
+	"That was way too close.",
+	"I need to get out of this situation.",
+	"This is not going to end well.",
+	"I have a terrible feeling.",
+	"This is turning into hell.",
+	"I need to hide right now.",
+	"I should not be here.",
+	"This is too dangerous.",
+	"I can hear gunshots right next to me.",
+	"My friend is down, I need to do something.",
+	"This is not a good place to be.",
+	"I need to find a way out of this.",
+	"This isn't safe, I need to move.",
+	"That bullet came too close.",
+	"I need to calm down and think.",
+	"This is not good. This is not good.",
+}
+
 local is_aimed_at_phrases = {
     "Oh God. This is it.",
     "Don't. move.",
@@ -378,6 +412,12 @@ function hg.fearful(ply)
 	return ply.organism and ply.organism.fear > 0.5
 end
 
+function hg.situation_fear(ply)
+	if not IsValid(ply) then return end
+
+	return ply.organism and ply.organism.fear > 0.75
+end
+
 function hg.likely_to_phrase(ply)
 	local org = ply.organism
 
@@ -388,6 +428,9 @@ function hg.likely_to_phrase(ply)
 	local despair = org.despair
 	local temperature = org.temperature
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
+	local adrenaline = org.adrenaline or 0
+
+	local fearBoost = (fear > 0.75) and ((adrenaline > 0.5) and 2.0 or 1.0) or 0
 
 	return (broken_dislocated) and 5
 		or (pain > 65) and 5
@@ -395,7 +438,7 @@ function hg.likely_to_phrase(ply)
 		or (temperature < 31 and 0.5)
 		or (temperature > 38 and 0.5)
 		or (blood < 3000 and 0.3)
-		--or (fear > 0.5 and 0.7)
+		or (fearBoost > 0 and fearBoost)
 		or (brain > 0.1 and brain * 5)
 		or (fear < -0.5 and 0.05)
 		or -0.1
@@ -503,6 +546,8 @@ local function get_status_message(ply)
 		if goodmood and goodmood > 0.8 and math.random(5) == 1 then
 			most_wanted_phraselist = good_mood_phrases
 		end
+	elseif not most_wanted_phraselist and hg.situation_fear(ply) then
+		most_wanted_phraselist = situation_fear_phrases
 	elseif hg.fearful(ply) then
 		if positive_thinking and math.random(3) == 1 then
 			most_wanted_phraselist = near_death_positive
@@ -522,6 +567,7 @@ end
 
 local allowedlist_types = {
 	heatvomit = heatvomit_phraselist,
+	hg_situationfear = situation_fear_phrases,
 }
 
 function hg.get_phraselist(ply, type)

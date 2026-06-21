@@ -761,6 +761,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				self:PostRicochet(new_vel_normal, len, ricochet, ang_diff, len_before, trace)
 			end
 		else
+			PLUGIN.PlayImpactSound(trace, false)
 			self.Pos = self.Pos + new_vel_normal * 1
 			self.PenetratingMaterial = trace.MatType
 			self.PenetratingStartPos = trace.HitPos
@@ -781,8 +782,6 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			end
 			
 			if(stopped)then
-				PLUGIN.PlayImpactSound(trace, false)
-				
 				if(self.OnStopped) then
 					self:OnStopped(nil, "hit", trace)
 				end
@@ -891,33 +890,23 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 
 	function PLUGIN.PlayImpactSound(trace, is_ricochet)
 		if(SERVER)then
-			local mat_type = trace.MatType
-			local sounds = PLUGIN.SurfaceImpactSounds[mat_type]
-			
-			if(sounds and #sounds > 0)then
-				local sound_file = sounds[math.random(1, #sounds)]
-				local sound_path = "bullet/" .. sound_file
-				
-				if(is_ricochet)then
-					if(math.random(1, 3) == 1)then
-						sound.Play(sound_path, trace.HitPos, 75, math.random(90, 110))
-						return true
-					end
-				else
-					if(math.random(1, 3) == 1)then
-						sound.Play(sound_path, trace.HitPos, 75, math.random(90, 110))
-						return true
-					end
-				end
-			end
-			
 			if(is_ricochet)then
-				if math.random(2) == 1 then
+				if(math.random(2) == 1)then
 					local rnd = math.random(4)
 					sound.Play("bullet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
 				else
-					local rnd = math.random(5)
-					sound.Play("weapons/fx/rics/ric" .. rnd .. ".wav", trace.HitPos, 75, math.random(90, 110))
+					local rnd = math.random(12)
+					if(rnd == 8)then rnd = 9 end
+					sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
+				end
+			else
+				local mat_type = trace.MatType
+				local sounds = PLUGIN.SurfaceImpactSounds[mat_type]
+				
+				if(sounds and #sounds > 0)then
+					local sound_file = sounds[math.random(1, #sounds)]
+					sound.Play("bullet/" .. sound_file, trace.HitPos, 75, math.random(90, 110))
+					return true
 				end
 			end
 		end
