@@ -971,6 +971,7 @@ function PANEL:AddSelect( pParent, strTitle, tbl )
         if luaMenu.DisconnectCutscene then return end
         if luaMenu.SwitchingPanel then return end
         surface.PlaySound(SOUND_MENU_SELECT)
+        surface.PlaySound(SOUND_MENU_SELECT)
 
         if tbl.BypassTransition then
             btn.Func(luaMenu)
@@ -1015,6 +1016,10 @@ function PANEL:AddSelect( pParent, strTitle, tbl )
             surface.PlaySound(SOUND_MENU_HOVER)
         end
         self.WasHovered = isHovered
+        if isHovered and not self.WasHovered then
+            surface.PlaySound(SOUND_MENU_HOVER)
+        end
+        self.WasHovered = isHovered
 
         self.HoverLerp = LerpFT(0.2, self.HoverLerp or 0, isHovered and 1 or 0)
         self.LineLerp = LerpFT(0.2, self.LineLerp or 0, isHovered and 1 or 0)
@@ -1033,6 +1038,14 @@ function PANEL:AddSelect( pParent, strTitle, tbl )
         local len = #targetText
 
         if charsToShow > len then charsToShow = len end
+        if self.TypewriterTarget ~= targetText then
+            self.TypewriterTarget = targetText
+            self.LastTypewriterChars = 0
+        end
+        if charsToShow > 0 and charsToShow > (self.LastTypewriterChars or 0) then
+            PlayTypewriterSound()
+        end
+        self.LastTypewriterChars = charsToShow
         if self.TypewriterTarget ~= targetText then
             self.TypewriterTarget = targetText
             self.LastTypewriterChars = 0

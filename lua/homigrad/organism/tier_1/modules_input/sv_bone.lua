@@ -256,7 +256,8 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-				PlayBoneBreakSound(org.owner)
+		PlayBoneBreakSound(org.owner)
+		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 		//broken
 	else
 		--//org[key] = 0.5
@@ -278,6 +279,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		PlayBoneBreakSound(org.owner)
+		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
 		//dislocated
 	end
 
@@ -335,7 +337,8 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-				PlayBoneBreakSound(org.owner)
+		PlayBoneBreakSound(org.owner)
+		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 		//broken
 	else
 		org[key.."dislocation"] = true
@@ -356,7 +359,8 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-				PlayBoneBreakSound(org.owner)
+		PlayBoneBreakSound(org.owner)
+		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
 		//dislocated
 	end
 
@@ -443,14 +447,9 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
-		if oldDmg < hg.organism[name2] then
-			PlayBoneBreakSound(org.owner)
-			AddBoneInternalBleed(org, 0.6, 0.9)
-		else
-			AddBrokenBoneHitTrauma(org, name, dmg, 0.35)
-		end
-
-		if oldDmg < hg.organism[name2] and org.owner:IsPlayer() then
+		PlayBoneBreakSound(org.owner)
+		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
+		if org.owner:IsPlayer() then
 			org.owner:Notify(huyasd[name], true, name, 2)
 		end
 		org.painadd = org.painadd + 25
@@ -499,49 +498,24 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local dislocated = jawDelta > math.Rand(0.2, 0.4) and (not sharpHead or dmg > 1.2)
 
 	if org.jaw == 1 then
-		org.shock = org.shock + dmg * (sharpHead and 18 or 40)
-		org.avgpain = org.avgpain + dmg * (sharpHead and 18 or 30)
+		org.shock = org.shock + dmg * 40
+		org.avgpain = org.avgpain + dmg * 30
 
 		if oldDmg != 1 then
 			PlayBoneBreakSound(org.owner)
-			AddBoneInternalBleed(org, 0.25, 0.4)
-		else
-			AddBrokenBoneHitTrauma(org, "jaw", dmg, 0.25)
+			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
 		end
 	end
 
-	org.shock = org.shock + dmg * (sharpHead and 1.6 or 3)
-	org.concussion = (org.concussion or 0) + dmg * 12 * concussionMul -- Jaw hits cause strong concussion
-
-	-- Chance to induce vomiting from jaw trauma
-	if org.isPly and math.random() < dmg * 0.2 * concussionMul then
-		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.2, 0.5)
-		org.vomitTypeHeadTrauma = math.random(10) == 1
-	end
-
-	-- Significant disorientation and consciousness loss from jaw trauma
-	org.disorientation = org.disorientation + dmg * math.max(concussionMul * 2, 0.55)
-	org.consciousness = math.max(org.consciousness - dmg * 0.25 * concussionMul, 0)
-
-	-- Add extra concussion for significant blows and when the jaw actually breaks or dislocates
-	if dmg > 0.2 then
-		org.concussion = (org.concussion or 0) + dmg * 6 * concussionMul
-	end
-
-	if org.jaw == 1 and (org.jaw - oldDmg) > 0 then
-		org.concussion = (org.concussion or 0) + 2 * concussionMul
-	end
-
-	if dislocated then
-		org.concussion = (org.concussion or 0) + 1.5 * concussionMul
-	end
+	org.shock = org.shock + dmg * 3
 
 	if dislocated then
 		org.shock = org.shock + dmg * (sharpHead and 8 or 20)
 		org.avgpain = org.avgpain + dmg * (sharpHead and 8 or 20)
 		
 		if !org.jawdislocation then
-PlayBoneBreakSound(org.owner)
+			PlayBoneBreakSound(org.owner)
+			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.85) end
 		end
 
 		org.jawdislocation = true
@@ -796,29 +770,8 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			if IsValid(owner) and owner:IsPlayer() then
 				owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
-				PlayBoneBreakSound(owner)
-				AddBoneInternalBleed(org, 0.12 + org.brokenribs * 0.08, 0.5)
-			
-				-- Chance to puncture lung when ribs break
-				local punctureChance = 0.25 + (org.brokenribs * 0.1) -- 25% base + 10% per broken rib
-				if math.random() < punctureChance then
-					local lungSide = math.random(2) == 1 and "lungsL" or "lungsR"
-					local punctureSeverity = math.Rand(0.3, 0.7)
-					org[lungSide][1] = math.min(org[lungSide][1] + punctureSeverity, 1)
-					
-					-- Chance to cause pneumothorax (collapsed lung)
-					if math.random() < 0.4 then
-						org[lungSide][2] = 1
-						owner:Notify("My lung hurts a lot for some reason...", 8, "pneumothorax", 3)
-					else
-						owner:Notify("I felt it- i felt the rib poke my lung...", 6, "lungpuncture", 3)
-					end
-					
-					-- Additional pain and shock from lung puncture
-					org.painadd = org.painadd + 30
-					org.shock = org.shock + 20
-				end
-			end
+			PlayBoneBreakSound(org.owner)
+			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end
 
 			return math.min(0, result)
 		end

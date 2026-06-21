@@ -3715,5 +3715,3 @@ if SERVER then
 		ply:SetNetVar("Inventory",ply.inventory)
     end)
 end
-
-

@@ -441,6 +441,7 @@ local function SettingsCreateCategoryButton(pParent, strTitle, categoryKey)
     function btn:DoClick()
         if not IsValid(self) then return end
         surface.PlaySound(SOUND_SETTINGS_CLICK)
+        surface.PlaySound(SOUND_SETTINGS_CLICK)
         settings_active_category = self.CategoryKey
         SettingsRefreshContent()
     end
@@ -466,6 +467,14 @@ local function SettingsCreateCategoryButton(pParent, strTitle, categoryKey)
         local targetText = isActive and ('[ '..strTitle..' ]') or strTitle
         local len = #targetText
         if charsToShow > len then charsToShow = len end
+        if self.TypewriterTarget ~= targetText then
+            self.TypewriterTarget = targetText
+            self.LastTypewriterChars = 0
+        end
+        if charsToShow > 0 and charsToShow > (self.LastTypewriterChars or 0) then
+            PlayTypewriterSound()
+        end
+        self.LastTypewriterChars = charsToShow
         if self.TypewriterTarget ~= targetText then
             self.TypewriterTarget = targetText
             self.LastTypewriterChars = 0
@@ -614,6 +623,7 @@ function SettingsRefreshContent()
                 if convar.GetName then
                     RunConsoleCommand(convar:GetName(), newValue and "1" or "0")
                 end
+                surface.PlaySound(SOUND_SETTINGS_CLICK)
                 surface.PlaySound(SOUND_SETTINGS_CLICK)
                 targetProgress = newValue and 1 or 0
             end
@@ -832,6 +842,14 @@ function hg.DrawSettings(ParentPanel)
             PlayTypewriterSound()
         end
         self.LastTypewriterChars = charsToShow
+        if self.TypewriterTarget ~= target then
+            self.TypewriterTarget = target
+            self.LastTypewriterChars = 0
+        end
+        if charsToShow > 0 and charsToShow > (self.LastTypewriterChars or 0) then
+            PlayTypewriterSound()
+        end
+        self.LastTypewriterChars = charsToShow
         local ntxt = ""
         for i = 1, len do
             if i <= charsToShow then ntxt = ntxt .. target:sub(i, i)
@@ -864,6 +882,7 @@ function hg.DrawSettings(ParentPanel)
     backBtn.LineLerp = 0
     backBtn.HoverScale = 0.008
     function backBtn:DoClick()
+        surface.PlaySound(SOUND_SETTINGS_CLICK)
         surface.PlaySound(SOUND_SETTINGS_CLICK)
         if IsValid(ParentPanel) then 
             local luaMenu = ParentPanel:GetParent()
@@ -902,6 +921,14 @@ function hg.DrawSettings(ParentPanel)
         local target = "<- Return"
         local len = #target
         if charsToShow > len then charsToShow = len end
+        if self.TypewriterTarget ~= target then
+            self.TypewriterTarget = target
+            self.LastTypewriterChars = 0
+        end
+        if charsToShow > 0 and charsToShow > (self.LastTypewriterChars or 0) then
+            PlayTypewriterSound()
+        end
+        self.LastTypewriterChars = charsToShow
         if self.TypewriterTarget ~= target then
             self.TypewriterTarget = target
             self.LastTypewriterChars = 0
@@ -1004,6 +1031,7 @@ local function InfoCreateSectionButton(pParent, strTitle, sectionKey)
     btn:SetMouseInputEnabled(true)
     btn:SizeToContents()
     btn:SetFont("ZCity_Menu_Settings_Small")
+    btn:SetFont("ZCity_Menu_Settings_Small")
     btn:SetTall(MenuUnit(42))
     btn:Dock(TOP)
     btn:DockMargin(MenuUnit(15), MenuUnit(2), 0, 0)
@@ -1036,6 +1064,7 @@ local function InfoCreateSectionButton(pParent, strTitle, sectionKey)
         if not IsValid(self) then return end
         if self.SectionDisabled then return end
         surface.PlaySound(SOUND_SETTINGS_CLICK)
+        surface.PlaySound(SOUND_SETTINGS_CLICK)
         info_active_section = self.SectionKey
         InfoRefreshContent()
     end
@@ -1059,6 +1088,14 @@ local function InfoCreateSectionButton(pParent, strTitle, sectionKey)
         local targetText = isActive and ("[ " .. strTitle .. " ]") or strTitle
         local len = #targetText
         if charsToShow > len then charsToShow = len end
+        if self.TypewriterTarget ~= targetText then
+            self.TypewriterTarget = targetText
+            self.LastTypewriterChars = 0
+        end
+        if charsToShow > 0 and charsToShow > (self.LastTypewriterChars or 0) then
+            PlayTypewriterSound()
+        end
+        self.LastTypewriterChars = charsToShow
         if self.TypewriterTarget ~= targetText then
             self.TypewriterTarget = targetText
             self.LastTypewriterChars = 0
@@ -1655,6 +1692,14 @@ function hg.DrawInformation(ParentPanel)
             PlayTypewriterSound()
         end
         self.LastTypewriterChars = charsToShow
+        if self.TypewriterTarget ~= target then
+            self.TypewriterTarget = target
+            self.LastTypewriterChars = 0
+        end
+        if charsToShow > 0 and charsToShow > (self.LastTypewriterChars or 0) then
+            PlayTypewriterSound()
+        end
+        self.LastTypewriterChars = charsToShow
         local ntxt = ""
         for i = 1, len do
             if i <= charsToShow then ntxt = ntxt .. target:sub(i, i)
@@ -1674,6 +1719,7 @@ function hg.DrawInformation(ParentPanel)
     backBtn:Dock(BOTTOM)
     backBtn:DockMargin(MenuUnit(15), MenuUnit(2), 0, MenuUnit(20))
     backBtn:SetFont("ZCity_Menu_Settings_Small")
+    backBtn:SetFont("ZCity_Menu_Settings_Small")
     backBtn:SetTextColor(settings_color_text)
     backBtn:SetText(string.rep("#", #"<- Return"))
     backBtn:SetMouseInputEnabled(true)
@@ -1683,6 +1729,7 @@ function hg.DrawInformation(ParentPanel)
     backBtn.HoverLerp = 0
     backBtn.LineLerp = 0
     function backBtn:DoClick()
+        surface.PlaySound(SOUND_SETTINGS_CLICK)
         surface.PlaySound(SOUND_SETTINGS_CLICK)
         if IsValid(ParentPanel) then
             local luaMenu = ParentPanel:GetParent()
@@ -1721,6 +1768,14 @@ function hg.DrawInformation(ParentPanel)
         local target = "<- Return"
         local len = #target
         if charsToShow > len then charsToShow = len end
+        if self.TypewriterTarget ~= target then
+            self.TypewriterTarget = target
+            self.LastTypewriterChars = 0
+        end
+        if charsToShow > 0 and charsToShow > (self.LastTypewriterChars or 0) then
+            PlayTypewriterSound()
+        end
+        self.LastTypewriterChars = charsToShow
         if self.TypewriterTarget ~= target then
             self.TypewriterTarget = target
             self.LastTypewriterChars = 0
