@@ -114,7 +114,7 @@ end
 		lkp = lkp == false and nil or lkp
 		if !ent.GetManipulateBoneScale or !lkp then return end
 
-		local smoothingUnfake = IsValid(ply.OldRagdoll) and ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0
+		local smoothingUnfake = false -- Disabled: default get-up behavior, no weird standing pose blending.
 		local distSqr = EyePos():DistToSqr(ent:GetPos())
 		local criticalView = ply == lply or GetViewEntity() == ply or follow == ent or smoothingUnfake
 		local fullPoseRender = criticalView or distSqr <= FULL_POSE_RENDER_DIST_SQR

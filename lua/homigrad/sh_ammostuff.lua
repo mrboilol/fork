@@ -2512,6 +2512,18 @@ hg.ammotypes = {
 			tranquilizer = true,
 		}
 	},
+	["dihbattery"] = {
+		name = "D.I.H Battery",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_NONE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 0,
+		maxcarry = 5,
+		minsplash = 0,
+		maxsplash = 0,
+	},
 }
 
 local ammotypes = hg.ammotypes
@@ -2856,6 +2868,12 @@ local ammoents = {
 		Model = "models/ammo/taser_ammo.mdl",
 		Count = 1,
 		Material = "models/defcon/taser/taser",
+	},
+	["dihbattery"] = {
+		Icon = matPistolAmmo,
+		Model = "models/Items/battery.mdl",
+		Scale = 0.75,
+		Count = 1,
 	},
 	[".45acp"] = {
 		Icon = matPistolAmmo,

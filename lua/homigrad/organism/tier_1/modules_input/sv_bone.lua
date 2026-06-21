@@ -438,6 +438,15 @@ PlayBoneBreakSound(org.owner)
 	if dmg > 0.2 then
 		if org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner,1 + dmg) end) end
 	end
+
+	-- teeth: break one tooth on any jaw damage
+	local jawDelta = (org.jaw - oldDmg)
+	if jawDelta > 0 then
+		if hg.organism and hg.organism.TeethOnJawDamage then
+			hg.organism.TeethOnJawDamage(org, jawDelta, dmgInfo, boneindex)
+		end
+	end
+
 	if dmg > 0 and dmgInfo:IsDamageType(DMG_CLUB) and math.random(3) == 1 then
 		local effectEnt = hg.GetCurrentCharacter(org.owner)
 		if not IsValid(effectEnt) then effectEnt = org.owner end

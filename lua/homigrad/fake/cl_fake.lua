@@ -422,12 +422,13 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	view.fov = math.Clamp(hg_fov:GetFloat(),75,100) + lerpfovadd + lerpfovadd2
 	view.znear = 1
 
-	if ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0 then
-		local k = 1 - (ply.gettingup + 1 - CurTime())
-		local k2 = math.max(k - 0.5, 0) * 2
-		//view.origin = LerpVector(k2, view.origin, oldorigin)
-		view.angles = LerpAngle(k2, view.angles, oldangles)
-	end
+	-- Disabled: default get-up behavior, no weird view angle smoothing.
+	//if ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0 then
+	//	local k = 1 - (ply.gettingup + 1 - CurTime())
+	//	local k2 = math.max(k - 0.5, 0) * 2
+	//	//view.origin = LerpVector(k2, view.origin, oldorigin)
+	//	view.angles = LerpAngle(k2, view.angles, oldangles)
+	//end
 	//view.angles = angles
 
 	view = hook.Run("Camera", ply, view.origin, view.angles, view, vector_origin) or view

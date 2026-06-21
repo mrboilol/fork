@@ -16,6 +16,7 @@ hook.Add("Org Clear", "Main", function(org)
 	module.concussion[1](org)
 	module.random_events[1](org)
 	module.goodmood[1](org)
+	if module.teeth and module.teeth[1] then module.teeth[1](org) end
 	org.brain = 0
 	org.consciousness = 1
 	org.consciousnessTracker = 0
@@ -702,6 +703,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.concussion[2](owner, org, timeValue)
 		module.random_events[2](owner, org, timeValue)
 		module.goodmood[2](owner, org, timeValue)
+		if module.teeth and module.teeth[2] then module.teeth[2](owner, org, timeValue) end
 	end
 
 
