@@ -4,8 +4,8 @@ if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_bandage_sh"
 
-SWEP.PrintName = "AutoSurgeoninator9000™"
-SWEP.Instructions = "The ultimate solution to fallen comrades on the field."
+SWEP.PrintName = "Portable D.I.H Unit"
+SWEP.Instructions = "A portable D.I.H (Direct Injury Handler) unit for the people, by the people."
 SWEP.Category = "Medicine"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
