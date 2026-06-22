@@ -56,6 +56,9 @@ hook.Add("Think", "stanleytumbler", function()
 
         if IsValid(ply.FakeRagdoll) then continue end
 
+        -- Grace period after unragdoll: don't trip the player while they are getting back up.
+        if (ply.LastFakeUp or 0) + 2.0 > CurTime() then continue end
+
         -- High-speed impact/air velocity can also force ragdoll (mcity behavior)
         hg.TryVelocityRagdoll(ply)
         if IsValid(ply.FakeRagdoll) then continue end

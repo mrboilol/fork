@@ -272,18 +272,21 @@ hook.Add("Ragdoll Collide", "RagdollFallSounds", function(ragdoll, data)
     if boneName == "ValveBiped.Bip01_Head1" then
         local owner = hg.RagdollOwner(ragdoll)
         if IsValid(owner) and owner:IsPlayer() then
-            local hitpos = data.HitPos or ragdoll:GetPos()
-            owner:AddTinnitus(2.5, false, true)
-            net.Start("headtrauma_flash")
-                net.WriteVector(hitpos)
-                net.WriteFloat(0.6)
-                net.WriteInt(2200, 20)
-                net.WriteBool(false) -- is_critical
-                net.WriteBool(false) -- play_knockout_sound
-                net.WriteBool(true)  -- hasBrainDamage
-                net.WriteBool(false) -- hasConcussion
-                net.WriteBool(true)  -- trigger_tinnitus
-            net.Send(owner)
+            owner.HeadDisorientFlashCooldown = owner.HeadDisorientFlashCooldown or 0
+            if owner.HeadDisorientFlashCooldown < CurTime() then
+                local hitpos = data.HitPos or ragdoll:GetPos()
+                net.Start("headtrauma_flash")
+                    net.WriteVector(hitpos)
+                    net.WriteFloat(0.6)
+                    net.WriteInt(2200, 20)
+                    net.WriteBool(false) -- is_critical
+                    net.WriteBool(false) -- play_knockout_sound
+                    net.WriteBool(false) -- hasBrainDamage
+                    net.WriteBool(false) -- hasConcussion
+                    net.WriteBool(false) -- trigger_tinnitus
+                net.Send(owner)
+                owner.HeadDisorientFlashCooldown = CurTime() + 0.35
+            end
         end
     end
     
@@ -323,17 +326,20 @@ hook.Add("Ragdoll Collide", "RagdollHeadFlashImpact", function(ragdoll, data)
     if speed < math.max(threshold, 80) then return end
 
     local hitpos = data.HitPos or ragdoll:GetPos()
-    owner:AddTinnitus(2.5, false, true)
-    net.Start("headtrauma_flash")
-        net.WriteVector(hitpos)
-        net.WriteFloat(0.6)
-        net.WriteInt(2200, 20)
-        net.WriteBool(false) -- is_critical
-        net.WriteBool(false) -- play_knockout_sound
-        net.WriteBool(true)  -- hasBrainDamage
-        net.WriteBool(false) -- hasConcussion
-        net.WriteBool(true)  -- trigger_tinnitus
-    net.Send(owner)
+    owner.HeadDisorientFlashCooldown = owner.HeadDisorientFlashCooldown or 0
+    if owner.HeadDisorientFlashCooldown < CurTime() then
+        net.Start("headtrauma_flash")
+            net.WriteVector(hitpos)
+            net.WriteFloat(0.6)
+            net.WriteInt(2200, 20)
+            net.WriteBool(false) -- is_critical
+            net.WriteBool(false) -- play_knockout_sound
+            net.WriteBool(false) -- hasBrainDamage
+            net.WriteBool(false) -- hasConcussion
+            net.WriteBool(false) -- trigger_tinnitus
+        net.Send(owner)
+        owner.HeadDisorientFlashCooldown = CurTime() + 0.35
+    end
 
     ragdoll.HeadFlashCooldown = CurTime() + 0.4
 end)

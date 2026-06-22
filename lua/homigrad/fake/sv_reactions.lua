@@ -439,7 +439,7 @@ function hg.reactions.ProcessProtective(ragdoll, ply, org)
     -- Check if falling
     if verticalSpeed < -300 then
         -- Check ground distance
-        local ground, _ = FindGroundPosition(ragdoll:GetPos(), ragdoll, ragdoll:GetPos().z)
+        local ground, _ = FindGroundPosition(ragdoll:GetPos(), ragdoll, ply)
         local dist = ground and (ragdoll:GetPos().z - ground.z) or 1000
         
         if dist < 300 and dist > 50 then

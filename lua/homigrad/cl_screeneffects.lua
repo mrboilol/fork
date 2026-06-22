@@ -1760,23 +1760,25 @@ local CONCUSSION_SOUND_PATH = "sound/concussion"
 local last_headhit_sound = 0
 local last_concussion_sound = 0
 
-local function PlayHeadhitSound()
+local function PlayHeadhitSound(volumeScale)
     if CurTime() < last_headhit_sound + 0.15 then return end
     last_headhit_sound = CurTime()
+    volumeScale = math.Clamp(volumeScale or 1, 0.2, 1.2)
     sound.PlayFile("sound/headhit.mp3", "noblock noplay", function(station)
         if IsValid(station) then
-            station:SetVolume(HEADHIT_VOLUME)
+            station:SetVolume(HEADHIT_VOLUME * volumeScale)
             station:Play()
         end
     end)
 end
 
-local function PlayConcussionSound()
+local function PlayConcussionSound(volumeScale)
     if CurTime() < last_concussion_sound + 0.15 then return end
     last_concussion_sound = CurTime()
+    volumeScale = math.Clamp(volumeScale or 1, 0.3, 1.2)
     sound.PlayFile(CONCUSSION_SOUND_PATH .. math.random(1, 4) .. ".mp3", "noblock noplay", function(station)
         if IsValid(station) then
-            station:SetVolume(CONCUSSION_VOLUME)
+            station:SetVolume(CONCUSSION_VOLUME * volumeScale)
             station:Play()
         end
     end)
@@ -1797,10 +1799,10 @@ net.Receive("headtrauma_flash", function()
     if trigger_tinnitus then
         if is_critical then
             surface.PlaySound("tinnituslong.wav")
-            if IsValid(lply) then lply:AddTinnitus(5, false, hasBrainDamage) end
+            if IsValid(lply) then lply:AddTinnitus(5 + time * 0.7, false, hasBrainDamage) end
         else
             surface.PlaySound("tinnitus.wav")
-            if IsValid(lply) then lply:AddTinnitus(2.5, false, hasBrainDamage) end
+            if IsValid(lply) then lply:AddTinnitus(2.5 + time * 0.5, false, hasBrainDamage) end
         end
     end
 
@@ -1812,12 +1814,20 @@ net.Receive("headtrauma_flash", function()
     end
 
     hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
-    headtraumaSaturation = math.min(time * 3, 5)
 
-    PlayHeadhitSound()
+    -- Scale effects by the received flash duration (which is scaled by damage on the server)
+    local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)
+    headtraumaSaturation = math.min(time * 4.5, 6)
+
+    PlayHeadhitSound(damageScale)
     if is_critical or hasBrainDamage or hasConcussion then
-        PlayConcussionSound()
+        PlayConcussionSound(damageScale)
     end
+
+    -- Scaled view punch based on damage
+    local punchScale = (is_critical or hasBrainDamage or hasConcussion) and 1.5 or damageScale
+    ViewPunch(Angle(math.random(-10, 10) * punchScale, math.random(-8, 8) * punchScale, math.random(-3, 3) * punchScale))
+
     if play_knockout_sound then
         ViewPunch(Angle(math.random(-15, 15), math.random(-15, 15), math.random(-5, 5)))
     end

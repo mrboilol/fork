@@ -900,6 +900,7 @@ if CLIENT then
 	local ammoLongCheck = 0
 	SWEP.DrawAmmoMetods = {
 		["Default"] = function(self,texture)
+			if dzity:GetBool() then return end
 			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
 			local clip = self:Clip1()
 			local owner = self:GetOwner()

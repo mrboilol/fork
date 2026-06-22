@@ -1,4 +1,5 @@
 --local Organism = hg.organism
+if SERVER then util.AddNetworkString("headtrauma_flash") end
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
 
@@ -10,19 +11,64 @@ local function PlayBoneBreakSound(entity)
     end
 end
 
-local function CheckConcussionFlash(org, old_concussion, dmgInfo)
-    if old_concussion < 1.5 and org.concussion >= 1.5 then
-        net.Start("headtrauma_flash")
-        net.WriteVector(dmgInfo:GetDamagePosition())
-        net.WriteFloat(3.0) -- flash_intensity - more severe
-        net.WriteInt(450, 20) -- flash_duration - longer
-        net.WriteBool(true) -- is_critical
-        net.WriteBool(false) -- play_knockout_sound
-        net.WriteBool(org.brain > 0.1) -- hasBrainDamage
-        net.WriteBool(true)
-        net.WriteBool(true) -- trigger_tinnitus
-        net.Send(org.owner)
+local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, oldBrain, oldHeadTrauma)
+    if not org.isPly then return end
+    local targetPlayer = org.owner
+    if IsValid(org.owner.FakeRagdoll) then
+        local ragdoll = org.owner.FakeRagdoll
+        if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
     end
+    if not IsValid(targetPlayer) or not targetPlayer:IsPlayer() then return end
+
+    targetPlayer.HeadDisorientFlashCooldown = targetPlayer.HeadDisorientFlashCooldown or 0
+    if targetPlayer.HeadDisorientFlashCooldown >= CurTime() then return end
+
+    local newConcussion = org.concussion or 0
+    local newBrain = org.brain or 0
+    local newHeadTrauma = org.headtrauma or 0
+
+    local hasBrainDamage = newBrain > 0.1 and oldBrain <= 0.1
+    local hasConcussion = newConcussion >= 1.5 and oldConcussion < 1.5
+    local isSevereTrauma = oldHeadTrauma < 0.5 and newHeadTrauma >= 0.5
+
+    local isCritical = hasBrainDamage or hasConcussion or isSevereTrauma
+
+    -- Base flash scales with damage and actual bone damage taken
+    local baseTime = math.Clamp(0.15 + (boneDelta or 0) * 1.0 + dmg * 0.3, 0.15, 1.0)
+    local baseSize = math.Clamp(800 + (boneDelta or 0) * 1500 + dmg * 1000, 800, 3000)
+
+    if isCritical then
+        baseTime = math.Clamp(baseTime * 1.8 + (hasBrainDamage and 0.5 or 0), 0.5, 3.5)
+        baseSize = math.Clamp(baseSize * 1.4, 1500, 5000)
+    end
+
+    local eyePos = targetPlayer:EyePos()
+    local ang = targetPlayer:EyeAngles()
+    local incomingPos = dmgInfo:GetDamagePosition()
+    local worldPos = eyePos + ang:Forward() * 16
+    if incomingPos and incomingPos ~= vector_origin then
+        local incDir = (incomingPos - eyePos):GetNormalized()
+        local dotRight = ang:Right():Dot(incDir)
+        worldPos = eyePos + ang:Right() * (dotRight * 160) + ang:Forward() * 16
+    end
+
+    net.Start("headtrauma_flash")
+    net.WriteVector(worldPos)
+    net.WriteFloat(baseTime)
+    net.WriteInt(baseSize, 20)
+    net.WriteBool(isCritical)
+    net.WriteBool(false)
+    net.WriteBool(hasBrainDamage)
+    net.WriteBool(hasConcussion)
+    net.WriteBool(isCritical and dmg >= 0.05)
+    net.Send(targetPlayer)
+
+    if isCritical then
+        local disorientationAdd = math.Clamp(dmg * (hasBrainDamage and 2.0 or 1.5), 0.1, 3.0)
+        org.disorientation = math.min((org.disorientation or 0) + disorientationAdd, 10)
+    end
+
+    targetPlayer.HeadDisorientFlashCooldown = CurTime() + (isCritical and 0.8 or 0.35)
 end
 
 local function isCrush(dmgInfo)
@@ -53,21 +99,7 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 
 	-- Track head trauma for long-term stroke risk
 	if key == "skull" then
-		local oldHeadTrauma = org.headtrauma or 0
-		org.headtrauma = math.min(oldHeadTrauma + dmg * 1.0, 2.0)
-		-- Trigger severe headtrauma flash when headtrauma increases significantly
-		if oldHeadTrauma < 0.5 and org.headtrauma >= 0.5 then
-			net.Start("headtrauma_flash")
-			net.WriteVector(dmgInfo:GetDamagePosition())
-			net.WriteFloat(2.5)
-			net.WriteInt(350, 20)
-			net.WriteBool(true)
-			net.WriteBool(false)
-			net.WriteBool(org.brain > 0.1)
-			net.WriteBool((org.concussion or 0) > 0)
-			net.WriteBool(true)
-			net.Send(org.owner)
-		end
+		org.headtrauma = math.min((org.headtrauma or 0) + dmg * 1.0, 2.0)
 	end
 
 	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8)
@@ -380,6 +412,8 @@ local input_list = hg.organism.input_list
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.jaw
 	local old_concussion = org.concussion or 0
+	local old_brain = org.brain or 0
+	local old_headtrauma = org.headtrauma or 0
 
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 
@@ -460,7 +494,7 @@ PlayBoneBreakSound(org.owner)
 		net.Broadcast()
 	end
 
-	CheckConcussionFlash(org, old_concussion, dmgInfo)
+	SendHeadTraumaFlash(org, dmg, dmgInfo, org.jaw - oldDmg, old_concussion, old_brain, old_headtrauma)
 	return result, vecrand
 end
 
@@ -481,8 +515,10 @@ end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.skull
-		local old_concussion = org.concussion or 0
-	
+	local old_concussion = org.concussion or 0
+	local old_brain = org.brain or 0
+	local old_headtrauma = org.headtrauma or 0
+
 	local result, vecrand = damageBone(org, 0.35, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
@@ -605,22 +641,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	-- Accumulate head trauma for long-term stroke risk
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
 
-	-- Trigger severe headtrauma flash on ANY brain damage from head hits
-	local brainDamage = org.brain > 0
-	if brainDamage and org.isPly then
-		net.Start("headtrauma_flash")
-		net.WriteVector(dmgInfo:GetDamagePosition())
-		net.WriteFloat(3.5) -- More severe flash intensity
-		net.WriteInt(500, 20) -- Longer flash duration
-		net.WriteBool(true) -- is_critical
-		net.WriteBool(false) -- play_knockout_sound
-		net.WriteBool(true) -- hasBrainDamage - always true since we have brain damage
-		net.WriteBool((org.concussion or 0) > 0)
-		net.WriteBool(true) -- trigger_tinnitus
-		net.Send(org.owner)
-	end
-
-	CheckConcussionFlash(org, old_concussion, dmgInfo)
+	SendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, old_concussion, old_brain, old_headtrauma)
 
     local eyeChance = 0
     if dmgInfo:IsDamageType(DMG_SLASH) then

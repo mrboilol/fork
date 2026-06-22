@@ -17,6 +17,7 @@ end
 --
 function SWEP:Initialize_Spray()
 	self.EyeSpray = Angle(0, 0, 0)
+	self.WeaponRecoilSway = Angle(0, 0, 0)
 	self.SprayI = 0
 	self.dmgStack = 0
 	self.dmgStack2 = 0
@@ -181,8 +182,9 @@ function SWEP:ComputePrimaryRecoil(mul, recoilForce, sprayI)
 	sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 	sprayAng.roll = 0
 
-	local eyeKick = sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 1.0 * self:GetFearRecoilMul()
+	local eyeKick = sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 1.5 * self:GetFearRecoilMul()
 	owner:SetEyeAngles(eyeang + eyeKick)
+	self.WeaponRecoilSway = sprayAng * 1.5
 
 	local rnd1 = SharedRand(seed .. "_rnd1", 1, 2)
 	local rnd2 = SharedRand(seed .. "_rnd2", -1, 1)
@@ -205,7 +207,7 @@ function SWEP:ComputePrimaryRecoil(mul, recoilForce, sprayI)
 	end
 	viewPunchAngle:Add(Angle(-1.5 * rnd1, -1.5 * rnd2, 0) * viewMul)
 
-	self.LastShotRecoil = viewPunchAngle * 1.5
+	self.LastShotRecoil = viewPunchAngle * 2.5
 
 	return huyang, angpopa, viewMul, rnd1, rnd2, seed
 end
@@ -416,6 +418,9 @@ function SWEP:Step_Spray(time,dtime)
 
 	owner:SetEyeAngles(eyeang + (eyeSpray * (eyeang.z == 180 and -1 or 1)))
 	eyeSpray:Set(LerpAngle(hg.lerpFrameTime2(0.1,dtime), eyeSpray, angZero))
+
+	self.WeaponRecoilSway = self.WeaponRecoilSway or Angle(0, 0, 0)
+	self.WeaponRecoilSway:Set(LerpAngle(hg.lerpFrameTime2(0.15,dtime), self.WeaponRecoilSway, angZero))
 end
 
 --[[else

@@ -852,7 +852,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 		local k2 = math.max(k - 0.5, 0) * 2
 
-		//view.origin = LerpVector(k2, view.origin, oldorigin)
+		view.origin = LerpVector(k2, view.origin, oldorigin)
 
 		view.angles = LerpAngle(k2, view.angles, oldangles)
 

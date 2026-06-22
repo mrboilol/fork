@@ -153,22 +153,39 @@ module[2] = function(owner, org, timeValue)
 		map = 0
 	end
 
-	-- High velocity reduces blood pressure (falling or fast vehicle movement)
+	-- High velocity reduces blood pressure (falling or rapid acceleration only)
 	local velocity = owner:GetVelocity()
 	local speed = velocity:Length()
-	if speed > 350 then
-		local velocityPenalty = math.Clamp((speed - 350) / 450, 0, 0.85) -- Up to 85% reduction at very high speeds
-		local fallSpeed = math.max(0, -velocity.z)
-		if fallSpeed > 200 then
-			velocityPenalty = math.min(velocityPenalty + math.Clamp((fallSpeed - 200) / 500, 0, 0.15), 0.95)
-		end
+	local fallSpeed = math.max(0, -velocity.z)
+	local velocityPenalty = 0
+
+	-- Falling causes G-force blood pressure loss
+	if fallSpeed > 100 then
+		velocityPenalty = math.Clamp((fallSpeed - 100) / 400, 0, 0.9)
+	end
+
+	-- Rapid acceleration (e.g., vehicle crashes) causes G-force loss
+	local prevSpeed = org._pulsePrevSpeed or speed
+	local acceleration = math.abs(speed - prevSpeed) / math.max(timeValue, 0.001)
+	if acceleration > 400 and velocity.z <= 0 then
+		velocityPenalty = math.min(velocityPenalty + math.Clamp((acceleration - 400) / 800, 0, 0.2), 0.95)
+	end
+	org._pulsePrevSpeed = speed
+
+	if velocityPenalty > 0 then
 		map = map * (1 - velocityPenalty)
 	end
 
 	if org.givingUp then map = map * 0.5 end
 
 	map = math.Clamp(map, 0, 190)
-	org.bloodpressure = math.Approach(org.bloodpressure or 93, map, timeValue * (map > (org.bloodpressure or 93) and 14 or 10))
+	local bpTarget = map
+	local bpCurrent = org.bloodpressure or 93
+	local bpRate = (bpTarget > bpCurrent) and 14 or 10
+	if velocityPenalty > 0 then
+		bpRate = bpRate * (1 + velocityPenalty * 4)
+	end
+	org.bloodpressure = math.Approach(bpCurrent, bpTarget, timeValue * bpRate)
 
 	local pulsePressure = 40 * heartK * math.max(bloodK, 0.3)
 	pulsePressure = pulsePressure * (1 + math.Clamp((org.heartbeat - 70) / 180, -0.2, 0.6))

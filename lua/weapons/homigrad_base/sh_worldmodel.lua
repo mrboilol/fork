@@ -221,6 +221,11 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 	ang[2] = ang[2] + self.prankang[2]
 	ang[1] = math.Clamp(ang[1] + self.prankang[1], -90, 90)
 
+	if self.WeaponRecoilSway and not self.WeaponRecoilSway:IsZero() then
+		ang = ang + self.WeaponRecoilSway
+		ang[1] = math.Clamp(ang[1], -90, 90)
+	end
+
 	if CLIENT and self:IsLocal() then
 		ang[3] = ang[3] + position_difference3[2] * -4 - GetViewPunchAngles2()[2] * 0.25
 	end

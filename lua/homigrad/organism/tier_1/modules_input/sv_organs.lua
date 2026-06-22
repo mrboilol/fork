@@ -1,4 +1,5 @@
 --local Organism = hg.organism
+if SERVER then util.AddNetworkString("headtrauma_flash") end
 -- Brain Chunks Logic (Ported from actually_brain_chunks_rework_check_desc_3673949172)
 local GORE_CVARS = {
     scale = 0.9,
@@ -318,6 +319,50 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
         local eyeFunc = input_list[which]
         if eyeFunc then eyeFunc(org, 1, dmg, dmgInfo) end
     end
+
+	-- Headtrauma flash for direct brain damage
+	if org.isPly and brainDelta > 0 then
+		local targetPlayer = org.owner
+		if IsValid(org.owner.FakeRagdoll) then
+			local ragdoll = org.owner.FakeRagdoll
+			if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
+		end
+		if IsValid(targetPlayer) and targetPlayer:IsPlayer() then
+			targetPlayer.HeadDisorientFlashCooldown = targetPlayer.HeadDisorientFlashCooldown or 0
+			if targetPlayer.HeadDisorientFlashCooldown < CurTime() then
+				local isCritical = brainDelta > 0.15
+				local flashTime = math.Clamp(0.25 + brainDelta * 1.2, 0.25, 2.5)
+				local flashSize = math.Clamp(1200 + brainDelta * 2500, 1200, 4500)
+
+				local eyePos = targetPlayer:EyePos()
+				local ang = targetPlayer:EyeAngles()
+				local incomingPos = dmgInfo:GetDamagePosition()
+				local worldPos = eyePos + ang:Forward() * 16
+				if incomingPos and incomingPos ~= vector_origin then
+					local incDir = (incomingPos - eyePos):GetNormalized()
+					local dotRight = ang:Right():Dot(incDir)
+					worldPos = eyePos + ang:Right() * (dotRight * 160) + ang:Forward() * 16
+				end
+
+				net.Start("headtrauma_flash")
+				net.WriteVector(worldPos)
+				net.WriteFloat(flashTime)
+				net.WriteInt(flashSize, 20)
+				net.WriteBool(isCritical)
+				net.WriteBool(false)
+				net.WriteBool(true)
+				net.WriteBool(false)
+				net.WriteBool(isCritical)
+				net.Send(targetPlayer)
+
+				if isCritical then
+					org.disorientation = math.min(org.disorientation + math.Clamp(dmg * 2.0, 0.1, 3.0), 10)
+				end
+
+				targetPlayer.HeadDisorientFlashCooldown = CurTime() + (isCritical and 0.8 or 0.35)
+			end
+		end
+	end
 
 	return result
 end
