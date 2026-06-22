@@ -1,6 +1,6 @@
 local type = type
 
-local function GetWeaponIcon(wep)
+local function GetItemIcon(wep)
 	if not IsValid(wep) then return nil end
 
 	local icon2 = wep.WepSelectIcon2
@@ -9,8 +9,15 @@ local function GetWeaponIcon(wep)
 	end
 
 	local icon = wep.WepSelectIcon
+	if type(icon) == "IMaterial" and icon:GetName() ~= "null" then
+		return icon
+	end
 	if isnumber(icon) then
 		return icon
+	end
+
+	if isstring(wep.IconOverride) and wep.IconOverride ~= "" then
+		return wep.IconOverride
 	end
 	return nil
 end
@@ -53,7 +60,7 @@ local function BuildInventoryOptions(ply)
 				wep:GetPrintName(),
 				nil,
 				nil,
-				GetWeaponIcon(wep)
+				GetItemIcon(wep)
 			}
 		else
 			local subOptions = {}
@@ -63,7 +70,7 @@ local function BuildInventoryOptions(ply)
 					wep:GetPrintName(),
 					nil,
 					nil,
-					GetWeaponIcon(wep)
+					GetItemIcon(wep)
 				}
 			end
 			options[#options + 1] = {

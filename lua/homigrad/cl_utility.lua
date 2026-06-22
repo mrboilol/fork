@@ -256,7 +256,7 @@ players : 1 humans, 0 bots (20 max)
 			local pos = net.ReadVector()
 			local eyePos = LocalPlayer():EyePos()
 			local dist = pos:Distance(eyePos)
-			if dist > 1500 then return end
+			if dist > 1000 then return end
 			local isVisible = not util.TraceLine({
 				start = pos,
 				endpos = eyePos,
@@ -990,7 +990,29 @@ players : 1 humans, 0 bots (20 max)
 	end
 --//
 
--- Tinnitus is handled by sh_tinnitus.lua
+--\\ Tinnitus function
+	if CLIENT then
+		local lply = LocalPlayer()
+		local function AddTinnitus(time, needSound, brainDamage)
+			lply = LocalPlayer()
+			lply.tinnitus = CurTime() + time * 4
+			lply.tinnitusBrainDamage = brainDamage or false
+			lply:SetDSP(32)
+		end
+
+		local plymeta = FindMetaTable("Player")
+		function plymeta:AddTinnitus(time,needSound,brainDamage)
+			needSound = needSound or false
+			AddTinnitus(time,needSound,brainDamage)
+		end
+
+		net.Receive("send_tinnitus",function()
+			local time = net.ReadFloat()
+			local bool = net.ReadBool()
+			local brainDamage = net.ReadBool()
+			AddTinnitus(time,bool,brainDamage)
+		end)
+	end
 --//
 
 --\\ Remove CLIENT side hit particles

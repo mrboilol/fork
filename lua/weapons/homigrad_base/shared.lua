@@ -138,6 +138,20 @@ function SWEP:GetWeaponWeightHandlingMul()
 	return math.Clamp(1 + (w - 2) * 0.15, 0.7, 2.0)
 end
 
+-- Stance-aware stability: high ready (3) / low ready (4) are steadier than usual,
+-- any other stance is slightly less stable. aiming = true weights the bonus stronger.
+function SWEP:GetPostureStabilityMul(aiming)
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return 1 end
+
+	local posture = owner.posture or 0
+	if posture == 3 or posture == 4 then
+		return aiming and 0.78 or 0.85
+	end
+
+	return aiming and 1.12 or 1.08
+end
+
 game.AddParticles("particles/tfa_smoke.pcf")
 PrecacheParticleSystem("smoke_trail_tfa")
 PrecacheParticleSystem("smoke_trail_wild")
@@ -614,7 +628,6 @@ function SWEP:PrimaryShoot()
 	end
 
 	self:EmitShoot()
-	self:PrimarySpread()
 	--if SERVER or self:IsClient() then
 		self:FireBullet()
 	--end
@@ -635,6 +648,7 @@ function SWEP:PrimaryShoot()
 
 	self.drawBullet = false
 	if self.AutomaticDraw then self:Draw() end
+	self:PrimarySpread()
 end
 
 SWEP.SightSlideOffset = 1
@@ -808,12 +822,12 @@ if CLIENT then
 	})
 
 	dynamicmags = CreateClientConVar("hg_dynamic_mags", "0", true, false, "Enables dynamic ammo show when shooting",0,1)
-	dzity = CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps",0,1)
 	instructions = CreateClientConVar("hg_instructions","1", true, false, "Enables gun instructions",0,1)
+	local hg_3dzity = GetConVar("hg_3dzity") or CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 end
 
-local scale = 1
-local developer = GetConVar("developer")
+function SWEP:DrawHUDAdd()
+end
 
 local blur = Material( "pp/blurscreen" )
 local function DrawBlurRect(x, y, w, h, dens, alpha)
@@ -824,55 +838,67 @@ local function DrawBlurRect(x, y, w, h, dens, alpha)
    	surface.SetDrawColor(0,0,0)
 end
 
-function SWEP:DrawHUDAdd()
-	local clipsize = (self:GetMaxClip1() + (self.OpenBolt and 0 or 1))
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return end
-	local attpos = self:GetMuzzleAtt(nil, true, true).Pos
-	local posX,posY = dynamicmags:GetBool() and attpos:ToScreen().x + 50 or ScrW() - ScrW() / 4, dynamicmags:GetBool() and attpos:ToScreen().y + 90 or ScrH() - ScrH() / 6
-	local sizeX,sizeY =  (clipsize == 1 and ScrH() / 15 or ScrW() / 40) * scale, (clipsize == 1 and ScrH() / 80 or ScrH() / 10) * scale
+	--local clipsize = (self:GetMaxClip1() + (self.OpenBolt and 0 or 1))
+	--local owner = self:GetOwner()
+	--local attpos = self:GetMuzzleAtt(nil, true, true).Pos
+	--local posX,posY = dynamicmags:GetBool() and attpos:ToScreen().x + 50 or ScrW() - ScrW() / 4, dynamicmags:GetBool() and attpos:ToScreen().y + 90 or ScrH() - ScrH() / 6
+	--local sizeX,sizeY =  (clipsize == 1 and ScrH() / 15 or ScrW() / 40) * scale, (clipsize == 1 and ScrH() / 80 or ScrH() / 10) * scale
+--
+--
+	--lerpAmmoCheck = Lerp(owner:KeyDown(IN_RELOAD) and 0.5 or 0.02, lerpAmmoCheck, self:KeyDown(IN_RELOAD) and 1 or (dynamicmags:GetBool() and 0 or 0.0))
+	--colBlack.a = 125 * lerpAmmoCheck
+	--colWhite.a = 255 * lerpAmmoCheck
+	--local ammoLeft = math.ceil(self:Clip1() / clipsize * sizeY)
+	--local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
+	--local magCount = math.ceil(ammo / clipsize)
+--
+	--col:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
+	--col.a = 255 * lerpAmmoCheck
+	--if col.a > 1 then
+	--	DrawBlurRect(posX-sizeX*(clipsize ~= 1 and .2 or .3),posY-sizeY*(clipsize ~= 1 and .1 or .7),(sizeX+sizeX*(clipsize ~= 1 and .12 or .2)) * (math.max(math.min(magCount+1,(clipsize ~= 1 and 5 or 4)),1.3)), sizeY + (clipsize ~= 1 and 20 or 60),7,col.a*5)
+	--end
+	--
+	--local color = col
+	--surface.SetDrawColor(color)
+	--surface.DrawRect(posX,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
+	--surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
+--
+	--local posX,posY = posX + (clipsize == 1 and ScrW() / 40 or ScrW() / 50), posY + (clipsize == 1 and ScrH()/70 or ScrH() / 20)
+	--local sizeX,sizeY = sizeX / 2,sizeY / 2
+--
+	--for i = 1,magCount do
+	--	if i > 3 then continue end
+	--	local ammoasd = math.min(clipsize,ammo)
+	--	ammo = ammo - ammoasd
+	--	
+	--	local ammoLeft = math.ceil(ammoasd / clipsize * sizeY)
+	--	
+	--	col2:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
+	--	col2.a = 255 * lerpAmmoCheck
+	--	surface.SetDrawColor(col2)
+	--	surface.DrawRect(posX + (sizeX + 15) * i,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
+	--	surface.DrawOutlinedRect(posX - 5 + (sizeX + 15) * i,posY - 5, sizeX + 10, sizeY + 10, 1)
+	--end
+--
+	--if magCount > 3 then
+	--	draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 + 1, posY + sizeX/2 + 1,Color(0,0,0,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+	--	draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 , posY + sizeX/2,Color(255,255,255,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+	--end
+	
 
-	local show = owner:KeyDown(IN_RELOAD) or dynamicmags:GetBool() or dzity:GetBool()
-	lerpAmmoCheck = Lerp(0.1, lerpAmmoCheck, show and 1 or 0)
-	colBlack.a = 125 * lerpAmmoCheck
-	colWhite.a = 255 * lerpAmmoCheck
-	local ammoLeft = math.ceil(self:Clip1() / clipsize * sizeY)
-	local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
-	local magCount = math.ceil(ammo / clipsize)
+	--self.hudinspect = self.hudinspect or 0
+	--if instructions:GetBool() and self.hudinspect - (CurTime()-6) > 0 then
+	--	self.InfoAlpha = Lerp(FrameTime() * 10,self.InfoAlpha or 0,math.min(self.hudinspect - (CurTime() - 5),1)*255)
+	--	local txt = self.Instructions
+	--	if not self.InfoMarkup1 then
+	--		self.InfoMarkup1 = markup.Parse( "<font=DescFont>"..txt.."</font>", 450 )
+	--	end
+	--	DrawBlurRect(posX - 5 - self.InfoMarkup1:GetWidth() - ScrW()*0.05, posY - self.InfoMarkup1:GetHeight()/2 - 5, self.InfoMarkup1:GetWidth()+10, self.InfoMarkup1:GetHeight()+10, 8, self.InfoAlpha)
+	--	self.InfoMarkup1:Draw(posX- ScrW()*0.05,posY,TEXT_ALIGN_RIGHT,TEXT_ALIGN_CENTER,self.InfoAlpha)
+	--end
 
-	col:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
-	col.a = 255 * lerpAmmoCheck
-	if col.a > 1 then
-		DrawBlurRect(posX-sizeX*(clipsize ~= 1 and .2 or .3),posY-sizeY*(clipsize ~= 1 and .1 or .7),(sizeX+sizeX*(clipsize ~= 1 and .12 or .2)) * (math.max(math.min(magCount+1,(clipsize ~= 1 and 5 or 4)),1.3)), sizeY + (clipsize ~= 1 and 20 or 60),7,col.a*5)
-	end
-
-	local color = col
-	surface.SetDrawColor(color)
-	surface.DrawRect(posX,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
-	surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
-
-	posX,posY = posX + (clipsize == 1 and ScrW() / 40 or ScrW() / 50), posY + (clipsize == 1 and ScrH()/70 or ScrH() / 20)
-	sizeX,sizeY = sizeX / 2,sizeY / 2
-
-	for i = 1,magCount do
-		if i > 3 then continue end
-		local ammoasd = math.min(clipsize,ammo)
-		ammo = ammo - ammoasd
-		
-		local ammoLeft = math.ceil(ammoasd / clipsize * sizeY)
-		
-		col2:SetUnpacked(LerpColor(ammoLeft / sizeY, yellow, color_white))
-		col2.a = 255 * lerpAmmoCheck
-		surface.SetDrawColor(col2)
-		surface.DrawRect(posX + (sizeX + 15) * i,posY - ammoLeft + sizeY, sizeX, ammoLeft, 1)
-		surface.DrawOutlinedRect(posX - 5 + (sizeX + 15) * i,posY - 5, sizeX + 10, sizeY + 10, 1)
-	end
-
-	if magCount > 3 then
-		draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 + 1, posY + sizeX/2 + 1,Color(0,0,0,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
-		draw.SimpleText("+"..magCount-3,"AmmoFont",posX + (sizeX + 15) * 4 , posY + sizeX/2,Color(255,255,255,255*lerpAmmoCheck),TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
-	end
-end
+local scale = 1
+local developer = GetConVar("developer")
 
 
 local function DrawBullet(matIcon, x, y, size, cColor)
@@ -900,7 +926,6 @@ if CLIENT then
 	local ammoLongCheck = 0
 	SWEP.DrawAmmoMetods = {
 		["Default"] = function(self,texture)
-			if dzity:GetBool() then return end
 			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
 			local clip = self:Clip1()
 			local owner = self:GetOwner()
@@ -1042,7 +1067,9 @@ if CLIENT then
 				end
 			end
 		end
-		self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
+		if not hg_3dzity:GetBool() then
+			self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
+		end
 		
 		self.isscoping = false
 		if self.attachments then
@@ -1368,6 +1395,7 @@ function SWEP:CoreStep()
 
 	self:Step_Inspect(time)
 	self:Step_Reload(time)
+	self:Step_JamClear(time)
 	self:ClearAnims()
 	-- self:Animation(time)
 
@@ -1478,8 +1506,8 @@ function SWEP:CoreStep()
 		self.aiminghuuuy = nil
 	end
 
-	self:Step_Spray(time, dtime)
-	self:Step_SprayVel(dtime)
+	if self:IsClient() then self:Step_Spray(time, dtime) end
+	if self:IsClient() then self:Step_SprayVel(dtime) end
 	self.dtimethink = SysTime()
 	//self:ThinkAtt()
 	if self.ThinkAdd then self:ThinkAdd() end
@@ -2116,6 +2144,39 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 10 * (self.podkid or 1)
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -5 * (self.podkid or 1)
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
+		end
+
+		-- Firing wobble: a smooth, weight-driven sway (mirroring the weighty-weapon
+		-- camera sway) that shifts the muzzle - and therefore the bullet trajectory -
+		-- while firing, then lerps back to a stable state as the shooter regains
+		-- control. Uses sine-of-time only (no random) so the server-authoritative
+		-- trajectory stays consistent with the client view.
+		local wobbleDt = dtime or FrameTime()
+		local sinceShot = CurTime() - (self:LastShootTime() or 0)
+		local firing = sinceShot < 0.2
+		-- While firing, drive instability up quickly; once firing stops, lerp it back
+		-- down slowly (the "fighting to regain control" recovery + lingering wobble).
+		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.28 or 0.06, wobbleDt), self.recoilWobbleAmp or 0, firing and 1 or 0)
+
+		if (self.recoilWobbleAmp or 0) > 0.001 then
+			local t = CurTime()
+			local weightFactor = math.Clamp((self.weight or 5) / 5, 0.5, 2.0)
+			local forceFactor = math.Clamp((self.Primary.Force2 or self.Primary.Force or 30) / 40, 0.6, 2.0)
+			local amp = self.recoilWobbleAmp * weightFactor * forceFactor * self:GetPostureStabilityMul(self:IsZoom()) * (self:IsResting() and 0.25 or 1) * 1.2
+
+			-- Multi-frequency sine sway, same pattern as the heavy-weapon camera sway.
+			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
+			local wobY = math.cos(t * 1.8) * 0.65 + math.cos(t * 3.1) * 0.35
+			local wobZ = math.sin(t * 2.2) * 0.65 + math.cos(t * 2.9) * 0.35
+
+			-- Angular wobble bends the muzzle direction -> changes bullet trajectory.
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 0.6
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.9
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 0.5
+
+			-- Positional wobble shifts the weapon model (and muzzle origin) a touch.
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.5
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.4
 		end
 	end
 

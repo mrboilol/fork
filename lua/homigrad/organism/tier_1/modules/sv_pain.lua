@@ -152,8 +152,6 @@ module[2] = function(owner, org, timeValue)
 
 		sub = sub * suppression
 
-		add = add * suppression
-
 	end
 
 
@@ -305,7 +303,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - adrenaline / 16, 0.75) * math.max(1 - org.analgesia, 0)
+	org.pain = org.avgpain * math.max(1 - adrenaline / 3, 0.1) * math.max(1 - org.analgesia, 0)
 
 
 

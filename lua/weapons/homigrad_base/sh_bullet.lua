@@ -37,31 +37,6 @@ local effect = {
 	[MAT_GLASS] = {"glass",1},
 }
 
-local surface_impact_sounds = {
-	[MAT_METAL] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_COMPUTER] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_VENT] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_GRATE] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_FLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
-	[MAT_ALIENFLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
-	[MAT_SAND] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[MAT_DIRT] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[MAT_WOOD] = {"ric_wood1.ogg", "ric_wood2.ogg", "ric_wood3.ogg", "ric_wood4.ogg"},
-	[MAT_FOLIAGE] = {"ric_wood1.ogg", "ric_wood2.ogg", "ric_wood3.ogg", "ric_wood4.ogg"},
-	[MAT_CONCRETE] = {"ric_stone1.ogg", "ric_stone2.ogg", "ric_stone3.ogg"},
-	[MAT_TILE] = {"ric_stone1.ogg", "ric_stone2.ogg", "ric_stone3.ogg"},
-	[MAT_GLASS] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_PLASTIC] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-}
-
-local function playImpactSound(tr)
-	local sounds = surface_impact_sounds[tr.MatType]
-	if sounds and #sounds > 0 then
-		local sound_file = sounds[math.random(1, #sounds)]
-		sound.Play("bullet/" .. sound_file, tr.HitPos, 75, math.random(90, 110))
-	end
-end
-
 if SERVER then
 	hg.bulletholes = hg.bulletholes or {}
 
@@ -93,7 +68,6 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	-- all the way through
 	--print(ApproachAngle > MaxRicAngle * 0.7  )
 	if ApproachAngle > MaxRicAngle * 1 or tr.Entity:IsVehicle() then
-		playImpactSound(tr)
 		local Pen = (bullet.Penetration or 5) * 3 or dmg
 		local MaxDist, SearchPos, SearchDist, Penetrated = math.min(Pen / hardness * 0.4, 100), hitPos, 5, false
 		
@@ -233,14 +207,9 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	elseif ApproachAngle < MaxRicAngle * 0.7 then --previosly 0.2, made 1 for fun
 		--if CLIENT then return end
 		-- ping whiiiizzzz
-		if math.random(2) == 1 then
-			local rnd = math.random(4)
-			sound.Play("bullet/ricochet" .. rnd .. ".ogg", hitPos, 75, math.random(90, 110))
-		else
-			local rnd = math.random(12)
-			if rnd == 8 then rnd = 9 end
-			sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", hitPos, 75, math.random(90, 110))
-		end
+		local rnd = math.random(12)
+		if rnd == 8 then rnd = 9 end
+		sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", hitPos, 75, math.random(90, 110))
 		--sound.Play("snd_jack_hmcd_ricochet_" .. math.random(1, 2) .. ".wav", hitPos, 75, math.random(90, 110))
 		--sound.Play("weapons/arccw/ricochet0" .. math.random(1, 5) .. "_quiet.wav", hitPos, 75, math.random(90, 110))
 		util.Decal("ManhackCut", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
@@ -278,19 +247,16 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			endpos = hitPos + hitNormal + -NewVec * 10000,
 			mask = MASK_SHOT
 		} )
-	else
-		playImpactSound(tr)
-		if math.random(2) == 1 then
-			if CLIENT then return end
-			local effectdata1 = EffectData()
-			effectdata1:SetOrigin(hitPos)
-			effectdata1:SetNormal(tr.Normal)
-			effectdata1:SetStart(tr.HitNormal)
-			effectdata1:SetEntity(self)
-			effectdata1:SetFlags(2)
-			effectdata1:SetMagnitude(4)
-			util.Effect("eff_bulletdrop", effectdata1)
-		end
+	elseif math.random(2) == 1 then
+		if CLIENT then return end
+		local effectdata1 = EffectData()
+		effectdata1:SetOrigin(hitPos)
+		effectdata1:SetNormal(tr.Normal)
+		effectdata1:SetStart(tr.HitNormal)
+		effectdata1:SetEntity(self)
+		effectdata1:SetFlags(2)
+		effectdata1:SetMagnitude(4)
+		util.Effect("eff_bulletdrop", effectdata1)
 	end
 end
 

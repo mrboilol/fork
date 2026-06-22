@@ -637,7 +637,17 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 					debuffMitigation = 0.6 -- Slightly mitigate debuffs (40% reduction)
 				end
 
-				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.7, 10)
+				-- Fatigue kicks in faster the longer you hold the aim.
+				local duration_ramp = 1 + math.Clamp(duration - 0.5, 0, 12) * 0.18
+
+				-- Stance affects fatigue: high ready (3) / low ready (4) are steadier
+				-- (slower fatigue); any other stance fatigues slightly faster.
+				local posture = owner.posture or 0
+				local posture_fatigue_mult = (posture == 3 or posture == 4) and 0.7 or 1.25
+
+				local fatigue_rate = timeValue * 0.7 * duration_ramp * posture_fatigue_mult
+
+				org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + fatigue_rate, 10)
 
 				-- Increase aiming fatigue accumulation for broken/amputated arms
 				if rarm_broken_debuff or larm_broken_debuff then
@@ -645,7 +655,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 					if org.rarmamputated or org.larmamputated then
 						fatigue_multiplier = 2.0 * debuffMitigation -- More severe for amputated arms
 					end
-					org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + timeValue * 0.7 * fatigue_multiplier, 10)
+					org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + fatigue_rate * fatigue_multiplier, 10)
 				end
 
 				local pain_threshold = 4.0

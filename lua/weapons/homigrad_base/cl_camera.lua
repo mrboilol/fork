@@ -396,7 +396,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 			final_brain_sway = final_brain_sway * mitigation_mult
 		end
 
-		local sway_scale = (1 + final_arm_sway + final_fatigue_sway + final_brain_sway) * handlingMul
+		-- Stance-aware stability: high/low ready steadies the weapon, other stances
+		-- are slightly swayier (bonus weighted stronger while aiming).
+		local sway_scale = (1 + final_arm_sway + final_fatigue_sway + final_brain_sway) * handlingMul * self:GetPostureStabilityMul(zooming)
 
 		local jitterMult = (stressFactor > 0.1) and (1 + stressFactor * 0.5) or 1
 		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * (isHoldingBreath and 0.05 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale + jitterSway * jitterMult)

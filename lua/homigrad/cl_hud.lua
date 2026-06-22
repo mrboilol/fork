@@ -273,8 +273,20 @@ local menuPanel
 
 local colBack = Color(0,0,0)
 
+local iconMaterialCache = {}
+
 local function DrawRadialIcon(icon, x, y, w, h, alpha)
 	if not icon then return end
+
+	if isstring(icon) then
+		local mat = iconMaterialCache[icon]
+		if mat == nil then
+			mat = Material(icon)
+			iconMaterialCache[icon] = mat or false
+		end
+		if not mat then return end
+		icon = mat
+	end
 
 	surface.SetDrawColor(255, 255, 255, alpha)
 	if type(icon) == "IMaterial" then

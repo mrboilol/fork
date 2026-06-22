@@ -213,10 +213,6 @@ function hg.Ragdoll_Create(ply)
 		end
 	end)
 	ragdoll:AddCallback("PhysicsCollide", function(outEnt, data) hook_Run("Ragdoll Collide", ragdoll, data) end)
-	
-	-- Track ragdoll creation time for rolling behavior
-	ragdoll.rollStartTime = CurTime()
-	
 	local velocity = ply:GetVelocity()
 	--local phys = ragdoll:GetPhysicsObject()
 	--if IsValid(phys) then --phys:SetMass(20)
@@ -359,7 +355,6 @@ function hg.Ragdoll_Create(ply)
 
 		phys:SetPos(matrix:GetTranslation() + (ply:InVehicle() and vector_origin or offset))
 		phys:SetAngles(matrix:GetAngles())
-		-- disable this if weird shit happens
 		if ragdoll:GetBoneName(bone) == "ValveBiped.Bip01_Head1" then
 			local _,ang = LocalToWorld(vecZero,Angle(-80,0,90),vecZero,ply:EyeAngles())
 			phys:SetAngles(ang)
@@ -790,13 +785,6 @@ function hg.FakeUp(ply, forced, instant)
 	ply.OldRagdoll = ragdoll
 	ply:SetNWEntity("FakeRagdollOld", ragdoll)
 	ply.FakeRagdoll = nil
-
-	ply:ConCommand("+duck")
-	timer.Simple(0.5,function()
-		if IsValid(ply) then
-			ply:ConCommand("-duck")
-		end
-	end)
 
 	if IsValid(ragdoll) and ragdoll:IsOnFire() then
 		timer.Simple(0.1,function()
@@ -1324,7 +1312,6 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 
 	if not data.HitEntity:IsWorld() then return end
 	if data.OurOldVelocity:LengthSqr() < 165000 or (rag.NextSND or 0) > data.DeltaTime then return end
-	if ConVarExists("hg_fallsounds_enabled") and GetConVar("hg_fallsounds_enabled"):GetBool() then return end
 	rag:EmitSound("player/falling_foley/fall_foley"..mRandom(13)..".wav", 60, mRandom(95, 115), 1, CHAN_AUTO)
 	if mRandom(3) == 2 then
 		rag:EmitSound("physics/flesh/flesh_impact_hard"..mRandom(6)..".wav", 55, mRandom(85, 105), 1, CHAN_AUTO)
