@@ -283,6 +283,7 @@ end
 SWEP.FakeEjectBrassATT = "2"
 
 function SWEP:Reload(time)
+	if self:GetJammed() then return end
 	--print(self:GetNetVar("shootgunReload",0))
 	if self.AnimStart_Draw > CurTime() - 0.5 then return end
 	if not self:CanUse() then return end

@@ -1412,6 +1412,12 @@ hook.Add("Think", "Fake", function()
 
 						if ply:WaterLevel() == 1 then shadowControl(ragdoll, 1, 0.001, nil, nil, nil, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,5)):GetPos(), 5, 0) end
 
+						if org.larm == 1 or org.larmdislocation then
+
+							org.painadd = org.painadd + ragdoll.dtime * 3
+
+						end
+
 					/*else
 
 						ang2:Set(angles)
@@ -1476,7 +1482,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.rarm == 1 or org.rarmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 5
 
 					end
 
@@ -1520,7 +1526,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.larm == 1 or org.larmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 5
 
 					end
 
@@ -1564,7 +1570,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.rarm == 1 or org.rarmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 5
 
 					end
 
@@ -1596,7 +1602,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.larm == 1 or org.larmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 5
 
 					end
 
@@ -1671,6 +1677,12 @@ hook.Add("Think", "Fake", function()
 						shadowControl(ragdoll, 7, 0.001, ang2, forceArm * 2, forceArm_dump, ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,7)):GetPos() + ang2:Forward() * rightHandReach + ((vellen > 150 and ragdoll:GetPhysicsObject():GetVelocity() / 224) or vector_zero), ishgweapon(wep) and 500 or 500, ishgweapon(wep) and 50 or 50)
 
 						if ply:WaterLevel() == 1 then shadowControl(ragdoll, 1, 0.001, nil, nil, nil, ragdoll:GetPhysicsObjectNum(7):GetPos(), 5, 0) end
+
+						if org.rarm == 1 or org.rarmdislocation then
+
+							org.painadd = org.painadd + ragdoll.dtime * 3
+
+						end
 
 					/*else
 
@@ -2542,7 +2554,7 @@ hook.Add("Think", "Fake", function()
 
 				if org.lleg >= 1 or org.rleg >= 1 then
 
-					org.painadd = org.painadd + ragdoll.dtime * 2 * (org.lleg + org.rleg)
+					org.painadd = org.painadd + ragdoll.dtime * 3 * (org.lleg + org.rleg)
 
 				end
 

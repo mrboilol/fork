@@ -112,50 +112,22 @@ function SWEP:StartJamClear()
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return false end
 
-	local clearTime = self:GetJamClearTime()
-	local endTime = CurTime() + clearTime
-
-	self:SetNWFloat("JamClearEnd", endTime)
-	self:SetNWFloat("JamClearStart", CurTime())
-	self.jamclear_start = CurTime()
-	self.inspect = math.huge
-
-	owner:EmitSound("weapons/zmirli/shared/foley_light" .. math.random(1, 4) .. ".wav", 45, math.random(95, 105))
-
-	return true
-end
-
-function SWEP:FinishJamClear()
-	self:SetNWFloat("JamClearEnd", 0)
-	self:SetNWFloat("JamClearStart", 0)
-	self.jamclear_start = nil
-	self.inspect = nil
-
-	if not self:GetJammed() then return false end
-
+	-- Clear the jam immediately
 	self:SetJammed(false)
 
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return true end
-
-	owner:EmitSound("weapons/zmirli/shared/foley_light" .. math.random(1, 4) .. ".wav", 45, math.random(95, 105))
-	owner:ViewPunch(AngleRand(-2, 2))
-
-	self:RejectShell(self.ShellEject)
-
-	if self:IsManualAction() then
-		local cycleAnim = self.AnimList and self.AnimList["cycle"]
-		if cycleAnim then
-			self:PlayAnim("cycle", 0.6, false, function()
-				self:PlayAnim("idle", 1, not self.NoIdleLoop)
-			end)
-		end
-
-		local cockSound = self.CockSound or self.ReloadSound
-		if cockSound then
-			owner:EmitSound(cockSound, 60, math.random(95, 105))
-		end
+	-- Play bolt/cock sound
+	local cockSound = self.CockSound or self.ReloadSound
+	if cockSound then
+		owner:EmitSound(cockSound, 60, math.random(95, 105))
 	end
+
+	-- Kick the view
+	if owner.ViewPunch then
+		owner:ViewPunch(AngleRand(-3, 3))
+	end
+
+	-- Eject the stuck casing
+	self:RejectShell(self.ShellEject)
 
 	return true
 end
@@ -182,16 +154,6 @@ function SWEP:ClearJam()
 	end
 
 	return true
-end
-
-function SWEP:Step_JamClear(time)
-	if not SERVER then return end
-	if not self:IsJamClearing() then return end
-
-	local endTime = self:GetJamClearEnd()
-	if endTime <= time then
-		self:FinishJamClear()
-	end
 end
 
 if SERVER then

@@ -115,6 +115,7 @@ SWEP.reloadCoolDown = 0
 if SERVER then
 	util.AddNetworkString("hgwep draw")
 	function SWEP:Reload(time)
+		if self:GetJammed() then return end
 		if not self:CanUse() then return end
 		local ply = self:GetOwner()
 		if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end

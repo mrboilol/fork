@@ -272,6 +272,20 @@ local taitorCol = Color(155,0,0)
 local menuPanel
 
 local colBack = Color(0,0,0)
+
+local function DrawRadialIcon(icon, x, y, w, h, alpha)
+	if not icon then return end
+
+	surface.SetDrawColor(255, 255, 255, alpha)
+	if type(icon) == "IMaterial" then
+		surface.SetMaterial(icon)
+		surface.DrawTexturedRect(x, y, w, h)
+	elseif isnumber(icon) then
+		surface.SetTexture(icon)
+		surface.DrawTexturedRect(x, y, w, h)
+	end
+end
+
 local function CreateRadialMenu(options_arg, bAutoClose)
 	local sizeX, sizeY = ScrW(), ScrH()
 	hg.radialOptions = {}
@@ -506,7 +520,33 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 					), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 			end
 
-			-- player name and role, drawn once in first segment
+			-- weapon / item icon
+			local icon = option[5]
+			if icon then
+				surface.SetFont("ZCity_Veteran")
+				local textW, textH = surface.GetTextSize(mainTxt)
+				local iconW = math.min(ScrH() * 0.05, math.max(textW * 1.2, ScrH() * 0.03))
+				local iconH = iconW * 0.5
+				local iconAlpha = math.floor(Lerp(sel, colTextBase.a, colTextHover.a) * panAlpha)
+	
+				-- approximate horizontal space inside this wedge at the text radius
+				local halfAngle = math.rad(partDeg / 2)
+				local chord = 2 * tRad * math.sin(halfAngle)
+				local iconFits = chord >= iconW * 1.2
+	
+				if iconFits then
+					local ix = tx - iconW / 2
+					local iy = ty + (subTxt and 40 or 16) + textH / 2
+					DrawRadialIcon(icon, ix, iy, iconW, iconH, iconAlpha)
+				else
+					local outR = hoverR + iconW * 0.7
+					local ix = ScrW() / 2 + math.cos(midA) * outR - iconW / 2
+					local iy = ScrH() / 2 + math.sin(midA) * outR - iconH / 2
+					DrawRadialIcon(icon, ix, iy, iconW, iconH, iconAlpha)
+				end
+			end
+
+		-- player name and role, drawn once in first segment
 			if idx == 0 and !(paining) then
 				draw.SimpleText(lply:GetPlayerName(), "HomigradFontGigantoNormous",
 					ScrW() * 0.0215 * viewLerp, ScrH() * 0.042, colBack, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)

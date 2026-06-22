@@ -44,6 +44,14 @@ surface.CreateFont("OtrubCriticalMessage", {
     shadow = true
 })
 
+surface.CreateFont("HomigradFontTypewriterSmall", {
+    font = "Veteran Typewriter",
+    size = ScreenScaleH(12),
+    weight = 800,
+    antialias = true,
+    shadow = true
+})
+
 local ringAlpha = 0
 local lerpBrain = 0
 local lerpShock = 0
@@ -86,6 +94,7 @@ local nearDeathClasses = {
 
 local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
 local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
+local hg_3dzity = GetConVar("hg_3dzity") or CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 
 local function GetHeartbeatVolume(org)
     if not org then return 0.2 end
@@ -663,69 +672,76 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
 
     if ecgAlphaPulseCheck > 0.01 then
-        local boxW, boxH = 400, 200
-        local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 60
+        if not IsValid(g_PulseCheckTarget) then
+            g_PulseCheckTarget = nil
+            g_PulseCheckData = nil
+            pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
+            ecgAlphaPulseCheck = 0
+        else
+            local boxW, boxH = 400, 200
+            local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 60
 
-        surface.SetDrawColor(0, 0, 0, 150 * ecgAlphaPulseCheck)
-        surface.DrawRect(boxX, boxY, boxW, boxH)
-        surface.SetDrawColor(255, 255, 255, 200 * ecgAlphaPulseCheck)
-        surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
+            surface.SetDrawColor(0, 0, 0, 150 * ecgAlphaPulseCheck)
+            surface.DrawRect(boxX, boxY, boxW, boxH)
+            surface.SetDrawColor(255, 255, 255, 200 * ecgAlphaPulseCheck)
+            surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
-        local target_org = g_PulseCheckTarget.organism or {}
-        local target_heartbeat = target_org.heartbeat or 70
-        local target_pulse = target_org.pulse or 70
-        local target_bp = target_org.bloodpressure or 93
-        local target_brain = target_org.brain or 0
-        local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4)
+            local target_org = g_PulseCheckTarget.organism or {}
+            local target_heartbeat = target_org.heartbeat or 70
+            local target_pulse = target_org.pulse or 70
+            local target_bp = target_org.bloodpressure or 93
+            local target_brain = target_org.brain or 0
+            local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4)
 
-        if g_PulseCheckData and not g_PulseCheckData.completed then
-            if target_org.heartstop or target_heartbeat <= 0 then
-                g_PulseCheckData.completed = true
-                g_PulseCheckData.finalBPM = "No Pulse"
-            elseif CurTime() >= g_PulseCheckData.started + 10 then
-                g_PulseCheckData.completed = true
-                g_PulseCheckData.finalBPM = g_PulseCheckData.counted * 6
-            else
-                local timeNow = CurTime()
-                while timeNow >= g_PulseCheckData.nextBeat and g_PulseCheckData.nextBeat <= g_PulseCheckData.started + 10 do
-                    g_PulseCheckData.counted = g_PulseCheckData.counted + 1
-                    local dynamicRate = math.max(target_heartbeat, 1)
-                    g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
-                    if target_heartbeat < 1 then
-                        EmitRingSound(SOUND_FLATLINE, 0.8)
-                    else
-                        local vol = GetHeartbeatVolume(target_org)
-                        local abnormalPulse = (target_heartbeat < 40 and target_heartbeat >= 1) or target_heartbeat > 100
-                        local highStress = vol > 0.5
-                        local fibrillating = target_heartbeat > 250
-                        if fibrillating then
-                            EmitRingSound(SOUND_FIBRILLATION, vol)
-                        elseif abnormalPulse or highStress then
-                            EmitRingSound(SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
+            if g_PulseCheckData and not g_PulseCheckData.completed then
+                if target_org.heartstop or target_heartbeat <= 0 then
+                    g_PulseCheckData.completed = true
+                    g_PulseCheckData.finalBPM = "No Pulse"
+                elseif CurTime() >= g_PulseCheckData.started + 10 then
+                    g_PulseCheckData.completed = true
+                    g_PulseCheckData.finalBPM = g_PulseCheckData.counted * 6
+                else
+                    local timeNow = CurTime()
+                    while timeNow >= g_PulseCheckData.nextBeat and g_PulseCheckData.nextBeat <= g_PulseCheckData.started + 10 do
+                        g_PulseCheckData.counted = g_PulseCheckData.counted + 1
+                        local dynamicRate = math.max(target_heartbeat, 1)
+                        g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
+                        if target_heartbeat < 1 then
+                            EmitRingSound(SOUND_FLATLINE, 0.8)
                         else
-                            EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
+                            local vol = GetHeartbeatVolume(target_org)
+                            local abnormalPulse = (target_heartbeat < 40 and target_heartbeat >= 1) or target_heartbeat > 100
+                            local highStress = vol > 0.5
+                            local fibrillating = target_heartbeat > 250
+                            if fibrillating then
+                                EmitRingSound(SOUND_FIBRILLATION, vol)
+                            elseif abnormalPulse or highStress then
+                                EmitRingSound(SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
+                            else
+                                EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
+                            end
                         end
                     end
                 end
             end
-        end
 
-        DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck)
+            DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck)
 
-        local displayText = ""
-        if g_PulseCheckData then
-            if g_PulseCheckData.completed then
-                if type(g_PulseCheckData.finalBPM) == "number" then
-                    displayText = g_PulseCheckData.counted .. " x 6 = " .. g_PulseCheckData.finalBPM .. " BPM"
+            local displayText = ""
+            if g_PulseCheckData then
+                if g_PulseCheckData.completed then
+                    if type(g_PulseCheckData.finalBPM) == "number" then
+                        displayText = g_PulseCheckData.counted .. " x 6 = " .. g_PulseCheckData.finalBPM .. " BPM"
+                    else
+                        displayText = g_PulseCheckData.finalBPM
+                    end
                 else
-                    displayText = g_PulseCheckData.finalBPM
+                    displayText = "Counting: " .. g_PulseCheckData.counted
                 end
-            else
-                displayText = "Counting: " .. g_PulseCheckData.counted
             end
-        end
 
-        draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY - 15, Color(255, 255, 255, 255 * ecgAlphaPulseCheck), TEXT_ALIGN_CENTER)
+            draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY - 15, Color(255, 255, 255, 255 * ecgAlphaPulseCheck), TEXT_ALIGN_CENTER)
+        end
     else
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
     end
@@ -785,4 +801,63 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         local textAlpha = 255 * otrubECGAlpha * criticalProgress
         draw.SimpleText("Theres nothing you can do.", "OtrubCriticalMessage", ScrW() / 2, ScrH() * 0.35, Color(255, 0, 0, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
+end)
+
+local function GetPulseCheckDisplayText()
+    local target = g_PulseCheckTarget
+    local data = g_PulseCheckData
+    local org = (IsValid(target) and target.organism) or {}
+    local heartbeat = org.heartbeat or 70
+
+    if heartbeat < 1 or org.heartstop then
+        return "NO PULSE"
+    end
+
+    if data then
+        if data.completed then
+            if type(data.finalBPM) == "number" then
+                return data.counted .. " x 6 = " .. data.finalBPM .. " BPM"
+            else
+                return tostring(data.finalBPM)
+            end
+        else
+            return "Counting: " .. data.counted
+        end
+    end
+
+    return "PULSE: " .. heartbeat .. " BPM"
+end
+
+hook.Add("PostDrawTranslucentRenderables", "PulseCheck3DIndicator", function(_, isDrawingSkybox)
+    if isDrawingSkybox then return end
+    if not hg_3dzity:GetBool() then return end
+    if not IsValid(g_PulseCheckTarget) then return end
+
+    local alpha = ecgAlphaPulseCheck
+    if alpha <= 0.01 then return end
+
+    local ent = g_PulseCheckTarget
+    local maxs = ent:OBBMaxs()
+    if not maxs then return end
+    local pos = ent:LocalToWorld(Vector(0, 0, maxs.z)) + Vector(0, 0, 4)
+
+    if pos:DistToSqr(EyePos()) > 250000 then return end
+
+    local text = GetPulseCheckDisplayText()
+    local ang = (EyePos() - pos):Angle()
+    ang.p = 0
+    ang.r = 0
+
+    surface.SetFont("HomigradFontTypewriterSmall")
+    local tw, th = surface.GetTextSize(text)
+    local pad = 8
+    local w, h = tw + pad * 2, th + pad * 2
+
+    local bg = Color(30, 30, 30, 220 * alpha)
+    local textColor = Color(255, 255, 255, 255 * alpha)
+
+    cam.Start3D2D(pos, ang, 0.25)
+        draw.RoundedBox(4, -w / 2, -h / 2, w, h, bg)
+        draw.SimpleText(text, "HomigradFontTypewriterSmall", 0, 0, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    cam.End3D2D()
 end)

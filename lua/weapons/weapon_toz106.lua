@@ -309,6 +309,7 @@ SWEP.GunCamAng = Angle(190,-5,-95)
 SWEP.FakeEjectBrassATT = "4"
 
 function SWEP:Reload(time)
+	if self:GetJammed() then return end
 	--PrintTable(self:GetWM():GetAttachments())
 	--print(self:GetNetVar("shootgunReload",0))
 	local ply = self:GetOwner()

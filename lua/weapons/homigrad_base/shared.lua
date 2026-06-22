@@ -1368,7 +1368,6 @@ function SWEP:CoreStep()
 
 	self:Step_Inspect(time)
 	self:Step_Reload(time)
-	self:Step_JamClear(time)
 	self:ClearAnims()
 	-- self:Animation(time)
 

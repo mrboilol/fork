@@ -465,7 +465,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		local ent = IsValid(ply:GetNetVar("carryent")) and ply:GetNetVar("carryent") or IsValid(ply:GetNetVar("carryent2")) and ply:GetNetVar("carryent2")
 
 		if SERVER and inertia_len > 5 and runnin then
-			local mul = math.Clamp(inertia_len / 200, 0.5, 1) * 5 * (ply:Crouching() and 0.01 or 1)
+			local mul = math.Clamp(inertia_len / 200, 0.5, 1) * 7.5 * (ply:Crouching() and 0.01 or 1)
 			if ply == rag then
 				if org.pelvis == 1 then
 					org.painadd = org.painadd + FrameTime() * mul

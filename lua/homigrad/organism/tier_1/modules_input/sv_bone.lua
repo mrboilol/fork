@@ -704,28 +704,31 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.brokenribs = math.Round(org.chest * 3)
 		
 		if org.brokenribs > 0 then
-			org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
+			local owner = org.owner
+			if IsValid(owner) and owner:IsPlayer() then
+				owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
-					PlayBoneBreakSound(org.owner)
+				PlayBoneBreakSound(owner)
 			
-			-- Chance to puncture lung when ribs break
-			local punctureChance = 0.25 + (org.brokenribs * 0.1) -- 25% base + 10% per broken rib
-			if math.random() < punctureChance then
-				local lungSide = math.random(2) == 1 and "lungsL" or "lungsR"
-				local punctureSeverity = math.Rand(0.3, 0.7)
-				org[lungSide][1] = math.min(org[lungSide][1] + punctureSeverity, 1)
-				
-				-- Chance to cause pneumothorax (collapsed lung)
-				if math.random() < 0.4 then
-					org[lungSide][2] = 1
-					org.owner:Notify("My lung hurts a lot for some reason...", 8, "pneumothorax", 3)
-				else
-					org.owner:Notify("I felt it- i felt the rib poke my lung...", 6, "lungpuncture", 3)
+				-- Chance to puncture lung when ribs break
+				local punctureChance = 0.25 + (org.brokenribs * 0.1) -- 25% base + 10% per broken rib
+				if math.random() < punctureChance then
+					local lungSide = math.random(2) == 1 and "lungsL" or "lungsR"
+					local punctureSeverity = math.Rand(0.3, 0.7)
+					org[lungSide][1] = math.min(org[lungSide][1] + punctureSeverity, 1)
+					
+					-- Chance to cause pneumothorax (collapsed lung)
+					if math.random() < 0.4 then
+						org[lungSide][2] = 1
+						owner:Notify("My lung hurts a lot for some reason...", 8, "pneumothorax", 3)
+					else
+						owner:Notify("I felt it- i felt the rib poke my lung...", 6, "lungpuncture", 3)
+					end
+					
+					-- Additional pain and shock from lung puncture
+					org.painadd = org.painadd + 30
+					org.shock = org.shock + 20
 				end
-				
-				-- Additional pain and shock from lung puncture
-				org.painadd = org.painadd + 30
-				org.shock = org.shock + 20
 			end
 
 			return math.min(0, result)

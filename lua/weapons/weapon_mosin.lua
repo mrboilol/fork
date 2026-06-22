@@ -292,6 +292,7 @@ end
 SWEP.FakeEjectBrassATT = "shell"
 
 function SWEP:Reload(time)
+	if self:GetJammed() then return end
 	--print(self:GetNetVar("shootgunReload",0))
 	local ply = self:GetOwner()
 	--if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end

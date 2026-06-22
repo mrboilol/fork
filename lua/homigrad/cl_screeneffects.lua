@@ -1754,7 +1754,8 @@ hook.Add("HG_CalcView", "DespairBreathShake", function(ply, pos, angles, fova, z
 	fova[1] = (fova[1] or 0) + pushPull * 2.8
 end)
 
-local HEADHIT_VOLUME = 1
+local HEADHIT_VOLUME = 1.0
+local HEADHIT_BASE_BOOST = 1.2 -- every head hit is louder than full volume
 local CONCUSSION_VOLUME = 0.45
 local CONCUSSION_SOUND_PATH = "sound/concussion"
 local last_headhit_sound = 0
@@ -1763,10 +1764,12 @@ local last_concussion_sound = 0
 local function PlayHeadhitSound(volumeScale)
     if CurTime() < last_headhit_sound + 0.15 then return end
     last_headhit_sound = CurTime()
-    volumeScale = math.Clamp(volumeScale or 1, 0.2, 1.2)
+    volumeScale = math.Clamp(volumeScale or 1, 0.2, 1.0)
+    -- Always above full volume, with extra scaling from damage
+    local finalVolume = HEADHIT_VOLUME * (HEADHIT_BASE_BOOST + volumeScale * 0.8)
     sound.PlayFile("sound/headhit.mp3", "noblock noplay", function(station)
         if IsValid(station) then
-            station:SetVolume(HEADHIT_VOLUME * volumeScale)
+            station:SetVolume(finalVolume)
             station:Play()
         end
     end)

@@ -184,7 +184,8 @@ function SWEP:ComputePrimaryRecoil(mul, recoilForce, sprayI)
 
 	local eyeKick = sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 1.5 * self:GetFearRecoilMul()
 	owner:SetEyeAngles(eyeang + eyeKick)
-	self.WeaponRecoilSway = sprayAng * 1.5
+	self.WeaponRecoilSway = self.WeaponRecoilSway or Angle(0, 0, 0)
+	self.WeaponRecoilSway:Add(sprayAng * 1.5)
 
 	local rnd1 = SharedRand(seed .. "_rnd1", 1, 2)
 	local rnd2 = SharedRand(seed .. "_rnd2", -1, 1)
@@ -207,7 +208,11 @@ function SWEP:ComputePrimaryRecoil(mul, recoilForce, sprayI)
 	end
 	viewPunchAngle:Add(Angle(-1.5 * rnd1, -1.5 * rnd2, 0) * viewMul)
 
-	self.LastShotRecoil = viewPunchAngle * 2.5
+	self.WeaponRecoilSway:Add(viewPunchAngle * 1.0)
+
+	self.WeaponRecoilSway[1] = math.Clamp(self.WeaponRecoilSway[1], -20, 20)
+	self.WeaponRecoilSway[2] = math.Clamp(self.WeaponRecoilSway[2], -20, 20)
+	self.WeaponRecoilSway[3] = math.Clamp(self.WeaponRecoilSway[3], -20, 20)
 
 	return huyang, angpopa, viewMul, rnd1, rnd2, seed
 end

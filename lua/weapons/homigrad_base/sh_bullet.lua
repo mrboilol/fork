@@ -491,10 +491,6 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
 	
 	gunpos = gunpos or gun:GetPos()
 	gunang = gunang or gun:GetAngles()
-	if bCacheTrace and not NoTrace and self.LastShotRecoil then
-		gunang = gunang + self.LastShotRecoil
-		self.LastShotRecoil = nil
-	end
 	--debugoverlay.Line(gunpos, gunpos + gunang:Forward() * 20,0.5,color_white)
 
 	if CLIENT and self:ShouldUseFakeModel() then

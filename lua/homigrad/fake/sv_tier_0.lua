@@ -791,6 +791,13 @@ function hg.FakeUp(ply, forced, instant)
 	ply:SetNWEntity("FakeRagdollOld", ragdoll)
 	ply.FakeRagdoll = nil
 
+	ply:ConCommand("+duck")
+	timer.Simple(0.5,function()
+		if IsValid(ply) then
+			ply:ConCommand("-duck")
+		end
+	end)
+
 	if IsValid(ragdoll) and ragdoll:IsOnFire() then
 		timer.Simple(0.1,function()
 			ply.fires = ragdoll.fires

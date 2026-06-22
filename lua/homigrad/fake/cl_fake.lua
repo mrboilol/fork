@@ -852,7 +852,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 		local k2 = math.max(k - 0.5, 0) * 2
 
-		view.origin = LerpVector(k2, view.origin, oldorigin)
+		//view.origin = LerpVector(k2, view.origin, oldorigin)
 
 		view.angles = LerpAngle(k2, view.angles, oldangles)
 
@@ -978,7 +978,7 @@ net.Receive("Player Ragdoll", function()
 
 	local ply, ragdoll, ragdoll_index = net.ReadEntity(), net.ReadEntity2() --,net_ReadTable()
 
-	if not ragdoll_index then return end
+	ragdoll_index = ragdoll_index or 0 -- NULL ragdoll returns nil; 0 means "no ragdoll" (get-up)
 
 	local ragdoll = IsValid(ragdoll) and ragdoll
 

@@ -331,40 +331,6 @@ function hg.reactions.ProcessStagger(ragdoll, ply, org)
     return false
 end
 
--- Flailing Behavior (High Fall)
-function hg.reactions.ProcessFlailing(ragdoll, ply, org)
-    if not org.alive or org.otrub then return false end
-    
-    -- Removed player control check - involuntary panic reflex
-    
-    local pelvis = ragdoll:GetPhysicsObjectNum(0)
-    local velocity = IsValid(pelvis) and pelvis:GetVelocity() or ragdoll:GetVelocity()
-    local verticalSpeed = velocity.z
-    
-    -- Falling fast (lowered threshold further to ensure it triggers)
-    if verticalSpeed < -200 then
-        local pos = IsValid(pelvis) and pelvis:GetPos() or ragdoll:GetPos()
-        local ground, _ = FindGroundPosition(pos, ragdoll, ply)
-        local dist = ground and (pos.z - ground.z) or 1000
-        
-        -- High up -> Flail
-        if dist > 200 then
-             -- Use Animation "Falling"
-             -- Force play it if not already playing
-             if not hg.animator.IsPlaying(ragdoll) or ragdoll.AnimCurrent.Name ~= "Falling" then
-                 hg.animator.Play(ragdoll, "Falling", 1.2, 1, true)
-             end
-             return true
-        end
-    end
-    
-    if hg.animator.IsPlaying(ragdoll) and ragdoll.AnimCurrent.Name == "Falling" then
-         hg.animator.Stop(ragdoll)
-    end
-    
-    return false
-end
-
 -- Tripping/Stumbling (Hit obstacle)
 function hg.reactions.ProcessTripping(ragdoll, ply, org)
     if not org.alive or org.otrub or org.paralyzed then return false end
@@ -516,12 +482,6 @@ function hg.ProcessReactions(ragdoll, ply, org)
     local isTripping = hg.reactions.ProcessTripping(ragdoll, ply, org)
     if isTripping then
         return {arms = true, legs = true}
-    end
-    
-    -- Check for flailing (High fall)
-    local isFlailing = hg.reactions.ProcessFlailing(ragdoll, ply, org)
-    if isFlailing then
-        return {arms = true, legs = false} 
     end
     
     -- Check for injured (High pain / dying)

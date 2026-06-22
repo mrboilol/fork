@@ -241,14 +241,15 @@ hg.ConVars = hg.ConVars or {}
 --\\ GetListByName
 	function player.GetListByName(name)
 		local list = {}
-		if name == "^" then
-			return
+		if not isstring(name) or name == "" or name == "^" then
+			return list
 		elseif name == "*" then
 			return player.GetAll()
 		end
 
+		local lowerName = string.lower(name)
 		for i, ply in player.Iterator() do
-			if string.find(string.lower(ply:Name()), string.lower(name)) then list[#list + 1] = ply end
+			if string.find(string.lower(ply:Name()), lowerName, nil, true) then list[#list + 1] = ply end
 		end
 		return list
 	end

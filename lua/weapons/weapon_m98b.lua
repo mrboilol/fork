@@ -209,6 +209,7 @@ SWEP.dwr_customVolume = 1
 SWEP.OpenBolt = false
 function SWEP:CanReload()
 	if self:LastShootTime() + 0.1 > CurTime() then return end
+	if self:GetJammed() then return end
 	local owner = self:GetOwner()
 	if !owner.GetAmmoCount then return true end
 	if self.ReloadNext or not self:CanUse() or self:GetOwner():GetAmmoCount(self:GetPrimaryAmmoType()) == 0 or self:Clip1() >= self:GetMaxClip1() + (self.drawBullet and not self.OpenBolt and 1 or 0) then --shit
