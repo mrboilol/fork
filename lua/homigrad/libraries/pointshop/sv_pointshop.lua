@@ -258,15 +258,24 @@ function PLUGIN:NET_GetBuyedItems( ply )
     PLUGIN:NET_SendPointShopVars( ply )
 end
 
+local PS_ALLOWED_NET_FUNCS = {
+    ["SendPointShopVars"] = true,
+    ["BuyItem"] = true,
+    ["GetBuyedItems"] = true,
+}
+
 net.Receive("hg_pointshop_net",function( _, ply )
     if ply.PSNetCD and ply.PSNetCD > CurTime() then return end
 
-    ply.PSNetCD = CurTime() + 0.01
+    ply.PSNetCD = CurTime() + 0.1
 
     local str = net.ReadString()
-    local funcstring = PLUGIN[ "NET_" .. str ]
+    if #str > 64 then print(ply, "[PS-ZCity] Oversized function name from player") return end
+    if not PS_ALLOWED_NET_FUNCS[str] then print(ply, "[PS-ZCity] Player trying to call a non-whitelisted function!", "NAME: "..str ) return end
 
-    if not funcstring then print(ply, "[PS-ZCity] Player trying to call an invalid function!", "NAME: "..str ) return end
+    local funcstring = PLUGIN[ "NET_" .. str ]
+    if not funcstring then return end
+
     local vars = net.ReadTable()
     if table.Count(vars) > 5 then print(ply, "[PS-ZCity] The player is trying to send a bunch of vars to the net.", "NAME: "..str ) return end
 

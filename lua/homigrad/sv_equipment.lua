@@ -105,22 +105,26 @@ function hg.CanEquipArmorPiece(ply, equipment)
 	return not isRestricted
 end
 
+local VALID_EQUIP_SHORTCUTS = {
+    ["hg_flashlight"] = "hg_dropflashlight",
+    ["hg_sling"] = "hg_dropsling",
+    ["hg_brassknuckles"] = "hg_dropkastet",
+}
+
 net.Receive("hg_drop_equipment", function(len, ply)
+    if not IsValid(ply) then return end
+    if (ply._dropEquipCD or 0) > CurTime() then return end
+    ply._dropEquipCD = CurTime() + 0.3
+
     local equipment = net.ReadString()
+    if #equipment > 64 or not string.match(equipment, "^[%w_]+$") then return end
 
-    if equipment == "hg_flashlight" then
-        ply:ConCommand("hg_dropflashlight")
+    local shortcut = VALID_EQUIP_SHORTCUTS[equipment]
+    if shortcut then
+        ply:ConCommand(shortcut)
     end
 
-    if equipment == "hg_sling" then
-        ply:ConCommand("hg_dropsling")
-    end
-
-    if equipment == "hg_brassknuckles" then
-        ply:ConCommand("hg_dropkastet")
-    end
-
-    if not ply.organism.canmove then return end
+    if not ply.organism or not ply.organism.canmove then return end
 
     hg.DropArmor(ply, equipment)
 end)

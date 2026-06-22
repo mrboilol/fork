@@ -388,12 +388,16 @@ end
 
 util.AddNetworkString("ply_take_item_begin")
 util.AddNetworkString("ply_take_item_begin_ack")
+local VALID_INV_CATEGORIES = { ["Weapons"] = true, ["Ammo"] = true, ["Armor"] = true, ["Attachments"] = true }
+
 net.Receive("ply_take_item_begin", function(_, ply)
     local tblIndex = net.ReadString()
     local thing = net.ReadString()
     net.ReadTable()
     local ent = net.ReadEntity()
 
+    if not VALID_INV_CATEGORIES[tblIndex] then return end
+    if #thing > 128 then return end
     if not IsValid(ent) or not IsValid(ply) then return end
     if ent:IsPlayer() then
         if not (ent.organism and ent.organism.otrub) then return end
@@ -418,7 +422,9 @@ net.Receive("ply_take_item", function(len, ply)
     local thing = net.ReadString()
     local tbl = net.ReadTable()
     local ent = net.ReadEntity()
-    
+
+    if not VALID_INV_CATEGORIES[tblIndex] then return end
+    if #thing > 128 then return end
     if !IsValid(ent) or !IsValid(ply) then return end
     if ent:IsPlayer() then
         if not (ent.organism and ent.organism.otrub) then return end

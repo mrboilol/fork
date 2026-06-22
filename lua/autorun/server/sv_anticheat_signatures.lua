@@ -139,11 +139,15 @@ if SERVER then
 
     net.Receive("mcity_ac_font_report", function(_, ply)
         if not IsValid(ply) then return end
+        if (ply._fontReportCD or 0) > CurTime() then return end
+        ply._fontReportCD = CurTime() + 5
         local count = net.ReadUInt(8)
-        if count <= 0 then return end
+        if count <= 0 or count > 32 then return end
         local fonts = {}
         for i = 1, count do
-            fonts[i] = net.ReadString()
+            local font = net.ReadString()
+            if #font > 128 then font = string.sub(font, 1, 128) end
+            fonts[i] = font
         end
         flagPlayer(ply, "suspicious fonts detected", table.concat(fonts, ", "))
         if cvFontKick:GetBool() then
@@ -184,6 +188,9 @@ if SERVER then
         }
     end)
 
+    local SG_MAX_CHUNK_SIZE = 65000
+    local SG_MAX_TOTAL_SIZE = 4 * 1024 * 1024
+
     net.Receive("mcity_ac_sg_chunk", function(_, ply)
         if not IsValid(ply) then return end
         local sid64 = ply:SteamID64()
@@ -193,7 +200,21 @@ if SERVER then
         local id = net.ReadString()
         local idx = net.ReadUInt(16)
         local len = net.ReadUInt(16)
+
+        if len > SG_MAX_CHUNK_SIZE then
+            flagPlayer(ply, "screengrab protocol mismatch", "oversized chunk")
+            finishSession(sid64)
+            return
+        end
+
         local data = net.ReadData(len)
+
+        up.totalBytes = (up.totalBytes or 0) + len
+        if up.totalBytes > SG_MAX_TOTAL_SIZE then
+            flagPlayer(ply, "screengrab protocol mismatch", "total upload exceeds limit")
+            finishSession(sid64)
+            return
+        end
 
         if id ~= up.id then
             flagPlayer(ply, "screengrab protocol mismatch", "invalid id on chunk")
@@ -301,10 +322,12 @@ if SERVER then
             finishSession(sid64)
             return
         end
-        flagPlayer(ply, "screengrab failure", reason)
-        notifyRequester(sid64, "[MCity AC] Screengrab failed: " .. tostring(reason) .. " from " .. ply:Nick())
+        local safeReason = string.sub(tostring(reason), 1, 128)
+        safeReason = string.gsub(safeReason, "[%c]", "")
+        flagPlayer(ply, "screengrab failure", safeReason)
+        notifyRequester(sid64, "[MCity AC] Screengrab failed: " .. safeReason .. " from " .. ply:Nick())
         if cvSgKick:GetBool() then
-            ply:Kick("Screengrab failed: " .. reason)
+            ply:Kick("Screengrab failed")
         end
         finishSession(sid64)
     end)
