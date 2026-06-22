@@ -146,11 +146,13 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if adrenaline > 0 then
+	if adrenaline > 0.5 then
 
-		local suppression = math.max(1 - adrenaline / 2, 0.1)
+		local suppression = math.max(1 - adrenaline, 0.05) / 1.5
 
 		sub = sub * suppression
+
+		add = add * suppression
 
 	end
 
@@ -303,7 +305,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - adrenaline / 3, 0.1) * math.max(1 - org.analgesia, 0)
+	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - org.analgesia, 0)
 
 
 
@@ -397,7 +399,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	local adrenalineDecayRate = timeValue / (org.otrub and 5 or 25)
+	local adrenalineDecayRate = timeValue / (org.otrub and 5 or 12)
 
 	if fastAdrenalineDecay then
 
