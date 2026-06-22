@@ -20,7 +20,15 @@ local VerficationTable = {}
 local STEAMIDs = {}
 
 if file.Exists("zcity/verification.json","DATA") then 
-    VerficationTable = util.JSONToTable(file.Read("zcity/verification.json","DATA"))
+    local rawData = file.Read("zcity/verification.json","DATA")
+    if rawData then
+        local parsed = util.JSONToTable(rawData)
+        if parsed then
+            VerficationTable = parsed
+        else
+            ErrorNoHalt("[sv_db] Failed to parse zcity/verification.json\n")
+        end
+    end
     STEAMIDs={}
     timer.Simple(0,function()
         for Z,T in pairs(VerficationTable) do 

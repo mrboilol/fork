@@ -1,17 +1,26 @@
 local function IncluderFunc(fileName)
 	if (fileName:find("sv_")) then
-		include(fileName)
+		local ok, err = pcall(include, fileName)
+		if not ok then
+			ErrorNoHalt("[ZB Loader] Failed to include " .. fileName .. ": " .. tostring(err) .. "\n")
+		end
 	elseif (fileName:find("shared.lua") or fileName:find("sh_")) then
 		if (SERVER) then
 			AddCSLuaFile(fileName)
 		end
 
-		include(fileName)
+		local ok, err = pcall(include, fileName)
+		if not ok then
+			ErrorNoHalt("[ZB Loader] Failed to include " .. fileName .. ": " .. tostring(err) .. "\n")
+		end
 	elseif (fileName:find("cl_")) then
 		if (SERVER) then
 			AddCSLuaFile(fileName)
 		else
-			include(fileName)
+			local ok, err = pcall(include, fileName)
+			if not ok then
+				ErrorNoHalt("[ZB Loader] Failed to include " .. fileName .. ": " .. tostring(err) .. "\n")
+			end
 		end
 	end
 end

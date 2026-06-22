@@ -250,6 +250,11 @@ hook.Add("InitPostEntity", "loadbigmap", function()
 	if filik then
 		local tbl = util.JSONToTable(filik)
 
+		if not tbl then
+			ErrorNoHalt("[sv_roundsystem] Failed to parse zbattle/mapsizes.json\n")
+			return
+		end
+
 		if tbl[game.GetMap()] then
 			ZBATTLE_BIGMAP = tbl[game.GetMap()]
 		end
@@ -265,7 +270,13 @@ COMMANDS.bigmap = {
 
 		file.CreateDir("zbattle")
 
-		local tbl = util.JSONToTable(file.Read("zbattle/mapsizes.json", "DATA") or util.TableToJSON({[game.GetMap()] = ZBATTLE_BIGMAP}))
+		local raw = file.Read("zbattle/mapsizes.json", "DATA") or util.TableToJSON({[game.GetMap()] = ZBATTLE_BIGMAP})
+		local tbl = util.JSONToTable(raw)
+
+		if not tbl then
+			ErrorNoHalt("[sv_roundsystem] Failed to parse mapsizes.json in bigmap command\n")
+			tbl = {[game.GetMap()] = ZBATTLE_BIGMAP}
+		end
 
 		tbl[game.GetMap()] = ZBATTLE_BIGMAP
 

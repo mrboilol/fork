@@ -396,7 +396,12 @@ local function addToPlayerInfo(ply, muted, volume)
 		local json = file.Read("zcity_muted.txt", "DATA")
 
 		if json then
-			hg.playerInfo = util.JSONToTable(json)
+			local parsed = util.JSONToTable(json)
+			if parsed then
+				hg.playerInfo = parsed
+			else
+				ErrorNoHalt("[cl_init] Failed to parse zcity_muted.txt\n")
+			end
 		end
 	end
 
@@ -417,7 +422,12 @@ hook.Add("InitPostEntity", "furryhuy", function()
 		local json = file.Read("zcity_muted.txt", "DATA")
 
 		if json then
-			hg.playerInfo = util.JSONToTable(json)
+			local parsed = util.JSONToTable(json)
+			if parsed then
+				hg.playerInfo = parsed
+			else
+				ErrorNoHalt("[cl_init] Failed to parse zcity_muted.txt on InitPostEntity\n")
+			end
 		end
 
 		if hg.playerInfo then

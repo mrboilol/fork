@@ -33,6 +33,8 @@ function hg.CoopPersistence.LoadAllPlayers()
         if data then
             hg.CoopPersistence.LoadedData = data
             return data
+        else
+            ErrorNoHalt("[CoopPersistence] Failed to parse session data at: " .. path .. "\n")
         end
     end
     

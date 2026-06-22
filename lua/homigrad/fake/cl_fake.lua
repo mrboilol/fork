@@ -1352,7 +1352,10 @@ local function funcrag(ply, name, oldval, ragdoll)
 
 	--ply.onetime = true
 
-	pcall(hook.Run, "RagdollEntityCreated", ply, ragdoll, name)
+	local ok, err = pcall(hook.Run, "RagdollEntityCreated", ply, ragdoll, name)
+	if not ok then
+		ErrorNoHalt("[cl_fake] RagdollEntityCreated hook error: " .. tostring(err) .. "\n")
+	end
 
 	--ply.onetime = false
 

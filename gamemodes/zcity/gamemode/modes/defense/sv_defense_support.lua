@@ -396,15 +396,21 @@ local function RespawnDeadPlayers(requester)
                 else
                     ply:GiveAmmo(30, ply:GetWeapon(weaponClass):GetPrimaryAmmoType(), true)
                 end
-                pcall(function()
+                local attOk, attErr = pcall(function()
                     hg.AddAttachmentForce(ply, gun, DEFENSE_ATTACHMENTS[0][math.random(#DEFENSE_ATTACHMENTS[0])])
                 end)
+                if not attOk then
+                    ErrorNoHalt("[DEFENSE] Failed to add attachment on respawn: " .. tostring(attErr) .. "\n")
+                end
             end
         end)
         
-        pcall(function()
+        local armorOk, armorErr = pcall(function()
             hg.AddArmor(ply, DEFENSE_ARMOR[0][math.random(#DEFENSE_ARMOR[0])])
         end)
+        if not armorOk then
+            ErrorNoHalt("[DEFENSE] Failed to add armor on respawn: " .. tostring(armorErr) .. "\n")
+        end
         
         ply:Give("weapon_melee")
         ply:Give("weapon_hg_rgd_tpik")
