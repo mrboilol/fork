@@ -7,9 +7,7 @@ function SWEP:Initialize_Anim()
 end
 
 function SWEP:SetHold(value)
-	self.holdtype = value
-	self:SetHoldType(value)
-	self:SetWeaponHoldType(value)
+	hg.swep.SetHold(self, value)
 end
 
 hook.Add("Bones", "homigrad-weapons-bone", function(ply)

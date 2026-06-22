@@ -42,32 +42,7 @@ local doors = {
 
 local JamPlacementRadius = 100
 function SWEP:DrawWorldModel()
-	self.model = IsValid(self.model) and self.model or ClientsideModel(self.WorldModel)
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-
-	if not IsValid(WorldModel) then return end
-
-	WorldModel:SetNoDraw(true)
-	WorldModel:SetModelScale(self.ModelScale or 0.4)
-	WorldModel:SetModel(self:GetModel())
-	if IsValid(owner) then
-		local offsetVec = self.offsetVec
-		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not owner.organism.larmamputated)) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
-		if not boneid then return end
-		local matrix = owner:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
-
-	WorldModel:DrawModel()
+	hg.swep.DrawBoneAttachedModel(self, {setModel = true})
 end
 
 function SWEP:PlaceSLAM(pos, ang, tr)

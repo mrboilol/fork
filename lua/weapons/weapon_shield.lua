@@ -26,37 +26,13 @@ SWEP.ViewModel = "models/bshields/rshield.mdl"
 SWEP.HoldType = "normal"
 
 function SWEP:SetHold(value)
-    self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 SWEP.offsetVec = Vector(2, -2, 0)
 SWEP.offsetAng = Angle(180, 90, 90)
 function SWEP:DrawWorldModel()
-	self.model = IsValid(self.model) and self.model or ClientsideModel(self.WorldModel)
-	self.model:SetNoDraw(true)
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-	if not IsValid(WorldModel) then return end
-	
-	if IsValid(owner) then
-		local offsetVec = self.offsetVec
-		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone("ValveBiped.Bip01_Spine")
-		if not boneid then return end
-		local matrix = owner:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
-
-	WorldModel:DrawModel()
+	hg.swep.DrawBoneAttachedModel(self, {boneName = "ValveBiped.Bip01_Spine"})
 end
 
 function SWEP:PrimaryAttack()

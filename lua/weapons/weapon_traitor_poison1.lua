@@ -43,34 +43,11 @@ if SERVER then
 end
 
 function SWEP:DrawWorldModel()
-	self.model = IsValid(self.model) and self.model or ClientsideModel(self.Model)
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-	WorldModel:SetNoDraw(true)
-	WorldModel:SetModelScale(self.ModelScale or 1)
-	if IsValid(owner) then
-		local offsetVec = self.offsetVec
-		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not owner.organism.larmamputated)) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
-		if not boneid then return end
-		local matrix = owner:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
-
-	WorldModel:DrawModel()
+	hg.swep.DrawBoneAttachedModel(self, {modelKey = self.Model})
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 function SWEP:Think()
@@ -80,7 +57,7 @@ end
 SWEP.traceLen = 5
 
 function SWEP:GetEyeTrace()
-	return hg.eyeTrace(self:GetOwner())
+	return hg.swep.GetEyeTrace(self)
 end
 
 local caninjectbone = {
@@ -138,25 +115,14 @@ function SWEP:DoPoison(ply)
 end
 
 if SERVER then
-    hook.Add("Org Clear", "RemovePoison1", function(org)
-        org.poison1 = nil
-		org.poison1notificate = nil
-    end)
-
-	hook.Add("Org Think", "poison1",function(owner, org, timeValue)
-		if not owner:IsPlayer() or not owner:Alive() then return end
-		if ( (not org.poison1) or (not org.alive) ) or not org.owner:IsPlayer() then return end
-		local curtime =  CurTime()
-		if (not org.poison1notificate) and ((org.poison1 + 20) < curtime) then
-			org.poison1notificate = true
-			org.owner:Notify("I can't... properly breathe...", true, "poison1", 3)
-			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav")
-		end
-
-		if (org.poison1 + 30) < curtime then
-        	org.o2.regen = 0
-		end
-	end)
+	hg.poison.Register({
+		key = "poison1",
+		notifyDelay = 20,
+		notifyMsg = "I can't... properly breathe...",
+		notifyTag = "poison1",
+		killDelay = 30,
+		hookSuffix = "poison1",
+	})
 end
 
 function SWEP:SecondaryAttack()

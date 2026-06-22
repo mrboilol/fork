@@ -75,38 +75,12 @@ function SWEP:MarkupUpdate()
 	end
 end
 
-local mat, clr = "debug/env_cubemap_model", Color(185, 180, 180)
 function SWEP:DrawWorldModel()
-	self.model = IsValid(self.model) and self.model or ClientsideModel(self.Model)
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-	WorldModel:SetNoDraw(true)
-	WorldModel:SetModelScale(self.ModelScale or 1)
-	if IsValid(owner) then
-		local offsetVec = self.offsetVec
-		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not owner.organism.larmamputated)) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
-		if not boneid then return end
-		local matrix = owner:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
-	WorldModel:SetMaterial(mat)
-	WorldModel:SetColor(clr)
-
-	WorldModel:DrawModel()
+	hg.swep.DrawBoneAttachedModel(self, {modelKey = self.Model, material = "debug/env_cubemap_model", color = Color(185, 180, 180)})
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 function SWEP:Think()
@@ -120,7 +94,7 @@ end
 SWEP.traceLen = 5
 
 function SWEP:GetEyeTrace()
-	return hg.eyeTrace(self:GetOwner())
+	return hg.swep.GetEyeTrace(self)
 end
 
 local poisonable_entities = {
@@ -169,35 +143,39 @@ function SWEP:DoPoison(ent)
 	self:SetUsesLeft(math.max(self:GetUsesLeft(0) - 1, 0))
 end
 
-if(SERVER)then
-    hook.Add("Org Clear", "RemovePoison_KCN", function(org)
-        org.Poison_KCN = nil
-    end)
+if SERVER then
+	hook.Add("Org Clear", "RemovePoison_KCN", function(org)
+		org.Poison_KCN = nil
+	end)
 
-	hook.Add("Org Think", "Poison_KCN",function(owner, org, timeValue)
+	hook.Add("Org Think", "Poison_KCN", function(owner, org, timeValue)
 		if not owner:IsPlayer() or not owner:Alive() then return end
-		if((not org.Poison_KCN) or (not org.alive))then return end
-		
+		if (not org.Poison_KCN) or (not org.alive) then return end
+
 		local poison = org.Poison_KCN
 		local poison_start_time = poison.StartTime
 		local poison_potency = poison.Potency
-		
-		if((poison_start_time + (20 / poison_potency)) < CurTime() and (!poison.NextNotification1 or poison.NextNotification1 <= CurTime()))then
+
+		if (poison_start_time + (20 / poison_potency)) < CurTime() and (not poison.NextNotification1 or poison.NextNotification1 <= CurTime()) then
 			poison.NextNotification1 = CurTime() + math.max(5 / poison_potency, 1)
-			
-			if not org.otrub then org.owner:EmitSound((ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav") end
+
+			if not org.otrub then
+				org.owner:EmitSound(
+					(ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0" .. math.random(5) .. ".wav")
+					or "vo/npc/male01/moan0" .. math.random(5) .. ".wav"
+				)
+			end
 		end
-		
-		if((poison_start_time + (22 / poison_potency)) < CurTime())then
+
+		if (poison_start_time + (22 / poison_potency)) < CurTime() then
 			org.stamina[1] = math.min(org.stamina[1], 50 / poison_potency)
 			org.o2[1] = math.min(org.o2[1], org.o2.range / poison_potency)
 			org.disorientation = math.max(org.disorientation, 10 * poison_potency)
 			org.pulse = math.max(org.pulse, 120 + 10 * poison_potency)
 		end
 
-		if((poison_start_time + (90 / poison_potency)) < CurTime())then
-			-- org.o2[1] = math.max(org.o2[1] - (poison_potency - 1) * 5, 5)
-        	org.o2.regen = 0
+		if (poison_start_time + (90 / poison_potency)) < CurTime() then
+			org.o2.regen = 0
 		end
 	end)
 end
