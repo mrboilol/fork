@@ -130,7 +130,10 @@ local function ApplyFixedModel(mode, ply)
 	if util.IsValidModel and not util.IsValidModel(model) then return end
 
 	if util.PrecacheModel then
-		pcall(util.PrecacheModel, model)
+		local ok, err = pcall(util.PrecacheModel, model)
+		if not ok then
+			ErrorNoHalt("[GravityDM] Failed to precache model " .. model .. ": " .. tostring(err) .. "\n")
+		end
 	end
 
 	ply:SetModel(model)

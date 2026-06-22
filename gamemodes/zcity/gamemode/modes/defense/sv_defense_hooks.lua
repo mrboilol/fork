@@ -154,7 +154,7 @@ hook.Add("EntityRemoved", "DefenseNPCRemoved", function(ent)
     if ent:GetClass() == "zb_temporary_ent" then return end
 
     if ent.IsDefenseWaveNPC then
-        pcall(function()
+        local ok, err = pcall(function()
             print("[DEFENSE] Entity removed: " .. tostring(ent:GetClass()) .. ", EntIndex: " .. ent:EntIndex())
             
             if not ent.DefenseNPCCountedAsDead then
@@ -177,6 +177,9 @@ hook.Add("EntityRemoved", "DefenseNPCRemoved", function(ent)
                 end
             end
         end)
+        if not ok then
+            ErrorNoHalt("[DEFENSE] Error in EntityRemoved handler: " .. tostring(err) .. "\n")
+        end
     end
 end)
 
@@ -242,7 +245,7 @@ hook.Add("OnNPCKilled", "DefenseNPCKilled", function(npc, attacker, inflictor)
     local MODE = CurrentRound()
     if not MODE or MODE.name ~= "defense" then return end
     
-    pcall(function()
+    local ok, err = pcall(function()
         if not IsValid(npc) then return end
         
         if npc.IsDefenseWaveNPC then
@@ -275,6 +278,9 @@ hook.Add("OnNPCKilled", "DefenseNPCKilled", function(npc, attacker, inflictor)
             end
         end
     end)
+    if not ok then
+        ErrorNoHalt("[DEFENSE] Error in OnNPCKilled handler: " .. tostring(err) .. "\n")
+    end
 end)
 
 hook.Remove("EntityTakeDamage", "DefenseZombieDamageTrack")

@@ -111,14 +111,20 @@ function MODE:AssignPlayerRoles()
                 else
                     ply:GiveAmmo(30, ply:GetWeapon(weaponClass):GetPrimaryAmmoType(), true)
                 end
-                pcall(function()
+                local attOk, attErr = pcall(function()
                     hg.AddAttachmentForce(ply, gun, DEFENSE_ATTACHMENTS[0][math.random(#DEFENSE_ATTACHMENTS[0])])
                 end)
+                if not attOk then
+                    ErrorNoHalt("[DEFENSE] Failed to add attachment: " .. tostring(attErr) .. "\n")
+                end
             end
         end)
-        pcall(function()
+        local armorOk, armorErr = pcall(function()
             hg.AddArmor(ply, DEFENSE_ARMOR[0][math.random(#DEFENSE_ARMOR[0])])
         end)
+        if not armorOk then
+            ErrorNoHalt("[DEFENSE] Failed to add armor: " .. tostring(armorErr) .. "\n")
+        end
         ply:Give("weapon_melee")
         ply:Give("weapon_hg_rgd_tpik")
         ply:Give("weapon_walkie_talkie")
@@ -205,9 +211,12 @@ function MODE:GiveEquipment()
         self.SpawnPoints = {}
     end
 
-    pcall(function()
+    local rolesOk, rolesErr = pcall(function()
         self:AssignPlayerRoles()
     end)
+    if not rolesOk then
+        ErrorNoHalt("[DEFENSE] Failed to assign player roles: " .. tostring(rolesErr) .. "\n")
+    end
 
     for _, ply in player.Iterator() do
         if not ply:Alive() or ply:Team() == TEAM_SPECTATOR then
@@ -217,10 +226,13 @@ function MODE:GiveEquipment()
         ply:SetSuppressPickupNotices(true)
         ply.noSound = true
 
-        pcall(function()
+        local classOk, classErr = pcall(function()
             ply:SetPlayerClass("Refugee")
             zb.GiveRole(ply, "Refugee", Color(255, 150, 0))
         end)
+        if not classOk then
+            ErrorNoHalt("[DEFENSE] Failed to set player class for " .. tostring(ply) .. ": " .. tostring(classErr) .. "\n")
+        end
 
         self:GetPlySpawn(ply)
 

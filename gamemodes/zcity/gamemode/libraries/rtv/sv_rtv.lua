@@ -371,10 +371,15 @@ function zb.StartRTV(time)
     local PlayedMaps = {}
     local playedMapsPath = GetDataPath("PlayedMaps.json")
     if file.Exists(playedMapsPath, "DATA") then
-        PlayedMaps = util.JSONToTable(file.Read(playedMapsPath, "DATA"))
-    end
-    if not PlayedMaps then
-        PlayedMaps = {}
+        local raw = file.Read(playedMapsPath, "DATA")
+        if raw then
+            local parsed = util.JSONToTable(raw)
+            if parsed then
+                PlayedMaps = parsed
+            else
+                ErrorNoHalt("[RTV] Failed to parse PlayedMaps.json\n")
+            end
+        end
     end
 
     --;; Сначала попытаемся выбрать 3 "уникальных" префикса 

@@ -25,7 +25,12 @@ function zb.GetMapPoints( pointGroup, forceupdatepoints ) -- Загрузить 
 
     local map = game.GetMap()
 
-    zb.Points[pointGroup].Points = util.JSONToTable( file.Read( "zbattle/mappoints/" .. map .. "/"..pointGroup..".json", "DATA" ) or "" ) 
+    local raw = file.Read( "zbattle/mappoints/" .. map .. "/"..pointGroup..".json", "DATA" ) or ""
+    local parsed = util.JSONToTable(raw)
+    if not parsed and raw ~= "" then
+        ErrorNoHalt("[sv_points] Failed to parse mappoints JSON for group: " .. pointGroup .. "\n")
+    end
+    zb.Points[pointGroup].Points = parsed
     
     local newTbl = {}
     if zb.Points[pointGroup].Points then

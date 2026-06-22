@@ -13,7 +13,14 @@ end
 
 function hg.Appearance.LoadAppearanceFile(strFile_name)
 	if not file.Exists(dir .. strFile_name .. ".json", "DATA") then return false, "no file [data/zcity/appearances/" .. strFile_name .. ".json]" end
-	local tblAppearance = util.JSONToTable(file.Read(dir .. strFile_name .. ".json"))
+	local raw = file.Read(dir .. strFile_name .. ".json")
+	if not raw then return false, "could not read file [data/zcity/appearances/" .. strFile_name .. ".json]" end
+
+	local tblAppearance = util.JSONToTable(raw)
+	if not tblAppearance then
+		ErrorNoHalt("[Appearance] Failed to parse JSON: " .. strFile_name .. ".json\n")
+		return false, "invalid JSON in [data/zcity/appearances/" .. strFile_name .. ".json]"
+	end
 
 	if not hg.Appearance.AppearanceValidater(tblAppearance) then return false, "file is damaged [data/zcity/appearances/" .. strFile_name .. ".json]"  end
 

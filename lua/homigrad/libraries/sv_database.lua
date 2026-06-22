@@ -13,9 +13,18 @@ function hg.db.Connect()
         }
 
     if not file.Exists("zbattle/sql.json","DATA") then file.Write("zbattle/sql.json", util.TableToJSON(standart_tbl,true)) end
-    local cfg = file.Exists("zbattle/sql.json","DATA") and 
-        util.JSONToTable(file.Read("zbattle/sql.json","DATA")) or 
-        standart_tbl
+    local cfg = standart_tbl
+    if file.Exists("zbattle/sql.json","DATA") then
+        local data = file.Read("zbattle/sql.json","DATA")
+        if data then
+            local parsed = util.JSONToTable(data)
+            if parsed then
+                cfg = parsed
+            else
+                ErrorNoHalt("[sv_database] Failed to parse zbattle/sql.json, using defaults\n")
+            end
+        end
+    end
 
     local dbmodule = cfg.dbmodule
     local hostname = cfg.hostname

@@ -59,12 +59,24 @@ if SERVER then
 
         local json = file.Read("zcity/vehicles_ragblacklist.json")
         if json then
-            hg.vehicleragblacklist = util.JSONToTable(json) or {}
+            local parsed = util.JSONToTable(json)
+            if parsed then
+                hg.vehicleragblacklist = parsed
+            else
+                ErrorNoHalt("[sh_vehicles] Failed to parse vehicles_ragblacklist.json\n")
+                hg.vehicleragblacklist = {}
+            end
         end
 
         local json = file.Read("zcity/vehicles_camblacklist.json")
         if json then
-            hg.vehiclecamblacklist = util.JSONToTable(json) or {}
+            local parsed = util.JSONToTable(json)
+            if parsed then
+                hg.vehiclecamblacklist = parsed
+            else
+                ErrorNoHalt("[sh_vehicles] Failed to parse vehicles_camblacklist.json\n")
+                hg.vehiclecamblacklist = {}
+            end
         end
     end)
 

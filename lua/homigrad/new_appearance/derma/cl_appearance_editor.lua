@@ -26,7 +26,13 @@ end
 
 local function LoadPreset(strName)
     if not file.Exists(presetsDir .. strName .. ".json", "DATA") then return nil end
-    return util.JSONToTable(file.Read(presetsDir .. strName .. ".json", "DATA"))
+    local raw = file.Read(presetsDir .. strName .. ".json", "DATA")
+    if not raw then return nil end
+    local parsed = util.JSONToTable(raw)
+    if not parsed then
+        ErrorNoHalt("[cl_appearance_editor] Failed to parse preset: " .. strName .. "\n")
+    end
+    return parsed
 end
 
 local function GetPresetList()
