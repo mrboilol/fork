@@ -791,6 +791,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
+	local painVolume = 0
+	local normalizedPain = 0
 	
 	if IsValid(PainStation) then
 		PainStation:SetVolume(0)
@@ -904,6 +906,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if canRetrySound("PainStation", PainStation) then
 		sound.PlayFile("sound/zbattle/pain_beat.ogg", "noblock noplay", function(station)
 			PainStationLoading = false
+			if generation != painAudioGeneration then
+				if IsValid(station) then
+					station:Stop()
+				end
+				return
+			end
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1384,7 +1392,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
-		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp / 2
+		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
 		pain = PainLerp + strobe
 		shock = shockLerp
 		
@@ -1499,6 +1507,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		//	PainStation = nil
 		//end
 	end
+
+	updatePainLayer(painLayers.agony, normalizedPain, painVolume)
+	updatePainLayer(painLayers.excruciating, normalizedPain, painVolume)
 
 	if brain > 0.01 then
 		local chooser = 1
