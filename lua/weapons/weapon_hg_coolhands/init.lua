@@ -349,6 +349,11 @@ function SWEP:ApplyForce()
 					end
 
 					self.firstTimePrint = false
+
+					if ply.organism and ply.organism.stamina then
+						ply.organism.stamina.subadd = (ply.organism.stamina.subadd or 0) + 0.8
+					end
+
 					if (self.CPRThink or 0) < CurTime() then
 						self.CPRThink = CurTime() + (1 / 120) * 60
 						if org.alive then

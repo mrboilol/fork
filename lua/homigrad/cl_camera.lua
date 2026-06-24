@@ -134,6 +134,53 @@ local function getCachedAttachmentData(ent, attachmentName)
 	return ent:GetAttachment(attachment)
 end
 
+local function isVortigauntModel(ent)
+	return IsValid(ent) and string.lower(ent:GetModel() or "") == "models/player/vortigaunt.mdl"
+end
+
+local function getPreferredEyeAttachment(ent)
+	local eye = getCachedAttachmentData(ent, "eyes")
+	if not eye or not istable(eye) then return nil end
+
+	if not isVortigauntModel(ent) then
+		return eye
+	end
+
+	return {
+		Pos = eye.Pos + eye.Ang:Forward() * 3 + eye.Ang:Up() * 3 + eye.Ang:Right() * 0,
+		Ang = eye.Ang
+	}
+end
+
+local function SetLocalFirstPersonHeadHidden(ply, hidden)
+	if not IsValid(ply) or ply ~= LocalPlayer() or not ply.LookupBone then return end
+
+	local bone = ply:LookupBone("ValveBiped.Bip01_Head1")
+	if not bone then return end
+
+	local scale = hidden and vecZero or vecFull
+	local current = ply:GetManipulateBoneScale(bone)
+	if current and current:IsEqualTol(scale, 0.001) then return end
+
+	ply:ManipulateBoneScale(bone, scale)
+	ply.ZC_FirstPersonHeadHidden = hidden or nil
+end
+
+local function RestoreLocalFirstPersonHead()
+	local ply = LocalPlayer()
+	if not IsValid(ply) or not ply.ZC_FirstPersonHeadHidden then return end
+
+	SetLocalFirstPersonHeadHidden(ply, false)
+end
+
+hook.Add("Think", "ZC_RestoreLocalFirstPersonHead", function()
+	local ply = LocalPlayer()
+	if not IsValid(ply) or not ply.ZC_FirstPersonHeadHidden then return end
+	if ply:Alive() and GetViewEntity() == ply then return end
+
+	RestoreLocalFirstPersonHead()
+end)
+
 local lerped_ang = Angle(0,0,0)
 function HGAddView(ply, origin, angles, velLen)
 	if ply:Alive() then
@@ -340,7 +387,7 @@ end)
 function SpecCam(ply, vec, ang, fov, znear, zfar)
 	if !ply:Alive() then return end
 	--local hand = ply:GetAttachment(ply:LookupAttachment("anim_attachment_rh"))
-	local eye = getCachedAttachmentData(ply, "eyes")
+	local eye = getPreferredEyeAttachment(ply)
 	if not eye then return end
 	--local org = eye.Pos
 	local ang1 = eye.Ang + Angle(5, 2, 0)
@@ -410,6 +457,9 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 	if not ply:Alive() and not follow then
 		if lply:GetNWInt("viewmode",0) == 1 then
+			local spectView = hook.Run("HG_CalcView", lply, origin, angles, fov, znear, zfar)
+			if spectView then return spectView end
+
 			ply = lply:GetNWEntity("spect",NULL)
 			
 			if IsValid(ply) then
@@ -422,18 +472,20 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 		end
 	end
 
-	if not IsValid(ply) or not ply.LookupBone or not cachedCameraBone(ply, "ValveBiped.Bip01_Head1") then return end
+	if not IsValid(ply) or not ply.LookupBone then return end
 	
 	if not ply.GetAimVector then return end
 
 	local firstPerson = GetViewEntity() == lply
+	local hideLocalHead = firstPerson and ply == lply and ply:Alive() and (not hg_thirdperson:GetBool() or hg_legacycam:GetBool() or lerpaim < 0.3)
+	SetLocalFirstPersonHeadHidden(lply, hideLocalHead)
 
 	local fova = {0}
 	hook.Run("HG_CalcView", ply, origin, angles, fova, znear, zfar)
 	
 	if not firstPerson then return end
 	
-	att = getCachedAttachmentData(ply, "eyes")
+	att = getPreferredEyeAttachment(ply)
 	if not att or not istable(att) then return end
 	
 	--ply:SetupBones()
@@ -515,8 +567,6 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 			return HuyControl
 		end
 	end
-
-	--ply:ManipulateBoneScale(ply:LookupBone("ValveBiped.Bip01_Head1"), firstPerson and (not hg_thirdperson:GetBool() or hg_legacycam:GetBool() or lerpaim < 0.3) and vecZero or vecFull)
 
 	--local angle = tr.Normal:Angle()
 	--angle[3] = angles[3]
