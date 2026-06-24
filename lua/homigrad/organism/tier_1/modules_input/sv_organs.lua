@@ -600,9 +600,17 @@ input_list.eyeL = function(org, bone, dmg, dmgInfo)
 
     if oldDmg < 1 and org.eyeL >= 1 then
         if IsValid(org.owner) then
-            org.owner:EmitSound("cuteye.ogg", 75, 100, 1, CHAN_AUTO)
+            org.owner:EmitSound("eyegone.mp3", 75, 100, 1, CHAN_AUTO)
+            org.owner:SendLua([[surface.PlaySound("cuteye.ogg")]])
             org.owner:Notify("My left eye... it's destroyed.", true, "eyeLlost", 1)
         end
+        if hg.organism.enhancedPain then
+            hg.organism.enhancedPain.applyPain(org, 25, dmgInfo, "eyeL", false)
+        else
+            org.painadd = org.painadd + 25
+        end
+        org.shock = org.shock + 8
+        org.disorientation = org.disorientation + 5
     end
 
     return result
@@ -628,9 +636,17 @@ input_list.eyeR = function(org, bone, dmg, dmgInfo)
 
     if oldDmg < 1 and org.eyeR >= 1 then
         if IsValid(org.owner) then
-            org.owner:EmitSound("cuteye.ogg", 75, 100, 1, CHAN_AUTO)
+            org.owner:EmitSound("eyegone.mp3", 75, 100, 1, CHAN_AUTO)
+            org.owner:SendLua([[surface.PlaySound("cuteye.ogg")]])
             org.owner:Notify("My right eye... it's destroyed.", true, "eyeRlost", 1)
         end
+        if hg.organism.enhancedPain then
+            hg.organism.enhancedPain.applyPain(org, 25, dmgInfo, "eyeR", false)
+        else
+            org.painadd = org.painadd + 25
+        end
+        org.shock = org.shock + 8
+        org.disorientation = org.disorientation + 5
     end
 
     return result

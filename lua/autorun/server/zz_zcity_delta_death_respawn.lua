@@ -18,8 +18,11 @@ local function ResetLifeStats(ply)
     }
 end
 
+local respawnRequested = {}
+
 hook.Add("PlayerSpawn", "zcity_delta_death_respawn_init", function(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
+    respawnRequested[ply] = nil
     timer.Simple(0.5, function()
         if IsValid(ply) then ResetLifeStats(ply) end
     end)
@@ -27,6 +30,7 @@ end)
 
 hook.Add("PlayerDisconnected", "zcity_delta_death_respawn_cleanup", function(ply)
     lifeStats[ply] = nil
+    respawnRequested[ply] = nil
 end)
 
 hook.Add("HomigradDamage", "zcity_delta_death_respawn_track", function(ply, dmgInfo, hitgroup, ent, rawDamage)
@@ -152,7 +156,7 @@ end)
 hook.Add("Think", "zcity_delta_death_respawn_block", function()
     if not cvDeathScreen:GetBool() then return end
     for _, ply in ipairs(player.GetAll()) do
-        if IsValid(ply) and ply:IsPlayer() and not ply:Alive() then
+        if IsValid(ply) and ply:IsPlayer() and not ply:Alive() and not respawnRequested[ply] then
             ply.NextSpawnTime = math.huge
         end
     end
@@ -162,6 +166,7 @@ end)
 net.Receive("zcity_delta_death_respawn", function(len, ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
     if ply:Alive() then return end
+    respawnRequested[ply] = true
     ply.NextSpawnTime = CurTime()
     if GAMEMODE and GAMEMODE.PlayerDeathThink then
         ply.NextSpawnTime = CurTime() + 0.1

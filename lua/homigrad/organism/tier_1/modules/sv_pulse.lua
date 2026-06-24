@@ -154,23 +154,28 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	-- High velocity reduces blood pressure (falling or rapid acceleration only)
-	local velocity = owner:GetVelocity()
-	local speed = velocity:Length()
-	local fallSpeed = math.max(0, -velocity.z)
+	-- Skip for ragdolled players: ragdoll physics jitter causes false velocity spikes
 	local velocityPenalty = 0
+	if not (owner:IsPlayer() and IsValid(owner.FakeRagdoll)) then
+		local velocity = owner:GetVelocity()
+		local speed = velocity:Length()
+		local fallSpeed = math.max(0, -velocity.z)
 
-	-- Falling causes G-force blood pressure loss
-	if fallSpeed > 100 then
-		velocityPenalty = math.Clamp((fallSpeed - 100) / 400, 0, 0.9)
-	end
+		-- Falling causes G-force blood pressure loss
+		if fallSpeed > 100 then
+			velocityPenalty = math.Clamp((fallSpeed - 100) / 400, 0, 0.9)
+		end
 
-	-- Rapid deceleration (e.g., vehicle crashes, slamming into walls) causes G-force loss
-	local prevSpeed = org._pulsePrevSpeed or speed
-	local decel = math.max(0, prevSpeed - speed) / math.max(timeValue, 0.001)
-	if decel > 800 and velocity.z <= 0 then
-		velocityPenalty = math.min(velocityPenalty + math.Clamp((decel - 800) / 800, 0, 0.2), 0.95)
+		-- Rapid deceleration (e.g., vehicle crashes, slamming into walls) causes G-force loss
+		local prevSpeed = org._pulsePrevSpeed or speed
+		local decel = math.max(0, prevSpeed - speed) / math.max(timeValue, 0.001)
+		if decel > 800 and velocity.z <= 0 then
+			velocityPenalty = math.min(velocityPenalty + math.Clamp((decel - 800) / 800, 0, 0.2), 0.95)
+		end
+		org._pulsePrevSpeed = speed
+	else
+		org._pulsePrevSpeed = nil
 	end
-	org._pulsePrevSpeed = speed
 
 	if velocityPenalty > 0 then
 		map = map * (1 - velocityPenalty)

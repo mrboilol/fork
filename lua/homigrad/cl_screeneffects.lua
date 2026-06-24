@@ -265,6 +265,8 @@ local O2Lerp = 0
 local assimilatedLerp = 0
 local tempLerp = 36.6
 local headtraumaSaturation = 0
+local suicideLerp = 0
+local SuicideHeartbeatStation
 local addtime = CurTime()
 
 local show_image_time = 0
@@ -417,6 +419,13 @@ local function stopthings()
 	if IsValid(GivingUpStation) then
 		GivingUpStation:Stop()
 		GivingUpStation = nil
+	end
+
+	suicideLerp = 0
+
+	if IsValid(SuicideHeartbeatStation) then
+		SuicideHeartbeatStation:Stop()
+		SuicideHeartbeatStation = nil
 	end
 end
 
@@ -1598,6 +1607,67 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
+	-- Suicide state visual effects
+	if lply.suiciding and lply:Alive() and not org.otrub then
+		local startTime = lply.startsuicide or CurTime()
+		local duration = CurTime() - startTime
+		local targetIntensity = math.Clamp(duration / 3, 0, 1)
+
+		suicideLerp = math.Approach(suicideLerp, targetIntensity, FrameTime() * 0.4)
+
+		local pulse = (math.sin(CurTime() * 1.2) + 1) * 0.5
+		local pulseEffect = pulse * suicideLerp * 0.15
+
+		-- Desaturation and darkening
+		local suiGray = suicideLerp * 0.55
+		tab["$pp_colour_colour"] = math.min(tab["$pp_colour_colour"] or 1, 1 - suiGray)
+		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) - suicideLerp * 0.12
+		tab["$pp_colour_contrast"] = math.min(tab["$pp_colour_contrast"] or 1, 1 - suicideLerp * 0.08)
+		tab["$pp_colour_mulr"] = (tab["$pp_colour_mulr"] or 0) - suicideLerp * 0.02
+		tab["$pp_colour_mulg"] = (tab["$pp_colour_mulg"] or 0) - suicideLerp * 0.02
+		tab["$pp_colour_mulb"] = (tab["$pp_colour_mulb"] or 0) - suicideLerp * 0.01
+
+		-- Vignette with slow pulse
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", suicideLerp * 0.35 + pulseEffect)
+		vignetteMat:SetFloat("$c1_y", suicideLerp * 0.55 + pulseEffect * 1.5)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
+		-- Subtle chromatic aberration
+		render.UpdateScreenEffectTexture()
+		chromaticMat:SetFloat("$c0_x", suicideLerp * 0.015)
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
+		render.DrawScreenQuad()
+
+		-- Subtle blur at high intensity
+		if suicideLerp > 0.4 then
+			DrawToyTown((suicideLerp - 0.4) * 2.5, ScrH() / 2)
+		end
+
+		-- Heartbeat sound
+		if canRetrySound("SuicideHeartbeatStation", SuicideHeartbeatStation) then
+			sound.PlayFile("sound/laststandheartbeat.ogg", "noblock noplay", function(station)
+				if IsValid(station) then
+					station:SetVolume(0)
+					station:Play()
+					SuicideHeartbeatStation = station
+					station:EnableLooping(true)
+				end
+			end)
+		end
+		if IsValid(SuicideHeartbeatStation) then
+			SuicideHeartbeatStation:SetVolume(suicideLerp * 0.4)
+		end
+	else
+		suicideLerp = math.Approach(suicideLerp, 0, FrameTime() * 3)
+		if IsValid(SuicideHeartbeatStation) then
+			SuicideHeartbeatStation:SetVolume(0)
+		end
+	end
+
 	if (headtraumaSaturation or 0) > 0 then
 		tab["$pp_colour_colour"] = 1 + headtraumaSaturation
 		headtraumaSaturation = math.max(headtraumaSaturation - FrameTime() * 1.2, 0)
@@ -1647,6 +1717,63 @@ hook.Add("DrawOverlay", "despair_text", function()
 
 	draw.SimpleText("im so fucking scared.", "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	draw.SimpleText("im so fucking scared.", "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end)
+
+local suicidePhrases = {
+	"theres no other way.",
+	"just end it.",
+	"nobody would care.",
+	"its not worth it anymore.",
+	"pull the trigger.",
+	"everyone would be better off.",
+}
+local suicideTextLerp = 0
+local suicidePhraseIndex = 1
+local suicideNextPhraseTime = 0
+
+hook.Add("DrawOverlay", "suicide_text", function()
+	local ply = IsValid(lply) and lply or LocalPlayer()
+	if not IsValid(ply) or !ply:Alive() then
+		suicideTextLerp = LerpFT(0.15, suicideTextLerp, 0)
+		return
+	end
+
+	if not ply.suiciding then
+		suicideTextLerp = LerpFT(0.1, suicideTextLerp, 0)
+		return
+	end
+
+	local org = ply.new_organism or ply.organism
+	if org and org.otrub then
+		suicideTextLerp = 0
+		return
+	end
+
+	local startTime = ply.startsuicide or CurTime()
+	local duration = CurTime() - startTime
+
+	-- Only show text after 2 seconds in suicide state
+	if duration < 2 then return end
+
+	local target = math.Clamp((duration - 2) / 3, 0, 1)
+	suicideTextLerp = LerpFT(0.02, suicideTextLerp, target)
+	if suicideTextLerp <= 0.001 then return end
+
+	-- Cycle phrases every 5 seconds
+	if CurTime() > suicideNextPhraseTime then
+		suicidePhraseIndex = math.random(#suicidePhrases)
+		suicideNextPhraseTime = CurTime() + 5
+	end
+
+	local time = CurTime()
+	local sway = 8 + 12 * suicideTextLerp
+	local x = ScrW() * 0.5 + math.sin(time * 0.5) * sway + math.cos(time * 0.27) * sway * 0.6
+	local y = ScrH() * 0.92 + math.sin(time * 0.43) * sway * 0.3
+	local alpha = math.floor(200 * suicideTextLerp)
+
+	local text = suicidePhrases[suicidePhraseIndex]
+	draw.SimpleText(text, "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText(text, "ZCity_Despair_Text", x, y, Color(210, 210, 210, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local function removeflash()

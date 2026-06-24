@@ -2147,38 +2147,92 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
 		end
 
-		-- Firing wobble: a smooth, weight-driven sway (mirroring the weighty-weapon
-		-- camera sway) that shifts the muzzle - and therefore the bullet trajectory -
-		-- while firing, then lerps back to a stable state as the shooter regains
-		-- control. Uses sine-of-time only (no random) so the server-authoritative
+		-- Firing wobble + recoil divergence: instead of punching the camera, physically
+		-- swing the GUN model around. This is driven mostly through pitch (AdditionalAng2[1])
+		-- and roll (AdditionalAng2[3]) - which rotate the gun and its muzzle without feeding
+		-- the camera-spray path (that path only reads the yaw [2] + Pos2[2] terms). So the
+		-- gun visibly wobbles/climbs, the muzzle (and therefore the bullet trajectory) goes
+		-- with it, and when recoil knocks the sights off target the rounds follow the gun.
+		-- Uses sine-of-time + a shared-random per-shot pattern so the server-authoritative
 		-- trajectory stays consistent with the client view.
 		local wobbleDt = dtime or FrameTime()
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
 		local firing = sinceShot < 0.2
-		-- While firing, drive instability up quickly; once firing stops, lerp it back
-		-- down slowly (the "fighting to regain control" recovery + lingering wobble).
-		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.28 or 0.06, wobbleDt), self.recoilWobbleAmp or 0, firing and 1 or 0)
+
+		local weightFactor = math.Clamp((self.weight or 5) / 5, 0.5, 2.0)
+		local forceFactor = math.Clamp((self.Primary.Force2 or self.Primary.Force or 30) / 40, 0.6, 2.0)
+		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
+		local restMul = self:IsResting() and 0.3 or 1
+		local handlingMul = math.Clamp(weightFactor * forceFactor, 0.4, 2.5)
+
+		-- Instability ramps up while firing and recovers (regaining control) afterward.
+		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.3 or 0.05, wobbleDt), self.recoilWobbleAmp or 0, firing and 1 or 0)
 
 		if (self.recoilWobbleAmp or 0) > 0.001 then
 			local t = CurTime()
-			local weightFactor = math.Clamp((self.weight or 5) / 5, 0.5, 2.0)
-			local forceFactor = math.Clamp((self.Primary.Force2 or self.Primary.Force or 30) / 40, 0.6, 2.0)
-			local amp = self.recoilWobbleAmp * weightFactor * forceFactor * self:GetPostureStabilityMul(self:IsZoom()) * (self:IsResting() and 0.25 or 1) * 1.2
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 1.6
 
-			-- Multi-frequency sine sway, same pattern as the heavy-weapon camera sway.
+			-- Multi-frequency sine sway, same shape as the heavy-weapon camera sway.
 			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
 			local wobY = math.cos(t * 1.8) * 0.65 + math.cos(t * 3.1) * 0.35
 			local wobZ = math.sin(t * 2.2) * 0.65 + math.cos(t * 2.9) * 0.35
 
-			-- Angular wobble bends the muzzle direction -> changes bullet trajectory.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 0.6
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.9
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 0.5
+			-- Swing the gun on pitch + roll (changes muzzle, no camera coupling); only a
+			-- touch of yaw so the camera stays mostly put while the gun does the moving.
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.1
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.0
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.2
 
-			-- Positional wobble shifts the weapon model (and muzzle origin) a touch.
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.5
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.4
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobZ * amp * 0.4
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.4
 		end
+
+		-- Per-shot recoil kick that physically knocks the gun off-axis and climbs the
+		-- longer you hold the trigger (SprayI). Mostly muzzle rise (pitch) plus a
+		-- deterministic horizontal/roll drift, so the muzzle diverges from the sights.
+		local recoilDecay = self:GetAnimShoot2(0.28 * mulhuy / host_timescale(), true)
+		if recoilDecay > 0.001 then
+			local sprayI = self.SprayI or 0
+			local climb = 0.45 + math.Clamp(sprayI / 7, 0, 1) * 0.55
+			local seed = math.floor(sprayI)
+			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
+			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
+			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.2
+
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 1.0           -- muzzle climbs
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.7
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.3
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.5           -- gun shoved up/back
+		end
+	end
+
+	-- Constant idle sway on the GUN: the weapon slowly drifts off and is pulled back
+	-- toward center, so it always looks like the shooter is making small corrections to
+	-- re-center the gun. Driven through pitch/roll so it stays on the gun (and its
+	-- muzzle) rather than the camera; the camera only inherits sway when it gets bad or
+	-- the weapon is heavy (see cl_camera). Sine-of-time only, so it stays deterministic.
+	if not self:IsSprinting() and not self.reload and not ply.suiciding and not IsValid(ply.FakeRagdoll) then
+		local org = ply.organism or {}
+		local fatigue = math.Clamp(org.aiming_fatigue or 0, 0, 10)
+		local fear = math.Clamp(org.fear or 0, 0, 2)
+		local idleWeight = math.Clamp((self.weight or 5) / 5, 0.5, 2.0)
+		local idleStance = self:GetPostureStabilityMul(self:IsZoom())
+		local idleRest = self:IsResting() and 0.3 or 1
+		local idleAim = self:IsZoom() and 0.6 or 1
+
+		local idleAmp = (0.35 + fatigue * 0.12 + fear * 0.25) * idleWeight * idleStance * idleRest * idleAim
+
+		local st = CurTime() * 0.9
+		local swA = math.sin(st * 1.1) * 0.7 + math.sin(st * 1.9) * 0.3
+		local swB = math.cos(st * 0.8) * 0.7 + math.cos(st * 1.7) * 0.3
+		local swC = math.sin(st * 1.3) * 0.6 + math.cos(st * 2.1) * 0.4
+
+		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 0.9
+		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 0.8
+		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * 0.2
+
+		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.5
+		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.5
 	end
 
 	if self.GetAnimPos_Draw and CLIENT then
