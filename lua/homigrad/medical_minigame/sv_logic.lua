@@ -545,6 +545,13 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
         local org = target.organism
         if not org then return end
 
+        if GetMedicalProgressModifier then
+            local mul = GetMedicalProgressModifier(ply, target, minigameType, progressDelta)
+            if mul and mul ~= 1 then
+                progressDelta = progressDelta * mul
+            end
+        end
+
         if minigameType == "syringe" then
             ApplySyringeProgress(wep, ply, target, progressDelta)
             return
@@ -668,6 +675,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
 
         hg.MedicalMinigame.AmputationSessions[ply] = nil
         hg.organism.AmputateLimb(target.organism, limb)
+        hook.Run("hg_medical_minigame_finished", ply, target, "amputation")
         return
     end
 
@@ -694,6 +702,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         end
 
         hg.MedicalMinigame.BandageSessions[ply] = nil
+        hook.Run("hg_medical_minigame_finished", ply, target, "bandage")
         return
     end
 
@@ -709,6 +718,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         if (dislocationSession.progress or 0) < 0.999 then return end
 
         hg.MedicalMinigame.DislocationSessions[ply] = nil
+        hook.Run("hg_medical_minigame_finished", ply, target, "dislocation")
 
         if hg.organism and hg.organism.CompleteDislocationFix then
             hg.organism.CompleteDislocationFix(target.organism, limb, ply)
@@ -760,6 +770,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
                 end
             end
 
+            hook.Run("hg_medical_minigame_finished", ply, target, "tourniquet")
             return
         end
 
@@ -815,6 +826,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
             end
         end
 
+        hook.Run("hg_medical_minigame_finished", ply, target, minigameType)
         return
     end
 

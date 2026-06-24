@@ -1914,3 +1914,432 @@ net.Receive("hg_medical_minigame_start", function()
 
     hg.MedicalMinigame.Panel = vgui.Create("hg_medical_minigame")
 end)
+
+--/////////////////////////////////////////////////////////////////////////////
+-- ZCity Delta: Mental System Client
+--/////////////////////////////////////////////////////////////////////////////
+
+local ClampMood = function(v) return math.Clamp(tonumber(v) or 0, -100, 100) end
+local ClampStat = function(v) return math.Clamp(tonumber(v) or 0, 0, 100) end
+
+local function GetMental(ent)
+    if not IsValid(ent) then return 0, 0 end
+    return ClampMood(ent:GetNWInt("zcity_delta_mood", 0)), ClampStat(ent:GetNWInt("zcity_delta_stress", 10))
+end
+
+local cvMentalHudShow = CreateClientConVar("zcity_delta_mental_hud_show", "0", true, false)
+local cvMoodlesShow = CreateClientConVar("zcity_delta_moodles_show", "1", true, false)
+
+concommand.Add("zcity_delta_mental_hud", function(_, _, args)
+    local a = tostring(args and args[1] or "")
+    if a == "" then
+        RunConsoleCommand("zcity_delta_mental_hud_show", cvMentalHudShow:GetBool() and "0" or "1")
+        return
+    end
+    if a == "0" or a == "1" then RunConsoleCommand("zcity_delta_mental_hud_show", a) end
+end)
+
+concommand.Add("zcity_delta_moodles", function(_, _, args)
+    local a = tostring(args and args[1] or "")
+    if a == "" then
+        RunConsoleCommand("zcity_delta_moodles_show", cvMoodlesShow:GetBool() and "0" or "1")
+        return
+    end
+    if a == "0" or a == "1" then RunConsoleCommand("zcity_delta_moodles_show", a) end
+end)
+
+-- Mental HUD bars
+surface.CreateFont("zcity_delta_mental_hud", { font = "Roboto", size = 16, weight = 500 })
+
+local function DrawMentalBar(x, y, w, label, value, minV, maxV, color)
+    local frac = math.Clamp((value - minV) / (maxV - minV), 0, 1)
+    surface.SetDrawColor(10, 10, 10, 180)
+    surface.DrawRect(x, y, w, 20)
+    surface.SetDrawColor(color.r, color.g, color.b, 220)
+    surface.DrawRect(x + 2, y + 2, (w - 4) * frac, 16)
+    surface.SetDrawColor(40, 40, 40, 200)
+    surface.DrawOutlinedRect(x, y, w, 20, 1)
+    draw.SimpleText(label .. ": " .. math.Round(value), "zcity_delta_mental_hud", x + 6, y + 10, Color(255, 255, 255, 240), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+end
+
+hook.Add("HUDPaint", "zcity_delta_mental_hud", function()
+    local lp = LocalPlayer()
+    if not IsValid(lp) then return end
+    local cv = GetConVar("zcity_delta_mental_enabled")
+    if cv and not cv:GetBool() then return end
+    if cvMentalHudShow and cvMentalHudShow.GetBool and not cvMentalHudShow:GetBool() then return end
+
+    local mood, stress = GetMental(lp)
+    local x = 20
+    local y = ScrH() - 80
+    DrawMentalBar(x, y, 200, "Mood", mood, -100, 100, Color(100, 180, 255))
+    DrawMentalBar(x, y + 24, 200, "Stress", stress, 0, 100, Color(220, 170, 90))
+end)
+
+-- Depression greyscale screen effect
+hook.Add("RenderScreenspaceEffects", "zcity_delta_depression_greyscale", function()
+    local cv = GetConVar("zcity_delta_mental_enabled")
+    if cv and not cv:GetBool() then return end
+
+    local lp = LocalPlayer()
+    if not IsValid(lp) then return end
+
+    local mood = ClampMood(lp:GetNWInt("zcity_delta_mood", 0))
+    if mood >= 0 then return end
+
+    local t = math.Clamp((-mood) / 100, 0, 1)
+    local sat = 1 - t * 0.7
+    local contrast = 1 - t * 0.15
+    local colour = 1 - t * 0.3
+
+    if DrawColorModify then
+        DrawColorModify({
+            ["$pp_colour_addr"] = 0,
+            ["$pp_colour_addg"] = 0,
+            ["$pp_colour_addb"] = 0,
+            ["$pp_colour_brightness"] = -t * 0.05,
+            ["$pp_colour_contrast"] = contrast,
+            ["$pp_colour_colour"] = colour,
+            ["$pp_colour_mulr"] = 0,
+            ["$pp_colour_mulg"] = 0,
+            ["$pp_colour_mulb"] = 0,
+        })
+    end
+end)
+
+-- Aim effects from stress and depression
+local mentalAim = { lastP = 0, lastY = 0, lastR = 0, lastWep = nil }
+
+local function ResetAimMod(cmd)
+    if not cmd then return end
+    mentalAim.lastP = 0
+    mentalAim.lastY = 0
+    mentalAim.lastR = 0
+end
+
+hook.Add("CreateMove", "zcity_delta_aim_effects", function(cmd)
+    local cv = GetConVar("zcity_delta_mental_enabled")
+    if cv and not cv:GetBool() then
+        ResetAimMod(cmd)
+        return
+    end
+
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not ply:Alive() then
+        ResetAimMod(cmd)
+        return
+    end
+
+    local wep = ply:GetActiveWeapon()
+    if not IsValid(wep) then
+        ResetAimMod(cmd)
+        return
+    end
+
+    local stress = ClampStat(ply:GetNWInt("zcity_delta_stress", 0))
+    local stressScale = math.Clamp(stress / 100, 0, 1)
+
+    local mood = ClampMood(ply:GetNWInt("zcity_delta_mood", 0))
+    local depScale = math.Clamp((-math.min(mood, 0)) / 100, 0, 1)
+
+    if mentalAim.lastWep ~= wep then
+        mentalAim.lastP = 0
+        mentalAim.lastY = 0
+        mentalAim.lastR = 0
+        mentalAim.lastWep = wep
+    end
+
+    local t = CurTime()
+    local swayAmount = stressScale * 1.5 + depScale * 0.8
+    if swayAmount <= 0.01 then
+        if math.abs(mentalAim.lastP) > 0.001 or math.abs(mentalAim.lastY) > 0.001 or math.abs(mentalAim.lastR) > 0.001 then
+            mentalAim.lastP = math.Approach(mentalAim.lastP, 0, 0.1)
+            mentalAim.lastY = math.Approach(mentalAim.lastY, 0, 0.1)
+            mentalAim.lastR = math.Approach(mentalAim.lastR, 0, 0.1)
+        end
+    else
+        local p = math.sin(t * 3.7) * swayAmount * 0.3 + math.sin(t * 7.1) * swayAmount * 0.15
+        local y = math.sin(t * 2.3) * swayAmount * 0.4 + math.sin(t * 5.9) * swayAmount * 0.2
+        local r = math.sin(t * 1.7) * swayAmount * 0.2
+
+        mentalAim.lastP = Lerp(FrameTime() * 8, mentalAim.lastP, p)
+        mentalAim.lastY = Lerp(FrameTime() * 8, mentalAim.lastY, y)
+        mentalAim.lastR = Lerp(FrameTime() * 8, mentalAim.lastR, r)
+    end
+
+    local ang = cmd:GetViewAngles()
+    ang.p = ang.p - mentalAim.lastP
+    ang.y = ang.y - mentalAim.lastY
+    ang.r = ang.r - mentalAim.lastR
+    cmd:SetViewAngles(ang)
+end)
+
+-- Depression music at rock bottom
+local miserable = { playing = false, pending = false }
+
+local function StopMiserable()
+    if miserable.channel and miserable.channel.Stop then
+        miserable.channel:Stop()
+    end
+    miserable.channel = nil
+    miserable.playing = false
+end
+
+hook.Add("Think", "zcity_delta_depression_music", function()
+    local lp = LocalPlayer()
+    if not IsValid(lp) then return end
+
+    local cv = GetConVar("zcity_delta_mental_enabled")
+    if cv and not cv:GetBool() then
+        StopMiserable()
+        return
+    end
+
+    if not lp:Alive() then
+        StopMiserable()
+        return
+    end
+
+    local mood = ClampMood(lp:GetNWInt("zcity_delta_mood", 0))
+    if mood > -100 then
+        StopMiserable()
+        return
+    end
+
+    if miserable.playing or miserable.pending then return end
+
+    miserable.pending = true
+    sound.PlayFile("sound/zcity_delta/miserable.mp3", "noplay", function(chan)
+        miserable.pending = false
+        local lp2 = LocalPlayer()
+        local mood2 = IsValid(lp2) and ClampMood(lp2:GetNWInt("zcity_delta_mood", 0)) or 0
+        if mood2 > -100 then
+            if chan and chan.IsValid and chan:IsValid() then chan:Stop() end
+            return
+        end
+        if chan then
+            miserable.channel = chan
+            miserable.playing = true
+            if chan.EnableLooping then chan:EnableLooping(true) end
+            if chan.SetVolume then chan:SetVolume(0.5) end
+            if chan.Play then chan:Play() end
+        end
+    end)
+end)
+
+--/////////////////////////////////////////////////////////////////////////////
+-- Schizophrenia Visual Effects (gated behind trait + convar)
+--/////////////////////////////////////////////////////////////////////////////
+
+local schizoFontsReady = false
+local function EnsureSchizoFonts()
+    if schizoFontsReady then return end
+    schizoFontsReady = true
+    surface.CreateFont("zcity_delta_schizo_text", {
+        font = "Pixel Operator",
+        size = 16,
+        weight = 700,
+        antialias = false,
+        additive = false,
+    })
+end
+
+local goodPhrases = {
+    "you are doing great", "everything is fine", "smile :)", "trust me",
+    "keep going", "nice weather today", "dont look back", "you are safe",
+    "take a deep breath", "it will pass", "you will be okay",
+    "calm down", "focus on the mission", "look at the sky", "no one can hurt you",
+    "its just a game", "you are stronger than them", "they cant see you", "dont panic",
+    "i am proud of you", "everything will work out", "you did the right thing",
+    "keep smiling", "relax your shoulders", "count to ten", "stay quiet", "stay sharp",
+    "you are in control", "keep breathing",
+}
+
+local evilPhrases = {
+    "i hope you will die", "they laugh at you", "you are worthless", "its all your fault",
+    "run while you can", "they are watching", "you will lose", "you are already dead",
+    "you cant trust anyone", "they want you gone", "you will fail again", "everyone hates you",
+    "you are a mistake", "they know what you did", "dont turn around", "you are not safe",
+    "you will never escape", "they will find you", "stop pretending", "you deserve it",
+    "you should give up", "its hopeless", "you cant win", "no one will help you",
+    "they are right behind you", "you are weak", "you should disappear", "your hands are shaking",
+    "you will be punished",
+}
+
+local smileyMat = Material("smiley/smiley.png", "smooth noclamp")
+local smileyTalkingMat = Material("smiley/smiley_talking.png", "smooth noclamp")
+local crazyMat = Material("smiley/crazy_smiley.png", "smooth noclamp")
+local crazyTalkingMat = Material("smiley/crazy_smiley_talking.png", "smooth noclamp")
+
+local schizoPhrase = ""
+local schizoMode = "good"
+local schizoTyping = false
+local schizoStartAt = 0
+local schizoHoldUntil = 0
+local schizoNextAt = 0
+local schizoAudio = nil
+local schizoAudioMode = nil
+
+local function StopSchizoAudio()
+    if schizoAudio and schizoAudio.Stop then schizoAudio:Stop() end
+    schizoAudio = nil
+    schizoAudioMode = nil
+end
+
+local function StartSchizoAudio(mode)
+    StopSchizoAudio()
+    local path = mode == "evil" and "sound/zcity_delta/0604_1.mp3" or "sound/zcity_delta/0604.mp3"
+    sound.PlayFile(path, "noplay", function(chan)
+        if not chan then return end
+        schizoAudio = chan
+        schizoAudioMode = mode
+        if chan.SetVolume then chan:SetVolume(0.8) end
+        if chan.EnableLooping then chan:EnableLooping(true) end
+        if chan.Play then chan:Play() end
+    end)
+end
+
+local function PickPhrase(mode)
+    if mode == "evil" then return evilPhrases[math.random(1, #evilPhrases)] end
+    return goodPhrases[math.random(1, #goodPhrases)]
+end
+
+local function BeginTyping(mode)
+    schizoMode = mode
+    schizoPhrase = PickPhrase(mode) or ""
+    schizoTyping = schizoPhrase ~= ""
+    schizoStartAt = CurTime()
+    schizoHoldUntil = 0
+    schizoNextAt = 0
+    if schizoTyping then
+        StartSchizoAudio(mode)
+    else
+        StopSchizoAudio()
+    end
+end
+
+hook.Add("HUDPaint", "zcity_delta_schizophrenia_smiley", function()
+    EnsureSchizoFonts()
+    local cv = GetConVar and GetConVar("zcity_delta_traits_enabled") or nil
+    if cv and not cv:GetBool() then
+        StopSchizoAudio()
+        schizoTyping = false
+        return
+    end
+
+    local lp = LocalPlayer()
+    if not IsValid(lp) or not lp:Alive() then
+        StopSchizoAudio()
+        schizoTyping = false
+        return
+    end
+
+    hg = hg or {}
+    local tr = hg.__zcity_delta_traits or {}
+    if not tr.schizophrenia then
+        StopSchizoAudio()
+        schizoTyping = false
+        return
+    end
+
+    local mood = tonumber(lp:GetNWInt("zcity_delta_mood", 0)) or 0
+    local mode = mood < -10 and "evil" or "good"
+
+    if schizoTyping and schizoMode ~= mode then
+        schizoTyping = false
+        StopSchizoAudio()
+        schizoNextAt = CurTime() + 0.2
+    end
+
+    if not schizoTyping and CurTime() >= (schizoNextAt or 0) then
+        BeginTyping(mode)
+    end
+
+    local cps = 26
+    local shown = 0
+    local text = ""
+    if schizoTyping then
+        shown = math.floor(math.max(0, CurTime() - schizoStartAt) * cps + 0.5)
+        if shown >= #schizoPhrase then
+            shown = #schizoPhrase
+            schizoTyping = false
+            schizoHoldUntil = CurTime() + math.Rand(2.0, 4.0)
+            schizoNextAt = schizoHoldUntil + math.Rand(12.0, 24.0)
+            StopSchizoAudio()
+        end
+        text = schizoPhrase:sub(1, shown)
+    else
+        if (schizoHoldUntil or 0) > CurTime() then
+            text = schizoPhrase
+        else
+            text = ""
+        end
+    end
+
+    if schizoAudio and schizoAudio.Play and schizoAudioMode == mode then
+        if schizoAudio.GetState and schizoAudio:GetState() == GMOD_CHANNEL_STOPPED then
+            schizoAudio:Play()
+        end
+    end
+
+    local size = 100
+    local stretch = 1
+    if schizoTyping then
+        local p = math.Clamp((CurTime() - schizoStartAt) / 0.55, 0, 1)
+        local hump = math.sin(math.pi * p) + 0.28 * math.sin(math.pi * 3 * p)
+        hump = math.max(0, hump)
+        stretch = 1 + 0.22 * hump
+    end
+    local w = size
+    local h = size * stretch
+    local x = ScrW() - 20 - w
+    local y = ScrH() - 20 - h
+    if y < 10 then y = 10 end
+
+    local mat = smileyMat
+    if mode == "evil" then
+        mat = schizoTyping and crazyTalkingMat or crazyMat
+    else
+        mat = schizoTyping and smileyTalkingMat or smileyMat
+    end
+
+    surface.SetDrawColor(255, 255, 255, 255)
+    surface.SetMaterial(mat)
+    surface.DrawTexturedRect(x, y, w, h)
+
+    if text ~= "" then
+        local col = mode == "evil" and Color(255, 80, 80, 255) or Color(255, 230, 80, 255)
+        draw.SimpleTextOutlined(text, "zcity_delta_schizo_text", x + w, y - 8, col, TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM, 1, Color(0, 0, 0, 220))
+    end
+end)
+
+hook.Add("ShutDown", "zcity_delta_schizo_cleanup", function()
+    StopSchizoAudio()
+end)
+
+--/////////////////////////////////////////////////////////////////////////////
+-- Moodles Extra (receive extra data from server)
+--/////////////////////////////////////////////////////////////////////////////
+
+local moodlesExtra = { satiety = 0, internalBleed = 0, hungry = 0 }
+
+net.Receive("zcity_delta_moodles_extra", function()
+    moodlesExtra.satiety = net.ReadFloat() or 0
+    moodlesExtra.internalBleed = net.ReadFloat() or 0
+    moodlesExtra.hungry = net.ReadFloat() or 0
+end)
+
+--/////////////////////////////////////////////////////////////////////////////
+-- Traits Sync (receive from server)
+--/////////////////////////////////////////////////////////////////////////////
+
+net.Receive("zcity_delta_traits_sync", function()
+    local arr = net.ReadTable() or {}
+    local traits = {}
+    for i = 1, #arr do
+        local id = tostring(arr[i] or "")
+        if id ~= "" then traits[id] = true end
+    end
+    hg = hg or {}
+    hg.__zcity_delta_traits = traits
+end)

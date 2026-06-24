@@ -26,6 +26,7 @@ local function BootClient()
     SafeInclude("zcity_delta/commands_cl.lua", "commands")
     if file.Exists("zcity_delta/unitmenu_cl.lua", "LUA") then SafeInclude("zcity_delta/unitmenu_cl.lua", "unitmenu") end
     SafeInclude("zcity_delta/dislocation_radial_cl.lua", "dislocation_radial")
+    SafeInclude("zcity_delta/death_screen_cl.lua", "death_screen")
 
     hook.Remove("radialOptions", "DislocatedJoint")
     hook.Remove("radialOptions", "DislocatedJoint2")

@@ -766,7 +766,6 @@ function hg.FakeUp(ply, forced, instant)
 	//if ply:InVehicle() and ply:GetVehicle():WaterLevel() >= 3 then return end
 	if not forced and (not IsValid(ply.FakeRagdoll) or not ply:Alive() or hook_Run("Should Fake Up", ply) ~= nil) then return false end
 	ply.fakecd = CurTime() + 2
-	ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
 
 	if ply:InVehicle() then
 		return
@@ -786,10 +785,17 @@ function hg.FakeUp(ply, forced, instant)
 	ply:SetNWEntity("FakeRagdollOld", ragdoll)
 	ply.FakeRagdoll = nil
 
+	ply:ConCommand("+duck")
+	timer.Simple(0.5,function()
+		if IsValid(ply) then
+			ply:ConCommand("-duck")
+		end
+	end)
+
 	if IsValid(ragdoll) and ragdoll:IsOnFire() then
 		timer.Simple(0.1,function()
-			ply.fires = ragdoll.fires
-			ply:Ignite(30 * ((ply.shouldburn or 0) + 1),16)
+			--ply.fires = ragdoll.fires
+			--ply:Ignite(30 * ((ply.shouldburn or 0) + 1),16)
 			if ragdoll.fires then
 				for fire, pos in pairs(ragdoll.fires) do
 					fire:Remove()
@@ -877,8 +883,6 @@ function hg.FakeUp(ply, forced, instant)
 			ply:SetRenderMode(RENDERMODE_NORMAL)
 			hg.ApplySetCollisionGroupNow(ply, ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
 			ply:SetMoveType(ply.switchingseat and MOVETYPE_NONE or MOVETYPE_WALK)
-			ply.fakecd = CurTime() + 2
-			ply:SetNWFloat("HGHeavyGetupCooldown", CurTime() + 2)
 			
 			--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 			hg.ragdollFake[ply] = nil
@@ -893,6 +897,13 @@ function hg.FakeUp(ply, forced, instant)
 
 	if IsValid(ragdoll) then ragdoll:SetNWEntity("ply", NULL) end
 	if ply.oldCanUseFlashlight and not ply:CanUseFlashlight() then ply:AllowFlashlight(true) end
+	local time = (ply.lastFake or 0) > 0 and 0.1 or 1.5
+	--[[timer.Simple(time,function()
+		if IsValid(ply) then
+			ply:ConCommand("-duck")
+		end
+	end)--]]
+
 	return true
 end
 

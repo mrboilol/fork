@@ -164,11 +164,11 @@ module[2] = function(owner, org, timeValue)
 		velocityPenalty = math.Clamp((fallSpeed - 100) / 400, 0, 0.9)
 	end
 
-	-- Rapid acceleration (e.g., vehicle crashes) causes G-force loss
+	-- Rapid deceleration (e.g., vehicle crashes, slamming into walls) causes G-force loss
 	local prevSpeed = org._pulsePrevSpeed or speed
-	local acceleration = math.abs(speed - prevSpeed) / math.max(timeValue, 0.001)
-	if acceleration > 400 and velocity.z <= 0 then
-		velocityPenalty = math.min(velocityPenalty + math.Clamp((acceleration - 400) / 800, 0, 0.2), 0.95)
+	local decel = math.max(0, prevSpeed - speed) / math.max(timeValue, 0.001)
+	if decel > 800 and velocity.z <= 0 then
+		velocityPenalty = math.min(velocityPenalty + math.Clamp((decel - 800) / 800, 0, 0.2), 0.95)
 	end
 	org._pulsePrevSpeed = speed
 

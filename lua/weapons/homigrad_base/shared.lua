@@ -802,7 +802,8 @@ end
 local col = Color(0, 0, 0)
 local col2 = Color(0, 0, 0)
 local dynamicmags
-local instructions 
+local instructions
+local hg_3dzity
 if CLIENT then
 	surface.CreateFont("AmmoFont",{
 		font = "Bahnschrift",
@@ -823,7 +824,7 @@ if CLIENT then
 
 	dynamicmags = CreateClientConVar("hg_dynamic_mags", "0", true, false, "Enables dynamic ammo show when shooting",0,1)
 	instructions = CreateClientConVar("hg_instructions","1", true, false, "Enables gun instructions",0,1)
-	local hg_3dzity = GetConVar("hg_3dzity") or CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
+	hg_3dzity = GetConVar("hg_3dzity") or CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 end
 
 function SWEP:DrawHUDAdd()
