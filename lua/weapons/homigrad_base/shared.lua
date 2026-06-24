@@ -2177,11 +2177,10 @@ function SWEP:GetAdditionalValues()
 			local wobY = math.cos(t * 1.8) * 0.65 + math.cos(t * 3.1) * 0.35
 			local wobZ = math.sin(t * 2.2) * 0.65 + math.cos(t * 2.9) * 0.35
 
-			-- Swing the gun on pitch + roll (changes muzzle, no camera coupling); only a
-			-- touch of yaw so the camera stays mostly put while the gun does the moving.
+			-- Swing the gun on pitch + roll only (changes muzzle, no camera coupling).
+			-- NO yaw — AdditionalAng2[2] is read by the camera-spray path.
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.1
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.0
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.2
 
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobZ * amp * 0.4
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.4
@@ -2229,7 +2228,6 @@ function SWEP:GetAdditionalValues()
 
 		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 0.9
 		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 0.8
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * 0.2
 
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.5
 		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.5

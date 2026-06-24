@@ -1223,12 +1223,12 @@ function SWEP:SecondaryAttack()
 					local painAmount = 0
 
 					if bothArmsBroken and (useRightHand or useLeftHand) then
-						-- Both arms broken - significant pain
+						-- Both arms broken - severe pain
 						if useRightHand and not org.rarmamputated then
-							painAmount = (org.rarm or 0) * 15 + (org.rarmdislocation or org.rarmdislocated and 10 or 0)
+							painAmount = (org.rarm or 0) * 40 + (org.rarmdislocation or org.rarmdislocated and 20 or 0)
 						end
 						if useLeftHand and not org.larmamputated then
-							painAmount = painAmount + (org.larm or 0) * 15 + (org.larmdislocation or org.larmdislocated and 10 or 0)
+							painAmount = painAmount + (org.larm or 0) * 40 + (org.larmdislocation or org.larmdislocated and 20 or 0)
 						end
 						painAmount = painAmount * 0.85
 					else
@@ -1237,10 +1237,10 @@ function SWEP:SecondaryAttack()
 							local armVal = org.rarm or 0
 							local disloc = org.rarmdislocation or org.rarmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = armVal * 10 + (disloc and 6 or 0)
-							elseif armVal >= 0.25 then
-								local severity = (armVal - 0.25) / 0.75
-								painAmount = severity * 4
+								painAmount = armVal * 30 + (disloc and 15 or 0)
+							elseif armVal >= 0.8 then
+								local severity = (armVal - 0.8) / 0.2
+								painAmount = severity * 12
 							end
 						end
 						-- Left arm pain
@@ -1248,10 +1248,10 @@ function SWEP:SecondaryAttack()
 							local armVal = org.larm or 0
 							local disloc = org.larmdislocation or org.larmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = painAmount + armVal * 8 + (disloc and 5 or 0)
-							elseif armVal >= 0.25 then
-								local severity = (armVal - 0.25) / 0.75
-								painAmount = painAmount + severity * 3
+								painAmount = painAmount + armVal * 25 + (disloc and 12 or 0)
+							elseif armVal >= 0.8 then
+								local severity = (armVal - 0.8) / 0.2
+								painAmount = painAmount + severity * 10
 							end
 						end
 					end
@@ -1445,10 +1445,10 @@ function SWEP:ApplyForce()
 			if self.BothArmsBroken and (self.UsingRightHand or self.UsingLeftHand) then
 				-- Both arms broken - most pain
 				if self.UsingRightHand and not org.rarmamputated then
-					continuousPain = (org.rarm or 0) * 3 + (org.rarmdislocation or org.rarmdislocated and 2 or 0)
+					continuousPain = (org.rarm or 0) * 10 + (org.rarmdislocation or org.rarmdislocated and 6 or 0)
 				end
 				if self.UsingLeftHand and not org.larmamputated then
-					continuousPain = continuousPain + (org.larm or 0) * 2 + (org.larmdislocation or org.larmdislocated and 1.5 or 0)
+					continuousPain = continuousPain + (org.larm or 0) * 8 + (org.larmdislocation or org.larmdislocated and 5 or 0)
 				end
 				continuousPain = continuousPain * 0.5
 			else
@@ -1457,10 +1457,10 @@ function SWEP:ApplyForce()
 					local armVal = org.rarm or 0
 					local disloc = org.rarmdislocation or org.rarmdislocated
 					if armVal >= 1 or disloc then
-						continuousPain = armVal * 2 + (disloc and 1.5 or 0)
-					elseif armVal >= 0.25 then
-						local severity = (armVal - 0.25) / 0.75
-						continuousPain = severity * 1
+						continuousPain = armVal * 8 + (disloc and 5 or 0)
+					elseif armVal >= 0.8 then
+						local severity = (armVal - 0.8) / 0.2
+						continuousPain = severity * 4
 					end
 				end
 				-- Left arm pain
@@ -1468,10 +1468,10 @@ function SWEP:ApplyForce()
 					local armVal = org.larm or 0
 					local disloc = org.larmdislocation or org.larmdislocated
 					if armVal >= 1 or disloc then
-						continuousPain = continuousPain + armVal * 1.5 + (disloc and 1 or 0)
-					elseif armVal >= 0.25 then
-						local severity = (armVal - 0.25) / 0.75
-						continuousPain = continuousPain + severity * 0.6
+						continuousPain = continuousPain + armVal * 6 + (disloc and 4 or 0)
+					elseif armVal >= 0.8 then
+						local severity = (armVal - 0.8) / 0.2
+						continuousPain = continuousPain + severity * 3
 					end
 				end
 			end

@@ -1072,7 +1072,9 @@ local function PatchOrganismForLastStand()
             local originalPain = painModule[2]
             painModule[2] = function(owner, org, timeValue)
                 if org and org.lastStandAdrenalineUntil and CurTime() < org.lastStandAdrenalineUntil then
-                    org.adrenaline = math.max(org.adrenaline or 0, 4)
+                    local remaining = org.lastStandAdrenalineUntil - CurTime()
+                    local floor = math.max(0, remaining / 200) * 4
+                    org.adrenaline = math.max(org.adrenaline or 0, floor)
                 end
                 originalPain(owner, org, timeValue)
             end
@@ -1115,6 +1117,11 @@ hook.Add("PlayerDeath", "zcity_delta_mental_death", function(ply)
     ply.__zcity_delta_laststand_rolled = false
     ply.__zcity_delta_laststand_attempted = nil
     ply.__zcity_delta_laststand_active_until = nil
+
+    if ply.organism then
+        ply.organism.lastStandAdrenalineUntil = nil
+        ply.organism.lastStandO2Until = nil
+    end
 
     if IsMentalEnabled() then
         local mood = ClampMood(ply:GetNWInt("zcity_delta_mood", 0))

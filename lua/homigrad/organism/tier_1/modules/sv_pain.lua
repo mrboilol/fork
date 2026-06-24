@@ -373,7 +373,11 @@ module[2] = function(owner, org, timeValue)
 
 	if org.adrenalineAdd > 0 then
 
-		org.adrenaline = Approach(org.adrenaline, 4, timeValue / 5)
+		local critical = (org.heartstop) or (org.blood and org.blood < 1500) or (org.brain and org.brain > 1.5)
+
+		if not critical then
+			org.adrenaline = Approach(org.adrenaline, 4, timeValue / 5)
+		end
 
 	end
 

@@ -69,7 +69,7 @@ local tab = {
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3", 0, 5)
 local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3", 0, 6)
-local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3", 0, 3)
+local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3, 4=ngaimcooked.mp3", 0, 4)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
@@ -390,6 +390,11 @@ local function stopthings()
 	if IsValid(FuckStation) then
 		FuckStation:Stop()
 		FuckStation = nil
+	end
+
+	if IsValid(NgaimCookedStation) then
+		NgaimCookedStation:Stop()
+		NgaimCookedStation = nil
 	end
 
 	if IsValid(NoisesStation) then
@@ -1406,6 +1411,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
+			if canRetrySound("NgaimCookedStation", NgaimCookedStation) then
+				sound.PlayFile("sound/ngaimcooked.mp3", "noblock noplay", function(station)
+					if IsValid(station) then
+						station:SetVolume(0)
+						station:Play()
+						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
+						NgaimCookedStation = station
+						station:EnableLooping(true)
+					end
+				end)
+			end
+
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
 
 			if otrubMode == 0 then
@@ -1422,6 +1439,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(FuckStation) then
 					FuckStation:SetVolume(0)
 				end
+				if IsValid(NgaimCookedStation) then
+					NgaimCookedStation:SetVolume(0)
+				end
 			elseif otrubMode == 1 then
 				-- Use altotrub.ogg instead
 				if IsValid(NoiseStation) then
@@ -1435,6 +1455,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end
 				if IsValid(FuckStation) then
 					FuckStation:SetVolume(0)
+				end
+				if IsValid(NgaimCookedStation) then
+					NgaimCookedStation:SetVolume(0)
 				end
 			elseif otrubMode == 2 then
 				-- Use sleepy.ogg instead
@@ -1450,6 +1473,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(FuckStation) then
 					FuckStation:SetVolume(0)
 				end
+				if IsValid(NgaimCookedStation) then
+					NgaimCookedStation:SetVolume(0)
+				end
 			elseif otrubMode == 3 then
 				-- Use fuck.mp3 instead
 				if IsValid(NoiseStation) then
@@ -1464,6 +1490,26 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(FuckStation) then
 					FuckStation:SetVolume(otrubVol)
 				end
+				if IsValid(NgaimCookedStation) then
+					NgaimCookedStation:SetVolume(0)
+				end
+			elseif otrubMode == 4 then
+				-- Use ngaimcooked.mp3 instead
+				if IsValid(NoiseStation) then
+					NoiseStation:SetVolume(0)
+				end
+				if IsValid(AltotrubStation) then
+					AltotrubStation:SetVolume(0)
+				end
+				if IsValid(SleepyStation) then
+					SleepyStation:SetVolume(0)
+				end
+				if IsValid(FuckStation) then
+					FuckStation:SetVolume(0)
+				end
+				if IsValid(NgaimCookedStation) then
+					NgaimCookedStation:SetVolume(otrubVol)
+				end
 			end
 		else
 			if IsValid(NoiseStation) then
@@ -1477,6 +1523,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(FuckStation) then
 				FuckStation:SetVolume(0)
+			end
+			if IsValid(NgaimCookedStation) then
+				NgaimCookedStation:SetVolume(0)
 			end
 		end
 	else

@@ -169,7 +169,7 @@ net.Receive("zcity_delta_death_respawn", function(len, ply)
     respawnRequested[ply] = true
     ply.NextSpawnTime = CurTime()
     if GAMEMODE and GAMEMODE.PlayerDeathThink then
-        ply.NextSpawnTime = CurTime() + 0.1
+        ply.NextSpawnTime = CurTime()
     end
 end)
 

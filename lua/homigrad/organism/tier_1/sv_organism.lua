@@ -1215,7 +1215,7 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 	org.shock = math.Approach(org.shock, 0, regen * 10)
 	org.immobilization = math.Approach(org.immobilization, 0, regen * 10)
 	org.disorientation = math.Approach(org.disorientation, 0, regen * 10)
-	org.adrenaline = math.Approach(org.adrenaline, 5, regen * 100)
+	org.adrenaline = math.Approach(org.adrenaline, 4, regen * 10)
 	org.analgesia = math.Approach(org.analgesia, 1, regen * 10)
 
 	if org.noradrenaline > 2 then
