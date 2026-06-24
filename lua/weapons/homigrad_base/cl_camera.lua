@@ -345,16 +345,6 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		lastPosSelected = CurTime()
 		-- Smooth sine wave sway instead of random jitter
 		local time = CurTime()
-		local fearMult = (ply.organism and math.Clamp(ply.organism.fear or 0, 0, 2) or 0) + 1
-		local swayStressFactor = fear + adrenalineJitter * 1.5
-		local swayStabilizer = adrenalineStabilizer
-		fearMult = fearMult * (1 + swayStressFactor * 0.2) / (1 + swayStabilizer * 2)
-		-- Add jittery high-frequency sway when fear or high adrenaline is present
-		local jitterSway = Vector(
-			math.sin(time * 12) * 0.1 + math.sin(time * 23) * 0.05,
-			math.cos(time * 14) * 0.1 + math.cos(time * 19) * 0.05,
-			math.sin(time * 17) * 0.08 + math.cos(time * 29) * 0.04
-		) * swayStressFactor
 		local healthyArmMult = (not rarm_bad and not larm_bad and not rarm_partial and not larm_partial) and 0.8 or 1
 		local swayX = math.sin(time * 1.5) * 0.65 + math.sin(time * 2.7) * 0.35
 		local swayY = math.cos(time * 1.8) * 0.65 + math.cos(time * 3.1) * 0.35
@@ -403,8 +393,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		local weightSway = math.Clamp((effective_weight - 5) * 0.12, 0, 1.0)
 		local sway_scale = (weightSway + final_arm_sway + final_fatigue_sway + final_brain_sway) * handlingMul * self:GetPostureStabilityMul(zooming)
 
-		local jitterMult = (stressFactor > 0.1) and (1 + stressFactor * 0.5) or 1
-		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * fearMult * healthyArmMult * (isHoldingBreath and 0.05 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale + jitterSway * jitterMult)
+		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * healthyArmMult * (isHoldingBreath and 0.05 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale)
 	end
 
 	randomPosL = LerpFT(0.05 * (inpain and 12.5 - (12 * painmul) or 1), randomPosL, randomPos)
@@ -433,7 +422,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local posIdle = eyePos
 	local angIdle = eyeAng
-	local zoom = self:IsZoom() and (IsValid(ply.FakeRagdoll) or ((self.lerpaddcloseanim * self.closeanimdis) < 3)) and (self:GetNetVar("shootgunReload", 0) < CurTime())// and (posIdle:IsEqualTol(posZoom,20))))
+	local zoom = self:IsZoom() and (IsValid(ply.FakeRagdoll) or (self.lerpaddcloseanim < 0.35)) and (self:GetNetVar("shootgunReload", 0) < CurTime())// and (posIdle:IsEqualTol(posZoom,20))))
 	
 	--if hg_aiminganim:GetBool() then
 		self.k = Lerp(self.Ergonomics * FrameTime() * 2, self.k or 0, zoom and 1 or 0)
@@ -470,7 +459,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 
 	local fatigue_shake = (organism.aiming_fatigue or 0) * 0.015
-	local fear_shake = stressFactor * 0.04
+	local fear_shake = adrenalineJitter * 0.04
 	local total_shake_debuff = arm_shake_penalty + fatigue_shake + fear_shake
 
 	-- Mitigation calculation for overall control (shake)
@@ -510,14 +499,16 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		shakeMul = 0
 	end
 
-	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01)
-	addview[3] = 0
+	if shakeMul > 0.01 then
+		local addview = AngleRand(-shakeMul, shakeMul)
+		addview[3] = 0
 
-	if ply == LocalPlayer() then
-		ViewPunch2(addview)
+		if ply == LocalPlayer() then
+			ViewPunch2(addview)
+		end
 	end
 
-	local k4 = stressFactor * 0.02
+	local k4 = adrenalineJitter * 0.02
 	local angRand = AngleRand(-k4 * 2, k4 * 2) * 0.2
 	lerpedAdren:Add(angRand)
 	lerpedAdren = LerpFT(0.1, lerpedAdren, angle_zero)
