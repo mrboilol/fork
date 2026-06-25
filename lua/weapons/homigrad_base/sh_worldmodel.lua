@@ -369,8 +369,6 @@ local function DrawWorldModel(self, force)
 						self.OldAngPunch = self.OldAngPunch or gAngles
 						local punch = ( self.OldAngPunch - gAngles )/(self.ViewPunchDiv or 50)
 						--print(punch)
-						ViewPunch2( -punch )
-						ViewPunch( punch )
 						self.OldAngPunch = gAngles
 					end
 				end
@@ -908,5 +906,4 @@ end)
 function SWEP:ShouldDrawViewModel()
 	return false
 end
-
 

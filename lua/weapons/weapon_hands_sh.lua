@@ -540,30 +540,7 @@ end
 SWEP.supportTPIK = true
 SWEP.ismelee = true
 function SWEP:Camera(eyePos, eyeAng, view, vellen)
-	//self:SetHandPos()
 	self:DrawWorldModel()
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return end
-
-	self.walkinglerp = Lerp(hg.lerpFrameTime2(0.1),self.walkinglerp or 0, owner.InVehicle and owner:InVehicle() and 0 or hg.GetCurrentCharacter(owner):GetVelocity():LengthSqr())
-	self.huytime = self.huytime or 0
-	local walk = math.Clamp(self.walkinglerp / 10000,0,1)
-
-	self.huytime = self.huytime + walk * FrameTime() * 4 * host_timescale()
-	if owner:IsSprinting() then
-		walk = walk * 2
-	end
-
-	local huy = self.huytime
-
-	local x,y = math.cos(huy) * math.sin(huy) * walk * 1,math.sin(huy) * walk * 1
-	eyePos = eyePos - eyeAng:Up() * walk
-	eyePos = eyePos - eyeAng:Up() * x * 0.5
-	eyePos = eyePos - eyeAng:Right() * y * 0.5
-
-	view.origin = (eyePos - (angle_difference_localvec * 150) - (position_difference * 0.5))
-
-	return view
 end
 
 SWEP.rhandik = false

@@ -269,9 +269,7 @@ function HGAddView(ply, origin, angles, velLen)
 
 		//angles[1] = angles[1] + x * 1
 		//angles[2] = angles[2] + y * 1
-		if ishgweapon(wep) then
-			ViewPunch4(Angle(y2, x2, x2 * 50) * 0.0005 * 1.5)
-		end
+		-- Weapon and hand sway should stay on the model, not the player's camera.
 
 		local music = hg.DynamicMusicV2.Player.GetTrack()
 
