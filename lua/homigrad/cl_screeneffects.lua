@@ -1229,6 +1229,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 								)
 								ViewPunch(shakeAngle)
 							end
+							if avgPeak > 0.3 then
+								local shakeIntensity = math.Clamp((avgPeak - 0.3) * 2, 0, 1)
+								local shakeAngle = Angle(
+									math.Rand(-1, 1) * shakeIntensity * 2,
+									math.Rand(-1, 1) * shakeIntensity * 2,
+									math.Rand(-0.5, 0.5) * shakeIntensity
+								)
+								ViewPunch(shakeAngle)
+							end
 						end
 					end
 				end
@@ -1310,7 +1319,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					ItssooverStation:SetVolume(consciousVol)
 
 					-- Sound peak detection for screen shake
-					if hg_dyingpulse:GetInt() == 1 and IsValid(ItssooverStation) and ItssooverStation.GetFFT and ItssooverStation:GetState() == GMOD_CHANNEL_PLAYING then
+							-- Apply screen shake based on peak intensity
+							if avgPeak > 0.3 then
+								local shakeIntensity = math.Clamp((avgPeak - 0.3) * 2, 0, 1)
+								local shakeAngle = Angle(
+									math.Rand(-1, 1) * shakeIntensity * 2,
+									math.Rand(-1, 1) * shakeIntensity * 2,
+									math.Rand(-0.5, 0.5) * shakeIntensity
+								)
+								ViewPunch(shakeAngle)
+							end
 						local fft = ItssooverStation:GetFFT(512)
 						if fft then
 							local peakSum = 0
@@ -1680,7 +1698,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
 		-- Chromatic aberration
-		render.UpdateScreenEffectTexture()
+		-- View wobble for disorientation
+		if suicideLerp > 0.3 then
+			local wobbleTime = CurTime() * (1.5 + suicideLerp * 2)
+			local wobbleStrength = (suicideLerp - 0.3) * 0.3
+			ViewPunch(Angle(
+				math.sin(wobbleTime) * wobbleStrength,
+				math.cos(wobbleTime * 0.7) * wobbleStrength * 0.7,
+				math.sin(wobbleTime * 0.5) * wobbleStrength * 0.3
+			))
+		end
 		chromaticMat:SetFloat("$c0_x", suicideLerp * 0.025)
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
@@ -1859,9 +1886,22 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	lply.blindflash:SetPos(view.origin)
 	lply.blindflash:SetAngles(Ang)
 	lply.blindflash:Update()
+	local pulse = GetConsciousBeatPulse()
+	if pulse > 0 then
+		return fov - (pulse * 20) -- zooms in slightly
+	end
 end)
 
 local function GetConsciousBeatPulse()
+	local pulse = GetConsciousBeatPulse()
+	if pulse > 0 then
+		local shakeAmt = pulse * 2.5
+		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
+		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
+		angles.r = angles.r + math.Rand(-shakeAmt, shakeAmt)
+		-- Also modify fova for when RenderScene is disabled
+		fova[1] = (fova[1] or 0) - (pulse * 20)
+	end
 	if not IsValid(lply) or not lply:Alive() then return 0 end
 
 	-- Check if dying pulse detection is enabled
@@ -1870,9 +1910,19 @@ local function GetConsciousBeatPulse()
 	local dyingMode = hg_dyingsound:GetInt()
 	-- Disable screen shake for modes 2, 3, 4, 5, and 6
 	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 or dyingMode == 6 then return 0 end
+	local pushPull = GetDespairCamPulse()
+	if pushPull ~= 0 then
+		return fov + pushPull * 2.8
+	end
 
 	local intensity = hg.consciousBeatIntensity or 0
 	if intensity <= 0.01 then return 0 end
+	local pushPull, jitter = GetDespairCamPulse()
+	if pushPull == 0 and jitter == 0 then return end
+	angles.p = angles.p + jitter * 0.75
+	angles.y = angles.y + jitter * 0.6
+	angles.r = angles.r + jitter * 0.5
+	fova[1] = (fova[1] or 0) + pushPull * 2.8
 
 	-- Only trigger the pulse if the sound is actually playing and hasn't been stopped
 	if not IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING or NoiseStation2:GetVolume() <= 0.01 then return 0 end
