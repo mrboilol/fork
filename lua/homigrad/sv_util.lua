@@ -472,6 +472,7 @@ hook.Add("PostEntityFireBullets","bulletsuppression",function(ent,bullet)
 		if !ply:Alive() then continue end
 		local dist,pos = util.DistanceToLine(tr.StartPos,tr.HitPos,ply:EyePos())
 		local org = ply.organism
+		if not org then continue end
 		local eyePos = ply:EyePos()
 
 		local isVisible = !util.TraceLine({
@@ -628,6 +629,8 @@ timer.Create("FastObjectFear", 0.05, 0, function()
 			org.fearadd = (org.fearadd or 0) + fearAmount
 			fastObjectFearCooldown[ply] = time + 0.2
 			break -- one scare per tick per player is enough
+			org.fearadd = org.fearadd + 0.2
+			hg.organism.AddPanicAttack(org, math.Clamp(0.0008 * dmg / math.max(dist / 10, 8), 0.0004, 0.0065), true)
 		end
 	end
 end)
@@ -689,6 +692,25 @@ function hg.ExplosionEffect(pos, dis, dmg)
 	net.Start("add_supression") -- i think this useless for now
 	net.WriteVector(pos)
 	net.Broadcast()
+
+	local radius = math.Clamp((dis or 0) * 1.5, 300, 4000)
+	for _, ply in ipairs(ents.FindInSphere(pos, radius)) do
+		if not ply:IsPlayer() or not ply:Alive() or not ply.organism or ply.organism.otrub then continue end
+
+		local center = ply:WorldSpaceCenter()
+		local tr = util.TraceLine({
+			start = pos,
+			endpos = center,
+			filter = {ply, hg.GetCurrentCharacter(ply)},
+			mask = MASK_SHOT
+		})
+
+		local dist = pos:Distance(center)
+		if tr.Hit and dist > radius * 0.35 then continue end
+
+		local amount = math.Clamp((1 - dist / radius) * 0.55 + (dmg or 0) / 1200, 0.08, 0.55)
+		hg.organism.AddPanicAttack(ply.organism, amount, true)
+	end
 end
 
 -- MANUAL PICKUP

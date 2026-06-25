@@ -8,7 +8,7 @@ local hg_windedsystem = ConVarExists("hg_windedsystem") and GetConVar("hg_winded
 local min, max, Round = math.min, math.max, Round
 
 local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_mul","1",{FCVAR_ARCHIVE,FCVAR_NOTIFY,FCVAR_NEVER_AS_STRING},"Multiply stamina drain when sprinting",0,10)
-
+local panicattack_stamina_drain_mul = 1.35
 --local Organism = hg.organism
 
 hg.organism.module.stamina = {}
@@ -172,7 +172,9 @@ module[2] = function(owner, org, timeValue)
 	local muffed = owner.armors and owner.armors["face"] == "mask2"
 
 	stamina.sub = stamina.sub + stamina.sub * stamina.weight * (muffed and 2 or 1)
-
+	if (org.panicattack or 0) >= 0.45 then
+		stamina.sub = stamina.sub * panicattack_stamina_drain_mul
+	end
 	org.hungry = org.hungry or 0
 
 	stamina.max = (org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) + goodmood * 20
@@ -303,4 +305,3 @@ hook.Add("FinishMove", "!homigrad-organism", function(ply, move)
 	ply.organism.moveMaxSpeed = move:GetMaxSpeed()
 
 end)
-
