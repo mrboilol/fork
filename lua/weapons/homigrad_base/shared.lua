@@ -2079,6 +2079,7 @@ function SWEP:GetAdditionalValues()
 	if CLIENT and self:IsLocal2() then
 		angle_huy[1] = x / 300
 		angle_huy[2] = y / 300
+		ViewPunch2(angle_huy)
 	end
 	
 	if CLIENT and self:IsLocal() then
@@ -2244,6 +2245,10 @@ function SWEP:GetAdditionalValues()
 		self.AdditionalAng2[1] = self.AdditionalAng2[1] + sin * 5
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + sin * 10
 		
+		if self:IsLocal2() then
+			ViewPunch2(Angle(-sin / 50, sin / 50, 0))
+		end
+
 		--self.weaponAng[2] = self.weaponAng[2] + sin * 5
 		--self.weaponAng[3] = self.weaponAng[3] + sin * -25
 	end

@@ -636,7 +636,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 
 			ang1[1] = math.cos(time) + math.sin(time * 0.5) + math.sin((time - 5) * 1.1)
 			ang1[2] = math.sin(time) + math.cos(time * 0.5) + math.sin((time + 1) * 1.1)
-			-- Keep disorientation visual-only; don't add continuous camera sway.
+			ViewPunch(ang1 * mul * 0.125)
 			//ViewPunch2(ang1 * mul * 1 * 0.25)
 
 			//local ang = lply:EyeAngles()
@@ -657,7 +657,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		ang1[2] = math.cos(time * 0.7) * shakeMul
 		ang1[3] = math.Rand(-1, 1) * shakeMul * 0.5
 
-		-- Keep pain effects visual-only; don't add continuous camera sway.
+		ViewPunch(ang1)
 	end
 
 	if (org.consciousness < 0.7) then

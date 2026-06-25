@@ -340,10 +340,60 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 	local slowlyZooming = math.Clamp((lastzoom - CurTime() + tta) / tta, inpain and 1 - (0.9 * painmul) or (0.10 * (math.Clamp(vellen / 200 * (ply:Crouching() and 0.5 or 1), 0, 1) * 15 + 1)), 1)
 	
-	-- Keep procedural instability on the weapon model only; do not move the camera.
-	randomPos = Vector()
-	randomPosL = LerpFT(0.05, randomPosL, randomPos)
-	scopedLerpAddvec = LerpVectorFT(0.05, scopedLerpAddvec, vector_origin)
+	if lastPosSelected + 0.1 * (inpain and 0.1 or 1) < CurTime() then
+		lastPosSelected = CurTime()
+		local time = CurTime()
+		local healthyArmMult = healthy_arms and 0.8 or 1
+		local swayX = math.sin(time * 1.5) * 0.65 + math.sin(time * 2.7) * 0.35
+		local swayY = math.cos(time * 1.8) * 0.65 + math.cos(time * 3.1) * 0.35
+		local swayZ = math.sin(time * 2.2) * 0.65 + math.cos(time * 2.9) * 0.35
+
+		local arm_sway_debuff = 0
+		if rarm_broken or rarm_amputated then
+			arm_sway_debuff = arm_sway_debuff + 4.5
+		elseif rarm_dislocated then
+			arm_sway_debuff = arm_sway_debuff + 2.2
+		elseif rarm_partial then
+			arm_sway_debuff = arm_sway_debuff + 0.8 + rarm_partial_severity * 1.2
+		end
+
+		if larm_broken or larm_amputated then
+			arm_sway_debuff = arm_sway_debuff + 3.0
+		elseif larm_dislocated then
+			arm_sway_debuff = arm_sway_debuff + 1.5
+		elseif larm_partial then
+			arm_sway_debuff = arm_sway_debuff + 0.5 + larm_partial_severity * 0.9
+		end
+
+		local fatigue = organism.aiming_fatigue or 0
+		local fatigue_debuff = fatigue * 0.4
+		local brain = organism.brain or 0
+		local brain_sway_debuff = brain * 2.5
+
+		local final_arm_sway = arm_sway_debuff
+		local final_fatigue_sway = fatigue_debuff
+		local final_brain_sway = brain_sway_debuff
+		if not bypass_mitigation then
+			final_arm_sway = final_arm_sway * mitigation_mult
+			final_fatigue_sway = final_fatigue_sway * mitigation_mult
+			final_brain_sway = final_brain_sway * mitigation_mult
+		end
+
+		-- No baseline camera sway: only bad conditions or heavy weapons move the view.
+		local weightSway = math.Clamp((effective_weight - 5) * 0.12, 0, 1.0)
+		local sway_scale = (weightSway + final_arm_sway + final_fatigue_sway + final_brain_sway) * handlingMul * self:GetPostureStabilityMul(zooming)
+
+		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * healthyArmMult * (isHoldingBreath and 0.05 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale)
+	end
+
+	randomPosL = LerpFT(0.05 * (inpain and 12.5 - (12 * painmul) or 1), randomPosL, randomPos)
+	
+	scopedLerpAddvec = LerpVectorFT(((false or self.shot2 == 1) and 1 or 0.02) * (cocking and 0.25 or 1) * (inpain and 1 or 1), scopedLerpAddvec, (cocking and 1 or 1) * (justzoomed and 0.5 or 1) * (self.shot2 == 1 and 0.5 or 1) * 3 * randomPosL * slowlyZooming)
+	if !hg_oldsights:GetBool() then
+		if not (ply:IsSuperAdmin() and hg_setzoompos:GetBool()) then
+			posZoom:Add(scopedLerpAddvec)
+		end
+	end
 	oldzoom = zooming
 
 	if LocalPlayer():IsAdmin() and hg_gun_cam:GetBool() then
@@ -381,7 +431,78 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local sp2  = isnumber(organism.spine2) and organism.spine2 or 0
 	local sp3  = isnumber(organism.spine3) and organism.spine3 or 0
 
+	-- Proportional arm damage adds weapon-camera instability only while this SWEP owns the view.
+	local larmShake = larm * 0.06 * (ply.posture != 7 and ply.posture != 8 and 1 or 0)
+	local rarmShake = rarm * 0.08
+	local arm_shake_penalty = larmShake + rarmShake
+
+	if larm >= 1 or organism.larmamputated then
+		arm_shake_penalty = arm_shake_penalty + 0.05
+	elseif organism.larmdislocated or organism.larmdislocation then
+		arm_shake_penalty = arm_shake_penalty + 0.02
+	end
+
+	if rarm >= 1 or organism.rarmamputated then
+		arm_shake_penalty = arm_shake_penalty + 0.07
+	elseif organism.rarmdislocated or organism.rarmdislocation then
+		arm_shake_penalty = arm_shake_penalty + 0.03
+	end
+
+	local fatigue_shake = (organism.aiming_fatigue or 0) * 0.015
+	local adrenaline_shake = adrenalineJitter * 0.04
+	local total_shake_debuff = arm_shake_penalty + fatigue_shake + adrenaline_shake
+
+	local isStationary = isvector(plyVel) and plyVel:LengthSqr() < 100
+	local shake_mitigation_mult = 1
+	if isRagdolled then
+		shake_mitigation_mult = shake_mitigation_mult * 0.6
+	elseif isCrouching then
+		shake_mitigation_mult = shake_mitigation_mult * 0.75
+	elseif isStationary then
+		shake_mitigation_mult = shake_mitigation_mult * 0.9
+	end
+
+	if isHoldingBreath then
+		shake_mitigation_mult = shake_mitigation_mult - 0.30
+	end
+
+	if bypass_mitigation then
+		shake_mitigation_mult = 1
+	end
+
+	local shakeMul = total_shake_debuff * shake_mitigation_mult
+
+	local armsBad = larm >= 1 or rarm >= 1 or organism.larmamputated or organism.rarmamputated
+	local gracePeriod = 1.5
+	if zooming and justzoomed then
+		ply.aimGraceStart = CurTime()
+	end
+	if not armsBad and ply.aimGraceStart and (CurTime() - ply.aimGraceStart) < gracePeriod then
+		shakeMul = 0
+	end
+
+	if shakeMul > 0.01 then
+		local addview = AngleRand(-shakeMul, shakeMul)
+		addview[3] = 0
+
+		if ply == LocalPlayer() then
+			ViewPunch2(addview)
+		end
+	end
+
+	local k4 = adrenalineJitter * 0.02
+	local angRand = AngleRand(-k4 * 2, k4 * 2) * 0.2
+	lerpedAdren:Add(angRand)
+	lerpedAdren = LerpFT(0.1, lerpedAdren, angle_zero)
+	local ang = ply:EyeAngles()
+	ang:Add(lerpedAdren * 1)
+	ply:SetEyeAngles(ang)
+
 	local angRand2 = AngleRand(-0.1, 0.1)
+
+	if (ply.Karma or 100) < 70 then
+		ViewPunch2(angRand2 * (1 - ply.Karma / 60))
+	end
 
 	local angfuk = angfuk23
 	angfuk[2] = -position_difference3[2]/40
@@ -409,7 +530,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local weight = math.max(self.weight or 1, 0.001)
 	local shit2 = (1 / weight) * (self.NumBullet or 3) / 3
 	angZoom:Add(self.prankang or angle_zero)
-	-- Shot/handling sway belongs on the weapon model, not the camera.
+	posZoom:Add(VectorRand(-0.1, 0.1) * animpos3 * shit2)
 
 	local fraction2 = math.ease.InCubic(self:GetAnimPos_Shoot2(self.lastShoot or 0, 1))
 	
@@ -420,13 +541,17 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	if zoom or hg.KeyDown(ply, IN_SPEED) then offsetView = LerpFT(0.07, offsetView, angZero) end
 
-	-- Do not feed weapon spray or mouse inertia back into the player's camera.
+	outputAng:Add(-eyeSpray * 10)
+	
+	outputPos:Add(-(angle_difference_localvec * 30 * (-k + 2) * 2) / (self.Ergonomics or 1) + position_difference23 * 0.25 * (-k + 1.25))
+	outputPos:Add(spray * 1.1)
 	
 	local fthuy = ftlerped * 150
 
 	angle_spray[3] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 60 * game.GetTimeScale() * 0.7
 	angle_spray[1] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7
 	angle_spray[2] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7
+	outputAng:Add(angle_spray)
 	
 	local imm = (organism and organism.immobilization) or 0
 	if type(imm) ~= "number" then imm = 0 end
@@ -449,7 +574,12 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	ply:SetLOD(0);
 
-	-- hg_realismcam used to add camera sway from mouse/position deltas; keep camera stable.
+	if hg_realismcam:GetBool() then
+		outputPos:Add(-(angle_difference_localvec * 150))
+		local ang = -(angle_difference * 5)
+		ang[3] = ang[3] / 2
+		outputAng:Add(ang)
+	end
 
 	if not hg_nofovzoom:GetBool() then
 		fov_mode_lerp = LerpFT(0.12, fov_mode_lerp, (self:HasAttachment("sight","optic") and not self.viewmode1 and -15 - (hg_fov:GetInt() - 75)) or - (hg_fov:GetInt() - 80))

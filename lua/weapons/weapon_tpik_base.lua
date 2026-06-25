@@ -1,4 +1,4 @@
-if SERVER then AddCSLuaFile() end
+﻿if SERVER then AddCSLuaFile() end
 SWEP.PrintName = "TPIK Base"
 SWEP.Instructions = "Tpik Base"
 SWEP.Category = "ZCity Anims items"
@@ -262,6 +262,28 @@ local host_timescale = game.GetTimeScale
 function SWEP:Camera(eyePos, eyeAng, view, vellen)
     self:SetHandPos()
     self:DrawWorldModel2()
+
+    local owner = self:GetOwner()
+
+	self.walkinglerp = Lerp(hg.lerpFrameTime2(0.1),self.walkinglerp or 0,((self.DisableWalkBob or owner:InVehicle()) and 0) or hg.GetCurrentCharacter(owner):GetVelocity():LengthSqr())
+	self.huytime = self.huytime or 0
+	local walk = math.Clamp(self.walkinglerp / 10000,0,1)
+	
+	self.huytime = self.huytime + walk * FrameTime() * 8 * host_timescale()
+	if owner:IsSprinting() then
+		--walk = walk * 2
+	end
+
+	local huy = self.huytime
+	
+	local x,y = math.cos(huy) * math.sin(huy) * walk * 1,math.sin(huy) * walk * 1
+	eyePos = eyePos - eyeAng:Up() * walk
+	eyePos = eyePos - eyeAng:Up() * x * 0.5
+	eyePos = eyePos - eyeAng:Right() * y * 0.5
+
+    view.origin = (eyePos - (angle_difference_localvec * 150) - (position_difference * 0.5))
+    
+    return view
 end
 
 function SWEP:CanPrimaryAttack()

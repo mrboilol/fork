@@ -714,9 +714,24 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen)
             
             self.punch = punch
 
+            //ViewPunch2( -punch )
+            ViewPunch( punch )
+            
             self.OldAngPunch = gAngles
         end
     end
+
+    local owner = self:GetOwner()
+    if not owner.InVehicle then return end
+
+    view.origin = eyePos - (angle_difference_localvec * 150) - (position_difference * 0.5)
+    view.angles = eyeAng
+    
+    local lpos = self.lastAddPos or vector_origin
+    //view.angles[1] = view.angles[1] + lpos.z * 1
+    //view.angles[2] = view.angles[2] + lpos.y * 1
+    
+    return view
 end
 
 local ang180, ang1 = Angle(0,180,0), Angle(-135,-90,0)
