@@ -651,6 +651,10 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 		view.angles:Add(-vpang)
 		view.angles[3] = view.angles[3] + GetViewPunchAngles4()[3]
 		hook_Run("PostHGCalcView", ply, view)
+		applyGetUpHandoff(ply, view)
+		hg_lastView_origin:Set(view.origin)
+		hg_lastView_angles:Set(view.angles)
+		hg_lastView_valid = true
 		return view
 	end
 
@@ -664,14 +668,44 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	if IsValid(wep) and whitelist[wep:GetClass()] then return end
 	result = hook_Run("PostPostHGCalcView", ply, view)
 	if result then
+		applyGetUpHandoff(ply, result)
+		hg_lastView_origin:Set(result.origin)
+		hg_lastView_angles:Set(result.angles)
+		hg_lastView_valid = true
 		return result
 	end
 
+	applyGetUpHandoff(ply, view)
+	hg_lastView_origin:Set(view.origin)
+	hg_lastView_angles:Set(view.angles)
+	hg_lastView_valid = true
 	return view
 end
 
 local angleZero = Angle(0,0,0)
 local torsoOld
+
+-- Get-up smoothing state for the LIVE-player CalcView leg.
+-- When the ragdoll is removed mid-get-up, control transfers from the fake
+-- camera (cl_fake.lua) back to this CalcView. Without this hold-over, the
+-- camera snaps because the fake-camera blend never reaches 1.0 before
+-- `follow` is cleared. We cache the last final view here and ease back to
+-- the natural eye position over the remainder of the 1s window.
+local hg_lastView_origin = Vector(0, 0, 0)
+local hg_lastView_angles = Angle(0, 0, 0)
+local hg_lastView_valid = false
+local function applyGetUpHandoff(ply, view)
+	if not IsValid(ply) or not ply.gettingup then return end
+	local elapsed = CurTime() - ply.gettingup
+	if elapsed < 0 or elapsed >= 1 then return end
+	if not hg_lastView_valid then return end
+	-- Only kicks in after the ragdoll's been removed (no `follow`); by then
+	-- the fake camera's own blend is mid-curve, so we continue easing.
+	local k = math.Clamp(elapsed, 0, 1)
+	local blend = math.ease.OutSine(k)
+	view.origin = LerpVector(blend, hg_lastView_origin, view.origin)
+	view.angles = LerpAngle(blend, hg_lastView_angles, view.angles)
+end
 
 function hg.cam_things(ply, view, angles)
 	local wep = ply:GetActiveWeapon()

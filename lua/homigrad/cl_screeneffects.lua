@@ -288,6 +288,7 @@ local function stopthings()
 	assimilatedLerp = 0
 	tempLerp = 36.6
 	consciousnessLerp = 1
+	grayscaleLerp = 0
 
 	lply.tinnitus = 0
 	
@@ -439,6 +440,7 @@ local stations = {
 
 local choosera = 1
 local tempolerp = 0
+local grayscaleLerp = 0
 local despairLerp = 0
 local despairVisualLerp = 0
 local despairTextLerp = 0
@@ -1318,18 +1320,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(ItssooverStation) then
 					ItssooverStation:SetVolume(consciousVol)
 
-					-- Sound peak detection for screen shake
-							-- Apply screen shake based on peak intensity
-							if avgPeak > 0.3 then
-								local shakeIntensity = math.Clamp((avgPeak - 0.3) * 2, 0, 1)
-								local shakeAngle = Angle(
-									math.Rand(-1, 1) * shakeIntensity * 2,
-									math.Rand(-1, 1) * shakeIntensity * 2,
-									math.Rand(-0.5, 0.5) * shakeIntensity
-								)
-								ViewPunch(shakeAngle)
-							end
-						local fft = ItssooverStation:GetFFT(512)
+					local fft = ItssooverStation:GetFFT(512)
 						if fft then
 							local peakSum = 0
 							for i = 1, #fft do
@@ -1736,6 +1727,57 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	else
 		suicideLerp = math.Approach(suicideLerp, 0, FrameTime() * 3)
+	end
+
+	do
+		local grayscaleTarget = 0
+
+		local fear = org.fear or 0
+		if fear > 0 then
+			grayscaleTarget = grayscaleTarget + math.Clamp(fear / 2, 0, 1) * 0.18
+		end
+
+		local suppForce = (SIB_suppress and SIB_suppress.Force or 0)
+		if suppForce > 1 then
+			grayscaleTarget = grayscaleTarget + math.Clamp((suppForce - 1) / 9, 0, 1) * 0.20
+		end
+
+		local adrenaline = org.adrenaline or 0
+		if adrenaline > 4 then
+			grayscaleTarget = grayscaleTarget + math.Clamp((adrenaline - 4) / 1, 0, 1) * 0.20
+		end
+
+		local blood = org.blood or 5000
+		if blood < 3500 then
+			grayscaleTarget = grayscaleTarget + math.Clamp((3500 - blood) / 3500, 0, 1) * 0.25
+		end
+
+		local o2 = (org.o2 and isnumber(org.o2[1])) and org.o2[1] or 100
+		if o2 < 30 then
+			grayscaleTarget = grayscaleTarget + math.Clamp((30 - o2) / 30, 0, 1) * 0.22
+		end
+
+		local shock = org.shock or 0
+		if shock > 20 then
+			grayscaleTarget = grayscaleTarget + math.Clamp((shock - 20) / 80, 0, 1) * 0.20
+		end
+
+		local immobilization = org.immobilization or 0
+		if immobilization > 5 then
+			grayscaleTarget = grayscaleTarget + math.Clamp((immobilization - 5) / 25, 0, 1) * 0.18
+		end
+
+		local consciousness = org.consciousness or 1
+		if consciousness < 0.8 then
+			grayscaleTarget = grayscaleTarget + math.Clamp((0.8 - consciousness) / 0.8, 0, 1) * 0.25
+		end
+
+		grayscaleTarget = math.Clamp(grayscaleTarget, 0, 0.65)
+		grayscaleLerp = LerpFT(0.04, grayscaleLerp, grayscaleTarget)
+
+		if grayscaleLerp > 0.005 then
+			tab["$pp_colour_colour"] = math.min(tab["$pp_colour_colour"] or 1, 1 - grayscaleLerp)
+		end
 	end
 
 	if (headtraumaSaturation or 0) > 0 then

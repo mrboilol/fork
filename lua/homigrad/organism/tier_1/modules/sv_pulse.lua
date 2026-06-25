@@ -42,12 +42,13 @@ module[2] = function(owner, org, timeValue)
 	
 	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
 	
-	--local k = heart * o2 * (1 / math.Clamp((org.blood - 2000) / 3000,0.2,1)) * brain * (org.heartstop and 0.1 or 1) --* halfValue2(stamina[2], stamina.fatigueRange, stamina.fatigueK)
-	local k = heart * o2 * (math.Clamp((org.blood - 1500) / 3500, 0, 1)) * brain * (org.heartstop and 0.1 or 1)
+	local k = heart * o2 * (math.Clamp((org.blood - 1500) / 3500, 0, 1)) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
-	
-	org.pulse = math.Approach(org.pulse, pulse, heart == 0 and timeValue * 10 or timeValue * 5)
+
+	local bloodCrash = org.blood ~= nil and org.blood < 100
+	local dropRate = (heart == 0 or org.heartstop or bloodCrash) and timeValue * 30 or timeValue * 5
+	org.pulse = math.Approach(org.pulse, pulse, dropRate)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 

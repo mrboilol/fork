@@ -92,7 +92,7 @@ SWEP.Primary.DefaultClip = 7
 SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "12/70 gauge"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Spread = Vector(0.01, 0.01, 0.01)
+SWEP.Primary.Spread = Vector(0.005, 0.005, 0.005)
 SWEP.NumBullet = 8
 
 SWEP.Primary.Sound = {"toz_shotgun/toz_fp.wav", 80, 70, 75}
@@ -103,7 +103,7 @@ SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-3, 0.3264, 2.2564)
 SWEP.RHandPos = Vector(-10, -2, 4)
 SWEP.LHandPos = Vector(7, -2, 0)
-SWEP.SprayRand = {Angle(-0.2, -0.4, 0), Angle(-0.4, 0.4, 0)}
+SWEP.SprayRand = {Angle(-0.1, -0.2, 0), Angle(-0.2, 0.2, 0)}
 SWEP.Ergonomics = 0.9
 SWEP.Penetration = 7
 SWEP.WorldPos = Vector(5, -0.5, -2.8)

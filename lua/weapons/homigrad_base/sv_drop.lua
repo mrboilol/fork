@@ -51,7 +51,7 @@ local function drop(ply, wep, newWeapon, vel)
 	if ply:GetNWFloat("willsuicide", 0) > 0 then return end -- you cant escape.
 	local eyeAngles = ply:LocalEyeAngles()
 
-	hg.AccidentalFire(ply, wep, IsValid(ply.FakeRagdoll) and 0.35 or 0.1)
+	hg.AccidentalFire(ply, wep, IsValid(ply.FakeRagdoll) and 0.55 or 0.18)
 
 	ply:DoAnimationEvent(ACT_GMOD_GESTURE_MELEE_SHOVE_1HAND)
 	ply:ViewPunch(vpang)
@@ -115,11 +115,32 @@ hook.Add("HG_PlayerSay", "homigrad-drop-weapons", function(ply, txtTbl, text)
 	end
 end)
 
+local function IsFullAuto(wep)
+	if not IsValid(wep) then return false end
+	local base = weapons.Get(wep:GetClass())
+	return base and base.Primary and base.Primary.Automatic
+end
+
+local function StartAutoTriggerHold(ply, wep, duration)
+	if not IsValid(ply) or not IsValid(wep) then return end
+	local endTime = CurTime() + duration
+	local timerName = "hg_auto_trigger_" .. ply:EntIndex()
+	timer.Create(timerName, 0.05, 0, function()
+		if not IsValid(ply) or not IsValid(wep) or CurTime() > endTime then
+			timer.Remove(timerName)
+			return
+		end
+		if not IsFirearm(wep) then timer.Remove(timerName) return end
+		wep:SetOwner(ply)
+		wep:PrimaryAttack(true)
+	end)
+end
+
 hook.Add("Fake", "hg-accidental-fire-fake", function(ply, ragdoll)
 	if not IsValid(ply) then return end
 	local wep = GetHeldFirearm(ply)
 	if not wep then return end
-	hg.AccidentalFire(ply, wep, 0.15)
+	hg.AccidentalFire(ply, wep, 0.05)
 end)
 
 hook.Add("DoPlayerDeath", "hg-accidental-fire-track", function(ply)
@@ -132,6 +153,33 @@ hook.Add("PlayerDropWeapon", "hg-accidental-fire-track-drop", function(ply, wep)
 	if not IsValid(ply) or not IsValid(wep) then return end
 	ply.hg_lastDroppedWep = wep
 	ply.hg_lastDroppedWepTime = CurTime()
+
+	timer.Simple(0.1, function()
+		if not IsValid(wep) then return end
+		local phys = wep:GetPhysicsObject()
+		if not IsValid(phys) then return end
+		local speed = phys:GetVelocity():Length()
+		if speed < 50 then return end
+		local impactChance = math.Clamp(speed / 800, 0, 1) * 0.55
+		wep.hg_floor_discharge_chance = impactChance
+		wep.hg_floor_discharge_owner = ply
+		wep.hg_floor_discharge_expires = CurTime() + 3
+
+		wep.PhysicsCollide = function(self, data, physobj)
+			if not self.hg_floor_discharge_chance then return end
+			if CurTime() > (self.hg_floor_discharge_expires or 0) then
+				self.hg_floor_discharge_chance = nil
+				return
+			end
+			if data.Speed < 100 then return end
+			local chance = self.hg_floor_discharge_chance * math.Clamp(data.Speed / 400, 0.2, 1)
+			local owner = self.hg_floor_discharge_owner
+			self.hg_floor_discharge_chance = nil
+			if IsValid(owner) and math.random() < chance then
+				hg.AccidentalFire(owner, self, 1)
+			end
+		end
+	end)
 end)
 
 hook.Add("RagdollDeath", "hg-accidental-fire-death", function(ply, ragdoll)
@@ -143,5 +191,10 @@ hook.Add("RagdollDeath", "hg-accidental-fire-death", function(ply, ragdoll)
 		ply.hg_lastDroppedWep = nil
 	end
 	if not IsValid(wep) then return end
-	hg.AccidentalFire(ply, wep, 0.2)
+	hg.AccidentalFire(ply, wep, 0.55)
+
+	if IsFullAuto(wep) and math.random() < 0.45 then
+		local holdDuration = math.Remap(math.random(), 0, 1, 0.3, 4.0)
+		StartAutoTriggerHold(ply, wep, holdDuration)
+	end
 end)

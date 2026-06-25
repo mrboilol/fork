@@ -649,6 +649,75 @@ function SWEP:PrimaryShoot()
 	self.drawBullet = false
 	if self.AutomaticDraw then self:Draw() end
 	self:PrimarySpread()
+	self:ApplyRecoilCameraKick()
+end
+
+-- Camera recoil kick on every shot. Drives ViewPunch (camera) directly so the
+-- screen visibly jolts on fire. Scaled by weapon weight, primary force, pellet
+-- count, posture stability, ADS state, and per-mag spray progression. Pistols
+-- get a slightly snappier feel, full-auto climbs harder the longer you hold.
+function SWEP:ApplyRecoilCameraKick()
+	if SERVER then return end
+	if not self:IsLocal2() then return end
+
+	local ply = self:GetOwner()
+	if not IsValid(ply) then return end
+
+	local primary = self.Primary or {}
+	local force = primary.Force2 or primary.Force or 30
+	local numBullet = self.NumBullet or 1
+	local weight = self.weight or 5
+
+	-- Force-based base kick. Heavy rounds + buckshot pile on more.
+	local baseKick = math.Clamp(force / 35, 0.4, 3.0) * math.sqrt(numBullet)
+
+	-- Lighter guns get punched around a bit more (less mass to soak the kick).
+	local weightFactor = math.Clamp(5 / math.max(weight, 0.5), 0.5, 1.8)
+
+	-- Stable stance / ADS / resting reduces visible camera kick (the gun absorbs more).
+	local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
+	local restMul = (self.IsResting and self:IsResting()) and 0.55 or 1
+	local adsMul = self:IsZoom() and 0.65 or 1
+
+	-- Spray climb: longer trigger holds make the camera kick rise (mostly pitch).
+	local sprayI = self.SprayI or 0
+	local sprayClimb = 1 + math.Clamp(sprayI / 8, 0, 1) * 0.6
+
+	-- Pistol-hold weapons feel punchier per shot.
+	local pistolMul = self:IsPistolHoldType() and 1.15 or 1
+
+	-- Player skill (organism.recoilmul: lower = better, default 1).
+	local skill = (ply.organism and ply.organism.recoilmul) or 1
+
+	local kickScale = baseKick * weightFactor * stanceMul * restMul * adsMul * sprayClimb * pistolMul * skill
+
+	-- Mostly upward (negative pitch in source angles) with a deterministic
+	-- horizontal/roll drift seeded on SprayI so server bullet trajectory
+	-- (which uses the same SharedRandom seeds) stays in agreement with the
+	-- camera direction the player sees.
+	local seed = math.floor(sprayI)
+	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
+	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
+
+	local pitchKick = -0.9 * kickScale
+	local yawKick   =  0.35 * kickScale * sideRand
+	local rollKick  =  0.6 * kickScale * rollRand
+
+	local punchAng = Angle(pitchKick, yawKick, rollKick)
+	local hg_coolcam = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()
+
+	if hg_coolcam then
+		-- "Cool camera" path uses the realangle-relative punches; multiply a bit
+		-- so the punch reads through the lerped angle blend.
+		ViewPunch(punchAng * 1.2)
+		ViewPunch2(punchAng * -0.4)
+	else
+		-- Normal path: use ViewPunch2 (the camera-coupled punch the spray path
+		-- already reads) so the kick stacks with the existing tiny zoom punch
+		-- without fighting the engine ViewPunch which lingers too long.
+		ViewPunch2(punchAng)
+		ViewPunch(punchAng * 0.35)
+	end
 end
 
 SWEP.SightSlideOffset = 1
@@ -2167,7 +2236,10 @@ function SWEP:GetAdditionalValues()
 
 		if (self.recoilWobbleAmp or 0) > 0.001 then
 			local t = CurTime()
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 3.0
+			-- Increased wobble intensity: amp multiplier 3.0 -> 5.5 so the gun
+			-- visibly sways farther off-axis while firing. The muzzle moves
+			-- with it, so bullet trajectories diverge naturally.
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 5.5
 
 			-- Multi-frequency sine sway, same shape as the heavy-weapon camera sway.
 			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
@@ -2176,11 +2248,15 @@ function SWEP:GetAdditionalValues()
 
 			-- Swing the gun on pitch + roll only (changes muzzle, no camera coupling).
 			-- NO yaw — AdditionalAng2[2] is read by the camera-spray path.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.8
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.5
+			-- Pitch/roll multipliers bumped (1.8 -> 2.8, 1.5 -> 2.4) for a wider
+			-- visible muzzle deviation.
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 2.8
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 2.4
 
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobZ * amp * 0.7
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.7
+			-- Pos2 offsets bumped (0.7 -> 1.2) so the gun visibly translates
+			-- around as well, not just rotates.
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobZ * amp * 1.2
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 1.2
 		end
 
 		-- Per-shot recoil kick that physically knocks the gun off-axis and climbs the
@@ -2193,12 +2269,17 @@ function SWEP:GetAdditionalValues()
 			local seed = math.floor(sprayI)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 3.5
+			-- Increased per-shot kick scale 3.5 -> 5.5 for a stronger muzzle rise/drift.
+			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 5.5
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 1.5           -- muzzle climbs
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.0
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.4
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.8           -- gun shoved up/back
+			-- Pitch (muzzle climb) bumped 1.5 -> 2.4
+			-- Roll bumped 1.0 -> 1.6
+			-- Yaw bumped 0.4 -> 0.7
+			-- Pos2[1] (gun shoved up/back) bumped 0.8 -> 1.4
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 2.4           -- muzzle climbs
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.6
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.7
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 1.4           -- gun shoved up/back
 		end
 	end
 
