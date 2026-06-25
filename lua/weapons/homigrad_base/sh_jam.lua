@@ -115,13 +115,6 @@ function SWEP:StartJamClear()
 	-- Clear the jam immediately
 	self:SetJammed(false)
 
-	-- Set the jam clear timer so the clearing animation plays
-	local clearTime = self:GetJamClearTime()
-	local endTime = CurTime() + clearTime
-	self:SetNWFloat("JamClearEnd", endTime)
-	self:SetNWFloat("JamClearStart", CurTime())
-	self.jamclear_start = CurTime()
-
 	-- Play bolt/cock sound
 	local cockSound = self.CockSound or self.ReloadSound
 	if cockSound then
@@ -137,15 +130,6 @@ function SWEP:StartJamClear()
 	self:RejectShell(self.ShellEject)
 
 	return true
-end
-
-function SWEP:Step_JamClear(time)
-	if not self:IsJamClearing() then return end
-
-	-- When the clear time expires, clean up the state
-	if self:GetJamClearEnd() <= time then
-		self:CancelJamClear()
-	end
 end
 
 function SWEP:CancelJamClear()

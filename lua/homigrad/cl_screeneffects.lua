@@ -266,7 +266,6 @@ local assimilatedLerp = 0
 local tempLerp = 36.6
 local headtraumaSaturation = 0
 local suicideLerp = 0
-local SuicideHeartbeatStation
 local addtime = CurTime()
 
 local show_image_time = 0
@@ -428,10 +427,6 @@ local function stopthings()
 
 	suicideLerp = 0
 
-	if IsValid(SuicideHeartbeatStation) then
-		SuicideHeartbeatStation:Stop()
-		SuicideHeartbeatStation = nil
-	end
 end
 
 local stations = {
@@ -1676,45 +1671,44 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_mulg"] = (tab["$pp_colour_mulg"] or 0) - suicideLerp * 0.02
 		tab["$pp_colour_mulb"] = (tab["$pp_colour_mulb"] or 0) - suicideLerp * 0.01
 
-		-- Vignette with slow pulse
+		-- Strong vignette with slow pulse
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", suicideLerp * 0.35 + pulseEffect)
-		vignetteMat:SetFloat("$c1_y", suicideLerp * 0.55 + pulseEffect * 1.5)
+		vignetteMat:SetFloat("$c0_z", suicideLerp * 0.6 + pulseEffect * 0.5)
+		vignetteMat:SetFloat("$c1_y", suicideLerp * 0.85 + pulseEffect * 2)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
-		-- Subtle chromatic aberration
+		-- Chromatic aberration
 		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", suicideLerp * 0.015)
+		chromaticMat:SetFloat("$c0_x", suicideLerp * 0.025)
 		chromaticMat:SetInt("$c0_y", 1)
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
 
-		-- Subtle blur at high intensity
+		-- Motion blur disorientation
+		if suicideLerp > 0.15 then
+			local blurAlpha = 0.1 + suicideLerp * 0.15
+			local blurDraw = suicideLerp * 1.5
+			DrawMotionBlur(blurAlpha, blurDraw, 0.001)
+		end
+
+		-- ToyTown blur at high intensity
 		if suicideLerp > 0.4 then
 			DrawToyTown((suicideLerp - 0.4) * 2.5, ScrH() / 2)
 		end
 
-		-- Heartbeat sound
-		if canRetrySound("SuicideHeartbeatStation", SuicideHeartbeatStation) then
-			sound.PlayFile("sound/laststandheartbeat.ogg", "noblock noplay", function(station)
-				if IsValid(station) then
-					station:SetVolume(0)
-					station:Play()
-					SuicideHeartbeatStation = station
-					station:EnableLooping(true)
-				end
-			end)
-		end
-		if IsValid(SuicideHeartbeatStation) then
-			SuicideHeartbeatStation:SetVolume(suicideLerp * 0.4)
+		-- View wobble for disorientation
+		if suicideLerp > 0.3 then
+			local wobbleTime = CurTime() * (1.5 + suicideLerp * 2)
+			local wobbleStrength = (suicideLerp - 0.3) * 0.3
+			ang1[1] = math.sin(wobbleTime) * wobbleStrength
+			ang1[2] = math.cos(wobbleTime * 0.7) * wobbleStrength * 0.7
+			ang1[3] = math.sin(wobbleTime * 0.5) * wobbleStrength * 0.3
+			ViewPunch(ang1)
 		end
 	else
 		suicideLerp = math.Approach(suicideLerp, 0, FrameTime() * 3)
-		if IsValid(SuicideHeartbeatStation) then
-			SuicideHeartbeatStation:SetVolume(0)
-		end
 	end
 
 	if (headtraumaSaturation or 0) > 0 then

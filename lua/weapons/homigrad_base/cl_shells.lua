@@ -238,7 +238,24 @@ function hg.CreateMag( self, vel, bodygroups, bDontChangePhys )
 end
 
 function hg.addBulletHoleEffect(pos)
-	return
+	if not hg_potatopc:GetBool() then
+		if math.random(3) == 1 and #hg_trails < hg_maxsmoketrails:GetInt() then
+			local eff = CreateParticleSystemNoEntity( "smoke_trail_wild", pos )
+			table.insert(hg_trails,eff)
+			eff:StartEmission()
+			timer.Simple(3,function()
+				if IsValid(eff) then
+					eff:StopEmission()
+				end
+			end)
+			timer.Simple(5,function()
+				if IsValid(eff) then
+					eff:StopEmissionAndDestroyImmediately()
+					table.RemoveByValue(hg_trails,eff)
+				end
+			end)
+		end
+	end
 end
 
 hook.Add("PostCleanupMap","cleanupshells",function()

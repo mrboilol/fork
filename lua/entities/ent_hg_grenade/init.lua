@@ -68,13 +68,13 @@ local GRENADE_SOUND_RADIUS_SQR = 4500 * 4500
 local GRENADE_NEARBY_ENTITY_CAP = 20
 local GRENADE_PLAYER_EFFECT_CAP = 8
 local GRENADE_PHYSICS_PUSH_CAP = 10
-local GRENADE_SHRAPNEL_SAMPLE_CAP = 96
+local GRENADE_SHRAPNEL_SAMPLE_CAP = 144
 local GRENADE_SHRAPNEL_BATCH_RESUMES = 3
 local GRENADE_SHRAPNEL_SLICE_TIME = 0.0008
 local GRENADE_CROWD_PLAYER_THRESHOLD = 10
 local GRENADE_CROWD_PLAYER_THRESHOLD_EXTREME = 16
-local GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP = 24
-local GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP_EXTREME = 12
+local GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP = 36
+local GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP_EXTREME = 18
 local GRENADE_CROWD_ENTITY_CAP = 12
 local GRENADE_CROWD_ENTITY_CAP_EXTREME = 8
 
@@ -331,8 +331,8 @@ function ENT:Explode()
 	end
 
 		local blastRadius = self.BlastDis / 0.01905
-	local nearRadius = 150
-	local damage = 35
+	local nearRadius = 200
+	local damage = 55
 	local attacker = IsValid(self.owner) and self.owner or self
 
 	for _, ent in ipairs(ents.FindInSphere(selfPos, nearRadius)) do
@@ -362,8 +362,8 @@ function ENT:Explode()
 	util.BlastDamage(self, attacker, selfPos, blastRadius, damage)
 
 	local blastRadius = self.BlastDis / 0.01905
-	local nearRadius = 150
-	local damage = 35
+	local nearRadius = 200
+	local damage = 55
 	local attacker = IsValid(self.owner) and self.owner or self
 
 	for _, ent in ipairs(ents.FindInSphere(selfPos, nearRadius)) do
@@ -430,7 +430,7 @@ function ENT:Explode()
 		force:Div(len)
 		local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1)  
 		local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)  
-		local forceadd = force * physics_frac * 75000  
+		local forceadd = force * physics_frac * 110000  
 
 		if enta.organism then
 			local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
@@ -506,8 +506,8 @@ function ENT:Explode()
 						bullet.Diameter = ammotype.Diameter or 1
 						bullet.Src = selfPos
 						bullet.Spread = vecCone
-						bullet.Force = 35
-						bullet.Damage = 55
+						bullet.Force = 50
+						bullet.Damage = 80
 						bullet.AmmoType = ammo
 						bullet.Attacker = self.owner
 						bullet.Inflictor = self

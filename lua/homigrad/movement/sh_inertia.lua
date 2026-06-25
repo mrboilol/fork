@@ -87,8 +87,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			cmd:RemoveKey(IN_JUMP)
 			mv:RemoveKey(IN_JUMP)
 
-			cmd:RemoveKey(IN_DUCK)
-			mv:RemoveKey(IN_DUCK)
+			cmd:AddKey(IN_DUCK)
+			mv:AddKey(IN_DUCK)
 
 			if ply.MovementInertia then
 				ply.MovementInertia:Zero()

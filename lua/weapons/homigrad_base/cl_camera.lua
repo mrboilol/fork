@@ -157,7 +157,7 @@ local scopedLerpAddvec = Vector()
 local oldzoom = false
 local lastzoom = 0
 local lastPosSelected = 0
-local randomPos = VectorRand(-1, 1)
+local randomPos = Vector()
 local randomPosL = Vector()
 local lerpedAdren = Angle()
 
@@ -343,57 +343,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	
 	if lastPosSelected + 0.1 * (inpain and 0.1 or 1) < CurTime() then
 		lastPosSelected = CurTime()
-		-- Smooth sine wave sway instead of random jitter
-		local time = CurTime()
-		local healthyArmMult = (not rarm_bad and not larm_bad and not rarm_partial and not larm_partial) and 0.8 or 1
-		local swayX = math.sin(time * 1.5) * 0.65 + math.sin(time * 2.7) * 0.35
-		local swayY = math.cos(time * 1.8) * 0.65 + math.cos(time * 3.1) * 0.35
-		local swayZ = math.sin(time * 2.2) * 0.65 + math.cos(time * 2.9) * 0.35
-
-		local arm_sway_debuff = 0
-		if rarm_broken or rarm_amputated then
-			arm_sway_debuff = arm_sway_debuff + 4.5
-		elseif rarm_dislocated then
-			arm_sway_debuff = arm_sway_debuff + 2.2
-		elseif rarm_partial then
-			-- Partial damage: scale sway from 0.8 (at 0.25 damage) to 2.0 (at 0.99 damage)
-			arm_sway_debuff = arm_sway_debuff + 0.8 + rarm_partial_severity * 1.2
-		end
-
-		if larm_broken or larm_amputated then
-			arm_sway_debuff = arm_sway_debuff + 3.0
-		elseif larm_dislocated then
-			arm_sway_debuff = arm_sway_debuff + 1.5
-		elseif larm_partial then
-			-- Partial damage: scale sway from 0.5 (at 0.25 damage) to 1.4 (at 0.99 damage)
-			arm_sway_debuff = arm_sway_debuff + 0.5 + larm_partial_severity * 0.9
-		end
-
-		local fatigue = organism.aiming_fatigue or 0
-		local fatigue_debuff = fatigue * 0.4
-
-		-- Brain damage increases sway multiplier
-		-- 0.1 brain damage adds 0.25x to sway multiplier
-		local brain = organism.brain or 0
-		local brain_sway_debuff = brain * 2.5
-
-		local final_arm_sway = arm_sway_debuff
-		local final_fatigue_sway = fatigue_debuff
-		local final_brain_sway = brain_sway_debuff
-		if not bypass_mitigation then
-			final_arm_sway = final_arm_sway * mitigation_mult
-			final_fatigue_sway = final_fatigue_sway * mitigation_mult
-			final_brain_sway = final_brain_sway * mitigation_mult
-		end
-
-		-- The idle sway now lives on the GUN (see GetAdditionalValues). The camera has
-		-- NO baseline sway — it only picks up sway when conditions are bad (fatigue,
-		-- fear, arm/brain damage) or the weapon is heavy. A calm shooter with a light
-		-- gun has a completely steady view.
-		local weightSway = math.Clamp((effective_weight - 5) * 0.12, 0, 1.0)
-		local sway_scale = (weightSway + final_arm_sway + final_fatigue_sway + final_brain_sway) * handlingMul * self:GetPostureStabilityMul(zooming)
-
-		randomPos = (inpain and 0.75 - (0.5 * painmul) or 1) * healthyArmMult * (isHoldingBreath and 0.05 or 1) * 0.5 * (Vector(swayX, swayY, swayZ) * sway_scale)
+		randomPos = Vector()
 	end
 
 	randomPosL = LerpFT(0.05 * (inpain and 12.5 - (12 * painmul) or 1), randomPosL, randomPos)

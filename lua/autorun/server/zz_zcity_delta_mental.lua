@@ -434,6 +434,76 @@ hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValu
         end
     end
 
+    --/////////////////////////////////////////////////////////////////////////////
+    -- Bidirectional feedback: Mental ↔ Despair/Fear/Goodmood merge
+    --/////////////////////////////////////////////////////////////////////////////
+    -- The bridge above derives mood/stress FROM the despair system.
+    -- This section feeds mood/stress BACK INTO the despair system, creating
+    -- a true bidirectional merge: bad mood deepens despair, high mood helps
+    -- recovery, stress makes the character more fearful and burns adrenaline.
+
+    local despairSimpleMode = ConVarExists("hg_despairsystem") and GetConVar("hg_despairsystem"):GetInt() == 0
+    local berserkActive = (org.berserk and org.berserk > 0) or (org.noradrenaline and org.noradrenaline > 0)
+    local isLocked = CurTime() < (org._despairLockUntil or 0)
+
+    if not despairSimpleMode and not berserkActive and not org.otrub then
+        -- Low mood feeds despair: at -100 mood, adds ~0.015/sec
+        if mood < -30 and org.despair then
+            local moodFactor = Clamp((-mood - 30) / 70, 0, 1)
+            local moodDespairAdd = moodFactor * timeValue * 0.015
+            if isLocked then
+                moodDespairAdd = moodDespairAdd * 0.3
+            end
+            org.despair = Clamp((org.despair or 0) + moodDespairAdd, 0, 1)
+        end
+
+        -- High mood helps despair decay: at +100 mood, extra ~0.5x decay rate
+        if mood > 30 and org.despair and org.despair > 0 and not isLocked then
+            local moodFactor = Clamp((mood - 30) / 70, 0, 1)
+            local extraDecay = moodFactor * (timeValue / 180) * 0.5
+            org.despair = math.max((org.despair or 0) - extraDecay, 0)
+        end
+    end
+
+    -- Mood → goodmood: positive mood boosts recovery, negative mood drains it
+    if not org.otrub then
+        if mood > 20 and (org.goodmood or 0) < 1 then
+            local moodFactor = Clamp((mood - 20) / 80, 0, 1)
+            org.goodmood = math.Clamp((org.goodmood or 0) + moodFactor * timeValue * 0.003, 0, 1)
+        elseif mood < -30 and (org.goodmood or 0) > 0 then
+            local moodFactor = Clamp((-mood - 30) / 70, 0, 1)
+            org.goodmood = math.Clamp((org.goodmood or 0) - moodFactor * timeValue * 0.004, 0, 1)
+        end
+    end
+
+    -- High stress → fear: stressed characters are jumpier
+    if not org.otrub and stress > 60 and not berserkActive then
+        local stressFactor = Clamp((stress - 60) / 40, 0, 1)
+        local stressFearAdd = stressFactor * timeValue * 0.15
+        local hasThreat = (hg.organism and hg.organism.should_gain_fear and hg.organism.should_gain_fear(org)) or (org.fear or 0) > 0.1
+        if hasThreat then
+            org.fearadd = math.Clamp((org.fearadd or 0) + stressFearAdd, 0, 3)
+        end
+    end
+
+    -- High stress → adrenaline burn: body in overdrive consumes adrenaline faster
+    if not org.otrub and stress > 70 and (org.adrenaline or 0) > 0.5 then
+        local stressFactor = Clamp((stress - 70) / 30, 0, 1)
+        local adrenalineBurn = stressFactor * timeValue * 0.08
+        org.adrenaline = math.max((org.adrenaline or 0) - adrenalineBurn, 0)
+    end
+
+    -- High stress → heartbeat increase (direct cardiovascular effect, up to +15 bpm)
+    if not org.otrub and stress > 50 then
+        local stressFactor = Clamp((stress - 50) / 50, 0, 1)
+        org.heartbeat = (org.heartbeat or 70) + stressFactor * 15
+    end
+
+    -- Very low mood → disorientation (mirrors despair's disorientation at high levels)
+    if mood < -70 and not org.otrub then
+        org.disorientation = math.max(org.disorientation or 0, Clamp((-mood - 70) / 30, 0, 1))
+    end
+
     -- Note: Trait fear gain and goodmood multipliers are applied via hooks
     -- (HomigradDamage for fear, and the goodmood module hooks for goodmood)
     -- to avoid compounding per-tick multiplication on cumulative organism values.

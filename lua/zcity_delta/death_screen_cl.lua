@@ -71,7 +71,7 @@ local function makeButton(parent)
         draw.SimpleText(label, "zcity_delta_death_button", snap(w * 0.5), snap(h * 0.5), Color(255, 255, 255, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 
-    btn.DoClick = function()
+    btn.DoClick = function(self)
         if self.Respawning then return end
         if not IsValid(LocalPlayer()) or LocalPlayer():Alive() then return end
         self.Respawning = true

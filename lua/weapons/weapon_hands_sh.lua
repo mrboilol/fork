@@ -1237,10 +1237,10 @@ function SWEP:SecondaryAttack()
 							local armVal = org.rarm or 0
 							local disloc = org.rarmdislocation or org.rarmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = armVal * 30 + (disloc and 15 or 0)
+								painAmount = armVal * 80 + (disloc and 40 or 0)
 							elseif armVal >= 0.8 then
 								local severity = (armVal - 0.8) / 0.2
-								painAmount = severity * 12
+								painAmount = severity * 30
 							end
 						end
 						-- Left arm pain
@@ -1248,10 +1248,10 @@ function SWEP:SecondaryAttack()
 							local armVal = org.larm or 0
 							local disloc = org.larmdislocation or org.larmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = painAmount + armVal * 25 + (disloc and 12 or 0)
+								painAmount = painAmount + armVal * 70 + (disloc and 35 or 0)
 							elseif armVal >= 0.8 then
 								local severity = (armVal - 0.8) / 0.2
-								painAmount = painAmount + severity * 10
+								painAmount = painAmount + severity * 25
 							end
 						end
 					end
@@ -1445,10 +1445,10 @@ function SWEP:ApplyForce()
 			if self.BothArmsBroken and (self.UsingRightHand or self.UsingLeftHand) then
 				-- Both arms broken - most pain
 				if self.UsingRightHand and not org.rarmamputated then
-					continuousPain = (org.rarm or 0) * 10 + (org.rarmdislocation or org.rarmdislocated and 6 or 0)
+					continuousPain = (org.rarm or 0) * 25 + (org.rarmdislocation or org.rarmdislocated and 15 or 0)
 				end
 				if self.UsingLeftHand and not org.larmamputated then
-					continuousPain = continuousPain + (org.larm or 0) * 8 + (org.larmdislocation or org.larmdislocated and 5 or 0)
+					continuousPain = continuousPain + (org.larm or 0) * 20 + (org.larmdislocation or org.larmdislocated and 12 or 0)
 				end
 				continuousPain = continuousPain * 0.5
 			else
@@ -1457,10 +1457,10 @@ function SWEP:ApplyForce()
 					local armVal = org.rarm or 0
 					local disloc = org.rarmdislocation or org.rarmdislocated
 					if armVal >= 1 or disloc then
-						continuousPain = armVal * 8 + (disloc and 5 or 0)
+						continuousPain = armVal * 20 + (disloc and 12 or 0)
 					elseif armVal >= 0.8 then
 						local severity = (armVal - 0.8) / 0.2
-						continuousPain = severity * 4
+						continuousPain = severity * 10
 					end
 				end
 				-- Left arm pain
@@ -1468,10 +1468,10 @@ function SWEP:ApplyForce()
 					local armVal = org.larm or 0
 					local disloc = org.larmdislocation or org.larmdislocated
 					if armVal >= 1 or disloc then
-						continuousPain = continuousPain + armVal * 6 + (disloc and 4 or 0)
+						continuousPain = continuousPain + armVal * 15 + (disloc and 10 or 0)
 					elseif armVal >= 0.8 then
 						local severity = (armVal - 0.8) / 0.2
-						continuousPain = continuousPain + severity * 3
+						continuousPain = continuousPain + severity * 8
 					end
 				end
 			end

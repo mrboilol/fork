@@ -1068,9 +1068,7 @@ if CLIENT then
 				end
 			end
 		end
-		if not hg_3dzity:GetBool() then
-			self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
-		end
+		self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
 		
 		self.isscoping = false
 		if self.attachments then
@@ -1396,7 +1394,6 @@ function SWEP:CoreStep()
 
 	self:Step_Inspect(time)
 	self:Step_Reload(time)
-	self:Step_JamClear(time)
 	self:ClearAnims()
 	-- self:Animation(time)
 

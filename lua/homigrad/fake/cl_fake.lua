@@ -312,7 +312,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	lerpfovadd2 = LerpFT(0.1, lerpfovadd2, zooming and -25 or 0)
 
 	local localFake = getLocalFakeRagdoll()
-	if lply:Alive() and IsValid(follow) and follow ~= localFake and not IsValid(lply.OldRagdoll) then
+	if lply:Alive() and IsValid(follow) and follow ~= localFake and lply.ragdoll_index ~= 0 and not IsValid(lply.OldRagdoll) then
 		clearLocalFollow()
 	end
 
@@ -660,10 +660,6 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 			ply.fakecd = CurTime() + 2
 		end
 
-		if ply == lply then
-			clearLocalFollow()
-		end
-
 		if IsValid(ply) then ply:SetNoDraw(false) end
 		ply:SetRenderMode(RENDERMODE_NORMAL)
 		
@@ -673,6 +669,10 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 		//ply.FakeRagdollOld = oldrag
 
 		ply.FakeRagdoll = nil
+
+		if ply == lply and IsValid(oldrag) then
+			follow = oldrag
+		end
 
 		hook_Run("FakeUp", ply, ragdoll)
 	end

@@ -188,6 +188,12 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	-- Adrenaline dampens the perceived intensity of despair effects
 	despair = apply_despair_adrenaline_mitigation(despair, org)
 
+	-- Mental merge: low mood amplifies despair visuals (at -100 mood, +15% intensity)
+	local mood = math.Clamp(tonumber(ply:GetNWInt("zcity_delta_mood", 0)) or 0, -100, 100)
+	if mood < 0 then
+		despair = math.min(despair + Clamp((-mood) / 100, 0, 1) * 0.15, 1)
+	end
+
 	local givingUp = org and org.givingUp
 
 	despairLerp = LerpFT(0.04, despairLerp, despair)
@@ -319,7 +325,12 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	end
 	-- Adrenaline dampens the perceived intensity of despair effects
 	despair = apply_despair_adrenaline_mitigation(despair, org)
-	local target = math.Clamp((despair - 0.5) / 0.5, 0, 1)
+
+	-- Mental merge: low mood lowers the threshold for despair text to appear
+	local moodVal = math.Clamp(tonumber(LocalPlayer():GetNWInt("zcity_delta_mood", 0)) or 0, -100, 100)
+	local moodShift = moodVal < 0 and Clamp((-moodVal) / 100, 0, 1) * 0.15 or 0
+
+	local target = math.Clamp((despair + moodShift - 0.5) / 0.5, 0, 1)
 	despairTextLerp = LerpFT(0.03, despairTextLerp, target)
 
 	if despairTextLerp <= 0.001 then return end

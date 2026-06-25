@@ -12,11 +12,11 @@ ENT.SoundWater = ""
 ENT.Speed = 0.095
 ENT.TruhstTime = 2
 ENT.Oskole = true
-ENT.Fragmentation = 1200
+ENT.Fragmentation = 1800
 ENT.IconOverride = "vgui/inventory/weapon_rpg7"
 
-ENT.BlastDamage = 80
-ENT.BlastDis = 30
+ENT.BlastDamage = 120
+ENT.BlastDis = 42
 
 
 ENT.ThrustEffect = "eff_jack_rockettrust"
@@ -29,9 +29,9 @@ local PROJECTILE_SOUND_RADIUS_SQR = 4500 * 4500
 local PROJECTILE_NEARBY_ENTITY_CAP = 20
 local PROJECTILE_NEARBY_ENTITY_CAP_CROWDED = 12
 local PROJECTILE_NEARBY_ENTITY_CAP_EXTREME = 8
-local PROJECTILE_SHRAPNEL_SAMPLE_CAP = 96
-local PROJECTILE_SHRAPNEL_SAMPLE_CAP_CROWDED = 24
-local PROJECTILE_SHRAPNEL_SAMPLE_CAP_EXTREME = 12
+local PROJECTILE_SHRAPNEL_SAMPLE_CAP = 144
+local PROJECTILE_SHRAPNEL_SAMPLE_CAP_CROWDED = 36
+local PROJECTILE_SHRAPNEL_SAMPLE_CAP_EXTREME = 18
 local PROJECTILE_SHRAPNEL_SLICE_TIME = 0.0008
 local PROJECTILE_CROWD_PLAYER_THRESHOLD = 10
 local PROJECTILE_CROWD_PLAYER_THRESHOLD_EXTREME = 16
@@ -223,7 +223,7 @@ if SERVER then
 			force:Div(len)
 			local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1) 
 			local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)  
-			local forceadd = force * physics_frac * 50000  
+			local forceadd = force * physics_frac * 75000  
 
 			if enta.organism then
 				local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
@@ -297,12 +297,12 @@ if SERVER then
 							local bullet = {}
 							bullet.Src = SelfPos
 							bullet.Spread = vecCone
-							bullet.Force = 20
-							bullet.Damage = 40
+							bullet.Force = 30
+							bullet.Damage = 60
 							bullet.AmmoType = "Metal Debris"
 							bullet.Attacker = self.owner
 							bullet.Inflictor = self
-							bullet.Distance = 16756
+							bullet.Distance = 25000
 							bullet.DisableLagComp = true
 							bullet.Filter = {self}
 							bullet.Dir = dir

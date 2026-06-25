@@ -510,9 +510,15 @@ end)
 
 local fastObjectFearNextCheck = 0
 local fastObjectFearCooldown = {}
+local recentlyDroppedWeapons = {} -- [weapon ent] = {dropper = ply, time = CurTime()}
 
 hook.Add("PlayerDisconnected", "FastObjectFearCleanup", function(ply)
 	fastObjectFearCooldown[ply] = nil
+end)
+
+hook.Add("PlayerDropWeapon", "FastObjectFearTrackDrop", function(ply, wep)
+	if not IsValid(wep) then return end
+	recentlyDroppedWeapons[wep] = {dropper = ply, time = CurTime()}
 end)
 
 timer.Create("FastObjectFear", 0.05, 0, function()
@@ -570,6 +576,9 @@ timer.Create("FastObjectFear", 0.05, 0, function()
 		local nextFear = fastObjectFearCooldown[ply] or 0
 		if time < nextFear then continue end
 
+		-- Skip players in noclip — their own high movement shouldn't trigger fear
+		if ply:GetMoveType() == MOVETYPE_NOCLIP then continue end
+
 		local org = ply.organism
 		if not org or org.otrub then continue end
 
@@ -583,6 +592,14 @@ timer.Create("FastObjectFear", 0.05, 0, function()
 			if ent:IsPlayerHolding() then continue end
 			if ply:GetVehicle() == ent then continue end
 			if ent:GetOwner() == ply then continue end
+
+			-- Skip weapons recently dropped by this player
+			local dropInfo = recentlyDroppedWeapons[ent]
+			if dropInfo and dropInfo.dropper == ply and (time - dropInfo.time) < 3 then
+				continue
+			elseif dropInfo and (time - dropInfo.time) >= 3 then
+				recentlyDroppedWeapons[ent] = nil
+			end
 
 			local vel = ent:GetVelocity():Length()
 			if vel < 350 then

@@ -1988,6 +1988,14 @@ hook.Add("RenderScreenspaceEffects", "zcity_delta_depression_greyscale", functio
     if mood >= 0 then return end
 
     local t = math.Clamp((-mood) / 100, 0, 1)
+
+    -- Mental merge: high despair amplifies the greyscale effect
+    local org = lp.new_organism or lp.organism
+    local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
+    if despair > 0.2 then
+        t = math.Clamp(t + (despair - 0.2) * 0.25, 0, 1)
+    end
+
     local sat = 1 - t * 0.7
     local contrast = 1 - t * 0.15
     local colour = 1 - t * 0.3
@@ -2042,6 +2050,11 @@ hook.Add("CreateMove", "zcity_delta_aim_effects", function(cmd)
     local mood = ClampMood(ply:GetNWInt("zcity_delta_mood", 0))
     local depScale = math.Clamp((-math.min(mood, 0)) / 100, 0, 1)
 
+    -- Mental merge: high despair amplifies aim sway
+    local org = ply.new_organism or ply.organism
+    local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
+    local despairSway = despair > 0.3 and Clamp((despair - 0.3) / 0.7, 0, 1) * 0.5 or 0
+
     if mentalAim.lastWep ~= wep then
         mentalAim.lastP = 0
         mentalAim.lastY = 0
@@ -2050,7 +2063,7 @@ hook.Add("CreateMove", "zcity_delta_aim_effects", function(cmd)
     end
 
     local t = CurTime()
-    local swayAmount = stressScale * 1.5 + depScale * 0.8
+    local swayAmount = stressScale * 1.5 + depScale * 0.8 + despairSway
     if swayAmount <= 0.01 then
         if math.abs(mentalAim.lastP) > 0.001 or math.abs(mentalAim.lastY) > 0.001 or math.abs(mentalAim.lastR) > 0.001 then
             mentalAim.lastP = math.Approach(mentalAim.lastP, 0, 0.1)

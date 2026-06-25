@@ -333,7 +333,7 @@ local ExpTypes = {
 		end
 
 		local dis = rad / 0.01900
-		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 50000, 0.5, function(target, frac, behindwall)
+		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 75000, 0.5, function(target, frac, behindwall)
 			hg.ExplosionDisorientation(target, 5 * frac / (behindwall and 3 or 1), 6 * frac / (behindwall and 3 or 1))
 			hg.RunZManipAnim(target.organism.owner, "shieldexplosion")
 		end)
@@ -351,7 +351,7 @@ local ExpTypes = {
 		bullet.Damage = Force
 		bullet.AmmoType = "Metal Debris"
 		bullet.Attacker = Owner
-		bullet.Distance = 15000
+		bullet.Distance = 22500
 		bullet.DisableLagComp = true
 		bullet.Filter = {Ent}
 		table.Add(bullet.Filter, hg.drums2)
@@ -359,7 +359,7 @@ local ExpTypes = {
 
 		co = coroutine.create(function()
 			local LastShrapnel = SysTime()
-			for i = 1, multi*3 do
+			for i = 1, multi*5 do
 				LastShrapnel = SysTime()
 				if not IsValid(Ent) then return end
 				bullet.Dir = Ent:GetAngles():Forward() * math.random(-1,1)
@@ -406,7 +406,7 @@ local ExpTypes = {
 		SendExplosionNet(SelfPos, "Sharpnel")
 
 		local dis = rad / 0.01900
-		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 50000, 0.5, function(target, frac, behindwall)
+		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 75000, 0.5, function(target, frac, behindwall)
 			if behindwall then return end
 			hg.ExplosionDisorientation(target, 5 * frac, 6 * frac)
 			hg.RunZManipAnim(target.organism.owner, "shieldexplosion")
@@ -425,7 +425,7 @@ local ExpTypes = {
 		bullet.Damage = Force
 		bullet.AmmoType = "Metal Debris"
 		bullet.Attacker = Owner
-		bullet.Distance = 15000
+		bullet.Distance = 22500
 		bullet.DisableLagComp = true
 		bullet.Filter = {Ent}
 		table.Add(bullet.Filter, hg.drums2)
@@ -433,7 +433,7 @@ local ExpTypes = {
 
 		co = coroutine.create(function()
 			local LastShrapnel = SysTime()
-			for i = 1, multi*5 do
+			for i = 1, multi*8 do
 				LastShrapnel = SysTime()
 				if not IsValid(Ent) then return end
 				bullet.Dir = Ent:GetAngles():Forward() * math.random(-1,1)
@@ -479,7 +479,7 @@ local ExpTypes = {
 		SendExplosionNet(SelfPos, "Normal")
 
 		local dis = rad / 0.01900
-		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 50000, 0.5, function(target, frac, behindwall)
+		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 75000, 0.5, function(target, frac, behindwall)
 			if behindwall then return end
 			hg.ExplosionDisorientation(target, 5 * frac, 6 * frac)
 			hg.RunZManipAnim(target.organism.owner, "shieldexplosion")
@@ -512,7 +512,7 @@ local ExpTypes = {
 			CreateVFireBall(14, 24, SelfPos + vector_up * 12, VectorRand(-350, 350) + Vector(0, 0, math.random(150, 350)))
 		end
 
-		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 70000, 0.6, function(target, frac, behindwall, visible)
+		local entsCount = ProcessExplosionTargets(Ent, SelfPos, dis, 100000, 0.6, function(target, frac, behindwall, visible)
 			if not visible or behindwall then return end
 			hg.ExplosionDisorientation(target, 6 * frac, 8 * frac)
 			hg.RunZManipAnim(target.organism.owner, "shieldexplosion")

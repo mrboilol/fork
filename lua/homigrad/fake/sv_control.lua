@@ -1476,7 +1476,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.rarm == 1 or org.rarmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 4
 
 					end
 
@@ -1520,7 +1520,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.larm == 1 or org.larmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 4
 
 					end
 
@@ -1564,7 +1564,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.rarm == 1 or org.rarmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 4
 
 					end
 
@@ -1596,7 +1596,7 @@ hook.Add("Think", "Fake", function()
 
 					if org.larm == 1 or org.larmdislocation then
 
-						org.painadd = org.painadd + ragdoll.dtime * 0.5
+						org.painadd = org.painadd + ragdoll.dtime * 4
 
 					end
 
@@ -1916,7 +1916,7 @@ hook.Add("Think", "Fake", function()
 
 							if org and bothArmsBroken and not org.rarmamputated then
 
-								local painAmount = (org.rarm or 0) * 8 + (org.rarmdislocation or org.rarmdislocated and 5 or 0)
+								local painAmount = (org.rarm or 0) * 30 + (org.rarmdislocation or org.rarmdislocated and 15 or 0)
 
 								org.painadd = (org.painadd or 0) + painAmount
 
@@ -1972,7 +1972,7 @@ hook.Add("Think", "Fake", function()
 
 							if org and bothArmsBroken and not org.larmamputated then
 
-								local painAmount = (org.larm or 0) * 8 + (org.larmdislocation or org.larmdislocated and 5 or 0)
+								local painAmount = (org.larm or 0) * 30 + (org.larmdislocation or org.larmdislocated and 15 or 0)
 
 								org.painadd = (org.painadd or 0) + painAmount
 

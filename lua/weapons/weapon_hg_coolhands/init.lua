@@ -108,7 +108,7 @@ function SWEP:SecondaryAttack()
 				if isBroken and org then
 					local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
 					local disloc = isRight and org.rarmdislocation or org.larmdislocation
-					local painAmount = armVal * 12 + (disloc and 8 or 0)
+					local painAmount = armVal * 35 + (disloc and 20 or 0)
 					if isRight then
 						painAmount = painAmount * 0.7 -- right arm is better overall (less pain)
 					end

@@ -98,8 +98,8 @@ function SWEP:GetEyeTrace()
 	return hg.eyeTrace(self:GetOwner())
 end
 
-SWEP.BlastDis = 12
-SWEP.BlastDamage = 350
+SWEP.BlastDis = 16
+SWEP.BlastDamage = 500
 SWEP.KABOOM = false
 
 SWEP.SoundFar = {"iedins/ied_detonate_dist_01.wav","ied/ied_detonate_dist_02.wav","ied/ied_detonate_dist_03.wav"}
@@ -234,8 +234,8 @@ local function ExplodeTheItem(self,ent)
 			if not IsValid(ent) then self:Remove() return end
 			
 			local blastRadius = BlastDis / 0.01905
-			local nearRadius = 150
-			local damage = BlastDamage * 0.1
+			local nearRadius = 200
+			local damage = BlastDamage * 0.15
 			local attacker = IsValid(self:GetOwner()) and self:GetOwner() or self
 
 			for _, nearEnt in ipairs(ents.FindInSphere(EntPos, nearRadius)) do
@@ -277,7 +277,7 @@ local function ExplodeTheItem(self,ent)
 				force:Div(len)
 				local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1)  
 				local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)  
-				local forceadd = force * physics_frac * 50000  
+				local forceadd = force * physics_frac * 75000  
 
 				if enta.organism then
 					local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
@@ -324,14 +324,14 @@ local function ExplodeTheItem(self,ent)
 				local co = coroutine.create(function()
 					local LastShrapnel = SysTime()
 
-					for i = 1, math.Round(ent:GetPhysicsObject():GetMass() * 50) do
+					for i = 1, math.Round(ent:GetPhysicsObject():GetMass() * 80) do
 							LastShrapnel = SysTime()
 
 							local dir = VectorRand(-1,1):GetNormalized()--vector_up
 							dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
 							dir:Normalize()
 
-							local Tr = util.QuickTrace(EntPos, dir * 205, ent)
+							local Tr = util.QuickTrace(EntPos, dir * 400, ent)
 
 							if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
 								local bullet = {}
@@ -341,10 +341,10 @@ local function ExplodeTheItem(self,ent)
 								bullet.Damage = BlastDamage
 								bullet.AmmoType = "Metal Debris"
 								bullet.Attacker = self:GetOwner()
-								bullet.Distance = 205
+								bullet.Distance = 400
 								bullet.DisableLagComp = true
 								bullet.Filter = {ent}
-								bullet.Penetration = 4
+								bullet.Penetration = 8
 								--bullet.Spread = vecCone * i / self.Fragmentation
 								ent:FireLuaBullets(bullet, true)
 							end
