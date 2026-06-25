@@ -1661,9 +1661,9 @@ local function draw_status_effects()
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
 			if bleed_val > HUD.bleeding_threshold then
 				local level_num = 1
-				if bleed_val > 0.2 then level_num = 2 end
-				if bleed_val > 0.5 then level_num = 3 end
-				if bleed_val > 1.0 then level_num = 4 end
+				if bleed_val > 1 then level_num = 2 end
+				if bleed_val > 1.5 then level_num = 3 end
+				if bleed_val > 2.5 then level_num = 4 end
 				
 				table.insert(effects, {
 					name = "bleeding",

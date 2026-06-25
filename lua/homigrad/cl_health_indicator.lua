@@ -3,7 +3,6 @@ local blinkModel
 local whiteMat = Material("models/debug/debugwhite")
 local statusCircleMat = Material("sef_icons/statuseffectcircle.png", "smooth")
 local bleedIconMat = Material("zcity_delta/unitmenu/status/bleeding.png", "smooth")
-local bigBleedIconMat = Material("zcity_delta/unitmenu/status/bigbleeding.png", "smooth")
 local statusIconCache = {}
 
 local IND_SIZE_BASE = 180
@@ -836,29 +835,11 @@ function HUD_DrawDynamicIndicator()
             end
         end
 
-        -- Collect bleeding icon screen positions for 2D overlay after cam.End3D
-        local bleedScreen2D = {}
+        -- Draw bleeding icons as 3D billboards that stick to the model bones
         if next(bleedingBones) then
-            local function Project3DToIndicator2D(pos, camPos, lookAng, viewX, viewY, w, h, fov)
-                local localPos = pos - camPos
-                local forward = lookAng:Forward()
-                local right = lookAng:Right()
-                local up = lookAng:Up()
-                
-                local zDist = localPos:Dot(forward)
-                if zDist <= 0.1 then return nil, nil end
-                
-                local xDist = localPos:Dot(right)
-                local yDist = localPos:Dot(up)
-                
-                local fovRad = math.rad(fov)
-                local halfW = zDist * math.tan(fovRad * 0.5)
-                
-                local sx = viewX + w * 0.5 - (xDist / halfW) * (w * 0.5)
-                local sy = viewY + h * 0.5 - (yDist / halfW) * (h * 0.5)
-                
-                return sx, sy
-            end
+            render.MaterialOverride(nil)
+            render.SetColorModulation(1, 1, 1)
+            render.SuppressEngineLighting(true)
 
             for key, data in pairs(bleedingBones) do
                 local boneName = majorBones[key].bone
@@ -867,14 +848,20 @@ function HUD_DrawDynamicIndicator()
                     local mat = healthModel:GetBoneMatrix(boneID)
                     if mat then
                         local pos = mat:GetTranslation()
-                        pos = pos + Vector(0, 0, 1.5)
-                        local sx, sy = Project3DToIndicator2D(pos, camPos, lookAng, viewX, viewY, w, h, 50)
-                        if sx and sy then
-                            table.insert(bleedScreen2D, {sx = sx, sy = sy, severity = data.severity, isArterial = data.isArterial, key = key})
-                        end
+                        -- Offset toward camera to prevent clipping through model
+                        local toCam = (camPos - pos):GetNormalized()
+                        pos = pos + toCam * 3.0 + Vector(0, 0, 1.5)
+
+                        local pulse = (math.sin(time * 5 + #key) + 1) / 2
+                        local alpha = 0.7 + pulse * 0.3
+
+                        render.SetMaterial(bleedIconMat)
+                        render.DrawSprite(pos, 6, 6, Color(255, 255, 255, alpha * 255))
                     end
                 end
             end
+
+            render.SuppressEngineLighting(false)
         end
 
         render.MaterialOverride(nil)
@@ -882,75 +869,6 @@ function HUD_DrawDynamicIndicator()
         render.SuppressEngineLighting(false)
     cam.End3D()
 
-    -- Draw bleeding icons as 2D overlays so they always render on top of model bones
-    if #bleedScreen2D > 0 then
-        local iconSize = ScreenScaleFixed(54)
-        for _, data in ipairs(bleedScreen2D) do
-            local severity = data.severity
-            local isArterial = data.isArterial
-            local r, g, b, mat
-            
-            if severity >= 4.25 or isArterial then
-                mat = bigBleedIconMat
-               -- the severity is bullshite
-                -- Dark yellow -> dark orange -> dark red based on severity
-                -- 4.25 = dark yellow (180, 160, 0), 7.125 = dark orange (180, 80, 0), 10.0+ = dark red (120, 0, 0)
-                local progress = math.Clamp((severity - 4.25) / 5.75, 0, 1)
-                if progress <= 0.5 then
-                    local p = progress / 0.5
-                    r = 180
-                    g = math.floor(160 - 80 * p)
-                    b = 0
-                else
-                    local p = (progress - 0.5) / 0.5
-                    r = math.floor(180 - 60 * p)
-                    g = math.floor(80 - 80 * p)
-                    b = 0
-                end
-            else
-                -- Show bleeding.png for normal bleeding wounds
-                mat = bleedIconMat
-                -- 0.01 to 4.25: white -> yellow -> really red
-                -- 0.01 = white (255, 255, 255), 2.13 = yellow (255, 255, 0), 4.25 = red (255, 0, 0)
-                local progress = math.Clamp((severity - 0.01) / 4.24, 0, 1)
-                if progress <= 0.5 then
-                    local p = progress / 0.5
-                    r = 255
-                    g = 255
-                    b = math.floor(255 * (1 - p))
-                else
-                    local p = (progress - 0.5) / 0.5
-                    r = 255
-                    g = math.floor(255 * (1 - p))
-                    b = 0
-                end
-            end
-
-            local pulse = (math.sin(time * 5 + #data.key) + 1) / 2
-            local alpha = math.floor((0.7 + pulse * 0.3) * 255)
-
-            local sx, sy = data.sx, data.sy
-            
-            -- Prevent clipping outside the indicator circle boundaries
-            local centerX = viewX + w * 0.5
-            local centerY = viewY + h * 0.5
-            local maxRadius = w * 0.45 -- Keep it slightly inside the edge
-            
-            local dx = sx - centerX
-            local dy = sy - centerY
-            local dist = math.sqrt(dx * dx + dy * dy)
-            
-            if dist > maxRadius then
-                local scale = maxRadius / dist
-                sx = centerX + dx * scale
-                sy = centerY + dy * scale
-            end
-
-            surface.SetDrawColor(r, g, b, alpha)
-            surface.SetMaterial(mat)
-            surface.DrawTexturedRect(sx - iconSize * 0.5, sy - iconSize * 0.5, iconSize, iconSize)
-        end
-    end
 end
 
 hook.Add("OnRemove", "HG_CleanupHealthIndicator", function()
