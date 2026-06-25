@@ -2059,7 +2059,7 @@ function hg.BreakNeck(ent, fromDamage)
 		elseif IsValid(playerRef) then
 			ragdoll = playerRef:GetNWEntity("RagdollDeath")
 			print("[HG Floppy] BreakNeck timer: RagdollDeath=" .. tostring(ragdoll))
-			if not IsValid(ragdoll) then
+			if not IsValid(ragdoll) and isfunction(playerRef.GetRagdollEntity) then
 				ragdoll = playerRef:GetRagdollEntity()
 				print("[HG Floppy] BreakNeck timer: GetRagdollEntity=" .. tostring(ragdoll))
 			end
@@ -2676,7 +2676,7 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
             ragdoll = ent
         elseif IsValid(playerRef) then
             ragdoll = playerRef:GetNWEntity("RagdollDeath")
-            if not IsValid(ragdoll) then
+            if not IsValid(ragdoll) and isfunction(playerRef.GetRagdollEntity) then
                 ragdoll = playerRef:GetRagdollEntity()
             end
             if not IsValid(ragdoll) then
@@ -2978,7 +2978,7 @@ function hg.BreakSpine(ent, segment, isDislocated)
             ragdoll = ent
         elseif IsValid(playerRef) then
             ragdoll = playerRef:GetNWEntity("RagdollDeath")
-            if not IsValid(ragdoll) then
+            if not IsValid(ragdoll) and isfunction(playerRef.GetRagdollEntity) then
                 ragdoll = playerRef:GetRagdollEntity()
             end
             if not IsValid(ragdoll) then
@@ -3114,7 +3114,7 @@ function hg.RemoveNeckConstraints(ent)
 		if not IsValid(ragdoll) then
 			ragdoll = ent:GetNWEntity("RagdollDeath")
 		end
-		if not IsValid(ragdoll) then
+		if not IsValid(ragdoll) and isfunction(ent.GetRagdollEntity) then
 			ragdoll = ent:GetRagdollEntity()
 		end
 	end
@@ -3146,7 +3146,7 @@ hook.Add("OnAmputateLimb", "amputate_remove_floppy", function(org, ent, limb)
 			local ragdolls = {
 				ply:GetNWEntity("FakeRagdoll"),
 				ply:GetNWEntity("RagdollDeath"),
-				ply:GetRagdollEntity()
+				isfunction(ply.GetRagdollEntity) and ply:GetRagdollEntity() or nil
 			}
 			for _, rag in ipairs(ragdolls) do
 				if IsValid(rag) then

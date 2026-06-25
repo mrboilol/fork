@@ -38,7 +38,7 @@ hook.Add("Post Post Processing", "hg_goodmood_effect", function()
     -- Mental merge: positive mood amplifies goodmood visuals
     local mood = math.Clamp(tonumber(ply:GetNWInt("zcity_delta_mood", 0)) or 0, -100, 100)
     if mood > 0 then
-        goodmood = math.min(goodmood + Clamp(mood / 100, 0, 1) * 0.1, 1)
+        goodmood = math.min(goodmood + math.Clamp(mood / 100, 0, 1) * 0.1, 1)
     end
 
     goodmood_lerp = LerpFT(0.04, goodmood_lerp, goodmood)

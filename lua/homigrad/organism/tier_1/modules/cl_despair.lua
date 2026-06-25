@@ -327,8 +327,10 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	despair = apply_despair_adrenaline_mitigation(despair, org)
 
 	-- Mental merge: low mood lowers the threshold for despair text to appear
-	local moodVal = math.Clamp(tonumber(LocalPlayer():GetNWInt("zcity_delta_mood", 0)) or 0, -100, 100)
-	local moodShift = moodVal < 0 and Clamp((-moodVal) / 100, 0, 1) * 0.15 or 0
+	local moodPly = LocalPlayer()
+	if not IsValid(moodPly) then return end
+	local moodVal = math.Clamp(tonumber(moodPly:GetNWInt("zcity_delta_mood", 0)) or 0, -100, 100)
+	local moodShift = moodVal < 0 and math.Clamp((-moodVal) / 100, 0, 1) * 0.15 or 0
 
 	local target = math.Clamp((despair + moodShift - 0.5) / 0.5, 0, 1)
 	despairTextLerp = LerpFT(0.03, despairTextLerp, target)

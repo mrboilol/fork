@@ -97,16 +97,6 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
-	-- Stress-driven heartbeat additions (fear, shock, pain, adrenaline) can't make a
-	-- failing heart beat faster. Gate them by heart damage and blood availability.
-	local stressGate = math.Clamp(heart * math.Clamp((org.blood - 1000) / 2000, 0, 1), 0, 1)
-	local baseHeartbeat = org.pulse < 70 and (org.brain > 0 and org.pulse or 70 + (70 - org.pulse) * 4) or org.pulse
-	heartbeat = baseHeartbeat + (heartbeat - baseHeartbeat) * stressGate
-
-	-- Brain damage drags the heart rate down (weaker pumping)
-	local brainHeartMul = math.Clamp(1 - org.brain, 0.1, 1)
-	heartbeat = heartbeat * brainHeartMul
-
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
 	-- Probabilistic heartstop based on heart rate
