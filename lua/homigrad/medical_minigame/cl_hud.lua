@@ -2015,77 +2015,11 @@ hook.Add("RenderScreenspaceEffects", "zcity_delta_depression_greyscale", functio
     end
 end)
 
--- Aim effects from stress and depression
-local mentalAim = { lastP = 0, lastY = 0, lastR = 0, lastWep = nil }
-
-local function ResetAimMod(cmd)
-    if not cmd then return end
-    mentalAim.lastP = 0
-    mentalAim.lastY = 0
-    mentalAim.lastR = 0
-end
-
-hook.Add("CreateMove", "zcity_delta_aim_effects", function(cmd)
-    local cv = GetConVar("zcity_delta_mental_enabled")
-    if cv and not cv:GetBool() then
-        ResetAimMod(cmd)
-        return
-    end
-
-    local ply = LocalPlayer()
-    if not IsValid(ply) or not ply:Alive() then
-        ResetAimMod(cmd)
-        return
-    end
-
-    local wep = ply:GetActiveWeapon()
-    if not IsValid(wep) then
-        ResetAimMod(cmd)
-        return
-    end
-
-    local stress = ClampStat(ply:GetNWInt("zcity_delta_stress", 0))
-    local stressScale = math.Clamp(stress / 100, 0, 1)
-
-    local mood = ClampMood(ply:GetNWInt("zcity_delta_mood", 0))
-    local depScale = math.Clamp((-math.min(mood, 0)) / 100, 0, 1)
-
-    -- Mental merge: high despair amplifies aim sway
-    local org = ply.new_organism or ply.organism
-    local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
-    local despairSway = despair > 0.3 and Clamp((despair - 0.3) / 0.7, 0, 1) * 0.5 or 0
-
-    if mentalAim.lastWep ~= wep then
-        mentalAim.lastP = 0
-        mentalAim.lastY = 0
-        mentalAim.lastR = 0
-        mentalAim.lastWep = wep
-    end
-
-    local t = CurTime()
-    local swayAmount = stressScale * 1.5 + depScale * 0.8 + despairSway
-    if swayAmount <= 0.01 then
-        if math.abs(mentalAim.lastP) > 0.001 or math.abs(mentalAim.lastY) > 0.001 or math.abs(mentalAim.lastR) > 0.001 then
-            mentalAim.lastP = math.Approach(mentalAim.lastP, 0, 0.1)
-            mentalAim.lastY = math.Approach(mentalAim.lastY, 0, 0.1)
-            mentalAim.lastR = math.Approach(mentalAim.lastR, 0, 0.1)
-        end
-    else
-        local p = math.sin(t * 3.7) * swayAmount * 0.3 + math.sin(t * 7.1) * swayAmount * 0.15
-        local y = math.sin(t * 2.3) * swayAmount * 0.4 + math.sin(t * 5.9) * swayAmount * 0.2
-        local r = math.sin(t * 1.7) * swayAmount * 0.2
-
-        mentalAim.lastP = Lerp(FrameTime() * 8, mentalAim.lastP, p)
-        mentalAim.lastY = Lerp(FrameTime() * 8, mentalAim.lastY, y)
-        mentalAim.lastR = Lerp(FrameTime() * 8, mentalAim.lastR, r)
-    end
-
-    local ang = cmd:GetViewAngles()
-    ang.p = ang.p - mentalAim.lastP
-    ang.y = ang.y - mentalAim.lastY
-    ang.r = ang.r - mentalAim.lastR
-    cmd:SetViewAngles(ang)
-end)
+-- Disabled: this hook used to rotate cmd:SetViewAngles every tick based on
+-- stress/fear/despair, which produced a constant low-frequency camera sway
+-- that also fired with weapon_hands because it is a valid active weapon.
+-- Removing it here also clears an old registered hook during Lua auto-refresh.
+hook.Remove("CreateMove", "zcity_delta_aim_effects")
 
 -- Depression music at rock bottom
 local miserable = { playing = false, pending = false }

@@ -1729,11 +1729,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if suicideLerp > 0.3 then
 			local wobbleTime = CurTime() * (1.5 + suicideLerp * 2)
 			local wobbleStrength = (suicideLerp - 0.3) * 0.3
-			ViewPunch(Angle(
-				math.sin(wobbleTime) * wobbleStrength,
-				math.cos(wobbleTime * 0.7) * wobbleStrength * 0.7,
-				math.sin(wobbleTime * 0.5) * wobbleStrength * 0.3
-			))
+			ang1[1] = math.sin(wobbleTime) * wobbleStrength
+			ang1[2] = math.cos(wobbleTime * 0.7) * wobbleStrength * 0.7
+			ang1[3] = math.sin(wobbleTime * 0.5) * wobbleStrength * 0.3
+			ViewPunch(ang1)
 		end
 	else
 		suicideLerp = math.Approach(suicideLerp, 0, FrameTime() * 3)

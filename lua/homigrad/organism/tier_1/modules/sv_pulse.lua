@@ -25,6 +25,8 @@ end
 
 module[2] = function(owner, org, timeValue)
 	local heart = 1 - org.heart
+	-- Brain damage weakens the heart's neurological drive (floor 0.1 keeps minimal signal)
+	local brain = math.Clamp(1 - org.brain * 1.5,0.1,1)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
@@ -33,33 +35,19 @@ module[2] = function(owner, org, timeValue)
 
 	local stamina = org.stamina
 	
-	local blood = org.blood or 5000
-	local staminaMax = stamina.max or 180
-	local staminaK = 1 - math.Clamp(stamina[1] / staminaMax, 0, 1)
-	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-
-	local pulse = 70
-	pulse = pulse + math.Clamp((3500 - blood) / 1000, 0, 1) * 25
-	pulse = pulse + math.Clamp((3000 - blood) / 500, 0, 1) * 30
-	pulse = pulse + math.Clamp((2750 - blood) / 750, 0, 1) * 35
-	pulse = pulse + math.Clamp(totalAdrenaline, 0, 3) * 15
-	pulse = pulse + (!org.otrub and math.max(org.fear * 35, 0) or 0)
-	pulse = pulse + math.Clamp(org.shock, 0, 40) * 0.5
-	pulse = pulse + (math.Clamp(org.pain, 40, 90) - 40) * 0.5
-	pulse = pulse + staminaK * 30 * (org.lungsfunction and 1 or 0)
-	pulse = pulse - 35 * math.min(org.analgesia / 2.5, 1)
-	if org.givingUp then pulse = pulse * 0.65 end
-
-	-- Brain damage weakens neurological drive but does not hard-lock pulse against compensation.
-	local brainDrive = math.Clamp(1 - org.brain * 0.9, 0.35, 1)
-	local k = heart * o2 * math.Clamp((blood - 1500) / 3500, 0, 1) * (org.heartstop and 0.1 or 1)
-	pulse = pulse * brainDrive * k
-	pulse = pulse * math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1)
-	pulse = pulse + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
+	local pulse = 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
+	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
 	pulse = org.alive and pulse or 0
-	pulse = math.Clamp(pulse, 0, 220)
-
-	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 8 or (heart == 0 and timeValue * 10 or timeValue * 5))
+	pulse = math.Clamp(pulse, 0, 200)
+	
+	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
+	
+	--local k = heart * o2 * (1 / math.Clamp((org.blood - 2000) / 3000,0.2,1)) * brain * (org.heartstop and 0.1 or 1) --* halfValue2(stamina[2], stamina.fatigueRange, stamina.fatigueK)
+	local k = heart * o2 * (math.Clamp((org.blood - 1500) / 3500, 0, 1)) * brain * (org.heartstop and 0.1 or 1)
+	pulse = pulse * k
+	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
+	
+	org.pulse = math.Approach(org.pulse, pulse, heart == 0 and timeValue * 10 or timeValue * 5)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
@@ -225,6 +213,7 @@ module[2] = function(owner, org, timeValue)
         end
     end
 
+	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
 	local adrenalineStabilizer = totalAdrenaline > 0.5
 	
 	-- Tranexamic acid and thiamine accelerate ischemia regression
