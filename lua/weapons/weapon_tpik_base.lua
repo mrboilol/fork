@@ -237,7 +237,6 @@ if CLIENT then
                 local gAngles = WorldModel:GetBoneMatrix(camBone):GetAngles()
                 local _,gAngles = WorldToLocal(vector_origin,gAngles, WorldModel:GetPos(), WorldModel:GetBoneMatrix(WorldModel:LookupBone(self.ViewBobCamBase or "") or 0):GetAngles())
                 self.OldAngPunch = self.OldAngPunch or gAngles
-                ViewPunch( ( self.OldAngPunch - gAngles )/(self.ViewPunchDiv or 100) )
                 self.OldAngPunch = gAngles
             end
         end

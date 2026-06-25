@@ -382,7 +382,9 @@ module[2] = function(owner, org, timeValue)
 
 	local o2 = org.o2
 
-	local losing_oxy = timeValue * 1 * math.Clamp(org.o2[1] / 30, 0.25, 1)
+	local pulseDeliveryK = math.Clamp(((org.pulse or org.heartbeat or 70) - 15) / 55, 0.15, 1.25)
+	local pulseO2Stress = math.Clamp((45 - (org.pulse or 70)) / 45, 0, 1) * 1.5
+	local losing_oxy = timeValue * (1 + pulseO2Stress) * math.Clamp(org.o2[1] / 30, 0.25, 1)
 
 	org.losing_oxy = losing_oxy
 
@@ -554,7 +556,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		local pulseMultiplier = math.Clamp((org.heartbeat or 70) / 70, 0.8, 1.5)
+		local pulseMultiplier = pulseDeliveryK * math.Clamp((org.heartbeat or 70) / 70, 0.75, 1.35)
 
 		local staminaRatio = org.stamina[1] / org.stamina.max
 

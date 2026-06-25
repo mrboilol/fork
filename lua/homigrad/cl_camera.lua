@@ -186,49 +186,13 @@ function HGAddView(ply, origin, angles, velLen)
 	if ply:Alive() then
 		local ent = hg.GetCurrentCharacter(ply)
 		local org = ply.organism or {}
-		local pulse = org.pulse or 70
-		local adrenaline = org.adrenaline or 0
-		local temp = org.temperature or 36.6
-		local o2 = org.o2 and org.o2[1] or 30
-		local analgesia = org.analgesia or 0
 
 		local wep = ply:GetActiveWeapon()
 		local inSight = IsValid(wep) and wep.IsZoom and wep:IsZoom()
 
-		--breathing_amount = breathing_amount + math.max((math.Clamp(pulse, 0, 80) / 120 / 30 + velLen / 100 - (30 - o2) / 3000), 0)
-		local breathing_amount = math.sin((org.pulsethink or 0) + 0.8) * (math.max(((org.heartbeat or 0) / 120 - 1) * 0.05, 0) + math.Clamp((org.stamina and org.stamina[1] and (1 - math.min(1, org.stamina[1] / (org.stamina.max * 0.75))) or 1), 0, 0.5))
-		--walk_amount = walk_amount + velLen / 100
-
-		--[[camera_position_addition[1] = 0
-		camera_position_addition[2] = 0
-		camera_position_addition[3] = 0]]
-		
-		camera_position_addition[1] = 0
-		camera_position_addition[2] = 0
-		camera_position_addition[3] = (math.sin(breathing_amount + math.pi)) * 0.5
-
-		local spineBone = ply.ZCSpineBoneCamera
-		if spineBone == nil then
-			spineBone = ply:LookupBone("ValveBiped.Bip01_Spine")
-			ply.ZCSpineBoneCamera = spineBone or false
-		end
-
-		if spineBone and spineBone ~= false then
-			local spineMatrix = ply:GetBoneMatrix(spineBone)
-			if spineMatrix then
-				local anga2 = spineMatrix:GetAngles()
-				anga2:RotateAroundAxis(anga2:Right(), 90)
-				camera_position_addition:Rotate(anga2)
-			end
-		end
-
-		origin:Add(camera_position_addition)
-
-		local ang = AngleRand(-0.1, 0.1) * math.Rand(0, math.min(adrenaline, 1)) / 1
-		ang[1] = ang[1] + breathing_amount
-		ang[3] = 0
-
-		lerped_ang = LerpFT(0.2, lerped_ang, ang * (inSight and 1 or 1) * math.max(org.recoilmul or 1, 0.1))
+		-- Camera breathing used heartbeat, which fear raises, causing universal sway.
+		camera_position_addition:Zero()
+		lerped_ang = LerpFT(0.2, lerped_ang, angle_zero)
 		--local tmpmul = math.max(36.6 - temp, 0)
 		--ang[1] = math.Rand(-tmpmul, tmpmul) / 155
 		--ang[2] = math.Rand(-tmpmul, tmpmul) / 155
@@ -291,9 +255,8 @@ function HGAddView(ply, origin, angles, velLen)
 		ply.xMove = x
 
 		if(ply.MovementInertiaAddView)then
-			angles = angles + ply.MovementInertiaAddView
-			ply.MovementInertiaAddView.r = Lerp(FrameTime() * 5, ply.MovementInertiaAddView.r, 0)
-			ply.MovementInertiaAddView.p = Lerp(FrameTime() * 5, ply.MovementInertiaAddView.p, 0)
+			ply.MovementInertiaAddView.r = 0
+			ply.MovementInertiaAddView.p = 0
 		end
 	else
 		if(ply.MovementInertiaAddView)then
