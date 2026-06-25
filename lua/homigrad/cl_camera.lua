@@ -269,7 +269,9 @@ function HGAddView(ply, origin, angles, velLen)
 
 		//angles[1] = angles[1] + x * 1
 		//angles[2] = angles[2] + y * 1
-		ViewPunch4(Angle(y2, x2, x2 * 50) * 0.0005 * (ishgweapon(wep) and 1.5 or 1))
+		if ishgweapon(wep) then
+			ViewPunch4(Angle(y2, x2, x2 * 50) * 0.0005 * 1.5)
+		end
 
 		local music = hg.DynamicMusicV2.Player.GetTrack()
 
@@ -546,9 +548,13 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 
 	local velLen = vel:Length()
 	--print()
-	ViewPunch(AngleRand(-1,1) * velLen / (BadSurfaceDrive and 5 or 50))
+	if ply:InVehicle() then
+		ViewPunch(AngleRand(-1,1) * velLen / (BadSurfaceDrive and 5 or 50))
+	end
 
-	eyePos:Add(VectorRand() * ( (ply:InVehicle() or velLen > 2) and (velLen +( ply:InVehicle() and 0 or - 2)) / (ply:InVehicle() and 50 or 10) or 0))
+	if ply:InVehicle() then
+		eyePos:Add(VectorRand() * (velLen / 50))
+	end
 	hg.clamp(vel, limit)
 	angles = ply:InVehicle() and ply:GetAimVector():AngleEx(vehicle:GetUp()) or angles
 
