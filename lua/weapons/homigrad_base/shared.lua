@@ -2167,7 +2167,7 @@ function SWEP:GetAdditionalValues()
 
 		if (self.recoilWobbleAmp or 0) > 0.001 then
 			local t = CurTime()
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 1.6
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 3.0
 
 			-- Multi-frequency sine sway, same shape as the heavy-weapon camera sway.
 			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
@@ -2176,11 +2176,11 @@ function SWEP:GetAdditionalValues()
 
 			-- Swing the gun on pitch + roll only (changes muzzle, no camera coupling).
 			-- NO yaw — AdditionalAng2[2] is read by the camera-spray path.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.1
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.0
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.8
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.5
 
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobZ * amp * 0.4
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.4
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobZ * amp * 0.7
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 0.7
 		end
 
 		-- Per-shot recoil kick that physically knocks the gun off-axis and climbs the
@@ -2193,12 +2193,12 @@ function SWEP:GetAdditionalValues()
 			local seed = math.floor(sprayI)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.2
+			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 3.5
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 1.0			-- muzzle climbs
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.7
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.3
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.5			-- gun shoved up/back
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 1.5           -- muzzle climbs
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.0
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.4
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.8           -- gun shoved up/back
 		end
 	end
 
@@ -2210,23 +2210,24 @@ function SWEP:GetAdditionalValues()
 	if not self:IsSprinting() and not self.reload and not ply.suiciding and not IsValid(ply.FakeRagdoll) then
 		local org = ply.organism or {}
 		local fatigue = math.Clamp(org.aiming_fatigue or 0, 0, 10)
+		local fear = math.Clamp(org.fear or 0, 0, 2)
 		local idleWeight = math.Clamp((self.weight or 5) / 5, 0.5, 2.0)
 		local idleStance = self:GetPostureStabilityMul(self:IsZoom())
 		local idleRest = self:IsResting() and 0.3 or 1
 		local idleAim = self:IsZoom() and 0.6 or 1
 
-		local idleAmp = (0.35 + fatigue * 0.12) * idleWeight * idleStance * idleRest * idleAim
+		local idleAmp = (0.5 + fatigue * 0.15 + fear * 0.35) * idleWeight * idleStance * idleRest * idleAim
 
 		local st = CurTime() * 0.9
 		local swA = math.sin(st * 1.1) * 0.7 + math.sin(st * 1.9) * 0.3
 		local swB = math.cos(st * 0.8) * 0.7 + math.cos(st * 1.7) * 0.3
 		local swC = math.sin(st * 1.3) * 0.6 + math.cos(st * 2.1) * 0.4
 
-		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 0.9
-		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 0.8
+		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 1.3
+		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 1.1
 
-		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.5
-		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.5
+		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.7
+		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.7
 	end
 
 	if self.GetAnimPos_Draw and CLIENT then
