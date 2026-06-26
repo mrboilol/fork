@@ -573,6 +573,72 @@ function hg.get_phraselist(ply, type)
 	return str
 end
 
+function hg.get_notify_color(ply)
+	if not IsValid(ply) then return Color(255, 255, 255) end
+	local org = ply.organism
+	if not org then return Color(255, 255, 255) end
+
+	local pain = org.pain or 0
+	local shock = org.shock or 0
+	local adrenaline = org.adrenaline or 0
+	local fear = org.fear or 0
+	local analgesia = org.analgesia or 0
+	local consciousness = org.consciousness or 1
+	local o2 = (org.o2 and org.o2[1]) or 30
+	local pulse = org.pulse or 70
+	local blood = org.blood or 5000
+	local hurt = org.hurt or 0
+	local lasthit = org.lasthit or 0
+	local recentDamage = lasthit > 0 and (CurTime() - lasthit) < 3
+
+	local dyingBlood = blood < 3750
+	local dyingO2 = o2 < 12
+	local dyingPulse = pulse < 40 and pulse > 0
+	local dying = dyingO2 or dyingPulse or (blood < 2500) or dyingBlood
+	local inPain = pain > 30
+	local inShock = shock > 20
+	local inAdrenalineOrFear = (adrenaline > 0.5) or (fear > 0.5)
+	local highAnalgesia = analgesia > 1.0
+	local lowConsciousness = consciousness < 0.6
+
+	if highAnalgesia then
+		return Color(255, 100, 255)
+	end
+
+	if dying then
+		local tO2 = dyingO2 and math.Clamp(1 - (o2 / 12), 0, 1) or 0
+		local tBlood = dyingBlood and math.Clamp(1 - (blood / 3750), 0, 1) or 0
+		local t = math.max(tO2, tBlood)
+		return Color(
+			math.floor(255 * (1 - t * 0.5)),
+			math.floor(255 * (1 - t * 0.3)),
+			255
+		)
+	end
+
+	if inPain or recentDamage then
+		local t = math.Clamp(pain / 100, 0, 1)
+		return Color(255, math.floor(255 * (1 - t * 0.85)), math.floor(255 * (1 - t * 0.85)))
+	end
+
+	if inShock then
+		local t = math.Clamp(shock / 80, 0, 1)
+		return Color(255, math.floor(255 * (1 - t * 0.5)), math.floor(255 * (1 - t * 0.5)))
+	end
+
+	if lowConsciousness then
+		local t = math.Clamp(1 - consciousness / 0.6, 0, 1)
+		local gray = math.floor(255 * (1 - t * 0.55))
+		return Color(gray, gray, gray)
+	end
+
+	if inAdrenalineOrFear then
+		return Color(255, 230, 180)
+	end
+
+	return Color(255, 255, 255)
+end
+
 function hg.get_status_message(ply)
 	local txt = get_status_message(ply)
 

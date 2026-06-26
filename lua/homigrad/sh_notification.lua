@@ -371,8 +371,37 @@ if CLIENT then
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
 			local msg, time, timeshow, clr, traumatic = tbl[1], tbl[2], tbl[3], tbl[4], tbl[5]
 
-			local mul = ((org.brain > 0.1 or org.pulse < 50) and 3 or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
-			local time_one_symbol = 0.06 * mul//(lply.organism and lply.organism.fear >= 0.5 and 0.5 or 1)
+			local pain = org.pain or 0
+			local shock = org.shock or 0
+			local adrenaline = org.adrenaline or 0
+			local fear = org.fear or 0
+			local analgesia = org.analgesia or 0
+			local consciousness = org.consciousness or 1
+			local o2 = (org.o2 and org.o2[1]) or 30
+			local pulse = org.pulse or 70
+			local blood = org.blood or 5000
+			local lasthit = org.lasthit or 0
+			local recentDamage = lasthit > 0 and (time_spent - lasthit) < 3
+
+			local dying = (o2 < 12) or (pulse < 40 and pulse > 0) or (blood < 2500)
+			local inPain = pain > 30 or recentDamage
+			local inShock = shock > 20
+			local inAdrenalineOrFear = (adrenaline > 0.5) or (fear > 0.5)
+			local highAnalgesia = analgesia > 1.0
+			local lowConsciousness = consciousness < 0.6
+
+			local speedMul = 1
+			if dying or lowConsciousness then
+				speedMul = 2.5
+			elseif org.brain > 0.1 or pulse < 50 then
+				speedMul = 3
+			elseif inShock then
+				speedMul = 1.4
+			elseif inAdrenalineOrFear then
+				speedMul = 0.75
+			end
+
+			local time_one_symbol = 0.06 * speedMul
 			local time_to_read = (utf8.len(msg) * time_one_symbol)
 			local wait = math.Clamp(time_to_read / 3 * math.Clamp(1 - #hg.notifications / 1, 0.25, 1), 1, 4) + timeshow
 
@@ -395,8 +424,8 @@ if CLIENT then
 				local txt = utf8.sub(utf8.force(msg), 1, click)
 
 				coloruse.r = clr.r
-				coloruse.g = math.min(math.Clamp(((90 - org.pain) / 90) * 255, 0, 255), clr.g)
-				coloruse.b = math.min(math.Clamp(((90 - org.pain) / 90) * 255, 0, 255), clr.g)
+				coloruse.g = clr.g
+				coloruse.b = clr.b
 
 				if (org.otrub or !lply:Alive()) then
 					if not last_message then
@@ -419,18 +448,29 @@ if CLIENT then
 				col.a = 255 * (last_time and (last_time + 2 - time_spent) or part2)
 				colBrown.a = 255 * (last_time and (last_time + 2 - time_spent) or part2)
 
-				-- Traumatic shake and fade effect
 				local shakeX = 0
 				local shakeY = 0
 				local fadeAlpha = 1
-				
+
+				if inPain or recentDamage then
+					local shakeScale = math.Clamp(pain / 60, 0, 1) * 8 + (recentDamage and 4 or 0)
+					shakeX = math.Rand(-shakeScale, shakeScale)
+					shakeY = math.Rand(-shakeScale, shakeScale)
+				elseif inShock then
+					local shakeScale = math.Clamp(shock / 80, 0, 1) * 5
+					shakeX = math.Rand(-shakeScale, shakeScale)
+					shakeY = math.Rand(-shakeScale, shakeScale)
+				elseif inAdrenalineOrFear then
+					local shakeScale = math.Clamp((adrenaline + fear) / 4, 0, 1) * 2.5
+					shakeX = math.Rand(-shakeScale, shakeScale)
+					shakeY = math.Rand(-shakeScale, shakeScale)
+				end
+
 				if traumatic then
-					-- Shake intensity based on time since notification started
 					local shakeIntensity = math.Clamp((time_spent - time) / 0.5, 0, 1) * 5
-					shakeX = math.Rand(-shakeIntensity, shakeIntensity)
-					shakeY = math.Rand(-shakeIntensity, shakeIntensity)
-					
-					-- Fade in effect for first 0.3 seconds
+					shakeX = shakeX + math.Rand(-shakeIntensity, shakeIntensity)
+					shakeY = shakeY + math.Rand(-shakeIntensity, shakeIntensity)
+
 					fadeAlpha = math.Clamp((time_spent - time) / 0.3, 0, 1)
 					col.a = col.a * fadeAlpha
 					colBrown.a = colBrown.a * fadeAlpha
@@ -472,13 +512,29 @@ if CLIENT then
 					cam.PopModelMatrix()
 
 					render.PopFilterMag()
+				elseif highAnalgesia then
+					local displayTxt = last_message or txt
+					local baseX = ScrW() / 2 - txtw / 2 + shakeX
+					local baseY = ScrH() - ScrH() / 6 + shakeY
+					local curX = baseX
+					local hueOffset = SysTime() * 80
+					for i, code in utf8.codes(displayTxt) do
+						local char = utf8.char(code)
+						surface.SetFont(font)
+						local cw, _ = surface.GetTextSize(char)
+						local charHue = (hueOffset + i * 30) % 360
+						local rainbowCol = HSVToColor(charHue, 0.9, 1)
+						rainbowCol.a = col.a
+						draw.SimpleTextOutlined(char, font, curX, baseY, rainbowCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
+						curX = curX + cw
+					end
 				elseif lply.PlayerClassName == "furry" then
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeX, ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeY
+					local x, y = ScrW() / 2 - txtw / 2 + shakeX, ScrH() - ScrH() / 6 + shakeY
 
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x + 2, y + 2, ColorAlpha(color_black, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x, y, ColorAlpha(bluewhite, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 				else
-					local x, y = ScrW() / 2 - txtw / 2 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeX, ScrH() - ScrH() / 6 + math.Rand(0, org.pain > 10 and org.pain / 10 or 0) + math.Rand(0, (255 - clr.g) / 255 * 2) + shakeY
+					local x, y = ScrW() / 2 - txtw / 2 + shakeX, ScrH() - ScrH() / 6 + shakeY
 
 					drawTextWithEmoji(last_message or txt, x, y, col, colBrown)
 				end

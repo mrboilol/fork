@@ -254,12 +254,6 @@ local blindMat = Material("effects/shaders/zb_blind")
 local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
--- White vignette materials for give-up effect
-local whiteVignetteR = Material("vgui/gradient-r")
-local whiteVignetteL = Material("vgui/gradient-l")
-local whiteVignetteU = Material("vgui/gradient-u")
-local whiteVignetteD = Material("vgui/gradient-d")
-
 local PainLerp = 0
 local O2Lerp = 0
 local assimilatedLerp = 0
@@ -1621,29 +1615,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		end
 
-		-- White desaturation as background (replaces dark graying)
 		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
 		local whiteAmt = giveUpWhiteLerp * 0.35
-		-- Flat white over the whole screen: very low opacity but noticeable
-		draw.NoTexture()
-		surface.SetDrawColor(255, 255, 255, math.floor(giveUpWhiteLerp * 30))
-		surface.DrawRect(0, 0, ScrW(), ScrH())
-		-- Draw white vignette as a background layer behind other effects
-		surface.SetDrawColor(255, 255, 255, math.floor(giveUpWhiteLerp * 35))
-		surface.SetMaterial(whiteVignetteR)
-		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		surface.SetMaterial(whiteVignetteL)
-		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		surface.SetMaterial(whiteVignetteU)
-		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		surface.SetMaterial(whiteVignetteD)
-		surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-		-- Apply white tint additively (colour increases toward white, not black)
-		tab["$pp_colour_addr"] = whiteAmt * 0.10
-		tab["$pp_colour_addg"] = whiteAmt * 0.10
-		tab["$pp_colour_addb"] = whiteAmt * 0.10
-		tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.18)
-		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.07
+		tab["$pp_colour_addr"] = whiteAmt * 0.22
+		tab["$pp_colour_addg"] = whiteAmt * 0.22
+		tab["$pp_colour_addb"] = whiteAmt * 0.22
+		tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.45)
+		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.18
+		tab["$pp_colour_contrast"] = math.min(tab["$pp_colour_contrast"] or 1, 1 - whiteAmt * 0.12)
 
 		-- Suppress regular despair visual effects
 		despairVisualLerp = 0

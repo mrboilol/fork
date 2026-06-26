@@ -1105,7 +1105,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			local traumatic = hg.is_traumatic_message(owner)
 			//print(str)
 			-- (msg, delay, msgKey, showTime, func, clr, traumatic)
-			owner:Notify(str, 1, "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255), traumatic)
+			owner:Notify(str, 1, "phrase", 1, nil, hg.get_notify_color(owner), traumatic)
 		end
 	end
 
@@ -1295,7 +1295,7 @@ hook.Add("HG_OnWakeOtrub", "afterOtrub", function( owner )
 	-- (msg, delay, msgKey, showTime, func, clr, traumatic)
 	timer.Simple(0.1,function()
 		if not IsValid(owner) then return end
-		owner:Notify(str, 1, "wake", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255)), traumatic)
+		owner:Notify(str, 1, "wake", 1, nil, hg.get_notify_color(owner), traumatic)
 	end)
 
 	owner.organism.fearadd = owner.organism.fearadd + 5
