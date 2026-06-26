@@ -202,9 +202,7 @@ module[2] = function(owner, org, timeValue)
 
 		local prevConsciousness = org.consciousness or 1
 
-		org.consciousness = math.Approach(org.consciousness, 0, timeValue / 5)
-
-		-- Reduce goodmood when going unconscious
+		org.consciousness = math.Approach(org.consciousness, 0.25, timeValue / 5)
 
 		if prevConsciousness > 0.5 and org.consciousness < 0.5 then
 
@@ -279,16 +277,6 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Severe shock triggers unconsciousness
-
-	if (org.shock or 0) > 80 then
-
-		org.needotrub = true
-
-	end
-
-
-
 	if org.consciousness < 0.4 then
 
 		org.needfake = true
@@ -323,7 +311,7 @@ module[2] = function(owner, org, timeValue)
 
 		local shockSeverity = math.Clamp((org.shock - shockCap) / 50, 0.1, 1)
 
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.4, 0)
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.4, 0.25)
 
 	end
 

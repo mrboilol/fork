@@ -400,7 +400,7 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	
 	if IsValid(ply.OldRagdoll) then DrawPlayerRagdoll(follow, ply) end
 
-	local pos = hg.eye(ply, 10, follow, att_Ang, att.Pos)
+	local pos = hg.eye(ply, 10, follow, att_Ang)
 
 	--local dot = ang:Forward():Dot((pos - att.Pos):GetNormalized())
 	
@@ -468,15 +468,10 @@ CalcView = function(ply, origin, angles, fov, znear, zfar)
 	view.znear = 1
 
 	if ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0 then
-		-- Renamed local var so it does NOT shadow the outer `k` (which is the
-		-- IN_JUMP lerp state used further down). Smooth the whole 1s window
-		-- with an ease-out curve so the hand-off from ragdoll-eye to player-eye
-		-- is gradual instead of a half-second snap.
-		local getUpK = math.Clamp(1 - (ply.gettingup + 1 - CurTime()), 0, 1)
-		local blend = math.ease.OutSine(getUpK)
-		-- Blend BOTH origin and angles so the camera doesn't pop in position.
-		view.origin = LerpVector(blend, view.origin, oldorigin)
-		view.angles = LerpAngle(blend, view.angles, oldangles)
+		local k = 1 - (ply.gettingup + 1 - CurTime())
+		local k2 = math.max(k - 0.5, 0) * 2
+		//view.origin = LerpVector(k2, view.origin, oldorigin)
+		view.angles = LerpAngle(k2, view.angles, oldangles)
 	end
 	//view.angles = angles
 

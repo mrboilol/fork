@@ -233,12 +233,29 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
 
+		local panicPulse = (math.sin(CurTime() * 2.5) + 1) * 0.5
+		local vignetteStrength = 2.8 + panicPulse * 1.2
+		local vignetteSoftness = 3.5 + panicPulse * 1.0
+
 		render.UpdateScreenEffectTexture()
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", 1.8)
-		vignetteMat:SetFloat("$c1_y", 2.2)
+		vignetteMat:SetFloat("$c0_z", vignetteStrength)
+		vignetteMat:SetFloat("$c1_y", vignetteSoftness)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		heatMat:SetFloat("$c0_x", -CurTime() * 0.22)
+		heatMat:SetFloat("$c0_y", 0.01 + 0.035)
+		heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 1.1) - 1.5) * (0.15 + 0.85))
+		render.SetMaterial(heatMat)
+		render.DrawScreenQuad()
+
+		local panicTab = {}
+		panicTab["$pp_colour_brightness"] = -0.015 - 0.06 * (0.5 + panicPulse * 0.5)
+		panicTab["$pp_colour_contrast"] = 1 - 0.07
+		panicTab["$pp_colour_colour"] = 1 - 0.38
+		DrawColorModify(panicTab)
 	end
 
 	-- Corpse-witness vignette

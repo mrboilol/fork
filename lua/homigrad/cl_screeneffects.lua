@@ -1321,23 +1321,22 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					ItssooverStation:SetVolume(consciousVol)
 
 					local fft = ItssooverStation:GetFFT(512)
-						if fft then
-							local peakSum = 0
-							for i = 1, #fft do
-								peakSum = peakSum + fft[i]
-							end
-							local avgPeak = peakSum / #fft
+					if fft then
+						local peakSum = 0
+						for i = 1, #fft do
+							peakSum = peakSum + fft[i]
+						end
+						local avgPeak = peakSum / #fft
 
-							-- Apply screen shake based on peak intensity
-							if avgPeak > 0.3 then
-								local shakeIntensity = math.Clamp((avgPeak - 0.3) * 2, 0, 1)
-								local shakeAngle = Angle(
-									math.Rand(-1, 1) * shakeIntensity * 2,
-									math.Rand(-1, 1) * shakeIntensity * 2,
-									math.Rand(-0.5, 0.5) * shakeIntensity
-								)
-								ViewPunch(shakeAngle)
-							end
+						-- Apply screen shake based on peak intensity
+						if avgPeak > 0.3 then
+							local shakeIntensity = math.Clamp((avgPeak - 0.3) * 2, 0, 1)
+							local shakeAngle = Angle(
+								math.Rand(-1, 1) * shakeIntensity * 2,
+								math.Rand(-1, 1) * shakeIntensity * 2,
+								math.Rand(-0.5, 0.5) * shakeIntensity
+							)
+							ViewPunch(shakeAngle)
 						end
 					end
 				end

@@ -299,7 +299,7 @@ local adrenaline_phrases = {
     "Im so incredibly anxious.",
     "Focus... just focus...",
     "My hands are so shaky.",
-    "I cant calm down.",
+    "I can't calm down.",
     "I feel at edge.",
     "I need to chill out, literally...",
 }

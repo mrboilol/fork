@@ -448,8 +448,27 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				org.adrenalineAdd = (org.adrenalineAdd or 0) + boost
 				org._corpseAdrenalineGiven = given + boost
 			end
+
+			if not org.panicAttack and not org.givingUp and not org.otrub then
+				if not org._corpsePanicCheckTime or time > org._corpsePanicCheckTime then
+					org._corpsePanicCheckTime = time + 2
+					local panicChance = 0.04 * math.min(corpsesSeen, 2) * Clamp((org.despair or 0) / 0.4, 0.2, 1)
+					if math.random() < panicChance then
+						org.panicAttack = true
+						org._panicAttackEndTime = time + math.random(6, 14)
+						org._panicAttackStartTime = nil
+						if not org._panicAdrenalineGiven then
+							local reserve = min(org.adrenaline or 0, 1.5)
+							org.adrenaline = (org.adrenaline or 0) - reserve
+							org.adrenalineAdd = (org.adrenalineAdd or 0) + 2.0
+							org._panicAdrenalineGiven = true
+						end
+					end
+				end
+			end
 		else
 			org._corpseAdrenalineGiven = math.max((org._corpseAdrenalineGiven or 0) - 0.015, 0)
+			org._corpsePanicCheckTime = nil
 		end
 	end
 
@@ -775,5 +794,20 @@ hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
 		org._despairLastGainedTime = now
 		org._despairNextDeathWitness = now + 0.5
 		org._despairLockUntil = math.max(org._despairLockUntil or 0, now + 30)
+
+		if not org.panicAttack and not org.givingUp and not org.otrub then
+			local panicChance = 0.12 * Clamp((org.despair or 0) / 0.3, 0.15, 1)
+			if math.random() < panicChance then
+				org.panicAttack = true
+				org._panicAttackEndTime = now + math.random(6, 14)
+				org._panicAttackStartTime = nil
+				if not org._panicAdrenalineGiven then
+					local reserve = min(org.adrenaline or 0, 1.5)
+					org.adrenaline = (org.adrenaline or 0) - reserve
+					org.adrenalineAdd = (org.adrenalineAdd or 0) + 2.0
+					org._panicAdrenalineGiven = true
+				end
+			end
+		end
 	end
 end)
