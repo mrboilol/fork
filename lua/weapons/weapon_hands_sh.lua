@@ -1636,7 +1636,7 @@ function SWEP:ApplyForce()
 					self.firstTimePrint = false
 
 					if ply.organism and ply.organism.stamina then
-						ply.organism.stamina.subadd = (ply.organism.stamina.subadd or 0) + 0.8
+						ply.organism.stamina.subadd = (ply.organism.stamina.subadd or 0) + 0.25
 					end
 
 					if (self.CPRThink or 0) < CurTime() then
@@ -1681,17 +1681,20 @@ function SWEP:ApplyForce()
 							
 							-- Heart restart based on CPR duration and pulse
 							-- Longer CPR = higher chance, even with 0 pulse
-							local durationChance = math.Clamp(self.CPRDuration / 10, 0, 0.8) * skillMult -- Up to 80% chance after 10 seconds (160% for doctors)
-							local pulseChance = math.Clamp(org.pulse / 70, 0, 1) * 0.5 * skillMult -- Up to 50% chance from pulse alone
-							local totalChance = durationChance + pulseChance
+							local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.brainstem or 0) < 1
+							local durationChance = math.Clamp(self.CPRDuration / 8, 0, 0.75) * skillMult -- Up to 75% after 8 seconds (150% for doctors)
+							local pulseChance = math.Clamp((org.pulse or 0) / 70, 0, 1) * 0.6 * skillMult
+							local adrenalineChance = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0)) / 4, 0, 1) * 0.45
+							local totalChance = math.Clamp(durationChance + pulseChance + adrenalineChance, 0, 0.98)
 							
-							if org.heartstop and math.random() < totalChance then
+							if canRestartHeart and org.heartstop and math.random() < totalChance then
 								org.heartstop = false
 								-- Reset heartbeat to safe range
-								org.heartbeat = math.Clamp(org.heartbeat, 80, 140)
-							elseif org.pulse > 5 then
+								org.heartbeat = math.Clamp(org.heartbeat > 0 and org.heartbeat or 90, 80, 140)
+								org.bloodpressure = math.max(org.bloodpressure or 0, 45)
+							elseif canRestartHeart and org.pulse > 5 then
 								org.heartstop = false
-							elseif org.pulse > 0 and math.random(100) < (org.pulse * 10 * skillMult) then
+							elseif canRestartHeart and org.pulse > 0 and math.random(100) < (org.pulse * 12 * skillMult) then
 								org.heartstop = false
 							end
 							

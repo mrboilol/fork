@@ -2032,7 +2032,7 @@ local function draw_status_effects()
 	local effectsToDraw = {}
 	for _, effect in ipairs(effects) do
 	    local timeActive = currentTime - (statusEffectAppearance[effect.name] or 0)
-	    if isAdmiring or timeActive < 25 then
+	    if isAdmiring or timeActive < 25 or not GetConVar("developer"):GetBool() then
 	        table.insert(effectsToDraw, effect)
 	    end
 	end

@@ -48,6 +48,14 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(255, 0, 255)
 	},
 	{
+		"brainstem",
+		nil,
+		Vector(0.6, 1.4, 0),
+		Angle(0, 0, 0),
+		Vector(0.8, 0.9, 0.8),
+		Color(180, 0, 255)
+	},
+	{
 		"eyeL",
 		nil,
 		Vector(4.1, -3.4, 1.5),
@@ -149,6 +157,8 @@ male["ValveBiped.Bip01_Spine2"] = {
 	{"lungsR", nil, Vector(4, 3, -3), Angle(0, 0, 0), Vector(4, 2, 2), Color(0, 255, 255)},
 	{"lungsL", nil, Vector(4, 3, 3), Angle(0, 0, 0), Vector(4, 2, 2), Color(0, 255, 255)},
 	{"trachea", nil, Vector(6, 3, 0), Angle(0, 0, 0), Vector(6, 0.75, 0.75), Color(0, 125, 255)},
+	{"subclavianR", nil, Vector(1, 4.2, -3.4), Angle(0, 0, -10), Vector(2.4, 0.3, 0.3), Color(220, 0, 0)},
+	{"subclavianL", nil, Vector(1, 4.2, 3.4), Angle(0, 0, 10), Vector(2.4, 0.3, 0.3), Color(220, 0, 0)},
 	{"heart", nil, Vector(1, 2, 1), Angle(0, 0, 0), Vector(1.5, 1.5, 1.5), Color(200, 0, 0)}
 }
 
@@ -317,6 +327,14 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(255, 0, 255)
 	},
 	{
+		"brainstem",
+		nil,
+		Vector(-0.2, 3.2, 0),
+		Angle(0, 0, 0),
+		Vector(0.8, 0.9, 0.8),
+		Color(180, 0, 255)
+	},
+	{
 		"eyeL",
 		nil,
 		Vector(3.6, -3.0, 1.5),
@@ -402,6 +420,7 @@ hg.organism.translationTbl = {
 	["skull"] = "Skull",
 	["jaw"] = "Jaw",
 	["brain"] = "Brain",
+	["brainstem"] = "Brainstem",
 	["eyeL"] = "Left eye",
 	["eyeR"] = "Right eye",
 	["arteria"] = "Carotid artery",
@@ -420,6 +439,8 @@ hg.organism.translationTbl = {
 	["rarmdown"] = "Right forearm",
 	["rarmup"] = "Right upperarm",
 	["rarmartery"] = "Right arm artery",
+	["subclavianL"] = "Left subclavian artery",
+	["subclavianR"] = "Right subclavian artery",
 }
 
 --[[local gordon = {}

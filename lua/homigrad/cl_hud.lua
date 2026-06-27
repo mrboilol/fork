@@ -1,6 +1,7 @@
 local hide = {
 	["CHudHealth"] = true,
 	["CHudBattery"] = true,
+	["CHudAmmo"] = true,
 	["CHudSecondaryAmmo"] = true,
 	["CHudCrosshair"] = true,
 	["CHudDamageIndicator"] = true,
@@ -16,6 +17,7 @@ local hide = {
 local gordon_hide = {
 	["CHudHealth"] = true,
 	["CHudBattery"] = true,
+	["CHudAmmo"] = true,
 	["CHudSecondaryAmmo"] = true,
 	["CHudCrosshair"] = true,
 	["CHudSuitPower"] = true,

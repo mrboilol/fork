@@ -26,6 +26,8 @@ module[1] = function(org)
 	org.arteria = 0
 	org.rarmartery = 0
 	org.larmartery = 0
+	org.subclavianR = 0
+	org.subclavianL = 0
 	org.rlegartery = 0
 	org.llegartery = 0
 	org.spineartery = 0
@@ -123,7 +125,7 @@ module[2] = function(owner, org, mulTime)
 		local regenBoost = 1 + math.Clamp(timeSinceBleed / 30, 0, 2)
 		local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 		local goodmoodBonus = 1 + goodmood * 0.3
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 3 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost * goodmoodBonus, 5000)
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.15 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost * goodmoodBonus, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)

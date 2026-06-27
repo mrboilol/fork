@@ -33,8 +33,8 @@ module[2] = function(owner, org, timeValue)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
-	//if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts.",true,"heart",6) end
-	//if org.isPly and not org.otrub and org.heartstop then org.owner:Notify("",true,"heartstop",6) end
+	if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts a lot...",true,"heart",6) end
+	if org.isPly and not org.otrub and org.heartstop then org.owner:Notify("",true,"heartstop",6) end
 
 	local stamina = org.stamina
 	
@@ -97,7 +97,7 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + 40 * math.max(0, org.fear)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
-	local adrenalineHeartBoost = 15 * math.min(org.adrenaline, 3)
+	local adrenalineHeartBoost = 9 * math.min(org.adrenaline, 3)
 	if org.givingUp then adrenalineHeartBoost = adrenalineHeartBoost * 0.3 end
 	heartbeat = heartbeat + adrenalineHeartBoost
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
@@ -159,7 +159,7 @@ module[2] = function(owner, org, timeValue)
 	local heartK = math.Clamp(1 - org.heart, 0, 1)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
-	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.15
+	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.08
 	if org.givingUp then adrenalineHyperMul = adrenalineHyperMul * 0.3 end
 	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
@@ -243,7 +243,7 @@ module[2] = function(owner, org, timeValue)
     end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-	local adrenalineStabilizer = totalAdrenaline > 0.5
+	local adrenalineStabilizer = totalAdrenaline > 0.8
 	
 	-- Tranexamic acid and thiamine accelerate ischemia regression
 	local hasAntiIschemia = (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
@@ -261,7 +261,7 @@ module[2] = function(owner, org, timeValue)
 
 		-- Epinephrine/adrenaline above 0.5 accelerates ischemia regression
 		-- Tranexamic acid and thiamine also accelerate ischemia regression
-		local decayRate = (adrenalineStabilizer or hasAntiIschemia) and timeValue / 2 or timeValue / 10
+		local decayRate = (adrenalineStabilizer or hasAntiIschemia) and timeValue / 4 or timeValue / 10
 		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 
@@ -359,21 +359,29 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
+		local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.brainstem or 0) < 1 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
 		-- Scale chance with adrenaline level: significantly improved effectiveness
 		-- Low dose (1): ~70% chance, Medium dose (2): ~90% chance, High dose (4+): near-certain
-		local chance = math.Clamp(adren * 50 + adren * adren * 10, 0, 99)
+		local chance = math.Clamp(adren * 60 + adren * adren * 12, 0, 99)
+		chance = chance * math.Clamp(1 - (org.heart or 0) * 0.65, 0.2, 1)
+		chance = chance * math.Clamp(1 - (org.brainstem or 0) * 0.75, 0.1, 1)
+		if (org.o2 and (org.o2[1] or 0) < 5) or (org.bloodpressure or 0) < 15 then
+			chance = chance * 0.6
+		end
 		local rand = math.random(100)
 
 		-- High adrenaline retries faster (0.02s at adren>=3, 0.04s otherwise)
 		org.adrenaline_try = CurTime() + (adren >= 3 and 0.02 or 0.04)
 
-		if chance > rand then
+		if canRestartHeart and chance > rand then
 			org.heartstop = false
 			-- Reset heartbeat to a safe range when restarting to prevent immediate fibrillation
-			org.heartbeat = math.Clamp(org.heartbeat, 80, 140)
+			org.heartbeat = math.Clamp(org.heartbeat > 0 and org.heartbeat or 90, 80, 140)
+			org.pulse = math.max(org.pulse or 0, 35)
+			org.bloodpressure = math.max(org.bloodpressure or 0, 45)
 			-- Also attempt to restore O2 to a minimum survivable level so breathing can resume
 			if org.o2 then
-				local o2Restore = math.Clamp(adren * 2, 2, 8)
+				local o2Restore = math.Clamp(adren * 2.5, 3, 12)
 				org.o2[1] = math.max(org.o2[1], o2Restore)
 			end
 		end

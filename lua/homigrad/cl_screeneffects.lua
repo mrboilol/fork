@@ -2093,10 +2093,11 @@ local function IsSkullBrokenFully(ent, visited)
 	if visited[ent] then return false end
 	visited[ent] = true
 
-	if ent:GetNWBool("SkullBrokenFully") then return true end
+	if ent:GetNWBool("SkullBrokenFully") or ent.HGSkullBrokenFully then return true end
 
 	-- Check organism
 	if ent.organism and (ent.organism.skull or 0) >= 1 then
+		ent.HGSkullBrokenFully = true
 		return true
 	end
 
@@ -2104,6 +2105,7 @@ local function IsSkullBrokenFully(ent, visited)
 	if ent:IsPlayer() then
 		local org = ent.organism or ent.new_organism
 		if org and (org.skull or 0) >= 1 then
+			ent.HGSkullBrokenFully = true
 			return true
 		end
 		-- Check their fake ragdoll or death ragdoll
@@ -2118,6 +2120,7 @@ local function IsSkullBrokenFully(ent, visited)
 	elseif ent:IsRagdoll() then
 		-- Check ragdoll's own organism first (works even after death when ply NWEntity is NULL)
 		if ent.organism and (ent.organism.skull or 0) >= 1 then
+			ent.HGSkullBrokenFully = true
 			return true
 		end
 		-- Also check linked player if still valid

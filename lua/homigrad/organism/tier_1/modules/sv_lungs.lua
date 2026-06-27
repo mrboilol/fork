@@ -597,7 +597,7 @@ module[2] = function(owner, org, timeValue)
 
 		-- Recovery is slower when winded but won't drop to zero
 
-		local staminaMultiplier = math.max(staminaRatio, 0.15)
+		local staminaMultiplier = math.max(staminaRatio, 0.35)
 
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
 		local regenerate = regen * timeValue * 4 * staminaMultiplier * pulseMultiplier * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
@@ -608,9 +608,9 @@ module[2] = function(owner, org, timeValue)
 
 			local hasStabilizer = totalAdrenaline > 0.5 or (org.thiamine or 0) > 0 or (org.tranexamic_acid or 0) > 0
 
-			regenerate = regenerate * (hasStabilizer and 0.4 or 0.1) -- drugs reduce penalty from 90% to 60%
+			regenerate = regenerate * (hasStabilizer and 0.65 or 0.35) -- drugs reduce penalty, but winded players can still catch some air
 
-			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue * (hasStabilizer and 2 or 1), 0) -- drugs clear O2 deprivation faster
+			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue * (hasStabilizer and 2.5 or 1.6), 0) -- drugs clear O2 deprivation faster
 
 		end
 
@@ -786,7 +786,7 @@ module[2] = function(owner, org, timeValue)
 
 			local struggleRatio = 1 - (o2.curregen / losing_oxy)
 
-			o2[1] = max(o2[1] - timeValue * struggleRatio * 2.0, 0)
+			o2[1] = max(o2[1] - timeValue * struggleRatio * 0.65, 0)
 
 		end
 

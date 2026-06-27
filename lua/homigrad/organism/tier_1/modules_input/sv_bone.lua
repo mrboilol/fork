@@ -684,9 +684,9 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.painadd = org.painadd + dmg * 2
 	org.shock = org.shock + dmg * 2.5
-	org.o2[1] = math.max(org.o2[1] - dmg * 12, 0)
-	org.stamina_damage = (org.stamina_damage or 0) + dmg * 45
-	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 25
+	org.o2[1] = math.max(org.o2[1] - math.min(dmg * 4, 10), 8)
+	org.stamina_damage = (org.stamina_damage or 0) + dmg * 16
+	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 8
 
 	-- Chest hits can cause hemothorax (blood filling pleural cavity)
 	if dmg >= 0.5 then

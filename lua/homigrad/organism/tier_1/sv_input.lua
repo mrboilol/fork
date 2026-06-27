@@ -1192,8 +1192,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_BURN) then
 			org.fearadd = org.fearadd + 0.3
 			if IsValid(att) and att ~= org.owner and att:IsPlayer() and att.organism then
-				att.organism.adrenalineAdd = math.max(att.organism.adrenalineAdd or 0, 1)
-				att.organism.adrenaline = math.min((att.organism.adrenaline or 0) + 0.05, 1.25)
+				local reserveK = math.Clamp((att.organism.adrenalineStorage or 0) / 5, 0, 1)
+				att.organism.adrenalineAdd = math.max(att.organism.adrenalineAdd or 0, 1.4 * (0.35 + reserveK * 0.65))
+				att:AddNaturalAdrenaline(0.35)
 			end
 		end
 
@@ -1227,7 +1228,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--end
 	
 	if not org.otrub and org.adrenalineAdd >= 0 then// and dmgInfo:IsDamageType(DMG_BULLET + DMG_BLAST + DMG_BUCKSHOT + DMG_SLASH + DMG_CLUB + DMG_BURN) then
-		org.owner:AddNaturalAdrenaline(instaPain * 0.75 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1) * (dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) and 4 or 1))
+		local reserveK = math.Clamp((org.adrenalineStorage or 0) / 5, 0, 1)
+		org.adrenalineAdd = math.max(org.adrenalineAdd or 0, math.min(instaPain * 0.25, 1.5) * (0.35 + reserveK * 0.65))
+		org.owner:AddNaturalAdrenaline(instaPain * 1.15 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1) * (dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) and 4 or 1))
 	end
 	
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH) or (dmgInfo:IsDamageType(DMG_GENERIC + DMG_VEHICLE + DMG_FALL + DMG_CLUB)) then

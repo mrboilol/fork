@@ -161,6 +161,8 @@ local function send_organism(org, ply)
 	sendtable.pelvis = org.pelvis
 	sendtable.disorientation = org.disorientation
 	sendtable.brain = org.brain
+	sendtable.brainstem = org.brainstem
+	sendtable.intpressure = org.intpressure
 	sendtable.o2 = org.o2
 	sendtable.CO = org.CO
 	sendtable.blood = org.blood
@@ -177,6 +179,8 @@ local function send_organism(org, ply)
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
+	sendtable.subclavianR = org.subclavianR
+	sendtable.subclavianL = org.subclavianL
 	sendtable.recoilmul = org.recoilmul
 	sendtable.meleespeed = org.meleespeed
 	sendtable.legstrength = org.legstrength
@@ -254,6 +258,8 @@ local function send_bareinfo(org)
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
 	sendtable.analgesia = org.analgesia
+	sendtable.brainstem = org.brainstem
+	sendtable.intpressure = org.intpressure
 	sendtable.o2 = org.o2
 	sendtable.timeValue = org.timeValue
 	sendtable.despair = org.despair

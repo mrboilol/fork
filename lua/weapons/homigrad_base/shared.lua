@@ -15,7 +15,7 @@ SWEP.Secondary.Ammo = "none"
 SWEP.Weight = 5
 SWEP.AutoSwitchTo = false
 SWEP.AutoSwitchFrom = false
-SWEP.DrawAmmo = true
+SWEP.DrawAmmo = false
 SWEP.DrawCrosshair = false
 SWEP.shouldntDrawHolstered = false
 hg.weapons = hg.weapons or {}
@@ -1093,6 +1093,13 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
+		if not dynamicmags:GetBool() and not self:KeyDown(IN_RELOAD) and not (self.hudinspect and self.hudinspect > CurTime()) then
+			self:ChangeFOV()
+			self:DrawHUDAdd()
+			if self.dort then self:DoRT() end
+			return
+		end
+
 		local ammotype = (hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon) or hg.matPistolAmmoAlt
 		if isstring(ammotype) then
 			local try_paths = { ammotype }

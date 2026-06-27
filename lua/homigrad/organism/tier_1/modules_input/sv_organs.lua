@@ -367,6 +367,27 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 	return result
 end
 
+input_list.brainstem = function(org, bone, dmg, dmgInfo)
+	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
+	local oldDmg = org.brainstem or 0
+	local result = damageOrgan(org, dmg * 1.4, dmgInfo, "brainstem")
+	local delta = (org.brainstem or 0) - oldDmg
+
+	hg.AddHarmToAttacker(dmgInfo, delta * 25, "Brainstem damage harm")
+
+	if delta > 0 then
+		org.consciousness = math.Approach(org.consciousness or 1, 0, dmg * 5)
+		org.disorientation = (org.disorientation or 0) + dmg * 2
+		org.shock = (org.shock or 0) + dmg * 8
+		org.painadd = (org.painadd or 0) + dmg * 12
+		if org.brainstem >= 0.45 and math.random() < delta * 2 then
+			org.heartstop = true
+		end
+	end
+
+	return result
+end
+
 local angZero = Angle(0, 0, 0)
 local vecZero = Vector(0, 0, 0)
 local function getlocalshit(ent, bone, dmgInfo, dir, hit)
@@ -386,6 +407,8 @@ local arterySize = {
 	["arteria"] = 14,
 	["rarmartery"] = 6,
 	["larmartery"] = 6,
+	["subclavianR"] = 12,
+	["subclavianL"] = 12,
 	["rlegartery"] = 9,
 	["llegartery"] = 9,
 	["spineartery"] = 10,
@@ -508,6 +531,8 @@ end
 
 input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rarmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
+input_list.subclavianR = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianR", org, dmg, dmgInfo, "ValveBiped.Bip01_Spine2", dir, hit) end
+input_list.subclavianL = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianL", org, dmg, dmgInfo, "ValveBiped.Bip01_Spine2", dir, hit) end
 input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit) end
