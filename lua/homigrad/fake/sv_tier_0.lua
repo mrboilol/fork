@@ -619,33 +619,6 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 
 	//if ragdoll:GetVelocity():LengthSqr() < (200 * 200) or ply:InVehicle() then hg.SetFreemove(ply,not no_freemove) end
 
-	-- Freemove removed on fake-in: keep the player in NOCLIP so the ragdoll doesn't freeze against the world.
-	-- Ragdoll combat mode still needs WALK for ground-based movement.
-	if not ply:InVehicle() then
-		if hg_ragdollcombat:GetBool() then
-			ply:SetMoveType(MOVETYPE_WALK)
-			local hull = Vector(5, 5, 5)
-			ply:SetHull(-Vector(hull, hull, 0), Vector(hull, hull, 72))
-			ply:SetHullDuck(-Vector(hull, hull, 0), Vector(hull, hull, 36))
-			ply:SetViewOffset(Vector(0, 0, 64))
-			ply:SetViewOffsetDucked(Vector(0, 0, 34))
-		else
-			ply:SetMoveType(MOVETYPE_NOCLIP)
-			local hull = Vector(1, 1, 1)
-			local hull2 = Vector(1, 1, 0)
-			ply:SetHull(-hull2, hull)
-			ply:SetHullDuck(-hull2, hull)
-			ply:SetViewOffset(vector_up)
-			ply:SetViewOffsetDucked(vector_up)
-		end
-	end
-
-	if isfunction(ply.UnDuck) then
-		ply:UnDuck()
-	elseif FL_DUCKING then
-		ply:RemoveFlags(FL_DUCKING)
-	end
-
 	hg.ragdollFake[ply] = ragdoll
 	ply.ActiveWeapon = ply:GetActiveWeapon()
 	hook_Run("Fake", ply, ragdoll, listArmor)
@@ -657,7 +630,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		//ply:Spectate(OBS_MODE_FREEZECAM)
 		//ply:UnSpectate()
 		--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
-		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
+		ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
 		ply:SetPos(pos)
 		ply:SetNoDraw(false)
 		ply:SetRenderMode(RENDERMODE_NONE)
@@ -665,7 +638,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 	--end)
 
 	timer.Simple(0, function() -- bandaid shitfix for now
-		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
+		ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
 	end)
 
 	if ply:FlashlightIsOn() then ply:Flashlight(false) end
@@ -868,7 +841,7 @@ function hg.FakeUp(ply, forced, instant)
 
 				ply:DrawShadow(true)
 				ply:SetRenderMode(RENDERMODE_NORMAL)
-				hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+				ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
 
 				--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 				hg.ragdollFake[ply] = nil
@@ -881,7 +854,7 @@ function hg.FakeUp(ply, forced, instant)
 		else
 			ply:DrawShadow(true)
 			ply:SetRenderMode(RENDERMODE_NORMAL)
-			hg.ApplySetCollisionGroupNow(ply, ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
+			ply:SetCollisionGroup(ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)
 			ply:SetMoveType(ply.switchingseat and MOVETYPE_NONE or MOVETYPE_WALK)
 			
 			--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
@@ -1081,7 +1054,7 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 		hg.FakeUp(ply, true, ply.switchingseat)
 	else
 		if ragdoll then
-			hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_IN_VEHICLE)
+			ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
 			--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
 			ragdoll.removingwelds = true
 
@@ -1102,7 +1075,7 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 				veh:EmitSound("zbattle/glass_shatter.ogg")
 			end
 		else
-			hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+			ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
 			--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 		end
 	end
