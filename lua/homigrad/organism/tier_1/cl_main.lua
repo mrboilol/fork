@@ -87,15 +87,13 @@ local function plyCommand(ply,cmd)
 	local time = CurTime()
 	ply.cmdtimer = ply.cmdtimer or time
 
-	if cmd == "soundfade 100 0" then
-		if IsValid(hg.chat) and not timer.Exists("otrubhuy") then
+	if cmd == "soundfade 100 99999" then
+		if IsValid(hg.chat) then
 			hg.chat:SetRealAlpha(0)
 
 			timer.Create("otrubhuy", 1, 1, function()
-				if not (lply.organism and lply.organism.otrub) then
-					lply:ConCommand("soundfade 0 1")
-					if IsValid(hg.chat) then hg.chat:AnimateRealAlpha(255) end
-				end
+				if lply.organism and not lply.organism.otrub then lply:ConCommand("soundfade 0 1") end
+				hg.chat:AnimateRealAlpha(255)
 			end)
 		end
 	end
@@ -108,13 +106,7 @@ local function plyCommand(ply,cmd)
 end
 
 local function forceOtrubSoundFade(ply)
-	local time = CurTime()
-	ply.cmdtimer = ply.cmdtimer or time
-
-	if ply.cmdtimer < time then
-		ply.cmdtimer = time + 0.1
-		ply:ConCommand("soundfade 100 0")
-	end
+	plyCommand(ply,"soundfade 100 99999")
 end
 local clr_black1 = Color( 0, 0, 0, 255)
 local clr_black2 = Color( 0, 0, 0, 255)
@@ -238,15 +230,15 @@ end)
 
 hook.Add("HG_OnOtrub", "adsadsadhuy!!", function(ply)
 	if ply == LocalPlayer() then
-		lply:SetDSP(17, true)
-		plyCommand(lply,"soundfade 100 0")
+		lply:SetDSP(17)
+		plyCommand(lply,"soundfade 100 99999")
 	end
 end)
 
 hook.Add("Player_Death", "adsadsadhuy!!", function(ply)
 	if ply == LocalPlayer() then
-		lply:SetDSP(17, true)
-		plyCommand(lply,"soundfade 100 0")
+		lply:SetDSP(17)
+		plyCommand(lply,"soundfade 100 99999")
 	end
 end)
 

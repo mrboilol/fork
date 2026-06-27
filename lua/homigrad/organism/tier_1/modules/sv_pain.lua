@@ -199,17 +199,9 @@ module[2] = function(owner, org, timeValue)
 
 
 	if org.shock > (30 * analgesiaMul) then
-
-		local prevConsciousness = org.consciousness or 1
-
-		org.consciousness = math.Approach(org.consciousness, 0.25, timeValue / 5)
-
-		if prevConsciousness > 0.5 and org.consciousness < 0.5 then
-
+		if (org.consciousness or 1) > 0.5 and (org.consciousness or 1) - timeValue / 5 < 0.5 then
 			org.goodmood = math.Clamp((org.goodmood or 1) - 0.1, 0, 1)
-
 		end
-
 	end
 
 
@@ -311,7 +303,29 @@ module[2] = function(owner, org, timeValue)
 
 		local shockSeverity = math.Clamp((org.shock - shockCap) / 50, 0.1, 1)
 
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.4, 0.25)
+		local pain = org.pain or 0
+		local highPain = pain > 70
+
+		local shockFloor
+		if highPain then
+			local painSeverity = math.Clamp((pain - 70) / 80, 0, 1)
+			shockFloor = 0.5 - painSeverity * 0.5
+		else
+			shockFloor = 0.5
+		end
+
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.4, shockFloor)
+
+		org._highShockTime = (org._highShockTime or 0)
+		if org.shock > 60 then
+			org._highShockTime = org._highShockTime + timeValue
+			if org._highShockTime > 15 then
+				local sustainedSeverity = math.Clamp((org._highShockTime - 15) / 30, 0, 1)
+				org.consciousness = math.max((org.consciousness or 1) - timeValue * sustainedSeverity * 0.15, 0)
+			end
+		else
+			org._highShockTime = math.max(org._highShockTime - timeValue * 2, 0)
+		end
 
 	end
 
@@ -361,7 +375,7 @@ module[2] = function(owner, org, timeValue)
 
 	if org.adrenalineAdd > 0 then
 
-		local critical = (org.heartstop) or (org.blood and org.blood < 1500) or (org.brain and org.brain > 1.5)
+		local critical = (org.blood and org.blood < 1500) or (org.brain and org.brain > 1.5)
 
 		if critical then
 			org.adrenaline = Approach(org.adrenaline, math.min(org.adrenaline, 2), timeValue / 5)

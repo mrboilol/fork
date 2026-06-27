@@ -1191,8 +1191,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_BURN) then
 			org.fearadd = org.fearadd + 0.3
-			if IsValid(att) and att.organism and att.organism.fearadd then
-				//att.organism.fearadd = att.organism.fearadd + 0.05
+			if IsValid(att) and att ~= org.owner and att:IsPlayer() and att.organism then
+				att.organism.adrenalineAdd = math.max(att.organism.adrenalineAdd or 0, 1)
+				att.organism.adrenaline = math.min((att.organism.adrenaline or 0) + 0.05, 1.25)
 			end
 		end
 
@@ -1434,7 +1435,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			end
 			
 			ply:ScreenFade(0, color_black, 1, 1)
-			ply:ConCommand("soundfade 100 0")
+			ply:ConCommand("soundfade 100 99999")
 		end
 	end
 
@@ -1947,7 +1948,7 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 			end
 			
 			ply:ScreenFade(0, color_black, 1, 1)
-			ply:ConCommand("soundfade 100 0")
+			ply:ConCommand("soundfade 100 99999")
 		end
 	end
 

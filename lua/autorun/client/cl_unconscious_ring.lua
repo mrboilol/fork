@@ -794,13 +794,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
-    -- Show "Theres nothing you can do." when otrub and critical
-    if isUnconscious and isCritical and otrubECGAlpha > 0.01 then
-        -- Calculate fade-in based on how critical the condition is (progress from brain damage)
-        local criticalProgress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
-        local textAlpha = 255 * otrubECGAlpha * criticalProgress
-        draw.SimpleText("Theres nothing you can do.", "OtrubCriticalMessage", ScrW() / 2, ScrH() * 0.35, Color(255, 0, 0, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    end
+
 end)
 
 local function GetPulseCheckDisplayText()

@@ -260,6 +260,7 @@ local assimilatedLerp = 0
 local tempLerp = 36.6
 local headtraumaSaturation = 0
 local suicideLerp = 0
+local suicideViewAng = Angle()
 local addtime = CurTime()
 
 local show_image_time = 0
@@ -1699,10 +1700,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if suicideLerp > 0.3 then
 			local wobbleTime = CurTime() * (1.5 + suicideLerp * 2)
 			local wobbleStrength = (suicideLerp - 0.3) * 0.3
-			ang1[1] = math.sin(wobbleTime) * wobbleStrength
-			ang1[2] = math.cos(wobbleTime * 0.7) * wobbleStrength * 0.7
-			ang1[3] = math.sin(wobbleTime * 0.5) * wobbleStrength * 0.3
-			ViewPunch(ang1)
+			suicideViewAng[1] = math.sin(wobbleTime) * wobbleStrength
+			suicideViewAng[2] = math.cos(wobbleTime * 0.7) * wobbleStrength * 0.7
+			suicideViewAng[3] = math.sin(wobbleTime * 0.5) * wobbleStrength * 0.3
+			ViewPunch(suicideViewAng)
 		end
 	else
 		suicideLerp = math.Approach(suicideLerp, 0, FrameTime() * 3)

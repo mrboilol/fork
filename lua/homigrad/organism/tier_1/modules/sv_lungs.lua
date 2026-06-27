@@ -501,12 +501,19 @@ module[2] = function(owner, org, timeValue)
 	
 
 	if o2[1] < 15 then
-
-        org.CO = math.min(org.CO + timeValue * 0.5, 30)
-
+        org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + timeValue * 0.5, 30)
     end
 
+	if o2[1] < 8 then
+		org._lowO2Time = (org._lowO2Time or 0) + timeValue
+	else
+		org._lowO2Time = math.max((org._lowO2Time or 0) - timeValue * 2, 0)
+	end
 
+	if org._lowO2Time > 5 then
+		local buildRate = math.Clamp((org._lowO2Time - 5) / 30, 0, 1)
+		org.CO = math.min(org.CO + timeValue * buildRate * 0.4, 10)
+	end
 
 	org.CO = max(org.CO - timeValue, 0)
 
@@ -524,7 +531,18 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		org.consciousness = math.min(org.consciousness, (30 - org.CO) / 30)
+		-- CO poisoning only affects consciousness once meaningful (above ~10).
+		-- Below that, hemoglobin still carries enough oxygen.
+		if org.CO > 10 then
+			org.consciousness = math.min(org.consciousness, (30 - org.CO) / 30)
+		end
+
+		local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+		if totalAdrenaline > 0.5 then
+			org.CO = math.max(org.CO - timeValue * math.Clamp(totalAdrenaline * 0.5, 0.25, 2), 0)
+			org.COregen = math.max(org.COregen - timeValue * math.Clamp(totalAdrenaline * 0.5, 0.25, 2), 0)
+			org._lowO2Time = math.max((org._lowO2Time or 0) - timeValue * totalAdrenaline * 2, 0)
+		end
 
 
 
@@ -564,7 +582,8 @@ module[2] = function(owner, org, timeValue)
 
 		local staminaMultiplier = math.max(staminaRatio, 0.15)
 
-		local regenerate = regen * timeValue * 4 * staminaMultiplier * pulseMultiplier * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * (1 - (org.CO / 30))
+		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
+		local regenerate = regen * timeValue * 4 * staminaMultiplier * pulseMultiplier * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
 
 		if org.oxygen_deprivation and org.oxygen_deprivation > 0 then
 
@@ -750,7 +769,7 @@ module[2] = function(owner, org, timeValue)
 
 			local struggleRatio = 1 - (o2.curregen / losing_oxy)
 
-			o2[1] = max(o2[1] - timeValue * struggleRatio * 0.5, 0)
+			o2[1] = max(o2[1] - timeValue * struggleRatio * 2.0, 0)
 
 		end
 
@@ -866,18 +885,23 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
+	-- Lung function gating:
+	-- * O2 at 0  -> tiny chance per tick of total lung failure (brainstem fades)
+	-- * O2 > 0   -> only restore lung function if the airway/lungs are not
+	--              catastrophically damaged. Previously this unconditionally
+	--              flipped lungsfunction=true every tick which would resurrect
+	--              breathing through destroyed lungs/trachea.
 	if o2[1] == 0 then
-
 		if math.random(50) == 1 then
-
 			org.lungsfunction = false
-
 		end
-
 	else
-
+		local lungsLost = (org.lungsL[1] or 0) >= 1 and (org.lungsR[1] or 0) >= 1
+		local tracheaLost = (org.trachea or 0) >= 1
+		local brainstemLost = (org.brain or 0) >= 0.6
+		if not (lungsLost or tracheaLost or brainstemLost or org.heartstop) then
 			org.lungsfunction = true
-
+		end
 	end
 
 
@@ -1127,37 +1151,26 @@ module[2] = function(owner, org, timeValue)
 
 
 	if org.brain >= 0.3 then
-
 		if org.brain >= 0.4 then
-
 			if math.random(120) == 1 then
-
 				org.heartstop = true
-
 			end
-
 		end
 
-
-
-		if org.brain > 0.325 and !org.heartstop then
-
-			if math.random(60) == 1 then
-
-				org.lungsfunction = true
-
+		-- Brain damage above 0.325 disrupts the brainstem's respiratory drive.
+		-- Severe damage should *suppress* lung function, not randomly restore it
+		-- (the previous code did the opposite and could reactivate breathing
+		-- after heartstop, which is logically impossible).
+		if not org.heartstop then
+			local brainSuppress = math.Clamp((org.brain - 0.325) / 0.275, 0, 1)
+			if math.random() < brainSuppress * 0.05 then
+				org.lungsfunction = false
 			end
-
 		end
-
-
 
 		local brainCap = 0.325
-
 		local brainSeverity = math.Clamp((org.brain - brainCap) / (1 - brainCap), 0.1, 1)
-
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)
-
 	end
 
 

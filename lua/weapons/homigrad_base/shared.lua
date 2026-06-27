@@ -2236,32 +2236,20 @@ function SWEP:GetAdditionalValues()
 
 		if (self.recoilWobbleAmp or 0) > 0.001 then
 			local t = CurTime()
-			-- Increased wobble intensity: amp multiplier 3.0 -> 5.5 so the gun
-			-- visibly sways farther off-axis while firing. The muzzle moves
-			-- with it, so bullet trajectories diverge naturally.
 			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 5.5
 
-			-- Multi-frequency sine sway, same shape as the heavy-weapon camera sway.
 			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
 			local wobY = math.cos(t * 1.8) * 0.65 + math.cos(t * 3.1) * 0.35
 			local wobZ = math.sin(t * 2.2) * 0.65 + math.cos(t * 2.9) * 0.35
 
-			-- Swing the gun on pitch + roll only (changes muzzle, no camera coupling).
-			-- NO yaw — AdditionalAng2[2] is read by the camera-spray path.
-			-- Pitch/roll multipliers bumped (1.8 -> 2.8, 1.5 -> 2.4) for a wider
-			-- visible muzzle deviation.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 2.8
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 2.4
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 3.8
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.6
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.35
 
-			-- Pos2 offsets bumped (0.7 -> 1.2) so the gun visibly translates
-			-- around as well, not just rotates.
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobZ * amp * 1.2
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobX * amp * 1.2
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 1.6
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.6
 		end
 
-		-- Per-shot recoil kick that physically knocks the gun off-axis and climbs the
-		-- longer you hold the trigger (SprayI). Mostly muzzle rise (pitch) plus a
-		-- deterministic horizontal/roll drift, so the muzzle diverges from the sights.
 		local recoilDecay = self:GetAnimShoot2(0.28 * mulhuy / host_timescale(), true)
 		if recoilDecay > 0.001 then
 			local sprayI = self.SprayI or 0
@@ -2269,17 +2257,12 @@ function SWEP:GetAdditionalValues()
 			local seed = math.floor(sprayI)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			-- Increased per-shot kick scale 3.5 -> 5.5 for a stronger muzzle rise/drift.
 			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 5.5
 
-			-- Pitch (muzzle climb) bumped 1.5 -> 2.4
-			-- Roll bumped 1.0 -> 1.6
-			-- Yaw bumped 0.4 -> 0.7
-			-- Pos2[1] (gun shoved up/back) bumped 0.8 -> 1.4
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 2.4           -- muzzle climbs
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.6
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.7
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 1.4           -- gun shoved up/back
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.2
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.2
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.45
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 1.8
 		end
 	end
 
@@ -2297,15 +2280,44 @@ function SWEP:GetAdditionalValues()
 		local idleRest = self:IsResting() and 0.3 or 1
 		local idleAim = self:IsZoom() and 0.6 or 1
 
-		local idleAmp = (0.5 + fatigue * 0.15 + fear * 0.35) * idleWeight * idleStance * idleRest * idleAim
+		local rarm = org.rarm or 0
+		local larm = org.larm or 0
+		local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
+		local larm_dislocated = org.larmdislocation or org.larmdislocated
+		local rarm_amputated = org.rarmamputated
+		local larm_amputated = org.larmamputated
+
+		local armSway = 0
+		if rarm_amputated then
+			armSway = armSway + 2.2
+		elseif rarm >= 1 then
+			armSway = armSway + 1.4
+		elseif rarm_dislocated then
+			armSway = armSway + 0.9
+		else
+			armSway = armSway + rarm * 0.8
+		end
+		if larm_amputated then
+			armSway = armSway + 1.6
+		elseif larm >= 1 then
+			armSway = armSway + 1.0
+		elseif larm_dislocated then
+			armSway = armSway + 0.6
+		else
+			armSway = armSway + larm * 0.5
+		end
+
+		local idleAmp = (0.5 + fatigue * 0.15 + fear * 0.35 + armSway * 0.4) * idleWeight * idleStance * idleRest * idleAim
 
 		local st = CurTime() * 0.9
 		local swA = math.sin(st * 1.1) * 0.7 + math.sin(st * 1.9) * 0.3
 		local swB = math.cos(st * 0.8) * 0.7 + math.cos(st * 1.7) * 0.3
 		local swC = math.sin(st * 1.3) * 0.6 + math.cos(st * 2.1) * 0.4
 
-		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 1.3
+		local armSwayVertBias = 1 + armSway * 0.25
+		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 1.3 * armSwayVertBias
 		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 1.1
+		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * armSway * 0.12
 
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.7
 		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.7

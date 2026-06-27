@@ -351,7 +351,7 @@ function SWEP:ApplyForce()
 					self.firstTimePrint = false
 
 					if ply.organism and ply.organism.stamina then
-						ply.organism.stamina.subadd = (ply.organism.stamina.subadd or 0) + 0.8
+						ply.organism.stamina.subadd = (ply.organism.stamina.subadd or 0) + 0.05
 					end
 
 					if (self.CPRThink or 0) < CurTime() then
@@ -397,6 +397,9 @@ function SWEP:ApplyForce()
 							elseif org.pulse > 0 and math.random(100) < (org.pulse * 10 * skillMult) then
 								-- Even with low pulse, have a chance to restart based on current pulse level
 								org.heartstop = false
+							elseif org.heartstop and math.random(100) < (5 * skillMult) then
+								org.heartstop = false
+								org.pulse = math.max(org.pulse, 5)
 							end
 							
 							-- Reduce ischemia during CPR

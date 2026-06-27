@@ -330,11 +330,33 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local fatigue_realignment_penalty = 1 + fatigue * 0.15
 	tta = tta * fatigue_realignment_penalty
 
-	-- Brain damage makes weapons feel heavier and harder to control
-	-- 0.1 brain damage adds 0.5 seconds to sight alignment time
 	local brain = organism.brain or 0
 	local brain_alignment_penalty = brain * 5
 	tta = tta + brain_alignment_penalty
+
+	local perm_impairment = organism.permanent_aim_impairment or 0
+	if perm_impairment > 0 then
+		tta = tta * (1 + perm_impairment * 2.5)
+	end
+
+	if rarm_bad or larm_bad then
+		local arm_tta_bonus = 0
+		if rarm_amputated then
+			arm_tta_bonus = arm_tta_bonus + 1.8
+		elseif rarm_broken then
+			arm_tta_bonus = arm_tta_bonus + 1.2
+		elseif rarm_dislocated then
+			arm_tta_bonus = arm_tta_bonus + 0.7
+		end
+		if larm_amputated then
+			arm_tta_bonus = arm_tta_bonus + 1.2
+		elseif larm_broken then
+			arm_tta_bonus = arm_tta_bonus + 0.8
+		elseif larm_dislocated then
+			arm_tta_bonus = arm_tta_bonus + 0.4
+		end
+		tta = tta + arm_tta_bonus
+	end
 
 	if isvector(vellen) then
 		vellen = vellen:Length()

@@ -20,13 +20,16 @@ module[1] = function(org)
 end
 
 function hg.organism.should_gain_fear(org)
-	return ((org.pain > 30) or (org.blood < 4000) or (org.bleed > 1))// + (org.just_damaged_bone and ((org.just_damaged_bone + 10 - CurTime()) >= 10) and 10 or 0)
+	local hasRealInjury = (org.blood and org.blood < 4000) or (org.bleed and org.bleed > 1) or (org.pain and org.pain > 30 and (org.blood and org.blood < 4500 or org.bleed and org.bleed > 0))
+	if not hasRealInjury then return false end
+	return true
 end
 
 module[2] = function(owner, org, timeValue)
 	local heart = 1 - org.heart
-	-- Brain damage weakens the heart's neurological drive (floor 0.1 keeps minimal signal)
-	local brain = math.Clamp(1 - org.brain * 1.5,0.1,1)
+	-- Brain damage weakens the heart's neurological drive. Floor 0 (z-city style):
+	-- a fully destroyed brainstem cannot drive cardiac rhythm.
+	local brain = math.Clamp(1 - org.brain * 1.5, 0, 1)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
@@ -42,11 +45,19 @@ module[2] = function(owner, org, timeValue)
 	
 	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
 	
-	local k = heart * o2 * (math.Clamp((org.blood - 1500) / 3500, 0, 1)) * brain * (org.heartstop and 0 or 1)
+	local k = heart * o2 * (math.Clamp((org.blood - 1500) / 2500, 0, 1)) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
 
-	local bloodCrash = org.blood ~= nil and org.blood < 100
+	-- Hypovolemia damps pulse pressure even before the heart stops.
+	-- Below 2500 mL of blood the heart can't generate a normal MAP.
+	local blood_now = org.blood or 5000
+	if blood_now < 2500 then
+		local hypoK = math.Clamp((blood_now - 800) / 1700, 0, 1)
+		pulse = pulse * math.max(hypoK, 0.1)
+	end
+
+	local bloodCrash = org.blood ~= nil and org.blood < 1500
 	local dropRate = (heart == 0 or org.heartstop or bloodCrash) and timeValue * 30 or timeValue * 5
 	org.pulse = math.Approach(org.pulse, pulse, dropRate)
 
@@ -98,21 +109,37 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
+	-- Survival scaling: a body without blood, oxygen, brain or heart cannot sustain
+	-- pathological tachycardia. Apply the same cardiovascular fitness factor `k`
+	-- to the modifier-driven heartbeat so a dying body can't spike to 600+ BPM.
+	-- Floor at 0.25 so light damage still allows full sympathetic response.
+	local survivalK = math.Clamp(k, 0.25, 1)
+	if org.heartstop then survivalK = 0 end
+	heartbeat = heartbeat * survivalK
+
+	-- Hard physiological ceiling. Sustained rates above ~250 BPM are ventricular
+	-- tachycardia/fibrillation; above ~300 the heart cannot fill and arrests.
+	heartbeat = math.Clamp(heartbeat, 0, 320)
+
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
-	
-	-- Probabilistic heartstop based on heart rate
+
+	-- Z-city style hard cap: sustained fibrillation collapses into cardiac arrest.
+	if org.heartbeat > 300 then
+		org.heartstop = true
+	end
+
+	-- Probabilistic heartstop based on heart rate (kept as a softer fallback for
+	-- the 200-300 range where rhythms become dangerous but not yet lethal).
 	if not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time then
 		org._heart_rate_check_time = CurTime() + 1 -- check every second
 
 		local hb = org.heartbeat
 		local chance = 0
-		if hb >= 400 then
-			chance = 0.25
-		elseif hb >= 375 then
+		if hb >= 280 then
+			chance = 0.2
+		elseif hb >= 250 then
 			chance = 0.1
-		elseif hb >= 350 then
-			chance = 0.075
-		elseif hb >= 300 then
+		elseif hb >= 220 then
 			chance = 0.05
 		elseif hb >= 200 then
 			chance = 0.025
@@ -153,7 +180,8 @@ module[2] = function(owner, org, timeValue)
 	-- High velocity reduces blood pressure (falling or rapid acceleration only)
 	-- Skip for ragdolled players: ragdoll physics jitter causes false velocity spikes
 	local velocityPenalty = 0
-	if not (owner:IsPlayer() and IsValid(owner.FakeRagdoll)) then
+	local isRagdolled = owner:IsPlayer() and (IsValid(owner.FakeRagdoll) or IsValid(owner:GetNWEntity("FakeRagdoll", NULL)) or org.needfake or org.otrub)
+	if not isRagdolled then
 		local velocity = owner:GetVelocity()
 		local speed = velocity:Length()
 		local fallSpeed = math.max(0, -velocity.z)
@@ -293,6 +321,24 @@ module[2] = function(owner, org, timeValue)
 
 	if org.pulse < 10 or org.brain >= 0.85 or org.bloodpressure < 25 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
+
+	-- Exsanguination: with under ~800 mL of blood there is not enough volume
+	-- left to circulate; the heart goes into pulseless electrical activity.
+	-- This is independent of heart organ damage (you can bleed out with a
+	-- perfectly healthy heart).
+	if (org.blood or 5000) < 800 then org.heartstop = true end
+
+	-- Severe hypovolemia (1500 mL or under) combined with any meaningful pump
+	-- failure (heart damage, low MAP, or already weakened pulse) collapses
+	-- circulation. Tranexamic acid / adrenaline can keep the body running a
+	-- little longer.
+	if (org.blood or 5000) < 1500 then
+		local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
+		local hasStabilizer = totalAdrenaline > 0.5 or (org.tranexamic_acid or 0) > 0
+		if not hasStabilizer and (org.heart >= 0.5 or (org.bloodpressure or 93) < 50 or (org.pulse or 70) < 30) then
+			org.heartstop = true
+		end
+	end
 
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
 		org.fear = math.max(org.fear, 0)
