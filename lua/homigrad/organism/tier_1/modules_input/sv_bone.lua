@@ -11,7 +11,7 @@ local function PlayBoneBreakSound(entity)
     end
 end
 
-local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, oldBrain, oldHeadTrauma)
+local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, oldBrain, oldHeadTrauma, traumaBone)
     if not org.isPly then return end
     local targetPlayer = org.owner
     if IsValid(org.owner.FakeRagdoll) then
@@ -28,18 +28,23 @@ local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, 
     local newHeadTrauma = org.headtrauma or 0
 
     local hasBrainDamage = newBrain > 0.1 and oldBrain <= 0.1
-    local hasConcussion = newConcussion >= 1.5 and oldConcussion < 1.5
+    local hasConcussion = newConcussion >= 1.5 and newConcussion > oldConcussion
     local isSevereTrauma = oldHeadTrauma < 0.5 and newHeadTrauma >= 0.5
 
     local isCritical = hasBrainDamage or hasConcussion or isSevereTrauma
+    boneDelta = math.max(boneDelta or 0, 0)
 
-    -- Base flash scales with damage and actual bone damage taken
-    local baseTime = math.Clamp(0.15 + (boneDelta or 0) * 1.0 + dmg * 0.3, 0.15, 1.0)
-    local baseSize = math.Clamp(800 + (boneDelta or 0) * 1500 + dmg * 1000, 800, 3000)
-
-    if isCritical then
-        baseTime = math.Clamp(baseTime * 1.8 + (hasBrainDamage and 0.5 or 0), 0.5, 3.5)
-        baseSize = math.Clamp(baseSize * 1.4, 1500, 5000)
+    local baseTime, baseSize, cooldown
+    if traumaBone == "jaw" then
+        if dmg < 0.35 or boneDelta <= 0.15 then return end
+        baseTime = math.Clamp(0.25 + boneDelta * 0.8, 0.25, 1.0)
+        baseSize = math.Clamp(1400 + boneDelta * 1400, 1200, 2800)
+        cooldown = 0.8
+    else
+        if boneDelta <= 0.02 and dmg < 0.35 then return end
+        baseTime = math.Clamp(0.3 + boneDelta * 0.9, 0.3, 1.2)
+        baseSize = math.Clamp(1400 + boneDelta * 1600, 1400, 3000)
+        cooldown = 0.2
     end
 
     local eyePos = targetPlayer:EyePos()
@@ -68,7 +73,7 @@ local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, 
         org.disorientation = math.min((org.disorientation or 0) + disorientationAdd, 10)
     end
 
-    targetPlayer.HeadDisorientFlashCooldown = CurTime() + (isCritical and 0.8 or 0.35)
+    targetPlayer.HeadDisorientFlashCooldown = CurTime() + cooldown
 end
 
 local function isCrush(dmgInfo)
@@ -494,7 +499,7 @@ PlayBoneBreakSound(org.owner)
 		net.Broadcast()
 	end
 
-	SendHeadTraumaFlash(org, dmg, dmgInfo, org.jaw - oldDmg, old_concussion, old_brain, old_headtrauma)
+	SendHeadTraumaFlash(org, dmg, dmgInfo, org.jaw - oldDmg, old_concussion, old_brain, old_headtrauma, "jaw")
 	return result, vecrand
 end
 
@@ -641,7 +646,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	-- Accumulate head trauma for long-term stroke risk
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
 
-	SendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, old_concussion, old_brain, old_headtrauma)
+	SendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, old_concussion, old_brain, old_headtrauma, "skull")
 
     local eyeChance = 0
     if dmgInfo:IsDamageType(DMG_SLASH) then

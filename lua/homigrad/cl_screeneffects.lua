@@ -281,6 +281,7 @@ local function stopthings()
 	shockLerp = 0
 	assimilatedLerp = 0
 	tempLerp = 36.6
+	headtraumaSaturation = 0
 	consciousnessLerp = 1
 	grayscaleLerp = 0
 
@@ -1760,7 +1761,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	if (headtraumaSaturation or 0) > 0 then
 		tab["$pp_colour_colour"] = 1 + headtraumaSaturation
-		headtraumaSaturation = math.max(headtraumaSaturation - FrameTime() * 1.2, 0)
+		headtraumaSaturation = math.max(headtraumaSaturation - FrameTime() * 0.85, 0)
 	end
 end)
 
@@ -1905,22 +1906,9 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	lply.blindflash:SetPos(view.origin)
 	lply.blindflash:SetAngles(Ang)
 	lply.blindflash:Update()
-	local pulse = GetConsciousBeatPulse()
-	if pulse > 0 then
-		return fov - (pulse * 20) -- zooms in slightly
-	end
 end)
 
 local function GetConsciousBeatPulse()
-	local pulse = GetConsciousBeatPulse()
-	if pulse > 0 then
-		local shakeAmt = pulse * 2.5
-		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
-		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
-		angles.r = angles.r + math.Rand(-shakeAmt, shakeAmt)
-		-- Also modify fova for when RenderScene is disabled
-		fova[1] = (fova[1] or 0) - (pulse * 20)
-	end
 	if not IsValid(lply) or not lply:Alive() then return 0 end
 
 	-- Check if dying pulse detection is enabled
@@ -1929,19 +1917,9 @@ local function GetConsciousBeatPulse()
 	local dyingMode = hg_dyingsound:GetInt()
 	-- Disable screen shake for modes 2, 3, 4, 5, and 6
 	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 or dyingMode == 6 then return 0 end
-	local pushPull = GetDespairCamPulse()
-	if pushPull ~= 0 then
-		return fov + pushPull * 2.8
-	end
 
 	local intensity = hg.consciousBeatIntensity or 0
 	if intensity <= 0.01 then return 0 end
-	local pushPull, jitter = GetDespairCamPulse()
-	if pushPull == 0 and jitter == 0 then return end
-	angles.p = angles.p + jitter * 0.75
-	angles.y = angles.y + jitter * 0.6
-	angles.r = angles.r + jitter * 0.5
-	fova[1] = (fova[1] or 0) + pushPull * 2.8
 
 	-- Only trigger the pulse if the sound is actually playing and hasn't been stopped
 	if not IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING or NoiseStation2:GetVolume() <= 0.01 then return 0 end
@@ -2060,7 +2038,9 @@ net.Receive("headtrauma_flash", function()
 
     -- Scale effects by the received flash duration (which is scaled by damage on the server)
     local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)
-    headtraumaSaturation = math.min(time * 4.5, 6)
+    if hasConcussion then
+        headtraumaSaturation = math.max(headtraumaSaturation or 0, math.min(time * 9, 10))
+    end
 
     PlayHeadhitSound(damageScale)
     if is_critical or hasBrainDamage or hasConcussion then
