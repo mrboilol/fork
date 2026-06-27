@@ -91,6 +91,9 @@ if SERVER then
 		-- Head trauma reduction
 		org.headtrauma = 0
 
+		-- Directly reduce intracranial pressure on injection
+		org.intpressure = math.max((org.intpressure or 0) - 0.25, 0)
+
 
 		if self.poisoned2 then
 			org.poison4 = CurTime()

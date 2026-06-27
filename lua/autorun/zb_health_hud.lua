@@ -1149,6 +1149,7 @@ local function draw_bar()
 	
 	smooth.temperature = Lerp(s * dt, smooth.temperature or 36.7, getOrgVal(org, "temperature", 36.7))
 	smooth.pneumothorax = Lerp(s * dt, smooth.pneumothorax or 0, getOrgVal(org, "pneumothorax", 0))
+	smooth.hemothorax = Lerp(s * dt, smooth.hemothorax or 0, getOrgVal(org, "hemothorax", 0))
 	smooth.analgesia = Lerp(s * dt, smooth.analgesia or 0, getOrgVal(org, "analgesia", 0))
 	smooth.brain = Lerp(s * dt, smooth.brain or 0, getOrgVal(org, "brain", 0))
 	smooth.wantToVomit = Lerp(s * dt, smooth.wantToVomit or 0, getOrgVal(org, "wantToVomit", 0))
@@ -1851,18 +1852,20 @@ local function draw_status_effects()
 			end
 			
 			local pneumo_val = smooth.pneumothorax or getOrgVal(org, "pneumothorax", 0)
-			if pneumo_val > HUD.hemothorax_threshold then
+			local hemo_val = smooth.hemothorax or getOrgVal(org, "hemothorax", 0)
+			local combined_lung_fluid = math.max(pneumo_val, hemo_val)
+			if combined_lung_fluid > HUD.hemothorax_threshold then
 				local level_num = 1
-				if pneumo_val > 0.7 then level_num = 4
-				elseif pneumo_val > 0.3 then level_num = 3
-				elseif pneumo_val > 0.1 then level_num = 2 end
+				if combined_lung_fluid > 0.7 then level_num = 4
+				elseif combined_lung_fluid > 0.3 then level_num = 3
+				elseif combined_lung_fluid > 0.1 then level_num = 2 end
 				
 				table.insert(effects, {
 					name = "hemothorax",
 					level_num = level_num,
 					has_levels = true,
 					priority = 0.25,
-					value = math_floor(pneumo_val * 100)
+					value = math_floor(combined_lung_fluid * 100)
 				})
 				currentEffectNames["hemothorax"] = true
 			end

@@ -18,6 +18,8 @@ hook.Add("Org Clear", "Main", function(org)
 	module.goodmood[1](org)
 	if module.teeth and module.teeth[1] then module.teeth[1](org) end
 	org.brain = 0
+	org.brainstem = 0
+	org.intpressure = 0
 	org.consciousness = 1
 	org.consciousnessTracker = 0
 	org.disorientation = 0
@@ -1180,6 +1182,8 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.lungsR[2] = math.max(org.lungsR[2] - regen, 0)
 	org.lungsL[2] = math.max(org.lungsL[2] - regen, 0)
 	org.brain = math.max(org.brain - regen, 0)
+	org.brainstem = math.max((org.brainstem or 0) - regen * 2, 0)
+	org.intpressure = math.max((org.intpressure or 0) - regen * 3, 0)
 
 	org.hungry = 0
 

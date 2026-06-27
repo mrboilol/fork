@@ -46,7 +46,7 @@ module[1] = function(org)
 	org.internalBleedDuration = 0
 
 	org.survivalchance = 1
-	org.hemothorax = false
+	org.hemothorax = 0
 	org.lastBleedTime = CurTime()
 
 	org.pressingWound = false
@@ -475,17 +475,10 @@ module[2] = function(owner, org, mulTime)
 
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 	
-	if org.internalBleed > 0.1 then
-		local chance = (org.internalBleed - 0.1) * 0.0005 -- 0.05% chance at 1.1 internal bleeding (reduced from 0.2%)
-		if math.random() < chance * mulTime then
-			org.hemothorax = true
-		end
-	end
-	
-	if (org.internalBleed > 1 or org.pneumothorax > 0) and org.blood > 2000 and org.o2[1] > 0 then
+	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 2000 and org.o2[1] > 0 then
 		org.wantToVomit = org.wantToVomit or 0
 
-		org.wantToVomit = org.wantToVomit + math.Rand(0, org.internalBleed / 1000 + org.pneumothorax / 200) * mulTime * 5
+		org.wantToVomit = org.wantToVomit + math.Rand(0, org.internalBleed / 1000 + org.pneumothorax / 200 + (org.hemothorax or 0) / 150) * mulTime * 5
 		
 		if org.wantToVomit > 0.90 then
 			//owner:Notify(about_to_puke[math.random(#about_to_puke)], 15, "internalbleed_pre")

@@ -27,9 +27,9 @@ end
 
 module[2] = function(owner, org, timeValue)
 	local heart = 1 - org.heart
-	-- Brain damage weakens the heart's neurological drive. Floor 0 (z-city style):
-	-- a fully destroyed brainstem cannot drive cardiac rhythm.
-	local brain = math.Clamp(1 - org.brain * 1.5, 0, 1)
+	-- Brainstem damage weakens the heart's neurological drive.
+	-- A fully destroyed brainstem cannot drive cardiac rhythm.
+	local brain = math.Clamp(1 - (org.brainstem or 0) * 1.5, 0, 1)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 

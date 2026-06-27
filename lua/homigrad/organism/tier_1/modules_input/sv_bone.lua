@@ -688,6 +688,11 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.stamina_damage = (org.stamina_damage or 0) + dmg * 45
 	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 25
 
+	-- Chest hits can cause hemothorax (blood filling pleural cavity)
+	if dmg >= 0.5 then
+		org.hemothorax = math.min((org.hemothorax or 0) + dmg * 0.08, 1)
+	end
+
 	-- Rare chance of cardiac arrest from chest blunt trauma
 	if dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH + DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) then
 		local heartStopChance = 0
