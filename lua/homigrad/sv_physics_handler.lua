@@ -28,16 +28,11 @@
 -- local CrazyPhysPerSec = 0
 -- local CrazyPhysTime = 0
 -- local CrazyPhysTrusthold = 500
--- hook.Add("OnCrazyPhysics", "stop_physics", function(ent, phys)
--- 	if CrazyPhysTime < CurTime() then
--- 		CrazyPhysTime = CurTime() + 1
+--
+-- 	if CrazyPhysTime > CurTime() and CrazyPhysPerSec > CrazyPhysTrusthold then
+-- 		physenv.SetPhysicsPaused(true)
 -- 	end
--- 	CrazyPhysPerSec = CrazyPhysPerSec + 1
-
-	if CrazyPhysTime > CurTime() and CrazyPhysPerSec > CrazyPhysTrusthold then
-		physenv.SetPhysicsPaused(true)
-	end
-end)
+-- end)
 
 local hg_prop_settle_delay = ConVarExists("hg_prop_settle_delay") and GetConVar("hg_prop_settle_delay") or CreateConVar("hg_prop_settle_delay", "6", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Delay before loose props get put to sleep and moved to a lighter collision group.", 0, 300)
 local hg_prop_sleep_velocity = ConVarExists("hg_prop_sleep_velocity") and GetConVar("hg_prop_sleep_velocity") or CreateConVar("hg_prop_sleep_velocity", "22", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Maximum linear velocity for a prop to be considered settled by the optimizer.", 0, 500)
