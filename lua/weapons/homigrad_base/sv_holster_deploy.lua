@@ -93,7 +93,7 @@ SWEP.Initialzed = false
 function SWEP:Deploy()
 	local time = CurTime()
 	if SERVER and self.Initialzed and not self:GetOwner().noSound then
-		timer.Simple(self.CooldownDeploy / self.Ergonomics * 0.4, function()
+		timer.Simple(math.min(self.CooldownDeploy / self.Ergonomics * 0.35, 0.25), function()
 			if IsValid(self) and IsValid(self:GetOwner()) then
 				self:GetOwner():EmitSound(self.DeploySnd[1], 65)
 			end
@@ -104,7 +104,7 @@ function SWEP:Deploy()
 	self.holster = nil
 	self:SetHolster(0)
 	
-	self.deploy = time + self.CooldownDeploy / self.Ergonomics
+	self.deploy = time + math.max(self.CooldownDeploy / self.Ergonomics, 0.35)
 	self:SetDeploy(self.deploy)
 
 	--self.endedholster = false

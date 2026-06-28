@@ -39,7 +39,8 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 
-	if #hg.bloodparticles1 > 200 then table.remove(hg.bloodparticles1, 1) end
+	local maxDrops = math.Clamp((hg_blood_fps:GetInt() or 24) * 14, 220, 900)
+	if #hg.bloodparticles1 > maxDrops then table.remove(hg.bloodparticles1, 1) end
 	
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
 end
@@ -55,7 +56,8 @@ local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)
 	local pos2 = Vector()
 	pos2:Set(pos)
 	
-	if #hg.bloodparticles2 > 5000 then table.remove(hg.bloodparticles2, 1) end
+	local maxClouds = math.Clamp((hg_blood_fps:GetInt() or 24) * 120, 2500, 7000)
+	if #hg.bloodparticles2 > maxClouds then table.remove(hg.bloodparticles2, 1) end
 	--if water and math.random(2) == 1 then return end
 	--if water and math.random(3) > 1 then return end
 

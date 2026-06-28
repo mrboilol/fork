@@ -204,6 +204,28 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
+	local shockLoad = math.Clamp(((org.shock or 0) - 35) / 65, 0, 1)
+	local painLoad = math.Clamp(((org.pain or 0) - 65) / 55, 0, 1)
+	local stressLoad = math.max(shockLoad, painLoad)
+	if stressLoad > 0 then
+		local protectedFloor = 0.45
+		local sustained = org._painShockSustain or 0
+		if shockLoad > 0.45 and painLoad > 0.35 then
+			sustained = sustained + timeValue * (shockLoad + painLoad)
+		else
+			sustained = math.max(sustained - timeValue * 1.5, 0)
+		end
+		org._painShockSustain = sustained
+
+		local drain = timeValue * (0.018 + stressLoad * 0.055)
+		if sustained > 8 then
+			drain = drain + timeValue * math.Clamp((sustained - 8) / 24, 0, 1) * 0.16
+			protectedFloor = 0
+		end
+
+		org.consciousness = math.max((org.consciousness or 1) - drain, protectedFloor)
+	end
+
 
 
 	if org.tranquilizer > 0 then
@@ -301,7 +323,7 @@ module[2] = function(owner, org, timeValue)
 
 		local shockCap = org.shock_turn * 4 * ((org.analgesia * 4 + 1))
 
-		local shockSeverity = math.Clamp((org.shock - shockCap) / 50, 0.1, 1)
+		local shockSeverity = math.Clamp((org.shock - shockCap) / 75, 0.05, 1)
 
 		local pain = org.pain or 0
 		local highPain = pain > 70
@@ -314,7 +336,7 @@ module[2] = function(owner, org, timeValue)
 			shockFloor = 0.5
 		end
 
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.4, shockFloor)
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.22, shockFloor)
 
 		org._highShockTime = (org._highShockTime or 0)
 		if org.shock > 60 then

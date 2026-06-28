@@ -1085,14 +1085,25 @@ if CLIENT then
 			local shoot = CurTime() - self:LastShootTime()
 			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
 			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
-			local posX = scrW*0.75
-			local posX2 = scrW*0.8
 			local HudHPos = 0.8
+			local use3DMags = hg_3dzity and hg_3dzity:GetBool()
+			local showDynamic = dynamicmags:GetBool() or use3DMags
+			local posX = scrW*0.75
+			local posY = scrH*HudHPos
+			if use3DMags then
+				local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
+				local scr = att and att.Pos and att.Pos:ToScreen()
+				if scr and scr.visible ~= false then
+					posX = scr.x + scrW*0.035
+					posY = scr.y + scrH*0.045
+				end
+			end
+			local posX2 = posX + scrH*0.11
 			
 			lastShoot = LerpFT(0.5,lastShoot, shoot > 0 and 1 or 0)
 			lastShootFor = lastShoot
 			self.hudinspect = self.hudinspect or 0
-			if self.hudinspect > CurTime() or (clip < clipsize/3 and lastShoot < 0.9 and dynamicmags:GetBool()) or self:KeyDown(IN_RELOAD) then
+			if self.hudinspect > CurTime() or (clip < clipsize/3 and lastShoot < 0.9 and showDynamic) or self:KeyDown(IN_RELOAD) then
 				ammoCheck = CurTime() + 1	
 			end
 			ammoLongCheck = LerpFT(0.025,ammoLongCheck, (self:KeyDown(IN_RELOAD) or self.hudinspect > CurTime()) and 5 or 0)
@@ -1109,12 +1120,12 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",scrW*0.8 + 2, scrH*HudHPos + scrH*0.05 + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",posX2 + 2, posY + scrH*0.05 + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",scrW*0.8, scrH*HudHPos + scrH*0.05,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",posX2, posY + scrH*0.05,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 
 			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
@@ -1127,8 +1138,8 @@ if CLIENT then
 			local PosLerp = Lerp(math.ease.OutExpo(lerpAmmoCheck),150,0)
 			--print(PosLerp)
 			if clip > 0 then
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,scrH*(HudHPos) + 2,scrH*0.08, color_bg)
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,scrH*(HudHPos),scrH*0.08, WhiteColor)
+				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,posY + 2,scrH*0.08, color_bg)
+				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,posY,scrH*0.08, WhiteColor)
 				--if lastShoot < 0.2 then StopShowBullet = true end
 			end
 			--if StopShowBullet then
@@ -1146,13 +1157,13 @@ if CLIENT then
 				local PosAdjust = math.max(PosLerp - i*15,0)
 				--print(PosAdjust)
 				if i < 2 then
-					DrawBullet(texture,posX + 2 + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX + 2 + PosAdjust,posY + scrH*(i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
+					DrawBullet(texture,posX + PosAdjust,posY + scrH*(i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
 				else
 					color_bg.a = (210 - (20 * i)) * lerpAmmoCheck
 					WhiteColor.a = (210 - (20 * i) )* lerpAmmoCheck
-					DrawBullet(texture,posX+2 + PosAdjust,scrH*((HudHPos - 0.026) + i*0.026+(0.026*lastShootFor))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,scrH*((HudHPos - 0.026) + i*0.026+(0.026*lastShootFor)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX+2 + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor))+2,scrH*0.08, color_bg)
+					DrawBullet(texture,posX + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor)),scrH*0.08, WhiteColor)
 				end
 			end
 
@@ -1161,12 +1172,12 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*lerpAmmoCheck
-				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2, scrH*HudHPos + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2, posY + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
 				coloruse.a = 210*lerpAmmoCheck
-				draw.SimpleText("+"..magCount,"AmmoFont",posX2, scrH*HudHPos,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText("+"..magCount,"AmmoFont",posX2, posY,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 			--draw.SimpleText("lastShoot: "..lastShoot,"Default",0,0)
 		end
@@ -1176,7 +1187,8 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
-		if not dynamicmags:GetBool() and not self:KeyDown(IN_RELOAD) and not (self.hudinspect and self.hudinspect > CurTime()) then
+		local use3DMags = hg_3dzity and hg_3dzity:GetBool()
+		if not dynamicmags:GetBool() and not use3DMags and not self:KeyDown(IN_RELOAD) and not (self.hudinspect and self.hudinspect > CurTime()) then
 			self:ChangeFOV()
 			self:DrawHUDAdd()
 			if self.dort then self:DoRT() end
@@ -2038,14 +2050,36 @@ function SWEP:GetAdditionalValues()
 
 	--self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - ((ply.lean or 0) * 2)
 	
-	local val = math.Clamp((self.deploy and ((self.deploy - CurTime()) * 10) --[[or self.holster and (((self.CooldownDeploy / self.Ergonomics) - (self.holster - CurTime())) * 10)]] or 0) / (self.CooldownDeploy / self.Ergonomics),0,10)
+	local deployDuration = math.max(self.CooldownDeploy / self.Ergonomics, 0.35)
+	local val = math.Clamp((self.deploy and ((self.deploy - CurTime()) * 10) --[[or self.holster and (((self.CooldownDeploy / self.Ergonomics) - (self.holster - CurTime())) * 10)]] or 0) / deployDuration,0,10)
+	local grabEase = math.ease.OutExpo(math.Clamp(val / 10, 0, 1))
 
-	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - val * 1.5
-	self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] - val * 2 * (self:IsPistolHoldType() and 0.5 or 0.75)
+	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - val * (self:IsPistolHoldType() and 1.2 or 1.45)
+	self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] - val * 2 * (self:IsPistolHoldType() and 0.45 or 0.7)
+	self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - grabEase * (self:IsPistolHoldType() and 1.5 or 2.5)
 	
-	self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + val / 10 * 40
-	self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + val / 10 * -90
-	self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + val / 10 * -90
+	self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + grabEase * 34
+	self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + grabEase * -72
+	self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + grabEase * -72
+
+	if ply.organism then
+		local org = ply.organism
+		local rightArm = math.Clamp((org.rarm or 0) + ((org.rarmdislocation or org.rarmdislocated) and 0.6 or 0) + (org.rarmamputated and 1.2 or 0), 0, 2)
+		local leftArm = math.Clamp((org.larm or 0) + ((org.larmdislocation or org.larmdislocated) and 0.45 or 0) + (org.larmamputated and 1.0 or 0), 0, 2)
+		local armDamage = self:IsPistolHoldType() and math.max(rightArm, leftArm * 0.55) or math.max(rightArm, leftArm)
+		if armDamage > 0.05 then
+			local sprintMul = self:IsSprinting() and 1.25 or 1
+			local painMul = 1 + math.Clamp((org.pain or 0) / 120, 0, 1)
+			local shake = armDamage * painMul * sprintMul
+			local t = CurTime()
+			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 17.0) * 0.35 * shake
+			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + math.cos(t * 13.0) * 0.45 * shake
+			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.sin(t * 23.0) * 0.25 * shake
+			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t * 19.0) * 2.4 * shake
+			self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 15.0) * 1.8 * shake
+			self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 11.0) * 3.0 * shake
+		end
+	end
 
 	local animpos = self:GetNWFloat("addAttachment")
 	animpos = 1 - math.Clamp((animpos + 1 - CurTime()) / 1,0,1)

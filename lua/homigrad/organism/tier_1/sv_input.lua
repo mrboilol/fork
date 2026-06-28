@@ -1913,12 +1913,24 @@ local function velocityDamage(ent, data)
 				end
 			end
 				
-			org.consciousness = math.Approach(org.consciousness, 0, dmg * 2 * (hadhelmet and 0.2 or 1))
+			local traumaLoad = math.Clamp(
+				dmg * 1.8 +
+				(org.brain or 0) * 1.25 +
+				(org.skull or 0) * 0.9 +
+				(org.concussion or 0) * 0.12 +
+				(org.jaw or 0) * 0.35 +
+				(oldHeadTrauma or 0) * 0.25,
+				0,
+				2.5
+			)
+			org.consciousness = math.Approach(org.consciousness, 0, traumaLoad * (hadhelmet and 0.55 or 1.15))
 				
 				local neck_not_broken = org.spine3 < 0.8
-			if dmg * 10 > 1.0 and !hadhelmet then
+			local knockoutChance = math.Clamp((traumaLoad - 0.45) * 0.42 + (skullDelta * 1.2), 0, 0.95)
+			if (dmg * 10 > 1.0 and !hadhelmet) or math.Rand(0, 1) < knockoutChance then
 				org.otrub = true
-				org.shock = org.shock + 10
+				org.needotrub = true
+				org.shock = org.shock + 10 + traumaLoad * 8
 			end
 
 			if neck_not_broken and org.spine3 >= 0.8 then

@@ -13,6 +13,8 @@ WS.Show = 0
 WS.Transparent = 0
 WS.LastSelectedSlot = 0
 WS.LastSelectedSlotPos = 0
+WS.GrabAnim = 0
+WS.PendingWeapon = NULL
 
 WS.SelectedSlot = 0
 WS.SelectedSlotPos = 0
@@ -63,7 +65,8 @@ function WS.WeaponSelectorDraw( ply )
     local Weapons = WS.GetWeaponTable( ply )
     local SelectedWep = WS.GetSelectedWeapon()
     if not IsValid(SelectedWep) then return end
-    WS.Transparent = LerpFT( 0.2, WS.Transparent, math.min( WS.Show - CurTime(), 1 ) )
+    WS.Transparent = LerpFT( 0.28, WS.Transparent, math.min( WS.Show - CurTime(), 1 ) )
+    WS.GrabAnim = LerpFT(0.22, WS.GrabAnim or 0, IsValid(WS.PendingWeapon) and 1 or 0)
     --draw.RoundedBox(0,(scrW / 2)-10,(scrH *0.15),20,20, color_red )
     local SuperAmmout = 0
     local AmmoutSlots = 0
@@ -98,7 +101,9 @@ function WS.WeaponSelectorDraw( ply )
             local wep = slotTbl[wepId]
             if not wep then continue end
             --print(wepId,wep)
-            local sizeH = SelectedWep == wep and (scrH *0.12) or (scrH *0.025)
+            local selected = SelectedWep == wep
+            local grab = selected and (WS.GrabAnim or 0) or 0
+            local sizeH = selected and (scrH * (0.12 + 0.02 * grab)) or (scrH *0.025)
             local LastSelected = 0
             if slotTbl[wepId-1] and SelectedWep == slotTbl[wepId-1] then
                 lastPos = (scrH *0.095) 
@@ -119,11 +124,11 @@ function WS.WeaponSelectorDraw( ply )
                 2, 
                 ColorAlpha(color_black,WS.Transparent*205) 
             )
-            surface.SetDrawColor( 155, 0, 0, WS.Transparent*( SelectedWep == wep and 200 or 0 )  )
+            surface.SetDrawColor( 155 + 80 * grab, 0, 0, WS.Transparent*( selected and 200 or 0 )  )
             surface.SetMaterial( gradient_u )
             surface.DrawTexturedRect( position, (scrH * 0.025) * (Ammout) + (scrH * 0.05) + lastPos, sizeX, sizeH )
-            if SelectedWep == wep then
-                surface.SetDrawColor( 255, 0, 0, WS.Transparent*155 )
+            if selected then
+                surface.SetDrawColor( 255, 40 * grab, 40 * grab, WS.Transparent*(155 + 80 * grab) )
 	            surface.DrawOutlinedRect( position, (scrH * 0.025) * (Ammout) + (scrH * 0.05) + lastPos, sizeX, sizeH, 2 )
             end
             local sizeHi = (scrH *0.025) * (Ammout) + (scrH * 0.05) + lastPos
@@ -132,7 +137,8 @@ function WS.WeaponSelectorDraw( ply )
             Ammout = Ammout + 1
 
             if SelectedWep == wep and wep.DrawWeaponSelection then
-                wep:DrawWeaponSelection(position + 5, (scrH * 0.025) * (Ammout) + (scrH * 0.055) + lastPos, sizeX - 10, sizeH, WS.Transparent*255)
+                local pull = math.ease.OutExpo(grab) * scrH * 0.012
+                wep:DrawWeaponSelection(position + 5, (scrH * 0.025) * (Ammout) + (scrH * 0.055) + lastPos - pull, sizeX - 10, sizeH, WS.Transparent*255)
             end
         end
         SuperAmmout = SuperAmmout + 1
@@ -292,11 +298,21 @@ function WS.SetActuallyWeapon( ply, cmd )
             WS.LastSelectedSlot = WS.SelectedSlot
             WS.LastSelectedSlotPos = WS.SelectedSlotPos
             WS.Selected = CurTime() + 0.2
-            WS.Show = CurTime() + 0.2
+            WS.PendingWeapon = WS.GetSelectedWeapon()
+            WS.GrabAnim = 1
+            WS.Show = CurTime() + 0.28
             surface.PlaySound("arc9_eft_shared/weapon_generic_spin"..math.random(1,10)..".ogg")
         end
     end
 end
+
+hook.Add("Think", "WeaponSelector_ClearPendingGrab", function()
+    if not IsValid(WS.PendingWeapon) then return end
+    local ply = LocalPlayer()
+    if not IsValid(ply) or ply:GetActiveWeapon() == WS.PendingWeapon or WS.Show < CurTime() then
+        WS.PendingWeapon = NULL
+    end
+end)
 
 hook.Add( "PlayerBindPress", "WeaponSelector_PlayerBindPress", WS.ChangeSelectionWep )
 

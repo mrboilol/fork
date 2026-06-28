@@ -72,6 +72,7 @@ local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dyi
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3, 4=ngaimcooked.mp3", 0, 4)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
+local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local themeVolume = CreateClientConVar("hg_theme_volume", "1", true, false, "Volume multiplier for despair, panic, and giving-up themes", 0, 2)
 local hook_Run = hook.Run
@@ -265,6 +266,11 @@ local addtime = CurTime()
 
 local show_image_time = 0
 local show_some_images_time = 0
+local lobotomy_memory_mat
+local lobotomy_memory_total = 1
+local lobotomy_memory_flash = false
+local lobotomy_recent_trauma = 0
+local lobotomy_recent_trauma_power = 0
 local lobotomy_mats = {
 	[1] = Material("overlays/photopsiaoverlay1.png"),
 	[2] = Material("overlays/photopsiaoverlay2.png"),
@@ -275,6 +281,32 @@ local lobotomy_mats = {
 	[7] = Material("overlays/tallflash2.png"),
 	[8] = Material("overlays/tallflash3.png")
 }
+
+local function getLobotomyMemoryMat()
+	local screens = hg and hg.screens
+	if not screens then return end
+
+	local valid = {}
+	for i = 1, #screens do
+		local mat = screens[i]
+		if mat and not mat:IsError() then
+			valid[#valid + 1] = mat
+		end
+	end
+
+	if #valid <= 0 then return end
+	return valid[math.random(#valid)]
+end
+
+local function drawLobotomyFlash(alpha)
+	local mat = lobotomy_mats[math.random(#lobotomy_mats)]
+	if not mat then return end
+
+	local rand = 5
+	surface.SetDrawColor(255, 255, 255, alpha or 255)
+	surface.SetMaterial(mat)
+	surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand), ScrH() + math.random(rand))
+end
 
 local function stopthings()
 	PainLerp = 0
@@ -932,6 +964,19 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
 
+		if hg_damage_corner_distortion:GetBool() then
+			local painWarp = math.Clamp((pain - 18) / 92, 0, 1)
+			local trauma = math.Clamp(painWarp + (shock / 170) + (org.brain or 0) * 0.65 + (org.concussion or 0) / 14, 0, 1.25)
+			if painWarp > 0.01 or (org.brain or 0) > 0.12 or (org.concussion or 0) > 1 then
+				render.UpdateScreenEffectTexture()
+				heatMat:SetFloat("$c0_x", math.sin(CurTime() * 1.7) * trauma * 0.025)
+				heatMat:SetFloat("$c0_y", trauma * 0.018)
+				heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.9) - 1.5) * trauma * 0.16)
+				render.SetMaterial(heatMat)
+				render.DrawScreenQuad()
+			end
+		end
+
 		if org.otrub then
 			DrawMotionBlur(0.1, 1., 0.01)
 			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
@@ -1073,19 +1118,36 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			brain_motionblur = true
 			DrawMotionBlur(0.1, 1., 0.1)
 			show_some_images_time = show_some_images_time - 1
-			if show_image_time <= 0 and math.random(10 * (1 - brain)) < 2 then
+			local recentTrauma = lobotomy_recent_trauma > CurTime()
+			local traumaPower = recentTrauma and lobotomy_recent_trauma_power or 0
+			local flashChance = recentTrauma and math.max(2, 7 - traumaPower * 4) or math.max(2, 10 * (1 - brain))
+			if show_image_time <= 0 and math.random(flashChance) < 2 then
 				show_image_time = 250 * (0.1 * 3) * math.Rand(0.1, 1) * (math.random(2) == 1 and 0.1 or 1)
-				lobotomy_index = math.random(#lobotomy_mats)
+				lobotomy_memory_total = math.max(show_image_time, 1)
+				local memoryChance = math.Clamp(0.08 + (brain or 0) * 0.22 + traumaPower * 0.18, 0.08, 0.45)
+				lobotomy_memory_flash = math.Rand(0, 1) < memoryChance
+				lobotomy_memory_mat = lobotomy_memory_flash and getLobotomyMemoryMat() or nil
 			end
 
 			if show_image_time > 0 then
 				show_image_time = show_image_time - 1
 
-				if lobotomy_index then
-					surface.SetDrawColor(255,255,255,255)
-					surface.SetMaterial(lobotomy_mats[lobotomy_index])
-					local rand = 5
-					surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand), ScrH() + math.random(rand))
+				if lobotomy_memory_flash and lobotomy_memory_mat then
+					local phase = 1 - math.Clamp(show_image_time / lobotomy_memory_total, 0, 1)
+					local alpha = 255 * math.sin(phase * math.pi)
+					local rand = 12
+					surface.SetDrawColor(255, 255, 255, alpha)
+					surface.SetMaterial(lobotomy_memory_mat)
+					surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand * 2), ScrH() + math.random(rand * 2))
+
+					render.UpdateScreenEffectTexture()
+					vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+					vignetteMat:SetFloat("$c0_z", 3.0)
+					vignetteMat:SetFloat("$c1_y", 5.0)
+					render.SetMaterial(vignetteMat)
+					render.DrawScreenQuad()
+				else
+					drawLobotomyFlash(255)
 				end
 			end
 		else
@@ -1102,7 +1164,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	else
 		brain_motionblur = false
 		show_image_time = 0
-		lobotomy_index = 0
+		lobotomy_memory_mat = nil
+		lobotomy_memory_flash = false
+		if lobotomy_recent_trauma <= CurTime() then
+			lobotomy_recent_trauma_power = 0
+		end
 	end
 	
 	if O2Lerp > 1 then
@@ -2039,6 +2105,14 @@ net.Receive("headtrauma_flash", function()
 
     -- Scale effects by the received flash duration (which is scaled by damage on the server)
     local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)
+    local traumaPower = math.Clamp(damageScale + (is_critical and 0.55 or 0) + (hasBrainDamage and 0.35 or 0) + (hasConcussion and 0.25 or 0), 0, 1.8)
+    lobotomy_recent_trauma = CurTime() + math.Clamp(2 + traumaPower * 4, 3, 9)
+    lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
+    show_some_images_time = math.max(show_some_images_time or 0, math.floor(80 + traumaPower * 140))
+    if traumaPower > 0.75 then
+        show_image_time = 0
+    end
+
     if hasConcussion then
         headtraumaSaturation = math.max(headtraumaSaturation or 0, math.min(time * 9, 10))
     end

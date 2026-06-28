@@ -456,9 +456,10 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 		-- Scale timing based on brain damage: higher damage = faster cycling
 		-- When otrub: faster cycling (20-40s range)
 		-- When awake: slower cycling (30-60s range) but still shows
-		local baseTime = org.otrub and 40 or 60
-		local time = baseTime - (lerpedbrain * 30) -- 40-10s when otrub, 60-30s when awake
-		time = math.max(time, 8) -- Minimum 8 seconds between cycles
+		local baseTime = org.otrub and 34 or 52
+		local traumaBoost = math.Clamp((org.concussion or 0) / 6 + (org.disorientation or 0) / 12, 0, 0.45)
+		local time = baseTime - (lerpedbrain * 34) - traumaBoost * 10
+		time = math.max(time, org.otrub and 6 or 10)
 		
 		-- Show for longer duration with more brain damage
 		local showDuration = time / 3 + (lerpedbrain * 5)
@@ -471,7 +472,7 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 			
 			-- More opaque with higher brain damage
 			-- When awake (not otrub), show at lower opacity
-			local awakeMultiplier = org.otrub and 1 or 0.4
+			local awakeMultiplier = org.otrub and 1 or math.Clamp(0.35 + lerpedbrain * 0.5 + traumaBoost * 0.35, 0.35, 0.85)
 			local alpha = math.Clamp(lerpedpart * (30 + lerpedbrain * 70) * awakeMultiplier, 0, 255)
 			surface.SetDrawColor(255, 255, 255, alpha)
 			surface.SetMaterial(screens[curscreen])
