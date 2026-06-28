@@ -60,18 +60,6 @@ ValveBiped.Bip01_R_Foot 2.3848159313202
 
 hg = hg or {}
 
-function IsLiveManagedRagdoll(rag)
-	if not IsValid(rag) then return false end
-	if not hg.RagdollOwner then return false end
-
-	local owner = hg.RagdollOwner(rag)
-	if not IsValid(owner) then
-		owner = rag:GetNWEntity("ply")
-	end
-
-	return IsValid(owner) and owner:IsPlayer() and owner:Alive()
-end
-
 hg.cachedmodels = {}
 
 local function cacheModel(ragdoll)
@@ -92,29 +80,6 @@ end
 
 hg.cacheModel = cacheModel
 
-local function cacheFakeRagdollData(ragdoll)
-	if not IsValid(ragdoll) then return end
-
-	ragdoll.ZCPhysicsObjectCount = ragdoll:GetPhysicsObjectCount()
-	ragdoll.ZCBoneLookup = ragdoll.ZCBoneLookup or {}
-	ragdoll.ZCAttachmentLookup = ragdoll.ZCAttachmentLookup or {}
-
-	local spine2 = ragdoll:LookupBone("ValveBiped.Bip01_Spine2")
-	ragdoll.ZCBoneLookup["ValveBiped.Bip01_Spine2"] = spine2 or false
-	ragdoll.ZCSpine2Bone = spine2 or false
-
-	local head1 = ragdoll:LookupBone("ValveBiped.Bip01_Head1")
-	ragdoll.ZCBoneLookup["ValveBiped.Bip01_Head1"] = head1 or false
-	ragdoll.ZCHeadBone = head1 or false
-	ragdoll.ZCHeadPhysBone = head1 and ragdoll:TranslateBoneToPhysBone(head1) or -1
-
-	local eyes = ragdoll:LookupAttachment("eyes")
-	ragdoll.ZCAttachmentLookup["eyes"] = eyes or false
-	ragdoll.ZCEyesAttachment = eyes or false
-end
-
-hg.CacheFakeRagdollData = cacheFakeRagdollData
-
 local IdealMassPlayer = hg.IdealMassPlayer
 
 local fixbones = {
@@ -127,82 +92,67 @@ local fixbones = {
 }
 
 function hg.Ragdoll_Create(ply)
-	-- Check edict limit before creating entities
-	local edictCount = ents.GetCount()
-	if edictCount >= 8100 then
-		print("[HG] Warning: Edict count too high ("..edictCount.."/8192), skipping ragdoll creation")
-		return nil
-	end
-
+	local Data = duplicator.CopyEntTable( ply )
 	local ragdoll = ents.Create("prop_ragdoll")
-	if not IsValid(ragdoll) then
-		print("[HG] Failed to create ragdoll entity")
-		return nil
-	end
+	duplicator.DoGeneric( ragdoll, Data )
 
 	ragdoll:SetPos(ply:GetPos())
 	ragdoll:SetAngles(ply:GetAngles())
 	--ragdoll:SetVelocity(ply:GetVelocity())
 	ragdoll:SetModel(ply:GetModel())
-	ragdoll:SetModelScale(ply:GetModelScale(), 0)
 	ragdoll.CurAppearance = table.Copy(ply.CurAppearance)
 
 	local bodygroups = ply:GetBodyGroups()
+	ragdoll:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 	ragdoll:Spawn()
 	ragdoll:Activate()
-	hg.ApplySetCollisionGroupNow(ragdoll, COLLISION_GROUP_WEAPON)
 	ragdoll:AddEFlags(EFL_NO_DAMAGE_FORCES + EFL_DONTBLOCKLOS)
 	--ragdoll:AddFlags(FL_NOTARGET)
 	--ply:AddFlags(FL_NOTARGET)
 
 	hg.queue_ragdolls[ragdoll] = {}
-	cacheFakeRagdollData(ragdoll)
 
 	if IsValid(ply.bull) then ply.bull:Remove() ply.bull = nil end
+	ragdoll.bull = ents.Create("npc_bullseye")
+	local bull = ragdoll.bull
+	bull.ply = ply
+	bull.rag = ragdoll
+	local eyeatt = ragdoll:GetAttachment(ragdoll:LookupAttachment("eyes"))
+	local bodyphy = ragdoll:GetPhysicsObjectNum(10)
+	if !bodyphy then return end
+	bull:SetPos(bodyphy:GetPos()+bodyphy:GetAngles():Right()*7)
+	--bull:SetPos( eyeatt.Pos + eyeatt.Ang:Up() * 3.5 )
+	bull:SetAngles( ragdoll:GetAngles() )
+	bull:SetMoveType(MOVETYPE_OBSERVER)
+	--bull:SetCollisionGroup(COLLISION_GROUP_BREAKABLE_GLASS)
+	bull:SetKeyValue( "targetname", "Bullseye" )
+	--bull:SetParent(ragdoll, ragdoll:LookupAttachment("eyes"))
+	bull:SetKeyValue( "health","9999" )
+	bull:SetKeyValue( "spawnflags","256" )
+	bull:Spawn()
+	bull:Activate()
+	bull:SetNotSolid(true)
 	
-	-- Check edict limit again before creating bullseye
-	if ents.GetCount() >= 8100 then
-		print("[HG] Warning: Edict count too high, skipping bullseye creation for ragdoll")
-	else
-		ragdoll.bull = ents.Create("npc_bullseye")
-		local bull = ragdoll.bull
-		bull.ply = ply
-		bull.rag = ragdoll
-		local bodyphy = ragdoll:GetPhysicsObjectNum(10)
-		if !bodyphy then return end
-		bull:SetPos(bodyphy:GetPos()+bodyphy:GetAngles():Right()*7)
-		--bull:SetPos( eyeatt.Pos + eyeatt.Ang:Up() * 3.5 )
-		bull:SetAngles( ragdoll:GetAngles() )
-		bull:SetMoveType(MOVETYPE_OBSERVER)
-		--bull:SetCollisionGroup(COLLISION_GROUP_BREAKABLE_GLASS)
-		bull:SetKeyValue( "targetname", "Bullseye" )
-		--bull:SetParent(ragdoll, ragdoll:LookupAttachment("eyes"))
-		bull:SetKeyValue( "health","9999" )
-		bull:SetKeyValue( "spawnflags","256" )
-		bull:Spawn()
-		bull:Activate()
-		bull:SetNotSolid(true)
-		
-		--bull:SetCollisionBoundsWS(-Vector(5,5,5),Vector(5,5,5))
-		--bull:SetSurroundingBounds(-Vector(50,50,50),Vector(50,50,50))
-		--[[local enta = ents.Create("prop_dynamic")
-		enta:SetPos(bull:GetPos())
-		enta:SetAngles(bull:GetAngles())
-		enta:SetModel("models/props_junk/metal_paintcan001a.mdl")
-		enta:SetParent(bull)
-		enta:Spawn()
-		enta:SetNotSolid(true)
-		bull:CallOnRemove("asdsad",function() enta:Remove() end)--]]
-		
-		for i, ent in ipairs(ents.FindByClass("npc_*")) do
-			if not IsValid(ent) or not ent.AddEntityRelationship then continue end
-			ent:AddEntityRelationship(bull, ent:Disposition(ply))
-		end
+	--bull:SetCollisionBoundsWS(-Vector(5,5,5),Vector(5,5,5))
+	--bull:SetSurroundingBounds(-Vector(50,50,50),Vector(50,50,50))
+	--[[local enta = ents.Create("prop_dynamic")
+	enta:SetPos(bull:GetPos())
+	enta:SetAngles(bull:GetAngles())
+	enta:SetModel("models/props_junk/metal_paintcan001a.mdl")
+	enta:SetParent(bull)
+	enta:Spawn()
+	enta:SetNotSolid(true)
+	bull:CallOnRemove("asdsad",function() enta:Remove() end)--]]
+	
+	for i, ent in ipairs(ents.FindByClass("npc_*")) do
+		if not IsValid(ent) or not ent.AddEntityRelationship then continue end
+		ent:AddEntityRelationship(bull, ent:Disposition(ply))
+	end
 
-		for i, ent in ipairs(ents.FindByClass("terminator_*")) do
-			if not IsValid(ent) or not ent.AddEntityRelationship then continue end
-			ent:AddEntityRelationship(bull, ent:Disposition(ply))
-		end
+
+	for i, ent in ipairs(ents.FindByClass("terminator_*")) do
+		if not IsValid(ent) or not ent.AddEntityRelationship then continue end
+		ent:AddEntityRelationship(bull, ent:Disposition(ply))
 	end
 
 	ragdoll:CallOnRemove("removeBull", function()
@@ -451,7 +401,7 @@ end
 
 hook.Add("PlayerSpawn", "Fake", function(ply)
 	ply:RemoveFlags(FL_NOTARGET)
-	hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+	ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
 	if OverrideSpawn then return end
 	if ply.gottarespawn then
 		ply:SetNWEntity("RagdollDeath", NULL)
@@ -584,10 +534,7 @@ function hg.ApplyPoses(ply)
 	end
 end
 
-local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, FCVAR_REPLICATED, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
-
 function hg.Fake(ply, huyragdoll, no_freemove, force)
-	if not IsValid(ply) then return end
 	ply.switchingseat = nil
 	if ply:GetMoveType() == 0 then return end
 	if ply.InVehicle and ply:InVehicle() and not force then return end
@@ -659,7 +606,37 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 	end
 end
 
+local hg_ragdollcombat = ConVarExists("hg_ragdollcombat") and GetConVar("hg_ragdollcombat") or CreateConVar("hg_ragdollcombat", 0, FCVAR_REPLICATED, "Toggle ragdoll combat-like ragdoll mode (walking, running in ragdoll, etc.)", 0, 1)
+
 local veczero = Vector(0,0,0)
+function hg.SetFreemove(ply, set)
+	if ply:InVehicle() or IsValid(ply.OldRagdoll) then return end
+	if set then
+		ply.lastFakeTime = hg_ragdollcombat:GetBool() and 9999 or 1
+		ply.lastFake = CurTime() + ply.lastFakeTime
+		//ply:SetNetVar("lastFake", ply.lastFake)
+		ply:SetMoveType(MOVETYPE_WALK)
+		local hull = Vector(5,5,5)
+		ply:SetHull(-Vector(hull,hull,0),Vector(hull,hull,72))
+		ply:SetHullDuck(-Vector(hull,hull,0),Vector(hull,hull,36))
+		ply:SetViewOffset(Vector(0,0,64))
+		ply:SetViewOffsetDucked(Vector(0,0,34))
+	else
+		ply.lastFake = 0
+		ply.lastFakeTime = 0
+		//ply:SetNetVar("lastFake",0)
+		//if ply:GetMoveType() != (ply:InVehicle() and MOVETYPE_NOCLIP or MOVETYPE_NONE) then
+			//ply:SetMoveType(ply:InVehicle() and MOVETYPE_NOCLIP or MOVETYPE_NONE)
+		//end
+		ply:SetMoveType(MOVETYPE_NOCLIP)
+		local hull = Vector(1, 1, 1)
+		local hull2 = Vector(1, 1, 0)
+		ply:SetHull(-hull2, hull)
+		ply:SetHullDuck(-hull2, hull)
+		ply:SetViewOffset(vector_up)
+		ply:SetViewOffsetDucked(vector_up)
+	end
+end
 
 local CurTime = CurTime
 
@@ -757,7 +734,7 @@ function hg.FakeUp(ply, forced, instant)
 	ply.OldRagdoll = ragdoll
 	ply:SetNWEntity("FakeRagdollOld", ragdoll)
 	ply.FakeRagdoll = nil
-
+	
 	ply:ConCommand("+duck")
 	timer.Simple(0.5,function()
 		if IsValid(ply) then
@@ -886,51 +863,8 @@ function hg.GetCurrentCharacter(ply)
 	return (IsValid(rag) and rag) or ply
 end
 
-hook.Add("PlayerDisconnected", "Fake", function(ply) 
-	hg.ragdollFake[ply] = nil
-	-- Clean up player's bullseye entity
-	if IsValid(ply.bull) then
-		ply.bull:Remove()
-		ply.bull = nil
-	end
-end)
+hook.Add("PlayerDisconnected", "Fake", function(ply) hg.ragdollFake[ply] = nil end)
 hook.Add("PlayerFootstep", "CustomFootstep", function(ply) if IsValid(ply.FakeRagdoll) then return true end end)
-
--- Periodic cleanup of orphaned entities
-local function CleanupOrphanedEntities()
-	if ents.GetCount() < 7000 then return end
-	
-	local cleaned = 0
-	
-	-- Clean up orphaned bullseye entities (ones without valid parent)
-	for _, ent in ipairs(ents.FindByClass("npc_bullseye")) do
-		if IsValid(ent) then
-			local hasValidParent = false
-			
-			-- Check if this bullseye belongs to a valid player
-			if IsValid(ent.ply) and ent.ply:IsPlayer() then
-				hasValidParent = true
-			end
-			
-			-- Check if this bullseye belongs to a valid ragdoll
-			if IsValid(ent.rag) then
-				hasValidParent = true
-			end
-			
-			if not hasValidParent then
-				ent:Remove()
-				cleaned = cleaned + 1
-			end
-		end
-	end
-	
-	if cleaned > 0 then
-		print("[HG] Cleanup: Removed "..cleaned.." orphaned bullseye entities. Edict count: "..ents.GetCount())
-	end
-end
-
--- Run cleanup every 30 seconds
-timer.Create("HG_EntityCleanup", 30, 0, CleanupOrphanedEntities)
 function hg.RagdollOwner(ragdoll)
 	if not IsValid(ragdoll) then return end
 	local ply = ragdoll.ply
@@ -1000,7 +934,7 @@ hook.Add("PlayerEnteredVehicle","allowweapons",function(ply,veh,role)
 		ply:SetEyeAngles(angle_zero)
 		hg.Fake(ply, nil, nil, true)
 		
-		hg.ApplySetCollisionGroupNow(ply, COLLISION_GROUP_PLAYER)
+		ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)
 		--ply:SetSolidFlags(bit.band(ply:GetSolidFlags(), bit.bnot(FSOLID_NOT_SOLID), bit.bnot(FSOLID_TRIGGER), bit.bnot(FSOLID_USE_TRIGGER_BOUNDS)))
 	end)
 
@@ -1169,7 +1103,7 @@ ragdoll.Appearance = ent.Appearance
 ragdoll:SetModel(ent:GetModel())
 ragdoll:SetPos(ent:GetPos())
 ragdoll:Spawn()
-	hg.SafeSetCollisionGroup(ragdoll, COLLISION_GROUP_DEBRIS)
+ragdoll:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 ent:SetRenderMode(RENDERMODE_NONE)
 ent:SetNWEntity("huy",ragdoll)
 ApplyAppearanceRagdoll(ent,ragdoll)
@@ -1262,11 +1196,10 @@ PushManagedRagdollAway = function(rag, awayDir, speed)
 		end
 	end
 end
-
 hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 	if not IsValid(rag) then return end
 
-	local hitEnt = data.HitEntity
+		local hitEnt = data.HitEntity
 	local owner = rag:GetNWEntity("ply")
 	if not IsValid(owner) then
 		owner = hg.RagdollOwner(rag)
@@ -1293,7 +1226,6 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 			target:SetVelocity(data.OurOldVelocity:GetNormalized() * math.min(impactSpeed * 0.25, 120) + vector_up * 30)
 		end
 	end
-
 	if not data.HitEntity:IsWorld() then return end
 	if data.OurOldVelocity:LengthSqr() < 165000 or (rag.NextSND or 0) > data.DeltaTime then return end
 	rag:EmitSound("player/falling_foley/fall_foley"..mRandom(13)..".wav", 60, mRandom(95, 115), 1, CHAN_AUTO)
@@ -1308,100 +1240,6 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 	end]]
 
 	rag.NextSND = data.DeltaTime + 1
-end)
-
-local hg_corpse_settle_delay = ConVarExists("hg_corpse_settle_delay") and GetConVar("hg_corpse_settle_delay") or CreateConVar("hg_corpse_settle_delay", "10", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Delay before settled corpse ragdolls are put to sleep.", 0, 300)
-local hg_corpse_cleanup_max = ConVarExists("hg_corpse_cleanup_max") and GetConVar("hg_corpse_cleanup_max") or CreateConVar("hg_corpse_cleanup_max", "18", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Maximum amount of inactive corpse ragdolls before oldest ones start getting cleaned up. 0 disables corpse culling.", 0, 128)
-local hg_corpse_cleanup_age = ConVarExists("hg_corpse_cleanup_age") and GetConVar("hg_corpse_cleanup_age") or CreateConVar("hg_corpse_cleanup_age", "45", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Minimum corpse age before the automatic ragdoll cleanup can remove it.", 0, 1800)
-local hg_corpse_cleanup_player_radius = ConVarExists("hg_corpse_cleanup_player_radius") and GetConVar("hg_corpse_cleanup_player_radius") or CreateConVar("hg_corpse_cleanup_player_radius", "350", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Corpses near living players are preserved by the automatic ragdoll cleanup.", 0, 5000)
-
-timer.Create("hg_fake_ragdoll_bodyblock", 0.04, 0, function()
-	return
-end)
-
-local function RagdollIsSettled(rag)
-	for i = 0, rag:GetPhysicsObjectCount() - 1 do
-		local phys = rag:GetPhysicsObjectNum(i)
-		if not IsValid(phys) then continue end
-		if phys:GetVelocity():LengthSqr() > 256 then return false end
-	end
-
-	return true
-end
-
-local function HasNearbyLivingPlayer(pos, radius)
-	local radiusSqr = radius * radius
-
-	for _, ply in ipairs(player.GetAll()) do
-		if IsValid(ply) and ply:Alive() and ply:GetPos():DistToSqr(pos) <= radiusSqr then
-			return true
-		end
-	end
-
-	return false
-end
-
-local function SettleCorpseRagdoll(rag)
-	if rag.hg_corpseSettled then return end
-
-	rag.hg_corpseSettled = true
-	hg.SafeSetCollisionGroup(rag, COLLISION_GROUP_DEBRIS)
-
-	for i = 0, rag:GetPhysicsObjectCount() - 1 do
-		local phys = rag:GetPhysicsObjectNum(i)
-		if IsValid(phys) then phys:Sleep() end
-	end
-end
-
-local _IsLiveManagedRagdoll = IsLiveManagedRagdoll
-timer.Create("hg_corpse_optimizer", 5, 0, function()
-	local corpses = {}
-	local now = CurTime()
-
-	for _, rag in ipairs(ents.FindByClass("prop_ragdoll")) do
-		if not IsValid(rag) then continue end
-
-		rag.hg_corpseSpawnTime = rag.hg_corpseSpawnTime or now
-
-		if _IsLiveManagedRagdoll(rag) or IsValid(rag:GetParent()) or rag:GetCustomCollisionCheck() then
-			rag.hg_corpseSettled = nil
-
-			if rag:GetCollisionGroup() == COLLISION_GROUP_DEBRIS then
-				hg.SafeSetCollisionGroup(rag, COLLISION_GROUP_WEAPON)
-			end
-
-			continue
-		end
-
-		corpses[#corpses + 1] = rag
-
-		if (now - rag.hg_corpseSpawnTime) >= hg_corpse_settle_delay:GetFloat() and RagdollIsSettled(rag) then
-			SettleCorpseRagdoll(rag)
-		end
-	end
-
-	local maxCorpses = math.max(hg_corpse_cleanup_max:GetInt(), 0)
-	if maxCorpses <= 0 or #corpses <= maxCorpses then return end
-
-	table.sort(corpses, function(a, b)
-		return (a.hg_corpseSpawnTime or now) < (b.hg_corpseSpawnTime or now)
-	end)
-
-	local minAge = hg_corpse_cleanup_age:GetFloat()
-	local keepRadius = hg_corpse_cleanup_player_radius:GetFloat()
-	local toRemove = #corpses - maxCorpses
-
-	for i = 1, #corpses do
-		if toRemove <= 0 then break end
-
-		local rag = corpses[i]
-		if not IsValid(rag) then continue end
-		if (now - (rag.hg_corpseSpawnTime or now)) < minAge then break end
-		if HasNearbyLivingPlayer(rag:GetPos(), keepRadius) then continue end
-
-		rag:Remove()
-		toRemove = toRemove - 1
-	end
 end)
 
 local hg_shitty_fake = CreateConVar("hg_shitty_fake", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "enable shitty fake", 0, 1)

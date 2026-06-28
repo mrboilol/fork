@@ -138,6 +138,94 @@ function SWEP:GetWeaponWeightHandlingMul()
 	return math.Clamp(1 + (w - 2) * 0.15, 0.7, 2.0)
 end
 
+function SWEP:GetAmmoBallistics()
+	local ammo = self.Primary and self.Primary.Ammo
+	local ammoInfo = ammo and hg.ammotypeshuy and hg.ammotypeshuy[ammo]
+	return ammoInfo and ammoInfo.BulletSettings or {}
+end
+
+function SWEP:GetRecoilImpulseFactors()
+	local primary = self.Primary or {}
+	local ammo = self:GetAmmoBallistics()
+	local force = ammo.Force or primary.Force2 or primary.Force or 30
+	local diameter = ammo.Diameter or 7.62
+	local mass = ammo.Mass or 8
+	local numBullet = ammo.NumBullet or self.NumBullet or 1
+	local weight = self.weight or self.Weight or 5
+
+	local forceFactor = math.Clamp(force / 40, 0.35, 3.5)
+	local diameterFactor = math.Clamp(diameter / 7.62, 0.55, 2.1)
+	local massFactor = math.Clamp(mass / 8, 0.5, 2.25)
+	local pelletFactor = numBullet > 1 and math.Clamp(math.sqrt(numBullet) * 0.55, 1, 2.4) or 1
+
+	local caliber = math.Clamp((forceFactor * 0.62 + diameterFactor * 0.23 + massFactor * 0.15) * pelletFactor, 0.35, 3.4)
+	local weaponMass = math.Clamp(3 / math.max(weight, 0.5), 0.55, 1.75)
+
+	return caliber, weaponMass, force, numBullet, ammo
+end
+
+function SWEP:GetRecoilSupportMul()
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return 1 end
+
+	local org = owner.organism or {}
+	local rightUsable = not org.rarmamputated and not ((org.rarm or 0) >= 1)
+	local leftUsable = not org.larmamputated and not ((org.larm or 0) >= 1)
+	local rightBad = org.rarmamputated or (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
+	local leftBad = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
+
+	local twoHanded = not self:IsPistolHoldType() and self.lhandik ~= false
+	local supportHands = (rightUsable and 1 or 0) + ((twoHanded and leftUsable) and 1 or 0)
+	local mul = supportHands >= 2 and 0.82 or 1.25
+
+	if rightBad then mul = mul * (org.rarmamputated and 1.7 or 1.35) end
+	if leftBad and twoHanded then mul = mul * (org.larmamputated and 1.45 or 1.22) end
+	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul * (1 / org.armstrength) end
+	if org.aiming_fatigue then mul = mul * (1 + math.Clamp(org.aiming_fatigue, 0, 10) * 0.025) end
+
+	return math.Clamp(mul, 0.65, 2.8), supportHands
+end
+
+function SWEP:IsManuallyCycledWeapon()
+	if self.ManualAction ~= nil then return self.ManualAction end
+	if self.IsBoltAction or self.IsPumpAction then return true end
+
+	if self.Base == "weapon_m4super" and self.AutomaticDraw == false then
+		return true
+	end
+
+	local instructions = self.Instructions
+	if isstring(instructions) then
+		instructions = string.lower(instructions)
+		if string.find(instructions, "bolt-action", 1, true) or string.find(instructions, "pump-action", 1, true) then
+			return true
+		end
+	end
+
+	return false
+end
+
+function SWEP:GetManualActionBlockReason(ply)
+	if not self:IsManuallyCycledWeapon() then return end
+	if not IsValid(ply) then return end
+
+	local org = ply.organism
+	if not org then return end
+
+	local leftBroken = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
+	if leftBroken then
+		return "I need my left arm to cycle this."
+	end
+
+	if IsValid(ply.FakeRagdoll) and IsValid(ply.FakeRagdoll.ConsLH) then
+		return "I can't cycle it while my left hand is busy."
+	end
+end
+
+function SWEP:CanRackOrReloadManualAction(ply)
+	return self:GetManualActionBlockReason(ply or self:GetOwner()) == nil
+end
+
 -- Stance-aware stability: high ready (3) / low ready (4) are steadier than usual,
 -- any other stance is slightly less stable. aiming = true weights the bonus stronger.
 function SWEP:GetPostureStabilityMul(aiming)
@@ -663,33 +751,28 @@ function SWEP:ApplyRecoilCameraKick()
 	local ply = self:GetOwner()
 	if not IsValid(ply) then return end
 
-	local primary = self.Primary or {}
-	local force = primary.Force2 or primary.Force or 30
-	local numBullet = self.NumBullet or 1
-	local weight = self.weight or 5
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 
-	-- Force-based base kick. Heavy rounds + buckshot pile on more.
-	local baseKick = math.Clamp(force / 35, 0.4, 3.0) * math.sqrt(numBullet)
-
-	-- Lighter guns get punched around a bit more (less mass to soak the kick).
-	local weightFactor = math.Clamp(5 / math.max(weight, 0.5), 0.5, 1.8)
+	-- Cartridge impulse sets the energy, weapon mass and support decide control.
+	local baseKick = math.Clamp(caliberMul * weightMul, 0.25, 3.6)
+	local supportMul = self:GetRecoilSupportMul()
 
 	-- Stable stance / ADS / resting reduces visible camera kick (the gun absorbs more).
 	local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
 	local restMul = (self.IsResting and self:IsResting()) and 0.55 or 1
-	local adsMul = self:IsZoom() and 0.65 or 1
+	local adsMul = self:IsZoom() and 0.72 or 1
 
 	-- Spray climb: longer trigger holds make the camera kick rise (mostly pitch).
 	local sprayI = self.SprayI or 0
 	local sprayClimb = 1 + math.Clamp(sprayI / 8, 0, 1) * 0.6
 
 	-- Pistol-hold weapons feel punchier per shot.
-	local pistolMul = self:IsPistolHoldType() and 1.15 or 1
+	local pistolMul = self:IsPistolHoldType() and 1.08 or 1
 
 	-- Player skill (organism.recoilmul: lower = better, default 1).
 	local skill = (ply.organism and ply.organism.recoilmul) or 1
 
-	local kickScale = baseKick * weightFactor * stanceMul * restMul * adsMul * sprayClimb * pistolMul * skill
+	local kickScale = baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * skill
 
 	-- Mostly upward (negative pitch in source angles) with a deterministic
 	-- horizontal/roll drift seeded on SprayI so server bullet trajectory
@@ -699,9 +782,9 @@ function SWEP:ApplyRecoilCameraKick()
 	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
 	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
 
-	local pitchKick = -0.9 * kickScale
-	local yawKick   =  0.35 * kickScale * sideRand
-	local rollKick  =  0.6 * kickScale * rollRand
+	local pitchKick = -0.72 * kickScale
+	local yawKick   =  0.22 * kickScale * sideRand
+	local rollKick  =  0.38 * kickScale * rollRand
 
 	local punchAng = Angle(pitchKick, yawKick, rollKick)
 	local hg_coolcam = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()
@@ -2232,29 +2315,29 @@ function SWEP:GetAdditionalValues()
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
 		local firing = sinceShot < 0.2
 
-		local weightFactor = math.Clamp((self.weight or 5) / 5, 0.5, 2.0)
-		local forceFactor = math.Clamp((self.Primary.Force2 or self.Primary.Force or 30) / 40, 0.6, 2.0)
+		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		local supportMul = self:GetRecoilSupportMul()
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local restMul = self:IsResting() and 0.3 or 1
-		local handlingMul = math.Clamp(weightFactor * forceFactor, 0.4, 2.5)
+		local handlingMul = math.Clamp(caliberMul * weightMul * supportMul, 0.3, 3.6)
 
 		-- Instability ramps up while firing and recovers (regaining control) afterward.
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.3 or 0.05, wobbleDt), self.recoilWobbleAmp or 0, firing and 1 or 0)
 
 		if (self.recoilWobbleAmp or 0) > 0.001 then
 			local t = CurTime()
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 5.5
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 6.4
 
 			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
 			local wobY = math.cos(t * 1.8) * 0.65 + math.cos(t * 3.1) * 0.35
 			local wobZ = math.sin(t * 2.2) * 0.65 + math.cos(t * 2.9) * 0.35
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 3.8
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.6
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.35
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 4.4
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.9
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.45
 
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 1.6
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.6
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 1.9
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.75
 		end
 
 		local recoilDecay = self:GetAnimShoot2(0.28 * mulhuy / host_timescale(), true)
@@ -2264,12 +2347,12 @@ function SWEP:GetAdditionalValues()
 			local seed = math.floor(sprayI)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 5.5
+			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 5.8
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.2
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.2
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.45
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 1.8
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.6
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.05
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.38
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 2.0
 		end
 	end
 

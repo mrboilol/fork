@@ -57,8 +57,9 @@ hook.Add("radialOptions", "ReloadOnFloor", function()
 	if not ishgweapon(ent) then return end
 	local clip, maxclip = ent:Clip1(), ent:GetMaxClip1()
 	local isshotgun = (ent.Base == "weapon_m4super" or ent:GetClass() == "weapon_m4super")
-	if ((clip < maxclip or lply:GetAmmoCount(ent.Primary.Ammo) > 0) or (isshotgun and not ent.drawBullet)) then
-		if clip >= maxclip then return end
+	local needsCycle = ent.IsManuallyCycledWeapon and ent:IsManuallyCycledWeapon() and ent.drawBullet == false
+	if ((clip < maxclip or lply:GetAmmoCount(ent.Primary.Ammo) > 0) or needsCycle or (isshotgun and not ent.drawBullet)) then
+		if clip >= maxclip and not needsCycle and not (isshotgun and not ent.drawBullet) then return end
 		if isshotgun and ent.drawBullet and lply:GetAmmoCount(ent.Primary.Ammo) <= 0 then return end
 		local tbl = {
 			function()

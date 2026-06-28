@@ -48,6 +48,7 @@ end
 
 function SWEP:TryJam()
 	if self:GetJammed() then return end
+	if self:IsManuallyCycledWeapon() then return end
 
 	local hg_jam = GetConVar("hg_jam")
 	if hg_jam and hg_jam:GetBool() then
@@ -74,6 +75,56 @@ end
 
 function SWEP:IsManualAction()
 	return self.Primary and self.Primary.Automatic == false and self.AutomaticDraw == false
+end
+
+local function normalizeSound(snd)
+	if istable(snd) then return snd[1] end
+	return snd
+end
+
+local function isBoltLikeSound(snd)
+	snd = normalizeSound(snd)
+	if not isstring(snd) then return false end
+
+	local lower = string.lower(snd)
+	return string.find(lower, "bolt", 1, true) or
+		string.find(lower, "cock", 1, true) or
+		string.find(lower, "pump", 1, true) or
+		string.find(lower, "slide", 1, true) or
+		string.find(lower, "charging", 1, true)
+end
+
+function SWEP:GetJamClearSound()
+	local direct = self.JamClearSound or self.CockSound or self.BoltSound or self.BoltBackSound or self.BoltReleaseSound
+	if direct then return normalizeSound(direct) end
+
+	local bestTime, bestSound
+	local function scan(tbl)
+		if not istable(tbl) then return end
+
+		for time, snd in pairs(tbl) do
+			if isnumber(time) and isBoltLikeSound(snd) and (not bestTime or time > bestTime) then
+				bestTime = time
+				bestSound = normalizeSound(snd)
+			end
+		end
+	end
+
+	scan(self.FakeEmptyReloadSounds)
+	scan(self.FakeReloadSounds)
+
+	if bestSound then return bestSound end
+
+	if istable(self.ReloadSoundes) then
+		for _, snd in ipairs(self.ReloadSoundes) do
+			if isBoltLikeSound(snd) then
+				return normalizeSound(snd)
+			end
+		end
+	end
+
+	if isBoltLikeSound(self.ReloadSound) then return normalizeSound(self.ReloadSound) end
+	return normalizeSound(self.ReloadSound)
 end
 
 function SWEP:GetJamClearTime()
@@ -115,8 +166,8 @@ function SWEP:StartJamClear()
 	-- Clear the jam immediately
 	self:SetJammed(false)
 
-	-- Play bolt/cock sound
-	local cockSound = self.CockSound or self.ReloadSound
+	-- Play this weapon's own bolt/cock sound instead of a universal fallback.
+	local cockSound = self:GetJamClearSound()
 	if cockSound then
 		owner:EmitSound(cockSound, 60, math.random(95, 105))
 	end
@@ -150,7 +201,10 @@ function SWEP:ClearJam()
 
 	local owner = self:GetOwner()
 	if IsValid(owner) then
-		owner:EmitSound("weapons/zmirli/shared/foley_light" .. math.random(1, 4) .. ".wav", 45, math.random(95, 105))
+		local cockSound = self:GetJamClearSound()
+		if cockSound then
+			owner:EmitSound(cockSound, 60, math.random(95, 105))
+		end
 	end
 
 	return true

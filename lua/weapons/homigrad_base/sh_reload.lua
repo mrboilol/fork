@@ -10,6 +10,7 @@ SWEP.Notified = false
 function SWEP:CanReload()
 	local ply = self:GetOwner()
 	local char = hg.GetCurrentCharacter(ply)
+	if self:GetManualActionBlockReason(ply) then return false end
 
 	-- Check if left arm is broken (but not amputated)
 	local org = ply.organism

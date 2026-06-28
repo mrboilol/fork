@@ -118,10 +118,14 @@ if SERVER then
 		if self:GetJammed() then return end
 		if not self:CanUse() then return end
 		local ply = self:GetOwner()
-		if ply.organism and (ply.organism.larmamputated or ply.organism.rarmamputated) then return end
 		if self.reloadCoolDown > CurTime() then return end
 		if self.Primary.Next > CurTime() then return end
 		if self.drawBullet == false then
+			local manualBlock = self:GetManualActionBlockReason(ply)
+			if manualBlock then
+				ply:Notify(manualBlock .. " Use ground reload.", 2)
+				return
+			end
 			self.AnimStart_Draw = CurTime()
 			if SERVER then
 				self:Draw(true)

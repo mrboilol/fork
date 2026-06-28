@@ -1138,10 +1138,23 @@ function SWEP:SecondaryAttack()
 			local leftStrong = leftEff >= 0.5
 
 			if alreadyHolding then
-				-- Already passive-holding something, use left hand only for new grab
+				-- Offhanding needs the free left hand; if it is broken, fall back to right and hurt.
 				useBothHands = false
-				useRightHand = false
-				useLeftHand = leftUsable
+				if leftStrong then
+					useRightHand = false
+					useLeftHand = true
+				elseif rightUsable then
+					useRightHand = true
+					useLeftHand = false
+				else
+					useRightHand = false
+					useLeftHand = leftUsable
+				end
+			elseif rightUsable and leftUsable then
+				-- Dragging uses both arms whenever both exist; broken arms still hurt below.
+				useBothHands = true
+				useRightHand = true
+				useLeftHand = true
 			elseif not rightUsable then
 				-- Right arm unusable, must use left
 				useBothHands = false
@@ -1149,21 +1162,6 @@ function SWEP:SecondaryAttack()
 				useLeftHand = leftUsable
 			elseif not leftUsable then
 				-- Left arm unusable, must use right
-				useBothHands = false
-				useRightHand = true
-				useLeftHand = false
-			elseif not rightStrong and not leftStrong then
-				-- Both arms are too weak to work together, default to right hand
-				useBothHands = false
-				useRightHand = true
-				useLeftHand = false
-			elseif not rightStrong then
-				-- Right arm weak, use the stronger left hand
-				useBothHands = false
-				useRightHand = false
-				useLeftHand = true
-			elseif not leftStrong then
-				-- Left arm weak, use the stronger right hand
 				useBothHands = false
 				useRightHand = true
 				useLeftHand = false

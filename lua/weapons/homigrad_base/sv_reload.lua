@@ -24,13 +24,7 @@ SWEP.ArmReloadPenalty = {
 
 function SWEP:CanRackWithOneHand()
     local ply = self:GetOwner()
-    if not IsValid(ply) or not ply.organism then return true end
-    local org = ply.organism
-
-    -- Can't rack one-handed if left arm is missing
-    if org.larmamputated then return false end
-
-    return true
+    return self:CanRackOrReloadManualAction(ply)
 end
 
 function SWEP:HasRightArmMissing()
@@ -79,35 +73,21 @@ end
 function SWEP:Reload(time)
 	if self.reload then return end
 
-	-- Check if left arm is broken (but not amputated) - allow reload but add pain
 	local ply = self:GetOwner()
 	local org = ply.organism
-	local leftArmBroken = org and ((org.larm and org.larm >= 1) or org.larmdislocation) and not org.larmamputated
 
-	-- Bypass ConsLH check if left arm is broken (but not amputated), add pain instead
+	local manualBlock = self:GetManualActionBlockReason(ply)
+	if manualBlock then
+		if SERVER then ply:Notify(manualBlock .. " I cant reload this properly.", 2) end
+		self:OnCantReload()
+		return
+	end
+
 	if IsValid(ply.FakeRagdoll) and ply.FakeRagdoll.ConsLH then
-		if leftArmBroken then
-			-- Add pain for using broken left arm to reload
-			local painAmount = (org.larm or 0) * 15 + (org.larmdislocation and 10 or 0)
-			org.painadd = (org.painadd or 0) + painAmount
-		else
-			return
-		end
+		return
 	end
 
 	if not self:CanUse() or not self:CanReload() then self:OnCantReload() return end
-
-	-- Check for left arm missing - can't rack one-handed bolt actions
-	if ply.organism and ply.organism.larmamputated then
-		-- If weapon needs racking (drawBullet == false), force floor reload
-		if self.drawBullet == false then
-			if SERVER then
-				ply:Notify("I can't cycle it with one hand.", 1)
-			end
-			self:OnCantReload()
-			return
-		end
-	end
 
 	self.LastReload = CurTime()
 	self:ReloadStart()
@@ -184,6 +164,63 @@ end
 
 local mRandom, mRand, mClamp = math.random, math.Rand, math.Clamp
 
+local function GetFloorReloadHandling(ply)
+	local org = ply.organism or {}
+	local rightUsable = not org.rarmamputated
+	local leftUsable = not org.larmamputated
+	local rightBroken = rightUsable and ((org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated)
+	local leftBroken = leftUsable and ((org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated)
+	local rightHealthy = rightUsable and not rightBroken
+	local leftHealthy = leftUsable and not leftBroken
+
+	local chosenArm, isRight, isBroken
+	if rightUsable and leftUsable then
+		chosenArm, isRight, isBroken = "both", false, rightBroken or leftBroken
+	elseif rightHealthy then
+		chosenArm, isRight, isBroken = "right", true, false
+	elseif leftHealthy then
+		chosenArm, isRight, isBroken = "left", false, false
+	elseif rightUsable then
+		chosenArm, isRight, isBroken = "right", true, true
+	elseif leftUsable then
+		chosenArm, isRight, isBroken = "left", false, true
+	else
+		return nil, false, true, 1, 1, 0
+	end
+
+	local speedMult = (chosenArm == "both") and 0.38 or 0.75
+	local dropChanceMult = (chosenArm == "both") and 0.25 or 0.75
+	local painAmount = 0
+	local missingHands = (rightUsable and 0 or 1) + (leftUsable and 0 or 1)
+	local damagedHands = (rightBroken and 1 or 0) + (leftBroken and 1 or 0)
+
+	if missingHands > 0 then
+		speedMult = speedMult + missingHands * 0.45
+		dropChanceMult = dropChanceMult + missingHands * 0.45
+	end
+
+	if damagedHands > 0 then
+		speedMult = speedMult + damagedHands * 0.28
+		dropChanceMult = dropChanceMult + damagedHands * 0.35
+	end
+
+	if leftBroken then
+		painAmount = painAmount + 6 + (org.larm or 0) * 4 + ((org.larmdislocation or org.larmdislocated) and 5 or 0)
+	end
+
+	if rightBroken then
+		painAmount = painAmount + 8 + (org.rarm or 0) * 5 + ((org.rarmdislocation or org.rarmdislocated) and 6 or 0)
+	end
+
+	if isBroken then
+		speedMult = speedMult + 0.25
+		dropChanceMult = dropChanceMult + 0.25
+		painAmount = painAmount + 5
+	end
+
+	return chosenArm, isRight, isBroken, math.Clamp(speedMult, 0.5, 1.9), math.Clamp(dropChanceMult, 0.4, 2.0), painAmount
+end
+
 concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 	if not IsValid(ply) and not ply:Alive() then return end
 	local org = ply.organism
@@ -195,39 +232,15 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 	local isshotgun = (ent.Base == "weapon_m4super" or ent:GetClass() == "weapon_m4super")
 	local limbs = org.rarmamputated or org.larmamputated
 	local clip, maxclip, ammocount = ent:Clip1(), ent:GetMaxClip1(), ply:GetAmmoCount(ent.Primary.Ammo)
+	local needsCycle = ent.IsManuallyCycledWeapon and ent:IsManuallyCycledWeapon() and ent.drawBullet == false
 
 	-- Calculate prioritized arm and penalties for floor reload
-	local chosenArm, isRight, isBroken = hg.GetPrioritizedArm(ply)
+	local chosenArm, isRight, isBroken, speedMult, dropChanceMult, painAmount = GetFloorReloadHandling(ply)
+	if not chosenArm then return end
 
 	-- Add pain when using broken arm during floor reload (overall hurt more!)
-	if isBroken then
-		local armVal = isRight and (org.rarm or 0) or (org.larm or 0)
-		local disloc = isRight and org.rarmdislocation or org.larmdislocation
-		local painAmount = 25 * armVal + (disloc and 15 or 0)
-
-		-- Using right arm makes things better overall (reduce pain from a broken arm)
-		if isRight then
-			painAmount = painAmount * 0.7
-		end
+	if painAmount > 0 then
 		org.painadd = (org.painadd or 0) + painAmount
-	end
-
-	-- Speed multiplier: faster when chosen arm is healthy.
-	-- If using right arm, things are even better overall!
-	local speedMult = 1.0
-	if not isBroken then
-		speedMult = isRight and 0.5 or 0.8 -- Right arm healthy is super fast (0.5), Left arm healthy is fast (0.8)
-	else
-		speedMult = isRight and 1.1 or 1.6 -- Right arm broken is slightly slower (1.1), Left arm broken is much slower (1.6)
-	end
-
-	-- Drop chance: lower when chosen arm is healthy.
-	-- If using right arm, things are even better overall!
-	local dropChanceMult = 1.0
-	if not isBroken then
-		dropChanceMult = isRight and 0.4 or 0.7 -- Right arm healthy has 60% less drop chance, Left arm healthy has 30% less
-	else
-		dropChanceMult = isRight and 1.0 or 1.5 -- Right arm broken is normal drop chance, Left arm broken is 1.5x drop chance
 	end
 
 	-- Fear and adrenaline make floor reloads clumsier
@@ -235,9 +248,9 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 	speedMult = speedMult * fearSpeedFactor
 	dropChanceMult = dropChanceMult * fearDropFactor
 
-	if clip >= maxclip then return end
+	if clip >= maxclip and not needsCycle and not (isshotgun and not ent.drawBullet) then return end
 
-	if limbs and clip < maxclip or (ammocount > 0 or (isshotgun and clip > 0 and not ent.drawBullet)) then
+	if limbs and clip < maxclip or (ammocount > 0 or needsCycle or (isshotgun and clip > 0 and not ent.drawBullet)) then
 		if isshotgun and ent.drawBullet and ammocount <= 0 then return end
 
 		local dist = ent:GetPos():DistToSqr(ply:GetPos()) > 6000
@@ -303,7 +316,25 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 			ply:ViewPunch(AngleRand(-2, 2))
 			ply:PickupWeapon(ent)
 			ply:SetActiveWeapon(ent)
-			ent:ReloadEnd()
+			if needsCycle and clip >= maxclip and ammocount > 0 then
+				ent.AnimStart_Draw = CurTime()
+				if ent.Draw then ent:Draw(true) end
+				if ent.Primary then
+					ent.Primary.Next = CurTime() + (ent.AnimDraw or 0) + (ent.Primary.Wait or 0)
+				end
+				net.Start("hgwep draw")
+				net.WriteEntity(ent)
+				net.WriteBool(ent.drawBullet)
+				net.WriteFloat(CurTime())
+				net.Broadcast()
+				if ent.PlaySnd then
+					ent:PlaySnd(ent.CockSound or "weapons/shotgun/shotgun_cock.wav", true, CHAN_AUTO)
+				else
+					ent:EmitSound(ent.CockSound or "weapons/shotgun/shotgun_cock.wav")
+				end
+			else
+				ent:ReloadEnd()
+			end
 
 			FailSafe(ply)
 		end)

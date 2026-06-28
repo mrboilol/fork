@@ -23,9 +23,11 @@ SWEP.RecoilMul = 1.0
 local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
 function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
-	local mul = ((0.5) + math_max(self.Primary.Force / 110 - 1, 0)) * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local supportMul = self:GetRecoilSupportMul()
+	local mul = math.Clamp(caliberMul * weightMul * 0.55, 0.18, 2.25) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
 	self:ApplyForce(mul)
-	mul = (mul or 0) * (self.Supressor and 0.75 or 1) * (owner.organism and owner.organism.recoilmul or 1) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul() * self:GetWeaponWeightHandlingMul()
+	mul = (mul or 0) * (self.Supressor and 0.85 or 1) * (owner.organism and owner.organism.recoilmul or 1) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
 	return mul
 end
 
@@ -164,8 +166,9 @@ function SWEP:PrimarySpread()
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
 		local organism = owner.organism or {}
+		local caliberMul, weightMul, ammoForce, numBullet = self:GetRecoilImpulseFactors()
 
-		local force = self.Primary.Damage / 100 * self.addSprayMul * (self.NumBullet or 1) * math.min(sprayI / 30,0.6)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
+		local force = math.Clamp(caliberMul * weightMul * 0.28, 0.08, 1.8) * self.addSprayMul * math.min(sprayI / 30,0.6)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
 
 		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
 		local dominance = organism.hand_dominance or "right"
@@ -245,7 +248,7 @@ function SWEP:PrimarySpread()
 		end
 		arm_debuff = arm_debuff + tourniquet_debuff
 
-		mul = mul * ((2.5 + arm_debuff) / 1 + amputate_debuff)
+		mul = mul * (1.15 + arm_debuff * 0.45 + amputate_debuff * 0.55)
 		mul = mul * broken_arm_recoil_mult
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
@@ -274,9 +277,9 @@ function SWEP:PrimarySpread()
 		local angrand3 = -(-angrand2)
 		angrand3[3] = 0
 		if not self.SprayRandOnly then
-			angrand2[1] = math.Clamp(-math.abs(angrand2[1]),-10,-force/1.5)
-			angrand2[2] = math.Clamp(angrand2[2],-1,1)
-			angrand2[3] = -angrand2[2] * 1
+			angrand2[1] = math.Clamp(-math.abs(angrand2[1]),-10,-force/1.8)
+			angrand2[2] = math.Clamp(angrand2[2],-0.75,0.75)
+			angrand2[3] = -angrand2[2] * 0.8
 			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
 			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
 			
@@ -290,19 +293,20 @@ function SWEP:PrimarySpread()
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 
-		local prank3 = math.Rand(-self.Primary.Force2,self.Primary.Force2) / (self.Primary.Force2 != 0 and self.Primary.Force2 or 1) * 2
+		local prank3 = math.Rand(-ammoForce, ammoForce) / (ammoForce != 0 and ammoForce or 1) * 2
 		local angleprikol = Angle(0,0,prank3)
 
 		//ViewPunch2(angleprikol)
 
-		local mul = mul * self.Primary.Force2 / 100 * (self:IsPistolHoldType() and 2 or 1) * (self.NumBullet and self.NumBullet * 3 or 1)
+		local mul = mul * caliberMul * weightMul * 0.38 * (self:IsPistolHoldType() and 1.25 or 1) * (numBullet and math.sqrt(numBullet) or 1)
 		ViewPunch2(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul)
 		ViewPunch(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul / -2)
 		timer.Simple(0.01, function() ViewPunch2(Angle(-1 * math.Rand(1,2),1 * math.Rand(-1,1),0) * mul) end)
 		timer.Simple(0.02, function() ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul) end)
 
 		local eyeang = owner:EyeAngles()
-		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 8 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
+		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 6.5 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
+		sprayAng[2] = math.Clamp(sprayAng[2], -math.abs(sprayAng[1]) * 0.45 - 0.2, math.abs(sprayAng[1]) * 0.45 + 0.2)
 		sprayAng[3] = 0
 
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
