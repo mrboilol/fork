@@ -9,10 +9,10 @@ SWEP.HoldType = "slam"
 
 SWEP.WorldModel = "models/weapons/tfa_nmrih/w_me_bat_wood.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_bat_metal.mdl"
-SWEP.WorldModelExchange = "models/hatedmekkr/boneworks/weapons/melee/blunts/clubs/bw_wpn_clb_baseball.mdl"
+SWEP.WorldModelExchange = "models/tfa_nmrih/w_bat.mdl"
 SWEP.DontChangeDropped = false
 SWEP.ViewModel = ""
-SWEP.modelscale = 1
+SWEP.modelscale = 1.45
 
 SWEP.basebone = 94
 
@@ -26,9 +26,8 @@ if CLIENT then
 end
 
 SWEP.DamageType = DMG_CLUB
-SWEP.DamagePrimary = 26
-SWEP.NeckBreakChance = 0.02
-SWEP.DamageSecondary = 11
+SWEP.DamagePrimary = 28
+SWEP.DamageSecondary = 10
 
 SWEP.PenetrationPrimary = 3
 SWEP.PenetrationSecondary = 3.5
@@ -44,11 +43,43 @@ SWEP.StaminaSecondary = 21
 SWEP.HoldPos = Vector(-8,0,0)
 SWEP.HoldAng = Angle(0,0,-10)
 
-SWEP.AttackTime = 0.6
-SWEP.AnimTime1 = 1.85
-SWEP.WaitTime1 = 1.65
-SWEP.AttackLen1 = 40
+SWEP.AttackTime = 0.275
+SWEP.AnimTime1 = 1.25
+SWEP.WaitTime1 = 0.89
+SWEP.AttackLen1 = 60
 SWEP.ViewPunch1 = Angle(2,4,0)
+SWEP.HitCooldownEnabled = true
+SWEP.HitCooldown = 1.35
+SWEP.ComboEnabled = true
+SWEP.ComboResetTime = 1.4
+SWEP.ComboDamageMul1 = 1
+SWEP.ComboDamageMul2 = 1.25
+SWEP.ComboDamageMul3 = 1.65
+
+SWEP.hitsoundextra = {
+    {"bat/sfx_bat_impact_02.wav", 55, {105, 115}},
+    {"bat/sfx_bat_impact_04.wav", 55, {105, 115}},
+    {"bat/sfx_bat_impact_05.wav", 55, {105, 115}},
+    {"bat/sfx_bat_impact_06.wav", 55, {105, 115}},
+    {"bat/sfx_bat_impact_07.wav", 55, {105, 115}},
+    {"bat/sfx_bat_impact_08.wav", 55, {105, 115}},
+    {"bat/sfx_bat_impact_09.wav", 55, {105, 115}},
+    {"bat/sfx_bat_impact_10.wav", 55, {105, 115}},
+}
+
+SWEP.hitsoundbrutalize = {
+    {"bat/sfx_bat_impact_gore_05.wav", 70, {95, 105}},
+    {"bat/sfx_bat_impact_gore_07.wav", 75, {98, 102}},
+    {"bat/sfx_bat_impact_gore_08.wav", 75, {98, 102}},
+    {"bat/sfx_bat_impact_gore_10.wav", 75, {98, 102}},
+}
+
+SWEP.swingsoundextra = {
+    {"bat/baseball_swing_1st_layer_01.wav", 60, {95, 105}},
+    {"bat/baseball_swing_1st_layer_02.wav", 60, {95, 105}},
+    {"bat/baseball_swing_1st_layer_03.wav", 60, {95, 105}},
+    {"bat/baseball_swing_1st_layer_04.wav", 60, {95, 105}},
+}
 
 SWEP.Attack2Time = 0.3
 SWEP.AnimTime2 = 1
@@ -61,7 +92,7 @@ SWEP.sprint_ang = Angle(15,0,0)
 
 SWEP.basebone = 94
 
-SWEP.weaponPos = Vector(5.5,0.2,-0.6)
+SWEP.weaponPos = Vector(9,0.2,-1.65)
 SWEP.weaponAng = Angle(-79,5,-4)
 
 SWEP.AnimList = {
@@ -92,8 +123,8 @@ SWEP.AttackPos = Vector(0,0,0)
 
 SWEP.NoHolster = true
 
-SWEP.BreakBoneMul = 0.55
-SWEP.PainMultiplier = 0.9
+SWEP.BreakBoneMul = 0.75
+SWEP.PainMultiplier = 0.85
 
 SWEP.BlockTier = 3
 SWEP.MeleeMaterial = "wood"

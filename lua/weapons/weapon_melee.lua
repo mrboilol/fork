@@ -62,14 +62,32 @@ SWEP.AttackLen1 = 55
 SWEP.Attack2Time = 0.1
 SWEP.AnimTime2 = 0.6
 SWEP.WaitTime2 = 0.4
-SWEP.AttackLen2 = 45 
+SWEP.HitCooldownEnabled = false
+SWEP.HitCooldown = 0.2
+SWEP.AttackLen2 = 45
 
 SWEP.DamageType = DMG_SLASH
 SWEP.DamagePrimary = 15
 SWEP.DamageSecondary = 8
-
-SWEP.ArteryChance = 0.75
-SWEP.SwingSoundPitch = nil
+SWEP.ComboEnabled = false
+SWEP.ComboResetTime = 1.1
+SWEP.ComboDamageMul1 = 1
+SWEP.ComboDamageMul2 = 1.25
+SWEP.ComboDamageMul3 = 1.65
+SWEP.PlayerKnockbackMul = 2
+SWEP.PlayerKnockbackUpMul = 0.45
+SWEP.PlayerSecondaryKnockbackMul = 0.75
+SWEP.RagdollKnockbackMul = 75
+SWEP.RagdollKnockbackUpMul = 8
+SWEP.RagdollSecondaryKnockbackMul = 0.65
+SWEP.RagdollSwingSideMul = 1.25
+SWEP.RagdollViewPunchYawMul = 0.08
+SWEP.RagdollViewPunchRollMul = 0.04
+SWEP.HeadTraceFallbackRadius = 10
+SWEP.HeadRagdollChance = 0.55
+SWEP.HeadRagdollForceMul = 1.35
+SWEP.HeadRagdollUpMul = 1.2
+SWEP.HeadRagdollMinDamage = 20
 
 SWEP.PenetrationPrimary = 8
 SWEP.PenetrationSecondary = 4
@@ -147,6 +165,12 @@ SWEP.HitFleshExtraPitch = nil
 SWEP.HitFleshPlus = nil
 SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
 SWEP.DeploySnd = "snd_jack_hmcd_knifedraw.wav"
+SWEP.swingsoundextra = nil
+SWEP.hitsoundextra = nil
+SWEP.hitsoundplus = nil
+SWEP.hitsoundbrutalize = nil
+SWEP.BrutalizeSkullThreshold = 0.99
+SWEP.BrutalizeHitVolumeMul = 0.5
 
 SWEP.setlh = false
 SWEP.setrh = true
@@ -871,14 +895,19 @@ function SWEP:OwnerChanged()
         self.EquipLockEnd = CurTime() + math.max(self.EquipTime or 1, 0)
         self:PlayAnim("deploy", self.DrawAnimTime or 1.25, false, nil, false, true)
         self:SetHold(self.HoldType)
+        self:ResetCombo()
         timer.Simple(0,function() self.picked = true end)
     else
         self:SetInAttack(false)
+        self:ResetCombo()
         timer.Simple(0,function() self.picked = nil end)
     end
 end
 
 function SWEP:OnRemove()
+    if CLIENT then
+        timer.Remove("hg_melee_hitstop_" .. self:EntIndex())
+    end
     if IsValid(self.worldModel) then
         self.worldModel:Remove()
     end
@@ -887,8 +916,8 @@ SWEP.Initialzed = false
 function SWEP:Deploy()
     if SERVER and self.Initialzed and not self:GetOwner().noSound then self:GetOwner():EmitSound(self.DeploySnd,65) end
     self.Initialzed = true
-    self.EquipLockEnd = CurTime() + math.max(self.EquipTime or 1, 0)
-    self:PlayAnim("deploy", self.DrawAnimTime or 1.25, false, nil, false, true)
+    self:ResetCombo()
+    self:PlayAnim("deploy", 1, false, nil, false)
     self:SetHold(self.HoldType)
 	
 	return true
@@ -896,14 +925,7 @@ end
 
 function SWEP:Holster(wep)
     self:SetInAttack(false)
-    if self.CanHeavyAttack then
-        if self.SetChargeState then self:SetChargeState(0) else self:SetDTInt(6, 0) end
-        self.HeavyAttackFeintBlockUntilRelease = false
-        if CLIENT then
-            self.ShakePos = Vector(0,0,0)
-            self.ShakeAng = Angle(0,0,0)
-        end
-    end
+    self:ResetCombo()
     return true
 end
 
@@ -921,6 +943,22 @@ end
 
 function SWEP:IsEntSoft(ent)
 	return ent:IsNPC() or ent:IsPlayer() or hg.RagdollOwner(ent) or ent:IsRagdoll()
+end
+
+function SWEP:IsHitCooldownTarget(ent)
+    return IsValid(ent) and (ent:IsPlayer() or ent:IsRagdoll() or IsValid(hg.RagdollOwner(ent)))
+end
+
+function SWEP:ApplyHitCooldown()
+    if not self.HitCooldownEnabled then return end
+    if self.HitCooldown == nil then return end
+    local owner = self:GetOwner()
+    local mul = 1
+    if IsValid(owner) and owner.organism then
+        mul = 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90, 1, 2)
+    end
+    self:SetAttackWait(self.HitCooldown / mul)
+    self.attackwait = self.HitCooldown / mul
 end
 
 function SWEP:ThinkAdd()
@@ -1043,6 +1081,226 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     return mul
 end
 
+function SWEP:ResetCombo()
+    self.ComboCount = 0
+    self.ComboExpire = 0
+    self.ComboAppliedThisAttack = nil
+end
+
+function SWEP:GetComboDamageMul()
+    if (self.ComboExpire or 0) < CurTime() then
+        self.ComboCount = 0
+    end
+
+    local step = math.Clamp((self.ComboCount or 0) + 1, 1, 3)
+
+    if step == 2 then
+        return self.ComboDamageMul2 or 1, step
+    elseif step == 3 then
+        return self.ComboDamageMul3 or 1, step
+    end
+
+    return self.ComboDamageMul1 or 1, step
+end
+
+function SWEP:ApplyComboDamage(dmg)
+    if not self.ComboEnabled then
+        return dmg
+    end
+
+    if self.ComboAppliedThisAttack then
+        return dmg
+    end
+
+    local mul, step = self:GetComboDamageMul()
+    self.ComboCount = step >= 3 and 0 or step
+    self.ComboExpire = step >= 3 and 0 or (CurTime() + (self.ComboResetTime or 1.1))
+    self.ComboAppliedThisAttack = true
+
+    return dmg * mul
+end
+
+function SWEP:GetConfiguredHitSoundPitch(pitch)
+    if istable(pitch) then
+        local pitchMin = pitch.min or pitch[1] or 100
+        local pitchMax = pitch.max or pitch[2] or pitchMin
+        return math.random(pitchMin, pitchMax)
+    end
+
+    return pitch or 100
+end
+
+function SWEP:EmitConfiguredHitSound(owner, data, volumeMul)
+    if not IsValid(owner) then return end
+
+    if isstring(data) then
+        owner:EmitSound(data, 50 * (volumeMul or 1), 100)
+        return
+    end
+
+    if not istable(data) then return end
+
+    local snd = data.sound or data.path or data[1]
+    if not isstring(snd) then return end
+
+    local volume = (data.volume or data.vol or data[2] or 50) * (volumeMul or 1)
+    local pitch = self:GetConfiguredHitSoundPitch(data.pitch or data[3])
+
+    owner:EmitSound(snd, volume, pitch)
+end
+
+function SWEP:EmitConfiguredHitSoundLayer(owner, layer, volumeMul)
+    if isstring(layer) then
+        self:EmitConfiguredHitSound(owner, layer, volumeMul)
+        return
+    end
+
+    if not istable(layer) then return end
+
+    local snd = layer.sound or layer.path or layer[1]
+    if isstring(snd) and (layer.sound or layer.path or not istable(layer[1])) then
+        self:EmitConfiguredHitSound(owner, layer, volumeMul)
+        return
+    end
+
+    for _, data in ipairs(layer) do
+        self:EmitConfiguredHitSoundLayer(owner, data, volumeMul)
+    end
+end
+
+function SWEP:GetRandomConfiguredHitSound(layer)
+    if isstring(layer) then return layer end
+    if not istable(layer) then return nil end
+
+    local snd = layer.sound or layer.path or layer[1]
+    if isstring(snd) and (layer.sound or layer.path or not istable(layer[1])) then
+        return layer
+    end
+
+    local count = #layer
+    if count <= 0 then return nil end
+
+    return self:GetRandomConfiguredHitSound(layer[math.random(count)])
+end
+
+function SWEP:PlayExtraHitSounds(owner, volumeMul)
+    self:EmitConfiguredHitSoundLayer(owner, self.hitsoundextra, volumeMul)
+    self:EmitConfiguredHitSoundLayer(owner, self.hitsoundplus, volumeMul)
+end
+
+function SWEP:PlaySwingSound(owner)
+    if self.swingsoundextra ~= nil then
+        self:EmitConfiguredHitSoundLayer(owner, self.swingsoundextra)
+        return
+    end
+
+    owner:EmitSound(self.AttackSwing or "weapons/slam/throw.wav", 50, math.random(95,105))
+end
+
+function SWEP:PrecacheConfiguredHitSoundLayer(layer)
+    if isstring(layer) then
+        util.PrecacheSound(layer)
+        return
+    end
+
+    if not istable(layer) then return end
+
+    local snd = layer.sound or layer.path or layer[1]
+    if isstring(snd) and (layer.sound or layer.path or not istable(layer[1])) then
+        util.PrecacheSound(snd)
+        return
+    end
+
+    for _, data in ipairs(layer) do
+        self:PrecacheConfiguredHitSoundLayer(data)
+    end
+end
+
+function SWEP:GetHitVictim(ent)
+    return hg.RagdollOwner(ent) or ent
+end
+
+function SWEP:IsHeadHit(ent, trace)
+    local victim = self:GetHitVictim(ent)
+    return self:IsHeadTrace(trace and trace.Entity, trace) or self:IsHeadTrace(victim, trace)
+end
+
+function SWEP:IsHeadTrace(ent, trace)
+    if not trace then return false end
+    if trace.HitGroup == HITGROUP_HEAD then return true end
+    if not IsValid(ent) then return false end
+
+    local headBone = ent.LookupBone and ent:LookupBone("ValveBiped.Bip01_Head1")
+    if not headBone then return false end
+
+    if trace.PhysicsBone ~= nil and ent.TranslateBoneToPhysBone and ent.TranslatePhysBoneToBone then
+        local headPhys = ent:TranslateBoneToPhysBone(headBone)
+        if headPhys ~= nil and headPhys >= 0 and trace.PhysicsBone == headPhys then
+            return true
+        end
+
+        local bone = ent:TranslatePhysBoneToBone(trace.PhysicsBone)
+        if bone and bone >= 0 and ent:GetBoneName(bone) == "ValveBiped.Bip01_Head1" then
+            return true
+        end
+    end
+
+    if trace.HitBoxBone ~= nil and ent.GetBoneName and ent:GetBoneName(trace.HitBoxBone) == "ValveBiped.Bip01_Head1" then
+        return true
+    end
+
+    if trace.HitPos then
+        local headMatrix = ent.GetBoneMatrix and ent:GetBoneMatrix(headBone)
+        local headPos = headMatrix and headMatrix:GetTranslation() or ent.GetBonePosition and select(1, ent:GetBonePosition(headBone))
+        if headPos and headPos ~= vector_origin then
+            local radius = self.HeadTraceFallbackRadius or 10
+            if headPos:DistToSqr(trace.HitPos) <= (radius * radius) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+function SWEP:ShouldHeadRagdoll(ent, trace)
+    local victim = self:GetHitVictim(ent)
+    local damageThreshold = self.HeadRagdollMinDamage or 20
+    local weaponDamage = math.max(self.DamagePrimary or 0, self.DamageSecondary or 0)
+    if not IsValid(victim) or not victim:IsPlayer() then return false end
+    if not victim:Alive() or IsValid(victim.FakeRagdoll) then return false end
+    if weaponDamage <= damageThreshold then return false end
+    if not self:IsHeadHit(ent, trace) then return false end
+    return math.Rand(0, 1) <= (self.HeadRagdollChance or 0.85)
+end
+
+function SWEP:ShouldPlayBrutalizeHitSound(victim, trace)
+    if not istable(self.hitsoundbrutalize) then return false end
+    if not self:GetRandomConfiguredHitSound(self.hitsoundbrutalize) then return false end
+    if not IsValid(victim) or not victim.organism then return false end
+    if (victim.organism.skull or 0) < (self.BrutalizeSkullThreshold or 0.99) then return false end
+    return self:IsHeadHit(victim, trace)
+end
+
+function SWEP:PlaySoftHitSounds(owner, ent, trace, attacktype)
+    if not IsValid(owner) then return end
+    if not IsValid(ent) then return end
+
+    local victim = self:GetHitVictim(ent)
+    local brutalize = self:ShouldPlayBrutalizeHitSound(victim, trace)
+    local volumeMul = brutalize and (self.BrutalizeHitVolumeMul or 0.5) or 1
+
+    owner:EmitSound(attacktype and self.Attack2HitFlesh or self.AttackHitFlesh, 50 * volumeMul)
+
+    if not attacktype then
+        self:PlayExtraHitSounds(owner, volumeMul)
+    end
+
+    if brutalize then
+        self:EmitConfiguredHitSound(owner, self:GetRandomConfiguredHitSound(self.hitsoundbrutalize))
+    end
+end
+
 function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
     //if SERVER then owner:SetNetVar("slowDown", owner:GetNetVar("slowDown", 0) + (attacktype and self.DamageSecondary or self.DamagePrimary)) end
     
@@ -1056,37 +1314,13 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             self.Penetration = (attacktype == 3 and self.PenetrationPrimary * 1.5) or (attacktype and self.PenetrationSecondary or self.PenetrationPrimary)
             self.PenetrationSize = (attacktype == 3 and self.PenetrationSizePrimary * 1.5) or (attacktype and self.PenetrationSizeSecondary or self.PenetrationSizePrimary)
             
-            local pitch = self.SwingSoundPitch and (istable(self.SwingSoundPitch) and math.random(self.SwingSoundPitch[1], self.SwingSoundPitch[2]) or self.SwingSoundPitch) or math.random(95,105)
-            if attacktype == 3 then pitch = pitch - 20 end
-            owner:EmitSound(self.SwingSound or self.AttackSwing or "weapons/slam/throw.wav",50,pitch)
+            self:PlaySwingSound(owner)
             
-            local staminaCost = (attacktype and self.StaminaSecondary or self.StaminaPrimary)
-        if self:HasBrokenArm(owner) then
-            local multiplier = self.BrokenArmPenalty.StaminaMultiplier
-            local org = owner.organism
-            local checkLeft = self.TwoHanded and (org.larm and org.larm >= 1 and org.larmdislocation)
-            local checkRight = (org.rarm and org.rarm >= 1 and org.rarmdislocation)
-            if org and (checkLeft or checkRight) then
-                multiplier = multiplier * 1.5 -- More severe
-            end
-            staminaCost = staminaCost * multiplier
-        end
-
-        staminaCost = staminaCost * self:GetStaminaWeightDamageMultiplier(attacktype)
-
-        if owner.organism and attacktype ~= 3 then
-            owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
-        end
-
-            -- Small pain when swinging with damaged arms
-            if self:HasBrokenArm(owner) and owner.organism then
-                local org = owner.organism
-                org.painadd = (org.painadd or 0) + 3
+            if owner.organism then
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + (attacktype and self.StaminaSecondary or self.StaminaPrimary) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
             end
 
-            if attacktype == 3 then
-                -- heavy attack custom logic if needed
-            elseif !attacktype then
+            if !attacktype then
                 if self.CustomAttack and self:CustomAttack() then
                     self:SetInAttack(false)
 
@@ -1171,21 +1405,6 @@ function SWEP:PlayEffects(trace, attacktype)
     local owner = self:GetOwner()
     
     if self:IsEntSoft(trace.Entity) then
-        owner:EmitSound("hitregister.ogg", 75, 115)
-        local sound = (attacktype == 3 and self.AttackHitFlesh) or (attacktype and self.Attack2HitFlesh or self.AttackHitFlesh)
-        owner:EmitSound(sound,75)
-
-        if not attacktype or attacktype == 3 then
-            if self.HitFleshExtra and #self.HitFleshExtra > 0 then
-                local snd = table.Random(self.HitFleshExtra)
-                owner:EmitSound(snd, 75, self.HitFleshExtraPitch and (istable(self.HitFleshExtraPitch) and math.random(self.HitFleshExtraPitch[1], self.HitFleshExtraPitch[2]) or self.HitFleshExtraPitch) or 100)
-            end
-
-            if self.HitFleshPlus then
-                owner:EmitSound(self.HitFleshPlus, 75)
-            end
-        end
-
         if self.DamageType == DMG_SLASH then
             util.Decal( "Blood", trace.HitPos + trace.HitNormal * 15, trace.HitPos - trace.HitNormal * 15, owner )
             util.Decal( "Blood", trace.HitPos + trace.HitNormal * 2, owner:GetPos(), trace.Entity )
@@ -1197,9 +1416,10 @@ function SWEP:PlayEffects(trace, attacktype)
         owner:EmitSound(self.AttackHit,75)
         owner:EmitSound(self.AttackHit, 75)
 
-        if self.DamageType ~= DMG_SLASH and trace.MatType ~= MAT_GLASS then
-            util.Decal("Impact.BluntAdd" .. math.random(bluntDecalsRand), trace.HitPos + trace.HitNormal, trace.HitPos - trace.HitNormal, owner)
-        end
+		if self.weight >= 1.5 and self.DamageType ~= DMG_SLASH and trace.MatType ~= MAT_GLASS and not attacktype then
+			util.Decal("Impact.BluntAdd" .. math.random(bluntDecalsRand), trace.HitPos + trace.HitNormal, trace.HitPos - trace.HitNormal, owner)
+			owner:ScreenShake(trace.HitPos, self.HitScreenShakeAmp or 22, self.HitScreenShakeFreq or 6, self.HitScreenShakeDur or 0.28, self.HitScreenShakeRadius or 110, false)
+		end
     end
 end
 
@@ -1241,12 +1461,49 @@ function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
             
             local angrand = AngleRand(-5, 5)
 
-            ply:ViewPunch((normal * -dot) * dmg / 30)
-			--if ply:OnGround() or ply.organism.superfighter then
-           		ply:SetVelocity(((trnormal:Angle() + normal):Forward() * -5 * math.min(dmg, 30) + trnormal * math.min(dmg, 30) * 10) * MELEE_GLOBAL_KNOCKBACK_MUL)
-			--end
+            ply:ViewPunch((normal * -dot) * dmg * (self.HitPunchMul or 0.75) / (self.HitPunchDiv or 40))
+			if ply:OnGround() or ply.organism.superfighter then
+                local owner = self:GetOwner()
+                local pushDir = IsValid(owner) and (ply:GetPos() - owner:GetPos()) or trnormal
+                pushDir.z = 0
+                if pushDir:LengthSqr() <= 0.001 then
+                    pushDir = Vector(trnormal.x, trnormal.y, 0)
+                end
+                if pushDir:LengthSqr() > 0.001 then
+                    pushDir:Normalize()
+                end
+                local forceMul = attacktype and (self.PlayerSecondaryKnockbackMul or 0.75) or 1
+                local force = pushDir * math.min(dmg * (self.PlayerKnockbackMul or 3.25) * forceMul, 140)
+                force.z = math.min(dmg * (self.PlayerKnockbackUpMul or 0.45) * forceMul, 22)
+                ply:SetVelocity(force)
+			end
         end
     end
+end
+
+function SWEP:GetRagdollHitForce(ent, traceNormal, dmg, attacktype)
+    local owner = self:GetOwner()
+    local pushDir = IsValid(owner) and IsValid(ent) and (ent:GetPos() - owner:GetPos()) or traceNormal
+    if IsValid(owner) then
+        local eyeAng = owner:EyeAngles()
+        local viewPunch = attacktype and (self.ViewPunch2 or angle_zero) or (self.ViewPunch1 or angle_zero)
+        local swingAng = attacktype and (self.SwingAng2 or 0) or (self.SwingAng or -90)
+        local sideBias = math.sin(math.rad(swingAng)) * (self.RagdollSwingSideMul or 0.85)
+        sideBias = sideBias - viewPunch.y * (self.RagdollViewPunchYawMul or 0.08)
+        sideBias = sideBias - viewPunch.r * (self.RagdollViewPunchRollMul or 0.04)
+        pushDir = pushDir + eyeAng:Right() * sideBias
+    end
+    pushDir.z = 0
+    if pushDir:LengthSqr() <= 0.001 then
+        pushDir = Vector(traceNormal.x, traceNormal.y, 0)
+    end
+    if pushDir:LengthSqr() > 0.001 then
+        pushDir:Normalize()
+    end
+    local forceMul = attacktype and (self.RagdollSecondaryKnockbackMul or 0.75) or 1
+    local force = pushDir * math.min(dmg * (self.RagdollKnockbackMul or 75) * forceMul, 1800)
+    force.z = math.min(dmg * (self.RagdollKnockbackUpMul or 8) * forceMul, 240)
+    return force
 end
 
 SWEP.MinSensivity = 0.35
@@ -1393,20 +1650,41 @@ if CLIENT then
     hg_nomeleestop = ConVarExists("hg_nomeleestop") and GetConVar("hg_nomeleestop") or CreateConVar("hg_nomeleestop", 0, FCVAR_ARCHIVE, "Toggle melee stop-on-hit animation feature", 0, 1)
 end
 
-function SWEP:SetupMove(ply, mv, cmd)
-    if self.CanHeavyAttack then
-        local state = self.GetChargeState and self:GetChargeState() or self:GetDTInt(6)
-        if state == 1 or state == 2 then
-            local speed = 110
-            
-            mv:SetMaxSpeed(speed)
-            mv:SetMaxClientSpeed(speed)
-            
-            if cmd then
-                cmd:RemoveKey(IN_SPEED)
-            end
-        end
-    end
+local function GetMeleeAnimTiming(self)
+    local animspeed = math.max(self.animspeed or 0, 0.001)
+    local timing = 1 - math.Clamp((self.animtime - CurTime()) / animspeed, 0, 1)
+    return self.reverseanim and (1 - timing) or timing
+end
+
+local function SetMeleeAnimTiming(self, timing, speedMul)
+    local animspeed = math.max((self.animspeed or 0) * speedMul, 0.001)
+    local internalTiming = self.reverseanim and (1 - timing) or timing
+    self.animspeed = animspeed
+    self.animtime = CurTime() - internalTiming * animspeed + animspeed
+end
+
+local function QueueMeleeHitStop(self, speedMul, pause, resumeMul, reverse, stopanim)
+    if not CLIENT then return end
+
+    self.hitstopToken = (self.hitstopToken or 0) + 1
+
+    local token = self.hitstopToken
+    local timerId = "hg_melee_hitstop_" .. self:EntIndex()
+    local timing = GetMeleeAnimTiming(self)
+
+    timer.Remove(timerId)
+
+    self.reverseanim = reverse and true or false
+    SetMeleeAnimTiming(self, timing, speedMul)
+    self.stopanim = stopanim
+
+    timer.Create(timerId, pause, 1, function()
+        if not IsValid(self) then return end
+        if self.hitstopToken ~= token then return end
+
+        local currentTiming = GetMeleeAnimTiming(self)
+        SetMeleeAnimTiming(self, currentTiming, resumeMul)
+    end)
 end
 
 function SWEP:CustomThink()
@@ -1840,59 +2118,22 @@ function SWEP:CustomThink()
             if SERVER and soft and self.HitEnts[#self.HitEnts] ~= ent then
                 self:AddDecal()
             end
-            
-            if CLIENT and IsFirstTimePredicted() then
-                local weight = self.weight or self.Weight or 0
-                
-                if weight > 0.4 and (not self.stopanim or (not soft and not self.HitWorld)) and (not hg_nomeleestop or not hg_nomeleestop:GetBool()) then
-                    if not soft or self.AnimAlwaysBack or self.HitWorld then
-                        if not self.NoReverse then
-                            local mul = 3
-                            self.animspeed = self.animspeed * mul
 
-                            self.animtime = CurTime() - (self.animtime - CurTime()) * mul + self.animspeed - 0.1
-                            
-                            timer.Simple(0.15, function()
-                                if not IsValid(self) then return end
-
-                                local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
-                                local mul = 0.5
-                                
-                                self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
-                                self.animspeed = self.animspeed * mul
-                            end)
-
-                            util.ScreenShake(self:GetPos(), 15, 5, 0.2, 100)
-
-                            self.stopanim = 0.15
-                            self.reverseanim = true
-                        else
-                            util.ScreenShake(self:GetPos(), 15, 5, 0.2, 100)
-                        end
-                        self.HitWorld = true
-                    else
-                        local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
-                        local mul = 2
-                        
-                        self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
-                        self.animspeed = self.animspeed * mul
-                        
-                        timer.Simple(0.05, function()
-                            if not IsValid(self) then return end
-
-                            local timing = (1 - math.Clamp((self.animtime - CurTime()) / self.animspeed, 0, 1))
-                            local mul = 0.5
-                            
-                            self.animtime = CurTime() - timing * self.animspeed * mul + self.animspeed * mul
-                            self.animspeed = self.animspeed * mul
-                        end)
-
-                        util.ScreenShake(self:GetPos(), 15, 5, 0.1, 100)
-
-                        self.stopanim = 0.05
-                    end
-                end
+            if self:IsHitCooldownTarget(ent) then
+                self:ApplyHitCooldown()
             end
+
+			if CLIENT and IsFirstTimePredicted() and self.weight > 0.4 and (!self.stopanim or (!soft and !self.HitWorld)) and !hg_nomeleestop:GetBool() then
+				if !soft or self.AnimAlwaysBack or self.HitWorld then   
+                    QueueMeleeHitStop(self, self.HitStopWorldSpeedMul or 2.35, self.HitStopWorldPause or 0.12, self.HitStopWorldResumeMul or 0.6, true, self.HitStopWorldStop or 0.12)
+                    util.ScreenShake(self:GetPos(), 35, 1, 1, 100)
+					self.reverseanim = true
+                    self.HitWorld = true
+				else
+                    QueueMeleeHitStop(self, self.HitStopSoftSpeedMul or 1.9, self.HitStopSoftPause or 0.05, self.HitStopSoftResumeMul or 0.72, false, self.HitStopSoftStop or 0.1)
+                    util.ScreenShake(self:GetPos(), 35, 1, 1, 100)
+				end
+			end
 
             if CLIENT then goto meleeskip1 end
 
@@ -1911,6 +2152,7 @@ function SWEP:CustomThink()
             end
 
             dmg = dmg * mul
+            dmg = self:ApplyComboDamage(dmg)
 
             if self:AlreadyHit(ent, trace) then
                 goto meleeskip1
@@ -1982,36 +2224,32 @@ function SWEP:CustomThink()
 
                 self.attackedOnce = true
                 self.slash = nil
+                self:PlaySoftHitSounds(owner, ent, trace, false)
+                
+                local headHit = self:IsHeadHit(ent, trace)
+                local hitForce = self:GetRagdollHitForce(ent, trace.Normal, dmg, false)
+                if headHit then
+                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
+                end
+                hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5)
 
-                -- Add pain to attacker when hitting with damaged arms
-                if owner.organism then
-                    local org = owner.organism
-                    local rarm_broken = org.rarm >= 1
-                    local larm_broken = org.larm >= 1
-                    local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
-                    local larm_dislocated = org.larmdislocation or org.larmdislocated
+                self:PunchPlayer(ent, false, trace.Normal, dmg)
 
-                    local pain_amount = 0
+                local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
 
-                    if self:HasBrokenArm(owner) then
-                        local painAmount = self.BrokenArmPenalty.PainOnHit or 12
-                        local armDamage = self:GetArmDamagePercent(owner)
-                        pain_amount = pain_amount + (painAmount * (0.5 + armDamage * 0.5))
-                    end
+                if IsValid(phys) then
+                    phys:ApplyForceOffset(hitForce, trace.HitPos)
+                end
 
-                    -- Add extra pain for dislocated arms (less than broken but still hurts)
-                    if rarm_dislocated then
-                        pain_amount = pain_amount + 6
-                    end
-                    if larm_dislocated then
-                        pain_amount = pain_amount + 6
-                    end
-
-                    if pain_amount > 0 then
-                        org.painadd = (org.painadd or 0) + pain_amount
-                        org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.3, 150)
-                        org.lasthit = CurTime()
-                    end
+                if self:ShouldHeadRagdoll(ent, trace) then
+                    timer.Simple(0, function()
+                        local victim = self:GetHitVictim(ent)
+                        if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
+                            hg.Fake(victim)
+                        end
+                    end)
                 end
 
                 self:PrimaryAttackAdd(ent, trace)
@@ -2030,6 +2268,7 @@ function SWEP:CustomThink()
                 self.HitEnts = nil
                 self.FirstAttackTick = false
                 self.AttackHitPlayed = false
+                self.ComboAppliedThisAttack = nil
             end
         elseif self:GetAttackType() == 2 and inattack2 == 0 then
             owner:LagCompensation(true)
@@ -2053,6 +2292,10 @@ function SWEP:CustomThink()
 
             if SERVER and self:IsEntSoft(ent) and self.DamageType == DMG_SLASH and self.HitEnts[#self.HitEnts] ~= ent then
                 self:AddDecal()
+            end
+
+            if self:IsHitCooldownTarget(ent) then
+                self:ApplyHitCooldown()
             end
 
             if CLIENT then goto meleeskip2 end
@@ -2079,6 +2322,7 @@ function SWEP:CustomThink()
             end
 
             dmg = dmg * mul
+            dmg = self:ApplyComboDamage(dmg)
 
             if self:AlreadyHit(ent, trace) then
                 goto meleeskip2
@@ -2146,36 +2390,32 @@ function SWEP:CustomThink()
 
                 self.attackedOnce = true
                 self.slash = nil
+                self:PlaySoftHitSounds(owner, ent, trace, true)
 
-                -- Add pain to attacker when hitting with damaged arms
-                if owner.organism then
-                    local org = owner.organism
-                    local rarm_broken = org.rarm >= 1
-                    local larm_broken = org.larm >= 1
-                    local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
-                    local larm_dislocated = org.larmdislocation or org.larmdislocated
+                local headHit = self:IsHeadHit(ent, trace)
+                local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
+                local hitForce = self:GetRagdollHitForce(ent, trace.Normal, dmg, true)
+                if headHit then
+                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
+                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
+                end
 
-                    local pain_amount = 0
+                hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5)
 
-                    if self:HasBrokenArm(owner) then
-                        local painAmount = self.BrokenArmPenalty.PainOnHit or 12
-                        local armDamage = self:GetArmDamagePercent(owner)
-                        pain_amount = pain_amount + (painAmount * (0.5 + armDamage * 0.5))
-                    end
+                self:PunchPlayer(ent, true, trace.Normal, dmg)
 
-                    -- Add extra pain for dislocated arms (less than broken but still hurts)
-                    if rarm_dislocated then
-                        pain_amount = pain_amount + 6
-                    end
-                    if larm_dislocated then
-                        pain_amount = pain_amount + 6
-                    end
+                if IsValid(phys) then
+                    phys:ApplyForceOffset(hitForce, trace.HitPos)
+                end
 
-                    if pain_amount > 0 then
-                        org.painadd = (org.painadd or 0) + pain_amount
-                        org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.3, 150)
-                        org.lasthit = CurTime()
-                    end
+                if self:ShouldHeadRagdoll(ent, trace) then
+                    timer.Simple(0, function()
+                        local victim = self:GetHitVictim(ent)
+                        if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
+                            hg.Fake(victim)
+                        end
+                    end)
                 end
 
                 self:SecondaryAttackAdd(ent, trace)
@@ -2194,161 +2434,12 @@ function SWEP:CustomThink()
                 self.HitEnts = nil
                 self.FirstAttackTick = false
                 self.AttackHitPlayed = false
-            end
-        elseif self:GetAttackType() == 3 and inattack3 == 0 then
-            owner:LagCompensation(true)
-            
-            local trace = self:Attack(owner, ent, vellen, 3, inattackL3)
-
-            owner:LagCompensation(false)
-
-            if SERVER and (owner:OnGround() or owner.organism.superfighter) then
-                local vec = owner:GetAimVector() * math.min(self.DamagePrimary * 0.5 * 2, 40)
-                vec[3] = 0
-
-                owner:SetVelocity(vec)
-            end
-
-            if !trace then return end
-
-            local ent = trace.Entity
-
-            local shouldhit = (IsValid(ent) or ent:IsWorld())
-
-            local dmg = math.random(self.DamagePrimary - 3, self.DamagePrimary + 3)
-            blockMul = 1
-
-            if !shouldhit then
-                goto meleeskip3
-            end
-
-            if SERVER and self:IsEntSoft(ent) and self.HitEnts[#self.HitEnts] ~= ent then
-                self:AddDecal()
-            end
-
-            if CLIENT and IsFirstTimePredicted() then
-                util.ScreenShake(self:GetPos(), 25, 1, 1, 100)
-            end
-
-            if CLIENT then goto meleeskip3 end
-
-            ent:PrecacheGibs()
-            
-            if SERVER then
-                local vec = trace.Normal * math.min(self.DamagePrimary * 2 * 0.5, 30) * MELEE_GLOBAL_KNOCKBACK_MUL
-                vec[3] = 0
-                ent:SetVelocity(vec)
-            end
-
-            mul = mul * (self:BehindAttack(ent) and 2 or 1)
-            blockMul = self:BlockingLogic(ent, mul, 3, trace)
-            mul = mul * blockMul
-
-            if blockMul == 0 and self.DamageType == DMG_SLASH then
-                self:SetInAttack(false)
-                self.HitEnts = nil
-                self.FirstAttackTick = false
-                self.AttackHitPlayed = false
-                return
-            end
-
-            dmg = dmg * mul
-
-            if self:AlreadyHit(ent, trace) then
-                goto meleeskip3
-            end
-            
-            if self.HitEnts[#self.HitEnts] ~= ent then
-                self:PlayEffects(trace, 3)
-            end
-            
-            if self.MultiDmg1 or (self.HitEnts[#self.HitEnts] ~= ent) then
-                if self.MultiDmg1 or not self:IsEntSoft(ent) then
-                    dmg = dmg / (self.HeavyAttackRads * self.HeavyAttackTimeLength)
-                else
-                    dmg = dmg / 1.5
-                end
-                                
-                local dmginfo = DamageInfo()
-
-                dmginfo:SetAttacker(owner)
-                dmginfo:SetInflictor(self)
-                dmginfo:SetDamage(dmg)
-                dmginfo:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
-                dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or self.DamageType)
-                dmginfo:SetDamagePosition(trace.HitPos)
-                
-                hg.AddForceRag(ent, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL, 0.5)
-
-                self:PunchPlayer(ent, 3, trace.Normal, dmg)
-
-                local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
-
-                if IsValid(phys) then
-                    local forceMultiplier = math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
-                    phys:ApplyForceCenter(trace.Normal * forceMultiplier * 0.8)
-                    phys:ApplyForceOffset(trace.Normal * forceMultiplier * 0.2, trace.HitPos)
-                end
-
-                self.slash = self.MultiDmg1
-                ent:TakeDamageInfo(dmginfo)
-
-                self.attackedOnce = true
-                self.slash = nil
-
-                -- Add pain to attacker when hitting with damaged arms
-                if owner.organism then
-                    local org = owner.organism
-                    local rarm_broken = org.rarm >= 1
-                    local larm_broken = org.larm >= 1
-                    local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
-                    local larm_dislocated = org.larmdislocation or org.larmdislocated
-
-                    local pain_amount = 0
-
-                    if self:HasBrokenArm(owner) then
-                        local painAmount = self.BrokenArmPenalty.PainOnHit or 12
-                        local armDamage = self:GetArmDamagePercent(owner)
-                        pain_amount = pain_amount + (painAmount * (0.5 + armDamage * 0.5))
-                    end
-
-                    -- Add extra pain for dislocated arms (less than broken but still hurts)
-                    if rarm_dislocated then
-                        pain_amount = pain_amount + 6
-                    end
-                    if larm_dislocated then
-                        pain_amount = pain_amount + 6
-                    end
-
-                    if pain_amount > 0 then
-                        org.painadd = (org.painadd or 0) + pain_amount
-                        org.avgpain = math.min((org.avgpain or 0) + pain_amount * 0.3, 150)
-                        org.lasthit = CurTime()
-                    end
-                end
-
-                self:PrimaryAttackAdd(ent, trace)
-            end
-
-            ::meleeskip3::
-            
-            if not ent:IsWorld() and self:IsEntSoft(ent) then
-                self.HitEnts[#self.HitEnts + 1] = ent
-            end
-
-            self.FirstAttackTick = true
-
-            if inattackL3 == 0 then
-                self:SetInAttack(false)
-                self.HitEnts = nil
-                self.FirstAttackTick = false
-                self.AttackHitPlayed = false
+                self.ComboAppliedThisAttack = nil
             end
         end
     else
         self.attackedOnce = nil
-        self.LastEyeAngles = nil
-        self.MouseSwayAccumulator = 0
+        self.ComboAppliedThisAttack = nil
     end
 
 end
@@ -2361,6 +2452,20 @@ end
 
 SWEP.AttackTimeLength = 0.15
 SWEP.Attack2TimeLength = 0.1
+SWEP.HitStopWorldSpeedMul = 2.35
+SWEP.HitStopWorldResumeMul = 0.6
+SWEP.HitStopWorldPause = 0.12
+SWEP.HitStopWorldStop = 0.12
+SWEP.HitStopSoftSpeedMul = 1.9
+SWEP.HitStopSoftResumeMul = 0.72
+SWEP.HitStopSoftPause = 0.05
+SWEP.HitStopSoftStop = 0.1
+SWEP.HitPunchMul = 0.75
+SWEP.HitPunchDiv = 40
+SWEP.HitScreenShakeAmp = 22
+SWEP.HitScreenShakeFreq = 6
+SWEP.HitScreenShakeDur = 0.28
+SWEP.HitScreenShakeRadius = 110
 
 SWEP.AttackRads = 45
 SWEP.AttackRads2 = 65
@@ -2421,6 +2526,7 @@ function SWEP:PrimaryAttack()
     self.FirstAttackTick = false
     self.AttackHitPlayed = false
     self.HitWorld = false
+    self.ComboAppliedThisAttack = nil
     self:PlayAnim("attack", self.AnimTime1 / mul,false,nil,false,false)
     self:SetAttackType(1)
     self:SetLastAttack(CurTime() + self.AttackTime / mul)
@@ -2550,6 +2656,7 @@ function SWEP:SecondaryAttack(override)
     self.FirstAttackTick = false
     self.AttackHitPlayed = false
     self.HitWorld = false
+    self.ComboAppliedThisAttack = nil
     self:PlayAnim("attack2",self.AnimTime2 / mul,false,nil,false,false)
     self:SetAttackType(2)
     self:SetLastAttack(CurTime() + self.Attack2Time / mul)
@@ -2576,6 +2683,7 @@ end
 
 local util = util
 function SWEP:Initialize()
+    self:ResetCombo()
     self.attackanim = 0
     self.sprintanim = 0
     self.animtime = 0
@@ -2659,6 +2767,10 @@ function SWEP:Initialize()
     end
     util.PrecacheSound(self.Attack2HitFlesh)
     util.PrecacheSound(self.DeploySnd)
+    self:PrecacheConfiguredHitSoundLayer(self.swingsoundextra)
+    self:PrecacheConfiguredHitSoundLayer(self.hitsoundextra)
+    self:PrecacheConfiguredHitSoundLayer(self.hitsoundplus)
+    self:PrecacheConfiguredHitSoundLayer(self.hitsoundbrutalize)
 
     self:InitAdd()
 end
@@ -2873,6 +2985,12 @@ function SWEP:PlayAnim(anim, time, cycling, callback, reverse, sendtoclient)
     self.tries = 10
     if self:GetWM():GetModel() ~= self.WorldModelReal then self:GetWM():SetModel(self.WorldModelReal) end
     
+    if CLIENT then
+        self.hitstopToken = (self.hitstopToken or 0) + 1
+        timer.Remove("hg_melee_hitstop_" .. self:EntIndex())
+        self.stopanim = nil
+    end
+    
     self:GetWM():SetSequence(self.AnimList[anim] or anim)
     self.animtime = CurTime() + time
     self.animspeed = time
@@ -2964,7 +3082,7 @@ function SWEP:NPCThink()
         local trEnt = IsValid(trace.Entity) and trace.Entity
 		if IsValid(trEnt) then
 			self.LastNPCAttack = CurTime() + (self.AnimTime1 or 1)
-			npc:EmitSound(self.SwingSound or self.AttackSwing or "weapons/slam/throw.wav", 70, self.SwingSoundPitch and (istable(self.SwingSoundPitch) and math.random(self.SwingSoundPitch[1], self.SwingSoundPitch[2]) or self.SwingSoundPitch) or math.random(95,110))
+			self:PlaySwingSound(npc)
 
             npc:SetSchedule(SCHED_MELEE_ATTACK1)
 			timer.Create(timerId, (self.AttackTime + 0.1) or 0.4, 1, function()
@@ -2983,28 +3101,33 @@ function SWEP:NPCThink()
 					dmginfo:SetDamageType(self.DamageType)
 					dmginfo:SetDamagePosition(trace.HitPos)
 					trEnt:TakeDamageInfo(dmginfo)
-					npc:EmitSound("hitregister.ogg", 75, 115)
-					npc:EmitSound(self.AttackHitFlesh, 75)
-					if self.HitFleshExtra and #self.HitFleshExtra > 0 then
-						local snd = table.Random(self.HitFleshExtra)
-						npc:EmitSound(snd, 75, self.HitFleshExtraPitch and (istable(self.HitFleshExtraPitch) and math.random(self.HitFleshExtraPitch[1], self.HitFleshExtraPitch[2]) or self.HitFleshExtraPitch) or 100)
-					end
-
-					if self.HitFleshPlus then
-						npc:EmitSound(self.HitFleshPlus, 75)
-					end
+                    self:PlaySoftHitSounds(npc, trEnt, trace, false)
 
 					if trEnt:IsPlayer() then
-						hg.AddForceRag(trEnt, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL, 0.5)
+						local headHit = self:IsHeadHit(trEnt, trace)
+						local hitForce = self:GetRagdollHitForce(trEnt, trace.Normal, dmg, false)
+						if headHit then
+							hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
+							hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
+							hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
+						end
+						hg.AddForceRag(trEnt, trace.PhysicsBone or 0, hitForce, 0.5)
 
 						self:PunchPlayer(trEnt, false, trace.Normal, dmg)
 		
 						local phys = trEnt:GetPhysicsObjectNum(trace.PhysicsBone or 0)
 		
 						if IsValid(phys) then
-							local forceMultiplier = math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
-							phys:ApplyForceCenter(trace.Normal * forceMultiplier * 0.8)
-							phys:ApplyForceOffset(trace.Normal * forceMultiplier * 0.2, trace.HitPos)
+							phys:ApplyForceOffset(hitForce, trace.HitPos)
+						end
+
+						if self:ShouldHeadRagdoll(trEnt, trace) then
+							timer.Simple(0, function()
+								local victim = self:GetHitVictim(trEnt)
+								if IsValid(victim) and victim:IsPlayer() and victim:Alive() and not IsValid(victim.FakeRagdoll) then
+									hg.Fake(victim)
+								end
+							end)
 						end
 					end
 				end
@@ -3234,4 +3357,3 @@ end
 
     return true
 end]]
-
