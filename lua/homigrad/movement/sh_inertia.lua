@@ -93,6 +93,10 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			if ply.MovementInertia then
 				ply.MovementInertia:Zero()
 			end
+			ply.LastVelocity = vector_origin
+			ply.LastVelocityLen = 0
+			ply.LastChangeVelocity = 0
+			ply.CurrentSpeed = math.min(ply.CurrentSpeed or ply:GetWalkSpeed(), ply:GetSlowWalkSpeed())
 		end
 
 		if (ply:GetMoveType() == MOVETYPE_NOCLIP) then

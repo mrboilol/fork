@@ -2,7 +2,50 @@ if CLIENT then return end
 
 local cvDeathScreen = CreateConVar("zcity_delta_deathscreen_enable", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable death screen", 0, 1)
 
+util.AddNetworkString("zcity_delta_death_respawn")
+util.AddNetworkString("zcity_delta_death_report")
+
 local lifeStats = {}
+local respawnRequested = {}
+local respawnRequestCooldown = {}
+
+local function RespawnTimerName(ply)
+    local id = IsValid(ply) and ply.SteamID64 and ply:SteamID64() or nil
+    if not id or id == "" or id == "0" then
+        id = IsValid(ply) and ply:EntIndex() or tostring(ply)
+    end
+    return "zcity_delta_death_respawn_" .. id
+end
+
+local function ClearRespawnRequest(ply)
+    respawnRequested[ply] = nil
+    respawnRequestCooldown[ply] = nil
+    if IsValid(ply) then
+        timer.Remove(RespawnTimerName(ply))
+    end
+end
+
+local function TryRespawnPlayer(ply)
+    if not IsValid(ply) or not ply:IsPlayer() then return true end
+    if ply:Alive() then
+        ClearRespawnRequest(ply)
+        return true
+    end
+    if not cvDeathScreen:GetBool() then
+        ClearRespawnRequest(ply)
+        return true
+    end
+
+    ply.NextSpawnTime = CurTime()
+    ply:Spawn()
+
+    if ply:Alive() then
+        ClearRespawnRequest(ply)
+        return true
+    end
+
+    return false
+end
 
 local function ResetLifeStats(ply)
     lifeStats[ply] = {
@@ -18,11 +61,9 @@ local function ResetLifeStats(ply)
     }
 end
 
-local respawnRequested = {}
-
 hook.Add("PlayerSpawn", "zcity_delta_death_respawn_init", function(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    respawnRequested[ply] = nil
+    ClearRespawnRequest(ply)
     timer.Simple(0.5, function()
         if IsValid(ply) then ResetLifeStats(ply) end
     end)
@@ -30,7 +71,7 @@ end)
 
 hook.Add("PlayerDisconnected", "zcity_delta_death_respawn_cleanup", function(ply)
     lifeStats[ply] = nil
-    respawnRequested[ply] = nil
+    ClearRespawnRequest(ply)
 end)
 
 hook.Add("HomigradDamage", "zcity_delta_death_respawn_track", function(ply, dmgInfo, hitgroup, ent, rawDamage)
@@ -165,12 +206,21 @@ end)
 -- Handle respawn request from client
 net.Receive("zcity_delta_death_respawn", function(len, ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
+    if not cvDeathScreen:GetBool() then return end
     if ply:Alive() then return end
+
+    local now = CurTime()
+    if (respawnRequestCooldown[ply] or 0) > now then return end
+    respawnRequestCooldown[ply] = now + 0.75
+
     respawnRequested[ply] = true
     ply.NextSpawnTime = CurTime()
-    if GAMEMODE and GAMEMODE.PlayerDeathThink then
-        ply.NextSpawnTime = CurTime()
-    end
+
+    if TryRespawnPlayer(ply) then return end
+
+    timer.Create(RespawnTimerName(ply), 0.1, 10, function()
+        if TryRespawnPlayer(ply) then return end
+    end)
 end)
 
 -- Concommands for toggling

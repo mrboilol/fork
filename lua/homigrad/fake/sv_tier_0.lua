@@ -60,6 +60,23 @@ ValveBiped.Bip01_R_Foot 2.3848159313202
 
 hg = hg or {}
 
+if not IsLiveManagedRagdoll then
+	function IsLiveManagedRagdoll(rag)
+		if not IsValid(rag) then return false end
+
+		local owner
+		if hg.RagdollOwner then
+			owner = hg.RagdollOwner(rag)
+		end
+
+		if not IsValid(owner) then
+			owner = rag:GetNWEntity("ply")
+		end
+
+		return IsValid(owner) and owner:IsPlayer() and owner:Alive()
+	end
+end
+
 hg.cachedmodels = {}
 
 local function cacheModel(ragdoll)

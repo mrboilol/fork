@@ -8,18 +8,28 @@ hg.Mental = hg.Mental or {}
 -- ConVars
 --/////////////////////////////////////////////////////////////////////////////
 
-local cvMentalEnabled = CreateConVar("zcity_delta_mental_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable mental system (mood/stress)", 0, 1)
-local cvTraitsEnabled = CreateConVar("zcity_delta_traits_enabled", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable traits system", 0, 1)
+local cvMentalEnabled = CreateConVar("zcity_delta_mental_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable unified mental meter (mood/despair/distress)", 0, 1)
+local cvMentalEffectsEnabled = CreateConVar("zcity_delta_mental_effects_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable unified mental meter gameplay effects", 0, 1)
+local cvMentalBadMood = CreateConVar("zcity_delta_mental_bad_mood_threshold", "35", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Unified mental meter bad mood threshold (0-100 distress)", 0, 100)
+local cvMentalDistress = CreateConVar("zcity_delta_mental_distress_threshold", "55", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Unified mental meter distress threshold (0-100 distress)", 0, 100)
+local cvMentalDesperate = CreateConVar("zcity_delta_mental_desperate_threshold", "78", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Unified mental meter desperate/despair threshold (0-100 distress)", 0, 100)
+local cvTraitsEnabled = CreateConVar("zcity_delta_traits_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable trait gameplay effects; traits can still be assigned while off", 0, 1)
 local cvLastStandEnabled = CreateConVar("zcity_delta_laststand_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable last stand mechanic (requires mental)", 0, 1)
 local cvSchizoEnabled = CreateConVar("zcity_delta_schizophrenia_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable schizophrenia visual effects (requires traits)", 0, 1)
 local cvDepressionDrainEnabled = CreateConVar("zcity_delta_depression_drain_enabled", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable depression stamina drain (requires mental)", 0, 1)
 local cvDeathScreenEnabled = CreateConVar("zcity_delta_deathscreen_enable", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable death screen", 0, 1)
 
-local function IsMentalEnabled() return cvMentalEnabled:GetBool() end
+local function IsDespairEnabled()
+    local cv = GetConVar("hg_despairsystem")
+    return not cv or cv:GetInt() ~= 0
+end
+
+local function IsMentalEnabled() return cvMentalEnabled:GetBool() and IsDespairEnabled() end
+local function AreMentalEffectsEnabled() return IsMentalEnabled() and cvMentalEffectsEnabled:GetBool() end
 local function IsTraitsEnabled() return cvTraitsEnabled:GetBool() end
 local function IsLastStandEnabled() return cvLastStandEnabled:GetBool() and IsMentalEnabled() end
 local function IsSchizoEnabled() return cvSchizoEnabled:GetBool() and IsTraitsEnabled() end
-local function IsDepressionDrainEnabled() return cvDepressionDrainEnabled:GetBool() and IsMentalEnabled() end
+local function IsDepressionDrainEnabled() return cvDepressionDrainEnabled:GetBool() and AreMentalEffectsEnabled() end
 
 --/////////////////////////////////////////////////////////////////////////////
 -- Trait Definitions
@@ -86,7 +96,6 @@ end
 
 local function GetPlayerTraits(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return {} end
-    if not IsTraitsEnabled() then return {} end
     if not istable(ply.__zcity_delta_traits) then ply.__zcity_delta_traits = {} end
     return ply.__zcity_delta_traits
 end
@@ -185,6 +194,13 @@ local function GetMental(ply)
     return ClampMood(ply:GetNWInt("zcity_delta_mood", 0)), ClampStat(ply:GetNWInt("zcity_delta_stress", 10))
 end
 
+local function GetMentalMeter(ply)
+    if not IsValid(ply) or not ply:IsPlayer() then return 0 end
+    local meter = tonumber(ply:GetNWFloat("zcity_delta_mental_meter", 0)) or 0
+    if meter == 0 then meter = ClampMood(ply:GetNWInt("zcity_delta_mood", 0)) end
+    return math.Clamp(meter, -100, 100)
+end
+
 local function SetMental(ply, mood, stress, silent)
     if not IsValid(ply) or not ply:IsPlayer() then return end
     if not IsMentalEnabled() then return end
@@ -207,13 +223,95 @@ local function PushRawMental(ply, moodDelta, stressDelta)
 end
 
 hg.Mental.GetMental = GetMental
+hg.Mental.GetMentalMeter = GetMentalMeter
 hg.Mental.SetMental = SetMental
 hg.Mental.PushRawMental = PushRawMental
 hg.Mental.IsMentalEnabled = IsMentalEnabled
+hg.Mental.AreMentalEffectsEnabled = AreMentalEffectsEnabled
 hg.Mental.IsTraitsEnabled = IsTraitsEnabled
 hg.Mental.HasTrait = HasTrait
 hg.Mental.GetTraitMultipliers = GetTraitMultipliers
 hg.Mental.GetTraitState = GetTraitState
+
+function hg.Mental.GetUnifiedState(ply, org)
+    org = org or (IsValid(ply) and ply.organism)
+    local mood, stress = 0, 10
+    if IsValid(ply) and ply:IsPlayer() then
+        mood, stress = GetMental(ply)
+    end
+
+    local despair = org and math.Clamp(tonumber(org.despair) or 0, 0, 1) or 0
+    local goodmood = org and math.Clamp(tonumber(org.goodmood) or 0, 0, 1) or 0
+    local fear = org and math.Clamp(tonumber(org.fear) or 0, 0, 3) or 0
+    local pain = org and math.Clamp(tonumber(org.pain) or 0, 0, 150) or 0
+    local shock = org and math.Clamp(tonumber(org.shock) or 0, 0, 100) or 0
+    local blood = org and math.Clamp(tonumber(org.blood) or 5000, 0, 5000) or 5000
+    local o2 = org and org.o2 and tonumber(org.o2[1]) or 100
+
+    local distress = 0
+    distress = distress + despair * 0.42
+    distress = distress + math.Clamp(stress / 100, 0, 1) * 0.22
+    distress = distress + math.Clamp(fear / 2, 0, 1) * 0.18
+    distress = distress + math.Clamp(pain / 120, 0, 1) * 0.12
+    distress = distress + math.Clamp(shock / 80, 0, 1) * 0.08
+    distress = distress + math.Clamp((3500 - blood) / 1800, 0, 1) * 0.12
+    distress = distress + math.Clamp((18 - o2) / 18, 0, 1) * 0.14
+    distress = distress + math.Clamp((-mood) / 100, 0, 1) * 0.18
+    distress = distress - goodmood * 0.16
+    distress = math.Clamp(distress, 0, 1)
+
+    local distressPct = distress * 100
+    local meter = math.Clamp(goodmood * 100 - distressPct, -100, 100)
+    local label = "stable"
+    if not IsMentalEnabled() then
+        distress = 0
+        distressPct = 0
+        meter = 0
+        label = "disabled"
+    elseif distressPct >= cvMentalDesperate:GetFloat() then
+        label = "desperate"
+    elseif distressPct >= cvMentalDistress:GetFloat() then
+        label = "distress"
+    elseif distressPct >= cvMentalBadMood:GetFloat() or mood < -25 then
+        label = "bad_mood"
+    elseif meter > 35 then
+        label = "good_mood"
+    end
+
+    local state = {
+        mood = mood,
+        stress = stress,
+        despair = despair,
+        goodmood = goodmood,
+        fear = fear,
+        pain = pain,
+        shock = shock,
+        distress = distress,
+        distressPct = distressPct,
+        meter = meter,
+        label = label,
+        stability = math.Clamp(1 - distress, 0, 1),
+        panicRisk = math.Clamp((distress - 0.42) / 0.58, 0, 1),
+    }
+
+    if org then
+        org.mentalMood = mood
+        org.mentalStress = stress
+        org.mentalDistress = state.distress
+        org.mentalMeter = state.meter
+        org.mentalState = state.label
+        org.mentalStability = state.stability
+        org.mentalPanicRisk = state.panicRisk
+    end
+
+    if IsValid(ply) and ply:IsPlayer() then
+        ply:SetNWFloat("zcity_delta_mental_meter", meter)
+        ply:SetNWFloat("zcity_delta_mental_distress", distress)
+        ply:SetNWString("zcity_delta_mental_state", label)
+    end
+
+    return state
+end
 
 --/////////////////////////////////////////////////////////////////////////////
 -- Persistence
@@ -221,7 +319,6 @@ hg.Mental.GetTraitState = GetTraitState
 
 local function SaveMental(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    if not IsMentalEnabled() then return end
     local sid = ply:SteamID64()
     if not sid then return end
 
@@ -256,7 +353,6 @@ end
 
 local function SaveTraits(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    if not IsTraitsEnabled() then return end
     local sid = ply:SteamID64()
     if not sid then return end
 
@@ -270,7 +366,6 @@ end
 
 local function LoadTraits(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    if not IsTraitsEnabled() then return end
 
     local sid = ply:SteamID64()
     if not sid then return end
@@ -285,7 +380,6 @@ end
 
 local function SyncTraits(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    if not IsTraitsEnabled() then return end
 
     local traits = GetPlayerTraits(ply)
     local arr = TraitsToArray(traits)
@@ -297,7 +391,6 @@ end
 
 local function ApplyTraits(ply, traits)
     if not IsValid(ply) or not ply:IsPlayer() then return false end
-    if not IsTraitsEnabled() then return false end
 
     local normalized = NormalizeTraits(traits)
     local points = CalcTraitPoints(normalized)
@@ -317,7 +410,6 @@ hg.Mental.SyncTraits = SyncTraits
 
 net.Receive("zcity_delta_traits_set", function(len, ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    if not IsTraitsEnabled() then return end
     local traits = net.ReadTable()
     local ok, err = ApplyTraits(ply, traits)
     if not ok then
@@ -334,7 +426,23 @@ end)
 -- Bridge: Org Think hook syncs mood/stress from organism state
 hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValue)
     if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
-    if not IsMentalEnabled() then return end
+    if not IsMentalEnabled() then
+        owner:SetNWFloat("zcity_delta_mental_meter", 0)
+        owner:SetNWFloat("zcity_delta_mental_distress", 0)
+        owner:SetNWString("zcity_delta_mental_state", "disabled")
+        owner:SetNWInt("zcity_delta_mood", 0)
+        owner:SetNWInt("zcity_delta_stress", 10)
+        if org then
+            org.mentalMood = 0
+            org.mentalStress = 10
+            org.mentalDistress = 0
+            org.mentalMeter = 0
+            org.mentalState = "disabled"
+            org.mentalStability = 1
+            org.mentalPanicRisk = 0
+        end
+        return
+    end
 
     local mood = ClampMood(owner:GetNWInt("zcity_delta_mood", 0))
     local stress = ClampStat(owner:GetNWInt("zcity_delta_stress", 10))
@@ -418,6 +526,9 @@ hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValu
 
     owner:SetNWInt("zcity_delta_mood", mood)
     owner:SetNWInt("zcity_delta_stress", stress)
+    local unifiedState = hg.Mental.GetUnifiedState(owner, org)
+
+    if not AreMentalEffectsEnabled() then return end
 
     -- Apply trait despair decay multiplier (optimist decays faster, etc.)
     -- Respect the despair system's lock so traumatic events still stick
@@ -477,12 +588,27 @@ hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValu
     end
 
     -- High stress → fear: stressed characters are jumpier
-    if not org.otrub and stress > 60 and not berserkActive then
-        local stressFactor = Clamp((stress - 60) / 40, 0, 1)
+    if not org.otrub and (stress > 60 or unifiedState.panicRisk > 0.25) and not berserkActive then
+        local stressFactor = math.max(Clamp((stress - 60) / 40, 0, 1), unifiedState.panicRisk * 0.65)
         local stressFearAdd = stressFactor * timeValue * 0.15
         local hasThreat = (hg.organism and hg.organism.should_gain_fear and hg.organism.should_gain_fear(org)) or (org.fear or 0) > 0.1
         if hasThreat then
             org.fearadd = math.Clamp((org.fearadd or 0) + stressFearAdd, 0, 3)
+        end
+    end
+
+    if not org.otrub and not org.givingUp and not org.panicAttack and unifiedState.panicRisk > 0.55 and not berserkActive then
+        org._mentalPanicCheckTime = org._mentalPanicCheckTime or 0
+        if CurTime() > org._mentalPanicCheckTime then
+            org._mentalPanicCheckTime = CurTime() + 1.25
+            local chance = (unifiedState.panicRisk - 0.55) / 0.45 * 0.16
+            if HasTrait(owner, "ptsd") then chance = chance * 1.35 end
+            if HasTrait(owner, "trained") or HasTrait(owner, "grunt") then chance = chance * 0.75 end
+            if math.Rand(0, 1) < chance then
+                org.panicAttack = true
+                org._panicAttackEndTime = CurTime() + math.random(6, 14)
+                org._panicAttackStartTime = nil
+            end
         end
     end
 
@@ -718,7 +844,7 @@ timer.Create("zcity_delta_trait_maintenance", 1, 0, function()
             end
         end
 
-        if HasTrait(ply, "optimist") and tonumber(ply:GetNWInt("zcity_delta_mood", 0)) >= 25 then
+        if HasTrait(ply, "optimist") and GetMentalMeter(ply) >= 25 then
             for _, near in ipairs(player.GetAll()) do
                 if near == ply then continue end
                 if not IsValid(near) or not near:IsPlayer() or not near:Alive() then continue end
@@ -754,12 +880,12 @@ timer.Create("zcity_delta_depression_stamina_drain", 0.35, 0, function()
         local org = ply.organism
         if not org or not istable(org.stamina) then continue end
 
-        local mood = ClampMood(ply:GetNWInt("zcity_delta_mood", 0))
-        if mood >= 0 then continue end
+        local meter = GetMentalMeter(ply)
+        if meter >= 0 then continue end
 
         if not ply:KeyDown(IN_SPEED) then continue end
 
-        local t = (-mood) / 100
+        local t = (-meter) / 100
         local maxStam = math.max(tonumber(org.stamina.max) or 180, 1)
         local drainPerSec = (0.25 + 2.2 * (t ^ 1.35)) * (maxStam / 220)
         org.stamina[1] = math.max((tonumber(org.stamina[1]) or 0) - drainPerSec * 0.35, 0)
@@ -825,7 +951,7 @@ end
 GetMedicalProgressModifier = function(ply, target, minigameType, progressDelta)
     local mul = 1
     local state = GetTraitState(ply)
-    local mood = tonumber(ply:GetNWInt("zcity_delta_mood", 0)) or 0
+    local meter = GetMentalMeter(ply)
 
     if not IsTraitsEnabled() then return mul end
 
@@ -845,7 +971,7 @@ GetMedicalProgressModifier = function(ply, target, minigameType, progressDelta)
         mul = mul * 0.78
     end
 
-    if HasTrait(ply, "depressed") and mood <= -35 then
+    if HasTrait(ply, "depressed") and meter <= -35 then
         mul = mul * 0.82
     end
 
@@ -1008,7 +1134,7 @@ timer.Create("zcity_delta_laststand_happiness_updater", 9, 0, function()
     for _, ply in ipairs(player.GetAll()) do
         if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then continue end
         local hist = EnsureLastStandHappinessHistory(ply)
-        table.insert(hist, 1, ClampMood(ply:GetNWInt("zcity_delta_mood", 0)))
+        table.insert(hist, 1, GetMentalMeter(ply))
         while #hist > 10 do table.remove(hist) end
     end
 end)
@@ -1058,7 +1184,7 @@ function hg.Mental.TryLastStand(ply, org)
     if ply.__zcity_delta_laststand_rolled then return false end
 
     local hist = EnsureLastStandHappinessHistory(ply)
-    local currentMood = ClampMood(ply:GetNWInt("zcity_delta_mood", 0))
+    local currentMood = GetMentalMeter(ply)
     local histMood = (hist and hist[10] ~= nil) and ClampMood(hist[10]) or nil
     local useHist = histMood ~= nil
     local happiness = useHist and histMood or currentMood
@@ -1240,10 +1366,6 @@ end)
 
 concommand.Add("zcity_delta_traits_set", function(ply, cmd, args)
     if not IsValid(ply) or not ply:IsPlayer() then return end
-    if not IsTraitsEnabled() then
-        ply:ChatPrint("[Traits] Traits system is disabled.")
-        return
-    end
     local traits = {}
     for i = 1, #args do
         local id = tostring(args[i] or "")
@@ -1267,11 +1389,14 @@ end)
 concommand.Add("zcity_delta_mental_debug", function(ply)
     if not IsValid(ply) or not ply:IsPlayer() then return end
     local mood, stress = GetMental(ply)
-    ply:ChatPrint("[Mental] Mood=" .. mood .. " Stress=" .. stress)
-    if IsTraitsEnabled() then
-        local traits = TraitsToArray(GetPlayerTraits(ply))
-        ply:ChatPrint("[Traits] " .. table.concat(traits, ", "))
-    end
+    local state = hg.Mental.GetUnifiedState(ply, ply.organism)
+    ply:ChatPrint("[Mental] Meter=" .. math.Round(state.meter or 0) ..
+        " Distress=" .. math.Round((state.distress or 0) * 100) ..
+        " State=" .. tostring(state.label) ..
+        " Mood=" .. mood ..
+        " Stress=" .. stress)
+    local traits = TraitsToArray(GetPlayerTraits(ply))
+    ply:ChatPrint("[Traits] " .. table.concat(traits, ", ") .. " (effects " .. (IsTraitsEnabled() and "on" or "off") .. ")")
 end)
 
 print("[zcity-delta] mental system loaded (server)")

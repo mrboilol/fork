@@ -1927,6 +1927,32 @@ local function GetMental(ent)
     return ClampMood(ent:GetNWInt("zcity_delta_mood", 0)), ClampStat(ent:GetNWInt("zcity_delta_stress", 10))
 end
 
+local function MentalSystemEnabled()
+    local mental = GetConVar("zcity_delta_mental_enabled")
+    if mental and not mental:GetBool() then return false end
+    local despair = GetConVar("hg_despairsystem")
+    if despair and despair:GetInt() == 0 then return false end
+    return true
+end
+
+local function MentalEffectsEnabled()
+    if not MentalSystemEnabled() then return false end
+    local effects = GetConVar("zcity_delta_mental_effects_enabled")
+    return not effects or effects:GetBool()
+end
+
+local function GetMentalMeter(ent)
+    if not IsValid(ent) then return 0 end
+    local meter = tonumber(ent:GetNWFloat("zcity_delta_mental_meter", 0)) or 0
+    if meter == 0 then meter = ClampMood(ent:GetNWInt("zcity_delta_mood", 0)) end
+    return math.Clamp(meter, -100, 100)
+end
+
+local function GetMentalDistress(ent)
+    if not IsValid(ent) then return 0 end
+    return math.Clamp((tonumber(ent:GetNWFloat("zcity_delta_mental_distress", 0)) or 0) * 100, 0, 100)
+end
+
 local cvMentalHudShow = CreateClientConVar("zcity_delta_mental_hud_show", "0", true, false)
 local cvMoodlesShow = CreateClientConVar("zcity_delta_moodles_show", "1", true, false)
 
@@ -1965,36 +1991,30 @@ end
 hook.Add("HUDPaint", "zcity_delta_mental_hud", function()
     local lp = LocalPlayer()
     if not IsValid(lp) then return end
-    local cv = GetConVar("zcity_delta_mental_enabled")
-    if cv and not cv:GetBool() then return end
+    if not MentalSystemEnabled() then return end
     if cvMentalHudShow and cvMentalHudShow.GetBool and not cvMentalHudShow:GetBool() then return end
 
-    local mood, stress = GetMental(lp)
+    local _, stress = GetMental(lp)
+    local meter = GetMentalMeter(lp)
+    local distress = GetMentalDistress(lp)
     local x = 20
     local y = ScrH() - 80
-    DrawMentalBar(x, y, 200, "Mood", mood, -100, 100, Color(100, 180, 255))
-    DrawMentalBar(x, y + 24, 200, "Stress", stress, 0, 100, Color(220, 170, 90))
+    DrawMentalBar(x, y, 200, "Mental", meter, -100, 100, Color(100, 180, 255))
+    DrawMentalBar(x, y + 24, 200, "Distress", math.max(distress, stress), 0, 100, Color(220, 170, 90))
 end)
 
 -- Depression greyscale screen effect
 hook.Add("RenderScreenspaceEffects", "zcity_delta_depression_greyscale", function()
-    local cv = GetConVar("zcity_delta_mental_enabled")
-    if cv and not cv:GetBool() then return end
+    if not MentalEffectsEnabled() then return end
 
     local lp = LocalPlayer()
     if not IsValid(lp) then return end
 
-    local mood = ClampMood(lp:GetNWInt("zcity_delta_mood", 0))
-    if mood >= 0 then return end
-
-    local t = math.Clamp((-mood) / 100, 0, 1)
-
-    -- Mental merge: high despair amplifies the greyscale effect
-    local org = lp.new_organism or lp.organism
-    local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
-    if despair > 0.2 then
-        t = math.Clamp(t + (despair - 0.2) * 0.25, 0, 1)
-    end
+    local meter = GetMentalMeter(lp)
+    local distress = GetMentalDistress(lp) / 100
+    local t = math.Clamp((-meter) / 100, 0, 1)
+    if distress > 0.2 then t = math.Clamp(t + (distress - 0.2) * 0.25, 0, 1) end
+    if t <= 0 then return end
 
     local sat = 1 - t * 0.7
     local contrast = 1 - t * 0.15
@@ -2036,8 +2056,7 @@ hook.Add("Think", "zcity_delta_depression_music", function()
     local lp = LocalPlayer()
     if not IsValid(lp) then return end
 
-    local cv = GetConVar("zcity_delta_mental_enabled")
-    if cv and not cv:GetBool() then
+    if not MentalEffectsEnabled() then
         StopMiserable()
         return
     end
@@ -2047,8 +2066,8 @@ hook.Add("Think", "zcity_delta_depression_music", function()
         return
     end
 
-    local mood = ClampMood(lp:GetNWInt("zcity_delta_mood", 0))
-    if mood > -100 then
+    local meter = GetMentalMeter(lp)
+    if meter > -95 then
         StopMiserable()
         return
     end
@@ -2059,8 +2078,8 @@ hook.Add("Think", "zcity_delta_depression_music", function()
     sound.PlayFile("sound/zcity_delta/miserable.mp3", "noplay", function(chan)
         miserable.pending = false
         local lp2 = LocalPlayer()
-        local mood2 = IsValid(lp2) and ClampMood(lp2:GetNWInt("zcity_delta_mood", 0)) or 0
-        if mood2 > -100 then
+        local meter2 = IsValid(lp2) and GetMentalMeter(lp2) or 0
+        if meter2 > -95 then
             if chan and chan.IsValid and chan:IsValid() then chan:Stop() end
             return
         end
@@ -2189,8 +2208,9 @@ hook.Add("HUDPaint", "zcity_delta_schizophrenia_smiley", function()
         return
     end
 
-    local mood = tonumber(lp:GetNWInt("zcity_delta_mood", 0)) or 0
-    local mode = mood < -10 and "evil" or "good"
+    local meter = GetMentalMeter(lp)
+    local state = lp:GetNWString("zcity_delta_mental_state", "stable")
+    local mode = (meter < -10 or state == "bad_mood" or state == "distress" or state == "desperate") and "evil" or "good"
 
     if schizoTyping and schizoMode ~= mode then
         schizoTyping = false

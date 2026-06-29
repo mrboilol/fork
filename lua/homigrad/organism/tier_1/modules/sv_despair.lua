@@ -4,7 +4,11 @@ if hg and hg.despair_server_builtin then return end
 hg.despair_server_builtin = true
 
 local hg_despair_override = CreateConVar("hg_despair_override", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Global despair override (0-1)", 0, 1)
-local hg_despairsystem = CreateConVar("hg_despairsystem", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Despair system mode (0 = giving-up only: despair/panic disabled, 1 = normal: despair/panic and give up enabled)", 0, 1)
+local hg_despairsystem = CreateConVar("hg_despairsystem", 1, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Despair/mental system mode (0 = giving-up only: despair, mood, distress, panic disabled; 1 = unified mental meter enabled)", 0, 1)
+
+local function mental_system_enabled()
+	return not (hg and hg.Mental and hg.Mental.IsMentalEnabled) or hg.Mental.IsMentalEnabled()
+end
 
 local function get_despair_org(ent)
 	if not IsValid(ent) then return nil end
@@ -31,23 +35,43 @@ end
 -- The player is in lethal danger while awake (used for panic and giving up)
 local function is_in_danger(org)
 	if org.otrub then return false end
-	local o2val = org.o2 and org.o2[1] or 0
+	local o2val = org.o2 and org.o2[1] or 100
 	local blood = org.blood or 5000
 	local bleed = org.bleed or 0
-	local isDying = o2val > 50
-	local isBleedingOut = blood < 4000 and bleed > 0
-	return isDying or isBleedingOut
+	local brain = org.brain or 0
+	local bp = org.bloodpressure or 93
+	local isSuffocating = o2val < 18 or org.choking or org.lungsfunction == false
+	local isBleedingOut = blood < 3800 and bleed > 0.05
+	local isCirculatoryCollapse = bp < 55 or org.heartstop
+	local isBrainDying = brain >= 0.6
+	return isSuffocating or isBleedingOut or isCirculatoryCollapse or isBrainDying
 end
 
 -- The player is awake and close to death (used for direct giving up)
 local function is_near_death(org)
 	if org.otrub then return false end
-	local o2val = org.o2 and org.o2[1] or 0
+	local o2val = org.o2 and org.o2[1] or 100
 	local blood = org.blood or 5000
 	local bleed = org.bleed or 0
-	local isDying = o2val > 65
-	local isBleedingOut = blood < 3500 and bleed > 0
-	return isDying or isBleedingOut
+	local bp = org.bloodpressure or 93
+	local isSuffocating = o2val < 12 or org.lungsfunction == false
+	local isBleedingOut = blood < 3200 and bleed > 0.05
+	local isCirculatoryCollapse = bp < 45 or org.heartstop
+	return isSuffocating or isBleedingOut or isCirculatoryCollapse or (org.brain or 0) >= 0.75
+end
+
+local function danger_severity(org)
+	local o2val = org.o2 and org.o2[1] or 100
+	local blood = org.blood or 5000
+	local bleed = org.bleed or 0
+	local bp = org.bloodpressure or 93
+	local severity = 0
+	severity = max(severity, Clamp((18 - o2val) / 18, 0, 1))
+	if bleed > 0.05 then severity = max(severity, Clamp((3800 - blood) / 1400, 0, 1)) end
+	severity = max(severity, Clamp((60 - bp) / 60, 0, 1))
+	severity = max(severity, Clamp(((org.brain or 0) - 0.45) / 0.35, 0, 1))
+	if org.heartstop or org.lungsfunction == false then severity = 1 end
+	return severity
 end
 
 hook.Add("Org Clear", "hg_despair_init", function(org)
@@ -76,7 +100,7 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 	local org = get_despair_org(ply)
 	if not org then return end
 	if org.otrub then return end
-	if hg_despairsystem:GetInt() == 0 then return end
+	if hg_despairsystem:GetInt() == 0 or not mental_system_enabled() then return end
 
 	local dmg = (dmgInfo and dmgInfo.GetDamage and dmgInfo:GetDamage()) or 0
 	if dmg <= 0 then return end
@@ -94,7 +118,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	local time = CurTime()
-	local simpleMode = hg_despairsystem:GetInt() == 0
+	local simpleMode = hg_despairsystem:GetInt() == 0 or not mental_system_enabled()
+	local mental = hg.Mental and hg.Mental.GetUnifiedState and hg.Mental.GetUnifiedState(owner, org)
+	local mentalPanicRisk = mental and mental.panicRisk or (org.mentalPanicRisk or 0)
 
 	-- In simple mode despair and panic are fully disabled
 	if simpleMode then
@@ -110,13 +136,14 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	local inDanger = is_in_danger(org)
 	if not org.givingUp then
 		-- Normal mode: direct give-up when despairing, near death, awake, and not panicking
-		if not simpleMode and not org.panicAttack and inDanger and org.despair >= 0.85 then
+		if not simpleMode and not org.panicAttack and inDanger and org.despair >= 0.75 then
 			org._giveUpDirectCheckTime = org._giveUpDirectCheckTime or 0
 			if time > org._giveUpDirectCheckTime then
 				org._giveUpDirectCheckTime = time + 1
 
-				local chance = 0.10
-				if is_near_death(org) then chance = 0.15 end
+				local severity = danger_severity(org)
+				local chance = 0.06 + severity * 0.12 + Clamp((org.despair - 0.75) / 0.25, 0, 1) * 0.08
+				if is_near_death(org) then chance = chance + 0.10 end
 
 				if math.random() < chance then
 					org.givingUp = true
@@ -131,18 +158,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			if time > org._giveUpCheckTime then
 				org._giveUpCheckTime = time + 1
 
-				local o2val = org.o2 and org.o2[1] or 0
-				local blood = org.blood or 5000
-				local bleed = org.bleed or 0
-				local isDying = o2val > 50
-				local isBleedingOut = blood < 4000 and bleed > 0
-
 				local fearFactor = Clamp((org.fear or 0) / 2, 0, 1)
-				local severity = 0
-				if isDying then severity = max(severity, Clamp((o2val - 50) / 50, 0, 1)) end
-				if isBleedingOut then severity = max(severity, Clamp((4000 - blood) / 1000, 0, 1)) end
+				local severity = danger_severity(org)
 
-				local chance = 0.015 + severity * 0.05 + fearFactor * 0.04
+				local chance = 0.012 + severity * 0.08 + fearFactor * 0.04
 				if math.random() < chance then
 					org.givingUp = true
 					org._panicAdrenalineGiven = false
@@ -307,7 +326,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			local pain = org.pain or 0
 			local blood = org.blood or 5000
 			local o2val = org.o2 and org.o2[1] or 100
-			local dyingOrAgony = pain > 70 or blood < 3000 or o2val > 60
+			local dyingOrAgony = pain > 70 or blood < 3000 or o2val < 18
 			if dyingOrAgony then
 				local fear = org.fear
 				local fearTransferRate = 0.004 -- Base transfer rate
@@ -328,8 +347,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 	local currentBP = org.bloodpressure or 93
 	local lastBP = org._despairLastBP or currentBP
-	local bpRising = currentBP > lastBP
-	org._despairLastBP = currentBP
+	local bpDelta = currentBP - lastBP
+	local bpRising = bpDelta > 4
+	local bpCrashing = bpDelta < -6
+	org._despairLastBP = lastBP + math.Clamp(bpDelta, -12, 12) * 0.35
 
 	local bleedRate = org.bleed or 0
 	local bleedStopped = bleedRate < 0.05 -- negligible bleed rate (clotted/stopped)
@@ -338,7 +359,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		-- Bleeding despair - 2 is severe bleeding (pouring blood)
 		local bleedSeverity = Clamp(bleedRate / 2, 0, 1)
 		add = add + bleedSeverity * timeValue * 0.14
-	elseif bleedStopped or bpRising then
+	elseif bleedStopped or (bpRising and not bpCrashing) then
 		-- Bleeding stopped or cardiac recovering: relieve despair
 		local relief = timeValue * 0.15
 		if CurTime() < (org._despairLockUntil or 0) then
@@ -558,7 +579,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org._panicAdrenalineGiven = false
 			org._postPanicEndTime = time
 			-- Panic didn't save them: high chance to give up after panic ends if still in danger
-			if is_in_danger(org) and math.random() < 0.60 then
+			if is_in_danger(org) and math.random() < (0.35 + danger_severity(org) * 0.35) then
 				org.givingUp = true
 			end
 		else
@@ -574,7 +595,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 	else
 		-- Check if panic attack should trigger (despair > 0.7 and in danger while awake)
-		if org.despair > 0.7 and is_in_danger(org) and not org.givingUp then
+		if (org.despair > 0.55 or mentalPanicRisk > 0.5) and is_in_danger(org) and not org.givingUp then
 			-- Start tracking time if not already tracking
 			if not org._panicAttackStartTime then
 				org._panicAttackStartTime = time
@@ -583,9 +604,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			if not org._panicAttackCheckTime or time > org._panicAttackCheckTime then
 				org._panicAttackCheckTime = time + 1
 
-				-- Guaranteed panic after 10 seconds of danger + high despair
-				local triggerChance = (org.despair - 0.7) / 0.3 * 0.25 -- up to 25% chance per second
-				local forceTrigger = (time - org._panicAttackStartTime >= 10)
+				-- Guaranteed panic after a short stretch of danger + high despair.
+				local riskFactor = max(Clamp((org.despair - 0.55) / 0.45, 0, 1), mentalPanicRisk)
+				local triggerChance = riskFactor * (0.18 + danger_severity(org) * 0.22)
+				local forceTrigger = (time - org._panicAttackStartTime >= 7)
 
 				if forceTrigger or math.random() < triggerChance then
 					org.panicAttack = true
@@ -718,6 +740,7 @@ end
 
 hook.Add("HG_HeadExploded", "hg_despair_head_explosion", function(rag, victim)
 	if not IsValid(rag) then return end
+	if hg_despairsystem:GetInt() == 0 or not mental_system_enabled() then return end
 
 	local pos = rag:WorldSpaceCenter()
 	local now = CurTime()
@@ -759,6 +782,7 @@ end)
 
 hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
 	if not IsValid(rag) then return end
+	if hg_despairsystem:GetInt() == 0 or not mental_system_enabled() then return end
 
 	local pos = rag:WorldSpaceCenter()
 	local now = CurTime()

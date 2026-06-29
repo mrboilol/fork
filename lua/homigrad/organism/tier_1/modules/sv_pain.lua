@@ -208,7 +208,8 @@ module[2] = function(owner, org, timeValue)
 	local painLoad = math.Clamp(((org.pain or 0) - 65) / 55, 0, 1)
 	local stressLoad = math.max(shockLoad, painLoad)
 	if stressLoad > 0 then
-		local protectedFloor = 0.45
+		local vitalsCritical = (org.blood or 5000) < 2600 or (org.o2 and org.o2[1] and org.o2[1] < 12) or (org.brain or 0) > 0.325 or (org.tranquilizer or 0) > 0
+		local protectedFloor = vitalsCritical and 0 or 0.28
 		local sustained = org._painShockSustain or 0
 		if shockLoad > 0.45 and painLoad > 0.35 then
 			sustained = sustained + timeValue * (shockLoad + painLoad)
@@ -219,8 +220,7 @@ module[2] = function(owner, org, timeValue)
 
 		local drain = timeValue * (0.018 + stressLoad * 0.055)
 		if sustained > 8 then
-			drain = drain + timeValue * math.Clamp((sustained - 8) / 24, 0, 1) * 0.16
-			protectedFloor = 0
+			drain = drain + timeValue * math.Clamp((sustained - 8) / 24, 0, 1) * (vitalsCritical and 0.16 or 0.045)
 		end
 
 		org.consciousness = math.max((org.consciousness or 1) - drain, protectedFloor)
@@ -328,10 +328,11 @@ module[2] = function(owner, org, timeValue)
 		local pain = org.pain or 0
 		local highPain = pain > 70
 
+		local vitalsCritical = (org.blood or 5000) < 2600 or (org.o2 and org.o2[1] and org.o2[1] < 12) or (org.brain or 0) > 0.325 or (org.tranquilizer or 0) > 0
 		local shockFloor
 		if highPain then
 			local painSeverity = math.Clamp((pain - 70) / 80, 0, 1)
-			shockFloor = 0.5 - painSeverity * 0.5
+			shockFloor = vitalsCritical and (0.5 - painSeverity * 0.5) or math.max(0.22, 0.5 - painSeverity * 0.28)
 		else
 			shockFloor = 0.5
 		end
@@ -343,7 +344,7 @@ module[2] = function(owner, org, timeValue)
 			org._highShockTime = org._highShockTime + timeValue
 			if org._highShockTime > 15 then
 				local sustainedSeverity = math.Clamp((org._highShockTime - 15) / 30, 0, 1)
-				org.consciousness = math.max((org.consciousness or 1) - timeValue * sustainedSeverity * 0.15, 0)
+				org.consciousness = math.max((org.consciousness or 1) - timeValue * sustainedSeverity * (vitalsCritical and 0.15 or 0.04), vitalsCritical and 0 or 0.18)
 			end
 		else
 			org._highShockTime = math.max(org._highShockTime - timeValue * 2, 0)
@@ -358,15 +359,13 @@ module[2] = function(owner, org, timeValue)
 	-- Brain damage from high analgesia
 	local noradrenalineProtected = org.noradrenaline > 0 or (org.noradrenalineEndTime and org.noradrenalineEndTime + 20 > CurTime())
 	if not noradrenalineProtected then
-		if org.analgesia > 0.75 then
-			-- Guaranteed damage above 0.75: 0.05 per second at 5.0 analgesia
-			local brainDamageRate = (org.analgesia - 0.75) * timeValue * 0.0118 * 0.75
+		if org.analgesia > 1.1 then
+			local brainDamageRate = (org.analgesia - 1.1) * timeValue * 0.0118 * 0.35
 			org.brain = (org.brain or 0) + brainDamageRate
-		elseif org.analgesia > 0.5 then
-			-- Chance-based damage between 0.5 and 0.75
-			local damageChance = (org.analgesia - 0.5) / 0.25 * 0.02 -- Up to 2% chance per tick at 0.75
+		elseif org.analgesia > 0.7 then
+			local damageChance = (org.analgesia - 0.7) / 0.4 * 0.008
 			if math.random() < damageChance then
-				org.brain = (org.brain or 0) + 0.001 * 0.75
+				org.brain = (org.brain or 0) + 0.00035
 			end
 		end
 	end

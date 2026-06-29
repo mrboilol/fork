@@ -43,6 +43,9 @@ end
 
 local function snap(v) return math.floor((v or 0) + 0.5) end
 
+local startWhiteIn
+local startWhiteOut
+
 local function makeButton(parent)
     local btn = vgui.Create("DButton", parent)
     btn:SetText("")
@@ -96,14 +99,14 @@ SCREEN.Respawn = SCREEN.Respawn or { state = "idle", startAt = 0, sent = false }
 SCREEN.Report = SCREEN.Report or nil
 SCREEN.DebugForced = SCREEN.DebugForced or false
 
-local function startWhiteIn()
+startWhiteIn = function()
     if SCREEN.Respawn.state ~= "idle" then return end
     SCREEN.Respawn.state = "white_in"
     SCREEN.Respawn.startAt = RealTime()
     SCREEN.Respawn.sent = false
 end
 
-local function startWhiteOut()
+startWhiteOut = function()
     SCREEN.Respawn.state = "white_out"
     SCREEN.Respawn.startAt = RealTime()
 end

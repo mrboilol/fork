@@ -49,6 +49,14 @@ local function despair_system_mode()
 	if not hg_despairsystem_convar then hg_despairsystem_convar = GetConVar("hg_despairsystem") end
 	return hg_despairsystem_convar and hg_despairsystem_convar:GetInt() or 0
 end
+local zcity_mental_effects_convar
+local zcity_mental_enabled_convar
+local function mental_effects_enabled()
+	if not zcity_mental_enabled_convar then zcity_mental_enabled_convar = GetConVar("zcity_delta_mental_enabled") end
+	if zcity_mental_enabled_convar and not zcity_mental_enabled_convar:GetBool() then return false end
+	if not zcity_mental_effects_convar then zcity_mental_effects_convar = GetConVar("zcity_delta_mental_effects_enabled") end
+	return not zcity_mental_effects_convar or zcity_mental_effects_convar:GetBool()
+end
 
 local panicThoughts = {
 	"I have to keep going.",
@@ -152,7 +160,10 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	local org = get_target_organism()
-	local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
+	local despair = math.Clamp(tonumber(ply:GetNWFloat("zcity_delta_mental_distress", 0)) or 0, 0, 1)
+	if despair <= 0 and org and org.despair then
+		despair = math.Clamp(org.despair, 0, 1)
+	end
 	local panicAttack = (org and org.panicAttack) or false
 	
 	-- Debug convar overrides
@@ -167,7 +178,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	-- Simple mode: despair and panic visuals/sounds are fully disabled
-	if despair_system_mode() == 0 then
+	if despair_system_mode() == 0 or not mental_effects_enabled() then
 		despair = 0
 		panicAttack = false
 		despairLerp = 0
@@ -188,12 +199,6 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	-- Adrenaline dampens the perceived intensity of despair effects
 	despair = apply_despair_adrenaline_mitigation(despair, org)
 
-	-- Mental merge: low mood amplifies despair visuals (at -100 mood, +15% intensity)
-	local mood = math.Clamp(tonumber(ply:GetNWInt("zcity_delta_mood", 0)) or 0, -100, 100)
-	if mood < 0 then
-		despair = math.min(despair + Clamp((-mood) / 100, 0, 1) * 0.15, 1)
-	end
-
 	local givingUp = org and org.givingUp
 
 	despairLerp = LerpFT(0.04, despairLerp, despair)
@@ -204,7 +209,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		local o2val = org.o2 and org.o2[1] or 0
 		local blood = org.blood or 5000
 		local bleed = org.bleed or 0
-		isNotDying = not (o2val > 50 or (blood < 4000 and bleed > 0) or org.otrub)
+		isNotDying = not (o2val < 18 or (blood < 4000 and bleed > 0.05) or org.otrub)
 	end
 	if panicAttack and isNotDying then
 		despairLerp = LerpFT(0.15, despairLerp, 0)
@@ -333,7 +338,16 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 		panicThoughtLerp = 0
 		return
 	end
-	local despair = (org and org.despair) and math.Clamp(org.despair, 0, 1) or 0
+	local moodPly = LocalPlayer()
+	if not IsValid(moodPly) then return end
+	if despair_system_mode() == 0 or not mental_effects_enabled() then
+		despairTextLerp = 0
+		return
+	end
+	local despair = math.Clamp(tonumber(moodPly:GetNWFloat("zcity_delta_mental_distress", 0)) or 0, 0, 1)
+	if despair <= 0 and org and org.despair then
+		despair = math.Clamp(org.despair, 0, 1)
+	end
 	
 	-- Debug convar override
 	local debugDespair = hg_despair_override_convar and hg_despair_override_convar:GetFloat() or 0
@@ -343,13 +357,7 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	-- Adrenaline dampens the perceived intensity of despair effects
 	despair = apply_despair_adrenaline_mitigation(despair, org)
 
-	-- Mental merge: low mood lowers the threshold for despair text to appear
-	local moodPly = LocalPlayer()
-	if not IsValid(moodPly) then return end
-	local moodVal = math.Clamp(tonumber(moodPly:GetNWInt("zcity_delta_mood", 0)) or 0, -100, 100)
-	local moodShift = moodVal < 0 and math.Clamp((-moodVal) / 100, 0, 1) * 0.15 or 0
-
-	local target = math.Clamp((despair + moodShift - 0.5) / 0.5, 0, 1)
+	local target = math.Clamp((despair - 0.45) / 0.55, 0, 1)
 	despairTextLerp = LerpFT(0.03, despairTextLerp, target)
 
 	if despairTextLerp <= 0.001 then return end
@@ -360,8 +368,10 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	draw.SimpleText("im so fucking scared", despairFont, x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText("im so fucking scared", despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	local state = moodPly:GetNWString("zcity_delta_mental_state", "stable")
+	local text = state == "desperate" and "im so fucking scared" or state == "distress" and "i cant calm down" or "everything feels wrong"
+	draw.SimpleText(text, despairFont, x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText(text, despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local panicThoughtIndex = 0
@@ -435,7 +445,7 @@ hook.Add("Think", "hg_despair_corpse_vignette", function()
 		return
 	end
 
-	if despair_system_mode() == 0 then
+	if despair_system_mode() == 0 or not mental_effects_enabled() then
 		corpseTarget = 0
 		return
 	end
