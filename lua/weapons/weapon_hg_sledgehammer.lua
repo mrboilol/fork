@@ -177,7 +177,7 @@ end
 
 SWEP.NoHolster = true
 
-SWEP.AttackTimeLength = 0.155
+SWEP.AttackTimeLength = 0.28
 SWEP.Attack2TimeLength = 0.01
 
 SWEP.AttackRads = 95
