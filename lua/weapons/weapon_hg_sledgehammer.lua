@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Sledgehammer"
 SWEP.Instructions = "The Sledgehammer is a two-handed tool which can be used as a melee weapon.\n\nLMB to attack.\nRMB to block."
@@ -121,6 +121,9 @@ SWEP.hitsoundextra = {
 }
 
 SWEP.AttackPos = Vector(0,0,0)
+SWEP.BlockTier = 5
+SWEP.BlockMaterial = "metal"
+SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 
 SWEP.Attack_Charge_Begin = "Attack_Charge_Begin"
 SWEP.Attack_Charge_Idle = "Attack_Charge_Idle"

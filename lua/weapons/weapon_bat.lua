@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Bat"
 SWEP.Instructions = "A bat. The design features of the bat allow it to deliver powerful and heavy blows.\n\nLMB to attack.\nRMB to block.\nE+LMB to charge up a heavy attack."
@@ -140,6 +140,9 @@ SWEP.HitFleshExtra = {
 SWEP.HitFleshExtraPitch = 112
 
 SWEP.AttackPos = Vector(0,0,0)
+SWEP.BlockTier = 3
+SWEP.BlockMaterial = "wood"
+SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.wav", 68, {95, 102}}
 
 SWEP.NoHolster = true
 
