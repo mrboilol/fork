@@ -148,6 +148,9 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 	if damage_dealt > 0 then
 		org.internalBleed = org.internalBleed + damage_dealt * 1.0 -- Base internal bleeding for any organ damage (increased from 0.5)
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
+		if hg.organism.ApplyBulletTrauma then
+			hg.organism.ApplyBulletTrauma(org, dmg, dmgInfo, {key = key, boneHit = false, hit = dmgInfo:GetDamagePosition()})
+		end
 
 		if abdominal_organs[key] then
 			--local multiplier = (oldval >= 1) and 3.5 or 2.0 -- Extra penalty if already destroyed
@@ -414,6 +417,13 @@ local arterySize = {
 	["spineartery"] = 10,
 }
 
+local o2DebuffArteries = {
+	["arteria"] = true,
+	["subclavianR"] = true,
+	["subclavianL"] = true,
+	["spineartery"] = true,
+}
+
 local arteryMessages ={
 	"MY NECK- MY NECK IS BLEEDING OUT",
 	"ITS SO BAD- I CAN FEEL THE WARMTH RUSHING OUT",
@@ -437,7 +447,10 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, forceHi
 	
 	org.painadd = org.painadd + dmg * 1
 	
-	-- Mark arteria for gradual O2 drain (direct pathway to brain)
+	-- Central arterial wounds impair oxygen delivery while they are open.
+	if o2DebuffArteries[artery] then
+		org.arterialO2Drain = true
+	end
 	if artery == "arteria" then
 		org.arteriaO2Drain = true
 	end

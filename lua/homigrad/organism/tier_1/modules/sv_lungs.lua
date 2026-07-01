@@ -704,33 +704,40 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		-- Gradual O2 drain for arteria wounds (direct pathway to brain)
+		-- Gradual O2 drain for central arterial wounds.
 
-		if org.arteriaO2Drain and org.arterialwounds then
+		if (org.arterialO2Drain or org.arteriaO2Drain) and org.arterialwounds then
 
-			local arteriaOpen = false
+			local arteryDrainMul = 0
 
 			for _, wound in pairs(org.arterialwounds) do
 
 				if wound[7] == "arteria" and wound[1] > 0 then
 
-					arteriaOpen = true
+					arteryDrainMul = arteryDrainMul + 1
 
-					break
+				elseif (wound[7] == "subclavianR" or wound[7] == "subclavianL") and wound[1] > 0 then
+
+					arteryDrainMul = arteryDrainMul + 0.7
+
+				elseif wound[7] == "spineartery" and wound[1] > 0 then
+
+					arteryDrainMul = arteryDrainMul + 0.85
 
 				end
 
 			end
 
-			if not arteriaOpen then
+			if arteryDrainMul <= 0 then
 
 				org.arteriaO2Drain = false
+				org.arterialO2Drain = false
 
 			else
 
 				local pulseMultiplier = math.Clamp((org.pulse or 70) / 70, 0.8, 1.5)
 
-				local arteriaDrain = timeValue * 0.15 * pulseMultiplier
+				local arteriaDrain = timeValue * 0.15 * pulseMultiplier * arteryDrainMul
 
 				o2[1] = max(o2[1] - arteriaDrain, 0)
 

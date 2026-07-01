@@ -1546,7 +1546,7 @@ local IsValid = IsValid
 		end
 
 		if hg.HasTourniquetOnLimb(ent, limb) then
-			effectiveness = math.min(effectiveness, 0.85)
+			effectiveness = math.min(effectiveness, 0.65)
 		end
 
 		return effectiveness

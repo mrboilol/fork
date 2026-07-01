@@ -248,8 +248,10 @@ function SWEP:PrimarySpread()
 		end
 		arm_debuff = arm_debuff + tourniquet_debuff
 
-		mul = mul * (1.15 + arm_debuff * 0.45 + amputate_debuff * 0.55)
-		mul = mul * broken_arm_recoil_mult
+		local armHandlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
+		mul = mul * math.Clamp(0.72 + arm_debuff * 0.14 + amputate_debuff * 0.16, 0.72, 1.65)
+		mul = mul * math.Clamp(broken_arm_recoil_mult, 1, 1.9)
+		mul = mul * armHandlingMul
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
 		mul = mul * (owner:Crouching() and 0.75 or 1)
@@ -285,11 +287,11 @@ function SWEP:PrimarySpread()
 			
 			local huyang = angrand2 * mul / 2 * mulhuy
 			huyang[3] = 0
-			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.25)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 2 or 1) * 0.09)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			
 			local angpopa = angrand2 * mul
 			angpopa[3] = 0
-			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1))-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.1 or 0.35))-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 
@@ -299,10 +301,10 @@ function SWEP:PrimarySpread()
 		//ViewPunch2(angleprikol)
 
 		local mul = mul * caliberMul * weightMul * 0.38 * (self:IsPistolHoldType() and 1.25 or 1) * (numBullet and math.sqrt(numBullet) or 1)
-		ViewPunch2(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul)
-		ViewPunch(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul / -2)
-		timer.Simple(0.01, function() ViewPunch2(Angle(-1 * math.Rand(1,2),1 * math.Rand(-1,1),0) * mul) end)
-		timer.Simple(0.02, function() ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul) end)
+		ViewPunch2(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul * 0.18)
+		ViewPunch(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul / -8)
+		timer.Simple(0.01, function() if IsValid(owner) then ViewPunch2(Angle(-1 * math.Rand(1,2),1 * math.Rand(-1,1),0) * mul * 0.12) end end)
+		timer.Simple(0.02, function() if IsValid(owner) then ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul * 0.1) end end)
 
 		local eyeang = owner:EyeAngles()
 		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 6.5 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
@@ -312,11 +314,15 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		owner:SetEyeAngles(eyeang + sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.25)
+		local muzzleKick = sprayAng * (organism.recoilmul or 1) * armHandlingMul * (owner.posture == 1 and not self:IsZoom() and 0.2 or 1) * 0.34
+		muzzleKick[1] = math.Clamp(muzzleKick[1], -2.2, 1.4)
+		muzzleKick[2] = math.Clamp(muzzleKick[2], -1.15, 1.15)
+		muzzleKick[3] = 0
+		owner:SetEyeAngles(eyeang + muzzleKick)
 		
 		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
-		ViewPunch2(Angle(2 * rnd1,2 * rnd2,0) * mul * 0.5)
-		ViewPunch(Angle(-2 * rnd1,-2 *rnd2,0) * mul)
+		ViewPunch2(Angle(2 * rnd1,2 * rnd2,0) * mul * 0.12)
+		ViewPunch(Angle(-2 * rnd1,-2 *rnd2,0) * mul * 0.22)
 
 		local max_clip1 = self:GetMaxClip1()
 		
@@ -324,13 +330,13 @@ function SWEP:PrimarySpread()
 			max_clip1 = 1
 		end
 		
-		local sprayvel = spray * mul * math.max(sprayI / max_clip1, 0.5) * self.addSprayMul * (self.cameraShakeMul or 1) * 10 * 1.2//(self.Primary.Automatic and 1 or 1)
+		local sprayvel = spray * mul * math.max(sprayI / max_clip1, 0.5) * self.addSprayMul * (self.cameraShakeMul or 1) * 4.2//(self.Primary.Automatic and 1 or 1)
 		
 		--self.weaponSway = self.weaponSway + sprayvel
 
 		self.sprayAngles[3] = self.sprayAngles[3] + math.max(self.Primary.Damage / 100,1) * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 40
 
-		self:ApplyEyeSprayVel(sprayvel * 1)
+		self:ApplyEyeSprayVel(sprayvel * 0.7)
 		--self:AnimApply_RecoilCameraZoom()
 	end
 end

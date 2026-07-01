@@ -192,13 +192,14 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org.adrenaline = 0
 			org.adrenalineAdd = 0
 
-			-- Chance of heartstop every few seconds; not a guaranteed death
+			-- Chance of heartstop every few seconds, only when vitals are already
+			-- failing. Giving up should not flatline a cardiovascularly stable body.
 			if not org._giveUpHeartStopCheck or time > org._giveUpHeartStopCheck then
 				org._giveUpHeartStopCheck = time + 4
 				local bp = org.bloodpressure or 93
 				local hb = org.heartbeat or 70
-				-- Base 8% chance every 4 seconds; scales up with critically low vitals
-				local stopChance = 0.08
+				local vitalRisk = bp < 55 or hb < 45 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
+				local stopChance = vitalRisk and 0.025 or 0
 				if bp < 50 then
 					stopChance = stopChance + (50 - bp) / 50 * 0.10
 				end
@@ -536,11 +537,13 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		org.disorientation = max(org.disorientation or 0, 1)
 	end
 
-	if org.despair > 0.9 then
+	local despairVitalRisk = (org.bloodpressure or 93) < 55 or (org.heartbeat or 70) < 45 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
+	if org.despair > 0.9 and despairVitalRisk then
         if not org._despair_check_time or CurTime() > org._despair_check_time then
             org._despair_check_time = CurTime() + 1 -- check every second
 
-            local chance = (org.despair - 0.9) / 0.1 * 0.05 -- at 1.0 despair, 5% chance
+            local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)
+            local chance = (org.despair - 0.9) / 0.1 * 0.018 * riskMul
             local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
             if totalAdrenaline > 1.0 then
                 chance = chance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.4)

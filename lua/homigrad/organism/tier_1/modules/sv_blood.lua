@@ -57,6 +57,7 @@ module[1] = function(org)
 	org.pressingWoundMul = 1.0
 	org.pressingWoundNextToggle = 0
 	org.neckslitStandUpSuppressed = false
+	org.arterialO2Drain = false
 end
 
 
@@ -69,6 +70,20 @@ local about_to_puke = {
 }
 
 local vecZero = Vector(0, 0, 0)
+local limbArteryWeakness = {
+	rarmartery = {limb = "rarm", damage = 0.65},
+	larmartery = {limb = "larm", damage = 0.65},
+	rlegartery = {limb = "rleg", damage = 0.7},
+	llegartery = {limb = "lleg", damage = 0.7},
+}
+
+local o2DebuffArteries = {
+	arteria = 1,
+	subclavianR = 0.7,
+	subclavianL = 0.7,
+	spineartery = 0.85,
+}
+
 module[2] = function(owner, org, mulTime)
 	local adrenaline = math.min(org.adrenaline, 2)
 	local isPlayer = owner:IsPlayer()
@@ -140,18 +155,35 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	if org.arteria == 1 then
-		local o2DebuffRate = 5
-		-- Stronger O2 debuff when blood reaches 3750 or below
-		if org.blood <= 3750 then
-			o2DebuffRate = 15 -- Triple the debuff rate
-			-- Notify player about severe oxygen deprivation from arterial bleeding
-			if org.isPly and not org.otrub and (org._arteriaO2NotifyTime or 0) + 30 < CurTime() then
-				org.owner:Notify("I can't breathe... my throat is bleeding...", 30, "arteria_o2", 0)
-				org._arteriaO2NotifyTime = CurTime()
+	if org.arterialwounds and #org.arterialwounds > 0 then
+		local o2DebuffRate = 0
+
+		for _, wound in pairs(org.arterialwounds) do
+			local artery = wound[7]
+			if wound[1] and wound[1] > 0 then
+				local weakness = limbArteryWeakness[artery]
+				if weakness and not org[weakness.limb .. "amputated"] then
+					org[weakness.limb] = math.max(org[weakness.limb] or 0, weakness.damage)
+				end
+
+				local o2Mul = o2DebuffArteries[artery]
+				if o2Mul then
+					o2DebuffRate = o2DebuffRate + 5 * o2Mul
+				end
 			end
 		end
-		org.o2[1] = math.max(org.o2[1] - mulTime * o2DebuffRate, 0)
+
+		if o2DebuffRate > 0 then
+			if org.blood <= 3750 then
+				o2DebuffRate = o2DebuffRate * 3
+				if org.isPly and not org.otrub and (org._arterialO2NotifyTime or 0) + 30 < CurTime() then
+					org.owner:Notify("I can't breathe... blood's not getting where it should.", 30, "arterial_o2", 0)
+					org._arterialO2NotifyTime = CurTime()
+				end
+			end
+
+			org.o2[1] = math.max(org.o2[1] - mulTime * o2DebuffRate, 0)
+		end
 	end
 
 	-- Track how long internal bleed has been untreated

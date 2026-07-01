@@ -619,10 +619,11 @@ hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValu
         org.adrenaline = math.max((org.adrenaline or 0) - adrenalineBurn, 0)
     end
 
-    -- High stress → heartbeat increase (direct cardiovascular effect, up to +15 bpm)
+    -- High stress nudges the cardiovascular target instead of adding a fresh
+    -- heartbeat spike every think.
     if not org.otrub and stress > 50 then
         local stressFactor = Clamp((stress - 50) / 50, 0, 1)
-        org.heartbeat = (org.heartbeat or 70) + stressFactor * 15
+        org.heartbeat = math.Approach(org.heartbeat or 70, 70 + stressFactor * 15, timeValue * 3)
     end
 
     -- Very low mood → disorientation (mirrors despair's disorientation at high levels)

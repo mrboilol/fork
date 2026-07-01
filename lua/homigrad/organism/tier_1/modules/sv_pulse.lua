@@ -119,13 +119,19 @@ module[2] = function(owner, org, timeValue)
 
 	-- Hard physiological ceiling. Sustained rates above ~250 BPM are ventricular
 	-- tachycardia/fibrillation; above ~300 the heart cannot fill and arrests.
-	heartbeat = math.Clamp(heartbeat, 0, 320)
+	heartbeat = math.Clamp(heartbeat, 0, 260)
 
-	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
+	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 2.4 or timeValue * 4.5)
 
-	-- Z-city style hard cap: sustained fibrillation collapses into cardiac arrest.
-	if org.heartbeat > 300 then
-		org.heartstop = true
+	-- Only sustained extreme tachycardia collapses into cardiac arrest. Short
+	-- event spikes should look scary without instantly killing a viable player.
+	if org.heartbeat > 250 and k < 0.65 then
+		org._tachycardiaSince = org._tachycardiaSince or CurTime()
+		if org._tachycardiaSince + 4 < CurTime() then
+			org.heartstop = true
+		end
+	else
+		org._tachycardiaSince = nil
 	end
 
 	-- Probabilistic heartstop based on heart rate (kept as a softer fallback for
@@ -135,13 +141,10 @@ module[2] = function(owner, org, timeValue)
 
 		local hb = org.heartbeat
 		local chance = 0
-		if hb >= 280 then
-			chance = 0.2
-		elseif hb >= 250 then
-			chance = 0.1
-		elseif hb >= 220 then
-			chance = 0.05
-		elseif hb >= 200 then
+		local sustainedTachy = org._tachycardiaSince and org._tachycardiaSince + 3 < CurTime()
+		if sustainedTachy and hb >= 250 and k < 0.8 then
+			chance = 0.06
+		elseif sustainedTachy and hb >= 230 and k < 0.55 then
 			chance = 0.025
 		end
 
@@ -406,11 +409,14 @@ module[2] = function(owner, org, timeValue)
 		org.lastsoundtime = CurTime() + math.random(25,35)
 	end
 
-	if org.fear > 1.5 then
+	local circulatoryRisk = (org.bloodpressure or 93) < 55 or (org.pulse or 70) < 35 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
+
+	if org.fear > 1.5 and circulatoryRisk then
         if not org._fear_check_time or CurTime() > org._fear_check_time then
             org._fear_check_time = CurTime() + 1 -- check every second
 
-            local chance = (org.fear - 1.5) / 0.5 * 0.025 -- at 2.0 fear, 2.5% chance
+            local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)
+            local chance = (org.fear - 1.5) / 0.5 * 0.012 * riskMul
             local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
             if totalAdrenaline > 1.0 then
                 chance = chance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.35)
@@ -423,10 +429,11 @@ module[2] = function(owner, org, timeValue)
     end
 
 	-- Small heartstop chance from despair alone (not panic-only)
-	if (org.despair or 0) > 0.4 and not org.panicAttack then
+	if (org.despair or 0) > 0.4 and not org.panicAttack and circulatoryRisk then
 		if not org._despair_pulse_check or CurTime() > org._despair_pulse_check then
 			org._despair_pulse_check = CurTime() + 5 -- check every 5 seconds
-			local despairChance = math.Clamp((org.despair - 0.4) / 0.6, 0, 1) * 0.008 -- up to 0.8% per 5s at max despair
+			local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)
+			local despairChance = math.Clamp((org.despair - 0.4) / 0.6, 0, 1) * 0.004 * riskMul
 			if org.givingUp then despairChance = despairChance * 1.5 end
 			local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
 			if totalAdrenaline > 1.0 then
