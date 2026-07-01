@@ -161,7 +161,8 @@ function SWEP:GetArmHealthHandlingMul()
 	if not IsValid(owner) then return 1, 0 end
 
 	local org = owner.organism or {}
-	local twoHanded = not self:IsPistolHoldType() and self.lhandik ~= false
+	local support = self:GetHandSupportState(owner)
+	local twoHanded = support.wantsTwoHands
 	local right = math.Clamp(org.rarm or 0, 0, 1.4)
 	local left = math.Clamp(org.larm or 0, 0, 1.4)
 	local damage = right * 0.45 + (twoHanded and left * 0.32 or left * 0.14)
@@ -170,12 +171,62 @@ function SWEP:GetArmHealthHandlingMul()
 	if twoHanded and (org.larmdislocation or org.larmdislocated) then damage = damage + 0.35 end
 	if org.rarmamputated then damage = damage + 1.15 end
 	if twoHanded and org.larmamputated then damage = damage + 0.85 end
+	if support.oneHanded then damage = damage + (support.onlyLeft and 1.05 or 0.62) end
+	if support.leftBusy then damage = damage + 0.45 end
+	if support.rightBusy then damage = damage + 0.75 end
 	if org.aiming_fatigue then damage = damage + math.Clamp(org.aiming_fatigue, 0, 10) * 0.045 end
 	if org.permanent_aim_impairment then damage = damage + math.Clamp(org.permanent_aim_impairment, 0, 2) * 0.4 end
 
 	local mul = 1 + damage
 	mul = mul * self:GetFocusHandlingMul()
 	return math.Clamp(mul, 0.82, 3.0), damage
+end
+
+function SWEP:GetHandSupportState(ply)
+	ply = ply or self:GetOwner()
+	local org = IsValid(ply) and ply.organism or {}
+	local wantsTwoHands = not self:IsPistolHoldType() and self.lhandik ~= false
+	local rightBad = org.rarmamputated or (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
+	local leftBad = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
+	local rightUsable = not rightBad
+	local leftUsable = not leftBad
+	local leftBusy = false
+	local rightBusy = false
+	local ragdoll = IsValid(ply) and ply.FakeRagdoll or nil
+
+	if IsValid(ply) then
+		local carrying = ply.GetNetVar and (IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) or false
+		local zmanipLeft = ply.zmanipstart ~= nil and ply.zmanipseq == "interact" and not org.larmamputated
+		local fakeLeftGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsLH)
+		local fakeRightGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsRH)
+		local offhandBusy = carrying or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
+
+		if offhandBusy then
+			leftBusy = leftUsable
+		end
+
+		rightBusy = rightBusy or fakeRightGrip and not leftUsable
+	end
+
+	local rightSupport = rightUsable and not rightBusy
+	local leftSupport = leftUsable and not leftBusy and wantsTwoHands
+	local supportHands = (rightSupport and 1 or 0) + (leftSupport and 1 or 0)
+
+	return {
+		wantsTwoHands = wantsTwoHands,
+		rightUsable = rightUsable,
+		leftUsable = leftUsable,
+		rightBad = rightBad,
+		leftBad = leftBad,
+		rightBusy = rightBusy,
+		leftBusy = leftBusy,
+		rightSupport = rightSupport,
+		leftSupport = leftSupport,
+		supportHands = supportHands,
+		oneHanded = supportHands <= 1,
+		onlyLeft = not rightUsable and leftUsable,
+		onlyRight = rightUsable and not leftUsable
+	}
 end
 
 function SWEP:GetWeaponWeightHandlingMul()
@@ -214,17 +265,15 @@ function SWEP:GetRecoilSupportMul()
 	if not IsValid(owner) then return 1 end
 
 	local org = owner.organism or {}
-	local rightUsable = not org.rarmamputated and not ((org.rarm or 0) >= 1)
-	local leftUsable = not org.larmamputated and not ((org.larm or 0) >= 1)
-	local rightBad = org.rarmamputated or (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
-	local leftBad = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
-
-	local twoHanded = not self:IsPistolHoldType() and self.lhandik ~= false
-	local supportHands = (rightUsable and 1 or 0) + ((twoHanded and leftUsable) and 1 or 0)
+	local support = self:GetHandSupportState(owner)
+	local supportHands = support.supportHands
 	local mul = supportHands >= 2 and 0.82 or 1.25
 
-	if rightBad then mul = mul * (org.rarmamputated and 1.7 or 1.35) end
-	if leftBad and twoHanded then mul = mul * (org.larmamputated and 1.45 or 1.22) end
+	if support.oneHanded then mul = mul * (support.onlyLeft and 1.45 or 1.25) end
+	if support.leftBusy then mul = mul * 1.28 end
+	if support.rightBusy then mul = mul * 1.45 end
+	if support.rightBad then mul = mul * (org.rarmamputated and 1.7 or 1.35) end
+	if support.leftBad and support.wantsTwoHands then mul = mul * (org.larmamputated and 1.45 or 1.22) end
 	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul * (1 / org.armstrength) end
 	if org.aiming_fatigue then mul = mul * (1 + math.Clamp(org.aiming_fatigue, 0, 10) * 0.025) end
 
@@ -499,7 +548,7 @@ function SWEP:CanUse()
     local owner = self:GetOwner()
 	if not IsValid(owner) then return true end
     if owner:IsNPC() then return true end
-	if owner.organism and owner.organism.rarmamputated and !self:IsPistolHoldType() then return false end
+	if owner.organism and owner.organism.rarmamputated and owner.organism.larmamputated and !self:IsPistolHoldType() then return false end
 	if self:IsJamClearing() then return false end
 	return not (self.reload or self.deploy or (owner:IsPlayer() and (self:IsSprinting() or (owner.organism and owner.organism.otrub))))
 end

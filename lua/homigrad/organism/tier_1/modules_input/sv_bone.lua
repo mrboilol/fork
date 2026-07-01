@@ -11,6 +11,36 @@ local function PlayBoneBreakSound(entity)
     end
 end
 
+local function PlayBrokenBoneHitSound(org, key, volume)
+	if not org or not IsValid(org.owner) then return end
+
+	org._brokenBoneHitSound = org._brokenBoneHitSound or {}
+	if (org._brokenBoneHitSound[key] or 0) > CurTime() then return end
+	org._brokenBoneHitSound[key] = CurTime() + 0.35
+
+	org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", volume or 62, math.random(120, 135), 0.55, CHAN_AUTO)
+end
+
+local function AddBoneInternalBleed(org, amount, cap)
+	if not org then return end
+
+	org.internalBleed = (org.internalBleed or 0) + math.Clamp(amount or 0, 0, cap or 1)
+end
+
+local function AddBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
+	if not org then return end
+
+	local severity = math.Clamp(dmg or 0, 0, 3)
+	if severity <= 0 then return end
+
+	org.painadd = (org.painadd or 0) + math.Clamp(severity * 7, 2, 18)
+	AddBoneInternalBleed(org, severity * 0.025, 0.12)
+
+	if severity >= (soundThreshold or 0.45) then
+		PlayBrokenBoneHitSound(org, key)
+	end
+end
+
 local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, oldBrain, oldHeadTrauma, traumaBone)
     if not org.isPly then return end
     local targetPlayer = org.owner
@@ -174,7 +204,10 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		return 0
 	end
 
-	if org[key] == 1 then return 0 end
+	if org[key] == 1 then
+		AddBrokenBoneHitTrauma(org, key, dmg, 0.5)
+		return 0
+	end
 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
@@ -197,6 +230,7 @@ local function legs(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		end
 
 		org.painadd = org.painadd + 55
+		AddBoneInternalBleed(org, 0.45, 0.8)
 		org.owner:AddNaturalAdrenaline(1)
 		org.immobilization = org.immobilization + dmg * 25
 		org.fearadd = org.fearadd + 0.5
@@ -249,7 +283,10 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		return 0
 	end
 
-	if org[key] == 1 then return 0 end
+	if org[key] == 1 then
+		AddBrokenBoneHitTrauma(org, key, dmg, 0.5)
+		return 0
+	end
 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
@@ -273,6 +310,7 @@ local function arms(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 		end
 
 		org.painadd = org.painadd + 55
+		AddBoneInternalBleed(org, 0.35, 0.7)
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
@@ -387,8 +425,14 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
-				PlayBoneBreakSound(org.owner)
-		if org.owner:IsPlayer() then
+		if oldDmg < hg.organism[name2] then
+			PlayBoneBreakSound(org.owner)
+			AddBoneInternalBleed(org, 0.6, 0.9)
+		else
+			AddBrokenBoneHitTrauma(org, name, dmg, 0.35)
+		end
+
+		if oldDmg < hg.organism[name2] and org.owner:IsPlayer() then
 			org.owner:Notify(huyasd[name], true, name, 2)
 		end
 		org.painadd = org.painadd + 25
@@ -436,7 +480,12 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
 
-if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
+		if oldDmg != 1 then
+			PlayBoneBreakSound(org.owner)
+			AddBoneInternalBleed(org, 0.25, 0.4)
+		else
+			AddBrokenBoneHitTrauma(org, "jaw", dmg, 0.25)
+		end
 	end
 
 	org.shock = org.shock + dmg * 3
@@ -536,7 +585,12 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.shock = org.shock + dmg * 30
 		org.avgpain = org.avgpain + dmg * 30
 
-		if oldDmg != 1 then PlayBoneBreakSound(org.owner) end
+		if oldDmg != 1 then
+			PlayBoneBreakSound(org.owner)
+			AddBoneInternalBleed(org, 0.35, 0.55)
+		else
+			AddBrokenBoneHitTrauma(org, "skull", dmg, 0.3)
+		end
 		if IsValid(org.owner) then
 			org.owner:SetNWBool("SkullBrokenFully", true)
 		end
@@ -638,9 +692,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				end
 			end
 
-			-- Bonebreak sound on every skull blood spray
+			-- Secondary bonebreak sound on every skull blood spray
 			if IsValid(org.owner) then
-				org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 85, math.random(120, 135), 1, CHAN_AUTO)
+				PlayBrokenBoneHitSound(org, "skull", 68)
 			end
 		end
 	end
@@ -679,6 +733,7 @@ local ribs = {
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
 	local oldDmg = org.chest
+	local oldBrokenRibs = org.brokenribs or math.Round(oldDmg * 3)
 
 	if dmgInfo:IsDamageType(DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT) and math.random(5) == 1 then return 0, vector_origin end --random chance it passed through ribs
 
@@ -695,6 +750,11 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	-- Chest hits can cause hemothorax (blood filling pleural cavity)
 	if dmg >= 0.5 then
 		org.hemothorax = math.min((org.hemothorax or 0) + dmg * 0.08, 1)
+	end
+
+	local currentBrokenRibs = math.Round(org.chest * 3)
+	if oldBrokenRibs > 0 and currentBrokenRibs <= oldBrokenRibs and dmg >= 0.35 then
+		AddBrokenBoneHitTrauma(org, "chest", dmg * 0.35, 0.5)
 	end
 
 	-- Rare chance of cardiac arrest from chest blunt trauma
@@ -723,6 +783,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
 
 				PlayBoneBreakSound(owner)
+				AddBoneInternalBleed(org, 0.12 + org.brokenribs * 0.08, 0.5)
 			
 				-- Chance to puncture lung when ribs break
 				local punctureChance = 0.25 + (org.brokenribs * 0.1) -- 25% base + 10% per broken rib
@@ -762,6 +823,10 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 5
 
 	local result = damageBone(org, 0.35, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
+
+	if oldDmg >= 1 and dmg >= 0.35 then
+		AddBrokenBoneHitTrauma(org, "pelvis", dmg * 0.5, 0.45)
+	end
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 

@@ -37,6 +37,7 @@ module[1] = function(org)
 	org.tranquilizer = 0
 
 	org.shock_turn = 0
+	org._highShockTime = 0
 
 
 
@@ -259,6 +260,30 @@ module[2] = function(owner, org, timeValue)
 
 
 
+	local shock = org.shock or 0
+	local pain = org.pain or 0
+	local analgesiaResistance = max(1 + (org.analgesia or 0) * 2.5 + (org.painkiller or 0) * 0.35, 1)
+	local stressResistance = analgesiaResistance * max(1 + (org.adrenaline or 0) * 0.12, 1) * max(0.75 + goodmood * 0.25, 0.75)
+	local shockPainMul = 1 + Clamp((pain - 50) / 70, 0, 0.45)
+
+	if shock >= 50 then
+		org._highShockTime = (org._highShockTime or 0) + timeValue
+	else
+		org._highShockTime = max((org._highShockTime or 0) - timeValue * 2, 0)
+	end
+
+	if shock > 70 then
+		local highShockSeverity = Clamp((shock - 70) / 30, 0.35, 1)
+		local highShockDrain = timeValue * highShockSeverity * shockPainMul * 0.62 / stressResistance
+		org.consciousness = max((org.consciousness or 1) - highShockDrain, 0)
+	elseif (org._highShockTime or 0) >= 15 then
+		local sustainedSeverity = Clamp((shock - 50) / 30, 0.35, 1) * Clamp((org._highShockTime - 15) / 10, 0.25, 1)
+		local sustainedDrain = timeValue * sustainedSeverity * shockPainMul * 0.28 / stressResistance
+		org.consciousness = max((org.consciousness or 1) - sustainedDrain, 0)
+	end
+
+
+
 	if org.consciousness < 0.1 then
 
 		org.needotrub = true
@@ -337,19 +362,15 @@ module[2] = function(owner, org, timeValue)
 			shockFloor = 0.5
 		end
 
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.22, shockFloor)
-
-		org._highShockTime = (org._highShockTime or 0)
-		if org.shock > 60 then
-			org._highShockTime = org._highShockTime + timeValue
-			if org._highShockTime > 15 then
-				local sustainedSeverity = math.Clamp((org._highShockTime - 15) / 30, 0, 1)
-				org.consciousness = math.max((org.consciousness or 1) - timeValue * sustainedSeverity * (vitalsCritical and 0.15 or 0.04), vitalsCritical and 0 or 0.18)
-			end
-		else
-			org._highShockTime = math.max(org._highShockTime - timeValue * 2, 0)
+		local consciousness = org.consciousness or 1
+		if consciousness > shockFloor then
+			org.consciousness = math.max(consciousness - timeValue * shockSeverity * 0.22, shockFloor)
 		end
 
+	end
+
+	if org.consciousness < 0.1 then
+		org.needotrub = true
 	end
 
 	

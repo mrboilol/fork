@@ -214,6 +214,11 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local rarm_bad = rarm_broken or rarm_dislocated or rarm_amputated
 	local larm_bad = larm_broken or larm_dislocated or larm_amputated
+	local handSupport = self.GetHandSupportState and self:GetHandSupportState(ply) or {}
+	local oneHandCameraMul = 1
+	if handSupport.oneHanded then oneHandCameraMul = oneHandCameraMul * (handSupport.onlyLeft and 1.75 or 1.38) end
+	if handSupport.leftBusy then oneHandCameraMul = oneHandCameraMul * 1.28 end
+	if handSupport.rightBusy then oneHandCameraMul = oneHandCameraMul * 1.45 end
 
 	-- Partial arm damage detection (0.25-0.99 damage range)
 	local rarm_partial = rarm_health >= 0.25 and rarm_health < 1 and not rarm_amputated
@@ -272,6 +277,11 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		local partial_severity = (larm_health - 0.25) / 0.75
 		arm_weight_penalty = arm_weight_penalty + 0.3 + partial_severity * 0.9
 	end
+	if handSupport.oneHanded then
+		arm_weight_penalty = arm_weight_penalty + (handSupport.onlyLeft and 3.2 or 2.0)
+	end
+	if handSupport.leftBusy then arm_weight_penalty = arm_weight_penalty + 1.4 end
+	if handSupport.rightBusy then arm_weight_penalty = arm_weight_penalty + 2.2 end
 
 	if not bypass_mitigation then
 		arm_weight_penalty = arm_weight_penalty * mitigation_mult
@@ -322,6 +332,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if tta_multiplier > 1 and not bypass_mitigation then
 		tta_multiplier = 1 + (tta_multiplier - 1) * mitigation_mult
 	end
+	tta_multiplier = tta_multiplier * oneHandCameraMul
 	tta_multiplier = tta_multiplier * (1 + fear * 0.15 + adrenalineJitter * 0.1) / (1 + adrenalineStabilizer) * handlingMul
 	tta = tta * tta_multiplier
 
@@ -431,9 +442,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local eyeSpray = -(-self.EyeSpray)
 	local mult = (hg.GunPositions[ply] and hg.GunPositions[ply][1] and (hg.GunPositions[ply][1] / 4 + 1) / 2 + 1 or 1) / 2
 	
-	local spray = self:GetCameraSprayValues(animpos) * mult
+	local spray = self:GetCameraSprayValues(animpos) * mult * oneHandCameraMul
 
-	spray = spray + animpos * 6 * k * mult * ply:EyeAngles():Up()
+	spray = spray + animpos * 6 * k * mult * oneHandCameraMul * ply:EyeAngles():Up()
 
 	//angIdle:Add(-angle_difference*2)
 	//angZoom:Add(-angle_difference*1)
@@ -445,7 +456,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local weight = math.max(self.weight or 1, 0.001)
 	local shit2 = (1 / weight) * (self.NumBullet or 3) / 3
 	angZoom:Add(self.prankang or angle_zero)
-	posZoom:Add(VectorRand(-0.1, 0.1) * animpos3 * shit2)
+	posZoom:Add(VectorRand(-0.1, 0.1) * animpos3 * shit2 * oneHandCameraMul)
 
 	local fraction2 = math.ease.InCubic(self:GetAnimPos_Shoot2(self.lastShoot or 0, 1))
 	
@@ -463,9 +474,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	
 	local fthuy = ftlerped * 150
 
-	angle_spray[3] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 60 * game.GetTimeScale() * 0.7
-	angle_spray[1] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7
-	angle_spray[2] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7
+	angle_spray[3] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 60 * game.GetTimeScale() * 0.7 * oneHandCameraMul
+	angle_spray[1] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7 * oneHandCameraMul
+	angle_spray[2] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7 * oneHandCameraMul
 	outputAng:Add(angle_spray)
 	
 	local imm = (organism and organism.immobilization) or 0

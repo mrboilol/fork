@@ -731,6 +731,7 @@ function SWEP:FireBullet()
 		local larm_dislocated = organism.larmdislocated or organism.larmdislocation
 		local rarm_amputated = organism.rarmamputated
 		local larm_amputated = organism.larmamputated
+		local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 
 		-- Partial arm damage detection (0.25-0.99 damage range)
 		local rarm_partial = rarm >= 0.25 and rarm < 1 and not rarm_amputated
@@ -740,6 +741,9 @@ function SWEP:FireBullet()
 		if rarm_amputated then spreadMul = spreadMul + 1.0 end
 		if larm_amputated then spreadMul = spreadMul + 0.5 end
 		if rarm_dislocated or larm_dislocated then spreadMul = spreadMul + 0.3 end
+		if support.oneHanded then spreadMul = spreadMul + (support.onlyLeft and 1.1 or 0.65) end
+		if support.leftBusy then spreadMul = spreadMul + 0.45 end
+		if support.rightBusy then spreadMul = spreadMul + 0.75 end
 
 		-- Add partial damage spread penalty
 		if rarm_partial then

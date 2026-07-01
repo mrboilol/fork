@@ -25,7 +25,7 @@ function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 	local supportMul = self:GetRecoilSupportMul()
-	local mul = math.Clamp(caliberMul * weightMul * 0.55, 0.18, 2.25) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
+	local mul = math.Clamp(caliberMul * weightMul * 0.68, 0.18, 2.7) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
 	self:ApplyForce(mul)
 	mul = (mul or 0) * (self.Supressor and 0.85 or 1) * (owner.organism and owner.organism.recoilmul or 1) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
 	return mul
@@ -59,11 +59,17 @@ function SWEP:PrimarySpread()
 			local force = self.Primary.Force2 or self.Primary.Force or 30
 			local numB = self.NumBullet or 1
 			local calForce = force * numB
+			local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 
 			local rarm_broken = (org.rarm and org.rarm >= 1) and not org.rarmamputated
 			local larm_broken = (org.larm and org.larm >= 1) and not org.larmamputated
 			local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
 			local larm_dislocated = org.larmdislocated or org.larmdislocation
+			local firingArm = support.onlyLeft and "larm" or "rarm"
+			local firingBroken = firingArm == "larm" and larm_broken or rarm_broken
+			local firingDislocated = firingArm == "larm" and larm_dislocated or rarm_dislocated
+			local firingAmputated = firingArm == "larm" and org.larmamputated or org.rarmamputated
+			local oneHanded = support.oneHanded or support.leftBusy or support.rightBusy
 
 			-- Pain from shooting based on hand dominance - only if arm is actually broken
 			local dominance = org.hand_dominance or "right"
@@ -88,6 +94,29 @@ function SWEP:PrimarySpread()
 			end
 
 			org.painadd = org.painadd + pain_mult * force / 20 * numB
+			if oneHanded then
+				local oneHandPain = math.max(0, calForce - 24) * (support.onlyLeft and 0.16 or 0.1)
+				if firingBroken or firingDislocated then oneHandPain = oneHandPain + calForce * 0.28 end
+				org.painadd = org.painadd + oneHandPain
+
+				if not firingAmputated and calForce >= 42 then
+					local wristChance = math.Clamp((calForce - 34) / 420, 0.01, 0.18)
+					if support.wantsTwoHands then wristChance = wristChance * 1.35 end
+					if support.onlyLeft then wristChance = wristChance * 1.25 end
+					if firingBroken or firingDislocated then wristChance = wristChance * 1.8 end
+
+					if math.random() < wristChance then
+						org[firingArm] = math.max(org[firingArm] or 0, firingBroken and 1 or 0.55)
+						org[firingArm .. "dislocation"] = true
+						org.painadd = org.painadd + 35 + calForce * 0.45
+						owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(105, 125), 1, CHAN_AUTO)
+						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+							hg.BreakLimb(owner, firingArm, nil, true)
+						end
+						owner:Notify("The recoil wrenched your " .. (firingArm == "larm" and "left" or "right") .. " wrist.", 1, firingArm .. "_onehand_recoil", 1, nil, nil)
+					end
+				end
+			end
 
 			-- Right arm broken shooting checks
 			if rarm_broken then
@@ -168,7 +197,14 @@ function SWEP:PrimarySpread()
 		local organism = owner.organism or {}
 		local caliberMul, weightMul, ammoForce, numBullet = self:GetRecoilImpulseFactors()
 
-		local force = math.Clamp(caliberMul * weightMul * 0.28, 0.08, 1.8) * self.addSprayMul * math.min(sprayI / 30,0.6)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
+		local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
+		local oneHandRecoilMul = 1
+		if support.oneHanded then oneHandRecoilMul = oneHandRecoilMul * (support.onlyLeft and 1.85 or 1.45) end
+		if support.leftBusy then oneHandRecoilMul = oneHandRecoilMul * 1.35 end
+		if support.rightBusy then oneHandRecoilMul = oneHandRecoilMul * 1.55 end
+		if support.wantsTwoHands and support.supportHands <= 1 then oneHandRecoilMul = oneHandRecoilMul * 1.25 end
+
+		local force = math.Clamp(caliberMul * weightMul * 0.38, 0.1, 2.45) * oneHandRecoilMul * self.addSprayMul * math.min(sprayI / 30,0.75)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
 
 		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
 		local dominance = organism.hand_dominance or "right"
@@ -251,6 +287,7 @@ function SWEP:PrimarySpread()
 		local armHandlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
 		mul = mul * math.Clamp(0.72 + arm_debuff * 0.14 + amputate_debuff * 0.16, 0.72, 1.65)
 		mul = mul * math.Clamp(broken_arm_recoil_mult, 1, 1.9)
+		mul = mul * oneHandRecoilMul
 		mul = mul * armHandlingMul
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
@@ -287,11 +324,11 @@ function SWEP:PrimarySpread()
 			
 			local huyang = angrand2 * mul / 2 * mulhuy
 			huyang[3] = 0
-			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 2 or 1) * 0.09)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 2 or 1) * 0.14)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			
 			local angpopa = angrand2 * mul
 			angpopa[3] = 0
-			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.1 or 0.35))-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.25 or 0.55))-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 
@@ -314,9 +351,9 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		local muzzleKick = sprayAng * (organism.recoilmul or 1) * armHandlingMul * (owner.posture == 1 and not self:IsZoom() and 0.2 or 1) * 0.34
-		muzzleKick[1] = math.Clamp(muzzleKick[1], -2.2, 1.4)
-		muzzleKick[2] = math.Clamp(muzzleKick[2], -1.15, 1.15)
+		local muzzleKick = sprayAng * (organism.recoilmul or 1) * armHandlingMul * oneHandRecoilMul * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.55
+		muzzleKick[1] = math.Clamp(muzzleKick[1], -4.2, 2.2)
+		muzzleKick[2] = math.Clamp(muzzleKick[2], -2.1, 2.1)
 		muzzleKick[3] = 0
 		owner:SetEyeAngles(eyeang + muzzleKick)
 		
@@ -330,13 +367,13 @@ function SWEP:PrimarySpread()
 			max_clip1 = 1
 		end
 		
-		local sprayvel = spray * mul * math.max(sprayI / max_clip1, 0.5) * self.addSprayMul * (self.cameraShakeMul or 1) * 4.2//(self.Primary.Automatic and 1 or 1)
+		local sprayvel = spray * mul * math.max(sprayI / max_clip1, 0.5) * self.addSprayMul * (self.cameraShakeMul or 1) * 5.6//(self.Primary.Automatic and 1 or 1)
 		
 		--self.weaponSway = self.weaponSway + sprayvel
 
-		self.sprayAngles[3] = self.sprayAngles[3] + math.max(self.Primary.Damage / 100,1) * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 40
+		self.sprayAngles[3] = self.sprayAngles[3] + math.max(self.Primary.Damage / 100,1) * oneHandRecoilMul * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 34
 
-		self:ApplyEyeSprayVel(sprayvel * 0.7)
+		self:ApplyEyeSprayVel(sprayvel * 0.9)
 		--self:AnimApply_RecoilCameraZoom()
 	end
 end

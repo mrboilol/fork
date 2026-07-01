@@ -229,23 +229,15 @@ local haloents = {
 	["weapon_hg_f1_tpik"] = true
 }
 
-local pickupHaloClasses = {
-	["prop_ragdoll"] = true,
-	["prop_physics"] = true,
-	["prop_physics_multiplayer"] = true
-}
-
 local pickuphalo = {}
 local function CanPickupHalo(ent)
 	if not IsValid(ent) then return false end
 	if ent:IsNPC() or ent:IsPlayer() or ent:IsWorld() then return false end
 	if ent:GetNoDraw() then return false end
-	if haloents[ent.Base] then return true end
-	if pickupHaloClasses[ent:GetClass()] then return true end
+	if ent.IsZPickup then return true end
+	if haloents[ent.Base] or haloents[ent:GetClass()] then return true end
 	if ent:IsWeapon() and haloents[ent.Base] then return true end
-
-	local phys = ent:GetPhysicsObject()
-	return IsValid(phys)
+	return false
 end
 
 hook.Add( "PreDrawHalos", "AddPropHalos", function()
