@@ -213,7 +213,7 @@ hook.Add("Post Processing", "Main", function()
 	DrawSunEffect()
 end)
 
-local color_red = Color( 56, 43, 0, 255)
+local pickupHaloColor = Color(255, 255, 255, 255)
 local haloents = {
 	["attachment_base"] = true,
 	["ammo_base"] = true,
@@ -229,21 +229,40 @@ local haloents = {
 	["weapon_hg_f1_tpik"] = true
 }
 
-local pickuphalo = {}
-hook.Add( "PreDrawHalos", "AddPropHalos", function() -- вариант с подсвечиванием только когда смотришь
-	pickuphalo[1] = nil
+local pickupHaloClasses = {
+	["prop_ragdoll"] = true,
+	["prop_physics"] = true,
+	["prop_physics_multiplayer"] = true
+}
 
-	local tr = hg.eyeTrace(lply,72)
-	if IsValid(tr.Entity) and haloents[tr.Entity.Base] then
-		pickuphalo[1] = tr.Entity
-		local dist = lply:GetPos():Distance(tr.Entity:GetPos()) * 0.03
-		color_red.r = Lerp(FrameTime()*2,color_red.r,56 / dist)
-		color_red.g = Lerp(FrameTime()*2,color_red.g,43 / dist)
-	else
-		color_red.r = Lerp(FrameTime()*2,color_red.r,0)
-		color_red.g = Lerp(FrameTime()*2,color_red.g,0)
+local pickuphalo = {}
+local function CanPickupHalo(ent)
+	if not IsValid(ent) then return false end
+	if ent:IsNPC() or ent:IsPlayer() or ent:IsWorld() then return false end
+	if ent:GetNoDraw() then return false end
+	if haloents[ent.Base] then return true end
+	if pickupHaloClasses[ent:GetClass()] then return true end
+	if ent:IsWeapon() and haloents[ent.Base] then return true end
+
+	local phys = ent:GetPhysicsObject()
+	return IsValid(phys)
+end
+
+hook.Add( "PreDrawHalos", "AddPropHalos", function()
+	table.Empty(pickuphalo)
+
+	local ply = IsValid(lply) and lply or LocalPlayer()
+	if not IsValid(ply) then return end
+
+	for _, ent in ipairs(ents.FindInSphere(ply:GetPos(), 72)) do
+		if CanPickupHalo(ent) then
+			pickuphalo[#pickuphalo + 1] = ent
+		end
 	end
-	halo.Add( pickuphalo, color_red, 1, 1, 1 )
+
+	if #pickuphalo > 0 then
+		halo.Add(pickuphalo, pickupHaloColor, 1, 1, 1)
+	end
 end )
 
 -- funny :)

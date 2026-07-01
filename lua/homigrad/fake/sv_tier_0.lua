@@ -132,7 +132,9 @@ function hg.Ragdoll_Create(ply)
 	ragdoll:SetSkin(ply:GetSkin() or 0)
 	ragdoll:SetMaterial(ply:GetMaterial() or "")
 	ragdoll:SetColor(ply:GetColor())
-	ragdoll:SetPlayerColor(ply:GetPlayerColor())
+	if ragdoll.SetPlayerColor and ply.GetPlayerColor then
+		ragdoll:SetPlayerColor(ply:GetPlayerColor())
+	end
 	ragdoll.CurAppearance = istable(ply.CurAppearance) and table.Copy(ply.CurAppearance) or nil
 
 	local bodygroups = ply:GetBodyGroups()
