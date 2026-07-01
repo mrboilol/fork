@@ -9,14 +9,22 @@ function PLAYER:CreateRagdoll()
 	return false
 end
 
+hg = hg or {}
+hg.fakeBullseyes = hg.fakeBullseyes or setmetatable({}, {__mode = "k"})
+
 local hook_Run = hook.Run
+local fakeBullseyes = hg.fakeBullseyes
+local string_StartWith = string.StartWith
 hook.Add("OnEntityCreated", "bull_add", function(npc)
 	timer.Simple(0, function()
-		if IsValid(npc) then
-			if npc:IsNPC() or string.Explode( "_" , npc:GetClass() ) == "terminator" then
-				for i, ent in pairs(ents.FindByClass("npc_bullseye")) do
-					if IsValid(ent) and IsValid(ent.ply) then npc:AddEntityRelationship(ent, npc:Disposition(ent.ply)) end
-				end
+		if !IsValid(npc) then return end
+		if !npc:IsNPC() and !string_StartWith(npc:GetClass(), "terminator_") then return end
+
+		for ent in pairs(fakeBullseyes) do
+			if IsValid(ent) and IsValid(ent.ply) then
+				npc:AddEntityRelationship(ent, npc:Disposition(ent.ply))
+			else
+				fakeBullseyes[ent] = nil
 			end
 		end
 	end)
@@ -109,20 +117,34 @@ local fixbones = {
 }
 
 function hg.Ragdoll_Create(ply)
-	local Data = duplicator.CopyEntTable( ply )
+	if !IsValid(ply) or !ply:IsPlayer() then return end
+
+	local model = ply:GetModel()
+	if !model or model == "" then return end
+
 	local ragdoll = ents.Create("prop_ragdoll")
-	duplicator.DoGeneric( ragdoll, Data )
+	if !IsValid(ragdoll) then return end
 
 	ragdoll:SetPos(ply:GetPos())
 	ragdoll:SetAngles(ply:GetAngles())
 	--ragdoll:SetVelocity(ply:GetVelocity())
-	ragdoll:SetModel(ply:GetModel())
-	ragdoll.CurAppearance = table.Copy(ply.CurAppearance)
+	ragdoll:SetModel(model)
+	ragdoll:SetSkin(ply:GetSkin() or 0)
+	ragdoll:SetMaterial(ply:GetMaterial() or "")
+	ragdoll:SetColor(ply:GetColor())
+	ragdoll:SetPlayerColor(ply:GetPlayerColor())
+	ragdoll.CurAppearance = istable(ply.CurAppearance) and table.Copy(ply.CurAppearance) or nil
 
 	local bodygroups = ply:GetBodyGroups()
 	ragdoll:SetCollisionGroup(COLLISION_GROUP_WEAPON)
 	ragdoll:Spawn()
 	ragdoll:Activate()
+	for _, bodygroup in ipairs(bodygroups) do
+		local id = bodygroup.id
+		if id then
+			ragdoll:SetBodygroup(id, ply:GetBodygroup(id))
+		end
+	end
 	ragdoll:AddEFlags(EFL_NO_DAMAGE_FORCES + EFL_DONTBLOCKLOS)
 	--ragdoll:AddFlags(FL_NOTARGET)
 	--ply:AddFlags(FL_NOTARGET)
@@ -132,11 +154,12 @@ function hg.Ragdoll_Create(ply)
 	if IsValid(ply.bull) then ply.bull:Remove() ply.bull = nil end
 	ragdoll.bull = ents.Create("npc_bullseye")
 	local bull = ragdoll.bull
+	if !IsValid(bull) then ragdoll:Remove() return end
 	bull.ply = ply
 	bull.rag = ragdoll
 	local eyeatt = ragdoll:GetAttachment(ragdoll:LookupAttachment("eyes"))
 	local bodyphy = ragdoll:GetPhysicsObjectNum(10)
-	if !bodyphy then return end
+	if !IsValid(bodyphy) then bull:Remove() ragdoll:Remove() return end
 	bull:SetPos(bodyphy:GetPos()+bodyphy:GetAngles():Right()*7)
 	--bull:SetPos( eyeatt.Pos + eyeatt.Ang:Up() * 3.5 )
 	bull:SetAngles( ragdoll:GetAngles() )
@@ -149,6 +172,7 @@ function hg.Ragdoll_Create(ply)
 	bull:Spawn()
 	bull:Activate()
 	bull:SetNotSolid(true)
+	fakeBullseyes[bull] = true
 	
 	--bull:SetCollisionBoundsWS(-Vector(5,5,5),Vector(5,5,5))
 	--bull:SetSurroundingBounds(-Vector(50,50,50),Vector(50,50,50))
@@ -176,6 +200,7 @@ function hg.Ragdoll_Create(ply)
 		hg.queue_ragdolls[ragdoll] = nil
 
 		if IsValid(ragdoll.bull) then
+			fakeBullseyes[ragdoll.bull] = nil
 			ragdoll.bull:Remove()
 		end
 	end)
