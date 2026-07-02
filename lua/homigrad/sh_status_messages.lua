@@ -387,7 +387,8 @@ end
 function hg.fearful(ply)
 	if not IsValid(ply) then return end
 
-	return ply.organism and ply.organism.fear > 0.5
+	local org = ply.organism
+	return org and ((org.fear or 0) > 0.5 or (org.adrenaline or 0) > 0.5)
 end
 
 function hg.situation_fear(ply)
@@ -526,7 +527,7 @@ local function get_status_message(ply)
 		end
 	elseif not most_wanted_phraselist and hg.situation_fear(ply) then
 		most_wanted_phraselist = situation_fear_phrases
-	elseif hg.fearful(ply) then
+	elseif not most_wanted_phraselist and hg.fearful(ply) then
 		if positive_thinking and math.random(3) == 1 then
 			most_wanted_phraselist = near_death_positive
 		else

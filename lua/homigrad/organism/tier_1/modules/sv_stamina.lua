@@ -19,6 +19,7 @@ module[1] = function(org)
 	org.adrenaline = 0
 
 	org.adrenalineAdd = 0
+	org._adrenalineHoldUntil = 0
 
 	org.adrenalineStorage = 5
 
@@ -262,6 +263,7 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 	
 
 	org.adrenaline = math.min(org.adrenaline + amt, 5)
+	org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, CurTime() + math.Clamp(amt * 2, 1, 8))
 
 	org.adrenalineStorage = math.max(storage - reserveAmt, 0)
 	org.adrenalineReserveEffectiveness = reserveK

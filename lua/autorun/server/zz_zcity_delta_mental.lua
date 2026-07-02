@@ -629,7 +629,7 @@ hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValu
     end
 
     -- High stress → adrenaline burn: body in overdrive consumes adrenaline faster
-    if not org.otrub and stress > 70 and (org.adrenaline or 0) > 0.5 then
+    if not org.otrub and stress > 70 and (org.adrenaline or 0) > 0.5 and CurTime() >= (org._adrenalineHoldUntil or 0) then
         local stressFactor = Clamp((stress - 70) / 30, 0, 1)
         local adrenalineBurn = stressFactor * timeValue * 0.08
         org.adrenaline = math.max((org.adrenaline or 0) - adrenalineBurn, 0)

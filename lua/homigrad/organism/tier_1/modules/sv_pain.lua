@@ -474,6 +474,10 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
+	if org.adrenalineAdd > 0 or CurTime() < (org._adrenalineHoldUntil or 0) then
+		adrenalineDecayRate = 0
+	end
+
 
 
 	org.adrenaline = Approach(org.adrenaline, 0, adrenalineDecayRate)
