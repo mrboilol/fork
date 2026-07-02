@@ -213,7 +213,7 @@ hook.Add("Post Processing", "Main", function()
 	DrawSunEffect()
 end)
 
-local pickupHaloColor = Color(255, 255, 255, 255)
+local pickupHaloRadius = 72
 local haloents = {
 	["attachment_base"] = true,
 	["ammo_base"] = true,
@@ -229,31 +229,64 @@ local haloents = {
 	["weapon_hg_f1_tpik"] = true
 }
 
-local pickuphalo = {}
+local pickupHaloClasses = {
+	["ent_hg_bugbait"] = true,
+	["ent_hg_emptymag"] = true,
+	["ent_hg_grenade"] = true,
+	["ent_hg_jam"] = true,
+	["ent_hg_magazine"] = true,
+	["ent_hg_molotov"] = true,
+	["ent_hg_slam"] = true,
+	["ent_hg_smokenade"] = true,
+	["ent_hg_snowball"] = true,
+	["ent_throwable"] = true
+}
+
+local pickupHaloLevels = setmetatable({}, {__mode = "k"})
+local pickupHaloSeen = setmetatable({}, {__mode = "k"})
 local function CanPickupHalo(ent)
 	if not IsValid(ent) then return false end
 	if ent:IsNPC() or ent:IsPlayer() or ent:IsWorld() then return false end
 	if ent:GetNoDraw() then return false end
+	if ent:IsWeapon() then return not IsValid(ent:GetOwner()) end
 	if ent.IsZPickup then return true end
+	if ent.Throwable then return true end
 	if haloents[ent.Base] or haloents[ent:GetClass()] then return true end
-	if ent:IsWeapon() and haloents[ent.Base] then return true end
+	if pickupHaloClasses[ent.Base] or pickupHaloClasses[ent:GetClass()] then return true end
 	return false
 end
 
 hook.Add( "PreDrawHalos", "AddPropHalos", function()
-	table.Empty(pickuphalo)
-
 	local ply = IsValid(lply) and lply or LocalPlayer()
 	if not IsValid(ply) then return end
 
-	for _, ent in ipairs(ents.FindInSphere(ply:GetPos(), 72)) do
+	table.Empty(pickupHaloSeen)
+
+	local frameLerp = math.min(FrameTime() * 8, 1)
+	local plyPos = ply:GetPos()
+
+	for _, ent in ipairs(ents.FindInSphere(plyPos, pickupHaloRadius)) do
 		if CanPickupHalo(ent) then
-			pickuphalo[#pickuphalo + 1] = ent
+			pickupHaloSeen[ent] = true
+
+			local dist = plyPos:Distance(ent:GetPos())
+			local target = math.Clamp(1 - dist / pickupHaloRadius, 0, 1)
+
+			local level = Lerp(frameLerp, pickupHaloLevels[ent] or 0, target)
+			pickupHaloLevels[ent] = level
+
+			if level > 0.01 then
+				local brightness = math.floor(255 * level)
+				halo.Add({ent}, Color(brightness, brightness, brightness, 255), 1, 1, 1)
+			end
 		end
 	end
 
-	if #pickuphalo > 0 then
-		halo.Add(pickuphalo, pickupHaloColor, 1, 1, 1)
+	for ent, level in pairs(pickupHaloLevels) do
+		if not pickupHaloSeen[ent] then
+			level = Lerp(frameLerp, level, 0)
+			pickupHaloLevels[ent] = level > 0.01 and level or nil
+		end
 	end
 end )
 
@@ -283,6 +316,7 @@ local headtraumaSaturation = 0
 local suicideLerp = 0
 local suicideViewAng = Angle()
 local addtime = CurTime()
+local GivingUpStationVol = 0
 
 local show_image_time = 0
 local show_some_images_time = 0
@@ -474,6 +508,7 @@ local function stopthings()
 		GivingUpStation:Stop()
 		GivingUpStation = nil
 	end
+	GivingUpStationVol = 0
 
 	suicideLerp = 0
 
@@ -791,26 +826,28 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	o2 = o2 + (org.CO or 0)
 	local brain = org.brain or 0
 	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * (org.otrub and 2 or 10) + (brain * 100) * (org.otrub and 1 or 5))
-	AnalgesiaLerp = LerpFT(0.04, AnalgesiaLerp, math.Clamp(((org.analgesia or 0) - 0.35) / 2.4, 0, 1))
+	local analgesia = org.analgesia or 0
+	AnalgesiaLerp = LerpFT(0.04, AnalgesiaLerp, math.Clamp((analgesia - 0.35) / 2.4, 0, 1))
 
 	tempLerp = LerpFT(0.01, tempLerp, org.temperature)
 
 	if AnalgesiaLerp > 0.005 then
 		local pulse = (math.sin(CurTime() * 1.35) + 1) * 0.5
 		local drugFx = AnalgesiaLerp * (0.75 + pulse * 0.25)
+		local lsdFx = math.Clamp((analgesia - 1) / 1.5, 0, 1) * drugFx
 
 		DrawMaterialOverlay("particle/warp4_warp_noz", -drugFx * 0.045)
 
 		if not (lply:IsBerserk() or lply:IsStimulated()) then
 			render.UpdateScreenEffectTexture()
 			heatMat:SetFloat("$c0_x", -CurTime() * 0.08)
-			heatMat:SetFloat("$c0_y", drugFx * 0.008)
-			heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.5) - 1.5) * drugFx * 0.08)
+			heatMat:SetFloat("$c0_y", drugFx * (0.008 + lsdFx * 0.025))
+			heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.5) - 1.5) * drugFx * (0.08 + lsdFx * 0.12))
 			render.SetMaterial(heatMat)
 			render.DrawScreenQuad()
 
 			render.UpdateScreenEffectTexture()
-			chromaticMat:SetFloat("$c0_x", drugFx * 0.018)
+			chromaticMat:SetFloat("$c0_x", drugFx * (0.018 + lsdFx * 0.045))
 			chromaticMat:SetInt("$c0_y", 1)
 			render.SetMaterial(chromaticMat)
 			render.DrawScreenQuad()
@@ -819,6 +856,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 + drugFx * 0.45)
 		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + drugFx * 0.025
 		tab["$pp_colour_contrast"] = math.max(tab["$pp_colour_contrast"] or 1, 1 + drugFx * 0.04)
+		if lsdFx > 0.001 then
+			local time = CurTime() * 1.8
+			tab["$pp_colour_mulr"] = (tab["$pp_colour_mulr"] or 0) + (0.18 + math.sin(time) * 0.12) * lsdFx
+			tab["$pp_colour_mulg"] = (tab["$pp_colour_mulg"] or 0) + (0.18 + math.sin(time + 2.094) * 0.12) * lsdFx
+			tab["$pp_colour_mulb"] = (tab["$pp_colour_mulb"] or 0) + (0.18 + math.sin(time + 4.188) * 0.12) * lsdFx
+			tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + lsdFx * 0.03
+			tab["$pp_colour_contrast"] = math.max(tab["$pp_colour_contrast"] or 1, 1 + lsdFx * 0.12)
+		end
 	end
 
 	if lply.PlayerClassName == "headcrabzombie" then
@@ -1730,7 +1775,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		if IsValid(GivingUpStation) then
-			GivingUpStation:SetVolume(1.5 * themeVolume:GetFloat())
+			GivingUpStationVol = math.Approach(GivingUpStationVol, 0.85 * themeVolume:GetFloat(), FrameTime() * 0.35)
+			GivingUpStation:SetVolume(GivingUpStationVol)
 			if GivingUpStation:GetTime() >= 120 then
 				GivingUpStation:SetTime(0)
 			end
@@ -1752,10 +1798,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_addr"] = 0
 		tab["$pp_colour_addg"] = 0
 		tab["$pp_colour_addb"] = 0
-		-- Stop the give-up theme once no longer giving up
 		if IsValid(GivingUpStation) then
-			GivingUpStation:Stop()
-			GivingUpStation = nil
+			GivingUpStationVol = math.Approach(GivingUpStationVol, 0, FrameTime() * 0.45)
+			GivingUpStation:SetVolume(GivingUpStationVol)
+			if GivingUpStationVol <= 0.001 then
+				GivingUpStation:Stop()
+				GivingUpStation = nil
+			end
+		else
+			GivingUpStationVol = 0
 		end
 	end
 

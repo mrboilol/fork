@@ -275,26 +275,29 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		render.DrawScreenQuad()
 	end
 
-	-- Despair theme plays in the background whenever despair is above threshold,
-	-- including during panic attacks and giving up (does not get overridden)
-	if despair > 0.25 then
+	local state = ply:GetNWString("zcity_delta_mental_state", "stable")
+	local themeIntensity = math.Clamp((despair - 0.18) / 0.62, 0, 1)
+	if state == "desperate" then themeIntensity = math.max(themeIntensity, 0.75) end
+	if panicAttack then themeIntensity = math.max(themeIntensity, 0.55) end
+	if givingUp then themeIntensity = math.max(themeIntensity, 0.85) end
+
+	-- Despair theme fades in as a background layer for bad mental states,
+	-- including panic attacks and giving up.
+	if themeIntensity > 0.01 then
 		if not IsValid(despairSound) and not despairSoundLoading then
 			despairSoundLoading = true
 			sound.PlayFile("sound/desolate.mp3", "noblock noplay", function(channel, err)
 				despairSoundLoading = false
 				if err or not IsValid(channel) then return end
-				channel:SetVolume(1.5 * themeVolume:GetFloat())
+				channel:SetVolume(0)
 				channel:Play()
 				channel:EnableLooping(true)
 				despairSound = channel
-				despairSoundVol = 1.5 * themeVolume:GetFloat()
 			end)
 		end
 
-		-- Despair theme stays loud and clear as a background layer;
-		-- it does not duck or override other sounds (panic, ambience, etc.)
-		local targetVol = 1.5 * themeVolume:GetFloat()
-		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.5)
+		local targetVol = (0.18 + themeIntensity * 0.62) * themeVolume:GetFloat()
+		despairSoundVol = math.Approach(despairSoundVol, targetVol, FrameTime() * 0.45)
 		if IsValid(despairSound) then
 			despairSound:SetVolume(despairSoundVol)
 		end
@@ -316,8 +319,8 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 			end)
 		end
 
-		local targetVol = 1.5 * themeVolume:GetFloat()
-		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 2)
+		local targetVol = 0.75 * themeVolume:GetFloat()
+		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 0.9)
 		if IsValid(panicSound) then
 			panicSound:SetVolume(panicSoundVol)
 		end

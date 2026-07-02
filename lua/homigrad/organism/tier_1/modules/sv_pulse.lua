@@ -88,7 +88,18 @@ module[2] = function(owner, org, timeValue)
 		org._despairLastGainedTime = CurTime()
 	end
 
-	local heartbeat = org.pulse < 70 and (org.brain > 0 and org.pulse or 70 + (70 - org.pulse) * 4) or org.pulse
+	-- Heartbeat is the pump rate. Low effective pulse/perfusion should trigger
+	-- compensation instead of dragging BPM down with it.
+	local perfusionPulse = org.pulse or 70
+	local compensationRate = 70
+	if perfusionPulse < 70 then
+		compensationRate = 70 + (70 - perfusionPulse) * 2.0
+	elseif perfusionPulse > 95 then
+		compensationRate = perfusionPulse
+	end
+	compensationRate = math.Clamp(compensationRate, 45, 185)
+
+	local heartbeat = compensationRate
 
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
 	org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
@@ -109,17 +120,24 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
-	-- Survival scaling: a body without blood, oxygen, brain or heart cannot sustain
-	-- pathological tachycardia. Apply the same cardiovascular fitness factor `k`
-	-- to the modifier-driven heartbeat so a dying body can't spike to 600+ BPM.
-	-- Floor at 0.25 so light damage still allows full sympathetic response.
-	local survivalK = math.Clamp(k, 0.25, 1)
-	if org.heartstop then survivalK = 0 end
-	heartbeat = heartbeat * survivalK
+	-- Viability limits the maximum rate the body can sustain, but compensation
+	-- should still exist. Do not multiply BPM down into impossible states like
+	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
+	local survivalK = math.Clamp(k, 0, 1)
+	local maxCompensatedRate = math.Clamp(95 + survivalK * 145, 95, 240)
+	if heart < 0.35 or brain < 0.35 then
+		maxCompensatedRate = math.min(maxCompensatedRate, 85)
+	end
+	if org.heartstop then
+		maxCompensatedRate = 0
+	else
+		local minPumpRate = perfusionPulse < 60 and 60 + (60 - perfusionPulse) * 0.4 or 45
+		heartbeat = math.max(heartbeat, minPumpRate)
+	end
 
 	-- Hard physiological ceiling. Sustained rates above ~250 BPM are ventricular
 	-- tachycardia/fibrillation; above ~300 the heart cannot fill and arrests.
-	heartbeat = math.Clamp(heartbeat, 0, 260)
+	heartbeat = math.Clamp(heartbeat, 0, maxCompensatedRate)
 
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 2.4 or timeValue * 4.5)
 
@@ -155,6 +173,18 @@ module[2] = function(owner, org, timeValue)
 			org.heartstop = true
 		end
 	end
+
+	if not org.heartstop then
+		-- A faster heartbeat can partially restore effective pulse pressure, but
+		-- very high rates lose filling efficiency and stop helping.
+		local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
+		local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
+		local pumpSupport = math.Clamp(pumpRateK * fillingK, 0.25, 1.35)
+		local supportedPulse = math.Clamp(pulse * pumpSupport, 0, 200)
+		if supportedPulse > org.pulse then
+			org.pulse = math.Approach(org.pulse, supportedPulse, timeValue * 8)
+		end
+	end
 	
 	local blood = math.Clamp(org.blood or 5000, 0, 5000)
 	local bloodK = math.Clamp((blood - 2000) / 2000, 0, 1)
@@ -172,7 +202,9 @@ module[2] = function(owner, org, timeValue)
 	compensation = compensation * (1 - math.Clamp((2250 - blood) / 500, 0, 1) * 0.5)
 	compensation = math.Clamp(compensation, 0.35, 1.2)
 
-	local pulse_factor = org.pulse / 70
+	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
+	local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
+	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.25)
 	local map = 93 * pulse_factor * hypertensionMul * compensation
 	map = org.alive and map or 0
 

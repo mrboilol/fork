@@ -590,6 +590,7 @@ module[2] = function(owner, org, timeValue)
 
 
 		local pulseMultiplier = math.Clamp((org.heartbeat or 70) / 70, 0.8, 1.5)
+		local pulsePerfusionK = math.Clamp(((org.pulse or 70) - 15) / 55, 0.12, 1)
 
 		local staminaRatio = org.stamina[1] / org.stamina.max
 
@@ -600,7 +601,7 @@ module[2] = function(owner, org, timeValue)
 		local staminaMultiplier = math.max(staminaRatio, 0.35)
 
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
-		local regenerate = regen * timeValue * 4 * staminaMultiplier * pulseMultiplier * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
+		local regenerate = regen * timeValue * 4 * staminaMultiplier * pulseMultiplier * pulsePerfusionK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
 
 		if org.oxygen_deprivation and org.oxygen_deprivation > 0 then
 
@@ -644,6 +645,11 @@ module[2] = function(owner, org, timeValue)
 
 			o2[1] = max(o2[1] - timeValue * bp_o2DropRate * 1.5, 0)
 
+		end
+
+		if org.pulse and org.pulse < 45 then
+			local pulseO2DropRate = math.Clamp((45 - org.pulse) / 45, 0, 1)
+			o2[1] = max(o2[1] - timeValue * pulseO2DropRate * 1.2, 0)
 		end
 
 

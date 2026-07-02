@@ -247,6 +247,8 @@ function hg.Mental.GetUnifiedState(ply, org)
     local shock = org and math.Clamp(tonumber(org.shock) or 0, 0, 100) or 0
     local blood = org and math.Clamp(tonumber(org.blood) or 5000, 0, 5000) or 5000
     local o2 = org and org.o2 and tonumber(org.o2[1]) or 100
+    local panicAttack = org and org.panicAttack or false
+    local givingUp = org and org.givingUp or false
 
     local distress = 0
     distress = distress + despair * 0.42
@@ -257,6 +259,8 @@ function hg.Mental.GetUnifiedState(ply, org)
     distress = distress + math.Clamp((3500 - blood) / 1800, 0, 1) * 0.12
     distress = distress + math.Clamp((18 - o2) / 18, 0, 1) * 0.14
     distress = distress + math.Clamp((-mood) / 100, 0, 1) * 0.18
+    if panicAttack then distress = distress + 0.25 end
+    if givingUp then distress = distress + 0.55 end
     distress = distress - goodmood * 0.16
     distress = math.Clamp(distress, 0, 1)
 
@@ -268,6 +272,10 @@ function hg.Mental.GetUnifiedState(ply, org)
         distressPct = 0
         meter = 0
         label = "disabled"
+    elseif givingUp then
+        label = "desperate"
+    elseif panicAttack and distressPct >= cvMentalDistress:GetFloat() then
+        label = "distress"
     elseif distressPct >= cvMentalDesperate:GetFloat() then
         label = "desperate"
     elseif distressPct >= cvMentalDistress:GetFloat() then
@@ -286,6 +294,8 @@ function hg.Mental.GetUnifiedState(ply, org)
         fear = fear,
         pain = pain,
         shock = shock,
+        panicAttack = panicAttack,
+        givingUp = givingUp,
         distress = distress,
         distressPct = distressPct,
         meter = meter,
@@ -459,6 +469,12 @@ hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValu
     moodDrift = moodDrift + goodmood * timeValue * 0.8 * tm.moodGain
     moodDrift = moodDrift - despair * timeValue * 1.5 * tm.moodLoss
     moodDrift = moodDrift - fear * timeValue * 0.5 * tm.moodLoss
+    if org.panicAttack then
+        moodDrift = moodDrift - timeValue * 1.2 * tm.moodLoss
+    end
+    if org.givingUp then
+        moodDrift = moodDrift - timeValue * 2.4 * tm.moodLoss
+    end
     if pain > 40 then
         moodDrift = moodDrift - Clamp((pain - 40) / 80, 0, 1) * timeValue * 2.0 * tm.moodLoss
     end
@@ -634,6 +650,7 @@ hook.Add("Org Think", "zcity_delta_mental_bridge", function(owner, org, timeValu
     -- Note: Trait fear gain and goodmood multipliers are applied via hooks
     -- (HomigradDamage for fear, and the goodmood module hooks for goodmood)
     -- to avoid compounding per-tick multiplication on cumulative organism values.
+    hg.Mental.GetUnifiedState(owner, org)
 
     -- Send moodles extra data to client
     if owner.__zcity_delta_moodles_next_send and CurTime() < owner.__zcity_delta_moodles_next_send then return end

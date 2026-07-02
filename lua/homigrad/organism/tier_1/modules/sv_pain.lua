@@ -210,7 +210,8 @@ module[2] = function(owner, org, timeValue)
 	local stressLoad = math.max(shockLoad, painLoad)
 	if stressLoad > 0 then
 		local vitalsCritical = (org.blood or 5000) < 2600 or (org.o2 and org.o2[1] and org.o2[1] < 12) or (org.brain or 0) > 0.325 or (org.tranquilizer or 0) > 0
-		local protectedFloor = vitalsCritical and 0 or 0.28
+		local severePainShock = shockLoad > 0.45 and painLoad > 0.35
+		local protectedFloor = (vitalsCritical or severePainShock) and 0 or 0.28
 		local sustained = org._painShockSustain or 0
 		if shockLoad > 0.45 and painLoad > 0.35 then
 			sustained = sustained + timeValue * (shockLoad + painLoad)
@@ -280,6 +281,13 @@ module[2] = function(owner, org, timeValue)
 		local sustainedSeverity = Clamp((shock - 50) / 30, 0.35, 1) * Clamp((org._highShockTime - 15) / 10, 0.25, 1)
 		local sustainedDrain = timeValue * sustainedSeverity * shockPainMul * 0.28 / stressResistance
 		org.consciousness = max((org.consciousness or 1) - sustainedDrain, 0)
+	end
+
+	if shockLoad > 0.45 and painLoad > 0.35 then
+		local combinedSeverity = Clamp((shockLoad + painLoad) / 2, 0.35, 1)
+		local sustainedMul = Clamp((org._painShockSustain or 0) / 12, 0.35, 1)
+		local collapseDrain = timeValue * combinedSeverity * sustainedMul * shockPainMul * 0.42 / stressResistance
+		org.consciousness = max((org.consciousness or 1) - collapseDrain, 0)
 	end
 
 
@@ -353,11 +361,9 @@ module[2] = function(owner, org, timeValue)
 		local pain = org.pain or 0
 		local highPain = pain > 70
 
-		local vitalsCritical = (org.blood or 5000) < 2600 or (org.o2 and org.o2[1] and org.o2[1] < 12) or (org.brain or 0) > 0.325 or (org.tranquilizer or 0) > 0
 		local shockFloor
 		if highPain then
-			local painSeverity = math.Clamp((pain - 70) / 80, 0, 1)
-			shockFloor = vitalsCritical and (0.5 - painSeverity * 0.5) or math.max(0.22, 0.5 - painSeverity * 0.28)
+			shockFloor = 0
 		else
 			shockFloor = 0.5
 		end

@@ -3327,9 +3327,12 @@ local function jointStressValue(ragdoll, cacheKey, phys1, phys2)
 	local speedDiff = relVel:Length()
 	local stretch = math.max(dist - restDist, 0)
 
-	if stretch < 6 and separatingSpeed < 220 and speedDiff < 420 then return 0 end
+	-- Muscle/self-control can create high relative velocity without actually
+	-- pulling the joint apart. Only count a real yank: visible stretch or
+	-- strong separating motion away from the parent bone.
+	if stretch < 10 and separatingSpeed < 420 then return 0 end
 
-	return stretch * 18 + separatingSpeed * 0.9 + speedDiff * 0.15
+	return stretch * 22 + separatingSpeed * 0.75 + speedDiff * 0.05
 end
 
 local function dislocateFromJointStress(ragdoll, org, ply, limb, segment, stress)
@@ -3357,7 +3360,7 @@ local function breakSpineFromJointStress(ragdoll, org, ply, segment, stress)
 	local threshold = (hg.organism and hg.organism["fake_" .. segment]) or 0.8
 	if org[segment] and org[segment] >= threshold then return end
 
-	local chance = math.Clamp((stress - 360) / 520, 0.12, 0.8)
+	local chance = math.Clamp((stress - 760) / 720, 0.08, 0.65)
 	if math.random() > chance then
 		org.painadd = (org.painadd or 0) + math.Clamp(stress / 45, 4, 18)
 		org.shock = (org.shock or 0) + math.Clamp(stress / 80, 2, 10)
@@ -3385,16 +3388,16 @@ local function breakSpineFromJointStress(ragdoll, org, ply, segment, stress)
 end
 
 local jointStressLimbs = {
-	{limb = "larm", segment = 1, child = "ValveBiped.Bip01_L_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 335},
-	{limb = "rarm", segment = 1, child = "ValveBiped.Bip01_R_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 335},
-	{limb = "lleg", segment = 1, child = "ValveBiped.Bip01_L_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 390},
-	{limb = "rleg", segment = 1, child = "ValveBiped.Bip01_R_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 390},
+	{limb = "larm", segment = 1, child = "ValveBiped.Bip01_L_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 690},
+	{limb = "rarm", segment = 1, child = "ValveBiped.Bip01_R_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 690},
+	{limb = "lleg", segment = 1, child = "ValveBiped.Bip01_L_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 820},
+	{limb = "rleg", segment = 1, child = "ValveBiped.Bip01_R_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 820},
 }
 
 local jointStressSpine = {
-	{segment = "spine1", child = "ValveBiped.Bip01_Pelvis", parent = "ValveBiped.Bip01_Spine2", threshold = 420},
-	{segment = "spine2", child = "ValveBiped.Bip01_Spine2", parent = "ValveBiped.Bip01_Pelvis", threshold = 440},
-	{segment = "spine3", child = "ValveBiped.Bip01_Head1", parent = "ValveBiped.Bip01_Spine2", threshold = 480},
+	{segment = "spine1", child = "ValveBiped.Bip01_Pelvis", parent = "ValveBiped.Bip01_Spine2", threshold = 900},
+	{segment = "spine2", child = "ValveBiped.Bip01_Spine2", parent = "ValveBiped.Bip01_Pelvis", threshold = 940},
+	{segment = "spine3", child = "ValveBiped.Bip01_Head1", parent = "ValveBiped.Bip01_Spine2", threshold = 1020},
 }
 
 local function checkRagdollJointStress(ragdoll)
