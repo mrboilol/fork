@@ -512,8 +512,8 @@ end
 
 input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rarmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.subclavianR = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianR", org, dmg, dmgInfo, "ValveBiped.Bip01_Spine2", dir, hit) end
-input_list.subclavianL = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianL", org, dmg, dmgInfo, "ValveBiped.Bip01_Spine2", dir, hit) end
+input_list.subclavianR = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianR", org, dmg, dmgInfo, boneindex or "ValveBiped.Bip01_R_UpperArm", dir, hit) end
+input_list.subclavianL = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianL", org, dmg, dmgInfo, boneindex or "ValveBiped.Bip01_L_UpperArm", dir, hit) end
 input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit) end

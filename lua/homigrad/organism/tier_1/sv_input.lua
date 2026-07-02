@@ -12,46 +12,58 @@ local input_list = hg.organism.input_list
 local bonetohitgroup, hitgrouptolimb
 
 local bulletTraumaOrganTargets = {
-	chest = {"lungsL", "lungsR", "heart"},
+	chest = {"lungsL", "lungsR", "heart", "subclavianL", "subclavianR", "spineartery"},
 	pelvis = {"intestines", "stomach", "liver"},
 	spine1 = {"intestines", "stomach", "liver", "spineartery"},
-	spine2 = {"lungsL", "lungsR", "heart", "spineartery"},
-	spine3 = {"trachea", "brainstem", "arteria"},
+	spine2 = {"lungsL", "lungsR", "heart", "spineartery", "subclavianL", "subclavianR"},
+	spine3 = {"trachea", "brainstem", "arteria", "spineartery", "subclavianL", "subclavianR"},
 	skull = {"brain", "eyeL", "eyeR"},
 	jaw = {"trachea", "arteria"},
-	larm = {"larmartery"},
-	rarm = {"rarmartery"},
+	larm = {"larmartery", "subclavianL"},
+	rarm = {"rarmartery", "subclavianR"},
+	larmup = {"larmartery", "subclavianL"},
+	rarmup = {"rarmartery", "subclavianR"},
+	larmdown = {"larmartery"},
+	rarmdown = {"rarmartery"},
 	lleg = {"llegartery"},
 	rleg = {"rlegartery"},
 	heart = {"spineartery", "subclavianL", "subclavianR"},
 	lungsL = {"subclavianL", "spineartery"},
 	lungsR = {"subclavianR", "spineartery"},
-	trachea = {"arteria"},
-	brainstem = {"arteria"},
+	trachea = {"arteria", "subclavianL", "subclavianR"},
+	brainstem = {"arteria", "spineartery"},
 }
 
 local bulletTraumaArteries = {
-	chest = {"subclavianL", "subclavianR", "spineartery"},
-	pelvis = {"llegartery", "rlegartery"},
-	spine1 = {"spineartery"},
-	spine2 = {"spineartery", "subclavianL", "subclavianR"},
-	spine3 = {"arteria"},
-	jaw = {"arteria"},
-	larm = {"larmartery"},
-	rarm = {"rarmartery"},
-	lleg = {"llegartery"},
-	rleg = {"rlegartery"},
-	heart = {"spineartery", "subclavianL", "subclavianR"},
-	lungsL = {"subclavianL", "spineartery"},
-	lungsR = {"subclavianR", "spineartery"},
-	trachea = {"arteria"},
-	brainstem = {"arteria"},
+	chest = {"subclavianL", "subclavianR", "spineartery", "arteria"},
+	pelvis = {"llegartery", "rlegartery", "spineartery"},
+	spine1 = {"spineartery", "llegartery", "rlegartery"},
+	spine2 = {"spineartery", "subclavianL", "subclavianR", "arteria"},
+	spine3 = {"arteria", "spineartery", "subclavianL", "subclavianR"},
+	jaw = {"arteria", "subclavianL", "subclavianR"},
+	larm = {"larmartery", "subclavianL", "arteria"},
+	rarm = {"rarmartery", "subclavianR", "arteria"},
+	larmup = {"larmartery", "subclavianL", "arteria"},
+	rarmup = {"rarmartery", "subclavianR", "arteria"},
+	larmdown = {"larmartery", "subclavianL"},
+	rarmdown = {"rarmartery", "subclavianR"},
+	lleg = {"llegartery", "spineartery"},
+	rleg = {"rlegartery", "spineartery"},
+	llegup = {"llegartery", "spineartery"},
+	rlegup = {"rlegartery", "spineartery"},
+	llegdown = {"llegartery"},
+	rlegdown = {"rlegartery"},
+	heart = {"spineartery", "subclavianL", "subclavianR", "arteria"},
+	lungsL = {"subclavianL", "spineartery", "arteria"},
+	lungsR = {"subclavianR", "spineartery", "arteria"},
+	trachea = {"arteria", "subclavianL", "subclavianR"},
+	brainstem = {"arteria", "spineartery"},
 }
 
 local bulletTraumaArteryBones = {
 	arteria = "ValveBiped.Bip01_Neck1",
-	subclavianL = "ValveBiped.Bip01_Spine2",
-	subclavianR = "ValveBiped.Bip01_Spine2",
+	subclavianL = "ValveBiped.Bip01_L_UpperArm",
+	subclavianR = "ValveBiped.Bip01_R_UpperArm",
 	spineartery = "ValveBiped.Bip01_Spine2",
 	larmartery = "ValveBiped.Bip01_L_Forearm",
 	rarmartery = "ValveBiped.Bip01_R_Forearm",
@@ -2840,8 +2852,10 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
         local segments = limb_segments[limb]
         if not segments then return end
 
-        -- ALWAYS break at elbows and knees (segment 2) for better predictability
-        local randomSegment = 2
+        -- Default breaks stay at elbows/knees, but callers that know which
+        -- joint failed can request the shoulder/hip/wrist/ankle segment.
+        local randomSegment = segmentOverride or 2
+        randomSegment = math.Clamp(math.Round(randomSegment), 1, #segments)
         local selectedSegment = segments[randomSegment]
         if not selectedSegment then return end
 
@@ -3270,6 +3284,164 @@ function hg.RemoveNeckConstraints(ent)
 	end
 	print("[HG Floppy] RemoveNeckConstraints: removed neck floppy from " .. tostring(ent))
 end
+
+local jointStressThinkDelay = 0.12
+local nextJointStressThink = 0
+
+local function getJointPhys(ragdoll, boneName)
+	local boneID = ragdoll:LookupBone(boneName)
+	if not boneID then return end
+
+	local physID = getPhysBoneForAnimationBone(ragdoll, boneID)
+	if not physID or physID < 0 then return end
+
+	local phys = ragdoll:GetPhysicsObjectNum(physID)
+	if not IsValid(phys) then return end
+
+	return phys, physID
+end
+
+local function getRagdollOrganism(ragdoll)
+	local ply = hg.RagdollOwner and hg.RagdollOwner(ragdoll)
+	if IsValid(ply) and ply.organism then return ply.organism, ply end
+	if ragdoll.organism then return ragdoll.organism, ragdoll.organism.owner end
+end
+
+local function jointStressValue(ragdoll, cacheKey, phys1, phys2)
+	local pos1 = phys1:GetPos()
+	local pos2 = phys2:GetPos()
+	local delta = pos1 - pos2
+	local dist = delta:Length()
+	if dist <= 0 then return 0 end
+
+	ragdoll.HG_JointStressRest = ragdoll.HG_JointStressRest or {}
+	local restDist = ragdoll.HG_JointStressRest[cacheKey]
+	if not restDist then
+		ragdoll.HG_JointStressRest[cacheKey] = dist
+		return 0
+	end
+
+	local dir = delta / dist
+	local relVel = phys1:GetVelocity() - phys2:GetVelocity()
+	local separatingSpeed = math.max(relVel:Dot(dir), 0)
+	local speedDiff = relVel:Length()
+	local stretch = math.max(dist - restDist, 0)
+
+	if stretch < 6 and separatingSpeed < 220 and speedDiff < 420 then return 0 end
+
+	return stretch * 18 + separatingSpeed * 0.9 + speedDiff * 0.15
+end
+
+local function dislocateFromJointStress(ragdoll, org, ply, limb, segment, stress)
+	if org[limb .. "amputated"] or org[limb .. "dislocation"] or (org[limb] and org[limb] >= 1) then return end
+
+	org[limb .. "dislocation"] = true
+	org.painadd = (org.painadd or 0) + math.Clamp(stress / 12, 28, 70)
+	org.shock = (org.shock or 0) + math.Clamp(stress / 30, 8, 35)
+	org.fearadd = (org.fearadd or 0) + 0.35
+	org.just_damaged_bone = CurTime()
+
+	if IsValid(ply) and ply.AddNaturalAdrenaline then ply:AddNaturalAdrenaline(0.5) end
+	if IsValid(ply) then
+		ply:EmitSound("newbonebreak/break" .. math.random(10) .. ".wav", 75, math.random(120, 135), 1, CHAN_AUTO)
+	end
+
+	if hg.BreakLimb and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+		hg.BreakLimb(ragdoll, limb, segment, true)
+	end
+
+	print("[HG JointStress] DISLOCATED " .. tostring(limb) .. " stress=" .. tostring(math.Round(stress)))
+end
+
+local function breakSpineFromJointStress(ragdoll, org, ply, segment, stress)
+	local threshold = (hg.organism and hg.organism["fake_" .. segment]) or 0.8
+	if org[segment] and org[segment] >= threshold then return end
+
+	local chance = math.Clamp((stress - 360) / 520, 0.12, 0.8)
+	if math.random() > chance then
+		org.painadd = (org.painadd or 0) + math.Clamp(stress / 45, 4, 18)
+		org.shock = (org.shock or 0) + math.Clamp(stress / 80, 2, 10)
+		return
+	end
+
+	org[segment] = math.max(org[segment] or 0, threshold)
+	org.painadd = (org.painadd or 0) + math.Clamp(stress / 10, 35, 90)
+	org.shock = (org.shock or 0) + math.Clamp(stress / 18, 20, 60)
+	org.internalBleed = (org.internalBleed or 0) + math.Clamp(stress / 1400, 0.15, 0.75)
+	org.just_damaged_bone = CurTime()
+
+	if IsValid(ply) and ply.AddNaturalAdrenaline then ply:AddNaturalAdrenaline(1) end
+	if IsValid(ply) then
+		ply:EmitSound("newbonebreak/break" .. math.random(10) .. ".wav", 85, math.random(105, 125), 1, CHAN_AUTO)
+	end
+
+	if segment == "spine3" then
+		if hg.BreakNeck then hg.BreakNeck(ragdoll, false) end
+	elseif hg.BreakSpine and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
+		hg.BreakSpine(ragdoll, segment, false)
+	end
+
+	print("[HG JointStress] BROKE " .. tostring(segment) .. " stress=" .. tostring(math.Round(stress)) .. " chance=" .. tostring(math.Round(chance * 100)) .. "%")
+end
+
+local jointStressLimbs = {
+	{limb = "larm", segment = 1, child = "ValveBiped.Bip01_L_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 335},
+	{limb = "rarm", segment = 1, child = "ValveBiped.Bip01_R_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 335},
+	{limb = "lleg", segment = 1, child = "ValveBiped.Bip01_L_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 390},
+	{limb = "rleg", segment = 1, child = "ValveBiped.Bip01_R_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 390},
+}
+
+local jointStressSpine = {
+	{segment = "spine1", child = "ValveBiped.Bip01_Pelvis", parent = "ValveBiped.Bip01_Spine2", threshold = 420},
+	{segment = "spine2", child = "ValveBiped.Bip01_Spine2", parent = "ValveBiped.Bip01_Pelvis", threshold = 440},
+	{segment = "spine3", child = "ValveBiped.Bip01_Head1", parent = "ValveBiped.Bip01_Spine2", threshold = 480},
+}
+
+local function checkRagdollJointStress(ragdoll)
+	if not IsValid(ragdoll) or not ragdoll:IsRagdoll() then return end
+
+	local org, ply = getRagdollOrganism(ragdoll)
+	if not org or not org.alive then return end
+
+	ragdoll.HG_JointStressCooldown = ragdoll.HG_JointStressCooldown or {}
+
+	for _, def in ipairs(jointStressLimbs) do
+		if (ragdoll.HG_JointStressCooldown[def.limb] or 0) <= CurTime() then
+			local phys1 = getJointPhys(ragdoll, def.child)
+			local phys2 = getJointPhys(ragdoll, def.parent)
+			if IsValid(phys1) and IsValid(phys2) then
+				local stress = jointStressValue(ragdoll, "limb_" .. def.limb, phys1, phys2)
+				if stress >= def.threshold then
+					ragdoll.HG_JointStressCooldown[def.limb] = CurTime() + 1.5
+					dislocateFromJointStress(ragdoll, org, ply, def.limb, def.segment, stress)
+				end
+			end
+		end
+	end
+
+	for _, def in ipairs(jointStressSpine) do
+		if (ragdoll.HG_JointStressCooldown[def.segment] or 0) <= CurTime() then
+			local phys1 = getJointPhys(ragdoll, def.child)
+			local phys2 = getJointPhys(ragdoll, def.parent)
+			if IsValid(phys1) and IsValid(phys2) then
+				local stress = jointStressValue(ragdoll, "spine_" .. def.segment, phys1, phys2)
+				if stress >= def.threshold then
+					ragdoll.HG_JointStressCooldown[def.segment] = CurTime() + 2.5
+					breakSpineFromJointStress(ragdoll, org, ply, def.segment, stress)
+				end
+			end
+		end
+	end
+end
+
+hook.Add("Think", "HG_JointForceDislocation", function()
+	if nextJointStressThink > CurTime() then return end
+	nextJointStressThink = CurTime() + jointStressThinkDelay
+
+	for _, ragdoll in ipairs(ents.FindByClass("prop_ragdoll")) do
+		checkRagdollJointStress(ragdoll)
+	end
+end)
 
 hook.Add("OnAmputateLimb", "amputate_remove_floppy", function(org, ent, limb)
 	if not IsValid(ent) then return end
