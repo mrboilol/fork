@@ -462,10 +462,12 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 	if not IsValid(ent) or not ent:IsPlayer() then return end
 	local org = ent.organism
 	if not org or org.otrub then return end
+	if string.lower(ent.PlayerClassName or "") == "slugcat" then return end
 
 	-- Get weapon info
 	local wep = ent:GetActiveWeapon()
 	if not IsValid(wep) then return end
+	if wep:GetClass() == "weapon_slugcat" then return end
 
 	-- Determine if caliber is heavy based on ammo type
 	local ammoType = wep:GetPrimaryAmmoType()
@@ -481,7 +483,10 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 		local diameter = bullet.Diameter or 0
 
 		-- Calculate caliber weight score
-		caliberWeight = (force / 200) + (mass / 20) + (diameter / 15)
+		caliberWeight = (force / 180) + (mass / 18) + (diameter / 14)
+		if wep:GetClass() == "weapon_ptrd" or wep.Base == "weapon_ptrd" then
+			caliberWeight = caliberWeight * 1.35
+		end
 		isHeavyCaliber = caliberWeight > 0.8
 	end
 
@@ -496,6 +501,7 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 		local rightArmDislocated = org.rarmdislocation or org.rarmdislocated
 		if rightArmDislocated then
 			ent:DropWeapon(wep)
+			if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
 			return
 		end
 		if not org.rarmamputated then
@@ -505,6 +511,7 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 			if oldRarm < 0.8 and org.rarm >= 0.8 then
 				org.rarmdislocation = true
 				ent:DropWeapon(wep)
+				if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
 			end
 		end
 		org.painadd = (org.painadd or 0) + caliberWeight * 7
@@ -515,6 +522,7 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 	local rightArmDislocated = org.rarmdislocation or org.rarmdislocated
 	if rightArmDislocated then
 		ent:DropWeapon(wep)
+		if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
 		return
 	end
 
@@ -531,6 +539,7 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 				org.rarmdislocation = true
 				-- Drop the weapon when arm dislocates
 				ent:DropWeapon(wep)
+				if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
 			end
 		end
 		-- Add pain
@@ -543,24 +552,26 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 		local dropChance = caliberWeight * 0.1 + armDamage * 0.15
 		if math.random() < dropChance then
 			ent:DropWeapon(wep)
+			if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
 		end
 	end
 
 	-- Apply reduced control for one-handed usage
-	-- Increase recoil multiplier based on caliber weight and one-handed status
-	local oneHandedPenalty = 1 + (caliberWeight * 0.5)
-	org.recoilmul = (org.recoilmul or 1) * oneHandedPenalty
+	-- Increase recoil multiplier based on caliber weight and one-handed status.
+	-- Keep it bounded so repeated shots do not permanently multiply recoil.
+	local oneHandedPenalty = math.Clamp(1 + caliberWeight * 0.35, 1, 2.35)
+	org.recoilmul = math.max(org.recoilmul or 1, oneHandedPenalty)
 
 	-- Reduce arm strength for one-handed usage
-	local armStrengthPenalty = 1 - (caliberWeight * 0.2)
-	org.armstrength = (org.armstrength or 1) * armStrengthPenalty
+	local armStrengthPenalty = math.Clamp(1 - caliberWeight * 0.12, 0.35, 1)
+	org.armstrength = math.min(org.armstrength or 1, armStrengthPenalty)
 
 	-- Apply worse control for one-handed postures (if weapon is two-handed but being used one-handed)
 	local isTwoHandedWeapon = wep.TwoHanded ~= false
 	if isTwoHandedWeapon then
 		-- Additional penalty for using two-handed weapons one-handed
-		org.recoilmul = org.recoilmul * 1.5
-		org.armstrength = org.armstrength * 0.7
+		org.recoilmul = math.max(org.recoilmul, 1.35)
+		org.armstrength = math.min(org.armstrength, 0.7)
 	end
 end)
 
@@ -572,7 +583,16 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		return
 	end
 
-	if owner:IsPlayer() and not owner:Alive() then return end
+	if owner:IsPlayer() and not owner:Alive() then
+		org.alive = false
+		org.heartstop = true
+		org.heartbeat = 0
+		org.pulse = 0
+		org.bloodpressure = 0
+		org.systolic = 0
+		org.diastolic = 0
+		return
+	end
 
 	local isPly = owner:IsPlayer()
 

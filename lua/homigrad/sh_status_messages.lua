@@ -287,6 +287,15 @@ local bleeding_out_phrases = {
     "Im going to die arent i?",
 }
 
+local low_o2_phrases = {
+	"I can't get enough air.",
+	"My chest is fighting for every breath.",
+	"Everything is getting dark.",
+	"I need air right now.",
+	"My lungs aren't keeping up.",
+	"I can't breathe right.",
+}
+
 local internalbleed_phrases = {
 	"That's... that's blood I just vomited...",
 	"Oh, that's blood...",
@@ -388,13 +397,14 @@ function hg.fearful(ply)
 	if not IsValid(ply) then return end
 
 	local org = ply.organism
-	return org and ((org.fear or 0) > 0.5 or (org.adrenaline or 0) > 0.5)
+	return org and (org.fear or 0) > 0.5 and (org.adrenaline or 0) > 0.5
 end
 
 function hg.situation_fear(ply)
 	if not IsValid(ply) then return end
 
-	return ply.organism and ply.organism.fear > 0.75
+	local org = ply.organism
+	return org and (org.fear or 0) > 0.75 and (org.adrenaline or 0) > 0.5
 end
 
 function hg.likely_to_phrase(ply)
@@ -409,7 +419,7 @@ function hg.likely_to_phrase(ply)
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
 	local adrenaline = org.adrenaline or 0
 
-	local fearBoost = (fear > 0.75) and ((adrenaline > 0.5) and 2.0 or 1.0) or 0
+	local fearBoost = (fear > 0.75 and adrenaline > 0.5) and 2.0 or 0
 
 	return (broken_dislocated) and 5
 		or (pain > 65) and 5
@@ -453,6 +463,7 @@ local function get_status_message(ply)
 	local thirst = org.thirst
 	local goodmood = org.goodmood
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
+	local o2 = org.o2 and org.o2[1] or 30
     local positive_thinking = (goodmood and goodmood > 0.5) or (org.despair and org.despair < 0.1)
 
     if org.fear and org.fear >= 1.0 then
@@ -476,42 +487,23 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 
-
-	if not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
-		most_wanted_phraselist = despair_phrases
-	end
-
-	if not most_wanted_phraselist and blood < 3750 then
-		local combined_phrases = {}
-		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
-		for _, phrase in ipairs(near_death_poetic) do table.insert(combined_phrases, phrase) end
-		for _, phrase in ipairs(fear_phrases) do table.insert(combined_phrases, phrase) end
-		if hg.internalbleed_phrases then
-			for _, phrase in ipairs(hg.internalbleed_phrases) do table.insert(combined_phrases, phrase) end
-		end
-		most_wanted_phraselist = combined_phrases
-	end
-
 	local adrenaline = org.adrenaline or 0
-	if not most_wanted_phraselist and adrenaline > 1.5 then
-		most_wanted_phraselist = adrenaline_phrases
-	end
 
-	if ((blood < 3250 and heartbeat >= 30 and heartbeat <= 250) or (pain > 75) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
+	if o2 < 12 then
+		most_wanted_phraselist = low_o2_phrases
+	elseif pain > 100 then
+		most_wanted_phraselist = sharp_pain
+	elseif pain > 75 then
+		most_wanted_phraselist = audible_pain
+	elseif ((blood < 3250 and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
 		if pain > 75 and (broken_dislocated) then
 			most_wanted_phraselist = math.random(2) == 1 and audible_pain or (broken_notify and broken_limb or dislocated_limb)
-		elseif pain > 75 then
-			most_wanted_phraselist = audible_pain
 		elseif broken_dislocated then
 			most_wanted_phraselist = (broken_notify and broken_limb or dislocated_limb)
 		end
 
-		if pain > 100 then
-			most_wanted_phraselist = sharp_pain
-		end
-
 		if not most_wanted_phraselist then
-			if (broken_dislocated_notify) and (blood < 3100) then
+			if (broken_dislocated) and (blood < 3100) then
 				most_wanted_phraselist = blood < 2900 and (positive_thinking and near_death_positive or near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or (positive_thinking and near_death_positive or near_death_poetic))
 			elseif(blood < 3100)then
 				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_poetic
@@ -519,6 +511,18 @@ local function get_status_message(ply)
 		end
 	elseif after_unconscious_notify then
 		most_wanted_phraselist = after_unconscious
+	elseif not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
+		most_wanted_phraselist = despair_phrases
+	elseif not most_wanted_phraselist and blood < 3750 then
+		local combined_phrases = {}
+		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
+		for _, phrase in ipairs(near_death_poetic) do table.insert(combined_phrases, phrase) end
+		if hg.internalbleed_phrases then
+			for _, phrase in ipairs(hg.internalbleed_phrases) do table.insert(combined_phrases, phrase) end
+		end
+		most_wanted_phraselist = combined_phrases
+	elseif not most_wanted_phraselist and adrenaline > 1.5 then
+		most_wanted_phraselist = adrenaline_phrases
 	elseif hg.nothing_happening(ply) then
 		most_wanted_phraselist = random_phrase
 

@@ -619,19 +619,19 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		-- Below 2500 blood: O2 drops slowly unless problem is solved (blood restored or stabilized)
+		-- Below 2300 blood: O2 drops slowly unless problem is solved (blood restored or stabilized)
 
 		-- Adrenaline, thiamine and tranexamic acid partially resist this to help kickstart recovery
 
-		if org.blood < 2500 then
+		if org.blood < 2300 then
 
-			local o2DropRate = (2500 - org.blood) / 2500 -- 0 to 1 based on how far below 2500
+			local o2DropRate = (2300 - org.blood) / 2300 -- 0 to 1 based on how far below 2300
 
 			local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
 
 			local hasStabilizer = totalAdrenaline > 0.5 or (org.thiamine or 0) > 0 or (org.tranexamic_acid or 0) > 0
 
-			o2[1] = max(o2[1] - timeValue * o2DropRate * (hasStabilizer and 0.3 or 0.8), 0)
+			o2[1] = max(o2[1] - timeValue * o2DropRate * (hasStabilizer and 0.2 or 0.45), 0)
 
 		end
 
@@ -643,13 +643,13 @@ module[2] = function(owner, org, timeValue)
 
 			local bp_o2DropRate = (40 - org.bloodpressure) / 40
 
-			o2[1] = max(o2[1] - timeValue * bp_o2DropRate * 1.5, 0)
+			o2[1] = max(o2[1] - timeValue * bp_o2DropRate * 0.8, 0)
 
 		end
 
 		if org.pulse and org.pulse < 45 then
 			local pulseO2DropRate = math.Clamp((45 - org.pulse) / 45, 0, 1)
-			o2[1] = max(o2[1] - timeValue * pulseO2DropRate * 1.2, 0)
+			o2[1] = max(o2[1] - timeValue * pulseO2DropRate * 0.65, 0)
 		end
 
 

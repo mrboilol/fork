@@ -37,6 +37,19 @@ SWEP.weaponSway = Angle(0,0,0)
 
 local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 1)
 
+local function IsSlugcatRecoilImmune(ply, wep)
+	local className = IsValid(ply) and string.lower(ply.PlayerClassName or "") or ""
+	return className == "slugcat" or (IsValid(wep) and wep:GetClass() == "weapon_slugcat")
+end
+
+local function DropWrenchedWeapon(ply, wep)
+	if not SERVER or not IsValid(ply) or not IsValid(wep) then return end
+	ply:DropWeapon(wep)
+	if ply:HasWeapon("weapon_hands_sh") then
+		ply:SelectWeapon("weapon_hands_sh")
+	end
+end
+
 function SWEP:PrimarySpread()
 	self.Primary.Force2 = (hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Force) or self.Primary.Force
 	self:SetLastShootTime(CurTime())
@@ -56,6 +69,8 @@ function SWEP:PrimarySpread()
 		if owner:IsNPC() then return end
 		local org = owner.organism
 		if org then
+			if IsSlugcatRecoilImmune(owner, self) then return end
+
 			local force = self.Primary.Force2 or self.Primary.Force or 30
 			local numB = self.NumBullet or 1
 			local calForce = force * numB
@@ -100,10 +115,12 @@ function SWEP:PrimarySpread()
 				org.painadd = org.painadd + oneHandPain
 
 				if not firingAmputated and calForce >= 42 then
-					local wristChance = math.Clamp((calForce - 34) / 420, 0.01, 0.18)
+					local wristChance = math.Clamp((calForce - 34) / 260, 0.015, 0.35)
 					if support.wantsTwoHands then wristChance = wristChance * 1.35 end
 					if support.onlyLeft then wristChance = wristChance * 1.25 end
 					if firingBroken or firingDislocated then wristChance = wristChance * 1.8 end
+					if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then wristChance = wristChance * 1.45 end
+					wristChance = math.Clamp(wristChance, 0.015, 0.65)
 
 					if math.random() < wristChance then
 						org[firingArm] = math.max(org[firingArm] or 0, firingBroken and 1 or 0.55)
@@ -113,6 +130,7 @@ function SWEP:PrimarySpread()
 						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 							hg.BreakLimb(owner, firingArm, nil, true)
 						end
+						DropWrenchedWeapon(owner, self)
 						owner:Notify("The recoil wrenched your " .. (firingArm == "larm" and "left" or "right") .. " wrist.", 1, firingArm .. "_onehand_recoil", 1, nil, nil)
 					end
 				end
@@ -128,10 +146,12 @@ function SWEP:PrimarySpread()
 
 				if not rarm_dislocated then
 					-- small chance to dislocate
-					local disl_chance = 0.05 * (calForce / 30)
+					local disl_chance = math.Clamp((calForce - 18) / 360, 0.04, 0.38)
 					if larm_broken then
 						disl_chance = disl_chance * 2
 					end
+					if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then disl_chance = disl_chance * 1.35 end
+					disl_chance = math.Clamp(disl_chance, 0.04, 0.7)
 					if math.random() < disl_chance then
 						org.rarmdislocation = true
 						org.painadd = org.painadd + 35
@@ -152,12 +172,15 @@ function SWEP:PrimarySpread()
 
 					-- High caliber weapons can break the arm again when already dislocated
 					if calForce >= 50 and not org.rarmamputated then
-						local break_again_chance = 0.02 * (calForce / 50)
+						local break_again_chance = math.Clamp((calForce - 45) / 520, 0.03, 0.42)
+						if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then break_again_chance = break_again_chance * 1.35 end
+						break_again_chance = math.Clamp(break_again_chance, 0.03, 0.55)
 						if math.random() < break_again_chance then
 							org.painadd = org.painadd + 80
 							owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
 							-- Permanent aiming impairment
 							org.permanent_aim_impairment = (org.permanent_aim_impairment or 0) + 0.15
+							DropWrenchedWeapon(owner, self)
 							owner:Notify("Your right arm shattered again - your aim will never be the same!", 1, "rarm_shattered", 1, nil, nil)
 						end
 					end
@@ -168,7 +191,9 @@ function SWEP:PrimarySpread()
 			if rarm_dislocated and not rarm_broken then
 				-- High caliber weapons can break a dislocated arm
 				if calForce >= 50 and not org.rarmamputated then
-					local break_chance = 0.03 * (calForce / 50)
+					local break_chance = math.Clamp((calForce - 45) / 360, 0.04, 0.5)
+					if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then break_chance = break_chance * 1.35 end
+					break_chance = math.Clamp(break_chance, 0.04, 0.65)
 					if math.random() < break_chance then
 						org.rarm = 1
 						org.painadd = org.painadd + 65
@@ -176,6 +201,7 @@ function SWEP:PrimarySpread()
 						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 							hg.BreakLimb(owner, "rarm", nil, false)
 						end
+						DropWrenchedWeapon(owner, self)
 						owner:Notify("Your dislocated right arm snapped from the recoil!", 1, "rarm_dislocated_snap", 1, nil, nil)
 					end
 				end
@@ -317,8 +343,8 @@ function SWEP:PrimarySpread()
 		angrand3[3] = 0
 		if not self.SprayRandOnly then
 			angrand2[1] = math.Clamp(-math.abs(angrand2[1]),-10,-force/1.8)
-			angrand2[2] = math.Clamp(angrand2[2],-0.75,0.75)
-			angrand2[3] = -angrand2[2] * 0.8
+			angrand2[2] = math.Clamp(angrand2[2],-0.35,0.35)
+			angrand2[3] = -angrand2[2] * 0.45
 			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
 			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
 			
@@ -345,15 +371,15 @@ function SWEP:PrimarySpread()
 
 		local eyeang = owner:EyeAngles()
 		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 6.5 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
-		sprayAng[2] = math.Clamp(sprayAng[2], -math.abs(sprayAng[1]) * 0.45 - 0.2, math.abs(sprayAng[1]) * 0.45 + 0.2)
+		sprayAng[2] = math.Clamp(sprayAng[2], -math.abs(sprayAng[1]) * 0.22 - 0.12, math.abs(sprayAng[1]) * 0.22 + 0.12)
 		sprayAng[3] = 0
 
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		local muzzleKick = sprayAng * (organism.recoilmul or 1) * armHandlingMul * oneHandRecoilMul * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.55
-		muzzleKick[1] = math.Clamp(muzzleKick[1], -4.2, 2.2)
-		muzzleKick[2] = math.Clamp(muzzleKick[2], -2.1, 2.1)
+		local muzzleKick = sprayAng * (organism.recoilmul or 1) * armHandlingMul * oneHandRecoilMul * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
+		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.22, -5.4, 2.4)
+		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.45, -0.85, 0.85)
 		muzzleKick[3] = 0
 		owner:SetEyeAngles(eyeang + muzzleKick)
 		

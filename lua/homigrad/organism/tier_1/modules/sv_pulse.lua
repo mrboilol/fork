@@ -38,14 +38,33 @@ module[2] = function(owner, org, timeValue)
 
 	local stamina = org.stamina
 	
-	local pulse = 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
+	if not org.alive then
+		org.heartbeat = 0
+		org.pulse = 0
+		org.bloodpressure = 0
+		org.systolic = 0
+		org.diastolic = 0
+		return
+	end
+
+	if org.heartstop then
+		org.heartbeat = 0
+		org.pulse = 0
+		org.bloodpressure = 0
+		org.systolic = 0
+		org.diastolic = 0
+	end
+
+	local pulse = org.heartstop and 0 or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
 	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
 	pulse = org.alive and pulse or 0
 	pulse = math.Clamp(pulse, 0, 200)
 	
 	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
 	
-	local k = heart * o2 * (math.Clamp((org.blood - 1500) / 2500, 0, 1)) * brain * (org.heartstop and 0 or 1)
+	local bloodNow = org.blood or 5000
+	local bloodPerfusionK = bloodNow >= 3000 and 1 or (bloodNow >= 2250 and math.Remap(bloodNow, 2250, 3000, 0.55, 1) or math.Remap(math.Clamp(bloodNow, 800, 2250), 800, 2250, 0.05, 0.55))
+	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
 
@@ -69,7 +88,7 @@ module[2] = function(owner, org, timeValue)
 		local pain = org.pain or 0
 		local blood = org.blood or 5000
 		local o2val = org.o2 and org.o2[1] or 100
-		local dyingOrAgony = pain > 70 or blood < 3000 or o2val > 60
+		local dyingOrAgony = pain > 70 or blood < 2500 or o2val < 18
 		if dyingOrAgony then
 			local despairConversion = excessFear * timeValue * 0.005
 			org.despair = math.min((org.despair or 0) + despairConversion, 1)
