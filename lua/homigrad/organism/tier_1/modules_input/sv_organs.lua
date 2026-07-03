@@ -412,21 +412,31 @@ local arteryMessages ={
 	"I'm bleeding out of my neck!"
 }
 
-local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, forceHit)
-	-- Skip damage type checks if forceHit is true (e.g., from bone breaking)
-	if not forceHit then
-		if isCrush(dmgInfo) then return 1 end
-		if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
-		
-		local wep = dmgInfo:GetInflictor()
-		local chance = (IsValid(wep) and wep.ArteryChance) or 0
-		if dmgInfo:IsDamageType(DMG_SLASH) then
-			local baseChance = (dmg < 2) and 0.2 or 1.0
-			local totalChance = baseChance + chance
-			if totalChance < 1 and math.random() > totalChance then return end
-		end
+local slashToArtery = {
+	["rarmup"] = "rarmartery",
+	["rarmdown"] = "rarmartery",
+	["larmup"] = "larmartery",
+	["larmdown"] = "larmartery",
+	["rlegup"] = "rlegartery",
+	["rlegdown"] = "rlegartery",
+	["llegup"] = "llegartery",
+	["llegdown"] = "llegartery",
+}
+
+local function getArteryChanceMul(dmgInfo)
+	local inflictor = dmgInfo:GetInflictor()
+	return IsValid(inflictor) and inflictor.ArteryChance or 1
+end
+
+local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
+	if isCrush(dmgInfo) then return 1 end
+	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
+	if dmgInfo:IsDamageType(DMG_SLASH) and dmg < 2 then
+		local arteryChanceMul = getArteryChanceMul(dmgInfo)
+		local arteryChance = arteryChanceMul >= 2 and 1 or math.Clamp(0.2 * arteryChanceMul, 0, 1)
+
+		if math.Rand(0, 1) > arteryChance then return end
 	end
-	
 	org.painadd = org.painadd + dmg * 1
 	
 	-- Central arterial wounds impair oxygen delivery while they are open.
@@ -486,7 +496,18 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit, forceHi
 	return 0
 end
 
-hg.hitArtery = hitArtery
+hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ)
+	if not dmgInfo:IsDamageType(DMG_SLASH) then return end
+
+	local artery = organ and slashToArtery[organ[1]]
+	if not artery then return end
+	if getArteryChanceMul(dmgInfo) <= 1 then return end
+
+	local arteryChance = math.Clamp(getArteryChanceMul(dmgInfo) - 1, 0, 1)
+	if math.Rand(0, 1) > arteryChance then return end
+
+	hitArtery(artery, org, dmg, dmgInfo, box[6], dir, hit)
+end)
 
 input_list.arteria = function(org, bone, dmg, dmgInfo, boneindex, dir, hit)
 	return hitArtery("arteria", org, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit)

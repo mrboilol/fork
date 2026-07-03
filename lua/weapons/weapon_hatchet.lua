@@ -22,33 +22,44 @@ SWEP.weight = 1
 
 SWEP.WorldModel = "models/hatedmekkr/boneworks/weapons/melee/blades/axes/bw_wpn_ax_hatchet.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_hatchet.mdl"
-SWEP.WorldModelExchange = "models/hatedmekkr/boneworks/weapons/melee/blades/axes/bw_wpn_ax_hatchet.mdl"
+SWEP.WorldModelExchange = "models/prop/re9_requiem_hatchet.mdl"
 SWEP.DontChangeDropped = true
 SWEP.ViewModel = ""
 
+SWEP.bloodID = 1
 
 SWEP.HoldPos = Vector(-12,0,0)
 SWEP.HoldAng = Angle(0,0,0)
 
-SWEP.AttackTime = 0.6
-SWEP.AnimTime1 = 1.85
-SWEP.WaitTime1 = 1.2
+SWEP.AttackTime = 0.3
+SWEP.AnimTime1 = 1.2
+SWEP.WaitTime1 = 0.75
 SWEP.AttackLen1 = 45
 SWEP.ViewPunch1 = Angle(1,1,0)
 
-SWEP.Attack2Time = 0.6
-SWEP.AnimTime2 = 1.85
-SWEP.WaitTime2 = 1
+SWEP.noreverse = true
+
+SWEP.Attack2Time = 0.7
+SWEP.AnimTime2 = 2
+SWEP.WaitTime2 = 0.85
 SWEP.AttackLen2 = 30
 SWEP.ViewPunch2 = Angle(0,0,-2)
+
+SWEP.HitCooldownEnabled = true
+SWEP.HitCooldown = 0.8
+SWEP.ComboEnabled = true
+SWEP.ComboResetTime = 1.4
+SWEP.ComboDamageMul1 = 1
+SWEP.ComboDamageMul2 = 1.25
+SWEP.ComboDamageMul3 = 1.65
 
 SWEP.attack_ang = Angle(0,0,0)
 SWEP.sprint_ang = Angle(15,0,0)
 
 SWEP.basebone = 94
 
-SWEP.weaponPos = Vector(0,0,-2)
-SWEP.weaponAng = Angle(0,-90,0)
+SWEP.weaponPos = Vector(0,1,-5)
+SWEP.weaponAng = Angle(-90,-90,0)
 
 SWEP.AnimList = {
     ["idle"] = "Idle",
@@ -57,9 +68,27 @@ SWEP.AnimList = {
     ["attack2"] = "Attack_Quick",
 }
 
+SWEP.hitsoundextra = {
+    {"hatchet/rem_hatchet1.wav", 70, {110, 115}},
+    {"hatchet/rem_hatchet2.wav", 70, {110, 115}},
+    {"hatchet/rem_hatchet3.wav", 70, {110, 115}},
+}
+
+SWEP.swingsoundextra = {
+    {"bat/baseball_swing_1st_layer_01.wav", 60, {85, 95}},
+    {"bat/baseball_swing_1st_layer_02.wav", 60, {85, 95}},
+    {"bat/baseball_swing_1st_layer_03.wav", 60, {85, 95}},
+    {"bat/baseball_swing_1st_layer_04.wav", 60, {85, 95}},
+}
+
+SWEP.BlockTier = 2
+SWEP.BlockMaterial = "metal"
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {125, 145}}
+SWEP.BlockDirectionalPrimary = "overhead"
+
 if CLIENT then
-	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_hatchet")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_hatchet"
+	SWEP.WepSelectIcon = Material("vgui/hud/handaxe.png")
+	SWEP.IconOverride = "vgui/hud/handaxe.png"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -88,26 +117,19 @@ SWEP.SwingSoundPitch = {115, 120}
 SWEP.AttackPos = Vector(0,0,0)
 
 SWEP.DamageType = DMG_SLASH
-SWEP.DamagePrimary = 24
+SWEP.DamagePrimary = 21
 SWEP.DamageSecondary = 11
 
-SWEP.PenetrationPrimary = 3
-SWEP.PenetrationSecondary = 2
+SWEP.PenetrationPrimary = 5
+SWEP.PenetrationSecondary = 3
 
 SWEP.MaxPenLen = 6
 
 SWEP.PenetrationSizePrimary = 2
 SWEP.PenetrationSizeSecondary = 3
 
-SWEP.StaminaPrimary = 31
-SWEP.StaminaSecondary = 10
-
-SWEP.AttackLen1 = 55
-SWEP.AttackLen2 = 30
-
-SWEP.BlockTier = 3
-SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
+SWEP.StaminaPrimary = 25
+SWEP.StaminaSecondary = 60
 
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
@@ -136,8 +158,9 @@ function SWEP:CustomAttack2()
     ent.localshit = Vector(4,6,0)
     ent.wep = self:GetClass()
     ent.owner = ply
-    ent.damage = 30
-    ent.wallLodgeChance = 0.15
+    ent.damage = 35
+    ent.penetration = 5
+    ent.shouldntlodge = true
 
     local phys = ent:GetPhysicsObject()
 
@@ -148,7 +171,7 @@ function SWEP:CustomAttack2()
         phys:AddAngleVelocity(Vector(0,ent.MaxSpeed,0) )
     end
     
-    //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+    ply:EmitSound("hatchet/rem_axethrow.wav",50,math.random(95,105))
     ply:SelectWeapon("weapon_hands_sh")
     ply:ViewPunch(Angle(0, 0, -8))
 
@@ -165,7 +188,7 @@ function SWEP:PrimaryAttackAdd(ent)
     end
 end
 
-SWEP.AttackTimeLength = 0.12
+SWEP.AttackTimeLength = 0.155
 SWEP.Attack2TimeLength = 0.01
 
 SWEP.AttackRads = 75

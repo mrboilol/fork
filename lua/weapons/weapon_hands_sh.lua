@@ -1842,6 +1842,11 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 end
 
 SWEP.DamagePrimary = 10
+SWEP.BlockHandsOnly = true
+
+function SWEP:CanBlockWeapon(attackerWep)
+	return not self.BlockHandsOnly or (IsValid(attackerWep) and attackerWep:GetClass() == self:GetClass())
+end
 
 function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 	local ent = hg.RagdollOwner(ent) or ent
@@ -1862,9 +1867,12 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
         local dmg = wep.DamagePrimary
         local selfdmg = self.DamagePrimary * 0.2
 
-        if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
-            local defenderBlockTier = wep.BlockTier or 1
-            local attackerBlockTier = self.BlockTier or 1
+		if wep.GetBlocking and wep:GetBlocking() and wep.SetStartedBlocking and dist < 10 then
+			if wep.CanBlockWeapon and not wep:CanBlockWeapon(self) then
+				return 1
+			end
+
+			ent.organism.stamina.subadd = ent.organism.stamina.subadd + mul * math.Clamp(selfdmg / dmg, 0.1, 1) * selfdmg * (1 - math.Clamp((self:GetStartedBlocking() - CurTime() + 0.1), 0, 0.1) / 0.1)
 
             if defenderBlockTier >= attackerBlockTier then
                 if wep.BlockImpactSound then
