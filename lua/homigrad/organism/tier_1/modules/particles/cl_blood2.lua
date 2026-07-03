@@ -39,7 +39,7 @@ bloodparticles_hook[3] = function(anim_pos)
         if not part then continue end
         local animpos = math.max((part[7] - time) / part[8], 0)
         color.a = part.water and (200 * animpos) or (122 * animpos)
-        local sizeing = part.water and math.max((1 - animpos), 0.1) or animpos
+        local sizeing = part.water and math.max((1 - animpos), 0.1) or 1
                 if isExpieOwner(part.owner) then
             color.r = 90
             color.g = 85
