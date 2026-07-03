@@ -212,12 +212,20 @@ module[2] = function(owner, org, mulTime)
 	-- 3500: mild-moderate O2 debuff, compensation starts
 	-- 3000: noticeable symptoms, still compensated
 	-- 2750: heavy compensation starts
-	-- 2500: decompensation begins
-	-- 2100: collapse pressure begins
-	-- 2000: heartstop risk begins
-	-- 1600: full ischemic collapse (handled below)
+	-- 2500: decompensation and coma pressure begin
+	-- 2300: forced collapse pressure begins
+	-- 2200: unconscious/coma threshold
+	-- 2000: deadly hypovolemic shock zone
 	local bloodConsciousnessCap = 1
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
+	local blood = org.blood or 5000
+	local bloodDeficit = math.Clamp((4000 - blood) / 2500, 0, 1)
+	local compensation = math.Clamp((3600 - blood) / 1100, 0, 1)
+	local shockStage = math.Clamp((2600 - blood) / 700, 0, 1)
+
+	org.hypovolemia = bloodDeficit
+	org.hemorrhageCompensation = compensation * (1 - shockStage * 0.35)
+	org.hypovolemicShock = shockStage
 
 	if org.blood < 4500 then
 		-- First symptoms: periodic notify
@@ -260,6 +268,7 @@ module[2] = function(owner, org, mulTime)
 			org.pulse = math.min(org.pulse + mulTime * 0.7, 105)
 		end
 		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.9)
+		org.disorientation = math.max(org.disorientation or 0, 0.35 + bloodDeficit * 0.65)
 		if org.isPly and not org.otrub and (org._blood3000NotifyTime or 0) + 30 < CurTime() then
 			org.owner:Notify("I can't... get enough air. Everything is heavy.", 15, "blood_3000", 0)
 			org._blood3000NotifyTime = CurTime()
@@ -275,13 +284,13 @@ module[2] = function(owner, org, mulTime)
 		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.82)
 	end
 
-	if org.blood < 2000 then
-		-- Blood-based heartstop: risk starts in true decompensation.
-		if org.blood >= 1500 then
+	if org.blood < 2200 then
+		-- Blood-based heartstop: risk starts once coma-level hypovolemia sets in.
+		if org.blood >= 1900 then
 			if not org._blood_heartstop_check or CurTime() > org._blood_heartstop_check then
 				org._blood_heartstop_check = CurTime() + 1
-				local depth = math.Clamp((2000 - org.blood) / 500, 0, 1)
-				local chance = 0.006 + depth * 0.035
+				local depth = math.Clamp((2200 - org.blood) / 300, 0, 1)
+				local chance = 0.004 + depth * 0.025
 				-- Adrenaline stabilizes the heart during compensation
 				if adrenalineStabilizer then
 					chance = chance * math.max(0, 1 - math.min(totalAdrenaline * 0.25, 0.8))
@@ -305,17 +314,28 @@ module[2] = function(owner, org, mulTime)
 		if not adrenalineStabilizer and not hasAntiIschemia then
 			org.ischemia = math.min(org.ischemia + mulTime * 0.004, 1.0)
 		end
-		-- Consciousness slips lower, but true collapse waits until the 2100-1600 range.
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.7)
+		org.shock = math.Approach(org.shock or 0, 18 + shockStage * 42, mulTime * (1 + shockStage * 2))
+		if org.stamina and org.stamina[1] then
+			org.stamina[1] = math.max(org.stamina[1] - mulTime * shockStage * (org.stamina.max or 180) / 35, 0)
+		end
+		-- Consciousness now slides toward coma across the 2500-2000 range.
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.Clamp((org.blood - 2000) / 500 * 0.52 + 0.1, 0.1, 0.62))
 		if org.isPly and not org.otrub and (org._blood2500NotifyTime or 0) + 20 < CurTime() then
 			org.owner:Notify("I feel cold... I can't think straight.", 15, "blood_2500", 0)
 			org._blood2500NotifyTime = CurTime()
 		end
 	end
 
-	-- Hard floor: at 2100 begin collapsing toward 0 by 1500.
-	if org.blood < 2100 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((org.blood - 1500) / 600, 0))
+	-- Hard floor: at 2300 begin collapsing toward coma by 2000.
+	if org.blood < 2300 then
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((org.blood - 2000) / 300, 0))
+		org.needfake = true
+		if org.blood < 2200 then
+			org.needotrub = true
+		end
+		if not adrenalineStabilizer and not hasAntiIschemia then
+			org.ischemia = math.min((org.ischemia or 0) + mulTime * math.Clamp((2300 - org.blood) / 600, 0, 1) * 0.02, 1.5)
+		end
 	end
 
 	org.consciousness = math.min(org.consciousness, bloodConsciousnessCap * tempMul)
@@ -460,9 +480,9 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	-- At 1600: ischemic collapse begins - O2 starved, heart under stress, consciousness crashes
-	if org.blood <= 1600 then
-		local ischemicDepth = math.Clamp((1600 - org.blood) / 1600, 0, 1)
+	-- At 2000: ischemic collapse begins - O2 starved, heart under stress, consciousness crashes
+	if org.blood <= 2000 then
+		local ischemicDepth = math.Clamp((2000 - org.blood) / 600, 0, 1)
 		local ischemicRate = 0.015 + ischemicDepth * 0.08
 		if not adrenalineStabilizer and not hasAntiIschemia then
 			org.ischemia = math.min(org.ischemia + mulTime * ischemicRate, 1.0)
@@ -473,15 +493,21 @@ module[2] = function(owner, org, mulTime)
 		if not adrenalineStabilizer then
 			org.pulse = math.max(org.pulse - mulTime * (1 + ischemicDepth * 4), 0)
 		end
-		-- Consciousness is already capped above; add direct drain only at extreme volume loss.
-		if org.blood < 1500 then
+		-- Consciousness is already capped above; add direct drain inside fatal volume loss.
+		if org.blood < 1900 then
 			org.consciousness = math.max((org.consciousness or 1) - mulTime * (0.35 + ischemicDepth * 1.4), 0)
+		end
+		org._hypovolemicCollapseTime = (org._hypovolemicCollapseTime or 0) + mulTime * (0.5 + ischemicDepth)
+		if not adrenalineStabilizer and org._hypovolemicCollapseTime > 18 + (1 - ischemicDepth) * 24 then
+			org.heartstop = true
 		end
 		-- Notify once entering ischemic threshold
 		if org.isPly and not org.otrub and (org._ischemicNotifyTime or 0) + 20 < CurTime() then
 			org.owner:Notify("My chest... I can't breathe right...", 20, "ischemic_collapse", 0)
 			org._ischemicNotifyTime = CurTime()
 		end
+	else
+		org._hypovolemicCollapseTime = math.max((org._hypovolemicCollapseTime or 0) - mulTime * 2, 0)
 	end
 	
 	if hasAntiIschemia then

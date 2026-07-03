@@ -63,18 +63,13 @@ module[2] = function(owner, org, timeValue)
 	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
 	
 	local bloodNow = org.blood or 5000
-	local bloodPerfusionK = bloodNow >= 3000 and 1 or (bloodNow >= 2250 and math.Remap(bloodNow, 2250, 3000, 0.55, 1) or math.Remap(math.Clamp(bloodNow, 800, 2250), 800, 2250, 0.05, 0.55))
+	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
+	local hypovolemicShock = math.Clamp(org.hypovolemicShock or 0, 0, 1)
+	-- Old Z-City compensation curve: blood volume directly weakens effective pulse.
+	local bloodPerfusionK = math.Clamp((bloodNow - 1000) / 4000, 0, 1)
 	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
-
-	-- Hypovolemia damps pulse pressure even before the heart stops.
-	-- Below 2500 mL of blood the heart can't generate a normal MAP.
-	local blood_now = org.blood or 5000
-	if blood_now < 2500 then
-		local hypoK = math.Clamp((blood_now - 800) / 1700, 0, 1)
-		pulse = pulse * math.max(hypoK, 0.1)
-	end
 
 	local bloodCrash = org.blood ~= nil and org.blood < 1500
 	local dropRate = (heart == 0 or org.heartstop or bloodCrash) and timeValue * 30 or timeValue * 5
@@ -107,16 +102,11 @@ module[2] = function(owner, org, timeValue)
 		org._despairLastGainedTime = CurTime()
 	end
 
-	-- Heartbeat is the pump rate. Low effective pulse/perfusion should trigger
-	-- compensation instead of dragging BPM down with it.
+	-- Old Z-City compensation: when effective pulse pressure falls below 70,
+	-- heartbeat races hard to keep perfusion moving.
 	local perfusionPulse = org.pulse or 70
-	local compensationRate = 70
-	if perfusionPulse < 70 then
-		compensationRate = 70 + (70 - perfusionPulse) * 2.0
-	elseif perfusionPulse > 95 then
-		compensationRate = perfusionPulse
-	end
-	compensationRate = math.Clamp(compensationRate, 45, 185)
+	local compensationRate = perfusionPulse < 70 and 70 + (70 - perfusionPulse) * 4 or perfusionPulse
+	compensationRate = math.Clamp(compensationRate, 45, 300)
 
 	local heartbeat = compensationRate
 
@@ -143,7 +133,7 @@ module[2] = function(owner, org, timeValue)
 	-- should still exist. Do not multiply BPM down into impossible states like
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
 	local survivalK = math.Clamp(k, 0, 1)
-	local maxCompensatedRate = math.Clamp(95 + survivalK * 145, 95, 240)
+	local maxCompensatedRate = math.Clamp(120 + survivalK * 110 + hemorrhageCompensation * 35 - hypovolemicShock * 20, 95, 240)
 	if heart < 0.35 or brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
 	end
@@ -217,14 +207,15 @@ module[2] = function(owner, org, timeValue)
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 2.0)
 
-	local compensation = 1 + math.Clamp((3000 - blood) / 1000, 0, 1) * 0.16
-	compensation = compensation * (1 - math.Clamp((2250 - blood) / 500, 0, 1) * 0.5)
-	compensation = math.Clamp(compensation, 0.35, 1.2)
+	local compensation = 1 + hemorrhageCompensation * 0.28
+	compensation = compensation * (1 - hypovolemicShock * 0.35)
+	compensation = math.Clamp(compensation, 0.35, 1.25)
 
 	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
 	local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
 	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.25)
-	local map = 93 * pulse_factor * hypertensionMul * compensation
+	local volumeMapK = blood >= 3600 and 1 or math.Remap(math.Clamp(blood, 900, 3600), 900, 3600, 0.12, 1)
+	local map = 93 * pulse_factor * hypertensionMul * compensation * volumeMapK
 	map = org.alive and map or 0
 
 	if org.heartstop then
@@ -382,14 +373,13 @@ module[2] = function(owner, org, timeValue)
 	-- perfectly healthy heart).
 	if (org.blood or 5000) < 800 then org.heartstop = true end
 
-	-- Severe hypovolemia (1500 mL or under) combined with any meaningful pump
-	-- failure (heart damage, low MAP, or already weakened pulse) collapses
-	-- circulation. Tranexamic acid / adrenaline can keep the body running a
-	-- little longer.
+	-- Severe hypovolemia (1500 mL or under) should not instantly flatline just
+	-- because MAP is low; sv_blood.lua owns the short delayed collapse window.
+	-- Only hard pump failure ends circulation immediately here.
 	if (org.blood or 5000) < 1500 then
 		local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
 		local hasStabilizer = totalAdrenaline > 0.5 or (org.tranexamic_acid or 0) > 0
-		if not hasStabilizer and (org.heart >= 0.5 or (org.bloodpressure or 93) < 50 or (org.pulse or 70) < 30) then
+		if not hasStabilizer and (org.heart >= 0.5 or (org.bloodpressure or 93) < 25 or (org.pulse or 70) < 15) then
 			org.heartstop = true
 		end
 	end

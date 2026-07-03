@@ -193,18 +193,18 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org.adrenalineAdd = 0
 
 			-- Chance of heartstop every few seconds, only when vitals are already
-			-- failing. Giving up should not flatline a cardiovascularly stable body.
+			-- deeply failing. Blood/pulse modules should own hypovolemic collapse.
 			if not org._giveUpHeartStopCheck or time > org._giveUpHeartStopCheck then
 				org._giveUpHeartStopCheck = time + 4
 				local bp = org.bloodpressure or 93
 				local hb = org.heartbeat or 70
-				local vitalRisk = bp < 55 or hb < 45 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
-				local stopChance = vitalRisk and 0.025 or 0
-				if bp < 50 then
-					stopChance = stopChance + (50 - bp) / 50 * 0.10
+				local vitalRisk = bp < 35 or hb < 30 or (org.blood or 5000) < 1500 or (org.o2 and (org.o2[1] or 30) < 5)
+				local stopChance = vitalRisk and 0.008 or 0
+				if bp < 35 then
+					stopChance = stopChance + (35 - bp) / 35 * 0.06
 				end
-				if hb < 50 then
-					stopChance = stopChance + (50 - hb) / 50 * 0.08
+				if hb < 30 then
+					stopChance = stopChance + (30 - hb) / 30 * 0.05
 				end
 				if math.random() < stopChance then
 					org.heartstop = true
@@ -537,13 +537,13 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		org.disorientation = max(org.disorientation or 0, 1)
 	end
 
-	local despairVitalRisk = (org.bloodpressure or 93) < 55 or (org.heartbeat or 70) < 45 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
+	local despairVitalRisk = (org.bloodpressure or 93) < 35 or (org.heartbeat or 70) < 30 or (org.blood or 5000) < 1500 or (org.o2 and (org.o2[1] or 30) < 5)
 	if org.despair > 0.9 and despairVitalRisk then
         if not org._despair_check_time or CurTime() > org._despair_check_time then
             org._despair_check_time = CurTime() + 1 -- check every second
 
-            local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)
-            local chance = (org.despair - 0.9) / 0.1 * 0.018 * riskMul
+            local riskMul = math.Clamp((35 - (org.bloodpressure or 93)) / 25, 0.2, 1)
+            local chance = (org.despair - 0.9) / 0.1 * 0.008 * riskMul
             local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
             if totalAdrenaline > 1.0 then
                 chance = chance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.4)

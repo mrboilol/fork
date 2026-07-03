@@ -240,7 +240,7 @@ module[2] = function(owner, org, timeValue)
 
 	else
 
-		org.consciousness = math.Approach(org.consciousness, org.blood < 2300 and math.Clamp((org.blood - 2000) / 300, 0, 1) or 1, timeValue / 15)
+		org.consciousness = math.Approach(org.consciousness, org.blood < 2500 and math.Clamp((org.blood - 2000) / 500, 0, 1) or 1, timeValue / 15)
 
 	end
 
@@ -296,7 +296,7 @@ module[2] = function(owner, org, timeValue)
 
 		org.needotrub = true
 
-	elseif org.consciousness > 0.4 and (org.blood or 5000) > 2300 and (org.o2 and org.o2[1] or 30) > 15 and (org.shock or 0) < 50 and (org.brain or 0) < 0.325 and (org.tranquilizer or 0) <= 0 then
+	elseif org.consciousness > 0.4 and (org.blood or 5000) > 2500 and (org.o2 and org.o2[1] or 30) > 15 and (org.shock or 0) < 50 and (org.brain or 0) < 0.325 and (org.tranquilizer or 0) <= 0 then
 
 		org.needotrub = false
 
@@ -306,7 +306,7 @@ module[2] = function(owner, org, timeValue)
 
 	-- Critical blood loss triggers unconsciousness
 
-	if (org.blood or 5000) < 2000 then
+	if (org.blood or 5000) < 2200 then
 
 		org.needotrub = true
 
