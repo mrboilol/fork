@@ -28,15 +28,9 @@ SWEP.weight = 4
 SWEP.HoldPos = Vector(-15,1,2)
 SWEP.HoldAng = Angle()
 
-<<<<<<< HEAD
-SWEP.AttackTime = 0.55
-SWEP.AnimTime1 = 2.10
-SWEP.WaitTime1 = 1.45
-=======
 SWEP.AttackTime = 0.47
 SWEP.AnimTime1 = 2
 SWEP.WaitTime1 = 1.85
->>>>>>> 00f21b9 (weaponry)
 SWEP.ViewPunch1 = Angle(1,2,0)
 
 SWEP.Attack2Time = 0.25
@@ -53,11 +47,7 @@ SWEP.weaponPos = Vector(0,2,0.3)
 SWEP.weaponAng = Angle(0,0,0)
 
 SWEP.DamageType = DMG_CLUB
-<<<<<<< HEAD
-SWEP.DamagePrimary = 41
-=======
 SWEP.DamagePrimary = 32
->>>>>>> 00f21b9 (weaponry)
 SWEP.DamageSecondary = 15
 
 SWEP.PenetrationPrimary = 5
@@ -68,11 +58,7 @@ SWEP.MaxPenLen = 5
 SWEP.PenetrationSizePrimary = 3
 SWEP.PenetrationSizeSecondary = 1.25
 
-<<<<<<< HEAD
-SWEP.StaminaPrimary = 35
-=======
 SWEP.StaminaPrimary = 40
->>>>>>> 00f21b9 (weaponry)
 SWEP.StaminaSecondary = 15
 
 SWEP.AttackLen1 = 48
@@ -149,27 +135,6 @@ SWEP.AttackRads2 = 0
 SWEP.SwingAng = -30
 SWEP.SwingAng2 = 0
 
-<<<<<<< HEAD
-SWEP.HeavyAttackDamageMul = 1.85 -- Max damage multiplier at full charge
-SWEP.HeavyAttackWaitTime = 2.5 -- Time before you can attack again
-SWEP.HeavyAttackAnimTimeBegin = 1.0 -- Duration of the wind-up/start animation
-SWEP.HeavyAttackAnimTimeIdle = 1 -- Duration of the idle loop
-SWEP.HeavyAttackAnimTimeEnd = 1.85 -- Duration of the attack animation
-SWEP.HeavyAttackDelay = 0.25 -- Time delay before the hit actually connects (during attack anim)
-SWEP.HeavyAttackTimeLength = 0.4 -- Duration of the active hit window
-SWEP.HeavyAttackViewPunch = Angle(5, 0, 0) -- View punch angle on hit
-SWEP.HeavyAttackMaxChargeTime = 2.0 -- Time in seconds to reach max damage/shake
-SWEP.HeavyAttackSwingAng = -30 -- Custom swing angle for heavy attack
-SWEP.HeavyAttackRads = 60 -- Custom radius/arc for heavy attack
-SWEP.HeavyAttackStamina = 35
-
-
-SWEP.CanHeavyAttack = true -- Set to true to enable
-
-SWEP.BlockTier = 4
-SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
-=======
 SWEP.BulletBlockExplodeChance = 0.2
 SWEP.DroppedExplodeChance = 0.5
 SWEP.BulletBlockFrontDot = 0.12
@@ -418,7 +383,6 @@ elseif CLIENT then
         emitter:Finish()
     end)
 end
->>>>>>> 00f21b9 (weaponry)
 
 function SWEP:Reload()
     if SERVER then
