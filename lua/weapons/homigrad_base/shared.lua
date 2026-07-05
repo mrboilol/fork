@@ -199,7 +199,8 @@ function SWEP:GetHandSupportState(ply)
 		local zmanipLeft = ply.zmanipstart ~= nil and ply.zmanipseq == "interact" and not org.larmamputated
 		local fakeLeftGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsLH)
 		local fakeRightGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsRH)
-		local offhandBusy = carrying or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
+		local pressureBusy = org.pressingWound and org.pressingWoundForceOneHanded
+		local offhandBusy = carrying or zmanipLeft or fakeLeftGrip or ply.holdingWeapon or pressureBusy
 
 		if offhandBusy then
 			leftBusy = leftUsable
@@ -1051,6 +1052,7 @@ local col2 = Color(0, 0, 0)
 local dynamicmags
 local instructions
 local hg_3dzity
+local hg_weird_mags
 if CLIENT then
 	surface.CreateFont("AmmoFont",{
 		font = "Bahnschrift",
@@ -1070,6 +1072,7 @@ if CLIENT then
 	})
 
 	dynamicmags = CreateClientConVar("hg_dynamic_mags", "0", true, false, "Enables dynamic ammo show when shooting",0,1)
+	hg_weird_mags = CreateClientConVar("hg_weird_mags", "0", true, false, "Use old block magazine ammo HUD instead of bullet icons", 0, 1)
 	instructions = CreateClientConVar("hg_instructions","1", true, false, "Enables gun instructions",0,1)
 	hg_3dzity = GetConVar("hg_3dzity") or CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 end
@@ -1152,13 +1155,12 @@ local developer = GetConVar("developer")
 local function DrawBullet(matIcon, x, y, size, cColor)
 	render.PushFilterMin(TEXFILTER.ANISOTROPIC)
 		surface.SetDrawColor(cColor)
-		surface.SetMaterial(matIcon or matPistolAmmo)
+		surface.SetMaterial(matIcon or hg.matPistolAmmoAlt or Material("vgui/hud/bullets/low_caliber.png"))
 		surface.DrawTexturedRect(x-size/2,y-size,size,size)
 	render.PopFilterMin()
 end
 
 if CLIENT then
-	local scrW, scrH = ScrW(), ScrH()
 	local lastShoot = 0
 	local StopShowBullet = false
 	local WhiteColor = Color(200,200,200,255)
@@ -1172,9 +1174,84 @@ if CLIENT then
 	local ammoCheck = 0
 	local color_bg = Color(0,0,0,150)
 	local ammoLongCheck = 0
+	local bulletIconMaterials = {
+		low = matPistolAmmo,
+		high = matRfileAmmo,
+		buck = matShotgunAmmo
+	}
+
+	local function NormalizeAmmoIconPath(path)
+		if not isstring(path) or path == "" then return end
+		path = string.Replace(path, "\\", "/")
+		path = string.Replace(path, "materials/", "")
+
+		if not string.StartWith(path, "vgui/hud/bullets/") then
+			if string.StartWith(path, "hud/bullets/") then
+				path = "vgui/" .. path
+			elseif not string.StartWith(path, "vgui/") then
+				path = "vgui/hud/bullets/" .. path
+			end
+		end
+
+		if not string.EndsWith(path, ".png") then path = path .. ".png" end
+		return path
+	end
+
+	local function GetAmmoCaliberClass(ammoName, bulletSettings)
+		bulletSettings = bulletSettings or {}
+		ammoName = string.lower(ammoName or "")
+
+		if (bulletSettings.NumBullet or 1) > 1 or string.find(ammoName, "gauge", 1, true) or string.find(ammoName, "buck", 1, true) or string.find(ammoName, "shot", 1, true) then
+			return "buck"
+		end
+
+		local diameter = tonumber(bulletSettings.Diameter) or 0
+		if diameter >= 10 or string.find(ammoName, "12/70", 1, true) or string.find(ammoName, "20/70", 1, true) or string.find(ammoName, "23x75", 1, true) then
+			return "buck"
+		end
+
+		if diameter >= 6 or (bulletSettings.Damage or 0) >= 40 or string.find(ammoName, "5.56", 1, true) or string.find(ammoName, "7.62", 1, true) or string.find(ammoName, "14.5", 1, true) or string.find(ammoName, ".50", 1, true) then
+			return "high"
+		end
+
+		return "low"
+	end
+
+	local function GetAmmoIcon(ammoName)
+		local ammoInfo = hg.ammotypeshuy and hg.ammotypeshuy[ammoName]
+		local bulletSettings = ammoInfo and ammoInfo.BulletSettings or {}
+		local iconPath = NormalizeAmmoIconPath(bulletSettings.Icon)
+
+		if iconPath then
+			local mat = Material(iconPath)
+			if mat and not mat:IsError() then return mat end
+		end
+
+		return bulletIconMaterials[GetAmmoCaliberClass(ammoName, bulletSettings)] or matPistolAmmo
+	end
+
+	local function GetAmmoHudPosition(self, scrW, scrH, hudHPos)
+		local posX = scrW * 0.75
+		local posY = scrH * hudHPos
+
+		if hg_3dzity and hg_3dzity:GetBool() then
+			local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
+			local scr = att and att.Pos and att.Pos:ToScreen()
+
+			if scr and scr.visible ~= false and scr.x > -scrW * 0.25 and scr.x < scrW * 1.25 and scr.y > -scrH * 0.25 and scr.y < scrH * 1.25 then
+				posX = math.Clamp(scr.x + scrW * 0.035, scrW * 0.56, scrW * 0.9)
+				posY = math.Clamp(scr.y + scrH * 0.045, scrH * 0.42, scrH * 0.88)
+			end
+		end
+
+		return posX, posY
+	end
+
 	SWEP.DrawAmmoMetods = {
 		["Default"] = function(self,texture)
+			local scrW, scrH = ScrW(), ScrH()
 			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
+			if clipsize <= 0 then clipsize = 1 end
 			local clip = self:Clip1()
 			local owner = self:GetOwner()
 			local shoot = CurTime() - self:LastShootTime()
@@ -1183,16 +1260,7 @@ if CLIENT then
 			local HudHPos = 0.8
 			local use3DMags = hg_3dzity and hg_3dzity:GetBool()
 			local showDynamic = dynamicmags:GetBool() or use3DMags
-			local posX = scrW*0.75
-			local posY = scrH*HudHPos
-			if use3DMags then
-				local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
-				local scr = att and att.Pos and att.Pos:ToScreen()
-				if scr and scr.visible ~= false then
-					posX = scr.x + scrW*0.035
-					posY = scr.y + scrH*0.045
-				end
-			end
+			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, HudHPos)
 			local posX2 = posX + scrH*0.11
 			
 			lastShoot = LerpFT(0.5,lastShoot, shoot > 0 and 1 or 0)
@@ -1224,7 +1292,7 @@ if CLIENT then
 			end
 
 			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
-			local Yellow = (( clipsize/clip )-1)/(clipsize/5)
+			local Yellow = clip > 0 and (( clipsize/clip )-1)/(clipsize/5) or 1
 			--print(Yellow)
 			color_bg.r = 55*Yellow
 			--draw.RoundedBox(0,scrW*0.75-(scrH*0.12/2),scrH*0.72,scrH*0.12,scrH*0.18,ColorAlpha(color_black,50))
@@ -1275,6 +1343,59 @@ if CLIENT then
 				draw.SimpleText("+"..magCount,"AmmoFont",posX2, posY,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 			--draw.SimpleText("lastShoot: "..lastShoot,"Default",0,0)
+		end,
+		["MagazineBlocks"] = function(self)
+			local scrW, scrH = ScrW(), ScrH()
+			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
+			if clipsize <= 0 then clipsize = 1 end
+			local owner = self:GetOwner()
+			self.hudinspect = self.hudinspect or 0
+			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, 0.8)
+			local sizeX = (clipsize == 1 and scrH / 15 or scrW / 40) * scale
+			local sizeY = (clipsize == 1 and scrH / 80 or scrH / 10) * scale
+			local clip = math.max(self:Clip1(), 0)
+			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
+			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
+
+			if self.hudinspect > CurTime() or self:KeyDown(IN_RELOAD) or dynamicmags:GetBool() or (hg_3dzity and hg_3dzity:GetBool()) then
+				ammoCheck = CurTime() + 1
+			end
+
+			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
+			if lerpAmmoCheck <= 0.01 then return end
+
+			local ammoLeft = math.ceil(clip / clipsize * sizeY)
+			col:SetUnpacked(LerpColor(clip / clipsize, yellow, color_white))
+			col.a = 255 * lerpAmmoCheck
+			DrawBlurRect(posX - sizeX * (clipsize ~= 1 and 0.2 or 0.3), posY - sizeY * (clipsize ~= 1 and 0.1 or 0.7), (sizeX + sizeX * (clipsize ~= 1 and 0.12 or 0.2)) * math.max(math.min(magCount + 1, clipsize ~= 1 and 5 or 4), 1.3), sizeY + (clipsize ~= 1 and 20 or 60), 7, col.a * 5)
+
+			surface.SetDrawColor(col)
+			surface.DrawRect(posX, posY - ammoLeft + sizeY, sizeX, ammoLeft)
+			surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
+
+			local magX = posX + (clipsize == 1 and scrW / 40 or scrW / 50)
+			local magY = posY + (clipsize == 1 and scrH / 70 or scrH / 20)
+			local smallX = sizeX / 2
+			local smallY = sizeY / 2
+			local reserveAmmo = ammo
+
+			for i = 1, math.min(magCount, 3) do
+				local magAmmo = math.min(clipsize, reserveAmmo)
+				reserveAmmo = reserveAmmo - magAmmo
+				local reserveLeft = math.ceil(magAmmo / clipsize * smallY)
+
+				col2:SetUnpacked(LerpColor(magAmmo / clipsize, yellow, color_white))
+				col2.a = 255 * lerpAmmoCheck
+				surface.SetDrawColor(col2)
+				surface.DrawRect(magX + (smallX + 15) * i, magY - reserveLeft + smallY, smallX, reserveLeft)
+				surface.DrawOutlinedRect(magX - 5 + (smallX + 15) * i, magY - 5, smallX + 10, smallY + 10, 1)
+			end
+
+			if magCount > 3 then
+				local extraMags = "+" .. (magCount - 3)
+				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4 + 1, magY + smallX / 2 + 1, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4, magY + smallX / 2, Color(255, 255, 255, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
 		end
 	}
 
@@ -1282,7 +1403,6 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
-		local ammotype = (hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon) or matPistolAmmo
 		local use3DMags = hg_3dzity and hg_3dzity:GetBool()
 		if not dynamicmags:GetBool() and not use3DMags and not self:KeyDown(IN_RELOAD) and not (self.hudinspect and self.hudinspect > CurTime()) then
 			self:ChangeFOV()
@@ -1291,51 +1411,9 @@ if CLIENT then
 			return
 		end
 
-		local ammotype = (hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon) or hg.matPistolAmmoAlt
-		if isstring(ammotype) then
-			local try_paths = { ammotype }
-			if not string.StartWith(ammotype, "vgui/") then
-				table.insert(try_paths, 1, "vgui/" .. ammotype)
-				table.insert(try_paths, 2, "vgui/" .. ammotype .. ".png")
-			end
-			if not string.EndsWith(ammotype, ".png") then
-				table.insert(try_paths, ammotype .. ".png")
-			end
-
-			local loaded_mat = nil
-			for _, path in ipairs(try_paths) do
-				local success, mat = pcall(Material, path)
-				if success and mat and not mat:IsError() then
-					loaded_mat = mat
-					break
-				end
-			end
-
-			if loaded_mat then
-				ammotype = loaded_mat
-			else
-				-- Fallback to alt materials based on bullet properties
-				local bulletSettings = hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings
-				if bulletSettings then
-					local numBullet = bulletSettings.NumBullet or 1
-					local damage = bulletSettings.Damage or 0
-					
-					-- Shotgun: multiple bullets or high damage single shot
-					if numBullet > 1 or (damage > 100 and numBullet == 1) then
-						ammotype = hg.matShotgunAmmoAlt
-					-- Rifle: high damage single bullet
-					elseif damage > 40 then
-						ammotype = hg.matRfileAmmoAlt
-					-- Pistol: lower damage
-					else
-						ammotype = hg.matPistolAmmoAlt
-					end
-				else
-					ammotype = hg.matPistolAmmoAlt
-				end
-			end
-		end
-		self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
+		local drawMethod = hg_weird_mags and hg_weird_mags:GetBool() and "MagazineBlocks" or self.AmmoDrawMetod
+		local drawFunc = self.DrawAmmoMetods[drawMethod] or self.DrawAmmoMetods.Default
+		drawFunc(self, GetAmmoIcon(self.Primary.Ammo))
 		
 		self.isscoping = false
 		if self.attachments then

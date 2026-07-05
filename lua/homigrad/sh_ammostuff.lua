@@ -3180,13 +3180,14 @@ if CLIENT then
             
             -- Use caliber-based icons exclusively
             local diameter = ammoType and ammoType.BulletSettings and ammoType.BulletSettings.Diameter or 0
+            local ammoNameLower = string.lower(ammoName or "")
             local iconPath
-            if diameter >= 12 then
-                iconPath = "hud/bullets/buck_caliber"
+            if diameter >= 12 or string.find(ammoNameLower, "gauge", 1, true) or string.find(ammoNameLower, "buck", 1, true) or string.find(ammoNameLower, "shot", 1, true) then
+                iconPath = "vgui/hud/bullets/buck_caliber.png"
             elseif diameter >= 6 then
-                iconPath = "hud/bullets/high_caliber"
+                iconPath = "vgui/hud/bullets/high_caliber.png"
             else
-                iconPath = "hud/bullets/low_caliber"
+                iconPath = "vgui/hud/bullets/low_caliber.png"
             end
             
             DermaButton:SetText( "  "..ammoName..": "..v )
