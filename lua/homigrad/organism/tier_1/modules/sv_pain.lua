@@ -6,17 +6,8 @@ hg.organism.module.pain = {}
 
 local module = hg.organism.module.pain
 
-local function GetShockConsciousnessThreshold(pain)
-	pain = pain or 0
-
-	if pain >= 100 then return 20 end
-	if pain >= 90 then return 30 end
-	if pain >= 80 then return 40 end
-	if pain > 60 then return 50 end
-	if pain < 40 then return 70 end
-	if pain < 50 then return 60 end
-
-	return 70
+local function GetShockConsciousnessThreshold(analgesia)
+	return 40 + Clamp(analgesia or 0, 0, 1) * 30
 end
 
 module[1] = function(org)
@@ -280,7 +271,7 @@ module[2] = function(owner, org, timeValue)
 	local stressResistance = analgesiaResistance * max(1 + (org.adrenaline or 0) * 0.12, 1) * max(0.75 + goodmood * 0.25, 0.75)
 	local shockPainMul = 1 + Clamp((currentPain - 50) / 70, 0, 0.45)
 
-	local shockCollapseThreshold = GetShockConsciousnessThreshold(currentPain)
+	local shockCollapseThreshold = GetShockConsciousnessThreshold(org.analgesia)
 
 	if shock > shockCollapseThreshold then
 		org._highShockTime = (org._highShockTime or 0) + timeValue
