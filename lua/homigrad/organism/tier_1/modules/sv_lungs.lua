@@ -1267,11 +1267,27 @@ module[2] = function(owner, org, timeValue)
 
 	local death_from_braindamage = false
 
-	if org.brain >= 0.7 and org.alive then
+	if org.braindead then
+		org.consciousness = 0
+		org.needotrub = true
+	elseif org.brain >= 0.7 and org.alive then
 
-		death_from_braindamage = true
+		local canBrainstemCarryVitals = (org.brainstem or 0) < 0.25 and not org.heartstop and org.lungsfunction ~= false and (org.blood or 5000) > 2500 and (org.o2 and (org.o2[1] or 0) > 12)
+		if canBrainstemCarryVitals and math.random(100) <= 12 then
+			org.braindead = true
+			org.alive = false
+			org.heartstop = false
+			org.postmortemPulseUntil = CurTime() + math.Rand(35, 90)
+			org.heartbeat = math.max(org.heartbeat or 0, 32)
+			org.pulse = math.max(org.pulse or 0, 18)
+			org.bloodpressure = math.max(org.bloodpressure or 0, 24)
+			org.consciousness = 0
+			org.needotrub = true
+		else
+			death_from_braindamage = true
 
-		org.alive = false
+			org.alive = false
+		end
 
 	end
 

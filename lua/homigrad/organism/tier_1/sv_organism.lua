@@ -19,6 +19,7 @@ hook.Add("Org Clear", "Main", function(org)
 	if module.teeth and module.teeth[1] then module.teeth[1](org) end
 	org.brain = 0
 	org.brainstem = 0
+	org.braindead = false
 	org.intpressure = 0
 	org.consciousness = 1
 	org.consciousnessTracker = 0
@@ -162,6 +163,7 @@ local function send_organism(org, ply)
 	sendtable.disorientation = org.disorientation
 	sendtable.brain = org.brain
 	sendtable.brainstem = org.brainstem
+	sendtable.braindead = org.braindead
 	sendtable.intpressure = org.intpressure
 	sendtable.o2 = org.o2
 	sendtable.CO = org.CO
@@ -259,6 +261,7 @@ local function send_bareinfo(org)
 	sendtable.diastolic = org.diastolic
 	sendtable.analgesia = org.analgesia
 	sendtable.brainstem = org.brainstem
+	sendtable.braindead = org.braindead
 	sendtable.intpressure = org.intpressure
 	sendtable.o2 = org.o2
 	sendtable.timeValue = org.timeValue
@@ -585,12 +588,23 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if owner:IsPlayer() and not owner:Alive() then
 		org.alive = false
-		org.heartstop = true
-		org.heartbeat = 0
-		org.pulse = 0
-		org.bloodpressure = 0
-		org.systolic = 0
-		org.diastolic = 0
+		local residualPulse = org.braindead and (org.brainstem or 1) < 0.25 and (org.postmortemPulseUntil or 0) > CurTime()
+		if residualPulse then
+			org.heartstop = false
+			org.heartbeat = math.max(org.heartbeat or 0, 28)
+			org.pulse = math.max(org.pulse or 0, 12)
+			org.bloodpressure = math.max(org.bloodpressure or 0, 18)
+			org.systolic = math.max(org.systolic or 0, 32)
+			org.diastolic = math.max(org.diastolic or 0, 12)
+			org.last_heartbeat = CurTime()
+		else
+			org.heartstop = true
+			org.heartbeat = 0
+			org.pulse = 0
+			org.bloodpressure = 0
+			org.systolic = 0
+			org.diastolic = 0
+		end
 		return
 	end
 
@@ -1141,7 +1155,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if !org.alive then
 		org.lungsfunction = false
-		org.heartstop = true
+		if not (org.braindead and (org.brainstem or 1) < 0.25 and (org.postmortemPulseUntil or 0) > CurTime()) then
+			org.heartstop = true
+		end
 	end
 
 	time = CurTime()

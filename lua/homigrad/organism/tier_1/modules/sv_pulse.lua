@@ -51,6 +51,17 @@ module[2] = function(owner, org, timeValue)
 	local stamina = org.stamina
 	
 	if not org.alive then
+		if org.braindead and (org.brainstem or 1) < 0.25 and (org.postmortemPulseUntil or 0) > CurTime() then
+			org.heartstop = false
+			org.heartbeat = math.Approach(org.heartbeat or 0, 28, timeValue * 4)
+			org.pulse = math.Approach(org.pulse or 0, 12, timeValue * 4)
+			org.bloodpressure = math.Approach(org.bloodpressure or 0, 18, timeValue * 6)
+			org.systolic = math.max(org.systolic or 0, 32)
+			org.diastolic = math.max(org.diastolic or 0, 12)
+			org.last_heartbeat = CurTime()
+			return
+		end
+
 		org.heartbeat = 0
 		org.pulse = 0
 		org.bloodpressure = 0
