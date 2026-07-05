@@ -1192,35 +1192,64 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Brainstem damage accumulates from high brain damage
-	-- brainstem controls how effective breathing and heart pumping are
-	-- 0 = fully functional, 1 = completely non-functional
 	org.brainstem = org.brainstem or 0
+	org.intpressure = org.intpressure or 0
+
+	-- Intracranial pressure builds from skull/brain trauma, then starts
+	-- damaging brain tissue and the brainstem as the swelling gets worse.
+	local skullSeverity = math.Clamp((org.skull or 0) / 1, 0, 1)
+	local fractureSeverity = math.Clamp(((org.skull or 0) - 0.45) / 0.55, 0, 1)
+	local brainPressureRate = math.Clamp(((org.brain or 0) - 0.08) / 0.92, 0, 1)
+	if skullSeverity > 0 or brainPressureRate > 0 then
+		local pressureRate = brainPressureRate * timeValue / 260
+		pressureRate = pressureRate + skullSeverity * timeValue / 520
+		pressureRate = pressureRate + fractureSeverity * timeValue / 180
+		org.intpressure = math.min(org.intpressure + pressureRate, 1)
+	end
+
+	local burstDmg = org.brainBurstDamage or 0
+	if burstDmg > 0.04 then
+		local burstPressure = math.Clamp((burstDmg - 0.04) / 0.5, 0, 1) * 0.24
+		org.intpressure = math.min(org.intpressure + burstPressure, 1)
+		org.brainBurstDamage = 0
+	end
+
+	if (org.internalBleed or 0) > 0.5 then
+		org.intpressure = math.min(org.intpressure + timeValue / 900, 1)
+	end
+
+	if org.intpressure > 0.25 then
+		local pressureSeverity = math.Clamp((org.intpressure - 0.25) / 0.75, 0, 1)
+		local fractureMul = (org.skull or 0) >= 0.6 and 1.65 or 1
+		org.brain = min((org.brain or 0) + pressureSeverity * fractureMul * timeValue / 420, 1)
+		if org.intpressure > 0.45 then
+			org.brainstem = min(org.brainstem + pressureSeverity * fractureMul * timeValue / 900, 1)
+		end
+	end
+
+	-- Brainstem damage accumulates from high brain damage and pressure.
+	-- 0 = fully functional, 1 = completely severed/non-functional.
 	if org.brain > 0.3 then
 		local brainstemRate = math.Clamp((org.brain - 0.3) / 0.7, 0, 1) * timeValue / 180
 		org.brainstem = math.min(org.brainstem + brainstemRate, 1)
 	end
 
-	-- Brainstem: reduce breathing effectiveness and heart drive proportionally
-	local brainstemHealth = 1 - org.brainstem
-	if org.brainstem > 0.2 then
-		if not org.heartstop then
-			local brainstemSuppress = math.Clamp((org.brainstem - 0.2) / 0.8, 0, 1)
-			if math.random() < brainstemSuppress * 0.06 * timeValue then
-				org.lungsfunction = false
-			end
-		end
-	end
-
-	if org.brainstem >= 0.5 then
-		if math.random(120) == 1 then
-			org.heartstop = true
-		end
-	end
-
 	if org.brainstem >= 1 then
 		org.lungsfunction = false
 		org.heartstop = true
+		org.alive = false
+	elseif org.brainstem > 0.2 then
+		local brainstemSuppress = math.Clamp((org.brainstem - 0.2) / 0.8, 0, 1)
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainstemSuppress * 0.7, 0)
+		if org.o2 then org.o2[1] = math.max((org.o2[1] or 0) - timeValue * brainstemSuppress * 0.9, 0) end
+		if math.random() < brainstemSuppress * 0.045 * timeValue then org.lungsfunction = false end
+		if not org.heartstop and org.brainstem > 0.35 and math.random() < brainstemSuppress * 0.018 * timeValue then org.heartstop = true end
+	end
+
+	if org.brain > 0.5 and org.alive then
+		local severeBrain = math.Clamp((org.brain - 0.5) / 0.5, 0, 1)
+		if math.random() < severeBrain * 0.004 * timeValue then org.lungsfunction = false end
+		if not org.heartstop and math.random() < severeBrain * 0.002 * timeValue then org.heartstop = true end
 	end
 
 	if org.brain >= 0.3 then
@@ -1267,26 +1296,6 @@ module[2] = function(owner, org, timeValue)
 	end
 
 
-
-	-- Intracranial pressure logic
-	-- Accumulates from: high brain damage (sustained), burst brain damage, slow internal bleeding creep
-	org.intpressure = org.intpressure or 0
-
-	if org.brain > 0.4 then
-		local brainPressureRate = math.Clamp((org.brain - 0.4) / 0.6, 0, 1)
-		org.intpressure = math.min(org.intpressure + brainPressureRate * timeValue / 240, 1)
-	end
-
-	local burstDmg = org.brainBurstDamage or 0
-	if burstDmg > 0.08 then
-		local burstPressure = math.Clamp((burstDmg - 0.08) / 0.5, 0, 1) * 0.2
-		org.intpressure = math.min(org.intpressure + burstPressure, 1)
-		org.brainBurstDamage = 0
-	end
-
-	if (org.internalBleed or 0) > 0.5 then
-		org.intpressure = math.min(org.intpressure + timeValue / 900, 1)
-	end
 
 	-- Healing: mannitol directly reduces intpressure
 	if org.mannitol > 0 and org.intpressure > 0 then

@@ -26,6 +26,18 @@ function hg.organism.should_gain_fear(org)
 end
 
 module[2] = function(owner, org, timeValue)
+	if (org.brainstem or 0) >= 1 then
+		org.alive = false
+		org.heartstop = true
+		org.lungsfunction = false
+		org.heartbeat = 0
+		org.pulse = 0
+		org.bloodpressure = 0
+		org.systolic = 0
+		org.diastolic = 0
+		return
+	end
+
 	local heart = 1 - org.heart
 	-- Brainstem damage weakens the heart's neurological drive.
 	-- A fully destroyed brainstem cannot drive cardiac rhythm.

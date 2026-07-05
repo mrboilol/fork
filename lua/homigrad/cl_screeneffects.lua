@@ -63,7 +63,13 @@ local addtiveLayer = postprs.addtiveLayer
 local tab = {
 	["$pp_colour_brightness"] = 0,
 	["$pp_colour_contrast"] = 1,
-	["$pp_colour_colour"] = 1
+	["$pp_colour_colour"] = 1,
+	["$pp_colour_addr"] = 0,
+	["$pp_colour_addg"] = 0,
+	["$pp_colour_addb"] = 0,
+	["$pp_colour_mulr"] = 0,
+	["$pp_colour_mulg"] = 0,
+	["$pp_colour_mulb"] = 0
 }
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
@@ -100,6 +106,9 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
 	tab["$pp_colour_contrast"] = 1
 	tab["$pp_colour_colour"] = 1
+	tab["$pp_colour_addr"] = 0
+	tab["$pp_colour_addg"] = 0
+	tab["$pp_colour_addb"] = 0
 	tab["$pp_colour_mulr"] = 0
 	tab["$pp_colour_mulg"] = 0
 	tab["$pp_colour_mulb"] = 0
@@ -325,6 +334,10 @@ local lobotomy_memory_total = 1
 local lobotomy_memory_flash = false
 local lobotomy_recent_trauma = 0
 local lobotomy_recent_trauma_power = 0
+local disorientationFxLerp = 0
+local lastDisorientationFx = 0
+local lastConcussionFx = 0
+local nextNeuroTinnitus = 0
 local lobotomy_mats = {
 	[1] = Material("overlays/photopsiaoverlay1.png"),
 	[2] = Material("overlays/photopsiaoverlay2.png"),
@@ -828,13 +841,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * (org.otrub and 2 or 10) + (brain * 100) * (org.otrub and 1 or 5))
 	local analgesia = org.analgesia or 0
 	AnalgesiaLerp = LerpFT(0.04, AnalgesiaLerp, math.Clamp((analgesia - 0.35) / 2.4, 0, 1))
+	local rainbowFx = math.Clamp((analgesia - 0.45) / 1.25, 0, 1) * math.max(AnalgesiaLerp, 0.35)
 
 	tempLerp = LerpFT(0.01, tempLerp, org.temperature)
 
 	if AnalgesiaLerp > 0.005 then
 		local pulse = (math.sin(CurTime() * 1.35) + 1) * 0.5
 		local drugFx = AnalgesiaLerp * (0.75 + pulse * 0.25)
-		local lsdFx = math.Clamp((analgesia - 1) / 1.5, 0, 1) * drugFx
+		local lsdFx = math.max(math.Clamp((analgesia - 1) / 1.5, 0, 1) * drugFx, rainbowFx)
 
 		DrawMaterialOverlay("particle/warp4_warp_noz", -drugFx * 0.045)
 
@@ -861,6 +875,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			tab["$pp_colour_mulr"] = (tab["$pp_colour_mulr"] or 0) + (0.18 + math.sin(time) * 0.12) * lsdFx
 			tab["$pp_colour_mulg"] = (tab["$pp_colour_mulg"] or 0) + (0.18 + math.sin(time + 2.094) * 0.12) * lsdFx
 			tab["$pp_colour_mulb"] = (tab["$pp_colour_mulb"] or 0) + (0.18 + math.sin(time + 4.188) * 0.12) * lsdFx
+			tab["$pp_colour_addr"] = (tab["$pp_colour_addr"] or 0) + math.max(math.sin(time), 0) * 0.035 * lsdFx
+			tab["$pp_colour_addg"] = (tab["$pp_colour_addg"] or 0) + math.max(math.sin(time + 2.094), 0) * 0.035 * lsdFx
+			tab["$pp_colour_addb"] = (tab["$pp_colour_addb"] or 0) + math.max(math.sin(time + 4.188), 0) * 0.035 * lsdFx
 			tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + lsdFx * 0.03
 			tab["$pp_colour_contrast"] = math.max(tab["$pp_colour_contrast"] or 1, 1 + lsdFx * 0.12)
 		end
@@ -1177,7 +1194,34 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	//if brain > 0.1 and not org.otrub and show_some_images_time > 0 and false then
-	if lply.tinnitus and lply.tinnitus > CurTime() and lply:Alive() and lply.tinnitusBrainDamage then
+	local disorientation = org.disorientation or 0
+	local concussion = org.concussion or 0
+	local disorientationSpike = math.max(disorientation - (lastDisorientationFx or 0), 0)
+	local concussionSpike = math.max(concussion - (lastConcussionFx or 0), 0)
+	lastDisorientationFx = disorientation
+	lastConcussionFx = concussion
+
+	if lply:Alive() and not org.otrub and CurTime() >= nextNeuroTinnitus and (disorientationSpike >= 1.5 or concussionSpike >= 1.0) then
+		local spike = math.max(disorientationSpike / 2, concussionSpike)
+		local chance = math.Clamp(0.18 + spike * 0.18 + math.Clamp(disorientation / 10, 0, 1) * 0.12 + math.Clamp(concussion / 6, 0, 1) * 0.18, 0, 0.75)
+		if math.Rand(0, 1) < chance then
+			lply:AddTinnitus(math.Rand(0.7, 1.8) + spike * 0.7, false, concussion >= 3 or brain > 0.05)
+			nextNeuroTinnitus = CurTime() + math.Rand(4, 9)
+		else
+			nextNeuroTinnitus = CurTime() + math.Rand(1.5, 3.5)
+		end
+	end
+
+	disorientationFxLerp = LerpFT(disorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, math.max(disorientation, concussion * 0.65))
+	if lply:Alive() and not org.otrub and disorientationFxLerp > 1.2 then
+		local blurPower = math.Clamp((disorientationFxLerp - 1.2) / 7.5, 0, 1)
+		DrawMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
+		if blurPower > 0.35 then
+			DrawToyTown(blurPower * 2.2, ScrH() / 2)
+		end
+	end
+
+	if lply.tinnitus and lply.tinnitus > CurTime() and lply:Alive() then
 		if canRetrySound("Tinnitus", Tinnitus) then
 			local choice = math.random(5)
 			local soundFile

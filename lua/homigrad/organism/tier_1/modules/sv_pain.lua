@@ -234,6 +234,10 @@ module[2] = function(owner, org, timeValue)
 
 
 
+	local shock = org.shock or 0
+	local currentPain = org.pain or 0
+	local consciousnessRecoveryBlocked = shock > 0.05 or currentPain > 0.5
+
 	if org.tranquilizer > 0 then
 
 		org.tranquilizer = math.Approach(org.tranquilizer, 0, org.tranquilizer > 1 and timeValue / 5 or timeValue / 30)
@@ -244,7 +248,11 @@ module[2] = function(owner, org, timeValue)
 
 	else
 
-		org.consciousness = math.Approach(org.consciousness, org.blood < 2500 and math.Clamp((org.blood - 2000) / 500, 0, 1) or 1, timeValue / 15)
+		local consciousnessTarget = org.blood < 2500 and math.Clamp((org.blood - 2000) / 500, 0, 1) or 1
+		local consciousness = org.consciousness or 1
+		if consciousnessTarget < consciousness or consciousnessRecoveryBlocked == false then
+			org.consciousness = math.Approach(consciousness, consciousnessTarget, timeValue / 15)
+		end
 
 	end
 
@@ -264,24 +272,21 @@ module[2] = function(owner, org, timeValue)
 	end
 
 
-
-	local shock = org.shock or 0
-	local currentPain = org.pain or 0
 	local analgesiaResistance = max(1 + (org.analgesia or 0) * 2.5 + (org.painkiller or 0) * 0.35, 1)
 	local stressResistance = analgesiaResistance * max(1 + (org.adrenaline or 0) * 0.12, 1) * max(0.75 + goodmood * 0.25, 0.75)
 	local shockPainMul = 1 + Clamp((currentPain - 50) / 70, 0, 0.45)
 
 	local shockCollapseThreshold = GetShockConsciousnessThreshold(org.analgesia)
 
-	if shock > shockCollapseThreshold then
+	if shock >= shockCollapseThreshold then
 		org._highShockTime = (org._highShockTime or 0) + timeValue
 	else
 		org._highShockTime = max((org._highShockTime or 0) - timeValue * 2, 0)
 	end
 
-	if shock > shockCollapseThreshold then
+	if shock >= shockCollapseThreshold then
 		local highShockSeverity = Clamp((shock - shockCollapseThreshold) / max(100 - shockCollapseThreshold, 1), 0.35, 1)
-		local highShockDrain = timeValue * highShockSeverity * shockPainMul * 0.9
+		local highShockDrain = timeValue * highShockSeverity * shockPainMul * 1.2
 		org.consciousness = max((org.consciousness or 1) - highShockDrain, 0)
 	end
 
