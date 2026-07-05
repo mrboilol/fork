@@ -1724,8 +1724,31 @@ end )
 local warmingEnts = {
 	["env_sprite"] = 0.1,
 	["env_fire"] = 0.5,
+	["entityflame"] = 0.5,
 	["vfire"] = function(ent) return ent:GetFireState() end,
 }
+
+local fireCOEnts = {
+	["env_fire"] = true,
+	["entityflame"] = true,
+	["vfire"] = true,
+}
+
+local function nerveagent(ent, ownerpos, maxDistSqr)
+	local class = ent:GetClass()
+	if not fireCOEnts[class] then return 0 end
+
+	local warmingent = warmingEnts[class]
+	if not warmingent or ent:GetNoDraw() then return 0 end
+
+	local strength = isfunction(warmingent) and warmingent(ent) or warmingent
+	if not strength or strength <= 0 then return 0 end
+
+	local distSqr = ent:GetPos():DistToSqr(ownerpos)
+	if distSqr > maxDistSqr then return 0 end
+
+	return strength * (1 - distSqr / maxDistSqr)
+end  
 
 hg.MapTemps = {
 	["gm_wintertown"] = -10,
@@ -1784,12 +1807,15 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 	end -- unused
 
 	local warming = org.stamina.sub > 0 and 0.5 or 0
+	local fireExposure = 0
 	local ownerpos = owner:GetPos()
+	local fireExposureDistSqr = 320 * 320
 	for i, ent in ipairs(ents.FindInSphere(ownerpos, 300)) do
 		local warmingent = warmingEnts[ent:GetClass()]
 		if warmingent and !ent:GetNoDraw() then
 			--org.temperature = org.temperature + timeValue * (warmingEnts[ent:GetClass()] / 50 * (1 - ent:GetPos():Distance(owner:GetPos()) / 200))
 			warming = warming + (isfunction(warmingent) and warmingent(ent) or warmingent)
+			fireExposure = fireExposure + nerveagent(ent, ownerpos, fireExposureDistSqr)
 		end
 	end
 
@@ -1797,12 +1823,16 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 		--tbl[2] -> true = burned, number = still burning, false = unignited
 		if tbl[2] and isnumber(tbl[2]) and (ownerpos - tbl[1]):LengthSqr() < 200 * 200 then
 			warming = warming + 0.5
+			fireExposure = fireExposure + 0.5
 		end
 	end
 
 	local changeRate = timeValue / 30 -- 1 degree every 1 minute
 
 	local temp = (IsVisibleSkyBox and temp or 20) + warming * 5
+	local indoorSmokeMul = IsVisibleSkyBox and 0.45 or 1.45
+	org.fireCOExposure = math.Clamp(fireExposure * indoorSmokeMul, 0, 20)
+	org._lastFireCOExposure = CurTime()
 	
 	local isFreezing = temp < 0
 	local isHeating = temp > 30

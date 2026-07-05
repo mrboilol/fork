@@ -61,6 +61,7 @@ module[1] = function(org)
 	org.CO = 0
 
 	org.COregen = 0
+	org.fireCOExposure = 0
 
 	org.lastCOBreathe = nil
 
@@ -515,6 +516,10 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
+	if not org._lastFireCOExposure or org._lastFireCOExposure + 1.5 < CurTime() then
+		org.fireCOExposure = math.Approach(org.fireCOExposure or 0, 0, timeValue * 8)
+	end
+
 	
 
 	if o2[1] < 15 then
@@ -545,6 +550,11 @@ module[2] = function(owner, org, timeValue)
 
 
 		org.CO = min(org.CO + (org.COregen > 0 and timeValue * 1.5 or 0), 30)
+
+		if (org.fireCOExposure or 0) > 0 and not org.holdingbreath then
+			local breathMul = math.Clamp(regen / math.max(o2.regen or 4, 1), 0.25, 2)
+			org.CO = min(org.CO + timeValue * (0.9 + org.fireCOExposure * 0.25) * breathMul, 30)
+		end
 
 
 

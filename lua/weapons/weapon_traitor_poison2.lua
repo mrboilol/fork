@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_base"
 SWEP.PrintName = "VX vial"
-SWEP.Instructions = "VX is an extremely toxic synthetic chemical compound in the organophosphorus class, specifically, a thiophosphonate. In the class of nerve agents, it was developed for military use in chemical warfare after translation of earlier discoveries of organophosphate toxicity in pesticide research."
+SWEP.Instructions = "nerve agent 🤑 🤑"
 SWEP.Category = "ZCity Other"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -107,7 +107,7 @@ function SWEP:DoPoison(ent)
 end
 
 if SERVER then
-	hook.Add("PlayerUse","otravleno_dibil!!!",function(ply,ent)
+	hook.Add("PlayerUse","nerve_agent_🤑 🤑 ",function(ply,ent)
 		if IsValid(ent) and ent.poisoned then
 			if IsValid(ply) and ply.organism then
 				ply.organism.poison2 = CurTime()

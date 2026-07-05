@@ -83,7 +83,7 @@ local o2DebuffArteries = {
 	subclavianL = 0.7,
 	spineartery = 0.85,
 }
-
+--worst mistake of my life
 local function ClearPressedWound(org)
 	org.pressingWound = false
 	org.pressingWoundTarget = nil
