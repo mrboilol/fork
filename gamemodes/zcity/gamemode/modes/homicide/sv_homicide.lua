@@ -14,8 +14,52 @@ MODE.OverrideSpawn = true
 MODE.LootSpawn = true
 MODE.LootOnTime = true
 
-MODE.Chance = 0.05
-MODE.LootDivTime = 1000
+MODE.Chance = 0.2 -- this is mostly unused
+MODE.LootDivTime = 500
+MODE.SingleModeStrongLootCategoryMul = 0.35
+MODE.SingleModeStrongLootItemMul = 0.45
+
+local function ScaleLootTable(lootTable, categoryMul, itemMul)
+	local scaled = {}
+
+	for _, category in ipairs(lootTable or {}) do
+		local items = {}
+
+		for _, item in ipairs(category[2] or {}) do
+			items[#items + 1] = {item[1] * itemMul, item[2]}
+		end
+
+		scaled[#scaled + 1] = {category[1] * categoryMul, items}
+	end
+
+	return scaled
+end
+
+local function MergeLootTables(...)
+	local merged = {}
+
+	for i = 1, select("#", ...) do
+		local lootTable = select(i, ...)
+
+		for _, category in ipairs(lootTable or {}) do
+			local items = {}
+
+			for _, item in ipairs(category[2] or {}) do
+				items[#items + 1] = {item[1], item[2]}
+			end
+
+			merged[#merged + 1] = {category[1], items}
+		end
+	end
+
+	return merged
+end
+
+function MODE:SetupChances()
+	for name, tbl in pairs(MODE.Types) do
+		zb.ModesChances[name] = zb.ModesChances[name] or tbl.Chance
+	end
+end
 
 MODE.LootTable = {
 	{40, {
@@ -166,56 +210,10 @@ MODE.LootTableStandard = {
 	}},
 }
 
-local function BuildMixedLootTable()
-	local mixedLootTable = {}
-	local STD_CATEGORY_MULTIPLIER = 1
-	local SOE_CATEGORY_MULTIPLIER = 0.10
-
-	local function appendLootTable(sourceLootTable, scale)
-		for _, weightedCategory in ipairs(sourceLootTable or {}) do
-			local categoryLoot = {}
-			for _, weightedItem in ipairs(weightedCategory[2] or {}) do
-				categoryLoot[#categoryLoot + 1] = {weightedItem[1], weightedItem[2]}
-			end
-			mixedLootTable[#mixedLootTable + 1] = {(weightedCategory[1] or 1) * (scale or 1), categoryLoot}
-		end
-	end
-
-	appendLootTable(MODE.LootTableStandard, STD_CATEGORY_MULTIPLIER)
-	appendLootTable(MODE.LootTable, SOE_CATEGORY_MULTIPLIER)
-
-	return mixedLootTable
-end
-
-MODE.MixedLootTable = BuildMixedLootTable()
-
-local gunmanMixedWeapons = {
-	"weapon_px4beretta",
-	"weapon_remington870",
-	"weapon_kar98",
-	"weapon_mosin",
-}
-
-local gunmanWeaponAttachments = {
-	["weapon_px4beretta"] = {"supressor4"},
-	["weapon_remington870"] = {"supressor5","holo1","holo2","holo15"},
-	["weapon_kar98"] = {"optic12"},
-	["weapon_mosin"] = {"supressor1"},
-}
-
-local function GiveMixedGunmanWeapon(ply)
-	local gun = ply:Give(gunmanMixedWeapons[math.random(#gunmanMixedWeapons)])
-	if IsValid(gun) then
-		local attachmentPool = gunmanWeaponAttachments[gun:GetClass()]
-		if attachmentPool and #attachmentPool > 0 then
-			hg.AddAttachmentForce(ply,gun,attachmentPool[math.random(#attachmentPool)])
-			if math.random(1,100) <= 35 and #attachmentPool > 1 then
-				hg.AddAttachmentForce(ply,gun,attachmentPool[math.random(#attachmentPool)])
-			end
-		end
-	end
-	return gun
-end
+MODE.LootTableSingle = MergeLootTables(
+	MODE.LootTableStandard,
+	ScaleLootTable(MODE.LootTable, MODE.SingleModeStrongLootCategoryMul, MODE.SingleModeStrongLootItemMul)
+)
 
 -- MODE.TraitorWords = {
 	-- "пистолет",
@@ -761,8 +759,9 @@ end)
 MODE.Type = MODE.Type or "standard"
 MODE.Types = MODE.Types or {}
 MODE.Types.standard = {
-	ChanceFunction = function() return (zb.GetWorldSize() < ZBATTLE_BIGMAP) and 0.4 or 0 end,
-	LootTable = MODE.LootTableStandard,
+	Chance = 0.2,
+	ChanceFunction = function() return zb.ModesChances["standard"] or zb.modes["hmcd"].Types.standard.Chance end,
+	LootTable = MODE.LootTableSingle,
 	Messages = {
 		[3] = "Everyone died.",
 		[1] = "The murderer has killed everyone.",
@@ -794,7 +793,11 @@ MODE.Types.standard = {
 		ply:SetNetVar("Inventory",inv)
 	end,
 	GunManLoot = function(ply)
-		GiveMixedGunmanWeapon(ply)
+		if MODE.ApplyHeroLoadout then
+			MODE.ApplyHeroLoadout(ply)
+			return
+		end
+		ply:Give("weapon_px4beretta")
 		ply.organism.recoilmul = 1
 	end,
 	PoliceTime = 220,
@@ -1135,6 +1138,10 @@ MODE.Types.soe = {
 	PoliceSound = "snd_jack_hmcd_heli2.mp3"
 }
 
+MODE.Types = {
+	standard = MODE.Types.standard,
+}
+
 local modes = {
 	"standard",
 }
@@ -1161,8 +1168,8 @@ function MODE:Intermission()
 	local _, CROUND = CurrentRound()
 	local availableModes = self:SubModes()
 
-	if not CROUND or CROUND == "hmcd" or not table.HasValue(availableModes, CROUND) then
-		CROUND = table.Random(availableModes)
+	if CROUND ~= "standard" then
+		CROUND = "standard"
 	end
 
 	self.Type = CROUND
@@ -2298,11 +2305,16 @@ function MODE.SpawnPlayers(spawn_with_subroles)
             local sub_role = nil
             if(spawn_with_subroles and MODE.RoleChooseRoundTypes[MODE.Type])then
                 if(current_ply.isTraitor)then
-                    sub_role = MODE.RoleChooseRoundTypes[MODE.Type].TraitorDefaultRole or "traitor_default"
+                    local sub_role_id = current_ply:GetInfo(MODE.ConVarName_SubRole_Traitor) or "traitor_custom"
+					sub_role = sub_role_id
                 end
 
                 if(current_ply.isGunner)then
-                    MODE.Types[MODE.Type].GunManLoot(current_ply)
+                    if MODE.ApplyHeroLoadout then
+                        MODE.ApplyHeroLoadout(current_ply)
+                    else
+                        MODE.Types[MODE.Type].GunManLoot(current_ply)
+                    end
                 end
 
                 if(sub_role)then
@@ -2311,7 +2323,7 @@ function MODE.SpawnPlayers(spawn_with_subroles)
                     elseif(current_ply.isTraitor)then
                         local role_info = MODE.SubRoles[sub_role]
                         if(!role_info or !MODE.RoleChooseRoundTypes[MODE.Type].Traitor[sub_role])then
-                            sub_role = MODE.RoleChooseRoundTypes[MODE.Type].TraitorDefaultRole or "traitor_default"
+                            sub_role = MODE.RoleChooseRoundTypes[MODE.Type].TraitorDefaultRole or "traitor_custom"
                             role_info = MODE.SubRoles[sub_role]
                         end
 

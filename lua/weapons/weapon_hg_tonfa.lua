@@ -16,10 +16,10 @@ SWEP.HoldType = "melee"
 SWEP.HoldPos = Vector(-12,2,3)
 SWEP.HoldAng = Angle(0,0,0)
 
-SWEP.AttackTime = 0.45
-SWEP.AnimTime1 = 1.45
+SWEP.AttackTime = 0.3
+SWEP.AnimTime1 = 1.2
 SWEP.WaitTime1 = 1.15
-SWEP.ViewPunch1 = Angle(0,-5,3)
+SWEP.ViewPunch1 = Angle(1,1,0)
 
 SWEP.Attack2Time = 0.3
 SWEP.AnimTime2 = 1
@@ -31,12 +31,38 @@ SWEP.sprint_ang = Angle(15,0,0)
 
 SWEP.basebone = 94
 
-SWEP.weaponPos = Vector(-1,-6,-8)
-SWEP.weaponAng = Angle(0,0,-90)
+SWEP.weaponPos = Vector(0,7,-8)
+SWEP.weaponAng = Angle(0,180,-90)
 SWEP.modelscale = 1.15
 
+SWEP.hitsoundextra = {
+    {"hammer/BodyHit-1.wav", 70, {115, 125}},
+    {"hammer/BodyHit-2.wav", 70, {115, 125}},
+    {"hammer/BodyHit-3.wav", 70, {115, 125}},
+    {"hammer/BodyHit-4.wav", 70, {115, 125}},
+    {"hammer/BodyHit-5.wav", 70, {115, 125}},
+    {"hammer/BodyHit-6.wav", 70, {115, 125}},
+}
+
+SWEP.hitsoundbrutalize = {
+    {"hammerbrutalize/rem_hammerbrutalize1.wav", 70, {110, 115}},
+    {"hammerbrutalize/rem_hammerbrutalize2.wav", 70, {110, 115}},
+    {"hammerbrutalize/rem_hammerbrutalize3.wav", 70, {110, 115}},
+    {"hammerbrutalize/rem_hammerbrutalize4.wav", 70, {110, 115}},
+}
+
+
+SWEP.swingsoundextra = {
+    {"bat/baseball_swing_1st_layer_01.wav", 60, {110, 115}},
+    {"bat/baseball_swing_1st_layer_02.wav", 60, {110, 115}},
+    {"bat/baseball_swing_1st_layer_03.wav", 60, {110, 115}},
+    {"bat/baseball_swing_1st_layer_04.wav", 60, {110, 115}},
+}
+
+
+
 SWEP.DamageType = DMG_CLUB
-SWEP.DamagePrimary = 20
+SWEP.DamagePrimary = 18
 SWEP.DamageSecondary = 13
 
 SWEP.PenetrationPrimary = 1
@@ -50,8 +76,12 @@ SWEP.PenetrationSizeSecondary = 2
 SWEP.StaminaPrimary = 12
 SWEP.StaminaSecondary = 8
 
-SWEP.AttackLen1 = 40
+SWEP.AttackLen1 = 43
 SWEP.AttackLen2 = 30
+
+SWEP.BlockTier = 2
+SWEP.BlockMaterial = "none"
+SWEP.BlockSound = {"Plastic_Box.ImpactHard", 68, {95, 102}}
 
 SWEP.AnimList = {
     ["idle"] = "Idle",
@@ -109,7 +139,7 @@ function SWEP:CustomBlockAnim(addPosLerp, addAngLerp)
     addPosLerp.y = addPosLerp.y + (self:GetBlocking() and -28 or 0)
     addAngLerp.r = addAngLerp.r + (self:GetBlocking() and -85 or 0)
     addAngLerp.y = addAngLerp.y + (self:GetBlocking() and 105 or 0)
-    addAngLerp.x = addAngLerp.x + (self:GetBlocking() and 0 or 0)
+    addAngLerp.x = addAngLerp.x + (self:GetBlocking() and -15 or 0)
     
     return true
 end
