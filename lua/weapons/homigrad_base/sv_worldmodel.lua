@@ -2,6 +2,8 @@
 util.AddNetworkString("addpredictable")
 function SWEP:CreateWorldModel()
 	local model = ents.Create("prop_physics")--ents.Create("homigrad_gun")
+	if not IsValid(model) then return end
+
 	model:SetNoDraw(not hg.show_weapons)
 	model:SetModel(self.WorldModel)
 	model:SetMaterial("models/wireframe")
@@ -29,6 +31,8 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional)
 	local model, owner = self.worldModel, self:GetOwner()
 	
 	if not IsValid(model) then model = self:CreateWorldModel() end
+	if not IsValid(model) then return false end
+	if not IsValid(owner) then return false end
 	
 	if owner:IsNPC() then
         return false
@@ -114,4 +118,3 @@ concommand.Add("hg_show_weapons", function(ply, cmd, args)
 		wep.worldModel:SetNoDraw(not hg.show_weapons)
 	end
 end)
-
