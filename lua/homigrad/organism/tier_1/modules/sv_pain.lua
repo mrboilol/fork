@@ -6,6 +6,19 @@ hg.organism.module.pain = {}
 
 local module = hg.organism.module.pain
 
+local function GetShockConsciousnessThreshold(pain)
+	pain = pain or 0
+
+	if pain >= 100 then return 20 end
+	if pain >= 90 then return 30 end
+	if pain >= 80 then return 40 end
+	if pain > 60 then return 50 end
+	if pain < 40 then return 70 end
+	if pain < 50 then return 60 end
+
+	return 70
+end
+
 module[1] = function(org)
 
 	org.shock = 0
@@ -262,25 +275,23 @@ module[2] = function(owner, org, timeValue)
 
 
 	local shock = org.shock or 0
-	local pain = org.pain or 0
+	local currentPain = org.pain or 0
 	local analgesiaResistance = max(1 + (org.analgesia or 0) * 2.5 + (org.painkiller or 0) * 0.35, 1)
 	local stressResistance = analgesiaResistance * max(1 + (org.adrenaline or 0) * 0.12, 1) * max(0.75 + goodmood * 0.25, 0.75)
-	local shockPainMul = 1 + Clamp((pain - 50) / 70, 0, 0.45)
+	local shockPainMul = 1 + Clamp((currentPain - 50) / 70, 0, 0.45)
 
-	if shock >= 50 then
+	local shockCollapseThreshold = GetShockConsciousnessThreshold(currentPain)
+
+	if shock > shockCollapseThreshold then
 		org._highShockTime = (org._highShockTime or 0) + timeValue
 	else
 		org._highShockTime = max((org._highShockTime or 0) - timeValue * 2, 0)
 	end
 
-	if shock > 70 then
-		local highShockSeverity = Clamp((shock - 70) / 30, 0.35, 1)
-		local highShockDrain = timeValue * highShockSeverity * shockPainMul * 0.62 / stressResistance
+	if shock > shockCollapseThreshold then
+		local highShockSeverity = Clamp((shock - shockCollapseThreshold) / max(100 - shockCollapseThreshold, 1), 0.35, 1)
+		local highShockDrain = timeValue * highShockSeverity * shockPainMul * 0.9
 		org.consciousness = max((org.consciousness or 1) - highShockDrain, 0)
-	elseif (org._highShockTime or 0) >= 15 then
-		local sustainedSeverity = Clamp((shock - 50) / 30, 0.35, 1) * Clamp((org._highShockTime - 15) / 10, 0.25, 1)
-		local sustainedDrain = timeValue * sustainedSeverity * shockPainMul * 0.28 / stressResistance
-		org.consciousness = max((org.consciousness or 1) - sustainedDrain, 0)
 	end
 
 	if shockLoad > 0.45 and painLoad > 0.35 then

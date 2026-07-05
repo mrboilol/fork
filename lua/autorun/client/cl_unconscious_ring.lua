@@ -59,6 +59,19 @@ local lerpConsciousness = 0
 local peakShock = 40
 local dotBeat = 0
 
+local function GetShockConsciousnessThreshold(pain)
+    pain = pain or 0
+
+    if pain >= 100 then return 20 end
+    if pain >= 90 then return 30 end
+    if pain >= 80 then return 40 end
+    if pain > 60 then return 50 end
+    if pain < 40 then return 70 end
+    if pain < 50 then return 60 end
+
+    return 70
+end
+
 local ecgAlphaPulseCheck = 0
 local awakeECGAlpha = 0
 local lastHeartBeat = 0
@@ -609,7 +622,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             if isCritical then
                 progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
             else
-                local shockProgress = math.Clamp((peakShock - lerpShock) / (peakShock - 0.02), 0, 1)
+                local shockLimit = math.max(GetShockConsciousnessThreshold(org.pain or 0), 0.02)
+                local shockProgress = math.Clamp((shockLimit - lerpShock) / shockLimit, 0, 1)
                 local consciousnessProgress = math.Clamp(lerpConsciousness / 0.10, 0, 1)
                 progress = math.min(shockProgress, consciousnessProgress)
             end

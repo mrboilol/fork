@@ -485,8 +485,20 @@ end
 
 local NOSEBLEED_MIN_HARM = 18
 local NOSEBLEED_COOLDOWN = 12
+local NOSEBLEED_PAIN_MIN = 4
+local NOSEBLEED_PAIN_MAX = 11
 local nosebleedLocalPos = Vector(3.5, 0, -3.5)
 local nosebleedLocalAng = Angle(90, 0, 0)
+
+local function resetNosebleed(ply)
+	if not IsValid(ply) or not ply:IsPlayer() then return end
+
+	if ply.organism then
+		ply.organism.nextNosebleed = 0
+	end
+
+	ply:SetNWFloat("ZCity_NosebleedUntil", 0)
+end
 
 local function isBluntMeleeInflictor(dmgInfo)
 	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
@@ -528,6 +540,7 @@ local function applyNosebleed(ent, harm, ignoreCooldown)
 	org.nextNosebleed = time + NOSEBLEED_COOLDOWN
 
 	local woundPower = math.Clamp(harm * 0.55, 10, 28)
+	org.painadd = (org.painadd or 0) + math.Clamp(harm * 0.2, NOSEBLEED_PAIN_MIN, NOSEBLEED_PAIN_MAX)
 	hg.organism.AddWoundManual(character, woundPower, nosebleedLocalPos, nosebleedLocalAng, headBone, time)
 	ply:SetNWFloat("ZCity_NosebleedUntil", math.max(ply:GetNWFloat("ZCity_NosebleedUntil", 0), time + math.Clamp(harm * 2.2, 28, 75)))
 
@@ -539,6 +552,13 @@ local function applyNosebleed(ent, harm, ignoreCooldown)
 end
 
 hg.applyNosebleed = applyNosebleed
+
+hook.Add("PlayerSpawn", "ZCity_ResetNosebleed", function(ply)
+	resetNosebleed(ply)
+	timer.Simple(0, function()
+		resetNosebleed(ply)
+	end)
+end)
 
 hook.Add("HomigradDamage", "ZCity_BluntFaceNosebleed", function(ent, dmgInfo, hitgroup, attackerEnt, harm)
 	if not isBluntFaceHit(dmgInfo, hitgroup, harm) then return end

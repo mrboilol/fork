@@ -71,7 +71,10 @@ end
 local function drawNosebleedForPlayer(ply, eyePos, maxDistanceSqr)
 	local bleedUntil = ply:GetNWFloat("ZCity_NosebleedUntil", 0)
 	local now = CurTime()
-	if bleedUntil <= now then return end
+	if bleedUntil <= now then
+		nosebleedDripNext[ply] = nil
+		return
+	end
 
 	local character = getNosebleedCharacter(ply)
 	if not IsValid(character) then return end

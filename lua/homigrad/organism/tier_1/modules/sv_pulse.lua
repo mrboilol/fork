@@ -114,7 +114,6 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
 	
 	heartbeat = heartbeat + (owner.suiciding and 50 or 0)
-	heartbeat = heartbeat + 40 * math.max(0, org.fear)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
 	local adrenalineHeartBoost = 9 * math.min(org.adrenaline, 3)
@@ -203,7 +202,7 @@ module[2] = function(owner, org, timeValue)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
 	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.08
 	if org.givingUp then adrenalineHyperMul = adrenalineHyperMul * 0.3 end
-	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.fear, 0, 2) * 0.05 + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
+	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 2.0)
 
@@ -342,9 +341,9 @@ module[2] = function(owner, org, timeValue)
 
 	if org.bloodpressure > 115 then
 		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
-		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.5
+		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.25
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
-		org.disorientation = math.max(org.disorientation, effectiveHighK * 2.5)
+		org.disorientation = math.max(org.disorientation, 0.4 + effectiveHighK * 3.6)
 		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
 	end
 
