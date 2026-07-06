@@ -961,9 +961,9 @@ function SWEP:ApplyRecoilCameraKick()
 	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
 	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
 
-	local pitchKick = -0.34 * kickScale
-	local yawKick   =  0.11 * kickScale * sideRand
-	local rollKick  =  0.18 * kickScale * rollRand
+	local pitchKick = -0.42 * kickScale
+	local yawKick   =  0.08 * kickScale * sideRand
+	local rollKick  =  0.14 * kickScale * rollRand
 
 	local punchAng = Angle(pitchKick, yawKick, rollKick)
 	local hg_coolcam = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()
@@ -2329,12 +2329,12 @@ function SWEP:GetAdditionalValues()
 			local painMul = 1 + math.Clamp((org.pain or 0) / 120, 0, 1)
 			local shake = armDamage * painMul * sprintMul
 			local t = CurTime()
-			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 17.0) * 0.35 * shake
-			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + math.cos(t * 13.0) * 0.45 * shake
-			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.sin(t * 23.0) * 0.25 * shake
-			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t * 19.0) * 2.4 * shake
-			self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 15.0) * 1.8 * shake
-			self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 11.0) * 3.0 * shake
+			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 17.0) * 0.34 * shake
+			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + math.cos(t * 13.0) * 0.34 * shake
+			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.sin(t * 23.0) * 0.34 * shake
+			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t * 19.0) * 2.25 * shake
+			self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 15.0) * 2.15 * shake
+			self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 11.0) * 2.25 * shake
 		end
 	end
 
@@ -2588,9 +2588,9 @@ function SWEP:GetAdditionalValues()
 		
 		if self.podkid or self:IsPistolHoldType() then
 			local animpos2 = self:GetAnimShoot2(0.05 * mulhuy / host_timescale(), true)
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * 20 * (self.podkid or 1)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 10 * (self.podkid or 1)
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -5 * (self.podkid or 1)
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -18 * (self.podkid or 1)
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * 7 * (self.podkid or 1)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 8 * (self.podkid or 1)
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
 		end
 
@@ -2618,18 +2618,19 @@ function SWEP:GetAdditionalValues()
 
 		if (self.recoilWobbleAmp or 0) > 0.001 then
 			local t = CurTime()
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 1.9
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 1.65
 
 			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
 			local wobY = math.cos(t * 1.8) * 0.65 + math.cos(t * 3.1) * 0.35
 			local wobZ = math.sin(t * 2.2) * 0.65 + math.cos(t * 2.9) * 0.35
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.4
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 0.75
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.22
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.18
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 0.9
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.34
 
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.7
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.35
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.1
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
 		end
 
 		local recoilDecay = self:GetAnimShoot2(0.28 * mulhuy / host_timescale(), true)
@@ -2641,9 +2642,9 @@ function SWEP:GetAdditionalValues()
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
 			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 1.7
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 1.2
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.45
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.18
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 1.45
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.34
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.1
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.75
 		end
 	end
@@ -2696,13 +2697,14 @@ function SWEP:GetAdditionalValues()
 		local swB = math.cos(st * 0.8) * 0.7 + math.cos(st * 1.7) * 0.3
 		local swC = math.sin(st * 1.3) * 0.6 + math.cos(st * 2.1) * 0.4
 
-		local armSwayVertBias = 1 + armSway * 0.25
-		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 1.3 * armSwayVertBias
-		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 1.1
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * armSway * 0.12
+		local armSwayInstability = 1 + armSway * 0.12
+		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 1.05 * armSwayInstability
+		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 0.95 * armSwayInstability
+		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * 0.72 * armSwayInstability
 
-		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.7
-		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.7
+		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.55
+		self.AdditionalPos2[2] = self.AdditionalPos2[2] + swB * idleAmp * 0.18
+		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.55
 	end
 
 	if self.GetAnimPos_Draw and CLIENT then

@@ -1,4 +1,5 @@
 local max, min, Round, Lerp, halfValue2 = math.max, math.min, math.Round, Lerp, util.halfValue2
+local hg_windedsystem = ConVarExists("hg_windedsystem") and GetConVar("hg_windedsystem") or CreateConVar("hg_windedsystem", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable chest-winded stamina and oxygen recovery penalties", 0, 1)
 
 --local Organism = hg.organism
 
@@ -522,9 +523,11 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	if o2[1] < 15 then
-        org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + timeValue * 0.5, 30)
-    end
+	if hg_windedsystem:GetBool() and o2[1] < 15 then
+		org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + timeValue * 0.25, 18)
+	elseif not hg_windedsystem:GetBool() then
+		org.oxygen_deprivation = 0
+	end
 
 	if o2[1] < 8 then
 		org._lowO2Time = (org._lowO2Time or 0) + timeValue
@@ -603,25 +606,30 @@ module[2] = function(owner, org, timeValue)
 		local pulsePerfusionK = math.Clamp(((org.pulse or 70) - 15) / 55, 0.12, 1)
 
 		local staminaRatio = org.stamina[1] / org.stamina.max
+		local windedEnabled = hg_windedsystem:GetBool()
 
 		-- When winded (low stamina), ensure minimum O2 recovery to prevent death
 
 		-- Recovery is slower when winded but won't drop to zero
 
-		local staminaMultiplier = math.max(staminaRatio, 0.35)
+		local staminaMultiplier = windedEnabled and math.max(staminaRatio, 0.55) or 1
 
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
 		local regenerate = regen * timeValue * 4 * staminaMultiplier * pulseMultiplier * pulsePerfusionK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
 
-		if org.oxygen_deprivation and org.oxygen_deprivation > 0 then
+		if windedEnabled and org.oxygen_deprivation and org.oxygen_deprivation > 0 then
 
 			local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
 
 			local hasStabilizer = totalAdrenaline > 0.5 or (org.thiamine or 0) > 0 or (org.tranexamic_acid or 0) > 0
 
-			regenerate = regenerate * (hasStabilizer and 0.65 or 0.35) -- drugs reduce penalty, but winded players can still catch some air
+			regenerate = regenerate * (hasStabilizer and 0.82 or 0.6) -- winded players can still catch air, especially with stabilizers
 
-			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue * (hasStabilizer and 2.5 or 1.6), 0) -- drugs clear O2 deprivation faster
+			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue * (hasStabilizer and 4.2 or 3.0), 0) -- drugs clear O2 deprivation faster
+
+		elseif not windedEnabled then
+
+			org.oxygen_deprivation = 0
 
 		end
 
@@ -1199,23 +1207,23 @@ module[2] = function(owner, org, timeValue)
 	-- damaging brain tissue and the brainstem as the swelling gets worse.
 	local skullSeverity = math.Clamp((org.skull or 0) / 1, 0, 1)
 	local fractureSeverity = math.Clamp(((org.skull or 0) - 0.45) / 0.55, 0, 1)
-	local brainPressureRate = math.Clamp(((org.brain or 0) - 0.08) / 0.92, 0, 1)
+	local brainPressureRate = math.Clamp(((org.brain or 0) - 0.04) / 0.96, 0, 1)
 	if skullSeverity > 0 or brainPressureRate > 0 then
-		local pressureRate = brainPressureRate * timeValue / 260
-		pressureRate = pressureRate + skullSeverity * timeValue / 520
-		pressureRate = pressureRate + fractureSeverity * timeValue / 180
+		local pressureRate = brainPressureRate * timeValue / 185
+		pressureRate = pressureRate + skullSeverity * timeValue / 360
+		pressureRate = pressureRate + fractureSeverity * timeValue / 120
 		org.intpressure = math.min(org.intpressure + pressureRate, 1)
 	end
 
 	local burstDmg = org.brainBurstDamage or 0
-	if burstDmg > 0.04 then
-		local burstPressure = math.Clamp((burstDmg - 0.04) / 0.5, 0, 1) * 0.24
+	if burstDmg > 0.025 then
+		local burstPressure = math.Clamp((burstDmg - 0.025) / 0.45, 0, 1) * 0.34
 		org.intpressure = math.min(org.intpressure + burstPressure, 1)
 		org.brainBurstDamage = 0
 	end
 
 	if (org.internalBleed or 0) > 0.5 then
-		org.intpressure = math.min(org.intpressure + timeValue / 900, 1)
+		org.intpressure = math.min(org.intpressure + timeValue / 600, 1)
 	end
 
 	if org.intpressure > 0.25 then

@@ -23,6 +23,7 @@ SWEP.RecoilMul = 1.0
 local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
 
 local hg_recoilmul = CreateConVar("hg_recoilmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply weapon physical recoil")
+local hg_spreadmul = ConVarExists("hg_spreadmul") and GetConVar("hg_spreadmul") or CreateConVar("hg_spreadmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply weapon shot spread")
 function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
@@ -340,13 +341,12 @@ function SWEP:PrimarySpread()
 		spray = (spray + angranda * self.addSprayMul * mul * (self.randmul or 1)) * hg_spreadmul:GetFloat()
 
 		local angrand2 = AngleRand(-force, force)
-		
-		local angrand3 = -(-angrand2)
-		angrand3[3] = 0
 		if not self.SprayRandOnly then
-			angrand2[1] = math.Clamp(-math.abs(angrand2[1]),-10,-force/1.8)
-			angrand2[2] = math.Clamp(angrand2[2],-0.35,0.35)
-			angrand2[3] = -angrand2[2] * 0.45
+			local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.62, 10)
+			local yawLimit = math.min(0.28, pitchMag * 0.26 + 0.04)
+			angrand2[1] = -pitchMag
+			angrand2[2] = math.Clamp(angrand2[2] * 0.45, -yawLimit, yawLimit)
+			angrand2[3] = -angrand2[2] * 0.35
 			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
 			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
 			
@@ -359,6 +359,7 @@ function SWEP:PrimarySpread()
 			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.25 or 0.55))-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
+		local angrand3 = Angle(angrand2[1], math.Clamp(angrand2[2] * 0.65, -math.abs(angrand2[1]) * 0.18 - 0.08, math.abs(angrand2[1]) * 0.18 + 0.08), 0)
 
 		local prank3 = math.Rand(-ammoForce, ammoForce) / (ammoForce != 0 and ammoForce or 1) * 2
 		local angleprikol = Angle(0,0,prank3)
@@ -366,9 +367,9 @@ function SWEP:PrimarySpread()
 		//ViewPunch2(angleprikol)
 
 		local mul = mul * caliberMul * weightMul * 0.38 * (self:IsPistolHoldType() and 1.25 or 1) * (numBullet and math.sqrt(numBullet) or 1)
-		ViewPunch2(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul * 0.18)
-		ViewPunch(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul / -8)
-		timer.Simple(0.01, function() if IsValid(owner) then ViewPunch2(Angle(-1 * math.Rand(1,2),1 * math.Rand(-1,1),0) * mul * 0.12) end end)
+		ViewPunch2(Angle(-math.Rand(1.25,2.2), math.Rand(-0.45,0.45), 0) * mul * 0.18)
+		ViewPunch(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul / -8)
+		timer.Simple(0.01, function() if IsValid(owner) then ViewPunch2(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul * 0.12) end end)
 		timer.Simple(0.02, function() if IsValid(owner) then ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul * 0.1) end end)
 
 		local eyeang = owner:EyeAngles()
@@ -380,14 +381,15 @@ function SWEP:PrimarySpread()
 		sprayAng.roll = 0
 
 		local muzzleKick = sprayAng * (organism.recoilmul or 1) * armHandlingMul * oneHandRecoilMul * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
-		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.22, -5.4, 2.4)
-		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.45, -0.85, 0.85)
+		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.35, -6.0, 2.4)
+		local muzzleYawCap = math.min(0.65, math.abs(muzzleKick[1]) * 0.18 + 0.08)
+		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.32, -muzzleYawCap, muzzleYawCap)
 		muzzleKick[3] = 0
 		owner:SetEyeAngles(eyeang + muzzleKick)
 		
 		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
-		ViewPunch2(Angle(2 * rnd1,2 * rnd2,0) * mul * 0.12)
-		ViewPunch(Angle(-2 * rnd1,-2 *rnd2,0) * mul * 0.22)
+		ViewPunch2(Angle(2 * rnd1, rnd2 * 1.1, 0) * mul * 0.12)
+		ViewPunch(Angle(-2 * rnd1, -rnd2 * 1.1, 0) * mul * 0.22)
 
 		local max_clip1 = self:GetMaxClip1()
 		

@@ -42,34 +42,34 @@ male["ValveBiped.Bip01_Head1"] = {
 	{
 		"brainstem", --brainstem fr fr ong ong"
 		nil,
-		Vector(1.7, 0, 0),
+		Vector(1.3, 0.55, 0),
 		Angle(0, 0, 0),
-		Vector(1.6, 2.1, 1.7),
-		Color(220, 0, 255)
+		Vector(2, 2.6, 1.9),
+		Color(255, 45, 255)
 	},
 	{
 		"brainstem",
 		nil,
-		Vector(-0.2, 2.25, 0),
+		Vector(-0.35, 2.65, 0),
 		Angle(0, 0, 0),
-		Vector(1.1, 2.35, 1.05),
-		Color(220, 0, 255)
+		Vector(1.4, 2.7, 1.25),
+		Color(255, 45, 255)
 	},
 	{
 		"eyeL",
 		nil,
-		Vector(4.1, -3.4, 1.5),
+		Vector(4.45, -3.55, 1.55),
 		Angle(0, 0, 0),
-		Vector(1.3, 1.3, 1.3),
-		Color(100, 180, 255)
+		Vector(1.55, 0.95, 1.05),
+		Color(40, 210, 255)
 	},
 	{
 		"eyeR",
 		nil,
-		Vector(4.1, -3.4, -1.5),
+		Vector(4.45, -3.55, -1.55),
 		Angle(0, 0, 0),
-		Vector(1.3, 1.3, 1.3),
-		Color(100, 180, 255)
+		Vector(1.55, 0.95, 1.05),
+		Color(40, 210, 255)
 	},
 }
 
@@ -157,8 +157,8 @@ male["ValveBiped.Bip01_Spine2"] = {
 	{"lungsR", nil, Vector(4, 3, -3), Angle(0, 0, 0), Vector(4, 2, 2), Color(0, 255, 255)},
 	{"lungsL", nil, Vector(4, 3, 3), Angle(0, 0, 0), Vector(4, 2, 2), Color(0, 255, 255)},
 	{"trachea", nil, Vector(6, 3, 0), Angle(0, 0, 0), Vector(6, 0.75, 0.75), Color(0, 125, 255)},
-	{"subclavianR", nil, Vector(2.35, 4, -3.75), Angle(0, 0, -15), Vector(4.4, 1.1, 1), Color(255, 0, 0)},
-	{"subclavianL", nil, Vector(2.35, 4, 3.75), Angle(0, 0, 15), Vector(4.4, 1.1, 1), Color(255, 0, 0)},
+	{"subclavianR", nil, Vector(2.7, 4.85, -4.15), Angle(0, 0, -22), Vector(5.5, 1.5, 1.35), Color(255, 25, 25)},
+	{"subclavianL", nil, Vector(2.7, 4.85, 4.15), Angle(0, 0, 22), Vector(5.5, 1.5, 1.35), Color(255, 25, 25)},
 	{"heart", nil, Vector(1, 2, 1), Angle(0, 0, 0), Vector(1.5, 1.5, 1.5), Color(200, 0, 0)}
 }
 
@@ -202,8 +202,8 @@ male["ValveBiped.Bip01_Pelvis"] = {
 }
 
 local bone = 0.5
-male["ValveBiped.Bip01_L_UpperArm"] = {{"larmup", bone, Vector(6, 0, 0), Angle(0, 0, 0), Vector(6, 0.8, 0.8), Color(0, 255, 0)}, {"subclavianL", nil, Vector(1.15, -0.15, -0.55), Angle(0, 0, 0), Vector(4.1, 1, 1), Color(255, 0, 0)}, {"larmartery", 0, Vector(6, 0, -1), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)},}
-male["ValveBiped.Bip01_R_UpperArm"] = {{"rarmup", bone, Vector(6, 0, 0), Angle(0, 0, 0), Vector(6, 0.8, 0.8), Color(0, 255, 0)}, {"subclavianR", nil, Vector(1.15, -0.15, 0.55), Angle(0, 0, 0), Vector(4.1, 1, 1), Color(255, 0, 0)}, {"rarmartery", 0, Vector(6, 0, 1), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)},}
+male["ValveBiped.Bip01_L_UpperArm"] = {{"larmup", bone, Vector(6, 0, 0), Angle(0, 0, 0), Vector(6, 0.8, 0.8), Color(0, 255, 0)}, {"subclavianL", nil, Vector(0.85, -0.2, -0.75), Angle(0, 0, -6), Vector(4.9, 1.3, 1.25), Color(255, 25, 25)}, {"larmartery", 0, Vector(6, 0, -1), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)},}
+male["ValveBiped.Bip01_R_UpperArm"] = {{"rarmup", bone, Vector(6, 0, 0), Angle(0, 0, 0), Vector(6, 0.8, 0.8), Color(0, 255, 0)}, {"subclavianR", nil, Vector(0.85, -0.2, 0.75), Angle(0, 0, 6), Vector(4.9, 1.3, 1.25), Color(255, 25, 25)}, {"rarmartery", 0, Vector(6, 0, 1), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)},}
 male["ValveBiped.Bip01_L_Forearm"] = {{"larmdown", bone, Vector(6, -1, 0), Angle(0, 5, 0), Vector(6, 0.5, 0.5), Color(0, 255, 0)}, {"larmdown", bone, Vector(6, 1, 0), Angle(0, -5, 0), Vector(6, 0.5, 0.5), Color(0, 255, 0)}, {"larmartery", 0, Vector(6, -0.8, 0), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)}, {"larmartery", 0, Vector(6, 0.8, 0), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)},}
 male["ValveBiped.Bip01_R_Forearm"] = {{"rarmdown", bone, Vector(6, -1, 0), Angle(0, 5, 0), Vector(6, 0.5, 0.5), Color(0, 255, 0)}, {"rarmdown", bone, Vector(6, 1, 0), Angle(0, -5, 0), Vector(6, 0.5, 0.5), Color(0, 255, 0)}, {"rarmartery", 0, Vector(6, -0.8, 0), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)}, {"rarmartery", 0, Vector(6, 0.8, 0), Angle(0, 0, 0), Vector(6, 0.4, 0.4), Color(255, 0, 0)},}
 male["ValveBiped.Bip01_L_Thigh"] = {{"llegup", bone, Vector(9, 0, 0), Angle(0, 0, 0), Vector(9, 1.5, 1.5), Color(0, 255, 0)}, {"llegartery", 0, Vector(9, 2, -1), Angle(0, 0, 0), Vector(9, 0.2, 0.2), Color(255, 0, 0)},}
@@ -321,34 +321,34 @@ female["ValveBiped.Bip01_Head1"] = {
 	{
 		"brainstem", --brain niz / lower brainstem
 		nil,
-		Vector(0.5, 2, 0),
+		Vector(0.35, 2.25, 0),
 		Angle(0, 0, 0),
-		Vector(1.6, 2.1, 1.7),
-		Color(220, 0, 255)
+		Vector(2, 2.6, 1.9),
+		Color(255, 45, 255)
 	},
 	{
 		"brainstem",
 		nil,
-		Vector(-1, 3.7, 0),
+		Vector(-1.15, 4, 0),
 		Angle(0, 0, 0),
-		Vector(1.1, 2.35, 1.05),
-		Color(220, 0, 255)
+		Vector(1.4, 2.7, 1.25),
+		Color(255, 45, 255)
 	},
 	{
 		"eyeL",
 		nil,
-		Vector(3.6, -3.0, 1.5),
+		Vector(3.85, -3.1, 1.5),
 		Angle(0, 0, 0),
-		Vector(1.3, 1.3, 1.3),
-		Color(100, 180, 255)
+		Vector(1.5, 0.95, 1.05),
+		Color(40, 210, 255)
 	},
 	{
 		"eyeR",
 		nil,
-		Vector(3.6, -3.0, -1.5),
+		Vector(3.85, -3.1, -1.5),
 		Angle(0, 0, 0),
-		Vector(1.3, 1.3, 1.3),
-		Color(100, 180, 255)
+		Vector(1.5, 0.95, 1.05),
+		Color(40, 210, 255)
 	},
 }
 

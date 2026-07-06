@@ -2,6 +2,7 @@
 if SERVER then util.AddNetworkString("headtrauma_flash") end
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
+local hg_windedsystem = ConVarExists("hg_windedsystem") and GetConVar("hg_windedsystem") or CreateConVar("hg_windedsystem", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable chest-winded stamina and oxygen recovery penalties", 0, 1)
 
 local function PlayBoneBreakSound(entity)
     if math.random() < 0.5 then
@@ -582,8 +583,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 	local skullDelta = math.max((org.skull or 0) - oldDmg, 0)
 	if skullDelta > 0 then
-		local fractureMul = (org.skull or 0) >= 0.6 and 2.2 or 1
-		org.intpressure = math.min((org.intpressure or 0) + skullDelta * 0.16 * fractureMul, 1)
+		local fractureMul = (org.skull or 0) >= 0.6 and 2.6 or 1
+		org.intpressure = math.min((org.intpressure or 0) + skullDelta * 0.24 * fractureMul, 1)
 		if (org.skull or 0) >= 0.6 then
 			org.brain = math.min((org.brain or 0) + skullDelta * 0.05, 1)
 		end
@@ -751,9 +752,12 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.painadd = org.painadd + dmg * 2
 	org.shock = org.shock + dmg * 2.5
-	org.o2[1] = math.max(org.o2[1] - math.min(dmg * 4, 10), 8)
-	org.stamina_damage = (org.stamina_damage or 0) + dmg * 16
-	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 8
+	org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2.5, 6), 10)
+
+	if hg_windedsystem:GetBool() then
+		org.stamina_damage = (org.stamina_damage or 0) + dmg * 8
+		org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + dmg * 3.5, 18)
+	end
 
 	-- Chest hits can cause hemothorax (blood filling pleural cavity)
 	if dmg >= 0.5 then
@@ -827,8 +831,10 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	org.shock = org.shock + dmg * 1.5
 	org.internalBleed = (org.internalBleed or 0) + dmg * 4.0
 	org.o2[1] = math.max(org.o2[1] - dmg * 3, 0)
-	org.stamina_damage = (org.stamina_damage or 0) + dmg * 15
-	org.oxygen_deprivation = (org.oxygen_deprivation or 0) + dmg * 5
+	if hg_windedsystem:GetBool() then
+		org.stamina_damage = (org.stamina_damage or 0) + dmg * 8
+		org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + dmg * 2.5, 18)
+	end
 
 	local result = damageBone(org, 0.35, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 

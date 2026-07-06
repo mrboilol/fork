@@ -244,7 +244,7 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		end
 		org.brainBurstLast = time
 		org.brainBurstDamage = (org.brainBurstDamage or 0) + brainDelta
-		local pressureSpike = brainDelta * ((org.skull or 0) >= 0.6 and 0.45 or 0.28)
+		local pressureSpike = brainDelta * ((org.skull or 0) >= 0.6 and 0.65 or 0.4)
 		org.intpressure = math.min((org.intpressure or 0) + pressureSpike, 1)
 	end
 
