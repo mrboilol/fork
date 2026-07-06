@@ -67,7 +67,7 @@ SWEP.PenetrationSizeSecondary = 1
 SWEP.StaminaPrimary = 9
 SWEP.StaminaSecondary = 12
 
-SWEP.AttackLen1 = 42
+SWEP.AttackLen1 = 40
 SWEP.AttackLen2 = 35
 
 function SWEP:Reload()

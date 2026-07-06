@@ -21,13 +21,15 @@ SWEP.addSprayMul = 1
 SWEP.RecoilMul = 1.0
 
 local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
+
+local hg_recoilmul = CreateConVar("hg_recoilmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply weapon physical recoil")
 function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 	local supportMul = self:GetRecoilSupportMul()
 	local mul = math.Clamp(caliberMul * weightMul * 0.68, 0.18, 2.7) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
 	self:ApplyForce(mul)
-	mul = (mul or 0) * (self.Supressor and 0.85 or 1) * (owner.organism and owner.organism.recoilmul or 1) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
+	mul = ((mul or 0) * (self.Supressor and 0.75 or 1) * (owner.organism and owner.organism.recoilmul or 1)) * hg_recoilmul:GetFloat() * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
 	return mul
 end
 
@@ -335,7 +337,7 @@ function SWEP:PrimarySpread()
 		
 		local angranda = AngleRand(self.SprayRand[1], self.SprayRand[2])
 		angranda[3] = 0
-		spray = spray + angranda * self.addSprayMul * mul * (self.randmul or 1)
+		spray = (spray + angranda * self.addSprayMul * mul * (self.randmul or 1)) * hg_spreadmul:GetFloat()
 
 		local angrand2 = AngleRand(-force, force)
 		

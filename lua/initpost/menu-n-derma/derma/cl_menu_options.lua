@@ -23,6 +23,80 @@ function hg.settings:AddOpt( strCategory, strConVar, strTitle, bDecimals, bStrin
     self.tbl[strCategory] = self.tbl[strCategory] or {}
     self.tbl[strCategory][strConVar] = { strCategory, strConVar, strTitle, bDecimals or false, bString or false }
 end
+local hg_firstperson_death = CreateClientConVar("hg_firstperson_death", "0", true, false, "Toggle first-person death camera view", 0, 1)
+local hg_font = CreateClientConVar("hg_font", "Bahnschrift", true, false, "change every text font to selected because ui customization is cool")
+local hg_attachment_draw_distance = CreateClientConVar("hg_attachment_draw_distance", 0, true, nil, "distance to draw attachments", 0, 4096)
+
+xbars = 17
+ybars = 30
+
+gradient_l = Material("vgui/gradient-l")
+
+local blur = Material("pp/blurscreen")
+local blur2 = Material("effects/shaders/zb_blur" )
+local sw, sh = ScrW(), ScrH()
+
+local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Bahnschrift"
+    local usefont = "Bahnschrift"
+
+    if hg_font:GetString() != "" then
+        usefont = hg_font:GetString()
+    end
+
+    return usefont
+end
+
+surface.CreateFont("ZCity_setiings_tiny", {
+	font = font(),
+	size = ScreenScale(7),
+	weight = 100
+})
+
+surface.CreateFont("ZCity_setiings_fine", {
+	font = font(),
+	size = ScreenScale(10),
+	weight = 100
+})
+
+surface.CreateFont("ZCity_setiings_category", {
+	font = font(),
+	size = ScreenScale(15),
+	weight = 100
+})
+
+
+hg.settings:AddOpt("Gameplay","hg_old_notificate", "Old Notifications")
+hg.settings:AddOpt("Gameplay","hg_cheats", "Enable Cheats")
+hg.settings:AddOpt("Gameplay","hg_showthoughts", "Show thoughts")
+hg.settings:AddOpt("Gameplay","hg_hints", "Show hints")
+hg.settings:AddOpt("Gameplay","hg_gary", "HG GARY")
+hg.settings:AddOpt("Gameplay","hg_deathfadeout", "Death fade out")
+--hg_gary
+--hg_deathfadeout
+if not game.IsDedicated() then
+	hg.settings:AddOpt("Server-side settings","hg_toughnpcs", "Tough npcs")
+	hg.settings:AddOpt("Server-side settings","hg_thirdperson", "Thirdperson (WIP)")
+	hg.settings:AddOpt("Server-side settings","hg_legacycam", "Legacy camera")
+	hg.settings:AddOpt("Server-side settings","hg_ragdollcombat", "Ragdoll combat mode")
+	hg.settings:AddOpt("Server-side settings","hg_movement_stamina_debuff", "Movement stamina debuff")
+	hg.settings:AddOpt("Server-side settings","hg_furcity", "Furcity")
+	hg.settings:AddOpt("Server-side settings","hg_appearance_access_for_all", "Appearance full access for all", nil, nil, "bool")
+	hg.settings:AddOpt("Server-side settings","hg_healanims", "Heal & food animations")
+	hg.settings:AddOpt("Server-side settings","hg_aimtoshoot", "Toggle DarkRP-like shooting system (aim to shoot): 0 - disabled; 1 - hipfire only; 2 - aiming only", nil, nil, "int")
+	hg.settings:AddOpt("Server-side settings","hg_slings", "Sling system")
+	hg.settings:AddOpt("Server-side settings","hg_allow_gopro", "Allow GoPro-like first-person camera")
+	hg.settings:AddOpt("Server-side settings","hg_allow_gopro_pos", "Allow editing GoPro camera position")
+	hg.settings:AddOpt("Server-side settings","hg_ixanims", "Toggle Helix-like animations on NPC models for players. Experimental")
+    hg.settings:AddOpt("Server-side settings","homicide_traitoramount", "Homicide: Traitor Amount", nil, nil, "int")
+end
+--hg_appearance_access_for_all
+--hg_furcity
+--hg_legacycam
+--hg_toughnpcs
+
+hg.settings:AddOpt("Debug","hg_show_hitposmuzzle", "Show weapon hitpos")
+hg.settings:AddOpt("Debug","hg_setzoompos", "Edit weapon zoompos, check console for results")
+hg.settings:AddOpt("Debug","hg_show_hitbox", "Show hitboxes")
 
 hg.settings:AddOpt("Optimization","hg_potatopc", "Potato PC Mode")
 hg.settings:AddOpt("Optimization","hg_anims_draw_distance", "Animations Draw Distance")

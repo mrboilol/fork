@@ -18,8 +18,11 @@ if CLIENT then
 		CreateChat()
 	end)
 
+	local adminShow = ConVarExists("zb_admin_show_voicechat") and GetConVar("zb_admin_show_voicechat") or CreateClientConVar("zb_admin_show_voicechat","0",false,false,"Show voicechat panels for admins",0,1)
 	hook.Add("PlayerStartVoice","RemoveVoicePanles",function(ply)
 		if !IsValid(ply) then return end
+		local lply = LocalPlayer()
+		if IsValid(lply) and lply:IsAdmin() and adminShow:GetBool() then return end
 
 		local other_alive = (ply:Alive() and LocalPlayer() != ply) or (ply.organism and (ply.organism.otrub or (ply.organism.brain and ply.organism.brain > 0.05)))
 

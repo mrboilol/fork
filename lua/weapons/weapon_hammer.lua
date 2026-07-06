@@ -106,6 +106,8 @@ function SWEP:ThinkAdd()
 		self.DamageType = DMG_CLUB
 		self.weaponPos = Vector(0, 0, -6.45)
 		self.weaponAng = Angle(-5, -90, 0)
+		self.weaponPos = Vector(-2, 4.5, -11)
+		self.weaponAng = Angle(14, -90, 90)
 		self.PenetrationPrimary = 2
 		self.MaxPenLen = 1
 		self.PainMultiplier = 1.65
@@ -116,6 +118,8 @@ function SWEP:ThinkAdd()
 		self.DamageType = DMG_SLASH
 		self.weaponPos = Vector(0, 0, -6.45)
 		self.weaponAng = Angle(0, 90, 0)
+		self.weaponPos = Vector(0.7, -1.8, -11.5)
+		self.weaponAng = Angle(-5, 90, 96)
 		self.PenetrationPrimary = 4
 		self.PainMultiplier = 1
 		self.MaxPenLen = 4
