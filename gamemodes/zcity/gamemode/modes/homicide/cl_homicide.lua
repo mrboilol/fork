@@ -462,6 +462,7 @@ if IsValid(hmcdEndMenu) then
 end
 
 CreateEndMenu = function(traitor)
+	if hg and hg.RoundSummaryEnabled then return end
 	if IsValid(hmcdEndMenu) then
 		hmcdEndMenu:Remove()
 		hmcdEndMenu = nil
