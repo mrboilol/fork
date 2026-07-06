@@ -54,256 +54,40 @@ function zb.RTVMenu()
     end
 
     local RTVMenu = vgui.Create("ZB_RTVMenu")
-    RTVMenu:SetSize(ScrW(), ScrH())
-    RTVMenu:SetPos(0, 0)
+    RTVMenu:SetSize(math.min(ScrW() * 0.58, 860), ScrH() * 0.86)
+    RTVMenu:Center()
     RTVMenu:SetTitle("")
     RTVMenu:SetBackgroundBlur(false)
     RTVMenu:ShowCloseButton(false)
     RTVMenu:SetDraggable(false)
     RTVMenu:MakePopup()
-    RTVMenu:SetKeyboardInputEnabled(true)
-    RTVMenu:SetAlpha(0)
-    RTVMenu:AlphaTo(255, 0.25, 0)
-    activeRTVMenu = RTVMenu
+    RTVMenu:SetKeyboardInputEnabled(false)
 
-    local sidePanel = vgui.Create("DPanel", RTVMenu)
-    sidePanel:SetSize(ScrW() * 0.27, ScrH() * 0.67)
-    sidePanel:SetPos(ScrW() * 0.06, ScrH() * 0.2)
-    sidePanel.Paint = function(_, w, h)
-        surface.SetDrawColor(8, 8, 8, 210)
-        surface.DrawRect(0, 0, w, h)
-        surface.SetDrawColor(48, 48, 48, 190)
-        surface.DrawOutlinedRect(0, 0, w, h, 2)
-    end
+    local MAPSPanel = vgui.Create("DPanel", RTVMenu)
+    MAPSPanel:Dock(FILL)
+    MAPSPanel:DockMargin(ScreenScale(12), ScreenScale(48), ScreenScale(12), ScreenScale(18))
+    function MAPSPanel.Paint() end
 
-    local function PickFontForWidth(text, maxWidth, fontA, fontB)
-        surface.SetFont(fontA)
-        if surface.GetTextSize(text) <= maxWidth then
-            return fontA
-        end
-        return fontB
-    end
-
-    local sideTitle = vgui.Create("DPanel", sidePanel)
-    sideTitle:Dock(TOP)
-    sideTitle:DockMargin(16, 18, 16, 6)
-    sideTitle:SetTall(36)
-    sideTitle.Paint = function(_, w, h)
-        local txt = "VOTE CONTROL"
-        local font = PickFontForWidth(txt, w - 2, "ZCity_Veteran", "ZCity_Small")
-        surface.SetFont(font)
-        surface.SetTextColor(212, 212, 212, 255)
-        local _, th = surface.GetTextSize(txt)
-        surface.SetTextPos(0, math.floor((h - th) * 0.5))
-        surface.DrawText(txt)
-    end
-
-    local timerLabel = vgui.Create("DPanel", sidePanel)
-    timerLabel:Dock(TOP)
-    timerLabel:DockMargin(16, 0, 16, 12)
-    timerLabel:SetTall(30)
-    timerLabel.Paint = function(_, w, h)
-        local left = math.max(0, math.ceil(time - CurTime()))
-        local txt = "TIME LEFT: " .. left .. "s"
-        local font = "ZCity_Veteran"
-        surface.SetFont(font)
-        if surface.GetTextSize(txt) > (w - 2) then
-            txt = "TIME: " .. left .. "s"
-            font = PickFontForWidth(txt, w - 2, "ZCity_Veteran", "ZCity_Small")
-        end
-        surface.SetFont(font)
-        surface.SetTextColor(170, 170, 170, 255)
-        local _, th = surface.GetTextSize(txt)
-        surface.SetTextPos(0, math.floor((h - th) * 0.5))
-        surface.DrawText(txt)
-    end
-
-    local previewName = "Hover a map"
-    local previewIcon = GetPlaceholderIcon()
-    local previewMap = ""
-
-    local function WrapPreviewText(text, font, maxWidth, maxLines)
-        text = tostring(text or "")
-        surface.SetFont(font)
-        local words = string.Explode(" ", text)
-        local lines = {""}
-
-        for _, word in ipairs(words) do
-            local line = lines[#lines]
-            local candidate = line == "" and word or (line .. " " .. word)
-            local cw = surface.GetTextSize(candidate)
-            if cw <= maxWidth then
-                lines[#lines] = candidate
-            else
-                if #lines < maxLines then
-                    lines[#lines + 1] = word
-                else
-                    local trim = lines[#lines] ~= "" and lines[#lines] or word
-                    while #trim > 0 and surface.GetTextSize(trim) > maxWidth do
-                        trim = string.sub(trim, 1, -2)
-                    end
-                    lines[#lines] = trim
-                    break
-                end
-            end
-        end
-
-        return lines
-    end
-
-    local showcase = vgui.Create("DPanel", sidePanel)
-    showcase:Dock(FILL)
-    showcase:DockMargin(16, 8, 16, 12)
-    showcase.Paint = function(_, w, h)
-        surface.SetDrawColor(12, 12, 12, 220)
-        surface.DrawRect(0, 0, w, h)
-        surface.SetDrawColor(55, 55, 55, 200)
-        surface.DrawOutlinedRect(0, 0, w, h, 2)
-
-        if previewIcon and not previewIcon:IsError() then
-            local imgW = w - 20
-            local imgH = math.floor(h * 0.62)
-            surface.SetDrawColor(255, 255, 255, 240)
-            surface.SetMaterial(previewIcon)
-            surface.DrawTexturedRect(10, 10, imgW, imgH)
-            surface.SetDrawColor(0, 0, 0, 85)
-            surface.DrawRect(10, 10 + imgH - 30, imgW, 30)
-        end
-
-        local titleFont = "ZCity_Veteran"
-        local titleMaxW = w - 28
-        local titleLines = WrapPreviewText(previewName, titleFont, titleMaxW, 3)
-        surface.SetFont(titleFont)
-        local _, titleH = surface.GetTextSize("A")
-        local textY = math.floor(h * 0.68)
-
-        surface.SetTextColor(220, 220, 220, 250)
-        for i = 1, #titleLines do
-            local line = titleLines[i] or ""
-            if line ~= "" then
-                surface.SetTextPos(14, textY + (i - 1) * (titleH + 2))
-                surface.DrawText(line)
-            end
-        end
-
-        if previewMap ~= "" then
-            local mapFont = "ZCity_Tiny"
-            surface.SetTextColor(155, 155, 155, 220)
-            local mapLine = string.upper(previewMap)
-            local mapLines = WrapPreviewText(mapLine, mapFont, w - 28, 2)
-            surface.SetFont(mapFont)
-            local _, mapH = surface.GetTextSize("A")
-            local mapY = textY + (#titleLines * (titleH + 2)) + 6
-            for i = 1, #mapLines do
-                local line = mapLines[i] or ""
-                if line ~= "" then
-                    surface.SetTextPos(14, mapY + (i - 1) * (mapH + 1))
-                    surface.DrawText(line)
-                end
-            end
-        end
-    end
-
-    local function SetPreview(mapName, displayName, mapIcon)
-        previewName = displayName or mapName or "Unknown"
-        previewMap = mapName or ""
-        if mapIcon and not mapIcon:IsError() then
-            previewIcon = mapIcon
-        else
-            previewIcon = GetPlaceholderIcon()
-        end
-    end
-
-    local closeBtn = vgui.Create("DButton", sidePanel)
-    closeBtn:Dock(BOTTOM)
-    closeBtn:DockMargin(16, 12, 16, 16)
-    closeBtn:SetTall(36)
-    closeBtn:SetText("EXIT")
-    closeBtn:SetFont("ZCity_Veteran")
-    closeBtn:SetTextColor(Color(215, 215, 215))
-    closeBtn.Paint = function(self, w, h)
-        local hovered = self:IsHovered()
-        surface.SetDrawColor(16, 16, 16, hovered and 235 or 215)
-        surface.DrawRect(0, 0, w, h)
-        surface.SetDrawColor(75, 75, 75, hovered and 230 or 185)
-        surface.DrawOutlinedRect(0, 0, w, h, 2)
-    end
-    closeBtn.DoClick = function()
-        if IsValid(RTVMenu) then
-            RTVMenu:Remove()
-        end
-    end
-
-    local mapsHost = vgui.Create("DPanel", RTVMenu)
-    mapsHost:SetSize(ScrW() * 0.59, ScrH() * 0.67)
-    mapsHost:SetPos(ScrW() * 0.35, ScrH() * 0.2)
-    mapsHost.Paint = function(_, w, h)
-        surface.SetDrawColor(8, 8, 8, 185)
-        surface.DrawRect(0, 0, w, h)
-        surface.SetDrawColor(45, 45, 45, 160)
-        surface.DrawOutlinedRect(0, 0, w, h, 2)
-    end
-
-    local mapsPanel = vgui.Create("DScrollPanel", mapsHost)
-    mapsPanel:Dock(FILL)
-    mapsPanel:DockMargin(12, 12, 12, 12)
-    mapsPanel:GetVBar():SetWide(7)
-    mapsPanel:GetVBar().Paint = function(_, w, h)
-        surface.SetDrawColor(15, 15, 15, 190)
-        surface.DrawRect(0, 0, w, h)
-    end
-    mapsPanel:GetVBar().btnUp.Paint = function() end
-    mapsPanel:GetVBar().btnDown.Paint = function() end
-    mapsPanel:GetVBar().btnGrip.Paint = function(_, w, h)
-        surface.SetDrawColor(82, 82, 82, 215)
-        surface.DrawRect(0, 0, w, h)
-    end
-
-    local mapGrid = vgui.Create("DIconLayout", mapsPanel)
-    mapGrid:Dock(TOP)
-    mapGrid:SetSpaceX(10)
-    mapGrid:SetSpaceY(10)
-
-    if not istable(maps) then
-        maps = {}
-    end
-
-    local displayMaps = {}
-    local displaySet = {}
-    for _, mapName in ipairs(maps) do
-        if #displayMaps >= maxChoices then break end
-        if not displaySet[mapName] then
-            table.insert(displayMaps, mapName)
-            displaySet[mapName] = true
-        end
-    end
-
-    local mapAreaWidth = mapsHost:GetWide() - 24 - mapsPanel:GetVBar():GetWide()
-    local columns = mapAreaWidth >= 980 and 3 or (mapAreaWidth >= 560 and 2 or 1)
-    local mapCardWidth = math.floor((mapAreaWidth - ((columns - 1) * 10)) / columns)
-    local mapCardHeight = math.max(82, ScrH() * 0.12)
-    local didSetPreview = false
-
-    for _, v in ipairs(displayMaps) do
-        local MapButton = vgui.Create("ZB_RTVButton", mapGrid)
-        MapButton:SetSize(mapCardWidth, mapCardHeight)
-        MapButton:SetFont("ZCity_Veteran")
-        MapButton:SetText("")
-        mapGrid:Add(MapButton)
+    local selectedButton
+    for k, v in ipairs(maps) do
+        local MapButton = vgui.Create("ZB_RTVButton", MAPSPanel)
+        MapButton:Dock(TOP)
+        MapButton:DockMargin(0, 0, 0, ScreenScale(4))
+        MapButton:SetSize(0, ScreenScale(34))
         
         if v == "random" then
             MapButton.DisplayName = "Random Map"
             MapButton.Map = "random"
             MapButton.MapIcon = Material("icon64/random.png")
             if MapButton.MapIcon:IsError() then
-                MapButton.MapIcon = GetPlaceholderIcon()
+                MapButton.MapIcon = nil
             end
         else
             MapButton.DisplayName = FormatMapName(v)
             MapButton.Map = v
             MapButton.MapIcon = Material("maps/thumb/" .. MapButton.Map .. ".png")
             if MapButton.MapIcon:IsError() then
-                MapButton.MapIcon = GetPlaceholderIcon()
+                MapButton.MapIcon = nil
             end
         end
 
@@ -321,7 +105,7 @@ function zb.RTVMenu()
 
         function MapButton:Think()
             self.Votes = votes[self.Map] or 0
-            if self.Map ~= "random" and self.Map == winmap then 
+            if self.Map == winmap then 
                 self.Win = true 
             else 
                 self.Win = false 
@@ -335,20 +119,42 @@ function zb.RTVMenu()
             net.Start("ZB_RockTheVote_vote")
                 net.WriteString(self.Map)
             net.SendToServer()
+            if IsValid(selectedButton) then
+                selectedButton:SetSelected(false)
+            end
+            selectedButton = self
+            self:SetSelected(true)
             VoteCD = CurTime() + 1
         end
     end
 
-    mapGrid:SizeToChildren(false, true)
+    local button = vgui.Create("DButton", RTVMenu)
+    button:SetPos(RTVMenu:GetWide() - ScreenScale(48), ScreenScale(12))
+    button:SetSize(ScreenScale(36), ScreenScale(14))
+    button:SetText("")
 
-    if #displayMaps == 0 then
-        local empty = vgui.Create("DLabel", mapGrid)
-        empty:SetSize(mapsHost:GetWide() - 24, 48)
-        empty:Dock(TOP)
-        empty:SetFont("ZCity_Veteran")
-        empty:SetTextColor(Color(165, 165, 165))
-        empty:SetText("No maps available right now.")
-        empty:SetContentAlignment(5)
+    function button:Paint(w, h)
+        local hovered = self:IsHovered()
+
+        surface.SetDrawColor(hovered and 95 or 30, hovered and 95 or 30, hovered and 95 or 30, hovered and 190 or 110)
+        surface.DrawRect(0, 0, w, h)
+
+        surface.SetDrawColor(155, 155, 155, 210)
+        surface.DrawOutlinedRect(0, 0, w, h, 1)
+
+        local x, y = w / 2, h / 2
+        local txt = "Exit"
+        surface.SetFont("ZCity_RTV_Tiny")
+        surface.SetTextColor(255, 255, 255, 255)
+        local tw, th = surface.GetTextSize(txt)
+        surface.SetTextPos(x - tw / 2, y - th / 2)
+        surface.DrawText(txt)
+    end
+
+    function button:DoClick()
+        if IsValid(RTVMenu) then
+            RTVMenu:Remove()
+        end
     end
 end
 

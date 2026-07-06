@@ -124,6 +124,10 @@ function SWEP:CustomBlockAnim(addPosLerp, addAngLerp)
     return true
 end
 
+SWEP.noreverse = true
+SWEP.BlockTier = 1.5
+SWEP.BlockMaterial = "none"
+
 SWEP.AttackTimeLength = 0.15
 SWEP.Attack2TimeLength = 0.001
 

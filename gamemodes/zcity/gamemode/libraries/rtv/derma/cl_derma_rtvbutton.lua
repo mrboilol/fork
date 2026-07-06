@@ -1,45 +1,40 @@
 local PANEL = {}
 
-local blurMat = Material("pp/blurscreen")
-local Dynamic = 0
+local gradient_r = surface.GetTextureID("vgui/gradient-r")
+local gradient_l = surface.GetTextureID("vgui/gradient-l")
+local col_bg = Color(18, 18, 24, 190)
+local col_bg_hover = Color(32, 32, 38, 220)
+local col_accent = Color(155, 155, 155, 220)
+local col_gray = Color(135, 135, 135)
 
 BlurBackground = BlurBackground or hg.DrawBlur
 
-local function WrapTextLimited(text, font, maxWidth, maxLines)
-    text = tostring(text or "")
-    if text == "" then
-        return {""}
-    end
-
-    surface.SetFont(font)
-    local words = string.Explode(" ", text)
-    local lines = {""}
-
-    for _, word in ipairs(words) do
-        local line = lines[#lines]
-        local candidate = line == "" and word or (line .. " " .. word)
-        local cw = surface.GetTextSize(candidate)
-        if cw <= maxWidth then
-            lines[#lines] = candidate
-        else
-            if #lines < maxLines then
-                lines[#lines + 1] = word
-            else
-                local trim = lines[#lines]
-                if trim == "" then
-                    trim = word
-                end
-                while #trim > 0 and surface.GetTextSize(trim) > maxWidth do
-                    trim = string.sub(trim, 1, -2)
-                end
-                lines[#lines] = trim
-                break
-            end
-        end
-    end
-
-    return lines
+local function RTVUnit(num)
+    return math.floor(num * math.min(ScrW(), ScrH()) / 1000)
 end
+
+local function CreateRTVButtonFonts()
+    surface.CreateFont("ZCity_RTV_Button", {
+        font = "Verily Serif Mono",
+        size = ScreenScale(14),
+        weight = 200
+    })
+
+    surface.CreateFont("ZCity_RTV_ButtonTiny", {
+        font = "Verily Serif Mono",
+        size = ScreenScale(7),
+        weight = 200
+    })
+
+    surface.CreateFont("ZCity_RTV_Voted", {
+        font = "Verily Serif Mono",
+        size = ScreenScale(18),
+        weight = 800
+    })
+end
+
+hook.Add("OnScreenSizeChanged", "ZCity_RTV_ButtonFonts", CreateRTVButtonFonts)
+CreateRTVButtonFonts()
 
 function PANEL:Init()
     self.Map = ""
@@ -50,7 +45,8 @@ function PANEL:Init()
     self.hovered = false
     self.alpha = 0
     self.setalpha = 0
-    self:SetFont("ZCity_Veteran")
+
+    self:SetFont("ZCity_RTV_Button")
 	self:SetPaintBackground(false)
 	self:SetContentAlignment(5)
     self:SetTextColor(color_white)
@@ -61,28 +57,30 @@ end
 
 
 function PANEL:Paint(w, h)
-    if self.MapIcon then
-        surface.SetDrawColor(255, 255, 255, 40)
-        surface.SetMaterial(self.MapIcon)
-        surface.DrawTexturedRect(-12, -12, w + 24, h + 24)
-    end
+    if self.disabled then return end
 
-    surface.SetDrawColor(10, 10, 10, 220)
+    self.HoverFrac = Lerp(FrameTime() * 8, self.HoverFrac or 0, self:IsHovered() and 1 or 0)
+
+    surface.SetDrawColor(col_bg.r + (col_bg_hover.r - col_bg.r) * self.HoverFrac, col_bg.g + (col_bg_hover.g - col_bg.g) * self.HoverFrac, col_bg.b + (col_bg_hover.b - col_bg.b) * self.HoverFrac, col_bg.a + (col_bg_hover.a - col_bg.a) * self.HoverFrac)
     surface.DrawRect(0, 0, w, h)
 
-    surface.SetDrawColor(2, 2, 2, 120)
-    surface.DrawRect(0, h * 0.5, w, h * 0.5)
+    surface.SetDrawColor(0, 0, 0, 170)
+    surface.SetTexture(gradient_l)
+    surface.DrawTexturedRect(0, 0, w, h)
 
-    local outlineR = self.hovered and 235 or 170
-    local outlineA = self.hovered and 220 or 165
-    surface.SetDrawColor(outlineR, outlineR, outlineR, outlineA)
-    surface.DrawOutlinedRect(0, 0, w, h, 2)
+    local iconSize = math.min(h - RTVUnit(12), RTVUnit(74))
+    surface.SetDrawColor(0, 0, 0, 180)
+    surface.DrawRect(RTVUnit(8), h / 2 - iconSize / 2, iconSize, iconSize)
 
-    local plyCount = math.max(player.GetCount(), 1)
-    self.lerp = Lerp(FrameTime() * 7, self.lerp, w * math.Clamp(self.Votes / plyCount, 0, 1))
+    if self.MapIcon then
+        surface.SetDrawColor(255, 255, 255, 210)
+        surface.SetMaterial(self.MapIcon)
+        surface.DrawTexturedRect(RTVUnit(8), h / 2 - iconSize / 2, iconSize, iconSize)
+    else
+        draw.SimpleText("?", "ZCity_RTV_Button", RTVUnit(8) + iconSize / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
 
-    surface.SetDrawColor(225, 225, 225, 95)
-    surface.DrawRect(0, 0, self.lerp, h)
+    local progressStart = iconSize + RTVUnit(18)
 
     if self.Win and self.BipCD < CurTime() then
         self.alpha = 255
@@ -98,54 +96,26 @@ function PANEL:Paint(w, h)
         })
     end
 
-    surface.SetDrawColor(255, 255, 255, self.alpha)
+    surface.SetDrawColor(col_accent.r, col_accent.g, col_accent.b, 95 + 80 * self.HoverFrac)
+    surface.DrawOutlinedRect(0, 0, w, h, 1)
+
+    surface.SetDrawColor(col_accent.r, col_accent.g, col_accent.b, self.alpha)
     surface.DrawRect(0, 0, w, h)
-    
-    local mapText = self.DisplayName or self.Map or ""
-    local font = "ZCity_Veteran"
-    local textMaxW = math.max(70, w - 28)
-    local lines = WrapTextLimited(mapText, font, textMaxW, 3)
-    if #lines >= 3 then
-        local firstW = surface.GetTextSize(lines[1] or "")
-        local secondW = surface.GetTextSize(lines[2] or "")
-        local thirdW = surface.GetTextSize(lines[3] or "")
-        if firstW > textMaxW or secondW > textMaxW or thirdW > textMaxW then
-            font = "ZCity_Tiny"
-            lines = WrapTextLimited(mapText, font, textMaxW, 3)
-        end
-    end
-    surface.SetFont(font)
-    local _, lineH = surface.GetTextSize("A")
-    local linesCount = math.max(#lines, 1)
-    local totalH = lineH * linesCount + (linesCount - 1) * 2
-    local textY = math.max(8, (h - totalH) * 0.5 - 6)
 
-    surface.SetTextColor(220, 220, 220, 245)
-    for i = 1, linesCount do
-        local line = lines[i] or ""
-        if line ~= "" then
-            surface.SetTextPos(14, textY + (i - 1) * (lineH + 2))
-            surface.DrawText(line)
-        end
+    local titleX = progressStart
+    draw.SimpleTextOutlined(self:GetText(), "ZCity_RTV_Button", titleX, h / 2 - RTVUnit(8), color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, color_black)
+    draw.SimpleText(tostring(self.Votes) .. " VOTES", "ZCity_RTV_ButtonTiny", w - RTVUnit(14), h / 2 + RTVUnit(11), col_gray, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+
+    if self.Win then
+        draw.SimpleText("LEADING", "ZCity_RTV_ButtonTiny", w - RTVUnit(14), h / 2 - RTVUnit(12), color_white, TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
     end
 
-    local voteText = tostring(self.Votes) .. " votes"
-    surface.SetFont("ZCity_Tiny")
-    local voteW, voteH = surface.GetTextSize(voteText)
-    surface.SetTextColor(185, 185, 185, 230)
-    surface.SetTextPos(w - voteW - 10, h - voteH - 8)
-    surface.DrawText(voteText)
-
-    if self.Blacklisted then
-        surface.SetDrawColor(0, 0, 0, 160)
-        surface.DrawRect(0, 0, w, h)
-        local msg = "Map is blacklisted"
-        surface.SetFont("ZCity_Small")
-        local mw, mh = surface.GetTextSize(msg)
-        surface.SetTextColor(255, 255, 255, 245)
-        surface.SetTextPos((w - mw) * 0.5, (h - mh) * 0.5)
-        surface.DrawText(msg)
+    if self.selected then
+        draw.SimpleTextOutlined("VOTED", "ZCity_RTV_Voted", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
     end
+
+    return true
+
 end
 
 function PANEL:OnCursorEntered()
@@ -165,8 +135,6 @@ function PANEL:OnCursorEntered()
 end
 
 function PANEL:OnCursorExited()
-    if self.selected then return end
-
     self:CreateAnimation(0.3, {
         index = 1,
         target = {
@@ -180,8 +148,7 @@ end
 
 function PANEL:SetSelected(value)
     self.selected = value
-    if value then self:OnCursorEntered()
-    else self:OnCursorExited() end
+    self:OnCursorExited()
 end
 
 function PANEL:Disabled(bool)
