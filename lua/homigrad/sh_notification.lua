@@ -109,6 +109,19 @@ if CLIENT then
 		outline = false,
 	})
 
+	surface.CreateFont("HuyFontDesperate", {
+		font = "Typewriter",
+		extended = true,
+		size = ScreenScale(10),
+		weight = 400,
+		blursize = 0,
+		scanlines = 0,
+		antialias = true,
+		strikeout = false,
+		shadow = false,
+		outline = false,
+	})
+
 	surface.CreateFont("SmallHuyFont", {
 		font = "BudgetLabel",
 		extended = true,
@@ -135,8 +148,22 @@ if CLIENT then
 		outline = false,
 	})
 
+	surface.CreateFont("EmojiFontDesperate", {
+		font = "Segoe UI Emoji",
+		extended = true,
+		size = ScreenScale(10),
+		weight = 0,
+		blursize = 0,
+		scanlines = 0,
+		antialias = true,
+		strikeout = false,
+		shadow = false,
+		outline = false,
+	})
+
 	hg.notifications = hg.notifications or {}
 	hg.notificationFont = "HuyFont"
+	hg.notificationDesperateFont = "HuyFontDesperate"
 
 	local function isEmojiCode(code)
 		return (code >= 0x1F300 and code <= 0x1F9FF) or
@@ -175,9 +202,10 @@ if CLIENT then
 		return false
 	end
 
-	local function drawTextWithEmoji(text, x, y, color, outlineColor)
+	local function drawTextWithEmoji(text, x, y, color, outlineColor, baseFont)
+		baseFont = baseFont or hg.notificationFont
 		if not hasEmoji(text) then
-			draw.SimpleTextOutlined(text, hg.notificationFont, x, y, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, outlineColor)
+			draw.SimpleTextOutlined(text, baseFont, x, y, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, outlineColor)
 			return
 		end
 
@@ -206,8 +234,9 @@ if CLIENT then
 		end
 
 		local currentX = x
+		local emojiFont = baseFont == hg.notificationDesperateFont and "EmojiFontDesperate" or "EmojiFont"
 		for _, seg in ipairs(segments) do
-			local font = seg.isEmoji and "EmojiFont" or hg.notificationFont
+			local font = seg.isEmoji and emojiFont or baseFont
 			surface.SetFont(font)
 			local w, h = surface.GetTextSize(seg.text)
 			draw.SimpleTextOutlined(seg.text, font, currentX, y, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, outlineColor)
@@ -375,6 +404,7 @@ if CLIENT then
 			local shock = org.shock or 0
 			local adrenaline = org.adrenaline or 0
 			local fear = org.fear or 0
+			local despair = org.despair or 0
 			local analgesia = org.analgesia or 0
 			local consciousness = org.consciousness or 1
 			local o2 = (org.o2 and org.o2[1]) or 30
@@ -383,8 +413,9 @@ if CLIENT then
 			local lasthit = org.lasthit or 0
 			local recentDamage = lasthit > 0 and (time_spent - lasthit) < 3
 
-			local dying = (o2 < 12) or (pulse < 40 and pulse > 0) or (blood < 2500)
+			local dying = (o2 < 12) or (pulse < 40 and pulse > 0) or (blood < 3750)
 			local inPain = pain > 30 or recentDamage
+			local inDespair = despair > 0.5
 			local inShock = shock > 20
 			local inAdrenalineOrFear = (adrenaline > 0.5) or (fear > 0.5)
 			local highAnalgesia = analgesia > 1.0
@@ -439,7 +470,8 @@ if CLIENT then
 					last_time = nil
 				end
 
-				local font = hg.notificationFont
+				local desperateText = inPain or dying or inDespair
+				local font = desperateText and hg.notificationDesperateFont or hg.notificationFont
 
 				surface.SetFont(font)
 				local txtw, txth = surface.GetTextSize(last_message or txt)
@@ -528,7 +560,7 @@ if CLIENT then
 						draw.SimpleTextOutlined(char, font, curX, baseY, rainbowCol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, colBrown)
 						curX = curX + cw
 					end
-				elseif lply.PlayerClassName == "furry" then
+				elseif lply.PlayerClassName == "furry" and not desperateText then
 					local x, y = ScrW() / 2 - txtw / 2 + shakeX, ScrH() - ScrH() / 6 + shakeY
 
 					draw.SimpleText(last_message or txt, "ZB_ProotOSMedium", x + 2, y + 2, ColorAlpha(color_black, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
@@ -536,7 +568,7 @@ if CLIENT then
 				else
 					local x, y = ScrW() / 2 - txtw / 2 + shakeX, ScrH() - ScrH() / 6 + shakeY
 
-					drawTextWithEmoji(last_message or txt, x, y, col, colBrown)
+					drawTextWithEmoji(last_message or txt, x, y, col, colBrown, font)
 				end
 			else
 				local tbl = hg.currentNotification

@@ -459,7 +459,7 @@ function hg.likely_to_phrase(ply)
 		or (temperature < 31 and 0.5)
 		or (temperature > 38 and 0.5)
 		or (blood < 3000 and 0.3)
-		or (fear > 0.5 and 0.7)
+		or (fearBoost > 0 and fearBoost)
 		or (brain > 0.1 and brain * 5)
 		or (fear < -0.5 and 0.05)
 		or -0.1
@@ -495,8 +495,16 @@ local function get_status_message(ply)
 	local thirst = org.thirst
 	local goodmood = org.goodmood
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
-	local fear = org.fear
-	local adrenaline = org.adrenaline
+	local o2 = org.o2 and org.o2[1] or 30
+	local fear = org.fear or 0
+	local adrenaline = org.adrenaline or 0
+	local positive_thinking = (goodmood and goodmood > 0.5) or (org.despair and org.despair < 0.1)
+
+	if fear >= 1.0 and math.random(10) > 3 then
+		positive_thinking = false
+	elseif adrenaline > 1.3 and fear < 0.5 then
+		positive_thinking = true
+	end
 
 	if broken_dislocated and org.just_damaged_bone then
         org.just_damaged_bone = nil
@@ -512,8 +520,6 @@ local function get_status_message(ply)
 	local str = ""
 
 	local most_wanted_phraselist
-
-	local adrenaline = org.adrenaline or 0
 
 	if o2 < 12 then
 		most_wanted_phraselist = low_o2_phrases
@@ -532,11 +538,7 @@ local function get_status_message(ply)
 			if (broken_dislocated) and (blood < 3100) then
 				most_wanted_phraselist = blood < 2900 and (positive_thinking and near_death_positive or near_death_poetic) or (math.random(2) == 1 and (broken_notify and broken_limb or dislocated_limb) or (positive_thinking and near_death_positive or near_death_poetic))
 			elseif(blood < 3100)then
-				if adrenaline > 1.3 and fear < 0.5 then
-					most_wanted_phraselist = near_death_positive
-				else
-					most_wanted_phraselist = near_death_poetic
-				end
+				most_wanted_phraselist = positive_thinking and near_death_positive or near_death_poetic
 			end
 		end
 	elseif after_unconscious_notify then

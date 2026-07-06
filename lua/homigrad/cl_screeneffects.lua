@@ -74,7 +74,7 @@ local tab = {
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3", 0, 5)
-local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3", 0, 6)
+local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3, 7=sonimcooked.mp3", 0, 7)
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3, 4=ngaimcooked.mp3", 0, 4)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
@@ -99,7 +99,7 @@ end
 hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
 	if ply == LocalPlayer() then
 		RunConsoleCommand("hg_painsound", math.random(0, 5))
-		RunConsoleCommand("hg_dyingsound", math.random(0, 6))
+		RunConsoleCommand("hg_dyingsound", math.random(0, 7))
 	end
 end)
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
@@ -473,6 +473,11 @@ local function stopthings()
 		ItssooverStation = nil
 	end
 
+	if IsValid(SonimCookedStation) then
+		SonimCookedStation:Stop()
+		SonimCookedStation = nil
+	end
+
 	if IsValid(AltotrubStation) then
 		AltotrubStation:Stop()
 		AltotrubStation = nil
@@ -768,6 +773,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				ItssooverStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if canRetrySound("SonimCookedStation", SonimCookedStation) then
+		sound.PlayFile("sound/sonimcooked.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				SonimCookedStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -1261,7 +1278,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local traumaPower = recentTrauma and lobotomy_recent_trauma_power or 0
 			local flashChance = recentTrauma and math.max(2, 7 - traumaPower * 4) or math.max(2, 10 * (1 - brain))
 			if show_image_time <= 0 and math.random(flashChance) < 2 then
-				show_image_time = 250 * (0.1 * 3) * math.Rand(0.1, 1) * (math.random(2) == 1 and 0.1 or 1)
+				local durationMul = recentTrauma and 1.8 or 1.45
+				show_image_time = 250 * (0.1 * 3) * math.Rand(0.35, 1.2) * (math.random(2) == 1 and 0.35 or 1) * durationMul
 				lobotomy_memory_total = math.max(show_image_time, 1)
 				local memoryChance = math.Clamp(0.08 + (brain or 0) * 0.22 + traumaPower * 0.18, 0.08, 0.45)
 				lobotomy_memory_flash = math.Rand(0, 1) < memoryChance
@@ -1298,7 +1316,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if (org.jaw or 0) >= 1 then
 				chance = chance + 3
 			end
-			show_some_images_time = math.random(1200) < chance and 250 or 0
+			show_some_images_time = math.random(1200) < chance and 380 or 0
 		end
 	else
 		brain_motionblur = false
@@ -1502,7 +1520,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SillydyingStation:SetVolume(consciousVol)
 				end
 			elseif dyingMode == 6 then
-				-- Only itssoover.mp3 with sound peak detection for screen shake
+				-- Only fuck.mp3 with sound peak detection for screen shake
 				if IsValid(NoiseStation2) then
 					NoiseStation2:SetVolume(0)
 				end
@@ -1541,6 +1559,35 @@ hook.Add("Post Post Processing", "ItHurts", function()
 						end
 					end
 				end
+				if IsValid(SonimCookedStation) then
+					SonimCookedStation:SetVolume(0)
+				end
+			elseif dyingMode == 7 then
+				-- Only sonimcooked.mp3, no screen shake
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(0)
+				end
+				if IsValid(SonimCookedStation) then
+					SonimCookedStation:SetVolume(consciousVol)
+				end
+			end
+			if dyingMode != 7 and IsValid(SonimCookedStation) then
+				SonimCookedStation:SetVolume(0)
 			end
 		else
 			hg.consciousBeatIntensity = 0
@@ -1562,10 +1609,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(ItssooverStation) then
 				ItssooverStation:SetVolume(0)
 			end
+			if IsValid(SonimCookedStation) then
+				SonimCookedStation:SetVolume(0)
+			end
 		end
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = hg_otrubsound:GetInt()
+			local deathFuckOtrub = hg_dyingsound:GetInt() == 6
 
 			if canRetrySound("NoiseStation", NoiseStation) then
 				sound.PlayFile("sound/zbattle/unconscious_type_beat.ogg", "noblock noplay", function(station)
@@ -1714,6 +1765,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(NgaimCookedStation) then
 					NgaimCookedStation:SetVolume(otrubVol)
 				end
+			end
+
+			if deathFuckOtrub and IsValid(ItssooverStation) then
+				ItssooverStation:SetVolume(otrubVol)
 			end
 		else
 			if IsValid(NoiseStation) then
@@ -2259,9 +2314,9 @@ net.Receive("headtrauma_flash", function()
     -- Scale effects by the received flash duration (which is scaled by damage on the server)
     local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)
     local traumaPower = math.Clamp(damageScale + (is_critical and 0.55 or 0) + (hasBrainDamage and 0.35 or 0) + (hasConcussion and 0.25 or 0), 0, 1.8)
-    lobotomy_recent_trauma = CurTime() + math.Clamp(2 + traumaPower * 4, 3, 9)
+    lobotomy_recent_trauma = CurTime() + math.Clamp(3 + traumaPower * 5, 4, 12)
     lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
-    show_some_images_time = math.max(show_some_images_time or 0, math.floor(80 + traumaPower * 140))
+    show_some_images_time = math.max(show_some_images_time or 0, math.floor(130 + traumaPower * 220))
     if traumaPower > 0.75 then
         show_image_time = 0
     end

@@ -462,8 +462,8 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 		time = math.max(time, org.otrub and 6 or 10)
 		
 		-- Show for longer duration with more brain damage
-		local showDuration = time / 3 + (lerpedbrain * 5)
-		showDuration = math.min(showDuration, time * 0.7) -- Max 70% of cycle
+		local showDuration = time * (org.otrub and 0.58 or 0.46) + (lerpedbrain * 8) + traumaBoost * 6
+		showDuration = math.min(showDuration, time * (org.otrub and 0.88 or 0.78))
 		
 		if part % time > time - showDuration and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
 			switch = true
@@ -1040,6 +1040,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				
 				if org.timeValue and org.o2.curregen <= org.timeValue * 0.5 and org.o2[1] < 20 then
 					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_wheeze"..math.random(5)..".mp3", 40, nil, nil, nil, nil, 1)
+				end
+				if org.o2[1] < 12 and ply == lply and (ent.pulse_breathe.lastsonimcooked or 0) < CurTime() and math.random(4) == 1 then
+					ply:EmitSound("sonimcooked.mp3", 45, math.random(94, 106), 0.85)
+					ent.pulse_breathe.lastsonimcooked = CurTime() + math.Rand(12, 24)
 				end
 			else
 				if org.o2[1] < 15 then
