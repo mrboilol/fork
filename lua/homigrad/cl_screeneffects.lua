@@ -87,13 +87,13 @@ local function despair_system_mode()
 	if not hg_despairsystem_convar then hg_despairsystem_convar = GetConVar("hg_despairsystem") end
 	return hg_despairsystem_convar and hg_despairsystem_convar:GetInt() or 0
 end
-local zcity_mental_effects_convar
-local zcity_mental_enabled_convar
-local function mental_effects_enabled()
-	if not zcity_mental_enabled_convar then zcity_mental_enabled_convar = GetConVar("zcity_delta_mental_enabled") end
-	if zcity_mental_enabled_convar and not zcity_mental_enabled_convar:GetBool() then return false end
-	if not zcity_mental_effects_convar then zcity_mental_effects_convar = GetConVar("zcity_delta_mental_effects_enabled") end
-	return not zcity_mental_effects_convar or zcity_mental_effects_convar:GetBool()
+local hg_ptsd_effects_convar
+local hg_ptsd_enabled_convar
+local function ptsd_effects_enabled()
+	if not hg_ptsd_enabled_convar then hg_ptsd_enabled_convar = GetConVar("hg_ptsd_enabled") end
+	if hg_ptsd_enabled_convar and not hg_ptsd_enabled_convar:GetBool() then return false end
+	if not hg_ptsd_effects_convar then hg_ptsd_effects_convar = GetConVar("hg_ptsd_effects_enabled") end
+	return not hg_ptsd_effects_convar or hg_ptsd_effects_convar:GetBool()
 end
 
 hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
@@ -989,11 +989,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	-- Consciousness whitenoise: ramps up from 0 at 0.95 consciousness to full at 0.1
 	-- Despair overrides this sound
-	local mentalDistress = math.Clamp(tonumber(lply:GetNWFloat("zcity_delta_mental_distress", 0)) or 0, 0, 1)
-	if mentalDistress <= 0 then mentalDistress = math.Clamp(org.despair or 0, 0, 1) end
-	if despair_system_mode() == 0 or not mental_effects_enabled() then mentalDistress = 0 end
+	local ptsdDistress = math.max(math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75, math.Clamp(org.despair or 0, 0, 1))
+	if despair_system_mode() == 0 or not ptsd_effects_enabled() then ptsdDistress = 0 end
 
-	if not org.otrub and (org.consciousness or 1) < 0.95 and mentalDistress <= 0 then
+	if not org.otrub and (org.consciousness or 1) < 0.95 and ptsdDistress <= 0 then
 		local consciousnessVol = math.Remap(org.consciousness, 0.95, 0.1, 0, 1)
 		consciousnessVol = math.Clamp(consciousnessVol, 0, 1)
 
@@ -1006,7 +1005,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	if org.consciousness < 0.5 and mentalDistress <= 0 then
+	if org.consciousness < 0.5 and ptsdDistress <= 0 then
         if canRetrySound("WhiteNoiseStation", WhiteNoiseStation) then
             sound.PlayFile("sound/whitenoise.wav", "noblock noplay", function(station)
                 if IsValid(station) then
@@ -1102,7 +1101,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			-- Panic attack and despair override pain sounds (except brain damage)
 			local panicAttack = (org.panicAttack or false)
 			local brain = (org.brain or 0)
-			local overridePainSounds = (panicAttack or mentalDistress > 0.5) and brain < 0.01
+			local overridePainSounds = (panicAttack or ptsdDistress > 0.5) and brain < 0.01
 
 			local targetPainVol = 0
 			local targetRealityVol = 0
@@ -1740,9 +1739,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	local despair = org.givingUp and 0 or math.Clamp(tonumber(lply:GetNWFloat("zcity_delta_mental_distress", 0)) or 0, 0, 1)
-	if despair <= 0 then despair = math.Clamp(org.despair or 0, 0, 1) end
-	if despair_system_mode() == 0 or not mental_effects_enabled() then despair = 0 end
+	local despair = org.givingUp and 0 or math.max(math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75, math.Clamp(org.despair or 0, 0, 1))
+	if despair_system_mode() == 0 or not ptsd_effects_enabled() then despair = 0 end
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
 
@@ -2010,13 +2008,12 @@ hook.Add("DrawOverlay", "despair_text", function()
 		return
 	end
 
-	if despair_system_mode() == 0 or not mental_effects_enabled() then
+	if despair_system_mode() == 0 or not ptsd_effects_enabled() then
 		despairTextLerp = 0
 		return
 	end
 
-	local despair = math.Clamp(tonumber(ply:GetNWFloat("zcity_delta_mental_distress", 0)) or 0, 0, 1)
-	if despair <= 0 then despair = math.Clamp(org.despair or 0, 0, 1) end
+	local despair = math.max(math.Clamp(tonumber(ply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75, math.Clamp(org.despair or 0, 0, 1))
 	local target = math.Clamp((despair - 0.45) / 0.55, 0, 1)
 	despairTextLerp = LerpFT(0.03, despairTextLerp, target)
 	if despairTextLerp <= 0.001 then return end
@@ -2027,8 +2024,8 @@ hook.Add("DrawOverlay", "despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	local state = ply:GetNWString("zcity_delta_mental_state", "stable")
-	local text = state == "desperate" and "im so fucking scared." or state == "distress" and "i cant calm down." or "everything feels wrong."
+	local state = ply:GetNWString("hg_ptsd_state", "stable")
+	local text = (state == "critical" or state == "flashback") and "this is happening again." or state == "acute" and "i cant calm down." or "everything feels wrong."
 	draw.SimpleText(text, "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	draw.SimpleText(text, "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)

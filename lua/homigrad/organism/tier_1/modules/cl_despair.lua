@@ -49,13 +49,18 @@ local function despair_system_mode()
 	if not hg_despairsystem_convar then hg_despairsystem_convar = GetConVar("hg_despairsystem") end
 	return hg_despairsystem_convar and hg_despairsystem_convar:GetInt() or 0
 end
-local zcity_mental_effects_convar
-local zcity_mental_enabled_convar
-local function mental_effects_enabled()
-	if not zcity_mental_enabled_convar then zcity_mental_enabled_convar = GetConVar("zcity_delta_mental_enabled") end
-	if zcity_mental_enabled_convar and not zcity_mental_enabled_convar:GetBool() then return false end
-	if not zcity_mental_effects_convar then zcity_mental_effects_convar = GetConVar("zcity_delta_mental_effects_enabled") end
-	return not zcity_mental_effects_convar or zcity_mental_effects_convar:GetBool()
+local hg_ptsd_effects_convar
+local hg_ptsd_enabled_convar
+local function ptsd_effects_enabled()
+	if not hg_ptsd_enabled_convar then hg_ptsd_enabled_convar = GetConVar("hg_ptsd_enabled") end
+	if hg_ptsd_enabled_convar and not hg_ptsd_enabled_convar:GetBool() then return false end
+	if not hg_ptsd_effects_convar then hg_ptsd_effects_convar = GetConVar("hg_ptsd_effects_enabled") end
+	return not hg_ptsd_effects_convar or hg_ptsd_effects_convar:GetBool()
+end
+
+local function get_ptsd_intensity(ply)
+	if not IsValid(ply) then return 0 end
+	return math.Clamp(tonumber(ply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1)
 end
 
 local panicThoughts = {
@@ -160,10 +165,8 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	local org = get_target_organism()
-	local despair = math.Clamp(tonumber(ply:GetNWFloat("zcity_delta_mental_distress", 0)) or 0, 0, 1)
-	if despair <= 0 and org and org.despair then
-		despair = math.Clamp(org.despair, 0, 1)
-	end
+	local despair = org and math.Clamp(org.despair or 0, 0, 1) or 0
+	despair = math.max(despair, get_ptsd_intensity(ply) * 0.75)
 	local panicAttack = (org and org.panicAttack) or false
 	
 	-- Debug convar overrides
@@ -178,7 +181,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	end
 
 	-- Simple mode: despair and panic visuals/sounds are fully disabled
-	if despair_system_mode() == 0 or not mental_effects_enabled() then
+	if despair_system_mode() == 0 or not ptsd_effects_enabled() then
 		despair = 0
 		panicAttack = false
 		despairLerp = 0
@@ -275,9 +278,9 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		render.DrawScreenQuad()
 	end
 
-	local state = ply:GetNWString("zcity_delta_mental_state", "stable")
+	local state = ply:GetNWString("hg_ptsd_state", "stable")
 	local themeIntensity = math.Clamp((despair - 0.18) / 0.62, 0, 1)
-	if state == "desperate" then themeIntensity = math.max(themeIntensity, 0.75) end
+	if state == "critical" or state == "flashback" then themeIntensity = math.max(themeIntensity, 0.75) end
 	if panicAttack then themeIntensity = math.max(themeIntensity, 0.55) end
 	if givingUp then themeIntensity = math.max(themeIntensity, 0.85) end
 
@@ -343,14 +346,12 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	end
 	local moodPly = LocalPlayer()
 	if not IsValid(moodPly) then return end
-	if despair_system_mode() == 0 or not mental_effects_enabled() then
+	if despair_system_mode() == 0 or not ptsd_effects_enabled() then
 		despairTextLerp = 0
 		return
 	end
-	local despair = math.Clamp(tonumber(moodPly:GetNWFloat("zcity_delta_mental_distress", 0)) or 0, 0, 1)
-	if despair <= 0 and org and org.despair then
-		despair = math.Clamp(org.despair, 0, 1)
-	end
+	local despair = org and math.Clamp(org.despair or 0, 0, 1) or 0
+	despair = math.max(despair, get_ptsd_intensity(moodPly) * 0.75)
 	
 	-- Debug convar override
 	local debugDespair = hg_despair_override_convar and hg_despair_override_convar:GetFloat() or 0
@@ -371,8 +372,8 @@ hook.Add("DrawOverlay", "hg_despair_text", function()
 	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
 	local alpha = math.floor(255 * despairTextLerp)
 
-	local state = moodPly:GetNWString("zcity_delta_mental_state", "stable")
-	local text = state == "desperate" and "im so fucking scared" or state == "distress" and "i cant calm down" or "everything feels wrong"
+	local state = moodPly:GetNWString("hg_ptsd_state", "stable")
+	local text = (state == "critical" or state == "flashback") and "this is happening again" or state == "acute" and "i cant calm down" or "everything feels wrong"
 	draw.SimpleText(text, despairFont, x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	draw.SimpleText(text, despairFont, x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
@@ -448,7 +449,7 @@ hook.Add("Think", "hg_despair_corpse_vignette", function()
 		return
 	end
 
-	if despair_system_mode() == 0 or not mental_effects_enabled() then
+	if despair_system_mode() == 0 or not ptsd_effects_enabled() then
 		corpseTarget = 0
 		return
 	end

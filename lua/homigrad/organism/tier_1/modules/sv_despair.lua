@@ -4,10 +4,10 @@ if hg and hg.despair_server_builtin then return end
 hg.despair_server_builtin = true
 
 local hg_despair_override = CreateConVar("hg_despair_override", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Global despair override (0-1)", 0, 1)
-local hg_despairsystem = CreateConVar("hg_despairsystem", 1, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Despair/mental system mode (0 = giving-up only: despair, mood, distress, panic disabled; 1 = unified mental meter enabled)", 0, 1)
+local hg_despairsystem = CreateConVar("hg_despairsystem", 1, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Despair/PTSD system mode (0 = giving-up only: despair, PTSD, and panic disabled; 1 = despair with PTSD pressure enabled)", 0, 1)
 
-local function mental_system_enabled()
-	return not (hg and hg.Mental and hg.Mental.IsMentalEnabled) or hg.Mental.IsMentalEnabled()
+local function ptsd_system_enabled()
+	return not (hg and hg.PTSD and hg.PTSD.IsEnabled) or hg.PTSD.IsEnabled()
 end
 
 local function get_despair_org(ent)
@@ -100,7 +100,7 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 	local org = get_despair_org(ply)
 	if not org then return end
 	if org.otrub then return end
-	if hg_despairsystem:GetInt() == 0 or not mental_system_enabled() then return end
+	if hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled() then return end
 
 	local dmg = (dmgInfo and dmgInfo.GetDamage and dmgInfo:GetDamage()) or 0
 	if dmg <= 0 then return end
@@ -110,17 +110,20 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 		add = add * 1.2
 	end
 
-	org.despair = min((org.despair or 0) + add, 1)
-	org._despairLastGainedTime = CurTime()
+	local before = org.despair or 0
+	org.despair = min(before + add, 1)
+	if org.despair > before then
+		org._despairLastGainedTime = CurTime()
+	end
 end)
 
 hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	local time = CurTime()
-	local simpleMode = hg_despairsystem:GetInt() == 0 or not mental_system_enabled()
-	local mental = hg.Mental and hg.Mental.GetUnifiedState and hg.Mental.GetUnifiedState(owner, org)
-	local mentalPanicRisk = mental and mental.panicRisk or (org.mentalPanicRisk or 0)
+	local simpleMode = hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled()
+	local ptsd = hg.PTSD and hg.PTSD.GetState and hg.PTSD.GetState(owner, org)
+	local ptsdPanicRisk = ptsd and ptsd.panicRisk or (org.ptsdPanicRisk or 0)
 
 	-- In simple mode despair and panic are fully disabled
 	if simpleMode then
@@ -244,6 +247,11 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + 10 + (gained * 30))
 	end
 	local isLocked = CurTime() < (org._despairLockUntil or 0)
+	local stableAtFullDespair = currentDespair >= 0.995 and not is_in_danger(org)
+	if stableAtFullDespair and (org._despairLockUntil or 0) > CurTime() + 8 then
+		org._despairLockUntil = CurTime() + 8
+		isLocked = true
+	end
 
 	-- Despair budge less unless despair hasn't been gained for a little bit
 	local timeSinceGain = CurTime() - (org._despairLastGainedTime or 0)
@@ -272,6 +280,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		-- Faster decay if despair hasn't been gained in a while (60+ seconds)
 		if timeSinceGain > 60 then
 			despairDecay = despairDecay * (1 + (timeSinceGain - 60) / 60) -- Up to 2x faster after 120 seconds
+		end
+		if stableAtFullDespair and timeSinceGain > 20 then
+			despairDecay = max(despairDecay, timeValue / 90)
 		end
 	end
 	org.despair = math.Approach(org.despair, 0, despairDecay)
@@ -520,8 +531,11 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org.goodmood = goodmood - goodmoodLoss
 			add = add - goodmoodLoss
 		end
-		org.despair = min(org.despair + add, 1)
-		org._despairLastGainedTime = CurTime()
+		local before = org.despair or 0
+		org.despair = min(before + add, 1)
+		if org.despair > before then
+			org._despairLastGainedTime = CurTime()
+		end
 	end
 
 	-- Cap despair at 0.5 if player had goodmood and still has some goodmood left
@@ -598,7 +612,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 	else
 		-- Check if panic attack should trigger (despair > 0.7 and in danger while awake)
-		if (org.despair > 0.55 or mentalPanicRisk > 0.5) and is_in_danger(org) and not org.givingUp then
+		if (org.despair > 0.55 or ptsdPanicRisk > 0.5) and is_in_danger(org) and not org.givingUp then
 			-- Start tracking time if not already tracking
 			if not org._panicAttackStartTime then
 				org._panicAttackStartTime = time
@@ -608,7 +622,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				org._panicAttackCheckTime = time + 1
 
 				-- Guaranteed panic after a short stretch of danger + high despair.
-				local riskFactor = max(Clamp((org.despair - 0.55) / 0.45, 0, 1), mentalPanicRisk)
+				local riskFactor = max(Clamp((org.despair - 0.55) / 0.45, 0, 1), ptsdPanicRisk)
 				local triggerChance = riskFactor * (0.18 + danger_severity(org) * 0.22)
 				local forceTrigger = (time - org._panicAttackStartTime >= 7)
 
@@ -743,7 +757,7 @@ end
 
 hook.Add("HG_HeadExploded", "hg_despair_head_explosion", function(rag, victim)
 	if not IsValid(rag) then return end
-	if hg_despairsystem:GetInt() == 0 or not mental_system_enabled() then return end
+	if hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled() then return end
 
 	local pos = rag:WorldSpaceCenter()
 	local now = CurTime()
@@ -775,8 +789,11 @@ hook.Add("HG_HeadExploded", "hg_despair_head_explosion", function(rag, victim)
 		local add = math.Clamp(1 - dist / 900, 0, 1) * 0.25
 		if add <= 0 then continue end
 
-		org.despair = math.min((org.despair or 0) + add, 1)
-		org._despairLastGainedTime = now
+		local before = org.despair or 0
+		org.despair = math.min(before + add, 1)
+		if org.despair > before then
+			org._despairLastGainedTime = now
+		end
 		org._despairNextHeadExplosion = now + 0.5
 		-- Traumatic events stick around: lock despair decay for a good while
 		org._despairLockUntil = math.max(org._despairLockUntil or 0, now + 30)
@@ -785,7 +802,7 @@ end)
 
 hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
 	if not IsValid(rag) then return end
-	if hg_despairsystem:GetInt() == 0 or not mental_system_enabled() then return end
+	if hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled() then return end
 
 	local pos = rag:WorldSpaceCenter()
 	local now = CurTime()
@@ -817,8 +834,11 @@ hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
 		local add = math.Clamp(1 - dist / 900, 0, 1) * 0.15
 		if add <= 0 then continue end
 
-		org.despair = math.min((org.despair or 0) + add, 1)
-		org._despairLastGainedTime = now
+		local before = org.despair or 0
+		org.despair = math.min(before + add, 1)
+		if org.despair > before then
+			org._despairLastGainedTime = now
+		end
 		org._despairNextDeathWitness = now + 0.5
 		org._despairLockUntil = math.max(org._despairLockUntil or 0, now + 30)
 

@@ -29,7 +29,7 @@ end
 local function BootServer()
     SafeInclude("homigrad/medical_minigame/sh_init.lua", "medical_shared")
     SafeInclude("homigrad/medical_minigame/sv_logic.lua", "medical_server")
-    SafeInclude("autorun/server/zz_zcity_delta_mental.lua", "mental_server")
+    SafeInclude("autorun/server/zz_zcity_delta_ptsd.lua", "ptsd_server")
     SafeInclude("autorun/server/zz_zcity_delta_death_respawn.lua", "death_respawn_server")
 end
 

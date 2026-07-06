@@ -24,8 +24,8 @@ function SWEP:Heal(target, mode)
     if not IsValid(target) or not target:IsPlayer() then return false end
     if not target.organism then return false end
 
-    if hg and hg.Mental and hg.Mental.ApplyAntidepressantDose then
-        hg.Mental.ApplyAntidepressantDose(self:GetOwner(), target, 1)
+    if hg and hg.PTSD and hg.PTSD.ApplyAntidepressantDose then
+        hg.PTSD.ApplyAntidepressantDose(self:GetOwner(), target, 1)
     end
 
     self.modeValues[1] = math.max((self.modeValues[1] or 0) - 1, 0)

@@ -143,11 +143,6 @@ function SWEP:GetFocusHandlingMul()
 	local anxious = math.Clamp((org.despair or 0) * 1.2 + (org.panicAttack and 0.45 or 0), 0, 1.4)
 	local focus = math.min(adrenaline, 1.5) * 0.08
 
-	if hg.Mental and hg.Mental.HasTrait then
-		if hg.Mental.HasTrait(owner, "trained") then focus = focus + 0.12 end
-		if hg.Mental.HasTrait(owner, "grunt") then focus = focus + 0.08 end
-	end
-
 	local className = owner.PlayerClassName
 	if className == "swat" or className == "nationalguard" or className == "Metrocop" or className == "police" then
 		focus = focus + 0.08

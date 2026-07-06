@@ -7,10 +7,7 @@ if SERVER then
     util.AddNetworkString("hg_medical_minigame_tourniquet_pain")
     util.AddNetworkString("hg_medical_minigame_dislocation_pain")
 
-    util.AddNetworkString("zcity_delta_laststand")
     util.AddNetworkString("zcity_delta_moodles_extra")
-    util.AddNetworkString("zcity_delta_traits_sync")
-    util.AddNetworkString("zcity_delta_traits_set")
     util.AddNetworkString("zcity_delta_death_report")
     util.AddNetworkString("zcity_delta_death_respawn")
 end
