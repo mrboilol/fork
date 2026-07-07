@@ -332,6 +332,8 @@ local show_some_images_time = 0
 local lobotomy_memory_mat
 local lobotomy_memory_total = 1
 local lobotomy_memory_flash = false
+local lobotomy_flash_mat
+local lobotomy_next_forced_flash = 0
 local lobotomy_recent_trauma = 0
 local lobotomy_recent_trauma_power = 0
 local disorientationFxLerp = 0
@@ -365,8 +367,29 @@ local function getLobotomyMemoryMat()
 	return valid[math.random(#valid)]
 end
 
-local function drawLobotomyFlash(alpha)
-	local mat = lobotomy_mats[math.random(#lobotomy_mats)]
+local function getLobotomyFlashMat()
+	return lobotomy_mats[math.random(#lobotomy_mats)]
+end
+
+local function startLobotomyFlash(duration, traumaPower, allowMemory)
+	show_image_time = math.max(duration or 45, 1)
+	lobotomy_memory_total = show_image_time
+	lobotomy_flash_mat = getLobotomyFlashMat()
+	lobotomy_memory_flash = false
+	lobotomy_memory_mat = nil
+
+	if allowMemory then
+		local memoryChance = math.Clamp(0.08 + (traumaPower or 0) * 0.2, 0.08, 0.35)
+		local memoryMat = math.Rand(0, 1) < memoryChance and getLobotomyMemoryMat() or nil
+		if memoryMat then
+			lobotomy_memory_flash = true
+			lobotomy_memory_mat = memoryMat
+		end
+	end
+end
+
+local function drawLobotomyFlash(alpha, mat)
+	mat = mat or lobotomy_flash_mat or getLobotomyFlashMat()
 	if not mat then return end
 
 	local rand = 5
@@ -1270,42 +1293,35 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 	
 	if ((org.skull or 0) > 0.2 or (org.jaw or 0) > 0.2 or (org.concussion or 0) > 0) and not org.otrub then
-		if show_some_images_time > 0 then
+		if show_image_time > 0 then
+			brain_motionblur = true
+			DrawMotionBlur(0.1, 1., 0.1)
+
+			local alpha = 255 * math.Clamp(show_image_time / math.max(lobotomy_memory_total, 1), 0, 1)
+			show_image_time = show_image_time - 1
+
+			if lobotomy_memory_flash and lobotomy_memory_mat then
+				local rand = 12
+				surface.SetDrawColor(255, 255, 255, alpha)
+				surface.SetMaterial(lobotomy_memory_mat)
+				surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand * 2), ScrH() + math.random(rand * 2))
+
+				render.UpdateScreenEffectTexture()
+				vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+				vignetteMat:SetFloat("$c0_z", 3.0)
+				vignetteMat:SetFloat("$c1_y", 5.0)
+				render.SetMaterial(vignetteMat)
+				render.DrawScreenQuad()
+			else
+				drawLobotomyFlash(alpha)
+			end
+		elseif show_some_images_time > 0 then
 			brain_motionblur = true
 			DrawMotionBlur(0.1, 1., 0.1)
 			show_some_images_time = show_some_images_time - 1
-			local recentTrauma = lobotomy_recent_trauma > CurTime()
-			local traumaPower = recentTrauma and lobotomy_recent_trauma_power or 0
-			local flashChance = recentTrauma and math.max(2, 7 - traumaPower * 4) or math.max(2, 10 * (1 - brain))
-			if show_image_time <= 0 and math.random(flashChance) < 2 then
-				local durationMul = recentTrauma and 1.8 or 1.45
-				show_image_time = 250 * (0.1 * 3) * math.Rand(0.35, 1.2) * (math.random(2) == 1 and 0.35 or 1) * durationMul
-				lobotomy_memory_total = math.max(show_image_time, 1)
-				local memoryChance = math.Clamp(0.08 + (brain or 0) * 0.22 + traumaPower * 0.18, 0.08, 0.45)
-				lobotomy_memory_flash = math.Rand(0, 1) < memoryChance
-				lobotomy_memory_mat = lobotomy_memory_flash and getLobotomyMemoryMat() or nil
-			end
-
-			if show_image_time > 0 then
-				show_image_time = show_image_time - 1
-
-				if lobotomy_memory_flash and lobotomy_memory_mat then
-					local phase = 1 - math.Clamp(show_image_time / lobotomy_memory_total, 0, 1)
-					local alpha = 255 * math.sin(phase * math.pi)
-					local rand = 12
-					surface.SetDrawColor(255, 255, 255, alpha)
-					surface.SetMaterial(lobotomy_memory_mat)
-					surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand * 2), ScrH() + math.random(rand * 2))
-
-					render.UpdateScreenEffectTexture()
-					vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-					vignetteMat:SetFloat("$c0_z", 3.0)
-					vignetteMat:SetFloat("$c1_y", 5.0)
-					render.SetMaterial(vignetteMat)
-					render.DrawScreenQuad()
-				else
-					drawLobotomyFlash(255)
-				end
+			local flashChance = math.max(2, 10 * (1 - brain))
+			if math.random(flashChance) < 2 then
+				startLobotomyFlash(250 * (0.1 * 3) * math.Rand(0.35, 1.2) * (math.random(2) == 1 and 0.35 or 1) * 1.15, math.Clamp(brain or 0, 0, 1), true)
 			end
 		else
 			brain_motionblur = false
@@ -1323,6 +1339,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		show_image_time = 0
 		lobotomy_memory_mat = nil
 		lobotomy_memory_flash = false
+		lobotomy_flash_mat = nil
 		if lobotomy_recent_trauma <= CurTime() then
 			lobotomy_recent_trauma_power = 0
 		end
@@ -2316,9 +2333,15 @@ net.Receive("headtrauma_flash", function()
     local traumaPower = math.Clamp(damageScale + (is_critical and 0.55 or 0) + (hasBrainDamage and 0.35 or 0) + (hasConcussion and 0.25 or 0), 0, 1.8)
     lobotomy_recent_trauma = CurTime() + math.Clamp(3 + traumaPower * 5, 4, 12)
     lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
-    show_some_images_time = math.max(show_some_images_time or 0, math.floor(130 + traumaPower * 220))
-    if traumaPower > 0.75 then
-        show_image_time = 0
+    local severeFlash = is_critical or hasBrainDamage or hasConcussion or traumaPower > 0.75
+    if severeFlash then
+        show_some_images_time = 0
+        if (lobotomy_next_forced_flash or 0) <= CurTime() then
+            startLobotomyFlash(math.floor(24 + traumaPower * 34), traumaPower, true)
+            lobotomy_next_forced_flash = CurTime() + math.Clamp(1.2 + traumaPower * 0.45, 1.2, 2.1)
+        end
+    elseif show_image_time <= 0 then
+        show_some_images_time = math.max(show_some_images_time or 0, math.floor(40 + traumaPower * 55))
     end
 
     if hasConcussion then

@@ -61,7 +61,7 @@ function hg.organism.paincheck(org)
 
 
 
-	return (org.shock > org.shock_turn * 4 * analgesiaMul)
+	return (org.shock >= org.shock_turn * 4 * analgesiaMul)
 
 end
 
@@ -349,6 +349,16 @@ module[2] = function(owner, org, timeValue)
 
 	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - org.analgesia, 0)
 
+	local activeShock = org.shock or 0
+	local activePain = org.pain or 0
+	local activeShockThreshold = GetShockConsciousnessThreshold(org.analgesia)
+	if activeShock >= activeShockThreshold and activePain > 35 then
+		local shockSeverity = Clamp((activeShock - activeShockThreshold) / 35, 0.45, 1)
+		local painSeverity = Clamp((activePain - 35) / 55, 0.35, 1)
+		local collapseDrain = timeValue * shockSeverity * painSeverity * 0.95 / stressResistance
+		org.consciousness = max((org.consciousness or 1) - collapseDrain, 0)
+	end
+
 
 
 	org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
@@ -366,10 +376,10 @@ module[2] = function(owner, org, timeValue)
 		local shockSeverity = math.Clamp((org.shock - shockCap) / 75, 0.05, 1)
 
 		local pain = org.pain or 0
-		local highPain = pain > 70
+		local highPain = pain > 55
 
 		local shockFloor
-		if highPain then
+		if highPain or (org.shock or 0) >= GetShockConsciousnessThreshold(org.analgesia) then
 			shockFloor = 0
 		else
 			shockFloor = 0.5

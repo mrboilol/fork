@@ -230,6 +230,8 @@ end
 
 input_list.brain = function(org, bone, dmg, dmgInfo)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
+	local sharpBrain = dmgInfo:IsDamageType(DMG_SLASH)
+	local sharpConsciousnessMul = sharpBrain and math.Clamp(dmg / 0.45, 0.25, 1) or 1
 	local oldDmg = org.brain
 	local result = damageOrgan(org, dmg * 1, dmgInfo, "brain")
 	local brainDelta = org.brain - oldDmg
@@ -298,7 +300,8 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		net.Broadcast()
 	end
 
-	if org.brain >= 0.01 and brainDelta > 0.01 and math.random(3) == 1 then
+	local severeBrainShock = not sharpBrain or brainDelta > 0.06 or dmg > 0.35
+	if severeBrainShock and org.brain >= 0.01 and brainDelta > 0.01 and math.random(3) == 1 then
 		--hg.applyFencingToPlayer(org.owner, org)
 		org.shock = 70
 
@@ -313,9 +316,9 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		end)
 	end
 
-	org.consciousness = math.Approach(org.consciousness, 0, dmg * 3)
+	org.consciousness = math.Approach(org.consciousness, 0, dmg * 3 * sharpConsciousnessMul)
 	
-	org.disorientation = org.disorientation + dmg * 1
+	org.disorientation = org.disorientation + dmg * (sharpBrain and 0.55 or 1)
 	org.shock = org.shock + dmg * 3
 	org.painadd = org.painadd + dmg * 10
 

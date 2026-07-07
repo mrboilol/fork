@@ -42,6 +42,21 @@ local function AddBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
 	end
 end
 
+local function IsSharpHeadDamage(dmgInfo)
+	return dmgInfo and dmgInfo:IsDamageType(DMG_SLASH)
+end
+
+local function GetHeadBoneDamageScale(dmgInfo)
+	return IsSharpHeadDamage(dmgInfo) and 0.3 or 1
+end
+
+local function GetHeadConcussionScale(dmgInfo)
+	if IsSharpHeadDamage(dmgInfo) then return 0.25 end
+	if dmgInfo and dmgInfo:IsDamageType(DMG_GENERIC) then return 0.55 end
+
+	return 1
+end
+
 local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, oldBrain, oldHeadTrauma, traumaBone)
     if not org.isPly then return end
     local targetPlayer = org.owner
@@ -468,18 +483,22 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local old_concussion = org.concussion or 0
 	local old_brain = org.brain or 0
 	local old_headtrauma = org.headtrauma or 0
+	local sharpHead = IsSharpHeadDamage(dmgInfo)
+	local concussionMul = GetHeadConcussionScale(dmgInfo)
+	local boneDmg = dmg * GetHeadBoneDamageScale(dmgInfo)
 
-	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.25, boneDmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.jaw - oldDmg) * 3, "Jaw bone damage harm")
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
 
-	local dislocated = (org.jaw - oldDmg) > math.Rand(0.2, 0.4)
+	local jawDelta = math.max((org.jaw or 0) - oldDmg, 0)
+	local dislocated = jawDelta > math.Rand(0.2, 0.4) and (not sharpHead or dmg > 1.2)
 
 	if org.jaw == 1 then
-		org.shock = org.shock + dmg * 40
-		org.avgpain = org.avgpain + dmg * 30
+		org.shock = org.shock + dmg * (sharpHead and 18 or 40)
+		org.avgpain = org.avgpain + dmg * (sharpHead and 18 or 30)
 
 		if oldDmg != 1 then
 			PlayBoneBreakSound(org.owner)
@@ -489,35 +508,35 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		end
 	end
 
-	org.shock = org.shock + dmg * 3
-	org.concussion = (org.concussion or 0) + dmg * 12 -- Jaw hits cause strong concussion
+	org.shock = org.shock + dmg * (sharpHead and 1.6 or 3)
+	org.concussion = (org.concussion or 0) + dmg * 12 * concussionMul -- Jaw hits cause strong concussion
 
 	-- Chance to induce vomiting from jaw trauma
-	if org.isPly and math.random() < dmg * 0.2 then
+	if org.isPly and math.random() < dmg * 0.2 * concussionMul then
 		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.2, 0.5)
 		org.vomitTypeHeadTrauma = math.random(10) == 1
 	end
 
 	-- Significant disorientation and consciousness loss from jaw trauma
-	org.disorientation = org.disorientation + dmg * 2
-	org.consciousness = math.max(org.consciousness - dmg * 0.25, 0)
+	org.disorientation = org.disorientation + dmg * math.max(concussionMul * 2, 0.55)
+	org.consciousness = math.max(org.consciousness - dmg * 0.25 * concussionMul, 0)
 
 	-- Add extra concussion for significant blows and when the jaw actually breaks or dislocates
 	if dmg > 0.2 then
-		org.concussion = (org.concussion or 0) + dmg * 6
+		org.concussion = (org.concussion or 0) + dmg * 6 * concussionMul
 	end
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 then
-		org.concussion = (org.concussion or 0) + 2
+		org.concussion = (org.concussion or 0) + 2 * concussionMul
 	end
 
 	if dislocated then
-		org.concussion = (org.concussion or 0) + 1.5
+		org.concussion = (org.concussion or 0) + 1.5 * concussionMul
 	end
 
 	if dislocated then
-		org.shock = org.shock + dmg * 20
-		org.avgpain = org.avgpain + dmg * 20
+		org.shock = org.shock + dmg * (sharpHead and 8 or 20)
+		org.avgpain = org.avgpain + dmg * (sharpHead and 8 or 20)
 		
 		if !org.jawdislocation then
 PlayBoneBreakSound(org.owner)
@@ -528,12 +547,11 @@ PlayBoneBreakSound(org.owner)
 		if org.isPly then org.owner:Notify(jaw_dislocated_msg[math.random(#jaw_dislocated_msg)], true, "jaw", 2) end
 	end
 
-	if dmg > 0.2 then
+	if dmg * concussionMul > 0.2 then
 		if org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner,1 + dmg) end) end
 	end
 
 	-- teeth: break one tooth on any jaw damage
-	local jawDelta = (org.jaw - oldDmg)
 	if jawDelta > 0 then
 		if hg.organism and hg.organism.TeethOnJawDamage then
 			hg.organism.TeethOnJawDamage(org, jawDelta, dmgInfo, boneindex)
@@ -577,8 +595,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local old_concussion = org.concussion or 0
 	local old_brain = org.brain or 0
 	local old_headtrauma = org.headtrauma or 0
+	local sharpHead = IsSharpHeadDamage(dmgInfo)
+	local concussionMul = GetHeadConcussionScale(dmgInfo)
+	local boneDmg = dmg * GetHeadBoneDamageScale(dmgInfo)
 
-	local result, vecrand = damageBone(org, 0.35, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.35, boneDmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 	local skullDelta = math.max((org.skull or 0) - oldDmg, 0)
@@ -591,8 +612,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	if org.skull == 1 then
-		org.shock = org.shock + dmg * 30
-		org.avgpain = org.avgpain + dmg * 30
+		org.shock = org.shock + dmg * (sharpHead and 14 or 30)
+		org.avgpain = org.avgpain + dmg * (sharpHead and 20 or 30)
 
 		if oldDmg != 1 then
 			PlayBoneBreakSound(org.owner)
@@ -605,19 +626,19 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	org.shock = org.shock + dmg * 3
-		org.concussion = math.min((org.concussion or 0) + dmg * 6, 10)
+	org.shock = org.shock + dmg * (sharpHead and 1.2 or 3)
+		org.concussion = math.min((org.concussion or 0) + dmg * 6 * concussionMul, 10)
 
 	-- Chance to induce vomiting from head trauma
-	if org.isPly and math.random() < dmg * 0.3 then
+	if org.isPly and math.random() < dmg * 0.3 * concussionMul then
 		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.25, 0.6)
 		org.vomitTypeHeadTrauma = math.random(8) == 1
 	end
 
-	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
-	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
+	local rnd = (not sharpHead and math.random(10) == 1) or dmgInfo:IsDamageType(DMG_CRUSH)
+	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 * concussionMul or 0)
 
-	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
+	org.brain = math.min(org.brain + (rnd and dmg * 0.05 * concussionMul or 0), 1)
 
 	if (org.skull - oldDmg) > 0.6 then
 		org.brain = math.min(org.brain + 0.1, 1)
@@ -639,7 +660,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end)
 	end
 
-	if dmg > 0.4 then
+	if dmg * concussionMul > 0.4 then
 		if org.isPly then
 			timer.Simple(0, function()
 				hg.LightStunPlayer(org.owner,1 + dmg)
@@ -659,7 +680,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		net.Broadcast()
 	end
 	
-	org.shock = org.shock + (dmg > 1 and 45 or dmg * 9)
+	org.shock = org.shock + (sharpHead and math.min(dmg * 8, 28) or (dmg > 1 and 45 or dmg * 9))
 
 	if org.skull > 0.6 then
 		if oldDmg <= 0.6 then
@@ -708,10 +729,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	org.disorientation = org.disorientation + (isCrush(dmgInfo) and dmg * 1 or dmg * 1)
+	org.disorientation = org.disorientation + dmg * math.max(concussionMul, 0.35)
 
 	-- Accumulate head trauma for long-term stroke risk
-	org.headtrauma = math.min((org.headtrauma or 0) + dmg * 0.6, 2.0)
+	org.headtrauma = math.min((org.headtrauma or 0) + dmg * (sharpHead and 0.18 or 0.6), 2.0)
 
 	SendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, old_concussion, old_brain, old_headtrauma, "skull")
 
