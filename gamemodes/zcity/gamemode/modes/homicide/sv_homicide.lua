@@ -95,10 +95,10 @@ MODE.LootTable = {
 		{6,"weapon_brick"},
 		{10,"weapon_pocketknife"},
 
-		{2.5,"weapon_bat"},
-		{1.8,"weapon_barbedbat"},
-		{2.2,"weapon_leadpipe"},
-		{1.8,"weapon_hg_extinguisher"},
+		{4,"weapon_bat"},
+		{1,"weapon_metalbat"},
+		{4,"weapon_leadpipe"},
+		{3,"weapon_hg_extinguisher"},
 
 		{1,"weapon_hg_crowbar"},
 		{0.55,"weapon_hatchet"},
@@ -190,13 +190,13 @@ MODE.LootTableStandard = {
 		{2.5,"hg_flashlight"},
 		{0.8,"weapon_matches"},
 	}},
-	{24, {
-		{0.75,"weapon_hammer"},
-		{0.75,"weapon_brick"},
-		{0.3,"weapon_wrench"},
-		{0.8,"weapon_pocketknife"},
-		{0.2,"weapon_bat"},
-		{0.18,"weapon_leadpipe"},
+	{35, {
+		{1,"weapon_hammer"},
+		{1,"weapon_brick"},
+		{1,"weapon_pocketknife"},
+		{0.32,"weapon_bat"},
+		{0.12,"weapon_metalbat"},
+		{0.3,"weapon_leadpipe"},
 
 		{0.08,"weapon_hg_extinguisher"},
 		{0.07,"weapon_hg_crowbar"},
@@ -1489,7 +1489,7 @@ function MODE:CheckAlivePlayers()
 			continue
 		end
 		
-		if((not ply.isTraitor)and ply.organism and ply.organism.incapacitated)then
+		if(ply.organism and ply.organism.incapacitated)then
 			continue
 		end
 		

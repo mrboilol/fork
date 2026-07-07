@@ -67,8 +67,9 @@ local function funca(ply, txt)
 	end
 
 	local bJawBroken = ply.organism.jaw == 1 or ply.organism.jawdislocation
-	local bUnintelligeble = ply.organism.brain > 0.05
-	local bHasMassiveBrainDamage = ply.organism.brain > 0.14
+	local bSeizure = ply.organism.seizureActive
+	local bUnintelligeble = bSeizure or ply.organism.brain > 0.05
+	local bHasMassiveBrainDamage = bSeizure or ply.organism.brain > 0.14
 
 	txt = utf8.force(txt)
 
@@ -138,6 +139,25 @@ hook.Add("HG_PlayerSay", "furrifyPhraseOwO", function(ply, txt)
 	end
 
 	txt[1] = text
+end)
+
+hook.Add("HG_PlayerCanHearPlayersVoice","BrainDamage", function(listener, speaker)
+	if speaker.organism.brain > 0.05 or speaker.organism.seizureActive then return false, false end
+end)
+
+local braindeadphrase_male = {
+	"vo/episode_1/npc/male01/cit_behindyousfx01.wav",
+	"vo/episode_1/npc/male01/cit_behindyousfx02.wav",
+}
+local braindeadphrase_female = {
+	"vo/episode_1/npc/female01/cit_behindyousfx01.wav",
+	"vo/episode_1/npc/female01/cit_behindyousfx02.wav",
+}
+hook.Add("HG_ReplacePhrase", "BraindeadPhrase", function(ply, phrase, muffed, pitch)
+	if IsValid(ply) and ply.organism and ply.organism.brain >= 0.5 then
+		local phr = ThatPlyIsFemale(ply) and braindeadphrase_female[math.random(#braindeadphrase_female)] or braindeadphrase_male[math.random(#braindeadphrase_male)]
+		return ply, phr, muffed, pitch
+	end
 end)
 
 hook.Add("PlayerCanHearPlayersVoice", "RealisticVoice", function(listener,speaker)
