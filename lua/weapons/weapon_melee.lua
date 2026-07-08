@@ -3656,7 +3656,8 @@ function SWEP:PrimaryAttack()
     if self.CanSuicide and ply.suiciding then return end
     if self.Charging then return end
 
-    if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or self:GetChargeState() > 0) and not (ply.fake or (ply.organism and (ply.organism.fake or ply.organism.otrub)) or IsValid(ply.FakeRagdoll)) then return end
+    local chargeState = self.CanHeavyAttack and ((self.GetChargeState and self:GetChargeState()) or self:GetDTInt(6)) or 0
+    if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or chargeState > 0) and not (ply.fake or (ply.organism and (ply.organism.fake or ply.organism.otrub)) or IsValid(ply.FakeRagdoll)) then return end
 
     -- Allow attacking with both arms broken (but not amputated)
     if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
@@ -3765,7 +3766,8 @@ end
 
 function SWEP:CanBlock()
     if (self.HeavyAttackFeintLockEndTime or 0) > CurTime() then return false end
-    if self.CanHeavyAttack and self.GetChargeState and self:GetChargeState() > 0 then return false end
+    local chargeState = self.CanHeavyAttack and ((self.GetChargeState and self:GetChargeState()) or self:GetDTInt(6)) or 0
+    if self.CanHeavyAttack and chargeState > 0 then return false end
     return true
 end
 
@@ -3776,7 +3778,8 @@ function SWEP:SecondaryAttack(override)
     if ply.organism and ply.organism.larmamputated and self.TwoHanded then return end
     if ply.organism and ply.organism.rarmamputated and ply.organism.larmamputated and self.TwoHanded then return end
 
-    if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or self:GetChargeState() > 0) then return end
+    local chargeState = self.CanHeavyAttack and ((self.GetChargeState and self:GetChargeState()) or self:GetDTInt(6)) or 0
+    if self.CanHeavyAttack and (hg.KeyDown(ply, IN_USE) or chargeState > 0) then return end
 
     if self:CutDuct() then
         return

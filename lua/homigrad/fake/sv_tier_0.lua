@@ -1881,7 +1881,8 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 		end
 	end
 	if not data.HitEntity:IsWorld() then return end
-	if data.OurOldVelocity:LengthSqr() < 165000 or (rag.NextSND or 0) > data.DeltaTime then return end
+	local now = CurTime()
+	if data.OurOldVelocity:LengthSqr() < 165000 or (rag.NextSND or 0) > now then return end
 	rag:EmitSound("player/falling_foley/fall_foley"..mRandom(13)..".wav", 60, mRandom(95, 115), 1, CHAN_AUTO)
 	if mRandom(3) == 2 then
 		rag:EmitSound("physics/flesh/flesh_impact_hard"..mRandom(6)..".wav", 55, mRandom(85, 105), 1, CHAN_AUTO)
@@ -1893,7 +1894,7 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 		ply:ViewPunch(AngleRand(-20 * mul, 20 * mul))
 	end]]
 
-	rag.NextSND = data.DeltaTime + 1
+	rag.NextSND = now + 1
 end)
 
 local hg_shitty_fake = CreateConVar("hg_shitty_fake", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "enable shitty fake", 0, 1)

@@ -553,6 +553,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 	local optionSelected = {}
 
 	menuPanel.Paint = function(self, w, h)
+		local scrW, scrH = w, h
 		local x, y = input.GetCursorPos()
 		local centerX, centerY = w / 2, h / 2
 		x = x - centerX
