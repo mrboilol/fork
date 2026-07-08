@@ -541,13 +541,16 @@ local function DamageArmorCondition(owner, placement, armor, dmg, dmgInfo, hit)
 	local hp = owner.armors_health[armor] or 1
 	if hp <= 0 then return end
 
-	local protection = math.max(armorData.protection or 1, 1)
+	local blunt = dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
+	local protection = math.max((blunt and armorData.bluntProtection) or armorData.protection or 1, 1)
 	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
 	local penetration = IsValid(inflictor) and inflictor.bullet and inflictor.bullet.Penetration or 1
 	local damageMul = dmgInfo:IsDamageType(DMG_BUCKSHOT) and 1.6 or (dmgInfo:IsDamageType(DMG_SLASH) and 0.45 or 1.25)
+	damageMul = damageMul * (armorData.conditionDamageMul or 1)
+	if blunt then damageMul = damageMul * (armorData.bluntConditionDamageMul or 1) end
 	local placementMul = placement == "head" and 1.35 or (placement == "face" and 1.2 or 1)
 	local penetrationMul = 1 + math.max(penetration - protection * 0.35, 0) * 0.12
-	local loss = math.Clamp((dmg * damageMul * placementMul * penetrationMul) / (protection * 3.2), 0.045, 0.65)
+	local loss = math.Clamp((dmg * damageMul * placementMul * penetrationMul) / (protection * 3.2), armorData.conditionLossMin or 0.045, armorData.conditionLossMax or 0.65)
 
 	hp = math.Clamp(hp - loss, 0, 1)
 	owner.armors_health[armor] = hp
@@ -561,7 +564,12 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	if not force and org.owner.armors[placement] ~= armor then return 0 end
 	force = nil
 	
-	local prot = placement and hg.armor[placement] and armor and hg.armor[placement][armor] and (hg.armor[placement][armor].protection - (dmgInfo:GetInflictor().bullet and dmgInfo:GetInflictor().bullet.Penetration or 1)) or (10 - ( dmgInfo:GetInflictor().bullet and dmgInfo:GetInflictor().bullet.Penetration or 1))
+	local armorData = placement and hg.armor[placement] and armor and hg.armor[placement][armor]
+	local inflictor = dmgInfo:GetInflictor()
+	local penetration = IsValid(inflictor) and inflictor.bullet and inflictor.bullet.Penetration or 1
+	local blunt = dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
+	local protection = armorData and ((blunt and armorData.bluntProtection) or armorData.protection) or 10
+	local prot = protection - penetration
 	
 	org.owner.armors_health = org.owner.armors_health or {}
 	org.owner.armors_broken_mul = org.owner.armors_broken_mul or {}
@@ -593,15 +601,20 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	
 	ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
 	hg.HandleArmorShot(org, placement, armor, dmgInfo, hit)
+	if armorData and (armorData.conditionDamageMul or armorData.bluntConditionDamageMul or armorData.conditionLossMin or armorData.conditionLossMax) then
+		DamageArmorCondition(org.owner, placement, armor, dmg, dmgInfo, hit)
+	end
 
 	if prot < 0 then
 		//dmgInfo:ScaleDamage(scale)
 		return 0
 	end
 
+	local damageMul = armorData and ((blunt and armorData.bluntDamageMul) or armorData.damageMul) or 0.2
+	local forceMul = armorData and ((blunt and armorData.bluntForceMul) or armorData.forceMul) or 0.4
 	dmgInfo:SetDamageType(DMG_CLUB)
-	dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * 0.4)
-	dmgInfo:ScaleDamage(0.2)
+	dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * forceMul)
+	dmgInfo:ScaleDamage(damageMul)
 
 	return 0.9
 end
