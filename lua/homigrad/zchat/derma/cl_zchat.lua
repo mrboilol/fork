@@ -1,9 +1,34 @@
 --made by mrrp :3
 
+hg = hg or {}
+hg.zchatConVars = hg.zchatConVars or {}
+
 local maxLength = GetConVar("zchat_maxmessagelength") or CreateConVar("zchat_maxmessagelength", "256", {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Maximum message length allowed")
 
 local NoDrop = CreateClientConVar("zchat_dropcharacters", 0, true, false, "Play the character dropping animation when erasing text", 0, 1)
 local ShowTextBoxInactive = CreateClientConVar("zchat_showtextboxinactive", 1, true, false, "Showing your text in textbox while chat is turned off", 0, 1)
+
+hg.zchatConVars["zchat_dropcharacters"] = {
+	name = "zchat_dropcharacters",
+	default = "0",
+	description = "Show erased characters briefly when deleting text",
+	min = 0,
+	max = 1,
+	type = "bool",
+	decimals = 0
+}
+
+hg.zchatConVars["zchat_showtextboxinactive"] = {
+	name = "zchat_showtextboxinactive",
+	default = "1",
+	description = "Show your unsent text while chat is inactive",
+	min = 0,
+	max = 1,
+	type = "bool",
+	decimals = 0
+}
+
+hg.zchatConVars["zchat_opaquebackground"] = nil
 
 local function CallbackBind(self, callback)
 	return function(_, ...)
@@ -700,9 +725,40 @@ function PANEL:Init()
 
 	self.alpha = 255
 	self.realAlpha = 255
+	self.dragState = nil
 
-	self:SetSize(ScrW() * 0.3, ScrH() * 0.2)
-	self:SetPos(ScrW() * 0.02, ScrH() * 0.67) --six seven!!!!!!!!!!
+	local x, y, w, h = GetSavedChatBounds()
+	self:SetSize(w, h)
+	self:SetPos(x, y)
+
+	self.hatPanel = vgui.Create("EditablePanel")
+	self.hatPanel.Paint = PaintHatPanel
+
+	self.settingsButton = self.hatPanel:Add("DButton")
+	self.hatPanel.settingsButton = self.settingsButton
+	self.settingsButton:Dock(RIGHT)
+	self.settingsButton:SetWide(26)
+	self.settingsButton:SetText("")
+	self.settingsButton.Paint = PaintSettingsButton
+	self.settingsButton.DoClick = OpenZChatSettings
+
+	self.dragHandle = self.hatPanel:Add("DButton")
+	self.dragHandle:Dock(FILL)
+	self.dragHandle:DockMargin(0, 0, 4, 0)
+	self.dragHandle:SetText("")
+	self.dragHandle:SetCursor("sizeall")
+	self.dragHandle.Paint = function() end
+	self.dragHandle.DoClick = function() end
+	self.dragHandle.OnMousePressed = function(_, mouseCode)
+		if mouseCode == MOUSE_LEFT and self:GetActive() then
+			self:BeginDrag("move")
+		end
+	end
+	self.dragHandle.OnMouseReleased = function(_, mouseCode)
+		if mouseCode == MOUSE_LEFT then
+			self:StopDrag()
+		end
+	end
 
 	local entryPanel = self:Add("Panel")
 	self.entryPanel = entryPanel
@@ -720,11 +776,6 @@ function PANEL:Init()
 	self.history = self:Add("DScrollPanel")
 	self.history:Dock(FILL)
 	self.history:DockMargin(4, 2, 4, 4)
-
-	ChatPosX:SetInt(x)
-	ChatPosY:SetInt(y)
-	ChatSizeW:SetInt(w)
-	ChatSizeH:SetInt(h)
 
 	SyncHatPanel(self)
 	self:SetActive(false)
@@ -883,12 +934,17 @@ function PANEL:Think()
 end
 
 function PANEL:Paint(w, h)
-	surface.SetDrawColor(247, 67, 67, 100 + math.sin(CurTime()) * 30)
+	surface.SetDrawColor(chatBoxColor)
+	surface.DrawRect(0, 0, w, h)
+
+	surface.SetDrawColor(chatVignetteColor.r, chatVignetteColor.g, chatVignetteColor.b, chatVignetteColor.a + math.sin(CurTime()) * 12)
 	surface.SetMaterial(gradient_d)
 	surface.DrawTexturedRect(0, h * 0.5, w, h * 0.5)
 
-	surface.SetDrawColor(0, 0, 0, 200)
-	surface.DrawRect(0, 0, w, h)
+	surface.SetDrawColor(chatOutlineColor)
+	surface.DrawOutlinedRect(0, 0, w, h, 1)
+	surface.SetDrawColor(chatInnerOutlineColor)
+	surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 1)
 
 	surface.SetAlphaMultiplier(1)
 		self.history:PaintManual()
@@ -910,6 +966,10 @@ function PANEL:Paint(w, h)
 	if self.bActive then
 		self:SetAlpha(self.alpha - (255 - self.realAlpha))
 	end
+end
+
+function PANEL:OpenSettings()
+	OpenZChatSettings()
 end
 
 function PANEL:SetActive(bActive, bRemovePrev)
@@ -1196,3 +1256,7 @@ function PANEL:AddMessage(...)
 end
 
 vgui.Register("zChatbox", PANEL, "EditablePanel")
+
+concommand.Add("zchat_settings", function()
+	OpenZChatSettings()
+end)
