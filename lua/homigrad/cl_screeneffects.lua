@@ -73,8 +73,8 @@ local tab = {
 }
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
-local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3", 0, 5)
-local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3, 7=sonimcooked.mp3", 0, 7)
+local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3, 6=REM pain stack", 0, 6)
+local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3, 7=sonimcooked.mp3, 8=REM low-O2 stack", 0, 8)
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3, 4=ngaimcooked.mp3", 0, 4)
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
@@ -98,8 +98,8 @@ end
 
 hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
 	if ply == LocalPlayer() then
-		RunConsoleCommand("hg_painsound", math.random(0, 5))
-		RunConsoleCommand("hg_dyingsound", math.random(0, 7))
+		RunConsoleCommand("hg_painsound", math.random(0, 6))
+		RunConsoleCommand("hg_dyingsound", math.random(0, 8))
 	end
 end)
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
@@ -317,6 +317,7 @@ local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
 local PainLerp = 0
+local PanicAttackLerp = 0
 local O2Lerp = 0
 local AnalgesiaLerp = 0
 local assimilatedLerp = 0
@@ -340,6 +341,7 @@ local disorientationFxLerp = 0
 local lastDisorientationFx = 0
 local lastConcussionFx = 0
 local nextNeuroTinnitus = 0
+local nextPanicAttackShake = 0
 local lobotomy_mats = {
 	[1] = Material("overlays/photopsiaoverlay1.png"),
 	[2] = Material("overlays/photopsiaoverlay2.png"),
@@ -352,7 +354,51 @@ local lobotomy_mats = {
 }
 
 local consciousnessTypeBeatVolume = 0.18
-local dying2Volume = 0.2
+local dying2Volume = 0.4
+local remPainOverlayVolumeMul = 1.25
+local remPainAgonyThreshold = 0.45
+local remPainExcruciatingThreshold = 0.87
+local remPainAgonyVolumeMul = 1.15
+local remPainExcruciatingVolumeMul = 0.85
+local panicattackOverlayPath = "sound/rem_panicattack.mp3"
+local panicattackVisualExponent = 1.75
+local panicattackPulseFloor = 0.78
+local panicattackPulseIntensity = 0.2
+local panicattackShakeIntervalMin = 0.45
+local panicattackShakeIntervalMax = 1.4
+local panicattackShakeMul = 0.85
+
+local seizureSoundPath = "sound/rem_seizure.ogg"
+local seizureIntroDuration = 3
+local seizureFlashDelayMin = 0.12
+local seizureFlashDelayMax = 0.55
+local seizureFlashDurationMin = 0.35
+local seizureFlashDurationMax = 1.1
+local seizureFlashSizeMin = 9000
+local seizureFlashSizeMax = 18000
+local seizureFinalFlashLead = 2
+local seizureFinalFlashDuration = 5
+local seizureFinalFlashSize = 90000
+local seizureSoundVolume = 1
+local seizureSoundOtrubVolume = 0.3
+local seizureSoundOtrubPlaybackRate = 0.82
+local seizureIntroTab = {
+	["$pp_colour_addr"] = 0,
+	["$pp_colour_addg"] = 0,
+	["$pp_colour_addb"] = 0,
+	["$pp_colour_brightness"] = 0,
+	["$pp_colour_contrast"] = 1,
+	["$pp_colour_colour"] = 1,
+	["$pp_colour_mulr"] = 0,
+	["$pp_colour_mulg"] = 0,
+	["$pp_colour_mulb"] = 0
+}
+local seizureClientActive = false
+local seizureClientStart = 0
+local seizureClientEnd = 0
+local nextSeizureFlash = 0
+local nextSeizureCamShake = 0
+local seizureFinalFlashFired = false
 
 local function getLobotomyMemoryMat()
 	local screens = hg and hg.screens
@@ -401,8 +447,109 @@ local function drawLobotomyFlash(alpha, mat)
 	surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand), ScrH() + math.random(rand))
 end
 
+local canRetrySound
+
+local function stopSeizureEffects()
+	if not seizureClientActive and not IsValid(SeizureStation) then return end
+
+	seizureClientActive = false
+	seizureClientStart = 0
+	seizureClientEnd = 0
+	nextSeizureFlash = 0
+	nextSeizureCamShake = 0
+	seizureFinalFlashFired = false
+
+	if IsValid(SeizureStation) then
+		SeizureStation:Stop()
+		SeizureStation = nil
+	end
+end
+
+local function addSeizureFlash(isFinal)
+	if not hg.AddFlash then return end
+
+	local view = render.GetViewSetup(true)
+	local pos = view.origin + view.angles:Forward() * math.Rand(isFinal and 140 or 120, isFinal and 220 or 210) + view.angles:Right() * math.Rand(isFinal and -45 or -110, isFinal and 45 or 110) + view.angles:Up() * math.Rand(isFinal and -45 or -80, isFinal and 45 or 80)
+	local time = isFinal and seizureFinalFlashDuration or math.Rand(seizureFlashDurationMin, seizureFlashDurationMax)
+	local size = isFinal and seizureFinalFlashSize or math.Rand(seizureFlashSizeMin, seizureFlashSizeMax)
+
+	hg.AddFlash(view.origin, 1, pos, time, size)
+end
+
+local function updateSeizureEffects(org)
+	if org.seizureActive and (org.seizureStart or 0) > 0 and (org.seizureEnd or 0) > CurTime() then
+		if not seizureClientActive or seizureClientStart != org.seizureStart or seizureClientEnd != org.seizureEnd then
+			seizureClientActive = true
+			seizureClientStart = org.seizureStart
+			seizureClientEnd = org.seizureEnd
+			nextSeizureFlash = math.max(seizureClientStart + seizureIntroDuration, CurTime() + seizureIntroDuration)
+			nextSeizureCamShake = CurTime()
+			seizureFinalFlashFired = false
+		end
+
+		if canRetrySound("SeizureStation", SeizureStation) then
+			sound.PlayFile(seizureSoundPath, "noblock noplay", function(station)
+				if IsValid(station) then
+					station:SetVolume(0)
+					station:Play()
+					station:EnableLooping(true)
+					SeizureStation = station
+				end
+			end)
+		end
+
+		if IsValid(SeizureStation) then
+			SeizureStation:SetVolume(org.otrub and seizureSoundOtrubVolume or seizureSoundVolume)
+			SeizureStation:SetPlaybackRate(org.otrub and seizureSoundOtrubPlaybackRate or 1)
+		end
+
+		local seizureElapsed = math.max(CurTime() - seizureClientStart, 0)
+		if seizureElapsed < seizureIntroDuration then
+			local intensity = math.min(seizureElapsed, seizureIntroDuration)
+			seizureIntroTab["$pp_colour_contrast"] = intensity / 2
+			seizureIntroTab["$pp_colour_addr"] = intensity / 10
+			seizureIntroTab["$pp_colour_brightness"] = intensity / 10
+			DrawColorModify(seizureIntroTab)
+			DrawBloom(0.65, intensity * 4, 9, 9, 1, 1, intensity / 16, 0.2, 0.2)
+
+			render.UpdateScreenEffectTexture()
+			chromaticMat:SetFloat("$c0_x", 3.5 - intensity)
+			chromaticMat:SetInt("$c0_y", 1)
+			render.SetMaterial(chromaticMat)
+			render.DrawScreenQuad()
+		end
+
+		if seizureElapsed >= seizureIntroDuration and CurTime() >= nextSeizureFlash then
+			addSeizureFlash(false)
+			nextSeizureFlash = CurTime() + math.Rand(seizureFlashDelayMin, seizureFlashDelayMax)
+		end
+
+		if CurTime() >= nextSeizureCamShake then
+			ViewPunch(Angle(math.Rand(-1.25, 1.25), math.Rand(-1.4, 1.4), math.Rand(-0.45, 0.45)))
+			ViewPunch2(Angle(math.Rand(-0.55, 0.55), math.Rand(-0.8, 0.8), math.Rand(-0.7, 0.7)))
+			nextSeizureCamShake = CurTime() + math.Rand(0.025, 0.06)
+		end
+
+		if not seizureFinalFlashFired and CurTime() >= seizureClientEnd - seizureFinalFlashLead then
+			addSeizureFlash(true)
+			seizureFinalFlashFired = true
+		end
+	else
+		stopSeizureEffects()
+	end
+end
+
+local function getPanicAttackFx(org)
+	if isnumber(org.panicattack) then
+		return math.Clamp(org.panicattack, 0, 1)
+	end
+
+	return org.panicAttack and 1 or 0
+end
+
 local function stopthings()
 	PainLerp = 0
+	PanicAttackLerp = 0
 	O2Lerp = 0
 	AnalgesiaLerp = 0
 	shockLerp = 0
@@ -413,10 +560,17 @@ local function stopthings()
 	grayscaleLerp = 0
 
 	lply.tinnitus = 0
+	nextPanicAttackShake = 0
+	stopSeizureEffects()
 	
 	if IsValid(PainStation) then
 		PainStation:Stop()
 		PainStation = nil
+	end
+
+	if IsValid(PainStationOverlay) then
+		PainStationOverlay:Stop()
+		PainStationOverlay = nil
 	end
 
 	if IsValid(NoiseStation) then
@@ -484,6 +638,16 @@ local function stopthings()
 		AltpainStation = nil
 	end
 
+	if IsValid(RemAgonyStation) then
+		RemAgonyStation:Stop()
+		RemAgonyStation = nil
+	end
+
+	if IsValid(RemExcruciatingPainStation) then
+		RemExcruciatingPainStation:Stop()
+		RemExcruciatingPainStation = nil
+	end
+
 	if IsValid(SillypainStation) then
 		SillypainStation:Stop()
 		SillypainStation = nil
@@ -494,9 +658,19 @@ local function stopthings()
 		DyingStation = nil
 	end
 
+	if IsValid(RemDying1Station) then
+		RemDying1Station:Stop()
+		RemDying1Station = nil
+	end
+
 	if IsValid(SillydyingStation) then
 		SillydyingStation:Stop()
 		SillydyingStation = nil
+	end
+
+	if IsValid(PanicStation) then
+		PanicStation:Stop()
+		PanicStation = nil
 	end
 
 	if IsValid(ItssooverStation) then
@@ -580,7 +754,7 @@ local despairTextLerp = 0
 local giveUpWhiteLerp = 0
 local WhiteNoiseStation
 local soundRetry = {}
-local function canRetrySound(key, station)
+function canRetrySound(key, station)
 	if IsValid(station) and station:GetState() == GMOD_CHANNEL_PLAYING then return false end
 	local nextTry = soundRetry[key] or 0
 	if CurTime() < nextTry then return false end
@@ -615,6 +789,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if IsValid(PainStation) then
 		PainStation:SetVolume(0)
 	end
+	if IsValid(PainStationOverlay) then
+		PainStationOverlay:SetVolume(0)
+	end
 	if IsValid(RealityStation) then
 		RealityStation:SetVolume(0)
 	end
@@ -623,6 +800,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 	if IsValid(AltpainStation) then
 		AltpainStation:SetVolume(0)
+	end
+	if IsValid(RemAgonyStation) then
+		RemAgonyStation:SetVolume(0)
+	end
+	if IsValid(RemExcruciatingPainStation) then
+		RemExcruciatingPainStation:SetVolume(0)
 	end
 	if IsValid(SillypainStation) then
 		SillypainStation:SetVolume(0)
@@ -724,6 +907,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
+	if painMode == 6 and canRetrySound("PainStationOverlay", PainStationOverlay) then
+		sound.PlayFile("sound/rem_pain.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(IsValid(PainStation) and PainStation:GetTime() or 0)
+				PainStationOverlay = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
 	if canRetrySound("RealityStation", RealityStation) then
 		sound.PlayFile("sound/reality.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -760,6 +955,30 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
+	if painMode == 6 and canRetrySound("RemAgonyStation", RemAgonyStation) then
+		sound.PlayFile("sound/rem_agony.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				RemAgonyStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if painMode == 6 and canRetrySound("RemExcruciatingPainStation", RemExcruciatingPainStation) then
+		sound.PlayFile("sound/rem_excruciatingpain.ogg", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				RemExcruciatingPainStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
 	if canRetrySound("SillypainStation", SillypainStation) then
 		sound.PlayFile("sound/sillypain.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -779,6 +998,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				DyingStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if hg_dyingsound:GetInt() == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
+		sound.PlayFile("sound/rem_dying1.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				RemDying1Station = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -886,6 +1117,64 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	o2 = o2 + (org.CO or 0)
 	local brain = org.brain or 0
 	O2Lerp = LerpFT(0.01, O2Lerp, (30 - o2) * (org.otrub and 2 or 10) + (brain * 100) * (org.otrub and 1 or 5))
+	updateSeizureEffects(org)
+
+	local panicBaseTarget = getPanicAttackFx(org)
+	PanicAttackLerp = LerpFT(0.03, PanicAttackLerp, panicBaseTarget ^ panicattackVisualExponent)
+	if PanicAttackLerp > 0.001 and not org.otrub then
+		local panicBase = PanicAttackLerp
+		local panicPulse = panicBase * (panicattackPulseFloor + math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * panicattackPulseIntensity)
+
+		render.UpdateScreenEffectTexture()
+		heatMat:SetFloat("$c0_x", -CurTime() * 0.1)
+		heatMat:SetFloat("$c0_y", panicBase * 0.014 + panicPulse * 0.055)
+		heatMat:SetFloat("$c2_x", panicBase * 0.28 + panicPulse * 1.7)
+		render.SetMaterial(heatMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		render.UpdateFullScreenDepthTexture()
+		grainMat:SetFloat("$c0_x", CurTime())
+		grainMat:SetFloat("$c0_y", -1)
+		grainMat:SetFloat("$c0_z", 1 + panicBase * 1.4)
+		grainMat:SetFloat("$c1_x", panicBase * 3.2 + panicPulse * 5.8)
+		grainMat:SetFloat("$c1_y", panicBase * 0.08 + panicPulse * 0.22)
+		grainMat:SetFloat("$c1_z", panicBase * 0.08 + panicPulse * 0.24)
+		grainMat:SetFloat("$c2_x", panicBase * 0.04 + panicPulse * 0.12)
+		grainMat:SetFloat("$c2_y", 0.075 * panicBase)
+		grainMat:SetFloat("$c2_z", 0)
+		grainMat:SetFloat("$c3_x", 0)
+		render.SetMaterial(grainMat)
+		render.DrawScreenQuad()
+
+		if CurTime() >= nextPanicAttackShake then
+			local shakeMul = (0.25 + panicBase * 0.9) * panicattackShakeMul
+			ViewPunch(Angle(math.Rand(-0.8, 0.6), math.Rand(-1, 1), math.Rand(-0.2, 0.2)) * shakeMul)
+			ViewPunch2(Angle(math.Rand(-0.25, 0.35), math.Rand(-0.55, 0.55), math.Rand(-0.4, 0.4)) * shakeMul)
+			nextPanicAttackShake = CurTime() + math.Rand(panicattackShakeIntervalMin, panicattackShakeIntervalMax)
+		end
+
+		if canRetrySound("PanicStation", PanicStation) then
+			sound.PlayFile(panicattackOverlayPath, "noblock noplay", function(station)
+				if IsValid(station) then
+					station:SetVolume(0)
+					station:Play()
+					PanicStation = station
+					station:EnableLooping(true)
+				end
+			end)
+		end
+		if IsValid(PanicStation) then
+			PanicStation:SetVolume(math.Clamp(PanicAttackLerp, 0, 1))
+		end
+	else
+		nextPanicAttackShake = 0
+		if IsValid(PanicStation) then
+			PanicStation:Stop()
+			PanicStation = nil
+		end
+	end
+
 	local analgesia = org.analgesia or 0
 	AnalgesiaLerp = LerpFT(0.04, AnalgesiaLerp, math.Clamp((analgesia - 0.35) / 2.4, 0, 1))
 	local rainbowFx = math.Clamp((analgesia - 0.45) / 1.25, 0, 1) * math.max(AnalgesiaLerp, 0.35)
@@ -1144,17 +1433,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		//if pain > 10 then
 			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 6), 0, 6)
-
-			-- Panic attack and despair override pain sounds (except brain damage)
-			local panicAttack = (org.panicAttack or false)
-			local brain = (org.brain or 0)
-			local overridePainSounds = (panicAttack or ptsdDistress > 0.5) and brain < 0.01
+			local normalizedPain = math.Clamp(pain / 120, 0, 1)
 
 			local targetPainVol = 0
 			local targetRealityVol = 0
 			local targetAgonyVol = 0
 			local targetAltpainVol = 0
 			local targetSillypainVol = 0
+			local targetRemPainVol = 0
+			local targetRemAgonyVol = 0
+			local targetRemExcruciatingVol = 0
 
 			if painMode == 0 then
 				-- Default: both pain_beat and reality play
@@ -1175,21 +1463,21 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			elseif painMode == 5 then
 				-- Only sillypain.mp3
 				targetSillypainVol = painVol
-			end
-
-			-- Panic attack and despair lower the active pain sound(s)
-			if overridePainSounds then
-				targetPainVol = targetPainVol * 0.6
-				targetRealityVol = targetRealityVol * 0.6
-				targetAgonyVol = targetAgonyVol * 0.6
-				targetAltpainVol = targetAltpainVol * 0.6
-				targetSillypainVol = targetSillypainVol * 0.6
+			elseif painMode == 6 then
+				-- REM pain stack from the reference: beat + rem_pain + pain-intensity layers.
+				targetPainVol = painVol
+				targetRemPainVol = painVol * remPainOverlayVolumeMul
+				targetRemAgonyVol = math.Clamp(math.Remap(normalizedPain, remPainAgonyThreshold, 1, 0, 1), 0, 1) * painVol * remPainAgonyVolumeMul
+				targetRemExcruciatingVol = math.Clamp(math.Remap(normalizedPain, remPainExcruciatingThreshold, 1, 0, 1), 0, 1) * painVol * remPainExcruciatingVolumeMul
 			end
 
 			if IsValid(PainStation) then PainStation:SetVolume(targetPainVol) end
+			if IsValid(PainStationOverlay) then PainStationOverlay:SetVolume(targetRemPainVol) end
 			if IsValid(RealityStation) then RealityStation:SetVolume(targetRealityVol) end
 			if IsValid(AgonyStation) then AgonyStation:SetVolume(targetAgonyVol) end
 			if IsValid(AltpainStation) then AltpainStation:SetVolume(targetAltpainVol) end
+			if IsValid(RemAgonyStation) then RemAgonyStation:SetVolume(targetRemAgonyVol) end
+			if IsValid(RemExcruciatingPainStation) then RemExcruciatingPainStation:SetVolume(targetRemExcruciatingVol) end
 			if IsValid(SillypainStation) then SillypainStation:SetVolume(targetSillypainVol) end
 		//else
 		//	if IsValid(PainStation) then
@@ -1383,7 +1671,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if !IsValid(NoiseStation2Dying) or NoiseStation2Dying:GetState() != GMOD_CHANNEL_PLAYING then
+			if dyingMode == 8 and (!IsValid(NoiseStation2Dying) or NoiseStation2Dying:GetState() != GMOD_CHANNEL_PLAYING) then
 				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
@@ -1399,7 +1687,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 
 			if IsValid(NoiseStation2Dying) then
-				NoiseStation2Dying:SetVolume(math.Clamp((o2 - 50) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, dying2Volume))
+				NoiseStation2Dying:SetVolume(0)
+			end
 
 			if canRetrySound("EndStation", EndStation) then
 				sound.PlayFile("sound/itsallcomingtoanend.mp3", "noblock noplay", function(station)
@@ -1425,6 +1714,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				local bleedSeverity = math.Clamp((3500 - blood) / 3500, 0, 1)
 				consciousVol = math.max(consciousVol, bleedSeverity * 2)
 				hg.consciousBeatIntensity = math.max(hg.consciousBeatIntensity, bleedSeverity * 2)
+			end
+
+			if IsValid(NoiseStation2Dying) then
+				NoiseStation2Dying:SetVolume(0)
+			end
+			if IsValid(RemDying1Station) then
+				RemDying1Station:SetVolume(0)
 			end
 
 			if dyingMode == 0 then
@@ -1627,9 +1923,44 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(SonimCookedStation) then
 					SonimCookedStation:SetVolume(consciousVol)
 				end
+			elseif dyingMode == 8 then
+				-- REM low-O2 stack from the reference: rem_dying1 + rem_dying2.
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(0)
+				end
+				if IsValid(SonimCookedStation) then
+					SonimCookedStation:SetVolume(0)
+				end
+				if IsValid(RemDying1Station) then
+					RemDying1Station:SetVolume(math.Clamp(consciousVol, 0, consciousnessTypeBeatVolume))
+				end
+				if IsValid(NoiseStation2Dying) then
+					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, dying2Volume))
+				end
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
+			end
+			if dyingMode != 8 and IsValid(RemDying1Station) then
+				RemDying1Station:SetVolume(0)
+			end
+			if dyingMode != 8 and IsValid(NoiseStation2Dying) then
+				NoiseStation2Dying:SetVolume(0)
 			end
 		else
 			hg.consciousBeatIntensity = 0
@@ -1658,11 +1989,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
 			end
+			if IsValid(RemDying1Station) then
+				RemDying1Station:SetVolume(0)
+			end
 		end
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = hg_otrubsound:GetInt()
 			local deathFuckOtrub = hg_dyingsound:GetInt() == 6
+			local remLowO2Otrub = hg_dyingsound:GetInt() == 8
 
 			if canRetrySound("NoiseStation", NoiseStation) then
 				sound.PlayFile("sound/zbattle/unconscious_type_beat.ogg", "noblock noplay", function(station)
@@ -1816,6 +2151,26 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if deathFuckOtrub and IsValid(ItssooverStation) then
 				ItssooverStation:SetVolume(otrubVol)
 			end
+			if remLowO2Otrub then
+				if IsValid(NoiseStation) then
+					NoiseStation:SetVolume(0)
+				end
+				if IsValid(AltotrubStation) then
+					AltotrubStation:SetVolume(0)
+				end
+				if IsValid(SleepyStation) then
+					SleepyStation:SetVolume(0)
+				end
+				if IsValid(FuckStation) then
+					FuckStation:SetVolume(0)
+				end
+				if IsValid(NgaimCookedStation) then
+					NgaimCookedStation:SetVolume(0)
+				end
+				if IsValid(RemDying1Station) then
+					RemDying1Station:SetVolume(math.Clamp(otrubVol, 0, 1))
+				end
+			end
 		else
 			if IsValid(NoiseStation) then
 				NoiseStation:SetVolume(0)
@@ -1858,10 +2213,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	local panicAttack = org and org.panicAttack or false
 	local despairFx = math.Clamp((despairVisualLerp - 0.03) / 0.97, 0, 1)
-	-- When panicking, the gray effect partially subsides
-	local despairGrayFx = panicAttack and despairFx * 0.35 or despairFx
+	local despairGrayFx = despairFx
 	if despairFx > 0.05 then
 		local despairShock = despairFx ^ 0.7
 		local despairGrayShock = despairGrayFx ^ 0.7
@@ -1882,8 +2235,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
         if not (lply:IsBerserk() or lply:IsStimulated()) then
-			-- Panic: heavier chromatic aberration, despair: lighter
-			local chromAmt = panicAttack and (0.04 + despairShock * 0.09 + math.sin(CurTime() * 6) * 0.015) or (despairShock * 0.035)
+			local chromAmt = despairShock * 0.035
     		render.UpdateScreenEffectTexture()
     		chromaticMat:SetFloat("$c0_x", chromAmt * 1.5)
     		chromaticMat:SetInt("$c0_y", 1)
@@ -2236,8 +2588,8 @@ local function GetConsciousBeatPulse()
 	if not hg_dyingpulse:GetBool() then return 0 end
 
 	local dyingMode = hg_dyingsound:GetInt()
-	-- Disable screen shake for modes 2, 3, 4, 5, and 6
-	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 or dyingMode == 6 then return 0 end
+	-- Disable conscious-beat camera pulse for non-consciousbeat modes.
+	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 or dyingMode == 6 or dyingMode == 8 then return 0 end
 
 	local intensity = hg.consciousBeatIntensity or 0
 	if intensity <= 0.01 then return 0 end
