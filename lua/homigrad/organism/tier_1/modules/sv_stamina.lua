@@ -247,10 +247,12 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 
 	if fAmount < 0 then return end
 
+	fAmount = fAmount * 0.45
+
 	local storage = org.adrenalineStorage or 0
 	local reserveK = math.Clamp(storage / 5, 0, 1)
 	local reserveAmt = math.min(storage, fAmount)
-	local exhaustedAmt = math.max(fAmount - reserveAmt, 0) * 0.18
+	local exhaustedAmt = math.max(fAmount - reserveAmt, 0) * 0.08
 	local amt = reserveAmt + exhaustedAmt
 
 	if amt <= 0 then return end

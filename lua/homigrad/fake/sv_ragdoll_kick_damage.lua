@@ -1,5 +1,5 @@
--- Ragdoll High-Speed Kick Damage System
--- Handles damage when ragdoll calf/foot bones hit players/ragdolls at high speeds
+-- Ragdoll High-Speed Impact Damage System
+-- Handles damage when ragdoll striking bones hit players/ragdolls at high speeds
 
 if not SERVER then return end
 
@@ -12,8 +12,14 @@ local KICK_DAMAGE_COOLDOWN = 0.5 -- Cooldown between kick damage hits (seconds)
 -- Hit tracking to prevent damage multiplication
 local kickHitTracker = {}
 
--- Kick bones that can deal damage
+-- Bones that can deal collision damage during kicks, tackles, and flailing hits.
 local KICK_BONES = {
+    ["ValveBiped.Bip01_L_UpperArm"] = true,
+    ["ValveBiped.Bip01_R_UpperArm"] = true,
+    ["ValveBiped.Bip01_L_Forearm"] = true,
+    ["ValveBiped.Bip01_R_Forearm"] = true,
+    ["ValveBiped.Bip01_L_Hand"] = true,
+    ["ValveBiped.Bip01_R_Hand"] = true,
     ["ValveBiped.Bip01_L_Calf"] = true,
     ["ValveBiped.Bip01_R_Calf"] = true,
     ["ValveBiped.Bip01_L_Foot"] = true,
@@ -21,6 +27,22 @@ local KICK_BONES = {
     ["ValveBiped.Bip01_L_Thigh"] = true, -- Added missing thigh bones
     ["ValveBiped.Bip01_R_Thigh"] = true, -- Added missing thigh bones
     ["ValveBiped.Bip01_Head1"] = true,
+}
+
+local BONE_HITGROUPS = {
+    ["ValveBiped.Bip01_L_UpperArm"] = HITGROUP_LEFTARM,
+    ["ValveBiped.Bip01_L_Forearm"] = HITGROUP_LEFTARM,
+    ["ValveBiped.Bip01_L_Hand"] = HITGROUP_LEFTARM,
+    ["ValveBiped.Bip01_R_UpperArm"] = HITGROUP_RIGHTARM,
+    ["ValveBiped.Bip01_R_Forearm"] = HITGROUP_RIGHTARM,
+    ["ValveBiped.Bip01_R_Hand"] = HITGROUP_RIGHTARM,
+    ["ValveBiped.Bip01_L_Thigh"] = HITGROUP_LEFTLEG,
+    ["ValveBiped.Bip01_L_Calf"] = HITGROUP_LEFTLEG,
+    ["ValveBiped.Bip01_L_Foot"] = HITGROUP_LEFTLEG,
+    ["ValveBiped.Bip01_R_Thigh"] = HITGROUP_RIGHTLEG,
+    ["ValveBiped.Bip01_R_Calf"] = HITGROUP_RIGHTLEG,
+    ["ValveBiped.Bip01_R_Foot"] = HITGROUP_RIGHTLEG,
+    ["ValveBiped.Bip01_Head1"] = HITGROUP_HEAD,
 }
 
 -- Sound effects for different impact types
@@ -84,8 +106,9 @@ end
 local function CanTakeKickDamage(ent)
     if not IsValid(ent) then return false end
     
-    -- Players can take damage
+    -- Players and NPCs can take damage
     if ent:IsPlayer() then return true end
+    if ent:IsNPC() then return true end
     
     -- Ragdolls can take damage if they have a valid owner
     if ent:IsRagdoll() then
@@ -134,11 +157,7 @@ local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName
 
     local harm = dmginfo:GetDamage() / 100
     local hitgroup = HITGROUP_GENERIC
-    if boneName and string.find(boneName, "Bip01_L_") then
-        hitgroup = HITGROUP_LEFTLEG
-    elseif boneName and string.find(boneName, "Bip01_R_") then
-        hitgroup = HITGROUP_RIGHTLEG
-    end
+    hitgroup = BONE_HITGROUPS[boneName] or HITGROUP_GENERIC
     hook.Run("HomigradDamage", target, dmginfo, hitgroup, target, harm)
     
     -- Add knockback effect similar to weapon_melee
@@ -234,6 +253,7 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     if ragdoll == data.HitEntity then return end
     if data.DeltaTime < 0.25 then return end
     if not ragdoll:IsRagdoll() then return end
+    if not IsValid(data.HitEntity) then return end
     if data.HitEntity:IsPlayerHolding() then return end
 
     -- Door handling with two different behaviors

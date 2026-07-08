@@ -157,6 +157,14 @@ surface.CreateFont("HomigradFontVSmall", {
 	outline = false
 })
 
+surface.CreateFont("ZCity_Veteran", {
+	font = "Typewriter",
+	size = ScreenScale(9),
+	weight = 800,
+	antialias = true,
+	shadow = true
+})
+
 local w, h
 
 hook.Add("HUDPaint", "homigrad-dev", function()
@@ -1471,6 +1479,10 @@ hook.Add("HUDPaint", "mcd_admire_observe", function()
 
 			surface.SetFont(observe_font)
 			local tw, th = surface.GetTextSize(text)
+			if not tw or not th then
+				surface.SetFont("HomigradFontSmall")
+				tw, th = surface.GetTextSize(text)
+			end
 			local pad = 6
 			local box_w = tw + pad * 2
 			local box_h = th + pad * 2

@@ -337,6 +337,13 @@ if SERVER then
 		timer.Create("GrenadeCheck_" .. index, 0, 0, function()
 			if !IsValid(self) then
 				timer.Remove("GrenadeCheck_" .. index)
+				return
+			end
+			if self.ShrapnelDone or not co or coroutine.status(co) == "dead" then
+				self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
+				SafeRemoveEntity(self)
+				timer.Remove("GrenadeCheck_" .. index)
+				return
 			end
 			if co then
 				local ok, err = coroutine.resume(co)
@@ -351,7 +358,6 @@ if SERVER then
 				end
 			end
 			if self.ShrapnelDone then
-				if not IsValid(self) then return end
 				self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
 				SafeRemoveEntity(self)
 				timer.Remove("GrenadeCheck_" .. index)

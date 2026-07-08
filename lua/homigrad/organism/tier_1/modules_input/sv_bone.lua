@@ -57,6 +57,16 @@ local function GetHeadConcussionScale(dmgInfo)
 	return 1
 end
 
+local function hasClimbGripActive(ply)
+	if not IsValid(ply) then return false end
+
+	local ragdoll = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply.FakeRagdollOld
+	if not IsValid(ragdoll) then return false end
+
+	return (IsValid(ragdoll.ConsLH) and ragdoll.ConsLH.ZCClimbGrip)
+		or (IsValid(ragdoll.ConsRH) and ragdoll.ConsRH.ZCClimbGrip)
+end
+
 local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, oldBrain, oldHeadTrauma, traumaBone)
     if not org.isPly then return end
     local targetPlayer = org.owner

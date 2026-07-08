@@ -360,6 +360,7 @@ remPainAgonyThreshold = 0.45
 remPainExcruciatingThreshold = 0.87
 remPainAgonyVolumeMul = 1.15
 remPainExcruciatingVolumeMul = 0.85
+painPulseIntensity = 0.12
 panicattackOverlayPath = "sound/rem_panicattack.mp3"
 panicattackVisualExponent = 1.75
 panicattackPulseFloor = 0.78

@@ -177,6 +177,7 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 end
 
 local input_list = hg.organism.input_list
+local hitArtery
 input_list.heart = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.heart
 
@@ -187,8 +188,8 @@ input_list.heart = function(org, bone, dmg, dmgInfo)
 	org.shock = org.shock + dmg * 20
 	org.internalBleed = org.internalBleed + (org.heart - oldDmg) * 10
 
-	if math.random() < 0.75 then
-		hg.hitArtery("spineartery", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Spine2", dmgInfo:GetDamageForce():GetNormalized(), dmgInfo:GetDamagePosition())
+	if hitArtery and math.random() < 0.75 then
+		hitArtery("spineartery", org, dmg * 0.5, dmgInfo, "ValveBiped.Bip01_Spine2", dmgInfo:GetDamageForce():GetNormalized(), dmgInfo:GetDamagePosition())
 	end
 
 	return result
@@ -428,7 +429,7 @@ local function getArteryChanceMul(dmgInfo)
 	return IsValid(inflictor) and inflictor.ArteryChance or 1
 end
 
-local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
+hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
 	if dmgInfo:IsDamageType(DMG_SLASH) and dmg < 2 then
@@ -495,6 +496,7 @@ local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
 end
+hg.hitArtery = hitArtery
 
 hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ)
 	if not dmgInfo:IsDamageType(DMG_SLASH) then return end

@@ -855,6 +855,9 @@ local forceArm = 600
 
 local forceArm_dump = 450
 
+local leftHandReach = 8
+local rightHandReach = 8
+
 
 
 local models_female = {
