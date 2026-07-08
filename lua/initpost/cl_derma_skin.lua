@@ -1,8 +1,5 @@
 --\\
 hg.VGUI = hg.VGUI or {}
-hg.VGUI.MainColor = Color(85, 85, 85)
-hg.VGUI.SecondaryColor = Color(65, 65, 65, 240)
-hg.VGUI.BackgroundColor = Color(20, 20, 20, 220)
 hg.VGUI.MainColor = Color(150, 150, 150)
 hg.VGUI.SecondaryColor = Color(155,155,155,240)
 hg.VGUI.BackgroundColor = Color(25,25,35,220)
@@ -22,15 +19,15 @@ end)
 -- HG.DrawBlur находится в cl_pointshop.lua... простите за такое ГОВНО но это нужно чтобы оно везде грузилось нормально.
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
-local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", "Bahnschrift", true, false, "change every text font to selected because ui customization is cool")
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Bahnschrift"
-    local usefont = "Verily Serif Mono"
+local hg_font_default = "Lora"
+local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", hg_font_default, true, false, "change every text font to selected because ui customization is cool")
 
-    if hg_font:GetString() != "" and hg_font:GetString() != "Bahnschrift" then
-        usefont = hg_font:GetString()
-    end
+if hg_font:GetString() != hg_font_default then
+	RunConsoleCommand("hg_font", hg_font_default)
+end
 
-    return usefont
+local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
+    return hg_font_default
 end
 
 surface.CreateFont("ZCity_VerySuperTiny", {
@@ -135,7 +132,6 @@ SKIN.Colours.Warning = Color(230, 180, 0)
 SKIN.Colours.MenuLabel = color_white
 SKIN.Colours.DarkerBackground = Color(0, 0, 0, 77)
 
-SKIN.Colours.Outline = Color(85, 85, 85, 255)
 SKIN.Colours.Outline = Color(155, 155, 155, 255)
 SKIN.Colours.Background = Color(0, 0, 0, 205)
 
