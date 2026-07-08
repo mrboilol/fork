@@ -17,7 +17,7 @@ local bulletTraumaOrganTargets = {
 	spine1 = {"intestines", "stomach", "liver", "spineartery"},
 	spine2 = {"lungsL", "lungsR", "heart", "spineartery", "subclavianL", "subclavianR"},
 	spine3 = {"trachea", "arteria", "spineartery", "subclavianL", "subclavianR"},
-	skull = {"brain", "eyeL", "eyeR"},
+	skull = {"brain"},
 	jaw = {"trachea", "arteria"},
 	larm = {"larmartery", "subclavianL"},
 	rarm = {"rarmartery", "subclavianR"},
@@ -1063,14 +1063,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		hg.organism.BlastTrace(dmgInfo:GetDamagePosition(), (ent:GetPos() - dmgInfo:GetDamagePosition()):Length() / 200, dmg * 2, boxs, organs, Trace_Blast, ent.organism, organs, dmg / 300, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
-
-		if math.random(100) <= 25 then
-			local which = (math.random(2) == 1) and "eyeL" or "eyeR"
-			local eyeFunc = hg.organism.input_list[which]
-			if eyeFunc then
-				eyeFunc(org, 1, dmgInfo:GetDamage() / 50, dmgInfo)
-			end
-		end
 	end
 
 	if attacker:IsPlayer() then

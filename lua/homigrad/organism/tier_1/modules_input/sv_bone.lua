@@ -632,15 +632,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 * concussionMul or 0), 1)
 
-	if math.random(1, 4) == 1 then
-		local eye_dmg = dmg * math.Rand(0.8, 1.5)
-		if math.random(1, 2) == 1 then
-			if hg.organism.input_list.eyeL then hg.organism.input_list.eyeL(org, bone, eye_dmg, dmgInfo) end
-		else
-			if hg.organism.input_list.eyeR then hg.organism.input_list.eyeR(org, bone, eye_dmg, dmgInfo) end
-		end
-	end
-
 	if (org.skull - oldDmg) > 0.6 then
 		org.brain = math.min(org.brain + 0.1, 1)
 	end
@@ -736,21 +727,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.headtrauma = math.min((org.headtrauma or 0) + dmg * (sharpHead and 0.18 or 0.6), 2.0)
 
 	SendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, old_concussion, old_brain, old_headtrauma, "skull")
-
-    local eyeChance = 0
-    if dmgInfo:IsDamageType(DMG_SLASH) then
-        eyeChance = 45
-    elseif dmgInfo:IsDamageType(DMG_BULLET) or dmgInfo:IsDamageType(DMG_BUCKSHOT) then
-        eyeChance = 35
-    elseif dmgInfo:IsDamageType(DMG_CLUB) or dmgInfo:IsDamageType(DMG_GENERIC) or dmgInfo:IsDamageType(DMG_CRUSH) then
-        eyeChance = 12
-    end
-
-    if eyeChance > 0 and math.random(100) <= eyeChance then
-        local which = (math.random(2) == 1) and "eyeL" or "eyeR"
-        local eyeFunc = hg.organism.input_list[which]
-        if eyeFunc then eyeFunc(org, 1, dmg, dmgInfo) end
-    end
 
 	return result * 0.75, vecrand
 end

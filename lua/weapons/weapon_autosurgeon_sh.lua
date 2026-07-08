@@ -96,7 +96,7 @@ SWEP.TargetOrgans = {
     [2] = {
         "heart", "brain",
         "spine1", "spine2", "spine3",
-        "arteria", "eyeR", "eyeL", "trachea"
+        "arteria", "trachea"
     }
 }
 
@@ -125,14 +125,6 @@ SWEP.DebuffClearers = {
     end,
     ["trachea"] = function(org) org.trachea = 0 end,
     ["pneumothorax"] = function(org) org.pneumothorax = 0 end,
-    ["eyeL"] = function(org)
-        org.eyekaput = nil
-        if IsValid(org.owner) then org.owner:SetNetVar("eyekaput", nil) end
-    end,
-    ["eyeR"] = function(org)
-        org.eyekaput = nil
-        if IsValid(org.owner) then org.owner:SetNetVar("eyekaput", nil) end
-    end,
     ["brain"] = function(org)
         org.consciousness = 1
         org.disorientation = 0
