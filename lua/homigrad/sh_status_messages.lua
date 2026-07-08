@@ -397,12 +397,6 @@ local heatvomit_phraselist = {
 	"Fuuck.. Oughhh.. I don't feel-"
 }
 
-local cooked_phrases = {
-    "its so over 😭",
-    "son im cooked 😭🙏",
-    "nga im so fried 🥹",
-}
-
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
 
 function string.Random(length)
