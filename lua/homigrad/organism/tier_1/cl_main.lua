@@ -462,8 +462,8 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 		time = math.max(time, org.otrub and 6 or 10)
 		
 		-- Show for longer duration with more brain damage
-		local showDuration = time * (org.otrub and 0.58 or 0.46) + (lerpedbrain * 8) + traumaBoost * 6
-		showDuration = math.min(showDuration, time * (org.otrub and 0.88 or 0.78))
+		local showDuration = time * (org.otrub and 0.72 or 0.58) + (lerpedbrain * 12) + traumaBoost * 9
+		showDuration = math.min(showDuration, time * (org.otrub and 0.94 or 0.86))
 		
 		if part % time > time - showDuration and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
 			switch = true
@@ -886,6 +886,17 @@ local arterySoundPitchMin = 95
 local arterySoundPitchMax = 110
 local arteryBurstCount = 2
 local arterySizeMul = 1.35
+local arterialRampTime = 0.7
+local arterialMinIntensity = 0.35
+local arterialParticleSizeMul = 1.1
+local arterialJetCount = 2
+local arterialJetOffset = 1.8
+local arterialVelocityMul = 78
+local arterialDirectionRandomness = 16
+local arterialVerticalRandomness = 22
+local arterialCloudRampStart = 0.65
+local arterialCloudChance = 5
+local arterialCloudInterval = 0.08
 
 local pitchAddClasses = {
 	["furry"] = 20,

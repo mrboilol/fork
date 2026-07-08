@@ -343,7 +343,10 @@ local radialIconMaterials = {
 	["fix dislocation"] = Material("radialmenu/broken.png", "smooth mips"),
 }
 
-local function NormalizeRadialText(txt)
+local function NormalizeRadialText(txt, option)
+	if isfunction(txt) then txt = txt(option) end
+	if txt == nil then return "" end
+	txt = tostring(txt)
 	txt = string.lower((txt or ""):gsub("\n", " "))
 	txt = txt:gsub("[^%w%s]", "")
 	txt = txt:gsub("%s+", " ")
@@ -404,7 +407,7 @@ local function GetRadialIcon(option)
 		return option[5]
 	end
 
-	local txt = NormalizeRadialText(option[2])
+	local txt = NormalizeRadialText(option[2], option)
 	if txt == "" then return nil end
 
 	if radialIconMaterials[txt] then

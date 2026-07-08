@@ -957,13 +957,17 @@ if SERVER then
 			if not wound then return false end
 			
 			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
-			org[wound[7]] = 0
 
 			if wound[7] == "arteria" then org.o2.regen = 0 end
 
 			table.remove(org.arterialwounds,pw)
 
-			org.owner:SetNetVar("arterialwounds",org.arterialwounds)
+			if hg.organism.RebuildArteryWoundState then
+				hg.organism.RebuildArteryWoundState(org, true)
+			else
+				org[wound[7]] = 0
+				org.owner:SetNetVar("arterialwounds",org.arterialwounds)
+			end
 
 			for i = 1, #bonewounds do
 				if org.wounds[bonewounds[i]] then

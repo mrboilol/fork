@@ -1123,11 +1123,15 @@ kaz
 
 		death_from_braindamage = true
 		org.alive = false
+		if hg.organism and hg.organism.ZeroVitals then hg.organism.ZeroVitals(org) end
 	end
 
 
 
-	if org.skull == 1 then org.brain = min(org.brain + timeValue / 1000, 1) end
+	if org.skull >= 0.6 then
+		local skullSeverity = math.Clamp((org.skull - 0.6) / 0.4, 0, 1)
+		org.brain = min(org.brain + timeValue / math.Remap(skullSeverity, 0, 1, 850, 180), 1)
+	end
 
 
 

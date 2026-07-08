@@ -226,7 +226,10 @@ function SWEP:RemoveArterialWound(org, organName)
         local wnd = org.arterialwounds[i]
         if wnd and wnd[7] == organName then
             table.remove(org.arterialwounds, i)
-            if IsValid(org.owner) and org.owner.SetNetVar then
+            if hg.organism.RebuildArteryWoundState then
+                hg.organism.RebuildArteryWoundState(org, true)
+            elseif IsValid(org.owner) and org.owner.SetNetVar then
+                org[organName] = 0
                 org.owner:SetNetVar("arterialwounds", org.arterialwounds)
             end
             return true

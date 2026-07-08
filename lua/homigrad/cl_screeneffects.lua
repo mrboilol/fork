@@ -1634,7 +1634,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			show_some_images_time = show_some_images_time - 1
 			local flashChance = math.max(2, 10 * (1 - brain))
 			if math.random(flashChance) < 2 then
-				startLobotomyFlash(250 * (0.1 * 3) * math.Rand(0.35, 1.2) * (math.random(2) == 1 and 0.35 or 1) * 1.15, math.Clamp(brain or 0, 0, 1), true)
+				startLobotomyFlash(250 * (0.1 * 3) * math.Rand(0.55, 1.55) * (math.random(2) == 1 and 0.55 or 1) * 1.45, math.Clamp(brain or 0, 0, 1), true)
 			end
 		else
 			brain_motionblur = false
@@ -1645,7 +1645,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if (org.jaw or 0) >= 1 then
 				chance = chance + 3
 			end
-			show_some_images_time = math.random(1200) < chance and 380 or 0
+			show_some_images_time = math.random(1200) < chance and 560 or 0
 		end
 	else
 		brain_motionblur = false

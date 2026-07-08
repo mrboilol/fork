@@ -84,6 +84,55 @@ local o2DebuffArteries = {
 	spineartery = 0.85,
 }
 
+local arteryStatusKeys = {
+	"arteria",
+	"subclavianR",
+	"subclavianL",
+	"rarmartery",
+	"larmartery",
+	"rlegartery",
+	"llegartery",
+	"spineartery",
+}
+
+function hg.organism.RebuildArteryWoundState(org, syncNow)
+	if not org then return end
+
+	local active = {}
+	for _, wound in pairs(org.arterialwounds or {}) do
+		local artery = wound and wound[7]
+		if artery and (wound[1] or 0) > 0 then
+			active[artery] = true
+		end
+	end
+
+	for _, artery in ipairs(arteryStatusKeys) do
+		org[artery] = active[artery] and 1 or 0
+	end
+
+	org.arteriaO2Drain = active.arteria and true or false
+	org.arterialO2Drain = false
+	for artery in pairs(o2DebuffArteries) do
+		if active[artery] then
+			org.arterialO2Drain = true
+			break
+		end
+	end
+
+	local owner = org.owner
+	if IsValid(owner) then
+		owner:SetNetVar("arterialwounds", org.arterialwounds or {})
+
+		if IsValid(owner.FakeRagdoll) then
+			owner.FakeRagdoll:SetNetVar("arterialwounds", org.arterialwounds or {})
+		end
+
+		if syncNow and hg.send_organism then
+			hg.send_organism(org, owner)
+		end
+	end
+end
+
 local hold_wound_size_threshold = 4
 local hold_wound_pain_threshold = 72
 local hold_wound_painadd_threshold = 8
@@ -524,7 +573,7 @@ module[2] = function(owner, org, mulTime)
 		table.remove(org.arterialwounds, arterialToRemove[idx])
 	end
 	if #arterialToRemove > 0 then
-		owner:SetNetVar("arterialwounds", org.arterialwounds)
+		hg.organism.RebuildArteryWoundState(org)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 

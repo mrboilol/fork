@@ -38,11 +38,16 @@ module[2] = function(owner, org, timeValue)
 	local stamina = org.stamina
 	
 	if not org.alive then
-		org.heartbeat = 0
-		org.pulse = 0
-		org.bloodpressure = 0
-		org.systolic = 0
-		org.diastolic = 0
+		if hg.organism and hg.organism.ZeroVitals then
+			hg.organism.ZeroVitals(org)
+		else
+			org.heartstop = true
+			org.heartbeat = 0
+			org.pulse = 0
+			org.bloodpressure = 0
+			org.systolic = 0
+			org.diastolic = 0
+		end
 		return
 	end
 
@@ -109,12 +114,15 @@ module[2] = function(owner, org, timeValue)
 
 	local heartbeat = compensationRate
 
-	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
-	org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
+	local staminaMax = math.max(org.stamina.max or 180, 1)
+	local staminaRatio = math.Clamp((org.stamina[1] or staminaMax) / staminaMax, 0, 1)
+	local exertionK = org.analgesia < 1 and math.max(math.Clamp((0.66 - staminaRatio) / 0.66, 0, 1), math.Clamp((org.stamina.sub or 0) / 2, 0, 1) * 0.55) or 0
+	local exertionHeartBoost = exertionK * 32
 	
 	heartbeat = heartbeat + (owner.suiciding and 50 or 0)
 	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
+	heartbeat = heartbeat + exertionHeartBoost
 	local adrenalineHeartBoost = 9 * math.min(org.adrenaline, 3)
 	if org.givingUp then adrenalineHeartBoost = adrenalineHeartBoost * 0.3 end
 	heartbeat = heartbeat + adrenalineHeartBoost
@@ -199,11 +207,11 @@ module[2] = function(owner, org, timeValue)
 	local heartK = math.Clamp(1 - org.heart, 0, 1)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
-	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.08
+	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.025
 	if org.givingUp then adrenalineHyperMul = adrenalineHyperMul * 0.3 end
 	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
-	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 2.0)
+	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.45)
 
 	local compensation = 1 + hemorrhageCompensation * 0.28
 	compensation = compensation * (1 - hypovolemicShock * 0.35)
@@ -211,7 +219,7 @@ module[2] = function(owner, org, timeValue)
 
 	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
 	local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
-	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.25)
+	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.12)
 	local volumeMapK = blood >= 3600 and 1 or math.Remap(math.Clamp(blood, 900, 3600), 900, 3600, 0.12, 1)
 	local map = 93 * pulse_factor * hypertensionMul * compensation * volumeMapK
 	map = org.alive and map or 0
@@ -467,11 +475,11 @@ module[2] = function(owner, org, timeValue)
     end
 
 	-- Small heartstop chance from despair alone (not panic-only)
-	if (org.despair or 0) > 0.4 and not org.panicAttack and circulatoryRisk then
+	if (org.despair or 0) > 0.65 and not org.panicAttack and circulatoryRisk then
 		if not org._despair_pulse_check or CurTime() > org._despair_pulse_check then
 			org._despair_pulse_check = CurTime() + 5 -- check every 5 seconds
 			local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)
-			local despairChance = math.Clamp((org.despair - 0.4) / 0.6, 0, 1) * 0.004 * riskMul
+			local despairChance = math.Clamp((org.despair - 0.65) / 0.35, 0, 1) * 0.0025 * riskMul
 			if org.givingUp then despairChance = despairChance * 1.5 end
 			local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
 			if totalAdrenaline > 1.0 then

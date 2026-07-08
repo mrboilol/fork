@@ -2,6 +2,17 @@
 hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
+
+function hg.organism.ZeroVitals(org)
+	if not org then return end
+	org.heartstop = true
+	org.heartbeat = 0
+	org.pulse = 0
+	org.bloodpressure = 0
+	org.systolic = 0
+	org.diastolic = 0
+end
+
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 90
 local panicattack_rise_time = 10
@@ -796,12 +807,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if owner:IsPlayer() and not owner:Alive() then
 		org.alive = false
-		org.heartstop = true
-		org.heartbeat = 0
-		org.pulse = 0
-		org.bloodpressure = 0
-		org.systolic = 0
-		org.diastolic = 0
+		hg.organism.ZeroVitals(org)
 		return
 	end
 
@@ -1435,7 +1441,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if !org.alive then
 		org.lungsfunction = false
-		org.heartstop = true
+		hg.organism.ZeroVitals(org)
 	end
 
 	time = CurTime()

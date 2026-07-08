@@ -139,14 +139,13 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	local inDanger = is_in_danger(org)
 	if not org.givingUp then
 		-- Normal mode: direct give-up when despairing, near death, awake, and not panicking
-		if not simpleMode and not org.panicAttack and inDanger and org.despair >= 0.75 then
+		if not simpleMode and not org.panicAttack and inDanger and is_near_death(org) and org.despair >= 0.9 then
 			org._giveUpDirectCheckTime = org._giveUpDirectCheckTime or 0
 			if time > org._giveUpDirectCheckTime then
 				org._giveUpDirectCheckTime = time + 1
 
 				local severity = danger_severity(org)
-				local chance = 0.06 + severity * 0.12 + Clamp((org.despair - 0.75) / 0.25, 0, 1) * 0.08
-				if is_near_death(org) then chance = chance + 0.10 end
+				local chance = 0.015 + severity * 0.055 + Clamp((org.despair - 0.9) / 0.1, 0, 1) * 0.035
 
 				if math.random() < chance then
 					org.givingUp = true
@@ -164,7 +163,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				local fearFactor = Clamp((org.fear or 0) / 2, 0, 1)
 				local severity = danger_severity(org)
 
-				local chance = 0.012 + severity * 0.08 + fearFactor * 0.04
+				local chance = 0.004 + severity * 0.035 + fearFactor * 0.018
 				if math.random() < chance then
 					org.givingUp = true
 					org._panicAdrenalineGiven = false
@@ -596,7 +595,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org._panicAdrenalineGiven = false
 			org._postPanicEndTime = time
 			-- Panic didn't save them: high chance to give up after panic ends if still in danger
-			if is_in_danger(org) and math.random() < (0.35 + danger_severity(org) * 0.35) then
+			if is_near_death(org) and (org.despair or 0) > 0.85 and math.random() < (0.08 + danger_severity(org) * 0.16) then
 				org.givingUp = true
 			end
 		else
