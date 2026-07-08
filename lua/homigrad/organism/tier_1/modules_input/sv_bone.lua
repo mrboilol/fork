@@ -602,14 +602,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.35, boneDmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
-	local skullDelta = math.max((org.skull or 0) - oldDmg, 0)
-	if skullDelta > 0 then
-		local fractureMul = (org.skull or 0) >= 0.6 and 2.6 or 1
-		org.intpressure = math.min((org.intpressure or 0) + skullDelta * 0.24 * fractureMul, 1)
-		if (org.skull or 0) >= 0.6 then
-			org.brain = math.min((org.brain or 0) + skullDelta * 0.05, 1)
-		end
-	end
 
 	if org.skull == 1 then
 		org.shock = org.shock + dmg * (sharpHead and 14 or 30)

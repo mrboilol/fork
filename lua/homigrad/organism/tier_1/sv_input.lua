@@ -16,7 +16,7 @@ local bulletTraumaOrganTargets = {
 	pelvis = {"intestines", "stomach", "liver"},
 	spine1 = {"intestines", "stomach", "liver", "spineartery"},
 	spine2 = {"lungsL", "lungsR", "heart", "spineartery", "subclavianL", "subclavianR"},
-	spine3 = {"trachea", "brainstem", "arteria", "spineartery", "subclavianL", "subclavianR"},
+	spine3 = {"trachea", "arteria", "spineartery", "subclavianL", "subclavianR"},
 	skull = {"brain", "eyeL", "eyeR"},
 	jaw = {"trachea", "arteria"},
 	larm = {"larmartery", "subclavianL"},
@@ -31,7 +31,6 @@ local bulletTraumaOrganTargets = {
 	lungsL = {"subclavianL", "spineartery"},
 	lungsR = {"subclavianR", "spineartery"},
 	trachea = {"arteria", "subclavianL", "subclavianR"},
-	brainstem = {"arteria", "spineartery"},
 }
 
 local bulletTraumaArteries = {
@@ -57,7 +56,6 @@ local bulletTraumaArteries = {
 	lungsL = {"subclavianL", "spineartery", "arteria"},
 	lungsR = {"subclavianR", "spineartery", "arteria"},
 	trachea = {"arteria", "subclavianL", "subclavianR"},
-	brainstem = {"arteria", "spineartery"},
 }
 
 local bulletTraumaArteryBones = {

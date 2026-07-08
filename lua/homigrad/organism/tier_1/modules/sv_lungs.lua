@@ -934,7 +934,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	-- Lung function gating:
-	-- * O2 at 0  -> tiny chance per tick of total lung failure (brainstem fades)
+	-- * O2 at 0  -> tiny chance per tick of total lung failure
 	-- * O2 > 0   -> only restore lung function if the airway/lungs are not
 	--              catastrophically damaged. Previously this unconditionally
 	--              flipped lungsfunction=true every tick which would resurrect
@@ -946,8 +946,7 @@ module[2] = function(owner, org, timeValue)
 	else
 		local lungsLost = (org.lungsL[1] or 0) >= 1 and (org.lungsR[1] or 0) >= 1
 		local tracheaLost = (org.trachea or 0) >= 1
-		local brainstemLost = (org.brainstem or 0) >= 1
-		if not (lungsLost or tracheaLost or brainstemLost or org.heartstop) then
+		if not (lungsLost or tracheaLost or org.heartstop) then
 			org.lungsfunction = true
 		end
 	end
@@ -1179,8 +1178,6 @@ module[2] = function(owner, org, timeValue)
 	if owner:IsBerserk() then
 
 		org.brain = math.min(0.5, org.brain)
-		org.brainstem = math.max(org.brainstem - timeValue / 30, 0)
-		org.intpressure = math.max(org.intpressure - timeValue / 20, 0)
 
 	end
 
@@ -1200,103 +1197,25 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.brainstem = org.brainstem or 0
-	org.intpressure = org.intpressure or 0
-
-	-- Intracranial pressure builds from skull/brain trauma, then starts
-	-- damaging brain tissue and the brainstem as the swelling gets worse.
-	local skullSeverity = math.Clamp((org.skull or 0) / 1, 0, 1)
-	local fractureSeverity = math.Clamp(((org.skull or 0) - 0.45) / 0.55, 0, 1)
-	local brainPressureRate = math.Clamp(((org.brain or 0) - 0.04) / 0.96, 0, 1)
-	if skullSeverity > 0 or brainPressureRate > 0 then
-		local pressureRate = brainPressureRate * timeValue / 185
-		pressureRate = pressureRate + skullSeverity * timeValue / 360
-		pressureRate = pressureRate + fractureSeverity * timeValue / 120
-		org.intpressure = math.min(org.intpressure + pressureRate, 1)
-	end
-
-	local burstDmg = org.brainBurstDamage or 0
-	if burstDmg > 0.025 then
-		local burstPressure = math.Clamp((burstDmg - 0.025) / 0.45, 0, 1) * 0.34
-		org.intpressure = math.min(org.intpressure + burstPressure, 1)
-		org.brainBurstDamage = 0
-	end
-
-	if (org.internalBleed or 0) > 0.5 then
-		org.intpressure = math.min(org.intpressure + timeValue / 600, 1)
-	end
-
-	if org.intpressure > 0.25 then
-		local pressureSeverity = math.Clamp((org.intpressure - 0.25) / 0.75, 0, 1)
-		local fractureMul = (org.skull or 0) >= 0.6 and 1.65 or 1
-		org.brain = min((org.brain or 0) + pressureSeverity * fractureMul * timeValue / 420, 1)
-		if org.intpressure > 0.45 then
-			org.brainstem = min(org.brainstem + pressureSeverity * fractureMul * timeValue / 900, 1)
-		end
-	end
-
-	-- Brainstem damage accumulates from high brain damage and pressure.
-	-- 0 = fully functional, 1 = completely severed/non-functional.
-	if org.brain > 0.3 then
-		local brainstemRate = math.Clamp((org.brain - 0.3) / 0.7, 0, 1) * timeValue / 180
-		org.brainstem = math.min(org.brainstem + brainstemRate, 1)
-	end
-
-	if org.brainstem >= 1 then
-		org.lungsfunction = false
-		org.heartstop = true
-		org.alive = false
-	elseif org.brainstem > 0.2 then
-		local brainstemSuppress = math.Clamp((org.brainstem - 0.2) / 0.8, 0, 1)
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainstemSuppress * 0.7, 0)
-		if org.o2 then org.o2[1] = math.max((org.o2[1] or 0) - timeValue * brainstemSuppress * 0.9, 0) end
-		if math.random() < brainstemSuppress * 0.045 * timeValue then org.lungsfunction = false end
-		if not org.heartstop and org.brainstem > 0.35 and math.random() < brainstemSuppress * 0.018 * timeValue then org.heartstop = true end
-	end
-
-	if org.brain > 0.5 and org.alive then
-		local severeBrain = math.Clamp((org.brain - 0.5) / 0.5, 0, 1)
-		if math.random() < severeBrain * 0.004 * timeValue then org.lungsfunction = false end
-		if not org.heartstop and math.random() < severeBrain * 0.002 * timeValue then org.heartstop = true end
-	end
-
 	if org.brain >= 0.3 then
+		if not org.heartstop then
+			local brainSuppress = math.Clamp((org.brain - 0.325) / 0.275, 0, 1)
+			if math.random() < brainSuppress * 0.05 then
+				org.lungsfunction = false
+			end
+		end
+
 		local brainCap = 0.325
 		local brainSeverity = math.Clamp((org.brain - brainCap) / (1 - brainCap), 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)
 	end
 
-	-- Mannitol heals brainstem damage
-	if org.mannitol > 0 and org.brainstem > 0 then
-		org.brainstem = math.max(org.brainstem - timeValue / 200 * org.mannitol, 0)
-	end
-
-
-
 	local death_from_braindamage = false
 
-	if org.braindead then
-		org.consciousness = 0
-		org.needotrub = true
-	elseif org.brain >= 0.7 and org.alive then
+	if org.brain >= 0.7 and org.alive then
 
-		local canBrainstemCarryVitals = (org.brainstem or 0) < 0.25 and not org.heartstop and org.lungsfunction ~= false and (org.blood or 5000) > 2500 and (org.o2 and (org.o2[1] or 0) > 12)
-		if canBrainstemCarryVitals and math.random(100) <= 12 then
-			org.braindead = true
-			org.alive = false
-			org.heartstop = false
-			org.postmortemPulseUntil = CurTime() + math.Rand(35, 90)
-			org.heartbeat = math.max(org.heartbeat or 0, 32)
-			org.pulse = math.max(org.pulse or 0, 18)
-			org.bloodpressure = math.max(org.bloodpressure or 0, 24)
-			org.consciousness = 0
-			org.needotrub = true
-		else
-			death_from_braindamage = true
-
-			org.alive = false
-		end
-
+		death_from_braindamage = true
+		org.alive = false
 	end
 
 
@@ -1317,41 +1236,6 @@ module[2] = function(owner, org, timeValue)
 
 		end
 
-	end
-
-
-
-	-- Healing: mannitol directly reduces intpressure
-	if org.mannitol > 0 and org.intpressure > 0 then
-		org.intpressure = math.max(org.intpressure - timeValue / 120 * org.mannitol, 0)
-	end
-
-	-- Tranexamic acid reduces internal bleeding which in turn stops feeding intpressure (indirect)
-	-- Natural decay: only when intpressure is small (below 0.3)
-	if org.intpressure > 0 and org.intpressure < 0.3 then
-		org.intpressure = math.max(org.intpressure - timeValue / 600, 0)
-	end
-
-	if org.intpressure > 0.4 then
-		local pressureSeverity = math.Clamp((org.intpressure - 0.4) / 0.6, 0, 1)
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * pressureSeverity * 0.4, 0)
-		if not org.heartstop and math.random() < pressureSeverity * 0.04 * timeValue then
-			org.lungsfunction = false
-		end
-	end
-
-	if org.isPly then
-		if org.intpressure > 0.25 and org.intpressure < 0.6 then
-			org.owner:Notify("My head is throbbing with pressure...", true, "intpressure1", 8)
-		else
-			org.owner:ResetNotification("intpressure1")
-		end
-
-		if org.intpressure >= 0.6 then
-			org.owner:Notify("The pressure in my skull is unbearable.", true, "intpressure2", 5, nil, Color(255, 100, 100))
-		else
-			org.owner:ResetNotification("intpressure2")
-		end
 	end
 
 

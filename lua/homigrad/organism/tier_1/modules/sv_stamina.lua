@@ -114,14 +114,7 @@ module[2] = function(owner, org, timeValue)
 
 		if (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner:IsSprinting() and org.stamina[1] > 20 then
 
-			local sprintMul = 1
-			if owner.hg_moveMode == 2 then
-				sprintMul = 2.0
-			elseif owner.hg_moveMode == 1 then
-				sprintMul = 1.35
-			end
-
-			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * sprintMul
+			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5)
 
 		end
 

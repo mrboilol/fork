@@ -226,8 +226,7 @@ function SWEP:GetHandSupportState(ply)
 		local zmanipLeft = ply.zmanipstart ~= nil and ply.zmanipseq == "interact" and not org.larmamputated
 		local fakeLeftGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsLH)
 		local fakeRightGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsRH)
-		local pressureBusy = org.pressingWound and org.pressingWoundForceOneHanded
-		local offhandBusy = carrying or zmanipLeft or fakeLeftGrip or ply.holdingWeapon or pressureBusy
+		local offhandBusy = carrying or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
 
 		if offhandBusy then
 			leftBusy = leftUsable

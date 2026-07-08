@@ -26,22 +26,9 @@ function hg.organism.should_gain_fear(org)
 end
 
 module[2] = function(owner, org, timeValue)
-	if (org.brainstem or 0) >= 1 then
-		org.alive = false
-		org.heartstop = true
-		org.lungsfunction = false
-		org.heartbeat = 0
-		org.pulse = 0
-		org.bloodpressure = 0
-		org.systolic = 0
-		org.diastolic = 0
-		return
-	end
-
 	local heart = 1 - org.heart
-	-- Brainstem damage weakens the heart's neurological drive.
-	-- A fully destroyed brainstem cannot drive cardiac rhythm.
-	local brain = math.Clamp(1 - (org.brainstem or 0) * 1.5, 0, 1)
+	-- Brain damage weakens the heart's neurological drive.
+	local brain = math.Clamp(1 - org.brain * 1.5, 0, 1)
 	local o2 = org.o2
 	local o2 = halfValue2(o2[1], o2.range, o2.k)
 
@@ -51,17 +38,6 @@ module[2] = function(owner, org, timeValue)
 	local stamina = org.stamina
 	
 	if not org.alive then
-		if org.braindead and (org.brainstem or 1) < 0.25 and (org.postmortemPulseUntil or 0) > CurTime() then
-			org.heartstop = false
-			org.heartbeat = math.Approach(org.heartbeat or 0, 28, timeValue * 4)
-			org.pulse = math.Approach(org.pulse or 0, 12, timeValue * 4)
-			org.bloodpressure = math.Approach(org.bloodpressure or 0, 18, timeValue * 6)
-			org.systolic = math.max(org.systolic or 0, 32)
-			org.diastolic = math.max(org.diastolic or 0, 12)
-			org.last_heartbeat = CurTime()
-			return
-		end
-
 		org.heartbeat = 0
 		org.pulse = 0
 		org.bloodpressure = 0
@@ -425,12 +401,11 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
-		local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.brainstem or 0) < 1 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
+		local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
 		-- Scale chance with adrenaline level: significantly improved effectiveness
 		-- Low dose (1): ~70% chance, Medium dose (2): ~90% chance, High dose (4+): near-certain
 		local chance = math.Clamp(adren * 60 + adren * adren * 12, 0, 99)
 		chance = chance * math.Clamp(1 - (org.heart or 0) * 0.65, 0.2, 1)
-		chance = chance * math.Clamp(1 - (org.brainstem or 0) * 0.75, 0.1, 1)
 		if (org.o2 and (org.o2[1] or 0) < 5) or (org.bloodpressure or 0) < 15 then
 			chance = chance * 0.6
 		end

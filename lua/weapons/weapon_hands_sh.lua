@@ -1679,7 +1679,7 @@ function SWEP:ApplyForce()
 							
 							-- Heart restart based on CPR duration and pulse
 							-- Longer CPR = higher chance, even with 0 pulse
-							local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.brainstem or 0) < 1
+							local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85
 							local durationChance = math.Clamp(self.CPRDuration / 8, 0, 0.75) * skillMult -- Up to 75% after 8 seconds (150% for doctors)
 							local pulseChance = math.Clamp((org.pulse or 0) / 70, 0, 1) * 0.6 * skillMult
 							local adrenalineChance = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0)) / 4, 0, 1) * 0.45

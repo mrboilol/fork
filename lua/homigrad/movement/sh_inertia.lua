@@ -110,32 +110,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			return
 		end
 
-		-- Jog / Sprint tracking
-		local now = CurTime()
-		local shiftDown = ply:KeyDown(IN_SPEED)
-		ply.lastShiftDown = ply.lastShiftDown or false
-		ply.hg_moveMode = ply.hg_moveMode or 0
-
-		if shiftDown and not ply.lastShiftDown then
-			if ply.lastShiftRelease and now - ply.lastShiftRelease < 0.4 then
-				ply.hg_moveMode = 2 -- sprint
-			else
-				ply.hg_moveMode = 1 -- jog
-			end
-			ply.lastShiftDown = true
-		elseif not shiftDown and ply.lastShiftDown then
-			ply.lastShiftDown = false
-			ply.lastShiftRelease = now
-		end
-
-		if not shiftDown and ply.lastShiftRelease and now - ply.lastShiftRelease >= 0.4 then
-			ply.hg_moveMode = 0
-			ply.lastShiftRelease = nil
-		end
-
-		local isJogging = ply.hg_moveMode == 1 and not ply:Crouching() and ply:KeyDown(IN_FORWARD)
-		local isSprinting = ply.hg_moveMode == 2 and not ply:Crouching() and ply:KeyDown(IN_FORWARD)
-		local runnin = isJogging or isSprinting
+		local runnin = ply:KeyDown(IN_SPEED) and not ply:Crouching() and ply:KeyDown(IN_FORWARD)
 
 		--[[if runnin then
 			mv:SetSideSpeed(0) --meh
@@ -274,13 +249,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		mul = mul * (ply:GetNWBool("TauntStopMoving", false) and 0.01 or 1)
 
 		if(runnin and velLen >= 10)then
-			local targetSpeed = (ply.move or ply:GetRunSpeed()) * mul
-			if isSprinting then
-				targetSpeed = targetSpeed * 1.2
-			elseif isJogging then
-				targetSpeed = targetSpeed * 0.72
-			end
-			ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, targetSpeed, delta_time * ply.SpeedGainMul)
+			ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, (ply.move or ply:GetRunSpeed()) * mul, delta_time * ply.SpeedGainMul)
 		else
 			if(ply:Crouching())then
 				ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, crouch_walk_speed * mul, delta_time * ply.SpeedLoseMul)

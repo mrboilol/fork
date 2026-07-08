@@ -6,10 +6,6 @@ hg.organism.module.pain = {}
 
 local module = hg.organism.module.pain
 
-local function GetShockConsciousnessThreshold(analgesia)
-	return 40 + Clamp(analgesia or 0, 0, 1) * 30
-end
-
 module[1] = function(org)
 
 	org.shock = 0
@@ -41,7 +37,6 @@ module[1] = function(org)
 	org.tranquilizer = 0
 
 	org.shock_turn = 0
-	org._highShockTime = 0
 
 
 
@@ -61,7 +56,7 @@ function hg.organism.paincheck(org)
 
 
 
-	return (org.shock >= org.shock_turn * 4 * analgesiaMul)
+	return (org.shock > org.shock_turn * 4 * analgesiaMul)
 
 end
 
@@ -204,39 +199,19 @@ module[2] = function(owner, org, timeValue)
 
 
 	if org.shock > (30 * analgesiaMul) then
-		if (org.consciousness or 1) > 0.5 and (org.consciousness or 1) - timeValue / 5 < 0.5 then
+
+		local prevConsciousness = org.consciousness or 1
+
+		org.consciousness = math.Approach(org.consciousness, 0.25, timeValue / 5)
+
+		if prevConsciousness > 0.5 and org.consciousness < 0.5 then
+
 			org.goodmood = math.Clamp((org.goodmood or 1) - 0.1, 0, 1)
+
 		end
+
 	end
 
-	local shockLoad = math.Clamp(((org.shock or 0) - 35) / 65, 0, 1)
-	local painLoad = math.Clamp(((org.pain or 0) - 65) / 55, 0, 1)
-	local stressLoad = math.max(shockLoad, painLoad)
-	if stressLoad > 0 then
-		local vitalsCritical = (org.blood or 5000) < 2600 or (org.o2 and org.o2[1] and org.o2[1] < 12) or (org.brain or 0) > 0.325 or (org.tranquilizer or 0) > 0
-		local severePainShock = shockLoad > 0.45 and painLoad > 0.35
-		local protectedFloor = (vitalsCritical or severePainShock) and 0 or 0.28
-		local sustained = org._painShockSustain or 0
-		if shockLoad > 0.45 and painLoad > 0.35 then
-			sustained = sustained + timeValue * (shockLoad + painLoad)
-		else
-			sustained = math.max(sustained - timeValue * 1.5, 0)
-		end
-		org._painShockSustain = sustained
-
-		local drain = timeValue * (0.018 + stressLoad * 0.055)
-		if sustained > 8 then
-			drain = drain + timeValue * math.Clamp((sustained - 8) / 24, 0, 1) * (vitalsCritical and 0.16 or 0.045)
-		end
-
-		org.consciousness = math.max((org.consciousness or 1) - drain, protectedFloor)
-	end
-
-
-
-	local shock = org.shock or 0
-	local currentPain = org.pain or 0
-	local consciousnessRecoveryBlocked = shock > 0.05 or currentPain > 0.5
 
 	if org.tranquilizer > 0 then
 
@@ -248,11 +223,7 @@ module[2] = function(owner, org, timeValue)
 
 	else
 
-		local consciousnessTarget = org.blood < 2500 and math.Clamp((org.blood - 2000) / 500, 0, 1) or 1
-		local consciousness = org.consciousness or 1
-		if consciousnessTarget < consciousness or consciousnessRecoveryBlocked == false then
-			org.consciousness = math.Approach(consciousness, consciousnessTarget, timeValue / 15)
-		end
+		org.consciousness = math.Approach(org.consciousness, org.blood < 2500 and math.Clamp((org.blood - 2000) / 500, 0, 1) or 1, timeValue / 15)
 
 	end
 
@@ -270,33 +241,6 @@ module[2] = function(owner, org, timeValue)
 		org.consciousness = math.max((org.consciousness or 1) - consciousnessDrain, 0)
 
 	end
-
-
-	local analgesiaResistance = max(1 + (org.analgesia or 0) * 2.5 + (org.painkiller or 0) * 0.35, 1)
-	local stressResistance = analgesiaResistance * max(1 + (org.adrenaline or 0) * 0.12, 1) * max(0.75 + goodmood * 0.25, 0.75)
-	local shockPainMul = 1 + Clamp((currentPain - 50) / 70, 0, 0.45)
-
-	local shockCollapseThreshold = GetShockConsciousnessThreshold(org.analgesia)
-
-	if shock >= shockCollapseThreshold then
-		org._highShockTime = (org._highShockTime or 0) + timeValue
-	else
-		org._highShockTime = max((org._highShockTime or 0) - timeValue * 2, 0)
-	end
-
-	if shock >= shockCollapseThreshold then
-		local highShockSeverity = Clamp((shock - shockCollapseThreshold) / max(100 - shockCollapseThreshold, 1), 0.35, 1)
-		local highShockDrain = timeValue * highShockSeverity * shockPainMul * 1.2
-		org.consciousness = max((org.consciousness or 1) - highShockDrain, 0)
-	end
-
-	if shockLoad > 0.45 and painLoad > 0.35 then
-		local combinedSeverity = Clamp((shockLoad + painLoad) / 2, 0.35, 1)
-		local sustainedMul = Clamp((org._painShockSustain or 0) / 12, 0.35, 1)
-		local collapseDrain = timeValue * combinedSeverity * sustainedMul * shockPainMul * 0.42 / stressResistance
-		org.consciousness = max((org.consciousness or 1) - collapseDrain, 0)
-	end
-
 
 
 	if org.consciousness < 0.1 then
@@ -349,17 +293,6 @@ module[2] = function(owner, org, timeValue)
 
 	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - org.analgesia, 0)
 
-	local activeShock = org.shock or 0
-	local activePain = org.pain or 0
-	local activeShockThreshold = GetShockConsciousnessThreshold(org.analgesia)
-	if activeShock >= activeShockThreshold and activePain > 35 then
-		local shockSeverity = Clamp((activeShock - activeShockThreshold) / 35, 0.45, 1)
-		local painSeverity = Clamp((activePain - 35) / 55, 0.35, 1)
-		local collapseDrain = timeValue * shockSeverity * painSeverity * 0.95 / stressResistance
-		org.consciousness = max((org.consciousness or 1) - collapseDrain, 0)
-	end
-
-
 
 	org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
 
@@ -373,22 +306,9 @@ module[2] = function(owner, org, timeValue)
 
 		local shockCap = org.shock_turn * 4 * ((org.analgesia * 4 + 1))
 
-		local shockSeverity = math.Clamp((org.shock - shockCap) / 75, 0.05, 1)
+		local shockSeverity = math.Clamp((org.shock - shockCap) / 50, 0.1, 1)
 
-		local pain = org.pain or 0
-		local highPain = pain > 55
-
-		local shockFloor
-		if highPain or (org.shock or 0) >= GetShockConsciousnessThreshold(org.analgesia) then
-			shockFloor = 0
-		else
-			shockFloor = 0.5
-		end
-
-		local consciousness = org.consciousness or 1
-		if consciousness > shockFloor then
-			org.consciousness = math.max(consciousness - timeValue * shockSeverity * 0.22, shockFloor)
-		end
+		org.consciousness = math.max((org.consciousness or 1) - timeValue * shockSeverity * 0.4, 0.25)
 
 	end
 
@@ -399,20 +319,6 @@ module[2] = function(owner, org, timeValue)
 	
 
 	org.analgesia =  Approach(org.analgesia, 0, timeValue / 240 * (org.naloxone * 25 + 1))
-
-	-- Brain damage from high analgesia
-	local noradrenalineProtected = org.noradrenaline > 0 or (org.noradrenalineEndTime and org.noradrenalineEndTime + 20 > CurTime())
-	if not noradrenalineProtected then
-		if org.analgesia > 1.1 then
-			local brainDamageRate = (org.analgesia - 1.1) * timeValue * 0.0118 * 0.35
-			org.brain = (org.brain or 0) + brainDamageRate
-		elseif org.analgesia > 0.7 then
-			local damageChance = (org.analgesia - 0.7) / 0.4 * 0.008
-			if math.random() < damageChance then
-				org.brain = (org.brain or 0) + 0.00035
-			end
-		end
-	end
 
 	if org.analgesiaAdd > 0 then
 

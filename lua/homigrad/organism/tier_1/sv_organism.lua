@@ -18,11 +18,7 @@ hook.Add("Org Clear", "Main", function(org)
 	module.goodmood[1](org)
 	if module.teeth and module.teeth[1] then module.teeth[1](org) end
 	org.brain = 0
-	org.brainstem = 0
-	org.braindead = false
-	org.intpressure = 0
 	org.consciousness = 1
-	org.consciousnessTracker = 0
 	org.disorientation = 0
 	org.jaw = 0
 	org.spine1 = 0
@@ -162,9 +158,6 @@ local function send_organism(org, ply)
 	sendtable.pelvis = org.pelvis
 	sendtable.disorientation = org.disorientation
 	sendtable.brain = org.brain
-	sendtable.brainstem = org.brainstem
-	sendtable.braindead = org.braindead
-	sendtable.intpressure = org.intpressure
 	sendtable.o2 = org.o2
 	sendtable.CO = org.CO
 	sendtable.blood = org.blood
@@ -260,9 +253,6 @@ local function send_bareinfo(org)
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
 	sendtable.analgesia = org.analgesia
-	sendtable.brainstem = org.brainstem
-	sendtable.braindead = org.braindead
-	sendtable.intpressure = org.intpressure
 	sendtable.o2 = org.o2
 	sendtable.timeValue = org.timeValue
 	sendtable.despair = org.despair
@@ -588,23 +578,12 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if owner:IsPlayer() and not owner:Alive() then
 		org.alive = false
-		local residualPulse = org.braindead and (org.brainstem or 1) < 0.25 and (org.postmortemPulseUntil or 0) > CurTime()
-		if residualPulse then
-			org.heartstop = false
-			org.heartbeat = math.max(org.heartbeat or 0, 28)
-			org.pulse = math.max(org.pulse or 0, 12)
-			org.bloodpressure = math.max(org.bloodpressure or 0, 18)
-			org.systolic = math.max(org.systolic or 0, 32)
-			org.diastolic = math.max(org.diastolic or 0, 12)
-			org.last_heartbeat = CurTime()
-		else
-			org.heartstop = true
-			org.heartbeat = 0
-			org.pulse = 0
-			org.bloodpressure = 0
-			org.systolic = 0
-			org.diastolic = 0
-		end
+		org.heartstop = true
+		org.heartbeat = 0
+		org.pulse = 0
+		org.bloodpressure = 0
+		org.systolic = 0
+		org.diastolic = 0
 		return
 	end
 
@@ -631,22 +610,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.timeValue = timeValue
 	org.incapacitated = false
 	org.critical = false
-
-	-- Track consciousness increases for brain damage
-	if org.consciousness then
-		local prevConsciousness = org.prevConsciousness or 0
-		org.prevConsciousness = org.consciousness
-
-		if org.consciousness > prevConsciousness then
-			org.consciousnessTracker = (org.consciousnessTracker or 0) + (org.consciousness - prevConsciousness)
-		end
-
-		-- Apply 0.015 brain damage when consciousness rises by 2.5
-		if (org.consciousnessTracker or 0) >= 2.5 then
-			org.brain = math.min((org.brain or 0) + 0.015, 1.0)
-			org.consciousnessTracker = 0
-		end
-	end
 
 	-- Aiming fatigue tracking (affects recoil multipliers)
 	if isPly then
@@ -1155,9 +1118,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if !org.alive then
 		org.lungsfunction = false
-		if not (org.braindead and (org.brainstem or 1) < 0.25 and (org.postmortemPulseUntil or 0) > CurTime()) then
-			org.heartstop = true
-		end
+		org.heartstop = true
 	end
 
 	time = CurTime()
@@ -1224,8 +1185,6 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.lungsR[2] = math.max(org.lungsR[2] - regen, 0)
 	org.lungsL[2] = math.max(org.lungsL[2] - regen, 0)
 	org.brain = math.max(org.brain - regen, 0)
-	org.brainstem = math.max((org.brainstem or 0) - regen * 2, 0)
-	org.intpressure = math.max((org.intpressure or 0) - regen * 3, 0)
 
 	org.hungry = 0
 

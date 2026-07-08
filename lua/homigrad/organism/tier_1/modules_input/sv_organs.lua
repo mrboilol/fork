@@ -246,8 +246,6 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		end
 		org.brainBurstLast = time
 		org.brainBurstDamage = (org.brainBurstDamage or 0) + brainDelta
-		local pressureSpike = brainDelta * ((org.skull or 0) >= 0.6 and 0.65 or 0.4)
-		org.intpressure = math.min((org.intpressure or 0) + pressureSpike, 1)
 	end
 
 	if brainDelta > 0 then
@@ -369,39 +367,6 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 
 				targetPlayer.HeadDisorientFlashCooldown = CurTime() + (isCritical and 0.8 or 0.35)
 			end
-		end
-	end
-
-	return result
-end
-
-input_list.brainstem = function(org, bone, dmg, dmgInfo)
-	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
-	local oldDmg = org.brainstem or 0
-	local result = damageOrgan(org, dmg * 1.4, dmgInfo, "brainstem")
-	local delta = (org.brainstem or 0) - oldDmg
-
-	hg.AddHarmToAttacker(dmgInfo, delta * 25, "Brainstem damage harm")
-
-	if delta > 0 then
-		org.consciousness = math.Approach(org.consciousness or 1, 0, dmg * 5)
-		org.disorientation = (org.disorientation or 0) + dmg * 2
-		org.shock = (org.shock or 0) + dmg * 8
-		org.painadd = (org.painadd or 0) + dmg * 12
-		if org.o2 then org.o2[1] = math.max((org.o2[1] or 0) - delta * 12, 0) end
-		if delta > 0.08 then org.lungsfunction = false end
-		if org.brainstem >= 0.45 and math.random() < delta * 2 then
-			org.heartstop = true
-		end
-		if org.brainstem >= 1 then
-			org.alive = false
-			org.heartstop = true
-			org.lungsfunction = false
-			org.heartbeat = 0
-			org.pulse = 0
-			org.bloodpressure = 0
-			org.systolic = 0
-			org.diastolic = 0
 		end
 	end
 

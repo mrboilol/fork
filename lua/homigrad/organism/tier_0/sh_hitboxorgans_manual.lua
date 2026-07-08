@@ -40,20 +40,20 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(255, 0, 255)
 	},
 	{
-		"brainstem", --brainstem fr fr ong ong"
+		"brain", --brain niz
 		nil,
 		Vector(1.3, 0.55, 0),
 		Angle(0, 0, 0),
 		Vector(2, 2.6, 1.9),
-		Color(255, 45, 255)
+		Color(255, 0, 255)
 	},
 	{
-		"brainstem",
+		"brain",
 		nil,
 		Vector(-0.35, 2.65, 0),
 		Angle(0, 0, 0),
 		Vector(1.4, 2.7, 1.25),
-		Color(255, 45, 255)
+		Color(255, 0, 255)
 	},
 	{
 		"eyeL",
@@ -319,20 +319,20 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(255, 0, 255)
 	},
 	{
-		"brainstem", --brain niz / lower brainstem
+		"brain", --brain niz
 		nil,
 		Vector(0.35, 2.25, 0),
 		Angle(0, 0, 0),
 		Vector(2, 2.6, 1.9),
-		Color(255, 45, 255)
+		Color(255, 0, 255)
 	},
 	{
-		"brainstem",
+		"brain",
 		nil,
 		Vector(-1.15, 4, 0),
 		Angle(0, 0, 0),
 		Vector(1.4, 2.7, 1.25),
-		Color(255, 45, 255)
+		Color(255, 0, 255)
 	},
 	{
 		"eyeL",
@@ -420,7 +420,6 @@ hg.organism.translationTbl = {
 	["skull"] = "Skull",
 	["jaw"] = "Jaw",
 	["brain"] = "Brain",
-	["brainstem"] = "Brainstem",
 	["eyeL"] = "Left eye",
 	["eyeR"] = "Right eye",
 	["arteria"] = "Carotid artery",
