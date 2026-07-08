@@ -1507,9 +1507,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		//end
 	end
 
-	updatePainLayer(painLayers.agony, normalizedPain, painVolume)
-	updatePainLayer(painLayers.excruciating, normalizedPain, painVolume)
-
 	if brain > 0.01 then
 		local chooser = 1
 		for i, choose in ipairs(stations) do
