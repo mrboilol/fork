@@ -589,10 +589,14 @@ local fakeBoneParents = {
 	["ValveBiped.Bip01_L_UpperArm"] = "ValveBiped.Bip01_Spine2",
 	["ValveBiped.Bip01_R_Forearm"] = "ValveBiped.Bip01_R_UpperArm",
 	["ValveBiped.Bip01_L_Forearm"] = "ValveBiped.Bip01_L_UpperArm",
+	["ValveBiped.Bip01_R_Hand"] = "ValveBiped.Bip01_R_Forearm",
+	["ValveBiped.Bip01_L_Hand"] = "ValveBiped.Bip01_L_Forearm",
 	["ValveBiped.Bip01_R_Thigh"] = "ValveBiped.Bip01_Pelvis",
 	["ValveBiped.Bip01_L_Thigh"] = "ValveBiped.Bip01_Pelvis",
 	["ValveBiped.Bip01_R_Calf"] = "ValveBiped.Bip01_R_Thigh",
 	["ValveBiped.Bip01_L_Calf"] = "ValveBiped.Bip01_L_Thigh",
+	["ValveBiped.Bip01_R_Foot"] = "ValveBiped.Bip01_R_Calf",
+	["ValveBiped.Bip01_L_Foot"] = "ValveBiped.Bip01_L_Calf",
 }
 
 local fakeBoneLimits = {
@@ -616,6 +620,16 @@ local fakeBoneLimits = {
 		[1] = {[0] = "45", [1] = "-45"},
 		[2] = {[0] = "90", [1] = "-90"},
 	},
+	["ValveBiped.Bip01_R_Hand"] = {
+		[0] = {[0] = "90", [1] = "-90"},
+		[1] = {[0] = "90", [1] = "-90"},
+		[2] = {[0] = "90", [1] = "-90"},
+	},
+	["ValveBiped.Bip01_L_Hand"] = {
+		[0] = {[0] = "90", [1] = "-90"},
+		[1] = {[0] = "90", [1] = "-90"},
+		[2] = {[0] = "90", [1] = "-90"},
+	},
 	["ValveBiped.Bip01_R_Thigh"] = {
 		[0] = {[0] = "100", [1] = "-60"},
 		[1] = {[0] = "10", [1] = "-60"},
@@ -636,6 +650,16 @@ local fakeBoneLimits = {
 		[1] = {[0] = "45", [1] = "-20"},
 		[2] = {[0] = "5", [1] = "-45"},
 	},
+	["ValveBiped.Bip01_R_Foot"] = {
+		[0] = {[0] = "45", [1] = "-45"},
+		[1] = {[0] = "45", [1] = "-45"},
+		[2] = {[0] = "45", [1] = "-45"},
+	},
+	["ValveBiped.Bip01_L_Foot"] = {
+		[0] = {[0] = "45", [1] = "-45"},
+		[1] = {[0] = "45", [1] = "-45"},
+		[2] = {[0] = "45", [1] = "-45"},
+	},
 }
 
 local fakeBoneCrookedOffsets = {
@@ -655,6 +679,14 @@ local fakeBoneCrookedOffsets = {
 		pos = Vector(0, 2, -1),
 		ang = Angle(-65, 10, -85),
 	},
+	["ValveBiped.Bip01_R_Hand"] = {
+		pos = Vector(0, -1.2, -0.5),
+		ang = Angle(-25, -20, 45),
+	},
+	["ValveBiped.Bip01_L_Hand"] = {
+		pos = Vector(0, 1.2, -0.5),
+		ang = Angle(-25, 20, -45),
+	},
 	["ValveBiped.Bip01_R_Thigh"] = {
 		pos = Vector(0, -3, 1),
 		ang = Angle(25, -20, 20),
@@ -671,65 +703,117 @@ local fakeBoneCrookedOffsets = {
 		pos = Vector(0, 2, -1),
 		ang = Angle(-55, 10, -30),
 	},
+	["ValveBiped.Bip01_R_Foot"] = {
+		pos = Vector(1, -0.5, -1),
+		ang = Angle(30, -10, 20),
+	},
+	["ValveBiped.Bip01_L_Foot"] = {
+		pos = Vector(1, 0.5, -1),
+		ang = Angle(30, 10, -20),
+	},
 }
 
 local fakeLimbBoneGroups = {
 	larm = {
 		"ValveBiped.Bip01_L_UpperArm",
 		"ValveBiped.Bip01_L_Forearm",
+		"ValveBiped.Bip01_L_Hand",
 	},
 	rarm = {
 		"ValveBiped.Bip01_R_UpperArm",
 		"ValveBiped.Bip01_R_Forearm",
+		"ValveBiped.Bip01_R_Hand",
 	},
 	lleg = {
 		"ValveBiped.Bip01_L_Thigh",
 		"ValveBiped.Bip01_L_Calf",
+		"ValveBiped.Bip01_L_Foot",
 	},
 	rleg = {
 		"ValveBiped.Bip01_R_Thigh",
 		"ValveBiped.Bip01_R_Calf",
+		"ValveBiped.Bip01_R_Foot",
 	},
 }
 
 local fakeLimbBoneSegments = {
 	larm = {
+		[1] = "ValveBiped.Bip01_L_UpperArm",
+		[2] = "ValveBiped.Bip01_L_Forearm",
+		[3] = "ValveBiped.Bip01_L_Hand",
 		up = "ValveBiped.Bip01_L_UpperArm",
 		down = "ValveBiped.Bip01_L_Forearm",
 	},
 	rarm = {
+		[1] = "ValveBiped.Bip01_R_UpperArm",
+		[2] = "ValveBiped.Bip01_R_Forearm",
+		[3] = "ValveBiped.Bip01_R_Hand",
 		up = "ValveBiped.Bip01_R_UpperArm",
 		down = "ValveBiped.Bip01_R_Forearm",
 	},
 	lleg = {
+		[1] = "ValveBiped.Bip01_L_Thigh",
+		[2] = "ValveBiped.Bip01_L_Calf",
+		[3] = "ValveBiped.Bip01_L_Foot",
 		up = "ValveBiped.Bip01_L_Thigh",
 		down = "ValveBiped.Bip01_L_Calf",
 	},
 	rleg = {
+		[1] = "ValveBiped.Bip01_R_Thigh",
+		[2] = "ValveBiped.Bip01_R_Calf",
+		[3] = "ValveBiped.Bip01_R_Foot",
 		up = "ValveBiped.Bip01_R_Thigh",
 		down = "ValveBiped.Bip01_R_Calf",
 	},
 }
 
 function fakeBoneFlop.ResolveBone(limb, segment)
-	return fakeLimbBoneSegments[limb] and fakeLimbBoneSegments[limb][segment]
+	local segments = fakeLimbBoneSegments[limb]
+	if not segments then return end
+
+	if segment == nil then
+		segment = 2
+	elseif isnumber(segment) then
+		segment = math.Clamp(math.Round(segment), 1, 3)
+	end
+
+	return segments[segment] or segments[2]
 end
 
 function fakeBoneFlop.GetLimbBones(limb)
 	return fakeLimbBoneGroups[limb]
 end
 
-function fakeBoneFlop.FlagBone(org, bone, active)
+local function normalizeFloppyState(state)
+	if istable(state) then return table.Copy(state) end
+	if isstring(state) then return {state = state} end
+	if state == true then return {state = "broken"} end
+
+	return {state = "broken"}
+end
+
+local function sameFloppyState(a, b)
+	if a == b then return true end
+	if not istable(a) or not istable(b) then return false end
+
+	return a.state == b.state and a.limb == b.limb and a.segment == b.segment
+end
+
+function fakeBoneFlop.FlagBone(org, bone, active, state)
 	if not org or not bone then return false end
 
-	org.fake_floppy_bones = org.fake_floppy_bones or {}
-
 	if active then
-		if org.fake_floppy_bones[bone] then return false end
-		org.fake_floppy_bones[bone] = true
-		return true
+		org.fake_floppy_bones = org.fake_floppy_bones or {}
+
+		local wanted = normalizeFloppyState(state)
+		local current = org.fake_floppy_bones[bone]
+		if current and sameFloppyState(current, wanted) then return false end
+
+		org.fake_floppy_bones[bone] = wanted
+		return true, bone
 	end
 
+	if not org.fake_floppy_bones then return false end
 	if not org.fake_floppy_bones[bone] then return false end
 	org.fake_floppy_bones[bone] = nil
 
@@ -737,11 +821,17 @@ function fakeBoneFlop.FlagBone(org, bone, active)
 		org.fake_floppy_bones = nil
 	end
 
-	return true
+	return true, bone
 end
 
-function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active)
-	return fakeBoneFlop.FlagBone(org, fakeBoneFlop.ResolveBone(limb, segment), active)
+function fakeBoneFlop.SetLimbSegmentState(org, limb, segment, active, state)
+	local bone = fakeBoneFlop.ResolveBone(limb, segment)
+	local meta = normalizeFloppyState(state)
+	meta.limb = meta.limb or limb
+	meta.segment = meta.segment or (isnumber(segment) and math.Clamp(math.Round(segment), 1, 3) or segment or 2)
+
+	local changed = fakeBoneFlop.FlagBone(org, bone, active, meta)
+	return changed, bone
 end
 
 function fakeBoneFlop.ClearStoredLimb(org, limb)
@@ -754,6 +844,76 @@ function fakeBoneFlop.ClearStoredLimb(org, limb)
 	end
 
 	return changed
+end
+
+local function getRagdollFloppyOwner(rag)
+	if not IsValid(rag) then return end
+
+	local owner
+	if hg.RagdollOwner then
+		owner = hg.RagdollOwner(rag)
+	end
+
+	if not IsValid(owner) then
+		owner = rag:GetNWEntity("ply")
+	end
+
+	return owner
+end
+
+function fakeBoneFlop.GetStoredBoneState(org, bone)
+	if not org or not org.fake_floppy_bones then return end
+
+	local state = org.fake_floppy_bones[bone]
+	if not state then return end
+
+	return normalizeFloppyState(state)
+end
+
+function fakeBoneFlop.GetRagdollBoneState(rag, bone)
+	if not IsValid(rag) or not bone then return end
+
+	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then
+		return normalizeFloppyState(rag.hg_floppy_bones[bone])
+	end
+
+	local owner = getRagdollFloppyOwner(rag)
+	if IsValid(owner) and owner.organism then
+		return fakeBoneFlop.GetStoredBoneState(owner.organism, bone)
+	end
+end
+
+function fakeBoneFlop.IsBoneFloppy(rag, bone)
+	return fakeBoneFlop.GetRagdollBoneState(rag, bone) ~= nil
+end
+
+function fakeBoneFlop.GetPhysBoneState(rag, physNumber, alreadyReal)
+	if not IsValid(rag) then return end
+
+	local real = alreadyReal and physNumber or (hg.realPhysNum and hg.realPhysNum(rag, physNumber) or physNumber)
+	local bone = rag:TranslatePhysBoneToBone(real)
+	if not bone or bone < 0 then return end
+
+	local boneName = rag:GetBoneName(bone)
+	local state = fakeBoneFlop.GetRagdollBoneState(rag, boneName)
+	if not state then return end
+
+	return state, boneName
+end
+
+function fakeBoneFlop.IsPhysFloppy(rag, physNumber, alreadyReal)
+	return fakeBoneFlop.GetPhysBoneState(rag, physNumber, alreadyReal) ~= nil
+end
+
+function fakeBoneFlop.GetPhysControlMultiplier(rag, physNumber, alreadyReal)
+	local state = fakeBoneFlop.GetPhysBoneState(rag, physNumber, alreadyReal)
+	if not state then return false, 1 end
+
+	if state.state == "dislocated" then
+		return true, 0.18
+	end
+
+	return true, 0
 end
 
 function fakeBoneFlop.CleanupRagdoll(rag)
@@ -775,6 +935,11 @@ function fakeBoneFlop.BendBone(rag, bone, forceMul)
 	if not IsValid(rag) then return end
 	if not (rag.hg_floppy_bones and rag.hg_floppy_bones[bone]) then return end
 	forceMul = forceMul or 1
+
+	local state = fakeBoneFlop.GetRagdollBoneState(rag, bone)
+	if state and state.state == "dislocated" then
+		forceMul = forceMul * 1.25
+	end
 
 	local parentBone = fakeBoneParents[bone]
 	local offset = fakeBoneCrookedOffsets[bone]
@@ -838,9 +1003,14 @@ local function fakeBoneBuildMatrixCache(rag)
 	return fakeBoneMatrixCache[model]
 end
 
-function fakeBoneFlop.ApplyBone(rag, bone)
+function fakeBoneFlop.ApplyBone(rag, bone, state)
 	if not IsValid(rag) then return end
-	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then return end
+	if rag.hg_floppy_bones and rag.hg_floppy_bones[bone] then
+		if state then
+			rag.hg_floppy_bones[bone] = normalizeFloppyState(state)
+		end
+		return
+	end
 
 	local parentBone = fakeBoneParents[bone]
 	local limits = fakeBoneLimits[bone]
@@ -864,6 +1034,8 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	local matrix = matrixCache[boneIDChild]
 	local matrixParent = matrixCache[boneIDParent]
 	if not matrix or not matrixParent then return end
+
+	state = state or fakeBoneFlop.GetRagdollBoneState(rag, bone) or {state = "broken"}
 
 	rag.hg_floppy_constraints = rag.hg_floppy_constraints or {}
 	rag.hg_floppy_bones = rag.hg_floppy_bones or {}
@@ -904,7 +1076,7 @@ function fakeBoneFlop.ApplyBone(rag, bone)
 	cons:Activate()
 
 	rag.hg_floppy_constraints[bone] = cons
-	rag.hg_floppy_bones[bone] = true
+	rag.hg_floppy_bones[bone] = normalizeFloppyState(state)
 
 	phys:SetPos(posOri)
 	phys:SetAngles(angOri)
@@ -926,8 +1098,8 @@ end
 function fakeBoneFlop.ApplyStored(rag, org)
 	if not IsValid(rag) or not org or not org.fake_floppy_bones then return end
 
-	for bone in pairs(org.fake_floppy_bones) do
-		fakeBoneFlop.ApplyBone(rag, bone)
+	for bone, state in pairs(org.fake_floppy_bones) do
+		fakeBoneFlop.ApplyBone(rag, bone, state)
 	end
 
 	timer.Simple(0, function()

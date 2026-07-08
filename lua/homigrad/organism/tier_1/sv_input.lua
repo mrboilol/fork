@@ -2780,6 +2780,63 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
     local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
     local playerRef = ply
 
+    local fakeFlop = hg.fakeBoneFlop
+    if fakeFlop and fakeFlop.SetLimbSegmentState then
+        timer.Simple(0, function()
+            local owner = IsValid(playerRef) and playerRef:IsPlayer() and playerRef or nil
+            local ragdoll
+
+            if IsValid(ent) and ent:IsRagdoll() then
+                ragdoll = ent
+                if not IsValid(owner) and hg.RagdollOwner then
+                    owner = hg.RagdollOwner(ent)
+                end
+            elseif IsValid(owner) then
+                ragdoll = owner:GetNWEntity("RagdollDeath")
+                if not IsValid(ragdoll) and isfunction(owner.GetRagdollEntity) then
+                    ragdoll = owner:GetRagdollEntity()
+                end
+                if not IsValid(ragdoll) then
+                    ragdoll = owner:GetNWEntity("FakeRagdoll")
+                end
+            end
+
+            local org = IsValid(owner) and owner.organism or (IsValid(ragdoll) and ragdoll.organism)
+            if not org or not org.alive then return end
+
+            local segment = segmentOverride or 2
+            local state = isDislocated and "dislocated" or "broken"
+            local changed, bone = fakeFlop.SetLimbSegmentState(org, limb, segment, true, {
+                state = state,
+                limb = limb,
+                segment = segment
+            })
+            if not bone then return end
+
+            if IsValid(owner) and owner:IsPlayer() then
+                owner.HG_FloppyPersistSeg = owner.HG_FloppyPersistSeg or {}
+                owner.HG_FloppyPersistSeg[limb] = segment
+                owner.HG_FloppyPersist = owner.HG_FloppyPersist or {}
+                owner.HG_FloppyPersist[limb] = true
+            end
+
+            if IsValid(ragdoll) and fakeFlop.ApplyBone then
+                local stored = org.fake_floppy_bones and org.fake_floppy_bones[bone]
+                fakeFlop.ApplyBone(ragdoll, bone, stored)
+
+                timer.Simple(0, function()
+                    if IsValid(ragdoll) and fakeFlop.BendBone then
+                        fakeFlop.BendBone(ragdoll, bone, isDislocated and 0.5 or 0.35)
+                    end
+                end)
+            elseif changed and IsValid(owner) and owner:IsPlayer() and fakeFlop.ScheduleRebuild then
+                fakeFlop.ScheduleRebuild(owner)
+            end
+        end)
+
+        return
+    end
+
     print("[HG Floppy] BreakLimb called: ent=" .. tostring(ent) .. " limb=" .. tostring(limb) .. " seg=" .. tostring(segmentOverride) .. " isDislocated=" .. tostring(isDislocated))
 
     -- OLD LUA: Use delay to ensure ragdoll exists
@@ -2928,6 +2985,14 @@ function hg.RemoveLimbConstraints(ent, limb)
         end
     end
     if not IsValid(ragdoll) then return end
+
+    local owner = ent:IsPlayer() and ent or (hg.RagdollOwner and hg.RagdollOwner(ragdoll))
+    local fakeFlop = hg.fakeBoneFlop
+    if fakeFlop and fakeFlop.ClearStoredLimb and IsValid(owner) and owner:IsPlayer() and owner.organism then
+        if fakeFlop.ClearStoredLimb(owner.organism, limb) and fakeFlop.ScheduleRebuild then
+            fakeFlop.ScheduleRebuild(owner)
+        end
+    end
 
     -- Don't tear constraints out from under a player-owned ragdoll.
     -- The next time they ragdoll the constraints will match the current organism state.

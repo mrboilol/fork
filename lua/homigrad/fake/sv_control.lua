@@ -457,6 +457,12 @@ end
 
 local function GetLimbDamageMultiplier(ragdoll, physNumber)
 
+	local flop = hg.fakeBoneFlop
+	if flop and flop.GetPhysControlMultiplier then
+		local floppy, floppyMult = flop.GetPhysControlMultiplier(ragdoll, physNumber, true)
+		if floppy then return true, floppyMult end
+	end
+
     local ply = hg.RagdollOwner(ragdoll)
 
     if not IsValid(ply) or not ply.organism then return false, 1.0 end
@@ -479,7 +485,7 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
 
     if limb == "head" or limb == "spine" then
 
-        local damage = limb == "head" and (org.spine3 or 0) or (org[limb] or 0)
+        local damage = limb == "head" and (org.spine3 or 0) or math.max(org.spine1 or 0, org.spine2 or 0, org.pelvis or 0)
 
         if damage >= 1 then
 
@@ -499,7 +505,7 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
 
     local damage = org[limb] or 0
 
-    local isDislocated = org[limb .. "dislocation"]
+    local isDislocated = org[limb .. "dislocation"] or org[limb .. "dislocated"]
 
 
 
@@ -559,16 +565,6 @@ end
 
 
 
-local function isFloppyPhys(ragdoll, physNumber, alreadyReal)
-	if not IsValid(ragdoll) or not ragdoll.hg_floppy_bones then return false end
-
-	local real = alreadyReal and physNumber or (realPhysNum(ragdoll, physNumber) or 0)
-	local bone = ragdoll:TranslatePhysBoneToBone(real)
-	if bone < 0 then return false end
-
-	return ragdoll.hg_floppy_bones[ragdoll:GetBoneName(bone)] == true
-end
-
 function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp)
 
     physNumber = realPhysNum(ragdoll, physNumber) or 0
@@ -587,7 +583,7 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 
     -- Apply reduced control for damaged limbs (0 = no control, 1 = full control)
 
-    if isDamaged and controlMult <= 0 then
+    if isDamaged and controlMult <= 0.01 then
 
         phys:Wake()
 
@@ -605,14 +601,6 @@ function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos,
 
     end
 
-
-	physNumber = realPhysNum(ragdoll, physNumber) or 0
-	local phys = ragdoll:GetPhysicsObjectNum(physNumber)
-	if not IsValid(phys) then return end
-	if isFloppyPhys(ragdoll, physNumber, true) then
-		phys:Wake()
-		return false
-	end
 
     shadowparams.secondstoarrive = ss
 
@@ -1190,17 +1178,11 @@ hook.Add("Think", "Fake", function()
 
 					local physobj = ragdoll:GetPhysicsObjectNum(i)
 
-					local mass = physobj:GetMass() / 5
-
-					
-
-					local name = ragdoll:GetBoneName(bone)
-
-
-
 					if IsValid(physobj) then
+						local mass = physobj:GetMass() / 5
+						local name = ragdoll:GetBoneName(bone)
 
-						local bone_impulse = ply.HitBones and ply.HitBones[bonename] or curTime
+						local bone_impulse = ply.HitBones and ply.HitBones[name] or curTime
 
 						local amt_impulse = (2 - math.Clamp(bone_impulse - curTime,0,2)) / 2
 
@@ -1246,9 +1228,15 @@ hook.Add("Think", "Fake", function()
 
 							ply.jumpedfake = nil
 
-							physobj:ComputeShadowControl(p)
+							local limited, controlMult = GetLimbDamageMultiplier(ragdoll, i)
+							if not limited or controlMult > 0.01 then
+								if limited then
+									p.maxangular = p.maxangular * controlMult
+									p.maxangulardamp = p.maxangulardamp * controlMult
+									p.maxspeed = p.maxspeed * controlMult
+									p.maxspeeddamp = p.maxspeeddamp * controlMult
+								end
 
-							if not isFloppyPhys(ragdoll, i, true) then
 								physobj:ComputeShadowControl(p)
 							end
 						end
