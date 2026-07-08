@@ -488,6 +488,10 @@ local NOSEBLEED_PAIN_MAX = 11
 local nosebleedLocalPos = Vector(3.5, 0, -3.5)
 local nosebleedLocalAng = Angle(90, 0, 0)
 
+local function nosebleedTimerName(ply)
+	return "ZCity_NosebleedCleanup" .. ply:EntIndex()
+end
+
 local function resetNosebleed(ply)
 	if not IsValid(ply) or not ply:IsPlayer() then return end
 
@@ -496,6 +500,17 @@ local function resetNosebleed(ply)
 	end
 
 	ply:SetNWFloat("ZCity_NosebleedUntil", 0)
+	timer.Remove(nosebleedTimerName(ply))
+end
+
+local function queueNosebleedCleanup(ply, bleedUntil)
+	timer.Remove(nosebleedTimerName(ply))
+	timer.Create(nosebleedTimerName(ply), math.max(bleedUntil - CurTime(), 0) + 0.1, 1, function()
+		if not IsValid(ply) then return end
+		if ply:GetNWFloat("ZCity_NosebleedUntil", 0) <= CurTime() then
+			resetNosebleed(ply)
+		end
+	end)
 end
 
 local function isBluntMeleeInflictor(dmgInfo)
@@ -540,7 +555,9 @@ local function applyNosebleed(ent, harm, ignoreCooldown)
 	local woundPower = math.Clamp(harm * 0.55, 10, 28)
 	org.painadd = (org.painadd or 0) + math.Clamp(harm * 0.2, NOSEBLEED_PAIN_MIN, NOSEBLEED_PAIN_MAX)
 	hg.organism.AddWoundManual(character, woundPower, nosebleedLocalPos, nosebleedLocalAng, headBone, time)
-	ply:SetNWFloat("ZCity_NosebleedUntil", math.max(ply:GetNWFloat("ZCity_NosebleedUntil", 0), time + math.Clamp(harm * 2.2, 28, 75)))
+	local bleedUntil = math.max(ply:GetNWFloat("ZCity_NosebleedUntil", 0), time + math.Clamp(harm * 2.2, 28, 75))
+	ply:SetNWFloat("ZCity_NosebleedUntil", bleedUntil)
+	queueNosebleedCleanup(ply, bleedUntil)
 
 	if ply.Notify then
 		ply:Notify("My nose is bleeding.", 8, "nosebleed", 0)
@@ -1698,7 +1715,7 @@ function hg.organism.DamageTypeAffliction(dmg, dmgInfo, ply, org)
 	end
 
 	if dmgInfo:IsDamageType(DMG_GENERIC+DMG_CLUB) then
-		dmgBlood = (math.random(15) == 1) and dmg / 4 or 0
+		dmgBlood = (math.random(4) == 1) and dmg * 0.65 or dmg * 0.08
 		dmgHurt = dmg * 10
 		instaPain = dmg * 6
 		immobilization = dmg * 5
@@ -1963,8 +1980,8 @@ local function velocityDamage(ent, data)
 
 
 		--print(dmg * 3, dmg * 80)
-		if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] and (dmg * 3 > 0.17) and math.random(2) == 2 then
-			hg.organism.AddWoundManual(ent,dmg*5,vector_origin,angle_zero,bone,CurTime() + (dmg * 250))
+		if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] and (dmg * 3 > 0.17) and math.random(3) ~= 1 then
+			hg.organism.AddWoundManual(ent,dmg*7,vector_origin,angle_zero,bone,CurTime() + (dmg * 250))
 			--PrintTable(org.wounds)
 		end
 		--print(dmg)
