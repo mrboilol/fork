@@ -606,29 +606,7 @@ function SWEP:CanUse(ignoreSprint)
     if owner:IsNPC() then return true end
 	if owner:IsPlayer() and owner:GetNWBool("hg_hold_wound_twohand", false) then return false end
 	if owner.organism and owner.organism.rarmamputated and !self:IsPistolHoldType() then return false end
-	return not (self.reload or self.deploy or (owner:IsPlayer() and (self:IsSprinting() or (owner.organism and owner.organism.otrub))))
-	local owner = self:GetOwner()
-
-	if not IsValid(owner) then
-		return true
-	end
-
-	if owner:IsNPC() then
-		return true
-	end
-
-	local hasAmputatedArm = owner.organism and owner.organism.rarmamputated and not self:IsPistolHoldType()
-		if self:IsJamClearing() then return false end
-	if hasAmputatedArm then
-		return false
-	end
-
-	local sprinting = owner:IsPlayer() and self:IsSprinting()
-	local otrub = owner.organism and owner.organism.otrub
-
-	local blockedState = self.reload or self.deploy or sprinting or otrub
-
-	return not blockedState
+	if self:IsJamClearing() then return false end
 	return not (self.reload or self.deploy or (owner:IsPlayer() and ((!ignoreSprint and self:IsSprinting()) or (owner.organism and owner.organism.otrub))))
 end
 

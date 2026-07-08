@@ -1289,12 +1289,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							for _ = 1, arteryBurstCount do
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 							end
-						else
-							local vel = VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70
-							hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent)
-							for _ = 2, arteryBurstCount do
-								hg.addBloodPart(pos, vel * math.Rand(0.65, 1.05) + VectorRand(-3, 3) * (org.pulse or 70) / 70, nil, size * math.Rand(0.85, 1.15), size * math.Rand(0.85, 1.15), true, nil, ent)
-							end
 						end
 
 						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))

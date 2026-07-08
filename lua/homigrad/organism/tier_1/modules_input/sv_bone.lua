@@ -785,6 +785,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			local owner = org.owner
 			if IsValid(owner) and owner:IsPlayer() then
 				owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
+			end
 
 			PlayBoneBreakSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end

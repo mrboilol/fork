@@ -147,7 +147,6 @@ end
 hg.applyFencingToPlayer = applyFencingToPlayer
 
 local function processFencing(rag, fade, ease)
-local function processFencing(rag, fade, ease)
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end
 	local spine2 = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(boneSpine2))
@@ -231,7 +230,6 @@ end
 hg.applyCushingToPlayer = applyCushingToPlayer
 
 local function processDecorticate(rag, fade, ease)
-local function processDecorticate(rag, fade, ease)
 	local org = rag.organism
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end
@@ -304,7 +302,6 @@ local function processDecorticate(rag, fade, ease)
 end
 
 local function processLazarus(rag, fade, ease)
-local function processLazarus(rag, fade, ease)
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end
 	local spine2 = rag:GetPhysicsObjectNum(rag:TranslateBoneToPhysBone(boneSpine2))
@@ -359,7 +356,6 @@ local function processLazarus(rag, fade, ease)
 	hg.ShadowControl(rag, 3, 0.001, spineAng, armMul * 0.3, damp, vector_origin, 0, 0)
 end
 
-local function processCushing(rag, fade, ease)
 local function processCushing(rag, fade, ease)
 	local boneSpine2 = rag:LookupBone("ValveBiped.Bip01_Spine2")
 	if not boneSpine2 then return end

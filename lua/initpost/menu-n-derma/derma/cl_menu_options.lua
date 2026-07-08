@@ -254,7 +254,7 @@ local info_sections = {
 local info_credit_lines = {
     "PLACEHOLDER",
     "PLACEHOLDER",
-    "PLACEHOLDER"
+    "PLACEHOLDER",
     "PLACEHOLDER",
     "PLACEHOLDER",
     "PLACEHOLDER"
@@ -278,10 +278,6 @@ local info_social_links = {
         icon = Material("vgui/lapseinjudgement.png", "smooth")
     },
     {
-        title = "Z-CITY English Community Server",
-        subtitle = "Official community server for the Z-CITY repository. (ENG)",
-        url = "https://discord.gg/SjqRcv3yYY",
-        icon = Material("vgui/zcityeng.png", "smooth")
         title = "Z-CITY English Community Server",
         subtitle = "Official community server for the Z-CITY repository. (ENG)",
         url = "https://discord.gg/SjqRcv3yYY",

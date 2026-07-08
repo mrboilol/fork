@@ -110,7 +110,6 @@ if SERVER then
 		org.panicattack = math.max((org.panicattack or 0) - self.modeValues[1] * 0.2, 0)
 
         self.modeValues[1] = 0
-        if self.modeValues[1] == 0 then
         org.adrenalineAdd = math.Approach(org.adrenalineAdd, -8, self.modeValues[1] * 2)
         org.adrenaline = math.Approach(org.adrenaline, 0, self.modeValues[1] * 0.5)
         
@@ -123,8 +122,8 @@ if SERVER then
         if self.modeValues[1] > 0 then
             self.modeValues[1] = 0
             owner:SelectWeapon("weapon_hands_sh")
-			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
+            self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
             self:Remove()
         end
-    end
+	end
 end

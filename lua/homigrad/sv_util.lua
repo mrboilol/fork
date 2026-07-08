@@ -629,8 +629,6 @@ timer.Create("FastObjectFear", 0.05, 0, function()
 			org.fearadd = (org.fearadd or 0) + fearAmount
 			fastObjectFearCooldown[ply] = time + 0.2
 			break -- one scare per tick per player is enough
-			org.fearadd = org.fearadd + 0.2
-			hg.organism.AddPanicAttack(org, math.Clamp(0.0008 * dmg / math.max(dist / 10, 8), 0.0004, 0.0065), true)
 		end
 	end
 end)

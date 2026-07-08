@@ -27,13 +27,6 @@ if hg_font:GetString() != hg_font_default then
 end
 
 local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
-    local usefont = hg_font_default
-
-    if hg_font:GetString() != "" then
-        usefont = hg_font:GetString()
-    end
-
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
     return hg_font_default
 end
 

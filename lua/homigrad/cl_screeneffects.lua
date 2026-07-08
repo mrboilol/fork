@@ -304,45 +304,45 @@ end )
 --that one furry game
 
 
-local painMat = Material("effects/shaders/zb_grain")
-local noiseMat = Material("effects/shaders/zb_grainwhite")
-local vignetteMat = Material("effects/shaders/zb_vignette")
-local assimilationMat = Material("effects/shaders/zb_assimilation")
-local coldMat = Material("effects/shaders/zb_colda")
-local grainMat = Material("effects/shaders/zb_grain2")
-local heatMat = Material("effects/shaders/zb_heat")
-local chromaticMat = Material("effects/shaders/merc_chromaticaberration")
-local blindMat = Material("effects/shaders/zb_blind")
-local zombMat = grainMat -- Material("effects/shaders/zb_zomb")
-local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
+painMat = Material("effects/shaders/zb_grain")
+noiseMat = Material("effects/shaders/zb_grainwhite")
+vignetteMat = Material("effects/shaders/zb_vignette")
+assimilationMat = Material("effects/shaders/zb_assimilation")
+coldMat = Material("effects/shaders/zb_colda")
+grainMat = Material("effects/shaders/zb_grain2")
+heatMat = Material("effects/shaders/zb_heat")
+chromaticMat = Material("effects/shaders/merc_chromaticaberration")
+blindMat = Material("effects/shaders/zb_blind")
+zombMat = grainMat -- Material("effects/shaders/zb_zomb")
+hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
-local PainLerp = 0
-local PanicAttackLerp = 0
-local O2Lerp = 0
-local AnalgesiaLerp = 0
-local assimilatedLerp = 0
-local tempLerp = 36.6
-local headtraumaSaturation = 0
-local suicideLerp = 0
-local suicideViewAng = Angle()
-local addtime = CurTime()
-local GivingUpStationVol = 0
+PainLerp = 0
+PanicAttackLerp = 0
+O2Lerp = 0
+AnalgesiaLerp = 0
+assimilatedLerp = 0
+tempLerp = 36.6
+headtraumaSaturation = 0
+suicideLerp = 0
+suicideViewAng = Angle()
+addtime = CurTime()
+GivingUpStationVol = 0
 
-local show_image_time = 0
-local show_some_images_time = 0
-local lobotomy_memory_mat
-local lobotomy_memory_total = 1
-local lobotomy_memory_flash = false
-local lobotomy_flash_mat
-local lobotomy_next_forced_flash = 0
-local lobotomy_recent_trauma = 0
-local lobotomy_recent_trauma_power = 0
-local disorientationFxLerp = 0
-local lastDisorientationFx = 0
-local lastConcussionFx = 0
-local nextNeuroTinnitus = 0
-local nextPanicAttackShake = 0
-local lobotomy_mats = {
+show_image_time = 0
+show_some_images_time = 0
+lobotomy_memory_mat = nil
+lobotomy_memory_total = 1
+lobotomy_memory_flash = false
+lobotomy_flash_mat = nil
+lobotomy_next_forced_flash = 0
+lobotomy_recent_trauma = 0
+lobotomy_recent_trauma_power = 0
+disorientationFxLerp = 0
+lastDisorientationFx = 0
+lastConcussionFx = 0
+nextNeuroTinnitus = 0
+nextPanicAttackShake = 0
+lobotomy_mats = {
 	[1] = Material("overlays/photopsiaoverlay1.png"),
 	[2] = Material("overlays/photopsiaoverlay2.png"),
 	[3] = Material("overlays/photopsiaoverlay3.png"),
@@ -353,36 +353,36 @@ local lobotomy_mats = {
 	[8] = Material("overlays/tallflash3.png")
 }
 
-local consciousnessTypeBeatVolume = 0.18
-local dying2Volume = 0.4
-local remPainOverlayVolumeMul = 1.25
-local remPainAgonyThreshold = 0.45
-local remPainExcruciatingThreshold = 0.87
-local remPainAgonyVolumeMul = 1.15
-local remPainExcruciatingVolumeMul = 0.85
-local panicattackOverlayPath = "sound/rem_panicattack.mp3"
-local panicattackVisualExponent = 1.75
-local panicattackPulseFloor = 0.78
-local panicattackPulseIntensity = 0.2
-local panicattackShakeIntervalMin = 0.45
-local panicattackShakeIntervalMax = 1.4
-local panicattackShakeMul = 0.85
+consciousnessTypeBeatVolume = 0.18
+dying2Volume = 0.4
+remPainOverlayVolumeMul = 1.25
+remPainAgonyThreshold = 0.45
+remPainExcruciatingThreshold = 0.87
+remPainAgonyVolumeMul = 1.15
+remPainExcruciatingVolumeMul = 0.85
+panicattackOverlayPath = "sound/rem_panicattack.mp3"
+panicattackVisualExponent = 1.75
+panicattackPulseFloor = 0.78
+panicattackPulseIntensity = 0.2
+panicattackShakeIntervalMin = 0.45
+panicattackShakeIntervalMax = 1.4
+panicattackShakeMul = 0.85
 
-local seizureSoundPath = "sound/rem_seizure.ogg"
-local seizureIntroDuration = 3
-local seizureFlashDelayMin = 0.12
-local seizureFlashDelayMax = 0.55
-local seizureFlashDurationMin = 0.35
-local seizureFlashDurationMax = 1.1
-local seizureFlashSizeMin = 9000
-local seizureFlashSizeMax = 18000
-local seizureFinalFlashLead = 2
-local seizureFinalFlashDuration = 5
-local seizureFinalFlashSize = 90000
-local seizureSoundVolume = 1
-local seizureSoundOtrubVolume = 0.3
-local seizureSoundOtrubPlaybackRate = 0.82
-local seizureIntroTab = {
+seizureSoundPath = "sound/rem_seizure.ogg"
+seizureIntroDuration = 3
+seizureFlashDelayMin = 0.12
+seizureFlashDelayMax = 0.55
+seizureFlashDurationMin = 0.35
+seizureFlashDurationMax = 1.1
+seizureFlashSizeMin = 9000
+seizureFlashSizeMax = 18000
+seizureFinalFlashLead = 2
+seizureFinalFlashDuration = 5
+seizureFinalFlashSize = 90000
+seizureSoundVolume = 1
+seizureSoundOtrubVolume = 0.3
+seizureSoundOtrubPlaybackRate = 0.82
+seizureIntroTab = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
 	["$pp_colour_addb"] = 0,
@@ -393,12 +393,12 @@ local seizureIntroTab = {
 	["$pp_colour_mulg"] = 0,
 	["$pp_colour_mulb"] = 0
 }
-local seizureClientActive = false
-local seizureClientStart = 0
-local seizureClientEnd = 0
-local nextSeizureFlash = 0
-local nextSeizureCamShake = 0
-local seizureFinalFlashFired = false
+seizureClientActive = false
+seizureClientStart = 0
+seizureClientEnd = 0
+nextSeizureFlash = 0
+nextSeizureCamShake = 0
+seizureFinalFlashFired = false
 
 local function getLobotomyMemoryMat()
 	local screens = hg and hg.screens
@@ -563,7 +563,6 @@ local function stopthings()
 	nextPanicAttackShake = 0
 	stopSeizureEffects()
 	
-	if IsValid(PainStation) then
 	if IsValid(PainStation) then
 		PainStation:Stop()
 		PainStation = nil
@@ -2871,9 +2870,7 @@ hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
 		end
 
 		if IsValid(ent) then
-			if ent == localPlayer and not localPlayer:ShouldDrawLocalPlayer() then continue end
-
-			if IsSkullBrokenFully(ent) then
+			if not (ent == localPlayer and not localPlayer:ShouldDrawLocalPlayer()) and IsSkullBrokenFully(ent) then
 				-- Find head bone
 				local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
 				if bone then

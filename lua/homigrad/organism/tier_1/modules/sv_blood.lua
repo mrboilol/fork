@@ -55,9 +55,6 @@ module[1] = function(org)
 	org.arterialO2Drain = false
 end
 
-
-end
-
 local internalbleed_phrases = {
 	"That's... that's blood I just vomited...",
 	"Oh, that's blood...",
@@ -513,6 +510,7 @@ module[2] = function(owner, org, mulTime)
 				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
 				dir = -dir:Forward() * len
 				hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
+			end
 			end
 
 			if wound[1] == 0 then
