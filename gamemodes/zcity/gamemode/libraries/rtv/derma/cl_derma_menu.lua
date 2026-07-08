@@ -12,39 +12,41 @@ function PANEL:Init()
     self.ShakeSeed = math.Rand(0, 512)
 end
 
-function PANEL:GetPickmanMaterial()
-    if pickmanA and not pickmanA:IsError() then
-        return pickmanA
-    end
-    if pickmanB and not pickmanB:IsError() then
-        return pickmanB
-    end
-    return nil
+local function CreateRTVFonts()
+    surface.CreateFont("ZCity_RTV_Title", {
+        font = "Verily Serif Mono",
+        size = RTVUnit(32),
+        weight = 800,
+        antialias = true
+    })
+
+    surface.CreateFont("ZCity_RTV_Tiny", {
+        font = "Verily Serif Mono",
+        size = RTVUnit(8),
+        weight = 200
+    })
 end
 
-function PANEL:Paint(w, h)
-    local t = math.Clamp((CurTime() - self.OpenTime) / self.FadeTime, 0, 1)
-    local a = 120 * t
+hook.Add("OnScreenSizeChanged", "ZCity_RTV_Fonts", CreateRTVFonts)
+CreateRTVFonts()
 
-    local shakeX = math.sin((CurTime() * 4.8) + self.ShakeSeed) * 2
-    local shakeY = math.cos((CurTime() * 5.3) + self.ShakeSeed) * 2
+function PANEL:Init()
+    self:SetTitle("")
+    self:SetDraggable(false)
+    self:ShowCloseButton(false)
+    self:SetBorder(false)
+    self:SetColorBG(bg)
+    self:SetColorBR(border)
+    self:SetBlurStrengh(5)
+end
 
-    surface.SetDrawColor(0, 0, 0, a)
-    surface.DrawRect(0, 0, w, h)
+function PANEL:Paint( w, h )
+    draw.RoundedBox(0, 0, 0, w, h, bg)
+    hg.DrawBlur(self, 5)
 
-    local bgMat = self:GetPickmanMaterial()
-    if bgMat then
-        surface.SetMaterial(bgMat)
-        surface.SetDrawColor(255, 255, 255, 255 * t)
-        surface.DrawTexturedRect(shakeX - 32, shakeY - 32, w + 64, h + 64)
-    elseif pickmanTextureID and pickmanTextureID > 0 then
-        surface.SetTexture(pickmanTextureID)
-        surface.SetDrawColor(255, 255, 255, 255 * t)
-        surface.DrawTexturedRect(shakeX - 32, shakeY - 32, w + 64, h + 64)
-    end
-
-    surface.SetDrawColor(4, 4, 4, 46 * t)
-    surface.DrawRect(0, 0, w, h)
+    surface.SetDrawColor(18, 18, 18, 65)
+    surface.SetTexture(gradient_r)
+    surface.DrawTexturedRect(0, 0, w, h)
 
     surface.SetDrawColor(0, 0, 0, 24 * t)
     surface.DrawRect(0, 0, w, h)
