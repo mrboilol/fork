@@ -529,7 +529,14 @@ function zb.SendRoundListToClient(ply)
 	net.Start("ZB_SendRoundList")
 		net.WriteTable(zb.RoundList)
 		net.WriteString(zb.nextround or "")
+		net.WriteString(forcemodeconvar:GetString() or "random")
 	net.Send(ply)
+end
+
+function zb.SyncForceModeToAdmins()
+	for _, admin in ipairs(zb.GetAllAdmins()) do
+		zb.SendRoundListToClient(admin)
+	end
 end
 
 
@@ -662,9 +669,20 @@ net.Receive("AdminSetGameMode", function(len, ply)
 			zb.SyncQueueToAdmins()
 		end
 	elseif command == "setforcemode" then
+		forcemodeconvar:SetString(modeKey)
 		forcemode = modeKey
-		NextRound(forcemode)
-		ply:ChatPrint("Force mode set to: " .. modeKey)
+
+		if modeKey == "random" then
+			ply:ChatPrint("Force mode disabled")
+			net.Start("ZB_NotifyRoundListChange")
+				net.WriteString(ply:Nick())
+			net.Send(zb.GetAllAdmins())
+		else
+			NextRound(forcemode)
+			ply:ChatPrint("Force mode set to: " .. modeKey)
+		end
+
+		zb.SyncForceModeToAdmins()
 
 		if addToQueue then
 			table.insert(zb.QueuedModes, modeKey)
@@ -830,9 +848,17 @@ if SERVER then
 				zb.SyncQueueToAdmins()
 			end
 		elseif command == "setforcemode" then
+			forcemodeconvar:SetString(modeKey)
 			forcemode = modeKey
-			NextRound(forcemode)
-			ply:ChatPrint("Force mode set to: " .. modeKey)
+
+			if modeKey == "random" then
+				ply:ChatPrint("Force mode disabled")
+			else
+				NextRound(forcemode)
+				ply:ChatPrint("Force mode set to: " .. modeKey)
+			end
+
+			zb.SyncForceModeToAdmins()
 
 			if addToQueue then
 				table.insert(zb.QueuedModes, modeKey)

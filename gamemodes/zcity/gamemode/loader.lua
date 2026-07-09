@@ -95,13 +95,63 @@ local function LoadModes()
 		end
 	end
 
-        for k, v2 in pairs(MODE) do
-            if isfunction(v2) then
-                addModeHook(MODE, k, v2)
-            end
-        end
+	for k, v2 in pairs(MODE) do
+		if isfunction(v2) then
+			addModeHook(MODE, k, v2)
+		end
+	end
+end
 
-        MODE = nil
+local chancesfile = "zbattle/modeschances.json"
+
+if SERVER then
+	hook.Add("ShutDown", "savechances", function()
+		file.Write(chancesfile, util.TableToJSON(zb.ModesChances or {}, true))
+	end)
+
+	concommand.Add("zb_getmodeschances", function(ply, cmd, args)
+		if not ply:IsAdmin() then
+			return
+		end
+
+		ply:zChatPrint(util.TableToJSON(zb.ModesChances, true))
+	end)
+
+	concommand.Add("zb_setmodechance", function(ply, cmd, args)
+		if not ply:IsAdmin() then
+			return
+		end
+
+		local mode = args[1]
+		local chance = tonumber(args[2])
+
+		if !zb.ModesChances[mode] or !chance then return end
+
+		zb.ModesChances[mode] = chance
+	end)
+
+	concommand.Add("zb_savemodeschances", function(ply, cmd, args)
+		if not ply:IsAdmin() then
+			return
+		end
+
+		file.Write(chancesfile, util.TableToJSON(zb.ModesChances or {}, true))
+	end)
+end
+
+local function LoadModes()
+	local directory = "zcity/gamemode/modes"
+	local files, folders = file.Find(directory .. "/*", "LUA")
+
+	if SERVER then
+		zb.ModesChances = util.JSONToTable(file.Read(chancesfile,  "DATA") or "") or {}
+	end
+
+	for _, v in ipairs(files) do
+		MODE = {}
+		IncluderFunc(directory .. "/" .. v)
+		InitMode()
+		MODE = nil
 	end
 
     for _, v in ipairs(folders) do
