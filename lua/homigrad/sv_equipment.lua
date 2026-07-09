@@ -125,9 +125,10 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 	ent.armors_health = ent.armors_health or {}
 	markArmorBroken(ent, equipment, brokenMul)
 
+	hg.PlayArmorBreakSound(ent)
+
 	if placement ~= "head" and placement ~= "face" then
 		ent.armors_shots[equipment] = nil
-		hg.PlayArmorBreakSound(ent)
 		syncLinkedArmor(ent)
 		return true
 	end
@@ -143,7 +144,7 @@ function hg.BreakArmor(ent, equipment, pos, dmgInfo)
 		ent.armors_broken_mul[equipment] = nil
 	end
 
-	if not IsValid(equipmentEnt) then return false end
+	if not IsValid(equipmentEnt) then return true end
 
 	hg.SetArmorBrokenEntity(equipmentEnt)
 	hg.PlayArmorBreakSound(equipmentEnt)
@@ -647,9 +648,6 @@ local function DamageArmorCondition(owner, placement, armor, dmg, dmgInfo, hit)
 	end
 =======
 
-local ARMOR_BREAK_SOUND = "rem_armorbreak.mp3"
-local ARMOR_BREAK_SOUND_LEVEL = 140
-local ARMOR_BREAK_SOUND_VOLUME = 2
 local DEFAULT_HELMET_DURABILITY = 180
 local DEFAULT_HELMET_BREAK_THRESHOLD = 120
 local DEFAULT_HELMET_ABSORB_MULTIPLIER = 0.2

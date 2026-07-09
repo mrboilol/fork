@@ -562,35 +562,37 @@ local slashToArtery = {
 
 local function getMeleeArteryChance(dmg, dmgInfo)
 	local inflictor = dmgInfo:GetInflictor()
-	local chanceMul = IsValid(inflictor) and (inflictor.ArteryChance or 1) or 1
-	local strikeDamage = math.max(dmgInfo:GetDamage() or 0, dmg or 0)
-
-	-- Light cuts can nick an artery, while committed high-damage swings are
-	-- substantially more likely to tear one without becoming guaranteed.
-	return math.Clamp(math.Clamp(strikeDamage / 40, 0.1, 0.8) * chanceMul, 0.1, 0.8)
+	return IsValid(inflictor) and inflictor.ArteryChance or 1
 end
 
-local arteryHitgroups = {
-	rarmartery = HITGROUP_RIGHTARM,
-	larmartery = HITGROUP_LEFTARM,
-	rlegartery = HITGROUP_RIGHTLEG,
-	llegartery = HITGROUP_LEFTLEG,
-}
+local function getStaminaMul(dmgInfo)
+	local att = dmgInfo:GetAttacker()
+	if IsValid(att) and att.organism and att.organism.stamina then
+		local stamina = att.organism.stamina
+		return math.max(stamina[1] / stamina.max, 0.1)
+	end
+	return 1
+end
 
-hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, skipThroatCutTracheaDamage)
+local function hitArtery(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
-	-- The spine-artery debug box is a non-injuring trace marker.  A shot that
-	-- reached it must not turn into a separate carotid hit farther along the
-	-- same damage trace.
-	if artery == "arteria" and org._spineArteryTraceDmgInfo == dmgInfo then return 0 end
+	if dmgInfo:IsDamageType(DMG_SLASH) and dmg < 2 then
+		local staminaMul = getStaminaMul(dmgInfo)
+		local arteryChanceMul = getArteryChanceMul(dmgInfo)
+		local arteryChance = arteryChanceMul >= 2 and 1 or math.Clamp(0.45 * arteryChanceMul * staminaMul, 0, 1)
 
-	local requiredHitgroup = arteryHitgroups[artery]
-	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
-		and requiredHitgroup
-		and org._bulletImpactHitgroup
-		and requiredHitgroup ~= org._bulletImpactHitgroup then
-		return 0
+		if math.Rand(0, 1) > arteryChance then
+			-- Didn't fully cut through, maybe just a scratch
+			local scratchChance = 0.2 + 0.3 * staminaMul
+			if math.Rand(0, 1) < scratchChance then
+				org.painadd = org.painadd + dmg * 0.3
+				if artery == "arteria" and org.isPly and IsValid(org.owner) then
+					org.owner:Notify("My neck got scratched!", true, "arteria", 0)
+				end
+			end
+			return
+		end
 	end
 	org.painadd = org.painadd + dmg * 1
 	
@@ -616,12 +618,18 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, skipThroatC
 		hg.AddHarmToAttacker(dmgInfo, 15, "Carotid artery punctured harm")
 		org.neckslit = true
 		org.needfake = true
-		
+	end
+
+	org[artery] = math.min(org[artery] + 1, 1)
+
+	local owner = org.owner
+
+	if artery == "arteria" and IsValid(owner) then
 		local ent = hg.GetCurrentCharacter(owner)
 		if IsValid(ent) and not org.otrub and not org.needotrub and (owner:IsPlayer() and owner:Alive() or not owner:IsPlayer()) then
 			ent:EmitSound("neckslit.ogg", 70, 100, 1, CHAN_AUTO)
 		end
-		
+
 		local snd = (ThatPlyIsFemale and ThatPlyIsFemale(owner)) and "femaleneck.mp3" or "maleneck.mp3"
 		timer.Simple(0, function()
 			if IsValid(owner) then
@@ -637,8 +645,6 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, skipThroatC
 			end
 		end)
 	end
-
-	org[artery] = math.min(org[artery] + 1, 1)
 
 	local bonea = owner:LookupBone(boneindex)
 	local localPos, localAng, dir2 = getlocalshit(owner, bonea, dmgInfo, dir, hit)

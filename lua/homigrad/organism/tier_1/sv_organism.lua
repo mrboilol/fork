@@ -205,13 +205,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.CantCheckPulse = nil
 	org.HEV = nil
 	org.bleedingmul = 1
-<<<<<<< HEAD
 	org.neckslitSoundName = nil
 	org.neckslitSoundEnt = nil
-
-	--\\ info for rp addition
-=======
->>>>>>> 8e5ef9bd (some changes i already made)
 	org.last_heartbeat = CurTime()
 	org.bulletwounds = 0
 	org.stabwounds = 0
@@ -1673,7 +1668,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.liver[2](owner, org, timeValue)
 	end
 	module.blood[2](owner, org, timeValue)
-<<<<<<< HEAD
 	local neckslit = false
 	if org.arterialwounds then
 		for i, wound in pairs(org.arterialwounds) do
@@ -1682,7 +1676,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 				break
 			end
 		end
-=======
+	end
+	org.neckslit = neckslit
 	module.pain[2](owner, org, timeValue)
 	if isPly then
 		module.metabolism[2](owner, org, timeValue)
@@ -2040,6 +2035,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
 >>>>>>> 8e5ef9bd (some changes i already made)
 	if (org.blood < 2700) then org.needfake = true end
+	if org.neckslit and not org.otrub then org.needfake = true end
 	local just_went_uncon = not org.otrub and org.needotrub
 <<<<<<< HEAD
 
@@ -2136,17 +2132,16 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	if not org.otrub and isPly and org.owner:Alive() then
 	end
-<<<<<<< HEAD
-
-	-- Cardiac arrest and unconsciousness are resuscitatable states.  Do not
-	-- convert either into death on a timer: fatality is handled exclusively by
-	-- KillFatalBrainDamage once brain injury crosses its terminal threshold.
-	if just_went_uncon then
-		org.owner.fullsend = true
+	if org.neckslitSoundName and (org.otrub or org.needotrub) then
+		if IsValid(org.neckslitSoundEnt) then
+			org.neckslitSoundEnt:StopSound(org.neckslitSoundName)
+		end
+		if IsValid(owner) then
+			owner:StopSound(org.neckslitSoundName)
+		end
+		org.neckslitSoundName = nil
+		org.neckslitSoundEnt = nil
 	end
-
-	if organSystemsEnabled and org.brain > 0.05 then
-=======
 	if just_went_uncon then
 		org.owner.fullsend = true
 	end
