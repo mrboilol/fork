@@ -55,6 +55,8 @@ ybars = 30
 
 gradient_l = Material("vgui/gradient-l")
 
+local logoistMat = Material("vgui/logoist.png", "noclamp smooth")
+
 local blur = Material("pp/blurscreen")
 local blur2 = Material("effects/shaders/zb_blur" )
 local sw, sh = ScrW(), ScrH()
@@ -78,7 +80,7 @@ local function PlayTypewriterSound()
     surface.PlaySound(SOUND_TYPEWRITER)
 end
 
-local settings_header_height = 70
+local settings_header_height = 78
 
 local function CreateSettingsFonts()
     local scale = math.min(ScrW(), ScrH()) / 1000
@@ -103,8 +105,13 @@ local function CreateSettingsFonts()
         size = math.max(14, math.floor(22 * scale)),
         weight = 300,
     })
+    surface.CreateFont("ZCity_Menu_Settings_Button", {
+        font = "Verily Serif Mono",
+        size = math.max(16, math.floor(27 * scale)),
+        weight = 300,
+    })
     surface.CreateFont("ZCity_Menu_Settings_Tiny", {
-        font = "VCR OSD Mono",
+        font = "Verily Serif Mono",
         size = math.max(12, math.floor(16 * scale)),
         weight = 300,
     })
@@ -293,10 +300,10 @@ local info_credit_lines = {
     {title = "Credits", key = "credits"}
 }
 local info_credit_entries = {
-    {name = "Ваше Имя", merit = "Заслуга / вклад"},
-    {name = "Ещё Имя", merit = "Что-то сделал"},
-    {name = "Третий Человек", merit = "Помог с чем-то"}
->>>>>>> 8e5ef9bd (some changes i already made)
+    {name = "Wiley", merit = "main dev of fork 'judge'", steamid = "76561199162536724", img = "wiley"},
+    {name = "CodeOrange", merit = "contributor of fork 'judge'", steamid = "76561198893264087", img = "codeorange"},
+    {name = "Lazzy", merit = "Main weapons developer.", steamid = "76561198876700603", img = "lazzy"},
+    {name = "Kazoo", merit = "Developer of \"Remorseism\".", steamid = "76561199404982388", img = "kazoo"}
 }
 local info_fallback_band = {
     icon = Material("vgui/mats_jack_awards/10")
@@ -528,10 +535,10 @@ local function SettingsCreateCategoryButton(pParent, strTitle, categoryKey)
     btn:SetText(string.rep("#", #strTitle))
     btn:SetMouseInputEnabled(true)
     btn:SizeToContents()
-    btn:SetFont("ZCity_Menu_Settings_Small")
-    btn:SetTall(MenuUnit(42))
+    btn:SetFont("ZCity_Menu_Settings_Button")
+    btn:SetTall(MenuUnit(54))
     btn:Dock(TOP)
-    btn:DockMargin(MenuUnit(15), MenuUnit(2), 0, 0)
+    btn:DockMargin(MenuUnit(15), MenuUnit(12), 0, 0)
     btn.CategoryKey = categoryKey
     btn.RColor = Color(225,225,225)
     btn.OpenTime = CurTime()
@@ -560,7 +567,7 @@ local function SettingsCreateCategoryButton(pParent, strTitle, categoryKey)
             local sx, sy = self.ShakeX, self.ShakeY
             self:DockMargin(
                 math.Round(MenuUnit(15) + mx * 0.3 + sx + self.HoverLerp * MenuUnit(2)),
-                math.Round(MenuUnit(2) + my * 0.1 + sy),
+                math.Round(MenuUnit(12) + my * 0.1 + sy),
                 0, 0
             )
         end
@@ -1105,7 +1112,9 @@ function hg.DrawSettings(ParentPanel)
     end
 
     local headerTitle = vgui.Create("DLabel", header)
-    headerTitle:SetPos(MenuUnit(25), MenuUnit(18))
+    headerTitle:SetPos(MenuUnit(25), MenuUnit(12))
+    headerTitle:SetTall(MenuUnit(40))
+    headerTitle:SetContentAlignment(1)
     headerTitle:SetFont("ZCity_Menu_Settings_Medium")
     headerTitle:SetTextColor(settings_color_whitey)
     headerTitle:SetText(settings_active_category and settings_active_category:upper() or "SETTINGS")
@@ -1113,7 +1122,8 @@ function hg.DrawSettings(ParentPanel)
     settings_header_label = headerTitle
 
     local headerHint = vgui.Create("DLabel", header)
-    headerHint:SetPos(MenuUnit(25), MenuUnit(45))
+    headerHint:SetPos(MenuUnit(25), MenuUnit(54))
+    headerHint:SetContentAlignment(1)
     headerHint:SetFont("ZCity_Menu_Settings_Tiny")
     headerHint:SetTextColor(settings_color_text_dim)
     headerHint:SetText("Preferences.")
@@ -1483,11 +1493,10 @@ local function InfoCreateSectionButton(pParent, strTitle, sectionKey)
     btn:SetText(string.rep("#", #strTitle))
     btn:SetMouseInputEnabled(true)
     btn:SizeToContents()
-    btn:SetFont("ZCity_Menu_Settings_Small")
-    btn:SetFont("ZCity_Menu_Settings_Small")
-    btn:SetTall(MenuUnit(42))
+    btn:SetFont("ZCity_Menu_Settings_Button")
+    btn:SetTall(MenuUnit(54))
     btn:Dock(TOP)
-    btn:DockMargin(MenuUnit(15), MenuUnit(2), 0, 0)
+    btn:DockMargin(MenuUnit(15), MenuUnit(12), 0, 0)
     btn.SectionKey = sectionKey
     local sectionData
     for _, data in ipairs(info_sections) do
@@ -1529,7 +1538,7 @@ local function InfoCreateSectionButton(pParent, strTitle, sectionKey)
         self.LineLerp = LerpFT(0.2, self.LineLerp or 0, isHovered and 1 or 0)
         self:DockMargin(
             math.Round(MenuUnit(15) + self.HoverLerp * MenuUnit(2)),
-            MenuUnit(2),
+            MenuUnit(12),
             0,
             0
         )
@@ -2131,6 +2140,21 @@ function InfoRefreshContent()
         RebuildRows()
 
     elseif sectionKey == "credits" then
+        local logoPanel = vgui.Create("DPanel", info_content_panel)
+        logoPanel:Dock(TOP)
+        logoPanel:SetTall(MenuUnit(140))
+        logoPanel:DockMargin(MenuUnit(24), MenuUnit(24), MenuUnit(24), 0)
+        logoPanel.Paint = function(this, w, h)
+            local aspect = math.max(1, logoistMat:Height()) / math.max(1, logoistMat:Width())
+            local drawW = math.min(MenuUnit(360), w)
+            local drawH = drawW * aspect
+            local drawX = (w - drawW) * 0.5
+            local drawY = (h - drawH) * 0.5
+            surface.SetDrawColor(255, 255, 255, 255)
+            surface.SetMaterial(logoistMat)
+            surface.DrawTexturedRect(drawX, drawY, drawW, drawH)
+        end
+
         local scroll = vgui.Create("DScrollPanel", info_content_panel)
         scroll:Dock(FILL)
         scroll:DockMargin(MenuUnit(24), MenuUnit(24), MenuUnit(24), MenuUnit(24))
@@ -2153,15 +2177,76 @@ function InfoRefreshContent()
             row:Dock(TOP)
             row:DockMargin(0, 0, 0, MenuUnit(10))
             row:SetTall(MenuUnit(64))
+
+            local avatarSize = MenuUnit(48)
+            local avatarX = MenuUnit(8)
+            local avatarY = (MenuUnit(64) - avatarSize) * 0.5
+            local av = nil
+            local avatarMat = nil
+
+            if entry.img then
+                for _, ext in ipairs({".jpg", ".png"}) do
+                    local matPath = entry.img .. ext
+                    if file.Exists("materials/" .. matPath, "GAME") then
+                        avatarMat = Material(matPath, "noclamp smooth")
+                        break
+                    end
+                end
+            end
+
+            if not avatarMat and entry.steamid and tostring(entry.steamid) != "0" then
+                local sid64 = util.SteamIDTo64(entry.steamid) or entry.steamid
+                av = vgui.Create("AvatarImage", row)
+                av:SetSteamID(sid64, 64)
+                av:SetPaintedManually(true)
+                av:SetSize(avatarSize, avatarSize)
+            end
+
             row.Paint = function(self, w, h)
                 surface.SetDrawColor(20, 20, 30, 120)
                 surface.DrawRect(0, 0, w, h)
                 surface.SetDrawColor(settings_color_whitey.r, settings_color_whitey.g, settings_color_whitey.b, 80)
                 surface.DrawRect(0, h - MenuUnit(1), w, MenuUnit(1))
+
+                if avatarMat then
+                    render.SetStencilEnable(true)
+                    render.ClearStencil()
+                    render.SetStencilWriteMask(1)
+                    render.SetStencilTestMask(1)
+                    render.SetStencilReferenceValue(1)
+                    render.SetStencilCompareFunction(STENCIL_ALWAYS)
+                    render.SetStencilPassOperation(STENCIL_REPLACE)
+                    draw.NoTexture()
+                    surface.SetDrawColor(255, 255, 255, 255)
+                    draw.Circle(avatarX + avatarSize * 0.5, avatarY + avatarSize * 0.5, avatarSize * 0.5, 32)
+                    render.SetStencilCompareFunction(STENCIL_EQUAL)
+                    surface.SetDrawColor(255, 255, 255, 255)
+                    surface.SetMaterial(avatarMat)
+                    surface.DrawTexturedRect(avatarX, avatarY, avatarSize, avatarSize)
+                    render.SetStencilEnable(false)
+                elseif IsValid(av) then
+                    render.SetStencilEnable(true)
+                    render.ClearStencil()
+                    render.SetStencilWriteMask(1)
+                    render.SetStencilTestMask(1)
+                    render.SetStencilReferenceValue(1)
+                    render.SetStencilCompareFunction(STENCIL_ALWAYS)
+                    render.SetStencilPassOperation(STENCIL_REPLACE)
+                    draw.NoTexture()
+                    surface.SetDrawColor(255, 255, 255, 255)
+                    draw.Circle(avatarX + avatarSize * 0.5, avatarY + avatarSize * 0.5, avatarSize * 0.5, 32)
+                    render.SetStencilCompareFunction(STENCIL_EQUAL)
+                    av:PaintManual(avatarX, avatarY)
+                    render.SetStencilEnable(false)
+                else
+                    draw.RoundedBox(avatarSize * 0.5, avatarX, avatarY, avatarSize, avatarSize, Color(40, 40, 50, 160))
+                end
             end
 
+            local textX = avatarX + avatarSize + MenuUnit(14)
+
             local name = vgui.Create("DLabel", row)
-            name:SetPos(MenuUnit(18), MenuUnit(18))
+            name:SetPos(textX, MenuUnit(18))
             name:SetFont("ZCity_Menu_Settings_Small")
             name:SetTextColor(settings_color_text)
             name:SetText(entry.name or "")
@@ -2290,7 +2375,7 @@ function InfoRefreshContent()
             end
 =======
             local merit = vgui.Create("DLabel", row)
-            merit:SetPos(MenuUnit(18), MenuUnit(40))
+            merit:SetPos(textX, MenuUnit(40))
             merit:SetFont("ZCity_Menu_Settings_Tiny")
             merit:SetTextColor(settings_color_text_dim)
             merit:SetText(entry.merit or "")
@@ -2527,7 +2612,9 @@ function hg.DrawInformation(ParentPanel)
     end
 
     local headerTitle = vgui.Create("DLabel", header)
-    headerTitle:SetPos(MenuUnit(25), MenuUnit(18))
+    headerTitle:SetPos(MenuUnit(25), MenuUnit(12))
+    headerTitle:SetTall(MenuUnit(40))
+    headerTitle:SetContentAlignment(1)
     headerTitle:SetFont("ZCity_Menu_Settings_Medium")
     headerTitle:SetTextColor(settings_color_whitey)
     headerTitle:SetText("RANK")
@@ -2535,7 +2622,8 @@ function hg.DrawInformation(ParentPanel)
     info_header_label = headerTitle
 
     local headerHint = vgui.Create("DLabel", header)
-    headerHint:SetPos(MenuUnit(25), MenuUnit(45))
+    headerHint:SetPos(MenuUnit(25), MenuUnit(54))
+    headerHint:SetContentAlignment(1)
     headerHint:SetFont("ZCity_Menu_Settings_Tiny")
     headerHint:SetTextColor(settings_color_text_dim)
 <<<<<<< HEAD
