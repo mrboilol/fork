@@ -59,7 +59,14 @@ end
 
 function ENT:TakeByPlayer(activator)
 	if not activator:IsPlayer() then return end
+<<<<<<< HEAD
 	if self.Unpickupable or self:GetNWBool("BrokenArmor", false) then return end
+=======
+	if self.broken or self:GetNWBool("ArmorBroken", false) then
+		activator:Notify("This armor is broken.", true, "armor_broken_pickup", 3)
+		return
+	end
+>>>>>>> 8e5ef9bd (some changes i already made)
 
 	local can = hg.AddArmor(activator,self.name, self)
     if can then

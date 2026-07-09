@@ -267,7 +267,11 @@ hook.Add("Think", "hg_blastwaves", function()
 	end
 end)
 
+<<<<<<< HEAD
 local function StartShrapnel(ent, selfPos, owner, force, mass, countMul, countBoost)
+=======
+local function StartShrapnel(ent, selfPos, owner, force, mass, countMul)
+>>>>>>> 8e5ef9bd (some changes i already made)
 	if not IsValid(ent) then return end
 	mass = math_max(mass or 10, 1)
 

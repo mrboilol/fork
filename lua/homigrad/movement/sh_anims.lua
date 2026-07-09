@@ -1,8 +1,11 @@
 local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vector, AngleRand, VectorRand, math, hook, util, game
+<<<<<<< HEAD
 local function IsJogging(ply)
 	if CLIENT and ply == LocalPlayer() then return ply.hg_isJogging == true end
 	return ply.hg_isJogging or ply:GetNWBool("hg_isJogging", false)
 end
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 --\\ Custom running anim rate
 	hook.Add("UpdateAnimation", "NormAnimki", function(ply, vel, maxSeqGroundSpeed)
 		if not IsValid(ply) or not ply:Alive() or not ply:OnGround() then return end
@@ -14,7 +17,7 @@ end
 			lenSqr = ply.hg_animSpeedSqr
 		end
 
-		if IsJogging(ply) then
+		if ply.hg_isJogging then
 			ply:SetPlaybackRate(0.8)
 			return ply, vel, maxSeqGroundSpeed
 		end
@@ -48,7 +51,7 @@ end
 			local isFurry = ply.PlayerClassName == "furry"
 			local anim = ACT_HL2MP_RUN_FAST
 			
-			if IsJogging(ply) then
+			if ply.hg_isJogging then
 				anim = ACT_HL2MP_RUN
 			elseif ply:IsOnFire() then
 				anim = ACT_HL2MP_RUN_PANICKED

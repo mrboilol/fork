@@ -202,12 +202,20 @@ local function playBloodDripImpact(pos, tr, artery)
 	sound.Play("gore/blood" .. math_random(1, 6) .. ".ogg", pos, math.random(85, 95), math.random(80, 120), bloodDripSoundVolume)
 end
 
+<<<<<<< HEAD
 local function decalBlood(pos, normal, tr, artery, owner, decalWeight)
 	-- Pool nearby splashes so a single burst does not immediately evict older
 	-- engine decals from the client's finite decal buffer. Small drops begin
 	-- with the smallest decal; more blood in the same spot advances it through
 	-- the larger decal materials instead of making every drop look identical.
 	local vec = math.Round(pos[1] / bloodDecalCellSize)..":"..math.Round(pos[2] / bloodDecalCellSize)..":"..math.Round(pos[3] / bloodDecalCellSize)
+=======
+local function decalBlood(pos, normal, tr, artery, owner)
+	if not pos or not normal then return end
+	if normal:LengthSqr() < 0.0001 then normal = vector_up end
+
+	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))
+>>>>>>> 8e5ef9bd (some changes i already made)
 
 	hg.bloodcount = hg.bloodcount + 1
 	

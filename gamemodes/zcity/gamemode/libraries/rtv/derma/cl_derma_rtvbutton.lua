@@ -15,20 +15,35 @@ end
 
 local function CreateRTVButtonFonts()
     surface.CreateFont("ZCity_RTV_Button", {
+<<<<<<< HEAD
         font = "VCR OSD Mono",
         size = RTVUnit(14),
+=======
+        font = "Verily Serif Mono",
+        size = ScreenScale(14),
+>>>>>>> 8e5ef9bd (some changes i already made)
         weight = 200
     })
 
     surface.CreateFont("ZCity_RTV_ButtonTiny", {
+<<<<<<< HEAD
         font = "VCR OSD Mono",
         size = RTVUnit(7),
+=======
+        font = "Verily Serif Mono",
+        size = ScreenScale(7),
+>>>>>>> 8e5ef9bd (some changes i already made)
         weight = 200
     })
 
     surface.CreateFont("ZCity_RTV_Voted", {
+<<<<<<< HEAD
         font = "VCR OSD Mono",
         size = RTVUnit(18),
+=======
+        font = "Verily Serif Mono",
+        size = ScreenScale(18),
+>>>>>>> 8e5ef9bd (some changes i already made)
         weight = 800
     })
 end

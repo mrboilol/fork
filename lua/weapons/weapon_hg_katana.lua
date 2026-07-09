@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 if SERVER then AddCSLuaFile() end
+=======
+﻿if SERVER then AddCSLuaFile() end
+>>>>>>> 8e5ef9bd (some changes i already made)
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Katana"
 SWEP.Instructions = "A traditional Japanese katana featuring a curved, single-edged blade designed for precision and balance. Lightweight and efficient, it allows for quick, controlled swings and smooth handling in close-range use.\n\nLMB to attack.\nRMB to block."

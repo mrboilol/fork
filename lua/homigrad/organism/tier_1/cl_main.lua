@@ -24,10 +24,10 @@ hg.bonetohitgroup = {
 hg.amputeetable = {
 	--["ValveBiped.Bip01_L_UpperArm"] = "larm",
 	["ValveBiped.Bip01_L_Forearm"] = "larm",
-	["ValveBiped.Bip01_L_Hand"] = "larm",
+	["ValveBiped.Bip01_L_Hand"] = "lhand",
 	--["ValveBiped.Bip01_R_UpperArm"] = "rarm",
 	["ValveBiped.Bip01_R_Forearm"] = "rarm",
-	["ValveBiped.Bip01_R_Hand"] = "rarm",
+	["ValveBiped.Bip01_R_Hand"] = "rhand",
 	--["ValveBiped.Bip01_L_Thigh"] = "lleg",
 	["ValveBiped.Bip01_L_Calf"] = "lleg",
 	["ValveBiped.Bip01_L_Foot"] = "lleg",
@@ -1088,6 +1088,21 @@ local function cachedClientThinkBone(ent, boneName)
 end
 local hg_heartbeat_volume = ConVarExists("hg_heartbeat_volume") and GetConVar("hg_heartbeat_volume") or CreateClientConVar("hg_heartbeat_volume", 1, true, nil, "heartbeat loudness", 0, 4)
 
+-- Returns a valid bone index or nil. Handles both bone names (string) and
+-- bone indices (number) stored in wound data, and protects against invalid
+-- bone ids (-1) which would crash the engine via GetBonePosition/GetBoneMatrix.
+local function GetValidBone(ent, bone)
+	if not IsValid(ent) then return nil end
+	local id
+	if type(bone) == "number" then
+		id = bone
+	else
+		id = ent:LookupBone(bone or "")
+	end
+	if not id or id < 0 then return nil end
+	return id
+end
+
 hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, ent, time)
 	--local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 	--print(ply,ent,ply.organism.owner,ply.new_organism.owner)
@@ -1291,6 +1306,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			local circulation = getCirculationStrength(org)
 			for i, wound in pairs(wounds) do
+<<<<<<< HEAD
 				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull)
 				local particleInterval = Lerp(intensity, 3.2, 0.16)
 				
@@ -1303,14 +1319,26 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 					end
 
 					if seen and boneID then
+=======
+				local size = math.random(0, 1) * math.max(math.min(wound[1], 1), 0.5)
+
+				if wound[5] + beatsPerSecond < time then
+					local boneID = GetValidBone(ent, wound[4])
+					if seen and boneID then
+						local bone = wound[4]
+>>>>>>> 8e5ef9bd (some changes i already made)
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
 
 						if !should then continue end
 
 						local mat = ent:GetBoneMatrix(boneID)
+<<<<<<< HEAD
 						if not mat then return end
+=======
+						if not mat then continue end
+>>>>>>> 8e5ef9bd (some changes i already made)
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
+						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
 						local pos, ang = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
@@ -1342,6 +1370,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
+<<<<<<< HEAD
 			-- Arterial blood is a continuous pressured stream.  The wound timer
 			-- below already limits particle emission to the player's blood-FPS
 			-- setting; a second pulse-scale gate here made every artery look like
@@ -1359,15 +1388,32 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5)
 					if seen then
+=======
+			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
+			local boneID = GetValidBone(ent, wound[4])
+			if wound[5] + addtime < time and boneID then
+				local bonePos, ang = ent:GetBonePosition(boneID)
+				if not bonePos or not ang then continue end
+				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
+					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
+					if seen and boneID then
+						local bone = wound[4]
+>>>>>>> 8e5ef9bd (some changes i already made)
 
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
 
 						if !should then continue end
 						
 						local mat = ent:GetBoneMatrix(boneID)
+<<<<<<< HEAD
 						if not mat then return end
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
+=======
+						if not mat then continue end
+						bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
+						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
+>>>>>>> 8e5ef9bd (some changes i already made)
 						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local dir = wound[6]
@@ -1417,12 +1463,16 @@ local modelPlacements = {
 		["ValveBiped.Bip01_R_Calf"] = {Vector(15.5, 0, 0), Angle(0, 90, 0)},
 		["ValveBiped.Bip01_R_Forearm"] = {Vector(11, 0.5, 0.5), Angle(0, 90, 0)},
 		["ValveBiped.Bip01_L_Forearm"] = {Vector(11, 0.5, -0.5), Angle(0, 90, 0)},
+		["ValveBiped.Bip01_R_Hand"] = {Vector(2, 0.5, 0.5), Angle(0, 90, 0)},
+		["ValveBiped.Bip01_L_Hand"] = {Vector(2, 0.5, -0.5), Angle(0, 90, 0)},
 	},
 	[0] = {
 		["ValveBiped.Bip01_L_Calf"] = {Vector(17.5, 0, 0), Angle(0, 90, 0)},
 		["ValveBiped.Bip01_R_Calf"] = {Vector(17.5, 0, 0), Angle(0, 90, 0)},
 		["ValveBiped.Bip01_R_Forearm"] = {Vector(11, 0.5, 0.5), Angle(0, 90, 0)},
 		["ValveBiped.Bip01_L_Forearm"] = {Vector(11, 0, -1), Angle(0, 90, 0)},
+		["ValveBiped.Bip01_R_Hand"] = {Vector(2, 0.5, 0.5), Angle(0, 90, 0)},
+		["ValveBiped.Bip01_L_Hand"] = {Vector(2, 0, -1), Angle(0, 90, 0)},
 	}
 }
 
@@ -1431,6 +1481,8 @@ local limbs = {
 	["rleg"] = "ValveBiped.Bip01_R_Calf",
 	["larm"] = "ValveBiped.Bip01_L_Forearm",
 	["rarm"] = "ValveBiped.Bip01_R_Forearm",
+	["lhand"] = "ValveBiped.Bip01_L_Hand",
+	["rhand"] = "ValveBiped.Bip01_R_Hand",
 	["head"] = "ValveBiped.Bip01_Head1"
 }
 
@@ -1458,6 +1510,7 @@ function hg.GoreCalc(ent, ply)
 	for bone, nam in pairs(limbs) do
 		if !org[bone.."amputated"] then
 			local bon = ent:LookupBone(nam)
+			if not bon or bon < 0 then continue end
 
 			if !ent:GetManipulateBoneScale(bon):IsEqualTol(vecFull, 0.01) then
 				ent:ManipulateBoneScale(bon, vecFull)
@@ -1467,8 +1520,10 @@ function hg.GoreCalc(ent, ply)
 		end
 		
 		local bon = ent:LookupBone(nam)
+		if not bon or bon < 0 then continue end
 		local mat = ent:GetBoneMatrix(bon)
 		local mat2 = ent:GetBoneMatrix(bon - 1)
+		if not mat or not mat2 then continue end
 		mat:SetScale(vecalmostzero)
 		
 		hg.bone_apply_matrix(ent, bon, mat)

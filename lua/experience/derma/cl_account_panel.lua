@@ -261,7 +261,7 @@ function PANEL:Close()
     end)
 end
 
-local BlurBackground = hg.DrawBlur
+local BlurBackground = (hg and hg.DrawBlur) or function() end
 
 local function PaintFrame(self,w,h)
     if BlurBackground then BlurBackground(self,5) end
@@ -283,7 +283,8 @@ function PANEL:Paint( w, h )
     PaintFrame( self, w, h )
 end
 
-vgui.Register( "ZB_AccountFrame", PANEL, "ZFrame" )
+local AccountBase = vgui.GetControlTable("ZFrame") and "ZFrame" or "DFrame"
+vgui.Register( "ZB_AccountFrame", PANEL, AccountBase )
 
 
 --vgui.Create("ZB_AccountFrame"):MakePopup()

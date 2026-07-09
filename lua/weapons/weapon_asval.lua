@@ -1,3 +1,4 @@
+--ByLazy
 SWEP.Base = "homigrad_base"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -8,15 +9,16 @@ SWEP.Category = "Weapons - Assault Rifles"
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
-SWEP.WorldModel = "models/weapons/w_snip_g3sg1.mdl"
+SWEP.WorldModel = "models/weapons/zcity/w_asval.mdl"
 SWEP.WorldModelFake = "models/tasty/asval.mdl"
-
-SWEP.FakePos = Vector(-10.5, 3.92, 8.35)
+--uncomment for funny
+--а еще надо настраивать заново zoompos
+SWEP.FakePos = Vector(-10.5, 1.92, 8.35)
 SWEP.FakeAng = Angle(0, 0, 0)
 SWEP.AttachmentPos = Vector(1,0,0.5)
 SWEP.AttachmentAng = Angle(0,0,0)
-
-
+//SWEP.MagIndex = 53
+//MagazineSwap
 SWEP.FakeAttachment = "muzzle"
 --Entity(1):GetActiveWeapon():GetWM():SetSubMaterial(0,"NULL")
 --PrintAnims(Entity(1):GetActiveWeapon():GetWM())
@@ -33,7 +35,11 @@ SWEP.FakeEmptyReloadSounds = {
 	[0.92] = "weapons/ak47/ak47_boltback.wav",
 	[0.97] = "weapons/ak47/ak47_boltrelease.wav"
 }
+<<<<<<< HEAD
 SWEP.MagModel = "models/weapons/arc9/darsu_eft/mods/mag_ak_custom_sawed_off_762x39_10.mdl"
+=======
+SWEP.MagModel = "models/weapons/upgrades/w_magazine_galil_35.mdl"
+>>>>>>> 8e5ef9bd (some changes i already made)
 local vector_full = Vector(1,1,1)
 local vecPochtiZero = Vector(0.01,0.01,0.01)
 if CLIENT then
@@ -49,6 +55,8 @@ if CLIENT then
 		end
 	}
 end
+
+SWEP.GetDebug = false
 
 SWEP.lmagpos = Vector(0,0,0)
 SWEP.lmagang = Angle(0,0,0)
@@ -72,8 +80,8 @@ function SWEP:ModelCreated(model)
 	self:GetWM():ManipulateBoneScale(49, vecPochtiZero)
 end
 
-SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/asval.png")
-SWEP.IconOverride = "pwb2/vgui/weapons/asval.png"
+SWEP.WepSelectIcon2 = Material("entities/arc9_eft_asval.png")
+SWEP.IconOverride = "entities/arc9_eft_asval.png"
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
 SWEP.dwr_customIsSuppressed = true
@@ -126,7 +134,7 @@ SWEP.WeaponEyeAngles = Angle(0,0,0)
 SWEP.PPSMuzzleEffectSuppress = "muzzleflash_suppressed"
 
 SWEP.HoldType = "rpg"
-SWEP.ZoomPos = Vector(0, -0.0762, 6.0112)
+SWEP.ZoomPos = Vector(0, -1.15, 6.0112)
 SWEP.RHandPos = Vector(-5, -1, 1)
 SWEP.LHandPos = Vector(7, -2, -2)
 SWEP.ShockMultiplier = 3
@@ -138,10 +146,8 @@ SWEP.weight = 4
 
 SWEP.Spray = {}
 for i = 1, 20 do
-	SWEP.Spray[i] = Angle(-0.01 - math.cos(i) * 0.01, math.cos(i * i) * 0.02, 0) * 1
+	SWEP.Spray[i] = Angle(-0.03 - math.cos(i) * 0.02, math.cos(i * i) * 0.06, 0) * 1
 end
-
-SWEP.addSprayMul = 0.5
 
 SWEP.Ergonomics = 0.9
 SWEP.Penetration = 15
@@ -363,17 +369,33 @@ SWEP.ReloadSlideAnim = {
 
 -- Inspect Assault
 
+<<<<<<< HEAD
+=======
+SWEP.InspectAnimLH = {
+	Vector(0,0,0)
+}
+SWEP.InspectAnimLHAng = {
+	Angle(0,0,0)
+}
+SWEP.InspectAnimRH = {
+	Vector(0,0,0)
+}
+SWEP.InspectAnimRHAng = {
+	Angle(0,0,0)
+}
+>>>>>>> 8e5ef9bd (some changes i already made)
 SWEP.InspectAnimWepAng = {
 	Angle(0,0,0),
-	Angle(4,4,15),
-	Angle(10,15,25),
-	Angle(10,15,25),
-	Angle(10,15,25),
-	Angle(-6,-15,-15),
-	Angle(1,15,-45),
-	Angle(15,25,-55),
-	Angle(15,25,-55),
-	Angle(15,25,-55),
-	Angle(0,0,0),
+	Angle(15,15,15),
+	Angle(15,15,24),
+	Angle(15,15,24),
+	Angle(15,15,24),
+	Angle(15,7,24),
+	Angle(10,3,-5),
+	Angle(2,3,-15),
+	Angle(0,4,-22),
+	Angle(0,3,-45),
+	Angle(0,3,-45),
+	Angle(0,-2,-2),
 	Angle(0,0,0)
 }

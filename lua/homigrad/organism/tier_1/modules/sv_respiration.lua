@@ -1,10 +1,14 @@
 local max, min, Round, Lerp, halfValue2 = math.max, math.min, math.Round, Lerp, util.halfValue2
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 --local Organism = hg.organism
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 hg.organism.module.lungs = {}
 
 local module = hg.organism.module.lungs
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 local BloodO2 = {
 	{5000, 30},
@@ -251,6 +255,82 @@ end
 
 
 
+=======
+module[1] = function(org)
+	org.lungsL = {
+		0,
+		0
+	}
+	org.lungsR = {0, 0}
+	org.trachea = 0
+	org.pneumothorax = 0
+	org.needle = 0
+	org.nextCough = nil
+	org.o2 = {
+		range = 30,
+		regen = 4,
+		k = 0.5,
+	}
+	org.lungsfunction = true
+	org.o2.curregen = org.o2.regen
+	org.o2[1] = org.o2.range
+	org.CO = 0
+	org.COregen = 0
+	org.lastCOBreathe = nil
+	org.mannitol = 0
+end
+function hg.organism.OxygenateBlood(org)
+	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)
+end
+function hg.organism.CanBreath(org)
+	return org.o2 and org.o2.curregen >= org.losing_oxy
+end
+local function insta_send_holdingbreath(org)
+	net.Start("organism_send")
+	local tbl = {}
+	tbl.holdingbreath = org.holdingbreath
+	tbl.owner = org.owner
+	net.WriteTable(tbl)
+	net.WriteBool(true)
+	net.WriteBool(false)
+	net.WriteBool(false)
+	net.WriteBool(true)
+	net.Send(org.owner)
+end
+local function togglebreath(ply, toggle)
+	local org = ply.organism
+	if isbool(toggle) then
+		if toggle then
+			if not ply.organism.holdingbreath then
+				ply.organism.holdingbreath = true
+				ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav",65)
+				insta_send_holdingbreath(ply.organism)
+			end
+		else
+			if ply.organism.holdingbreath then
+				ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/exhale/female/exhale_0"..math.random(5)..".wav" or "breathing/exhale/male/exhale_0"..math.random(5)..".wav",65)
+				ply.organism.holdingbreath = false
+				ply.releasebreathe = nil
+				insta_send_holdingbreath(ply.organism)
+			end
+		end
+	else
+		if ply.organism.holdingbreath then
+			ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/exhale/female/exhale_0"..math.random(5)..".wav" or "breathing/exhale/male/exhale_0"..math.random(5)..".wav",65)
+			ply.organism.holdingbreath = false
+			ply.releasebreathe = nil
+			insta_send_holdingbreath(ply.organism)
+		else
+			ply.organism.holdingbreath = true
+			ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav",65)
+			insta_send_holdingbreath(ply.organism)
+		end
+	end
+	local ent = hg.GetCurrentCharacter(ply)
+	ent:StopSound(ply.lastPhr or "")
+	ply.phrCld = 0
+end
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 concommand.Add("hmcd_holdbreath",function(ply)
 
 	if not ply.organism then return end
@@ -260,21 +340,30 @@ concommand.Add("hmcd_holdbreath",function(ply)
 	if ply.organism.stamina[1] < 90 then return end
 
 	if ply.organism.o2.curregen == 0 then return end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if (ply.cooldownbreathe or 0) > CurTime() then return end
 
 	ply.cooldownbreathe = CurTime() + 0.5
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	togglebreath(ply)
 
 end)
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 concommand.Add("+hmcd_holdbreath",function(ply)
 
 	if not ply.organism then return end
@@ -284,21 +373,30 @@ concommand.Add("+hmcd_holdbreath",function(ply)
 	if ply.organism.stamina[1] < 90 then return end
 
 	if ply.organism.o2.curregen == 0 then return end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if (ply.cooldownbreathe or 0) > CurTime() then return end
 
 	ply.cooldownbreathe = CurTime() + 0.5
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	togglebreath(ply,true)
 
 end)
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 concommand.Add("-hmcd_holdbreath",function(ply)
 
 	if not ply.organism then return end
@@ -306,6 +404,7 @@ concommand.Add("-hmcd_holdbreath",function(ply)
 	if ply.organism.stamina[1] < 90 then return end
 
 	if ply.organism.o2.curregen == 0 then return end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -313,12 +412,18 @@ concommand.Add("-hmcd_holdbreath",function(ply)
 
 
 
+=======
+	if (ply.cooldownbreathe or 0) > CurTime() then ply.releasebreathe = ply.cooldownbreathe return end
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	togglebreath(ply,false)
 
 end)
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 local lowoxy = {
 	"I'm gonna faint right now... There's not enough oxygen.",
 	"There's not enough oxygen... I can't hold much longer...",
@@ -326,8 +431,8 @@ local lowoxy = {
 	"I'm gasping for air...",
 	"Need to breathe air... or I'm gonna faint right here..."
 }
-
 local not_enough_intake = {
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 	//"I have to breathe...",
 
@@ -352,15 +457,23 @@ local low_stamina = {
 	"I can barely keep going...",
 }
 
+=======
+	"I need to breathe...",
+	"I'm struggling to breathe...",
+}
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 local drop_mask = {
 	"I can't breathe in this mask... I need to take it off.",
 	"Drop the mask, it's not worth it...",
 	"It's fucking disgusting... and I surely can't breathe in this...",
 	"Fucking stinks... Gotta take this mask off...",
 }
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 local drugged = {
 
 	"Ohhh hohoohoooo Ie-like it.....",
@@ -382,6 +495,7 @@ local drugged = {
 	"Don't want anything else... this is pERRRfect!..",
 
 }
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -389,6 +503,9 @@ local bit_band,util_PointContents = bit.band,util.PointContents
 
 
 
+=======
+local bit_band,util_PointContents = bit.band,util.PointContents
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 local color_white, color_red, color_red2, color_red3 = Color(255, 255, 255), Color(255, 0, 0), Color(200, 55, 55), Color(255, 100, 100)
 
 module[2] = function(owner, org, timeValue)
@@ -473,6 +590,7 @@ module[2] = function(owner, org, timeValue)
 	local ent = hg.GetCurrentCharacter(owner)
 
 	local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -484,19 +602,27 @@ module[2] = function(owner, org, timeValue)
 
 	
 
+=======
+	if (not bone) or (bone < 0) then bone = 6 end
+	local head = ent:GetBonePosition(bone)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if not head then
 
 		head = ent:GetBonePosition(0)
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if org.o2.curregen == 0 and org.holdingbreath then
 
 		togglebreath(owner, false)
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -504,14 +630,20 @@ module[2] = function(owner, org, timeValue)
 
 		//org.stamina[1] = max(org.stamina[1] - timeValue * 15,0)
 
+=======
+	if org.holdingbreath then
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		if org.stamina[1] < 90 or org.o2[1] <= 10 then
 
 			togglebreath(owner, false)
 
 		end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 		
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		if owner.releasebreathe and owner.releasebreathe < CurTime() then
 
 			togglebreath(owner, false)
@@ -521,6 +653,7 @@ module[2] = function(owner, org, timeValue)
 		end
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -558,6 +691,20 @@ module[2] = function(owner, org, timeValue)
 	-- lung is repaired, so the condition can return after the temporary vent ends.
 	if hasPneumothorax and not needleActive then
 		org.pneumothorax = min(org.pneumothorax + timeValue / 90 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2)
+=======
+	if not head then head = owner:GetPos() end
+	local inwater = bit_band(util_PointContents(head),CONTENTS_WATER) == CONTENTS_WATER
+	local success = owner:IsBerserk() or (not org.heartstop and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
+	if success and owner:IsPlayer() and inwater then success = false end
+	if success and org.choking then org.needfake = true success = false end
+	if success and org.vomitInThroat then success = false end
+	org.choking = false
+	local pneumothorax = (org.lungsR[2] == 1 or org.lungsL[2] == 1) and org.needle == 0
+	org.needle = math.Approach(org.needle, 0, timeValue / 1200)
+	org.pneumothorax = pneumothorax and min(org.pneumothorax + timeValue / 180 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2) or max(org.pneumothorax - timeValue / 10, 0)
+	if org.lastCOBreathe and org.lastCOBreathe + 1 > CurTime() then
+		org.COregen = math.Approach(org.COregen, 30, timeValue * 1)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	else
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
@@ -628,7 +775,6 @@ module[2] = function(owner, org, timeValue)
 		local buildRate = math.Clamp((org._lowO2Time - 5) / 30, 0, 1)
 		org.CO = math.min(org.CO + timeValue * buildRate * 0.4, 10)
 	end
-
 	org.CO = max(org.CO - timeValue, 0)
 
 	if success then
@@ -638,6 +784,7 @@ module[2] = function(owner, org, timeValue)
 		local lerp = min(max(org.pulse - 20, 0) / 20, 1)
 
 		local regen = Lerp(lerp, 0, o2.regen * oxygenate * math.Rand(0.95, 1.05))
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -669,9 +816,15 @@ module[2] = function(owner, org, timeValue)
 
 
 
+=======
+		org.CO = min(org.CO + (org.COregen > 0 and timeValue * 1.5 or 0), 30)
+		org.consciousness = math.min(org.consciousness, (30 - org.CO) / 30)
+		local mask_blevota = owner:GetNetVar("zableval_masku", false)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		local sprayed = org.is_sprayed_at
 
 		org.is_sprayed_at = nil
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -884,20 +1037,31 @@ module[2] = function(owner, org, timeValue)
 
 		//org.owner:ResetNotification("oxygen_cantbreathe2")
 
+=======
+		local regenerate = regen * timeValue * 4 * (org.stamina[1] / org.stamina.max) * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1)
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.min(org.blood / 4500, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
+		o2.curregen = regenerate
+		o2[1] = max(o2[1] - (org.CO > 0 and o2.curregen * 1.1 * (org.CO / 30) or 0),0)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	else
 
 		o2.curregen = 0
 		org.oxygenIntakeAvailable = false
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
 	if owner:IsBerserk() and not org.heartstop then
 
+=======
+	if owner:IsBerserk() then
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		o2[1] = math.max(5, o2[1])
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 	-- Blood volume and exertion debt cap tissue oxygen delivery. When circulation
 	-- reaches zero, tissue oxygen reaches zero with it.
@@ -932,6 +1096,8 @@ module[2] = function(owner, org, timeValue)
 
 	
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if org.isPly and not org.otrub and o2.curregen < losing_oxy and org.analgesia <= 1.5 and !org.heartstop then
 
 		if mask_blevota then
@@ -955,6 +1121,7 @@ module[2] = function(owner, org, timeValue)
 			end
 
 		end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -970,6 +1137,10 @@ module[2] = function(owner, org, timeValue)
 
 	
 
+=======
+		if o2[1] < 12 then
+			org.owner:Notify(lowoxy[math.random(#lowoxy)], 30, "lowoxy", 0, nil, color_red3)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 			if o2[1] < 6 then
 
 				org.owner:Notify("Oxygen... please...", 30, "lowoxy2", 0, nil, color_red)
@@ -979,6 +1150,7 @@ module[2] = function(owner, org, timeValue)
 		end
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -1002,11 +1174,14 @@ module[2] = function(owner, org, timeValue)
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if org.analgesia > 1.5 then
 
 		org.owner:Notify(drugged[math.random(#drugged)], 30, "drugged", 0, nil, color_white)
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -1016,6 +1191,12 @@ module[2] = function(owner, org, timeValue)
 	--              catastrophically damaged. Previously this unconditionally
 	--              flipped lungsfunction=true every tick which would resurrect
 	--              breathing through destroyed lungs/trachea.
+=======
+	if org.analgesia > 1.5 or org.painkiller > 2.4 then
+		if math.Rand(0, 500) < (org.analgesia + org.painkiller) then
+		end
+	end
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if o2[1] == 0 then
 		if math.random(50) == 1 then
 			org.lungsfunction = false
@@ -1027,14 +1208,19 @@ module[2] = function(owner, org, timeValue)
 			org.lungsfunction = true
 		end
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
 	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop or org.respiratoryArrest or (org.hemothorax or 0) >= 0.9 then
 
+=======
+	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop then
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		org.lungsfunction = false
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -1084,19 +1270,24 @@ kaz
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if org.isPly then
 
 		if org.pneumothorax > 0 then
-			org.owner:Notify("I can feel something filling my lungs.", true, "pneumothorax1",10) // delay of 10 seconds before typing that
+			org.owner:Notify("I can feel something filling my lungs.", true, "pneumothorax1",10)
 		else
 			org.owner:ResetNotification("pneumothorax1")
 
 			org.nextPneumothoraxNotify1 = nil
 
 		end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		if org.pneumothorax > 0.3 then
 			org.owner:Notify("It's getting harder to breathe.", true, "pneumothorax2", 5)
 		else
@@ -1106,9 +1297,12 @@ kaz
 			org.nextPneumothoraxNotify2 = nil
 
 		end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		if org.pneumothorax > 0.5 then
 			org.owner:Notify("I'm really struggling to breathe.", true, "pneumothorax3", 5)
 		else
@@ -1158,6 +1352,7 @@ kaz
 		end
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -1191,6 +1386,18 @@ kaz
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.05 + severity * 0.12), 0)
 		if org.stamina and org.stamina[1] then
 			org.stamina[1] = math.max(org.stamina[1] - timeValue * staminaMax / 75, 0)
+=======
+	local k = halfValue2(o2[1], o2.range, o2.k)
+	if o2[1] < 10 then
+		if org.isPly then
+			hg.StunPlayer(owner, 3)
+		end
+	end
+	if o2[1] < 12 then
+		org.needfake = true
+		if org.isPly then
+			hg.LightStunPlayer(owner, 3)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		end
 		if org.isPly then hg.LightStunPlayer(owner, 3) end
 	elseif tissueO2 < hypoxiaBands.heavy and tissueO2 >= hypoxiaBands.incapacitating then
@@ -1215,6 +1422,7 @@ kaz
 		org.brain = math.min((org.brain or 0) + timeValue * anoxicBrainDamageRate, 1)
 		if org._zeroO2Time >= 5 then org.heartstop = true end
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
@@ -1234,17 +1442,30 @@ kaz
 
 
 
+=======
+	if o2[1] < 4 then
+		org.needotrub = true
+	end
+	if org.lungsR[1] < 0.5 then
+	end
+	if org.lungsL[1] < 0.5 then
+	end
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if owner:IsBerserk() then
 
 		org.brain = math.min(0.5, org.brain)
 
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if org.skull >= 0.6 then k = 0 end
 
 	if org.brain >= 0.6 then k = 0 end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 	local frontal = org.brainFrontal or 0
 	local parietal = org.brainParietal or 0
@@ -1327,16 +1548,31 @@ kaz
 
         if org.brain >= 0.5 then
 		if org.brain >= 0.5 and (mannitolK <= 0 or (org.brainHemorrhage or 0) >= 0.85) then
+=======
+	if org.skull < 1 and org.skull >= 0.5 and org.bandagedskull then
+		org.skull = math.Approach(org.skull, 0, timeValue / 600)
+	end
+	if org.brain >= 0.3 then
+		if org.brain >= 0.5 then
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 			if math.random(60) == 1 then
 				org.heartstop = true
 			end
 		end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 		local brainCap = 0.325
 		local brainSeverity = math.Clamp((org.brain - brainCap) / (1 - brainCap), 0.1, 1)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * brainSeverity * 0.6, 0)
+=======
+		if org.brain > 0.35 and !org.heartstop then
+			if math.random(60) == 1 then
+				org.lungsfunction = true
+			end
+		end
+		org.needotrub = true
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	end
-
 	local death_from_braindamage = false
 
 	if org.brain >= 0.7 and org.alive then
@@ -1348,15 +1584,23 @@ kaz
 		end
 		org.alive = false
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
+=======
+	if org.skull == 1 then org.brain = min(org.brain + timeValue / 1000, 1) end
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	if org.isPly then
 
 		if org.brain > 0.1 and org.brain < 0.3 then
 			org.owner:Notify(math.random(2) == 1 and "My head hurts..." or "Where am I?", true, "brain", 5)
 		else
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
 			org.owner:ResetNotification("brain") 
 
+=======
+			org.owner:ResetNotification("brain")
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 		end
 
 	end
@@ -1371,12 +1615,71 @@ kaz
 		org.brainTemporal = max(org.brainTemporal - brainRecovery, 0)
 		org.brainOccipital = max(org.brainOccipital - brainRecovery, 0)
 	end
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 
+=======
+	org.brain = max(org.brain - timeValue / 400 * ((org.mannitol > 0 and org.brain < 0.6) and 1 or (org.brain > 0.1 and 0.1 or 0)), 0)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua
 	org.mannitol = math.Approach(org.mannitol, 0, timeValue / 200)
-	
 	if k < 0.25 then
+<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/sv_lungs.lua
 		org.brain = min(org.brain + timeValue / (org.brain < 0.3 and 300 or 120) * math.min(((org.o2[1] < 0.25 and 1 or 0) + (org.brainHemorrhage or 0)), 1), 1)
 	end --~120 seconds to fully die (0.3 of 300 and 0.4 of 60 seconds after)
 
 end
 
+=======
+		if not org.alive and owner:IsPlayer() and death_from_braindamage and org.o2[1] == 0 then
+			hg.achievements.AddPlayerAchievement(owner,"brain",1)
+			if org.analgesia > 1 then
+				hg.achievements.AddPlayerAchievement(owner,"drugs",1)
+			end
+		end
+		org.brain = min(org.brain + timeValue / (org.brain < 0.3 and 300 or 120) * math.min(((org.o2[1] < 0.25 and 1 or 0) + org.skull), 1), 1)
+	end
+end
+local hg_hungersystem = CreateConVar("hg_hungersystem", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enables/disabled hunger system", 0, 1)
+local max, min, Round, Lerp, halfValue2 = math.max, math.min, math.Round, Lerp, util.halfValue2
+hg.organism.module.metabolism = {}
+local module = hg.organism.module.metabolism
+module[1] = function(org)
+	org.satiety = 0
+    org.hungry = 0
+    org.hungryDmgCd = 0
+end
+local colorRed = Color(125,25,25)
+module[2] = function(owner, org, timeValue)
+    if org.satiety <= 0 and hg_hungersystem:GetBool() then
+        org.hungry = min(max(org.hungry + timeValue * 0.01, 0),100)
+        org.hungryDmgCd = org.hungryDmgCd or 0
+        if org.alive and org.hungryDmgCd < CurTime() and org.hungry > 45 then
+            org.painadd = org.painadd + 25 * (org.hungry/45)
+            org.hungryDmgCd = CurTime() + (math.random(40,55) - (org.hungry/5.5))
+            if org.hungry > 80 then
+                org.stomach = math.min(org.stomach + 0.1,1)
+                if org.stomach > 0.85 and org.heart < 0.3 then
+                    org.heart = org.heart + 0.1
+                end
+                if org.heart > 0.3 then
+                    org.o2.regen = 0
+                end
+            end
+        end
+    else
+        org.hungry = min(max(org.hungry - timeValue * 2, 0),100)
+    end
+    org.hungry = Round(org.hungry or 0,3)
+    if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and owner:IsPlayer() and org.satiety > 1 then
+        if not org.randomPainSound or org.randomPainSound < CurTime() then
+            org.randomPainSound = CurTime() + math.random(20,45)
+            owner:EmitSound("zcitysnd/"..(ThatPlyIsFemale(owner) and "female" or "male").."/pain_"..math.random(1,8)..".mp3")
+            org.painadd = org.painadd + 20
+        end
+    end
+    if org.satiety == 0 then return end
+    org.satiety = min(max(org.satiety - timeValue * 0.5, 0), 100)
+    org.blood = min(org.blood + timeValue * (org.satiety/10) , 5000)
+    org.regeneratehp = (!((org.regeneratehp or 0) >= 1) and min( (org.regeneratehp or 0) + timeValue * (org.satiety/100), 1)) or 0
+    owner:SetHealth(min(owner:Health() + org.regeneratehp,100))
+end
+>>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/sv_respiration.lua

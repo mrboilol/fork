@@ -3222,6 +3222,7 @@ function SWEP:CustomThink()
 
             if CLIENT then goto meleeskip1 end
 
+<<<<<<< HEAD
             if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(1) then
                 -- Doors are world hits, so pass the swing through the shared damage path before
                 -- letting door-breaching weapons apply their own stronger special behavior.
@@ -3236,6 +3237,9 @@ function SWEP:CustomThink()
                     ent:TakeDamageInfo(doorDamage)
                     self:PrimaryAttackAdd(ent, trace)
                 end
+=======
+            if not soft and self:ShouldStopAttackOnWorldHit(1) then
+>>>>>>> 8e5ef9bd (some changes i already made)
                 self:PlayEffects(trace, false)
                 self:SendMeleeHitStop(1, trace.HitNormal)
                 self:AbortBlockedAttack()
@@ -3406,7 +3410,11 @@ function SWEP:CustomThink()
 
             if CLIENT then goto meleeskip2 end
 
+<<<<<<< HEAD
             if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(2) then
+=======
+            if not soft and self:ShouldStopAttackOnWorldHit(2) then
+>>>>>>> 8e5ef9bd (some changes i already made)
                 self:PlayEffects(trace, true)
                 self:SendMeleeHitStop(2, trace.HitNormal)
                 self:AbortBlockedAttack()
@@ -3602,7 +3610,11 @@ function SWEP:CustomThink()
                     goto meleeskip3
                 end
 
+<<<<<<< HEAD
                 if not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(3) then
+=======
+                if self:ShouldStopAttackOnWorldHit(3) then
+>>>>>>> 8e5ef9bd (some changes i already made)
                     self:PlayEffects(trace, 3)
                     self:SendMeleeHitStop(3, trace.HitNormal)
                     self:AbortBlockedAttack()

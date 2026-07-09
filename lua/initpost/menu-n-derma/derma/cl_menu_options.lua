@@ -117,7 +117,12 @@ end
 hook.Add("OnScreenSizeChanged", "ZCity_Settings_Fonts", CreateSettingsFonts)
 CreateSettingsFonts()
 
+<<<<<<< HEAD
 hg.settings:AddOpt("Gameplay","hg_newthoughts", "New thoughts")
+=======
+hg.settings:AddOpt("Gameplay","hg_old_notificate", "Old Notifications")
+hg.settings:AddOpt("Gameplay","hg_cheats", "Enable Cheats")
+>>>>>>> 8e5ef9bd (some changes i already made)
 hg.settings:AddOpt("Gameplay","hg_showthoughts", "Show thoughts")
 hg.settings:AddOpt("Gameplay","hg_hints", "Show hints")
 hg.settings:AddOpt("Gameplay","hg_gary", "Center weapon in fake")
@@ -271,6 +276,7 @@ local isValidMainMenuPanel = false
 
 local info_sections = {
     {title = "Rank", key = "rank"},
+<<<<<<< HEAD
     {title = "Leaderboard", key = "leaderboard"},
     {title = "Credits", key = "credits", disabled = true, disabledColor = Color(105, 105, 105, 180)},
     {title = "Credits", key = "credits", disabled = true, disabledColor = Color(105, 105, 105, 180)},
@@ -283,6 +289,14 @@ local info_credit_lines = {
     "PLACEHOLDER",
     "PLACEHOLDER",
     "PLACEHOLDER"
+=======
+    {title = "Credits", key = "credits"}
+}
+local info_credit_entries = {
+    {name = "Ваше Имя", merit = "Заслуга / вклад"},
+    {name = "Ещё Имя", merit = "Что-то сделал"},
+    {name = "Третий Человек", merit = "Помог с чем-то"}
+>>>>>>> 8e5ef9bd (some changes i already made)
 }
 local info_fallback_band = {
     icon = Material("vgui/mats_jack_awards/10")
@@ -296,6 +310,7 @@ local info_stat_rows = {
     {"Deaths", "Deaths"},
     {"Suicides", "Suicides"}
 }
+<<<<<<< HEAD
 local info_social_links = {
     {
         title = "Lapse",
@@ -330,6 +345,8 @@ local info_social_button_h = MenuUnit(24)
 local info_social_button_right = MenuUnit(18)
 local info_judge_logo = Material("vgui/judgelogo.png", "noclamp smooth")
 local info_judge_url = "https://discord.gg/hsRfFdEDTH"
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 local info_active_section = nil
 local info_section_buttons = {}
 local info_content_panel = nil
@@ -1704,6 +1721,28 @@ function InfoRefreshContent()
         bandLabel:SetContentAlignment(5)
         bandLabel:SetText("")
 
+        profileBlock.LastSkill = nil
+        profileBlock.LastExp = nil
+        function profileBlock:Think()
+            local ply = LocalPlayer()
+            if not IsValid(ply) then return end
+            local skill = ply.skill or 0
+            local exp = ply.exp or 0
+            if skill == (self.LastSkill or 0) and exp == (self.LastExp or 0) then return end
+            self.LastSkill = skill
+            self.LastExp = exp
+            local Band, Medal = zb.Experience.GetAwards({skill = skill, exp = exp})
+            if Band then
+                medalPanel.Band = Band
+                medalPanel.Medal = Medal
+            end
+            playerLabel:SetText(ply:Nick())
+            xpLabel:SetText("Experience: " .. math.Round(exp))
+            skillLabel:SetText("Skill: " .. math.Round(skill, 3))
+            medalLabel:SetText("Medal: " .. (Medal and Medal.name or "None"))
+            bandLabel:SetText("Band: " .. (Band and Band.name or "None"))
+        end
+
         profileBlock.PerformLayout = function(self, w, h)
             local medalSize = math.min(MenuUnit(200), math.max(MenuUnit(130), math.floor(w * 0.28)))
             medalPanel:SetSize(medalSize, medalSize)
@@ -1759,6 +1798,18 @@ function InfoRefreshContent()
             value:SetTextColor(settings_color_text)
             value:SetText("0")
             value:SizeToContents()
+            value.StatKey = statData[2]
+            function value:Think()
+                local ply = LocalPlayer()
+                if not IsValid(ply) then return end
+                local val = ply.SvDB and ply.SvDB[self.StatKey]
+                if val == nil then return end
+                local str = tostring(math.Round(val))
+                if self:GetText() ~= str then
+                    self:SetText(str)
+                    self:SizeToContents()
+                end
+            end
 
             statCards[#statCards + 1] = {
                 key = statData[2],
@@ -1788,6 +1839,18 @@ function InfoRefreshContent()
         kdValue:SetTextColor(settings_color_text)
         kdValue:SetText("0.00")
         kdValue:SizeToContents()
+        function kdValue:Think()
+            local ply = LocalPlayer()
+            if not IsValid(ply) then return end
+            local kills = ply.SvDB and ply.SvDB["Kills"] or 0
+            local deaths = ply.SvDB and ply.SvDB["Deaths"] or 0
+            local kd = deaths > 0 and math.Round(kills / deaths, 2) or kills
+            local str = string.format("%.2f", kd)
+            if self:GetText() ~= str then
+                self:SetText(str)
+                self:SizeToContents()
+            end
+        end
 
         statsGrid.PerformLayout = function(self, w, h)
             local gap = MenuUnit(8)
@@ -2085,7 +2148,7 @@ function InfoRefreshContent()
             draw.RoundedBox(2, 1, 1, w - 2, h - 2, col)
         end
 
-        for _, line in ipairs(info_credit_lines) do
+        for _, entry in ipairs(info_credit_entries) do
             local row = vgui.Create("DPanel", scroll)
             row:Dock(TOP)
             row:DockMargin(0, 0, 0, MenuUnit(10))
@@ -2097,14 +2160,14 @@ function InfoRefreshContent()
                 surface.DrawRect(0, h - MenuUnit(1), w, MenuUnit(1))
             end
 
-            local text = vgui.Create("DLabel", row)
-            text:SetPos(MenuUnit(18), MenuUnit(18))
-            text:SetFont("ZCity_Menu_Settings_Small")
-            text:SetTextColor(settings_color_text)
-            text:SetText(line)
-            text:SizeToContents()
-        end
+            local name = vgui.Create("DLabel", row)
+            name:SetPos(MenuUnit(18), MenuUnit(18))
+            name:SetFont("ZCity_Menu_Settings_Small")
+            name:SetTextColor(settings_color_text)
+            name:SetText(entry.name or "")
+            name:SizeToContents()
 
+<<<<<<< HEAD
     elseif sectionKey == "socials" then
         local holder = vgui.Create("DPanel", info_content_panel)
         holder:Dock(FILL)
@@ -2225,6 +2288,14 @@ function InfoRefreshContent()
                 surface.DrawOutlinedRect(buttonX, buttonY, buttonW, buttonH, 1)
                 draw.SimpleText("Join", "ZCity_Menu_Settings_Tiny", buttonX + buttonW * 0.5, buttonY + buttonH * 0.5, settings_color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
+=======
+            local merit = vgui.Create("DLabel", row)
+            merit:SetPos(MenuUnit(18), MenuUnit(40))
+            merit:SetFont("ZCity_Menu_Settings_Tiny")
+            merit:SetTextColor(settings_color_text_dim)
+            merit:SetText(entry.merit or "")
+            merit:SizeToContents()
+>>>>>>> 8e5ef9bd (some changes i already made)
         end
     end
 end
@@ -2467,8 +2538,12 @@ function hg.DrawInformation(ParentPanel)
     headerHint:SetPos(MenuUnit(25), MenuUnit(45))
     headerHint:SetFont("ZCity_Menu_Settings_Tiny")
     headerHint:SetTextColor(settings_color_text_dim)
+<<<<<<< HEAD
     headerHint:SetText("View rank and social links")
     headerHint:SetText("View rank and social links")
+=======
+    headerHint:SetText("View rank and credits")
+>>>>>>> 8e5ef9bd (some changes i already made)
     headerHint:SizeToContents()
 
     local contentHolder = vgui.Create("DPanel", mainPanel)

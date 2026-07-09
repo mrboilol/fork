@@ -814,6 +814,23 @@ local fliprtmat = CreateMaterial(
 )
 
 local invertCam = CreateClientConVar("hg_cheats","0",false,false,"Toggle uselezz cheats",0,1)
+<<<<<<< HEAD
+=======
+
+hook.Add("HG.InputMouseApply","ASdInvert",function(tbl)
+	if invertCam:GetBool() then
+		tbl.x = -tbl.x
+		--print("huy")
+		--return true
+	end
+end)
+
+hook.Add( "CreateMove", "flipmove", function( cmd )	
+	if invertCam:GetBool() then
+		cmd:SetSideMove( -cmd:GetSideMove() )
+	end
+end)
+>>>>>>> 8e5ef9bd (some changes i already made)
 
 hook.Add("HG.InputMouseApply","ASdInvert",function(tbl)
 	if invertCam:GetBool() then
@@ -861,7 +878,10 @@ local function renderscene(pos, angle, fov)
 	viewOverride = view
 	
 	local invert = invertCam:GetBool()
+<<<<<<< HEAD
 	local oldrt
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 	
 	if not view then return end
 	if not isvector(view.origin) or not isangle(view.angles) then return end

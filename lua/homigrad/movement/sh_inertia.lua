@@ -341,6 +341,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
                                 ply.isSprintingState = false
                         end
 
+<<<<<<< HEAD
                         ply.hg_isSprinting = runnin_held and (ply.isSprintingState or force_sprint)
                         ply.hg_isJogging = runnin_held and not ply.hg_isSprinting
                 end
@@ -355,6 +356,12 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
                         end
                 end
                 local runnin = ply.hg_isSprinting or ply.hg_isJogging
+=======
+		local runnin_held = in_speed and not ply:Crouching() and ply:KeyDown(IN_FORWARD)
+		ply.hg_isSprinting = runnin_held and (ply.isSprintingState or force_sprint)
+		ply.hg_isJogging = runnin_held and not ply.hg_isSprinting
+		local runnin = ply.hg_isSprinting or ply.hg_isJogging
+>>>>>>> 8e5ef9bd (some changes i already made)
 
                 --[[if runnin then
                         mv:SetSideSpeed(0) --meh
@@ -647,6 +654,7 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 			end
 		--//
 
+<<<<<<< HEAD
 		local move = (ply.hg_isJogging and (run_speed * 0.55) or run_speed) * 1.1
 		local k = 1 * weightmul
 		k = k * math_Clamp(consmul, 0.7, 1)
@@ -658,6 +666,20 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		k = k * math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
 		k = k * (math_min(math_Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
 		k = k * math_Clamp((org.lleg and org.lleg >= 0.5 and math_max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math_max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
+=======
+		local target_run_speed = ply.hg_isJogging and (ply:GetRunSpeed() * 0.6) or ply:GetRunSpeed()
+		local move = target_run_speed * 1.1
+		k = 1 * weightmul
+		k = k * math.Clamp(consmul, 0.7, 1)
+		k = k * math.Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
+		k = k * math.Clamp((org.temperature and ((org.temperature - 35) * 0.25 + 1) or 1), 0.5, 1)
+		k = k * math.Clamp(math.Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
+		k = k * math.Clamp(5 / ((org.immobilization or 0) + 1), 0.7, 1)
+		k = k * math.Clamp((org.blood or 0) / 5000, 0, 1)
+		k = k * math.Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
+		k = k * (math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
+		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
+>>>>>>> 8e5ef9bd (some changes i already made)
 		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
 		if hg.HasTourniquetOnLimb then
 			local weakenedLegs = (hg.HasTourniquetOnLimb(ply, "lleg") and 1 or 0) + (hg.HasTourniquetOnLimb(ply, "rleg") and 1 or 0)

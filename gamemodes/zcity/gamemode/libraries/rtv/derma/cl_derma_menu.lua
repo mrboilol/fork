@@ -14,15 +14,25 @@ end
 
 local function CreateRTVFonts()
     surface.CreateFont("ZCity_RTV_Title", {
+<<<<<<< HEAD
         font = "VCR OSD Mono",
         size = RTVUnit(32),
+=======
+        font = "Verily Serif Mono",
+        size = ScreenScale(32),
+>>>>>>> 8e5ef9bd (some changes i already made)
         weight = 800,
         antialias = true
     })
 
     surface.CreateFont("ZCity_RTV_Tiny", {
+<<<<<<< HEAD
         font = "VCR OSD Mono",
         size = RTVUnit(8),
+=======
+        font = "Verily Serif Mono",
+        size = ScreenScale(8),
+>>>>>>> 8e5ef9bd (some changes i already made)
         weight = 200
     })
 end

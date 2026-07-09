@@ -1,3 +1,17 @@
+<<<<<<< HEAD
+=======
+if not CLIENT then return end
+hg = hg or {}
+if hg._zsh_surrender_cl_loaded then return end
+hg._zsh_surrender_cl_loaded = true
+
+if not GetConVar("surrender_text") then
+    CreateClientConVar("surrender_text", "1", true, false, "Show surrender/kneel chat messages (1=on, 0=off)")
+end
+if not GetConVar("surrender_voicel") then
+    CreateClientConVar("surrender_voicel", "1", true, false, "Play scared voice line when surrendering (1=on, 0=off)")
+end
+>>>>>>> 8e5ef9bd (some changes i already made)
 local function SurrText()   return GetConVar("surrender_text"):GetBool()   end
 local function SurrVoicel() return GetConVar("surrender_voicel"):GetBool() end
 
@@ -36,7 +50,10 @@ local STAND_CD        = 1.5
 local WEAPON_LOCK_TIME = 10
 
 local MIN_SURRENDER_TIME = 5.0
+<<<<<<< HEAD
 local hmcdPoliceArrived = false
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 
 net.Receive("hg_surrender_min_time_sync", function()
     local newVal = net.ReadFloat()
@@ -47,10 +64,13 @@ net.Receive("hg_surrender_min_time_sync", function()
     end
 end)
 
+<<<<<<< HEAD
 net.Receive("hg_surrender_hmcd_police_state", function()
     hmcdPoliceArrived = net.ReadBool()
 end)
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 local kneelCD         = 0
 local hbhCD           = 0
 local standCD         = 0
@@ -269,8 +289,11 @@ hook.Add("CreateMove", "surrender_weapon_lock_input", function(cmd)
     cmd:SetImpulse(0)
 end)
 
+<<<<<<< HEAD
 local ExitSurrender
 
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 hook.Add("Think", "surrender_kneel_weapon_watch", function()
     local ply = LocalPlayer()
     if not (inSurrender or inKneel or kneelExiting) then
@@ -312,7 +335,11 @@ local function CanExitSurrender()
     return CurTime() >= (surrenderStartTime + MIN_SURRENDER_TIME)
 end
 
+<<<<<<< HEAD
 ExitSurrender = function(ply, silent)
+=======
+local function ExitSurrender(ply, silent)
+>>>>>>> 8e5ef9bd (some changes i already made)
     if not inSurrender then return end
     if not CanExitSurrender() then
         if SurrText() then ply:ChatPrint("You cannot lower your hands yet! ("..math.ceil(surrenderStartTime + MIN_SURRENDER_TIME - CurTime()).."s)") end
@@ -560,6 +587,7 @@ local function EnterKneelWithSurrender(ply)
     end)
 end
 
+<<<<<<< HEAD
 local function IsHMCDRoundActive()
     local round = CurrentRound and CurrentRound()
     if round and round.name == "hmcd" then return true end
@@ -589,6 +617,25 @@ hook.Add("radialOptions", "surrender_option", function()
 
     if inKneel then
         hg.radialOptions[#hg.radialOptions + 1] = {
+=======
+hg = hg or {}
+
+function hg.GetSurrenderRadialOption(ply)
+    ply = ply or LocalPlayer()
+    if not IsValid(ply) then return end
+    if not ply:Alive() or (ply.organism and ply.organism.otrub) or hg.GetCurrentCharacter(ply) ~= ply then return end
+
+    if kneelExiting then
+        return { function() return -1 end, "Getting Up..." }
+    end
+
+    if hbhTransitioning then
+        return { function() return -1 end, "..." }
+    end
+
+    if inKneel then
+        return {
+>>>>>>> 8e5ef9bd (some changes i already made)
             function(mouseClick)
                 if mouseClick == 2 then
                     if inHandsBehindHead then
@@ -609,11 +656,18 @@ hook.Add("radialOptions", "surrender_option", function()
             end,
             inHandsBehindHead and "Kneeling + Hands Behind Head\nRMB - Options" or "Kneeling + Hands Up\nRMB - Options"
         }
+<<<<<<< HEAD
         return
     end
 
     if inSurrender then
         hg.radialOptions[#hg.radialOptions + 1] = {
+=======
+    end
+
+    if inSurrender then
+        return {
+>>>>>>> 8e5ef9bd (some changes i already made)
             function(mouseClick)
                 if mouseClick == 2 then
                     if inHandsBehindHead then
@@ -639,7 +693,11 @@ hook.Add("radialOptions", "surrender_option", function()
     else
         local wep = ply:GetActiveWeapon()
         local hasWeapon = IsValid(wep) and wep:GetClass() ~= "weapon_hands_sh"
+<<<<<<< HEAD
         hg.radialOptions[#hg.radialOptions + 1] = {
+=======
+        return {
+>>>>>>> 8e5ef9bd (some changes i already made)
             function(mouseClick)
                 if CurTime() < surrenderCD then return -1 end
                 surrenderCD = CurTime() + SURR_CD_TIME
@@ -654,7 +712,11 @@ hook.Add("radialOptions", "surrender_option", function()
             "Surrender\nRMB - Kneel+Surrender"
         }
     end
+<<<<<<< HEAD
 end)
+=======
+end
+>>>>>>> 8e5ef9bd (some changes i already made)
 
 hook.Add("Think", "surr_kneel_attack_cancel", function()
     local ply = LocalPlayer()
@@ -687,12 +749,15 @@ hook.Add("PlayerBindPress", "surrender_block_punch", function(ply, bind, pressed
     if string.find(bind, "+attack") then
         return true
     end
+<<<<<<< HEAD
     if string.find(bind, "hg_kick") and inKneel then --------bad boy!
         return true
     end
     if string.find(bind, "fake") then
         return true
     end
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 end)
 
 local function SurrenderForceReset(ply)
@@ -747,7 +812,10 @@ end)
 concommand.Add("surrender_toggle", function()
     local ply = LocalPlayer()
     if not IsValid(ply) or not ply:Alive() or (ply.organism and ply.organism.otrub) or hg.GetCurrentCharacter(ply) ~= ply then return end
+<<<<<<< HEAD
     if not CanUseSurrenderMenu() and not inSurrender and not inKneel then return end
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 
     if inSurrender then
         ExitSurrender(ply)
@@ -763,7 +831,10 @@ end)
 concommand.Add("kneel_toggle", function()
     local ply = LocalPlayer()
     if not IsValid(ply) or not ply:Alive() or (ply.organism and ply.organism.otrub) or hg.GetCurrentCharacter(ply) ~= ply then return end
+<<<<<<< HEAD
     if not CanUseSurrenderMenu() and not inSurrender and not inKneel then return end
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 
     if inKneel then
         ExitKneel(ply)

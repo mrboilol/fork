@@ -280,7 +280,12 @@ local limbs = {
 	["rleg"] = "ValveBiped.Bip01_R_Calf",
 	["larm"] = "ValveBiped.Bip01_L_Forearm",
 	["rarm"] = "ValveBiped.Bip01_R_Forearm",
+<<<<<<< HEAD
 	["head"] = "ValveBiped.Bip01_Head1",
+=======
+	["lhand"] = "ValveBiped.Bip01_L_Hand",
+	["rhand"] = "ValveBiped.Bip01_R_Hand",
+>>>>>>> 8e5ef9bd (some changes i already made)
 }
 
 local injuryBones = {

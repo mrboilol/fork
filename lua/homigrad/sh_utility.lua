@@ -1477,7 +1477,7 @@ local IsValid = IsValid
 			return false
 		end
 
-		if ent.organism and ent.organism.larmamputated then
+		if ent.organism and (ent.organism.larmamputated or ent.organism.lhandamputated) then
 			return false
 		end
 		local wep = IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon()
@@ -1507,9 +1507,13 @@ local IsValid = IsValid
 			return false
 		end
 
+<<<<<<< HEAD
 		-- A broken or dislocated right arm still holds the weapon (just lowered / weaker).
 		-- Only a full amputation forces the left hand to take over.
 		if ent.organism and ent.organism.rarmamputated then
+=======
+		if ent.organism and (ent.organism.rarmamputated or ent.organism.rhandamputated) then
+>>>>>>> 8e5ef9bd (some changes i already made)
 			return false
 		end
 		return true

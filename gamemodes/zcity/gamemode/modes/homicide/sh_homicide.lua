@@ -83,6 +83,7 @@ local LegacyTraitorLoadout = {
 	}
 }
 
+<<<<<<< HEAD
 local TraitorSkillsetSubRoles = {
 	["infiltrator"] = "traitor_infiltrator",
 	["assassin"] = "traitor_assasin",
@@ -90,14 +91,20 @@ local TraitorSkillsetSubRoles = {
 }
 
 local function ApplyTraitorLoadout(ply, forcedSkillset, preserveSubRole)
+=======
+local function ApplyTraitorLoadout(ply)
+>>>>>>> 8e5ef9bd (some changes i already made)
 	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_traitor_loadout"))
 	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
 
 	local skillset = forcedSkillset or loadout.skillset or "none"
 	local weaponsList = loadout.weapons or {}
+<<<<<<< HEAD
 	if not preserveSubRole then
 		ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
 	end
+=======
+>>>>>>> 8e5ef9bd (some changes i already made)
 
 	ply.organism.stamina.max = 220
 	ply.organism.recoilmul = 1

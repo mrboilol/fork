@@ -16,7 +16,9 @@ local gradient_u = Material("vgui/gradient-u")
 local blurMat = Material("pp/blurscreen")
 local Dynamic = 0
 
-BlurBackground = hg.DrawBlur
+BlurBackground = (hg and hg.DrawBlur) or function() end
+
+local FrameClass = vgui.GetControlTable("ZFrame") and "ZFrame" or "DFrame"
 
 local function PaintFrame(self,w,h)
 	BlurBackground(self)
@@ -34,7 +36,7 @@ function EXP.Menu( ply )
         EXP.OpenedMenu = nil
     end
 
-    EXP.OpenedMenu = vgui.Create( "ZFrame" )
+    EXP.OpenedMenu = vgui.Create( FrameClass )
     EXP.OpenedMenu:SetSize( ScrW()*0.2, ScrH()*0.5 )
     EXP.OpenedMenu:Center()
     EXP.OpenedMenu:MakePopup()
@@ -82,3 +84,13 @@ function EXP.AccountMenu( ply )
     needCallback = true
     EXP.OpenMenu( ply )
 end
+<<<<<<< HEAD:gamemodes/zcity/gamemode/libraries/experience/cl_menu.lua
+=======
+
+-- Консольная команда для просмотра своего аккаунта/медали в любом гейммоде (в т.ч. сандбоксе)
+concommand.Add("xp_menu", function()
+    if IsValid(LocalPlayer()) then
+        EXP.AccountMenu(LocalPlayer())
+    end
+end)
+>>>>>>> 8e5ef9bd (some changes i already made):lua/experience/cl_menu.lua

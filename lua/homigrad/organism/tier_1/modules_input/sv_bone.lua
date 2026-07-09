@@ -313,13 +313,20 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	end
 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
+<<<<<<< HEAD
 	dmg = org[key]
+=======
+	
+	local dmg = org[key]
+
+>>>>>>> 8e5ef9bd (some changes i already made)
 	org[key] = org[key] * 0.5
 	markDamagedBone(org, key == "lleg" and (segment == "up" and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_L_Calf") or (segment == "up" and "ValveBiped.Bip01_R_Thigh" or "ValveBiped.Bip01_R_Calf"), dmg)
 
 	if dmg < 0.7 then return 0 end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then return 0 end
 
+<<<<<<< HEAD
 	if org.isPly and !org[key .. "amputated"] then org.just_damaged_bone = CurTime() end
 
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
@@ -329,8 +336,26 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
 		org.painadd = org.painadd + 55
 		addBoneInternalBleed(org, 0.45, 0.8)
+=======
+	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
+
+	local stabilized = org[key.."stabilized"]
+	
+	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
+		org[key] = 1
+		if hg.fakeBoneFlop then
+			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
+		end
+
+		if not stabilized then
+			org.painadd = org.painadd + 55
+			org.immobilization = org.immobilization + dmg * 25
+		else
+			org.painadd = org.painadd + 10
+			org.immobilization = org.immobilization + dmg * 5
+		end
+>>>>>>> 8e5ef9bd (some changes i already made)
 		org.owner:AddNaturalAdrenaline(1)
-		org.immobilization = org.immobilization + dmg * 25
 		org.fearadd = org.fearadd + 0.5
 
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
@@ -340,12 +365,27 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 	else
+<<<<<<< HEAD
 		org[key .. "dislocation"] = true
 		markBrokenBone(org, key == "lleg" and (segment == "up" and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_L_Calf") or (segment == "up" and "ValveBiped.Bip01_R_Thigh" or "ValveBiped.Bip01_R_Calf"))
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
 		org.painadd = org.painadd + 35
+=======
+		//org[key] = 0.5
+		org[key.."dislocation"] = true
+		if hg.fakeBoneFlop then
+			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
+		end
+
+		if not stabilized then
+			org.painadd = org.painadd + 35
+			org.immobilization = org.immobilization + dmg * 10
+		else
+			org.painadd = org.painadd + 10
+			org.immobilization = org.immobilization + dmg * 3
+		end
+>>>>>>> 8e5ef9bd (some changes i already made)
 		org.owner:AddNaturalAdrenaline(0.5)
-		org.immobilization = org.immobilization + dmg * 10
 		org.fearadd = org.fearadd + 0.5
 
 		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_leg[math.random(#dislocated_leg)], 1, "dislocated"..key, 1, nil, nil) end
@@ -390,6 +430,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		return 0
 	end
 
+<<<<<<< HEAD
 	if org.isPly and !org[key .. "amputated"] then org.just_damaged_bone = CurTime() end
 
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
@@ -399,6 +440,25 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
 		org.painadd = org.painadd + 55
 		addBoneInternalBleed(org, 0.35, 0.7)
+=======
+	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
+
+	local stabilized = org[key.."stabilized"]
+	
+	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB+DMG_CRUSH+DMG_FALL) or math.random(3) != 1) then
+		org[key] = 1
+		if hg.fakeBoneFlop then
+			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
+		end
+
+		if not stabilized then
+			org.painadd = org.painadd + 55
+			org.immobilization = org.immobilization + dmg * 25
+		else
+			org.painadd = org.painadd + 10
+			org.immobilization = org.immobilization + dmg * 5
+		end
+>>>>>>> 8e5ef9bd (some changes i already made)
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
@@ -410,10 +470,26 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 		tryDropHeldItemFromArmInjury(org, key, "fracture")
 	else
+<<<<<<< HEAD
 		org[key .. "dislocation"] = true
 		markBrokenBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"))
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
 		org.painadd = org.painadd + 35
+=======
+		org[key.."dislocation"] = true
+		if hg.fakeBoneFlop then
+			hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, not stabilized)
+		end
+		//org[key] = 0.5
+
+		if not stabilized then
+			org.painadd = org.painadd + 35
+			org.immobilization = org.immobilization + dmg * 10
+		else
+			org.painadd = org.painadd + 10
+			org.immobilization = org.immobilization + dmg * 3
+		end
+>>>>>>> 8e5ef9bd (some changes i already made)
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5
 
@@ -776,3 +852,40 @@ input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ric
 input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 1, boneindex, dir, hit, ricochet) end
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
 input_list.spine3 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 3, boneindex, dir, hit, ricochet) end
+
+hook.Add("Org Think", "homigrad_bone_stabilization", function(owner, org, timeValue)
+	if not org.alive then return end
+
+	org._zsh_stab_prev = org._zsh_stab_prev or {}
+
+	for _, info in ipairs({
+		{key = "larm", segs = {"up", "down"}},
+		{key = "rarm", segs = {"up", "down"}},
+		{key = "lleg", segs = {"up", "down"}},
+		{key = "rleg", segs = {"up", "down"}},
+	}) do
+		local key = info.key
+		local stabilized = org[key .. "stabilized"]
+		local broke = (org[key] or 0) >= 0.95 or org[key .. "dislocation"]
+
+		if not stabilized or not broke then
+			org._zsh_stab_prev[key] = false
+		else
+			local prev = org._zsh_stab_prev[key]
+			if not prev then
+				if hg.fakeBoneFlop then
+					for _, seg in ipairs(info.segs) do
+						hg.fakeBoneFlop.SetLimbSegmentState(org, key, seg, false)
+					end
+				end
+				org.painadd = math.max(org.painadd - 25, 0)
+				org.immobilization = math.max(org.immobilization - (broke and 100 or 40), 0)
+			end
+
+			org.painadd = math.Approach(org.painadd, 0, timeValue * 5)
+			org.immobilization = math.Approach(org.immobilization, 0, timeValue * 10)
+
+			org._zsh_stab_prev[key] = true
+		end
+	end
+end)

@@ -3,14 +3,28 @@ AddCSLuaFile("shared.lua")
 include("shared.lua")
 
 function ENT:Initialize()
+<<<<<<< HEAD
 	self:SetModel("models/kali/weapons/black_ops/magazines/30rd galil magazine.mdl")
+=======
+	self:SetModel(self.MagModelOverride or "models/kali/weapons/black_ops/magazines/30rd galil magazine.mdl")
+	self.StoredAmmo = math.max(tonumber(self.StoredAmmo) or 0, 0)
+	self.StoredAmmoType = tonumber(self.StoredAmmoType) or -1
+	self.StoredAmmoName = tostring(self.StoredAmmoName or "")
+	self:SetNWInt("StoredAmmo", self.StoredAmmo)
+	self:SetNWInt("StoredAmmoType", self.StoredAmmoType)
+	self:SetNWString("StoredAmmoName", self.StoredAmmoName)
+>>>>>>> 8e5ef9bd (some changes i already made)
 	self:PhysicsInit(SOLID_VPHYSICS)
 	self:SetMoveType(MOVETYPE_VPHYSICS)
 	self:SetSolid(SOLID_VPHYSICS)
 	self:DrawShadow(true)
 	self:SetUseType(USE_TOGGLE)
 	self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+<<<<<<< HEAD
 	self:SetBodygroup(1, 1)
+=======
+	self:SetBodygroup(1, isnumber(self.MagBodygroupValue) and self.MagBodygroupValue or 1)
+>>>>>>> 8e5ef9bd (some changes i already made)
 	timer.Simple(0.1, function()
 		if not IsValid(self) then return end
 		self:SetCollisionGroup(COLLISION_GROUP_NONE)
@@ -56,4 +70,8 @@ function ENT:Detonate(data)
 	end)
 
 	--SafeRemoveEntityDelayed(self, 320) 
+<<<<<<< HEAD
 end
+=======
+end
+>>>>>>> 8e5ef9bd (some changes i already made)
