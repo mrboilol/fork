@@ -200,6 +200,28 @@ SWEP.ShoveKnockdownVictimFatigueMul = 0.20
 SWEP.ShoveKnockdownStaminaAdvantageMul = 0.10
 SWEP.ShoveKnockdownCooldown = 2
 SWEP.SwingForwardBoostMinSpeed = 20
+SWEP.RagdollHitForceMul = 0.5
+
+SWEP.SwingDamageEnabled = true
+SWEP.SwingDamageMinSpeed = 150
+SWEP.SwingDamageMaxSpeed = 900
+SWEP.SwingDamageMaxMul = 1.5
+SWEP.SwingDamageDebug = true
+SWEP.SwingDecayHalfLife = 0.5
+
+if CLIENT then
+    hook.Add("HUDPaint", "hg_melee_swing_debug", function()
+        local ply = LocalPlayer()
+        local wep = IsValid(ply) and ply:GetActiveWeapon() or NULL
+
+        if not IsValid(wep) or wep.Base ~= "weapon_melee" or not wep.SwingDamageDebug then return end
+
+        local speed = math.Round(wep.SwingSpeed or 0)
+        local mul = math.Round(wep:GetSwingDamageMul(), 2)
+
+        draw.SimpleText("Swing: " .. speed .. " deg/s   Dmg x" .. mul, "Default", ScrW() * 0.5, ScrH() - 120, color_white, TEXT_ALIGN_CENTER)
+    end)
+end
 SWEP.HeadTraceFallbackRadius = 10
 SWEP.HeadRagdollChance = 0.45
 SWEP.HeadRagdollMinDamage = 20
@@ -1223,6 +1245,11 @@ function SWEP:StartChargeAttack()
     self.SoftHitPlayed = false
     self.HitWorld = false
     self.ComboAppliedThisAttack = nil
+    self.SwingDamageEvaluated = false
+    self.SwingDamageMul = 1
+    self.SwingSpeed = 0
+    self.SwingLastAng = nil
+    self.SwingLastTime = nil
     self.Charging = true
     self.ChargeIdleLooping = false
     self.ChargeStartedAt = CurTime()
@@ -1256,6 +1283,8 @@ function SWEP:ReleaseChargeAttack()
     self.SoftHitPlayed = false
     self.HitWorld = false
     self.ComboAppliedThisAttack = nil
+    self.SwingDamageEvaluated = false
+    self.SwingDamageMul = 1
     self:PlayAnim(self:GetAttackAnimToken("charge_end", "Attack_Charge_End"), (self.ChargeAnimTimeEnd or self.AnimTime1 or 1) / mul, false, nil, false, false)
     self:SetAttackType(3)
     self:SetLastAttack(CurTime() + (self.ChargeAttackTime or self.AttackTime) / mul)
@@ -1394,6 +1423,19 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     end
 
     return mul
+end
+
+function SWEP:GetSwingDamageMul()
+    if not self.SwingDamageEnabled then return 1 end
+
+    local minSpeed = self.SwingDamageMinSpeed or 150
+    local maxSpeed = self.SwingDamageMaxSpeed or 900
+    local maxMul = self.SwingDamageMaxMul or 1.5
+    local speed = self.SwingSpeed or 0
+
+    local t = math.Clamp((speed - minSpeed) / math.max(maxSpeed - minSpeed, 0.001), 0, 1)
+
+    return Lerp(t, 1, maxMul)
 end
 
 function SWEP:ResetCombo()
@@ -2760,9 +2802,30 @@ function SWEP:CustomThink()
     local owner = self:GetOwner()
     local actwep = owner.GetActiveWeapon and owner:GetActiveWeapon()
 
-    if CLIENT and (not self.ShakePos or not self.ShakeAng) then
-        self.ShakePos = Vector(0,0,0)
-        self.ShakeAng = Angle(0,0,0)
+    if IsValid(owner) then
+        if self:GetInAttack() or self.Charging then
+            local ang = owner:EyeAngles()
+
+            if self.SwingLastAng and self.SwingLastTime then
+                local dt = math.max(CurTime() - self.SwingLastTime, 0.001)
+                local d = math.abs(math.AngleDifference(ang[1], self.SwingLastAng[1])) + math.abs(math.AngleDifference(ang[2], self.SwingLastAng[2]))
+                local rate = d / dt
+                local cur = self.SwingSpeed or 0
+
+                if rate > cur then
+                    self.SwingSpeed = rate
+                else
+                    self.SwingSpeed = cur * math.pow(0.5, dt / (self.SwingDecayHalfLife or 0.5))
+                end
+            end
+
+            self.SwingLastAng = ang
+            self.SwingLastTime = CurTime()
+        else
+            self.SwingLastAng = nil
+            self.SwingLastTime = nil
+            self.SwingSpeed = 0
+        end
     end
 
 	if SERVER and not owner:IsNPC() and owner.organism and (not owner.organism.canmove or ((owner.organism.stun - CurTime()) > 0) or (owner.organism.larm == 1 and owner.organism.rarm == 1)) and IsValid(actwep) and self == actwep then
@@ -3222,24 +3285,7 @@ function SWEP:CustomThink()
 
             if CLIENT then goto meleeskip1 end
 
-<<<<<<< HEAD
-            if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(1) then
-                -- Doors are world hits, so pass the swing through the shared damage path before
-                -- letting door-breaching weapons apply their own stronger special behavior.
-                if IsValid(ent) and hgIsDoor(ent) and not self:IsDestructibleTarget(ent) then
-                    local doorDamage = DamageInfo()
-                    doorDamage:SetAttacker(owner)
-                    doorDamage:SetInflictor(self)
-                    doorDamage:SetDamage(dmg)
-                    doorDamage:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
-                    doorDamage:SetDamageType(self.DamageType or DMG_CLUB)
-                    doorDamage:SetDamagePosition(trace.HitPos)
-                    ent:TakeDamageInfo(doorDamage)
-                    self:PrimaryAttackAdd(ent, trace)
-                end
-=======
             if not soft and self:ShouldStopAttackOnWorldHit(1) then
->>>>>>> 8e5ef9bd (some changes i already made)
                 self:PlayEffects(trace, false)
                 self:SendMeleeHitStop(1, trace.HitNormal)
                 self:AbortBlockedAttack()
@@ -3254,6 +3300,15 @@ function SWEP:CustomThink()
 
             dmg = dmg * mul
             dmg = self:ApplyComboDamage(dmg)
+
+            if not self.SwingDamageEvaluated then
+                self.SwingDamageMul = self:GetSwingDamageMul()
+                self.SwingDamageEvaluated = true
+            end
+
+            dmg = dmg * (self.SwingDamageMul or 1)
+
+            if self.SwingDamageDebug and IsValid(owner) then owner:PrintMessage(HUD_PRINTCONSOLE, "[SwingDmg] speed=" .. math.Round(self.SwingSpeed or 0) .. " deg/s  mul=x" .. math.Round(self.SwingDamageMul or 1, 2) .. "  dmg=" .. math.Round(dmg)) end
 
             if self:AlreadyHit(ent, trace) then
                 goto meleeskip1
@@ -3410,11 +3465,7 @@ function SWEP:CustomThink()
 
             if CLIENT then goto meleeskip2 end
 
-<<<<<<< HEAD
-            if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(2) then
-=======
             if not soft and self:ShouldStopAttackOnWorldHit(2) then
->>>>>>> 8e5ef9bd (some changes i already made)
                 self:PlayEffects(trace, true)
                 self:SendMeleeHitStop(2, trace.HitNormal)
                 self:AbortBlockedAttack()
@@ -3436,6 +3487,15 @@ function SWEP:CustomThink()
 
             dmg = dmg * mul
             dmg = self:ApplyComboDamage(dmg)
+
+            if not self.SwingDamageEvaluated then
+                self.SwingDamageMul = self:GetSwingDamageMul()
+                self.SwingDamageEvaluated = true
+            end
+
+            dmg = dmg * (self.SwingDamageMul or 1)
+
+            if self.SwingDamageDebug and IsValid(owner) then owner:PrintMessage(HUD_PRINTCONSOLE, "[SwingDmg] speed=" .. math.Round(self.SwingSpeed or 0) .. " deg/s  mul=x" .. math.Round(self.SwingDamageMul or 1, 2) .. "  dmg=" .. math.Round(dmg)) end
 
             if self:AlreadyHit(ent, trace) then
                 goto meleeskip2
@@ -3610,11 +3670,7 @@ function SWEP:CustomThink()
                     goto meleeskip3
                 end
 
-<<<<<<< HEAD
-                if not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(3) then
-=======
                 if self:ShouldStopAttackOnWorldHit(3) then
->>>>>>> 8e5ef9bd (some changes i already made)
                     self:PlayEffects(trace, 3)
                     self:SendMeleeHitStop(3, trace.HitNormal)
                     self:AbortBlockedAttack()
@@ -3630,6 +3686,15 @@ function SWEP:CustomThink()
 
             dmg = dmg * mul
             dmg = self:ApplyComboDamage(dmg)
+
+            if not self.SwingDamageEvaluated then
+                self.SwingDamageMul = self:GetSwingDamageMul()
+                self.SwingDamageEvaluated = true
+            end
+
+            dmg = dmg * (self.SwingDamageMul or 1)
+
+            if self.SwingDamageDebug and IsValid(owner) then owner:PrintMessage(HUD_PRINTCONSOLE, "[SwingDmg] speed=" .. math.Round(self.SwingSpeed or 0) .. " deg/s  mul=x" .. math.Round(self.SwingDamageMul or 1, 2) .. "  dmg=" .. math.Round(dmg)) end
 
             if self:AlreadyHit(ent, trace) then
                 goto meleeskip3
@@ -3815,6 +3880,11 @@ function SWEP:PrimaryAttack()
     self.SoftHitPlayed = false
     self.HitWorld = false
     self.ComboAppliedThisAttack = nil
+    self.SwingDamageEvaluated = false
+    self.SwingDamageMul = 1
+    self.SwingSpeed = 0
+    self.SwingLastAng = nil
+    self.SwingLastTime = nil
     self:PlayAnim("attack", self.AnimTime1 / mul,false,nil,false,false)
     self:SetAttackType(1)
     self:SetLastAttack(CurTime() + self.AttackTime / mul)
@@ -3951,6 +4021,11 @@ function SWEP:SecondaryAttack(override)
     self.SoftHitPlayed = false
     self.HitWorld = false
     self.ComboAppliedThisAttack = nil
+    self.SwingDamageEvaluated = false
+    self.SwingDamageMul = 1
+    self.SwingSpeed = 0
+    self.SwingLastAng = nil
+    self.SwingLastTime = nil
     self:PlayAnim("attack2",self.AnimTime2 / mul,false,nil,false,false)
     self:SetAttackType(2)
     self:SetLastAttack(CurTime() + self.Attack2Time / mul)
