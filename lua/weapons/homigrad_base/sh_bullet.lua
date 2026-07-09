@@ -45,6 +45,118 @@ if SERVER then
 
 		SetNetVar("BulletHoles", hg.bulletholes)
 	end)
+
+	hg.ragdollHistory = hg.ragdollHistory or {}
+
+	local HISTORY_TIME = 1.0
+	local RECORD_INTERVAL = 1 / 30
+	local nextRecord = 0
+
+	local function recordRagdoll(rag, t)
+		local bones = {}
+		local has = false
+
+		for i = 0, rag:GetPhysicsObjectCount() - 1 do
+			local phys = rag:GetPhysicsObjectNum(i)
+			if IsValid(phys) and phys:IsMotionEnabled() then
+				bones[i] = {phys:GetPos(), phys:GetAngles()}
+				has = true
+			end
+		end
+
+		if not has then return end
+
+		local hist = hg.ragdollHistory[rag] or {}
+		table.insert(hist, {t = t, bones = bones})
+
+		while hist[1] and (t - hist[1].t) > HISTORY_TIME do
+			table.remove(hist, 1)
+		end
+
+		hg.ragdollHistory[rag] = hist
+	end
+
+	hook.Add("Tick", "hg_ragdoll_lagcomp_record", function()
+		local t = CurTime()
+		if t < nextRecord then return end
+		nextRecord = t + RECORD_INTERVAL
+
+		for _, ply in ipairs(player.GetAll()) do
+			local rag = ply.FakeRagdoll
+			if ply:Alive() and IsValid(rag) and rag:IsRagdoll() then
+				recordRagdoll(rag, t)
+			end
+		end
+	end)
+
+	hook.Add("PlayerDisconnected", "hg_ragdoll_lagcomp_clear", function(ply)
+		local rag = ply.FakeRagdoll
+		if IsValid(rag) then
+			hg.ragdollHistory[rag] = nil
+		end
+	end)
+
+	function hg.RewindRagdolls(latency, excludePly)
+		local t = CurTime() - math.Clamp(latency or 0, 0, HISTORY_TIME)
+		local restored = {}
+
+		for _, ply in ipairs(player.GetAll()) do
+			if ply == excludePly or not ply:Alive() then continue end
+
+			local rag = ply.FakeRagdoll
+			if not (IsValid(rag) and rag:IsRagdoll()) then continue end
+
+			local hist = hg.ragdollHistory[rag]
+			if not hist or #hist == 0 then continue end
+
+			local snap
+			for i = #hist, 1, -1 do
+				if hist[i].t <= t then snap = hist[i] break end
+			end
+			snap = snap or hist[1]
+
+			local entry = {rag = rag, bones = {}, motion = {}}
+			local changed = false
+
+			for i = 0, rag:GetPhysicsObjectCount() - 1 do
+				local phys = rag:GetPhysicsObjectNum(i)
+				local b = snap.bones[i]
+				if IsValid(phys) and b then
+					entry.bones[i] = {phys:GetPos(), phys:GetAngles()}
+					entry.motion[i] = phys:IsMotionEnabled()
+					phys:EnableMotion(false)
+					phys:SetPos(b[1])
+					phys:SetAngles(b[2])
+					changed = true
+				end
+			end
+
+			if changed then table.insert(restored, entry) end
+		end
+
+		return restored
+	end
+
+	function hg.RestoreRagdolls(restored)
+		if not restored then return end
+
+		for _, entry in ipairs(restored) do
+			local rag = entry.rag
+			if not (IsValid(rag) and rag:IsRagdoll()) then continue end
+
+			for i = 0, rag:GetPhysicsObjectCount() - 1 do
+				local phys = rag:GetPhysicsObjectNum(i)
+				local b = entry.bones[i]
+				if IsValid(phys) and b then
+					phys:SetPos(b[1])
+					phys:SetAngles(b[2])
+					if entry.motion[i] then phys:EnableMotion(true) end
+				end
+			end
+		end
+	end
+
+	hg.ragdollLagComp = hg.ragdollLagComp or CreateConVar("hg_ragdolllagcomp", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED, "Rewind FakeRagdolls to shooter latency for better bullet hit registration", 0, 1)
 end
 
 local bulletHit
@@ -713,6 +825,8 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 		owner:LagCompensation(true)
 	end
 
+	self:WorldModel_Transform()
+	local tr, pos, ang = self:GetTrace(true)
 	local tr
 	if capturedTrace and capturedPos and capturedAng then
 		-- Copy the trigger-time snapshot. Physical bullets keep these vectors after
@@ -771,10 +885,6 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 
 	local headpos, headang
 
-	if isply then
-		owner:LagCompensation(true)
-	end
-
 	if CLIENT then
 		if IsValid(ent) then
 			local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
@@ -802,6 +912,8 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 			end
 		end
 	end
+	
+	local willsuicide = IsValid(owner) and owner:GetNWFloat("willsuicide", 0) != 0 and owner:GetNWFloat("willsuicide", 0) or ((owner.startsuicide or CurTime()) + 1) or CurTime() + 1
 	
 	if isply then
 		owner:LagCompensation(false)
@@ -965,6 +1077,15 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 		bullet.DontUsePhysBullets = true]]
 		bullet.IgnoreEntity = owner
 	end
+
+	local rewound
+	if SERVER and hg.ragdollLagComp and hg.ragdollLagComp:GetBool() and isply then
+		local latency = owner:GetLaggedMovementValue()
+		if latency and latency > 0 then
+			rewound = hg.RewindRagdolls(latency, owner)
+		end
+	end
+
 	
 	local penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
 	local diameter = ammotype.Diameter or 1
@@ -1018,7 +1139,10 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 				end
 			end
 		end
-    end
+		end
+
+	if SERVER and rewound then hg.RestoreRagdolls(rewound) end
+	if isply then owner:LagCompensation(false) end
 
 	if CLIENT then
 		local att = self:GetMuzzleAtt(gun, true)
