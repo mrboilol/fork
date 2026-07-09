@@ -243,11 +243,12 @@ end
 
 function hg.organism.AddNaturalAdrenaline(org, fAmount)
 
-	if org.otrub then return end
+	if org.otrub and not org.heartstop then return end
 
 	if fAmount < 0 then return end
 
 	fAmount = fAmount * 0.45
+	if org.heartstop then fAmount = fAmount * 0.75 end
 
 	local storage = org.adrenalineStorage or 0
 	local reserveK = math.Clamp(storage / 5, 0, 1)

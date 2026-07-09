@@ -202,7 +202,7 @@ module[2] = function(owner, org, timeValue)
 
 		org.consciousness = math.Approach(org.consciousness, 0, timeValue / 30 * org.tranquilizer)
 	elseif not shockActive then
-		local target = org.blood < 3000 and (org.blood - 2500) / 500 or 1
+		local target = org.blood < 2500 and (org.blood - 2000) / 500 or 1
 		local recovery_speed = consciousness_recovery_speed
 		if org.otrub or org.consciousness < consciousness_otrub_threshold then
 			recovery_speed = otrub_consciousness_recovery_speed
@@ -295,7 +295,7 @@ module[2] = function(owner, org, timeValue)
 		local reserveK = math.Clamp(((org.adrenalineStorage or 0) / 5) * 0.75 + 0.25, 0.25, 1)
 
 		if critical then
-			org.adrenaline = Approach(org.adrenaline, math.min(org.adrenaline, 2), timeValue / 5 * reserveK)
+			org.adrenaline = Approach(org.adrenaline, 2, timeValue / 5 * reserveK)
 		else
 			org.adrenaline = Approach(org.adrenaline, 3.2, timeValue / 5 * reserveK)
 		end

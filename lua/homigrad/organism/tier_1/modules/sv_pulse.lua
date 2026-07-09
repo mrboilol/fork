@@ -124,7 +124,7 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
 	heartbeat = heartbeat + exertionHeartBoost
 	local adrenalineHeartBoost = 9 * math.min(org.adrenaline, 3)
-	if org.givingUp then adrenalineHeartBoost = adrenalineHeartBoost * 0.3 end
+	if org.givingUp then adrenalineHeartBoost = adrenalineHeartBoost * 0.55 end
 	heartbeat = heartbeat + adrenalineHeartBoost
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
@@ -133,13 +133,13 @@ module[2] = function(owner, org, timeValue)
 	local despairHeartBoost = math.Clamp((org.despair or 0) - 0.3, 0, 0.7) / 0.7 * 35
 	if org.panicattackActive then despairHeartBoost = despairHeartBoost * 0.5 end
 	heartbeat = heartbeat + despairHeartBoost
-	if org.givingUp then heartbeat = heartbeat * 0.6 end
+	if org.givingUp then heartbeat = heartbeat * 0.8 end
 
 	-- Viability limits the maximum rate the body can sustain, but compensation
 	-- should still exist. Do not multiply BPM down into impossible states like
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
 	local survivalK = math.Clamp(k, 0, 1)
-	local maxCompensatedRate = math.Clamp(120 + survivalK * 110 + hemorrhageCompensation * 35 - hypovolemicShock * 20, 95, 240)
+	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, 270)
 	if heart < 0.35 or brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
 	end
@@ -194,7 +194,7 @@ module[2] = function(owner, org, timeValue)
 		-- very high rates lose filling efficiency and stop helping.
 		local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
 		local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
-		local pumpSupport = math.Clamp(pumpRateK * fillingK, 0.25, 1.35)
+		local pumpSupport = math.Clamp(pumpRateK * fillingK, 0.25, 1.45)
 		local supportedPulse = math.Clamp(pulse * pumpSupport, 0, 200)
 		if supportedPulse > org.pulse then
 			org.pulse = math.Approach(org.pulse, supportedPulse, timeValue * 8)
@@ -208,14 +208,14 @@ module[2] = function(owner, org, timeValue)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
 	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.025
-	if org.givingUp then adrenalineHyperMul = adrenalineHyperMul * 0.3 end
+	if org.givingUp then adrenalineHyperMul = adrenalineHyperMul * 0.55 end
 	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.45)
 
-	local compensation = 1 + hemorrhageCompensation * 0.28
-	compensation = compensation * (1 - hypovolemicShock * 0.35)
-	compensation = math.Clamp(compensation, 0.35, 1.25)
+	local compensation = 1 + hemorrhageCompensation * 0.45
+	compensation = compensation * (1 - hypovolemicShock * 0.2)
+	compensation = math.Clamp(compensation, 0.45, 1.4)
 
 	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
 	local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
@@ -257,7 +257,7 @@ module[2] = function(owner, org, timeValue)
 		map = map * (1 - velocityPenalty)
 	end
 
-	if org.givingUp then map = map * 0.5 end
+	if org.givingUp then map = map * 0.75 end
 
 	map = math.Clamp(map, 0, 190)
 	local bpTarget = map

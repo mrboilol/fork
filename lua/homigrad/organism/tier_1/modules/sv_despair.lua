@@ -55,8 +55,8 @@ local function is_near_death(org)
 	local bleed = org.bleed or 0
 	local bp = org.bloodpressure or 93
 	local isSuffocating = o2val < 12 or org.lungsfunction == false
-	local isBleedingOut = blood < 3200 and bleed > 0.05
-	local isCirculatoryCollapse = bp < 45 or org.heartstop
+	local isBleedingOut = blood < 2500 and bleed > 0.05
+	local isCirculatoryCollapse = (blood < 2600 and bp < 38) or org.heartstop
 	return isSuffocating or isBleedingOut or isCirculatoryCollapse or (org.brain or 0) >= 0.75
 end
 
@@ -67,7 +67,7 @@ local function danger_severity(org)
 	local bp = org.bloodpressure or 93
 	local severity = 0
 	severity = max(severity, Clamp((18 - o2val) / 18, 0, 1))
-	if bleed > 0.05 then severity = max(severity, Clamp((3800 - blood) / 1400, 0, 1)) end
+	if bleed > 0.05 then severity = max(severity, Clamp((2600 - blood) / 600, 0, 1)) end
 	severity = max(severity, Clamp((60 - bp) / 60, 0, 1))
 	severity = max(severity, Clamp(((org.brain or 0) - 0.45) / 0.35, 0, 1))
 	if org.heartstop or org.lungsfunction == false then severity = 1 end
@@ -166,7 +166,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 
 		-- Simple mode: fear-driven give-up path (no despair/panic)
-		if simpleMode and inDanger then
+		if simpleMode and inDanger and is_near_death(org) then
 			org._giveUpCheckTime = org._giveUpCheckTime or 0
 			if time > org._giveUpCheckTime then
 				org._giveUpCheckTime = time + 1
@@ -197,11 +197,11 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org.panicattack = math.Approach(org.panicattack or 0, 0, timeValue * 0.75)
 			org.despair = math.max(org.despair, 0.25)
 
-			-- Giving up: immune to fear and adrenaline, higher heartstop chance
-			org.fear = 0
-			org.fearadd = 0
-			org.adrenaline = 0
-			org.adrenalineAdd = 0
+			-- Giving up blunts panic/adrenaline without making the outcome deterministic.
+			org.fear = math.Approach(org.fear or 0, 0, timeValue * 1.5)
+			org.fearadd = math.Approach(org.fearadd or 0, 0, timeValue * 1.5)
+			org.adrenaline = math.Approach(org.adrenaline or 0, 0, timeValue * 0.35)
+			org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, 0, timeValue * 0.75)
 
 			-- Chance of heartstop every few seconds, only when vitals are already
 			-- deeply failing. Blood/pulse modules should own hypovolemic collapse.
@@ -209,7 +209,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				org._giveUpHeartStopCheck = time + 4
 				local bp = org.bloodpressure or 93
 				local hb = org.heartbeat or 70
-				local vitalRisk = bp < 35 or hb < 30 or (org.blood or 5000) < 1500 or (org.o2 and (org.o2[1] or 30) < 5)
+				local vitalRisk = bp < 35 or hb < 30 or (org.blood or 5000) < 2000 or (org.o2 and (org.o2[1] or 30) < 5)
 				local stopChance = vitalRisk and 0.008 or 0
 				if bp < 35 then
 					stopChance = stopChance + (35 - bp) / 35 * 0.06
@@ -346,7 +346,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			local pain = org.pain or 0
 			local blood = org.blood or 5000
 			local o2val = org.o2 and org.o2[1] or 100
-			local dyingOrAgony = pain > 70 or blood < 3000 or o2val < 18
+			local dyingOrAgony = pain > 70 or blood < 2500 or o2val < 18
 			if dyingOrAgony then
 				local fear = org.fear
 				local fearTransferRate = 0.004 -- Base transfer rate
@@ -638,7 +638,7 @@ concommand.Add("hg_giveup", function(ply, cmd, args)
 	if not org then return end
 
 	if val then
-		org.blood = 3000
+		org.blood = 2250
 		org.bleed = 1
 		org.despair = 0.85
 		org.givingUp = true
@@ -646,7 +646,7 @@ concommand.Add("hg_giveup", function(ply, cmd, args)
 		org.panicattack = 0
 		org.panicattackActive = false
 		clear_legacy_panic(org)
-		ply:ChatPrint("[Debug] Give up triggered. Reduced blood to 3000 to create dying/bleeding out state, added some despair, and initiated give up (itssofuckingover.mp3).")
+		ply:ChatPrint("[Debug] Give up triggered. Reduced blood to 2250 to create dying/bleeding out state, added some despair, and initiated give up (itssofuckingover.mp3).")
 	else
 		org.givingUp = false
 		org._giveUpCheckTime = 0
