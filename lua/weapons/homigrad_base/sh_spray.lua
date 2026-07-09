@@ -22,6 +22,19 @@ SWEP.RecoilMul = 1.0
 
 local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
 
+local function finite_number(n)
+	return isnumber(n) and n == n and n > -math.huge and n < math.huge
+end
+
+local function finite_angle(ang)
+	return isangle(ang) and finite_number(ang[1]) and finite_number(ang[2]) and finite_number(ang[3])
+end
+
+local function sanitize_angle(ang)
+	if finite_angle(ang) then return ang end
+	return Angle(0, 0, 0)
+end
+
 local hg_recoilmul = CreateConVar("hg_recoilmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply weapon physical recoil")
 local hg_spreadmul = ConVarExists("hg_spreadmul") and GetConVar("hg_spreadmul") or CreateConVar("hg_spreadmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply weapon shot spread")
 function SWEP:GetPrimaryMul()
@@ -373,6 +386,7 @@ function SWEP:PrimarySpread()
 		timer.Simple(0.02, function() if IsValid(owner) then ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul * 0.1) end end)
 
 		local eyeang = owner:EyeAngles()
+		if not finite_angle(eyeang) then return end
 		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 6.5 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
 		sprayAng[2] = math.Clamp(sprayAng[2], -math.abs(sprayAng[1]) * 0.22 - 0.12, math.abs(sprayAng[1]) * 0.22 + 0.12)
 		sprayAng[3] = 0
@@ -385,7 +399,11 @@ function SWEP:PrimarySpread()
 		local muzzleYawCap = math.min(0.65, math.abs(muzzleKick[1]) * 0.18 + 0.08)
 		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.32, -muzzleYawCap, muzzleYawCap)
 		muzzleKick[3] = 0
-		owner:SetEyeAngles(eyeang + muzzleKick)
+		muzzleKick = sanitize_angle(muzzleKick)
+		local newEyeAng = eyeang + muzzleKick
+		if finite_angle(newEyeAng) then
+			owner:SetEyeAngles(newEyeAng)
+		end
 		
 		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
 		ViewPunch2(Angle(2 * rnd1, rnd2 * 1.1, 0) * mul * 0.12)
@@ -442,7 +460,12 @@ end
 
 function SWEP:ApplyEyeSpray(value)
 	if CLIENT and self:GetOwner() ~= LocalPlayer() then return end
-	self.EyeSpray = self.EyeSpray + value * 0.2 * (FrameTime() / engine.TickInterval())
+	if not finite_angle(value) then return end
+	self.EyeSpray = sanitize_angle(self.EyeSpray)
+	local tickInterval = engine.TickInterval()
+	if not finite_number(tickInterval) or tickInterval <= 0 then return end
+	local nextSpray = self.EyeSpray + value * 0.2 * (FrameTime() / tickInterval)
+	self.EyeSpray = sanitize_angle(nextSpray)
 end
 
 function SWEP:Step_Spray(time,dtime)
@@ -453,9 +476,14 @@ function SWEP:Step_Spray(time,dtime)
 	local eyeSpray = self.EyeSpray
 	local owner = self:GetOwner()
 	local eyeang = owner:EyeAngles()
+	if not finite_angle(eyeang) then return end
 
-	owner:SetEyeAngles(eyeang + (eyeSpray * (eyeang.z == 180 and -1 or 1)))
-	eyeSpray:Set(LerpAngle(hg.lerpFrameTime2(0.1,dtime), eyeSpray, angZero))
+	local nextEyeAng = eyeang + (sanitize_angle(eyeSpray) * (eyeang.z == 180 and -1 or 1))
+	if finite_angle(nextEyeAng) then
+		owner:SetEyeAngles(nextEyeAng)
+	end
+	local nextSpray = LerpAngle(hg.lerpFrameTime2(0.1,dtime), eyeSpray, angZero)
+	eyeSpray:Set(sanitize_angle(nextSpray))
 end
 
 --[[else

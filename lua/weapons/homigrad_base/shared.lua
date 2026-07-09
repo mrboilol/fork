@@ -172,7 +172,8 @@ function SWEP:GetFocusHandlingMul()
 	local org = owner.organism or {}
 	local fear = math.Clamp(org.fear or 0, 0, 2)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 3)
-	local anxious = math.Clamp((org.despair or 0) * 1.2 + (org.panicAttack and 0.45 or 0), 0, 1.4)
+	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
+	local anxious = math.Clamp((org.despair or 0) * 1.2 + panic * 0.45, 0, 1.4)
 	local focus = math.min(adrenaline, 1.5) * 0.08
 
 	local className = owner.PlayerClassName

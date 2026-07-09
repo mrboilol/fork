@@ -63,6 +63,15 @@ local function get_ptsd_intensity(ply)
 	return math.Clamp(tonumber(ply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1)
 end
 
+local function get_panic_intensity(org)
+	if not org then return 0 end
+	if isnumber(org.panicattack) then
+		return math.Clamp(org.panicattack, 0, 1)
+	end
+
+	return org.panicattackActive and 1 or 0
+end
+
 local panicThoughts = {
 	"I have to keep going.",
 	"Not like this... not now.",
@@ -167,7 +176,8 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	local org = get_target_organism()
 	local despair = org and math.Clamp(org.despair or 0, 0, 1) or 0
 	despair = math.max(despair, get_ptsd_intensity(ply) * 0.75)
-	local panicAttack = (org and org.panicAttack) or false
+	local panicIntensity = get_panic_intensity(org)
+	local panicAttack = panicIntensity >= 0.45
 	
 	-- Debug convar overrides
 	local debugDespair = hg_despair_override_convar and hg_despair_override_convar:GetFloat() or 0
@@ -177,6 +187,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	
 	local debugPanic = hg_panic_debug_convar:GetFloat()
 	if debugPanic >= 1 then
+		panicIntensity = 1
 		panicAttack = true
 	end
 
@@ -184,6 +195,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	if despair_system_mode() == 0 or not ptsd_effects_enabled() then
 		despair = 0
 		panicAttack = false
+		panicIntensity = 0
 		despairLerp = 0
 		despairTextLerp = 0
 		stop_despair_sound(true)
@@ -281,7 +293,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	local state = ply:GetNWString("hg_ptsd_state", "stable")
 	local themeIntensity = math.Clamp((despair - 0.18) / 0.62, 0, 1)
 	if state == "critical" or state == "flashback" then themeIntensity = math.max(themeIntensity, 0.75) end
-	if panicAttack then themeIntensity = math.max(themeIntensity, 0.55) end
+	if panicAttack then themeIntensity = math.max(themeIntensity, 0.35 + panicIntensity * 0.4) end
 	if givingUp then themeIntensity = math.max(themeIntensity, 0.85) end
 
 	-- Despair theme fades in as a background layer for bad mental states,
@@ -308,28 +320,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		stop_despair_sound(false)
 	end
 
-	-- Panic attack sound
-	if panicAttack and not givingUp then
-		if not IsValid(panicSound) and not panicSoundLoading then
-			panicSoundLoading = true
-			sound.PlayFile("sound/panic.mp3", "noblock noplay", function(channel, err)
-				panicSoundLoading = false
-				if err or not IsValid(channel) then return end
-				channel:SetVolume(0)
-				channel:Play()
-				channel:EnableLooping(true)
-				panicSound = channel
-			end)
-		end
-
-		local targetVol = 0.75 * themeVolume:GetFloat()
-		panicSoundVol = math.Approach(panicSoundVol, targetVol, FrameTime() * 0.9)
-		if IsValid(panicSound) then
-			panicSound:SetVolume(panicSoundVol)
-		end
-	else
-		stop_panic_sound(false)
-	end
+	stop_panic_sound(false)
 end)
 
 hook.Add("DrawOverlay", "hg_despair_text", function()
@@ -385,7 +376,8 @@ hook.Add("Think", "hg_panic_thoughts_notify", function()
 	local org = get_target_organism()
 	if not org then return end
 	
-	local panicAttack = org.panicAttack or false
+	local panicIntensity = get_panic_intensity(org)
+	local panicAttack = panicIntensity >= 0.45
 	
 	-- Debug convar override
 	local debugPanic = hg_panic_debug_convar:GetFloat()

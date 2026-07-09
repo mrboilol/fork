@@ -1327,7 +1327,7 @@ local function draw_status_effects()
 				value = nil
 			})
 			currentEffectNames["death"] = true
-		elseif org.panicAttack then
+		elseif org.panicattackActive then
 			table.insert(effects, {
 				name = "death",
 				has_levels = true,

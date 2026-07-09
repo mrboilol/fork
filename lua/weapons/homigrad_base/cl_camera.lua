@@ -30,6 +30,18 @@ local hg_setzoompos = CreateClientConVar("hg_setzoompos", "0", false, false, "se
 local hg_gun_cam = CreateClientConVar("hg_gun_cam", "0", false, false, "settingzoom", 0, 1)
 local hg_realismcam = ConVarExists("hg_realismcam") and GetConVar("hg_realismcam") or CreateClientConVar("hg_realismcam", "0", true, false, "realism camera", 0, 1)
 
+local function finite_number(n)
+	return isnumber(n) and n == n and n > -math.huge and n < math.huge
+end
+
+local function finite_vector(vec)
+	return isvector(vec) and finite_number(vec[1]) and finite_number(vec[2]) and finite_number(vec[3])
+end
+
+local function finite_angle(ang)
+	return isangle(ang) and finite_number(ang[1]) and finite_number(ang[2]) and finite_number(ang[3])
+end
+
 local zoomPosSetter = Vector()
 local isSettingZoom = false
 
@@ -54,6 +66,9 @@ function SWEP:GetZoomPos(recoilZoomPos, view, eyePos)
 	recoilZoomPos = recoilZoomPos or vecZero
 	gun = IsValid(gun) and gun or self:GetWeaponEntity()
 	local pos, ang = gun:GetPos(), gun:GetAngles()
+	if not finite_vector(pos) or not finite_angle(ang) then
+		return view and view.origin or LocalPlayer():EyePos(), view and view.angles or LocalPlayer():EyeAngles()
+	end
 
 	if self.WorldModelFake then
 		local mat = Matrix()
@@ -84,8 +99,14 @@ function SWEP:GetZoomPos(recoilZoomPos, view, eyePos)
 	end
 	
 	local pos2, ang2 = self:GetTrace(true, nil, nil, true)
+	if not finite_angle(ang2) then
+		return view and view.origin or LocalPlayer():EyePos(), view and view.angles or LocalPlayer():EyeAngles()
+	end
 
 	local posZoom = LocalToWorld(zoomPos, angle_zero, pos, ang2)
+	if not finite_vector(posZoom) then
+		return view and view.origin or LocalPlayer():EyePos(), view and view.angles or LocalPlayer():EyeAngles()
+	end
 	
 	local override = self:GetCameraOverride(view)
 	if override then
@@ -183,6 +204,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local cocking = (self:GetNetVar("shootgunReload", 0) > CurTime()) or self.reload
 	--print(self:GetNetVar("shootgunReload", 0))
 	local posZoom, angPos = self:GetZoomPos(recoilZoomPos, view, eyePos)
+	if not finite_vector(posZoom) or not finite_angle(angPos) then return view end
 	
 	local org = ply.organism or {}
 	local inpain = org.pain and org.pain > 50
@@ -372,6 +394,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
+	if not finite_number(tta) or tta <= 0 then tta = 0.25 end
 	local slowlyZooming = math.Clamp((lastzoom - CurTime() + tta) / tta, inpain and 1 - (0.9 * painmul) or (0.10 * (math.Clamp(vellen / 200 * (ply:Crouching() and 0.5 or 1), 0, 1) * 15 + 1)), 1)
 	
 	if lastPosSelected + 0.1 * (inpain and 0.1 or 1) < CurTime() then
@@ -518,6 +541,8 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		fov = -50
 	end
 	
+	if not finite_vector(outputPos) or not finite_angle(outputAng) then return view end
+
 	view.origin = outputPos
 	view.angles = outputAng
 	

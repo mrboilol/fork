@@ -129,9 +129,9 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
-	if org.panicAttack then heartbeat = heartbeat + 20 end -- adrenaline handles most of the boost
+	if org.panicattackActive then heartbeat = heartbeat + 20 end -- adrenaline handles most of the boost
 	local despairHeartBoost = math.Clamp((org.despair or 0) - 0.3, 0, 0.7) / 0.7 * 35
-	if org.panicAttack then despairHeartBoost = despairHeartBoost * 0.5 end
+	if org.panicattackActive then despairHeartBoost = despairHeartBoost * 0.5 end
 	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.6 end
 
@@ -181,7 +181,7 @@ module[2] = function(owner, org, timeValue)
 			chance = 0.025
 		end
 
-		if org.panicAttack then chance = chance * 0.5 end
+		if org.panicattackActive then chance = chance * 0.5 end
 		if org.givingUp then chance = chance * 1.5 end
 
 		if chance > 0 and math.random() < chance then
@@ -475,7 +475,7 @@ module[2] = function(owner, org, timeValue)
     end
 
 	-- Small heartstop chance from despair alone (not panic-only)
-	if (org.despair or 0) > 0.65 and not org.panicAttack and circulatoryRisk then
+	if (org.despair or 0) > 0.65 and not org.panicattackActive and circulatoryRisk then
 		if not org._despair_pulse_check or CurTime() > org._despair_pulse_check then
 			org._despair_pulse_check = CurTime() + 5 -- check every 5 seconds
 			local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)

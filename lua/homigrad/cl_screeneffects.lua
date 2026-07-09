@@ -545,7 +545,7 @@ local function getPanicAttackFx(org)
 		return math.Clamp(org.panicattack, 0, 1)
 	end
 
-	return org.panicAttack and 1 or 0
+	return org.panicattackActive and 1 or 0
 end
 
 local function stopthings()

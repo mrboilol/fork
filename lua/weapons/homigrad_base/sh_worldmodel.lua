@@ -564,6 +564,31 @@ local vecZero = Vector(0, 0, 0)
 local angZero = Angle(0, 0, 0)
 local math_max = math.max
 
+local function finite_number(n)
+	return isnumber(n) and n == n and n > -math.huge and n < math.huge
+end
+
+local function finite_vector(vec)
+	return isvector(vec) and finite_number(vec[1]) and finite_number(vec[2]) and finite_number(vec[3])
+end
+
+local function finite_angle(ang)
+	return isangle(ang) and finite_number(ang[1]) and finite_number(ang[2]) and finite_number(ang[3])
+end
+
+local function apply_model_transform(model, pos, ang, renderOnly)
+	if not IsValid(model) or not finite_vector(pos) or not finite_angle(ang) then return false end
+
+	model:SetRenderOrigin(pos)
+	model:SetRenderAngles(ang)
+	if not renderOnly then
+		model:SetPos(pos)
+		model:SetAngles(ang)
+	end
+
+	return true
+end
+
 hook.Add("NotifyShouldTransmit", "PvsThingy", function(ent, shouldTransmit)
 	ent.shouldTransmit = shouldTransmit
 	
@@ -639,9 +664,11 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 				
 		if !owner:IsNPC() then//should then
 			local desiredPos1, desiredAng1 = self:PosAngChanges(owner, desiredPos, desiredAng, bNoAdditional, nil, dtime)
-			
-			desiredPos = LerpVector(self.lerped_positioning or 0, desiredPos, desiredPos1)
-			desiredAng = LerpAngle(self.lerped_angle or 0, desiredAng, desiredAng1)
+
+			if finite_vector(desiredPos1) and finite_angle(desiredAng1) then
+				desiredPos = LerpVector(self.lerped_positioning or 0, desiredPos, desiredPos1)
+				desiredAng = LerpAngle(self.lerped_angle or 0, desiredAng, desiredAng1)
+			end
 			--self.lastTpikPos = desiredPos
 			--self.lastTpikAng = desiredAng
 		end
@@ -657,6 +684,10 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 		if self:ShouldUseFakeModel() then
 			newPos, newAng = LocalToWorld(self.FakePos, self.FakeAng, newPos, newAng)
 		end
+
+		if not finite_vector(newPos) or not finite_angle(newAng) then
+			return
+		end
 		
 		if bNoApply then
 			return newPos, newAng, desiredPos, desiredAng
@@ -665,10 +696,7 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 		self.desiredPos, self.desiredAng = newPos, newAng
 		self.handPos, self.handAng = desiredPos, desiredAng
 		
-		model:SetRenderOrigin(newPos)
-		model:SetRenderAngles(newAng)
-		model:SetPos(newPos)
-		model:SetAngles(newAng)
+		if not apply_model_transform(model, newPos, newAng) then return end
 		self:DrawShadow(true)
 	else
 		local pos, ang = self:GetPos(), self:GetAngles()
@@ -677,10 +705,7 @@ function SWEP:WorldModel_Transform(bNoApply, bNoAdditional, model)
 			pos, ang = LocalToWorld(self.FakePos, self.FakeAng, pos, ang)
 		end
 		
-		model:SetRenderOrigin(pos)
-		model:SetRenderAngles(ang)
-		model:SetPos(pos)
-		model:SetAngles(ang)
+		if not apply_model_transform(model, pos, ang) then return end
 		self:DrawShadow(false)
 	end
 end
@@ -759,6 +784,7 @@ function SWEP:WorldModel_Transform_Holstered()
 		
 		local newPos = LerpVector(lerp, newPos, model:GetPos())
 		local newAng = LerpAngle(lerp, newAng, model:GetAngles())
+		if not finite_vector(newPos) or not finite_angle(newAng) then return end
 		
 		local matrix = Matrix()
 		matrix:SetTranslation(self.WorldPos)
@@ -773,10 +799,7 @@ function SWEP:WorldModel_Transform_Holstered()
 
 		self.holstercheckwait = CurTime()--FUCKING FUCK
 
-		model:SetRenderOrigin(newPos)
-		model:SetRenderAngles(newAng)
-		model:SetPos(newPos)
-		model:SetAngles(newAng)
+		if not apply_model_transform(model, newPos, newAng) then return end
 		self.desiredPos = newPos
 		self.desiredAng = newAng
 	else
@@ -786,10 +809,7 @@ function SWEP:WorldModel_Transform_Holstered()
 			pos, ang = LocalToWorld(self.FakePos, self.FakeAng, pos, ang)
 		end
 
-		model:SetRenderOrigin(pos)
-		model:SetRenderAngles(ang)
-		model:SetPos(pos)
-		model:SetAngles(ang)
+		if not apply_model_transform(model, pos, ang) then return end
 		model:SetRenderOrigin()
 		model:SetRenderAngles()
 	end
