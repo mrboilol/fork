@@ -1735,9 +1735,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			
 			hg.AddForceRag(ply, bone, force * 0.5, 0.5)
 
-			local ragForce = ply.AddForceRag and ply.AddForceRag[bone] and ply.AddForceRag[bone][2]
-			if isvector(ragForce) and ragForce:Length() > 4500 then //по-моему какие-то большие значения, не?
-				if ragForce:Length() > 7000 then
+			if ply.AddForceRag[bone][2] and ply.AddForceRag[bone][2]:Length() > 4500 then //по-моему какие-то большие значения, не?
+				if ply.AddForceRag[bone][2]:Length() > 7000 then
 					hg.StunPlayer(ply, 0.5)
 					hg.LightStunPlayer(ply, 2)
 				else
