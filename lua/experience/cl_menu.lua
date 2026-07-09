@@ -87,7 +87,6 @@ end
 <<<<<<< HEAD:gamemodes/zcity/gamemode/libraries/experience/cl_menu.lua
 =======
 
--- Консольная команда для просмотра своего аккаунта/медали в любом гейммоде (в т.ч. сандбоксе)
 concommand.Add("xp_menu", function()
     if IsValid(LocalPlayer()) then
         EXP.AccountMenu(LocalPlayer())
