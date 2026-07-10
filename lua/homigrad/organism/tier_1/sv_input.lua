@@ -978,6 +978,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if isMeleeDmg then
 		dmgInfo:ScaleDamage(1.05)
 	end
+	local isSharpMelee = isMeleeDmg and dmgInfo:IsDamageType(DMG_SLASH)
 	
 	local dmg = dmgInfo:GetDamage()
 
@@ -1319,7 +1320,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		attacker.harm = attacker.harm + bleed_add / 50
 		local hurt_add = dmgHurt * 0.5 * hurtMul
 		org.hurtadd = org.hurtadd + hurt_add
-		local painadd = dmgHurt * painMul * 1.5
+		local meleePainMul = isSharpMelee and 0.75 or 1
+		local painadd = dmgHurt * painMul * 1.5 * meleePainMul
 		local instantPainMul = 0.2
 		local instant_pain = (instantPainMul or 0) * painadd
 		local slow_pain = (1 - (instantPainMul or 0)) * painadd
@@ -1328,7 +1330,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local slow_pain = (1 - instantPainMul) * painadd
 		org.painadd = org.painadd + slow_pain
 		//org.avgpain = org.avgpain + instant_pain
-		local shockAdd = instaPain * shockMul * 4.5 * instant_pain_shock_scale * math.Clamp(pen / 5,1,2)
+		local meleeShockMul = isMeleeDmg and (isSharpMelee and 0.55 or 0.7) or 1
+		local shockAdd = instaPain * shockMul * 4.5 * instant_pain_shock_scale * meleeShockMul * math.Clamp(pen / 5,1,2)
 		org.shock = math.min(org.shock + shockAdd, 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
@@ -3378,6 +3381,12 @@ local function dislocateFromJointStress(ragdoll, org, ply, limb, segment, stress
 	-- A limb that is already injured is not eligible for another automatic
 	-- joint-stress injury from its own ragdoll control.
 	if org[limb .. "amputated"] or org[limb .. "dislocation"] or (org[limb] or 0) > 0 then return end
+
+	-- Do not let fake-control compensation for an injured arm cascade into the
+	-- opposite arm. External damage can still injure it through the normal
+	-- collision/damage path; only this automatic joint-stress path is blocked.
+	if limb == "larm" and (org.rarmamputated or org.rarmdislocation or org.rarmdislocated or (org.rarm or 0) > 0) then return end
+	if limb == "rarm" and (org.larmamputated or org.larmdislocation or org.larmdislocated or (org.larm or 0) > 0) then return end
 
 	org[limb .. "dislocation"] = true
 	org.painadd = (org.painadd or 0) + math.Clamp(stress / 12, 28, 70)

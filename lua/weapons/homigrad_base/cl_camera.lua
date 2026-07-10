@@ -241,6 +241,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if handSupport.oneHanded then oneHandCameraMul = oneHandCameraMul * (handSupport.onlyLeft and 1.75 or 1.38) end
 	if handSupport.leftBusy then oneHandCameraMul = oneHandCameraMul * 1.28 end
 	if handSupport.rightBusy then oneHandCameraMul = oneHandCameraMul * 1.45 end
+	-- Multiple busy/injured-arm states can overlap. Preserve visible instability,
+	-- but never let them compound into camera-breaking motion.
+	oneHandCameraMul = math.Clamp(oneHandCameraMul, 1, 1.4)
 
 	-- Partial arm damage detection (0.25-0.99 damage range)
 	local rarm_partial = rarm_health >= 0.25 and rarm_health < 1 and not rarm_amputated

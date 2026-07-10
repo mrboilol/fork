@@ -945,12 +945,12 @@ local arteryBurstCount = 2
 local arterySizeMul = 1.35
 local arterialRampTime = 0.7
 local arterialMinIntensity = 0.35
-local arterialParticleSizeMul = 1.1
-local arterialJetCount = 2
-local arterialJetOffset = 1.8
+local arterialParticleSizeMul = 0.65
+local arterialJetCount = 1
+local arterialJetOffset = 0.35
 local arterialVelocityMul = 78
-local arterialDirectionRandomness = 16
-local arterialVerticalRandomness = 22
+local arterialDirectionRandomness = 3
+local arterialVerticalRandomness = 5
 
 local pitchAddClasses = {
 	["furry"] = 20,

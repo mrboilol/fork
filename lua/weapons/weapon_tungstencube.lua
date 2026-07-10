@@ -104,3 +104,9 @@ end
 function SWEP:CanSecondaryAttack()
     return false
 end
+
+if CLIENT then
+    function SWEP:Think()
+        self:MarkShadowAsDirty()
+    end
+end

@@ -45,8 +45,6 @@ local majorBones = {
     chest_spine = { organ = "chest", bone = "ValveBiped.Bip01_Spine2" },
     chest_ribs = { organ = "chest", bone = "ValveBiped.Bip01_Spine1", name = "Ribcage" },
     neck = { organ = "neck", bone = "ValveBiped.Bip01_Neck1" },
-    skull = { organ = "skull", bone = "ValveBiped.Bip01_Head1" },
-    jaw = { organ = "jaw", bone = "ValveBiped.Bip01_Head1" },
     l_clavicle = { organ = "larm", bone = "ValveBiped.Bip01_L_Clavicle" },
     r_clavicle = { organ = "rarm", bone = "ValveBiped.Bip01_R_Clavicle" },
     l_upperarm = { organ = "larm", bone = "ValveBiped.Bip01_L_UpperArm", canAmputate = true, ampBone = "ValveBiped.Bip01_L_Forearm" },
@@ -210,10 +208,6 @@ local function SyncBonesCallback(ent, numbones)
         if srcBone then
             local mat = src:GetBoneMatrix(srcBone)
             if mat then
-                -- CRITICAL: Skip bone manipulation for the local player's actual model
-                -- This prevents the health indicator's bone scaling from wrecking the bone tracing system
-                if ent == ply then continue end
-
                 local manipScale = ent:GetManipulateBoneScale(i)
                 
                 local localMat = srcInv * mat
@@ -429,7 +423,7 @@ function HUD_DrawDynamicIndicator()
 
             local boneName = data.bone
             local isAmputated = data.canAmputate and org[organName .. "amputated"]
-            local isBroken = (organName == "skull" and GetOrgValueNumber(org[organName]) >= 0.6) or (GetOrgValueNumber(org[organName]) >= 1)
+            local isBroken = GetOrgValueNumber(org[organName]) >= 1
             local isDislocated = org[organName .. "dislocation"]
 
             -- SPINE DAMAGE CASCADING: Apply spine damage to limbs
@@ -630,13 +624,6 @@ function HUD_DrawDynamicIndicator()
 
         healthModel:SetupBones()
 
-        -- Ensure skull (head) is always visible for the health indicator
-        local skullBoneID = healthModel:LookupBone("ValveBiped.Bip01_Head1")
-        if skullBoneID then
-            healthModel:ManipulateBoneScale(skullBoneID, Vector(1, 1, 1))
-            healthModel:SetupBones()
-        end
-
         local base_col = math.max(0.2, consciousness)
 
         render.SetColorModulation(base_col, base_col, base_col)
@@ -693,28 +680,9 @@ function HUD_DrawDynamicIndicator()
                     alpha = fadeProgress
                 end
 
-                local isHeadBone = (boneName == "ValveBiped.Bip01_Head1")
-                if isHeadBone then
-                    local headPos = healthModel:GetBoneMatrix(bID):GetTranslation()
-                    local splitZ = headPos.z - 1.0
-                    local normal, distance
-                    if data.key == "skull" then
-                        normal = Vector(0, 0, 1)
-                        distance = normal:Dot(Vector(0, 0, splitZ))
-                    else -- jaw
-                        normal = Vector(0, 0, -1)
-                        distance = normal:Dot(Vector(0, 0, splitZ))
-                    end
-                    render.PushCustomClipPlane(normal, distance)
-                end
-
                 ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
                 DrawDamageBlinkState(blinkModel, r * alpha, g * alpha, b * alpha)
                 ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
-
-                if isHeadBone then
-                    render.PopCustomClipPlane()
-                end
             end
         end
 
@@ -777,28 +745,9 @@ function HUD_DrawDynamicIndicator()
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
                 if bID then
-                    local isHeadBone = (boneName == "ValveBiped.Bip01_Head1")
-                    if isHeadBone then
-                        local headPos = healthModel:GetBoneMatrix(bID):GetTranslation()
-                        local splitZ = headPos.z - 1.0
-                        local normal, distance
-                        if key == "skull" then
-                            normal = Vector(0, 0, 1)
-                            distance = normal:Dot(Vector(0, 0, splitZ))
-                        else -- jaw
-                            normal = Vector(0, 0, -1)
-                            distance = normal:Dot(Vector(0, 0, splitZ))
-                        end
-                        render.PushCustomClipPlane(normal, distance)
-                    end
-
                     ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
                     DrawDamageBlinkState(blinkModel, 1, 0, 0)
                     ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
-
-                    if isHeadBone then
-                        render.PopCustomClipPlane()
-                    end
                 end
             end
         end
@@ -809,28 +758,9 @@ function HUD_DrawDynamicIndicator()
                 local boneName = majorBones[key].bone
                 local bID = blinkModel:LookupBone(boneName)
                 if bID then
-                    local isHeadBone = (boneName == "ValveBiped.Bip01_Head1")
-                    if isHeadBone then
-                        local headPos = healthModel:GetBoneMatrix(bID):GetTranslation()
-                        local splitZ = headPos.z - 1.0
-                        local normal, distance
-                        if key == "skull" then
-                            normal = Vector(0, 0, 1)
-                            distance = normal:Dot(Vector(0, 0, splitZ))
-                        else -- jaw
-                            normal = Vector(0, 0, -1)
-                            distance = normal:Dot(Vector(0, 0, splitZ))
-                        end
-                        render.PushCustomClipPlane(normal, distance)
-                    end
-
                     ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
                     DrawDamageBlinkState(blinkModel, val, 0, 0)
                     ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
-
-                    if isHeadBone then
-                        render.PopCustomClipPlane()
-                    end
                 end
             end
         end

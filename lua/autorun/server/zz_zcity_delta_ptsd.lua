@@ -134,6 +134,7 @@ local function get_state(ply)
 		lastCorpseCheck = 0,
 		lastCorpseCacheClean = 0,
 		seenCorpses = {},
+		panicTrauma = 0,
 		flashbackUntil = 0,
 		nextFlash = 0,
 		recoveryBoostUntil = 0,
@@ -323,6 +324,7 @@ local function reset_state(ply)
 		lastCorpseCheck = 0,
 		lastCorpseCacheClean = 0,
 		seenCorpses = {},
+		panicTrauma = 0,
 		flashbackUntil = 0,
 		nextFlash = 0,
 		recoveryBoostUntil = 0,
@@ -552,6 +554,29 @@ local function absorb_despair(owner, org, state, timeValue)
 	state.lastReason = "despair"
 end
 
+local function absorb_panic(org, state, timeValue)
+	if not org or not effects_enabled() then return end
+	if not org.panicattackActive then
+		state.panicWasActive = false
+		state.panicTrauma = 0
+		return
+	end
+	if org.otrub or (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then return end
+	if not state.panicWasActive then
+		state.panicWasActive = true
+		state.panicTrauma = 0
+	end
+
+	-- Panic is an acute traumatic event. It can worsen PTSD, but each attack has a
+	-- bounded contribution so the panic/PTSD relationship cannot self-amplify forever.
+	local add = min(timeValue * (0.18 + (org.panicattack or 0) * 0.22), max(8 - (state.panicTrauma or 0), 0))
+	if add <= 0 then return end
+	state.panicTrauma = (state.panicTrauma or 0) + add
+	state.trauma = Clamp((state.trauma or 0) + add, 0, 100)
+	state.lastTraumaEvent = CurTime()
+	state.lastReason = "panicattack"
+end
+
 local function send_moodles_extra(owner, org)
 	if not org then return end
 	if owner.__hg_ptsd_moodles_next_send and CurTime() < owner.__hg_ptsd_moodles_next_send then return end
@@ -590,6 +615,7 @@ hook.Add("Org Think", "hg_ptsd_bridge", function(owner, org, timeValue)
 	update_flashback(owner, org, state)
 	update_corpse_witness(owner, org, state)
 	absorb_despair(owner, org, state, timeValue)
+	absorb_panic(org, state, timeValue)
 	feed_despair(owner, org, state, timeValue)
 	publish_state(owner, org)
 	send_moodles_extra(owner, org)

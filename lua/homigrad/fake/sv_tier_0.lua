@@ -1442,7 +1442,16 @@ function hg.FakeUp(ply, forced, instant)
 
 	if IsValid(ragdoll) then
 		local phys = ragdoll:GetPhysicsObject()
-		ply:SetVelocity(-ply:GetVelocity() + (IsValid(phys) and phys:GetVelocity() or vecZero)) --как это работает б**н
+		local recoveryVelocity = IsValid(phys) and phys:GetVelocity() or vecZero
+		-- Never carry a ragdoll's impact velocity into a newly spawned standing
+		-- player. In particular, downward velocity could immediately slam the
+		-- player into the floor and feed a second impact into the bone system.
+		recoveryVelocity = Vector(recoveryVelocity.x, recoveryVelocity.y, math.max(recoveryVelocity.z, 0))
+		if recoveryVelocity:LengthSqr() > 14400 then
+			recoveryVelocity:Normalize()
+			recoveryVelocity:Mul(120)
+		end
+		ply:SetVelocity(-ply:GetVelocity() + recoveryVelocity)
 		--hg.SetFreemove(ply, true)
 
 		if pos then
@@ -1455,6 +1464,9 @@ function hg.FakeUp(ply, forced, instant)
 
 		if not instant then
 			ply:SetRenderMode(RENDERMODE_NORMAL)
+			-- Keep the recovering player from colliding with their old ragdoll until
+			-- it is removed at the end of the stand-up transition.
+			ply:SetCollisionGroup(COLLISION_GROUP_DEBRIS_TRIGGER)
 			--ply:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 			--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
 			ply:DrawShadow(false)
@@ -1906,6 +1918,11 @@ end)
 timer.Create("HG_FallSoundRearm", 0.25, 0, function()
 	for _, rag in ipairs(ents.FindByClass("prop_ragdoll")) do
 		if rag.hg_fallSoundGrounded then
+			local velocity = rag:GetVelocity()
+			-- A settled body can have its origin above the floor even while its
+			-- limbs are resting on it. Only consider re-arming after the body has
+			-- made a real upward/aerial movement.
+			if velocity.z < 80 or velocity:LengthSqr() < 22500 then continue end
 			local tr = util.TraceLine({
 				start = rag:GetPos() + vector_up * 8,
 				endpos = rag:GetPos() - vector_up * 48,

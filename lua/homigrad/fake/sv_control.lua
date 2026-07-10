@@ -2,6 +2,13 @@
 
 local vecZero = Vector(0, 0, 0)
 
+local function AddFakeDislocatedArmPain(org, limb, dt, rate)
+	if not org or org[limb .. "amputated"] then return end
+	if not (org[limb .. "dislocation"] or org[limb .. "dislocated"]) then return end
+
+	org.painadd = (org.painadd or 0) + (rate or 10) * math.max(dt or 0, 0)
+end
+
 local angZero = Angle(0, 0, 0)
 
 local shadowparams = {}
@@ -1451,6 +1458,13 @@ hook.Add("Think", "Fake", function()
 		local manualHoldWound = wantsManualHold and manualHoldHands > 0
 		setManualWoundHold(ply, org, manualHoldWound, holdWound, manualHoldHands, manualUseRight, holdWoundArterial)
 
+		-- Gripping, climbing, or holding a wound with a dislocated arm should be
+		-- possible, but it continuously hurts while that arm is actually in use.
+		local leftArmActive = IsValid(ragdoll.ConsLH) or manualUseLeft or (ply:KeyDown(IN_ATTACK) and not ishgweapon(wep))
+		local rightArmActive = IsValid(ragdoll.ConsRH) or manualUseRight or (ply:KeyDown(IN_ATTACK2) and not ishgweapon(wep))
+		if leftArmActive then AddFakeDislocatedArmPain(org, "larm", ragdoll.dtime, 10) end
+		if rightArmActive then AddFakeDislocatedArmPain(org, "rarm", ragdoll.dtime, 10) end
+
 		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (CurTime() - ragdoll.otrubCollapseStart) < 1.5 then
 			inmove = true
 
@@ -1934,12 +1948,14 @@ hook.Add("Think", "Fake", function()
 				local useRightHandForE = false
 
 				local bothArmsBroken = false
+				local rightArmBroken = false
+				local leftArmBroken = false
 
 				if org then
 
-					local rightArmBroken = (org.rarm and org.rarm >= 1) or org.rarmamputated or org.rarmdislocation or org.rarmdislocated
+					rightArmBroken = (org.rarm and org.rarm >= 1) or org.rarmamputated or org.rarmdislocation or org.rarmdislocated
 
-					local leftArmBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
+					leftArmBroken = (org.larm and org.larm >= 1) or org.larmamputated or org.larmdislocation or org.larmdislocated
 
 					bothArmsBroken = rightArmBroken and leftArmBroken
 
@@ -2033,9 +2049,9 @@ hook.Add("Think", "Fake", function()
 
 							-- Add pain if right arm is broken and not amputated
 
-							if org and bothArmsBroken and not org.rarmamputated then
+							if org and rightArmBroken and not org.rarmamputated then
 
-								local painAmount = (org.rarm or 0) * 10 + (org.rarmdislocation or org.rarmdislocated and 5 or 0)
+								local painAmount = (org.rarm or 0) * 10 + ((org.rarmdislocation or org.rarmdislocated) and 8 or 0)
 
 								org.painadd = (org.painadd or 0) + painAmount
 
@@ -2089,9 +2105,9 @@ hook.Add("Think", "Fake", function()
 
 							-- Add pain if left arm is broken and not amputated
 
-							if org and bothArmsBroken and not org.larmamputated then
+							if org and leftArmBroken and not org.larmamputated then
 
-								local painAmount = (org.larm or 0) * 10 + (org.larmdislocation or org.larmdislocated and 5 or 0)
+								local painAmount = (org.larm or 0) * 10 + ((org.larmdislocation or org.larmdislocated) and 8 or 0)
 
 								org.painadd = (org.painadd or 0) + painAmount
 

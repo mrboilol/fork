@@ -748,6 +748,19 @@ end
 -- 	end
 -- end
 
+-- Other render/animation code can restore the hidden player entity's shadow
+-- after the fake transition. Keep the client shadow state authoritative for
+-- as long as the physical ragdoll is active.
+hook.Add("Think", "HG_FakeRagdollShadowState", function()
+	for _, ply in ipairs(player.GetAll()) do
+		local shouldDraw = not IsValid(ply.FakeRagdoll)
+		if ply.hg_fakeShadowDrawn ~= shouldDraw then
+			ply:DrawShadow(shouldDraw)
+			ply.hg_fakeShadowDrawn = shouldDraw
+		end
+	end
+end)
+
 -- hook.Add("PostCleanupMap","wtfdude",function()
 -- 	LocalPlayer():BoneScaleChange()
 -- end)

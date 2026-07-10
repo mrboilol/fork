@@ -238,7 +238,7 @@ SWEP.ChargeSwingAng = -90
 SWEP.ChargeStamina = 10
 SWEP.ChargePenetration = 8
 SWEP.ChargePenetrationSize = 0.75
-SWEP.ChargeDamageMul = 1.5
+SWEP.ChargeDamageMul = 1.3
 SWEP.ChargeBreakBoneMul = 1.25
 SWEP.ChargeMinStamina = 90
 SWEP.ChargeTapCancelTime = 0.12
@@ -283,7 +283,8 @@ SWEP.HeavyAttackDamageType = nil -- Damage type for heavy attack (nil = use Prim
 SWEP.CanHeavyAttack = false
 local MELEE_GLOBAL_KNOCKBACK_MUL = 0.7
 local MELEE_GLOBAL_ACCURACY_MUL = 0.75
-local MELEE_GLOBAL_DAMAGE_MUL = 0.6
+local MELEE_GLOBAL_DAMAGE_MUL = 0.55
+local MELEE_GLOBAL_STAMINA_COST_MUL = 1.2
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")
@@ -441,6 +442,7 @@ if CLIENT then
 
 	function SWEP:DrawWorldModel2()
 		local owner = self:GetOwner()
+		self:DrawShadow(not self.DisableDefaultShadow)
         
         if not IsValid(self.worldModel) then
             self.worldModel = self:GetWM()
@@ -452,6 +454,8 @@ if CLIENT then
         if not IsValid(owner) and (not self.shouldTransmit or self.NotSeen) then return end
 
 		local WorldModel = self.worldModel
+		WorldModel:DrawShadow(true)
+		WorldModel:MarkShadowAsDirty()
         
         self.worldModel:SetModelScale(self.modelscale2)
         local ent = hg.GetCurrentCharacter(owner)
@@ -579,7 +583,9 @@ if CLIENT then
         if IsValid(self.worldModel) and self.WorldModelExchange then
             if not IsValid(self.worldModel2) then
                 self.worldModel2 = ClientsideModel(self.WorldModelExchange)
-                self.worldModel2:SetNoDraw(true)
+				self.worldModel2:SetNoDraw(true)
+				self.worldModel2:DrawShadow(true)
+				self.worldModel2:MarkShadowAsDirty()
                 self.worldModel2:SetupBones()
                 local model = self.worldModel2
 
@@ -1312,11 +1318,11 @@ function SWEP:HasBrokenArm(owner)
     
     -- For one-handed weapons, only check right arm (left arm doesn't affect one-handed grip)
     if not self.TwoHanded then
-        return (org.rarm and org.rarm >= 1) or org.rarmdislocation
+        return (org.rarm and org.rarm >= 1) or org.rarmdislocation or org.rarmdislocated
     end
     
     -- For two-handed weapons, check both arms
-    return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.rarmdislocation
+    return (org.larm and org.larm >= 1) or (org.rarm and org.rarm >= 1) or org.larmdislocation or org.larmdislocated or org.rarmdislocation or org.rarmdislocated
 end
 
 function SWEP:GetArmDamagePercent(owner)
@@ -1327,12 +1333,12 @@ function SWEP:GetArmDamagePercent(owner)
     if not self.TwoHanded then
         -- For one-handed: only check right arm (left arm doesn't affect one-handed grip)
         local rarmDamage = (org.rarm or 0)
-        local rarmDisloc = org.rarmdislocation and 0.5 or 0
+        local rarmDisloc = (org.rarmdislocation or org.rarmdislocated) and 1 or 0
         damage = rarmDamage + rarmDisloc
     else
         -- For two-handed: average both arms
-        local larmDamage = (org.larm or 0) + (org.larmdislocation and 0.5 or 0)
-        local rarmDamage = (org.rarm or 0) + (org.rarmdislocation and 0.5 or 0)
+        local larmDamage = (org.larm or 0) + ((org.larmdislocation or org.larmdislocated) and 1 or 0)
+        local rarmDamage = (org.rarm or 0) + ((org.rarmdislocation or org.rarmdislocated) and 1 or 0)
         damage = (larmDamage + rarmDamage) / 2
     end
     
@@ -1683,7 +1689,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             self:PlaySwingSound(owner, attacktype)
             
             if owner.organism then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * 0.5 * MELEE_GLOBAL_STAMINA_COST_MUL * math.Clamp(vellen / 200, 1, 1.25)
             end
 
             if charge then
@@ -2893,7 +2899,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * self:GetStaminaWeightDamageMultiplier(3)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * MELEE_GLOBAL_STAMINA_COST_MUL * self:GetStaminaWeightDamageMultiplier(3)
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -2953,7 +2959,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * self:GetStaminaWeightDamageMultiplier(3)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * MELEE_GLOBAL_STAMINA_COST_MUL * self:GetStaminaWeightDamageMultiplier(3)
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -3001,7 +3007,7 @@ function SWEP:CustomThink()
 
                 if owner.organism and owner.organism.stamina then
                     while self.HeavyChargeStaminaDrainAcc >= 1 do
-                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5) * self:GetStaminaWeightDamageMultiplier(3)
+                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5) * MELEE_GLOBAL_STAMINA_COST_MUL * self:GetStaminaWeightDamageMultiplier(3)
                         self.HeavyChargeStaminaDrainAcc = self.HeavyChargeStaminaDrainAcc - 1
                     end
                 else
@@ -3687,7 +3693,13 @@ function SWEP:PrimaryAttack()
 
     if !hg.KeyDown(self:GetOwner(), IN_ATTACK2) and not self:CanPrimaryAttack() then return end
 
-    local mul = 1 / math.Clamp((180 - self:GetOwner().organism.stamina[1]) / 90, 1, 2)
+	local mul = 1 / math.Clamp((180 - self:GetOwner().organism.stamina[1]) / 90, 1, 2)
+	if self:HasBrokenArm(ply) then
+		mul = mul * self.BrokenArmPenalty.SwingSpeedMultiplier
+		if SERVER then
+			ply.organism.painadd = (ply.organism.painadd or 0) + self.BrokenArmPenalty.PainOnHit
+		end
+	end
 
     
     self.HitEnts = nil
@@ -3812,7 +3824,7 @@ function SWEP:SecondaryAttack(override)
         mul = 1 / math.Clamp((180 - ply.organism.stamina[1]) / 90, 1, 2)
     end
 
-    if self:HasBrokenArm(ply) then
+	if self:HasBrokenArm(ply) then
         local multiplier = self.BrokenArmPenalty.SwingSpeedMultiplier
         local org = ply.organism
         local checkLeft = self.TwoHanded and (org.larm and org.larm >= 1 and org.larmdislocation)
@@ -3820,8 +3832,11 @@ function SWEP:SecondaryAttack(override)
         if org and (checkLeft or checkRight) then
             multiplier = multiplier * 0.5 -- More severe (even slower)
         end
-        mul = mul * multiplier
-    end
+		mul = mul * multiplier
+		if SERVER then
+			ply.organism.painadd = (ply.organism.painadd or 0) + self.BrokenArmPenalty.PainOnHit
+		end
+	end
 
     self.HitEnts = nil
     self.FirstAttackTick = false

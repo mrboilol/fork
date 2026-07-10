@@ -42,8 +42,6 @@ local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
 local seizure_brain_roll_delay = 20
 local seizure_brain_roll_chance = 15
-local seizure_brain_roll_gain_min = 0.04
-local seizure_brain_roll_gain_max = 0.11
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
@@ -404,10 +402,13 @@ end
 function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
-	local chance = math.Clamp((tonumber(chanceMultiplier) or 1) / panicattack_gain_chance, 0, 1)
+	local adrenalineRisk = math.Clamp(((org.adrenaline or 0) + (org.adrenalineAdd or 0) - 1.5) / 3, 0, 0.65)
+	local analgesiaRisk = math.Clamp(((org.analgesia or 0) + (org.analgesiaAdd or 0) - 0.2) / 2.8, 0, 1) * 0.2
+	local vulnerability = 1 + math.Clamp(org.ptsdPanicRisk or 0, 0, 1) * 1.25 + math.Clamp((org.despair or 0) - 0.55, 0, 0.45) + adrenalineRisk + analgesiaRisk
+	local chance = math.Clamp((tonumber(chanceMultiplier) or 1) * vulnerability / panicattack_gain_chance, 0, 1)
 	if math.Rand(0, 1) > chance then return org.panicattackadd or 0 end
 
-	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
+	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul * math.min(vulnerability, 1.75), 0, 1)
 
 	return org.panicattackadd
 end
@@ -631,11 +632,10 @@ hook.Add("EntityEmitSound", "DespairExplosionNearby", function(data)
 		local dist = ply:GetPos():Distance(pos)
 		if dist > 900 then continue end
 
-		local add = math.Clamp(1 - dist / 900, 0, 1) * 0.012
-		if add > 0 then
-			org.despair = math.min((org.despair or 0) + add, 1)
-			org._despairNextExplosionEvent = now + 0.25
-		end
+		local threat = math.Clamp(1 - dist / 900, 0, 1)
+		if threat <= 0 then continue end
+		hg.organism.AddPanicAttack(org, 0.08 + threat * 0.16, true, 1.5)
+		org._despairNextExplosionEvent = now + 0.75
 	end
 end)
 
@@ -682,10 +682,10 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 		})
 		if tr.Hit and tr.Entity ~= ply then continue end
 
-		local add = math.Clamp(1 - dist / 130, 0, 1) * 0.008
-		if add > 0 then
-			org.despair = math.min((org.despair or 0) + add, 1)
-			org._despairNextNearBullet = now + 0.22
+		local threat = math.Clamp(1 - dist / 130, 0, 1)
+		if threat > 0 then
+			hg.organism.AddPanicAttack(org, 0.12 + threat * 0.18, true, 2)
+			org._despairNextNearBullet = now + 0.45
 		end
 
 	end
@@ -1093,7 +1093,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if curTime >= org.nextSeizureRoll then
 			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
 			if math.random(seizure_brain_roll_chance) == 1 then
-				hg.organism.AddSeizure(org, math.Rand(seizure_brain_roll_gain_min, seizure_brain_roll_gain_max) * math.Clamp(math.Remap(org.brain or 0, 0.05, 1, 0.75, 1.5), 0.75, 1.5))
+				hg.organism.AddSeizure(org, 1)
 			end
 		end
 	else
@@ -1119,6 +1119,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 		if time >= seizureEnd then
 			org.brain = math.max(org.brain or 0, seizure_brain_damage_final)
+			org.consciousness = 0
+			org.needotrub = true
 			stop_seizure(owner, org)
 		else
 			if time >= seizureStart + seizure_brain_damage_start then
@@ -1411,7 +1413,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local incapacitationMode = hg_incapacitation:GetInt()
 	local scavDyingMode = hg_scavdying:GetInt()
 	local flatlined = org.heartstop or (org.heartbeat or 0) < 1 or (org.pulse or 0) < 1
-	local dyingIncapacitated = isPly and org.otrub and org.incapacitated and (scavDyingMode ~= 1 or flatlined)
+	local dyingIncapacitated = isPly and org.otrub and org.incapacitated
 
 	if incapacitationMode > 0 and dyingIncapacitated then
 		if not org.deathStateStart and not org.deathStatePendingEnd then
@@ -1432,10 +1434,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if not org.deathStateStart and CurTime() >= org.deathStatePendingEnd then
 			org.deathStateStart = CurTime()
 			local duration = 20
-			if scavDyingMode == 1 and SoundDuration then
-				local soundDuration = SoundDuration("deathing.ogg")
-				if soundDuration and soundDuration > 0 then duration = math.min(duration, soundDuration) end
-			end
 			org.deathStateEnd = org.deathStateStart + duration
 		end
 

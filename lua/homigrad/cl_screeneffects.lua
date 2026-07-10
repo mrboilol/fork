@@ -750,7 +750,6 @@ local tempolerp = 0
 local grayscaleLerp = 0
 local despairLerp = 0
 local despairVisualLerp = 0
-local despairTextLerp = 0
 local giveUpWhiteLerp = 0
 local WhiteNoiseStation
 local soundRetry = {}
@@ -767,7 +766,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		stopthings()
 		despairLerp = 0
 		despairVisualLerp = 0
-		despairTextLerp = 0
 		tab["$pp_colour_brightness"] = 0
 		tab["$pp_colour_contrast"] = 1
 		tab["$pp_colour_colour"] = 1
@@ -777,7 +775,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		stopthings()
 		despairLerp = 0
 		despairVisualLerp = 0
-		despairTextLerp = 0
 		tab["$pp_colour_brightness"] = 0
 		tab["$pp_colour_contrast"] = 1
 		tab["$pp_colour_colour"] = 1
@@ -1376,8 +1373,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.UpdateScreenEffectTexture()
 
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 30 + math.max(shock - 5, 0) / 2 + extremePainFlicker)) //ColorIntensity
-		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 30 + math.max(shock - 5, 0) / 2 + extremePainFlicker)) //Vignette
+		-- The vignette shader stops behaving predictably when fed very large values.
+		-- Clamp the combined pain/shock signal so extreme pain cannot wrap or wash
+		-- out the shock vignette.
+		local shockVignette = math.Clamp(pain / 30 + math.max(shock - 5, 0) / 2 + extremePainFlicker, 0, 10)
+		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or shockVignette) //ColorIntensity
+		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or shockVignette) //Vignette
 
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
@@ -2301,43 +2302,6 @@ hook.Add("Player Spawn", "ItDoesntNow", function(ply)
 	if not IsValid(me) or ply != me then return end
 
 	stopthings()
-end)
-
-hook.Add("DrawOverlay", "despair_text", function()
-	local ply = IsValid(lply) and lply or LocalPlayer()
-	if not IsValid(ply) then return end
-	if !ply:Alive() then
-		despairTextLerp = LerpFT(0.15, despairTextLerp, 0)
-		return
-	end
-
-	local org = ply.new_organism or ply.organism
-	if not org then return end
-	if org.otrub then
-		despairTextLerp = 0
-		return
-	end
-
-	if despair_system_mode() == 0 or not ptsd_effects_enabled() then
-		despairTextLerp = 0
-		return
-	end
-
-	local despair = math.max(math.Clamp(tonumber(ply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75, math.Clamp(org.despair or 0, 0, 1))
-	local target = math.Clamp((despair - 0.45) / 0.55, 0, 1)
-	despairTextLerp = LerpFT(0.03, despairTextLerp, target)
-	if despairTextLerp <= 0.001 then return end
-
-	local time = CurTime()
-	local sway = 10 + 16 * despairTextLerp
-	local x = ScrW() * 0.5 + math.sin(time * 0.7) * sway + math.cos(time * 0.33) * sway * 0.7
-	local y = ScrH() * 0.08 + math.sin(time * 0.51) * sway * 0.4
-	local alpha = math.floor(255 * despairTextLerp)
-
-	local state = ply:GetNWString("hg_ptsd_state", "stable")
-	local text = (state == "critical" or state == "flashback") and "this is happening again." or state == "acute" and "i cant calm down." or "everything feels wrong."
-	draw.SimpleText(text, "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText(text, "ZCity_Despair_Text", x, y, Color(235, 235, 235, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local suicidePhrases = {

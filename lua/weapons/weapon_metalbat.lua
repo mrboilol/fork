@@ -10,6 +10,7 @@ SWEP.HoldType = "slam"
 SWEP.WorldModel = "models/weapons/baseball_bat/w.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_bat_metal.mdl"
 SWEP.DontChangeDropped = false
+SWEP.DisableDefaultShadow = true
 SWEP.ViewModel = ""
 SWEP.modelscale = 1.45
 

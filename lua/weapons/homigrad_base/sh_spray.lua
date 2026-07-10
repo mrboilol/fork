@@ -329,9 +329,12 @@ function SWEP:PrimarySpread()
 
 		local armHandlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
 		mul = mul * math.Clamp(0.72 + arm_debuff * 0.14 + amputate_debuff * 0.16, 0.72, 1.65)
-		mul = mul * math.Clamp(broken_arm_recoil_mult, 1, 1.9)
-		mul = mul * oneHandRecoilMul
-		mul = mul * armHandlingMul
+		-- Injury/support penalties used to multiply one another without a useful
+		-- ceiling (and oneHandRecoilMul had already affected force above). Keep
+		-- the gun hard to control without allowing a broken arm to explode the
+		-- camera punch into several stacked multiples.
+		local injuryRecoilMul = math.Clamp(broken_arm_recoil_mult * oneHandRecoilMul * armHandlingMul, 1, 2.15)
+		mul = mul * injuryRecoilMul
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
 		mul = mul * (owner:Crouching() and 0.75 or 1)

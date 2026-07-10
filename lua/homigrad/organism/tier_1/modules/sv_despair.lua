@@ -98,6 +98,7 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._despairLastAdrenaline = 0
 	org._despairNextCorpseCheck = 0
 	org._corpseAdrenalineGiven = 0
+	org._despairCorpseFamiliarity = setmetatable({}, {__mode = "k"})
 	org._hadGoodMood = false
 	org._despairLastGainedTime = 0
 	org._despairLastPain = 0
@@ -129,6 +130,19 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 	if org.despair > before then
 		org._despairLastGainedTime = CurTime()
 	end
+end)
+
+hook.Add("hg_medical_minigame_finished", "hg_despair_self_treatment_relief", function(healer, target, treatmentType)
+	if not IsValid(healer) or healer ~= target then return end
+	local org = get_despair_org(healer)
+	if not org or org.otrub then return end
+
+	-- Successfully treating yourself restores some hope, but an acute panic
+	-- response is deliberately much harder to shake through treatment alone.
+	org.despair = math.max((org.despair or 0) - 0.06, 0)
+	org.panicattackadd = math.max((org.panicattackadd or 0) - 0.015, 0)
+	org.panicattack = math.max((org.panicattack or 0) - 0.008, 0)
+	org._despairLockUntil = math.min(org._despairLockUntil or 0, CurTime() + 2)
 end)
 
 hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
@@ -321,27 +335,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	local add = 0
-	local adrenaline = org.adrenaline or 0
-	local adrenalineAdd = org.adrenalineAdd or 0
-	local prevAdrenaline = org._despairLastAdrenaline or adrenaline
-	local adrenalineDelta = max(adrenaline - prevAdrenaline, 0)
-	org._despairLastAdrenaline = adrenaline
-
-	-- During a panic attack the body is flooded with adrenaline and fear as the
-	-- panic response itself - feeding those back into despair creates a runaway loop.
+	-- Despair is the lasting mood state. Adrenaline by itself is an acute physical
+	-- response and must not slowly turn into despair; only sustained agony or dying fear does.
 	if not org.panicattackActive then
-		if adrenaline > 2.5 then
-			add = add + (adrenaline - 2.5) * timeValue * 0.045
-		end
-
-		if adrenalineAdd > 0.35 then
-			add = add + min(adrenalineAdd, 2) * timeValue * 0.03
-		end
-
-		if adrenalineDelta > 0 then
-			add = add + min(adrenalineDelta * 0.25, 0.03)
-		end
-
 		if (org.fear or 0) > 0 then
 			-- Transfer fear to despair only when in incredible pain or dying
 			local pain = org.pain or 0
@@ -460,8 +456,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		local eyePos = owner:EyePos()
 		local aim = owner:GetAimVector()
 		local corpsesSeen = 0
+		local freshCorpsesSeen = 0
 		local rag = owner.FakeRagdoll
 		local traceFilter = IsValid(rag) and {owner, rag} or owner
+		org._despairCorpseFamiliarity = org._despairCorpseFamiliarity or setmetatable({}, {__mode = "k"})
 
 		for _, ent in ipairs(ents.FindInCone(eyePos, aim, 1024, math.cos(math.rad(26)))) do
 			if ent == owner or ent == rag then continue end
@@ -475,34 +473,31 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 			if tr.Entity == ent or not tr.Hit then
 				corpsesSeen = corpsesSeen + 1
+				local familiarAt = org._despairCorpseFamiliarity[ent]
+				if not familiarAt then
+					familiarAt = time + 12
+					org._despairCorpseFamiliarity[ent] = familiarAt
+				end
+				if time < familiarAt then
+					freshCorpsesSeen = freshCorpsesSeen + 1
+				end
 			end
 
 			if corpsesSeen >= 3 then break end
 		end
 
-		if corpsesSeen > 0 then
-			add = add + timeValue * 0.06 * math.min(corpsesSeen, 2)
+		if freshCorpsesSeen > 0 then
+			add = add + timeValue * 0.06 * math.min(freshCorpsesSeen, 2)
 
 			local maxCorpseAdrenaline = 0.3
 			local given = org._corpseAdrenalineGiven or 0
 			if given < maxCorpseAdrenaline then
-				local boost = min(0.008 * corpsesSeen, maxCorpseAdrenaline - given)
+				local boost = min(0.008 * freshCorpsesSeen, maxCorpseAdrenaline - given)
 				org.adrenalineAdd = (org.adrenalineAdd or 0) + boost
 				org._corpseAdrenalineGiven = given + boost
 			end
-
-			if not org.givingUp and not org.otrub then
-				if not org._corpsePanicCheckTime or time > org._corpsePanicCheckTime then
-					org._corpsePanicCheckTime = time + 2
-					local panicChance = 0.04 * math.min(corpsesSeen, 2) * Clamp((org.despair or 0) / 0.4, 0.2, 1)
-					if math.random() < panicChance then
-						add_panic_pressure(owner, org, 0.16 + 0.12 * math.min(corpsesSeen, 2))
-					end
-				end
-			end
 		else
 			org._corpseAdrenalineGiven = math.max((org._corpseAdrenalineGiven or 0) - 0.015, 0)
-			org._corpsePanicCheckTime = nil
 		end
 	end
 
@@ -525,6 +520,11 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if add > 0 then
+		-- Analgesia softens how strongly stressful injuries settle into the lasting
+		-- despair mood. It does not erase the event or make the player fearless.
+		local analgesiaProtection = Clamp(((org.analgesia or 0) + (org.analgesiaAdd or 0)) / 3, 0, 0.5)
+		add = add * (1 - analgesiaProtection)
+
 		-- Chip away at goodmood first before adding despair
 		local goodmood = org.goodmood or 0
 		if goodmood > 0 then
@@ -573,7 +573,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	clear_legacy_panic(org)
 
 	if org.panicattackActive then
-		org.despair = math.Approach(org.despair, 0.65, timeValue * 0.18)
 		org.fear = math.Approach(org.fear or 0, 0, timeValue * 1.5)
 		org.fearadd = math.Approach(org.fearadd or 0, 0, timeValue * 1.5)
 	elseif (org.despair > 0.55 or ptsdPanicRisk > 0.5) and is_in_danger(org) and not org.givingUp then
