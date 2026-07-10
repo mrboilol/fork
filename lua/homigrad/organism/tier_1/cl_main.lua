@@ -144,9 +144,6 @@ local function plyCommand(ply,cmd)
 	end
 end
 
-local function forceOtrubSoundFade(ply)
-	plyCommand(ply,"soundfade 100 99999")
-end
 local clr_black1 = Color( 0, 0, 0, 255)
 local clr_black2 = Color( 0, 0, 0, 255)
 local hg_forced_firstperson_death = ConVarExists("hg_firstperson_death") and GetConVar("hg_firstperson_death") or CreateClientConVar("hg_firstperson_death", "1", true, false, "Toggle first-person death camera view", 0, 1)
@@ -289,13 +286,6 @@ hook.Add("Player Spawn", "hg.forsaken.deathscene.reset", function(ply)
 	forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
 	resetPlayerSound(ply)
 end)
-
-hook.Add("HG_OnWakeOtrub", "adsadsadhuy!!", function(ply)
-	if ply ~= LocalPlayer() then return end
-	resetPlayerSound(ply)
-end)
-
-
 
 local alivestart = CurTime()
 hg.screens = hg.screens or {}
@@ -642,7 +632,7 @@ hook.Add("Post Post Processing", "organism-effects", function()
 		elseif lply:Alive() then
 			target_dsp = 17
 			dsp_fast = true
-			forceOtrubSoundFade(lply)
+			plyCommand(lply,"soundfade 100 25")
 		end
 	else
 		plyCommand(lply,"soundfade "..tinnitusSoundFactor2.." 25")

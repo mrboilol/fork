@@ -544,6 +544,9 @@ module[2] = function(owner, org, timeValue)
 
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
 		local regenerate = regen * timeValue * 4 * pulseMultiplier * pulsePerfusionK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
+		local tracheaDamage = math.Clamp(org.trachea or 0, 0, 1)
+		local tracheaIntakeK = 1 - (tracheaDamage * 0.15 + tracheaDamage * tracheaDamage * 0.55)
+		regenerate = regenerate * math.Clamp(tracheaIntakeK, 0.3, 1)
 
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.min(org.blood / 4000, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
 
@@ -616,26 +619,12 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		-- O2 impairment when trachea is damaged (smooth curve, no sharp cliff at 0.5)
-
-		if org.trachea > 0 then
-
-			local impairment = org.trachea * 0.3 + org.trachea * org.trachea * 0.7 -- 0 at 0, ~32% at 0.5, 100% at 1.0
-
-			regenerate = regenerate * (1 - math.min(impairment, 1))
-
-		end
-
-
-
-		-- O2 drain when trachea is damaged (starts immediately but scales gently)
-
-		if org.trachea > 0 then
-
-			local tracheaDrain = org.trachea * org.trachea * 0.4 -- 0 at 0, 0.1 at 0.5, 0.4 at 1.0
-
+		-- Any trachea damage leaks O2. Above 0.5 the airway becomes progressively
+		-- lethal: intake is already weaker and O2 is lost increasingly quickly.
+		if tracheaDamage > 0 then
+			local lethalSeverity = math.Clamp((tracheaDamage - 0.5) / 0.5, 0, 1)
+			local tracheaDrain = tracheaDamage * tracheaDamage * 0.25 + lethalSeverity * lethalSeverity * 1.2
 			o2[1] = max(o2[1] - timeValue * tracheaDrain, 0)
-
 		end
 
 

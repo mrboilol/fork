@@ -76,6 +76,14 @@ local tab = {
 local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3, 6=REM pain stack", 0, 6)
 local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3, 7=sonimcooked.mp3, 8=REM low-O2 stack", 0, 8)
 local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3, 4=ngaimcooked.mp3", 0, 4)
+local otrubSoundPaths = {
+	[1] = "sound/altotrub.ogg",
+	[2] = "sound/sleepy.ogg",
+	[3] = "sound/itssoover.mp3",
+	[4] = "sound/ngaimcooked.mp3"
+}
+local OtrubModeStation
+local activeOtrubMode
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
@@ -689,25 +697,11 @@ local function stopthings()
 		SonimCookedStation = nil
 	end
 
-	if IsValid(AltotrubStation) then
-		AltotrubStation:Stop()
-		AltotrubStation = nil
+	if IsValid(OtrubModeStation) then
+		OtrubModeStation:Stop()
+		OtrubModeStation = nil
 	end
-
-	if IsValid(SleepyStation) then
-		SleepyStation:Stop()
-		SleepyStation = nil
-	end
-
-	if IsValid(FuckStation) then
-		FuckStation:Stop()
-		FuckStation = nil
-	end
-
-	if IsValid(NgaimCookedStation) then
-		NgaimCookedStation:Stop()
-		NgaimCookedStation = nil
-	end
+	activeOtrubMode = nil
 
 	if IsValid(NoisesStation) then
 		NoisesStation:Stop()
@@ -1078,30 +1072,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if canRetrySound("AltotrubStation", AltotrubStation) then
-		sound.PlayFile("sound/altotrub.ogg", "noblock noplay", function(station)
-			if IsValid(station) then
-				station:SetVolume(0)
-				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
-				AltotrubStation = station
-				station:EnableLooping(true)
-			end
-		end)
-	end
-
-	if canRetrySound("SleepyStation", SleepyStation) then
-		sound.PlayFile("sound/sleepy.ogg", "noblock noplay", function(station)
-			if IsValid(station) then
-				station:SetVolume(0)
-				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
-				SleepyStation = station
-				station:EnableLooping(true)
-			end
-		end)
-	end
-
 	if canRetrySound("ConsciousnessWhiteNoise", ConsciousnessWhiteNoise) then
 		sound.PlayFile("sound/homigrad/whitenoise.wav", "noblock noplay", function(station)
 			if IsValid(station) then
@@ -1281,7 +1251,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	shockLerp = LerpFT(0.01, shockLerp or 0, shock)
 	consciousnessLerp = LerpFT(org.consciousness < (consciousnessLerp or 1) and 1 or 0.01, consciousnessLerp or 1, org.consciousness)
 	-- local immobilization = org.immobilization
-	PainLerp = LerpFT(0.05, PainLerp, math.max(pain * (org.otrub and 0.05 or 1), 0))
+	PainLerp = LerpFT(0.05, PainLerp, math.max(pain * (org.otrub and 0.2 or 1), 0))
 	assimilatedLerp = LerpFT(0.01, assimilatedLerp, (org.assimilated or 0))
 
 	if assimilatedLerp > 0.001 then
@@ -1392,7 +1362,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
-		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
+		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
 		pain = PainLerp + strobe
 		shock = shockLerp
 		
@@ -1416,20 +1386,22 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 		painMat:SetFloat("$c2_x", CurTime() + 10000) //Time
 		painMat:SetFloat("$c0_y", 0.8) //Gate
-		painMat:SetFloat("$c0_z", 1 + extremePainFlicker) //ColorIntensity
-		painMat:SetFloat("$c1_x", math.Clamp(pain / 90 + extremePainFlicker, 0, 0.85)) //Lerp
-		painMat:SetFloat("$c1_y", math.Clamp(pain / 90 + extremePainFlicker, 0, 0.85)) //Vignette
+		painMat:SetFloat("$c0_z", org.otrub and 1 or (1 + extremePainFlicker)) //ColorIntensity
+		painMat:SetFloat("$c1_x", math.Clamp(pain / 90 + (org.otrub and 0 or extremePainFlicker), 0, org.otrub and 0.75 or 0.85)) //Lerp
+		painMat:SetFloat("$c1_y", math.Clamp(pain / 90 + (org.otrub and 0 or extremePainFlicker), 0, org.otrub and 0.75 or 0.85)) //Vignette
 
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 
-		render.UpdateScreenEffectTexture()
-		chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100 + extremePainFlicker * 0.3, 0, 0.35) * 1.5)
-		chromaticMat:SetInt("$c0_y", 1)
-		render.SetMaterial(chromaticMat)
-		render.DrawScreenQuad()
+		if not org.otrub then
+			render.UpdateScreenEffectTexture()
+			chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100 + extremePainFlicker * 0.3, 0, 0.35) * 1.5)
+			chromaticMat:SetInt("$c0_y", 1)
+			render.SetMaterial(chromaticMat)
+			render.DrawScreenQuad()
+		end
 
-		if hg_damage_corner_distortion:GetBool() then
+		if not org.otrub and hg_damage_corner_distortion:GetBool() then
 			local painWarp = math.Clamp((pain - 18) / 92, 0, 1)
 			local trauma = math.Clamp(painWarp + (shock / 170) + (org.brain or 0) * 0.65 + (org.concussion or 0) / 14, 0, 1.25)
 			if painWarp > 0.01 or (org.brain or 0) > 0.12 or (org.concussion or 0) > 1 then
@@ -2013,8 +1985,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = hg_otrubsound:GetInt()
-			local deathFuckOtrub = hg_dyingsound:GetInt() == 6
-			local remLowO2Otrub = hg_dyingsound:GetInt() == 8
+			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
 				sound.PlayFile("sound/zbattle/unconscious_type_beat.ogg", "noblock noplay", function(station)
@@ -2028,182 +1999,51 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if canRetrySound("AltotrubStation", AltotrubStation) then
-				sound.PlayFile("sound/altotrub.ogg", "noblock noplay", function(station)
-					if IsValid(station) then
-						station:SetVolume(0)
-						station:Play()
-						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
-						AltotrubStation = station
-						station:EnableLooping(true)
-					end
-				end)
-			end
-
-			if canRetrySound("SleepyStation", SleepyStation) then
-				sound.PlayFile("sound/sleepy.ogg", "noblock noplay", function(station)
-					if IsValid(station) then
-						station:SetVolume(0)
-						station:Play()
-						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
-						SleepyStation = station
-						station:EnableLooping(true)
-					end
-				end)
-			end
-
-			if canRetrySound("FuckStation", FuckStation) then
-				sound.PlayFile("sound/itssoover.mp3", "noblock noplay", function(station)
-					if IsValid(station) then
-						station:SetVolume(0)
-						station:Play()
-						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
-						FuckStation = station
-						station:EnableLooping(true)
-					end
-				end)
-			end
-
-			if canRetrySound("NgaimCookedStation", NgaimCookedStation) then
-				sound.PlayFile("sound/ngaimcooked.mp3", "noblock noplay", function(station)
-					if IsValid(station) then
-						station:SetVolume(0)
-						station:Play()
-						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
-						NgaimCookedStation = station
-						station:EnableLooping(true)
-					end
-				end)
-			end
-
-			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 3)
-
 			if otrubMode == 0 then
-				-- Default: unconscious_type_beat
-				if IsValid(NoiseStation) then
-					NoiseStation:SetVolume(otrubVol)
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+			else
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+
+				if activeOtrubMode ~= otrubMode then
+					if IsValid(OtrubModeStation) then OtrubModeStation:Stop() end
+					OtrubModeStation = nil
+					activeOtrubMode = otrubMode
 				end
-				if IsValid(AltotrubStation) then
-					AltotrubStation:SetVolume(0)
+
+				if canRetrySound("OtrubModeStation" .. otrubMode, OtrubModeStation) then
+					local requestedMode = otrubMode
+					sound.PlayFile(otrubSoundPaths[requestedMode], "noblock noplay", function(station)
+						if not IsValid(station) then return end
+						if hg_otrubsound:GetInt() ~= requestedMode then
+							station:Stop()
+							return
+						end
+
+						station:SetVolume(0)
+						station:Play()
+						station:SetTime(math.min(brain / 0.5 * station:GetLength(), 200))
+						station:EnableLooping(true)
+						OtrubModeStation = station
+					end)
 				end
-				if IsValid(SleepyStation) then
-					SleepyStation:SetVolume(0)
-				end
-				if IsValid(FuckStation) then
-					FuckStation:SetVolume(0)
-				end
-				if IsValid(NgaimCookedStation) then
-					NgaimCookedStation:SetVolume(0)
-				end
-			elseif otrubMode == 1 then
-				-- Use altotrub.ogg instead
-				if IsValid(NoiseStation) then
-					NoiseStation:SetVolume(0)
-				end
-				if IsValid(AltotrubStation) then
-					AltotrubStation:SetVolume(otrubVol)
-				end
-				if IsValid(SleepyStation) then
-					SleepyStation:SetVolume(0)
-				end
-				if IsValid(FuckStation) then
-					FuckStation:SetVolume(0)
-				end
-				if IsValid(NgaimCookedStation) then
-					NgaimCookedStation:SetVolume(0)
-				end
-			elseif otrubMode == 2 then
-				-- Use sleepy.ogg instead
-				if IsValid(NoiseStation) then
-					NoiseStation:SetVolume(0)
-				end
-				if IsValid(AltotrubStation) then
-					AltotrubStation:SetVolume(0)
-				end
-				if IsValid(SleepyStation) then
-					SleepyStation:SetVolume(otrubVol)
-				end
-				if IsValid(FuckStation) then
-					FuckStation:SetVolume(0)
-				end
-				if IsValid(NgaimCookedStation) then
-					NgaimCookedStation:SetVolume(0)
-				end
-			elseif otrubMode == 3 then
-				-- Use fuck.mp3 instead
-				if IsValid(NoiseStation) then
-					NoiseStation:SetVolume(0)
-				end
-				if IsValid(AltotrubStation) then
-					AltotrubStation:SetVolume(0)
-				end
-				if IsValid(SleepyStation) then
-					SleepyStation:SetVolume(0)
-				end
-				if IsValid(FuckStation) then
-					FuckStation:SetVolume(otrubVol)
-				end
-				if IsValid(NgaimCookedStation) then
-					NgaimCookedStation:SetVolume(0)
-				end
-			elseif otrubMode == 4 then
-				-- Use ngaimcooked.mp3 instead
-				if IsValid(NoiseStation) then
-					NoiseStation:SetVolume(0)
-				end
-				if IsValid(AltotrubStation) then
-					AltotrubStation:SetVolume(0)
-				end
-				if IsValid(SleepyStation) then
-					SleepyStation:SetVolume(0)
-				end
-				if IsValid(FuckStation) then
-					FuckStation:SetVolume(0)
-				end
-				if IsValid(NgaimCookedStation) then
-					NgaimCookedStation:SetVolume(otrubVol)
-				end
+
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
 
-			if deathFuckOtrub and IsValid(ItssooverStation) then
+			if hg_dyingsound:GetInt() == 6 and IsValid(ItssooverStation) then
 				ItssooverStation:SetVolume(otrubVol)
 			end
-			if remLowO2Otrub then
-				if IsValid(NoiseStation) then
-					NoiseStation:SetVolume(0)
-				end
-				if IsValid(AltotrubStation) then
-					AltotrubStation:SetVolume(0)
-				end
-				if IsValid(SleepyStation) then
-					SleepyStation:SetVolume(0)
-				end
-				if IsValid(FuckStation) then
-					FuckStation:SetVolume(0)
-				end
-				if IsValid(NgaimCookedStation) then
-					NgaimCookedStation:SetVolume(0)
-				end
-				if IsValid(RemDying1Station) then
-					RemDying1Station:SetVolume(math.Clamp(otrubVol, 0, 1))
-				end
+			if hg_dyingsound:GetInt() == 8 then
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
 			end
 		else
 			if IsValid(NoiseStation) then
 				NoiseStation:SetVolume(0)
 			end
-			if IsValid(AltotrubStation) then
-				AltotrubStation:SetVolume(0)
-			end
-			if IsValid(SleepyStation) then
-				SleepyStation:SetVolume(0)
-			end
-			if IsValid(FuckStation) then
-				FuckStation:SetVolume(0)
-			end
-			if IsValid(NgaimCookedStation) then
-				NgaimCookedStation:SetVolume(0)
-			end
+			if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 		end
 	else
 		if IsValid(NoiseStation) then
@@ -2703,11 +2543,13 @@ net.Receive("headtrauma_flash", function()
     local play_knockout_sound = net.ReadBool()
     local hasBrainDamage = net.ReadBool()
     local hasConcussion = net.ReadBool()
-    local trigger_tinnitus = net.ReadBool()
+	local trigger_tinnitus = net.ReadBool()
 
-    local lply = LocalPlayer()
+	local lply = LocalPlayer()
+	if not IsValid(lply) then return end
+	if lply.organism and lply.organism.otrub then return end
 
-    if trigger_tinnitus then
+	if trigger_tinnitus then
         if is_critical then
             surface.PlaySound("tinnituslong.wav")
             if IsValid(lply) then lply:AddTinnitus(5 + time * 0.7, false, hasBrainDamage) end
@@ -2717,14 +2559,7 @@ net.Receive("headtrauma_flash", function()
         end
     end
 
-    if not IsValid(lply) then return end
-
-    if lply.organism and lply.organism.otrub then
-        hg.PlayOtrubHeadTraumaEffect(pos, time, size)
-        return
-    end
-
-    hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
+	hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
 
     -- Scale effects by the received flash duration (which is scaled by damage on the server)
     local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)
@@ -2758,32 +2593,12 @@ net.Receive("headtrauma_flash", function()
     end
 end)
 
-local showing_otrub_headtrauma = false
-local last_otrub_concussion_time = 0
-function hg.PlayOtrubHeadTraumaEffect(pos, time, size)
-    if showing_otrub_headtrauma then return end
-    showing_otrub_headtrauma = true
-    timer.Simple(0.5, function() showing_otrub_headtrauma = false end)
-
-    local lply = LocalPlayer()
-    if not IsValid(lply) or not lply:Alive() then return end
-
-    PlayHeadhitSound()
-    if CurTime() > last_otrub_concussion_time + 5 then
-        sound.PlayFile(CONCUSSION_SOUND_PATH .. math.random(1, 4) .. ".mp3", "noblock noplay", function(station)
-            if IsValid(station) then
-                station:SetVolume(CONCUSSION_VOLUME)
-                station:Play()
-            end
-        end)
-        last_otrub_concussion_time = CurTime()
-    end
-    hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
-end
 hook.Add("HG_OnOtrub", "FUCKINGSHITOW", function(ply)
-    if ply == LocalPlayer() then
-        sound.PlayFile("sound/owfuck.ogg", "noblock noplay", function(station) if IsValid(station) then station:Play() end end)
-    end
+	if ply == LocalPlayer() then
+		sound.PlayFile("sound/owfuck.ogg", "noblock noplay", function(station)
+			if IsValid(station) then station:Play() end
+		end)
+	end
 end)
 
 local function IsSkullBrokenFully(ent, visited)
