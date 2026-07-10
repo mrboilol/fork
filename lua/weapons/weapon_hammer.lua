@@ -97,7 +97,6 @@ SWEP.SwingAng = -90
 SWEP.SwingAng2 = 0
 SWEP.AttackPos = Vector(0, 0, 0)
 SWEP.noreverse = true
-SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "metal"
 SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 SWEP.UnNailables = {MAT_METAL, MAT_SAND, MAT_SLOSH, MAT_GLASS}
@@ -158,8 +157,6 @@ function SWEP:ThinkAdd()
 		self.DamageType = DMG_SLASH
 		self.weaponPos = LerpFT(0.4, self.weaponPos, weppos2)
 		self.weaponAng = LerpFT(0.3, self.weaponAng, wepang2)
-		self.PenetrationPrimary = 4
-		self.PainMultiplier = 1
 		self.PenetrationPrimary = 3
 		self.PainMultiplier = 1.1
 		self.MaxPenLen = 4
