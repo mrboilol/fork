@@ -87,21 +87,26 @@ surface.CreateFont("RemDeathStateFont", {
 local remDeathStateColor = Color(255, 255, 255, 0)
 local remDeathStateStation
 local remDeathStateLoading
+local remDeathStatePath
 
-local function PlayRemDeathStateSound()
-	if IsValid(remDeathStateStation) then
+local function PlayRemDeathStateSound(path, looping)
+	path = path or "sound/rem_deathstatefull.mp3"
+	if IsValid(remDeathStateStation) and remDeathStatePath == path then
 		remDeathStateStation:Play()
 		return
 	end
 	if remDeathStateLoading then return end
+	if IsValid(remDeathStateStation) then remDeathStateStation:Stop() end
+	remDeathStateStation = nil
 
 	remDeathStateLoading = true
-	sound.PlayFile("sound/rem_deathstatefull.mp3", "noplay", function(station)
+	sound.PlayFile(path, "noplay", function(station)
 		remDeathStateLoading = nil
 		if not IsValid(station) then return end
 		if not LocalPlayer():Alive() then station:Stop() return end
 		remDeathStateStation = station
-		station:EnableLooping(true)
+		remDeathStatePath = path
+		station:EnableLooping(looping ~= false)
 		station:SetVolume(1)
 		station:Play()
 	end)
@@ -593,18 +598,23 @@ hook.Add("Post Post Processing", "organism-effects", function()
 	local incapacitated = org.incapacitated or new_organism.incapacitated or false
 	local critical = org.critical or false
 	local deathStateEnd = new_organism.deathStateEnd or org.deathStateEnd
+	local deathStateStart = new_organism.deathStateStart or org.deathStateStart
 	if deathStateEnd and deathStateEnd <= 0 then deathStateEnd = nil end
+	if deathStateStart and deathStateStart <= 0 then deathStateStart = nil end
 	tinnitusSoundFactor = Lerp(FrameTime()*2.5,tinnitusSoundFactor or 0, math.min(math.max( lply.tinnitus and (lply.tinnitus - CurTime()) or 0, 0)*7.5,120))
 	local tinnitusSoundFactor2 = tinnitusSoundFactor + (hook.Run("ModifyTinnitusFactor", tinnitusSoundFactor) or 0)
 
 	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
 		local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
-		remDeathStateColor.a = math.Clamp((25 - (deathStateEnd - CurTime())) / 2, 0, 1) * 255
-		PlayRemDeathStateSound()
-		draw.SimpleText("You are incapacitated, You will die in " .. seconds, "RemDeathStateFont", ScrW() / 2, ScrH() / 2, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
+		remDeathStateColor.a = math.Clamp((CurTime() - (deathStateStart or CurTime())) / 2, 0, 1) * 255
+		PlayRemDeathStateSound(scavDyingMode == 1 and "sound/deathing.ogg" or "sound/rem_deathstatefull.mp3", scavDyingMode ~= 1)
+		local text = scavDyingMode == 1 and "You are incapacitated" or "You are incapacitated, You will die in " .. seconds
+		draw.SimpleText(text, "RemDeathStateFont", ScrW() / 2, ScrH() / 2 + 330, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	elseif IsValid(remDeathStateStation) then
 		remDeathStateStation:Stop()
 		remDeathStateStation = nil
+		remDeathStatePath = nil
 	end
 
 	--print(lply.tinnitus)

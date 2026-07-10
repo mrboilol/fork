@@ -462,7 +462,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         return 
     end
     
-    local isUnconscious = org.otrub
+	local isUnconscious = org.otrub
+	local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
+	local deathStateEnd = org.deathStateEnd and org.deathStateEnd > 0 and org.deathStateEnd or nil
+	local deathStatePendingEnd = org.deathStatePendingEnd and org.deathStatePendingEnd > 0 and org.deathStatePendingEnd or nil
+	local deathStateFadeStart = org.deathStateFadeStart and org.deathStateFadeStart > 0 and org.deathStateFadeStart or nil
+	local hideDyingRing = org.incapacitated and scavDyingMode == 0 and (deathStateEnd or (deathStateFadeStart and CurTime() >= deathStateFadeStart))
     local heartbeat = org.heartbeat or 70
     local pulse = org.pulse or 70
     local brain = org.brain or 0
@@ -535,7 +540,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical)
     
-    if isUnconscious then
+	if isUnconscious and not hideDyingRing then
         if not wasUnconsciousState then
             flatlinePlayedThisUnconscious = false
         end
@@ -606,11 +611,14 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             surface.SetDrawColor(0, 0, 0, 90 * otrubECGAlpha)
             surface.DrawRect(0, 0, scrW, scrH)
             
-            local ringColor = isCritical and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(220, 220, 220, 255 * otrubECGAlpha)
+			local dyingRing = org.incapacitated and deathStateEnd and scavDyingMode > 0
+			local ringColor = (isCritical or dyingRing) and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(220, 220, 220, 255 * otrubECGAlpha)
             local dotColor = isCritical and ringColor or Color(255, 255, 255, 255 * otrubECGAlpha)
             
             local progress = 0
-            if isCritical then
+			if dyingRing then
+				progress = math.Clamp((deathStateEnd - CurTime()) / 20, 0, 1)
+			elseif isCritical then
                 progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
             else
                 local shockLimit = math.max(GetShockConsciousnessThreshold(org.analgesia or 0), 0.02)
