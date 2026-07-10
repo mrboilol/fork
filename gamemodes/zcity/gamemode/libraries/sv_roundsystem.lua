@@ -739,7 +739,7 @@ net.Receive("AdminSetGameMode", function(len, ply)
                 NextRound(modeKey, true)
 		ply:ChatPrint("Game mode set to: " .. modeKey)
 
-		if addToQueue then
+		if addToQueue and #zb.QueuedModes < 12 then
 			table.insert(zb.QueuedModes, modeKey)
 			zb.NotifyQueueModified(ply, "added " .. modeKey .. " to")
 
@@ -902,6 +902,8 @@ if SERVER then
 		local command = net.ReadString()
 		local modeKey = net.ReadString()
 		local addToQueue = net.ReadBool() or false
+		if command ~= "setmode" and command ~= "setforcemode" then return end
+		if not isstring(modeKey) or not zb.modes[modeKey] then ply:ChatPrint("Invalid game mode") return end
 
 		if !(ply:IsSuperAdmin() or ply:IsAdmin()) and not zb.modes[modeKey]:CanLaunch() then
 			ply:ChatPrint("This mode can't launch (No points or Is blocked): " .. modeKey)
@@ -912,7 +914,7 @@ if SERVER then
                         NextRound(modeKey, true)
 			ply:ChatPrint("Game mode set to: " .. modeKey)
 
-			if addToQueue then
+			if addToQueue and #zb.QueuedModes < 12 then
 				table.insert(zb.QueuedModes, modeKey)
 				zb.NotifyQueueModified(ply, "added " .. modeKey .. " to")
 
@@ -924,9 +926,7 @@ if SERVER then
                         NextRound(forcemode, true)
 			ply:ChatPrint("Force mode set to: " .. modeKey)
 
-			zb.SyncForceModeToAdmins()
-
-			if addToQueue then
+			if addToQueue and #zb.QueuedModes < 12 then
 				table.insert(zb.QueuedModes, modeKey)
 				zb.NotifyQueueModified(ply, "added " .. modeKey .. " to")
 
@@ -947,6 +947,13 @@ if SERVER then
 		if not ply:IsAdmin() then return end
 
 		local modeQueue = net.ReadTable()
+		if not istable(modeQueue) then return end
+		local cleanQueue = {}
+		for _, modeKey in ipairs(modeQueue) do
+			if #cleanQueue >= 12 then break end
+			if isstring(modeKey) and zb.modes[modeKey] then cleanQueue[#cleanQueue + 1] = modeKey end
+		end
+		modeQueue = cleanQueue
 		zb.QueuedModes = modeQueue
 
 		if #modeQueue == 0 then
