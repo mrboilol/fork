@@ -213,7 +213,9 @@ end
 function SWEP:GetHandSupportState(ply)
 	ply = ply or self:GetOwner()
 	local org = IsValid(ply) and ply.organism or {}
-	local wantsTwoHands = not self:IsPistolHoldType() and self.lhandik ~= false
+	-- Hold type only controls the animation.  A pistol can still use its off hand
+	-- for support, so use the actual left-hand IK state instead.
+	local wantsTwoHands = self.lhandik ~= false
 	local rightBad = org.rarmamputated or (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
 	local leftBad = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
 	local rightUsable = not rightBad
@@ -221,27 +223,35 @@ function SWEP:GetHandSupportState(ply)
 	local leftBusy = false
 	local rightBusy = false
 	local ragdoll = IsValid(ply) and ply.FakeRagdoll or nil
+	local postureOneHanded = IsValid(ply) and (ply.posture == 7 or ply.posture == 8)
 
 	if IsValid(ply) then
+		local hands = ply:GetWeapon("weapon_hands_sh")
 		local carrying = ply.GetNetVar and (IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) or false
 		local zmanipLeft = ply.zmanipstart ~= nil and ply.zmanipseq == "interact" and not org.larmamputated
 		local fakeLeftGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsLH)
 		local fakeRightGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsRH)
-		local offhandBusy = carrying or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
+		local handsCarry = IsValid(hands) and (IsValid(hands.CarryEnt) or hands.UsingBothHands or hands.UsingLeftHand or hands.UsingRightHand)
+		local handsUsesLeft = handsCarry and hands.UsingLeftHand ~= false
+		local handsUsesRight = handsCarry and hands.UsingRightHand == true
+		local offhandBusy = carrying or handsUsesLeft or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
 
 		if offhandBusy then
 			leftBusy = leftUsable
 		end
 
+		rightBusy = handsUsesRight and not handsUsesLeft
 		rightBusy = rightBusy or fakeRightGrip and not leftUsable
 	end
 
 	local rightSupport = rightUsable and not rightBusy
-	local leftSupport = leftUsable and not leftBusy and wantsTwoHands
+	local leftSupport = leftUsable and not leftBusy and wantsTwoHands and not postureOneHanded
 	local supportHands = (rightSupport and 1 or 0) + (leftSupport and 1 or 0)
+	local oneHanded = postureOneHanded or (wantsTwoHands and supportHands <= 1)
 
 	return {
 		wantsTwoHands = wantsTwoHands,
+		postureOneHanded = postureOneHanded,
 		rightUsable = rightUsable,
 		leftUsable = leftUsable,
 		rightBad = rightBad,
@@ -251,7 +261,7 @@ function SWEP:GetHandSupportState(ply)
 		rightSupport = rightSupport,
 		leftSupport = leftSupport,
 		supportHands = supportHands,
-		oneHanded = supportHands <= 1,
+		oneHanded = oneHanded,
 		onlyLeft = not rightUsable and leftUsable,
 		onlyRight = rightUsable and not leftUsable
 	}

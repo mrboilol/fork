@@ -1232,10 +1232,10 @@ function SWEP:SecondaryAttack()
 					if bothArmsBroken and (useRightHand or useLeftHand) then
 						-- Both arms broken - severe pain
 						if useRightHand and not org.rarmamputated then
-							painAmount = (org.rarm or 0) * 40 + (org.rarmdislocation or org.rarmdislocated and 20 or 0)
+							painAmount = (org.rarm or 0) * 15 + (org.rarmdislocation or org.rarmdislocated and 8 or 0)
 						end
 						if useLeftHand and not org.larmamputated then
-							painAmount = painAmount + (org.larm or 0) * 40 + (org.larmdislocation or org.larmdislocated and 20 or 0)
+							painAmount = painAmount + (org.larm or 0) * 15 + (org.larmdislocation or org.larmdislocated and 8 or 0)
 						end
 						painAmount = painAmount * 0.85
 					else
@@ -1244,10 +1244,10 @@ function SWEP:SecondaryAttack()
 							local armVal = org.rarm or 0
 							local disloc = org.rarmdislocation or org.rarmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = armVal * 80 + (disloc and 40 or 0)
+								painAmount = armVal * 25 + (disloc and 12 or 0)
 							elseif armVal >= 0.8 then
 								local severity = (armVal - 0.8) / 0.2
-								painAmount = severity * 30
+								painAmount = severity * 10
 							end
 						end
 						-- Left arm pain
@@ -1255,10 +1255,10 @@ function SWEP:SecondaryAttack()
 							local armVal = org.larm or 0
 							local disloc = org.larmdislocation or org.larmdislocated
 							if armVal >= 1 or disloc then
-								painAmount = painAmount + armVal * 70 + (disloc and 35 or 0)
+								painAmount = painAmount + armVal * 22 + (disloc and 10 or 0)
 							elseif armVal >= 0.8 then
 								local severity = (armVal - 0.8) / 0.2
-								painAmount = painAmount + severity * 25
+								painAmount = painAmount + severity * 8
 							end
 						end
 					end
@@ -1484,7 +1484,7 @@ function SWEP:ApplyForce()
 			end
 
 			if continuousPain > 0 then
-				org.painadd = (org.painadd or 0) + continuousPain
+				org.painadd = (org.painadd or 0) + continuousPain * FrameTime()
 			end
 		end
 

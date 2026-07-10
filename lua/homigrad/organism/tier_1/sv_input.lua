@@ -20,56 +20,54 @@ local player_head_gib_threshold = 175
 local bonetohitgroup, hitgrouptolimb
 
 local bulletTraumaOrganTargets = {
-	chest = {"lungsL", "lungsR", "heart", "subclavianL", "subclavianR", "spineartery"},
+	chest = {"lungsL", "lungsR", "heart", "spineartery"},
 	pelvis = {"intestines", "stomach", "liver"},
 	spine1 = {"intestines", "stomach", "liver", "spineartery"},
-	spine2 = {"lungsL", "lungsR", "heart", "spineartery", "subclavianL", "subclavianR"},
-	spine3 = {"trachea", "arteria", "spineartery", "subclavianL", "subclavianR"},
+	spine2 = {"lungsL", "lungsR", "heart", "spineartery"},
+	spine3 = {"trachea", "arteria", "spineartery"},
 	skull = {"brain"},
 	jaw = {"trachea", "arteria"},
-	larm = {"larmartery", "subclavianL"},
-	rarm = {"rarmartery", "subclavianR"},
-	larmup = {"larmartery", "subclavianL"},
-	rarmup = {"rarmartery", "subclavianR"},
+	larm = {"larmartery"},
+	rarm = {"rarmartery"},
+	larmup = {"larmartery"},
+	rarmup = {"rarmartery"},
 	larmdown = {"larmartery"},
 	rarmdown = {"rarmartery"},
 	lleg = {"llegartery"},
 	rleg = {"rlegartery"},
-	heart = {"spineartery", "subclavianL", "subclavianR"},
-	lungsL = {"subclavianL", "spineartery"},
-	lungsR = {"subclavianR", "spineartery"},
-	trachea = {"arteria", "subclavianL", "subclavianR"},
+	heart = {"spineartery"},
+	lungsL = {"spineartery"},
+	lungsR = {"spineartery"},
+	trachea = {"arteria"},
 }
 
 local bulletTraumaArteries = {
-	chest = {"subclavianL", "subclavianR", "spineartery", "arteria"},
+	chest = {"spineartery", "arteria"},
 	pelvis = {"llegartery", "rlegartery", "spineartery"},
 	spine1 = {"spineartery", "llegartery", "rlegartery"},
-	spine2 = {"spineartery", "subclavianL", "subclavianR", "arteria"},
-	spine3 = {"arteria", "spineartery", "subclavianL", "subclavianR"},
-	jaw = {"arteria", "subclavianL", "subclavianR"},
-	larm = {"larmartery", "subclavianL", "arteria"},
-	rarm = {"rarmartery", "subclavianR", "arteria"},
-	larmup = {"larmartery", "subclavianL", "arteria"},
-	rarmup = {"rarmartery", "subclavianR", "arteria"},
-	larmdown = {"larmartery", "subclavianL"},
-	rarmdown = {"rarmartery", "subclavianR"},
+	spine2 = {"spineartery", "arteria"},
+	spine3 = {"arteria", "spineartery"},
+	jaw = {"arteria"},
+	larm = {"larmartery", "arteria"},
+	rarm = {"rarmartery", "arteria"},
+	larmup = {"larmartery", "arteria"},
+	rarmup = {"rarmartery", "arteria"},
+	larmdown = {"larmartery"},
+	rarmdown = {"rarmartery"},
 	lleg = {"llegartery", "spineartery"},
 	rleg = {"rlegartery", "spineartery"},
 	llegup = {"llegartery", "spineartery"},
 	rlegup = {"rlegartery", "spineartery"},
 	llegdown = {"llegartery"},
 	rlegdown = {"rlegartery"},
-	heart = {"spineartery", "subclavianL", "subclavianR", "arteria"},
-	lungsL = {"subclavianL", "spineartery", "arteria"},
-	lungsR = {"subclavianR", "spineartery", "arteria"},
-	trachea = {"arteria", "subclavianL", "subclavianR"},
+	heart = {"spineartery", "arteria"},
+	lungsL = {"spineartery", "arteria"},
+	lungsR = {"spineartery", "arteria"},
+	trachea = {"arteria"},
 }
 
 local bulletTraumaArteryBones = {
 	arteria = "ValveBiped.Bip01_Neck1",
-	subclavianL = "ValveBiped.Bip01_L_UpperArm",
-	subclavianR = "ValveBiped.Bip01_R_UpperArm",
 	spineartery = "ValveBiped.Bip01_Spine2",
 	larmartery = "ValveBiped.Bip01_L_Forearm",
 	rarmartery = "ValveBiped.Bip01_R_Forearm",
@@ -1365,8 +1363,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			org.fearadd = org.fearadd + 0.3
 			if IsValid(att) and att ~= org.owner and att:IsPlayer() and att.organism then
 				local reserveK = math.Clamp((att.organism.adrenalineStorage or 0) / 5, 0, 1)
-				att.organism.adrenalineAdd = math.max(att.organism.adrenalineAdd or 0, 1.4 * (0.35 + reserveK * 0.65))
-				att:AddNaturalAdrenaline(0.35)
+				att.organism.adrenalineAdd = math.max(att.organism.adrenalineAdd or 0, 0.7 * (0.35 + reserveK * 0.65))
+				att:AddNaturalAdrenaline(0.15)
 			end
 		end
 
@@ -1900,7 +1898,7 @@ local bleedSurfaces = { -- https://developer.valvesoftware.com/wiki/Material_sur
 
 local function velocityDamage(ent, data)
 	local speed = (data.OurOldVelocity - data.TheirOldVelocity):Length()
-	if speed < 350 then return end
+	if speed < 250 then return end
 	if data.HitEntity.Throwable then return end
 	
 	if !data.HitEntity:IsWorld() and data.HitEntity.lasttouched and data.HitEntity.lasttouched[ent] then
@@ -1913,7 +1911,7 @@ local function velocityDamage(ent, data)
 	data.HitEntity.lasttouched[ent] = CurTime()
 
 	--print(data.HitObject:GetEntity():IsWorld())
-	local dmg = speed / 5350 * data.DeltaTime * ((IsValid(data.HitObject) && !data.HitObject:GetEntity():IsWorld()) && math.min(data.HitObject:GetMass() / 20, 1) || 1)
+	local dmg = speed / 4300 * data.DeltaTime * ((IsValid(data.HitObject) && !data.HitObject:GetEntity():IsWorld()) && math.min(data.HitObject:GetMass() / 20, 1) || 1)
 	dmg = dmg * math.abs(data.OurOldVelocity:GetNormalized():Dot(data.HitNormal))
 	if !data.HitObject:GetEntity():IsWorld() && !data.HitObject:GetEntity():IsRagdoll() then
 		//dmg = dmg * math.max(data.HitObject:GetMass()*(speed/50000),5)
@@ -1921,9 +1919,9 @@ local function velocityDamage(ent, data)
 	
 	if !ent.organism then return end
 	if dmg * 20 < 0.1 then return end
-	dmg = dmg * 1.5
+	dmg = dmg * 2
 
-	dmg = math.min(dmg, 5)
+	dmg = math.min(dmg, 7)
 
 	local bone
 	for i = 0, ent:GetPhysicsObjectCount() do
@@ -3377,7 +3375,9 @@ local function jointStressValue(ragdoll, cacheKey, phys1, phys2)
 end
 
 local function dislocateFromJointStress(ragdoll, org, ply, limb, segment, stress)
-	if org[limb .. "amputated"] or org[limb .. "dislocation"] or (org[limb] and org[limb] >= 1) then return end
+	-- A limb that is already injured is not eligible for another automatic
+	-- joint-stress injury from its own ragdoll control.
+	if org[limb .. "amputated"] or org[limb .. "dislocation"] or (org[limb] or 0) > 0 then return end
 
 	org[limb .. "dislocation"] = true
 	org.painadd = (org.painadd or 0) + math.Clamp(stress / 12, 28, 70)

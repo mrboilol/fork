@@ -494,6 +494,7 @@ hook.Add("DoPlayerDeath", "Fake", function(ply)
 	ragdoll:SetNetVar("wounds", ply:GetNetVar("wounds"))
 	ragdoll:SetNetVar("arterialwounds", ply:GetNetVar("arterialwounds"))
 	ply.RagdollDeath = ragdoll
+	hook.Run("RagdollDeath", ply, ragdoll)
 end)
 
 hook.Add("PostPlayerDeath", "Garbage", function(ply)
@@ -1882,6 +1883,10 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 	end
 	if not data.HitEntity:IsWorld() then return end
 	local now = CurTime()
+	-- A settled ragdoll can keep reporting small physics collisions forever.  A
+	-- real fall should produce one impact sound, then stay silent until the body
+	-- has actually left the ground again.
+	if rag.hg_fallSoundGrounded then return end
 	if data.OurOldVelocity:LengthSqr() < 165000 or (rag.NextSND or 0) > now then return end
 	rag:EmitSound("player/falling_foley/fall_foley"..mRandom(13)..".wav", 60, mRandom(95, 115), 1, CHAN_AUTO)
 	if mRandom(3) == 2 then
@@ -1895,6 +1900,25 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 	end]]
 
 	rag.NextSND = now + 1
+	rag.hg_fallSoundGrounded = true
+end)
+
+timer.Create("HG_FallSoundRearm", 0.25, 0, function()
+	for _, rag in ipairs(ents.FindByClass("prop_ragdoll")) do
+		if rag.hg_fallSoundGrounded then
+			local tr = util.TraceLine({
+				start = rag:GetPos() + vector_up * 8,
+				endpos = rag:GetPos() - vector_up * 48,
+				filter = rag,
+				mask = MASK_SOLID_BRUSHONLY,
+			})
+
+			-- The pelvis is clear of the ground, so the next real landing may play.
+			if not tr.Hit or tr.Fraction > 0.65 then
+				rag.hg_fallSoundGrounded = nil
+			end
+		end
+	end
 end)
 
 local hg_shitty_fake = CreateConVar("hg_shitty_fake", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "enable shitty fake", 0, 1)

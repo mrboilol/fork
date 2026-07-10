@@ -2,14 +2,28 @@
 if SERVER then util.AddNetworkString("headtrauma_flash") end
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
-local hg_windedsystem = ConVarExists("hg_windedsystem") and GetConVar("hg_windedsystem") or CreateConVar("hg_windedsystem", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable chest-winded stamina and oxygen recovery penalties", 0, 1)
+
+local bonefracture_sounds = {
+	"bonefracture/rem_bonebreak1.wav",
+	"bonefracture/rem_bonebreak2.wav",
+	"bonefracture/rem_bonebreak3.wav",
+}
+
+local function EmitRandomBoneBreakSound(entity, volume, level)
+	if not IsValid(entity) then return end
+
+	local soundType = math.random(3)
+	if soundType == 1 then
+		entity:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], volume or 75, math.random(135, 155), level or 1, CHAN_AUTO)
+	elseif soundType == 2 then
+		entity:EmitSound("owfuck"..math.random(1, 9)..".ogg", volume or 75, 100, level or 1, CHAN_AUTO)
+	else
+		entity:EmitSound("newbonebreak/break"..math.random(10)..".wav", volume or 75, math.random(120, 135), level or 1, CHAN_AUTO)
+	end
+end
 
 local function PlayBoneBreakSound(entity)
-    if math.random() < 0.5 then
-                        entity:EmitSound("owfuck"..math.random(1, 9)..".ogg", 75, 100, 1, CHAN_AUTO)
-    else
-        entity:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(120, 135), 1, CHAN_AUTO)
-    end
+    EmitRandomBoneBreakSound(entity)
 end
 
 local function PlayBrokenBoneHitSound(org, key, volume)
@@ -19,7 +33,7 @@ local function PlayBrokenBoneHitSound(org, key, volume)
 	if (org._brokenBoneHitSound[key] or 0) > CurTime() then return end
 	org._brokenBoneHitSound[key] = CurTime() + 0.35
 
-	org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", volume or 62, math.random(120, 135), 0.55, CHAN_AUTO)
+	EmitRandomBoneBreakSound(org.owner, volume or 62, 0.55)
 end
 
 local function AddBoneInternalBleed(org, amount, cap)
@@ -170,30 +184,44 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8)
 end
 
-local bonefracture_sounds = {
-	"bonefracture/rem_bonebreak1.wav",
-	"bonefracture/rem_bonebreak2.wav",
-	"bonefracture/rem_bonebreak3.wav",
-}
-
 local skullfracture_sounds = {
-	"skullfracture/SkullFracture-1.wav",
-	"skullfracture/SkullFracture-2.wav",
-	"skullfracture/SkullFracture-3.wav",
-	"skullfracture/SkullFracture-4.wav",
-	"skullfracture/SkullFracture-5.wav",
-	"skullfracture/SkullFracture-6.wav",
-	"skullfracture/SkullFracture-7.wav",
+	"skullfracture/skullfracture-1.wav",
+	"skullfracture/skullfracture-2.wav",
+	"skullfracture/skullfracture-3.wav",
+	"skullfracture/skullfracture-4.wav",
+	"skullfracture/skullfracture-5.wav",
+	"skullfracture/skullfracture-6.wav",
+	"skullfracture/skullfracture-7.wav",
 }
-
-local function playBoneFractureSound(ent)
-	if not IsValid(ent) then return end
-	ent:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], 75, math.random(135, 155), 1, CHAN_AUTO)
-end
 
 local function playSkullFractureSound(ent)
 	if not IsValid(ent) then return end
 	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 75, math.random(90, 110), 1, CHAN_AUTO)
+end
+
+local function PlayRepeatSkullFractureSound(org)
+	if not org or not IsValid(org.owner) then return end
+	if (org._skullFractureSound or 0) > CurTime() then return end
+
+	org._skullFractureSound = CurTime() + 0.4
+	playSkullFractureSound(org.owner)
+end
+
+local function SendSevereSkullGore(org, dmgInfo)
+	local effectEnt = hg.GetCurrentCharacter(org.owner)
+	if not IsValid(effectEnt) then effectEnt = org.owner end
+	if not IsValid(effectEnt) then return end
+
+	local force = dmgInfo:GetDamageForce()
+	local ang = force:LengthSqr() > 0 and force:GetNormalized():Angle() or angle_zero
+	net.Start("hg_brainmist")
+	net.WriteEntity(effectEnt)
+	net.WriteVector(dmgInfo:GetDamagePosition())
+	net.WriteAngle(ang)
+	net.WriteBool(true)
+	net.WriteBool(false)
+	net.WriteBool(true)
+	net.Broadcast()
 end
 
 local huyasd = {
@@ -603,7 +631,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 		if oldDmg != 1 then
 			PlayBoneBreakSound(org.owner)
-			playSkullFractureSound(org.owner)
 			AddBoneInternalBleed(org, 0.35, 0.55)
 		else
 			AddBrokenBoneHitTrauma(org, "skull", dmg, 0.3)
@@ -680,6 +707,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if org.skull > 0.6 then
 		if oldDmg <= 0.6 then
+			playSkullFractureSound(org.owner)
 			if org.isPly then org.owner:Notify(huyasd["skull"],true,"skull",4) end
 
 			-- Really loud bonebreak on initial skull fracture
@@ -687,13 +715,22 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 110, math.random(95, 115), 1, CHAN_AUTO)
 			end
 
-			-- Persistent head blood decal for severe skull damage
+			-- Layer several random decals so a severe skull injury is visibly bloodier.
 			if IsValid(org.owner) then
 				org.owner.HG_HeadBloodDecal = true
-				net.Start("hg_head_blood_decal")
-				net.WriteEntity(org.owner)
-				net.Broadcast()
+				for i = 1, 3 do
+					net.Start("hg_head_blood_decal")
+					net.WriteEntity(hg.GetCurrentCharacter(org.owner))
+					net.Broadcast()
+				end
 			end
+		end
+		if oldDmg > 0.6 and math.random(3) == 1 then
+			PlayRepeatSkullFractureSound(org)
+		end
+
+		if oldDmg <= 0.6 or (dmg >= 0.4 and math.random(3) == 1) then
+			SendSevereSkullGore(org, dmgInfo)
 		end
 
 		if dir and hg_bloodimpacts:GetBool() and (oldDmg <= 0.6 or math.random() < 0.75) then
@@ -756,11 +793,6 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.shock = org.shock + dmg * 2.5
 	org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2.5, 6), 10)
 
-	if hg_windedsystem:GetBool() then
-		org.stamina_damage = (org.stamina_damage or 0) + dmg * 8
-		org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + dmg * 3.5, 18)
-	end
-
 	-- Chest hits can cause hemothorax (blood filling pleural cavity)
 	if dmg >= 0.5 then
 		org.hemothorax = math.min((org.hemothorax or 0) + dmg * 0.08, 1)
@@ -813,11 +845,6 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	org.shock = org.shock + dmg * 1.5
 	org.internalBleed = (org.internalBleed or 0) + dmg * 4.0
 	org.o2[1] = math.max(org.o2[1] - dmg * 3, 0)
-	if hg_windedsystem:GetBool() then
-		org.stamina_damage = (org.stamina_damage or 0) + dmg * 8
-		org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + dmg * 2.5, 18)
-	end
-
 	local result = damageBone(org, 0.35, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 
 	if oldDmg >= 1 and dmg >= 0.35 then

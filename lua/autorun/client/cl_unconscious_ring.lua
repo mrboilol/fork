@@ -826,37 +826,3 @@ local function GetPulseCheckDisplayText()
 
     return "PULSE: " .. heartbeat .. " BPM"
 end
-
-hook.Add("PostDrawTranslucentRenderables", "PulseCheck3DIndicator", function(_, isDrawingSkybox)
-    if isDrawingSkybox then return end
-    if not hg_3dzity:GetBool() then return end
-    if not IsValid(g_PulseCheckTarget) then return end
-
-    local alpha = ecgAlphaPulseCheck
-    if alpha <= 0.01 then return end
-
-    local ent = g_PulseCheckTarget
-    local maxs = ent:OBBMaxs()
-    if not maxs then return end
-    local pos = ent:LocalToWorld(Vector(0, 0, maxs.z)) + Vector(0, 0, 4)
-
-    if pos:DistToSqr(EyePos()) > 250000 then return end
-
-    local text = GetPulseCheckDisplayText()
-    local ang = (EyePos() - pos):Angle()
-    ang.p = 0
-    ang.r = 0
-
-    surface.SetFont("HomigradFontTypewriterSmall")
-    local tw, th = surface.GetTextSize(text)
-    local pad = 8
-    local w, h = tw + pad * 2, th + pad * 2
-
-    local bg = Color(30, 30, 30, 220 * alpha)
-    local textColor = Color(255, 255, 255, 255 * alpha)
-
-    cam.Start3D2D(pos, ang, 0.25)
-        draw.RoundedBox(4, -w / 2, -h / 2, w, h, bg)
-        draw.SimpleText(text, "HomigradFontTypewriterSmall", 0, 0, textColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-    cam.End3D2D()
-end)

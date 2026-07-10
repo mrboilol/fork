@@ -1,5 +1,4 @@
 local max, min, Round, Lerp, halfValue2 = math.max, math.min, math.Round, Lerp, util.halfValue2
-local hg_windedsystem = ConVarExists("hg_windedsystem") and GetConVar("hg_windedsystem") or CreateConVar("hg_windedsystem", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable chest-winded stamina and oxygen recovery penalties", 0, 1)
 
 --local Organism = hg.organism
 
@@ -461,12 +460,6 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	if hg_windedsystem:GetBool() and o2[1] < 15 then
-		org.oxygen_deprivation = math.min((org.oxygen_deprivation or 0) + timeValue * 0.25, 18)
-	elseif not hg_windedsystem:GetBool() then
-		org.oxygen_deprivation = 0
-	end
-
 	if o2[1] < 8 then
 		org._lowO2Time = (org._lowO2Time or 0) + timeValue
 	else
@@ -543,33 +536,8 @@ module[2] = function(owner, org, timeValue)
 		local pulseMultiplier = math.Clamp((org.heartbeat or 70) / 70, 0.8, 1.5)
 		local pulsePerfusionK = math.Clamp(((org.pulse or 70) - 15) / 55, 0.12, 1)
 
-		local staminaRatio = org.stamina[1] / org.stamina.max
-		local windedEnabled = hg_windedsystem:GetBool()
-
-		-- When winded (low stamina), ensure minimum O2 recovery to prevent death
-
-		-- Recovery is slower when winded but won't drop to zero
-
-		local staminaMultiplier = windedEnabled and math.max(staminaRatio, 0.55) or 1
-
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
-		local regenerate = regen * timeValue * 4 * staminaMultiplier * pulseMultiplier * pulsePerfusionK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
-
-		if windedEnabled and org.oxygen_deprivation and org.oxygen_deprivation > 0 then
-
-			local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-
-			local hasStabilizer = totalAdrenaline > 0.5 or (org.thiamine or 0) > 0 or (org.tranexamic_acid or 0) > 0
-
-			regenerate = regenerate * (hasStabilizer and 0.82 or 0.6) -- winded players can still catch air, especially with stabilizers
-
-			org.oxygen_deprivation = math.max(org.oxygen_deprivation - timeValue * (hasStabilizer and 4.2 or 3.0), 0) -- drugs clear O2 deprivation faster
-
-		elseif not windedEnabled then
-
-			org.oxygen_deprivation = 0
-
-		end
+		local regenerate = regen * timeValue * 4 * pulseMultiplier * pulsePerfusionK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
 
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.min(org.blood / 4000, 1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5))
 
@@ -677,10 +645,6 @@ module[2] = function(owner, org, timeValue)
 				if wound[7] == "arteria" and wound[1] > 0 then
 
 					arteryDrainMul = arteryDrainMul + 1
-
-				elseif (wound[7] == "subclavianR" or wound[7] == "subclavianL") and wound[1] > 0 then
-
-					arteryDrainMul = arteryDrainMul + 0.7
 
 				elseif wound[7] == "spineartery" and wound[1] > 0 then
 
@@ -845,7 +809,8 @@ module[2] = function(owner, org, timeValue)
 
 	-- Low stamina - 3rd priority, bypassed if choking
 
-	if org.isPly and not org.otrub and not org.choking and org.stamina[1] < 30 and org.stamina[1] > 10 and org.analgesia <= 1.5 and !org.heartstop then
+	local staminaValue = org.stamina and org.stamina[1] or 0
+	if org.isPly and not org.otrub and not org.choking and staminaValue < 30 and org.analgesia <= 1.5 and !org.heartstop then
 
 		org.owner:Notify(low_stamina[math.random(#low_stamina)], 50, "low_stamina", 3)
 

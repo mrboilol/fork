@@ -4,9 +4,9 @@
 if not SERVER then return end
 
 -- Configuration
-local KICK_SPEED_THRESHOLD = 400 -- Minimum speed for kick damage
-local MAX_KICK_DAMAGE = 15 -- Maximum damage cap
-local KICK_DAMAGE_MULTIPLIER = 0.05 -- Speed to damage conversion rate
+local KICK_SPEED_THRESHOLD = 260 -- Minimum speed for kick damage
+local MAX_KICK_DAMAGE = 24 -- Maximum damage cap
+local KICK_DAMAGE_MULTIPLIER = 0.075 -- Speed to damage conversion rate
 local KICK_DAMAGE_COOLDOWN = 0.5 -- Cooldown between kick damage hits (seconds)
 
 -- Hit tracking to prevent damage multiplication
@@ -183,9 +183,9 @@ local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName
     local sound = GetKickSound(target)
     target:EmitSound(sound, 75, math.random(95, 105))
     
-    -- Add adrenaline to attacker like weapon_melee
+    -- A committed ragdoll kick gives the attacker a noticeable adrenaline response.
     if IsValid(attacker) and attacker.organism then
-        local adrenalineGain = math.Clamp(damage * 0.005, 0.02, 0.1)
+        local adrenalineGain = math.Clamp(damage * 0.01, 0.1, 0.15)
         attacker.organism.adrenalineAdd = math.min(attacker.organism.adrenalineAdd + adrenalineGain, 4)
     end
 end

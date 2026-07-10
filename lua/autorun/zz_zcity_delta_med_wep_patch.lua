@@ -73,7 +73,7 @@ end
 
 local function ResolveSecondaryTarget(owner)
     if not IsValid(owner) then return nil end
-    local tr = owner:GetEyeTrace()
+    local tr = (hg and hg.eyeTrace and hg.eyeTrace(owner, 100)) or owner:GetEyeTrace()
     local ent = tr and tr.Entity or nil
     if not IsValid(ent) then return nil end
 
@@ -84,6 +84,7 @@ local function ResolveSecondaryTarget(owner)
     if not IsValid(ent) or not ent:IsPlayer() or not ent:Alive() or not ent.organism then return nil end
     if ent ~= owner then
         local entChar = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent)) or ent
+        if not IsValid(entChar) then entChar = ent end
         if owner:GetPos():DistToSqr(entChar:GetPos()) > 10000 then return nil end
     end
     return ent

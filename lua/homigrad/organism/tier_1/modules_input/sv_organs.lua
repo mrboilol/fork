@@ -393,8 +393,6 @@ local arterySize = {
 	["arteria"] = 14,
 	["rarmartery"] = 6,
 	["larmartery"] = 6,
-	["subclavianR"] = 12,
-	["subclavianL"] = 12,
 	["rlegartery"] = 9,
 	["llegartery"] = 9,
 	["spineartery"] = 10,
@@ -402,8 +400,6 @@ local arterySize = {
 
 local o2DebuffArteries = {
 	["arteria"] = true,
-	["subclavianR"] = true,
-	["subclavianL"] = true,
 	["spineartery"] = true,
 }
 
@@ -517,8 +513,6 @@ end
 
 input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rarmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.subclavianR = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianR", org, dmg, dmgInfo, boneindex or "ValveBiped.Bip01_R_UpperArm", dir, hit) end
-input_list.subclavianL = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("subclavianL", org, dmg, dmgInfo, boneindex or "ValveBiped.Bip01_L_UpperArm", dir, hit) end
 input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return 0 end--hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit) end

@@ -1,7 +1,6 @@
 
 
 local hg_infstamina = CreateConVar("hg_infstamina", "0", {FCVAR_REPLICATED, FCVAR_HIDDEN})
-local hg_windedsystem = ConVarExists("hg_windedsystem") and GetConVar("hg_windedsystem") or CreateConVar("hg_windedsystem", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable chest-winded stamina and oxygen recovery penalties", 0, 1)
 
 
 
@@ -197,11 +196,7 @@ module[2] = function(owner, org, timeValue)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
 
-	-- Winded recovery is slower at low stamina, but it should not lock recovery down.
-	local staminaRatio = org.stamina[1] / org.stamina.max
-	local windedRecoveryMultiplier = hg_windedsystem:GetBool() and (math.max(staminaRatio, 0.25) ^ 0.35) or 1
-
-	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3.75 * windedRecoveryMultiplier * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
 
 
 

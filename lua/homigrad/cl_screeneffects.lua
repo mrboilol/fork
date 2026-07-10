@@ -1605,10 +1605,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 	
-	if ((org.skull or 0) > 0.2 or (org.jaw or 0) > 0.2 or (org.concussion or 0) > 0) and not org.otrub then
+	local brainDamaged = brain >= 0.05
+	local brainFlashScale = math.Clamp((brain - 0.05) / (0.35 - 0.05), 0, 1)
+	local recentSevereHeadTrauma = lobotomy_recent_trauma > CurTime()
+	if (brainDamaged or recentSevereHeadTrauma) and not org.otrub then
 		if show_image_time > 0 then
 			brain_motionblur = true
-			DrawMotionBlur(0.1, 1., 0.1)
+			DrawMotionBlur(0.04 + brainFlashScale * 0.06, 0.35 + brainFlashScale * 0.65, 0.1)
 
 			local alpha = 255 * math.Clamp(show_image_time / math.max(lobotomy_memory_total, 1), 0, 1)
 			show_image_time = show_image_time - 1
@@ -1628,28 +1631,23 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			else
 				drawLobotomyFlash(alpha)
 			end
-		elseif show_some_images_time > 0 then
+		elseif brainDamaged and show_some_images_time > 0 then
 			brain_motionblur = true
-			DrawMotionBlur(0.1, 1., 0.1)
+			DrawMotionBlur(0.035 + brainFlashScale * 0.065, 0.3 + brainFlashScale * 0.7, 0.1)
 			show_some_images_time = show_some_images_time - 1
-			local flashChance = math.max(2, 10 * (1 - brain))
+			local flashChance = math.max(12, math.floor(28 - brainFlashScale * 12))
 			if math.random(flashChance) < 2 then
-				startLobotomyFlash(250 * (0.1 * 3) * math.Rand(0.55, 1.55) * (math.random(2) == 1 and 0.55 or 1) * 1.45, math.Clamp(brain or 0, 0, 1), true)
+				local flashDuration = (8 + brainFlashScale * 14) * math.Rand(0.65, 1.15)
+				startLobotomyFlash(flashDuration, brainFlashScale, true)
 			end
 		else
 			brain_motionblur = false
-			local chance = (brain or 0) * 15
-			if (org.skull or 0) >= 1 then
-				chance = chance + 6
-			end
-			if (org.jaw or 0) >= 1 then
-				chance = chance + 3
-			end
-			show_some_images_time = math.random(1200) < chance and 560 or 0
+			show_some_images_time = brainDamaged and math.random(1800) < (1 + brainFlashScale * 3) and math.floor(45 + brainFlashScale * 75) or 0
 		end
 	else
 		brain_motionblur = false
 		show_image_time = 0
+		show_some_images_time = 0
 		lobotomy_memory_mat = nil
 		lobotomy_memory_flash = false
 		lobotomy_flash_mat = nil
@@ -2731,17 +2729,15 @@ net.Receive("headtrauma_flash", function()
     -- Scale effects by the received flash duration (which is scaled by damage on the server)
     local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)
     local traumaPower = math.Clamp(damageScale + (is_critical and 0.55 or 0) + (hasBrainDamage and 0.35 or 0) + (hasConcussion and 0.25 or 0), 0, 1.8)
-    lobotomy_recent_trauma = CurTime() + math.Clamp(3 + traumaPower * 5, 4, 12)
-    lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
-    local severeFlash = is_critical or hasBrainDamage or hasConcussion or traumaPower > 0.75
+    local severeFlash = is_critical or hasBrainDamage
     if severeFlash then
         show_some_images_time = 0
+        lobotomy_recent_trauma = CurTime() + math.Clamp(2.5 + traumaPower * 1.5, 3, 5)
+        lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
         if (lobotomy_next_forced_flash or 0) <= CurTime() then
-            startLobotomyFlash(math.floor(24 + traumaPower * 34), traumaPower, true)
-            lobotomy_next_forced_flash = CurTime() + math.Clamp(1.2 + traumaPower * 0.45, 1.2, 2.1)
+            startLobotomyFlash(math.floor(9 + traumaPower * 8), traumaPower, true)
+            lobotomy_next_forced_flash = CurTime() + 5
         end
-    elseif show_image_time <= 0 then
-        show_some_images_time = math.max(show_some_images_time or 0, math.floor(40 + traumaPower * 55))
     end
 
     if hasConcussion then

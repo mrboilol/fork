@@ -540,7 +540,7 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
 
         local target = wep.healbuddy or ply
         if not IsValid(target) then return end
-        if target ~= ply and ply:GetPos():DistToSqr(target:GetPos()) > 10000 then return end
+        if not CanUseMedicalMinigameTarget(ply, target) then return end
 
         local org = target.organism
         if not org then return end
@@ -739,7 +739,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
         local target = wep.healbuddy or ply
         if not IsValid(target) then target = ply end
 
-        if target ~= ply and ply:GetPos():DistToSqr(target:GetPos()) > 10000 then return end
+        if not CanUseMedicalMinigameTarget(ply, target) then return end
 
         if minigameType == "tourniquet" then
             local tourniquetSession = hg.MedicalMinigame.TourniquetSessions[ply]
@@ -749,7 +749,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
             end
 
             if not IsValid(target) or not target.organism then return end
-            if target ~= ply and ply:GetPos():DistToSqr(target:GetPos()) > 10000 then return end
+            if not CanUseMedicalMinigameTarget(ply, target) then return end
 
             local modeValueIndex = GetMinigameModeValueIndex(wep, minigameType)
             local done = IsValid(wep) and wep.Tourniquet and wep:Tourniquet(target, nil)
@@ -835,7 +835,7 @@ end)
 
 local function ResolveEyeTarget(ply)
     if not IsValid(ply) then return nil end
-    local tr = ply:GetEyeTrace()
+    local tr = (hg and hg.eyeTrace and hg.eyeTrace(ply, 100)) or ply:GetEyeTrace()
     local ent = tr and tr.Entity or nil
     if not IsValid(ent) then return nil end
     if ent:IsRagdoll() and hg and hg.RagdollOwner then
@@ -845,6 +845,7 @@ local function ResolveEyeTarget(ply)
     if not ent:IsPlayer() or not ent:Alive() or not ent.organism then return nil end
     if ent ~= ply then
         local entChar = (hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent)) or ent
+        if not IsValid(entChar) then entChar = ent end
         if ply:GetPos():DistToSqr(entChar:GetPos()) > 10000 then return nil end
     end
     return ent

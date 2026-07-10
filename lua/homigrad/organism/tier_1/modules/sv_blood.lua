@@ -26,8 +26,6 @@ module[1] = function(org)
 	org.arteria = 0
 	org.rarmartery = 0
 	org.larmartery = 0
-	org.subclavianR = 0
-	org.subclavianL = 0
 	org.rlegartery = 0
 	org.llegartery = 0
 	org.spineartery = 0
@@ -79,15 +77,11 @@ local limbArteryWeakness = {
 
 local o2DebuffArteries = {
 	arteria = 1,
-	subclavianR = 0.7,
-	subclavianL = 0.7,
 	spineartery = 0.85,
 }
 
 local arteryStatusKeys = {
 	"arteria",
-	"subclavianR",
-	"subclavianL",
 	"rarmartery",
 	"larmartery",
 	"rlegartery",

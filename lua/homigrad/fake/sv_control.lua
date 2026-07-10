@@ -563,8 +563,6 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
 
 end
 
-
-
 function hg.ShadowControl(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp)
 
     physNumber = realPhysNum(ragdoll, physNumber) or 0
@@ -855,6 +853,21 @@ local forceArm = 600
 
 local forceArm_dump = 450
 
+local ragdollCombatControlMul = {
+	["ValveBiped.Bip01_R_UpperArm"] = 1.15,
+	["ValveBiped.Bip01_L_UpperArm"] = 1.15,
+	["ValveBiped.Bip01_R_Forearm"] = 1.15,
+	["ValveBiped.Bip01_L_Forearm"] = 1.15,
+	["ValveBiped.Bip01_R_Hand"] = 1.15,
+	["ValveBiped.Bip01_L_Hand"] = 1.15,
+	["ValveBiped.Bip01_R_Thigh"] = 1.5,
+	["ValveBiped.Bip01_L_Thigh"] = 1.5,
+	["ValveBiped.Bip01_R_Calf"] = 1.5,
+	["ValveBiped.Bip01_L_Calf"] = 1.5,
+	["ValveBiped.Bip01_R_Foot"] = 1.5,
+	["ValveBiped.Bip01_L_Foot"] = 1.5,
+}
+
 local leftHandReach = 8
 local rightHandReach = 8
 
@@ -1115,20 +1128,6 @@ hook.Add("Think", "Fake", function()
 		local wep = ply:GetActiveWeapon()
 
 
-		local floppyBones = ragdoll.hg_floppy_bones or org.fake_floppy_bones
-		local leftArmFloppy = floppyBones and (floppyBones["ValveBiped.Bip01_L_UpperArm"] or floppyBones["ValveBiped.Bip01_L_Forearm"])
-		local rightArmFloppy = floppyBones and (floppyBones["ValveBiped.Bip01_R_UpperArm"] or floppyBones["ValveBiped.Bip01_R_Forearm"])
-
-		if leftArmFloppy and IsValid(ragdoll.ConsLH) then
-			ragdoll.ConsLH:Remove()
-			ragdoll.ConsLH = nil
-		end
-
-		if rightArmFloppy and IsValid(ragdoll.ConsRH) then
-			ragdoll.ConsRH:Remove()
-			ragdoll.ConsRH = nil
-		end
-
 		local tr = {}
 
 		tr.start = ply:GetPos()
@@ -1184,6 +1183,7 @@ hook.Add("Think", "Fake", function()
 					if IsValid(physobj) then
 						local mass = physobj:GetMass() / 5
 						local name = ragdoll:GetBoneName(bone)
+						local controlMul = ragdollCombatControlMul[name] or 1
 
 						local bone_impulse = ply.HitBones and ply.HitBones[name] or curTime
 
@@ -1199,13 +1199,13 @@ hook.Add("Think", "Fake", function()
 
 						p.angle = boneang
 
-						p.maxangular = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse
+						p.maxangular = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse * controlMul
 
-						p.maxangulardamp = 100 * (ragdollcombat and 1 or 0.9) * mass * power * amt_impulse
+						p.maxangulardamp = 100 * (ragdollcombat and 1 or 0.9) * mass * power * amt_impulse * controlMul
 
-						p.maxspeed = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse
+						p.maxspeed = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse * controlMul
 
-						p.maxspeeddamp = 100 * (ragdollcombat and 1 or 0.9) * mass * amt_impulse
+						p.maxspeeddamp = 100 * (ragdollcombat and 1 or 0.9) * mass * amt_impulse * controlMul
 
 						p.teleportdistance = 0
 
@@ -1640,11 +1640,6 @@ hook.Add("Think", "Fake", function()
 
 
 
-					if org.rarm == 1 or org.rarmdislocation then
-
-						org.painadd = org.painadd + ragdoll.dtime * 4
-
-					end
 
 
 
@@ -1684,11 +1679,6 @@ hook.Add("Think", "Fake", function()
 
 
 
-					if org.larm == 1 or org.larmdislocation then
-
-						org.painadd = org.painadd + ragdoll.dtime * 4
-
-					end
 
 
 
@@ -1728,11 +1718,6 @@ hook.Add("Think", "Fake", function()
 
 
 
-					if org.rarm == 1 or org.rarmdislocation then
-
-						org.painadd = org.painadd + ragdoll.dtime * 4
-
-					end
 
 				end
 
@@ -1760,11 +1745,6 @@ hook.Add("Think", "Fake", function()
 
 
 
-					if org.larm == 1 or org.larmdislocation then
-
-						org.painadd = org.painadd + ragdoll.dtime * 4
-
-					end
 
 				end
 
@@ -2055,7 +2035,7 @@ hook.Add("Think", "Fake", function()
 
 							if org and bothArmsBroken and not org.rarmamputated then
 
-								local painAmount = (org.rarm or 0) * 30 + (org.rarmdislocation or org.rarmdislocated and 15 or 0)
+								local painAmount = (org.rarm or 0) * 10 + (org.rarmdislocation or org.rarmdislocated and 5 or 0)
 
 								org.painadd = (org.painadd or 0) + painAmount
 
@@ -2111,7 +2091,7 @@ hook.Add("Think", "Fake", function()
 
 							if org and bothArmsBroken and not org.larmamputated then
 
-								local painAmount = (org.larm or 0) * 30 + (org.larmdislocation or org.larmdislocated and 15 or 0)
+								local painAmount = (org.larm or 0) * 10 + (org.larmdislocation or org.larmdislocated and 5 or 0)
 
 								org.painadd = (org.painadd or 0) + painAmount
 

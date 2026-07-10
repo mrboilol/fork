@@ -76,7 +76,6 @@ hook.Add("Org Clear", "Main", function(org)
 	org.stomach = 0
 	org.intestines = 0
 	org.headtrauma = 0
-	org.oxygen_deprivation = 0
 
 	org.tranexamic_acid = 0
 
@@ -226,8 +225,6 @@ local function send_organism(org, ply)
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
-	sendtable.subclavianR = org.subclavianR
-	sendtable.subclavianL = org.subclavianL
 	sendtable.recoilmul = org.recoilmul
 	sendtable.meleespeed = org.meleespeed
 	sendtable.legstrength = org.legstrength
@@ -253,7 +250,6 @@ local function send_organism(org, ply)
 	sendtable.eyeR = org.eyeR
 	sendtable.consciousness = org.consciousness
 	sendtable.concussion = org.concussion
-	sendtable.oxygen_deprivation = org.oxygen_deprivation
 	sendtable.assimilated = org.assimilated
 	sendtable.berserk = org.berserk
 	sendtable.noradrenaline = org.noradrenaline

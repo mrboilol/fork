@@ -2,22 +2,55 @@
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
     util.AddNetworkString("hg_head_blood_decal")
+    util.AddNetworkString("hg_clear_blood_decals")
 
-    local function ReapplyHeadBloodDecal(ply)
+    local function ApplyHeadBloodDecal(ent)
+        if not IsValid(ent) then return end
+
+        net.Start("hg_head_blood_decal")
+        net.WriteEntity(ent)
+        net.Broadcast()
+    end
+
+    local function ReapplyHeadBloodDecal(ply, ragdoll)
         if not IsValid(ply) then return end
         if ply.HG_HeadBloodDecal then
-            net.Start("hg_head_blood_decal")
-            net.WriteEntity(ply)
-            net.Broadcast()
+            ApplyHeadBloodDecal(IsValid(ragdoll) and ragdoll or hg.GetCurrentCharacter(ply))
         end
     end
 
     hook.Add("Fake", "HG_HeadBloodDecal_Fake", function(ply, ragdoll)
-        ReapplyHeadBloodDecal(ply)
+        ReapplyHeadBloodDecal(ply, ragdoll)
     end)
 
     hook.Add("RagdollDeath", "HG_HeadBloodDecal_Death", function(ply, ragdoll)
-        ReapplyHeadBloodDecal(ply)
+        ReapplyHeadBloodDecal(ply, ragdoll)
+    end)
+
+    hook.Add("Player Think", "HG_WashBloodDecals", function(ply)
+        local character = hg.GetCurrentCharacter(ply)
+        local deathRagdoll = ply.RagdollDeath
+        if ply:WaterLevel() <= 0
+            and (not IsValid(character) or character:WaterLevel() <= 0)
+            and (not IsValid(deathRagdoll) or deathRagdoll:WaterLevel() <= 0) then return end
+        if ply.HG_NextBloodWash and ply.HG_NextBloodWash > CurTime() then return end
+
+        ply.HG_NextBloodWash = CurTime() + 0.5
+        ply.HG_HeadBloodDecal = nil
+
+        local targets = {
+            ply,
+            character,
+            deathRagdoll,
+        }
+
+        for _, ent in ipairs(targets) do
+            if IsValid(ent) then
+                net.Start("hg_clear_blood_decals")
+                net.WriteEntity(ent)
+                net.Broadcast()
+            end
+        end
     end)
 
     return
@@ -25,11 +58,13 @@ end
 
 
 function ClearDecalToEnt(ent)
-	if ent.decalshuy then
-		ent:SetSubMaterial()
-		
-		ent.decalshuy = nil
+	if not IsValid(ent) or not ent.decalshuy then return end
+
+	for id, original in pairs(ent.decalshuy) do
+		ent:SetSubMaterial(id - 1, original or "")
 	end
+
+	ent.decalshuy = nil
 end
 
 local matRepl = Material("decals/decalsplash")
@@ -148,14 +183,15 @@ net.Receive("bloody_decal_1", function()
 end)
 
 net.Receive("hg_head_blood_decal", function()
-	local ply = net.ReadEntity()
-	if not IsValid(ply) then return end
-
-	local ent = hg.GetCurrentCharacter(ply)
+	local ent = net.ReadEntity()
 	if not IsValid(ent) then return end
 
-	-- Apply a strong, non-clearing blood decal to the current character (player/ragdoll)
-	AddDecalToEnt2(ent, ent:EntIndex(), matBlood, false, nil, nil, nil, nil, 255)
+	-- Keep a skull wound visible without covering every material in an opaque blood sheet.
+	AddDecalToEnt2(ent, ent:EntIndex(), matBlood, false, nil, nil, nil, 192, 110)
+end)
+
+net.Receive("hg_clear_blood_decals", function()
+	ClearDecalToEnt(net.ReadEntity())
 end)
 
 --[[

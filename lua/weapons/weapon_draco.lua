@@ -71,7 +71,7 @@ function SlipWeapon(self, bullet)
 			timer.Simple(0.05,function()
 				owner:DropWeapon(self, nil, force)
 				self:SetPos(pos)
-				owner:SelectWeapon(owner:GetWeapon("weapon_hands_sh"))
+				owner:SelectWeapon("weapon_hands_sh")
 				//owner:ChatPrint("Your hand hurts really bad.")
 				if owner.organism then
 					//owner.organism.pain = owner.organism.pain + 20

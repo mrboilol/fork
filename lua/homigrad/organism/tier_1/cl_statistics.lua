@@ -80,8 +80,6 @@ local list = {
 	{"internalBleed", 10, true}, 
 	"internalBleedHeal", 
 	{"arteria", 1, true}, 
-	{"subclavianR", 1, true},
-	{"subclavianL", 1, true},
 	{"rarmartery", 1, true}, 
 	{"larmartery", 1, true}, 
 	{"rlegartery", 1, true}, 

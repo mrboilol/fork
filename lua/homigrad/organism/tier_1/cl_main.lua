@@ -438,6 +438,10 @@ end)
 local braindeathstart = CurTime() + 20
 local lerpedpart = 0
 local lerpedbrain = 0
+local function BrainDamageFxScale(brain)
+	return math.Clamp(((brain or 0) - 0.05) / (0.35 - 0.05), 0, 1)
+end
+
 hook.Add("Post Pre Post Processing", "ShowScreens", function()
 	local org = lply.organism
 	
@@ -448,22 +452,24 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 
 	-- Show memories when brain damage is present (more severe = more frequent)
 	-- Works both when unconscious (otrub) and awake with brain damage
-	local show_multiki = org.brain > 0.05
+	local brainFx = BrainDamageFxScale(org.brain)
+	local show_multiki = org.brain >= 0.05
 
 	if show_multiki then
 		lerpedbrain = LerpFT(0.05, lerpedbrain, org.brain)
+		brainFx = BrainDamageFxScale(lerpedbrain)
 		
 		-- Scale timing based on brain damage: higher damage = faster cycling
 		-- When otrub: faster cycling (20-40s range)
 		-- When awake: slower cycling (30-60s range) but still shows
-		local baseTime = org.otrub and 34 or 52
+		local baseTime = org.otrub and 40 or 68
 		local traumaBoost = math.Clamp((org.concussion or 0) / 6 + (org.disorientation or 0) / 12, 0, 0.45)
-		local time = baseTime - (lerpedbrain * 34) - traumaBoost * 10
-		time = math.max(time, org.otrub and 6 or 10)
+		local time = baseTime - (brainFx * (org.otrub and 28 or 46)) - traumaBoost * 10
+		time = math.max(time, org.otrub and 7 or 12)
 		
 		-- Show for longer duration with more brain damage
-		local showDuration = time * (org.otrub and 0.72 or 0.58) + (lerpedbrain * 12) + traumaBoost * 9
-		showDuration = math.min(showDuration, time * (org.otrub and 0.94 or 0.86))
+		local showDuration = time * (org.otrub and (0.24 + brainFx * 0.46) or (0.10 + brainFx * 0.44)) + traumaBoost * 7
+		showDuration = math.Clamp(showDuration, org.otrub and 3 or 1.5, time * (org.otrub and 0.9 or 0.78))
 		
 		if part % time > time - showDuration and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
 			switch = true
@@ -472,20 +478,20 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 			
 			-- More opaque with higher brain damage
 			-- When awake (not otrub), show at lower opacity
-			local awakeMultiplier = org.otrub and 1 or math.Clamp(0.35 + lerpedbrain * 0.5 + traumaBoost * 0.35, 0.35, 0.85)
-			local alpha = math.Clamp(lerpedpart * (30 + lerpedbrain * 70) * awakeMultiplier, 0, 255)
+			local awakeMultiplier = org.otrub and 1 or math.Clamp(0.18 + brainFx * 0.48 + traumaBoost * 0.3, 0.18, 0.85)
+			local alpha = math.Clamp(lerpedpart * (12 + brainFx * 86) * awakeMultiplier, 0, 255)
 			surface.SetDrawColor(255, 255, 255, alpha)
 			surface.SetMaterial(screens[curscreen])
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 
 			-- More severe effects with higher brain damage
-			if org.otrub or lerpedbrain > 0.2 then
-				DrawToyTown(4 + lerpedbrain * 4, ScrH())
+			if org.otrub or brainFx > 0.5 then
+				DrawToyTown(2 + brainFx * 5, ScrH())
 			end
 
 			-- Stronger vignette when memories show while awake and brain damaged
 			if not org.otrub then
-				local vignetteAlpha = math.Clamp(lerpedpart * (25 + lerpedbrain * 75), 0, 100)
+				local vignetteAlpha = math.Clamp(lerpedpart * (8 + brainFx * 92), 0, 100)
 				render.UpdateScreenEffectTexture()
 				memory_vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
 				memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 20)
@@ -513,7 +519,7 @@ local old = false
 local tinnitusSoundFactor
 local lerpblood = 0
 local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like first-person camera view", 0, 1)
-hook.Add("Post Post Pre Post Processing", "organism-effects", function()
+hook.Add("Post Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
 	local new_organism = lply:Alive() and lply.new_organism or (viewmode == 1 and IsValid(spect) and spect.new_organism) or {}
@@ -894,9 +900,6 @@ local arterialJetOffset = 1.8
 local arterialVelocityMul = 78
 local arterialDirectionRandomness = 16
 local arterialVerticalRandomness = 22
-local arterialCloudRampStart = 0.65
-local arterialCloudChance = 5
-local arterialCloudInterval = 0.08
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -994,10 +997,6 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 		hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
 	end
 
-	if fxData and buildup >= arterialCloudRampStart and math.random(arterialCloudChance) == 1 and (fxData.nextMist or 0) <= CurTime() then
-		fxData.nextMist = CurTime() + arterialCloudInterval
-		hg.addBloodPart2(pos + VectorRand(-4, 4), dir * pulseMul * buildup + VectorRand(-20, 20) * pulseMul * buildup, nil, 24 * buildup, 24 * buildup, arterialCloudLifetime, nil, ent)
-	end
 end
 local hg_altberserk = GetConVar("hg_altberserk")
 local hg_altnoradrenaline = GetConVar("hg_altnoradrenaline")

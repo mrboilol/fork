@@ -115,15 +115,16 @@ module[2] = function(owner, org, timeValue)
 	local heartbeat = compensationRate
 
 	local staminaMax = math.max(org.stamina.max or 180, 1)
-	local staminaRatio = math.Clamp((org.stamina[1] or staminaMax) / staminaMax, 0, 1)
-	local exertionK = org.analgesia < 1 and math.max(math.Clamp((0.66 - staminaRatio) / 0.66, 0, 1), math.Clamp((org.stamina.sub or 0) / 2, 0, 1) * 0.55) or 0
+	local stamina = math.Clamp(org.stamina[1] or staminaMax, 0, staminaMax)
+	-- Exertion only elevates the heart rate once 50 stamina has actually been lost.
+	local exertionK = org.analgesia < 1 and math.Clamp((staminaMax - 50 - stamina) / math.max(staminaMax - 50, 1), 0, 1) or 0
 	local exertionHeartBoost = exertionK * 32
 	
 	heartbeat = heartbeat + (owner.suiciding and 50 or 0)
-	heartbeat = heartbeat + math.Clamp(org.shock, 0, 40)
+	heartbeat = heartbeat + math.Clamp((org.shock or 0) - 20, 0, 40)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
 	heartbeat = heartbeat + exertionHeartBoost
-	local adrenalineHeartBoost = 9 * math.min(org.adrenaline, 3)
+	local adrenalineHeartBoost = 9 * math.min(math.max((org.adrenaline or 0) - 1.5, 0), 3)
 	if org.givingUp then adrenalineHeartBoost = adrenalineHeartBoost * 0.55 end
 	heartbeat = heartbeat + adrenalineHeartBoost
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
@@ -350,7 +351,7 @@ module[2] = function(owner, org, timeValue)
 		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
 		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.25
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
-		org.disorientation = math.max(org.disorientation, 0.4 + effectiveHighK * 3.6)
+		org.disorientation = math.max(org.disorientation, 0.25 + effectiveHighK * 1.5)
 		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
 	end
 
