@@ -2387,7 +2387,10 @@ hook.Add("Think", "Fake", function()
 			--lhand:SetPos(head:GetPos())
 
 			--rhand:SetPos(head:GetPos())
-
+			if not ragdoll.chokingSound then
+				ragdoll:EmitSound("physics/flesh/flesh_impact_hard"..math.random(3, 6)..".wav", 65, math.random(95, 105), 0.7)
+				ragdoll.chokingSound = true
+			end
 			local org = choking1.organism
 
 			if org then
@@ -2415,27 +2418,11 @@ hook.Add("Think", "Fake", function()
 			end
 
 			--print("huy")
-
+		else
+			ragdoll.chokingSound = false
 		end
 
-
-
-				local keyLeft = false
-
-		local keyRight = false
-
-		local isNeckSlitRolling = false
-
-		
-
-		keyLeft = ply:KeyDown(IN_MOVELEFT)
-
-		keyRight = ply:KeyDown(IN_MOVERIGHT)
-
-
-
-		if keyLeft and not inmove and !ply:InVehicle() and (isNeckSlitRolling or not ply:KeyDown(IN_USE)) then
-
+		if ply:KeyDown(IN_MOVELEFT) and ragdoll:IsOnFire() and not inmove and !ply:InVehicle() then
 			if org.canmove then
 
 				local angle = spine:GetAngles()
