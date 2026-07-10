@@ -19,9 +19,8 @@ SWEP.SuicideTime = 0.5
 SWEP.CanSuicide = true
 SWEP.SuicideNoLH = true
 
-SWEP.CantClash = true
-
 SWEP.BreakBoneMul = 0.1
+SWEP.weight = 0.5
 
 SWEP.AnimTime1 = 1.0
 SWEP.AttackTime = 0.2
@@ -31,14 +30,43 @@ SWEP.modelscale = 0.5
 SWEP.modelscale2 = 1
 
 SWEP.noreverse = true
-SWEP.BlockTier = 1
+SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "none"
-SWEP.BlockSound = {"GlassBottle.ImpactHard", 68, {95, 102}}
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("entities/zcity/glassshard.png")
 	SWEP.IconOverride = "entities/zcity/glassshard.png"
 	SWEP.BounceWeaponIcon = false
+
+	local nextGlassBlood = 0
+	hook.Add("Think", "GlassShardsClientBlood", function()
+		if nextGlassBlood > CurTime() then return end
+		nextGlassBlood = CurTime() + 0.3
+
+		local ply = LocalPlayer()
+		if not IsValid(ply) or not ply.organism or ply.organism.otrub then return end
+		local org = ply.organism
+		if not org.LodgedEntities or #org.LodgedEntities == 0 then return end
+
+		local speed = ply:GetVelocity():Length()
+		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
+		if IsValid(ply.FakeRagdoll) and IsValid(ply.FakeRagdoll:GetPhysicsObject()) then
+			speed = math.max(speed, ply.FakeRagdoll:GetPhysicsObject():GetVelocity():Length())
+		end
+		if speed < 120 then return end
+
+		for _, v in ipairs(org.LodgedEntities) do
+			if v.takeent ~= "weapon_hg_glassshard" then continue end
+
+			local bone = ent:LookupBone(v.BoneName or "")
+			if not bone or bone < 0 then bone = ent:TranslatePhysBoneToBone(v.PhysBoneID) end
+			local mat = ent:GetBoneMatrix(bone)
+			if not mat then continue end
+
+			local pos = LocalToWorld(v.OffsetPos, v.OffsetAng, mat:GetTranslation(), mat:GetAngles())
+			hg.addBloodPart(pos, VectorRand(-15, 15), nil, 0.8, 0.8, false, nil, ent)
+		end
+	end)
 end
 
 SWEP.setlh = false
@@ -52,6 +80,7 @@ SWEP.DamagePrimary = 7
 SWEP.PenetrationPrimary = 1.1
 
 SWEP.StaminaPrimary = 10
+SWEP.StaminaSecondary = 20
 
 SWEP.BleedMultiplier = 1.8
 
@@ -101,8 +130,14 @@ function SWEP:CustomAttack2()
     ent.damage = self.DamagePrimary * 0.7
     ent.MaxSpeed = 1200
     ent.DamageType = self.DamageType
-    ent.AttackHit = "GlassBottle.ImpactHard"
-    ent.AttackHitFlesh = "Flesh.ImpactHard"
+    ent.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+	ent.AttackHit = "snd_jack_hmcd_knifehit.wav"
+    ent.modelscale = self.modelscale
+    ent.uglublenie = 10
+    ent.returndamage = 8
+    ent.returnblood = 15
+    ent.penetration = 5
+    ent.PenetrationSize = 5
     ent:PrecacheGibs()
 
     ent.func = function(data)
@@ -118,9 +153,7 @@ function SWEP:CustomAttack2()
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-        local throwVel = ply:GetAimVector() * ent.MaxSpeed
-        local playerVel = ply:GetVelocity()
-        phys:SetVelocity(throwVel + playerVel * 0.5)
+        phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
         phys:AddAngleVelocity(VectorRand() * 500)
     end
 

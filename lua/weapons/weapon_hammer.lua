@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Hammer"
-SWEP.Instructions = "A regular household hammer, which has a blunt and a sharp side. Use it to block off paths or restrict someone from moving.\n\nLMB to attack.\nR + LMB to change attack mode.\nRMB to block.\nRMB + LMB to nail or throw."
+SWEP.Instructions = "A regular household hammer, which has a blunt and a sharp side. Use it to block off paths or restrict someone from moving.\n\nLMB to attack.\nR + LMB to change attack mode.\nRMB to block/nail.\nRMB + LMB to throw."
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -36,9 +36,9 @@ SWEP.AnimTime1 = 1.3
 SWEP.WaitTime1 = 1
 SWEP.AttackLen1 = 45
 SWEP.ViewPunch1 = Angle(1, 1, 0)
-SWEP.Attack2Time = 0.45
-SWEP.AnimTime2 = 1.57
-SWEP.WaitTime2 = 1.25
+SWEP.Attack2Time = 0.1
+SWEP.AnimTime2 = 0.7
+SWEP.WaitTime2 = 0.7
 SWEP.AttackLen2 = 40
 SWEP.ViewPunch2 = Angle(0, 0, -2)
 SWEP.attack_ang = Angle(0, 0, 0)
@@ -50,7 +50,7 @@ SWEP.AnimList = {
 	["idle"] = "Idle",
 	["deploy"] = "Draw",
 	["attack"] = "Attack_Quick",
-	["attack2"] = "Attack_Quick",
+	["attack2"] = "Shove",
 }
 
 SWEP.hitsoundextra = {
@@ -97,6 +97,7 @@ SWEP.SwingAng = -90
 SWEP.SwingAng2 = 0
 SWEP.AttackPos = Vector(0, 0, 0)
 SWEP.noreverse = true
+SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "metal"
 SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 SWEP.UnNailables = {MAT_METAL, MAT_SAND, MAT_SLOSH, MAT_GLASS}
@@ -107,12 +108,8 @@ function hgCheckBindObjects(ent1)
 end
 
 function SWEP:CanPrimaryAttack()
-	return not hg.KeyDown(self:GetOwner(), IN_RELOAD) and self:GetNextPrimaryFire() < CurTime()
+	return not hg.KeyDown(self:GetOwner(), IN_RELOAD)
 end
-
-SWEP.BlockTier = 2
-SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
 
 SWEP.DamageType = DMG_CLUB
 SWEP.PenetrationPrimary = 2
@@ -120,10 +117,6 @@ SWEP.MaxPenLen = 1
 SWEP.PainMultiplier = 1.65
 SWEP.PenetrationSizePrimary = 1
 SWEP.StaminaPrimary = 25
-
-local setmodevpang = Angle(0, 0, 5)
-
-local weppos1, wepang1, weppos2, wepang2 = Vector(-2, 4.5, -11), Angle(14, -90, 90), Vector(0.7, -0.5, -12), Angle(-15, 90, 96)
 SWEP.HammerModeLerpSpeed = 10
 function SWEP:ThinkAdd()
 	local ply = self:GetOwner()
@@ -143,8 +136,6 @@ function SWEP:ThinkAdd()
 	if mode == 1 then
 		self.DamagePrimary = 19
 		self.DamageType = DMG_CLUB
-		self.weaponPos = LerpFT(0.4, self.weaponPos, weppos1)
-		self.weaponAng = LerpFT(0.3, self.weaponAng, wepang1)
 		self.PenetrationPrimary = 2
 		self.MaxPenLen = 1
 		self.PainMultiplier = 1.15
@@ -155,8 +146,6 @@ function SWEP:ThinkAdd()
 	else
 		self.DamagePrimary = 15
 		self.DamageType = DMG_SLASH
-		self.weaponPos = LerpFT(0.4, self.weaponPos, weppos2)
-		self.weaponAng = LerpFT(0.3, self.weaponAng, wepang2)
 		self.PenetrationPrimary = 3
 		self.PainMultiplier = 1.1
 		self.MaxPenLen = 4
@@ -179,18 +168,12 @@ function SWEP:ThinkAdd()
 	self.weaponPos = self._hammerCurPos
 	self.weaponAng = self._hammerCurAng
 
-	--if CLIENT then return end
+	if CLIENT then return end
 	if IsValid(ply) then
-		if hg.KeyDown(ply, IN_ATTACK) and hg.KeyDown(ply, IN_RELOAD) and self:GetNextPrimaryFire() < CurTime() and not self:GetInAttack() and (self:GetAttackTime() - CurTime()) < 0 and ((self:GetLastBlocked() + 3) < CurTime()) then
+		if hg.KeyDown(ply, IN_ATTACK) and hg.KeyDown(ply, IN_RELOAD) then
 			if not self.setmode then
 				local int = self:GetNetVar("AttackMode", 1)
-				if SERVER then
-					self:SetNetVar("AttackMode", int >= 2 and 1 or (int + 1))
-				elseif CLIENT and lply == ply then
-					ViewPunch2(Angle(1, int >= 2 and -2 or 2, -1))
-				end
-				ply:EmitSound("player/clothes_generic_foley_0"..math.random(5)..".wav", 55, math.random(110, 120), 0.3, CHAN_BODY)
-				self:SetNextPrimaryFire(CurTime() + 0.5)
+				self:SetNetVar("AttackMode", int >= 2 and 1 or (int + 1))
 				self.setmode = true
 			end
 		else
@@ -333,7 +316,51 @@ function DoorIsOpen(door)
 end
 
 local vpang = Angle(3, 0, 0)
+
+function SWEP:ThrowHammer()
+	if CLIENT then return true end
+
+	local ply = self:GetOwner()
+	if not IsValid(ply) then return true end
+
+	local ent = ents.Create("ent_throwable")
+	if not IsValid(ent) then return true end
+	ent.WorldModel = self.WorldModelExchange or self.WorldModel
+
+	ent:SetPos(select(1, hg.eye(ply, 60, hg.GetCurrentCharacter(ply))) - ply:GetAimVector() * 2)
+	ent:SetAngles(ply:EyeAngles())
+	ent:SetOwner(ply)
+	ent:Spawn()
+	ent.localshit = Vector(4, 6, 0)
+	ent.wep = self:GetClass()
+	ent.owner = ply
+	ent.damage = 35
+	ent.penetration = 5
+	ent.shouldntlodge = true
+
+	local phys = ent:GetPhysicsObject()
+	if IsValid(phys) then
+		phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed * 0.5)
+		phys:AddAngleVelocity(Vector(0, ent.MaxSpeed * 0.5, 0))
+	end
+
+	if ply.organism and ply.organism.stamina then
+		ply.organism.stamina.subadd = ply.organism.stamina.subadd + 30
+	end
+
+	ply:EmitSound("weapons/slam/throw.wav", 50, math.random(95, 105))
+	ply:SelectWeapon("weapon_hands_sh")
+	ply:ViewPunch(Angle(0, 0, -2))
+
+	self:Remove()
+
+	return true
+end
+
 function SWEP:SecondaryAttack(override)
+	if override then
+		return self:ThrowHammer()
+	end
 	if CLIENT then return end
 	if self:GetLastAttack() + 3 > CurTime() then return end
 	local Owner = self:GetOwner()
@@ -371,81 +398,78 @@ function SWEP:SecondaryAttack(override)
 					Tr.Entity.Nails[Tr.PhysicsBone] = nil
 				end
 			end)
-			return
 		end
 	else
 		if Owner:KeyDown(IN_SPEED) then return end
-		if Owner:GetAmmoCount(self.Ammo) > 0 then
-			local AimVec = Owner:GetAimVector()
-			local Tr = hg.eyeTrace(Owner)
-			if self:CanNail(Tr) then
-				local NewTr, NewEnt = util.QuickTrace(Tr.HitPos, AimVec * 10, {Owner, Tr.Entity}), nil
-				if self:CanNail(NewTr) then
-					if not NewTr.HitSky then NewEnt = NewTr.Entity end
-					if NewEnt and (IsValid(NewEnt) or NewEnt:IsWorld()) and not (NewEnt:IsPlayer() or NewEnt:IsNPC() or (NewEnt == Tr.Entity)) then
-						if hgIsDoor(Tr.Entity) then
-							if Owner:GetAmmoCount(self.Ammo) > (Owner.Profession and Owner.Profession == "builder" and 1 or 2) then
-								if not DoorIsOpen(Tr.Entity) then
-									if not Tr.Entity.LockedDoorNail then Tr.Entity.LockedDoorMap = true end
-								else
-									Tr.Entity.LockedDoorMap = false
-								end
-
-								Tr.Entity:Fire("lock", "", 0)
-								Tr.Entity.LockedDoorNail = true
-								Tr.Entity.CadedByBuilder = (Owner.Profession and Owner.Profession == "builder") and true or false
-								Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - (Owner.Profession and Owner.Profession == "builder" and 2 or 3), self.Ammo)
-								sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
-								self:SprayDecals()
-								Owner:PrintMessage(HUD_PRINTCENTER, "Door Sealed")
-								Owner:ViewPunch(vpang)
-								Owner:SetAnimation(PLAYER_ATTACK1)
-								self:SetNextSecondaryFire(CurTime() + 2.5)
-								self:SetNextPrimaryFire(CurTime() + 2.5)
+		if Owner:GetAmmoCount(self.Ammo) <= 0 then return end
+		local AimVec = Owner:GetAimVector()
+		local Tr = hg.eyeTrace(Owner)
+		if self:CanNail(Tr) then
+			local NewTr, NewEnt = util.QuickTrace(Tr.HitPos, AimVec * 10, {Owner, Tr.Entity}), nil
+			if self:CanNail(NewTr) then
+				if not NewTr.HitSky then NewEnt = NewTr.Entity end
+				if NewEnt and (IsValid(NewEnt) or NewEnt:IsWorld()) and not (NewEnt:IsPlayer() or NewEnt:IsNPC() or (NewEnt == Tr.Entity)) then
+					if hgIsDoor(Tr.Entity) then
+						if Owner:GetAmmoCount(self.Ammo) > (Owner.Profession and Owner.Profession == "builder" and 1 or 2) then
+							if not DoorIsOpen(Tr.Entity) then
+								if not Tr.Entity.LockedDoorNail then Tr.Entity.LockedDoorMap = true end
 							else
-								Owner:PrintMessage(HUD_PRINTCENTER, "Need at least "..tostring((Owner.Profession and Owner.Profession == "builder") and 2 or 3).." nails to seal door.")
-							end
-						else
-							if Tr.Entity:IsRagdoll() then
-								local DmgInfo = DamageInfo()
-								DmgInfo:SetDamage(15)
-								DmgInfo:SetDamageType(DMG_SLASH)
-								DmgInfo:SetDamageForce(AimVec * 5)
-								DmgInfo:SetDamagePosition(Tr.HitPos)
-								DmgInfo:SetInflictor(self)
-								DmgInfo:SetAttacker(Owner)
-								self.Penetration = 15
-								Tr.Entity:TakeDamageInfo(DmgInfo)
-								self.Penetration = nil
+								Tr.Entity.LockedDoorMap = false
 							end
 
-							if NewEnt:IsRagdoll() then
-								local DmgInfo = DamageInfo()
-								DmgInfo:SetDamage(15)
-								DmgInfo:SetDamageType(DMG_SLASH)
-								DmgInfo:SetDamageForce(AimVec * 5)
-								DmgInfo:SetDamagePosition(NewTr.HitPos)
-								DmgInfo:SetInflictor(self)
-								DmgInfo:SetAttacker(Owner)
-								self.Penetration = 15
-								NewEnt:TakeDamageInfo(DmgInfo)
-								self.Penetration = nil
-							end
-
-							local Strength, Weld = BindObjects(Tr.Entity, Tr.HitPos, NewEnt, NewTr.HitPos, 3.5, Tr.PhysicsBone or 0, NewTr.PhysicsBone or 0)
-							--print(Tr.Entity,Weld)
-							if Weld or Weld == nil then Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - 1, self.Ammo) end
+							Tr.Entity:Fire("lock", "", 0)
+							Tr.Entity.LockedDoorNail = true
+							Tr.Entity.CadedByBuilder = (Owner.Profession and Owner.Profession == "builder") and true or false
+							Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - (Owner.Profession and Owner.Profession == "builder" and 2 or 3), self.Ammo)
 							sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
-							util.Decal("hmcd_jackanail", Tr.HitPos + Tr.HitNormal, Tr.HitPos - Tr.HitNormal)
-							Owner:ChatPrint("Bond strength: " .. tostring(Strength))
+							self:SprayDecals()
+							Owner:PrintMessage(HUD_PRINTCENTER, "Door Sealed")
 							Owner:ViewPunch(vpang)
-							self:PlayAnim("attack", 0.6, false, nil, false, true)
-							
+							Owner:SetAnimation(PLAYER_ATTACK1)
 							self:SetNextSecondaryFire(CurTime() + 2.5)
 							self:SetNextPrimaryFire(CurTime() + 2.5)
-							self:SetLastBlocked(CurTime())
+						else
+							Owner:PrintMessage(HUD_PRINTCENTER, "Need at least "..tostring((Owner.Profession and Owner.Profession == "builder") and 2 or 3).." nails to seal door.")
 						end
-						return
+					else
+						if Tr.Entity:IsRagdoll() then
+							local DmgInfo = DamageInfo()
+							DmgInfo:SetDamage(15)
+							DmgInfo:SetDamageType(DMG_SLASH)
+							DmgInfo:SetDamageForce(AimVec * 5)
+							DmgInfo:SetDamagePosition(Tr.HitPos)
+							DmgInfo:SetInflictor(self)
+							DmgInfo:SetAttacker(Owner)
+							self.Penetration = 15
+							Tr.Entity:TakeDamageInfo(DmgInfo)
+							self.Penetration = nil
+						end
+
+						if NewEnt:IsRagdoll() then
+							local DmgInfo = DamageInfo()
+							DmgInfo:SetDamage(15)
+							DmgInfo:SetDamageType(DMG_SLASH)
+							DmgInfo:SetDamageForce(AimVec * 5)
+							DmgInfo:SetDamagePosition(NewTr.HitPos)
+							DmgInfo:SetInflictor(self)
+							DmgInfo:SetAttacker(Owner)
+							self.Penetration = 15
+							NewEnt:TakeDamageInfo(DmgInfo)
+							self.Penetration = nil
+						end
+
+						local Strength, Weld = BindObjects(Tr.Entity, Tr.HitPos, NewEnt, NewTr.HitPos, 3.5, Tr.PhysicsBone or 0, NewTr.PhysicsBone or 0)
+						--print(Tr.Entity,Weld)
+						if Weld or Weld == nil then Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - 1, self.Ammo) end
+						sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
+						util.Decal("hmcd_jackanail", Tr.HitPos + Tr.HitNormal, Tr.HitPos - Tr.HitNormal)
+						Owner:ChatPrint("Bond strength: " .. tostring(Strength))
+						Owner:ViewPunch(vpang)
+						self:PlayAnim("attack", 0.6, false, nil, false, true)
+						
+						self:SetNextSecondaryFire(CurTime() + 2.5)
+						self:SetNextPrimaryFire(CurTime() + 2.5)
+						self:SetLastBlocked(CurTime())
 					end
 				end
 			end
