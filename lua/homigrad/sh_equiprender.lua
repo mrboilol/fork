@@ -30,87 +30,7 @@ if CLIENT then
 	local PixVis
 	hook.Add("Initialize", "SetupPixVis", function() PixVis = util.GetPixelVisibleHandle() end)
 	local islply
-	local color_white = Color(255, 255, 255, 255)
-	local ARMOR_RENDER_DIST_SQR = 1450 * 1450
-	local function getShadowArmorVisuals(ent)
-		if not IsValid(ent) or not ent.GetNWBool or not ent:GetNWBool("HMCD_ShadowCamouflageActive", false) then return end
 
-		local owner = ent
-		if ent:IsRagdoll() then
-			owner = hg.RagdollOwner(ent) or ent
-		end
-
-		if MODE and MODE.GetShadowCamouflageVisuals then
-			return MODE.GetShadowCamouflageVisuals(owner)
-		end
-
-		return {
-			tint = Color(110, 120, 132, 96),
-			modulation = {0.42, 0.45, 0.5},
-			blend = 0.34
-		}
-	end
-
-	local function clearArmorModels(ent)
-		if not IsValid(ent) or not ent.modelArmor then return end
-
-		for key, model in pairs(ent.modelArmor) do
-			if IsValid(model) then
-				model:Remove()
-			end
-
-			ent.modelArmor[key] = nil
-		end
-	end
-
-	local function beginShadowArmorCamouflage(ent, model)
-		local visuals = getShadowArmorVisuals(ent)
-		if not visuals then return false end
-
-		local tint = visuals.tint or Color(110, 120, 132, 96)
-		local modulation = visuals.modulation or {0.42, 0.45, 0.5}
-
-		render.SetBlend(visuals.blend or 0.34)
-		render.SetColorModulation(modulation[1], modulation[2], modulation[3])
-		render.SuppressEngineLighting(true)
-		render.SetModelLighting(BOX_FRONT, tint.r / 255, tint.g / 255, tint.b / 255)
-		render.SetModelLighting(BOX_BACK, tint.r / 255, tint.g / 255, tint.b / 255)
-		render.SetModelLighting(BOX_TOP, tint.r / 255, tint.g / 255, tint.b / 255)
-		render.SetModelLighting(BOX_BOTTOM, tint.r / 255, tint.g / 255, tint.b / 255)
-		render.SetModelLighting(BOX_LEFT, tint.r / 255, tint.g / 255, tint.b / 255)
-		render.SetModelLighting(BOX_RIGHT, tint.r / 255, tint.g / 255, tint.b / 255)
-
-		if IsValid(model) then
-			model:SetRenderMode(RENDERMODE_TRANSCOLOR)
-			model:SetColor(tint)
-		end
-
-		return true
-	end
-
-	local function endShadowArmorCamouflage(model)
-		if IsValid(model) then
-			model:SetRenderMode(RENDERMODE_NORMAL)
-			model:SetColor(color_white)
-		end
-
-		render.SuppressEngineLighting(false)
-		render.SetBlend(1)
-		render.SetColorModulation(1, 1, 1)
-		render.ResetModelLighting(1, 1, 1)
-	end
-
-	local function cachedArmorBone(ent, boneName)
-		ent.ZCArmorBones = ent.ZCArmorBones or {}
-		local idx = ent.ZCArmorBones[boneName]
-		if idx == nil then
-			idx = ent:LookupBone(boneName)
-			ent.ZCArmorBones[boneName] = idx or false
-		end
-
-		return idx == false and nil or idx
-	end
-	
 	local blmodels = {
 		["models/monolithservers/kerry/swat_male_02.mdl"] = true,
 		["models/monolithservers/kerry/swat_male_04.mdl"] = true,
@@ -176,26 +96,28 @@ if CLIENT then
 		
 		local wep = ply:IsPlayer() and ply:GetActiveWeapon()
 		
-		local viewPly = LocalPlayer():Alive() and LocalPlayer() or LocalPlayer():GetNWEntity("spect", LocalPlayer())
-		islply = ((ply:IsRagdoll() and hg.RagdollOwner(ply)) or ply) == viewPly and GetViewEntity() == viewPly
-
-		if getShadowArmorVisuals(ent) then
-			clearArmorModels(ent)
-			return
-		end
+		islply = ((ply:IsRagdoll() and hg.RagdollOwner(ply)) or ply) == (LocalPlayer():Alive() and LocalPlayer() or LocalPlayer():GetNWEntity("spect",LocalPlayer())) and GetViewEntity() == (LocalPlayer():Alive() and LocalPlayer() or LocalPlayer():GetNWEntity("spect",LocalPlayer()))
 	
 		if islply and IsValid(wep) and whitelist[wep:GetClass()] then
-			clearArmorModels(ent)
+			if not ent.modelArmor then return end
+			for k,v in ipairs(ent.modelArmor) do
+				if IsValid(v) then
+					v:Remove()
+					v = nil
+				end
+			end
 			return
 		end
 		
 	
 		if not ent.shouldTransmit or ent.NotSeen then
-			clearArmorModels(ent)
-			return
-		end
-
-		if not islply and EyePos():DistToSqr(ent:GetPos()) > ARMOR_RENDER_DIST_SQR then
+			if not ent.modelArmor then return end
+			for k,v in ipairs(ent.modelArmor) do
+				if IsValid(v) then
+					v:Remove()
+					v = nil
+				end
+			end
 			return
 		end
 		
@@ -252,6 +174,20 @@ if CLIENT then
 						model = nil
 					end
 				end)
+
+				ply.modelArmorBroken = ply.modelArmorBroken or {}
+				if not IsValid(ply.modelArmorBroken[armor]) then
+					local omodel = ClientsideModel(armorData["model"])
+					omodel:SetNoDraw(true)
+					omodel:SetModelScale((fem and armorData.femscale or armorData.scale or 1) * 1.01)
+					omodel:SetSubMaterial(0, "armor/brokenarmor")
+					omodel:SetRenderMode(RENDERMODE_TRANSALPHA)
+					omodel:SetColor(Color(255, 255, 255, 0))
+					if not armorData.nobonemerge then
+						omodel:AddEffects(EF_BONEMERGE)
+					end
+					ply.modelArmorBroken[armor] = omodel
+				end
 			end
 			
 			local ent = hg.GetCurrentCharacter(ply)
@@ -271,9 +207,7 @@ if CLIENT then
 				model:SetFlexWeight(model:GetFlexIDByName(mdl),1)
 			end
 			
-			local armorBone = cachedArmorBone(ent, armorData["bone"])
-			if not armorBone then return end
-			local matrix = ent:GetBoneMatrix(armorBone)
+			local matrix = ent:GetBoneMatrix(ent:LookupBone(armorData["bone"]))
 			if not matrix then
 				return
 			end
@@ -284,67 +218,26 @@ if CLIENT then
 			model:SetRenderOrigin(pos)
 			model:SetRenderAngles(ang)
 
-			model:SetParent(ent, armorBone)
+			model:SetParent(ent,ent:LookupBone(armorData["bone"]))
 			
 			--model:SetupBones()
 			
 			if not (islply and armorData.norender) then
-				local camouflaged = beginShadowArmorCamouflage(ent, model)
 				model:DrawModel()
-				if camouflaged then
-					endShadowArmorCamouflage(model)
+			end
+
+			local omodel = ply.modelArmorBroken and ply.modelArmorBroken[armor]
+			if IsValid(omodel) then
+				local wear = ply:GetNWFloat("ArmorWear" .. armor, 0)
+				if wear > 0.01 and not (islply and armorData.norender) then
+					omodel:SetRenderOrigin(pos)
+					omodel:SetRenderAngles(ang)
+					omodel:SetParent(ent, ent:LookupBone(armorData["bone"]))
+					omodel:SetColor(Color(255, 255, 255, math.Clamp(wear, 0, 1) * 255))
+					omodel:DrawModel()
 				end
 			end
 		end
-	end
-
-	local defibModel = "models/weapons/defib/w_eq_defibrillator.mdl"
-	local defibBone = "ValveBiped.Bip01_Spine2"
-	local defibPos = Vector(1.5, 7.5, 0)
-	local defibAng = Angle(85, 180, 90)
-	local defibFemPos = Vector(-2.4, 0, 1.1)
-
-	function hg.RenderDefibs(ent, ply)
-		if not IsValid(ent) or not IsValid(ply) then return end
-
-		if not (ply:GetNetVar("DefibAttached", false) or ent:GetNetVar("DefibAttached", false)) then
-			if IsValid(ply.modelDefib) then
-				ply.modelDefib:Remove()
-				ply.modelDefib = nil
-			end
-			return
-		end
-
-		local bone = ent:LookupBone(defibBone)
-		if not bone then return end
-
-		if not IsValid(ply.modelDefib) then
-			ply.modelDefib = ClientsideModel(defibModel)
-			ply.modelDefib:SetNoDraw(true)
-
-			ply:CallOnRemove("removedefib", function()
-				if IsValid(ply.modelDefib) then
-					ply.modelDefib:Remove()
-					ply.modelDefib = nil
-				end
-			end)
-		end
-
-		local model = ply.modelDefib
-		if not IsValid(model) then return end
-
-		local matrix = ent:GetBoneMatrix(bone)
-		if not matrix then return end
-
-		local fem = ThatPlyIsFemale(ent)
-		local bonePos, boneAng = matrix:GetTranslation(), matrix:GetAngles()
-		bonePos:Add(boneAng:Forward() * (fem and defibFemPos[1] or 0) + boneAng:Up() * (fem and defibFemPos[2] or 0) + boneAng:Right() * (fem and defibFemPos[3] or 0))
-
-		local pos, ang = LocalToWorld(defibPos, defibAng, bonePos, boneAng)
-		model:SetRenderOrigin(pos)
-		model:SetRenderAngles(ang)
-		model:SetParent(ent, bone)
-		model:DrawModel()
 	end
 	
 	hook.Add("OnNetVarSet","ArmorVarSet",function(index, key, var)
@@ -361,8 +254,65 @@ if CLIENT then
 					ent.modelArmor[k] = nil
 				end
 
+				if ent.modelArmorBroken then
+					for k,v in pairs(ent.modelArmorBroken) do
+						if IsValid(ent.modelArmorBroken[k]) then
+							ent.modelArmorBroken[k]:Remove()
+						end
+						ent.modelArmorBroken[k] = nil
+					end
+				end
+
 				ent.armors = var
 			end)
+		end
+	end)
+
+	local droppedBrokenOverlays = {}
+
+	local function EnsureDroppedBrokenOverlay(ent)
+		if not IsValid(ent) then return end
+		local idx = ent:EntIndex()
+		if droppedBrokenOverlays[idx] then return end
+		local mdl = ent:GetModel()
+		if not mdl or mdl == "" or mdl == "models/error.mdl" then return end
+		local omodel = ClientsideModel(mdl)
+		if not IsValid(omodel) then return end
+		omodel:SetNoDraw(true)
+		omodel:SetModelScale(1.01)
+		omodel:SetSubMaterial(0, "armor/brokenarmor")
+		omodel:SetRenderMode(RENDERMODE_TRANSALPHA)
+		omodel:SetColor(Color(255, 255, 255, 230))
+		droppedBrokenOverlays[idx] = omodel
+	end
+
+	hook.Add("OnNetVarSet", "BrokenDroppedArmorOverlay", function(index, key, var)
+		if key ~= "ArmorBroken" or not var then return end
+		EnsureDroppedBrokenOverlay(Entity(index))
+	end)
+
+	hook.Add("OnEntityCreated", "BrokenDroppedArmorCheck", function(ent)
+		if not IsValid(ent) then return end
+		local cls = ent:GetClass()
+		if not (cls and (cls:find("ent_armor") or cls == "armor_base")) then return end
+		timer.Simple(0.1, function()
+			if IsValid(ent) and ent:GetNWBool("ArmorBroken", false) then
+				EnsureDroppedBrokenOverlay(ent)
+			end
+		end)
+	end)
+
+	hook.Add("PostDrawTranslucentRenderables", "DroppedBrokenOverlayDraw", function()
+		for idx, omodel in pairs(droppedBrokenOverlays) do
+			local parent = Entity(idx)
+			if not IsValid(parent) then
+				omodel:Remove()
+				droppedBrokenOverlays[idx] = nil
+			else
+				omodel:SetRenderOrigin(parent:GetPos())
+				omodel:SetRenderAngles(parent:GetAngles())
+				omodel:DrawModel()
+			end
 		end
 	end)
 	
