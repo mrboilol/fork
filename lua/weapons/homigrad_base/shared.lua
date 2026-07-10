@@ -213,9 +213,9 @@ end
 function SWEP:GetHandSupportState(ply)
 	ply = ply or self:GetOwner()
 	local org = IsValid(ply) and ply.organism or {}
-	-- Hold type only controls the animation.  A pistol can still use its off hand
-	-- for support, so use the actual left-hand IK state instead.
-	local wantsTwoHands = self.lhandik ~= false
+	-- IK is clientside presentation state and can disagree with the server. Every
+	-- firearm can benefit from an off-hand brace unless it explicitly opts out.
+	local wantsTwoHands = self.OneHandedOnly ~= true
 	local rightBad = org.rarmamputated or (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
 	local leftBad = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
 	local rightUsable = not rightBad
@@ -227,27 +227,31 @@ function SWEP:GetHandSupportState(ply)
 
 	if IsValid(ply) then
 		local hands = ply:GetWeapon("weapon_hands_sh")
-		local carrying = ply.GetNetVar and (IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) or false
+		local carryingMain = ply.GetNetVar and IsValid(ply:GetNetVar("carryent")) or false
+		local carryingOffhand = ply.GetNetVar and IsValid(ply:GetNetVar("carryent2")) or false
 		local zmanipLeft = ply.zmanipstart ~= nil and ply.zmanipseq == "interact" and not org.larmamputated
 		local fakeLeftGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsLH)
 		local fakeRightGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsRH)
 		local handsCarry = IsValid(hands) and (IsValid(hands.CarryEnt) or hands.UsingBothHands or hands.UsingLeftHand or hands.UsingRightHand)
 		local handsUsesLeft = handsCarry and hands.UsingLeftHand ~= false
 		local handsUsesRight = handsCarry and hands.UsingRightHand == true
-		local offhandBusy = carrying or handsUsesLeft or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
+		local offhandBusy = carryingMain or carryingOffhand or handsUsesLeft or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
 
 		if offhandBusy then
 			leftBusy = leftUsable
 		end
 
-		rightBusy = handsUsesRight and not handsUsesLeft
-		rightBusy = rightBusy or fakeRightGrip and not leftUsable
+		-- Main dragging and right-hand ragdoll/crawl grips consume the firing hand
+		-- even when the left hand is occupied at the same time.
+		rightBusy = rightUsable and (carryingMain or handsUsesRight or fakeRightGrip)
 	end
 
 	local rightSupport = rightUsable and not rightBusy
 	local leftSupport = leftUsable and not leftBusy and wantsTwoHands and not postureOneHanded
 	local supportHands = (rightSupport and 1 or 0) + (leftSupport and 1 or 0)
-	local oneHanded = postureOneHanded or (wantsTwoHands and supportHands <= 1)
+	local oneHanded = postureOneHanded or leftBusy or rightBusy or (wantsTwoHands and supportHands <= 1)
+	local onlyLeft = leftSupport and not rightSupport
+	local onlyRight = rightSupport and not leftSupport
 
 	return {
 		wantsTwoHands = wantsTwoHands,
@@ -262,8 +266,9 @@ function SWEP:GetHandSupportState(ply)
 		leftSupport = leftSupport,
 		supportHands = supportHands,
 		oneHanded = oneHanded,
-		onlyLeft = not rightUsable and leftUsable,
-		onlyRight = rightUsable and not leftUsable
+		onlyLeft = onlyLeft,
+		onlyRight = onlyRight,
+		firingArm = onlyLeft and "larm" or "rarm"
 	}
 end
 
@@ -284,18 +289,25 @@ function SWEP:GetRecoilImpulseFactors()
 	local force = ammo.Force or primary.Force2 or primary.Force or 30
 	local diameter = ammo.Diameter or 7.62
 	local mass = ammo.Mass or 8
+	local speed = ammo.Speed or 700
 	local numBullet = ammo.NumBullet or self.NumBullet or 1
 	local weight = self.weight or self.Weight or 5
 
-	local forceFactor = math.Clamp(force / 40, 0.35, 3.5)
-	local diameterFactor = math.Clamp(diameter / 7.62, 0.55, 2.1)
-	local massFactor = math.Clamp(mass / 8, 0.5, 2.25)
-	local pelletFactor = numBullet > 1 and math.Clamp(math.sqrt(numBullet) * 0.55, 1, 2.4) or 1
+	-- Shotgun tables describe each pellet. Recoil comes from the whole payload,
+	-- so reconstruct its total mass/diameter and a damped total force here.
+	local payloadCount = math.max(numBullet, 1)
+	local payloadMass = mass * payloadCount
+	local payloadDiameter = diameter * payloadCount
+	local recoilForce = force * (1 + math.max(payloadCount - 1, 0) * 0.55)
+	local forceFactor = math.Clamp(recoilForce / 40, 0.25, 3.75)
+	local momentumFactor = math.Clamp((payloadMass * speed) / (8 * 700), 0.3, 3.2)
+	local diameterFactor = math.Clamp(payloadDiameter / 7.62, 0.55, 2.1)
+	local payloadFactor = payloadCount > 1 and math.Clamp(1 + math.log(payloadCount) / math.log(2) * 0.06, 1, 1.25) or 1
 
-	local caliber = math.Clamp((forceFactor * 0.62 + diameterFactor * 0.23 + massFactor * 0.15) * pelletFactor, 0.35, 3.4)
+	local caliber = math.Clamp((forceFactor * 0.45 + momentumFactor * 0.4 + diameterFactor * 0.15) * payloadFactor, 0.3, 3.6)
 	local weaponMass = math.Clamp(3 / math.max(weight, 0.5), 0.55, 1.75)
 
-	return caliber, weaponMass, force, numBullet, ammo
+	return caliber, weaponMass, recoilForce, numBullet, ammo
 end
 
 function SWEP:GetRecoilSupportMul()

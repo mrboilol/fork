@@ -57,7 +57,6 @@ local cvTraumaCorpse = CreateConVar("hg_ptsd_trauma_corpse", "3", FCVAR_ARCHIVE 
 local cvTraumaHead = CreateConVar("hg_ptsd_trauma_head_explosion", "14", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from seeing a head explosion", 0, 60)
 local cvTraumaGunfire = CreateConVar("hg_ptsd_trauma_gunfire", "1.5", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from nearby confirmed bullet hits", 0, 10)
 local cvTraumaExplosion = CreateConVar("hg_ptsd_trauma_explosion", "15", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from blast damage", 0, 60)
-local cvTraumaKill = CreateConVar("hg_ptsd_trauma_kill", "5", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from killing another player", 0, 50)
 local cvTraumaCombat = CreateConVar("hg_ptsd_trauma_combat", "3", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma per combat second", 0, 60)
 local cvFlashbackMin = CreateConVar("hg_ptsd_flashback_min", "50", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum PTSD trauma for flashbacks", 0, 100)
 local cvRandomFlashMin = CreateConVar("hg_ptsd_random_flash_min", "180", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum random PTSD flashback interval", 30, 3600)
@@ -83,6 +82,27 @@ end
 local function get_org(ply)
 	if not IsValid(ply) or not ply:IsPlayer() then return nil end
 	return ply.organism
+end
+
+local function resolve_harm_attacker(victim, attacker)
+	if IsValid(attacker) and attacker:IsPlayer() then return attacker end
+	if IsValid(attacker) and attacker.GetOwner then
+		local owner = attacker:GetOwner()
+		if IsValid(owner) and owner:IsPlayer() then return owner end
+	end
+	if IsValid(victim) and victim.GetPhysicsAttacker then
+		local physicsAttacker = victim:GetPhysicsAttacker()
+		if IsValid(physicsAttacker) and physicsAttacker:IsPlayer() then return physicsAttacker end
+	end
+	if zb and zb.HarmDone and IsValid(victim) then
+		local mostHarm, culprit = 0, nil
+		for candidate, harm in pairs(zb.HarmDone[victim] or {}) do
+			if IsValid(candidate) and candidate:IsPlayer() and harm > mostHarm then
+				mostHarm, culprit = harm, candidate
+			end
+		end
+		return culprit
+	end
 end
 
 local function get_opioid_level(org)
@@ -616,10 +636,12 @@ hook.Add("EntityTakeDamage", "hg_ptsd_nearby_hit", function(target, dmgInfo)
 	end
 
 	if not dmgInfo:IsBulletDamage() then return end
+	local attacker = resolve_harm_attacker(target, dmgInfo:GetAttacker())
 
 	local targetPos = target:GetPos()
 	for _, ply in ipairs(player.GetAll()) do
 		if ply == target then continue end
+		if IsValid(attacker) and ply == attacker then continue end
 		if not IsValid(ply) or not ply:Alive() then continue end
 		local state = get_state(ply)
 		if not state then continue end
@@ -638,13 +660,9 @@ hook.Add("PlayerDeath", "hg_ptsd_kill_trauma", function(victim, inflictor, attac
 	if IsValid(victim) and victim:IsPlayer() then
 		add_trauma(victim, 25, "own_death", {combat = false})
 	end
-
-	if not IsValid(attacker) or not attacker:IsPlayer() then return end
-	if attacker == victim then return end
-	add_trauma(attacker, cvTraumaKill:GetFloat(), "kill", {combat = true})
 end)
 
-local function witness_death_trauma(victim, ent, amount, reason, radius)
+local function witness_death_trauma(victim, ent, amount, reason, radius, attacker)
 	if not IsValid(ent) then return end
 	local pos = ent.WorldSpaceCenter and ent:WorldSpaceCenter() or ent:GetPos()
 	local now = CurTime()
@@ -652,6 +670,7 @@ local function witness_death_trauma(victim, ent, amount, reason, radius)
 	for _, ply in ipairs(player.GetAll()) do
 		if not IsValid(ply) or not ply:Alive() then continue end
 		if ply == victim then continue end
+		if IsValid(attacker) and ply == attacker then continue end
 
 		local state = get_state(ply)
 		if not state then continue end
@@ -669,11 +688,11 @@ local function witness_death_trauma(victim, ent, amount, reason, radius)
 end
 
 hook.Add("HG_HeadExploded", "hg_ptsd_head_explosion", function(rag, victim)
-	witness_death_trauma(victim, rag, cvTraumaHead:GetFloat(), "head_explosion", 900)
+	witness_death_trauma(victim, rag, cvTraumaHead:GetFloat(), "head_explosion", 900, resolve_harm_attacker(victim))
 end)
 
 hook.Add("RagdollDeath", "hg_ptsd_death_witness", function(victim, rag)
-	witness_death_trauma(victim, rag, cvTraumaDeath:GetFloat(), "witness_death", 700)
+	witness_death_trauma(victim, rag, cvTraumaDeath:GetFloat(), "witness_death", 700, resolve_harm_attacker(victim))
 end)
 
 concommand.Add("hg_ptsd", function(ply, cmd, args)

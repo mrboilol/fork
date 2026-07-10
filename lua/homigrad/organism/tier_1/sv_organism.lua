@@ -389,10 +389,11 @@ function META2:IsStimulated()
 	return false
 end
 
-function hg.organism.AddPanicAttack(org, amount, silent)
+function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
-	if math.random(panicattack_gain_chance) != 1 then return org.panicattackadd or 0 end
+	local chance = math.Clamp((tonumber(chanceMultiplier) or 1) / panicattack_gain_chance, 0, 1)
+	if math.Rand(0, 1) > chance then return org.panicattackadd or 0 end
 
 	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
 
@@ -505,7 +506,7 @@ local function resolve_panic_attacker(victim, attacker)
 	end
 end
 
-local function panic_witness_event(victim, attacker, amount, radius)
+local function panic_witness_event(victim, attacker, amount, radius, chanceMultiplier)
 	if not IsValid(victim) then return end
 	if not isnumber(amount) or amount <= 0 then return end
 
@@ -527,7 +528,7 @@ local function panic_witness_event(victim, attacker, amount, radius)
 
 		if tr.Hit then continue end
 
-		hg.organism.AddPanicAttack(watcher.organism, amount, true)
+		hg.organism.AddPanicAttack(watcher.organism, amount, true, chanceMultiplier)
 	end
 end
 
@@ -649,8 +650,15 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 		local eye = ply:EyePos()
 		local toEye = eye - src
 		local t = toEye:Dot(dir)
-		if t <= 0 or t >= range then continue end
 
+		local gunfightDist = ply:GetPos():Distance(src)
+		if (org._panicNextGunfire or 0) <= now and gunfightDist <= 700 then
+			local gunfightFalloff = math.Clamp(1 - gunfightDist / 700, 0, 1)
+			hg.organism.AddPanicAttack(org, 0.08 + gunfightFalloff * 0.14, true, 1.5)
+			org._panicNextGunfire = now + 0.9
+		end
+
+		if t <= 0 or t >= range then continue end
 		local closest = src + dir * t
 		local dist = eye:Distance(closest)
 		if dist > 130 then continue end
@@ -667,6 +675,28 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 			org.despair = math.min((org.despair or 0) + add, 1)
 			org._despairNextNearBullet = now + 0.22
 		end
+
+	end
+end)
+
+hook.Add("Org Think", "PanicAttackNearbyFire", function(owner, org, timeValue)
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+	if not org or org.otrub or org.givingUp then return end
+	if (org._panicNextFireCheck or 0) > CurTime() then return end
+	org._panicNextFireCheck = CurTime() + 1
+
+	local closest = nil
+	for _, ent in ipairs(ents.FindInSphere(owner:GetPos(), 450)) do
+		if not IsValid(ent) or ent == owner then continue end
+		local isFire = ent:GetClass() == "env_fire" or ent:GetClass() == "vfire" or ent:IsOnFire()
+		if not isFire then continue end
+		local dist = owner:GetPos():Distance(ent:GetPos())
+		if not closest or dist < closest then closest = dist end
+	end
+
+	if closest then
+		local falloff = math.Clamp(1 - closest / 450, 0, 1)
+		hg.organism.AddPanicAttack(org, 0.06 + falloff * 0.12, true, 1.5)
 	end
 end)
 
@@ -1621,12 +1651,12 @@ end)
 
 hook.Add("PlayerDeath", "PanicAttackWitnessDeath", function(victim, inflictor, attacker)
 	local realAttacker = resolve_panic_attacker(victim, attacker)
-	panic_witness_event(victim, realAttacker, 0.14, panicattack_death_radius)
+	panic_witness_event(victim, realAttacker, 0.22, panicattack_death_radius, 2)
 end)
 
 hook.Add("OnNPCKilled", "PanicAttackWitnessNPCDeath", function(victim, attacker, inflictor)
 	local realAttacker = resolve_panic_attacker(victim, attacker)
-	panic_witness_event(victim, realAttacker, 0.1, panicattack_death_radius)
+	panic_witness_event(victim, realAttacker, 0.16, panicattack_death_radius, 2)
 end)
 
 hook.Add("HG_OnWakeOtrub", "afterOtrub", function( owner )

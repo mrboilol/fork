@@ -280,6 +280,12 @@ local not_enough_intake = {
 	"I'm struggling to breathe...",
 }
 
+local barely_breathing = {
+	"My breathing is getting shallow...",
+	"I can barely catch my breath...",
+	"Every breath feels weak...",
+}
+
 local drop_mask = {
 	"I can't breathe in this mask... I need to take it off.",
 	"Drop the mask, it's not worth it...",

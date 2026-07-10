@@ -84,10 +84,10 @@ local function clear_legacy_panic(org)
 	org._postPanicEndTime = 0
 end
 
-local function add_panic_pressure(owner, org, amount)
+local function add_panic_pressure(owner, org, amount, chanceMultiplier)
 	if not org or amount <= 0 then return end
 	if hg and hg.organism and hg.organism.AddPanicAttack then
-		hg.organism.AddPanicAttack(org, amount)
+		hg.organism.AddPanicAttack(org, amount, true, chanceMultiplier)
 	else
 		org.panicattackadd = Clamp((org.panicattackadd or 0) + amount, 0, 1)
 	end
@@ -246,24 +246,25 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		return
 	end
 
-	-- If they just gained despair, make it hard for it to go away
+	-- Let despair settle once the immediate threat has passed.  Recent harm still
+	-- has a short hold, but a safe player should not remain stuck in the state.
 	local currentDespair = org.despair or 0
 	local lastDespair = org._lastDespair or 0
 	if currentDespair > lastDespair then
-		-- Lock decay based on the amount of despair gained (e.g., if it went all the way up to 1.0, lock for 30 seconds)
+		-- Large events get a brief pause before recovery, rather than the old long lock.
 		local gained = currentDespair - lastDespair
-		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + 10 + (gained * 30))
+		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + 4 + (gained * 12))
 	end
 	local isLocked = CurTime() < (org._despairLockUntil or 0)
 	local stableAtFullDespair = currentDespair >= 0.995 and not is_in_danger(org)
-	if stableAtFullDespair and (org._despairLockUntil or 0) > CurTime() + 8 then
-		org._despairLockUntil = CurTime() + 8
+	if stableAtFullDespair and (org._despairLockUntil or 0) > CurTime() + 4 then
+		org._despairLockUntil = CurTime() + 4
 		isLocked = true
 	end
 
 	-- Despair budge less unless despair hasn't been gained for a little bit
 	local timeSinceGain = CurTime() - (org._despairLastGainedTime or 0)
-	local despairDecay = timeValue / 180
+	local despairDecay = timeValue / 120
 	if isLocked then
 		despairDecay = 0
 	else
@@ -271,26 +272,26 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		if org.otrub then
 			despairDecay = despairDecay * 3
 		end
-		-- Slower decay if despair was gained recently (within 30 seconds)
-		if timeSinceGain < 30 then
+		-- Slow recovery only during the short period directly after a stressor.
+		if timeSinceGain < 12 then
 			if org.despair > 0.7 then
-				despairDecay = timeValue / 360 -- Half decay rate when despair is high and recently gained
+				despairDecay = timeValue / 210
 			elseif org.despair > 0.5 then
-				despairDecay = timeValue / 270 -- Slower decay when despair is moderate and recently gained
+				despairDecay = timeValue / 165
 			else
-				despairDecay = timeValue / 240 -- Slower decay when recently gained
+				despairDecay = timeValue / 145
 			end
 		elseif org.despair > 0.7 then
-			despairDecay = timeValue / 360 -- Half decay rate when despair is high
+			despairDecay = timeValue / 180
 		elseif org.despair > 0.5 then
-			despairDecay = timeValue / 270 -- Slower decay when despair is moderate
+			despairDecay = timeValue / 145
 		end
-		-- Faster decay if despair hasn't been gained in a while (60+ seconds)
-		if timeSinceGain > 60 then
-			despairDecay = despairDecay * (1 + (timeSinceGain - 60) / 60) -- Up to 2x faster after 120 seconds
+		-- Once no new stress has arrived, recovery accelerates noticeably.
+		if timeSinceGain > 25 then
+			despairDecay = despairDecay * math.min(1 + (timeSinceGain - 25) / 35, 2.5)
 		end
-		if stableAtFullDespair and timeSinceGain > 20 then
-			despairDecay = max(despairDecay, timeValue / 90)
+		if stableAtFullDespair and timeSinceGain > 8 then
+			despairDecay = max(despairDecay, timeValue / 55)
 		end
 	end
 	org.despair = math.Approach(org.despair, 0, despairDecay)
@@ -769,7 +770,7 @@ hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
 		if not org.givingUp and not org.otrub then
 			local panicChance = 0.12 * Clamp((org.despair or 0) / 0.3, 0.15, 1)
 			if math.random() < panicChance then
-				add_panic_pressure(ply, org, 0.2)
+				add_panic_pressure(ply, org, 0.28, 2)
 			end
 		end
 	end

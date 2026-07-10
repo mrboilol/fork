@@ -87,16 +87,16 @@ function SWEP:PrimarySpread()
 		if org then
 			if IsSlugcatRecoilImmune(owner, self) then return end
 
+			local _, _, recoilForce, numB = self:GetRecoilImpulseFactors()
 			local force = self.Primary.Force2 or self.Primary.Force or 30
-			local numB = self.NumBullet or 1
-			local calForce = force * numB
+			local calForce = recoilForce
 			local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 
 			local rarm_broken = (org.rarm and org.rarm >= 1) and not org.rarmamputated
 			local larm_broken = (org.larm and org.larm >= 1) and not org.larmamputated
 			local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
 			local larm_dislocated = org.larmdislocated or org.larmdislocation
-			local firingArm = support.onlyLeft and "larm" or "rarm"
+			local firingArm = support.firingArm or (support.onlyLeft and "larm" or "rarm")
 			local firingBroken = firingArm == "larm" and larm_broken or rarm_broken
 			local firingDislocated = firingArm == "larm" and larm_dislocated or rarm_dislocated
 			local firingAmputated = firingArm == "larm" and org.larmamputated or org.rarmamputated
@@ -130,8 +130,8 @@ function SWEP:PrimarySpread()
 				if firingBroken or firingDislocated then oneHandPain = oneHandPain + calForce * 0.28 end
 				org.painadd = org.painadd + oneHandPain
 
-				if not firingAmputated and calForce >= 42 then
-					local wristChance = math.Clamp((calForce - 34) / 260, 0.015, 0.35)
+				if not firingAmputated and calForce >= 34 then
+					local wristChance = math.Clamp((calForce - 28) / 150, 0.025, 0.42)
 					if support.wantsTwoHands then wristChance = wristChance * 1.35 end
 					if support.onlyLeft then wristChance = wristChance * 1.25 end
 					if firingBroken or firingDislocated then wristChance = wristChance * 1.8 end
@@ -139,7 +139,7 @@ function SWEP:PrimarySpread()
 					wristChance = math.Clamp(wristChance, 0.015, 0.65)
 
 					if math.random() < wristChance then
-						org[firingArm] = math.max(org[firingArm] or 0, firingBroken and 1 or 0.55)
+						org[firingArm] = math.max(org[firingArm] or 0, 1)
 						org[firingArm .. "dislocation"] = true
 						org.painadd = org.painadd + 35 + calForce * 0.45
 						owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(105, 125), 1, CHAN_AUTO)
@@ -147,7 +147,7 @@ function SWEP:PrimarySpread()
 							hg.BreakLimb(owner, firingArm, nil, true)
 						end
 						DropWrenchedWeapon(owner, self)
-						owner:Notify("The recoil wrenched your " .. (firingArm == "larm" and "left" or "right") .. " wrist.", 1, firingArm .. "_onehand_recoil", 1, nil, nil)
+						owner:Notify("The recoil broke your " .. (firingArm == "larm" and "left" or "right") .. " wrist.", 1, firingArm .. "_onehand_recoil", 1, nil, nil)
 					end
 				end
 			end
@@ -246,7 +246,8 @@ function SWEP:PrimarySpread()
 		if support.rightBusy then oneHandRecoilMul = oneHandRecoilMul * 1.55 end
 		if support.wantsTwoHands and support.supportHands <= 1 then oneHandRecoilMul = oneHandRecoilMul * 1.25 end
 
-		local force = math.Clamp(caliberMul * weightMul * 0.38, 0.1, 2.45) * oneHandRecoilMul * self.addSprayMul * math.min(sprayI / 30,0.75)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
+		local recoilProgress = 0.55 + math.Clamp((sprayI - 1) / 10, 0, 1) * 0.45
+		local force = math.Clamp(caliberMul * weightMul * 0.38, 0.1, 2.45) * oneHandRecoilMul * self.addSprayMul * recoilProgress
 
 		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
 		local dominance = organism.hand_dominance or "right"
@@ -337,10 +338,9 @@ function SWEP:PrimarySpread()
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
 
-		local angRand = AngleRand(0.03, 0.05)
-		angRand[1] = -math.abs(angRand[1])
-		angRand[2] = (math.random(2) == 1 and 1 or -1) * angRand[2]
-		angRand[3] = 0
+		-- Baseline shot dispersion is pitch-dominant. Horizontal movement is still
+		-- present, but cannot overpower vertical climb on light pistols.
+		local angRand = Angle(-math.Rand(0.035, 0.06), math.Rand(-0.016, 0.016), 0)
 		local spray
 
 		if sprayI < 3 then

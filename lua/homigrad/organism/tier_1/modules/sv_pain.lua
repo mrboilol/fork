@@ -25,7 +25,7 @@ local pain_shock_max_gain = 10
 local pain_tolerance = 120
 local otrub_pain_tolerance = 90
 local pain_fake_threshold = 0.9
-local pain_drain_base = 20
+local pain_drain_base = 12
 local pain_drain_otrub_mul = 4.5
 module[1] = function(org)
 
@@ -155,7 +155,8 @@ module[2] = function(owner, org, timeValue)
 
 	if org.pain > 60 and not org.otrub then
 
-		add = add / 5
+		-- Severe pain compounds: it is harder to settle and more readily aggravated.
+		add = add * 1.5
 
 		if org.pain > 70 and add > 0.01 then
 
@@ -324,11 +325,11 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	local adrenalineDecayRate = timeValue / (org.otrub and 5 or 12)
+	local adrenalineDecayRate = timeValue / (org.otrub and 8 or 20)
 
 	if fastAdrenalineDecay then
 
-		adrenalineDecayRate = timeValue / 5 -- Much faster decay
+		adrenalineDecayRate = timeValue / 8 -- Faster than normal, but still a gradual comedown
 
 	end
 
