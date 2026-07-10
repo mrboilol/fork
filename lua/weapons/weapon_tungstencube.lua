@@ -12,6 +12,7 @@ SWEP.AdminOnly = false
 SWEP.ViewModel = "models/linnaeus/weaps/v_tungsten.mdl"
 SWEP.WorldModel = "models/linnaeus/weaps/w_tungsten.mdl"
 SWEP.HoldType = "melee"
+SWEP.DisableDefaultShadow = true
 
 SWEP.modelscale = 1.4
 SWEP.HoldPos = Vector(-5, 2, -2)
@@ -105,8 +106,16 @@ function SWEP:CanSecondaryAttack()
     return false
 end
 
-if CLIENT then
-    function SWEP:Think()
-        self:MarkShadowAsDirty()
+function SWEP:Initialize()
+    self:SetHoldType(self.HoldType)
+
+    if CLIENT then
+        self:DrawShadow(false)
+    end
+end
+
+function SWEP:Think()
+    if CLIENT then
+        self:DrawShadow(false)
     end
 end

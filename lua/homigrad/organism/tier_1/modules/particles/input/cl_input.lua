@@ -123,17 +123,13 @@ end)
 			ang = headang
 		end
 	end
-	if headshot then
+	if headshot and not redmist then
 		ParticleEffect("headshot", pos, ang)
 	end
 	if redmist then
-		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-35, 35) + ang:Forward() * -15, nil, Rand(8, 15), Rand(8, 15), 0.6, true, renderEnt or ent)
-		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-25, 25), nil, Rand(5, 12), Rand(5, 12), 0.45, true, renderEnt or ent)
-		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-20, 20), nil, Rand(3, 8), Rand(3, 8), 0.35, true, renderEnt or ent)
-		hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-45, 45) + ang:Forward() * -20, nil, Rand(10, 18), Rand(10, 18), 0.75, true, renderEnt or ent)
-		hg.addBloodPart2(pos + VectorRand(-3, 3), VectorRand(-30, 30), nil, Rand(6, 14), Rand(6, 14), 0.55, true, renderEnt or ent)
-		hg.addBloodPart(pos + VectorRand(-1, 1), VectorRand(-20, 20) + ang:Forward() * -10, nil, 2, 2, true, nil, renderEnt or ent)
-		hg.addBloodPart(pos + VectorRand(-1, 1), VectorRand(-25, 25), nil, 2, 2, true, nil, renderEnt or ent)
+		for i = 1, math.random(1, 2) do
+			hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), VectorRand(-18, 18) + ang:Forward() * -8, nil, Rand(6, 10), Rand(6, 10), Rand(0.25, 0.4), true, renderEnt or ent)
+		end
 	end
 	if club then
 		local spitColor = Color(210, 230, 235, 110)
@@ -164,25 +160,91 @@ local limbs = {
 	["rleg"] = "ValveBiped.Bip01_R_Calf",
 	["larm"] = "ValveBiped.Bip01_L_Forearm",
 	["rarm"] = "ValveBiped.Bip01_R_Forearm",
+	["head"] = "ValveBiped.Bip01_Head1",
 }
 
-hook.Add("HG_OrganismChanged", "explodelegs", function(oldorg, org)
+local injuryBones = {
+	skull = "ValveBiped.Bip01_Head1",
+	spine1 = "ValveBiped.Bip01_Spine",
+	spine2 = "ValveBiped.Bip01_Spine1",
+	spine3 = "ValveBiped.Bip01_Spine2",
+	chest = "ValveBiped.Bip01_Spine2",
+	pelvis = "ValveBiped.Bip01_Pelvis",
+	lleg = limbs.lleg,
+	rleg = limbs.rleg,
+	larm = limbs.larm,
+	rarm = limbs.rarm,
+}
+
+local severeOrgans = {
+	heart = "ValveBiped.Bip01_Spine2",
+	stomach = "ValveBiped.Bip01_Spine1",
+	liver = "ValveBiped.Bip01_Spine1",
+	intestines = "ValveBiped.Bip01_Pelvis",
+	lungsL = "ValveBiped.Bip01_Spine2",
+	lungsR = "ValveBiped.Bip01_Spine2",
+	trachea = "ValveBiped.Bip01_Neck1",
+	brain = "ValveBiped.Bip01_Head1",
+}
+
+local function getInjuryPos(ent, boneName)
+	if not IsValid(ent) then return end
+	local bone = boneName and ent:LookupBone(boneName)
+	local mat = bone and ent:GetBoneMatrix(bone)
+	return mat and mat:GetTranslation() or ent:WorldSpaceCenter()
+end
+
+local function emitInjuryMist(ent, pos)
+	if not pos then return end
+	for i = 1, math.random(1, 2) do
+		hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), VectorRand(-18, 18) + Vector(0, 0, math.Rand(4, 14)), nil, math.Rand(6, 10), math.Rand(6, 10), math.Rand(0.25, 0.4), true, ent)
+	end
+end
+
+hook.Add("HG_OrganismChanged", "injury_damage_mist", function(oldorg, org)
 	local ply = org.owner
 	local ent = hg.GetCurrentCharacter(ply)
-	
+	if not IsValid(ent) then return end
+
+	local mistPos
 	for ind, nam in pairs(limbs) do
 		if !oldorg[ind.."amputated"] and org[ind.."amputated"] then
-			local bone = ent:LookupBone(nam)
+			mistPos = getInjuryPos(ent, nam)
+			break
+		end
+	end
 
-			if bone then
-				local mat = ent:GetBoneMatrix(bone)
-
-				if mat then
-					explode(mat:GetTranslation() + mat:GetAngles():Forward() * 8, 0.5, Vector())
-				end
+	if not mistPos then
+		for key, boneName in pairs(injuryBones) do
+			if key != "skull" and (oldorg[key] or 0) < 1 and (org[key] or 0) >= 1 then
+				mistPos = getInjuryPos(ent, boneName)
+				break
 			end
 		end
 	end
+
+	if not mistPos then
+		for key, boneName in pairs(severeOrgans) do
+			if (oldorg[key] or 0) < 0.75 and (org[key] or 0) >= 0.75 then
+				mistPos = getInjuryPos(ent, boneName)
+				break
+			end
+		end
+	end
+
+	if not mistPos and #(org.arterialwounds or {}) > #(oldorg.arterialwounds or {}) then
+		local wound = org.arterialwounds[#org.arterialwounds]
+		local boneName = wound and wound[4]
+		local bone = boneName and ent:LookupBone(boneName)
+		local mat = bone and ent:GetBoneMatrix(bone)
+		if mat and wound[2] and wound[3] then
+			mistPos = LocalToWorld(wound[2], wound[3], mat:GetTranslation(), mat:GetAngles())
+		else
+			mistPos = getInjuryPos(ent, boneName)
+		end
+	end
+
+	emitInjuryMist(ent, mistPos)
 end)
 
 hg.explode = explode

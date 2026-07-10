@@ -548,7 +548,10 @@ hook.Add("NetworkEntityCreated", "HG_GiveRenderOverride", function(ragdoll)
 			ragdoll.RenderOverride = function(self, flags)
 				if not IsValid(self) or self:IsDormant() then return end
 				local bonePos = self:GetBonePosition(1)
-				if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then return end
+				if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then
+					self:DrawModel()
+					return
+				end
 				if not self:GetNWString("PlayerName") then return end
 				local ply = self:GetNWEntity("ply")
 				local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
@@ -599,7 +602,10 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 		ent.RenderOverride = function(self, flags)
 			if not IsValid(self) or self:IsDormant() then return end
 			local bonePos = self:GetBonePosition(1)
-			if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then return end
+			if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then
+				self:DrawModel()
+				return
+			end
 			local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
 			
 			hg.renderOverride(ply, self, flags)
@@ -753,7 +759,8 @@ end
 -- as long as the physical ragdoll is active.
 hook.Add("Think", "HG_FakeRagdollShadowState", function()
 	for _, ply in ipairs(player.GetAll()) do
-		local shouldDraw = not IsValid(ply.FakeRagdoll)
+		local networkRagdoll = ply:GetNWEntity("FakeRagdoll", NULL)
+		local shouldDraw = not IsValid(ply.FakeRagdoll) and not IsValid(networkRagdoll)
 		if ply.hg_fakeShadowDrawn ~= shouldDraw then
 			ply:DrawShadow(shouldDraw)
 			ply.hg_fakeShadowDrawn = shouldDraw

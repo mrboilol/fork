@@ -1273,6 +1273,10 @@ end
 
 function SWEP:Think()
     self:CustomThink()
+
+	if CLIENT and self.DisableDefaultShadow then
+		self:DrawShadow(false)
+	end
 end
 
 if CLIENT then
@@ -3879,6 +3883,10 @@ function SWEP:Initialize()
     self:PlayAnim("idle",10,true)
 
 	if CLIENT then
+		if self.DisableDefaultShadow then
+			self:DrawShadow(false)
+		end
+
 		self.ShakePos = Vector(0,0,0)
 		self.ShakeAng = Angle(0,0,0)
 		self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>".. self.PrintName .."</font>\n<font=ZCity_SuperTiny><colour=125,125,125>".. self.HowToUseInstructions .."</colour></font>",450)

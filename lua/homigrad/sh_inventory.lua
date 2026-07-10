@@ -520,10 +520,6 @@ if CLIENT then
 					TakeItem(tab, i, thing, ent)
 				end
 				
-				button.DoClick = function()
-					return
-				end
-
 				button.DoRightClick = function()
 					if not ent.foundloot[i] then return end
 					if cooldown > CurTime() then return end

@@ -1394,6 +1394,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 
+		-- Pain is drawn after the shock pass and can otherwise wash the darker
+		-- shock vignette out at high values. Reapply the shock layer last so it
+		-- remains visible throughout the pain range.
+		render.UpdateScreenEffectTexture()
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
 		if not org.otrub then
 			render.UpdateScreenEffectTexture()
 			chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100 + extremePainFlicker * 0.3, 0, 0.35) * 1.5)

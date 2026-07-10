@@ -108,6 +108,8 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._giveUpDirectCheckTime = 0
 	org._giveUpHeartStopCheck = 0
 	org._despairLastBP = nil
+	org._despairLastTraumaPos = nil
+	org._despairLastTraumaTime = 0
 	clear_legacy_panic(org)
 end)
 
@@ -271,13 +273,27 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 	local isLocked = CurTime() < (org._despairLockUntil or 0)
 	local stableAtFullDespair = currentDespair >= 0.995 and not is_in_danger(org)
+	local timeSinceGain = CurTime() - (org._despairLastGainedTime or 0)
+	local traumaAge = CurTime() - (org._despairLastTraumaTime or 0)
+	local awayFromTrauma = traumaAge < 90 and org._despairLastTraumaPos
+		and owner:GetPos():DistToSqr(org._despairLastTraumaPos) > (1200 * 1200)
+	local sceneIsCalm = not is_in_danger(org)
+		and (org.fear or 0) < 0.2
+		and (org.pain or 0) < 35
+		and (org.bleed or 0) < 0.1
+	local safeRecovery = awayFromTrauma or sceneIsCalm
 	if stableAtFullDespair and (org._despairLockUntil or 0) > CurTime() + 4 then
 		org._despairLockUntil = CurTime() + 4
 		isLocked = true
 	end
+	-- Once the player has left the traumatic area, or the situation is plainly
+	-- under control, do not let an old witness lock keep despair pinned.
+	if safeRecovery and timeSinceGain > 8 and (org._despairLockUntil or 0) > CurTime() + 3 then
+		org._despairLockUntil = CurTime() + 3
+		isLocked = true
+	end
 
 	-- Despair budge less unless despair hasn't been gained for a little bit
-	local timeSinceGain = CurTime() - (org._despairLastGainedTime or 0)
 	local despairDecay = timeValue / 120
 	if isLocked then
 		despairDecay = 0
@@ -303,6 +319,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		-- Once no new stress has arrived, recovery accelerates noticeably.
 		if timeSinceGain > 25 then
 			despairDecay = despairDecay * math.min(1 + (timeSinceGain - 25) / 35, 2.5)
+		end
+		if safeRecovery and timeSinceGain > 12 then
+			despairDecay = despairDecay * (awayFromTrauma and 1.4 or 1.25)
 		end
 		if stableAtFullDespair and timeSinceGain > 8 then
 			despairDecay = max(despairDecay, timeValue / 55)
@@ -719,6 +738,8 @@ hook.Add("HG_HeadExploded", "hg_despair_head_explosion", function(rag, victim)
 			org._despairLastGainedTime = now
 		end
 		org._despairNextHeadExplosion = now + 0.5
+		org._despairLastTraumaPos = Vector(pos.x, pos.y, pos.z)
+		org._despairLastTraumaTime = now
 		-- Traumatic events stick around: lock despair decay for a good while
 		org._despairLockUntil = math.max(org._despairLockUntil or 0, now + 30)
 	end
@@ -764,6 +785,8 @@ hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
 			org._despairLastGainedTime = now
 		end
 		org._despairNextDeathWitness = now + 0.5
+		org._despairLastTraumaPos = Vector(pos.x, pos.y, pos.z)
+		org._despairLastTraumaTime = now
 		org._despairLockUntil = math.max(org._despairLockUntil or 0, now + 30)
 
 		if not org.givingUp and not org.otrub then

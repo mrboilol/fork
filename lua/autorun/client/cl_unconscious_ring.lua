@@ -63,6 +63,25 @@ local function GetShockConsciousnessThreshold(analgesia)
     return 40 + math.Clamp(analgesia or 0, 0, 1) * 30
 end
 
+local dyingRingServerEnd
+local dyingRingLocalEnd
+
+local function GetDyingRingTimeLeft(deathStateStart, deathStateEnd)
+	if not deathStateEnd then
+		dyingRingServerEnd = nil
+		dyingRingLocalEnd = nil
+		return
+	end
+
+	if dyingRingServerEnd ~= deathStateEnd then
+		local duration = math.Clamp(deathStateEnd - (deathStateStart or deathStateEnd - 20), 0, 20)
+		dyingRingServerEnd = deathStateEnd
+		dyingRingLocalEnd = CurTime() + duration
+	end
+
+	return math.max((dyingRingLocalEnd or CurTime()) - CurTime(), 0)
+end
+
 local ecgAlphaPulseCheck = 0
 local awakeECGAlpha = 0
 local lastHeartBeat = 0
@@ -465,6 +484,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 	local isUnconscious = org.otrub
 	local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
 	local deathStateEnd = org.deathStateEnd and org.deathStateEnd > 0 and org.deathStateEnd or nil
+	local deathStateStart = org.deathStateStart and org.deathStateStart > 0 and org.deathStateStart or nil
 	local deathStatePendingEnd = org.deathStatePendingEnd and org.deathStatePendingEnd > 0 and org.deathStatePendingEnd or nil
 	local deathStateFadeStart = org.deathStateFadeStart and org.deathStateFadeStart > 0 and org.deathStateFadeStart or nil
 	local hideDyingRing = org.incapacitated and scavDyingMode == 0 and (deathStateEnd or (deathStateFadeStart and CurTime() >= deathStateFadeStart))
@@ -617,7 +637,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             
             local progress = 0
 			if dyingRing then
-				progress = math.Clamp((deathStateEnd - CurTime()) / 20, 0, 1)
+				progress = math.Clamp((GetDyingRingTimeLeft(deathStateStart, deathStateEnd) or 0) / 20, 0, 1)
 			elseif isCritical then
                 progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
             else

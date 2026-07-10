@@ -2620,16 +2620,18 @@ function SWEP:GetAdditionalValues()
 		local armHandlingMul = self:GetArmHealthHandlingMul()
 		local handlingMul = math.Clamp(caliberMul * weightMul * supportMul * armHandlingMul, 0.25, 2.6)
 
-		-- Instability ramps up while firing and recovers (regaining control) afterward.
-		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.3 or 0.05, wobbleDt), self.recoilWobbleAmp or 0, firing and 1 or 0)
+		-- Instability ramps up while firing, then settles like a lightly damped spring.
+		-- The long tail lets the gun cross its resting point a few times instead of
+		-- appearing to freeze the instant the main recoil animation reaches zero.
+		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.34 or 0.022, wobbleDt), self.recoilWobbleAmp or 0, firing and 1 or 0)
 
-		if (self.recoilWobbleAmp or 0) > 0.001 then
+		if (self.recoilWobbleAmp or 0) > 0.0001 then
 			local t = CurTime()
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 1.65
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 2.05
 
-			local wobX = math.sin(t * 1.5) * 0.65 + math.sin(t * 2.7) * 0.35
-			local wobY = math.cos(t * 1.8) * 0.65 + math.cos(t * 3.1) * 0.35
-			local wobZ = math.sin(t * 2.2) * 0.65 + math.cos(t * 2.9) * 0.35
+			local wobX = math.sin(t * 1.65) * 0.65 + math.sin(t * 2.95) * 0.35
+			local wobY = math.cos(t * 2.05) * 0.65 + math.cos(t * 3.45) * 0.35
+			local wobZ = math.sin(t * 2.45) * 0.65 + math.cos(t * 3.2) * 0.35
 
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.18
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 0.9
