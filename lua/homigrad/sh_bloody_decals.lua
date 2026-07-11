@@ -3,66 +3,22 @@ if SERVER then
     util.AddNetworkString("bloody_decal_1")
     util.AddNetworkString("bruise_decal")
 
-    local bruiseDecalCount = 4
-
-    function hg.ApplyBruiseTo(ent, victim, hitPos, hitNormal)
-        if not IsValid(ent) then return end
-        if not IsValid(victim) or not victim:IsPlayer() then return end
-        if math.random() > math.Rand(0.65, 0.75) then return end
-
-        local idx = math.random(bruiseDecalCount)
-        net.Start("bruise_decal")
-        net.WriteEntity(ent)
-        net.WriteEntity(victim)
-        net.WriteUInt(idx, 4)
-        net.WriteVector(hitPos)
-        net.WriteVector(hitNormal)
-        net.SendPVS(hitPos)
-    end
-
     return
 end
 
 
 function ClearDecalToEnt(ent)
-	if not IsValid(ent) or not ent.decalshuy then return end
-
-	for id, original in pairs(ent.decalshuy) do
-		ent:SetSubMaterial(id - 1, original or "")
+	if ent.decalshuy then
+		ent:SetSubMaterial()
+		
+		ent.decalshuy = nil
 	end
-
-	ent.decalshuy = nil
-	ent.hgBloodDecalMaterials = nil
-	ent.hgBloodDecalRenderTargets = nil
-	ent.hgBloodDecalMaterialVersion = nil
 end
 
 local matRepl = Material("decals/decalsplash")
-local bloodMaterialVersion = 5
 local curmat
 local curmat2
-
-local function CopyMaterialValue(value)
-	local valueType = type(value)
-
-	if valueType == "ITexture" then return value:GetName() end
-	if valueType == "Vector" or valueType == "VMatrix" or valueType == "Angle" then return tostring(value) end
-	if valueType == "boolean" then return value and 1 or 0 end
-	if valueType == "string" or valueType == "number" then return value end
-	if valueType != "table" then return nil end
-
-	local copy = {}
-	for key, child in pairs(value) do
-		local copied = CopyMaterialValue(child)
-		if copied != nil then copy[key] = copied end
-	end
-
-	return copy
-end
-
 function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, size, alpha)
-	if !IsValid(ent) then return end
-
 	local subm = ent:GetSubMaterial(id - 1) != "" and ent:GetSubMaterial(id - 1) or ent:GetMaterials()[id]
 	if !subm then
 		print("Invalid submaterial entered for weapon "..tostring(Entity(entIndex)).."; change SWEP.bloodID to something else or remove it completely if you don't wanna bother.")
@@ -70,107 +26,64 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 		return
 	end
 
-	ent.decalshuy = ent.decalshuy or {}
-	if ent.hgBloodDecalMaterialVersion != bloodMaterialVersion then
-		ent.hgBloodDecalMaterials = {}
-		ent.hgBloodDecalRenderTargets = {}
-		ent.hgBloodDecalMaterialVersion = bloodMaterialVersion
-	else
-		ent.hgBloodDecalMaterials = ent.hgBloodDecalMaterials or {}
-		ent.hgBloodDecalRenderTargets = ent.hgBloodDecalRenderTargets or {}
-	end
-
-	local firstime = ent.decalshuy[id] == nil
-	if not firstime then
-		subm = ent.decalshuy[id] != "" and ent.decalshuy[id] or ent:GetMaterials()[id]
-	end
-
 	local mata = Material(subm)
+	if !IsValid(ent) then return end
 	if !mata then return end
+	
+	ent.decalshuy = ent.decalshuy or {}
+	local firstime = !ent.decalshuy[id]
 
+	local tabla = mata:GetKeyValues()
+	
+	-- you should set up entIndex for CSModels since their entIndex is -1
+	local mat = CreateMaterial(mata:GetName()..(entIndex or ent:EntIndex()).."228", mata:GetShader(), {})
+	
+	--[[for i, val in pairs(tabla) do
+		if type(val) == "ITexture" then
+			mat:SetTexture(i, val)
+		end
+	end--]]
+	
 	local basetexture = mata:GetTexture("$basetexture")
 	if !basetexture then return end
 
-	-- Replacing $basetexture with a render target changes the entire outfit and
-	-- can make VertexLitGeneric player materials render black. Blood belongs in
-	-- a transparent detail layer so the model keeps its original base texture.
-	-- Do not steal an existing detail slot; that can contain the clothing pattern.
-	local olddetail = mata:GetTexture("$detail")
-	if olddetail and olddetail:GetName() != "error" then return end
-
-	if firstime then
-		ent.decalshuy[id] = ent:GetSubMaterial(id - 1)
-	end
-
-	-- CreateMaterial accepts texture names, not the ITexture objects returned by
-	-- GetKeyValues. Convert the clone data so bump/phong textures stay valid.
-	local tabla = CopyMaterialValue(mata:GetKeyValues())
-	-- Source's internal material flags are added by CreateMaterial itself.
-	-- Passing its serialized copies back in declares each flag twice.
-	tabla["$flags"] = nil
-	tabla["$flags2"] = nil
-	tabla["$flags_defined"] = nil
-	tabla["$flags_defined2"] = nil
-
-	-- GetKeyValues only returns resolved shader parameters, not the VMT's
-	-- material proxies. Colorable citizen clothes use PlayerColor to drive
-	-- $color2, so a blood clone without this proxy falls back to white and
-	-- makes the victim look like their outfit changed until the decal clears.
-	-- Restore the proxy only for materials that actually use the player-color
-	-- mask; applying it to every model material would tint unrelated slots.
-	local usesPlayerColor = tonumber(tabla["$blendtintbybasealpha"]) == 1
-	if usesPlayerColor then
-		tabla["Proxies"] = {
-			PlayerColor = {
-				resultvar = "$color2",
-			},
-		}
-	end
+	local oldbasetex = basetexture:GetName()
 	
-	-- you should set up entIndex for CSModels since their entIndex is -1
-	local materialKey = mata:GetName()..":"..(entIndex or ent:EntIndex())..":"..id..":v"..bloodMaterialVersion
+	mat:SetTexture("$basetexture", basetexture)
 
+	local name = mat:GetName()
+	local olddetail = mata:GetTexture("$detail")
+	local sizew = basetexture:Width()
+	local sizeh = basetexture:Height()
 	local size = size or 512
+	local scale = 1
 
 	local tex = tex or matRepl
 	
-	local rt = ent.hgBloodDecalRenderTargets[id]
-	local newRenderTarget = not rt
-	if not rt then
-		rt = GetRenderTargetEx("hg_blood_rt_"..util.CRC(materialKey), size, size, RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_SHARED, 0, CREATERENDERTARGETFLAGS_HDR, IMAGE_FORMAT_ARGB8888)
-		ent.hgBloodDecalRenderTargets[id] = rt
-	end
-
-	local mat = ent.hgBloodDecalMaterials[id]
-	if not mat then
-		-- Clone the complete source material, then add the blood overlay. Keeping
-		-- its original shader parameters preserves phong, tint, bumpmaps and alpha.
-		tabla["$basetexture"] = basetexture:GetName()
-		tabla["$detail"] = rt:GetName()
-		tabla["$detailscale"] = 1
-		tabla["$detailblendfactor"] = 1
-		tabla["$detailblendmode"] = 2
-		mat = CreateMaterial("hg_blood_"..util.CRC(materialKey), mata:GetShader(), tabla)
-		ent.hgBloodDecalMaterials[id] = mat
-	end
-
-	-- Seed the correct color before the first draw; PlayerColor keeps it synced
-	-- on later draws for both live players and appearance-copied ragdolls.
-	if usesPlayerColor and ent.GetPlayerColor then
-		mat:SetVector("$color2", ent:GetPlayerColor())
-	end
+	local rt = GetRenderTargetEx("vms_rt_"..util.CRC(name), size, size, RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_SHARED, 0, CREATERENDERTARGETFLAGS_HDR, IMAGE_FORMAT_ARGB8888)
 
 	render.PushRenderTarget(rt)
 
-	local resetBaseTexture = clear or firstime or newRenderTarget
-	if resetBaseTexture then
+	--if olddetail and olddetail != rt and olddetail:GetName() != rt:GetName() then
+	if clear or firstime then
 		render.Clear(0, 0, 0, 0, true)
 	end
+	--end
 
 	local x, y = x or math.random(0, size), y or math.random(0, size)
 	local rot = rot or math.Rand(-180, 180)
 	
 	cam.Start2D()
+		--if (clear or firstime) and olddetail:GetName() != "error" then
+			--[[render.SuppressEngineLighting(true)
+			render.ResetModelLighting( 1, 1, 1 )
+			surface.SetDrawColor( 255, 255, 255, 1 )
+			surface.SetMaterial( mata )
+			--surface.SetTexture(surface.GetTextureID(mata:GetTexture("$basetexture"):GetName()))
+			surface.DrawTexturedRect( 0, 0, sizew, sizeh)
+			render.SuppressEngineLighting(false)--]]
+		--end
+
 		surface.SetDrawColor( 255, 255, 255, alpha or math.random(100, 255) )
 		surface.SetMaterial( tex )
 		--surface.SetTexture(surface.GetTextureID("zbattle/blood"))
@@ -180,7 +93,6 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 
 	render.PopRenderTarget()
 
-	mat:SetTexture("$basetexture", basetexture)
 	mat:SetTexture("$detail", rt)
 	mat:SetFloat("$detailscale", 1)
 	mat:SetFloat("$detailblendfactor", 1)
@@ -189,6 +101,7 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	curmat = mat
 	curmat2 = mata
 
+	ent.decalshuy[id] = ent:GetSubMaterial(id - 1)
 	ent:SetSubMaterial(id - 1, "!"..mat:GetName())
 	--print(ent:GetSubMaterial(id - 1), 1, "!"..mat:GetName(), 2)
 end
@@ -217,7 +130,11 @@ net.Receive("bloody_decal_1", function()
 	end
 end)
 
-local bruiseSizeCvar = CreateClientConVar("hg_bruise_size", "0.04", true, false, "Bruise decal size (world units)", 0.01, 5)
+--синяки: сервер шлёт сущность, индекс текстуры, точку и нормаль удара.
+--Клиент клеит декаль ЧЕРЕЗ util.DecalEx — она ставит декаль строго в точку
+--(position + normal) на конкретной сущности, размер задаётся числом.
+--util.DecalEx существует только на клиенте, поэтому вызываем здесь.
+local bruiseSizeCvar = CreateClientConVar("hg_bruise_size", "0.5", true, false, "Bruise decal size (world units)", 0.01, 5)
 net.Receive("bruise_decal", function()
 	local ent = net.ReadEntity()
 	local victim = net.ReadEntity()
@@ -229,9 +146,15 @@ net.Receive("bruise_decal", function()
 	local mat = Material(util.DecalMaterial("Bruise.Add" .. idx))
 	if not mat then return end
 
+	--util.DecalEx(material, entity, position, normal, color, size, depth)
+	--размер берём из консольной переменной hg_bruise_size (меняется на лету)
 	local s = bruiseSizeCvar:GetFloat()
-	local alpha = math.random(80, 180)
+	--прозрачность: заметный, но не экстремальный разброс (от довольно
+	--прозрачных до плотных)
+	local alpha = math.random(140, 255)
 	local col = Color(255, 255, 255, alpha)
+	--на видимое тело (сразу видно в фейке) и на сущность игрока (чтобы
+	--перенеслось на труп RagdollDeath через ServerRagdollTransferDecals)
 	util.DecalEx(mat, ent, pos + normal, normal, col, s, s)
 	if IsValid(victim) and victim ~= ent then
 		util.DecalEx(mat, victim, pos + normal, normal, col, s, s)
