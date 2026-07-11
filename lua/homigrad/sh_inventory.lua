@@ -477,8 +477,12 @@ if CLIENT then
 				button.Think = function(self)
 					if ent.foundloot[i] then return end
 					if self:IsHovered() and input.IsMouseDown(MOUSE_LEFT) then
+						if not self.HoldRequested then
+							BeginTakeRequest(self, tab, i, thing1, ent)
+						end
 						self.RevealStart = self.RevealStart or CurTime()
-						self.RevealProgress = math.Clamp((CurTime() - self.RevealStart) / self.RevealTime, 0, 1)
+						local revealDuration = self.HoldReady and self.HoldDuration or self.RevealTime
+						self.RevealProgress = math.Clamp((CurTime() - self.RevealStart) / math.max(revealDuration or 0, 0.01), 0, 1)
 						if self.RevealProgress >= 1 then
 							ent.foundloot[i] = true
 							self.HoldLock = true
@@ -494,6 +498,7 @@ if CLIENT then
 				button.DoClick = function()
 					if button.HoldLock then button.HoldLock = nil return end
 					if not ent.foundloot[i] then return end
+					if not button.HoldReady or not button.HoldDuration or CurTime() - button.HoldStart < button.HoldDuration then return end
 					if cooldown > CurTime() then return end
 
 					cooldown = CurTime() + 0.3
@@ -516,7 +521,7 @@ if CLIENT then
 					
 					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".ogg")
 					grid.SoundKD = CurTime() + 0.2
-					self:Remove()
+					button:Remove()
 					TakeItem(tab, i, thing, ent)
 				end
 				

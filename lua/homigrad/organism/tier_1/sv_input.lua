@@ -19,124 +19,11 @@ local player_limb_gib_threshold = 160
 local player_head_gib_threshold = 175
 local bonetohitgroup, hitgrouptolimb
 
-local bulletTraumaOrganTargets = {
-	chest = {"lungsL", "lungsR", "heart", "spineartery"},
-	pelvis = {"intestines", "stomach", "liver"},
-	spine1 = {"intestines", "stomach", "liver", "spineartery"},
-	spine2 = {"lungsL", "lungsR", "heart", "spineartery"},
-	spine3 = {"trachea", "arteria", "spineartery"},
-	skull = {"brain"},
-	jaw = {"trachea", "arteria"},
-	larm = {"larmartery"},
-	rarm = {"rarmartery"},
-	larmup = {"larmartery"},
-	rarmup = {"rarmartery"},
-	larmdown = {"larmartery"},
-	rarmdown = {"rarmartery"},
-	lleg = {"llegartery"},
-	rleg = {"rlegartery"},
-	heart = {"spineartery"},
-	lungsL = {"spineartery"},
-	lungsR = {"spineartery"},
-	trachea = {"arteria"},
-}
+function hg.organism.AddBulletImpactBleeding(org, dmgInfo, multiplier)
+	if not org or not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
 
-local bulletTraumaArteries = {
-	chest = {"spineartery", "arteria"},
-	pelvis = {"llegartery", "rlegartery", "spineartery"},
-	spine1 = {"spineartery", "llegartery", "rlegartery"},
-	spine2 = {"spineartery", "arteria"},
-	spine3 = {"arteria", "spineartery"},
-	jaw = {"arteria"},
-	larm = {"larmartery", "arteria"},
-	rarm = {"rarmartery", "arteria"},
-	larmup = {"larmartery", "arteria"},
-	rarmup = {"rarmartery", "arteria"},
-	larmdown = {"larmartery"},
-	rarmdown = {"rarmartery"},
-	lleg = {"llegartery"},
-	rleg = {"rlegartery"},
-	llegup = {"llegartery"},
-	rlegup = {"rlegartery"},
-	llegdown = {"llegartery"},
-	rlegdown = {"rlegartery"},
-	heart = {"spineartery", "arteria"},
-	lungsL = {"spineartery", "arteria"},
-	lungsR = {"spineartery", "arteria"},
-	trachea = {"arteria"},
-}
-
-local bulletTraumaArteryBones = {
-	arteria = "ValveBiped.Bip01_Neck1",
-	spineartery = "ValveBiped.Bip01_Spine2",
-	larmartery = "ValveBiped.Bip01_L_Forearm",
-	rarmartery = "ValveBiped.Bip01_R_Forearm",
-	llegartery = "ValveBiped.Bip01_L_Calf",
-	rlegartery = "ValveBiped.Bip01_R_Calf",
-}
-
-local function bulletTraumaProfile(dmg, dmgInfo, dir, boneHit)
-	if not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
-
-	local rawDamage = math.max(dmgInfo:GetDamage(), dmg * 25)
-	local penetration = 0
-	if dir and dir.Length then penetration = dir:Length() end
-
-	if penetration <= 0 then
-		local inf = dmgInfo:GetInflictor()
-		local bullet = IsValid(inf) and inf.bullet
-		penetration = (bullet and bullet.Penetration) or (IsValid(inf) and inf.Penetration) or rawDamage / 2
-	end
-
-	local lowPen = math.Clamp((8 - penetration) / 8, 0, 1)
-	local highDamage = math.Clamp((rawDamage - 12) / 55, 0, 1.5)
-	local buckshot = dmgInfo:IsDamageType(DMG_BUCKSHOT) and 0.15 or 0
-	local severity = math.Clamp(dmg * 0.75 + highDamage * 0.75 + lowPen * 0.65 + buckshot, 0, 2.25)
-	local chance = math.Clamp(0.05 + highDamage * 0.2 + lowPen * 0.3 + severity * 0.12 + (boneHit and 0.18 or 0), 0.02, boneHit and 0.85 or 0.65)
-
-	return rawDamage, penetration, severity, chance
-end
-
-function hg.organism.ApplyBulletTrauma(org, dmg, dmgInfo, context)
-	if not org or org._bulletTraumaApplying then return end
-	context = context or {}
-
-	local rawDamage, penetration, severity, chance = bulletTraumaProfile(dmg, dmgInfo, context.dir, context.boneHit)
-	if not severity or severity <= 0 then return end
-	if math.random() > chance then return end
-
-	org._bulletTraumaApplying = true
-
-	local boneMul = context.boneHit and 1.35 or 1
-	org.painadd = (org.painadd or 0) + (rawDamage * 0.06 + severity * 7) * boneMul
-	org.hurtadd = (org.hurtadd or 0) + severity * (context.boneHit and 1.8 or 1.1)
-	org.shock = math.min((org.shock or 0) + (rawDamage * 0.045 + severity * 5) * boneMul, 95)
-	org.internalBleed = (org.internalBleed or 0) + math.Clamp(severity * (context.boneHit and 0.45 or 0.25), 0, 1.4)
-	org._bulletTraumaBleedAdd = (org._bulletTraumaBleedAdd or 0) + rawDamage * math.Clamp(0.012 + severity * 0.018, 0.012, 0.06)
-
-	local key = context.key
-	if context.boneHit and key then
-		local targets = bulletTraumaOrganTargets[key]
-		if targets and math.random() < math.Clamp(0.15 + severity * 0.22 + math.Clamp((8 - penetration) / 8, 0, 1) * 0.2, 0.12, 0.75) then
-			local target = table.Random(targets)
-			local func = input_list[target]
-			if bulletTraumaArteryBones[target] then
-				if hg.hitArtery then
-					hg.hitArtery(target, org, math.Clamp(dmg * math.Rand(0.2, 0.45), 0.015, 0.35), dmgInfo, bulletTraumaArteryBones[target], context.dir or vector_origin, context.hit, true)
-				end
-			elseif func then
-				func(org, 1, math.Clamp(dmg * math.Rand(0.18, 0.45), 0.015, 0.35), dmgInfo, context.boneindex, context.dir or vector_origin, context.hit, context.ricochet)
-			end
-		end
-	end
-
-	local arteries = key and bulletTraumaArteries[key]
-	if arteries and hg.hitArtery and math.random() < math.Clamp(0.06 + severity * 0.16 + math.Clamp((8 - penetration) / 8, 0, 1) * 0.2, 0.03, 0.55) then
-		local artery = table.Random(arteries)
-		hg.hitArtery(artery, org, math.Clamp(dmg * (0.5 + severity * 0.35), 0.02, 1), dmgInfo, bulletTraumaArteryBones[artery] or context.boneindex or "ValveBiped.Bip01_Spine2", context.dir or vector_origin, context.hit, true)
-	end
-
-	org._bulletTraumaApplying = false
+	local rawDamage = math.max(dmgInfo:GetDamage(), 0)
+	org._bulletImpactBleedAdd = (org._bulletImpactBleedAdd or 0) + rawDamage * 0.02 * (multiplier or 1)
 end
 local ragdoll_fall_skull_damage_mul = 1.2
 local ragdoll_fall_jaw_damage_mul = 0.45
@@ -1092,7 +979,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local dmg_before = dmgInfo:GetDamage()
 
 	local lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = nil,{},{},{},{},nil,nil
-	org._bulletTraumaBleedAdd = nil
+	org._bulletImpactBleedAdd = nil
 	if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
 		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, boxs, pos, sphere, organs, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, ent.organism, organs, dmg / 25, dmgInfo, dir)
 	elseif dmgInfo:IsDamageType(DMG_BLAST) then
@@ -1408,7 +1295,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH) or (dmgInfo:IsDamageType(DMG_GENERIC + DMG_VEHICLE + DMG_FALL + DMG_CLUB)) then
 		local hook_info = {
-			bleed = dmgBlood + (org._bulletTraumaBleedAdd or 0),
+			bleed = dmgBlood + (org._bulletImpactBleedAdd or 0),
 			input_hole = inputHole,
 			output_hole = outputHole,
 			bone = bone,

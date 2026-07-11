@@ -148,8 +148,8 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 	if damage_dealt > 0 then
 		org.internalBleed = org.internalBleed + damage_dealt * 1.0 -- Base internal bleeding for any organ damage (increased from 0.5)
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
-		if hg.organism.ApplyBulletTrauma then
-			hg.organism.ApplyBulletTrauma(org, dmg, dmgInfo, {key = key, boneHit = false, hit = dmgInfo:GetDamagePosition()})
+		if hg.organism.AddBulletImpactBleeding then
+			hg.organism.AddBulletImpactBleeding(org, dmgInfo, 0.75)
 		end
 
 		if abdominal_organs[key] then

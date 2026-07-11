@@ -6,43 +6,6 @@ hg = hg or {}
 
 util.AddNetworkString("zcity_delta_moodles_extra")
 
-local function clear_old_mental_runtime()
-	hg["Mental"] = nil
-
-	local oldMental = "zcity_delta_" .. "mental"
-	local oldTrait = "zcity_delta_" .. "trait"
-	local oldLastStand = "zcity_delta_" .. "laststand"
-
-	local oldHooks = {
-		{"Org Think", oldMental .. "_bridge"},
-		{"Org Think", oldTrait .. "_goodmood_gain"},
-		{"HomigradDamage", oldTrait .. "_damage_mental"},
-		{"EntityTakeDamage", oldTrait .. "_misc_damage"},
-		{"EntityTakeDamage", oldTrait .. "_trained_melee"},
-		{"EntityTakeDamage", oldTrait .. "_brawler_hits"},
-		{"PlayerDeath", oldTrait .. "_maniac_kill"},
-		{"EntityFireBullets", oldTrait .. "_gunshot_stress"},
-		{"hg_medical_minigame_finished", oldTrait .. "_medical_finish"},
-		{"HomigradRun", oldLastStand .. "_patch"},
-		{"InitPostEntity", oldLastStand .. "_patch"},
-		{"PlayerInitialSpawn", oldMental .. "_load"},
-		{"PlayerSpawn", oldMental .. "_spawn"},
-		{"PlayerDeath", oldMental .. "_death"},
-		{"PlayerDisconnected", oldMental .. "_save"},
-		{"ShutDown", oldMental .. "_save_all"},
-	}
-
-	for i = 1, #oldHooks do
-		hook.Remove(oldHooks[i][1], oldHooks[i][2])
-	end
-
-	timer.Remove(oldTrait .. "_maintenance")
-	timer.Remove(oldLastStand .. "_happiness_updater")
-
-end
-
-clear_old_mental_runtime()
-
 if hg.ptsd_server_builtin then return end
 hg.ptsd_server_builtin = true
 hg.PTSD = hg.PTSD or {}
@@ -630,6 +593,18 @@ local function own_damage_trauma(ply, damage, reason, combat)
 	add_trauma(ply, Clamp(damage * cvTraumaWound:GetFloat(), 0.5, 24), reason or "wound", {combat = combat ~= false})
 end
 
+local function is_severely_hurt_witness_target(target, damage)
+	if not IsValid(target) then return false end
+	if target:IsPlayer() then
+		local org = get_org(target)
+		return not target:Alive()
+			or (org and ((org.bleed or 0) >= 2 or org.incapacitated or org.critical))
+			or target:Health() - damage <= 0
+	end
+
+	return target:IsNPC() and target:Health() - damage <= 0
+end
+
 hook.Add("HomigradDamage", "hg_ptsd_damage_gain", function(ply, dmgInfo)
 	if not IsValid(ply) or not ply:IsPlayer() then return end
 	local org = get_org(ply)
@@ -662,6 +637,7 @@ hook.Add("EntityTakeDamage", "hg_ptsd_nearby_hit", function(target, dmgInfo)
 	end
 
 	if not dmgInfo:IsBulletDamage() then return end
+	if not is_severely_hurt_witness_target(target, damage) then return end
 	local attacker = resolve_harm_attacker(target, dmgInfo:GetAttacker())
 
 	local targetPos = target:GetPos()

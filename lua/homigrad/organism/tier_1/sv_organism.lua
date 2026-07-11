@@ -27,6 +27,7 @@ local panicattack_heart_roll_chance = 1
 local panicattack_damage_scale = 0.006
 local panicattack_witness_radius = 850
 local panicattack_death_radius = 900
+local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
 local seizure_duration = 90
 local seizure_brain_damage_start = 80
 local seizure_brain_damage_final = 0.99
@@ -951,6 +952,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if isPly or org.fakePlayer then
 		module.lungs[2](owner, org, timeValue)
 	end
+
+	local debugEyes = debug_destroy_eyes:GetInt()
+	if debugEyes == 1 or debugEyes == 3 then org.eyeL = 1 end
+	if debugEyes == 2 or debugEyes == 3 then org.eyeR = 1 end
 
 	local eyeL = org.eyeL or 0
 	local eyeR = org.eyeR or 0

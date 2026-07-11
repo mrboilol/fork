@@ -947,10 +947,10 @@ local arterialRampTime = 0.7
 local arterialMinIntensity = 0.35
 local arterialParticleSizeMul = 0.65
 local arterialJetCount = 1
-local arterialJetOffset = 0.35
-local arterialVelocityMul = 78
-local arterialDirectionRandomness = 3
-local arterialVerticalRandomness = 5
+local arterialJetOffset = 0.12
+local arterialVelocityMul = 105
+local arterialDirectionRandomness = 0.75
+local arterialVerticalRandomness = 1
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -1032,7 +1032,8 @@ end
 emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData)
 	local pulseMul = math.max(pulse or 70, 35) / 70
 	local buildup = fxData and math.Clamp((CurTime() - (fxData.created or CurTime())) / arterialRampTime, arterialMinIntensity, 1) or 1
-	local wave = (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * 5) + math.sin(CurTime() * 3)) + 4) * 0.1
+	local time = CurTime()
+	local wave = 0.9 + math.sin(time * 5) * 0.18
 	local dirAng = dir:Angle()
 	local right = dirAng:Right()
 	local up = ang:Up()
@@ -1041,10 +1042,10 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 
 	for jet = 1, jetCount do
 		local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
-		local sprayVel = VectorRand(-1, 1) * pulseMul * buildup
+		local sprayVel = VectorRand(-0.25, 0.25) * pulseMul * buildup
 		sprayVel:Add(dir * arterialVelocityMul * wave * buildup)
-		sprayVel:Add(right * math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness) * buildup)
-		sprayVel:Add(up * math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness) * buildup)
+		sprayVel:Add(right * (math.sin(time * 3.2) * 3 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * buildup)
+		sprayVel:Add(up * (math.sin(time * 2.4 + 1.1) * 2 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * buildup)
 		hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
 	end
 
@@ -1346,7 +1347,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
 						else
 							emitArterialSpray(ent, pos, dir, ang, org.pulse, size, wound[7], fxData)
-							hg.addBloodPart(pos, VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 12.5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70, nil, size, size, true, nil, ent)
 							for _ = 1, arteryBurstCount do
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 							end

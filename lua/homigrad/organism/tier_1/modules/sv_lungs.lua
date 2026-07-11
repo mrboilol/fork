@@ -585,8 +585,6 @@ module[2] = function(owner, org, timeValue)
 			o2[1] = max(o2[1] - timeValue * pulseO2DropRate * 0.65, 0)
 		end
 
-
-
 		-- Trachea damage from breathing - damages trachea when breathing, more breathing = more damage
 
 		-- Needle prevents trachea damage, only triggers when trachea > 0.65
@@ -740,6 +738,13 @@ module[2] = function(owner, org, timeValue)
 
 		o2[1] = math.max(5, o2[1])
 
+	end
+
+	-- At this blood volume there is no longer enough circulating blood to
+	-- transport oxygen. Apply this after intake and berserk support so neither
+	-- can restore O2 without first restoring blood volume.
+	if org.blood <= 1750 then
+		o2[1] = 0
 	end
 
 	

@@ -111,8 +111,13 @@ module[2] = function(owner, org, timeValue)
 	local perfusionPulse = org.pulse or 70
 	local compensationRate = perfusionPulse < 70 and 70 + (70 - perfusionPulse) * 4 or perfusionPulse
 	compensationRate = math.Clamp(compensationRate, 45, 300)
+	-- Severe hypovolemia drives the heart from its compensated rate toward
+	-- ventricular tachycardia: the ramp begins at 2500 blood and reaches
+	-- roughly 300 BPM by 2250 blood.
+	local bloodTachyK = math.Clamp((2500 - bloodNow) / 250, 0, 1)
+	local bloodTachyRate = Lerp(bloodTachyK, compensationRate, 300)
 
-	local heartbeat = compensationRate
+	local heartbeat = math.max(compensationRate, bloodTachyRate)
 
 	local staminaMax = math.max(org.stamina.max or 180, 1)
 	local stamina = math.Clamp(org.stamina[1] or staminaMax, 0, staminaMax)
@@ -141,6 +146,9 @@ module[2] = function(owner, org, timeValue)
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
 	local survivalK = math.Clamp(k, 0, 1)
 	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, 270)
+	if bloodTachyK > 0 then
+		maxCompensatedRate = math.max(maxCompensatedRate, bloodTachyRate)
+	end
 	if heart < 0.35 or brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
 	end

@@ -177,8 +177,8 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 		org.headtrauma = math.min((org.headtrauma or 0) + dmg * 1.0, 2.0)
 	end
 
-	if hg.organism.ApplyBulletTrauma then
-		hg.organism.ApplyBulletTrauma(org, dmg, dmgInfo, {key = key, boneHit = true, boneindex = boneindex, dir = dir, hit = hit, ricochet = ricochet})
+	if hg.organism.AddBulletImpactBleeding then
+		hg.organism.AddBulletImpactBleeding(org, dmgInfo, 1)
 	end
 
 	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8)

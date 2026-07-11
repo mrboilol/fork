@@ -201,6 +201,11 @@ local function emitInjuryMist(ent, pos)
 	end
 end
 
+local function getOrganDamage(value)
+	if istable(value) then return tonumber(value[1]) or 0 end
+	return tonumber(value) or 0
+end
+
 hook.Add("HG_OrganismChanged", "injury_damage_mist", function(oldorg, org)
 	local ply = org.owner
 	local ent = hg.GetCurrentCharacter(ply)
@@ -225,7 +230,7 @@ hook.Add("HG_OrganismChanged", "injury_damage_mist", function(oldorg, org)
 
 	if not mistPos then
 		for key, boneName in pairs(severeOrgans) do
-			if (oldorg[key] or 0) < 0.75 and (org[key] or 0) >= 0.75 then
+			if getOrganDamage(oldorg[key]) < 0.75 and getOrganDamage(org[key]) >= 0.75 then
 				mistPos = getInjuryPos(ent, boneName)
 				break
 			end

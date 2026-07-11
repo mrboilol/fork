@@ -1495,7 +1495,8 @@ function SWEP:ApplyForce()
 		local avec = vec * len * 8 - phys:GetVelocity()
 
 		local Force = avec * mul
-		local ForceMagnitude = math.min(Force:Length(), 3000) * (1 / math.max(phys:GetVelocity():Dot(vec) / 25, 1))
+		local gripForceCap = self.TwoHandGrip and 4500 or 3000
+		local ForceMagnitude = math.min(Force:Length(), gripForceCap) * (1 / math.max(phys:GetVelocity():Dot(vec) / 25, 1))
 
 		Force = Force:GetNormalized() * ForceMagnitude
 
@@ -1632,7 +1633,9 @@ function SWEP:ApplyForce()
 				local trace = util.TraceLine(tr)
 				
 				if bone != "ValveBiped.Bip01_Spine2" or !trace.Hit then
-					phys:ApplyForceCenter(ply:GetAimVector() * math.min(5000, phys:GetMass() * 800))
+					local throwCap = self.TwoHandGrip and 8000 or 5000
+					local throwMassScale = self.TwoHandGrip and 1200 or 800
+					phys:ApplyForceCenter(ply:GetAimVector() * math.min(throwCap, phys:GetMass() * throwMassScale))
 					self:SetCarrying()
 				end
 
@@ -1839,11 +1842,43 @@ function SWEP:SetCarrying(ent, bone, pos, dist)
 		self.UsingBothHands = nil
 		self.UsingRightHand = nil
 		self.UsingLeftHand = nil
+		self.TwoHandGrip = nil
 		self.IsRightBroken = nil
 		self.IsLeftBroken = nil
 		self.BothArmsBroken = nil
 		self.CarryCentered = nil
 	end
+end
+
+if SERVER then
+	hook.Add("PlayerButtonDown", "hg_two_hand_object_grip", function(ply, button)
+		if button ~= KEY_F or not IsValid(ply) or ply:InVehicle() then return end
+
+		local wep = ply:GetActiveWeapon()
+		if not IsValid(wep) or wep:GetClass() ~= "weapon_hands_sh" then return end
+		if hg.GetArmEffectiveness(ply, "rarm") <= 0 or hg.GetArmEffectiveness(ply, "larm") <= 0 then return end
+
+		if not IsValid(wep:GetCarrying()) then
+			local eyePos = hg.eye(ply)
+			local tr = util.TraceHull({
+				start = eyePos,
+				endpos = eyePos + ply:GetAimVector() * wep.ReachDistance,
+				filter = {ply, hg.GetCurrentCharacter(ply)},
+				mins = trMins,
+				maxs = trMaxs,
+			})
+			if not IsValid(tr.Entity) or not wep:CanPickup(tr.Entity) then return end
+			wep:SecondaryAttack()
+		end
+
+		if not IsValid(wep:GetCarrying()) then return end
+		wep.TwoHandGrip = true
+		wep.UsingBothHands = true
+		wep.UsingRightHand = true
+		wep.UsingLeftHand = true
+		wep.RightArmEff = hg.GetArmEffectiveness(ply, "rarm")
+		wep.LeftArmEff = hg.GetArmEffectiveness(ply, "larm")
+	end)
 end
 
 SWEP.DamagePrimary = 10

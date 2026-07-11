@@ -74,16 +74,6 @@ local function danger_severity(org)
 	return severity
 end
 
-local function clear_legacy_panic(org)
-	if not org then return end
-	org.panicAttack = false
-	org._panicAttackEndTime = 0
-	org._panicAttackStartTime = nil
-	org._panicAttackCheckTime = nil
-	org._panicAdrenalineGiven = false
-	org._postPanicEndTime = 0
-end
-
 local function add_panic_pressure(owner, org, amount, chanceMultiplier)
 	if not org or amount <= 0 then return end
 	if hg and hg.organism and hg.organism.AddPanicAttack then
@@ -110,7 +100,6 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._despairLastBP = nil
 	org._despairLastTraumaPos = nil
 	org._despairLastTraumaTime = 0
-	clear_legacy_panic(org)
 end)
 
 hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
@@ -158,7 +147,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	-- In simple mode despair and panic are fully disabled
 	if simpleMode then
 		org.despair = 0
-		clear_legacy_panic(org)
 	end
 
 	-- Give up mechanic: only while awake and dying
@@ -176,7 +164,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 
 				if math.random() < chance then
 					org.givingUp = true
-					clear_legacy_panic(org)
 				end
 			end
 		end
@@ -193,7 +180,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 				local chance = 0.004 + severity * 0.035 + fearFactor * 0.018
 				if math.random() < chance then
 					org.givingUp = true
-					clear_legacy_panic(org)
 				end
 			end
 		end
@@ -205,10 +191,8 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			org._giveUpHeartStopCheck = 0
 			-- Recovery: treated or no longer dying, despair fades and goodmood returns
 			org.goodmood = math.min((org.goodmood or 0) + timeValue * 0.03, 1)
-			clear_legacy_panic(org)
 		else
 			-- Giving up takes precedence over panic.
-			clear_legacy_panic(org)
 			org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue * 0.75)
 			org.panicattack = math.Approach(org.panicattack or 0, 0, timeValue * 0.75)
 			org.despair = math.max(org.despair, 0.25)
@@ -244,7 +228,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	-- Simple mode: despair and panic are disabled, only giving up remains
 	if simpleMode then
 		org.despair = 0
-		clear_legacy_panic(org)
 		return
 	end
 
@@ -589,7 +572,6 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
         end
     end
 
-	clear_legacy_panic(org)
 
 	if org.panicattackActive then
 		org.fear = math.Approach(org.fear or 0, 0, timeValue * 1.5)
@@ -643,7 +625,6 @@ concommand.Add("hg_panic", function(ply, cmd, args)
 		org.panicattackadd = 0
 		org.panicattack = 0
 		org.panicattackActive = false
-		clear_legacy_panic(org)
 		ply:ChatPrint("[Debug] Panic attack ended.")
 	end
 end)
@@ -664,7 +645,6 @@ concommand.Add("hg_giveup", function(ply, cmd, args)
 		org.panicattackadd = 0
 		org.panicattack = 0
 		org.panicattackActive = false
-		clear_legacy_panic(org)
 		ply:ChatPrint("[Debug] Give up triggered. Reduced blood to 2250 to create dying/bleeding out state, added some despair, and initiated give up (itssofuckingover.mp3).")
 	else
 		org.givingUp = false
