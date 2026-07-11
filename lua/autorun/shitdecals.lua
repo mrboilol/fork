@@ -121,6 +121,10 @@ game.AddDecal("Organism.VomitSmall", "decals/vomit_small")
 game.AddDecal("Organism.VomitMedium", "decals/vomit_medium")
 game.AddDecal("Organism.VomitLarge", "decals/vomit_large")
 
+game.AddDecal("Concussion.VomitSmall", "decals/vomit_small")
+game.AddDecal("Concussion.VomitMedium", "decals/vomit_medium")
+game.AddDecal("Concussion.VomitLarge", "decals/vomit_large")
+
 if CLIENT then
     local func = function()
 		for i = 1, 5 do

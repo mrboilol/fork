@@ -77,123 +77,6 @@ local tabblood = {
 	["$pp_colour_mulb"] = 0,
 }
 
-surface.CreateFont("RemDeathStateFont", {
-	font = "Lora",
-	size = ScreenScale(22),
-	weight = 1100,
-	outline = true
-})
-
-local remDeathStateColor = Color(255, 255, 255, 0)
-local remDeathStateStation
-local remDeathStateLoading
-local remHeartStopped = false
-local remFibrillationStation
-local remFibrillationLoading
-local remFibrillationStopping
-local remHeartStopLoading
-
-local function PlayRemHeartStopSound(uncon)
-	if remHeartStopLoading then return end
-
-	remHeartStopLoading = true
-	sound.PlayFile("sound/" .. (uncon and "rem_heartstopuncon.wav" or "rem_heartstop.wav"), "noblock noplay", function(station)
-		remHeartStopLoading = nil
-		if not IsValid(station) then return end
-		station:SetVolume(1)
-		station:Play()
-	end)
-end
-
-local function PlayRemDeathStateSound()
-	if IsValid(remDeathStateStation) then
-		remDeathStateStation:Play()
-		return
-	end
-	if remDeathStateLoading then return end
-
-	remDeathStateLoading = true
-	sound.PlayFile("sound/rem_deathstatefull.mp3", "noplay", function(station)
-		remDeathStateLoading = nil
-		if not IsValid(station) then return end
-		if not LocalPlayer():Alive() then station:Stop() return end
-		remDeathStateStation = station
-		station:EnableLooping(true)
-		station:SetVolume(1)
-		station:Play()
-	end)
-end
-
-net.Receive("rem_deathstate_sound", PlayRemDeathStateSound)
-
-local function StartRemFibrillationSound()
- if IsValid(remFibrillationStation) then
-  remFibrillationStopping = nil
-  remFibrillationStation:Play()
-  if remFibrillationStation.ChangeVolume then remFibrillationStation:ChangeVolume(1, 1) else remFibrillationStation:SetVolume(1) end
-  return
- end
- if remFibrillationLoading then return end
-
- remFibrillationLoading = true
- sound.PlayFile("sound/rem_fibrillation.mp3", "noplay", function(station)
-  remFibrillationLoading = nil
-  if not IsValid(station) then return end
-  local ply = LocalPlayer()
-  local org = IsValid(ply) and (ply.new_organism or ply.organism)
-  if not IsValid(ply) or not ply:Alive() or not org or not org.fibrillation then station:Stop() return end
-  remFibrillationStation = station
-  station:EnableLooping(true)
-  station:SetVolume(0)
-  station:Play()
-  if station.ChangeVolume then station:ChangeVolume(1, 1) else station:SetVolume(1) end
- end)
-end
-
-local function StopRemFibrillationSound()
- if not IsValid(remFibrillationStation) or remFibrillationStopping then return end
- remFibrillationStopping = true
- if remFibrillationStation.ChangeVolume then
-  remFibrillationStation:ChangeVolume(0, 1)
- else
-  remFibrillationStation:Stop()
-  remFibrillationStation = nil
-  remFibrillationStopping = nil
-  return
- end
- timer.Simple(1.05, function()
-  if not remFibrillationStopping or not IsValid(remFibrillationStation) then return end
-  remFibrillationStation:Stop()
-  remFibrillationStation = nil
-  remFibrillationStopping = nil
- end)
-end
-
-hook.Add("Think", "RemCardiacSounds", function()
- local ply = LocalPlayer()
- if not IsValid(ply) then return end
-
- local org = ply:Alive() and (ply.new_organism or ply.organism)
- local heartstop = org and org.heartstop or false
- local fibrillation = org and org.fibrillation or false
-
- if heartstop and not remHeartStopped then PlayRemHeartStopSound(org.otrub) end
- remHeartStopped = heartstop
-
- if fibrillation then
-  StartRemFibrillationSound()
- else
-  StopRemFibrillationSound()
- end
-end)
-
-hook.Add("Think", "RemDeathStateSoundStop", function()
-	local ply = LocalPlayer()
-	if not IsValid(ply) or ply:Alive() or not IsValid(remDeathStateStation) then return end
-	remDeathStateStation:Stop()
-	remDeathStateStation = nil
-end)
-
 local k1, k2, k3
 
 local upDir = Vector(0, 0, 1)
@@ -224,8 +107,6 @@ end
 
 local clr_black1 = Color( 0, 0, 0, 255)
 local clr_black2 = Color( 0, 0, 0, 255)
-local hg_forced_firstperson_death = ConVarExists("hg_firstperson_death") and GetConVar("hg_firstperson_death") or CreateClientConVar("hg_firstperson_death", "1", true, false, "Toggle first-person death camera view", 0, 1)
-local hg_forced_deathfadeout = ConVarExists("hg_deathfadeout") and GetConVar("hg_deathfadeout") or CreateClientConVar("hg_deathfadeout", "0", true, true, "Toggle screen fade and sound mute on death", 0, 1)
 
 local mat1 = Material("vgui/gradient-u")
 local mat2 = Material("vgui/gradient-d")
@@ -233,31 +114,20 @@ local mat2 = Material("vgui/gradient-d")
 local ang1 = Angle()
 local ang2 = Angle()
 
-hook.Add("Think", "hg.force.death.convars", function()
-	if hg_forced_deathfadeout:GetInt() ~= 0 then
-		RunConsoleCommand("hg_deathfadeout", "0")
-	end
-
-	if hg_forced_firstperson_death:GetInt() ~= 1 then
-		RunConsoleCommand("hg_firstperson_death", "1")
-	end
-
-end)
-
 hook.Add("HUDShouldDraw", "hg.HUDShouldDraw", function(id)
 	if (fakeTimer and fakeTimer - 2 > CurTime()) then
 		return false
 	end
 end)
 
-hook.Add("HG_OnOtrub", "adsadsadhuy!!", function(ply)
+hook.Add("HG_OnOtrub", "adsadsadhuy!!", function(ply)	
 	if ply == LocalPlayer() then
 		lply:SetDSP(17)
 		plyCommand(lply,"soundfade 100 99999")
 	end
 end)
 
-hook.Add("Player_Death", "adsadsadhuy!!", function(ply)
+hook.Add("Player_Death", "adsadsadhuy!!", function(ply)	
 	if ply == LocalPlayer() then
 		lply:SetDSP(17)
 		plyCommand(lply,"soundfade 100 99999")
@@ -274,23 +144,28 @@ local file_Delete = file.Delete
 hg.alivecntr = hg.alivecntr or 0
 
 local function remove_imgs()
-	local folder = "dreams"
-		if file.Exists(folder, "DATA") then
-			local files, _ = file.Find(folder.."/*", "DATA")
+	if file.Exists("dreams", "DATA") then
+		local files, _ = file.Find("dreams/*", "DATA")
 
-			for _, name in pairs(files) do
-				file_Delete(folder.."/"..name)
-			end
+		for i, file in pairs(files) do
+			file_Delete("dreams/"..file)
 		end
+	end
 end
 
 local disorientationLerp = 0
+local concLerp = 0
+local nauseaLerp = 0
+local tinnitusConcLerp = 0
 
 hook.Add("Player Spawn", "screenshot_game", function(ply)
 	if OverrideSpawn then return end
 
 	if ply == lply then
 		disorientationLerp = 0
+		concLerp = 0
+		nauseaLerp = 0
+		tinnitusConcLerp = 0
 
 		alivestart = CurTime()
 		lply.tried_fixing_limb = nil
@@ -300,6 +175,7 @@ hook.Add("Player Spawn", "screenshot_game", function(ply)
 		for i, screen in ipairs(hg.screens) do
 			hg.screens[i] = nil
 		end
+
 		remove_imgs()
 	end
 end)
@@ -332,7 +208,7 @@ hook.Add("radialOptions", "DislocatedJoint", function()
 	local ent = hg.eyeTrace(lply).Entity
 
 	if IsValid(ent) and ent.organism and ent.organism != org and (ent.organism.llegdislocation or ent.organism.rlegdislocation) then
-		local target = ent.organism.owner or ent
+		local target = (IsValid(ent:GetNWEntity("ply")) and ent:GetNWEntity("ply")) or (ent.organism and ent.organism.owner) or ent
 		local tbl = {
 			function()
 			lply.tried_fixing_limb = CurTime() + 0.5
@@ -365,7 +241,7 @@ hook.Add("radialOptions", "DislocatedJoint2", function()
 	local ent = hg.eyeTrace(lply).Entity
 
 	if IsValid(ent) and ent.organism and ent.organism != org and (ent.organism.larmdislocation or ent.organism.rarmdislocation) then
-		local target = ent.organism.owner or ent
+		local target = (IsValid(ent:GetNWEntity("ply")) and ent:GetNWEntity("ply")) or (ent.organism and ent.organism.owner) or ent
 		local tbl = {
 			function()
 			lply.tried_fixing_limb = CurTime() + 0.5
@@ -398,7 +274,7 @@ hook.Add("radialOptions", "DislocatedJaw", function()
 	local ent = hg.eyeTrace(lply).Entity
 
 	if IsValid(ent) and ent.organism and ent.organism != org and ent.organism.jawdislocation then
-		local target = ent.organism.owner or ent
+		local target = (IsValid(ent:GetNWEntity("ply")) and ent:GetNWEntity("ply")) or (ent.organism and ent.organism.owner) or ent
 		local tbl = {
 			function()
 			lply.tried_fixing_limb = CurTime() + 0.5
@@ -415,6 +291,7 @@ hook.Add("PostRender", "screenshot_think", function()
 	local org = lply.organism
 	
 	if not org or not org.brain or org.otrub or !lply:Alive() then return end
+	
 	local part = CurTime() - alivestart
 	//print(part)
 	if part % 60 > 59 and (screened != math.Round(part / 60, 0)) then
@@ -449,6 +326,7 @@ end)
 local braindeathstart = CurTime() + 20
 local lerpedpart = 0
 local lerpedbrain = 0
+
 hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 	local org = lply.organism
 	
@@ -466,11 +344,11 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 			switch = true
 			local part2 = math.ease.InOutSine(math.sin(((part % time) - time / 3) / (time / 3 * 2) * math.pi))
 			lerpedpart = LerpFT(0.1, lerpedpart, part2)
-
+			
 			surface.SetDrawColor(255, 255, 255, math.Clamp(lerpedpart * 50, 0, 255))
 			surface.SetMaterial(screens[curscreen])
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-
+			
 			DrawToyTown(4, ScrH())
 		else
 			if switch then
@@ -479,18 +357,15 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 			end
 		end
 	else
-
 		braindeathstart = CurTime()
 	end
 end)
-local hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
+
 local blindoverlay = Material("zcity/neurotrauma/blindoverlay.png")
-local addtime = CurTime()
 
 local hg_potatopc
 local old = false
 local tinnitusSoundFactor
-local lerpblood = 0
 local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like first-person camera view", 0, 1)
 hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
@@ -530,16 +405,15 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local brain = org.brain or 0
 	local otrub = lply:Alive() and org.otrub or false
 	local analgesia = organism.analgesia or 0
-	local analgesiaVisual = analgesia >= 1 and (org.seizureActive and not org.otrub and math.max(analgesia * 3, 3) or analgesia) or 0
-	local zerlkersOverdose = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
-	-- Zerlkers does not cure these conditions; it reduces their distracting
-	-- visual feedback while the server keeps the real values and consequences.
-	local zerlkersVisualMul = 1 - math.Clamp(org.zerlkers or 0, 0, 1) * 0.8
-	analgesiaVisual = math.max(analgesiaVisual, 1 + zerlkersOverdose * 2.5)
+	local analgesiaVisual = org.seizureActive and math.max(analgesia * 3, 3) or analgesia
 	local health = health
 	local disorientation = org.disorientation or 0
 	local immobilization = org.immobilization or 0
+	local incapacitated = org.incapacitated or false
 	local critical = org.critical or false
+	local concussion = org.concussion or 0
+	local concussionNausea = org.nausea or 0
+	local concussionTinnitus = org.concussion_tinnitus or 0
 	tinnitusSoundFactor = Lerp(FrameTime()*2.5,tinnitusSoundFactor or 0, math.min(math.max( lply.tinnitus and (lply.tinnitus - CurTime()) or 0, 0)*7.5,120))
 	local tinnitusSoundFactor2 = tinnitusSoundFactor + (hook.Run("ModifyTinnitusFactor", tinnitusSoundFactor) or 0)
 
@@ -553,8 +427,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	
 	--maybe 56, 30?
 	local normaldsp = hg_gopro:GetBool() and 55 or 0
-	local target_dsp = normaldsp
-	local dsp_fast = false
+	lply:SetDSP(normaldsp)
 
 	if otrub or ((fakeTimer and fakeTimer - 2 > CurTime()) and GetConVar("hg_deathfadeout"):GetBool()) then
 		--if otrub or (fakeTimer and fakeTimer - 2 > CurTime()) then
@@ -563,24 +436,21 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		--lply:ScreenFade( SCREENFADE.IN, Color(0,0,0,255), 2, 0.5 )
 		
 		if isnumber(zb.ROUND_STATE) and (zb.ROUND_STATE ~= 1) then
-			target_dsp = normaldsp
+			lply:SetDSP(normaldsp)
 			plyCommand(lply,"soundfade "..tinnitusSoundFactor2.." 25")
 		elseif lply:Alive() then
-			target_dsp = 17
-			dsp_fast = true
+			lply:SetDSP(17)
 			plyCommand(lply,"soundfade 100 25")
 		end
 	else
 		plyCommand(lply,"soundfade "..tinnitusSoundFactor2.." 25")
 
 		if ((disorientation and disorientation > 3) or (brain and brain > 0.2) or lply.PlayerClassName == "headcrabzombie" or lply:GetNetVar("headcrab")) and lply:Alive() then
-			target_dsp = 130
-		elseif lply.suiciding and lply:Alive() then
-			target_dsp = 130
+			lply:SetDSP(130)
+		else
+			lply:SetDSP((lply.suiciding and lply:Alive()) and 130 or normaldsp)
 		end
 	end
-
-	lply:SetDSP(target_dsp, dsp_fast)
 
 	if not alive then
 		return false
@@ -604,7 +474,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 
 	local amount = 1 - math.Clamp(lowpulse + disorientation / 4 + k2 * 2,0,1)
 
-	disorientationLerp = LerpFT(disorientation > disorientationLerp and 1 or 0.01, disorientationLerp, math.max(lply.suiciding and 2.5 or 0, disorientation))
+	disorientationLerp = LerpFT(disorientation > disorientationLerp and 1 or 0.15, disorientationLerp, math.max(lply.suiciding and 1.5 or 0, disorientation))
 
 	if (disorientationLerp > 1) and lply:Alive() or brain > 0 then
 		local add2 = disorientationLerp - 1
@@ -627,48 +497,13 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 			//ViewPunch(ang1 * mul * 1)
 		end
 	end
-		-- Pain-based screen shake
-	if pain > 55 and lply:Alive() and not otrub then
-		local painShakeIntensity = math.Clamp((pain - 55) / (120 - 55), 0, 1)
-		local shakeMul = painShakeIntensity * 0.5 * zerlkersVisualMul
-		local time = CurTime() * (4 + painShakeIntensity * 4)
-
-		ang1[1] = math.sin(time) * shakeMul
-		ang1[2] = math.cos(time * 0.7) * shakeMul
-		ang1[3] = math.Rand(-1, 1) * shakeMul * 0.5
-
-		ViewPunch(ang1)
-	end
-
-	-- cl_screeneffects owns the Z-City low-consciousness/otrub damage overlay.
-	-- Keep this additional awake feedback from drawing the same layer twice.
-	if not otrub and (org.consciousness < 0.7) then
-		lerpblood = LerpFT(0.01, lerpblood or 0, math.Clamp((0.7 - org.consciousness) * 5, 0, 1) * 255)
-		local lowblood = (3600 - blood) / 600
-
-		addtime = addtime + FrameTime() / 6
-		local amt = (math.cos(addtime) + math.sin(addtime * 3) + math.sin(addtime * 2)) / 90
-		local amt2 = (math.sin(addtime) + math.cos(addtime * 5) + math.sin(addtime * 6)) / 90
-		local mat = Matrix({
-			{1 - amt, amt, 0, -amt2 / 2},
-			{amt2, 1 - amt2, 0, -amt / 2},
-			{0, 0, 1, 0},
-			{0, 0, 0, 1},
-		})
-		hurtoverlay:SetMatrix("$basetexturetransform", mat)
-		surface.SetMaterial(hurtoverlay)
-		surface.SetDrawColor(0, 0, 0, lerpblood)
-		surface.DrawTexturedRect(-ScrW() * 2.0, -ScrH() * 2.0, ScrW() * 5, ScrH() * 5)
-		//ViewPunch(Angle(-amt * 1, amt2 * 1,0))
-		//ViewPunch2(Angle(-amt * 1, amt2 * 1,0))
-	end
 
 
 	//pain = math.abs(math.cos(CurTime())) * 40
 	if (pain > 0) or (hurt > 0) or (immobilization > 0) or (brain > 0) then
 		local k = ((hurt + immobilization / 15) / 2)
 		--DrawToyTown(1, k * ScrH())
-		local newpain = (pain - 10) * zerlkersVisualMul
+		local newpain = pain - 10
 		if newpain > 0 then
 			//surface.SetDrawColor(0, 0, 0, (newpain / 20) * 255 - math.ease.InOutCirc(math.abs(math.cos(CurTime()))) * 50)
 			//surface.SetMaterial(pain_mat)
@@ -726,6 +561,51 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	//DrawColorModify(tab)
 	
 	DrawColorModify(tabblood)
+
+	if concussion > 0 and lply:Alive() then
+		concLerp = LerpFT(0.03, concLerp, concussion)
+		if concLerp > 0.3 then
+			DrawMaterialOverlay("sprites/mat_jack_hmcd_scope_aberration", concLerp * 0.15)
+		end
+		if concLerp > 1.0 then
+			local wobbleTime = CurTime() * 2.5
+			local wobbleAmt = math.Clamp((concLerp - 1.0) / 3, 0, 0.4)
+			local wobbleAng = Angle(
+				math.sin(wobbleTime) * wobbleAmt * 3,
+				math.cos(wobbleTime * 0.7) * wobbleAmt * 4,
+				math.sin(wobbleTime * 1.3) * wobbleAmt * 2
+			)
+			ViewPunch(wobbleAng)
+		end
+		if concLerp > 2.0 then
+			local blurAmt = math.Clamp((concLerp - 2.0) / 3, 0, 0.15)
+			DrawToyTown(2, blurAmt * ScrH())
+		end
+	else
+		concLerp = LerpFT(0.08, concLerp, 0)
+	end
+
+	if concussionNausea > 0 and lply:Alive() then
+		nauseaLerp = LerpFT(0.02, nauseaLerp, concussionNausea)
+		if nauseaLerp > 1.0 then
+			local swayTime = CurTime() * 1.8
+			local swayAmt = math.Clamp((nauseaLerp - 1.0) / 4, 0, 0.3)
+			local swayAng = Angle(
+				math.sin(swayTime) * swayAmt * 2,
+				math.cos(swayTime * 0.6) * swayAmt * 3,
+				0
+			)
+			ViewPunch(swayAng)
+		end
+	else
+		nauseaLerp = LerpFT(0.08, nauseaLerp, 0)
+	end
+
+	if concussionTinnitus > 0.1 and lply:Alive() then
+		tinnitusConcLerp = LerpFT(0.02, tinnitusConcLerp, concussionTinnitus)
+	else
+		tinnitusConcLerp = LerpFT(0.08, tinnitusConcLerp, 0)
+	end
 
 	local ent = IsValid(lply.FakeRagdoll) and lply.FakeRagdoll or lply
 
@@ -794,10 +674,9 @@ hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
 
 			ent.wounds = var
 			--PrintTable(ent.wounds)
-			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")
-			rag = IsValid(rag) and rag or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
+			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")-- or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
 			if IsValid(rag) then
-				rag.wounds = var
+				rag.wounds = rag:GetNetVar("wounds") or var
 			end
 		end
 	end
@@ -822,11 +701,10 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 			end
 
 			ent.arterialwounds = var
-			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")
-			rag = IsValid(rag) and rag or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
+			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")-- or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
 			
 			if IsValid(rag) then
-				rag.arterialwounds = var
+				rag.arterialwounds = rag:GetNetVar("arterialwounds") or var
 			end
 		end
 	end
@@ -837,12 +715,6 @@ hook.Add("Player Spawn", "removewounds", function(ply)
 
 	ply.wounds = {}
 	ply.arterialwounds = {}
-
-	local rag = IsValid(ply:GetNWEntity("FakeRagdoll")) and ply:GetNWEntity("FakeRagdoll")
-	if IsValid(rag) then
-		rag.wounds = {}
-		rag.arterialwounds = {}
-	end
 end)
 
 hook.Add("Fake", "huyhuyhuy235", function(ply,ragdoll)
@@ -865,12 +737,14 @@ function hg.applyFountain(pos, ang, mul, mul2, forward, ent)
 	end
 end
 
+local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") or CreateClientConVar("hg_old_blood", 0, true, false, "new decals, or old", 0, 1)
 local vecTorso = Vector(1, 1, 1)
 local checkpulsebones = {
 	["ValveBiped.Bip01_Head1"] = true,
 	["ValveBiped.Bip01_R_Hand"] = true,
 	["ValveBiped.Bip01_L_Hand"] = true,
 }
+local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local arteryDelayedDripSound = "arteryblooddrip/splat-blood"
 local arteryDelayedDripCount = 10
 local arteryNeckSlitSound = "rem_neckslit.ogg"
@@ -878,84 +752,8 @@ local arterySoundDelayMin = 1
 local arterySoundDelayMax = 1.25
 local arterySoundPitchMin = 95
 local arterySoundPitchMax = 110
-local normalBleedRateFull = 0.18
-local normalParticleSizeThin = 0.48
-local normalParticleSizeAverage = 0.7
-local normalParticleSizeThick = 0.9
-local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
-local bloodDown = Vector(0, 0, -1)
-
-local function getWoundVisualIntensity(org, totalBleedRate, wound, woundCount, fullRate)
-	local woundBleedRate = tonumber(wound.visualBleedRate)
-	if woundBleedRate == nil then
-		woundBleedRate = math.max(totalBleedRate or 0, 0) / math.max(woundCount or 1, 1)
-	end
-	woundBleedRate = math.max(woundBleedRate, 0)
-	local rateIntensity = math.Clamp((woundBleedRate - 0.005) / math.max(fullRate - 0.005, 0.001), 0, 1)
-	local bloodReserve = math.Clamp(((org.blood or 5000) - 2000) / 3000, 0, 1)
-	local perfusion = math.Clamp(org.perfusion or (1 - (org.hypotension or 0)), 0, 1)
-	local threatMul = 1 + (1 - bloodReserve) * 0.35 + (1 - perfusion) * 0.15
-
-	-- Wound size and its initial peak do not participate. The visual is driven by
-	-- current blood loss, with only a restrained boost when that loss is especially
-	-- dangerous to the organism's remaining circulation.
-	return math.Clamp(rateIntensity * threatMul, 0, 1)
-end
-
-local function getCirculationStrength(org, pulseOverride)
-	local pulse = org.heartstop and 0 or math.max(pulseOverride or org.pulse or 70, 0)
-	local circulation = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.55)
-	if pulse <= 0 or circulation <= 0 then return 0 end
-	local pulseStrength = math.Clamp(pulse / 70, 0, 1.55)
-
-	-- Both circulation state and an effective pulse contribute to how far blood can be
-	-- driven. A strong value can partly compensate for the other, but cannot hide
-	-- failed circulation.
-	return math.Clamp(math.sqrt(pulseStrength * circulation), 0, 1.55)
-end
-
-local function getWoundPressure(org)
-	if org.heartstop then return 0, 0 end
-
-	local pulse = math.max(tonumber(org.pulse) or 0, 0)
-	local peripheralPressure = math.Clamp(1 - (tonumber(org.hypotension) or 0), 0, 1)
-	local cardiacOutput = math.Clamp(tonumber(org.cardiacOutput) or peripheralPressure, 0, 1.5)
-	local hypertension = math.Clamp(tonumber(org.hypertension) or 0, 0, 1)
-	local pressure = math.Clamp(peripheralPressure * 0.6 + cardiacOutput * 0.4 + hypertension * 0.2, 0, 1.35)
-
-	-- A wound has a brief, stronger outward push with each effective pulse. Low
-	-- pressure or a failed pulse therefore becomes a drip instead of a jet.
-	local beat = math.max(math.sin(CurTime() * pulse * math.pi / 30), 0)
-	return pressure, beat
-end
-
-local function emitNormalWoundParticles(ent, pos, outward, intensity, circulation, org)
-	local count = intensity >= 0.82 and 3 or intensity >= 0.48 and 2 or 1
-	local pressure, beat = getWoundPressure(org)
-	local pulseForce = math.Clamp((org.pulse or 0) / 70, 0, 1.5)
-	local force = (2 + intensity * intensity * 52) * circulation * pressure * (0.72 + beat * 0.58) * pulseForce
-	local spread = 0.8 + intensity * 5.5
-	local decalWeight = Lerp(intensity, 0.45, 3)
-	local particleSize = normalParticleSizeAverage
-	if decalWeight <= 0.8 then
-		particleSize = normalParticleSizeThin
-	elseif decalWeight >= 2.2 then
-		particleSize = normalParticleSizeThick
-	end
-
-	for _ = 1, count do
-		local direction = outward
-		if not direction or direction:LengthSqr() <= 0 then
-			direction = (VectorRand(-1, 1) + Vector(0, 0, -0.7)):GetNormalized()
-		end
-
-		local velocity = direction * force * math.Rand(0.82, 1.18)
-			+ VectorRand(-spread, spread)
-			+ bloodDown * Lerp(intensity, 0.8, 2.6)
-		local particle = hg.addBloodPart(pos + VectorRand(-0.45, 0.45), velocity, nil, particleSize, particleSize, false, nil, ent)
-		if particle then particle.decalWeight = decalWeight end
-	end
-end
+local arteryBurstCount = 2
+local arterySizeMul = 1.35
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -999,22 +797,11 @@ local function randomArteryPitch()
 	return math.random(arterySoundPitchMin, arterySoundPitchMax)
 end
 
-local function getArteryWoundOwner(ent)
-	if ent:IsPlayer() then return ent end
-
-	local owner = ent.GetNWEntity and ent:GetNWEntity("ply")
-	if not IsValid(owner) or not owner:IsPlayer() then return end
-
-	local fakeRagdoll = owner:GetNWEntity("FakeRagdoll")
-	local deathRagdoll = owner:GetNWEntity("RagdollDeath")
-	if fakeRagdoll == ent or deathRagdoll == ent then return owner end
-end
-
 local function playRandomArteryDrip(ent, wound, vol)
 	local pos = getArterialWoundPos(ent, wound)
 	if not pos then return end
 
-	sound.Play(arteryDelayedDripSound .. math.random(1, arteryDelayedDripCount) .. ".wav", pos, 96, randomArteryPitch(), vol or 1)
+	sound.Play(arteryDelayedDripSound .. math.random(1, arteryDelayedDripCount) .. ".wav", pos, 70, randomArteryPitch(), vol or 1)
 end
 
 function hg.queueArterialWoundSound(ent, wound)
@@ -1022,20 +809,14 @@ function hg.queueArterialWoundSound(ent, wound)
 
 	local delay = math.Rand(arterySoundDelayMin, arterySoundDelayMax)
 	local artery = wound[7]
-	local owner = getArteryWoundOwner(ent)
-	local org = IsValid(owner) and owner.organism or ent.organism or {}
-	-- Death-ragdoll netvars can arrive before the ragdoll's player link. An
-	-- unknown owner must not replay the neck-slit sound for an existing corpse.
-	local sourceAlive = IsValid(owner) and owner:Alive()
-		or ent:IsNPC() and ent:Health() > 0
-	local canPlayNeckSlit = sourceAlive and not org.otrub
+	local org = ent.organism or {}
 
-	if artery == "arteria" and canPlayNeckSlit then
+	if artery == "arteria" and (not ent:IsPlayer() or ent:Alive() and not org.otrub) then
 		local _, target = getArterialWoundPos(ent, wound)
 		if IsValid(target) then
 			local snd = CreateSound(target, arteryNeckSlitSound)
 			if snd then
-				snd:SetSoundLevel(92)
+				snd:SetSoundLevel(75)
 				snd:PlayEx(1, randomArteryPitch())
 				snd:ChangeVolume(0, delay)
 				timer.Simple(delay + 0.05, function()
@@ -1047,53 +828,10 @@ function hg.queueArterialWoundSound(ent, wound)
 
 	timer.Simple(delay, function()
 		if not IsValid(ent) then return end
-		playRandomArteryDrip(ent, wound, 1)
+		playRandomArteryDrip(ent, wound, artery == "arteria" and 0.85 or 1)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmount, isAmputation)
-	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
-	-- artery-marked blood trail with the original combined right/up oscillation.
-	-- Give the pressure pulse enough forward speed and lift to form an arc before
-	-- gravity takes over instead of immediately pouring down the body.
-	local time = CurTime()
-	local pulse = math.max(org.pulse or 0, 0)
-	local pulseMul = pulse / 70
-	local circulation = getCirculationStrength(org, pulse)
-	local arterialPressureMul = circulation * (isAmputation and 1.7 or 2.5)
-	if arterialPressureMul <= 0 then
-		hg.addBloodPart(pos, bloodDown * 2 + VectorRand(-0.5, 0.5), nil, size, size, true, nil, ent)
-		return
-	end
-	-- Keep the oscillation, but let forward pressure dominate enough for the
-	-- arterial trail to read as a fast jet instead of a short local spray.
-	-- A fully open carotid (14 bleed) reaches four times the old distance;
-	-- smaller or closing arteries scale down from that using their live bleed.
-	local bleedRangeMul = 1 + (isAmputation and 1 or 3) * math.Clamp((bleedAmount or 0) / 14, 0, 1)
-	local forwardVelocityMul = (isAmputation and 1.55 or 2.5) * bleedRangeMul
-	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
-	local velocity = (VectorRand(-1, 1) * pulseMul
-		+ dir * 5 * forwardVelocityMul * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
-		+ dir:Angle():Right() * 25 * math.sin(time * 2) * math.cos(time * 4)
-		+ ang:Up() * 25 * math.sin(time * 3) * math.cos(time)
-		+ vector_up * upwardVelocity
-		+ VectorRand(-1, 1) * pulseMul) * arterialPressureMul
-
-	hg.addBloodPart(pos, velocity, nil, size, size, true, nil, ent)
-end
-local hg_altberserk = GetConVar("hg_altberserk")
-local hg_altnoradrenaline = GetConVar("hg_altnoradrenaline")
-
-local function cachedClientThinkBone(ent, boneName)
-	ent.ZCClientThinkBones = ent.ZCClientThinkBones or {}
-	local bone = ent.ZCClientThinkBones[boneName]
-	if bone == nil then
-		bone = ent:LookupBone(boneName)
-		ent.ZCClientThinkBones[boneName] = bone or false
-	end
-
-	return bone == false and nil or bone
-end
 local hg_heartbeat_volume = ConVarExists("hg_heartbeat_volume") and GetConVar("hg_heartbeat_volume") or CreateClientConVar("hg_heartbeat_volume", 1, true, nil, "heartbeat loudness", 0, 4)
 
 -- Returns a valid bone index or nil. Handles both bone names (string) and
@@ -1125,7 +863,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 	if !org then return end
 
-
 	if org and org.pulse and org.o2 and org.o2[1] then
 		local pulse = org.heartbeat
 		org.pulsethink = org.pulsethink or 0
@@ -1140,13 +877,12 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			local sin = (math.sin(org.pulsethink) + 1) * 0.5
 			local amt = 0.05 * sin * math.max(org.pulse / 70, 0.5)
 			
-			-- Disabled bone scaling to prevent stretchiness
-			-- local size = 1 + amt
-			-- vecTorso[1] = size
-			-- vecTorso[2] = size
-			-- vecTorso[3] = size
-			-- 
-			-- ent:ManipulateBoneScale(torso, vecTorso)
+			local size = 1 + amt
+			vecTorso[1] = size
+			vecTorso[2] = size
+			vecTorso[3] = size
+			
+			ent:ManipulateBoneScale(torso, vecTorso)
 			//ent:ManipulateBoneAngles(torso, Angle(0, amt, 0))
 
 			vecTorso[1] = 0
@@ -1213,6 +949,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	local org = ent.organism or {}
 	local owner = ent
 	
+	local beatsPerSecond = math.max(min(30 / math.max(org.pulse or 70,2), 4), 0.1) * (!hg_old_blood:GetBool() and 0.3 or 1)
+	
 	if org.pulse and org.heartbeat > 30 and (org.lastpulse or 0) + (1 / math.Clamp(org.heartbeat, 1, 600)) * 60 < CurTime() then
 		org.lastpulse = CurTime()
 		local pulse = org.heartbeat or 0
@@ -1239,7 +977,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		end
 	end
 
---why? because
+	--why? because
 	if org.pulse and (ent.pulse_breathe.lastbreathe or 0) < CurTime() and org.lastbreathed and org.lastbreathed + 5 < CurTime() then
 		local heartbeat = org.heartbeat or 0
 		ent.pulse_breathe.lastbreathe = CurTime() + (1 / math.Clamp(org.heartbeat + (org.o2[1] - 30) * 1, 1, 120)) * 90 + ( org.o2[1] < 20 and 5 or 0)
@@ -1254,10 +992,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				
 				if org.timeValue and org.o2.curregen <= org.timeValue * 0.5 and org.o2[1] < 20 then
 					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_wheeze"..math.random(5)..".mp3", 40, nil, nil, nil, nil, 1)
-				end
-				if org.o2[1] < 12 and ply == lply and (ent.pulse_breathe.lastsonimcooked or 0) < CurTime() and math.random(4) == 1 then
-					ply:EmitSound("sonimcooked.mp3", 45, math.random(94, 106), 0.85)
-					ent.pulse_breathe.lastsonimcooked = CurTime() + math.Rand(12, 24)
 				end
 			else
 				if org.o2[1] < 15 then
@@ -1290,75 +1024,36 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			end
 		end
 	end
-
-		if org and ent:LookupBone("ValveBiped.Bip01_Head1") then
-		local brain = org.brain or 0
-		org.brainmist_old = org.brainmist_old or brain
-		org.brainmist_next = org.brainmist_next or 0
-		if brain > org.brainmist_old and (brain - org.brainmist_old) > 0.005 and time >= org.brainmist_next then
-			local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
-			local headpos, headang = ent:GetBonePosition(bone)
-			if headpos then
-				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-35, 35) + headang:Forward() * -15, nil, math.Rand(8, 15), math.Rand(8, 15), 0.6, true, ent)
-				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-25, 25), nil, math.Rand(5, 12), math.Rand(5, 12), 0.45, true, ent)
-				hg.addBloodPart2(headpos + VectorRand(-2, 2), VectorRand(-20, 20), nil, math.Rand(3, 8), math.Rand(3, 8), 0.35, true, ent)
-				hg.addBloodPart(headpos + VectorRand(-1, 1), VectorRand(-20, 20) + headang:Forward() * -10, nil, 2, 2, true, nil, ent)
-				hg.addBloodPart(headpos + VectorRand(-1, 1), VectorRand(-25, 25), nil, 2, 2, true, nil, ent)
-			end
-			org.brainmist_next = time + 0.2
-		end
-		org.brainmist_old = brain
-	end
 	
 	if org and org.blood and org.blood > 10 and wounds and #wounds > 0 then
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-			local circulation = getCirculationStrength(org)
 			for i, wound in pairs(wounds) do
-<<<<<<< HEAD
-				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull)
-				local particleInterval = Lerp(intensity, 3.2, 0.16)
-				
-				if (wound[5] or 0) < time then
-					local bone = wound[4]
-					local boneID = wound[8]
-					if not boneID or ent:GetBoneName(boneID) != bone then
-						boneID = ent:LookupBone(bone)
-						wound[8] = boneID
-					end
-
-					if seen and boneID then
-=======
 				local size = math.random(0, 1) * math.max(math.min(wound[1], 1), 0.5)
 
 				if wound[5] + beatsPerSecond < time then
 					local boneID = GetValidBone(ent, wound[4])
 					if seen and boneID then
 						local bone = wound[4]
->>>>>>> 8e5ef9bd (some changes i already made)
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
 
 						if !should then continue end
 
 						local mat = ent:GetBoneMatrix(boneID)
-<<<<<<< HEAD
-						if not mat then return end
-=======
 						if not mat then continue end
->>>>>>> 8e5ef9bd (some changes i already made)
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
 						local pos, ang = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
-							if (wound[5] or 0) + 1 < time then
+							if wound[5] + 1 < time then
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 							end
 						else
-							emitNormalWoundParticles(ent, pos, -ang:Forward(), intensity, circulation, org)
+							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, false, nil, ent)
 						end
 
-						wound[5] = time + (water and 2 or particleInterval)
+						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
 					else
 						local pos = ent:GetPos()
 
@@ -1366,10 +1061,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitNormalWoundParticles(ent, pos, nil, intensity, circulation, org)
+							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, false, nil, ent)
 						end
 
-						wound[5] = time + (water and 2 or particleInterval)
+						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
 					end
 				end
 			end
@@ -1378,25 +1073,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-<<<<<<< HEAD
-			-- Arterial blood is a continuous pressured stream.  The wound timer
-			-- below already limits particle emission to the player's blood-FPS
-			-- setting; a second pulse-scale gate here made every artery look like
-			-- a slow drip instead of a jet.
-			if (wound[5] or 0) < time then
-				local bone = wound[4]
-				local boneID = wound[8]
-				if not boneID or ent:GetBoneName(boneID) != bone then
-					boneID = ent:LookupBone(bone)
-					wound[8] = boneID
-				end
-				if not boneID then continue end
-
-				local pos, ang = ent:GetBonePosition(boneID)
-				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5)
-					if seen then
-=======
 			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
 			local boneID = GetValidBone(ent, wound[4])
 			if wound[5] + addtime < time and boneID then
@@ -1406,44 +1082,50 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
 					if seen and boneID then
 						local bone = wound[4]
->>>>>>> 8e5ef9bd (some changes i already made)
 
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
 
 						if !should then continue end
 						
 						local mat = ent:GetBoneMatrix(boneID)
-<<<<<<< HEAD
-						if not mat then return end
-						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
-						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
-=======
 						if not mat then continue end
 						bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then continue end
->>>>>>> 8e5ef9bd (some changes i already made)
 						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local dir = wound[6]
-						local len = dir:Length()
-						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, boneAng)
+						local len = dir:Length() * (org.pulse or 70) / 70
+						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)
+						
 						dir = -dir:Forward() * len
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
-							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
+							for _ = 1, arteryBurstCount do
+								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
+							end
 						else
-							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, wound[1], wound[9] == true)
+							local vel = VectorRand(-1, 1) * (org.pulse or 70) / 70 + dir * 5 * (math.abs(math.sin(CurTime() * 2) + math.cos(CurTime() * (5 + i * 2)) + math.sin(CurTime() * (1 + i))) * 0.6 + math.sin(CurTime() * 2) + 4) * 0.1 + dir:Angle():Right() * 25 * math.sin(CurTime() * 2) * math.cos(CurTime() * 4) + ang:Up() * 25 * math.sin(CurTime() * 3) * math.cos(CurTime() * 1) + VectorRand(-1, 1) * (org.pulse or 70) / 70
+							hg.addBloodPart(pos, vel, nil, size, size, true, nil, ent)
+							for _ = 2, arteryBurstCount do
+								hg.addBloodPart(pos, vel * math.Rand(0.65, 1.05) + VectorRand(-3, 3) * (org.pulse or 70) / 70, nil, size * math.Rand(0.85, 1.15), size * math.Rand(0.85, 1.15), true, nil, ent)
+							end
 						end
 
-						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))
+						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))
 					else
 						local pos = ent:GetPos()
+						
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
-							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
+							for _ = 1, arteryBurstCount do
+								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
+							end
 						else
 							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, true, nil, ent)
+							for _ = 2, arteryBurstCount do
+								hg.addBloodPart(pos, VectorRand(-15, 15), nil, size * math.Rand(0.85, 1.15), size * math.Rand(0.85, 1.15), true, nil, ent)
+							end
 						end
 
 						wound[5] = time + (water and 2 or 0)
@@ -1455,14 +1137,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 end)
 
 local grub = Model("models/grub_nugget_small.mdl")
---ValveBiped.Bip01_R_Hand
---ValveBiped.Bip01_R_Forearm
---ValveBiped.Bip01_R_Foot
---ValveBiped.Bip01_R_Thigh
---ValveBiped.Bip01_R_Calf
---ValveBiped.Bip01_R_Shoulder
---ValveBiped.Bip01_R_Elbow
-
 local vecalmostzero = Vector(0.01, 0.01, 0.01)
 
 local modelPlacements = {
@@ -1634,3 +1308,25 @@ end)
 
 hook.Add("LocalPlayerDeath", "hg_exhausted_sound_death", StopExhaustedSound)
 hook.Add("ShutDown", "hg_exhausted_sound_shutdown", StopExhaustedSound)
+
+net.Receive("headtrauma_concussion_update", function()
+	local severity = net.ReadFloat()
+	local concussionLevel = net.ReadFloat()
+	if not lply or not lply:Alive() then return end
+
+	local flashAlpha = math.Clamp(severity * 22, 0, 130)
+	if flashAlpha > 1 then
+		lply:ScreenFade(SCREENFADE.IN, Color(220, 180, 180, flashAlpha), 0.35, 0.45)
+	end
+
+	if severity > 0.4 then
+		local punch = math.Clamp(severity * 3.5, 1, 22)
+		lply:ViewPunch(AngleRand(-punch, punch))
+		lply:ViewPunch(Angle(math.Rand(-1, 1) * punch * 0.4, math.Rand(-1, 1) * punch * 0.4, math.Rand(-1, 1) * punch * 0.5))
+	end
+
+	if severity > 1.2 then
+		local shake = math.Clamp(severity * 2, 2, 16)
+		util.ScreenShake(lply:EyePos(), shake, 6, 0.4, 120)
+	end
+end)

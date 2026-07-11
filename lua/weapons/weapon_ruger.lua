@@ -13,7 +13,7 @@ SWEP.WorldModel = "models/weapons/w_shotgun.mdl"
 SWEP.WorldModelFake = "models/weapons/c_svt.mdl"
 
 
-SWEP.FakePos = Vector(-15, 1, 4)
+SWEP.FakePos = Vector(-16, 1, 4)
 SWEP.FakeAng = Angle(0, 0, 0)
 SWEP.FakeAttachment = "1"
 SWEP.AttachmentPos = Vector(3.5,-0.2,-0.05)
@@ -30,15 +30,7 @@ SWEP.FakeViewBobBone = "ValveBiped.Bip01_L_Hand"
 SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_L_UpperArm"
 SWEP.ViewPunchDiv = 30
 
--- Фейковые звуки
-SWEP.FakeReloadSounds = {
-    [0.25] = "weapons/ak74/ak74_magout.wav",
-    [0.85] = "weapons/ak74/ak74_magin.wav",
-}
-SWEP.FakeEmptyReloadSounds = {
-    [0.25] = "weapons/ak74/ak74_magout.wav",
-    [0.65] = "weapons/ak74/ak74_magin.wav",
-}
+
 
 SWEP.MagModel = "models/weapons/upgrades/w_magazine_m1a1_30.mdl"
 SWEP.FakeReloadEvents = {}
@@ -53,8 +45,7 @@ SWEP.LocalMuzzleAng = Angle(0,0,0)
 SWEP.WeaponEyeAngles = Angle(0,0,0)
 
 SWEP.CustomShell = "762x54"
-SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.wav"
-SWEP.CockSound = "pwb2/weapons/ithaca37stakeout/pump.wav"
+
 SWEP.weight = 3.5
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
@@ -93,7 +84,7 @@ SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
 SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
 SWEP.HoldType = "rpg"
-SWEP.ZoomPos = Vector(-3, -3.3, 3.126)
+SWEP.ZoomPos = Vector(-3, -3.3, 2.65)
 SWEP.RHandPos = Vector(-8, -2, 6)
 SWEP.LHandPos = Vector(6, -3, 1)
 SWEP.Ergonomics = 0.85
@@ -154,6 +145,10 @@ SWEP.AnimsSounds = {
 }
 
 SWEP.stupidgun = true
+
+function SWEP:AllowedInspect()
+	return self:Clip1() >= self.Primary.ClipSize
+end
 
 function SWEP:AnimHoldPost() end
 function SWEP:ModelCreated(model) model:SetBodyGroups(self:GetRandomBodygroups() or "000000000") end
@@ -260,241 +255,3 @@ function SWEP:CanPrimaryAttack()
     return not (self:GetNetVar("shootgunReload", 0) > CurTime())
 end
 
-<<<<<<< HEAD
-SWEP.WepSelectIcon2 = Material("vgui/hud/tfa_nmrih_rif_rug1022_ext")
-SWEP.WepSelectIcon2box = false
-SWEP.IconOverride = "vgui/entities/tfa_nmrih_rif_rug1022_ext"
-
-SWEP.Ergonomics = 1
-SWEP.WorldPos = Vector(2, -1, -1.1)
-SWEP.WorldAng = Angle(0, 0, 0)
-SWEP.UseCustomWorldModel = true
-SWEP.attPos = Vector(0.25, -2.1, 28)
-SWEP.attAng = Angle(0, 0.4, 0)
-SWEP.lengthSub = 25
-SWEP.handsAng = Angle(1, -1.5, 0)
-SWEP.DistSound = "m9/m9_dist.wav"
-
-SWEP.availableAttachments = {
-	barrel = {
-		[1] = {"supressor1", Vector(-2, 0, 0), {}},
-		[2] = {"supressor6", Vector(-1.5, 0, 0), {}},
-		[3] = {"supressor7", Vector(-1.8, 0, 0), {}},
-	},
-	sight = {
-		["mountType"] = "picatinny_small",
-		["mount"] = Vector(-20, 5, 0.1),
-	},
-}
-
-
-
-SWEP.weight = 3
-
---local to head
-SWEP.RHPos = Vector(3,-6,3.5)
-SWEP.RHAng = Angle(0,-12,90)
---local to rh
-SWEP.LHPos = Vector(15,1,-3.3)
-SWEP.LHAng = Angle(-110,-180,0)
-
-local finger1 = Angle(25,0, 40)
-
-SWEP.ShootAnimMul = 3
-function SWEP:DrawPost()
-	local wep = self:GetWeaponEntity()
-	self.vec = self.vec or Vector(0,0,0)
-	local vec = self.vec
-	if CLIENT and IsValid(wep) then
-		self.shooanim = Lerp(FrameTime()*15,self.shooanim or 0,self.ReloadSlideOffset)
-		vec[1] = -2*self.shooanim
-		vec[2] = 0*self.shooanim
-		vec[3] = 0*self.shooanim
-		wep:ManipulateBonePosition(97,vec,false)
-	end
-end
-
-local lfang2 = Angle(0, -15, -1)
-local lfang1 = Angle(-5, -5, -5)
-local lfang0 = Angle(-12, -16, 20)
-local vec_zero = Vector(0,0,0)
-local ang_zero = Angle(0,0,0)
-function SWEP:AnimHoldPost()
-
-end
--- RELOAD ANIM AKM
-SWEP.ReloadAnimLH = {
-	Vector(0,0,0),
-	Vector(-1.5,1.5,-8),
-	Vector(-1.5,1.5,-8),
-	Vector(-1.5,1.5,-8),
-	Vector(-1,7,-3),
-	Vector(-7,15,-15),
-	Vector(-7,15,-15),
-	Vector(-1,7,-3),
-	Vector(-1.5,1.5,-8),
-	Vector(-1.5,1.5,-8),
-	Vector(-1.5,1.5,-8),
-	"fastreload",
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-}
-
-SWEP.ReloadAnimRH = {
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,0),
-	Vector(0,0,2),
-	Vector(8,1,2),
-	Vector(8,2.5,-2),
-	Vector(7,2.5,-2),
-	Vector(6,2.5,-2),
-	Vector(3,2.5,-2),
-	Vector(3,2.5,-1),
-	Vector(0,4,-1),
-	"reloadend",
-	Vector(0,5,0),
-	Vector(-2,2,1),
-	Vector(0,0,0),
-}
-
-SWEP.ReloadAnimLHAng = {
-	Angle(0,0,0),
-	Angle(-90,0,110),
-	Angle(-90,0,110),
-	Angle(-80,0,110),
-	Angle(-20,0,110),
-	Angle(-30,0,110),
-	Angle(-20,0,110),
-	Angle(-90,0,110),
-	Angle(-90,0,110),
-	Angle(-90,0,110),
-	Angle(-90,0,110),
-	Angle(-20,0,45),
-	Angle(-2,0,-3),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-}
-
-SWEP.ReloadAnimRHAng = {
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(0,0,0),
-	Angle(20,-10,-20),
-	Angle(20,0,-20),
-	Angle(20,0,-20),
-	Angle(0,0,0),
-}
-
-SWEP.ReloadSlideAnim = {
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	0,
-	3,
-	3,
-	0,
-	0,
-	0,
-	0
-}
-
-SWEP.ReloadAnimWepAng = {
-	Angle(0,0,0),
-	Angle(-15,15,-17),
-	Angle(-14,14,-22),
-	Angle(-10,15,-24),
-	Angle(12,14,-23),
-	Angle(11,15,-20),
-	Angle(12,14,-19),
-	Angle(11,14,-20),
-	Angle(7,17,-22),
-	Angle(0,14,-21),
-	Angle(0,15,-22),
-	Angle(0,24,-23),
-	Angle(0,25,-22),
-	Angle(-15,24,-25),
-	Angle(-15,25,-23),
-	Angle(5,0,2),
-	Angle(0,0,0),
-}
-
--- Inspect Assault
-
-=======
-SWEP.InspectAnimLH = { Vector(0, 0, 0) }
-SWEP.InspectAnimLHAng = { Angle(0, 0, 0) }
-SWEP.InspectAnimRH = { Vector(0, 0, 0) }
-SWEP.InspectAnimRHAng = { Angle(0, 0, 0) }
->>>>>>> 8e5ef9bd (some changes i already made)
-SWEP.InspectAnimWepAng = {
-    Angle(0, 0, 0),
-    Angle(-5, 9, 5),
-    Angle(-5, 9, 14),
-    Angle(-5, 9, 16),
-    Angle(-6, 10, 15),
-    Angle(-5, 9, 16),
-    Angle(-10, 15, -15),
-    Angle(-2, 22, -15),
-    Angle(0, 25, -32),
-    Angle(0, 24, -45),
-    Angle(0, 22, -55),
-    Angle(0, 20, -56),
-    Angle(0, 0, 0)
-}
