@@ -6,6 +6,7 @@ SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 SWEP.Damage = 25
+SWEP.Damage = 25
 SWEP.HoldType = "melee"
 
 SWEP.SuicidePos = Vector(28, 6, -31)
@@ -46,6 +47,8 @@ SWEP.WaitTime2 = 0.85
 SWEP.AttackLen2 = 30
 SWEP.ViewPunch2 = Angle(0,0,-2)
 
+
+
 SWEP.HitCooldownEnabled = true
 SWEP.HitCooldown = 0.8
 SWEP.ComboEnabled = true
@@ -61,6 +64,8 @@ SWEP.basebone = 94
 
 SWEP.weaponPos = Vector(0,1,-5)
 SWEP.weaponAng = Angle(-90,-90,0)
+
+SWEP.AnimAlwaysBack = true
 
 SWEP.AnimList = {
     ["idle"] = "Idle",
@@ -97,7 +102,6 @@ end
 SWEP.setlh = false
 SWEP.setrh = true
 SWEP.TwoHanded = false
-SWEP.NoReverse = true
 
 
 SWEP.AttackHit = "Canister.ImpactHard"
@@ -105,15 +109,6 @@ SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.wav"
-SWEP.SwingSound = "baseballbat/swing.ogg"
-SWEP.HitFleshExtra = {
-    "hatchet/hatchethit1.ogg",
-    "hatchet/hatchethit2.ogg",
-    "hatchet/hatchethit3.ogg",
-
-}
-SWEP.HitFleshExtraPitch = 105
-SWEP.SwingSoundPitch = {115, 120}
 
 SWEP.AttackPos = Vector(0,0,0)
 
@@ -161,15 +156,21 @@ function SWEP:CustomAttack2()
     ent.owner = ply
     ent.damage = 35
     ent.penetration = 5
-    ent.shouldntlodge = true
+    ent.PenetrationSize = 10
+    ent.LodgeChance = 0.7
+    ent.StickInWorld = true
+    ent.StickPhysics = false
+    ent.UnstickSnd = "physics/metal/metal_solid_impact_hard3.wav"
+    ent.ArteryChance = 1.45
+    ent.StickDepth = -1
+    ent.returndamage = 20
+    ent.returnblood = 50
 
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-        local throwVel = ply:GetAimVector() * ent.MaxSpeed
-        local playerVel = ply:GetVelocity()
-        phys:SetVelocity(throwVel + playerVel * 0.5)
-        phys:AddAngleVelocity(Vector(0,ent.MaxSpeed,0) )
+        phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
+        phys:AddAngleVelocity(Vector(0,ent.MaxSpeed,0))
     end
     
     ply:EmitSound("hatchet/rem_axethrow.wav",50,math.random(95,105))

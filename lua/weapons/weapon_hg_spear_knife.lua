@@ -29,6 +29,8 @@ SWEP.AnimTime2 = 2.1
 SWEP.WaitTime2 = 1.4
 SWEP.ViewPunch2 = Angle(0,0,-2)
 
+
+
 SWEP.attack_ang = Angle(0,0,0)
 SWEP.sprint_ang = Angle(15,0,0)
 
@@ -110,7 +112,11 @@ function SWEP:CustomAttack2()
     ent.returndamage = 30
     ent.returnblood = 100
     ent.PenetrationSize = 15
-    ent.Penetration = 40
+    ent.penetration = 10
+    ent.LodgeChance = 0.9
+    ent.StickInWorld = true
+    ent.StickDepth = -6
+    ent.ArteryChance = 1.3
 
     ent.hitworldfunc = function(ent)
         ent.wep = "weapon_hg_spear"
@@ -126,9 +132,7 @@ function SWEP:CustomAttack2()
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-        local throwVel = ply:GetAimVector() * ent.MaxSpeed
-        local playerVel = ply:GetVelocity()
-        phys:SetVelocity(throwVel + playerVel * 0.5)
+        phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
         phys:AddAngleVelocity(Vector(0,0,0))
     end
 

@@ -209,26 +209,6 @@ if SERVER then
         self:Remove()
 	end
 
-		-- Bone to organ damage mapping
-	local boneToOrgans = {
-		["ValveBiped.Bip01_Head1"] = {{"brain", 0.15, 0.4}},
-		["ValveBiped.Bip01_Neck1"] = {{"arteria", 0.3, 0.6}},
-		["ValveBiped.Bip01_Spine4"] = {{"heart", 0.25, 0.5}, {"liver", 0.15, 0.3}},
-		["ValveBiped.Bip01_Spine3"] = {{"liver", 0.2, 0.4}, {"stomach", 0.15, 0.3}},
-		["ValveBiped.Bip01_Spine2"] = {{"intestines", 0.2, 0.4}},
-		["ValveBiped.Bip01_Spine1"] = {{"intestines", 0.15, 0.3}},
-		["ValveBiped.Bip01_L_Clavicle"] = {{"lungsL", 0.2, 0.4}},
-		["ValveBiped.Bip01_R_Clavicle"] = {{"lungsR", 0.2, 0.4}},
-		["ValveBiped.Bip01_L_UpperArm"] = {{"larmartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_R_UpperArm"] = {{"rarmartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_L_Forearm"] = {{"larmartery", 0.2, 0.4}},
-		["ValveBiped.Bip01_R_Forearm"] = {{"rarmartery", 0.2, 0.4}},
-		["ValveBiped.Bip01_L_Thigh"] = {{"llegartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_R_Thigh"] = {{"rlegartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_L_Calf"] = {{"llegartery", 0.2, 0.4}},
-		["ValveBiped.Bip01_R_Calf"] = {{"rlegartery", 0.2, 0.4}},
-	}
-
 	function hg.TakeArrow(ent, ply)
 		local org = ent.organism
 		
@@ -240,110 +220,21 @@ if SERVER then
 
 		local tbl = table.remove(org.LodgedEntities, i)
 
-		local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0))
+		local bone = ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0)
+		local mat = ent:GetBoneMatrix(bone)
 		
 		if mat then
-			local lpos, lang = tbl.OffsetPos, tbl.OffsetAng
-			local boneName = ent:GetBoneName(ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0))
-			
-			for i = 1, 5 do
-				hg.organism.AddWoundManual(org.owner, 50, lpos + VectorRand(-0.6, 0.6), lang or AngleRand(-180, 180), boneName, CurTime() + math.Rand(0, 2))
-			end
-
-			-- Check for organ damage based on bone location
-			if boneToOrgans[boneName] then
-				-- Calculate extraction position and direction for blood flow
-				local boneIdx = ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0)
-				local bonePos = ent:GetBonePosition(ent:LookupBone(boneName))
-				local extractPos = bonePos
-				local extractDir = Vector(0, 0, 1)
-				
-				-- Calculate outward direction from bone center to extraction point
-				if bonePos and tbl.OffsetPos then
-					local worldOffset = tbl.OffsetPos
-					local boneMat = ent:GetBoneMatrix(ent:LookupBone(boneName))
-					local boneAng = boneMat and boneMat:GetAngles()
-					if boneAng then
-						local worldOffsetRotated = worldOffset.x * boneAng:Right() + worldOffset.y * boneAng:Up() + worldOffset.z * boneAng:Forward()
-						if worldOffsetRotated:Length() > 0.01 then
-							extractDir = worldOffsetRotated:GetNormalized()
-							extractPos = bonePos + worldOffsetRotated
-						else
-							-- Default direction based on limb type
-							if string.find(boneName, "L_") then
-								extractDir = Vector(-1, 0, 0)
-							elseif string.find(boneName, "R_") then
-								extractDir = Vector(1, 0, 0)
-							end
-						end
-					end
-				end
-				
-				for _, organData in ipairs(boneToOrgans[boneName]) do
-					local organName, minChance, maxChance = organData[1], organData[2], organData[3]
-					local damageChance = math.Rand(minChance, maxChance)
-					
-					if math.random() < damageChance then
-						local causesInternalBleed = false
-						if organName == "brain" then
-							org.brain = math.min(org.brain + math.Rand(0.05, 0.15), 1)
-						elseif organName == "heart" then
-							org.heart = math.min(org.heart + math.Rand(0.1, 0.3), 1)
-							causesInternalBleed = true
-						elseif organName == "liver" then
-							org.liver = math.min(org.liver + math.Rand(0.1, 0.25), 1)
-							causesInternalBleed = true
-						elseif organName == "lungsL" then
-							org.lungsL[1] = math.min(org.lungsL[1] + math.Rand(0.1, 0.25), 1)
-							causesInternalBleed = true
-							if math.random() < 0.3 then
-								org.lungsL[2] = math.min(org.lungsL[2] + math.Rand(0.1, 0.2), 1)
-							end
-						elseif organName == "lungsR" then
-							org.lungsR[1] = math.min(org.lungsR[1] + math.Rand(0.1, 0.25), 1)
-							causesInternalBleed = true
-							if math.random() < 0.3 then
-								org.lungsR[2] = math.min(org.lungsR[2] + math.Rand(0.1, 0.2), 1)
-							end
-						elseif organName == "stomach" then
-							org.stomach = math.min(org.stomach + math.Rand(0.1, 0.2), 1)
-							causesInternalBleed = true
-						elseif organName == "intestines" then
-							org.intestines = math.min(org.intestines + math.Rand(0.1, 0.2), 1)
-							causesInternalBleed = true
-						elseif organName == "arteria" then
-							-- Call hitArtery to create proper arterial wound with blood stream
-							if hg.hitArtery then hg.hitArtery("arteria", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
-						elseif organName == "larmartery" then
-							-- Call hitArtery to create proper arterial wound with blood stream
-							if hg.hitArtery then hg.hitArtery("larmartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
-						elseif organName == "rarmartery" then
-							-- Call hitArtery to create proper arterial wound with blood stream
-							if hg.hitArtery then hg.hitArtery("rarmartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
-						elseif organName == "llegartery" then
-							-- Call hitArtery to create proper arterial wound with blood stream
-							if hg.hitArtery then hg.hitArtery("llegartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
-						elseif organName == "rlegartery" then
-							-- Call hitArtery to create proper arterial wound with blood stream
-							if hg.hitArtery then hg.hitArtery("rlegartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
-						end
-						
-						-- Limb artery extraction must remain a limb wound. Only actual
-						-- torso organs add internal (chest/abdominal) bleeding here.
-						if causesInternalBleed then
-							org.internalBleed = org.internalBleed + math.Rand(0.1, 0.3)
-						end
-					end
-				end
+			for j = 1, 5 do
+				hg.organism.AddWoundManual(org.owner, 50, vector_origin, AngleRand(-180, 180), ent:GetBoneName(bone), CurTime() + math.Rand(0, 2))
 			end
 		end
 
 		if tbl.takeent then
 			if ply:HasWeapon(tbl.takeent) then
-				local ent = ents.Create(tbl.takeent)
-				ent:SetPos(ply:EyePos())
-				ent.IsSpawned = true
-				ent:Spawn()
+				local wep = ents.Create(tbl.takeent)
+				wep:SetPos(ply:EyePos())
+				wep.IsSpawned = true
+				wep:Spawn()
 			else
 				ply:Give(tbl.takeent)
 			end
@@ -354,11 +245,11 @@ if SERVER then
 
 		net.Start("organism_send")
 
-		local tbl = {}
-		tbl.LodgedEntities = org.LodgedEntities
-		tbl.owner = org.owner
+		local netTbl = {}
+		netTbl.LodgedEntities = org.LodgedEntities
+		netTbl.owner = org.owner
 	
-		net.WriteTable(tbl)
+		net.WriteTable(netTbl)
 		net.WriteBool(true)
 		net.WriteBool(false)
 		net.WriteBool(false)
@@ -379,6 +270,17 @@ if SERVER then
 			local tr = hg.eyeTrace(ply)
 
 			local ent = tr.Entity
+
+			if not IsValid(ent) then return end
+
+			if not ent.organism then
+				local owner = ent:GetNWEntity("ply")
+				if IsValid(owner) and owner.organism then
+					ent = owner
+				else
+					return
+				end
+			end
 
 			hg.TakeArrow(ent, ply)
 		end
@@ -415,7 +317,6 @@ elseif CLIENT then
 		end
 
 		if ent.organism and ent.organism.LodgedEntities then
-			ent.ZCLodgedBones = ent.ZCLodgedBones or {}
 			for i, settings in ipairs(ent.organism.LodgedEntities) do				
 				local arrow = hg.lodgedmodels[settings.model] or arrowasdasd
 				
@@ -430,16 +331,7 @@ elseif CLIENT then
 					arrow = hg.lodgedmodels[settings.model]
 				end
 
-				local bone = ent.ZCLodgedBones[settings.PhysBoneID]
-				if bone == nil then
-					bone = ent:TranslatePhysBoneToBone(settings.PhysBoneID)
-					ent.ZCLodgedBones[settings.PhysBoneID] = bone or false
-				end
-				bone = bone == false and nil or bone
-				if not bone then continue end
-
-				local mat = ent:GetBoneMatrix(bone)
-				if not mat then continue end
+				local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(settings.PhysBoneID))
 				local pos, ang = LocalToWorld(settings.OffsetPos, settings.OffsetAng, mat:GetTranslation(), mat:GetAngles())
 	
 				arrow:SetPos(pos)

@@ -19,14 +19,12 @@ SWEP.SuicideTime = 0.5
 SWEP.CanSuicide = true
 SWEP.SuicideNoLH = true
 
-SWEP.CantClash = true
-
 SWEP.BreakBoneMul = 0.1
+SWEP.weight = 0.5
 
 SWEP.noreverse = true
 SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "none"
-SWEP.BlockSound = {"GlassBottle.ImpactHard", 68, {95, 102}}
 
 SWEP.AnimTime1 = 1.0
 SWEP.AttackTime = 0.2
@@ -47,11 +45,14 @@ SWEP.TwoHanded = false
 
 SWEP.NoHolster = true
 
+
+
 SWEP.DamagePrimary = 7
 
 SWEP.PenetrationPrimary = 1.1
 
 SWEP.StaminaPrimary = 10
+SWEP.StaminaSecondary = 20
 
 SWEP.BleedMultiplier = 1.8
 
@@ -101,8 +102,12 @@ function SWEP:CustomAttack2()
     ent.damage = self.DamagePrimary * 0.7
     ent.MaxSpeed = 1200
     ent.DamageType = self.DamageType
-    ent.AttackHit = "GlassBottle.ImpactHard"
-    ent.AttackHitFlesh = "Flesh.ImpactHard"
+    ent.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+	ent.AttackHit = "snd_jack_hmcd_knifehit.wav"
+    ent.LodgeChance = 0
+    ent.penetration = 5
+    ent.PenetrationSize = 5
+    ent.modelscale = self.modelscale
     ent:PrecacheGibs()
 
     ent.func = function(data)
@@ -118,9 +123,7 @@ function SWEP:CustomAttack2()
     local phys = ent:GetPhysicsObject()
 
     if IsValid(phys) then
-        local throwVel = ply:GetAimVector() * ent.MaxSpeed
-        local playerVel = ply:GetVelocity()
-        phys:SetVelocity(throwVel + playerVel * 0.5)
+        phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
         phys:AddAngleVelocity(VectorRand() * 500)
     end
 

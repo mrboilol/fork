@@ -32,194 +32,273 @@ function ENT:Initialize()
 	end)
 end
 
+local impactSounds = {
+	[MAT_CONCRETE] = {"physics/concrete/concrete_impact_hard1.wav", "physics/concrete/concrete_impact_hard2.wav", "physics/concrete/concrete_impact_hard3.wav"},
+	[MAT_METAL] = {"physics/metal/metal_sheet_impact_hard2.wav", "physics/metal/metal_sheet_impact_hard6.wav", "physics/metal/metal_sheet_impact_hard7.wav"},
+	[MAT_WOOD] = {"physics/wood/wood_plank_impact_hard1.wav", "physics/wood/wood_plank_impact_hard2.wav", "physics/wood/wood_plank_impact_hard3.wav"},
+	[MAT_DIRT] = {"physics/flesh/flesh_impact_hard1.wav", "physics/flesh/flesh_impact_hard2.wav"},
+	[MAT_SAND] = {"physics/flesh/flesh_impact_hard1.wav", "physics/flesh/flesh_impact_hard2.wav"},
+	[MAT_FLESH] = {"physics/flesh/flesh_impact_hard1.wav", "physics/flesh/flesh_impact_hard2.wav"},
+	[MAT_GLASS] = {"physics/glass/glass_impact_hard1.wav", "physics/glass/glass_impact_hard2.wav", "physics/glass/glass_impact_hard3.wav"},
+	[MAT_PLASTIC] = {"physics/plastic/plastic_box_impact_hard1.wav", "physics/plastic/plastic_box_impact_hard5.wav"},
+	[MAT_TILE] = {"physics/concrete/concrete_impact_hard1.wav", "physics/concrete/concrete_impact_hard3.wav"},
+}
+
+local function StickToWorld(ent, hitPos, hitNormal, hitVel)
+	local physObj = ent:GetPhysicsObject()
+	if IsValid(physObj) then
+		physObj:SetVelocity(vector_origin)
+		physObj:SetAngleVelocity(vector_origin)
+		physObj:EnableMotion(false)
+
+		if ent.StickPhysics == false then
+			physObj:EnableCollisions(false)
+		end
+	end
+
+	local ang = hitVel:Angle()
+	local forward = ang:Forward()
+	local tipOffset = ent:OBBMaxs().x
+
+	local tipTarget = hitPos - hitNormal * (ent.StickDepth or 5)
+	ent:SetAngles(ang)
+	ent:SetPos(tipTarget - forward * tipOffset)
+
+	if ent.StickPhysics == false then
+		ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+	end
+
+	ent.Stuck = true
+
+	ent:EmitSound(ent.AttackHit or "Canister.ImpactHard", 65)
+
+	util.Decal("ManhackCut", hitPos + hitNormal, hitPos - hitNormal)
+end
+
 function ENT:Think()
 	if not IsValid(self:GetPhysicsObject()) then return end
+	if self.Stuck then
+		self.Stress = (self.Stress or 0) - FrameTime() * 20
+		if self.Stress < 0 then self.Stress = 0 end
+
+		if (self.Stress or 0) > 500 then
+			local physObj = self:GetPhysicsObject()
+			if IsValid(physObj) then
+				physObj:EnableMotion(true)
+				physObj:Wake()
+			end
+			self.Stuck = false
+			self.Stress = 0
+			self:EmitSound("physics/wood/wood_plank_impact_hard3.wav", 75, math.random(90, 110))
+			self:NextThink(CurTime() + 0.1)
+			return true
+		elseif (self.Stress or 0) > 300 and not self.CreakPlayed then
+			self.CreakPlayed = true
+			self:EmitSound("physics/wood/wood_plank_impact_hard2.wav", 45, math.random(130, 150))
+		elseif (self.Stress or 0) <= 300 then
+			self.CreakPlayed = false
+		end
+
+		for _, ply in ipairs(player.GetAll()) do
+			local wep = ply:GetActiveWeapon()
+			if IsValid(wep) and wep:GetClass() == "weapon_physgun" and ply:KeyDown(IN_ATTACK) then
+				local tr = ply:GetEyeTrace()
+				if tr.Entity == self then
+					self:EmitSound("physics/wood/wood_plank_impact_hard3.wav", 65, math.random(110, 130))
+					local physObj = self:GetPhysicsObject()
+					if IsValid(physObj) then
+						physObj:EnableMotion(true)
+						physObj:Wake()
+						physObj:SetVelocity(ply:GetAimVector() * 500)
+					end
+					self.Stuck = false
+					self:NextThink(CurTime() + 0.1)
+					return true
+				end
+			end
+		end
+
+		self:NextThink(CurTime() + 0.1)
+		return true
+	end
 	local speed = self:GetPhysicsObject():GetVelocity():LengthSqr()
+
 	if self.constrained then return end
 	if self.AeroDrag then
 		AeroDrag(self, self:GetAngles():Forward(), 10)
 	end
-	self:SetCollisionGroup(speed < 220000 and COLLISION_GROUP_WEAPON or COLLISION_GROUP_NONE)
-end
-
-local function IsHeadImpact(ent, hitPos, velocity, thrown)
-	if not IsValid(ent) or not isvector(hitPos) then return false end
-
-	-- Ragdolls expose a reliable physics bone. Trace through the contact point
-	-- first so a small projectile does not have to rely on the generic damage
-	-- handler reconstructing its hitgroup after the collision has finished.
-	local direction = isvector(velocity) and velocity:GetNormalized() or vector_origin
-	if direction:LengthSqr() > 0 then
-		local impactTrace = util.TraceLine({
-			start = hitPos - direction * 12,
-			endpos = hitPos + direction * 12,
-			filter = thrown
-		})
-		local tracedEnt = impactTrace.Entity
-		if IsValid(tracedEnt) and tracedEnt == ent then
-			local bone = tracedEnt:TranslatePhysBoneToBone(impactTrace.PhysicsBone or 0)
-			local boneName = bone and tracedEnt:GetBoneName(bone) or nil
-			if boneName and string.find(string.lower(boneName), "head", 1, true) then
-				return true
-			end
-		end
+	if not self.StickInWorld then
+		self:SetCollisionGroup(speed < 220000 and COLLISION_GROUP_WEAPON or COLLISION_GROUP_NONE)
 	end
-
-	-- Standing players often report only their collision hull, with no useful
-	-- physics bone. In that case use the animated head position and a deliberately
-	-- tight radius; chest/neck contacts must continue through normal blunt damage.
-	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-	local headMatrix = headBone and ent:GetBoneMatrix(headBone)
-	local headPos = headMatrix and headMatrix:GetTranslation()
-	if not isvector(headPos) then return false end
-
-	-- The standing player hull is roughly 16 units from its centre, so a sphere
-	-- around the bone would either miss the hull surface or also include shoulders.
-	-- Use a head-height slice wide enough to reach the hull instead.
-	local offset = hitPos - headPos
-	return math.abs(offset.z) <= 11 and offset.x * offset.x + offset.y * offset.y <= 20 * 20
 end
 
 function ENT:PhysicsCollide(data, phys)
-	if data.Speed < 400 then return end
 	if self.removed then return end
 
-	if self.Bounce then
-		local bounce = math.min(self.Bounce, 1)
-		local newVel = data.OurOldVelocity * -bounce
-		phys:SetVelocity(newVel)
+	if self.Stuck then
+		local hitEnt = data.HitEntity
+		if IsValid(hitEnt) and hitEnt:GetClass() ~= "worldspawn" then
+			local hitPhys = hitEnt:GetPhysicsObject()
+			local hitMass = IsValid(hitPhys) and hitPhys:GetMass() or 1
+			self.Stress = (self.Stress or 0) + data.Speed * hitMass * 0.01
+		end
+		return
 	end
-	local pos,_ = LocalToWorld(self.localshit,angle_zero,self:GetPos(),self:GetAngles())
-	local tr = {}
-	tr.start = pos
-	tr.endpos = pos + data.OurOldVelocity:GetNormalized() * 32
-	tr.filter = self
-	--if util.TraceLine(tr).Entity != data.HitEntity and not self.dont_account_for_placement then return end
-	
-	self.Penetration = self.penetration or 1
+
+	if self.StickInWorld and data.HitEntity:IsWorld() then
+		local stick = self.StickAnywhere or math.abs(data.HitNormal.z) < 0.7
+		if stick then
+			StickToWorld(self, data.HitPos, data.HitNormal, data.OurOldVelocity)
+			return
+		end
+	end
+
+	local hitMat = data.HitEntity:GetMaterialType()
+	local snds = impactSounds[hitMat]
+	local speedChance = math.Clamp(data.Speed / 600, 0, 1)
+	local playChance = math.Rand(0, 1) < (0.35 + speedChance * 0.65)
+	if playChance then
+		if snds then
+			local vol = math.Clamp(data.Speed / 600, 0.35, 1) * 70
+			self:EmitSound(snds[math.random(#snds)], vol, math.random(90, 110))
+		elseif data.HitEntity:IsWorld() then
+			local vol = math.Clamp(data.Speed / 600, 0.35, 1) * 70
+			self:EmitSound("physics/concrete/concrete_impact_hard1.wav", vol, math.random(90, 110))
+		end
+	end
+
+	if data.Speed < 400 then return end
+
+	-- resolve ragdoll to real player
+	local hitEnt = data.HitEntity
+	local ragdollOwner = IsValid(hitEnt) and hitEnt:GetNWEntity("ply")
+	if not IsValid(ragdollOwner) and hitEnt:GetClass() == "prop_ragdoll" then
+		return
+	end
+	local target = IsValid(ragdollOwner) and ragdollOwner or hitEnt
+
+	-- headshot detection trace
+	local headTr = {}
+	headTr.start = data.HitPos
+	headTr.endpos = data.HitPos + data.OurOldVelocity
+	headTr.filter = self
+	local headTrace = util.TraceLine(headTr)
+
+	local isHeadshot = target.organism and headTrace.HitGroup == HITGROUP_HEAD
+
+	local speedFraction = math.Clamp(data.Speed / self.MaxSpeed, 0, 1)
+	self.Penetration = (self.penetration or 1) * speedFraction
+	self.PenetrationSize = self.PenetrationSize or math.max((self.penetration or 1) * 0.5, 1)
+
+	local baseDmg = (self.damage or 20) * math.Clamp((data.Speed / self.MaxSpeed), 0, 1)
+	if isHeadshot then
+		baseDmg = baseDmg * (self.HeadshotMultiplier or 1.3)
+	end
+
 	local dmginfo = DamageInfo()
 	dmginfo:SetAttacker(self.owner)
 	dmginfo:SetInflictor(self)
-	dmginfo:SetDamage((self.damage or 20) * math.Clamp((data.Speed / self.MaxSpeed), 0, 1))
+	dmginfo:SetDamage(baseDmg)
 	dmginfo:SetDamageForce(data.OurOldVelocity)
 	dmginfo:SetDamageType(self.DamageType or DMG_SLASH)
 	dmginfo:SetDamagePosition(data.HitPos)
+	target:TakeDamageInfo(dmginfo)
 
-	-- Weapons may opt into special head-impact outcomes. These fields are only
-	-- exposed during TakeDamageInfo, so a later collision rolls independently.
-	local headGibDamageMul = self.HeadGibDamageMul
-	local forceHeadKnockout = self.ForceHeadKnockout
-	local forceHeadGib = headGibDamageMul and IsHeadImpact(data.HitEntity, data.HitPos, data.OurOldVelocity, self)
-	-- Player collision hulls cannot reliably identify a thrown object's head hit.
-	-- Weapons that need a guaranteed standing-player kill can bypass that ambiguity;
-	-- ExplodeHead then waits until the death ragdoll exists before gibbing its head.
-	local forceStandingGib = self.GibStandingVictims
-		and data.HitEntity:IsPlayer()
-		and data.HitEntity:Alive()
-		and not IsValid(data.HitEntity.FakeRagdoll)
-	if headGibDamageMul and self.HeadImpactGibChance then
-		local gibImpact = math.Rand(0, 1) < self.HeadImpactGibChance
-		self.HeadGibDamageMul = gibImpact and headGibDamageMul or nil
-		self.ForceHeadKnockout = not gibImpact and self.HeadImpactKnockout or nil
-	end
-	data.HitEntity:TakeDamageInfo(dmginfo)
-	self.HeadGibDamageMul = headGibDamageMul
-	self.ForceHeadKnockout = forceHeadKnockout
-
-	-- ExplodeHead owns death-ragdoll timing and deduplicates repeated impacts.
-	if (forceHeadGib or forceStandingGib) and hg.ExplodeHead then
-		hg.ExplodeHead(data.HitEntity, dmginfo:GetDamage() * (headGibDamageMul or 1), false, data.OurOldVelocity)
-	end
-
-	if data.HitEntity.organism then
+	if target.organism then
 		self:EmitSound(self.AttackHitFlesh, 65)
 
-		if (self.DamageType or DMG_SLASH) == DMG_CLUB then
-			if data.HitEntity:IsPlayer() then
-				hg.ApplyBruiseTo(data.HitEntity, data.HitEntity, data.HitPos, data.HitNormal)
-			elseif data.HitEntity:GetClass() == "prop_ragdoll" then
-				local ragOwner = hg.RagdollOwner(data.HitEntity)
+		if (self.DamageType or DMG_SLASH) == DMG_SLASH then
+			util.Decal("Blood", data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2, hitEnt)
+			util.Decal("Blood", data.HitPos + data.HitNormal * 2, data.HitPos - data.HitNormal * 2)
+		elseif (self.DamageType or DMG_SLASH) == DMG_CLUB then
+			if hitEnt:IsPlayer() then
+				hg.ApplyBruiseTo(hitEnt, hitEnt, data.HitPos, data.HitNormal)
+			elseif hitEnt:GetClass() == "prop_ragdoll" then
+				local ragOwner = hg.RagdollOwner(hitEnt)
 				if IsValid(ragOwner) and ragOwner:IsPlayer() then
-					hg.ApplyBruiseTo(data.HitEntity, ragOwner, data.HitPos, data.HitNormal)
+					hg.ApplyBruiseTo(hitEnt, ragOwner, data.HitPos, data.HitNormal)
 				end
 			end
 		end
 	end
 
-	if (data.HitEntity.organism) and ((self.DamageType or DMG_SLASH) == DMG_SLASH) and !self.shouldntlodge then
+	-- headshot ragdoll trigger
+	if isHeadshot and target:IsPlayer() and target:Alive() and not IsValid(target.FakeRagdoll) then
+		if math.random() <= 0.55 then
+			timer.Simple(0, function()
+				if IsValid(target) and target:Alive() and not IsValid(target.FakeRagdoll) then
+					hg.Fake(target)
+				end
+			end)
+		end
+	end
 
-		local pos, ang = self:GetPos(), self:GetAngles()
+	local lodgeChance = self.LodgeChance or 0
+	if (target.organism) and ((self.DamageType or DMG_SLASH) == DMG_SLASH) and lodgeChance > 0 then
+		local speedFraction = math.Clamp((data.Speed - 400) / math.max(self.MaxSpeed - 400, 1), 0, 1)
+		local velNorm = data.OurOldVelocity:GetNormalized()
+		local hitDot = math.abs(velNorm:Dot(data.HitNormal))
+		local finalChance = lodgeChance * speedFraction * hitDot
 
-		local hitent = data.HitEntity
+		if math.Rand(0, 1) <= finalChance then
+			local tr = util.TraceLine({
+				start = data.HitPos,
+				endpos = data.HitPos + data.OurOldVelocity,
+				filter = self,
+			})
+			local bone = tr.PhysicsBone
+			local mat = hitEnt:GetBoneMatrix(hitEnt:TranslatePhysBoneToBone(bone))
 
-		local tr = {}
-		tr.start = pos
-		tr.endpos = pos + data.OurOldVelocity
-		tr.filter = self
-		local tr = util.TraceLine(tr)
-		local bone = tr.PhysicsBone
-		local mat = hitent:GetBoneMatrix(hitent:TranslatePhysBoneToBone(bone))
+			local stickAng = data.OurOldVelocity:Angle()
+			local lpos, lang = WorldToLocal(tr.HitPos, stickAng, mat:GetTranslation(), mat:GetAngles())
 
-		local lpos, lang = WorldToLocal(tr.HitPos, ang, mat:GetTranslation(), mat:GetAngles())
+			local org = target.organism
+			org.LodgedEntities = org.LodgedEntities or {}
+			org.LodgedEntities[#org.LodgedEntities + 1] = {
+				PhysBoneID = bone,
+				OffsetPos = lpos,
+				OffsetAng = lang,
+				model = self:GetModel(),
+				takeent = self.wep,
+			}
 
-		local org = hitent.organism
-		org.LodgedEntities = org.LodgedEntities or {}
-		org.LodgedEntities[#org.LodgedEntities + 1] = {
-			PhysBoneID = bone,
-			OffsetPos = lpos,
-			OffsetAng = lang,
-			model = self:GetModel(),
-			takeent = self.wep,
-		}
+			net.Start("organism_send")
 
-		net.Start("organism_send")
+			local tbl = {}
+			tbl.LodgedEntities = org.LodgedEntities
+			tbl.owner = org.owner
+		
+			net.WriteTable(tbl)
+			net.WriteBool(true)
+			net.WriteBool(false)
+			net.WriteBool(false)
+			net.WriteBool(true)
+			net.Broadcast()
 
-		local tbl = {}
-		tbl.LodgedEntities = org.LodgedEntities
-		tbl.owner = org.owner
-	
-		net.WriteTable(tbl)
-		net.WriteBool(true)
-		net.WriteBool(false)
-		net.WriteBool(false)
-		net.WriteBool(true)
-		net.Broadcast()
-
-		self:Remove()
-		self.removed = true
+			self:Remove()
+			self.removed = true
+		end
 	end
 end
-
-	-- Bone to organ damage mapping (shared with projectile_nonexplosive_base)
-	local boneToOrgans = {
-		["ValveBiped.Bip01_Head1"] = {{"brain", 0.15, 0.4}},
-		["ValveBiped.Bip01_Neck1"] = {{"arteria", 0.3, 0.6}},
-		["ValveBiped.Bip01_Spine4"] = {{"heart", 0.25, 0.5}, {"liver", 0.15, 0.3}},
-		["ValveBiped.Bip01_Spine3"] = {{"liver", 0.2, 0.4}, {"stomach", 0.15, 0.3}},
-		["ValveBiped.Bip01_Spine2"] = {{"intestines", 0.2, 0.4}},
-		["ValveBiped.Bip01_Spine1"] = {{"intestines", 0.15, 0.3}},
-		["ValveBiped.Bip01_L_Clavicle"] = {{"lungsL", 0.2, 0.4}},
-		["ValveBiped.Bip01_R_Clavicle"] = {{"lungsR", 0.2, 0.4}},
-		["ValveBiped.Bip01_L_UpperArm"] = {{"larmartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_R_UpperArm"] = {{"rarmartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_L_Forearm"] = {{"larmartery", 0.2, 0.4}},
-		["ValveBiped.Bip01_R_Forearm"] = {{"rarmartery", 0.2, 0.4}},
-		["ValveBiped.Bip01_L_Thigh"] = {{"llegartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_R_Thigh"] = {{"rlegartery", 0.25, 0.5}},
-		["ValveBiped.Bip01_L_Calf"] = {{"llegartery", 0.2, 0.4}},
-		["ValveBiped.Bip01_R_Calf"] = {{"rlegartery", 0.2, 0.4}},
-	}
 
 function ENT:Use(ply)
 	if self.created + 0.5 > CurTime() then return end
 	if self.removed then return end
+	if IsValid(ply.FakeRagdoll) then return end
 	if self.wep then
+		self.removed = true
+
+		if self.Stuck then
+			self:EmitSound(self.UnstickSnd or "physics/wood/wood_plank_impact_hard3.wav", 65, math.random(110, 130))
+		end
+
 		local wep = ents.Create(self.wep)
 		wep:Spawn()
 		wep:SetPos(self:GetPos())
 		wep:SetAngles(self:GetAngles())
 		wep.poisoned2 = self.poisoned2
-		self:Remove()
+
+		if not hook.Run("PlayerCanPickupWeapon",ply,wep) then wep.IsSpawned = true wep.init = true wep:Remove() self:Remove() return end
 
 		if constraint.FindConstraint( self, "Weld" ) then
 			local tbl = constraint.FindConstraint( self, "Weld" )
@@ -233,57 +312,10 @@ function ENT:Use(ply)
 				self.PainMultiplier = 0.5
 				tbl.Ent2:TakeDamageInfo(dmginfo)
 				hg.organism.AddWoundManual(tbl.Ent2,self.returnblood or 10,vector_origin,angle_zero,tbl["Bone2"] or 0,CurTime())
-
-				-- Check for organ damage based on bone location
-				local org = tbl.Ent2.organism
-				if org and boneToOrgans[tbl["Bone2"]] then
-					for _, organData in ipairs(boneToOrgans[tbl["Bone2"]]) do
-						local organName, minChance, maxChance = organData[1], organData[2], organData[3]
-						local damageChance = math.Rand(minChance, maxChance)
-						
-						if math.random() < damageChance then
-							if organName == "brain" then
-								org.brain = math.min(org.brain + math.Rand(0.05, 0.15), 1)
-							elseif organName == "heart" then
-								org.heart = math.min(org.heart + math.Rand(0.1, 0.3), 1)
-							elseif organName == "liver" then
-								org.liver = math.min(org.liver + math.Rand(0.1, 0.25), 1)
-							elseif organName == "lungsL" then
-								org.lungsL[1] = math.min(org.lungsL[1] + math.Rand(0.1, 0.25), 1)
-								if math.random() < 0.3 then
-									org.lungsL[2] = math.min(org.lungsL[2] + math.Rand(0.1, 0.2), 1)
-								end
-							elseif organName == "lungsR" then
-								org.lungsR[1] = math.min(org.lungsR[1] + math.Rand(0.1, 0.25), 1)
-								if math.random() < 0.3 then
-									org.lungsR[2] = math.min(org.lungsR[2] + math.Rand(0.1, 0.2), 1)
-								end
-							elseif organName == "stomach" then
-								org.stomach = math.min(org.stomach + math.Rand(0.1, 0.2), 1)
-							elseif organName == "intestines" then
-								org.intestines = math.min(org.intestines + math.Rand(0.1, 0.2), 1)
-							elseif organName == "arteria" then
-								org.arteria = 1
-							elseif organName == "larmartery" then
-								org.larmartery = 1
-							elseif organName == "rarmartery" then
-								org.rarmartery = 1
-							elseif organName == "llegartery" then
-								org.llegartery = 1
-							elseif organName == "rlegartery" then
-								org.rlegartery = 1
-							end
-							
-							-- Add additional bleeding from organ damage
-							org.internalBleed = org.internalBleed + math.Rand(0.1, 0.3)
-						end
-					end
-				end
 			end
 		end
 
-		if not hook.Run("PlayerCanPickupWeapon",ply,wep) then wep.IsSpawned = true wep.init = true return end
-
+		self:Remove()
 		ply:PickupWeapon(wep)
 	end
 end

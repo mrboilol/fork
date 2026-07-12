@@ -55,6 +55,8 @@ SWEP.WaitTime2 = 0.4
 SWEP.AttackLen2 = 30
 SWEP.HP = 20
 
+
+
 function SWEP:PrimaryAttackAdd(ent, trace)
     if SERVER then
 		local dmg = self.DamagePrimary
@@ -97,6 +99,8 @@ function SWEP:CustomAttack2()
     ent.AttackHit = "Concrete.ImpactHard"
     ent.AttackHitFlesh = "Flesh.ImpactHard"
     ent.noStuck = true
+    ent.penetration = 3
+    ent.PenetrationSize = 8
 
     local phys = ent:GetPhysicsObject()
 
