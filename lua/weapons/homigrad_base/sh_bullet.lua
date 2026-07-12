@@ -1,4 +1,4 @@
-AddCSLuaFile()
+﻿AddCSLuaFile()
 --
 local surface_hardness = {
 	[MAT_METAL] = 1,
@@ -161,95 +161,7 @@ end
 
 local bulletHit
 local timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game = timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game
-local table_Copy = table.Copy
 local hg_bulletholes = CreateConVar("hg_bulletholes", "0", FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED, "Enable R6S bulletholes feature", 0, 1)
-local knockbackMul, knockbackMin = 0.35, 25
-local gollavoSound = "rem_gollavo.wav"
-
-if SERVER then
-	util.AddNetworkString("hg_gollavo_headshot")
-	resource.AddFile("materials/effects/crit.vmt")
-	resource.AddFile("materials/effects/crit.vtf")
-	resource.AddFile("sound/" .. gollavoSound)
-end
-
-if CLIENT then
-	local gollavoEnabled = ConVarExists("hg_gollavo_headshot_effect") and GetConVar("hg_gollavo_headshot_effect") or CreateClientConVar("hg_gollavo_headshot_effect", "1", true, false, "Enable Gollavo headshot effect", 0, 1)
-	local gollavoMat = Material("effects/crit", "smooth")
-	local gollavoEffects = {}
-
-	net.Receive("hg_gollavo_headshot", function()
-		if not gollavoEnabled:GetBool() then return end
-		gollavoEffects[#gollavoEffects + 1] = {pos = net.ReadVector(), time = CurTime()}
-	end)
-
-	hook.Add("PostDrawTranslucentRenderables", "hg_gollavo_headshot", function()
-		render.SetMaterial(gollavoMat)
-		for i = #gollavoEffects, 1, -1 do
-			local data = gollavoEffects[i]
-			local delta = (CurTime() - data.time) / 1.5
-			if delta >= 1 then
-				table.remove(gollavoEffects, i)
-			else
-				local pos = data.pos + Vector(0, 0, delta * 18)
-				local size = Lerp(delta, 8, 18)
-				render.DrawSprite(pos, size, size, Color(255, 255, 255, 255 * (1 - delta)))
-			end
-		end
-	end)
-end
-
-local function scaleBulletForce(force, pellets)
-	pellets = math.max(pellets or 1, 1)
-	return math.max((force or 0) * (knockbackMul / pellets), knockbackMin / pellets)
-end
-
-local function hasGollavo(ply)
-	if not IsValid(ply) or not ply:IsPlayer() or not hg.achievements then return false end
-	local info = hg.achievements.GetAchievementInfo and hg.achievements.GetAchievementInfo("gollavo")
-	local ach = hg.achievements.GetPlayerAchievement and hg.achievements.GetPlayerAchievement(ply, "gollavo")
-	return info and ach and (ach.value or 0) >= info.needed_value
-end
-
-local function getHeadPos(ent, tr)
-	if IsValid(ent) then
-		local bone = ent.LookupBone and ent:LookupBone("ValveBiped.Bip01_Head1")
-		local mat = bone and ent:GetBoneMatrix(bone)
-		if mat then return mat:GetTranslation() end
-		if ent.EyePos then return ent:EyePos() end
-		return ent:GetPos()
-	end
-
-	return tr.HitPos
-end
-
-local function getTraceHitGroup(ent, tr)
-	if tr.HitGroup == HITGROUP_HEAD then return HITGROUP_HEAD end
-	if not IsValid(ent) or not ent:IsRagdoll() then return tr.HitGroup end
-
-	if tr.PhysicsBone ~= nil and ent.TranslatePhysBoneToBone and ent.GetBoneName then
-		local bone = ent:TranslatePhysBoneToBone(tr.PhysicsBone)
-		if bone and bone >= 0 then return hg.bonetohitgroup and hg.bonetohitgroup[ent:GetBoneName(bone)] end
-	end
-
-	if tr.HitBoxBone ~= nil and ent.GetBoneName then
-		return hg.bonetohitgroup and hg.bonetohitgroup[ent:GetBoneName(tr.HitBoxBone)]
-	end
-
-	return tr.HitGroup
-end
-
-local function gollavoHeadshotEffect(attacker, victim, tr)
-	if getTraceHitGroup(victim, tr) ~= HITGROUP_HEAD then return end
-	local pos = getHeadPos(victim, tr)
-	if not hasGollavo(attacker) then return end
-	if (attacker.GollavoHeadshotEffectNext or 0) > CurTime() then return end
-	attacker.GollavoHeadshotEffectNext = CurTime() + 1
-	net.Start("hg_gollavo_headshot")
-		net.WriteVector(pos)
-	net.Broadcast()
-	sound.Play(gollavoSound, pos, 70, 100, 1)
-end
 
 local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	if CLIENT then return end
@@ -321,7 +233,7 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			local tBullet = {
 				Attacker = IsValid(self) and IsValid(self:GetOwner()) and self:GetOwner() or self,
 				Damage = dmg * 0.65,
-				Force = scaleBulletForce(force / 3, bullet.Pellets),
+				Force = force / 3,
 				Num = 1,
 				Tracer = 0,
 				TracerName = "nil",
@@ -336,7 +248,6 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 				penetrated = bullet.penetrated + 1,
 				dmgtype = bullet.dmgtype or DMG_BULLET,
 				NpcShoot = bullet.NpcShoot,
-				Pellets = bullet.Pellets,
 				limit_ricochet = bullet.limit_ricochet + 1,
 				noricochet = bullet.noricochet,
 				AmmoType = bullet.AmmoType
@@ -416,11 +327,9 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	elseif ApproachAngle < MaxRicAngle * 0.7 then --previosly 0.2, made 1 for fun
 		--if CLIENT then return end
 		-- ping whiiiizzzz
-		if not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayRicochet(hitPos) then
-			local rnd = math.random(12)
-			if rnd == 8 then rnd = 9 end
-			sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", hitPos, 75, math.random(90, 110))
-		end
+		local rnd = math.random(12)
+		if rnd == 8 then rnd = 9 end
+		sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", hitPos, 75, math.random(90, 110))
 		--sound.Play("snd_jack_hmcd_ricochet_" .. math.random(1, 2) .. ".wav", hitPos, 75, math.random(90, 110))
 		--sound.Play("weapons/arccw/ricochet0" .. math.random(1, 5) .. "_quiet.wav", hitPos, 75, math.random(90, 110))
 		util.Decal("ManhackCut", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
@@ -430,7 +339,7 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 		local tBullet = {
 			Attacker = IsValid(self) and IsValid(self:GetOwner()) and self:GetOwner() or self,
 			Damage = (dmg or 1) * .85,
-			Force = scaleBulletForce(force / 3, bullet.Pellets),
+			Force = force / 3,
 			Num = 1,
 			Tracer = 0,
 			TracerName = "nil",
@@ -444,7 +353,6 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			Diameter = bullet.Diameter,
 			penetrated = bullet.penetrated + 1,
 			dmgtype = bullet.dmgtype or DMG_BULLET,
-			Pellets = bullet.Pellets,
 			limit_ricochet = bullet.limit_ricochet + 1,
 			noricochet = bullet.noricochet,
 			AmmoType = bullet.AmmoType
@@ -531,8 +439,6 @@ local allowedMats = {
 }
 bulletHit = function(ply, tr, dmgInfo, bullet, Weapon)
 	if CLIENT then return end
-	local attacker = dmgInfo:GetAttacker()
-	gollavoHeadshotEffect(attacker, tr.Entity, tr)
 	local inflictor = IsValid(ply) and not ply:IsNPC() and ply.GetActiveWeapon and ply:GetActiveWeapon() or dmgInfo:GetInflictor()
 	local dmg, force = dmgInfo:GetDamage(), dmgInfo:GetDamage()--dmgInfo:GetDamageForce():Length()
 
@@ -548,13 +454,13 @@ bulletHit = function(ply, tr, dmgInfo, bullet, Weapon)
 		util.ScreenShake(trPos, 3, 1, 1, 128)
 	end
 	
-	 if force >= 35 and dist <= 1400000 and (math.random(3) == 2 or force >= 45) and !tr.Entity:IsRagdoll() then
-	 	util.Decal("Impact.ShootPowderAdd", trPos + trNormal, trPos - trNormal)
-	 	util.ScreenShake(trPos, 3, 10, 1, 150)
-	 end
+	-- if force >= 35 and dist <= 1400000 and (math.random(3) == 2 or force >= 45) and !tr.Entity:IsRagdoll() then
+	-- 	util.Decal("Impact.ShootPowderAdd", trPos + trNormal, trPos - trNormal)
+	-- 	util.ScreenShake(trPos, 3, 10, 1, 150)
+	-- end
 
-	 gasInertia(trPos, force * 3, -tr.Normal, Weapon, tr)
-	 gasInertia(trStart, force * 3, tr.Normal, Weapon, tr)
+	-- gasInertia(trPos, force * 3, -tr.Normal, Weapon, tr)
+	-- gasInertia(trStart, force * 3, tr.Normal, Weapon, tr)
 
 	local penetration, dmgmul
 	if tr.Entity:IsVehicle() then
@@ -660,27 +566,21 @@ local tr = {}
 local att
 local util_TraceLine = util.TraceLine
 
-function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, bNoAdditional)
-	if SERVER and !bCacheTrace and !bNoAdditional and self.cache_trace and !(desiredPos or desiredAng) then return self.cache_trace[1], self.cache_trace[2], self.cache_trace[3] end
+function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
+	if SERVER and !bCacheTrace and self.cache_trace and !(desiredPos or desiredAng) then return self.cache_trace[1], self.cache_trace[2], self.cache_trace[3] end
 	local owner = self:GetOwner()
 	
-	if IsValid(owner) and owner:IsNPC() then
-		local att = self:GetMuzzleAtt()
-		local npcPos = self.NPCShootPos or (SERVER and owner:GetShootPos() or att.Pos)
-		local npcDir = self.NPCShootDir
-		local npcAng = npcDir and npcDir:Angle() or (SERVER and owner:GetAimVector():Angle() or att.Ang)
-		return nil, npcPos, npcAng
-	end
+	if IsValid(owner) and owner:IsNPC() then local att = self:GetMuzzleAtt() return nil,SERVER and owner:GetShootPos() or att.Pos,SERVER and owner:GetAimVector():Angle() or att.Ang end
 	
 	local gun = self:GetWeaponEntity()
 	if !IsValid(gun) then return end
 
 	local gunpos, gunang
 
-	if CLIENT and !closeanim and !bNoAdditional then
+	if CLIENT and !closeanim then
 		gunpos, gunang = self.desiredPos, self.desiredAng
 	else
-		gunpos, gunang = self:WorldModel_Transform(true, bNoAdditional)
+		gunpos, gunang = self:WorldModel_Transform(true)
 	end
 	
 	gunpos = gunpos or gun:GetPos()
@@ -726,13 +626,6 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, 
 	end
 
 	return trace, pos, ang
-end
-
--- Fire along the barrel transform returned by GetTrace.  The muzzle debug's
--- white marker uses this same trace; converging it onto the owner's eye trace
--- made bullets travel toward the gray marker instead of where the gun points.
-function SWEP:GetFireTrace()
-	return self:GetTrace(true)
 end
 
 SWEP.ShellEject = "EjectBrass_556"
@@ -787,13 +680,12 @@ end
 	ent:PrimaryAttack()
 end*/
 
-function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
+function SWEP:FireBullet()
     local gun = self:GetWeaponEntity()
     local owner = self:GetOwner()
 	local isply = IsValid(owner) and owner:IsPlayer()
 	local isnpc = IsValid(owner) and owner:IsNPC()
 	local ent = owner
-	local curTime = CurTime()
 
 	if self:ShouldUseFakeModel() and not self.NoIdleLoop and isply then
 		self:PlayAnim("idle", 1)
@@ -813,13 +705,13 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 		end)
 	end
 
-	local att = self:GetMuzzleAtt(gun, true)
-	if not att then return end
-	local pos, ang = att.Pos, att.Ang
-	//if not isply and not owner:IsNPC() then return end
-	local fakeGun = self:GetNWEntity("fakeGun")
+    local att = self:GetMuzzleAtt(gun, true)
+    if not att then return end
+    local pos, ang = att.Pos, att.Ang
+    //if not isply and not owner:IsNPC() then return end
+    local fakeGun = self:GetNWEntity("fakeGun")
 
-	local primary = self.Primary
+    local primary = self.Primary
 
 	if isply then
 		owner:LagCompensation(true)
@@ -827,39 +719,20 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 
 	self:WorldModel_Transform()
 	local tr, pos, ang = self:GetTrace(true)
-	local tr
-	if capturedTrace and capturedPos and capturedAng then
-		-- Copy the trigger-time snapshot. Physical bullets keep these vectors after
-		-- this function returns, so never hand them mutable pose references.
-		tr = capturedTrace
-		pos = Vector(capturedPos)
-		ang = Angle(capturedAng)
-	else
-		self:WorldModel_Transform()
-		tr, pos, ang = self:GetFireTrace()
-	end
-
-	if isply then
-		owner:LagCompensation(false)
-	end
 
 	local trace
 	local dir = ang:Forward()
 	if isply then
+		//print(gun:GetAngles(), dir, owner.offsetView)
 		local dist, point = util.DistanceToLine(pos, pos - dir * 50, owner:EyePos())
-		local obstructionTrace = {}
-		obstructionTrace.start = point
-		obstructionTrace.endpos = pos
-		obstructionTrace.filter = {owner, ent, SERVER and hg.ragdollFake[owner]}
-		trace = util.TraceLine(obstructionTrace)
+		local tr = {}
+		tr.start = point
+		tr.endpos = pos
+		tr.filter = {owner, ent, SERVER and hg.ragdollFake[owner]}
+		trace = util.TraceLine(tr)
 	end
 
-	-- The loaded ammo is authoritative.  A few weapons inherit stale NumBullet
-	-- values from another base (for example a rifle derived from a shotgun), and
-	-- using math.max here silently turned those rifle rounds into pellet loads.
-	local numbullet = tonumber(ammotype.NumBullet)
-	if numbullet == nil then numbullet = tonumber(self.NumBullet) or 1 end
-	numbullet = math.max(math.floor(numbullet), 1)
+    local numbullet = ammotype.NumBullet or 1
 
 	if not IsValid(owner) then
 		local phys = self:GetPhysicsObject()
@@ -887,8 +760,7 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 
 	if CLIENT then
 		if IsValid(ent) then
-			local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-			local head = headBone and ent:GetBoneMatrix(headBone)
+			local head = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Head1"))
 
 			if head then
 				headpos, headang = head:GetTranslation(), head:GetAngles()
@@ -902,8 +774,7 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 			headpos = headpos + headang:Forward() * 3-- - dir * 10
 		end]]
 		if IsValid(ent) then
-			local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-			local head = headBone and ent:GetBoneMatrix(headBone)
+			local head = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Head1"))
 
 			if head then
 				headpos, headang = head:GetTranslation(), head:GetAngles()
@@ -914,22 +785,14 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 	end
 	
 	local willsuicide = IsValid(owner) and owner:GetNWFloat("willsuicide", 0) != 0 and owner:GetNWFloat("willsuicide", 0) or ((owner.startsuicide or CurTime()) + 1) or CurTime() + 1
-	
-	if isply then
-		owner:LagCompensation(false)
-	end
-
-	local willsuicideNet = IsValid(owner) and owner:GetNWFloat("willsuicide", 0) or 0
-	local willsuicide = willsuicideNet != 0 and willsuicideNet or ((owner.startsuicide or curTime) + 1) or curTime + 1
 	local suiciding = owner.suiciding
-	local willsuicidereal = (suiciding and (willsuicide == 0 or willsuicide < curTime))
+	local willsuicidereal = (suiciding and (willsuicide == 0 or willsuicide < CurTime()))
 	if isnpc then
 		suiciding, willsuicidereal = false, false
 	end
 
 	local bullet = {}
-	-- Original calibrated muzzle path, with the old near-eye obstruction guard.
-	bullet.Src = willsuicidereal and headpos or (trace and (trace.HitPos - trace.Normal) or pos)
+    bullet.Src = (willsuicidereal and headpos or (trace and (trace.HitPos - trace.Normal) or pos))
 	bullet.Dir = dir
 	bullet.Attacker = owner
 	
@@ -945,93 +808,12 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 		bullet.Dir = (owner:GetAngles()+AngleRand(-4,4)+Angle(npcPitchOffset,npcYawOffset,0)):Forward()
 	end
 
-	bullet.Force = scaleBulletForce(ammotype.Force and ammotype.Force / 1.5 or primary.Force, numbullet)
+	bullet.Force = ammotype.Force and ammotype.Force / 1.5 or primary.Force
     bullet.Damage = ammotype.Damage or primary.Damage or 25
 	bullet.Damage = bullet.Damage * (self.Supressor and 0.9 or 1) * (self.DamageMultiplier or 1)
 
 	bullet.Spread = (ammotype.Spread or self.Primary.Spread or 0) * 3
-	if isply then
-		local organism = owner.organism or {}
-		local rarm = organism.rarm or 0
-		local larm = organism.larm or 0
-		local rarm_broken = rarm >= 1 and not organism.rarmamputated
-		local larm_broken = larm >= 1 and not organism.larmamputated
-		local rarm_dislocated = organism.rarmdislocated or organism.rarmdislocation
-		local larm_dislocated = organism.larmdislocated or organism.larmdislocation
-		local rarm_amputated = organism.rarmamputated
-		local larm_amputated = organism.larmamputated
-		local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
-
-		-- Partial arm damage detection (0.25-0.99 damage range)
-		local rarm_partial = rarm >= 0.25 and rarm < 1 and not rarm_amputated
-		local larm_partial = larm >= 0.25 and larm < 1 and not larm_amputated
-
-		local spreadMul = 1 + rarm * 1.5 + larm * 0.5
-		if rarm_amputated then spreadMul = spreadMul + 1.0 end
-		if larm_amputated then spreadMul = spreadMul + 0.5 end
-		if rarm_dislocated or larm_dislocated then spreadMul = spreadMul + 0.3 end
-		if support.oneHanded then spreadMul = spreadMul + (support.onlyLeft and 1.1 or 0.65) end
-		if support.leftBusy then spreadMul = spreadMul + 0.45 end
-		if support.rightBusy then spreadMul = spreadMul + 0.75 end
-
-		-- Add partial damage spread penalty
-		if rarm_partial then
-			local partial_severity = (rarm - 0.25) / 0.75
-			spreadMul = spreadMul + 0.1 + partial_severity * 0.4 -- 0.1 to 0.5 extra spread
-		end
-		if larm_partial then
-			local partial_severity = (larm - 0.25) / 0.75
-			spreadMul = spreadMul + 0.05 + partial_severity * 0.2 -- 0.05 to 0.25 extra spread
-		end
-
-		-- Apply armstrength penalty from spine2 damage (further reduces accuracy)
-		if organism.armstrength and organism.armstrength < 1 then
-			spreadMul = spreadMul * (1 / organism.armstrength)
-		end
-
-		-- Mitigation calculation for overall control (spread)
-		local plyVel = owner:GetVelocity()
-		local isStandingStill = isvector(plyVel) and plyVel:LengthSqr() < 100
-		local isCrouching = owner:Crouching()
-		local isRagdolled = IsValid(owner.FakeRagdoll)
-		local isHoldingBreath = organism.holdingbreath
-
-		local mitigation_mult = 1
-		if isRagdolled then
-			mitigation_mult = mitigation_mult * 0.65
-		elseif isCrouching then
-			mitigation_mult = mitigation_mult * 0.78
-		elseif isStandingStill then
-			mitigation_mult = mitigation_mult * 0.9
-		end
-
-		if self:IsZoom() then
-			mitigation_mult = mitigation_mult * 0.7
-		end
-
-		if isHoldingBreath then
-			mitigation_mult = mitigation_mult * 0.35
-		end
-
-		-- Stabilizing a weapon helps even with serious arm trauma; it reduces the
-		-- injury penalty, never removes the injury itself.
-		local debuff_portion = spreadMul - 1
-		debuff_portion = debuff_portion * mitigation_mult
-		spreadMul = 1 + debuff_portion
-
-		bullet.Spread = bullet.Spread * spreadMul * self:GetFearSpreadMul() * self:GetCognitiveHandlingMul() * self:GetWeaponWeightHandlingMul()
-	end
 	bullet.Num = 1
-	bullet.Pellets = numbullet
-	-- Rifle and pistol accuracy is represented by the physical muzzle transform:
-	-- idle sway, handling instability, and the previous recoil impulse all rotate
-	-- the barrel before this shot is captured. Do not add a second invisible cone
-	-- afterward. Pellet weapons retain their real pattern around that same muzzle.
-	if numbullet == 1 then
-		bullet.Spread = vector_origin
-		bullet.NoHiddenSpread = true
-		bullet.Flags = bit.bor(bullet.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)
-	end
 	
 	bullet.AmmoType = primary.Ammo
 	bullet.TracerName = self.Tracer or "nil"
@@ -1059,9 +841,9 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 	bullet.noricochet = ammotype.noricochet
 	
 	local f1 = not owner.suiciding and owner or nil
-	local f2 = isply and owner:InVehicle() and owner:GetVehicle() or nil
-	local f3 = isply and owner.GetSimfphys and IsValid(owner:GetSimfphys()) and owner:GetSimfphys() or nil
-	local f4 = isply and owner:InVehicle() and owner.FakeRagdoll
+	local f2 = owner:IsPlayer() and owner:InVehicle() and owner:GetVehicle() or nil
+	local f3 = owner:IsPlayer() and owner.GetSimfphys and IsValid(owner:GetSimfphys()) and owner:GetSimfphys() or nil
+	local f4 = owner:IsPlayer() and owner:InVehicle() and owner.FakeRagdoll
 	local f5 = IsValid(owner.OldRagdoll) and owner.OldRagdoll or nil
 	
 	if IsValid(f1) then table.insert(bullet.Filter, 1, f1) end
@@ -1086,49 +868,33 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 		end
 	end
 
-	
-	local penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
-	local diameter = ammotype.Diameter or 1
-	if SERVER and isply then
-		bullet.HullSize = math.Clamp((owner:Ping() / 85) + (diameter * 0.04), 0, 3)
-	end
-
     for i = 1, numbullet do
-		local shot = numbullet == 1 and bullet or table_Copy(bullet)
-		shot.penetrated = 0
-		shot.MaxPenLen = 100
-		shot.Penetration = penetration
-		shot.Diameter = diameter
+		local bullet = table.Copy(bullet)
+		bullet.penetrated = 0
+		bullet.MaxPenLen = 100
+		bullet.Penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
+		bullet.Diameter = ammotype.Diameter or 1
 
 		if SERVER and owner.suiciding and willsuicidereal then
 			local dmginfo = DamageInfo()
-			dmginfo:SetDamage(shot.Damage)
+			dmginfo:SetDamage(bullet.Damage)
 			dmginfo:SetInflictor(self)
 			dmginfo:SetAttacker(owner)
 			dmginfo:SetDamageType(DMG_BULLET)
-			dmginfo:SetDamageForce(dir * shot.Force)
+			dmginfo:SetDamageForce(dir * bullet.Force)
 			dmginfo:SetDamagePosition(headpos)
 			ent:TakeDamageInfo(dmginfo)
 		end
 
-		-- The wind addon marked every Homigrad weapon as physical.  Keep the
-		-- original Lua shot path for those forced conversions; only weapons that
-		-- explicitly opt into physical bullets should use that simulation.
-		if hg.PhysBullet and self.UsePhysBullets and not self.ZCityWindForcedPhysBullets then
+		if(hg.PhysBullet and hg.PhysBullet.CreateBullet and self.UsePhysBullets)then
 			if(SERVER)then
-				hg.PhysBullet.CreateBullet(shot)
+				hg.PhysBullet.CreateBullet(bullet)
 			end
 		else
-			-- The global EntityFireBullets hook can otherwise convert this straight
-			-- back into a wind/physical bullet and change the debug trajectory.
-			if self.ZCityWindForcedPhysBullets then
-				shot.DontUsePhysBullets = true
-				shot.ZCityWindDisablePhysBullets = true
-			end
 			--if owner.suiciding then bullet.DisableLagComp = true end
-			self:FireLuaBullets(shot)
+			self:FireLuaBullets(bullet)
 
-			if CLIENT and !GetGlobalBool("PhysBullets_ReplaceDefault") then				
+			if CLIENT and !GetGlobalBool("PhysBullets_ReplaceDefault") then					
 				if tr then
 					local effectdata1 = EffectData()
 					if tr.HitPos then effectdata1:SetOrigin(tr.HitPos) end
@@ -1177,25 +943,6 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 end
 
 function SWEP:PostFireBullet()
-	if SERVER then
-		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() and owner.organism then
-			local org = owner.organism
-			local fatigue_gain = 0.3
-			local rarm_broken = (org.rarm and org.rarm >= 1) or org.rarmamputated
-			local larm_broken = (org.larm and org.larm >= 1) or org.larmamputated
-			local rarm_dislocated = org.rarmdislocated or org.rarmdislocation
-			local larm_dislocated = org.larmdislocated or org.larmdislocation
-
-			if rarm_broken or larm_broken then
-				fatigue_gain = fatigue_gain * 1.5
-			elseif rarm_dislocated or larm_dislocated then
-				fatigue_gain = fatigue_gain * 1.2
-			end
-
-			org.aiming_fatigue = math.min((org.aiming_fatigue or 0) + fatigue_gain, 10)
-		end
-	end
 end
 
 if CLIENT then
@@ -1239,33 +986,9 @@ if CLIENT then
 else
 	util.AddNetworkString("reject shell")
 	function SWEP:RejectShell(shell)
-		if not isstring(shell) or shell == "" then return end
-
-		-- Shell ejection may be requested from inside weapon/organism hooks.
-		-- Build and finish its packet on the next tick so it cannot overlap a
-		-- packet already being assembled by one of those hook chains.
-		timer.Simple(0, function()
-			if not IsValid(self) then return end
-
-			local owner = self:GetOwner()
-			local rf
-
-			if IsValid(owner) then
-				rf = RecipientFilter()
-				rf:AddPVS(owner:GetPos())
-				if owner:IsPlayer() then
-					rf:AddPlayer(owner)
-				end
-			end
-
-			net.Start("reject shell")
+		net.Start("reject shell")
 			net.WriteEntity(self)
 			net.WriteString(shell)
-			if rf then
-				net.Send(rf)
-			else
-				net.Broadcast()
-			end
-		end)
+		net.Broadcast()
 	end
 end

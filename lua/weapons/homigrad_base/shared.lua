@@ -17,7 +17,7 @@ SWEP.Secondary.Ammo = "none"
 SWEP.Weight = 5
 SWEP.AutoSwitchTo = false
 SWEP.AutoSwitchFrom = false
-SWEP.DrawAmmo = false
+SWEP.DrawAmmo = true
 SWEP.DrawCrosshair = false
 SWEP.shouldntDrawHolstered = false
 hg.weapons = hg.weapons or {}
@@ -39,43 +39,12 @@ SWEP.AmmoTypes2 = {
 	["9x19 mm Parabellum"] = {
 		[1] = {"9x19 mm Parabellum"},
 		[2] = {"9x19 mm Green Tracer"},
-		[3] = {"9x19 mm QuakeMaker"},
-		[4] = {"9x19 mm PBP gzh"}
-	}, 
-	["9x18 mm"] = {
-		[1] = {"9x18 mm"},
-		[2] = {"9x18 mm PBM 7N25"}
-	}, 
-	[".366 TKM"] = {
-		[1] = {".366 TKM"},
-		[2] = {".366 TKM 'Geksa'"}
-	}, 
-	["7.62x54 mm"] = {
-		[1] = {"7.62x54 mm"},
-		[2] = {"7.62x54 mm 7N26"}
-	}, 
-	["4.6x30 mm"] = {
-		[1] = {"4.6x30 mm"},
-		[2] = {"4.6x30 mm AP SX"}
-	}, 
-	["5.7x28 mm"] = {
-		[1] = {"5.7x28 mm"},
-		[2] = {"5.7x28 mm SS190"}
-	}, 
-	["5.45x39 mm"] = {
-		[1] = {"5.45x39 mm"},
-		[2] = {"5.45x39 mm BP 7N22"},
-		[3] = {"5.45x39 mm PPBS 7N39"}
-	}, 
-	["9x39 mm"] = {
-		[1] = {"9x39 mm"},
-		[2] = {"9x39 mm SP-6"}
+		[3] = {"9x19 mm QuakeMaker"}
 	}, 
 	["5.56x45 mm"] = {
 		[1] = {"5.56x45 mm"},
-		[2] = {"5.56x45 mm M855"},
-		[3] = {"5.56x45 mm M855A1"},
-		[4] = {"5.56x45 mm M995"}	
+		[2] = {"5.56x45 mm M856"},
+		[3] = {"5.56x45 mm AP"}
 	},
 	["7.62x39 mm"] = {
 		[1] = {"7.62x39 mm"},
@@ -93,7 +62,6 @@ SWEP.AmmoTypes2 = {
 	[".45 ACP"] = {
 		[1] = {".45 ACP"},
 		[2] = {".45 ACP Hydro Shock"},
-		[3] = {".45 ACP +P"}
 	},
 	[".50 Action Express"] = {
 		[1] = {".50 Action Express"},
@@ -102,11 +70,11 @@ SWEP.AmmoTypes2 = {
 	},
 	["9mm PAK Blank"] = {
 		[1] = {"9mm PAK Blank"},
-		[2] = {"9mm PAK Flash Defense"}
+		[2] = {"9mm PAK Flash Defense"},
 	},
 	["18x45mm Traumatic"] = {
 		[1] = {"18x45mm Traumatic"}, -- T
-		[2] = {"18x45mm Flash Defense"} -- LAS
+		[2] = {"18x45mm Flash Defense"}, -- LAS
 	},
 	["23x75 SH10"] = {
 		[1] = {"23x75 SH10"},
@@ -118,7 +86,7 @@ SWEP.AmmoTypes2 = {
 	["20/70 gauge"] = {
 		[1] = {"20/70 gauge"},
 		[2] = {"20/70 Slug"},
-		[3] = {"20/70 Flechette"}
+		[3] = {"20/70 Flechette"},
 	},
 }
 
@@ -130,306 +98,6 @@ function SWEP:OnReloaded()
 end
 
 SWEP.CanSuicide = true
-
-function SWEP:GetFearAdrenalineFactors()
-	local owner = self:GetOwner()
-	local org = IsValid(owner) and owner.organism or nil
-	local fear = math.Clamp(org and org.fear or 0, 0, 2)
-	local adrenaline = math.Clamp(org and org.adrenaline or 0, 0, 2)
-	local jitter = math.max(0, adrenaline - 1.25)
-	local stabilizer = math.min(adrenaline, 1.25) * 0.05
-	return fear, adrenaline, jitter, stabilizer
-end
-
-function SWEP:GetFearRecoilMul()
-	local fear, _, jitter, stabilizer = self:GetFearAdrenalineFactors()
-	return 1 + fear * 0.15 + jitter * 0.1 - stabilizer
-end
-
-function SWEP:GetCharacterRecoilMul()
-	local owner = self:GetOwner()
-	local org = IsValid(owner) and owner.organism or nil
-	-- Organism state is replicated independently of a weapon. A stale or bad
-	-- value must not turn every client recoil layer into an extreme multiplier.
-	return math.Clamp(tonumber(org and org.recoilmul) or 1, 0.65, 1.5)
-end
-
-function SWEP:GetFearSpreadMul()
-	local fear, _, jitter, stabilizer = self:GetFearAdrenalineFactors()
-	return 1 + fear * 0.3 + jitter * 0.2 - stabilizer
-end
-
-function SWEP:GetFearHandlingMul()
-	local fear, _, jitter, stabilizer = self:GetFearAdrenalineFactors()
-	return 1 + fear * 0.15 + jitter * 0.1 - stabilizer
-end
-
-function SWEP:GetCognitiveHandlingMul()
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return 1 end
-
-	local org = owner.organism or {}
-	local consciousness = math.Clamp(org.consciousness or 1, 0, 1)
-	local disorientation = math.Clamp(org.disorientation or 0, 0, 1)
-
-	return 1 + (1 - consciousness) * 0.5 + disorientation * 0.4
-end
-
-function SWEP:GetFocusHandlingMul()
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return 1 end
-
-	local org = owner.organism or {}
-	local fear = math.Clamp(org.fear or 0, 0, 2)
-	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 3)
-	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
-	local anxious = math.Clamp(panic * 0.45, 0, 1.4)
-	local focus = math.min(adrenaline, 1.5) * 0.08
-
-	local className = owner.PlayerClassName
-	if className == "swat" or className == "nationalguard" or className == "Metrocop" or className == "police" then
-		focus = focus + 0.08
-	end
-
-	return math.Clamp(1 + fear * 0.1 + anxious * 0.18 - focus, 0.78, 1.35)
-end
-
-function SWEP:GetArmHealthHandlingMul()
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return 1, 0 end
-
-	local org = owner.organism or {}
-	local support = self:GetHandSupportState(owner)
-	local twoHanded = support.wantsTwoHands
-	local right = math.Clamp(org.rarm or 0, 0, 1.4)
-	local left = math.Clamp(org.larm or 0, 0, 1.4)
-	-- A bad left arm is normally only the brace. It should still cost control,
-	-- but must not wobble like the right firing arm has been destroyed.
-	local leftHandlingWeight = support.offhandImpaired and 0.12 or (twoHanded and 0.32 or 0.14)
-	local damage = right * 0.45 + left * leftHandlingWeight
-	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "rarm") then damage = damage + 0.9 end
-	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "larm") then damage = damage + (support.offhandImpaired and 0.25 or (twoHanded and 0.7 or 0.25)) end
-
-	if org.rarmdislocation or org.rarmdislocated then damage = damage + 0.45 end
-	if twoHanded and (org.larmdislocation or org.larmdislocated) then damage = damage + (support.offhandImpaired and 0.14 or 0.35) end
-	-- Do not count a missing right arm twice when the left arm is already the
-	-- active one-handed firing arm. It should remain worse than two-hand use,
-	-- but not become unusably shaky.
-	if org.rarmamputated then damage = damage + (support.onlyLeft and 0.5 or 1.15) end
-	if twoHanded and org.larmamputated then damage = damage + (support.offhandImpaired and 0.32 or 0.85) end
-	if support.oneHanded then damage = damage + (support.offhandImpaired and 0.28 or 0.62) end
-	if support.leftBusy then damage = damage + 0.45 end
-	if support.rightBusy then damage = damage + 0.75 end
-	if org.aiming_fatigue then damage = damage + math.Clamp(org.aiming_fatigue, 0, 10) * 0.045 end
-	if org.permanent_aim_impairment then damage = damage + math.Clamp(org.permanent_aim_impairment, 0, 2) * 0.4 end
-
-	local mul = 1 + damage
-	mul = mul * self:GetFocusHandlingMul()
-	return math.Clamp(mul, 0.82, 3.0), damage
-end
-
-function SWEP:GetHandSupportState(ply)
-	ply = ply or self:GetOwner()
-	local org = IsValid(ply) and ply.organism or {}
-	-- IK is clientside presentation state and can disagree with the server. Every
-	-- firearm can benefit from an off-hand brace unless it explicitly opts out.
-	local wantsTwoHands = self.OneHandedOnly ~= true
-	local rightBad = org.rarmamputated or (org.rarm or 0) >= 1 or org.rarmdislocation or org.rarmdislocated
-	local leftBad = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
-	local rightUsable = not rightBad
-	local leftUsable = not leftBad
-	local leftBusy = false
-	local rightBusy = false
-	local ragdoll = IsValid(ply) and ply.FakeRagdoll or nil
-	local postureOneHanded = IsValid(ply) and (ply.posture == 7 or ply.posture == 8)
-
-	if IsValid(ply) then
-		-- Predicted/non-player owners can still be valid entities, but they do not
-		-- expose the Player-only GetWeapon method. Treat them as having no hands
-		-- SWEP instead of crashing the recoil path.
-		local hands = ply.GetWeapon and ply:GetWeapon("weapon_hands_sh") or nil
-		local carryingMain = ply.GetNetVar and IsValid(ply:GetNetVar("carryent")) or false
-		local carryingOffhand = ply.GetNetVar and IsValid(ply:GetNetVar("carryent2")) or false
-		local zmanipLeft = ply.zmanipstart ~= nil and ply.zmanipseq == "interact" and not org.larmamputated
-		local fakeLeftGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsLH)
-		local fakeRightGrip = IsValid(ragdoll) and IsValid(ragdoll.ConsRH)
-		local handsCarry = IsValid(hands) and (IsValid(hands.CarryEnt) or hands.UsingBothHands or hands.UsingLeftHand or hands.UsingRightHand)
-		local handsUsesLeft = handsCarry and hands.UsingLeftHand ~= false
-		local handsUsesRight = handsCarry and hands.UsingRightHand == true
-		local offhandBusy = carryingMain or carryingOffhand or handsUsesLeft or zmanipLeft or fakeLeftGrip or ply.holdingWeapon
-
-		if offhandBusy then
-			leftBusy = leftUsable
-		end
-
-		-- Main dragging and right-hand ragdoll/crawl grips consume the firing hand
-		-- even when the left hand is occupied at the same time.
-		rightBusy = rightUsable and (carryingMain or handsUsesRight or fakeRightGrip)
-	end
-
-	local rightSupport = rightUsable and not rightBusy
-	local leftSupport = leftUsable and not leftBusy and wantsTwoHands and not postureOneHanded
-	local supportHands = (rightSupport and 1 or 0) + (leftSupport and 1 or 0)
-	local oneHanded = postureOneHanded or leftBusy or rightBusy or (wantsTwoHands and supportHands <= 1)
-	local onlyLeft = leftSupport and not rightSupport
-	local onlyRight = rightSupport and not leftSupport
-	-- The usual firearm stance fires from the right and uses the left as a brace.
-	-- Keep a broken/missing brace distinct from a damaged firing hand.
-	local offhandImpaired = wantsTwoHands and rightSupport and leftBad
-
-	return {
-		wantsTwoHands = wantsTwoHands,
-		postureOneHanded = postureOneHanded,
-		rightUsable = rightUsable,
-		leftUsable = leftUsable,
-		rightBad = rightBad,
-		leftBad = leftBad,
-		rightBusy = rightBusy,
-		leftBusy = leftBusy,
-		rightSupport = rightSupport,
-		leftSupport = leftSupport,
-		supportHands = supportHands,
-		oneHanded = oneHanded,
-		onlyLeft = onlyLeft,
-		onlyRight = onlyRight,
-		offhandImpaired = offhandImpaired,
-		firingArm = onlyLeft and "larm" or "rarm"
-	}
-end
-
-function SWEP:GetWeaponWeightHandlingMul()
-	local w = self.weight or self.Weight or 5
-	return math.Clamp(1 + (w - 2) * 0.15, 0.7, 2.0)
-end
-
-function SWEP:GetAmmoBallistics()
-	local ammo = self.Primary and self.Primary.Ammo
-	local ammoInfo = ammo and hg.ammotypeshuy and hg.ammotypeshuy[ammo]
-	return ammoInfo and ammoInfo.BulletSettings or {}
-end
-
-function SWEP:GetRecoilImpulseFactors()
-	local primary = self.Primary or {}
-	local ammo = self:GetAmmoBallistics()
-	local force = ammo.Force or primary.Force2 or primary.Force or 30
-	local diameter = ammo.Diameter or 7.62
-	local mass = ammo.Mass or 8
-	local speed = ammo.Speed or 700
-	local numBullet = ammo.NumBullet or self.NumBullet or 1
-	local weight = self.weight or self.Weight or 5
-
-	-- Shotgun tables describe each pellet. Recoil comes from the whole payload,
-	-- so reconstruct its total mass/diameter and a damped total force here.
-	local payloadCount = math.max(numBullet, 1)
-	local payloadMass = mass * payloadCount
-	local payloadDiameter = diameter * payloadCount
-	local recoilForce = force * (1 + math.max(payloadCount - 1, 0) * 0.55)
-	local forceFactor = math.Clamp(recoilForce / 40, 0.25, 3.75)
-	local momentumFactor = math.Clamp((payloadMass * speed) / (8 * 700), 0.3, 3.2)
-	local diameterFactor = math.Clamp(payloadDiameter / 7.62, 0.55, 2.1)
-	local payloadFactor = payloadCount > 1 and math.Clamp(1 + math.log(payloadCount) / math.log(2) * 0.06, 1, 1.25) or 1
-
-	local caliber = math.Clamp((forceFactor * 0.45 + momentumFactor * 0.4 + diameterFactor * 0.15) * payloadFactor, 0.3, 3.6)
-	-- Light rifle projectiles and the rifle's own weight used to damp intermediate
-	-- cartridges below a meaningful long-gun recoil level.
-	if not self:IsPistolHoldType() and speed >= 750 and force >= 25 and diameter >= 5 then
-		local rifleFloor = (mass >= 7 or diameter >= 7) and 1.3 or 1.08
-		caliber = math.max(caliber, rifleFloor)
-	end
-	local weaponMass = math.Clamp(3 / math.max(weight, 0.5), 0.55, 1.75)
-
-	return caliber, weaponMass, recoilForce, numBullet, ammo
-end
-
--- Keep recoil families distinct without requiring every weapon file to carry
--- bespoke tuning. Small cartridges get a modest, quick snap; high-momentum
--- cartridges push a little harder and take longer to settle back on target.
-function SWEP:GetRecoilTuning()
-	local caliber = self:GetRecoilImpulseFactors()
-	local caliberClass = math.Clamp((caliber - 0.55) / 2.2, 0, 1)
-	local kickMul = Lerp(caliberClass, 1.04, 1.10)
-	local recoveryMul = Lerp(caliberClass, 0.78, 1.28)
-	return kickMul, recoveryMul, caliberClass
-end
-
-function SWEP:GetRecoilSupportMul()
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return 1 end
-
-	local org = owner.organism or {}
-	local support = self:GetHandSupportState(owner)
-	local supportHands = support.supportHands
-	local mul = supportHands >= 2 and 0.82 or 1.25
-
-	if support.oneHanded then mul = mul * (support.offhandImpaired and 1.10 or 1.25) end
-	if support.leftBusy then mul = mul * 1.28 end
-	if support.rightBusy then mul = mul * 1.45 end
-	if support.rightBad then mul = mul * (org.rarmamputated and (support.onlyLeft and 1.15 or 1.7) or 1.35) end
-	if support.leftBad and support.wantsTwoHands then
-		mul = mul * (support.offhandImpaired and (org.larmamputated and 1.18 or 1.10) or (org.larmamputated and 1.45 or 1.22))
-	end
-	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul * (1 / org.armstrength) end
-	if org.aiming_fatigue then mul = mul * (1 + math.Clamp(org.aiming_fatigue, 0, 10) * 0.025) end
-
-	return math.Clamp(mul, 0.65, 2.8), supportHands
-end
-
-function SWEP:IsManuallyCycledWeapon()
-	if self.ManualAction ~= nil then return self.ManualAction end
-	if self.IsBoltAction or self.IsPumpAction then return true end
-
-	if self.Base == "weapon_m4super" and self.AutomaticDraw == false then
-		return true
-	end
-
-	local instructions = self.Instructions
-	if isstring(instructions) then
-		instructions = string.lower(instructions)
-		if string.find(instructions, "bolt-action", 1, true) or
-			string.find(instructions, "bolt action", 1, true) or
-			string.find(instructions, "pump-action", 1, true) or
-			string.find(instructions, "pump action", 1, true) then
-			return true
-		end
-	end
-
-	return false
-end
-
-function SWEP:GetManualActionBlockReason(ply)
-	if not self:IsManuallyCycledWeapon() then return end
-	if not IsValid(ply) then return end
-
-	local org = ply.organism
-	if not org then return end
-
-	local leftBroken = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
-	if leftBroken then
-		return "I need my left arm to cycle this."
-	end
-
-	if IsValid(ply.FakeRagdoll) and IsValid(ply.FakeRagdoll.ConsLH) then
-		return "I can't cycle it while my left hand is busy."
-	end
-end
-
-function SWEP:CanRackOrReloadManualAction(ply)
-	return self:GetManualActionBlockReason(ply or self:GetOwner()) == nil
-end
-
--- Stance-aware stability: high ready (3) / low ready (4) are steadier than usual,
--- any other stance is slightly less stable. aiming = true weights the bonus stronger.
-function SWEP:GetPostureStabilityMul(aiming)
-	local owner = self:GetOwner()
-	if not IsValid(owner) then return 1 end
-
-	local posture = owner.posture or 0
-	if posture == 3 or posture == 4 then
-		return aiming and 0.78 or 0.85
-	end
-
-	return aiming and 1.12 or 1.08
-end
 
 game.AddParticles("particles/tfa_smoke.pcf")
 PrecacheParticleSystem("smoke_trail_tfa")
@@ -470,8 +138,7 @@ function SWEP:Initialize()
 	
 	self.SlotPos = self:IsPistolHoldType() and 1 or 2
 
-	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
-	self.deploy = CurTime() + self.CooldownDeploy / self.Ergonomics * roleDeployMul
+	self.deploy = CurTime() + self.CooldownDeploy / self.Ergonomics
 
 	self:ClearAttachments()
 
@@ -516,25 +183,11 @@ function SWEP:Initialize()
 	self:InitializePost()
 end
 
-function SWEP:TryDropMisfire(chance, speed, force)
-	if !self.CantFireFromCollision and (force or !self.lastshotfromhit or (self.lastshotfromhit + 0.5 < CurTime())) and (force or speed > 250) and (force or math.random(chance or 45) == 1) then
-		if self.Clip1 and self:Clip1() <= 0 then return end
-		if self.Shoot then self:Shoot(true) else self:PrimaryAttack() end
-		if SERVER and self.Shoot then
-			self.hgShootEventID = ((self.hgShootEventID or 0) % 65535) + 1
-			net.Start("hgwep shoot", true)
-			net.WriteEntity(self)
-			net.WriteBool(true)
-			net.WriteBool(true)
-			net.WriteUInt(self.hgShootEventID, 16)
-			net.Broadcast()
-		end
+function SWEP:PhysicsCollide(ent, data)
+	if !self.CantFireFromCollision and (!self.lastshotfromhit or (self.lastshotfromhit + 0.5 < CurTime())) and data.Speed > 250 and math.random(45) == 1 then
+		self:PrimaryAttack()
 		self.lastshotfromhit = CurTime()
 	end
-end
-
-function SWEP:PhysicsCollide(ent, data)
-	self:TryDropMisfire(45, data.Speed)
 end
 
 SWEP.WepSelectIcon2 = Material("null")
@@ -636,84 +289,41 @@ function SWEP:OnRemove()
 	end
 end
 
-local hg_aimtoshoot = ConVarExists("hg_aimtoshoot") and GetConVar("hg_aimtoshoot") or CreateConVar("hg_aimtoshoot", 0, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Toggle DarkRP-like shooting system (aim to shoot): 0 - disabled; 1 - hipfire only; 2 - aiming only", 0, 2)
+local hg_aimtoshoot = ConVarExists("hg_aimtoshoot") and GetConVar("hg_aimtoshoot") or CreateConVar("hg_aimtoshoot", 0, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Toggle DarkRP-like shooting system (aim to shoot)", 0, 1)
+
 local owner
 local CurTime = CurTime
 function SWEP:IsZoom()
 	local owner = self:GetOwner()
-
-	if not self:CanUse() then
-		return false
-	end
-
-	local aimtoshoot = hg_aimtoshoot:GetInt() == 0 or hg_aimtoshoot:GetInt() == 2 or self:GetNWBool("aiming")
-	if not aimtoshoot then
-		return false
-	end
-
-	if self:GetButtstockAttack() - CurTime() >= -1 then
-		return false
-	end
-
-	local attacking = owner:IsPlayer() and self:KeyDown(IN_ATTACK2) and not self:IsSprinting()
-	if not attacking then
-		return false
-	end
-
-	local validrag = IsValid(owner.FakeRagdoll)
-
-	if self:IsSprinting() and validrag then
-		return false
-	end
-
-	if owner.suiciding then
-		return false
-	end
-
-	local canzoom = validrag and (self:KeyDown(IN_USE) or hg.RagdollCombatInUse(owner)) or (owner:IsOnGround() or owner:InVehicle())
-
-	if not canzoom then
-		return false
-	end
-
-	local rightarm = owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99)
-	if owner.organism and (owner.organism.larm and not self:IsPistolHoldType()) and rightarm then
-		return false
-	end
-
-	return true
+	--print( (owner.armors and (hg.armor.head[owner.armors["head"]] and not hg.armor.head[owner.armors["head"]].cantsight)))
+	return self:CanUse() and
+		(!hg_aimtoshoot:GetBool() or self:GetNWBool("aiming")) and
+		(self:GetButtstockAttack() - CurTime() < -1) and 
+		(self:GetOwner():IsPlayer() and self:KeyDown(IN_ATTACK2) and not self:IsSprinting()) and
+		!(self:IsSprinting() and !IsValid(owner.FakeRagdoll)) and
+		((IsValid(owner.FakeRagdoll) and (self:KeyDown(IN_USE) or hg.RagdollCombatInUse(owner))) or
+		(owner:IsOnGround() or owner:InVehicle())) and 
+		not owner.suiciding and !(owner.organism and (owner.organism.larm and !self:IsPistolHoldType())
+		and owner.organism.rarm and (owner.organism.larm > 0.99 or owner.organism.rarm > 0.99))
+		
+		-- and owner.posture ~= 1 and owner.posture ~= 3-- and (not IsValid(owner.FakeRagdoll) or self:KeyDown(IN_JUMP))
 end
-
 
 function SWEP:CanUse(ignoreSprint)
     local owner = self:GetOwner()
 	if not IsValid(owner) then return true end
-	if owner:IsNPC() then
-		return not self.reload and not self.deploy and not self:IsJamClearing()
-	end
+    if owner:IsNPC() then return true end
 	if owner:IsPlayer() and owner:GetNWBool("hg_hold_wound_twohand", false) then return false end
 	if owner.organism and owner.organism.rarmamputated and !self:IsPistolHoldType() then return false end
-	if self:IsJamClearing() then return false end
 	return not (self.reload or self.deploy or (owner:IsPlayer() and ((!ignoreSprint and self:IsSprinting()) or (owner.organism and owner.organism.otrub))))
 end
 
 function SWEP:IsSprinting()
 	local ply = self:GetOwner()
-
-	if ply:IsNPC() then
-		return false
-	end
-
-	local isfast = ply:GetVelocity():LengthSqr() > 150 * 150
-	local sprinting = self:KeyDown(IN_SPEED)
-	local validrag = IsValid(ply.FakeRagdoll)
-
-	if hg_aimtoshoot:GetInt() > 0 then
-		local sprintCondition = sprinting and isfast
-		local aimCondition = not self:KeyDown(IN_ATTACK2) and not validrag
-		return sprintCondition or aimCondition
+	if hg_aimtoshoot:GetBool() then
+		return not ply:IsNPC() and (self:KeyDown(IN_SPEED) and ply:GetVelocity():LengthSqr() > 150 * 150) or not self:KeyDown(IN_ATTACK2) and not IsValid(ply.FakeRagdoll)
 	else
-		return sprinting and isfast and not validrag
+		return not ply:IsNPC() and self:KeyDown(IN_SPEED) and ply:GetVelocity():LengthSqr() > 150 * 150 and not IsValid(ply.FakeRagdoll)
 	end
 end
 
@@ -742,7 +352,6 @@ local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateCli
 local hg_distortedsounds = ConVarExists("hg_distortedsounds") and GetConVar("hg_distortedsounds") or CreateClientConVar("hg_distortedsounds", "0", true, false, "Toggle distorted sounds for the gunshots", 0, 1)
 
 local math_random = math.random
-local emptyBulletSound = {"panoptisscon/uhoh.ogg", 75, 97, 103}
 function SWEP:PlaySnd(snd, server, chan, vol, pitch, entity, tripleaffirmative)
 	if SERVER and not server then return end
 	local owner = self:GetOwner()
@@ -862,7 +471,7 @@ end
 if SERVER then
 	hook.Add("Player Think","huyhuy",function(ply)
 		local wep = ply:GetActiveWeapon()
-		if (not IsValid(wep) or (!wep.ishgweapon and !wep.ismelee2) or !wep.CanSuicide) and ply.suiciding then ply.suiciding = false end
+		if (!wep.ishgweapon and !wep.ismelee2) or !wep.CanSuicide then ply.suiciding = false end
 	end)
 end
 
@@ -881,28 +490,11 @@ function SWEP:Shoot(override)
 
 	local primary = self.Primary
 	if override then self.drawBullet = true end
-
-	if !override and self:GetJammed() then
-		self.LastPrimaryDryFire = CurTime()
-		if SERVER then
-			self:PlaySnd(emptyBulletSound, true, CHAN_AUTO)
-		end
-		primary.Automatic = false
-
-		return false
-	end
 	
 	if !self.drawBullet or (self:Clip1() == 0 and !override) then
 		self.LastPrimaryDryFire = CurTime()
 		self:PrimaryShootEmpty()
 		primary.Automatic = false
-
-		-- The engine may ask an NPC to attack again before selecting its reload
-		-- schedule. Start the reload here as a fallback instead of dry-firing
-		-- indefinitely; Reload guards against an already active reload.
-		if SERVER and owner:IsNPC() and self.Reload and not self.reload then
-			self:Reload()
-		end
 
 		return false
 	end
@@ -928,12 +520,10 @@ function SWEP:PrimaryAttack(broadcast)
 	local huy = self:Shoot() ~= false
 	
 	if SERVER and huy then
-		self.hgShootEventID = ((self.hgShootEventID or 0) % 65535) + 1
 		net.Start("hgwep shoot", true)
 		net.WriteEntity(self)
 		net.WriteBool(huy)
 		net.WriteBool(broadcast)
-		net.WriteUInt(self.hgShootEventID, 16)
 		net.Broadcast()
 	end
 end
@@ -973,24 +563,16 @@ function SWEP:PrimaryShoot()
 		return
 	end
 
-	-- Capture the ballistic muzzle before sound/animation work and before any
-	-- recoil state is advanced. The authoritative physical projectile may not be
-	-- seen until a later frame, but it must retain the trigger-time direction.
-	local shotTrace, shotPos, shotAng = self:GetFireTrace()
-
 	self:EmitShoot()
 	--if SERVER or self:IsClient() then
-		self:FireBullet(shotTrace, shotPos, shotAng)
+		local ok, err = pcall(self.FireBullet, self)
+		if not ok then ErrorNoHalt("[HG] FireBullet error: " .. tostring(err)) end
 	--end
 	self.dwr_reverbDisable = nil
 	self.shooanim = self.ShootAnimMul
 	self.shot = self.shot or 0
 	self.shot = math.min(3, self.shot + (self.NumBullet or 1))
 	self.shot2 = math.min(1, self.shot2 + 1)
-
-	if SERVER then
-		self:TryJam()
-	end
 	
 	if not (CLIENT and self:GetOwner():IsNPC()) then
 		self:TakePrimaryAmmo(1)
@@ -1000,83 +582,19 @@ function SWEP:PrimaryShoot()
 	self.drawBullet = false
 	if self.AutomaticDraw then self:Draw() end
 	self:PrimarySpread()
-	self:ApplyRecoilCameraKick()
-end
-
--- A visible, post-shot camera jolt. It cannot alter the round that was just
--- fired; it only moves the player's aim for the next shot.
-function SWEP:ApplyRecoilCameraKick()
-	if SERVER or not self:IsLocal2() then return end
-
-	local ply = self:GetOwner()
-	if not IsValid(ply) then return end
-
-	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
-	local recoilKickMul = self:GetRecoilTuning()
-	local baseKick = math.Clamp(caliberMul * weightMul * recoilKickMul, 0.25, 3.9)
-	local supportMul = self:GetRecoilSupportMul()
-	local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
-	local restMul = (self.IsResting and self:IsResting()) and 0.55 or 1
-	local adsMul = self:IsZoom() and 0.72 or 1
-	local sprayI = self.SprayI or 0
-	local sprayClimb = 1 + math.Clamp(sprayI / 8, 0, 1) * 0.6
-	local pistolMul = self:IsPistolHoldType() and 1.08 or 1
-	local kickScale = math.Clamp(baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * self:GetCharacterRecoilMul() * self:GetArmHealthHandlingMul(), 0.1, 4)
-
-	-- PrimarySpread owns the random impulse. Reusing it here prevents several
-	-- unrelated camera layers from forcing every shot back into the same up-right
-	-- path. Both clockwise-canted holds naturally drive left.
-	local cantedHold = ply.posture == 7 or ply.posture == 9
-	local recoilDir = self.LastRecoilDirection
-	if not isangle(recoilDir) then
-		recoilDir = cantedHold and Angle(0, -0.9, 0) or Angle(-0.8, math.Rand(-0.5, 0.5), 0)
-	end
-	local pitchKick = recoilDir[1] * kickScale
-	local yawKick = recoilDir[2] * kickScale * (cantedHold and 1.05 or 0.72)
-	local rollKick = recoilDir[3] * kickScale * 0.65
-	local punchAng = Angle(pitchKick, yawKick, rollKick)
-	local coolCamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()
-	local realismMul = GetGlobalBool("FullRealismMode", false) and 1.7 or 1
-	punchAng:Mul(realismMul * (self.ScreenRecoilMul or 1))
-
-	if coolCamera then
-		ViewPunch(punchAng * 0.7)
-		ViewPunch2(punchAng * -0.18)
-	else
-		ViewPunch2(punchAng * 0.55)
-		ViewPunch(punchAng * 0.16)
-	end
 end
 
 SWEP.SightSlideOffset = 1
 
 function SWEP:PrimaryShootEmpty()
 	if CLIENT then return end
-	self:PlaySnd(emptyBulletSound, true, CHAN_AUTO)
+	self:PlaySnd(self.Primary.SoundEmpty, true, CHAN_AUTO)
 end
 
 SWEP.DistSound = "m4a1/m4a1_dist.wav"
 SWEP.NewSoundClose = nil
 SWEP.NewSoundDist = nil
 SWEP.NewSoundSupressor = nil
-
-local additionalShotSoundExists = {}
-local function GetAdditionalShotSound(configuredSound, generatedSound)
-	if configuredSound == false then return end
-	if configuredSound ~= nil then return configuredSound end
-
-	local path = istable(generatedSound) and generatedSound[1] or generatedSound
-	if not isstring(path) or path == "" then return end
-
-	local exists = additionalShotSoundExists[path]
-	if exists == nil then
-		exists = file.Exists("sound/" .. path, "GAME")
-		additionalShotSoundExists[path] = exists
-	end
-	if not exists then return end
-
-	return generatedSound
-end
 
 if SERVER then
 	util.AddNetworkString("resettinnitus")
@@ -1173,31 +691,11 @@ function SWEP:EmitShoot()
 
 	if (self.Primary.SoundFP or self.Supressor and self.SupressedSoundFP) and nearDist then
 		self:PlaySnd((self.Supressor and self.SupressedSoundFP) or self.Primary.SoundFP, nil, nil, vol, nil, 55533, not self.Supressor)
-		if self.Supressor then self:PlaySnd(self.Primary.SoundFP or self.Primary.Sound, nil, nil, vol * 0.7, math_random(135, 160), 55534, false) end
 	else
 		self:PlaySnd(self.Supressor and (self.SupressedSound or (self:IsPistolHoldType() and "homigrad/weapons/pistols/sil.wav" or "m4a1/m4a1_suppressed_fp.wav")) or self.Primary.Sound, nil, nil, vol, nil, 55533, not self.Supressor)
-		if self.Supressor then self:PlaySnd(self.Primary.Sound, nil, nil, vol * 0.6, math_random(135, 160), 55534, false) end
 	end
-
-	local configuredClose = self.NewSoundClose
-	local generatedClose = snd_close
-	if self.Supressor then
-		configuredClose = self.NewSoundSupressor
-		generatedClose = snd_suppressor
-	end
-
-	local additionalClose = GetAdditionalShotSound(configuredClose, generatedClose)
-	if additionalClose then
-		self:PlaySnd(additionalClose, nil, nil, vol, nil, 55534, false)
-	end
-
 	if !self.Supressor then
 		self:PlaySndDist(self.DistSound, nil, nil, nil, nil, 55511, not self.Supressor)
-
-		local additionalDist = GetAdditionalShotSound(self.NewSoundDist, snd_dist)
-		if additionalDist then
-			self:PlaySndDist(istable(additionalDist) and additionalDist[1] or additionalDist)
-		end
 	end
 end
 
@@ -1237,11 +735,10 @@ end
 local col = Color(0, 0, 0)
 local col2 = Color(0, 0, 0)
 local dynamicmags
-local instructions
-local hg_weird_mags
+local instructions 
 if CLIENT then
 	surface.CreateFont("AmmoFont",{
-		font = "VCR OSD Mono",
+		font = "Courier Prime",
 		size = ScreenScale(16),
 		extended = true,
 		weight = 500,
@@ -1249,7 +746,7 @@ if CLIENT then
 	})
 
 	surface.CreateFont("DescFont",{
-		font = "VCR OSD Mono",
+		font = "Courier Prime",
 		size = ScreenScale(8),
 		extended = true,
 		shadow = true,
@@ -1259,12 +756,6 @@ if CLIENT then
 
 	dynamicmags = CreateClientConVar("hg_dynamic_mags", "0", true, false, "Enables dynamic ammo show when shooting",0,1)
 	instructions = CreateClientConVar("hg_instructions","1", true, false, "Enables gun instructions",0,1)
-end
-
-if SERVER then
-	hg_weird_mags = ConVarExists("hg_weirdmags") and GetConVar("hg_weirdmags") or CreateConVar("hg_weirdmags", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Use old block magazine ammo HUD instead of bullet icons", 0, 1)
-elseif CLIENT then
-	hg_weird_mags = GetConVar("hg_weirdmags")
 end
 
 function SWEP:DrawHUDAdd()
@@ -1345,12 +836,13 @@ local developer = GetConVar("developer")
 local function DrawBullet(matIcon, x, y, size, cColor)
 	render.PushFilterMin(TEXFILTER.ANISOTROPIC)
 		surface.SetDrawColor(cColor)
-		surface.SetMaterial(matIcon or hg.matPistolAmmoAlt or Material("vgui/hud/bullets/low_caliber.png"))
+		surface.SetMaterial(matIcon or matPistolAmmo)
 		surface.DrawTexturedRect(x-size/2,y-size,size,size)
 	render.PopFilterMin()
 end
 
 if CLIENT then
+	local scrW, scrH = ScrW(), ScrH()
 	local lastShoot = 0
 	local StopShowBullet = false
 	local WhiteColor = Color(200,200,200,255)
@@ -1358,47 +850,28 @@ if CLIENT then
 	local coloruse = Color(255,255,255,255)
 
 	local matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
+	local matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
+	local matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
 	local lerpAmmoCheck = 0
 	local ammoCheck = 0
 	local color_bg = Color(0,0,0,150)
 	local ammoLongCheck = 0
-	local function GetAmmoIcon(ammoName)
-		return hg.GetAmmoIconMaterial and hg.GetAmmoIconMaterial(ammoName) or matPistolAmmo
-	end
-
-	local function GetAmmoHudPosition(self, scrW, scrH, hudHPos)
-		local posX = scrW * 0.75
-		local posY = scrH * hudHPos
-		local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
-		local scr = att and att.Pos and att.Pos:ToScreen()
-
-		if scr and scr.visible ~= false and scr.x > -scrW * 0.25 and scr.x < scrW * 1.25 and scr.y > -scrH * 0.25 and scr.y < scrH * 1.25 then
-			posX = math.Clamp(scr.x + scrW * 0.035, scrW * 0.56, scrW * 0.9)
-			posY = math.Clamp(scr.y + scrH * 0.045, scrH * 0.42, scrH * 0.88)
-		end
-
-		return posX, posY
-	end
-
 	SWEP.DrawAmmoMetods = {
 		["Default"] = function(self,texture)
-			local scrW, scrH = ScrW(), ScrH()
 			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
-			if clipsize <= 0 then clipsize = 1 end
 			local clip = self:Clip1()
 			local owner = self:GetOwner()
 			local shoot = CurTime() - self:LastShootTime()
 			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
 			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
+			local posX = scrW*0.75
+			local posX2 = scrW*0.8
 			local HudHPos = 0.8
-			local showDynamic = true
-			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, HudHPos)
-			local posX2 = posX + scrH*0.11
 			
 			lastShoot = LerpFT(0.5,lastShoot, shoot > 0 and 1 or 0)
 			lastShootFor = lastShoot
 			self.hudinspect = self.hudinspect or 0
-			if self.hudinspect > CurTime() or (clip < clipsize/3 and lastShoot < 0.9 and showDynamic) or self:KeyDown(IN_RELOAD) then
+			if self.hudinspect > CurTime() or (clip < clipsize/3 and lastShoot < 0.9 and dynamicmags:GetBool()) or self:KeyDown(IN_RELOAD) then
 				ammoCheck = CurTime() + 1	
 			end
 			ammoLongCheck = LerpFT(0.025,ammoLongCheck, (self:KeyDown(IN_RELOAD) or self.hudinspect > CurTime()) and 5 or 0)
@@ -1415,16 +888,16 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",posX2 + 2, posY + scrH*0.05 + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",scrW*0.8 + 2, scrH*HudHPos + scrH*0.05 + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",posX2, posY + scrH*0.05,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",scrW*0.8, scrH*HudHPos + scrH*0.05,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 
 			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
-			local Yellow = clip > 0 and (( clipsize/clip )-1)/(clipsize/5) or 1
+			local Yellow = (( clipsize/clip )-1)/(clipsize/5)
 			--print(Yellow)
 			color_bg.r = 55*Yellow
 			--draw.RoundedBox(0,scrW*0.75-(scrH*0.12/2),scrH*0.72,scrH*0.12,scrH*0.18,ColorAlpha(color_black,50))
@@ -1433,8 +906,8 @@ if CLIENT then
 			local PosLerp = Lerp(math.ease.OutExpo(lerpAmmoCheck),150,0)
 			--print(PosLerp)
 			if clip > 0 then
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,posY + 2,scrH*0.08, color_bg)
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,posY,scrH*0.08, WhiteColor)
+				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,scrH*(HudHPos) + 2,scrH*0.08, color_bg)
+				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,scrH*(HudHPos),scrH*0.08, WhiteColor)
 				--if lastShoot < 0.2 then StopShowBullet = true end
 			end
 			--if StopShowBullet then
@@ -1452,13 +925,13 @@ if CLIENT then
 				local PosAdjust = math.max(PosLerp - i*15,0)
 				--print(PosAdjust)
 				if i < 2 then
-					DrawBullet(texture,posX + 2 + PosAdjust,posY + scrH*(i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,posY + scrH*(i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX + 2 + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
+					DrawBullet(texture,posX + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
 				else
 					color_bg.a = (210 - (20 * i)) * lerpAmmoCheck
 					WhiteColor.a = (210 - (20 * i) )* lerpAmmoCheck
-					DrawBullet(texture,posX+2 + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX+2 + PosAdjust,scrH*((HudHPos - 0.026) + i*0.026+(0.026*lastShootFor))+2,scrH*0.08, color_bg)
+					DrawBullet(texture,posX + PosAdjust,scrH*((HudHPos - 0.026) + i*0.026+(0.026*lastShootFor)),scrH*0.08, WhiteColor)
 				end
 			end
 
@@ -1467,67 +940,14 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*lerpAmmoCheck
-				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2, posY + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2, scrH*HudHPos + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
 				coloruse.a = 210*lerpAmmoCheck
-				draw.SimpleText("+"..magCount,"AmmoFont",posX2, posY,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText("+"..magCount,"AmmoFont",posX2, scrH*HudHPos,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 			--draw.SimpleText("lastShoot: "..lastShoot,"Default",0,0)
-		end,
-		["MagazineBlocks"] = function(self)
-			local scrW, scrH = ScrW(), ScrH()
-			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
-			if clipsize <= 0 then clipsize = 1 end
-			local owner = self:GetOwner()
-			self.hudinspect = self.hudinspect or 0
-			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, 0.8)
-			local sizeX = (clipsize == 1 and scrH / 15 or scrW / 40) * scale
-			local sizeY = (clipsize == 1 and scrH / 80 or scrH / 10) * scale
-			local clip = math.max(self:Clip1(), 0)
-			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
-			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
-
-			if self.hudinspect > CurTime() or self:KeyDown(IN_RELOAD) or dynamicmags:GetBool() then
-				ammoCheck = CurTime() + 1
-			end
-
-			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
-			if lerpAmmoCheck <= 0.01 then return end
-
-			local ammoLeft = math.ceil(clip / clipsize * sizeY)
-			col:SetUnpacked(LerpColor(clip / clipsize, yellow, color_white))
-			col.a = 255 * lerpAmmoCheck
-			DrawBlurRect(posX - sizeX * (clipsize ~= 1 and 0.2 or 0.3), posY - sizeY * (clipsize ~= 1 and 0.1 or 0.7), (sizeX + sizeX * (clipsize ~= 1 and 0.12 or 0.2)) * math.max(math.min(magCount + 1, clipsize ~= 1 and 5 or 4), 1.3), sizeY + (clipsize ~= 1 and 20 or 60), 7, col.a * 5)
-
-			surface.SetDrawColor(col)
-			surface.DrawRect(posX, posY - ammoLeft + sizeY, sizeX, ammoLeft)
-			surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
-
-			local magX = posX + (clipsize == 1 and scrW / 40 or scrW / 50)
-			local magY = posY + (clipsize == 1 and scrH / 70 or scrH / 20)
-			local smallX = sizeX / 2
-			local smallY = sizeY / 2
-			local reserveAmmo = ammo
-
-			for i = 1, math.min(magCount, 3) do
-				local magAmmo = math.min(clipsize, reserveAmmo)
-				reserveAmmo = reserveAmmo - magAmmo
-				local reserveLeft = math.ceil(magAmmo / clipsize * smallY)
-
-				col2:SetUnpacked(LerpColor(magAmmo / clipsize, yellow, color_white))
-				col2.a = 255 * lerpAmmoCheck
-				surface.SetDrawColor(col2)
-				surface.DrawRect(magX + (smallX + 15) * i, magY - reserveLeft + smallY, smallX, reserveLeft)
-				surface.DrawOutlinedRect(magX - 5 + (smallX + 15) * i, magY - 5, smallX + 10, smallY + 10, 1)
-			end
-
-			if magCount > 3 then
-				local extraMags = "+" .. (magCount - 3)
-				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4 + 1, magY + smallX / 2 + 1, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4, magY + smallX / 2, Color(255, 255, 255, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-			end
 		end
 	}
 
@@ -1535,9 +955,8 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
-		local drawMethod = hg_weird_mags and hg_weird_mags:GetBool() and "MagazineBlocks" or self.AmmoDrawMetod
-		local drawFunc = self.DrawAmmoMetods[drawMethod] or self.DrawAmmoMetods.Default
-		drawFunc(self, GetAmmoIcon(self.Primary.Ammo))
+		local ammotype = (hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon) or matPistolAmmo
+		self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
 		
 		self.isscoping = false
 		if self.attachments then
@@ -1566,20 +985,17 @@ end
 if CLIENT then
 	local hook_Run = hook.Run
 	hook.Add("Think", "homigrad-weapons", function()
-		local curTime = CurTime()
-
 		for i,wep in ipairs(hg.weapons) do
 			--local wep = ply:GetActiveWeapon()
 
-			if not IsValid(wep) or not wep.Step then continue end
-			local owner = wep:GetOwner()
-			if not IsValid(owner) and wep:GetVelocity():LengthSqr() < 5 then continue end
+			if not IsValid(wep) or not wep.Step or (not IsValid(wep:GetOwner()) and wep:GetVelocity():LengthSqr() < 5) then continue end
 			--hook_Run("SWEPStep", wep)
 			if wep.NotSeen or not wep.shouldTransmit then continue end
 			//if (wep.lasttimetick or 0) > CurTime() then continue end
+			local owner = wep:GetOwner()
 			//wep.lasttimetick = CurTime() + (IsValid(owner) and owner:IsPlayer() and (owner == LocalPlayer() or owner == LocalPlayer():GetNWEntity("spect")) and 0 or 0.1)
 			if IsValid(owner) and owner:IsPlayer() then
-				wep:Step_HolsterDeploy(curTime)
+				wep:Step_HolsterDeploy(CurTime())
 				continue
 			end
 			wep:Step()
@@ -1596,12 +1012,7 @@ end
 
 hook.Add("Player Think", "suicidingaa", function(ply)
 	if SERVER then
-		local suiciding = ply.suiciding or false
-		if ply:GetNWBool("suiciding", false) ~= suiciding then
-			ply:SetNWBool("suiciding", suiciding)
-		end
-
-		return
+		ply:SetNWBool("suiciding", ply.suiciding)
 	end
 	
 	if CLIENT then
@@ -1669,12 +1080,9 @@ end
 
 if SERVER then
 	hook.Add("Player Think", "removesuiciding", function(ply)
-		local willsuicide = ply:GetNWFloat("willsuicide", 0)
-		if willsuicide == 0 then return end
-
 		local wep = ply:GetActiveWeapon()
 		
-		if !ishgweapon(wep) or !wep.CanSuicide or (willsuicide < CurTime() - 1) then
+		if !ishgweapon(wep) or !wep.CanSuicide or (ply:GetNWFloat("willsuicide", 0) < CurTime() - 1) then
 			ply:SetNWFloat("willsuicide", 0)
 		end
 	end)
@@ -1687,10 +1095,7 @@ hook.Add("PlayerSwitchWeapon", "cantswitchwhenithappens", function(ply)
 
 	if ply.organism and ply.organism.larmamputated and ply.organism.rarmamputated then
 		if SERVER then
-                        local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply) or ply:GetWeapon("weapon_hands_sh")
-                        if IsValid(hands) then
-                                ply:SetActiveWeapon(hands)
-                        end
+			ply:SetActiveWeapon(ply:GetWeapon("weapon_hands_sh"))
 		end
 		return true
 	end
@@ -1731,10 +1136,6 @@ function SWEP:CoreStep()
 	
 	if SERVER and (not IsValid(owner) or (IsValid(actwep) and self != actwep)) then
 		self:SetNWBool("IsResting", false)
-
-		if self:IsJamClearing() then
-			self:CancelJamClear()
-		end
 
 		return
 	end
@@ -1854,10 +1255,7 @@ function SWEP:CoreStep()
 				hook.Run("PlayerDropWeapon", owner)
 			else
 				hook.Run("PlayerDropWeapon", owner)
-                                local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(owner) or owner:GetWeapon("weapon_hands_sh")
-                                if IsValid(hands) then
-                                        owner:SetActiveWeapon(hands)
-                                end
+				owner:SetActiveWeapon(owner:GetWeapon("weapon_hands_sh"))
 			end
 		end
 
@@ -1870,13 +1268,7 @@ function SWEP:CoreStep()
 		self:MuzzleEffect(time2)
 	end
 
-	if not IsValid(owner) or (IsValid(actwep) and self != actwep) then
-		if self:IsJamClearing() then
-			self:CancelJamClear()
-		end
-
-		return
-	end
+	if not IsValid(owner) or (IsValid(actwep) and self != actwep) then return end
 
 	self:Step_Inspect(time)
 	self:Step_Reload(time)
@@ -1891,9 +1283,7 @@ function SWEP:CoreStep()
 	end
 
 	local stam = (owner.organism ~= nil and owner.organism.stamina and owner.organism.stamina[1]) or 180
-	-- Fake mode already routes hg.eyeTrace through the ragdoll's head, so it can
-	-- use the same normal kick checks as a standing player.
-	if owner:GetNWFloat("InLegKick",0) <= CurTime() and self:KeyDown(IN_ATTACK) and self:KeyDown(IN_USE) and ((self:GetButtstockAttack() + 1 * ((math.max(0, (self.weight - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 2))) < CurTime()) and owner:GetVelocity():LengthSqr() < 250 * 250 and (SERVER or IsFirstTimePredicted()) then
+	if owner:GetNWFloat("InLegKick",0) <= CurTime() and (!(IsValid(owner.FakeRagdoll) or IsValid(owner.FakeRagdollOld)) or false--[[self:Clip1() <= 0]]) and self:KeyDown(IN_ATTACK) and self:KeyDown(IN_USE) and ((self:GetButtstockAttack() + 1 * ((math.max(0, (self.weight - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 2))) < CurTime()) and owner:GetVelocity():LengthSqr() < 250 * 250 and (SERVER or IsFirstTimePredicted()) then
 		self:SetButtstockAttack(CurTime())
 		self:GetOwner():EmitSound("weapons/tfa/melee"..math.random(1,6)..".wav")
 		if SERVER then
@@ -1906,7 +1296,7 @@ function SWEP:CoreStep()
 					dmgInfo:SetDamage(15 * (owner.organism.superfighter and 5 or 1))
                     dmgInfo:SetDamageType((ent:GetClass() == "func_breakable_surf") and DMG_SLASH or DMG_CLUB)
 					dmgInfo:SetAttacker(owner)
-                                        dmgInfo:SetInflictor(hg.GetHandsWeapon and hg.GetHandsWeapon(owner) or owner:GetWeapon("weapon_hands_sh"))
+					dmgInfo:SetInflictor(owner:GetWeapon("weapon_hands_sh"))
 					dmgInfo:SetDamagePosition(tr.HitPos - tr.Normal * 5)
 					dmgInfo:SetDamageForce(tr.Normal * 55)
 
@@ -1941,46 +1331,6 @@ function SWEP:CoreStep()
 
 	if !self:KeyDown(IN_ATTACK2) then
 		self:SetNWBool("aiming", false)
-	end
-
-	-- Pain when aiming with a broken/dislocated gun arm.
-	-- Right arm causes pain when broken/dislocated (it's the primary trigger hand).
-	-- Left arm only causes pain when the right hand is amputated (forced to sole-hold with broken left).
-	if SERVER and self:KeyDown(IN_ATTACK2) and IsValid(owner) and owner.organism then
-		local org = owner.organism
-
-		local rarm_broken = (org.rarm and org.rarm >= 1)
-		local rarm_dislocated = org.rarmdislocation
-		local rarm_amputated = org.rarmamputated
-		local larm_broken = (org.larm and org.larm >= 1)
-		local larm_dislocated = org.larmdislocation
-
-		local shouldPain = (rarm_broken or rarm_dislocated) or
-			(rarm_amputated and (larm_broken or larm_dislocated))
-
-		if shouldPain then
-			org.aimPainGraceStart = org.aimPainGraceStart or CurTime()
-			local gracePeriod = 5
-
-			if CurTime() - org.aimPainGraceStart >= gracePeriod then
-				local pain_amount
-				if rarm_amputated and not (rarm_broken or rarm_dislocated) then
-					-- Sole left-hand hold: scale off left arm damage
-					pain_amount = (org.larm or 0) * 1.5 + (org.larmdislocation and 2 or 0)
-				else
-					pain_amount = (org.rarm or 0) * 1.5 + (org.rarmdislocation and 2 or 0)
-				end
-
-				if pain_amount > 0 then
-					org.painadd = (org.painadd or 0) + pain_amount * 0.06
-				end
-			end
-		end
-	else
-		-- Reset grace period when not aiming
-		if SERVER and IsValid(owner) and owner.organism then
-			owner.organism.aimPainGraceStart = nil
-		end
 	end
 
 	if self:KeyDown(IN_SPEED) then
@@ -2173,7 +1523,7 @@ hg.postureFunctions2 = {
 		local epicRunY = self.EpicRunPos and self.EpicRunPos[2]
 		local epicRunX = self.EpicRunPos and self.EpicRunPos[1]
 
-		local posturehold = !self:IsSprinting() or (hg_aimtoshoot:GetInt() >= 1 and not self:GetNWBool("aiming"))
+		local posturehold = !self:IsSprinting()
 		local running = posturehold or ply:GetVelocity():LengthSqr() > 150 * 150
 		
 		if !running then return end
@@ -2367,49 +1717,14 @@ function SWEP:GetAdditionalValues()
 
 	--self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - ((ply.lean or 0) * 2)
 	
-	local deployDuration = math.max(self.CooldownDeploy / self.Ergonomics, 0.35)
-	-- Finish the grab rotation before CanUse releases the trigger lock. Previously
-	-- the smoothed -72 degree yaw was still settling on the first legal shot.
-	local deploySettleTime = math.min(0.2, deployDuration * 0.25)
-	local deployPoseDuration = math.max(deployDuration - deploySettleTime, 0.1)
-	local deployPoseRemaining = self.deploy and math.max(self.deploy - CurTime() - deploySettleTime, 0) or 0
-	local deploySettling = self.deploy and self.deploy - CurTime() <= deploySettleTime
-	local val = math.Clamp(deployPoseRemaining * 10 / deployPoseDuration, 0, 10)
-	local grabEase = math.ease.OutExpo(math.Clamp(val / 10, 0, 1))
+	local val = math.Clamp((self.deploy and ((self.deploy - CurTime()) * 10) --[[or self.holster and (((self.CooldownDeploy / self.Ergonomics) - (self.holster - CurTime())) * 10)]] or 0) / (self.CooldownDeploy / self.Ergonomics),0,10)
 
-	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - val * (self:IsPistolHoldType() and 1.2 or 1.45)
-	self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] - val * 2 * (self:IsPistolHoldType() and 0.45 or 0.7)
-	self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - grabEase * (self:IsPistolHoldType() and 1.5 or 2.5)
+	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - val * 1.5
+	self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] - val * 2 * (self:IsPistolHoldType() and 0.5 or 0.75)
 	
-	self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + grabEase * 34
-	self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + grabEase * -72
-	self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + grabEase * -72
-
-	if ply.organism then
-		local org = ply.organism
-		local rightArm = math.Clamp((org.rarm or 0) + ((org.rarmdislocation or org.rarmdislocated) and 0.6 or 0) + (org.rarmamputated and 1.2 or 0), 0, 2)
-		local leftArm = math.Clamp((org.larm or 0) + ((org.larmdislocation or org.larmdislocated) and 0.45 or 0) + (org.larmamputated and 1.0 or 0), 0, 2)
-		local armDamage = self:IsPistolHoldType() and math.max(rightArm, leftArm * 0.55) or math.max(rightArm, leftArm)
-		if armDamage > 0.05 then
-			local sprintMul = self:IsSprinting() and 1.25 or 1
-			local painMul = 1 + math.Clamp((org.pain or 0) / 120, 0, 1)
-			-- Weapon bracing reduces injury tremor in every arm state. The damage
-			-- remains visible, but ADS, breath control, crouching, and fake mode
-			-- all make it progressively easier to keep the sights on target.
-			local shakeStability = self:IsZoom() and 0.7 or 1
-			if org.holdingbreath then shakeStability = shakeStability * 0.35 end
-			if ply:Crouching() then shakeStability = shakeStability * 0.8 end
-			if IsValid(ply.FakeRagdoll) then shakeStability = shakeStability * 0.7 end
-			local shake = armDamage * painMul * sprintMul * shakeStability
-			local t = CurTime()
-			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 17.0) * 0.34 * shake
-			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + math.cos(t * 13.0) * 0.34 * shake
-			self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] + math.sin(t * 23.0) * 0.34 * shake
-			self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + math.sin(t * 19.0) * 2.25 * shake
-			self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + math.cos(t * 15.0) * 2.15 * shake
-			self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + math.sin(t * 11.0) * 2.25 * shake
-		end
-	end
+	self.AdditionalAngPreLerp[1] = self.AdditionalAngPreLerp[1] + val / 10 * 40
+	self.AdditionalAngPreLerp[3] = self.AdditionalAngPreLerp[3] + val / 10 * -90
+	self.AdditionalAngPreLerp[2] = self.AdditionalAngPreLerp[2] + val / 10 * -90
 
 	local animpos = self:GetNWFloat("addAttachment")
 	animpos = 1 - math.Clamp((animpos + 1 - CurTime()) / 1,0,1)
@@ -2445,7 +1760,7 @@ function SWEP:GetAdditionalValues()
 
 	local func = hg.postureFunctions2[(self:IsSprinting() or huya) and (self:GetButtstockAttack() - CurTime() < -1) and ((ply.posture == 3 and 3) or (ply.posture == 3 and 3) or (self:IsPistolHoldType() and 3 or 3)) or ply.posture] or funcNil
 	func = ply:GetNWFloat("InLegKick", 0) > CurTime() and hg.postureFunctions2["legkicking"] or func
-	if not self.inspect and not self:IsJamClearing() then
+	if not self.inspect then
 		func(self, ply, huya)
 	end
 	
@@ -2635,196 +1950,37 @@ function SWEP:GetAdditionalValues()
 		end
 	end
 
-	local skillissue = self:GetCharacterRecoilMul()
+	local skillissue = ply.organism and ply.organism.recoilmul or 1
 
 
 	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)
 	
 	if not suiciding and !self.norecoil then
-		local weaponRecoilMul = self.WeaponRecoilMul or 1
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
 		local shit = 0.2 * mulhuy / host_timescale()
 		local animpos3 = self:GetAnimShoot2(shit, true) / shit
 		
-		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1) * weaponRecoilMul
+		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1)
 		animpos = animpos * math.min((self.Primary.Force2 or self.Primary.Force) / 40,3) * ((self.NumBullet or 1) * 3 or 1) * (self.animposmul or 1) // * 4
 
 		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
-		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5 * weaponRecoilMul
+		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5
 		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
-		-- Recoil used to kick the model backward with only a sideways recovery sway;
-		-- give the muzzle a real upward displacement as well, proportional to the
-		-- same shot impulse.  This is separate from the pitch kick so its vertical
-		-- offset remains visible on weapons with short barrels or low pitch recoil.
-		local cantedHold = ply.posture == 7 or ply.posture == 9
-		if cantedHold then
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos * 7.5
-		else
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 4.5
-		end
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -0.12 * shit2
+		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
 		
-		local recoilSeed = math.floor((self:LastShootTime() or 0) * 1000) + math.floor(self.SprayI or 0) * 37 + self:EntIndex() * 101
-		self.AdditionalPos2:Add(Vector(
-			util.SharedRandom("hg_recoil_pos_x", -0.02, 0.02, recoilSeed + 101),
-			util.SharedRandom("hg_recoil_pos_y", -0.015, 0.015, recoilSeed + 211),
-			util.SharedRandom("hg_recoil_pos_z", -0.035, 0.035, recoilSeed + 307)
-		) * animpos3 * shit2)
+		self.AdditionalPos2:Add(VectorRand(-0.07, 0.07) * animpos3 * shit2)
 
 		//self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * ply.offsetView[2] * 0.2
 		
 		if self.podkid or self:IsPistolHoldType() then
 			local animpos2 = self:GetAnimShoot2(0.05 * mulhuy / host_timescale(), true)
-			-- The directional impulse below owns angular recoil. Keep only the small
-			-- posture-specific hand snap here; the old fixed +20 yaw overwhelmed every
-			-- random component and made pistols travel right on every shot.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (cantedHold and 0 or -3) * (self.podkid or 1)
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (cantedHold and -6 or 0) * (self.podkid or 1)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (cantedHold and -2 or 0) * (self.podkid or 1)
-			animpos2 = animpos2 * weaponRecoilMul
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * (cantedHold and 2.5 or 1) * (self.podkid or 1)
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * 20 * (self.podkid or 1)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 10 * (self.podkid or 1)
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -5 * (self.podkid or 1)
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
 		end
-
-		-- Firing wobble + recoil divergence physically swings the rendered gun through
-		-- pitch, yaw and roll. The camera receives the same shot direction separately;
-		-- keeping those layers coherent makes the sights and follow-up aim move together.
-		-- Time-based sway supplies a damped recovery tail between individual impulses.
-		local wobbleDt = dtime or FrameTime()
-		local support = self:GetHandSupportState(ply)
-		local sinceShot = CurTime() - (self:LastShootTime() or 0)
-
-		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
-		local supportMul = self:GetRecoilSupportMul()
-		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
-		local restMul = self:IsResting() and 0.3 or 1
-		local armHandlingMul = self:GetArmHealthHandlingMul()
-		local recoilKickMul, recoilRecoveryMul, caliberClass = self:GetRecoilTuning()
-		local handlingMul = math.Clamp(caliberMul * weightMul * recoilKickMul * supportMul * armHandlingMul, 0.25, 2.9)
-
-		local armInjury = math.Clamp(armHandlingMul - 1, 0, 2)
-		local firing = sinceShot < (support.offhandImpaired and 0.14 or 0.2)
-		-- Restore the older damped recovery tail; firing-arm damage makes it slower.
-		local recoveryRate = Lerp(caliberClass, 0.032, 0.01)
-		recoveryRate = Lerp(armInjury / 2, recoveryRate, recoveryRate * 0.48)
-		if support.offhandImpaired then recoveryRate = recoveryRate * 0.72 end
-		-- Keep the recoil tail readable without making the gun vibrate around the
-		-- actual kick. Arm injuries still slow recovery; they do not multiply every
-		-- oscillation into violent shaking.
-		local wobbleTarget = firing and (0.38 + armInjury * 0.06) * (support.offhandImpaired and 0.72 or 1) or 0
-		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.38 or recoveryRate, wobbleDt), self.recoilWobbleAmp or 0, wobbleTarget)
-
-		if (self.recoilWobbleAmp or 0) > 0.00001 then
-			local t = CurTime()
-			local frequencyMul = Lerp(armInjury / 2, 1, 0.68)
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 1.15 * (1 + armInjury * 0.16)
-
-			local wobX = math.sin(t * 1.65 * frequencyMul) * 0.65 + math.sin(t * 2.95 * frequencyMul) * 0.35
-			local wobY = math.cos(t * 2.05 * frequencyMul) * 0.65 + math.cos(t * 3.45 * frequencyMul) * 0.35
-			local wobZ = math.sin(t * 2.45 * frequencyMul) * 0.65 + math.cos(t * 3.2 * frequencyMul) * 0.35
-
-			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 1.75 or 1.55)
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.55 or 0.10)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.8 or 1.05)
-
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.26
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
-		end
-
-		local recoilDecay = self:GetAnimShoot2(0.28 * recoilRecoveryMul * mulhuy / host_timescale(), true)
-		if recoilDecay > 0.001 then
-			local sprayI = self.SprayI or 0
-			local climb = 0.45 + math.Clamp(sprayI / 7, 0, 1) * 0.55
-			local seed = recoilSeed
-			local recoilDir = CLIENT and self:IsLocal2() and self.LastRecoilDirection or nil
-			local pitchDir, yawDir, rollDir
-			if isangle(recoilDir) then
-				pitchDir, yawDir, rollDir = recoilDir[1], recoilDir[2], recoilDir[3]
-			elseif cantedHold then
-				pitchDir = util.SharedRandom("hg_recoil_pitch_canted", -0.3, 0.24, seed + 4451)
-				yawDir = -util.SharedRandom("hg_recoil_side_canted", 0.72, 1.12, seed)
-				rollDir = util.SharedRandom("hg_recoil_roll_canted", -0.22, 0.22, seed + 9173)
-			else
-				local downKick = util.SharedRandom("hg_recoil_pitch_sign", 0, 1, seed + 2129) < 0.22
-				pitchDir = downKick and util.SharedRandom("hg_recoil_pitch_down", 0.18, 0.55, seed + 4451) or -util.SharedRandom("hg_recoil_pitch_up", 0.58, 1.18, seed + 4451)
-				yawDir = util.SharedRandom("hg_recoil_side", -0.65, 0.65, seed)
-				rollDir = util.SharedRandom("hg_recoil_roll", -0.2, 0.2, seed + 9173)
-			end
-			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.25
-
-			-- Apply the same four-direction impulse to angle and local-space position,
-			-- so automatic fire arcs and settles rather than tracing one diagonal.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + kick * 4.2 * pitchDir
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + yawDir * kick * (cantedHold and 1.35 or 0.95)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollDir * kick * 1.15
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * (0.72 + math.abs(pitchDir) * 0.18)
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + yawDir * kick * (cantedHold and 0.85 or 0.52)
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] - pitchDir * kick * (self:IsPistolHoldType() and 1.7 or 2.65) + rollDir * kick * 0.22
-		end
-	end
-
-	-- Constant idle sway on the GUN: the weapon slowly drifts off and is pulled back
-	-- toward center, so it always looks like the shooter is making small corrections to
-	-- re-center the gun. Driven through pitch/roll so it stays on the gun (and its
-	-- muzzle) rather than the camera; the camera only inherits sway when it gets bad or
-	-- the weapon is heavy (see cl_camera). Sine-of-time only, so it stays deterministic.
-	if not self:IsSprinting() and not self.reload and not ply.suiciding and not IsValid(ply.FakeRagdoll) then
-		local org = ply.organism or {}
-		local fatigue = math.Clamp(org.aiming_fatigue or 0, 0, 10)
-		local fear = math.Clamp(org.fear or 0, 0, 2)
-		local idleWeight = math.Clamp((self.weight or 5) / 5, 0.5, 2.0)
-		local idleStance = self:GetPostureStabilityMul(self:IsZoom())
-		local idleRest = self:IsResting() and 0.3 or 1
-		local idleAim = self:IsZoom() and 0.6 or 1
-
-		local rarm = org.rarm or 0
-		local larm = org.larm or 0
-		local rarm_dislocated = org.rarmdislocation or org.rarmdislocated
-		local larm_dislocated = org.larmdislocation or org.larmdislocated
-		local rarm_amputated = org.rarmamputated
-		local larm_amputated = org.larmamputated
-
-		local armSway = 0
-		local support = self:GetHandSupportState(ply)
-		if rarm_amputated then
-			armSway = armSway + 2.4
-		elseif rarm >= 1 then
-			armSway = armSway + 1.65
-		elseif rarm_dislocated then
-			armSway = armSway + 1.1
-		else
-			armSway = armSway + rarm * 0.8
-		end
-		if larm_amputated then
-			armSway = armSway + (support.offhandImpaired and 0.5 or 1.6)
-		elseif larm >= 1 then
-			armSway = armSway + (support.offhandImpaired and 0.35 or 1.0)
-		elseif larm_dislocated then
-			armSway = armSway + (support.offhandImpaired and 0.22 or 0.6)
-		else
-			armSway = armSway + larm * (support.offhandImpaired and 0.18 or 0.5)
-		end
-
-		-- Healthy hands should drift, not shake. A damaged dominant/right arm is
-		-- still immediately apparent relative to the much quieter baseline.
-		local idleAmp = (0.14 + fatigue * 0.07 + fear * 0.12 + armSway * 0.22) * idleWeight * idleStance * idleRest * idleAim
-
-		local st = CurTime() * 0.9
-		local swA = math.sin(st * 1.1) * 0.7 + math.sin(st * 1.9) * 0.3
-		local swB = math.cos(st * 0.8) * 0.7 + math.cos(st * 1.7) * 0.3
-		local swC = math.sin(st * 1.3) * 0.6 + math.cos(st * 2.1) * 0.4
-
-		local armSwayInstability = 1 + armSway * 0.08
-		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 0.82 * armSwayInstability
-		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 0.68 * armSwayInstability
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * 0.48 * armSwayInstability
-
-		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.34
-		self.AdditionalPos2[2] = self.AdditionalPos2[2] + swB * idleAmp * 0.10
-		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.34
 	end
 
 	if self.GetAnimPos_Draw and CLIENT then
@@ -2855,13 +2011,8 @@ function SWEP:GetAdditionalValues()
 		self.AdditionalPos2[3] = self.AdditionalPos2[3] + ply.lean * 2
 	end
 
-	-- During the protected end of the draw animation, fully drain the large
-	-- temporary grab rotation. A multiplier of three left roughly a degree of
-	-- yaw on the first legal shot, which consistently appeared as a left miss.
-	local poseLerp = hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add * (deploySettling and 5 or 1)
-	poseLerp = math.min(poseLerp, 1)
-	self.AdditionalPos = Lerp(poseLerp, self.AdditionalPos, self.AdditionalPosPreLerp)
-	self.AdditionalAng = Lerp(poseLerp, self.AdditionalAng, self.AdditionalAngPreLerp + self.weaponAng)
+	self.AdditionalPos = Lerp(hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add, self.AdditionalPos, self.AdditionalPosPreLerp)
+	self.AdditionalAng = Lerp(hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add, self.AdditionalAng, self.AdditionalAngPreLerp + self.weaponAng)
 
 	self:CloseAnim(dtime)
 	local animpos = self.lerpaddcloseanim
@@ -2880,24 +2031,6 @@ function SWEP:GetAdditionalValues()
 	
 	self.AdditionalPos2:Add(self.CloseAnimAddVec)
 	self.AdditionalAng2:Add(self.CloseAnimAddAng)
-
-	-- The close-wall pose is deliberately large enough to pull a barrel clear of
-	-- geometry.  It is evaluated after the normal shot pose, which used to hide
-	-- the gun's angular recoil whenever that pose was active.  Add a short,
-	-- camera-independent presentation kick after the wall correction so contact
-	-- with a wall cannot make a fired weapon look recoil-free.
-	if CLIENT and self:IsLocal2() and animpos > 0 and not self.norecoil then
-		local shotAge = CurTime() - (self:LastShootTime() or 0)
-		if shotAge >= 0 and shotAge < 0.16 then
-			local recoilDir = self.LastRecoilDirection
-			if isangle(recoilDir) then
-				local kick = (1 - shotAge / 0.16) * math.Clamp(animpos / 0.4, 0.35, 1)
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] + recoilDir[1] * kick * 2.2
-				self.AdditionalAng2[2] = self.AdditionalAng2[2] + recoilDir[2] * kick * 0.65
-				self.AdditionalAng2[3] = self.AdditionalAng2[3] + recoilDir[3] * kick * 0.5
-			end
-		end
-	end
 	
 	self.timetick2 = SysTime()
 end
@@ -2915,20 +2048,16 @@ local addvec2 = Vector(0,0,0)
 
 if SERVER then
 	hook.Add("Player Think", "sethuynyis", function(ply)
-		local curTime = CurTime()
-		local dtime = curTime - (ply.lastcalley or (curTime - 10))
+		local dtime = CurTime() - (ply.lastcalley or (CurTime() - 10))
 		if dtime < 0.1 then return end
-		ply.lastcalley = curTime
+		ply.lastcalley = CurTime()
 
 		local org = ply.organism
-		if not org then return end
 
 		local power = org.pain and ((org.pain > 50 or org.blood < 2900 or org.o2[1] < 5) and 0.3) or ((org.pain > 20 or org.blood < 4200 or org.o2[1] < 10) and 0.5) or 1
 		power = power * org.consciousness
 
-		if ply:GetNWFloat("power", -1) ~= power then
-			ply:SetNWFloat("power", power)
-		end
+		ply:SetNWFloat("power", power)
 	end)
 end
 
@@ -3324,22 +2453,12 @@ end)
 ["DSP"] =       0
 ]]
 
-local function PrecacheSoundsSWEP(self)
-	if self.HolsterSnd and self.HolsterSnd[1] then util.PrecacheSound(self.HolsterSnd[1]) end
-	if self.DeploySnd and self.DeploySnd[1] then util.PrecacheSound(self.DeploySnd[1]) end
-	if self.Primary and self.Primary.Sound and self.Primary.Sound[1] then util.PrecacheSound(self.Primary.Sound[1]) end
-	if self.DistSound then util.PrecacheSound(self.DistSound) end
-	if self.SupressedSound and self.SupressedSound[1] then util.PrecacheSound(self.SupressedSound[1]) end
-	if self.CockSound then util.PrecacheSound(self.CockSound) end
-	if self.ReloadSound then util.PrecacheSound(self.ReloadSound) end
-end
-
 hook.Add("PreRegisterSWEP", "precachemodels", function(self, class)
 	if self.ishgwep or self.Base == "homigrad_base" then
 		if self.WorldModel then util.PrecacheModel( self.WorldModel ) end
 		if self.WorldModelFake then util.PrecacheModel( self.WorldModelFake ) end
 
-		(hg.PrecacheSoundsSWEP or PrecacheSoundsSWEP)(self)
+		hg.PrecacheSoundsSWEP(self)
 	end
 end)
 
@@ -3505,4 +2624,3 @@ hook.Add("HG_MovementCalc_2", "moveWithWeapon", function(mul, ply, cmd, mv)
         end
     end
 end)
-

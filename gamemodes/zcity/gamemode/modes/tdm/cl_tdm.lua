@@ -3,14 +3,10 @@ MODE.name = "tdm"
 local MODE = MODE
 
 net.Receive("tdm_start",function()
-	if hg.DynaMusic then hg.DynaMusic:Stop() end
-	surface.PlaySound("rem_tdm.mp3")
+    surface.PlaySound("csgo_round.wav")
 	zb.rtype = net.ReadString()
+	hg.DynaMusic:Start( "swat4" )
 	zb.RemoveFade()
-	MODE.RoundTextTilts = {}
-	for i = 1, 8 do
-		MODE.RoundTextTilts[i] = (math.random() < 0.5) and 3 or -3
-	end
 end)
 
 local teams = {
@@ -30,7 +26,7 @@ local teams = {
 
 hook.Add( "StartCommand", "TDM_DisallowMoveOrShoting", function( ply, mv )
 	--; BLYAT NY NAXUA PISAT VSE V ODNY LINIY BLYAAA
-	if zb.CROUND == "tdm" and (zb.ROUND_START or 0) + 35 > CurTime() then 
+	if zb.CROUND == "tdm" and (zb.ROUND_START or 0) + 20 > CurTime() then 
 		mv:RemoveKey(IN_ATTACK)
 		mv:RemoveKey(IN_ATTACK2)
 		mv:RemoveKey(IN_FORWARD)
@@ -40,81 +36,42 @@ hook.Add( "StartCommand", "TDM_DisallowMoveOrShoting", function( ply, mv )
 	end
 end)
 
-local function tdm_ease_out(x)
-	return 1 - (1 - x) ^ 3
-end
-
-local function tdm_draw_text(text, fontname, x, y, col, a, ang, xalign, yalign)
-	local m = Matrix()
-	m:Translate(Vector(x, y, 0))
-	m:Rotate(Angle(0, ang, 0))
-	m:Translate(Vector(-x, -y, 0))
-
-	cam.PushModelMatrix(m)
-		draw.SimpleText(text, fontname, x, y, Color(col.r, col.g, col.b, a), xalign, yalign)
-	cam.PopModelMatrix()
-end
-
 function MODE:RenderScreenspaceEffects()
     local StartTime = zb.ROUND_START or CurTime()
-	if StartTime + 7.5 < CurTime() then return end
-    local fade = math.Clamp(StartTime + 7.5 - CurTime(),0,1)
-
-    surface.SetDrawColor(0,0,0,255 * fade)
-    surface.DrawRect(-1,-1,ScrW() + 1,ScrH() + 1)
+	hg.RoundStart.Fade({ startTime = StartTime, duration = 10 })
 end
 
 function MODE:HUDPaint()
     local StartTime = zb.ROUND_START or CurTime()
 	self:AddHudPaint()
-	if StartTime + 35 > CurTime() then
-		draw.SimpleText( string.FormattedTime(StartTime + 35 - CurTime(), "%02i:%02i:%02i"	), "ZB_HomicideMedium", sw * 0.5, sh * 0.95, Color(255,255,255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	if StartTime + 20 > CurTime() then
+		draw.SimpleText( string.FormattedTime(StartTime + 20 - CurTime(), "%02i:%02i:%02i"	), "ZB_HomicideMedium", sw * 0.5, sh * 0.95, Color(255,255,255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		draw.SimpleText( "Press F3 to open buymenu", "ZB_HomicideMedium", sw * 0.5, sh * 0.9, Color(255,255,255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	else
 		local time = string.FormattedTime( math.max(StartTime + (zb.ROUND_TIME or 400) - CurTime(), 0), "%02i:%02i:%02i" )
 		draw.SimpleText( time, "ZB_HomicideMedium", sw * 0.5, sh * 0.95, ColorObj, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 
-    if StartTime + 35 < CurTime() then return end
+    if StartTime + 20 < CurTime() then return end
 	 
 	if not lply:Alive() then return end
-	zb.RemoveFade()
-	local t = CurTime() - StartTime
-	local out_fade = math.Clamp((10.5 - t) / 1.5, 0, 1)
 	local team_ = lply:Team()
-    local Rolename = teams[team_].name
-    local ColorRole = teams[team_].color1
-    local Objective = teams[team_].objective
-    local ColorObj = teams[team_].color2
-	local elements = {
-		{"Team DeathMatch", "ZB_HomicideMediumLarge", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9},
-		{"You are "..Rolename, "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1},
-		{Objective, "ZB_HomicideMedium", ColorObj, sw * 0.5, sh * 0.9, "bottom", 1.4, 1.3, true}
-	}
+	hg.RoundStart.DrawTitle({
+		header = "ZBattle | " .. (self.PrintName or "Team Deathmatch"),
+		lines = {
+			{ text = "You are " .. (teams[team_] or teams[0]).name, color = (teams[team_] or teams[0]).color1 },
+		},
+		objective = (teams[team_] or teams[0]).objective ~= "" and (teams[team_] or teams[0]).objective or nil,
+		color = (teams[team_] or teams[0]).color1,
+	}, { startTime = StartTime, duration = 10 })
 
-	for i, el in ipairs(elements) do
-		if el[1] == "" then continue end
-		local appear = tdm_ease_out(math.Clamp((t - el[7]) / 2, 0, 1))
-		local a = 255 * appear * out_fade
-		if a <= 1 then continue end
-		local slide = 1 - appear
-		local x, y = el[4], el[5]
-		if el[6] == "left" then
-			x = x - slide * ScreenScale(220)
-		elseif el[6] == "right" then
-			x = x + slide * ScreenScale(220)
-		elseif el[6] == "bottom" then
-			y = y + slide * ScreenScale(120)
-		end
-		tdm_draw_text(el[1], el[2], x, y, el[3], a, el[9] and 0 or ((self.RoundTextTilts or {})[i] or 3) * appear, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	end
-
-	if hg.PluvTown.Active then
+	if hg.PluvTown.Active and (CurTime() - StartTime) < 10 then
+		local pluv_a = math.Clamp((10 - (CurTime() - StartTime)) / 10, 0, 1)
 		surface.SetMaterial(hg.PluvTown.PluvMadness)
-		surface.SetDrawColor(255, 255, 255, math.random(175, 255) * out_fade / 2)
+		surface.SetDrawColor(255, 255, 255, math.random(175, 255) * pluv_a / 2)
 		surface.DrawTexturedRect(sw * 0.25, sh * 0.44 - ScreenScale(15), sw / 2, ScreenScale(30))
 
-		draw.SimpleText("SOMEWHERE IN PLUVTOWN", "ZB_ScrappersLarge", sw / 2, sh * 0.44 - ScreenScale(2), Color(0, 0, 0, 255 * out_fade), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("SOMEWHERE IN PLUVTOWN", "ZB_ScrappersLarge", sw / 2, sh * 0.44 - ScreenScale(2), Color(0, 0, 0, 255 * pluv_a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 end
 
@@ -226,47 +183,41 @@ CreateEndMenu = function()
 		but:DockMargin( 8, 6, 8, -1 )
 		but:SetText("")
 		but.Paint = function(self,w,h)
-			local validPly = IsValid(ply)
-			local isAlive = validPly and ply:Alive()
-            local col1 = (isAlive and colRed) or colGray
-            local col2 = (isAlive and colRedUp) or colSpect1
+            local col1 = (ply:Alive() and colRed) or colGray
+            local col2 = (ply:Alive() and colRedUp) or colSpect1
 			surface.SetDrawColor(col1.r,col1.g,col1.b,col1.a)
 			surface.DrawRect(0,0,w,h)
 			surface.SetDrawColor(col2.r,col2.g,col2.b,col2.a)
 			surface.DrawRect(0,h/2,w,h/2)
 
-            local plyColor = validPly and ply:GetPlayerColor():ToColor() or color_white
+            local col = ply:GetPlayerColor():ToColor()
 			surface.SetFont( "ZB_InterfaceMediumLarge" )
-			local displayName = validPly and (ply:GetPlayerName() or ply:Name()) or "He quited..."
-			local lengthX, lengthY = surface.GetTextSize(displayName)
+			local lengthX, lengthY = surface.GetTextSize( ply:GetPlayerName() or "He quited..." )
 			
 			surface.SetTextColor(0,0,0,255)
 			surface.SetTextPos(w / 2 + 1,h/2 - lengthY/2 + 1)
-			surface.DrawText(displayName)
+			surface.DrawText(ply:GetPlayerName() or "He quited...")
 
-			surface.SetTextColor(plyColor.r,plyColor.g,plyColor.b,plyColor.a)
+			surface.SetTextColor(col.r,col.g,col.b,col.a)
 			surface.SetTextPos(w / 2,h/2 - lengthY/2)
-			surface.DrawText(displayName)
+			surface.DrawText(ply:GetPlayerName() or "He quited...")
 
             
 			local col = colSpect2
 			surface.SetFont( "ZB_InterfaceMediumLarge" )
 			surface.SetTextColor(col.r,col.g,col.b,col.a)
-			local leftText = validPly and (ply:Name() .. (not isAlive and " - died" or "")) or "He quited..."
-			local lengthX, lengthY = surface.GetTextSize(leftText)
+			local lengthX, lengthY = surface.GetTextSize( ply:GetPlayerName() or "He quited..." )
 			surface.SetTextPos(15,h/2 - lengthY/2)
-			surface.DrawText(leftText)
+			surface.DrawText((ply:Name() .. (not ply:Alive() and " - died" or "")) or "He quited...")
 
 			surface.SetFont( "ZB_InterfaceMediumLarge" )
 			surface.SetTextColor(col.r,col.g,col.b,col.a)
-			local fragsText = validPly and tostring(ply:Frags()) or "0"
-			local lengthX, lengthY = surface.GetTextSize(fragsText)
+			local lengthX, lengthY = surface.GetTextSize( ply:Frags() or "He quited..." )
 			surface.SetTextPos(w - lengthX -15,h/2 - lengthY/2)
-			surface.DrawText(fragsText)
+			surface.DrawText(ply:Frags() or "He quited...")
 		end
 
 		function but:DoClick()
-			if not IsValid(ply) then return end
 			if ply:IsBot() then chat.AddText(Color(255,0,0), "no, you can't") return end
 			gui.OpenURL("https://steamcommunity.com/profiles/"..ply:SteamID64())
 		end
@@ -285,21 +236,14 @@ function MODE:RoundStart()
 end
 
 surface.CreateFont("ZB_TDM_MENU", {
-    font = "VCR OSD Mono",
+    font = "Courier Prime",
     size = ScreenScale(12),
     extended = true,
     weight = 400,
     antialias = true
 })
-surface.CreateFont("ZB_TDM_MENU_BIG", {
-    font = "VCR OSD Mono",
-    size = ScreenScale(24),
-    extended = true,
-    weight = 400,
-    antialias = true
-})
 surface.CreateFont("ZB_TDM_DESC", {
-    font = "VCR OSD Mono",
+    font = "Courier Prime",
     size = ScreenScale(7),
     extended = true,
     weight = 400,
@@ -307,7 +251,7 @@ surface.CreateFont("ZB_TDM_DESC", {
 })
 
 surface.CreateFont("ZB_TDM_CATEGORY", {
-    font = "VCR OSD Mono",
+    font = "Courier Prime",
     size = ScreenScale(6),
     extended = true,
     weight = 400,
@@ -315,7 +259,7 @@ surface.CreateFont("ZB_TDM_CATEGORY", {
 })
 
 surface.CreateFont("ZB_TDM_DESCSMALL", {
-    font = "VCR OSD Mono",
+    font = "Courier Prime",
     size = ScreenScale(5),
     extended = true,
     weight = 400,
@@ -324,126 +268,68 @@ surface.CreateFont("ZB_TDM_DESCSMALL", {
 
 local function PaintFrame(self,w,h)
 	BlurBackground(self)
-	surface.SetDrawColor(0, 0, 0, 120)
-	surface.DrawRect(0, 0, w, h)
+
+	surface.SetDrawColor( 255, 0, 0, 128)
+    surface.DrawOutlinedRect( 0, 0, w, h, 2.5 )
 end
 
 local function PaintPanel(self,w,h)
-	surface.SetDrawColor(0, 0, 0, 185)
-	surface.DrawRect(0, 0, w, h)
-	surface.SetDrawColor(255, 255, 255, 145)
-	surface.DrawOutlinedRect(0, 0, w, h, 1)
+	surface.SetDrawColor( 0, 0, 0,155)
+    surface.DrawRect( 0, 0, w, h, 2.5 )
+	surface.SetDrawColor( 255, 0, 0, 128)
+    surface.DrawOutlinedRect( 0, 0, w, h, 2.5 )
 end
 
-local function tdm_buy(item)
-	net.Start("tdm_buyitem")
-		net.WriteTable(item)
-	net.SendToServer()
+local gradient_l = Material("vgui/gradient-l")
+
+local function PaintPanel1(self,w,h)
+	surface.SetDrawColor( 0, 0, 0,155)
+    surface.DrawRect( 0, 0, w, h, 2.5 )
+	surface.SetDrawColor( 255, 0, 0, 128)
+    surface.DrawOutlinedRect( 0, 0, w, h, 2.5 )
+	draw.RoundedBox( 0, 2.5, 2.5, w-5, h-5, Color( 0, 0, 0, 140) )
+    surface.SetDrawColor(155, 0, 0, 55)
+    surface.SetMaterial(gradient_l)
+    surface.DrawTexturedRect( 0, 0, w/1.5, h )
 end
 
-local function tdm_icon_material(path)
-	if not path or path == "" then return end
-	if type(path) == "IMaterial" then return path end
-	if isstring(path) then return Material(path, "smooth mips") end
+local function PaintPanel2(self,w,h)
+	--surface.SetDrawColor( 15, 15, 15,25)
+    --surface.DrawRect( 0, 0, w, h, 2.5 )
+	--draw.RoundedBox( 0, 2.5, 2.5, w-5, h-5, Color( 0, 0, 0, 140) )
+    surface.SetDrawColor(55, 155, 55, 25)
+    surface.SetMaterial(gradient_l)
+    surface.DrawTexturedRect( 0, 0, w*1.2, h )
 end
 
-local tdm_close_icon = Material("radialmenu/redcross.png", "smooth mips")
+local rtabFunc = function(self)
 
-local function tdm_item_icon(item, weapon, ent)
-	if item.Type == "Armor" then
-		local armor = string.Replace(item.ItemClass or "", "ent_armor_", "")
-		return tdm_icon_material(hg.armorIcons and hg.armorIcons[armor])
+	local ExtraInset = 10
+
+	if ( self.Image ) then
+		ExtraInset = ExtraInset + self.Image:GetWide()
 	end
 
-	if weapon then
-		if weapon.WepSelectIcon2 then return weapon.WepSelectIcon2 end
-		return tdm_icon_material(weapon.IconOverride)
-	end
+	self:SetTextInset( ExtraInset, 2 )
+	local w, h = self:GetContentSize()
+	h = self:GetTabHeight()
 
-	return tdm_icon_material(ent and ent.t and ent.t.IconOverride)
-end
+	self:SetSize( w + 10, h + 7 )
 
-local function tdm_weapon_ammo(item, weapon)
-	if not weapon then return end
-	local ammo = weapon.Primary.Ammo != "none" and weapon.Primary.Ammo or weapon.Ammo or (weapons.GetStored( weapon.Base ) and weapons.GetStored( weapon.Base ).Primary.Ammo)
-	if not hg.ammotypeshuy[ammo] then return end
-	local ammo2 = "ent_ammo_"..hg.ammotypeshuy[ammo].name
-	for name, ammoItem in pairs(MODE.BuyItems["Ammo"] or {}) do
-		if istable(ammoItem) and ammoItem.ItemClass == ammo2 then return name, ammoItem, ammo end
-	end
-end
+	DLabel.ApplySchemeSettings( self )
 
-local function tdm_attach_preview(StartTime)
-	if IsValid(TDM_OpenedBuyMenu) then TDM_OpenedBuyMenu:Remove() end
-	if not IsValid(MENUPANELHUYHUY) then return end
-
-	TDM_OpenedBuyMenu = vgui.Create("DPanel", MENUPANELHUYHUY)
-	local Frame = TDM_OpenedBuyMenu
-	Frame:SetSize(ScrW(), ScrH())
-	Frame:SetMouseInputEnabled(false)
-	Frame:SetKeyboardInputEnabled(false)
-	Frame.Paint = function() end
-
-	function Frame:Think()
-		if StartTime + 35 < CurTime() and IsValid(MENUPANELHUYHUY) then
-			MENUPANELHUYHUY:Close()
-		end
-
-		if not LocalPlayer():Alive() or StartTime + 35 < CurTime() or not IsValid(MENUPANELHUYHUY) then
-			self:Remove()
-			return
-		end
-	end
-
-	local buytime = vgui.Create("DLabel", Frame)
-	buytime:SetPos(ScrW() * 0.02, ScrH() * 0.8)
-	buytime:SetSize(ScrW() * 0.22, ScrH() * 0.1)
-	buytime:SetFont("ZB_TDM_MENU_BIG")
-	buytime:SetContentAlignment(5)
-	buytime:SetMouseInputEnabled(false)
-	function buytime:Think()
-		local timeLeft = math.ceil(math.max(StartTime + 35 - CurTime(), 0))
-		local flash = timeLeft <= 5 and math.abs(math.sin(CurTime() * 8)) or 1
-		self:SetText(timeLeft)
-		self:SetTextColor(Color(255, 255 * flash, 255 * flash))
-	end
-
-	local cash = vgui.Create("DLabel", Frame)
-	cash:SetPos(ScrW() * 0.02, ScrH() * 0.89)
-	cash:SetSize(ScrW() * 0.22, ScrH() * 0.08)
-	cash:SetFont("ZB_TDM_MENU_BIG")
-	cash:SetTextColor(Color(60, 220, 60))
-	cash:SetContentAlignment(5)
-	cash:SetMouseInputEnabled(false)
-	function cash:Think()
-		self:SetText("$"..LocalPlayer():GetNWInt("TDM_Money",0))
-	end
-
-	local hint = vgui.Create("DLabel", Frame)
-	hint:SetPos(ScrW() * 0.45, ScrH() * 0.91)
-	hint:SetSize(ScrW() * 0.52, ScrH() * 0.06)
-	hint:SetText("RMB: buy ammo     E: attachments")
-	hint:SetFont("ZB_TDM_MENU")
-	hint:SetTextColor(Color(235, 235, 235))
-	hint:SetContentAlignment(6)
-	hint:SetMouseInputEnabled(false)
-
-	Frame:MoveToFront()
 end
 
 local function OpenBuyMenu()
-	if zb.CROUND ~= "tdm" then return end
-
-	if IsValid(TDM_OpenedBuyMenu) then
+	if TDM_OpenedBuyMenu then
 		TDM_OpenedBuyMenu:Remove()
 		TDM_OpenedBuyMenu = nil
 	end
-
 	local StartTime = zb.ROUND_START or CurTime()
 	if not LocalPlayer():Alive() or StartTime + 40 < CurTime() then return end
 	TDM_OpenedBuyMenu = vgui.Create("ZFrame")
 	local Frame = TDM_OpenedBuyMenu
-	Frame:SetSize(1920*0.35,ScrH()*0.85)
+	Frame:SetSize(ScrW() * 0.35,ScrH() * 0.85)
 	Frame:Center()
 	Frame:MakePopup()
 	Frame:SetTitle("Buy menu")
@@ -458,7 +344,7 @@ local function OpenBuyMenu()
 	Sheet:SetFadeTime(0.1)
 
 	for k,category in SortedPairsByMemberValue(MODE.BuyItems, "Priority") do
-		local CategoryPanel = vgui.Create("DScrollPanel", Sheet)
+		local CategoryPanel = vgui.Create( "DScrollPanel", sheet )
 		--CategoryPanel:Dock()
 		CategoryPanel.Paint = function() end
 		for n,Item in pairs(category) do
@@ -469,8 +355,8 @@ local function OpenBuyMenu()
 			local ItemPanel = vgui.Create("DPanel",CategoryPanel)
 			ItemPanel:SetSize(0,ScrH()*0.1)
 			ItemPanel:Dock(TOP)
-			ItemPanel:DockMargin(0,5,0,0)
-			ItemPanel.Paint = PaintPanel
+			ItemPanel:DockMargin(0,8,0,0)
+			ItemPanel.Paint = PaintPanel1
 			--print(Item.ItemClass,weapon)
 			if ( weapon ~= nil and ( (weapon.WepSelectIcon2 and weapon.WepSelectIcon2:GetName()) or (weapon.IconOverride)) ) or ((ent and ent.t.IconOverride)) then
 				local ItemButton = vgui.Create("DImage",ItemPanel)
@@ -557,17 +443,18 @@ local function OpenBuyMenu()
 
 			if Item.Attachments and #Item.Attachments > 0 then
 				local ItemAtt = vgui.Create("DGrid",ItemPanel)
+				local ItemIcon = math.ceil(ScrH()*0.06)
 				ItemAtt:Dock(RIGHT)
 				ItemAtt:DockMargin(0,5,0,0)
 				ItemAtt:SetCols( 4 )
-				ItemAtt:SetColWide(50)
-				ItemAtt:SetRowHeight(50)
+				ItemAtt:SetColWide(ItemIcon)
+				ItemAtt:SetRowHeight(ItemIcon)
 				ItemAtt.Paint = function() end
 				for id,AttachN in pairs(Item.Attachments) do
 					local ico = hg.attachmentsIcons[AttachN]
 					local Attach = vgui.Create( "DImageButton" )
 					Attach:SetImage(ico)
-					Attach:SetSize(45,45)
+					Attach:SetSize(ItemIcon-5,ItemIcon-5)
 
 					Attach.Attachment = {k,n,AttachN}
 
@@ -577,7 +464,7 @@ local function OpenBuyMenu()
 						net.SendToServer()
 					end
 
-					Attach.Paint = PaintPanel
+					Attach.Paint = PaintPanel2
 					ItemAtt:AddItem(Attach)
 				end
 			end
@@ -586,6 +473,7 @@ local function OpenBuyMenu()
 		local rTab = tab["Tab"]
 		rTab.Paint = PaintPanel
 		rTab:SetFont("ZB_TDM_CATEGORY")
+		rTab.ApplySchemeSettings = rtabFunc
 		--rTab:SetTextInset(50)
 	end
 
@@ -603,15 +491,19 @@ local function OpenBuyMenu()
 		self:SetText("Time Left: "..string.FormattedTime(StartTime + 40 - CurTime(), "%02i:%02i:%02i"))
 	end
 
-	local down = input.IsKeyDown(KEY_E)
-	if down and not tdm_e_wasdown then
-		hg.PressRadialMenu(3)
+	local lbl = vgui.Create("DLabel", Frame)
+	lbl:SetText("Cash: $"..LocalPlayer():GetNWInt("TDM_Money",0))
+	lbl:DockMargin(10,5,10,5)
+	lbl:Dock(BOTTOM)
+	lbl:SetTextColor(Color(61,173,61))
+	lbl:SetFont("ZB_TDM_DESC")
+	lbl:SetSize(0,ScrH()*0.02)
+
+	function lbl:Think()
+		self:SetText("Cash: $"..LocalPlayer():GetNWInt("TDM_Money",0))
 	end
-	tdm_e_wasdown = down
+
 end
 
-net.Receive("tdm_open_buymenu",function()
-	if zb.CROUND ~= "tdm" then return end
-	OpenBuyMenu()
-end)
+net.Receive("tdm_open_buymenu",function() OpenBuyMenu() end)
 TDM_OpenedBuyMenu = TDM_OpenedBuyMenu or nil

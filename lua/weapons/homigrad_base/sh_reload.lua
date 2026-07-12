@@ -103,6 +103,7 @@ if CLIENT then
 			ent:ReloadEnd()
 			ent.FakeSoundPlayed = nil
 			ent.FakeEventPlayed = nil
+			if ammo > 0 then ent.drawBullet = true end
 		end
 	end)
 end
@@ -149,6 +150,7 @@ function SWEP:Step_Reload(time)
 		self:ReloadEnd()
 		self.FakeSoundPlayed = nil
 		self.FakeEventPlayed = nil
+		if self:Clip1() > 0 then self.drawBullet = true end
 	else
 		self:ClearAnims()
 	end

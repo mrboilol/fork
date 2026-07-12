@@ -1,21 +1,10 @@
 local SUMMARY_MAX = 3
-local SUMMARY_CLEAR_DELAY = 4
+local SUMMARY_POST_ROUND = 24
+local SUMMARY_CLEAR_DELAY = 6
 local SUMMARY_LIFETIME = 16
-local SUMMARY_POST_ROUND = SUMMARY_CLEAR_DELAY + 10.75
-local SUMMARY_MEDAL_XP = 10
-local SUMMARY_MVP_XP_MULT = 5
 
 if SERVER then
 	util.AddNetworkString("rem_roundsummary")
-
-	local function SyncHeadshots(ply)
-		if not IsValid(ply) or not ply:IsPlayer() then return end
-		ply:SetNWInt("Headshots", tonumber(ply:GetPData("Headshots", 0)) or 0)
-	end
-
-	hook.Add("PlayerInitialSpawn", "rem_headshots_load", function(ply)
-		timer.Simple(0, function() SyncHeadshots(ply) end)
-	end)
 
 	local MELEE = {
 		["weapon_hammer"] = true,
@@ -44,74 +33,7 @@ if SERVER then
 		return false
 	end
 
-	local function WeaponType(ply)
-		local wep = IsValid(ply) and ply:GetActiveWeapon()
-		if not IsValid(wep) then return "bare hands" end
-		local class = string.lower(wep:GetClass() or "")
-		local category = string.lower(wep.Category or "")
-		local printName = string.lower(wep.PrintName or "")
-		local ammo = string.lower((wep.Primary and wep.Primary.Ammo) or "")
-		local info = class .. " " .. category .. " " .. printName .. " " .. ammo
-		if class == "weapon_hands" or class == "weapon_hands_sh" or class == "weapon_hg_coolhands" then return "bare hands" end
-		if MELEE[class] or wep.ismelee2 or wep.Base == "weapon_melee" then return "melee" end
-		if wep.IsPistolHoldType and wep:IsPistolHoldType() then return "pistol" end
-		if info:find("shotgun", 1, true) or info:find("gauge", 1, true) or info:find("m590", 1, true) or info:find("spas", 1, true) then return "shotgun" end
-		if info:find("lmg", 1, true) or info:find("machine gun", 1, true) or info:find("m249", 1, true) or info:find("rpk", 1, true) then return "lmg" end
-		if info:find("smg", 1, true) or info:find("submachine", 1, true) or info:find("mp5", 1, true) or info:find("ump", 1, true) or info:find("vector", 1, true) then return "smg" end
-		if info:find("pistol", 1, true) or info:find("revolver", 1, true) or info:find("glock", 1, true) or info:find("deagle", 1, true) or info:find("usp", 1, true) or info:find("9x19", 1, true) or info:find(".45 acp", 1, true) or info:find(".50 action", 1, true) then return "pistol" end
-		if info:find("rifle", 1, true) or info:find("sniper", 1, true) or info:find("ak", 1, true) or info:find("ar", 1, true) or info:find("m4", 1, true) or info:find("m16", 1, true) or info:find("fal", 1, true) or info:find("scar", 1, true) or info:find("aug", 1, true) then return "rifle" end
-		return "other"
-	end
-
-	local NewStats
-
-	local function AddWeaponUse(ply)
-		if not IsValid(ply) or not ply:IsPlayer() then return end
-		ply.RSStats = ply.RSStats or NewStats()
-		local wt = WeaponType(ply)
-		ply.RSStats.weaponCounts[wt] = (ply.RSStats.weaponCounts[wt] or 0) + 1
-	end
-
-	local function AddShotFired(ply)
-		if not IsValid(ply) or not ply:IsPlayer() then return end
-		local ct = CurTime()
-		if ply.RSLastShotTrack and ct - ply.RSLastShotTrack < 0.01 then return end
-		ply.RSLastShotTrack = ct
-		ply.RSStats = ply.RSStats or NewStats()
-		ply.RSStats.shotsFired = ply.RSStats.shotsFired + 1
-		AddWeaponUse(ply)
-	end
-
-	local function AddConsumable(ply)
-		if not IsValid(ply) or not ply:IsPlayer() then return end
-		ply.RSStats = ply.RSStats or NewStats()
-		ply.RSStats.consumablesConsumed = ply.RSStats.consumablesConsumed + 1
-	end
-
-	local function UpdateKarmaStats(ply)
-		if not IsValid(ply) or not ply:IsPlayer() then return end
-		ply.RSStats = ply.RSStats or NewStats()
-		local cur = tonumber(ply.Karma or (ply.guilt_GetValue and ply:guilt_GetValue()) or 100) or 100
-		ply.RSStats.karmaEarned = ply.RSStats.karmaEarned or 0
-		ply.RSStats.karmaLost = ply.RSStats.karmaLost or 0
-		if ply.RSStats.karmaLast == nil then
-			ply.RSStats.karmaStart = cur
-			ply.RSStats.karmaLast = cur
-			ply.RSStats.karmaCurrent = cur
-			return
-		end
-		local last = tonumber(ply.RSStats.karmaLast or cur) or cur
-		local delta = cur - last
-		if delta > 0 then
-			ply.RSStats.karmaEarned = ply.RSStats.karmaEarned + delta
-		elseif delta < 0 then
-			ply.RSStats.karmaLost = ply.RSStats.karmaLost - delta
-		end
-		ply.RSStats.karmaLast = cur
-		ply.RSStats.karmaCurrent = cur
-	end
-
-	function NewStats()
+	local function NewStats()
 		return {
 			kills = 0,
 			headshotKills = 0,
@@ -121,38 +43,17 @@ if SERVER then
 			damageDealt = 0,
 			damageTaken = 0,
 			headshotHits = 0,
-			firstHurtTime = 0,
 			deaths = 0,
 			diedTime = 0,
 			survived = true,
-			killedBy = "",
-			shotsFired = 0,
-			shotsHit = 0,
-			kicks = 0,
-			buttstockShoves = 0,
-			pushes = 0,
-			windowsBroken = 0,
-			consumablesConsumed = 0,
-			karmaStart = nil,
-			karmaLast = nil,
-			karmaCurrent = nil,
-			karmaEarned = 0,
-			karmaLost = 0,
-			weaponCounts = {},
 		}
 	end
 
 	local function ResetStats()
-		zb.RSRoundStart = CurTime()
-		zb.RSSummaryXPDone = false
 		zb.RSDeathOrder = {}
 		zb.RSKilledMain = nil
 		for _, ply in player.Iterator() do
 			ply.RSStats = NewStats()
-			local karma = tonumber(ply.Karma or (ply.guilt_GetValue and ply:guilt_GetValue()) or 100) or 100
-			ply.RSStats.karmaStart = karma
-			ply.RSStats.karmaLast = karma
-			ply.RSStats.karmaCurrent = karma
 			ply.RSLastHit = nil
 		end
 	end
@@ -170,36 +71,11 @@ if SERVER then
 		harm = math.max(harm or 0, 0)
 		attacker.RSStats.damageDealt = attacker.RSStats.damageDealt + harm
 		victim.RSStats.damageTaken = victim.RSStats.damageTaken + harm
-		local wt = WeaponType(attacker)
-		local ranged = wt ~= "melee" and wt ~= "bare hands"
-		if ranged then
-			attacker.RSStats.shotsHit = attacker.RSStats.shotsHit + 1
-		end
-		AddWeaponUse(attacker)
-		if harm > 0 and attacker.RSStats.firstHurtTime <= 0 then attacker.RSStats.firstHurtTime = CurTime() end
 
 		local head = hitgroup == HITGROUP_HEAD
-		if head then
-			attacker.RSStats.headshotHits = attacker.RSStats.headshotHits + 1
-			if ranged then
-				local headshots = (tonumber(attacker:GetNWInt("Headshots", attacker:GetPData("Headshots", 0))) or 0) + 1
-				attacker:SetPData("Headshots", headshots)
-				attacker:SetNWInt("Headshots", headshots)
-				if hg.achievements then hg.achievements.SetPlayerAchievement(attacker, "gollavo", headshots) end
-			end
-		end
+		if head then attacker.RSStats.headshotHits = attacker.RSStats.headshotHits + 1 end
 
 		victim.RSLastHit = { att = attacker, head = head, melee = IsMeleeKill(attacker), t = CurTime() }
-		timer.Simple(0, function()
-			UpdateKarmaStats(attacker)
-			UpdateKarmaStats(victim)
-		end)
-	end)
-
-	hook.Add("Player Think", "rem_roundsummary_karma", function(ply)
-		if (ply.RSNextKarmaTrack or 0) > CurTime() then return end
-		ply.RSNextKarmaTrack = CurTime() + 1
-		UpdateKarmaStats(ply)
 	end)
 
 	hook.Add("Player_Death", "rem_roundsummary_death", function(victim)
@@ -230,7 +106,6 @@ if SERVER then
 		end
 
 		if IsValid(killer) and killer:IsPlayer() and killer ~= victim then
-			victim.RSStats.killedBy = killer.Nick and killer:Nick() or "Unknown"
 			killer.RSStats = killer.RSStats or NewStats()
 			killer.RSStats.kills = killer.RSStats.kills + 1
 			if head then
@@ -248,109 +123,6 @@ if SERVER then
 				zb.RSKilledMain = killer
 			end
 		end
-	end)
-
-	hook.Add("EntityFireBullets", "rem_roundsummary_shots", function(ent, bullet)
-		local ply = IsValid(ent) and (ent:IsPlayer() and ent or ent:GetOwner())
-		AddShotFired(ply)
-	end)
-
-	hook.Add("EntityTakeDamage", "rem_roundsummary_misc", function(ent, dmgInfo)
-		local attacker = dmgInfo and dmgInfo:GetAttacker()
-		if not IsValid(attacker) or not attacker:IsPlayer() then return end
-		attacker.RSStats = attacker.RSStats or NewStats()
-		local class = IsValid(ent) and ent:GetClass() or ""
-		if class == "func_breakable_surf" or (class == "func_breakable" and ent:GetMaterialType() == MAT_GLASS) then
-			ent.RSWindowBreaker = attacker
-		end
-	end)
-
-	hook.Add("EntityRemoved", "rem_roundsummary_windows", function(ent)
-		local class = IsValid(ent) and ent:GetClass() or ""
-		if class ~= "func_breakable_surf" and not (class == "func_breakable" and ent:GetMaterialType() == MAT_GLASS) then return end
-		local ply = ent.RSWindowBreaker
-		if not IsValid(ply) or not ply:IsPlayer() then return end
-		ply.RSStats = ply.RSStats or NewStats()
-		ply.RSStats.windowsBroken = ply.RSStats.windowsBroken + 1
-	end)
-
-	local function PatchPushTracker()
-		local stored = weapons.GetStored("weapon_hg_coolhands")
-		if not stored or stored.RSRoundSummaryPushPatch or not stored.ShoveFront then return end
-		local old = stored.ShoveFront
-		stored.RSRoundSummaryPushPatch = true
-		stored.ShoveFront = function(self, ...)
-			local owner = IsValid(self) and self:GetOwner()
-			if IsValid(owner) and owner:IsPlayer() then
-				owner.RSStats = owner.RSStats or NewStats()
-				owner.RSStats.pushes = owner.RSStats.pushes + 1
-			end
-			return old(self, ...)
-		end
-	end
-
-	hook.Add("HomigradLegKick", "rem_roundsummary_kicks", function(ply)
-		if not IsValid(ply) or not ply:IsPlayer() then return end
-		ply.RSStats = ply.RSStats or NewStats()
-		ply.RSStats.kicks = ply.RSStats.kicks + 1
-	end)
-
-	local function PatchConsumableTracker(class)
-		local stored = weapons.GetStored(class)
-		if not stored or stored.RSRoundSummaryConsumePatch or not stored.Heal then return end
-		local old = stored.Heal
-		stored.RSRoundSummaryConsumePatch = true
-		stored.Heal = function(self, ent, ...)
-			local owner = IsValid(self) and self:GetOwner()
-			local before = self.Eating or 0
-			local ret = old(self, ent, ...)
-			if ret and IsValid(owner) and owner:IsPlayer() and before <= 5 and (self.Eating or 0) > 5 then
-				AddConsumable(owner)
-			end
-			return ret
-		end
-	end
-
-	local function PatchGunBaseTracker()
-		local stored = weapons.GetStored("homigrad_base")
-		if not stored or stored.RSRoundSummaryGunPatch then return end
-		stored.RSRoundSummaryGunPatch = true
-		if stored.PrimaryShoot then
-			local oldShoot = stored.PrimaryShoot
-			stored.PrimaryShoot = function(self, ...)
-				local owner = IsValid(self) and self:GetOwner()
-				if SERVER then AddShotFired(owner) end
-				return oldShoot(self, ...)
-			end
-		end
-		if stored.Think then
-			local oldThink = stored.Think
-			stored.Think = function(self, ...)
-				local owner = IsValid(self) and self:GetOwner()
-				local before = self.GetButtstockAttack and self:GetButtstockAttack() or 0
-				local ret = oldThink(self, ...)
-				local after = self.GetButtstockAttack and self:GetButtstockAttack() or 0
-				if SERVER and IsValid(owner) and owner:IsPlayer() and after ~= before and math.abs(after - CurTime()) < 0.08 and (owner.RSLastButtstockTrack or 0) ~= after then
-					owner.RSLastButtstockTrack = after
-					owner.RSStats = owner.RSStats or NewStats()
-					owner.RSStats.buttstockShoves = owner.RSStats.buttstockShoves + 1
-				end
-				return ret
-			end
-		end
-	end
-
-	hook.Add("InitPostEntity", "rem_roundsummary_push_patch", function()
-		PatchPushTracker()
-		PatchConsumableTracker("weapon_bigconsumable")
-		PatchConsumableTracker("weapon_smallconsumable")
-		PatchGunBaseTracker()
-	end)
-	timer.Simple(0, function()
-		PatchPushTracker()
-		PatchConsumableTracker("weapon_bigconsumable")
-		PatchConsumableTracker("weapon_smallconsumable")
-		PatchGunBaseTracker()
 	end)
 
 	local function ActivePlayers()
@@ -373,29 +145,6 @@ if SERVER then
 		end
 		return best, bestv
 	end
-
-        local function BestByValue(plys, fn)
-                local best, bestv
-                for _, ply in ipairs(plys) do
-                        local v = fn(ply)
-                        if v ~= nil and (bestv == nil or v > bestv) then
-                                bestv, best = v, ply
-                        end
-                end
-                return best, bestv
-        end
-
-        local function BestByValueExcept(plys, used, fn)
-                local best, bestv
-                for _, ply in ipairs(plys) do
-                        if used[ply] then continue end
-                        local v = fn(ply)
-                        if v ~= nil and (bestv == nil or v > bestv) then
-                                bestv, best = v, ply
-                        end
-                end
-                return best, bestv
-        end
 
 	local AWARDS = {
 		{ "mvp", function(plys)
@@ -426,12 +175,6 @@ if SERVER then
 		{ "melee", function(plys)
 			return BestBy(plys, function(p) local v = p.RSStats.meleeKills return v >= 1 and v or nil end)
 		end },
-		{ "unstoppable", function(plys)
-			return BestBy(plys, function(p)
-				local s = p.RSStats
-				if s.survived and s.kills >= 4 then return s.kills end
-			end)
-		end },
 		{ "berserker", function(plys)
 			return BestBy(plys, function(p) local v = p.RSStats.kills return v >= 2 and v or nil end)
 		end },
@@ -442,68 +185,25 @@ if SERVER then
 			return BestBy(plys, function(p)
 				local s = p.RSStats
 				if s.kills < 2 or s.headshotKills < 1 then return end
-				local v = math.floor((s.headshotKills / s.kills) * 100)
-				return v >= 75 and v or nil
+				return math.floor((s.headshotKills / s.kills) * 100)
 			end)
 		end },
 		{ "untouchable", function(plys)
 			return BestBy(plys, function(p)
 				local s = p.RSStats
-				if s.survived and s.kills >= 1 and s.damageTaken <= 0 then return s.kills end
+				if s.kills >= 1 and s.damageTaken <= 0 then return s.kills end
 			end)
-		end },
-		{ "gunslinger", function(plys)
-			return BestBy(plys, function(p) local v = p.RSStats.rangedKills return v >= 3 and v or nil end)
-		end },
-		{ "stalker", function(plys)
-			return BestBy(plys, function(p) local v = p.RSStats.meleeKills return v >= 2 and v or nil end)
-		end },
-		{ "headhunter2", function(plys)
-			return BestBy(plys, function(p) local v = p.RSStats.headshotHits return v >= 3 and v or nil end)
 		end },
 		{ "bloodthirsty", function(plys)
 			return BestBy(plys, function(p) local v = math.floor(p.RSStats.damageDealt) return v >= 80 and v or nil end)
 		end },
-		{ "warrior", function(plys)
-			return BestBy(plys, function(p)
-				local s = p.RSStats
-				local v = math.floor(s.damageDealt)
-				if s.survived and v >= 120 then return v end
-			end)
-		end },
-		{ "glasscannon", function(plys)
-			return BestBy(plys, function(p)
-				local s = p.RSStats
-				local v = math.floor(s.damageDealt)
-				if v >= 120 and s.damageTaken <= 20 then return v end
-			end)
-		end },
 		{ "punchingbag", function(plys)
 			return BestBy(plys, function(p) local v = math.floor(p.RSStats.damageTaken) return v >= 120 and v or nil end)
 		end },
-		{ "laststand", function(plys)
+		{ "survivor", function(plys)
+			if not zb.RSDeathOrder or #zb.RSDeathOrder < 1 then return end
 			return BestBy(plys, function(p)
-				local s = p.RSStats
-				if s.survived and s.kills >= 1 and s.damageTaken >= 80 then return math.floor(s.damageTaken) end
-			end)
-		end },
-		{ "revenant", function(plys)
-			return BestBy(plys, function(p)
-				local s = p.RSStats
-				local v = math.floor(s.damageDealt)
-				if not s.survived and v >= 100 then return v end
-			end)
-		end },
-		{ "savior", function(plys)
-			return BestBy(plys, function(p)
-				if p.isTraitor then return end
-				local v = p.RSStats.traitorKills return v >= 2 and v or nil
-			end)
-		end },
-		{ "menace", function(plys)
-			return BestBy(plys, function(p)
-				if not p.isTraitor then return end
-				local v = p.RSStats.kills return v >= 3 and v or nil
+				if p.RSStats.survived and p.RSStats.kills >= 1 then return p.RSStats.kills end
 			end)
 		end },
 		{ "firstblood", function()
@@ -513,29 +213,10 @@ if SERVER then
 		{ "pacifist", function(plys)
 			return BestBy(plys, function(p)
 				local s = p.RSStats
-				local start = zb.RSRoundStart or 0
-				if s.survived and s.kills == 0 and s.damageDealt < 1 and CurTime() - start >= 60 and (s.firstHurtTime <= 0 or s.firstHurtTime - start >= 60) then return 1 end
+				if s.survived and s.kills == 0 and s.damageDealt < 1 then return 1 end
 			end)
 		end },
 	}
-
-	local function MedalXP(key)
-		return SUMMARY_MEDAL_XP * (key == "mvp" and SUMMARY_MVP_XP_MULT or 1)
-	end
-
-	local function ApplyMedalXP(featured)
-		if zb.RSSummaryXPDone then return end
-		zb.RSSummaryXPDone = true
-		for _, f in ipairs(featured) do
-			local ply = f.ply
-			f.xpbonus = MedalXP(f.key)
-			if IsValid(ply) then
-				local instance = zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[ply:SteamID64()]
-				f.expstart = math.floor(tonumber((instance and instance.experience) or ply.exp or -1) or -1)
-				if ply.GiveExp then ply:GiveExp(f.xpbonus) end
-			end
-		end
-	end
 
 	local function NameOf(ply)
 		if not IsValid(ply) then return "Unknown" end
@@ -561,8 +242,8 @@ if SERVER then
 		return "Bystander", ROLE_INNO
 	end
 
-	-- Mirror of MODE:CheckAlivePlayers: traitors win when they are the only
-	-- side left standing.
+	
+	
 	local function TraitorsWon()
 		local tAlive, iAlive = false, false
 		for _, ply in player.Iterator() do
@@ -583,46 +264,9 @@ if SERVER then
 		local plys = ActivePlayers()
 		local featured, used = {}, {}
 
-                local round = CurrentRound and CurrentRound()
-                if round and round.name == "dm" then
-                        local dmUsed = {}
-                        local winner = BestByValue(plys, function(p)
-                                if p:Alive() and not (p.organism and p.organism.incapacitated) then return 1 end
-                        end)
-                        local topKills, topKillsValue
-                        local topHeadshots, topHeadshotsValue
-
-                        if not IsValid(winner) then
-                                winner = BestByValue(plys, function(p)
-                                        return p.RSStats.kills or 0
-                                end)
-                        end
-
-                        if IsValid(winner) then
-                                dmUsed[winner] = true
-                                featured[#featured + 1] = { ply = winner, key = "dm_winner", value = winner.RSStats.kills or 0 }
-                        end
-
-                        topKills, topKillsValue = BestByValueExcept(plys, dmUsed, function(p)
-                                return p.RSStats.kills or 0
-                        end)
-                        if IsValid(topKills) then
-                                dmUsed[topKills] = true
-                                featured[#featured + 1] = { ply = topKills, key = "dm_kills", value = math.floor(topKillsValue or 0) }
-                        end
-
-                        topHeadshots, topHeadshotsValue = BestByValueExcept(plys, dmUsed, function(p)
-                                return p.RSStats.headshotKills or 0
-                        end)
-                        if IsValid(topHeadshots) then
-                                featured[#featured + 1] = { ply = topHeadshots, key = "dm_headshots", value = math.floor(topHeadshotsValue or 0) }
-                        end
-
-                        return featured, NameOf, RoleFor
-                end
-
-		-- Traitor victory: the MVP is automatically the traitor with the most kills.
+		
 		local haveMVP = false
+
 		if TraitorsWon() then
 			local best = BestBy(plys, function(p)
 				if not p.isTraitor then return end
@@ -655,59 +299,18 @@ if SERVER then
 		return featured, NameOf, RoleFor
 	end
 
-	local function PreferredWeapon(stats)
-		local best, bestv = "other", -1
-		for k, v in pairs(stats.weaponCounts or {}) do
-			if v > bestv then
-				best, bestv = k, v
-			end
-		end
-		return best
-	end
-
-	local function MapHasWindows()
-		if #ents.FindByClass("func_breakable_surf") > 0 then return true end
-		for _, ent in ipairs(ents.FindByClass("func_breakable")) do
-			if ent:GetMaterialType() == MAT_GLASS then return true end
-		end
-		return false
-	end
-
-	local function WriteStats(ply)
-		local s = ply.RSStats or NewStats()
-		UpdateKarmaStats(ply)
-		net.WriteString(s.killedBy or "")
-		net.WriteUInt(math.Clamp(s.kills or 0, 0, 65535), 16)
-		net.WriteUInt(math.Clamp(s.headshotHits or 0, 0, 65535), 16)
-		net.WriteUInt(math.Clamp(s.kicks or 0, 0, 65535), 16)
-		net.WriteUInt(math.Clamp(s.buttstockShoves or 0, 0, 65535), 16)
-		net.WriteUInt(math.Clamp(s.pushes or 0, 0, 65535), 16)
-		net.WriteUInt(math.Clamp(s.shotsHit or 0, 0, 65535), 16)
-		net.WriteUInt(math.Clamp(s.shotsFired or 0, 0, 65535), 16)
-		net.WriteString(PreferredWeapon(s))
-		net.WriteUInt(math.Clamp(s.windowsBroken or 0, 0, 65535), 16)
-		net.WriteUInt(math.Clamp(s.consumablesConsumed or 0, 0, 65535), 16)
-		net.WriteFloat(tonumber(s.karmaCurrent or ply.Karma or 100) or 100)
-		net.WriteFloat(tonumber(s.karmaEarned or 0) or 0)
-		net.WriteFloat(tonumber(s.karmaLost or 0) or 0)
-	end
-
 	hook.Add("ZB_EndRound", "rem_roundsummary_send", function()
+		if zb.CROUND == "coop" then return end
+
 		local featured, NameOf, RoleFor = ComputeFeatured()
 		if #featured == 0 then return end
-		local first = { featured[1] }
-		ApplyMedalXP(first)
 
-		if zb.nextround ~= "coop" then
-			local want = CurTime() + math.max(SUMMARY_POST_ROUND, CurrentRound().end_time or 5)
-			zb.END_TIME = math.max(zb.END_TIME or 0, want)
-		end
+		local want = CurTime() + math.max(SUMMARY_POST_ROUND, CurrentRound().end_time or 5)
+		zb.END_TIME = math.max(zb.END_TIME or 0, want)
 
-		for _, receiver in player.Iterator() do
-			receiver.RSStats = receiver.RSStats or NewStats()
-			net.Start("rem_roundsummary")
-				net.WriteUInt(#first, 4)
-				for _, f in ipairs(first) do
+		net.Start("rem_roundsummary")
+			net.WriteUInt(#featured, 4)
+			for _, f in ipairs(featured) do
 				local ply = f.ply
 				local model = ""
 				local steamid = "0"
@@ -718,13 +321,13 @@ if SERVER then
 					steamid = ply:IsBot() and "0" or (ply:SteamID64() or "0")
 					spec = ply:Team() == TEAM_SPECTATOR
 				end
-				local hasAppearance = IsValid(ply) and istable(ply.CurAppearance) and ply.CurAppearance.AModel ~= nil
-				local exp, skill = -1, 0
-				if IsValid(ply) then
-					local instance = zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[ply:SteamID64()]
-					exp = math.floor(tonumber(f.expstart or (instance and instance.experience) or ply.exp or -1) or -1)
-					skill = tonumber((instance and instance.skill) or ply.skill or 0) or 0
-				end
+			local hasAppearance = IsValid(ply) and istable(ply.CurAppearance) and ply.CurAppearance.AModel ~= nil
+			local exp, skill = -1, 0
+			if IsValid(ply) then
+				local instance = zb.Experience and zb.Experience.PlayerInstances and zb.Experience.PlayerInstances[ply:SteamID64()]
+				exp = math.floor(tonumber((instance and instance.experience) or ply.exp or -1) or -1)
+				skill = tonumber((instance and instance.skill) or ply.skill or 0) or 0
+			end
 
 				net.WriteEntity(ply)
 				net.WriteString(model)
@@ -737,14 +340,10 @@ if SERVER then
 				net.WriteString(IsValid(ply) and (ply.PlayerClassName or "") or "")
 				net.WriteInt(math.Clamp(exp, -1, 2147483647), 32)
 				net.WriteFloat(skill)
-				net.WriteInt(math.Clamp(math.floor(f.xpbonus or 0), 0, 2147483647), 32)
 				net.WriteBool(hasAppearance)
 			end
-				net.WriteBool(MapHasWindows())
-				WriteStats(receiver)
 
-			net.Send(receiver)
-		end
+		net.Broadcast()
 	end)
 
 	return
@@ -754,45 +353,31 @@ hg = hg or {}
 hg.RoundSummaryEnabled = true
 
 surface.CreateFont("Rem_Sum_AwardBig", { font = "ITC Avant Garde Gothic", size = ScreenScale(23), weight = 800, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_Award", { font = "ITC Avant Garde Gothic", size = ScreenScale(21), weight = 800, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_NameBig", { font = "ITC Avant Garde Gothic", size = ScreenScale(17), weight = 700, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_Name", { font = "ITC Avant Garde Gothic", size = ScreenScale(16), weight = 700, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_DescBig", { font = "ITC Avant Garde Gothic", size = ScreenScale(20), weight = 500, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_Desc", { font = "ITC Avant Garde Gothic", size = ScreenScale(16), weight = 500, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_XPBig", { font = "ITC Avant Garde Gothic", size = ScreenScale(17), weight = 600, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_XP", { font = "ITC Avant Garde Gothic", size = ScreenScale(14), weight = 600, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_Stat", { font = "ITC Avant Garde Gothic", size = ScreenScale(21), weight = 800, antialias = true, extended = true })
-surface.CreateFont("Rem_Sum_Countdown", { font = "ITC Avant Garde Gothic", size = ScreenScale(23), weight = 800, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_Award", { font = "ITC Avant Garde Gothic", size = ScreenScale(18), weight = 800, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_NameBig", { font = "Lora", size = ScreenScale(17), weight = 700, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_Name", { font = "Lora", size = ScreenScale(14), weight = 700, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_DescBig", { font = "Lora", size = ScreenScale(15), weight = 500, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_Desc", { font = "Lora", size = ScreenScale(12.5), weight = 500, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_XPBig", { font = "Lora", size = ScreenScale(13), weight = 600, antialias = true, extended = true })
+surface.CreateFont("Rem_Sum_XP", { font = "Lora", size = ScreenScale(11), weight = 600, antialias = true, extended = true })
 
 local AWARD_INFO = {
 	mvp          = { title = "MVP OF THE ROUND", color = Color(232, 190, 70),  desc = function(v) return "Best player around" end },
-    dm_winner    = { title = "MVP OF THE ROUND", color = Color(232, 190, 70),  desc = function(v) return "Deathmatch round winner" end },
-    dm_kills     = { title = "MOST KILLS",       color = Color(210, 80, 80),   desc = function(v) return v .. " kill" .. (v == 1 and "" or "s") end },
-    dm_headshots = { title = "MOST HEADSHOTS",   color = Color(215, 95, 70),   desc = function(v) return v .. " headshot" .. (v == 1 and "" or "s") end },
 	executioner  = { title = "THE EXECUTIONER",  color = Color(150, 20, 20),   desc = function(v) return "Killed the main traitor" end },
 	headhunter   = { title = "HEAD HUNTER",      color = Color(200, 55, 55),   desc = function(v) return v .. " headshot kill" .. (v == 1 and "" or "s") end },
 	serialkiller = { title = "SERIAL KILLER",    color = Color(170, 25, 25),   desc = function(v) return v .. " victims" end },
 	hero         = { title = "THE HERO",         color = Color(70, 130, 220),  desc = function(v) return "Slayed a traitor" end },
 	melee        = { title = "BRAWLER", color = Color(210, 120, 40), desc = function(v) return v .. " melee kill" .. (v == 1 and "" or "s") end },
-	unstoppable  = { title = "UNSTOPPABLE",      color = Color(230, 120, 45),  desc = function(v) return v .. " kills and survived" end },
 	berserker    = { title = "BERSERKER",        color = Color(190, 45, 45),   desc = function(v) return v .. " kills" end },
 	sharpshooter = { title = "SHARPSHOOTER",     color = Color(60, 170, 170),  desc = function(v) return v .. " gun kills" end },
 	deadeye      = { title = "DEADEYE",          color = Color(232, 190, 70),  desc = function(v) return v .. "% headshots" end },
 	untouchable  = { title = "UNTOUCHABLE",      color = Color(90, 200, 220),  desc = function(v) return "Not a scratch" end },
-	gunslinger   = { title = "GUNSLINGER",       color = Color(80, 180, 210),  desc = function(v) return v .. " gun kills" end },
-	stalker      = { title = "STALKER",          color = Color(160, 80, 45),   desc = function(v) return v .. " melee kills" end },
-	headhunter2  = { title = "CRACK SHOT",       color = Color(215, 80, 60),   desc = function(v) return v .. " headshots landed" end },
 	bloodthirsty = { title = "BLOODTHIRSTY",     color = Color(150, 20, 20),   desc = function(v) return v .. " damage dealt" end },
-	warrior      = { title = "WARRIOR",          color = Color(200, 90, 50),   desc = function(v) return v .. " damage and survived" end },
-	glasscannon  = { title = "GLASS CANNON",     color = Color(235, 160, 70),  desc = function(v) return v .. " damage, barely touched" end },
 	punchingbag  = { title = "DEMOLISHED",     color = Color(130, 130, 130), desc = function(v) return v .. " damage taken" end },
-	laststand    = { title = "LAST STAND",       color = Color(180, 70, 40),   desc = function(v) return v .. " damage taken and lived" end },
-	revenant     = { title = "REVENANT",         color = Color(120, 70, 150),  desc = function(v) return v .. " damage before death" end },
-	savior       = { title = "SAVIOR",           color = Color(70, 150, 240),  desc = function(v) return v .. " traitors killed" end },
-	menace       = { title = "MENACE",           color = Color(190, 35, 35),   desc = function(v) return v .. " victims" end },
+	survivor     = { title = "SOLE SURVIVOR",    color = Color(80, 190, 90),   desc = function(v) return "Made it out alive" end },
 	firstblood   = { title = "FIRST TO FALL",    color = Color(120, 120, 120), desc = function(v) return "Died first" end },
 	pacifist     = { title = "THE PACIFIST",     color = Color(220, 220, 220), desc = function(v) return "Harmed no one" end },
-	participant  = { title = "PARTICIPANT",      color = Color(140, 140, 140), desc = function(v) return "Stood their ground" end },
+	participant  = { title = "SURVIVOR",         color = Color(140, 140, 140), desc = function(v) return "Stood their ground" end },
 }
 
 local RS_GradD = Material("vgui/gradient-d")
@@ -1005,14 +590,6 @@ local function SetupModel(mp, ply, model, pose, spec, appearance, playerClassNam
 			end
 		end
 		local parent = self:GetParent()
-		if IsValid(parent) and IsValid(parent.RSCard) then parent = parent.RSCard end
-		local walkFrac = 1
-		if IsValid(parent) and parent.RSWalkStart then
-			walkFrac = math.Clamp((CurTime() - parent.RSWalkStart) / math.max(parent.RSWalkTime or 1, 0.001), 0, 1)
-			ent:SetPos(Vector(0, (1 - walkFrac) * (parent.RSWalkDistance or 130), 0))
-		else
-			ent:SetPos(vector_origin)
-		end
 		local targetSeq = IsValid(parent) and parent.RSSettled and self.RSIdleSeq or self.RSWalkSeq
 		if self.RSActiveSeq ~= targetSeq then
 			ent:ResetSequence(targetSeq)
@@ -1021,17 +598,13 @@ local function SetupModel(mp, ply, model, pose, spec, appearance, playerClassNam
 		ent:FrameAdvance(RealFrameTime())
 		ent:SetPoseParameter("head_yaw", pose.hy)
 		ent:SetPoseParameter("head_pitch", pose.hp)
-		if walkFrac < 1 then
-			ent:SetPoseParameter("move_x", 1)
-			ent:SetPoseParameter("move_y", 0)
-		end
 		self:SetFOV(pose.fov)
 		self:SetCamPos(pose.cam)
 		self:SetLookAng(look)
 	end
 
 	if spec then
-		-- Spectators who somehow got featured show as a solid black silhouette.
+		
 		function mp:PreDrawModel()
 			render.SuppressEngineLighting(true)
 			render.SetColorModulation(0, 0, 0)
@@ -1060,7 +633,7 @@ local function SetupModel(mp, ply, model, pose, spec, appearance, playerClassNam
 		if istable(acc) and hg and hg.Accessories and DrawAccesories then
 			for _, a in ipairs(acc) do
 				local d = hg.Accessories[a]
-				if d then DrawAccesories(ent, ent, a, d, false, true) end
+				if d then DrawAccesories(ply, ent, a, d, false, true) end
 			end
 		end
 		ent:SetupBones()
@@ -1125,14 +698,7 @@ local function BuildCard(parent, data, slot)
 		end
 	end
 
-	local modelWrap = vgui.Create("DPanel", card)
-	modelWrap:SetSize(w, h)
-	modelWrap:SetPos(0, 0)
-	modelWrap:SetMouseInputEnabled(false)
-	modelWrap.RSCard = card
-	modelWrap.Paint = function() end
-
-	local mp = vgui.Create("DModelPanel", modelWrap)
+	local mp = vgui.Create("DModelPanel", card)
 	mp:SetSize(w, h)
 	mp:SetPos(0, 0)
 	mp:SetMouseInputEnabled(false)
@@ -1201,37 +767,14 @@ local function BuildCard(parent, data, slot)
 	xp:SetContentAlignment(4)
 	xp:SetExpensiveShadow(1, Color(0, 0, 0, 225))
 
-	local gainXP = vgui.Create("DLabel", infoWrap)
-	gainXP:SetFont(xpFont)
-	gainXP:SetTextColor(Color(120, 220, 120))
-	gainXP:SetContentAlignment(4)
-	gainXP:SetExpensiveShadow(1, Color(0, 0, 0, 225))
-
 	local lastXP, lastSkill = "", nil
 	infoWrap.Think = function(self)
-		local bonus = math.floor(data.xpbonus or 0)
-		local expOverride = data.exp
-		local gainAlpha = bonus > 0 and 255 or 0
-		if bonus > 0 and data.exp and data.exp >= 0 then
-			if self:GetAlpha() > 10 and not self.RSXPStart then self.RSXPStart = CurTime() end
-			local elapsed = self.RSXPStart and CurTime() - self.RSXPStart or 0
-			local frac = math.Clamp(elapsed / 2.2, 0, 1)
-			gainAlpha = 255 * (1 - math.Clamp((elapsed - 2.2) / 0.75, 0, 1))
-			frac = 1 - (1 - frac) * (1 - frac)
-			expOverride = data.exp + math.floor(bonus * frac)
-		end
-		local xpText, band, med = GetProfileState(data.ply, expOverride, data.skill)
-		local gainText = bonus > 0 and "+" .. bonus or ""
+		local xpText, band, med = GetProfileState(data.ply, data.exp, data.skill)
 		local skill = tonumber(data.skill or (IsValid(data.ply) and data.ply.skill or 0)) or 0
 		if xp:GetText() ~= xpText then
 			xp:SetText(xpText)
 			xp:SizeToContents()
 		end
-		if gainXP:GetText() ~= gainText then
-			gainXP:SetText(gainText)
-			gainXP:SizeToContents()
-		end
-		gainXP:SetAlpha(gainAlpha)
 		if lastXP ~= xpText or lastSkill ~= skill then
 			medal.Band = band or RS_FallbackBand
 			medal.Medal = med or RS_FallbackMedal
@@ -1246,12 +789,10 @@ local function BuildCard(parent, data, slot)
 		local _, nameH = name:GetContentSize()
 		name:SetTall(nameH)
 		local medalY = infoH - medal:GetTall() - math.floor(infoH * 0.16)
-		local gainGap = gainXP:GetAlpha() > 0 and math.floor(w * 0.015) or 0
-		local totalW = medal:GetWide() + math.floor(w * 0.025) + xp:GetWide() + gainGap + (gainXP:GetAlpha() > 0 and gainXP:GetWide() or 0)
+		local totalW = medal:GetWide() + math.floor(w * 0.025) + xp:GetWide()
 		local startX = math.floor(w / 2 - totalW / 2)
 		medal:SetPos(startX, medalY)
 		xp:SetPos(startX + medal:GetWide() + math.floor(w * 0.025), medalY + math.floor((medal:GetTall() - xp:GetTall()) / 2))
-		gainXP:SetPos(xp:GetX() + xp:GetWide() + gainGap, medalY + math.floor((medal:GetTall() - gainXP:GetTall()) / 2))
 	end
 
 	card.RSTitle = titleWrap
@@ -1261,7 +802,6 @@ local function BuildCard(parent, data, slot)
 end
 
 local function CloseSummary()
-	timer.Remove("rem_roundsummary_show")
 	StopSummarySound()
 	gui.EnableScreenClicker(false)
 	if IsValid(RS_Container) then
@@ -1279,18 +819,10 @@ local function CloseSummary()
 	RS_Container = nil
 end
 
-local function IsRTVActive()
-	return zb and zb.IsRTVActive and zb.IsRTVActive()
-end
-
 local function ShowSummary(featured)
-	if IsRTVActive() then return end
-
 	if IsValid(RS_Container) then RS_Container:Remove() end
 
 	local sw, sh = ScrW(), ScrH()
-	local data = featured[1]
-	if not data then return end
 
 	local container = vgui.Create("DPanel")
 	container:SetSize(sw, sh)
@@ -1302,148 +834,88 @@ local function ShowSummary(featured)
 	container.OnRemove = function() gui.EnableScreenClicker(false) end
 	RS_Container = container
 	container:MakePopup()
-	container.StartTime = CurTime()
-	container.RevealedStats = 0
-	container.CountdownStart = 0
-	container.LastCountdown = -1
-	container.CountPunch = 0
 
 	local bg = vgui.Create("DPanel", container)
 	bg:SetSize(sw, sh)
 	bg:SetPos(0, 0)
 	bg:SetMouseInputEnabled(false)
 	bg.Paint = function(self, w, h)
-		surface.SetDrawColor(0, 0, 0, 255)
-		surface.DrawRect(0, 0, w, h)
+		draw.RoundedBox(0, 0, 0, w, h, RS_BGColor)
+		if hg and hg.DrawBlur then
+			hg.DrawBlur(self, 5)
+		end
+		surface.SetDrawColor(RS_BGRight.r, RS_BGRight.g, RS_BGRight.b, RS_BGRight.a)
+		surface.SetTexture(RS_GradR)
+		surface.DrawTexturedRect(0, 0, w, h)
+		surface.SetDrawColor(RS_BGColor.r, RS_BGColor.g, RS_BGColor.b, RS_BGColor.a)
+		surface.SetTexture(RS_GradL)
+		surface.DrawTexturedRect(0, 0, w, h)
+		surface.SetDrawColor(RS_BGTop.r, RS_BGTop.g, RS_BGTop.b, RS_BGTop.a)
+		surface.SetTexture(RS_GradDTex)
+		surface.DrawTexturedRect(0, 0, w, h)
 	end
 	bg:SetAlpha(0)
-	bg:AlphaTo(255, 0.8, 0)
+	bg:AlphaTo(255, 0.7, 0)
 	container.BG = bg
 
-	local stats = data.stats or {}
-	local rows = {}
-	if stats.killedBy and stats.killedBy ~= "" then rows[#rows + 1] = "killed by: " .. stats.killedBy end
-	rows[#rows + 1] = "kills: " .. (stats.kills or 0)
-	rows[#rows + 1] = "headshots: " .. (stats.headshots or 0)
-	rows[#rows + 1] = "kicks: " .. (stats.kicks or 0)
-	rows[#rows + 1] = "buttstock shoves: " .. (stats.buttstockShoves or 0)
-	rows[#rows + 1] = "pushes: " .. (stats.pushes or 0)
-	local acc = (stats.shotsFired or 0) > 0 and math.floor(((stats.shotsHit or 0) / stats.shotsFired) * 100) or 0
-	rows[#rows + 1] = "accuracy: " .. acc .. "%"
-	rows[#rows + 1] = "shots fired: " .. (stats.shotsFired or 0)
-	rows[#rows + 1] = "preferred weapon type: " .. (stats.weaponType or "other")
-	if data.mapHasWindows then rows[#rows + 1] = "windows broken: " .. (stats.windowsBroken or 0) end
-	rows[#rows + 1] = "consumables consumed: " .. (stats.consumablesConsumed or 0)
-	rows[#rows + 1] = "current karma: " .. math.Round(stats.karmaCurrent or 100, 1)
-	rows[#rows + 1] = "karma earned: " .. math.Round(stats.karmaEarned or 0, 1)
-	rows[#rows + 1] = "karma lost: " .. math.Round(stats.karmaLost or 0, 1)
+	local order = {}
+	if featured[1] then order[1] = { data = featured[1], slot = 1 } end
+	if featured[2] then order[2] = { data = featured[2], slot = 2 } end
+	if featured[3] then order[3] = { data = featured[3], slot = 3 } end
 
-	local statPanel = vgui.Create("DPanel", container)
-	statPanel:SetPos(math.floor(sw * 0.055), math.floor(sh * 0.08))
-	statPanel:SetSize(math.floor(sw * 0.5), math.floor(sh * 0.82))
-	statPanel:SetPaintBackground(false)
-	statPanel.Rows = rows
-	statPanel.Paint = function(self, w, h)
-		local now = CurTime()
-		local reveal = math.Clamp(math.floor((now - container.StartTime - 0.7) / 0.3) + 1, 0, #self.Rows)
-		if reveal > container.RevealedStats then
-			container.RevealedStats = reveal
-			surface.PlaySound("ui/rem_tik.wav")
-		end
-		for i = 1, reveal do
-			local y = (i - 1) * ScreenScale(21)
-			local a = math.Clamp((now - container.StartTime - 0.7 - (i - 1) * 0.3) / 0.18, 0, 1) * 255
-			draw.SimpleText(string.upper(self.Rows[i]), "Rem_Sum_Stat", 0, y, Color(235, 235, 235, a), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-		end
+	local cards = {}
+	for _, o in ipairs(order) do
+		local card, w, h = BuildCard(container, o.data, o.slot)
+		cards[o.slot] = { panel = card, w = w, h = h }
 	end
 
-	local modelFrameW = math.floor(sw * 0.31)
-	local modelFrameH = math.floor(sh * 0.88)
-	local modelFrame = vgui.Create("DPanel", container)
-	modelFrame:SetSize(modelFrameW, modelFrameH)
-	modelFrame:SetPos(sw - modelFrameW - math.floor(sw * 0.04), math.floor(sh * 0.06))
-	modelFrame:SetAlpha(0)
-	modelFrame:SetPaintBackground(false)
-	modelFrame.RSSettled = false
-	modelFrame.RSWalkStart = CurTime() + 0.2
-	modelFrame.RSWalkTime = 1.35
-	modelFrame.RSWalkDistance = 145
-	modelFrame.Paint = function() end
-	modelFrame:AlphaTo(255, 0.35, 0.15)
-	timer.Simple(1.55, function()
-		if IsValid(modelFrame) then modelFrame.RSSettled = true end
-	end)
+	local mid = cards[1]
+	local gap = math.floor(sw * 0.015)
 
-	local mvpText = vgui.Create("DPanel", modelFrame)
-	mvpText:SetSize(modelFrameW, math.floor(sh * 0.13))
-	mvpText:SetPos(0, 0)
-	mvpText:SetAlpha(0)
-	mvpText.Paint = function(self, w, h)
-		local a = self:GetAlpha()
-		draw.SimpleTextOutlined("MVP OF THE ROUND", "Rem_Sum_Award", w / 2, 0, Color(232, 190, 70, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, a))
-		draw.SimpleTextOutlined(string.upper(data.name or "Unknown"), "Rem_Sum_Name", w / 2, ScreenScale(20), Color(245, 245, 245, a), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, a))
+	local midX = math.floor(sw / 2 - mid.w / 2)
+	local midY = math.floor(sh / 2 - mid.h / 2)
+
+	local layout = {}
+	layout[1] = { x = midX, y = midY, ox = midX, oy = sh + math.floor(sh * 0.08), delay = 0 }
+
+	if cards[2] then
+		local lx = midX - gap - cards[2].w
+		local ly = math.floor(sh / 2 - cards[2].h / 2)
+		layout[2] = { x = lx, y = ly, ox = lx, oy = sh + math.floor(sh * 0.1), delay = 0.08 }
 	end
-	mvpText:AlphaTo(255, 0.4, 1.3)
-
-	local modelHolder = vgui.Create("DPanel", modelFrame)
-	modelHolder:SetSize(modelFrameW, modelFrameH - math.floor(sh * 0.1))
-	modelHolder:SetPos(0, math.floor(sh * 0.08))
-	modelHolder:SetPaintBackground(false)
-	modelHolder.RSCard = modelFrame
-
-	local mp = vgui.Create("DModelPanel", modelHolder)
-	mp:SetSize(modelHolder:GetWide(), modelHolder:GetTall())
-	mp:SetPos(0, 0)
-	mp:SetMouseInputEnabled(false)
-	SetupModel(mp, data.ply, data.model, POSES[1], data.spec, data.appearance, data.playerclass)
-
-	local countdown = vgui.Create("DPanel", container)
-	countdown:SetSize(math.floor(sw * 0.34), math.floor(sh * 0.12))
-	countdown:SetPos(sw - countdown:GetWide() - math.floor(sw * 0.035), sh - countdown:GetTall() - math.floor(sh * 0.04))
-	countdown:SetPaintBackground(false)
-	countdown.Paint = function(self, w, h)
-		if container.CountdownStart <= 0 then return end
-		local left = math.max(0, 6 - math.floor(CurTime() - container.CountdownStart))
-		if left ~= container.LastCountdown then
-			container.LastCountdown = left
-			container.CountPunch = 1
-		end
-		container.CountPunch = Lerp(FrameTime() * 8, container.CountPunch, 0)
-		local scale = 1 + container.CountPunch * 0.08
-		local x, y = w, h / 2
-		local old = Matrix()
-		old:Translate(Vector(x, y, 0))
-		old:Scale(Vector(scale, scale, 1))
-		old:Translate(Vector(-x, -y, 0))
-		cam.PushModelMatrix(old)
-		draw.SimpleText("next round in: " .. left, "Rem_Sum_Countdown", w, h / 2, Color(245, 245, 245), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
-		cam.PopModelMatrix()
+	if cards[3] then
+		local rx = midX + mid.w + gap
+		local ry = math.floor(sh / 2 - cards[3].h / 2)
+		layout[3] = { x = rx, y = ry, ox = rx, oy = sh + math.floor(sh * 0.12), delay = 0.16 }
 	end
 
-	timer.Simple(4, function()
-		if not IsValid(container) then return end
-		container.CountdownStart = CurTime()
-		container.CountPunch = 1
-		surface.PlaySound("ui/rem_success.wav")
-	end)
-
-	local endFade = vgui.Create("DPanel", container)
-	endFade:SetSize(sw, sh)
-	endFade:SetPos(0, 0)
-	endFade:SetAlpha(0)
-	endFade:SetMouseInputEnabled(false)
-	endFade.Paint = function(self, w, h)
-		surface.SetDrawColor(0, 0, 0, self:GetAlpha())
-		surface.DrawRect(0, 0, w, h)
+	for slot, c in pairs(cards) do
+		local l = layout[slot]
+		c.panel.OffX, c.panel.OffY = l.ox, l.oy
+		c.panel:SetPos(l.ox, l.oy)
+		c.panel:MoveTo(l.x, l.y, 0.95, l.delay, 0.15)
+		c.panel:AlphaTo(255, 0.45, l.delay)
+		timer.Simple(l.delay + 0.9, function()
+			if not IsValid(c.panel) then return end
+			c.panel.RSSettled = true
+			c.panel.RSReveal = true
+			if IsValid(c.panel.RSTitle) then
+				c.panel.RSTitle:AlphaTo(255, 0.35, 0)
+			end
+			if IsValid(c.panel.RSInfoWrap) then
+				c.panel.RSInfoWrap:AlphaTo(255, 0.4, 0.12)
+			end
+		end)
+		container.Cards[#container.Cards + 1] = c.panel
 	end
-	timer.Simple(10, function()
-		if IsValid(endFade) then 
-			endFade:AlphaTo(255, 0.75, 0, function()
-				if IsValid(statPanel) then statPanel:Remove() end
-				if IsValid(modelFrame) then modelFrame:Remove() end
-				if IsValid(countdown) then countdown:Remove() end
-			end)
-		end
+
+	StopSummarySound()
+	sound.PlayFile("sound/rem_roundsummary.mp3", "noblock", function(ch)
+		if not IsValid(ch) then return end
+		if not IsValid(RS_Container) or RS_Container ~= container then ch:Stop() return end
+		RS_Sound = ch
+		ch:SetVolume(0.75)
+		ch:Play()
 	end)
 
 	timer.Create("rem_roundsummary_close", SUMMARY_LIFETIME, 1, function()
@@ -1468,47 +940,13 @@ net.Receive("rem_roundsummary", function()
 		local playerclass = net.ReadString()
 		local exp = net.ReadInt(32)
 		local skill = net.ReadFloat()
-		local xpbonus = net.ReadInt(32)
 		local hasAppearance = net.ReadBool()
-		featured[i] = { ply = ply, model = model, name = name, steamid = steamid, key = key, value = value, spec = spec, appearance = appearance, playerclass = playerclass, exp = exp, skill = skill, xpbonus = xpbonus, hasAppearance = hasAppearance }
-	end
-	local mapHasWindows = net.ReadBool()
-	local stats = {
-		killedBy = net.ReadString(),
-		kills = net.ReadUInt(16),
-		headshots = net.ReadUInt(16),
-		kicks = net.ReadUInt(16),
-		buttstockShoves = net.ReadUInt(16),
-		pushes = net.ReadUInt(16),
-		shotsHit = net.ReadUInt(16),
-		shotsFired = net.ReadUInt(16),
-		weaponType = net.ReadString(),
-		windowsBroken = net.ReadUInt(16),
-		consumablesConsumed = net.ReadUInt(16),
-		karmaCurrent = net.ReadFloat(),
-		karmaEarned = net.ReadFloat(),
-		karmaLost = net.ReadFloat(),
-	}
-	for _, data in ipairs(featured) do
-		data.stats = stats
-		data.mapHasWindows = mapHasWindows
+		featured[i] = { ply = ply, model = model, name = name, steamid = steamid, key = key, value = value, spec = spec, appearance = appearance, playerclass = playerclass, exp = exp, skill = skill, hasAppearance = hasAppearance }
 	end
 
 	if count == 0 then return end
-	if IsRTVActive() then return end
 
 	timer.Create("rem_roundsummary_show", SUMMARY_CLEAR_DELAY, 1, function()
-		if IsRTVActive() then return end
 		ShowSummary(featured)
 	end)
 end)
-
-hook.Add("RoundInfoCalled", "rem_roundsummary_close", function(rnd)
-	timer.Simple(0, function()
-		if zb and zb.ROUND_STATE == 1 then
-			CloseSummary()
-		end
-	end)
-end)
-
-hook.Add("ZB_StartRound", "rem_roundsummary_close_start", CloseSummary)

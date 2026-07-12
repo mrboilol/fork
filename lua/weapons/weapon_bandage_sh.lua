@@ -101,21 +101,8 @@ function SWEP:DrawWorldModel2(nodraw)
 	end
 end
 
-function SWEP:CancelBandageRotation()
-	-- Cleanup for rotation effects if needed
-end
-
 function SWEP:OnRemove()
-	if CLIENT then
-		self:CancelBandageRotation()
-	end
-end
-
-function SWEP:Holster()
-	if CLIENT then
-		self:CancelBandageRotation()
-	end
-	return true
+	if SERVER then return end
 end
 
 function SWEP:SetHold(value)
@@ -141,31 +128,23 @@ end
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
 function SWEP:Animation()
 	local owner = self:GetOwner()
-	if not IsValid(owner) or not owner.GetAimVector then return end
-
-	local ownerPly = owner:IsPlayer() and owner or hg.GetCurrentCharacter(owner)
-	if not IsValid(ownerPly) or not ownerPly:IsPlayer() or not ownerPly.GetAimVector then return end
-
-	local aimvec = ownerPly:GetAimVector()
+	local aimvec = self:GetOwner():GetAimVector()
 	local hold = self:GetHolding()
-	if (ownerPly.zmanipstart ~= nil and ownerPly.organism and not ownerPly.organism.larmamputated) then return end
+	if (owner.zmanipstart ~= nil and not owner.organism.larmamputated) then return end
 	self:BoneSet("r_upperarm", vector_origin, Angle(30 - hold / 4, -30 + hold / 2 + 20 * aimvec[3], 5 - hold / 3.5))
     self:BoneSet("r_forearm", vector_origin, Angle(hold / 10, -hold / 2.5, 35 -hold/1.5))
 end
 
 SWEP.usetime = 2
-
+local math = math
 function SWEP:Think()
 	self:SetHold(self.HoldType)
 
-	if self:GetClass() == "weapon_bandage_sh" and self.modeValues and self.modeValuesdef and self.modeValues[1] and self.modeValuesdef[1] and self.modeValuesdef[1][1] then
+	if self:GetClass() == "weapon_bandage_sh" then
 		self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
-	else
-		self.ModelScale = self.ModelScale or 1
 	end
 
-	local owner = self:GetOwner()
-	if IsValid(owner) and not owner:KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 12, 0))
 	end
 
@@ -208,6 +187,20 @@ function SWEP:Think()
 end
 SWEP.net_cooldown2 = 0
 function SWEP:PrimaryAttack()
+	if SERVER then--and not self.modeValuesdef[self.mode][2] then
+
+		self.healbuddy = self:GetOwner()
+		local done = self:Heal(self.healbuddy, self.mode)
+		
+		if(done and self.PostHeal)then
+			self:PostHeal(self.healbuddy, self.mode)
+		end
+
+		if self.net_cooldown2 < CurTime() then
+			self:SetNetVar("modeValues",self.modeValues)
+			--self.net_cooldown2 = CurTime() + 0.1
+		end
+	end
 end
 
 if CLIENT then
@@ -219,7 +212,6 @@ if CLIENT then
 	SWEP.ofsV = Vector(10,-2,1)
 	SWEP.ofsA = Angle(-90,-40,270)
 	local vector_one = Vector(1,1,1)
-
 	function SWEP:DrawHUD()
 		local owner = self:GetOwner()
 		if !owner:IsPlayer() then return end
@@ -250,36 +242,42 @@ if CLIENT then
 		local p,a = mdl:GetPos(), mdl:GetAngles()
 		local pos,ang = LocalToWorld(self.ofsV,self.ofsA,p,a)
 		if self.showstats and self.modeValues and istable(self.modeValues) then
-			render.PushFilterMag(TEXFILTER.LINEAR)
-			render.PushFilterMin(TEXFILTER.LINEAR)
-			local m = Matrix()
-			m:Translate(Vector(ScrW() / 2 - ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0))
-			m:Scale(vector_one * 0.5)
+			//cam.Start3D()
+				//cam.Start3D2D(pos,ang,0.01)
+				render.PushFilterMag( TEXFILTER.LINEAR )
+				render.PushFilterMin( TEXFILTER.LINEAR )
+				local m = Matrix()
+				m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
+				m:Scale( vector_one * 0.5 )
 
-			cam.PushModelMatrix(m, true)
-				for i, val in ipairs(self.modeValues) do
-					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
-					local val = math.Round(val / self.modeValuesdef[i][1] * 100)
-					local x, y = 0, i * ScrH() / 20
-					local reveal = 1
-					colBrown.a = reveal * 185
-					draw.RoundedBox(2, x, y, x + ScreenScale(210) + ScrW() / 10, ScrH() / 25, colBrown)
-					surface.SetFont("ZCity_Small")
-					surface.SetTextPos(x, y)
-					surface.SetTextColor(255, 255, 255, 255 * reveal)
-					local txt = string.NiceName(tostring(self.modeNames[i]))
-					colBrown.a = reveal * 255
-					draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255, i == self.mode and 0 or 255, i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+				cam.PushModelMatrix( m, true )
+					for i, val in ipairs(self.modeValues) do
+						if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
+						local val = math.Round(val / self.modeValuesdef[i][1] * 100)
+						local x,y = 0, i * ScrH() / 20
+						local reveal = 1//math.Clamp(lply:EyeAngles()[1] / 90 - 0.25, 0, 1) * 4 / 3
+						colBrown.a = reveal * 185
+						draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25 + (#self.modeValues > 0 and 0 or 0),colBrown)
+						surface.SetFont("ZCity_Small")
+						surface.SetTextPos(x,y)
+						surface.SetTextColor(255,255,255,255 * reveal)
+						local txt = string.NiceName(tostring(self.modeNames[i]))
+						local w, h = surface.GetTextSize(txt)
+						--surface.DrawText(tostring(self.modeNames[i]))
+						colBrown.a = reveal * 255
+						draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,i == self.mode and 0 or 255,i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+					
+						surface.SetDrawColor(0,100,0,255 * reveal)
+						surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)
+						surface.SetDrawColor(0,0,0,255 * reveal)
+						surface.DrawOutlinedRect(x + ScreenScale(210),y,ScrW() / 10,ScrH() / 25, 4)
+					end
+				cam.PopModelMatrix()
 
-					surface.SetDrawColor(0, 100, 0, 255 * reveal)
-					surface.DrawRect(x + ScreenScale(210), y, ScrW() / 10 * val / 100, ScrH() / 25)
-					surface.SetDrawColor(0, 0, 0, 255 * reveal)
-					surface.DrawOutlinedRect(x + ScreenScale(210), y, ScrW() / 10, ScrH() / 25, 4)
-				end
-			cam.PopModelMatrix()
-
-			render.PopFilterMag()
-			render.PopFilterMin()
+				render.PopFilterMag()
+				render.PopFilterMin()
+				//cam.End3D2D()
+			//cam.End3D()
 		end
 	end
 end
@@ -287,12 +285,11 @@ end
 SWEP.mode = 1
 SWEP.modes = 1
 SWEP.modeNames = {
-	[1] = "bandaging",
+	[1] = "bandaging"
 }
 
 function SWEP:InitializeAdd()
 	self.ModelScale = 0.9
-	self.minigameCompletions = 0
 end
 
 SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
@@ -349,12 +346,27 @@ function SWEP:SetInfo(info)
 end
 
 function SWEP:SecondaryAttack()
+	--self:SetHolding(math.min(self:GetHolding() + 9, 100))
+	if SERVER then
+		if IsValid(self:GetNWEntity("fakeGun")) then return end
+		local ent = hg.eyeTrace(self:GetOwner()).Entity
+		self.healbuddy = ent
+		if !IsValid(self.healbuddy) then return end
+		if hg.GetCurrentCharacter(self.healbuddy) == hg.GetCurrentCharacter(self:GetOwner()) then return end
+		local done = self:Heal(self.healbuddy, self.mode)
+		if(done and self.PostHeal)then
+			self:PostHeal(self.healbuddy, self.mode)
+		end		
+
+		if self.net_cooldown2 < CurTime() then
+			self:SetNetVar("modeValues",self.modeValues)
+			--self.net_cooldown2 = CurTime() + 0.1 * game.GetTimeScale()
+		end
+	end
 end
 
 if SERVER then
 	util.AddNetworkString("select_mode")
-	
-	-- No old rotation done net receive needed
 else
 	net.Receive("select_mode",function()
 		net.ReadEntity().mode = net.ReadInt(4)
@@ -380,7 +392,6 @@ if CLIENT then
 		end
 	end)
 end
-
 
 local function PhysCallback(ent, data)
 	if data.DeltaTime < 0.2 then return end
@@ -422,9 +433,7 @@ function SWEP:SpawnGarbage(mdl_custom, skin_custom, snd_custom, clr_custom, bgs_
 	ent:Activate()
 	ent:Spawn()
 	ent:SetOwner(owner)
-	if snd_custom or self.FallSnd then
-		ent.FallSnd = Sound((snd_custom and snd_custom ~= nil) and snd_custom or self.FallSnd)
-	end
+	ent.FallSnd = Sound((snd_custom and snd_custom ~= nil) and snd_custom or self.FallSnd)
 
 	if clr_custom and clr_custom ~= nil and IsColor(clr_custom) then
 		ent:SetColor(clr_custom)
@@ -453,212 +462,29 @@ end
 
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
-
 if SERVER then
-	-- Keep all derived medicine synchronized with the perfusion state after a
-	-- treatment changes bleeding, blood volume, or oxygen delivery.
-	function SWEP:RefreshPerfusionTreatment(ent, amount)
-		local org = ent and ent.organism
-		if not org then return end
-		amount = math.Clamp(tonumber(amount) or 0.2, 0.05, 1)
-		local oldPerfusion = org.perfusion or 1
-		local oldBrainOxygen = org.brainoxygen or oldPerfusion
-
-		if not istable(org.arterialwounds) or #org.arterialwounds == 0 then org.arterialBleed = 0 end
-		if not istable(org.wounds) or #org.wounds == 0 then org.venousBleed = 0 end
-		if (org.internalBleed or 0) <= (org.internalBleedHeal or 0) then org.internalBleedRate = 0 end
-		if hg.organism and hg.organism.UpdatePerfusion then
-			hg.organism.UpdatePerfusion(org.owner or ent, org, amount)
-		end
-		if (org.perfusion or 0) > oldPerfusion or (org.brainoxygen or 0) > oldBrainOxygen then
-			org.hypoxiaTime = math.Approach(org.hypoxiaTime or 0, 0, amount * 4)
-			org.severeHypoxiaTime = math.Approach(org.severeHypoxiaTime or 0, 0, amount * 3)
-		end
-	end
-
-	local function CanHealKey(org, key)
-		local v = tonumber(org[key] or 0) or 0
-		if key == "larm" and org.larmamputated then return false end
-		if key == "rarm" and org.rarmamputated then return false end
-		if key == "lleg" and org.llegamputated then return false end
-		if key == "rleg" and org.rlegamputated then return false end
-		return v >= 0.05
-	end
-
-	local fallbackConditionKeys = {
-		"skull", "jaw", "chest", "spine3", "spine2", "spine1", "pelvis",
-		"lleg", "rleg", "larm", "rarm",
-	}
-
-	local fallbackDislocations = {
-		{key = "llegdislocation", limb = "lleg"},
-		{key = "rlegdislocation", limb = "rleg"},
-		{key = "larmdislocation", limb = "larm"},
-		{key = "rarmdislocation", limb = "rarm"},
-		{key = "jawdislocation", limb = "jaw"},
-	}
-
-	local FRACTURE_TREATMENT_THRESHOLD = 0.95
-	local BANDAGE_WOUND_RESOURCE_COST = 4.5
-	local BANDAGE_GENERAL_BLEED_RESOURCE_COST = 9
-	local BANDAGE_STRUCTURAL_RESOURCE_COST = 10
-
-	local function GetFallbackDislocation(org)
-		for _, dislocation in ipairs(fallbackDislocations) do
-			if org[dislocation.key] then
-				return {key = dislocation.key, limb = dislocation.limb, dislocation = true}
-			end
-		end
-	end
-
-	local function GetFallbackTreatment(org)
-		for _, key in ipairs(fallbackConditionKeys) do
-			if CanHealKey(org, key) then
-				return {key = key}
-			end
-		end
-
-		return GetFallbackDislocation(org)
-	end
-
-	function SWEP:GetHealData(org)
-		local totalRotations = 1 -- Base 1 rotation
-		local totalCost = 0
-		local woundsToHeal = {}
-		local fracturesToHeal = {}
-		local availableResource = self.modeValues[1] or 0
-
-		-- Count bleeding wounds (1 rotation each)
-		if istable(org.wounds) then
-			for i, wound in ipairs(org.wounds) do
-				if wound[1] > 0 then
-					totalRotations = totalRotations + 1
-					table.insert(woundsToHeal, {index = i, size = wound[1]})
-				end
-			end
-		end
-
-		-- Count arterial wounds (1 rotation each)
-		if istable(org.arterialwounds) then
-			for i, wound in ipairs(org.arterialwounds) do
-				totalRotations = totalRotations + 1
-				table.insert(woundsToHeal, {arterial = true, index = i})
-			end
-		end
-
-		-- Count general bleeding (1 rotation per significant amount)
-		if tonumber(org.bleed) and org.bleed > 35 then
-			local bleedRotations = math.floor(org.bleed / 35)
-			totalRotations = totalRotations + bleedRotations
-		end
-
-		-- Count fractures (2 rotations each) once they reach the live fracture threshold.
-		local brokenLimbs = {"lleg", "rleg", "larm", "rarm"}
-		for _, limb in ipairs(brokenLimbs) do
-			if (tonumber(org[limb]) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not (limb == "lleg" and org.llegamputated) and not (limb == "rleg" and org.rlegamputated) and not (limb == "larm" and org.larmamputated) and not (limb == "rarm" and org.rarmamputated) then
-				totalRotations = totalRotations + 2
-				table.insert(fracturesToHeal, {key = limb, heal = 0.1})
-			end
-		end
-
-		-- Count severe injuries (skull, chest)
-		if org.skull >= 0.6 then
-			totalRotations = totalRotations + 1
-		end
-		if org.chest >= 0.6 then
-			totalRotations = totalRotations + 1
-		end
-
-		local hasPrimaryTreatment = #woundsToHeal > 0
-			or (tonumber(org.bleed) or 0) > 0
-			or #fracturesToHeal > 0
-			or org.skull >= 0.6
-			or org.chest >= 0.6
-		if not hasPrimaryTreatment and GetFallbackTreatment(org) then
-			totalRotations = totalRotations + 2
-		elseif hasPrimaryTreatment and availableResource > 0 and GetFallbackDislocation(org) then
-			-- Dislocations remain last priority, but account for resetting one if any
-			-- of the bandage remains after its primary treatment.
-			totalRotations = totalRotations + 2
-		end
-
-		return totalRotations, totalCost, woundsToHeal, fracturesToHeal
-	end
-
 	function SWEP:Bandage(ent, bone)
 		local org = ent.organism
 		local owner = self:GetOwner()
 		if not org then return end
 		
-		local hasInjuries = #org.wounds > 0 
-			or (istable(org.arterialwounds) and #org.arterialwounds > 0) 
-			or (tonumber(org.bleed) or 0) > 0 
-			or org.skull >= 0.6 
-			or org.chest >= 0.05
-			or CanHealKey(org, "jaw")
-			or CanHealKey(org, "spine1")
-			or CanHealKey(org, "spine2")
-			or CanHealKey(org, "spine3")
-			or CanHealKey(org, "pelvis")
-			or (org.lleg >= 0.05 and not org.llegamputated)
-			or (org.rleg >= 0.05 and not org.rlegamputated)
-			or (org.larm >= 0.05 and not org.larmamputated)
-			or (org.rarm >= 0.05 and not org.rarmamputated)
-			or org.llegdislocation
-			or org.rlegdislocation
-			or org.larmdislocation
-			or org.rarmdislocation
-			or org.jawdislocation
-
-		if self.modeValues[1] <= 0 or not hasInjuries then return end
-
-		-- Manipulating a player or their fake ragdoll can briefly create enough
-		-- physics stress to look like a crushing injury. Mark the patient before
-		-- the treatment work starts so the crush monitor ignores that handling.
-		local treatmentUntil = CurTime() + 1.5
-		ent.HG_MedicalTreatmentUntil = math.max(ent.HG_MedicalTreatmentUntil or 0, treatmentUntil)
-		if IsValid(org.owner) then
-			org.owner.HG_MedicalTreatmentUntil = math.max(org.owner.HG_MedicalTreatmentUntil or 0, treatmentUntil)
-			if IsValid(org.owner.FakeRagdoll) then
-				org.owner.FakeRagdoll.HG_MedicalTreatmentUntil = math.max(org.owner.FakeRagdoll.HG_MedicalTreatmentUntil or 0, treatmentUntil)
-			end
-		end
+		-- Если растрелять труп а потом его взорвать гранатой, после перевязать - крашнет сервер why?
+		if self.modeValues[1] <= 0 or not (#org.wounds > 0 or org.lleg == 1 or org.rleg == 1 or org.skull >= 0.6 or org.chest == 1 or org.rarm == 1 or org.larm == 1) then return end
+		table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 		
 		local done = false
 		local bandaged = false
-		local treatedPrimary = false
-
-		-- A neck cannot be tourniqueted. A bandage can seal the carotid wound and
-		-- lessen the shock, while the tracheal injury stays a separate airway issue.
-		if org.throatcut and self.modeValues[1] > 0 and (not bone or bone == "ValveBiped.Bip01_Neck1" or bone == "ValveBiped.Bip01_Head1") then
-			for i = #(org.arterialwounds or {}), 1, -1 do
-				local wound = org.arterialwounds[i]
-				if wound[7] == "arteria" then
-					local seal = math.min(wound[1] or 0, self.modeValues[1] * 10)
-					wound[1] = math.max((wound[1] or 0) - seal, 0)
-					self.modeValues[1] = math.max(self.modeValues[1] - seal / 10, 0)
-					org.throatCutPressureShock = math.max((org.throatCutPressureShock or 0) - seal / 36, 0)
-					org.neckBrainOxygenPenalty = math.max((org.neckBrainOxygenPenalty or 0) - seal / 54, 0)
-					if wound[1] <= 0 then table.remove(org.arterialwounds, i) end
-					done, bandaged, treatedPrimary = true, true, true
-					break
-				end
-			end
-			if done and hg.organism.RebuildArteryWoundState then hg.organism.RebuildArteryWoundState(org, true) end
-		end
-
-		-- Prioritize bleeding wounds first
+		
 		if not bone then
+			--print(#org.wounds)
 			for i = 1, #org.wounds do
 				if self.modeValues[1] > 0 and #org.wounds > 0 then
 					local biggestWound = org.wounds[1][1]
-					local healAmount = math.min(22.5 * self.modeValues[1], biggestWound)
-					local healedWound = biggestWound - healAmount
-					local consumption = BANDAGE_WOUND_RESOURCE_COST * healAmount
-					org.bleed = math.max(org.bleed - healAmount, 0)
+					local healedWound = math.max(biggestWound - self.modeValues[1], 0)
+					local woundHeal = self.modeValues[1] - (biggestWound - healedWound)-- * ((owner.Profession == "doctor") and 0.33 or 1)
+					org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
 					org.wounds[1][1] = healedWound
-					self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
-					treatedPrimary = treatedPrimary or healAmount > 0
+					self.modeValues[1] = woundHeal > 0.1 and woundHeal or 0
 					
 					if (biggestWound - healedWound) > 0.1 then
 						bandaged = true
@@ -670,7 +496,6 @@ if SERVER then
 					end
 					ent.bandaged_limbs = ent.bandaged_limbs or {}
 					local bone_name = org.wounds[1][4]
-					local wound = org.wounds[1]
 					if not ent.bandaged_limbs[bone_name] then
 						ent.bandaged_limbs[bone_name] = true
 						done = true
@@ -691,15 +516,13 @@ if SERVER then
 				if self.modeValues[1] ~= 0 and #bonewounds > 0 then
 					if org.wounds[bonewounds[1]] then
 						local biggestWound = org.wounds[bonewounds[1]][1]
-						local healAmount = math.min(6.25 * self.modeValues[1], biggestWound)
-						local healedWound = biggestWound - healAmount
-						local consumption = BANDAGE_WOUND_RESOURCE_COST * healAmount
-						org.bleed = math.max(org.bleed - healAmount, 0)
+						local healedWound = math.max(biggestWound - self.modeValues[1], 0)
+						local woundHeal = self.modeValues[1] - (biggestWound - healedWound)
+						org.bleed = math.max(org.bleed - (biggestWound - healedWound), 0)
 						org.wounds[bonewounds[1]][1] = healedWound
-						self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
-						treatedPrimary = treatedPrimary or healAmount > 0
+						self.modeValues[1] = woundHeal
 
-						org.pain = math.max(org.pain - healAmount / 4, 0)
+						org.pain = math.max(org.pain - (biggestWound - healedWound) / 4, 0)
 
 						if (biggestWound - healedWound) > 0.1 then
 							bandaged = true
@@ -707,7 +530,6 @@ if SERVER then
 
 						ent.bandaged_limbs = ent.bandaged_limbs or {}
 						local bone_name = ent:GetBoneName(ent:LookupBone(org.wounds[bonewounds[1]][4]))
-						local wound = org.wounds[bonewounds[1]]
 						
 						if not ent.bandaged_limbs[bone_name] then
 							ent.bandaged_limbs[bone_name] = true
@@ -723,160 +545,57 @@ if SERVER then
 		org.owner:SetNetVar("wounds",org.wounds)
 		timer.Create("bandage_limbs"..ent:EntIndex(),0.1,1,function()
 			ent:SetNetVar("bandaged_limbs",ent.bandaged_limbs)
-			if IsValid(ent.FakeRagdoll) then
-				ent.FakeRagdoll:SetNetVar("bandaged_limbs",ent.bandaged_limbs)
-			end
 			if ent:IsRagdoll() and hg.RagdollOwner(ent) and hg.RagdollOwner(ent):Alive() then
 				hg.RagdollOwner(ent):SetNetVar("bandaged_limbs",ent.bandaged_limbs)
 			end
 		end)
 
-		-- Splint fractures at the same threshold used by the fracture presentation.
-		local brokenLimbs = {}
-		if (tonumber(org.lleg) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
-		if (tonumber(org.rleg) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
-		if (tonumber(org.larm) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.larmamputated then table.insert(brokenLimbs, "larm") end
-		if (tonumber(org.rarm) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
-
-		if #brokenLimbs > 0 and self.modeValues[1] > 0 then
-			local limbToSplint = brokenLimbs[1]
-			if bone then
-				for _, limb in ipairs(brokenLimbs) do
-					local targetBone = limb == "lleg" and "ValveBiped.Bip01_L_Calf" or
-									   limb == "rleg" and "ValveBiped.Bip01_R_Calf" or
-									   limb == "larm" and "ValveBiped.Bip01_L_Forearm" or
-									   limb == "rarm" and "ValveBiped.Bip01_R_Forearm" or nil
-					if targetBone and ent:GetBoneName(ent:LookupBone(targetBone)) == bone then
-						limbToSplint = limb
-						break
-					end
-				end
-			end
-			
-			local limbBone = limbToSplint == "lleg" and "ValveBiped.Bip01_L_Calf" or
-							 limbToSplint == "rleg" and "ValveBiped.Bip01_R_Calf" or
-							 limbToSplint == "larm" and "ValveBiped.Bip01_L_Forearm" or
-							 limbToSplint == "rarm" and "ValveBiped.Bip01_R_Forearm" or nil
-			
-			local healAmount = 0.1 -- Heal 0.1 when at 1.0 health
-			org[limbToSplint] = math.max(org[limbToSplint] - healAmount, 0)
-			org.avgpain = math.max(org.avgpain - 5, 0)
-			
-			ent.splinted_limbs = ent.splinted_limbs or {}
-			ent.splinted_limbs[limbToSplint] = true
-			ent:SetNetVar("splinted_limbs", ent.splinted_limbs)
-
-			ent.bandaged_limbs = ent.bandaged_limbs or {}
-			if limbBone and not ent.bandaged_limbs[limbBone] then
-				ent.bandaged_limbs[limbBone] = true
-			end
-			
-			-- Consume bandage value for fracture healing
-			self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
-			done = true
-			treatedPrimary = true
-		end
-		
-
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
-		local amt = 281.25 * mul
-		if org.skull >= 0.6 and self.modeValues[1] >= BANDAGE_STRUCTURAL_RESOURCE_COST then
-			org.skull = 0.55
-			self.modeValues[1] = self.modeValues[1] - BANDAGE_STRUCTURAL_RESOURCE_COST
+		local amt = 25 * mul
+		if org.skull >= 0.6 and self.modeValues[1] >= amt then
+			org.skull = 0.59
+			self.modeValues[1] = self.modeValues[1] - amt
 			org.bandagedskull = true
-			org.pain = math.max(org.pain - 14, 0)
+			org.pain = math.max(org.pain - 7, 0)
+			ent.bandaged_limbs = ent.bandaged_limbs or {}
+			ent.bandaged_limbs["ValveBiped.Bip01_Head1"] = true
 			done = true
-			treatedPrimary = true
 		end
 
 		if org.chest == 1 and self.modeValues[1] >= amt then
-			org.chest = org.chest - 0.1
+			org.chest = org.chest - 0.05
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 14, 0)
+			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
-			treatedPrimary = true
 		end
 
 		if org.lleg == 1 and self.modeValues[1] >= amt and !org.llegamputated then
-			org.lleg = org.lleg - 0.1
-
+			org.lleg = org.lleg - 0.05
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 14, 0)
+			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
-			treatedPrimary = true
 		end
 
 		if org.rleg == 1 and self.modeValues[1] >= amt and !org.rlegamputated then
-			org.rleg = org.rleg - 0.1
-
+			org.rleg = org.rleg - 0.05
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 14, 0)
+			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
-			treatedPrimary = true
 		end
 
 		if org.rarm == 1 and self.modeValues[1] >= amt and !org.rarmamputated then
-			org.rarm = org.rarm - 0.1
-
+			org.rarm = org.rarm - 0.05
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 14, 0)
+			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
-			treatedPrimary = true
 		end
 
 		if org.larm == 1 and self.modeValues[1] >= amt and !org.larmamputated then
-			org.larm = org.larm - 0.1
-
+			org.larm = org.larm - 0.05
 			self.modeValues[1] = self.modeValues[1] - amt
-			org.avgpain = math.max(org.avgpain - 14, 0)
+			org.avgpain = math.max(org.avgpain - 7, 0)
 			done = true
-			treatedPrimary = true
-		end
-
-		if not done and (tonumber(org.bleed) or 0) > 0 and self.modeValues[1] > 0 then
-			local bleedHeal = math.min(tonumber(org.bleed) or 0, 18.125 * self.modeValues[1])
-			org.bleed = math.max((tonumber(org.bleed) or 0) - bleedHeal, 0)
-			self.modeValues[1] = math.max(self.modeValues[1] - BANDAGE_GENERAL_BLEED_RESOURCE_COST * bleedHeal, 0)
-			done = bleedHeal > 0
-			treatedPrimary = treatedPrimary or bleedHeal > 0
-		end
-
-		-- Once bleeding and the normal splint targets are handled, remaining bandage
-		-- can reset one dislocation. With no primary treatment, damaged bones still
-		-- take priority over that dislocation.
-		if self.modeValues[1] > 0 then
-			local treatment = treatedPrimary and GetFallbackDislocation(org) or GetFallbackTreatment(org)
-			if treatment then
-				if treatment.dislocation then
-					if hg.organism.CompleteDislocationFix then
-						hg.organism.CompleteDislocationFix(org, treatment.limb, owner)
-					else
-						org[treatment.key] = false
-					end
-				else
-					org[treatment.key] = math.max((tonumber(org[treatment.key]) or 0) - 0.1, 0)
-				end
-
-				local bandageBones = {
-					skull = "ValveBiped.Bip01_Head1", jaw = "ValveBiped.Bip01_Head1",
-					chest = "ValveBiped.Bip01_Spine2", spine3 = "ValveBiped.Bip01_Spine2",
-					spine2 = "ValveBiped.Bip01_Spine2", spine1 = "ValveBiped.Bip01_Spine1",
-					pelvis = "ValveBiped.Bip01_Pelvis", lleg = "ValveBiped.Bip01_L_Calf",
-					rleg = "ValveBiped.Bip01_R_Calf", larm = "ValveBiped.Bip01_L_Forearm",
-					rarm = "ValveBiped.Bip01_R_Forearm",
-				}
-				local boneName = bandageBones[treatment.limb or treatment.key]
-				if boneName then
-					ent.bandaged_limbs = ent.bandaged_limbs or {}
-					ent.bandaged_limbs[boneName] = true
-					ent:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
-				end
-
-				self.modeValues[1] = math.max(self.modeValues[1] - BANDAGE_STRUCTURAL_RESOURCE_COST, 0)
-				org.avgpain = math.max((org.avgpain or 0) - 5, 0)
-				done = true
-			end
 		end
 
 		if done then
@@ -887,7 +606,6 @@ if SERVER then
 
 				self.poisoned2 = nil
 			end
-			self:RefreshPerfusionTreatment(ent, bandaged and 0.25 or 0.12)
 		end
 
 		return done
@@ -1026,140 +744,123 @@ hg.TourniquetGuys = hg.TourniquetGuys or {}
 
 if SERVER then
 	util.AddNetworkString("send_tourniquets")
-	local tourniquet_bone_to_limb = {
-		["ValveBiped.Bip01_L_UpperArm"] = "larm",
-		["ValveBiped.Bip01_L_Forearm"] = "larm",
-		["ValveBiped.Bip01_L_Hand"] = "larm",
-		["ValveBiped.Bip01_R_UpperArm"] = "rarm",
-		["ValveBiped.Bip01_R_Forearm"] = "rarm",
-		["ValveBiped.Bip01_R_Hand"] = "rarm",
-		["ValveBiped.Bip01_L_Thigh"] = "lleg",
-		["ValveBiped.Bip01_L_Calf"] = "lleg",
-		["ValveBiped.Bip01_L_Foot"] = "lleg",
-		["ValveBiped.Bip01_R_Thigh"] = "rleg",
-		["ValveBiped.Bip01_R_Calf"] = "rleg",
-		["ValveBiped.Bip01_R_Foot"] = "rleg",
+	local tourniqet_bones = {
+		["ValveBiped.Bip01_L_UpperArm"] = {
+			["ValveBiped.Bip01_L_Forearm"] = true,
+			["ValveBiped.Bip01_L_Hand"] = true
+		},
+		["ValveBiped.Bip01_L_Forearm"] = {
+			["ValveBiped.Bip01_L_Hand"] = true
+		},
+
+		["ValveBiped.Bip01_R_UpperArm"] = {
+			["ValveBiped.Bip01_R_Forearm"] = true,
+			["ValveBiped.Bip01_R_Hand"] = true
+		},
+		["ValveBiped.Bip01_R_Forearm"] = {
+			["ValveBiped.Bip01_R_Hand"] = true
+		},
+
+		["ValveBiped.Bip01_L_Thigh"] = {
+			["ValveBiped.Bip01_L_Calf"] = true,
+			["ValveBiped.Bip01_L_Foot"] = true
+		},
+		["ValveBiped.Bip01_L_Calf"] = {
+			["ValveBiped.Bip01_L_Foot"] = true
+		},
+
+		["ValveBiped.Bip01_R_Thigh"] = {
+			["ValveBiped.Bip01_R_Calf"] = true,
+			["ValveBiped.Bip01_R_Foot"] = true
+		},
+		["ValveBiped.Bip01_R_Calf"] = {
+			["ValveBiped.Bip01_R_Foot"] = true
+		},
 	}
-
-	local function getTourniquetWoundBone(ent, wound)
-		local woundBoneRef = wound and wound[4]
-		if isnumber(woundBoneRef) then return ent:GetBoneName(woundBoneRef) end
-		if not isstring(woundBoneRef) then return end
-
-		local boneIndex = ent:LookupBone(woundBoneRef)
-		return boneIndex and ent:GetBoneName(boneIndex) or nil
-	end
-
-	local proximalTourniquetBones = {
-		["ValveBiped.Bip01_L_Hand"] = "ValveBiped.Bip01_L_Forearm",
-		["ValveBiped.Bip01_R_Hand"] = "ValveBiped.Bip01_R_Forearm",
-		["ValveBiped.Bip01_L_Forearm"] = "ValveBiped.Bip01_L_UpperArm",
-		["ValveBiped.Bip01_R_Forearm"] = "ValveBiped.Bip01_R_UpperArm",
-		["ValveBiped.Bip01_L_Foot"] = "ValveBiped.Bip01_L_Calf",
-		["ValveBiped.Bip01_R_Foot"] = "ValveBiped.Bip01_R_Calf",
-		["ValveBiped.Bip01_L_Calf"] = "ValveBiped.Bip01_L_Thigh",
-		["ValveBiped.Bip01_R_Calf"] = "ValveBiped.Bip01_R_Thigh",
-	}
-
 	function SWEP:Tourniquet(ent, bone)
 		local org = ent.organism
-		if not org then return false end
+		if not org then return end
+		if #org.arterialwounds > 0 then
+			local ent = org.isPly and org.owner or ent
+			ent.tourniquets = ent.tourniquets or {}
 
-		local target = org.isPly and org.owner or ent
-		if not IsValid(target) then return false end
+			local pw
+			local bonewounds = {}
+			if not bone then
+				for i,wound in pairs(org.arterialwounds) do
+					if wound[7] != "arteria" then 
+						pw = i 
+						for i1,tbl in pairs(org.wounds) do
+							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
+							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
+							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
+							--print(1,bonename,sec_bonename)
+							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
+								--print(2,bonename,sec_bonename)
+								table.insert(bonewounds,i1)
+							end
+						end
+						--PrintTable(bonewounds)
+					break end
+				end
+				
+			else
+				for i,wound in pairs(org.arterialwounds) do
+					if ent:GetBoneName(ent:LookupBone(wound[4])) == bone then pw = i break end
+				end
+				for i,tbl in pairs(org.wounds) do
+					local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
+					if bonename == bone or (tourniqet_bones[bone] and tourniqet_bones[bone][bonename]) then
+						table.insert(bonewounds,i)
+					end
+				end
+			end		
+			pw = pw or math.random(#org.arterialwounds)
 
-		if isnumber(bone) then bone = target:GetBoneName(bone) end
-		if bone and not tourniquet_bone_to_limb[bone] then return false end
+			local wound = org.arterialwounds[pw]
+			if not wound then return false end
+			
+			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
+			org[wound[7]] = 0
 
-		local bestWound
-		local bestBone
-		local bestBleed = 0
-		local bestArterial = false
+			if wound[7] == "arteria" then org.o2.regen = 0 end
 
-		local function considerWound(wound, arterial)
-			local woundBone = getTourniquetWoundBone(target, wound)
-			if not woundBone or not tourniquet_bone_to_limb[woundBone] then return end
-			if bone and not hg.IsBoneAtOrBelowTourniquet(bone, woundBone) then return end
-			if hg.IsBoneControlledByTourniquet(target, woundBone) then return end
+			table.remove(org.arterialwounds,pw)
 
-			local bleed = tonumber(wound[1]) or 0
-			if bleed <= 0 then return end
-			if bleed > bestBleed or (bleed == bestBleed and arterial and not bestArterial) then
-				bestWound = wound
-				bestBone = woundBone
-				bestBleed = bleed
-				bestArterial = arterial
+			org.owner:SetNetVar("arterialwounds",org.arterialwounds)
+
+			for i = 1, #bonewounds do
+				if org.wounds[bonewounds[i]] then
+					--print(org.wounds[bonewounds[i]], bonewounds[i])
+					org.wounds[bonewounds[i]][1] = 0
+				end
 			end
-		end
-
-		for _, wound in pairs(org.wounds or {}) do
-			considerWound(wound, false)
-		end
-		for _, wound in pairs(org.arterialwounds or {}) do
-			considerWound(wound, true)
-		end
-
-		if not bestWound then return false end
-		-- Distal wounds get a band one segment closer to the torso. Upper-arm and
-		-- thigh wounds use the high-and-tight placement supported by the model.
-		local tourniquetBone = proximalTourniquetBones[bestBone] or bestBone
-
-		target.tourniquets = target.tourniquets or {}
-		target.tourniquets[#target.tourniquets + 1] = {bestWound[2], bestWound[3], tourniquetBone}
-
-		-- Remove every wound controlled by the applied tourniquet. Merely setting
-		-- visualBleedRate to zero leaves arterialwounds and the artery status flag
-		-- active, allowing the arterial bleed loop to resume later.
-		for i = #(org.wounds or {}), 1, -1 do
-			local woundBone = getTourniquetWoundBone(target, org.wounds[i])
-			if woundBone and hg.IsBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
-				table.remove(org.wounds, i)
+			for i = 1, #bonewounds do
+				if org.wounds[bonewounds[i]] then
+					table.remove(org.wounds, bonewounds[i])
+				end
 			end
-		end
 
-		local removedArterial = false
-		local removedArteries = {}
-		for i = #(org.arterialwounds or {}), 1, -1 do
-			local arterialWound = org.arterialwounds[i]
-			local woundBone = getTourniquetWoundBone(target, arterialWound)
-			if woundBone and hg.IsBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
-				if arterialWound[7] then removedArteries[arterialWound[7]] = true end
-				table.remove(org.arterialwounds, i)
-				removedArterial = true
+			org.owner:SetNetVar("wounds",org.wounds)
+
+			ent:SetNetVar("Tourniquets",ent.tourniquets)
+			if IsValid(ent.FakeRagdoll) then
+				ent.FakeRagdoll:SetNetVar("Tourniquets",ent.tourniquets)
 			end
-		end
-
-		if removedArterial and hg.organism.RebuildArteryWoundState then
-			hg.organism.RebuildArteryWoundState(org, true)
-		else
-			for artery in pairs(removedArteries) do
-				org[artery] = 0
+			
+			if not table.HasValue(hg.TourniquetGuys,ent) then
+				table.insert(hg.TourniquetGuys,ent)
 			end
-			org.owner:SetNetVar("arterialwounds", org.arterialwounds or {})
-		end
-		org.owner:SetNetVar("wounds", org.wounds or {})
 
-		target:SetNetVar("Tourniquets", target.tourniquets)
-		if IsValid(target.FakeRagdoll) then
-			target.FakeRagdoll:SetNetVar("Tourniquets", target.tourniquets)
-		end
-
-		if not table.HasValue(hg.TourniquetGuys, target) then
-			table.insert(hg.TourniquetGuys, target)
-		end
-
-		for i = #hg.TourniquetGuys, 1, -1 do
-			local tourniquetTarget = hg.TourniquetGuys[i]
-			if not IsValid(tourniquetTarget) or not tourniquetTarget.tourniquets or table.IsEmpty(tourniquetTarget.tourniquets) then
-				table.remove(hg.TourniquetGuys, i)
+			for i,ent in ipairs(hg.TourniquetGuys) do
+				if not IsValid(ent) or not ent.tourniquets or table.IsEmpty(ent.tourniquets) then table.remove(hg.TourniquetGuys,i) end
 			end
+
+			SetNetVar("TourniquetGuys",hg.TourniquetGuys)
+
+			self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
+			return true
 		end
-
-		SetNetVar("TourniquetGuys", hg.TourniquetGuys)
-		self:RefreshPerfusionTreatment(target, (bestArterial or removedArterial) and 0.45 or 0.25)
-
-		self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
-		return true
 	end
 
 	hook.Add("Player Spawn", "remove-tourniquets", function(ply)
@@ -1212,7 +913,7 @@ if SERVER then
 else
 	local boneScale = {
 		["ValveBiped.Bip01_Head1"] = 1,
-		["ValveBiped.Bip01_Neck1"] = 0.8,
+		["ValveBiped.Bip01_Neck1"] = 1,
 		["ValveBiped.Bip01_L_UpperArm"] = 0.9,
 		["ValveBiped.Bip01_L_Forearm"] = 0.8,
 		["ValveBiped.Bip01_R_UpperArm"] = 0.9,
@@ -1224,7 +925,7 @@ else
 	}
 
 	local boneOffset = {
-		["ValveBiped.Bip01_Neck1"] = {Vector(0, -1.5, -2), Angle(90, 90, 90)},
+		["ValveBiped.Bip01_Neck1"] = {Vector(2, -2, -2.9), Angle(90, 80, 70)},
 		["ValveBiped.Bip01_L_UpperArm"] = {Vector(5, -0.5, -3.2), Angle(90, 90, 90)},
 		["ValveBiped.Bip01_L_Forearm"] = {Vector(5, -0.1, -2.8), Angle(90, 90, 90)},
 		["ValveBiped.Bip01_R_UpperArm"] = {Vector(7, -0.1, -1.5), Angle(90, 90, 90)},
@@ -1274,16 +975,11 @@ else
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_tourniquets", function(ent,ply)
 	function hg.RenderTourniquets(ent, ply)
-		local tourniquets = ent.tourniquets
-		if not tourniquets or not next(tourniquets) then
-			tourniquets = ply.tourniquets
-			if not tourniquets or not next(tourniquets) then return end
-		end
-		local tourniquetsM = ent.tourniquetsM or {}
-		ent.tourniquetsM = tourniquetsM
-		for i, wound in ipairs(tourniquets) do
-			tourniquetsM[i] = IsValid(tourniquetsM[i]) and tourniquetsM[i] or ClientsideModel("models/tourniquet/tourniquet_put.mdl")
-			local model = tourniquetsM[i]
+		if !ply.tourniquets or !next(ply.tourniquets) then return end
+		for i, wound in ipairs(ply.tourniquets) do
+			ply.tourniquetsM = ply.tourniquetsM or {}
+			ply.tourniquetsM[i] = IsValid(ply.tourniquetsM[i]) and ply.tourniquetsM[i] or ClientsideModel("models/tourniquet/tourniquet_put.mdl")
+			local model = ply.tourniquetsM[i]
 			model:SetNoDraw(true)
 
 			if not IsValid(model) then return end
@@ -1320,19 +1016,12 @@ else
 	function remove_bandages(ent)
 		if IsValid(ent.bandagesModel) then
 			ent.bandagesModel:Remove()
-			ent.bandagesModel = nil
 		end
-		if IsValid(ent.bruiseWrapModel) then
-			ent.bruiseWrapModel:Remove()
-			ent.bruiseWrapModel = nil
+		ent.bandagesModel = nil
+		if IsValid(ent.bandagesHeadModel) then
+			ent.bandagesHeadModel:Remove()
 		end
-		if not ent.bandagesModels then return end
-		for _, model in pairs(ent.bandagesModels) do
-			if IsValid(model) then
-				model:Remove()
-			end
-		end
-		ent.bandagesModels = nil
+		ent.bandagesHeadModel = nil
 	end
 
 	hook.Add("OnNetVarSet","bandage_netvar",function(index, key, var)
@@ -1354,6 +1043,11 @@ else
 
 	local BadagesModelMale = "models/distac/newbandage.mdl"
 	local BadagesModelFemale = "models/distac/newbandage_f.mdl"
+
+	local HeadBandageModelMale = "models/distac/newbandage-head.mdl"
+	local HeadBandageModelFemale = "models/distac/newbandage-head.mdl"
+	local HeadBandageOffsetMale = {Vector(0, 0, -0.2), Angle(0, 0, 0)}
+	local HeadBandageOffsetFemale = {Vector(0, 0, -0.6), Angle(0, 0, 0)}
 	local BodyGroupsMale = {
 		["ValveBiped.Bip01_Pelvis"] = "belly",
 		["ValveBiped.Bip01_Spine"] = "groin",
@@ -1390,90 +1084,80 @@ else
 
 	--hook.Add("PostDrawPlayerRagdoll", "draw_bandages", function(ent,ply)
 	function hg.RenderBandages(ent, ply)
-		local bandaged_limbs = ent:GetNetVar("bandaged_limbs") or ent.bandaged_limbs
-		if not bandaged_limbs or not next(bandaged_limbs) then
-			bandaged_limbs = ply:GetNetVar("bandaged_limbs") or ply.bandaged_limbs
-			if not bandaged_limbs or not next(bandaged_limbs) then return end
-		end
-
-		local bandagedBones = {}
-		local bandageColor
-
-		for bone, info in pairs(bandaged_limbs) do
-			if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
-
-			bandagedBones[#bandagedBones + 1] = bone
-
-			local col = istable(info) and info.color
-			if IsColor(col) or (istable(col) and col.r and col.g and col.b) then
-				if not bandageColor then
-					bandageColor = col
+		--PrintTable(ent.bandaged_limbs)
+		if not ent.bandaged_limbs then return end
+		if !next(ent.bandaged_limbs) then return end
+		if not IsValid( ent.bandagesModel ) then
+			ent.bandagesModel = (ThatPlyIsFemale(ent) and ClientsideModel(BadagesModelFemale) or ClientsideModel(BadagesModelMale))
+			local model = ent.bandagesModel
+			ent:CallOnRemove("removebandages",function()
+				if IsValid(model) then
+					model:Remove()
+					model = nil
 				end
+			end)
+		end
+		
+		local model = ent.bandagesModel
+		model:SetNoDraw(true)
+		model:SetPos(ent:GetPos() + vector_up * 1)
+		model:SetParent(ent)
+		model:AddEffects(EF_BONEMERGE)
+		local dontmakehands = false
+		if !hg.Appearance.FuckYouModels[1][ent:GetModel()] and !hg.Appearance.FuckYouModels[2][ent:GetModel()] then dontmakehands = true end
+		
+		if not model.BodygroupsApplied then 
+			for k, v in pairs(ent.bandaged_limbs) do
+				if k == "ValveBiped.Bip01_Head1" then continue end -- head uses separate model
+				if dontmakehands and (k == "ValveBiped.Bip01_L_Hand" or k == "ValveBiped.Bip01_R_Hand") then continue end -- ez
+				model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[k] or BodyGroupsMale[k] or ""), 1)
 			end
-		end
 
-		if #bandagedBones > 0 then
-			if not IsValid(ent.bruiseWrapModel) then
-				local sexEnt = IsValid(ply) and ply or ent
-				local isFemale = ThatPlyIsFemale(sexEnt)
-				local mdlPath = isFemale and BadagesModelFemale or BadagesModelMale
-				local model = ClientsideModel(mdlPath)
-				ent.bruiseWrapModel = model
-				model:SetNoDraw(true)
-				model:SetPos(ent:GetPos() + vector_up * 1)
-				model:SetParent(ent)
-				model:AddEffects(EF_BONEMERGE)
-
-				local mapping = isFemale and BodyGroupsFemale or BodyGroupsMale
-				local dontmakehands = false
-				if not hg.Appearance.FuckYouModels[1][ent:GetModel()] and not hg.Appearance.FuckYouModels[2][ent:GetModel()] then
-					dontmakehands = true
-				end
-
-				model.wrapBodygroups = {}
-				for bone, bgName in pairs(mapping) do
-					if dontmakehands and (bone == "ValveBiped.Bip01_L_Hand" or bone == "ValveBiped.Bip01_R_Hand") then continue end
-					local bgID = model:FindBodygroupByName(bgName)
-					if bgID and bgID >= 0 then
-						model.wrapBodygroups[bone] = bgID
+			for k, v in pairs(hg.amputatedlimbs2) do
+				local children = hg.get_children(ent, k)
+				table.insert(children, k)
+				
+				for k2, v2 in ipairs(children) do
+					if ent.bandaged_limbs[v2] and ent.organism and ent.organism[hg.amputatedlimbs2[v2].."amputated"] then
+						model:SetBodygroup(model:FindBodygroupByName( ThatPlyIsFemale(ent) and BodyGroupsFemale[v2] or BodyGroupsMale[v2] or ""), 0)
 					end
 				end
+			end
 
-				ent:CallOnRemove("remove_bruise_wrap", function()
-					if IsValid(model) then
-						model:Remove()
+			model.BodygroupsApplied = true
+		end
+		model:DrawModel()
+
+		if ent.bandaged_limbs["ValveBiped.Bip01_Head1"] then
+			local female = ThatPlyIsFemale(ent)
+			local mdlpath = female and HeadBandageModelFemale or HeadBandageModelMale
+			if not IsValid(ent.bandagesHeadModel) or ent.bandagesHeadModel:GetModel() ~= mdlpath then
+				if IsValid(ent.bandagesHeadModel) then ent.bandagesHeadModel:Remove() end
+				ent.bandagesHeadModel = ClientsideModel(mdlpath)
+				ent:CallOnRemove("removebandageshead", function()
+					if IsValid(ent.bandagesHeadModel) then
+						ent.bandagesHeadModel:Remove()
+						ent.bandagesHeadModel = nil
 					end
 				end)
 			end
+			local headmodel = ent.bandagesHeadModel
+			headmodel:SetNoDraw(true)
+			headmodel:SetPos(ent:GetPos() + vector_up * 1)
+			headmodel:SetParent(ent)
+			headmodel:AddEffects(EF_BONEMERGE)
+			headmodel:SetupBones()
 
-			local model = ent.bruiseWrapModel
-
-			local hasActiveBodygroup = false
-			if model.wrapBodygroups then
-				for bone, bgID in pairs(model.wrapBodygroups) do
-					model:SetBodygroup(bgID, 0)
-				end
-				for _, bone in ipairs(bandagedBones) do
-					if hg.amputatedbone and hg.amputatedbone(ent, bone) then continue end
-					local bgID = model.wrapBodygroups[bone]
-					if bgID then
-						model:SetBodygroup(bgID, 1)
-						hasActiveBodygroup = true
-					end
+			local offset = female and HeadBandageOffsetFemale or HeadBandageOffsetMale
+			if offset[1] ~= vector_origin or offset[2] ~= angle_zero then
+				local nb = headmodel:GetBoneCount()
+				for i = 0, nb - 1 do
+					local p, a = headmodel:GetBonePosition(i)
+					headmodel:SetBonePosition(i, p + offset[1], a + offset[2])
 				end
 			end
 
-			if hasActiveBodygroup then
-				if bandageColor then
-					render.SetColorModulation((bandageColor.r or 255) / 255, (bandageColor.g or 255) / 255, (bandageColor.b or 255) / 255)
-				end
-
-				model:DrawModel()
-				render.SetColorModulation(1, 1, 1)
-			end
-		elseif IsValid(ent.bruiseWrapModel) then
-			ent.bruiseWrapModel:Remove()
-			ent.bruiseWrapModel = nil
+			headmodel:DrawModel()
 		end
 	end
 	--end)
