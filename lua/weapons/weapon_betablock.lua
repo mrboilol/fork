@@ -106,24 +106,27 @@ if SERVER then
         entOwner:EmitSound("snd_jack_hmcd_pillsuse.wav", 60, math.random(95, 105))
 
         org.adrenalineAdd = math.Approach(org.adrenalineAdd, -4, self.modeValues[1] * 2)
-		org.panicattackadd = math.max((org.panicattackadd or 0) - self.modeValues[1] * 0.65, 0)
-		org.panicattack = math.max((org.panicattack or 0) - self.modeValues[1] * 0.2, 0)
-
-        self.modeValues[1] = 0
-        org.adrenalineAdd = math.Approach(org.adrenalineAdd, -8, self.modeValues[1] * 2)
-        org.adrenaline = math.Approach(org.adrenaline, 0, self.modeValues[1] * 0.5)
+		org.panicattackadd = 0
+		org.panicattack = 0
+		org.panicattackActive = false
+		org.nextPanicHeartRoll = CurTime() + 15
+		org.adrenalineAdd = math.Approach(org.adrenalineAdd, -8, self.modeValues[1] * 2)
+		org.adrenaline = math.Approach(org.adrenaline, 0, self.modeValues[1] * 0.5)
         
-        -- Beta blockers help reduce despair
-        org.despair = math.max((org.despair or 0) - 0.15, 0)
+        -- Beta blockers stop the acute stress response and its lasting despair.
+        org.despair = 0
+		org._despairLockUntil = 0
+		org._despairLastGainedTime = 0
+		if hg and hg.PTSD and hg.PTSD.ApplyBetaBlockerStressReset then
+			hg.PTSD.ApplyBetaBlockerStressReset(ent)
+		end
         
         -- Beta blockers provide mild analgesic effect
         org.analgesiaAdd = (org.analgesiaAdd or 0) + 0.15
 
-        if self.modeValues[1] > 0 then
-            self.modeValues[1] = 0
-            owner:SelectWeapon("weapon_hands_sh")
-            self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
-            self:Remove()
-        end
+		self.modeValues[1] = 0
+		owner:SelectWeapon("weapon_hands_sh")
+		self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
+		self:Remove()
 	end
 end

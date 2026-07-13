@@ -660,7 +660,8 @@ hook.Add("Post Post Processing", "organism-effects", function()
 		return false
 	end
 	
-	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(math.min(adrenaline / 1, 2),1.5))
+	local adrenalineDisorientation = math.max(adrenaline - 2.5, 0)
+	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(adrenalineDisorientation, 1.5))
 	k2 = (30 - (o2 or 30)) / 30 + (1 - (consciousnessLerp or 1)) * 1-- + brain * 2
 	k3 = ((5000 / math.max(blood, 1000)) - 1) * 1.5
 
@@ -948,7 +949,7 @@ local arterialMinIntensity = 0.35
 local arterialParticleSizeMul = 0.65
 local arterialJetCount = 1
 local arterialJetOffset = 0.12
-local arterialVelocityMul = 105
+local arterialVelocityMul = 70
 local arterialDirectionRandomness = 0.75
 local arterialVerticalRandomness = 1
 
@@ -1044,8 +1045,8 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 		local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
 		local sprayVel = VectorRand(-0.25, 0.25) * pulseMul * buildup
 		sprayVel:Add(dir * arterialVelocityMul * wave * buildup)
-		sprayVel:Add(right * (math.sin(time * 3.2) * 3 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * buildup)
-		sprayVel:Add(up * (math.sin(time * 2.4 + 1.1) * 2 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * buildup)
+		sprayVel:Add(right * (math.sin(time * 0.8) * 3 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * buildup)
+		sprayVel:Add(up * (math.sin(time * 0.6 + 1.1) * 2 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * buildup)
 		hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
 	end
 
@@ -1347,9 +1348,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
 						else
 							emitArterialSpray(ent, pos, dir, ang, org.pulse, size, wound[7], fxData)
-							for _ = 1, arteryBurstCount do
-								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
-							end
 						end
 
 						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))

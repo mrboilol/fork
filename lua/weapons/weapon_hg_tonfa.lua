@@ -6,14 +6,14 @@ SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 
-SWEP.WorldModel = "models/weapons/tacint_melee/w_tonfa.mdl"
+SWEP.WorldModel = "models/weapons/w_jjife_t.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_hatchet.mdl"
 SWEP.WorldModelExchange = "models/weapons/tacint_melee/w_tonfa.mdl"
 SWEP.ViewModel = ""
 
 SWEP.HoldType = "melee"
 
-SWEP.HoldPos = Vector(-12,2,3)
+SWEP.HoldPos = Vector(-12,0,0)
 SWEP.HoldAng = Angle(0,0,0)
 
 SWEP.AttackTime = 0.3
@@ -65,8 +65,8 @@ SWEP.DamageType = DMG_CLUB
 SWEP.DamagePrimary = 18
 SWEP.DamageSecondary = 13
 
-SWEP.PenetrationPrimary = 1
-SWEP.PenetrationSecondary = 1
+SWEP.PenetrationPrimary = 3
+SWEP.PenetrationSecondary = 3
 
 SWEP.MaxPenLen = 3
 

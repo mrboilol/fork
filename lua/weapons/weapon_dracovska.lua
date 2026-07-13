@@ -115,4 +115,4 @@ SWEP.attAng = Angle(0, 0.4, 0)
 SWEP.weight = 2.5
 SWEP.addweight = -1.5
 SWEP.podkid = 0.2
-SWEP.animposmul = 1.5
+SWEP.animposmul = 1

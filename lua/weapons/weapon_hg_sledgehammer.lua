@@ -35,7 +35,7 @@ SWEP.sprint_ang = Angle(15,0,0)
 
 SWEP.basebone = 94
 
-SWEP.weaponPos = Vector(0.6,-0.1,-7)
+SWEP.weaponPos = Vector(0,0,0)
 SWEP.weaponAng = Angle(0,-90,0)
 SWEP.modelscale = 0.89
 
@@ -49,12 +49,12 @@ SWEP.ComboDamageMul1 = 1
 SWEP.ComboDamageMul2 = 1.25
 SWEP.ComboDamageMul3 = 1.65
 
-SWEP.PenetrationPrimary = 4
-SWEP.PenetrationSecondary = 1.6
+SWEP.PenetrationPrimary = 5
+SWEP.PenetrationSecondary = 7
 
 SWEP.MaxPenLen = 6
 
-SWEP.PenetrationSizePrimary = 3
+SWEP.PenetrationSizePrimary = 4
 SWEP.PenetrationSizeSecondary = 1.25
 
 SWEP.StaminaPrimary = 43

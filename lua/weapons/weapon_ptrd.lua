@@ -86,7 +86,7 @@ SWEP.holsteredAng = Angle(210, 0, 180)
 SWEP.PPSMuzzleEffect = "pcf_jack_mf_mshotgun" -- shared in sh_effects.lua
 
 -- bipod
-SWEP.RestPosition = Vector(15,2, 9)
+SWEP.RestPosition = Vector(15, 2, 5)
 
 local math = math
 local math_random = math.random

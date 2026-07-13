@@ -239,20 +239,6 @@ function hg.PTSD.ReduceTrauma(ply, amount, reason)
 	return reduce_trauma(ply, amount, reason)
 end
 
-function hg.PTSD.ApplyAntidepressantDose(ply, target, dose)
-	if not IsValid(target) or not target:IsPlayer() then return end
-	local amt = 18 * (tonumber(dose) or 1)
-	local state = get_state(target)
-	if state then state.recoveryBoostUntil = CurTime() + 240 end
-	reduce_trauma(target, amt, "antidepressant")
-
-	local org = get_org(target)
-	if org then
-		org.despair = max((org.despair or 0) - 0.2, 0)
-		org.goodmood = min((org.goodmood or 0) + 0.12, 1)
-	end
-end
-
 function hg.PTSD.ApplyBetaBlockerStressReset(ply)
 	if not IsValid(ply) or not ply:IsPlayer() then return end
 	local state = get_state(ply)

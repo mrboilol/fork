@@ -33,7 +33,7 @@ SWEP.FakeEmptyReloadSounds = {
 	[0.92] = "weapons/ak47/ak47_boltback.wav",
 	[0.97] = "weapons/ak47/ak47_boltrelease.wav"
 }
-SWEP.MagModel = "models/weapons/upgrades/w_magazine_galil_35.mdl"
+SWEP.MagModel = "models/weapons/arc9/darsu_eft/mods/mag_ak_custom_sawed_off_762x39_10.mdl"
 local vector_full = Vector(1,1,1)
 local vecPochtiZero = Vector(0.01,0.01,0.01)
 if CLIENT then

@@ -88,6 +88,7 @@ hook.Add("Org Clear", "hg_despair_init", function(org)
 	org._despairLastAdrenaline = 0
 	org._despairNextCorpseCheck = 0
 	org._corpseAdrenalineGiven = 0
+	org._corpseDespairGiven = 0
 	org._despairCorpseFamiliarity = setmetatable({}, {__mode = "k"})
 	org._hadGoodMood = false
 	org._despairLastGainedTime = 0
@@ -277,7 +278,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	-- Despair budge less unless despair hasn't been gained for a little bit
-	local despairDecay = timeValue / 120
+	local despairDecay = timeValue / 90
 	if isLocked then
 		despairDecay = 0
 	else
@@ -286,25 +287,25 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			despairDecay = despairDecay * 3
 		end
 		-- Slow recovery only during the short period directly after a stressor.
-		if timeSinceGain < 12 then
+		if timeSinceGain < 15 then
 			if org.despair > 0.7 then
-				despairDecay = timeValue / 210
+				despairDecay = timeValue / 240
 			elseif org.despair > 0.5 then
-				despairDecay = timeValue / 165
+				despairDecay = timeValue / 200
 			else
-				despairDecay = timeValue / 145
+				despairDecay = timeValue / 175
 			end
 		elseif org.despair > 0.7 then
-			despairDecay = timeValue / 180
+			despairDecay = timeValue / 120
 		elseif org.despair > 0.5 then
-			despairDecay = timeValue / 145
+			despairDecay = timeValue / 105
 		end
 		-- Once no new stress has arrived, recovery accelerates noticeably.
 		if timeSinceGain > 25 then
 			despairDecay = despairDecay * math.min(1 + (timeSinceGain - 25) / 35, 2.5)
 		end
-		if safeRecovery and timeSinceGain > 12 then
-			despairDecay = despairDecay * (awayFromTrauma and 1.4 or 1.25)
+		if safeRecovery and timeSinceGain > 15 then
+			despairDecay = despairDecay * (awayFromTrauma and 1.75 or 1.5)
 		end
 		if stableAtFullDespair and timeSinceGain > 8 then
 			despairDecay = max(despairDecay, timeValue / 55)
@@ -489,7 +490,10 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 
 		if freshCorpsesSeen > 0 then
-			add = add + timeValue * 0.06 * math.min(freshCorpsesSeen, 2)
+			local corpseDespairRemaining = math.max(0.5 - (org._corpseDespairGiven or 0), 0)
+			local corpseDespairAdd = math.min(timeValue * 0.06 * math.min(freshCorpsesSeen, 2), corpseDespairRemaining)
+			add = add + corpseDespairAdd
+			org._corpseDespairGiven = (org._corpseDespairGiven or 0) + corpseDespairAdd
 
 			local maxCorpseAdrenaline = 0.3
 			local given = org._corpseAdrenalineGiven or 0

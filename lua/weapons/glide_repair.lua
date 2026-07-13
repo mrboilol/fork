@@ -14,8 +14,10 @@ SWEP.ViewModelFOV = 60
 SWEP.BobScale = 0.5
 SWEP.SwayScale = 1.0
 
-SWEP.ViewModel = "models/weapons/v_physcannon.mdl"
-SWEP.WorldModel = "models/weapons/w_physics.mdl"
+SWEP.ViewModel = ""
+SWEP.WorldModel = "models/props_c17/tools_wrench01a.mdl"
+SWEP.offsetVec = Vector(3.5, -1.8, -2)
+SWEP.offsetAng = Angle(0, 90, -90)
 
 if CLIENT then
     SWEP.DrawCrosshair = false
@@ -25,7 +27,7 @@ if CLIENT then
 end
 
 SWEP.DrawAmmo = false
-SWEP.HoldType = "physgun"
+SWEP.HoldType = "slam"
 
 SWEP.Primary.Ammo = "none"
 SWEP.Primary.ClipSize = -1
@@ -36,6 +38,7 @@ SWEP.Secondary.Ammo = "none"
 SWEP.Secondary.ClipSize = -1
 SWEP.Secondary.DefaultClip = 0
 SWEP.Secondary.Automatic = false
+SWEP.WorkWithFake = true
 
 function SWEP:Initialize()
     self:SetHoldType( self.HoldType )

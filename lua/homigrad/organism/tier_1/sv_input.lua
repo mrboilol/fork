@@ -15,6 +15,9 @@ local head_otrub_max_chance = 0.35
 local head_consciousness_mul = 28
 local head_otrub_consciousness_cap = 0.04
 local instant_pain_shock_scale = 0.75
+local attacker_adrenaline_gain_window = 2
+local attacker_adrenaline_cooldown = 5
+local attacker_adrenaline_cap = 1.5
 local player_limb_gib_threshold = 160
 local player_head_gib_threshold = 175
 local bonetohitgroup, hitgrouptolimb
@@ -1217,7 +1220,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local slow_pain = (1 - instantPainMul) * painadd
 		org.painadd = org.painadd + slow_pain
 		//org.avgpain = org.avgpain + instant_pain
-		local meleeShockMul = isMeleeDmg and (isSharpMelee and 0.55 or 0.7) or 1
+		local meleeShockMul = isMeleeDmg and (isSharpMelee and 0.44 or 0.56) or 1
 		local shockAdd = instaPain * shockMul * 4.5 * instant_pain_shock_scale * meleeShockMul * math.Clamp(pen / 5,1,2)
 		org.shock = math.min(org.shock + shockAdd, 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
@@ -1252,9 +1255,20 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_BURN) then
 			org.fearadd = org.fearadd + 0.3
 			if IsValid(att) and att ~= org.owner and att:IsPlayer() and att.organism then
-				local reserveK = math.Clamp((att.organism.adrenalineStorage or 0) / 5, 0, 1)
-				att.organism.adrenalineAdd = math.max(att.organism.adrenalineAdd or 0, 0.7 * (0.35 + reserveK * 0.65))
-				att:AddNaturalAdrenaline(0.15)
+				local attackerOrg = att.organism
+				local now = CurTime()
+
+				if now >= (attackerOrg._attackAdrenalineCooldownUntil or 0) then
+					attackerOrg._attackAdrenalineGainUntil = now + attacker_adrenaline_gain_window
+					attackerOrg._attackAdrenalineCooldownUntil = attackerOrg._attackAdrenalineGainUntil + attacker_adrenaline_cooldown
+				end
+
+				if now <= (attackerOrg._attackAdrenalineGainUntil or 0) then
+					if (attackerOrg.adrenaline or 0) < attacker_adrenaline_cap then
+						att:AddNaturalAdrenaline(0.15)
+						attackerOrg.adrenaline = math.min(attackerOrg.adrenaline or 0, attacker_adrenaline_cap)
+					end
+				end
 			end
 		end
 
@@ -1374,7 +1388,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if org.isPly then
 		hitgroup_max = hitgroup == HITGROUP_HEAD and player_head_gib_threshold or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup_max
 	end
-	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 40 or 135 -- easier decapitation
+	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 85 or 135 -- heads remain easier to sever than limbs, but not from light damage
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)

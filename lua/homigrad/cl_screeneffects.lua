@@ -828,10 +828,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
     end
 
     local adrenaline = org.adrenaline or 0
-    if adrenaline > 1.5 then
-        blurAmount = math.max(blurAmount, (adrenaline - 1.5) * 3)
+    if adrenaline > 2.5 then
+        blurAmount = math.max(blurAmount, (adrenaline - 2.5) * 3)
 
-		local adrenalineShock = (adrenaline - 1.5) * 2
+		local adrenalineShock = (adrenaline - 2.5) * 2
         if not (lply:IsBerserk() or lply:IsStimulated()) then
             render.UpdateScreenEffectTexture()
             heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
@@ -2241,11 +2241,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	do
 		local grayscaleTarget = 0
-
-		local fear = org.fear or 0
-		if fear > 0 then
-			grayscaleTarget = grayscaleTarget + math.Clamp(fear / 2, 0, 1) * 0.18
-		end
 
 		local suppForce = (SIB_suppress and SIB_suppress.Force or 0)
 		if suppForce > 1 then

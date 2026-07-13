@@ -5,6 +5,7 @@ SWEP.Instructions = "A single-handed striking tool with a sharp blade on one sid
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
+SWEP.Damage = 25
 SWEP.HoldType = "melee"
 
 SWEP.SuicidePos = Vector(28, 6, -31)
@@ -20,7 +21,7 @@ SWEP.SuicidePunchAng = Angle(5, -15, 0)
 SWEP.Weight = 0
 SWEP.weight = 1
 
-SWEP.WorldModel = "models/hatedmekkr/boneworks/weapons/melee/blades/axes/bw_wpn_ax_hatchet.mdl"
+SWEP.WorldModel = "models/weapons/tfa_nmrih/w_me_hatchet.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_hatchet.mdl"
 SWEP.WorldModelExchange = "models/prop/re9_requiem_hatchet.mdl"
 SWEP.DontChangeDropped = true

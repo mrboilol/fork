@@ -27,7 +27,7 @@ SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "Concrete.ImpactHard"
 
 SWEP.DamageType = DMG_CLUB
-SWEP.DamagePrimary = 10
+SWEP.DamagePrimary = 6
 SWEP.DamageSecondary = 6
 
 SWEP.PenetrationPrimary = 3

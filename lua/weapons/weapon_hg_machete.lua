@@ -6,7 +6,7 @@ SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 
-SWEP.WorldModel = "models/weapons/melee/w_ws_pamachete.mdl"
+SWEP.WorldModel = "models/weapons/tfa_nmrih/w_me_machete.mdl"
 SWEP.WorldModelReal = "models/weapons/tfa_nmrih/v_me_machete.mdl"
 SWEP.WorldModelExchange = "models/weapons/melee/w_ws_pamachete.mdl"
 SWEP.ViewModel = ""
@@ -27,7 +27,7 @@ SWEP.HoldType = "melee"
 
 SWEP.DamageType = DMG_SLASH
 
-SWEP.HoldPos = Vector(-15,4,-2)
+SWEP.HoldPos = Vector(-15,1,-4)
 SWEP.HoldAng = Angle(-2,0,-4)
 
 SWEP.AttackTime = 0.35
@@ -47,8 +47,8 @@ SWEP.sprint_ang = Angle(15,0,0)
 
 SWEP.basebone = 94
 
-SWEP.weaponPos = Vector(0,5,0)
-SWEP.weaponAng = Angle(90,0,0)
+SWEP.weaponPos = Vector(0,0,0)
+SWEP.weaponAng = Angle(0,0,0)
 
 SWEP.DamageType = DMG_SLASH
 SWEP.DamagePrimary = 40
@@ -56,7 +56,7 @@ SWEP.DamageSecondary = 3
 SWEP.BleedMultiplier = 2
 SWEP.PainMultiplier = 1.3
 
-SWEP.PenetrationPrimary = 3
+SWEP.PenetrationPrimary = 7
 SWEP.PenetrationSecondary = 0
 
 SWEP.MaxPenLen = 6

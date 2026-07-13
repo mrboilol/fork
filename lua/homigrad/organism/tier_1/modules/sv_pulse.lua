@@ -69,8 +69,9 @@ module[2] = function(owner, org, timeValue)
 	local bloodNow = org.blood or 5000
 	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
 	local hypovolemicShock = math.Clamp(org.hypovolemicShock or 0, 0, 1)
-	-- Old Z-City compensation curve: blood volume directly weakens effective pulse.
-	local bloodPerfusionK = math.Clamp((bloodNow - 1000) / 4000, 0, 1)
+	-- Blood volume begins weakening effective perfusion at 3500 mL. Keeping
+	-- full perfusion above that point prevents compensation from starting early.
+	local bloodPerfusionK = bloodNow >= 3500 and 1 or math.Remap(math.Clamp(bloodNow, 1000, 3500), 1000, 3500, 0, 1)
 	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
@@ -111,13 +112,17 @@ module[2] = function(owner, org, timeValue)
 	local perfusionPulse = org.pulse or 70
 	local compensationRate = perfusionPulse < 70 and 70 + (70 - perfusionPulse) * 4 or perfusionPulse
 	compensationRate = math.Clamp(compensationRate, 45, 300)
-	-- Severe hypovolemia drives the heart from its compensated rate toward
-	-- ventricular tachycardia: the ramp begins at 2500 blood and reaches
-	-- roughly 300 BPM by 2250 blood.
-	local bloodTachyK = math.Clamp((2500 - bloodNow) / 250, 0, 1)
-	local bloodTachyRate = Lerp(bloodTachyK, compensationRate, 300)
+	-- Blood-loss compensation starts at 3500 mL. It rises steadily to marked
+	-- tachycardia at 2500, then rapidly becomes ventricular tachycardia and
+	-- reaches 300 BPM at 2250. Above 3500, blood volume adds no heart-rate boost.
+	local bloodCompensationRate = 70
+	if bloodNow < 2500 then
+		bloodCompensationRate = Lerp(math.Clamp((2500 - bloodNow) / 250, 0, 1), 160, 300)
+	elseif bloodNow < 3500 then
+		bloodCompensationRate = Lerp(math.Clamp((3500 - bloodNow) / 1000, 0, 1), 70, 160)
+	end
 
-	local heartbeat = math.max(compensationRate, bloodTachyRate)
+	local heartbeat = math.max(compensationRate, bloodCompensationRate)
 
 	local staminaMax = math.max(org.stamina.max or 180, 1)
 	local stamina = math.Clamp(org.stamina[1] or staminaMax, 0, staminaMax)
@@ -146,8 +151,8 @@ module[2] = function(owner, org, timeValue)
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
 	local survivalK = math.Clamp(k, 0, 1)
 	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, 270)
-	if bloodTachyK > 0 then
-		maxCompensatedRate = math.max(maxCompensatedRate, bloodTachyRate)
+	if bloodNow < 3500 then
+		maxCompensatedRate = math.max(maxCompensatedRate, bloodCompensationRate)
 	end
 	if heart < 0.35 or brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
@@ -163,15 +168,17 @@ module[2] = function(owner, org, timeValue)
 	-- tachycardia/fibrillation; above ~300 the heart cannot fill and arrests.
 	heartbeat = math.Clamp(heartbeat, 0, maxCompensatedRate)
 
-	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 2.4 or timeValue * 4.5)
+	-- The cardiovascular response accelerates with blood loss. The old fixed
+	-- 2.4 BPM/s rise lagged so far behind active bleeding that the target curve
+	-- was never reached before pressure collapse.
+	local compensationResponse = math.Clamp((3500 - bloodNow) / 1250, 0, 1)
+	local riseRate = Lerp(compensationResponse, 3, 75)
+	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * riseRate or timeValue * 4.5)
 
-	-- Only sustained extreme tachycardia collapses into cardiac arrest. Short
-	-- event spikes should look scary without instantly killing a viable player.
+	-- Track sustained ventricular tachycardia for the probabilistic arrest
+	-- check below. Low pressure/perfusion remains the deterministic flatline.
 	if org.heartbeat > 250 and k < 0.65 then
 		org._tachycardiaSince = org._tachycardiaSince or CurTime()
-		if org._tachycardiaSince + 4 < CurTime() then
-			org.heartstop = true
-		end
 	else
 		org._tachycardiaSince = nil
 	end
@@ -229,7 +236,7 @@ module[2] = function(owner, org, timeValue)
 	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
 	local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
 	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.12)
-	local volumeMapK = blood >= 3600 and 1 or math.Remap(math.Clamp(blood, 900, 3600), 900, 3600, 0.12, 1)
+	local volumeMapK = blood >= 3500 and 1 or math.Remap(math.Clamp(blood, 1000, 3500), 1000, 3500, 0.12, 1)
 	local map = 93 * pulse_factor * hypertensionMul * compensation * volumeMapK
 	map = org.alive and map or 0
 

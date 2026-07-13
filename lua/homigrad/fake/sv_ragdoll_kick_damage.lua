@@ -183,11 +183,21 @@ local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName
     local sound = GetKickSound(target)
     target:EmitSound(sound, 75, math.random(95, 105))
     
-    -- A committed ragdoll kick gives the attacker a noticeable adrenaline response.
-    if IsValid(attacker) and attacker.organism then
-        local adrenalineGain = math.Clamp(damage * 0.01, 0.1, 0.15)
-        attacker.organism.adrenalineAdd = math.min(attacker.organism.adrenalineAdd + adrenalineGain, 4)
-    end
+	-- A committed ragdoll kick shares the same short attack-adrenaline window and cap.
+	if IsValid(attacker) and attacker.organism then
+		local attackerOrg = attacker.organism
+		local now = CurTime()
+
+		if now >= (attackerOrg._attackAdrenalineCooldownUntil or 0) then
+			attackerOrg._attackAdrenalineGainUntil = now + 2
+			attackerOrg._attackAdrenalineCooldownUntil = attackerOrg._attackAdrenalineGainUntil + 5
+		end
+
+		if now <= (attackerOrg._attackAdrenalineGainUntil or 0) then
+			local adrenalineGain = math.Clamp(damage * 0.01, 0.1, 0.15)
+			attackerOrg.adrenalineAdd = math.min((attackerOrg.adrenalineAdd or 0) + adrenalineGain, 1.5)
+		end
+	end
 end
 
 -- Function to open door faster and restore original speed

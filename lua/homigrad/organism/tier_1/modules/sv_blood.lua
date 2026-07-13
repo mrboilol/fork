@@ -344,8 +344,8 @@ module[2] = function(owner, org, mulTime)
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
 	local blood = org.blood or 5000
 	local bloodDeficit = math.Clamp((4000 - blood) / 2500, 0, 1)
-	local compensation = math.Clamp((3600 - blood) / 1100, 0, 1)
-	local shockStage = math.Clamp((2600 - blood) / 700, 0, 1)
+	local compensation = math.Clamp((3500 - blood) / 1000, 0, 1)
+	local shockStage = math.Clamp((2500 - blood) / 750, 0, 1)
 
 	org.hypovolemia = bloodDeficit
 	org.hemorrhageCompensation = compensation * (1 - shockStage * 0.35)
