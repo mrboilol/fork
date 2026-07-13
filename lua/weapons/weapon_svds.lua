@@ -1,9 +1,9 @@
 SWEP.Base = "homigrad_base"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
-SWEP.PrintName = "SVD"
+SWEP.PrintName = "SVDS"
 SWEP.Author = "Kalashnikov Concern"
-SWEP.Instructions = "Semi-automatic Marksman rifle chambered in 7.62x54 mm"
+SWEP.Instructions = "Semi-automatic Sniper rifle chambered in 7.62x54 mm"
 SWEP.Category = "Weapons - Sniper Rifles"
 SWEP.Slot = 2
 SWEP.SlotPos = 10
@@ -11,14 +11,14 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_snip_g3sg1.mdl"
 SWEP.WorldModelFake = "models/weapons/c_svd.mdl"
 
-SWEP.FakeAttachment = "1"
-SWEP.FakeEjectBrassATT = "2"
-
-SWEP.FakeBodyGroups = "11101001010111111"
+SWEP.FakeBodyGroups = "1111100124003121"
 SWEP.FakePos = Vector(-15, 2.02, 5.25)
 SWEP.FakeAng = Angle(0, 0, 0)
 SWEP.AttachmentPos = Vector(0.5, 0.1, 0.3)
 SWEP.AttachmentAng = Angle(0, 0, 0)
+
+SWEP.FakeAttachment = "1"
+SWEP.FakeEjectBrassATT = "2"
 
 SWEP.MagModel = "models/kali/weapons/10rd m14 magazine.mdl"
 SWEP.FakeMagDropBone = "Magazine"
@@ -27,6 +27,7 @@ SWEP.lmagang = Angle(0, 0, 0)
 SWEP.lmagpos2 = Vector(0, 0.3, 0)
 SWEP.lmagang2 = Angle(0, 0, 0)
 SWEP.ViewPunchDiv = 1000
+
 
 local vector_full = Vector(1, 1, 1)
 local vecPochtiZero = Vector(0.01, 0.01, 0.01)
@@ -77,7 +78,6 @@ SWEP.AnimsEvents = {
 	},
 }
 
-
 function SWEP:AllowedInspect()
 	if not self:CanUse() then return end
 	if self.isReloading then return end
@@ -87,9 +87,9 @@ function SWEP:AllowedInspect()
 end
 
 SWEP.ScrappersSlot = "Primary"
-SWEP.WepSelectIcon2 = Material("entities/arc9_eft_svd.png")
+SWEP.WepSelectIcon2 = Material("entities/arc9_eft_svds.png")
 SWEP.WepSelectIcon2box = true
-SWEP.IconOverride = "entities/arc9_eft_svd.png"
+SWEP.IconOverride = "entities/arc9_eft_svds.png"
 SWEP.weight = 4
 SWEP.weaponInvCategory = 1
 SWEP.CustomShell = "762x54"
@@ -102,34 +102,20 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "7.62x54 mm"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = 0
-SWEP.Primary.Damage = 65
-SWEP.Primary.Force = 65
+SWEP.Primary.Damage = 70
+SWEP.Primary.Force = 70
 SWEP.Primary.Sound = {"weapons/darsu_eft/svds/svd_fire_close.ogg", 85, 100, 100}
 SWEP.SupressedSound = {"weapons/darsu_eft/svds/svd_fire_close_silenced.ogg", 65, 100, 100}
 SWEP.availableAttachments = {
 	barrel = {
 		[1] = {"supressor1", Vector(0, 0, 0), {}},
-		[2] = {"supressor6", Vector(3, 0, 0), {}},
-		["mount"] = Vector(-0.5, 0.6, 0),
+		[2] = {"supressor8", Vector(3, 0, 0), {}},
+		["mount"] = Vector(-2.8, -0.1, -0.29),
 	},
-	sight = {
-		["mountType"] = {"picatinny", "dovetail"},
-		["mount"] = {["dovetail"] = Vector(-30.5, 2, -0.45), ["picatinny"] = Vector(-31, 2.35, -0.2)},
-	},
-	mount = {
-		["picatinny"] = {
-			"mount3",
-			Vector(-28, -0.3, -1.3),
-			{},
-			["mountType"] = "picatinny",
-		},
-		["dovetail"] = {
-			"empty",
-			Vector(0, 0, 0),
-			{},
-			["mountType"] = "dovetail",
-		},
-	},
+    sight = {
+        ["mountType"] = {"picatinny", "ironsight"},
+        ["mount"] = Vector(-27, 1.5, -0.29),
+    },
 }
 
 SWEP.addSprayMul = 1
@@ -155,20 +141,18 @@ SWEP.ReloadTime = 4.8
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
 SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
 SWEP.HoldType = "rpg"
-SWEP.ZoomPos = Vector(0, -2.2656, 3.7901)
+SWEP.ZoomPos = Vector(0, -2.2829, 3.8266)
 SWEP.RHandPos = Vector(-8, -2, 6)
 SWEP.LHandPos = Vector(6, -3, 1)
 SWEP.AimHands = Vector(-10, 1.8, -6.1)
 SWEP.SprayRand = {Angle(0.05, -0.05, 0), Angle(-0.05, 0.05, 0)}
-SWEP.Ergonomics = 0.75
+SWEP.Ergonomics = 0.85
 SWEP.Penetration = 15
 SWEP.ZoomFOV = 20
 SWEP.WorldPos = Vector(5.5, -1, -1)
 SWEP.WorldAng = Angle(0, 0, 0)
 SWEP.UseCustomWorldModel = true
 SWEP.handsAng = Angle(-2, -1, 0)
-SWEP.scopemat = Material("decals/scope.png")
-SWEP.perekrestie = Material("decals/perekrestie8.png", "smooth")
 SWEP.localScopePos = Vector(-21, 3.95, -0.2)
 SWEP.scope_blackout = 400
 SWEP.maxzoom = 3.5
@@ -180,7 +164,7 @@ SWEP.FOVScoped = 40
 
 local vecZero = Vector(0, 0, 0)
 
-SWEP.DistSound = "weapons/tfa_ins2/sks/sks_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/svds/svd_fire_close.ogg"
 
 SWEP.lengthSub = 15
 
@@ -207,3 +191,4 @@ function SWEP:DrawPost()
 		wep:ManipulateBonePosition(70, Vector(-1.8 * self.shooanim, 0, 0), false)
 	end
 end
+
