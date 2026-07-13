@@ -204,6 +204,7 @@ local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") 
 hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
+local bloodDecalCellSize = 4
 
 local function playBloodDripImpact(pos, tr)
 	if math.Rand(0, 1) > bloodDripSoundChance then return end
@@ -215,7 +216,9 @@ local function playBloodDripImpact(pos, tr)
 end
 
 local function decalBlood(pos, normal, tr, artery, owner)
-	local vec = tostring(math.Round(pos[1]))..tostring(math.Round(pos[2]))..tostring(math.Round(pos[3]))
+	-- Pool nearby splashes so a single burst does not immediately evict older
+	-- engine decals from the client's finite decal buffer.
+	local vec = math.Round(pos[1] / bloodDecalCellSize)..":"..math.Round(pos[2] / bloodDecalCellSize)..":"..math.Round(pos[3] / bloodDecalCellSize)
 
 	hg.bloodcount = hg.bloodcount + 1
 	
@@ -232,7 +235,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 			
 			//timer.Simple(0.1, function()
 				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-				if hg.bloodpositions[vec] < 6 then
+				if hg.bloodpositions[vec] < 4 then
 					util.Decal("Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
 				end
 				playBloodDripImpact(pos, tr)
@@ -250,7 +253,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 				
 				playBloodDripImpact(pos, tr)
 
-				if hg.bloodpositions[vec] < 6 then
+				if hg.bloodpositions[vec] < 4 then
 					util.Decal("Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
 				end
 

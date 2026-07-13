@@ -77,6 +77,12 @@ local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
 	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
+	local sprayDir = -vel * math.Rand(0.25, 0.4)
+
+	-- The server sends separate entry and exit positions only when a shot passes through.
+	for i = 1, math.random(1, 2) do
+		addBloodPart2(pos + velnorm + VectorRand(-1.5, 1.5), sprayDir + VectorRand(-25, 25), nil, Rand(8, 12), Rand(8, 12), Rand(0.4, 0.65))
+	end
 	
 	if hg_bloodimpacts:GetBool() then
 		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
@@ -194,10 +200,16 @@ local function getInjuryPos(ent, boneName)
 	return mat and mat:GetTranslation() or ent:WorldSpaceCenter()
 end
 
-local function emitInjuryMist(ent, pos)
+local function emitInjuryMist(ent, pos, forceful)
 	if not pos then return end
-	for i = 1, math.random(1, 2) do
-		hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), VectorRand(-18, 18) + Vector(0, 0, math.Rand(4, 14)), nil, math.Rand(6, 10), math.Rand(6, 10), math.Rand(0.25, 0.4), true, ent)
+	local mistSpeed = forceful and 80 or 18
+	local mistCount = forceful and math.random(4, 6) or math.random(1, 2)
+	for i = 1, mistCount do
+		local velocity = VectorRand(-mistSpeed, mistSpeed) + Vector(0, 0, math.Rand(forceful and 20 or 4, forceful and 55 or 14))
+		hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), velocity, nil, math.Rand(6, 10), math.Rand(6, 10), forceful and math.Rand(0.65, 0.95) or math.Rand(0.25, 0.4), true, ent)
+		if forceful then
+			hg.addBloodPart(pos + VectorRand(-1, 1), velocity * math.Rand(1.1, 1.6), mat_huy, math.Rand(0.65, 1), math.Rand(0.65, 1), true, false)
+		end
 	end
 end
 
@@ -212,9 +224,11 @@ hook.Add("HG_OrganismChanged", "injury_damage_mist", function(oldorg, org)
 	if not IsValid(ent) then return end
 
 	local mistPos
+	local amputation
 	for ind, nam in pairs(limbs) do
 		if !oldorg[ind.."amputated"] and org[ind.."amputated"] then
 			mistPos = getInjuryPos(ent, nam)
+			amputation = true
 			break
 		end
 	end
@@ -249,7 +263,7 @@ hook.Add("HG_OrganismChanged", "injury_damage_mist", function(oldorg, org)
 		end
 	end
 
-	emitInjuryMist(ent, mistPos)
+	emitInjuryMist(ent, mistPos, amputation)
 end)
 
 hg.explode = explode

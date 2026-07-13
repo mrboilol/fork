@@ -663,8 +663,8 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 
 		ply.FakeRagdoll = ragdoll
 		-- The ragdoll owns the visible silhouette while faked.  Suppress the
-		-- player entity's separate animated shadow, which otherwise keeps playing
-		-- the fall animation beneath the physical ragdoll.
+		-- player entity completely so it cannot leave a second animated shadow.
+		ply:SetNoDraw(true)
 		ply:DrawShadow(false)
 		hook_Run("Fake", ply, ragdoll)
 	else

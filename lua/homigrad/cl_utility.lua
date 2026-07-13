@@ -388,14 +388,7 @@ players : 1 humans, 0 bots (20 max)
 			local force = SIB_suppress.Force - 1
 
 			if force > 0 then
-				render.UpdateScreenEffectTexture()
-
-				vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-				vignetteMat:SetFloat("$c0_z", force / 3 ) //ColorIntensity
-				vignetteMat:SetFloat("$c1_y", force / 12 ) //Vignette
-
-				render.SetMaterial(vignetteMat)
-				render.DrawScreenQuad()
+				hg.DrawVignetteLayer(vignetteMat, force / 3, force / 12)
 			end
 
 			if force > 6 then

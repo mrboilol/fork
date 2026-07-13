@@ -4,9 +4,9 @@
 if not SERVER then return end
 
 -- Configuration
-local KICK_SPEED_THRESHOLD = 260 -- Minimum speed for kick damage
-local MAX_KICK_DAMAGE = 24 -- Maximum damage cap
-local KICK_DAMAGE_MULTIPLIER = 0.075 -- Speed to damage conversion rate
+local KICK_SPEED_THRESHOLD = 220 -- Minimum speed for kick damage
+local MAX_KICK_DAMAGE = 36 -- Maximum damage cap
+local KICK_DAMAGE_MULTIPLIER = 0.1 -- Speed to damage conversion rate
 local KICK_DAMAGE_COOLDOWN = 0.5 -- Cooldown between kick damage hits (seconds)
 
 -- Hit tracking to prevent damage multiplication
@@ -268,14 +268,14 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
 
     -- Door handling with two different behaviors
     if hgIsDoor(data.HitEntity) then
-        if data.Speed > 700 then
+        if data.Speed > 560 then
             -- High-speed impact: Break door + bleeding + dislocation
             -- Play fire axe door breaking sounds
             sound.Play("Wood_Crate.Break", data.HitEntity:GetPos(), 60, 100)
             sound.Play("Wood_Furniture.Break", data.HitEntity:GetPos(), 60, 100)
             hgBlastThatDoor(data.HitEntity, data.HitNormal * 200)
             ApplyInjuriesToRagdoll(ragdoll)
-        elseif data.Speed > 400 then
+        elseif data.Speed > 320 then
             -- Normal speed impact: Just open door faster
             OpenDoorFaster(data.HitEntity)
         end

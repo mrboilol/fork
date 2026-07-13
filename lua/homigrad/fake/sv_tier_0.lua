@@ -1234,7 +1234,9 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
 		ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
 		ply:SetPos(pos)
-		ply:SetNoDraw(false)
+		-- The physical ragdoll is the only world model while fake. RENDERMODE_NONE
+		-- alone can leave the player entity participating in shadow rendering.
+		ply:SetNoDraw(true)
 		ply:SetRenderMode(RENDERMODE_NONE)
 		//ply:ExitVehicle()
 	--end)
@@ -1348,6 +1350,11 @@ function hg.FakeUp(ply, forced, instant)
 	
 	if !IsValid(ragdoll) then return end
 
+	-- Standing up is a state transition, not arm use. Preserve queued pain so
+	-- damaged/dislocated arms cannot add pain through spawn or fake-up hooks.
+	local org = ply.organism
+	local painAddBeforeFakeUp = org and org.painadd
+
 	if ragdoll.welds then
 		if ply:InVehicle() then
 			local veh = ply:GetVehicle()
@@ -1425,6 +1432,7 @@ function hg.FakeUp(ply, forced, instant)
 	//local pos = ply:GetPos()
 	ply:Spawn()
 	//ply:SetPos(pos)
+	ply:SetNoDraw(false)
 	ply:SetRenderMode(RENDERMODE_NORMAL)
 	ply.LastFakeUp = CurTime()
 	ply:DrawWorldModel(true)
@@ -1514,6 +1522,9 @@ function hg.FakeUp(ply, forced, instant)
 
 	if IsValid(ragdoll) then ragdoll:SetNWEntity("ply", NULL) end
 	if ply.oldCanUseFlashlight and not ply:CanUseFlashlight() then ply:AllowFlashlight(true) end
+	if org and ply.organism == org and painAddBeforeFakeUp ~= nil then
+		org.painadd = painAddBeforeFakeUp
+	end
 	local time = (ply.lastFake or 0) > 0 and 0.1 or 1.5
 	--[[timer.Simple(time,function()
 		if IsValid(ply) then

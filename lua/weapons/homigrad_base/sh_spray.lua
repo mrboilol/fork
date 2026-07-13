@@ -333,7 +333,7 @@ function SWEP:PrimarySpread()
 		-- ceiling (and oneHandRecoilMul had already affected force above). Keep
 		-- the gun hard to control without allowing a broken arm to explode the
 		-- camera punch into several stacked multiples.
-		local injuryRecoilMul = math.Clamp(broken_arm_recoil_mult * oneHandRecoilMul * armHandlingMul, 1, 2.15)
+		local injuryRecoilMul = math.Clamp(broken_arm_recoil_mult * oneHandRecoilMul * armHandlingMul, 1, 1.65)
 		mul = mul * injuryRecoilMul
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
@@ -397,7 +397,12 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		local muzzleKick = sprayAng * (organism.recoilmul or 1) * armHandlingMul * oneHandRecoilMul * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
+		-- Injury and lost-hand support are already represented by mul above.
+		-- Multiplying both into the direct eye-angle kick again could pin the
+		-- camera at its pitch limit after firing with a damaged arm.
+		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.62, 0.22, 1.85)
+		local muzzleKick = sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
+		muzzleKick[1] = muzzleKick[1] - verticalKick
 		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.35, -6.0, 2.4)
 		local muzzleYawCap = math.min(0.65, math.abs(muzzleKick[1]) * 0.18 + 0.08)
 		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.32, -muzzleYawCap, muzzleYawCap)
@@ -450,6 +455,9 @@ end
 local angZero = Angle(0, 0, 0)
 function SWEP:ApplyEyeSprayVel(value)
 	self.EyeSprayVel = self.EyeSprayVel + value * 0.2
+	self.EyeSprayVel[1] = math.Clamp(self.EyeSprayVel[1], -6, 6)
+	self.EyeSprayVel[2] = math.Clamp(self.EyeSprayVel[2], -2.5, 2.5)
+	self.EyeSprayVel[3] = 0
 	self:ApplyEyeSpray(self.EyeSprayVel)
 	--self.AdditionalAng = self.AdditionalAng + Angle(-math.Rand(self.EyeSprayVel[1] * 1 ,self.EyeSprayVel[1] * 2),math.Rand(self.EyeSprayVel[2] * 2 ,self.EyeSprayVel[2] * 5),-self.EyeSprayVel[2] * 10)
 	--self.AdditionalPos[1] = self.AdditionalPos[1] + self.EyeSprayVel[1] * 15

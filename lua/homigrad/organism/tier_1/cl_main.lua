@@ -526,12 +526,7 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 			-- Stronger vignette when memories show while awake and brain damaged
 			if not org.otrub then
 				local vignetteAlpha = math.Clamp(lerpedpart * (8 + brainFx * 92), 0, 100)
-				render.UpdateScreenEffectTexture()
-				memory_vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-				memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 20)
-				memory_vignetteMat:SetFloat("$c1_y", vignetteAlpha / 20)
-				render.SetMaterial(memory_vignetteMat)
-				render.DrawScreenQuad()
+				hg.DrawVignetteLayer(memory_vignetteMat, vignetteAlpha / 20, vignetteAlpha / 20)
 			end
 		else
 			if switch then
@@ -952,6 +947,7 @@ local arterialJetOffset = 0.12
 local arterialVelocityMul = 70
 local arterialDirectionRandomness = 0.75
 local arterialVerticalRandomness = 1
+local arterialPulseRetractRate = 85
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -1031,7 +1027,9 @@ function hg.queueArterialWoundSound(ent, wound)
 end
 
 emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData)
-	local pulseMul = math.max(pulse or 70, 35) / 70
+	local pulseMul = math.max(pulse or 70, 0) / 70
+	if pulseMul <= 0 then return end
+
 	local buildup = fxData and math.Clamp((CurTime() - (fxData.created or CurTime())) / arterialRampTime, arterialMinIntensity, 1) or 1
 	local time = CurTime()
 	local wave = 0.9 + math.sin(time * 5) * 0.18
@@ -1045,8 +1043,8 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 		local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
 		local sprayVel = VectorRand(-0.25, 0.25) * pulseMul * buildup
 		sprayVel:Add(dir * arterialVelocityMul * wave * buildup)
-		sprayVel:Add(right * (math.sin(time * 0.8) * 3 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * buildup)
-		sprayVel:Add(up * (math.sin(time * 0.6 + 1.1) * 2 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * buildup)
+		sprayVel:Add(right * (math.sin(time * 0.8) * 3 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * pulseMul * buildup)
+		sprayVel:Add(up * (math.sin(time * 0.6 + 1.1) * 2 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * pulseMul * buildup)
 		hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
 	end
 
@@ -1318,7 +1316,16 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
+			local pulse = math.max(org.pulse or 70, 0)
+			local visualPulse = wound.arterialVisualPulse
+			if visualPulse == nil or pulse >= visualPulse then
+				visualPulse = pulse
+			else
+				visualPulse = math.max(pulse, visualPulse - FrameTime() * arterialPulseRetractRate)
+			end
+			wound.arterialVisualPulse = visualPulse
+
+			local addtime = seen and 1 / math.Clamp(visualPulse, 1, 15) * 0.25 or 0.06
 			if wound[5] + addtime < time and ent:LookupBone(wound[4]) then
 				local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
@@ -1337,7 +1344,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local dir = wound[6]
-						local len = dir:Length() * (org.pulse or 70) / 70
+						local len = dir:Length() * visualPulse / 70
 						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)
 						
 						dir = -dir:Forward() * len
@@ -1347,7 +1354,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
 							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, ang, org.pulse, size, wound[7], fxData)
+							emitArterialSpray(ent, pos, dir, ang, visualPulse, size, wound[7], fxData)
 						end
 
 						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))

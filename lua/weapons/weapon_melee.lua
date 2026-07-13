@@ -284,6 +284,7 @@ SWEP.CanHeavyAttack = false
 -- Remorseism uses each weapon's configured damage and force without a hidden
 -- global reduction. Keep a named force multiplier for the live-only force paths.
 local MELEE_GLOBAL_KNOCKBACK_MUL = 1
+local MELEE_GLOBAL_STAMINA_COST_MUL = 1.2
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")

@@ -51,14 +51,6 @@ module[2] = function(owner, org, timeValue)
 		return
 	end
 
-	if org.heartstop then
-		org.heartbeat = 0
-		org.pulse = 0
-		org.bloodpressure = 0
-		org.systolic = 0
-		org.diastolic = 0
-	end
-
 	local pulse = org.heartstop and 0 or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
 	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
 	pulse = org.alive and pulse or 0
@@ -77,7 +69,10 @@ module[2] = function(owner, org, timeValue)
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
 
 	local bloodCrash = org.blood ~= nil and org.blood < 1500
-	local dropRate = (heart == 0 or org.heartstop or bloodCrash) and timeValue * 30 or timeValue * 5
+	-- Loss of circulation is progressive while the organism is still alive. This
+	-- leaves a short treatment window instead of turning a heart stop into an
+	-- immediate zero-pulse state on the next organism tick.
+	local dropRate = (heart == 0 or org.heartstop or bloodCrash) and timeValue * 6 or timeValue * 5
 	org.pulse = math.Approach(org.pulse, pulse, dropRate)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
@@ -368,10 +363,6 @@ module[2] = function(owner, org, timeValue)
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
 		org.disorientation = math.max(org.disorientation, 0.25 + effectiveHighK * 1.5)
 		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
-	end
-
-	if org.heartstop then
-		org.heartbeat = 0
 	end
 
 	org.fear = math.Approach(org.fear, (org.otrub and 0 or (org.fearadd > 0 and 1 or -1)), org.otrub and timeValue * 0.5 or (org.fearadd > 0 and (org.fear < 0 and timeValue * 5 * org.fearadd or timeValue / 5 * org.fearadd) or (org.fear <= 0 and timeValue / 240 or timeValue / 50)))

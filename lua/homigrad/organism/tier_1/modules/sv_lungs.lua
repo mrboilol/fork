@@ -740,11 +740,12 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	-- At this blood volume there is no longer enough circulating blood to
-	-- transport oxygen. Apply this after intake and berserk support so neither
-	-- can restore O2 without first restoring blood volume.
+	-- Critically low blood cannot sustain oxygen transport. Deplete the remaining
+	-- O2 progressively so transfusion/stabilization still has a brief window to
+	-- reverse the collapse instead of snapping the value straight to zero.
 	if org.blood <= 1750 then
-		o2[1] = 0
+		local exsanguinationSeverity = math.Clamp((1750 - org.blood) / 1750, 0, 1)
+		o2[1] = max(o2[1] - timeValue * (0.75 + exsanguinationSeverity * 1.25), 0)
 	end
 
 	
@@ -1087,8 +1088,12 @@ kaz
 	if org.brain >= 0.7 and org.alive then
 
 		death_from_braindamage = true
-		org.alive = false
-		if hg.organism and hg.organism.ZeroVitals then hg.organism.ZeroVitals(org) end
+		-- Catastrophic brain damage already suppresses breathing and cardiac drive.
+		-- Let those vitals run down before declaring death so treatment has the
+		-- same short intervention window as other causes of cardiopulmonary arrest.
+		if o2[1] <= 0 and (org.pulse or 0) <= 0 then
+			org.alive = false
+		end
 	end
 
 

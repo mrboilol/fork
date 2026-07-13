@@ -116,13 +116,6 @@ if CLIENT then
 		if LocalPlayer():InVehicle() then return end
 
         lerp = Lerp(FrameTime() * 5, lerp, self.Hidden and 8 or 0)
-		render.UpdateScreenEffectTexture()
-
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", lerp / 3 )
-		vignetteMat:SetFloat("$c1_y", lerp / 12 )
-
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, lerp / 3, lerp / 12)
 	end
 end

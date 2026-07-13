@@ -305,6 +305,12 @@ function SWEP:GetRecoilImpulseFactors()
 	local payloadFactor = payloadCount > 1 and math.Clamp(1 + math.log(payloadCount) / math.log(2) * 0.06, 1, 1.25) or 1
 
 	local caliber = math.Clamp((forceFactor * 0.45 + momentumFactor * 0.4 + diameterFactor * 0.15) * payloadFactor, 0.3, 3.6)
+	-- Light rifle projectiles and the rifle's own weight used to damp intermediate
+	-- cartridges below a meaningful long-gun recoil level.
+	if not self:IsPistolHoldType() and speed >= 750 and force >= 25 and diameter >= 5 then
+		local rifleFloor = (mass >= 7 or diameter >= 7) and 1.3 or 1.08
+		caliber = math.max(caliber, rifleFloor)
+	end
 	local weaponMass = math.Clamp(3 / math.max(weight, 0.5), 0.55, 1.75)
 
 	return caliber, weaponMass, recoilForce, numBullet, ammo
@@ -2623,22 +2629,28 @@ function SWEP:GetAdditionalValues()
 		-- Instability ramps up while firing, then settles like a lightly damped spring.
 		-- The long tail lets the gun cross its resting point a few times instead of
 		-- appearing to freeze the instant the main recoil animation reaches zero.
-		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.34 or 0.022, wobbleDt), self.recoilWobbleAmp or 0, firing and 1 or 0)
+		local armInjury = math.Clamp(armHandlingMul - 1, 0, 2)
+		local recoveryRate = Lerp(armInjury / 2, 0.018, 0.007)
+		local wobbleTarget = firing and (1.08 + armInjury * 0.12) or 0
+		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.38 or recoveryRate, wobbleDt), self.recoilWobbleAmp or 0, wobbleTarget)
 
-		if (self.recoilWobbleAmp or 0) > 0.0001 then
+		if (self.recoilWobbleAmp or 0) > 0.00001 then
 			local t = CurTime()
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 2.05
+			local frequencyMul = Lerp(armInjury / 2, 1, 0.68)
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 2.45 * (1 + armInjury * 0.35)
 
-			local wobX = math.sin(t * 1.65) * 0.65 + math.sin(t * 2.95) * 0.35
-			local wobY = math.cos(t * 2.05) * 0.65 + math.cos(t * 3.45) * 0.35
-			local wobZ = math.sin(t * 2.45) * 0.65 + math.cos(t * 3.2) * 0.35
+			local wobX = math.sin(t * 1.65 * frequencyMul) * 0.65 + math.sin(t * 2.95 * frequencyMul) * 0.35
+			local wobY = math.cos(t * 2.05 * frequencyMul) * 0.65 + math.cos(t * 3.45 * frequencyMul) * 0.35
+			local wobZ = math.sin(t * 2.45 * frequencyMul) * 0.65 + math.cos(t * 3.2 * frequencyMul) * 0.35
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.18
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 0.9
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.34
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.55
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.05
+			-- Keep the previous absolute yaw contribution while the added wobble
+			-- strength goes into pitch/roll and vertical recovery motion.
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.285
 
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.1
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.084
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
 		end
 

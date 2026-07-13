@@ -65,12 +65,16 @@ function ClearDecalToEnt(ent)
 	end
 
 	ent.decalshuy = nil
+	ent.hgBloodDecalMaterials = nil
+	ent.hgBloodDecalRenderTargets = nil
 end
 
 local matRepl = Material("decals/decalsplash")
 local curmat
 local curmat2
 function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, size, alpha)
+	if !IsValid(ent) then return end
+
 	local subm = ent:GetSubMaterial(id - 1) != "" and ent:GetSubMaterial(id - 1) or ent:GetMaterials()[id]
 	if !subm then
 		print("Invalid submaterial entered for weapon "..tostring(Entity(entIndex)).."; change SWEP.bloodID to something else or remove it completely if you don't wanna bother.")
@@ -78,17 +82,29 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 		return
 	end
 
-	local mata = Material(subm)
-	if !IsValid(ent) then return end
-	if !mata then return end
-	
 	ent.decalshuy = ent.decalshuy or {}
-	local firstime = !ent.decalshuy[id]
+	ent.hgBloodDecalMaterials = ent.hgBloodDecalMaterials or {}
+	ent.hgBloodDecalRenderTargets = ent.hgBloodDecalRenderTargets or {}
+
+	local firstime = ent.decalshuy[id] == nil
+	if firstime then
+		ent.decalshuy[id] = ent:GetSubMaterial(id - 1)
+	else
+		subm = ent.decalshuy[id] != "" and ent.decalshuy[id] or ent:GetMaterials()[id]
+	end
+
+	local mata = Material(subm)
+	if !mata then return end
 
 	local tabla = mata:GetKeyValues()
 	
 	-- you should set up entIndex for CSModels since their entIndex is -1
-	local mat = CreateMaterial(mata:GetName()..(entIndex or ent:EntIndex()).."228", mata:GetShader(), {})
+	local materialKey = mata:GetName()..":"..(entIndex or ent:EntIndex())..":"..id
+	local mat = ent.hgBloodDecalMaterials[id]
+	if not mat then
+		mat = CreateMaterial("hg_blood_"..util.CRC(materialKey), mata:GetShader(), {})
+		ent.hgBloodDecalMaterials[id] = mat
+	end
 	
 	--[[for i, val in pairs(tabla) do
 		if type(val) == "ITexture" then
@@ -103,7 +119,6 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	
 	mat:SetTexture("$basetexture", basetexture)
 
-	local name = mat:GetName()
 	local olddetail = mata:GetTexture("$detail")
 	local sizew = basetexture:Width()
 	local sizeh = basetexture:Height()
@@ -112,7 +127,11 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 
 	local tex = tex or matRepl
 	
-	local rt = GetRenderTargetEx("vms_rt_"..util.CRC(name), size, size, RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_SHARED, 0, CREATERENDERTARGETFLAGS_HDR, IMAGE_FORMAT_ARGB8888)
+	local rt = ent.hgBloodDecalRenderTargets[id]
+	if not rt then
+		rt = GetRenderTargetEx("hg_blood_rt_"..util.CRC(materialKey), size, size, RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_SHARED, 0, CREATERENDERTARGETFLAGS_HDR, IMAGE_FORMAT_ARGB8888)
+		ent.hgBloodDecalRenderTargets[id] = rt
+	end
 
 	render.PushRenderTarget(rt)
 
@@ -153,7 +172,6 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	curmat = mat
 	curmat2 = mata
 
-	ent.decalshuy[id] = ent:GetSubMaterial(id - 1)
 	ent:SetSubMaterial(id - 1, "!"..mat:GetName())
 	--print(ent:GetSubMaterial(id - 1), 1, "!"..mat:GetName(), 2)
 end

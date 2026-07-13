@@ -324,6 +324,28 @@ blindMat = Material("effects/shaders/zb_blind")
 zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
+local vignetteCompositeFrame = -1
+local vignetteCompositeColor = 0
+local vignetteCompositeStrength = 0
+function hg.DrawVignetteLayer(mat, colorIntensity, strength)
+	local frame = FrameNumber()
+	if vignetteCompositeFrame ~= frame then
+		vignetteCompositeFrame = frame
+		vignetteCompositeColor = 0
+		vignetteCompositeStrength = 0
+	end
+
+	vignetteCompositeColor = math.max(vignetteCompositeColor, colorIntensity or 0)
+	vignetteCompositeStrength = math.max(vignetteCompositeStrength, strength or 0)
+
+	render.UpdateScreenEffectTexture()
+	mat:SetFloat("$c2_x", CurTime() + 10000)
+	mat:SetFloat("$c0_z", vignetteCompositeColor)
+	mat:SetFloat("$c1_y", vignetteCompositeStrength)
+	render.SetMaterial(mat)
+	render.DrawScreenQuad()
+end
+
 PainLerp = 0
 PanicAttackLerp = 0
 O2Lerp = 0
@@ -846,12 +868,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
             render.SetMaterial(chromaticMat)
             render.DrawScreenQuad()
         end
-        render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", adrenalineShock * 0.6)
-		vignetteMat:SetFloat("$c1_y", adrenalineShock * 0.8)
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, adrenalineShock * 0.6, adrenalineShock * 0.8)
     end
 
     if blurAmount > 0 then
@@ -1370,18 +1387,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			extremePainFlicker = math.abs(math.sin(CurTime() * 15)) * flickerIntensity * 0.5
 		end
 		
-		render.UpdateScreenEffectTexture()
-
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
 		-- The vignette shader stops behaving predictably when fed very large values.
 		-- Clamp the combined pain/shock signal so extreme pain cannot wrap or wash
 		-- out the shock vignette.
 		local shockVignette = math.Clamp(pain / 30 + math.max(shock - 5, 0) / 2 + extremePainFlicker, 0, 10)
-		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or shockVignette) //ColorIntensity
-		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or shockVignette) //Vignette
-
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, org.otrub and 5 or shockVignette, org.otrub and 10 or shockVignette)
 
 		render.UpdateScreenEffectTexture()
 
@@ -1397,9 +1407,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		-- Pain is drawn after the shock pass and can otherwise wash the darker
 		-- shock vignette out at high values. Reapply the shock layer last so it
 		-- remains visible throughout the pain range.
-		render.UpdateScreenEffectTexture()
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, org.otrub and 5 or shockVignette, org.otrub and 10 or shockVignette)
 
 		if not org.otrub then
 			render.UpdateScreenEffectTexture()
@@ -1602,12 +1610,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				surface.SetMaterial(lobotomy_memory_mat)
 				surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand * 2), ScrH() + math.random(rand * 2))
 
-				render.UpdateScreenEffectTexture()
-				vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-				vignetteMat:SetFloat("$c0_z", 3.0)
-				vignetteMat:SetFloat("$c1_y", 5.0)
-				render.SetMaterial(vignetteMat)
-				render.DrawScreenQuad()
+				hg.DrawVignetteLayer(vignetteMat, 3.0, 5.0)
 			else
 				drawLobotomyFlash(alpha)
 			end
@@ -2092,12 +2095,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
     		render.DrawScreenQuad()
         end
 
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", despairShock * 0.35)
-		vignetteMat:SetFloat("$c1_y", despairShock * 0.55)
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, despairShock * 0.35, despairShock * 0.55)
 
         if not (lply:IsBerserk() or lply:IsStimulated()) then
 			local chromAmt = despairShock * 0.035
@@ -2191,12 +2189,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_mulb"] = (tab["$pp_colour_mulb"] or 0) - suicideLerp * 0.01
 
 		-- Strong vignette with slow pulse
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", suicideLerp * 0.6 + pulseEffect * 0.5)
-		vignetteMat:SetFloat("$c1_y", suicideLerp * 0.85 + pulseEffect * 2)
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, suicideLerp * 0.6 + pulseEffect * 0.5, suicideLerp * 0.85 + pulseEffect * 2)
 
 		-- Chromatic aberration
 		-- View wobble for disorientation

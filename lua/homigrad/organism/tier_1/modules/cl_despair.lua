@@ -257,12 +257,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 		local vignetteStrength = 2.8 + panicPulse * 1.2
 		local vignetteSoftness = 3.5 + panicPulse * 1.0
 
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", vignetteStrength)
-		vignetteMat:SetFloat("$c1_y", vignetteSoftness)
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, vignetteStrength, vignetteSoftness)
 
 		render.UpdateScreenEffectTexture()
 		heatMat:SetFloat("$c0_x", -CurTime() * 0.22)
@@ -282,12 +277,7 @@ hook.Add("Post Post Processing", "hg_despair_effect", function()
 	corpseVignetteLerp = LerpFT(0.05, corpseVignetteLerp, corpseTarget)
 
 	if corpseVignetteLerp > 0.001 then
-		render.UpdateScreenEffectTexture()
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", corpseVignetteLerp * 1.2)
-		vignetteMat:SetFloat("$c1_y", corpseVignetteLerp * 1.6)
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
+		hg.DrawVignetteLayer(vignetteMat, corpseVignetteLerp * 1.2, corpseVignetteLerp * 1.6)
 	end
 
 	local state = ply:GetNWString("hg_ptsd_state", "stable")
