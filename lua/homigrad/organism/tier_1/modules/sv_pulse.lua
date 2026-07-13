@@ -51,6 +51,12 @@ module[2] = function(owner, org, timeValue)
 		return
 	end
 
+	-- Heart rhythm is handled as an immediate arrest state. Only pulse pressure
+	-- and oxygen are allowed to run down gradually while treatment can intervene.
+	if org.heartstop then
+		org.heartbeat = 0
+	end
+
 	local pulse = org.heartstop and 0 or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
 	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
 	pulse = org.alive and pulse or 0

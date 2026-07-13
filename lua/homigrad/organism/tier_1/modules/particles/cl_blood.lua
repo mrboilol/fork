@@ -206,13 +206,19 @@ hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
 local bloodDecalCellSize = 4
 
-local function playBloodDripImpact(pos, tr)
+local function playBloodDripImpact(pos, tr, artery)
 	if math.Rand(0, 1) > bloodDripSoundChance then return end
 
-	sound.Play("newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav", pos, math.random(10, 60), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
 	if tr.MatType == MAT_METAL then
-		sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), tr.MatType == MAT_METAL and math.random(100, 120) or math.random(80, 120))
+		sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), math.random(100, 120))
+		return
 	end
+
+	local impactSound = artery
+		and "newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav"
+		or "drip" .. math_random(1, 3) .. ".ogg"
+
+	sound.Play(impactSound, pos, math.random(10, 60), math.random(80, 120))
 end
 
 local function decalBlood(pos, normal, tr, artery, owner)
@@ -238,11 +244,11 @@ local function decalBlood(pos, normal, tr, artery, owner)
 				if hg.bloodpositions[vec] < 4 then
 					util.Decal("Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
 				end
-				playBloodDripImpact(pos, tr)
+				playBloodDripImpact(pos, tr, true)
 			//end)
 		else
 			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr)
+			playBloodDripImpact(pos, tr, true)
 		end
 	else
 		if !hg_old_blood:GetBool() then
@@ -251,7 +257,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 			//timer.Simple(0.1, function()
 				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
 				
-				playBloodDripImpact(pos, tr)
+				playBloodDripImpact(pos, tr, false)
 
 				if hg.bloodpositions[vec] < 4 then
 					util.Decal("Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
@@ -264,7 +270,7 @@ local function decalBlood(pos, normal, tr, artery, owner)
 			//end)
 		else
 			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
-			playBloodDripImpact(pos, tr)
+			playBloodDripImpact(pos, tr, false)
 		end
 	end
 end

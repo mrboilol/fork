@@ -60,10 +60,6 @@ local function IsSharpHeadDamage(dmgInfo)
 	return dmgInfo and dmgInfo:IsDamageType(DMG_SLASH)
 end
 
-local function GetHeadBoneDamageScale(dmgInfo)
-	return IsSharpHeadDamage(dmgInfo) and 0.3 or 1
-end
-
 local function GetHeadConcussionScale(dmgInfo)
 	if IsSharpHeadDamage(dmgInfo) then return 0.25 end
 	if dmgInfo and dmgInfo:IsDamageType(DMG_GENERIC) then return 0.55 end
@@ -539,9 +535,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local old_headtrauma = org.headtrauma or 0
 	local sharpHead = IsSharpHeadDamage(dmgInfo)
 	local concussionMul = GetHeadConcussionScale(dmgInfo)
-	local boneDmg = dmg * GetHeadBoneDamageScale(dmgInfo)
-
-	local result, vecrand = damageBone(org, 0.25, boneDmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.jaw - oldDmg) * 3, "Jaw bone damage harm")
 
@@ -619,9 +613,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local old_headtrauma = org.headtrauma or 0
 	local sharpHead = IsSharpHeadDamage(dmgInfo)
 	local concussionMul = GetHeadConcussionScale(dmgInfo)
-	local boneDmg = dmg * GetHeadBoneDamageScale(dmgInfo)
-
-	local result, vecrand = damageBone(org, 0.35, boneDmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 

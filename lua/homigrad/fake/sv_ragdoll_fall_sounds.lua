@@ -225,6 +225,10 @@ hook.Add("Ragdoll Collide", "RagdollFallSounds", function(ragdoll, data)
     -- Check if ragdoll has an owner (player)
     local owner = hg.RagdollOwner(ragdoll)
     if not IsValid(owner) or not owner:IsPlayer() then return end
+
+    -- Share the authoritative grounded latch with the legacy fall-sound hook.
+    -- Resting physics bones keep colliding, but they are not new landings.
+    if ragdoll.hg_fallSoundGrounded then return end
     
     -- Check if we're hitting the ground or a solid surface
     if not IsGroundEntity(data.HitEntity) then return end
@@ -292,6 +296,7 @@ hook.Add("Ragdoll Collide", "RagdollFallSounds", function(ragdoll, data)
     
     -- Record this sound to prevent rapid successive sounds
     RecordFallSound(ragdoll)
+    ragdoll.hg_fallSoundGrounded = true
     
     -- Update ground position tracking after impact
     UpdateGroundPosition(ragdoll)
