@@ -133,22 +133,28 @@ if SERVER then
 
     function ENT:Think()
 		if self.Removed then return end
-		AeroDrag(self, self:GetAngles():Forward(), .75)
+		local curTime = CurTime()
+		local forward = self:GetAngles():Forward()
+
+		AeroDrag(self, forward, .75)
 		if self.Osejka then self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav") return end
-		self.Truhst = self.Truhst or CurTime() + self.TruhstTime
+		self.Truhst = self.Truhst or curTime + self.TruhstTime
 		local Eff = EffectData()
 		Eff:SetOrigin(self:GetPos())
-		Eff:SetNormal(-self:GetAngles():Forward())
+		Eff:SetNormal(-forward)
 		Eff:SetScale(0.5)
 		util.Effect(self.TrailEffect, Eff, true, true)
-		if self.Truhst >= CurTime() then
-        	self:GetPhysicsObject():SetVelocity( self:GetVelocity() + (self.dragvec or self:GetAngles():Forward()) * self.Speed )
-        	self:NextThink(CurTime() + 0.0)
+		if self.Truhst >= curTime then
+			local phys = self:GetPhysicsObject()
+			if IsValid(phys) then
+				phys:SetVelocity( self:GetVelocity() + (self.dragvec or forward) * self.Speed )
+			end
+			self:NextThink(curTime)
 		end
 		
 		local tr = {}
 		tr.start = self:GetPos()
-		tr.endpos = tr.start + self:GetAngles():Forward() * 128
+		tr.endpos = tr.start + forward * 128
 		tr.filter = self
 		
 		local trace = util.TraceLine(tr)
@@ -281,11 +287,23 @@ if SERVER then
 			co = coroutine.create(function()
 				local LastShrapnel = SysTime()
 				local vecCone = Vector(5, 5, 0)
-				local forward = self:GetAngles():Forward()
 				local selfowner = self.owner
 				local selfFragmentation = self.Fragmentation
-				local sampleCount = math.min(self.Fragmentation, shrapnelSampleCap)
-				for i = 1, sampleCount do
+				local filter = {self}
+				local bullet = {
+					Src = SelfPos,
+					Spread = vecCone,
+					Force = 20,
+					Damage = 40,
+					AmmoType = "Metal Debris",
+					Attacker = selfowner,
+					Inflictor = self,
+					Distance = 16756,
+					DisableLagComp = true,
+					Filter = filter
+				}
+
+				for i = 1, selfFragmentation do
 						LastShrapnel = SysTime()
 
 						local dir = VectorRand(-1,1):GetNormalized()--vector_up
@@ -294,17 +312,6 @@ if SERVER then
 
 						local Tr = util.QuickTrace(SelfPos, dir * 10000, self)
 						if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
-							local bullet = {}
-							bullet.Src = SelfPos
-							bullet.Spread = vecCone
-							bullet.Force = 30
-							bullet.Damage = 60
-							bullet.AmmoType = "Metal Debris"
-							bullet.Attacker = self.owner
-							bullet.Inflictor = self
-							bullet.Distance = 25000
-							bullet.DisableLagComp = true
-							bullet.Filter = {self}
 							bullet.Dir = dir
 							if not IsValid(self) then
 								self = Entity(1)
@@ -339,24 +346,7 @@ if SERVER then
 				timer.Remove("GrenadeCheck_" .. index)
 				return
 			end
-			if self.ShrapnelDone or not co or coroutine.status(co) == "dead" then
-				self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
-				SafeRemoveEntity(self)
-				timer.Remove("GrenadeCheck_" .. index)
-				return
-			end
-			if co then
-				local ok, err = coroutine.resume(co)
-				if not ok then
-					ErrorNoHalt(string.format("[projectile_base] shrapnel timer failed: %s\n", tostring(err)))
-					if IsValid(self) then
-						self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
-						SafeRemoveEntity(self)
-					end
-					timer.Remove("GrenadeCheck_" .. index)
-					return
-				end
-			end
+			coroutine.resume(co)
 			if self.ShrapnelDone then
 				self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
 				SafeRemoveEntity(self)

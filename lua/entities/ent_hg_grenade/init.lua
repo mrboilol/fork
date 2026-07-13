@@ -118,13 +118,14 @@ end
 
 function ENT:Think()
 	if CLIENT then return end
-	self:NextThink(CurTime())
+	local curTime = CurTime()
+	self:NextThink(curTime)
 
 	if self.AddThink then
 		self:AddThink()
 	end
 
-	if (CurTime() - ( self.CreateTime or 0 )) >= 90 and self.owner ~= nil then
+	if (curTime - ( self.CreateTime or 0 )) >= 90 and self.owner ~= nil then
 		self:SetOwner(nil)
 		self.owner = nil
 		self.shouldBoom = true
@@ -137,7 +138,7 @@ function ENT:Think()
 			local wpos = ent:LocalToWorld(lpos)
 
 			if wpos:Distance(self:GetPos()) > origlen + 20 then
-				self:Arm(CurTime() - self.timeToBoom + 1)
+				self:Arm(curTime - self.timeToBoom + 1)
 			end
 
 			local tr = {}
@@ -146,17 +147,18 @@ function ENT:Think()
 			tr.filter = {self,self.ent2,self.ent}
 			local trace = util.TraceLine(tr)
 			if IsValid(trace.Entity) then
-				self:Arm(CurTime() - self.timeToBoom + 1,trace.Entity:GetVelocity())
+				self:Arm(curTime - self.timeToBoom + 1,trace.Entity:GetVelocity())
 			end
 		end
 		if not IsValid(self.cons2) then
-			self:Arm(CurTime() - self.timeToBoom + 1,0)
+			self:Arm(curTime - self.timeToBoom + 1,0)
 		end
 		return true
 	end
 
-	if (CurTime() - self.timer) < self.timeToBoom then hg.EmitAISound(self:GetPos(), 256, 2, 8) end
-	if (CurTime() - self.timer) > self.timeToBoom and not self.Exploded then self:Explode() end
+	local time = curTime - self.timer
+	if time < self.timeToBoom then hg.EmitAISound(self:GetPos(), 256, 2, 8) end
+	if time > self.timeToBoom and not self.Exploded then self:Explode() end
 	
 	return true
 end
@@ -420,17 +422,32 @@ function ENT:Explode()
 		
 		local ammo = "Metal Debris"
 		local ammotype = hg.ammotypeshuy[ammo].BulletSettings
-		local sampleCount = math.min(self.Fragmentation, GRENADE_SHRAPNEL_SAMPLE_CAP)
-		if nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD_EXTREME then
-			sampleCount = math.min(sampleCount, GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP_EXTREME)
-		elseif nearbyPlayerCount >= GRENADE_CROWD_PLAYER_THRESHOLD then
-			sampleCount = math.min(sampleCount, GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP)
-		end
 
-		self.ShrapnelDone = false
-		self.ShrapnelCoroutine = coroutine.create(function()
-			for i = 1, sampleCount do
-				local LastShrapnel = SysTime()
+		local co = coroutine.create(function()
+
+			local LastShrapnel = SysTime()
+			local filter = {self}
+			local penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
+			local diameter = ammotype.Diameter or 1
+			local bullet = {
+				Speed = ammotype.Speed,
+				Distance = 56756,
+				MaxPenLen = 100,
+				Diameter = diameter,
+				Src = selfPos,
+				Spread = vecCone,
+				Force = 20,
+				Damage = 40,
+				AmmoType = ammo,
+				Attacker = self.owner,
+				Inflictor = self,
+				DisableLagComp = true,
+				Filter = filter,
+				Callback = hg.bulletHit
+			}
+
+			for i = 1, self.Fragmentation do
+					LastShrapnel = SysTime()
 
 					local dir = VectorRand(-1,1):GetNormalized()--vector_up
 					dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
@@ -439,25 +456,10 @@ function ENT:Explode()
 					local Tr = util.QuickTrace(selfPos, dir * 10000, self)
 
 					if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
-						local bullet = {}
-						bullet.Speed = ammotype.Speed
-						bullet.Distance = ammotype.Distance or 56756
 						bullet.penetrated = 0
-						bullet.MaxPenLen = 100
-						bullet.Penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
-						bullet.Diameter = ammotype.Diameter or 1
-						bullet.Src = selfPos
-						bullet.Spread = vecCone
-						bullet.Force = 50
-						bullet.Damage = 80
-						bullet.AmmoType = ammo
-						bullet.Attacker = self.owner
-						bullet.Inflictor = self
-						bullet.Distance = 56756
-						bullet.DisableLagComp = true
-						bullet.Filter = {self}
+						bullet.Penetration = penetration
+						bullet.Diameter = diameter
 						bullet.Dir = dir
-						bullet.Callback = hg.bulletHit
 
 						self:FireLuaBullets(bullet, true)
 					end
@@ -479,6 +481,7 @@ function ENT:Explode()
 		timer.Create("GrenadeCheck_" .. index, 0, 0, function()
 			if !IsValid(self) then
 				timer.Remove("GrenadeCheck_" .. index)
+				return
 			end
 
 			coroutine.resume(self.ShrapnelCoroutine)
