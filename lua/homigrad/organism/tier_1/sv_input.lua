@@ -593,17 +593,12 @@ end)
 
 hook.Add("PlayerDeath", "hg_forsaken_deathscene", function(victim)
 	local org = victim.organism
+
+	-- Forsaken now represents every real death, not only a recent brain-damage burst.
+	net.Start("hg_forsaken_deathscene")
+	net.Send(victim)
+
 	if not org then return end
-
-	local time = CurTime()
-	local burstDamage = org.brainBurstDamage or 0
-	local burstStart = org.brainBurstWindowStart or 0
-	local burstLast = org.brainBurstLast or 0
-
-	if burstDamage >= 0.3 and (time - burstLast) <= 1.5 and (time - burstStart) <= 2 then
-		net.Start("hg_forsaken_deathscene")
-		net.Send(victim)
-	end
 
 	org.brainBurstDamage = 0
 	org.brainBurstWindowStart = 0
@@ -978,6 +973,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	local lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = nil,{},{},{},{},nil,nil
 	org._bulletImpactBleedAdd = nil
+	-- Limb artery damage must stay on the side of the physics bone the bullet
+	-- actually entered; do not let a long trace rupture the opposite limb.
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
+		org._bulletImpactHitgroup = hitgroup ~= 0 and hitgroup or nil
+	end
 	if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
 		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, boxs, pos, sphere, organs, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, ent.organism, organs, dmg / 25, dmgInfo, dir)
 	elseif dmgInfo:IsDamageType(DMG_BLAST) then
@@ -987,6 +987,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.BlastTrace(dmgInfo:GetDamagePosition(), (ent:GetPos() - dmgInfo:GetDamagePosition()):Length() / 200, dmg * 2, boxs, organs, Trace_Blast, ent.organism, organs, dmg / 300, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
 	end
+	org._bulletImpactHitgroup = nil
 
 	if attacker:IsPlayer() then
 		ent:SetPhysicsAttacker(attacker, 15)
@@ -1162,6 +1163,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	local bonename = ent:GetBoneName(ent:TranslatePhysBoneToBone(bone))
 	local hitgroup = bonetohitgroup[bonename] or 0
+	local hasHeadArmor = org.owner.armors and org.owner.armors["head"] ~= nil
+	local fatalHeadshot = hitgroup == HITGROUP_HEAD
+		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		and not hasHeadArmor
 	--print(dmg_before, 1)
 	--if ent:IsRagdoll() then
 		if RagdollForceBoneMul[hitgroup] then len = len * RagdollForceBoneMul[hitgroup] end
@@ -1502,6 +1507,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	takeRagdollDamage(ent, dmgInfo)
 
+	if fatalHeadshot and hg.organism.KillFatalBrainDamage then
+		hg.organism.KillFatalBrainDamage(org)
+	end
+
 	if org.isPly then
 		hook.Run("Org Think Call", ply, org)
 		
@@ -1638,7 +1647,7 @@ function hg.organism.DamageTypeAffliction(dmg, dmgInfo, ply, org)
 	end
 
 	if dmgInfo:IsDamageType(DMG_BULLET) then
-		dmgBlood = dmg * 8
+		dmgBlood = dmg * 3
 		dmgHurt = dmg * 5
 		instaPain = dmg * 5
 		immobilization = dmg * 5
@@ -2065,11 +2074,9 @@ function hg.BreakNeck(ent, fromDamage)
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	print("[HG Floppy] BreakNeck: ply=" .. tostring(ply) .. " isRagdoll=" .. tostring(ent:IsRagdoll()))
 	
-	-- Only kill player if called from damage and they're alive
-	if fromDamage and ply:Alive() then
-		print("[HG Floppy] BreakNeck: Killing player from damage")
-		ply:Kill()
-	end
+	-- A broken spine3 is a paralyzing neck injury, not an immediate kill.
+	-- Keep the player alive long enough for the organism incapacitation state
+	-- and the floppy-neck constraint to take effect.
 
 	-- Store the player reference for later
 	local playerRef = ply
@@ -2379,8 +2386,10 @@ local spine_segments = {
         -- Bias the constraint anchor towards the chest end of the joint
         anchorBias = 0.15,
         offsetBones = {
+            -- Keep the visual break on the middle-torso physics bone.  Spine4
+            -- is above this joint and carries the Neck1/Head1 descendants, so
+            -- offsetting it here made a spine2 break look like a neck flop.
             {name = "ValveBiped.Bip01_Spine2", pos = Vector(0, -3, 4),  ang = Angle(-25, 0, 0)},
-            {name = "ValveBiped.Bip01_Spine4", pos = Vector(0, -1.5, 3), ang = Angle(-15, 0, 0)},
         },
     },
 }
@@ -3054,6 +3063,14 @@ end
 
 function hg.BreakSpine(ent, segment, isDislocated)
     if not IsValid(ent) then return end
+
+    -- spine3 is the neck segment.  It has its own head-to-neck constraint;
+    -- never apply the pelvis-to-torso spine constraint to it.
+    if segment == "spine3" then
+        if hg.BreakNeck then hg.BreakNeck(ent, false) end
+        return
+    end
+
     local segData = spine_segments[segment]
     if not segData then
         print("[HG Floppy] BreakSpine: unknown segment " .. tostring(segment))
@@ -3124,6 +3141,11 @@ end
 
 function hg.RemoveSpineConstraints(ent, segment)
     if not IsValid(ent) then return end
+
+    if segment == "spine3" then
+        if hg.RemoveNeckConstraints then hg.RemoveNeckConstraints(ent) end
+        return
+    end
 
     local ragdoll = ent:IsRagdoll() and ent or nil
     if not IsValid(ragdoll) and ent:IsPlayer() then
@@ -3273,35 +3295,6 @@ local function jointStressValue(ragdoll, cacheKey, phys1, phys2)
 	return stretch * 22 + separatingSpeed * 0.75 + speedDiff * 0.05
 end
 
-local function dislocateFromJointStress(ragdoll, org, ply, limb, segment, stress)
-	-- A limb that is already injured is not eligible for another automatic
-	-- joint-stress injury from its own ragdoll control.
-	if org[limb .. "amputated"] or org[limb .. "dislocation"] or (org[limb] or 0) > 0 then return end
-
-	-- Do not let fake-control compensation for an injured arm cascade into the
-	-- opposite arm. External damage can still injure it through the normal
-	-- collision/damage path; only this automatic joint-stress path is blocked.
-	if limb == "larm" and (org.rarmamputated or org.rarmdislocation or org.rarmdislocated or (org.rarm or 0) > 0) then return end
-	if limb == "rarm" and (org.larmamputated or org.larmdislocation or org.larmdislocated or (org.larm or 0) > 0) then return end
-
-	org[limb .. "dislocation"] = true
-	org.painadd = (org.painadd or 0) + math.Clamp(stress / 12, 28, 70)
-	org.shock = (org.shock or 0) + math.Clamp(stress / 30, 8, 35)
-	org.fearadd = (org.fearadd or 0) + 0.35
-	org.just_damaged_bone = CurTime()
-
-	if IsValid(ply) and ply.AddNaturalAdrenaline then ply:AddNaturalAdrenaline(0.5) end
-	if IsValid(ply) then
-		ply:EmitSound("newbonebreak/break" .. math.random(10) .. ".wav", 75, math.random(120, 135), 1, CHAN_AUTO)
-	end
-
-	if hg.BreakLimb and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-		hg.BreakLimb(ragdoll, limb, segment, true)
-	end
-
-	print("[HG JointStress] DISLOCATED " .. tostring(limb) .. " stress=" .. tostring(math.Round(stress)))
-end
-
 local function breakSpineFromJointStress(ragdoll, org, ply, segment, stress)
 	local threshold = (hg.organism and hg.organism["fake_" .. segment]) or 0.8
 	if org[segment] and org[segment] >= threshold then return end
@@ -3333,13 +3326,6 @@ local function breakSpineFromJointStress(ragdoll, org, ply, segment, stress)
 	print("[HG JointStress] BROKE " .. tostring(segment) .. " stress=" .. tostring(math.Round(stress)) .. " chance=" .. tostring(math.Round(chance * 100)) .. "%")
 end
 
-local jointStressLimbs = {
-	{limb = "larm", segment = 1, child = "ValveBiped.Bip01_L_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 690},
-	{limb = "rarm", segment = 1, child = "ValveBiped.Bip01_R_Hand", parent = "ValveBiped.Bip01_Spine2", threshold = 690},
-	{limb = "lleg", segment = 1, child = "ValveBiped.Bip01_L_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 820},
-	{limb = "rleg", segment = 1, child = "ValveBiped.Bip01_R_Foot", parent = "ValveBiped.Bip01_Pelvis", threshold = 820},
-}
-
 local jointStressSpine = {
 	{segment = "spine1", child = "ValveBiped.Bip01_Pelvis", parent = "ValveBiped.Bip01_Spine2", threshold = 900},
 	{segment = "spine2", child = "ValveBiped.Bip01_Spine2", parent = "ValveBiped.Bip01_Pelvis", threshold = 940},
@@ -3353,20 +3339,6 @@ local function checkRagdollJointStress(ragdoll)
 	if not org or not org.alive then return end
 
 	ragdoll.HG_JointStressCooldown = ragdoll.HG_JointStressCooldown or {}
-
-	for _, def in ipairs(jointStressLimbs) do
-		if (ragdoll.HG_JointStressCooldown[def.limb] or 0) <= CurTime() then
-			local phys1 = getJointPhys(ragdoll, def.child)
-			local phys2 = getJointPhys(ragdoll, def.parent)
-			if IsValid(phys1) and IsValid(phys2) then
-				local stress = jointStressValue(ragdoll, "limb_" .. def.limb, phys1, phys2)
-				if stress >= def.threshold then
-					ragdoll.HG_JointStressCooldown[def.limb] = CurTime() + 1.5
-					dislocateFromJointStress(ragdoll, org, ply, def.limb, def.segment, stress)
-				end
-			end
-		end
-	end
 
 	for _, def in ipairs(jointStressSpine) do
 		if (ragdoll.HG_JointStressCooldown[def.segment] or 0) <= CurTime() then

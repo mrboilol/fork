@@ -261,6 +261,19 @@ local dislocated_leg = {
 	"THE ANKLE'S TWISTED- BUT THE KNEE'S THE REAL PROBLEM!",
 }
 
+local function TryDropWeaponFromInjury(org, chance)
+	local owner = org and org.owner
+	if not (IsValid(owner) and owner:IsPlayer() and hg.drop) then return end
+	if (owner.HG_InjuryWeaponDropCooldown or 0) > CurTime() then return end
+
+	local wep = owner:GetActiveWeapon()
+	if not IsValid(wep) or wep.NoDrop or wep:GetClass() == "weapon_hands_sh" then return end
+	if math.random() >= chance then return end
+
+	owner.HG_InjuryWeaponDropCooldown = CurTime() + 1
+	hg.drop(owner, wep)
+end
+
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
 	local dmg = dmg * 3.25
@@ -282,12 +295,11 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	
 	org[key] = org[key] * 0.5
 
-	if dmg < 0.8 then return 0 end
+	if dmg < 1 then return 0 end
 
 	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 	
-	if dmg >= 1 then
-		org[key] = 1
+	org[key] = 1
 
 		print("[HG Bone] LEG BROKEN: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
 
@@ -308,29 +320,6 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		PlayBoneBreakSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 		//broken
-	else
-		--//org[key] = 0.5
-		org[key.."dislocation"] = true
-
-		print("[HG Bone] LEG DISLOCATED: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
-
-		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-			print("[HG Bone] Calling hg.BreakLimb for dislocated leg: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key, nil, true) -- true = dislocated (will apply offset)
-		end
-
-		org.painadd = org.painadd + 35
-		org.owner:AddNaturalAdrenaline(0.5)
-		org.immobilization = org.immobilization + dmg * 10
-		org.fearadd = org.fearadd + 0.5
-
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_leg[math.random(#dislocated_leg)], 1, "dislocated"..key, 1, nil, nil) end
-
-		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		PlayBoneBreakSound(org.owner)
-		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
-		//dislocated
-	end
 
 	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 2, "Legs bone damage harm")
 
@@ -360,16 +349,20 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	
 	local dmg = org[key]
-	local dislocationThreshold = climbGrip and 0.82 or 0.6
-	
 	org[key] = org[key] * 0.5
 
-	if dmg < dislocationThreshold then return 0 end
+	if dmg < 1 then
+		if key == "rarm" then
+			TryDropWeaponFromInjury(org, math.Clamp((dmg - oldDmg) * 0.18, 0.03, 0.18))
+		else
+			TryDropWeaponFromInjury(org, math.Clamp((dmg - oldDmg) * 0.02, 0.005, 0.02))
+		end
+		return 0
+	end
 
 	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
 	
-	if dmg >= 1 then
-		org[key] = 1
+	org[key] = 1
 
 		print("[HG Bone] ARM BROKEN: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
 
@@ -389,44 +382,10 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		PlayBoneBreakSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 		//broken
-	else
-		org[key.."dislocation"] = true
-
-		print("[HG Bone] ARM DISLOCATED: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
-
-		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-			print("[HG Bone] Calling hg.BreakLimb for dislocated arm: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key, nil, true) -- true = dislocated (will apply offset)
-		end
-
-		--//org[key] = 0.5
-
-		org.painadd = org.painadd + (climbGrip and 20 or 35)
-		org.owner:AddNaturalAdrenaline(0.5)
-		org.fearadd = org.fearadd + 0.5
-
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
-
-		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		PlayBoneBreakSound(org.owner)
-		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
-		//dislocated
-	end
 
 	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 1.5, "Arms bone damage harm")
 
-	if org[key] == 1 and key == "rarm" and org.isPly then
-		local wep = org.owner.GetActiveWeapon and org.owner:GetActiveWeapon()
-		
-		/*if IsValid(wep) then
-			local inv = org.owner:GetNetVar("Inventory",{})
-			if not (inv["Weapons"] and inv["Weapons"]["hg_sling"] and ishgweapon(wep) and not wep:IsPistolHoldType()) then
-				hg.drop(org.owner)
-			else
-				org.owner:SetActiveWeapon(org.owner:GetWeapon("weapon_hands_sh"))
-			end
-		end*/
-	end
+	TryDropWeaponFromInjury(org, key == "rarm" and 0.7 or 0.02)
 
 	return result, vecrand
 end
@@ -542,7 +501,6 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
 
 	local jawDelta = math.max((org.jaw or 0) - oldDmg, 0)
-	local dislocated = jawDelta > math.Rand(0.2, 0.4) and (not sharpHead or dmg > 1.2)
 
 	if org.jaw == 1 then
 		org.shock = org.shock + dmg * 40
@@ -555,20 +513,6 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	end
 
 	org.shock = org.shock + dmg * 3
-
-	if dislocated then
-		org.shock = org.shock + dmg * (sharpHead and 8 or 20)
-		org.avgpain = org.avgpain + dmg * (sharpHead and 8 or 20)
-		
-		if !org.jawdislocation then
-			PlayBoneBreakSound(org.owner)
-			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.85) end
-		end
-
-		org.jawdislocation = true
-
-		if org.isPly then org.owner:Notify(jaw_dislocated_msg[math.random(#jaw_dislocated_msg)], true, "jaw", 2) end
-	end
 
 	if dmg * concussionMul > 0.2 then
 		if org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner,1 + dmg) end) end
@@ -784,6 +728,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.painadd = org.painadd + dmg * 2
 	org.shock = org.shock + dmg * 2.5
 	org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2.5, 6), 10)
+	TryDropWeaponFromInjury(org, math.Clamp(dmg * 0.006, 0.005, 0.02))
 
 	-- Chest hits can cause hemothorax (blood filling pleural cavity)
 	if dmg >= 0.5 then

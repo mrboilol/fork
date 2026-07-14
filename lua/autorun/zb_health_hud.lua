@@ -1484,7 +1484,7 @@ local function draw_status_effects()
 				currentEffectNames["cardiac_arrest"] = true
 			end
 			
-			if org.lungsfunction == false then
+			if org.lungsfunction == false and not currentEffectNames["lungs_failure"] then
 				table.insert(effects, {name = "lungs_failure", priority = 0.35})
 				currentEffectNames["lungs_failure"] = true
 			end
@@ -1870,7 +1870,7 @@ local function draw_status_effects()
 				currentEffectNames["hemothorax"] = true
 			end
 			
-			if org.lungsfunction == false then
+			if org.lungsfunction == false and not currentEffectNames["lungs_failure"] then
 				table.insert(effects, {
 					name = "lungs_failure",
 					priority = 0.35

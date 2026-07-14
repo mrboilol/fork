@@ -1103,6 +1103,11 @@ kaz
 		org.brain = min(org.brain + timeValue / math.Remap(skullSeverity, 0, 1, 850, 180), 1)
 	end
 
+	if org.brain >= 1 and hg.organism.KillFatalBrainDamage then
+		hg.organism.KillFatalBrainDamage(org)
+		return
+	end
+
 
 
 	if org.isPly then

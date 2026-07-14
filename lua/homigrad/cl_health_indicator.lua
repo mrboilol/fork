@@ -23,7 +23,6 @@ local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
-local lastKnownFacingAngle = 0
 local fadingBones = {} -- Track bones that are fading out after being healed
 local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
@@ -133,65 +132,18 @@ scaleZeroMat:Scale(Vector(0.001, 0.001, 0.001))
 local function SyncBonesCallback(ent, numbones)
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
-    
-    local src = ply
-    local isRag = false
-    local fakeRag = ply:GetNWEntity("FakeRagdoll")
-    local deathRag = ply:GetNWEntity("RagdollDeath")
-    
-    if IsValid(fakeRag) then src = fakeRag; isRag = true
-    elseif IsValid(deathRag) then src = deathRag; isRag = true
-    elseif IsValid(ply:GetRagdollEntity()) then src = ply:GetRagdollEntity(); isRag = true end
 
-    if not IsValid(src) then return end
+    -- The indicator must always copy the initial player model's skeleton.
+    -- Ragdoll skeletons can have a different bone layout (notably Expie's),
+    -- which maps the indicator's head transform onto a limb.
+    local src = ply
     
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
 
-    -- FIX: Ragdoll drooping and north-facing issues
-    if isRag then
-        local minZ = math.huge
-        for i = 0, src:GetBoneCount() - 1 do
-            local mat = src:GetBoneMatrix(i)
-            if mat then
-                local pos = mat:GetTranslation()
-                if pos.z < minZ then minZ = pos.z end
-            end
-        end
-        
-        local pelvis = src:LookupBone("ValveBiped.Bip01_Pelvis")
-        if pelvis then
-            local pMat = src:GetBoneMatrix(pelvis)
-            if pMat then
-                -- Anchor ragdolls to the pelvis x/y but lowest bone z
-                srcPos = pMat:GetTranslation()
-                if minZ ~= math.huge then
-                    srcPos.z = minZ
-                end
-            end
-        end
-        -- Prevent snapping North: Use last known facing angle or player eye angles
-        -- When ragdoll angles are zeroed/invalid, use stored angle or player eye angles
-        local ragYaw = srcAng.y
-        if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
-            -- Ragdoll angles are likely default/invalid, use last known good angle or player eye angles
-            local eyeAng = ply:EyeAngles()
-            if lastKnownFacingAngle ~= 0 then
-                srcAng = Angle(0, lastKnownFacingAngle, 0)
-            else
-                srcAng = Angle(0, eyeAng.y, 0)
-            end
-        else
-            -- Use ragdoll's actual yaw but update our stored angle
-            srcAng = Angle(0, ragYaw, 0)
-            lastKnownFacingAngle = ragYaw
-        end
-    else
-        -- FIX: Prevent the model from leaning backward/forward when you look up/down
-        local eyeAng = ply:EyeAngles()
-        srcAng = Angle(0, eyeAng.y, 0)
-        lastKnownFacingAngle = eyeAng.y
-    end
+    -- Prevent the model from leaning backward/forward when looking up/down.
+    local eyeAng = ply:EyeAngles()
+    srcAng = Angle(0, eyeAng.y, 0)
     
     local srcWorld = Matrix()
     srcWorld:SetTranslation(srcPos)
@@ -581,29 +533,10 @@ function HUD_DrawDynamicIndicator()
         
         local col = math.Clamp(consciousness, 0, 1)
         
+        -- Keep animation in sync with the same player skeleton used by the
+        -- bone callback. Never substitute a fake or death ragdoll here.
         local srcEnt = ply
-        local isRagdoll = false
-        local fakeRag = ply:GetNWEntity("FakeRagdoll")
-        local deathRag = ply:GetNWEntity("RagdollDeath")
-        
-        if IsValid(fakeRag) then
-            srcEnt = fakeRag
-            isRagdoll = true
-        elseif IsValid(deathRag) then
-            srcEnt = deathRag
-            isRagdoll = true
-        elseif IsValid(ply:GetRagdollEntity()) then
-            srcEnt = ply:GetRagdollEntity()
-            isRagdoll = true
-        end
-
-        local modelOffset
-        if isRagdoll then
-            -- With the ragdoll lowest-Z fix, we no longer need a huge offset
-            modelOffset = Vector(0, 0, 10)
-        else
-            modelOffset = Vector(0, 0, 10)
-        end
+        local modelOffset = Vector(0, 0, 10)
 
         local drawAng = Angle(0, 0, 0)
 

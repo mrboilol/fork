@@ -2395,8 +2395,6 @@ function SWEP:AttackFront(special_attack, rand)
 			end)
 		end
 
-		Mul = Mul * (owner.FistsDamageMul or owner.MeleeDamageMul or 1)
-
 		if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
 			Mul = Mul * (self:GetBlocking() and 0.5 or 1)
 		end

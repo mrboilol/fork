@@ -143,8 +143,27 @@ local abdominal_organs = {
 local function damageOrgan(org, dmg, dmgInfo, key)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
-	org[key] = math.Round(math.min(org[key] + dmg * (isCrush(dmgInfo) and 1 or 3), 1), 3)
+	local rawDamage = math.max(dmg * (isCrush(dmgInfo) and 1 or 3), 0)
+	local alreadyDamaged = oldval > 0.01
+	org[key] = math.Round(math.min(org[key] + rawDamage, 1), 3)
 		local damage_dealt = org[key] - oldval
+
+	-- Once an organ is wounded, further hits deepen the trauma instead of
+	-- repeatedly hard-stunning the victim. This still matters at the damage cap.
+	if alreadyDamaged and rawDamage > 0 then
+		local repeatTrauma = math.min(rawDamage, 0.25)
+		local abdominalMul = abdominal_organs[key] and 1 or 0.5
+
+		org.internalBleed = org.internalBleed + repeatTrauma * (1 + abdominalMul * 2.5)
+		org.painadd = (org.painadd or 0) + repeatTrauma * (10 + abdominalMul * 15)
+		org.stamina_damage = (org.stamina_damage or 0) + repeatTrauma * (5 + abdominalMul * 15)
+
+		-- Progressive organ damage already adds bullet bleed below; only add the
+		-- extra wound bleed once the organ damage meter has stopped increasing.
+		if damage_dealt <= 0 and hg.organism.AddBulletImpactBleeding then
+			hg.organism.AddBulletImpactBleeding(org, dmgInfo, 0.5 + abdominalMul * 0.25)
+		end
+	end
 	if damage_dealt > 0 then
 		org.internalBleed = org.internalBleed + damage_dealt * 1.0 -- Base internal bleeding for any organ damage (increased from 0.5)
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
@@ -158,7 +177,7 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 			org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 25
 			org.disorientation = (org.disorientation or 0) + damage_dealt * 1
 
-			if org.analgesia < 0.4 and damage_dealt > 0.15 then
+			if not alreadyDamaged and org.analgesia < 0.4 and damage_dealt > 0.15 then
 				timer.Simple(0, function()
 					if IsValid(org.owner) then
 						hg.StunPlayer(org.owner, 1.5)
@@ -299,6 +318,11 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		net.Broadcast()
 	end
 
+	if org.brain >= 1 and hg.organism.KillFatalBrainDamage then
+		hg.organism.KillFatalBrainDamage(org)
+		return result
+	end
+
 	local severeBrainShock = not sharpBrain or brainDelta > 0.06 or dmg > 0.35
 	if severeBrainShock and org.brain >= 0.01 and brainDelta > 0.01 and math.random(3) == 1 then
 		--hg.applyFencingToPlayer(org.owner, org)
@@ -420,19 +444,23 @@ local slashToArtery = {
 	["llegdown"] = "llegartery",
 }
 
-local function getArteryChanceMul(dmgInfo)
-	local inflictor = dmgInfo:GetInflictor()
-	return IsValid(inflictor) and inflictor.ArteryChance or 1
-end
+local arteryHitgroups = {
+	rarmartery = HITGROUP_RIGHTARM,
+	larmartery = HITGROUP_LEFTARM,
+	rlegartery = HITGROUP_RIGHTLEG,
+	llegartery = HITGROUP_LEFTLEG,
+}
 
 hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
-	if dmgInfo:IsDamageType(DMG_SLASH) and dmg < 2 then
-		local arteryChanceMul = getArteryChanceMul(dmgInfo)
-		local arteryChance = arteryChanceMul >= 2 and 1 or math.Clamp(0.2 * arteryChanceMul, 0, 1)
 
-		if math.Rand(0, 1) > arteryChance then return end
+	local requiredHitgroup = arteryHitgroups[artery]
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		and requiredHitgroup
+		and org._bulletImpactHitgroup
+		and requiredHitgroup ~= org._bulletImpactHitgroup then
+		return 0
 	end
 	org.painadd = org.painadd + dmg * 1
 	
@@ -494,15 +522,11 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 end
 hg.hitArtery = hitArtery
 
-hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_chance", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ)
+hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_hit", function(org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ)
 	if not dmgInfo:IsDamageType(DMG_SLASH) then return end
 
 	local artery = organ and slashToArtery[organ[1]]
 	if not artery then return end
-	if getArteryChanceMul(dmgInfo) <= 1 then return end
-
-	local arteryChance = math.Clamp(getArteryChanceMul(dmgInfo) - 1, 0, 1)
-	if math.Rand(0, 1) > arteryChance then return end
 
 	hitArtery(artery, org, dmg, dmgInfo, box[6], dir, hit)
 end)

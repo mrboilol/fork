@@ -1350,12 +1350,10 @@ function SWEP:GetArmDamagePercent(owner)
 end
 
 function SWEP:MultiplyDMG(owner, ent, vellen, mul)
-    if owner.organism and owner.organism.stamina and owner.organism.stamina[1] then
-        mul = mul * 1 / math.Clamp((180 - owner.organism.stamina[1]) / 90,1,1.3)
-    end
+    -- Stamina governs attack availability, recovery, and cost, not strike strength.
+    -- Keep strength bonuses explicit (for example berserk) below.
     mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
     mul = mul * (ent ~= owner and 0.75 or 1)
-    mul = mul * (owner.MeleeDamageMul or 1)
 
     if owner.organism.superfighter then
         mul = mul * 5
@@ -2902,7 +2900,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * MELEE_GLOBAL_STAMINA_COST_MUL * self:GetStaminaWeightDamageMultiplier(3)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * MELEE_GLOBAL_STAMINA_COST_MUL * (self.GetStaminaWeightDamageMultiplier and self:GetStaminaWeightDamageMultiplier(3) or 1)
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -2962,7 +2960,7 @@ function SWEP:CustomThink()
                 self:PlayAnim(self.Attack_Charge_End, self.HeavyAttackAnimTimeEnd / mul, false, nil, false, true)
 
                 if SERVER and owner.organism and owner.organism.stamina and not self.HeavyAttackStaminaDeducted then
-                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * MELEE_GLOBAL_STAMINA_COST_MUL * self:GetStaminaWeightDamageMultiplier(3)
+                    owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyAttackStamina or 20) * MELEE_GLOBAL_STAMINA_COST_MUL * (self.GetStaminaWeightDamageMultiplier and self:GetStaminaWeightDamageMultiplier(3) or 1)
                     self.HeavyAttackStaminaDeducted = true
                 end
                 
@@ -3010,7 +3008,7 @@ function SWEP:CustomThink()
 
                 if owner.organism and owner.organism.stamina then
                     while self.HeavyChargeStaminaDrainAcc >= 1 do
-                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5) * MELEE_GLOBAL_STAMINA_COST_MUL * self:GetStaminaWeightDamageMultiplier(3)
+                        owner.organism.stamina.subadd = owner.organism.stamina.subadd + (self.HeavyChargeStaminaDrainPerSecond or 5) * MELEE_GLOBAL_STAMINA_COST_MUL * (self.GetStaminaWeightDamageMultiplier and self:GetStaminaWeightDamageMultiplier(3) or 1)
                         self.HeavyChargeStaminaDrainAcc = self.HeavyChargeStaminaDrainAcc - 1
                     end
                 else

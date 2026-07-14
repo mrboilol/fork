@@ -176,9 +176,7 @@ hook.Add("Think", "stanleytumbler", function()
                 --mcity reference?
                 if not org.superfighter then
                     local breakChance = 0.15
-                    local dislocationChance = 0.3
-
-                    if math.random() < breakChance then
+					if math.random() < breakChance then
                         -- Limb break
                                                 PlayBoneBreakSound(ply)
 
@@ -201,28 +199,7 @@ hook.Add("Think", "stanleytumbler", function()
                         else
                             ply:EmitSound("physics/body/body_medium_break"..math.random(2,4)..".wav")
                         end
-                    elseif math.random() < dislocationChance then
-                        -- Limb dislocation
-                                                PlayBoneBreakSound(ply)
-
-                        if tripType == "wall" then
-                            if trHighHit then
-                                org.jawdislocation = true
-                            else
-                                if math.random(1, 2) == 1 then
-                                    org.rlegdislocation = true
-                                else
-                                    org.llegdislocation = true
-                                end
-                            end
-                        elseif tripType == "ragdoll" then
-                            if math.random(1, 2) == 1 then
-                                org.rarmdislocation = true
-                            else
-                                org.larmdislocation = true
-                            end
-                        end
-                    end
+					end
                 end
                 
                 local ragdoll = ply.FakeRagdoll

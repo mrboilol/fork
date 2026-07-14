@@ -163,7 +163,7 @@ SWEP.MeleeMaterial = "metal"
 SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 function SWEP:ThinkAdd()
-	local state = self:GetChargeState()
+	local state = self.GetChargeState and self:GetChargeState() or self:GetDTInt(6)
 	if state ~= 0 then
 		self.setlh = true
 	else

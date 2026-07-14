@@ -28,7 +28,6 @@ if SERVER then
     AddCSLuaFile("zcity_delta/medical_properties_cl.lua")
     AddCSLuaFile("zcity_delta/commands_cl.lua")
     AddCSLuaFile("zcity_delta/dislocation_radial_cl.lua")
-    AddCSLuaFile("zcity_delta/death_screen_cl.lua")
 end
 
 local sharedModules = {
@@ -45,8 +44,7 @@ local clientModules = {
     "zcity_delta/medical_properties_cl.lua",
     "zcity_delta/commands_cl.lua",
     "zcity_delta/dislocation_radial_cl.lua",
-    "zcity_delta/unitmenu_cl.lua",
-    "zcity_delta/death_screen_cl.lua"
+    "zcity_delta/unitmenu_cl.lua"
 }
 
 local function LoadModuleList(list)

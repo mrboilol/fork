@@ -9,7 +9,6 @@ AddCSLuaFile("zcity_delta/medical_menu_cl.lua")
 AddCSLuaFile("zcity_delta/medical_properties_cl.lua")
 AddCSLuaFile("zcity_delta/commands_cl.lua")
 AddCSLuaFile("zcity_delta/dislocation_radial_cl.lua")
-AddCSLuaFile("zcity_delta/death_screen_cl.lua")
 
 local loaded = hg.__zcity_delta_server_boot
 
@@ -30,7 +29,6 @@ local function BootServer()
     SafeInclude("homigrad/medical_minigame/sh_init.lua", "medical_shared")
     SafeInclude("homigrad/medical_minigame/sv_logic.lua", "medical_server")
     SafeInclude("autorun/server/zz_zcity_delta_ptsd.lua", "ptsd_server")
-    SafeInclude("autorun/server/zz_zcity_delta_death_respawn.lua", "death_respawn_server")
 end
 
 hook.Add("Initialize", "zcity_delta_server_boot", BootServer)

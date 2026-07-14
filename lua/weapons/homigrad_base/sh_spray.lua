@@ -130,26 +130,6 @@ function SWEP:PrimarySpread()
 				if firingBroken or firingDislocated then oneHandPain = oneHandPain + calForce * 0.28 end
 				org.painadd = org.painadd + oneHandPain
 
-				if not firingAmputated and calForce >= 34 then
-					local wristChance = math.Clamp((calForce - 28) / 150, 0.025, 0.42)
-					if support.wantsTwoHands then wristChance = wristChance * 1.35 end
-					if support.onlyLeft then wristChance = wristChance * 1.25 end
-					if firingBroken or firingDislocated then wristChance = wristChance * 1.8 end
-					if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then wristChance = wristChance * 1.45 end
-					wristChance = math.Clamp(wristChance, 0.015, 0.65)
-
-					if math.random() < wristChance then
-						org[firingArm] = math.max(org[firingArm] or 0, 1)
-						org[firingArm .. "dislocation"] = true
-						org.painadd = org.painadd + 35 + calForce * 0.45
-						owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(105, 125), 1, CHAN_AUTO)
-						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-							hg.BreakLimb(owner, firingArm, nil, true)
-						end
-						DropWrenchedWeapon(owner, self)
-						owner:Notify("The recoil broke your " .. (firingArm == "larm" and "left" or "right") .. " wrist.", 1, firingArm .. "_onehand_recoil", 1, nil, nil)
-					end
-				end
 			end
 
 			-- Right arm broken shooting checks
@@ -160,67 +140,6 @@ function SWEP:PrimarySpread()
 				end
 				org.painadd = org.painadd + extra_broken_pain
 
-				if not rarm_dislocated then
-					-- small chance to dislocate
-					local disl_chance = math.Clamp((calForce - 18) / 360, 0.04, 0.38)
-					if larm_broken then
-						disl_chance = disl_chance * 2
-					end
-					if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then disl_chance = disl_chance * 1.35 end
-					disl_chance = math.Clamp(disl_chance, 0.04, 0.7)
-					if math.random() < disl_chance then
-						org.rarmdislocation = true
-						org.painadd = org.painadd + 35
-						owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
-						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-							hg.BreakLimb(owner, "rarm", nil, true)
-						end
-						owner:Notify("Your broken right arm dislocated from shooting!", 1, "rarm_broken_dislocate", 1, nil, nil)
-					end
-				else
-					-- already dislocated: add a bunch of pain and a bone breaking sound
-					local extra_disl_pain = 50 + calForce * 3.0 -- Increased from 35 + 1.5 to 50 + 3.0
-					if larm_broken then
-						extra_disl_pain = extra_disl_pain * 1.5
-					end
-					org.painadd = org.painadd + extra_disl_pain
-					owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
-
-					-- High caliber weapons can break the arm again when already dislocated
-					if calForce >= 50 and not org.rarmamputated then
-						local break_again_chance = math.Clamp((calForce - 45) / 520, 0.03, 0.42)
-						if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then break_again_chance = break_again_chance * 1.35 end
-						break_again_chance = math.Clamp(break_again_chance, 0.03, 0.55)
-						if math.random() < break_again_chance then
-							org.painadd = org.painadd + 80
-							owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
-							-- Permanent aiming impairment
-							org.permanent_aim_impairment = (org.permanent_aim_impairment or 0) + 0.15
-							DropWrenchedWeapon(owner, self)
-							owner:Notify("Your right arm shattered again - your aim will never be the same!", 1, "rarm_shattered", 1, nil, nil)
-						end
-					end
-				end
-			end
-
-			-- Right arm dislocated shooting checks (not broken yet)
-			if rarm_dislocated and not rarm_broken then
-				-- High caliber weapons can break a dislocated arm
-				if calForce >= 50 and not org.rarmamputated then
-					local break_chance = math.Clamp((calForce - 45) / 360, 0.04, 0.5)
-					if self:GetClass() == "weapon_ptrd" or self.Base == "weapon_ptrd" then break_chance = break_chance * 1.35 end
-					break_chance = math.Clamp(break_chance, 0.04, 0.65)
-					if math.random() < break_chance then
-						org.rarm = 1
-						org.painadd = org.painadd + 65
-						owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 75, math.random(110, 130), 1, CHAN_AUTO)
-						if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-							hg.BreakLimb(owner, "rarm", nil, false)
-						end
-						DropWrenchedWeapon(owner, self)
-						owner:Notify("Your dislocated right arm snapped from the recoil!", 1, "rarm_dislocated_snap", 1, nil, nil)
-					end
-				end
 			end
 			-- Base shooting pain only applies when firing with a damaged firing arm.
 			-- Right arm broken/dislocated, or (right arm missing AND left arm broken/dislocated).

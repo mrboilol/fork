@@ -333,10 +333,10 @@ module[2] = function(owner, org, mulTime)
 	-- Tiered blood loss progression
 	-- 4500: first symptoms - lightheaded, faint nausea
 	-- 4000: slight systemic debuffs begin (O2, consciousness soft-cap 0.95)
-	-- 3500: mild-moderate O2 debuff, compensation starts
+	-- 4000: compensation starts as circulating volume begins to fall
 	-- 3000: noticeable symptoms, still compensated
 	-- 2750: heavy compensation starts
-	-- 2500: decompensation and coma pressure begin
+	-- 2500: severe tachycardia; decompensation and coma pressure begin
 	-- 2300: forced collapse pressure begins
 	-- 2200: unconscious/coma threshold
 	-- 2000: deadly hypovolemic shock zone
@@ -344,7 +344,7 @@ module[2] = function(owner, org, mulTime)
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
 	local blood = org.blood or 5000
 	local bloodDeficit = math.Clamp((4000 - blood) / 2500, 0, 1)
-	local compensation = math.Clamp((3500 - blood) / 1000, 0, 1)
+	local compensation = math.Clamp((4000 - blood) / 1750, 0, 1)
 	local shockStage = math.Clamp((2500 - blood) / 750, 0, 1)
 
 	org.hypovolemia = bloodDeficit

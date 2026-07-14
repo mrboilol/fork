@@ -113,14 +113,14 @@ module[2] = function(owner, org, timeValue)
 	local perfusionPulse = org.pulse or 70
 	local compensationRate = perfusionPulse < 70 and 70 + (70 - perfusionPulse) * 4 or perfusionPulse
 	compensationRate = math.Clamp(compensationRate, 45, 300)
-	-- Blood-loss compensation starts at 3500 mL. It rises steadily to marked
-	-- tachycardia at 2500, then rapidly becomes ventricular tachycardia and
-	-- reaches 300 BPM at 2250. Above 3500, blood volume adds no heart-rate boost.
+	-- Blood-loss compensation starts at 4000 mL. It becomes severe by 2500 and
+	-- reaches ventricular-fibrillation rates near 300 BPM by 2250. Above 4000,
+	-- blood volume adds no heart-rate boost.
 	local bloodCompensationRate = 70
-	if bloodNow < 2500 then
-		bloodCompensationRate = Lerp(math.Clamp((2500 - bloodNow) / 250, 0, 1), 160, 300)
-	elseif bloodNow < 3500 then
-		bloodCompensationRate = Lerp(math.Clamp((3500 - bloodNow) / 1000, 0, 1), 70, 160)
+	if bloodNow < 2250 then
+		bloodCompensationRate = 300
+	elseif bloodNow < 4000 then
+		bloodCompensationRate = Lerp(math.Clamp((4000 - bloodNow) / 1750, 0, 1), 70, 300)
 	end
 
 	local heartbeat = math.max(compensationRate, bloodCompensationRate)
@@ -152,7 +152,7 @@ module[2] = function(owner, org, timeValue)
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
 	local survivalK = math.Clamp(k, 0, 1)
 	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, 270)
-	if bloodNow < 3500 then
+	if bloodNow < 4000 then
 		maxCompensatedRate = math.max(maxCompensatedRate, bloodCompensationRate)
 	end
 	if heart < 0.35 or brain < 0.35 then
@@ -172,7 +172,7 @@ module[2] = function(owner, org, timeValue)
 	-- The cardiovascular response accelerates with blood loss. The old fixed
 	-- 2.4 BPM/s rise lagged so far behind active bleeding that the target curve
 	-- was never reached before pressure collapse.
-	local compensationResponse = math.Clamp((3500 - bloodNow) / 1250, 0, 1)
+	local compensationResponse = math.Clamp((4000 - bloodNow) / 1750, 0, 1)
 	local riseRate = Lerp(compensationResponse, 3, 75)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * riseRate or timeValue * 4.5)
 

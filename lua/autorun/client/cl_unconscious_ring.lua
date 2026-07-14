@@ -103,6 +103,11 @@ local heartStationsLoading = false
 local heartStationNext = 1
 local flatlineStation = nil
 local flatlineLoading = false
+local fibrillationStation = nil
+local fibrillationLoading = false
+local fibrillationPlaying = false
+local fibrillationRequested = false
+local fibrillationVolume = 0
 
 -- Track consciousness loss for sudden drop detection
 local lastConsciousness = 1
@@ -175,6 +180,15 @@ local function ResetRingAudio()
     end
     flatlineStation = nil
     flatlineLoading = false
+
+    if IsValid(fibrillationStation) then
+        fibrillationStation:Stop()
+    end
+    fibrillationStation = nil
+    fibrillationLoading = false
+    fibrillationPlaying = false
+    fibrillationRequested = false
+    fibrillationVolume = 0
 end
 
 -- Ensure heart sound stations are loaded (pooling)
@@ -270,6 +284,44 @@ local function EmitRingSound(soundPath, volume)
     end
 end
 
+local function RequestFibrillationSound(volume)
+    if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then return end
+    fibrillationRequested = true
+    fibrillationVolume = math.max(fibrillationVolume, math.Clamp(volume or 1, 0, 1))
+end
+
+local function UpdateFibrillationSound()
+    if fibrillationRequested then
+        if fibrillationPlaying then return end
+
+        fibrillationPlaying = true
+        if IsValid(fibrillationStation) then
+            PlayStation(fibrillationStation, fibrillationVolume)
+            return
+        end
+
+        if fibrillationLoading then return end
+        fibrillationLoading = true
+        local gen = soundGen
+        sound.PlayFile("sound/" .. SOUND_FIBRILLATION, "noblock noplay", function(station)
+            fibrillationLoading = false
+            if gen ~= soundGen or not fibrillationPlaying then
+                if IsValid(station) then station:Stop() end
+                return
+            end
+            if IsValid(station) then
+                fibrillationStation = station
+                PlayStation(fibrillationStation, fibrillationVolume)
+            end
+        end)
+    elseif fibrillationPlaying then
+        fibrillationPlaying = false
+        if IsValid(fibrillationStation) and fibrillationStation:GetState() == GMOD_CHANNEL_PLAYING then
+            fibrillationStation:FadeOut(0.5)
+        end
+    end
+end
+
 -- Update ring audio with phase-based triggering from oldring
 local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
     if pulse < 1 or ringAlpha <= 0 then return end
@@ -279,6 +331,10 @@ local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
     lastPhaseMod = curr
 
     local beatVolume = GetHeartbeatVolumeAdmiring(org, admiring) * ringAlpha
+    local fibrillating = pulse > 250
+    if fibrillating then
+        RequestFibrillationSound(beatVolume)
+    end
     if PhaseCrossed(prev, curr, 0.239) then
         -- Use heartthump for abnormal heart rates or high stress, normal heartbeat otherwise
         local abnormalPulse = (pulse < 40 and pulse >= 1) or pulse > 100
@@ -295,12 +351,9 @@ local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
             beatVolume = 1.0
         end
 
-        local fibrillating = pulse > 250
-        if fibrillating then
-            EmitRingSound(SOUND_FIBRILLATION, beatVolume)
-        elseif abnormalPulse or highStress then
+        if not fibrillating and (abnormalPulse or highStress) then
             EmitRingSound(SOUND_HEART, beatVolume * CRITBEAT_VOLUME_SCALE)
-        else
+        elseif not fibrillating then
             EmitRingSound("sound/heartbeat/heartbeat_single.wav", beatVolume)
         end
     end
@@ -496,6 +549,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local shock = org.shock or 0
     local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4)
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
+    fibrillationRequested = false
+    fibrillationVolume = 0
 
     -- Track sudden consciousness loss
     local consciousnessDelta = lastConsciousness - consciousness
@@ -613,7 +668,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical) then return end
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical) then
+        UpdateFibrillationSound()
+        return
+    end
     local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring or fibrillating))
 
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
@@ -725,6 +783,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             local target_bp = target_org.bloodpressure or 93
             local target_brain = target_org.brain or 0
             local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4)
+            if target_heartbeat > 250 then
+                RequestFibrillationSound(GetHeartbeatVolume(target_org))
+            end
 
             if g_PulseCheckData and not g_PulseCheckData.completed then
                 if target_org.heartstop or target_heartbeat <= 0 then
@@ -747,7 +808,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                             local highStress = vol > 0.5
                             local fibrillating = target_heartbeat > 250
                             if fibrillating then
-                                EmitRingSound(SOUND_FIBRILLATION, vol)
+                                RequestFibrillationSound(vol)
                             elseif abnormalPulse or highStress then
                                 EmitRingSound(SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
                             else
@@ -781,6 +842,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
 
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
+    if heartbeat > 250 and (admiring or isUnconscious or abnormalPulse or isCheckingPulse) then
+        RequestFibrillationSound(GetHeartbeatVolumeAdmiring(org, admiring))
+    end
     if heartbeat >= 1 then
         if IsValid(flatlineStation) and flatlineStation:GetState() == GMOD_CHANNEL_PLAYING then
             flatlineStation:Stop()
@@ -798,9 +862,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     local highStress = vol > 0.5
                     local fibrillating = heartbeat > 250
                     if (abnormalPulse and hasHealthHUD) or highStress or admiring then
-                        local soundToPlay = fibrillating and SOUND_FIBRILLATION or SOUND_HEART
-                        local volScale = fibrillating and 1 or CRITBEAT_VOLUME_SCALE
-                        EmitRingSound(soundToPlay, vol * volScale)
+                        if fibrillating then
+                            RequestFibrillationSound(vol)
+                        else
+                            EmitRingSound(SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
+                        end
                     else
                         EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
                     end
@@ -808,6 +874,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             end
         end
     end
+
+    UpdateFibrillationSound()
     
     if isNearDeathClass and isInBadHealth then
         local flashCycle = math.floor(CurTime() / 0.65)

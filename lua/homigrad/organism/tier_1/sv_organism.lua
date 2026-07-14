@@ -13,6 +13,28 @@ function hg.organism.ZeroVitals(org)
 	org.diastolic = 0
 end
 
+function hg.organism.KillFatalBrainDamage(org)
+	if not org or org.fatalBrainDeath then return false end
+
+	org.fatalBrainDeath = true
+	org.alive = false
+	org.needotrub = false
+	org.otrub = false
+	org.incapacitated = false
+	org.deathStateEnd = nil
+	org.deathStateStart = nil
+	org.deathStatePendingEnd = nil
+	org.deathStateFadeStart = nil
+	hg.organism.ZeroVitals(org)
+
+	local owner = org.owner
+	if IsValid(owner) and owner:IsPlayer() and owner:Alive() then
+		owner:Kill()
+	end
+
+	return true
+end
+
 local panicattack_threshold = 0.45
 local panicattack_add_decay_time = 90
 local panicattack_rise_time = 10
@@ -148,6 +170,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.nextSeizureRoll = 0
 	org.lastSeizureBrain = 0
 	org.lastSeizureTemperature = org.temperature
+	org.fatalBrainDeath = nil
 	org.deathStateEnd = nil
 	org.deathStateStart = nil
 	org.deathStatePendingEnd = nil
@@ -754,31 +777,11 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 	-- Posture-only one-handing (healthy left arm, weapon set TwoHanded = false): only penalize for heavy calibers
 	if not leftArmDamaged and isPostureOneHanded then
 		if not isHeavyCaliber then return end
-		local rightArmDislocated = org.rarmdislocation or org.rarmdislocated
-		if rightArmDislocated then
-			ent:DropWeapon(wep)
-			if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
-			return
-		end
 		if not org.rarmamputated then
 			local wristDamage = caliberWeight * 0.10
-			local oldRarm = org.rarm or 0
-			org.rarm = math.min(oldRarm + wristDamage, 1)
-			if oldRarm < 0.8 and org.rarm >= 0.8 then
-				org.rarmdislocation = true
-				ent:DropWeapon(wep)
-				if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
-			end
+			org.rarm = math.min((org.rarm or 0) + wristDamage, 1)
 		end
 		org.painadd = (org.painadd or 0) + caliberWeight * 7
-		return
-	end
-
-	-- Check if right arm is dislocated - can't fire one-handed with dislocated arm
-	local rightArmDislocated = org.rarmdislocation or org.rarmdislocated
-	if rightArmDislocated then
-		ent:DropWeapon(wep)
-		if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
 		return
 	end
 
@@ -787,16 +790,7 @@ hook.Add("EntityFireBullets", "OneHandedBehavior", function(ent, bulletData)
 		local wristDamage = caliberWeight * 0.15
 		-- Damage the right arm (the only usable arm)
 		if not org.rarmamputated then
-			local oldRarm = org.rarm or 0
-			org.rarm = math.min(oldRarm + wristDamage, 1)
-
-			-- Check if arm dislocates from the damage (threshold around 0.8)
-			if oldRarm < 0.8 and org.rarm >= 0.8 then
-				org.rarmdislocation = true
-				-- Drop the weapon when arm dislocates
-				ent:DropWeapon(wep)
-				if ent:HasWeapon("weapon_hands_sh") then ent:SelectWeapon("weapon_hands_sh") end
-			end
+			org.rarm = math.min((org.rarm or 0) + wristDamage, 1)
 		end
 		-- Add pain
 		org.painadd = (org.painadd or 0) + wristDamage * 10
@@ -1280,53 +1274,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 				org.armstrength = org.armstrength * 0.75
 			end
 
-			-- Chance to dislocate wrist when using one-handed weapons
-			-- Higher chance for two-handed weapons used one-handed
-			if IsValid(wep) then
-				local isTwoHandedWeapon = wep.TwoHanded ~= false
-				
-				-- Get caliber info for damage calculation
-				local ammoType = wep:GetPrimaryAmmoType()
-				local ammoData = hg.ammotypes and hg.ammotypes[game.GetAmmoName(ammoType)]
-				local caliberWeight = 0
-				local calForce = 0
-				
-				if ammoData and ammoData.BulletSettings then
-					local bullet = ammoData.BulletSettings
-					local force = bullet.Force or 0
-					local mass = bullet.Mass or 0
-					local diameter = bullet.Diameter or 0
-					local numB = wep.NumBullet or 1
-					calForce = force * numB
-					caliberWeight = (force / 200) + (mass / 20) + (diameter / 15)
-				end
-				
-				-- Base dislocation chance (per think tick)
-				local dislocationChance = isTwoHandedWeapon and 0.002 or 0.0005
-				
-				-- Increase chance based on caliber weight (heavy calibers are more dangerous)
-				if caliberWeight > 0.8 then
-					dislocationChance = dislocationChance * (1 + caliberWeight * 0.5)
-				end
-				
-				-- Increase chance based on current arm damage
-				local rarmDamage = org.rarm or 0
-				dislocationChance = dislocationChance * (1 + rarmDamage * 2)
-				
-				if math.random() < dislocationChance and not org.rarmamputated then
-					local oldRarm = org.rarm or 0
-					if oldRarm < 0.8 then
-						org.rarm = math.min(oldRarm + 0.3, 1)
-						if org.rarm >= 0.8 then
-							org.rarmdislocation = true
-							org.painadd = (org.painadd or 0) + 35
-							owner:AddNaturalAdrenaline(0.5)
-							org.fearadd = (org.fearadd or 0) + 0.5
-							owner:DropWeapon(wep)
-						end
-					end
-				end
-			end
 		end
 	end
 

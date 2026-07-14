@@ -327,22 +327,37 @@ hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 local vignetteCompositeFrame = -1
 local vignetteCompositeColor = 0
 local vignetteCompositeStrength = 0
+local vignetteCompositeMat
 function hg.DrawVignetteLayer(mat, colorIntensity, strength)
 	local frame = FrameNumber()
 	if vignetteCompositeFrame ~= frame then
 		vignetteCompositeFrame = frame
 		vignetteCompositeColor = 0
 		vignetteCompositeStrength = 0
+		vignetteCompositeMat = nil
 	end
 
 	vignetteCompositeColor = math.max(vignetteCompositeColor, colorIntensity or 0)
 	vignetteCompositeStrength = math.max(vignetteCompositeStrength, strength or 0)
+	vignetteCompositeMat = mat
 
 	render.UpdateScreenEffectTexture()
-	mat:SetFloat("$c2_x", CurTime() + 10000)
-	mat:SetFloat("$c0_z", vignetteCompositeColor)
-	mat:SetFloat("$c1_y", vignetteCompositeStrength)
-	render.SetMaterial(mat)
+	vignetteCompositeMat:SetFloat("$c2_x", CurTime() + 10000)
+	vignetteCompositeMat:SetFloat("$c0_z", vignetteCompositeColor)
+	vignetteCompositeMat:SetFloat("$c1_y", vignetteCompositeStrength)
+	render.SetMaterial(vignetteCompositeMat)
+	render.DrawScreenQuad()
+end
+
+
+function hg.FlushVignetteLayer()
+	if vignetteCompositeFrame ~= FrameNumber() or not vignetteCompositeMat or vignetteCompositeStrength <= 0 then return end
+
+	render.UpdateScreenEffectTexture()
+	vignetteCompositeMat:SetFloat("$c2_x", CurTime() + 10000)
+	vignetteCompositeMat:SetFloat("$c0_z", vignetteCompositeColor)
+	vignetteCompositeMat:SetFloat("$c1_y", vignetteCompositeStrength)
+	render.SetMaterial(vignetteCompositeMat)
 	render.DrawScreenQuad()
 end
 
@@ -2282,6 +2297,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_colour"] = 1 + headtraumaSaturation
 		headtraumaSaturation = math.max(headtraumaSaturation - FrameTime() * 0.85, 0)
 	end
+
+	-- Other trauma passes redraw the screen-effect texture after shock has requested
+	-- its vignette. Composite it only after every pass, so high shock cannot vanish.
+	hg.FlushVignetteLayer()
 end)
 
 hook.Add("Player_Death", "ItDoesntNow", function(ply)
