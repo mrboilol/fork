@@ -771,15 +771,30 @@ end
 hook.Add("Think", "HG_FakeRagdollShadowState", function()
 	for _, ply in ipairs(player.GetAll()) do
 		local networkRagdoll = ply:GetNWEntity("FakeRagdoll", NULL)
-		local shouldDraw = not IsValid(ply.FakeRagdoll) and not IsValid(networkRagdoll)
-		if not shouldDraw then
-			-- This must remain authoritative every frame: render hooks outside this
-			-- file can restore the player shadow without updating our cached state.
+		local fakeRagdoll = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or networkRagdoll
+
+		if IsValid(fakeRagdoll) then
+			if IsValid(ply.hg_fakeShadowRagdoll) and ply.hg_fakeShadowRagdoll ~= fakeRagdoll then
+				ply.hg_fakeShadowRagdoll:DrawShadow(true)
+			end
+
+			-- The render override's default ragdoll shadow can use a stale falling
+			-- pose. Suppress both shadow sources while fake; restore the ragdoll's
+			-- normal shadow if it later becomes a corpse.
 			ply:DrawShadow(false)
+			fakeRagdoll:DrawShadow(false)
+			ply.hg_fakeShadowRagdoll = fakeRagdoll
 			ply.hg_fakeShadowDrawn = false
-		elseif ply.hg_fakeShadowDrawn ~= true then
-			ply:DrawShadow(true)
-			ply.hg_fakeShadowDrawn = true
+		else
+			if IsValid(ply.hg_fakeShadowRagdoll) then
+				ply.hg_fakeShadowRagdoll:DrawShadow(true)
+			end
+			ply.hg_fakeShadowRagdoll = nil
+
+			if ply.hg_fakeShadowDrawn ~= true then
+				ply:DrawShadow(true)
+				ply.hg_fakeShadowDrawn = true
+			end
 		end
 	end
 end)

@@ -595,21 +595,27 @@ function SWEP:FireBullet()
 		end)
 	end
 
-    local att = self:GetMuzzleAtt(gun, true)
-    if not att then return end
-    local pos, ang = att.Pos, att.Ang
-    //if not isply and not owner:IsNPC() then return end
-    local fakeGun = self:GetNWEntity("fakeGun")
-
-    local primary = self.Primary
-
 	if isply then
 		owner:LagCompensation(true)
 	end
 
 	self:WorldModel_Transform()
-	-- Keep the projectile origin at the real muzzle attachment.  GetTrace()
-	-- returns a transformed hitpos origin for sights/debugging, not the muzzle.
+	-- Sample the attachment only after the world model is in its current,
+	-- lag-compensated pose.  Sampling it earlier used the previous transform,
+	-- while the debug marker showed this updated one.
+	local att = self:GetMuzzleAtt(gun, true)
+	if not att then
+		if isply then owner:LagCompensation(false) end
+		return
+	end
+	local pos, ang = att.Pos, att.Ang
+	//if not isply and not owner:IsNPC() then return end
+	local fakeGun = self:GetNWEntity("fakeGun")
+
+	local primary = self.Primary
+
+	-- Keep the transformed hitpos trace only for targeting/debugging; it is not
+	-- the projectile origin.
 	local tr = self:GetTrace(true)
 	local aimTrace = tr
 

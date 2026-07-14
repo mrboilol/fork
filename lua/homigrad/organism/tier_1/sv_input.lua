@@ -348,6 +348,7 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 			else
 				if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
 			end
+			if hg.AddOrganismBloodDecal then hg.AddOrganismBloodDecal(org.owner) end
 			
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 			
@@ -371,6 +372,7 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	else
 		if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + dmgBlood / 2 end
 	end
+	if hg.AddOrganismBloodDecal then hg.AddOrganismBloodDecal(org.owner) end
 	
 	table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
@@ -1056,6 +1058,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 					else
 						if org.wounds[1] then org.wounds[1][1] = org.wounds[1][1] + woundSeverity end
 					end
+					if hg.AddOrganismBloodDecal then hg.AddOrganismBloodDecal(org.owner) end
 					
 					table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 					

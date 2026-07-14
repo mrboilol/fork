@@ -12,6 +12,31 @@ if SERVER then
         net.Broadcast()
     end
 
+    local bloodDecalReplayLimit = 16
+
+    local function ApplyBloodDecal(ent)
+        if not IsValid(ent) then return end
+
+        net.Start("bloody_decal_1")
+        net.WriteEntity(ent)
+        net.Broadcast()
+    end
+
+    -- Record ordinary hit blood server-side. The visible decal is emitted
+    -- immediately and the compact count lets a new ragdoll rebuild the same
+    -- bloodiness instead of starting clean after an entity swap.
+    function hg.AddOrganismBloodDecal(ply, amount)
+        if not IsValid(ply) then return end
+
+        amount = math.max(tonumber(amount) or 1, 1)
+        ply.HG_BloodDecalCount = math.min((ply.HG_BloodDecalCount or 0) + amount, bloodDecalReplayLimit)
+
+        local target = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
+        for i = 1, amount do
+            ApplyBloodDecal(IsValid(target) and target or ply)
+        end
+    end
+
     local function ReapplyHeadBloodDecal(ply, ragdoll)
         if not IsValid(ply) then return end
         if ply.HG_HeadBloodDecal then
@@ -19,12 +44,23 @@ if SERVER then
         end
     end
 
+    local function ReapplyBloodDecals(ply, ragdoll)
+        if not IsValid(ply) then return end
+
+        local target = IsValid(ragdoll) and ragdoll or hg.GetCurrentCharacter(ply)
+        for i = 1, ply.HG_BloodDecalCount or 0 do
+            ApplyBloodDecal(target)
+        end
+    end
+
     hook.Add("Fake", "HG_HeadBloodDecal_Fake", function(ply, ragdoll)
         ReapplyHeadBloodDecal(ply, ragdoll)
+        ReapplyBloodDecals(ply, ragdoll)
     end)
 
     hook.Add("RagdollDeath", "HG_HeadBloodDecal_Death", function(ply, ragdoll)
         ReapplyHeadBloodDecal(ply, ragdoll)
+        ReapplyBloodDecals(ply, ragdoll)
     end)
 
     hook.Add("Player Think", "HG_WashBloodDecals", function(ply)
@@ -37,6 +73,7 @@ if SERVER then
 
         ply.HG_NextBloodWash = CurTime() + 0.5
         ply.HG_HeadBloodDecal = nil
+        ply.HG_BloodDecalCount = nil
 
         local targets = {
             ply,

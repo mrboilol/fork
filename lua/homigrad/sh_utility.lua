@@ -1686,7 +1686,8 @@ local IsValid = IsValid
 
 		-- Add pain if using damaged left arm for interaction
 		if leftArmBroken then
-			local painAmount = (org.larm or 0) * 12 + ((org.larmdislocation or org.larmdislocated) and 8 or 0)
+			-- PlayerUse can also reach the manipulation hook, so keep this small.
+			local painAmount = (org.larm or 0) * 3 + ((org.larmdislocation or org.larmdislocated) and 2 or 0)
 			org.painadd = (org.painadd or 0) + painAmount
 		end
 	end)

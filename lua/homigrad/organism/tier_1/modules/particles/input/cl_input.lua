@@ -40,9 +40,15 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	pos2:Set(pos)
 
 	local maxDrops = math.Clamp((hg_blood_fps:GetInt() or 24) * 14, 220, 900)
-	if #hg.bloodparticles1 > maxDrops then table.remove(hg.bloodparticles1, 1) end
+	if #hg.bloodparticles1 > maxDrops then
+		hg.bloodparticles1[1].active = false
+		table.remove(hg.bloodparticles1, 1)
+	end
 	
-	hg.bloodparticles1[#hg.bloodparticles1 + 1] = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin}
+	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, active = true}
+	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
+
+	return part
 end
 
 local function addBloodPart2(pos, vel, mat, w, h, time, water, owner)

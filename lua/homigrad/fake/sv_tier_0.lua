@@ -1941,6 +1941,11 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 			target:SetVelocity(data.OurOldVelocity:GetNormalized() * math.min(impactSpeed * 0.25, 120) + vector_up * 30)
 		end
 	end
+
+	-- Living fake ragdolls are continuously manipulated by the control system.
+	-- Their physics contacts are not discrete falls and must not feed the legacy
+	-- fall-foley path. Death ragdolls still use the impact sounds below.
+	if IsLiveManagedRagdoll(rag) then return end
 	if not data.HitEntity:IsWorld() then return end
 	local now = CurTime()
 	-- A settled ragdoll can keep reporting small physics collisions forever.  A
@@ -1962,6 +1967,16 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 	rag.NextSND = now + 1
 	rag.hg_fallSoundGrounded = true
 	rag.hg_fallSoundAirborneSince = nil
+end)
+
+hook.Add("EntityEmitSound", "HG_BlockFakeRagdollFallFoley", function(soundData)
+	local soundName = string.lower(soundData.SoundName or "")
+	if not string.find(soundName, "fall_foley", 1, true) then return end
+
+	local ent = soundData.Entity
+	if not IsValid(ent) then return end
+	if ent:IsPlayer() and IsValid(ent.FakeRagdoll) then return false end
+	if ent:GetClass() == "prop_ragdoll" and IsLiveManagedRagdoll(ent) then return false end
 end)
 
 local fallSoundSupportMins = Vector(-3, -3, -2)

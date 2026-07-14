@@ -268,11 +268,6 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		org.brainBurstDamage = (org.brainBurstDamage or 0) + brainDelta
 	end
 
-	if brainDelta > 0 then
-		local soundFile = (math.random(2) == 1) and "hits/headshot1.wav" or "hits/headshot2.wav"
-		org.owner:EmitSound(soundFile, 60, math.random(90, 120))
-	end
-
 	-- Chance to induce vomiting from brain trauma
 	if org.isPly and brainDelta > 0 and math.random() < brainDelta * 0.4 then
 		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.3, 0.7)
@@ -523,6 +518,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	
 	-- Store local position relative to bone so it follows organism movement
 	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), (dir2 or Vector(0,0,1)) * 5, artery, false}) -- false = local position
+	if hg.AddOrganismBloodDecal then hg.AddOrganismBloodDecal(owner) end
 	hg.organism.SyncWounds(org)
 
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end

@@ -1307,7 +1307,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-	if (org.blood < 2750) then org.needfake = true end
+	if (org.blood < 2500) then org.needfake = true end
 
 	local just_went_uncon = not org.otrub and org.needotrub
 

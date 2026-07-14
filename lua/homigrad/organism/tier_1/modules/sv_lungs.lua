@@ -656,7 +656,9 @@ module[2] = function(owner, org, timeValue)
 
 				local pulseMultiplier = math.Clamp((org.pulse or 70) / 70, 0.8, 1.5)
 
-				local arteriaDrain = timeValue * 0.15 * pulseMultiplier * arteryDrainMul
+				-- Neck and spinal arterial wounds still compromise oxygen delivery, but
+				-- this is deliberately a slow secondary loss rather than a rapid O2 wipe.
+				local arteriaDrain = timeValue * 0.03 * pulseMultiplier * arteryDrainMul
 
 				o2[1] = max(o2[1] - arteriaDrain, 0)
 

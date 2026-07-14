@@ -226,6 +226,10 @@ hook.Add("Ragdoll Collide", "RagdollFallSounds", function(ragdoll, data)
     local owner = hg.RagdollOwner(ragdoll)
     if not IsValid(owner) or not owner:IsPlayer() then return end
 
+    -- Fake-control contacts are continuous physics motion, not new falls.
+    -- Keep this impact system for corpses, but never loop it on a living fake.
+    if owner:Alive() and owner.FakeRagdoll == ragdoll then return end
+
     -- Share the authoritative grounded latch with the legacy fall-sound hook.
     -- Resting physics bones keep colliding, but they are not new landings.
     if ragdoll.hg_fallSoundGrounded then return end

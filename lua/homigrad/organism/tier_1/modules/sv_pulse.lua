@@ -207,11 +207,13 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if not org.heartstop then
-		-- A faster heartbeat can partially restore effective pulse pressure, but
-		-- very high rates lose filling efficiency and stop helping.
-		local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
-		local fillingK = 1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)
-		local pumpSupport = math.Clamp(pumpRateK * fillingK, 0.25, 1.45)
+		-- A compensating heartbeat can only modestly support perfusion. It must
+		-- not make a weak pulse look normal simply because the heart is racing.
+		local heartbeatNow = org.heartbeat or 70
+		local pumpRateK = math.Clamp(heartbeatNow / 70, 0.25, 2.4)
+		local fillingK = 1 - math.Clamp((heartbeatNow - 185) / 85, 0, 0.55)
+		local maxPumpSupport = 1.1 - math.Clamp((heartbeatNow - 100) / 200, 0, 0.35)
+		local pumpSupport = math.Clamp(pumpRateK * fillingK, 0.25, maxPumpSupport)
 		local supportedPulse = math.Clamp(pulse * pumpSupport, 0, 200)
 		if supportedPulse > org.pulse then
 			org.pulse = math.Approach(org.pulse, supportedPulse, timeValue * 8)
@@ -469,23 +471,6 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	local circulatoryRisk = (org.bloodpressure or 93) < 55 or (org.pulse or 70) < 35 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
-
-	if org.fear > 1.5 and circulatoryRisk then
-        if not org._fear_check_time or CurTime() > org._fear_check_time then
-            org._fear_check_time = CurTime() + 1 -- check every second
-
-            local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)
-            local chance = (org.fear - 1.5) / 0.5 * 0.012 * riskMul
-            local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
-            if totalAdrenaline > 1.0 then
-                chance = chance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.35)
-            end
-            if math.random() < chance then
-                org.heartstop = true
-                org.lungsfunction = false
-            end
-        end
-    end
 
 	-- Small heartstop chance from despair alone (not panic-only)
 	if (org.despair or 0) > 0.65 and not org.panicattackActive and circulatoryRisk then

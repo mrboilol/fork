@@ -31,7 +31,8 @@ hook.Add("PlayerUse", "ZManipUseAnim", function(ply, ent)
 		if org and isBroken then
 			local armVal = org.larm or 0
 			local disloc = org.larmdislocation
-			local painAmount = armVal * 12 + (disloc and 8 or 0)
+			-- This may be charged alongside PlayerUse's generic arm-use check.
+			local painAmount = armVal * 3 + (disloc and 2 or 0)
 			org.painadd = (org.painadd or 0) + painAmount
 		end
 

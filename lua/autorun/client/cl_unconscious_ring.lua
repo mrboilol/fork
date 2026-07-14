@@ -95,7 +95,7 @@ local CRITBEAT_VOLUME_SCALE = 0.6
 
 local lastPhaseMod = 0
 local wasUnconsciousState = false
-local flatlinePlayedThisUnconscious = false
+local flatlinePlayedThisLife = false
 local wasHeartbeatZero = false
 local soundGen = 0
 local heartStations = {}
@@ -161,7 +161,6 @@ end
 local function ResetRingAudio()
     soundGen = soundGen + 1
     wasUnconsciousState = false
-    flatlinePlayedThisUnconscious = false
     wasHeartbeatZero = false
 
     for i = 1, #heartStations do
@@ -190,6 +189,13 @@ local function ResetRingAudio()
     fibrillationRequested = false
     fibrillationVolume = 0
 end
+
+hook.Add("Player Spawn", "ResetUnconsciousRingFlatline", function(ply)
+    if ply == LocalPlayer() then
+        flatlinePlayedThisLife = false
+        wasHeartbeatZero = false
+    end
+end)
 
 -- Ensure heart sound stations are loaded (pooling)
 local function EnsureHeartStations()
@@ -317,7 +323,12 @@ local function UpdateFibrillationSound()
     elseif fibrillationPlaying then
         fibrillationPlaying = false
         if IsValid(fibrillationStation) and fibrillationStation:GetState() == GMOD_CHANNEL_PLAYING then
-            fibrillationStation:FadeOut(0.5)
+            if fibrillationStation.FadeOut then
+                fibrillationStation:FadeOut(0.5)
+            else
+                fibrillationStation:SetVolume(0)
+                fibrillationStation:Stop()
+            end
         end
     end
 end
@@ -564,15 +575,17 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     -- Check if consciousness loss was recent and sudden (within 5 seconds)
     local recentSuddenDrop = (CurTime() - consciousnessDropTime) < 5 and consciousnessDropAmount > 0.15
 
-    -- Reset flatline flag when heartbeat recovers from flatline
+    -- Allow a new flatline only after the heart has actually recovered.
     if heartbeat >= 1 and wasHeartbeatZero then
-        flatlinePlayedThisUnconscious = false
+        flatlinePlayedThisLife = false
     end
     wasHeartbeatZero = heartbeat < 1
-    
-    -- Reset flatline flag when becoming unconscious to ensure asystole plays
-    if isUnconscious and not wasUnconsciousState then
-        flatlinePlayedThisUnconscious = false
+
+    -- Asystole can happen while awake. Play its cue once, independent of
+    -- whether the unconscious-ring UI is currently visible.
+    if heartbeat < 1 and not flatlinePlayedThisLife and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool()) then
+        EmitRingSound(SOUND_FLATLINE, 1.0)
+        flatlinePlayedThisLife = true
     end
     
     local className = ply.PlayerClassName
@@ -616,10 +629,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical)
     
 	if isUnconscious and not hideDyingRing then
-        if not wasUnconsciousState then
-            flatlinePlayedThisUnconscious = false
-        end
-
         local currentShock = org.shock or 0
         if currentShock > peakShock then
             peakShock = currentShock
@@ -630,7 +639,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         ringAlpha = Lerp(FrameTime() * 2, ringAlpha, 0.4)
         dotBeat = math.floor(CurTime()) % 3
     else
-        flatlinePlayedThisUnconscious = false
         ringAlpha = Lerp(FrameTime() * 3, ringAlpha, 0)
         if ringAlpha <= 0.01 and not showAwakeECG then
             ringAlpha = 0
@@ -713,7 +721,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             
             if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
                 lastPhaseMod = 0
-                flatlinePlayedThisUnconscious = false
                 local beat = dotBeat
                 local dotText = ""
 
@@ -727,11 +734,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 
                 draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             else
-                local isFlatline = heartbeat < 1
-                if isFlatline and not flatlinePlayedThisUnconscious then
-                    EmitRingSound(SOUND_FLATLINE, 1.0)
-                    flatlinePlayedThisUnconscious = true
-                end
                 UpdateRingAudio(heartbeat, otrubECGAlpha, org, admiring)
                 DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ringColor, otrubECGAlpha)
             end
@@ -875,6 +877,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         end
     end
 
+    -- Critical-beats is only for fibrillation. As soon as the local heart is
+    -- asystolic, clear any request so the existing fade-out branch runs.
+    if heartbeat < 1 then
+        fibrillationRequested = false
+        fibrillationVolume = 0
+    end
     UpdateFibrillationSound()
     
     if isNearDeathClass and isInBadHealth then

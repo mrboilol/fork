@@ -361,6 +361,11 @@ function hg.FlushVignetteLayer()
 	render.DrawScreenQuad()
 end
 
+local function DrawMotionBlurPreservingVignette(addAlpha, drawAlpha, delay)
+	DrawMotionBlur(addAlpha, drawAlpha, delay)
+	hg.FlushVignetteLayer()
+end
+
 PainLerp = 0
 PanicAttackLerp = 0
 O2Lerp = 0
@@ -893,22 +898,24 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local blindness = org.blindness
 	if blindness ~= nil or amtflashed >= 0.8 then
 		local eyesmode = amtflashed >= 0.8 and 0 or (blindness ~= nil and math.Round(blindness) or 0)
-		if eyesmode == 1 or eyesmode == 2 then
-			-- A destroyed eye blocks only its own side of the view.  The blind
-			-- shader is intentionally reserved for both eyes and flashbangs.
-			surface.SetDrawColor(0, 0, 0, 255)
-			surface.DrawRect(eyesmode == 2 and 0 or ScrW() / 2, 0, ScrW() / 2, ScrH())
-		else
-			render.UpdateScreenEffectTexture()
-			render.UpdateFullScreenDepthTexture()
+		local singleEye = eyesmode == 1 or eyesmode == 2
 
-			blindMat:SetFloat("$c0_x", 5)
-			blindMat:SetFloat("$c0_y", CurTime())
-			blindMat:SetFloat("$c0_z", 0)
+		render.UpdateScreenEffectTexture()
+		render.UpdateFullScreenDepthTexture()
 
-			render.SetMaterial(blindMat)
-			render.DrawScreenQuad()
+		blindMat:SetFloat("$c0_x", 5)
+		blindMat:SetFloat("$c0_y", CurTime())
+		blindMat:SetFloat("$c0_z", eyesmode)
+
+		if singleEye then
+			local sideX = eyesmode == 2 and 0 or ScrW() / 2
+			render.SetScissorRect(sideX, 0, sideX + ScrW() / 2, ScrH(), true)
 		end
+
+		render.SetMaterial(blindMat)
+		render.DrawScreenQuad()
+
+		if singleEye then render.SetScissorRect(0, 0, 0, 0, false) end
 	end
 
 	if (org.consciousness < 0.7) then
@@ -1454,7 +1461,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		if org.otrub then
-			DrawMotionBlur(0.1, 1., 0.01)
+			DrawMotionBlurPreservingVignette(0.1, 1., 0.01)
 			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
 		end
 		
@@ -1578,7 +1585,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	disorientationFxLerp = LerpFT(disorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, math.max(disorientation, concussion * 0.65))
 	if lply:Alive() and not org.otrub and disorientationFxLerp > 1.2 then
 		local blurPower = math.Clamp((disorientationFxLerp - 1.2) / 7.5, 0, 1)
-		DrawMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
+		DrawMotionBlurPreservingVignette(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
 		if blurPower > 0.35 then
 			DrawToyTown(blurPower * 2.2, ScrH() / 2)
 		end
@@ -1622,7 +1629,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if (brainDamaged or recentSevereHeadTrauma) and not org.otrub then
 		if show_image_time > 0 then
 			brain_motionblur = true
-			DrawMotionBlur(0.04 + brainFlashScale * 0.06, 0.35 + brainFlashScale * 0.65, 0.1)
+			DrawMotionBlurPreservingVignette(0.04 + brainFlashScale * 0.06, 0.35 + brainFlashScale * 0.65, 0.1)
 
 			local alpha = 255 * math.Clamp(show_image_time / math.max(lobotomy_memory_total, 1), 0, 1)
 			show_image_time = show_image_time - 1
@@ -1639,7 +1646,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		elseif brainDamaged and show_some_images_time > 0 then
 			brain_motionblur = true
-			DrawMotionBlur(0.035 + brainFlashScale * 0.065, 0.3 + brainFlashScale * 0.7, 0.1)
+			DrawMotionBlurPreservingVignette(0.035 + brainFlashScale * 0.065, 0.3 + brainFlashScale * 0.7, 0.1)
 			show_some_images_time = show_some_images_time - 1
 			local flashChance = math.max(12, math.floor(28 - brainFlashScale * 12))
 			if math.random(flashChance) < 2 then
@@ -2234,7 +2241,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if suicideLerp > 0.15 then
 			local blurAlpha = 0.1 + suicideLerp * 0.15
 			local blurDraw = suicideLerp * 1.5
-			DrawMotionBlur(blurAlpha, blurDraw, 0.001)
+			DrawMotionBlurPreservingVignette(blurAlpha, blurDraw, 0.001)
 		end
 
 		-- ToyTown blur at high intensity

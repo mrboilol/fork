@@ -568,6 +568,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local old_headtrauma = org.headtrauma or 0
 	local sharpHead = IsSharpHeadDamage(dmgInfo)
 	local concussionMul = GetHeadConcussionScale(dmgInfo)
+	-- A knife can cut scalp tissue, but a sound skull should absorb almost all
+	-- of the force. Once it is substantially damaged, retain the normal path.
+	if sharpHead and oldDmg < 0.5 then
+		dmg = dmg * 0.12
+	end
 	-- The cranium should protect the brain from ordinary blows.  It remains
 	-- breakable under sustained or very heavy force, but no longer fractures from
 	-- a single typical punch.

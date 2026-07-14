@@ -944,11 +944,8 @@ local arterySizeMul = 1.35
 local arterialRampTime = 0.7
 local arterialMinIntensity = 0.35
 local arterialParticleSizeMul = 0.65
-local arterialJetCount = 1
 local arterialJetOffset = 0.12
 local arterialVelocityMul = 70
-local arterialDirectionRandomness = 0.75
-local arterialVerticalRandomness = 1
 local arterialPulseRetractRate = 85
 
 local pitchAddClasses = {
@@ -1028,7 +1025,7 @@ function hg.queueArterialWoundSound(ent, wound)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData)
+emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData, wound)
 	local pulseMul = math.max(pulse or 70, 0) / 70
 	if pulseMul <= 0 then return end
 
@@ -1039,16 +1036,19 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 	local right = dirAng:Right()
 	local up = ang:Up()
 	local scaledSize = size * arterialParticleSizeMul * buildup
-	local jetCount = math.max(1, math.ceil(arterialJetCount * buildup))
+	local sprayVel = dir * arterialVelocityMul * wave * buildup
+	sprayVel:Add(right * math.sin(time * 0.8) * 8 * pulseMul * buildup)
+	sprayVel:Add(up * math.sin(time * 0.6 + 1.1) * 3.5 * pulseMul * buildup)
 
-	for jet = 1, jetCount do
-		local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
-		local sprayVel = VectorRand(-0.25, 0.25) * pulseMul * buildup
-		sprayVel:Add(dir * arterialVelocityMul * wave * buildup)
-		sprayVel:Add(right * (math.sin(time * 0.8) * 5 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * pulseMul * buildup)
-		sprayVel:Add(up * (math.sin(time * 0.6 + 1.1) * 3.5 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * pulseMul * buildup)
-		hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
+	local jet = wound and wound.arterialJet
+	if jet and jet.active then
+		jet[3]:Set(sprayVel)
+		return
 	end
+
+	local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
+	jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
+	if wound and jet then wound.arterialJet = jet end
 
 end
 local hg_altberserk = GetConVar("hg_altberserk")
@@ -1356,7 +1356,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
 							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, ang, visualPulse, size, wound[7], fxData)
+							emitArterialSpray(ent, pos, dir, ang, visualPulse, size, wound[7], fxData, wound)
 						end
 
 						wound[5] = time + (water and 2 or (0.5 * 1 / hg_blood_fps:GetInt()))

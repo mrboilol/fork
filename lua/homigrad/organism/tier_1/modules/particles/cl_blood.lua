@@ -312,22 +312,29 @@ bloodparticles_hook[2] = function(mul)
 		result = util_TraceLine(tr)
 		local hitPos = result.HitPos
 		
-		if radiusSqr < hitPos:LengthSqr() then table_remove(hg.bloodparticles1, i) continue end
+		if radiusSqr < hitPos:LengthSqr() then
+			part.active = false
+			table_remove(hg.bloodparticles1, i)
+			continue
+		end
 		
         if bit.band(util.PointContents(hitPos), CONTENTS_WATER) == CONTENTS_WATER then
 			hg.addBloodPart2(hitPos, part[3] / 20 + VectorRand(-1, 1), nil, nil, nil, nil, true)
 
+			part.active = false
 			table_remove(hg.bloodparticles1, i)
 			continue
 		end
 		
 		if time - part[7] >= 30 then
+			part.active = false
 			table_remove(hg.bloodparticles1, i)
 
 			continue
 		end
 
 		if result.Hit and result.Entity:IsWorld() then
+			part.active = false
 			table_remove(hg.bloodparticles1, i)
 			local dir = result.HitNormal
 			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
@@ -364,6 +371,7 @@ bloodparticles_hook[2] = function(mul)
 				local insolid = result.StartSolid and IsValid(result.Entity)
 				if insolid then
 					if result.Entity:IsVehicle() then
+						part.active = false
 						table_remove(hg.bloodparticles1, i)
 					
 						continue
@@ -385,6 +393,7 @@ bloodparticles_hook[2] = function(mul)
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
 					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
 					
+					part.active = false
 					table_remove(hg.bloodparticles1, i)
 					
 					continue
