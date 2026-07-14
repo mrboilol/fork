@@ -897,7 +897,10 @@ function SWEP:FireBullet()
 			ent:TakeDamageInfo(dmginfo)
 		end
 
-		if(hg.PhysBullet and self.UsePhysBullets)then
+		-- The wind addon marked every Homigrad weapon as physical.  Keep the
+		-- original Lua shot path for those forced conversions; only weapons that
+		-- explicitly opt into physical bullets should use that simulation.
+		if hg.PhysBullet and self.UsePhysBullets and not self.ZCityWindForcedPhysBullets then
 			if(SERVER)then
 				hg.PhysBullet.CreateBullet(shot)
 			end

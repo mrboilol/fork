@@ -1253,9 +1253,7 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 		--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))
 		ply:SetCollisionGroup(COLLISION_GROUP_IN_VEHICLE)
 		ply:SetPos(pos)
-		-- The physical ragdoll is the only world model while fake. RENDERMODE_NONE
-		-- alone can leave the player entity participating in shadow rendering.
-		ply:SetNoDraw(true)
+		ply:SetNoDraw(false)
 		ply:SetRenderMode(RENDERMODE_NONE)
 		//ply:ExitVehicle()
 	--end)
@@ -1362,9 +1360,6 @@ hook.Add("Player Spawn", "fuckingremoveragdoll", function(ply)
 	hg.ragdollFake[ply] = nil
 	ply:SetNWEntity("FakeRagdoll", NULL)
 	ply:SetNWEntity("RagdollDeath", NULL)
-	ply:SetNoDraw(false)
-	ply:DrawShadow(true)
-	ply:SetRenderMode(RENDERMODE_NORMAL)
 end)
 
 hook.Add("CanControlFake","stunnednocontrol",function(ply,rag)
@@ -1459,7 +1454,6 @@ function hg.FakeUp(ply, forced, instant)
 	//local pos = ply:GetPos()
 	ply:Spawn()
 	//ply:SetPos(pos)
-	ply:SetNoDraw(false)
 	ply:SetRenderMode(RENDERMODE_NORMAL)
 	ply.LastFakeUp = CurTime()
 	ply:DrawWorldModel(true)
@@ -1911,6 +1905,9 @@ PushManagedRagdollAway = function(rag, awayDir, speed)
 		end
 	end
 end
+hook.Remove("Ragdoll Collide", "RagdollFallSounds")
+hook.Remove("Ragdoll Collide", "RagdollHeadFlashImpact")
+timer.Remove("FallSoundCleanup")
 hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 	if not IsValid(rag) then return end
 
@@ -1942,17 +1939,8 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 		end
 	end
 
-	-- Living fake ragdolls are continuously manipulated by the control system.
-	-- Their physics contacts are not discrete falls and must not feed the legacy
-	-- fall-foley path. Death ragdolls still use the impact sounds below.
-	if IsLiveManagedRagdoll(rag) then return end
 	if not data.HitEntity:IsWorld() then return end
-	local now = CurTime()
-	-- A settled ragdoll can keep reporting small physics collisions forever.  A
-	-- real fall should produce one impact sound, then stay silent until the body
-	-- has actually left the ground again.
-	if rag.hg_fallSoundGrounded then return end
-	if data.OurOldVelocity:LengthSqr() < 165000 or (rag.NextSND or 0) > now then return end
+	if data.OurOldVelocity:LengthSqr() < 165000 or (rag.NextSND or 0) > data.DeltaTime then return end
 	rag:EmitSound("player/falling_foley/fall_foley"..mRandom(13)..".wav", 60, mRandom(95, 115), 1, CHAN_AUTO)
 	if mRandom(3) == 2 then
 		rag:EmitSound("physics/flesh/flesh_impact_hard"..mRandom(6)..".wav", 55, mRandom(85, 105), 1, CHAN_AUTO)
@@ -1964,69 +1952,7 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 		ply:ViewPunch(AngleRand(-20 * mul, 20 * mul))
 	end]]
 
-	rag.NextSND = now + 1
-	rag.hg_fallSoundGrounded = true
-	rag.hg_fallSoundAirborneSince = nil
-end)
-
-hook.Add("EntityEmitSound", "HG_BlockFakeRagdollFallFoley", function(soundData)
-	local soundName = string.lower(soundData.SoundName or "")
-	if not string.find(soundName, "fall_foley", 1, true) then return end
-
-	local ent = soundData.Entity
-	if not IsValid(ent) then return end
-	if ent:IsPlayer() and IsValid(ent.FakeRagdoll) then return false end
-	if ent:GetClass() == "prop_ragdoll" and IsLiveManagedRagdoll(ent) then return false end
-end)
-
-local fallSoundSupportMins = Vector(-3, -3, -2)
-local fallSoundSupportMaxs = Vector(3, 3, 2)
-
-timer.Create("HG_FallSoundRearm", 0.25, 0, function()
-	for _, rag in ipairs(ents.FindByClass("prop_ragdoll")) do
-		if rag.hg_fallSoundGrounded then
-			local owner = hg.RagdollOwner(rag)
-			local traceFilter = IsValid(owner) and {rag, owner} or rag
-			local supported = false
-
-			-- Fake-control can briefly lift the pelvis while another limb is still
-			-- resting on the floor. Check every physics body so that motion from
-			-- shadow control cannot masquerade as a new fall.
-			for physIndex = 0, rag:GetPhysicsObjectCount() - 1 do
-				local phys = rag:GetPhysicsObjectNum(physIndex)
-				if not IsValid(phys) then continue end
-
-				local pos = phys:GetPos()
-				local tr = util.TraceHull({
-					start = pos + vector_up * 2,
-					endpos = pos - vector_up * 12,
-					mins = fallSoundSupportMins,
-					maxs = fallSoundSupportMaxs,
-					filter = traceFilter,
-					mask = MASK_SOLID,
-				})
-
-				if tr.Hit then
-					supported = true
-					break
-				end
-			end
-
-			if supported then
-				rag.hg_fallSoundAirborneSince = nil
-				continue
-			end
-
-			local now = CurTime()
-			rag.hg_fallSoundAirborneSince = rag.hg_fallSoundAirborneSince or now
-			-- Require a sustained, fully unsupported interval before accepting a
-			-- later collision as a separate landing.
-			if now - rag.hg_fallSoundAirborneSince >= 0.5 then
-				rag.hg_fallSoundGrounded = nil
-				rag.hg_fallSoundAirborneSince = nil
-			end
-		end
-	end
+	rag.NextSND = data.DeltaTime + 1
 end)
 
 local hg_shitty_fake = CreateConVar("hg_shitty_fake", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "enable shitty fake", 0, 1)

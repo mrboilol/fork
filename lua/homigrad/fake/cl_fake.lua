@@ -547,21 +547,10 @@ hook.Add("NetworkEntityCreated", "HG_GiveRenderOverride", function(ragdoll)
 		if !IsValid(ragdoll:GetNWEntity("ply")) then
 			ragdoll.RenderOverride = function(self, flags)
 				if not IsValid(self) or self:IsDormant() then return end
-				local bonePos = self:GetBonePosition(1)
-				if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then
-					self:DrawModel()
-					return
-				end
-				if not self:GetNWString("PlayerName") then
-					self:DrawModel()
-					return
-				end
+				if not self:GetBonePosition(1) or self:GetBonePosition(1):IsEqualTol(self:GetPos(), 0.01) then return end
+				if not self:GetNWString("PlayerName") then return end
 				local ply = self:GetNWEntity("ply")
 				local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
-				if not ply.shouldTransmit then
-					self:DrawModel()
-					return
-				end
 				
 				hg.renderOverride(ply, self, flags)
 			end
@@ -608,16 +597,8 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 	if IsValid(ent) then
 		ent.RenderOverride = function(self, flags)
 			if not IsValid(self) or self:IsDormant() then return end
-			local bonePos = self:GetBonePosition(1)
-			if not bonePos or bonePos:IsEqualTol(self:GetPos(), 0.01) then
-				self:DrawModel()
-				return
-			end
+			if not self:GetBonePosition(1) or self:GetBonePosition(1):IsEqualTol(self:GetPos(), 0.01) then return end
 			local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
-			if not ply.shouldTransmit then
-				self:DrawModel()
-				return
-			end
 			
 			hg.renderOverride(ply, self, flags)
 		end
@@ -673,20 +654,13 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 		//ply.FakeRagdollOld = nil
 
 		ply.FakeRagdoll = ragdoll
-		-- The ragdoll owns the visible silhouette while faked.  Suppress the
-		-- player entity completely so it cannot leave a second animated shadow.
-		ply:SetNoDraw(true)
-		ply:DrawShadow(false)
 		hook_Run("Fake", ply, ragdoll)
 	else
 		if IsValid(ply.FakeRagdoll) then
 			ply.fakecd = CurTime() + 2
 		end
 
-		if IsValid(ply) then
-			ply:SetNoDraw(false)
-			ply:DrawShadow(true)
-		end
+		if IsValid(ply) then ply:SetNoDraw(false) end
 		ply:SetRenderMode(RENDERMODE_NORMAL)
 		
 		if IsValid(oldrag) then
@@ -765,39 +739,7 @@ end
 -- 	end
 -- end
 
--- Other render/animation code can restore the hidden player entity's shadow
--- after the fake transition. Keep the client shadow state authoritative for
--- as long as the physical ragdoll is active.
-hook.Add("Think", "HG_FakeRagdollShadowState", function()
-	for _, ply in ipairs(player.GetAll()) do
-		local networkRagdoll = ply:GetNWEntity("FakeRagdoll", NULL)
-		local fakeRagdoll = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or networkRagdoll
-
-		if IsValid(fakeRagdoll) then
-			if IsValid(ply.hg_fakeShadowRagdoll) and ply.hg_fakeShadowRagdoll ~= fakeRagdoll then
-				ply.hg_fakeShadowRagdoll:DrawShadow(true)
-			end
-
-			-- The render override's default ragdoll shadow can use a stale falling
-			-- pose. Suppress both shadow sources while fake; restore the ragdoll's
-			-- normal shadow if it later becomes a corpse.
-			ply:DrawShadow(false)
-			fakeRagdoll:DrawShadow(false)
-			ply.hg_fakeShadowRagdoll = fakeRagdoll
-			ply.hg_fakeShadowDrawn = false
-		else
-			if IsValid(ply.hg_fakeShadowRagdoll) then
-				ply.hg_fakeShadowRagdoll:DrawShadow(true)
-			end
-			ply.hg_fakeShadowRagdoll = nil
-
-			if ply.hg_fakeShadowDrawn ~= true then
-				ply:DrawShadow(true)
-				ply.hg_fakeShadowDrawn = true
-			end
-		end
-	end
-end)
+hook.Remove("Think", "HG_FakeRagdollShadowState")
 
 -- hook.Add("PostCleanupMap","wtfdude",function()
 -- 	LocalPlayer():BoneScaleChange()
@@ -880,12 +822,6 @@ hook.Add("Player Spawn", "fuckingremoveragdoll", function(ply)
 		clearLocalFollow()
 	end
 
-	-- The server-side cleanup above is mirrored here.  A stale local reference
-	-- keeps the player in the fake render path after a real spawn, producing an
-	-- invisible falling silhouette until another ragdoll transition happens.
-	ply:SetNoDraw(false)
-	ply:DrawShadow(true)
-	ply:SetRenderMode(RENDERMODE_NORMAL)
 	ply:SetNWEntity("FakeRagdoll", NULL)
 	ply:SetNWEntity("RagdollDeath", NULL)
 end)
