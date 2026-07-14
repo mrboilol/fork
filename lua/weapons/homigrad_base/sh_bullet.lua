@@ -607,6 +607,28 @@ function SWEP:FireBullet()
 
 	self:WorldModel_Transform()
 	local tr, pos, ang = self:GetTrace(true)
+	local aimTrace = tr
+
+	-- The muzzle transform is animated and can be visibly offset from the
+	-- player's view.  Use the view trace as the aim point, then aim the
+	-- projectile from the muzzle toward that point below.  This keeps the
+	-- physical-bullet path on the crosshair instead of on the model's angle.
+	if isply then
+		local aimStart = owner:GetShootPos()
+		local aimDir = owner:GetAimVector()
+		if isvector(aimStart) and isvector(aimDir) and aimDir:LengthSqr() > 0.0001 then
+			local aimFilter = {self, gun, owner, ent}
+			local fake = SERVER and hg.ragdollFake[owner] or owner.FakeRagdoll
+			if IsValid(fake) then table.insert(aimFilter, fake) end
+
+			aimTrace = util_TraceLine({
+				start = aimStart,
+				endpos = aimStart + aimDir * (ammotype.Distance or 56756),
+				filter = aimFilter,
+				mask = MASK_SHOT
+			})
+		end
+	end
 
 	if isply then
 		owner:LagCompensation(false)
@@ -692,7 +714,7 @@ function SWEP:FireBullet()
 	end
 
 	local bullet = {}
-	local aimPos = (tr and tr.HitPos) or (pos + dir * (ammotype.Distance or 56756))
+	local aimPos = (aimTrace and aimTrace.HitPos) or (pos + dir * (ammotype.Distance or 56756))
     bullet.Src = (willsuicidereal and headpos or (trace and (trace.HitPos - trace.Normal) or pos))
 	bullet.Dir = dir
 	bullet.Attacker = owner

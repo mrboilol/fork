@@ -13,6 +13,33 @@ function hg.organism.ZeroVitals(org)
 	org.diastolic = 0
 end
 
+-- Wounds are owned by the organism, but both kinds of player ragdoll are
+-- rendered as separate entities. Keep their replicated wound lists in lockstep
+-- so a hit remains visible and targetable through fake/death ragdoll changes.
+function hg.organism.SyncWounds(org)
+	if not org or not IsValid(org.owner) then return end
+
+	local owner = org.owner
+	local wounds = org.wounds or {}
+	local arterialWounds = org.arterialwounds or {}
+	local targets = {owner}
+	local fakeRagdoll = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner:GetNWEntity("FakeRagdoll", NULL)
+	local deathRagdoll = IsValid(owner.RagdollDeath) and owner.RagdollDeath or owner:GetNWEntity("RagdollDeath", NULL)
+
+	if IsValid(fakeRagdoll) and fakeRagdoll != owner then
+		table.insert(targets, fakeRagdoll)
+	end
+
+	if IsValid(deathRagdoll) and deathRagdoll != owner and deathRagdoll != fakeRagdoll then
+		table.insert(targets, deathRagdoll)
+	end
+
+	for _, target in ipairs(targets) do
+		target:SetNetVar("wounds", wounds)
+		target:SetNetVar("arterialwounds", arterialWounds)
+	end
+end
+
 function hg.organism.KillFatalBrainDamage(org)
 	if not org or org.fatalBrainDeath then return false end
 
@@ -1478,8 +1505,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if (org.sendPlyTime > time) and !just_went_uncon then return end
 		org.sendPlyTime = CurTime() + 1 + (not isPly and 2 or 0)
 		send_bareinfo(org)
-					org.owner:SetNetVar("wounds", org.wounds)
-		org.owner:SetNetVar("arterialwounds", org.arterialwounds)
+		hg.organism.SyncWounds(org)
 
 		if isPly and owner:Alive() then
 			send_organism(org, owner)

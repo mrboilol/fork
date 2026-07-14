@@ -77,7 +77,16 @@ PLUGIN.SurfaceImpactSounds = {
 	[MAT_TILE] = {"ric_stone1.ogg", "ric_stone2.ogg", "ric_stone3.ogg"},
 	[MAT_GLASS] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
 	[MAT_PLASTIC] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
+	[MAT_SLOSH] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
+	[MAT_GRASS] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
+	[MAT_SNOW] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
+	[MAT_ANTLION] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
+	[MAT_BLOODYFLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
+	[74] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
+	[85] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
 }
+
+PLUGIN.DefaultImpactSounds = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"}
 
 PLUGIN.Bullet_StandartMask = MASK_SHOT
 
@@ -901,7 +910,9 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				end
 			else
 				local mat_type = trace.MatType
-				local sounds = PLUGIN.SurfaceImpactSounds[mat_type]
+				-- Always supply a bullet impact.  Otherwise an unmapped Source material
+				-- falls back to the stock physics impact sound instead of this sound set.
+				local sounds = PLUGIN.SurfaceImpactSounds[mat_type] or PLUGIN.DefaultImpactSounds
 				
 				if(sounds and #sounds > 0)then
 					local sound_file = sounds[math.random(1, #sounds)]

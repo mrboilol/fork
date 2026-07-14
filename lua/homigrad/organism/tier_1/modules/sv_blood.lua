@@ -115,11 +115,7 @@ function hg.organism.RebuildArteryWoundState(org, syncNow)
 
 	local owner = org.owner
 	if IsValid(owner) then
-		owner:SetNetVar("arterialwounds", org.arterialwounds or {})
-
-		if IsValid(owner.FakeRagdoll) then
-			owner.FakeRagdoll:SetNetVar("arterialwounds", org.arterialwounds or {})
-		end
+		hg.organism.SyncWounds(org)
 
 		if syncNow and hg.send_organism then
 			hg.send_organism(org, owner)
@@ -511,7 +507,7 @@ module[2] = function(owner, org, mulTime)
 			table.remove(org.wounds, woundsToRemove[idx])
 		end
 		if #woundsToRemove > 0 then
-			owner:SetNetVar("wounds", org.wounds)
+			hg.organism.SyncWounds(org)
 		end
 	end
 

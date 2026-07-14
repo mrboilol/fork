@@ -240,7 +240,7 @@ function hg.organism.AmputateLimb(org, limb)
 	table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery"})
 	
 	org.arterialwounds = wnds
-	org.owner:SetNetVar("arterialwounds", wnds)
+	hg.organism.SyncWounds(org)
 
 	org[limb.."amputated"] = true
 
@@ -352,13 +352,8 @@ function hg.organism.AddWound(ent, tr, bone, dmgInfo, dmgPos, dmgBlood, inputHol
 			table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 			
 			if #org.wounds <= 30 then
-				local wounds = org.wounds
 				timer.Create("WoundsSend"..ent:EntIndex(),0.1,1,function()
-					local ent = org.owner
-					if IsValid(ent) then
-						ent:SetNetVar("wounds", wounds)
-						if IsValid(ent.RagdollDeath) then ent.RagdollDeath:SetNetVar("wounds", wounds) end
-					end
+					hg.organism.SyncWounds(org)
 				end)
 			end
 		end
@@ -380,13 +375,8 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 	table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 
 	if #org.wounds <= 30 then
-		local wounds = org.wounds
 		timer.Create("WoundsSend"..ent:EntIndex(),0.1,1,function()
-			local ent = org.owner
-			if IsValid(ent) then
-				ent:SetNetVar("wounds",wounds)
-				if IsValid(ent.RagdollDeath) then ent.RagdollDeath:SetNetVar("wounds", wounds) end
-			end
+			hg.organism.SyncWounds(org)
 		end)
 	end
 end
@@ -754,6 +744,42 @@ local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodi
 
 local net, math, hg, IsValid = net, math, hg, IsValid
 local takeRagdollDamage
+
+-- Rapid-fire damage can arrive several times inside one server tick.  Keep the
+-- entry and exit streams separate, but coalesce each stream without replacing
+-- its pending timer or losing the accumulated impact count.
+local function queueBulletBloodImpact(ent, stream, pos, velocity, damage)
+	if not IsValid(ent) then return end
+
+	ent._pendingBulletBloodImpacts = ent._pendingBulletBloodImpacts or {}
+	local pending = ent._pendingBulletBloodImpacts[stream]
+	if not pending then
+		pending = {amount = 0}
+		ent._pendingBulletBloodImpacts[stream] = pending
+	end
+
+	pending.pos = pos
+	pending.velocity = velocity
+	pending.damage = damage
+	pending.amount = math.min((pending.amount or 0) + 1, 32)
+	if pending.queued then return end
+	pending.queued = true
+
+	timer.Simple(0.02, function()
+		if not IsValid(ent) then return end
+		local queued = ent._pendingBulletBloodImpacts and ent._pendingBulletBloodImpacts[stream]
+		if not queued then return end
+		ent._pendingBulletBloodImpacts[stream] = nil
+
+		net.Start("hg_bloodimpact")
+		net.WriteVector(queued.pos)
+		net.WriteVector(queued.velocity)
+		net.WriteFloat(queued.damage)
+		net.WriteInt(queued.amount, 8)
+		net.Broadcast()
+	end)
+end
+
 hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	if dmgInfo:IsDamageType(DMG_DISSOLVE) then return end
@@ -1033,13 +1059,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 					table.sort(org.wounds, function(a, b) return a[1] > b[1] end)
 					
 					if #org.wounds <= 30 then
-						local wounds = org.wounds
 						timer.Create("WoundsSend"..ent:EntIndex(), 0.1, 1, function()
-							local ent = org.owner
-							if IsValid(ent) then
-								ent:SetNetVar("wounds", wounds)
-								if IsValid(ent.RagdollDeath) then ent.RagdollDeath:SetNetVar("wounds", wounds) end
-							end
+							hg.organism.SyncWounds(org)
 						end)
 					end
 				end
@@ -1063,26 +1084,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local att = dmgInfo:GetAttacker()
 	if true and outputHole and #outputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
 		local bullet = inf.bullet
-		ent.bloodamt = ent.bloodamt or 0
-		ent.bloodamt = ent.bloodamt + 1
 		org.blood = org.blood - 75
 		
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
 
-			if IsValid(ent) then
-				timer.Create("Blood_burst"..ent:EntIndex(),0.02,1,function()
-					if IsValid(ent) and ent.bloodamt then
-						net.Start("hg_bloodimpact")
-						net.WriteVector(outputHole[#outputHole])
-						net.WriteVector(-outputDir)
-						net.WriteFloat(dmg)
-						net.WriteInt(ent.bloodamt,8)
-						net.Broadcast()
-						ent.bloodamt = 0
-					end
-				end)
-			end
+			queueBulletBloodImpact(ent, "exit", outputHole[#outputHole], -outputDir, dmg)
 			
 			if bullet and true then
 				local mul = distance / pen
@@ -1180,21 +1187,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--end
 
 	if inputHole and #inputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
-		ent.bloodamt2 = ent.bloodamt2 or 0
-		ent.bloodamt2 = ent.bloodamt2 + 1
-
-		timer.Simple(0, function()
-			timer.Create("Blood_burst_input"..ent:EntIndex(), 0.02, 1, function()
-				if not IsValid(ent) then return end
-				net.Start("hg_bloodimpact")
-				net.WriteVector(inputHole[1])
-				net.WriteVector(dir / 2)
-				net.WriteFloat(dmg)
-				net.WriteInt(ent.bloodamt2, 8)
-				net.Broadcast()
-				ent.bloodamt2 = 0
-			end)
-		end)
+		queueBulletBloodImpact(ent, "entry", inputHole[1], dir / 2, dmg)
 	end
 
 	--print(dmg_before, 2)

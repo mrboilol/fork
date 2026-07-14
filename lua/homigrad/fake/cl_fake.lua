@@ -849,6 +849,12 @@ hook.Add("Player Spawn", "fuckingremoveragdoll", function(ply)
 		clearLocalFollow()
 	end
 
+	-- The server-side cleanup above is mirrored here.  A stale local reference
+	-- keeps the player in the fake render path after a real spawn, producing an
+	-- invisible falling silhouette until another ragdoll transition happens.
+	ply:SetNoDraw(false)
+	ply:DrawShadow(true)
+	ply:SetRenderMode(RENDERMODE_NORMAL)
 	ply:SetNWEntity("FakeRagdoll", NULL)
 	ply:SetNWEntity("RagdollDeath", NULL)
 end)

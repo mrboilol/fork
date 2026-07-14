@@ -276,10 +276,12 @@ APmodule.ApplyAppearance = ApplyAppearance
 
 -- Ragdoll apply
 function ApplyAppearanceRagdoll(ent, ply)
-    local Appearance = ply.CurAppearance
-    if !Appearance then return end
+    if !IsValid(ent) or !IsValid(ply) then return end
+
+    local Appearance = ply.CurAppearance or {}
+    ent.CurAppearance = istable(ply.CurAppearance) and table.Copy(ply.CurAppearance) or nil
     ent:SetNWString("PlayerName", ply:GetNWString("PlayerName", Appearance.AName))
-    ent:SetNetVar("Accessories", ply:GetNetVar("Accessories",""))
+    ent:SetNetVar("Accessories", CopyAppearanceAccessories(ply:GetNetVar("Accessories", "")))
 
     local tMdl = APmodule.PlayerModels[1][ent:GetModel()] or APmodule.PlayerModels[2][ent:GetModel()] or ent:GetModel()
     if istable(tMdl) then

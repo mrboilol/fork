@@ -859,7 +859,8 @@ hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
 
 			ent.wounds = var
 			--PrintTable(ent.wounds)
-			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")-- or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
+			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")
+			rag = IsValid(rag) and rag or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
 			if IsValid(rag) then
 				rag.wounds = rag:GetNetVar("wounds") or var
 			end
@@ -886,7 +887,8 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 			end
 
 			ent.arterialwounds = var
-			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")-- or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
+			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")
+			rag = IsValid(rag) and rag or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
 			
 			if IsValid(rag) then
 				rag.arterialwounds = rag:GetNetVar("arterialwounds") or var
@@ -1043,8 +1045,8 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 		local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
 		local sprayVel = VectorRand(-0.25, 0.25) * pulseMul * buildup
 		sprayVel:Add(dir * arterialVelocityMul * wave * buildup)
-		sprayVel:Add(right * (math.sin(time * 0.8) * 3 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * pulseMul * buildup)
-		sprayVel:Add(up * (math.sin(time * 0.6 + 1.1) * 2 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * pulseMul * buildup)
+		sprayVel:Add(right * (math.sin(time * 0.8) * 5 + math.Rand(-arterialDirectionRandomness, arterialDirectionRandomness)) * pulseMul * buildup)
+		sprayVel:Add(up * (math.sin(time * 0.6 + 1.1) * 3.5 + math.Rand(-arterialVerticalRandomness, arterialVerticalRandomness)) * pulseMul * buildup)
 		hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
 	end
 

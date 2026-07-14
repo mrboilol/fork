@@ -23,6 +23,9 @@ local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
+local lastKnownFacingAngle = 0
+local indicatorBoneSource
+local indicatorBoneSourceKind
 local fadingBones = {} -- Track bones that are fading out after being healed
 local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
@@ -117,6 +120,8 @@ local function ResetModels(ply)
     end
     healthModel = nil
     blinkModel = nil
+    indicatorBoneSource = nil
+    indicatorBoneSourceKind = nil
     boneStates = {}
     pulseStartTime = 0
     iconsVisibility = 0
@@ -129,21 +134,85 @@ end
 local scaleZeroMat = Matrix()
 scaleZeroMat:Scale(Vector(0.001, 0.001, 0.001))
 
+local function GetIndicatorBoneSource(ply)
+    local function IsCompatibleRagdoll(ent)
+        return IsValid(ent) and ent:GetModel() == ply:GetModel()
+    end
+
+    local fakeRag = ply:GetNWEntity("FakeRagdoll")
+    local deathRag = ply:GetNWEntity("RagdollDeath")
+    local ragdoll = ply:GetRagdollEntity()
+    local hasRagdoll = IsCompatibleRagdoll(fakeRag) or IsCompatibleRagdoll(deathRag) or IsCompatibleRagdoll(ragdoll)
+
+    -- Keep the first compatible source for the current player/ragdoll state.
+    -- Do not bounce between fake, death, and entity ragdolls while they coexist.
+    if IsValid(indicatorBoneSource) then
+        if indicatorBoneSourceKind == "player" then
+            if not hasRagdoll then return indicatorBoneSource end
+        elseif hasRagdoll then
+            return indicatorBoneSource
+        end
+    end
+
+    if IsCompatibleRagdoll(fakeRag) then
+        indicatorBoneSource = fakeRag
+        indicatorBoneSourceKind = "fake"
+    elseif IsCompatibleRagdoll(deathRag) then
+        indicatorBoneSource = deathRag
+        indicatorBoneSourceKind = "death"
+    elseif IsCompatibleRagdoll(ragdoll) then
+        indicatorBoneSource = ragdoll
+        indicatorBoneSourceKind = "ragdoll"
+    else
+        indicatorBoneSource = ply
+        indicatorBoneSourceKind = "player"
+    end
+
+    return indicatorBoneSource
+end
+
 local function SyncBonesCallback(ent, numbones)
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
-    -- The indicator must always copy the initial player model's skeleton.
-    -- Ragdoll skeletons can have a different bone layout (notably Expie's),
-    -- which maps the indicator's head transform onto a limb.
-    local src = ply
+    local src = GetIndicatorBoneSource(ply)
+    local isRag = indicatorBoneSourceKind ~= "player"
     
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
 
-    -- Prevent the model from leaning backward/forward when looking up/down.
-    local eyeAng = ply:EyeAngles()
-    srcAng = Angle(0, eyeAng.y, 0)
+    if isRag then
+        local minZ = math.huge
+        for i = 0, src:GetBoneCount() - 1 do
+            local mat = src:GetBoneMatrix(i)
+            if mat then
+                local pos = mat:GetTranslation()
+                if pos.z < minZ then minZ = pos.z end
+            end
+        end
+
+        local pelvis = src:LookupBone("ValveBiped.Bip01_Pelvis")
+        if pelvis then
+            local pMat = src:GetBoneMatrix(pelvis)
+            if pMat then
+                srcPos = pMat:GetTranslation()
+                if minZ ~= math.huge then srcPos.z = minZ end
+            end
+        end
+
+        local ragYaw = srcAng.y
+        if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
+            local eyeAng = ply:EyeAngles()
+            srcAng = Angle(0, lastKnownFacingAngle ~= 0 and lastKnownFacingAngle or eyeAng.y, 0)
+        else
+            srcAng = Angle(0, ragYaw, 0)
+            lastKnownFacingAngle = ragYaw
+        end
+    else
+        local eyeAng = ply:EyeAngles()
+        srcAng = Angle(0, eyeAng.y, 0)
+        lastKnownFacingAngle = eyeAng.y
+    end
     
     local srcWorld = Matrix()
     srcWorld:SetTranslation(srcPos)
@@ -327,6 +396,8 @@ function HUD_DrawDynamicIndicator()
     end
 
     if healthModel:GetModel() ~= ply:GetModel() or (ply.PlayerClassName ~= healthModel.lastPlayerClassName) then
+        indicatorBoneSource = nil
+        indicatorBoneSourceKind = nil
         healthModel:SetModel(ply:GetModel())
         blinkModel:SetModel(ply:GetModel())
         InitBlinkModel(blinkModel)
@@ -533,9 +604,7 @@ function HUD_DrawDynamicIndicator()
         
         local col = math.Clamp(consciousness, 0, 1)
         
-        -- Keep animation in sync with the same player skeleton used by the
-        -- bone callback. Never substitute a fake or death ragdoll here.
-        local srcEnt = ply
+        local srcEnt = GetIndicatorBoneSource(ply)
         local modelOffset = Vector(0, 0, 10)
 
         local drawAng = Angle(0, 0, 0)

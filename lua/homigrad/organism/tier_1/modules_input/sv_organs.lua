@@ -444,6 +444,16 @@ local slashToArtery = {
 	["llegdown"] = "llegartery",
 }
 
+local function getMeleeArteryChance(dmg, dmgInfo)
+	local inflictor = dmgInfo:GetInflictor()
+	local chanceMul = IsValid(inflictor) and (inflictor.ArteryChance or 1) or 1
+	local strikeDamage = math.max(dmgInfo:GetDamage() or 0, dmg or 0)
+
+	-- Light cuts can nick an artery, while committed high-damage swings are
+	-- substantially more likely to tear one without becoming guaranteed.
+	return math.Clamp(math.Clamp(strikeDamage / 40, 0.1, 0.8) * chanceMul, 0.1, 0.8)
+end
+
 local arteryHitgroups = {
 	rarmartery = HITGROUP_RIGHTARM,
 	larmartery = HITGROUP_LEFTARM,
@@ -515,7 +525,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	
 	-- Store local position relative to bone so it follows organism movement
 	table.insert(org.arterialwounds, {arterySize[artery], localPos, localAng, boneindex, CurTime(), (dir2 or Vector(0,0,1)) * 5, artery, false}) -- false = local position
-	owner:SetNetVar("arterialwounds", org.arterialwounds)
+	hg.organism.SyncWounds(org)
 
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
 	return 0
@@ -527,6 +537,7 @@ hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_hit", function(org, bone,
 
 	local artery = organ and slashToArtery[organ[1]]
 	if not artery then return end
+	if math.Rand(0, 1) > getMeleeArteryChance(dmg, dmgInfo) then return end
 
 	hitArtery(artery, org, dmg, dmgInfo, box[6], dir, hit)
 end)

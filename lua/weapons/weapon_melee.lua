@@ -281,9 +281,10 @@ SWEP.HeavyAttackRads = 65
 SWEP.HeavyAttackDamageType = nil -- Damage type for heavy attack (nil = use Primary)
 
 SWEP.CanHeavyAttack = false
--- Remorseism uses each weapon's configured damage and force without a hidden
--- global reduction. Keep a named force multiplier for the live-only force paths.
-local MELEE_GLOBAL_KNOCKBACK_MUL = 1
+-- Shared balance controls: preserve each weapon's relative stats while keeping
+-- normal hits from overwhelming players or constantly forcing knockdowns.
+local MELEE_GLOBAL_DAMAGE_MUL = 0.6
+local MELEE_GLOBAL_KNOCKBACK_MUL = 0.6
 local MELEE_GLOBAL_STAMINA_COST_MUL = 1.2
 
 if CLIENT then
@@ -1354,6 +1355,7 @@ function SWEP:MultiplyDMG(owner, ent, vellen, mul)
     -- Keep strength bonuses explicit (for example berserk) below.
     mul = mul * math.Clamp(vellen / 250, 0.9, 1.25)
     mul = mul * (ent ~= owner and 0.75 or 1)
+    mul = mul * MELEE_GLOBAL_DAMAGE_MUL
 
     if owner.organism.superfighter then
         mul = mul * 5
@@ -1854,8 +1856,8 @@ function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
                     pushDir:Normalize()
                 end
                 local forceMul = self:IsSecondaryAttackType(attacktype) and (self.PlayerSecondaryKnockbackMul or 0.75) or 1
-                local force = pushDir * math.min(dmg * (self.PlayerKnockbackMul or 3.25) * forceMul, 140)
-                force.z = math.min(dmg * (self.PlayerKnockbackUpMul or 0.45) * forceMul, 22)
+                local force = pushDir * math.min(dmg * (self.PlayerKnockbackMul or 3.25) * forceMul * MELEE_GLOBAL_KNOCKBACK_MUL, 140)
+                force.z = math.min(dmg * (self.PlayerKnockbackUpMul or 0.45) * forceMul * MELEE_GLOBAL_KNOCKBACK_MUL, 22)
                 ply:SetVelocity(force)
 			end
         end
@@ -4337,6 +4339,7 @@ function SWEP:NPCThink()
 					trEnt:PrecacheGibs()
 
 					dmg = dmg * mul
+					dmg = dmg * MELEE_GLOBAL_DAMAGE_MUL
 					local dmginfo = DamageInfo()
 					dmginfo:SetAttacker(npc)
 					dmginfo:SetInflictor(self)

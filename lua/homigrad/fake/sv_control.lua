@@ -1624,46 +1624,6 @@ hook.Add("Think", "Fake", function()
 
 				}).Hit
 
-			-- Fake locomotion gains momentum from working legs instead of relying
-			-- entirely on hand grips. Sprint builds a bounded acceleration ramp;
-			-- stronger and healthier legs accelerate harder and reach a higher cap.
-			local leftLegControl = org.llegamputated and 0 or math.Clamp(1 - (org.lleg or 0) / 1.3, 0, 1)
-			local rightLegControl = org.rlegamputated and 0 or math.Clamp(1 - (org.rleg or 0) / 1.3, 0, 1)
-			if org.llegdislocation or org.llegdislocated then leftLegControl = leftLegControl * 0.35 end
-			if org.rlegdislocation or org.rlegdislocated then rightLegControl = rightLegControl * 0.35 end
-
-			local legPower = math.Clamp((leftLegControl + rightLegControl) * 0.5 * (org.legstrength or 1), 0, 1.25)
-			local sprintingForward = forward and ply:KeyDown(IN_SPEED) and on_ground and legPower > 0.05
-			local sprintRampTarget = sprintingForward and 1 or 0
-			ragdoll.fakeSprintRamp = math.Approach(ragdoll.fakeSprintRamp or 0, sprintRampTarget, ragdoll.dtime * (sprintingForward and 0.85 or 1.4))
-
-			if on_ground and legPower > 0.05 and (forward or back) then
-				local torso = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 1))
-				local leftFoot = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 14))
-				local rightFoot = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 13))
-				local moveDir = angles2:Forward()
-				moveDir.z = 0
-				moveDir:Normalize()
-				if back then moveDir:Mul(-1) end
-
-				local ramp = ragdoll.fakeSprintRamp or 0
-				local maxSpeed = (back and 180 or 230) + (back and 60 or 310) * ramp * legPower
-				local currentSpeed = ragdoll:GetVelocity():Dot(moveDir)
-				if currentSpeed < maxSpeed then
-					local drive = 1050 * legPower * (1 + ramp * 1.35) * ragdoll.dtime / 0.015 * ragdoll.power
-					local moveForce = moveDir * drive
-					if IsValid(torso) then torso:ApplyForceCenter(moveForce * 0.6) end
-					if IsValid(leftFoot) then leftFoot:ApplyForceCenter(moveForce * 0.2) end
-					if IsValid(rightFoot) then rightFoot:ApplyForceCenter(moveForce * 0.2) end
-				end
-
-				if sprintingForward and hg_fake_stamina:GetBool() then
-					org.stamina.subadd = org.stamina.subadd + 0.035 * (0.5 + ramp * 0.5) * ragdoll.dtime / 0.015
-				end
-			end
-
-			
-
 			if forward then
 
 				if IsValid(ragdoll.ConsRH) then

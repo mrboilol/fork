@@ -147,6 +147,15 @@ function hg.Ragdoll_Create(ply)
 			ragdoll:SetBodygroup(id, ply:GetBodygroup(id))
 		end
 	end
+	-- Clothes, facemaps, and other appearance cosmetics are submaterial
+	-- overrides, not bodygroups. Copy the live overrides after Spawn so the
+	-- ragdoll has the same base appearance before client-side accessories draw.
+	for id = 0, #ragdoll:GetMaterials() - 1 do
+		local submaterial = ply:GetSubMaterial(id)
+		if submaterial and submaterial != "" then
+			ragdoll:SetSubMaterial(id, submaterial)
+		end
+	end
 	ragdoll:AddEFlags(EFL_NO_DAMAGE_FORCES + EFL_DONTBLOCKLOS)
 	--ragdoll:AddFlags(FL_NOTARGET)
 	--ply:AddFlags(FL_NOTARGET)
@@ -401,6 +410,9 @@ function hg.Ragdoll_Create(ply)
 	
 	ragdoll.ply = ply
 	ApplyAppearanceRagdoll(ragdoll, ply)
+	if ply.organism and hg.organism.SyncWounds then
+		hg.organism.SyncWounds(ply.organism)
+	end
 	return ragdoll
 end
 
@@ -491,9 +503,13 @@ hook.Add("DoPlayerDeath", "Fake", function(ply)
 	if IsValid(ragdoll.bull) then ragdoll.bull:Remove() end
 	
 	ply:SetNWEntity("RagdollDeath", ragdoll)
-	ragdoll:SetNetVar("wounds", ply:GetNetVar("wounds"))
-	ragdoll:SetNetVar("arterialwounds", ply:GetNetVar("arterialwounds"))
 	ply.RagdollDeath = ragdoll
+	if ply.organism and hg.organism.SyncWounds then
+		hg.organism.SyncWounds(ply.organism)
+	else
+		ragdoll:SetNetVar("wounds", ply:GetNetVar("wounds", {}))
+		ragdoll:SetNetVar("arterialwounds", ply:GetNetVar("arterialwounds", {}))
+	end
 	hook.Run("RagdollDeath", ply, ragdoll)
 end)
 
@@ -1207,6 +1223,9 @@ function hg.Fake(ply, huyragdoll, no_freemove, force)
 	NET_Fake(ragdoll, ply)
 	
 	ply.FakeRagdoll = ragdoll
+	if ply.organism and hg.organism.SyncWounds then
+		hg.organism.SyncWounds(ply.organism)
+	end
 	
 	if IsValid(ply.FakeRagdollOld) then
 		ply.FakeRagdollOld:Remove()
@@ -1335,9 +1354,17 @@ hook.Add("Player Spawn", "fuckingremoveragdoll", function(ply)
 	if IsValid(ragdoll) then
 		ragdoll:SetNWEntity("ply", NULL)
 	end
+	if IsValid(ply.FakeRagdoll) then
+		ply.FakeRagdoll.ply = nil
+	end
 
+	ply.FakeRagdoll = nil
+	hg.ragdollFake[ply] = nil
 	ply:SetNWEntity("FakeRagdoll", NULL)
 	ply:SetNWEntity("RagdollDeath", NULL)
+	ply:SetNoDraw(false)
+	ply:DrawShadow(true)
+	ply:SetRenderMode(RENDERMODE_NORMAL)
 end)
 
 hook.Add("CanControlFake","stunnednocontrol",function(ply,rag)
@@ -1480,6 +1507,13 @@ function hg.FakeUp(ply, forced, instant)
 			ply:DrawShadow(false)
 
 			timer.Create("faking_up"..ply:EntIndex(), 1, 1, function()
+				-- A player can fall again or die during this one-second transition.
+				-- Do not let the old get-up timer clear the replacement ragdoll and
+				-- leave its owner hidden/in the wrong collision state.
+				if not IsValid(ply) then return end
+				local currentRagdoll = ply:GetNWEntity("FakeRagdoll", NULL)
+				if (IsValid(ply.FakeRagdoll) and ply.FakeRagdoll ~= ragdoll) or (IsValid(currentRagdoll) and currentRagdoll ~= ragdoll) then return end
+
 				if IsValid(ragdoll) then
 					local posit = ragdoll:GetBoneMatrix(ragdoll:LookupBone("ValveBiped.Bip01_Spine4")):GetTranslation()
 					//pos = hg.GetUpPos(ply, posit, 50, 50) or oldpos
@@ -1504,6 +1538,9 @@ function hg.FakeUp(ply, forced, instant)
 				end
 			end)
 		else
+			local currentRagdoll = ply:GetNWEntity("FakeRagdoll", NULL)
+			if (IsValid(ply.FakeRagdoll) and ply.FakeRagdoll ~= ragdoll) or (IsValid(currentRagdoll) and currentRagdoll ~= ragdoll) then return true end
+
 			ply:DrawShadow(true)
 			ply:SetRenderMode(RENDERMODE_NORMAL)
 			ply:SetCollisionGroup(ply.switchingseat and COLLISION_GROUP_IN_VEHICLE or COLLISION_GROUP_PLAYER)

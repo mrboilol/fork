@@ -72,6 +72,10 @@ local Rand = math.Rand
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
 local bloodImpactCloudSize = 16
 local bloodImpactParticleSize = 0.75
+local pendingBulletImpacts = {}
+local pendingBulletImpactCount = 0
+local maxPendingBulletImpacts = 96
+local impactsPerFrame = 3
 
 local function impact(pos,vel,mul)
 	local max = math.min(mul,8)
@@ -111,7 +115,33 @@ net.Receive("hg_bloodimpact", function()
 			break 
 		end
 	end
-	for i = 1, amt do impact(pos,vel,mul,owner) end
+	-- A burst can represent many hits received during one server tick.  Rendering
+	-- them all at once makes both the particles and their collision sounds hitch.
+	amt = math.min(amt, math.max(maxPendingBulletImpacts - pendingBulletImpactCount, 0))
+	if amt <= 0 then return end
+	pendingBulletImpactCount = pendingBulletImpactCount + amt
+	pendingBulletImpacts[#pendingBulletImpacts + 1] = {
+		pos = pos,
+		vel = vel,
+		mul = mul,
+		owner = owner,
+		amount = amt,
+	}
+end)
+
+hook.Add("Think", "hg.bloodimpact.render_queue", function()
+	local budget = impactsPerFrame
+	while budget > 0 and pendingBulletImpacts[1] do
+		local queued = pendingBulletImpacts[1]
+		impact(queued.pos, queued.vel, queued.mul, queued.owner)
+		queued.amount = queued.amount - 1
+		pendingBulletImpactCount = pendingBulletImpactCount - 1
+		budget = budget - 1
+
+		if queued.amount <= 0 then
+			table.remove(pendingBulletImpacts, 1)
+		end
+	end
 end)
 	net.Receive("hg_brainmist", function()
 	local ent = net.ReadEntity()

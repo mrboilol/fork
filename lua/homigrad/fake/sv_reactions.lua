@@ -16,8 +16,23 @@ local CONFIG = {
     StepReachMultiplier = 0.8,
     StepSpeed = 400, -- Speed of leg movement
     BalanceRadius = 15,
-    ReactionDelay = 0.1
+    ReactionDelay = 0.1,
+    StaggerCooldown = 0.35,
+    TripCooldown = 0.8,
+    ProtectiveCooldown = 0.12
 }
+
+-- These are small corrective poses, not impulses to be applied every server tick.
+-- Repeating a reaction while its trace stays valid makes the ragdoll thrash instead
+-- of settling into a believable brace or step.
+local function ReactionReady(ragdoll, name, cooldown)
+    local now = CurTime()
+    local nextTime = ragdoll[name] or 0
+    if nextTime > now then return false end
+
+    ragdoll[name] = now + cooldown
+    return true
+end
 
 -- Helper: Check if player is trying to control
 local function IsPlayerControlling(ply)
@@ -180,13 +195,8 @@ function hg.reactions.ProcessHeadshot(ragdoll, ply, org)
     if not hg.animator.IsPlaying(ragdoll) or ragdoll.AnimCurrent.Name ~= "HeadshotCurl" then
         hg.animator.Play(ragdoll, "HeadshotCurl", 1.2, 1.5, true) -- Faster rate, higher strength for brutality
         
-        -- Apply sudden impulse to head to simulate impact/spasm
-        local head = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 10))
-        if IsValid(head) then
-            head:ApplyForceCenter(VectorRand() * 200 + Vector(0,0,100))
-        end
-        
-        -- Add extreme stiffness
+        -- The animation and stiffness provide the posture; a random head impulse
+        -- here turned a sustained neurological reaction into a full-body fling.
         if RagdollStiffness then
             RagdollStiffness.ActivateHeadshot(ragdoll, 3)
         end
@@ -275,6 +285,10 @@ function hg.reactions.ProcessStagger(ragdoll, ply, org)
     end
 
     if isStaggering then
+        if not ReactionReady(ragdoll, "reaction_stagger_until", CONFIG.StaggerCooldown) then
+            return false
+        end
+
         -- Use procedural stagger for now as it needs context (which leg to step)
         -- Artagdoll uses "Stagger" animation but it's generic.
         -- Let's stick to procedural for walking/balancing unless we want to replace it.
@@ -282,8 +296,9 @@ function hg.reactions.ProcessStagger(ragdoll, ply, org)
         -- Artagdoll's stagger.lua uses procedural steps too? No, it uses animation in some cases but mostly procedural.
         -- Let's keep procedural for now.
         
-        -- Determine which leg to step with (the one further behind usually, or random)
-        local stepLeg = (math.random() > 0.5) and 13 or 14 -- 13: LFoot, 14: RFoot
+        -- Step with the trailing foot. Randomly swapping feet during the same
+        -- loss of balance was a major source of the excessive flopping.
+        local stepLeg = lfoot:GetPos():Dot(velocity) < rfoot:GetPos():Dot(velocity) and 13 or 14
         
         -- Check for broken legs (organism system)
         local isLeft = (stepLeg == 13)
@@ -321,7 +336,7 @@ function hg.reactions.ProcessStagger(ragdoll, ply, org)
                 local liftHeight = CONFIG.StepHeight
                 local stepTarget = targetPos + Vector(0, 0, liftHeight)
                 
-                hg.ShadowControl(ragdoll, stepLeg, 0.1, nil, nil, nil, stepTarget, CONFIG.StepSpeed, 100)
+                hg.ShadowControl(ragdoll, stepLeg, 0.15, nil, nil, nil, stepTarget, CONFIG.StepSpeed, 250)
                 
                 return true -- We handled legs
             end
@@ -361,6 +376,10 @@ function hg.reactions.ProcessTripping(ragdoll, ply, org)
     })
     
     if tr.Hit then
+        if not ReactionReady(ragdoll, "reaction_trip_until", CONFIG.TripCooldown) then
+            return false
+        end
+
         -- TRIP!
         -- 1. Push pelvis forward (momentum carries body)
         -- 2. Pull legs back/up (caught on obstacle)
@@ -368,23 +387,23 @@ function hg.reactions.ProcessTripping(ragdoll, ply, org)
         
         local pelvis = ragdoll:GetPhysicsObjectNum(0)
         if IsValid(pelvis) then
-            pelvis:ApplyForceCenter(forward * 500 + Vector(0, 0, -200)) -- Dip forward
+            pelvis:ApplyForceCenter(forward * 120) -- Carry momentum forward without throwing the torso down
         end
         
         -- Lift legs back
-        hg.ShadowControl(ragdoll, 13, 0.1, nil, nil, nil, lfoot:GetPos() - forward * 20 + Vector(0, 0, 10), 1000, 100)
-        hg.ShadowControl(ragdoll, 14, 0.1, nil, nil, nil, rfoot:GetPos() - forward * 20 + Vector(0, 0, 10), 1000, 100)
+        hg.ShadowControl(ragdoll, 13, 0.15, nil, nil, nil, lfoot:GetPos() - forward * 12 + Vector(0, 0, 6), 350, 250)
+        hg.ShadowControl(ragdoll, 14, 0.15, nil, nil, nil, rfoot:GetPos() - forward * 12 + Vector(0, 0, 6), 350, 250)
         
         -- Arms forward immediately to catch fall
         local lhand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 5))
         local rhand = ragdoll:GetPhysicsObjectNum(hg.realPhysNum(ragdoll, 7))
         
         if IsValid(lhand) and org.larm ~= 1 then
-            hg.ShadowControl(ragdoll, 5, 0.05, nil, nil, nil, ragdoll:GetPos() + forward * 50 + Vector(0, 0, 20), 1000, 100)
+            hg.ShadowControl(ragdoll, 5, 0.12, nil, nil, nil, ragdoll:GetPos() + forward * 30 + Vector(0, 0, 12), 400, 250)
         end
         
         if IsValid(rhand) and org.rarm ~= 1 then
-            hg.ShadowControl(ragdoll, 7, 0.05, nil, nil, nil, ragdoll:GetPos() + forward * 50 + Vector(0, 0, 20), 1000, 100)
+            hg.ShadowControl(ragdoll, 7, 0.12, nil, nil, nil, ragdoll:GetPos() + forward * 30 + Vector(0, 0, 12), 400, 250)
         end
         
         return true -- Handled everything (arms and legs)
@@ -409,6 +428,10 @@ function hg.reactions.ProcessProtective(ragdoll, ply, org)
         local dist = ground and (ragdoll:GetPos().z - ground.z) or 1000
         
         if dist < 300 and dist > 50 then
+            if not ReactionReady(ragdoll, "reaction_protective_until", CONFIG.ProtectiveCooldown) then
+                return false
+            end
+
             -- Put arms out!
             local handled = false
             
@@ -424,13 +447,13 @@ function hg.reactions.ProcessProtective(ragdoll, ply, org)
             
             if IsValid(lhand) and not leftBroken then
                 local targetL = ragdoll:GetPos() + forward * 30 + Vector(0, 10, 0)
-                hg.ShadowControl(ragdoll, 5, 0.05, nil, nil, nil, targetL, 600, 50)
+                hg.ShadowControl(ragdoll, 5, 0.12, nil, nil, nil, targetL, 325, 250)
                 handled = true
             end
             
             if IsValid(rhand) and not rightBroken then
                 local targetR = ragdoll:GetPos() + forward * 30 + Vector(0, -10, 0)
-                hg.ShadowControl(ragdoll, 7, 0.05, nil, nil, nil, targetR, 600, 50)
+                hg.ShadowControl(ragdoll, 7, 0.12, nil, nil, nil, targetR, 325, 250)
                 handled = true
             end
             
