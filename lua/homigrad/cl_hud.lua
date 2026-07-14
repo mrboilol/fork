@@ -128,6 +128,13 @@ surface.CreateFont("HomigradFontRadialCenter", {
 	outline = false,
 })
 
+surface.CreateFont("HomigradFontRadialDescription", {
+	font = font(),
+	size = ScreenScale(7),
+	weight = 600,
+	outline = false,
+})
+
 surface.CreateFont("HomigradFontLarge", {
 	font = font(),
 	size = ScreenScale(15),
@@ -500,6 +507,95 @@ local function DrawModernRadialCenterText(text, x, y, maxWidth, color)
 	cam.PopModelMatrix()
 end
 
+local function GetRadialDescription(option)
+	local description = option and (option.description or option[8])
+	if isfunction(description) then description = description(option) end
+	if not isstring(description) then return "" end
+
+	description = language.GetPhrase(description)
+	description = description:gsub("<.->", " ")
+	description = description:gsub("[%s\r\n]+", " ")
+	return string.Trim(description)
+end
+
+local function WrapRadialDescription(text, maxWidth, maxLines)
+	surface.SetFont("HomigradFontRadialDescription")
+	local lines = {}
+	local current = ""
+	local truncated = false
+
+	for word in string.gmatch(text, "%S+") do
+		local candidate = current == "" and word or current .. " " .. word
+		if surface.GetTextSize(candidate) <= maxWidth then
+			current = candidate
+		elseif current ~= "" then
+			lines[#lines + 1] = current
+			current = word
+			if #lines >= maxLines then
+				truncated = true
+				break
+			end
+		else
+			current = word
+		end
+	end
+
+	if not truncated and current ~= "" and #lines < maxLines then
+		lines[#lines + 1] = current
+	elseif truncated and #lines > 0 then
+		local last = lines[#lines]
+		while last ~= "" and surface.GetTextSize(last .. "...") > maxWidth do
+			last = string.gsub(last, "%s*%S+$", "")
+		end
+		lines[#lines] = last .. "..."
+	end
+
+	local widest = 0
+	local _, lineHeight = surface.GetTextSize("Hg")
+	for _, line in ipairs(lines) do
+		local lineWidth = surface.GetTextSize(line)
+		widest = math.max(widest, lineWidth)
+	end
+
+	return lines, widest, lineHeight
+end
+
+local function DrawRadialItemDescription(option, itemX, itemY, directionX, iconSize, alpha, screenWidth, screenHeight)
+	local description = GetRadialDescription(option)
+	if description == "" then return end
+
+	local maxWidth = math.min(screenWidth * 0.22, 420)
+	local lines, textWidth, lineHeight = WrapRadialDescription(description, maxWidth, 6)
+	if #lines == 0 then return end
+
+	local side = directionX >= 0 and 1 or -1
+	local padding = 9
+	local gap = iconSize * 0.62 + screenWidth * 0.012
+	local textX = itemX + side * gap
+	if side > 0 then
+		textX = math.Clamp(textX, 12, screenWidth - textWidth - padding * 2 - 12)
+	else
+		textX = math.Clamp(textX, textWidth + padding * 2 + 12, screenWidth - 12)
+	end
+
+	local blockHeight = lineHeight * #lines
+	local boxX = side > 0 and textX - padding or textX - textWidth - padding
+	local boxHeight = blockHeight + padding * 2
+	local boxY = math.Clamp(itemY - blockHeight * 0.5 - padding, 12, screenHeight - boxHeight - 12)
+	local textAlign = side > 0 and TEXT_ALIGN_LEFT or TEXT_ALIGN_RIGHT
+
+	surface.SetDrawColor(0, 0, 0, 195 * alpha)
+	surface.DrawRect(boxX, boxY, textWidth + padding * 2, boxHeight)
+	surface.SetDrawColor(235, 235, 235, 90 * alpha)
+	surface.DrawOutlinedRect(boxX, boxY, textWidth + padding * 2, boxHeight, 1)
+
+	for index, line in ipairs(lines) do
+		local y = boxY + padding + (index - 1) * lineHeight
+		draw.SimpleText(line, "HomigradFontRadialDescription", textX + 1, y + 1, Color(0, 0, 0, 230 * alpha), textAlign, TEXT_ALIGN_TOP)
+		draw.SimpleText(line, "HomigradFontRadialDescription", textX, y, Color(240, 240, 240, 255 * alpha), textAlign, TEXT_ALIGN_TOP)
+	end
+end
+
 local function CreateRadialMenu(options_arg, bAutoClose)
 	local sizeX, sizeY = ScrW(), ScrH()
 	hg.radialOptions = {}
@@ -675,6 +771,12 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 						end
 						draw.DrawText(txt, "HomigradFont", centerX + math.sin(a) * r * 0.75, centerY + math.cos(a) * r * 0.75, colWhite, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 					end
+
+					if isMouseIntersecting then
+						local itemX = centerX + math.sin(a) * r * 0.75
+						local itemY = centerY + math.cos(a) * r * 0.75
+						DrawRadialItemDescription(option, itemX, itemY, math.sin(a), scrH * oldRadialIconSizeMul, viewLerp, scrW, scrH)
+					end
 				end
 			end
 
@@ -759,6 +861,7 @@ local function CreateRadialMenu(options_arg, bAutoClose)
 
 			if selected then
 				hoveredText = GetRadialText(option)
+				DrawRadialItemDescription(option, slotX, slotY, math.cos(angleRad), iconSize, viewLerp, scrW, scrH)
 			end
 		end
 

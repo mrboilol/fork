@@ -1,3 +1,9 @@
+hg = hg or {}
+hg.ZCityInventoryAddonEnabled = true
+hg.ZCityInventoryAddonFileGuards = hg.ZCityInventoryAddonFileGuards or {}
+if hg.ZCityInventoryAddonFileGuards["new_inventory_sv"] then return end
+hg.ZCityInventoryAddonFileGuards["new_inventory_sv"] = true
+
 util.AddNetworkString("NI_SelectWeapon")
 
 net.Receive("NI_SelectWeapon", function(len, ply)
@@ -24,5 +30,5 @@ local function SyncInventorySystem()
 	SetGlobalBool("RadialInventory", mode == 2)
 end
 
-cvars.AddChangeCallback("hg_invsystem", SyncInventorySystem, "HomigradInventorySystem")
+cvars.AddChangeCallback("hg_invsystem", SyncInventorySystem, "ZCityInventorySystem")
 SyncInventorySystem()

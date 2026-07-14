@@ -1,3 +1,10 @@
+hg = hg or {}
+hg.ZCityInventoryAddonEnabled = true
+hg.ZCityInventoryAddonFileGuards = hg.ZCityInventoryAddonFileGuards or {}
+if hg.ZCityInventoryAddonFileGuards["weaponInv"] then return end
+hg.ZCityInventoryAddonFileGuards["weaponInv"] = true
+hg.ZCityInventoryAddonLoaded = true
+
 hg.weaponInv = hg.weaponInv or {}
 local weaponInv = hg.weaponInv
 local ammoType
@@ -183,4 +190,67 @@ else
 
 	concommand.Add("hg_listammo", function() PrintTable(game.GetAmmoTypes()) end)
 	concommand.Add("hg_weaponInv_table", function() PrintTable(weaponInv) end)
+end
+if SERVER then
+    local function ZCitySetPlayerPosture(ply, pos)
+        if not IsValid(ply) then return end
+        if hg and hg.SetPlayerPosture then
+            hg.SetPlayerPosture(ply, pos, true)
+        else
+            ply.posture = pos
+        end
+    end
+
+    local function ZCityShouldUseLowReady(wep)
+        if not IsValid(wep) or not wep:IsWeapon() then return false end
+        if wep.ZCityNoDeployLowReady then return false end
+
+        local class = wep:GetClass()
+        if class == "weapon_hands" or class == "weapon_hands_sh" or class == "gmod_tool" or class == "weapon_physgun" or class == "weapon_physcannon" then return false end
+
+        if isfunction(ishgweapon) then
+            return ishgweapon(wep)
+        end
+
+        return true
+    end
+
+    local function ZCityPutWeaponLowReady(ply, wep)
+        if not (hg and hg.ZCityInventoryAddonEnabled) then return end
+        if not IsValid(ply) or not ply:IsPlayer() or not IsValid(wep) then return end
+        if ply:GetActiveWeapon() ~= wep then return end
+        if not ZCityShouldUseLowReady(wep) then return end
+
+        wep.ZCityResetLowReadyOnFirstAim = true
+        ply.ZCityBackpackResetLowReadyWep = wep
+        ply.ZCityBackpackResetLowReadyUntil = nil
+        ZCitySetPlayerPosture(ply, 4)
+    end
+
+    hook.Add("PlayerSwitchWeapon", "ZCityLowReadyOnEveryWeaponTake", function(ply, oldWeapon, newWeapon)
+        timer.Simple(0, function()
+            ZCityPutWeaponLowReady(ply, newWeapon)
+        end)
+    end)
+
+    hook.Add("WeaponEquip", "ZCityLowReadyOnWeaponEquip", function(wep, ply)
+        timer.Simple(0, function()
+            ZCityPutWeaponLowReady(ply, wep)
+        end)
+    end)
+
+    hook.Add("StartCommand", "ZCityResetLowReadyOnAim", function(ply, cmd)
+        if not (hg and hg.ZCityInventoryAddonEnabled) then return end
+        if not IsValid(ply) or not ply:IsPlayer() then return end
+        if not (cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2)) then return end
+
+        local wep = ply:GetActiveWeapon()
+        if not IsValid(wep) or not wep.ZCityResetLowReadyOnFirstAim then return end
+        if ply.posture ~= 4 then return end
+
+        wep.ZCityResetLowReadyOnFirstAim = nil
+        ply.ZCityBackpackResetLowReadyWep = nil
+        ply.ZCityBackpackResetLowReadyUntil = nil
+        ZCitySetPlayerPosture(ply, 0)
+    end)
 end

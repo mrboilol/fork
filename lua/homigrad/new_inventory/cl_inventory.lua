@@ -1,5 +1,20 @@
 local type = type
 
+local function GetInventorySystem()
+	return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 2)
+end
+
+local function GetItemDescription(wep)
+	if not IsValid(wep) then return "" end
+
+	local description = wep.Description
+	if not isstring(description) or string.Trim(description) == "" then description = wep.Instructions end
+	if not isstring(description) or string.Trim(description) == "" then description = wep.Purpose end
+	if not isstring(description) then return "" end
+
+	return string.Trim(language.GetPhrase(description))
+end
+
 local function GetItemIcon(wep)
 	if not IsValid(wep) then return nil end
 
@@ -60,7 +75,10 @@ local function BuildInventoryOptions(ply)
 				wep:GetPrintName(),
 				nil,
 				nil,
-				GetItemIcon(wep)
+				GetItemIcon(wep),
+				nil,
+				nil,
+				GetItemDescription(wep)
 			}
 		else
 			local subOptions = {}
@@ -70,7 +88,10 @@ local function BuildInventoryOptions(ply)
 					wep:GetPrintName(),
 					nil,
 					nil,
-					GetItemIcon(wep)
+					GetItemIcon(wep),
+					nil,
+					nil,
+					GetItemDescription(wep)
 				}
 			end
 			options[#options + 1] = {
@@ -87,7 +108,7 @@ local function BuildInventoryOptions(ply)
 end
 
 hook.Add("PlayerButtonDown", "NI_PlayerButtonDown", function(ply, key)
-	if not GetGlobalBool("RadialInventory", false) then return end
+	if GetInventorySystem() ~= 2 then return end
 	if key ~= KEY_1 then return end
 	if not ply.organism or ply.organism.otrub then return end
 
@@ -98,7 +119,7 @@ hook.Add("PlayerButtonDown", "NI_PlayerButtonDown", function(ply, key)
 end)
 
 hook.Add("PlayerButtonUp", "NI_PlayerButtonUp", function(ply, key)
-	if GetGlobalBool("RadialInventory", false) and key == KEY_1 then
+	if GetInventorySystem() == 2 and key == KEY_1 then
 		hg.PressRadialMenu(1)
 	end
 end)
