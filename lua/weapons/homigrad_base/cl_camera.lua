@@ -500,9 +500,19 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	
 	local fthuy = ftlerped * 150
 
-	angle_spray[3] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 60 * game.GetTimeScale() * 0.7 * oneHandCameraMul
-	angle_spray[1] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7 * oneHandCameraMul
-	angle_spray[2] = math.Rand(-self.sprayAngles[3], self.sprayAngles[3]) * 12 * game.GetTimeScale() * 0.7 * oneHandCameraMul
+	local sprayShake = (self.sprayAngles[3] or 0) * game.GetTimeScale() * 0.7 * oneHandCameraMul
+	if not self:IsPistolHoldType() and not self.PistolKinda then
+		-- Rifles climb into the shoulder: make their camera impulse reliably
+		-- upward, rather than letting the old roll-heavy random shake read as
+		-- sideways recoil.
+		angle_spray[1] = -math.Rand(0.55, 1) * sprayShake * 22
+		angle_spray[2] = math.Rand(-sprayShake, sprayShake) * 3.5
+		angle_spray[3] = math.Rand(-sprayShake, sprayShake) * 8
+	else
+		angle_spray[3] = math.Rand(-sprayShake, sprayShake) * 60
+		angle_spray[1] = math.Rand(-sprayShake, sprayShake) * 12
+		angle_spray[2] = math.Rand(-sprayShake, sprayShake) * 12
+	end
 	outputAng:Add(angle_spray)
 	
 	local imm = (organism and organism.immobilization) or 0

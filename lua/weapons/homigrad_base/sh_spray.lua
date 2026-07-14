@@ -285,12 +285,13 @@ function SWEP:PrimarySpread()
 		-- camera at its pitch limit after firing with a damaged arm.
 		-- Keep the direct shot correction pitch-led.  The old kick was small enough
 		-- for the spread yaw and punch recovery to make rifles feel sideways.
-		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.15, 0.45, 3.25)
+		local longGunKickMul = not self:IsPistolHoldType() and 1.35 or 1
+		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.15 * longGunKickMul, 0.45, 4.4)
 		local muzzleKick = sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
 		muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
 		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.5, -8.0, 1.2)
-		local muzzleYawCap = math.min(0.36, math.abs(muzzleKick[1]) * 0.10 + 0.04)
-		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.16, -muzzleYawCap, muzzleYawCap)
+		local muzzleYawCap = math.min(longGunKickMul > 1 and 0.22 or 0.36, math.abs(muzzleKick[1]) * 0.08 + 0.04)
+		muzzleKick[2] = math.Clamp(muzzleKick[2] * (longGunKickMul > 1 and 0.10 or 0.16), -muzzleYawCap, muzzleYawCap)
 		muzzleKick[3] = 0
 		muzzleKick = sanitize_angle(muzzleKick)
 		local newEyeAng = eyeang + muzzleKick

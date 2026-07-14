@@ -2658,11 +2658,12 @@ function SWEP:GetAdditionalValues()
 			local wobY = math.cos(t * 2.05 * frequencyMul) * 0.65 + math.cos(t * 3.45 * frequencyMul) * 0.35
 			local wobZ = math.sin(t * 2.45 * frequencyMul) * 0.65 + math.cos(t * 3.2 * frequencyMul) * 0.35
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * 1.55
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * 1.05
+			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 2.15 or 1.55)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.32 or 1.05)
 			-- Keep the previous absolute yaw contribution while the added wobble
 			-- strength goes into pitch/roll and vertical recovery motion.
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * 0.285
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.12 or 0.285)
 
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.084
