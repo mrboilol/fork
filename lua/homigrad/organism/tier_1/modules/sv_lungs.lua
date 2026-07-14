@@ -1157,3 +1157,4 @@ kaz
 	end --~120 seconds to fully die (0.3 of 300 and 0.4 of 60 seconds after)
 
 end
+
