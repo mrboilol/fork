@@ -109,6 +109,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.brain = 0
 	org.eyeL = 0
 	org.eyeR = 0
+	org.eyeLDestroyed = nil
+	org.eyeRDestroyed = nil
 	org.consciousness = 1
 	org.disorientation = 0
 	org.jaw = 0
@@ -981,17 +983,22 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if debugEyes ~= (org.debugEyesMode or 0) then
 		if debugEyes == 1 or debugEyes == 3 then
 			org.eyeL = 1
-			org.eyeBlindLUntil = CurTime() + 12
 		end
 		if debugEyes == 2 or debugEyes == 3 then
 			org.eyeR = 1
-			org.eyeBlindRUntil = CurTime() + 12
 		end
 		org.debugEyesMode = debugEyes
 	end
 
-	local leftEyeBlind = (org.eyeBlindLUntil or 0) > CurTime()
-	local rightEyeBlind = (org.eyeBlindRUntil or 0) > CurTime()
+	-- Latch a destroyed eye until its damage is fully healed. Passive recovery
+	-- dipping from 1 to 0.99 must not make the blind side vanish immediately.
+	if (org.eyeL or 0) >= 1 then org.eyeLDestroyed = true end
+	if (org.eyeR or 0) >= 1 then org.eyeRDestroyed = true end
+	if (org.eyeL or 0) <= 0 then org.eyeLDestroyed = nil end
+	if (org.eyeR or 0) <= 0 then org.eyeRDestroyed = nil end
+
+	local leftEyeBlind = org.eyeLDestroyed == true
+	local rightEyeBlind = org.eyeRDestroyed == true
 	if not leftEyeBlind and not rightEyeBlind then
 		org.blindness = nil
 	elseif leftEyeBlind and not rightEyeBlind then

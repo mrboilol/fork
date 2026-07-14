@@ -11,7 +11,8 @@ local WS = hg.WeaponSelector
 local SimpleSelector = {
     Draw = WS.WeaponSelectorDraw,
     Change = WS.ChangeSelectionWep,
-    Select = WS.SetActuallyWeapon
+    Select = WS.SetActuallyWeapon,
+    Weapons = WS.GetWeaponTable
 }
 
 local function ZCityGetInventorySystem()
@@ -43,21 +44,76 @@ function WS.GetSelectedWeapon()
     return Weapons[WS.SelectedSlot] and Weapons[WS.SelectedSlot][WS.SelectedSlotPos] or Weapons[WS.LastSelectedSlot][WS.LastSelectedSlotPos] or Weapons[0][0]
 end
 
+WS.WeaponPickupOrder = WS.WeaponPickupOrder or {}
+WS.WeaponPickupSerial = WS.WeaponPickupSerial or 0
+WS.OwnedWeaponSnapshot = WS.OwnedWeaponSnapshot or {}
+
+local function ZCityRefreshWeaponPickupOrder(ply)
+    if not IsValid(ply) then return {} end
+
+    local weapons = ply:GetWeapons()
+    table.sort(weapons, function(a, b) return a:EntIndex() < b:EntIndex() end)
+
+    local current = {}
+    for _, wep in ipairs(weapons) do
+        current[wep] = true
+        if not WS.OwnedWeaponSnapshot[wep] then
+            local class = wep:GetClass()
+            if class == "weapon_hands_sh" or class == "weapon_hands" then
+                WS.WeaponPickupOrder[wep] = -1
+            else
+                WS.WeaponPickupSerial = WS.WeaponPickupSerial + 1
+                WS.WeaponPickupOrder[wep] = WS.WeaponPickupSerial
+            end
+        end
+    end
+
+    WS.OwnedWeaponSnapshot = current
+    return weapons
+end
+
+local nextPickupOrderRefresh = 0
+hook.Add("Think", "ZCityInventory_TrackPickupOrder", function()
+    if nextPickupOrderRefresh > CurTime() then return end
+    nextPickupOrderRefresh = CurTime() + 0.2
+
+    local ply = LocalPlayer()
+    if IsValid(ply) then ZCityRefreshWeaponPickupOrder(ply) end
+end)
+
 function WS.GetWeaponTable( ply )
     if not IsValid( ply ) or not ply:Alive() then return end
-    local WeaponsGet = ply:GetWeapons()
+    if ZCityGetInventorySystem() == 1 and SimpleSelector.Weapons then
+        return SimpleSelector.Weapons(ply)
+    end
+
+    local WeaponsGet = ZCityRefreshWeaponPickupOrder(ply)
     local FormatedTable = {
         [0] = {}, [1] = {}, [2] = {}, [3] = {}, [4] = {}, [5] = {},
     }
 
-    table.sort(WeaponsGet, function(a, b) return (a.SlotPos or 0) > (b.SlotPos or 0) end)
+    local grouped = {
+        [0] = {}, [1] = {}, [2] = {}, [3] = {}, [4] = {}, [5] = {},
+    }
 
-    for k,wep in ipairs(WeaponsGet) do
-        local tTbl = FormatedTable[wep.Slot or 0]
-        local iMinPos = math.min( (wep.SlotPos and wep.SlotPos) or 1, ((#tTbl or 0) + 1)) - 1
-        local iPos = tTbl[ iMinPos ] and #tTbl + 1 or iMinPos
-        tTbl[ iPos ] = wep
+    for _, wep in ipairs(WeaponsGet) do
+        local slot = math.Clamp(tonumber(wep.Slot) or 0, 0, 5)
+        grouped[slot][#grouped[slot] + 1] = wep
     end
+
+    for slot = 0, 5 do
+        table.sort(grouped[slot], function(a, b)
+            local aOrder = WS.WeaponPickupOrder[a] or 0
+            local bOrder = WS.WeaponPickupOrder[b] or 0
+            if aOrder ~= bOrder then return aOrder > bOrder end
+            return (a.SlotPos or 0) < (b.SlotPos or 0)
+        end)
+
+        for index, wep in ipairs(grouped[slot]) do
+            FormatedTable[slot][index - 1] = wep
+        end
+    end
+
     return FormatedTable
 end
 
@@ -118,6 +174,12 @@ WS.BodyPlaces = {
         bone = "ValveBiped.Bip01_Pelvis",
         pos = Vector(5.0, 5.0, 0.0),
         iconOffset = -20
+    },
+    hands = {
+        bone = "ValveBiped.Bip01_R_Hand",
+        fallbackBone = "ValveBiped.Bip01_Pelvis",
+        pos = Vector(0, 0, 0),
+        iconOffset = 8
     }
 }
 
@@ -127,7 +189,7 @@ WS.BodyIconSize = 88
 local zcity_slot_square = Color(0, 0, 0, 220)
 local zcity_slot_highlight = Color(255, 255, 255, 42)
 local zcity_slot_outline = Color(235, 235, 235, 215)
-local zcity_slot_progress = Color(245, 245, 245, 245)
+local zcity_slot_progress = Color(0, 0, 0, 255)
 local zcity_slot_text = Color(245, 245, 245, 255)
 local zcity_slot_icon_tint = Color(255, 255, 255, 255)
 local zcity_slot_gradient = Material("vgui/gradient-d")
@@ -143,12 +205,15 @@ end
 local function ZCityGetBodySlotForWeapon(wep)
     if not IsValid(wep) then return "pocket" end
 
+    local class = wep:GetClass()
+    if class == "weapon_hands_sh" or class == "weapon_hands" then return "hands" end
+
     local category = tonumber(wep.weaponInvCategory or 0) or 0
     if category == 1 then return "longgun" end
     if category == 2 then return "pistol" end
     if category == 3 or category == 5 or category == 6 then return "melee" end
 
-    local class = ZCityWepText(wep, "GetClass")
+    class = ZCityWepText(wep, "GetClass")
     local printName = ZCityWepText(wep, "GetPrintName")
     local catName = ZCityWepText(wep, "Category")
     local scrappersSlot = ZCityWepText(wep, "ScrappersSlot")
@@ -299,6 +364,7 @@ local function ZCityGetHolsterDataForWeapon(ply, wep, place)
         local backpack = WS.BodyPlaces.backpack or data
         return {
             bone = backpack.bone,
+            fallbackBone = backpack.fallbackBone,
             pos = backpack.pos,
             iconOffset = backpack.iconOffset or 1,
             frontTorso = backpack.frontTorso == true,
@@ -315,6 +381,7 @@ local function ZCityGetHolsterDataForWeapon(ply, wep, place)
 
     return {
         bone = bone,
+        fallbackBone = data.fallbackBone,
         pos = pos,
         iconOffset = data.iconOffset or 1
     }
@@ -324,6 +391,9 @@ local function ZCityGetBodyLabelPos(ent, place, wep)
     local owner = IsValid(wep) and wep:GetOwner() or LocalPlayer()
     local data = ZCityGetHolsterDataForWeapon(owner, wep, place)
     local bone = ent:LookupBone(data.bone)
+    if not bone and data.fallbackBone then
+        bone = ent:LookupBone(data.fallbackBone)
+    end
     if not bone then return end
 
     local matrix = ent:GetBoneMatrix(bone)
@@ -458,23 +528,103 @@ local function ZCityDrawProgressStroke(x, y, w, h, thickness, progress)
     drawSegment(x, y, thickness, h, remaining, false, true)
 end
 
-local function ZCityDrawBodySquare(place, entry, ent, alpha)
+local function ZCityGetBodyScreenPosition(pos, size)
+    local screenWidth, screenHeight = ScrW(), ScrH()
+    local centerX, centerY = screenWidth * 0.5, screenHeight * 0.5
+    local margin = size * 0.5 + 28
+    local screen = pos:ToScreen()
+    local onScreen = screen.visible
+        and screen.x >= margin and screen.x <= screenWidth - margin
+        and screen.y >= margin and screen.y <= screenHeight - margin
+
+    if onScreen then
+        return screen.x, screen.y, false, 0, 0
+    end
+
+    local directionX, directionY
+    if screen.visible then
+        directionX = screen.x - centerX
+        directionY = screen.y - centerY
+    else
+        local delta = pos - EyePos()
+        local eyeAngles = EyeAngles()
+        directionX = delta:Dot(eyeAngles:Right())
+        directionY = -delta:Dot(eyeAngles:Up())
+        if delta:Dot(eyeAngles:Forward()) < 0 then
+            directionX = -directionX
+            directionY = -directionY
+        end
+    end
+
+    local length = math.sqrt(directionX * directionX + directionY * directionY)
+    if length < 0.001 then
+        directionX, directionY, length = 0, 1, 1
+    end
+
+    local normalX, normalY = directionX / length, directionY / length
+    local edgeScale = math.min(
+        (centerX - margin) / math.max(math.abs(normalX), 0.001),
+        (centerY - margin) / math.max(math.abs(normalY), 0.001)
+    )
+
+    return centerX + normalX * edgeScale, centerY + normalY * edgeScale, true, normalX, normalY
+end
+
+local function ZCityDrawOffscreenPointer(centerX, centerY, size, directionX, directionY, alpha)
+    local perpendicularX, perpendicularY = -directionY, directionX
+    local tipDistance = size * 0.5 + 18
+    local baseDistance = size * 0.5 + 5
+    local halfWidth = 7
+    local tipX = centerX + directionX * tipDistance
+    local tipY = centerY + directionY * tipDistance
+    local baseX = centerX + directionX * baseDistance
+    local baseY = centerY + directionY * baseDistance
+    local leftX = baseX + perpendicularX * halfWidth
+    local leftY = baseY + perpendicularY * halfWidth
+    local rightX = baseX - perpendicularX * halfWidth
+    local rightY = baseY - perpendicularY * halfWidth
+
+    draw.NoTexture()
+    surface.SetDrawColor(0, 0, 0, 240 * alpha)
+    surface.DrawPoly({
+        {x = tipX, y = tipY},
+        {x = leftX, y = leftY},
+        {x = rightX, y = rightY}
+    })
+    surface.SetDrawColor(235, 235, 235, 180 * alpha)
+    surface.DrawLine(tipX, tipY, leftX, leftY)
+    surface.DrawLine(leftX, leftY, rightX, rightY)
+    surface.DrawLine(rightX, rightY, tipX, tipY)
+end
+
+local function ZCityDrawBodySquare(place, entry, ent, alpha, presentation)
     if not entry then return end
 
-    local pos = ZCityGetBodyLabelPos(ent, place, entry.wep)
+    presentation = presentation or {}
+
+    local pos = ZCityGetBodyLabelPos(ent, place, presentation.anchorWep or entry.wep)
     if not pos then return end
 
     local dist = EyePos():Distance(pos)
     if dist > 220 then return end
 
-    local screen = pos:ToScreen()
-    if not screen.visible then return end
-
-    local aMul = math.Clamp(alpha or 0, 0, 1)
-    local size = WS.BodySquareSize or 116
-    local iconSize = WS.BodyIconSize or 88
-    local x = math.floor(screen.x - size / 2)
-    local y = math.floor(screen.y - size / 2)
+    local aMul = math.Clamp((alpha or 0) * (presentation.opacity or 1), 0, 1)
+    local brightness = math.Clamp(presentation.brightness or 1, 0, 1)
+    local scale = math.Clamp(presentation.scale or 1, 0.45, 1)
+    local size = (WS.BodySquareSize or 116) * scale
+    local iconSize = (WS.BodyIconSize or 88) * scale
+    local screenX, screenY, isOffscreen, directionX, directionY = ZCityGetBodyScreenPosition(pos, size)
+    local offsetX = presentation.offsetX or 0
+    local offsetY = presentation.offsetY or 0
+    if isOffscreen then
+        offsetX = offsetX - directionX * math.abs(offsetX)
+        offsetY = offsetY - directionY * math.abs(offsetY)
+    end
+    local cardMargin = size * 0.5 + 5
+    screenX = math.Clamp(screenX + offsetX, cardMargin, ScrW() - cardMargin)
+    screenY = math.Clamp(screenY + offsetY, cardMargin, ScrH() - cardMargin)
+    local x = math.floor(screenX - size / 2)
+    local y = math.floor(screenY - size / 2)
     local icon = ZCityGetSWEPSelectIcon(entry.wep)
     local progress = WS.ConfirmProgress or 0
 
@@ -485,19 +635,31 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha)
     surface.SetDrawColor(ZCityAlpha(zcity_slot_highlight, aMul))
     surface.DrawTexturedRect(x, y, size, size)
 
-    surface.SetDrawColor(ZCityAlpha(zcity_slot_outline, aMul))
+    if presentation.dark then
+        surface.SetDrawColor(0, 0, 0, 135 * aMul)
+        surface.DrawRect(x, y, size, size)
+    end
+
+    surface.SetDrawColor(ZCityAlpha(zcity_slot_outline, aMul * brightness))
     ZCityDrawOutlinedBox(x, y, size, size, 3)
 
-    surface.SetDrawColor(ZCityAlpha(zcity_slot_progress, aMul))
-    ZCityDrawProgressStroke(x, y, size, size, 4, progress)
+    if presentation.progress ~= false then
+        surface.SetDrawColor(ZCityAlpha(zcity_slot_progress, aMul))
+        ZCityDrawProgressStroke(x, y, size, size, 4, progress)
+    end
 
     if icon then
         local drawW = iconSize
         local drawH = icon.boxed and iconSize or math.floor(iconSize * 0.56)
-        local drawX = math.floor(screen.x - drawW / 2)
-        local drawY = math.floor(screen.y - drawH / 2 - 8)
+        local drawX = math.floor(screenX - drawW / 2)
+        local drawY = math.floor(screenY - drawH / 2 - 8)
 
-        surface.SetDrawColor(ZCityAlpha(zcity_slot_icon_tint, aMul))
+        surface.SetDrawColor(
+            zcity_slot_icon_tint.r * brightness,
+            zcity_slot_icon_tint.g * brightness,
+            zcity_slot_icon_tint.b * brightness,
+            zcity_slot_icon_tint.a * aMul
+        )
         if icon.kind == "material" then
             surface.SetMaterial(icon.value)
             surface.DrawTexturedRect(drawX, drawY, drawW, drawH)
@@ -510,7 +672,11 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha)
     local labelY = y + size - 25
     surface.SetDrawColor(0, 0, 0, 175 * aMul)
     surface.DrawRect(x + 3, labelY, size - 6, 22)
-    draw.SimpleTextOutlined(entry.name or "", "ZCity_SuperTiny", screen.x, labelY + 11, ZCityAlpha(zcity_slot_text, aMul), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 220 * aMul))
+    draw.SimpleTextOutlined(entry.name or "", "ZCity_SuperTiny", screenX, labelY + 11, ZCityAlpha(zcity_slot_text, aMul * brightness), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 220 * aMul))
+
+    if isOffscreen and presentation.pointer ~= false then
+        ZCityDrawOffscreenPointer(screenX, screenY, size, directionX, directionY, aMul)
+    end
 end
 
 function WS.DrawBodySlotSelector(ply)
@@ -526,15 +692,49 @@ function WS.DrawBodySlotSelector(ply)
     local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
     if not IsValid(ent) then return end
 
-    local selected = WS.GetSelectedWeapon()
-    if not IsValid(selected) or selected:GetClass() == "weapon_hands_sh" then return end
+    local weapons = WS.GetWeaponTable(ply)
+    local slotWeapons = weapons and weapons[WS.SelectedSlot]
+    if not slotWeapons or not slotWeapons[0] then return end
+
+    WS.SelectedSlotPos = math.Clamp(WS.SelectedSlotPos or 0, 0, #slotWeapons)
+    local selected = slotWeapons[WS.SelectedSlotPos] or slotWeapons[0]
+    if not IsValid(selected) then return end
 
     local place = ZCityGetBodySlotForWeapon(selected)
+    local stacked = {}
+    for index = 0, #slotWeapons do
+        local wep = slotWeapons[index]
+        if IsValid(wep) and wep ~= selected then
+            stacked[#stacked + 1] = wep
+        end
+    end
+
+    for depth = #stacked, 1, -1 do
+        local wep = stacked[depth]
+        ZCityDrawBodySquare(place, {
+            name = WS.GetPrintName(wep),
+            selected = false,
+            wep = wep
+        }, ent, WS.BodyAlpha, {
+            anchorWep = selected,
+            scale = math.max(0.84 - (depth - 1) * 0.07, 0.56),
+            opacity = math.max(0.76 - (depth - 1) * 0.06, 0.46),
+            brightness = 0.48,
+            offsetX = depth * 14,
+            offsetY = depth * 10,
+            dark = true,
+            pointer = false,
+            progress = false
+        })
+    end
+
     ZCityDrawBodySquare(place, {
         name = WS.GetPrintName(selected),
         selected = true,
         wep = selected
-    }, ent, WS.BodyAlpha)
+    }, ent, WS.BodyAlpha, {
+        anchorWep = selected
+    })
 end
 
 local tAcceptKeys = {
@@ -571,6 +771,45 @@ local function ZCityResetSlotHold(fadeOut, finished)
     else
         WS.ConfirmProgress = 0
     end
+end
+
+local function ZCityGetHandsWeapon(ply)
+    local hands = ply:GetWeapon("weapon_hands_sh")
+    if IsValid(hands) then return hands end
+
+    hands = ply:GetWeapon("weapon_hands")
+    return IsValid(hands) and hands or nil
+end
+
+local function ZCityBeginHeldSelection(ply, selectedWep, bind, code)
+    if not IsValid(selectedWep) then return end
+
+    ZCityCancelBackpackDraw(false)
+    WS.HoldStart = CurTime()
+    WS.HoldWeapon = selectedWep
+    WS.HoldSlotBind = bind
+    WS.HoldSlotKeyCode = code or tSlotFallbackKeys[bind]
+    WS.BackpackEarlySelect = ZCityIsBodyHolsterBlocked(ply) and ZCityIsBackpackDrawWeaponForSelector(selectedWep)
+    WS.BackpackEarlyWeapon = WS.BackpackEarlySelect and selectedWep or nil
+    WS.BackpackEarlySelected = false
+    WS.BackpackPreviousWeapon = WS.BackpackEarlySelect and ply:GetActiveWeapon() or nil
+    WS.ConfirmProgress = 0
+
+    if WS.BackpackEarlySelect then
+        ZCityStartBackpackDraw(ply, selectedWep, ZCityGetSlotHoldDuration(ply, selectedWep))
+    end
+end
+
+local function ZCityPutActiveWeaponAway(ply, activeWep)
+    local hands = ZCityGetHandsWeapon(ply)
+    if not IsValid(hands) or not IsValid(activeWep) or ZCityIsHandsWeapon(activeWep) then return false end
+
+    WS.LastInv = activeWep
+    WS.Show = 0
+    ZCityResetSlotHold(false)
+    input.SelectWeapon(hands)
+    surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".ogg")
+    return true
 end
 
 local function ZCityIsHeldSlotKeyDown()
@@ -671,6 +910,19 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
 
     if not IsValid( ply ) or not ply:Alive() then return end
     if ply.organism and ply.organism.otrub then return end
+
+    if iPos then
+        local requestedSlot = iPos - 1
+        local activeWep = ply:GetActiveWeapon()
+        local activeSlot = IsValid(activeWep) and math.Clamp(tonumber(activeWep.Slot) or 0, 0, 5) or -1
+        if activeSlot == requestedSlot and ZCityPutActiveWeaponAway(ply, activeWep) then
+            LastSelected = -1
+            WS.SelectedSlot = requestedSlot
+            WS.SelectedSlotPos = 0
+            return true
+        end
+    end
+
     if canUseSelector( ply ) then return end
     --print(canUseSelector( ply ))
     --print("Table")
@@ -679,36 +931,33 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
 
         local Weapons = WS.GetWeaponTable( ply )
 
+        local selectorWasOpen = WS.Show > CurTime()
         WS.Show = CurTime() + 4
         --print(key)
         surface.PlaySound("arc9_eft_shared/weapon_generic_rifle_spin"..math.random(10)..".ogg")
         if iPos then
             iPos = iPos - 1
-            if LastSelected ~= iPos then
-                WS.SelectedSlotPos = -1
-            end
-            WS.SelectedSlotPos = (Weapons[iPos] and LastSelected == iPos and WS.SelectedSlotPos + 1 > #Weapons[iPos] and 0 or math.min( WS.SelectedSlotPos + 1, #Weapons[iPos] )) or 0
+            if not Weapons[iPos] or not Weapons[iPos][0] then return true end
+
+            local preserveSelection = LastSelected == iPos and selectorWasOpen
+            WS.SelectedSlotPos = preserveSelection and math.Clamp(WS.SelectedSlotPos or 0, 0, #Weapons[iPos]) or 0
             WS.SelectedSlot = iPos
             LastSelected = iPos
 
             local selectedWep = WS.GetSelectedWeapon()
-            WS.HoldStart = CurTime()
-            WS.HoldWeapon = selectedWep
-            WS.HoldSlotBind = key
-            WS.HoldSlotKeyCode = code or tSlotFallbackKeys[key]
-            WS.BackpackEarlySelect = ZCityIsBodyHolsterBlocked(ply) and ZCityIsBackpackDrawWeaponForSelector(selectedWep)
-            WS.BackpackEarlyWeapon = WS.BackpackEarlySelect and selectedWep or nil
-            WS.BackpackEarlySelected = false
-            WS.BackpackPreviousWeapon = WS.BackpackEarlySelect and ply:GetActiveWeapon() or nil
-            WS.ConfirmProgress = 0
-
-            if WS.BackpackEarlySelect then
-                ZCityStartBackpackDraw(ply, selectedWep, ZCityGetSlotHoldDuration(ply, selectedWep))
-            end
+            ZCityBeginHeldSelection(ply, selectedWep, key, code)
             --print(WS.SelectedSlotPos)
             --print(iPos)
             --print( Weapons[WS.SelectedSlot][WS.SelectedSlotPos] )
         elseif key == "invprev" then
+            local slotWeapons = Weapons[WS.SelectedSlot]
+            if WS.Show > CurTime() and WS.HoldSlotBind and slotWeapons and #slotWeapons > 0 then
+                local count = #slotWeapons + 1
+                WS.SelectedSlotPos = (WS.SelectedSlotPos - 1) % count
+                ZCityBeginHeldSelection(ply, slotWeapons[WS.SelectedSlotPos], WS.HoldSlotBind, WS.HoldSlotKeyCode)
+                return true
+            end
+
             WS.SelectedSlotPos = WS.SelectedSlotPos - 1
             --print(WS.SelectedSlotPos)
             if Weapons[WS.SelectedSlot] and WS.SelectedSlotPos < 0  then
@@ -717,6 +966,14 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
             ZCityResetSlotHold(false)
             --WS.SelectedSlot = Weapons[WS.SelectedSlot] and #Weapons[WS.SelectedSlot] > (WS.SelectedSlotPos + 1) and WS.SelectedSlot + 1 or WS.SelectedSlot + 1 > #Weapons - 1 and 0 or 0
         elseif key == "invnext" then
+            local slotWeapons = Weapons[WS.SelectedSlot]
+            if WS.Show > CurTime() and WS.HoldSlotBind and slotWeapons and #slotWeapons > 0 then
+                local count = #slotWeapons + 1
+                WS.SelectedSlotPos = (WS.SelectedSlotPos + 1) % count
+                ZCityBeginHeldSelection(ply, slotWeapons[WS.SelectedSlotPos], WS.HoldSlotBind, WS.HoldSlotKeyCode)
+                return true
+            end
+
             WS.SelectedSlotPos = WS.SelectedSlotPos + 1
             --print(WS.SelectedSlotPos)
             if Weapons[WS.SelectedSlot] and WS.SelectedSlotPos > #Weapons[WS.SelectedSlot] then

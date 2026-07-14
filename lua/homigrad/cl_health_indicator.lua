@@ -24,8 +24,6 @@ local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
 local lastKnownFacingAngle = 0
-local indicatorBoneSource
-local indicatorBoneSourceKind
 local fadingBones = {} -- Track bones that are fading out after being healed
 local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
@@ -120,8 +118,6 @@ local function ResetModels(ply)
     end
     healthModel = nil
     blinkModel = nil
-    indicatorBoneSource = nil
-    indicatorBoneSourceKind = nil
     boneStates = {}
     pulseStartTime = 0
     iconsVisibility = 0
@@ -135,48 +131,20 @@ local scaleZeroMat = Matrix()
 scaleZeroMat:Scale(Vector(0.001, 0.001, 0.001))
 
 local function GetIndicatorBoneSource(ply)
-    local function IsCompatibleRagdoll(ent)
-        return IsValid(ent) and ent:GetModel() == ply:GetModel()
-    end
-
     local fakeRag = ply:GetNWEntity("FakeRagdoll")
-    local deathRag = ply:GetNWEntity("RagdollDeath")
-    local ragdoll = ply:GetRagdollEntity()
-    local hasRagdoll = IsCompatibleRagdoll(fakeRag) or IsCompatibleRagdoll(deathRag) or IsCompatibleRagdoll(ragdoll)
+    if IsValid(fakeRag) then return fakeRag, true end
 
-    -- Keep the first compatible source for the current player/ragdoll state.
-    -- Do not bounce between fake, death, and entity ragdolls while they coexist.
-    if IsValid(indicatorBoneSource) then
-        if indicatorBoneSourceKind == "player" then
-            if not hasRagdoll then return indicatorBoneSource end
-        elseif hasRagdoll then
-            return indicatorBoneSource
-        end
-    end
-
-    if IsCompatibleRagdoll(fakeRag) then
-        indicatorBoneSource = fakeRag
-        indicatorBoneSourceKind = "fake"
-    elseif IsCompatibleRagdoll(deathRag) then
-        indicatorBoneSource = deathRag
-        indicatorBoneSourceKind = "death"
-    elseif IsCompatibleRagdoll(ragdoll) then
-        indicatorBoneSource = ragdoll
-        indicatorBoneSourceKind = "ragdoll"
-    else
-        indicatorBoneSource = ply
-        indicatorBoneSourceKind = "player"
-    end
-
-    return indicatorBoneSource
+    -- FakeRagdoll is the sole ragdoll trace source. Do not fall through to
+    -- RagdollDeath or GetRagdollEntity: those can point at stale/different
+    -- skeletons and leave old transforms on the indicator.
+    return ply, false
 end
 
 local function SyncBonesCallback(ent, numbones)
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
-    local src = GetIndicatorBoneSource(ply)
-    local isRag = indicatorBoneSourceKind ~= "player"
+    local src, isRag = GetIndicatorBoneSource(ply)
     
     local srcPos = src:GetPos()
     local srcAng = src:GetAngles()
@@ -396,8 +364,6 @@ function HUD_DrawDynamicIndicator()
     end
 
     if healthModel:GetModel() ~= ply:GetModel() or (ply.PlayerClassName ~= healthModel.lastPlayerClassName) then
-        indicatorBoneSource = nil
-        indicatorBoneSourceKind = nil
         healthModel:SetModel(ply:GetModel())
         blinkModel:SetModel(ply:GetModel())
         InitBlinkModel(blinkModel)

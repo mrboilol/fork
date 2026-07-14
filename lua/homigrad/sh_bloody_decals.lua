@@ -104,9 +104,11 @@ function ClearDecalToEnt(ent)
 	ent.decalshuy = nil
 	ent.hgBloodDecalMaterials = nil
 	ent.hgBloodDecalRenderTargets = nil
+	ent.hgBloodDecalMaterialVersion = nil
 end
 
 local matRepl = Material("decals/decalsplash")
+local bloodMaterialVersion = 2
 local curmat
 local curmat2
 function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, size, alpha)
@@ -120,8 +122,14 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	end
 
 	ent.decalshuy = ent.decalshuy or {}
-	ent.hgBloodDecalMaterials = ent.hgBloodDecalMaterials or {}
-	ent.hgBloodDecalRenderTargets = ent.hgBloodDecalRenderTargets or {}
+	if ent.hgBloodDecalMaterialVersion != bloodMaterialVersion then
+		ent.hgBloodDecalMaterials = {}
+		ent.hgBloodDecalRenderTargets = {}
+		ent.hgBloodDecalMaterialVersion = bloodMaterialVersion
+	else
+		ent.hgBloodDecalMaterials = ent.hgBloodDecalMaterials or {}
+		ent.hgBloodDecalRenderTargets = ent.hgBloodDecalRenderTargets or {}
+	end
 
 	local firstime = ent.decalshuy[id] == nil
 	if firstime then
@@ -136,35 +144,24 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	local tabla = mata:GetKeyValues()
 	
 	-- you should set up entIndex for CSModels since their entIndex is -1
-	local materialKey = mata:GetName()..":"..(entIndex or ent:EntIndex())..":"..id
+	local materialKey = mata:GetName()..":"..(entIndex or ent:EntIndex())..":"..id..":v"..bloodMaterialVersion
 	local mat = ent.hgBloodDecalMaterials[id]
 	if not mat then
-		mat = CreateMaterial("hg_blood_"..util.CRC(materialKey), mata:GetShader(), {})
+		-- Clone the complete outfit material. Building this from an empty table
+		-- drops its phong, tint, bumpmap, alpha, and other shader settings.
+		mat = CreateMaterial("hg_blood_"..util.CRC(materialKey), mata:GetShader(), tabla)
 		ent.hgBloodDecalMaterials[id] = mat
 	end
-	
-	--[[for i, val in pairs(tabla) do
-		if type(val) == "ITexture" then
-			mat:SetTexture(i, val)
-		end
-	end--]]
 	
 	local basetexture = mata:GetTexture("$basetexture")
 	if !basetexture then return end
 
-	local oldbasetex = basetexture:GetName()
-	
-	mat:SetTexture("$basetexture", basetexture)
-
-	local olddetail = mata:GetTexture("$detail")
-	local sizew = basetexture:Width()
-	local sizeh = basetexture:Height()
 	local size = size or 512
-	local scale = 1
 
 	local tex = tex or matRepl
 	
 	local rt = ent.hgBloodDecalRenderTargets[id]
+	local newRenderTarget = not rt
 	if not rt then
 		rt = GetRenderTargetEx("hg_blood_rt_"..util.CRC(materialKey), size, size, RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_SHARED, 0, CREATERENDERTARGETFLAGS_HDR, IMAGE_FORMAT_ARGB8888)
 		ent.hgBloodDecalRenderTargets[id] = rt
@@ -172,25 +169,20 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 
 	render.PushRenderTarget(rt)
 
-	--if olddetail and olddetail != rt and olddetail:GetName() != rt:GetName() then
-	if clear or firstime then
+	local resetBaseTexture = clear or firstime or newRenderTarget
+	if resetBaseTexture then
 		render.Clear(0, 0, 0, 0, true)
 	end
-	--end
 
 	local x, y = x or math.random(0, size), y or math.random(0, size)
 	local rot = rot or math.Rand(-180, 180)
 	
 	cam.Start2D()
-		--if (clear or firstime) and olddetail:GetName() != "error" then
-			--[[render.SuppressEngineLighting(true)
-			render.ResetModelLighting( 1, 1, 1 )
-			surface.SetDrawColor( 255, 255, 255, 1 )
-			surface.SetMaterial( mata )
-			--surface.SetTexture(surface.GetTextureID(mata:GetTexture("$basetexture"):GetName()))
-			surface.DrawTexturedRect( 0, 0, sizew, sizeh)
-			render.SuppressEngineLighting(false)--]]
-		--end
+		if resetBaseTexture then
+			-- Bake blood into a copy of the base texture so an outfit's existing
+			-- $detail texture (often its actual clothing pattern) stays untouched.
+			render.DrawTextureToScreenRect(basetexture, 0, 0, size, size)
+		end
 
 		surface.SetDrawColor( 255, 255, 255, alpha or math.random(100, 255) )
 		surface.SetMaterial( tex )
@@ -201,10 +193,7 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 
 	render.PopRenderTarget()
 
-	mat:SetTexture("$detail", rt)
-	mat:SetFloat("$detailscale", 1)
-	mat:SetFloat("$detailblendfactor", 1)
-	mat:SetInt("$detailblendmode", 2)
+	mat:SetTexture("$basetexture", rt)
 
 	curmat = mat
 	curmat2 = mata

@@ -83,15 +83,15 @@ local pendingBulletImpactCount = 0
 local maxPendingBulletImpacts = 96
 local impactsPerFrame = 3
 
-local function impact(pos,vel,mul)
-	local max = math.min(mul,8)
+local function impact(pos,vel,mul,owner)
+	local max = math.Clamp(math.ceil(mul or 1), 1, 8)
 	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
 	local sprayDir = -vel * math.Rand(0.25, 0.4)
 
 	-- The server sends separate entry and exit positions only when a shot passes through.
 	for i = 1, math.random(1, 2) do
-		addBloodPart2(pos + velnorm + VectorRand(-1.5, 1.5), sprayDir + VectorRand(-25, 25), nil, Rand(8, 12), Rand(8, 12), Rand(0.4, 0.65))
+		addBloodPart2(pos + velnorm + VectorRand(-1.5, 1.5), sprayDir + VectorRand(-25, 25), nil, Rand(8, 12), Rand(8, 12), Rand(0.4, 0.65), true, owner)
 	end
 	
 	if hg_bloodimpacts:GetBool() then
@@ -102,7 +102,7 @@ local function impact(pos,vel,mul)
 
 	for i = 1, iters do
 		local size = bloodImpactParticleSize
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false)
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, mul >= 3, false, owner)
 	end
 end
 
@@ -170,7 +170,10 @@ end)
 	end
 	if redmist then
 		for i = 1, math.random(1, 2) do
-			hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), VectorRand(-18, 18) + ang:Forward() * -8, nil, Rand(6, 10), Rand(6, 10), Rand(0.25, 0.4), true, renderEnt or ent)
+			local owner = renderEnt or ent
+			local velocity = VectorRand(-18, 18) + ang:Forward() * -8
+			hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), velocity, nil, Rand(6, 10), Rand(6, 10), Rand(0.25, 0.4), true, owner)
+			hg.addBloodPart(pos + VectorRand(-1, 1), velocity * Rand(1.2, 1.8), mat_huy, Rand(0.65, 1), Rand(0.65, 1), true, false, owner)
 		end
 	end
 	if club then
@@ -243,9 +246,7 @@ local function emitInjuryMist(ent, pos, forceful)
 	for i = 1, mistCount do
 		local velocity = VectorRand(-mistSpeed, mistSpeed) + Vector(0, 0, math.Rand(forceful and 20 or 4, forceful and 55 or 14))
 		hg.addBloodPart2(pos + VectorRand(-1.5, 1.5), velocity, nil, math.Rand(6, 10), math.Rand(6, 10), forceful and math.Rand(0.65, 0.95) or math.Rand(0.25, 0.4), true, ent)
-		if forceful then
-			hg.addBloodPart(pos + VectorRand(-1, 1), velocity * math.Rand(1.1, 1.6), mat_huy, math.Rand(0.65, 1), math.Rand(0.65, 1), true, false)
-		end
+		hg.addBloodPart(pos + VectorRand(-1, 1), velocity * math.Rand(forceful and 1.1 or 0.8, forceful and 1.6 or 1.25), mat_huy, math.Rand(0.65, 1), math.Rand(0.65, 1), forceful, false, ent)
 	end
 end
 

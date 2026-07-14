@@ -1090,12 +1090,11 @@ kaz
 	if org.brain >= 0.7 and org.alive then
 
 		death_from_braindamage = true
-		-- Catastrophic brain damage already suppresses breathing and cardiac drive.
-		-- Let those vitals run down before declaring death so treatment has the
-		-- same short intervention window as other causes of cardiopulmonary arrest.
-		if o2[1] <= 0 and (org.pulse or 0) <= 0 then
-			org.alive = false
+		if hg.organism.KillFatalBrainDamage then
+			hg.organism.KillFatalBrainDamage(org)
+			return
 		end
+		org.alive = false
 	end
 
 

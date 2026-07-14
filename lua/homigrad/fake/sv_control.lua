@@ -2629,7 +2629,7 @@ hook.Add("Think", "Fake", function()
 
 				-- Crouched fake control is the deliberate leg-extension move.  Give it
 				-- enough impulse to create a real shove without bypassing leg injuries.
-				force = force * 450 * ragdoll.dtime / 0.015 * ragdoll.power * math.max(org.legstrength or 1, 0.1)
+				force = force * 110 * ragdoll.dtime / 0.015 * ragdoll.power * math.max(org.legstrength or 1, 0.1)
 
 
 

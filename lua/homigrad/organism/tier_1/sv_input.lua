@@ -15,15 +15,69 @@ local head_otrub_max_chance = 0.35
 local head_consciousness_mul = 28
 local head_otrub_consciousness_cap = 0.04
 local instant_pain_shock_scale = 0.75
-local melee_pain_scale = 0.6
+local melee_pain_scale = 0.4
 local melee_shock_scale = 0.45
-local melee_nosebleed_pain_scale = 0.55
+local melee_nosebleed_pain_scale = 0.35
 local attacker_adrenaline_gain_window = 2
 local attacker_adrenaline_cooldown = 5
 local attacker_adrenaline_cap = 1.5
-local player_limb_gib_threshold = 160
-local player_head_gib_threshold = 175
+local live_limb_gib_threshold = 135
+local live_head_gib_threshold = 85
+local destroyed_brain_head_gib_threshold = 45
+local disfigured_player_name = "Unidentifiable person"
 local bonetohitgroup, hitgrouptolimb
+
+local function IsHeadDisfigured(org)
+	if not org then return false end
+
+	local skull = org.skull or 0
+	local jaw = org.jaw or 0
+	return skull >= 0.6 or jaw >= 1
+end
+
+local function ApplyHeadDisfigurement(ply, org, extraEnt)
+	if not IsValid(ply) or not IsHeadDisfigured(org) then return false end
+
+	local targets = {}
+	local seen = {}
+	local function AddTarget(target)
+		if not IsValid(target) or seen[target] then return end
+		seen[target] = true
+		table.insert(targets, target)
+	end
+
+	AddTarget(ply)
+	AddTarget(extraEnt)
+	AddTarget(ply.FakeRagdoll)
+	AddTarget(ply:GetNWEntity("FakeRagdoll", NULL))
+	AddTarget(ply.RagdollDeath)
+	AddTarget(ply:GetNWEntity("RagdollDeath", NULL))
+	if hg.GetCurrentCharacter then AddTarget(hg.GetCurrentCharacter(ply)) end
+
+	ply.HG_HeadBloodDecal = true
+	for _, target in ipairs(targets) do
+		target:SetNWString("PlayerName", disfigured_player_name)
+		if not target.HG_DisfigurementDecalsSent then
+			target.HG_DisfigurementDecalsSent = true
+			for i = 1, 3 do
+				net.Start("hg_head_blood_decal")
+				net.WriteEntity(target)
+				net.Broadcast()
+			end
+		end
+	end
+
+	return true
+end
+
+local function QueueHeadDisfigurement(ply, org, extraEnt)
+	ApplyHeadDisfigurement(ply, org, extraEnt)
+	for _, delay in ipairs({0, 0.1}) do
+		timer.Simple(delay, function()
+			if IsValid(ply) then ApplyHeadDisfigurement(ply, org, extraEnt) end
+		end)
+	end
+end
 
 function hg.organism.AddBulletImpactBleeding(org, dmgInfo, multiplier)
 	if not org or not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
@@ -599,10 +653,8 @@ hook.Add("PlayerDeath", "hg_forsaken_deathscene", function(victim)
 	org.brainBurstWindowStart = 0
 	org.brainBurstLast = 0
 
-	if (math.Round(victim:GetInfoNum("hg_deathfadeout", 1)) == 1) and (org.skull >= 0.6 or org.jaw == 1) then
-		victim:SetNWString("PlayerName", "disfigured nigga")
-		local rag = IsValid(victim:GetNWEntity("RagdollDeath")) and victim:GetNWEntity("RagdollDeath") or victim.FakeRagdoll
-		if IsValid(rag) then rag:SetNWString("PlayerName", "disfigured nigga") end
+	if math.Round(victim:GetInfoNum("hg_deathfadeout", 1)) == 1 then
+		QueueHeadDisfigurement(victim, org)
 	end
 end)
 
@@ -1384,11 +1436,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org.dmgstack[hitgroup][3] = (org.dmgstack[hitgroup][3] or 0) + damageStack / 500
 
 	local mat = ent:GetBoneMatrix(ent:TranslatePhysBoneToBone(bone))
-	local hitgroup_max = 100
-	if org.isPly then
-		hitgroup_max = hitgroup == HITGROUP_HEAD and player_head_gib_threshold or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup_max
-	end
-	local hitgroup_max = (hitgroup == HITGROUP_HEAD) and 85 or 135 -- heads remain easier to sever than limbs, but not from light damage
+	local headGibThreshold = (org.brain or 0) >= 1 and destroyed_brain_head_gib_threshold or live_head_gib_threshold
+	local hitgroup_max = hitgroup == HITGROUP_HEAD and headGibThreshold or live_limb_gib_threshold
 	local instant = org.dmgstack[hitgroup][1] > hitgroup_max
 	--print(damageStack, org.dmgstack[hitgroup][1], org.dmgstack[hitgroup][3])
 	local blast = dmgInfo:IsDamageType(DMG_BLAST)
@@ -1515,9 +1564,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hook.Run("Org Think Call", ply, org)
 		
 		if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
-			if org.skull == 1 then
-				//ent:SetNWString("PlayerName", "Unidentifiable person")
-			end
+			QueueHeadDisfigurement(ply, org, ent)
 			
 			ply:ScreenFade(0, color_black, 1, 1)
 			ply:ConCommand("soundfade 100 99999")
@@ -1965,13 +2012,7 @@ local function velocityDamage(ent, data)
 		hook.Run("Org Think Call", ply, org)
 		
 if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfadeout", 1)) == 1) then// or org.otrub or hg.organism.paincheck(org) or (ply:Health() <= 0) then
-			if org.skull >= 0.6 or org.jaw == 1 then
-				ent:SetNWString("PlayerName", "disfigured nigga")
-				if IsValid(ply) and ply ~= ent then ply:SetNWString("PlayerName", "disfigured nigga") end
-
-				local body = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
-				if IsValid(body) and body ~= ent then body:SetNWString("PlayerName", "disfigured nigga") end
-			end
+			QueueHeadDisfigurement(ply, org, ent)
 			
 			ply:ScreenFade(0, color_black, 1, 1)
 			ply:ConCommand("soundfade 100 99999")

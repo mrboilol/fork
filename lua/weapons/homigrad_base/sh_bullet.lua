@@ -790,6 +790,11 @@ function SWEP:FireBullet()
 		bullet.Spread = bullet.Spread * spreadMul * self:GetFearSpreadMul() * self:GetCognitiveHandlingMul() * self:GetWeaponWeightHandlingMul()
 	end
 	bullet.Num = 1
+	-- Single-projectile weapons already express inaccuracy through the animated
+	-- muzzle/debug trajectory. Do not add a second hidden random cone afterward.
+	if numbullet == 1 then
+		bullet.Flags = bit.bor(bullet.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)
+	end
 	
 	bullet.AmmoType = primary.Ammo
 	bullet.TracerName = self.Tracer or "nil"
@@ -865,6 +870,12 @@ function SWEP:FireBullet()
 				hg.PhysBullet.CreateBullet(shot)
 			end
 		else
+			-- The global EntityFireBullets hook can otherwise convert this straight
+			-- back into a wind/physical bullet and change the debug trajectory.
+			if self.ZCityWindForcedPhysBullets then
+				shot.DontUsePhysBullets = true
+				shot.ZCityWindDisablePhysBullets = true
+			end
 			--if owner.suiciding then bullet.DisableLagComp = true end
 			self:FireLuaBullets(shot)
 

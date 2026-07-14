@@ -947,6 +947,7 @@ local arterialParticleSizeMul = 0.65
 local arterialJetOffset = 0.12
 local arterialVelocityMul = 70
 local arterialPulseRetractRate = 85
+local arterialStreamParticleCount = 24
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -990,6 +991,17 @@ local function randomArteryPitch()
 	return math.random(arterySoundPitchMin, arterySoundPitchMax)
 end
 
+local function getArteryWoundOwner(ent)
+	if ent:IsPlayer() then return ent end
+
+	local owner = ent.GetNWEntity and ent:GetNWEntity("ply")
+	if not IsValid(owner) or not owner:IsPlayer() then return end
+
+	local fakeRagdoll = owner:GetNWEntity("FakeRagdoll")
+	local deathRagdoll = owner:GetNWEntity("RagdollDeath")
+	if fakeRagdoll == ent or deathRagdoll == ent then return owner end
+end
+
 local function playRandomArteryDrip(ent, wound, vol)
 	local pos = getArterialWoundPos(ent, wound)
 	if not pos then return end
@@ -1002,9 +1014,11 @@ function hg.queueArterialWoundSound(ent, wound)
 
 	local delay = math.Rand(arterySoundDelayMin, arterySoundDelayMax)
 	local artery = wound[7]
-	local org = ent.organism or {}
+	local owner = getArteryWoundOwner(ent)
+	local org = IsValid(owner) and owner.organism or ent.organism or {}
+	local canPlayNeckSlit = not IsValid(owner) or owner:Alive() and not org.otrub
 
-	if artery == "arteria" and (not ent:IsPlayer() or ent:Alive() and not org.otrub) then
+	if artery == "arteria" and canPlayNeckSlit then
 		local _, target = getArterialWoundPos(ent, wound)
 		if IsValid(target) then
 			local snd = CreateSound(target, arteryNeckSlitSound)
@@ -1040,15 +1054,30 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 	sprayVel:Add(right * math.sin(time * 0.8) * 8 * pulseMul * buildup)
 	sprayVel:Add(up * math.sin(time * 0.6 + 1.1) * 3.5 * pulseMul * buildup)
 
-	local jet = wound and wound.arterialJet
-	if jet and jet.active then
-		jet[3]:Set(sprayVel)
-		return
+	local jets = wound and wound.arterialJets
+	if wound and not jets then
+		jets = {}
+		wound.arterialJets = jets
+		wound.arterialJet = nil
+	end
+
+	if jets then
+		for i = #jets, 1, -1 do
+			local jet = jets[i]
+			if jet and jet.active then
+				jet[3]:Set(sprayVel)
+			else
+				table.remove(jets, i)
+			end
+		end
 	end
 
 	local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
-	jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
-	if wound and jet then wound.arterialJet = jet end
+	local jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
+	if jets and jet then
+		jets[#jets + 1] = jet
+		if #jets > arterialStreamParticleCount then table.remove(jets, 1) end
+	end
 
 end
 local hg_altberserk = GetConVar("hg_altberserk")

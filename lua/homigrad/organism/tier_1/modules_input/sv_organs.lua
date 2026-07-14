@@ -309,7 +309,7 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 		end
 
 		if multiplier > 0 then
-			local base_chunks = 3
+			local base_chunks = org.brain >= 1 and 6 or 3
 			local count = math.floor(base_chunks * multiplier)
 			for i=1, count do
 				CreateBrainChunk(dmgInfo:GetDamagePosition(), dmgInfo:GetDamageForce():GetNormalized() + VectorRand() * 0.5)
@@ -321,17 +321,30 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 	if dmg > 0 then
 		local effectEnt = hg.GetCurrentCharacter(org.owner)
 		if not IsValid(effectEnt) then effectEnt = org.owner end
-		net.Start("hg_brainmist")
-		net.WriteEntity(effectEnt)
-		net.WriteVector(dmgInfo:GetDamagePosition())
-		net.WriteAngle(dmgInfo:GetDamageForce():GetNormalized():Angle())
-		net.WriteBool(headshotEffect)
-		net.WriteBool(dmgInfo:IsDamageType(DMG_CLUB))
-		net.WriteBool(true)
-		net.Broadcast()
+		local effectCount = org.brain >= 1 and 4 or org.brain >= 0.7 and 3 or brainDelta >= 0.15 and 2 or 1
+		for i = 1, effectCount do
+			net.Start("hg_brainmist")
+			net.WriteEntity(effectEnt)
+			net.WriteVector(dmgInfo:GetDamagePosition() + VectorRand(-2, 2))
+			net.WriteAngle(dmgInfo:GetDamageForce():GetNormalized():Angle())
+			net.WriteBool(headshotEffect)
+			net.WriteBool(dmgInfo:IsDamageType(DMG_CLUB))
+			net.WriteBool(true)
+			net.Broadcast()
+		end
+
+		if IsValid(effectEnt) and org.brain >= 0.7 then
+			org.owner.HG_HeadBloodDecal = true
+			local decalCount = org.brain >= 1 and 4 or 2
+			for i = 1, decalCount do
+				net.Start("hg_head_blood_decal")
+				net.WriteEntity(effectEnt)
+				net.Broadcast()
+			end
+		end
 	end
 
-	if org.brain >= 1 and hg.organism.KillFatalBrainDamage then
+	if org.brain >= 0.7 and hg.organism.KillFatalBrainDamage then
 		hg.organism.KillFatalBrainDamage(org)
 		return result
 	end
@@ -570,10 +583,8 @@ input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit)
 	return 0
 end -- Intentionally not an active artery wound; blocks follow-on carotid routing.
 input_list.eyeL = function(org, bone, dmg, dmgInfo)
-	local oldDmg = org.eyeL or 0
-	dmg = dmg * 3
+	dmg = dmg * 5
 	org.eyeL = math.min((org.eyeL or 0) + dmg, 1)
-	org.eyeBlindLUntil = CurTime() + 12
 
 	hg.AddHarmToAttacker(dmgInfo, dmg * 5, "Left eye damage harm")
 	org.painadd = org.painadd + dmg * 20
@@ -584,10 +595,8 @@ input_list.eyeL = function(org, bone, dmg, dmgInfo)
 end
 
 input_list.eyeR = function(org, bone, dmg, dmgInfo)
-	local oldDmg = org.eyeR or 0
-	dmg = dmg * 3
+	dmg = dmg * 5
 	org.eyeR = math.min((org.eyeR or 0) + dmg, 1)
-	org.eyeBlindRUntil = CurTime() + 12
 
 	hg.AddHarmToAttacker(dmgInfo, dmg * 5, "Right eye damage harm")
 	org.painadd = org.painadd + dmg * 20

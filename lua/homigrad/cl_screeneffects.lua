@@ -908,7 +908,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local blindness = org.blindness
 	if blindness ~= nil or amtflashed >= 0.8 then
 		local eyesmode = amtflashed >= 0.8 and 0 or (blindness ~= nil and math.Round(blindness) or 0)
-		local singleEye = eyesmode == 1 or eyesmode == 2
 
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
@@ -917,15 +916,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		blindMat:SetFloat("$c0_y", CurTime())
 		blindMat:SetFloat("$c0_z", eyesmode)
 
-		if singleEye then
-			local sideX = eyesmode == 2 and 0 or ScrW() / 2
-			render.SetScissorRect(sideX, 0, sideX + ScrW() / 2, ScrH(), true)
-		end
-
 		render.SetMaterial(blindMat)
 		render.DrawScreenQuad()
-
-		if singleEye then render.SetScissorRect(0, 0, 0, 0, false) end
 	end
 
 	if (org.consciousness < 0.7) then
@@ -2614,7 +2606,15 @@ local function IsSkullBrokenFully(ent, visited)
 	if visited[ent] then return false end
 	visited[ent] = true
 
-	if ent:GetNWBool("SkullBrokenFully") or ent.HGSkullBrokenFully then return true end
+	if ent:IsPlayer() then
+		if ent:GetNWBool("SkullBrokenFully", false) then
+			ent.HGSkullBrokenFully = true
+			return true
+		end
+		ent.HGSkullBrokenFully = nil
+	elseif ent:GetNWBool("SkullBrokenFully", false) or ent.HGSkullBrokenFully then
+		return true
+	end
 
 	-- Check organism
 	if ent.organism and (ent.organism.skull or 0) >= 1 then
@@ -2684,7 +2684,8 @@ hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
 		end
 
 		if IsValid(ent) then
-			if not (ent == localPlayer and not localPlayer:ShouldDrawLocalPlayer()) and IsSkullBrokenFully(ent) then
+			local skullDestroyed = IsSkullBrokenFully(ply) or IsSkullBrokenFully(ent)
+			if not (ent == localPlayer and not localPlayer:ShouldDrawLocalPlayer()) and skullDestroyed then
 				-- Find head bone
 				local bone = ent:LookupBone("ValveBiped.Bip01_Head1")
 				if bone then
