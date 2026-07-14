@@ -890,17 +890,25 @@ hook.Add("Post Post Processing", "ItHurts", function()
         DrawToyTown(blurAmount, ScrH() / 2)
     end
 
-	if org.blindness or amtflashed >= 0.8 then
-		local blindness = ((org.blindness and math.Round(org.blindness) == 0) or amtflashed >= 0.8) and 0 or (org.blindness)
-		render.UpdateScreenEffectTexture()
-		render.UpdateFullScreenDepthTexture()
-		
-		blindMat:SetFloat("$c0_x", 5)
-		blindMat:SetFloat("$c0_y", CurTime())
-		blindMat:SetFloat("$c0_z", math.Round(blindness))
-	
-		render.SetMaterial(blindMat)
-		render.DrawScreenQuad()
+	local blindness = org.blindness
+	if blindness ~= nil or amtflashed >= 0.8 then
+		local eyesmode = amtflashed >= 0.8 and 0 or (blindness ~= nil and math.Round(blindness) or 0)
+		if eyesmode == 1 or eyesmode == 2 then
+			-- A destroyed eye blocks only its own side of the view.  The blind
+			-- shader is intentionally reserved for both eyes and flashbangs.
+			surface.SetDrawColor(0, 0, 0, 255)
+			surface.DrawRect(eyesmode == 2 and 0 or ScrW() / 2, 0, ScrW() / 2, ScrH())
+		else
+			render.UpdateScreenEffectTexture()
+			render.UpdateFullScreenDepthTexture()
+
+			blindMat:SetFloat("$c0_x", 5)
+			blindMat:SetFloat("$c0_y", CurTime())
+			blindMat:SetFloat("$c0_z", 0)
+
+			render.SetMaterial(blindMat)
+			render.DrawScreenQuad()
+		end
 	end
 
 	if (org.consciousness < 0.7) then
@@ -2388,12 +2396,13 @@ hook.Add("PreDrawOpaqueRenderables", "renderblindnessflash", function()
 	if !lply:Alive() and viewmode != 1 then removeflash() return end
 
 	local organism = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
-	if not organism or isbool(organism) then return end
+	if not organism or isbool(organism) then removeflash() return end
 
 	if !(organism.blindness or (amtflashed or 0) >= 0.8) then removeflash() return end
 	local blindness = ((organism.blindness and math.Round(organism.blindness) == 0) or amtflashed >= 0.8) and 0 or (organism.blindness)
 
 	local eyesmode = math.Round(blindness)
+	if eyesmode == 1 or eyesmode == 2 then removeflash() return end
 	
 	local view = render.GetViewSetup(true)
 	

@@ -772,9 +772,14 @@ hook.Add("Think", "HG_FakeRagdollShadowState", function()
 	for _, ply in ipairs(player.GetAll()) do
 		local networkRagdoll = ply:GetNWEntity("FakeRagdoll", NULL)
 		local shouldDraw = not IsValid(ply.FakeRagdoll) and not IsValid(networkRagdoll)
-		if ply.hg_fakeShadowDrawn ~= shouldDraw then
-			ply:DrawShadow(shouldDraw)
-			ply.hg_fakeShadowDrawn = shouldDraw
+		if not shouldDraw then
+			-- This must remain authoritative every frame: render hooks outside this
+			-- file can restore the player shadow without updating our cached state.
+			ply:DrawShadow(false)
+			ply.hg_fakeShadowDrawn = false
+		elseif ply.hg_fakeShadowDrawn ~= true then
+			ply:DrawShadow(true)
+			ply.hg_fakeShadowDrawn = true
 		end
 	end
 end)

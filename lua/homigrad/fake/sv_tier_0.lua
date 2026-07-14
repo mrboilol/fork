@@ -1961,26 +1961,54 @@ hook.Add("Ragdoll Collide", "FallSounds", function(rag, data)
 
 	rag.NextSND = now + 1
 	rag.hg_fallSoundGrounded = true
+	rag.hg_fallSoundAirborneSince = nil
 end)
+
+local fallSoundSupportMins = Vector(-3, -3, -2)
+local fallSoundSupportMaxs = Vector(3, 3, 2)
 
 timer.Create("HG_FallSoundRearm", 0.25, 0, function()
 	for _, rag in ipairs(ents.FindByClass("prop_ragdoll")) do
 		if rag.hg_fallSoundGrounded then
-			local velocity = rag:GetVelocity()
-			-- A settled body can have its origin above the floor even while its
-			-- limbs are resting on it. Only consider re-arming after the body has
-			-- made a real upward/aerial movement.
-			if velocity.z < 80 or velocity:LengthSqr() < 22500 then continue end
-			local tr = util.TraceLine({
-				start = rag:GetPos() + vector_up * 8,
-				endpos = rag:GetPos() - vector_up * 48,
-				filter = rag,
-				mask = MASK_SOLID_BRUSHONLY,
-			})
+			local owner = hg.RagdollOwner(rag)
+			local traceFilter = IsValid(owner) and {rag, owner} or rag
+			local supported = false
 
-			-- The pelvis is clear of the ground, so the next real landing may play.
-			if not tr.Hit or tr.Fraction > 0.65 then
+			-- Fake-control can briefly lift the pelvis while another limb is still
+			-- resting on the floor. Check every physics body so that motion from
+			-- shadow control cannot masquerade as a new fall.
+			for physIndex = 0, rag:GetPhysicsObjectCount() - 1 do
+				local phys = rag:GetPhysicsObjectNum(physIndex)
+				if not IsValid(phys) then continue end
+
+				local pos = phys:GetPos()
+				local tr = util.TraceHull({
+					start = pos + vector_up * 2,
+					endpos = pos - vector_up * 12,
+					mins = fallSoundSupportMins,
+					maxs = fallSoundSupportMaxs,
+					filter = traceFilter,
+					mask = MASK_SOLID,
+				})
+
+				if tr.Hit then
+					supported = true
+					break
+				end
+			end
+
+			if supported then
+				rag.hg_fallSoundAirborneSince = nil
+				continue
+			end
+
+			local now = CurTime()
+			rag.hg_fallSoundAirborneSince = rag.hg_fallSoundAirborneSince or now
+			-- Require a sustained, fully unsupported interval before accepting a
+			-- later collision as a separate landing.
+			if now - rag.hg_fallSoundAirborneSince >= 0.5 then
 				rag.hg_fallSoundGrounded = nil
+				rag.hg_fallSoundAirborneSince = nil
 			end
 		end
 	end

@@ -21,6 +21,87 @@ local WALL_CHECK_HEIGHT = 10
 
 local BASE_TRIP_CHANCE = 0.1
 local MAX_TRIP_CHANCE = 0.8
+local COLLISION_TRACE_MINS = Vector(-12, -12, -20)
+local COLLISION_TRACE_MAXS = Vector(12, 12, 20)
+local COLLISION_FULL_SPEED_MUL = 0.98
+local COLLISION_STUMBLE_SLOWDOWN = 450
+local COLLISION_STUMBLE_TIME = 0.18
+local COLLISION_DAMAGE_MUL = 0.08
+local COLLISION_DAMAGE_TIME = 0.9
+local COLLISION_SOUNDS = {
+    "raminto/ram1.wav",
+    "raminto/ram2.wav",
+    "raminto/ram3.wav"
+}
+
+local function GetCollisionPhysBone(ply, hitPos)
+    local localHit = ply:WorldToLocal(hitPos)
+    local boneName = "ValveBiped.Bip01_Spine2"
+
+    if localHit.z >= 54 then
+        boneName = "ValveBiped.Bip01_Head1"
+    elseif localHit.z <= 20 then
+        boneName = localHit.y >= 0 and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_R_Thigh"
+    elseif localHit.y >= 12 then
+        boneName = "ValveBiped.Bip01_L_UpperArm"
+    elseif localHit.y <= -12 then
+        boneName = "ValveBiped.Bip01_R_UpperArm"
+    end
+
+    local bone = ply:LookupBone(boneName)
+    local physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
+
+    if not physbone or physbone < 0 then
+        boneName = "ValveBiped.Bip01_Spine2"
+        bone = ply:LookupBone(boneName)
+        physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
+    end
+
+    return physbone, boneName
+end
+
+local function PlayCollisionSound(ply)
+    ply:EmitSound(COLLISION_SOUNDS[math.random(#COLLISION_SOUNDS)], 75, math.random(96, 104), 1)
+end
+
+local function StumbleFromCollision(ply)
+    PlayCollisionSound(ply)
+    ply:SetNetVar("slowDown", COLLISION_STUMBLE_SLOWDOWN)
+    ply:ViewPunch(Angle(math.random(2) == 1 and -18 or 18, math.random(-2, 2), math.random(-4, 4)))
+
+    timer.Create("hg_tumble_collision_slowdown_" .. ply:EntIndex(), COLLISION_STUMBLE_TIME, 1, function()
+        if IsValid(ply) and ply:GetNetVar("slowDown", 0) <= COLLISION_STUMBLE_SLOWDOWN then
+            ply:SetNetVar("slowDown", 0)
+        end
+    end)
+end
+
+local function ApplyCollisionTripForces(ply, tr, velocity, impactSpeed)
+    local hitEnt = tr.Entity
+    local impactDir = IsValid(hitEnt) and hitEnt:IsPlayer() and ply:WorldSpaceCenter() - hitEnt:WorldSpaceCenter() or -tr.HitNormal
+
+    if impactDir:LengthSqr() <= 0.001 then
+        impactDir = velocity:GetNormalized()
+    end
+
+    impactDir.z = math.max(impactDir.z, 0.18)
+    impactDir:Normalize()
+
+    local hitPhysbone, hitBoneName = GetCollisionPhysBone(ply, tr.HitPos)
+    local torsoBone = ply:LookupBone("ValveBiped.Bip01_Spine2")
+    torsoBone = torsoBone and ply:TranslateBoneToPhysBone(torsoBone) or 0
+
+    local clampedImpact = math.Clamp(impactSpeed, 0, 260)
+    local hitMass = (hg.IdealMassPlayer and hg.IdealMassPlayer[hitBoneName]) or 4
+    local torsoMass = (hg.IdealMassPlayer and hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"]) or 4
+    local contactForce = impactDir * clampedImpact * hitMass * 0.55
+    local torsoForce = impactDir * clampedImpact * torsoMass * 0.4 + Vector(0, 0, clampedImpact * torsoMass * 0.2)
+
+    ply.hgSprintCollisionDamageMul = COLLISION_DAMAGE_MUL
+    ply.hgSprintCollisionDamageUntil = CurTime() + COLLISION_DAMAGE_TIME
+    hg.AddForceRag(ply, hitPhysbone, contactForce, 0.25)
+    hg.AddForceRag(ply, torsoBone, torsoForce, 0.25)
+end
 
 hook.Add("Think", "stanleytumbler", function()
     for _, ply in ipairs(player_GetAll()) do
@@ -57,31 +138,42 @@ hook.Add("Think", "stanleytumbler", function()
         local tripType = "none"
         local trHighHit = false
 
-        local forward = ply:GetAimVector()
+        local forward = Vector(velocity.x, velocity.y, 0)
+        if forward:LengthSqr() <= 0.001 then continue end
         forward.z = 0
         forward:Normalize()
 
         local pos = ply:GetPos()
+        local collisionTrace
+        local collisionImpactSpeed
 
         local trWall = util_TraceHull({
-            start = pos + Vector(0,0,8),
-            endpos = pos + Vector(0,0,8) + forward * 20,
-            mins = ply:OBBMins(),
-            maxs = ply:OBBMaxs(),
-            filter = ply,
+            start = ply:WorldSpaceCenter(),
+            endpos = ply:WorldSpaceCenter() + forward * math.Clamp(speed * engine.TickInterval() * 1.5, 18, 42),
+            mins = COLLISION_TRACE_MINS,
+            maxs = COLLISION_TRACE_MAXS,
+            filter = {ply, ply:GetVehicle()},
             mask = MASK_PLAYERSOLID
         })
 
-        if trWall.Hit then
+        if trWall.Hit and not trWall.HitSky and not trWall.StartSolid then
              if trWall.HitNormal.z < 0.3 then
                  local ent = trWall.Entity
                  local isEntity = IsValid(ent) and (ent:IsPlayer() or ent:IsNPC() or ent:IsRagdoll())
-                 
-                 if isEntity then
+                 local isLightProp = false
+
+                 if IsValid(ent) and not isEntity then
+                    local phys = ent:GetPhysicsObject()
+                    isLightProp = IsValid(phys) and phys:GetMass() < 8
+                 end
+
+                 if not isLightProp and isEntity then
                      tripType = "ragdoll"
                      shouldTrip = true
                      tripChance = tripChance + 0.5 
-                 else
+                     collisionImpactSpeed = IsValid(ent) and ent:IsPlayer() and (velocity - ent:GetVelocity()):Length() or speed
+                     collisionTrace = trWall
+                 elseif not isLightProp then
                      local highTraceHeight = 35
                      local trHigh = util_TraceLine({
                          start = pos + Vector(0,0,highTraceHeight),
@@ -102,6 +194,9 @@ hook.Add("Think", "stanleytumbler", function()
                          shouldTrip = true
                          tripType = "wall"
                          tripChance = tripChance + wallChance
+                         collisionImpactSpeed = math.abs(velocity:Dot(-trWall.HitNormal))
+                         collisionImpactSpeed = collisionImpactSpeed > 0 and collisionImpactSpeed or speed
+                         collisionTrace = trWall
                      end
                  end
              end
@@ -171,6 +266,13 @@ hook.Add("Think", "stanleytumbler", function()
         tripChance = math.Clamp(tripChance, 0, MAX_TRIP_CHANCE)
 
         if shouldTrip then
+            local fullSpeed = math.max(ply:GetRunSpeed(), ply.move or 0)
+            if collisionTrace and speed < fullSpeed * COLLISION_FULL_SPEED_MUL then
+                shouldTrip = false
+            end
+        end
+
+        if shouldTrip then
             if math.random() < tripChance then
                 hg.Fake(ply)
                 --mcity reference?
@@ -213,7 +315,10 @@ hook.Add("Think", "stanleytumbler", function()
 
                     local force = velocity:GetNormalized() * 150
 
-                    if tripType == "slip" then
+                    if collisionTrace then
+                        PlayCollisionSound(ply)
+                        ApplyCollisionTripForces(ply, collisionTrace, velocity, collisionImpactSpeed)
+                    elseif tripType == "slip" then
                         hg.AddForceRag(ply, torso, -force * 5 * phystorso, 0.5)
                         hg.AddForceRag(ply, b1, (force * 5 - Vector(0,0,2)) * phys1, 0.5)
                         hg.AddForceRag(ply, b2, (force * 5 - Vector(0,0,2)) * phys2, 0.5)
@@ -246,8 +351,11 @@ hook.Add("Think", "stanleytumbler", function()
                 
                 ply.nextTumbleCheck = CurTime() + TUMBLE_COOLDOWN
             else
-                -- why not
-                ply:ViewPunch(Angle(2, 0, 0))
+                if collisionTrace then
+                    StumbleFromCollision(ply)
+                else
+                    ply:ViewPunch(Angle(2, 0, 0))
+                end
                 ply.nextTumbleCheck = CurTime() + 1 
             end
         end
