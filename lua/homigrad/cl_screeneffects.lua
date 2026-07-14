@@ -2547,6 +2547,7 @@ net.Receive("headtrauma_flash", function()
     local play_knockout_sound = net.ReadBool()
     local hasBrainDamage = net.ReadBool()
     local hasConcussion = net.ReadBool()
+	local playConcussionSound = net.ReadBool()
 	local trigger_tinnitus = net.ReadBool()
 
 	local lply = LocalPlayer()
@@ -2584,7 +2585,7 @@ net.Receive("headtrauma_flash", function()
     end
 
     PlayHeadhitSound(damageScale)
-    if is_critical or hasBrainDamage or hasConcussion then
+    if playConcussionSound then
         PlayConcussionSound(damageScale)
     end
 

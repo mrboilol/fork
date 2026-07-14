@@ -971,9 +971,11 @@ function SWEP:ApplyRecoilCameraKick()
 	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
 	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
 
-	local pitchKick = -0.42 * kickScale
-	local yawKick   =  0.08 * kickScale * sideRand
-	local rollKick  =  0.14 * kickScale * rollRand
+	-- The camera layer mirrors the pitch-led trajectory kick in sh_spray.  Keep
+	-- side drift present but subordinate so it cannot read as horizontal recoil.
+	local pitchKick = -0.72 * kickScale
+	local yawKick   =  0.035 * kickScale * sideRand
+	local rollKick  =  0.10 * kickScale * rollRand
 
 	local punchAng = Angle(pitchKick, yawKick, rollKick)
 	local hg_coolcam = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()

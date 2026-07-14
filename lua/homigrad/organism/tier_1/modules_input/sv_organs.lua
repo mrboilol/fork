@@ -145,14 +145,29 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 	local oldval = org[key]
 	local rawDamage = math.max(dmg * (isCrush(dmgInfo) and 1 or 3), 0)
 	local alreadyDamaged = oldval > 0.01
+
+	-- A second hit on an already wounded abdominal organ should reopen the
+	-- wound, not keep stacking the full organ-trauma package.  Its only
+	-- organism effects are a small external bleed and a slight internal bleed.
+	if alreadyDamaged and abdominal_organs[key] and rawDamage > 0 then
+		local repeatBleed = math.min(rawDamage, 0.25)
+		org.internalBleed = org.internalBleed + repeatBleed * 0.35
+
+		if hg.organism.AddBulletImpactBleeding then
+			hg.organism.AddBulletImpactBleeding(org, dmgInfo, 0.35)
+		end
+
+		dmgInfo:ScaleDamage(0.8)
+		return 0
+	end
+
 	org[key] = math.Round(math.min(org[key] + rawDamage, 1), 3)
 		local damage_dealt = org[key] - oldval
 
-	-- Once an organ is wounded, further hits deepen the trauma instead of
-	-- repeatedly hard-stunning the victim. This still matters at the damage cap.
+	-- Non-abdominal organs retain their existing repeat-trauma behavior.
 	if alreadyDamaged and rawDamage > 0 then
 		local repeatTrauma = math.min(rawDamage, 0.25)
-		local abdominalMul = abdominal_organs[key] and 1 or 0.5
+		local abdominalMul = 0.5
 
 		org.internalBleed = org.internalBleed + repeatTrauma * (1 + abdominalMul * 2.5)
 		org.painadd = (org.painadd or 0) + repeatTrauma * (10 + abdominalMul * 15)
@@ -216,12 +231,15 @@ end
 
 input_list.liver = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.liver
+	local alreadyDamaged = oldDmg > 0.01
 	local result = damageOrgan(org, dmg, dmgInfo, "liver")
 	
 	hg.AddHarmToAttacker(dmgInfo, (org.liver - oldDmg) * 3, "Liver damage harm")
 	
-	org.shock = org.shock + dmg * 20
-	org.painadd = org.painadd + dmg * 35
+	if not alreadyDamaged then
+		org.shock = org.shock + dmg * 20
+		org.painadd = org.painadd + dmg * 35
+	end
 	
 	return result
 end
@@ -372,6 +390,9 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 				net.WriteBool(false)
 				net.WriteBool(true)
 				net.WriteBool(false)
+				-- Any direct brain injury should use the concussion sting, even when
+				-- it is below the severe-flash threshold.
+				net.WriteBool(true)
 				net.WriteBool(isCritical)
 				net.Send(targetPlayer)
 

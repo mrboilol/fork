@@ -96,6 +96,10 @@ local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, 
     local hasBrainDamage = newBrain > 0.1 and oldBrain <= 0.1
     local hasConcussion = newConcussion >= 1.5 and newConcussion > oldConcussion
     local isSevereTrauma = oldHeadTrauma < 0.5 and newHeadTrauma >= 0.5
+    -- The concussion sting is feedback for a meaningful head impact, not every
+    -- tiny skull scrape.  Direct brain trauma always qualifies regardless of
+    -- the skull delta.
+    local playConcussionSound = (traumaBone == "skull" and dmg >= 0.1) or newBrain > 0
 
     local isCritical = hasBrainDamage or hasConcussion or isSevereTrauma
     boneDelta = math.max(boneDelta or 0, 0)
@@ -131,6 +135,7 @@ local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, 
     net.WriteBool(false)
     net.WriteBool(hasBrainDamage)
     net.WriteBool(hasConcussion)
+    net.WriteBool(playConcussionSound)
     net.WriteBool(isCritical and dmg >= 0.05)
     net.Send(targetPlayer)
 

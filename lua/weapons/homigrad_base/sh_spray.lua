@@ -283,12 +283,14 @@ function SWEP:PrimarySpread()
 		-- Injury and lost-hand support are already represented by mul above.
 		-- Multiplying both into the direct eye-angle kick again could pin the
 		-- camera at its pitch limit after firing with a damaged arm.
-		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.62, 0.22, 1.85)
+		-- Keep the direct shot correction pitch-led.  The old kick was small enough
+		-- for the spread yaw and punch recovery to make rifles feel sideways.
+		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.15, 0.45, 3.25)
 		local muzzleKick = sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
-		muzzleKick[1] = muzzleKick[1] - verticalKick
-		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.35, -6.0, 2.4)
-		local muzzleYawCap = math.min(0.65, math.abs(muzzleKick[1]) * 0.18 + 0.08)
-		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.32, -muzzleYawCap, muzzleYawCap)
+		muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
+		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.5, -8.0, 1.2)
+		local muzzleYawCap = math.min(0.36, math.abs(muzzleKick[1]) * 0.10 + 0.04)
+		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.16, -muzzleYawCap, muzzleYawCap)
 		muzzleKick[3] = 0
 		muzzleKick = sanitize_angle(muzzleKick)
 		local newEyeAng = eyeang + muzzleKick

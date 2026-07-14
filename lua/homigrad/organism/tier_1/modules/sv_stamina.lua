@@ -8,6 +8,8 @@ local min, max, Round = math.min, math.max, Round
 
 local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_mul","1",{FCVAR_ARCHIVE,FCVAR_NOTIFY,FCVAR_NEVER_AS_STRING},"Multiply stamina drain when sprinting",0,10)
 local panicattack_stamina_drain_mul = 1.35
+local low_stamina_drain_max_mul = 1.2
+local low_stamina_recovery_min_mul = 0.85
 --local Organism = hg.organism
 
 hg.organism.module.stamina = {}
@@ -177,7 +179,11 @@ module[2] = function(owner, org, timeValue)
 	org.hungry = org.hungry or 0
 
 	stamina.max = (org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) + goodmood * 20
-	    stamina[1] = max(stamina[1] - stamina.sub * timeValue * 8 * (2 - (org.o2[1] / org.o2.range)), 0)
+	local staminaFraction = math.Clamp(stamina[1] / math.max(stamina.max, 1), 0, 1)
+	local lowStamina = 1 - staminaFraction
+	local staminaDrainMul = Lerp(lowStamina, 1, low_stamina_drain_max_mul)
+	local staminaRecoveryMul = Lerp(lowStamina, 1, low_stamina_recovery_min_mul)
+	    stamina[1] = max(stamina[1] - stamina.sub * staminaDrainMul * timeValue * 8 * (2 - (org.o2[1] / org.o2.range)), 0)
 	if stamina.max > 100 then
 
 		stamina.max = Lerp(despair, stamina.max, 100)
@@ -196,7 +202,7 @@ module[2] = function(owner, org, timeValue)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
 
-	stamina[1] = min(stamina[1] + stamina.regen * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
 
 
 

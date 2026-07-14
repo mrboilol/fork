@@ -595,40 +595,34 @@ function SWEP:FireBullet()
 		end)
 	end
 
-	if isply then
-		owner:LagCompensation(true)
-	end
-
-	self:WorldModel_Transform()
-	-- Sample the attachment only after the world model is in its current,
-	-- lag-compensated pose.  Sampling it earlier used the previous transform,
-	-- while the debug marker showed this updated one.
 	local att = self:GetMuzzleAtt(gun, true)
-	if not att then
-		if isply then owner:LagCompensation(false) end
-		return
-	end
+	if not att then return end
 	local pos, ang = att.Pos, att.Ang
 	//if not isply and not owner:IsNPC() then return end
 	local fakeGun = self:GetNWEntity("fakeGun")
 
 	local primary = self.Primary
 
-	-- Spawn at the real muzzle attachment and converge on the calibrated muzzle
-	-- trace's white hit marker. Using only its angle leaves two parallel paths
-	-- a few units apart because their start positions are different.
-	local tr = self:GetTrace(true)
+	if isply then
+		owner:LagCompensation(true)
+	end
+
+	self:WorldModel_Transform()
+	local tr, pos, ang = self:GetTrace(true)
 
 	if isply then
 		owner:LagCompensation(false)
 	end
 
+	local trace
 	local dir = ang:Forward()
-	if tr and tr.HitPos then
-		local muzzlePath = tr.HitPos - pos
-		if muzzlePath:LengthSqr() > 0 then
-			dir = muzzlePath:GetNormalized()
-		end
+	if isply then
+		local dist, point = util.DistanceToLine(pos, pos - dir * 50, owner:EyePos())
+		local obstructionTrace = {}
+		obstructionTrace.start = point
+		obstructionTrace.endpos = pos
+		obstructionTrace.filter = {owner, ent, SERVER and hg.ragdollFake[owner]}
+		trace = util.TraceLine(obstructionTrace)
 	end
 
     local numbullet = ammotype.NumBullet or 1
@@ -700,8 +694,8 @@ function SWEP:FireBullet()
 	end
 
 	local bullet = {}
-	-- The source is always the real muzzle; dir targets its white trace marker.
-	bullet.Src = willsuicidereal and headpos or pos
+	-- Original calibrated muzzle path, with the old near-eye obstruction guard.
+	bullet.Src = willsuicidereal and headpos or (trace and (trace.HitPos - trace.Normal) or pos)
 	bullet.Dir = dir
 	bullet.Attacker = owner
 	
