@@ -446,8 +446,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
 		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
 		if hg.HasTourniquetOnLimb then
-			if hg.HasTourniquetOnLimb(ply, "lleg") then k = k * 0.75 end
-			if hg.HasTourniquetOnLimb(ply, "rleg") then k = k * 0.75 end
+			local weakenedLegs = (hg.HasTourniquetOnLimb(ply, "lleg") and 1 or 0) + (hg.HasTourniquetOnLimb(ply, "rleg") and 1 or 0)
+			k = k * (0.6 ^ weakenedLegs)
 		end
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		k = k * ((IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) and math.Clamp(50 / math.max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)

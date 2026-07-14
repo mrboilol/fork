@@ -194,6 +194,8 @@ function SWEP:GetArmHealthHandlingMul()
 	local right = math.Clamp(org.rarm or 0, 0, 1.4)
 	local left = math.Clamp(org.larm or 0, 0, 1.4)
 	local damage = right * 0.45 + (twoHanded and left * 0.32 or left * 0.14)
+	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "rarm") then damage = damage + 0.9 end
+	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "larm") then damage = damage + (twoHanded and 0.7 or 0.25) end
 
 	if org.rarmdislocation or org.rarmdislocated then damage = damage + 0.45 end
 	if twoHanded and (org.larmdislocation or org.larmdislocated) then damage = damage + 0.35 end

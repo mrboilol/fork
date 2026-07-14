@@ -915,94 +915,125 @@ if SERVER then
 			["ValveBiped.Bip01_R_Foot"] = true
 		},
 	}
+	local tourniquet_bone_to_limb = {
+		["ValveBiped.Bip01_L_UpperArm"] = "larm",
+		["ValveBiped.Bip01_L_Forearm"] = "larm",
+		["ValveBiped.Bip01_L_Hand"] = "larm",
+		["ValveBiped.Bip01_R_UpperArm"] = "rarm",
+		["ValveBiped.Bip01_R_Forearm"] = "rarm",
+		["ValveBiped.Bip01_R_Hand"] = "rarm",
+		["ValveBiped.Bip01_L_Thigh"] = "lleg",
+		["ValveBiped.Bip01_L_Calf"] = "lleg",
+		["ValveBiped.Bip01_L_Foot"] = "lleg",
+		["ValveBiped.Bip01_R_Thigh"] = "rleg",
+		["ValveBiped.Bip01_R_Calf"] = "rleg",
+		["ValveBiped.Bip01_R_Foot"] = "rleg",
+	}
+
+	local function getTourniquetWoundBone(ent, wound)
+		local woundBoneRef = wound and wound[4]
+		if isnumber(woundBoneRef) then return ent:GetBoneName(woundBoneRef) end
+		if not isstring(woundBoneRef) then return end
+
+		local boneIndex = ent:LookupBone(woundBoneRef)
+		return boneIndex and ent:GetBoneName(boneIndex) or nil
+	end
+
+	local function isBoneAtOrBelowTourniquet(tourniquetBone, woundBone)
+		return tourniquetBone == woundBone or (tourniqet_bones[tourniquetBone] and tourniqet_bones[tourniquetBone][woundBone]) or false
+	end
+
 	function SWEP:Tourniquet(ent, bone)
 		local org = ent.organism
-		if not org then return end
-		if #org.arterialwounds > 0 then
-			local ent = org.isPly and org.owner or ent
-			ent.tourniquets = ent.tourniquets or {}
+		if not org then return false end
 
-			local pw
-			local bonewounds = {}
-			if not bone then
-				for i,wound in pairs(org.arterialwounds) do
-					if wound[7] != "arteria" then 
-						pw = i 
-						for i1,tbl in pairs(org.wounds) do
-							if !tbl or !tbl[4] or !ent:LookupBone(tbl[4]) then continue end
-							local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-							local sec_bonename = ent:GetBoneName(ent:LookupBone(wound[4]))
-							--print(1,bonename,sec_bonename)
-							if bonename == sec_bonename or (tourniqet_bones[sec_bonename] and tourniqet_bones[sec_bonename][bonename]) then
-								--print(2,bonename,sec_bonename)
-								table.insert(bonewounds,i1)
-							end
-						end
-						--PrintTable(bonewounds)
-					break end
-				end
-				
-			else
-				for i,wound in pairs(org.arterialwounds) do
-					if ent:GetBoneName(ent:LookupBone(wound[4])) == bone then pw = i break end
-				end
-				for i,tbl in pairs(org.wounds) do
-					local bonename = ent:GetBoneName(ent:LookupBone(tbl[4]))
-					if bonename == bone or (tourniqet_bones[bone] and tourniqet_bones[bone][bonename]) then
-						table.insert(bonewounds,i)
-					end
-				end
-			end		
-			pw = pw or math.random(#org.arterialwounds)
+		local target = org.isPly and org.owner or ent
+		if not IsValid(target) then return false end
 
-			local wound = org.arterialwounds[pw]
-			if not wound then return false end
-			
-			ent.tourniquets[#ent.tourniquets + 1] = {wound[2], wound[3], wound[4]}
+		if isnumber(bone) then bone = target:GetBoneName(bone) end
+		if bone and not tourniquet_bone_to_limb[bone] then return false end
 
-			if wound[7] == "arteria" then org.o2.regen = 0 end
+		local bestWound
+		local bestBone
+		local bestBleed = 0
+		local bestArterial = false
 
-			table.remove(org.arterialwounds,pw)
+		local function considerWound(wound, arterial)
+			local woundBone = getTourniquetWoundBone(target, wound)
+			if not woundBone or not tourniquet_bone_to_limb[woundBone] then return end
+			if bone and not isBoneAtOrBelowTourniquet(bone, woundBone) then return end
 
-			if hg.organism.RebuildArteryWoundState then
-				hg.organism.RebuildArteryWoundState(org, true)
-			else
-				org[wound[7]] = 0
-				org.owner:SetNetVar("arterialwounds",org.arterialwounds)
+			local bleed = tonumber(wound[1]) or 0
+			if bleed <= 0 then return end
+			if bleed > bestBleed or (bleed == bestBleed and arterial and not bestArterial) then
+				bestWound = wound
+				bestBone = woundBone
+				bestBleed = bleed
+				bestArterial = arterial
 			end
-
-			for i = 1, #bonewounds do
-				if org.wounds[bonewounds[i]] then
-					--print(org.wounds[bonewounds[i]], bonewounds[i])
-					org.wounds[bonewounds[i]][1] = 0
-				end
-			end
-			for i = 1, #bonewounds do
-				if org.wounds[bonewounds[i]] then
-					table.remove(org.wounds, bonewounds[i])
-				end
-			end
-
-			org.owner:SetNetVar("wounds",org.wounds)
-
-			ent:SetNetVar("Tourniquets",ent.tourniquets)
-			if IsValid(ent.FakeRagdoll) then
-				ent.FakeRagdoll:SetNetVar("Tourniquets",ent.tourniquets)
-			end
-			
-			if not table.HasValue(hg.TourniquetGuys,ent) then
-				table.insert(hg.TourniquetGuys,ent)
-			end
-
-			for i,ent in ipairs(hg.TourniquetGuys) do
-				if not IsValid(ent) or not ent.tourniquets or table.IsEmpty(ent.tourniquets) then table.remove(hg.TourniquetGuys,i) end
-			end
-
-			SetNetVar("TourniquetGuys",hg.TourniquetGuys)
-
-			self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
-			return true
 		end
+
+		for _, wound in pairs(org.wounds or {}) do
+			considerWound(wound, false)
+		end
+		for _, wound in pairs(org.arterialwounds or {}) do
+			considerWound(wound, true)
+		end
+
+		if not bestWound then return false end
+
+		target.tourniquets = target.tourniquets or {}
+		target.tourniquets[#target.tourniquets + 1] = {bestWound[2], bestWound[3], bestBone}
+
+		for i = #(org.wounds or {}), 1, -1 do
+			local woundBone = getTourniquetWoundBone(target, org.wounds[i])
+			if woundBone and isBoneAtOrBelowTourniquet(bestBone, woundBone) then
+				table.remove(org.wounds, i)
+			end
+		end
+
+		local removedArterial = false
+		local removedArteries = {}
+		for i = #(org.arterialwounds or {}), 1, -1 do
+			local arterialWound = org.arterialwounds[i]
+			local woundBone = getTourniquetWoundBone(target, arterialWound)
+			if woundBone and isBoneAtOrBelowTourniquet(bestBone, woundBone) then
+				if arterialWound[7] then removedArteries[arterialWound[7]] = true end
+				table.remove(org.arterialwounds, i)
+				removedArterial = true
+			end
+		end
+
+		if removedArterial and hg.organism.RebuildArteryWoundState then
+			hg.organism.RebuildArteryWoundState(org, true)
+		else
+			for artery in pairs(removedArteries) do
+				org[artery] = 0
+			end
+			org.owner:SetNetVar("arterialwounds", org.arterialwounds or {})
+		end
+		org.owner:SetNetVar("wounds", org.wounds or {})
+
+		target:SetNetVar("Tourniquets", target.tourniquets)
+		if IsValid(target.FakeRagdoll) then
+			target.FakeRagdoll:SetNetVar("Tourniquets", target.tourniquets)
+		end
+
+		if not table.HasValue(hg.TourniquetGuys, target) then
+			table.insert(hg.TourniquetGuys, target)
+		end
+
+		for i = #hg.TourniquetGuys, 1, -1 do
+			local tourniquetTarget = hg.TourniquetGuys[i]
+			if not IsValid(tourniquetTarget) or not tourniquetTarget.tourniquets or table.IsEmpty(tourniquetTarget.tourniquets) then
+				table.remove(hg.TourniquetGuys, i)
+			end
+		end
+
+		SetNetVar("TourniquetGuys", hg.TourniquetGuys)
+
+		self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
+		return true
 	end
 
 	hook.Add("Player Spawn", "remove-tourniquets", function(ply)

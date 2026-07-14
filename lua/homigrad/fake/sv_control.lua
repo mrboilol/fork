@@ -553,11 +553,11 @@ local function GetLimbDamageMultiplier(ragdoll, physNumber)
 
     end
 
-    -- Tourniquet reduces control by 15%
+    -- A tightened tourniquet leaves the limb usable, but with very little control.
 
     if hasTourniquet then
 
-        controlMultiplier = controlMultiplier - 0.15
+        controlMultiplier = math.min(controlMultiplier, 0.2)
 
     end
 

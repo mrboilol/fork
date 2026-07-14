@@ -1465,7 +1465,6 @@ local IsValid = IsValid
 		if ent.organism and ent.organism.larmamputated then
 			return false
 		end
-
 		local wep = IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon()
 		local Car = (ply.GetSimfphys and IsValid(ply:GetSimfphys()) and ply:GetSimfphys()) or ( ply.GlideGetVehicle and IsValid(ply:GlideGetVehicle()) and ply:GlideGetVehicle()) or ply:GetVehicle()
 
@@ -1498,7 +1497,6 @@ local IsValid = IsValid
 		if ent.organism and ent.organism.rarmamputated then
 			return false
 		end
-
 		return true
 	end
 
@@ -1567,7 +1565,7 @@ local IsValid = IsValid
 		end
 
 		if hg.HasTourniquetOnLimb(ent, limb) then
-			effectiveness = math.min(effectiveness, 0.65)
+			effectiveness = math.min(effectiveness, 0.2)
 		end
 
 		return effectiveness
