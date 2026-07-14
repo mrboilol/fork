@@ -14,8 +14,8 @@ SWEP.ViewModel = ""
 SWEP.HoldType = "melee2"
 SWEP.weight = 5
 
-SWEP.setlh = false
-SWEP.setrh = false
+SWEP.setlh = true
+SWEP.setrh = true
 SWEP.TwoHanded = false
 SWEP.CanSuicide = false
 SWEP.WorkWithFake = true
