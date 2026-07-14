@@ -104,7 +104,7 @@ hg.settings:AddOpt("Gameplay","hg_old_notificate", "Old Notifications")
 hg.settings:AddOpt("Gameplay","hg_cheats", "Enable Cheats")
 hg.settings:AddOpt("Gameplay","hg_showthoughts", "Show thoughts")
 hg.settings:AddOpt("Gameplay","hg_hints", "Show hints")
-hg.settings:AddOpt("Gameplay","hg_gary", "HG GARY")
+hg.settings:AddOpt("Gameplay","hg_gary", "Center weapon in fake")
 hg.settings:AddOpt("Gameplay","hg_deathfadeout", "Death fade out")
 hg.settings:AddOpt("Gameplay","hg_hold_shift_sprint", "Hold shift to sprint")
 if not game.IsDedicated() then
@@ -120,8 +120,10 @@ if not game.IsDedicated() then
 	hg.settings:AddOpt("Server-side settings","hg_slings", "Sling system")
 	hg.settings:AddOpt("Server-side settings","hg_allow_gopro", "Allow GoPro-like first-person camera")
 	hg.settings:AddOpt("Server-side settings","hg_allow_gopro_pos", "Allow editing GoPro camera position")
+	hg.settings:AddOpt("Server-side settings","hg_giveammomul", "Multiply given ammo for weapon spawned from spawnmenu")
 	hg.settings:AddOpt("Server-side settings","hg_ixanims", "Toggle Helix-like animations on NPC models for players. Experimental")
 	hg.settings:AddOpt("Server-side settings","hg_coolhands", "Give cool hands instead of default hands on spawn")
+	hg.settings:AddOpt("Server-side settings","hg_loadcontent", "Toggle loading content to clients using 'resource.AddWorkshop' (need server restart to apply)")
     hg.settings:AddOpt("Server-side settings","homicide_traitoramount", "Homicide: Traitor Amount", nil, nil, "int")
 end
 
@@ -141,9 +143,7 @@ hg.settings:AddOpt("Blood","hg_blood_fps", "Blood FPS")
 hg.settings:AddOpt("Blood","hg_blood_sprites", "Blood Sprites (DISABLED FOR EVERYONE)")
 hg.settings:AddOpt("Blood","hg_old_blood", "Old blood")
 
-hg.settings.tbl["UI"] = hg.settings.tbl["UI"] or {}
-hg.settings.tbl["UI"]["hg_font"] = nil
-hg.settings:AddOpt("UI","hg_oldradialmenu", "Old Radial Menu")
+hg.settings:AddOpt("UI","hg_font", "Change Custom Font", false, true)
 
 hg.settings:AddOpt("Weapons","hg_weaponshotblur_enable", "Shooting Blur")
 hg.settings:AddOpt("Weapons","hg_dynamic_mags", "Dynamic Ammo Inspect")

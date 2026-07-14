@@ -44,7 +44,6 @@ local function DrawFirstPersonHelmet(ply, strModel, vecAdjust, fFov, setMat)
 	end
 
 	local gp = hg_gopro:GetBool()
-
 	local view = render.GetViewSetup()
 	cam.Start3D(view.origin,view.angles,view.fov + fFov,nil,nil,nil,nil,1,10)
 		--cam.IgnoreZ(true)
