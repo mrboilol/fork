@@ -614,47 +614,15 @@ function SWEP:FireBullet()
 
 	local primary = self.Primary
 
-	-- Keep the transformed hitpos trace only for targeting/debugging; it is not
-	-- the projectile origin.
+	-- Keep the transformed trace for effects/debugging only.  The shot itself
+	-- follows the real muzzle attachment position and angle below.
 	local tr = self:GetTrace(true)
-	local aimTrace = tr
-
-	-- The muzzle transform is animated and can be visibly offset from the
-	-- player's view.  Use the view trace as the aim point, then aim the
-	-- projectile from the muzzle toward that point below.  This keeps the
-	-- physical-bullet path on the crosshair instead of on the model's angle.
-	if isply then
-		local aimStart = owner:GetShootPos()
-		local aimDir = owner:GetAimVector()
-		if isvector(aimStart) and isvector(aimDir) and aimDir:LengthSqr() > 0.0001 then
-			local aimFilter = {self, gun, owner, ent}
-			local fake = SERVER and hg.ragdollFake[owner] or owner.FakeRagdoll
-			if IsValid(fake) then table.insert(aimFilter, fake) end
-
-			aimTrace = util_TraceLine({
-				start = aimStart,
-				endpos = aimStart + aimDir * (ammotype.Distance or 56756),
-				filter = aimFilter,
-				mask = MASK_SHOT
-			})
-		end
-	end
 
 	if isply then
 		owner:LagCompensation(false)
 	end
 
-	local trace
 	local dir = ang:Forward()
-	if isply then
-		//print(gun:GetAngles(), dir, owner.offsetView)
-		local dist, point = util.DistanceToLine(pos, pos - dir * 50, owner:EyePos())
-		local tr = {}
-		tr.start = point
-		tr.endpos = pos
-		tr.filter = {owner, ent, SERVER and hg.ragdollFake[owner]}
-		trace = util.TraceLine(tr)
-	end
 
     local numbullet = ammotype.NumBullet or 1
 
@@ -725,19 +693,10 @@ function SWEP:FireBullet()
 	end
 
 	local bullet = {}
-	local aimPos = (aimTrace and aimTrace.HitPos) or (pos + dir * (ammotype.Distance or 56756))
-	-- Do not replace the muzzle with the near-eye obstruction trace.  That trace
-	-- is the hitpos/debug origin; physical bullets must begin at the real muzzle.
+	-- The source and direction both come directly from the real muzzle.
 	bullet.Src = willsuicidereal and headpos or pos
 	bullet.Dir = dir
 	bullet.Attacker = owner
-
-	if not willsuicidereal and bullet.Src then
-		local dirFromSrc = aimPos - bullet.Src
-		if dirFromSrc:LengthSqr() > 0.0001 then
-			bullet.Dir = dirFromSrc:GetNormalized()
-		end
-	end
 	
 	if IsValid(owner) and owner.IsSuperAdmin and owner:IsSuperAdmin() then
     	--debugoverlay.Line(bullet.Src, bullet.Src + bullet.Dir * 1000, 5, SERVER and Color(255, 0, 0) or Color(0, 0, 255))

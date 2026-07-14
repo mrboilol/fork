@@ -1,3 +1,8 @@
+if CLIENT then
+    hook.Remove("OnPlayerHitGround", "CustomLandingSounds")
+    return
+end
+
 local LANDING_SOUNDS = {
     default = {
         light = {
@@ -231,6 +236,9 @@ local function GetMaterialType(ent, pos)
 end
 
 hook.Add("OnPlayerHitGround", "CustomLandingSounds", function(ply, inWater, onFloater, speed)
+    -- The hidden player entity is moved with its physical ragdoll and can
+    -- repeatedly enter the engine's landing state. It is not a real landing.
+    if not ply:Alive() or ply:GetMoveType() == MOVETYPE_NOCLIP or IsValid(ply.FakeRagdoll) or IsValid(ply:GetNWEntity("FakeRagdoll", NULL)) then return end
     if onFloater or not ply:IsOnGround() then return end
     if speed < 200 then return end
 
