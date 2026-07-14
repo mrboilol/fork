@@ -675,7 +675,7 @@ hook.Add("Post Post Processing", "organism-effects", function()
 
 	if (disorientationLerp > 1) and lply:Alive() or brain > 0 then
 		local add2 = disorientationLerp - 1
-		if not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then DrawMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
+		if not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then hg.QueueMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
 		if disorientationLerp > 2 then
 			local add = (disorientationLerp - 2) * 2
 			local time = CurTime() * 3

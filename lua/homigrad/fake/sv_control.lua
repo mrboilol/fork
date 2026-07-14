@@ -2,11 +2,14 @@
 
 local vecZero = Vector(0, 0, 0)
 
-local function AddFakeDislocatedArmPain(org, limb, dt, rate)
+local function AddFakeArmUsePain(org, limb, dt)
 	if not org or org[limb .. "amputated"] then return end
-	if not (org[limb .. "dislocation"] or org[limb .. "dislocated"]) then return end
 
-	org.painadd = (org.painadd or 0) + (rate or 10) * math.max(dt or 0, 0)
+	local broken = (org[limb] or 0) >= 1
+	local dislocated = org[limb .. "dislocation"] or org[limb .. "dislocated"]
+	if not broken and not dislocated then return end
+
+	org.painadd = (org.painadd or 0) + (broken and 10 or 7.5) * math.max(dt or 0, 0)
 end
 
 local angZero = Angle(0, 0, 0)
@@ -1441,12 +1444,12 @@ hook.Add("Think", "Fake", function()
 		local manualHoldWound = wantsManualHold and manualHoldHands > 0
 		setManualWoundHold(ply, org, manualHoldWound, holdWound, manualHoldHands, manualUseRight, holdWoundArterial)
 
-		-- Gripping, climbing, or holding a wound with a dislocated arm should be
-		-- possible, but it continuously hurts while that arm is actually in use.
+		-- Gripping, climbing, or holding a wound with a broken/dislocated arm should
+		-- be possible, but it continuously hurts while that arm is actually in use.
 		local leftArmActive = IsValid(ragdoll.ConsLH) or manualUseLeft or (ply:KeyDown(IN_ATTACK) and not ishgweapon(wep))
 		local rightArmActive = IsValid(ragdoll.ConsRH) or manualUseRight or (ply:KeyDown(IN_ATTACK2) and not ishgweapon(wep))
-		if leftArmActive then AddFakeDislocatedArmPain(org, "larm", ragdoll.dtime, 10) end
-		if rightArmActive then AddFakeDislocatedArmPain(org, "rarm", ragdoll.dtime, 10) end
+		if leftArmActive then AddFakeArmUsePain(org, "larm", ragdoll.dtime) end
+		if rightArmActive then AddFakeArmUsePain(org, "rarm", ragdoll.dtime) end
 
 		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (CurTime() - ragdoll.otrubCollapseStart) < 1.5 then
 			inmove = true
@@ -2624,7 +2627,9 @@ hook.Add("Think", "Fake", function()
 
 				force:Normalize()
 
-				force = force * 100 * ragdoll.dtime / 0.015 * ragdoll.power
+				-- Crouched fake control is the deliberate leg-extension move.  Give it
+				-- enough impulse to create a real shove without bypassing leg injuries.
+				force = force * 1400 * ragdoll.dtime / 0.015 * ragdoll.power * math.max(org.legstrength or 1, 0.1)
 
 
 
@@ -2634,9 +2639,9 @@ hook.Add("Think", "Fake", function()
 
 				end
 
-				//rleg:ApplyForceCenter(force)
+				if IsValid(rleg) then rleg:ApplyForceCenter(force) end
 
-				//lleg:ApplyForceCenter(force)
+				if IsValid(lleg) then lleg:ApplyForceCenter(force) end
 
 			end
 

@@ -87,8 +87,7 @@ function SWEP:PrimarySpread()
 		if org then
 			if IsSlugcatRecoilImmune(owner, self) then return end
 
-			local _, _, recoilForce, numB = self:GetRecoilImpulseFactors()
-			local force = self.Primary.Force2 or self.Primary.Force or 30
+			local _, _, recoilForce = self:GetRecoilImpulseFactors()
 			local calForce = recoilForce
 			local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 
@@ -99,32 +98,16 @@ function SWEP:PrimarySpread()
 			local firingArm = support.firingArm or (support.onlyLeft and "larm" or "rarm")
 			local firingBroken = firingArm == "larm" and larm_broken or rarm_broken
 			local firingDislocated = firingArm == "larm" and larm_dislocated or rarm_dislocated
-			local firingAmputated = firingArm == "larm" and org.larmamputated or org.rarmamputated
 			local oneHanded = support.oneHanded or support.leftBusy or support.rightBusy
 
-			-- Pain from shooting based on hand dominance - only if arm is actually broken
-			local dominance = org.hand_dominance or "right"
-			local pain_mult = 0
-
-			if dominance == "right" then
-				-- Right hand dominant: only hurt if right arm is broken (>=1) or dislocated
-				if rarm_broken then
-					pain_mult = org.rarm * 5 -- Increased from 2 to 5
-				elseif rarm_dislocated then
-					pain_mult = 5 -- Increased from 2 to 5
-				end
-				-- If right arm amputated, no pain (using left arm instead)
-			else
-				-- Left hand dominant: only hurt if left arm is broken (>=1) or dislocated
-				if larm_broken then
-					pain_mult = org.larm * 2
-				elseif larm_dislocated then
-					pain_mult = 2
-				end
-				-- If left arm amputated, no pain (using right arm instead)
+			-- A damaged firing arm hurts from recoil, but only once per shot.  The old
+			-- code stacked three independent penalties and multiplied one by pellet
+			-- count, letting a broken right arm inflict hundreds of pain per shot.
+			if firingBroken or firingDislocated then
+				local injurySeverity = firingBroken and 1 or 0.55
+				local recoilPain = math.Clamp((calForce - 20) / 30 * injurySeverity, 0.4, 6)
+				org.painadd = (org.painadd or 0) + recoilPain
 			end
-
-			org.painadd = org.painadd + pain_mult * force / 20 * numB
 			if oneHanded then
 				local oneHandPain = math.max(0, calForce - 24) * (support.onlyLeft and 0.16 or 0.1)
 				if firingBroken or firingDislocated then oneHandPain = oneHandPain + calForce * 0.28 end
@@ -132,25 +115,6 @@ function SWEP:PrimarySpread()
 
 			end
 
-			-- Right arm broken shooting checks
-			if rarm_broken then
-				local extra_broken_pain = calForce * 3.0 -- Increased from 1.5 to 3.0
-				if larm_broken then
-					extra_broken_pain = extra_broken_pain * 1.5
-				end
-				org.painadd = org.painadd + extra_broken_pain
-
-			end
-			-- Base shooting pain only applies when firing with a damaged firing arm.
-			-- Right arm broken/dislocated, or (right arm missing AND left arm broken/dislocated).
-			local rarm_amputated = org.rarmamputated
-			local shouldShootPain = (rarm_broken or rarm_dislocated) or
-				(rarm_amputated and (larm_broken or larm_dislocated))
-
-			if shouldShootPain then
-				local baseShootPain = math.max(17.5, calForce * 0.35)
-				org.painadd = org.painadd + baseShootPain
-			end
 		end
 	end
 

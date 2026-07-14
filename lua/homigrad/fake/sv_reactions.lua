@@ -19,6 +19,7 @@ local CONFIG = {
     ReactionDelay = 0.1,
     StaggerCooldown = 0.35,
     TripCooldown = 0.8,
+    CollisionTripMinSpeed = 160,
     ProtectiveCooldown = 0.12
 }
 
@@ -42,6 +43,16 @@ local function IsPlayerControlling(ply)
            ply:KeyDown(IN_JUMP) or ply:KeyDown(IN_DUCK) or 
            ply:KeyDown(IN_ATTACK) or ply:KeyDown(IN_ATTACK2) or
            ply:KeyDown(IN_USE)
+end
+
+local function GetTumbleChance(org)
+    local chance = 0.4
+    chance = chance + math.Clamp((org.brain or 0) * 0.45, 0, 0.45)
+    chance = chance + math.Clamp((org.adrenaline or 0) * 0.14, 0, 0.25)
+    chance = chance - math.Clamp((org.berserk or 0) * 0.25, 0, 0.3)
+    chance = chance - math.Clamp((org.noradrenaline or 0) * 0.3, 0, 0.35)
+
+    return math.Clamp(chance, 0.05, 0.9)
 end
 
 -- Helper: Find ground position (simplified from Artagdoll)
@@ -349,9 +360,9 @@ end
 -- Tripping/Stumbling (Hit obstacle)
 function hg.reactions.ProcessTripping(ragdoll, ply, org)
     if not org.alive or org.otrub or org.paralyzed then return false end
-    
-    -- If user is controlling, maybe they MEANT to jump?
-    if ply:KeyDown(IN_JUMP) then return false end
+
+    local collisionTrip = (ragdoll.reaction_collision_tumble_until or 0) > CurTime()
+    if ply:KeyDown(IN_JUMP) and not collisionTrip then return false end
     
     local velocity = ragdoll:GetVelocity()
     local speed = velocity:Length()
@@ -363,8 +374,9 @@ function hg.reactions.ProcessTripping(ragdoll, ply, org)
     
     if not IsValid(lfoot) or not IsValid(rfoot) then return false end
     
-    -- Raycast forward from feet to detect low obstacles
-    local forward = velocity:GetNormalized()
+    -- Raycast forward from feet to detect low obstacles, players, ragdolls, and props.
+    local forward = collisionTrip and ragdoll.reaction_collision_tumble_dir or velocity:GetNormalized()
+    if forward:LengthSqr() <= 0 then return false end
     local traceStart = (lfoot:GetPos() + rfoot:GetPos()) / 2 + Vector(0, 0, 5)
     local traceEnd = traceStart + forward * 30
     
@@ -372,11 +384,15 @@ function hg.reactions.ProcessTripping(ragdoll, ply, org)
         start = traceStart,
         endpos = traceEnd,
         filter = {ragdoll, ply},
-        mask = MASK_SOLID
+        mask = MASK_SHOT_HULL
     })
     
-    if tr.Hit then
+    if collisionTrip or tr.Hit then
         if not ReactionReady(ragdoll, "reaction_trip_until", CONFIG.TripCooldown) then
+            return false
+        end
+
+        if math.Rand(0, 1) > GetTumbleChance(org) then
             return false
         end
 
@@ -387,7 +403,8 @@ function hg.reactions.ProcessTripping(ragdoll, ply, org)
         
         local pelvis = ragdoll:GetPhysicsObjectNum(0)
         if IsValid(pelvis) then
-            pelvis:ApplyForceCenter(forward * 120) -- Carry momentum forward without throwing the torso down
+            local collisionSpeed = ragdoll.reaction_collision_tumble_speed or speed
+            pelvis:ApplyForceCenter(forward * math.Clamp(collisionSpeed * 1.2, 120, 600))
         end
         
         -- Lift legs back
@@ -411,6 +428,30 @@ function hg.reactions.ProcessTripping(ragdoll, ply, org)
     
     return false
 end
+
+-- Physics collisions catch the cases a forward foot trace cannot: another player,
+-- a ragdoll, a physics prop, or the face of a large ledge.
+hook.Add("Ragdoll Collide", "RagdollReactionTumble", function(ragdoll, data)
+    if not IsValid(ragdoll) or (data.Speed or 0) < CONFIG.CollisionTripMinSpeed then return end
+
+    local ply = hg.RagdollOwner(ragdoll)
+    local org = IsValid(ply) and ply.organism
+    if not org or not org.alive or org.otrub or org.paralyzed then return end
+
+    local hit = data.HitEntity
+    if not IsValid(hit) then return end
+    if hit == ply or hit == ragdoll then return end
+
+    local tumbleTarget = hit:IsPlayer() or hit:IsRagdoll() or hit:IsWorld() or hit:GetMoveType() == MOVETYPE_VPHYSICS
+    if not tumbleTarget then return end
+
+    local velocity = data.OurOldVelocity
+    if not velocity or velocity:LengthSqr() <= 0 then return end
+
+    ragdoll.reaction_collision_tumble_dir = velocity:GetNormalized()
+    ragdoll.reaction_collision_tumble_speed = data.Speed
+    ragdoll.reaction_collision_tumble_until = CurTime() + 0.15
+end)
 
 -- Protective Behavior (Arms out when falling)
 function hg.reactions.ProcessProtective(ragdoll, ply, org)

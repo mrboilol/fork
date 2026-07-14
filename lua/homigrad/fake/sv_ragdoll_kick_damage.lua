@@ -4,9 +4,9 @@
 if not SERVER then return end
 
 -- Configuration
-local KICK_SPEED_THRESHOLD = 220 -- Minimum speed for kick damage
-local MAX_KICK_DAMAGE = 36 -- Maximum damage cap
-local KICK_DAMAGE_MULTIPLIER = 0.1 -- Speed to damage conversion rate
+local LEG_SHOVE_SPEED_THRESHOLD = 100
+local DROP_KICK_SPEED_THRESHOLD = 360
+local TACKLE_SPEED_THRESHOLD = 160
 local KICK_DAMAGE_COOLDOWN = 0.5 -- Cooldown between kick damage hits (seconds)
 
 -- Hit tracking to prevent damage multiplication
@@ -27,6 +27,19 @@ local KICK_BONES = {
     ["ValveBiped.Bip01_L_Thigh"] = true, -- Added missing thigh bones
     ["ValveBiped.Bip01_R_Thigh"] = true, -- Added missing thigh bones
     ["ValveBiped.Bip01_Head1"] = true,
+    ["ValveBiped.Bip01_Pelvis"] = true,
+    ["ValveBiped.Bip01_Spine"] = true,
+    ["ValveBiped.Bip01_Spine1"] = true,
+    ["ValveBiped.Bip01_Spine2"] = true,
+}
+
+local LEG_BONES = {
+    ["ValveBiped.Bip01_L_Thigh"] = true,
+    ["ValveBiped.Bip01_L_Calf"] = true,
+    ["ValveBiped.Bip01_L_Foot"] = true,
+    ["ValveBiped.Bip01_R_Thigh"] = true,
+    ["ValveBiped.Bip01_R_Calf"] = true,
+    ["ValveBiped.Bip01_R_Foot"] = true,
 }
 
 local BONE_HITGROUPS = {
@@ -43,6 +56,10 @@ local BONE_HITGROUPS = {
     ["ValveBiped.Bip01_R_Calf"] = HITGROUP_RIGHTLEG,
     ["ValveBiped.Bip01_R_Foot"] = HITGROUP_RIGHTLEG,
     ["ValveBiped.Bip01_Head1"] = HITGROUP_HEAD,
+    ["ValveBiped.Bip01_Pelvis"] = HITGROUP_STOMACH,
+    ["ValveBiped.Bip01_Spine"] = HITGROUP_CHEST,
+    ["ValveBiped.Bip01_Spine1"] = HITGROUP_CHEST,
+    ["ValveBiped.Bip01_Spine2"] = HITGROUP_CHEST,
 }
 
 -- Sound effects for different impact types
@@ -119,13 +136,31 @@ local function CanTakeKickDamage(ent)
     return false
 end
 
--- Calculate kick damage based on speed
-local function CalculateKickDamage(speed)
-    if speed < KICK_SPEED_THRESHOLD then return 0 end
-    
-    -- Linear scaling from threshold to max damage
-    local damage = (speed - KICK_SPEED_THRESHOLD) * KICK_DAMAGE_MULTIPLIER
-    return math.min(damage, MAX_KICK_DAMAGE)
+-- Leg extensions are primarily shoves, while a fast airborne leg impact becomes a dropkick.
+-- Body, arm, and head contacts are tackles: reliable knockback with deliberately low damage.
+local function CalculateImpact(boneName, speed)
+    if LEG_BONES[boneName] then
+        if speed >= DROP_KICK_SPEED_THRESHOLD then
+            return math.min(20 + (speed - DROP_KICK_SPEED_THRESHOLD) * 0.28, 90),
+                math.max(2200, speed * 8),
+                math.Clamp(350 + (speed - DROP_KICK_SPEED_THRESHOLD) * 1.5, 400, 900),
+                "dropkick"
+        end
+
+        if speed >= LEG_SHOVE_SPEED_THRESHOLD then
+            return math.min(1 + (speed - LEG_SHOVE_SPEED_THRESHOLD) * 0.035, 9),
+                math.max(1400, speed * 8),
+                math.Clamp(250 + speed * 1.4, 350, 650),
+                "leg shove"
+        end
+    elseif speed >= TACKLE_SPEED_THRESHOLD then
+        return math.min(2 + (speed - TACKLE_SPEED_THRESHOLD) * 0.04, 13),
+            math.max(1000, speed * 5),
+            math.Clamp(200 + speed, 300, 600),
+            "tackle"
+    end
+
+    return 0, 0, 0, nil
 end
 
 -- Get appropriate sound for the target
@@ -140,7 +175,7 @@ local function GetKickSound(target)
 end
 
 -- Apply kick damage to target
-local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName)
+local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName, knockback)
     if damage <= 0 then return end
     
     -- Create damage info similar to weapon_melee
@@ -167,7 +202,7 @@ local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName
             -- Apply view punch and velocity like melee weapons
             local forceDir = force:GetNormalized()
             targetPlayer:ViewPunch(Angle(damage * 0.3, 0, 0))
-            targetPlayer:SetVelocity(forceDir * damage * 3)
+            targetPlayer:SetVelocity(forceDir * knockback)
         end
     end
     
@@ -311,9 +346,9 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     local boneName = GetBoneNameFromPhysBone(ragdoll, physBone)
     if not boneName or not KICK_BONES[boneName] then return end
     
-    -- Calculate speed and damage
+    -- Calculate the distinct shove, dropkick, or tackle response for this impact.
     local speed = data.OurOldVelocity:Length()
-    local damage = CalculateKickDamage(speed)
+    local damage, impactForce, knockback, impactType = CalculateImpact(boneName, speed)
     
     if damage <= 0 then return end
     
@@ -322,10 +357,10 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     
     -- Calculate force direction and magnitude
     local forceDir = data.OurOldVelocity:GetNormalized()
-    local force = forceDir * damage * 150 -- Similar to weapon_melee force
+    local force = forceDir * impactForce
     
     -- Apply the damage
-    ApplyKickDamage(attacker, target, damage, data.HitPos, force, boneName)
+    ApplyKickDamage(attacker, target, damage, data.HitPos, force, boneName, knockback)
     
     -- Record this hit to prevent rapid successive hits
     RecordKickHit(attacker, target)
@@ -333,8 +368,9 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     -- Debug output for developers
     if GetConVar("developer"):GetInt() == 1 then
         local targetPlayer = hg.RagdollOwner(target) or target
-        print(string.format("[KICK DAMAGE] %s kicked %s with %s for %.1f damage (speed: %.1f)", 
+        print(string.format("[KICK DAMAGE] %s landed a %s on %s with %s for %.1f damage (speed: %.1f)",
             attacker:GetName(), 
+            impactType,
             targetPlayer:GetName(), 
             boneName, 
             damage, 

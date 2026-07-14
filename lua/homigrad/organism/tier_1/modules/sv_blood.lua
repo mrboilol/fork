@@ -427,7 +427,9 @@ module[2] = function(owner, org, mulTime)
 		-- Hemoglobin is low, but the sharper delivery penalty is handled by lungs/pulse.
 		org.o2[1] = math.max(org.o2[1] - mulTime * 1.0, 0)
 		-- Pulse now destabilizing: starts to drop from overexertion
-		if not adrenalineStabilizer then
+		-- A pulse floor is only for a still-beating heart under ischemic stress.
+		-- Never recreate circulation after the pulse module has set cardiac arrest.
+		if not adrenalineStabilizer and not org.heartstop and (org.heartbeat or 0) > 0 then
 			org.pulse = math.max(org.pulse - mulTime * 0.8, 40)
 		end
 		-- Slow ischemia creep begins

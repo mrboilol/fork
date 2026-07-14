@@ -614,15 +614,22 @@ function SWEP:FireBullet()
 
 	local primary = self.Primary
 
-	-- Spawn at the real muzzle attachment, but follow the weapon's calibrated
-	-- muzzle trajectory. Model attachment angles can point a few units low.
-	local tr, _, trajectoryAng = self:GetTrace(true)
+	-- Spawn at the real muzzle attachment and converge on the calibrated muzzle
+	-- trace's white hit marker. Using only its angle leaves two parallel paths
+	-- a few units apart because their start positions are different.
+	local tr = self:GetTrace(true)
 
 	if isply then
 		owner:LagCompensation(false)
 	end
 
-	local dir = (trajectoryAng or ang):Forward()
+	local dir = ang:Forward()
+	if tr and tr.HitPos then
+		local muzzlePath = tr.HitPos - pos
+		if muzzlePath:LengthSqr() > 0 then
+			dir = muzzlePath:GetNormalized()
+		end
+	end
 
     local numbullet = ammotype.NumBullet or 1
 
@@ -693,7 +700,7 @@ function SWEP:FireBullet()
 	end
 
 	local bullet = {}
-	-- The source and direction both come directly from the real muzzle.
+	-- The source is always the real muzzle; dir targets its white trace marker.
 	bullet.Src = willsuicidereal and headpos or pos
 	bullet.Dir = dir
 	bullet.Attacker = owner
