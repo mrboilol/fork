@@ -720,7 +720,9 @@ function SWEP:FireBullet()
 
 	local bullet = {}
 	local aimPos = (aimTrace and aimTrace.HitPos) or (pos + dir * (ammotype.Distance or 56756))
-    bullet.Src = (willsuicidereal and headpos or (trace and (trace.HitPos - trace.Normal) or pos))
+	-- Do not replace the muzzle with the near-eye obstruction trace.  That trace
+	-- is the hitpos/debug origin; physical bullets must begin at the real muzzle.
+	bullet.Src = willsuicidereal and headpos or pos
 	bullet.Dir = dir
 	bullet.Attacker = owner
 

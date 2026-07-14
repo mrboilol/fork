@@ -60,7 +60,7 @@ male["ValveBiped.Bip01_Head1"] = {
 		0.3,
 		Vector(4.5, -4.8, 1.2),
 		Angle(0, 0, 0),
-		Vector(0.7, 0.7, 0.7),
+		Vector(0.85, 0.9, 0.9),
 		Color(255, 255, 255)
 	},
 	{
@@ -68,7 +68,7 @@ male["ValveBiped.Bip01_Head1"] = {
 		0.3,
 		Vector(4.5, -4.8, -1.2),
 		Angle(0, 0, 0),
-		Vector(0.7, 0.7, 0.7),
+		Vector(0.85, 0.9, 0.9),
 		Color(255, 255, 255)
 	},
 }
@@ -337,7 +337,7 @@ female["ValveBiped.Bip01_Head1"] = {
 		0.3,
 		Vector(3.5, -3.3, 1.2),
 		Angle(0, 0, 0),
-		Vector(0.7, 0.7, 0.7),
+		Vector(0.85, 0.9, 0.9),
 		Color(255, 255, 255)
 	},
 	{
@@ -345,7 +345,7 @@ female["ValveBiped.Bip01_Head1"] = {
 		0.3,
 		Vector(3.5, -3.3, -1.2),
 		Angle(0, 0, 0),
-		Vector(0.7, 0.7, 0.7),
+		Vector(0.85, 0.9, 0.9),
 		Color(255, 255, 255)
 	},
 }

@@ -812,23 +812,6 @@ hook.Add("Player Think", "HG_ClearManualWoundHold", function(ply)
 	end
 end)
 
-local function triggerOtrubCollapse(ply)
-	if not IsValid(ply) or not ply:IsPlayer() then return end
-	if ply.otrubCollapseStart and CurTime() - ply.otrubCollapseStart < 1.5 then return end
-	ply.otrubCollapseStart = CurTime()
-	local ragdoll = ply.FakeRagdoll
-	if IsValid(ragdoll) then
-		ragdoll.otrubCollapseStart = CurTime()
-	end
-end
-
-hook.Add("EntityTakeDamage", "OtrubCollapseDmg", function(ent, dmgInfo)
-	if not IsValid(ent) or not ent:IsPlayer() then return end
-	if dmgInfo:IsDamageType(DMG_CRUSH + DMG_FALL + DMG_CLUB) and ent:Alive() then
-		triggerOtrubCollapse(ent)
-	end
-end)
-
 local att, trace, ent
 
 

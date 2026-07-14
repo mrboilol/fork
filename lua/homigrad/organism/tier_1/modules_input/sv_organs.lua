@@ -345,12 +345,6 @@ input_list.brain = function(org, bone, dmg, dmgInfo)
 	org.shock = org.shock + dmg * 3
 	org.painadd = org.painadd + dmg * 10
 
-    if (dmgInfo:IsDamageType(DMG_BULLET) or dmgInfo:IsDamageType(DMG_BUCKSHOT) or dmgInfo:IsDamageType(DMG_SLASH)) and math.random(100) <= 5 then
-        local which = (math.random(2) == 1) and "eyeL" or "eyeR"
-        local eyeFunc = input_list[which]
-        if eyeFunc then eyeFunc(org, 1, dmg, dmgInfo) end
-    end
-
 	-- Headtrauma flash for direct brain damage
 	if org.isPly and brainDelta > 0 then
 		local targetPlayer = org.owner
@@ -562,6 +556,7 @@ input_list.eyeL = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.eyeL or 0
 	dmg = dmg * 3
 	org.eyeL = math.min((org.eyeL or 0) + dmg, 1)
+	org.eyeBlindLUntil = CurTime() + 12
 
 	hg.AddHarmToAttacker(dmgInfo, dmg * 5, "Left eye damage harm")
 	org.painadd = org.painadd + dmg * 20
@@ -575,6 +570,7 @@ input_list.eyeR = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.eyeR or 0
 	dmg = dmg * 3
 	org.eyeR = math.min((org.eyeR or 0) + dmg, 1)
+	org.eyeBlindRUntil = CurTime() + 12
 
 	hg.AddHarmToAttacker(dmgInfo, dmg * 5, "Right eye damage harm")
 	org.painadd = org.painadd + dmg * 20

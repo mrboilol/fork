@@ -6,8 +6,6 @@ local function GetPepperSprayStrength(ply)
     local blindEnd = ply:GetNWFloat("PS_BlindEndTime", 0)
     local recovStart = ply:GetNWFloat("PS_RecoveryStart", 0)
     local lingeringTint = ply:GetNWFloat("PS_LingeringTint", 0)
-    local organism = ply.organism
-
     local lingeringAlpha = 0
     if lingeringTint > 0 and recovStart <= 0 then
         lingeringAlpha = math.Clamp(lingeringTint / 100, 0, 1) * 240
@@ -20,22 +18,12 @@ local function GetPepperSprayStrength(ply)
         blindAlpha = Lerp(blindProgress, math.max(lingeringAlpha, 80), 255)
     end
 
-    local organismBlindAlpha = 0
-    if istable(organism) and organism.blindness ~= nil then
-        local blindValue = tonumber(organism.blindness) or 1
-        if blindValue <= 0.25 then
-            organismBlindAlpha = 230
-        else
-            organismBlindAlpha = math.Clamp(blindValue, 0.4, 1) * 255
-        end
-    end
-
     local recoverAlpha = 0
     if recovStart > 0 and now - recovStart < 5 then
         recoverAlpha = (1 - math.Clamp((now - recovStart) / 5, 0, 1)) * 180
     end
 
-    local targetAlpha = math.max(lingeringAlpha, blindAlpha, organismBlindAlpha, recoverAlpha)
+    local targetAlpha = math.max(lingeringAlpha, blindAlpha, recoverAlpha)
     return math.Clamp(targetAlpha / 255, 0, 1)
 end
 

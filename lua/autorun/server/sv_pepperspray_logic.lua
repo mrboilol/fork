@@ -53,16 +53,13 @@ hook.Add("Org Think", "PepperSprayRegression", function(ply, org, dt)
         local endTime = CurTime() + blindDuration
         ply:SetNWFloat("PS_BlindEndTime", endTime)
         ply:SetNWFloat("PS_BlindStartTime", CurTime())
-        org.blindness = 0.1
     end
     if blindEnd > 0 and CurTime() >= blindEnd then
-        org.blindness = nil
         ply:SetNWFloat("PS_BlindEndTime", 0)
         ply:SetNWFloat("PS_BlindStartTime", 0)
         ply:SetNWFloat("PS_RecoveryStart", CurTime())
     end
     if blindEnd > 0 and CurTime() < blindEnd then
-        org.blindness = 0.1
     end
     local recovStart = ply:GetNWFloat("PS_RecoveryStart", 0)
     if recovStart > 0 and CurTime() - recovStart >= 5 then
@@ -116,9 +113,6 @@ local function ResetPepperSpray(ply)
     ply:SetNWFloat("PS_RecoveryStart", 0)
     ply:SetNWFloat("PS_LingeringTint", 0)
     ply.PS_NextPainTick = 0
-    if ply.organism then
-        ply.organism.blindness = nil
-    end
 end
 hook.Add("PlayerDeath", "PepperSprayResetOnDeath", ResetPepperSpray)
 hook.Add("PlayerSpawn", "PepperSprayResetOnSpawn", ResetPepperSpray)

@@ -974,18 +974,27 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	local debugEyes = debug_destroy_eyes:GetInt()
-	if debugEyes == 1 or debugEyes == 3 then org.eyeL = 1 end
-	if debugEyes == 2 or debugEyes == 3 then org.eyeR = 1 end
+	if debugEyes ~= (org.debugEyesMode or 0) then
+		if debugEyes == 1 or debugEyes == 3 then
+			org.eyeL = 1
+			org.eyeBlindLUntil = CurTime() + 12
+		end
+		if debugEyes == 2 or debugEyes == 3 then
+			org.eyeR = 1
+			org.eyeBlindRUntil = CurTime() + 12
+		end
+		org.debugEyesMode = debugEyes
+	end
 
-	local eyeL = org.eyeL or 0
-	local eyeR = org.eyeR or 0
-	if eyeL < 1 and eyeR < 1 then
+	local leftEyeBlind = (org.eyeBlindLUntil or 0) > CurTime()
+	local rightEyeBlind = (org.eyeBlindRUntil or 0) > CurTime()
+	if not leftEyeBlind and not rightEyeBlind then
 		org.blindness = nil
-	elseif eyeL >= 1 and eyeR < 1 then
+	elseif leftEyeBlind and not rightEyeBlind then
 		org.blindness = 2
-	elseif eyeR >= 1 and eyeL < 1 then
+	elseif rightEyeBlind and not leftEyeBlind then
 		org.blindness = 1
-	elseif eyeL >= 1 and eyeR >= 1 then
+	else
 		org.blindness = 0
 	end
 
