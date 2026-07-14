@@ -614,15 +614,15 @@ function SWEP:FireBullet()
 
 	local primary = self.Primary
 
-	-- Keep the transformed trace for effects/debugging only.  The shot itself
-	-- follows the real muzzle attachment position and angle below.
-	local tr = self:GetTrace(true)
+	-- Spawn at the real muzzle attachment, but follow the weapon's calibrated
+	-- muzzle trajectory. Model attachment angles can point a few units low.
+	local tr, _, trajectoryAng = self:GetTrace(true)
 
 	if isply then
 		owner:LagCompensation(false)
 	end
 
-	local dir = ang:Forward()
+	local dir = (trajectoryAng or ang):Forward()
 
     local numbullet = ammotype.NumBullet or 1
 
