@@ -1155,11 +1155,16 @@ function MODE:SubModes()
 	return modes
 end
 
-function MODE:GetLootTable()
-	if self.Type == "standard" or self.Type == "soe" then
-		local _, lootCategory = hg.WeightedRandomSelect(self.MixedLootTable)
-		return lootCategory
-	end
+local function GetHomicideTraitorCount(player_count)
+        local traitors_needed = 1
+
+        if player_count > 20 then
+                traitors_needed = 3
+        elseif player_count > 10 then
+                traitors_needed = 2
+        end
+
+        return math.max(0, math.min(player_count - 1, traitors_needed))
 end
 
 function MODE:Intermission()
@@ -1195,8 +1200,8 @@ function MODE:Intermission()
 	MODE.TraitorFrequency = nil
 	MODE.TraitorWord = MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
 	MODE.TraitorWordSecond = MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
-	
-	local traitors_needed = 1 + math.floor(player_count / 15)
+
+        local traitors_needed = GetHomicideTraitorCount(player_count)
 
 	MODE.TraitorExpectedAmt = traitors_needed
 	
