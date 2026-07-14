@@ -494,7 +494,8 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local old_headtrauma = org.headtrauma or 0
 	local sharpHead = IsSharpHeadDamage(dmgInfo)
 	local concussionMul = GetHeadConcussionScale(dmgInfo)
-	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
+	-- The jaw is vulnerable, but it should not be as brittle as the old head setup.
+	local result, vecrand = damageBone(org, 0.35, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.jaw - oldDmg) * 3, "Jaw bone damage harm")
 
@@ -514,8 +515,18 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	org.shock = org.shock + dmg * 3
 
-	if dmg * concussionMul > 0.2 then
-		if org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner,1 + dmg) end) end
+
+	-- A clean blunt jaw shot is the reliable knockout route, not an automatic stun
+	-- from every small hit.  Bone damage contributes, but a solid impact is still
+	-- required before the chance becomes high.
+	local jawImpact = dmg * concussionMul
+	if isCrush(dmgInfo) and jawImpact >= 0.35 then
+		local knockoutChance = math.Clamp(0.20 + jawImpact * 0.12 + jawDelta * 0.50, 0.25, 0.70)
+		if org.isPly and math.random() < knockoutChance then
+			timer.Simple(0, function()
+				if IsValid(org.owner) then hg.LightStunPlayer(org.owner, 1 + math.min(jawImpact, 2)) end
+			end)
+		end
 	end
 
 	-- teeth: break one tooth on any jaw damage
@@ -557,7 +568,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local old_headtrauma = org.headtrauma or 0
 	local sharpHead = IsSharpHeadDamage(dmgInfo)
 	local concussionMul = GetHeadConcussionScale(dmgInfo)
-	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+	-- The cranium should protect the brain from ordinary blows.  It remains
+	-- breakable under sustained or very heavy force, but no longer fractures from
+	-- a single typical punch.
+	local result, vecrand = damageBone(org, 0.75, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 
@@ -576,8 +590,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
+	local skullDelta = math.max((org.skull or 0) - oldDmg, 0)
 	org.shock = org.shock + dmg * (sharpHead and 1.2 or 3)
-		org.concussion = math.min((org.concussion or 0) + dmg * 6 * concussionMul, 10)
+	org.concussion = math.min((org.concussion or 0) + dmg * 2.25 * concussionMul, 10)
 
 	-- Chance to induce vomiting from head trauma
 	if org.isPly and math.random() < dmg * 0.3 * concussionMul then
@@ -585,10 +600,13 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.vomitTypeHeadTrauma = math.random(8) == 1
 	end
 
-	local rnd = (not sharpHead and math.random(10) == 1) or dmgInfo:IsDamageType(DMG_CRUSH)
-	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 * concussionMul or 0)
-
-	org.brain = math.min(org.brain + (rnd and dmg * 0.05 * concussionMul or 0), 1)
+	-- Brain trauma from a protected skull is an exceptional consequence of a
+	-- heavy blow, rather than the default result of any head contact.
+	local skullImpact = dmg * concussionMul
+	local brainTraumaChance = math.Clamp((skullImpact - 0.75) * 0.12 + skullDelta * 0.45, 0, 0.35)
+	local rnd = isCrush(dmgInfo) and skullImpact >= 0.75 and math.random() < brainTraumaChance
+	org.consciousness = math.Approach(org.consciousness, 0, rnd and skullImpact * 0.75 or 0)
+	org.brain = math.min(org.brain + (rnd and skullImpact * 0.02 or 0), 1)
 
 	if math.random(1, 4) == 1 then
 		local eye_dmg = dmg * math.Rand(0.8, 1.5)
@@ -599,7 +617,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if (org.skull - oldDmg) > 0.6 then
+	if skullDelta > 0.85 then
 		org.brain = math.min(org.brain + 0.1, 1)
 	end
 
@@ -619,10 +637,13 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end)
 	end
 
-	if dmg * concussionMul > 0.4 then
-		if org.isPly then
+	-- Skull knockouts are possible, but only from a genuinely heavy blunt hit
+	-- and are less likely than a comparable jaw strike.
+	if isCrush(dmgInfo) and skullImpact >= 0.9 then
+		local knockoutChance = math.Clamp(0.10 + (skullImpact - 0.9) * 0.14 + skullDelta * 0.45, 0.10, 0.50)
+		if org.isPly and math.random() < knockoutChance then
 			timer.Simple(0, function()
-				hg.LightStunPlayer(org.owner,1 + dmg)
+				if IsValid(org.owner) then hg.LightStunPlayer(org.owner, 1 + math.min(skullImpact, 2)) end
 			end)
 		end
 	end
@@ -641,8 +662,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	
 	org.shock = org.shock + (sharpHead and math.min(dmg * 8, 28) or (dmg > 1 and 45 or dmg * 9))
 
-	if org.skull > 0.6 then
-		if oldDmg <= 0.6 then
+	if org.skull > 0.85 then
+		if oldDmg <= 0.85 then
 			playSkullFractureSound(org.owner)
 			if org.isPly then org.owner:Notify(huyasd["skull"],true,"skull",4) end
 
@@ -661,15 +682,15 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 				end
 			end
 		end
-		if oldDmg > 0.6 and math.random(3) == 1 then
+		if oldDmg > 0.85 and math.random(3) == 1 then
 			PlayRepeatSkullFractureSound(org)
 		end
 
-		if oldDmg <= 0.6 or (dmg >= 0.4 and math.random(3) == 1) then
+		if oldDmg <= 0.85 or (dmg >= 0.4 and math.random(3) == 1) then
 			SendSevereSkullGore(org, dmgInfo)
 		end
 
-		if dir and hg_bloodimpacts:GetBool() and (oldDmg <= 0.6 or math.random() < 0.75) then
+		if dir and hg_bloodimpacts:GetBool() and (oldDmg <= 0.85 or math.random() < 0.75) then
 			local dmgPos = dmgInfo:GetDamagePosition()
 			local dirNorm = dir:GetNormalized()
 			-- Main blood spray
@@ -680,7 +701,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 			net.WriteInt(2, 8)
 			net.Broadcast()
 			-- Additional spray when skull just broke (oldDmg != 1)
-			if oldDmg <= 0.6 and oldDmg ~= 1 then
+			if oldDmg <= 0.85 and oldDmg ~= 1 then
 				for i = 1, 3 do
 					net.Start("hg_bloodimpact")
 					net.WriteVector(dmgPos + VectorRand(-2, 2))

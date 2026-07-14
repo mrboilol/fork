@@ -35,7 +35,9 @@ local function is_despair_enabled()
 end
 
 local function is_enabled()
-	return cvEnabled:GetBool() and is_despair_enabled()
+	-- Despair is an optional downstream mood system.  PTSD must keep tracking
+	-- trauma and feeding the normal panic path even when despair is disabled.
+	return cvEnabled:GetBool()
 end
 
 local function effects_enabled()
@@ -427,7 +429,7 @@ local function update_flashback(owner, org, state)
 end
 
 local function feed_despair(owner, org, state, timeValue)
-	if not org or not cvDespairFeed:GetBool() or not effects_enabled() then return end
+	if not org or not cvDespairFeed:GetBool() or not is_despair_enabled() or not effects_enabled() then return end
 	if org.otrub then return end
 	if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then return end
 
@@ -484,7 +486,7 @@ local function update_corpse_witness(owner, org, state)
 end
 
 local function absorb_despair(owner, org, state, timeValue)
-	if not org or not effects_enabled() then return end
+	if not org or not is_despair_enabled() or not effects_enabled() then return end
 	if org.otrub then return end
 	if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then return end
 

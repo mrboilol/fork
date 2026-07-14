@@ -1014,6 +1014,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
 	end
 	org._bulletImpactHitgroup = nil
+	org._spineArteryTraceDmgInfo = nil
 
 	if attacker:IsPlayer() then
 		ent:SetPhysicsAttacker(attacker, 15)

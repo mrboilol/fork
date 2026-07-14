@@ -464,6 +464,10 @@ local arteryHitgroups = {
 hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
+	-- The spine-artery debug box is a non-injuring trace marker.  A shot that
+	-- reached it must not turn into a separate carotid hit farther along the
+	-- same damage trace.
+	if artery == "arteria" and org._spineArteryTraceDmgInfo == dmgInfo then return 0 end
 
 	local requiredHitgroup = arteryHitgroups[artery]
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
@@ -550,7 +554,10 @@ input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) r
 input_list.larmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("larmartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.rlegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rlegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
 input_list.llegartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("llegartery", org, dmg, dmgInfo, boneindex, dir, hit) end
-input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return 0 end--hitArtery("spineartery", org, dmg, dmgInfo, boneindex, dir, hit) end
+input_list.spineartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit)
+	org._spineArteryTraceDmgInfo = dmgInfo
+	return 0
+end -- Intentionally not an active artery wound; blocks follow-on carotid routing.
 input_list.eyeL = function(org, bone, dmg, dmgInfo)
 	local oldDmg = org.eyeL or 0
 	dmg = dmg * 3

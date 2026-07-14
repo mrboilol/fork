@@ -355,7 +355,7 @@ function ENT:Explode()
 	local entsCount = 0
 	local processedEnts = 0
 	for i, enta in ipairs(ents.FindInSphere(selfPos, disorientation_dis)) do
-		if processedEnts >= nearbyEntityCap then break end
+		if processedEnts >= GRENADE_NEARBY_ENTITY_CAP then break end
 		if not IsValid(enta) then continue end
 		processedEnts = processedEnts + 1
 

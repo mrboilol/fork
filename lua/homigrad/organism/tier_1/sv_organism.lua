@@ -77,9 +77,8 @@ local panicattack_damage_scale = 0.006
 local panicattack_witness_radius = 850
 local panicattack_death_radius = 900
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
-local seizure_duration = 90
-local seizure_brain_damage_start = 80
-local seizure_brain_damage_final = 0.99
+local seizure_duration = 15
+local seizure_end_shock = 20
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
 local seizure_leg_buckle = 46
@@ -1137,23 +1136,17 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if org.seizureActive then
 		local time = CurTime()
-		local seizureStart = org.seizureStart or time
 		local seizureEnd = org.seizureEnd or time
 
 		org.needfake = true
 		owner.fakecd = math.max(owner.fakecd or 0, seizureEnd)
 
 		if time >= seizureEnd then
-			org.brain = math.max(org.brain or 0, seizure_brain_damage_final)
+			org.shock = math.max(org.shock or 0, seizure_end_shock)
 			org.consciousness = 0
 			org.needotrub = true
 			stop_seizure(owner, org)
 		else
-			if time >= seizureStart + seizure_brain_damage_start then
-				local frac = math.Clamp((time - (seizureStart + seizure_brain_damage_start)) / math.max(seizure_duration - seizure_brain_damage_start, 0.001), 0, 1)
-				org.brain = math.max(org.brain or 0, seizure_brain_damage_final * frac)
-			end
-
 			local rag = owner.FakeRagdoll
 			if IsValid(rag) then
 				apply_seizure_pose(rag, org, time)

@@ -552,9 +552,16 @@ hook.Add("NetworkEntityCreated", "HG_GiveRenderOverride", function(ragdoll)
 					self:DrawModel()
 					return
 				end
-				if not self:GetNWString("PlayerName") then return end
+				if not self:GetNWString("PlayerName") then
+					self:DrawModel()
+					return
+				end
 				local ply = self:GetNWEntity("ply")
 				local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
+				if not ply.shouldTransmit then
+					self:DrawModel()
+					return
+				end
 				
 				hg.renderOverride(ply, self, flags)
 			end
@@ -607,6 +614,10 @@ hook.Add("RagdollEntityCreated", "RagdollFinder", function(ply, ent, key)
 				return
 			end
 			local ply = (IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply.FakeRagdoll == self) and ply or self
+			if not ply.shouldTransmit then
+				self:DrawModel()
+				return
+			end
 			
 			hg.renderOverride(ply, self, flags)
 		end

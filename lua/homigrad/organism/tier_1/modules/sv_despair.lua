@@ -4,10 +4,16 @@ if hg and hg.despair_server_builtin then return end
 hg.despair_server_builtin = true
 
 local hg_despair_override = CreateConVar("hg_despair_override", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Global despair override (0-1)", 0, 1)
-local hg_despairsystem = CreateConVar("hg_despairsystem", 1, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Despair/PTSD system mode (0 = giving-up only: despair, PTSD, and panic disabled; 1 = despair with PTSD pressure enabled)", 0, 1)
+local hg_despairsystem = CreateConVar("hg_despairsystem", 1, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Enable the despair mood system (0 = despair disabled; PTSD, panic, and giving up remain enabled)", 0, 1)
+local DESPAIR_GAIN_MULTIPLIER = 1.6
+local DESPAIR_DECAY_MULTIPLIER = 2
 
 local function ptsd_system_enabled()
 	return not (hg and hg.PTSD and hg.PTSD.IsEnabled) or hg.PTSD.IsEnabled()
+end
+
+local function despair_system_enabled()
+	return hg_despairsystem:GetInt() ~= 0
 end
 
 local function get_despair_org(ent)
@@ -107,12 +113,12 @@ hook.Add("HomigradDamage", "hg_despair_damage_gain", function(ply, dmgInfo)
 	local org = get_despair_org(ply)
 	if not org then return end
 	if org.otrub then return end
-	if hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled() then return end
+	if not despair_system_enabled() or not ptsd_system_enabled() then return end
 
 	local dmg = (dmgInfo and dmgInfo.GetDamage and dmgInfo:GetDamage()) or 0
 	if dmg <= 0 then return end
 
-	local add = Clamp(dmg / 240, 0.01, 0.18)
+	local add = Clamp(dmg / 240, 0.01, 0.18) * DESPAIR_GAIN_MULTIPLIER
 	if dmgInfo and dmgInfo.IsDamageType and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_BURN + DMG_SLASH + DMG_CLUB) then
 		add = add * 1.2
 	end
@@ -141,12 +147,14 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	local time = CurTime()
-	local simpleMode = hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled()
+	local despairDisabled = not despair_system_enabled()
+	local simpleMode = not ptsd_system_enabled()
 	local ptsd = hg.PTSD and hg.PTSD.GetState and hg.PTSD.GetState(owner, org)
 	local ptsdPanicRisk = ptsd and ptsd.panicRisk or (org.ptsdPanicRisk or 0)
 
-	-- In simple mode despair and panic are fully disabled
-	if simpleMode then
+	-- This convar only controls the lasting despair meter.  PTSD and the
+	-- organism-owned panic system continue to run independently.
+	if despairDisabled then
 		org.despair = 0
 	end
 
@@ -155,7 +163,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	local inDanger = is_in_danger(org)
 	if not org.givingUp then
 		-- Normal mode: direct give-up when despairing, near death, awake, and not panicking
-		if not simpleMode and not org.panicattackActive and inDanger and is_near_death(org) and org.despair >= 0.9 then
+		if not simpleMode and not despairDisabled and not org.panicattackActive and inDanger and is_near_death(org) and org.despair >= 0.9 then
 			org._giveUpDirectCheckTime = org._giveUpDirectCheckTime or 0
 			if time > org._giveUpDirectCheckTime then
 				org._giveUpDirectCheckTime = time + 1
@@ -170,7 +178,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 
 		-- Simple mode: fear-driven give-up path (no despair/panic)
-		if simpleMode and inDanger and is_near_death(org) then
+		if (simpleMode or despairDisabled) and inDanger and is_near_death(org) then
 			org._giveUpCheckTime = org._giveUpCheckTime or 0
 			if time > org._giveUpCheckTime then
 				org._giveUpCheckTime = time + 1
@@ -196,7 +204,9 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			-- Giving up takes precedence over panic.
 			org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue * 0.75)
 			org.panicattack = math.Approach(org.panicattack or 0, 0, timeValue * 0.75)
-			org.despair = math.max(org.despair, 0.25)
+			if not despairDisabled then
+				org.despair = math.max(org.despair, 0.25)
+			end
 
 			-- Giving up blunts panic/adrenaline without making the outcome deterministic.
 			org.fear = math.Approach(org.fear or 0, 0, timeValue * 1.5)
@@ -226,11 +236,15 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 		end
 	end
 
-	-- Simple mode: despair and panic are disabled, only giving up remains
+	-- If PTSD itself is disabled, only the independent giving-up path remains.
 	if simpleMode then
 		org.despair = 0
 		return
 	end
+
+	-- Keep PTSD/panic active while the despair convar is off, but do not run any
+	-- of the despair gain, lock, or vital-risk code below.
+	if despairDisabled then return end
 
 	-- Apply convar override if set
 	local convarValue = hg_despair_override:GetFloat()
@@ -253,7 +267,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	if currentDespair > lastDespair then
 		-- Large events get a brief pause before recovery, rather than the old long lock.
 		local gained = currentDespair - lastDespair
-		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + 4 + (gained * 12))
+		org._despairLockUntil = math.max(org._despairLockUntil or 0, CurTime() + 2 + (gained * 8))
 	end
 	local isLocked = CurTime() < (org._despairLockUntil or 0)
 	local stableAtFullDespair = currentDespair >= 0.995 and not is_in_danger(org)
@@ -272,8 +286,8 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 	-- Once the player has left the traumatic area, or the situation is plainly
 	-- under control, do not let an old witness lock keep despair pinned.
-	if safeRecovery and timeSinceGain > 8 and (org._despairLockUntil or 0) > CurTime() + 3 then
-		org._despairLockUntil = CurTime() + 3
+	if safeRecovery and timeSinceGain > 5 and (org._despairLockUntil or 0) > CurTime() + 2 then
+		org._despairLockUntil = CurTime() + 2
 		isLocked = true
 	end
 
@@ -287,7 +301,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			despairDecay = despairDecay * 3
 		end
 		-- Slow recovery only during the short period directly after a stressor.
-		if timeSinceGain < 15 then
+		if timeSinceGain < 8 then
 			if org.despair > 0.7 then
 				despairDecay = timeValue / 240
 			elseif org.despair > 0.5 then
@@ -301,16 +315,17 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 			despairDecay = timeValue / 105
 		end
 		-- Once no new stress has arrived, recovery accelerates noticeably.
-		if timeSinceGain > 25 then
-			despairDecay = despairDecay * math.min(1 + (timeSinceGain - 25) / 35, 2.5)
+		if timeSinceGain > 14 then
+			despairDecay = despairDecay * math.min(1 + (timeSinceGain - 14) / 25, 2.5)
 		end
-		if safeRecovery and timeSinceGain > 15 then
+		if safeRecovery and timeSinceGain > 8 then
 			despairDecay = despairDecay * (awayFromTrauma and 1.75 or 1.5)
 		end
 		if stableAtFullDespair and timeSinceGain > 8 then
 			despairDecay = max(despairDecay, timeValue / 55)
 		end
 	end
+	despairDecay = despairDecay * DESPAIR_DECAY_MULTIPLIER
 	org.despair = math.Approach(org.despair, 0, despairDecay)
 
 	-- Opiates (analgesia) help reduce despair
@@ -526,6 +541,7 @@ hook.Add("Org Think", "hg_despair_think", function(owner, org, timeValue)
 	end
 
 	if add > 0 then
+		add = add * DESPAIR_GAIN_MULTIPLIER
 		-- Analgesia softens how strongly stressful injuries settle into the lasting
 		-- despair mood. It does not erase the event or make the player fearless.
 		local analgesiaProtection = Clamp(((org.analgesia or 0) + (org.analgesiaAdd or 0)) / 3, 0, 0.5)
@@ -684,7 +700,7 @@ end
 
 hook.Add("HG_HeadExploded", "hg_despair_head_explosion", function(rag, victim)
 	if not IsValid(rag) then return end
-	if hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled() then return end
+	if not despair_system_enabled() or not ptsd_system_enabled() then return end
 
 	local pos = rag:WorldSpaceCenter()
 	local now = CurTime()
@@ -731,7 +747,7 @@ end)
 
 hook.Add("RagdollDeath", "hg_despair_death_witness", function(victim, rag)
 	if not IsValid(rag) then return end
-	if hg_despairsystem:GetInt() == 0 or not ptsd_system_enabled() then return end
+	if not despair_system_enabled() or not ptsd_system_enabled() then return end
 
 	local pos = rag:WorldSpaceCenter()
 	local now = CurTime()

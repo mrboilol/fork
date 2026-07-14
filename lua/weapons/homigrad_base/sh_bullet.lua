@@ -606,7 +606,9 @@ function SWEP:FireBullet()
 	end
 
 	self:WorldModel_Transform()
-	local tr, pos, ang = self:GetTrace(true)
+	-- Keep the projectile origin at the real muzzle attachment.  GetTrace()
+	-- returns a transformed hitpos origin for sights/debugging, not the muzzle.
+	local tr = self:GetTrace(true)
 	local aimTrace = tr
 
 	-- The muzzle transform is animated and can be visibly offset from the

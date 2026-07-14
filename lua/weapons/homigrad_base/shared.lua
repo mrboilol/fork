@@ -2593,6 +2593,11 @@ function SWEP:GetAdditionalValues()
 		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5
 		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
+		-- Recoil used to kick the model backward with only a sideways recovery sway;
+		-- give the muzzle a real upward displacement as well, proportional to the
+		-- same shot impulse.  This is separate from the pitch kick so its vertical
+		-- offset remains visible on weapons with short barrels or low pitch recoil.
+		self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 2.25
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
 		
 		self.AdditionalPos2:Add(VectorRand(-0.07, 0.07) * animpos3 * shit2)
