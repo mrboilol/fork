@@ -488,6 +488,8 @@ function zb.StartRTV(time)
                 table.insert(finalmaps, selectedMap)
                 finalMapSet[selectedMap] = true
                 table.remove(filteredFallback, selectedIndex)
+            else
+                break
             end
         end
     end
