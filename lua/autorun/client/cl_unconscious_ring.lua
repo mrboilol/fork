@@ -396,7 +396,7 @@ local Color = Color
 local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 
-local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse, color, ringAlpha)
+local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse, ecgState, color, ringAlpha)
     local time = CurTime()
     if state.lastUpdate == 0 then state.lastUpdate = time end
     local dt = time - state.lastUpdate
@@ -409,13 +409,7 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
     local oldSweepPos = state.sweepPos
     state.sweepPos = (state.sweepPos + dt * sweepSpeed) % width
 
-    -- Calculate morph factor for high heartbeat & low pulse (looks like a sinewave)
-    local hbFactor = math.Clamp((heartbeat - 90) / 60, 0, 1)
-    local pulseFactor = math.Clamp((65 - pulse) / 35, 0, 1)
-    local sineMorphFactor = hbFactor * pulseFactor
-
-    -- Clean ECG waveform (P-QRS-T complex) from oldring
-    local function getH(phase)
+    local function getSinusH(phase)
         phase = phase % 1
         local h = 0
 
@@ -437,9 +431,45 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
             h = h + math.sin((phase - 0.45) / 0.2 * math.pi) * 0.22
         end
 
-        if sineMorphFactor > 0 then
-            local sineH = math.sin(phase * 2 * math.pi) * 0.35
-            h = Lerp(sineMorphFactor, h, sineH)
+        return h
+    end
+
+    local function getWideComplexH(phase)
+        phase = phase % 1
+        if phase < 0.08 or phase > 0.58 then return 0 end
+
+        local p = (phase - 0.08) / 0.5
+        if p < 0.58 then
+            return math.sin(p / 0.58 * math.pi) * 0.85
+        end
+        return -math.sin((p - 0.58) / 0.42 * math.pi) * 0.45
+    end
+
+    local function getH(rawPhase)
+        local rhythm = ecgState or "normal_sinus"
+        if rhythm == "asystole" or heartbeat < 1 then return 0 end
+
+        local phase = rawPhase % 1
+        local beatIndex = math.floor(rawPhase)
+        local h
+
+        if rhythm == "terminal_tachycardia" then
+            h = getWideComplexH(phase)
+        elseif rhythm == "extreme_tachycardia" and beatIndex % 5 == 0 then
+            h = getWideComplexH(phase)
+        else
+            h = getSinusH(phase)
+            if rhythm == "compressed_tachycardia" then
+                -- At this rate the next P wave starts before the prior T wave
+                -- has fully settled, visually compressing the P-QRS-T complex.
+                if phase > 0.7 and phase < 0.92 then
+                    h = h + math.sin((phase - 0.7) / 0.22 * math.pi) * 0.1
+                end
+            end
+        end
+
+        if rhythm == "pea" then
+            h = getSinusH(phase) * 0.18
         end
 
         return h
@@ -552,8 +582,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 	local deathStatePendingEnd = org.deathStatePendingEnd and org.deathStatePendingEnd > 0 and org.deathStatePendingEnd or nil
 	local deathStateFadeStart = org.deathStateFadeStart and org.deathStateFadeStart > 0 and org.deathStateFadeStart or nil
 	local hideDyingRing = org.incapacitated and scavDyingMode == 0 and (deathStateEnd or (deathStateFadeStart and CurTime() >= deathStateFadeStart))
-    local heartbeat = org.heartbeat or 70
+    local heartbeat = org.heartbeat or 75
     local pulse = org.pulse or 70
+    local ecgState = org.ecgState or "normal_sinus"
     local brain = org.brain or 0
     local bloodpressure = org.bloodpressure or 93
     local consciousness = org.consciousness or 0
@@ -625,8 +656,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4)
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     local fibrillating = heartbeat > 250
+    local isElectricalArrest = org.heartstop or ecgState == "pea" or ecgState == "asystole"
 
-    local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical)
+    local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest)
     
 	if isUnconscious and not hideDyingRing then
         local currentShock = org.shock or 0
@@ -676,11 +708,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical) then
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest) then
         UpdateFibrillationSound()
         return
     end
-    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring or fibrillating))
+    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring or fibrillating or isElectricalArrest))
 
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
     
@@ -735,12 +767,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             else
                 UpdateRingAudio(heartbeat, otrubECGAlpha, org, admiring)
-                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ringColor, otrubECGAlpha)
+                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgState, ringColor, otrubECGAlpha)
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
             local ecgColor = isCritical and Color(255, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
-            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgColor, otrubECGAlpha)
+            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgState, ecgColor, otrubECGAlpha)
             
             -- Add consciousness meter ring for low opacity ECG when consciousness is low or recently dropped
             if recentSuddenDrop or consciousness < 0.6 then
@@ -780,8 +812,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
 
             local target_org = g_PulseCheckTarget.organism or {}
-            local target_heartbeat = target_org.heartbeat or 70
+            local target_heartbeat = target_org.heartbeat or 75
             local target_pulse = target_org.pulse or 70
+            local target_ecgState = target_org.ecgState or "normal_sinus"
             local target_bp = target_org.bloodpressure or 93
             local target_brain = target_org.brain or 0
             local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4)
@@ -821,7 +854,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 end
             end
 
-            DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, Color(255, 255, 255, 255), ecgAlphaPulseCheck)
+            DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, target_ecgState, Color(255, 255, 255, 255), ecgAlphaPulseCheck)
 
             local displayText = ""
             if g_PulseCheckData then

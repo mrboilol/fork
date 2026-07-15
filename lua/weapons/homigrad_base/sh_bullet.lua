@@ -792,7 +792,10 @@ function SWEP:FireBullet()
 	bullet.Num = 1
 	-- Single-projectile weapons already express inaccuracy through the animated
 	-- muzzle/debug trajectory. Do not add a second hidden random cone afterward.
+	-- FIRE_BULLETS_FIRST_SHOT_ACCURATE only affects the Lua-bullet path; physical
+	-- bullets apply Spread directly, so clear it here for both implementations.
 	if numbullet == 1 then
+		bullet.Spread = vector_origin
 		bullet.Flags = bit.bor(bullet.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)
 	end
 	

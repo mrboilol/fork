@@ -8,6 +8,8 @@ function hg.organism.ZeroVitals(org)
 	org.heartstop = true
 	org.heartbeat = 0
 	org.pulse = 0
+	org.ecgState = "asystole"
+	org.cardiacOutput = 0
 	org.bloodpressure = 0
 	org.systolic = 0
 	org.diastolic = 0
@@ -281,6 +283,15 @@ local function send_organism(org, ply)
 	sendtable.shock = org.shock
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
+	sendtable.heartstop = org.heartstop
+	sendtable.ecgState = org.ecgState
+	sendtable.cardiacOutput = org.cardiacOutput
+	sendtable.hemorrhageCompensation = org.hemorrhageCompensation
+	sendtable.compensationPulseMultiplier = org.compensationPulseMultiplier
+	sendtable.compensationHeartRateTarget = org.compensationHeartRateTarget
+	sendtable.hypovolemia = org.hypovolemia
+	sendtable.hypovolemicShock = org.hypovolemicShock
+	sendtable.bloodO2Cap = org.bloodO2Cap
 	sendtable.bloodpressure = org.bloodpressure
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
@@ -371,6 +382,15 @@ local function send_bareinfo(org)
 	sendtable.pulse = org.pulse
 	sendtable.blood = org.blood
 	sendtable.heartbeat = org.heartbeat
+	sendtable.heartstop = org.heartstop
+	sendtable.ecgState = org.ecgState
+	sendtable.cardiacOutput = org.cardiacOutput
+	sendtable.hemorrhageCompensation = org.hemorrhageCompensation
+	sendtable.compensationPulseMultiplier = org.compensationPulseMultiplier
+	sendtable.compensationHeartRateTarget = org.compensationHeartRateTarget
+	sendtable.hypovolemia = org.hypovolemia
+	sendtable.hypovolemicShock = org.hypovolemicShock
+	sendtable.bloodO2Cap = org.bloodO2Cap
 	sendtable.bloodpressure = org.bloodpressure
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
@@ -1509,6 +1529,22 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if !org.alive then
 		org.lungsfunction = false
 		hg.organism.ZeroVitals(org)
+	end
+
+	-- A heartstop can be triggered by systems that run after the pulse module
+	-- (for example panic). Normalize the replicated state before clients draw
+	-- the ECG or organism stats so the rhythm can never lag behind heartstop.
+	if hg.organism.GetECGState then
+		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, org.heartstop)
+	end
+	if org.heartstop then
+		org.cardiacArrestStart = org.cardiacArrestStart or CurTime()
+		org.cardiacArrestO2Start = math.Clamp(org.cardiacArrestO2Start or (org.o2 and org.o2[1] or 0), 0, 6)
+		org.pulse = 0
+		org.cardiacOutput = 0
+		org.bloodpressure = 0
+		org.systolic = 0
+		org.diastolic = 0
 	end
 
 	time = CurTime()

@@ -3,13 +3,63 @@ local min, max, Round, halfValue2 = math.min, math.max, math.Round, util.halfVal
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
+local BloodBPM = {
+	{5000, 75},
+	{4500, 95},
+	{4200, 110},
+	{3800, 135},
+	{3400, 165},
+	{3000, 205},
+	{2600, 250},
+	{2300, 280},
+	{2000, 300},
+}
+
+local cardiacArrestBlood = 2000
+local terminalHeartRate = 300
+local peaDuration = 6
+
+local function interpolateCurve(curve, value)
+	value = tonumber(value) or curve[1][1]
+	if value >= curve[1][1] then return curve[1][2] end
+
+	for i = 1, #curve - 1 do
+		local high = curve[i]
+		local low = curve[i + 1]
+		if value <= high[1] and value >= low[1] then
+			local fraction = math.Clamp((high[1] - value) / (high[1] - low[1]), 0, 1)
+			return Lerp(fraction, high[2], low[2])
+		end
+	end
+
+	return curve[#curve][2]
+end
+
+function hg.organism.GetECGState(heartbeat, heartstop)
+	heartbeat = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
+	if heartstop then return heartbeat < 1 and "asystole" or "pea" end
+	if heartbeat < 1 then return "asystole" end
+	if heartbeat < 60 then return "bradycardia" end
+	if heartbeat <= 100 then return "normal_sinus" end
+	if heartbeat <= 150 then return "sinus_tachycardia" end
+	if heartbeat <= 200 then return "compressed_tachycardia" end
+	if heartbeat < 280 then return "extreme_tachycardia" end
+	return "terminal_tachycardia"
+end
+
 
 
 module[1] = function(org)
 	org.heart = 0
 	org.heartstop = false
 	org.pulse = 70 -- that's the blood pressure
-	org.heartbeat = 70
+	org.heartbeat = 75
+	org.ecgState = "normal_sinus"
+	org.cardiacOutput = 1
+	org.compensationPulseMultiplier = 1
+	org.compensationHeartRateTarget = 75
+	org.cardiacArrestStart = nil
+	org.cardiacArrestO2Start = nil
 		org.bloodpressure = 93
 	org.systolic = 120
 	org.diastolic = 80
@@ -51,12 +101,6 @@ module[2] = function(owner, org, timeValue)
 		return
 	end
 
-	-- Heart rhythm is handled as an immediate arrest state. Only pulse pressure
-	-- and oxygen are allowed to run down gradually while treatment can intervene.
-	if org.heartstop then
-		org.heartbeat = 0
-	end
-
 	local pulse = org.heartstop and 0 or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
 	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
 	pulse = org.alive and pulse or 0
@@ -67,11 +111,14 @@ module[2] = function(owner, org, timeValue)
 	local bloodNow = org.blood or 5000
 	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
 	local hypovolemicShock = math.Clamp(org.hypovolemicShock or 0, 0, 1)
+	local compensationPulseMultiplier = math.Clamp(1 - hemorrhageCompensation * 0.35 - hypovolemicShock * 0.1, 0.45, 1)
+	org.compensationPulseMultiplier = compensationPulseMultiplier
 	-- Blood volume begins weakening effective perfusion at 3500 mL. Keeping
 	-- full perfusion above that point prevents compensation from starting early.
 	local bloodPerfusionK = bloodNow >= 3500 and 1 or math.Remap(math.Clamp(bloodNow, 1000, 3500), 1000, 3500, 0, 1)
 	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
+	pulse = pulse * compensationPulseMultiplier
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
 
 	local bloodCrash = org.blood ~= nil and org.blood < 1500
@@ -108,19 +155,15 @@ module[2] = function(owner, org, timeValue)
 		org._despairLastGainedTime = CurTime()
 	end
 
-	-- Old Z-City compensation: when effective pulse pressure falls below 70,
-	-- heartbeat races hard to keep perfusion moving.
+	-- Keep the existing pressure compensation, but let the configured blood
+	-- curve own the baseline heart-rate response to hemorrhage.
 	local perfusionPulse = org.pulse or 70
 	local compensationRate = perfusionPulse < 70 and 70 + (70 - perfusionPulse) * 4 or perfusionPulse
 	compensationRate = math.Clamp(compensationRate, 45, 300)
-	-- Blood-loss compensation starts at 4000 mL. It becomes severe by 2500 and
-	-- reaches ventricular-fibrillation rates near 300 BPM by 2250. Above 4000,
-	-- blood volume adds no heart-rate boost.
-	local bloodCompensationRate = 70
-	if bloodNow < 2250 then
-		bloodCompensationRate = 300
-	elseif bloodNow < 4000 then
-		bloodCompensationRate = Lerp(math.Clamp((4000 - bloodNow) / 1750, 0, 1), 70, 300)
+	local bloodCompensationRate = interpolateCurve(BloodBPM, math.Clamp(bloodNow, 0, 5000))
+	org.compensationHeartRateTarget = bloodCompensationRate
+	if bloodNow < 4500 then
+		compensationRate = math.min(compensationRate, bloodCompensationRate)
 	end
 
 	local heartbeat = math.max(compensationRate, bloodCompensationRate)
@@ -151,10 +194,8 @@ module[2] = function(owner, org, timeValue)
 	-- should still exist. Do not multiply BPM down into impossible states like
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
 	local survivalK = math.Clamp(k, 0, 1)
-	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, 270)
-	if bloodNow < 4000 then
-		maxCompensatedRate = math.max(maxCompensatedRate, bloodCompensationRate)
-	end
+	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, terminalHeartRate)
+	maxCompensatedRate = math.max(maxCompensatedRate, bloodCompensationRate)
 	if heart < 0.35 or brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
 	end
@@ -172,9 +213,16 @@ module[2] = function(owner, org, timeValue)
 	-- The cardiovascular response accelerates with blood loss. The old fixed
 	-- 2.4 BPM/s rise lagged so far behind active bleeding that the target curve
 	-- was never reached before pressure collapse.
-	local compensationResponse = math.Clamp((4000 - bloodNow) / 1750, 0, 1)
-	local riseRate = Lerp(compensationResponse, 3, 75)
+	local compensationResponse = math.Clamp((5000 - bloodNow) / (5000 - cardiacArrestBlood), 0, 1)
+	local riseRate = Lerp(compensationResponse, 5, 35)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * riseRate or timeValue * 4.5)
+	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
+
+	-- Blood-loss arrest is deterministic: the configured curve must actually
+	-- reach its 300 BPM terminal point at 2000 mL before circulation stops.
+	if not org.heartstop and bloodNow <= cardiacArrestBlood and bloodCompensationRate >= terminalHeartRate and org.heartbeat >= terminalHeartRate then
+		org.heartstop = true
+	end
 
 	-- Track sustained ventricular tachycardia for the probabilistic arrest
 	-- check below. Low pressure/perfusion remains the deterministic flatline.
@@ -186,7 +234,7 @@ module[2] = function(owner, org, timeValue)
 
 	-- Probabilistic heartstop based on heart rate (kept as a softer fallback for
 	-- the 200-300 range where rhythms become dangerous but not yet lethal).
-	if not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time then
+	if bloodNow >= 4500 and (not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time) then
 		org._heart_rate_check_time = CurTime() + 1 -- check every second
 
 		local hb = org.heartbeat
@@ -385,25 +433,9 @@ module[2] = function(owner, org, timeValue)
 	local adrenK = max(1 + org.adrenaline, 1)
 	local adren = org.adrenaline
 
-	if org.pulse < 10 or org.brain >= 0.85 or org.bloodpressure < 25 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
+	local bloodCurveOwnsArrest = bloodNow <= 2300 and (org.heart or 0) < 0.8 and org.brain < 0.85
+	if ((org.pulse < 10 or org.bloodpressure < 25) and not bloodCurveOwnsArrest) or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
-
-	-- Exsanguination: with under ~800 mL of blood there is not enough volume
-	-- left to circulate; the heart goes into pulseless electrical activity.
-	-- This is independent of heart organ damage (you can bleed out with a
-	-- perfectly healthy heart).
-	if (org.blood or 5000) < 800 then org.heartstop = true end
-
-	-- Severe hypovolemia (1500 mL or under) should not instantly flatline just
-	-- because MAP is low; sv_blood.lua owns the short delayed collapse window.
-	-- Only hard pump failure ends circulation immediately here.
-	if (org.blood or 5000) < 1500 then
-		local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-		local hasStabilizer = totalAdrenaline > 0.5 or (org.tranexamic_acid or 0) > 0
-		if not hasStabilizer and (org.heart >= 0.5 or (org.bloodpressure or 93) < 25 or (org.pulse or 70) < 15) then
-			org.heartstop = true
-		end
-	end
 
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
 		org.fear = math.max(org.fear, 0)
@@ -449,6 +481,38 @@ module[2] = function(owner, org, timeValue)
 				org.o2[1] = math.max(org.o2[1], o2Restore)
 			end
 		end
+	end
+
+	-- Electrical activity, a palpable pulse, and cardiac output are separate.
+	-- PEA therefore keeps a weak ECG trace briefly while pressure and pulse are 0.
+	if org.heartstop then
+		if not org.cardiacArrestStart then
+			org.cardiacArrestStart = CurTime()
+			org.cardiacArrestO2Start = math.Clamp(org.o2 and org.o2[1] or 0, 0, 6)
+		end
+
+		local arrestElapsed = math.max(CurTime() - org.cardiacArrestStart, 0)
+		if arrestElapsed < peaDuration then
+			local peaTarget = Lerp(math.Clamp(arrestElapsed / peaDuration, 0, 1), 60, 20)
+			org.heartbeat = math.Approach(org.heartbeat or terminalHeartRate, peaTarget, timeValue * 120)
+			org.ecgState = "pea"
+		else
+			org.heartbeat = math.Approach(org.heartbeat or 0, 0, timeValue * 40)
+			org.ecgState = org.heartbeat < 1 and "asystole" or "pea"
+		end
+
+		org.pulse = 0
+		org.cardiacOutput = 0
+		org.bloodpressure = 0
+		org.systolic = 0
+		org.diastolic = 0
+	else
+		org.cardiacArrestStart = nil
+		org.cardiacArrestO2Start = nil
+		local rateK = math.Clamp((org.heartbeat or 0) / 75, 0, 2.5)
+		local fillingK = 1 - math.Clamp(((org.heartbeat or 75) - 180) / 120, 0, 0.7)
+		org.cardiacOutput = math.Clamp(((org.pulse or 0) / 70) * rateK * fillingK * (1 - math.Clamp(org.heart or 0, 0, 1)), 0, 1.5)
+		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, false)
 	end
 
 	if org.heartstop then

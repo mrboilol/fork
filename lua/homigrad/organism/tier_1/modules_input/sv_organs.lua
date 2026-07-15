@@ -140,11 +140,21 @@ local abdominal_organs = {
     ["intestines"] = true,
 }
 
+local organBulletBleedMultipliers = {
+	heart = 2,
+	liver = 1.75,
+	stomach = 1.5,
+	intestines = 1.5,
+	brain = 1.25,
+	trachea = 1.25,
+}
+
 local function damageOrgan(org, dmg, dmgInfo, key)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
 	local rawDamage = math.max(dmg * (isCrush(dmgInfo) and 1 or 3), 0)
 	local alreadyDamaged = oldval > 0.01
+	local organBulletBleedMul = organBulletBleedMultipliers[key] or 1.5
 
 	-- A second hit on an already wounded abdominal organ should reopen the
 	-- wound, not keep stacking the full organ-trauma package.  Its only
@@ -176,14 +186,14 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 		-- Progressive organ damage already adds bullet bleed below; only add the
 		-- extra wound bleed once the organ damage meter has stopped increasing.
 		if damage_dealt <= 0 and hg.organism.AddBulletImpactBleeding then
-			hg.organism.AddBulletImpactBleeding(org, dmgInfo, 0.5 + abdominalMul * 0.25)
+			hg.organism.AddBulletImpactBleeding(org, dmgInfo, organBulletBleedMul * 0.5)
 		end
 	end
 	if damage_dealt > 0 then
 		org.internalBleed = org.internalBleed + damage_dealt * 1.0 -- Base internal bleeding for any organ damage (increased from 0.5)
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
 		if hg.organism.AddBulletImpactBleeding then
-			hg.organism.AddBulletImpactBleeding(org, dmgInfo, 0.75)
+			hg.organism.AddBulletImpactBleeding(org, dmgInfo, organBulletBleedMul)
 		end
 
 		if abdominal_organs[key] then

@@ -1016,7 +1016,11 @@ function hg.queueArterialWoundSound(ent, wound)
 	local artery = wound[7]
 	local owner = getArteryWoundOwner(ent)
 	local org = IsValid(owner) and owner.organism or ent.organism or {}
-	local canPlayNeckSlit = not IsValid(owner) or owner:Alive() and not org.otrub
+	-- Death-ragdoll netvars can arrive before the ragdoll's player link. An
+	-- unknown owner must not replay the neck-slit sound for an existing corpse.
+	local sourceAlive = IsValid(owner) and owner:Alive()
+		or ent:IsNPC() and ent:Health() > 0
+	local canPlayNeckSlit = sourceAlive and not org.otrub
 
 	if artery == "arteria" and canPlayNeckSlit then
 		local _, target = getArterialWoundPos(ent, wound)
