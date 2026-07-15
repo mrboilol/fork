@@ -945,9 +945,8 @@ local arterialRampTime = 0.7
 local arterialMinIntensity = 0.35
 local arterialParticleSizeMul = 0.65
 local arterialJetOffset = 0.12
-local arterialVelocityMul = 70
+local arterialVelocityMul = 82
 local arterialPulseRetractRate = 85
-local arterialStreamParticleCount = 24
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -1049,39 +1048,24 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 
 	local buildup = fxData and math.Clamp((CurTime() - (fxData.created or CurTime())) / arterialRampTime, arterialMinIntensity, 1) or 1
 	local time = CurTime()
-	local wave = 0.9 + math.sin(time * 5) * 0.18
+	local wave = 0.9 + math.sin(time * 5.6) * 0.22
 	local dirAng = dir:Angle()
 	local right = dirAng:Right()
 	local up = ang:Up()
 	local scaledSize = size * arterialParticleSizeMul * buildup
 	local sprayVel = dir * arterialVelocityMul * wave * buildup
-	sprayVel:Add(right * math.sin(time * 0.8) * 8 * pulseMul * buildup)
-	sprayVel:Add(up * math.sin(time * 0.6 + 1.1) * 3.5 * pulseMul * buildup)
+	sprayVel:Add(right * math.sin(time * 1.05) * 12 * pulseMul * buildup)
+	sprayVel:Add(up * math.sin(time * 0.8 + 1.1) * 5 * pulseMul * buildup)
 
-	local jets = wound and wound.arterialJets
-	if wound and not jets then
-		jets = {}
-		wound.arterialJets = jets
-		wound.arterialJet = nil
-	end
-
-	if jets then
-		for i = #jets, 1, -1 do
-			local jet = jets[i]
-			if jet and jet.active then
-				jet[3]:Set(sprayVel)
-			else
-				table.remove(jets, i)
-			end
-		end
+	local jet = wound and wound.arterialJet
+	if jet and jet.active then
+		jet[3]:Set(sprayVel)
+		return
 	end
 
 	local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
-	local jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
-	if jets and jet then
-		jets[#jets + 1] = jet
-		if #jets > arterialStreamParticleCount then table.remove(jets, 1) end
-	end
+	jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
+	if wound and jet then wound.arterialJet = jet end
 
 end
 local hg_altberserk = GetConVar("hg_altberserk")
@@ -1303,7 +1287,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	if org and org.blood and org.blood > 10 and wounds and #wounds > 0 then
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			for i, wound in pairs(wounds) do
-				local size = math.random(0, 1) * math.max(math.min(wound[1], 1), 0.5)
+				-- Let the visual droplet retain the wound's severity.  The old cap at
+				-- one made a small cut and a deep wound create the same-sized decal.
+				local woundSize = math.max(wound[1] or 0, 0)
+				local size = math.Clamp(0.35 + woundSize * 0.11, 0.45, 5.5)
 				
 				if wound[5] + beatsPerSecond < time then
 					if seen and ent:LookupBone(wound[4]) then
@@ -1364,7 +1351,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			if wound[5] + addtime < time and ent:LookupBone(wound[4]) then
 				local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
+					local woundSize = math.max(wound[1] or 0, 0)
+					local size = math.Clamp(0.8 + woundSize * 0.12, 0.9, 6) * arterySizeMul
 					if seen and ent:LookupBone(wound[4]) then
 						local bone = wound[4]
 

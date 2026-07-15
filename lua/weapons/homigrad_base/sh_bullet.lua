@@ -625,7 +625,9 @@ function SWEP:FireBullet()
 		trace = util.TraceLine(obstructionTrace)
 	end
 
-    local numbullet = ammotype.NumBullet or 1
+    -- Some weapons declare their pellet count on the SWEP while others keep it
+    -- in the ammo table.  Treat either as an intentional multi-projectile load.
+    local numbullet = math.max(tonumber(ammotype.NumBullet) or 1, tonumber(self.NumBullet) or 1)
 
 	if not IsValid(owner) then
 		local phys = self:GetPhysicsObject()
@@ -796,6 +798,10 @@ function SWEP:FireBullet()
 	-- bullets apply Spread directly, so clear it here for both implementations.
 	if numbullet == 1 then
 		bullet.Spread = vector_origin
+		-- FireLuaBullets has a legacy random-cone branch.  This marker is checked
+		-- after EntityFireBullets hooks, so no hook can accidentally restore spread
+		-- to a normal projectile after the muzzle direction was chosen.
+		bullet.NoHiddenSpread = true
 		bullet.Flags = bit.bor(bullet.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)
 	end
 	

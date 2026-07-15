@@ -291,18 +291,30 @@ local function ZCityIsHandsWeapon(wep)
     return class == "weapon_hands_sh" or class == "weapon_hands"
 end
 
+local function ZCityGetWeaponActionDuration(wep, field, fallback, minimum, maximum)
+    if not IsValid(wep) then return fallback end
+
+    local base = tonumber(wep[field]) or fallback
+    local ergonomics = math.Clamp(tonumber(wep.Ergonomics) or 1, 0.35, 2.5)
+    return math.Clamp(base / ergonomics, minimum, maximum)
+end
+
 local function ZCityGetSlotHoldDuration(ply, wep)
-    local duration = WS.HoldDuration or 0.62
+    local duration = ZCityGetWeaponActionDuration(wep, "CooldownDeploy", WS.HoldDuration or 0.62, 0.35, 2.4)
 
     if IsValid(ply) and ZCityIsHandsWeapon(wep) then
         local active = ply:GetActiveWeapon()
         if IsValid(active) and ZCityIsBackpackDrawWeaponForSelector(active) then
-            return WS.HolsterAwayDuration or 0.95
+            return ZCityGetWeaponActionDuration(active, "CooldownHolster", WS.HolsterAwayDuration or 0.95, 0.35, 2.4)
         end
     end
 
     if IsValid(wep) and ZCityIsBackpackDrawWeaponForSelector(wep) and ZCityIsBodyHolsterBlocked(ply) then
-        return ZCityGetBackpackHoldDuration()
+        return math.max(duration, ZCityGetBackpackHoldDuration())
+    end
+
+    if IsValid(wep) and wep.NoHolster then
+        return math.max(duration, WS.HoldDurationNoHolster or 1.15)
     end
 
     return duration
@@ -636,7 +648,7 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha, presentation)
     surface.DrawTexturedRect(x, y, size, size)
 
     if presentation.dark then
-        surface.SetDrawColor(0, 0, 0, 135 * aMul)
+        surface.SetDrawColor(0, 0, 0, (presentation.shadowAlpha or 135) * aMul)
         surface.DrawRect(x, y, size, size)
     end
 
@@ -700,41 +712,46 @@ function WS.DrawBodySlotSelector(ply)
     local selected = slotWeapons[WS.SelectedSlotPos] or slotWeapons[0]
     if not IsValid(selected) then return end
 
-    local place = ZCityGetBodySlotForWeapon(selected)
-    local stacked = {}
+    local visible = {}
+    local minDuration, maxDuration
     for index = 0, #slotWeapons do
         local wep = slotWeapons[index]
-        if IsValid(wep) and wep ~= selected then
-            stacked[#stacked + 1] = wep
+        if IsValid(wep) then
+            local duration = ZCityGetSlotHoldDuration(ply, wep)
+            visible[#visible + 1] = {wep = wep, duration = duration}
+            minDuration = minDuration and math.min(minDuration, duration) or duration
+            maxDuration = maxDuration and math.max(maxDuration, duration) or duration
         end
     end
 
-    for depth = #stacked, 1, -1 do
-        local wep = stacked[depth]
+    -- The row runs from quick-access gear to slow bag draws. Slower items get
+    -- a deeper shadow, so players can read the unholster cost before choosing.
+    table.sort(visible, function(a, b)
+        if a.duration ~= b.duration then return a.duration < b.duration end
+        return a.wep:EntIndex() < b.wep:EntIndex()
+    end)
+
+    local rowStep = WS.BodySquareSize * 0.72
+    for index, item in ipairs(visible) do
+        local durationK = maxDuration > minDuration and math.Clamp((item.duration - minDuration) / (maxDuration - minDuration), 0, 1) or 0
+        local isSelected = item.wep == selected
+        local place = ZCityGetBodySlotForWeapon(item.wep)
         ZCityDrawBodySquare(place, {
-            name = WS.GetPrintName(wep),
-            selected = false,
-            wep = wep
+            name = WS.GetPrintName(item.wep),
+            selected = isSelected,
+            wep = item.wep
         }, ent, WS.BodyAlpha, {
-            anchorWep = selected,
-            scale = math.max(0.84 - (depth - 1) * 0.07, 0.56),
-            opacity = math.max(0.76 - (depth - 1) * 0.06, 0.46),
-            brightness = 0.48,
-            offsetX = depth * 14,
-            offsetY = depth * 10,
-            dark = true,
-            pointer = false,
-            progress = false
+            anchorWep = item.wep,
+            scale = isSelected and 1 or 0.82,
+            opacity = isSelected and 1 or 0.86,
+            brightness = isSelected and 1 or (0.68 - durationK * 0.18),
+            offsetX = (index - (#visible + 1) / 2) * rowStep,
+            dark = not isSelected,
+            shadowAlpha = 70 + durationK * 145,
+            pointer = isSelected,
+            progress = isSelected
         })
     end
-
-    ZCityDrawBodySquare(place, {
-        name = WS.GetPrintName(selected),
-        selected = true,
-        wep = selected
-    }, ent, WS.BodyAlpha, {
-        anchorWep = selected
-    })
 end
 
 local tAcceptKeys = {

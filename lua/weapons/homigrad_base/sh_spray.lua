@@ -124,7 +124,7 @@ function SWEP:PrimarySpread()
 
 		local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 		local oneHandRecoilMul = 1
-		if support.oneHanded then oneHandRecoilMul = oneHandRecoilMul * (support.onlyLeft and 1.85 or 1.45) end
+		if support.oneHanded then oneHandRecoilMul = oneHandRecoilMul * 1.45 end
 		if support.leftBusy then oneHandRecoilMul = oneHandRecoilMul * 1.35 end
 		if support.rightBusy then oneHandRecoilMul = oneHandRecoilMul * 1.55 end
 		if support.wantsTwoHands and support.supportHands <= 1 then oneHandRecoilMul = oneHandRecoilMul * 1.25 end
@@ -286,12 +286,15 @@ function SWEP:PrimarySpread()
 		-- Keep the direct shot correction pitch-led.  The old kick was small enough
 		-- for the spread yaw and punch recovery to make rifles feel sideways.
 		local longGunKickMul = not self:IsPistolHoldType() and 1.35 or 1
-		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.15 * longGunKickMul, 0.45, 4.4)
+		-- Recoil displaces the muzzle upward between shots instead of widening a
+		-- hidden cone.  Keep a very small yaw component only so recoil does not
+		-- read as a horizontal spread pattern.
+		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.7 * longGunKickMul, 0.7, 6.2)
 		local muzzleKick = sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
 		muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
-		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.5, -8.0, 1.2)
-		local muzzleYawCap = math.min(longGunKickMul > 1 and 0.22 or 0.36, math.abs(muzzleKick[1]) * 0.08 + 0.04)
-		muzzleKick[2] = math.Clamp(muzzleKick[2] * (longGunKickMul > 1 and 0.10 or 0.16), -muzzleYawCap, muzzleYawCap)
+		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.7, -10.0, 1.2)
+		local muzzleYawCap = math.min(longGunKickMul > 1 and 0.12 or 0.18, math.abs(muzzleKick[1]) * 0.045 + 0.02)
+		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.06, -muzzleYawCap, muzzleYawCap)
 		muzzleKick[3] = 0
 		muzzleKick = sanitize_angle(muzzleKick)
 		local newEyeAng = eyeang + muzzleKick

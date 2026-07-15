@@ -471,9 +471,9 @@ function PANEL:Init()
     self.CenterX = ScrW() / 2
     self.CenterY = ScrH() / 2
     self.Radius = 150
-    self.MaxBandageDistance = 365
-    self.BandageFollowSpeed = 1.9
-    self.WrapSpeedMultiplier = 0.55
+    self.MaxBandageDistance = 450
+    self.BandageFollowSpeed = 3.2
+    self.WrapSpeedMultiplier = 0.9
     self.VisualWrapThicknessStep = 1.5
 
     -- Fear/adrenaline bandage state
@@ -1922,8 +1922,6 @@ end)
 local function PTSDSystemEnabled()
     local ptsd = GetConVar("hg_ptsd_enabled")
     if ptsd and not ptsd:GetBool() then return false end
-    local despair = GetConVar("hg_despairsystem")
-    if despair and despair:GetInt() == 0 then return false end
     return true
 end
 

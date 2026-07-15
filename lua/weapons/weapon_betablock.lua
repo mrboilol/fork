@@ -113,10 +113,7 @@ if SERVER then
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, -8, self.modeValues[1] * 2)
 		org.adrenaline = math.Approach(org.adrenaline, 0, self.modeValues[1] * 0.5)
         
-        -- Beta blockers stop the acute stress response and its lasting despair.
-        org.despair = 0
-		org._despairLockUntil = 0
-		org._despairLastGainedTime = 0
+		-- Beta blockers stop the acute stress response and reduce PTSD trauma.
 		if hg and hg.PTSD and hg.PTSD.ApplyBetaBlockerStressReset then
 			hg.PTSD.ApplyBetaBlockerStressReset(ent)
 		end

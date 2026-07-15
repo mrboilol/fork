@@ -24,19 +24,6 @@ local audible_pain = {
 	"I WISH I HAD SOME PAINKILLERS NOW. FUCK.",
 }
 
-local despair_phrases = {
-    "What's the point anymore?",
-    "Everything feels so heavy.",
-    "I'm so tired of fighting.",
-    "Is this all there is?",
-    "I just want it to be over.",
-    "I feel so empty.",
-    "Nothing makes sense.",
-    "I'm lost.",
-    "I can't see a way out.",
-    "This is hopeless."
-}
-
 local sharp_pain = {
 	"AAAHH",
 	"AAAH",
@@ -461,7 +448,6 @@ function hg.likely_to_phrase(ply)
 	local brain = org.brain
 	local blood = org.blood
 	local fear = org.fear
-	local despair = org.despair
 	local panicattack = org.panicattack or 0
 	local temperature = org.temperature
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
@@ -471,7 +457,6 @@ function hg.likely_to_phrase(ply)
 
 	return (broken_dislocated) and 5
 		or (pain > 65) and 5
-		or (despair > 0.5) and 5
 		or (panicattack > 0.55 and 1.2)
 		or (temperature < 31 and 0.5)
 		or (temperature > 38 and 0.5)
@@ -516,7 +501,7 @@ local function get_status_message(ply)
 	local o2 = org.o2 and org.o2[1] or 30
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
-	local positive_thinking = (goodmood and goodmood > 0.5) or (org.despair and org.despair < 0.1)
+	local positive_thinking = goodmood and goodmood > 0.5
 
 	if fear >= 1.0 and math.random(10) > 3 then
 		positive_thinking = false
@@ -565,8 +550,6 @@ local function get_status_message(ply)
 		end
 	elseif after_unconscious_notify then
 		most_wanted_phraselist = after_unconscious
-	elseif not most_wanted_phraselist and org.despair and org.despair > 0.5 and math.random(2) == 1 then
-		most_wanted_phraselist = despair_phrases
 	elseif not most_wanted_phraselist and blood < 3750 then
 		local combined_phrases = {}
 		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
@@ -670,10 +653,11 @@ function hg.get_notify_color(ply)
 		local tO2 = dyingO2 and math.Clamp(1 - (o2 / 12), 0, 1) or 0
 		local tBlood = dyingBlood and math.Clamp(1 - (blood / 3750), 0, 1) or 0
 		local t = math.max(tO2, tBlood)
+		local gray = math.floor(220 - t * 70)
 		return Color(
-			math.floor(255 * (1 - t * 0.5)),
-			math.floor(255 * (1 - t * 0.3)),
-			255
+			math.min(gray + 25, 255),
+			math.max(gray - 12, 0),
+			math.max(gray - 12, 0)
 		)
 	end
 

@@ -67,7 +67,6 @@ local list = {
 	"heatbuff",
 	"blindness",
 	"fear",
-	"despair",
 	{"goodmood", 1, false},
 	"assimilated",
 	"berserk",

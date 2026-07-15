@@ -158,11 +158,7 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	local despair = math.Clamp(org.despair or 0, 0, 1)
-
 	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
-
-	stamina.sub = stamina.sub * (1 + despair * 0.6)
 
 
 
@@ -186,8 +182,6 @@ module[2] = function(owner, org, timeValue)
 	    stamina[1] = max(stamina[1] - stamina.sub * staminaDrainMul * timeValue * 8 * (2 - (org.o2[1] / org.o2.range)), 0)
 	if stamina.max > 100 then
 
-		stamina.max = Lerp(despair, stamina.max, 100)
-
 	end
 
 	
@@ -202,7 +196,7 @@ module[2] = function(owner, org, timeValue)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
 
-	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * (1 - despair * 0.5) * lungRecoveryMultiplier * breathingMul, stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul, stamina.max)
 
 
 

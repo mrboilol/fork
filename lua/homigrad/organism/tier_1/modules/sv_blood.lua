@@ -253,14 +253,18 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",60,"blood2",0) end
+	if org.isPly and not org.otrub and org.blood < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",true,"blood2",0,nil,Color(200, 170, 170)) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
 		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
 		local regenBoost = 1 + math.Clamp(timeSinceBleed / 30, 0, 2)
 		local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 		local goodmoodBonus = 1 + goodmood * 0.3
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.15 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * (org.bloodpressure / 110) * regenBoost * goodmoodBonus, 5000)
+		-- Normal MAP is 93 in the cardiovascular model.  Use that same reference
+		-- here so healthy circulation does not receive an unintended regeneration
+		-- penalty while low blood pressure still suppresses recovery.
+		local pressurePerfusion = math.Clamp((org.bloodpressure or 93) / 93, 0.05, 1.1)
+		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.15 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * pressurePerfusion * regenBoost * goodmoodBonus, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -296,9 +300,8 @@ module[2] = function(owner, org, mulTime)
 		if o2DebuffRate > 0 then
 			if org.blood <= 3750 then
 				o2DebuffRate = o2DebuffRate * 3
-				if org.isPly and not org.otrub and (org._arterialO2NotifyTime or 0) + 30 < CurTime() then
-					org.owner:Notify("I can't breathe... blood's not getting where it should.", 30, "arterial_o2", 0)
-					org._arterialO2NotifyTime = CurTime()
+				if org.isPly and not org.otrub then
+					org.owner:Notify("I can't breathe... blood's not getting where it should.", true, "arterial_o2", 0, nil, Color(200, 170, 170))
 				end
 			end
 
@@ -348,36 +351,32 @@ module[2] = function(owner, org, mulTime)
 	org.hypovolemicShock = shockStage
 
 	if org.blood < 4500 then
-		-- First symptoms: periodic notify
-		if org.isPly and not org.otrub and (org._blood4500NotifyTime or 0) + 90 < CurTime() then
-			org.owner:Notify("I feel a little lightheaded...", 15, "blood_4500", 0)
-			org._blood4500NotifyTime = CurTime()
+		-- One alert when this blood-loss stage is first reached.
+		if org.isPly and not org.otrub then
+			org.owner:Notify("I'm starting to feel faint...", true, "blood_4500", 0, nil, Color(200, 170, 170))
 		end
 	end
 
 	if org.blood < 4000 then
 		-- Soft consciousness cap at 0.95
 		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
-		if org.isPly and not org.otrub and (org._blood4000NotifyTime or 0) + 60 < CurTime() then
-			org.owner:Notify("I'm starting to feel weak...", 15, "blood_4000", 0)
-			org._blood4000NotifyTime = CurTime()
+		if org.isPly and not org.otrub then
+			org.owner:Notify("My body is hard to move...", true, "blood_4000", 0, nil, Color(200, 170, 170))
 		end
 	end
 
 	if org.blood < 3500 then
 		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
-		if org.isPly and not org.otrub and (org._blood3500NotifyTime or 0) + 45 < CurTime() then
-			org.owner:Notify("My head is spinning... I can barely focus.", 15, "blood_3500", 0)
-			org._blood3500NotifyTime = CurTime()
+		if org.isPly and not org.otrub then
+			org.owner:Notify("Everything feels so heavy...", true, "blood_3500", 0, nil, Color(200, 170, 170))
 		end
 	end
 
 	if org.blood < 3000 then
 		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.9)
 		org.disorientation = math.max(org.disorientation or 0, 0.35 + bloodDeficit * 0.65)
-		if org.isPly and not org.otrub and (org._blood3000NotifyTime or 0) + 30 < CurTime() then
-			org.owner:Notify("I can't... get enough air. Everything is heavy.", 15, "blood_3000", 0)
-			org._blood3000NotifyTime = CurTime()
+		if org.isPly and not org.otrub then
+			org.owner:Notify("My eyes are starting to lose focus...", true, "blood_3000", 0, nil, Color(200, 170, 170))
 		end
 	end
 
@@ -396,9 +395,8 @@ module[2] = function(owner, org, mulTime)
 		end
 		-- Consciousness now slides toward coma across the 2500-2000 range.
 		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.Clamp((org.blood - 2000) / 500 * 0.52 + 0.1, 0.1, 0.62))
-		if org.isPly and not org.otrub and (org._blood2500NotifyTime or 0) + 20 < CurTime() then
-			org.owner:Notify("I feel cold... I can't think straight.", 15, "blood_2500", 0)
-			org._blood2500NotifyTime = CurTime()
+		if org.isPly and not org.otrub then
+			org.owner:Notify("I feel cold... I can't think straight.", true, "blood_2500", 0, nil, Color(200, 170, 170))
 		end
 	end
 
@@ -535,10 +533,9 @@ module[2] = function(owner, org, mulTime)
 		if org.blood < 1900 then
 			org.consciousness = math.max((org.consciousness or 1) - mulTime * (0.35 + ischemicDepth * 1.4), 0)
 		end
-		-- Notify once entering ischemic threshold
-		if org.isPly and not org.otrub and (org._ischemicNotifyTime or 0) + 20 < CurTime() then
-			org.owner:Notify("My chest... I can't breathe right...", 20, "ischemic_collapse", 0)
-			org._ischemicNotifyTime = CurTime()
+		-- One alert when ischemic collapse starts.
+		if org.isPly and not org.otrub then
+			org.owner:Notify("My chest... I can't breathe right...", true, "ischemic_collapse", 0, nil, Color(200, 170, 170))
 		end
 	end
 	

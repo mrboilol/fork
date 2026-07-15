@@ -130,7 +130,7 @@ local function PatchWeapon(class)
         local minigameType = GetMinigameType(self)
         if IsValid(owner) and minigameType then
             StartMinigame(self, owner, minigameType, owner)
-            self:SetNextPrimaryFire(CurTime() + 1)
+            self:SetNextPrimaryFire(CurTime() + (minigameType == "bandage" and 0.25 or 1))
             return
         end
 
@@ -146,7 +146,7 @@ local function PatchWeapon(class)
             local target = ResolveSecondaryTarget(owner)
             if IsValid(target) then
                 StartMinigame(self, owner, minigameType, target)
-                self:SetNextSecondaryFire(CurTime() + 1)
+                self:SetNextSecondaryFire(CurTime() + (minigameType == "bandage" and 0.25 or 1))
                 return
             end
         end

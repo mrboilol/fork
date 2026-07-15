@@ -118,7 +118,6 @@ hook.Add("Think", "stanleytumbler", function()
         local org = ply.organism or {}
         local consciousness = org.consciousness or 1
         local fear = org.fear or 0
-        local despair = org.despair or 0
         local disorientation = org.disorientation or 0
         local stamina = org.stamina and org.stamina[1] or 100
         local effectiveThreshold = TUMBLE_SPEED_THRESHOLD
@@ -235,9 +234,6 @@ hook.Add("Think", "stanleytumbler", function()
 
         if fear > 0.1 then
             tripChance = tripChance + fear * 0.25
-        end
-        if despair > 0.1 then
-            tripChance = tripChance + despair * 0.25
         end
         if disorientation > 0.1 then
             tripChance = tripChance + disorientation * 0.05

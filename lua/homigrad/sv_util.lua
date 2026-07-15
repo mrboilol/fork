@@ -499,9 +499,12 @@ hook.Add("PostEntityFireBullets","bulletsuppression",function(ent,bullet)
 			ply:AddNaturalAdrenaline(0.05 * dmg / math.max(dist / 2,10) / 1)
 			org.fearadd = org.fearadd + 0.4
 			
-			-- Add despair when getting shot at
-			org.despair = math.Clamp((org.despair or 0) + 0.05 * (dmg / math.max(dist / 2, 10)), 0, 1)
-			org._despairLastGainedTime = CurTime()
+			if hg.organism and hg.organism.AddPanicAttack then
+				hg.organism.AddPanicAttack(org, 0.1 * (dmg / math.max(dist / 2, 10)), true, 2.5)
+			end
+			if hg.PTSD and hg.PTSD.AddTrauma then
+				hg.PTSD.AddTrauma(ply, 1.2, "suppression", {combat = true})
+			end
 		end
 	end
 end)
@@ -707,7 +710,10 @@ function hg.ExplosionEffect(pos, dis, dmg)
 		if tr.Hit and dist > radius * 0.35 then continue end
 
 		local amount = math.Clamp((1 - dist / radius) * 0.55 + (dmg or 0) / 1200, 0.08, 0.55)
-		hg.organism.AddPanicAttack(ply.organism, amount, true)
+		hg.organism.AddPanicAttack(ply.organism, amount, true, 2.5)
+		if hg.PTSD and hg.PTSD.AddTrauma then
+			hg.PTSD.AddTrauma(ply, 2 + amount * 8, "nearby_explosion", {combat = true})
+		end
 	end
 end
 

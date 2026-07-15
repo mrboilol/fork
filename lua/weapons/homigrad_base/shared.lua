@@ -173,7 +173,7 @@ function SWEP:GetFocusHandlingMul()
 	local fear = math.Clamp(org.fear or 0, 0, 2)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 3)
 	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
-	local anxious = math.Clamp((org.despair or 0) * 1.2 + panic * 0.45, 0, 1.4)
+	local anxious = math.Clamp(panic * 0.45 + math.Clamp(org.ptsdPanicRisk or 0, 0, 1) * 0.35, 0, 1.4)
 	local focus = math.min(adrenaline, 1.5) * 0.08
 
 	local className = owner.PlayerClassName
@@ -199,9 +199,12 @@ function SWEP:GetArmHealthHandlingMul()
 
 	if org.rarmdislocation or org.rarmdislocated then damage = damage + 0.45 end
 	if twoHanded and (org.larmdislocation or org.larmdislocated) then damage = damage + 0.35 end
-	if org.rarmamputated then damage = damage + 1.15 end
+	-- Do not count a missing right arm twice when the left arm is already the
+	-- active one-handed firing arm. It should remain worse than two-hand use,
+	-- but not become unusably shaky.
+	if org.rarmamputated then damage = damage + (support.onlyLeft and 0.5 or 1.15) end
 	if twoHanded and org.larmamputated then damage = damage + 0.85 end
-	if support.oneHanded then damage = damage + (support.onlyLeft and 1.05 or 0.62) end
+	if support.oneHanded then damage = damage + 0.62 end
 	if support.leftBusy then damage = damage + 0.45 end
 	if support.rightBusy then damage = damage + 0.75 end
 	if org.aiming_fatigue then damage = damage + math.Clamp(org.aiming_fatigue, 0, 10) * 0.045 end
@@ -327,10 +330,10 @@ function SWEP:GetRecoilSupportMul()
 	local supportHands = support.supportHands
 	local mul = supportHands >= 2 and 0.82 or 1.25
 
-	if support.oneHanded then mul = mul * (support.onlyLeft and 1.45 or 1.25) end
+	if support.oneHanded then mul = mul * 1.25 end
 	if support.leftBusy then mul = mul * 1.28 end
 	if support.rightBusy then mul = mul * 1.45 end
-	if support.rightBad then mul = mul * (org.rarmamputated and 1.7 or 1.35) end
+	if support.rightBad then mul = mul * (org.rarmamputated and (support.onlyLeft and 1.15 or 1.7) or 1.35) end
 	if support.leftBad and support.wantsTwoHands then mul = mul * (org.larmamputated and 1.45 or 1.22) end
 	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul * (1 / org.armstrength) end
 	if org.aiming_fatigue then mul = mul * (1 + math.Clamp(org.aiming_fatigue, 0, 10) * 0.025) end
@@ -2333,7 +2336,13 @@ function SWEP:GetAdditionalValues()
 	--self.AdditionalPosPreLerp[3] = self.AdditionalPosPreLerp[3] - ((ply.lean or 0) * 2)
 	
 	local deployDuration = math.max(self.CooldownDeploy / self.Ergonomics, 0.35)
-	local val = math.Clamp((self.deploy and ((self.deploy - CurTime()) * 10) --[[or self.holster and (((self.CooldownDeploy / self.Ergonomics) - (self.holster - CurTime())) * 10)]] or 0) / deployDuration,0,10)
+	-- Finish the grab rotation before CanUse releases the trigger lock. Previously
+	-- the smoothed -72 degree yaw was still settling on the first legal shot.
+	local deploySettleTime = math.min(0.2, deployDuration * 0.25)
+	local deployPoseDuration = math.max(deployDuration - deploySettleTime, 0.1)
+	local deployPoseRemaining = self.deploy and math.max(self.deploy - CurTime() - deploySettleTime, 0) or 0
+	local deploySettling = self.deploy and self.deploy - CurTime() <= deploySettleTime
+	local val = math.Clamp(deployPoseRemaining * 10 / deployPoseDuration, 0, 10)
 	local grabEase = math.ease.OutExpo(math.Clamp(val / 10, 0, 1))
 
 	self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] - val * (self:IsPistolHoldType() and 1.2 or 1.45)
@@ -2352,7 +2361,11 @@ function SWEP:GetAdditionalValues()
 		if armDamage > 0.05 then
 			local sprintMul = self:IsSprinting() and 1.25 or 1
 			local painMul = 1 + math.Clamp((org.pain or 0) / 120, 0, 1)
-			local shake = armDamage * painMul * sprintMul
+			-- Aiming braces a broken trigger arm against the weapon. It remains
+			-- visibly unsteady, but no longer shakes at full hip-fire strength.
+			local aimingBrokenRightArm = self:IsZoom() and (org.rarm or 0) >= 1 and not org.rarmamputated
+			local aimBraceMul = aimingBrokenRightArm and 0.7 or 1
+			local shake = armDamage * painMul * sprintMul * aimBraceMul
 			local t = CurTime()
 			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 17.0) * 0.34 * shake
 			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + math.cos(t * 13.0) * 0.34 * shake
@@ -2603,16 +2616,18 @@ function SWEP:GetAdditionalValues()
 
 		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
 		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5
-		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
+		-- The model recoil should climb into the shoulder.  The old lateral
+		-- recovery was large enough to make the muzzle feel like random spread.
+		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 0.18 * shit2
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
 		-- Recoil used to kick the model backward with only a sideways recovery sway;
 		-- give the muzzle a real upward displacement as well, proportional to the
 		-- same shot impulse.  This is separate from the pitch kick so its vertical
 		-- offset remains visible on weapons with short barrels or low pitch recoil.
-		self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 2.25
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -2 * shit2
+		self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 4.5
+		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -0.35 * shit2
 		
-		self.AdditionalPos2:Add(VectorRand(-0.07, 0.07) * animpos3 * shit2)
+		self.AdditionalPos2:Add(Vector(math.Rand(-0.02, 0.02), math.Rand(-0.015, 0.015), math.Rand(-0.035, 0.035)) * animpos3 * shit2)
 
 		//self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * ply.offsetView[2] * 0.2
 		
@@ -2665,10 +2680,10 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.32 or 1.05)
 			-- Keep the previous absolute yaw contribution while the added wobble
 			-- strength goes into pitch/roll and vertical recovery motion.
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.12 or 0.285)
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.045 or 0.10)
 
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.084
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.03
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
 		end
 
@@ -2679,12 +2694,15 @@ function SWEP:GetAdditionalValues()
 			local seed = math.floor(sprayI)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 1.7
+			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.25
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 1.45
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.34
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.1
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 2.35
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.18
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.035
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.75
+			-- Lift the physical muzzle with the pitch impulse. GetTrace uses this
+			-- transform, so follow-up rounds climb with the visible barrel.
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 0.85 or 1.35)
 		end
 	end
 
@@ -2710,8 +2728,9 @@ function SWEP:GetAdditionalValues()
 		local larm_amputated = org.larmamputated
 
 		local armSway = 0
+		local support = self:GetHandSupportState(ply)
 		if rarm_amputated then
-			armSway = armSway + 2.2
+			armSway = armSway + (support.onlyLeft and 0.8 or 2.2)
 		elseif rarm >= 1 then
 			armSway = armSway + 1.4
 		elseif rarm_dislocated then
@@ -2774,8 +2793,10 @@ function SWEP:GetAdditionalValues()
 		self.AdditionalPos2[3] = self.AdditionalPos2[3] + ply.lean * 2
 	end
 
-	self.AdditionalPos = Lerp(hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add, self.AdditionalPos, self.AdditionalPosPreLerp)
-	self.AdditionalAng = Lerp(hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add, self.AdditionalAng, self.AdditionalAngPreLerp + self.weaponAng)
+	local poseLerp = hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add * (deploySettling and 3 or 1)
+	poseLerp = math.min(poseLerp, 1)
+	self.AdditionalPos = Lerp(poseLerp, self.AdditionalPos, self.AdditionalPosPreLerp)
+	self.AdditionalAng = Lerp(poseLerp, self.AdditionalAng, self.AdditionalAngPreLerp + self.weaponAng)
 
 	self:CloseAnim(dtime)
 	local animpos = self.lerpaddcloseanim

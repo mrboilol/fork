@@ -18,25 +18,17 @@ local cvTraumaWound = CreateConVar("hg_ptsd_trauma_wound", "0.45", FCVAR_ARCHIVE
 local cvTraumaDeath = CreateConVar("hg_ptsd_trauma_death", "8", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from witnessing death", 0, 50)
 local cvTraumaCorpse = CreateConVar("hg_ptsd_trauma_corpse", "3", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from seeing a corpse", 0, 50)
 local cvTraumaHead = CreateConVar("hg_ptsd_trauma_head_explosion", "14", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from seeing a head explosion", 0, 60)
-local cvTraumaGunfire = CreateConVar("hg_ptsd_trauma_gunfire", "1.5", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from nearby confirmed bullet hits", 0, 10)
-local cvTraumaExplosion = CreateConVar("hg_ptsd_trauma_explosion", "15", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from blast damage", 0, 60)
+local cvTraumaGunfire = CreateConVar("hg_ptsd_trauma_gunfire", "2.5", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from nearby confirmed bullet hits", 0, 10)
+local cvTraumaExplosion = CreateConVar("hg_ptsd_trauma_explosion", "18", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from blast damage", 0, 60)
 local cvTraumaCombat = CreateConVar("hg_ptsd_trauma_combat", "3", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma per combat second", 0, 60)
-local cvFlashbackMin = CreateConVar("hg_ptsd_flashback_min", "50", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum PTSD trauma for flashbacks", 0, 100)
+local cvFlashbackMin = CreateConVar("hg_ptsd_flashback_min", "35", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum PTSD trauma for flashbacks", 0, 100)
 local cvRandomFlashMin = CreateConVar("hg_ptsd_random_flash_min", "180", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum random PTSD flashback interval", 30, 3600)
 local cvRandomFlashMax = CreateConVar("hg_ptsd_random_flash_max", "420", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum random PTSD flashback interval", 30, 3600)
 local cvOpioidTraumaMul = CreateConVar("hg_ptsd_opioid_trauma_mul", "0.4", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Trauma multiplier at high analgesia", 0, 1)
 local cvOpioidDecayBoost = CreateConVar("hg_ptsd_opioid_decay_boost", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Trauma decay multiplier at high analgesia", 1, 20)
-local cvDespairFeed = CreateConVar("hg_ptsd_despair_feed", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Let PTSD pressure feed the despair system", 0, 1)
 local cvDebug = CreateConVar("hg_ptsd_debug", "0", FCVAR_ARCHIVE, "Print PTSD trauma changes", 0, 1)
 
-local function is_despair_enabled()
-	local cv = GetConVar("hg_despairsystem")
-	return not cv or cv:GetInt() ~= 0
-end
-
 local function is_enabled()
-	-- Despair is an optional downstream mood system.  PTSD must keep tracking
-	-- trauma and feeding the normal panic path even when despair is disabled.
 	return cvEnabled:GetBool()
 end
 
@@ -134,14 +126,10 @@ local function publish_state(ply, org)
 		label = "flashback"
 	end
 
-	local panicRisk = Clamp((trauma - 45) / 55, 0, 1)
+	local panicRisk = Clamp((trauma - 25) / 75, 0, 1)
 	if (state.flashbackUntil or 0) > CurTime() then
 		panicRisk = max(panicRisk, 0.78)
 	end
-	if org then
-		panicRisk = max(panicRisk, Clamp(((org.despair or 0) - 0.55) / 0.45, 0, 1) * 0.75)
-	end
-
 	ply:SetNWFloat("hg_ptsd_trauma", trauma)
 	ply:SetNWFloat("hg_ptsd_intensity", intensity)
 	ply:SetNWFloat("hg_ptsd_panic_risk", panicRisk)
@@ -428,35 +416,6 @@ local function update_flashback(owner, org, state)
 	end
 end
 
-local function feed_despair(owner, org, state, timeValue)
-	if not org or not cvDespairFeed:GetBool() or not is_despair_enabled() or not effects_enabled() then return end
-	if org.otrub then return end
-	if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then return end
-
-	local intensity = Clamp((state.trauma or 0) / 100, 0, 1)
-	local pressure = Clamp((intensity - 0.25) / 0.75, 0, 1)
-	if pressure <= 0 then return end
-
-	local severity = danger_severity(org)
-	local target = 0.15 + pressure * 0.5
-	if is_in_danger(org) then
-		target = min(1, target + severity * 0.25)
-	end
-	if (state.flashbackUntil or 0) > CurTime() then
-		target = max(target, 0.62)
-	end
-
-	local current = org.despair or 0
-	if current >= target then return end
-
-	local add = min(target - current, pressure * timeValue * 0.028)
-	if add <= 0 then return end
-
-	org.despair = Clamp(current + add, 0, 1)
-	org._despairLastGainedTime = CurTime()
-	org._despairLockUntil = max(org._despairLockUntil or 0, CurTime() + 5 + pressure * 10)
-end
-
 local function update_corpse_witness(owner, org, state)
 	local now = CurTime()
 	if now < (state.lastCorpseCheck or 0) then return end
@@ -483,26 +442,6 @@ local function update_corpse_witness(owner, org, state)
 			end
 		end
 	end
-end
-
-local function absorb_despair(owner, org, state, timeValue)
-	if not org or not is_despair_enabled() or not effects_enabled() then return end
-	if org.otrub then return end
-	if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then return end
-
-	local despair = Clamp(org.despair or 0, 0, 1)
-	if despair <= 0.35 then return end
-
-	local severity = danger_severity(org)
-	local targetTrauma = Clamp(((despair - 0.35) / 0.65) * 70 + severity * 15, 0, 85)
-	if (state.trauma or 0) >= targetTrauma then return end
-
-	local add = min(targetTrauma - (state.trauma or 0), (despair - 0.35) * (1 + severity) * 5 * timeValue)
-	if add <= 0 then return end
-
-	state.trauma = Clamp((state.trauma or 0) + add, 0, 100)
-	state.lastTraumaEvent = CurTime()
-	state.lastReason = "despair"
 end
 
 local function absorb_panic(org, state, timeValue)
@@ -565,9 +504,7 @@ hook.Add("Org Think", "hg_ptsd_bridge", function(owner, org, timeValue)
 	update_decay(owner, org, state, timeValue)
 	update_flashback(owner, org, state)
 	update_corpse_witness(owner, org, state)
-	absorb_despair(owner, org, state, timeValue)
 	absorb_panic(org, state, timeValue)
-	feed_despair(owner, org, state, timeValue)
 	publish_state(owner, org)
 	send_moodles_extra(owner, org)
 end)

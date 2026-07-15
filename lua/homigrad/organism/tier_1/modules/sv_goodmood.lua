@@ -31,9 +31,9 @@ module[2] = function(owner, org, timeValue)
     local timeSinceLoss = CurTime() - (org._goodmoodLostTime or 0)
     local inPenaltyWindow = timeSinceLoss < 30
 
-    -- Increase goodmood when in good condition (pristine, no fear/despair)
+    -- Increase goodmood when in good condition.
     -- Reduced by 75% during penalty window
-    if org.despair < 0.1 and org.fear < 0.1 and org.pain < 10 then
+    if org.fear < 0.1 and org.pain < 10 then
         local multiplier = inPenaltyWindow and 0.25 or 1
         goodmood_add = goodmood_add + timeValue * 0.008 * multiplier
     end
@@ -71,15 +71,11 @@ module[2] = function(owner, org, timeValue)
         goodmood_add = goodmood_add + timeValue * 0.005 * math.Clamp(org.painkiller, 0, 5) * multiplier
     end
 
-    -- Decrease goodmood when in fear or despair
+    -- Decrease goodmood when in fear.
     -- Fear penalty scales with both current fear level and accumulated fear duration
     if org.fear > 0.2 then
         local fearDurationMultiplier = 1 + math.min((org._fearDuration or 0) / 60, 2) -- Up to 3x multiplier after 60 seconds of fear
         goodmood_add = goodmood_add - timeValue * 0.02 * org.fear * fearDurationMultiplier
-    end
-
-    if org.despair > 0.2 then
-        goodmood_add = goodmood_add - timeValue * 0.015 * org.despair
     end
 
     org.goodmood = math.Clamp(org.goodmood + goodmood_add, 0, 1)
@@ -97,7 +93,7 @@ hook.Add("HomigradDamage", "GoodMood_OnDamage", function(ply, dmgInfo, hitgroup,
     end
 end)
 
--- Increase goodmood when overcoming fear/despair
+-- Increase goodmood when overcoming fear.
 hook.Add("Org Think", "GoodMood_OvercomeFear", function(owner, org, timeValue)
     if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
@@ -105,11 +101,9 @@ hook.Add("Org Think", "GoodMood_OvercomeFear", function(owner, org, timeValue)
     local timeSinceLoss = CurTime() - (org._goodmoodLostTime or 0)
     local inPenaltyWindow = timeSinceLoss < 30
 
-    -- Track previous fear/despair for overcoming moments
+    -- Track previous fear for overcoming moments.
     local prevFear = org._prevFear or 0
-    local prevDespair = org._prevDespair or 0
     local currentFear = org.fear or 0
-    local currentDespair = org.despair or 0
 
     -- If fear was high (>0.8) and is now low (<0.2), give goodmood boost
     -- Reduced by 75% during penalty window
@@ -118,15 +112,7 @@ hook.Add("Org Think", "GoodMood_OvercomeFear", function(owner, org, timeValue)
         org.goodmood = math.Clamp(org.goodmood + boost, 0, 1)
     end
 
-    -- If despair was high (>0.7) and is now low (<0.2), give goodmood boost
-    -- Reduced by 75% during penalty window
-    if prevDespair > 0.7 and currentDespair < 0.2 then
-        local boost = inPenaltyWindow and 0.05 or 0.2
-        org.goodmood = math.Clamp(org.goodmood + boost, 0, 1)
-    end
-
     org._prevFear = currentFear
-    org._prevDespair = currentDespair
 end)
 
 -- Increase goodmood when healing (bandaging wounds)

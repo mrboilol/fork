@@ -504,6 +504,14 @@ function ENTITY:FireLuaBullets(tInfo)
     if (hook.Run("EntityFireBullets", self, tInfo) == false) then
 		return
 	end
+
+	-- Homigrad weapons mark ordinary single-projectile shots once their muzzle
+	-- direction is resolved.  Enforce that marker after hooks so this legacy
+	-- routine cannot add an invisible random cone on top of physical recoil.
+	if tInfo.NoHiddenSpread then
+		tInfo.Spread = vector_origin
+		tInfo.Flags = bit.bor(tInfo.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)
+	end
 	
     local owner = tInfo.Attacker and tInfo.Attacker:IsValid() and tInfo.Attacker or IsValid(self) and self:GetOwner() and self:GetOwner():IsValid() and self:GetOwner() or self
 	local bIsPlayer = owner:IsPlayer()

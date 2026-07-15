@@ -64,12 +64,12 @@ function hg.organism.KillFatalBrainDamage(org)
 	return true
 end
 
-local panicattack_threshold = 0.45
-local panicattack_add_decay_time = 90
-local panicattack_rise_time = 10
+local panicattack_threshold = 0.35
+local panicattack_add_decay_time = 120
+local panicattack_rise_time = 5
 local panicattack_decay_time = 200
-local panicattack_gain_chance = 3
-local panicattack_gain_mul = 0.4
+local panicattack_gain_chance = 2
+local panicattack_gain_mul = 0.5
 local panicattack_disorientation = 0.45
 local panicattack_adrenaline_add_target = 4
 local panicattack_adrenaline_add_rise_time = 14
@@ -178,9 +178,6 @@ hook.Add("Org Clear", "Main", function(org)
 
 	org.fear = 0
 	org.fearadd = 0
-	org.despair = 0
-	org._despairLastAdrenaline = 0
-	org._despairNextCorpseCheck = 0
 	org.givingUp = false
 	org._giveUpHeartStopCheck = 0
 	--//
@@ -306,7 +303,6 @@ local function send_organism(org, ply)
 	sendtable.temperature = org.temperature
 	sendtable.canmove = org.canmove
 	sendtable.fear = org.fear
-	sendtable.despair = org.despair
 	sendtable.goodmood = org.goodmood
 	sendtable.llegdislocation = org.llegdislocation
 	sendtable.rlegdislocation = org.rlegdislocation
@@ -397,7 +393,6 @@ local function send_bareinfo(org)
 	sendtable.analgesia = org.analgesia
 	sendtable.o2 = org.o2
 	sendtable.timeValue = org.timeValue
-	sendtable.despair = org.despair
 	sendtable.superfighter = org.superfighter
 	sendtable.lungsfunction = org.lungsfunction
 	sendtable.eyeL = org.eyeL
@@ -480,7 +475,7 @@ function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
 	local adrenalineRisk = math.Clamp(((org.adrenaline or 0) + (org.adrenalineAdd or 0) - 1.5) / 3, 0, 0.65)
 	local analgesiaRisk = math.Clamp(((org.analgesia or 0) + (org.analgesiaAdd or 0) - 0.2) / 2.8, 0, 1) * 0.2
-	local vulnerability = 1 + math.Clamp(org.ptsdPanicRisk or 0, 0, 1) * 1.25 + math.Clamp((org.despair or 0) - 0.55, 0, 0.45) + adrenalineRisk + analgesiaRisk
+	local vulnerability = 1 + math.Clamp(org.ptsdPanicRisk or 0, 0, 1) * 1.6 + adrenalineRisk + analgesiaRisk
 	local chance = math.Clamp((tonumber(chanceMultiplier) or 1) * vulnerability / panicattack_gain_chance, 0, 1)
 	if math.Rand(0, 1) > chance then return org.panicattackadd or 0 end
 
@@ -677,7 +672,7 @@ hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius)
 end)
 
-hook.Add("EntityEmitSound", "DespairExplosionNearby", function(data)
+hook.Add("EntityEmitSound", "PanicAttackExplosionNearby", function(data)
 	local name = string.lower(data.SoundName or "")
 	if name == "" then return end
 	if not string.find(name, "explode", 1, true) and not string.find(name, "explosion", 1, true) then return end
@@ -699,23 +694,20 @@ hook.Add("EntityEmitSound", "DespairExplosionNearby", function(data)
 		if not IsValid(ply) or not ply:Alive() then continue end
 		local org = ply.organism
 		if not org or org.otrub then continue end
-		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then
-			org.despair = 0
-			continue
-		end
-		if (org._despairNextExplosionEvent or 0) > now then continue end
+		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then continue end
+		if (org._panicNextExplosionEvent or 0) > now then continue end
 
 		local dist = ply:GetPos():Distance(pos)
 		if dist > 900 then continue end
 
 		local threat = math.Clamp(1 - dist / 900, 0, 1)
 		if threat <= 0 then continue end
-		hg.organism.AddPanicAttack(org, 0.08 + threat * 0.16, true, 1.5)
-		org._despairNextExplosionEvent = now + 0.75
+		hg.organism.AddPanicAttack(org, 0.14 + threat * 0.28, true, 2.25)
+		org._panicNextExplosionEvent = now + 0.75
 	end
 end)
 
-hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
+hook.Add("EntityFireBullets", "PanicAttackNearBullets", function(ent, bulletData)
 	if not IsValid(ent) then return end
 	local src = bulletData and bulletData.Src
 	local dir = bulletData and bulletData.Dir
@@ -729,11 +721,8 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 		if not IsValid(ply) or not ply:Alive() or ply == ent then continue end
 		local org = ply.organism
 		if not org or org.otrub then continue end
-		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then
-			org.despair = 0
-			continue
-		end
-		if (org._despairNextNearBullet or 0) > now then continue end
+		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then continue end
+		if (org._panicNextSuppression or 0) > now then continue end
 
 		local eye = ply:EyePos()
 		local toEye = eye - src
@@ -742,7 +731,7 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 		local gunfightDist = ply:GetPos():Distance(src)
 		if (org._panicNextGunfire or 0) <= now and gunfightDist <= 700 then
 			local gunfightFalloff = math.Clamp(1 - gunfightDist / 700, 0, 1)
-			hg.organism.AddPanicAttack(org, 0.08 + gunfightFalloff * 0.14, true, 1.5)
+			hg.organism.AddPanicAttack(org, 0.12 + gunfightFalloff * 0.2, true, 2)
 			org._panicNextGunfire = now + 0.9
 		end
 
@@ -760,8 +749,8 @@ hook.Add("EntityFireBullets", "DespairNearBullets", function(ent, bulletData)
 
 		local threat = math.Clamp(1 - dist / 130, 0, 1)
 		if threat > 0 then
-			hg.organism.AddPanicAttack(org, 0.12 + threat * 0.18, true, 2)
-			org._despairNextNearBullet = now + 0.45
+			hg.organism.AddPanicAttack(org, 0.18 + threat * 0.3, true, 2.75)
+			org._panicNextSuppression = now + 0.45
 		end
 
 	end
@@ -1520,7 +1509,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			local str = hg.get_status_message(owner)
 			//print(str)
 			-- (msg, delay, msgKey, showTime, func, clr)
-			owner:Notify(str, 1, "phrase", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), 255))
+			owner:Notify(str, 1, "phrase", 1, nil, hg.get_notify_color(owner))
 		end
 	end
 
@@ -1748,7 +1737,7 @@ hook.Add("HG_OnWakeOtrub", "afterOtrub", function( owner )
 	-- (msg, delay, msgKey, showTime, func, clr, traumatic)
 	timer.Simple(0.1,function()
 		if not IsValid(owner) then return end
-		owner:Notify(str, 1, "wake", 1, nil, Color(255, math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255), math.Clamp(1 / hg.likely_to_phrase(owner) * 255, 0, 255)) )
+		owner:Notify(str, 1, "wake", 1, nil, hg.get_notify_color(owner))
 	end)
 
 	owner.organism.fearadd = owner.organism.fearadd + 5

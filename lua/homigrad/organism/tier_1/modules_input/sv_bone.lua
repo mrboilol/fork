@@ -521,15 +521,19 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	org.shock = org.shock + dmg * 3
 
 
-	-- A clean blunt jaw shot is the reliable knockout route, not an automatic stun
-	-- from every small hit.  Bone damage contributes, but a solid impact is still
-	-- required before the chance becomes high.
+	-- A clean blunt jaw shot is the reliable knockout route.  It takes a solid
+	-- impact, but repeated jaw damage makes the next one increasingly likely to
+	-- put the victim fully unconscious instead of only applying a light stun.
 	local jawImpact = dmg * concussionMul
-	if isCrush(dmgInfo) and jawImpact >= 0.35 then
-		local knockoutChance = math.Clamp(0.20 + jawImpact * 0.12 + jawDelta * 0.50, 0.25, 0.70)
+	if isCrush(dmgInfo) and jawImpact >= 0.22 then
+		local knockoutChance = math.Clamp(0.12 + jawImpact * 0.20 + jawDelta * 0.65 + (org.jaw or 0) * 0.18, 0.15, 0.82)
 		if org.isPly and math.random() < knockoutChance then
 			timer.Simple(0, function()
-				if IsValid(org.owner) then hg.LightStunPlayer(org.owner, 1 + math.min(jawImpact, 2)) end
+				if not IsValid(org.owner) then return end
+				org.needotrub = true
+				org.shock = (org.shock or 0) + math.Clamp(8 + jawImpact * 8, 8, 24)
+				org.consciousness = math.min(org.consciousness or 1, 0.08)
+				hg.LightStunPlayer(org.owner, 1 + math.min(jawImpact, 2))
 			end)
 		end
 	end
@@ -611,12 +615,17 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	-- Brain trauma from a protected skull is an exceptional consequence of a
-	-- heavy blow, rather than the default result of any head contact.
+	-- hard blow.  A fractured skull stops absorbing the same repeat impacts,
+	-- which is how sustained head trauma can still become lethal.
 	local skullImpact = dmg * concussionMul
-	local brainTraumaChance = math.Clamp((skullImpact - 0.75) * 0.12 + skullDelta * 0.45, 0, 0.35)
-	local rnd = isCrush(dmgInfo) and skullImpact >= 0.75 and math.random() < brainTraumaChance
+	local repeatSkullHit = oldDmg >= 0.85 and skullImpact >= 0.45
+	local hardSkullHit = skullImpact >= 1.65
+	local brainTraumaChance = math.Clamp((skullImpact - 1.05) * 0.10 + math.max(skullDelta - 0.20, 0) * 0.35 + (repeatSkullHit and 0.12 or 0), 0, 0.45)
+	local rnd = isCrush(dmgInfo) and (hardSkullHit or math.random() < brainTraumaChance)
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and skullImpact * 0.75 or 0)
-	org.brain = math.min(org.brain + (rnd and skullImpact * 0.02 or 0), 1)
+	local brainTrauma = rnd and skullImpact * (hardSkullHit and 0.045 or 0.022) or 0
+	if repeatSkullHit then brainTrauma = brainTrauma + skullImpact * 0.012 end
+	org.brain = math.min(org.brain + brainTrauma, 1)
 
 	if math.random(1, 4) == 1 then
 		local eye_dmg = dmg * math.Rand(0.8, 1.5)

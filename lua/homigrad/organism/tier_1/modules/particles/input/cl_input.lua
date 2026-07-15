@@ -46,6 +46,7 @@ local function addBloodPart(pos, vel, mat, w, h, artery, kishki, owner)
 	end
 	
 	local part = {pos, pos2, vel, mat or mat_huy, w or 2, h or 2, CurTime(), artery = artery, kishki = kishki, owner = owner, start_velocity = IsValid(owner) and owner:GetVelocity() or vector_origin, active = true}
+	part.decalWeight = math.max(w or 2, h or 2)
 	hg.bloodparticles1[#hg.bloodparticles1 + 1] = part
 
 	return part

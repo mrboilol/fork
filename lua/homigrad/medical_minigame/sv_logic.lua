@@ -304,7 +304,9 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
         end
     end
 
-    requiredCompletions = math.max(math.ceil(requiredCompletions * GetMedicalMinigameOtherSpeedMultiplier(ply, target)), 1)
+    -- Bandages are quick field dressings: require fewer full wraps while keeping
+    -- the amount healed per completed wrap unchanged.
+    requiredCompletions = math.max(math.ceil(requiredCompletions * 0.65 * GetMedicalMinigameOtherSpeedMultiplier(ply, target)), 1)
 
     local existingSession = hg.MedicalMinigame.BandageSessions[ply]
     if not existingSession or existingSession.target ~= target then

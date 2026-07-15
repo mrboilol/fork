@@ -108,9 +108,28 @@ function ClearDecalToEnt(ent)
 end
 
 local matRepl = Material("decals/decalsplash")
-local bloodMaterialVersion = 2
+local bloodMaterialVersion = 4
 local curmat
 local curmat2
+
+local function CopyMaterialValue(value)
+	local valueType = type(value)
+
+	if valueType == "ITexture" then return value:GetName() end
+	if valueType == "Vector" or valueType == "VMatrix" or valueType == "Angle" then return tostring(value) end
+	if valueType == "boolean" then return value and 1 or 0 end
+	if valueType == "string" or valueType == "number" then return value end
+	if valueType != "table" then return nil end
+
+	local copy = {}
+	for key, child in pairs(value) do
+		local copied = CopyMaterialValue(child)
+		if copied != nil then copy[key] = copied end
+	end
+
+	return copy
+end
+
 function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, size, alpha)
 	if !IsValid(ent) then return end
 
@@ -132,29 +151,39 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	end
 
 	local firstime = ent.decalshuy[id] == nil
-	if firstime then
-		ent.decalshuy[id] = ent:GetSubMaterial(id - 1)
-	else
+	if not firstime then
 		subm = ent.decalshuy[id] != "" and ent.decalshuy[id] or ent:GetMaterials()[id]
 	end
 
 	local mata = Material(subm)
 	if !mata then return end
 
-	local tabla = mata:GetKeyValues()
+	local basetexture = mata:GetTexture("$basetexture")
+	if !basetexture then return end
+
+	-- Replacing $basetexture with a render target changes the entire outfit and
+	-- can make VertexLitGeneric player materials render black. Blood belongs in
+	-- a transparent detail layer so the model keeps its original base texture.
+	-- Do not steal an existing detail slot; that can contain the clothing pattern.
+	local olddetail = mata:GetTexture("$detail")
+	if olddetail and olddetail:GetName() != "error" then return end
+
+	if firstime then
+		ent.decalshuy[id] = ent:GetSubMaterial(id - 1)
+	end
+
+	-- CreateMaterial accepts texture names, not the ITexture objects returned by
+	-- GetKeyValues. Convert the clone data so bump/phong textures stay valid.
+	local tabla = CopyMaterialValue(mata:GetKeyValues())
+	-- Source's internal material flags are added by CreateMaterial itself.
+	-- Passing its serialized copies back in declares each flag twice.
+	tabla["$flags"] = nil
+	tabla["$flags2"] = nil
+	tabla["$flags_defined"] = nil
+	tabla["$flags_defined2"] = nil
 	
 	-- you should set up entIndex for CSModels since their entIndex is -1
 	local materialKey = mata:GetName()..":"..(entIndex or ent:EntIndex())..":"..id..":v"..bloodMaterialVersion
-	local mat = ent.hgBloodDecalMaterials[id]
-	if not mat then
-		-- Clone the complete outfit material. Building this from an empty table
-		-- drops its phong, tint, bumpmap, alpha, and other shader settings.
-		mat = CreateMaterial("hg_blood_"..util.CRC(materialKey), mata:GetShader(), tabla)
-		ent.hgBloodDecalMaterials[id] = mat
-	end
-	
-	local basetexture = mata:GetTexture("$basetexture")
-	if !basetexture then return end
 
 	local size = size or 512
 
@@ -165,6 +194,19 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	if not rt then
 		rt = GetRenderTargetEx("hg_blood_rt_"..util.CRC(materialKey), size, size, RT_SIZE_OFFSCREEN, MATERIAL_RT_DEPTH_SHARED, 0, CREATERENDERTARGETFLAGS_HDR, IMAGE_FORMAT_ARGB8888)
 		ent.hgBloodDecalRenderTargets[id] = rt
+	end
+
+	local mat = ent.hgBloodDecalMaterials[id]
+	if not mat then
+		-- Clone the complete source material, then add the blood overlay. Keeping
+		-- its original shader parameters preserves phong, tint, bumpmaps and alpha.
+		tabla["$basetexture"] = basetexture:GetName()
+		tabla["$detail"] = rt:GetName()
+		tabla["$detailscale"] = 1
+		tabla["$detailblendfactor"] = 1
+		tabla["$detailblendmode"] = 2
+		mat = CreateMaterial("hg_blood_"..util.CRC(materialKey), mata:GetShader(), tabla)
+		ent.hgBloodDecalMaterials[id] = mat
 	end
 
 	render.PushRenderTarget(rt)
@@ -178,12 +220,6 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	local rot = rot or math.Rand(-180, 180)
 	
 	cam.Start2D()
-		if resetBaseTexture then
-			-- Bake blood into a copy of the base texture so an outfit's existing
-			-- $detail texture (often its actual clothing pattern) stays untouched.
-			render.DrawTextureToScreenRect(basetexture, 0, 0, size, size)
-		end
-
 		surface.SetDrawColor( 255, 255, 255, alpha or math.random(100, 255) )
 		surface.SetMaterial( tex )
 		--surface.SetTexture(surface.GetTextureID("zbattle/blood"))
@@ -193,7 +229,11 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 
 	render.PopRenderTarget()
 
-	mat:SetTexture("$basetexture", rt)
+	mat:SetTexture("$basetexture", basetexture)
+	mat:SetTexture("$detail", rt)
+	mat:SetFloat("$detailscale", 1)
+	mat:SetFloat("$detailblendfactor", 1)
+	mat:SetInt("$detailblendmode", 2)
 
 	curmat = mat
 	curmat2 = mata

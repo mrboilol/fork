@@ -190,6 +190,9 @@ local function GetFloorReloadHandling(ply)
 
 	local speedMult = (chosenArm == "both") and 0.38 or 0.75
 	local dropChanceMult = (chosenArm == "both") and 0.25 or 0.75
+	-- One-handed floor reloads are possible, but the weaker left-hand-only
+	-- manipulation is much more likely to fail than the usual right hand.
+	local reloadFailChance = chosenArm == "right" and 0.12 or (chosenArm == "left" and 0.42 or 0)
 	local painAmount = 0
 	local missingHands = (rightUsable and 0 or 1) + (leftUsable and 0 or 1)
 	local damagedHands = (rightBroken and 1 or 0) + (leftBroken and 1 or 0)
@@ -218,7 +221,7 @@ local function GetFloorReloadHandling(ply)
 		painAmount = painAmount + 5
 	end
 
-	return chosenArm, isRight, isBroken, math.Clamp(speedMult, 0.5, 1.9), math.Clamp(dropChanceMult, 0.4, 2.0), painAmount
+	return chosenArm, isRight, isBroken, math.Clamp(speedMult, 0.5, 1.9), math.Clamp(dropChanceMult, 0.4, 2.0), painAmount, reloadFailChance
 end
 
 concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
@@ -235,7 +238,7 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 	local needsCycle = ent.IsManuallyCycledWeapon and ent:IsManuallyCycledWeapon() and ent.drawBullet == false
 
 	-- Calculate prioritized arm and penalties for floor reload
-	local chosenArm, isRight, isBroken, speedMult, dropChanceMult, painAmount = GetFloorReloadHandling(ply)
+	local chosenArm, isRight, isBroken, speedMult, dropChanceMult, painAmount, reloadFailChance = GetFloorReloadHandling(ply)
 	if not chosenArm then return end
 
 	-- Add pain when using broken arm during floor reload (overall hurt more!)
@@ -249,6 +252,7 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 	dropChanceMult = dropChanceMult * fearDropFactor
 
 	if clip >= maxclip and not needsCycle and not (isshotgun and not ent.drawBullet) then return end
+	local reloadFailed = reloadFailChance > 0 and mRand(0, 1) < reloadFailChance
 
 	if limbs and clip < maxclip or (ammocount > 0 or needsCycle or (isshotgun and clip > 0 and not ent.drawBullet)) then
 		if isshotgun and ent.drawBullet and ammocount <= 0 then return end
@@ -316,6 +320,12 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 			ply:ViewPunch(AngleRand(-2, 2))
 			ply:PickupWeapon(ent)
 			ply:SetActiveWeapon(ent)
+			if reloadFailed then
+				ent:EmitSound("physics/metal/weapon_impact_hard"..mRandom(3)..".wav", 60)
+				ply:Notify("You fumble the reload.", 4)
+				FailSafe(ply)
+				return
+			end
 			if needsCycle and clip >= maxclip and ammocount > 0 then
 				ent.AnimStart_Draw = CurTime()
 				if ent.Draw then ent:Draw(true) end

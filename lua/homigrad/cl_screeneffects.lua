@@ -90,11 +90,6 @@ local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distort
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local themeVolume = CreateClientConVar("hg_theme_volume", "1", true, false, "Volume multiplier for despair, panic, and giving-up themes", 0, 2)
 local hook_Run = hook.Run
-local hg_despairsystem_convar
-local function despair_system_mode()
-	if not hg_despairsystem_convar then hg_despairsystem_convar = GetConVar("hg_despairsystem") end
-	return hg_despairsystem_convar and hg_despairsystem_convar:GetInt() or 0
-end
 local hg_ptsd_effects_convar
 local hg_ptsd_enabled_convar
 local function ptsd_effects_enabled()
@@ -398,6 +393,7 @@ lobotomy_next_forced_flash = 0
 lobotomy_recent_trauma = 0
 lobotomy_recent_trauma_power = 0
 disorientationFxLerp = 0
+adrenalineVisualLerp = 0
 lastDisorientationFx = 0
 lastConcussionFx = 0
 nextNeuroTinnitus = 0
@@ -619,6 +615,7 @@ local function stopthings()
 	headtraumaSaturation = 0
 	consciousnessLerp = 1
 	grayscaleLerp = 0
+	adrenalineVisualLerp = 0
 
 	lply.tinnitus = 0
 	nextPanicAttackShake = 0
@@ -880,10 +877,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
     end
 
     local adrenaline = org.adrenaline or 0
-    if adrenaline > 2.5 then
-        blurAmount = math.max(blurAmount, (adrenaline - 2.5) * 3)
+    local adrenalineIntensity = math.Clamp((adrenaline - 1) / 1.5, 0, 1)
+    if adrenalineIntensity > 0 then
+		-- A sustained surge should feel increasingly disorienting instead of
+		-- jumping straight to its final visual strength.
+		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 1, FrameTime() * (0.08 + adrenalineIntensity * 0.22))
+		local adrenalineShock = adrenalineIntensity * (0.35 + adrenalineVisualLerp * 2.65)
+		blurAmount = math.max(blurAmount, adrenalineShock * 1.5)
 
-		local adrenalineShock = (adrenaline - 2.5) * 2
         if not (lply:IsBerserk() or lply:IsStimulated()) then
             render.UpdateScreenEffectTexture()
             heatMat:SetFloat("$c0_x", -CurTime() * 0.18)
@@ -897,8 +898,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
             chromaticMat:SetInt("$c0_y", 1)
             render.SetMaterial(chromaticMat)
             render.DrawScreenQuad()
-        end
+		end
 		hg.DrawVignetteLayer(vignetteMat, adrenalineShock * 0.6, adrenalineShock * 0.8)
+	else
+		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 0, FrameTime() * 0.45)
     end
 
     if blurAmount > 0 then
@@ -1356,9 +1359,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	-- Consciousness whitenoise: ramps up from 0 at 0.95 consciousness to full at 0.1
-	-- Despair overrides this sound
-	local ptsdDistress = math.max(math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75, math.Clamp(org.despair or 0, 0, 1))
-	if despair_system_mode() == 0 or not ptsd_effects_enabled() then ptsdDistress = 0 end
+	-- PTSD distress overrides this sound.
+	local ptsdDistress = math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75
+	if not ptsd_effects_enabled() then ptsdDistress = 0 end
 
 	if not org.otrub and (org.consciousness or 1) < 0.95 and ptsdDistress <= 0 then
 		local consciousnessVol = math.Remap(org.consciousness, 0.95, 0.1, 0, 1)
@@ -1688,7 +1691,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if o2 > 50 and !org.otrub then
 			local dyingMode = hg_dyingsound:GetInt()
 
-			-- Despair is handled by the cl_despair theme; dying sounds keep playing in the background
+			-- PTSD effects do not suppress the normal dying-sound background.
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
 				sound.PlayFile("sound/zbattle/conscioustypebeat.ogg", "noblock noplay", function(station)
@@ -2095,8 +2098,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	local despair = org.givingUp and 0 or math.max(math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75, math.Clamp(org.despair or 0, 0, 1))
-	if despair_system_mode() == 0 or not ptsd_effects_enabled() then despair = 0 end
+	local despair = org.givingUp and 0 or math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75
+	if not ptsd_effects_enabled() then despair = 0 end
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
 
@@ -2146,7 +2149,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_mulb"] = -despairGrayShock * 0.02
 	end
 
-	-- Despair sound is handled by cl_despair.lua module
+	-- PTSD uses this shared visual layer; panic audio is handled separately.
 
 	-- Give up mechanic: white vignette and itssofuckingover.mp3
 	if org.givingUp then
@@ -2273,8 +2276,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		local adrenaline = org.adrenaline or 0
-		if adrenaline > 4 then
-			grayscaleTarget = grayscaleTarget + math.Clamp((adrenaline - 4) / 1, 0, 1) * 0.20
+		local adrenalineIntensity = math.Clamp((adrenaline - 1) / 1.5, 0, 1)
+		if adrenalineIntensity > 0 then
+			grayscaleTarget = grayscaleTarget + adrenalineIntensity * (0.03 + adrenalineVisualLerp * 0.17)
 		end
 
 		local blood = org.blood or 5000

@@ -9,11 +9,13 @@ hg.organism.input_list = hg.organism.input_list or {}
 local vecZero, angZero = Vector(), Angle()
 local hook_Run = hook.Run
 local input_list = hg.organism.input_list
-local head_otrub_min_damage = 0.05
-local head_otrub_chance_mul = 1.25
-local head_otrub_max_chance = 0.35
-local head_consciousness_mul = 28
-local head_otrub_consciousness_cap = 0.04
+-- Jaw trauma is the ordinary blunt knockout route.  Generic head collisions
+-- still can knock someone out, but only when they are genuinely severe.
+local head_otrub_min_damage = 0.55
+local head_otrub_chance_mul = 0.35
+local head_otrub_max_chance = 0.18
+local head_consciousness_mul = 8
+local head_otrub_consciousness_cap = 0.08
 local instant_pain_shock_scale = 0.75
 local melee_pain_scale = 0.4
 local melee_shock_scale = 0.45
@@ -1397,8 +1399,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			
 			hg.AddForceRag(ply, bone, force * 0.5, 0.5)
 
-			if ply.AddForceRag[bone][2] and ply.AddForceRag[bone][2]:Length() > 4500 then //по-моему какие-то большие значения, не?
-				if ply.AddForceRag[bone][2]:Length() > 7000 then
+			local ragForce = ply.AddForceRag and ply.AddForceRag[bone] and ply.AddForceRag[bone][2]
+			if isvector(ragForce) and ragForce:Length() > 4500 then //по-моему какие-то большие значения, не?
+				if ragForce:Length() > 7000 then
 					hg.StunPlayer(ply, 0.5)
 					hg.LightStunPlayer(ply, 2)
 				else
@@ -1966,8 +1969,8 @@ local function velocityDamage(ent, data)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
 			
-			hg.organism.input_list.skull(org, bone, dmg * 6 * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
-			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+			hg.organism.input_list.skull(org, bone, dmg * 3.25 * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
+			hg.organism.input_list.jaw(org, bone, dmg * 1.35 * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 			
 			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
 			
@@ -3291,6 +3294,27 @@ end
 
 local jointStressThinkDelay = 0.12
 local nextJointStressThink = 0
+local crushPressureHoldTime = 0.55
+local crushPressureDecay = 2
+
+-- PhysObj:GetStress() reports received stress in kilograms. Require it to be
+-- sustained so a heavy object pinning a body part can sever it without making
+-- ordinary impacts or the ragdoll's own weight trigger amputations.
+local crushPressureThresholds = {
+	head = 180,
+	larm = 260,
+	rarm = 260,
+	lleg = 300,
+	rleg = 300,
+}
+
+local crushPressureParts = {
+	[HITGROUP_HEAD] = "head",
+	[HITGROUP_LEFTARM] = "larm",
+	[HITGROUP_RIGHTARM] = "rarm",
+	[HITGROUP_LEFTLEG] = "lleg",
+	[HITGROUP_RIGHTLEG] = "rleg",
+}
 
 local function getJointPhys(ragdoll, boneName)
 	local boneID = ragdoll:LookupBone(boneName)
@@ -3309,6 +3333,64 @@ local function getRagdollOrganism(ragdoll)
 	local ply = hg.RagdollOwner and hg.RagdollOwner(ragdoll)
 	if IsValid(ply) and ply.organism then return ply.organism, ply end
 	if ragdoll.organism then return ragdoll.organism, ragdoll.organism.owner end
+end
+
+local function amputateFromCrushPressure(ragdoll, org, part, pressure)
+	if org[part .. "amputated"] then return end
+	if not IsValid(org.owner) then return end
+
+	ragdoll.HG_CrushPressureTriggered = ragdoll.HG_CrushPressureTriggered or {}
+	if ragdoll.HG_CrushPressureTriggered[part] then return end
+	ragdoll.HG_CrushPressureTriggered[part] = true
+
+	if part == "head" then
+		hg.ExplodeHead(ragdoll)
+	else
+		hg.organism.AmputateLimb(org, part)
+	end
+
+	print("[HG CrushPressure] AMPUTATED " .. part .. " pressure=" .. tostring(math.Round(pressure)) .. "kg")
+end
+
+local function checkRagdollCrushPressure(ragdoll)
+	if not IsValid(ragdoll) or not ragdoll:IsRagdoll() then return end
+
+	local org = getRagdollOrganism(ragdoll)
+	if not org or org.godmode then return end
+
+	local pressureByPart = {}
+	for physID = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+		local phys = ragdoll:GetPhysicsObjectNum(physID)
+		if IsValid(phys) then
+			local boneID = ragdoll:TranslatePhysBoneToBone(physID)
+			local boneName = boneID and ragdoll:GetBoneName(boneID)
+			local part = crushPressureParts[bonetohitgroup[boneName]]
+			if part and not org[part .. "amputated"] then
+				local _, receivedStress = phys:GetStress()
+				receivedStress = tonumber(receivedStress) or 0
+				pressureByPart[part] = math.max(pressureByPart[part] or 0, receivedStress)
+			end
+		end
+	end
+
+	ragdoll.HG_CrushPressureTime = ragdoll.HG_CrushPressureTime or {}
+	for part, threshold in pairs(crushPressureThresholds) do
+		if not org[part .. "amputated"] then
+			local pressure = pressureByPart[part] or 0
+			local exposure = ragdoll.HG_CrushPressureTime[part] or 0
+			if pressure >= threshold then
+				exposure = exposure + jointStressThinkDelay * math.Clamp(pressure / threshold, 1, 3)
+			else
+				exposure = math.max(exposure - jointStressThinkDelay * crushPressureDecay, 0)
+			end
+			ragdoll.HG_CrushPressureTime[part] = exposure
+
+			if exposure >= crushPressureHoldTime then
+				amputateFromCrushPressure(ragdoll, org, part, pressure)
+				ragdoll.HG_CrushPressureTime[part] = 0
+			end
+		end
+	end
 end
 
 local function jointStressValue(ragdoll, cacheKey, phys1, phys2)
@@ -3405,6 +3487,7 @@ hook.Add("Think", "HG_JointForceDislocation", function()
 
 	for _, ragdoll in ipairs(ents.FindByClass("prop_ragdoll")) do
 		checkRagdollJointStress(ragdoll)
+		checkRagdollCrushPressure(ragdoll)
 	end
 end)
 

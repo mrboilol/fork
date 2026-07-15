@@ -455,7 +455,6 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		if org.bloodpressure and org.bloodpressure < 80 and runnin then
 			k = k * math.Clamp(math.Remap(org.bloodpressure, 20, 80, 0.65, 1), 0.65, 1)
 		end
-			k = k * (1 - math.Clamp(org.despair or 0, 0, 1) * 0.28)
 		if org.panicattackActive then k = k * 0.5 end
 		if org.givingUp then k = k * 0.5 end
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)

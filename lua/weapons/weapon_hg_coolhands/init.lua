@@ -205,10 +205,6 @@ function SWEP:ApplyForce()
 			mul = mul * (1 + ply.organism.noradrenaline / 5)
 		end
 
-		if (ply.organism and ply.organism.noradrenaline >= 0.5) then
-			mul = mul * (1 + ply.organism.noradrenaline / 5)
-		end
-
 		local avec = vec * len * 8 - phys:GetVelocity()
 
 		local Force = avec * mul
@@ -216,8 +212,6 @@ function SWEP:ApplyForce()
 
 		Force = Force:GetNormalized() * ForceMagnitude
 
-		local maxlen = self.ReachDistance * 2.5 * (ply.organism.superfighter and 2 or 1) * (1 + ply.organism.berserk) * (1 + ply.organism.noradrenaline)
-		if len > maxlen then
 		local maxlen = self.ReachDistance * 2.5 * (ply.organism.superfighter and 2 or 1) * (1 + ply.organism.berserk) * (1 + ply.organism.noradrenaline)
 		if len > maxlen then
 			self:SetCarrying()
@@ -315,14 +309,11 @@ function SWEP:ApplyForce()
 						end
 
 						if (bone == "ValveBiped.Bip01_Head1") then
-							if (org.o2.curregen == 0 or not org.alive or org.holdingbreath) then
-								--ply:ChatPrint("Not breathing.")
-							if (org.o2.curregen == 0 or not org.alive or org.holdingbreath) then
-								--ply:ChatPrint("Not breathing.")
-							else
-								--ply:ChatPrint("Breathing.")
-								--ply:ChatPrint("Breathing.")
-							end
+						if (org.o2.curregen == 0 or not org.alive or org.holdingbreath) then
+							--ply:ChatPrint("Not breathing.")
+						else
+							--ply:ChatPrint("Breathing.")
+						end
 
 							--ply:ChatPrint(org.otrub and "No reaction." or "Reaction present.")
 							--ply:ChatPrint(org.otrub and "No reaction." or "Reaction present.")
@@ -357,8 +348,6 @@ function SWEP:ApplyForce()
 				local trace = util.TraceLine(tr)
 				
 				if bone != "ValveBiped.Bip01_Spine2" or !trace.Hit then
-				
-				if bone != "ValveBiped.Bip01_Spine2" or !trace.Hit then
 					phys:ApplyForceCenter(ply:GetAimVector() * math.min(5000, phys:GetMass() * 800))
 					self:SetCarrying()
 				end
@@ -389,8 +378,9 @@ function SWEP:ApplyForce()
 							-- Much better pulse restoration - works even from 0
 							org.pulse = math.min(org.pulse + 15 * skillMult, 70)
 							
-							-- Blood pressure restoration
-							local targetBP = org.pulse * 1.2
+							-- Restore pressure into the cardiovascular model's MAP range instead
+							-- of using the old pulse-to-pressure scale (which topped out at 84).
+							local targetBP = math.Clamp(30 + org.pulse * 0.9, 35, 93)
 							org.bloodpressure = math.Approach(org.bloodpressure or 0, targetBP, 3 * skillMult)
 							
 							-- CO removal
@@ -441,7 +431,6 @@ function SWEP:ApplyForce()
 				self.firstTimePrint2 = true
 			end
 
-			if ply:KeyDown(IN_ATTACK) and ply.PlayerClassName == "furry" and org ~= nil and org.alive and org.owner.PlayerClassName != "furry" and !(org.owner.IsBerserk and org.owner:IsBerserk()) then
 			if ply:KeyDown(IN_ATTACK) and ply.PlayerClassName == "furry" and org ~= nil and org.alive and org.owner.PlayerClassName != "furry" and !(org.owner.IsBerserk and org.owner:IsBerserk()) then
 				org.assimilated = math.Approach(org.assimilated, 1, FrameTime() / 6)
 				ply:SetLocalVar("assimilation", org.assimilated)

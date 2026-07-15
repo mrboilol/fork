@@ -875,8 +875,7 @@ local tooltipTexts = {
 		death = {
 			[4] = {title = "Death", text = "You are dead. Observe what's happening."},
 			[3] = {title = "Giving Up", text = "Your body is shutting down. The heartbeat slows and darkness approaches."},
-			[2] = {title = "Panic", text = "Your heart is racing, adrenaline surging. You are fighting to stay alive."},
-			[1] = {title = "Despair", text = "Things are going wrong. Hope is fading, but not yet gone."}
+			[2] = {title = "Panic", text = "Your heart is racing, adrenaline surging. You are fighting to stay alive."}
 		},
 		berserk = {
 			[4] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
@@ -1334,15 +1333,6 @@ local function draw_status_effects()
 				level_num = 2,
 				priority = -800,
 				value = nil
-			})
-			currentEffectNames["death"] = true
-		elseif (org.despair or 0) >= 0.5 then
-			table.insert(effects, {
-				name = "death",
-				has_levels = true,
-				level_num = 1,
-				priority = -700,
-				value = math_floor(org.despair * 100)
 			})
 			currentEffectNames["death"] = true
 		end

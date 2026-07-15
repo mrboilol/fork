@@ -4,7 +4,6 @@ hg.adrenalineMusicStation = hg.adrenalineMusicStation or nil
 hg.adrenalineMusicVol = hg.adrenalineMusicVol or 0
 hg.adrenalineMusicLoading = false
 hg.lastAdrenalineAdd = hg.lastAdrenalineAdd or 0
-hg.lastDespair = hg.lastDespair or 0
 hg.lastFear = hg.lastFear or 0
 hg.lastCombatTime = hg.lastCombatTime or 0
 hg.adrenalineMusicThreaded = hg.adrenalineMusicThreaded or 0
@@ -93,7 +92,6 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 
 	local shouldPlay = false
 	local adrenalineAdd = org.adrenalineAdd or 0
-	local despair = org.despair or 0
 	local adrenaline = org.adrenaline or 0
 	local fear = org.fear or 0
 	local pain = org.pain or 0
@@ -124,7 +122,6 @@ hook.Add("Think", "hg_adrenalinemusic_check", function()
 	-- Track values for other systems but don't use them for triggering
 	hg.lastAdrenalineAdd = adrenalineAdd
 	hg.lastFear = fear
-	hg.lastDespair = despair
 
 	if shouldPlay then
 		start_adrenaline_music()
@@ -195,7 +192,6 @@ hook.Add("Player Spawn", "hg_adrenalinemusic_cleanup", function(ply)
 	if ply ~= lply then return end
 	stop_adrenaline_music(true)
 	hg.lastAdrenalineAdd = 0
-	hg.lastDespair = 0
 	hg.lastFear = 0
 	hg.lastCombatTime = 0
 	hg.adrenalineMusicThreaded = 0

@@ -399,6 +399,18 @@ if CLIENT then
 
 		if tbl and istable(tbl) and not table.IsEmpty(tbl) then
 			local msg, time, timeshow, clr, traumatic = tbl[1], tbl[2], tbl[3], tbl[4], tbl[5]
+			local pain = org.pain or 0
+			local shock = org.shock or 0
+			local adrenaline = org.adrenaline or 0
+			local fear = org.fear or 0
+			local blood = org.blood or 5000
+			local o2 = (org.o2 and org.o2[1]) or 30
+			local pulse = org.pulse or 70
+			local recentDamage = (org.lasthit or 0) > 0 and CurTime() - org.lasthit < 3
+			local dying = blood < 3750 or o2 < 12 or (pulse < 40 and pulse > 0)
+			local inPain = pain > 30
+			local inShock = shock > 20
+			local inAdrenalineOrFear = adrenaline > 0.5 or fear > 0.5
 
 			local mul = ((org.brain > 0.1 or org.pulse < 50) and 3 or 1)// * (org.fear > 0 and math.max(1 - org.fear, 0.6) or 1)
 			local time_one_symbol = 0.06 * mul//(lply.organism and lply.organism.fear >= 0.5 and 0.5 or 1)
@@ -439,7 +451,7 @@ if CLIENT then
 					last_time = nil
 				end
 
-				local desperateText = inPain or dying or inDespair
+				local desperateText = inPain or dying
 				local font = desperateText and hg.notificationDesperateFont or hg.notificationFont
 
 				surface.SetFont(font)
@@ -459,6 +471,11 @@ if CLIENT then
 					shakeY = math.Rand(-shakeScale, shakeScale)
 				elseif inShock then
 					local shakeScale = math.Clamp(shock / 80, 0, 1) * 5
+					shakeX = math.Rand(-shakeScale, shakeScale)
+					shakeY = math.Rand(-shakeScale, shakeScale)
+				elseif dying then
+					local severity = math.max(math.Clamp((3750 - blood) / 1750, 0, 1), math.Clamp((12 - o2) / 12, 0, 1))
+					local shakeScale = 1.5 + severity * 3.5
 					shakeX = math.Rand(-shakeScale, shakeScale)
 					shakeY = math.Rand(-shakeScale, shakeScale)
 				elseif inAdrenalineOrFear then

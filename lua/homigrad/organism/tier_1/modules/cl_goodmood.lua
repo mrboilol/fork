@@ -11,16 +11,13 @@ local goodmood_tab = {
 }
 
 local goodmood_lerp = 0
-local hg_despairsystem_convar
 local hg_ptsd_effects_convar
 local hg_ptsd_enabled_convar
 
 local function ptsd_effects_enabled()
     if not hg_ptsd_enabled_convar then hg_ptsd_enabled_convar = GetConVar("hg_ptsd_enabled") end
     if hg_ptsd_enabled_convar and not hg_ptsd_enabled_convar:GetBool() then return false end
-    if not hg_despairsystem_convar then hg_despairsystem_convar = GetConVar("hg_despairsystem") end
-    if hg_despairsystem_convar and hg_despairsystem_convar:GetInt() == 0 then return false end
-    if not hg_ptsd_effects_convar then hg_ptsd_effects_convar = GetConVar("hg_ptsd_effects_enabled") end
+	if not hg_ptsd_effects_convar then hg_ptsd_effects_convar = GetConVar("hg_ptsd_effects_enabled") end
     return not hg_ptsd_effects_convar or hg_ptsd_effects_convar:GetBool()
 end
 

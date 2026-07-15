@@ -221,9 +221,11 @@ local function playBloodDripImpact(pos, tr, artery)
 	sound.Play(impactSound, pos, math.random(10, 60), math.random(80, 120))
 end
 
-local function decalBlood(pos, normal, tr, artery, owner)
+local function decalBlood(pos, normal, tr, artery, owner, decalWeight)
 	-- Pool nearby splashes so a single burst does not immediately evict older
-	-- engine decals from the client's finite decal buffer.
+	-- engine decals from the client's finite decal buffer. Small drops begin
+	-- with the smallest decal; more blood in the same spot advances it through
+	-- the larger decal materials instead of making every drop look identical.
 	local vec = math.Round(pos[1] / bloodDecalCellSize)..":"..math.Round(pos[2] / bloodDecalCellSize)..":"..math.Round(pos[3] / bloodDecalCellSize)
 
 	hg.bloodcount = hg.bloodcount + 1
@@ -235,39 +237,35 @@ local function decalBlood(pos, normal, tr, artery, owner)
 
 	-- я не знаю насколько большой можно делать такие таблицы... надеюсь, что это не так страшно выйдет
 
+	local cell = hg.bloodpositions[vec]
+	if !istable(cell) then
+		cell = {hits = tonumber(cell) or 0, volume = 0, decalSize = 0}
+		hg.bloodpositions[vec] = cell
+	end
+
+	cell.hits = cell.hits + 1
+	cell.volume = math.min(cell.volume + math.Clamp(tonumber(decalWeight) or 1, 0.35, 6), 12)
+	local decalSize = math.Clamp(math.ceil(cell.volume / 2.2), 1, 5)
+	local grew = decalSize > cell.decalSize
+	if grew then cell.decalSize = decalSize end
+
 	if artery then
 		if !hg_old_blood:GetBool() then
-			local howmuch = 1
-			
-			//timer.Simple(0.1, function()
-				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-				if hg.bloodpositions[vec] < 4 then
-					util.Decal("Arterial.Blood2"..math.Clamp(hg.bloodpositions[vec], 1, 5), pos + normal, pos - normal, owner)
-				end
-				playBloodDripImpact(pos, tr, true)
-			//end)
+			if grew then
+				util.Decal("Arterial.Blood2"..decalSize, pos + normal, pos - normal, owner)
+			end
+			playBloodDripImpact(pos, tr, true)
 		else
 			util.Decal("Arterial.Blood1", pos + normal, pos - normal, owner)
 			playBloodDripImpact(pos, tr, true)
 		end
 	else
 		if !hg_old_blood:GetBool() then
-			local howmuch = 1
-			
-			//timer.Simple(0.1, function()
-				hg.bloodpositions[vec] = (hg.bloodpositions[vec] or 0) + 1
-				
-				playBloodDripImpact(pos, tr, false)
+			playBloodDripImpact(pos, tr, false)
 
-				if hg.bloodpositions[vec] < 4 then
-					util.Decal("Normal.Blood2"..math.Clamp((hg.bloodpositions[vec] or 0) + math.random(0, 2), 1, 5), pos + normal, pos - normal, owner)
-				end
-
-				if hg.bloodpositions[vec] == 50 then
-					util.Decal("Blood", pos + normal, pos - normal, owner)
-				end
-
-			//end)
+			if grew then
+				util.Decal("Normal.Blood2"..decalSize, pos + normal, pos - normal, owner)
+			end
 		else
 			util.Decal("Normal.Blood1", pos + normal, pos - normal, owner)
 			playBloodDripImpact(pos, tr, false)
@@ -337,7 +335,7 @@ bloodparticles_hook[2] = function(mul)
 			part.active = false
 			table_remove(hg.bloodparticles1, i)
 			local dir = result.HitNormal
-			decalBlood(result.HitPos, dir, result, part.artery, part.owner)
+			decalBlood(result.HitPos, dir, result, part.artery, part.owner, part.decalWeight)
 			
 			
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
@@ -365,7 +363,7 @@ bloodparticles_hook[2] = function(mul)
 				if !insolid and (part.nextput or 0) < CurTime() then
 					part.nextput = CurTime() + 1
 
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.decalWeight)
 				end
 
 				local insolid = result.StartSolid and IsValid(result.Entity)
@@ -391,7 +389,7 @@ bloodparticles_hook[2] = function(mul)
 				part.lerpedmove = LerpVector(1, part.lerpedmove or part[3] * mul, nextpos * mul * 2)
 				
 				if part.lerpedmove:LengthSqr() < 0.1 * mul then
-					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner)
+					decalBlood(result.HitPos, result.HitNormal, result, part.artery, part.owner, part.decalWeight)
 					
 					part.active = false
 					table_remove(hg.bloodparticles1, i)

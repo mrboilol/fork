@@ -130,31 +130,6 @@ module[2] = function(owner, org, timeValue)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
-	-- Convert excess fearadd to despair only when in incredible pain or dying
-	if org.fearadd > 1.5 then
-		local excessFear = org.fearadd - 1.5
-		local pain = org.pain or 0
-		local blood = org.blood or 5000
-		local o2val = org.o2 and org.o2[1] or 100
-		local dyingOrAgony = pain > 70 or blood < 2500 or o2val < 18
-		if dyingOrAgony then
-			local despairConversion = excessFear * timeValue * 0.005
-			org.despair = math.min((org.despair or 0) + despairConversion, 1)
-			org.fearadd = math.max(org.fearadd - despairConversion, 1.5)
-			org._despairLastGainedTime = CurTime()
-		end
-	end
-
-	-- If goodmood was fully chipped away by fear and we got some excess fearadd, add it to despair
-	-- Guarded: only convert if the player is actually hurt/dying, so fresh-spawn players never spiral into panic.
-	if (org.goodmood or 0) <= 0 and org.fearadd > 0.5 and hg.organism.should_gain_fear(org) then
-		local excessFear = org.fearadd - 0.5
-		local despairConversion = excessFear * timeValue * 0.02
-		org.despair = math.min((org.despair or 0) + despairConversion, 1)
-		org.fearadd = math.max(org.fearadd - despairConversion, 0.5)
-		org._despairLastGainedTime = CurTime()
-	end
-
 	-- Keep the existing pressure compensation, but let the configured blood
 	-- curve own the baseline heart-rate response to hemorrhage.
 	local perfusionPulse = org.pulse or 70
@@ -185,9 +160,6 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
 	if org.panicattackActive then heartbeat = heartbeat + 20 end -- adrenaline handles most of the boost
-	local despairHeartBoost = math.Clamp((org.despair or 0) - 0.3, 0, 0.7) / 0.7 * 35
-	if org.panicattackActive then despairHeartBoost = despairHeartBoost * 0.5 end
-	heartbeat = heartbeat + despairHeartBoost
 	if org.givingUp then heartbeat = heartbeat * 0.8 end
 
 	-- Viability limits the maximum rate the body can sustain, but compensation
@@ -536,22 +508,6 @@ module[2] = function(owner, org, timeValue)
 
 	local circulatoryRisk = (org.bloodpressure or 93) < 55 or (org.pulse or 70) < 35 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
 
-	-- Small heartstop chance from despair alone (not panic-only)
-	if (org.despair or 0) > 0.65 and not org.panicattackActive and circulatoryRisk then
-		if not org._despair_pulse_check or CurTime() > org._despair_pulse_check then
-			org._despair_pulse_check = CurTime() + 5 -- check every 5 seconds
-			local riskMul = math.Clamp((55 - (org.bloodpressure or 93)) / 35, 0.25, 1)
-			local despairChance = math.Clamp((org.despair - 0.65) / 0.35, 0, 1) * 0.0025 * riskMul
-			if org.givingUp then despairChance = despairChance * 1.5 end
-			local totalAdrenaline = (org.adrenaline or 0) + (org.adrenalineAdd or 0)
-			if totalAdrenaline > 1.0 then
-				despairChance = despairChance * math.max(0, 1 - (totalAdrenaline - 1.0) * 0.4)
-			end
-			if math.random() < despairChance then
-				org.heartstop = true
-			end
-		end
-	end
 end
 
 --if org.heartstop then org.needotrub = true end --не совсем...

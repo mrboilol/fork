@@ -7,6 +7,23 @@ local APmodule = hg.Appearance
 hg.PointShop = hg.PointShop or {}
 local PSmodule = hg.PointShop
 
+-- Appearance backpacks are gameplay inventory equipment too: they cover the
+-- body holster positions, so pistols and long guns must be drawn from the bag.
+local function SyncInventoryAccessoryEffects(ply, accessories)
+	local hasBackpack = false
+	if istable(accessories) then
+		for _, accessoryID in pairs(accessories) do
+			local data = hg.Accessories and hg.Accessories[accessoryID]
+			if data and data.inventoryRole == "backpack" then
+				hasBackpack = true
+				break
+			end
+		end
+	end
+
+	ply:SetNWBool("ZCityBodyHolsterBlocked", hasBackpack)
+end
+
 -- Stub function for permamodel check (not implemented)
 function APmodule.IsPermamodelEnabled(ply)
     return false
@@ -109,7 +126,8 @@ local function ForceApplyAppearance(ply, tbl, noModelChange)
         end
     end
 
-    ply:SetNetVar("Accessories", tbl.AAttachments)
+	ply:SetNetVar("Accessories", tbl.AAttachments)
+	SyncInventoryAccessoryEffects(ply, tbl.AAttachments)
 
     ply.CurAppearance = {}
     table.CopyFromTo(tbl, ply.CurAppearance)
