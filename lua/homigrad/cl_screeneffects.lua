@@ -137,7 +137,10 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	hook_Run("Post Pre Post Processing")
 
 	hook_Run("Post Post Processing")
-	DrawColorModify(tab)
+
+	hook_Run("Post Post Pre Post Processing")
+
+	hook_Run("Post Pain Processing")
 end)
 
 local postprs = hg.postprocess
@@ -321,6 +324,7 @@ zombMat = grainMat -- Material("effects/shaders/zb_zomb")
 hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
 local PainLerp = 0
+local painThresholdIntensityLerp = 1
 local PanicAttackLerp = 0
 local PanicStationVolume = 0
 local O2Lerp = 0
@@ -432,37 +436,72 @@ lobotomy_mats = {
 	[8] = Material("overlays/tallflash3.png")
 }
 
-consciousnessTypeBeatVolume = 0.18
-dying2Volume = 0.4
-remPainOverlayVolumeMul = 1.25
-remPainAgonyThreshold = 0.45
-remPainExcruciatingThreshold = 0.87
-remPainAgonyVolumeMul = 1.15
-remPainExcruciatingVolumeMul = 0.85
-painPulseIntensity = 0.12
-panicattackOverlayPath = "sound/rem_panicattack.mp3"
-panicattackVisualExponent = 1.75
-panicattackPulseFloor = 0.78
-panicattackPulseIntensity = 0.2
-panicattackShakeIntervalMin = 0.45
-panicattackShakeIntervalMax = 1.4
-panicattackShakeMul = 0.85
-
-seizureSoundPath = "sound/rem_seizure.ogg"
-seizureIntroDuration = 3
-seizureFlashDelayMin = 0.12
-seizureFlashDelayMax = 0.55
-seizureFlashDurationMin = 0.35
-seizureFlashDurationMax = 1.1
-seizureFlashSizeMin = 9000
-seizureFlashSizeMax = 18000
-seizureFinalFlashLead = 2
-seizureFinalFlashDuration = 5
-seizureFinalFlashSize = 90000
-seizureSoundVolume = 1
-seizureSoundOtrubVolume = 0.3
-seizureSoundOtrubPlaybackRate = 0.82
-seizureIntroTab = {
+local consciousnessTypeBeatVolume = 0.18
+local dying2Volume = 0.4
+local painBeatOverlayPath = "sound/rem_pain.mp3"
+local panicattackOverlayPath = "sound/rem_panicattack.mp3"
+local panicattackFadeStart = 0
+local panicattackThreshold = 0.55
+local panicattackVolumeMul = 1
+local panicattackVisualExponent = 1.75
+local panicattackPulseFloor = 0.78
+local panicattackPulseIntensity = 0.2
+local panicattackShakeIntervalMin = 0.45
+local panicattackShakeIntervalMax = 1.4
+local panicattackShakeMul = 0.85
+local painBeatOverlayVolumeMul = 1.25
+local painThresholdMax = 120
+local painAgonyThreshold = 0.45
+local painExcruciatingThreshold = 0.87
+local painAgonyVolumeMul = 1.15
+local painExcruciatingVolumeMul = 0.85
+local painLayerFadeLerp = 0.06
+local painEffectIntensity = 0.8
+local unconsciousPainEffectIntensity = 1.55
+local painPulseIntensity = 0.25
+local PainStationLoading = false
+local PanicStationLoading = false
+local PainStationOverlayLoading = false
+local AssimilationStationLoading = false
+local BrainTraumaStationLoading = false
+local TinnitusLoading = false
+local NoiseStationLoading = false
+local NoiseStation2Loading = false
+local NoiseStation2DyingLoading = false
+local painAudioGeneration = 0
+local painLayers = {
+	agony = {
+		path = "rem_agony.ogg",
+		threshold = painAgonyThreshold,
+		volumeMul = painAgonyVolumeMul,
+		fadeLerp = painLayerFadeLerp,
+		currentVolume = 0,
+		targetVolume = 0
+	},
+	excruciating = {
+		path = "rem_excruciatingpain.ogg",
+		threshold = painExcruciatingThreshold,
+		volumeMul = painExcruciatingVolumeMul,
+		fadeLerp = painLayerFadeLerp,
+		currentVolume = 0,
+		targetVolume = 0
+	}
+}
+local seizureSoundPath = "sound/rem_seizure.ogg"
+local seizureIntroDuration = 3
+local seizureFlashDelayMin = 0.12
+local seizureFlashDelayMax = 0.55
+local seizureFlashDurationMin = 0.35
+local seizureFlashDurationMax = 1.1
+local seizureFlashSizeMin = 9000
+local seizureFlashSizeMax = 18000
+local seizureFinalFlashLead = 2
+local seizureFinalFlashDuration = 5
+local seizureFinalFlashSize = 90000
+local seizureSoundVolume = 1
+local seizureSoundOtrubVolume = 0.3
+local seizureSoundOtrubPlaybackRate = 0.82
+local seizureIntroTab = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
 	["$pp_colour_addb"] = 0,
@@ -629,6 +668,7 @@ end
 
 local function stopthings()
 	PainLerp = 0
+	painThresholdIntensityLerp = 1
 	PanicAttackLerp = 0
 	PanicStationVolume = 0
 	O2Lerp = 0
@@ -1457,56 +1497,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
 		pain = PainLerp + strobe
 		shock = shockLerp
-		
-		-- Extreme pain flickering effect (> 90)
-		local extremePainFlicker = 0
-		if pain > 90 then
-			local flickerIntensity = (pain - 90) / 30 -- 0 to 1 as pain goes from 90 to 120
-			extremePainFlicker = math.abs(math.sin(CurTime() * 15)) * flickerIntensity * 0.5
-		end
-		
-		-- The vignette shader stops behaving predictably when fed very large values.
-		-- Clamp the combined pain/shock signal so extreme pain cannot wrap or wash
-		-- out the shock vignette.
-		local shockVignette = math.Clamp(pain / 30 + math.max(shock - 5, 0) / 2 + extremePainFlicker, 0, 10)
-		hg.DrawVignetteLayer(vignetteMat, org.otrub and 5 or shockVignette, org.otrub and 10 or shockVignette)
-
-		render.UpdateScreenEffectTexture()
-
-		painMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-		painMat:SetFloat("$c0_y", 0.8) //Gate
-		painMat:SetFloat("$c0_z", org.otrub and 1 or (1 + extremePainFlicker)) //ColorIntensity
-		painMat:SetFloat("$c1_x", math.Clamp(pain / 90 + (org.otrub and 0 or extremePainFlicker), 0, org.otrub and 0.75 or 0.85)) //Lerp
-		painMat:SetFloat("$c1_y", math.Clamp(pain / 90 + (org.otrub and 0 or extremePainFlicker), 0, org.otrub and 0.75 or 0.85)) //Vignette
-
-		render.SetMaterial(painMat)
-		render.DrawScreenQuad()
-
-		-- Pain is drawn after the shock pass and can otherwise wash the darker
-		-- shock vignette out at high values. Reapply the shock layer last so it
-		-- remains visible throughout the pain range.
-		hg.DrawVignetteLayer(vignetteMat, org.otrub and 5 or shockVignette, org.otrub and 10 or shockVignette)
-
-		if not org.otrub then
-			render.UpdateScreenEffectTexture()
-			chromaticMat:SetFloat("$c0_x", math.Clamp(shockLerp / 100 + extremePainFlicker * 0.3, 0, 0.35) * 1.5)
-			chromaticMat:SetInt("$c0_y", 1)
-			render.SetMaterial(chromaticMat)
-			render.DrawScreenQuad()
-		end
-
-		if not org.otrub and hg_damage_corner_distortion:GetBool() then
-			local painWarp = math.Clamp((pain - 18) / 92, 0, 1)
-			local trauma = math.Clamp(painWarp + (shock / 170) + (org.brain or 0) * 0.65 + (org.concussion or 0) / 14, 0, 1.25)
-			if painWarp > 0.01 or (org.brain or 0) > 0.12 or (org.concussion or 0) > 1 then
-				render.UpdateScreenEffectTexture()
-				heatMat:SetFloat("$c0_x", math.sin(CurTime() * 1.7) * trauma * 0.025)
-				heatMat:SetFloat("$c0_y", trauma * 0.018)
-				heatMat:SetFloat("$c2_x", (math.sin(CurTime() * 0.9) - 1.5) * trauma * 0.16)
-				render.SetMaterial(heatMat)
-				render.DrawScreenQuad()
-			end
-		end
 
 		if org.otrub then
 			hg.QueueMotionBlur(0.1, 1., 0.01)
@@ -1590,7 +1580,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 
 			BrainTraumaStationLoading = true
-			sound.PlayFile("sound/zcitysnd/real_sonar/brainhemorrhagestage"..chooser..".mp3", "noblock noplay", function(station, err)
+			sound.PlayFile("sound/rem_cerebralanoxia.wav", "noblock noplay", function(station, err)
 				BrainTraumaStationLoading = false
 				if IsValid(station) then
 					station:SetVolume(0)
@@ -2449,6 +2439,44 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 	end
+end)
+
+hook.Add("Post Pain Processing", "PainEffects", function()
+	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
+	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
+
+	local org = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
+	if not org or not org.brain then return end
+	if not ((PainLerp > 0.001 or shockLerp > 5) or org.otrub) then return end
+
+	local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
+	local pain = PainLerp + strobe
+	local shock = shockLerp
+	local thresholdReached = PainLerp >= painThresholdMax
+	painThresholdIntensityLerp = LerpFT(0.03, painThresholdIntensityLerp, thresholdReached and 5 or 1)
+	local intensityMul = painThresholdIntensityLerp
+	local coverage = thresholdReached and 1 or math.Clamp(pain / 70, 0, 0.95)
+	local effectIntensity = pain / 32 * painEffectIntensity * intensityMul + math.max(shock - 5, 0) / 2.4 * painEffectIntensity
+
+	render.UpdateScreenEffectTexture()
+
+	vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+	vignetteMat:SetFloat("$c0_z", org.otrub and 5 * unconsciousPainEffectIntensity or effectIntensity)
+	vignetteMat:SetFloat("$c1_y", org.otrub and 10 * unconsciousPainEffectIntensity or effectIntensity)
+
+	render.SetMaterial(vignetteMat)
+	render.DrawScreenQuad()
+
+	render.UpdateScreenEffectTexture()
+
+	painMat:SetFloat("$c2_x", CurTime() + 10000)
+	painMat:SetFloat("$c0_y", 0.8)
+	painMat:SetFloat("$c0_z", org.otrub and unconsciousPainEffectIntensity or painEffectIntensity * intensityMul)
+	painMat:SetFloat("$c1_x", coverage)
+	painMat:SetFloat("$c1_y", coverage)
+
+	render.SetMaterial(painMat)
+	render.DrawScreenQuad()
 end)
 
 hook.Add("Player_Death", "ItDoesntNow", function(ply)
