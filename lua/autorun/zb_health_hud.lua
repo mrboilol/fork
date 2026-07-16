@@ -428,7 +428,7 @@ HUD = {
 	organ_damage_threshold = 0.3,
 	fracture_threshold = 0.95,
 	
-	bleeding_threshold = 0.05,
+	bleeding_threshold = 0,
 	internal_bleed_threshold = 0.05,
 	
 	hypotension_threshold = 90,
@@ -777,10 +777,10 @@ local tooltipTexts = {
 			[1] = {title = "Mild pain", text = "Your average tuesday."}
 		},
 		bleeding = {
-			[4] = {title = "Critical Hemorrhage", text = "There so much blood, you better get help now."},
-			[3] = {title = "Severe Bleeding", text = "Blood is pouring out of you like a fire hose!"},
-			[2] = {title = "Moderate Bleeding", text = "This is severe enough to where you should start worrying about it."},
-			[1] = {title = "Minor Bleeding", text = "Blood is pouring out of a wound at a small rate."}
+			[4] = {title = "Catastrophic Bleeding", text = "There is so much blood, you need help immediately."},
+			[3] = {title = "Heavy Bleeding", text = "Blood is pouring out of you like a fire hose!"},
+			[2] = {title = "Normal Bleeding", text = "This needs treatment before it gets worse."},
+			[1] = {title = "Small Bleed", text = "Blood is coming from a wound at a small rate."}
 		},
 		internal_bleed = {title = "Internal bleeding", text = "Something inside broke and you are starting to lose blood inside, while not usually lethal on its own you should get it fixed to prevent complications."},
 		conscious = {
@@ -1652,9 +1652,9 @@ local function draw_status_effects()
 			local bleed_val = smooth.bleed or getOrgVal(org, "bleed", 0)
 			if bleed_val > HUD.bleeding_threshold then
 				local level_num = 1
-				if bleed_val > 1 then level_num = 2 end
-				if bleed_val > 1.5 then level_num = 3 end
-				if bleed_val > 2.5 then level_num = 4 end
+				if bleed_val > 0.05 then level_num = 2 end
+				if bleed_val > 0.1 then level_num = 3 end
+				if bleed_val > 0.15 then level_num = 4 end
 				
 				table.insert(effects, {
 					name = "bleeding",

@@ -1100,6 +1100,17 @@ kaz
 	local hemorrhage = org.brainHemorrhage or 0
 	local bleedRate = org.brainBleedRate or 0
 
+	-- Both treatments can stabilize an intracranial bleed: mannitol relieves
+	-- pressure, while tranexamic acid also slows the active bleed itself.
+	if (org.tranexamic_acid or 0) > 0 then
+		bleedRate = max(bleedRate - timeValue / 60000, 0)
+		org.brainBleedRate = bleedRate
+	end
+
+	local hemorrhageReliefRate = 0
+	if (org.mannitol or 0) > 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 800 end
+	if (org.tranexamic_acid or 0) > 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 1200 end
+
 	org.disorientation = math.max(org.disorientation, frontal * 0.35 + parietal * 0.65 + temporal * 0.25)
 	org.immobilization = math.max(org.immobilization, parietal * 8)
 	org.consciousness = math.min(org.consciousness, 1 - frontal * 0.35 - temporal * 0.15)
@@ -1118,6 +1129,10 @@ kaz
 		org.brainHemorrhage = min(hemorrhage + timeValue * bleedRate * 0.4, 1)
 		org.brain = min(org.brain + timeValue * bleedRate * (1 + hemorrhage), 1)
 		org.brainBleedRate = max(bleedRate - timeValue / 600000, 0)
+	end
+
+	if hemorrhageReliefRate > 0 and (org.brainHemorrhage or 0) > 0 then
+		org.brainHemorrhage = max(org.brainHemorrhage - timeValue * hemorrhageReliefRate, 0)
 	end
 
 	if occipital > 0.35 then
