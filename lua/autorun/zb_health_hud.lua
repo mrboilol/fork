@@ -725,10 +725,10 @@ local tooltipTexts = {
 		berserk_cardiac_arrest = {title = "Остановка сердца", text = "ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО."},
 		berserk_lungs_failure = {title = "Отказ лёгких", text = "ЭТО УЖЕ ЗВУЧИТ НЕ ТАК КРУТО."},
 		stroke = {
-			[4] = {title = "Инсульт", text = "Клетки мозга умирают. Вы теряете сознание, внутреннее кровотечение, и едва можете дышать."},
-			[3] = {title = "Высокий риск инсульта", text = "Сильная головная боль и спутанность сознания. Кто-нибудь чувствует запах железа?"},
-			[2] = {title = "Риск инсульта", text = "Головная боль и головокружение."},
-			[1] = {title = "Низкий риск инсульта", text = "Легкая головная боль."}
+			[4] = {title = "Массивное кровоизлияние в мозг", text = "Давление в черепе опасно высокое. Потеря сознания неизбежна."},
+			[3] = {title = "Тяжёлое кровоизлияние в мозг", text = "Сильная головная боль, спутанность сознания и быстрое ухудшение."},
+			[2] = {title = "Кровоизлияние в мозг", text = "Кровь скапливается в черепе. Вам становится всё хуже."},
+			[1] = {title = "Внутричерепное кровотечение", text = "Лёгкая головная боль и дезориентация."}
 		},
 		palpitations = {
             [4] = {title = "Фибрилляция", text = "Ваше сердце бьется хаотично. Немедленная медицинская помощь обязательна."},
@@ -893,10 +893,10 @@ local tooltipTexts = {
 		berserk_cardiac_arrest = {title = "Cardiac arrest", text = "You are already dead, but rage still drives you."},
 		berserk_lungs_failure = {title = "Lung failure", text = "No air to breathe, but berserk won't let you fall."},
 		stroke = {
-			[4] = {title = "Stroke", text = "Brain cells are dying. You are losing consciousness, bleeding internally, and can barely breathe."},
-			[3] = {title = "High Stroke Risk", text = "Severe headache and confusion. Does anyone smell iron?"},
-			[2] = {title = "Dizzyness", text = "Does anyone smell iron?"},
-			[1] = {title = "Confusion", text = "My brain feels funny..."}
+			[4] = {title = "Massive brain hemorrhage", text = "Pressure inside your skull is critically high. Losing consciousness is imminent."},
+			[3] = {title = "Severe brain hemorrhage", text = "A severe headache, confusion, and rapidly worsening condition."},
+			[2] = {title = "Brain hemorrhage", text = "Blood is building up inside your skull. Your condition is worsening."},
+			[1] = {title = "Intracranial bleeding", text = "A mild headache and disorientation."}
 		},
 		palpitations = {
             [4] = {title = "Ventricular Flutter", text = "Really fast and irregular to keep up with your abysmal performance, but this wont do, your heart will fail soon."},
@@ -1151,6 +1151,7 @@ local function draw_bar()
 	smooth.hemothorax = Lerp(s * dt, smooth.hemothorax or 0, getOrgVal(org, "hemothorax", 0))
 	smooth.analgesia = Lerp(s * dt, smooth.analgesia or 0, getOrgVal(org, "analgesia", 0))
 	smooth.brain = Lerp(s * dt, smooth.brain or 0, getOrgVal(org, "brain", 0))
+	smooth.brainHemorrhage = Lerp(s * dt, smooth.brainHemorrhage or 0, getOrgVal(org, "brainHemorrhage", 0))
 	smooth.wantToVomit = Lerp(s * dt, smooth.wantToVomit or 0, getOrgVal(org, "wantToVomit", 0))
 	
 	smooth.adrenaline = Lerp(s * dt, smooth.adrenaline or 0, getOrgVal(org, "adrenaline", 0))
@@ -1373,6 +1374,22 @@ local function draw_status_effects()
 		end
 		
 		local showAllIcons = not berserkActive
+		local hemorrhage_val = smooth.brainHemorrhage or getOrgVal(org, "brainHemorrhage", 0)
+		if hemorrhage_val > 0.05 then
+			local level_num = 1
+			if hemorrhage_val >= 0.75 then level_num = 4
+			elseif hemorrhage_val >= 0.5 then level_num = 3
+			elseif hemorrhage_val >= 0.25 then level_num = 2 end
+
+			table.insert(effects, {
+				name = "stroke",
+				level_num = level_num,
+				has_levels = true,
+				priority = 0.58,
+				value = math_floor(hemorrhage_val * 100)
+			})
+			currentEffectNames["stroke"] = true
+		end
 		
 		if berserkActive then
 			local brain_val = smooth.brain or getOrgVal(org, "brain", 0)

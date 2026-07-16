@@ -43,6 +43,11 @@ module[1] = function(org)
 
 	}
 
+	-- The HUD receives these fields through the organism table and uses them
+	-- for the encumbered moodle.
+	org.weight = 0
+	org.maxweight = 60
+
 
 
 	org.energy = 0
@@ -164,7 +169,13 @@ module[2] = function(owner, org, timeValue)
 
 	stamina.subadd = 0
 
-	stamina.weight = owner:IsPlayer() and math.Clamp((1 / hg.CalculateWeight(owner,250)) - 1,0,1) or 0
+	if owner:IsPlayer() then
+		org.weight = hg.GetCarryWeight(owner)
+		org.maxweight = 60
+		stamina.weight = math.Clamp(org.weight / 250, 0, 1)
+	else
+		stamina.weight = 0
+	end
 
 	local muffed = owner.armors and owner.armors["face"] == "mask2"
 

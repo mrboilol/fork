@@ -215,17 +215,14 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Brain damage tanks consciousness above 0.325
-
-	if (org.brain or 0) > 0.325 then
-
-		local brainSeverity = (org.brain - 0.325) / 0.675 -- 0 to 1 scaling
-
-		-- At 0.325: drains to 0 in ~10s; at max brain damage: drains to 0 in ~6s
-		local consciousnessDrain = (0.17 + brainSeverity * 0.06) * timeValue
-
-		org.consciousness = math.max((org.consciousness or 1) - consciousnessDrain, 0)
-
+	-- Brain trauma and intracranial bleeding share the normal unconsciousness
+	-- pipeline, so a hemorrhage cannot be hidden by the regular recovery step.
+	local brainSeverity = math.Clamp(((org.brain or 0) - 0.325) / 0.675, 0, 1)
+	local hemorrhageSeverity = math.Clamp(((org.brainHemorrhage or 0) - 0.05) / 0.95, 0, 1)
+	if brainSeverity > 0 or hemorrhageSeverity > 0 then
+		local consciousnessDrain = brainSeverity > 0 and (0.17 + brainSeverity * 0.06) or 0
+		consciousnessDrain = consciousnessDrain + hemorrhageSeverity * (0.02 + hemorrhageSeverity * 0.12)
+		org.consciousness = math.max((org.consciousness or 1) - consciousnessDrain * timeValue, 0)
 	end
 
 

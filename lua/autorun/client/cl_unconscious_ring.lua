@@ -54,6 +54,7 @@ surface.CreateFont("HomigradFontTypewriterSmall", {
 
 local ringAlpha = 0
 local lerpBrain = 0
+local lerpBrainHemorrhage = 0
 local lerpShock = 0
 local lerpConsciousness = 0
 local peakShock = 40
@@ -129,6 +130,7 @@ local function GetHeartbeatVolume(org)
     local hurt = math.Clamp((5000 - (org.blood or 5000)) / 5000, 0, 1) * 0.4
          + math.Clamp((org.pain or 0) / 100, 0, 1) * 0.4
          + math.Clamp(org.brain or 0, 0, 1) * 0.2
+         + math.Clamp(org.brainHemorrhage or 0, 0, 1) * 0.2
     return math.Clamp(0.2 + hurt, 0.2, 1.0)
 end
 
@@ -586,10 +588,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local pulse = org.pulse or 70
     local ecgState = org.ecgState or "normal_sinus"
     local brain = org.brain or 0
+    local brainHemorrhage = org.brainHemorrhage or 0
     local bloodpressure = org.bloodpressure or 93
     local consciousness = org.consciousness or 0
     local shock = org.shock or 0
-    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4)
+    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4) or (brainHemorrhage >= 0.4)
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
     fibrillationRequested = false
     fibrillationVolume = 0
@@ -630,6 +633,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or (org.blood and org.blood < 3000)
         or (org.o2 and org.o2[1] and org.o2[1] < 10)
         or (org.bloodpressure and org.bloodpressure < 50)
+        or brainHemorrhage >= 0.25
         or (heartbeat < 30 or heartbeat > 170)
     
     if not ply:Alive() or isUnconscious or not isInBadHealth then
@@ -653,7 +657,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     heartPhase = heartPhase + FrameTime() * (heartbeat / 60)
 
     local lowConsciousness = (org.consciousness or 1) < 0.4 and not isUnconscious
-    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4)
+    local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4) or (brainHemorrhage >= 0.4)
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     local fibrillating = heartbeat > 250
     local isElectricalArrest = org.heartstop or ecgState == "pea" or ecgState == "asystole"
@@ -718,6 +722,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     
     if otrubECGAlpha > 0.01 then
         lerpBrain = Lerp(FrameTime() * 3, lerpBrain, org.brain or 0)
+        lerpBrainHemorrhage = Lerp(FrameTime() * 3, lerpBrainHemorrhage, brainHemorrhage)
         lerpShock = Lerp(FrameTime() * 6, lerpShock, org.shock or 0)
         lerpConsciousness = Lerp(FrameTime() * 3, lerpConsciousness, org.consciousness or 0)
         
@@ -737,7 +742,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 			if dyingRing then
 				progress = math.Clamp((GetDyingRingTimeLeft(deathStateStart, deathStateEnd) or 0) / 20, 0, 1)
 			elseif isCritical then
-                progress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
+                local brainProgress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
+                local hemorrhageProgress = math.Clamp(1 - lerpBrainHemorrhage, 0, 1)
+                progress = math.min(brainProgress, hemorrhageProgress)
             else
                 local shockLimit = math.max(GetShockConsciousnessThreshold(org.analgesia or 0), 0.02)
                 local shockProgress = math.Clamp((shockLimit - lerpShock) / shockLimit, 0, 1)
@@ -817,7 +824,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             local target_ecgState = target_org.ecgState or "normal_sinus"
             local target_bp = target_org.bloodpressure or 93
             local target_brain = target_org.brain or 0
-            local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4)
+            local target_hemorrhage = target_org.brainHemorrhage or 0
+            local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4) or (target_hemorrhage >= 0.4)
             if target_heartbeat > 250 then
                 RequestFibrillationSound(GetHeartbeatVolume(target_org))
             end
@@ -854,7 +862,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 end
             end
 
-            DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, target_ecgState, Color(255, 255, 255, 255), ecgAlphaPulseCheck)
+            local targetECGColor = target_isCritical and Color(200, 0, 0, 255) or Color(255, 255, 255, 255)
+            DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, target_ecgState, targetECGColor, ecgAlphaPulseCheck)
 
             local displayText = ""
             if g_PulseCheckData then

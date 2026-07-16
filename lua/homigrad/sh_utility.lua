@@ -892,7 +892,7 @@ local IsValid = IsValid
 	end
 --//
 --\\ Calculate Weight 
-	function hg.CalculateWeight(ply,maxweight)
+	function hg.GetCarryWeight(ply)
 		local weight = 0
 
 		local weps = ply:GetWeapons()
@@ -913,9 +913,16 @@ local IsValid = IsValid
 
 		ply.armors = ply:GetNetVar("Armor",{})
 		for plc,arm in pairs(ply.armors) do
-			weight = weight + (hg.armor[plc][arm].mass or 1)
+			local armorSlot = hg.armor[plc]
+			local armor = armorSlot and armorSlot[arm]
+			weight = weight + (armor and armor.mass or 1)
 		end
 
+		return weight
+	end
+
+	function hg.CalculateWeight(ply,maxweight)
+		local weight = hg.GetCarryWeight(ply)
 		local weightmul = (1 / (weight / maxweight + 1))
 		return weightmul
 	end
