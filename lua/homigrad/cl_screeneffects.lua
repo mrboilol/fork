@@ -342,9 +342,6 @@ local brainFrontalColor = {
 	["$pp_colour_mulb"] = 0
 }
 
-local show_image_time = 0
-local show_some_images_time = 0
-local lobotomy_mats = {
 local vignetteCompositeFrame = -1
 local vignetteCompositeColor = 0
 local vignetteCompositeStrength = 0
@@ -1608,11 +1605,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	//if brain > 0.1 and not org.otrub and show_some_images_time > 0 and false then
 	local temporalTinnitus = math.Clamp(((org.brainTemporal or 0) - 0.1) / 0.9, 0, 1)
 	local tinnitusTime = lply.tinnitus and math.max(lply.tinnitus - CurTime(), 0) or 0
-	if (tinnitusTime > 0 or temporalTinnitus > 0.01) and lply:Alive() then
-		if (!IsValid(Tinnitus) or Tinnitus:GetState() != GMOD_CHANNEL_PLAYING) and not TinnitusLoading then
-			TinnitusLoading = true
-			sound.PlayFile("sound/zcitysnd/real_sonar/tinnitus"..math.random(3)..".mp3", "noblock noplay", function(station, err)
-				TinnitusLoading = false
 	local disorientation = org.disorientation or 0
 	local concussion = org.concussion or 0
 	local disorientationSpike = math.max(disorientation - (lastDisorientationFx or 0), 0)
@@ -1640,7 +1632,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	if lply.tinnitus and lply.tinnitus > CurTime() and lply:Alive() then
+	if (tinnitusTime > 0 or temporalTinnitus > 0.01) and lply:Alive() then
 		if canRetrySound("Tinnitus", Tinnitus) then
 			local choice = math.random(5)
 			local soundFile
@@ -2368,7 +2360,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	hg.FlushVignetteLayer()
 end)
 
-hook.Add("Post Post Pre Post Processing", "BrainLobeEffects", function()
+hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
 
