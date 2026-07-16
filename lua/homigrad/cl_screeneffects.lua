@@ -322,6 +322,7 @@ hurtoverlay = Material("zcity/neurotrauma/damageOverlay.png")
 
 local PainLerp = 0
 local PanicAttackLerp = 0
+local PanicStationVolume = 0
 local O2Lerp = 0
 local assimilatedLerp = 0
 local tempLerp = 36.6
@@ -629,6 +630,7 @@ end
 local function stopthings()
 	PainLerp = 0
 	PanicAttackLerp = 0
+	PanicStationVolume = 0
 	O2Lerp = 0
 	AnalgesiaLerp = 0
 	shockLerp = 0
@@ -1225,20 +1227,27 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			sound.PlayFile(panicattackOverlayPath, "noblock noplay", function(station)
 				if IsValid(station) then
 					station:SetVolume(0)
+					station:EnableLooping(true)
 					station:Play()
 					PanicStation = station
-					station:EnableLooping(true)
 				end
 			end)
 		end
 		if IsValid(PanicStation) then
-			PanicStation:SetVolume(math.Clamp(PanicAttackLerp, 0, 1))
+			PanicStationVolume = math.Approach(PanicStationVolume, math.Clamp(PanicAttackLerp, 0, 1), FrameTime() * 1.5)
+			PanicStation:SetVolume(PanicStationVolume)
 		end
 	else
 		nextPanicAttackShake = 0
 		if IsValid(PanicStation) then
-			PanicStation:Stop()
-			PanicStation = nil
+			PanicStationVolume = math.Approach(PanicStationVolume, 0, FrameTime() * 1.8)
+			PanicStation:SetVolume(PanicStationVolume)
+			if PanicStationVolume <= 0.001 then
+				PanicStation:Stop()
+				PanicStation = nil
+			end
+		else
+			PanicStationVolume = 0
 		end
 	end
 

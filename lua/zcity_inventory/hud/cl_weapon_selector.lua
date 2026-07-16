@@ -143,6 +143,9 @@ WS.BackpackEarlySelect = WS.BackpackEarlySelect or false
 WS.BackpackEarlyWeapon = WS.BackpackEarlyWeapon or nil
 WS.BackpackEarlySelected = WS.BackpackEarlySelected or false
 WS.BackpackPreviousWeapon = WS.BackpackPreviousWeapon or nil
+WS.SimpleBackpackDrawWeapon = WS.SimpleBackpackDrawWeapon or nil
+WS.SimpleBackpackDrawStarted = WS.SimpleBackpackDrawStarted or 0
+WS.SimpleBackpackDrawDuration = WS.SimpleBackpackDrawDuration or 0
 WS.ConfirmProgress = WS.ConfirmProgress or 0
 
 WS.BodyPlaces = {
@@ -320,12 +323,15 @@ local function ZCityGetSlotHoldDuration(ply, wep)
     return duration
 end
 
-local function ZCityCancelBackpackDraw(finished)
-    if not WS.BackpackEarlySelect then return end
-
+local function ZCitySendBackpackDrawCancel(finished)
     net.Start("ZCityBackpackDrawCancel")
         net.WriteBool(finished == true)
     net.SendToServer()
+end
+
+local function ZCityCancelBackpackDraw(finished)
+    if not WS.BackpackEarlySelect then return end
+    ZCitySendBackpackDrawCancel(finished)
 end
 
 local function ZCityStartBackpackDraw(ply, wep, duration)
@@ -349,6 +355,57 @@ local function ZCityPlayBackpackReachPreview(wep, duration)
 
     wep.ZCityNextBackpackReachPreview = CurTime() + math.max((duration or 1.15) * 0.45, 0.35)
     wep:PlayAnim(anim, math.max((duration or 1.15) * 1.7, 1.25), true)
+end
+
+function WS.ShouldDelayBackpackDraw(ply, wep)
+    return ZCityIsBodyHolsterBlocked(ply) and ZCityIsBackpackDrawWeaponForSelector(wep)
+end
+
+function WS.GetBackpackDrawDuration(ply, wep)
+    return ZCityGetSlotHoldDuration(ply, wep)
+end
+
+function WS.StartBackpackDraw(ply, wep, duration)
+    ZCityStartBackpackDraw(ply, wep, duration)
+end
+
+function WS.CancelBackpackDraw(finished)
+    ZCitySendBackpackDrawCancel(finished)
+end
+
+function WS.PlayBackpackReachPreview(wep, duration)
+    ZCityPlayBackpackReachPreview(wep, duration)
+end
+
+local function ZCityCancelSimpleBackpackDraw(finished)
+    if not IsValid(WS.SimpleBackpackDrawWeapon) then return end
+
+    ZCitySendBackpackDrawCancel(finished)
+    WS.SimpleBackpackDrawWeapon = nil
+    WS.SimpleBackpackDrawStarted = 0
+    WS.SimpleBackpackDrawDuration = 0
+end
+
+local function ZCityStartSimpleBackpackDraw(ply, wep)
+    local duration = ZCityGetSlotHoldDuration(ply, wep)
+    WS.SimpleBackpackDrawWeapon = wep
+    WS.SimpleBackpackDrawStarted = CurTime()
+    WS.SimpleBackpackDrawDuration = duration
+    ZCityStartBackpackDraw(ply, wep, duration)
+    ZCityPlayBackpackReachPreview(wep, duration)
+end
+
+local function ZCityCompleteSimpleBackpackDraw(ply, wep)
+    ZCityCancelSimpleBackpackDraw(true)
+    WS.LastInv = WS.LastInv ~= ply:GetActiveWeapon() and WS.LastInv or ply:GetActiveWeapon()
+    input.SelectWeapon(wep)
+    WS.LastSelectedSlot = WS.SelectedSlot
+    WS.LastSelectedSlotPos = WS.SelectedSlotPos
+    WS.Selected = CurTime() + 0.2
+    WS.PendingWeapon = wep
+    WS.GrabAnim = 1
+    WS.Show = CurTime() + 0.28
+    surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".ogg")
 end
 
 local function ZCityShouldUseBackpackSource(ply, wep, place)
@@ -909,7 +966,13 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
     local inventorySystem = ZCityGetInventorySystem()
     if inventorySystem == 1 then
         ZCityResetSlotHold(false)
-        if SimpleSelector.Change then return SimpleSelector.Change(ply, key, pressed, code) end
+        if SimpleSelector.Change then
+            local result = SimpleSelector.Change(ply, key, pressed, code)
+            if IsValid(WS.SimpleBackpackDrawWeapon) and WS.GetSelectedWeapon() ~= WS.SimpleBackpackDrawWeapon then
+                ZCityCancelSimpleBackpackDraw(false)
+            end
+            return result
+        end
         return
     elseif inventorySystem ~= 0 then
         ZCityResetSlotHold(false)
@@ -1013,6 +1076,35 @@ function WS.SetActuallyWeapon( ply, cmd )
     local inventorySystem = ZCityGetInventorySystem()
     if inventorySystem == 1 then
         ZCityResetSlotHold(false)
+        if not IsValid(ply) or not ply:Alive() then
+            ZCityCancelSimpleBackpackDraw(false)
+            return
+        end
+
+        local pending = WS.SimpleBackpackDrawWeapon
+        local selected = WS.GetSelectedWeapon()
+        if IsValid(pending) and (WS.Show <= CurTime() or selected ~= pending) then
+            ZCityCancelSimpleBackpackDraw(false)
+            pending = nil
+        end
+
+        if IsValid(pending) then
+            cmd:RemoveKey(IN_ATTACK)
+            cmd:RemoveKey(IN_ATTACK2)
+            if CurTime() >= (WS.SimpleBackpackDrawStarted + WS.SimpleBackpackDrawDuration) then
+                ZCityCompleteSimpleBackpackDraw(ply, pending)
+            end
+            return
+        end
+
+        if (cmd:KeyDown(IN_ATTACK) or cmd:KeyDown(IN_ATTACK2)) and WS.Show > CurTime() and IsValid(selected)
+            and ZCityIsBodyHolsterBlocked(ply) and ZCityIsBackpackDrawWeaponForSelector(selected) then
+            cmd:RemoveKey(IN_ATTACK)
+            cmd:RemoveKey(IN_ATTACK2)
+            ZCityStartSimpleBackpackDraw(ply, selected)
+            return
+        end
+
         if SimpleSelector.Select then return SimpleSelector.Select(ply, cmd) end
         return
     end

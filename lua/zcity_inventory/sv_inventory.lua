@@ -374,6 +374,8 @@ local functions = {
     -- end,
 }
 
+util.AddNetworkString("ZCityBackpackDrawStart")
+util.AddNetworkString("ZCityBackpackDrawCancel")
 util.AddNetworkString("ply_take_item")
 net.Receive("ply_take_item", function(len, ply)
     if (ply.cooldown_takeitem or 0) > CurTime() then return end

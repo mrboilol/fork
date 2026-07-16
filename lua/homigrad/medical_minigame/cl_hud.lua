@@ -1936,9 +1936,10 @@ local function GetPTSDTrauma(ent)
     return math.Clamp(tonumber(ent:GetNWFloat("hg_ptsd_trauma", 0)) or 0, 0, 100)
 end
 
-local function GetPTSDRisk(ent)
+local function GetPanicAttackProgress(ent)
     if not IsValid(ent) then return 0 end
-    return math.Clamp((tonumber(ent:GetNWFloat("hg_ptsd_panic_risk", 0)) or 0) * 100, 0, 100)
+    local org = ent.organism
+    return math.Clamp((tonumber(org and org.panicattack) or 0) * 100, 0, 100)
 end
 
 local cvPTSDHudShow = CreateClientConVar("hg_ptsd_hud_show", "0", true, false)
@@ -1983,11 +1984,11 @@ hook.Add("HUDPaint", "hg_ptsd_hud", function()
     if cvPTSDHudShow and cvPTSDHudShow.GetBool and not cvPTSDHudShow:GetBool() then return end
 
     local trauma = GetPTSDTrauma(lp)
-    local risk = GetPTSDRisk(lp)
+    local panicattack = GetPanicAttackProgress(lp)
     local x = 20
     local y = ScrH() - 80
     DrawPTSDBar(x, y, 200, "PTSD", trauma, 0, 100, Color(220, 170, 90))
-    DrawPTSDBar(x, y + 24, 200, "Panic", risk, 0, 100, Color(220, 90, 80))
+    DrawPTSDBar(x, y + 24, 200, "Panic Attack", panicattack, 0, 100, Color(220, 90, 80))
 end)
 
 -- PTSD greyscale screen effect

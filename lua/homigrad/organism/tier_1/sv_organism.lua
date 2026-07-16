@@ -68,7 +68,6 @@ local panicattack_threshold = 0.35
 local panicattack_add_decay_time = 120
 local panicattack_rise_time = 5
 local panicattack_decay_time = 200
-local panicattack_gain_chance = 2
 local panicattack_gain_mul = 0.5
 local panicattack_disorientation = 0.45
 local panicattack_adrenaline_add_target = 4
@@ -491,10 +490,12 @@ function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	local adrenalineRisk = math.Clamp(((org.adrenaline or 0) + (org.adrenalineAdd or 0) - 1.5) / 3, 0, 0.65)
 	local analgesiaRisk = math.Clamp(((org.analgesia or 0) + (org.analgesiaAdd or 0) - 0.2) / 2.8, 0, 1) * 0.2
 	local vulnerability = 1 + math.Clamp(org.ptsdPanicRisk or 0, 0, 1) * 1.6 + adrenalineRisk + analgesiaRisk
-	local chance = math.Clamp((tonumber(chanceMultiplier) or 1) * vulnerability / panicattack_gain_chance, 0, 1)
-	if math.Rand(0, 1) > chance then return org.panicattackadd or 0 end
+	local eventScale = math.max(tonumber(chanceMultiplier) or 1, 0)
 
-	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul * math.min(vulnerability, 1.75), 0, 1)
+	-- Every real panic event advances the live panic-attack meter. PTSD and the
+	-- other vulnerability sources decide how much it advances, rather than
+	-- randomly discarding the event and leaving the displayed Panic value inert.
+	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul * eventScale * math.min(vulnerability, 1.75), 0, 1)
 
 	return org.panicattackadd
 end
@@ -728,12 +729,16 @@ hook.Add("EntityFireBullets", "PanicAttackNearBullets", function(ent, bulletData
 	local dir = bulletData and bulletData.Dir
 	if not src or not dir then return end
 	if dir:LengthSqr() <= 0 then return end
+	local shooter = resolve_panic_attacker(nil, ent)
+	if not IsValid(shooter) then
+		shooter = resolve_panic_attacker(nil, bulletData.Attacker)
+	end
 	dir = dir:GetNormalized()
 	local range = math.max(tonumber(bulletData.Distance) or 0, 1800)
 
 	local now = CurTime()
 	for _, ply in ipairs(player.GetAll()) do
-		if not IsValid(ply) or not ply:Alive() or ply == ent then continue end
+		if not IsValid(ply) or not ply:Alive() or ply == shooter then continue end
 		local org = ply.organism
 		if not org or org.otrub then continue end
 		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then continue end

@@ -319,6 +319,7 @@ local function UpdateFibrillationSound()
             end
             if IsValid(station) then
                 fibrillationStation = station
+                station:EnableLooping(true)
                 PlayStation(fibrillationStation, fibrillationVolume)
             end
         end)
