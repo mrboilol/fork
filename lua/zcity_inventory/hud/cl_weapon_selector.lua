@@ -303,13 +303,15 @@ local function ZCityGetWeaponActionDuration(wep, field, fallback, minimum, maxim
 end
 
 local function ZCityGetSlotHoldDuration(ply, wep)
-    local duration = ZCityGetWeaponActionDuration(wep, "CooldownDeploy", WS.HoldDuration or 0.62, 0.35, 2.4)
+    local drawingHands = ZCityIsHandsWeapon(wep)
+    local duration = drawingHands and 0 or ZCityGetWeaponActionDuration(wep, "CooldownDeploy", WS.HoldDuration or 0.62, 0.35, 2.4)
+    local active = IsValid(ply) and ply:GetActiveWeapon() or nil
 
-    if IsValid(ply) and ZCityIsHandsWeapon(wep) then
-        local active = ply:GetActiveWeapon()
-        if IsValid(active) and ZCityIsBackpackDrawWeaponForSelector(active) then
-            return ZCityGetWeaponActionDuration(active, "CooldownHolster", WS.HolsterAwayDuration or 0.95, 0.35, 2.4)
-        end
+    -- Empty hands are already ready.  Any real item must be put away before
+    -- drawing hands or another item, so object-to-object switches pay both costs.
+    if IsValid(active) and active ~= wep and not ZCityIsHandsWeapon(active) then
+        local holsterDuration = ZCityGetWeaponActionDuration(active, "CooldownHolster", WS.HolsterAwayDuration or 0.95, 0.35, 2.4)
+        duration = drawingHands and holsterDuration or duration + holsterDuration
     end
 
     if IsValid(wep) and ZCityIsBackpackDrawWeaponForSelector(wep) and ZCityIsBodyHolsterBlocked(ply) then
@@ -317,10 +319,10 @@ local function ZCityGetSlotHoldDuration(ply, wep)
     end
 
     if IsValid(wep) and wep.NoHolster then
-        return math.max(duration, WS.HoldDurationNoHolster or 1.15)
+        return math.Clamp(math.max(duration, WS.HoldDurationNoHolster or 1.15), 0, 4)
     end
 
-    return duration
+    return math.Clamp(duration, 0, 4)
 end
 
 local function ZCitySendBackpackDrawCancel(finished)
@@ -874,16 +876,25 @@ local function ZCityBeginHeldSelection(ply, selectedWep, bind, code)
     end
 end
 
-local function ZCityPutActiveWeaponAway(ply, activeWep)
+local function ZCityPutActiveWeaponAway(ply, activeWep, bind, code)
     local hands = ZCityGetHandsWeapon(ply)
     if not IsValid(hands) or not IsValid(activeWep) or ZCityIsHandsWeapon(activeWep) then return false end
 
-    WS.LastInv = activeWep
-    WS.Show = 0
-    ZCityResetSlotHold(false)
-    input.SelectWeapon(hands)
-    surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(1, 10) .. ".ogg")
-    return true
+    local weapons = WS.GetWeaponTable(ply)
+    for slot = 0, 5 do
+        for position = 0, #(weapons[slot] or {}) do
+            if weapons[slot][position] == hands then
+                WS.SelectedSlot = slot
+                WS.SelectedSlotPos = position
+                WS.LastInv = activeWep
+                WS.Show = CurTime() + 4
+                ZCityBeginHeldSelection(ply, hands, bind, code)
+                return true
+            end
+        end
+    end
+
+    return false
 end
 
 local function ZCityIsHeldSlotKeyDown()
@@ -995,10 +1006,7 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
         local requestedSlot = iPos - 1
         local activeWep = ply:GetActiveWeapon()
         local activeSlot = IsValid(activeWep) and math.Clamp(tonumber(activeWep.Slot) or 0, 0, 5) or -1
-        if activeSlot == requestedSlot and ZCityPutActiveWeaponAway(ply, activeWep) then
-            LastSelected = -1
-            WS.SelectedSlot = requestedSlot
-            WS.SelectedSlotPos = 0
+        if activeSlot == requestedSlot and ZCityPutActiveWeaponAway(ply, activeWep, key, code) then
             return true
         end
     end

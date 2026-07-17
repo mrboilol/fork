@@ -349,6 +349,11 @@ module[2] = function(owner, org, mulTime)
 	org.hypovolemia = bloodDeficit
 	org.hemorrhageCompensation = compensation
 	org.hypovolemicShock = shockStage
+	-- Hypovolemia also reduces heat delivery. Pulse uses this target on its
+	-- temperature tick, allowing severe blood loss to contribute to cold-driven
+	-- bradycardia without instantly forcing every bleed into the same rhythm.
+	local lowBloodCold = math.Clamp((3500 - blood) / 2500, 0, 1)
+	org.lowBloodTemperatureTarget = 36.7 - lowBloodCold * 3.2
 
 	if org.blood < 4500 then
 		-- One alert when this blood-loss stage is first reached.
@@ -603,10 +608,11 @@ module[2] = function(owner, org, mulTime)
 	org.timetouncon = (timetouncon ~= timetouncon) and timetouncon or Lerp(hg.lerpFrameTime2(0.01,mulTime), org.timetouncon or 10000, timetouncon)
 	
 	local scavDyingMode = GetConVar("hg_scavdying")
-	local flatlined = org.heartstop or (org.heartbeat or 0) < 1 or (org.pulse or 0) < 1
 	local normallyIncapacitated = org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 2000)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2))
 	if (scavDyingMode and scavDyingMode:GetInt() == 1) and org.otrub then
-		org.incapacitated = flatlined
+		-- The ring mode must begin when the player becomes incapacitated, not
+		-- wait for asystole/flatline to set the state.
+		org.incapacitated = normallyIncapacitated
 	elseif normallyIncapacitated then
 		org.incapacitated = true
 	else

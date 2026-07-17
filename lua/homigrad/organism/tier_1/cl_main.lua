@@ -121,6 +121,33 @@ hook.Add("Think", "RemDeathStateSoundStop", function()
 	remDeathStateStation = nil
 end)
 
+-- Keep the added incapacitation copy with the ring in HUDPaint.  Otrub's
+-- original full-screen effects and memory replays are post-processing passes,
+-- so drawing this there let either one cover the text.
+hook.Add("HUDPaint", "RemIncapacitationStatus", function()
+	local ply = lply
+	local org = IsValid(ply) and ply.organism
+	local deathStateEnd = org and org.deathStateEnd
+	local deathStateStart = org and org.deathStateStart
+
+	if not IsValid(ply) or not ply:Alive() or not org or not org.otrub or not org.incapacitated or not deathStateEnd or deathStateEnd <= 0 then
+		if IsValid(remDeathStateStation) then
+			remDeathStateStation:Stop()
+			remDeathStateStation = nil
+			remDeathStatePath = nil
+		end
+		return
+	end
+
+	local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
+	local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
+	remDeathStateColor.a = math.Clamp((CurTime() - (deathStateStart or CurTime())) / 2, 0, 1) * 255
+	PlayRemDeathStateSound(scavDyingMode == 1 and "sound/deathing.ogg" or "sound/rem_deathstatefull.mp3", scavDyingMode ~= 1)
+
+	local text = scavDyingMode == 1 and "You are incapacitated" or "You are incapacitated, You will die in " .. seconds
+	draw.SimpleText(text, "RemDeathStateFont", ScrW() / 2, ScrH() / 2 + 330, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+end)
+
 local k1, k2, k3
 
 local upDir = Vector(0, 0, 1)
@@ -300,7 +327,9 @@ local ptsd_screens = hg.ptsd_screens
 local ptsd_screen_names = {}
 local ptsd_memory_serial = 0
 local ptsd_flashback_until = 0
+local ptsd_flashback_started = 0
 local ptsd_memory_screen = 1
+local ptsd_memory_alpha = 0
 local screened = 0
 local curscreen = 1
 local switch = false
@@ -369,6 +398,8 @@ hook.Add("Player Spawn", "screenshot_game", function(ply)
 		ptsd_screen_names = {}
 		ptsd_memory_serial = 0
 		ptsd_flashback_until = 0
+		ptsd_flashback_started = 0
+		ptsd_memory_alpha = 0
 
 		remove_imgs()
 	end
@@ -530,7 +561,10 @@ local function ptsd_memory_effects_enabled()
 	return not effectsEnabled or effectsEnabled:GetBool()
 end
 
-hook.Add("Post Pre Post Processing", "ShowScreens", function()
+-- Otrub blackout/blur is drawn by cl_screeneffects in Post Post Processing.
+-- Keep memories and the incapacitation copy after it, as in remorseism, so the
+-- blackout never covers the information the player needs to see.
+hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 	local org = lply.organism
 	
 	if !lply:Alive() then return end
@@ -538,18 +572,24 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 
 	local ptsdTrauma = math.Clamp(lply:GetNWFloat("hg_ptsd_trauma", 0), 0, 100)
 	local flashbackUntil = lply:GetNWFloat("hg_ptsd_flashback_until", 0)
+	-- PTSD memories only ever read from ptsd_screens. Ordinary brain-damage
+	-- memories below continue to use screens, so the two memory pools cannot mix.
 	local showPTSDMemory = ptsd_memory_effects_enabled() and ptsdTrauma >= 75 and flashbackUntil > CurTime() and #ptsd_screens > 0
 	if showPTSDMemory then
 		if flashbackUntil ~= ptsd_flashback_until then
 			ptsd_flashback_until = flashbackUntil
+			ptsd_flashback_started = CurTime()
 			ptsd_memory_screen = math.random(#ptsd_screens)
 		end
 
 		local memory = ptsd_screens[ptsd_memory_screen]
 		if memory and not memory:IsError() then
-			local pulse = math.ease.InOutSine(math.abs(math.sin(CurTime() * 7)))
-			local alpha = 105 + pulse * 140
-			surface.SetDrawColor(255, 255, 255, alpha)
+			-- A flashback has one smooth envelope instead of a rapid opacity pulse.
+			local fadeIn = math.ease.InOutSine(math.Clamp((CurTime() - ptsd_flashback_started) / 0.85, 0, 1))
+			local fadeOut = math.ease.InOutSine(math.Clamp((flashbackUntil - CurTime()) / 0.85, 0, 1))
+			local targetAlpha = math.min(fadeIn, fadeOut) * (125 + math.Clamp((ptsdTrauma - 75) * 3, 0, 105))
+			ptsd_memory_alpha = LerpFT(0.04, ptsd_memory_alpha, targetAlpha)
+			surface.SetDrawColor(255, 255, 255, ptsd_memory_alpha)
 			surface.SetMaterial(memory)
 			surface.DrawTexturedRect(-math.random(8), -math.random(8), ScrW() + math.random(16), ScrH() + math.random(16))
 			DrawToyTown(5, ScrH())
@@ -558,6 +598,7 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 		return
 	end
 	ptsd_flashback_until = 0
+	ptsd_memory_alpha = 0
 
 	local part = CurTime() - braindeathstart
 
@@ -582,17 +623,25 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 		local showDuration = time * (org.otrub and (0.34 + brainFx * 0.56) or (0.18 + brainFx * 0.60)) + traumaBoost * 8
 		showDuration = math.Clamp(showDuration, org.otrub and 3 or 1.5, time * (org.otrub and 0.9 or 0.78))
 		
-		if part % time > time - showDuration and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
+		local memory = screens[curscreen]
+		local memoryActive = part % time > time - showDuration and curscreen <= #screens and memory and !memory:IsError()
+		local part2 = 0
+		if memoryActive then
 			switch = true
-			local part2 = math.ease.InOutSine(math.sin(((part % time) - (time - showDuration)) / showDuration * math.pi))
-			lerpedpart = LerpFT(0.1, lerpedpart, part2)
-			
+			part2 = math.ease.InOutSine(math.sin(((part % time) - (time - showDuration)) / showDuration * math.pi))
+		end
+
+		-- Awake memories use a slower interpolation so they ease in and out
+		-- rather than appearing and vanishing like a flash. Keep rendering until
+		-- the eased value reaches zero, instead of cutting the last fade-out frame.
+		lerpedpart = LerpFT(org.otrub and 0.1 or 0.04, lerpedpart, part2)
+		if (memoryActive or (switch and lerpedpart > 0.01)) and memory and !memory:IsError() then
 			-- More opaque with higher brain damage
 			-- When awake (not otrub), show at lower opacity
 			local awakeMultiplier = org.otrub and 1 or math.Clamp(0.30 + brainFx * 0.65 + traumaBoost * 0.3, 0.30, 1)
 			local alpha = math.Clamp(lerpedpart * (20 + brainFx * 120) * awakeMultiplier, 0, 255)
 			surface.SetDrawColor(255, 255, 255, alpha)
-			surface.SetMaterial(screens[curscreen])
+			surface.SetMaterial(memory)
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 
 			-- More severe effects with higher brain damage
@@ -605,11 +654,9 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 				local vignetteAlpha = math.Clamp(lerpedpart * (8 + brainFx * 92), 0, 100)
 				hg.DrawVignetteLayer(memory_vignetteMat, vignetteAlpha / 20, vignetteAlpha / 20)
 			end
-		else
-			if switch then
-				curscreen = curscreen == #screens and 1 or curscreen + 1
-				switch = false
-			end
+		elseif switch then
+			curscreen = curscreen == #screens and 1 or curscreen + 1
+			switch = false
 		end
 	else
 
@@ -625,7 +672,7 @@ local old = false
 local tinnitusSoundFactor
 local lerpblood = 0
 local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like first-person camera view", 0, 1)
-hook.Add("Post Post Processing", "organism-effects", function()
+hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	local organism = lply:Alive() and lply.organism or (viewmode == 1 and IsValid(spect) and spect.organism) or {}
 	local new_organism = lply:Alive() and lply.new_organism or (viewmode == 1 and IsValid(spect) and spect.new_organism) or {}
@@ -667,27 +714,9 @@ hook.Add("Post Post Processing", "organism-effects", function()
 	local health = health
 	local disorientation = org.disorientation or 0
 	local immobilization = org.immobilization or 0
-	local incapacitated = org.incapacitated or new_organism.incapacitated or false
 	local critical = org.critical or false
-	local deathStateEnd = new_organism.deathStateEnd or org.deathStateEnd
-	local deathStateStart = new_organism.deathStateStart or org.deathStateStart
-	if deathStateEnd and deathStateEnd <= 0 then deathStateEnd = nil end
-	if deathStateStart and deathStateStart <= 0 then deathStateStart = nil end
 	tinnitusSoundFactor = Lerp(FrameTime()*2.5,tinnitusSoundFactor or 0, math.min(math.max( lply.tinnitus and (lply.tinnitus - CurTime()) or 0, 0)*7.5,120))
 	local tinnitusSoundFactor2 = tinnitusSoundFactor + (hook.Run("ModifyTinnitusFactor", tinnitusSoundFactor) or 0)
-
-	if lply:Alive() and (otrub or new_organism.otrub) and incapacitated and deathStateEnd then
-		local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
-		local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
-		remDeathStateColor.a = math.Clamp((CurTime() - (deathStateStart or CurTime())) / 2, 0, 1) * 255
-		PlayRemDeathStateSound(scavDyingMode == 1 and "sound/deathing.ogg" or "sound/rem_deathstatefull.mp3", scavDyingMode ~= 1)
-		local text = scavDyingMode == 1 and "You are incapacitated" or "You are incapacitated, You will die in " .. seconds
-		draw.SimpleText(text, "RemDeathStateFont", ScrW() / 2, ScrH() / 2 + 330, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	elseif IsValid(remDeathStateStation) then
-		remDeathStateStation:Stop()
-		remDeathStateStation = nil
-		remDeathStatePath = nil
-	end
 
 	--print(lply.tinnitus)
 	local adrenK = math.min(math.max(1 + adrenaline, 1), 1.2)
@@ -1024,6 +1053,11 @@ local arterialParticleSizeMul = 0.65
 local arterialJetOffset = 0.12
 local arterialVelocityMul = 82
 local arterialPulseRetractRate = 85
+local arterialMaxReachMul = 1.8
+local arterialSideSway = 23
+local normalWoundForceBase = 7
+local normalWoundForcePerSeverity = 2
+local normalWoundForceMax = 28
 
 local pitchAddClasses = {
 	["furry"] = 20,
@@ -1125,14 +1159,24 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 
 	local buildup = fxData and math.Clamp((CurTime() - (fxData.created or CurTime())) / arterialRampTime, arterialMinIntensity, 1) or 1
 	local time = CurTime()
+	local woundSeverity = math.max(wound and wound[1] or 0, 0)
+	local reachMul = math.Clamp(1 + woundSeverity * 0.07, 1, arterialMaxReachMul)
+	local sideSway = arterialSideSway + math.Clamp(woundSeverity * 0.45, 0, 9)
+	local swayPhase = wound and wound.arterialSwayPhase
+	if wound and not swayPhase then
+		swayPhase = math.Rand(0, math.pi * 2)
+		wound.arterialSwayPhase = swayPhase
+	end
 	local wave = 0.9 + math.sin(time * 5.6) * 0.22
 	local dirAng = dir:Angle()
 	local right = dirAng:Right()
 	local up = ang:Up()
 	local scaledSize = size * arterialParticleSizeMul * buildup
-	local sprayVel = dir * arterialVelocityMul * wave * buildup
-	sprayVel:Add(right * math.sin(time * 1.05) * 12 * pulseMul * buildup)
-	sprayVel:Add(up * math.sin(time * 0.8 + 1.1) * 5 * pulseMul * buildup)
+	local sprayVel = dir * arterialVelocityMul * reachMul * wave * buildup
+	-- Side sway is deliberately stronger than the remaining subtle vertical pulse,
+	-- so an arterial jet arcs outward instead of falling straight down.
+	sprayVel:Add(right * math.sin(time * 1.35 + (swayPhase or 0)) * sideSway * pulseMul * buildup)
+	sprayVel:Add(up * math.sin(time * 0.8 + 1.1 + (swayPhase or 0)) * 4 * pulseMul * buildup)
 
 	local jet = wound and wound.arterialJet
 	if jet and jet.active then
@@ -1388,9 +1432,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 							end
 						else
-							local pulseMult = (org.pulse or 70) / 70
-							local outwardVel = ang:Forward() * -8 * pulseMult + ang:Up() * -5 * pulseMult
-							hg.addBloodPart(pos, outwardVel + VectorRand(-10, 10) * pulseMult, nil, size, size, false, nil, ent)
+							local pulseMult = math.Clamp((org.pulse or 70) / 70, 0.45, 1.15)
+							local woundForce = math.Clamp(normalWoundForceBase + woundSize * normalWoundForcePerSeverity, normalWoundForceBase, normalWoundForceMax) * pulseMult
+							local outwardVel = ang:Forward() * -woundForce + ang:Up() * -2 * pulseMult
+							hg.addBloodPart(pos, outwardVel + VectorRand(-2, 2) * pulseMult, nil, size, size, false, nil, ent)
 						end
 
 						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))
@@ -1401,9 +1446,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							local pulseMult = (org.pulse or 70) / 70
-							local outwardVel = Vector(0, 0, -8) * pulseMult
-							hg.addBloodPart(pos, outwardVel + VectorRand(-10, 10) * pulseMult, nil, size, size, false, nil, ent)
+							local pulseMult = math.Clamp((org.pulse or 70) / 70, 0.45, 1.15)
+							local woundForce = math.Clamp(normalWoundForceBase + woundSize * normalWoundForcePerSeverity, normalWoundForceBase, normalWoundForceMax) * pulseMult
+							local outwardVel = VectorRand(-1, 1) * woundForce * 0.45 + Vector(0, 0, -woundForce * 0.55)
+							hg.addBloodPart(pos, outwardVel + VectorRand(-2, 2) * pulseMult, nil, size, size, false, nil, ent)
 						end
 
 						wound[5] = time + (water and 2 or (math.Rand(0, 1) * (!hg_old_blood:GetBool() and 0.5 or 1) / wound[1] * 15))

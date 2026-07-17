@@ -102,6 +102,8 @@ local function LoadModes()
 	end
 end
 
+end
+
 local chancesfile = "zbattle/modeschances.json"
 
 if SERVER then

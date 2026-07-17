@@ -29,10 +29,16 @@ if SERVER then
         if not IsValid(ply) then return end
 
         amount = math.max(tonumber(amount) or 1, 1)
-        ply.HG_BloodDecalCount = math.min((ply.HG_BloodDecalCount or 0) + amount, bloodDecalReplayLimit)
+        local oldCount = ply.HG_BloodDecalCount or 0
+        local newCount = math.min(oldCount + amount, bloodDecalReplayLimit)
+        ply.HG_BloodDecalCount = newCount
 
         local target = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
-        for i = 1, amount do
+        -- Stop applying decals once this character has reached the same cap
+        -- used for ragdoll replay. Previously the count stopped at 16 but the
+        -- live player kept receiving decals forever, eventually covering every
+        -- material while a new ragdoll looked normal again.
+        for i = oldCount + 1, newCount do
             ApplyBloodDecal(IsValid(target) and target or ply)
         end
     end

@@ -88,6 +88,28 @@ local awakeECGAlpha = 0
 local lastHeartBeat = 0
 local heartPhase = 0
 
+local awakeECGSeverityByState = {
+    sinus_bradycardia = 0.15,
+    sinus_tachycardia = 0.15,
+    hypothermia_bradycardia = 0.3,
+    sinus_pause = 0.4,
+    junctional_escape = 0.5,
+    cerebral_bradycardia = 0.55,
+    cerebral_irregular = 0.6,
+    compressed_tachycardia = 0.6,
+    av_block_partial = 0.65,
+    ventricular_escape = 0.7,
+    extreme_tachycardia = 0.75,
+    av_block_complete = 0.8,
+    terminal_tachycardia = 0.9,
+    pea = 0.95,
+    asystole = 1,
+}
+
+local function GetAwakeECGSeverity(ecgState)
+    return awakeECGSeverityByState[ecgState] or 0.5
+end
+
 -- Better sound system from oldring
 local SOUND_HEART = "health/critbeat.ogg"
 local SOUND_FLATLINE = "health/gg.ogg"
@@ -448,6 +470,58 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
         return -math.sin((p - 0.58) / 0.42 * math.pi) * 0.45
     end
 
+    local function getJunctionalH(phase)
+        local h = getSinusH(phase)
+        -- The sinus P wave is absent; occasional retrograde P waves appear
+        -- just after the narrow escape complex.
+        if phase > 0.05 and phase < 0.15 then
+            h = h - math.sin((phase - 0.05) / 0.1 * math.pi) * 0.12
+        elseif phase > 0.36 and phase < 0.44 then
+            h = h - math.sin((phase - 0.36) / 0.08 * math.pi) * 0.1
+        end
+        return h
+    end
+
+    local function getHypothermiaH(phase)
+        local h = getSinusH(phase)
+        -- A small positive notch at the end of the widened-looking QRS is the
+        -- Osborn/J wave. The low BPM comes from the server rhythm target.
+        if phase > 0.32 and phase < 0.42 then
+            h = h + math.sin((phase - 0.32) / 0.1 * math.pi) * 0.16
+        elseif phase > 0.58 and phase < 0.82 then
+            h = h + math.sin((phase - 0.58) / 0.24 * math.pi) * 0.12
+        end
+        return h
+    end
+
+    local function getAVBlockH(phase, complete)
+        local h = getSinusH(phase)
+        -- Extra atrial activity makes the P-to-QRS relationship visibly
+        -- prolonged (partial block) or dissociated (complete block).
+        if phase > 0.58 and phase < 0.68 then
+            h = h + math.sin((phase - 0.58) / 0.1 * math.pi) * 0.12
+        end
+        if complete and phase > 0.78 and phase < 0.88 then
+            h = h + math.sin((phase - 0.78) / 0.1 * math.pi) * 0.12
+        end
+        return h
+    end
+
+    local function getCerebralH(phase, beatIndex)
+        if beatIndex % 5 == 0 and phase > 0.1 and phase < 0.7 then
+            return getWideComplexH(phase)
+        end
+
+        local h = getSinusH(phase)
+        -- Intracranial hemorrhage can lengthen QT and invert/warp T waves.
+        if phase > 0.45 and phase < 0.65 then
+            h = h - math.sin((phase - 0.45) / 0.2 * math.pi) * 0.48
+        elseif phase > 0.68 and phase < 0.9 then
+            h = h - math.sin((phase - 0.68) / 0.22 * math.pi) * 0.16
+        end
+        return h
+    end
+
     local function getH(rawPhase)
         local rhythm = ecgState or "normal_sinus"
         if rhythm == "asystole" or heartbeat < 1 then return 0 end
@@ -456,8 +530,22 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
         local beatIndex = math.floor(rawPhase)
         local h
 
-        if rhythm == "terminal_tachycardia" then
+        if rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then
             h = getWideComplexH(phase)
+        elseif rhythm == "junctional_escape" then
+            h = getJunctionalH(phase)
+        elseif rhythm == "hypothermia_bradycardia" then
+            h = getHypothermiaH(phase)
+        elseif rhythm == "av_block_partial" then
+            h = getAVBlockH(phase, false)
+        elseif rhythm == "av_block_complete" then
+            h = getAVBlockH(phase, true)
+        elseif rhythm == "cerebral_bradycardia" or rhythm == "cerebral_irregular" then
+            h = getCerebralH(phase, beatIndex)
+        elseif rhythm == "sinus_pause" and beatIndex % 4 == 3 then
+            -- Suppressed sinus-node output: a full missed cycle creates the
+            -- temporary electrical gap before escape activity takes over.
+            h = 0
         elseif rhythm == "extreme_tachycardia" and beatIndex % 5 == 0 then
             h = getWideComplexH(phase)
         else
@@ -662,8 +750,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     local fibrillating = heartbeat > 250
     local isElectricalArrest = org.heartstop or ecgState == "pea" or ecgState == "asystole"
+    local abnormalECG = ecgState ~= "normal_sinus"
 
-    local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest)
+    local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or abnormalECG or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest)
     
 	if isUnconscious and not hideDyingRing then
         local currentShock = org.shock or 0
@@ -689,7 +778,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Update persistent awake ECG alpha
     if showAwakeECG then
-        awakeECGAlpha = Lerp(FrameTime() * 4, awakeECGAlpha, 0.15)
+        local awakeECGTargetAlpha = 0.15
+        if ply:KeyDown(IN_ATTACK2) then
+            -- Keep the conscious ECG very visible while aiming, but let more
+            -- severe rhythms stay more transparent so they do not block the sight picture.
+            awakeECGTargetAlpha = Lerp(GetAwakeECGSeverity(ecgState), 0.8, 0.28)
+        end
+        awakeECGAlpha = Lerp(FrameTime() * 4, awakeECGAlpha, awakeECGTargetAlpha)
     else
         awakeECGAlpha = Lerp(FrameTime() * 2, awakeECGAlpha, 0)
     end
@@ -713,11 +808,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest) then
+    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or abnormalECG or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest) then
         UpdateFibrillationSound()
         return
     end
-    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or admiring or fibrillating or isElectricalArrest))
+    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or abnormalECG or admiring or fibrillating or isElectricalArrest))
 
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
     

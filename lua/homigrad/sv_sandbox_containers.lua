@@ -4,6 +4,9 @@ hg = hg or {}
 
 local hg_sandbox_containers = CreateConVar("hg_sandbox_containers", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable random lootable prop containers in Sandbox.", 0, 1)
 
+util.AddNetworkString("hg_sandbox_container_open")
+util.AddNetworkString("hg_sandbox_container_take")
+
 hg.SandboxContainerModels = hg.SandboxContainerModels or {
 	["models/props_borealis/bluebarrel001.mdl"] = {8, "all"},
 	["models/props_c17/display_cooler01a.mdl"] = {8, "food"},
@@ -281,68 +284,33 @@ local function RandomLootClass(containerCategory)
 	end
 end
 
-local function AddWeapon(ent, class)
-	local weapon = weapons.Get(class)
-	ent.inventory.Weapons = ent.inventory.Weapons or {}
-	if ent.inventory.Weapons[class] then return end
-	ent.inventory.Weapons[class] = weapon and weapon.GetInfo and weapon:GetInfo() or true
-end
-
-local function AddAmmo(ent, class)
+local function RandomAmmoAmount(class)
 	local ammoName = string.Replace(class, "ent_ammo_", "")
-	local ammoData = hg.ammotypes and hg.ammotypes[ammoName]
-	if not ammoData then return end
-
-	local ammoID = game.GetAmmoID(ammoData.name)
-	if not ammoID or ammoID == -1 then return end
-
-	local maxCount = hg.ammoents and hg.ammoents[ammoName] and hg.ammoents[ammoName].Count or 30
-	ent.inventory.Ammo = ent.inventory.Ammo or {}
-	ent.inventory.Ammo[ammoID] = (ent.inventory.Ammo[ammoID] or 0) + math.random(maxCount)
+	return math.random(hg.ammoents and hg.ammoents[ammoName] and hg.ammoents[ammoName].Count or 30)
 end
 
-local function AddArmorLoot(ent, class)
-	local armor = string.Replace(class, "ent_armor_", "")
-	ent.armors = ent.armors or {}
-
-	if hg.AddArmor then
-		hg.AddArmor(ent, armor)
-	else
-		ent.armors[armor] = true
-	end
-end
-
-local function AddAttachment(ent, class)
-	local att = string.Replace(class, "ent_att_", "")
-	ent.inventory.Attachments = ent.inventory.Attachments or {}
-	ent.inventory.Attachments[#ent.inventory.Attachments + 1] = att
-end
-
-local function AddLootToInventory(ent, class)
-	if string.StartWith(class, "ent_ammo_") then
-		AddAmmo(ent, class)
-	elseif string.StartWith(class, "ent_armor_") then
-		AddArmorLoot(ent, class)
-	elseif string.StartWith(class, "ent_att_") then
-		AddAttachment(ent, class)
-	else
-		AddWeapon(ent, class)
-	end
-end
-
-local function SpawnLootClass(ent, class)
+local function SpawnLootClass(ent, class, ammoAmount, ply)
 	local spawned = ents.Create(class)
 	if not IsValid(spawned) then return end
 
-	spawned:SetPos(ent:GetPos() + VectorRand(-8, 8) + vector_up * 12)
+	if IsValid(ply) then
+		local trace = util.TraceEntityHull({
+			start = ent:GetPos() + vector_up * 5,
+			endpos = ply:GetPos() + vector_up * 15,
+			filter = {ent, ply},
+			mask = MASK_SHOT,
+		}, spawned)
+		spawned:SetPos(trace.HitPos)
+	else
+		spawned:SetPos(ent:GetPos() + VectorRand(-8, 8) + vector_up * 12)
+	end
 	spawned:SetAngles(Angle(0, math.random(0, 359), 0))
 	spawned:Spawn()
 	spawned.IsSpawned = true
 	spawned.init = true
 
 	if string.StartWith(class, "ent_ammo_") then
-		local ammoName = string.Replace(class, "ent_ammo_", "")
-		spawned.AmmoCount = math.random(hg.ammoents and hg.ammoents[ammoName] and hg.ammoents[ammoName].Count or 30)
+		spawned.AmmoCount = ammoAmount or RandomAmmoAmount(class)
 	end
 end
 
@@ -355,8 +323,7 @@ local function GenerateSandboxContainerLoot(ply, ent)
 	local containerData = hg.SandboxContainerModels[model]
 	if not containerData then return false end
 
-	ent.armors = {}
-	ent.inventory = {}
+	ent.sandboxLoot = {}
 	ent.was_opened = true
 
 	local amountRange = lootAmount[containerData[1]] or lootAmount[6]
@@ -364,16 +331,54 @@ local function GenerateSandboxContainerLoot(ply, ent)
 
 	for _ = 1, amount do
 		local class = RandomLootClass(containerData[2])
-		if class then AddLootToInventory(ent, class) end
+		if class then
+			local item = {class = class}
+			if string.StartWith(class, "ent_ammo_") then item.ammoAmount = RandomAmmoAmount(class) end
+			ent.sandboxLoot[#ent.sandboxLoot + 1] = item
+		end
 	end
 
-	ent:SetNetVar("Armor", ent.armors)
-	ent:SetNetVar("Inventory", ent.inventory)
 	return true
 end
 
 hook.Add("ZB_InventoryChecked", "SandboxContainers", function(ply, ent)
 	GenerateSandboxContainerLoot(ply, ent)
+end)
+
+local function IsSandboxContainer(ent)
+	if not SandboxContainersEnabled() or not IsValid(ent) or ent:GetClass() ~= "prop_physics" then return false end
+	return hg.SandboxContainerModels[string.lower(ent:GetModel() or "")] ~= nil
+end
+
+local function SendSandboxContainerLoot(ply, ent)
+	if not IsValid(ply) or not IsValid(ent) then return end
+	net.Start("hg_sandbox_container_open")
+		net.WriteEntity(ent)
+		net.WriteTable(ent.sandboxLoot or {})
+	net.Send(ply)
+end
+
+hook.Add("ZB_CanLootInventory", "SandboxContainerGrid", function(ply, ent)
+	if not IsSandboxContainer(ent) then return end
+	if not ply.keypressed then
+		GenerateSandboxContainerLoot(ply, ent)
+		SendSandboxContainerLoot(ply, ent)
+	end
+	return ply, ent, false
+end)
+
+net.Receive("hg_sandbox_container_take", function(_, ply)
+	local ent = net.ReadEntity()
+	local itemID = net.ReadUInt(10)
+	if not IsSandboxContainer(ent) or not IsValid(ply) then return end
+	if ent:GetPos():DistToSqr(ply:GetPos()) > 125 ^ 2 then return end
+
+	local item = ent.sandboxLoot and ent.sandboxLoot[itemID]
+	if not item or not item.class then return end
+
+	ent.sandboxLoot[itemID] = nil
+	SpawnLootClass(ent, item.class, item.ammoAmount, ply)
+	SendSandboxContainerLoot(ply, ent)
 end)
 
 hook.Add("PropBreak", "SandboxContainers", function(ply, ent)
@@ -387,33 +392,11 @@ hook.Add("PropBreak", "SandboxContainers", function(ply, ent)
 		GenerateSandboxContainerLoot(ply, ent)
 	end
 
-	if not ent.inventory and not ent.armors then return end
-
-	local inventory = ent.inventory or {}
-	local armors = ent.armors or {}
-	local spawned = {}
-
-	for class in pairs(inventory.Weapons or {}) do
-		spawned[#spawned + 1] = class
+	for _, item in pairs(ent.sandboxLoot or {}) do
+		SpawnLootClass(ent, item.class, item.ammoAmount)
 	end
 
-	for ammoID in pairs(inventory.Ammo or {}) do
-		local ammoName = game.GetAmmoName(ammoID)
-		local ammoData = hg.ammotypes and hg.ammotypes[ammoName]
-		if ammoData then spawned[#spawned + 1] = "ent_ammo_" .. ammoData.name end
-	end
-
-	for _, att in ipairs(inventory.Attachments or {}) do
-		spawned[#spawned + 1] = "ent_att_" .. att
-	end
-
-	for armor in pairs(armors) do
-		spawned[#spawned + 1] = "ent_armor_" .. armor
-	end
-
-	for _, class in ipairs(spawned) do
-		SpawnLootClass(ent, class)
-	end
+	ent.sandboxLoot = {}
 end)
 
 local function ResetSandboxContainers()
@@ -423,6 +406,7 @@ local function ResetSandboxContainers()
 		local model = string.lower(ent:GetModel() or "")
 		if hg.SandboxContainerModels[model] then
 			ent.was_opened = nil
+			ent.sandboxLoot = nil
 			ent.inventory = nil
 			ent.armors = nil
 			ent:SetNetVar("Inventory", nil)

@@ -1029,6 +1029,9 @@ kaz
 	if tissueO2 < HypoxiaBands.normal and tissueO2 >= HypoxiaBands.impaired then
 		local severity = math.Clamp((HypoxiaBands.normal - tissueO2) / (HypoxiaBands.normal - HypoxiaBands.impaired), 0, 1)
 		org.disorientation = math.max(org.disorientation or 0, 0.15 + severity * 0.3)
+		-- Oxygen deprivation should affect awareness before it reaches the
+		-- heavy-hypoxia drain bands below.
+		org.consciousness = math.min(org.consciousness or 1, 1 - severity * 0.1)
 		if org.stamina and org.stamina[1] then
 			org.stamina[1] = math.max(org.stamina[1] - timeValue * severity * staminaMax / 180, 0)
 		end
@@ -1100,15 +1103,22 @@ kaz
 	local hemorrhage = org.brainHemorrhage or 0
 	local bleedRate = org.brainBleedRate or 0
 
-	-- Both treatments can stabilize an intracranial bleed: mannitol relieves
-	-- pressure, while tranexamic acid also slows the active bleed itself.
+	-- Mannitol is the main emergency treatment here: it rapidly lowers edema
+	-- and bleeding pressure so recoverable brain trauma can stabilize before it
+	-- reaches the fatal damage path. Tranexamic acid remains useful as a slower
+	-- direct bleed stabilizer.
+	local mannitolK = math.Clamp((org.mannitol or 0) / 4, 0, 1)
 	if (org.tranexamic_acid or 0) > 0 then
 		bleedRate = max(bleedRate - timeValue / 60000, 0)
 		org.brainBleedRate = bleedRate
 	end
+	if mannitolK > 0 then
+		bleedRate = max(bleedRate - timeValue * (1 / 180) * mannitolK, 0)
+		org.brainBleedRate = bleedRate
+	end
 
 	local hemorrhageReliefRate = 0
-	if (org.mannitol or 0) > 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 800 end
+	if mannitolK > 0 then hemorrhageReliefRate = hemorrhageReliefRate + (1 / 110) * mannitolK end
 	if (org.tranexamic_acid or 0) > 0 then hemorrhageReliefRate = hemorrhageReliefRate + 1 / 1200 end
 
 	org.disorientation = math.max(org.disorientation, frontal * 0.35 + parietal * 0.65 + temporal * 0.25)
@@ -1134,6 +1144,9 @@ kaz
 	if hemorrhageReliefRate > 0 and (org.brainHemorrhage or 0) > 0 then
 		org.brainHemorrhage = max(org.brainHemorrhage - timeValue * hemorrhageReliefRate, 0)
 	end
+	if mannitolK > 0 then
+		org.brain = max(org.brain - timeValue * (1 / 170) * mannitolK, 0)
+	end
 
 	if occipital > 0.35 then
 		org.disorientation = math.max(org.disorientation, occipital * 0.4)
@@ -1148,7 +1161,7 @@ kaz
 
 
         if org.brain >= 0.5 then
-		if org.brain >= 0.5 then
+		if org.brain >= 0.5 and (mannitolK <= 0 or (org.brainHemorrhage or 0) >= 0.85) then
 			if math.random(60) == 1 then
 				org.heartstop = true
 			end
@@ -1161,7 +1174,8 @@ kaz
 
 	local death_from_braindamage = false
 
-	if org.brain >= 0.7 and org.alive then
+	local mannitolSavingBrain = mannitolK > 0 and (org.brainHemorrhage or 0) < 0.85 and org.brain < 0.9
+	if org.brain >= 0.7 and org.alive and not mannitolSavingBrain then
 
 		death_from_braindamage = true
 		if hg.organism.KillFatalBrainDamage then
@@ -1185,7 +1199,7 @@ kaz
 
 
 
-	org.brain = max(org.brain - timeValue / 400 * ((org.mannitol > 0 and org.brain < 0.6) and 1 or (org.brain > 0.1 and 0.1 or 0)), 0)
+	org.brain = max(org.brain - timeValue / 400 * ((mannitolK > 0 and org.brain < 0.6) and 1 or (org.brain > 0.1 and 0.1 or 0)), 0)
 
 	org.mannitol = math.Approach(org.mannitol, 0, timeValue / 200)
 	

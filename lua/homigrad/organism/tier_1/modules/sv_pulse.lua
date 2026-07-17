@@ -35,11 +35,29 @@ local function interpolateCurve(curve, value)
 	return curve[#curve][2]
 end
 
-function hg.organism.GetECGState(heartbeat, heartstop)
+function hg.organism.GetECGState(heartbeat, heartstop, org)
 	heartbeat = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
 	if heartstop then return heartbeat < 1 and "asystole" or "pea" end
 	if heartbeat < 1 then return "asystole" end
-	if heartbeat < 60 then return "bradycardia" end
+
+	org = org or {}
+	local o2 = org.o2 and org.o2[1] or 30
+	local hypoxia = math.Clamp((12 - o2) / 12, 0, 1)
+	local cerebral = math.Clamp(math.max((org.brain or 0) * 0.8, org.brainHemorrhage or 0), 0, 1)
+	local cardiac = math.Clamp(org.heart or 0, 0, 1)
+	local cold = math.Clamp((35 - (org.temperature or 36.7)) / 7, 0, 1)
+	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold)
+
+	-- Complete/partial AV block is a direct conduction-system injury pattern,
+	-- while severe systemic failure falls back to an escape rhythm.
+	if cardiac >= 0.72 and heartbeat > 40 then return "av_block_complete" end
+	if cardiac >= 0.4 and heartbeat > 45 then return "av_block_partial" end
+	if heartbeat <= 40 and (hypoxia >= 0.65 or cardiac >= 0.65 or cold >= 0.75) then return "ventricular_escape" end
+	if heartbeat <= 60 and suppression >= 0.52 then return "junctional_escape" end
+	if heartbeat < 50 and suppression >= 0.32 then return "sinus_pause" end
+	if cold >= 0.18 and heartbeat < 70 then return "hypothermia_bradycardia" end
+	if cerebral >= 0.28 then return heartbeat < 60 and "cerebral_bradycardia" or "cerebral_irregular" end
+	if heartbeat < 60 then return "sinus_bradycardia" end
 	if heartbeat <= 100 then return "normal_sinus" end
 	if heartbeat <= 150 then return "sinus_tachycardia" end
 	if heartbeat <= 200 then return "compressed_tachycardia" end
@@ -67,6 +85,7 @@ module[1] = function(org)
 	org.tempchanging = 0
 	org.heatbuff = 30 -- seconds of heat supply
 	org.needed_temp = 36.7
+	org.lowBloodTemperatureTarget = 36.7
 end
 
 function hg.organism.should_gain_fear(org)
@@ -79,8 +98,8 @@ module[2] = function(owner, org, timeValue)
 	local heart = 1 - org.heart
 	-- Brain damage weakens the heart's neurological drive.
 	local brain = math.Clamp(1 - org.brain * 1.5, 0, 1)
-	local o2 = org.o2
-	local o2 = halfValue2(o2[1], o2.range, o2.k)
+	local o2Value = org.o2 and org.o2[1] or 30
+	local o2 = halfValue2(o2Value, org.o2.range, org.o2.k)
 
 	if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts a lot...",true,"heart",6) end
 	if org.isPly and not org.otrub and org.heartstop then org.owner:Notify("",true,"heartstop",6) end
@@ -162,6 +181,32 @@ module[2] = function(owner, org, timeValue)
 	if org.panicattackActive then heartbeat = heartbeat + 20 end -- adrenaline handles most of the boost
 	if org.givingUp then heartbeat = heartbeat * 0.8 end
 
+	-- Neurologic injury, oxygen starvation, myocardial damage, and cold each
+	-- suppress the sinus node differently. This creates bradycardia first, then
+	-- pause/junctional and ventricular escape ranges instead of one universal
+	-- flatline path.
+	local brainHemorrhage = math.Clamp(org.brainHemorrhage or 0, 0, 1)
+	local cerebralSuppression = math.Clamp(math.max((org.brain or 0) * 0.8, brainHemorrhage) * 0.9, 0, 1)
+	local hypoxiaSuppression = math.Clamp((12 - o2Value) / 12, 0, 1)
+	local cardiacSuppression = math.Clamp(org.heart or 0, 0, 1)
+	local coldSuppression = math.Clamp((35 - (org.temperature or 36.7)) / 7, 0, 1)
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression)
+	org.bradycardiaSeverity = bradycardiaSeverity
+
+	local bradyTarget
+	if bradycardiaSeverity >= 0.16 then
+		if bradycardiaSeverity >= 0.78 then
+			bradyTarget = 30 -- ventricular escape: 20-40 BPM
+		elseif bradycardiaSeverity >= 0.52 then
+			bradyTarget = 50 -- junctional escape: 40-60 BPM
+		elseif bradycardiaSeverity >= 0.32 then
+			bradyTarget = 44 -- sinus pauses/arrest with a slow residual rhythm
+		else
+			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.16, 0.32, 0, 1), 59, 47)
+		end
+		heartbeat = math.min(heartbeat, bradyTarget)
+	end
+
 	-- Viability limits the maximum rate the body can sustain, but compensation
 	-- should still exist. Do not multiply BPM down into impossible states like
 	-- 45 pulse / 15 heartbeat unless the heart has actually stopped.
@@ -175,6 +220,7 @@ module[2] = function(owner, org, timeValue)
 		maxCompensatedRate = 0
 	else
 		local minPumpRate = perfusionPulse < 60 and 60 + (60 - perfusionPulse) * 0.4 or 45
+		if bradyTarget then minPumpRate = math.min(minPumpRate, bradyTarget) end
 		heartbeat = math.max(heartbeat, minPumpRate)
 	end
 
@@ -192,7 +238,7 @@ module[2] = function(owner, org, timeValue)
 
 	-- Blood-loss arrest is deterministic: the configured curve must actually
 	-- reach its 300 BPM terminal point at 2000 mL before circulation stops.
-	if not org.heartstop and bloodNow <= cardiacArrestBlood and bloodCompensationRate >= terminalHeartRate and org.heartbeat >= terminalHeartRate then
+	if not org.heartstop and bloodNow <= cardiacArrestBlood and bloodCompensationRate >= terminalHeartRate and (org.heartbeat >= terminalHeartRate or (bloodNow <= 1600 and bradycardiaSeverity >= 0.4)) then
 		org.heartstop = true
 	end
 
@@ -414,7 +460,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	-- temperature
-	local needed_temp = math.min(math.max(37 * (org.pulse / 45), 35), 36.7)
+	local needed_temp = math.min(math.max(37 * (org.pulse / 45), 35), org.lowBloodTemperatureTarget or 36.7)
 	local changeRate = timeValue / 60
 	changeRate = changeRate * (org.temperature < needed_temp and math.Clamp(org.heatbuff / 60, 1, 2) or 1)
 	if math.abs(org.tempchanging) < changeRate then
@@ -484,7 +530,7 @@ module[2] = function(owner, org, timeValue)
 		local rateK = math.Clamp((org.heartbeat or 0) / 75, 0, 2.5)
 		local fillingK = 1 - math.Clamp(((org.heartbeat or 75) - 180) / 120, 0, 0.7)
 		org.cardiacOutput = math.Clamp(((org.pulse or 0) / 70) * rateK * fillingK * (1 - math.Clamp(org.heart or 0, 0, 1)), 0, 1.5)
-		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, false)
+		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, false, org)
 	end
 
 	if org.heartstop then

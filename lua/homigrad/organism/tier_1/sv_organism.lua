@@ -92,6 +92,8 @@ local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
 local seizure_brain_roll_delay = 20
 local seizure_brain_roll_chance = 15
+local seizure_brain_roll_gain_min = 0.04
+local seizure_brain_roll_gain_max = 0.11
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
@@ -1402,7 +1404,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if incapacitationMode > 0 and dyingIncapacitated then
 		if not org.deathStateStart and not org.deathStatePendingEnd then
 			local delay = 0
-			if incapacitationMode == 2 then
+			-- Ring mode is an immediate, fixed twenty-second countdown once the
+			-- player is incapacitated.  Do not hold it behind the injury/asystole
+			-- delay used by the non-ring delayed-death mode.
+			if incapacitationMode == 2 and scavDyingMode ~= 1 then
 				local injury = math.max(
 					math.Clamp((3000 - (org.blood or 5000)) / 1800, 0, 1),
 					math.Clamp((10 - (org.o2 and org.o2[1] or 30)) / 10, 0, 1),
@@ -1507,7 +1512,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	-- (for example panic). Normalize the replicated state before clients draw
 	-- the ECG or organism stats so the rhythm can never lag behind heartstop.
 	if hg.organism.GetECGState then
-		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, org.heartstop)
+		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, org.heartstop, org)
 	end
 	if org.heartstop then
 		org.cardiacArrestStart = org.cardiacArrestStart or CurTime()

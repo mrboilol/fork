@@ -596,6 +596,9 @@ end)
 
 hook.Add("PlayerDeath", "hg_ptsd_kill_trauma", function(victim, inflictor, attacker)
 	if IsValid(victim) and victim:IsPlayer() then
+		-- RagdollDeath does not expose the killer. Keep the resolved player here so
+		-- that the witness-trauma pass does not traumatize the person who killed them.
+		victim._ptsdDeathAttacker = resolve_harm_attacker(victim, attacker)
 		add_trauma(victim, 25, "own_death", {combat = false})
 	end
 end)
@@ -626,11 +629,13 @@ local function witness_death_trauma(victim, ent, amount, reason, radius, attacke
 end
 
 hook.Add("HG_HeadExploded", "hg_ptsd_head_explosion", function(rag, victim)
-	witness_death_trauma(victim, rag, cvTraumaHead:GetFloat(), "head_explosion", 900, resolve_harm_attacker(victim))
+	local deathAttacker = IsValid(victim) and victim._ptsdDeathAttacker or nil
+	witness_death_trauma(victim, rag, cvTraumaHead:GetFloat(), "head_explosion", 900, resolve_harm_attacker(victim, deathAttacker))
 end)
 
 hook.Add("RagdollDeath", "hg_ptsd_death_witness", function(victim, rag)
-	witness_death_trauma(victim, rag, cvTraumaDeath:GetFloat(), "witness_death", 700, resolve_harm_attacker(victim))
+	local deathAttacker = IsValid(victim) and victim._ptsdDeathAttacker or nil
+	witness_death_trauma(victim, rag, cvTraumaDeath:GetFloat(), "witness_death", 700, resolve_harm_attacker(victim, deathAttacker))
 end)
 
 concommand.Add("hg_ptsd", function(ply, cmd, args)

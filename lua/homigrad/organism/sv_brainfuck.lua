@@ -20,7 +20,7 @@ local extendDur, rigorDur, flexionDur = {4, 10}, {10, 20}, {6, 12}
 local RIGOR_DAMP, FLEXION_FORCE = 8, 400
 local DECORTICATE_START, DECEREBRATE_START = 0.2, 0.7
 local POSTURE_DEATH_FADE = 8
-local FENCING_DURATION, FENCING_FADE, FENCING_RECENT_DAMAGE = 3.8, 0.35, 1.5
+local FENCING_DEFAULT_DURATION, FENCING_FADE, FENCING_RECENT_DAMAGE = 3.8, 0.35, 1.5
 local FENCING_HEAVY_DURATION, FENCING_HEAVY_FORCE = 0.18, 15
 local POSTURE_SHAKE_REFRESH = {0.035, 0.095}
 local FENCING_FORCE_MUL, FENCING_DAMP_MUL = 1, 1
@@ -191,7 +191,7 @@ local function startFencing(org, dur)
 	local time = CurTime()
 	if not org.fencingEnd or time >= org.fencingEnd then org.fencingHeavyEnd = time + FENCING_HEAVY_DURATION end
 	org.fencingStart = time
-	org.fencingEnd = time + (dur or FENCING_DURATION)
+	org.fencingEnd = time + (isnumber(dur) and dur or FENCING_DEFAULT_DURATION)
 end
 
 local function applyFencingToPlayer(ply, dur)

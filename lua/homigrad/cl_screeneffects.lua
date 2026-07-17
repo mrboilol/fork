@@ -1538,9 +1538,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			elseif painMode == 6 then
 				-- REM pain stack from the reference: beat + rem_pain + pain-intensity layers.
 				targetPainVol = painVol
-				targetRemPainVol = painVol * remPainOverlayVolumeMul
-				targetRemAgonyVol = math.Clamp(math.Remap(normalizedPain, remPainAgonyThreshold, 1, 0, 1), 0, 1) * painVol * remPainAgonyVolumeMul
-				targetRemExcruciatingVol = math.Clamp(math.Remap(normalizedPain, remPainExcruciatingThreshold, 1, 0, 1), 0, 1) * painVol * remPainExcruciatingVolumeMul
+				targetRemPainVol = painVol * painBeatOverlayVolumeMul
+				targetRemAgonyVol = math.Clamp(math.Remap(normalizedPain, painAgonyThreshold, 1, 0, 1), 0, 1) * painVol * painAgonyVolumeMul
+				targetRemExcruciatingVol = math.Clamp(math.Remap(normalizedPain, painExcruciatingThreshold, 1, 0, 1), 0, 1) * painVol * painExcruciatingVolumeMul
 			end
 
 			if IsValid(PainStation) then PainStation:SetVolume(targetPainVol) end
@@ -2319,6 +2319,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 
 		local blood = org.blood or 5000
+		local lowBloodVisual = math.Clamp((4000 - blood) / 2000, 0, 1)
+		if lowBloodVisual > 0 then
+			-- Blood loss starts with a restrained desaturation and blur, while the
+			-- existing consciousness/shock effects still own severe collapse.
+			grayscaleTarget = grayscaleTarget + lowBloodVisual * 0.18
+			hg.QueueMotionBlur(0.04 + lowBloodVisual * 0.04, 0.18 + lowBloodVisual * 0.22, 0.02)
+		end
 		if blood < 3500 then
 			grayscaleTarget = grayscaleTarget + math.Clamp((3500 - blood) / 3500, 0, 1) * 0.25
 		end
@@ -2441,7 +2448,10 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 	end
 end)
 
-hook.Add("Post Pain Processing", "PainEffects", function()
+-- Z-City applied the otrub pain/vignette pass before its memory and status
+-- overlays.  Keeping it in the main post-processing phase preserves that
+-- ordering: blackout and blur first, then readable memories/text, then HUD.
+hook.Add("Post Post Processing", "PainEffects", function()
 	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
 	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
 
@@ -2600,14 +2610,17 @@ local function GetConsciousBeatPulse()
 	if not hg_dyingpulse:GetBool() then return 0 end
 
 	local dyingMode = hg_dyingsound:GetInt()
-	-- Disable conscious-beat camera pulse for non-consciousbeat modes.
-	if dyingMode == 2 or dyingMode == 3 or dyingMode == 4 or dyingMode == 5 or dyingMode == 6 or dyingMode == 8 then return 0 end
+	-- The camera pulse belongs only to the modes that actually play
+	-- conscioustypebeat. Keep the other dying tracks visually quiet.
+	if dyingMode != 0 and dyingMode != 1 then return 0 end
 
 	local intensity = hg.consciousBeatIntensity or 0
 	if intensity <= 0.01 then return 0 end
 
-	-- Only trigger the pulse if the sound is actually playing and hasn't been stopped
-	if not IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING or NoiseStation2:GetVolume() <= 0.01 then return 0 end
+	-- Do not depend on GetVolume here. The track is intentionally capped at a
+	-- quiet volume, and some clients report that capped channel as zero even
+	-- while it is playing, which silently removed the camera shake.
+	if not IsValid(NoiseStation2) or NoiseStation2:GetState() != GMOD_CHANNEL_PLAYING then return 0 end
 
 	local time = NoiseStation2:GetTime()
 
