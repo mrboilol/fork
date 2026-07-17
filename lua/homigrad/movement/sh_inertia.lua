@@ -451,8 +451,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		end
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		k = k * ((IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) and math.Clamp(50 / math.max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
-		k = k * math.Clamp(20 / ((org.pain or 0) + 1), 0.01, 1)
-		if org.bloodpressure and org.bloodpressure < 80 and runnin then
+		k = k * math.Clamp(60 / ((org.pain or 0) + 1), 0.35, 1)
+				if org.bloodpressure and org.bloodpressure < 80 and runnin then
 			k = k * math.Clamp(math.Remap(org.bloodpressure, 20, 80, 0.65, 1), 0.65, 1)
 		end
 		if org.panicattackActive then k = k * 0.5 end

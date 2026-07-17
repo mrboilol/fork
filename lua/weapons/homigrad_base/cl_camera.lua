@@ -360,7 +360,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	tta_multiplier = tta_multiplier * oneHandCameraMul
 	tta_multiplier = tta_multiplier * (1 + fear * 0.15 + adrenalineJitter * 0.1) / (1 + adrenalineStabilizer) * handlingMul
 	tta = tta * tta_multiplier
-
+    tta = tta + math.Clamp((self.weight or 1) / 8, 0.25, 0.75) * 0.5
 	-- Aiming fatigue slows down sight realignment
 	local fatigue = organism.aiming_fatigue or 0
 	local fatigue_realignment_penalty = 1 + fatigue * 0.15
@@ -393,7 +393,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		end
 		tta = tta + arm_tta_bonus
 	end
-
+	
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
