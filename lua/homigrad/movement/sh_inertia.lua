@@ -49,15 +49,191 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 	local hg_divejump = CreateConVar("hg_divejump", "0", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Toggle dive jumps on crouch jump", 0, 1)
 	local hg_movement_speed_gain_mul = CreateConVar("hg_movement_speed_gain_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed gain", 0.01, 5)
 	local hg_movement_speed_lose_mul = CreateConVar("hg_movement_speed_lose_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
-		local function hg_HoldShiftSprint(ply)
-				return IsValid(ply) and ply:GetInfoNum("hg_hold_shift_sprint", 0) >= 1
-		end
+	local hg_movement_lagcomp = CreateConVar("hg_movement_lagcomp", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Compensate movement inertia for latency", 0, 1)
+        local function hg_GetMovementLagComp(ply)
+                if not hg_movement_lagcomp:GetBool() or not IsValid(ply) then return 1, 0 end
+
+                local ping_time = math.Clamp(ply:Ping() / 1000, 0, 0.18)
+
+                return math.Clamp(1 + ping_time * 4.5, 1, 1.8), ping_time
+        end
+        local sprint_collision_trace_mins = Vector(-12, -12, -20)
+        local sprint_collision_trace_maxs = Vector(12, 12, 20)
+        local sprint_collision_up = Vector(0, 0, 1)
+        local sprint_collision_force_mul = 0.55
+        local sprint_collision_torso_force_mul = 0.4
+        local sprint_collision_upward_mul = 0.2
+        local sprint_collision_full_speed_mul = 0.98
+        local sprint_collision_trip_chance = 3
+        local sprint_collision_stumble_slowdown = 450
+        local sprint_collision_stumble_time = 0.18
+        local sprint_collision_damage_mul = 0.08
+        local sprint_collision_damage_time = 0.9
+        local sprint_collision_sounds = {
+                "raminto/ram1.wav",
+                "raminto/ram2.wav",
+                "raminto/ram3.wav"
+        }
+
+        local function hg_HoldShiftSprint(ply)
+                return IsValid(ply) and ply:GetInfoNum("hg_hold_shift_sprint", 0) >= 1
+        end
+
+        local function hg_GetSprintCollisionPhysBone(ply, hitPos)
+                local localHit = ply:WorldToLocal(hitPos)
+                local boneName = "ValveBiped.Bip01_Spine2"
+
+                if localHit.z >= 54 then
+                        boneName = "ValveBiped.Bip01_Head1"
+                elseif localHit.z <= 20 then
+                        boneName = localHit.y >= 0 and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_R_Thigh"
+                elseif localHit.y >= 12 then
+                        boneName = "ValveBiped.Bip01_L_UpperArm"
+                elseif localHit.y <= -12 then
+                        boneName = "ValveBiped.Bip01_R_UpperArm"
+                end
+
+                local bone = ply:LookupBone(boneName)
+                local physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
+
+                if not physbone or physbone < 0 then
+                        boneName = "ValveBiped.Bip01_Spine2"
+                        bone = ply:LookupBone(boneName)
+                        physbone = bone and ply:TranslateBoneToPhysBone(bone) or 0
+                end
+
+                return physbone, boneName
+        end
+
+        local function hg_PlaySprintCollisionSound(ply)
+                if not SERVER or not IsValid(ply) then return end
+                ply:EmitSound(sprint_collision_sounds[math.random(#sprint_collision_sounds)], 75, math.random(96, 104), 1)
+        end
+
+        local function hg_TriggerSprintCollisionRagdoll(ply, tr, vel, impactSpeed)
+                if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+
+                ply.hgSprintCollisionCooldown = CurTime() + 0.45
+                hg_PlaySprintCollisionSound(ply)
+
+                local hitEnt = tr.Entity
+                local impactDir
+
+                if IsValid(hitEnt) and hitEnt:IsPlayer() then
+                        impactDir = ply:WorldSpaceCenter() - hitEnt:WorldSpaceCenter()
+                else
+                        impactDir = -tr.HitNormal
+                end
+
+                if impactDir:LengthSqr() <= 0.001 then
+                        impactDir = -vel:GetNormalized()
+                end
+
+                impactDir.z = math.max(impactDir.z, 0.18)
+                impactDir:Normalize()
+
+                local hitPhysbone, hitBoneName = hg_GetSprintCollisionPhysBone(ply, tr.HitPos)
+                local torsoBone = ply:LookupBone("ValveBiped.Bip01_Spine2")
+                torsoBone = torsoBone and ply:TranslateBoneToPhysBone(torsoBone) or 0
+
+                local clampedImpact = math.Clamp(impactSpeed, 0, 260)
+                local hitMass = hg.IdealMassPlayer[hitBoneName] or 4
+                local torsoMass = hg.IdealMassPlayer["ValveBiped.Bip01_Spine2"] or 4
+                local contactForce = impactDir * clampedImpact * hitMass * sprint_collision_force_mul
+                local torsoForce = impactDir * clampedImpact * torsoMass * sprint_collision_torso_force_mul + sprint_collision_up * clampedImpact * torsoMass * sprint_collision_upward_mul
+
+                ply.hgSprintCollisionDamageMul = sprint_collision_damage_mul
+                ply.hgSprintCollisionDamageUntil = CurTime() + sprint_collision_damage_time
+                hg.AddForceRag(ply, hitPhysbone, contactForce, 0.25)
+                hg.AddForceRag(ply, torsoBone, torsoForce, 0.25)
+                hg.LightStunPlayer(ply, 1.35)
+        end
+
+        local function hg_TriggerSprintCollisionStumble(ply)
+                if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+
+                ply.hgSprintCollisionCooldown = CurTime() + 0.35
+                hg_PlaySprintCollisionSound(ply)
+                ply:SetNetVar("slowDown", sprint_collision_stumble_slowdown)
+                ply:ViewPunch(Angle(math.random(2) == 1 and -18 or 18, math.random(-2, 2), math.random(-4, 4)))
+
+                timer.Create("hg_sprint_collision_slowdown_" .. ply:EntIndex(), sprint_collision_stumble_time, 1, function()
+                        if not IsValid(ply) then return end
+                        if ply:GetNetVar("slowDown", 0) <= sprint_collision_stumble_slowdown then
+                                ply:SetNetVar("slowDown", 0)
+                        end
+                end)
+        end
+
+        hg.TriggerSprintCollisionRagdoll = hg_TriggerSprintCollisionRagdoll
+        hg.TriggerSprintCollisionStumble = hg_TriggerSprintCollisionStumble
+
+        local function hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
+                if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+                if ply.hgSprintCollisionCooldown and ply.hgSprintCollisionCooldown > CurTime() then return end
+                if ply:InVehicle() or ply:GetMoveType() != MOVETYPE_WALK or ply:WaterLevel() >= 2 then return end
+                if not (ply.hg_isSprinting or (not ply:OnGround() and ply:KeyDown(IN_SPEED) and ply:KeyDown(IN_FORWARD))) then return end
+                local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
+                if velLen < 215 / lag_comp_mul then return end
+
+                local fullSpeed = math.max(ply:GetRunSpeed(), ply.move or 0)
+                if velLen < fullSpeed * math.Clamp(sprint_collision_full_speed_mul / lag_comp_mul, 0.78, sprint_collision_full_speed_mul) then return end
+
+                local dir = vel:GetNormalized()
+                if dir:LengthSqr() <= 0.001 then return end
+
+                local tr = util.TraceHull({
+                        start = ply:WorldSpaceCenter(),
+                        endpos = ply:WorldSpaceCenter() + dir * math.Clamp(velLen * (engine.TickInterval() * 1.5 + lag_comp_time * 0.7), 18, 64),
+                        mins = sprint_collision_trace_mins,
+                        maxs = sprint_collision_trace_maxs,
+                        filter = {ply, ply:GetVehicle()},
+                        mask = MASK_PLAYERSOLID
+                })
+
+                if not tr.Hit or tr.HitSky or tr.StartSolid then return end
+
+                local hitEnt = tr.Entity
+                local impactSpeed = math.abs(vel:Dot(-tr.HitNormal))
+                local shouldTrip = math.random(sprint_collision_trip_chance) == 1
+
+                if IsValid(hitEnt) and hitEnt:IsPlayer() and hitEnt:Alive() then
+                        impactSpeed = (vel - hitEnt:GetVelocity()):Length()
+                        if impactSpeed >= 170 / lag_comp_mul then
+                                if shouldTrip then
+                                        hg_TriggerSprintCollisionRagdoll(ply, tr, vel, impactSpeed)
+                                else
+                                        hg_TriggerSprintCollisionStumble(ply)
+                                end
+                        end
+                        return
+                end
+
+                if IsValid(hitEnt) then
+                        local phys = hitEnt:GetPhysicsObject()
+                        if IsValid(phys) and phys:GetMass() < 8 then return end
+                end
+
+                if impactSpeed <= 0 then
+                        impactSpeed = velLen
+                end
+
+                if impactSpeed >= ((ply:OnGround() and 200 or 160) / lag_comp_mul) then
+                        if shouldTrip then
+                                hg_TriggerSprintCollisionRagdoll(ply, tr, vel, impactSpeed)
+                        else
+                                hg_TriggerSprintCollisionStumble(ply)
+                        end
+                end
+        end
 
 
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
 		--\\ DeltaTime
 			local delta_time = engine.TickInterval()
+			local move_time = cmd:TickCount() > 0 and cmd:TickCount() * delta_time or CurTime()
+			local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
 		--//
 
 		if(not IsValid(ply) or not ply:Alive())then
@@ -127,13 +303,13 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
                         ply.hg_isJogging = false
                 else
                         if speed_pressed then
-                                if (ply.lastInSpeed and CurTime() - ply.lastInSpeed < 0.3) or force_sprint then
+						if (ply.lastInSpeed and move_time - ply.lastInSpeed < 0.3) or force_sprint then
                                         ply.isSprintingState = true
                                         if (ply.CurrentSpeed or 0) <= slow_walk_speed * 1.5 then
-                                                ply.sprintDebuff = CurTime() + 0.3
+										ply.sprintDebuff = move_time + 0.3
                                         end
                                 end
-                                ply.lastInSpeed = CurTime()
+							ply.lastInSpeed = move_time
                         end
 
                         if not in_speed then
@@ -144,8 +320,14 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
                         ply.hg_isJogging = runnin_held and not ply.hg_isSprinting
                 end
                 if SERVER then
-                        if ply:GetNWBool("hg_isSprinting", false) ~= ply.hg_isSprinting then ply:SetNWBool("hg_isSprinting", ply.hg_isSprinting) end
-                        if ply:GetNWBool("hg_isJogging", false) ~= ply.hg_isJogging then ply:SetNWBool("hg_isJogging", ply.hg_isJogging) end
+                        if ply.hg_LastIsSprinting ~= ply.hg_isSprinting then
+                                ply.hg_LastIsSprinting = ply.hg_isSprinting
+                                ply:SetNWBool("hg_isSprinting", ply.hg_isSprinting)
+                        end
+                        if ply.hg_LastIsJogging ~= ply.hg_isJogging then
+                                ply.hg_LastIsJogging = ply.hg_isJogging
+                                ply:SetNWBool("hg_isJogging", ply.hg_isJogging)
+                        end
                 end
                 local runnin = ply.hg_isSprinting or ply.hg_isJogging
 
@@ -162,8 +344,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
                 local wep = ply:GetActiveWeapon()
                 local vel = ply:GetVelocity()
                 local velLen = vel:Length()
-				local fm = cmd:GetForwardMove() * (org.brain and org.brain > 0.1 and math.sin(CurTime() / 2) or 1)
-                local sm = cmd:GetSideMove() * (org.brain and org.brain > 0.1 and math.sin(CurTime() / 2) or 1)
+                hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
+				local fm = cmd:GetForwardMove() * (org.brain and org.brain > 0.1 and math.sin(move_time / 2) or 1)
+				local sm = cmd:GetSideMove() * (org.brain and org.brain > 0.1 and math.sin(move_time / 2) or 1)
 
                 local slow_walking = cmd:KeyDown(IN_WALK)
                 local aiming = cmd:KeyDown(IN_ATTACK2) and wep and IsValid(wep) and ishgweapon(wep)
@@ -193,7 +376,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		end
 
 		if org.brain and org.brain > 0.05 then
-			local brainadjust = org.brain > 0.05 and math.Clamp(((org.brain - 0.05) * math.sin(CurTime() + 10) * 20), -2, 2) or 0
+			local brainadjust = org.brain > 0.05 and math.Clamp(((org.brain - 0.05) * math.sin(move_time + 10) * 20), -2, 2) or 0
 
 			if brainadjust > 1 then
 				local in_jump = cmd:KeyDown(IN_JUMP)
@@ -218,7 +401,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			end
 		end
 
-		if ply:GetNetVar("vomiting", 0) > CurTime() then
+		if ply:GetNetVar("vomiting", 0) > move_time then
 			cmd:AddKey(IN_DUCK)
 			mv:AddKey(IN_DUCK)
 			if ply == lply then ViewPunch(vomitVPAng) end
@@ -230,14 +413,14 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		ply.FrictionGainMul = 0.01
 		ply.FrictionLoseMul = 0.2
 
-		ply.SpeedGainMul = 240 * weightmul * (ply.organism.superfighter and 5 or 1) * (ply:GetNWInt("SpeedGainClassMul", 1) or 1)
+		ply.SpeedGainMul = 240 * weightmul * (ply.organism.superfighter and 5 or 1) * (ply:GetNWInt("SpeedGainClassMul", 1) or 1) * lag_comp_mul
 		ply.SpeedGainMul = ply.SpeedGainMul * hg_movement_speed_gain_mul:GetFloat()
 
 		ply.SpeedLoseMul = 10000
 		ply.SpeedLoseMul = ply.SpeedLoseMul * hg_movement_speed_lose_mul:GetFloat()
 
 		ply.SpeedSharpLoseMul = 0.007
-		ply.InertiaBlend = 2000 * weightmul * (ply.organism.superfighter and 100 or 1)
+		ply.InertiaBlend = 2000 * weightmul * (ply.organism.superfighter and 100 or 1) * lag_comp_mul
 		ply.DuckingSlowdown = ply.DuckingSlowdown or 0
 		-- ply.InertiaBlend = 15 * weightmul * ply.CurrentFrictionMul
 		local inertia_blend_mul = 1
@@ -282,11 +465,11 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		mul = mul * (ply:GetNWBool("TauntStopMoving", false) and 0.01 or 1)
 
-		if(ply.hg_isSprinting and velLen >= 10)then
+		if ply.hg_isSprinting and runnin then
 			local sprint_mul = 1
-			if ply.sprintDebuff and ply.sprintDebuff > CurTime() then sprint_mul = 0.5 end
+			if ply.sprintDebuff and ply.sprintDebuff > move_time then sprint_mul = 0.5 end
 			ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, (ply.move or ply:GetRunSpeed()) * mul * sprint_mul, delta_time * ply.SpeedGainMul)
-		elseif(ply.hg_isJogging and velLen >= 10)then
+		elseif ply.hg_isJogging and runnin then
 			ply.CurrentSpeed = math.Approach(ply.CurrentSpeed, (ply.move or (ply:GetRunSpeed() * 0.55)) * mul, delta_time * ply.SpeedGainMul)
 		else
 			if(ply:Crouching())then
@@ -316,9 +499,16 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		end
 
 		local change = math.abs(math.AngleDifference(calc_vector2d_angle(ply.LastVelocity), calc_vector2d_angle(vel))) // * (SERVER and 0 or 5)
+		if CLIENT and ply == LocalPlayer() and (fm ~= 0 or sm ~= 0) then
+			change = math.min(change, sm ~= 0 and 18 or 35)
+		end
 
 		if ply.LastVelocity == vel and ply.LastChangeVelocity then // this is so bullshit but it works
 			change = ply.LastChangeVelocity
+		end
+
+		if CLIENT and ply == LocalPlayer() and (fm ~= 0 or sm ~= 0) then
+			change = math.min(change, sm ~= 0 and 18 or 35)
 		end
 
 		local change_mul = math.abs(ply.CurrentSpeed - (ply:GetSlowWalkSpeed() or 100))
@@ -423,8 +613,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 			if(CLIENT)then
 				ply.MovementInertiaAddView = ply.MovementInertiaAddView or Angle(0,0,0)
-				ply.MovementInertiaAddView.r = ply.MovementInertiaAddView.r + side_move * delta_time * inertia_len * 0.03
-				ply.MovementInertiaAddView.p = ply.MovementInertiaAddView.p + math.abs(side_move) * delta_time * inertia_len * 0.01
+				ply.MovementInertiaAddView.r = ply.MovementInertiaAddView.r + side_move * delta_time * inertia_len * 0.01
+				ply.MovementInertiaAddView.p = ply.MovementInertiaAddView.p + math.abs(side_move) * delta_time * inertia_len * 0.003
 			end
 		--//
 
@@ -469,7 +659,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		k = math.max(k, 20 / 200)
 
-		if ply:GetNetVar("vomiting", 0) > (CurTime() - 3) then
+		if ply:GetNetVar("vomiting", 0) > (move_time - 3) then
 			k = k * 0.25
 		end
 
@@ -479,14 +669,14 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			local mul = math.Clamp(inertia_len / 200, 0.5, 1) * 5 * (ply:Crouching() and 0.01 or 1)
 			if ply == rag then
 				if org.pelvis == 1 then
-					org.painadd = org.painadd + FrameTime() * mul
+					org.painadd = org.painadd + delta_time * mul
 				end
 				if (org.lleg == 1) or org.llegdislocation then
-					org.painadd = org.painadd + FrameTime() * mul
+					org.painadd = org.painadd + delta_time * mul
 				end
 
 				if (org.rleg == 1) or org.rlegdislocation then
-					org.painadd = org.painadd + FrameTime() * mul
+					org.painadd = org.painadd + delta_time * mul
 				end
 			end
 		end
@@ -523,9 +713,9 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		--// Dive jump
 		if hg_divejump:GetBool() then
-			ply.lastInDuck = ply:KeyPressed(IN_DUCK) and CurTime() or ply.lastInDuck or 0
-			ply.lastInJump = ply:KeyPressed(IN_JUMP) and CurTime() or ply.lastInJump or 0
-			if(SERVER && rag == ply && (ply.lastInJump + 0.1 > CurTime()) && (ply.lastInDuck + 0.1 > CurTime()))then
+			ply.lastInDuck = ply:KeyPressed(IN_DUCK) and move_time or ply.lastInDuck or 0
+			ply.lastInJump = ply:KeyPressed(IN_JUMP) and move_time or ply.lastInJump or 0
+			if(SERVER && rag == ply && (ply.lastInJump + 0.1 + lag_comp_time > move_time) && (ply.lastInDuck + 0.1 + lag_comp_time > move_time))then
 				local force = ply:GetAimVector() * 400
 				force[3] = 0
 				local torso = ply:TranslateBoneToPhysBone(ply:LookupBone("ValveBiped.Bip01_Spine2"))
@@ -549,22 +739,13 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
 		ply:SetMaxSpeed(math.max(100, inertia_len))
-		local jumpPowerMul = (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1)
-		-- Apply legstrength penalty from spine1 damage
-		if ply.organism and ply.organism.legstrength and ply.organism.legstrength < 1 then
-			jumpPowerMul = jumpPowerMul * ply.organism.legstrength
-		end
-		ply:SetJumpPower(DEFAULT_JUMP_POWER * math.min(k, 1.1) * (not ply:GetNWBool("TauntStopMoving", false) and 1 or 0) * jumpPowerMul)
+		ply:SetJumpPower(DEFAULT_JUMP_POWER * math.min(k, 1.1) * (not ply:GetNWBool("TauntStopMoving", false) and 1 or 0) * (ply.organism.superfighter and 1.5 or 1) * (ply.JumpPowerMul or 1) * math.Clamp(1 + lag_comp_time * 0.35, 1, 1.06))
 
-		if(CLIENT)then
-			local fwangs = math.rad(GetViewPunchAngles2()[2] + GetViewPunchAngles3()[2])
+		local cmd_forward_move = forward_move
+		local cmd_side_move = side_move
 
-			forward_move = forward_move * math.cos(fwangs) + side_move * math.sin(fwangs)
-			side_move = side_move * math.cos(fwangs) + forward_move * math.sin(fwangs)
-
-			cmd:SetForwardMove(forward_move * inertia_len)
-			cmd:SetSideMove(side_move * inertia_len)
-		end
+		cmd:SetForwardMove(cmd_forward_move * inertia_len)
+		cmd:SetSideMove(cmd_side_move * inertia_len)
 
 		if hg_inertiaenabled:GetBool() then
 			mv:SetForwardSpeed(forward_move * inertia_len)

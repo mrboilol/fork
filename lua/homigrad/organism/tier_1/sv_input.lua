@@ -1265,8 +1265,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		attacker.harm = attacker.harm + bleed_add / 50
 		local hurt_add = dmgHurt * 0.5 * hurtMul
 		org.hurtadd = org.hurtadd + hurt_add
-		local meleePainMul = isMeleeDmg and melee_pain_scale * (isSharpMelee and 0.75 or 1) or 1
-		local painadd = dmgHurt * painMul * 1.5 * meleePainMul
+		local painadd = dmgHurt * painMul * 1.5
 		local instantPainMul = 0.2
 		local instant_pain = (instantPainMul or 0) * painadd
 		local slow_pain = (1 - (instantPainMul or 0)) * painadd

@@ -1207,6 +1207,7 @@ end)
 
 function hg.Fake(ply, huyragdoll, no_freemove, force)
 	ply.switchingseat = nil
+	if not force and (ply.hg_no_fake_until or 0) > CurTime() then return end
 	if ply:GetMoveType() == 0 then return end
 	if ply.InVehicle and ply:InVehicle() and not force then return end
 	if not IsValid(huyragdoll) and (not IsValid(ply) or IsValid(ply.FakeRagdoll) or not (ply:IsPlayer() and ply:Alive())) then return end
@@ -1462,6 +1463,7 @@ function hg.FakeUp(ply, forced, instant)
 		ply:SetMoveType(MOVETYPE_NOCLIP)
 	end
 	ply.LastFakeUp = CurTime()
+	ply.hg_no_fake_until = CurTime() + 1
 	ply:DrawWorldModel(true)
 	ply:SetHealth(hp)
 	ply:SetArmor(armor)
