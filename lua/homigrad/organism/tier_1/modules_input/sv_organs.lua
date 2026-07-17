@@ -305,6 +305,9 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	local delta = (org[key] or 0) - oldDmg
 
 	org.brain = math.min((org.brain or 0) + getBrainLobeDamage(org) - oldBrainLobeDamage, 1)
+	if delta > 0 then
+		org.concussion = math.min((org.concussion or 0) + math.min(delta * 3, 1.2), 6)
+	end
 	org.consciousness = math.Approach(org.consciousness, 0, delta * profile.consciousness)
 	org.disorientation = org.disorientation + delta * profile.disorientation
 	org.shock = org.shock + dmg * profile.shock

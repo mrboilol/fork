@@ -9,13 +9,11 @@ hg.organism.input_list = hg.organism.input_list or {}
 local vecZero, angZero = Vector(), Angle()
 local hook_Run = hook.Run
 local input_list = hg.organism.input_list
--- Jaw trauma is the ordinary blunt knockout route.  Generic head collisions
--- still can knock someone out, but only when they are genuinely severe.
-local head_otrub_min_damage = 0.55
-local head_otrub_chance_mul = 0.35
-local head_otrub_max_chance = 0.18
-local head_consciousness_mul = 8
-local head_otrub_consciousness_cap = 0.08
+local head_otrub_min_damage = 0.05
+local head_otrub_chance_mul = 1.25
+local head_otrub_max_chance = 0.35
+local head_consciousness_mul = 28
+local head_otrub_consciousness_cap = 0.04
 local instant_pain_shock_scale = 0.75
 local melee_pain_scale = 0.4
 local melee_shock_scale = 0.45
@@ -1969,8 +1967,8 @@ local function velocityDamage(ent, data)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
 			
-			hg.organism.input_list.skull(org, bone, dmg * 3.25 * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
-			hg.organism.input_list.jaw(org, bone, dmg * 1.35 * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+			hg.organism.input_list.skull(org, bone, dmg * 6 * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
+			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 			
 			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
 			
@@ -1986,7 +1984,7 @@ local function velocityDamage(ent, data)
 			end
 
 			if neck_not_broken and org.spine3 >= 0.8 then
-				hg.BreakNeck(ent, true)
+				hg.BreakNeck(ent)
 			end
 
 			if oldSkull < 1 and org.skull == 1 then

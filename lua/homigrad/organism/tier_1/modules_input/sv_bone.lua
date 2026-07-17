@@ -1,151 +1,4 @@
---local Organism = hg.organism
-if SERVER then util.AddNetworkString("headtrauma_flash") end
-
-local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
-
-local bonefracture_sounds = {
-	"bonefracture/rem_bonebreak1.wav",
-	"bonefracture/rem_bonebreak2.wav",
-	"bonefracture/rem_bonebreak3.wav",
-}
-
-local function EmitRandomBoneBreakSound(entity, volume, level)
-	if not IsValid(entity) then return end
-
-	local soundType = math.random(3)
-	if soundType == 1 then
-		entity:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], volume or 75, math.random(135, 155), level or 1, CHAN_AUTO)
-	elseif soundType == 2 then
-		entity:EmitSound("owfuck"..math.random(1, 9)..".ogg", volume or 75, 100, level or 1, CHAN_AUTO)
-	else
-		entity:EmitSound("newbonebreak/break"..math.random(10)..".wav", volume or 75, math.random(120, 135), level or 1, CHAN_AUTO)
-	end
-end
-
-local function PlayBoneBreakSound(entity)
-    EmitRandomBoneBreakSound(entity)
-end
-
-local function PlayBrokenBoneHitSound(org, key, volume)
-	if not org or not IsValid(org.owner) then return end
-
-	org._brokenBoneHitSound = org._brokenBoneHitSound or {}
-	if (org._brokenBoneHitSound[key] or 0) > CurTime() then return end
-	org._brokenBoneHitSound[key] = CurTime() + 0.35
-
-	EmitRandomBoneBreakSound(org.owner, volume or 62, 0.55)
-end
-
-local function AddBoneInternalBleed(org, amount, cap)
-	if not org then return end
-
-	org.internalBleed = (org.internalBleed or 0) + math.Clamp(amount or 0, 0, cap or 1)
-end
-
-local function AddBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
-	if not org then return end
-
-	local severity = math.Clamp(dmg or 0, 0, 3)
-	if severity <= 0 then return end
-
-	org.painadd = (org.painadd or 0) + math.Clamp(severity * 7, 2, 18)
-	AddBoneInternalBleed(org, severity * 0.025, 0.12)
-
-	if severity >= (soundThreshold or 0.45) then
-		PlayBrokenBoneHitSound(org, key)
-	end
-end
-
-local function IsSharpHeadDamage(dmgInfo)
-	return dmgInfo and dmgInfo:IsDamageType(DMG_SLASH)
-end
-
-local function GetHeadConcussionScale(dmgInfo)
-	if IsSharpHeadDamage(dmgInfo) then return 0.25 end
-	if dmgInfo and dmgInfo:IsDamageType(DMG_GENERIC) then return 0.55 end
-
-	return 1
-end
-
-local function hasClimbGripActive(ply)
-	if not IsValid(ply) then return false end
-
-	local ragdoll = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply.FakeRagdollOld
-	if not IsValid(ragdoll) then return false end
-
-	return (IsValid(ragdoll.ConsLH) and ragdoll.ConsLH.ZCClimbGrip)
-		or (IsValid(ragdoll.ConsRH) and ragdoll.ConsRH.ZCClimbGrip)
-end
-
-local function SendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, oldConcussion, oldBrain, oldHeadTrauma, traumaBone)
-    if not org.isPly then return end
-    local targetPlayer = org.owner
-    if IsValid(org.owner.FakeRagdoll) then
-        local ragdoll = org.owner.FakeRagdoll
-        if IsValid(ragdoll.ply) then targetPlayer = ragdoll.ply end
-    end
-    if not IsValid(targetPlayer) or not targetPlayer:IsPlayer() then return end
-
-    targetPlayer.HeadDisorientFlashCooldown = targetPlayer.HeadDisorientFlashCooldown or 0
-    if targetPlayer.HeadDisorientFlashCooldown >= CurTime() then return end
-
-    local newConcussion = org.concussion or 0
-    local newBrain = org.brain or 0
-    local newHeadTrauma = org.headtrauma or 0
-
-    local hasBrainDamage = newBrain > 0.1 and oldBrain <= 0.1
-    local hasConcussion = newConcussion >= 1.5 and newConcussion > oldConcussion
-    local isSevereTrauma = oldHeadTrauma < 0.5 and newHeadTrauma >= 0.5
-    -- The concussion sting is feedback for a meaningful head impact, not every
-    -- tiny skull scrape.  Direct brain trauma always qualifies regardless of
-    -- the skull delta.
-    local playConcussionSound = (traumaBone == "skull" and dmg >= 0.1) or newBrain > 0
-
-    local isCritical = hasBrainDamage or hasConcussion or isSevereTrauma
-    boneDelta = math.max(boneDelta or 0, 0)
-
-    local baseTime, baseSize, cooldown
-    if traumaBone == "jaw" then
-        if dmg < 0.35 or boneDelta <= 0.15 then return end
-        baseTime = math.Clamp(0.25 + boneDelta * 0.8, 0.25, 1.0)
-        baseSize = math.Clamp(1400 + boneDelta * 1400, 1200, 2800)
-        cooldown = 0.8
-    else
-        if boneDelta <= 0.02 and dmg < 0.35 then return end
-        baseTime = math.Clamp(0.3 + boneDelta * 0.9, 0.3, 1.2)
-        baseSize = math.Clamp(1400 + boneDelta * 1600, 1400, 3000)
-        cooldown = 0.2
-    end
-
-    local eyePos = targetPlayer:EyePos()
-    local ang = targetPlayer:EyeAngles()
-    local incomingPos = dmgInfo:GetDamagePosition()
-    local worldPos = eyePos + ang:Forward() * 16
-    if incomingPos and incomingPos ~= vector_origin then
-        local incDir = (incomingPos - eyePos):GetNormalized()
-        local dotRight = ang:Right():Dot(incDir)
-        worldPos = eyePos + ang:Right() * (dotRight * 160) + ang:Forward() * 16
-    end
-
-    net.Start("headtrauma_flash")
-    net.WriteVector(worldPos)
-    net.WriteFloat(baseTime)
-    net.WriteInt(baseSize, 20)
-    net.WriteBool(isCritical)
-    net.WriteBool(false)
-    net.WriteBool(hasBrainDamage)
-    net.WriteBool(hasConcussion)
-    net.WriteBool(playConcussionSound)
-    net.WriteBool(isCritical and dmg >= 0.05)
-    net.Send(targetPlayer)
-
-    if isCritical then
-        local disorientationAdd = math.Clamp(dmg * (hasBrainDamage and 2.0 or 1.5), 0.1, 3.0)
-        org.disorientation = math.min((org.disorientation or 0) + disorientationAdd, 10)
-    end
-
-    targetPlayer.HeadDisorientFlashCooldown = CurTime() + cooldown
-end
+local player_crush_amputation_threshold = 7
 
 local function isCrush(dmgInfo)
 	return (not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)) or dmgInfo:GetInflictor().RubberBullets
@@ -154,36 +7,27 @@ end
 local halfValue2 = util.halfValue2
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
 	local crush = isCrush(dmgInfo)
-	
-	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 1.5 then
-		//crush = false
-	end
-	
+
 	dmg = dmg * (dmgInfo:GetInflictor().BreakBoneMul or 1)
-	
+
 	if crush then
 		crush = halfValue2(1 - org[key], 1, 0.5)
 		dmg = dmg / math.max(10 * crush * (bone or 1), 1)
 		if dmgInfo:GetInflictor().RubberBullets then dmg = dmg * dmgInfo:GetInflictor().Penetration end
 	end
 
-	local val = org[key]
 	org[key] = math.min(org[key] + dmg, 1)
-	local scale = 1 - (org[key] - val)
-	
-	if !nodmgchange then dmgInfo:ScaleDamage(1 - (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone))) end
 
-	-- Track head trauma for long-term stroke risk
-	if key == "skull" then
-		org.headtrauma = math.min((org.headtrauma or 0) + dmg * 1.0, 2.0)
-	end
+	if !nodmgchange then dmgInfo:ScaleDamage(1 - (crush and crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * bone)) end
 
-	if hg.organism.AddBulletImpactBleeding then
-		hg.organism.AddBulletImpactBleeding(org, dmgInfo, 1)
-	end
-
-	return (crush and 1 * crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * (bone)), VectorRand(-0.2,0.2) / math.Clamp(dmg,0.4,0.8)
+	return (crush and crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * bone), VectorRand(-0.2, 0.2) / math.Clamp(dmg, 0.4, 0.8)
 end
+
+local bonefracture_sounds = {
+	"bonefracture/rem_bonebreak1.wav",
+	"bonefracture/rem_bonebreak2.wav",
+	"bonefracture/rem_bonebreak3.wav",
+}
 
 local skullfracture_sounds = {
 	"skullfracture/skullfracture-1.wav",
@@ -195,33 +39,71 @@ local skullfracture_sounds = {
 	"skullfracture/skullfracture-7.wav",
 }
 
+local function emitRandomBoneBreakSound(ent, volume, level)
+	if not IsValid(ent) then return end
+
+	local soundType = math.random(3)
+	if soundType == 1 then
+		ent:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], volume or 75, math.random(135, 155), level or 1, CHAN_AUTO)
+	elseif soundType == 2 then
+		ent:EmitSound("owfuck" .. math.random(1, 9) .. ".ogg", volume or 75, 100, level or 1, CHAN_AUTO)
+	else
+		ent:EmitSound("newbonebreak/break" .. math.random(10) .. ".wav", volume or 75, math.random(120, 135), level or 1, CHAN_AUTO)
+	end
+end
+
+local function playBoneFractureSound(ent)
+	emitRandomBoneBreakSound(ent)
+end
+
+local function playRemorseismBoneBreakSound(ent, volume, level)
+	if not IsValid(ent) then return end
+	ent:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], volume or 75, math.random(135, 155), level or 1, CHAN_AUTO)
+end
+
 local function playSkullFractureSound(ent)
 	if not IsValid(ent) then return end
 	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 75, math.random(90, 110), 1, CHAN_AUTO)
 end
 
-local function PlayRepeatSkullFractureSound(org)
-	if not org or not IsValid(org.owner) then return end
-	if (org._skullFractureSound or 0) > CurTime() then return end
-
-	org._skullFractureSound = CurTime() + 0.4
-	playSkullFractureSound(org.owner)
+local function addConcussion(org, amount)
+	if amount <= 0 then return end
+	org.concussion = math.min((org.concussion or 0) + amount, 6)
 end
 
-local function SendSevereSkullGore(org, dmgInfo)
-	local effectEnt = hg.GetCurrentCharacter(org.owner)
-	if not IsValid(effectEnt) then effectEnt = org.owner end
-	if not IsValid(effectEnt) then return end
+local function addBoneInternalBleed(org, amount, cap)
+	org.internalBleed = (org.internalBleed or 0) + math.Clamp(amount or 0, 0, cap or 1)
+end
+
+local function addBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
+	local severity = math.Clamp(dmg or 0, 0, 3)
+	if severity <= 0 then return end
+
+	org.painadd = (org.painadd or 0) + math.Clamp(severity * 7, 2, 18)
+	addBoneInternalBleed(org, severity * 0.025, 0.12)
+
+	if severity >= (soundThreshold or 0.45) then
+		if (org._brokenBoneHitSound and org._brokenBoneHitSound[key] or 0) > CurTime() then return end
+		org._brokenBoneHitSound = org._brokenBoneHitSound or {}
+		org._brokenBoneHitSound[key] = CurTime() + 0.35
+		playRemorseismBoneBreakSound(org.owner, 62, 0.55)
+	end
+end
+
+local function sendSkullFractureGore(org, dmgInfo)
+	local ent = hg.GetCurrentCharacter(org.owner)
+	if not IsValid(ent) then ent = org.owner end
+	if not IsValid(ent) then return end
 
 	local force = dmgInfo:GetDamageForce()
 	local ang = force:LengthSqr() > 0 and force:GetNormalized():Angle() or angle_zero
 	net.Start("hg_brainmist")
-	net.WriteEntity(effectEnt)
+	net.WriteEntity(ent)
 	net.WriteVector(dmgInfo:GetDamagePosition())
 	net.WriteAngle(ang)
 	net.WriteBool(true)
 	net.WriteBool(false)
-	net.WriteBool(true)
+	net.WriteBool(false)
 	net.Broadcast()
 end
 
@@ -232,166 +114,103 @@ local huyasd = {
 	["skull"] = "My head is aching.",
 }
 
-local broke_arm = {
-	"AAAAH OH GOD, IT'S BROKEN! MY ARM! IT'S BROKEN!",
-	"FUCK MY FUCKING ARM IS BROKEN!",
-	"NONONO MY ARM IS BENT ALL WRONG!",
-	"IT'S.. MY ARM.. SNAPPED- I HEARD IT SNAP!",
-	"MY ARM IS NOT SUPPOSED TO BEND IN HALF!",
-}
-
-local dislocated_arm = {
-	"MY ARM- GOD, IT'S POPPED OUT OF THE SOCKET!",
-	"FUCK- THE SHOULDER'S JUST- HANGING LOOSE!",
-	"MY ARM..! IT'S DISLOCATED! I CAN SEE THE BULGE WHERE IT'S WRONG!",
-	"THE ARM'S JUST- DEAD WEIGHT- IT'S NOT ATTACHED RIGHT!",
-	"SHIT! I CAN FEEL THE BONE OUT OF PLACE!",
-}
-
-local broke_leg = {
-	"MY LEG- FUCK, IT'S BROKEN- I HEARD THE SNAP!",
-	"FUCK! THE SHIN'S SNAPPED CLEAN THROUGH!",
-	"THE KNEE'S WRONG- THE WHOLE LEG'S TWISTED WRONG!",
-	"MY LEG..! IT'S JUST- HANGING BY MUSCLE AND SKIN!",
-	"THE PAIN'S SHOOTING UP TO MY HIP- FUCK, IT'S BAD!",
-	"I CAN'T MOVE MY FOOT- THE ANKLE'S BROKEN TOO!",
-}
-
-local dislocated_leg = {
-	"MY LEG- FUCK, IT'S DISLOCATED AT THE KNEE!",
-	"I CAN SEE THE KNEECAP IN THE WRONG PLACE!",
-	"AGHH- THE HIP'S POPPED OUT- IT'S STUCK OUTWARD!",
-	"IT'S BENT BACKWARD- THE KNEE SHOULDN'T BEND THIS WAY!",
-	"FUCK! THE HIP'S DISLOCATED!",
-	"THE ANKLE'S TWISTED- BUT THE KNEE'S THE REAL PROBLEM!",
-}
-
-local function TryDropWeaponFromInjury(org, chance)
-	local owner = org and org.owner
-	if not (IsValid(owner) and owner:IsPlayer() and hg.drop) then return end
-	if (owner.HG_InjuryWeaponDropCooldown or 0) > CurTime() then return end
-
-	local wep = owner:GetActiveWeapon()
-	if not IsValid(wep) or wep.NoDrop or wep:GetClass() == "weapon_hands_sh" then return end
-	if math.random() >= chance then return end
-
-	owner.HG_InjuryWeaponDropCooldown = CurTime() + 1
-	hg.drop(owner, wep)
-end
-
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
-	local dmg = dmg * 3.25
+	dmg = dmg * 4
+	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
 
-	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 4 and !org[key.."amputated"] then
+	if dmgInfo:IsDamageType(DMG_CRUSH) and dmg > amputateThreshold and !org[key .. "amputated"] then
 		hg.organism.AmputateLimb(org, key)
-
 		return 0
 	end
 
 	if org[key] == 1 then
-		AddBrokenBoneHitTrauma(org, key, dmg, 0.5)
+		addBrokenBoneHitTrauma(org, key, dmg, 0.5)
 		return 0
 	end
 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
-	
-	local dmg = org[key]
-	
+	dmg = org[key]
 	org[key] = org[key] * 0.5
 
-	if dmg < 1 then return 0 end
+	if dmg < 0.7 then return 0 end
+	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then return 0 end
 
-	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
-	
-	org[key] = 1
+	if org.isPly and !org[key .. "amputated"] then org.just_damaged_bone = CurTime() end
 
-		print("[HG Bone] LEG BROKEN: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
-
-		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-			print("[HG Bone] Calling hg.BreakLimb for leg: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key, nil, false) -- false = broken (not dislocated)
-		end
-
+	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
+		org[key] = 1
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
+		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
 		org.painadd = org.painadd + 55
-		AddBoneInternalBleed(org, 0.45, 0.8)
+		addBoneInternalBleed(org, 0.45, 0.8)
 		org.owner:AddNaturalAdrenaline(1)
 		org.immobilization = org.immobilization + dmg * 25
 		org.fearadd = org.fearadd + 0.5
-
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
-
-		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
-		PlayBoneBreakSound(org.owner)
+		timer.Simple(0, function() hg.LightStunPlayer(org.owner, 2) end)
+		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
-		//broken
+	else
+		org[key .. "dislocation"] = true
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
+		org.painadd = org.painadd + 35
+		org.owner:AddNaturalAdrenaline(0.5)
+		org.immobilization = org.immobilization + dmg * 10
+		org.fearadd = org.fearadd + 0.5
+		timer.Simple(0, function() hg.LightStunPlayer(org.owner, 2) end)
+		playBoneFractureSound(org.owner)
+		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
+	end
 
 	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 2, "Legs bone damage harm")
-
 	return result, vecrand
 end
 
 local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
-	local dmg = dmg * 4
-	local climbGrip = hasClimbGripActive(org.owner)
+	dmg = dmg * 4
+	local amputateThreshold = org.isPly and player_crush_amputation_threshold or 4
 
-	if climbGrip and (dmgInfo:IsDamageType(DMG_CRUSH) or dmgInfo:IsDamageType(DMG_FALL)) then
-		dmg = dmg * 0.35
-	end
-	
-	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 4 and !org[key.."amputated"] then
+	if dmgInfo:IsDamageType(DMG_CRUSH) and dmg > amputateThreshold and !org[key .. "amputated"] then
 		hg.organism.AmputateLimb(org, key)
-
 		return 0
 	end
 
 	if org[key] == 1 then
-		AddBrokenBoneHitTrauma(org, key, dmg, 0.5)
+		addBrokenBoneHitTrauma(org, key, dmg, 0.5)
 		return 0
 	end
 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
-	
-	local dmg = org[key]
+	dmg = org[key]
 	org[key] = org[key] * 0.5
 
-	if dmg < 1 then
-		if key == "rarm" then
-			TryDropWeaponFromInjury(org, math.Clamp((dmg - oldDmg) * 0.18, 0.03, 0.18))
-		else
-			TryDropWeaponFromInjury(org, math.Clamp((dmg - oldDmg) * 0.02, 0.005, 0.02))
-		end
-		return 0
-	end
+	if dmg < 0.6 then return 0 end
+	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then return 0 end
 
-	if org.isPly and !org[key.."amputated"] then org.just_damaged_bone = CurTime() end
-	
-	org[key] = 1
+	if org.isPly and !org[key .. "amputated"] then org.just_damaged_bone = CurTime() end
 
-		print("[HG Bone] ARM BROKEN: key=" .. tostring(key) .. " owner=" .. tostring(org.owner))
-
-		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-			print("[HG Bone] Calling hg.BreakLimb for arm: key=" .. tostring(key))
-			hg.BreakLimb(org.owner, key, nil, false) -- false = broken (not dislocated)
-		end
-
+	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
+		org[key] = 1
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
+		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
 		org.painadd = org.painadd + 55
-		AddBoneInternalBleed(org, 0.35, 0.7)
+		addBoneInternalBleed(org, 0.35, 0.7)
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
-
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
-
-		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
-		PlayBoneBreakSound(org.owner)
+		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
-		//broken
+	else
+		org[key .. "dislocation"] = true
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
+		org.painadd = org.painadd + 35
+		org.owner:AddNaturalAdrenaline(0.5)
+		org.fearadd = org.fearadd + 0.5
+		playBoneFractureSound(org.owner)
+		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
+	end
 
 	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 1.5, "Arms bone damage harm")
-
-	TryDropWeaponFromInjury(org, key == "rarm" and 0.7 or 0.02)
-
 	return result, vecrand
 end
 
@@ -403,79 +222,32 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	if org[name] >= hg.organism[name2] then return 0 end
 	local oldDmg = org[name]
 
-	-- Heavy collision check for neck damage transfer to skull
 	if name == "spine3" and isCrush(dmgInfo) and dmg > 0.3 and math.random() < 0.4 then
-		-- Transfer full damage to skull (no reduction)
-		local skullDmg = dmg
-		org.spine3 = oldDmg -- Reset spine3 damage
-		print("[HG Bone] Heavy collision: neck damage transferred to skull (full damage), original dmg=" .. tostring(dmg) .. " skull dmg=" .. tostring(skullDmg))
-		
-		-- Apply damage to skull
-		local skullResult, skullVec = damageBone(org, 0.25, skullDmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
-		hg.AddHarmToAttacker(dmgInfo, (org.skull - (org.skull - skullResult * 0.25)) * 2, "Skull damage from neck collision transfer")
-		
+		local skullResult, skullVec = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+		addConcussion(org, math.min(dmg * 0.45, 1.4))
+		hg.AddHarmToAttacker(dmgInfo, skullResult * 0.5, "Skull damage from neck collision transfer")
 		return skullResult, skullVec
 	end
 
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
-	
-	if name == "spine3" and org.spine3 > 0.75 and oldDmg <= 0.75 then
-		print("[HG Bone] SPINE3 threshold crossed: spine3=" .. tostring(org.spine3) .. " oldDmg=" .. tostring(oldDmg) .. " dmg=" .. tostring(dmg))
-		
-		-- Calculate neck break death chance based on force (damage amount)
-		-- Much higher force required to kill vs paralyze
-		local forceMultiplier = isCrush(dmgInfo) and 2 or 1
-		local effectiveDmg = dmg * forceMultiplier
-		
-		-- Scale chance: 0.05 (5%) at minimum force, up to 1.0 (100%) at very high force
-		-- Requires significantly more force to reach lethal levels
-		local deathChance = math.Clamp(0.05 + (effectiveDmg - 0.5) * 0.8, 0.05, 1.0)
-		
-		print("[HG Bone] Neck break death chance: " .. tostring(deathChance * 100) .. "% (effectiveDmg=" .. tostring(effectiveDmg) .. ")")
-		
-		if math.random() < deathChance then
-			print("[HG Bone] NECK BREAK TRIGGERED from spine damage (fatal)")
-			hg.BreakNeck(org.owner, true)
-			return result, vecrand
-		else
-			print("[HG Bone] Neck break SURVIVED - spine3=" .. tostring(org.spine3))
-		end
-	end
-
-	-- Trigger spine floppy when spine1 or spine2 reach their break threshold
-	-- (broken-back / broken-pelvis effect)
-	if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-		if (name == "spine1" or name == "spine2") and org[name] >= hg.organism[name2] and oldDmg < hg.organism[name2] then
-			print("[HG Bone] " .. string.upper(name) .. " threshold crossed: calling BreakSpine")
-			if hg.BreakSpine then
-				hg.BreakSpine(org.owner, name, false)
-			end
-		end
+	if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakSpine and (name == "spine1" or name == "spine2") and org[name] >= hg.organism[name2] and oldDmg < hg.organism[name2] then
+		hg.BreakSpine(org.owner, name, false)
 	end
 
 	hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 5, "Spine bone damage harm")
-	
-	if (name == "spine3" || name == "spine2") then
-		hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 8, "Broken spine harm")
-	end
+	if name == "spine3" or name == "spine2" then hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 8, "Broken spine harm") end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
-		PlayBoneBreakSound(org.owner)
+		playBoneFractureSound(org.owner)
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
-		if org.owner:IsPlayer() then
-			org.owner:Notify(huyasd[name], true, name, 2)
-		end
+		if org.owner:IsPlayer() then org.owner:Notify(huyasd[name], true, name, 2) end
 		org.painadd = org.painadd + 25
-	end
-	
-	if dmg > 0.2 then
-		--org.owner:Notify("Your spinal cord is damaged.",true,"spinalcord",4)
 	end
 
 	org.painadd = org.painadd + dmg * 2
 	timer.Simple(0, function() hg.LightStunPlayer(org.owner) end)
 	org.shock = org.shock + dmg * 5
-	return result,vecrand
+	return result, vecrand
 end
 
 local jaw_broken_msg = {
@@ -488,83 +260,45 @@ local jaw_dislocated_msg = {
 	"I CAN'T CLOSE MY JAW... IT FUCKING HURTS",
 	"MY JAW... ITS JUST STUCK THERE-- OH ITS PAINING",
 	"I CANT MOVE MY JAW AT ALL... AND ITS REALLY ACHING",
-	//"I CANT EVEN SPEAK, I NEED TO PUNCH IT BACK IN PLACE... BUT IT HURTS REAL BAD",
 }
 
 local input_list = hg.organism.input_list
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.jaw
-	local old_concussion = org.concussion or 0
-	local old_brain = org.brain or 0
-	local old_headtrauma = org.headtrauma or 0
-	local sharpHead = IsSharpHeadDamage(dmgInfo)
-	local concussionMul = GetHeadConcussionScale(dmgInfo)
-	-- The jaw is vulnerable, but it should not be as brittle as the old head setup.
-	local result, vecrand = damageBone(org, 0.35, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
-
+	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 	hg.AddHarmToAttacker(dmgInfo, (org.jaw - oldDmg) * 3, "Jaw bone damage harm")
+	addConcussion(org, math.min(dmg * 0.3, 0.9))
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
-
-	local jawDelta = math.max((org.jaw or 0) - oldDmg, 0)
+	local dislocated = (org.jaw - oldDmg) > math.Rand(0.1, 0.3)
 
 	if org.jaw == 1 then
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
-
 		if oldDmg != 1 then
-			PlayBoneBreakSound(org.owner)
+			playBoneFractureSound(org.owner)
 			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
 		end
 	end
 
 	org.shock = org.shock + dmg * 3
-
-
-	-- A clean blunt jaw shot is the reliable knockout route.  It takes a solid
-	-- impact, but repeated jaw damage makes the next one increasingly likely to
-	-- put the victim fully unconscious instead of only applying a light stun.
-	local jawImpact = dmg * concussionMul
-	if isCrush(dmgInfo) and jawImpact >= 0.22 then
-		local knockoutChance = math.Clamp(0.12 + jawImpact * 0.20 + jawDelta * 0.65 + (org.jaw or 0) * 0.18, 0.15, 0.82)
-		if org.isPly and math.random() < knockoutChance then
-			timer.Simple(0, function()
-				if not IsValid(org.owner) then return end
-				org.needotrub = true
-				org.shock = (org.shock or 0) + math.Clamp(8 + jawImpact * 8, 8, 24)
-				org.consciousness = math.min(org.consciousness or 1, 0.08)
-				hg.LightStunPlayer(org.owner, 1 + math.min(jawImpact, 2))
-			end)
+	if dislocated then
+		org.shock = org.shock + dmg * 20
+		org.avgpain = org.avgpain + dmg * 20
+		if !org.jawdislocation then
+			playBoneFractureSound(org.owner)
+			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.85) end
 		end
+		org.jawdislocation = true
+		if org.isPly then org.owner:Notify(jaw_dislocated_msg[math.random(#jaw_dislocated_msg)], true, "jaw", 2) end
 	end
 
-	-- teeth: break one tooth on any jaw damage
-	if jawDelta > 0 then
-		if hg.organism and hg.organism.TeethOnJawDamage then
-			hg.organism.TeethOnJawDamage(org, jawDelta, dmgInfo, boneindex)
-		end
-	end
-
-	if dmg > 0 and dmgInfo:IsDamageType(DMG_CLUB) and math.random(3) == 1 then
-		local effectEnt = hg.GetCurrentCharacter(org.owner)
-		if not IsValid(effectEnt) then effectEnt = org.owner end
-		net.Start("hg_brainmist")
-		net.WriteEntity(effectEnt)
-		net.WriteVector(dmgInfo:GetDamagePosition())
-		net.WriteAngle(dmgInfo:GetDamageForce():GetNormalized():Angle())
-		net.WriteBool(false)
-		net.WriteBool(true)
-		net.WriteBool(false)
-		net.Broadcast()
-	end
-
-	SendHeadTraumaFlash(org, dmg, dmgInfo, org.jaw - oldDmg, old_concussion, old_brain, old_headtrauma, "jaw")
+	if dmg > 0.2 and org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner, 1 + dmg) end) end
 	return result, vecrand
 end
 
 hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isChat, teamonly, text)
 	if IsValid(output) and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
-		-- and !isChat and output:IsSpeaking()
 		output.organism.painadd = output.organism.painadd + 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))
 		output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
 	end
@@ -572,60 +306,31 @@ end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.skull
-	local old_concussion = org.concussion or 0
-	local old_brain = org.brain or 0
-	local old_headtrauma = org.headtrauma or 0
-	local sharpHead = IsSharpHeadDamage(dmgInfo)
-	local concussionMul = GetHeadConcussionScale(dmgInfo)
-	-- A knife can cut scalp tissue, but a sound skull should absorb almost all
-	-- of the force. Once it is substantially damaged, retain the normal path.
-	if sharpHead and oldDmg < 0.5 then
-		dmg = dmg * 0.12
-	end
-	-- The cranium should protect the brain from ordinary blows.  It remains
-	-- breakable under sustained or very heavy force, but no longer fractures from
-	-- a single typical punch.
-	local result, vecrand = damageBone(org, 0.75, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
-
+	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
+	local skullDelta = org.skull - oldDmg
+	local brainBefore = org.brain or 0
 
 	if org.skull == 1 then
-		org.shock = org.shock + dmg * (sharpHead and 14 or 30)
-		org.avgpain = org.avgpain + dmg * (sharpHead and 20 or 30)
-
+		org.shock = org.shock + dmg * 40
+		org.avgpain = org.avgpain + dmg * 30
 		if oldDmg != 1 then
-			PlayBoneBreakSound(org.owner)
-			AddBoneInternalBleed(org, 0.35, 0.55)
+			playSkullFractureSound(org.owner)
+			playBoneFractureSound(org.owner)
+			sendSkullFractureGore(org, dmgInfo)
+			addBoneInternalBleed(org, 0.35, 0.55)
+			if IsValid(org.owner) then org.owner:SetNWBool("SkullBrokenFully", true) end
 		else
-			AddBrokenBoneHitTrauma(org, "skull", dmg, 0.3)
-		end
-		if IsValid(org.owner) then
-			org.owner:SetNWBool("SkullBrokenFully", true)
+			addBrokenBoneHitTrauma(org, "skull", dmg, 0.3)
 		end
 	end
 
-	local skullDelta = math.max((org.skull or 0) - oldDmg, 0)
-	org.shock = org.shock + dmg * (sharpHead and 1.2 or 3)
-	org.concussion = math.min((org.concussion or 0) + dmg * 2.25 * concussionMul, 10)
-
-	-- Chance to induce vomiting from head trauma
-	if org.isPly and math.random() < dmg * 0.3 * concussionMul then
-		org.wantToVomit = (org.wantToVomit or 0) + math.Rand(0.25, 0.6)
-		org.vomitTypeHeadTrauma = math.random(8) == 1
-	end
-
-	-- Brain trauma from a protected skull is an exceptional consequence of a
-	-- hard blow.  A fractured skull stops absorbing the same repeat impacts,
-	-- which is how sustained head trauma can still become lethal.
-	local skullImpact = dmg * concussionMul
-	local repeatSkullHit = oldDmg >= 0.85 and skullImpact >= 0.45
-	local hardSkullHit = skullImpact >= 1.65
-	local brainTraumaChance = math.Clamp((skullImpact - 1.05) * 0.10 + math.max(skullDelta - 0.20, 0) * 0.35 + (repeatSkullHit and 0.12 or 0), 0, 0.45)
-	local rnd = isCrush(dmgInfo) and (hardSkullHit or math.random() < brainTraumaChance)
-	org.consciousness = math.Approach(org.consciousness, 0, rnd and skullImpact * 0.75 or 0)
-	local brainTrauma = rnd and skullImpact * (hardSkullHit and 0.045 or 0.022) or 0
-	if repeatSkullHit then brainTrauma = brainTrauma + skullImpact * 0.012 end
-	org.brain = math.min(org.brain + brainTrauma, 1)
+	org.shock = org.shock + dmg * 3
+	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
+	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
+	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
+	local brainGain = math.max(org.brain - brainBefore, 0)
+	addConcussion(org, math.min(dmg * 0.45 + brainGain * 4 + math.max(skullDelta - 0.25, 0) * 0.5, 1.4))
 
 	if math.random(1, 4) == 1 then
 		local eye_dmg = dmg * math.Rand(0.8, 1.5)
@@ -636,212 +341,81 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if skullDelta > 0.85 then
+	if skullDelta > 0.6 then
 		org.brain = math.min(org.brain + 0.1, 1)
+		addConcussion(org, 0.35)
 	end
 
-	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or (org.skull - oldDmg) > 0.6) then
+	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or skullDelta > 0.6) then
 		org.shock = 70
+		timer.Simple(0.1, function()
+			local rag = hg.GetCurrentCharacter(org.owner)
+			if IsValid(rag) and rag:IsRagdoll() then hg.applyFencingToPlayer(org.owner, org) end
+		end)
 	end
 
-	-- Skull knockouts are possible, but only from a genuinely heavy blunt hit
-	-- and are less likely than a comparable jaw strike.
-	if isCrush(dmgInfo) and skullImpact >= 0.9 then
-		local knockoutChance = math.Clamp(0.10 + (skullImpact - 0.9) * 0.14 + skullDelta * 0.45, 0.10, 0.50)
-		if org.isPly and math.random() < knockoutChance then
-			timer.Simple(0, function()
-				if IsValid(org.owner) then hg.LightStunPlayer(org.owner, 1 + math.min(skullImpact, 2)) end
-			end)
-		end
-	end
-		if dmg > 0 and dmgInfo:IsDamageType(DMG_CLUB) and math.random(3) == 1 then
-		local effectEnt = hg.GetCurrentCharacter(org.owner)
-		if not IsValid(effectEnt) then effectEnt = org.owner end
-		net.Start("hg_brainmist")
-		net.WriteEntity(effectEnt)
-		net.WriteVector(dmgInfo:GetDamagePosition())
-		net.WriteAngle(dmgInfo:GetDamageForce():GetNormalized():Angle())
-		net.WriteBool(false)
-		net.WriteBool(true)
-		net.WriteBool(false)
-		net.Broadcast()
-	end
-	
-	org.shock = org.shock + (sharpHead and math.min(dmg * 8, 28) or (dmg > 1 and 45 or dmg * 9))
-
-	if org.skull > 0.85 then
-		if oldDmg <= 0.85 then
-			playSkullFractureSound(org.owner)
-			if org.isPly then org.owner:Notify(huyasd["skull"],true,"skull",4) end
-
-			-- Really loud bonebreak on initial skull fracture
-			if IsValid(org.owner) then
-				org.owner:EmitSound("newbonebreak/break"..math.random(10)..".wav", 110, math.random(95, 115), 1, CHAN_AUTO)
-			end
-
-			-- Layer several random decals so a severe skull injury is visibly bloodier.
-			if IsValid(org.owner) then
-				org.owner.HG_HeadBloodDecal = true
-				for i = 1, 3 do
-					net.Start("hg_head_blood_decal")
-					net.WriteEntity(hg.GetCurrentCharacter(org.owner))
-					net.Broadcast()
-				end
-			end
-		end
-		if oldDmg > 0.85 and math.random(3) == 1 then
-			PlayRepeatSkullFractureSound(org)
-		end
-
-		if oldDmg <= 0.85 or (dmg >= 0.4 and math.random(3) == 1) then
-			SendSevereSkullGore(org, dmgInfo)
-		end
-
-		if dir and hg_bloodimpacts:GetBool() and (oldDmg <= 0.85 or math.random() < 0.75) then
-			local dmgPos = dmgInfo:GetDamagePosition()
-			local dirNorm = dir:GetNormalized()
-			-- Main blood spray
-			net.Start("hg_bloodimpact")
-			net.WriteVector(dmgPos)
-			net.WriteVector(dir / 10)
-			net.WriteFloat(3)
-			net.WriteInt(2, 8)
-			net.Broadcast()
-			-- Additional spray when skull just broke (oldDmg != 1)
-			if oldDmg <= 0.85 and oldDmg ~= 1 then
-				for i = 1, 3 do
-					net.Start("hg_bloodimpact")
-					net.WriteVector(dmgPos + VectorRand(-2, 2))
-					net.WriteVector(dirNorm * 1.5 + VectorRand(-0.8, 0.8))
-					net.WriteFloat(2)
-					net.WriteInt(2, 8)
-					net.Broadcast()
-				end
-			end
-
-			-- Secondary bonebreak sound on every skull blood spray
-			if IsValid(org.owner) then
-				PlayBrokenBoneHitSound(org, "skull", 68)
-			end
-		end
+	if dmg > 0.4 and org.isPly then
+		timer.Simple(0, function() hg.LightStunPlayer(org.owner, 1 + dmg) end)
 	end
 
-	org.disorientation = org.disorientation + dmg * math.max(concussionMul, 0.35)
-
-	-- Accumulate head trauma for long-term stroke risk
-	org.headtrauma = math.min((org.headtrauma or 0) + dmg * (sharpHead and 0.18 or 0.6), 2.0)
-
-	SendHeadTraumaFlash(org, dmg, dmgInfo, org.skull - oldDmg, old_concussion, old_brain, old_headtrauma, "skull")
-
-	return result * 0.75, vecrand
+	org.shock = org.shock + (dmg > 1 and 50 or dmg * 10)
+	if org.skull > 0.85 and oldDmg <= 0.85 then
+		if org.isPly then org.owner:Notify(huyasd.skull, true, "skull", 4) end
+	end
+	org.disorientation = org.disorientation + dmg
+	return result, vecrand
 end
 
 local ribs = {
-	"I felt my torso snapping.",
-	"I feel something sharp poking inside...",
-	"I heard my chest break.",
-	"I think one of my ribs is broken.",
+	"MY CHEST... SNAPPED",
+	"SOMETHING SNAPPED IN MY TORSO",
+	"THERE'S SOMETHING SHARP IN MY CHEST...",
+	"I FEEL SOMETHING SHARP IN MY TORSO",
 }
 
-input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)	
+input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.chest
 	local oldBrokenRibs = org.brokenribs or math.Round(oldDmg * 3)
-
-	if dmgInfo:IsDamageType(DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT) and math.random(5) == 1 then return 0, vector_origin end --random chance it passed through ribs
-
-	local result, vecrand = damageBone(org, 0.15, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
-	
+	if dmgInfo:IsDamageType(DMG_SLASH + DMG_BULLET + DMG_BUCKSHOT) and math.random(5) == 1 then return 0, vector_origin end
+	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
+	org.painadd = org.painadd + dmg
+	org.shock = org.shock + dmg
+	if dmg >= 0.5 then org.hemothorax = math.min((org.hemothorax or 0) + dmg * 0.08, 1) end
+	if oldBrokenRibs > 0 and math.Round(org.chest * 3) <= oldBrokenRibs and dmg >= 0.35 then addBrokenBoneHitTrauma(org, "chest", dmg * 0.35, 0.5) end
 
-	org.painadd = org.painadd + dmg * 2
-	org.shock = org.shock + dmg * 2.5
-	org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2.5, 6), 10)
-	TryDropWeaponFromInjury(org, math.Clamp(dmg * 0.006, 0.005, 0.02))
-
-	-- Chest hits can cause hemothorax (blood filling pleural cavity)
-	if dmg >= 0.5 then
-		org.hemothorax = math.min((org.hemothorax or 0) + dmg * 0.08, 1)
-	end
-
-	local currentBrokenRibs = math.Round(org.chest * 3)
-	if oldBrokenRibs > 0 and currentBrokenRibs <= oldBrokenRibs and dmg >= 0.35 then
-		AddBrokenBoneHitTrauma(org, "chest", dmg * 0.35, 0.5)
-	end
-
-	-- Rare chance of cardiac arrest from chest blunt trauma
-	if dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) and not dmgInfo:IsDamageType(DMG_SLASH + DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST) then
-		local heartStopChance = 0
-		if dmg >= 3 then
-			heartStopChance = 0.025 -- 2.5% for hard blunt impacts
-		else
-			heartStopChance = 0.002 -- 0.2% for small hits
-		end
-		
-		if math.random() < heartStopChance then
-			org.heartstop = true
-			if org.isPly then
-				org.owner:Notify("o shittings", 8, "heartstop", 0)
-			end
-		end
-	end
-
-	if org.isPly and (not org.brokenribs or (org.brokenribs ~= math.Round(org.chest * 3))) then
+	if org.isPly and (not org.brokenribs or org.brokenribs ~= math.Round(org.chest * 3)) then
 		org.brokenribs = math.Round(org.chest * 3)
-		
 		if org.brokenribs > 0 then
-			local owner = org.owner
-			if IsValid(owner) and owner:IsPlayer() then
-				owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
-			end
-
-			PlayBoneBreakSound(org.owner)
+			if IsValid(org.owner) and org.owner:IsPlayer() then org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4) end
+			playBoneFractureSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end
-
 			return math.min(0, result)
 		end
 	end
 
-	return result * 0.6, vecrand
+	return result * 0.5, vecrand
 end
 
 input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.pelvis
-	org.painadd = org.painadd + dmg * 1.5
-	org.shock = org.shock + dmg * 1.5
-	org.internalBleed = (org.internalBleed or 0) + dmg * 4.0
-	org.o2[1] = math.max(org.o2[1] - dmg * 3, 0)
-	local result = damageBone(org, 0.35, dmg * 0.75, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
-
-	if oldDmg >= 1 and dmg >= 0.35 then
-		AddBrokenBoneHitTrauma(org, "pelvis", dmg * 0.5, 0.45)
-	end
-	
+	org.painadd = org.painadd + dmg
+	org.shock = org.shock + dmg
+	addBoneInternalBleed(org, dmg * 4, 4)
+	local result = damageBone(org, bone, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
-
-	if org.isPly and org.pelvis == 1 then
-		org.owner:Notify("FUCKING HELL- MY ASS IS BACKWARDS, LITERALLY!", true, "pelvis", 4)
-	end
-
-	-- Pelvis broken -> apply spine1 floppy (pelvis & lower spine flop loose)
-	if org.pelvis >= 1 and oldDmg < 1 then
-		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
-			print("[HG Bone] PELVIS BROKEN: calling BreakSpine for spine1 (pelvis floppy)")
-			if hg.BreakSpine then
-				hg.BreakSpine(org.owner, "spine1", false)
-			end
-		end
-	end
-
-	return result * 0.75
+	if oldDmg >= 1 and dmg >= 0.35 then addBrokenBoneHitTrauma(org, "pelvis", dmg * 0.5, 0.45) end
+	if org.pelvis >= 1 and oldDmg < 1 and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakSpine then hg.BreakSpine(org.owner, "spine1", false) end
+	return result
 end
 
 input_list.rarmup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return arms(org, bone * 1.25, dmg, dmgInfo, "rarm", "up", boneindex, dir, hit, ricochet) end
 input_list.rarmdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return arms(org, bone, dmg, dmgInfo, "rarm", "down", boneindex, dir, hit, ricochet) end
 input_list.larmup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return arms(org, bone * 1.25, dmg, dmgInfo, "larm", "up", boneindex, dir, hit, ricochet) end
 input_list.larmdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return arms(org, bone, dmg, dmgInfo, "larm", "down", boneindex, dir, hit, ricochet) end
-input_list.rlegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone, dmg * 1.25, dmgInfo, "rleg", "up", boneindex, dir, hit, ricochet) end
+input_list.rlegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone * 1.25, dmg, dmgInfo, "rleg", "up", boneindex, dir, hit, ricochet) end
 input_list.rlegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone, dmg, dmgInfo, "rleg", "down", boneindex, dir, hit, ricochet) end
-input_list.llegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone, dmg * 1.25, dmgInfo, "lleg", "up", boneindex, dir, hit, ricochet) end
+input_list.llegup = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone * 1.25, dmg, dmgInfo, "lleg", "up", boneindex, dir, hit, ricochet) end
 input_list.llegdown = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return legs(org, bone, dmg, dmgInfo, "lleg", "down", boneindex, dir, hit, ricochet) end
 input_list.spine1 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 1, boneindex, dir, hit, ricochet) end
 input_list.spine2 = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet) return spine(org, bone, dmg, dmgInfo, 2, boneindex, dir, hit, ricochet) end
