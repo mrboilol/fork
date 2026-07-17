@@ -211,7 +211,17 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply)
 end)
 
 hook.Add("PlayerLoadout", "giveHands", function(ply)
-    ply:Give("weapon_hands_sh")
+    local class = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hg_coolhands"
+    local hands = ply:GetWeapon(class)
+    if not IsValid(hands) then
+        hands = ply:Give(class)
+    end
+    if class == "weapon_hg_coolhands" and ply:HasWeapon("weapon_hands_sh") then
+        ply:StripWeapon("weapon_hands_sh")
+    end
+    if IsValid(hands) then
+        ply:SelectWeapon(hands:GetClass())
+    end
     return true
 end)
 
@@ -221,11 +231,16 @@ hook.Add("PlayerPostThink", "ZCityInventory_AlwaysUseHands", function(ply)
     if not ply:Alive() or ply:GetMoveType() == MOVETYPE_OBSERVER then return end
     if IsValid(ply:GetActiveWeapon()) then return end
 
-    if not ply:HasWeapon("weapon_hands_sh") then
-        ply:Give("weapon_hands_sh")
+    local class = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hg_coolhands"
+    if not ply:HasWeapon(class) then
+        ply:Give(class)
     end
 
-    ply:SelectWeapon("weapon_hands_sh")
+    if class == "weapon_hg_coolhands" and ply:HasWeapon("weapon_hands_sh") then
+        ply:StripWeapon("weapon_hands_sh")
+    end
+
+    ply:SelectWeapon(class)
 end)
 
 hook.Add("DoPlayerDeath", "homigrad-inventory", function(ply)

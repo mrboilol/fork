@@ -1777,6 +1777,10 @@ function SWEP:GetCarrying()
 end
 
 function SWEP:SetCarrying(ent, bone, pos, dist)
+	-- Carry physics and custom netvars are authoritative server state. Think also
+	-- reaches this cleanup path clientside, where Entity:SetNetVar does not exist.
+	if not SERVER then return end
+
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return end
 
