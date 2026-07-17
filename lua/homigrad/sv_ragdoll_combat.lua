@@ -102,7 +102,9 @@ local function RagdollBodyDamage()
                                     door.HP = door.HP - damage
                                     door:EmitSound("physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".wav")
 
-                                    if door.HP <= 0 then
+                                    local locked = door:GetInternalVariable("m_bLocked")
+                                    local breachChance = math.Clamp(damage / 250, 0.02, 0.3)
+                                    if door.HP <= 0 or (locked and math.Rand(0, 1) <= breachChance) then
                                         hgBlastThatDoor(door, vel:GetNormalized() * 200)
                                     else
                                         if part.dislocation_limb and math.random() < FAILED_BREACH_DISLOCATION_CHANCE then

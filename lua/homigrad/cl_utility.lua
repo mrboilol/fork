@@ -708,17 +708,6 @@ players : 1 humans, 0 bots (20 max)
 
 		local cachedLerp = Lerp
 
-		local expieModels = {
-			["models/blop/expie/expie.mdl"] = true,
-			["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
-			["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
-		}
-
-		local function IsExpie(ent)
-			if not IsValid(ent) then return false end
-			return expieModels[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or false
-		end
-
 		local function mouthmove(ply)
 			ply:SetVoiceVolumeScale(!hg.muteall and (!hg.mutespect or ply:Alive()) and (hg.playerInfo[ply:SteamID()] and hg.playerInfo[ply:SteamID()][2] or 1) or 0)
 
@@ -798,14 +787,6 @@ players : 1 humans, 0 bots (20 max)
 					if v and v ~= -1 then
 						ent:SetFlexWeight( v, weight )
 					end
-				end
-			end
-
-			-- Expie mouth flex fallback
-			if IsExpie(ent) then
-				local mouthOpen = ent:GetFlexIDByName("Mouth_open")
-				if mouthOpen and mouthOpen ~= -1 then
-					ent:SetFlexWeight(mouthOpen, weight)
 				end
 			end
 

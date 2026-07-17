@@ -181,10 +181,7 @@ end
 				local mat = ent:GetBoneMatrix(lkp)
 				if mat then
 					if !(Glide and Glide.Camera and !Glide.Camera.isInFirstPerson and lply == ply and lply:InVehicle() and hg_no_camera_in_cars:GetBool()) then
-						-- For expie models, always hide head in first-person view
-						if (ply.IsExpie or ply.PlayerClassName == "expie") and (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) then
-							mat:SetScale(vector_small)
-						elseif (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
+						if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
 							mat:SetScale(wawanted)
 						end
 					end
@@ -195,8 +192,7 @@ end
 
 					hg.bone_apply_matrix(ent, lkp, mat)
 
-					-- Always hide head children for expie models when head is hidden
-					if (wawanted == vector_small or (ply.IsExpie or ply.PlayerClassName == "expie")) and (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) then
+					if wawanted == vector_small and (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) then
 						local children = ent:GetChildBones(lkp)
 						if children then
 							for _, childID in ipairs(children) do

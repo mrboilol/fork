@@ -508,7 +508,7 @@ local function startLobotomyFlash(duration, traumaPower, allowMemory)
 	lobotomy_memory_mat = nil
 
 	if allowMemory then
-		local memoryChance = math.Clamp(0.08 + (traumaPower or 0) * 0.2, 0.08, 0.35)
+		local memoryChance = math.Clamp(0.20 + (traumaPower or 0) * 0.40, 0.20, 0.70)
 		local memoryMat = math.Rand(0, 1) < memoryChance and getLobotomyMemoryMat() or nil
 		if memoryMat then
 			lobotomy_memory_flash = true
@@ -1402,7 +1402,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	-- Consciousness whitenoise: ramps up from 0 at 0.95 consciousness to full at 0.1
 	-- PTSD distress overrides this sound.
-	local ptsdDistress = math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75
+	local ptsdTrauma = math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_trauma", 0)) or 0, 0, 100)
+	local ptsdDistress = math.Clamp((ptsdTrauma - 50) / 50, 0, 1) * 0.75
 	if not ptsd_effects_enabled() then ptsdDistress = 0 end
 
 	if not org.otrub and (org.consciousness or 1) < 0.95 and ptsdDistress <= 0 then
@@ -1685,12 +1686,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			show_image_time = show_image_time - 1
 
 			if lobotomy_memory_flash and lobotomy_memory_mat then
-				local rand = 12
+				local rand = 6
 				surface.SetDrawColor(255, 255, 255, alpha)
 				surface.SetMaterial(lobotomy_memory_mat)
 				surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand * 2), ScrH() + math.random(rand * 2))
 
-				hg.DrawVignetteLayer(vignetteMat, 3.0, 5.0)
+				hg.DrawVignetteLayer(vignetteMat, 4.5, 7.0)
 			else
 				drawLobotomyFlash(alpha)
 			end
@@ -1700,12 +1701,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			show_some_images_time = show_some_images_time - 1
 			local flashChance = math.max(12, math.floor(28 - brainFlashScale * 12))
 			if math.random(flashChance) < 2 then
-				local flashDuration = (8 + brainFlashScale * 14) * math.Rand(0.65, 1.15)
+				local flashDuration = (16 + brainFlashScale * 26) * math.Rand(0.75, 1.2)
 				startLobotomyFlash(flashDuration, brainFlashScale, true)
 			end
 		else
 			brain_motionblur = false
-			show_some_images_time = brainDamaged and math.random(1800) < (1 + brainFlashScale * 3) and math.floor(45 + brainFlashScale * 75) or 0
+			show_some_images_time = brainDamaged and math.random(1500) < (1 + brainFlashScale * 4) and math.floor(90 + brainFlashScale * 150) or 0
 		end
 	else
 		brain_motionblur = false
@@ -2143,7 +2144,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	local despair = org.givingUp and 0 or math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_intensity", 0)) or 0, 0, 1) * 0.75
+	local ptsdVisualTrauma = math.Clamp(tonumber(lply:GetNWFloat("hg_ptsd_trauma", 0)) or 0, 0, 100)
+	local despair = org.givingUp and 0 or math.Clamp((ptsdVisualTrauma - 50) / 50, 0, 1) * 0.75
 	if not ptsd_effects_enabled() then despair = 0 end
 	despairLerp = LerpFT(0.04, despairLerp, despair)
 	despairVisualLerp = math.Approach(despairVisualLerp, despairLerp, FrameTime() * 0.45)
@@ -2696,7 +2698,7 @@ net.Receive("headtrauma_flash", function()
         lobotomy_recent_trauma = CurTime() + math.Clamp(2.5 + traumaPower * 1.5, 3, 5)
         lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
         if (lobotomy_next_forced_flash or 0) <= CurTime() then
-            startLobotomyFlash(math.floor(9 + traumaPower * 8), traumaPower, true)
+			startLobotomyFlash(math.floor(16 + traumaPower * 14), traumaPower, true)
             lobotomy_next_forced_flash = CurTime() + 5
         end
     end

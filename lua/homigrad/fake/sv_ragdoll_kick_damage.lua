@@ -311,8 +311,15 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
             hgBlastThatDoor(data.HitEntity, data.HitNormal * 200)
             ApplyInjuriesToRagdoll(ragdoll)
         elseif data.Speed > 320 then
-            -- Normal speed impact: Just open door faster
-            OpenDoorFaster(data.HitEntity)
+            -- A weaker locked-door impact can still breach, with the chance rising toward the full-force threshold.
+            local locked = data.HitEntity:GetInternalVariable("m_bLocked")
+            local breachChance = math.Clamp((data.Speed - 320) / 800, 0.03, 0.3)
+            if locked and math.Rand(0, 1) <= breachChance then
+                hgBlastThatDoor(data.HitEntity, data.HitNormal * 200)
+                ApplyInjuriesToRagdoll(ragdoll)
+            else
+                OpenDoorFaster(data.HitEntity)
+            end
         end
         return
     end

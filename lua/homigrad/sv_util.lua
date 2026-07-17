@@ -14,12 +14,12 @@ local timer, hook, net, game, util = timer, hook, net, game, util
 
 local bloodColors = {
     [0] = "Blood",
-    [1] = "YellowBlood",
-    [2] = "YellowBlood",
+    [1] = "Blood",
+    [2] = "Blood",
     [3] = "ManhackSparks",
-    [4] = "YellowBlood",
-    [5] = "YellowBlood",
-    [6] = "YellowBlood"
+    [4] = "Blood",
+    [5] = "Blood",
+    [6] = "Blood"
 }
 
 local vecbloodpos = Vector( 0, 0, 75 )

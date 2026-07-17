@@ -109,18 +109,7 @@ hook.Add("PostDrawTranslucentRenderables", "ZCity_NosebleedFaceRun", function()
 end)
 
 local mat_huy = Material("effects/blood_core")
-local mat_expie_drop = Material("effects/droplets/drop2")
 local lightcolor = Color(0, 0, 0, 255)
-
-local expieModels_b = {
-	["models/blop/expie/expie.mdl"] = true,
-	["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
-	["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
-}
-local function isExpieOwner(owner)
-	if not IsValid(owner) then return false end
-	return expieModels_b[owner:GetModel()] or owner.PlayerClassName == "expie" or owner.IsExpie or false
-end
 
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
@@ -144,42 +133,29 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 		local light3 = render.ComputeDynamicLighting(pos, vector_up * 1)
 
 		local light = (light1 + light2 + light3) * 3
-				local isExpie = isExpieOwner(part.owner)
-						if part.landed or part.kishki or hg_blood_sprites:GetBool() then
-			render_SetMaterial(part[4] or (isExpie and mat_expie_drop or mat_huy))
-			if isExpie then
-				lightcolor.r = math.min(255 * light[1], 255)
-				lightcolor.g = math.min(255 * light[2], 255)
+		if part.landed or part.kishki or hg_blood_sprites:GetBool() then
+			render_SetMaterial(part[4] or mat_huy)
+			if part.kishki then
+				render_SetMaterial(part[4])
+				lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+				lightcolor.g = 0
 				lightcolor.b = 0
 			else
-				if part.kishki then
-					render_SetMaterial(part[4])
-					lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
-					lightcolor.g = 0
-					lightcolor.b = 0
-				else
-					lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
-					lightcolor.g = 0
-					lightcolor.b = 0
-				end
+				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+				lightcolor.g = 0
+				lightcolor.b = 0
 			end
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
-						local speed = part[3] and math.sqrt(part[3]:LengthSqr()) or 0
+			local speed = part[3] and math.sqrt(part[3]:LengthSqr()) or 0
 			-- Thicker, brighter beams for fast-moving (high-bleed) particles so they look like a stream
 			local beamWidth = math.max(part[5] * 0.4, 0.6) * (1 + math.min(speed / 120, 1.5))
 			local intensity = (part.artery and 45 or 20) + math.min(speed * 0.35, 80)
-			render_SetMaterial(isExpie and mat_expie_drop or mat_huy)
-			if isExpie then
-				lightcolor.r = math.min(255 * light[1], 255)
-				lightcolor.g = math.min(255 * light[2], 255)
-				lightcolor.b = 0
-			else
-				lightcolor.r = math.min(intensity * light[1], 255)
-				lightcolor.g = 0
-								lightcolor.b = 0
-			end
+			render_SetMaterial(mat_huy)
+			lightcolor.r = math.min(intensity * light[1], 255)
+			lightcolor.g = 0
+			lightcolor.b = 0
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
 			--if len > 1 * 1 then
 				render_SetMaterial(mat_huy)

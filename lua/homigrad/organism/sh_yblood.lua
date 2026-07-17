@@ -1,14 +1,3 @@
-local expieModels = {
-    ["models/blop/expie/expie.mdl"] = true,
-    ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
-    ["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
-}
-
-local function chekExpie(ent)
-    if not IsValid(ent) then return false end
-    return expieModels[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or ent.PlayerClassName == "furry" or false
-end
-
 local function inityblood()
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
@@ -168,14 +157,12 @@ end
             net.Start("addfountain")
             net.WriteEntity(rag)
             net.WriteVector(force or vector_origin)
-            net.WriteBool(chekExpie(rag))
             net.Broadcast()
 
             hg.fountains[rag] = {
                 bone = rag:LookupBone("ValveBiped.Bip01_Neck1"), 
                 lpos = isFem and Vector(4,0,0) or Vector(5,0,0),
                 lang = Angle(0,0,0),
-                isExpie = chekExpie(rag)
             }
 
             rag:CallOnRemove("removefountain", function()
@@ -187,9 +174,6 @@ end
     end
 end
 
-if CLIENT then
-    -- Yellow blood for expies is handled via SetBloodColor on the entity
-end
 if SERVER then
 
 local function PhysCallback( ent, data, mainent )
@@ -221,7 +205,7 @@ local function PhysCallback( ent, data, mainent )
 	-- 		end
 	-- 	end)
 	-- end
-	if mainent and chekExpie(mainent) then util.Decal("YNormal.Blood24", data.HitPos - data.HitNormal * 1, data.HitPos + data.HitNormal * 1, ent) else util.Decal("Normal.Blood24", data.HitPos - data.HitNormal * 1, data.HitPos + data.HitNormal * 1, ent) end
+	util.Decal("Normal.Blood24", data.HitPos - data.HitNormal * 1, data.HitPos + data.HitNormal * 1, ent)
 end
 
 if SERVER then
@@ -239,17 +223,11 @@ local input_list = hg.organism.input_list
 
 SpawnMeatGore = function(mainent, pos, count, force, scale)
 	force = force or Vector(0,0,0)
-	shouldBeYellow = chekExpie(mainent)
-
 	for i = 1, (count or math.random(8, 10)) do
 		local ent = ents.Create("prop_physics")
 		if not IsValid(ent) then continue end
 
 		ent:SetModel(meatModels[math.random(#meatModels)])
-		if shouldBeYellow then
-			ent:SetMaterial("models/balloon/balloon")
-			ent:SetColor(Color(190, 195, 10,200)) 
-		end
 		ent:SetSubMaterial(0, mat)
 		ent:SetPos(pos)
 		ent:SetCollisionGroup(COLLISION_GROUP_DEBRIS)

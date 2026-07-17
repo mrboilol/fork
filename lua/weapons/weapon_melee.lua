@@ -3148,6 +3148,10 @@ function SWEP:CustomThink()
             if CLIENT then goto meleeskip1 end
 
             if not soft and self:ShouldStopAttackOnWorldHit(1) then
+                -- Door-breaching weapons define their chance in PrimaryAttackAdd, but doors are world hits.
+                if IsValid(ent) and hgIsDoor(ent) then
+                    self:PrimaryAttackAdd(ent, trace)
+                end
                 self:PlayEffects(trace, false)
                 self:SendMeleeHitStop(1, trace.HitNormal)
                 self:AbortBlockedAttack()

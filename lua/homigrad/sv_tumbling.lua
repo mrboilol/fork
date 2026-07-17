@@ -223,7 +223,8 @@ hook.Add("Think", "stanleytumbler", function()
 
             if speed > 200 and cosine <= 0.99 then
                 local tr = util_TraceLine({ start = pos, endpos = pos - Vector(0,0,1), filter = ply })
-                if tr.Hit and tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps).friction < 0.2 then
+                local surfaceData = tr and tr.Hit and tr.SurfaceProps and util.GetSurfaceData(tr.SurfaceProps)
+                if surfaceData and surfaceData.friction < 0.2 then
                     shouldTrip = true
                     tripType = "slip"
                     tripChance = tripChance + 0.7

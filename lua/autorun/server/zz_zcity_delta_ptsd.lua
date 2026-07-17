@@ -21,7 +21,7 @@ local cvTraumaHead = CreateConVar("hg_ptsd_trauma_head_explosion", "14", FCVAR_A
 local cvTraumaGunfire = CreateConVar("hg_ptsd_trauma_gunfire", "2.5", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from nearby confirmed bullet hits", 0, 10)
 local cvTraumaExplosion = CreateConVar("hg_ptsd_trauma_explosion", "18", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma from blast damage", 0, 60)
 local cvTraumaCombat = CreateConVar("hg_ptsd_trauma_combat", "3", FCVAR_ARCHIVE + FCVAR_REPLICATED, "PTSD trauma per combat second", 0, 60)
-local cvFlashbackMin = CreateConVar("hg_ptsd_flashback_min", "35", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum PTSD trauma for flashbacks", 0, 100)
+local cvFlashbackMin = CreateConVar("hg_ptsd_flashback_min", "75", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum PTSD trauma for full flashback memories", 0, 100)
 local cvRandomFlashMin = CreateConVar("hg_ptsd_random_flash_min", "180", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Minimum random PTSD flashback interval", 30, 3600)
 local cvRandomFlashMax = CreateConVar("hg_ptsd_random_flash_max", "420", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Maximum random PTSD flashback interval", 30, 3600)
 local cvOpioidTraumaMul = CreateConVar("hg_ptsd_opioid_trauma_mul", "0.4", FCVAR_ARCHIVE + FCVAR_REPLICATED, "Trauma multiplier at high analgesia", 0, 1)
@@ -94,6 +94,8 @@ local function get_state(ply)
 		panicTrauma = 0,
 		flashbackUntil = 0,
 		nextFlash = 0,
+		memorySerial = 0,
+		nextMemoryCapture = 0,
 		recoveryBoostUntil = 0,
 		lastReason = "",
 	}
@@ -106,11 +108,9 @@ local function get_state(ply)
 end
 
 local function trauma_level(trauma)
-	if trauma < 20 then return 0, "stable" end
-	if trauma < 40 then return 1, "elevated" end
-	if trauma < 60 then return 2, "stressed" end
-	if trauma < 80 then return 3, "acute" end
-	return 4, "critical"
+	if trauma < 50 then return 0, "building" end
+	if trauma < 75 then return 1, "visible" end
+	return 2, "severe"
 end
 
 local function publish_state(ply, org)
@@ -134,6 +134,7 @@ local function publish_state(ply, org)
 	ply:SetNWFloat("hg_ptsd_intensity", intensity)
 	ply:SetNWFloat("hg_ptsd_panic_risk", panicRisk)
 	ply:SetNWFloat("hg_ptsd_flashback_until", state.flashbackUntil or 0)
+	ply:SetNWInt("hg_ptsd_memory_serial", state.memorySerial or 0)
 	ply:SetNWString("hg_ptsd_state", is_enabled() and label or "disabled")
 
 	if org then
@@ -179,6 +180,12 @@ local function adjust_trauma(ply, amount, reason, flags)
 		state.lastTraumaEvent = CurTime()
 		state.lastReason = tostring(reason or "")
 		if flags.combat then set_combat(state, 15) end
+		-- Store a client-side snapshot of actual trauma. These become the only
+		-- images used by PTSD flashbacks; ordinary brain-damage memories stay separate.
+		if amount >= 0.25 and CurTime() >= (state.nextMemoryCapture or 0) then
+			state.memorySerial = (state.memorySerial or 0) + 1
+			state.nextMemoryCapture = CurTime() + 6
+		end
 	elseif amount < 0 and not flags.allowNegative then
 		return
 	end
@@ -266,6 +273,8 @@ local function reset_state(ply)
 		panicTrauma = 0,
 		flashbackUntil = 0,
 		nextFlash = 0,
+		memorySerial = 0,
+		nextMemoryCapture = 0,
 		recoveryBoostUntil = 0,
 		lastReason = "",
 	}
@@ -404,7 +413,9 @@ local function update_flashback(owner, org, state)
 		return
 	end
 
-	if (state.trauma or 0) < cvFlashbackMin:GetFloat() then return end
+	-- Trauma below 50 only builds the stored memory pool. At 50 visual distress
+	-- is enabled client-side; full replaying flashbacks begin at 75 or higher.
+	if (state.trauma or 0) < max(75, cvFlashbackMin:GetFloat()) then return end
 	if now < (state.nextFlash or 0) then return end
 	if org and org.otrub then return end
 

@@ -27,17 +27,6 @@ local lastKnownFacingAngle = 0
 local fadingBones = {} -- Track bones that are fading out after being healed
 local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
-local expieModels = {
-    ["models/blop/expie/expie.mdl"] = true,
-    ["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
-    ["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
-}
-
-local function IsExpie(ent)
-    if not IsValid(ent) then return false end
-    return expieModels[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or false
-end
-
 local majorBones = {
     pelvis = { organ = "stomach", bone = "ValveBiped.Bip01_Pelvis" },
     spine1 = { organ = "spine", bone = "ValveBiped.Bip01_Spine1" },

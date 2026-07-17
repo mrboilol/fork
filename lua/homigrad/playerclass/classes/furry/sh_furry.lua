@@ -92,7 +92,7 @@ function CLASS.On(self, data)
 			self.oldbloodtype = self.organism.bloodtype
 			self.organism.bloodtype = "c-"
 		end
-		self:SetBloodColor(BLOOD_COLOR_YELLOW)
+		self:SetBloodColor(BLOOD_COLOR_RED)
 
 		local Appearance = self.CurAppearance or hg.Appearance.GetRandomAppearance()
 

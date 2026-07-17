@@ -193,7 +193,7 @@ function PLAYER:LegAttack()
                 if IsValid(ent) and not blacklist[ent] then
                     local normal = ang:Forward()
                     local phys = ent:GetPhysicsObjectNum(tr.PhysicsBone or 0)
-                    if !ent:IsPlayer() and not IsValid(phys) then continue end
+                    if !ent:IsPlayer() and not IsValid(phys) and not hgIsDoor(ent) then continue end
                     if not soundplayed then
                         soundplayed = true
 
@@ -272,7 +272,9 @@ function PLAYER:LegAttack()
                             ent:EmitSound("physics/wood/wood_box_impact_hard3.wav")
                         end
 
-                        if ent.HP <= 0 then
+                        local locked = not DoorIsOpen(ent)
+                        local breachChance = math.Clamp(dmg / 250, 0.02, 0.3)
+                        if ent.HP <= 0 or (locked and math.Rand(0, 1) <= breachChance) then
                             hgBlastThatDoor(ent, normal * 125)
                         end
                     end

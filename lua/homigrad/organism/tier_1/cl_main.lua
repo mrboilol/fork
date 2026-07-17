@@ -295,6 +295,12 @@ end)
 local alivestart = CurTime()
 hg.screens = hg.screens or {}
 local screens = hg.screens
+hg.ptsd_screens = hg.ptsd_screens or {}
+local ptsd_screens = hg.ptsd_screens
+local ptsd_screen_names = {}
+local ptsd_memory_serial = 0
+local ptsd_flashback_until = 0
+local ptsd_memory_screen = 1
 local screened = 0
 local curscreen = 1
 local switch = false
@@ -302,13 +308,43 @@ local file_Delete = file.Delete
 hg.alivecntr = hg.alivecntr or 0
 
 local function remove_imgs()
-	if file.Exists("dreams", "DATA") then
-		local files, _ = file.Find("dreams/*", "DATA")
+	for _, folder in ipairs({"dreams", "ptsd_dreams"}) do
+		if file.Exists(folder, "DATA") then
+			local files, _ = file.Find(folder.."/*", "DATA")
 
-		for i, file in pairs(files) do
-			file_Delete("dreams/"..file)
+			for _, name in pairs(files) do
+				file_Delete(folder.."/"..name)
+			end
 		end
 	end
+end
+
+local function capture_ptsd_memory()
+	if gui.IsGameUIVisible() or gui.IsConsoleVisible() or IsValid(vgui.GetHoveredPanel()) then return end
+
+	local data = render.Capture({
+		format = "jpeg",
+		x = 0,
+		y = 0,
+		w = ScrW(),
+		h = ScrH(),
+		quality = 1,
+	})
+	if not data then return end
+
+	if #ptsd_screens >= 12 then
+		table.remove(ptsd_screens, 1)
+		local oldName = table.remove(ptsd_screen_names, 1)
+		if oldName then file_Delete("ptsd_dreams/"..oldName) end
+	end
+
+	if not file.Exists("ptsd_dreams", "DATA") then file.CreateDir("ptsd_dreams") end
+	local name = "memory"..hg.alivecntr.."_"..CurTime()..".jpeg"
+	file.Write("ptsd_dreams/"..name, data)
+	timer.Simple(1, function()
+		ptsd_screens[#ptsd_screens + 1] = Material("data/ptsd_dreams/"..name)
+		ptsd_screen_names[#ptsd_screen_names + 1] = name
+	end)
 end
 
 local disorientationLerp = 0
@@ -327,6 +363,12 @@ hook.Add("Player Spawn", "screenshot_game", function(ply)
 		for i, screen in ipairs(hg.screens) do
 			hg.screens[i] = nil
 		end
+		for i, screen in ipairs(hg.ptsd_screens) do
+			hg.ptsd_screens[i] = nil
+		end
+		ptsd_screen_names = {}
+		ptsd_memory_serial = 0
+		ptsd_flashback_until = 0
 
 		remove_imgs()
 	end
@@ -437,6 +479,11 @@ hook.Add("PostRender", "screenshot_think", function()
 	local org = lply.organism
 	
 	if not org or not org.brain or org.otrub or !lply:Alive() then return end
+	local memorySerial = lply:GetNWInt("hg_ptsd_memory_serial", 0)
+	if memorySerial > ptsd_memory_serial then
+		ptsd_memory_serial = memorySerial
+		capture_ptsd_memory()
+	end
 	
 	local part = CurTime() - alivestart
 	//print(part)
@@ -476,11 +523,41 @@ local function BrainDamageFxScale(brain)
 	return math.Clamp(((brain or 0) - 0.05) / (0.35 - 0.05), 0, 1)
 end
 
+local function ptsd_memory_effects_enabled()
+	local enabled = GetConVar("hg_ptsd_enabled")
+	if enabled and not enabled:GetBool() then return false end
+	local effectsEnabled = GetConVar("hg_ptsd_effects_enabled")
+	return not effectsEnabled or effectsEnabled:GetBool()
+end
+
 hook.Add("Post Pre Post Processing", "ShowScreens", function()
 	local org = lply.organism
 	
 	if !lply:Alive() then return end
 	if not org or not org.brain then return end
+
+	local ptsdTrauma = math.Clamp(lply:GetNWFloat("hg_ptsd_trauma", 0), 0, 100)
+	local flashbackUntil = lply:GetNWFloat("hg_ptsd_flashback_until", 0)
+	local showPTSDMemory = ptsd_memory_effects_enabled() and ptsdTrauma >= 75 and flashbackUntil > CurTime() and #ptsd_screens > 0
+	if showPTSDMemory then
+		if flashbackUntil ~= ptsd_flashback_until then
+			ptsd_flashback_until = flashbackUntil
+			ptsd_memory_screen = math.random(#ptsd_screens)
+		end
+
+		local memory = ptsd_screens[ptsd_memory_screen]
+		if memory and not memory:IsError() then
+			local pulse = math.ease.InOutSine(math.abs(math.sin(CurTime() * 7)))
+			local alpha = 105 + pulse * 140
+			surface.SetDrawColor(255, 255, 255, alpha)
+			surface.SetMaterial(memory)
+			surface.DrawTexturedRect(-math.random(8), -math.random(8), ScrW() + math.random(16), ScrH() + math.random(16))
+			DrawToyTown(5, ScrH())
+			hg.DrawVignetteLayer(memory_vignetteMat, 5, 7)
+		end
+		return
+	end
+	ptsd_flashback_until = 0
 
 	local part = CurTime() - braindeathstart
 
@@ -496,13 +573,13 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 		-- Scale timing based on brain damage: higher damage = faster cycling
 		-- When otrub: faster cycling (20-40s range)
 		-- When awake: slower cycling (30-60s range) but still shows
-		local baseTime = org.otrub and 40 or 68
+		local baseTime = org.otrub and 36 or 60
 		local traumaBoost = math.Clamp((org.concussion or 0) / 6 + (org.disorientation or 0) / 12, 0, 0.45)
 		local time = baseTime - (brainFx * (org.otrub and 28 or 46)) - traumaBoost * 10
 		time = math.max(time, org.otrub and 7 or 12)
 		
 		-- Show for longer duration with more brain damage
-		local showDuration = time * (org.otrub and (0.24 + brainFx * 0.46) or (0.10 + brainFx * 0.44)) + traumaBoost * 7
+		local showDuration = time * (org.otrub and (0.34 + brainFx * 0.56) or (0.18 + brainFx * 0.60)) + traumaBoost * 8
 		showDuration = math.Clamp(showDuration, org.otrub and 3 or 1.5, time * (org.otrub and 0.9 or 0.78))
 		
 		if part % time > time - showDuration and curscreen <= #screens and screens[curscreen] and !screens[curscreen]:IsError() then
@@ -512,8 +589,8 @@ hook.Add("Post Pre Post Processing", "ShowScreens", function()
 			
 			-- More opaque with higher brain damage
 			-- When awake (not otrub), show at lower opacity
-			local awakeMultiplier = org.otrub and 1 or math.Clamp(0.18 + brainFx * 0.48 + traumaBoost * 0.3, 0.18, 0.85)
-			local alpha = math.Clamp(lerpedpart * (12 + brainFx * 86) * awakeMultiplier, 0, 255)
+			local awakeMultiplier = org.otrub and 1 or math.Clamp(0.30 + brainFx * 0.65 + traumaBoost * 0.3, 0.30, 1)
+			local alpha = math.Clamp(lerpedpart * (20 + brainFx * 120) * awakeMultiplier, 0, 255)
 			surface.SetDrawColor(255, 255, 255, alpha)
 			surface.SetMaterial(screens[curscreen])
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
@@ -1405,15 +1482,6 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 end)
 
 local grub = Model("models/grub_nugget_small.mdl")
-local expieModels_gore = {
-	["models/blop/expie/expie.mdl"] = true,
-	["models/assassingecko/geckoexpie/geckoexpie.mdl"] = true,
-	["models/assassingecko/geckoexpie/femgeckoexpie.mdl"] = true,
-}
-local function isExpieEnt(ent)
-	if not IsValid(ent) then return false end
-	return expieModels_gore[ent:GetModel()] or ent.PlayerClassName == "expie" or ent.IsExpie or false
-end
 --ValveBiped.Bip01_R_Hand
 --ValveBiped.Bip01_R_Forearm
 --ValveBiped.Bip01_R_Foot
