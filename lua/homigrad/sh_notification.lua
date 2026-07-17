@@ -122,6 +122,17 @@ if CLIENT then
 		outline = false,
 	})
 
+	-- Large crisis notifications use Remorseism's normal UI face instead of
+	-- enlarging the compact notification font.
+	surface.CreateFont("RemorseismNotificationLarge", {
+		font = "Lora",
+		extended = true,
+		size = ScreenScale(9),
+		weight = 700,
+		antialias = true,
+		shadow = true,
+	})
+
 	surface.CreateFont("SmallHuyFont", {
 		font = "BudgetLabel",
 		extended = true,
@@ -164,6 +175,7 @@ if CLIENT then
 	hg.notifications = hg.notifications or {}
 	hg.notificationFont = "HuyFont"
 	hg.notificationDesperateFont = "HuyFontDesperate"
+	hg.notificationLargeEventFont = "RemorseismNotificationLarge"
 
 	local function isEmojiCode(code)
 		return (code >= 0x1F300 and code <= 0x1F9FF) or
@@ -452,7 +464,8 @@ if CLIENT then
 				end
 
 				local desperateText = inPain or dying
-				local font = desperateText and hg.notificationDesperateFont or hg.notificationFont
+				local largeEvent = hg.underberserk2
+				local font = largeEvent and hg.notificationLargeEventFont or (desperateText and hg.notificationDesperateFont or hg.notificationFont)
 
 				surface.SetFont(font)
 				local txtw, txth = surface.GetTextSize(last_message or txt)

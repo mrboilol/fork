@@ -499,12 +499,6 @@ hook.Add("PostEntityFireBullets","bulletsuppression",function(ent,bullet)
 			ply:AddNaturalAdrenaline(0.05 * dmg / math.max(dist / 2,10) / 1)
 			org.fearadd = org.fearadd + 0.4
 			
-			if hg.organism and hg.organism.AddPanicAttack then
-				hg.organism.AddPanicAttack(org, 0.1 * (dmg / math.max(dist / 2, 10)), true, 2.5)
-			end
-			if hg.PTSD and hg.PTSD.AddTrauma then
-				hg.PTSD.AddTrauma(ply, 1.2, "suppression", {combat = true})
-			end
 		end
 	end
 end)
@@ -694,27 +688,6 @@ function hg.ExplosionEffect(pos, dis, dmg)
 	net.WriteVector(pos)
 	net.Broadcast()
 
-	local radius = math.Clamp((dis or 0) * 1.5, 300, 4000)
-	for _, ply in ipairs(ents.FindInSphere(pos, radius)) do
-		if not ply:IsPlayer() or not ply:Alive() or not ply.organism or ply.organism.otrub then continue end
-
-		local center = ply:WorldSpaceCenter()
-		local tr = util.TraceLine({
-			start = pos,
-			endpos = center,
-			filter = {ply, hg.GetCurrentCharacter(ply)},
-			mask = MASK_SHOT
-		})
-
-		local dist = pos:Distance(center)
-		if tr.Hit and dist > radius * 0.35 then continue end
-
-		local amount = math.Clamp((1 - dist / radius) * 0.55 + (dmg or 0) / 1200, 0.08, 0.55)
-		hg.organism.AddPanicAttack(ply.organism, amount, true, 2.5)
-		if hg.PTSD and hg.PTSD.AddTrauma then
-			hg.PTSD.AddTrauma(ply, 2 + amount * 8, "nearby_explosion", {combat = true})
-		end
-	end
 end
 
 -- MANUAL PICKUP

@@ -194,6 +194,11 @@ SWEP.ComboDamageMul3 = 1.65
 SWEP.PlayerKnockbackMul = 1.55
 SWEP.PlayerKnockbackUpMul = 0.45
 SWEP.PlayerSecondaryKnockbackMul = 0.75
+SWEP.ShoveKnockdownChanceBase = 0.06
+SWEP.ShoveKnockdownDamageScale = 15
+SWEP.ShoveKnockdownVictimFatigueMul = 0.20
+SWEP.ShoveKnockdownStaminaAdvantageMul = 0.10
+SWEP.ShoveKnockdownCooldown = 2
 SWEP.SwingForwardBoostMinSpeed = 20
 SWEP.RagdollHitForceMul = 0.5
 SWEP.HeadTraceFallbackRadius = 10
@@ -1836,6 +1841,7 @@ function SWEP:BehindAttack(ent)
 end
 
 function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
+    local owner = self:GetOwner()
     if ent:IsPlayer() or ent:IsRagdoll() then 
         local ply = hg.RagdollOwner(ent) or ent
 
@@ -1848,10 +1854,9 @@ function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
             
             local angrand = AngleRand(-5, 5)
 
-            ply:ViewPunch((normal * -dot) * dmg * (self.HitPunchMul or 0.75) / (self.HitPunchDiv or 40))
+			ply:ViewPunch((normal * -dot) * dmg * (self.HitPunchMul or 0.75) / (self.HitPunchDiv or 40))
 			if ply:OnGround() or ply.organism.superfighter then
-                local owner = self:GetOwner()
-                local pushDir = IsValid(owner) and (ply:GetPos() - owner:GetPos()) or trnormal
+				local pushDir = IsValid(owner) and (ply:GetPos() - owner:GetPos()) or trnormal
                 pushDir.z = 0
                 if pushDir:LengthSqr() <= 0.001 then
                     pushDir = Vector(trnormal.x, trnormal.y, 0)
@@ -1861,11 +1866,29 @@ function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
                 end
                 local forceMul = self:IsSecondaryAttackType(attacktype) and (self.PlayerSecondaryKnockbackMul or 0.75) or 1
                 local force = pushDir * math.min(dmg * (self.PlayerKnockbackMul or 3.25) * forceMul * MELEE_GLOBAL_KNOCKBACK_MUL, 140)
-                force.z = math.min(dmg * (self.PlayerKnockbackUpMul or 0.45) * forceMul * MELEE_GLOBAL_KNOCKBACK_MUL, 22)
-                ply:SetVelocity(force)
+				force.z = math.min(dmg * (self.PlayerKnockbackUpMul or 0.45) * forceMul * MELEE_GLOBAL_KNOCKBACK_MUL, 22)
+				ply:SetVelocity(force)
 			end
-        end
-    end
+
+			if SERVER and self:IsSecondaryAttackType(attacktype) and ply:Alive() and not IsValid(ply.FakeRagdoll) and ply:OnGround() and CurTime() >= (ply.ShoveKnockdownUntil or 0) then
+				local attackerOrg = IsValid(owner) and owner.organism
+				local attackerStamina = math.Clamp((attackerOrg and attackerOrg.stamina and attackerOrg.stamina[1]) or 180, 0, 180) / 180
+				local victimStamina = math.Clamp((ply.organism and ply.organism.stamina and ply.organism.stamina[1]) or 180, 0, 180) / 180
+				local damageFactor = math.Clamp(dmg / (self.ShoveKnockdownDamageScale or 15), 0, 1)
+				local staminaAdvantage = math.max(attackerStamina - victimStamina, 0)
+				local chance = (self.ShoveKnockdownChanceBase or 0.06)
+					+ damageFactor * 0.20
+					+ (1 - victimStamina) * (self.ShoveKnockdownVictimFatigueMul or 0.20)
+					+ staminaAdvantage * (self.ShoveKnockdownStaminaAdvantageMul or 0.10)
+				chance = chance * (0.35 + attackerStamina * 0.65)
+
+				if math.Rand(0, 1) <= math.Clamp(chance, 0, 0.65) then
+					ply.ShoveKnockdownUntil = CurTime() + (self.ShoveKnockdownCooldown or 2)
+					hg.Fake(ply)
+				end
+			end
+		end
+	end
 end
 
 SWEP.MinSensivity = 0.35

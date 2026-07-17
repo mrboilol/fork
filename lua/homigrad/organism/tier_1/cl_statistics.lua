@@ -132,6 +132,8 @@ local list = {
 	{"brainOccipital", 1, true},
 	{"brainHemorrhage", 1, true},
 	{"brainBleedRate", 0.008, true},
+	{"seizure", 1, true, "seizure chance"},
+	{"concussion", 6, true},
 	{"consciousness", 1, false},
 	{"skull", 1, true},
 	{"disorientation",1,true},
@@ -214,8 +216,8 @@ local function getTextTable(org)
 				value = org[v[1][2]][v[1][3]]
 			else
 				if org[v[1]] == nil then continue end
-				text1 = v[1]
-				value = org[text1]
+				text1 = v[4] or v[1]
+				value = org[v[1]]
 				
 				if type(value) == "table" then value = value[1] end
 			end

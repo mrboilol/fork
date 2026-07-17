@@ -215,6 +215,19 @@ hook.Add("PlayerLoadout", "giveHands", function(ply)
     return true
 end)
 
+-- Inventory drops intentionally clear the active weapon. Never leave a living
+-- player in the engine's empty-handed state afterwards: hands are the default.
+hook.Add("PlayerPostThink", "ZCityInventory_AlwaysUseHands", function(ply)
+    if not ply:Alive() or ply:GetMoveType() == MOVETYPE_OBSERVER then return end
+    if IsValid(ply:GetActiveWeapon()) then return end
+
+    if not ply:HasWeapon("weapon_hands_sh") then
+        ply:Give("weapon_hands_sh")
+    end
+
+    ply:SelectWeapon("weapon_hands_sh")
+end)
+
 hook.Add("DoPlayerDeath", "homigrad-inventory", function(ply)
     hook.Run("PlayerDropWeapon", ply)
 end)

@@ -570,6 +570,11 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	local blunt = dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
 	local protection = armorData and ((blunt and armorData.bluntProtection) or armorData.protection) or 10
 	local prot = protection - penetration
+	-- Armor padding cushions trauma even when the impact defeats its penetration rating.
+	-- Keep a meaningful portion of the pain so armor never acts as analgesia.
+	if armorData and protection > 0 then
+		org._armorPainMul = math.min(org._armorPainMul or 1, armorData.painMul or 0.72)
+	end
 	
 	org.owner.armors_health = org.owner.armors_health or {}
 	org.owner.armors_broken_mul = org.owner.armors_broken_mul or {}

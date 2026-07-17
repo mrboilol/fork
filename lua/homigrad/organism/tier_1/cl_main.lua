@@ -322,14 +322,6 @@ end)
 local alivestart = CurTime()
 hg.screens = hg.screens or {}
 local screens = hg.screens
-hg.ptsd_screens = hg.ptsd_screens or {}
-local ptsd_screens = hg.ptsd_screens
-local ptsd_screen_names = {}
-local ptsd_memory_serial = 0
-local ptsd_flashback_until = 0
-local ptsd_flashback_started = 0
-local ptsd_memory_screen = 1
-local ptsd_memory_alpha = 0
 local screened = 0
 local curscreen = 1
 local switch = false
@@ -337,7 +329,7 @@ local file_Delete = file.Delete
 hg.alivecntr = hg.alivecntr or 0
 
 local function remove_imgs()
-	for _, folder in ipairs({"dreams", "ptsd_dreams"}) do
+	local folder = "dreams"
 		if file.Exists(folder, "DATA") then
 			local files, _ = file.Find(folder.."/*", "DATA")
 
@@ -345,35 +337,6 @@ local function remove_imgs()
 				file_Delete(folder.."/"..name)
 			end
 		end
-	end
-end
-
-local function capture_ptsd_memory()
-	if gui.IsGameUIVisible() or gui.IsConsoleVisible() or IsValid(vgui.GetHoveredPanel()) then return end
-
-	local data = render.Capture({
-		format = "jpeg",
-		x = 0,
-		y = 0,
-		w = ScrW(),
-		h = ScrH(),
-		quality = 1,
-	})
-	if not data then return end
-
-	if #ptsd_screens >= 12 then
-		table.remove(ptsd_screens, 1)
-		local oldName = table.remove(ptsd_screen_names, 1)
-		if oldName then file_Delete("ptsd_dreams/"..oldName) end
-	end
-
-	if not file.Exists("ptsd_dreams", "DATA") then file.CreateDir("ptsd_dreams") end
-	local name = "memory"..hg.alivecntr.."_"..CurTime()..".jpeg"
-	file.Write("ptsd_dreams/"..name, data)
-	timer.Simple(1, function()
-		ptsd_screens[#ptsd_screens + 1] = Material("data/ptsd_dreams/"..name)
-		ptsd_screen_names[#ptsd_screen_names + 1] = name
-	end)
 end
 
 local disorientationLerp = 0
@@ -392,15 +355,6 @@ hook.Add("Player Spawn", "screenshot_game", function(ply)
 		for i, screen in ipairs(hg.screens) do
 			hg.screens[i] = nil
 		end
-		for i, screen in ipairs(hg.ptsd_screens) do
-			hg.ptsd_screens[i] = nil
-		end
-		ptsd_screen_names = {}
-		ptsd_memory_serial = 0
-		ptsd_flashback_until = 0
-		ptsd_flashback_started = 0
-		ptsd_memory_alpha = 0
-
 		remove_imgs()
 	end
 end)
@@ -510,12 +464,6 @@ hook.Add("PostRender", "screenshot_think", function()
 	local org = lply.organism
 	
 	if not org or not org.brain or org.otrub or !lply:Alive() then return end
-	local memorySerial = lply:GetNWInt("hg_ptsd_memory_serial", 0)
-	if memorySerial > ptsd_memory_serial then
-		ptsd_memory_serial = memorySerial
-		capture_ptsd_memory()
-	end
-	
 	local part = CurTime() - alivestart
 	//print(part)
 	if part % 60 > 59 and (screened != math.Round(part / 60, 0)) then
@@ -554,13 +502,6 @@ local function BrainDamageFxScale(brain)
 	return math.Clamp(((brain or 0) - 0.05) / (0.35 - 0.05), 0, 1)
 end
 
-local function ptsd_memory_effects_enabled()
-	local enabled = GetConVar("hg_ptsd_enabled")
-	if enabled and not enabled:GetBool() then return false end
-	local effectsEnabled = GetConVar("hg_ptsd_effects_enabled")
-	return not effectsEnabled or effectsEnabled:GetBool()
-end
-
 -- Otrub blackout/blur is drawn by cl_screeneffects in Post Post Processing.
 -- Keep memories and the incapacitation copy after it, as in remorseism, so the
 -- blackout never covers the information the player needs to see.
@@ -569,36 +510,6 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 	
 	if !lply:Alive() then return end
 	if not org or not org.brain then return end
-
-	local ptsdTrauma = math.Clamp(lply:GetNWFloat("hg_ptsd_trauma", 0), 0, 100)
-	local flashbackUntil = lply:GetNWFloat("hg_ptsd_flashback_until", 0)
-	-- PTSD memories only ever read from ptsd_screens. Ordinary brain-damage
-	-- memories below continue to use screens, so the two memory pools cannot mix.
-	local showPTSDMemory = ptsd_memory_effects_enabled() and ptsdTrauma >= 75 and flashbackUntil > CurTime() and #ptsd_screens > 0
-	if showPTSDMemory then
-		if flashbackUntil ~= ptsd_flashback_until then
-			ptsd_flashback_until = flashbackUntil
-			ptsd_flashback_started = CurTime()
-			ptsd_memory_screen = math.random(#ptsd_screens)
-		end
-
-		local memory = ptsd_screens[ptsd_memory_screen]
-		if memory and not memory:IsError() then
-			-- A flashback has one smooth envelope instead of a rapid opacity pulse.
-			local fadeIn = math.ease.InOutSine(math.Clamp((CurTime() - ptsd_flashback_started) / 0.85, 0, 1))
-			local fadeOut = math.ease.InOutSine(math.Clamp((flashbackUntil - CurTime()) / 0.85, 0, 1))
-			local targetAlpha = math.min(fadeIn, fadeOut) * (125 + math.Clamp((ptsdTrauma - 75) * 3, 0, 105))
-			ptsd_memory_alpha = LerpFT(0.04, ptsd_memory_alpha, targetAlpha)
-			surface.SetDrawColor(255, 255, 255, ptsd_memory_alpha)
-			surface.SetMaterial(memory)
-			surface.DrawTexturedRect(-math.random(8), -math.random(8), ScrW() + math.random(16), ScrH() + math.random(16))
-			DrawToyTown(5, ScrH())
-			hg.DrawVignetteLayer(memory_vignetteMat, 5, 7)
-		end
-		return
-	end
-	ptsd_flashback_until = 0
-	ptsd_memory_alpha = 0
 
 	local part = CurTime() - braindeathstart
 
@@ -1178,14 +1089,11 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 	sprayVel:Add(right * math.sin(time * 1.35 + (swayPhase or 0)) * sideSway * pulseMul * buildup)
 	sprayVel:Add(up * math.sin(time * 0.8 + 1.1 + (swayPhase or 0)) * 4 * pulseMul * buildup)
 
-	local jet = wound and wound.arterialJet
-	if jet and jet.active then
-		jet[3]:Set(sprayVel)
-		return
-	end
-
 	local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
-	jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
+	-- Blood particles are removed as soon as they hit a surface. Emit one aligned
+	-- particle on every arterial tick so the jet remains a continuous ribbon
+	-- instead of waiting for a single droplet to expire before replacing it.
+	local jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
 	if wound and jet then wound.arterialJet = jet end
 
 end

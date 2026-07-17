@@ -74,9 +74,10 @@ local panicattack_adrenaline_add_target = 4
 local panicattack_adrenaline_add_rise_time = 14
 local panicattack_heart_roll_delay = 15
 local panicattack_heart_roll_chance = 1
-local panicattack_damage_scale = 0.006
-local panicattack_witness_radius = 850
 local panicattack_death_radius = 900
+local panicattack_corpse_radius = 400
+local panicattack_fire_radius = 450
+local panicattack_fire_check_delay = 1
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
 local seizure_duration = 15
 local seizure_end_shock = 20
@@ -88,6 +89,7 @@ local seizure_shake_amp = 1.35
 local seizure_brain_trauma_gain_mul = 2
 local seizure_brain_heal_gain_mul = 1.1
 local seizure_temperature_gain_mul = 0.013
+local seizure_temperature_cold_gain_mul = 0.005
 local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
 local seizure_brain_roll_delay = 20
@@ -490,14 +492,13 @@ end
 function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
+	if (org.berserk or 0) > 0 then return org.panicattackadd or 0 end
 	local adrenalineRisk = math.Clamp(((org.adrenaline or 0) + (org.adrenalineAdd or 0) - 1.5) / 3, 0, 0.65)
 	local analgesiaRisk = math.Clamp(((org.analgesia or 0) + (org.analgesiaAdd or 0) - 0.2) / 2.8, 0, 1) * 0.2
-	local vulnerability = 1 + math.Clamp(org.ptsdPanicRisk or 0, 0, 1) * 1.6 + adrenalineRisk + analgesiaRisk
+	local vulnerability = 1 + adrenalineRisk + analgesiaRisk
 	local eventScale = math.max(tonumber(chanceMultiplier) or 1, 0)
 
-	-- Every real panic event advances the live panic-attack meter. PTSD and the
-	-- other vulnerability sources decide how much it advances, rather than
-	-- randomly discarding the event and leaving the displayed Panic value inert.
+	-- Every witnessed-death or corpse-exposure event advances the live panic meter.
 	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul * eventScale * math.min(vulnerability, 1.75), 0, 1)
 
 	return org.panicattackadd
@@ -546,6 +547,74 @@ local function start_seizure(owner, org)
 	owner.fullsend = true
 	send_organism(org, owner)
 end
+
+local function is_panic_corpse(ent)
+	if not IsValid(ent) then return false end
+	if ent:IsPlayer() then
+		return not ent:Alive() and not IsValid(ent:GetNWEntity("RagdollDeath", NULL))
+	end
+	if ent:IsNPC() then return ent:Health() <= 0 end
+	if not ent:IsRagdoll() then return false end
+	local owner = hg.RagdollOwner and hg.RagdollOwner(ent)
+	return not IsValid(owner) or not owner:IsPlayer() or not owner:Alive()
+end
+
+local function get_corpse_killer(ent)
+	if not IsValid(ent) then return nil end
+	if IsValid(ent._panicDeathAttacker) then return ent._panicDeathAttacker end
+	local owner = hg.RagdollOwner and hg.RagdollOwner(ent)
+	return IsValid(owner) and owner._panicDeathAttacker or nil
+end
+
+local function can_see_panic_corpse(owner, corpse)
+	local corpsePos = corpse:WorldSpaceCenter()
+	local character = hg.GetCurrentCharacter(owner) or owner
+	local tr = util.TraceLine({
+		start = owner:EyePos(),
+		endpos = corpsePos,
+		filter = {owner, character, corpse},
+		mask = MASK_SHOT
+	})
+	return not tr.Hit
+end
+
+hook.Add("Org Think", "PanicAttackCorpseExposure", function(owner, org)
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+	if not org or org.otrub or org.givingUp then return end
+	if (org._panicNextCorpseCheck or 0) > CurTime() then return end
+	org._panicNextCorpseCheck = CurTime() + 1
+
+	for _, corpse in ipairs(ents.FindInSphere(owner:GetPos(), panicattack_corpse_radius)) do
+		if corpse ~= owner and is_panic_corpse(corpse) and get_corpse_killer(corpse) ~= owner and can_see_panic_corpse(owner, corpse) then
+			-- Continuous, sight-checked exposure makes staring at a body matter without
+			-- turning a single glance into an immediate panic attack.
+			hg.organism.AddPanicAttack(org, 0.06, true)
+		end
+	end
+end)
+
+hook.Add("Org Think", "PanicAttackNearbyFire", function(owner, org)
+	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
+	if not org or org.otrub or org.givingUp then return end
+	if (org._panicNextFireCheck or 0) > CurTime() then return end
+	org._panicNextFireCheck = CurTime() + panicattack_fire_check_delay
+
+	local closest
+	for _, ent in ipairs(ents.FindInSphere(owner:GetPos(), panicattack_fire_radius)) do
+		if not IsValid(ent) or ent == owner then continue end
+		if ent:GetClass() ~= "env_fire" and ent:GetClass() ~= "vfire" and not ent:IsOnFire() then continue end
+
+		local dist = owner:GetPos():Distance(ent:GetPos())
+		if not closest or dist < closest then closest = dist end
+	end
+
+	if closest then
+		-- Fire is a sustained threat: this tiny per-second gain only overtakes
+		-- normal panic decay when the player stays close to it for a while.
+		local falloff = math.Clamp(1 - closest / panicattack_fire_radius, 0, 1)
+		hg.organism.AddPanicAttack(org, 0.012 + falloff * 0.024, true)
+	end
+end)
 
 local function resolve_panic_attacker(victim, attacker)
 	if IsValid(attacker) then
@@ -635,127 +704,6 @@ hook.Add("HomigradDamage", "Berserk", function(ply, dmgInfo, hitgroup, ent)
 			attacker.organism.berserk = attacker.organism.berserk + 0.5
 		end
 	end)
-end)
-
-hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
-	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
-	if not ply.organism then return end
-
-	local amount = math.Clamp(dmgInfo:GetDamage() * panicattack_damage_scale + (dmgInfo:IsDamageType(DMG_BLAST) and 0.08 or 0), 0.03, 0.35)
-	local attacker = resolve_panic_attacker(ply, dmgInfo:GetAttacker())
-
-	hg.organism.AddPanicAttack(ply.organism, amount)
-	if dmgInfo:GetDamage() <= 0 and not dmgInfo:IsDamageType(DMG_BLAST) then return end
-	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius)
-end)
-
-hook.Add("EntityEmitSound", "PanicAttackExplosionNearby", function(data)
-	local name = string.lower(data.SoundName or "")
-	if name == "" then return end
-	if not string.find(name, "explode", 1, true) and not string.find(name, "explosion", 1, true) then return end
-
-	local pos = data.Pos
-	if not pos or pos == vector_origin then
-		local ent = data.Entity
-		if isnumber(ent) then
-			ent = Entity(ent)
-		elseif not IsEntity(ent) then
-			ent = nil
-		end
-		if not IsValid(ent) then return end
-		pos = ent:GetPos()
-	end
-
-	local now = CurTime()
-	for _, ply in ipairs(player.GetAll()) do
-		if not IsValid(ply) or not ply:Alive() then continue end
-		local org = ply.organism
-		if not org or org.otrub then continue end
-		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then continue end
-		if (org._panicNextExplosionEvent or 0) > now then continue end
-
-		local dist = ply:GetPos():Distance(pos)
-		if dist > 900 then continue end
-
-		local threat = math.Clamp(1 - dist / 900, 0, 1)
-		if threat <= 0 then continue end
-		hg.organism.AddPanicAttack(org, 0.14 + threat * 0.28, true, 2.25)
-		org._panicNextExplosionEvent = now + 0.75
-	end
-end)
-
-hook.Add("EntityFireBullets", "PanicAttackNearBullets", function(ent, bulletData)
-	if not IsValid(ent) then return end
-	local src = bulletData and bulletData.Src
-	local dir = bulletData and bulletData.Dir
-	if not src or not dir then return end
-	if dir:LengthSqr() <= 0 then return end
-	local shooter = resolve_panic_attacker(nil, ent)
-	if not IsValid(shooter) then
-		shooter = resolve_panic_attacker(nil, bulletData.Attacker)
-	end
-	dir = dir:GetNormalized()
-	local range = math.max(tonumber(bulletData.Distance) or 0, 1800)
-
-	local now = CurTime()
-	for _, ply in ipairs(player.GetAll()) do
-		if not IsValid(ply) or not ply:Alive() or ply == shooter then continue end
-		local org = ply.organism
-		if not org or org.otrub then continue end
-		if (org.berserk or 0) > 0 or (org.noradrenaline or 0) > 0 then continue end
-		if (org._panicNextSuppression or 0) > now then continue end
-
-		local eye = ply:EyePos()
-		local toEye = eye - src
-		local t = toEye:Dot(dir)
-
-		local gunfightDist = ply:GetPos():Distance(src)
-		if (org._panicNextGunfire or 0) <= now and gunfightDist <= 700 then
-			local gunfightFalloff = math.Clamp(1 - gunfightDist / 700, 0, 1)
-			hg.organism.AddPanicAttack(org, 0.12 + gunfightFalloff * 0.2, true, 2)
-			org._panicNextGunfire = now + 0.9
-		end
-
-		if t <= 0 or t >= range then continue end
-		local closest = src + dir * t
-		local dist = eye:Distance(closest)
-		if dist > 130 then continue end
-
-		local tr = util.TraceLine({
-			start = src,
-			endpos = eye,
-			filter = {ent, ply}
-		})
-		if tr.Hit and tr.Entity ~= ply then continue end
-
-		local threat = math.Clamp(1 - dist / 130, 0, 1)
-		if threat > 0 then
-			hg.organism.AddPanicAttack(org, 0.18 + threat * 0.3, true, 2.75)
-			org._panicNextSuppression = now + 0.45
-		end
-
-	end
-end)
-
-hook.Add("Org Think", "PanicAttackNearbyFire", function(owner, org, timeValue)
-	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
-	if not org or org.otrub or org.givingUp then return end
-	if (org._panicNextFireCheck or 0) > CurTime() then return end
-	org._panicNextFireCheck = CurTime() + 1
-
-	local closest = nil
-	for _, ent in ipairs(ents.FindInSphere(owner:GetPos(), 450)) do
-		if not IsValid(ent) or ent == owner then continue end
-		local isFire = ent:GetClass() == "env_fire" or ent:GetClass() == "vfire" or ent:IsOnFire()
-		if not isFire then continue end
-		local dist = owner:GetPos():Distance(ent:GetPos())
-		if not closest or dist < closest then closest = dist end
-	end
-
-	if closest then
-		local falloff = math.Clamp(1 - closest / 450, 0, 1)
-		hg.organism.AddPanicAttack(org, 0.06 + falloff * 0.12, true, 1.5)
-	end
 end)
 
 -- One-handed behavior: wrist damage from heavy calibers and reduced control
@@ -1055,8 +1003,14 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
 	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
 	local oldPanicAttack = org.panicattack or 0
-	org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / panicattack_add_decay_time)
-	org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))
+	if org.berserk > 0 then
+		-- Berserk suppresses both new panic triggers and any attack already in progress.
+		org.panicattackadd = 0
+		org.panicattack = 0
+	else
+		org.panicattackadd = math.Approach(org.panicattackadd or 0, 0, timeValue / panicattack_add_decay_time)
+		org.panicattack = math.Approach(oldPanicAttack, org.panicattackadd or 0, timeValue / ((org.panicattackadd or 0) > oldPanicAttack and panicattack_rise_time or panicattack_decay_time))
+	end
 	local oldSeizureBrain = org.lastSeizureBrain or (org.brain or 0)
 	local lobeDamage = getSeizureLobeDamage(org)
 	local oldSeizureLobeDamage = org.lastSeizureLobeDamage or lobeDamage
@@ -1123,9 +1077,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local previousTemperature = oldSeizureTemperature
 	local heatStress = math.max(temperature - seizure_temperature_high_start, previousTemperature - seizure_temperature_high_start, 0)
 	local coldStress = math.max(seizure_temperature_low_start - temperature, seizure_temperature_low_start - previousTemperature, 0)
-	local temperatureStress = math.max(heatStress, coldStress)
-	if temperatureStress > 0 then
-		hg.organism.AddSeizure(org, timeValue * temperatureStress * seizure_temperature_gain_mul)
+	if heatStress > 0 then
+		hg.organism.AddSeizure(org, timeValue * heatStress * seizure_temperature_gain_mul)
+	elseif coldStress > 0 then
+		hg.organism.AddSeizure(org, timeValue * coldStress * seizure_temperature_cold_gain_mul)
 	end
 
 	local curTime = CurTime()
@@ -1709,12 +1664,20 @@ end)
 
 hook.Add("PlayerDeath", "PanicAttackWitnessDeath", function(victim, inflictor, attacker)
 	local realAttacker = resolve_panic_attacker(victim, attacker)
+	victim._panicDeathAttacker = realAttacker
 	panic_witness_event(victim, realAttacker, 0.22, panicattack_death_radius, 2)
 end)
 
 hook.Add("OnNPCKilled", "PanicAttackWitnessNPCDeath", function(victim, attacker, inflictor)
 	local realAttacker = resolve_panic_attacker(victim, attacker)
+	victim._panicDeathAttacker = realAttacker
 	panic_witness_event(victim, realAttacker, 0.16, panicattack_death_radius, 2)
+end)
+
+hook.Add("RagdollDeath", "PanicAttackRememberCorpseKiller", function(victim, ragdoll)
+	if IsValid(victim) and IsValid(ragdoll) then
+		ragdoll._panicDeathAttacker = victim._panicDeathAttacker
+	end
 end)
 
 hook.Add("HG_OnWakeOtrub", "afterOtrub", function( owner )

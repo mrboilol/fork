@@ -141,7 +141,8 @@ end
 local function CalculateImpact(boneName, speed)
     if LEG_BONES[boneName] then
         if speed >= DROP_KICK_SPEED_THRESHOLD then
-            return math.min(20 + (speed - DROP_KICK_SPEED_THRESHOLD) * 0.28, 90),
+            -- A committed ragdoll dropkick should hit harder than the animated hg_kick dropkick.
+            return math.min(65 + (speed - DROP_KICK_SPEED_THRESHOLD) * 0.35, 120),
                 math.max(2200, speed * 8),
                 math.Clamp(350 + (speed - DROP_KICK_SPEED_THRESHOLD) * 1.5, 400, 900),
                 "dropkick"

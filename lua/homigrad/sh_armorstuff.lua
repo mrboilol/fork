@@ -359,9 +359,10 @@ hg.armor.head = {
 		bluntDamageMul = 0.06,
 		forceMul = 0.25,
 		bluntForceMul = 0.12,
-		conditionDamageMul = 2.4,
-		bluntConditionDamageMul = 3.8,
-		conditionLossMax = 1,
+		-- It still sacrifices itself for strong hits, but no longer fails on the first one.
+		conditionDamageMul = 1.35,
+		bluntConditionDamageMul = 2.2,
+		conditionLossMax = 0.65,
 		restricted = {"head","ears","face"},
 		cantsight = true
 	},

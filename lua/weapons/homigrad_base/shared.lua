@@ -173,7 +173,7 @@ function SWEP:GetFocusHandlingMul()
 	local fear = math.Clamp(org.fear or 0, 0, 2)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 3)
 	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
-	local anxious = math.Clamp(panic * 0.45 + math.Clamp(org.ptsdPanicRisk or 0, 0, 1) * 0.35, 0, 1.4)
+	local anxious = math.Clamp(panic * 0.45, 0, 1.4)
 	local focus = math.min(adrenaline, 1.5) * 0.08
 
 	local className = owner.PlayerClassName
@@ -988,11 +988,13 @@ function SWEP:ApplyRecoilCameraKick()
 	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
 	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
 
-	-- The camera layer mirrors the pitch-led trajectory kick in sh_spray.  Keep
-	-- side drift present but subordinate so it cannot read as horizontal recoil.
-	local pitchKick = -0.72 * kickScale
-	local yawKick   =  0.035 * kickScale * sideRand
-	local rollKick  =  0.10 * kickScale * rollRand
+	-- Gangsta hold is deliberately an exception: the canted pistol kicks left
+	-- across the screen with only a small upward rise. All other holds remain
+	-- pitch-led so ordinary recoil does not become horizontal.
+	local gangstaHold = ply.posture == 7
+	local pitchKick = gangstaHold and -0.12 * kickScale or -0.72 * kickScale
+	local yawKick = gangstaHold and -0.72 * kickScale or 0.035 * kickScale * sideRand
+	local rollKick = gangstaHold and 0 or 0.10 * kickScale * rollRand
 
 	local punchAng = Angle(pitchKick, yawKick, rollKick)
 	local hg_coolcam = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()

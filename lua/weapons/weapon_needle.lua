@@ -89,17 +89,9 @@ if SERVER then
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 
-		--org.lungsR[2] = 0
-		--org.lungsL[2] = 0
+		-- The needle vents a punctured lung temporarily. It does not create a
+		-- puncture when used on a healthy target.
 		org.needle = 1
-
-		if !(org.lungsR[2] == 1 or org.lungsL[2] == 1) then
-			if math.random(2) == 1 then 
-				org.lungsR[2] = 1
-			else
-				org.lungsL[2] = 1
-			end
-		end
 		
 
 		if self.poisoned2 then

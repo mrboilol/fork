@@ -321,6 +321,7 @@ hook.Add("PlayerInitialSpawn", "HMCDPoliceArrivedSync", function(ply)
 		if not IsValid(ply) then return end
 		BroadcastHMCDPoliceArrivedState(GetGlobalBool("HMCDPoliceArrived", false), ply)
 	end)
+end)
 
 MODE.BaseProfessionHealth = 100
 MODE.BaseProfessionStamina = 60 * 3

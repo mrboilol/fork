@@ -179,9 +179,6 @@ if SERVER then
 					local ent = owner:KeyDown(IN_ATTACK) and owner or hg.eyeTrace(self:GetOwner()).Entity
 					if not ent.organism then return end
 					local ent = hg.GetCurrentCharacter(ent)
-					if ent.organism and (ent.organism.pneumothorax > 0 or ent.organism.hemothorax) then
-						ent.organism.needle = 1
-					end
 					if ent:GetVelocity():LengthSqr() < 1000 then
 						local old = -(-ent.organism.blood)
 						local good_type = hg.organism.bloodtypes[self.bloodtype or "o-"][ent.organism.bloodtype or "o-"]

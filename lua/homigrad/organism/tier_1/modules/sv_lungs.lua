@@ -328,6 +328,12 @@ local barely_breathing = {
 	"Every breath feels weak...",
 }
 
+local low_stamina = {
+	"I'm running out of stamina...",
+	"I need to slow down and catch my breath...",
+	"I can barely keep going...",
+}
+
 local drop_mask = {
 	"I can't breathe in this mask... I need to take it off.",
 	"Drop the mask, it's not worth it...",
@@ -453,45 +459,33 @@ module[2] = function(owner, org, timeValue)
 
 	org.choking = false
 
-	local pneumothorax = (org.lungsR[2] == 1 or org.lungsL[2] == 1) and org.needle == 0
+	org.needle = math.max(tonumber(org.needle) or 0, 0)
+	org.pneumothorax = math.Clamp(tonumber(org.pneumothorax) or 0, 0, 1)
+	org.hemothorax = math.Clamp(tonumber(org.hemothorax) or 0, 0, 1)
 
-	
-
+	local hasPneumothorax = org.lungsR[2] == 1 or org.lungsL[2] == 1
+	local needleActive = org.needle > 0
 	org.needle = math.Approach(org.needle, 0, timeValue / 1200)
 
-
-
-	if org.needle > 0 then
-
-		org.hemothorax = math.max((org.hemothorax or 0) - timeValue / 300, 0)
-
+	-- A decompression needle vents an existing pneumothorax; it must never make
+	-- an uninjured lung become punctured. The actual puncture remains until the
+	-- lung is repaired, so the condition can return after the temporary vent ends.
+	if hasPneumothorax and not needleActive then
+		org.pneumothorax = min(org.pneumothorax + timeValue / 180 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2)
+	else
+		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
 
-
-
-	if not org.hemothorax or org.hemothorax == false then org.hemothorax = 0 end
-
-	if org.pneumothorax == false then org.pneumothorax = 0 end
-
-
-
-	org.pneumothorax = pneumothorax and min(org.pneumothorax + timeValue / 180 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2) or max(org.pneumothorax - timeValue / 10, 0)
-
-
-
-	-- Hemothorax: blood filling the pleural cavity, builds from internal bleeding
-	-- Separate meter from pneumothorax (0 = clear, 1 = critical)
-	org.hemothorax = org.hemothorax or 0
+	-- Hemothorax is its own pleural-blood meter. A needle drains pressure while
+	-- active; otherwise significant internal bleeding can continue filling it.
 	local internalBleedVal = org.internalBleed or 0
-	if internalBleedVal > 0.3 then
+	if needleActive then
+		org.hemothorax = max(org.hemothorax - timeValue / 120, 0)
+	elseif internalBleedVal > 0.3 then
 		local buildRate = math.Clamp((internalBleedVal - 0.3) / 3, 0, 1)
 		org.hemothorax = min(org.hemothorax + buildRate * timeValue / 200, 1)
-	end
-
-	if org.hemothorax > 0 then
-		if internalBleedVal <= 0.1 then
-			org.hemothorax = max(org.hemothorax - timeValue / 120, 0)
-		end
+	elseif org.hemothorax > 0 and internalBleedVal <= 0.1 then
+		org.hemothorax = max(org.hemothorax - timeValue / 120, 0)
 	end
 
 
@@ -1145,7 +1139,12 @@ kaz
 		org.brainHemorrhage = max(org.brainHemorrhage - timeValue * hemorrhageReliefRate, 0)
 	end
 	if mannitolK > 0 then
-		org.brain = max(org.brain - timeValue * (1 / 170) * mannitolK, 0)
+		local mannitolBrainRecovery = timeValue * (1 / 170) * mannitolK
+		org.brain = max(org.brain - mannitolBrainRecovery, 0)
+		org.brainFrontal = max(frontal - mannitolBrainRecovery, 0)
+		org.brainParietal = max(parietal - mannitolBrainRecovery, 0)
+		org.brainTemporal = max(temporal - mannitolBrainRecovery, 0)
+		org.brainOccipital = max(occipital - mannitolBrainRecovery, 0)
 	end
 
 	if occipital > 0.35 then
@@ -1199,7 +1198,14 @@ kaz
 
 
 
-	org.brain = max(org.brain - timeValue / 400 * ((mannitolK > 0 and org.brain < 0.6) and 1 or (org.brain > 0.1 and 0.1 or 0)), 0)
+	local brainRecovery = timeValue / 400 * ((mannitolK > 0 and org.brain < 0.6) and 1 or (org.brain > 0.1 and 0.1 or 0))
+	org.brain = max(org.brain - brainRecovery, 0)
+	if mannitolK > 0 then
+		org.brainFrontal = max(org.brainFrontal - brainRecovery, 0)
+		org.brainParietal = max(org.brainParietal - brainRecovery, 0)
+		org.brainTemporal = max(org.brainTemporal - brainRecovery, 0)
+		org.brainOccipital = max(org.brainOccipital - brainRecovery, 0)
+	end
 
 	org.mannitol = math.Approach(org.mannitol, 0, timeValue / 200)
 	

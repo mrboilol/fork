@@ -241,11 +241,21 @@ function SWEP:PrimarySpread()
 
 		local angrand2 = AngleRand(-force, force)
 		if not self.SprayRandOnly then
-			local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.62, 10)
-			local yawLimit = math.min(0.28, pitchMag * 0.26 + 0.04)
-			angrand2[1] = -pitchMag
-			angrand2[2] = math.Clamp(angrand2[2] * 0.45, -yawLimit, yawLimit)
-			angrand2[3] = -angrand2[2] * 0.35
+			local gangstaHold = owner.posture == 7
+			if gangstaHold then
+				-- Sideways pistol cant: recoil tracks left across the screen instead
+				-- of following the normal upward muzzle-climb profile.
+				local leftKick = math.Clamp(force * 0.85, 0.3, 2.8)
+				angrand2[1] = -math.Clamp(math.abs(angrand2[1]) * 0.14, 0.03, 0.45)
+				angrand2[2] = -leftKick
+				angrand2[3] = 0
+			else
+				local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.62, 10)
+				local yawLimit = math.min(0.28, pitchMag * 0.26 + 0.04)
+				angrand2[1] = -pitchMag
+				angrand2[2] = math.Clamp(angrand2[2] * 0.45, -yawLimit, yawLimit)
+				angrand2[3] = -angrand2[2] * 0.35
+			end
 			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
 			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
 			
@@ -286,15 +296,22 @@ function SWEP:PrimarySpread()
 		-- Keep the direct shot correction pitch-led.  The old kick was small enough
 		-- for the spread yaw and punch recovery to make rifles feel sideways.
 		local longGunKickMul = not self:IsPistolHoldType() and 1.35 or 1
+		local gangstaHold = owner.posture == 7
 		-- Recoil displaces the muzzle upward between shots instead of widening a
 		-- hidden cone.  Keep a very small yaw component only so recoil does not
 		-- read as a horizontal spread pattern.
 		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.7 * longGunKickMul, 0.7, 6.2)
 		local muzzleKick = sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
-		muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
-		muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.7, -10.0, 1.2)
-		local muzzleYawCap = math.min(longGunKickMul > 1 and 0.12 or 0.18, math.abs(muzzleKick[1]) * 0.045 + 0.02)
-		muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.06, -muzzleYawCap, muzzleYawCap)
+		if gangstaHold then
+			local leftKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.9, 0.35, 3.2)
+			muzzleKick[1] = math.Clamp(muzzleKick[1] * 0.15, -0.65, 0.12)
+			muzzleKick[2] = -leftKick
+		else
+			muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
+			muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.7, -10.0, 1.2)
+			local muzzleYawCap = math.min(longGunKickMul > 1 and 0.12 or 0.18, math.abs(muzzleKick[1]) * 0.045 + 0.02)
+			muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.06, -muzzleYawCap, muzzleYawCap)
+		end
 		muzzleKick[3] = 0
 		muzzleKick = sanitize_angle(muzzleKick)
 		local newEyeAng = eyeang + muzzleKick

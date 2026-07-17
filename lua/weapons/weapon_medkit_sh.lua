@@ -151,15 +151,8 @@ if SERVER then
 					self.poisoned2 = nil
 				end
 
+				-- Vent the chest without turning an uninjured lung into a puncture.
 				org.needle = 1
-
-				if !(org.lungsR[2] == 1 or org.lungsL[2] == 1) then
-					if math.random(2) == 1 then 
-						org.lungsR[2] = 1
-					else
-						org.lungsL[2] = 1
-					end
-				end
 
 				if org.trachea and org.trachea > 0 then
 					org.trachea = math.max(org.trachea - 0.75, 0)

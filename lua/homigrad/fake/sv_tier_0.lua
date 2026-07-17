@@ -1455,6 +1455,12 @@ function hg.FakeUp(ply, forced, instant)
 	ply:Spawn()
 	//ply:SetPos(pos)
 	ply:SetRenderMode(RENDERMODE_NORMAL)
+	-- The recovery position can overlap the floor or nearby props when the
+	-- ragdoll was facing the wrong way. Let the player phase through that
+	-- one-second handoff instead of turning the correction into bone damage.
+	if not instant then
+		ply:SetMoveType(MOVETYPE_NOCLIP)
+	end
 	ply.LastFakeUp = CurTime()
 	ply:DrawWorldModel(true)
 	ply:SetHealth(hp)
@@ -1493,8 +1499,8 @@ function hg.FakeUp(ply, forced, instant)
 
 		if not instant then
 			ply:SetRenderMode(RENDERMODE_NORMAL)
-			-- Keep the recovering player from colliding with their old ragdoll until
-			-- it is removed at the end of the stand-up transition.
+			-- Noclip prevents world impacts during recovery; this also keeps the
+			-- player from colliding with their old ragdoll until it is removed.
 			ply:SetCollisionGroup(COLLISION_GROUP_DEBRIS_TRIGGER)
 			--ply:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
 			--ply:SetSolidFlags(bit.bor(ply:GetSolidFlags(), FSOLID_NOT_SOLID, FSOLID_TRIGGER, FSOLID_USE_TRIGGER_BOUNDS))

@@ -89,7 +89,7 @@ SWEP.TargetOrgans = {
         "skull", "jaw", "chest", "pelvis",
         "rarmartery", "larmartery", "rlegartery", "llegartery",
         "liver", "stomach", "intestines", "spineartery",
-        "lungsL", "lungsR", "pneumothorax",
+        "lungsL", "lungsR", "pneumothorax", "hemothorax",
         "rvein", "lvein", "spinevein", "pulmvein",
         "rarmvein", "larmvein", "rlegvein", "llegvein"
     },
@@ -124,7 +124,12 @@ SWEP.DebuffClearers = {
         org.lungsfunction = true
     end,
     ["trachea"] = function(org) org.trachea = 0 end,
-    ["pneumothorax"] = function(org) org.pneumothorax = 0 end,
+    ["pneumothorax"] = function(org)
+        org.pneumothorax = 0
+        if org.lungsL then org.lungsL[2] = 0 end
+        if org.lungsR then org.lungsR[2] = 0 end
+    end,
+    ["hemothorax"] = function(org) org.hemothorax = 0 end,
     ["brain"] = function(org)
         org.consciousness = 1
         org.disorientation = 0

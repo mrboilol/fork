@@ -20,6 +20,7 @@ SWEP.SwingCooldown = 0.75
 SWEP.SwingGateTime = 0.28
 SWEP.AttackTime = 0.10
 SWEP.SwingDamageMul = 1.25
+SWEP.FistStaminaCost = 4
 SWEP.SwingBackDuration = 1
 SWEP.JabAnimTime = 1
 SWEP.Primary.ClipSize = -1
@@ -2189,6 +2190,9 @@ function SWEP:PrimaryAttack(forcespecial)
 	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetLastShootTime(CurTime())
+	if SERVER and owner.organism and owner.organism.stamina then
+		owner.organism.stamina.subadd = (owner.organism.stamina.subadd or 0) + self.FistStaminaCost
+	end
 	if rand then
 		self.swingBackRightEnd = CurTime() + self.SwingBackDuration
 		self.swingBackLeftEnd = CurTime()
@@ -2442,8 +2446,6 @@ function SWEP:AttackFront(special_attack, rand)
 	end
 
 	if SERVER then
-		owner.organism.stamina.subadd = owner.organism.stamina.subadd + 4
-
 		-- Apply pain when punching with broken or dislocated arm
 		local org = owner.organism
 		if org then

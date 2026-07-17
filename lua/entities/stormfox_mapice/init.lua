@@ -6,6 +6,48 @@ include("shared.lua")
 local ice = Material("stormfox2/effects/ice_water")
 
 local Props = {}
+local ICE_FRICTION = 0.08
+
+local function IsStandingOnMapIce(ply)
+	local ground = ply:GetGroundEntity()
+	if IsValid(ground) and ground:GetClass() == "stormfox_mapice" then
+		return true
+	end
+
+	local tr = util.TraceHull({
+		start = ply:GetPos() + Vector(0, 0, 4),
+		endpos = ply:GetPos() - Vector(0, 0, 8),
+		mins = ply:OBBMins(),
+		maxs = ply:OBBMaxs(),
+		filter = ply,
+		mask = MASK_PLAYERSOLID
+	})
+
+	return IsValid(tr.Entity) and tr.Entity:GetClass() == "stormfox_mapice"
+end
+
+-- The ice mesh is a static physics surface, so its physics material alone
+-- does not lower player traction. Apply the same low-friction behavior while
+-- a player is standing on it and restore normal traction on every exit.
+hook.Add("SetupMove", "StormFox2.MapIce.PlayerTraction", function(ply)
+	if not ply:Alive() or ply:GetMoveType() == MOVETYPE_OBSERVER then return end
+
+	local onIce = IsStandingOnMapIce(ply)
+	if onIce then
+		ply:SetFriction(ICE_FRICTION)
+		ply.StormFox2MapIceFriction = true
+	elseif ply.StormFox2MapIceFriction then
+		ply:SetFriction(1)
+		ply.StormFox2MapIceFriction = nil
+	end
+end)
+
+hook.Add("PlayerDeath", "StormFox2.MapIce.ResetPlayerTraction", function(ply)
+	if not ply.StormFox2MapIceFriction then return end
+	ply:SetFriction(1)
+	ply.StormFox2MapIceFriction = nil
+end)
+
 hook.Add( "PhysgunPickup", "StormFox2.MapIce.DisallowPickup", function( ply, ent )
 	if ent:GetClass() == "stormfox_mapice" then return false end
 	if Props[ent] then return false end

@@ -1056,6 +1056,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	local lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = nil,{},{},{},{},nil,nil
 	org._bulletImpactBleedAdd = nil
+	org._armorPainMul = nil
 	-- Limb artery damage must stay on the side of the physics bone the bullet
 	-- actually entered; do not let a long trace rupture the opposite limb.
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
@@ -1250,7 +1251,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 
 	--print(dmg_before, 2)
-	local dmgBlood, dmgHurt, instaPain, immobilization = hg.organism.DamageTypeAffliction(dmg_before / 12, dmgInfo, ent, org)
+	local armorPainMul = org._armorPainMul or 1
+	org._armorPainMul = nil
+	local dmgBlood, dmgHurt, instaPain, immobilization = hg.organism.DamageTypeAffliction(dmg_before * armorPainMul / 12, dmgInfo, ent, org)
 	
 	local hitbody = #inputHole > 0 or not dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT)
 	
