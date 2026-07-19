@@ -474,7 +474,9 @@ function ENT:Explode()
 			self.ShrapnelDone = true
 		end)
 
-		coroutine.resume(self.ShrapnelCoroutine)
+		if coroutine.status(self.ShrapnelCoroutine) == "suspended" then
+			coroutine.resume(self.ShrapnelCoroutine)
+		end
 
 		local index = self:EntIndex()
 
@@ -484,7 +486,9 @@ function ENT:Explode()
 				return
 			end
 
-			coroutine.resume(self.ShrapnelCoroutine)
+			if coroutine.status(self.ShrapnelCoroutine) == "suspended" then
+				coroutine.resume(self.ShrapnelCoroutine)
+			end
 
 			if self.ShrapnelDone then
 				SafeRemoveEntity(self)

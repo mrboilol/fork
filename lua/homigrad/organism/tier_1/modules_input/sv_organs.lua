@@ -223,6 +223,9 @@ end
 local input_list = hg.organism.input_list
 local hitArtery
 input_list.heart = function(org, bone, dmg, dmgInfo)
+	-- A heart hit may create its own internal/spine-artery consequence, but it
+	-- must never be treated as a follow-on carotid (arteria) hit in this pass.
+	org._spineArteryTraceDmgInfo = dmgInfo
 	local oldDmg = org.heart
 
 	local result = damageOrgan(org, dmg * 0.3, dmgInfo, "heart")

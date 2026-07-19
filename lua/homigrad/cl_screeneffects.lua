@@ -108,7 +108,6 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_mulb"] = 0
 	--//if potatopc:GetInt() >= 1 then return end
 	hook_Run("Post Processing")
-	hg.DrawQueuedMotionBlur()
 	--//DrawSunEffect()
 	for _, layer in ipairs(layers_name) do
 		layer = layers[layer]
@@ -337,57 +336,6 @@ local brainFrontalColor = {
 	["$pp_colour_mulg"] = 0,
 	["$pp_colour_mulb"] = 0
 }
-
-local vignetteCompositeFrame = -1
-local vignetteCompositeColor = 0
-local vignetteCompositeStrength = 0
-local vignetteCompositeMat
-function hg.DrawVignetteLayer(mat, colorIntensity, strength)
-	local frame = FrameNumber()
-	if vignetteCompositeFrame ~= frame then
-		vignetteCompositeFrame = frame
-		vignetteCompositeColor = 0
-		vignetteCompositeStrength = 0
-		vignetteCompositeMat = nil
-	end
-
-	vignetteCompositeColor = math.max(vignetteCompositeColor, colorIntensity or 0)
-	vignetteCompositeStrength = math.max(vignetteCompositeStrength, strength or 0)
-	vignetteCompositeMat = mat
-
-	render.UpdateScreenEffectTexture()
-	vignetteCompositeMat:SetFloat("$c2_x", CurTime() + 10000)
-	vignetteCompositeMat:SetFloat("$c0_z", vignetteCompositeColor)
-	vignetteCompositeMat:SetFloat("$c1_y", vignetteCompositeStrength)
-	render.SetMaterial(vignetteCompositeMat)
-	render.DrawScreenQuad()
-end
-
-
-function hg.FlushVignetteLayer()
-	if vignetteCompositeFrame ~= FrameNumber() or not vignetteCompositeMat or vignetteCompositeStrength <= 0 then return end
-
-	render.UpdateScreenEffectTexture()
-	vignetteCompositeMat:SetFloat("$c2_x", CurTime() + 10000)
-	vignetteCompositeMat:SetFloat("$c0_z", vignetteCompositeColor)
-	vignetteCompositeMat:SetFloat("$c1_y", vignetteCompositeStrength)
-	render.SetMaterial(vignetteCompositeMat)
-	render.DrawScreenQuad()
-end
-
-local queuedMotionBlur = {}
-function hg.QueueMotionBlur(addAlpha, drawAlpha, delay)
-	queuedMotionBlur.addAlpha = math.max(queuedMotionBlur.addAlpha or 0, addAlpha or 0)
-	queuedMotionBlur.drawAlpha = math.max(queuedMotionBlur.drawAlpha or 0, drawAlpha or 0)
-	queuedMotionBlur.delay = math.min(queuedMotionBlur.delay or delay or 0, delay or 0)
-end
-
-function hg.DrawQueuedMotionBlur()
-	if not queuedMotionBlur.drawAlpha or queuedMotionBlur.drawAlpha <= 0 then return end
-
-	DrawMotionBlur(queuedMotionBlur.addAlpha, queuedMotionBlur.drawAlpha, queuedMotionBlur.delay)
-	queuedMotionBlur = {}
-end
 
 PainLerp = 0
 PanicAttackLerp = 0
@@ -956,7 +904,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
             render.SetMaterial(chromaticMat)
             render.DrawScreenQuad()
 		end
-		hg.DrawVignetteLayer(vignetteMat, adrenalineShock * 0.6, adrenalineShock * 0.8)
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", adrenalineShock * 0.6)
+		vignetteMat:SetFloat("$c1_y", adrenalineShock * 0.8)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
 	else
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 0, FrameTime() * 0.45)
     end
@@ -1477,12 +1430,28 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
-		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
+		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp / 2
 		pain = PainLerp + strobe
 		shock = shockLerp
+		render.UpdateScreenEffectTexture()
+
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 40 + math.max(shock - 5, 0) / 3))
+		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 40 + math.max(shock - 5, 0) / 3))
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		painMat:SetFloat("$c2_x", CurTime() + 10000)
+		painMat:SetFloat("$c0_y", 0.8)
+		painMat:SetFloat("$c0_z", 1)
+		painMat:SetFloat("$c1_x", math.Clamp(pain / 90, 0, 0.75))
+		painMat:SetFloat("$c1_y", math.Clamp(pain / 90, 0, 0.75))
+		render.SetMaterial(painMat)
+		render.DrawScreenQuad()
 
 		if org.otrub then
-			hg.QueueMotionBlur(0.1, 1., 0.01)
+			DrawMotionBlur(0.1, 1., 0.01)
 			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
 		end
 		
@@ -1609,7 +1578,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	disorientationFxLerp = LerpFT(disorientation > (disorientationFxLerp or 0) and 0.35 or 0.025, disorientationFxLerp or 0, math.max(disorientation, concussion * 0.65))
 	if lply:Alive() and not org.otrub and disorientationFxLerp > 1.2 then
 		local blurPower = math.Clamp((disorientationFxLerp - 1.2) / 7.5, 0, 1)
-		hg.QueueMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
+		DrawMotionBlur(0.08 + blurPower * 0.12, 0.45 + blurPower * 1.25, 0.01)
 		if blurPower > 0.35 then
 			DrawToyTown(blurPower * 2.2, ScrH() / 2)
 		end
@@ -1653,7 +1622,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if (brainDamaged or recentSevereHeadTrauma) and not org.otrub then
 		if show_image_time > 0 then
 			brain_motionblur = true
-			hg.QueueMotionBlur(0.04 + brainFlashScale * 0.06, 0.35 + brainFlashScale * 0.65, 0.1)
+			DrawMotionBlur(0.04 + brainFlashScale * 0.06, 0.35 + brainFlashScale * 0.65, 0.1)
 
 			local alpha = 255 * math.Clamp(show_image_time / math.max(lobotomy_memory_total, 1), 0, 1)
 			show_image_time = show_image_time - 1
@@ -1664,13 +1633,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				surface.SetMaterial(lobotomy_memory_mat)
 				surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand * 2), ScrH() + math.random(rand * 2))
 
-				hg.DrawVignetteLayer(vignetteMat, 4.5, 7.0)
+				render.UpdateScreenEffectTexture()
+				vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+				vignetteMat:SetFloat("$c0_z", 4.5)
+				vignetteMat:SetFloat("$c1_y", 7.0)
+				render.SetMaterial(vignetteMat)
+				render.DrawScreenQuad()
 			else
 				drawLobotomyFlash(alpha)
 			end
 		elseif brainDamaged and show_some_images_time > 0 then
 			brain_motionblur = true
-			hg.QueueMotionBlur(0.035 + brainFlashScale * 0.065, 0.3 + brainFlashScale * 0.7, 0.1)
+			DrawMotionBlur(0.035 + brainFlashScale * 0.065, 0.3 + brainFlashScale * 0.7, 0.1)
 			show_some_images_time = show_some_images_time - 1
 			local flashChance = math.max(12, math.floor(28 - brainFlashScale * 12))
 			if math.random(flashChance) < 2 then
@@ -2204,7 +2178,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		tab["$pp_colour_mulb"] = (tab["$pp_colour_mulb"] or 0) - suicideLerp * 0.01
 
 		-- Strong vignette with slow pulse
-		hg.DrawVignetteLayer(vignetteMat, suicideLerp * 0.6 + pulseEffect * 0.5, suicideLerp * 0.85 + pulseEffect * 2)
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", suicideLerp * 0.6 + pulseEffect * 0.5)
+		vignetteMat:SetFloat("$c1_y", suicideLerp * 0.85 + pulseEffect * 2)
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
 
 		-- Chromatic aberration
 		-- View wobble for disorientation
@@ -2226,7 +2205,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if suicideLerp > 0.15 then
 			local blurAlpha = 0.1 + suicideLerp * 0.15
 			local blurDraw = suicideLerp * 1.5
-			hg.QueueMotionBlur(blurAlpha, blurDraw, 0.001)
+			DrawMotionBlur(blurAlpha, blurDraw, 0.001)
 		end
 
 		-- ToyTown blur at high intensity
@@ -2267,7 +2246,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			-- Blood loss starts with a restrained desaturation and blur, while the
 			-- existing consciousness/shock effects still own severe collapse.
 			grayscaleTarget = grayscaleTarget + lowBloodVisual * 0.18
-			hg.QueueMotionBlur(0.04 + lowBloodVisual * 0.04, 0.18 + lowBloodVisual * 0.22, 0.02)
+			DrawMotionBlur(0.04 + lowBloodVisual * 0.04, 0.18 + lowBloodVisual * 0.22, 0.02)
 		end
 		if blood < 3500 then
 			grayscaleTarget = grayscaleTarget + math.Clamp((3500 - blood) / 3500, 0, 1) * 0.25
@@ -2306,9 +2285,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		headtraumaSaturation = math.max(headtraumaSaturation - FrameTime() * 0.85, 0)
 	end
 
-	-- Other trauma passes redraw the screen-effect texture after shock has requested
-	-- its vignette. Composite it only after every pass, so high shock cannot vanish.
-	hg.FlushVignetteLayer()
 end)
 
 hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
@@ -2354,9 +2330,9 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 
 	if temporal > 0.01 then
 		render.UpdateScreenEffectTexture()
-		seizureChromatic:SetFloat("$c0_x", 3.4 - temporal * 2.6)
-		seizureChromatic:SetInt("$c0_y", 1)
-		render.SetMaterial(seizureChromatic)
+		chromaticMat:SetFloat("$c0_x", 3.4 - temporal * 2.6)
+		chromaticMat:SetInt("$c0_y", 1)
+		render.SetMaterial(chromaticMat)
 		render.DrawScreenQuad()
 	end
 
@@ -2389,47 +2365,6 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 	end
-end)
-
--- Z-City applied the otrub pain/vignette pass before its memory and status
--- overlays.  Keeping it in the main post-processing phase preserves that
--- ordering: blackout and blur first, then readable memories/text, then HUD.
-hook.Add("Post Post Processing", "PainEffects", function()
-	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
-	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
-
-	local org = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
-	if not org or not org.brain then return end
-	if not ((PainLerp > 0.001 or shockLerp > 5) or org.otrub) then return end
-
-	local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
-	local pain = PainLerp + strobe
-	local shock = shockLerp
-	local thresholdReached = PainLerp >= painThresholdMax
-	painThresholdIntensityLerp = LerpFT(0.03, painThresholdIntensityLerp, thresholdReached and 5 or 1)
-	local intensityMul = painThresholdIntensityLerp
-	local coverage = thresholdReached and 1 or math.Clamp(pain / 70, 0, 0.95)
-	local effectIntensity = pain / 32 * painEffectIntensity * intensityMul + math.max(shock - 5, 0) / 2.4 * painEffectIntensity
-
-	render.UpdateScreenEffectTexture()
-
-	vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-	vignetteMat:SetFloat("$c0_z", org.otrub and 5 * unconsciousPainEffectIntensity or effectIntensity)
-	vignetteMat:SetFloat("$c1_y", org.otrub and 10 * unconsciousPainEffectIntensity or effectIntensity)
-
-	render.SetMaterial(vignetteMat)
-	render.DrawScreenQuad()
-
-	render.UpdateScreenEffectTexture()
-
-	painMat:SetFloat("$c2_x", CurTime() + 10000)
-	painMat:SetFloat("$c0_y", 0.8)
-	painMat:SetFloat("$c0_z", org.otrub and unconsciousPainEffectIntensity or painEffectIntensity * intensityMul)
-	painMat:SetFloat("$c1_x", coverage)
-	painMat:SetFloat("$c1_y", coverage)
-
-	render.SetMaterial(painMat)
-	render.DrawScreenQuad()
 end)
 
 hook.Add("Player_Death", "ItDoesntNow", function(ply)

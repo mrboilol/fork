@@ -585,10 +585,11 @@ hook.Add("Org Think", "PanicAttackCorpseExposure", function(owner, org)
 	org._panicNextCorpseCheck = CurTime() + 1
 
 	for _, corpse in ipairs(ents.FindInSphere(owner:GetPos(), panicattack_corpse_radius)) do
-		if corpse ~= owner and is_panic_corpse(corpse) and get_corpse_killer(corpse) ~= owner and can_see_panic_corpse(owner, corpse) then
+		local corpseKiller = get_corpse_killer(corpse)
+		if corpse ~= owner and is_panic_corpse(corpse) and corpseKiller ~= owner and can_see_panic_corpse(owner, corpse) then
 			-- Continuous, sight-checked exposure makes staring at a body matter without
 			-- turning a single glance into an immediate panic attack.
-			hg.organism.AddPanicAttack(org, 0.06, true)
+			hg.organism.AddPanicAttack(org, 0.02, true)
 		end
 	end
 end)

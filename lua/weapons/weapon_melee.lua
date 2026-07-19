@@ -1819,19 +1819,18 @@ function SWEP:PlayEffects(trace, attacktype)
     end
 end
 
-function SWEP:BreakGlass(ent)
-	if not IsValid(ent) then return end
-    if string.find(ent:GetClass(),"break") and ent:GetBrushSurfaces()[1] and string.find(ent:GetBrushSurfaces()[1]:GetMaterial():GetName(),"glass") then
-        //ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math.random(3)..".wav")
-        
-        if math.random(1, 4) == 4 and ent:Health() < 250 then
-            //ent:Fire("Break")
-        end
-        
-        return true
-    else
-        return false
-    end
+function SWEP:IsBreakableGlass(ent)
+    if not IsValid(ent) then return false end
+
+    local class = ent:GetClass()
+    if class == "func_breakable_surf" then return true end
+    if class ~= "func_breakable" then return false end
+    if ent:GetMaterialType() == MAT_GLASS then return true end
+
+    local surfaces = ent:GetBrushSurfaces()
+    local surface = surfaces and surfaces[1]
+    local material = surface and surface:GetMaterial()
+    return material and string.find(material:GetName(), "glass", 1, true) ~= nil
 end
 
 function SWEP:BehindAttack(ent)
@@ -3170,7 +3169,7 @@ function SWEP:CustomThink()
 
             if CLIENT then goto meleeskip1 end
 
-            if not soft and self:ShouldStopAttackOnWorldHit(1) then
+            if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(1) then
                 -- Door-breaching weapons define their chance in PrimaryAttackAdd, but doors are world hits.
                 if IsValid(ent) and hgIsDoor(ent) then
                     self:PrimaryAttackAdd(ent, trace)
@@ -3218,7 +3217,7 @@ function SWEP:CustomThink()
                     dmgType = self.HeavyAttackDamageType
                 end
                 
-                dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or dmgType)
+                dmginfo:SetDamageType(self:IsBreakableGlass(ent) and DMG_SLASH or dmgType)
                 dmginfo:SetDamagePosition(trace.HitPos)
                 
                 hg.AddForceRag(ent, trace.PhysicsBone or 0, trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL, 0.5)
@@ -3347,7 +3346,7 @@ function SWEP:CustomThink()
 
             if CLIENT then goto meleeskip2 end
 
-            if not soft and self:ShouldStopAttackOnWorldHit(2) then
+            if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(2) then
                 self:PlayEffects(trace, true)
                 self:SendMeleeHitStop(2, trace.HitNormal)
                 self:AbortBlockedAttack()
@@ -3393,7 +3392,7 @@ function SWEP:CustomThink()
                 dmginfo:SetInflictor(self)
                 dmginfo:SetDamage(dmg)
                 dmginfo:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
-                dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or self.DamageType)
+                dmginfo:SetDamageType(self:IsBreakableGlass(ent) and DMG_SLASH or self.DamageType)
                 dmginfo:SetDamagePosition(trace.HitPos)
 
                 local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
@@ -3536,11 +3535,11 @@ function SWEP:CustomThink()
             if CLIENT then goto meleeskip3 end
 
             if not soft then
-                if self:HandleChargeWorldHit(trace, 3) then
+                if not self:IsBreakableGlass(ent) and self:HandleChargeWorldHit(trace, 3) then
                     goto meleeskip3
                 end
 
-                if self:ShouldStopAttackOnWorldHit(3) then
+                if not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(3) then
                     self:PlayEffects(trace, 3)
                     self:SendMeleeHitStop(3, trace.HitNormal)
                     self:AbortBlockedAttack()
@@ -3578,7 +3577,7 @@ function SWEP:CustomThink()
                 dmginfo:SetInflictor(self)
                 dmginfo:SetDamage(dmg)
                 dmginfo:SetDamageForce(trace.Normal * dmg)
-                dmginfo:SetDamageType(ent:GetClass() == "func_breakable_surf" and DMG_SLASH or self.DamageType)
+                dmginfo:SetDamageType(self:IsBreakableGlass(ent) and DMG_SLASH or self.DamageType)
                 dmginfo:SetDamagePosition(trace.HitPos)
                 
                 local oldBreakBoneMul = self.BreakBoneMul

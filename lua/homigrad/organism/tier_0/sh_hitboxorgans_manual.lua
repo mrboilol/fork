@@ -384,7 +384,7 @@ female["ValveBiped.Bip01_Head1"] = {
 
 -- Head-organ coordinates were sitting slightly above the visual model. Keep
 -- armour aligned to its model attachment, while lowering anatomical targets.
-local headHitboxDrop = 0.75
+local headHitboxDrop = 1
 for _, anatomy in ipairs({male, female}) do
 	for _, organ in ipairs(anatomy["ValveBiped.Bip01_Head1"]) do
 		if not organ[7] then

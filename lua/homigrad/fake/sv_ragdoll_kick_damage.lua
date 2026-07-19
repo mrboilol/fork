@@ -76,6 +76,20 @@ local function GetBoneNameFromPhysBone(ragdoll, physBone)
     return ragdoll:GetBoneName(bone)
 end
 
+-- Door collisions happen before the ordinary damage path, so identify a real
+-- leg-first airborne hit here instead of treating every ragdoll impact alike.
+local function IsRagdollDropkick(ragdoll, data)
+    if data.OurOldVelocity:Length() < DROP_KICK_SPEED_THRESHOLD then return false end
+
+    for i = 0, ragdoll:GetPhysicsObjectCount() - 1 do
+        if ragdoll:GetPhysicsObjectNum(i) == data.PhysObject then
+            return LEG_BONES[GetBoneNameFromPhysBone(ragdoll, i)] == true
+        end
+    end
+
+    return false
+end
+
 -- Generate unique key for attacker-target pair
 local function GetHitKey(attacker, target)
     local attackerID = IsValid(attacker) and attacker:SteamID() or "unknown"
@@ -314,7 +328,15 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
         elseif data.Speed > 320 then
             -- A weaker locked-door impact can still breach, with the chance rising toward the full-force threshold.
             local locked = data.HitEntity:GetInternalVariable("m_bLocked")
-            local breachChance = math.Clamp((data.Speed - 320) / 800, 0.03, 0.3)
+            local breachChance
+
+            if IsRagdollDropkick(ragdoll, data) then
+                -- A committed ragdoll dropkick is more likely to force a locked door than a regular kick.
+                breachChance = math.Clamp(0.45 + (data.Speed - DROP_KICK_SPEED_THRESHOLD) / 1000, 0.45, 0.6)
+            else
+                breachChance = math.Clamp((data.Speed - 320) / 800, 0.03, 0.3)
+            end
+
             if locked and math.Rand(0, 1) <= breachChance then
                 hgBlastThatDoor(data.HitEntity, data.HitNormal * 200)
                 ApplyInjuriesToRagdoll(ragdoll)

@@ -502,14 +502,17 @@ local function BrainDamageFxScale(brain)
 	return math.Clamp(((brain or 0) - 0.05) / (0.35 - 0.05), 0, 1)
 end
 
--- Otrub blackout/blur is drawn by cl_screeneffects in Post Post Processing.
--- Keep memories and the incapacitation copy after it, as in remorseism, so the
--- blackout never covers the information the player needs to see.
+-- Otrub uses the original Z-City blackout sequence in cl_screeneffects.
+-- Brain-damage memories are an awake-only effect and must not layer over it.
 hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 	local org = lply.organism
 	
 	if !lply:Alive() then return end
 	if not org or not org.brain then return end
+	if org.otrub then
+		lerpedpart = 0
+		return
+	end
 
 	local part = CurTime() - braindeathstart
 
@@ -522,17 +525,15 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 		lerpedbrain = LerpFT(0.05, lerpedbrain, org.brain)
 		brainFx = BrainDamageFxScale(lerpedbrain)
 		
-		-- Scale timing based on brain damage: higher damage = faster cycling
-		-- When otrub: faster cycling (20-40s range)
-		-- When awake: slower cycling (30-60s range) but still shows
-		local baseTime = org.otrub and 36 or 60
+		-- Scale timing based on brain damage: higher damage = faster cycling.
+		local baseTime = 60
 		local traumaBoost = math.Clamp((org.concussion or 0) / 6 + (org.disorientation or 0) / 12, 0, 0.45)
-		local time = baseTime - (brainFx * (org.otrub and 28 or 46)) - traumaBoost * 10
-		time = math.max(time, org.otrub and 7 or 12)
+		local time = baseTime - brainFx * 46 - traumaBoost * 10
+		time = math.max(time, 12)
 		
 		-- Show for longer duration with more brain damage
-		local showDuration = time * (org.otrub and (0.34 + brainFx * 0.56) or (0.18 + brainFx * 0.60)) + traumaBoost * 8
-		showDuration = math.Clamp(showDuration, org.otrub and 3 or 1.5, time * (org.otrub and 0.9 or 0.78))
+		local showDuration = time * (0.18 + brainFx * 0.60) + traumaBoost * 8
+		showDuration = math.Clamp(showDuration, 1.5, time * 0.78)
 		
 		local memory = screens[curscreen]
 		local memoryActive = part % time > time - showDuration and curscreen <= #screens and memory and !memory:IsError()
@@ -545,26 +546,28 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 		-- Awake memories use a slower interpolation so they ease in and out
 		-- rather than appearing and vanishing like a flash. Keep rendering until
 		-- the eased value reaches zero, instead of cutting the last fade-out frame.
-		lerpedpart = LerpFT(org.otrub and 0.1 or 0.04, lerpedpart, part2)
+		lerpedpart = LerpFT(0.04, lerpedpart, part2)
 		if (memoryActive or (switch and lerpedpart > 0.01)) and memory and !memory:IsError() then
-			-- More opaque with higher brain damage
-			-- When awake (not otrub), show at lower opacity
-			local awakeMultiplier = org.otrub and 1 or math.Clamp(0.30 + brainFx * 0.65 + traumaBoost * 0.3, 0.30, 1)
+			-- More opaque with higher brain damage.
+			local awakeMultiplier = math.Clamp(0.30 + brainFx * 0.65 + traumaBoost * 0.3, 0.30, 1)
 			local alpha = math.Clamp(lerpedpart * (20 + brainFx * 120) * awakeMultiplier, 0, 255)
 			surface.SetDrawColor(255, 255, 255, alpha)
 			surface.SetMaterial(memory)
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 
 			-- More severe effects with higher brain damage
-			if org.otrub or brainFx > 0.5 then
+			if brainFx > 0.5 then
 				DrawToyTown(2 + brainFx * 5, ScrH())
 			end
 
 			-- Stronger vignette when memories show while awake and brain damaged
-			if not org.otrub then
-				local vignetteAlpha = math.Clamp(lerpedpart * (8 + brainFx * 92), 0, 100)
-				hg.DrawVignetteLayer(memory_vignetteMat, vignetteAlpha / 20, vignetteAlpha / 20)
-			end
+			local vignetteAlpha = math.Clamp(lerpedpart * (8 + brainFx * 92), 0, 100)
+			render.UpdateScreenEffectTexture()
+			memory_vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+			memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 20)
+			memory_vignetteMat:SetFloat("$c1_y", vignetteAlpha / 20)
+			render.SetMaterial(memory_vignetteMat)
+			render.DrawScreenQuad()
 		elseif switch then
 			curscreen = curscreen == #screens and 1 or curscreen + 1
 			switch = false
@@ -692,7 +695,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 
 	if (disorientationLerp > 1) and lply:Alive() or brain > 0 then
 		local add2 = disorientationLerp - 1
-		if not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then hg.QueueMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
+		if not brain_motionblur and lply.PlayerClassName ~= "headcrabzombie" then DrawMotionBlur(0.15 - math.Clamp(add2 / 1, 0, 0.1), add2 * 2, 0.001) end
 		if disorientationLerp > 2 then
 			local add = (disorientationLerp - 2) * 2
 			local time = CurTime() * 3
@@ -1084,17 +1087,37 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 	local up = ang:Up()
 	local scaledSize = size * arterialParticleSizeMul * buildup
 	local sprayVel = dir * arterialVelocityMul * reachMul * wave * buildup
-	-- Side sway is deliberately stronger than the remaining subtle vertical pulse,
-	-- so an arterial jet arcs outward instead of falling straight down.
-	sprayVel:Add(right * math.sin(time * 1.35 + (swayPhase or 0)) * sideSway * pulseMul * buildup)
-	sprayVel:Add(up * math.sin(time * 0.8 + 1.1 + (swayPhase or 0)) * 4 * pulseMul * buildup)
+	-- One shared sine wave moves the jet up/right, then down/left, instead of
+	-- splitting the wound into separate vertical and horizontal sprays.
+	local sway = math.sin(time * 1.35 + (swayPhase or 0))
+	sprayVel:Add(right * sway * sideSway * pulseMul * buildup)
+	sprayVel:Add(up * sway * sideSway * 0.42 * pulseMul * buildup)
 
-	local jetPos = pos + VectorRand(-arterialJetOffset, arterialJetOffset)
-	-- Blood particles are removed as soon as they hit a surface. Emit one aligned
-	-- particle on every arterial tick so the jet remains a continuous ribbon
-	-- instead of waiting for a single droplet to expire before replacing it.
-	local jet = hg.addBloodPart(jetPos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
-	if wound and jet then wound.arterialJet = jet end
+	local jetLength = math.Clamp(24 + woundSeverity * 6, 24, 100) * math.Clamp(pulseMul, 0.3, 1.15) * buildup
+	local jetEnd = pos + sprayVel:GetNormalized() * jetLength
+	local trace = util.TraceLine({start = pos, endpos = jetEnd, filter = ent})
+	if trace.Hit then jetEnd = trace.HitPos end
+
+	local jet = wound and wound.arterialJet
+	if not jet or not jet.active then
+		jet = hg.addBloodPart(pos, sprayVel, nil, scaledSize, scaledSize, arteryType or true, nil, ent)
+		if wound and jet then wound.arterialJet = jet end
+	end
+
+	if not jet then return end
+
+	-- This is a single persistent beam carrier. Its end point rotates around the
+	-- wound every tick, producing one smooth jet rather than separate droplets.
+	jet.arterialJet = true
+	jet.jetOrigin = jet.jetOrigin or pos + vector_origin
+	jet.jetEnd = jet.jetEnd or jetEnd + vector_origin
+	jet.jetOrigin:Set(pos)
+	jet.jetEnd:Set(jetEnd)
+	jet[1]:Set(jetEnd)
+	jet[2]:Set(jetEnd)
+	jet[3]:Set(sprayVel)
+	jet.jetWidth = math.max(scaledSize * 0.55, 1)
+	jet.jetExpires = time + 0.12
 
 end
 local hg_altberserk = GetConVar("hg_altberserk")

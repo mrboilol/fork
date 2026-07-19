@@ -130,6 +130,7 @@ local hold_wound_bleed_threshold = 0.35
 local hold_wound_bleed_slow_mul = 0.72
 local hold_wound_bleed_slow_twohand_mul = 0.55
 local hold_wound_arterial_slow_mul = 0.2
+local arterial_bleed_rate_mul = 0.9
 
 local function hasWound(wounds, target)
 	if not target or not wounds then return false end
@@ -489,17 +490,17 @@ module[2] = function(owner, org, mulTime)
 
 	local arterialToRemove = {}
 	for i, wound in pairs(org.arterialwounds) do
-		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.14 * math.max(pulse, 20) / 80
-		local arterialBleed = wound[1] * mulTime * 0.2 * math.max(org.pulse, 20) / 80
+		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80
+		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80
 		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
 		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
 
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * math.max(pulse, 20) / 80, 1)
+			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80, 1)
 			if isAlive or not isPlayer then
-			local pumpBleed = wound[1] * mulTime * 4.5 * math.max(org.pulse, 20) / 80
+			local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80
 			pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
 			org.blood = max(org.blood - pumpBleed, 1)
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then

@@ -66,11 +66,6 @@ local function playSkullFractureSound(ent)
 	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 75, math.random(90, 110), 1, CHAN_AUTO)
 end
 
-local function addConcussion(org, amount)
-	if amount <= 0 then return end
-	org.concussion = math.min((org.concussion or 0) + amount, 6)
-end
-
 local function addBoneInternalBleed(org, amount, cap)
 	org.internalBleed = (org.internalBleed or 0) + math.Clamp(amount or 0, 0, cap or 1)
 end
@@ -224,7 +219,6 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 
 	if name == "spine3" and isCrush(dmgInfo) and dmg > 0.3 and math.random() < 0.4 then
 		local skullResult, skullVec = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
-		addConcussion(org, math.min(dmg * 0.45, 1.4))
 		hg.AddHarmToAttacker(dmgInfo, skullResult * 0.5, "Skull damage from neck collision transfer")
 		return skullResult, skullVec
 	end
@@ -267,7 +261,6 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local oldDmg = org.jaw
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 	hg.AddHarmToAttacker(dmgInfo, (org.jaw - oldDmg) * 3, "Jaw bone damage harm")
-	addConcussion(org, math.min(dmg * 0.3, 0.9))
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
 	local dislocated = (org.jaw - oldDmg) > math.Rand(0.1, 0.3)
@@ -329,8 +322,6 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
-	local brainGain = math.max(org.brain - brainBefore, 0)
-	addConcussion(org, math.min(dmg * 0.45 + brainGain * 4 + math.max(skullDelta - 0.25, 0) * 0.5, 1.4))
 
 	if math.random(1, 4) == 1 then
 		local eye_dmg = dmg * math.Rand(0.8, 1.5)
@@ -343,7 +334,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	if skullDelta > 0.6 then
 		org.brain = math.min(org.brain + 0.1, 1)
-		addConcussion(org, 0.35)
+	end
+
+	local brainGain = math.max(org.brain - brainBefore, 0)
+	if brainGain > 0 then
+		org.concussion = math.min((org.concussion or 0) + math.min(brainGain * 4, 1.4), 6)
 	end
 
 	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or skullDelta > 0.6) then

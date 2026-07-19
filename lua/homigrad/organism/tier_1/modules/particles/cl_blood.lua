@@ -122,6 +122,19 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 	for i = 1, #hg.bloodparticles1 do
 		local part = hg.bloodparticles1[i]
 		if not part then continue end
+		if part.arterialJet then
+			local jetOrigin = part.jetOrigin
+			local jetEnd = part.jetEnd
+			if not jetOrigin or not jetEnd or (jetEnd - lplypos):LengthSqr() > dstsqr then continue end
+
+			local light = (render.GetLightColor(jetEnd) + render.ComputeLighting(jetEnd, vector_up) + render.ComputeDynamicLighting(jetEnd, vector_up)) * 3
+			render_SetMaterial(mat_huy)
+			lightcolor.r = math.min(70 * light[1], 255)
+			lightcolor.g = 0
+			lightcolor.b = 0
+			render_DrawBeam(jetOrigin, jetEnd, part.jetWidth or 1, 0, 1, lightcolor)
+			continue
+		end
 		if (pos - lplypos):Dot(lplyang) < 0 then continue end
 		if (part[2] - pos):LengthSqr() > dstsqr then continue end
 		--if !hg.isVisible(part[1],LocalPlayer():GetShootPos(),LocalPlayer(),MASK_VISIBLE) then continue end
@@ -275,6 +288,20 @@ bloodparticles_hook[2] = function(mul)
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
 		if not part then table_remove(hg.bloodparticles1, i) continue end
+		if part.arterialJet then
+			if not part.jetExpires or time >= part.jetExpires then
+				part.active = false
+				table_remove(hg.bloodparticles1, i)
+				continue
+			end
+
+			local jetTrace = util_TraceLine({start = part.jetOrigin, endpos = part.jetEnd, filter = part.owner})
+			if jetTrace.Hit and jetTrace.Entity:IsWorld() and (part.nextJetDecal or 0) <= time then
+				part.nextJetDecal = time + 0.2
+				decalBlood(jetTrace.HitPos, jetTrace.HitNormal, jetTrace, part.artery, part.owner, part.decalWeight)
+			end
+			continue
+		end
 		
 		local pos = part[1]
 		local posSet = part[2]

@@ -26,6 +26,9 @@ local shoveRange = 50
 local shoveForce = 200
 local shoveRagdollChance = 4
 local shoveStumbleChance = 1
+local shoveStaminaCost = 9
+local punchStaminaCost = 9
+local sprintSpecialPunchStaminaCost = 18
 local specialDamageMul = 2.5
 local runningSpecialDamageMul = 3
 local incomingVelocityDamageMul = 2
@@ -151,7 +154,7 @@ function SWEP:SecondaryAttack()
                 self:GetOwner():ViewPunch(Angle(2, 0, 0))
                 sound.Play("player/shove_0"..math_random(5)..".wav", self:GetPos(), 65, math_random(105, 115))
                 if self:GetOwner().organism then
-                        self:GetOwner().organism.stamina.subadd = self:GetOwner().organism.stamina.subadd + 18
+                        self:GetOwner().organism.stamina.subadd = self:GetOwner().organism.stamina.subadd + shoveStaminaCost
                 end
                 self:ShoveFront(sprintShove)
                 return
@@ -1189,7 +1192,7 @@ function SWEP:AttackFront(special_attack, rand)
         end
 
         if SERVER then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and 36 or 18)
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and sprintSpecialPunchStaminaCost or punchStaminaCost)
         end
 
         owner:LagCompensation(false)
