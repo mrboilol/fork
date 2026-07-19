@@ -503,16 +503,12 @@ local function BrainDamageFxScale(brain)
 end
 
 -- Otrub uses the original Z-City blackout sequence in cl_screeneffects.
--- Brain-damage memories are an awake-only effect and must not layer over it.
+-- During otrub, memories are a faint, slow image only: never a trauma flash.
 hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 	local org = lply.organism
 	
 	if !lply:Alive() then return end
 	if not org or not org.brain then return end
-	if org.otrub then
-		lerpedpart = 0
-		return
-	end
 
 	local part = CurTime() - braindeathstart
 
@@ -526,14 +522,23 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 		brainFx = BrainDamageFxScale(lerpedbrain)
 		
 		-- Scale timing based on brain damage: higher damage = faster cycling.
-		local baseTime = 60
+		-- Unconscious memories deliberately take much longer so they feel like a
+		-- dim recollection appearing through the blackout instead of a flash.
+		local unconscious = org.otrub
+		local baseTime = unconscious and 85 or 60
 		local traumaBoost = math.Clamp((org.concussion or 0) / 6 + (org.disorientation or 0) / 12, 0, 0.45)
-		local time = baseTime - brainFx * 46 - traumaBoost * 10
-		time = math.max(time, 12)
+		local time = baseTime - brainFx * (unconscious and 20 or 46) - traumaBoost * (unconscious and 4 or 10)
+		time = math.max(time, unconscious and 50 or 12)
 		
-		-- Show for longer duration with more brain damage
-		local showDuration = time * (0.18 + brainFx * 0.60) + traumaBoost * 8
-		showDuration = math.Clamp(showDuration, 1.5, time * 0.78)
+		-- Keep unconscious memories visible long enough for their fade-in and
+		-- fade-out to be clearly perceptible, but cap their opacity below.
+		local showDuration
+		if unconscious then
+			showDuration = math.Clamp(18 + brainFx * 14 + traumaBoost * 4, 18, time * 0.55)
+		else
+			showDuration = time * (0.18 + brainFx * 0.60) + traumaBoost * 8
+			showDuration = math.Clamp(showDuration, 1.5, time * 0.78)
+		end
 		
 		local memory = screens[curscreen]
 		local memoryActive = part % time > time - showDuration and curscreen <= #screens and memory and !memory:IsError()
@@ -543,31 +548,38 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 			part2 = math.ease.InOutSine(math.sin(((part % time) - (time - showDuration)) / showDuration * math.pi))
 		end
 
-		-- Awake memories use a slower interpolation so they ease in and out
+		-- Memories use a slower interpolation so they ease in and out
 		-- rather than appearing and vanishing like a flash. Keep rendering until
 		-- the eased value reaches zero, instead of cutting the last fade-out frame.
-		lerpedpart = LerpFT(0.04, lerpedpart, part2)
+		lerpedpart = LerpFT(unconscious and 0.018 or 0.04, lerpedpart, part2)
 		if (memoryActive or (switch and lerpedpart > 0.01)) and memory and !memory:IsError() then
-			-- More opaque with higher brain damage.
-			local awakeMultiplier = math.Clamp(0.30 + brainFx * 0.65 + traumaBoost * 0.3, 0.30, 1)
-			local alpha = math.Clamp(lerpedpart * (20 + brainFx * 120) * awakeMultiplier, 0, 255)
+			-- More opaque with higher brain damage. Otrub memories remain subdued.
+			local alpha
+			if unconscious then
+				alpha = math.Clamp(lerpedpart * (16 + brainFx * 30 + traumaBoost * 8), 0, 46)
+			else
+				local awakeMultiplier = math.Clamp(0.30 + brainFx * 0.65 + traumaBoost * 0.3, 0.30, 1)
+				alpha = math.Clamp(lerpedpart * (20 + brainFx * 120) * awakeMultiplier, 0, 255)
+			end
 			surface.SetDrawColor(255, 255, 255, alpha)
 			surface.SetMaterial(memory)
 			surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
 
 			-- More severe effects with higher brain damage
-			if brainFx > 0.5 then
+			if not unconscious and brainFx > 0.5 then
 				DrawToyTown(2 + brainFx * 5, ScrH())
 			end
 
 			-- Stronger vignette when memories show while awake and brain damaged
-			local vignetteAlpha = math.Clamp(lerpedpart * (8 + brainFx * 92), 0, 100)
-			render.UpdateScreenEffectTexture()
-			memory_vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-			memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 20)
-			memory_vignetteMat:SetFloat("$c1_y", vignetteAlpha / 20)
-			render.SetMaterial(memory_vignetteMat)
-			render.DrawScreenQuad()
+			if not unconscious then
+				local vignetteAlpha = math.Clamp(lerpedpart * (8 + brainFx * 92), 0, 100)
+				render.UpdateScreenEffectTexture()
+				memory_vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+				memory_vignetteMat:SetFloat("$c0_z", vignetteAlpha / 20)
+				memory_vignetteMat:SetFloat("$c1_y", vignetteAlpha / 20)
+				render.SetMaterial(memory_vignetteMat)
+				render.DrawScreenQuad()
+			end
 		elseif switch then
 			curscreen = curscreen == #screens and 1 or curscreen + 1
 			switch = false

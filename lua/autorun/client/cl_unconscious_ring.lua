@@ -92,6 +92,9 @@ local awakeECGSeverityByState = {
     sinus_bradycardia = 0.15,
     sinus_tachycardia = 0.15,
     hypothermia_bradycardia = 0.3,
+	atrial_fibrillation = 0.65,
+	ventricular_ectopy = 0.75,
+	ventricular_fibrillation = 0.95,
     sinus_pause = 0.4,
     junctional_escape = 0.5,
     cerebral_bradycardia = 0.55,
@@ -483,15 +486,36 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
     end
 
     local function getHypothermiaH(phase)
-        local h = getSinusH(phase)
-        -- A small positive notch at the end of the widened-looking QRS is the
-        -- Osborn/J wave. The low BPM comes from the server rhythm target.
-        if phase > 0.32 and phase < 0.42 then
-            h = h + math.sin((phase - 0.32) / 0.1 * math.pi) * 0.16
-        elseif phase > 0.58 and phase < 0.82 then
-            h = h + math.sin((phase - 0.58) / 0.24 * math.pi) * 0.12
+        local h = 0
+        -- Hypothermia lengthens PR, widens QRS, and prolongs QT. The positive
+        -- notch after the QRS is an Osborn/J wave.
+        if phase > 0.06 and phase < 0.16 then
+            h = math.sin((phase - 0.06) / 0.1 * math.pi) * 0.12
+        elseif phase > 0.29 and phase < 0.51 then
+            h = getWideComplexH((phase - 0.21) * 2.25)
+        elseif phase > 0.51 and phase < 0.59 then
+            h = math.sin((phase - 0.51) / 0.08 * math.pi) * 0.18
+        elseif phase > 0.64 and phase < 0.9 then
+            h = math.sin((phase - 0.64) / 0.26 * math.pi) * 0.2
         end
         return h
+    end
+
+    local function getAtrialFibrillationH(phase, beatIndex)
+        -- No organized P waves; coarse fibrillatory baseline with irregular,
+        -- variably shaped ventricular complexes.
+        local h = math.sin((phase * 13 + beatIndex * 0.37) * math.pi * 2) * 0.055
+        local qrsStart = beatIndex % 3 == 0 and 0.31 or 0.22
+        if phase > qrsStart and phase < qrsStart + 0.12 then
+            h = h + getSinusH((phase - qrsStart + 0.2) * 2.5)
+        end
+        return h
+    end
+
+    local function getVentricularFibrillationH(phase, beatIndex)
+        -- Chaotic electrical activity with no pulse-producing QRS complexes.
+        return math.sin((phase * 9 + beatIndex * 0.63) * math.pi * 2) * 0.38
+            + math.sin((phase * 17 + beatIndex * 0.19) * math.pi * 2) * 0.16
     end
 
     local function getAVBlockH(phase, complete)
@@ -530,7 +554,13 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
         local beatIndex = math.floor(rawPhase)
         local h
 
-        if rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then
+        if rhythm == "ventricular_fibrillation" then
+            h = getVentricularFibrillationH(phase, beatIndex)
+        elseif rhythm == "atrial_fibrillation" then
+            h = getAtrialFibrillationH(phase, beatIndex)
+        elseif rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then
+            h = getWideComplexH(phase)
+        elseif rhythm == "ventricular_ectopy" and beatIndex % 4 == 3 then
             h = getWideComplexH(phase)
         elseif rhythm == "junctional_escape" then
             h = getJunctionalH(phase)
@@ -780,9 +810,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if showAwakeECG then
         local awakeECGTargetAlpha = 0.15
         if ply:KeyDown(IN_ATTACK2) then
-            -- Keep the conscious ECG very visible while aiming, but let more
-            -- severe rhythms stay more transparent so they do not block the sight picture.
-            awakeECGTargetAlpha = Lerp(GetAwakeECGSeverity(ecgState), 0.8, 0.28)
+            -- Keep the sight picture clear: aiming makes the ECG very faint,
+            -- with increasingly severe rhythms fading almost completely out.
+            awakeECGTargetAlpha = Lerp(GetAwakeECGSeverity(ecgState), 0.07, 0.01)
         end
         awakeECGAlpha = Lerp(FrameTime() * 4, awakeECGAlpha, awakeECGTargetAlpha)
     else

@@ -473,6 +473,7 @@ function ENT:Explode()
 
 			self.ShrapnelDone = true
 		end)
+		self.ShrapnelCoroutine = co
 
 		if coroutine.status(self.ShrapnelCoroutine) == "suspended" then
 			coroutine.resume(self.ShrapnelCoroutine)

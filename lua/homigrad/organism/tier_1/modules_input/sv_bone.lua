@@ -260,7 +260,12 @@ local input_list = hg.organism.input_list
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.jaw
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
-	hg.AddHarmToAttacker(dmgInfo, (org.jaw - oldDmg) * 3, "Jaw bone damage harm")
+	local jawDelta = org.jaw - oldDmg
+	hg.AddHarmToAttacker(dmgInfo, jawDelta * 3, "Jaw bone damage harm")
+
+	if jawDelta > 0 then
+		org.concussion = math.min((org.concussion or 0) + math.min(jawDelta * 3, 2.25), 10)
+	end
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
 	local dislocated = (org.jaw - oldDmg) > math.Rand(0.1, 0.3)
@@ -337,8 +342,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	local brainGain = math.max(org.brain - brainBefore, 0)
-	if brainGain > 0 then
-		org.concussion = math.min((org.concussion or 0) + math.min(brainGain * 4, 1.4), 6)
+	if skullDelta > 0 or brainGain > 0 then
+		local concussionGain = math.min(skullDelta * 3 + brainGain * 5, 3)
+		org.concussion = math.min((org.concussion or 0) + concussionGain, 10)
 	end
 
 	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or skullDelta > 0.6) then

@@ -2,20 +2,15 @@ local healthModel
 local blinkModel
 local whiteMat = Material("models/debug/debugwhite")
 local statusCircleMat = Material("sef_icons/statuseffectcircle.png", "smooth")
-local bleedIconMat = Material("zcity_delta/unitmenu/status/bleeding.png", "smooth")
 local statusIconCache = {}
 
 local IND_SIZE_BASE = 180
 local IND_SIZE_MAX = 240
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
-local PULSE_DURATION = 8
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
-local FRACTURE_BLINK_SPEED = 10
-local SOLID_RED_DURATION = 1
 
-local pulseStartTime = 0
 local boneStates = {}
 local boneCache = {}
 local lastLifeState = nil
@@ -24,8 +19,6 @@ local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
 local lastKnownFacingAngle = 0
-local fadingBones = {} -- Track bones that are fading out after being healed
-local FADE_DURATION = 2 -- Seconds for damage color to fade out
 
 local majorBones = {
     pelvis = { organ = "stomach", bone = "ValveBiped.Bip01_Pelvis" },
@@ -108,7 +101,6 @@ local function ResetModels(ply)
     healthModel = nil
     blinkModel = nil
     boneStates = {}
-    pulseStartTime = 0
     iconsVisibility = 0
     iconsAppearTime = 0
     iconsTargetVisible = false
@@ -298,16 +290,6 @@ local function DrawHealthAccessories(healthModel, ply, baseCol)
     end
 end
 
-local function GetOrgValueNumber(value)
-    if type(value) == "number" then return value end
-    if type(value) == "table" then
-        if type(value[1]) == "number" then return value[1] end
-        if type(value.cur) == "number" then return value.cur end
-        if type(value.value) == "number" then return value.value end
-    end
-    return 0
-end
-
 local function GetStatusIcon(iconName)
     local cached = statusIconCache[iconName]
     if cached ~= nil then
@@ -357,7 +339,6 @@ function HUD_DrawDynamicIndicator()
         blinkModel:SetModel(ply:GetModel())
         InitBlinkModel(blinkModel)
         boneStates = {}
-        fadingBones = {}
         healthModel.lastPlayerClassName = ply.PlayerClassName
         
         if healthModel.accessories then
@@ -376,12 +357,6 @@ function HUD_DrawDynamicIndicator()
     end
     
     local time = CurTime()
-    local damagedBones = {}
-    
-    -- Check spine damage levels for cascading limb damage
-    local spine1Broken = org and GetOrgValueNumber(org.spine1 or 0) >= 1
-    local spine2Broken = org and GetOrgValueNumber(org.spine2 or 0) >= 1
-    local spine3Broken = org and GetOrgValueNumber(org.spine3 or 0) >= 0.8
 
     if org then
         for key, data in pairs(majorBones) do
@@ -391,9 +366,7 @@ function HUD_DrawDynamicIndicator()
                 boneStates[key] = {
                     amputated = false,
                     blinking = false,
-                    blinkEnd = 0,
-                    fractured = false,
-                    fractureTime = 0
+                    blinkEnd = 0
                 }
             end
 
@@ -401,29 +374,6 @@ function HUD_DrawDynamicIndicator()
 
             local boneName = data.bone
             local isAmputated = data.canAmputate and org[organName .. "amputated"]
-            local isBroken = GetOrgValueNumber(org[organName]) >= 1
-            local isDislocated = org[organName .. "dislocation"]
-
-            -- SPINE DAMAGE CASCADING: Apply spine damage to limbs
-            -- spine1 broken = both legs black
-            -- spine2 broken = chest, legs, arms black
-            -- spine3 broken = everything black
-            if spine3Broken then
-                -- Everything is broken
-                isBroken = true
-            elseif spine2Broken then
-                -- Chest, legs, and arms are broken
-                if organName == "chest" or organName == "lleg" or organName == "rleg" or
-                   organName == "larm" or organName == "rarm" or organName == "stomach" or
-                   organName == "pelvis" then
-                    isBroken = true
-                end
-            elseif spine1Broken then
-                -- Both legs are broken
-                if organName == "lleg" or organName == "rleg" then
-                    isBroken = true
-                end
-            end
 
             local state = boneStates[key]
             local ampBoneName = data.ampBone or boneName
@@ -437,48 +387,11 @@ function HUD_DrawDynamicIndicator()
                 if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), ampBoneName) end
             end
 
-            if state.fractured and not (isBroken or isDislocated) then
-                state.fractured = false
-                if not state.amputated then
-                    local blinkBoneID = blinkModel:LookupBone(boneName)
-                    if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), boneName) end
-                    
-                    local boneID = healthModel:LookupBone(boneName)
-                    if boneID then ScaleBone(healthModel, boneID, Vector(1, 1, 1), boneName) end
-                end
-            end
-
-            local damageValue = GetOrgValueNumber(org[organName])
-            
-            -- Handle fading out when bone is fully healed
-            local prevFade = fadingBones[key]
-            if damageValue and damageValue > 0 then
-                -- Bone is damaged, remove from fading if it was there
-                if prevFade then
-                    fadingBones[key] = nil
-                end
-            elseif prevFade then
-                -- Bone was fading, check if fade is complete
-                if time > prevFade.endTime then
-                    fadingBones[key] = nil
-                end
-            end
-
             if isAmputated then
-                if state.fractured then
-                     state.fractured = false
-                     local blinkBoneID = blinkModel:LookupBone(boneName)
-                     if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), boneName) end
-                     
-                     local boneID = healthModel:LookupBone(boneName)
-                     if boneID then ScaleBone(healthModel, boneID, Vector(1, 1, 1), boneName) end
-                end
-
                 if not state.amputated then
                     state.amputated = true
                     state.blinking = true
                     state.blinkEnd = time + BLINK_DURATION
-                    pulseStartTime = time
                     
                     local boneID = healthModel:LookupBone(ampBoneName)
                     if boneID then ScaleBone(healthModel, boneID, Vector(0, 0, 0), ampBoneName) end
@@ -492,42 +405,6 @@ function HUD_DrawDynamicIndicator()
                     local blinkBoneID = blinkModel:LookupBone(ampBoneName)
                     if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), ampBoneName) end
                 end
-                
-            elseif (isBroken or isDislocated) then
-                if not state.fractured then
-                    state.fractured = true
-                    state.fractureTime = time
-                    pulseStartTime = time
-                    local blinkBoneID = blinkModel:LookupBone(boneName)
-                    if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, BLINK_SCALE, boneName) end
-                    
-                    local boneID = healthModel:LookupBone(boneName)
-                    if boneID then ScaleBone(healthModel, boneID, Vector(0, 0, 0), boneName) end
-                end
-            end
-
-            if damageValue and damageValue > 0 and damageValue < 1 and not state.fractured and not state.amputated then
-                table.insert(damagedBones, {key = key, damage = damageValue, fading = false})
-            elseif damageValue and damageValue == 0 and not state.fractured and not state.amputated then
-                -- Bone was damaged but is now healed - start fade out if not already fading
-                local prevDamage = prevFade and prevFade.lastDamage or 0
-                if prevDamage > 0 and not fadingBones[key] then
-                    fadingBones[key] = {
-                        key = key,
-                        lastDamage = prevDamage,
-                        startTime = time,
-                        endTime = time + FADE_DURATION
-                    }
-                end
-                -- Add to damagedBones for rendering during fade
-                if fadingBones[key] then
-                    table.insert(damagedBones, {key = key, damage = fadingBones[key].lastDamage, fading = true})
-                end
-            end
-            
-            -- Store current damage for next frame comparison
-            if fadingBones[key] then
-                fadingBones[key].lastDamage = damageValue
             end
         end
     end
@@ -610,145 +487,15 @@ function HUD_DrawDynamicIndicator()
             blinkModel:DrawModel()
         end
 
-        -- DAMAGE COLORS LOGIC (Verified Working: 0.0=White -> 0.5=Yellow -> 0.75=Orange -> 1.0=Red)
-        for _, data in ipairs(damagedBones) do
-            local boneName = majorBones[data.key].bone
-            local bID = blinkModel:LookupBone(boneName)
-            if bID then
-                local r, g, b, alpha
-                local damage = data.damage
-                if damage <= 0.5 then
-                    local prog = damage / 0.5
-                    r, g, b = 1, 1, 1 - prog
-                elseif damage <= 0.75 then
-                    local prog = (damage - 0.5) / 0.25
-                    r, g, b = 1, 1 - 0.5 * prog, 0
-                elseif damage <= 0.99 then
-                    local prog = (damage - 0.75) / 0.24
-                    r, g, b = 1, 0.5 - 0.5 * prog, 0
-                else
-                    r, g, b = 1, 0, 0
-                end
-
-                -- Apply fade alpha if bone is fading out after being healed
-                alpha = 1
-                if data.fading and fadingBones[data.key] then
-                    local fadeProgress = 1 - math.Clamp((time - fadingBones[data.key].startTime) / FADE_DURATION, 0, 1)
-                    alpha = fadeProgress
-                end
-
-                ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
-                DrawDamageBlinkState(blinkModel, r * alpha, g * alpha, b * alpha)
-                ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
-            end
-        end
-
         local hasAmputationBlink = false
-        local hasFractureBlink = false
-        local solidRedBones = {}
-        local blinkingRedBones = {}
-        local bleedingBones = {} -- key -> {severity = num, isArterial = bool}
 
         for key, state in pairs(boneStates) do
             if state.blinking then hasAmputationBlink = true end
-            if state.fractured then
-                hasFractureBlink = true
-                if (time - state.fractureTime) < SOLID_RED_DURATION then
-                    table.insert(solidRedBones, key)
-                else
-                    table.insert(blinkingRedBones, key)
-                end
-            end
-        end
-
-        if IsValid(ply) then
-            local function CheckWoundList(list, isArterial)
-                if not list then return end
-                for i = 1, #list do
-                    local wound = list[i]
-                    if type(wound) == "table" and (wound[1] or 0) > 0.001 then
-                        local boneName = wound[4]
-                        if type(boneName) == "string" then
-                            -- Check against major bones
-                            for key, data in pairs(majorBones) do
-                                if data.bone == boneName then
-                                    if not bleedingBones[key] then
-                                        bleedingBones[key] = {severity = 0, isArterial = false}
-                                    end
-                                    bleedingBones[key].severity = bleedingBones[key].severity + (wound[1] or 0)
-                                    if isArterial then
-                                        bleedingBones[key].isArterial = true
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-            
-            local netWounds = ply:GetNetVar("wounds", nil)
-            local netArterial = ply:GetNetVar("arterialwounds", nil)
-            CheckWoundList((netWounds and #netWounds > 0) and netWounds or ply.wounds, false)
-            CheckWoundList((netArterial and #netArterial > 0) and netArterial or ply.arterialwounds, true)
         end
 
         if hasAmputationBlink then
             local val = (math.sin(time * 10) + 1) / 2
             DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val)
-        end
-
-        if #solidRedBones > 0 then
-            for _, key in ipairs(solidRedBones) do
-                local boneName = majorBones[key].bone
-                local bID = blinkModel:LookupBone(boneName)
-                if bID then
-                    ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
-                    DrawDamageBlinkState(blinkModel, 1, 0, 0)
-                    ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
-                end
-            end
-        end
-
-        if #blinkingRedBones > 0 then
-            local val = (math.sin(time * FRACTURE_BLINK_SPEED) + 1) / 2
-            for _, key in ipairs(blinkingRedBones) do
-                local boneName = majorBones[key].bone
-                local bID = blinkModel:LookupBone(boneName)
-                if bID then
-                    ScaleBone(blinkModel, bID, BLINK_SCALE, boneName)
-                    DrawDamageBlinkState(blinkModel, val, 0, 0)
-                    ScaleBone(blinkModel, bID, Vector(0,0,0), boneName)
-                end
-            end
-        end
-
-        -- Draw bleeding icons as 3D billboards that stick to the model bones
-        if next(bleedingBones) then
-            render.MaterialOverride(nil)
-            render.SetColorModulation(1, 1, 1)
-            render.SuppressEngineLighting(true)
-
-            for key, data in pairs(bleedingBones) do
-                local boneName = majorBones[key].bone
-                local boneID = healthModel:LookupBone(boneName)
-                if boneID then
-                    local mat = healthModel:GetBoneMatrix(boneID)
-                    if mat then
-                        local pos = mat:GetTranslation()
-                        -- Offset toward camera to prevent clipping through model
-                        local toCam = (camPos - pos):GetNormalized()
-                        pos = pos + toCam * 3.0 + Vector(0, 0, 1.5)
-
-                        local pulse = (math.sin(time * 5 + #key) + 1) / 2
-                        local alpha = 0.7 + pulse * 0.3
-
-                        render.SetMaterial(bleedIconMat)
-                        render.DrawSprite(pos, 6, 6, Color(255, 255, 255, alpha * 255))
-                    end
-                end
-            end
-
-            render.SuppressEngineLighting(false)
         end
 
         render.MaterialOverride(nil)

@@ -21,6 +21,8 @@ local melee_nosebleed_pain_scale = 0.35
 local attacker_adrenaline_gain_window = 2
 local attacker_adrenaline_cooldown = 5
 local attacker_adrenaline_cap = 1.5
+local severe_damage_adrenaline_threshold = 25
+local severe_damage_adrenaline_delay = 0.75
 local live_limb_gib_threshold = 135
 local live_head_gib_threshold = 85
 local destroyed_brain_head_gib_threshold = 45
@@ -1359,6 +1361,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local reserveK = math.Clamp((org.adrenalineStorage or 0) / 5, 0, 1)
 		org.adrenalineAdd = math.max(org.adrenalineAdd or 0, math.min(instaPain * 0.25, 1.5) * (0.35 + reserveK * 0.65))
 		org.owner:AddNaturalAdrenaline(instaPain * 1.15 * (dmgInfo:IsDamageType(DMG_BLAST) and 4 or 1) * (dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) and 4 or 1))
+
+		-- Keep a clear floor for severe trauma even when its calculated pain is
+		-- reduced by armour or damage-type scaling. Fractures keep their own boost.
+		if dmgInfo:GetDamage() >= severe_damage_adrenaline_threshold and (org._severeDamageAdrenalineNext or 0) <= CurTime() then
+			org._severeDamageAdrenalineNext = CurTime() + severe_damage_adrenaline_delay
+			org.owner:AddNaturalAdrenaline(0.65)
+		end
 	end
 	
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST + DMG_SLASH) or (dmgInfo:IsDamageType(DMG_GENERIC + DMG_VEHICLE + DMG_FALL + DMG_CLUB)) then

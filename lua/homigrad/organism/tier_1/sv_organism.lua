@@ -76,8 +76,13 @@ local panicattack_heart_roll_delay = 15
 local panicattack_heart_roll_chance = 1
 local panicattack_death_radius = 900
 local panicattack_corpse_radius = 400
+local panicattack_corpse_total = 0.3
+local panicattack_corpse_tick = 0.03
 local panicattack_fire_radius = 450
 local panicattack_fire_check_delay = 1
+local hg_panic = ConVarExists("hg_panic") and GetConVar("hg_panic") or CreateConVar("hg_panic", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable panic attack logic", 0, 1)
+local gunfight_adrenaline_delay = 1.5
+local gunfight_adrenaline_cap = 1.5
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
 local seizure_duration = 15
 local seizure_end_shock = 20
@@ -96,6 +101,7 @@ local seizure_brain_roll_delay = 20
 local seizure_brain_roll_chance = 15
 local seizure_brain_roll_gain_min = 0.04
 local seizure_brain_roll_gain_max = 0.11
+local seizure_no_cause_decay_time = 90
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
@@ -491,6 +497,12 @@ end
 
 function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	if not org then return 0 end
+	if not hg_panic:GetBool() then
+		org.panicattackadd = 0
+		org.panicattack = 0
+		org.panicattackActive = false
+		return 0
+	end
 	if not isnumber(amount) or amount <= 0 then return org.panicattackadd or 0 end
 	if (org.berserk or 0) > 0 then return org.panicattackadd or 0 end
 	local adrenalineRisk = math.Clamp(((org.adrenaline or 0) + (org.adrenalineAdd or 0) - 1.5) / 3, 0, 0.65)
@@ -509,6 +521,14 @@ function hg.organism.AddSeizure(org, amount)
 	if not isnumber(amount) or amount <= 0 then return org.seizure or 0 end
 
 	org.seizure = math.Clamp((org.seizure or 0) + amount, 0, 1)
+
+	return org.seizure
+end
+
+local function reduceSeizure(org, amount)
+	if not org or not isnumber(amount) or amount <= 0 then return org and org.seizure or 0 end
+
+	org.seizure = math.max((org.seizure or 0) - amount, 0)
 
 	return org.seizure
 end
@@ -579,22 +599,44 @@ local function can_see_panic_corpse(owner, corpse)
 end
 
 hook.Add("Org Think", "PanicAttackCorpseExposure", function(owner, org)
+	if not hg_panic:GetBool() then return end
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 	if not org or org.otrub or org.givingUp then return end
 	if (org._panicNextCorpseCheck or 0) > CurTime() then return end
 	org._panicNextCorpseCheck = CurTime() + 1
 
+	org._panicCorpseExposure = org._panicCorpseExposure or {}
+
 	for _, corpse in ipairs(ents.FindInSphere(owner:GetPos(), panicattack_corpse_radius)) do
 		local corpseKiller = get_corpse_killer(corpse)
 		if corpse ~= owner and is_panic_corpse(corpse) and corpseKiller ~= owner and can_see_panic_corpse(owner, corpse) then
-			-- Continuous, sight-checked exposure makes staring at a body matter without
-			-- turning a single glance into an immediate panic attack.
-			hg.organism.AddPanicAttack(org, 0.02, true)
+			local exposure = org._panicCorpseExposure[corpse] or 0
+			if exposure < panicattack_corpse_total then
+				-- A body has a finite impact. Once this specific corpse has registered,
+				-- looking at it again cannot keep feeding panic or its adrenaline response.
+				local before = org.panicattackadd or 0
+				hg.organism.AddPanicAttack(org, math.min(panicattack_corpse_tick, panicattack_corpse_total - exposure), true)
+				local gained = math.max((org.panicattackadd or 0) - before, 0)
+				org._panicCorpseExposure[corpse] = math.min(exposure + gained, panicattack_corpse_total)
+			end
 		end
 	end
 end)
 
+hook.Add("EntityFireBullets", "GunfightNaturalAdrenaline", function(shooter)
+	if not IsValid(shooter) or not shooter:IsPlayer() or not shooter:Alive() then return end
+	local org = shooter.organism
+	if not org or org.otrub or (org.adrenaline or 0) >= gunfight_adrenaline_cap then return end
+	if (org._gunfightAdrenalineNext or 0) > CurTime() then return end
+
+	-- Firing under pressure should produce the same short survival response as
+	-- taking a serious hit, without allowing sustained fire to fill the meter.
+	org._gunfightAdrenalineNext = CurTime() + gunfight_adrenaline_delay
+	shooter:AddNaturalAdrenaline(0.3)
+end)
+
 hook.Add("Org Think", "PanicAttackNearbyFire", function(owner, org)
+	if not hg_panic:GetBool() then return end
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 	if not org or org.otrub or org.givingUp then return end
 	if (org._panicNextFireCheck or 0) > CurTime() then return end
@@ -638,6 +680,7 @@ local function resolve_panic_attacker(victim, attacker)
 end
 
 local function panic_witness_event(victim, attacker, amount, radius, chanceMultiplier)
+	if not hg_panic:GetBool() then return end
 	if not IsValid(victim) then return end
 	if not isnumber(amount) or amount <= 0 then return end
 
@@ -1004,7 +1047,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
 	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
 	local oldPanicAttack = org.panicattack or 0
-	if org.berserk > 0 then
+	if not hg_panic:GetBool() then
+		org.panicattackadd = 0
+		org.panicattack = 0
+		org.panicattackActive = false
+	elseif org.berserk > 0 then
 		-- Berserk suppresses both new panic triggers and any attack already in progress.
 		org.panicattackadd = 0
 		org.panicattack = 0
@@ -1068,7 +1115,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if brainDelta > 0 then
 		hg.organism.AddSeizure(org, math.Clamp(brainDelta * seizure_brain_trauma_gain_mul, 0, 1))
 	elseif brainDelta < 0 and oldSeizureBrain > 0 then
-		hg.organism.AddSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
+		reduceSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
 	end
 	if lobeDelta > 0 then
 		hg.organism.AddSeizure(org, math.Clamp(lobeDelta * seizure_brain_trauma_gain_mul, 0, 1))
@@ -1096,6 +1143,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	else
 		org.nextSeizureRoll = curTime + seizure_brain_roll_delay
+	end
+
+	if not org.seizureActive and seizureBrainDamage <= 0.05 and heatStress <= 0 and coldStress <= 0 then
+		reduceSeizure(org, timeValue / seizure_no_cause_decay_time)
 	end
 
 	org.lastSeizureBrain = org.brain or 0
@@ -1546,7 +1597,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.eyeR = math.max((org.eyeR or 0) - regen, 0)
 	local oldBrain = org.brain or 0
 	org.brain = math.max(oldBrain - regen, 0)
-	hg.organism.AddSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
+	reduceSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
 	org.lastSeizureBrain = org.brain
 
 	org.hungry = 0
@@ -1591,7 +1642,7 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 	if org.noradrenaline > 2 then
 		local oldBrain = org.brain or 0
 		org.brain = math.Approach(oldBrain, 0.3, timeValue / 60)
-		hg.organism.AddSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
+		reduceSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
 		org.lastSeizureBrain = org.brain
 	end
 

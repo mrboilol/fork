@@ -1532,7 +1532,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 
 			BrainTraumaStationLoading = true
-			sound.PlayFile("sound/rem_cerebralanoxia.wav", "noblock noplay", function(station, err)
+			sound.PlayFile("sound/zcitysnd/real_sonar/brainhemorrhagestage"..chooser..".mp3", "noblock noplay", function(station, err)
 				BrainTraumaStationLoading = false
 				if IsValid(station) then
 					station:SetVolume(0)

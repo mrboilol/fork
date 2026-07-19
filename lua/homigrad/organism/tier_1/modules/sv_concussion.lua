@@ -4,6 +4,7 @@ local module = hg.organism.module.concussion
 module[1] = function(org)
     org.concussion = 0
     org.concussionTracker = 0
+    org.concussionSpikeTracker = 0
 end
 
 module[2] = function(ply, org, timeValue)
@@ -13,7 +14,16 @@ module[2] = function(ply, org, timeValue)
 
         -- Track concussion increases for disorientation (when it climbs, not decreases)
         if org.concussion > prevConcussion then
-            org.concussionTracker = (org.concussionTracker or 0) + (org.concussion - prevConcussion)
+            local concussionGain = org.concussion - prevConcussion
+            org.concussionTracker = (org.concussionTracker or 0) + concussionGain
+            org.concussionSpikeTracker = (org.concussionSpikeTracker or 0) + concussionGain
+
+            -- Every two concussion gained is a major neurological hit.
+            -- Keep any remainder so repeated smaller head injuries still add up.
+            while org.concussionSpikeTracker >= 2 do
+                org.consciousness = math.max((org.consciousness or 1) - 0.3, 0)
+                org.concussionSpikeTracker = org.concussionSpikeTracker - 2
+            end
 
             -- Chance to induce vomiting from severe concussion
             if org.isPly and org.concussion >= 3 and math.random() < (org.concussion - prevConcussion) * 0.25 then
@@ -23,10 +33,10 @@ module[2] = function(ply, org, timeValue)
         end
 
         -- Apply 2 points of disorientation when concussion climbs 2.5 points
-        if (org.concussionTracker or 0) >= 2.5 then
+        while (org.concussionTracker or 0) >= 2.5 do
             org.disorientation = (org.disorientation or 0) + 2
             org.brain = math.min((org.brain or 0) + 0.01, 1.0)
-            org.concussionTracker = 0
+            org.concussionTracker = org.concussionTracker - 2.5
         end
 
         org.concussion = math.max(org.concussion - timeValue, 0)

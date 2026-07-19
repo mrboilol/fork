@@ -15,7 +15,10 @@ local BloodBPM = {
 	{2000, 300},
 }
 
-local cardiacArrestBlood = 2000
+-- 2000 mL is the beginning of severe shock, not an instant flatline. A
+-- hemorrhaging organism can still compensate there; terminal bradycardia and
+-- arrest need a further loss of preload/cardiac output.
+local cardiacArrestBlood = 900
 local terminalHeartRate = 300
 local peaDuration = 6
 
@@ -45,17 +48,26 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 	local hypoxia = math.Clamp((12 - o2) / 12, 0, 1)
 	local cerebral = math.Clamp(math.max((org.brain or 0) * 0.8, org.brainHemorrhage or 0), 0, 1)
 	local cardiac = math.Clamp(org.heart or 0, 0, 1)
-	local cold = math.Clamp((35 - (org.temperature or 36.7)) / 7, 0, 1)
-	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold)
+	-- Mild cold (34-35 C) does not override a needed hemorrhage response.
+	-- Conduction suppression begins in moderate hypothermia and grows toward
+	-- severe hypothermia.
+	local cold = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((1500 - (org.blood or 5000)) / 600, 0, 1)
+	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold, hemorrhagicDecompensation)
 
 	-- Complete/partial AV block is a direct conduction-system injury pattern,
 	-- while severe systemic failure falls back to an escape rhythm.
 	if cardiac >= 0.72 and heartbeat > 40 then return "av_block_complete" end
 	if cardiac >= 0.4 and heartbeat > 45 then return "av_block_partial" end
-	if heartbeat <= 40 and (hypoxia >= 0.65 or cardiac >= 0.65 or cold >= 0.75) then return "ventricular_escape" end
+	if org.terminalRhythm == "ventricular_fibrillation" then return "ventricular_fibrillation" end
+	if org.unstableRhythm == "atrial_fibrillation" then return "atrial_fibrillation" end
+	if org.unstableRhythm == "ventricular_ectopy" then return "ventricular_ectopy" end
+	-- Moderate cold should retain its conduction/J-wave morphology while the
+	-- rhythm is still sinus-driven; a slower escape rhythm takes precedence.
+	if cold >= 0.18 and heartbeat > 40 and cold >= math.max(cerebral * 0.9, hypoxia, cardiac * 0.9) then return "hypothermia_bradycardia" end
+	if heartbeat <= 40 and (hypoxia >= 0.65 or cardiac >= 0.65 or cold >= 0.75 or hemorrhagicDecompensation >= 0.75) then return "ventricular_escape" end
 	if heartbeat <= 60 and suppression >= 0.52 then return "junctional_escape" end
 	if heartbeat < 50 and suppression >= 0.32 then return "sinus_pause" end
-	if cold >= 0.18 and heartbeat < 70 then return "hypothermia_bradycardia" end
 	if cerebral >= 0.28 then return heartbeat < 60 and "cerebral_bradycardia" or "cerebral_irregular" end
 	if heartbeat < 60 then return "sinus_bradycardia" end
 	if heartbeat <= 100 then return "normal_sinus" end
@@ -74,6 +86,7 @@ module[1] = function(org)
 	org.heartbeat = 75
 	org.ecgState = "normal_sinus"
 	org.cardiacOutput = 1
+	org.strokeVolume = 1
 	org.compensationPulseMultiplier = 1
 	org.compensationHeartRateTarget = 75
 	org.cardiacArrestStart = nil
@@ -189,20 +202,25 @@ module[2] = function(owner, org, timeValue)
 	local cerebralSuppression = math.Clamp(math.max((org.brain or 0) * 0.8, brainHemorrhage) * 0.9, 0, 1)
 	local hypoxiaSuppression = math.Clamp((12 - o2Value) / 12, 0, 1)
 	local cardiacSuppression = math.Clamp(org.heart or 0, 0, 1)
-	local coldSuppression = math.Clamp((35 - (org.temperature or 36.7)) / 7, 0, 1)
-	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression)
+	-- Compensation remains effective through mild cold. Below 34 C the sinus
+	-- node and conduction system progressively lose responsiveness. At terminal
+	-- blood volume, preload failure can also remove the prior tachycardia.
+	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((1500 - bloodNow) / 600, 0, 1)
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, hemorrhagicDecompensation)
 	org.bradycardiaSeverity = bradycardiaSeverity
+	org.hemorrhagicDecompensation = hemorrhagicDecompensation
 
 	local bradyTarget
 	if bradycardiaSeverity >= 0.16 then
 		if bradycardiaSeverity >= 0.78 then
-			bradyTarget = 30 -- ventricular escape: 20-40 BPM
+			bradyTarget = 28 -- ventricular escape: 20-40 BPM
 		elseif bradycardiaSeverity >= 0.52 then
-			bradyTarget = 50 -- junctional escape: 40-60 BPM
+			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.52, 0.78, 0, 1), 45, 30)
 		elseif bradycardiaSeverity >= 0.32 then
-			bradyTarget = 44 -- sinus pauses/arrest with a slow residual rhythm
+			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.32, 0.52, 0, 1), 58, 45)
 		else
-			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.16, 0.32, 0, 1), 59, 47)
+			bradyTarget = Lerp(math.Remap(bradycardiaSeverity, 0.16, 0.32, 0, 1), 66, 58)
 		end
 		heartbeat = math.min(heartbeat, bradyTarget)
 	end
@@ -236,10 +254,34 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * riseRate or timeValue * 4.5)
 	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
 
-	-- Blood-loss arrest is deterministic: the configured curve must actually
-	-- reach its 300 BPM terminal point at 2000 mL before circulation stops.
-	if not org.heartstop and bloodNow <= cardiacArrestBlood and bloodCompensationRate >= terminalHeartRate and (org.heartbeat >= terminalHeartRate or (bloodNow <= 1600 and bradycardiaSeverity >= 0.4)) then
+	-- At terminal blood volume, bradycardia/poor filling finally progress to
+	-- deterministic arrest. The 2000 mL band remains severe compensated shock.
+	if not org.heartstop and bloodNow <= cardiacArrestBlood and (org.heartbeat <= 40 or bradycardiaSeverity >= 0.7) then
 		org.heartstop = true
+	end
+
+	-- Severe cold and terminal preload failure destabilize the myocardium before
+	-- arrest. Keep transient AF/ectopy visible, but let VF be a no-output
+	-- electrical arrest rather than pretending it is a fast effective pulse.
+	local severeCold = coldSuppression >= 0.62
+	local terminalHemorrhage = hemorrhagicDecompensation >= 0.7
+	if not (severeCold or terminalHemorrhage) then
+		org.unstableRhythm = nil
+		org.terminalRhythm = nil
+	elseif not org.heartstop and (org.nextColdRhythmRoll or 0) <= CurTime() then
+		org.nextColdRhythmRoll = CurTime() + 3
+		local instability = math.max(coldSuppression, hemorrhagicDecompensation)
+		local roll = math.Rand(0, 1)
+		if roll < 0.025 + instability * 0.055 then
+			org.terminalRhythm = "ventricular_fibrillation"
+			org.heartstop = true
+		elseif roll < 0.2 + instability * 0.18 then
+			org.unstableRhythm = "atrial_fibrillation"
+		elseif roll < 0.45 + instability * 0.2 then
+			org.unstableRhythm = "ventricular_ectopy"
+		else
+			org.unstableRhythm = nil
+		end
 	end
 
 	-- Track sustained ventricular tachycardia for the probabilistic arrest
@@ -510,7 +552,10 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		local arrestElapsed = math.max(CurTime() - org.cardiacArrestStart, 0)
-		if arrestElapsed < peaDuration then
+		if org.terminalRhythm == "ventricular_fibrillation" and arrestElapsed < peaDuration then
+			org.heartbeat = 260
+			org.ecgState = "ventricular_fibrillation"
+		elseif arrestElapsed < peaDuration then
 			local peaTarget = Lerp(math.Clamp(arrestElapsed / peaDuration, 0, 1), 60, 20)
 			org.heartbeat = math.Approach(org.heartbeat or terminalHeartRate, peaTarget, timeValue * 120)
 			org.ecgState = "pea"
@@ -518,8 +563,12 @@ module[2] = function(owner, org, timeValue)
 			org.heartbeat = math.Approach(org.heartbeat or 0, 0, timeValue * 40)
 			org.ecgState = org.heartbeat < 1 and "asystole" or "pea"
 		end
+		if arrestElapsed >= peaDuration then
+			org.terminalRhythm = nil
+		end
 
 		org.pulse = 0
+		org.strokeVolume = 0
 		org.cardiacOutput = 0
 		org.bloodpressure = 0
 		org.systolic = 0
@@ -527,9 +576,14 @@ module[2] = function(owner, org, timeValue)
 	else
 		org.cardiacArrestStart = nil
 		org.cardiacArrestO2Start = nil
+		-- CO = HR x SV. Blood volume, cardiac damage, cold contractility, and
+		-- insufficient diastolic filling each reduce stroke volume; a high rate
+		-- alone cannot make a thready hypovolemic pulse look effective.
 		local rateK = math.Clamp((org.heartbeat or 0) / 75, 0, 2.5)
 		local fillingK = 1 - math.Clamp(((org.heartbeat or 75) - 180) / 120, 0, 0.7)
-		org.cardiacOutput = math.Clamp(((org.pulse or 0) / 70) * rateK * fillingK * (1 - math.Clamp(org.heart or 0, 0, 1)), 0, 1.5)
+		local strokeVolume = volumeMapK * (1 - math.Clamp(org.heart or 0, 0, 1)) * hypothermiaK * fillingK
+		org.strokeVolume = math.Clamp(strokeVolume, 0, 1.2)
+		org.cardiacOutput = math.Clamp(rateK * org.strokeVolume, 0, 1.5)
 		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, false, org)
 	end
 
