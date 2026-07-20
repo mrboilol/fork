@@ -555,6 +555,10 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 	
 	if not finite_vector(outputPos) or not finite_angle(outputAng) then return view end
+	-- Recoil and view-punch layers can overlap here. Keep their final result
+	-- short of the pitch pole so a bad spike cannot flip the camera or controls.
+	outputAng[1] = math.Clamp(math.AngleDifference(outputAng[1], 0), -89, 89)
+	outputAng[3] = math.Clamp(math.AngleDifference(outputAng[3], 0), -45, 45)
 
 	view.origin = outputPos
 	view.angles = outputAng

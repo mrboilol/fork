@@ -174,6 +174,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.armstrength = 1
 	org.meleespeed = 1
 	org.breathing = 1
+	-- Keep the initialized recoil multiplier within the safe range.
+	org.recoilmul = math.Clamp(tonumber(org.recoilmul) or 1, 0.65, 1.5)
 	org.temperature = 36.7
 	org.superfighter = false
 	org.CantCheckPulse = nil
@@ -1306,18 +1308,27 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	-- One-handed posture penalties (continuous effects when left arm is damaged/amputated)
 	if isPly then
+		-- Repair any multiplier accumulated by older builds before applying this
+		-- tick's fixed one-handed penalty.
+		org.recoilmul = math.Clamp(tonumber(org.recoilmul) or 1, 0.65, 1.5)
 		local leftArmDamaged = (org.larm and org.larm >= 1) or org.larmamputated or (org.larmdislocation or org.larmdislocated)
 		if leftArmDamaged then
-			-- General reduced control for one-handed posture
-			org.recoilmul = (org.recoilmul or 1) * 1.15
-			org.armstrength = (org.armstrength or 1) * 0.85
+			-- This runs every organism tick. These are state penalties, not
+			-- per-tick multipliers: multiplying here made recoil grow forever until
+			-- a character reset.
+			local recoilPenalty = 1.15
+			local armStrengthPenalty = 0.85
 
-			-- Additional penalty if holding a two-handed weapon
+			-- A two-handed weapon without the supporting arm is harder to control,
+			-- but still must remain a fixed penalty.
 			local wep = owner:GetActiveWeapon()
 			if IsValid(wep) and wep.TwoHanded ~= false then
-				org.recoilmul = org.recoilmul * 1.3
-				org.armstrength = org.armstrength * 0.75
+				recoilPenalty = recoilPenalty * 1.3
+				armStrengthPenalty = armStrengthPenalty * 0.75
 			end
+
+			org.recoilmul = math.max(math.Clamp(tonumber(org.recoilmul) or 1, 0.65, 1.5), recoilPenalty)
+			org.armstrength = math.min(org.armstrength or 1, armStrengthPenalty)
 
 		end
 	end

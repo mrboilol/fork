@@ -207,7 +207,17 @@ module[2] = function(owner, org, timeValue)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
 
-	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * ((owner:IsPlayer() and owner:Crouching() and velLen < 0.1) and 1.1 or 1) * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul, stamina.max)
+	local postureRecoveryMul = 1
+	if owner:IsPlayer() then
+		local ragdolled = IsValid(owner.FakeRagdoll) or org.fake or (hg.GetCurrentCharacter(owner) and hg.GetCurrentCharacter(owner):IsRagdoll())
+		if ragdolled then
+			postureRecoveryMul = 1.3
+		elseif owner:Crouching() and velLen < 0.1 then
+			postureRecoveryMul = 1.15
+		end
+	end
+
+	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul, stamina.max)
 
 
 

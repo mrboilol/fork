@@ -2,19 +2,29 @@
 local PLAYER = FindMetaTable("Player")
 
 local vpang = Angle(2, -1, 1)
-local LEG_KICK_DAMAGE_MUL = 0.85
+local LEG_KICK_DAMAGE_MUL = 1.1
 local LEG_KICK_RAG_FORCE_MUL = 650
 local LEG_KICK_PROP_FORCE_MUL = 90
 local LEG_KICK_PLAYER_PUSH = 85
-local LEG_KICK_FAKE_CHANCE = 0.65
+local LEG_KICK_FAKE_CHANCE = 0.35
+local CROUCH_KICK_DAMAGE_MUL = 1.25
+local CROUCH_KICK_FAKE_CHANCE = 0.55
+local DROP_KICK_DAMAGE_MUL = 2
+local DROP_KICK_RAG_FORCE_MUL = 1000
+local DROP_KICK_PLAYER_PUSH = 240
+local DROP_KICK_FAKE_CHANCE = 0.8
+local KICK_STAMINA_COST = 14
+local CROUCH_KICK_STAMINA_COST = 30
+local DROP_KICK_STAMINA_COST = 50
 local LEG_KICK_TRACE_RANGE = 28
 local LEG_KICK_TRACE_SIZE = Vector(5, 5, 5)
 local LEG_KICK_SEGMENT_SIZE = Vector(6, 6, 6)
-local CURBSTOMP_DAMAGE_MUL = 1
-local CURBSTOMP_RAG_FORCE_MUL = 120
+local CURBSTOMP_DAMAGE_MUL = 2.4
+local CURBSTOMP_HEAD_DAMAGE_MUL = 1.6
+local CURBSTOMP_RAG_FORCE_MUL = 220
 local CURBSTOMP_PROP_FORCE_MUL = 20
 local CURBSTOMP_PLAYER_PUSH = 12
-local CURBSTOMP_FAKE_CHANCE = 0.15
+local CURBSTOMP_FAKE_CHANCE = 0.55
 local CURBSTOMP_TRACE_RANGE = 24
 local CURBSTOMP_TRACE_SIZE = Vector(6, 6, 6)
 local CURBSTOMP_SEGMENT_SIZE = Vector(7, 7, 7)
@@ -208,15 +218,19 @@ function PLAYER:LegAttack()
     self:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav",65)
 
     local org = self.organism
-    org.stamina.subadd = org.stamina.subadd + (anim == "curbstomp_base" and 12 or 20)
+    local isCrouchKick = (self:KeyDown(IN_DUCK) or self:Crouching()) and not isMidAir
+    local isCurbstomp = anim == "curbstomp_base"
+    local staminaCost = isMidAir and DROP_KICK_STAMINA_COST or (isCurbstomp and 18 or (isCrouchKick and CROUCH_KICK_STAMINA_COST or KICK_STAMINA_COST))
+    org.stamina.subadd = org.stamina.subadd + staminaCost
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.5 * speedmul
     local animstopAdjust = 0.3 * speedmul
-    local isCurbstomp = anim == "curbstomp_base"
     local dmg = isCurbstomp and 22 or 10 * (2 - speedmul)
     dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
     dmg = dmg * (org.legstrength or 1)
     dmg = dmg * (isCurbstomp and CURBSTOMP_DAMAGE_MUL or LEG_KICK_DAMAGE_MUL)
+    dmg = dmg * (isCrouchKick and CROUCH_KICK_DAMAGE_MUL or 1)
+    dmg = dmg * (isMidAir and DROP_KICK_DAMAGE_MUL or 1)
     --print(dmg)
     --print(speedmul)
     self:PlayCustomAnims(anim, true, speed, true, animstopAdjust, {
@@ -315,15 +329,25 @@ function PLAYER:LegAttack()
                         self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
                     end
 
+                    local hitDmg = dmg
+                    local stompHeadHit = isCurbstomp and footPos and getHeadPos(ent) and footPos:DistToSqr(getHeadPos(ent)) <= CURBSTOMP_HEAD_RADIUS * CURBSTOMP_HEAD_RADIUS
+                    if stompHeadHit then
+                        hitDmg = hitDmg * CURBSTOMP_HEAD_DAMAGE_MUL
+                    end
+
                     local dmginfo = DamageInfo()
 
                     dmginfo:SetAttacker(self)
                     dmginfo:SetInflictor(self)
-                    dmginfo:SetDamage(dmg)
+                    dmginfo:SetDamage(hitDmg)
                     local ragForceMul = isCurbstomp and CURBSTOMP_RAG_FORCE_MUL or LEG_KICK_RAG_FORCE_MUL
                     local propForceMul = isCurbstomp and CURBSTOMP_PROP_FORCE_MUL or LEG_KICK_PROP_FORCE_MUL
                     local playerPush = isCurbstomp and CURBSTOMP_PLAYER_PUSH or LEG_KICK_PLAYER_PUSH
-                    local force = normal * dmg * ragForceMul
+                    if isMidAir then
+                        ragForceMul = DROP_KICK_RAG_FORCE_MUL
+                        playerPush = DROP_KICK_PLAYER_PUSH
+                    end
+                    local force = normal * hitDmg * ragForceMul
 
                     dmginfo:SetDamageForce(force)
                     dmginfo:SetDamageType((ent:GetClass() == "func_breakable_surf") and DMG_SLASH or DMG_CLUB)
@@ -335,7 +359,7 @@ function PLAYER:LegAttack()
                     ent:TakeDamageInfo(dmginfo)
                     
                     if IsValid(phys) then
-                        phys:ApplyForceOffset(normal * dmg * propForceMul, tr.HitPos)
+                        phys:ApplyForceOffset(normal * hitDmg * propForceMul, tr.HitPos)
                     end
 
 					if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
@@ -343,7 +367,7 @@ function PLAYER:LegAttack()
 					end
 
                     if ent:IsPlayer() then
-                        local fakeChance = isCurbstomp and CURBSTOMP_FAKE_CHANCE or LEG_KICK_FAKE_CHANCE
+                        local fakeChance = isMidAir and DROP_KICK_FAKE_CHANCE or (isCurbstomp and CURBSTOMP_FAKE_CHANCE or (isCrouchKick and CROUCH_KICK_FAKE_CHANCE or LEG_KICK_FAKE_CHANCE))
                         if math.Rand(0, 1) <= fakeChance then
                             timer.Simple(0,function()
                                 hg.Fake(ent)
@@ -355,37 +379,6 @@ function PLAYER:LegAttack()
 
                     if isCurbstomp then
                         handleCurbstompHead(ent, footPos or tr.HitPos)
-                    end
-                    if hgIsDoor(ent) and !ent:GetNoDraw() then
-                        ent.HP = ent.HP or 200
-                        ent.HP = ent.HP - dmg * (tr.MatType == MAT_METAL and 1 or 2)
-                        ent:EmitSound( "physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".wav" )
-                        
-                        if DoorIsOpen(ent) then
-                            if !DoorIsOpen2(ent) then
-                                ent:FastOpenDoor(self, 5, true)
-                                --ent:Use(self)
-                                local oldname = self:GetName()
-                                self:SetName(oldname..self:EntIndex())
-                                if ent:GetClass() == "func_door_rotating" then
-                                    ent:Fire("open", self:GetName(), 0, self, self)
-                                elseif ent:GetClass() == "prop_door_rotating" then
-                                    ent:Fire("openawayfrom", self:GetName(), 0, self, self)
-                                end
-                                self:SetName(oldname)
-                            else
-                                ent:FastOpenDoor(self, 2, true)
-                                ent:Fire("Close", oldname, 0, self, self)
-                            end
-
-                            ent:EmitSound("physics/wood/wood_box_impact_hard3.wav")
-                        end
-
-                        local locked = not DoorIsOpen(ent)
-                        local breachChance = math.Clamp(dmg / 250, 0.02, 0.3)
-                        if ent.HP <= 0 or (locked and math.Rand(0, 1) <= breachChance) then
-                            hgBlastThatDoor(ent, normal * 125)
-                        end
                     end
                 end
             end

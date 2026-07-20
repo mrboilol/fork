@@ -3170,8 +3170,17 @@ function SWEP:CustomThink()
             if CLIENT then goto meleeskip1 end
 
             if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(1) then
-                -- Door-breaching weapons define their chance in PrimaryAttackAdd, but doors are world hits.
+                -- Doors are world hits, so pass the swing through the shared damage path before
+                -- letting door-breaching weapons apply their own stronger special behavior.
                 if IsValid(ent) and hgIsDoor(ent) then
+                    local doorDamage = DamageInfo()
+                    doorDamage:SetAttacker(owner)
+                    doorDamage:SetInflictor(self)
+                    doorDamage:SetDamage(dmg)
+                    doorDamage:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
+                    doorDamage:SetDamageType(self.DamageType or DMG_CLUB)
+                    doorDamage:SetDamagePosition(trace.HitPos)
+                    ent:TakeDamageInfo(doorDamage)
                     self:PrimaryAttackAdd(ent, trace)
                 end
                 self:PlayEffects(trace, false)

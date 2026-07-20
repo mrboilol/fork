@@ -144,6 +144,14 @@ function SWEP:GetFearRecoilMul()
 	return 1 + fear * 0.15 + jitter * 0.1 - stabilizer
 end
 
+function SWEP:GetCharacterRecoilMul()
+	local owner = self:GetOwner()
+	local org = IsValid(owner) and owner.organism or nil
+	-- Organism state is replicated independently of a weapon. A stale or bad
+	-- value must not turn every client recoil layer into an extreme multiplier.
+	return math.Clamp(tonumber(org and org.recoilmul) or 1, 0.65, 1.5)
+end
+
 function SWEP:GetFearSpreadMul()
 	local fear, _, jitter, stabilizer = self:GetFearAdrenalineFactors()
 	return 1 + fear * 0.3 + jitter * 0.2 - stabilizer
@@ -193,18 +201,21 @@ function SWEP:GetArmHealthHandlingMul()
 	local twoHanded = support.wantsTwoHands
 	local right = math.Clamp(org.rarm or 0, 0, 1.4)
 	local left = math.Clamp(org.larm or 0, 0, 1.4)
-	local damage = right * 0.45 + (twoHanded and left * 0.32 or left * 0.14)
+	-- A bad left arm is normally only the brace. It should still cost control,
+	-- but must not wobble like the right firing arm has been destroyed.
+	local leftHandlingWeight = support.offhandImpaired and 0.12 or (twoHanded and 0.32 or 0.14)
+	local damage = right * 0.45 + left * leftHandlingWeight
 	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "rarm") then damage = damage + 0.9 end
-	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "larm") then damage = damage + (twoHanded and 0.7 or 0.25) end
+	if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(owner, "larm") then damage = damage + (support.offhandImpaired and 0.25 or (twoHanded and 0.7 or 0.25)) end
 
 	if org.rarmdislocation or org.rarmdislocated then damage = damage + 0.45 end
-	if twoHanded and (org.larmdislocation or org.larmdislocated) then damage = damage + 0.35 end
+	if twoHanded and (org.larmdislocation or org.larmdislocated) then damage = damage + (support.offhandImpaired and 0.14 or 0.35) end
 	-- Do not count a missing right arm twice when the left arm is already the
 	-- active one-handed firing arm. It should remain worse than two-hand use,
 	-- but not become unusably shaky.
 	if org.rarmamputated then damage = damage + (support.onlyLeft and 0.5 or 1.15) end
-	if twoHanded and org.larmamputated then damage = damage + 0.85 end
-	if support.oneHanded then damage = damage + 0.62 end
+	if twoHanded and org.larmamputated then damage = damage + (support.offhandImpaired and 0.32 or 0.85) end
+	if support.oneHanded then damage = damage + (support.offhandImpaired and 0.28 or 0.62) end
 	if support.leftBusy then damage = damage + 0.45 end
 	if support.rightBusy then damage = damage + 0.75 end
 	if org.aiming_fatigue then damage = damage + math.Clamp(org.aiming_fatigue, 0, 10) * 0.045 end
@@ -257,6 +268,9 @@ function SWEP:GetHandSupportState(ply)
 	local oneHanded = postureOneHanded or leftBusy or rightBusy or (wantsTwoHands and supportHands <= 1)
 	local onlyLeft = leftSupport and not rightSupport
 	local onlyRight = rightSupport and not leftSupport
+	-- The usual firearm stance fires from the right and uses the left as a brace.
+	-- Keep a broken/missing brace distinct from a damaged firing hand.
+	local offhandImpaired = wantsTwoHands and rightSupport and leftBad
 
 	return {
 		wantsTwoHands = wantsTwoHands,
@@ -273,6 +287,7 @@ function SWEP:GetHandSupportState(ply)
 		oneHanded = oneHanded,
 		onlyLeft = onlyLeft,
 		onlyRight = onlyRight,
+		offhandImpaired = offhandImpaired,
 		firingArm = onlyLeft and "larm" or "rarm"
 	}
 end
@@ -330,11 +345,13 @@ function SWEP:GetRecoilSupportMul()
 	local supportHands = support.supportHands
 	local mul = supportHands >= 2 and 0.82 or 1.25
 
-	if support.oneHanded then mul = mul * 1.25 end
+	if support.oneHanded then mul = mul * (support.offhandImpaired and 1.10 or 1.25) end
 	if support.leftBusy then mul = mul * 1.28 end
 	if support.rightBusy then mul = mul * 1.45 end
 	if support.rightBad then mul = mul * (org.rarmamputated and (support.onlyLeft and 1.15 or 1.7) or 1.35) end
-	if support.leftBad and support.wantsTwoHands then mul = mul * (org.larmamputated and 1.45 or 1.22) end
+	if support.leftBad and support.wantsTwoHands then
+		mul = mul * (support.offhandImpaired and (org.larmamputated and 1.18 or 1.10) or (org.larmamputated and 1.45 or 1.22))
+	end
 	if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then mul = mul * (1 / org.armstrength) end
 	if org.aiming_fatigue then mul = mul * (1 + math.Clamp(org.aiming_fatigue, 0, 10) * 0.025) end
 
@@ -975,10 +992,10 @@ function SWEP:ApplyRecoilCameraKick()
 	local pistolMul = self:IsPistolHoldType() and 1.08 or 1
 
 	-- Player skill (organism.recoilmul: lower = better, default 1).
-	local skill = (ply.organism and ply.organism.recoilmul) or 1
+	local skill = self:GetCharacterRecoilMul()
 	local armMul = self:GetArmHealthHandlingMul()
 
-	local kickScale = baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * skill * armMul
+	local kickScale = math.Clamp(baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * skill * armMul, 0.1, 4)
 
 	-- Mostly upward (negative pitch in source angles) with a deterministic
 	-- horizontal/roll drift seeded on SprayI so server bullet trajectory
@@ -2620,7 +2637,7 @@ function SWEP:GetAdditionalValues()
 		end
 	end
 
-	local skillissue = ply.organism and ply.organism.recoilmul or 1
+	local skillissue = self:GetCharacterRecoilMul()
 
 
 	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)
@@ -2668,8 +2685,11 @@ function SWEP:GetAdditionalValues()
 		-- Uses sine-of-time + a shared-random per-shot pattern so the server-authoritative
 		-- trajectory stays consistent with the client view.
 		local wobbleDt = dtime or FrameTime()
+		local support = self:GetHandSupportState(ply)
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
-		local firing = sinceShot < 0.2
+		-- An impaired brace should not hold the weapon in its firing wobble state
+		-- as long as a broken firing hand. This is the between-shot adjustment time.
+		local firing = sinceShot < (support.offhandImpaired and 0.14 or 0.2)
 
 		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 		local supportMul = self:GetRecoilSupportMul()
@@ -2683,7 +2703,8 @@ function SWEP:GetAdditionalValues()
 		-- appearing to freeze the instant the main recoil animation reaches zero.
 		local armInjury = math.Clamp(armHandlingMul - 1, 0, 2)
 		local recoveryRate = Lerp(armInjury / 2, 0.018, 0.007)
-		local wobbleTarget = firing and (1.08 + armInjury * 0.12) or 0
+		if support.offhandImpaired then recoveryRate = math.max(recoveryRate, 0.03) end
+		local wobbleTarget = firing and (1.08 + armInjury * 0.12) * (support.offhandImpaired and 0.58 or 1) or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.38 or recoveryRate, wobbleDt), self.recoilWobbleAmp or 0, wobbleTarget)
 
 		if (self.recoilWobbleAmp or 0) > 0.00001 then
@@ -2759,13 +2780,13 @@ function SWEP:GetAdditionalValues()
 			armSway = armSway + rarm * 0.8
 		end
 		if larm_amputated then
-			armSway = armSway + 1.6
+			armSway = armSway + (support.offhandImpaired and 0.5 or 1.6)
 		elseif larm >= 1 then
-			armSway = armSway + 1.0
+			armSway = armSway + (support.offhandImpaired and 0.35 or 1.0)
 		elseif larm_dislocated then
-			armSway = armSway + 0.6
+			armSway = armSway + (support.offhandImpaired and 0.22 or 0.6)
 		else
-			armSway = armSway + larm * 0.5
+			armSway = armSway + larm * (support.offhandImpaired and 0.18 or 0.5)
 		end
 
 		local idleAmp = (0.5 + fatigue * 0.15 + fear * 0.35 + armSway * 0.4) * idleWeight * idleStance * idleRest * idleAim

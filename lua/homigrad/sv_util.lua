@@ -894,6 +894,37 @@ function hgIsDoor(ent)
 	return (Class == "prop_door") or (Class == "prop_door_rotating") or (Class == "func_door") or (Class == "func_door_rotating")
 end
 
+-- Doors retain damage from every hit source.  Kicks and door-breaking weapons
+-- already send DamageInfo, so this also makes bullets, tools, and explosions
+-- eventually breach a sufficiently damaged door.
+function hgDamageDoor(door, damage, force)
+	if not IsValid(door) or not hgIsDoor(door) or door:GetNoDraw() then return false end
+
+	damage = math.max(damage or 0, 0)
+	if damage <= 0 then return false end
+
+	door.HP = (door.HP or 260) - damage
+	if (door._hgNextDamageSound or 0) <= CurTime() then
+		door._hgNextDamageSound = CurTime() + 0.1
+		door:EmitSound("physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".wav")
+	end
+
+	local locked = door:GetInternalVariable("m_bLocked")
+	local breachChance = math.Clamp(0.04 + damage / 75, 0.04, 0.55)
+	if door.HP <= 0 or (locked and math.Rand(0, 1) <= breachChance) then
+		hgBlastThatDoor(door, force and force:GetNormalized() * 200 or nil)
+		return true
+	end
+
+	return false
+end
+
+hook.Add("EntityTakeDamage", "hg-DoorDamage", function(door, dmginfo)
+	if IsValid(door) and hgIsDoor(door) then
+		hgDamageDoor(door, dmginfo:GetDamage(), dmginfo:GetDamageForce())
+	end
+end)
+
 function hgBlastDoors(blaster, pos, power, range, ignoreVisChecks) -- taken from JMod
 	for k, door in pairs(ents.FindInSphere(pos, 40 * power * (range or 1))) do
 		if hgIsDoor(door) and hook.Run("hg_CanDestroyDoor", door, blaster, pos, power, range, ignore) ~= false then

@@ -51,9 +51,10 @@ if SERVER then
 		"rarm",
 		"chest",
 		"skull",
+		"jaw",
 	}
 
-	local brokenLimbsList = { "lleg", "rleg", "larm", "rarm" }
+	local brokenLimbsList = { "lleg", "rleg", "larm", "rarm", "chest" }
 	local complexBonesList = { "spine3", "spine2", "spine1", "pelvis", "chest", "skull" }
 
 	local function CanHealKey(org, key)
@@ -83,6 +84,33 @@ if SERVER then
 					totalCost = totalCost + cost
 					totalRotations = totalRotations + rotations
 					table.insert(bonesToHeal, {key = key, cost = cost, heal = 0.25})
+				end
+			end
+		end
+
+		-- A bruise kit treats a dislocation only when there is no damaged bone left
+		-- to restore, so it does not skip a more urgent injury.
+		if #bonesToHeal == 0 and availableResource >= 0.25 then
+			local dislocations = {
+				{key = "llegdislocation", limb = "lleg"},
+				{key = "rlegdislocation", limb = "rleg"},
+				{key = "larmdislocation", limb = "larm"},
+				{key = "rarmdislocation", limb = "rarm"},
+				{key = "jawdislocation", limb = "jaw"},
+			}
+
+			for _, dislocation in ipairs(dislocations) do
+				if org[dislocation.key] then
+					totalCost = 0.25
+					totalRotations = totalRotations + 2
+					table.insert(bonesToHeal, {
+						key = dislocation.key,
+						limb = dislocation.limb,
+						dislocation = true,
+						cost = 0.25,
+						heal = 0.25,
+					})
+					break
 				end
 			end
 		end
@@ -121,6 +149,16 @@ if SERVER then
 		local amountHealed = 0
 		for _, data in ipairs(bones) do
 			local key = data.key
+			if data.dislocation then
+				if hg.organism.CompleteDislocationFix then
+					hg.organism.CompleteDislocationFix(org, data.limb, owner)
+				else
+					org[key] = false
+				end
+				amountHealed = amountHealed + data.heal
+				continue
+			end
+
 			local v = tonumber(org[key] or 0) or 0
 			local newVal = math.max(v - data.heal, 0)
 
@@ -146,12 +184,14 @@ if SERVER then
 				spine1 = "ValveBiped.Bip01_Spine1",
 				spine2 = "ValveBiped.Bip01_Spine2",
 				spine3 = "ValveBiped.Bip01_Spine2",
+				skull = "ValveBiped.Bip01_Head1",
+				jaw = "ValveBiped.Bip01_Head1",
 			}
 			local spearmint = Color(0, 255, 150)
 
 			ent.bandaged_limbs = ent.bandaged_limbs or {}
 			for _, data in ipairs(bones) do
-				local boneName = bruisemap[data.key]
+				local boneName = bruisemap[data.limb or data.key]
 				if boneName and not ent.bandaged_limbs[boneName] then
 					ent.bandaged_limbs[boneName] = { pos = vector_origin, ang = angle_zero, color = spearmint }
 				end

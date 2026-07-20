@@ -98,15 +98,7 @@ local function RagdollBodyDamage()
                                 if speed > DOOR_BREAK_THRESHOLD then
                                     hgBlastThatDoor(door, vel:GetNormalized() * speed * 0.5)
                                 else
-                                    door.HP = door.HP or 200
-                                    door.HP = door.HP - damage
-                                    door:EmitSound("physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".wav")
-
-                                    local locked = door:GetInternalVariable("m_bLocked")
-                                    local breachChance = math.Clamp(damage / 250, 0.02, 0.3)
-                                    if door.HP <= 0 or (locked and math.Rand(0, 1) <= breachChance) then
-                                        hgBlastThatDoor(door, vel:GetNormalized() * 200)
-                                    else
+                                    if not hgDamageDoor(door, damage, vel) then
                                         if part.dislocation_limb and math.random() < FAILED_BREACH_DISLOCATION_CHANCE then
                                             apply_dislocation(owner, part.dislocation_limb, part.limb_name)
                                         end

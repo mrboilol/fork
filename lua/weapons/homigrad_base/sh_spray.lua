@@ -43,7 +43,7 @@ function SWEP:GetPrimaryMul()
 	local supportMul = self:GetRecoilSupportMul()
 	local mul = math.Clamp(caliberMul * weightMul * 0.68, 0.18, 2.7) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
 	self:ApplyForce(mul)
-	mul = ((mul or 0) * (self.Supressor and 0.75 or 1) * (owner.organism and owner.organism.recoilmul or 1)) * hg_recoilmul:GetFloat() * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
+	mul = ((mul or 0) * (self.Supressor and 0.75 or 1) * self:GetCharacterRecoilMul()) * math.Clamp(hg_recoilmul:GetFloat(), 0.1, 3) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
 	return mul
 end
 
@@ -124,13 +124,14 @@ function SWEP:PrimarySpread()
 
 		local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 		local oneHandRecoilMul = 1
-		if support.oneHanded then oneHandRecoilMul = oneHandRecoilMul * 1.45 end
+		if support.oneHanded then oneHandRecoilMul = oneHandRecoilMul * (support.offhandImpaired and 1.12 or 1.45) end
 		if support.leftBusy then oneHandRecoilMul = oneHandRecoilMul * 1.35 end
 		if support.rightBusy then oneHandRecoilMul = oneHandRecoilMul * 1.55 end
-		if support.wantsTwoHands and support.supportHands <= 1 then oneHandRecoilMul = oneHandRecoilMul * 1.25 end
+		if support.wantsTwoHands and support.supportHands <= 1 then oneHandRecoilMul = oneHandRecoilMul * (support.offhandImpaired and 1.08 or 1.25) end
+		oneHandRecoilMul = math.Clamp(oneHandRecoilMul, 1, 1.6)
 
 		local recoilProgress = 0.55 + math.Clamp((sprayI - 1) / 10, 0, 1) * 0.45
-		local force = math.Clamp(caliberMul * weightMul * 0.38, 0.1, 2.45) * oneHandRecoilMul * self.addSprayMul * recoilProgress
+		local force = math.Clamp(math.Clamp(caliberMul * weightMul * 0.38, 0.1, 2.45) * oneHandRecoilMul * self.addSprayMul * recoilProgress, 0.1, 4)
 
 		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
 		local dominance = organism.hand_dominance or "right"
@@ -165,7 +166,7 @@ function SWEP:PrimarySpread()
 			broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
 		end
 		if larm_broken_debuff then
-			local multiplier = organism.larmamputated and 2.0 or 1.35
+			local multiplier = support.offhandImpaired and (organism.larmamputated and 1.28 or 1.16) or (organism.larmamputated and 2.0 or 1.35)
 			broken_arm_recoil_mult = broken_arm_recoil_mult * multiplier
 		end
 
@@ -223,6 +224,7 @@ function SWEP:PrimarySpread()
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
+		mul = math.Clamp(mul, 0.08, 3.5)
 
 		-- Baseline shot dispersion is pitch-dominant. Horizontal movement is still
 		-- present, but cannot overpower vertical climb on light pistols.
@@ -275,7 +277,7 @@ function SWEP:PrimarySpread()
 
 		//ViewPunch2(angleprikol)
 
-		local mul = mul * caliberMul * weightMul * 0.38 * (self:IsPistolHoldType() and 1.25 or 1) * (numBullet and math.sqrt(numBullet) or 1)
+		local mul = math.Clamp(mul * caliberMul * weightMul * 0.38 * (self:IsPistolHoldType() and 1.25 or 1) * (numBullet and math.sqrt(numBullet) or 1), 0.08, 2.5)
 		ViewPunch2(Angle(-math.Rand(1.25,2.2), math.Rand(-0.45,0.45), 0) * mul * 0.18)
 		ViewPunch(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul / -8)
 		timer.Simple(0.01, function() if IsValid(owner) then ViewPunch2(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul * 0.12) end end)
@@ -301,7 +303,7 @@ function SWEP:PrimarySpread()
 		-- hidden cone.  Keep a very small yaw component only so recoil does not
 		-- read as a horizontal spread pattern.
 		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.7 * longGunKickMul, 0.7, 6.2)
-		local muzzleKick = sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
+		local muzzleKick = sprayAng * self:GetCharacterRecoilMul() * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
 		if gangstaHold then
 			local leftKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.9, 0.35, 3.2)
 			muzzleKick[1] = math.Clamp(muzzleKick[1] * 0.15, -0.65, 0.12)
@@ -316,6 +318,10 @@ function SWEP:PrimarySpread()
 		muzzleKick = sanitize_angle(muzzleKick)
 		local newEyeAng = eyeang + muzzleKick
 		if finite_angle(newEyeAng) then
+			-- SetEyeAngles does not protect against recoil pushing pitch past the
+			-- vertical pole. Crossing it flips the view and inverts mouse input.
+			newEyeAng[1] = math.Clamp(math.AngleDifference(newEyeAng[1], 0), -89, 89)
+			newEyeAng[3] = math.Clamp(math.AngleDifference(newEyeAng[3], 0), -45, 45)
 			owner:SetEyeAngles(newEyeAng)
 		end
 		
@@ -333,7 +339,7 @@ function SWEP:PrimarySpread()
 		
 		--self.weaponSway = self.weaponSway + sprayvel
 
-		self.sprayAngles[3] = self.sprayAngles[3] + math.max(self.Primary.Damage / 100,1) * oneHandRecoilMul * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 34
+		self.sprayAngles[3] = math.Clamp((self.sprayAngles[3] or 0) + math.max(self.Primary.Damage / 100,1) * oneHandRecoilMul * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 34, 0, 0.35)
 
 		self:ApplyEyeSprayVel(sprayvel * 0.9)
 		--self:AnimApply_RecoilCameraZoom()

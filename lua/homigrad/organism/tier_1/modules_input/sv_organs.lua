@@ -332,12 +332,9 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
 		local dmgPos = dmgInfo:GetDamagePosition()
 		local dirCool = dmgInfo:GetDamageForce():GetNormalized()
-		local effdata = EffectData()
-		effdata:SetOrigin(dmgPos)
-		effdata:SetRadius(dmg / 10)
-		effdata:SetMagnitude(dmg / 10)
-		effdata:SetScale(1)
-		util.Effect("BloodImpact", effdata)
+		-- Bullet impacts already route through hg_bloodimpact, which renders the
+		-- small physical blood pellets. Do not layer the red vanilla BloodImpact
+		-- particles over that same hit.
 
 		local ent = hg.GetCurrentCharacter(org.owner)
 		if IsValid(ent) and ent.organism and not ent.organism.SpawnedBrainChunks and math.random(5) == 1 then

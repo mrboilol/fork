@@ -156,7 +156,7 @@ local function CalculateImpact(boneName, speed)
     if LEG_BONES[boneName] then
         if speed >= DROP_KICK_SPEED_THRESHOLD then
             -- A committed ragdoll dropkick should hit harder than the animated hg_kick dropkick.
-            return math.min(65 + (speed - DROP_KICK_SPEED_THRESHOLD) * 0.35, 120),
+            return math.min(34 + (speed - DROP_KICK_SPEED_THRESHOLD) * 0.14, 65),
                 math.max(2200, speed * 8),
                 math.Clamp(350 + (speed - DROP_KICK_SPEED_THRESHOLD) * 1.5, 400, 900),
                 "dropkick"
@@ -318,6 +318,12 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
 
     -- Door handling with two different behaviors
     if hgIsDoor(data.HitEntity) then
+        local impactDamage = math.max((data.Speed - 180) / 12, 6)
+        if hgDamageDoor(data.HitEntity, impactDamage, data.HitNormal) then
+            ApplyInjuriesToRagdoll(ragdoll)
+            return
+        end
+
         if data.Speed > 560 then
             -- High-speed impact: Break door + bleeding + dislocation
             -- Play fire axe door breaking sounds
@@ -391,6 +397,37 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     
     -- Apply the damage
     ApplyKickDamage(attacker, target, damage, data.HitPos, force, boneName, knockback)
+
+    if impactType == "dropkick" then
+        local attackerOrg = attacker.organism
+        if attackerOrg and (attackerOrg._ragdollDropkickStaminaUntil or 0) < CurTime() then
+            attackerOrg._ragdollDropkickStaminaUntil = CurTime() + 0.75
+            attackerOrg.stamina.subadd = (attackerOrg.stamina.subadd or 0) + 45
+
+            if attackerOrg.lleg == 1 or attackerOrg.rleg == 1 or attackerOrg.llegdislocation or attackerOrg.rlegdislocation then
+                attackerOrg.painadd = (attackerOrg.painadd or 0) + 35
+            end
+        end
+
+        local targetPlayer = hg.RagdollOwner(target) or target
+        if IsValid(targetPlayer) and targetPlayer:IsPlayer() and targetPlayer:Alive() then
+            timer.Simple(0, function()
+                if IsValid(targetPlayer) and targetPlayer:Alive() then
+                    hg.Fake(targetPlayer)
+                end
+            end)
+        end
+    elseif impactType == "leg shove" then
+        local targetPlayer = hg.RagdollOwner(target) or target
+        local ragdollChance = math.Clamp(0.08 + (speed - LEG_SHOVE_SPEED_THRESHOLD) / 900, 0.08, 0.18)
+        if IsValid(targetPlayer) and targetPlayer:IsPlayer() and targetPlayer:Alive() and math.Rand(0, 1) <= ragdollChance then
+            timer.Simple(0, function()
+                if IsValid(targetPlayer) and targetPlayer:Alive() then
+                    hg.Fake(targetPlayer)
+                end
+            end)
+        end
+    end
     
     -- Record this hit to prevent rapid successive hits
     RecordKickHit(attacker, target)

@@ -402,7 +402,7 @@ hg.ConVars = hg.ConVars or {}
 --\\ custom spawn
 	gameevent.Listen("player_spawn")
 
-	DEFAULT_JUMP_POWER = 200
+	DEFAULT_JUMP_POWER = 210
 
 	local music_packs = {
 		"mirrors_edge",
@@ -427,7 +427,7 @@ hg.ConVars = hg.ConVars or {}
 			if not IsValid(ply) then return end
 
 			ply:SetWalkSpeed(100)
-			ply:SetRunSpeed(350) -- 230
+			ply:SetRunSpeed(365) -- 230
 
 			ply:SetJumpPower(DEFAULT_JUMP_POWER)
 

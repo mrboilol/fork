@@ -480,6 +480,33 @@ if SERVER then
 		return v >= 0.05
 	end
 
+	local fallbackConditionKeys = {
+		"skull", "jaw", "chest", "spine3", "spine2", "spine1", "pelvis",
+		"lleg", "rleg", "larm", "rarm",
+	}
+
+	local fallbackDislocations = {
+		{key = "llegdislocation", limb = "lleg"},
+		{key = "rlegdislocation", limb = "rleg"},
+		{key = "larmdislocation", limb = "larm"},
+		{key = "rarmdislocation", limb = "rarm"},
+		{key = "jawdislocation", limb = "jaw"},
+	}
+
+	local function GetFallbackTreatment(org)
+		for _, key in ipairs(fallbackConditionKeys) do
+			if CanHealKey(org, key) then
+				return {key = key}
+			end
+		end
+
+		for _, dislocation in ipairs(fallbackDislocations) do
+			if org[dislocation.key] then
+				return {key = dislocation.key, limb = dislocation.limb, dislocation = true}
+			end
+		end
+	end
+
 	function SWEP:GetHealData(org)
 		local totalRotations = 1 -- Base 1 rotation
 		local totalCost = 0
@@ -528,6 +555,15 @@ if SERVER then
 			totalRotations = totalRotations + 1
 		end
 
+		local hasPrimaryTreatment = #woundsToHeal > 0
+			or (tonumber(org.bleed) or 0) > 0
+			or #fracturesToHeal > 0
+			or org.skull >= 0.6
+			or org.chest >= 0.6
+		if not hasPrimaryTreatment and GetFallbackTreatment(org) then
+			totalRotations = totalRotations + 2
+		end
+
 		return totalRotations, totalCost, woundsToHeal, fracturesToHeal
 	end
 
@@ -540,16 +576,27 @@ if SERVER then
 			or (istable(org.arterialwounds) and #org.arterialwounds > 0) 
 			or (tonumber(org.bleed) or 0) > 0 
 			or org.skull >= 0.6 
-			or org.chest == 1
+			or org.chest >= 0.05
+			or CanHealKey(org, "jaw")
+			or CanHealKey(org, "spine1")
+			or CanHealKey(org, "spine2")
+			or CanHealKey(org, "spine3")
+			or CanHealKey(org, "pelvis")
 			or (org.lleg >= 0.05 and not org.llegamputated)
 			or (org.rleg >= 0.05 and not org.rlegamputated)
 			or (org.larm >= 0.05 and not org.larmamputated)
 			or (org.rarm >= 0.05 and not org.rarmamputated)
+			or org.llegdislocation
+			or org.rlegdislocation
+			or org.larmdislocation
+			or org.rarmdislocation
+			or org.jawdislocation
 
 		if self.modeValues[1] <= 0 or not hasInjuries then return end
 		
 		local done = false
 		local bandaged = false
+		local treatedPrimary = false
 
 		-- Prioritize bleeding wounds first
 		if not bone then
@@ -562,6 +609,7 @@ if SERVER then
 					org.bleed = math.max(org.bleed - healAmount, 0)
 					org.wounds[1][1] = healedWound
 					self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
+					treatedPrimary = treatedPrimary or healAmount > 0
 					
 					if (biggestWound - healedWound) > 0.1 then
 						bandaged = true
@@ -600,6 +648,7 @@ if SERVER then
 						org.bleed = math.max(org.bleed - healAmount, 0)
 						org.wounds[bonewounds[1]][1] = healedWound
 						self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
+						treatedPrimary = treatedPrimary or healAmount > 0
 
 						org.pain = math.max(org.pain - healAmount / 4, 0)
 
@@ -676,6 +725,7 @@ if SERVER then
 			-- Consume bandage value for fracture healing
 			self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
 			done = true
+			treatedPrimary = true
 		end
 		
 
@@ -688,6 +738,7 @@ if SERVER then
 			org.bandagedskull = true
 			org.pain = math.max(org.pain - 14, 0)
 			done = true
+			treatedPrimary = true
 		end
 
 		if org.chest == 1 and self.modeValues[1] >= amt then
@@ -695,6 +746,7 @@ if SERVER then
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
+			treatedPrimary = true
 		end
 
 		if org.lleg == 1 and self.modeValues[1] >= amt and !org.llegamputated then
@@ -703,6 +755,7 @@ if SERVER then
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
+			treatedPrimary = true
 		end
 
 		if org.rleg == 1 and self.modeValues[1] >= amt and !org.rlegamputated then
@@ -711,6 +764,7 @@ if SERVER then
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
+			treatedPrimary = true
 		end
 
 		if org.rarm == 1 and self.modeValues[1] >= amt and !org.rarmamputated then
@@ -719,6 +773,7 @@ if SERVER then
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
+			treatedPrimary = true
 		end
 
 		if org.larm == 1 and self.modeValues[1] >= amt and !org.larmamputated then
@@ -727,6 +782,7 @@ if SERVER then
 			self.modeValues[1] = self.modeValues[1] - amt
 			org.avgpain = math.max(org.avgpain - 14, 0)
 			done = true
+			treatedPrimary = true
 		end
 
 		if not done and (tonumber(org.bleed) or 0) > 0 and self.modeValues[1] > 0 then
@@ -734,6 +790,43 @@ if SERVER then
 			org.bleed = math.max((tonumber(org.bleed) or 0) - bleedHeal, 0)
 			self.modeValues[1] = math.max(self.modeValues[1] - 10 * bleedHeal, 0)
 			done = bleedHeal > 0
+			treatedPrimary = treatedPrimary or bleedHeal > 0
+		end
+
+		-- Once bleeding and the normal splint targets are handled, a remaining bandage
+		-- can still support one damaged bone or reset one dislocated joint.
+		if not treatedPrimary and self.modeValues[1] > 0 then
+			local treatment = GetFallbackTreatment(org)
+			if treatment then
+				if treatment.dislocation then
+					if hg.organism.CompleteDislocationFix then
+						hg.organism.CompleteDislocationFix(org, treatment.limb, owner)
+					else
+						org[treatment.key] = false
+					end
+				else
+					org[treatment.key] = math.max((tonumber(org[treatment.key]) or 0) - 0.1, 0)
+				end
+
+				local bandageBones = {
+					skull = "ValveBiped.Bip01_Head1", jaw = "ValveBiped.Bip01_Head1",
+					chest = "ValveBiped.Bip01_Spine2", spine3 = "ValveBiped.Bip01_Spine2",
+					spine2 = "ValveBiped.Bip01_Spine2", spine1 = "ValveBiped.Bip01_Spine1",
+					pelvis = "ValveBiped.Bip01_Pelvis", lleg = "ValveBiped.Bip01_L_Calf",
+					rleg = "ValveBiped.Bip01_R_Calf", larm = "ValveBiped.Bip01_L_Forearm",
+					rarm = "ValveBiped.Bip01_R_Forearm",
+				}
+				local boneName = bandageBones[treatment.limb or treatment.key]
+				if boneName then
+					ent.bandaged_limbs = ent.bandaged_limbs or {}
+					ent.bandaged_limbs[boneName] = true
+					ent:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
+				end
+
+				self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
+				org.avgpain = math.max((org.avgpain or 0) - 5, 0)
+				done = true
+			end
 		end
 
 		if done then

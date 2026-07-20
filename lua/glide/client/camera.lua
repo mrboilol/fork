@@ -46,7 +46,7 @@ function Camera:Activate( vehicle, seatIndex )
     self.punchVelocity = Angle()
     self.shakeOffset = Vector()
 
-    self:SetFirstPerson( self.isInFirstPerson )
+    self:SetFirstPerson( true )
 
     hook.Add( "Think", "GlideCamera.Think", function()
         if self.isActive then return self:Think() end
@@ -121,6 +121,9 @@ function Camera:IsFixed()
 end
 
 function Camera:SetFirstPerson( enable )
+    -- Vehicles use the Homigrad first-person camera; never let Glide replace it with its external view.
+    enable = true
+
     local angles = self.angles
     local wasFixed = self:IsFixed()
 
