@@ -376,6 +376,13 @@ local color_white, color_red, color_red2, color_red3 = Color(255, 255, 255), Col
 module[2] = function(owner, org, timeValue)
 
 	local o2 = org.o2
+	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
+		o2[1] = o2.range
+		org.lungsfunction = true
+		org._zeroO2Time = 0
+		return
+	end
+
 	local bloodO2Cap = math.Clamp(interpolateCurve(BloodO2, math.Clamp(org.blood or 5000, 0, 5000)), 0, o2.range)
 	org.bloodO2Cap = bloodO2Cap
 

@@ -29,7 +29,8 @@ hook.Add("Think", "hg_hunger_thoughts_notify", function()
 	if not org then return end
 	
 	-- Only show hunger thoughts if hunger system is enabled
-	if not GetConVar("hg_hungersystem"):GetBool() then
+	local hungerSystem = GetConVar("hg_hungersystem")
+	if not hungerSystem or not hungerSystem:GetBool() then
 		hungerThoughtIndex = 0
 		hungerThoughtNextTime = 0
 		return

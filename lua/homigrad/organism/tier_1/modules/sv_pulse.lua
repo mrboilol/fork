@@ -42,6 +42,13 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 	heartbeat = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
 	if heartstop then return heartbeat < 1 and "asystole" or "pea" end
 	if heartbeat < 1 then return "asystole" end
+	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
+		if heartbeat <= 100 then return "normal_sinus" end
+		if heartbeat <= 150 then return "sinus_tachycardia" end
+		if heartbeat <= 200 then return "compressed_tachycardia" end
+		if heartbeat < 280 then return "extreme_tachycardia" end
+		return "terminal_tachycardia"
+	end
 
 	org = org or {}
 	local o2 = org.o2 and org.o2[1] or 30
@@ -108,11 +115,18 @@ function hg.organism.should_gain_fear(org)
 end
 
 module[2] = function(owner, org, timeValue)
-	local heart = 1 - org.heart
+	local organSystemsEnabled = hg.organism.OrganSystemsEnabled and hg.organism.OrganSystemsEnabled() or true
+	if not organSystemsEnabled then
+		org.heartstop = false
+		org.terminalRhythm = nil
+		org.unstableRhythm = nil
+	end
+
+	local heart = organSystemsEnabled and 1 - org.heart or 1
 	-- Brain damage weakens the heart's neurological drive.
-	local brain = math.Clamp(1 - org.brain * 1.5, 0, 1)
+	local brain = organSystemsEnabled and math.Clamp(1 - org.brain * 1.5, 0, 1) or 1
 	local o2Value = org.o2 and org.o2[1] or 30
-	local o2 = halfValue2(o2Value, org.o2.range, org.o2.k)
+	local o2 = organSystemsEnabled and halfValue2(o2Value, org.o2.range, org.o2.k) or 1
 
 	if org.isPly and not org.otrub and (heart == 0) then org.owner:Notify("My torso hurts a lot...",true,"heart",6) end
 	if org.isPly and not org.otrub and org.heartstop then org.owner:Notify("",true,"heartstop",6) end
@@ -263,7 +277,7 @@ module[2] = function(owner, org, timeValue)
 	-- Severe cold and terminal preload failure destabilize the myocardium before
 	-- arrest. Keep transient AF/ectopy visible, but let VF be a no-output
 	-- electrical arrest rather than pretending it is a fast effective pulse.
-	local severeCold = coldSuppression >= 0.62
+	local severeCold = organSystemsEnabled and coldSuppression >= 0.62
 	local terminalHemorrhage = hemorrhagicDecompensation >= 0.7
 	if not (severeCold or terminalHemorrhage) then
 		org.unstableRhythm = nil
@@ -294,7 +308,7 @@ module[2] = function(owner, org, timeValue)
 
 	-- Probabilistic heartstop based on heart rate (kept as a softer fallback for
 	-- the 200-300 range where rhythms become dangerous but not yet lethal).
-	if bloodNow >= 4500 and (not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time) then
+	if organSystemsEnabled and bloodNow >= 4500 and (not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time) then
 		org._heart_rate_check_time = CurTime() + 1 -- check every second
 
 		local hb = org.heartbeat
@@ -494,8 +508,10 @@ module[2] = function(owner, org, timeValue)
 	local adren = org.adrenaline
 
 	local bloodCurveOwnsArrest = bloodNow <= 2300 and (org.heart or 0) < 0.8 and org.brain < 0.85
-	if ((org.pulse < 10 or org.bloodpressure < 25) and not bloodCurveOwnsArrest) or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
-	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
+	if organSystemsEnabled then
+		if ((org.pulse < 10 or org.bloodpressure < 25) and not bloodCurveOwnsArrest) or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
+		if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
+	end
 
 	if org.temperature < 34 or org.temperature > 38 or org.blood < 4000 or org.pain > 20 then
 		org.fear = math.max(org.fear, 0)
@@ -516,7 +532,7 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
-		local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
+		local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (not organSystemsEnabled or ((org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42))
 		-- Scale chance with adrenaline level: significantly improved effectiveness
 		-- Low dose (1): ~70% chance, Medium dose (2): ~90% chance, High dose (4+): near-certain
 		local chance = math.Clamp(adren * 60 + adren * adren * 12, 0, 99)
@@ -581,7 +597,7 @@ module[2] = function(owner, org, timeValue)
 		-- alone cannot make a thready hypovolemic pulse look effective.
 		local rateK = math.Clamp((org.heartbeat or 0) / 75, 0, 2.5)
 		local fillingK = 1 - math.Clamp(((org.heartbeat or 75) - 180) / 120, 0, 0.7)
-		local strokeVolume = volumeMapK * (1 - math.Clamp(org.heart or 0, 0, 1)) * hypothermiaK * fillingK
+		local strokeVolume = volumeMapK * (organSystemsEnabled and (1 - math.Clamp(org.heart or 0, 0, 1)) * hypothermiaK or 1) * fillingK
 		org.strokeVolume = math.Clamp(strokeVolume, 0, 1.2)
 		org.cardiacOutput = math.Clamp(rateK * org.strokeVolume, 0, 1.5)
 		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, false, org)

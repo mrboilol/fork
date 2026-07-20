@@ -55,6 +55,65 @@ local WS_StackAlpha = 0.42
 local WS_StackAnimTime = 0.32
 local WS_StackFadeSplit = 0.55
 local WS_StackRise = 0.03
+local scrW, scrH = ScrW(), ScrH()
+local WS_DescriptionWidth = 0.52
+local WS_DescriptionY = 0.32
+
+local function WS_GetWeaponDescription(wep)
+    if not IsValid(wep) then return "" end
+
+    local description = wep.Description
+    if not isstring(description) or string.Trim(description) == "" then description = wep.Instructions end
+    if not isstring(description) or string.Trim(description) == "" then description = wep.Purpose end
+    if not isstring(description) then return "" end
+
+    description = language.GetPhrase(description)
+    description = description:gsub("<.->", " ")
+    description = description:gsub("[%s\r\n]+", " ")
+    return string.Trim(description)
+end
+
+local function WS_WrapDescription(text, maxWidth)
+    surface.SetFont("HomigradFontSmall")
+
+    local lines, current = {}, ""
+    for _, word in ipairs(string.Explode(" ", text)) do
+        local candidate = current == "" and word or current .. " " .. word
+        local width = surface.GetTextSize(candidate)
+
+        if current ~= "" and width > maxWidth then
+            lines[#lines + 1] = current
+            if #lines == 2 then break end
+            current = word
+        else
+            current = candidate
+        end
+    end
+
+    if #lines < 2 and current ~= "" then lines[#lines + 1] = current end
+    return lines
+end
+
+local function WS_DrawWeaponDescription(wep, alpha)
+    local description = WS_GetWeaponDescription(wep)
+    if description == "" then return end
+
+    local maxWidth = scrW * WS_DescriptionWidth
+    local lines = WS_WrapDescription(description, maxWidth)
+    if #lines == 0 then return end
+
+    surface.SetFont("HomigradFontSmall")
+    local _, lineHeight = surface.GetTextSize("W")
+    local padding = 8
+    local height = lineHeight * #lines + padding * 2
+    local x = scrW * 0.5 - maxWidth * 0.5
+    local y = scrH * WS_DescriptionY
+
+    draw.RoundedBox(0, x, y, maxWidth, height, Color(0, 0, 0, alpha * 0.72))
+    for index, line in ipairs(lines) do
+        WS.DrawText(line, "HomigradFontSmall", scrW * 0.5, y + padding + (index - 1) * lineHeight, Color(225, 225, 225, alpha), TEXT_ALIGN_CENTER)
+    end
+end
 
 function WS.DrawText(text, font, posX, posY, color, textAlign)
     local alpha = color.a or 255
@@ -85,8 +144,6 @@ function WS.GetWeaponTable( ply )
     end
     return FormatedTable
 end
-
-local scrW, scrH = ScrW(), ScrH()
 
 local gradient_u = Material("vgui/gradient-d")
 
@@ -419,6 +476,8 @@ function WS.WeaponSelectorDraw( ply )
 
         WS_DrawWeaponIcon(data.wep, mainX + 6, iconY, mainW - 12, iconH, baseAlpha, iconAngle)
     end
+
+    WS_DrawWeaponDescription(SelectedWep, WS.Transparent * 255)
 end
 
 -- Changer

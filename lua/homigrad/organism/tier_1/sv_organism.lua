@@ -265,6 +265,12 @@ local nullTbl = {}
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
 local hg_scavdying = ConVarExists("hg_scavdying") and GetConVar("hg_scavdying") or CreateConVar("hg_scavdying", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Incapacitated display mode: 0=fade ring then text, 1=flatline ring, 2=ring and countdown text", 0, 2)
 local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Incapacitated dying: 0=disabled, 1=immediate, 2=delayed by injury severity", 0, 2)
+local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable organ-system failure: 0=organs stay functional, 1=normal organ failure", 0, 1)
+
+function hg.organism.OrganSystemsEnabled()
+	return hg_huyorgans:GetBool()
+end
+
 local function send_organism(org, ply)
 	if not IsValid(org.owner) then return end
 	local sendtable = {}
@@ -1091,6 +1097,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.noradrenalineActive = false
 	end
 
+	local organSystemsEnabled = hg_huyorgans:GetBool()
+
 	if oldPanicAttack < panicattack_threshold and org.panicattack >= panicattack_threshold and isPly and owner:Alive() then
 		owner:Notify("I can't calm down.", 2, "panicattack_start", 2, nil, Color(255, 140, 140))
 	end
@@ -1100,7 +1108,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target), timeValue / panicattack_adrenaline_add_rise_time)
 
-		if isPly and CurTime() >= (org.nextPanicHeartRoll or 0) then
+		if organSystemsEnabled and isPly and CurTime() >= (org.nextPanicHeartRoll or 0) then
 			org.nextPanicHeartRoll = CurTime() + panicattack_heart_roll_delay
 			if math.random(100) <= panicattack_heart_roll_chance then
 				org.heartstop = true
@@ -1112,52 +1120,56 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.nextPanicHeartRoll = CurTime() + panicattack_heart_roll_delay
 	end
 
-	local brainDelta = (org.brain or 0) - oldSeizureBrain
-	local lobeDelta = lobeDamage - oldSeizureLobeDamage
-	if brainDelta > 0 then
-		hg.organism.AddSeizure(org, math.Clamp(brainDelta * seizure_brain_trauma_gain_mul, 0, 1))
-	elseif brainDelta < 0 and oldSeizureBrain > 0 then
-		reduceSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
-	end
-	if lobeDelta > 0 then
-		hg.organism.AddSeizure(org, math.Clamp(lobeDelta * seizure_brain_trauma_gain_mul, 0, 1))
-	end
-
-	local temperature = org.temperature or 36.7
-	local previousTemperature = oldSeizureTemperature
-	local heatStress = math.max(temperature - seizure_temperature_high_start, previousTemperature - seizure_temperature_high_start, 0)
-	local coldStress = math.max(seizure_temperature_low_start - temperature, seizure_temperature_low_start - previousTemperature, 0)
-	if heatStress > 0 then
-		hg.organism.AddSeizure(org, timeValue * heatStress * seizure_temperature_gain_mul)
-	elseif coldStress > 0 then
-		hg.organism.AddSeizure(org, timeValue * coldStress * seizure_temperature_cold_gain_mul)
-	end
-
-	local curTime = CurTime()
-	local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
-	if seizureBrainDamage > 0.05 then
-		org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
-		if curTime >= org.nextSeizureRoll then
-			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
-			if math.random(seizure_brain_roll_chance) == 1 then
-				hg.organism.AddSeizure(org, math.Rand(seizure_brain_roll_gain_min, seizure_brain_roll_gain_max) * math.Clamp(math.Remap(seizureBrainDamage, 0.05, 1, 0.75, 1.5), 0.75, 1.5))
-			end
+	if organSystemsEnabled then
+		local brainDelta = (org.brain or 0) - oldSeizureBrain
+		local lobeDelta = lobeDamage - oldSeizureLobeDamage
+		if brainDelta > 0 then
+			hg.organism.AddSeizure(org, math.Clamp(brainDelta * seizure_brain_trauma_gain_mul, 0, 1))
+		elseif brainDelta < 0 and oldSeizureBrain > 0 then
+			reduceSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
 		end
-	else
-		org.nextSeizureRoll = curTime + seizure_brain_roll_delay
-	end
+		if lobeDelta > 0 then
+			hg.organism.AddSeizure(org, math.Clamp(lobeDelta * seizure_brain_trauma_gain_mul, 0, 1))
+		end
 
-	if not org.seizureActive and seizureBrainDamage <= 0.05 and heatStress <= 0 and coldStress <= 0 then
-		reduceSeizure(org, timeValue / seizure_no_cause_decay_time)
-	end
+		local temperature = org.temperature or 36.7
+		local previousTemperature = oldSeizureTemperature
+		local heatStress = math.max(temperature - seizure_temperature_high_start, previousTemperature - seizure_temperature_high_start, 0)
+		local coldStress = math.max(seizure_temperature_low_start - temperature, seizure_temperature_low_start - previousTemperature, 0)
+		if heatStress > 0 then
+			hg.organism.AddSeizure(org, timeValue * heatStress * seizure_temperature_gain_mul)
+		elseif coldStress > 0 then
+			hg.organism.AddSeizure(org, timeValue * coldStress * seizure_temperature_cold_gain_mul)
+		end
 
-	org.lastSeizureBrain = org.brain or 0
-	org.lastSeizureLobeDamage = lobeDamage
-	org.lastSeizureTemperature = temperature
+		local curTime = CurTime()
+		local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
+		if seizureBrainDamage > 0.05 then
+			org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
+			if curTime >= org.nextSeizureRoll then
+				org.nextSeizureRoll = curTime + seizure_brain_roll_delay
+				if math.random(seizure_brain_roll_chance) == 1 then
+					hg.organism.AddSeizure(org, math.Rand(seizure_brain_roll_gain_min, seizure_brain_roll_gain_max) * math.Clamp(math.Remap(seizureBrainDamage, 0.05, 1, 0.75, 1.5), 0.75, 1.5))
+				end
+			end
+		else
+			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
+		end
 
-	if org.seizure >= 1 and !org.seizureActive and isPly and owner:Alive() then
-		start_seizure(owner, org)
-	elseif org.seizureActive and org.seizure <= 0 then
+		if not org.seizureActive and seizureBrainDamage <= 0.05 and heatStress <= 0 and coldStress <= 0 then
+			reduceSeizure(org, timeValue / seizure_no_cause_decay_time)
+		end
+
+		org.lastSeizureBrain = org.brain or 0
+		org.lastSeizureLobeDamage = lobeDamage
+		org.lastSeizureTemperature = temperature
+
+		if org.seizure >= 1 and !org.seizureActive and isPly and owner:Alive() then
+			start_seizure(owner, org)
+		elseif org.seizureActive and org.seizure <= 0 then
+			stop_seizure(owner, org)
+		end
+	elseif org.seizureActive then
 		stop_seizure(owner, org)
 	end
 
@@ -1461,7 +1473,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.owner.fullsend = true
 	end
 
-	if org.brain > 0.05 then
+	if organSystemsEnabled and org.brain > 0.05 then
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end

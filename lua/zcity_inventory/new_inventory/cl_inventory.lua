@@ -33,67 +33,18 @@ local function GetItemName(wep)
 	return phrase ~= class and phrase or wep:GetPrintName()
 end
 
-local radialBackpackDraw
-
 local function SelectWeapon(wep)
     net.Start("NI_SelectWeapon")
     net.WriteEntity(wep)
     net.SendToServer()
 end
 
-local function CancelRadialBackpackDraw(finished)
-    if not radialBackpackDraw then return end
-
-    local selector = hg.WeaponSelector
-    if selector and selector.CancelBackpackDraw then
-        selector.CancelBackpackDraw(finished)
-    end
-
-    radialBackpackDraw = nil
-end
-
 local function BeginRadialWeaponSelect(ply, wep)
-    CancelRadialBackpackDraw(false)
-
-    local selector = hg.WeaponSelector
-    local mustDrawFromBackpack = wep ~= ply:GetActiveWeapon()
-        and selector and selector.ShouldDelayBackpackDraw and selector.ShouldDelayBackpackDraw(ply, wep)
-
-    if not mustDrawFromBackpack then
-        SelectWeapon(wep)
-        if wep ~= ply:GetActiveWeapon() then
-            surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(10) .. ".ogg")
-        end
-        return
-    end
-
-    local duration = selector.GetBackpackDrawDuration(ply, wep)
-    radialBackpackDraw = {
-        weapon = wep,
-        finish = CurTime() + duration
-    }
-    selector.StartBackpackDraw(ply, wep, duration)
-    selector.PlayBackpackReachPreview(wep, duration)
-end
-
-hook.Add("StartCommand", "NI_RadialBackpackDraw", function(ply, cmd)
-    local pending = radialBackpackDraw
-    if not pending then return end
-
-    if GetInventorySystem() ~= 2 or not IsValid(ply) or not ply:Alive() or not IsValid(pending.weapon) then
-        CancelRadialBackpackDraw(false)
-        return
-    end
-
-    cmd:RemoveKey(IN_ATTACK)
-    cmd:RemoveKey(IN_ATTACK2)
-    if CurTime() < pending.finish then return end
-
-    local wep = pending.weapon
-    CancelRadialBackpackDraw(true)
     SelectWeapon(wep)
-    surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(10) .. ".ogg")
-end)
+    if wep ~= ply:GetActiveWeapon() then
+        surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(10) .. ".ogg")
+    end
+end
 
 hook.Add("PlayerButtonDown", "NI_PlayerButtonDown", function(ply, key)
 	if GetInventorySystem() == 2 and key == KEY_1 and ply.organism and not ply.organism.otrub then
