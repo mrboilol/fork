@@ -14,7 +14,7 @@ Camera.lastAimEntity = NULL
 Camera.lastAimPos = Vector()
 
 Camera.viewAngles = Angle()
-Camera.isInFirstPerson = false
+Camera.isInFirstPerson = true
 Camera.FIRST_PERSON_DSP = 30
 
 function Glide.GetCameraAimPos()
@@ -47,7 +47,7 @@ function Camera:Activate( vehicle, seatIndex )
     self.punchVelocity = Angle()
     self.shakeOffset = Vector()
 
-    self:SetFirstPerson( self.isInFirstPerson )
+    self:SetFirstPerson( true )
 
     hook.Add( "Think", "GlideCamera.Think", function()
         if self.isActive then return self:Think() end
@@ -122,6 +122,9 @@ function Camera:IsFixed()
 end
 
 function Camera:SetFirstPerson( enable )
+    -- Glide vehicles always use the internal camera in this addon.
+    enable = true
+
     local angles = self.angles
     local wasFixed = self:IsFixed()
 
@@ -237,17 +240,6 @@ function Camera:Think()
     if not IsValid( vehicle ) then
         self:Deactivate()
         return
-    end
-
-    -- Toggle first person
-    local isSwitchKeyDown = self.user:KeyDown( IN_DUCK ) and not vgui.CursorVisible()
-
-    if self.isSwitchKeyDown ~= isSwitchKeyDown then
-        self.isSwitchKeyDown = isSwitchKeyDown
-
-        if isSwitchKeyDown then
-            self:SetFirstPerson( not self.isInFirstPerson )
-        end
     end
 
     local t = RealTime()
