@@ -1365,7 +1365,17 @@ if CLIENT then
 	end
 
 	local function GetAmmoHudPosition(self, scrW, scrH, hudHPos)
-		return scrW * 0.75, scrH * hudHPos
+		local posX = scrW * 0.75
+		local posY = scrH * hudHPos
+		local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
+		local scr = att and att.Pos and att.Pos:ToScreen()
+
+		if scr and scr.visible ~= false and scr.x > -scrW * 0.25 and scr.x < scrW * 1.25 and scr.y > -scrH * 0.25 and scr.y < scrH * 1.25 then
+			posX = math.Clamp(scr.x + scrW * 0.035, scrW * 0.56, scrW * 0.9)
+			posY = math.Clamp(scr.y + scrH * 0.045, scrH * 0.42, scrH * 0.88)
+		end
+
+		return posX, posY
 	end
 
 	SWEP.DrawAmmoMetods = {
@@ -1379,7 +1389,7 @@ if CLIENT then
 			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
 			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
 			local HudHPos = 0.8
-			local showDynamic = dynamicmags:GetBool()
+			local showDynamic = true
 			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, HudHPos)
 			local posX2 = posX + scrH*0.11
 			
@@ -1523,13 +1533,6 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
-		if not dynamicmags:GetBool() and not self:KeyDown(IN_RELOAD) and not (self.hudinspect and self.hudinspect > CurTime()) then
-			self:ChangeFOV()
-			self:DrawHUDAdd()
-			if self.dort then self:DoRT() end
-			return
-		end
-
 		local drawMethod = hg_weird_mags and hg_weird_mags:GetBool() and "MagazineBlocks" or self.AmmoDrawMetod
 		local drawFunc = self.DrawAmmoMetods[drawMethod] or self.DrawAmmoMetods.Default
 		drawFunc(self, GetAmmoIcon(self.Primary.Ammo))

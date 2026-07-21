@@ -39,7 +39,7 @@ net.Receive("Get_Appearance", function()
         net.WriteBool(not tbl)
     net.SendToServer()
 
-	if not tbl and not forced_random then lply:ChatPrint("[Appearance] file load failed - " .. reason) end
+	if not tbl and not forced_random then chat.AddText("[Appearance] file load failed - " .. reason) end
 end)
 
 local function OnlyGetAppearance()
@@ -55,7 +55,7 @@ local function OnlyGetAppearance()
 
     net.SendToServer()
 
-	if not tbl and not forced_random and reason then lply:ChatPrint("[Appearance] file load failed - " .. reason) end
+	if not tbl and not forced_random and reason then chat.AddText("[Appearance] file load failed - " .. reason) end
 end
 
 net.Receive("OnlyGet_Appearance", OnlyGetAppearance)
