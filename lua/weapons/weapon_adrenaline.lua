@@ -86,6 +86,12 @@ if SERVER then
 		local entOwner = IsValid(org.owner.FakeRagdoll) and org.owner.FakeRagdoll or org.owner
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, 4, self.modeValues[1] * 4)
+		-- The injector has to act before the normal adrenalineAdd-to-adrenaline
+		-- conversion finishes, otherwise it cannot help a current cardiac arrest.
+		org.adrenaline = math.max(org.adrenaline or 0, 1.5)
+		org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, CurTime() + 4)
+		org.adrenaline_try = 0
+		self:RefreshPerfusionTreatment(ent, 0.2)
 
 		if self.poisoned2 then
 			org.poison4 = CurTime()

@@ -10,6 +10,7 @@ local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
+local BONE_DAMAGE_DURATION = 5
 
 local boneStates = {}
 local boneCache = {}
@@ -21,12 +22,13 @@ local cachedAfflictionIcons = {}
 local lastKnownFacingAngle = 0
 
 local majorBones = {
-    pelvis = { organ = "stomach", bone = "ValveBiped.Bip01_Pelvis" },
-    spine1 = { organ = "spine", bone = "ValveBiped.Bip01_Spine1" },
-    spine2 = { organ = "spine", bone = "ValveBiped.Bip01_Spine2" },
+    pelvis = { organ = "pelvis", bone = "ValveBiped.Bip01_Pelvis" },
+    spine1 = { organ = "spine1", bone = "ValveBiped.Bip01_Spine1" },
+    spine2 = { organ = "spine2", bone = "ValveBiped.Bip01_Spine2" },
     chest_spine = { organ = "chest", bone = "ValveBiped.Bip01_Spine2" },
     chest_ribs = { organ = "chest", bone = "ValveBiped.Bip01_Spine1", name = "Ribcage" },
-    neck = { organ = "neck", bone = "ValveBiped.Bip01_Neck1" },
+    neck = { organ = "spine3", bone = "ValveBiped.Bip01_Neck1" },
+    skull = { organ = "skull", bone = "ValveBiped.Bip01_Head1" },
     l_clavicle = { organ = "larm", bone = "ValveBiped.Bip01_L_Clavicle" },
     r_clavicle = { organ = "rarm", bone = "ValveBiped.Bip01_R_Clavicle" },
     l_upperarm = { organ = "larm", bone = "ValveBiped.Bip01_L_UpperArm", canAmputate = true, ampBone = "ValveBiped.Bip01_L_Forearm" },
@@ -84,6 +86,50 @@ local function InitBlinkModel(ent)
     for i = 0, ent:GetBoneCount() - 1 do
         ent:ManipulateBoneScale(i, Vector(0, 0, 0))
     end
+end
+
+local function GetBoneMarkerDimensions(ent, boneID)
+    local mat = ent:GetBoneMatrix(boneID)
+    if not mat then return end
+
+    local startPos = mat:GetTranslation()
+    local endPos
+    local longestDistance = 0
+
+    for _, childID in ipairs(ent:GetChildBones(boneID) or {}) do
+        local childMat = ent:GetBoneMatrix(childID)
+        if childMat then
+            local childPos = childMat:GetTranslation()
+            local distance = startPos:Distance(childPos)
+            if distance > longestDistance then
+                longestDistance = distance
+                endPos = childPos
+            end
+        end
+    end
+
+    local length = math.Clamp(longestDistance > 0 and longestDistance or 9, 7, 26)
+    local width = math.Clamp(length * 0.32, 3.5, 8)
+    local pos = endPos and (startPos + endPos) * 0.5 or startPos
+
+    return pos, width, length
+end
+
+local function DrawBoneDamageMarker(ent, boneName, severity, alpha, cameraPos)
+    local boneID = ent:LookupBone(boneName)
+    if not boneID then return end
+
+    local pos, width, length = GetBoneMarkerDimensions(ent, boneID)
+    if not pos then return end
+
+    -- Pull the marker slightly toward the indicator camera so the smooth,
+    -- capsule-like circle remains readable over the traced skeleton.
+    pos = pos + (cameraPos - pos):GetNormalized() * 1.5
+    local damage = math.Clamp(severity or 0, 0, 1)
+    local color = Color(255, 230 - damage * 180, 85 - damage * 65, alpha)
+
+    render.SetMaterial(statusCircleMat)
+    render.DrawSprite(pos, width * 2.1, length * 1.15, color)
 end
 
 local function ResetModels(ply)
@@ -357,8 +403,18 @@ function HUD_DrawDynamicIndicator()
     end
     
     local time = CurTime()
+    local damagedBone
 
     if org then
+        local damageTime = org.damagedBoneTime or 0
+        if org.damagedBoneName and damageTime > 0 and time - damageTime <= BONE_DAMAGE_DURATION then
+            damagedBone = {
+                name = org.damagedBoneName,
+                severity = org.damagedBoneSeverity or 0.5,
+                alpha = math.Clamp(1 - (time - damageTime) / BONE_DAMAGE_DURATION, 0, 1) * 235
+            }
+        end
+
         for key, data in pairs(majorBones) do
             local organName = data.organ
             -- Initialize bone state even if organ data doesn't exist yet
@@ -496,6 +552,14 @@ function HUD_DrawDynamicIndicator()
         if hasAmputationBlink then
             local val = (math.sin(time * 10) + 1) / 2
             DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val)
+        end
+
+        if damagedBone then
+            -- This is based on the copied live/fake-ragdoll bone matrices, not
+            -- a fixed body silhouette, so it follows the exact injured bone.
+            cam.IgnoreZ(true)
+            DrawBoneDamageMarker(healthModel, damagedBone.name, damagedBone.severity, damagedBone.alpha, camPos)
+            cam.IgnoreZ(false)
         end
 
         render.MaterialOverride(nil)

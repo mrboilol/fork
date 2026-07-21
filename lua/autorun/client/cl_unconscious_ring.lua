@@ -85,6 +85,8 @@ end
 
 local ecgAlphaPulseCheck = 0
 local awakeECGAlpha = 0
+local lastECGState
+local ecgStateAlertUntil = 0
 local lastHeartBeat = 0
 local heartPhase = 0
 
@@ -111,6 +113,27 @@ local awakeECGSeverityByState = {
 
 local function GetAwakeECGSeverity(ecgState)
     return awakeECGSeverityByState[ecgState] or 0.5
+end
+
+local function SmoothAlpha(current, target, speed)
+    return Lerp(1 - math.exp(-FrameTime() * speed), current, target)
+end
+
+local function UpdateECGStateAlert(ecgState)
+    if not lastECGState then
+        lastECGState = ecgState
+        return false
+    end
+
+    if ecgState ~= lastECGState then
+        local severity = math.max(GetAwakeECGSeverity(lastECGState), GetAwakeECGSeverity(ecgState))
+        -- Mild rhythm changes stay visible briefly; terminal states remain long
+        -- enough to be read before the trace fades back out.
+        ecgStateAlertUntil = CurTime() + Lerp(severity, 3.5, 18)
+        lastECGState = ecgState
+    end
+
+    return CurTime() < ecgStateAlertUntil
 end
 
 -- Better sound system from oldring
@@ -780,21 +803,21 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local fibrillating = heartbeat > 250
     local isElectricalArrest = org.heartstop or ecgState == "pea" or ecgState == "asystole"
     local abnormalECG = ecgState ~= "normal_sinus"
-
-    local showAwakeECG = not isUnconscious and not lowConsciousness and (abnormalPulse or abnormalECG or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest)
+    local ecgStateChanged = UpdateECGStateAlert(ecgState)
+    local showAwakeECG = not isUnconscious and not lowConsciousness and ecgStateChanged
     
 	if isUnconscious and not hideDyingRing then
         local currentShock = org.shock or 0
         if currentShock > peakShock then
             peakShock = currentShock
         end
-        ringAlpha = Lerp(FrameTime() * 2, ringAlpha, 1)
+        ringAlpha = SmoothAlpha(ringAlpha, 1, 3)
         dotBeat = math.floor(CurTime()) % 3
     elseif lowConsciousness then
-        ringAlpha = Lerp(FrameTime() * 2, ringAlpha, 0.4)
+        ringAlpha = SmoothAlpha(ringAlpha, 0.4, 3)
         dotBeat = math.floor(CurTime()) % 3
     else
-        ringAlpha = Lerp(FrameTime() * 3, ringAlpha, 0)
+        ringAlpha = SmoothAlpha(ringAlpha, 0, 4)
         if ringAlpha <= 0.01 and not showAwakeECG then
             ringAlpha = 0
             peakShock = 40
@@ -813,9 +836,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             -- with increasingly severe rhythms fading almost completely out.
             awakeECGTargetAlpha = Lerp(GetAwakeECGSeverity(ecgState), 0.07, 0.01)
         end
-        awakeECGAlpha = Lerp(FrameTime() * 4, awakeECGAlpha, awakeECGTargetAlpha)
+        awakeECGAlpha = SmoothAlpha(awakeECGAlpha, awakeECGTargetAlpha, 5)
     else
-        awakeECGAlpha = Lerp(FrameTime() * 2, awakeECGAlpha, 0)
+        awakeECGAlpha = SmoothAlpha(awakeECGAlpha, 0, 3)
     end
     
     local showPulseCheckECG = false
@@ -837,12 +860,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
 
-    if ringAlpha <= 0 and not showPulseCheckECG and not (abnormalPulse or abnormalECG or admiring or recentSuddenDrop or fibrillating or isCritical or isElectricalArrest) then
+    if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and not showPulseCheckECG then
         UpdateFibrillationSound()
         return
     end
-    local showOtrubECG = isUnconscious or lowConsciousness or recentSuddenDrop or (not isUnconscious and (abnormalPulse or abnormalECG or admiring or fibrillating or isElectricalArrest))
-
     local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
     
     if otrubECGAlpha > 0.01 then

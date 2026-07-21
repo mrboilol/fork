@@ -90,12 +90,25 @@ end
 local ragdoll_fall_skull_damage_mul = 1.2
 local ragdoll_fall_jaw_damage_mul = 0.45
 local ragdoll_fall_skull_break_blood_mul = 1.15
+
+local function isFistInflictor(dmgInfo)
+	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
+	if not IsValid(inflictor) or not inflictor:IsWeapon() then return false end
+
+	local class = inflictor:GetClass()
+	return class == "weapon_hands_sh" or class == "weapon_hg_coolhands"
+end
+
 local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	dmg = dmgInfo:GetDamage() / 25
 	local organ = box[6] and organs[box[6]][box[7]]
 	if not organ then return 0 end
 	local name = organ[1]
 	if not name then return 0 end
+	-- A fist can concuss through the skull, but cannot directly strike a protected
+	-- brain hitbox. Snapshot this at the start of the trace so one punch that
+	-- fractures the skull cannot also tunnel into the brain on that same hit.
+	if org._fistHeadTraceSkullIntact and (name == "brain" or string.StartWith(name, "brain")) then return 0 end
 	if org.superfighter and not (string.find(name,"vest") or string.find(name,"helmet")) then return 0 end
 	local bone = organ[2] or 0
 	local func = input_list[name]
@@ -542,6 +555,41 @@ hook.Add("HomigradDamage", "ZCity_BluntFaceNosebleed", function(ent, dmgInfo, hi
 	applyNosebleed(ent, harm)
 end)
 
+-- Deliberate sharp melee strikes close to the neck create a throat-cut state,
+-- not merely an ordinary head hit. Bullets continue to use the normal organ
+-- trace/artery path.
+local THROAT_CUT_MIN_DAMAGE = 5
+local THROAT_CUT_NECK_DIST_SQR = 22 * 22
+
+local function isSharpMeleeInflictor(dmgInfo)
+	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
+	if not IsValid(inflictor) or not inflictor:IsWeapon() or inflictor.ThroatCutCapable == false then return false end
+	if inflictor.DamageType == DMG_SLASH then return true end
+	local stored = weapons.GetStored(inflictor:GetClass())
+	return stored and stored.DamageType == DMG_SLASH
+end
+
+hook.Add("HomigradDamage", "ZCity_SlashThroatCut", function(ent, dmgInfo, hitgroup, attackerEnt, harm)
+	if hitgroup ~= HITGROUP_HEAD and hitgroup ~= HITGROUP_GENERIC and hitgroup ~= 0 then return end
+	if not dmgInfo or not dmgInfo:IsDamageType(DMG_SLASH) or dmgInfo:GetDamage() < THROAT_CUT_MIN_DAMAGE then return end
+	if not isSharpMeleeInflictor(dmgInfo) then return end
+
+	local owner = hg.RagdollOwner and hg.RagdollOwner(ent) or ent
+	if not IsValid(owner) or not owner.organism or owner.organism.throatcut then return end
+	local character = hg.GetCurrentCharacter and hg.GetCurrentCharacter(owner) or ent
+	if not IsValid(character) or not character.LookupBone then return end
+	local neckBone = character:LookupBone("ValveBiped.Bip01_Neck1")
+	if not neckBone then return end
+	local neckPos = character:GetBonePosition(neckBone)
+	local hitPos = dmgInfo:GetDamagePosition()
+	if not isvector(neckPos) or not isvector(hitPos) or hitPos:DistToSqr(neckPos) > THROAT_CUT_NECK_DIST_SQR then return end
+
+	local force = dmgInfo:GetDamageForce()
+	local dir = isvector(force) and force:LengthSqr() > 1 and force:GetNormalized() or nil
+	local severity = math.Clamp((dmgInfo:GetDamage() + (tonumber(harm) or 0) * 0.18) / 18, 0.6, 1.15)
+	hg.organism.CutThroat(ent, dmgInfo, hitPos, dir, severity)
+end)
+
 concommand.Add("zc_debug_nosebleed", function(ply)
 	if IsValid(ply) and not ply:IsAdmin() then return end
 
@@ -616,7 +664,7 @@ local headcrabs = {
 }
 
 local headcrabsmodels = {
-	["npc_headcrab"] = "models/nova/w_headcrab.mdl",
+	["npc_headcrab"] = "models/headcrabclassic.mdl",
 	["npc_headcrab_fast"] = "models/headcrab.mdl",
 	["npc_headcrab_black"] = "models/headcrabblack.mdl",
 }
@@ -807,7 +855,7 @@ local takeRagdollDamage
 -- Rapid-fire damage can arrive several times inside one server tick.  Keep the
 -- entry and exit streams separate, but coalesce each stream without replacing
 -- its pending timer or losing the accumulated impact count.
-local function queueBulletBloodImpact(ent, stream, pos, velocity, damage)
+local function queueBulletBloodImpact(ent, stream, pos, velocity, damage, severe)
 	if not IsValid(ent) then return end
 
 	ent._pendingBulletBloodImpacts = ent._pendingBulletBloodImpacts or {}
@@ -820,6 +868,7 @@ local function queueBulletBloodImpact(ent, stream, pos, velocity, damage)
 	pending.pos = pos
 	pending.velocity = velocity
 	pending.damage = damage
+	pending.severe = pending.severe or severe
 	pending.amount = math.min((pending.amount or 0) + 1, 32)
 	if pending.queued then return end
 	pending.queued = true
@@ -835,6 +884,7 @@ local function queueBulletBloodImpact(ent, stream, pos, velocity, damage)
 		net.WriteVector(queued.velocity)
 		net.WriteFloat(queued.damage)
 		net.WriteInt(queued.amount, 8)
+		net.WriteBool(queued.severe or false)
 		net.Broadcast()
 	end)
 end
@@ -1059,6 +1109,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = nil,{},{},{},{},nil,nil
 	org._bulletImpactBleedAdd = nil
 	org._armorPainMul = nil
+	org._fistHeadTraceSkullIntact = isFistInflictor(dmgInfo) and (org.skull or 0) < 1 or nil
 	-- Limb artery damage must stay on the side of the physics bone the bullet
 	-- actually entered; do not let a long trace rupture the opposite limb.
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
@@ -1074,6 +1125,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
 	end
 	org._bulletImpactHitgroup = nil
+	org._fistHeadTraceSkullIntact = nil
 	org._spineArteryTraceDmgInfo = nil
 
 	if attacker:IsPlayer() then
@@ -1151,8 +1203,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
 
-			queueBulletBloodImpact(ent, "exit", outputHole[#outputHole], -outputDir, dmg)
-			
 			if bullet and true then
 				local mul = distance / pen
 				bullet.Src = outputHole[#outputHole]
@@ -1236,6 +1286,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local fatalHeadshot = hitgroup == HITGROUP_HEAD
 		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 		and not hasHeadArmor
+	local severeBulletImpact = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		and (dmg >= severe_damage_adrenaline_threshold or (hitgroup == HITGROUP_HEAD and dmg >= severe_damage_adrenaline_threshold * 0.5))
 	--print(dmg_before, 1)
 	--if ent:IsRagdoll() then
 		if RagdollForceBoneMul[hitgroup] then len = len * RagdollForceBoneMul[hitgroup] end
@@ -1249,7 +1301,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--end
 
 	if inputHole and #inputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
-		queueBulletBloodImpact(ent, "entry", inputHole[1], dir / 2, dmg)
+		queueBulletBloodImpact(ent, "entry", inputHole[1], dir / 2, dmg, severeBulletImpact)
+	end
+
+	if outputHole and #outputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
+		queueBulletBloodImpact(ent, "exit", outputHole[#outputHole], -outputDir, dmg, severeBulletImpact)
 	end
 
 	--print(dmg_before, 2)
@@ -1564,6 +1620,21 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.AmputateLimb(org, "rarm")
 	end--]]
 
+	-- A bullet to the face can dislodge an attached headcrab. Gun suicides get
+	-- a higher chance because the muzzle is deliberately pressed to the head.
+	-- This must happen before fatal-headshot handling creates the death ragdoll,
+	-- otherwise the attached model has already been transferred to it.
+	local isGunshot = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local isGunSuicide = isGunshot and ply and dmgInfo:GetAttacker() == ply
+		and ply.suiciding and IsValid(inf) and inf.ishgweapon
+	local hitsFace = isGunshot and hitgroup == HITGROUP_HEAD
+	if ply and ply:GetNetVar("headcrab") and (hitsFace or isGunSuicide) then
+		local dislodgeChance = isGunSuicide and 0.6 or 0.3
+		if math.Rand(0, 1) <= dislodgeChance then
+			ply:RemoveHeadcrabFromTrauma()
+		end
+	end
+
 	dmgInfo:ScaleDamage(dmgInfo:IsDamageType(DMG_BURN) and 0.015 or (dmgInfo:IsDamageType(DMG_CLUB) and 0.25 or 0.15))
 	
 	takeRagdollDamage(ent, dmgInfo)
@@ -1590,9 +1661,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		net.WriteVector(dirCool / 15)
 		net.WriteFloat(brokenSkullHeadImpact and math.max(dmg / 8, 1) or dmg / 10)
 		net.WriteInt(1, 8)
+		net.WriteBool(brokenSkullHeadImpact or severeBulletImpact)
 		net.Broadcast()
 	end
-	
+
 	if ply and !ply:GetNetVar("headcrab") and (ply.PlayerClassName != "Gordon" or ply.armors.head != "gordon_helmet") and ply.PlayerClassName ~= "headcrabzombie" then
 		local class = dmgInfo:GetAttacker():GetClass()
 
@@ -1706,7 +1778,7 @@ function hg.organism.DamageTypeAffliction(dmg, dmgInfo, ply, org)
 	end
 
 	if dmgInfo:IsDamageType(DMG_BULLET) then
-		dmgBlood = dmg * 3
+		dmgBlood = dmg * 4.5
 		dmgHurt = dmg * 5
 		instaPain = dmg * 5
 		immobilization = dmg * 5
@@ -1720,7 +1792,7 @@ function hg.organism.DamageTypeAffliction(dmg, dmgInfo, ply, org)
 	end
 	
 	if dmgInfo:IsDamageType(DMG_BUCKSHOT) then
-		dmgBlood = dmg * 3
+		dmgBlood = dmg * 4.5
 		dmgHurt = dmg * 5
 		instaPain = dmg * 3
 		immobilization = dmg * 5
@@ -2004,6 +2076,7 @@ local function velocityDamage(ent, data)
 				net.WriteVector((data.OurOldVelocity - data.TheirOldVelocity):GetNormalized() / 10)
 				net.WriteFloat(math.max(dmg * ragdoll_fall_skull_break_blood_mul, 1))
 				net.WriteInt(1, 8)
+				net.WriteBool(true)
 				net.Broadcast()
 			end
 		end

@@ -16,7 +16,10 @@ local offsetAng = Angle(-90,-90,-20)
 --hook.Add("PostDrawPlayerRagdoll","hg-drawplayer",function(ent,ply)
 function hg.RenderHeadcrab(ent, ply)
     if not IsValid(ply.headcrabmodel) then
-        ply.headcrabmodel = ClientsideModel(ply:GetNetVar("headcrab"))
+        local crabModel = ply:GetNetVar("headcrab")
+        if not isstring(crabModel) or crabModel == "" then return end
+
+        ply.headcrabmodel = ClientsideModel(crabModel, RENDERGROUP_OPAQUE)
         
         local model = ply.headcrabmodel
         model:SetNoDraw(true)

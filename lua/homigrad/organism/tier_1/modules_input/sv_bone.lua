@@ -23,6 +23,12 @@ local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ric
 	return (crush and crush * math.max((1 - org[key]) ^ 0.1, 0.5) or (1 - org[key]) * bone), VectorRand(-0.2, 0.2) / math.Clamp(dmg, 0.4, 0.8)
 end
 
+local function markDamagedBone(org, boneName, severity)
+	if hg.organism.MarkDamagedBone then
+		hg.organism.MarkDamagedBone(org, boneName, severity)
+	end
+end
+
 local bonefracture_sounds = {
 	"bonefracture/rem_bonebreak1.wav",
 	"bonefracture/rem_bonebreak2.wav",
@@ -127,6 +133,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	dmg = org[key]
 	org[key] = org[key] * 0.5
+	markDamagedBone(org, key == "lleg" and (segment == "up" and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_L_Calf") or (segment == "up" and "ValveBiped.Bip01_R_Thigh" or "ValveBiped.Bip01_R_Calf"), dmg)
 
 	if dmg < 0.7 then return 0 end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then return 0 end
@@ -179,6 +186,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	local result, vecrand = damageBone(org, 0.3, dmg, dmgInfo, key, boneindex, dir, hit, ricochet)
 	dmg = org[key]
 	org[key] = org[key] * 0.5
+	markDamagedBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"), dmg)
 
 	if dmg < 0.6 then return 0 end
 	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then return 0 end
@@ -224,6 +232,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	end
 
 	local result, vecrand = damageBone(org, 0.1, isCrush(dmgInfo) and dmg * 2 or dmg * 2, dmgInfo, name, boneindex, dir, hit, ricochet)
+	markDamagedBone(org, number == 1 and "ValveBiped.Bip01_Spine1" or (number == 2 and "ValveBiped.Bip01_Spine2" or "ValveBiped.Bip01_Neck1"), org[name])
 	if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakSpine and (name == "spine1" or name == "spine2") and org[name] >= hg.organism[name2] and oldDmg < hg.organism[name2] then
 		hg.BreakSpine(org.owner, name, false)
 	end
@@ -257,14 +266,35 @@ local jaw_dislocated_msg = {
 }
 
 local input_list = hg.organism.input_list
+local function isFistInflictor(dmgInfo)
+	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
+	if not IsValid(inflictor) or not inflictor:IsWeapon() then return false end
+
+	local class = inflictor:GetClass()
+	return class == "weapon_hands_sh" or class == "weapon_hg_coolhands"
+end
+
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.jaw
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 	local jawDelta = org.jaw - oldDmg
+	markDamagedBone(org, "ValveBiped.Bip01_Head1", org.jaw)
 	hg.AddHarmToAttacker(dmgInfo, jawDelta * 3, "Jaw bone damage harm")
 
 	if jawDelta > 0 then
 		org.concussion = math.min((org.concussion or 0) + math.min(jawDelta * 3, 2.25), 10)
+
+		-- Normal jabs still build concussion through jaw damage. A high-damage fist
+		-- strike (such as an uppercut) adds enough rotational trauma to knock out a
+		-- target without bypassing an intact skull to damage the brain directly.
+		if isFistInflictor(dmgInfo) then
+			local fistImpact = math.Clamp(((dmgInfo:GetDamage() or 0) - 11) / 4, 0, 1)
+			if fistImpact > 0 then
+				org.concussion = math.min(org.concussion + 1 + fistImpact * 2, 10)
+				org.consciousness = math.max((org.consciousness or 1) - fistImpact * 0.4, 0)
+				if fistImpact >= 0.75 and org.concussion >= 3 then org.needfake = true end
+			end
+		end
 	end
 
 	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
@@ -307,6 +337,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 	local skullDelta = org.skull - oldDmg
+	markDamagedBone(org, "ValveBiped.Bip01_Head1", org.skull)
 	local brainBefore = org.brain or 0
 
 	if org.skull == 1 then
@@ -361,7 +392,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.shock = org.shock + (dmg > 1 and 50 or dmg * 10)
 	if org.skull > 0.85 and oldDmg <= 0.85 then
-		if org.isPly then org.owner:Notify(huyasd.skull, true, "skull", 4) end
+		if org.isPly and IsValid(org.owner) and org.owner.Notify then org.owner:Notify(huyasd.skull, true, "skull", 4) end
 	end
 	org.disorientation = org.disorientation + dmg
 	return result, vecrand
@@ -379,6 +410,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldBrokenRibs = org.brokenribs or math.Round(oldDmg * 3)
 	if dmgInfo:IsDamageType(DMG_SLASH + DMG_BULLET + DMG_BUCKSHOT) and math.random(5) == 1 then return 0, vector_origin end
 	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
+	markDamagedBone(org, "ValveBiped.Bip01_Spine2", org.chest)
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 	org.painadd = org.painadd + dmg
 	org.shock = org.shock + dmg
@@ -404,6 +436,7 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	org.shock = org.shock + dmg
 	addBoneInternalBleed(org, dmg * 4, 4)
 	local result = damageBone(org, bone, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
+	markDamagedBone(org, "ValveBiped.Bip01_Pelvis", org.pelvis)
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 	if oldDmg >= 1 and dmg >= 0.35 then addBrokenBoneHitTrauma(org, "pelvis", dmg * 0.5, 0.45) end
 	if org.pelvis >= 1 and oldDmg < 1 and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakSpine then hg.BreakSpine(org.owner, "spine1", false) end

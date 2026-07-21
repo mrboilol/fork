@@ -166,6 +166,10 @@ if SERVER then
 						end
 						
 						ent.organism.blood = math.max(ent.organism.blood - (self.modeValues[1] - old) * 500,0)
+						if old ~= self.modeValues[1] and (self.nextPerfusionRefresh or 0) < CurTime() then
+							self.nextPerfusionRefresh = CurTime() + 0.25
+							self:RefreshPerfusionTreatment(ent, 0.18)
+						end
 						if self.sndcd < CurTime() and old ~= self.modeValues[1] then
 							owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".wav")
 							self.sndcd = CurTime() + 0.7
@@ -202,6 +206,10 @@ if SERVER then
 						end
 
 						self.modeValues[1] = math.max(self.modeValues[1] - (ent.organism.blood - old) / (good_type and 500 or 200),0)
+						if old ~= ent.organism.blood and (self.nextPerfusionRefresh or 0) < CurTime() then
+							self.nextPerfusionRefresh = CurTime() + 0.25
+							self:RefreshPerfusionTreatment(ent, good_type and 0.3 or 0.12)
+						end
 						if self.sndcd < CurTime() and old ~= ent.organism.blood  then
 							owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".wav")
 							self.sndcd = CurTime() + 0.7

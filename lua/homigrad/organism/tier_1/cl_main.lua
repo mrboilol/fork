@@ -505,6 +505,10 @@ end
 -- Otrub uses the original Z-City blackout sequence in cl_screeneffects.
 -- During otrub, memories are a faint, slow image only: never a trauma flash.
 hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
+	-- The lobotomy path reads this on the next post-process pass so it cannot
+	-- replace a normal, slowly fading brain-damage memory with a flash.
+	hg.brain_damage_memory_active = false
+
 	local org = lply.organism
 	
 	if !lply:Alive() then return end
@@ -553,6 +557,10 @@ hook.Add("Post Post Pre Post Processing", "ShowScreens", function()
 		-- the eased value reaches zero, instead of cutting the last fade-out frame.
 		lerpedpart = LerpFT(unconscious and 0.018 or 0.04, lerpedpart, part2)
 		if (memoryActive or (switch and lerpedpart > 0.01)) and memory and !memory:IsError() then
+			-- A real zombie keeps its trauma flashes. A living body carrying a
+			-- headcrab is deliberately not treated as a zombie here.
+			hg.brain_damage_memory_active = not unconscious and lply.PlayerClassName ~= "headcrabzombie"
+
 			-- More opaque with higher brain damage. Otrub memories remain subdued.
 			local alpha
 			if unconscious then

@@ -425,7 +425,12 @@ properties.Add( "break_limb", {
 	Order = 13,
 	MenuIcon = "pluv/pluv51.png",
 
-	Filter = check,
+	Filter = function(self, ent, ply)
+		if not check(self, ent, ply) then return false end
+
+		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
+		return ent.organism ~= nil
+	end,
 	MenuOpen = function( self, option, ent, tr )
 		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
 
@@ -493,6 +498,7 @@ properties.Add( "break_limb", {
         
 		if not self:Filter(ent, ply) then return end
        	ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
+		if not ent.organism then return end
         
         local dmgInfo = DamageInfo()
 		if limb == 0 then

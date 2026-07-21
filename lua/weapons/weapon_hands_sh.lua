@@ -1303,6 +1303,42 @@ SWEP.Checking = 0
 SWEP.PulseCheckDuration = 10
 SWEP.PulseCheckTick = 0.02
 
+local function buildPerfusionDiagnosis(org, countedBPM)
+	if not org then return nil end
+	local messages = {}
+	local pulse = countedBPM or tonumber(org.pulse) or tonumber(org.heartbeat) or 0
+	local pressure = tonumber(org.bloodpressure) or 0
+	local perfusion = math.Clamp(tonumber(org.perfusion) or math.Clamp(pressure / 93, 0, 1), 0, 1)
+	local peripheral = math.Clamp(tonumber(org.peripheralperfusion) or perfusion, 0, 1)
+	local brainoxygen = math.Clamp(tonumber(org.brainoxygen) or perfusion, 0, 1)
+	local cerebral = math.Clamp(tonumber(org.cerebralPerfusion) or perfusion, 0, 1)
+	local arterial = tonumber(org.arterialBleed) or 0
+	local venous = tonumber(org.venousBleed) or tonumber(org.bleed) or 0
+	local shock = tonumber(org.shock) or 0
+
+	if pulse >= 105 and (pressure < 55 or perfusion < 0.5 or shock > 20) then
+		messages[#messages + 1] = "Pulse is fast and weak."
+	elseif pulse > 0 and pulse <= 45 and pressure < 60 then
+		messages[#messages + 1] = "Pulse is slow and weak."
+	elseif pulse > 0 and pressure < 38 then
+		messages[#messages + 1] = "Pulse is weak."
+	end
+	if peripheral < 0.45 or (org.blood or 5000) < 3500 then messages[#messages + 1] = "Skin is pale and cold." end
+	if shock > 35 or perfusion < 0.35 or pressure < 35 then messages[#messages + 1] = "They are in shock." end
+	if peripheral < 0.24 and pressure > 11 and pulse > 18 then messages[#messages + 1] = "No radial pulse, but carotid pulse is present." end
+	if pressure < 25 or perfusion < 0.22 or arterial > 3 or venous > 12 then messages[#messages + 1] = "Blood pressure is crashing." end
+	if arterial > 0.5 then messages[#messages + 1] = "Active arterial bleeding needs immediate control." elseif venous > 4 then messages[#messages + 1] = "They have significant venous bleeding." end
+	if org.throatcut then messages[#messages + 1] = "Their throat is cut; control the neck bleeding and airway." end
+	if (org.intracranialPressure or 0) >= 0.72 then messages[#messages + 1] = "Signs suggest critically raised pressure inside the skull."
+	elseif (org.intracranialPressure or 0) >= 0.45 then messages[#messages + 1] = "Their neurological responses suggest rising pressure inside the skull." end
+	if cerebral < 0.35 or brainoxygen < 0.35 then messages[#messages + 1] = "Their brain is being poorly oxygenated and perfused." end
+	return messages
+end
+
+local function printPerfusionDiagnosis(ply, org, countedBPM)
+	for _, message in ipairs(buildPerfusionDiagnosis(org, countedBPM) or {}) do ply:ChatPrint(message) end
+end
+
 function SWEP:StopPulseCheck(targetPly, skipNotify)
 	if not self.ActivePulseChecks then return end
 
@@ -1315,6 +1351,7 @@ function SWEP:StopPulseCheck(targetPly, skipNotify)
 			if not skipNotify and IsValid(ply) and data and data.completed and data.counted then
 				local bpm = data.counted * 6
 				ply:Notify(data.counted .. " x 6 = " .. bpm .. " BPM", 3)
+				printPerfusionDiagnosis(ply, data.org, bpm)
 			end
 
 			self.ActivePulseChecks[ply] = nil
@@ -1662,8 +1699,10 @@ function SWEP:ApplyForce()
 							-- Track CPR duration
 							self.CPRDuration = (self.CPRDuration or 0) + (1 / 120) * 60
 							
-							-- Improved oxygenation
-							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)
+							-- CPR must provide enough oxygen to get an arrested patient back into
+							-- the recoverable band, even when their normal lung regeneration is 0.
+							local oxygenation = hg.organism.OxygenateBlood(org)
+							org.o2[1] = math.min(org.o2[1] + math.max(oxygenation * 3, 2) * skillMult, org.o2.range)
 							
 							-- Much better pulse restoration - works even from 0
 							org.pulse = math.min(org.pulse + 15 * skillMult, 70)
@@ -1696,25 +1735,34 @@ function SWEP:ApplyForce()
 							
 							-- Heart restart based on CPR duration and pulse
 							-- Longer CPR = higher chance, even with 0 pulse
-							local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85
+							local canRestartHeart = org.alive and (org.blood or 5000) >= 900 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
 							local durationChance = math.Clamp(self.CPRDuration / 8, 0, 0.75) * skillMult -- Up to 75% after 8 seconds (150% for doctors)
 							local pulseChance = math.Clamp((org.pulse or 0) / 70, 0, 1) * 0.6 * skillMult
 							local adrenalineChance = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0)) / 4, 0, 1) * 0.45
 							local totalChance = math.Clamp(durationChance + pulseChance + adrenalineChance, 0, 0.98)
 							
-							if canRestartHeart and org.heartstop and math.random() < totalChance then
+							if canRestartHeart and org.heartstop and (org.pulse > 5 or math.random() < totalChance) then
 								org.heartstop = false
-								-- Reset heartbeat to safe range
+								org.terminalRhythm = nil
+								org.unstableRhythm = nil
+								org.cardiacArrestStart = nil
+								org.cardiacArrestO2Start = nil
+								org._zeroO2Time = 0
 								org.heartbeat = math.Clamp(org.heartbeat > 0 and org.heartbeat or 90, 80, 140)
-								org.bloodpressure = math.max(org.bloodpressure or 0, 45)
-							elseif canRestartHeart and org.pulse > 5 then
-								org.heartstop = false
-							elseif canRestartHeart and org.pulse > 0 and math.random(100) < (org.pulse * 12 * skillMult) then
-								org.heartstop = false
+								org.pulse = math.max(org.pulse or 0, 35)
+								org.bloodpressure = math.max(org.bloodpressure or 0, 55)
+								org.o2[1] = math.max(org.o2[1], 8)
 							end
+
+							-- Keep active chest compressions from being erased by the next low-output
+							-- physiology tick before the restarted heart can build its own pressure.
+							if not org.heartstop then org.cardiacRestartUntil = CurTime() + 1 end
 							
 							-- Reduce ischemia during CPR
 							org.ischemia = math.max((org.ischemia or 0) - 0.5 * skillMult, 0)
+							if hg.organism.UpdatePerfusion then
+								hg.organism.UpdatePerfusion(org.owner or ply2, org, 0.2 * skillMult)
+							end
 						end
 
 						phys:ApplyForceCenter(-vector_up * 6000)

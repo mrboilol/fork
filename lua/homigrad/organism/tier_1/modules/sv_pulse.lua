@@ -270,7 +270,8 @@ module[2] = function(owner, org, timeValue)
 
 	-- At terminal blood volume, bradycardia/poor filling finally progress to
 	-- deterministic arrest. The 2000 mL band remains severe compensated shock.
-	if not org.heartstop and bloodNow <= cardiacArrestBlood and (org.heartbeat <= 40 or bradycardiaSeverity >= 0.7) then
+	local restartCirculationActive = (org.cardiacRestartUntil or 0) > CurTime()
+	if not org.heartstop and not restartCirculationActive and bloodNow <= cardiacArrestBlood and (org.heartbeat <= 40 or bradycardiaSeverity >= 0.7) then
 		org.heartstop = true
 	end
 
@@ -398,6 +399,18 @@ module[2] = function(owner, org, timeValue)
 		map = map * (1 - velocityPenalty)
 	end
 
+	-- Keep the existing mmHg model, but make its pressure target respond to
+	-- Vottur's separate loss channels instead of waiting only for blood volume
+	-- to fall. Arterial loss causes the sharpest immediate pressure collapse.
+	local arterialLoss = math.max(org.arterialBleed or 0, 0)
+	local venousLoss = math.max(org.venousBleed or 0, 0)
+	local internalLoss = math.max(org.internalBleedRate or 0, 0)
+	local bleedPressureLoss = math.Clamp(arterialLoss / 18, 0, 0.50)
+		+ math.Clamp(venousLoss / 65, 0, 0.18)
+		+ math.Clamp(internalLoss / 45, 0, 0.22)
+	local throatPressureLoss = math.Clamp(org.throatCutPressureShock or 0, 0, 1) * 0.22
+	map = map * math.Clamp(1 - bleedPressureLoss - throatPressureLoss, 0.08, 1)
+
 	if org.givingUp then map = map * 0.75 end
 
 	map = math.Clamp(map, 0, 190)
@@ -505,11 +518,14 @@ module[2] = function(owner, org, timeValue)
 	org.fearadd = math.Approach(org.fearadd, 1, fearGainRate)
 	
 	local adrenK = max(1 + org.adrenaline, 1)
-	local adren = org.adrenaline
+	-- Medication fills adrenalineAdd first; include that active dose so an
+	-- epinephrine injection can affect an arrest before its normal decay tick.
+	local adren = math.max(org.adrenaline or 0, org.adrenalineAdd or 0)
 
 	local bloodCurveOwnsArrest = bloodNow <= 2300 and (org.heart or 0) < 0.8 and org.brain < 0.85
 	if organSystemsEnabled then
-		if ((org.pulse < 10 or org.bloodpressure < 25) and not bloodCurveOwnsArrest) or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
+		local failedCirculation = (org.pulse < 10 or org.bloodpressure < 25) and not bloodCurveOwnsArrest and not restartCirculationActive
+		if failedCirculation or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
 		if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	end
 
@@ -547,13 +563,17 @@ module[2] = function(owner, org, timeValue)
 
 		if canRestartHeart and chance > rand then
 			org.heartstop = false
-			-- Reset heartbeat to a safe range when restarting to prevent immediate fibrillation
+			org.terminalRhythm = nil
+			org.unstableRhythm = nil
+			org.cardiacArrestStart = nil
+			org.cardiacArrestO2Start = nil
+			org._zeroO2Time = 0
 			org.heartbeat = math.Clamp(org.heartbeat > 0 and org.heartbeat or 90, 80, 140)
 			org.pulse = math.max(org.pulse or 0, 35)
-			org.bloodpressure = math.max(org.bloodpressure or 0, 45)
-			-- Also attempt to restore O2 to a minimum survivable level so breathing can resume
+			org.bloodpressure = math.max(org.bloodpressure or 0, 55)
+			org.cardiacRestartUntil = CurTime() + 2
 			if org.o2 then
-				local o2Restore = math.Clamp(adren * 2.5, 3, 12)
+				local o2Restore = math.Clamp(adren * 2.5, 8, 12)
 				org.o2[1] = math.max(org.o2[1], o2Restore)
 			end
 		end

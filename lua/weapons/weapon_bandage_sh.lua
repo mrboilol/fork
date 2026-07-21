@@ -455,6 +455,27 @@ end
 SWEP.ShouldDeleteOnFullUse = true
 
 if SERVER then
+	-- Keep all derived medicine synchronized with the perfusion state after a
+	-- treatment changes bleeding, blood volume, or oxygen delivery.
+	function SWEP:RefreshPerfusionTreatment(ent, amount)
+		local org = ent and ent.organism
+		if not org then return end
+		amount = math.Clamp(tonumber(amount) or 0.2, 0.05, 1)
+		local oldPerfusion = org.perfusion or 1
+		local oldBrainOxygen = org.brainoxygen or oldPerfusion
+
+		if not istable(org.arterialwounds) or #org.arterialwounds == 0 then org.arterialBleed = 0 end
+		if not istable(org.wounds) or #org.wounds == 0 then org.venousBleed = 0 end
+		if (org.internalBleed or 0) <= (org.internalBleedHeal or 0) then org.internalBleedRate = 0 end
+		if hg.organism and hg.organism.UpdatePerfusion then
+			hg.organism.UpdatePerfusion(org.owner or ent, org, amount)
+		end
+		if (org.perfusion or 0) > oldPerfusion or (org.brainoxygen or 0) > oldBrainOxygen then
+			org.hypoxiaTime = math.Approach(org.hypoxiaTime or 0, 0, amount * 4)
+			org.severeHypoxiaTime = math.Approach(org.severeHypoxiaTime or 0, 0, amount * 3)
+		end
+	end
+
 	local function CanHealKey(org, key)
 		local v = tonumber(org[key] or 0) or 0
 		if key == "larm" and org.larmamputated then return false end
@@ -581,6 +602,25 @@ if SERVER then
 		local done = false
 		local bandaged = false
 		local treatedPrimary = false
+
+		-- A neck cannot be tourniqueted. A bandage can seal the carotid wound and
+		-- lessen the shock, while the tracheal injury stays a separate airway issue.
+		if org.throatcut and self.modeValues[1] > 0 and (not bone or bone == "ValveBiped.Bip01_Neck1" or bone == "ValveBiped.Bip01_Head1") then
+			for i = #(org.arterialwounds or {}), 1, -1 do
+				local wound = org.arterialwounds[i]
+				if wound[7] == "arteria" then
+					local seal = math.min(wound[1] or 0, self.modeValues[1] * 10)
+					wound[1] = math.max((wound[1] or 0) - seal, 0)
+					self.modeValues[1] = math.max(self.modeValues[1] - seal / 10, 0)
+					org.throatCutPressureShock = math.max((org.throatCutPressureShock or 0) - seal / 36, 0)
+					org.neckBrainOxygenPenalty = math.max((org.neckBrainOxygenPenalty or 0) - seal / 54, 0)
+					if wound[1] <= 0 then table.remove(org.arterialwounds, i) end
+					done, bandaged, treatedPrimary = true, true, true
+					break
+				end
+			end
+			if done and hg.organism.RebuildArteryWoundState then hg.organism.RebuildArteryWoundState(org, true) end
+		end
 
 		-- Prioritize bleeding wounds first
 		if not bone then
@@ -821,6 +861,7 @@ if SERVER then
 
 				self.poisoned2 = nil
 			end
+			self:RefreshPerfusionTreatment(ent, bandaged and 0.25 or 0.12)
 		end
 
 		return done
@@ -1108,6 +1149,7 @@ if SERVER then
 		end
 
 		SetNetVar("TourniquetGuys", hg.TourniquetGuys)
+		self:RefreshPerfusionTreatment(target, bestArterial and 0.45 or 0.25)
 
 		self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
 		return true

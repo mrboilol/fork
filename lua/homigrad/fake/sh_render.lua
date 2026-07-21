@@ -215,6 +215,8 @@ end
 			hg.ProjectilesDraw(ent, ply)
 		end
 
-		if detailRender and ply:GetNetVar("headcrab") then hg.RenderHeadcrab(ent, ply) end
+		-- A headcrab replaces the visible head, so do not cull it under the optional
+		-- detail-render distance used for cosmetic props.
+		if ply:GetNetVar("headcrab") then hg.RenderHeadcrab(ent, ply) end
 	end
 --//

@@ -88,7 +88,9 @@ local gunfight_adrenaline_delay = 1.5
 local gunfight_adrenaline_cap = 1.5
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
 local seizure_duration = 15
-local seizure_end_shock = 20
+local seizure_end_shock = 35
+local seizure_brain_damage_per_second = 0.0015
+local seizure_shock_per_second = 1.5
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
 local seizure_leg_buckle = 46
@@ -127,6 +129,21 @@ hook.Add("Org Clear", "Main", function(org)
 	org.brainOccipital = 0
 	org.brainHemorrhage = 0
 	org.brainBleedRate = 0
+	-- Perfusion is kept separate from the existing mmHg blood-pressure value:
+	-- pressure is the pump's output, while perfusion describes how much of that
+	-- output reaches the body and brain.
+	org.brainSwelling = 0
+	org.intracranialPressure = 0
+	org.cerebralPerfusion = 1
+	org.bodyoxygen = 1
+	org.perfusion = 1
+	org.brainoxygen = 1
+	org.peripheralperfusion = 1
+	org.perfusionMoveMul = 1
+	org.perfusionGripMul = 1
+	org.hypoxiaTime = 0
+	org.severeHypoxiaTime = 0
+	org.neckBrainOxygenPenalty = 0
 	org.eyeL = 0
 	org.eyeR = 0
 	org.eyeLDestroyed = nil
@@ -274,6 +291,89 @@ function hg.organism.OrganSystemsEnabled()
 	return hg_huyorgans:GetBool()
 end
 
+local function approachVital(current, target, timeValue, rate)
+	return math.Approach(tonumber(current) or target, target, math.max(timeValue or 0, 0) * rate)
+end
+
+-- Vottur's perfusion model, adapted to this checkout's existing mmHg blood
+-- pressure.  Do not write bloodpressure here: sv_pulse remains the sole owner
+-- of pressure/ECG and this derives delivery from its result.
+function hg.organism.UpdateIntracranialPressure(org, pressure, timeValue)
+	if not org then return 1 end
+
+	local dt = timeValue or engine.TickInterval()
+	local hemorrhage = math.Clamp(org.brainHemorrhage or 0, 0, 1)
+	local bleedStress = math.Clamp((org.brainBleedRate or 0) / 0.0035, 0, 1)
+	local brainTrauma = math.Clamp(org.brain or 0, 0, 1)
+	local skullTrauma = math.Clamp(org.skull or 0, 0, 1)
+	local mannitolRelief = math.Clamp((org.mannitol or 0) / 2, 0, 1)
+	local hypoxicEdema = math.Clamp(((org.hypoxiaTime or 0) - 25) / 50, 0, 1) * 0.16
+	local swellingTarget = math.Clamp(hemorrhage * 0.62 + bleedStress * 0.18 + brainTrauma * 0.24 + skullTrauma * 0.06 + hypoxicEdema - mannitolRelief * 0.22, 0, 1)
+
+	org.brainSwelling = approachVital(org.brainSwelling, swellingTarget, dt, swellingTarget > (org.brainSwelling or 0) and 0.026 or (0.006 + mannitolRelief * 0.02))
+	local icpTarget = math.Clamp((org.brainSwelling or 0) * 0.78 + hemorrhage * 0.24 + bleedStress * 0.12 - mannitolRelief * 0.08, 0, 1)
+	org.intracranialPressure = approachVital(org.intracranialPressure, icpTarget, dt, icpTarget > (org.intracranialPressure or 0) and 0.10 or (0.03 + mannitolRelief * 0.05))
+
+	local pressurePenalty = math.Clamp(math.Remap(org.intracranialPressure, 0.15, 0.85, 0, 0.9), 0, 0.9)
+	local cerebralTarget = math.Clamp((pressure or 0) - pressurePenalty, 0, 1)
+	org.cerebralPerfusion = approachVital(org.cerebralPerfusion, cerebralTarget, dt, 2.5)
+	return org.cerebralPerfusion
+end
+
+function hg.organism.UpdatePerfusion(owner, org, timeValue)
+	if not org then return end
+
+	local dt = timeValue or engine.TickInterval()
+	local blood = math.max(org.blood or 0, 0)
+	local bloodFraction = math.Clamp((blood - 1800) / 2700, 0, 1)
+	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
+	local arterialBleed = math.max(org.arterialBleed or 0, 0)
+	local venousBleed = math.max(org.venousBleed or 0, 0)
+	local internalBleed = math.max(org.internalBleedRate or 0, 0)
+	local arterialPenalty = math.Clamp(arterialBleed / 18, 0, 0.50)
+	local venousPenalty = math.Clamp(venousBleed / 65, 0, 0.18)
+	local internalPenalty = math.Clamp(internalBleed / 45, 0, 0.22)
+	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35)
+	local throatPenalty = math.Clamp(org.throatCutPressureShock or 0, 0, 1)
+	local neckPenalty = math.Clamp(org.neckBrainOxygenPenalty or 0, 0, 1)
+	local pump = math.Clamp((org.bloodpressure or 0) / 93, 0, 1.2)
+	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
+
+	org.bodyoxygen = approachVital(org.bodyoxygen, oxygen, dt, 2.5)
+	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - arterialPenalty - venousPenalty - internalPenalty - shockPenalty * 0.45 - throatPenalty * 0.22, 0, 1)
+	local perfusionTarget = math.Clamp(pressureDelivery * Lerp(org.bodyoxygen, 0.55, 1), 0, 1)
+	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - arterialPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
+
+	org.perfusion = approachVital(org.perfusion, perfusionTarget, dt, 3.5)
+	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, pump, dt)
+	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05), 0, 1)
+	org.brainoxygen = approachVital(org.brainoxygen, brainTarget, dt, 3.5)
+	org.peripheralperfusion = approachVital(org.peripheralperfusion, peripheralTarget, dt, 3.5)
+	org.neckBrainOxygenPenalty = math.Approach(neckPenalty, 0, dt * 1.5)
+	org.throatCutPressureShock = math.Approach(throatPenalty, 0, dt * 0.035)
+
+	org.perfusionMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1)
+	org.perfusionGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1)
+
+	local badHypoxia = org.brainoxygen < 0.45 or org.cerebralPerfusion < 0.4 or org.perfusion < 0.35
+	local severeHypoxia = org.brainoxygen < 0.22 or org.cerebralPerfusion < 0.18 or org.perfusion < 0.16
+	org.hypoxiaTime = badHypoxia and math.min((org.hypoxiaTime or 0) + dt * (severeHypoxia and 2.25 or 1), 120) or math.Approach(org.hypoxiaTime or 0, 0, dt * 2)
+	org.severeHypoxiaTime = severeHypoxia and math.min((org.severeHypoxiaTime or 0) + dt, 120) or math.Approach(org.severeHypoxiaTime or 0, 0, dt * 1.5)
+
+	if owner and owner.IsBerserk and owner:IsBerserk() then return end
+	if org.brainoxygen < 0.55 and ((org.hypoxiaTime or 0) > 8 or (org.severeHypoxiaTime or 0) > 3) then
+		org.consciousness = math.min(org.consciousness or 1, math.Clamp(math.Remap(org.brainoxygen, 0.18, 0.55, 0.05, 1), 0.05, 1))
+	end
+	if org.perfusion < 0.4 and ((org.hypoxiaTime or 0) > 10 or (org.severeHypoxiaTime or 0) > 4) then
+		org.disorientation = math.max(org.disorientation or 0, math.Remap(org.perfusion, 0.4, 0, 1.5, 6))
+	end
+	if org.peripheralperfusion < 0.32 then
+		org.immobilization = math.max(org.immobilization or 0, math.Remap(org.peripheralperfusion, 0.32, 0, 1.5, 7))
+	end
+	if (org.perfusion < 0.32 or org.brainoxygen < 0.35) and ((org.hypoxiaTime or 0) > 16 or (org.severeHypoxiaTime or 0) > 6) then org.needfake = true end
+	if (org.perfusion < 0.18 or org.brainoxygen < 0.2) and ((org.hypoxiaTime or 0) > 26 or (org.severeHypoxiaTime or 0) > 10) then org.needotrub = true end
+end
+
 local function send_organism(org, ply)
 	if not IsValid(org.owner) then return end
 	local sendtable = {}
@@ -322,6 +422,18 @@ local function send_organism(org, ply)
 	sendtable.hypovolemia = org.hypovolemia
 	sendtable.hypovolemicShock = org.hypovolemicShock
 	sendtable.bloodO2Cap = org.bloodO2Cap
+	sendtable.arterialBleed = org.arterialBleed
+	sendtable.venousBleed = org.venousBleed
+	sendtable.internalBleedRate = org.internalBleedRate
+	sendtable.bodyoxygen = org.bodyoxygen
+	sendtable.perfusion = org.perfusion
+	sendtable.brainoxygen = org.brainoxygen
+	sendtable.peripheralperfusion = org.peripheralperfusion
+	sendtable.cerebralPerfusion = org.cerebralPerfusion
+	sendtable.intracranialPressure = org.intracranialPressure
+	sendtable.throatcut = org.throatcut
+	sendtable.throatCutUntil = org.throatCutUntil
+	sendtable.throatCutSeverity = org.throatCutSeverity
 	sendtable.bloodpressure = org.bloodpressure
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
@@ -361,6 +473,9 @@ local function send_organism(org, ply)
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
 	sendtable.seizureEnd = org.seizureEnd
+	sendtable.damagedBoneName = org.damagedBoneName
+	sendtable.damagedBoneSeverity = org.damagedBoneSeverity
+	sendtable.damagedBoneTime = org.damagedBoneTime
 	sendtable.LodgedEntities = org.LodgedEntities
 	sendtable.CantCheckPulse = org.CantCheckPulse
 	sendtable.blindness = org.blindness
@@ -420,6 +535,18 @@ local function send_bareinfo(org)
 	sendtable.hypovolemia = org.hypovolemia
 	sendtable.hypovolemicShock = org.hypovolemicShock
 	sendtable.bloodO2Cap = org.bloodO2Cap
+	sendtable.arterialBleed = org.arterialBleed
+	sendtable.venousBleed = org.venousBleed
+	sendtable.internalBleedRate = org.internalBleedRate
+	sendtable.bodyoxygen = org.bodyoxygen
+	sendtable.perfusion = org.perfusion
+	sendtable.brainoxygen = org.brainoxygen
+	sendtable.peripheralperfusion = org.peripheralperfusion
+	sendtable.cerebralPerfusion = org.cerebralPerfusion
+	sendtable.intracranialPressure = org.intracranialPressure
+	sendtable.throatcut = org.throatcut
+	sendtable.throatCutUntil = org.throatCutUntil
+	sendtable.throatCutSeverity = org.throatCutSeverity
 	sendtable.bloodpressure = org.bloodpressure
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
@@ -456,6 +583,9 @@ local function send_bareinfo(org)
 	sendtable.seizureActive = org.seizureActive
 	sendtable.seizureStart = org.seizureStart
 	sendtable.seizureEnd = org.seizureEnd
+	sendtable.damagedBoneName = org.damagedBoneName
+	sendtable.damagedBoneSeverity = org.damagedBoneSeverity
+	sendtable.damagedBoneTime = org.damagedBoneTime
 	sendtable.brainFrontal = org.brainFrontal
 	sendtable.brainParietal = org.brainParietal
 	sendtable.brainTemporal = org.brainTemporal
@@ -536,6 +666,15 @@ function hg.organism.AddSeizure(org, amount)
 	return org.seizure
 end
 
+function hg.organism.MarkDamagedBone(org, boneName, severity)
+	if not org or not isstring(boneName) then return end
+
+	org.damagedBoneName = boneName
+	org.damagedBoneSeverity = math.Clamp(severity or 0.5, 0, 1)
+	org.damagedBoneTime = CurTime()
+	if IsValid(org.owner) then org.owner.fullsend = true end
+end
+
 local function reduceSeizure(org, amount)
 	if not org or not isnumber(amount) or amount <= 0 then return org and org.seizure or 0 end
 
@@ -575,6 +714,7 @@ local function start_seizure(owner, org)
 	org.seizureStart = time
 	org.seizureEnd = time + seizure_duration
 	org.nextSeizureSpasm = time
+	org.lastSeizureInjuryTime = time
 	owner.fullsend = true
 	send_organism(org, owner)
 end
@@ -1031,6 +1171,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 
 	module.pulse[2](owner, org, timeValue)
+	-- Derive systemic/brain delivery only after the blood and pulse modules
+	-- have supplied this tick's bleed rates, oxygen and pump output.
+	hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	if org.owner.PlayerClassName == "furry" then
 		org.assimilated = 0
@@ -1189,6 +1332,15 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.needotrub = true
 			stop_seizure(owner, org)
 		else
+			local lastInjuryTime = org.lastSeizureInjuryTime or time
+			local injuryDelta = math.Clamp(time - lastInjuryTime, 0, 0.25)
+			org.lastSeizureInjuryTime = time
+
+			-- A seizure is physiologically stressful without becoming a major new
+			-- source of brain trauma: a full 15-second event adds only 0.0225.
+			org.brain = math.min((org.brain or 0) + injuryDelta * seizure_brain_damage_per_second, 1)
+			org.shock = math.min((org.shock or 0) + injuryDelta * seizure_shock_per_second, 85)
+
 			local rag = owner.FakeRagdoll
 			if IsValid(rag) then
 				apply_seizure_pose(rag, org, time)

@@ -12,6 +12,34 @@ util.AddNetworkString("hg_coolhands_hit_stop")
 local math = math -- owo
 local math_random, math_Clamp, CurTime, Color = math.random, math.Clamp, CurTime, Color
 
+local function PrintPerfusionDiagnosis(ply, org)
+	if not IsValid(ply) or not org then return end
+
+	local pressure = tonumber(org.bloodpressure) or 0
+	local perfusion = math.Clamp(tonumber(org.perfusion) or math.Clamp(pressure / 93, 0, 1), 0, 1)
+	local peripheral = math.Clamp(tonumber(org.peripheralperfusion) or perfusion, 0, 1)
+	local brainoxygen = math.Clamp(tonumber(org.brainoxygen) or perfusion, 0, 1)
+	local arterial = tonumber(org.arterialBleed) or 0
+	local venous = tonumber(org.venousBleed) or tonumber(org.bleed) or 0
+	local pulse = tonumber(org.pulse) or 0
+
+	if pulse >= 105 and (pressure < 55 or perfusion < 0.5 or (org.shock or 0) > 20) then
+		ply:ChatPrint("Pulse is fast and weak.")
+	elseif pulse > 0 and pulse <= 45 and pressure < 60 then
+		ply:ChatPrint("Pulse is slow and weak.")
+	elseif pulse > 0 and pressure < 38 then
+		ply:ChatPrint("Pulse is weak.")
+	end
+	if peripheral < 0.45 or (org.blood or 5000) < 3500 then ply:ChatPrint("Skin is pale and cold.") end
+	if (org.shock or 0) > 35 or perfusion < 0.35 or pressure < 35 then ply:ChatPrint("They are in shock.") end
+	if peripheral < 0.24 and pressure > 11 and pulse > 18 then ply:ChatPrint("No radial pulse, but carotid pulse is present.") end
+	if pressure < 25 or perfusion < 0.22 or arterial > 3 or venous > 12 then ply:ChatPrint("Blood pressure is crashing.") end
+	if arterial > 0.5 then ply:ChatPrint("Active arterial bleeding needs immediate control.") elseif venous > 4 then ply:ChatPrint("They have significant venous bleeding.") end
+	if org.throatcut then ply:ChatPrint("Their throat is cut; control the neck bleeding and airway.") end
+	if (org.intracranialPressure or 0) >= 0.72 then ply:ChatPrint("Signs suggest critically raised pressure inside the skull.") end
+	if (org.cerebralPerfusion or perfusion) < 0.35 or brainoxygen < 0.35 then ply:ChatPrint("Their brain is being poorly oxygenated and perfused.") end
+end
+
 local ang4 = Angle(0,0,180)
 local ang5 = Angle(0,0,0)
 
@@ -374,6 +402,7 @@ function SWEP:ApplyForce()
 						if org.bleed > 0 then
 							ply:ChatPrint("The body is bleeding "..((org.bleed > 10 and "profusely.") or (org.bleed > 5 and "moderately.") or "slightly."))
 						end
+						PrintPerfusionDiagnosis(ply, org)
 
 						//org.bulletwounds = 0
 						//org.stabwounds = 0
@@ -469,6 +498,7 @@ function SWEP:ApplyForce()
 						self.CPRThink = CurTime() + (1 / 120) * 60
 						if org.alive then
 							local skillMult = ply.Profession == "doctor" and 2 or 1
+							self.CPRDuration = (self.CPRDuration or 0) + (1 / 120) * 60
 							
 							-- Improved oxygenation
 							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)
@@ -503,19 +533,30 @@ function SWEP:ApplyForce()
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
 							
-							-- Much more reliable heart restart - pulse threshold lowered, and direct chance based on pulse
-							if org.pulse > 5 then
+							local canRestartHeart = org.alive and (org.blood or 5000) >= 900 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
+							local durationChance = math.Clamp((self.CPRDuration or 0) / 8, 0, 0.75) * skillMult
+							local pulseChance = math.Clamp((org.pulse or 0) / 70, 0, 1) * 0.6 * skillMult
+							local adrenalineChance = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0)) / 4, 0, 1) * 0.45
+							local restartChance = math.Clamp(durationChance + pulseChance + adrenalineChance, 0, 0.98)
+							if canRestartHeart and org.heartstop and ((org.pulse or 0) > 5 or math.random() < restartChance) then
 								org.heartstop = false
-							elseif org.pulse > 0 and math.random(100) < (org.pulse * 10 * skillMult) then
-								-- Even with low pulse, have a chance to restart based on current pulse level
-								org.heartstop = false
-							elseif org.heartstop and math.random(100) < (5 * skillMult) then
-								org.heartstop = false
-								org.pulse = math.max(org.pulse, 5)
+								org.terminalRhythm = nil
+								org.unstableRhythm = nil
+								org.cardiacArrestStart = nil
+								org.cardiacArrestO2Start = nil
+								org._zeroO2Time = 0
+								org.heartbeat = math.Clamp((org.heartbeat or 0) > 0 and org.heartbeat or 90, 80, 140)
+								org.pulse = math.max(org.pulse or 0, 35)
+								org.bloodpressure = math.max(org.bloodpressure or 0, 55)
+								org.o2[1] = math.max(org.o2[1] or 0, 8)
 							end
+							if not org.heartstop then org.cardiacRestartUntil = CurTime() + 1 end
 							
 							-- Reduce ischemia during CPR
 							org.ischemia = math.max((org.ischemia or 0) - 0.5 * skillMult, 0)
+							if hg.organism.UpdatePerfusion then
+								hg.organism.UpdatePerfusion(org.owner or ply2, org, 0.2 * skillMult)
+							end
 						end
 
 						phys:ApplyForceCenter(-vector_up * 6000)
@@ -527,6 +568,7 @@ function SWEP:ApplyForce()
 			else
 				self.firstTimePrint = true
 				self.firstTimePrint2 = true
+				self.CPRDuration = 0
 			end
 
 			if ply:KeyDown(IN_ATTACK) and ply.PlayerClassName == "furry" and org ~= nil and org.alive and org.owner.PlayerClassName != "furry" and !(org.owner.IsBerserk and org.owner:IsBerserk()) then

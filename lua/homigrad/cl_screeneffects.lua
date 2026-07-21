@@ -346,9 +346,7 @@ GivingUpStationVol = 0
 
 show_image_time = 0
 show_some_images_time = 0
-lobotomy_memory_mat = nil
 lobotomy_memory_total = 1
-lobotomy_memory_flash = false
 lobotomy_flash_mat = nil
 lobotomy_next_forced_flash = 0
 lobotomy_recent_trauma = 0
@@ -453,41 +451,16 @@ nextSeizureFlash = 0
 nextSeizureCamShake = 0
 seizureFinalFlashFired = false
 
-local function getLobotomyMemoryMat()
-	local screens = hg and hg.screens
-	if not screens then return end
-
-	local valid = {}
-	for i = 1, #screens do
-		local mat = screens[i]
-		if mat and not mat:IsError() then
-			valid[#valid + 1] = mat
-		end
-	end
-
-	if #valid <= 0 then return end
-	return valid[math.random(#valid)]
-end
-
 local function getLobotomyFlashMat()
 	return lobotomy_mats[math.random(#lobotomy_mats)]
 end
 
-local function startLobotomyFlash(duration, traumaPower, allowMemory)
+local function startLobotomyFlash(duration)
+	if hg.brain_damage_memory_active and lply.PlayerClassName ~= "headcrabzombie" then return end
+
 	show_image_time = math.max(duration or 45, 1)
 	lobotomy_memory_total = show_image_time
 	lobotomy_flash_mat = getLobotomyFlashMat()
-	lobotomy_memory_flash = false
-	lobotomy_memory_mat = nil
-
-	if allowMemory then
-		local memoryChance = math.Clamp(0.20 + (traumaPower or 0) * 0.40, 0.20, 0.70)
-		local memoryMat = math.Rand(0, 1) < memoryChance and getLobotomyMemoryMat() or nil
-		if memoryMat then
-			lobotomy_memory_flash = true
-			lobotomy_memory_mat = memoryMat
-		end
-	end
 end
 
 local function drawLobotomyFlash(alpha, mat)
@@ -541,10 +514,13 @@ local function updateSeizureEffects(org)
 		end
 
 		if canRetrySound("SeizureStation", SeizureStation) then
+			local seizureDuration = math.max(seizureClientEnd - seizureClientStart, 0.001)
+			local seizureTimeline = math.Clamp((CurTime() - seizureClientStart) / seizureDuration, 0, 1)
 			sound.PlayFile(seizureSoundPath, "noblock noplay", function(station)
 				if IsValid(station) then
 					station:SetVolume(0)
 					station:Play()
+					station:SetTime(seizureTimeline * station:GetLength())
 					station:EnableLooping(true)
 					SeizureStation = station
 				end
@@ -804,6 +780,21 @@ local despairVisualLerp = 0
 local giveUpWhiteLerp = 0
 local WhiteNoiseStation
 local soundRetry = {}
+local otrubBlurLerp = 0
+
+hook.Add("HG_OnOtrub", "OtrubFreezeFade", function(ply)
+	if ply ~= LocalPlayer() then return end
+
+	otrubBlurLerp = 0
+	local org = ply.new_organism or ply.organism
+	local adrenaline = math.Clamp((org and org.adrenaline) or 0, 0, 1.5)
+	local adrenalineIntensity = adrenaline / 1.5
+
+	-- Run the blackout only once at the moment consciousness is lost.  Repeating
+	-- ScreenFade every frame prevents the old fade-away feeling from completing.
+	ply:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 3.5 + adrenalineIntensity * 2, 0.5)
+end)
+
 function canRetrySound(key, station)
 	if IsValid(station) and station:GetState() == GMOD_CHANNEL_PLAYING then return false end
 	local nextTry = soundRetry[key] or 0
@@ -1446,8 +1437,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 
 		if org.otrub then
-			DrawMotionBlur(0.1, 1., 0.01)
-			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
+			-- Once the frozen blackout has faded away, retain only the faint old
+			-- motion-blur outline. Adrenaline makes that after-image more pronounced.
+			local otrubAdrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
+			otrubBlurLerp = LerpFT(0.08, otrubBlurLerp, otrubAdrenaline)
+			DrawMotionBlur(0.055 + otrubBlurLerp * 0.035, 0.28 + otrubBlurLerp * 0.28, 0.02)
+		else
+			otrubBlurLerp = LerpFT(0.06, otrubBlurLerp, 0)
 		end
 		
 		//if pain > 10 then
@@ -1614,7 +1610,13 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local brainDamaged = brain >= 0.05
 	local brainFlashScale = math.Clamp((brain - 0.05) / (0.35 - 0.05), 0, 1)
 	local recentSevereHeadTrauma = lobotomy_recent_trauma > CurTime()
-	if (brainDamaged or recentSevereHeadTrauma) and not org.otrub then
+	local backgroundMemoryActive = hg.brain_damage_memory_active and lply.PlayerClassName ~= "headcrabzombie"
+	if backgroundMemoryActive then
+		brain_motionblur = false
+		show_image_time = 0
+		show_some_images_time = 0
+		lobotomy_flash_mat = nil
+	elseif (brainDamaged or recentSevereHeadTrauma) and not org.otrub then
 		if show_image_time > 0 then
 			brain_motionblur = true
 			DrawMotionBlur(0.04 + brainFlashScale * 0.06, 0.35 + brainFlashScale * 0.65, 0.1)
@@ -1622,21 +1624,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local alpha = 255 * math.Clamp(show_image_time / math.max(lobotomy_memory_total, 1), 0, 1)
 			show_image_time = show_image_time - 1
 
-			if lobotomy_memory_flash and lobotomy_memory_mat then
-				local rand = 6
-				surface.SetDrawColor(255, 255, 255, alpha)
-				surface.SetMaterial(lobotomy_memory_mat)
-				surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand * 2), ScrH() + math.random(rand * 2))
-
-				render.UpdateScreenEffectTexture()
-				vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-				vignetteMat:SetFloat("$c0_z", 4.5)
-				vignetteMat:SetFloat("$c1_y", 7.0)
-				render.SetMaterial(vignetteMat)
-				render.DrawScreenQuad()
-			else
-				drawLobotomyFlash(alpha)
-			end
+			drawLobotomyFlash(alpha)
 		elseif brainDamaged and show_some_images_time > 0 then
 			brain_motionblur = true
 			DrawMotionBlur(0.035 + brainFlashScale * 0.065, 0.3 + brainFlashScale * 0.7, 0.1)
@@ -1644,7 +1632,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local flashChance = math.max(12, math.floor(28 - brainFlashScale * 12))
 			if math.random(flashChance) < 2 then
 				local flashDuration = (16 + brainFlashScale * 26) * math.Rand(0.75, 1.2)
-				startLobotomyFlash(flashDuration, brainFlashScale, true)
+				startLobotomyFlash(flashDuration)
 			end
 		else
 			brain_motionblur = false
@@ -1654,8 +1642,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		brain_motionblur = false
 		show_image_time = 0
 		show_some_images_time = 0
-		lobotomy_memory_mat = nil
-		lobotomy_memory_flash = false
 		lobotomy_flash_mat = nil
 		if lobotomy_recent_trauma <= CurTime() then
 			lobotomy_recent_trauma_power = 0
@@ -2612,7 +2598,7 @@ net.Receive("headtrauma_flash", function()
         lobotomy_recent_trauma = CurTime() + math.Clamp(2.5 + traumaPower * 1.5, 3, 5)
         lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
         if (lobotomy_next_forced_flash or 0) <= CurTime() then
-			startLobotomyFlash(math.floor(16 + traumaPower * 14), traumaPower, true)
+			startLobotomyFlash(math.floor(16 + traumaPower * 14))
             lobotomy_next_forced_flash = CurTime() + 5
         end
     end

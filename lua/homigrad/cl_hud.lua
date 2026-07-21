@@ -1197,7 +1197,7 @@ local observe_state = {
 	was_alive = true,
 	require_admire_reset = false
 }
-local observe_parts = {"Arms", "Torso", "Legs"}
+local observe_parts = {"Arms", "Torso", "Legs", "Vitals"}
 local observe_stage_time = 4.5
 local observe_text_delay = 1.8
 local observe_type_speed = 28
@@ -1267,6 +1267,21 @@ local observe_bone_sets = {
 			hitgroups = {
 				[HITGROUP_RIGHTLEG] = true
 			}
+		}
+	},
+	Vitals = {
+		{
+			label = "ECG",
+			bones = {"ValveBiped.Bip01_Spine2"},
+			side = 1,
+			offset = 12,
+			status_func = function(org)
+				local rhythm = string.NiceName(string.Replace(org.ecgState or "normal_sinus", "_", " "))
+				if org.heartstop then
+					return "ECG: Cardiac arrest (" .. rhythm .. ")"
+				end
+				return "ECG: " .. rhythm
+			end
 		}
 	}
 }
@@ -1416,6 +1431,7 @@ local function build_observe_text(entry, ent)
 	if not ent.organism and not ent.new_organism then
 		return entry.label .. ": No data"
 	end
+	if entry.status_func then return entry.status_func(org) end
 	local fracture = has_fracture(org, entry.fracture_keys or {})
 	local dislocation = entry.dis_key and (org[entry.dis_key] or false) or false
 	local woundcount = count_wounds_for_groups(ent, wounds, entry.hitgroups or {})

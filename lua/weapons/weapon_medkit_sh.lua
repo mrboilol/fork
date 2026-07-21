@@ -163,6 +163,10 @@ if SERVER then
 			//end
 		end
 
+		if self.RefreshPerfusionTreatment then
+			self:RefreshPerfusionTreatment(ent, owner.Profession == "doctor" and 0.25 or 0.18)
+		end
+
 		if self.modeValues[1] <= 0 and self.modeValues[2] <= 0 and self.modeValues[3] <= 0 and self.modeValues[4] <= 0 and self.modeValues[5] <= 0 and self.modeValues[6] <= 0 and self.ShouldDeleteOnFullUse then
 			owner:SelectWeapon("weapon_hands_sh")
 			self:Remove()

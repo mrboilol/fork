@@ -21,6 +21,9 @@ hg.organism.bloodtypes = {
 module[1] = function(org)
 	org.blood = 5000
 	org.bleed = 0
+	org.venousBleed = 0
+	org.arterialBleed = 0
+	org.internalBleedRate = 0
 	org.internalBleed = 0
 	org.internalBleedHeal = 0
 	org.arteria = 0
@@ -51,6 +54,11 @@ module[1] = function(org)
 	org.hemothorax = 0
 	org.lastBleedTime = CurTime()
 	org.arterialO2Drain = false
+	org.throatcut = false
+	org.throatCutTime = 0
+	org.throatCutUntil = 0
+	org.throatCutSeverity = 0
+	org.throatCutPressureShock = 0
 end
 
 local internalbleed_phrases = {
@@ -489,7 +497,9 @@ module[2] = function(owner, org, mulTime)
 	local ownerVel = owner:GetVelocity()
 
 	local arterialToRemove = {}
+	local hasCarotidWound = false
 	for i, wound in pairs(org.arterialwounds) do
+		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80
 		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80
 		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
@@ -524,6 +534,19 @@ module[2] = function(owner, org, mulTime)
 	end
 	if #arterialToRemove > 0 then
 		hg.organism.RebuildArteryWoundState(org)
+	end
+	if org.throatcut then
+		local severity = math.Clamp(org.throatCutSeverity or 1, 0.35, 1.25)
+		if hasCarotidWound then
+			org.throatCutPressureShock = math.max(org.throatCutPressureShock or 0, severity)
+		else
+			org.throatCutPressureShock = math.Approach(org.throatCutPressureShock or 0, 0, mulTime / 8)
+		end
+		-- The open airway continues to consume body oxygen even after a neck
+		-- bandage has stopped the arterial jet.
+		if org.o2 and org.o2[1] then
+			org.o2[1] = math.max(org.o2[1] - mulTime * 4.5 * severity, 0)
+		end
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
@@ -638,6 +661,9 @@ module[2] = function(owner, org, mulTime)
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
 	org.bleed = (bleedoutspeed + bleedoutspeed2)
+	org.venousBleed = bleedoutspeed
+	org.arterialBleed = bleedoutspeed2
+	org.internalBleedRate = bleed
 	updateHoldWound(org)
 end
 

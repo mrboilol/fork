@@ -84,7 +84,7 @@ local pendingBulletImpactCount = 0
 local maxPendingBulletImpacts = 96
 local impactsPerFrame = 3
 
-local function impact(pos,vel,mul,owner)
+local function impact(pos,vel,mul,owner,severe)
 	local max = math.Clamp(math.ceil(mul or 1), 1, 8)
 	local iters = math.ceil(math.random(1, max) * 2.5)
 	local velnorm = -vel:GetNormalized() * 5
@@ -103,7 +103,17 @@ local function impact(pos,vel,mul,owner)
 
 	for i = 1, iters do
 		local size = bloodImpactParticleSize
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, mul >= 3, false, owner)
+		-- Bullet impacts are wound blood, not an arterial wound effect.
+		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false, owner)
+	end
+
+	if severe then
+		-- Reuse the small physical pellets used by the forceful amputation burst,
+		-- without marking the shot itself as arterial.
+		for i = 1, math.random(4, 6) do
+			local velocity = -vel:GetNormalized() * Rand(80, 140) + VectorRand(-55, 55) + Vector(0, 0, Rand(20, 55))
+			addBloodPart(pos + VectorRand(-1, 1), velocity, mat_huy, Rand(0.65, 1), Rand(0.65, 1), false, false, owner)
+		end
 	end
 end
 
@@ -112,6 +122,7 @@ net.Receive("hg_bloodimpact", function()
 	local vel = net.ReadVector() * 500
 	local mul = net.ReadFloat()
 	local amt = net.ReadInt(8)
+	local severe = net.ReadBool()
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
 		
@@ -133,6 +144,7 @@ net.Receive("hg_bloodimpact", function()
 		mul = mul,
 		owner = owner,
 		amount = amt,
+		severe = severe,
 	}
 end)
 
@@ -140,7 +152,7 @@ hook.Add("Think", "hg.bloodimpact.render_queue", function()
 	local budget = impactsPerFrame
 	while budget > 0 and pendingBulletImpacts[1] do
 		local queued = pendingBulletImpacts[1]
-		impact(queued.pos, queued.vel, queued.mul, queued.owner)
+		impact(queued.pos, queued.vel, queued.mul, queued.owner, queued.severe)
 		queued.amount = queued.amount - 1
 		pendingBulletImpactCount = pendingBulletImpactCount - 1
 		budget = budget - 1
@@ -168,6 +180,12 @@ end)
 	end
 	if headshot and not redmist then
 		ParticleEffect("headshot", pos, ang)
+		-- Keep the stock headshot effect, but give its physical blood spray enough
+		-- force to visibly travel away from the impact instead of dying at the head.
+		for i = 1, math.random(5, 7) do
+			local velocity = ang:Forward() * -Rand(130, 190) + VectorRand(-45, 45) + Vector(0, 0, Rand(20, 55))
+			hg.addBloodPart(pos + VectorRand(-1, 1), velocity, mat_huy, Rand(0.65, 1), Rand(0.65, 1), false, false, renderEnt or ent)
+		end
 	end
 	if redmist then
 		for i = 1, math.random(1, 2) do
