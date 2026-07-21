@@ -219,9 +219,9 @@ function PANEL:InitializeMarkup()
 		mapname = string.sub(mapname, prefix + 1)
 	end
 	local gm = splasheh[math.random(#splasheh)] .. " | " .. string.NiceName(mapname) 
+	self.SplashText = gm
 
     if hg.PluvTown.Active then
-        local text = "<font=ZC_MM_Title><colour=199,2,2>    </colour>City</font>\n<font=ZCity_Menu_Tiny><colour=105,105,105>" .. gm .. "</colour></font>"
         local text = "<font=ZC_MM_Title><colour=199,2,2>    </colour>City</font>\n<font=ZCity_Menu_Tiny><colour=105,105,105>" .. gm .. "</colour></font>"
 
         self.SelectedPluv = table.Random(hg.PluvTown.PluvMats)
@@ -229,7 +229,6 @@ function PANEL:InitializeMarkup()
         return markup.Parse(text)
     end
 
-    local text = "<font=ZC_MM_Title><colour=199,2,2,255>Z</colour>-City</font>\n<font=ZCity_Menu_Tiny><colour=105,105,105>" .. gm .. "</colour></font>"
     local text = "<font=ZC_MM_Title><colour=199,2,2,255>Z</colour>-City</font>\n<font=ZCity_Menu_Tiny><colour=105,105,105>" .. gm .. "</colour></font>"
     return markup.Parse(text)
 end
@@ -788,7 +787,9 @@ function PANEL:Init()
         local maxW = math.max(1, this:GetWide() - MenuUnit(12))
         local drawW = math.min(MenuUnit(menu_title.width), maxW)
         local drawH = drawW * logoAspect
-        this:SetTall(math.ceil(drawH * (1 + menu_live.title_hover_scale) + MenuUnit(8)))
+        surface.SetFont("ZCity_Menu_Tiny")
+        local _, splashH = surface.GetTextSize(self.SplashText or "")
+        this:SetTall(math.ceil(drawH * (1 + menu_live.title_hover_scale) + splashH + MenuUnit(14)))
     end
     logoPanel.Paint = function(this, w, h)
         local driftX, driftY = self:GetLiveOffset(MenuUnit(menu_live.logo_drift_x), MenuUnit(menu_live.logo_drift_y))
@@ -800,12 +801,13 @@ function PANEL:Init()
         local drawW = baseW * scale
         local drawH = baseH * scale
         local maxX = math.max(0, w - drawW)
-        local maxY = math.max(0, h - drawH)
+        local maxY = math.max(0, h - drawH - MenuUnit(10))
         local drawX = math.Clamp(MenuUnit(menu_title.offset_x) + driftX + shakeX, 0, maxX)
-        local drawY = math.Clamp((h - drawH) * 0.5 + driftY + shakeY, 0, maxY)
+        local drawY = math.Clamp(driftY + shakeY, 0, maxY)
         surface.SetDrawColor(255, 255, 255, 255)
         surface.SetMaterial(LogoistMat)
         surface.DrawTexturedRect(drawX, drawY, drawW, drawH)
+        draw.SimpleText(self.SplashText or "", "ZCity_Menu_Tiny", drawX, drawY + drawH + MenuUnit(4), Color(105, 105, 105), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
     end
 
 

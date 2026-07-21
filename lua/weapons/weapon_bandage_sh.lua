@@ -220,28 +220,6 @@ if CLIENT then
 	SWEP.ofsA = Angle(-90,-40,270)
 	local vector_one = Vector(1,1,1)
 
-	local function DrawModeStats(self, x, y, alpha)
-		local textWidth = 150
-		local barWidth = 100
-		local rowHeight = 30
-		local barHeight = 25
-		for i, val in ipairs(self.modeValues) do
-			if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
-			local pct = math.Round(val / self.modeValuesdef[i][1] * 100)
-			local xPos, yPos = x, y + i * rowHeight
-			colBrown.a = alpha * 185
-			draw.RoundedBox(2, xPos, yPos, textWidth + barWidth, barHeight, colBrown)
-			surface.SetFont("ZCity_Small")
-			local txt = string.NiceName(tostring(self.modeNames[i]))
-			colBrown.a = alpha * 255
-			draw.SimpleTextOutlined(txt, "ZCity_Small", xPos, yPos, Color(255, i == self.mode and 0 or 255, i == self.mode and 0 or 255, alpha * 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
-			surface.SetDrawColor(0, 100, 0, alpha * 255)
-			surface.DrawRect(xPos + textWidth, yPos, barWidth * pct / 100, barHeight)
-			surface.SetDrawColor(0, 0, 0, alpha * 255)
-			surface.DrawOutlinedRect(xPos + textWidth, yPos, barWidth, barHeight, 4)
-		end
-	end
-
 	function SWEP:DrawHUD()
 		local owner = self:GetOwner()
 		if !owner:IsPlayer() then return end
@@ -269,9 +247,40 @@ if CLIENT then
 		end
 		local mdl = modelshuy[self.Model or self.WorldModel]
 		self:DrawWorldModel2(true)
-		if not (self.showstats and self.modeValues and istable(self.modeValues)) then return end
-		local x2d, y2d = ScrW() / 2 - 125, ScrH() / 2 + 50
-		DrawModeStats(self, x2d, y2d, 1)
+		local p,a = mdl:GetPos(), mdl:GetAngles()
+		local pos,ang = LocalToWorld(self.ofsV,self.ofsA,p,a)
+		if self.showstats and self.modeValues and istable(self.modeValues) then
+			render.PushFilterMag(TEXFILTER.LINEAR)
+			render.PushFilterMin(TEXFILTER.LINEAR)
+			local m = Matrix()
+			m:Translate(Vector(ScrW() / 2 - ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0))
+			m:Scale(vector_one * 0.5)
+
+			cam.PushModelMatrix(m, true)
+				for i, val in ipairs(self.modeValues) do
+					if not isnumber(i) or not val or not self.modeValuesdef or not self.modeValuesdef[i][1] then continue end
+					local val = math.Round(val / self.modeValuesdef[i][1] * 100)
+					local x, y = 0, i * ScrH() / 20
+					local reveal = 1
+					colBrown.a = reveal * 185
+					draw.RoundedBox(2, x, y, x + ScreenScale(210) + ScrW() / 10, ScrH() / 25, colBrown)
+					surface.SetFont("ZCity_Small")
+					surface.SetTextPos(x, y)
+					surface.SetTextColor(255, 255, 255, 255 * reveal)
+					local txt = string.NiceName(tostring(self.modeNames[i]))
+					colBrown.a = reveal * 255
+					draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255, i == self.mode and 0 or 255, i == self.mode and 0 or 255, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+
+					surface.SetDrawColor(0, 100, 0, 255 * reveal)
+					surface.DrawRect(x + ScreenScale(210), y, ScrW() / 10 * val / 100, ScrH() / 25)
+					surface.SetDrawColor(0, 0, 0, 255 * reveal)
+					surface.DrawOutlinedRect(x + ScreenScale(210), y, ScrW() / 10, ScrH() / 25, 4)
+				end
+			cam.PopModelMatrix()
+
+			render.PopFilterMag()
+			render.PopFilterMin()
+		end
 	end
 end
 
