@@ -774,7 +774,7 @@ function SWEP:FireBullet()
 		end
 
 		if isHoldingBreath then
-			mitigation_mult = mitigation_mult - 0.15
+			mitigation_mult = mitigation_mult * 0.35
 		end
 
 		-- Broken arms bypass this mitigation

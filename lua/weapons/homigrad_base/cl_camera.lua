@@ -266,7 +266,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	end
 
 	if isHoldingBreath then
-		mitigation_mult = mitigation_mult - 0.55
+		mitigation_mult = mitigation_mult * 0.35
 	end
 
 	-- Broken arms bypass this mitigation

@@ -17,7 +17,7 @@ end)
 
 local inventorySystem = GetConVar("hg_invsystem") or CreateConVar(
 	"hg_invsystem",
-	0,
+	1,
 	{FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED, FCVAR_SERVER_CAN_EXECUTE},
 	"Inventory system: 0 = body/backpack, 1 = simple selector, 2 = radial",
 	0,

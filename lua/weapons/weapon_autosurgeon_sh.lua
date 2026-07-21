@@ -498,7 +498,6 @@ if CLIENT then
     SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.png"
     SWEP.BounceWeaponIcon = false
 
-    local hg_3dzity = CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
     local colBrown = Color(40, 40, 40)
     local colWhite = Color(255, 255, 255, 255)
     local colGray = Color(200, 200, 200, 200)
@@ -538,11 +537,10 @@ if CLIENT then
         local tr = hg.eyeTrace(owner)
         if not tr then return end
 
-        local use3D = hg_3dzity:GetBool()
         local size = math.max(math.min(1 - tr.Fraction, 0.5), 0.1)
         local sx, sy = tr.HitPos:ToScreen().x, tr.HitPos:ToScreen().y
 
-        if not use3D and tr.Hit then
+        if tr.Hit then
             lerpthing = Lerp(0.1, lerpthing, 1)
             colWhite.a = 255 * size
             surface.SetDrawColor(colGray)
@@ -560,31 +558,8 @@ if CLIENT then
         end
 
         self:DrawWorldModel2(true)
-        if use3D then
-            local pos = mdl:GetPos()
-            local mins, maxs = mdl:OBBMins(), mdl:OBBMaxs()
-            local dist = 10
-            if mins and maxs then
-                dist = math.max((maxs - mins):Length() * 0.5 + 2, 8)
-            end
-            local dir = (EyePos() - pos):GetNormalized()
-            pos = pos + dir * dist
-            local ang = (EyePos() - pos):Angle()
-            ang.p = 0
-            ang.r = 0
-            cam.Start3D()
-                cam.Start3D2D(pos, ang, 0.01)
-                render.PushFilterMag(TEXFILTER.LINEAR)
-                render.PushFilterMin(TEXFILTER.LINEAR)
-                    DrawBatteryStats(self, 0, 0, 1)
-                render.PopFilterMag()
-                render.PopFilterMin()
-            cam.End3D2D()
-            cam.End3D()
-        else
-            local x2d, y2d = ScrW() / 2 - 125, ScrH() / 2 + 50
-            DrawBatteryStats(self, x2d, y2d, 1)
-        end
+        local x2d, y2d = ScrW() / 2 - 125, ScrH() / 2 + 50
+        DrawBatteryStats(self, x2d, y2d, 1)
     end
 
     local altWasDown = false

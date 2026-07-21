@@ -73,9 +73,10 @@ local tab = {
 }
 
 --local potatopc = GetConVar("hg_potatopc") or CreateClientConVar("hg_potatopc", "0", true, false, "enable this if you are noob", 0, 1)
-local hg_painsound = CreateClientConVar("hg_painsound", "0", true, false, "Pain sound mode: 0=default, 1=pain beat only, 2=agony.mp3, 3=altpain.ogg, 4=reality only, 5=sillypain.mp3, 6=REM pain stack", 0, 6)
-local hg_dyingsound = CreateClientConVar("hg_dyingsound", "0", true, false, "Dying sound mode: 0=default, 1=consciousbeat only, 2=dying.ogg no shake, 3=alto2.ogg no shake, 4=itsallcomingtoanend only, 5=sillydying.mp3, 6=fuck.mp3, 7=sonimcooked.mp3, 8=REM low-O2 stack", 0, 8)
-local hg_otrubsound = CreateClientConVar("hg_otrubsound", "0", true, false, "Otrub sound mode: 0=default, 1=altotrub.ogg, 2=sleepy.ogg, 3=itssoover.mp3, 4=ngaimcooked.mp3", 0, 4)
+local function getServerSoundMode(name, fallback)
+	local convar = GetConVar(name)
+	return convar and convar:GetInt() or fallback
+end
 local otrubSoundPaths = {
 	[1] = "sound/altotrub.ogg",
 	[2] = "sound/sleepy.ogg",
@@ -90,12 +91,6 @@ local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distort
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local themeVolume = CreateClientConVar("hg_theme_volume", "1", true, false, "Volume multiplier for despair, panic, and giving-up themes", 0, 2)
 local hook_Run = hook.Run
-hook.Add("PlayerSpawn", "RandomizeSounds", function(ply)
-	if ply == LocalPlayer() then
-		RunConsoleCommand("hg_painsound", math.random(0, 6))
-		RunConsoleCommand("hg_dyingsound", math.random(0, 8))
-	end
-end)
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
 	tab["$pp_colour_contrast"] = 1
@@ -954,7 +949,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		//ViewPunch2(Angle(-amt * 1, amt2 * 1,0))
 	end
 	
-	local painMode = hg_painsound:GetInt()
+	local painMode = getServerSoundMode("hg_painsound", 6)
 
 	if canRetrySound("PainStation", PainStation) then
 		sound.PlayFile("sound/zbattle/pain_beat.ogg", "noblock noplay", function(station)
@@ -1071,7 +1066,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if hg_dyingsound:GetInt() == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
+	if getServerSoundMode("hg_dyingsound", 2) == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
 		sound.PlayFile("sound/rem_dying1.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
@@ -1682,7 +1677,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 		
 		if o2 > 50 and !org.otrub then
-			local dyingMode = hg_dyingsound:GetInt()
+			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
 				sound.PlayFile("sound/zbattle/conscioustypebeat.ogg", "noblock noplay", function(station)
@@ -2021,7 +2016,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 		
 		if o2 > 20 and org.otrub then
-			local otrubMode = hg_otrubsound:GetInt()
+			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
@@ -2052,7 +2047,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					local requestedMode = otrubMode
 					sound.PlayFile(otrubSoundPaths[requestedMode], "noblock noplay", function(station)
 						if not IsValid(station) then return end
-						if hg_otrubsound:GetInt() ~= requestedMode then
+					if getServerSoundMode("hg_otrubsound", 4) ~= requestedMode then
 							station:Stop()
 							return
 						end
@@ -2068,10 +2063,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
 
-			if hg_dyingsound:GetInt() == 6 and IsValid(ItssooverStation) then
+			if getServerSoundMode("hg_dyingsound", 2) == 6 and IsValid(ItssooverStation) then
 				ItssooverStation:SetVolume(otrubVol)
 			end
-			if hg_dyingsound:GetInt() == 8 then
+			if getServerSoundMode("hg_dyingsound", 2) == 8 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
@@ -2487,7 +2482,7 @@ local function GetConsciousBeatPulse()
 	-- Check if dying pulse detection is enabled
 	if not hg_dyingpulse:GetBool() then return 0 end
 
-	local dyingMode = hg_dyingsound:GetInt()
+	local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 	-- The camera pulse belongs only to the modes that actually play
 	-- conscioustypebeat. Keep the other dying tracks visually quiet.
 	if dyingMode != 0 and dyingMode != 1 then return 0 end

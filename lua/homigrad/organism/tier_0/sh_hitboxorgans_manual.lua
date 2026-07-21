@@ -32,7 +32,7 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(0, 255, 0)
 	},
 	{
-		"brainFrontal",
+		"brain",
 		nil,
 		Vector(5.5, -3, 0),
 		Angle(0, 0, 0),
@@ -40,7 +40,7 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(255, 80, 120)
 	},
 	{
-		"brainParietal",
+		"brain",
 		nil,
 		Vector(6.2, 0, 0),
 		Angle(0, 0, 0),
@@ -48,7 +48,7 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(255, 180, 40)
 	},
 	{
-		"brainTemporal",
+		"brain",
 		nil,
 		Vector(3.8, -0.5, 2.1),
 		Angle(0, 0, 0),
@@ -56,7 +56,7 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(80, 160, 255)
 	},
 	{
-		"brainTemporal",
+		"brain",
 		nil,
 		Vector(3.8, -0.5, -2.1),
 		Angle(0, 0, 0),
@@ -64,7 +64,7 @@ male["ValveBiped.Bip01_Head1"] = {
 		Color(80, 160, 255)
 	},
 	{
-		"brainOccipital",
+		"brain",
 		nil,
 		Vector(4.5, 2.4, 0),
 		Angle(0, 0, 0),
@@ -325,7 +325,7 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(0, 255, 0)
 	},
 	{
-		"brainFrontal",
+		"brain",
 		nil,
 		Vector(4.5, -1.8, 0),
 		Angle(0, 0, 0),
@@ -333,7 +333,7 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(255, 80, 120)
 	},
 	{
-		"brainParietal",
+		"brain",
 		nil,
 		Vector(5.2, 1.2, 0),
 		Angle(0, 0, 0),
@@ -341,7 +341,7 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(255, 180, 40)
 	},
 	{
-		"brainTemporal",
+		"brain",
 		nil,
 		Vector(2.8, 0.7, 2.1),
 		Angle(0, 0, 0),
@@ -349,7 +349,7 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(80, 160, 255)
 	},
 	{
-		"brainTemporal",
+		"brain",
 		nil,
 		Vector(2.8, 0.7, -2.1),
 		Angle(0, 0, 0),
@@ -357,7 +357,7 @@ female["ValveBiped.Bip01_Head1"] = {
 		Color(80, 160, 255)
 	},
 	{
-		"brainOccipital",
+		"brain",
 		nil,
 		Vector(3.5, 3.5, 0),
 		Angle(0, 0, 0),
@@ -389,7 +389,7 @@ for _, anatomy in ipairs({male, female}) do
 	for _, organ in ipairs(anatomy["ValveBiped.Bip01_Head1"]) do
 		if not organ[7] then
 			organ[3].y = organ[3].y - headHitboxDrop
-			if organ[1] == "brainFrontal" or organ[1] == "brainParietal" or organ[1] == "brainTemporal" or organ[1] == "brainOccipital" or organ[1] == "eyeL" or organ[1] == "eyeR" then
+			if organ[1] == "brain" or organ[1] == "eyeL" or organ[1] == "eyeR" then
 				organ[3].y = organ[3].y - 0.25
 			end
 		end

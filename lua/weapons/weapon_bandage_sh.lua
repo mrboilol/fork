@@ -211,7 +211,6 @@ function SWEP:PrimaryAttack()
 end
 
 if CLIENT then
-	local hg_3dzity = CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 	local colWhite = Color(255, 255, 255, 255)
 	local colGray = Color(200, 200, 200, 200)
 	local lerpthing = 1
@@ -251,10 +250,9 @@ if CLIENT then
 		if not IsValid(modelshuy[self.Model or self.WorldModel]) then return end
 		local Tr = hg.eyeTrace(owner)
 		if !Tr then return end
-		local use3D = hg_3dzity:GetBool()
 		local Size = math.max(math.min(1 - Tr.Fraction, 0.5), 0.1)
 		local x, y = Tr.HitPos:ToScreen().x, Tr.HitPos:ToScreen().y
-		if not use3D and Tr.Hit then
+		if Tr.Hit then
 			lerpthing = Lerp(0.1, lerpthing, 1)
 			colWhite.a = 255 * Size
 			surface.SetDrawColor(colGray)
@@ -272,31 +270,8 @@ if CLIENT then
 		local mdl = modelshuy[self.Model or self.WorldModel]
 		self:DrawWorldModel2(true)
 		if not (self.showstats and self.modeValues and istable(self.modeValues)) then return end
-		if use3D and IsValid(mdl) then
-			local pos = mdl:GetPos()
-			local mins, maxs = mdl:OBBMins(), mdl:OBBMaxs()
-			local dist = 10
-			if mins and maxs then
-				dist = math.max((maxs - mins):Length() * 0.5 + 2, 8)
-			end
-			local dir = (EyePos() - pos):GetNormalized()
-			pos = pos + dir * dist
-			local ang = (EyePos() - pos):Angle()
-			ang.p = 0
-			ang.r = 0
-			cam.Start3D()
-				cam.Start3D2D(pos, ang, 0.01)
-				render.PushFilterMag( TEXFILTER.LINEAR )
-				render.PushFilterMin( TEXFILTER.LINEAR )
-					DrawModeStats(self, 0, 0, 1)
-				render.PopFilterMag()
-				render.PopFilterMin()
-				cam.End3D2D()
-			cam.End3D()
-		elseif not use3D then
-			local x2d, y2d = ScrW() / 2 - 125, ScrH() / 2 + 50
-			DrawModeStats(self, x2d, y2d, 1)
-		end
+		local x2d, y2d = ScrW() / 2 - 125, ScrH() / 2 + 50
+		DrawModeStats(self, x2d, y2d, 1)
 	end
 end
 

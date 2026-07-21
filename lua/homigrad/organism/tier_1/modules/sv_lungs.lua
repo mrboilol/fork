@@ -380,6 +380,13 @@ module[2] = function(owner, org, timeValue)
 		o2[1] = o2.range
 		org.lungsfunction = true
 		org._zeroO2Time = 0
+		if org.brain >= 0.7 and org.alive then
+			if hg.organism.KillFatalBrainDamage then
+				hg.organism.KillFatalBrainDamage(org)
+			else
+				org.alive = false
+			end
+		end
 		return
 	end
 
@@ -1180,8 +1187,7 @@ kaz
 
 	local death_from_braindamage = false
 
-	local mannitolSavingBrain = mannitolK > 0 and (org.brainHemorrhage or 0) < 0.85 and org.brain < 0.9
-	if org.brain >= 0.7 and org.alive and not mannitolSavingBrain then
+	if org.brain >= 0.7 and org.alive then
 
 		death_from_braindamage = true
 		if hg.organism.KillFatalBrainDamage then

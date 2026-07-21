@@ -51,9 +51,6 @@ hg.AddOptionPanel( "hg_weaponshotblur_mul", "slider", {desc = "Multiplicates the
 hg.AddOptionPanel( "hg_bulletholes", "slider", {desc = "Amount of bullet hole effects (Rainbow Six Siege-like)",min = 0,max = 500,decimals = 0}, "optimization" )
 hg.AddOptionPanel( "hg_maxsmoketrails", "slider", {desc = "Max amount of smoke trail effects (lags after 10)",min = 0,max = 30,decimals = 0}, "optimization" )
 hg.AddOptionPanel( "hg_optimise_scopes", "slider", {desc = "Enable this if scoping makes your fps cry (1 - lowers quality of props around you, 2 - \"disables\" main render)",min = 0,max = 2,decimals = 0}, "optimization" )
-hg.AddOptionPanel( "hg_painsound", "slider", {desc = "What sound to play when paining: 0=default, 1=no creepy sound thing, 2=scav prototype, 3=pixelated sound",min = 0,max = 3,decimals = 0}, "other" )
-hg.AddOptionPanel( "hg_dyingsound", "slider", {desc = "What sound to play when dying: 0=default, 1=no creepy sound thing, 2=scav prototype, 3=pixelated sound, 4=scary sound only, 5=sillydying.mp3, 6=fuck.mp3",min = 0,max = 6,decimals = 0}, "other" )
-hg.AddOptionPanel( "hg_otrubsound", "slider", {desc = "What sound to play when unconscious and dying: 0=default, 1=pixelated sound, 2=sleepy.ogg, 3=itssoover.mp3",min = 0,max = 3,decimals = 0}, "other" )
 hg.AddOptionPanel( "hg_reality", "switcher", {desc = "Enable reality sound logic"}, "other" )
 hg.AddOptionPanel( "hg_dyingpulse", "switcher", {desc = "Detect peaks for screen shake when dying"}, "other" )
 

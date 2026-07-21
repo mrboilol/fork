@@ -45,16 +45,18 @@ local function OpenContainer(ent)
 
 	zbSandboxContainerMenu:SetTitle("")
 	zbSandboxContainerMenu:SetSize(sizeX, sizeY)
-    zbSandboxContainerMenu:SetPos(0, 500)
+	local cx, cy = (ScrW() - sizeX) / 2, (ScrH() - sizeY) / 2
+	zbSandboxContainerMenu:SetPos(cx, cy + 100)
 	zbSandboxContainerMenu:MakePopup()
 	zbSandboxContainerMenu:SetKeyBoardInputEnabled(false)
 	zbSandboxContainerMenu:ShowCloseButton(true)
-	zbSandboxContainerMenu:SetVisible(false)
+	zbSandboxContainerMenu:SetVisible(true)
+	zbSandboxContainerMenu:SetMouseInputEnabled(true)
 	zbSandboxContainerMenu.Created = CurTime()
     zbSandboxContainerMenu:SetAlpha(0)
     zbSandboxContainerMenu.OnClose = function() zbSandboxContainerMenu = nil end
 
-    zbSandboxContainerMenu:MoveTo(0, 0, 0.5, 0, 0.3)
+    zbSandboxContainerMenu:MoveTo(cx, cy, 0.5, 0, 0.3)
     zbSandboxContainerMenu:AlphaTo(255, 0.2, 0.1, nil)
 
     function zbSandboxContainerMenu:Close()
@@ -183,40 +185,3 @@ if IsValid(zbSandboxContainerMenu) then
     zbSandboxContainerMenu:Remove()
     zbSandboxContainerMenu = nil
 end
-
-local modelOffset = {
-    ["models/props_c17/furnituredrawer002a.mdl"] = {Vector(0, 0, 25), Angle(0, 90, -20)},
-    ["models/props_c17/furnituredrawer003a.mdl"] = {Vector(0, 0, 25), Angle(0, 90, -30)},
-    ["models/props_junk/wood_crate001a.mdl"] = {Vector(0, 0, 25), Angle(0, 90, -20)},
-    ["models/props_junk/wood_crate002a.mdl"] = {Vector(0, 0, 25), Angle(0, 90, -20)},
-    ["models/props_c17/furniturefridge001a.mdl"] = {Vector(25, 0, 17), Angle(0, 90, -50)},
-    ["models/props_c17/furnituredrawer001a.mdl"] = {Vector(0, 0, 27), Angle(0, 90, -25)},
-    ["models/props_wasteland/controlroom_storagecloset001a.mdl"] = {Vector(20, 0, 15), Angle(0, 90, -70)},
-    ["models/props_wasteland/controlroom_filecabinet001a.mdl"] = {Vector(7, 0, 15), Angle(0, 90, 0)},
-    ["models/props_wasteland/controlroom_filecabinet002a.mdl"] = {Vector(17, 0, 15), Angle(0, 90, -50)},
-    ["models/props_c17/lockers001a.mdl"] = {Vector(9, 0, 15), Angle(0, 90, -50)},
-    ["models/props_c17/furnituredresser001a.mdl"] = {Vector(17, 0, 15), Angle(0, 90, -70)},
-    ["models/props/de_prodigy/ammo_can_01.mdl"] = {Vector(17, 0, 45), Angle(0, 90, -20)},
-    ["models/props/de_prodigy/ammo_can_02.mdl"] = {Vector(0, 0, 10), Angle(0, 90, 30)},
-    ["models/kali/props/cases/hard case a.mdl"] = {Vector(5, 0, 30), Angle(0, 90, 40)},
-    ["models/props/cs_militia/footlocker01_closed.mdl"] = {Vector(5, 0, 12), Angle(0, 90, 30)},
-    ["models/kali/props/cases/hard case c.mdl"] = {Vector(5, 0, 25), Angle(0, 90, 30)},
-}
-
-local offsetVec1, offsetAng1 = Vector(25, 0, 15), Angle(0, 90, 0)
-local lerpang = Angle(0, 0, 0)
-hook.Add("PostDrawOpaqueRenderables", "Draw3D2DFrameSandboxContainer", function()
-    local ent = hg.OpenedContainer
-    if IsValid(ent) and IsValid(zbSandboxContainerMenu) and not zbSandboxContainerMenu.Closing then
-        local pos, ang = LocalToWorld(modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][1] or offsetVec1, modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][2] or offsetAng1, ent:GetPos(), ent:GetAngles())
-        local viewSetup = render.GetViewSetup()
-        local angle = (pos - viewSetup.origin):GetNormalized():Angle()
-        lerpang = LerpAngleFT(0.1, EyeAngles(), angle)
-        lerpang[3] = 0
-        LocalPlayer():SetEyeAngles(lerpang)
-        ang = Angle(0, angle.y, viewSetup.angles[1]) - (modelOffset[ent:GetModel()] and modelOffset[ent:GetModel()][2] or offsetAng1)
-		vgui.Start3D2D(pos + ang:Forward() * -12.7 - ang:Right() * 7 + ang:Up() * 5, ang, 0.04)
-            zbSandboxContainerMenu:Paint3D2D()
-		vgui.End3D2D()
-	end
-end)

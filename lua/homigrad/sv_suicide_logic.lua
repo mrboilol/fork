@@ -1,6 +1,7 @@
 if SERVER then
     resource.AddFile("resource/fonts/arnopro.ttf")
     util.AddNetworkString("HG_SuicideCutscene")
+    local hg_cutscene = ConVarExists("hg_cutscene") and GetConVar("hg_cutscene") or CreateConVar("hg_cutscene", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable suicide cutscene", 0, 1)
 
     concommand.Add("suicide", function(ply)
         if not IsValid(ply) or not ply:Alive() then return end
@@ -14,8 +15,8 @@ if SERVER then
             return
         end
 
-        if ply:GetInfoNum("hg_cutscene", 1) == 0 then
-            -- Cutscene disabled: toggle normal suicide mode immediately, no cutscene or forced firing
+        if not hg_cutscene:GetBool() then
+            -- The server controls whether suicide uses the cutscene.
             ply.suiciding = not ply.suiciding
             ply:SetNWBool("suiciding", ply.suiciding)
             ply.startsuicide = ply.suiciding and (CurTime() - 2) or nil
@@ -76,18 +77,6 @@ if SERVER then
                 end
             end
         end)
-    end)
-
-    net.Receive("HG_SuicideCutscene", function(len, ply)
-        local cancel = net.ReadBool()
-        if cancel and ply.suicideCutscene then
-            -- Client rejected cutscene, continue normal suicide like non-gun behavior
-            ply.suicideCutscene = false
-            ply.suicideCutsceneWep = nil
-            ply.suiciding = not ply.suiciding
-            ply:SetNWBool("suiciding", ply.suiciding)
-            ply.startsuicide = ply.suiciding and (CurTime() - 2) or nil
-        end
     end)
 
     hook.Add("PlayerDeath", "HG_ResetSuicideCutscene", function(ply)

@@ -14,7 +14,6 @@ hg = hg or {}
 hg.OpenedContainer = hg.OpenedContainer or nil
 local blurMat = Material("pp/blurscreen")
 local Dynamic = 0
-local hg_3dzity = CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 
 local cooldown = 0
 
@@ -55,25 +54,19 @@ local function OpenContainer( ent )
 	zbContainerMenu.ent = ent
 	zbContainerMenu.entindex = ent:EntIndex()
 
-	local use3D = hg_3dzity:GetBool()
 	zbContainerMenu:SetTitle("")
 	zbContainerMenu:SetSize(sizeX, sizeY)
 	zbContainerMenu:ShowCloseButton(true)
 	zbContainerMenu:SetKeyBoardInputEnabled(false)
-	zbContainerMenu:SetVisible(not use3D)
-	zbContainerMenu:SetMouseInputEnabled(not use3D)
+	zbContainerMenu:SetVisible(true)
+	zbContainerMenu:SetMouseInputEnabled(true)
 	zbContainerMenu.Created = CurTime()
     zbContainerMenu:SetAlpha(0)
     zbContainerMenu.OnClose = function() zbContainerMenu = nil end
 
-    if use3D then
-        zbContainerMenu:SetPos(0, 500)
-        zbContainerMenu:MoveTo(0, 0, 0.5, 0, 0.3)
-    else
-        local cx, cy = (ScrW() - sizeX) / 2, (ScrH() - sizeY) / 2
-        zbContainerMenu:SetPos(cx, cy + 100)
-        zbContainerMenu:MoveTo(cx, cy, 0.5, 0, 0.3)
-    end
+    local cx, cy = (ScrW() - sizeX) / 2, (ScrH() - sizeY) / 2
+    zbContainerMenu:SetPos(cx, cy + 100)
+    zbContainerMenu:MoveTo(cx, cy, 0.5, 0, 0.3)
 
     zbContainerMenu:MakePopup()
     zbContainerMenu:AlphaTo(255, 0.2, 0.1, nil)
@@ -100,12 +93,6 @@ local function OpenContainer( ent )
 	end
 
 	function zbContainerMenu:Think()
-		local use3D = hg_3dzity:GetBool()
-		if self.use3D ~= use3D then
-			self.use3D = use3D
-			self:SetVisible(not use3D)
-			self:SetMouseInputEnabled(not use3D)
-		end
 		local ent = self.ent
 		if not IsValid(ent) then self:Close() return end
 		if LocalPlayer().organism.otrub or not LocalPlayer():Alive() then self:Remove() return end
@@ -218,60 +205,3 @@ if IsValid(zbContainerMenu) then
     zbContainerMenu:Remove()
     zbContainerMenu = nil
 end
-
-local modelOffset = {
-    ["models/props_c17/furnituredrawer002a.mdl"] = { Vector(0,0,25), Angle(0,90,-20) },
-    ["models/props_c17/furnituredrawer003a.mdl"] = { Vector(0,0,25), Angle(0,90,-30) },
-    ["models/props_junk/wood_crate001a.mdl"] = { Vector(0,0,25), Angle(0,90,-20) },
-    ["models/props_junk/wood_crate002a.mdl"] = { Vector(0,0,25), Angle(0,90,-20) },
-    ["models/props_c17/furniturefridge001a.mdl"] = { Vector(25,0,17), Angle(0,90,-50) },
-    ["models/props_c17/furnituredrawer001a.mdl"] = { Vector(0,0,27), Angle(0,90,-25) },
-    ["models/props_wasteland/controlroom_storagecloset001a.mdl"] = { Vector(20,0,15), Angle(0,90,-70) },
-    ["models/props_wasteland/controlroom_filecabinet001a.mdl"] = { Vector(7,0,15), Angle(0,90,0) },
-    ["models/props_wasteland/controlroom_filecabinet002a.mdl"] = { Vector(17,0,15), Angle(0,90,-50) },
-    ["models/props_c17/lockers001a.mdl"] = { Vector(9,0,15), Angle(0,90,-50) },
-    ["models/props_c17/furnituredresser001a.mdl"] = { Vector(17,0,15), Angle(0,90,-70) },
-    ["models/props/de_prodigy/ammo_can_01.mdl"] = { Vector(17,0,45), Angle(0,90,-20) },
-    ["models/props/de_prodigy/ammo_can_02.mdl"] = { Vector(0,0,10), Angle(0,90,30) },
-    ["models/kali/props/cases/hard case a.mdl"] = { Vector(5,0,30), Angle(0,90,40) },
-    ["models/props/cs_militia/footlocker01_closed.mdl"] = { Vector(5,0,12), Angle(0,90,30) },
-    ["models/kali/props/cases/hard case c.mdl"] = { Vector(5,0,25), Angle(0,90,30) },
-    
-}
-
-local offsetVec1,offsetAng1 = Vector(25,0,15),Angle(0,90,0)
-
-local function GetContainerPanelBase(ent)
-    local off = modelOffset[ent:GetModel()]
-    if off then
-        return LocalToWorld(off[1], off[2], ent:GetPos(), ent:GetAngles()), off[2]
-    else
-        local mins, maxs = ent:OBBMins(), ent:OBBMaxs()
-        local front = Vector(0, 0, 25)
-        if mins and maxs then
-            front.x = maxs.x + 5
-            front.y = (mins.y + maxs.y) / 2
-            front.z = maxs.z + 5
-        end
-        return LocalToWorld(front, Angle(0, 90, 0), ent:GetPos(), ent:GetAngles()), Angle(0, 90, 0)
-    end
-end
-
-local lerpang = Angle(0,0,0)
-hook.Add("PostDrawOpaqueRenderables","Draw3D2DFrameContainer",function()
-    if not hg_3dzity:GetBool() then return end
-    local ent = hg.OpenedContainer
-
-	if IsValid(ent) and IsValid(zbContainerMenu) and !zbContainerMenu.Closing then
-        local pos, baseAng = GetContainerPanelBase(ent)
-        local veiwSetup = render.GetViewSetup()
-        local angle = (pos - veiwSetup.origin):GetNormalized():Angle()
-        lerpang = LerpAngleFT(0.1, EyeAngles(), angle)
-        lerpang[3] = 0
-        LocalPlayer():SetEyeAngles(lerpang)
-        local ang = Angle(0, angle.y, veiwSetup.angles[1]) - baseAng
-		vgui.Start3D2D(pos + ang:Forward() * -12.7 - ang:Right() * 7 + ang:Up() * 5, ang, 0.04)
-            zbContainerMenu:Paint3D2D()
-		vgui.End3D2D()
-	end
-end)

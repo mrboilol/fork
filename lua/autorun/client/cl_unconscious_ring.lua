@@ -148,7 +148,6 @@ local nearDeathClasses = {
 
 local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
 local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
-local hg_3dzity = GetConVar("hg_3dzity") or CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
 
 local function GetHeartbeatVolume(org)
     if not org then return 0.2 end

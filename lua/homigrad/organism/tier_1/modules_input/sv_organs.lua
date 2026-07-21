@@ -354,7 +354,11 @@ input_list.brainFrontal = function(org, bone, dmg, dmgInfo) return damageBrainLo
 input_list.brainParietal = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainParietal") end
 input_list.brainTemporal = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainTemporal") end
 input_list.brainOccipital = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainOccipital") end
-input_list.brain = input_list.brainFrontal
+input_list.brain = function(org, bone, dmg, dmgInfo)
+	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
+
+	return damageOrgan(org, dmg, dmgInfo, "brain")
+end
 
 hook.Add("HomigradDamage", "BrainHemorrhageTrauma", function(ply, dmgInfo, hitgroup)
 	local org = ply.organism

@@ -980,6 +980,9 @@ local arterialJetOffset = 0.12
 local arterialVelocityMul = 52
 local arterialPulseRetractRate = 85
 local arterialMaxReachMul = 1.3
+local arterialJetLengthBase = 14
+local arterialJetLengthPerSeverity = 2.5
+local arterialJetLengthMax = 40
 local arterialSideSway = 14
 local normalWoundForceBase = 7
 local normalWoundForcePerSeverity = 2
@@ -1105,7 +1108,7 @@ emitArterialSpray = function(ent, pos, dir, ang, pulse, size, arteryType, fxData
 	sprayVel:Add(right * sway * sideSway * pulseMul * buildup)
 	sprayVel:Add(up * sway * sideSway * 0.42 * pulseMul * buildup)
 
-	local jetLength = math.Clamp(18 + woundSeverity * 4, 18, 64) * math.Clamp(pulseMul, 0.3, 1.05) * buildup
+	local jetLength = math.Clamp(arterialJetLengthBase + woundSeverity * arterialJetLengthPerSeverity, arterialJetLengthBase, arterialJetLengthMax) * math.Clamp(pulseMul, 0.3, 1.05) * buildup
 	local jetEnd = pos + sprayVel:GetNormalized() * jetLength
 	local trace = util.TraceLine({start = pos, endpos = jetEnd, filter = ent})
 	if trace.Hit then jetEnd = trace.HitPos end

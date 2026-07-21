@@ -1182,7 +1182,6 @@ local col = Color(0, 0, 0)
 local col2 = Color(0, 0, 0)
 local dynamicmags
 local instructions
-local hg_3dzity
 local hg_weird_mags
 if CLIENT then
 	surface.CreateFont("AmmoFont",{
@@ -1203,9 +1202,13 @@ if CLIENT then
 	})
 
 	dynamicmags = CreateClientConVar("hg_dynamic_mags", "0", true, false, "Enables dynamic ammo show when shooting",0,1)
-	hg_weird_mags = CreateClientConVar("hg_weird_mags", "0", true, false, "Use old block magazine ammo HUD instead of bullet icons", 0, 1)
 	instructions = CreateClientConVar("hg_instructions","1", true, false, "Enables gun instructions",0,1)
-	hg_3dzity = GetConVar("hg_3dzity") or CreateClientConVar("hg_3dzity", "1", true, false, "Toggle 3D UI for containers and medical sweps", 0, 1)
+end
+
+if SERVER then
+	hg_weird_mags = ConVarExists("hg_weirdmags") and GetConVar("hg_weirdmags") or CreateConVar("hg_weirdmags", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Use old block magazine ammo HUD instead of bullet icons", 0, 1)
+elseif CLIENT then
+	hg_weird_mags = GetConVar("hg_weirdmags")
 end
 
 function SWEP:DrawHUDAdd()
@@ -1362,20 +1365,7 @@ if CLIENT then
 	end
 
 	local function GetAmmoHudPosition(self, scrW, scrH, hudHPos)
-		local posX = scrW * 0.75
-		local posY = scrH * hudHPos
-
-		if hg_3dzity and hg_3dzity:GetBool() then
-			local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
-			local scr = att and att.Pos and att.Pos:ToScreen()
-
-			if scr and scr.visible ~= false and scr.x > -scrW * 0.25 and scr.x < scrW * 1.25 and scr.y > -scrH * 0.25 and scr.y < scrH * 1.25 then
-				posX = math.Clamp(scr.x + scrW * 0.035, scrW * 0.56, scrW * 0.9)
-				posY = math.Clamp(scr.y + scrH * 0.045, scrH * 0.42, scrH * 0.88)
-			end
-		end
-
-		return posX, posY
+		return scrW * 0.75, scrH * hudHPos
 	end
 
 	SWEP.DrawAmmoMetods = {
@@ -1389,8 +1379,7 @@ if CLIENT then
 			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
 			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
 			local HudHPos = 0.8
-			local use3DMags = hg_3dzity and hg_3dzity:GetBool()
-			local showDynamic = dynamicmags:GetBool() or use3DMags
+			local showDynamic = dynamicmags:GetBool()
 			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, HudHPos)
 			local posX2 = posX + scrH*0.11
 			
@@ -1488,7 +1477,7 @@ if CLIENT then
 			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
 			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
 
-			if self.hudinspect > CurTime() or self:KeyDown(IN_RELOAD) or dynamicmags:GetBool() or (hg_3dzity and hg_3dzity:GetBool()) then
+			if self.hudinspect > CurTime() or self:KeyDown(IN_RELOAD) or dynamicmags:GetBool() then
 				ammoCheck = CurTime() + 1
 			end
 
@@ -1534,8 +1523,7 @@ if CLIENT then
 
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
-		local use3DMags = hg_3dzity and hg_3dzity:GetBool()
-		if not dynamicmags:GetBool() and not use3DMags and not self:KeyDown(IN_RELOAD) and not (self.hudinspect and self.hudinspect > CurTime()) then
+		if not dynamicmags:GetBool() and not self:KeyDown(IN_RELOAD) and not (self.hudinspect and self.hudinspect > CurTime()) then
 			self:ChangeFOV()
 			self:DrawHUDAdd()
 			if self.dort then self:DoRT() end

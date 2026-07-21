@@ -187,7 +187,7 @@ function SWEP:PrimarySpread()
 		end
 
 		if isHoldingBreath then
-			mitigation_mult = mitigation_mult - 0.05
+			mitigation_mult = mitigation_mult * 0.35
 		end
 
 		-- Broken arms bypass this mitigation
