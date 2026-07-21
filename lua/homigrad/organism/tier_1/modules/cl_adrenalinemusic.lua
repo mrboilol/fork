@@ -1,4 +1,7 @@
-local hg_adrenalinemusic = CreateClientConVar("hg_adrenalinemusic", "1", true, false, "Enable adrenaline combat music (sorrymud.mp3)", 0, 1)
+local function IsAdrenalineMusicEnabled()
+	local convar = GetConVar("hg_adrenalinemusic")
+	return not convar or convar:GetBool()
+end
 
 hg.adrenalineMusicStation = hg.adrenalineMusicStation or nil
 hg.adrenalineMusicVol = hg.adrenalineMusicVol or 0
@@ -27,7 +30,7 @@ local function stop_adrenaline_music(force)
 end
 
 local function start_adrenaline_music()
-	if not hg_adrenalinemusic:GetBool() then return end
+	if not IsAdrenalineMusicEnabled() then return end
 	if IsValid(hg.adrenalineMusicStation) then return end
 	if hg.adrenalineMusicLoading then return end
 
@@ -53,7 +56,7 @@ local function get_target_organism()
 end
 
 hook.Add("Think", "hg_adrenalinemusic_check", function()
-	if not hg_adrenalinemusic:GetBool() then
+	if not IsAdrenalineMusicEnabled() then
 		stop_adrenaline_music(true)
 		return
 	end
@@ -156,7 +159,7 @@ end)
 
 -- Detect combat situations via damage taken from players, NPCs, or suppression
 hook.Add("EntityTakeDamage", "hg_adrenalinemusic_combat", function(ent, dmgInfo)
-	if not hg_adrenalinemusic:GetBool() then return end
+	if not IsAdrenalineMusicEnabled() then return end
 	if ent ~= LocalPlayer() then return end
 	if not IsValid(ent) or not ent:Alive() then return end
 
@@ -174,7 +177,7 @@ end)
 
 -- Detect combat via weapon fire
 hook.Add("EntityFireBullets", "hg_adrenalinemusic_weaponfire", function(ent, data)
-	if not hg_adrenalinemusic:GetBool() then return end
+	if not IsAdrenalineMusicEnabled() then return end
 	if ent ~= LocalPlayer() then return end
 	if not IsValid(ent) or not ent:Alive() then return end
 

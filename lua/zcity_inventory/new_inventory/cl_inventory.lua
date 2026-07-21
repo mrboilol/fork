@@ -8,6 +8,11 @@ local clr_inv, clr_inv_selected = Color(8, 8, 8, 225), Color(215, 215, 215, 105)
 local type = type
 
 local function GetInventorySystem()
+	local convar = GetConVar("hg_invsystem")
+	if convar then
+		return math.Clamp(convar:GetInt(), 0, 2)
+	end
+
 	return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 2)
 end
 

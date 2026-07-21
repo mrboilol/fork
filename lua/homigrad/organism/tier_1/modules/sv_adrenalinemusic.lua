@@ -1,5 +1,14 @@
 util.AddNetworkString("hg_adrenalinemusic_panic")
 
+CreateConVar(
+	"hg_adrenalinemusic",
+	"1",
+	{FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED},
+	"Enable adrenaline combat music for all players.",
+	0,
+	1
+)
+
 function hg.AddAdrenalineMusicPanic(ply, amount)
 	net.Start("hg_adrenalinemusic_panic")
 		net.WriteFloat(amount)

@@ -16,6 +16,11 @@ local SimpleSelector = {
 }
 
 local function ZCityGetInventorySystem()
+	local convar = GetConVar("hg_invsystem")
+	if convar then
+		return math.Clamp(convar:GetInt(), 0, 2)
+	end
+
     return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 2)
 end
 

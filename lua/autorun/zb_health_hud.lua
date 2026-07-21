@@ -126,6 +126,7 @@ if SERVER then
 	for _, path in ipairs(STATUS_SPRITES) do resource.AddFile(path) end
 	
 	AddCSLuaFile("autorun/zb_health_hud.lua")
+	AddCSLuaFile("homigrad/cl_health_indicator.lua")
 	
 	hook.Add("Initialize", "ZB_HealthHUD_ServerInit", function()
 	end)

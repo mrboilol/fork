@@ -547,7 +547,7 @@ module[2] = function(owner, org, timeValue)
 
 		if (org.fireCOExposure or 0) > 0 and not org.holdingbreath then
 			local breathMul = math.Clamp(regen / math.max(o2.regen or 4, 1), 0.25, 2)
-			org.CO = min(org.CO + timeValue * (0.9 + org.fireCOExposure * 0.25) * breathMul, 30)
+			org.CO = min(org.CO + timeValue * (0.45 + org.fireCOExposure * 0.125) * breathMul, 30)
 		end
 
 
