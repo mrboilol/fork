@@ -144,6 +144,8 @@ WS.BackpackEarlyWeapon = WS.BackpackEarlyWeapon or nil
 WS.BackpackEarlySelected = WS.BackpackEarlySelected or false
 WS.BackpackPreviousWeapon = WS.BackpackPreviousWeapon or nil
 WS.ConfirmProgress = WS.ConfirmProgress or 0
+WS.ClickConfirmWeapon = WS.ClickConfirmWeapon or nil
+WS.BodySlotHitboxes = WS.BodySlotHitboxes or {}
 
 WS.BodyPlaces = {
     pistol = {
@@ -711,9 +713,15 @@ local function ZCityDrawBodySquare(place, entry, ent, alpha, presentation)
     surface.DrawRect(x + 3, labelY, size - 6, 22)
     draw.SimpleTextOutlined(entry.name or "", "ZCity_SuperTiny", screenX, labelY + 11, ZCityAlpha(zcity_slot_text, aMul * brightness), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 220 * aMul))
 
+    if entry.slotNumber then
+        draw.SimpleTextOutlined(tostring(entry.slotNumber), "ZCity_SuperTiny", x + 8, y + 8, ZCityAlpha(zcity_slot_text, aMul * brightness), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, 220 * aMul))
+    end
+
     if isOffscreen and presentation.pointer ~= false then
         ZCityDrawOffscreenPointer(screenX, screenY, size, directionX, directionY, aMul)
     end
+
+    return x, y, size
 end
 
 function WS.DrawBodySlotSelector(ply)
@@ -729,6 +737,7 @@ function WS.DrawBodySlotSelector(ply)
     local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
     if not IsValid(ent) then return end
 
+    WS.BodySlotHitboxes = {}
     local weapons = WS.GetWeaponTable(ply)
     local slotWeapons = weapons and weapons[WS.SelectedSlot]
     if not slotWeapons or not slotWeapons[0] then return end
@@ -756,15 +765,18 @@ function WS.DrawBodySlotSelector(ply)
         return a.wep:EntIndex() < b.wep:EntIndex()
     end)
 
-    local rowStep = WS.BodySquareSize * 0.72
+    -- Keep each selectable card distinct; the old overlap made it unclear
+    -- which item the scroll wheel had focused.
+    local rowStep = WS.BodySquareSize * 1.08
     for index, item in ipairs(visible) do
         local durationK = maxDuration > minDuration and math.Clamp((item.duration - minDuration) / (maxDuration - minDuration), 0, 1) or 0
         local isSelected = item.wep == selected
         local place = ZCityGetBodySlotForWeapon(item.wep)
-        ZCityDrawBodySquare(place, {
+        local cardX, cardY, cardSize = ZCityDrawBodySquare(place, {
             name = WS.GetPrintName(item.wep),
             selected = isSelected,
-            wep = item.wep
+            wep = item.wep,
+            slotNumber = (tonumber(item.wep.Slot) or 0) + 1
         }, ent, WS.BodyAlpha, {
             anchorWep = item.wep,
             scale = isSelected and 1 or 0.82,
@@ -776,6 +788,15 @@ function WS.DrawBodySlotSelector(ply)
             pointer = isSelected,
             progress = isSelected
         })
+
+        if cardX and cardY and cardSize then
+            WS.BodySlotHitboxes[#WS.BodySlotHitboxes + 1] = {
+                x = cardX,
+                y = cardY,
+                size = cardSize,
+                wep = item.wep
+            }
+        end
     end
 end
 
@@ -804,6 +825,7 @@ local function ZCityResetSlotHold(fadeOut, finished)
     WS.HoldWeapon = nil
     WS.HoldSlotBind = nil
     WS.HoldSlotKeyCode = nil
+    WS.ClickConfirmWeapon = nil
     WS.BackpackEarlySelect = false
     WS.BackpackEarlyWeapon = nil
     WS.BackpackEarlySelected = false
@@ -839,6 +861,23 @@ local function ZCityBeginHeldSelection(ply, selectedWep, bind, code)
 
     if WS.BackpackEarlySelect then
         ZCityStartBackpackDraw(ply, selectedWep, ZCityGetSlotHoldDuration(ply, selectedWep))
+    end
+end
+
+local function ZCityBeginClickSelection(ply, selectedWep)
+    ZCityBeginHeldSelection(ply, selectedWep)
+    WS.ClickConfirmWeapon = selectedWep
+end
+
+local function ZCityGetClickedBodySlotWeapon()
+    local mouseX, mouseY = gui.MousePos()
+    if mouseX <= 0 or mouseY <= 0 then return end
+
+    for _, hitbox in ipairs(WS.BodySlotHitboxes or {}) do
+        if mouseX >= hitbox.x and mouseX <= hitbox.x + hitbox.size
+            and mouseY >= hitbox.y and mouseY <= hitbox.y + hitbox.size then
+            return hitbox.wep
+        end
     end
 end
 
@@ -921,8 +960,6 @@ local function GetDown(Weapons)
     end
 end
 
-local LastSelected = 0
-
 local function get_active_tool(ply, tool)
     local activeWep = ply:GetActiveWeapon()
     if not IsValid(activeWep) or activeWep:GetClass() ~= "gmod_tool" or activeWep.Mode ~= tool then return end
@@ -964,11 +1001,30 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
     if not IsValid( ply ) or not ply:Alive() then return end
     if ply.organism and ply.organism.otrub then return end
 
+    if key:find("+attack", 1, true) and WS.Show > CurTime() then
+        local clickedWep = ZCityGetClickedBodySlotWeapon()
+        if IsValid(clickedWep) then
+            local weapons = WS.GetWeaponTable(ply)
+            for slot = 0, 5 do
+                for position = 0, #(weapons[slot] or {}) do
+                    if weapons[slot][position] == clickedWep then
+                        WS.SelectedSlot = slot
+                        WS.SelectedSlotPos = position
+                        ZCityBeginClickSelection(ply, clickedWep)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
     if iPos then
         local requestedSlot = iPos - 1
         local activeWep = ply:GetActiveWeapon()
         local activeSlot = IsValid(activeWep) and math.Clamp(tonumber(activeWep.Slot) or 0, 0, 5) or -1
-        if activeSlot == requestedSlot and ZCityPutActiveWeaponAway(ply, activeWep, key, code) then
+        local focusedWep = WS.Show > CurTime() and WS.SelectedSlot == requestedSlot and WS.GetSelectedWeapon() or nil
+        if activeSlot == requestedSlot and (not IsValid(focusedWep) or focusedWep == activeWep)
+            and ZCityPutActiveWeaponAway(ply, activeWep, key, code) then
             return true
         end
     end
@@ -989,10 +1045,9 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
             iPos = iPos - 1
             if not Weapons[iPos] or not Weapons[iPos][0] then return true end
 
-            local preserveSelection = LastSelected == iPos and selectorWasOpen
+            local preserveSelection = selectorWasOpen and WS.SelectedSlot == iPos
             WS.SelectedSlotPos = preserveSelection and math.Clamp(WS.SelectedSlotPos or 0, 0, #Weapons[iPos]) or 0
             WS.SelectedSlot = iPos
-            LastSelected = iPos
 
             local selectedWep = WS.GetSelectedWeapon()
             ZCityBeginHeldSelection(ply, selectedWep, key, code)
@@ -1056,7 +1111,8 @@ function WS.SetActuallyWeapon( ply, cmd )
     end
 
     local selectedWep = WS.GetSelectedWeapon()
-    local holdingConfirm = WS.Show > CurTime() and IsValid(WS.HoldWeapon) and IsValid(selectedWep) and selectedWep == WS.HoldWeapon and ZCityIsHeldSlotKeyDown()
+    local holdingConfirm = WS.Show > CurTime() and IsValid(WS.HoldWeapon) and IsValid(selectedWep) and selectedWep == WS.HoldWeapon
+        and (ZCityIsHeldSlotKeyDown() or WS.ClickConfirmWeapon == selectedWep)
 
     if not holdingConfirm then
         ZCityResetSlotHold(true)
@@ -1102,6 +1158,15 @@ hook.Add( "PlayerBindPress", "WeaponSelector_PlayerBindPress", WS.ChangeSelectio
 hook.Add( "HUDPaint", "WeaponSelector_Draw", function()
     WS.WeaponSelectorDraw( LocalPlayer() )
     WS.DrawBodySlotSelector( LocalPlayer() )
+
+    local wantsScreenClicker = ZCityGetInventorySystem() == 0 and WS.Show > CurTime() and #WS.BodySlotHitboxes > 0
+    if wantsScreenClicker and not WS.BodySlotScreenClicker then
+        gui.EnableScreenClicker(true)
+        WS.BodySlotScreenClicker = true
+    elseif not wantsScreenClicker and WS.BodySlotScreenClicker then
+        gui.EnableScreenClicker(false)
+        WS.BodySlotScreenClicker = false
+    end
 end)
 
 hook.Add( "StartCommand", "WeaponSelector_StartCommand", WS.SetActuallyWeapon )

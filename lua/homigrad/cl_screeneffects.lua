@@ -780,20 +780,6 @@ local despairVisualLerp = 0
 local giveUpWhiteLerp = 0
 local WhiteNoiseStation
 local soundRetry = {}
-local otrubBlurLerp = 0
-
-hook.Add("HG_OnOtrub", "OtrubFreezeFade", function(ply)
-	if ply ~= LocalPlayer() then return end
-
-	otrubBlurLerp = 0
-	local org = ply.new_organism or ply.organism
-	local adrenaline = math.Clamp((org and org.adrenaline) or 0, 0, 1.5)
-	local adrenalineIntensity = adrenaline / 1.5
-
-	-- Run the blackout only once at the moment consciousness is lost.  Repeating
-	-- ScreenFade every frame prevents the old fade-away feeling from completing.
-	ply:ScreenFade(SCREENFADE.IN, Color(0, 0, 0), 3.5 + adrenalineIntensity * 2, 0.5)
-end)
 
 function canRetrySound(key, station)
 	if IsValid(station) and station:GetState() == GMOD_CHANNEL_PLAYING then return false end
@@ -1416,34 +1402,29 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
-		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp / 2
+		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
 		pain = PainLerp + strobe
 		shock = shockLerp
 		render.UpdateScreenEffectTexture()
 
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 40 + math.max(shock - 5, 0) / 3))
-		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 40 + math.max(shock - 5, 0) / 3))
+		vignetteMat:SetFloat("$c0_z", org.otrub and 5 * painEffectIntensity or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
+		vignetteMat:SetFloat("$c1_y", org.otrub and 10 * painEffectIntensity or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
 		painMat:SetFloat("$c2_x", CurTime() + 10000)
 		painMat:SetFloat("$c0_y", 0.8)
-		painMat:SetFloat("$c0_z", 1)
-		painMat:SetFloat("$c1_x", math.Clamp(pain / 90, 0, 0.75))
-		painMat:SetFloat("$c1_y", math.Clamp(pain / 90, 0, 0.75))
+		painMat:SetFloat("$c0_z", painEffectIntensity)
+		painMat:SetFloat("$c1_x", math.Clamp(pain / 70, 0, 0.95))
+		painMat:SetFloat("$c1_y", math.Clamp(pain / 70, 0, 0.95))
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 
 		if org.otrub then
-			-- Once the frozen blackout has faded away, retain only the faint old
-			-- motion-blur outline. Adrenaline makes that after-image more pronounced.
-			local otrubAdrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
-			otrubBlurLerp = LerpFT(0.08, otrubBlurLerp, otrubAdrenaline)
-			DrawMotionBlur(0.055 + otrubBlurLerp * 0.035, 0.28 + otrubBlurLerp * 0.28, 0.02)
-		else
-			otrubBlurLerp = LerpFT(0.06, otrubBlurLerp, 0)
+			DrawMotionBlur(0.1, 1., 0.01)
+			lply:ScreenFade(SCREENFADE.IN, Color(0,0,0), 2, 0.5)
 		end
 		
 		//if pain > 10 then

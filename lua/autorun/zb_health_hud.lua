@@ -1540,11 +1540,16 @@ local function draw_status_effects()
 
 				if showAllIcons then
 				local pulse_val = smooth.heartbeat or getOrgVal(org, "heartbeat", 70)
-				if pulse_val > 120 then
+				local palpitations_val = getOrgVal(org, "palpitations", 0)
+				if pulse_val > 120 or palpitations_val > 0.1 then
 					local level_num = 1
 					if pulse_val > 220 then level_num = 4
 					elseif pulse_val > 180 then level_num = 3
 					elseif pulse_val > 150 then level_num = 2
+					end
+					if palpitations_val > 0.8 then level_num = math.max(level_num, 4)
+					elseif palpitations_val > 0.5 then level_num = math.max(level_num, 3)
+					elseif palpitations_val > 0.2 then level_num = math.max(level_num, 2)
 					end
 
 					table.insert(effects, {

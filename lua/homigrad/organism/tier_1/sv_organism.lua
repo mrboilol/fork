@@ -264,6 +264,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.allowholster = false
 	
 	org.just_damaged_bone = nil
+	org.damagedBoneName = nil
+	org.damagedBoneSeverity = nil
+	org.damagedBoneTime = nil
+	org.brokenBoneName = nil
 	org.LodgedEntities = nil
 	
 	
@@ -476,6 +480,7 @@ local function send_organism(org, ply)
 	sendtable.damagedBoneName = org.damagedBoneName
 	sendtable.damagedBoneSeverity = org.damagedBoneSeverity
 	sendtable.damagedBoneTime = org.damagedBoneTime
+	sendtable.brokenBoneName = org.brokenBoneName
 	sendtable.LodgedEntities = org.LodgedEntities
 	sendtable.CantCheckPulse = org.CantCheckPulse
 	sendtable.blindness = org.blindness
@@ -586,6 +591,7 @@ local function send_bareinfo(org)
 	sendtable.damagedBoneName = org.damagedBoneName
 	sendtable.damagedBoneSeverity = org.damagedBoneSeverity
 	sendtable.damagedBoneTime = org.damagedBoneTime
+	sendtable.brokenBoneName = org.brokenBoneName
 	sendtable.brainFrontal = org.brainFrontal
 	sendtable.brainParietal = org.brainParietal
 	sendtable.brainTemporal = org.brainTemporal
@@ -672,6 +678,13 @@ function hg.organism.MarkDamagedBone(org, boneName, severity)
 	org.damagedBoneName = boneName
 	org.damagedBoneSeverity = math.Clamp(severity or 0.5, 0, 1)
 	org.damagedBoneTime = CurTime()
+	if IsValid(org.owner) then org.owner.fullsend = true end
+end
+
+function hg.organism.MarkBrokenBone(org, boneName)
+	if not org or not isstring(boneName) then return end
+
+	org.brokenBoneName = boneName
 	if IsValid(org.owner) then org.owner.fullsend = true end
 end
 

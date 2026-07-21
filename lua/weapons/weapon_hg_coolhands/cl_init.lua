@@ -48,6 +48,11 @@ if not SWEP.SetBlocking then
         end
 end
 
+function SWEP:GetCarrying()
+	local owner = self:GetOwner()
+	return IsValid(owner) and owner:GetNetVar("carryent") or nil
+end
+
 SWEP.Category = "ZCity Other"
 SWEP.PrintName = "Hands"
 SWEP.AdminOnly = true
@@ -559,6 +564,16 @@ function SWEP:SetHandPos(noset)
 
 	ply.rhold = rhmat
 	ply.lhold = lhmat
+
+	if self:GetCheckingAfflictions() then
+		local chest = ply:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Spine2") or ply:LookupBone("ValveBiped.Bip01_Spine4"))
+		if chest then
+			local chestPos, chestAng = chest:GetTranslation(), chest:GetAngles()
+			local inspectPos = chestPos + chestAng:Forward() * 9 + chestAng:Right() * -4 + chestAng:Up() * 2
+			hg.DragHandsToPos(ply, self, inspectPos, false, 0, chestAng:Forward(), Angle(-80, -90, 0), Angle(-80, 90, 0))
+			return
+		end
+	end
 
 	if self:GetFists() then
 		local bones = hg.TPIKBonesRH

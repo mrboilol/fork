@@ -264,6 +264,19 @@ end
 
 SWEP.Checking = 0
 
+function SWEP:StartPulseCheck(ply, org)
+	if not IsValid(ply) or not org or not IsValid(self.CarryEnt) then return end
+
+	if org.heartstop or (tonumber(org.pulse) or 0) <= 0 then
+		ply:Notify("No Pulse.", 2)
+		return
+	end
+
+	umsg.Start("hg_StartPulseCheckECG", ply)
+	umsg.Entity(self.CarryEnt)
+	umsg.End()
+end
+
 -- function SWEP:AdjustMouseSensitivity()
 -- 	local owner = self:GetOwner()
 -- 	local ent = owner:GetNetVar("carryent", nil)
@@ -376,6 +389,7 @@ function SWEP:ApplyForce()
 						--ply:ChatPrint("The armor is too thick to feel the pulse.")
 					elseif ((bone == "ValveBiped.Bip01_L_Hand") or (bone == "ValveBiped.Bip01_R_Hand") or (bone == "ValveBiped.Bip01_Head1")) then
 						local org = ply2.organism
+						self:StartPulseCheck(ply, org)
 
 						if org.heartstop then
 							--ply:ChatPrint("No pulse.")
@@ -736,8 +750,10 @@ function SWEP:Think()
 	self.Secondary.Automatic = false//owner.PlayerClassName == "furry"
 
 	self.Checking = math.max(self.Checking - FrameTime(), 0)
+	self:SetCheckingAfflictions(not self:GetFists() and not IsValid(self.CarryEnt) and not IsValid(owner:GetNetVar("carryent2")) and owner:KeyDown(IN_RELOAD) and not owner:KeyDown(IN_USE) and not owner:InVehicle())
 
 	if self:GetOwner():GetNWBool("TauntHolsterWeapons", false) then
+		self:SetCheckingAfflictions(false)
 		self:SetFists(false)
 		self:SetBlocking(false)
 		self:SetCarrying()

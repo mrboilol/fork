@@ -245,7 +245,6 @@ hook.Add("Player Spawn", "ResetUnconsciousRingFlatline", function(ply)
         wasHeartbeatZero = false
     end
 end)
-
 -- Ensure heart sound stations are loaded (pooling)
 local function EnsureHeartStations()
     if heartStationsLoading or (#heartStations > 0) then return end
@@ -424,19 +423,10 @@ local alertPlayed = false
 local alertSound = nil
 
 local g_PulseCheckTarget = nil
-local g_PulseCheckData = nil
 
 usermessage.Hook("hg_StartPulseCheckECG", function(msg)
     g_PulseCheckTarget = msg:ReadEntity()
-    g_PulseCheckData = {
-        started = CurTime(),
-        nextBeat = CurTime(),
-        counted = 0,
-        completed = false,
-        finalBPM = 0
-    }
 end)
-
 -- Local variables for faster access
 local math = math
 local surface = surface
@@ -446,7 +436,7 @@ local Color = Color
 local centerEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 local pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
 
-local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse, ecgState, color, ringAlpha)
+local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse, ecgState, palpitations, color, ringAlpha)
     local time = CurTime()
     if state.lastUpdate == 0 then state.lastUpdate = time end
     local dt = time - state.lastUpdate
@@ -540,6 +530,12 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
             + math.sin((phase * 17 + beatIndex * 0.19) * math.pi * 2) * 0.16
     end
 
+    local function getPalpitationH(phase)
+        -- Sustained tachycardia progressively merges QRS and T waves into the
+        -- broad sine-like ventricular-tachycardia morphology.
+        return math.sin(phase * math.pi * 2) * 0.62
+    end
+
     local function getAVBlockH(phase, complete)
         local h = getSinusH(phase)
         -- Extra atrial activity makes the P-to-QRS relationship visibly
@@ -601,7 +597,7 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
         elseif rhythm == "extreme_tachycardia" and beatIndex % 5 == 0 then
             h = getWideComplexH(phase)
         else
-            h = getSinusH(phase)
+			h = getSinusH(phase)
             if rhythm == "compressed_tachycardia" then
                 -- At this rate the next P wave starts before the prior T wave
                 -- has fully settled, visually compressing the P-QRS-T complex.
@@ -609,6 +605,12 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
                     h = h + math.sin((phase - 0.7) / 0.22 * math.pi) * 0.1
                 end
             end
+        end
+
+        local palpitationK = math.Clamp(tonumber(palpitations) or 0, 0, 1)
+		palpitationK = palpitationK * math.Clamp((heartbeat - 120) / 100, 0, 1)
+        if rhythm ~= "asystole" and rhythm ~= "pea" and rhythm ~= "ventricular_fibrillation" and palpitationK > 0 then
+            h = Lerp(palpitationK, h, getPalpitationH(phase))
         end
 
         if rhythm == "pea" then
@@ -639,18 +641,19 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
     local startX = centerX - width / 2
     local lastX, lastY
 
-    local function drawSegment(sx, sy, slastX, slastY, sthick)
-        if slastX then
-            local sdy = sy - slastY
-            if math.abs(sdy) > 1 then
-                local ssy = sdy > 0 and slastY or sy
-                surface.DrawRect(sx - sthick, ssy, sthick * 2 + 1, math.abs(sdy) + 1)
-            else
-                surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
-            end
-        else
-            surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
+    local function drawSegment(sx, sy, slastX, slastY, thickness)
+        if not slastX then return end
+
+        -- Native lines preserve diagonal strokes instead of building a QRS
+        -- complex from vertical rectangles. Add parallel passes for the soft
+        -- shadow without relying on polygon rendering in HUDPaint.
+        if thickness > 2 then
+            surface.DrawLine(slastX, slastY - 1, sx, sy - 1)
+            surface.DrawLine(slastX - 1, slastY, sx - 1, sy)
+            surface.DrawLine(slastX + 1, slastY, sx + 1, sy)
+            surface.DrawLine(slastX, slastY + 1, sx, sy + 1)
         end
+        surface.DrawLine(slastX, slastY, sx, sy)
     end
 
     for i = 0, width - 1 do
@@ -678,7 +681,7 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
 
         -- Draw Shadow first
         surface.SetDrawColor(0, 0, 0, shadowAlpha)
-        drawSegment(x, y, lastX, lastY, thick + 1)
+        drawSegment(x, y, lastX, lastY, thick + 2)
 
         -- Draw Main Line
         surface.SetDrawColor(color.r, color.g, color.b, currentAlpha)
@@ -846,11 +849,11 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local isCheckingPulse = false
     if IsValid(g_PulseCheckTarget) then
         local wep = ply:GetActiveWeapon()
-        if IsValid(wep) and wep:GetClass() == "weapon_hands_sh" and wep.GetCarrying and IsValid(wep:GetCarrying()) and wep:GetCarrying() == g_PulseCheckTarget then
+        local isHandsWeapon = IsValid(wep) and (wep:GetClass() == "weapon_hands_sh" or wep:GetClass() == "weapon_hg_coolhands")
+        if isHandsWeapon and wep.GetCarrying and IsValid(wep:GetCarrying()) and wep:GetCarrying() == g_PulseCheckTarget then
             isCheckingPulse = true
         else
             g_PulseCheckTarget = nil
-            g_PulseCheckData = nil
         end
     end
 
@@ -920,12 +923,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             else
                 UpdateRingAudio(heartbeat, otrubECGAlpha, org, admiring)
-                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgState, ringColor, otrubECGAlpha)
+                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgState, org.palpitations, ringColor, otrubECGAlpha)
             end
         else
             -- For awake players with abnormal heartbeat or admiring, just show the ECG line without background/ring
             local ecgColor = isCritical and Color(255, 0, 0, 255 * otrubECGAlpha) or Color(255, 255, 255, 255 * otrubECGAlpha)
-            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgState, ecgColor, otrubECGAlpha)
+            DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse, ecgState, org.palpitations, ecgColor, otrubECGAlpha)
             
             -- Add consciousness meter ring for low opacity ECG when consciousness is low or recently dropped
             if recentSuddenDrop or consciousness < 0.6 then
@@ -952,12 +955,20 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if ecgAlphaPulseCheck > 0.01 then
         if not IsValid(g_PulseCheckTarget) then
             g_PulseCheckTarget = nil
-            g_PulseCheckData = nil
             pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
             ecgAlphaPulseCheck = 0
         else
-            local boxW, boxH = 400, 200
+            local boxW, boxH = 300, 150
             local boxX, boxY = ScrW() / 2 - boxW / 2, ScrH() - boxH - 60
+            local handBone = ply:LookupBone("ValveBiped.Bip01_L_Hand") or ply:LookupBone("ValveBiped.Bip01_R_Hand")
+            local handMatrix = handBone and ply:GetBoneMatrix(handBone)
+            if handMatrix then
+                local handScreen = handMatrix:GetTranslation():ToScreen()
+                if handScreen.visible then
+                    boxX = math.Clamp(handScreen.x - boxW / 2, 10, ScrW() - boxW - 10)
+                    boxY = math.Clamp(handScreen.y - boxH - 36, 10, ScrH() - boxH - 10)
+                end
+            end
 
             surface.SetDrawColor(0, 0, 0, 150 * ecgAlphaPulseCheck)
             surface.DrawRect(boxX, boxY, boxW, boxH)
@@ -976,55 +987,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 RequestFibrillationSound(GetHeartbeatVolume(target_org))
             end
 
-            if g_PulseCheckData and not g_PulseCheckData.completed then
-                if target_org.heartstop or target_heartbeat <= 0 then
-                    g_PulseCheckData.completed = true
-                    g_PulseCheckData.finalBPM = "No Pulse"
-                elseif CurTime() >= g_PulseCheckData.started + 10 then
-                    g_PulseCheckData.completed = true
-                    g_PulseCheckData.finalBPM = g_PulseCheckData.counted * 6
-                else
-                    local timeNow = CurTime()
-                    while timeNow >= g_PulseCheckData.nextBeat and g_PulseCheckData.nextBeat <= g_PulseCheckData.started + 10 do
-                        g_PulseCheckData.counted = g_PulseCheckData.counted + 1
-                        local dynamicRate = math.max(target_heartbeat, 1)
-                        g_PulseCheckData.nextBeat = g_PulseCheckData.nextBeat + (60 / dynamicRate)
-                        if target_heartbeat < 1 then
-                            EmitRingSound(SOUND_FLATLINE, 0.8)
-                        else
-                            local vol = GetHeartbeatVolume(target_org)
-                            local abnormalPulse = (target_heartbeat < 40 and target_heartbeat >= 1) or target_heartbeat > 100
-                            local highStress = vol > 0.5
-                            local fibrillating = target_heartbeat > 250
-                            if fibrillating then
-                                RequestFibrillationSound(vol)
-                            elseif abnormalPulse or highStress then
-                                EmitRingSound(SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
-                            else
-                                EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
-                            end
-                        end
-                    end
-                end
-            end
-
             local targetECGColor = target_isCritical and Color(200, 0, 0, 255) or Color(255, 255, 255, 255)
-            DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, target_ecgState, targetECGColor, ecgAlphaPulseCheck)
-
-            local displayText = ""
-            if g_PulseCheckData then
-                if g_PulseCheckData.completed then
-                    if type(g_PulseCheckData.finalBPM) == "number" then
-                        displayText = g_PulseCheckData.counted .. " x 6 = " .. g_PulseCheckData.finalBPM .. " BPM"
-                    else
-                        displayText = g_PulseCheckData.finalBPM
-                    end
-                else
-                    displayText = "Counting: " .. g_PulseCheckData.counted
-                end
-            end
-
-            draw.SimpleText(displayText, "HomigradFontTypewriterSmall", boxX + boxW / 2, boxY - 15, Color(255, 255, 255, 255 * ecgAlphaPulseCheck), TEXT_ALIGN_CENTER)
+            DrawEKG(pulseCheckEKGState, boxX + boxW / 2, boxY + boxH / 2, boxW - 20, boxH - 20, target_heartbeat, target_pulse, target_ecgState, target_org.palpitations, targetECGColor, ecgAlphaPulseCheck)
         end
     else
         pulseCheckEKGState = { points = {}, sweepPos = 0, lastUpdate = 0, phase = 0 }
@@ -1093,28 +1057,3 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
 
 end)
-
-local function GetPulseCheckDisplayText()
-    local target = g_PulseCheckTarget
-    local data = g_PulseCheckData
-    local org = (IsValid(target) and target.organism) or {}
-    local heartbeat = org.heartbeat or 70
-
-    if heartbeat < 1 or org.heartstop then
-        return "NO PULSE"
-    end
-
-    if data then
-        if data.completed then
-            if type(data.finalBPM) == "number" then
-                return data.counted .. " x 6 = " .. data.finalBPM .. " BPM"
-            else
-                return tostring(data.finalBPM)
-            end
-        else
-            return "Counting: " .. data.counted
-        end
-    end
-
-    return "PULSE: " .. heartbeat .. " BPM"
-end

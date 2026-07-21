@@ -6,6 +6,7 @@ local hg_sandbox_containers = CreateConVar("hg_sandbox_containers", "1", FCVAR_A
 
 util.AddNetworkString("hg_sandbox_container_open")
 util.AddNetworkString("hg_sandbox_container_take")
+util.AddNetworkString("hg_sandbox_container_close")
 
 hg.SandboxContainerModels = hg.SandboxContainerModels or {
 	["models/props_borealis/bluebarrel001.mdl"] = {8, "all"},
@@ -352,6 +353,7 @@ end
 
 local function SendSandboxContainerLoot(ply, ent)
 	if not IsValid(ply) or not IsValid(ent) then return end
+	ply.hgSandboxOpenedContainer = ent
 	net.Start("hg_sandbox_container_open")
 		net.WriteEntity(ent)
 		net.WriteTable(ent.sandboxLoot or {})
@@ -362,6 +364,16 @@ hook.Add("ZB_CanLootInventory", "SandboxContainerGrid", function(ply, ent)
 	if not IsSandboxContainer(ent) then return end
 	if not ply.keypressed then
 		GenerateSandboxContainerLoot(ply, ent)
+
+		local wep = ply:GetActiveWeapon()
+		local handsWeapon = IsValid(wep) and (wep:GetClass() == "weapon_hands_sh" or wep:GetClass() == "weapon_hg_coolhands")
+		if handsWeapon and wep.GetCarrying and wep.SetCarrying and not IsValid(wep:GetCarrying()) then
+			local phys = ent:GetPhysicsObject()
+			if IsValid(phys) then
+				wep:SetCarrying(ent, 0, ent:WorldSpaceCenter(), ply:EyePos():Distance(ent:WorldSpaceCenter()))
+			end
+		end
+
 		SendSandboxContainerLoot(ply, ent)
 	end
 	return ply, ent, false
@@ -378,7 +390,18 @@ net.Receive("hg_sandbox_container_take", function(_, ply)
 
 	ent.sandboxLoot[itemID] = nil
 	SpawnLootClass(ent, item.class, item.ammoAmount, ply)
-	SendSandboxContainerLoot(ply, ent)
+end)
+
+net.Receive("hg_sandbox_container_close", function(_, ply)
+	local ent = net.ReadEntity()
+	if not IsValid(ply) or ply.hgSandboxOpenedContainer ~= ent then return end
+
+	local wep = ply:GetActiveWeapon()
+	if IsValid(wep) and wep.GetCarrying and wep.SetCarrying and wep:GetCarrying() == ent then
+		wep:SetCarrying()
+	end
+
+	ply.hgSandboxOpenedContainer = nil
 end)
 
 hook.Add("PropBreak", "SandboxContainers", function(ply, ent)

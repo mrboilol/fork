@@ -96,9 +96,11 @@ local function RagdollBodyDamage()
                             elseif hgIsDoor and hgIsDoor(tr.Entity) and not tr.Entity:GetNoDraw() then
                                 local door = tr.Entity
                                 if speed > DOOR_BREAK_THRESHOLD then
-                                    hgBlastThatDoor(door, vel:GetNormalized() * speed * 0.5)
+                                    if not hgOpenBerserkLockedDoor(door, owner) then
+                                        hgBlastThatDoor(door, vel:GetNormalized() * speed * 0.5)
+                                    end
                                 else
-                                    if not hgDamageDoor(door, damage, vel) then
+                                    if not hgDamageDoor(door, damage, vel, owner) then
                                         if part.dislocation_limb and math.random() < FAILED_BREACH_DISLOCATION_CHANCE then
                                             apply_dislocation(owner, part.dislocation_limb, part.limb_name)
                                         end

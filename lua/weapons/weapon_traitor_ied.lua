@@ -127,6 +127,10 @@ SWEP.CallSound = "rem_iedcall.mp3"
 SWEP.CallSoundLevel = 100
 SWEP.DisorientationRange = 15
 SWEP.FireEntForceBonus = 70
+SWEP.BlastForce = 225000
+SWEP.PlantedBlastForceMul = 1.5
+SWEP.PlantedObjectForce = 350000
+SWEP.PlantedDoorVelocity = 3000
 SWEP.AttachedBombModel = "models/props_junk/cardboard_jox004a.mdl"
 SWEP.AttachedBombScale = 0.4
 SWEP.ExplosionSounds = {
@@ -303,6 +307,11 @@ local function RegisterIEDBomb(self, ent, tr)
 	end)
 
 	if tr then
+		-- Store the attachment in the target's local space so the charge stays on
+		-- moving doors and props, and its blast always pushes through that face.
+		ent.IEDPlacementLocalPos = ent:WorldToLocal(tr.HitPos + tr.HitNormal * 4)
+		ent.IEDPlacementLocalNormal = ent:WorldToLocalAngles(tr.HitNormal:Angle()):Forward()
+		ent.IEDHasShrapnel = ent:GetMaterialType() == MAT_METAL or (hgIsDoor and hgIsDoor(ent))
 		CreateAttachedBombVisual(self, ent, tr)
 	end
 end
@@ -368,6 +377,18 @@ ExplodeTheItem = function(self,ent)
 	local entWaterLevel = entValid and ent:WaterLevel() or 0
 	local entAngles = entValid and ent:GetAngles() or angle_zero
 	local mat = entValid and ent:GetMaterialType() or nil
+	local planted = entValid and ent.IEDPlacementLocalPos ~= nil
+	local plantedDoor = planted and hgIsDoor and hgIsDoor(ent)
+	local hasShrapnel = mat == MAT_METAL or (planted and ent.IEDHasShrapnel)
+	local plantedNormal
+
+	if planted then
+		EntPos = ent:LocalToWorld(ent.IEDPlacementLocalPos)
+		plantedNormal = ent:LocalToWorldAngles(ent.IEDPlacementLocalNormal:Angle()):Forward()
+		ent.IEDPlacementLocalPos = nil
+		ent.IEDPlacementLocalNormal = nil
+		ent.IEDHasShrapnel = nil
+	end
 
 	self.KABOOM = true
 	self:SetDialing(false)
@@ -381,6 +402,7 @@ ExplodeTheItem = function(self,ent)
 	local BlastDamage = self.BlastDamage
 	local BlastDis = self.BlastDis
 	local owner = self:GetOwner()
+	local BlastForce = self.BlastForce * (planted and self.PlantedBlastForceMul or 1)
 
 	if entValid and hg and hg.GasTank and hg.GasTank.ActiveTanks and hg.GasTank.ActiveTanks[ent:EntIndex()] and hg.GasTankDetonate then
 		hg.GasTankDetonate(ent)
@@ -433,7 +455,7 @@ ExplodeTheItem = function(self,ent)
 			end
 			hg.ExplosionEffect(EntPos, BlastDis / 0.2, 80)
 
-			if mat == MAT_METAL then
+			if hasShrapnel then
 				local Poof=EffectData()
 				Poof:SetOrigin(EntPos)
 				Poof:SetScale(1)
@@ -456,7 +478,7 @@ ExplodeTheItem = function(self,ent)
 				force:Div(len)
 				local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1)  
 				local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)  
-				local forceadd = force * physics_frac * 75000  
+				local forceadd = force * physics_frac * BlastForce
 
 				if enta.organism then
 					local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
@@ -486,8 +508,20 @@ ExplodeTheItem = function(self,ent)
 				phys:ApplyForceCenter(forceadd)
 			end
 
-			--hgWreckBuildings(ent, EntPos, BlastDamage / 400, BlastDis/8, false)
-			hgBlastDoors(entValid and ent or self, EntPos, BlastDamage / 400, BlastDis/8, false)
+			-- A charge planted on a door breaches it away from the face it was placed
+			-- on, instead of using the weak radial fallback for nearby doors.
+			if plantedDoor and plantedNormal then
+				hgBlastThatDoor(ent, -plantedNormal * self.PlantedDoorVelocity)
+			else
+				hgBlastDoors(entValid and ent or self, EntPos, BlastDamage / 400, BlastDis/8, false)
+			end
+
+			if planted and not plantedDoor and plantedNormal then
+				local plantedPhys = ent:GetPhysicsObject()
+				if IsValid(plantedPhys) then
+					plantedPhys:ApplyForceOffset(-plantedNormal * self.PlantedObjectForce, EntPos)
+				end
+			end
 			util.ScreenShake( EntPos, 45, 225, 2.5, 3000 )
 
 			if FireEnts[entModel] then
@@ -498,11 +532,13 @@ ExplodeTheItem = function(self,ent)
 				end
 			end
 
-			if mat == MAT_METAL and entValid and IsValid(ent:GetPhysicsObject()) then
+			if hasShrapnel and entValid then
+				local shrapnelPhys = ent:GetPhysicsObject()
+				local shrapnelMass = IsValid(shrapnelPhys) and shrapnelPhys:GetMass() or 20
 				local co = coroutine.create(function()
 					local LastShrapnel = SysTime()
 
-					for i = 1, math.Round(ent:GetPhysicsObject():GetMass() * 80) do
+					for i = 1, math.Clamp(math.Round(shrapnelMass * 80), 200, 2400) do
 							LastShrapnel = SysTime()
 
 							local dir = VectorRand(-1,1):GetNormalized()--vector_up
@@ -551,9 +587,13 @@ ExplodeTheItem = function(self,ent)
 						return
 					end
 
-					coroutine.resume(co)
+					if coroutine.status(co) != "dead" then
+						coroutine.resume(co)
+					end
 					if ent.ShrapnelDone then
-						ent:Remove()
+						if not plantedDoor then
+							ent:Remove()
+						end
 						timer.Remove("IEDCheck_" .. index)
 					end
 				end)
@@ -563,7 +603,7 @@ ExplodeTheItem = function(self,ent)
 				self:Remove()
 			end
 
-			if mat != MAT_METAL and IsValid(ent) then
+			if not hasShrapnel and not plantedDoor and IsValid(ent) then
 				ent:Remove()
 			end
 		end)
@@ -659,7 +699,9 @@ if SERVER then
 			local Owner = self:GetOwner()
 			local Tr = self:GetEyeTrace()
 
-			if IsValid(Tr.Entity) and IsValid(Tr.Entity:GetPhysicsObject()) and Tr.Entity:GetPhysicsObject():GetMass() < 500 then
+			local targetPhys = IsValid(Tr.Entity) and Tr.Entity:GetPhysicsObject()
+			local targetIsDoor = IsValid(Tr.Entity) and hgIsDoor and hgIsDoor(Tr.Entity)
+			if IsValid(Tr.Entity) and (targetIsDoor or (IsValid(targetPhys) and targetPhys:GetMass() < 500)) then
 				local min, max = Tr.Entity:GetModelBounds()
 				local minmaxs = (max - min)
 				local size = minmaxs[1] + minmaxs[2] + minmaxs[3]

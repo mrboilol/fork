@@ -115,20 +115,20 @@ local function DrawEKG(centerX, centerY, width, height, heartbeat, pulse, color,
     -- Draw the buffered points
     local startX = centerX - width / 2
     local lastX, lastY
-    
+
     -- Move drawSegment outside for efficiency
-    local function drawSegment(sx, sy, slastX, slastY, sthick)
-        if slastX then
-            local sdy = sy - slastY
-            if math.abs(sdy) > 1 then
-                local ssy = sdy > 0 and slastY or sy
-                surface.DrawRect(sx - sthick, ssy, sthick * 2 + 1, math.abs(sdy) + 1)
-            else
-                surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
-            end
-        else
-            surface.DrawRect(sx - sthick, sy - sthick, sthick * 2 + 1, sthick * 2 + 1)
+    local function drawSegment(sx, sy, slastX, slastY, thickness)
+        if not slastX then return end
+
+        -- Native diagonal lines avoid the old rectangle staircase. Parallel
+        -- passes keep the shadow thicker without HUDPaint polygon calls.
+        if thickness > 2 then
+            surface.DrawLine(slastX, slastY - 1, sx, sy - 1)
+            surface.DrawLine(slastX - 1, slastY, sx - 1, sy)
+            surface.DrawLine(slastX + 1, slastY, sx + 1, sy)
+            surface.DrawLine(slastX, slastY + 1, sx, sy + 1)
         end
+        surface.DrawLine(slastX, slastY, sx, sy)
     end
 
     for i = 0, width - 1 do
@@ -156,7 +156,7 @@ local function DrawEKG(centerX, centerY, width, height, heartbeat, pulse, color,
         
         -- Draw Shadow first
         surface.SetDrawColor(0, 0, 0, shadowAlpha)
-        drawSegment(x, y, lastX, lastY, thick + 1)
+        drawSegment(x, y, lastX, lastY, thick + 2)
 
         -- Draw Main Line
         surface.SetDrawColor(color.r, color.g, color.b, currentAlpha)

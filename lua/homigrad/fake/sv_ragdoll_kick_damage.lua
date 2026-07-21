@@ -316,10 +316,12 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     if not IsValid(data.HitEntity) then return end
     if data.HitEntity:IsPlayerHolding() then return end
 
+    local attacker = hg.RagdollOwner(ragdoll)
+
     -- Door handling with two different behaviors
     if hgIsDoor(data.HitEntity) then
         local impactDamage = math.max((data.Speed - 180) / 12, 6)
-        if hgDamageDoor(data.HitEntity, impactDamage, data.HitNormal) then
+        if hgDamageDoor(data.HitEntity, impactDamage, data.HitNormal, attacker) then
             ApplyInjuriesToRagdoll(ragdoll)
             return
         end
@@ -354,7 +356,6 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     end
 
     -- Get the ragdoll owner for kick damage
-    local attacker = hg.RagdollOwner(ragdoll)
     if not IsValid(attacker) or not attacker:IsPlayer() then return end
     
     local target = data.HitEntity

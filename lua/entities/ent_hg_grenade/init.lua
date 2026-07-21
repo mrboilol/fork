@@ -14,8 +14,8 @@ local CUSTOM_EXPLOSION_LEVEL = 140
 local GRENADE_BLAST_RADIUS_MULT = 2.2
 local GRENADE_BLAST_DAMAGE = 40
 local GRENADE_DISORIENTATION_RADIUS = 15
-local GRENADE_KNOCKBACK_FORCE = 16500
-local GRENADE_LIFT_FORCE = 35000
+local GRENADE_KNOCKBACK_FORCE = 75000
+local GRENADE_LIFT_FORCE = 70000
 local GRENADE_LIFT_FRAC = 0.85
 
 function ENT:InitAdd()
@@ -431,7 +431,7 @@ function ENT:Explode()
 			local diameter = ammotype.Diameter or 1
 			local bullet = {
 				Speed = ammotype.Speed,
-				Distance = 56756,
+				Distance = 66756,
 				MaxPenLen = 100,
 				Diameter = diameter,
 				Src = selfPos,

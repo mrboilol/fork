@@ -894,14 +894,39 @@ function hgIsDoor(ent)
 	return (Class == "prop_door") or (Class == "prop_door_rotating") or (Class == "func_door") or (Class == "func_door_rotating")
 end
 
--- Doors retain damage from every hit source.  Kicks and door-breaking weapons
+-- Berserk does not destroy a locked door: the impact forces its lock and opens
+-- it immediately. Keeping this separate from hgBlastThatDoor preserves the
+-- actual door instead of replacing it with debris.
+function hgOpenBerserkLockedDoor(door, attacker)
+	if not IsValid(door) or not hgIsDoor(door) then return false end
+	if not IsValid(attacker) or not attacker:IsPlayer() or not attacker:IsBerserk() then return false end
+	if not door:GetInternalVariable("m_bLocked") then return false end
+
+	door._hgBerserkDoorOpenedUntil = CurTime() + 0.1
+	local keyValues = door:GetKeyValues() or {}
+	local originalSpeed = keyValues.speed or "100"
+	door:SetKeyValue("speed", "400")
+	door:Fire("unlock", "", 0)
+	door:Fire("open", "", 0)
+
+	timer.Simple(2, function()
+		if IsValid(door) then
+			door:SetKeyValue("speed", tostring(originalSpeed))
+		end
+	end)
+
+	return true
+end
+
+-- Doors retain damage from every hit source. Kicks and door-breaking weapons
 -- already send DamageInfo, so this also makes bullets, tools, and explosions
 -- eventually breach a sufficiently damaged door.
-function hgDamageDoor(door, damage, force)
+function hgDamageDoor(door, damage, force, attacker)
 	if not IsValid(door) or not hgIsDoor(door) or door:GetNoDraw() then return false end
 
 	damage = math.max(damage or 0, 0)
 	if damage <= 0 then return false end
+	if hgOpenBerserkLockedDoor(door, attacker) then return true end
 
 	door.HP = (door.HP or 260) - damage
 	if (door._hgNextDamageSound or 0) <= CurTime() then
@@ -921,7 +946,13 @@ end
 
 hook.Add("EntityTakeDamage", "hg-DoorDamage", function(door, dmginfo)
 	if IsValid(door) and hgIsDoor(door) then
-		hgDamageDoor(door, dmginfo:GetDamage(), dmginfo:GetDamageForce())
+		local attacker = dmginfo:GetAttacker()
+		if not IsValid(attacker) or not attacker:IsPlayer() then
+			local inflictor = dmginfo:GetInflictor()
+			attacker = IsValid(inflictor) and inflictor:GetOwner() or attacker
+		end
+
+		hgDamageDoor(door, dmginfo:GetDamage(), dmginfo:GetDamageForce(), attacker)
 	end
 end)
 
@@ -964,6 +995,8 @@ function DoorIsOpen2( door )
 end
 
 function hgBlastThatDoor(ent, vel) -- taken from JMod
+	if (ent._hgBerserkDoorOpenedUntil or 0) > CurTime() then return end
+
 	local Moddel, Pozishun, Ayngul, Muteeriul, Skin = ent:GetModel(), ent:GetPos(), ent:GetAngles(), ent:GetMaterial(), ent:GetSkin()
 	sound.Play("Wood_Crate.Break", Pozishun, 60, 100)
 	sound.Play("Wood_Furniture.Break", Pozishun, 60, 100)

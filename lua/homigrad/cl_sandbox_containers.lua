@@ -36,6 +36,16 @@ local function getIconThing(i)
 end
 
 local colRed = Color(255, 0, 0, 255)
+
+local function ReleaseContainer(menu)
+	if not IsValid(menu) or menu.Released then return end
+	menu.Released = true
+
+	net.Start("hg_sandbox_container_close")
+		net.WriteEntity(menu.ent)
+	net.SendToServer()
+end
+
 local function OpenContainer(ent)
     local name = "Container"
 	local sizeX, sizeY = ScrW() / 3, ScrH() / 2.5
@@ -45,8 +55,7 @@ local function OpenContainer(ent)
 
 	zbSandboxContainerMenu:SetTitle("")
 	zbSandboxContainerMenu:SetSize(sizeX, sizeY)
-	local cx, cy = (ScrW() - sizeX) / 2, (ScrH() - sizeY) / 2
-	zbSandboxContainerMenu:SetPos(cx, cy + 100)
+	zbSandboxContainerMenu:SetPos(0, 500)
 	zbSandboxContainerMenu:MakePopup()
 	zbSandboxContainerMenu:SetKeyBoardInputEnabled(false)
 	zbSandboxContainerMenu:ShowCloseButton(true)
@@ -54,13 +63,18 @@ local function OpenContainer(ent)
 	zbSandboxContainerMenu:SetMouseInputEnabled(true)
 	zbSandboxContainerMenu.Created = CurTime()
     zbSandboxContainerMenu:SetAlpha(0)
-    zbSandboxContainerMenu.OnClose = function() zbSandboxContainerMenu = nil end
+    zbSandboxContainerMenu.OnClose = function(self)
+        ReleaseContainer(self)
+        zbSandboxContainerMenu = nil
+    end
 
-    zbSandboxContainerMenu:MoveTo(cx, cy, 0.5, 0, 0.3)
+    zbSandboxContainerMenu:MoveTo(0, 0, 0.5, 0, 0.3)
     zbSandboxContainerMenu:AlphaTo(255, 0.2, 0.1, nil)
 
     function zbSandboxContainerMenu:Close()
+		if self.Closing then return end
 		self.Closing = true
+		ReleaseContainer(self)
 
         self:MoveTo(0, 500, 0.5, 0, 0.3, function()
             self:Remove()
@@ -77,7 +91,7 @@ local function OpenContainer(ent)
 		surface.SetDrawColor(92, 0, 0, 240)
 		surface.DrawRect(w / 2 - 100, 10, 200, 20)
 		draw.DrawText(name, "HomigradFontSmall", w / 2, 10, color_white, TEXT_ALIGN_CENTER)
-		draw.DrawText("R - Close", "HomigradFontSmall", w * 0.012, h - h * 0.055, Color(255, 255, 255, 15), TEXT_ALIGN_LEFT)
+		draw.DrawText("R / click outside - let go", "HomigradFontSmall", w * 0.012, h - h * 0.055, Color(255, 255, 255, 15), TEXT_ALIGN_LEFT)
 	end
 
 	function zbSandboxContainerMenu:Think()
@@ -185,3 +199,46 @@ if IsValid(zbSandboxContainerMenu) then
     zbSandboxContainerMenu:Remove()
     zbSandboxContainerMenu = nil
 end
+
+local function GetContainerHUDPosition(ply)
+    local leftBone = ply:LookupBone("ValveBiped.Bip01_L_Hand")
+    local rightBone = ply:LookupBone("ValveBiped.Bip01_R_Hand")
+    local leftMatrix = leftBone and ply:GetBoneMatrix(leftBone)
+    local rightMatrix = rightBone and ply:GetBoneMatrix(rightBone)
+
+    if leftMatrix and rightMatrix then
+        return (leftMatrix:GetTranslation() + rightMatrix:GetTranslation()) / 2 + Vector(0, 0, 12)
+    end
+    if leftMatrix then return leftMatrix:GetTranslation() + Vector(0, 0, 12) end
+    if rightMatrix then return rightMatrix:GetTranslation() + Vector(0, 0, 12) end
+
+    return ply:EyePos() + ply:EyeAngles():Forward() * 30 + Vector(0, 0, -12)
+end
+
+local outsideClickDown = false
+hook.Add("SetupMove", "CloseSandboxContainerOutsideClick", function()
+    local menu = zbSandboxContainerMenu
+    local leftDown = input.IsMouseDown(MOUSE_LEFT)
+    local pointingAtMenu = menu and menu.Origin and vgui.IsPointingPanel(menu)
+    if leftDown and not outsideClickDown and IsValid(menu) and not menu.Closing and not pointingAtMenu then
+        menu:Close()
+    end
+    outsideClickDown = leftDown
+end)
+
+hook.Add("PostDrawOpaqueRenderables", "Draw3D2DSandboxContainer", function()
+    local menu = zbSandboxContainerMenu
+    if not IsValid(hg.OpenedContainer) or not IsValid(menu) or menu.Closing then return end
+
+    local view = render.GetViewSetup()
+    local pos = GetContainerHUDPosition(LocalPlayer())
+    local lookAngle = (pos - view.origin):GetNormalized():Angle()
+    local ang = Angle(0, lookAngle.y, view.angles[1]) - Angle(0, 90, 0)
+    local w, h = menu:GetSize()
+    pos = pos - ang:Right() * (w * 0.04 / 2) + ang:Forward() * (h * 0.04 / 2)
+
+    vgui.Start3D2D(pos, ang, 0.04)
+        vgui.MaxRange3D2D(100)
+        menu:Paint3D2D()
+    vgui.End3D2D()
+end)

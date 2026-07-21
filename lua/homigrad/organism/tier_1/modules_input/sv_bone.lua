@@ -29,6 +29,12 @@ local function markDamagedBone(org, boneName, severity)
 	end
 end
 
+local function markBrokenBone(org, boneName)
+	if hg.organism.MarkBrokenBone then
+		hg.organism.MarkBrokenBone(org, boneName)
+	end
+end
+
 local bonefracture_sounds = {
 	"bonefracture/rem_bonebreak1.wav",
 	"bonefracture/rem_bonebreak2.wav",
@@ -142,6 +148,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
+		markBrokenBone(org, key == "lleg" and (segment == "up" and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_L_Calf") or (segment == "up" and "ValveBiped.Bip01_R_Thigh" or "ValveBiped.Bip01_R_Calf"))
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
 		org.painadd = org.painadd + 55
@@ -154,6 +161,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 	else
 		org[key .. "dislocation"] = true
+		markBrokenBone(org, key == "lleg" and (segment == "up" and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_L_Calf") or (segment == "up" and "ValveBiped.Bip01_R_Thigh" or "ValveBiped.Bip01_R_Calf"))
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
 		org.painadd = org.painadd + 35
 		org.owner:AddNaturalAdrenaline(0.5)
@@ -195,6 +203,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
+		markBrokenBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"))
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
 		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
 		org.painadd = org.painadd + 55
@@ -205,6 +214,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 	else
 		org[key .. "dislocation"] = true
+		markBrokenBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"))
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
 		org.painadd = org.painadd + 35
 		org.owner:AddNaturalAdrenaline(0.5)
@@ -241,6 +251,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	if name == "spine3" or name == "spine2" then hg.AddHarmToAttacker(dmgInfo, (org[name] - oldDmg) * 8, "Broken spine harm") end
 
 	if org[name] >= hg.organism[name2] and org.isPly then
+		markBrokenBone(org, number == 1 and "ValveBiped.Bip01_Spine1" or (number == 2 and "ValveBiped.Bip01_Spine2" or "ValveBiped.Bip01_Neck1"))
 		playBoneFractureSound(org.owner)
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
 		if org.owner:IsPlayer() then org.owner:Notify(huyasd[name], true, name, 2) end
@@ -301,6 +312,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	local dislocated = (org.jaw - oldDmg) > math.Rand(0.1, 0.3)
 
 	if org.jaw == 1 then
+		markBrokenBone(org, "ValveBiped.Bip01_Head1")
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
 		if oldDmg != 1 then
@@ -311,6 +323,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 
 	org.shock = org.shock + dmg * 3
 	if dislocated then
+		markBrokenBone(org, "ValveBiped.Bip01_Head1")
 		org.shock = org.shock + dmg * 20
 		org.avgpain = org.avgpain + dmg * 20
 		if !org.jawdislocation then
@@ -341,6 +354,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local brainBefore = org.brain or 0
 
 	if org.skull == 1 then
+		markBrokenBone(org, "ValveBiped.Bip01_Head1")
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
 		if oldDmg != 1 then
@@ -399,10 +413,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 end
 
 local ribs = {
-	"MY CHEST... SNAPPED",
-	"SOMETHING SNAPPED IN MY TORSO",
-	"THERE'S SOMETHING SHARP IN MY CHEST...",
-	"I FEEL SOMETHING SHARP IN MY TORSO",
+	"My rib is broken.",
+	"Why does it hurt this much to breathe...",
+	"Something is stabbing my lung...",
+	"I felt something snap in my chest...",
 }
 
 input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
@@ -420,6 +434,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	if org.isPly and (not org.brokenribs or org.brokenribs ~= math.Round(org.chest * 3)) then
 		org.brokenribs = math.Round(org.chest * 3)
 		if org.brokenribs > 0 then
+			markBrokenBone(org, "ValveBiped.Bip01_Spine2")
 			if IsValid(org.owner) and org.owner:IsPlayer() then org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4) end
 			playBoneFractureSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end
@@ -440,6 +455,7 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 	if oldDmg >= 1 and dmg >= 0.35 then addBrokenBoneHitTrauma(org, "pelvis", dmg * 0.5, 0.45) end
 	if org.pelvis >= 1 and oldDmg < 1 and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakSpine then hg.BreakSpine(org.owner, "spine1", false) end
+	if org.pelvis >= 1 then markBrokenBone(org, "ValveBiped.Bip01_Pelvis") end
 	return result
 end
 

@@ -10,7 +10,6 @@ local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
-local BONE_DAMAGE_DURATION = 5
 
 local boneStates = {}
 local boneCache = {}
@@ -115,7 +114,7 @@ local function GetBoneMarkerDimensions(ent, boneID)
     return pos, width, length
 end
 
-local function DrawBoneDamageMarker(ent, boneName, severity, alpha, cameraPos)
+local function DrawBoneMarker(ent, boneName, color, cameraPos)
     local boneID = ent:LookupBone(boneName)
     if not boneID then return end
 
@@ -125,11 +124,38 @@ local function DrawBoneDamageMarker(ent, boneName, severity, alpha, cameraPos)
     -- Pull the marker slightly toward the indicator camera so the smooth,
     -- capsule-like circle remains readable over the traced skeleton.
     pos = pos + (cameraPos - pos):GetNormalized() * 1.5
-    local damage = math.Clamp(severity or 0, 0, 1)
-    local color = Color(255, 230 - damage * 180, 85 - damage * 65, alpha)
-
     render.SetMaterial(statusCircleMat)
     render.DrawSprite(pos, width * 2.1, length * 1.15, color)
+end
+
+local function GetDamageColor(severity)
+    local damage = math.Clamp(severity or 0, 0, 1)
+
+    -- Healthy is white; sustained damage moves through yellow into red.
+    -- Broken or dislocated bones are handled separately as blinking red.
+    if damage <= 0.5 then
+        local progress = damage * 2
+        return 1, 1, 1 - progress
+    end
+
+    local progress = (damage - 0.5) * 2
+    return 1, 1 - progress, 0
+end
+
+local function GetOrgValueNumber(value)
+    if isnumber(value) then return value end
+    if istable(value) then
+        if isnumber(value[1]) then return value[1] end
+        if isnumber(value.cur) then return value.cur end
+        if isnumber(value.value) then return value.value end
+    end
+
+    return 0
+end
+
+local function IsSubrosaEnabled()
+    local convar = GetConVar("hg_subrosa")
+    return convar and convar:GetBool()
 end
 
 local function ResetModels(ply)
@@ -403,18 +429,9 @@ function HUD_DrawDynamicIndicator()
     end
     
     local time = CurTime()
-    local damagedBone
+    local damagedBones = {}
 
     if org then
-        local damageTime = org.damagedBoneTime or 0
-        if org.damagedBoneName and damageTime > 0 and time - damageTime <= BONE_DAMAGE_DURATION then
-            damagedBone = {
-                name = org.damagedBoneName,
-                severity = org.damagedBoneSeverity or 0.5,
-                alpha = math.Clamp(1 - (time - damageTime) / BONE_DAMAGE_DURATION, 0, 1) * 235
-            }
-        end
-
         for key, data in pairs(majorBones) do
             local organName = data.organ
             -- Initialize bone state even if organ data doesn't exist yet
@@ -430,6 +447,8 @@ function HUD_DrawDynamicIndicator()
 
             local boneName = data.bone
             local isAmputated = data.canAmputate and org[organName .. "amputated"]
+            local severity = math.Clamp(GetOrgValueNumber(org[organName]), 0, 1)
+            local isBroken = severity >= 1 or org[organName .. "dislocation"]
 
             local state = boneStates[key]
             local ampBoneName = data.ampBone or boneName
@@ -461,6 +480,12 @@ function HUD_DrawDynamicIndicator()
                     local blinkBoneID = blinkModel:LookupBone(ampBoneName)
                     if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), ampBoneName) end
                 end
+            elseif severity > 0 or isBroken then
+                damagedBones[key] = {
+                    bone = boneName,
+                    severity = severity,
+                    broken = isBroken
+                }
             end
         end
     end
@@ -516,18 +541,6 @@ function HUD_DrawDynamicIndicator()
 
         local base_col = math.max(0.2, consciousness)
 
-        render.SetColorModulation(base_col, base_col, base_col)
-        for _, offset in ipairs(outlineOffsets) do
-            healthModel:SetPos(modelOffset + offset)
-            healthModel:DrawModel()
-        end
-
-        render.SetColorModulation(base_col, base_col, base_col)
-        healthModel:SetPos(modelOffset)
-        healthModel:DrawModel()
-        
-        DrawHealthAccessories(healthModel, ply, base_col)
-
         local function DrawDamageBlinkState(blinkModel, r, g, b)
             blinkModel:SetupBones()
 
@@ -543,23 +556,64 @@ function HUD_DrawDynamicIndicator()
             blinkModel:DrawModel()
         end
 
+        if IsSubrosaEnabled() then
+            -- Bone-only mode: every marker is sized from the copied bone and
+            -- its child, so the pose is traced without drawing the character.
+            cam.IgnoreZ(true)
+            for key, data in pairs(majorBones) do
+                local r, g, b, alpha = base_col, base_col, base_col, 185
+                local damage = damagedBones[key]
+                if damage and damage.broken then
+                    local blink = 0.45 + (math.sin(time * 10) + 1) * 0.275
+                    r, g, b, alpha = 1, 0, 0, 255 * blink
+                elseif damage then
+                    r, g, b = GetDamageColor(damage.severity)
+                    alpha = 235
+                end
+                DrawBoneMarker(healthModel, data.bone, Color(r * 255, g * 255, b * 255, alpha), camPos)
+            end
+            cam.IgnoreZ(false)
+        else
+            render.SetColorModulation(base_col, base_col, base_col)
+            for _, offset in ipairs(outlineOffsets) do
+                healthModel:SetPos(modelOffset + offset)
+                healthModel:DrawModel()
+            end
+
+            render.SetColorModulation(base_col, base_col, base_col)
+            healthModel:SetPos(modelOffset)
+            healthModel:DrawModel()
+            DrawHealthAccessories(healthModel, ply, base_col)
+        end
+
         local hasAmputationBlink = false
 
         for key, state in pairs(boneStates) do
             if state.blinking then hasAmputationBlink = true end
         end
 
-        if hasAmputationBlink then
+        if hasAmputationBlink and not IsSubrosaEnabled() then
             local val = (math.sin(time * 10) + 1) / 2
             DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val)
         end
 
-        if damagedBone then
-            -- This is based on the copied live/fake-ragdoll bone matrices, not
-            -- a fixed body silhouette, so it follows the exact injured bone.
-            cam.IgnoreZ(true)
-            DrawBoneDamageMarker(healthModel, damagedBone.name, damagedBone.severity, damagedBone.alpha, camPos)
-            cam.IgnoreZ(false)
+        if not IsSubrosaEnabled() then
+            for _, damage in pairs(damagedBones) do
+                local boneID = blinkModel:LookupBone(damage.bone)
+                if boneID then
+                    local r, g, b
+                    if damage.broken then
+                        r = 0.35 + (math.sin(time * 10) + 1) * 0.325
+                        g, b = 0, 0
+                    else
+                        r, g, b = GetDamageColor(damage.severity)
+                    end
+
+                    ScaleBone(blinkModel, boneID, BLINK_SCALE, damage.bone)
+                    DrawDamageBlinkState(blinkModel, r, g, b)
+                    ScaleBone(blinkModel, boneID, Vector(0, 0, 0), damage.bone)
+                end
+            end
         end
 
         render.MaterialOverride(nil)
