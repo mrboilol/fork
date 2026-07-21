@@ -354,9 +354,17 @@ end
 local function SendSandboxContainerLoot(ply, ent)
 	if not IsValid(ply) or not IsValid(ent) then return end
 	ply.hgSandboxOpenedContainer = ent
+	local handMode = 0 -- Both hands by default: the grid sits between them.
+	local wep = ply:GetActiveWeapon()
+	if IsValid(wep) and wep.UsingLeftHand and not wep.UsingRightHand then
+		handMode = 1
+	elseif IsValid(wep) and wep.UsingRightHand and not wep.UsingLeftHand then
+		handMode = 2
+	end
 	net.Start("hg_sandbox_container_open")
 		net.WriteEntity(ent)
 		net.WriteTable(ent.sandboxLoot or {})
+		net.WriteUInt(handMode, 2)
 	net.Send(ply)
 end
 

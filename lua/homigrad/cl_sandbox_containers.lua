@@ -37,6 +37,40 @@ end
 
 local colRed = Color(255, 0, 0, 255)
 
+local function GetHandScreenPosition(ply, boneName)
+    local bone = ply:LookupBone(boneName)
+    local matrix = bone and ply:GetBoneMatrix(bone)
+    if not matrix then return end
+
+    local screen = matrix:GetTranslation():ToScreen()
+    if not screen.visible then return end
+    return screen.x, screen.y
+end
+
+local function PositionContainerHUD(menu)
+    local ply = LocalPlayer()
+    local leftX, leftY = GetHandScreenPosition(ply, "ValveBiped.Bip01_L_Hand")
+    local rightX, rightY = GetHandScreenPosition(ply, "ValveBiped.Bip01_R_Hand")
+    local mode = menu.handMode or 0
+    local w, h = menu:GetSize()
+    local x, y
+
+    if mode == 1 and leftX then
+        -- Left hand: keep the grid to its right.
+        x, y = leftX + 18, leftY - h / 2
+    elseif mode == 2 and rightX then
+        -- Right hand: keep the grid to its left.
+        x, y = rightX - w - 18, rightY - h / 2
+    elseif leftX and rightX then
+        -- Both hands: center the grid in the space between them.
+        x, y = (leftX + rightX) / 2 - w / 2, (leftY + rightY) / 2 - h / 2
+    else
+        x, y = ScrW() / 2 - w / 2, ScrH() / 2 - h / 2
+    end
+
+    menu:SetPos(math.Clamp(x, 8, ScrW() - w - 8), math.Clamp(y, 8, ScrH() - h - 8))
+end
+
 local function ReleaseContainer(menu)
 	if not IsValid(menu) or menu.Released then return end
 	menu.Released = true
@@ -55,10 +89,11 @@ local function OpenContainer(ent)
 
 	zbSandboxContainerMenu:SetTitle("")
 	zbSandboxContainerMenu:SetSize(sizeX, sizeY)
-	zbSandboxContainerMenu:SetPos(0, 500)
+	zbSandboxContainerMenu.handMode = ent.SandboxContainerHandMode or 0
+	PositionContainerHUD(zbSandboxContainerMenu)
 	zbSandboxContainerMenu:MakePopup()
 	zbSandboxContainerMenu:SetKeyBoardInputEnabled(false)
-	zbSandboxContainerMenu:ShowCloseButton(true)
+	zbSandboxContainerMenu:ShowCloseButton(false)
 	zbSandboxContainerMenu:SetVisible(true)
 	zbSandboxContainerMenu:SetMouseInputEnabled(true)
 	zbSandboxContainerMenu.Created = CurTime()
@@ -68,7 +103,6 @@ local function OpenContainer(ent)
         zbSandboxContainerMenu = nil
     end
 
-    zbSandboxContainerMenu:MoveTo(0, 0, 0.5, 0, 0.3)
     zbSandboxContainerMenu:AlphaTo(255, 0.2, 0.1, nil)
 
     function zbSandboxContainerMenu:Close()
@@ -76,10 +110,7 @@ local function OpenContainer(ent)
 		self.Closing = true
 		ReleaseContainer(self)
 
-        self:MoveTo(0, 500, 0.5, 0, 0.3, function()
-            self:Remove()
-        end)
-        self:AlphaTo(0, 0.1, 0, nil)
+        self:AlphaTo(0, 0.1, 0, function() self:Remove() end)
         self:SetKeyboardInputEnabled(false)
         self:SetMouseInputEnabled(false)
     end
@@ -99,6 +130,7 @@ local function OpenContainer(ent)
 		if not IsValid(entity) then self:Close() return end
 		if LocalPlayer().organism.otrub or not LocalPlayer():Alive() then self:Remove() return end
 		if (entity:GetPos() - LocalPlayer():GetPos()):LengthSqr() > 125 ^ 2 then self:Remove() return end
+		PositionContainerHUD(self)
 		if input.IsKeyDown(KEY_R) then self:Close() end
 	end
 
@@ -184,13 +216,13 @@ local function OpenContainer(ent)
 		grid:AddItem(button)
     end
 
-    zbSandboxContainerMenu:SlideDown(0.5)
 end
 
 net.Receive("hg_sandbox_container_open", function()
     local ent = net.ReadEntity()
     hg.OpenedContainer = ent
     ent.Loot = net.ReadTable()
+    ent.SandboxContainerHandMode = net.ReadUInt(2)
     OpenContainer(ent)
 end)
 
@@ -200,45 +232,18 @@ if IsValid(zbSandboxContainerMenu) then
     zbSandboxContainerMenu = nil
 end
 
-local function GetContainerHUDPosition(ply)
-    local leftBone = ply:LookupBone("ValveBiped.Bip01_L_Hand")
-    local rightBone = ply:LookupBone("ValveBiped.Bip01_R_Hand")
-    local leftMatrix = leftBone and ply:GetBoneMatrix(leftBone)
-    local rightMatrix = rightBone and ply:GetBoneMatrix(rightBone)
-
-    if leftMatrix and rightMatrix then
-        return (leftMatrix:GetTranslation() + rightMatrix:GetTranslation()) / 2 + Vector(0, 0, 12)
-    end
-    if leftMatrix then return leftMatrix:GetTranslation() + Vector(0, 0, 12) end
-    if rightMatrix then return rightMatrix:GetTranslation() + Vector(0, 0, 12) end
-
-    return ply:EyePos() + ply:EyeAngles():Forward() * 30 + Vector(0, 0, -12)
-end
-
 local outsideClickDown = false
-hook.Add("SetupMove", "CloseSandboxContainerOutsideClick", function()
+hook.Add("Think", "CloseSandboxContainerOutsideClick", function()
     local menu = zbSandboxContainerMenu
     local leftDown = input.IsMouseDown(MOUSE_LEFT)
-    local pointingAtMenu = menu and menu.Origin and vgui.IsPointingPanel(menu)
-    if leftDown and not outsideClickDown and IsValid(menu) and not menu.Closing and not pointingAtMenu then
-        menu:Close()
+    if leftDown and not outsideClickDown and IsValid(menu) and not menu.Closing then
+        local mouseX, mouseY = gui.MousePos()
+        local menuX, menuY = menu:GetPos()
+        local menuW, menuH = menu:GetSize()
+        local pointingAtMenu = mouseX >= menuX and mouseX <= menuX + menuW and mouseY >= menuY and mouseY <= menuY + menuH
+        if not pointingAtMenu then
+            menu:Close()
+        end
     end
     outsideClickDown = leftDown
-end)
-
-hook.Add("PostDrawOpaqueRenderables", "Draw3D2DSandboxContainer", function()
-    local menu = zbSandboxContainerMenu
-    if not IsValid(hg.OpenedContainer) or not IsValid(menu) or menu.Closing then return end
-
-    local view = render.GetViewSetup()
-    local pos = GetContainerHUDPosition(LocalPlayer())
-    local lookAngle = (pos - view.origin):GetNormalized():Angle()
-    local ang = Angle(0, lookAngle.y, view.angles[1]) - Angle(0, 90, 0)
-    local w, h = menu:GetSize()
-    pos = pos - ang:Right() * (w * 0.04 / 2) + ang:Forward() * (h * 0.04 / 2)
-
-    vgui.Start3D2D(pos, ang, 0.04)
-        vgui.MaxRange3D2D(100)
-        menu:Paint3D2D()
-    vgui.End3D2D()
 end)
