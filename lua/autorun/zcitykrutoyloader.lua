@@ -16,8 +16,10 @@ local sides = {
 }
 
 local files = {
-    "zcity_inventory/sh_inventory.lua",
-    "zcity_inventory/sv_inventory.lua",
+    -- The authoritative loot/inventory implementation is loaded recursively
+    -- from homigrad/sh_inventory.lua and homigrad/sv_inventory.lua. Loading the
+    -- legacy copies here afterwards replaces their net receivers, hooks and
+    -- Player:OpenInventory method with the old non-grid implementation.
     "zcity_inventory/new_inventory/cl_inventory.lua",
     "zcity_inventory/new_inventory/sv_inventory.lua",
     "zcity_inventory/hud/cl_weapon_selector.lua",

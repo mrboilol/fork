@@ -84,7 +84,9 @@ local limbArteryWeakness = {
 }
 
 local o2DebuffArteries = {
-	arteria = 1,
+	-- A slit carotid is primarily a bleed/shock emergency. Keep its direct body
+	-- O2 penalty small so it does not overwhelm the separate airway and blood-loss paths.
+	arteria = 0.1,
 	spineartery = 0.85,
 }
 
@@ -543,9 +545,10 @@ module[2] = function(owner, org, mulTime)
 			org.throatCutPressureShock = math.Approach(org.throatCutPressureShock or 0, 0, mulTime / 8)
 		end
 		-- The open airway continues to consume body oxygen even after a neck
-		-- bandage has stopped the arterial jet.
+		-- bandage has stopped the arterial jet, but this stays secondary to the
+		-- bleeding and airway-function consequences of a slit throat.
 		if org.o2 and org.o2[1] then
-			org.o2[1] = math.max(org.o2[1] - mulTime * 4.5 * severity, 0)
+			org.o2[1] = math.max(org.o2[1] - mulTime * 0.25 * severity, 0)
 		end
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
