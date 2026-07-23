@@ -10,6 +10,7 @@ local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
+local BONE_DAMAGE_DURATION = 5
 
 local boneStates = {}
 local boneCache = {}
@@ -156,6 +157,49 @@ end
 local function IsSubrosaEnabled()
     local convar = GetConVar("hg_subrosa")
     return convar and convar:GetBool()
+end
+
+local boneOrgans = {
+    ["ValveBiped.Bip01_Pelvis"] = { "pelvis" },
+    ["ValveBiped.Bip01_Spine1"] = { "spine1" },
+    ["ValveBiped.Bip01_Spine2"] = { "spine2", "chest" },
+    ["ValveBiped.Bip01_Neck1"] = { "spine3" },
+    ["ValveBiped.Bip01_Head1"] = { "skull", "jaw" },
+    ["ValveBiped.Bip01_L_Clavicle"] = { "larm" },
+    ["ValveBiped.Bip01_L_UpperArm"] = { "larm" },
+    ["ValveBiped.Bip01_L_Forearm"] = { "larm" },
+    ["ValveBiped.Bip01_L_Hand"] = { "larm" },
+    ["ValveBiped.Bip01_R_Clavicle"] = { "rarm" },
+    ["ValveBiped.Bip01_R_UpperArm"] = { "rarm" },
+    ["ValveBiped.Bip01_R_Forearm"] = { "rarm" },
+    ["ValveBiped.Bip01_R_Hand"] = { "rarm" },
+    ["ValveBiped.Bip01_L_Thigh"] = { "lleg" },
+    ["ValveBiped.Bip01_L_Calf"] = { "lleg" },
+    ["ValveBiped.Bip01_L_Foot"] = { "lleg" },
+    ["ValveBiped.Bip01_R_Thigh"] = { "rleg" },
+    ["ValveBiped.Bip01_R_Calf"] = { "rleg" },
+    ["ValveBiped.Bip01_R_Foot"] = { "rleg" },
+}
+
+local function IsTrackedBoneStillBroken(org, boneName)
+    local organs = boneOrgans[boneName]
+    if not organs then return false end
+
+    for _, organName in ipairs(organs) do
+        if org[organName .. "dislocation"] then return true end
+
+        local severity = GetOrgValueNumber(org[organName])
+        if organName == "chest" then
+            if (org.brokenribs or math.Round(severity * 3)) > 0 then return true end
+        elseif string.StartWith(organName, "spine") then
+            local threshold = hg.organism and hg.organism["fake_" .. organName] or 1
+            if severity >= threshold then return true end
+        elseif severity >= 1 then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function ResetModels(ply)
@@ -447,9 +491,6 @@ function HUD_DrawDynamicIndicator()
 
             local boneName = data.bone
             local isAmputated = data.canAmputate and org[organName .. "amputated"]
-            local severity = math.Clamp(GetOrgValueNumber(org[organName]), 0, 1)
-            local isBroken = severity >= 1 or org[organName .. "dislocation"]
-
             local state = boneStates[key]
             local ampBoneName = data.ampBone or boneName
 
@@ -480,13 +521,30 @@ function HUD_DrawDynamicIndicator()
                     local blinkBoneID = blinkModel:LookupBone(ampBoneName)
                     if blinkBoneID then ScaleBone(blinkModel, blinkBoneID, Vector(0, 0, 0), ampBoneName) end
                 end
-            elseif severity > 0 or isBroken then
-                damagedBones[key] = {
-                    bone = boneName,
-                    severity = severity,
-                    broken = isBroken
-                }
             end
+        end
+
+        -- Damage input records the exact model bone that was hit. Do not infer
+        -- it from aggregate larm/rarm/lleg/rleg values: medicine changes those
+        -- values too, and one limb value cannot identify an upper/lower bone.
+        local damageTime = org.damagedBoneTime or 0
+        if isstring(org.damagedBoneName) and damageTime > 0 and time - damageTime <= BONE_DAMAGE_DURATION then
+            damagedBones[org.damagedBoneName] = {
+                bone = org.damagedBoneName,
+                severity = math.Clamp(org.damagedBoneSeverity or 0.5, 0, 1),
+                broken = false
+            }
+        end
+
+        -- Keep the exact most recently broken/dislocated segment red while its
+        -- underlying injury still exists. This validation prevents a medicine
+        -- heal from leaving a stale broken-bone trace behind.
+        if isstring(org.brokenBoneName) and IsTrackedBoneStillBroken(org, org.brokenBoneName) then
+            damagedBones[org.brokenBoneName] = {
+                bone = org.brokenBoneName,
+                severity = 1,
+                broken = true
+            }
         end
     end
     
@@ -560,9 +618,13 @@ function HUD_DrawDynamicIndicator()
             -- Bone-only mode: every marker is sized from the copied bone and
             -- its child, so the pose is traced without drawing the character.
             cam.IgnoreZ(true)
-            for key, data in pairs(majorBones) do
+            local tracedBones = {}
+            for _, data in pairs(majorBones) do
+                if tracedBones[data.bone] then continue end
+                tracedBones[data.bone] = true
+
                 local r, g, b, alpha = base_col, base_col, base_col, 185
-                local damage = damagedBones[key]
+                local damage = damagedBones[data.bone]
                 if damage and damage.broken then
                     local blink = 0.45 + (math.sin(time * 10) + 1) * 0.275
                     r, g, b, alpha = 1, 0, 0, 255 * blink

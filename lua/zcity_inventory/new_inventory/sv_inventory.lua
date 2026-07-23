@@ -7,8 +7,6 @@ hg.ZCityInventoryAddonFileGuards["new_inventory_sv"] = true
 util.AddNetworkString("NI_SelectWeapon")
 
 net.Receive("NI_SelectWeapon", function(len, ply)
-	if GetGlobalInt("InventorySystem", 0) ~= 2 then return end
-
 	local wep = net.ReadEntity()
 	if IsValid(wep) and ply:HasWeapon(wep:GetClass()) and wep:GetOwner() == ply and ply:GetActiveWeapon() ~= wep then
 		ply:SelectWeapon(wep)

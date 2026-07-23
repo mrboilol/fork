@@ -24,6 +24,15 @@ local function ZCityGetInventorySystem()
     return math.Clamp(GetGlobalInt("InventorySystem", 0), 0, 2)
 end
 
+local function ZCitySelectInventoryWeapon(wep)
+    if not IsValid(wep) then return end
+
+    input.SelectWeapon(wep)
+    net.Start("NI_SelectWeapon")
+    net.WriteEntity(wep)
+    net.SendToServer()
+end
+
 function WS.GetPrintName( self )
 	local class = self:GetClass()
 	local phrase = language.GetPhrase(class)
@@ -1094,7 +1103,7 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
             WS.Show = 0
             WS.LastInv = WS.LastInv or "weapon_hands_sh"
             local oldwep = ply:GetActiveWeapon()
-            input.SelectWeapon( WS.LastInv )
+            ZCitySelectInventoryWeapon(WS.LastInv)
             WS.LastInv = oldwep
         end
 
@@ -1146,7 +1155,7 @@ function WS.SetActuallyWeapon( ply, cmd )
             WS.LastInv = WS.LastInv ~= ply:GetActiveWeapon() and WS.LastInv or ply:GetActiveWeapon()
         end
         if ply:GetActiveWeapon() ~= selectedWep then
-            input.SelectWeapon(selectedWep)
+            ZCitySelectInventoryWeapon(selectedWep)
         end
 
         WS.LastSelectedSlot = WS.SelectedSlot

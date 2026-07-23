@@ -1430,6 +1430,12 @@ function PANEL:OnRemove()
         net.SendToServer()
     end
 
+    if not self.Finished and self.GameType then
+        net.Start("hg_medical_minigame_cancel")
+        net.WriteString(self.GameType)
+        net.SendToServer()
+    end
+
     if hg and hg.MedicalMinigame and hg.MedicalMinigame.Panel == self then
         hg.MedicalMinigame.Panel = nil
     end

@@ -36,9 +36,9 @@ SWEP.Config = {
         ["Taser Cartridge"] = 100
     },
     BatteryCost = {
-        [1] = 0.15,
-        [2] = 0.35,
-        [3] = 0.01
+        [1] = 1.5,
+        [2] = 3.5,
+        [3] = 0.1
     },
     HealAmount = {
         [1] = 0.65,
@@ -87,6 +87,7 @@ SWEP.modeNames = {
 SWEP.TargetOrgans = {
     [1] = {
         "skull", "jaw", "chest", "pelvis",
+        "lleg", "rleg", "larm", "rarm",
         "rarmartery", "larmartery", "rlegartery", "llegartery",
         "liver", "stomach", "intestines", "spineartery",
         "lungsL", "lungsR", "pneumothorax", "hemothorax",
@@ -163,11 +164,7 @@ function SWEP:Initialize()
 
     if SERVER and not self._asInitialized then
         self._asInitialized = true
-        if math.random() < 0.75 then
-            self:SetClip1(math.random(150, 400))
-        else
-            self:SetClip1(0)
-        end
+        self:SetClip1(self.Config.BatteryMax)
     end
 end
 

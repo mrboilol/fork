@@ -1,5 +1,7 @@
 if CLIENT then return end
 
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
+
 local MEDICAL_WEAPON_CLASSES = {
     "weapon_bandage_sh",
     "weapon_bigbandage_sh",
@@ -21,6 +23,35 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_fury13",
     "weapon_fury16"
 }
+
+local function StopHealAnimation(owner)
+    if not IsValid(owner) then return end
+
+    local wep = owner.HGMedicalMinigameWeapon
+    owner.HGMedicalMinigameWeapon = nil
+
+    if not IsValid(wep) then return end
+    wep.HGMedicalMinigameActive = nil
+
+    if wep.SetHolding then
+        wep:SetHolding(0)
+    end
+end
+
+local function StartHealAnimation(owner, wep)
+    if not IsValid(owner) or not IsValid(wep) then return end
+
+    if owner.HGMedicalMinigameWeapon ~= wep then
+        StopHealAnimation(owner)
+    end
+
+    owner.HGMedicalMinigameWeapon = wep
+    wep.HGMedicalMinigameActive = true
+
+    if wep.SetHolding then
+        wep:SetHolding(hg_healanims:GetBool() and 100 or 0)
+    end
+end
 
 local function GetMinigameType(wep)
     if not IsValid(wep) then return nil end
@@ -100,20 +131,24 @@ local function StartMinigame(wep, owner, minigameType, target)
     wep.healbuddy = target or owner
     wep.HGMedicalMinigameStartValue = startValue
 
+    local started = false
     if minigameType == "bandage" and hg and hg.MedicalMinigame and hg.MedicalMinigame.StartBandageMinigame then
-        return hg.MedicalMinigame.StartBandageMinigame(owner, wep.healbuddy)
+        started = hg.MedicalMinigame.StartBandageMinigame(owner, wep.healbuddy) == true
+    elseif minigameType == "tourniquet" and hg and hg.MedicalMinigame and hg.MedicalMinigame.StartTourniquetMinigame then
+        started = hg.MedicalMinigame.StartTourniquetMinigame(owner, wep.healbuddy) == true
+    else
+        net.Start("hg_medical_minigame_start")
+            net.WriteString(minigameType)
+            net.WriteEntity(wep.healbuddy)
+        net.Send(owner)
+        started = true
     end
 
-    if minigameType == "tourniquet" and hg and hg.MedicalMinigame and hg.MedicalMinigame.StartTourniquetMinigame then
-        return hg.MedicalMinigame.StartTourniquetMinigame(owner, wep.healbuddy)
+    if started then
+        StartHealAnimation(owner, wep)
     end
 
-    net.Start("hg_medical_minigame_start")
-        net.WriteString(minigameType)
-        net.WriteEntity(wep.healbuddy)
-    net.Send(owner)
-
-    return true
+    return started
 end
 
 local function PatchWeapon(class)
@@ -174,5 +209,32 @@ end
 hook.Add("Initialize", "zcity_delta_patch_med_weps", SchedulePatchRetries)
 hook.Add("InitPostEntity", "zcity_delta_patch_med_weps_post", SchedulePatchRetries)
 hook.Add("OnReloaded", "zcity_delta_patch_med_weps_reload", SchedulePatchRetries)
+
+hook.Add("Think", "zcity_delta_medical_healanim_progress", function()
+    for _, owner in player.Iterator() do
+        local wep = owner.HGMedicalMinigameWeapon
+        if IsValid(wep) and wep.HGMedicalMinigameActive and owner:GetActiveWeapon() == wep then
+            if wep.SetHolding then
+                wep:SetHolding(hg_healanims:GetBool() and 100 or 0)
+            end
+        elseif wep ~= nil then
+            StopHealAnimation(owner)
+        end
+
+        local active = owner:GetActiveWeapon()
+        if IsValid(active) and active:GetClass() == "weapon_defibrilator_homigrad" and active.SetHolding then
+            local inUse = owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2)
+            active:SetHolding(hg_healanims:GetBool() and inUse and 100 or 0)
+        end
+    end
+end)
+
+hook.Add("hg_medical_minigame_ended", "zcity_delta_medical_healanim_end", function(owner)
+    StopHealAnimation(owner)
+end)
+
+hook.Add("PlayerDeath", "zcity_delta_medical_healanim_death", function(owner)
+    StopHealAnimation(owner)
+end)
 
 timer.Simple(0, SchedulePatchRetries)

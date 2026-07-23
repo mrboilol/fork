@@ -33,6 +33,7 @@ local PROJECTILE_SHRAPNEL_SAMPLE_CAP = 144
 local PROJECTILE_SHRAPNEL_SAMPLE_CAP_CROWDED = 36
 local PROJECTILE_SHRAPNEL_SAMPLE_CAP_EXTREME = 18
 local PROJECTILE_SHRAPNEL_SLICE_TIME = 0.0008
+local PROJECTILE_SHRAPNEL_TRACE_DISTANCE = 16756
 local PROJECTILE_CROWD_PLAYER_THRESHOLD = 10
 local PROJECTILE_CROWD_PLAYER_THRESHOLD_EXTREME = 16
 
@@ -310,7 +311,7 @@ if SERVER then
 						dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
 						dir:Normalize()
 
-						local Tr = util.QuickTrace(SelfPos, dir * 10000, self)
+						local Tr = util.QuickTrace(SelfPos, dir * PROJECTILE_SHRAPNEL_TRACE_DISTANCE, self)
 						if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
 							bullet.Dir = dir
 							if not IsValid(self) then

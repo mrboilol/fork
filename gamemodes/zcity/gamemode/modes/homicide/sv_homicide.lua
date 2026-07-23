@@ -187,6 +187,8 @@ MODE.LootTableStandard = {
 		{4.5,"weapon_painkillers"},
 		{3.5,"weapon_bloodbag"},
 		{1.5,"weapon_bruicekit"},
+		{0.08,"weapon_mannitol"},
+		{0.05,"weapon_autosurgeon_sh"},
 		{2.5,"hg_flashlight"},
 		{0.8,"weapon_matches"},
 	}},

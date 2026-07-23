@@ -120,6 +120,7 @@ local lootPools = {
 		"weapon_bloodbag",
 		"weapon_bruicekit",
 		"weapon_medkit_sh",
+		"weapon_autosurgeon_sh",
 		"weapon_betablock",
 		"weapon_naloxone",
 		"weapon_mannitol",

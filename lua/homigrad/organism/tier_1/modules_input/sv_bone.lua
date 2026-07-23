@@ -435,6 +435,7 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.brokenribs = math.Round(org.chest * 3)
 		if org.brokenribs > 0 then
 			markBrokenBone(org, "ValveBiped.Bip01_Spine2")
+			org.painadd = org.painadd + 8
 			if IsValid(org.owner) and org.owner:IsPlayer() then org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4) end
 			playBoneFractureSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end

@@ -356,6 +356,8 @@ end)
 
 net.Receive("hg_medical_minigame_cancel", function(len, ply)
     local minigameType = net.ReadString()
+    hook.Run("hg_medical_minigame_ended", ply, minigameType, false)
+
     if minigameType == "amputation" then
         ClearAmputationSessionsForPlayer(ply)
         return
@@ -378,6 +380,7 @@ net.Receive("hg_medical_minigame_cancel", function(len, ply)
 end)
 
 hook.Add("PlayerDeath", "hg_medical_minigame_clear_amputation_progress", function(ply)
+    hook.Run("hg_medical_minigame_ended", ply, nil, false)
     ClearAmputationSessionsForPlayer(ply)
     ClearDislocationSessionsForPlayer(ply)
     ClearBandageSessionsForPlayer(ply)
@@ -659,6 +662,11 @@ end)
 net.Receive("hg_medical_minigame_finish", function(len, ply)
     local requestedType = net.ReadString()
     local reportedProgress = math.Clamp(net.ReadFloat() or 0, 0, 1)
+    timer.Simple(0, function()
+        if IsValid(ply) then
+            hook.Run("hg_medical_minigame_ended", ply, requestedType, true)
+        end
+    end)
 
     if requestedType == "amputation" then
         local amputationSession = hg.MedicalMinigame.AmputationSessions[ply]

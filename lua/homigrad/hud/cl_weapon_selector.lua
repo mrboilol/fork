@@ -545,6 +545,15 @@ end
 
 local LastSelected = 0
 
+local function SelectInventoryWeapon(wep)
+    if not IsValid(wep) then return end
+
+    input.SelectWeapon(wep)
+    net.Start("NI_SelectWeapon")
+    net.WriteEntity(wep)
+    net.SendToServer()
+end
+
 local function get_active_tool(ply, tool)
     local activeWep = ply:GetActiveWeapon()
     if not IsValid(activeWep) or activeWep:GetClass() ~= "gmod_tool" or activeWep.Mode ~= tool then return end
@@ -604,7 +613,7 @@ function WS.ChangeSelectionWep( ply, key )
             WS.Show = 0
             WS.LastInv = WS.LastInv or "weapon_hands_sh"
             local oldwep = ply:GetActiveWeapon()
-            input.SelectWeapon( WS.LastInv )
+            SelectInventoryWeapon(WS.LastInv)
             WS.LastInv = oldwep
         end
 
@@ -625,7 +634,7 @@ function WS.SetActuallyWeapon( ply, cmd )
 
             if IsValid(WS.GetSelectedWeapon()) then
                 WS.LastInv = WS.LastInv ~= ply:GetActiveWeapon() and WS.LastInv or ply:GetActiveWeapon()
-                input.SelectWeapon( WS.GetSelectedWeapon() )
+                SelectInventoryWeapon(WS.GetSelectedWeapon())
             end
             cmd:RemoveKey(IN_ATTACK)
             cmd:RemoveKey(IN_ATTACK2)

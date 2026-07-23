@@ -498,6 +498,10 @@ if SERVER then
 		{key = "jawdislocation", limb = "jaw"},
 	}
 
+	local FRACTURE_TREATMENT_THRESHOLD = 0.95
+	local BANDAGE_WOUND_RESOURCE_COST = 4.5
+	local BANDAGE_GENERAL_BLEED_RESOURCE_COST = 9
+
 	local function GetFallbackTreatment(org)
 		for _, key in ipairs(fallbackConditionKeys) do
 			if CanHealKey(org, key) then
@@ -543,10 +547,10 @@ if SERVER then
 			totalRotations = totalRotations + bleedRotations
 		end
 
-		-- Count fractures (2 rotations each) - only at 1.0 health
+		-- Count fractures (2 rotations each) once they reach the live fracture threshold.
 		local brokenLimbs = {"lleg", "rleg", "larm", "rarm"}
 		for _, limb in ipairs(brokenLimbs) do
-			if org[limb] == 1 and not (limb == "lleg" and org.llegamputated) and not (limb == "rleg" and org.rlegamputated) and not (limb == "larm" and org.larmamputated) and not (limb == "rarm" and org.rarmamputated) then
+			if (tonumber(org[limb]) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not (limb == "lleg" and org.llegamputated) and not (limb == "rleg" and org.rlegamputated) and not (limb == "larm" and org.larmamputated) and not (limb == "rarm" and org.rarmamputated) then
 				totalRotations = totalRotations + 2
 				table.insert(fracturesToHeal, {key = limb, heal = 0.1})
 			end
@@ -629,7 +633,7 @@ if SERVER then
 					local biggestWound = org.wounds[1][1]
 					local healAmount = math.min(22.5 * self.modeValues[1], biggestWound)
 					local healedWound = biggestWound - healAmount
-					local consumption = 5 * healAmount
+					local consumption = BANDAGE_WOUND_RESOURCE_COST * healAmount
 					org.bleed = math.max(org.bleed - healAmount, 0)
 					org.wounds[1][1] = healedWound
 					self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
@@ -668,7 +672,7 @@ if SERVER then
 						local biggestWound = org.wounds[bonewounds[1]][1]
 						local healAmount = math.min(6.25 * self.modeValues[1], biggestWound)
 						local healedWound = biggestWound - healAmount
-						local consumption = 5 * healAmount
+						local consumption = BANDAGE_WOUND_RESOURCE_COST * healAmount
 						org.bleed = math.max(org.bleed - healAmount, 0)
 						org.wounds[bonewounds[1]][1] = healedWound
 						self.modeValues[1] = math.max(self.modeValues[1] - consumption, 0)
@@ -706,12 +710,12 @@ if SERVER then
 			end
 		end)
 
-		-- Heal fractures only at 1.0 health (2 rotations per fracture)
+		-- Splint fractures at the same threshold used by the fracture presentation.
 		local brokenLimbs = {}
-		if org.lleg == 1 and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
-		if org.rleg == 1 and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
-		if org.larm == 1 and not org.larmamputated then table.insert(brokenLimbs, "larm") end
-		if org.rarm == 1 and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
+		if (tonumber(org.lleg) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.llegamputated then table.insert(brokenLimbs, "lleg") end
+		if (tonumber(org.rleg) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.rlegamputated then table.insert(brokenLimbs, "rleg") end
+		if (tonumber(org.larm) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.larmamputated then table.insert(brokenLimbs, "larm") end
+		if (tonumber(org.rarm) or 0) >= FRACTURE_TREATMENT_THRESHOLD and not org.rarmamputated then table.insert(brokenLimbs, "rarm") end
 
 		if #brokenLimbs > 0 and self.modeValues[1] > 0 then
 			local limbToSplint = brokenLimbs[1]
@@ -812,7 +816,7 @@ if SERVER then
 		if not done and (tonumber(org.bleed) or 0) > 0 and self.modeValues[1] > 0 then
 			local bleedHeal = math.min(tonumber(org.bleed) or 0, 18.125 * self.modeValues[1])
 			org.bleed = math.max((tonumber(org.bleed) or 0) - bleedHeal, 0)
-			self.modeValues[1] = math.max(self.modeValues[1] - 10 * bleedHeal, 0)
+			self.modeValues[1] = math.max(self.modeValues[1] - BANDAGE_GENERAL_BLEED_RESOURCE_COST * bleedHeal, 0)
 			done = bleedHeal > 0
 			treatedPrimary = treatedPrimary or bleedHeal > 0
 		end
@@ -1061,6 +1065,13 @@ if SERVER then
 		return tourniquetBone == woundBone or (tourniqet_bones[tourniquetBone] and tourniqet_bones[tourniquetBone][woundBone]) or false
 	end
 
+	local distalTourniquetBones = {
+		["ValveBiped.Bip01_L_Hand"] = "ValveBiped.Bip01_L_Forearm",
+		["ValveBiped.Bip01_R_Hand"] = "ValveBiped.Bip01_R_Forearm",
+		["ValveBiped.Bip01_L_Foot"] = "ValveBiped.Bip01_L_Calf",
+		["ValveBiped.Bip01_R_Foot"] = "ValveBiped.Bip01_R_Calf",
+	}
+
 	function SWEP:Tourniquet(ent, bone)
 		local org = ent.organism
 		if not org then return false end
@@ -1099,13 +1110,14 @@ if SERVER then
 		end
 
 		if not bestWound then return false end
+		local tourniquetBone = distalTourniquetBones[bestBone] or bestBone
 
 		target.tourniquets = target.tourniquets or {}
-		target.tourniquets[#target.tourniquets + 1] = {bestWound[2], bestWound[3], bestBone}
+		target.tourniquets[#target.tourniquets + 1] = {bestWound[2], bestWound[3], tourniquetBone}
 
 		for i = #(org.wounds or {}), 1, -1 do
 			local woundBone = getTourniquetWoundBone(target, org.wounds[i])
-			if woundBone and isBoneAtOrBelowTourniquet(bestBone, woundBone) then
+			if woundBone and isBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
 				table.remove(org.wounds, i)
 			end
 		end
@@ -1115,7 +1127,7 @@ if SERVER then
 		for i = #(org.arterialwounds or {}), 1, -1 do
 			local arterialWound = org.arterialwounds[i]
 			local woundBone = getTourniquetWoundBone(target, arterialWound)
-			if woundBone and isBoneAtOrBelowTourniquet(bestBone, woundBone) then
+			if woundBone and isBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
 				if arterialWound[7] then removedArteries[arterialWound[7]] = true end
 				table.remove(org.arterialwounds, i)
 				removedArterial = true

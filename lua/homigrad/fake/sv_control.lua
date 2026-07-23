@@ -2183,7 +2183,9 @@ hook.Add("Think", "Fake", function()
 
 
 
-						local cons = constraint.Weld(ragdoll, ent, realPhysNum(ragdoll, 5), IsValid(choking) and realPhysNum(choking, 10) or trace.PhysicsBone, ent:IsWorld() and 10000 or 0, false, false)
+						-- World grips must last until the player releases them. A finite force
+						-- limit lets normal climbing impulses randomly break the weld mid-grab.
+						local cons = constraint.Weld(ragdoll, ent, realPhysNum(ragdoll, 5), IsValid(choking) and realPhysNum(choking, 10) or trace.PhysicsBone, 0, false, false)
 
 						if IsValid(cons) then
 
@@ -2343,7 +2345,9 @@ hook.Add("Think", "Fake", function()
 
 						
 
-						local cons = constraint.Weld(ragdoll, ent, realPhysNum(ragdoll, 7), IsValid(choking) and realPhysNum(choking, 10) or trace.PhysicsBone, ent:IsWorld() and 10000 or 0, false, false)
+						-- Match the left-hand grip: releasing the key/stamina removes this
+						-- explicitly, rather than physics breaking it at an arbitrary force.
+						local cons = constraint.Weld(ragdoll, ent, realPhysNum(ragdoll, 7), IsValid(choking) and realPhysNum(choking, 10) or trace.PhysicsBone, 0, false, false)
 
 						if IsValid(cons) then
 

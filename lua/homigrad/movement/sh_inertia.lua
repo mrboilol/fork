@@ -671,12 +671,13 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 				if org.pelvis == 1 then
 					org.painadd = org.painadd + delta_time * mul
 				end
+				local dislocationPainMul = ply.hg_isSprinting and 2 or 1.5
 				if (org.lleg == 1) or org.llegdislocation then
-					org.painadd = org.painadd + delta_time * mul
+					org.painadd = org.painadd + delta_time * mul * (org.llegdislocation and dislocationPainMul or 1)
 				end
 
 				if (org.rleg == 1) or org.rlegdislocation then
-					org.painadd = org.painadd + delta_time * mul
+					org.painadd = org.painadd + delta_time * mul * (org.rlegdislocation and dislocationPainMul or 1)
 				end
 			end
 		end

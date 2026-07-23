@@ -87,6 +87,7 @@ local GRENADE_PHYSICS_PUSH_CAP = 10
 local GRENADE_SHRAPNEL_SAMPLE_CAP = 144
 local GRENADE_SHRAPNEL_BATCH_RESUMES = 3
 local GRENADE_SHRAPNEL_SLICE_TIME = 0.0008
+local GRENADE_SHRAPNEL_TRACE_DISTANCE = 20000
 local GRENADE_CROWD_PLAYER_THRESHOLD = 10
 local GRENADE_CROWD_PLAYER_THRESHOLD_EXTREME = 16
 local GRENADE_CROWD_SHRAPNEL_SAMPLE_CAP = 36
@@ -453,7 +454,7 @@ function ENT:Explode()
 					dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
 					dir:Normalize()
 
-					local Tr = util.QuickTrace(selfPos, dir * 10000, self)
+					local Tr = util.QuickTrace(selfPos, dir * GRENADE_SHRAPNEL_TRACE_DISTANCE, self)
 
 					if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
 						bullet.penetrated = 0
