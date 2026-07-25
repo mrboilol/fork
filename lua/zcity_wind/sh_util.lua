@@ -298,7 +298,7 @@ function ZW.PerformCustomBulletHit(bullet, plugin, trace, len, len_before)
         -- Reduce bullet damage on ricochet by 15% (Z-City style)
         bullet.Damage = (bullet.Damage or 0) * 0.85
 
-        if SERVER then
+        if SERVER and (not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayRicochet(trace.HitPos)) then
             local rnd = math.random(12)
             if rnd == 8 then rnd = 9 end
             sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
@@ -378,7 +378,14 @@ function ZW.PerformCustomBulletHit(bullet, plugin, trace, len, len_before)
                     effectdata:SetSurfaceProp(exitTrace.SurfaceProps)
                     effectdata:SetDamageType(DMG_BULLET)
                     effectdata:SetHitBox(exitTrace.HitBox)
-                    util.Effect("Impact", effectdata, true, true)
+
+                    local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(exitTrace)
+                    if replacedSound then
+                        HG_BulletImpactSounds.MakeEffectSilent(effectdata)
+                        util.Effect("Impact_GMOD", effectdata, true, true)
+                    else
+                        util.Effect("Impact", effectdata, true, true)
+                    end
                 end
 
                 if bullet.PostPenetration then

@@ -518,9 +518,9 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         org.internalBleedHeal = (org.internalBleedHeal or 0) + healAmount
         entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
     elseif class == "weapon_tranexamic_acid" then
-        local efficiency = owner.Profession == "doctor" and 0.5 or 1
-
-        org.internalBleedHeal = (org.internalBleedHeal or 0) + consumedAmount / efficiency
+        -- Match direct use: consuming the full 10-unit dose supplies exactly
+        -- 10 points of internal-bleed healing for every profession.
+        org.internalBleedHeal = (org.internalBleedHeal or 0) + consumedAmount
         org.tranexamic_acid = math.min((org.tranexamic_acid or 0) + consumedAmount, 10)
         entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
     end

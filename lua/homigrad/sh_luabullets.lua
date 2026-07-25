@@ -344,8 +344,14 @@ local function Impact(Weapon, iAmmoDamageType, bFirstTimePredicted, vSrc, tr, sI
 				if (SERVER) then
 					data:SetEntIndex(tr.Entity:EntIndex())
 				end
-			
-			util.Effect(sImpactEffect, data, true, true)
+
+			local replacedSound = SERVER and HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(tr)
+			if (replacedSound) then
+				HG_BulletImpactSounds.MakeEffectSilent(data)
+				util.Effect("Impact_GMOD", data, true, true)
+			else
+				util.Effect(sImpactEffect, data, true, true)
+			end
 		end
 	elseif (bFirstTimePredicted) then
 		// We may not impact, but we DO need to affect ragdolls on the client

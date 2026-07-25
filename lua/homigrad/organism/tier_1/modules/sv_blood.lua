@@ -227,10 +227,8 @@ module[2] = function(owner, org, mulTime)
 		org.coagulation_multiplier = org.coagulation_multiplier * (1 - org.liver * 0.5)
 		org.blood_regeneration_multiplier = org.blood_regeneration_multiplier * (1 - org.liver * 0.75)
 		org.bleedingmul = org.bleedingmul * (1 + org.liver * 0.5)
-		-- Liver-induced internal bleeding stops when tranexamic acid is administered
-		if (org.tranexamic_acid or 0) <= 0 then
-			org.internalBleed = org.internalBleed + (org.liver * mulTime * 0.05)
-		end
+		-- Liver trauma adds internal bleeding when the organ is damaged. Do not
+		-- generate more forever from the persistent liver-damage value here.
 	else
 		org.coagulation_multiplier = 1.2
 		org.blood_regeneration_multiplier = 1.2

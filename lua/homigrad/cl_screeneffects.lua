@@ -88,6 +88,7 @@ local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show blac
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
 local hook_Run = hook.Run
+local drawFinalVitalsVignettes
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
 	tab["$pp_colour_contrast"] = 1
@@ -122,6 +123,10 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	hook_Run("Post Post Processing")
 
 	hook_Run("Post Post Pre Post Processing")
+
+	-- Keep the vital-state borders above every motion-blur pass, including the
+	-- organism effects dispatched by the hook immediately above.
+	if drawFinalVitalsVignettes then drawFinalVitalsVignettes() end
 end)
 
 local postprs = hg.postprocess
@@ -789,6 +794,49 @@ local grayscaleLerp = 0
 local WhiteNoiseStation
 local soundRetry = {}
 
+drawFinalVitalsVignettes = function()
+	if not IsValid(lply) or not lply:Alive() then return end
+	if IsValid(lply:GetNWEntity("spect")) then return end
+
+	local org = lply.new_organism or lply.organism
+	if not org or not org.brain or not org.o2 or not isnumber(org.o2[1]) or not org.analgesia then return end
+
+	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
+		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
+		local pain = PainLerp + strobe
+		local shock = shockLerp
+
+		render.UpdateScreenEffectTexture()
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+		vignetteMat:SetFloat("$c0_z", org.otrub and 1 or (pain / 40 + math.max(shock - 5, 0) / 6))
+		vignetteMat:SetFloat("$c1_y", org.otrub and 5 or (pain / 40 + math.max(shock - 5, 0) / 6))
+		render.SetMaterial(vignetteMat)
+		render.DrawScreenQuad()
+
+		render.UpdateScreenEffectTexture()
+		painMat:SetFloat("$c2_x", CurTime() + 10000)
+		painMat:SetFloat("$c0_y", 0.3)
+		painMat:SetFloat("$c0_z", 1)
+		painMat:SetFloat("$c1_x", math.Clamp(pain / 90, 0, 0.75))
+		painMat:SetFloat("$c1_y", math.Clamp(pain / 90, 0, 0.75))
+		render.SetMaterial(painMat)
+		render.DrawScreenQuad()
+	end
+
+	if O2Lerp > 1 then
+		local o2 = O2Lerp
+
+		render.UpdateScreenEffectTexture()
+		noiseMat:SetFloat("$c0_y", 1 - o2 / 200)
+		noiseMat:SetFloat("$c0_z", 1)
+		noiseMat:SetFloat("$c1_x", math.Clamp(o2 / 200, 0, 2))
+		noiseMat:SetFloat("$c1_y", o2 * (not org.otrub and 0.05 or 1))
+		noiseMat:SetFloat("$c2_x", CurTime() + 10000)
+		render.SetMaterial(noiseMat)
+		render.DrawScreenQuad()
+	end
+end
+
 function canRetrySound(key, station)
 	if IsValid(station) and station:GetState() == GMOD_CHANNEL_PLAYING then return false end
 	local nextTry = soundRetry[key] or 0
@@ -911,7 +959,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 	end
 
-	if (org.consciousness < 0.7) then
+	if not org.otrub and (org.consciousness < 0.7) then
 		lerpblood = LerpFT(0.01, lerpblood or 0, math.Clamp((0.7 - org.consciousness) * 5, 0, 1) * 255)
 		local lowblood = (3600 - (org.blood or 5000)) / 600
 
@@ -1352,7 +1400,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	if (org.consciousness or 0) < 1 then
+	if not org.otrub and (org.consciousness or 0) < 1 then
 		local consciousness = 1 - consciousnessLerp
 		render.UpdateScreenEffectTexture()
 		render.UpdateFullScreenDepthTexture()
@@ -1424,25 +1472,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
 		pain = PainLerp + strobe
 		shock = shockLerp
-		render.UpdateScreenEffectTexture()
-
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-		vignetteMat:SetFloat("$c0_z", org.otrub and 1 or (pain / 40 + math.max(shock - 5, 0) / 6)) //ColorIntensity
-		vignetteMat:SetFloat("$c1_y", org.otrub and 5 or (pain / 40 + math.max(shock - 5, 0) / 6)) //Vignette
-
-		render.SetMaterial(vignetteMat)
-		render.DrawScreenQuad()
-
-		render.UpdateScreenEffectTexture()
-
-		painMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-		painMat:SetFloat("$c0_y", 0.3) //Gate
-		painMat:SetFloat("$c0_z", 1) //ColorIntensity
-		painMat:SetFloat("$c1_x", math.Clamp(pain / 90, 0, 0.75)) //Lerp
-		painMat:SetFloat("$c1_y", math.Clamp(pain / 90, 0, 0.75)) //Vignette
-
-		render.SetMaterial(painMat)
-		render.DrawScreenQuad()
 
 		if org.otrub then
 			--DrawMotionBlur(0.1, 1., 0.01)
@@ -1652,18 +1681,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 	
 	if O2Lerp > 1 then
-		render.UpdateScreenEffectTexture()
-		
 		o2 = O2Lerp
-		
-		noiseMat:SetFloat("$c0_y", 1 - o2 / 200) //Gate
-		noiseMat:SetFloat("$c0_z", 1) //ColorIntensity
-		noiseMat:SetFloat("$c1_x", math.Clamp(o2 / 200, 0, 2)) //Lerp
-		noiseMat:SetFloat("$c1_y", o2 * (!org.otrub and 0.05 or 1)) //Vignette
-		noiseMat:SetFloat("$c2_x", CurTime() + 10000) //Time
-
-		render.SetMaterial(noiseMat)
-		render.DrawScreenQuad()
 		
 		if o2 > 50 and !org.otrub then
 			local dyingMode = getServerSoundMode("hg_dyingsound", 2)

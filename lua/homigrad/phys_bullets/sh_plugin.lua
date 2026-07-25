@@ -62,32 +62,6 @@ PLUGIN.SurfaceHardness = {
 	[MAT_GLASS] = 0.6,
 }
 
-PLUGIN.SurfaceImpactSounds = {
-	[MAT_METAL] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_COMPUTER] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_VENT] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_GRATE] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_FLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
-	[MAT_ALIENFLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
-	[MAT_SAND] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[MAT_DIRT] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[MAT_WOOD] = {"ric_wood1.ogg", "ric_wood2.ogg", "ric_wood3.ogg", "ric_wood4.ogg"},
-	[MAT_FOLIAGE] = {"ric_wood1.ogg", "ric_wood2.ogg", "ric_wood3.ogg", "ric_wood4.ogg"},
-	[MAT_CONCRETE] = {"ric_stone1.ogg", "ric_stone2.ogg", "ric_stone3.ogg"},
-	[MAT_TILE] = {"ric_stone1.ogg", "ric_stone2.ogg", "ric_stone3.ogg"},
-	[MAT_GLASS] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_PLASTIC] = {"ric_metal1.ogg", "ric_metal2.ogg", "ric_metal3.ogg", "ric_metal4.ogg", "ric_metal5.ogg"},
-	[MAT_SLOSH] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[MAT_GRASS] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[MAT_SNOW] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[MAT_ANTLION] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
-	[MAT_BLOODYFLESH] = {"ric_flesh1.ogg", "ric_flesh2.ogg", "ric_flesh3.ogg", "ric_flesh4.ogg"},
-	[74] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-	[85] = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"},
-}
-
-PLUGIN.DefaultImpactSounds = {"ric_ground1.ogg", "ric_ground2.ogg", "ric_ground3.ogg", "ric_ground4.ogg", "ric_ground5.ogg"}
-
 PLUGIN.Bullet_StandartMask = MASK_SHOT
 
 --\\Misc
@@ -518,7 +492,14 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 								effectdata:SetSurfaceProp(trace_backwards.SurfaceProps)
 								effectdata:SetDamageType(DMG_BULLET)
 								effectdata:SetHitBox(trace_backwards.HitBox)
-								util.Effect("Impact", effectdata, true, true)
+
+								local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace_backwards)
+								if(replacedSound)then
+									HG_BulletImpactSounds.MakeEffectSilent(effectdata)
+									util.Effect("Impact_GMOD", effectdata, true, true)
+								else
+									util.Effect("Impact", effectdata, true, true)
+								end
 							end
 						end
 						
@@ -589,6 +570,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 						trace.Entity:DispatchTraceAttack(dmg, trace, dir)
 
 						if(trace.Entity.organism)then
+							if(HG_BulletImpactSounds)then
+								HG_BulletImpactSounds.PlayMaterialImpact(trace)
+							end
+
 							if(self.OnStopped)then
 								self:OnStopped(nil, "organism", trace)
 							end
@@ -610,7 +595,14 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 					effectdata:SetSurfaceProp(trace.SurfaceProps)
 					effectdata:SetDamageType(DMG_BULLET)
 					effectdata:SetHitBox(trace.HitBox)
-					util.Effect("Impact", effectdata, true, true)
+
+					local replacedSound = HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace)
+					if(replacedSound)then
+						HG_BulletImpactSounds.MakeEffectSilent(effectdata)
+						util.Effect("Impact_GMOD", effectdata, true, true)
+					else
+						util.Effect("Impact", effectdata, true, true)
+					end
 				end
 				
 				if(self.PenetratingMaterial)then
@@ -770,7 +762,6 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 				self:PostRicochet(new_vel_normal, len, ricochet, ang_diff, len_before, trace)
 			end
 		else
-			PLUGIN.PlayImpactSound(trace, false)
 			self.Pos = self.Pos + new_vel_normal * 1
 			self.PenetratingMaterial = trace.MatType
 			self.PenetratingStartPos = trace.HitPos
@@ -904,25 +895,15 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 	function PLUGIN.PlayImpactSound(trace, is_ricochet)
 		if(SERVER)then
 			if(is_ricochet)then
-				if(math.random(2) == 1)then
-					local rnd = math.random(4)
-					sound.Play("bullet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
-				else
+				if(not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayRicochet(trace.HitPos))then
 					local rnd = math.random(12)
 					if(rnd == 8)then rnd = 9 end
 					sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
 				end
+
+				return true
 			else
-				local mat_type = trace.MatType
-				-- Always supply a bullet impact.  Otherwise an unmapped Source material
-				-- falls back to the stock physics impact sound instead of this sound set.
-				local sounds = PLUGIN.SurfaceImpactSounds[mat_type] or PLUGIN.DefaultImpactSounds
-				
-				if(sounds and #sounds > 0)then
-					local sound_file = sounds[math.random(1, #sounds)]
-					sound.Play("bullet/" .. sound_file, trace.HitPos, 75, math.random(90, 110))
-					return true
-				end
+				return HG_BulletImpactSounds and HG_BulletImpactSounds.PlayMaterialImpact(trace) or false
 			end
 		end
 		

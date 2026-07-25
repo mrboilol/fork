@@ -107,6 +107,8 @@ local seizure_brain_roll_chance = 15
 local seizure_brain_roll_gain_min = 0.04
 local seizure_brain_roll_gain_max = 0.11
 local seizure_no_cause_decay_time = 90
+local seizure_mannitol_gain_reduction = 0.5
+local seizure_mannitol_recovery_bonus = 1
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
@@ -407,6 +409,7 @@ local function send_organism(org, ply)
 	sendtable.brainHemorrhage = org.brainHemorrhage
 	sendtable.brainBleedRate = org.brainBleedRate
 	sendtable.o2 = org.o2
+	sendtable.losing_oxy = org.losing_oxy
 	sendtable.CO = org.CO
 	sendtable.blood = org.blood
 	sendtable.bloodtype = org.bloodtype
@@ -555,6 +558,7 @@ local function send_bareinfo(org)
 	sendtable.diastolic = org.diastolic
 	sendtable.analgesia = org.analgesia
 	sendtable.o2 = org.o2
+	sendtable.losing_oxy = org.losing_oxy
 	sendtable.timeValue = org.timeValue
 	sendtable.superfighter = org.superfighter
 	sendtable.lungsfunction = org.lungsfunction
@@ -661,11 +665,17 @@ function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	return org.panicattackadd
 end
 
+local function getMannitolSeizureStrength(org)
+	return math.Clamp((org.mannitol or 0) / 4, 0, 1)
+end
+
 function hg.organism.AddSeizure(org, amount)
 	if not org then return 0 end
 	if not isnumber(amount) or amount <= 0 then return org.seizure or 0 end
 
-	org.seizure = math.Clamp((org.seizure or 0) + amount, 0, 1)
+	local mannitolStrength = getMannitolSeizureStrength(org)
+	local gainMultiplier = 1 - mannitolStrength * seizure_mannitol_gain_reduction
+	org.seizure = math.Clamp((org.seizure or 0) + amount * gainMultiplier, 0, 1)
 
 	return org.seizure
 end
@@ -689,6 +699,10 @@ end
 local function reduceSeizure(org, amount)
 	if not org or not isnumber(amount) or amount <= 0 then return org and org.seizure or 0 end
 
+	-- Mannitol clears seizure risk faster, but does not cut short an active seizure.
+	if not org.seizureActive then
+		amount = amount * (1 + getMannitolSeizureStrength(org) * seizure_mannitol_recovery_bonus)
+	end
 	org.seizure = math.max((org.seizure or 0) - amount, 0)
 
 	return org.seizure

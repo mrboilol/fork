@@ -22,6 +22,20 @@ local cardiacArrestBlood = 900
 local terminalHeartRate = 300
 local peaDuration = 6
 
+local function getPalpitationThreat(org, blood, o2Value)
+	local lowBlood = math.Clamp((4000 - blood) / 2000, 0, 1)
+	local lowPressure = math.Clamp((65 - (org.bloodpressure or 93)) / 40, 0, 1)
+	local hypoxia = math.Clamp((12 - o2Value) / 12, 0, 1)
+	local shock = math.Clamp((org.shock or 0) / 60, 0, 1)
+	local heartDamage = math.Clamp(org.heart or 0, 0, 1)
+	local temperatureStress = math.max(
+		math.Clamp((34 - (org.temperature or 36.7)) / 6, 0, 1),
+		math.Clamp(((org.temperature or 36.7) - 39) / 3, 0, 1)
+	)
+
+	return math.max(lowBlood, lowPressure, hypoxia, shock, heartDamage, temperatureStress)
+end
+
 local function interpolateCurve(curve, value)
 	value = tonumber(value) or curve[1][1]
 	if value >= curve[1][1] then return curve[1][2] end
@@ -97,6 +111,7 @@ module[1] = function(org)
 	org.compensationPulseMultiplier = 1
 	org.compensationHeartRateTarget = 75
 	org.palpitations = 0
+	org.palpitationTreatmentUntil = 0
 	org.cardiacArrestStart = nil
 	org.cardiacArrestO2Start = nil
 		org.bloodpressure = 93
@@ -159,7 +174,9 @@ module[2] = function(owner, org, timeValue)
 	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
 	local hypovolemicShock = math.Clamp(org.hypovolemicShock or 0, 0, 1)
 	local palpitations = math.Clamp(org.palpitations or 0, 0, 1)
-	local compensationPulseMultiplier = math.Clamp(1 - hemorrhageCompensation * 0.35 - hypovolemicShock * 0.1 - palpitations * 0.3, 0.35, 1)
+	local palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
+	local effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
+	local compensationPulseMultiplier = math.Clamp(1 - hemorrhageCompensation * 0.35 - hypovolemicShock * 0.1 - effectivePalpitations * 0.3, 0.35, 1)
 	org.compensationPulseMultiplier = compensationPulseMultiplier
 	-- Blood volume begins weakening effective perfusion at 3500 mL. Keeping
 	-- full perfusion above that point prevents compensation from starting early.
@@ -273,12 +290,17 @@ module[2] = function(owner, org, timeValue)
 	-- extreme rates build the condition rapidly; it then clears only gradually
 	-- once the rhythm settles.
 	local tachycardiaK = math.Clamp((org.heartbeat - 120) / 120, 0, 1)
-	if tachycardiaK > 0 and not org.heartstop then
+	local correctingPalpitations = (org.palpitationTreatmentUntil or 0) > CurTime()
+	if correctingPalpitations then
+		org.palpitations = math.max(palpitations - timeValue / 4, 0)
+	elseif tachycardiaK > 0 and not org.heartstop then
 		org.palpitations = math.Clamp(palpitations + timeValue * (0.002 + tachycardiaK * 0.021), 0, 1)
 	else
 		org.palpitations = math.max(palpitations - timeValue / 90, 0)
 	end
 	palpitations = org.palpitations
+	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
+	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 
 	-- At terminal blood volume, bradycardia/poor filling finally progress to
 	-- deterministic arrest. The 2000 mL band remains severe compensated shock.
@@ -328,11 +350,11 @@ module[2] = function(owner, org, timeValue)
 		local chance = 0
 		local sustainedTachy = org._tachycardiaSince and org._tachycardiaSince + 3 < CurTime()
 		local highTachyK = math.Clamp((hb - 130) / 120, 0, 1)
-		if palpitations > 0.05 and highTachyK > 0 then
+		if effectivePalpitations > 0.05 and highTachyK > 0 then
 			-- A strained heart is especially likely to fail when it is still
-			-- forced to race. Low pressure makes that transition more likely.
-			chance = highTachyK * palpitations * 0.032
-			if (org.bloodpressure or 93) < 65 then chance = chance * 1.5 end
+			-- forced to race. Palpitations alone are mild; blood loss, shock,
+			-- hypoxia, heart damage, or temperature stress restore their danger.
+			chance = highTachyK * effectivePalpitations * 0.032
 		end
 		if bloodNow >= 4500 and sustainedTachy and hb >= 250 and k < 0.8 then
 			chance = 0.06
@@ -351,7 +373,7 @@ module[2] = function(owner, org, timeValue)
 		-- not make a weak pulse look normal simply because the heart is racing.
 		local heartbeatNow = org.heartbeat or 70
 		local pumpRateK = math.Clamp(heartbeatNow / 70, 0.25, 2.4)
-		local fillingK = (1 - math.Clamp((heartbeatNow - 185) / 85, 0, 0.55)) * (1 - palpitations * 0.2)
+		local fillingK = (1 - math.Clamp((heartbeatNow - 185) / 85, 0, 0.55)) * (1 - effectivePalpitations * 0.2)
 		local maxPumpSupport = 1.1 - math.Clamp((heartbeatNow - 100) / 200, 0, 0.35)
 		local pumpSupport = math.Clamp(pumpRateK * fillingK, 0.25, maxPumpSupport)
 		local supportedPulse = math.Clamp(pulse * pumpSupport, 0, 200)
@@ -371,12 +393,12 @@ module[2] = function(owner, org, timeValue)
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.45)
 
-	local compensation = 1 + hemorrhageCompensation * 0.45 * (1 - palpitations * 0.75)
+	local compensation = 1 + hemorrhageCompensation * 0.45 * (1 - effectivePalpitations * 0.75)
 	compensation = compensation * (1 - hypovolemicShock * 0.2)
 	compensation = math.Clamp(compensation, 0.45, 1.4)
 
 	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
-	local fillingK = (1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)) * (1 - palpitations * 0.2)
+	local fillingK = (1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)) * (1 - effectivePalpitations * 0.2)
 	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.12)
 	local volumeMapK = blood >= 3500 and 1 or math.Remap(math.Clamp(blood, 1000, 3500), 1000, 3500, 0.12, 1)
 	local map = 93 * pulse_factor * hypertensionMul * compensation * volumeMapK
@@ -629,7 +651,7 @@ module[2] = function(owner, org, timeValue)
 		-- insufficient diastolic filling each reduce stroke volume; a high rate
 		-- alone cannot make a thready hypovolemic pulse look effective.
 		local rateK = math.Clamp((org.heartbeat or 0) / 75, 0, 2.5)
-		local fillingK = (1 - math.Clamp(((org.heartbeat or 75) - 180) / 120, 0, 0.7)) * (1 - palpitations * 0.25)
+		local fillingK = (1 - math.Clamp(((org.heartbeat or 75) - 180) / 120, 0, 0.7)) * (1 - effectivePalpitations * 0.25)
 		local strokeVolume = volumeMapK * (organSystemsEnabled and (1 - math.Clamp(org.heart or 0, 0, 1)) * hypothermiaK or 1) * fillingK
 		org.strokeVolume = math.Clamp(strokeVolume, 0, 1.2)
 		org.cardiacOutput = math.Clamp(rateK * org.strokeVolume, 0, 1.5)

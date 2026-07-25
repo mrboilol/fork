@@ -859,7 +859,9 @@ function SWEP:Shoot(override)
 
 	if !override and self:GetJammed() then
 		self.LastPrimaryDryFire = CurTime()
-		self:PrimaryShootEmpty()
+		if SERVER then
+			self:PlaySnd("panoptisscon/uhoh.ogg", true, CHAN_AUTO)
+		end
 		primary.Automatic = false
 
 		return false

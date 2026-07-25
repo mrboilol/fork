@@ -939,6 +939,7 @@ local arterialJetLengthMin = 4
 local arterialJetLengthMax = 40
 local arterialSideSway = 8
 local arterialVerticalSway = 3.5
+local arterialJetTravelSpeed = 24
 local arterialUpdateInterval = 0.04
 local bloodDown = Vector(0, 0, -1)
 
@@ -1125,11 +1126,32 @@ emitArterialSpray = function(ent, pos, dir, ang, circulation, intensity, arteryT
 	-- spawning a fan or a succession of separate particle bursts.
 	jet.arterialJet = true
 	jet.jetOrigin = jet.jetOrigin or pos + vector_origin
-	jet.jetEnd = jet.jetEnd or jetEnd + vector_origin
+	jet.jetEnd = jet.jetEnd or pos + vector_origin
+
+	-- Advance the stream through space at a finite speed instead of teleporting
+	-- it to full length. Smooth the offset rather than the world position so the
+	-- stream still stays attached when its owner moves.
+	local jetOffset = jet.jetEnd - jet.jetOrigin
+	local targetOffset = jetEnd - pos
+	local offsetDelta = targetOffset - jetOffset
+	local deltaLength = offsetDelta:Length()
+	local deltaTime = math.Clamp(time - (jet.jetLastUpdate or time), 0, 0.1)
+	local maxTravel = arterialJetTravelSpeed * deltaTime
+	if deltaLength <= maxTravel then
+		jetOffset:Set(targetOffset)
+	elseif maxTravel > 0 then
+		jetOffset:Add(offsetDelta * (maxTravel / deltaLength))
+	end
+	jet.jetLastUpdate = time
+
+	local movingJetEnd = pos + jetOffset
+	local movingTrace = util.TraceLine({start = pos, endpos = movingJetEnd, filter = ent})
+	if movingTrace.Hit then movingJetEnd = movingTrace.HitPos end
+
 	jet.jetOrigin:Set(pos)
-	jet.jetEnd:Set(jetEnd)
-	jet[1]:Set(jetEnd)
-	jet[2]:Set(jetEnd)
+	jet.jetEnd:Set(movingJetEnd)
+	jet[1]:Set(movingJetEnd)
+	jet[2]:Set(movingJetEnd)
 	jet[3]:Set(direction * jetLength)
 	jet.jetWidth = arteryType == "arteria" and arterialJetWidth + 0.2 or arterialJetWidth
 	jet.decalWeight = jet.jetWidth

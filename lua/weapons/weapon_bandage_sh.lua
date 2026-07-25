@@ -501,6 +501,15 @@ if SERVER then
 	local FRACTURE_TREATMENT_THRESHOLD = 0.95
 	local BANDAGE_WOUND_RESOURCE_COST = 4.5
 	local BANDAGE_GENERAL_BLEED_RESOURCE_COST = 9
+	local BANDAGE_STRUCTURAL_RESOURCE_COST = 10
+
+	local function GetFallbackDislocation(org)
+		for _, dislocation in ipairs(fallbackDislocations) do
+			if org[dislocation.key] then
+				return {key = dislocation.key, limb = dislocation.limb, dislocation = true}
+			end
+		end
+	end
 
 	local function GetFallbackTreatment(org)
 		for _, key in ipairs(fallbackConditionKeys) do
@@ -509,11 +518,7 @@ if SERVER then
 			end
 		end
 
-		for _, dislocation in ipairs(fallbackDislocations) do
-			if org[dislocation.key] then
-				return {key = dislocation.key, limb = dislocation.limb, dislocation = true}
-			end
-		end
+		return GetFallbackDislocation(org)
 	end
 
 	function SWEP:GetHealData(org)
@@ -570,6 +575,10 @@ if SERVER then
 			or org.skull >= 0.6
 			or org.chest >= 0.6
 		if not hasPrimaryTreatment and GetFallbackTreatment(org) then
+			totalRotations = totalRotations + 2
+		elseif hasPrimaryTreatment and availableResource > 0 and GetFallbackDislocation(org) then
+			-- Dislocations remain last priority, but account for resetting one if any
+			-- of the bandage remains after its primary treatment.
 			totalRotations = totalRotations + 2
 		end
 
@@ -760,9 +769,9 @@ if SERVER then
 		local who = (self:GetOwner() == org.owner) and "You" or ((owner.Profession == "doctor") and "A doctor" or "Someone")
 		local mul = ((owner.Profession == "doctor") and 0.2 or 1)
 		local amt = 281.25 * mul
-		if org.skull >= 0.6 and self.modeValues[1] >= amt then
+		if org.skull >= 0.6 and self.modeValues[1] >= BANDAGE_STRUCTURAL_RESOURCE_COST then
 			org.skull = 0.55
-			self.modeValues[1] = self.modeValues[1] - amt
+			self.modeValues[1] = self.modeValues[1] - BANDAGE_STRUCTURAL_RESOURCE_COST
 			org.bandagedskull = true
 			org.pain = math.max(org.pain - 14, 0)
 			done = true
@@ -821,10 +830,11 @@ if SERVER then
 			treatedPrimary = treatedPrimary or bleedHeal > 0
 		end
 
-		-- Once bleeding and the normal splint targets are handled, a remaining bandage
-		-- can still support one damaged bone or reset one dislocated joint.
-		if not treatedPrimary and self.modeValues[1] > 0 then
-			local treatment = GetFallbackTreatment(org)
+		-- Once bleeding and the normal splint targets are handled, remaining bandage
+		-- can reset one dislocation. With no primary treatment, damaged bones still
+		-- take priority over that dislocation.
+		if self.modeValues[1] > 0 then
+			local treatment = treatedPrimary and GetFallbackDislocation(org) or GetFallbackTreatment(org)
 			if treatment then
 				if treatment.dislocation then
 					if hg.organism.CompleteDislocationFix then
@@ -851,7 +861,7 @@ if SERVER then
 					ent:SetNetVar("bandaged_limbs", ent.bandaged_limbs)
 				end
 
-				self.modeValues[1] = math.max(self.modeValues[1] - 10, 0)
+				self.modeValues[1] = math.max(self.modeValues[1] - BANDAGE_STRUCTURAL_RESOURCE_COST, 0)
 				org.avgpain = math.max((org.avgpain or 0) - 5, 0)
 				done = true
 			end

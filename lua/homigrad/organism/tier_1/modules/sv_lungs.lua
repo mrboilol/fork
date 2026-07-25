@@ -31,6 +31,10 @@ local HypoxiaBands = {
 }
 
 local cardiacArrestO2DrainTime = 10
+local lowStaminaO2Start = 50
+local criticalStaminaO2Start = 20
+local lowStaminaO2DebtMax = 8
+local opioidRespiratoryArrestThreshold = 0.85
 
 local function interpolateCurve(curve, value)
 	value = tonumber(value) or curve[1][1]
@@ -106,6 +110,9 @@ module[1] = function(org)
 	org.fireCOExposure = 0
 
 	org.lastCOBreathe = nil
+	org.exertionO2Debt = 0
+	org.opioidRespiratoryDepression = 0
+	org.respiratoryArrest = false
 
 
 
@@ -379,6 +386,9 @@ module[2] = function(owner, org, timeValue)
 	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
 		o2[1] = o2.range
 		org.lungsfunction = true
+		org.exertionO2Debt = 0
+		org.opioidRespiratoryDepression = 0
+		org.respiratoryArrest = false
 		org._zeroO2Time = 0
 		if org.brain >= 0.7 and org.alive then
 			if hg.organism.KillFatalBrainDamage then
@@ -389,6 +399,38 @@ module[2] = function(owner, org, timeValue)
 		end
 		return
 	end
+
+	local staminaValue = org.stamina and org.stamina[1] or lowStaminaO2Start
+	local activelyExerting = org.stamina and (org.stamina.sub or 0) > 0.05 or false
+	if owner:IsPlayer() and not owner:InVehicle() then
+		local deliberatelyMoving = owner:KeyDown(IN_FORWARD) or owner:KeyDown(IN_BACK) or owner:KeyDown(IN_MOVELEFT) or owner:KeyDown(IN_MOVERIGHT)
+		activelyExerting = activelyExerting or (deliberatelyMoving and owner:GetVelocity():Length2D() > 25)
+	end
+
+	local exertionO2Debt = math.Clamp(org.exertionO2Debt or 0, 0, o2.range)
+	if activelyExerting and staminaValue < lowStaminaO2Start then
+		if staminaValue > criticalStaminaO2Start then
+			local severity = math.Clamp((lowStaminaO2Start - staminaValue) / (lowStaminaO2Start - criticalStaminaO2Start), 0, 1)
+			exertionO2Debt = math.Approach(exertionO2Debt, lowStaminaO2DebtMax * severity, timeValue * 0.8)
+		else
+			local criticalSeverity = math.Clamp((criticalStaminaO2Start - staminaValue) / criticalStaminaO2Start, 0, 1)
+			exertionO2Debt = math.min(exertionO2Debt + timeValue * (0.8 + criticalSeverity * 1.7), o2.range)
+		end
+	else
+		exertionO2Debt = math.Approach(exertionO2Debt, 0, timeValue * 1.5)
+	end
+	org.exertionO2Debt = exertionO2Debt
+	local exertionO2Cap = math.max(o2.range - exertionO2Debt, 0)
+
+	-- Opioid overdose suppresses breathing directly. Naloxone lowers the active
+	-- load, and a sufficiently severe overdose stops respiration until the load
+	-- falls again; death then proceeds through the normal hypoxia/O2 path.
+	local analgesiaLoad = math.Clamp(((org.analgesia or 0) - 1.5) / 2.5, 0, 1)
+	local painkillerLoad = math.Clamp(((org.painkiller or 0) - 2.4) / 1.6, 0, 1)
+	local naloxoneProtection = math.Clamp((org.naloxone or 0) / 4, 0, 1)
+	local opioidRespiratoryDepression = math.Clamp((analgesiaLoad + painkillerLoad) * (1 - naloxoneProtection), 0, 1)
+	org.opioidRespiratoryDepression = opioidRespiratoryDepression
+	org.respiratoryArrest = opioidRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
 	local bloodO2Cap = math.Clamp(interpolateCurve(BloodO2, math.Clamp(org.blood or 5000, 0, 5000)), 0, o2.range)
 	org.bloodO2Cap = bloodO2Cap
@@ -473,7 +515,7 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	local success = owner:IsBerserk() or (not org.heartstop and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
+	local success = owner:IsBerserk() or (not org.heartstop and not org.respiratoryArrest and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
 
 	if success and owner:IsPlayer() and inwater then success = false end
 
@@ -609,7 +651,8 @@ module[2] = function(owner, org, timeValue)
 
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
 		local coldO2RegenK = Lerp(coldO2Stress, 1, 0.55)
-		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * blood_pressure_k * coBreathePenalty
+		local opioidBreathingK = math.Clamp(1 - opioidRespiratoryDepression * 1.15, 0.05, 1)
+		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * blood_pressure_k * coBreathePenalty * opioidBreathingK
 		local tracheaDamage = math.Clamp(org.trachea or 0, 0, 1)
 		local tracheaIntakeK = 1 - (tracheaDamage * 0.15 + tracheaDamage * tracheaDamage * 0.55)
 		regenerate = regenerate * math.Clamp(tracheaIntakeK, 0.3, 1)
@@ -619,7 +662,7 @@ module[2] = function(owner, org, timeValue)
 		-- gradually than ambient pressure itself.
 		local altitudeO2Cap = o2.range * Lerp(altitudeO2K, 0.5, 1)
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
 
 
 
@@ -795,9 +838,10 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	-- Blood volume caps tissue oxygen delivery. During arrest, circulation no
-	-- longer replenishes O2; the remaining (at most 6) drains over about 10 s.
-	o2[1] = math.Clamp(min(o2[1], bloodO2Cap), 0, o2.range)
+	-- Blood volume and exertion debt cap tissue oxygen delivery. During cardiac
+	-- arrest, circulation no longer replenishes O2; the remaining (at most 6)
+	-- drains over about 10 s.
+	o2[1] = math.Clamp(min(o2[1], bloodO2Cap, exertionO2Cap), 0, o2.range)
 	if org.heartstop then
 		org.cardiacArrestO2Start = math.Clamp(org.cardiacArrestO2Start or min(o2[1], 6), 0, 6)
 		local arrestDrainRate = max(org.cardiacArrestO2Start, 0.1) / cardiacArrestO2DrainTime
@@ -866,7 +910,6 @@ module[2] = function(owner, org, timeValue)
 
 	-- Low stamina - 3rd priority, bypassed if choking
 
-	local staminaValue = org.stamina and org.stamina[1] or 0
 	if org.isPly and not org.otrub and not org.choking and staminaValue < 30 and org.analgesia <= 1.5 and !org.heartstop then
 
 		org.owner:Notify(low_stamina[math.random(#low_stamina)], 50, "low_stamina", 3)
@@ -883,16 +926,6 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if org.analgesia > 1.5 or org.painkiller > 2.4 then
-
-		if math.Rand(0, 500) < (org.analgesia + org.painkiller) then
-
-			//org.lungsfunction = false
-
-		end
-
-	end
-
 	-- Lung function gating:
 	-- * O2 at 0  -> tiny chance per tick of total lung failure
 	-- * O2 > 0   -> only restore lung function if the airway/lungs are not
@@ -906,14 +939,14 @@ module[2] = function(owner, org, timeValue)
 	else
 		local lungsLost = (org.lungsL[1] or 0) >= 1 and (org.lungsR[1] or 0) >= 1
 		local tracheaLost = (org.trachea or 0) >= 1
-		if not (lungsLost or tracheaLost or org.heartstop) then
+		if not (lungsLost or tracheaLost or org.heartstop or org.respiratoryArrest) then
 			org.lungsfunction = true
 		end
 	end
 
 
 
-	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop or (org.hemothorax or 0) >= 0.9 then
+	if (org.lungsL[1] == 1 and org.lungsR[1] == 1) or org.heartstop or org.respiratoryArrest or (org.hemothorax or 0) >= 0.9 then
 
 		org.lungsfunction = false
 

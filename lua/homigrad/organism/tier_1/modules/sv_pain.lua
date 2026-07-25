@@ -145,9 +145,9 @@ module[2] = function(owner, org, timeValue)
 
 	if adrenaline > 0.5 then
 
-		-- Remorseism-style adrenaline pacing: a real rush delays both the pain
-		-- arriving and the body settling it, so the stored injury survives the rush.
-		local suppression = math.max(1 - adrenaline, 0.05) / 1.5
+		-- A real rush strongly delays both the pain arriving and the body settling
+		-- it, so the stored injury survives the rush and catches up afterward.
+		local suppression = math.max(1 - adrenaline, 0.05) / 2.5
 
 		add = add * suppression
 		sub = sub * suppression

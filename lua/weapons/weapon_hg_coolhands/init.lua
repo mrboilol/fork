@@ -513,6 +513,7 @@ function SWEP:ApplyForce()
 						if org.alive then
 							local skillMult = ply.Profession == "doctor" and 2 or 1
 							self.CPRDuration = (self.CPRDuration or 0) + (1 / 120) * 60
+							org.palpitationTreatmentUntil = CurTime() + 1
 							
 							-- Improved oxygenation
 							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)

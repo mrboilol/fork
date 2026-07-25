@@ -91,6 +91,7 @@ if SERVER then
 		org.adrenaline = math.max(org.adrenaline or 0, 1.5)
 		org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, CurTime() + 4)
 		org.adrenaline_try = 0
+		org.palpitationTreatmentUntil = math.max(org.palpitationTreatmentUntil or 0, CurTime() + 8)
 		self:RefreshPerfusionTreatment(ent, 0.2)
 
 		if self.poisoned2 then

@@ -88,9 +88,9 @@ if SERVER then
 			end
 		end
 
-		-- A bruise kit treats a dislocation only when there is no damaged bone left
-		-- to restore, so it does not skip a more urgent injury.
-		if #bonesToHeal == 0 and availableResource >= 0.25 then
+		-- Bones stay ahead of dislocations, but any quarter-charge left after those
+		-- higher-priority treatments can reset one joint in the same use.
+		if availableResource - totalCost >= 0.25 - 0.001 then
 			local dislocations = {
 				{key = "llegdislocation", limb = "lleg"},
 				{key = "rlegdislocation", limb = "rleg"},

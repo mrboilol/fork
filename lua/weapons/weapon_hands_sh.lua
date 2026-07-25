@@ -1698,6 +1698,7 @@ function SWEP:ApplyForce()
 
 							-- Track CPR duration
 							self.CPRDuration = (self.CPRDuration or 0) + (1 / 120) * 60
+							org.palpitationTreatmentUntil = CurTime() + 1
 							
 							-- CPR must provide enough oxygen to get an arrested patient back into
 							-- the recoverable band, even when their normal lung regeneration is 0.

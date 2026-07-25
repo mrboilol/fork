@@ -59,6 +59,7 @@ if SERVER then
 		"materials/vgui/hud/stroke.png",
 		"materials/vgui/hud/palpitations.png",
 		"materials/vgui/hud/hypoventilation.png",
+		"materials/vgui/hud/hypercapnia.png",
 		"materials/vgui/hud/concussion.png",
 		"materials/vgui/hud/smallbleeding.png",
 		"materials/vgui/hud/maxbleeding.png",
@@ -481,6 +482,7 @@ local status_sprites = {
 	stroke = nil,
 	palpitations = nil,
 	hypoventilation = nil,
+	hypercapnia = nil,
 	concussion = nil,
 	sepsis = nil,
 	bleeding_small = nil,
@@ -749,6 +751,12 @@ local tooltipTexts = {
             [2] = {title = "Затрудненное дыхание", text = "Вы дышите с трудом. Вам не хватает воздуха."},
             [1] = {title = "Поверхностное дыхание", text = "Вы дышите неглубоко. Это вызывает легкий дискомфорт."}
         },
+		hypercapnia = {
+			[4] = {title = "Тяжёлая гиперкапния", text = "Уровень углекислого газа критический. Потеря сознания неизбежна."},
+			[3] = {title = "Выраженная гиперкапния", text = "Сильная головная боль, спутанность сознания и удушье."},
+			[2] = {title = "Гиперкапния", text = "Углекислый газ накапливается в крови. Вам трудно дышать."},
+			[1] = {title = "Повышенный углекислый газ", text = "Дыхание кажется тяжёлым, начинает болеть голова."}
+		},
         concussion = {
             [4] = {title = "Тяжелое сотрясение мозга", text = "Вы в замешательстве и не можете ясно мыслить. Возможна потеря памяти."},
             [3] = {title = "Сотрясение мозга", text = "Сильная головная боль, головокружение и тошнота."},
@@ -916,6 +924,12 @@ local tooltipTexts = {
             [2] = {title = "Shallow Breathing", text = "You can breathe, but theres nothing coming in."},
             [1] = {title = "Shortness of Breath", text = "Discomfort, maybe you exercised too much."}
         },
+		hypercapnia = {
+			[4] = {title = "Severe Hypercapnia", text = "Carbon dioxide is critically high. Losing consciousness is imminent."},
+			[3] = {title = "Advanced Hypercapnia", text = "A crushing headache, confusion, and air hunger are setting in."},
+			[2] = {title = "Hypercapnia", text = "Carbon dioxide is building up in your blood. Breathing feels difficult."},
+			[1] = {title = "Elevated Carbon Dioxide", text = "Breathing feels heavy and a headache is starting."}
+		},
         concussion = {
             [4] = {title = "Cerebral Bruising", text = "You probably got hit so bad it caused some brain damage."},
             [3] = {title = "Concussion", text = "My world is spinning around so fast..."},
@@ -1064,7 +1078,8 @@ local function load_status_sprites()
 	status_sprites.brain_damage = loadMaterial("vgui/hud/status_brain_damage.png", suffix)
 	status_sprites.stroke = loadMaterial("vgui/hud/stroke.png", suffix)
 	status_sprites.palpitations = loadMaterial("vgui/hud/palpitations.png", suffix)
-	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix)
+	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix) or loadMaterial("vgui/hud/hypoventilation.png", "")
+	status_sprites.hypercapnia = loadMaterial("vgui/hud/hypercapnia.png", suffix) or loadMaterial("vgui/hud/hypercapnia.png", "")
 	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
 	status_sprites.sepsis = loadMaterial("vgui/hud/sepsis.png", suffix)
 	status_sprites.bleeding_small = loadMaterial("vgui/hud/smallbleeding.png", suffix)
@@ -1563,6 +1578,7 @@ local function draw_status_effects()
 
 				local o2_val = getO2Value(org)
 				local o2_curregen = getOrgTableVal(org, "o2", "curregen", nil, 0)
+				local o2_demand = getOrgVal(org, "losing_oxy", 0)
 				if o2_curregen <= 0 and o2_val < 5 then
 					if not currentEffectNames["lungs_failure"] then
 						table.insert(effects, {
@@ -1571,20 +1587,38 @@ local function draw_status_effects()
 						})
 						currentEffectNames["lungs_failure"] = true
 					end
-				elseif o2_curregen < -0.1 and not currentEffectNames["lungs_failure"] then
+				elseif o2_demand > 0 and o2_curregen < o2_demand and not org.holdingbreath and not currentEffectNames["lungs_failure"] then
+					local ventilation_deficit = math.Clamp(1 - o2_curregen / o2_demand, 0, 1)
 					local level_num = 1
-					if o2_curregen < -0.8 then level_num = 4
-					elseif o2_curregen < -0.5 then level_num = 3
-					elseif o2_curregen < -0.25 then level_num = 2 end
+					if ventilation_deficit > 0.8 then level_num = 4
+					elseif ventilation_deficit > 0.5 then level_num = 3
+					elseif ventilation_deficit > 0.25 then level_num = 2 end
 
 					table.insert(effects, {
 						name = "hypoventilation",
 						level_num = level_num,
 						has_levels = true,
 						priority = 0.51,
-						value = math.abs(math_floor(o2_curregen * 10))
+						value = math_floor(ventilation_deficit * 100)
 					})
 					currentEffectNames["hypoventilation"] = true
+				end
+
+				local co_val = getOrgVal(org, "CO", 0)
+				if co_val > 5 then
+					local level_num = 1
+					if co_val > 25 then level_num = 4
+					elseif co_val > 20 then level_num = 3
+					elseif co_val > 10 then level_num = 2 end
+
+					table.insert(effects, {
+						name = "hypercapnia",
+						level_num = level_num,
+						has_levels = true,
+						priority = 0.52,
+						value = math_floor(math.Clamp(co_val / 30, 0, 1) * 100)
+					})
+					currentEffectNames["hypercapnia"] = true
 				end
 
 				local concussion_val = smooth.concussion or getOrgVal(org, "concussion", 0)
@@ -2377,6 +2411,7 @@ local function draw_status_effects()
 		elseif effect.name == "stroke" then icon_mat = status_sprites.stroke
 		elseif effect.name == "palpitations" then icon_mat = status_sprites.palpitations
 		elseif effect.name == "hypoventilation" then icon_mat = status_sprites.hypoventilation
+		elseif effect.name == "hypercapnia" then icon_mat = status_sprites.hypercapnia
 		elseif effect.name == "concussion" then icon_mat = status_sprites.concussion
 		elseif effect.name == "death" then icon_mat = status_sprites.death
 		elseif effect.name == "berserk" then icon_mat = status_sprites.berserk

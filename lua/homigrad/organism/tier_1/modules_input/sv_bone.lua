@@ -6,6 +6,10 @@ local function isCrush(dmgInfo)
 	return (not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)) or dmgInfo:GetInflictor().RubberBullets
 end
 
+local function isBluntBrainImpact(dmgInfo)
+	return dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
+end
+
 local halfValue2 = util.halfValue2
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
 	local crush = isCrush(dmgInfo)
@@ -82,6 +86,25 @@ end
 
 local function addBoneInternalBleed(org, amount, cap)
 	org.internalBleed = (org.internalBleed or 0) + math.Clamp(amount or 0, 0, cap or 1)
+end
+
+local function trySkullFractureHemorrhage(org, oldDamage, newDamage)
+	if not hg.organism.AddBrainHemorrhage then return end
+
+	local chance, amountMin, amountMax, rateMin, rateMax
+	if oldDamage < 1 and newDamage >= 1 then
+		chance, amountMin, amountMax = 0.45, 0.025, 0.07
+		rateMin, rateMax = 0.0004, 0.0012
+	elseif oldDamage < 0.6 and newDamage >= 0.6 then
+		chance, amountMin, amountMax = 0.2, 0.01, 0.035
+		rateMin, rateMax = 0.00015, 0.00065
+	else
+		return
+	end
+
+	if math.Rand(0, 1) <= chance then
+		hg.organism.AddBrainHemorrhage(org, math.Rand(amountMin, amountMax), math.Rand(rateMin, rateMax))
+	end
 end
 
 local function addBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
@@ -410,8 +433,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 	local skullDelta = org.skull - oldDmg
+	trySkullFractureHemorrhage(org, oldDmg, org.skull)
 	markDamagedBone(org, "ValveBiped.Bip01_Head1", org.skull)
-	local brainBefore = org.brain or 0
 
 	if org.skull == 1 then
 		markBrokenBone(org, "ValveBiped.Bip01_Head1")
@@ -432,8 +455,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
 	local brainExposure = math.Clamp(((org.skull or 0) - 0.6) / 0.4, 0, 1)
+	local bluntBrainDamage = 0
 	if brainExposure > 0 and rnd then
-		org.brain = math.min(org.brain + dmg * 0.05 * Lerp(brainExposure, 0.35, 1), 1)
+		bluntBrainDamage = bluntBrainDamage + dmg * 0.05 * Lerp(brainExposure, 0.35, 1)
 	end
 
 	if math.random(1, 4) == 1 then
@@ -447,10 +471,22 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	local newlyExposedSkull = math.max((org.skull or 0) - math.max(oldDmg, 0.6), 0)
 	if newlyExposedSkull > 0 then
-		org.brain = math.min(org.brain + newlyExposedSkull * 0.25, 1)
+		bluntBrainDamage = bluntBrainDamage + newlyExposedSkull * 0.25
 	end
 
-	local brainGain = math.max(org.brain - brainBefore, 0)
+	local brainGain = 0
+	local brainTraumaApplied = false
+	if bluntBrainDamage > 0 then
+		if isBluntBrainImpact(dmgInfo) and hg.organism.ApplyBluntBrainTrauma then
+			brainGain = hg.organism.ApplyBluntBrainTrauma(org, bluntBrainDamage, dmgInfo, 0.5)
+			brainTraumaApplied = true
+		else
+			local brainBefore = org.brain or 0
+			org.brain = math.min(brainBefore + bluntBrainDamage, 1)
+			brainGain = math.max((org.brain or 0) - brainBefore, 0)
+		end
+	end
+
 	if skullDelta > 0 or brainGain > 0 then
 		local concussionGain = math.min(skullDelta * 2.75 + brainGain * 7, 4.5)
 		org.concussion = math.min((org.concussion or 0) + concussionGain, 10)
@@ -458,7 +494,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		org.disorientation = (org.disorientation or 0) + skullDelta * 0.9
 	end
 
-	if brainGain > 0 then
+	if brainGain > 0 and not brainTraumaApplied then
 		if hg.organism.ApplyBrainTraumaEffects then
 			hg.organism.ApplyBrainTraumaEffects(org, brainGain, dmgInfo)
 		else

@@ -92,10 +92,11 @@ if SERVER then
 			self.poisoned2 = nil
 		end
 
-		local efficiency = owner.Profession == "doctor" and 0.5 or 1
 		local dose = self.modeValues[1]
 		if dose > 0 then
-			org.internalBleedHeal = org.internalBleedHeal + dose / efficiency
+			-- One full 10-unit syringe always supplies exactly 10 points of
+			-- internal-bleed healing, regardless of profession.
+			org.internalBleedHeal = (org.internalBleedHeal or 0) + dose
 			org.tranexamic_acid = math.min(org.tranexamic_acid + dose, 10)
 			self.modeValues[1] = 0
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
