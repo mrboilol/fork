@@ -1424,24 +1424,27 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		shock = shockLerp
 		render.UpdateScreenEffectTexture()
 
-		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
-		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
+		vignetteMat:SetFloat("$c2_x", CurTime() + 10000) //Time
+		vignetteMat:SetFloat("$c0_z", org.otrub and 1 or (pain / 40 + math.max(shock - 5, 0) / 6)) //ColorIntensity
+		vignetteMat:SetFloat("$c1_y", org.otrub and 5 or (pain / 40 + math.max(shock - 5, 0) / 6)) //Vignette
+
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
-		painMat:SetFloat("$c2_x", CurTime() + 10000)
-		painMat:SetFloat("$c0_y", 0.8)
-		painMat:SetFloat("$c0_z", org.otrub and 1 or painEffectIntensity)
-		painMat:SetFloat("$c1_x", org.otrub and math.Clamp(pain / 90, 0, 0.75) or math.Clamp(pain / 70, 0, 0.95))
-		painMat:SetFloat("$c1_y", org.otrub and math.Clamp(pain / 90, 0, 0.75) or math.Clamp(pain / 70, 0, 0.95))
+
+		painMat:SetFloat("$c2_x", CurTime() + 10000) //Time
+		painMat:SetFloat("$c0_y", 0.3) //Gate
+		painMat:SetFloat("$c0_z", 1) //ColorIntensity
+		painMat:SetFloat("$c1_x", math.Clamp(pain / 90, 0, 0.75)) //Lerp
+		painMat:SetFloat("$c1_y", math.Clamp(pain / 90, 0, 0.75)) //Vignette
+
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 
 		if org.otrub then
-			DrawMotionBlur(0.1, 1., 0.01)
-			lply:ScreenFade(SCREENFADE.IN, Color(0,0,0), 2, 0.5)
+			--DrawMotionBlur(0.1, 1., 0.01)
+			lply:ScreenFade( SCREENFADE.IN, Color(0,0,0), 2, 0.5 )
 		end
 		
 		//if pain > 10 then
