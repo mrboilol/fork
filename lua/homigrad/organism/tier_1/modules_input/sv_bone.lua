@@ -293,7 +293,9 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	hg.AddHarmToAttacker(dmgInfo, jawDelta * 3, "Jaw bone damage harm")
 
 	if jawDelta > 0 then
-		org.concussion = math.min((org.concussion or 0) + math.min(jawDelta * 3, 2.25), 10)
+		org.concussion = math.min((org.concussion or 0) + math.min(jawDelta * 5, 3.25), 10)
+		org.consciousness = math.Approach(org.consciousness or 1, 0, jawDelta * 0.35)
+		org.disorientation = (org.disorientation or 0) + jawDelta * 0.8
 
 		-- Normal jabs still build concussion through jaw damage. A high-damage fist
 		-- strike (such as an uppercut) adds enough rotational trauma to knock out a
@@ -371,7 +373,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.shock = org.shock + dmg * 3
 	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
 	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
-	org.brain = math.min(org.brain + (rnd and dmg * 0.05 or 0), 1)
+	local brainExposure = math.Clamp(((org.skull or 0) - 0.6) / 0.4, 0, 1)
+	if brainExposure > 0 and rnd then
+		org.brain = math.min(org.brain + dmg * 0.05 * Lerp(brainExposure, 0.35, 1), 1)
+	end
 
 	if math.random(1, 4) == 1 then
 		local eye_dmg = dmg * math.Rand(0.8, 1.5)
@@ -382,14 +387,26 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if skullDelta > 0.6 then
-		org.brain = math.min(org.brain + 0.1, 1)
+	local newlyExposedSkull = math.max((org.skull or 0) - math.max(oldDmg, 0.6), 0)
+	if newlyExposedSkull > 0 then
+		org.brain = math.min(org.brain + newlyExposedSkull * 0.25, 1)
 	end
 
 	local brainGain = math.max(org.brain - brainBefore, 0)
 	if skullDelta > 0 or brainGain > 0 then
-		local concussionGain = math.min(skullDelta * 3 + brainGain * 5, 3)
+		local concussionGain = math.min(skullDelta * 5 + brainGain * 10, 5)
 		org.concussion = math.min((org.concussion or 0) + concussionGain, 10)
+		org.consciousness = math.Approach(org.consciousness or 1, 0, skullDelta * 0.4)
+		org.disorientation = (org.disorientation or 0) + skullDelta * 1.5
+	end
+
+	if brainGain > 0 then
+		if hg.organism.ApplyBrainTraumaEffects then
+			hg.organism.ApplyBrainTraumaEffects(org, brainGain, dmgInfo)
+		else
+			org.consciousness = math.Approach(org.consciousness or 1, 0, brainGain * 2.5)
+			org.disorientation = (org.disorientation or 0) + brainGain * 4
+		end
 	end
 
 	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or skullDelta > 0.6) then

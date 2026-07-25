@@ -245,11 +245,11 @@ function SWEP:PrimarySpread()
 		if not self.SprayRandOnly then
 			local gangstaHold = owner.posture == 7
 			if gangstaHold then
-				-- Sideways pistol cant: recoil tracks left across the screen instead
+				-- Sideways pistol cant: recoil tracks right across the screen instead
 				-- of following the normal upward muzzle-climb profile.
-				local leftKick = math.Clamp(force * 0.85, 0.3, 2.8)
+				local rightKick = math.Clamp(force * 0.85, 0.3, 2.8)
 				angrand2[1] = -math.Clamp(math.abs(angrand2[1]) * 0.14, 0.03, 0.45)
-				angrand2[2] = -leftKick
+				angrand2[2] = rightKick
 				angrand2[3] = 0
 			else
 				local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.62, 10)
@@ -305,9 +305,9 @@ function SWEP:PrimarySpread()
 		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.7 * longGunKickMul, 0.7, 6.2)
 		local muzzleKick = sprayAng * self:GetCharacterRecoilMul() * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
 		if gangstaHold then
-			local leftKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.9, 0.35, 3.2)
+			local rightKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.9, 0.35, 3.2)
 			muzzleKick[1] = math.Clamp(muzzleKick[1] * 0.15, -0.65, 0.12)
-			muzzleKick[2] = -leftKick
+			muzzleKick[2] = rightKick
 		else
 			muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
 			muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.7, -10.0, 1.2)

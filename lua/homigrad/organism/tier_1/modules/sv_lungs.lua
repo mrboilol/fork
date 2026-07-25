@@ -485,7 +485,7 @@ module[2] = function(owner, org, timeValue)
 	-- an uninjured lung become punctured. The actual puncture remains until the
 	-- lung is repaired, so the condition can return after the temporary vent ends.
 	if hasPneumothorax and not needleActive then
-		org.pneumothorax = min(org.pneumothorax + timeValue / 180 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2)
+		org.pneumothorax = min(org.pneumothorax + timeValue / 90 * (org.lungsL[2] + org.lungsR[2]), (org.lungsL[2] + org.lungsR[2]) / 2)
 	else
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
@@ -497,7 +497,7 @@ module[2] = function(owner, org, timeValue)
 		org.hemothorax = max(org.hemothorax - timeValue / 120, 0)
 	elseif internalBleedVal > 0.3 then
 		local buildRate = math.Clamp((internalBleedVal - 0.3) / 3, 0, 1)
-		org.hemothorax = min(org.hemothorax + buildRate * timeValue / 200, 1)
+		org.hemothorax = min(org.hemothorax + buildRate * timeValue / 100, 1)
 	elseif org.hemothorax > 0 and internalBleedVal <= 0.1 then
 		org.hemothorax = max(org.hemothorax - timeValue / 120, 0)
 	end

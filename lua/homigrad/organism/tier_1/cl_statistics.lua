@@ -341,20 +341,27 @@ hook.Add("HUDPaint", "homigrad-organism-debug", function()
 	local textList = getTextTable(organism_otherply)
 	local w = ScrW()
 	local x = w - 15 - weight
-	draw.RoundedBox(0, x, 15, weight, #textList * h, black)
+	draw.RoundedBox(0, x, 15, weight, cutoff * h, black)
+
+	if cutoff < #textList then
+		draw.RoundedBox(0, x - weight - 15, 15, weight, (#textList - cutoff) * h, black)
+	end
+
 	for i, text in ipairs(textList) do
-		local y = 15 + (i - 1) * h
-		if i % 2 == 0 then draw.RoundedBox(0, x, y, weight, h, littleblack) end
+		local y = i > cutoff and 15 + (i - 1 - cutoff) * h or 15 + (i - 1) * h
+		local rowX = i > cutoff and x - weight - 15 or x
+
+		if i % 2 == 0 then draw.RoundedBox(0, rowX, y, weight, h, littleblack) end
 		if text[3] then
 			trahalgmod.r = text[3]
 			trahalgmod.g = text[4]
 			trahalgmod.b = text[5]
 			trahalgmod.a = 75
-			draw.RoundedBox(0, x, y, weight, h, trahalgmod)
+			draw.RoundedBox(0, rowX, y, weight, h, trahalgmod)
 		end
 
-		draw.SimpleText(text[1], "DefaultFixedDropShadow", w - 15, y, white, TEXT_ALIGN_RIGHT)
-		draw.SimpleText(text[2], "DefaultFixedDropShadow", w - 15 - weight, y, white)
+		draw.SimpleText(text[1], "DefaultFixedDropShadow", rowX + weight, y, white, TEXT_ALIGN_RIGHT)
+		draw.SimpleText(text[2], "DefaultFixedDropShadow", rowX, y, white)
 	end
 end)
 

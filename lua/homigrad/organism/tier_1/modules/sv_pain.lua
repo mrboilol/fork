@@ -138,16 +138,18 @@ module[2] = function(owner, org, timeValue)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
 	
-	local add = math.min(timeValue * 15, org.painadd)
+	-- Otrub blocks incoming pain.  Apply that rule to the accumulator itself so
+	-- queued pain cannot keep avgpain pinned at its 150 cap indefinitely.
+	local add = shouldPainAdd and math.min(timeValue * 15, org.painadd) or 0
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
 
-	if adrenaline > 0.5 then
+	if adrenaline > 0 then
 
-		local suppression = math.max(1 - adrenaline, 0.05) / 1.5
+		-- Historical adrenaline behavior: incoming pain still accumulates while
+		-- pain recovery slows heavily, leaving the stored pain for the comedown.
+		local suppression = math.max(1 - adrenaline / 2, 0.1)
 
 		sub = sub * suppression
-
-		add = add * suppression
 
 	end
 
@@ -248,10 +250,14 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - org.analgesia, 0)
+	org.pain = org.avgpain * math.max(1 - adrenaline / 3, 0.1) * math.max(1 - org.analgesia, 0)
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
-	org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
+	if shouldPainAdd then
+		org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
+	else
+		org.painadd = 0
+	end
 
 
 

@@ -85,6 +85,7 @@ local otrubSoundPaths = {
 }
 local OtrubModeStation
 local activeOtrubMode
+local warnedOtrubIncapacitationConflict = false
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
@@ -118,14 +119,13 @@ hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	--//if not brain_motionblur then DrawMotionBlur(addtiveLayer.blur_addalpha, addtiveLayer.blur_drawalpha, addtiveLayer.blur_delay) end
 	--//DrawToyTown(addtiveLayer.toytown, addtiveLayer.toytown_h * ScrH())
 	tab["$pp_colour_brightness"] = addtiveLayer.brightness
+	DrawColorModify(tab)
 
 	hook_Run("Post Pre Post Processing")
 
 	hook_Run("Post Post Processing")
 
 	hook_Run("Post Post Pre Post Processing")
-
-	hook_Run("Post Pain Processing")
 end)
 
 local postprs = hg.postprocess
@@ -391,6 +391,23 @@ local painLayerFadeLerp = 0.06
 local painEffectIntensity = 0.8
 local unconsciousPainEffectIntensity = 1.55
 local painPulseIntensity = 0.25
+local hiddenPainFlickerSeverity = 0
+local hiddenPainFlickerStart = 0
+local hiddenPainFlickerAttackEnd = 0
+local hiddenPainFlickerEnd = 0
+local hiddenPainFlickerPeak = 0
+local hiddenPainNextFlicker = 0
+local hiddenPainColor = {
+	["$pp_colour_brightness"] = 0,
+	["$pp_colour_contrast"] = 1,
+	["$pp_colour_colour"] = 1,
+	["$pp_colour_addr"] = 0,
+	["$pp_colour_addg"] = 0,
+	["$pp_colour_addb"] = 0,
+	["$pp_colour_mulr"] = 0,
+	["$pp_colour_mulg"] = 0,
+	["$pp_colour_mulb"] = 0
+}
 local PainStationLoading = false
 local PanicStationLoading = false
 local PainStationOverlayLoading = false
@@ -845,17 +862,17 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
     -- Concussion and low blood blur
     local blurAmount = 0
-    if org.concussion and org.concussion > 2 then
+    if not org.otrub and org.concussion and org.concussion > 2 then
         blurAmount = math.min((org.concussion - 2) / 8, 1) * 4
     end
 
-    if org.blood and org.blood < 4000 then
+    if not org.otrub and org.blood and org.blood < 4000 then
         blurAmount = math.max(blurAmount, math.min((4000 - org.blood) / 3500, 1) * 5)
     end
 
     local adrenaline = org.adrenaline or 0
     local adrenalineIntensity = math.Clamp((adrenaline - 1) / 1.5, 0, 1)
-    if adrenalineIntensity > 0 then
+    if adrenalineIntensity > 0 and not org.otrub then
 		-- A sustained surge should feel increasingly disorienting instead of
 		-- jumping straight to its final visual strength.
 		adrenalineVisualLerp = math.Approach(adrenalineVisualLerp, 1, FrameTime() * (0.08 + adrenalineIntensity * 0.22))
@@ -1210,7 +1227,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	tempLerp = LerpFT(0.01, tempLerp, org.temperature)
 
-	if AnalgesiaLerp > 0.005 then
+	if AnalgesiaLerp > 0.005 and not org.otrub then
 		local pulse = (math.sin(CurTime() * 1.35) + 1) * 0.5
 		local drugFx = AnalgesiaLerp * (0.75 + pulse * 0.25)
 		local lsdFx = math.max(math.Clamp((analgesia - 1) / 1.5, 0, 1) * drugFx, rainbowFx)
@@ -1248,7 +1265,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	if lply.PlayerClassName == "headcrabzombie" then
+	if lply.PlayerClassName == "headcrabzombie" and not org.otrub then
 		render.UpdateScreenEffectTexture()
 
 		heatMat:SetFloat("$c0_x", -CurTime() * 0.1) //time
@@ -1402,23 +1419,23 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
-		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
+		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
 		pain = PainLerp + strobe
 		shock = shockLerp
 		render.UpdateScreenEffectTexture()
 
 		vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
-		vignetteMat:SetFloat("$c0_z", org.otrub and 5 * painEffectIntensity or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
-		vignetteMat:SetFloat("$c1_y", org.otrub and 10 * painEffectIntensity or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
+		vignetteMat:SetFloat("$c0_z", org.otrub and 5 or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
+		vignetteMat:SetFloat("$c1_y", org.otrub and 10 or (pain / 32 + math.max(shock - 5, 0) / 2.4) * painEffectIntensity)
 		render.SetMaterial(vignetteMat)
 		render.DrawScreenQuad()
 
 		render.UpdateScreenEffectTexture()
 		painMat:SetFloat("$c2_x", CurTime() + 10000)
 		painMat:SetFloat("$c0_y", 0.8)
-		painMat:SetFloat("$c0_z", painEffectIntensity)
-		painMat:SetFloat("$c1_x", math.Clamp(pain / 70, 0, 0.95))
-		painMat:SetFloat("$c1_y", math.Clamp(pain / 70, 0, 0.95))
+		painMat:SetFloat("$c0_z", org.otrub and 1 or painEffectIntensity)
+		painMat:SetFloat("$c1_x", org.otrub and math.Clamp(pain / 90, 0, 0.75) or math.Clamp(pain / 70, 0, 0.95))
+		painMat:SetFloat("$c1_y", org.otrub and math.Clamp(pain / 90, 0, 0.75) or math.Clamp(pain / 70, 0, 0.95))
 		render.SetMaterial(painMat)
 		render.DrawScreenQuad()
 
@@ -1757,9 +1774,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					DyingStation:SetVolume(consciousVol)
 
 					-- Sound peak detection for screen shake
-					if hg_dyingpulse:GetInt() == 1 and IsValid(DyingStation) and DyingStation.GetFFT and DyingStation:GetState() == GMOD_CHANNEL_PLAYING then
-						local fft = DyingStation:GetFFT(512)
-						if fft then
+					if hg_dyingpulse:GetInt() == 1 and IsValid(DyingStation) and DyingStation.FFT and DyingStation:GetState() == GMOD_CHANNEL_PLAYING then
+						local fft = {}
+						DyingStation:FFT(fft, FFT_512)
+						if #fft > 0 then
 							local peakSum = 0
 							for i = 1, #fft do
 								peakSum = peakSum + fft[i]
@@ -1865,8 +1883,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(ItssooverStation) then
 					ItssooverStation:SetVolume(consciousVol)
 
-					local fft = ItssooverStation:GetFFT(512)
-					if fft then
+					local fft = {}
+					if ItssooverStation.FFT and ItssooverStation:GetState() == GMOD_CHANNEL_PLAYING then
+						ItssooverStation:FFT(fft, FFT_512)
+					end
+					if #fft > 0 then
 						local peakSum = 0
 						for i = 1, #fft do
 							peakSum = peakSum + fft[i]
@@ -1984,6 +2005,16 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
+			local incapacitationMode = getServerSoundMode("hg_incapacitation", 0)
+			if otrubMode == 4 and incapacitationMode > 0 then
+				otrubMode = 0
+				if not warnedOtrubIncapacitationConflict then
+					print("dont do that kid")
+					warnedOtrubIncapacitationConflict = true
+				end
+			else
+				warnedOtrubIncapacitationConflict = false
+			end
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
@@ -2091,14 +2122,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 		end
 
-		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
-		local whiteAmt = giveUpWhiteLerp * 0.35
-		tab["$pp_colour_addr"] = whiteAmt * 0.22
-		tab["$pp_colour_addg"] = whiteAmt * 0.22
-		tab["$pp_colour_addb"] = whiteAmt * 0.22
-		tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.45)
-		tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.18
-		tab["$pp_colour_contrast"] = math.min(tab["$pp_colour_contrast"] or 1, 1 - whiteAmt * 0.12)
+		if not org.otrub then
+			giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
+			local whiteAmt = giveUpWhiteLerp * 0.35
+			tab["$pp_colour_addr"] = whiteAmt * 0.22
+			tab["$pp_colour_addg"] = whiteAmt * 0.22
+			tab["$pp_colour_addb"] = whiteAmt * 0.22
+			tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.45)
+			tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.18
+			tab["$pp_colour_contrast"] = math.min(tab["$pp_colour_contrast"] or 1, 1 - whiteAmt * 0.12)
+		else
+			giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 0, FrameTime() * 0.3)
+		end
 
 		-- Suppress regular despair visual effects
 		despairVisualLerp = 0
@@ -2190,6 +2225,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	do
 		local grayscaleTarget = 0
+		if not org.otrub then
 
 		local suppForce = (SIB_suppress and SIB_suppress.Force or 0)
 		if suppForce > 1 then
@@ -2240,13 +2276,88 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if grayscaleLerp > 0.005 then
 			tab["$pp_colour_colour"] = math.min(tab["$pp_colour_colour"] or 1, 1 - grayscaleLerp)
 		end
+		else
+			grayscaleLerp = LerpFT(0.04, grayscaleLerp, 0)
+		end
 	end
 
 	if (headtraumaSaturation or 0) > 0 then
-		tab["$pp_colour_colour"] = 1 + headtraumaSaturation
+		if not org.otrub then
+			tab["$pp_colour_colour"] = 1 + headtraumaSaturation
+		end
 		headtraumaSaturation = math.max(headtraumaSaturation - FrameTime() * 0.85, 0)
 	end
 
+end)
+
+-- Brief warning flashes for pain that is stored or still queued but currently
+-- masked by adrenaline/analgesia. The uneven pauses keep this from becoming a
+-- regular heartbeat effect, while felt pain gradually takes the warning over.
+hook.Add("Post Post Pre Post Processing", "HiddenPainFlicker", function()
+	local now = CurTime()
+	local org = IsValid(lply) and lply:Alive() and (lply.new_organism or lply.organism)
+
+	if not org or org.otrub then
+		hiddenPainFlickerSeverity = math.Approach(hiddenPainFlickerSeverity, 0, FrameTime() * 5)
+		hiddenPainFlickerEnd = 0
+		hiddenPainNextFlicker = now + math.Rand(0.4, 1)
+		return
+	end
+
+	local avgPain = math.max(org.avgpain or 0, 0)
+	local painAdd = math.max(org.painadd or 0, 0)
+	local feltPain = math.max(org.pain or 0, 0)
+	local storedPain = math.Clamp(avgPain + painAdd, 0, 150)
+	local hiddenDifference = math.max(storedPain - feltPain, 0)
+	local targetSeverity = math.Clamp((hiddenDifference - 10) / 125, 0, 1)
+
+	-- Felt pain starts quieting the warning between 40 and 60 pain depending on
+	-- how much avgpain is waiting underneath, then fully wins over 35 pain later.
+	local recedeStart = Lerp(math.Clamp(avgPain / 150, 0, 1), 40, 60)
+	local feltPainSuppression = 1 - math.Clamp((feltPain - recedeStart) / 35, 0, 1)
+	targetSeverity = targetSeverity * feltPainSuppression
+	hiddenPainFlickerSeverity = math.Approach(
+		hiddenPainFlickerSeverity,
+		targetSeverity,
+		FrameTime() * (targetSeverity > hiddenPainFlickerSeverity and 1.8 or 4)
+	)
+
+	if hiddenPainFlickerSeverity > 0.025 and now >= hiddenPainNextFlicker then
+		local duration = math.Rand(0.1, Lerp(hiddenPainFlickerSeverity, 0.17, 0.26))
+		hiddenPainFlickerStart = now
+		hiddenPainFlickerAttackEnd = now + math.min(duration * math.Rand(0.12, 0.28), 0.05)
+		hiddenPainFlickerEnd = now + duration
+		hiddenPainFlickerPeak = hiddenPainFlickerSeverity * math.Rand(0.65, 1)
+
+		local gap = math.Rand(
+			Lerp(hiddenPainFlickerSeverity, 1.4, 0.35),
+			Lerp(hiddenPainFlickerSeverity, 3.4, 1.15)
+		)
+		if math.Rand(0, 1) < 0.25 then gap = gap * math.Rand(1.4, 2.2) end
+		hiddenPainNextFlicker = hiddenPainFlickerEnd + gap
+	end
+
+	if now >= hiddenPainFlickerEnd then return end
+
+	local envelope
+	if now < hiddenPainFlickerAttackEnd then
+		envelope = math.TimeFraction(hiddenPainFlickerStart, hiddenPainFlickerAttackEnd, now)
+	else
+		envelope = 1 - math.TimeFraction(hiddenPainFlickerAttackEnd, hiddenPainFlickerEnd, now)
+		envelope = math.max(envelope, 0) ^ 1.6
+	end
+
+	local flash = math.Clamp(envelope * hiddenPainFlickerPeak * hiddenPainFlickerSeverity, 0, 1)
+	if flash <= 0.001 then return end
+
+	hiddenPainColor["$pp_colour_brightness"] = -0.012 * flash
+	hiddenPainColor["$pp_colour_contrast"] = 1 + 0.04 * flash
+	hiddenPainColor["$pp_colour_colour"] = 1 - 0.12 * flash
+	hiddenPainColor["$pp_colour_addr"] = 0.12 * flash
+	hiddenPainColor["$pp_colour_addg"] = 0.008 * flash
+	hiddenPainColor["$pp_colour_addb"] = 0.004 * flash
+	hiddenPainColor["$pp_colour_mulr"] = 0.18 * flash
+	DrawColorModify(hiddenPainColor)
 end)
 
 hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()

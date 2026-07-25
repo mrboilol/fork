@@ -114,7 +114,7 @@ function ClearDecalToEnt(ent)
 end
 
 local matRepl = Material("decals/decalsplash")
-local bloodMaterialVersion = 4
+local bloodMaterialVersion = 5
 local curmat
 local curmat2
 
@@ -187,6 +187,21 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 	tabla["$flags2"] = nil
 	tabla["$flags_defined"] = nil
 	tabla["$flags_defined2"] = nil
+
+	-- GetKeyValues only returns resolved shader parameters, not the VMT's
+	-- material proxies. Colorable citizen clothes use PlayerColor to drive
+	-- $color2, so a blood clone without this proxy falls back to white and
+	-- makes the victim look like their outfit changed until the decal clears.
+	-- Restore the proxy only for materials that actually use the player-color
+	-- mask; applying it to every model material would tint unrelated slots.
+	local usesPlayerColor = tonumber(tabla["$blendtintbybasealpha"]) == 1
+	if usesPlayerColor then
+		tabla["Proxies"] = {
+			PlayerColor = {
+				resultvar = "$color2",
+			},
+		}
+	end
 	
 	-- you should set up entIndex for CSModels since their entIndex is -1
 	local materialKey = mata:GetName()..":"..(entIndex or ent:EntIndex())..":"..id..":v"..bloodMaterialVersion
@@ -213,6 +228,12 @@ function AddDecalToEnt(ent, id, --[[optional]] entIndex, tex, clear, x, y, rot, 
 		tabla["$detailblendmode"] = 2
 		mat = CreateMaterial("hg_blood_"..util.CRC(materialKey), mata:GetShader(), tabla)
 		ent.hgBloodDecalMaterials[id] = mat
+	end
+
+	-- Seed the correct color before the first draw; PlayerColor keeps it synced
+	-- on later draws for both live players and appearance-copied ragdolls.
+	if usesPlayerColor and ent.GetPlayerColor then
+		mat:SetVector("$color2", ent:GetPlayerColor())
 	end
 
 	render.PushRenderTarget(rt)

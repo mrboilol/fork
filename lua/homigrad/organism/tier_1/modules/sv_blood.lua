@@ -216,7 +216,7 @@ local function getHeldWoundBleedMul(org, wound)
 end
 
 module[2] = function(owner, org, mulTime)
-	local adrenaline = math.min(org.adrenaline, 2)
+	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
 	local isPlayer = owner:IsPlayer()
 	org.coagulation_multiplier = 1
 	org.blood_regeneration_multiplier = 1
@@ -268,14 +268,19 @@ module[2] = function(owner, org, mulTime)
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
 		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
-		local regenBoost = 1 + math.Clamp(timeSinceBleed / 30, 0, 2)
+		local recoveryRamp = Lerp(math.Clamp(timeSinceBleed / 60, 0, 1), 0.75, 1)
+		local heartRate = org.heartbeat or org.pulse or 75
+		local highHeartRateBoost = 1 + math.Clamp((heartRate - 120) / 80, 0, 1) * 0.5
+		local adrenalineBoost = 1 + math.Clamp((adrenaline - 0.5) / 1.5, 0, 1) * 0.4
+		local satietyMultiplier = 0.75 + math.Clamp((org.satiety or 0) / 100, 0, 1) * 0.25
 		local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
-		local goodmoodBonus = 1 + goodmood * 0.3
+		local goodmoodBonus = 1 + goodmood * 0.1
 		-- Normal MAP is 93 in the cardiovascular model.  Use that same reference
 		-- here so healthy circulation does not receive an unintended regeneration
-		-- penalty while low blood pressure still suppresses recovery.
-		local pressurePerfusion = math.Clamp((org.bloodpressure or 93) / 93, 0.05, 1.1)
-		org.blood = min(org.blood + mulTime * 5 * (adrenaline * 1.15 + 1) * (org.satiety / 100 + 1) * org.pulse / 70 * org.blood_regeneration_multiplier * pressurePerfusion * regenBoost * goodmoodBonus, 5000)
+		-- penalty while high pressure cannot turn regeneration into a fast refill.
+		local pressurePerfusion = math.Clamp((org.bloodpressure or 93) / 93, 0.05, 1)
+		local regenerationRate = 0.3 * highHeartRateBoost * adrenalineBoost * satietyMultiplier * org.blood_regeneration_multiplier * pressurePerfusion * recoveryRamp * goodmoodBonus
+		org.blood = min(org.blood + mulTime * regenerationRate, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -451,6 +456,7 @@ module[2] = function(owner, org, mulTime)
 			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * 1.35 * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3
+			local woundBleedRate = bleed / rand1 * 3
 			coagulatespeed = coagulatespeed + coagulate / rand2
 			local rand1 = math.Rand(4, 10) * 1
 			local rand2 = math.Rand(0.5, 1) * 1
@@ -458,6 +464,7 @@ module[2] = function(owner, org, mulTime)
 			bleed = bleed * getHeldWoundBleedMul(org, wound)
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
+			wound.visualBleedRate = woundBleedRate + bleed / rand1 * 3
 			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
 			
 			wound[5] = time
@@ -502,10 +509,12 @@ module[2] = function(owner, org, mulTime)
 	local hasCarotidWound = false
 	for i, wound in pairs(org.arterialwounds) do
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
-		bleedoutspeed2 = bleedoutspeed2 + wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80
+		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80
+		bleedoutspeed2 = bleedoutspeed2 + passiveArterialBleed
 		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80
 		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
 		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
+		wound.visualBleedRate = passiveArterialBleed + arterialBleed
 
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))

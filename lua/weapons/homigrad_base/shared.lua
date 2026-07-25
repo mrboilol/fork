@@ -1005,12 +1005,12 @@ function SWEP:ApplyRecoilCameraKick()
 	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
 	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
 
-	-- Gangsta hold is deliberately an exception: the canted pistol kicks left
+	-- Gangsta hold is deliberately an exception: the canted pistol kicks right
 	-- across the screen with only a small upward rise. All other holds remain
 	-- pitch-led so ordinary recoil does not become horizontal.
 	local gangstaHold = ply.posture == 7
 	local pitchKick = gangstaHold and -0.12 * kickScale or -0.72 * kickScale
-	local yawKick = gangstaHold and -0.72 * kickScale or 0.035 * kickScale * sideRand
+	local yawKick = gangstaHold and 0.72 * kickScale or 0.035 * kickScale * sideRand
 	local rollKick = gangstaHold and 0 or 0.10 * kickScale * rollRand
 
 	local punchAng = Angle(pitchKick, yawKick, rollKick)

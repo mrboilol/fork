@@ -14,6 +14,8 @@ local head_otrub_chance_mul = 1.25
 local head_otrub_max_chance = 0.35
 local head_consciousness_mul = 28
 local head_otrub_consciousness_cap = 0.04
+local brain_exposure_partial = 0.6
+local brain_exposure_full = 1
 local instant_pain_shock_scale = 0.75
 local melee_pain_scale = 0.4
 local melee_shock_scale = 0.45
@@ -105,16 +107,28 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	if not organ then return 0 end
 	local name = organ[1]
 	if not name then return 0 end
+	local isBrain = name == "brain" or string.StartWith(name, "brain")
 	-- A fist can concuss through the skull, but cannot directly strike a protected
 	-- brain hitbox. Snapshot this at the start of the trace so one punch that
 	-- fractures the skull cannot also tunnel into the brain on that same hit.
-	if org._fistHeadTraceSkullIntact and (name == "brain" or string.StartWith(name, "brain")) then return 0 end
+	if org._fistHeadTraceSkullIntact and isBrain then return 0 end
 	if org.superfighter and not (string.find(name,"vest") or string.find(name,"helmet")) then return 0 end
 	local bone = organ[2] or 0
 	local func = input_list[name]
+	local brainExposure = 1
+	if isBrain then
+		local skullDamage = math.Clamp(org.skull or 0, 0, brain_exposure_full)
+		if skullDamage < brain_exposure_partial then return 0 end
+
+		brainExposure = math.Clamp((skullDamage - brain_exposure_partial) / (brain_exposure_full - brain_exposure_partial), 0, 1)
+		-- At 0.6 the brain has only just become reachable; damage then ramps to
+		-- its full traced value as the skull reaches complete destruction at 1.0.
+		dmg = dmg * Lerp(brainExposure, 0.25, 1)
+	end
 	local hook_info = {
 		restricted = false,
 		dmg = dmg,
+		brainExposure = brainExposure,
 	}
 	
 	hook_Run("PreTraceOrganBulletDamage", org, bone, dmg, dmgInfo, box, dir, hit, ricochet, organ, hook_info)

@@ -297,6 +297,38 @@ end
 
 hg.organism.AddBrainHemorrhage = addBrainHemorrhage
 
+local defaultBrainTraumaProfile = {
+	consciousness = 1.8,
+	disorientation = 3,
+	shock = 3,
+	pain = 8,
+	hemorrhage = 0.8,
+}
+
+local function applyBrainTraumaEffects(org, delta, dmgInfo, profile)
+	if delta <= 0 then return end
+	profile = profile or defaultBrainTraumaProfile
+
+	org.concussion = math.min((org.concussion or 0) + math.min(delta * 8, 4), 10)
+	org.consciousness = math.Approach(org.consciousness or 1, 0, delta * profile.consciousness * 1.6)
+	org.disorientation = (org.disorientation or 0) + delta * profile.disorientation * 1.5
+	org.shock = (org.shock or 0) + delta * profile.shock * 5
+	org.painadd = (org.painadd or 0) + delta * profile.pain
+
+	local penetrating = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local impact = dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH + DMG_FALL)
+	local hemorrhageScale = profile.hemorrhage or 0.8
+	local hemorrhageChance = penetrating and math.Clamp(0.4 + delta * 2, 0, 0.98)
+		or impact and math.Clamp(0.12 + delta * hemorrhageScale * 1.5, 0, 0.8)
+		or math.Clamp(0.04 + delta * hemorrhageScale, 0, 0.5)
+
+	if math.Rand(0, 1) <= hemorrhageChance then
+		addBrainHemorrhage(org, delta * hemorrhageScale * 1.25, delta * (penetrating and 0.0035 or 0.0015))
+	end
+end
+
+hg.organism.ApplyBrainTraumaEffects = applyBrainTraumaEffects
+
 local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	local profile = brainLobeProfiles[key]
 	if not profile then return 0 end
@@ -309,21 +341,12 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 
 	org.brain = math.min((org.brain or 0) + getBrainLobeDamage(org) - oldBrainLobeDamage, 1)
 	if delta > 0 then
-		org.concussion = math.min((org.concussion or 0) + math.min(delta * 5, 2.5), 10)
+		applyBrainTraumaEffects(org, delta, dmgInfo, profile)
 	end
-	org.consciousness = math.Approach(org.consciousness, 0, delta * profile.consciousness)
-	org.disorientation = org.disorientation + delta * profile.disorientation
 	org.shock = org.shock + dmg * profile.shock
 	org.painadd = org.painadd + dmg * profile.pain
 
 	hg.AddHarmToAttacker(dmgInfo, delta * 15, key .. " damage harm")
-
-	local penetrating = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
-	local impact = dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH)
-	local hemorrhageChance = penetrating and math.Clamp(0.3 + delta * 1.6, 0, 0.95) or impact and math.Clamp(0.04 + delta * profile.hemorrhage, 0, 0.65) or 0.02
-	if delta > 0 and math.Rand(0, 1) <= hemorrhageChance then
-		addBrainHemorrhage(org, delta * profile.hemorrhage, delta * (penetrating and 0.003 or 0.0012))
-	end
 
 	if key == "brainTemporal" and delta > 0.02 and math.random(2) == 1 and IsValid(org.owner) and org.owner.AddTinnitus then
 		org.owner:AddTinnitus(math.Clamp(delta * 35, 1.5, 12), true)
@@ -357,7 +380,15 @@ input_list.brainOccipital = function(org, bone, dmg, dmgInfo) return damageBrain
 input_list.brain = function(org, bone, dmg, dmgInfo)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 50 end
 
-	return damageOrgan(org, dmg, dmgInfo, "brain")
+	local oldDmg = org.brain or 0
+	local result = damageOrgan(org, dmg, dmgInfo, "brain")
+	local delta = math.max((org.brain or 0) - oldDmg, 0)
+	if delta > 0 then
+		applyBrainTraumaEffects(org, delta, dmgInfo)
+		hg.AddHarmToAttacker(dmgInfo, delta * 15, "Brain damage harm")
+	end
+
+	return result
 end
 
 hook.Add("HomigradDamage", "BrainHemorrhageTrauma", function(ply, dmgInfo, hitgroup)

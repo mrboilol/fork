@@ -30,6 +30,7 @@ hook.Add("OnEntityCreated", "bull_add", function(npc)
 	end)
 end)
 local vecZero = Vector(0,0,0)
+local VEHICLE_OCCUPANT_WELD_FORCE_LIMIT = 9000
 
 --[[
 
@@ -311,7 +312,7 @@ function hg.Ragdoll_Create(ply)
 			//ragdoll:SetCollisionGroup(COLLISION_GROUP_WORLD)
 
 			if fixbones[ragdoll:GetBoneName(bone)] then
-				local weld = constraint.Weld(ragdoll, IsValid(veh:GetParent()) and veh:GetParent() or veh, physNum, 0, 10000, false, false)
+				local weld = constraint.Weld(ragdoll, IsValid(veh:GetParent()) and veh:GetParent() or veh, physNum, 0, VEHICLE_OCCUPANT_WELD_FORCE_LIMIT, false, false)
 
 				ragdoll.welds = ragdoll.welds or {}
 				table.insert(ragdoll.welds, weld)
