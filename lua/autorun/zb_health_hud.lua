@@ -58,6 +58,7 @@ if SERVER then
 		"materials/vgui/hud/status_brain_damage.png",
 		"materials/vgui/hud/stroke.png",
 		"materials/vgui/hud/palpitations.png",
+		"materials/vgui/hud/bradycardia.png",
 		"materials/vgui/hud/hypoventilation.png",
 		"materials/vgui/hud/hypercapnia.png",
 		"materials/vgui/hud/concussion.png",
@@ -481,6 +482,7 @@ local status_sprites = {
 	brain_damage = nil,
 	stroke = nil,
 	palpitations = nil,
+	bradycardia = nil,
 	hypoventilation = nil,
 	hypercapnia = nil,
 	concussion = nil,
@@ -745,6 +747,12 @@ local tooltipTexts = {
             [2] = {title = "Учащенное сердцебиение", text = "Ваше сердце колотится. Это вызывает дискомфорт."},
             [1] = {title = "Легкое сердцебиение", text = "Вы ощущаете, как ваше сердце бьется быстрее, чем обычно."}
         },
+		bradycardia = {
+			[4] = {title = "Критическая брадикардия", text = "Сердце едва сокращается. Остановка кровообращения неизбежна."},
+			[3] = {title = "Тяжёлая брадикардия", text = "Пульс опасно редкий. Вы слабеете и можете потерять сознание."},
+			[2] = {title = "Брадикардия", text = "Сердце бьётся слишком медленно. Вы чувствуете слабость и головокружение."},
+			[1] = {title = "Замедленный пульс", text = "Ваше сердцебиение необычно медленное."}
+		},
         hypoventilation = {
             [4] = {title = "Тяжелая гиповентиляция", text = "Вы почти не дышите. Потеря сознания неизбежна."},
             [3] = {title = "Гиповентиляция", text = "Вам очень трудно дышать. Нехватка кислорода вызывает головокружение."},
@@ -792,7 +800,7 @@ local tooltipTexts = {
 			[1] = {title = "Mild pain", text = "Your average tuesday."}
 		},
 		bleeding = {
-			[4] = {title = "Catastrophic Bleeding", text = "There is so much blood, you need help immediately."},
+			[4] = {title = "Catastrophic Bleeding", text = "STOP LOOKING AT THIS AND FIND A BANDAGE"},
 			[3] = {title = "Heavy Bleeding", text = "Blood is pouring out of you like a fire hose!"},
 			[2] = {title = "Normal Bleeding", text = "This needs treatment before it gets worse."},
 			[1] = {title = "Small Bleed", text = "Blood is coming from a wound at a small rate."}
@@ -820,10 +828,10 @@ local tooltipTexts = {
 		dislocation = {title = "Joint dislocation", text = "One of your limb's socket was dislocated, its best to put that back."},
 		amputant = {title = "Amputation", text = "One of your limbs was torn off, Accept the reality you'll never use it again."},
 		hypotension = {
-			[4] = {title = "Critical Hypotension", text = "Your blood pressure has collapsed. Organs are failing. Death is imminent."},
-			[3] = {title = "Severe Hypotension", text = "Barely conscious. You can barely feel anything..."},
-			[2] = {title = "Hypotension", text = "Feeling weak and dizzy. Your blood pressure is dangerously low."},
-			[1] = {title = "Lightheaded", text = "You feel faint. Your heart is struggling to maintain pressure."}
+			[4] = {title = "Critical Hypotension", text = "Incredibly low blood pressure, your body is coping with it as best as it can, but you are dying."},
+			[3] = {title = "Severe Hypotension", text = "Your limbs feel tingly and you are starting to feel dizzy."},
+			[2] = {title = "Hypotension", text = "Blood pressure is lower than normal, something isnt right with you."},
+			[1] = {title = "Lightheaded", text = "Your blood pressure is low, but you are probably just calm."}
 		},
 		cardiac_arrest = {title = "Cardiac arrest", text = "Your body already worked hard enough, lets rest for now."},
 		cold = {
@@ -835,8 +843,8 @@ local tooltipTexts = {
 		heat = {
 			[4] = {title = "Heat stroke", text = "I WOULD KILL FOR SOME WATER RIGHT NOW"},
 			[3] = {title = "Hyperthermia", text = "Ughhh i want to throw up..."},
-			[2] = {title = "Hot", text = "It feels too hot!"},
-			[1] = {title = "Warm", text = "Its not nice outside!"}
+			[2] = {title = "Hot", text = "It feels way too hot!"},
+			[1] = {title = "Warm", text = "Its too hot outside."}
 		},
 		hemothorax = {
 			[4] = {title = "Critical hemothorax", text = "Breathing is too hard, I want to breathe I WANT TO BREATHE...."},
@@ -876,20 +884,20 @@ local tooltipTexts = {
 			[1] = {title = "Tense", text = "You feel a slight surge of strength."}
 		},
 		shock = {
-			[4] = {title = "Shock", text = "The best response your body has is to go unconscious, good night."},
-			[3] = {title = "Traumatic Shock", text = "You definitively dont feel good, you feel horrible and unfocused."},
+			[4] = {title = "Shock", text = "Incredibly drowsy and disoriented, you should be asleep by now."},
+			[3] = {title = "Traumatic Shock", text = "Developing tunnel vision and feeling incredibly faint and drowsy."},
 			[2] = {title = "Vasovagal Response", text = "Sweaty, Dizzy and drowsy. You feel faint."},
-			[1] = {title = "Vasovagal Response", text = "Your body is responding to whats happening to you."}
+			[1] = {title = "Vasovagal Response", text = "Your body's response to trauma is triggering."}
 		},
 		trauma = {
-			[4] = {title = "Shell-shocked", text = "Im scared and disoriented. This is hopeless."},
-			[3] = {title = "Severe disorientation", text = "Ringing in ears and the world like a carousel."},
-			[2] = {title = "Serious disorientation", text = "Head spinning and everything floating around."},
-			[1] = {title = "Mild disorientation", text = "Feeling sleepy."}
+			[4] = {title = "Shell-shocked", text = "Incredibly disoriented and confused, it will take a while to regain focus."},
+			[3] = {title = "Severe disorientation", text = "Ears ringing and the world looks like its spinning around."},
+			[2] = {title = "Serious disorientation", text = "Your eyes are losing focus and you are losing balance."},
+			[1] = {title = "Mild disorientation", text = "Slightly dizzy."}
 		},
 		death = {
 			[4] = {title = "Death", text = "You are dead. Observe what's happening."},
-			[2] = {title = "Panic", text = "Your heart is racing, adrenaline surging. You are fighting to stay alive."}
+			[2] = {title = "Panic", text = "You are in panic."}
 		},
 		berserk = {
 			[4] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
@@ -918,6 +926,12 @@ local tooltipTexts = {
             [2] = {title = "Palpitations", text = "Your heart is beating unusually fast, and it does not feel good."},
             [1] = {title = "Tachycardia", text = "Probably just a workout."}
         },
+		bradycardia = {
+			[4] = {title = "Critical Bradycardia", text = "Your heart is barely contracting. Circulatory arrest is imminent."},
+			[3] = {title = "Severe Bradycardia", text = "Your heart rate is dangerously slow. You may lose consciousness."},
+			[2] = {title = "Bradycardia", text = "Your heart is beating too slowly. You feel weak and dizzy."},
+			[1] = {title = "Slow Heart Rate", text = "Your heartbeat is unusually slow."}
+		},
         hypoventilation = {
             [4] = {title = "Severe Hypoventilation", text = "I CANT CATCH A SINGLE GOOD BREATH OF AIR"},
             [3] = {title = "Hypoventilation", text = "Its very hard to catch my breath..."},
@@ -1078,6 +1092,7 @@ local function load_status_sprites()
 	status_sprites.brain_damage = loadMaterial("vgui/hud/status_brain_damage.png", suffix)
 	status_sprites.stroke = loadMaterial("vgui/hud/stroke.png", suffix)
 	status_sprites.palpitations = loadMaterial("vgui/hud/palpitations.png", suffix)
+	status_sprites.bradycardia = loadMaterial("vgui/hud/bradycardia.png", suffix) or loadMaterial("vgui/hud/bradycardia.png", "")
 	status_sprites.hypoventilation = loadMaterial("vgui/hud/hypoventilation.png", suffix) or loadMaterial("vgui/hud/hypoventilation.png", "")
 	status_sprites.hypercapnia = loadMaterial("vgui/hud/hypercapnia.png", suffix) or loadMaterial("vgui/hud/hypercapnia.png", "")
 	status_sprites.concussion = loadMaterial("vgui/hud/concussion.png", suffix)
@@ -1574,6 +1589,22 @@ local function draw_status_effects()
 						value = math_floor(pulse_val)
 					})
 					currentEffectNames["palpitations"] = true
+				end
+
+				if not org.heartstop and pulse_val > 0 and pulse_val < 60 then
+					local level_num = 1
+					if pulse_val < 30 then level_num = 4
+					elseif pulse_val < 40 then level_num = 3
+					elseif pulse_val < 50 then level_num = 2 end
+
+					table.insert(effects, {
+						name = "bradycardia",
+						level_num = level_num,
+						has_levels = true,
+						priority = 0.27,
+						value = math_floor(pulse_val)
+					})
+					currentEffectNames["bradycardia"] = true
 				end
 
 				local o2_val = getO2Value(org)
@@ -2410,6 +2441,7 @@ local function draw_status_effects()
 		elseif effect.name == "trauma" then icon_mat = status_sprites.trauma
 		elseif effect.name == "stroke" then icon_mat = status_sprites.stroke
 		elseif effect.name == "palpitations" then icon_mat = status_sprites.palpitations
+		elseif effect.name == "bradycardia" then icon_mat = status_sprites.bradycardia
 		elseif effect.name == "hypoventilation" then icon_mat = status_sprites.hypoventilation
 		elseif effect.name == "hypercapnia" then icon_mat = status_sprites.hypercapnia
 		elseif effect.name == "concussion" then icon_mat = status_sprites.concussion
