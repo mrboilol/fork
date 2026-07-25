@@ -10,12 +10,8 @@ local function DrawSunEffect()
 	DrawSunbeams(0.1, 0.15 * dot * sun.obstruction, 0.1, scrpos.x / ScrW(), scrpos.y / ScrH())
 end
 
-local despair_font = function()
-	return "Mx437 IBM PS/55 re."
-end
-
-surface.CreateFont("ZCity_Despair_Text", {
-	font = despair_font(),
+surface.CreateFont("ZCity_Suicide_Text", {
+	font = "Mx437 IBM PS/55 re.",
 	size = ScreenScaleH(20),
 	weight = 700,
 	antialias = true
@@ -85,12 +81,12 @@ local otrubSoundPaths = {
 }
 local OtrubModeStation
 local activeOtrubMode
+local AltRemDyingStation
 local warnedOtrubIncapacitationConflict = false
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
 local snd_musicvolume = GetConVar("snd_musicvolume")
-local themeVolume = CreateClientConVar("hg_theme_volume", "1", true, false, "Volume multiplier for despair, panic, and giving-up themes", 0, 2)
 local hook_Run = hook.Run
 hook.Add("RenderScreenspaceEffects", "homigrad", function()
 	tab["$pp_colour_brightness"] = 0
@@ -342,8 +338,6 @@ headtraumaSaturation = 0
 suicideLerp = 0
 suicideViewAng = Angle()
 addtime = CurTime()
-GivingUpStationVol = 0
-
 show_image_time = 0
 show_some_images_time = 0
 lobotomy_memory_total = 1
@@ -370,6 +364,7 @@ lobotomy_mats = {
 
 local consciousnessTypeBeatVolume = 0.18
 local dying2Volume = 0.4
+local quietAltDyingVolume = 0.28
 local painBeatOverlayPath = "sound/rem_pain.mp3"
 local panicattackOverlayPath = "sound/rem_panicattack.mp3"
 local panicattackFadeStart = 0
@@ -721,6 +716,10 @@ local function stopthings()
 		RemDying1Station:Stop()
 		RemDying1Station = nil
 	end
+	if IsValid(AltRemDyingStation) then
+		AltRemDyingStation:Stop()
+		AltRemDyingStation = nil
+	end
 
 	if IsValid(SillydyingStation) then
 		SillydyingStation:Stop()
@@ -772,12 +771,6 @@ local function stopthings()
 		Alto2Station = nil
 	end
 
-	if IsValid(GivingUpStation) then
-		GivingUpStation:Stop()
-		GivingUpStation = nil
-	end
-	GivingUpStationVol = 0
-
 	suicideLerp = 0
 
 end
@@ -793,8 +786,6 @@ local stations = {
 local choosera = 1
 local tempolerp = 0
 local grayscaleLerp = 0
-local despairVisualLerp = 0
-local giveUpWhiteLerp = 0
 local WhiteNoiseStation
 local soundRetry = {}
 
@@ -809,7 +800,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	if not IsValid(lply) then return end
 	if IsValid(lply:GetNWEntity("spect")) then
 		stopthings()
-		despairVisualLerp = 0
 		tab["$pp_colour_brightness"] = 0
 		tab["$pp_colour_contrast"] = 1
 		tab["$pp_colour_colour"] = 1
@@ -817,7 +807,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 	if not lply:Alive() then
 		stopthings()
-		despairVisualLerp = 0
 		tab["$pp_colour_brightness"] = 0
 		tab["$pp_colour_contrast"] = 1
 		tab["$pp_colour_colour"] = 1
@@ -1060,13 +1049,26 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if getServerSoundMode("hg_dyingsound", 2) == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
+	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 2)
+	if selectedDyingMode == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
 		sound.PlayFile("sound/rem_dying1.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				RemDying1Station = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	if selectedDyingMode == 9 and canRetrySound("AltRemDyingStation", AltRemDyingStation) then
+		sound.PlayFile("sound/itssofuckingover.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 119))
+				AltRemDyingStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -1678,7 +1680,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if dyingMode == 8 and (!IsValid(NoiseStation2Dying) or NoiseStation2Dying:GetState() != GMOD_CHANNEL_PLAYING) then
+			if (dyingMode == 8 or dyingMode == 9) and (!IsValid(NoiseStation2Dying) or NoiseStation2Dying:GetState() != GMOD_CHANNEL_PLAYING) then
 				sound.PlayFile("sound/rem_dying2.mp3", "noblock noplay", function(station)
 					NoiseStation2DyingLoading = false
 					if IsValid(station) then
@@ -1729,6 +1731,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(RemDying1Station) then
 				RemDying1Station:SetVolume(0)
+			end
+			if IsValid(AltRemDyingStation) then
+				AltRemDyingStation:SetVolume(0)
 			end
 
 			if dyingMode == 0 then
@@ -1964,6 +1969,37 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(NoiseStation2Dying) then
 					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, dying2Volume))
 				end
+			elseif dyingMode == 9 then
+				-- Alternate REM stack: keep rem_dying2, but replace rem_dying1
+				-- with itssofuckingover as a restrained background.
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(0)
+				end
+				if IsValid(SonimCookedStation) then
+					SonimCookedStation:SetVolume(0)
+				end
+				if IsValid(AltRemDyingStation) then
+					AltRemDyingStation:SetVolume(math.Clamp(consciousVol * 0.35, 0, quietAltDyingVolume))
+					if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
+				end
+				if IsValid(NoiseStation2Dying) then
+					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, dying2Volume))
+				end
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
@@ -1971,7 +2007,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if dyingMode != 8 and IsValid(RemDying1Station) then
 				RemDying1Station:SetVolume(0)
 			end
-			if dyingMode != 8 and IsValid(NoiseStation2Dying) then
+			if dyingMode != 9 and IsValid(AltRemDyingStation) then
+				AltRemDyingStation:SetVolume(0)
+			end
+			if dyingMode != 8 and dyingMode != 9 and IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
 			end
 		else
@@ -2003,6 +2042,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(RemDying1Station) then
 				RemDying1Station:SetVolume(0)
+			end
+			if IsValid(AltRemDyingStation) then
+				AltRemDyingStation:SetVolume(0)
 			end
 		end
 		
@@ -2064,13 +2106,21 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
 
-			if getServerSoundMode("hg_dyingsound", 2) == 6 and IsValid(ItssooverStation) then
+			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
+			if dyingMode == 6 and IsValid(ItssooverStation) then
 				ItssooverStation:SetVolume(otrubVol)
 			end
-			if getServerSoundMode("hg_dyingsound", 2) == 8 then
+			if dyingMode == 8 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
+			elseif dyingMode == 9 then
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+				if IsValid(AltRemDyingStation) then
+					AltRemDyingStation:SetVolume(math.min(otrubVol * 0.35, quietAltDyingVolume))
+					if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
+				end
 			end
 		else
 			if IsValid(NoiseStation) then
@@ -2085,9 +2135,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 
-	-- Panic has its own effect above.
-	despairVisualLerp = 0
-
 	-- Play noises.ogg when brain health is between 0.6 and 0.7
 	if brain >= 0.6 and brain <= 0.7 and not org.otrub then
 		local noisesVol = math.Remap(brain, 0.6, 0.7, 0, 0.75)
@@ -2098,62 +2145,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	else
 		if IsValid(NoisesStation) then
 			NoisesStation:SetVolume(0)
-		end
-	end
-
-	-- Give up mechanic: white vignette and itssofuckingover.mp3
-	if org.givingUp then
-		-- Give-up theme layers in the background alongside other dying/despair music.
-		-- It does not override or mute any other themes.
-
-		-- Play itssofuckingover.mp3
-		if canRetrySound("GivingUpStation", GivingUpStation) then
-			sound.PlayFile("sound/itssofuckingover.mp3", "noblock noplay", function(station, err)
-				if err or not IsValid(station) then return end
-				station:SetVolume(0)
-				station:Play()
-				GivingUpStation = station
-				station:EnableLooping(true)
-			end)
-		end
-
-		if IsValid(GivingUpStation) then
-			GivingUpStationVol = math.Approach(GivingUpStationVol, 0.85 * themeVolume:GetFloat(), FrameTime() * 0.35)
-			GivingUpStation:SetVolume(GivingUpStationVol)
-			if GivingUpStation:GetTime() >= 120 then
-				GivingUpStation:SetTime(0)
-			end
-		end
-
-		if not org.otrub then
-			giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 1, FrameTime() * 0.08)
-			local whiteAmt = giveUpWhiteLerp * 0.35
-			tab["$pp_colour_addr"] = whiteAmt * 0.22
-			tab["$pp_colour_addg"] = whiteAmt * 0.22
-			tab["$pp_colour_addb"] = whiteAmt * 0.22
-			tab["$pp_colour_colour"] = math.max(tab["$pp_colour_colour"] or 1, 1 - whiteAmt * 0.45)
-			tab["$pp_colour_brightness"] = (tab["$pp_colour_brightness"] or 0) + whiteAmt * 0.18
-			tab["$pp_colour_contrast"] = math.min(tab["$pp_colour_contrast"] or 1, 1 - whiteAmt * 0.12)
-		else
-			giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 0, FrameTime() * 0.3)
-		end
-
-		-- Suppress regular despair visual effects
-		despairVisualLerp = 0
-	else
-		giveUpWhiteLerp = math.Approach(giveUpWhiteLerp, 0, FrameTime() * 0.3)
-		tab["$pp_colour_addr"] = 0
-		tab["$pp_colour_addg"] = 0
-		tab["$pp_colour_addb"] = 0
-		if IsValid(GivingUpStation) then
-			GivingUpStationVol = math.Approach(GivingUpStationVol, 0, FrameTime() * 0.45)
-			GivingUpStation:SetVolume(GivingUpStationVol)
-			if GivingUpStationVol <= 0.001 then
-				GivingUpStation:Stop()
-				GivingUpStation = nil
-			end
-		else
-			GivingUpStationVol = 0
 		end
 	end
 
@@ -2511,8 +2502,8 @@ hook.Add("DrawOverlay", "suicide_text", function()
 	local alpha = math.floor(200 * suicideTextLerp)
 
 	local text = suicidePhrases[suicidePhraseIndex]
-	draw.SimpleText(text, "ZCity_Despair_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText(text, "ZCity_Despair_Text", x, y, Color(210, 210, 210, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText(text, "ZCity_Suicide_Text", x + 2, y + 2, Color(0, 0, 0, math.floor(alpha * 0.7)), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText(text, "ZCity_Suicide_Text", x, y, Color(210, 210, 210, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local function removeflash()
@@ -2601,27 +2592,6 @@ hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, z
 		-- Also modify fova for when RenderScene is disabled
 		fova[1] = (fova[1] or 0) - (pulse * 20)
 	end
-end)
-
-local function GetDespairCamPulse()
-	-- Screen shaking disabled when in despair
-	return 0, 0
-end
-
-hook.Add("TranslateFOV", "DespairBreathFov", function(ply, fov)
-	local pushPull = GetDespairCamPulse()
-	if pushPull ~= 0 then
-		return fov + pushPull * 2.8
-	end
-end)
-
-hook.Add("HG_CalcView", "DespairBreathShake", function(ply, pos, angles, fova, znear, zfar)
-	local pushPull, jitter = GetDespairCamPulse()
-	if pushPull == 0 and jitter == 0 then return end
-	angles.p = angles.p + jitter * 0.75
-	angles.y = angles.y + jitter * 0.6
-	angles.r = angles.r + jitter * 0.5
-	fova[1] = (fova[1] or 0) + pushPull * 2.8
 end)
 
 local HEADHIT_VOLUME = 1.0

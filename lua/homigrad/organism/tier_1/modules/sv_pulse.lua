@@ -202,13 +202,11 @@ module[2] = function(owner, org, timeValue)
 	heartbeat = heartbeat + math.Clamp(org.pain, 40, 80) - 40
 	heartbeat = heartbeat + exertionHeartBoost
 	local adrenalineHeartBoost = 9 * math.min(math.max((org.adrenaline or 0) - 1.5, 0), 3)
-	if org.givingUp then adrenalineHeartBoost = adrenalineHeartBoost * 0.55 end
 	heartbeat = heartbeat + adrenalineHeartBoost
 	heartbeat = heartbeat - 40 * math.min(org.analgesia / 2.5, 1)
 	heartbeat = heartbeat + 100 * math.Clamp(math.Remap(org.temperature, 40, 42, 0, 1), 0, 1)
 	heartbeat = heartbeat - 160 * (1 - math.Clamp(math.Remap(org.temperature, 28, 36.7, 0, 1), 0, 1))
 	if org.panicattackActive then heartbeat = heartbeat + 20 end -- adrenaline handles most of the boost
-	if org.givingUp then heartbeat = heartbeat * 0.8 end
 
 	-- Neurologic injury, oxygen starvation, myocardial damage, and cold each
 	-- suppress the sinus node differently. This creates bradycardia first, then
@@ -343,8 +341,6 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		if org.panicattackActive then chance = chance * 0.5 end
-		if org.givingUp then chance = chance * 1.5 end
-
 		if chance > 0 and math.random() < chance then
 			org.heartstop = true
 		end
@@ -371,7 +367,6 @@ module[2] = function(owner, org, timeValue)
 	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
 	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
 	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.025
-	if org.givingUp then adrenalineHyperMul = adrenalineHyperMul * 0.55 end
 	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
 	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
 	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.45)
@@ -431,8 +426,6 @@ module[2] = function(owner, org, timeValue)
 		+ math.Clamp(internalLoss / 45, 0, 0.22)
 	local throatPressureLoss = math.Clamp(org.throatCutPressureShock or 0, 0, 1) * 0.22
 	map = map * math.Clamp(1 - bleedPressureLoss - throatPressureLoss, 0.08, 1)
-
-	if org.givingUp then map = map * 0.75 end
 
 	map = math.Clamp(map, 0, 190)
 	local bpTarget = map
@@ -535,7 +528,6 @@ module[2] = function(owner, org, timeValue)
 	local gainfear = hg.organism.should_gain_fear(org)
 	org.fearadd = math.Approach(org.fearadd, 0, gainfear and timeValue or timeValue / 4.9) -- 15 seconds to stop fearing something and start to calm down
 	local fearGainRate = gainfear and timeValue / 5 or 0
-	if org.givingUp then fearGainRate = fearGainRate * 0.25 end
 	org.fearadd = math.Approach(org.fearadd, 1, fearGainRate)
 	
 	local adrenK = max(1 + org.adrenaline, 1)

@@ -629,7 +629,6 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		k = k * math.Clamp((org.blood or 0) / 5000, 0, 1)
 		k = k * math.Clamp(10 / ((org.shock or 0) + 1), 0.45, 1)
 		local adrenalineMoveBoost = math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3)
-		if org.givingUp then adrenalineMoveBoost = adrenalineMoveBoost * 0.3 end
 		k = k * (adrenalineMoveBoost + 1)
 		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
 		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
@@ -644,7 +643,6 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			k = k * math.Clamp(math.Remap(org.bloodpressure, 20, 80, 0.65, 1), 0.65, 1)
 		end
 		if org.panicattackActive then k = k * 0.5 end
-		if org.givingUp then k = k * 0.5 end
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)
 
 		local slwdwn = ply:GetNetVar("slowDown", 0)

@@ -81,9 +81,9 @@ local panicattack_corpse_tick = 0.03
 local panicattack_fire_radius = 450
 local panicattack_fire_check_delay = 1
 local hg_panic = ConVarExists("hg_panic") and GetConVar("hg_panic") or CreateConVar("hg_panic", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable panic attack logic", 0, 1)
-local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain sound mode", 0, 6)
-local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying sound mode", 0, 8)
-local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Otrub sound mode", 0, 4)
+local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 3 = altpain, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
+local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = REM dying 2 + quiet itssofuckingover background", 0, 9)
+local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 1 = altotrub, 2 = sleepy, 3 = itssoover, 4 = nga im cooked", 0, 4)
 local gunfight_adrenaline_delay = 1.5
 local gunfight_adrenaline_cap = 1.5
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
@@ -215,8 +215,6 @@ hook.Add("Org Clear", "Main", function(org)
 
 	org.fear = 0
 	org.fearadd = 0
-	org.givingUp = false
-	org._giveUpHeartStopCheck = 0
 	--//
 
 	org.assimilated = 0
@@ -496,7 +494,6 @@ local function send_organism(org, ply)
 	sendtable.aiming_fatigue = org.aiming_fatigue
 	sendtable.hand_dominance = org.hand_dominance
 	sendtable.permanent_aim_impairment = org.permanent_aim_impairment
-	sendtable.givingUp = org.givingUp
 	sendtable.panicattackActive = org.panicattackActive
 
 	sendtable.superfighter = org.superfighter
@@ -765,7 +762,7 @@ end
 hook.Add("Org Think", "PanicAttackCorpseExposure", function(owner, org)
 	if not hg_panic:GetBool() then return end
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
-	if not org or org.otrub or org.givingUp then return end
+	if not org or org.otrub then return end
 	if (org._panicNextCorpseCheck or 0) > CurTime() then return end
 	org._panicNextCorpseCheck = CurTime() + 1
 
@@ -802,7 +799,7 @@ end)
 hook.Add("Org Think", "PanicAttackNearbyFire", function(owner, org)
 	if not hg_panic:GetBool() then return end
 	if not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
-	if not org or org.otrub or org.givingUp then return end
+	if not org or org.otrub then return end
 	if (org._panicNextFireCheck or 0) > CurTime() then return end
 	org._panicNextFireCheck = CurTime() + panicattack_fire_check_delay
 
