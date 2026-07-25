@@ -1,64 +1,78 @@
 SWEP.Base = "homigrad_base"
 SWEP.Spawnable = true
-SWEP.AdminOnly = true
-SWEP.PrintName = "Henchman's Pistol"
-SWEP.Author = "Henchman"
-SWEP.Instructions = "Pistol chambered in 9x19 mm"
-SWEP.Category = "Weapons - Pistols"
+SWEP.AdminOnly = false
+SWEP.PrintName = "SA58 FAL"
+SWEP.Author = "Fabrique Nationale"
+SWEP.Instructions = "Selective-fire battle rifle chambered in 7.62x51 mm\n\nRate of fire 500 rounds per minute"
+SWEP.Category = "Weapons - Assault Rifles"
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
-SWEP.WorldModel = "models/weapons/w_rif_m4a1.mdl"
-SWEP.WorldModelFake = "models/weapons/c_usp.mdl"
+SWEP.WorldModel = "models/weapons/w_rif_ak47.mdl"
+SWEP.WorldModelFake = "models/weapons/c_dsa_sa58.mdl"
 SWEP.CanCustomize = true
-SWEP.CustomizeCategory = "HK USP"
+SWEP.CustomizeCategory = "SA58 FAL"
 
 SWEP.UseARC9Parts = true
 
 SWEP.ARC9Parts = {
 	magazine = {
-		model = "models/weapons/mods/mag_hk_usp_tactical.mdl",
+		model = "models/weapons/mods/mag_fal_sarco_fal_l1a1_orig_762x51_30.mdl",
 		bonemerge = false,
 		bone = "mod_magazine",
-		pos = Vector(0, -1.2, -1.25),
+		pos = Vector(0, -3, -2),
 		ang = Angle(0, -90, 0)
+	},
+	handguard = {
+		model = "models/weapons/mods/handguard_fal_ds_arms_belgian.mdl",
+		bonemerge = false,
+		bone = "mod_handguard",
+		pos = Vector(0, 0, 0),
+		ang = Angle(0, 0, 0)
 	},
 }
 
-SWEP.FakePos = Vector(-21, 2, 3.22)
+SWEP.FakePos = Vector(-14, 2.52, 7.5)
 SWEP.FakeAng = Angle(0, 0, 0)
-SWEP.AttachmentPos = Vector(1, 0, -0)
-SWEP.AttachmentAng = Angle(0, 0, 90)
+SWEP.AttachmentPos = Vector(9, 0, 0)
+SWEP.AttachmentAng = Angle(0, 0, 0)
 SWEP.FakeAttachment = "1"
+SWEP.FakeBodyGroups = "1211310"
+SWEP.ZoomPos = Vector(0, -1.7928, 6.408)
+
+SWEP.GunCamPos = Vector(4, -15, -6)
+SWEP.GunCamAng = Angle(190, -5, -100)
+
 SWEP.FakeEjectBrassATT = "2"
-SWEP.FakeBodyGroups = "11112202"
 
-SWEP.FakeVPShouldUseHand = true
 SWEP.FakeViewBobBone = "ValveBiped.Bip01_R_Hand"
-SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_R_Forearm"
-SWEP.ViewPunchDiv = 50
+SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_L_UpperArm"
+SWEP.ViewPunchDiv = 1000
 
-SWEP.AnimList = {
-	["idle"] = "base_idle",
-	["reload"] = "reload",
-	["reload_empty"] = "reload_empty0",
-	["inspect"] = "inspect",
-}
+local path = "weapons/darsu_eft/sa58/"
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
 		[0.01] = function(self) self:EmitSound("weapons/universal/uni_crawl_l_03.wav") end,
 	},
-	["reload"] = {
-		[0.1] = function(self) self:EmitSound("weapons/darsu_eft/57/fiveseven_mag_out.ogg") end,
-		[0.6] = function(self) self:EmitSound("weapons/darsu_eft/57/fiveseven_mag_in.ogg") end,
+	["reload0"] = {
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_out.ogg") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_in.ogg") end,
 	},
-	["reload_empty"] = {
-		[0.015] = function(self) self:EmitSound("weapons/darsu_eft/57/fiveseven_slider_out_fast.ogg") end,
-		[0.065] = function(self) self:EmitSound("weapons/darsu_eft/57/fiveseven_mag_out.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/57/fiveseven_mag_in.ogg") end,
-		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/57/fiveseven_slider_in_fast.ogg") end,
+	["reload_empty0"] = {
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_release_button.ogg") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_out.ogg") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_in.ogg") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_release_button.ogg") end,
 	},
+}
+
+SWEP.AnimList = {
+	["fire"] = "fire",
+	["idle"] = "idle",
+	["reload"] = "reload0",
+	["reload_empty"] = "reload_empty0",
+	["inspect"] = "look",
 }
 
 function SWEP:AllowedInspect()
@@ -81,204 +95,90 @@ function SWEP:ModelCreated(model)
 	end
 end
 
-SWEP.FakeMagDropBone = "magazine"
-SWEP.MagModel = "models/weapons/mods/mag_hk_usp_tactical.mdl"
+SWEP.ReloadHold = nil
+SWEP.FakeVPShouldUseHand = false
 
-SWEP.HeldMagModel = "models/weapons/mods/mag_hk_usp_tactical.mdl"
+SWEP.HeldMagModel = "models/weapons/mods/mag_fal_sarco_fal_l1a1_orig_762x51_30.mdl"
 SWEP.HeldMagBone = "mod_magazine"
 SWEP.HeldMagOffsetPos = Vector(0, 0, 0)
 SWEP.HeldMagOffsetAng = Angle(0, -90, 0)
 
-SWEP.lmagpos = Vector(2, 0, 0)
-SWEP.lmagang = Angle(-10, 0, 0)
-SWEP.lmagpos2 = Vector(0, -1.5, 0.7)
-SWEP.lmagang2 = Angle(0, 0, 0)
+SWEP.HeldHandguardModel = "models/weapons/mods/handguard_fal_ds_arms_belgian.mdl"
+SWEP.HeldHandguardBone = "mod_handguard"
+SWEP.HeldHandguardOffsetPos = Vector(0, 0, 0)
+SWEP.HeldHandguardOffsetAng = Angle(0, 0, 0)
 
-if CLIENT then
-	local vector_full = Vector(1, 1, 1)
-
-	SWEP.FakeReloadEvents = {
-		[0.15] = function(self, timeMul)
-			if self:Clip1() < 1 then
-				self:GetOwner():PullLHTowards("ValveBiped.Bip01_L_Thigh", 1.5 * timeMul)
-			else
-				self:GetWM():ManipulateBoneScale(49, vector_full)
-				self:GetWM():ManipulateBoneScale(50, vector_origin)
-				self:GetWM():ManipulateBoneScale(51, vector_origin)
-				self:GetOwner():PullLHTowards("ValveBiped.Bip01_L_Thigh", 0.5 * timeMul)
-			end
-		end,
-		[0.3] = function(self)
-			if self:Clip1() < 1 then
-				hg.CreateMag(self, Vector(0, 0, -50))
-				self:GetWM():ManipulateBoneScale(49, vector_origin)
-				self:GetWM():ManipulateBoneScale(50, vector_origin)
-				self:GetWM():ManipulateBoneScale(51, vector_origin)
-			else
-				self:GetWM():ManipulateBoneScale(50, vector_full)
-				self:GetWM():ManipulateBoneScale(51, vector_full)
-			end
-		end,
-		[0.45] = function(self)
-			if self:Clip1() < 1 then
-				self:GetWM():ManipulateBoneScale(50, vector_full)
-				self:GetWM():ManipulateBoneScale(51, vector_full)
-			end
-		end,
-		[0.8] = function(self, timeMul)
-			if self:Clip1() >= 1 then
-				self:GetOwner():PullLHTowards("ValveBiped.Bip01_L_Thigh", 1 * timeMul)
-			end
-		end,
-		[0.9] = function(self)
-			self:GetWM():ManipulateBoneScale(53, vector_origin)
-		end,
-	}
-end
-
-function SWEP:Deploy()
-	net.Start("HenchmanUSP_StopMusic")
-	net.Send(self:GetOwner())
-
-	local result = self.BaseClass.Deploy(self)
-
-	if SERVER then
-		timer.Simple(0.3, function()
-			if IsValid(self) and IsValid(self:GetOwner()) then
-				net.Start("HenchmanUSP_PlayMusic")
-				net.Send(self:GetOwner())
-			end
-		end)
-	end
-
-	if SERVER and IsValid(self:GetOwner()) then
-		local ply = self:GetOwner()
-		ply.posture = 8
-		net.Start("change_posture")
-		net.WriteEntity(ply)
-		net.WriteInt(8, 9)
-		net.Broadcast()
-	end
-
-	return result
-end
-
-function SWEP:StopHenchmanMusic()
-	if SERVER and IsValid(self:GetOwner()) then
-		net.Start("HenchmanUSP_StopMusic")
-		net.Send(self:GetOwner())
-	end
-end
-
-function SWEP:Holster()
-	self:StopHenchmanMusic()
-	return self.BaseClass.Holster(self)
-end
-
-function SWEP:Think()
-	self.BaseClass.Think(self)
-
-	if SERVER and IsValid(self:GetOwner()) then
-		local ply = self:GetOwner()
-		if ply.posture ~= 8 then
-			ply.posture = 8
-			net.Start("change_posture")
-			net.WriteEntity(ply)
-			net.WriteInt(8, 9)
-			net.Broadcast()
-		end
-	end
-end
-
-SWEP.WepSelectIcon2 = Material("entities/hACH.png")
-SWEP.IconOverride = "entities/hACH.png"
-
-SWEP.CustomShell = "9x19"
-SWEP.EjectPos = Vector(4.5, 3, -21.5)
-SWEP.EjectAng = Angle(0, 0, 0)
-
-SWEP.weight = 1
-SWEP.ScrappersSlot = "Secondary"
-SWEP.weaponInvCategory = 2
-SWEP.ShellEject = "EjectBrass_9mm"
-SWEP.Primary.ClipSize = 15
-SWEP.Primary.DefaultClip = 15
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = "9x19 mm Parabellum"
+SWEP.weaponInvCategory = 1
+SWEP.CustomEjectAngle = Angle(0, 0, 90)
+SWEP.Primary.ClipSize = 30
+SWEP.Primary.DefaultClip = 30
+SWEP.Primary.Automatic = true
+SWEP.Primary.Ammo = "7.62x51 mm"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 25
-SWEP.Primary.Sound = {"weapons/darsu_eft/usp/H_shot.wav", 95, 95, 105}
-SWEP.SupressedSound = {"weapons/darsu_eft/usp/H_shot.wav", 95, 95, 105}
-SWEP.Primary.SoundEmpty = {"weapons/darsu_eft/usp/usp_fire_dry.ogg", 75, 100, 105, CHAN_WEAPON, 2}
-SWEP.Primary.Force = 22
-SWEP.Primary.Wait = PISTOLS_WAIT
-SWEP.SupressorOnly = true
+SWEP.Primary.Damage = 48
+SWEP.Primary.Spread = 0
+SWEP.Primary.Force = 45
+SWEP.animposmul = 2
+SWEP.Primary.Sound = {"weapons/darsu_eft/sa58/fire_new/fal_outdoor_close_loop3.wav", 85, 90, 100}
+SWEP.SupressedSound = {"weapons/darsu_eft/sa58/fire_new/fal_outdoor_close_silenced_loop3.wav", 65, 90, 100}
+SWEP.Primary.SoundEmpty = {"weapons/darsu_eft/fal/fal_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Wait = 0.090
+SWEP.ReloadTime = 3.5
 
-SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
-SWEP.HoldType = "revolver"
-SWEP.ZoomPos = Vector(0, -2.2867, 1.2432)
-SWEP.RHandPos = Vector(-3, -1, 0)
-SWEP.LHandPos = false
-SWEP.SprayRand = {Angle(-0.02, -0.02, 0), Angle(-0.03, 0.02, 0)}
-SWEP.Ergonomics = 1.2
-SWEP.Penetration = 7
-SWEP.ShockMultiplier = 1
-SWEP.punchmul = 1.5
-SWEP.punchspeed = 3
+SWEP.PPSMuzzleEffect = "muzzleflash_FAMAS"
 
-SWEP.LocalMuzzlePos = Vector(5, -2.25, 0.6)
+SWEP.CustomShell = "762x51"
+SWEP.ShellEject = "EjectBrass_762"
+
+SWEP.LocalMuzzlePos = Vector(31, -1.76, 4.6)
 SWEP.LocalMuzzleAng = Angle(0, 0, 0)
 SWEP.WeaponEyeAngles = Angle(0, 0, 0)
 
-SWEP.WorldPos = Vector(2.9, -1.2, -2.2)
-SWEP.WorldAng = Angle(0, 0, 0)
-SWEP.UseCustomWorldModel = true
-SWEP.attPos = Vector(-0.7, -0.1, 0)
-SWEP.attAng = Angle(0, 0, 0)
-SWEP.lengthSub = 22
-SWEP.DistSound = "zcitysnd/sound/weapons/makarov/makarov_dist.wav"
-SWEP.holsteredBone = "ValveBiped.Bip01_R_Thigh"
-SWEP.holsteredPos = Vector(0, -2, 0)
-SWEP.holsteredAng = Angle(0, 20, 30)
-SWEP.shouldntDrawHolstered = true
+SWEP.HoldType = "rpg"
 
-SWEP.RHPos = Vector(12, -4.5, 3.5)
-SWEP.RHAng = Angle(5, -5, 90)
-SWEP.LHPos = Vector(-1.2, -1.4, -2.8)
-SWEP.LHAng = Angle(5, 9, -100)
-SWEP.ShootAnimMul = 4
-SWEP.AnimShootMul = 3
+SWEP.WepSelectIcon2 = Material("entities/arc9_eft_sa58.png")
+SWEP.IconOverride = "entities/arc9_eft_sa58.png"
 
-SWEP.podkid = 1
+SWEP.weight = 4.5
+SWEP.ScrappersSlot = "Primary"
 
-SWEP.StartAtt = {"holo16", "supressor2"}
+SWEP.DistSound = "weapons/darsu_eft/fal/fal_outdoor_close_loop3.wav"
+
 SWEP.availableAttachments = {
 	barrel = {
-		[1] = {"supressor2", Vector(0, 0.0, 0), {}},
-		[2] = {"supressor1", Vector(0, 0.0, 0), {}},
-		["mount"] = Vector(-0.5, 0, -0.05),
-		["mountAngle"] = Angle(0, 0, 180),
-	},
-	sight = {
-		["mountType"] = "pistolmount",
-		["mount"] = Vector(-6, -1, -0.4),
-		["mountAngle"] = Angle(0, 0, -90),
-		transformFunction = function(self, model, pos, ang)
-			if self.shooanim and self.shooanim > 0 then
-				local offset = ang:Forward() * -self.shooanim * 0.8
-				pos:Add(offset)
-				model:SetPos(pos)
-				model:SetAngles(ang)
-			end
-		end,
-	},
-	underbarrel = {
-		["mount"] = Vector(12.55, -0.2, -0.09),
-		["mountAngle"] = Angle(0, 0, 0),
-		["mountType"] = "picatinny_small"
+		[1] = {"supressor9", Vector(0, 0, 0), {}},
+		[2] = {"supressor16", Vector(0, 0, 0), {}},
+		[3] = {"supressor15", Vector(1.3, 0, 0), {}},
+		["mount"] = Vector(-1, 0, 0),
 	},
 }
+
+SWEP.RHandPos = Vector(0, -1, 0)
+SWEP.LHandPos = Vector(7, -2, -2)
+SWEP.Penetration = 15
+SWEP.Spray = {}
+for i = 1, 20 do
+	SWEP.Spray[i] = Angle(-0.0, 0, 0) * 1
+end
+
+SWEP.Ergonomics = 0.78
+SWEP.WorldPos = Vector(4, -0.8, -0.5)
+SWEP.WorldAng = Angle(0, 0, 0)
+SWEP.UseCustomWorldModel = true
+SWEP.attPos = Vector(1, 0, 0)
+SWEP.attAng = Angle(-0.02, 0, 0)
+SWEP.lengthSub = 30
+SWEP.handsAng = Angle(7, 2, 0)
+
+SWEP.RHPos = Vector(3, -7, 3.5)
+SWEP.RHAng = Angle(0, -8, 90)
+SWEP.LHPos = Vector(11, 1.6, -3)
+SWEP.LHAng = Angle(-110, -180, 5)
+
+SWEP.ShootAnimMul = 2
+
+function SWEP:AnimHoldPost(model)
+end
 
 function SWEP:DrawPost()
 	local wep = self:GetWeaponEntity()
@@ -291,16 +191,17 @@ function SWEP:DrawPost()
 	local wm = self:GetWM()
 	if not IsValid(wm) then return end
 
-	if not IsValid(self.HeldMagCSModel) and self.HeldMagModel then
+	-- Magazine
+	if not IsValid(self.HeldMagCSModel) then
 		self.HeldMagCSModel = ClientsideModel(self.HeldMagModel, RENDERGROUP_BOTH)
 		if IsValid(self.HeldMagCSModel) then self.HeldMagCSModel:SetNoDraw(true) end
 	end
-	if IsValid(self.HeldMagCSModel) and self.HeldMagBone then
+	if IsValid(self.HeldMagCSModel) then
 		local boneID = wm:LookupBone(self.HeldMagBone)
 		if boneID then
 			local boneMatrix = wm:GetBoneMatrix(boneID)
 			if boneMatrix then
-				local lpos, lang = LocalToWorld(self.HeldMagOffsetPos or vector_origin, self.HeldMagOffsetAng or angle_zero, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
+				local lpos, lang = LocalToWorld(self.HeldMagOffsetPos, self.HeldMagOffsetAng, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
 				self.HeldMagCSModel:SetRenderOrigin(lpos)
 				self.HeldMagCSModel:SetRenderAngles(lang)
 				self.HeldMagCSModel:SetPos(lpos)
@@ -311,9 +212,32 @@ function SWEP:DrawPost()
 		end
 	end
 
-	self.shooanim = LerpFT(0.4, self.shooanim or 0, (self:Clip1() > 0 or self.reload) and 0 or 1)
-	wep:ManipulateBonePosition(43, Vector(0, 0.8 * self.shooanim, 0), false)
+	-- Handguard
+	if not IsValid(self.HeldHandguardCSModel) then
+		self.HeldHandguardCSModel = ClientsideModel(self.HeldHandguardModel, RENDERGROUP_BOTH)
+		if IsValid(self.HeldHandguardCSModel) then self.HeldHandguardCSModel:SetNoDraw(true) end
+	end
+	if IsValid(self.HeldHandguardCSModel) then
+		local boneID = wm:LookupBone(self.HeldHandguardBone)
+		if boneID then
+			local boneMatrix = wm:GetBoneMatrix(boneID)
+			if boneMatrix then
+				local lpos, lang = LocalToWorld(self.HeldHandguardOffsetPos, self.HeldHandguardOffsetAng, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
+				self.HeldHandguardCSModel:SetRenderOrigin(lpos)
+				self.HeldHandguardCSModel:SetRenderAngles(lang)
+				self.HeldHandguardCSModel:SetPos(lpos)
+				self.HeldHandguardCSModel:SetAngles(lang)
+				self.HeldHandguardCSModel:SetupBones()
+				self.HeldHandguardCSModel:DrawModel()
+			end
+		end
+	end
 end
+
+
+--========================================================
+-- DROPPED EFT MODEL + MODULAR PARTS
+--========================================================
 
 SWEP.WorldPartsOffsetPos = Vector(-20, 5, 10)
 SWEP.WorldPartsOffsetAng = Angle(0, 0, 0)
@@ -527,46 +451,43 @@ if CLIENT then
 	function SWEP:OnRemove()
 		self:BC_RemoveDroppedModels()
 		if IsValid(self.HeldMagCSModel) then self.HeldMagCSModel:Remove() end
-		local ply = LocalPlayer()
-		if IsValid(ply) and ply.HenchmanMusic then
-			ply.HenchmanMusic:Stop()
-			ply.HenchmanMusic = nil
-		end
+		if IsValid(self.HeldHandguardCSModel) then self.HeldHandguardCSModel:Remove() end
 	end
 end
 
-if SERVER then
-	util.AddNetworkString("HenchmanUSP_StopMusic")
-	util.AddNetworkString("HenchmanUSP_PlayMusic")
+--========================================================
+-- FIRE ANIMATION
+--========================================================
 
-	hook.Add("PlayerDeath", "HenchmanUSP_StopMusic", function(ply)
-		net.Start("HenchmanUSP_StopMusic")
-		net.Send(ply)
+SWEP.FireAnimTime = 0.15
+SWEP.FireAnimCandidates = {"fire", "fire1"}
+
+function SWEP:PrimaryShootPost()
+	if not CLIENT then return end
+	if self.reload then return end
+	if not self:ShouldUseFakeModel() then return end
+
+	local worldModel = self:GetWM()
+	if not IsValid(worldModel) then return end
+
+	local selectedSequence
+	for _, sequenceName in ipairs(self.FireAnimCandidates) do
+		local sequenceID = worldModel:LookupSequence(sequenceName)
+		if sequenceID ~= nil and sequenceID >= 0 then
+			selectedSequence = sequenceName
+			break
+		end
+	end
+
+	if not selectedSequence then return end
+
+	self.AnimList.fire = selectedSequence
+	self:PlayAnim("fire", self.FireAnimTime, false)
+
+	local timerName = "BC_FireAnimation_" .. self:EntIndex()
+	timer.Create(timerName, self.FireAnimTime, 1, function()
+		if not IsValid(self) or self.reload then return end
+		if self.Primary and (self.Primary.Next or 0) > CurTime() then return end
+		self:PlayAnim("idle", 1, not self.NoIdleLoop)
 	end)
 end
-
-if CLIENT then
-	net.Receive("HenchmanUSP_PlayMusic", function()
-		local ply = LocalPlayer()
-		if not IsValid(ply) then return end
-
-		if ply.HenchmanMusic then
-			ply.HenchmanMusic:Stop()
-		end
-
-		ply.HenchmanMusic = CreateSound(ply, "weapons/darsu_eft/usp/Remorse.ogg")
-		ply.HenchmanMusic:Play()
-		ply.HenchmanMusic:Volume(50)
-	end)
-
-	net.Receive("HenchmanUSP_StopMusic", function()
-		local ply = LocalPlayer()
-		if not IsValid(ply) then return end
-
-		if ply.HenchmanMusic then
-			ply.HenchmanMusic:Stop()
-			ply.HenchmanMusic = nil
-		end
-	end)
-end
-

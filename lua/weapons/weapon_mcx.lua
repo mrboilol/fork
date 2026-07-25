@@ -1,65 +1,59 @@
 SWEP.Base = "homigrad_base"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
-SWEP.PrintName = "STM-9"
-SWEP.Author = "STM Arms"
-SWEP.Instructions = "Pistol caliber carbine chambered in 9x19 mm\n\nRate of fire 750 rounds per minute"
-SWEP.Category = "Weapons - Carbines"
+SWEP.PrintName = "SIG MCX"
+SWEP.Author = "SIG Sauer"
+SWEP.Instructions = "Selective-fire assault rifle chambered in 5.56x45 mm\n\nRate of fire 800 rounds per minute"
+SWEP.Category = "Weapons - Assault Rifles"
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
-SWEP.WorldModel = "models/weapons/w_rif_m4a1.mdl"
-SWEP.WorldModelFake = "models/weapons/c_stm9.mdl"
+SWEP.WorldModel = "models/weapons/w_rif_ak47.mdl"
+SWEP.WorldModelFake = "models/weapons/c_sig_mcx.mdl"
 SWEP.CanCustomize = true
-SWEP.CustomizeCategory = "STM-9"
+SWEP.CustomizeCategory = "SIG MCX"
 
 SWEP.UseARC9Parts = true
 
 SWEP.ARC9Parts = {
 	magazine = {
-		model = "models/weapons/mods/mag_glock_magex_30.mdl",
+		model = "models/weapons/mods/mag_stanag_colt_ar15_std_556x45_30.mdl",
 		bonemerge = false,
 		bone = "mod_magazine",
-		pos = Vector(0, 1.8, -0.8),
-		ang = Angle(-17, -90, 0)
-	},
-	handguard = {
-		model = "models/weapons/mods/handguard_ar15_stmarms_12_inch_m_lok.mdl",
-		bonemerge = false,
-		bone = "weapon",
-		pos = Vector(0, -16.72, 0.070),
-		ang = Angle(0, 0, 0)
-	},
-	pistolgrip = {
-		model = "models/weapons/mods/pistolgrip_mpx.mdl",
-		bonemerge = false,
-		bone = "weapon",
-		pos = Vector(0, -11.25, -2),
+		pos = Vector(0, 1.1, 0),
 		ang = Angle(0, -90, 0)
 	},
 	stock = {
-		model = "models/weapons/mods/stock_ar15_dd_enhanced.mdl",
+		model = "models/weapons/mods/stock_mpx_pmm_ulss.mdl",
 		bonemerge = false,
-		bone = "weapon",
-		pos = Vector(0, -6, -1),
+		bone = "mod_stock",
+		pos = Vector(0, 0, 0),
 		ang = Angle(0, -90, 0)
 	},
-	stock1 = {
-		model = "models/weapons/mods/stock_ar15_stmarms_com_spec_std.mdl",
+	pistolgrip = {
+		model = "models/weapons/mods/pistolgrip_ar15_colt_a1.mdl",
 		bonemerge = false,
-		bone = "weapon",
-		pos = Vector(0, -8.8, -0.1),
+		bone = "mod_pistol_grip",
+		pos = Vector(0, 0, 0),
 		ang = Angle(0, -90, 0)
+	},
+	handguard = {
+		model = "models/weapons/mods/handguard_mcx_sig_gen1_12inch.mdl",
+		bonemerge = false,
+		bone = "mod_reciever",
+		pos = Vector(0, -0.7, 0),
+		ang = Angle(0, 0, 0)
 	},
 }
 
-SWEP.FakePos = Vector(-12, 2.0, 7.5)
+SWEP.FakePos = Vector(-13, 2.52, 7.5)
 SWEP.FakeAng = Angle(0, 0, 0)
-SWEP.AttachmentPos = Vector(-5, 0, 0)
+SWEP.AttachmentPos = Vector(0, 0, 0)
 SWEP.AttachmentAng = Angle(0, 0, 0)
 SWEP.FakeAttachment = "1"
-SWEP.FakeBodyGroups = "113"
-SWEP.ZoomPos = Vector(0, -2.2531, 5.7158)
+SWEP.FakeBodyGroups = "111215"
+SWEP.ZoomPos = Vector(0, -1.776, 6.215)
+
 
 SWEP.GunCamPos = Vector(4, -15, -6)
 SWEP.GunCamAng = Angle(190, -5, -100)
@@ -68,32 +62,32 @@ SWEP.FakeEjectBrassATT = "2"
 
 SWEP.FakeViewBobBone = "ValveBiped.Bip01_R_Hand"
 SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_L_UpperArm"
-SWEP.ViewPunchDiv = 70
+SWEP.ViewPunchDiv = 1000
 
-local path = "weapons/darsu_eft/mpx/"
+local path = "weapons/darsu_eft/mcx/"
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
 		[0.01] = function(self) self:EmitSound("weapons/universal/uni_crawl_l_03.wav") end,
 	},
-	["reload"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/mcxmpx/mpx_weap_magout_plastic.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/mcxmpx/mpx_weap_magin_plastic.ogg") end,
+	["reload0"] = {
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/aug/g36_mag_out.ogg") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/aug/g36_mag_in.ogg") end,
 	},
-	["reload_empty"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/mcxmpx/mpx_weap_magrelease_button.ogg") end,
-		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/mcxmpx/mpx_weap_magout_plastic.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/mcxmpx/mpx_weap_magin_plastic.ogg") end,
-		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/mcxmpx/mpx_weap_magrelease_button.ogg") end,
+	["reload_empty0"] = {
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/g36/g36_mag_releasebutton.ogg") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/g36/g36_mag_out.ogg") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/g36/g36_mag_in.ogg") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/g36/g36_bolt_catchrelease.ogg") end,
 	},
 }
 
 SWEP.AnimList = {
 	["fire"] = "fire",
 	["idle"] = "idle",
-	["reload"] = "reload2",
-	["reload_empty"] = "reload_empty2",
-	["inspect"] = "look0",
+	["reload"] = "reload0",
+	["reload_empty"] = "reload_empty0",
+	["inspect"] = "look_1",
 }
 
 function SWEP:AllowedInspect()
@@ -116,109 +110,79 @@ function SWEP:ModelCreated(model)
 	end
 end
 
-if CLIENT then
-	local vector_full = Vector(1, 1, 1)
-	SWEP.FakeReloadEvents = {
-		[0.10] = function(self, timeMul)
-			self:GetWM():ManipulateBoneScale(27, vector_origin)
-			self:GetWM():ManipulateBoneScale(38, vector_full)
-			self:GetWM():ManipulateBoneScale(39, vector_origin)
-			self:GetWM():ManipulateBoneScale(40, vector_origin)
-			self:GetWM():ManipulateBoneScale(41, vector_origin)
-		end,
-		[0.35] = function(self, timeMul)
-			self:GetOwner():PullLHTowards("ValveBiped.Bip01_Spine2", 0.5 * timeMul, nil, nil, function()
-				self:GetWM():ManipulateBoneScale(38, vector_full)
-				self:GetWM():ManipulateBoneScale(39, vector_full)
-			end)
-		end,
-		[0.70] = function(self, timeMul)
-			self:GetWM():ManipulateBoneScale(38, vector_origin)
-			self:GetWM():ManipulateBoneScale(39, vector_origin)
-			self:GetWM():ManipulateBoneScale(40, vector_origin)
-			self:GetOwner():PullLHTowards("ValveBiped.Bip01_Spine2", 1 * timeMul, nil, nil, function()
-				self:GetWM():ManipulateBoneScale(38, vector_origin)
-				self:GetWM():ManipulateBoneScale(39, vector_origin)
-				self:GetWM():ManipulateBoneScale(40, vector_origin)
-			end)
-		end,
-	}
-end
-
 SWEP.ReloadHold = nil
 SWEP.FakeVPShouldUseHand = false
 
-SWEP.HeldMagModel = "models/weapons/mods/mag_glock_magex_30.mdl"
+SWEP.HeldMagModel = "models/weapons/mods/mag_stanag_colt_ar15_std_556x45_30.mdl"
 SWEP.HeldMagBone = "mod_magazine"
-SWEP.HeldMagOffsetPos = Vector(0, 0, 0.2)
-SWEP.HeldMagOffsetAng = Angle(-5, -90, 0)
+SWEP.HeldMagOffsetPos = Vector(0, 0, 0)
+SWEP.HeldMagOffsetAng = Angle(0, -90, 0)
 
-SWEP.HeldHandguardModel = "models/weapons/mods/handguard_ar15_stmarms_12_inch_m_lok.mdl"
-SWEP.HeldHandguardBone = "weapon"
-SWEP.HeldHandguardOffsetPos = Vector(0, -16.72, 0.070)
-SWEP.HeldHandguardOffsetAng = Angle(0, 0, 0)
-
-SWEP.HeldPistolgripModel = "models/weapons/mods/pistolgrip_mpx.mdl"
-SWEP.HeldPistolgripBone = "weapon"
-SWEP.HeldPistolgripOffsetPos = Vector(0, -11.25, -2)
-SWEP.HeldPistolgripOffsetAng = Angle(0, -90, 0)
-
-SWEP.HeldStockModel = "models/weapons/mods/stock_ar15_dd_enhanced.mdl"
-SWEP.HeldStockBone = "weapon"
-SWEP.HeldStockOffsetPos = Vector(0, -6, -1)
+SWEP.HeldStockModel = "models/weapons/mods/stock_mpx_pmm_ulss.mdl"
+SWEP.HeldStockBone = "mod_stock"
+SWEP.HeldStockOffsetPos = Vector(0, 0, 0)
 SWEP.HeldStockOffsetAng = Angle(0, -90, 0)
 
-SWEP.HeldStock1Model = "models/weapons/mods/stock_ar15_stmarms_com_spec_std.mdl"
-SWEP.HeldStock1Bone = "weapon"
-SWEP.HeldStock1OffsetPos = Vector(0, -9, -0.1)
-SWEP.HeldStock1OffsetAng = Angle(0, -90, 0)
+SWEP.HeldPistolgripModel = "models/weapons/mods/pistolgrip_ar15_colt_a1.mdl"
+SWEP.HeldPistolgripBone = "mod_pistol_grip"
+SWEP.HeldPistolgripOffsetPos = Vector(0, 0, 0)
+SWEP.HeldPistolgripOffsetAng = Angle(0, -90, 0)
+
+SWEP.HeldHandguardModel = "models/weapons/mods/handguard_mcx_sig_gen1_12inch.mdl"
+SWEP.HeldHandguardBone = "mod_reciever"
+SWEP.HeldHandguardOffsetPos = Vector(0, 0, 0)
+SWEP.HeldHandguardOffsetAng = Angle(0, 0, 0)
 
 SWEP.weaponInvCategory = 1
 SWEP.CustomEjectAngle = Angle(0, 0, 90)
 SWEP.Primary.ClipSize = 30
 SWEP.Primary.DefaultClip = 30
-SWEP.Primary.Automatic = false
-SWEP.Primary.Ammo = "9x19 mm Parabellum"
+SWEP.Primary.Automatic = true
+SWEP.Primary.Ammo = "5.56x45 mm"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 22
+SWEP.Primary.Damage = 33
 SWEP.Primary.Spread = 0
-SWEP.Primary.Force = 20
+SWEP.Primary.Force = 28
 SWEP.animposmul = 2
-SWEP.Primary.Sound = {"weapons/darsu_eft/mcxmpx/fire_new/mpx_outdoor_close_loop1.wav", 85, 120, 130}
-SWEP.SupressedSound = {"weapons/darsu_eft/mcxmpx/fire_new/mpx_outdoor_close_silenced_loop1.wav", 75, 90, 100}
-SWEP.Primary.Wait = 0.08
+SWEP.Primary.Sound = {"weapons/darsu_eft/mcxmpx/fire_new/mcx_outdoor_close2.wav", 85, 90, 100}
+SWEP.SupressedSound = {"weapons/darsu_eft/mcxmpx/fire_new/mcx_outdoor_silenced_close1.wav", 65, 90, 100}
+SWEP.Primary.SoundEmpty = {"weapons/darsu_eft/mcx/mcx_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Wait = 0.075
+SWEP.ReloadTime = 3
 
 SWEP.PPSMuzzleEffect = "muzzleflash_FAMAS"
 
-SWEP.CustomShell = "9x19"
-SWEP.ShellEject = "EjectBrass_9mm"
+SWEP.CustomShell = "556"
+SWEP.ShellEject = "EjectBrass_556"
 
-SWEP.LocalMuzzlePos = Vector(19.5, -2.3, 4)
+SWEP.LocalMuzzlePos = Vector(12.5, -1.75, 4.1)
 SWEP.LocalMuzzleAng = Angle(0, 0, 0)
 SWEP.WeaponEyeAngles = Angle(0, 0, 0)
 
 SWEP.HoldType = "rpg"
 
-SWEP.WepSelectIcon2 = Material("entities/arc9_eft_stm9.png")
-SWEP.IconOverride = "entities/arc9_eft_stm9.png"
+SWEP.WepSelectIcon2 = Material("entities/arc9_eft_mcx.png")
+SWEP.IconOverride = "entities/arc9_eft_mcx.png"
 
-SWEP.weight = 2.7
+SWEP.weight = 2.9
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.StartAtt = {"holo9"}
+SWEP.DistSound = "weapons/darsu_eft/mcx/mcx_dist.wav"
+
+SWEP.StartAtt = {"supressor9","holo14"}
 SWEP.availableAttachments = {
 	barrel = {
-		[1] = {"supressor2", Vector(0, 0, 0), {}},
-		[2] = {"supressor1", Vector(0, 0, 0), {}},
-		[3] = {"supressor15", Vector(0.5, 0, 0), {}},
-		["mount"] = Vector(-0.8, -0.05, 0),
+		[1] = {"supressor9", Vector(0, 0, 0), {}},
+		[2] = {"supressor16", Vector(0, 0, 0), {}},
+		[3] = {"supressor15", Vector(1.3, 0, 0), {}},
+		["mount"] = Vector(0.1, 0, 0),
 	},
 	sight = {
 		["mountType"] = {"picatinny"},
-		["mount"] = {picatinny = Vector(-17, 1.1, 0)}
+		["mount"] = {["picatinny"] = Vector(-11, 1.5, 0.05)},
 	},
 	grip = {
-		["mount"] = {["picatinny"] = Vector(9, 0.4, 0.15)},
+		["mount"] = {["picatinny"] = Vector(13, 0.5, 0.015)},
 		["mountType"] = {"picatinny"},
 		["mountAngle"] = Angle(0,0,0)
 	},
@@ -226,13 +190,13 @@ SWEP.availableAttachments = {
 
 SWEP.RHandPos = Vector(0, -1, 0)
 SWEP.LHandPos = Vector(7, -2, -2)
-SWEP.Penetration = 7
+SWEP.Penetration = 15
 SWEP.Spray = {}
-for i = 1, 30 do
+for i = 1, 20 do
 	SWEP.Spray[i] = Angle(-0.0, 0, 0) * 1
 end
 
-SWEP.Ergonomics = 1.15
+SWEP.Ergonomics = 0.85
 SWEP.WorldPos = Vector(4, -0.8, -0.5)
 SWEP.WorldAng = Angle(0, 0, 0)
 SWEP.UseCustomWorldModel = true
@@ -240,9 +204,7 @@ SWEP.attPos = Vector(1, 0, 0)
 SWEP.attAng = Angle(-0.02, 0, 0)
 SWEP.lengthSub = 25
 SWEP.handsAng = Angle(7, 2, 0)
-SWEP.DistSound = path .. "stm9_fire_close.ogg"
 
--- tpik hand positions
 SWEP.RHPos = Vector(3, -7, 3.5)
 SWEP.RHAng = Angle(0, -8, 90)
 SWEP.LHPos = Vector(11, 1.6, -3)
@@ -285,23 +247,23 @@ function SWEP:DrawPost()
 		end
 	end
 
-	-- Handguard
-	if not IsValid(self.HeldHandguardCSModel) then
-		self.HeldHandguardCSModel = ClientsideModel(self.HeldHandguardModel, RENDERGROUP_BOTH)
-		if IsValid(self.HeldHandguardCSModel) then self.HeldHandguardCSModel:SetNoDraw(true) end
+	-- Stock
+	if not IsValid(self.HeldStockCSModel) then
+		self.HeldStockCSModel = ClientsideModel(self.HeldStockModel, RENDERGROUP_BOTH)
+		if IsValid(self.HeldStockCSModel) then self.HeldStockCSModel:SetNoDraw(true) end
 	end
-	if IsValid(self.HeldHandguardCSModel) then
-		local boneID = wm:LookupBone(self.HeldHandguardBone)
+	if IsValid(self.HeldStockCSModel) then
+		local boneID = wm:LookupBone(self.HeldStockBone)
 		if boneID then
 			local boneMatrix = wm:GetBoneMatrix(boneID)
 			if boneMatrix then
-				local lpos, lang = LocalToWorld(self.HeldHandguardOffsetPos, self.HeldHandguardOffsetAng, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
-				self.HeldHandguardCSModel:SetRenderOrigin(lpos)
-				self.HeldHandguardCSModel:SetRenderAngles(lang)
-				self.HeldHandguardCSModel:SetPos(lpos)
-				self.HeldHandguardCSModel:SetAngles(lang)
-				self.HeldHandguardCSModel:SetupBones()
-				self.HeldHandguardCSModel:DrawModel()
+				local lpos, lang = LocalToWorld(self.HeldStockOffsetPos, self.HeldStockOffsetAng, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
+				self.HeldStockCSModel:SetRenderOrigin(lpos)
+				self.HeldStockCSModel:SetRenderAngles(lang)
+				self.HeldStockCSModel:SetPos(lpos)
+				self.HeldStockCSModel:SetAngles(lang)
+				self.HeldStockCSModel:SetupBones()
+				self.HeldStockCSModel:DrawModel()
 			end
 		end
 	end
@@ -327,44 +289,23 @@ function SWEP:DrawPost()
 		end
 	end
 
-	-- Stock
-	if not IsValid(self.HeldStockCSModel) then
-		self.HeldStockCSModel = ClientsideModel(self.HeldStockModel, RENDERGROUP_BOTH)
-		if IsValid(self.HeldStockCSModel) then self.HeldStockCSModel:SetNoDraw(true) end
+	-- Handguard
+	if not IsValid(self.HeldHandguardCSModel) then
+		self.HeldHandguardCSModel = ClientsideModel(self.HeldHandguardModel, RENDERGROUP_BOTH)
+		if IsValid(self.HeldHandguardCSModel) then self.HeldHandguardCSModel:SetNoDraw(true) end
 	end
-	if IsValid(self.HeldStockCSModel) then
-		local boneID = wm:LookupBone(self.HeldStockBone)
+	if IsValid(self.HeldHandguardCSModel) then
+		local boneID = wm:LookupBone(self.HeldHandguardBone)
 		if boneID then
 			local boneMatrix = wm:GetBoneMatrix(boneID)
 			if boneMatrix then
-				local lpos, lang = LocalToWorld(self.HeldStockOffsetPos, self.HeldStockOffsetAng, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
-				self.HeldStockCSModel:SetRenderOrigin(lpos)
-				self.HeldStockCSModel:SetRenderAngles(lang)
-				self.HeldStockCSModel:SetPos(lpos)
-				self.HeldStockCSModel:SetAngles(lang)
-				self.HeldStockCSModel:SetupBones()
-				self.HeldStockCSModel:DrawModel()
-			end
-		end
-	end
-
-	-- Stock1
-	if not IsValid(self.HeldStock1CSModel) then
-		self.HeldStock1CSModel = ClientsideModel(self.HeldStock1Model, RENDERGROUP_BOTH)
-		if IsValid(self.HeldStock1CSModel) then self.HeldStock1CSModel:SetNoDraw(true) end
-	end
-	if IsValid(self.HeldStock1CSModel) then
-		local boneID = wm:LookupBone(self.HeldStock1Bone)
-		if boneID then
-			local boneMatrix = wm:GetBoneMatrix(boneID)
-			if boneMatrix then
-				local lpos, lang = LocalToWorld(self.HeldStock1OffsetPos, self.HeldStock1OffsetAng, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
-				self.HeldStock1CSModel:SetRenderOrigin(lpos)
-				self.HeldStock1CSModel:SetRenderAngles(lang)
-				self.HeldStock1CSModel:SetPos(lpos)
-				self.HeldStock1CSModel:SetAngles(lang)
-				self.HeldStock1CSModel:SetupBones()
-				self.HeldStock1CSModel:DrawModel()
+				local lpos, lang = LocalToWorld(self.HeldHandguardOffsetPos, self.HeldHandguardOffsetAng, boneMatrix:GetTranslation(), boneMatrix:GetAngles())
+				self.HeldHandguardCSModel:SetRenderOrigin(lpos)
+				self.HeldHandguardCSModel:SetRenderAngles(lang)
+				self.HeldHandguardCSModel:SetPos(lpos)
+				self.HeldHandguardCSModel:SetAngles(lang)
+				self.HeldHandguardCSModel:SetupBones()
+				self.HeldHandguardCSModel:DrawModel()
 			end
 		end
 	end
@@ -587,10 +528,9 @@ if CLIENT then
 	function SWEP:OnRemove()
 		self:BC_RemoveDroppedModels()
 		if IsValid(self.HeldMagCSModel) then self.HeldMagCSModel:Remove() end
-		if IsValid(self.HeldHandguardCSModel) then self.HeldHandguardCSModel:Remove() end
-		if IsValid(self.HeldPistolgripCSModel) then self.HeldPistolgripCSModel:Remove() end
 		if IsValid(self.HeldStockCSModel) then self.HeldStockCSModel:Remove() end
-		if IsValid(self.HeldStock1CSModel) then self.HeldStock1CSModel:Remove() end
+		if IsValid(self.HeldPistolgripCSModel) then self.HeldPistolgripCSModel:Remove() end
+		if IsValid(self.HeldHandguardCSModel) then self.HeldHandguardCSModel:Remove() end
 	end
 end
 
@@ -598,7 +538,7 @@ end
 -- FIRE ANIMATION
 --========================================================
 
-SWEP.FireAnimTime = 0.08
+SWEP.FireAnimTime = 0.15
 SWEP.FireAnimCandidates = {"fire", "fire1"}
 
 function SWEP:PrimaryShootPost()
