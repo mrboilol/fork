@@ -625,9 +625,12 @@ function SWEP:FireBullet()
 		trace = util.TraceLine(obstructionTrace)
 	end
 
-    -- Some weapons declare their pellet count on the SWEP while others keep it
-    -- in the ammo table.  Treat either as an intentional multi-projectile load.
-    local numbullet = math.max(tonumber(ammotype.NumBullet) or 1, tonumber(self.NumBullet) or 1)
+	-- The loaded ammo is authoritative.  A few weapons inherit stale NumBullet
+	-- values from another base (for example a rifle derived from a shotgun), and
+	-- using math.max here silently turned those rifle rounds into pellet loads.
+	local numbullet = tonumber(ammotype.NumBullet)
+	if numbullet == nil then numbullet = tonumber(self.NumBullet) or 1 end
+	numbullet = math.max(math.floor(numbullet), 1)
 
 	if not IsValid(owner) then
 		local phys = self:GetPhysicsObject()

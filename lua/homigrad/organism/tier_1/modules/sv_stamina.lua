@@ -10,6 +10,9 @@ local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_
 local panicattack_stamina_drain_mul = 1.35
 local low_stamina_drain_max_mul = 1.2
 local low_stamina_recovery_min_mul = 0.85
+local recent_stamina_loss_recovery_min_mul = 0.5
+local recent_stamina_loss_hold_time = 2
+local recent_stamina_loss_fade_time = 6
 --local Organism = hg.organism
 
 hg.organism.module.stamina = {}
@@ -38,6 +41,10 @@ module[1] = function(org)
 		subadd = 0,
 
 		weight = 0,
+
+		recoveryPenaltyUntil = 0,
+
+		recoveryPenaltyFadeUntil = 0,
 
 		max = 60 * 3,
 
@@ -192,7 +199,12 @@ module[2] = function(owner, org, timeValue)
 	local lowStamina = 1 - staminaFraction
 	local staminaDrainMul = Lerp(lowStamina, 1, low_stamina_drain_max_mul)
 	local staminaRecoveryMul = Lerp(lowStamina, 1, low_stamina_recovery_min_mul)
-	    stamina[1] = max(stamina[1] - stamina.sub * staminaDrainMul * timeValue * 8 * (2 - (org.o2[1] / org.o2.range)), 0)
+	local staminaBeforeDrain = stamina[1]
+	stamina[1] = max(stamina[1] - stamina.sub * staminaDrainMul * timeValue * 8 * (2 - (org.o2[1] / org.o2.range)), 0)
+	if staminaBeforeDrain - stamina[1] > 0.01 then
+		stamina.recoveryPenaltyUntil = CurTime() + recent_stamina_loss_hold_time
+		stamina.recoveryPenaltyFadeUntil = stamina.recoveryPenaltyUntil + recent_stamina_loss_fade_time
+	end
 	if stamina.max > 100 then
 
 	end
@@ -208,6 +220,14 @@ module[2] = function(owner, org, timeValue)
 	local lungRecoveryMultiplier = math.max(1 - lungDamage, 0.3)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
+	local recentLossRecoveryMul = 1
+	local now = CurTime()
+	if now < (stamina.recoveryPenaltyUntil or 0) then
+		recentLossRecoveryMul = recent_stamina_loss_recovery_min_mul
+	elseif now < (stamina.recoveryPenaltyFadeUntil or 0) then
+		local fadeProgress = math.Clamp((now - stamina.recoveryPenaltyUntil) / recent_stamina_loss_fade_time, 0, 1)
+		recentLossRecoveryMul = Lerp(fadeProgress, recent_stamina_loss_recovery_min_mul, 1)
+	end
 
 	local postureRecoveryMul = 1
 	if owner:IsPlayer() then
@@ -219,7 +239,7 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul, stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * recentLossRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul, stamina.max)
 
 
 

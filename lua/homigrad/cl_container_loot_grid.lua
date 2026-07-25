@@ -52,11 +52,15 @@ local function SortedItemIDs(items)
 	return ids
 end
 
-local function GetItemGridSize(class)
+local function GetItemWeight(class)
 	local weapon = weapons.Get(class)
 	local weight = weapon and (tonumber(weapon.weight) or tonumber(weapon.Weight))
 	if weapon and not weight then weight = weapon.weaponInvCategory == 1 and 8 or 3 end
-	weight = tonumber(weight) or 1
+	return tonumber(weight) or 1
+end
+
+local function GetItemGridSize(class)
+	local weight = GetItemWeight(class)
 	if weight >= 8 then return 3, 2 end
 	if weight >= 5 then return 2, 2 end
 	if weight >= 2.5 then return 2, 1 end
@@ -73,6 +77,8 @@ function hg.OpenContainerLootGrid(options)
 	end
 
 	local items = options.items or {}
+	ent.hgContainerFoundLoot = ent.hgContainerFoundLoot or {}
+	local foundLoot = ent.hgContainerFoundLoot
 	local sizeX = math.floor(math.min(math.max(ScrW() * 0.62, 420), ScrW() - 20, 980))
 	local sizeY = math.floor(math.min(math.max(ScrH() * 0.74, 360), ScrH() - 20, 760))
 	local menu = vgui.Create("ZFrame")
@@ -122,7 +128,7 @@ function hg.OpenContainerLootGrid(options)
 
 	menu.PaintOver = function(self, w, h)
 		draw.DrawText(options.title or "Container", "ZCity_Menu_Settings_Small", 14, 12, color_white, TEXT_ALIGN_LEFT)
-		draw.DrawText(options.helpText or "LMB - Take | R - Close", "ZCity_Tiny", w / 2, h - h * 0.04, Color(255, 255, 255, 45), TEXT_ALIGN_CENTER)
+		draw.DrawText(options.helpText or "Hold LMB - Search | LMB - Take | R - Close", "ZCity_Tiny", w / 2, h - h * 0.04, Color(255, 255, 255, 45), TEXT_ALIGN_CENTER)
 	end
 
 	local released = false
@@ -233,7 +239,26 @@ function hg.OpenContainerLootGrid(options)
 		button:SetText("")
 		button:SetPos(gap + (layout.x - 1) * (cell + gap), gap + (layout.y - 1) * (cell + gap))
 		button:SetSize(layout.w * cell + (layout.w - 1) * gap, layout.h * cell + (layout.h - 1) * gap)
+		button.RevealTime = math.Clamp(0.45 + GetItemWeight(class) * 0.24, 0.65, 4)
+		button.Think = function(self)
+			if foundLoot[itemID] then return end
+			if self:IsHovered() and input.IsMouseDown(MOUSE_LEFT) then
+				self.RevealStart = self.RevealStart or CurTime()
+				self.RevealProgress = math.Clamp((CurTime() - self.RevealStart) / self.RevealTime, 0, 1)
+				if self.RevealProgress >= 1 then
+					foundLoot[itemID] = true
+					self.HoldLock = true
+					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".ogg")
+				end
+			else
+				self.RevealStart = nil
+				self.RevealProgress = 0
+				if not input.IsMouseDown(MOUSE_LEFT) then self.HoldLock = nil end
+			end
+		end
 		button.DoClick = function(self)
+			if self.HoldLock then self.HoldLock = nil return end
+			if not foundLoot[itemID] then return end
 			if cooldown > CurTime() then return end
 			cooldown = CurTime() + 0.3
 			if options.onTake then options.onTake(ent, itemID, item) end
@@ -243,6 +268,7 @@ function hg.OpenContainerLootGrid(options)
 
 		button.col1 = 100
 		button.Paint = function(self, w, h)
+			local found = foundLoot[itemID]
 			self.col1 = Lerp(0.1, self.col1, self:IsHovered() and 180 or 100)
 			if self:IsHovered() then
 				self.SoundKD = self.SoundKD or 0
@@ -259,6 +285,16 @@ function hg.OpenContainerLootGrid(options)
 					surface.SetDrawColor(70, 70, 70, 145)
 					surface.DrawOutlinedRect(xx * (cell + gap), yy * (cell + gap), cell, cell, 1)
 				end
+			end
+			if not found then
+				draw.SimpleText("?", "ZCity_Small", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				if (self.RevealProgress or 0) > 0 then
+					surface.SetDrawColor(150, 150, 150, 210)
+					surface.DrawRect(6, h - 10, (w - 12) * self.RevealProgress, 4)
+				end
+				surface.SetDrawColor(self.col1, self.col1, self.col1, 210)
+				surface.DrawOutlinedRect(0, 0, w, h, 1)
+				return
 			end
 			local icon, hasIcon, override, quad = GetItemIcon(class)
 			if icon then self.Icon = self.Icon or (isstring(icon) and Material(icon)) or icon end

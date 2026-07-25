@@ -161,13 +161,8 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
-			local speed = part[3] and math.sqrt(part[3]:LengthSqr()) or 0
-			-- Particle size carries wound bleed severity. Velocity adds only a small
-			-- stretch so pressure changes reach without making every fast drop huge.
-			local beamWidth = math.max(part[5] * 0.72, 0.35) * (1 + math.min(speed / 220, 0.45))
-			local intensity = (part.artery and 45 or 20) + math.min(speed * 0.35, 80)
 			render_SetMaterial(mat_huy)
-			lightcolor.r = math.min(intensity * light[1], 255)
+			lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
 			lightcolor.g = 0
 			lightcolor.b = 0
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
@@ -178,7 +173,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 				--render_DrawBeam(pos - (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5,pos + (part[2] - part[1]) * part.lerpedshit / mul / 24 * 0.5, part.lerpedshit, 0, 1, part[9] or lightcolor )
 				
 				--render_DrawBeam(pos - (len < 2 and (part[2] - part[1]):GetNormalized() * 2 or (part[2] - part[1])) * 0.5 / mul / 24,pos + (part[2] - part[1]) * 0.5 / mul / 24, 1, 0, 1, part[9] or lightcolor )
-				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, beamWidth, 0, 1, part[9] or lightcolor )
+				render_DrawBeam(pos - (part[2] - part[1]) * 1 / mul / 24 * 0.5,pos + (part[2] - part[1]) * 1 / mul / 24 * 0.5, 1, 0, 1, part[9] or lightcolor )
 
 				--lightcolor.r = lightcolor.r * 0.25
 				--debugoverlay.Line(part[2], part[1], 1, lightcolor, false)	

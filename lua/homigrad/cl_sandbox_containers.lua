@@ -13,7 +13,7 @@ net.Receive("hg_sandbox_container_open", function()
 		ent = ent,
 		items = loot,
 		title = "Container",
-		helpText = "LMB - Take | R - Let go",
+		helpText = "Hold LMB - Search | LMB - Take | R - Let go",
 		onTake = function(container, itemID)
 			net.Start("hg_sandbox_container_take")
 				net.WriteEntity(container)

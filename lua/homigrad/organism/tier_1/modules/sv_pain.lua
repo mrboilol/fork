@@ -25,7 +25,7 @@ local pain_shock_max_gain = 10
 local pain_tolerance = 120
 local otrub_pain_tolerance = 90
 local pain_fake_threshold = 0.9
-local pain_drain_base = 12
+local pain_drain_base = 8
 local pain_drain_otrub_mul = 4.5
 module[1] = function(org)
 
@@ -143,12 +143,13 @@ module[2] = function(owner, org, timeValue)
 	local add = shouldPainAdd and math.min(timeValue * 15, org.painadd) or 0
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
 
-	if adrenaline > 0 then
+	if adrenaline > 0.5 then
 
-		-- Historical adrenaline behavior: incoming pain still accumulates while
-		-- pain recovery slows heavily, leaving the stored pain for the comedown.
-		local suppression = math.max(1 - adrenaline / 2, 0.1)
+		-- Remorseism-style adrenaline pacing: a real rush delays both the pain
+		-- arriving and the body settling it, so the stored injury survives the rush.
+		local suppression = math.max(1 - adrenaline, 0.05) / 1.5
 
+		add = add * suppression
 		sub = sub * suppression
 
 	end
@@ -250,7 +251,9 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain = org.avgpain * math.max(1 - adrenaline / 3, 0.1) * math.max(1 - org.analgesia, 0)
+	-- Adrenaline can blunt pain, but it cannot erase nearly all of it.  Keep the
+	-- Remorseism 75% floor so injuries remain readable during the rush.
+	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - org.analgesia, 0)
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
 	if shouldPainAdd then
@@ -301,7 +304,7 @@ module[2] = function(owner, org, timeValue)
 		if critical then
 			org.adrenaline = Approach(org.adrenaline, 2, timeValue / 5 * reserveK)
 		else
-			org.adrenaline = Approach(org.adrenaline, 3.2, timeValue / 5 * reserveK)
+			org.adrenaline = Approach(org.adrenaline, 4, timeValue / 5 * reserveK)
 		end
 
 	end
@@ -328,7 +331,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	local adrenalineDecayRate = timeValue / (org.otrub and 8 or 20)
+	local adrenalineDecayRate = timeValue / (org.otrub and 8 or 25)
 
 	if fastAdrenalineDecay then
 

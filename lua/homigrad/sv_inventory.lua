@@ -400,6 +400,8 @@ local function GetLootTakeDuration(tblIndex, thing)
     return math.Rand(0.5, 1.15)
 end
 
+util.AddNetworkString("ZCityBackpackDrawStart")
+util.AddNetworkString("ZCityBackpackDrawCancel")
 util.AddNetworkString("ply_take_item_begin")
 util.AddNetworkString("ply_take_item_begin_ack")
 net.Receive("ply_take_item_begin", function(_, ply)

@@ -23,7 +23,7 @@ net.Receive("ZBox_LootSystem_net", function()
 		ent = ent,
 		items = loot,
 		title = "Container",
-		helpText = "LMB - Take | R - Close",
+		helpText = "Hold LMB - Search | LMB - Take | R - Close",
 		maxDistance = 400,
 		onTake = function(container, itemID)
 			net.Start("ZBox_LootSystem_net")

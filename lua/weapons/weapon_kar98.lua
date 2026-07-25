@@ -69,7 +69,7 @@ SWEP.availableAttachments = {
 }
 
 SWEP.Primary.Wait = 0.25
-SWEP.NumBullet = 8
+SWEP.NumBullet = 1
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}

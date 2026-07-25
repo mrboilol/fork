@@ -139,7 +139,11 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 
     if func and !hook_info.restricted then
         local old_consciousness = org.consciousness
+        local directBrainBefore = isBrain and (org[name] or 0) or nil
         local result = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
+        if isBrain and (org[name] or 0) > directBrainBefore then
+            org._directBrainDamageThisHit = true
+        end
 
         return result
     else
@@ -1123,6 +1127,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = nil,{},{},{},{},nil,nil
 	org._bulletImpactBleedAdd = nil
 	org._armorPainMul = nil
+	org._directBrainDamageThisHit = nil
 	org._fistHeadTraceSkullIntact = isFistInflictor(dmgInfo) and (org.skull or 0) < 1 or nil
 	-- Limb artery damage must stay on the side of the physics bone the bullet
 	-- actually entered; do not let a long trace rupture the opposite limb.
@@ -1138,7 +1143,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.BlastTrace(dmgInfo:GetDamagePosition(), (ent:GetPos() - dmgInfo:GetDamagePosition()):Length() / 200, dmg * 2, boxs, organs, Trace_Blast, ent.organism, organs, dmg / 300, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
 	end
+	local directBrainDamageThisHit = org._directBrainDamageThisHit == true
 	org._bulletImpactHitgroup = nil
+	org._directBrainDamageThisHit = nil
 	org._fistHeadTraceSkullIntact = nil
 	org._spineArteryTraceDmgInfo = nil
 
@@ -1297,7 +1304,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local bonename = ent:GetBoneName(ent:TranslatePhysBoneToBone(bone))
 	local hitgroup = bonetohitgroup[bonename] or 0
 	local hasHeadArmor = org.owner.armors and org.owner.armors["head"] ~= nil
-	local fatalHeadshot = hitgroup == HITGROUP_HEAD
+	local fatalBrainShotCandidate = hitgroup == HITGROUP_HEAD
 		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 		and not hasHeadArmor
 	local severeBulletImpact = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
@@ -1636,7 +1643,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 	-- A bullet to the face can dislodge an attached headcrab. Gun suicides get
 	-- a higher chance because the muzzle is deliberately pressed to the head.
-	-- This must happen before fatal-headshot handling creates the death ragdoll,
+	-- This must happen before fatal brain-shot handling creates the death ragdoll,
 	-- otherwise the attached model has already been transferred to it.
 	local isGunshot = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local isGunSuicide = isGunshot and ply and dmgInfo:GetAttacker() == ply
@@ -1653,7 +1660,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	takeRagdollDamage(ent, dmgInfo)
 
-	if fatalHeadshot and hg.organism.KillFatalBrainDamage then
+	-- A head hit is not automatically a fatal brain hit. The organ trace must
+	-- have actually damaged a brain or brain-lobe hitbox during this shot.
+	if fatalBrainShotCandidate and directBrainDamageThisHit and hg.organism.KillFatalBrainDamage then
 		hg.organism.KillFatalBrainDamage(org)
 	end
 

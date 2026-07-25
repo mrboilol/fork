@@ -959,75 +959,6 @@ function SWEP:PrimaryShoot()
 	self.drawBullet = false
 	if self.AutomaticDraw then self:Draw() end
 	self:PrimarySpread()
-	self:ApplyRecoilCameraKick()
-end
-
--- Camera recoil kick on every shot. Drives ViewPunch (camera) directly so the
--- screen visibly jolts on fire. Scaled by weapon weight, primary force, pellet
--- count, posture stability, ADS state, and per-mag spray progression. Pistols
--- get a slightly snappier feel, full-auto climbs harder the longer you hold.
-function SWEP:ApplyRecoilCameraKick()
-	if SERVER then return end
-	if not self:IsLocal2() then return end
-
-	local ply = self:GetOwner()
-	if not IsValid(ply) then return end
-
-	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
-
-	-- Cartridge impulse sets the energy, weapon mass and support decide control.
-	local baseKick = math.Clamp(caliberMul * weightMul, 0.25, 3.6)
-	local supportMul = self:GetRecoilSupportMul()
-
-	-- Stable stance / ADS / resting reduces visible camera kick (the gun absorbs more).
-	local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
-	local restMul = (self.IsResting and self:IsResting()) and 0.55 or 1
-	local adsMul = self:IsZoom() and 0.72 or 1
-
-	-- Spray climb: longer trigger holds make the camera kick rise (mostly pitch).
-	local sprayI = self.SprayI or 0
-	local sprayClimb = 1 + math.Clamp(sprayI / 8, 0, 1) * 0.6
-
-	-- Pistol-hold weapons feel punchier per shot.
-	local pistolMul = self:IsPistolHoldType() and 1.08 or 1
-
-	-- Player skill (organism.recoilmul: lower = better, default 1).
-	local skill = self:GetCharacterRecoilMul()
-	local armMul = self:GetArmHealthHandlingMul()
-
-	local kickScale = math.Clamp(baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * skill * armMul, 0.1, 4)
-
-	-- Mostly upward (negative pitch in source angles) with a deterministic
-	-- horizontal/roll drift seeded on SprayI so server bullet trajectory
-	-- (which uses the same SharedRandom seeds) stays in agreement with the
-	-- camera direction the player sees.
-	local seed = math.floor(sprayI)
-	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
-	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
-
-	-- Gangsta hold is deliberately an exception: the canted pistol kicks right
-	-- across the screen with only a small upward rise. All other holds remain
-	-- pitch-led so ordinary recoil does not become horizontal.
-	local gangstaHold = ply.posture == 7
-	local pitchKick = gangstaHold and -0.12 * kickScale or -0.72 * kickScale
-	local yawKick = gangstaHold and 0.72 * kickScale or 0.035 * kickScale * sideRand
-	local rollKick = gangstaHold and 0 or 0.10 * kickScale * rollRand
-
-	local punchAng = Angle(pitchKick, yawKick, rollKick)
-	local hg_coolcam = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()
-
-	if hg_coolcam then
-		-- "Cool camera" path uses the realangle-relative punches; multiply a bit
-		-- so the punch reads through the lerped angle blend.
-		ViewPunch(punchAng * 0.7)
-		ViewPunch2(punchAng * -0.18)
-	else
-		-- Normal path: use ViewPunch2 (the camera-coupled punch the spray path
-		-- already reads) so the kick stacks with the existing tiny zoom punch
-		-- without fighting the engine ViewPunch which lingers too long.
-		ViewPunch2(punchAng * 0.55)
-		ViewPunch(punchAng * 0.16)
-	end
 end
 
 SWEP.SightSlideOffset = 1
@@ -1041,6 +972,24 @@ SWEP.DistSound = "m4a1/m4a1_dist.wav"
 SWEP.NewSoundClose = nil
 SWEP.NewSoundDist = nil
 SWEP.NewSoundSupressor = nil
+
+local additionalShotSoundExists = {}
+local function GetAdditionalShotSound(configuredSound, generatedSound)
+	if configuredSound == false then return end
+	if configuredSound ~= nil then return configuredSound end
+
+	local path = istable(generatedSound) and generatedSound[1] or generatedSound
+	if not isstring(path) or path == "" then return end
+
+	local exists = additionalShotSoundExists[path]
+	if exists == nil then
+		exists = file.Exists("sound/" .. path, "GAME")
+		additionalShotSoundExists[path] = exists
+	end
+	if not exists then return end
+
+	return generatedSound
+end
 
 if SERVER then
 	util.AddNetworkString("resettinnitus")
@@ -1140,8 +1089,26 @@ function SWEP:EmitShoot()
 	else
 		self:PlaySnd(self.Supressor and (self.SupressedSound or (self:IsPistolHoldType() and "homigrad/weapons/pistols/sil.wav" or "m4a1/m4a1_suppressed_fp.wav")) or self.Primary.Sound, nil, nil, vol, nil, 55533, not self.Supressor)
 	end
+
+	local configuredClose = self.NewSoundClose
+	local generatedClose = snd_close
+	if self.Supressor then
+		configuredClose = self.NewSoundSupressor
+		generatedClose = snd_suppressor
+	end
+
+	local additionalClose = GetAdditionalShotSound(configuredClose, generatedClose)
+	if additionalClose then
+		self:PlaySnd(additionalClose, nil, nil, vol, nil, 55534, false)
+	end
+
 	if !self.Supressor then
 		self:PlaySndDist(self.DistSound, nil, nil, nil, nil, 55511, not self.Supressor)
+
+		local additionalDist = GetAdditionalShotSound(self.NewSoundDist, snd_dist)
+		if additionalDist then
+			self:PlaySndDist(istable(additionalDist) and additionalDist[1] or additionalDist)
+		end
 	end
 end
 
@@ -2655,7 +2622,12 @@ function SWEP:GetAdditionalValues()
 		self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 4.5
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -0.35 * shit2
 		
-		self.AdditionalPos2:Add(Vector(math.Rand(-0.02, 0.02), math.Rand(-0.015, 0.015), math.Rand(-0.035, 0.035)) * animpos3 * shit2)
+		local recoilSeed = math.floor(self.SprayI or 0)
+		self.AdditionalPos2:Add(Vector(
+			util.SharedRandom("hg_recoil_pos_x", -0.02, 0.02, recoilSeed + 101),
+			util.SharedRandom("hg_recoil_pos_y", -0.015, 0.015, recoilSeed + 211),
+			util.SharedRandom("hg_recoil_pos_z", -0.035, 0.035, recoilSeed + 307)
+		) * animpos3 * shit2)
 
 		//self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * ply.offsetView[2] * 0.2
 		
@@ -2678,23 +2650,27 @@ function SWEP:GetAdditionalValues()
 		local wobbleDt = dtime or FrameTime()
 		local support = self:GetHandSupportState(ply)
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
-		-- An impaired brace should not hold the weapon in its firing wobble state
-		-- as long as a broken firing hand. This is the between-shot adjustment time.
-		local firing = sinceShot < (support.offhandImpaired and 0.14 or 0.2)
 
 		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 		local supportMul = self:GetRecoilSupportMul()
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local restMul = self:IsResting() and 0.3 or 1
 		local armHandlingMul = self:GetArmHealthHandlingMul()
-		local handlingMul = math.Clamp(caliberMul * weightMul * supportMul * armHandlingMul, 0.25, 2.6)
+		local physicalRecoilMul = self.GetPhysicalRecoilMul and self:GetPhysicalRecoilMul() or 1
+		local handlingMul = math.Clamp(
+			caliberMul * weightMul * supportMul * armHandlingMul * physicalRecoilMul
+				* (self.RecoilMul or 1) * self:GetCharacterRecoilMul() * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul(),
+			0.25,
+			3.2
+		)
 
-		-- Instability ramps up while firing, then settles like a lightly damped spring.
-		-- The long tail lets the gun cross its resting point a few times instead of
-		-- appearing to freeze the instant the main recoil animation reaches zero.
 		local armInjury = math.Clamp(armHandlingMul - 1, 0, 2)
-		local recoveryRate = Lerp(armInjury / 2, 0.018, 0.007)
-		if support.offhandImpaired then recoveryRate = math.max(recoveryRate, 0.03) end
+		-- Healthy, supported arms return the muzzle quickly. Firing-arm damage keeps
+		-- the displacement alive longer and slows the automatic recovery.
+		local firing = sinceShot < Lerp(armInjury / 2, 0.11, 0.24)
+		local recoveryRate = Lerp(armInjury / 2, 0.09, 0.025)
+		recoveryRate = recoveryRate / math.max(stanceMul, 0.45)
+		if support.offhandImpaired then recoveryRate = math.max(recoveryRate, 0.055) end
 		local wobbleTarget = firing and (1.08 + armInjury * 0.12) * (support.offhandImpaired and 0.58 or 1) or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.38 or recoveryRate, wobbleDt), self.recoilWobbleAmp or 0, wobbleTarget)
 

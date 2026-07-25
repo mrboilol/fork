@@ -1,3 +1,5 @@
+if SERVER then util.AddNetworkString("headtrauma_flash") end
+
 local player_crush_amputation_threshold = 7
 
 local function isCrush(dmgInfo)
@@ -112,6 +114,53 @@ local function sendSkullFractureGore(org, dmgInfo)
 	net.WriteBool(false)
 	net.WriteBool(false)
 	net.Broadcast()
+end
+
+local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain, brainGain, traumaBone)
+	if not org.isPly or not IsValid(org.owner) or not org.owner:IsPlayer() then return end
+
+	local target = org.owner
+	local cooldown = traumaBone == "jaw" and 0.35 or 0.2
+	if (target.HeadDisorientFlashCooldown or 0) > CurTime() then return end
+
+	boneDelta = math.max(boneDelta or 0, 0)
+	concussionGain = math.max(concussionGain or 0, 0)
+	brainGain = math.max(brainGain or 0, 0)
+	dmg = math.max(dmg or 0, 0)
+	if boneDelta <= 0.01 and concussionGain <= 0.05 and brainGain <= 0 and dmg < 0.2 then return end
+
+	local hasBrainDamage = brainGain > 0
+	local hasConcussion = concussionGain > 0.05
+	local isCritical = hasBrainDamage or concussionGain >= 1.5
+	local timeScale = traumaBone == "jaw"
+		and math.Clamp(0.25 + boneDelta * 0.8 + concussionGain * 0.08, 0.25, 1.15)
+		or math.Clamp(0.3 + boneDelta * 0.8 + brainGain * 1.5, 0.3, 1.35)
+	local flashSize = traumaBone == "jaw"
+		and math.Clamp(1400 + boneDelta * 1400 + concussionGain * 120, 1400, 3000)
+		or math.Clamp(1500 + boneDelta * 1500 + brainGain * 900, 1500, 3200)
+
+	local eyePos = target:EyePos()
+	local eyeAng = target:EyeAngles()
+	local worldPos = eyePos + eyeAng:Forward() * 16
+	local incomingPos = dmgInfo:GetDamagePosition()
+	if incomingPos ~= vector_origin then
+		local incomingDir = (incomingPos - eyePos):GetNormalized()
+		worldPos = eyePos + eyeAng:Right() * (eyeAng:Right():Dot(incomingDir) * 160) + eyeAng:Forward() * 16
+	end
+
+	net.Start("headtrauma_flash")
+	net.WriteVector(worldPos)
+	net.WriteFloat(timeScale)
+	net.WriteInt(math.floor(flashSize), 20)
+	net.WriteBool(isCritical)
+	net.WriteBool(false)
+	net.WriteBool(hasBrainDamage)
+	net.WriteBool(hasConcussion)
+	net.WriteBool(hasConcussion and (concussionGain >= 0.35 or hasBrainDamage))
+	net.WriteBool(hasBrainDamage or concussionGain >= 1.5)
+	net.Send(target)
+
+	target.HeadDisorientFlashCooldown = CurTime() + cooldown
 end
 
 local huyasd = {
@@ -277,6 +326,7 @@ local jaw_dislocated_msg = {
 }
 
 local input_list = hg.organism.input_list
+local fist_skull_damage_mul = 0.35
 local function isFistInflictor(dmgInfo)
 	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
 	if not IsValid(inflictor) or not inflictor:IsWeapon() then return false end
@@ -287,26 +337,31 @@ end
 
 input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.jaw
+	local oldConcussion = org.concussion or 0
+	local jawImpact = math.max(dmg or 0, 0)
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "jaw", boneindex, dir, hit, ricochet)
 	local jawDelta = org.jaw - oldDmg
 	markDamagedBone(org, "ValveBiped.Bip01_Head1", org.jaw)
 	hg.AddHarmToAttacker(dmgInfo, jawDelta * 3, "Jaw bone damage harm")
 
-	if jawDelta > 0 then
-		org.concussion = math.min((org.concussion or 0) + math.min(jawDelta * 5, 3.25), 10)
-		org.consciousness = math.Approach(org.consciousness or 1, 0, jawDelta * 0.35)
-		org.disorientation = (org.disorientation or 0) + jawDelta * 0.8
+	-- The jaw transfers rotational force into the brain even when the bone is
+	-- already damaged. Weight it toward concussion/disorientation instead of
+	-- directly injuring brain tissue like a penetrating skull hit.
+	if jawDelta > 0 or jawImpact >= 0.2 then
+		local impactConcussion = math.max(jawImpact - 0.15, 0) * (isCrush(dmgInfo) and 1.75 or 0.9)
+		local concussionAdd = math.min(jawDelta * 6 + impactConcussion, 5)
+		local consciousnessLoss = math.min(jawDelta * 0.75 + math.max(jawImpact - 0.55, 0) * 0.35, 0.8)
+		local disorientationAdd = math.min(jawDelta * 2.5 + jawImpact * 1.25, 5)
 
-		-- Normal jabs still build concussion through jaw damage. A high-damage fist
-		-- strike (such as an uppercut) adds enough rotational trauma to knock out a
-		-- target without bypassing an intact skull to damage the brain directly.
-		if isFistInflictor(dmgInfo) then
-			local fistImpact = math.Clamp(((dmgInfo:GetDamage() or 0) - 11) / 4, 0, 1)
-			if fistImpact > 0 then
-				org.concussion = math.min(org.concussion + 1 + fistImpact * 2, 10)
-				org.consciousness = math.max((org.consciousness or 1) - fistImpact * 0.4, 0)
-				if fistImpact >= 0.75 and org.concussion >= 3 then org.needfake = true end
-			end
+		org.concussion = math.min((org.concussion or 0) + concussionAdd, 10)
+		org.consciousness = math.Approach(org.consciousness or 1, 0, consciousnessLoss)
+		org.disorientation = math.min((org.disorientation or 0) + disorientationAdd, 10)
+
+		-- A genuinely hard uppercut can immediately drop someone through the jaw
+		-- lever without pretending the fist penetrated an intact skull.
+		if isFistInflictor(dmgInfo) and jawImpact >= 0.65 and org.concussion >= 3.5 then
+			org.consciousness = math.max((org.consciousness or 1) - math.min(jawImpact * 0.45, 0.5), 0)
+			org.needfake = true
 		end
 	end
 
@@ -337,6 +392,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	end
 
 	if dmg > 0.2 and org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner, 1 + dmg) end) end
+	sendHeadTraumaFlash(org, jawImpact, dmgInfo, jawDelta, (org.concussion or 0) - oldConcussion, 0, "jaw")
 	return result, vecrand
 end
 
@@ -349,6 +405,8 @@ end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
 	local oldDmg = org.skull
+	local oldConcussion = org.concussion or 0
+	if isFistInflictor(dmgInfo) then dmg = dmg * fist_skull_damage_mul end
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 	local skullDelta = org.skull - oldDmg
@@ -394,10 +452,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	local brainGain = math.max(org.brain - brainBefore, 0)
 	if skullDelta > 0 or brainGain > 0 then
-		local concussionGain = math.min(skullDelta * 5 + brainGain * 10, 5)
+		local concussionGain = math.min(skullDelta * 2.75 + brainGain * 7, 4.5)
 		org.concussion = math.min((org.concussion or 0) + concussionGain, 10)
-		org.consciousness = math.Approach(org.consciousness or 1, 0, skullDelta * 0.4)
-		org.disorientation = (org.disorientation or 0) + skullDelta * 1.5
+		org.consciousness = math.Approach(org.consciousness or 1, 0, skullDelta * 0.25)
+		org.disorientation = (org.disorientation or 0) + skullDelta * 0.9
 	end
 
 	if brainGain > 0 then
@@ -425,7 +483,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	if org.skull > 0.85 and oldDmg <= 0.85 then
 		if org.isPly and IsValid(org.owner) and org.owner.Notify then org.owner:Notify(huyasd.skull, true, "skull", 4) end
 	end
-	org.disorientation = org.disorientation + dmg
+	org.disorientation = org.disorientation + dmg * 0.35
+	sendHeadTraumaFlash(org, dmg, dmgInfo, skullDelta, (org.concussion or 0) - oldConcussion, brainGain, "skull")
 	return result, vecrand
 end
 

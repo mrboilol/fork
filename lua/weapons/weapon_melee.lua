@@ -200,11 +200,8 @@ SWEP.ShoveKnockdownVictimFatigueMul = 0.20
 SWEP.ShoveKnockdownStaminaAdvantageMul = 0.10
 SWEP.ShoveKnockdownCooldown = 2
 SWEP.SwingForwardBoostMinSpeed = 20
-SWEP.RagdollHitForceMul = 0.5
 SWEP.HeadTraceFallbackRadius = 10
 SWEP.HeadRagdollChance = 0.55
-SWEP.HeadRagdollForceMul = 1.35
-SWEP.HeadRagdollUpMul = 1.2
 SWEP.HeadRagdollMinDamage = 20
 
 SWEP.PenetrationPrimary = 8
@@ -3272,12 +3269,7 @@ function SWEP:CustomThink()
                     self:PlaySoftHitSounds(owner, ent, trace, false)
                 end
                 
-                local hitForce = trace.Normal * math.min(dmg, 25) * 400 * (self.RagdollHitForceMul or 1)
-                if self:IsHeadHit(ent, trace) then
-                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
-                end
+                local hitForce = trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
                 hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5)
 
                 self:PunchPlayer(ent, false, trace.Normal, dmg)
@@ -3449,12 +3441,7 @@ function SWEP:CustomThink()
                 end
 
                 local phys = ent:GetPhysicsObjectNum(trace.PhysicsBone or 0)
-                local hitForce = trace.Normal * math.min(dmg, 25) * 400 * (self.RagdollHitForceMul or 1)
-                if self:IsHeadHit(ent, trace) then
-                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
-                end
+                local hitForce = trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
 
                 hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5)
 
@@ -3600,12 +3587,7 @@ function SWEP:CustomThink()
                     self:PlaySoftHitSounds(owner, ent, trace, 3)
                 end
                 
-                local hitForce = trace.Normal * math.min(dmg, 25) * 400 * (self.RagdollHitForceMul or 1)
-                if self:IsHeadHit(ent, trace) then
-                    hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
-                    hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
-                end
+                local hitForce = trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
                 hg.AddForceRag(ent, trace.PhysicsBone or 0, hitForce, 0.5)
 
                 self:PunchPlayer(ent, 3, trace.Normal, dmg)
@@ -4392,12 +4374,7 @@ function SWEP:NPCThink()
                     end
 
 					if trEnt:IsPlayer() then
-						local hitForce = trace.Normal * math.min(dmg, 25) * 400 * (self.RagdollHitForceMul or 1)
-						if self:IsHeadHit(trEnt, trace) then
-							hitForce.x = hitForce.x * (self.HeadRagdollForceMul or 1.35)
-							hitForce.y = hitForce.y * (self.HeadRagdollForceMul or 1.35)
-							hitForce.z = hitForce.z * (self.HeadRagdollUpMul or 1.2)
-						end
+						local hitForce = trace.Normal * math.min(dmg, 25) * 400 * MELEE_GLOBAL_KNOCKBACK_MUL
 						hg.AddForceRag(trEnt, trace.PhysicsBone or 0, hitForce, 0.5)
 
 						self:PunchPlayer(trEnt, false, trace.Normal, dmg)

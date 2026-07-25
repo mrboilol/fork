@@ -221,9 +221,9 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 	ang[2] = ang[2] + self.prankang[2]
 	ang[1] = math.Clamp(ang[1] + self.prankang[1], -90, 90)
 
-	if CLIENT and self:IsLocal() then
-		ang[3] = ang[3] + position_difference3[2] * -4 - GetViewPunchAngles2()[2] * 0.25
-	end
+	-- Do not rotate the ballistic muzzle with client-only render punch.  The
+	-- server never has these values, so including them here made the local
+	-- predicted impact disagree with the authoritative shot direction.
 	self.fuckingfuckangle = ang
 	self.fuckingfuckpos = pos
 	desiredPos, desiredAng = LocalToWorld(self.RHPos + (bNoAdditional and vector_origin or (self.AdditionalPos + self.AdditionalPos2)), bNoAdditional and angle_zero or (self.AdditionalAng + self.AdditionalAng2), pos, ang)

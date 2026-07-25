@@ -298,26 +298,26 @@ local clothes = {
         WarmSave = 0.07
     },
 
-    -- jacket4 = {
-    --     PrintName = "Black jacket",
-    --     Model = "models/props_junk/cardboard_box003a.mdl",
-    --     SlotOccupation = {
-    --         [ZC_CLOTHES_SLOT_TORSO] = true
-    --     },
-    --     Male = {
-    --         Model = "models/tnb/halflife2/male_torso_leatherjacket1.mdl",
-    --         HideSubMaterails = {"models/humans/male/group01/players_sheet"},
-    --         Skin = 0,
-    --         Bodygroups = "0000000000000"
-    --     },
-    --     FeMale = {
-    --         Model = "models/tnb/halflife2/female_torso_leatherjacket1.mdl",
-    --         HideSubMaterails = {"models/humans/female/group01/players_sheet"},
-    --         Skin = 0,
-    --         Bodygroups = "0000000000000"
-    --     },
-    --     WarmSave = 0.07
-    -- },
+    jacket4 = {
+        PrintName = "Black jacket",
+        Model = "models/props_junk/cardboard_box003a.mdl",
+        SlotOccupation = {
+            [ZC_CLOTHES_SLOT_TORSO] = true
+        },
+        Male = {
+            Model = "models/tnb/halflife2/male_torso_leatherjacket1.mdl",
+            HideSubMaterails = {"models/humans/male/group01/players_sheet"},
+            Skin = 0,
+            Bodygroups = "0000000000000"
+        },
+        FeMale = {
+            Model = "models/tnb/halflife2/female_torso_leatherjacket1.mdl",
+            HideSubMaterails = {"models/humans/female/group01/players_sheet"},
+            Skin = 0,
+            Bodygroups = "0000000000000"
+        },
+        WarmSave = 0.07
+    },
 
     cargo_pants1 = {
         PrintName = "Cargo Pants",
@@ -357,7 +357,7 @@ local function register()
 
         ENT.Male = v.Male
         ENT.FeMale = v.FeMale
-        
+
         if v.WarmSave then
             ENT.WarmSave = v.WarmSave
         end
@@ -365,7 +365,6 @@ local function register()
         scripted_ents.Register(ENT, "ent_zcity_colthes_" .. k)
     end
 end
-if CLIENT and !steamworks.ShouldMountAddon("3670069780") then return end -- anyway client not abile to see it when no
 hook.Add("Think","remove-me-clothes",function()
     register()
     hook.Remove("Think","remove-me-clothes")
