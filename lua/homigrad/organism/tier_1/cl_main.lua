@@ -143,7 +143,7 @@ end)
 -- original full-screen effects and memory replays are post-processing passes,
 -- so drawing this there let either one cover the text.
 hook.Add("HUDPaint", "RemIncapacitationStatus", function()
-	local ply = lply
+	local ply = LocalPlayer()
 	local org = IsValid(ply) and ply.organism
 	local deathStateEnd = org and org.deathStateEnd
 	local deathStateStart = org and org.deathStateStart
@@ -164,7 +164,8 @@ hook.Add("HUDPaint", "RemIncapacitationStatus", function()
 	PlayRemDeathStateSound(dyingSoundPath, dyingSoundPath ~= remDeathStateMindwipePath)
 
 	local text = scavDyingMode == 1 and "You are incapacitated" or "You are incapacitated, You will die in " .. seconds
-	draw.SimpleText(text, "RemDeathStateFont", ScrW() / 2, ScrH() / 2 + 330, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	local textY = math.min(ScrH() / 2 + ScreenScaleH(105), ScrH() - ScreenScaleH(28))
+	draw.SimpleText(text, "RemDeathStateFont", ScrW() / 2, textY, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local k1, k2, k3
@@ -1421,7 +1422,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if not mat then return end
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
-						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
+						local pos, ang = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local dir = wound[6]
 						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)

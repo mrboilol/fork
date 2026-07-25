@@ -54,6 +54,7 @@ if not hg.ammoents then
 end
 
 hg.ammoents["12.7x43"] = {
+    Icon = "vgui/hud/bullets/high_caliber.png",
     Material = "models/hmcd_ammobox_792",
     Scale = 1.0,
     Color = Color(218, 165, 32),
@@ -83,6 +84,8 @@ local function registerfury()
     ammoent.ModelMaterial = hg.ammoents["12.7x43"].Material or ""
     ammoent.ModelScale = hg.ammoents["12.7x43"].Scale or 1.2
     ammoent.Color = hg.ammoents["12.7x43"].Color or Color(218, 165, 32)
+    ammoent.IconOverride = hg.GetAmmoIconPath("12.7x43 Beowulf")
+    ammoent.IconTexture = ammoent.IconOverride
     
     scripted_ents.Register(ammoent, "ent_ammo_.277fury")
     

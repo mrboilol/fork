@@ -87,23 +87,7 @@ local function RegisterBulletHook()
             local h, T_local, P, p_sat, p_v, rho = 0, 15, 101325, 1705, 682, 1.225
 
             if config.AtmosphereEnabled then
-                local baseZ = atmosphere.SeaLevel or 0
-                h = (bullet.Pos.z - baseZ) * 0.01905
-                h = math.Clamp(h, -3000, 44000)
-
-                local T_base = atmosphere.TBase or 15
-                local P0 = atmosphere.P0 or 101325
-                local RH = atmosphere.RH or 0.4
-
-                T_local = T_base - 0.0065 * h
-                P = P0 * ((1 - 2.25577e-5 * h) ^ 5.25588)
-                local T_denom = T_local + 237.3
-                if T_denom == 0 then T_denom = 0.0001 end
-                p_sat = 610.78 * math.exp((17.27 * T_local) / T_denom)
-                p_v = RH * p_sat
-                local T_kelvin = T_local + 273.15
-                if T_kelvin <= 0 then T_kelvin = 0.0001 end
-                rho = (P - 0.378 * p_v) / (287.058 * T_kelvin)
+                h, T_local, P, p_sat, p_v, rho = ZW.GetAtmosphereAtZ(bullet.Pos.z)
                 eta = math.Clamp(rho / 1.225, 0.1, 2.0)
             end
 

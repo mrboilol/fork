@@ -503,6 +503,12 @@ local tooltipHoverTime = {}
 local lastHoveredStatus = nil
 local lastStatusEffectLevels = {}
 local wasAdmiring = false
+local statusEffectsWereOtrub = false
+local statusEffectsOtrubStart
+local MOODLE_VISIBLE_TIME = 20
+local MOODLE_FADE_TIME = 5
+local OTRUB_MOODLE_VISIBLE_TIME = 0.5
+local OTRUB_MOODLE_FADE_TIME = 2.5
 
 local smooth = {
 	blood = 5000,
@@ -1262,6 +1268,8 @@ local function draw_status_effects()
 	local ply = LocalPlayer()
 	if not IsValid(ply) or not (ply.new_organism or ply.organism) then 
 		statusEffectPositions = {}
+		statusEffectsWereOtrub = false
+		statusEffectsOtrubStart = nil
 		return 
 	end
 	
@@ -2023,6 +2031,19 @@ local function draw_status_effects()
 	end
 	
 	local isAdmiring = LocalPlayer():GetNWBool("mcd_admiring", false)
+	local isOtrub = org.otrub == true
+
+	if isOtrub and not statusEffectsWereOtrub then
+		statusEffectsOtrubStart = currentTime
+	elseif not isOtrub and statusEffectsWereOtrub then
+		statusEffectsOtrubStart = nil
+		-- Waking is a fresh HUD presentation: show every still-active moodle,
+		-- then let each one use the normal visibility/fade counter again.
+		for _, effect in ipairs(effects) do
+			statusEffectAppearance[effect.name] = currentTime
+		end
+	end
+	statusEffectsWereOtrub = isOtrub
 	
 	-- Reset moodle fade timer when player starts admiring afflictions
 	if isAdmiring and not wasAdmiring then
@@ -2034,8 +2055,13 @@ local function draw_status_effects()
 	
 	local effectsToDraw = {}
 	for _, effect in ipairs(effects) do
-	    local timeActive = currentTime - (statusEffectAppearance[effect.name] or 0)
-	    if isAdmiring or timeActive < 25 or not GetConVar("developer"):GetBool() then
+	    local timeActive = isOtrub
+			and (currentTime - (statusEffectsOtrubStart or currentTime))
+			or (currentTime - (statusEffectAppearance[effect.name] or currentTime))
+		local totalVisibleTime = isOtrub
+			and (OTRUB_MOODLE_VISIBLE_TIME + OTRUB_MOODLE_FADE_TIME)
+			or (MOODLE_VISIBLE_TIME + MOODLE_FADE_TIME)
+	    if (isAdmiring and not isOtrub) or timeActive < totalVisibleTime then
 	        table.insert(effectsToDraw, effect)
 	    end
 	end
@@ -2185,12 +2211,17 @@ local function draw_status_effects()
 		local moveAwayOffset = 0
 		local appearanceTime = statusEffectAppearance[effect.name]
 		if appearanceTime then
-			local timeActive = currentTime - appearanceTime
+			local timeActive = isOtrub
+				and (currentTime - (statusEffectsOtrubStart or currentTime))
+				or (currentTime - appearanceTime)
+			local visibleTime = isOtrub and OTRUB_MOODLE_VISIBLE_TIME or MOODLE_VISIBLE_TIME
+			local fadeTime = isOtrub and OTRUB_MOODLE_FADE_TIME or MOODLE_FADE_TIME
 			if timeActive < 1.5 then
 				local easeOut = (1 - timeActive) ^ 3
 				shakeOffset = math_sin(timeActive * 18) * easeOut * 30
-			elseif timeActive > 20 then
-				local fadeProgress = (timeActive - 20) / 5
+			end
+			if timeActive > visibleTime then
+				local fadeProgress = (timeActive - visibleTime) / fadeTime
 				fadeProgress = math_min(fadeProgress, 1)
 				fadeAlpha = 255 * (1 - fadeProgress)
 				moveAwayOffset = fadeProgress * 50

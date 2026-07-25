@@ -495,8 +495,15 @@ hook.Add("PostEntityFireBullets","bulletsuppression",function(ent,bullet)
 		end
 
 		if !org.otrub then
-			--print(1 * dmg / math.max(dist / 2,10) / 1)
-			ply:AddNaturalAdrenaline(0.05 * dmg / math.max(dist / 2,10) / 1)
+			-- A single near miss is only a small shock, while close or sustained
+			-- suppression can build into a noticeable adrenaline/disorientation response.
+			local suppressionResponse = math.Clamp(0.25 * dmg / math.max(dist / 2, 10), 0.08, 0.4)
+			ply:AddNaturalAdrenaline(suppressionResponse)
+
+			local disorientation = org.disorientation or 0
+			if disorientation < 2.5 then
+				org.disorientation = math.min(disorientation + math.Clamp(suppressionResponse * 0.8, 0.08, 0.35), 2.5)
+			end
 			org.fearadd = org.fearadd + 0.4
 			
 		end
@@ -1874,6 +1881,11 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 	local warming = org.stamina.sub > 0 and 0.5 or 0
 	local fireExposure = 0
 	local ownerpos = owner:GetPos()
+	if IsVisibleSkyBox and ZCityWind and ZCityWind.Config and ZCityWind.Config.AtmosphereEnabled and ZCityWind.GetAtmosphereAtZ then
+		local altitude = ZCityWind.GetAtmosphereAtZ(ownerpos.z)
+		temp = temp - 0.0065 * altitude
+		org.altitudeMeters = altitude
+	end
 	local fireExposureDistSqr = 320 * 320
 	for i, ent in ipairs(ents.FindInSphere(ownerpos, 300)) do
 		local warmingent = warmingEnts[ent:GetClass()]

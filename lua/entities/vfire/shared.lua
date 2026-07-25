@@ -728,8 +728,12 @@ if SERVER then
 			if self:IsPrioritized() then
 				self:ChangeLife(self.life + f)
 			else
-				local decayMul = 1 - vFireDecayRate
-				self:ChangeLife(self.life * decayMul + f - vFireLifeThrottle)
+				-- Dry, temperate weather should let a fueled fire persist. Rain and
+				-- extreme cold apply their stronger extinguishing in StormFox's vFire
+				-- handshake instead of making every fire rapidly decay all the time.
+				local ambientDecayScale = 0.2
+				local decayMul = 1 - vFireDecayRate * ambientDecayScale
+				self:ChangeLife(self.life * decayMul + f - vFireLifeThrottle * ambientDecayScale)
 				-- If a fire isn't prioritized, we don't give it a second chance in fueling up
 				if self.life <= 0 then self:Remove() return end
 			end
@@ -1003,7 +1007,19 @@ if SERVER then
 					if !self.spreadAng then self.spreadAng = math.Rand(0, 360) end
 					
 					ang:RotateAroundAxis(forward, self.spreadAng)
-					local offset = ang:Right() * mul + forward * 2
+					local spreadDir = ang:Right()
+					local windVec = self:GetWindVector()
+					local windStrength = math.Clamp(windVec:Length(), 0, 1)
+					if windStrength > 0.05 then
+						-- Project the wind onto the burning surface so ground spread moves
+						-- downwind without trying to trace away from that surface.
+						local windAlongSurface = windVec - forward * windVec:Dot(forward)
+						if windAlongSurface:LengthSqr() > 0.0001 then
+							windAlongSurface:Normalize()
+							spreadDir = (spreadDir * (1 - windStrength * 0.8) + windAlongSurface * (windStrength * 1.35)):GetNormalized()
+						end
+					end
+					local offset = spreadDir * mul + forward * 2
 
 					local pos = self:GetPos() + offset
 					local tr = util.QuickTrace(pos, dir)

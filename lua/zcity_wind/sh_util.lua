@@ -1,6 +1,30 @@
 local ZW = ZCityWind
 local sqrt = math.sqrt
 
+-- Keep every atmospheric consumer on the same altitude model. Source positions
+-- are converted to metres and measured from the calibrated map sea level.
+function ZW.GetAtmosphereAtZ(worldZ)
+    local atmosphere = ZW.Atmosphere or {}
+    local config = ZW.Config or {}
+    local baseZ = atmosphere.SeaLevel or config.MapSeaLevelZ or 0
+    local altitude = math.Clamp(((tonumber(worldZ) or baseZ) - baseZ) * 0.01905, -3000, 44000)
+    local baseTemperature = atmosphere.TBase or 15
+    local basePressure = math.max(atmosphere.P0 or 101325, 1)
+    local humidity = atmosphere.RH or 0.4
+    local temperature = baseTemperature - 0.0065 * altitude
+    local pressure = basePressure * ((1 - 2.25577e-5 * altitude) ^ 5.25588)
+    local temperatureDenominator = temperature + 237.3
+
+    if temperatureDenominator == 0 then temperatureDenominator = 0.0001 end
+
+    local saturatedPressure = 610.78 * math.exp((17.27 * temperature) / temperatureDenominator)
+    local vaporPressure = humidity * saturatedPressure
+    local temperatureKelvin = math.max(temperature + 273.15, 0.0001)
+    local density = (pressure - 0.378 * vaporPressure) / (287.058 * temperatureKelvin)
+
+    return altitude, temperature, pressure, saturatedPressure, vaporPressure, density, pressure / basePressure
+end
+
 function ZW.NormalizePhysBulletInput(bullet)
     if not istable(bullet) then return bullet end
 

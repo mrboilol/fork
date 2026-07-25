@@ -158,8 +158,6 @@ WS.BackpackEarlyWeapon = WS.BackpackEarlyWeapon or nil
 WS.BackpackEarlySelected = WS.BackpackEarlySelected or false
 WS.BackpackPreviousWeapon = WS.BackpackPreviousWeapon or nil
 WS.ConfirmProgress = WS.ConfirmProgress or 0
-WS.ClickConfirmWeapon = WS.ClickConfirmWeapon or nil
-WS.BodySlotHitboxes = WS.BodySlotHitboxes or {}
 
 WS.BodyPlaces = {
     pistol = {
@@ -751,7 +749,6 @@ function WS.DrawBodySlotSelector(ply)
     local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
     if not IsValid(ent) then return end
 
-    WS.BodySlotHitboxes = {}
     local weapons = WS.GetWeaponTable(ply)
     local slotWeapons = weapons and weapons[WS.SelectedSlot]
     if not slotWeapons or not slotWeapons[0] then return end
@@ -786,7 +783,7 @@ function WS.DrawBodySlotSelector(ply)
         local durationK = maxDuration > minDuration and math.Clamp((item.duration - minDuration) / (maxDuration - minDuration), 0, 1) or 0
         local isSelected = item.wep == selected
         local place = ZCityGetBodySlotForWeapon(item.wep)
-        local cardX, cardY, cardSize = ZCityDrawBodySquare(place, {
+        ZCityDrawBodySquare(place, {
             name = WS.GetPrintName(item.wep),
             selected = isSelected,
             wep = item.wep,
@@ -803,14 +800,6 @@ function WS.DrawBodySlotSelector(ply)
             progress = isSelected
         })
 
-        if cardX and cardY and cardSize then
-            WS.BodySlotHitboxes[#WS.BodySlotHitboxes + 1] = {
-                x = cardX,
-                y = cardY,
-                size = cardSize,
-                wep = item.wep
-            }
-        end
     end
 end
 
@@ -839,7 +828,6 @@ local function ZCityResetSlotHold(fadeOut, finished)
     WS.HoldWeapon = nil
     WS.HoldSlotBind = nil
     WS.HoldSlotKeyCode = nil
-    WS.ClickConfirmWeapon = nil
     WS.BackpackEarlySelect = false
     WS.BackpackEarlyWeapon = nil
     WS.BackpackEarlySelected = false
@@ -875,23 +863,6 @@ local function ZCityBeginHeldSelection(ply, selectedWep, bind, code)
 
     if WS.BackpackEarlySelect then
         ZCityStartBackpackDraw(ply, selectedWep, ZCityGetSlotHoldDuration(ply, selectedWep))
-    end
-end
-
-local function ZCityBeginClickSelection(ply, selectedWep)
-    ZCityBeginHeldSelection(ply, selectedWep)
-    WS.ClickConfirmWeapon = selectedWep
-end
-
-local function ZCityGetClickedBodySlotWeapon()
-    local mouseX, mouseY = gui.MousePos()
-    if mouseX <= 0 or mouseY <= 0 then return end
-
-    for _, hitbox in ipairs(WS.BodySlotHitboxes or {}) do
-        if mouseX >= hitbox.x and mouseX <= hitbox.x + hitbox.size
-            and mouseY >= hitbox.y and mouseY <= hitbox.y + hitbox.size then
-            return hitbox.wep
-        end
     end
 end
 
@@ -1015,23 +986,6 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
     if not IsValid( ply ) or not ply:Alive() then return end
     if ply.organism and ply.organism.otrub then return end
 
-    if key:find("+attack", 1, true) and WS.Show > CurTime() then
-        local clickedWep = ZCityGetClickedBodySlotWeapon()
-        if IsValid(clickedWep) then
-            local weapons = WS.GetWeaponTable(ply)
-            for slot = 0, 5 do
-                for position = 0, #(weapons[slot] or {}) do
-                    if weapons[slot][position] == clickedWep then
-                        WS.SelectedSlot = slot
-                        WS.SelectedSlotPos = position
-                        ZCityBeginClickSelection(ply, clickedWep)
-                        return true
-                    end
-                end
-            end
-        end
-    end
-
     if iPos then
         local requestedSlot = iPos - 1
         local activeWep = ply:GetActiveWeapon()
@@ -1126,7 +1080,7 @@ function WS.SetActuallyWeapon( ply, cmd )
 
     local selectedWep = WS.GetSelectedWeapon()
     local holdingConfirm = WS.Show > CurTime() and IsValid(WS.HoldWeapon) and IsValid(selectedWep) and selectedWep == WS.HoldWeapon
-        and (ZCityIsHeldSlotKeyDown() or WS.ClickConfirmWeapon == selectedWep)
+        and ZCityIsHeldSlotKeyDown()
 
     if not holdingConfirm then
         ZCityResetSlotHold(true)
@@ -1172,15 +1126,6 @@ hook.Add( "PlayerBindPress", "WeaponSelector_PlayerBindPress", WS.ChangeSelectio
 hook.Add( "HUDPaint", "WeaponSelector_Draw", function()
     WS.WeaponSelectorDraw( LocalPlayer() )
     WS.DrawBodySlotSelector( LocalPlayer() )
-
-    local wantsScreenClicker = ZCityGetInventorySystem() == 0 and WS.Show > CurTime() and #WS.BodySlotHitboxes > 0
-    if wantsScreenClicker and not WS.BodySlotScreenClicker then
-        gui.EnableScreenClicker(true)
-        WS.BodySlotScreenClicker = true
-    elseif not wantsScreenClicker and WS.BodySlotScreenClicker then
-        gui.EnableScreenClicker(false)
-        WS.BodySlotScreenClicker = false
-    end
 end)
 
 hook.Add( "StartCommand", "WeaponSelector_StartCommand", WS.SetActuallyWeapon )

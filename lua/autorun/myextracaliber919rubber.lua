@@ -55,7 +55,7 @@ if not hg.ammoents then
 end
 
 hg.ammoents["9x19rubber"] = {
-    Icon = "vgui/hud/bullets/low_caliber.png",
+	Icon = "vgui/hud/hmcd_round_beanshot9.vmt",
     Material = "models/hmcd_ammobox_9",
     Scale = 0.9,
 }
@@ -83,6 +83,8 @@ local function register9rmm()
     ammoent.ModelMaterial = hg.ammoents["9x19rubber"].Material or ""
     ammoent.ModelScale = hg.ammoents["9x19rubber"].Scale or 1.2
     ammoent.Color = hg.ammoents["9x19rubber"].Color or Color(218, 165, 32)
+    ammoent.IconOverride = hg.GetAmmoIconPath("9x19 Rubber")
+    ammoent.IconTexture = ammoent.IconOverride
     
     scripted_ents.Register(ammoent, "ent_ammo_9x19rubber")
     

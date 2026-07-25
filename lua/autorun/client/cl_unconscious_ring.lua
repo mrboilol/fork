@@ -144,6 +144,8 @@ local CRITBEAT_VOLUME_SCALE = 0.6
 
 local lastPhaseMod = 0
 local wasUnconsciousState = false
+local unconsciousStartTime
+local UNCONSCIOUS_RING_DELAY = 5
 local flatlinePlayedThisLife = false
 local wasHeartbeatZero = false
 local soundGen = 0
@@ -703,6 +705,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local ply = LocalPlayer()
     if not IsValid(ply) or not ply:Alive() then
         ringAlpha = 0
+        unconsciousStartTime = nil
         peakShock = 40
         lastPhaseMod = 0
         lastConsciousness = 1
@@ -715,6 +718,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local org = ply.organism
     if not org then 
         ringAlpha = 0
+        unconsciousStartTime = nil
         peakShock = 40
         lastPhaseMod = 0
         ResetRingAudio()
@@ -722,6 +726,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     
 	local isUnconscious = org.otrub
+	if isUnconscious and not wasUnconsciousState then
+		unconsciousStartTime = CurTime()
+		ringAlpha = 0
+	elseif not isUnconscious and wasUnconsciousState then
+		unconsciousStartTime = nil
+	end
+
 	local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
 	local deathStateEnd = org.deathStateEnd and org.deathStateEnd > 0 and org.deathStateEnd or nil
 	local deathStateStart = org.deathStateStart and org.deathStateStart > 0 and org.deathStateStart or nil
@@ -809,13 +820,16 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local ecgStateChanged = UpdateECGStateAlert(ecgState)
     local showAwakeECG = not isUnconscious and not lowConsciousness and ecgStateChanged
     
-	if isUnconscious and not hideDyingRing then
+	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
+	if isUnconscious and not hideDyingRing and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
         local currentShock = org.shock or 0
         if currentShock > peakShock then
             peakShock = currentShock
         end
-        ringAlpha = SmoothAlpha(ringAlpha, 1, 3)
+        ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)
         dotBeat = math.floor(CurTime()) % 3
+	elseif isUnconscious then
+		ringAlpha = SmoothAlpha(ringAlpha, 0, 8)
     elseif lowConsciousness then
         ringAlpha = SmoothAlpha(ringAlpha, 0.4, 3)
         dotBeat = math.floor(CurTime()) % 3

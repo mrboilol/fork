@@ -78,14 +78,7 @@ if CLIENT then
 
 	local function getAmmoIcon(i)
 		local ammoName = game.GetAmmoName(tonumber(i) or i) or tostring(i)
-		local ammoKey = string.lower(string.gsub(ammoName, "%s+", ""))
-		local ammoData = hg.ammoents and hg.ammoents[ammoKey]
-		local icon = ammoData and ammoData.Icon
-		if not icon then
-			local entData = scripted_ents.Get("ent_ammo_" .. ammoKey)
-			icon = entData and entData.IconOverride
-		end
-		icon = icon or "vgui/hud/bullets/high_caliber.png"
+		local icon = hg.GetAmmoIconPath and hg.GetAmmoIconPath(ammoName) or "vgui/hud/bullets/low_caliber.png"
 		ammoIcons[icon] = ammoIcons[icon] or Material(icon)
 		return ammoIcons[icon]
 	end

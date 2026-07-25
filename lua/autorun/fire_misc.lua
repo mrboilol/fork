@@ -475,17 +475,17 @@ if SERVER then
 	We don't use material types here to give fueling mechanics more variation
 	---------------------------------------------------------------------------]]
 	local matsFuelAmount = {
-		wood_crate = 40,
-		wood = 40,
+		wood_crate = 120,
+		wood = 120,
 		plastic_barrel = 15,
 		plastic = 10,
-		wood_furniture = 40,
+		wood_furniture = 120,
 		rubbertire = 20,
 		cardboard = 8,
 		paper = 6,
 		rubber = 18,
 		alienflesh = 7,
-		wood_solid = 40,
+		wood_solid = 120,
 		tile = 1
 	}
 
@@ -493,17 +493,17 @@ if SERVER then
 	How quickly does each material give fuel?
 	---------------------------------------------------------------------------]]
 	local matsFuelRate = {
-		wood_crate = 0.5,
-		wood = 0.5,
+		wood_crate = 1.5,
+		wood = 1.5,
 		plastic_barrel = 1.8,
 		plastic = 1.8,
-		wood_furniture = 0.5,
+		wood_furniture = 1.5,
 		rubbertire = 1.5,
 		cardboard = 9,
 		paper = 13,
 		rubber = 0.6,
 		alienflesh = 0.7,
-		wood_solid = 0.5,
+		wood_solid = 1.5,
 		tile = 0.2
 	}
 	
@@ -669,10 +669,12 @@ if SERVER then
 				local volume = phys:GetVolume()
 				if !isnumber(volume) then volume = 0 end
 
-				local matGive = matsFuelAmount[mat] or 0
+				-- Some wooden props use a custom physics-material string while still
+				-- reporting MAT_WOOD. Treat both routes as proper fuel sources.
+				local matGive = matsFuelAmount[mat] or (ent:GetMaterialType() == MAT_WOOD and 120 or 0)
 				local give = matGive * volume^0.5 / 5
 
-				local fuelRate = vFireMatToFuelRate(mat)
+				local fuelRate = ent:GetMaterialType() == MAT_WOOD and math.max(vFireMatToFuelRate(mat), 1.5) or vFireMatToFuelRate(mat)
 
 				if give then
 					ent.vFireFuelAmount = give

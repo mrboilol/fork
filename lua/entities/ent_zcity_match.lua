@@ -20,14 +20,6 @@ function ENT:SetupDataTables()
 	end
 end
 
-local ignitable = { -- Very sorry for this silly table, but i don't want allow to ignite all wooden entity
-    ["models/gibs/wood_gib01b.mdl"] = true,
-    ["models/gibs/wood_gib01a.mdl"] = true,
-    ["models/gibs/wood_gib01c.mdl"] = true,
-    ["models/gibs/wood_gib01d.mdl"] = true,
-    ["models/gibs/wood_gib01e.mdl"] = true
-}
-
 function ENT:Initialize()
     self:SetModel(self.Model)
 
@@ -49,27 +41,14 @@ function ENT:Initialize()
             if ent1:GetFireLeft() <= 0 then return end
             local pos = ent1:GetPos()
             local ent = data.HitEntity
-            --print(IsValid(ent), ignitable[ent:GetModel()], ent:GetModel())
-            if IsValid(ent) and ignitable[ent:GetModel()] then
-                ent:Ignite()
+            if IsValid(ent) and hg.TrySmallFlameIgnite then
+                hg.TrySmallFlameIgnite(ent, data.HitPos, data.HitNormal, ent1.debil, "match", ent1)
             end
 
             for _,v in ipairs(hg.gasolinePath) do
                 if v[1]:Distance(pos) > 30 or v[2] ~= false then continue end
                 v[2] = CurTime()
-                v[3] = owner
-            end
-            if IsValid(data.HitEntity) and hg.drums[data.HitEntity:EntIndex()] then
-                local drum = hg.drums[data.HitEntity:EntIndex()]
-                local drumEnt = data.HitEntity
-                local tbl = hg.expItems[drumEnt:GetModel()]
-                for i, point in ipairs(drum.high_point) do
-                    local pos2 = LocalToWorld(point[1], angle_zero, drumEnt:GetPos(), drumEnt:GetAngles())
-                    if pos:DistToSqr(pos2) < 5 * 5 then
-                        drumEnt.owner = ent1.debil
-                        hg.PropExplosion( drumEnt, tbl.ExpType, (drumEnt.Volume or tbl.Force) * 2, drumEnt:GetPhysicsObject():GetMass() )
-                    end
-                end
+                v[3] = ent1.debil
             end
         end)
     end

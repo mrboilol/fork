@@ -171,22 +171,8 @@ if CLIENT then
 		if not ammoName or ammoName == "" then return nil end
 		if weaponMenuAmmoIconCache[ammoName] ~= nil then return weaponMenuAmmoIconCache[ammoName] end
 
-		local ammoInfo = hg.ammotypeshuy and hg.ammotypeshuy[ammoName]
-		local ammoID = ammoInfo and ammoInfo.name
-		if not ammoID then
-			weaponMenuAmmoIconCache[ammoName] = false
-			return nil
-		end
-
-		local entClass = "ent_ammo_" .. ammoID
-		local stored = scripted_ents.GetStored(entClass)
-		local iconPath = stored and stored.t and stored.t.IconOverride or hg.ammoents and hg.ammoents[ammoID] and hg.ammoents[ammoID].Icon
-		if not iconPath or iconPath == "" then
-			weaponMenuAmmoIconCache[ammoName] = false
-			return nil
-		end
-
-		local mat = Material(iconPath, "smooth mips")
+		local mat = hg.GetAmmoIconMaterial and hg.GetAmmoIconMaterial(ammoName)
+		if not mat then return nil end
 		weaponMenuAmmoIconCache[ammoName] = mat
 
 		return mat

@@ -83,6 +83,8 @@ local function register556rmm()
     ammoent.ModelMaterial = hg.ammoents["5.56rubber"].Material or ""
     ammoent.ModelScale = hg.ammoents["5.56rubber"].Scale or 1.2
     ammoent.Color = hg.ammoents["5.56rubber"].Color or Color(218, 165, 32)
+    ammoent.IconOverride = hg.GetAmmoIconPath("5.56x45 Rubber")
+    ammoent.IconTexture = ammoent.IconOverride
     
     scripted_ents.Register(ammoent, "ent_ammo_5.56rubber")
     

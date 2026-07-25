@@ -12,9 +12,7 @@ SWEP.SpreadMul = 2
 SWEP.CrouchMul = 0.75
 SWEP.Spray = {}
 for i = 1, 150 do
-	-- Spread is visible aim movement around the current camera direction.  It is
-	-- deliberately centred instead of being a second recoil/climb pattern.
-	SWEP.Spray[i] = Angle(math.sin(i * 1.618) * 0.025, math.cos(i * i) * 0.018, 0)
+	SWEP.Spray[i] = Angle(-0.02 - math.cos(i) * 0.01, math.cos(i * i) * 0.01, 0)
 end
 
 SWEP.SprayRand = {Angle(0, 0, 0), Angle(0, 0, 0)}
@@ -38,26 +36,22 @@ local function sanitize_angle(ang)
 end
 
 local hg_recoilmul = CreateConVar("hg_recoilmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply weapon physical recoil")
-local hg_spreadmul = ConVarExists("hg_spreadmul") and GetConVar("hg_spreadmul") or CreateConVar("hg_spreadmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply visible camera aim spread")
-function SWEP:GetPhysicalRecoilMul()
-	return math.Clamp(hg_recoilmul:GetFloat(), 0.1, 3)
-end
-
+local hg_spreadmul = ConVarExists("hg_spreadmul") and GetConVar("hg_spreadmul") or CreateConVar("hg_spreadmul", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Multiply visible post-shot camera spray")
 function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
 	local supportMul = self:GetRecoilSupportMul()
 	local mul = math.Clamp(caliberMul * weightMul * 0.68, 0.18, 2.7) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
-	self:ApplyForce(mul * self:GetPhysicalRecoilMul())
-	-- Camera spread is handling/accuracy only. Physical recoil multipliers belong
-	-- to the muzzle transform and must not secretly punch the view as well.
-	mul = (mul or 0) * (self.Supressor and 0.75 or 1) * self:GetFearSpreadMul() * self:GetCognitiveHandlingMul()
+	self:ApplyForce(mul)
+	mul = ((mul or 0) * (self.Supressor and 0.75 or 1) * self:GetCharacterRecoilMul()) * math.Clamp(hg_recoilmul:GetFloat(), 0.1, 3) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
 	return mul
 end
 
 SWEP.sprayAngles = Angle(0,0,0)
 
 SWEP.weaponSway = Angle(0,0,0)
+
+local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera") or CreateConVar("hg_coolcamera", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Cool camera movement", 0, 1)
 
 local function IsSlugcatRecoilImmune(ply, wep)
 	local className = IsValid(ply) and string.lower(ply.PlayerClassName or "") or ""
@@ -126,6 +120,7 @@ function SWEP:PrimarySpread()
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
 		local organism = owner.organism or {}
+		local caliberMul, weightMul, ammoForce, numBullet = self:GetRecoilImpulseFactors()
 
 		local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 		local oneHandRecoilMul = 1
@@ -134,6 +129,9 @@ function SWEP:PrimarySpread()
 		if support.rightBusy then oneHandRecoilMul = oneHandRecoilMul * 1.55 end
 		if support.wantsTwoHands and support.supportHands <= 1 then oneHandRecoilMul = oneHandRecoilMul * (support.offhandImpaired and 1.08 or 1.25) end
 		oneHandRecoilMul = math.Clamp(oneHandRecoilMul, 1, 1.6)
+
+		local recoilProgress = 0.55 + math.Clamp((sprayI - 1) / 10, 0, 1) * 0.45
+		local force = math.Clamp(math.Clamp(caliberMul * weightMul * 0.38, 0.1, 2.45) * oneHandRecoilMul * self.addSprayMul * recoilProgress, 0.1, 4)
 
 		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
 		local dominance = organism.hand_dominance or "right"
@@ -222,19 +220,15 @@ function SWEP:PrimarySpread()
 		local injuryRecoilMul = math.Clamp(broken_arm_recoil_mult * oneHandRecoilMul * armHandlingMul, 1, 1.65)
 		mul = mul * injuryRecoilMul
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
+		mul = mul * self.RecoilMul
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
 		mul = math.Clamp(mul, 0.08, 3.5)
 
-		-- This is the visible spread input. Recoil itself is handled by the weapon
-		-- model/muzzle transform, so do not add a hidden or camera-only recoil kick.
-		local seed = math.floor(sprayI)
-		local angRand = Angle(
-			util.SharedRandom("hg_camera_spread_pitch", -0.06, 0.06, seed + 311),
-			util.SharedRandom("hg_camera_spread_yaw", -0.045, 0.045, seed + 977),
-			0
-		)
+		-- Old spray is post-shot camera motion, never a random bullet cone. The
+		-- round already left along the predicted muzzle trace before this moves aim.
+		local angRand = Angle(-math.Rand(0.035, 0.06), math.Rand(-0.016, 0.016), 0)
 		local spray
 
 		if sprayI < 3 then
@@ -247,29 +241,91 @@ function SWEP:PrimarySpread()
 		angranda[3] = 0
 		spray = (spray + angranda * self.addSprayMul * mul * (self.randmul or 1)) * hg_spreadmul:GetFloat()
 
+		local angrand2 = AngleRand(-force, force)
+		if not self.SprayRandOnly then
+			local gangstaHold = owner.posture == 7
+			if gangstaHold then
+				local rightKick = math.Clamp(force * 0.85, 0.3, 2.8)
+				angrand2[1] = -math.Clamp(math.abs(angrand2[1]) * 0.14, 0.03, 0.45)
+				angrand2[2] = rightKick
+				angrand2[3] = 0
+			else
+				local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.62, 10)
+				local yawLimit = math.min(0.28, pitchMag * 0.26 + 0.04)
+				angrand2[1] = -pitchMag
+				angrand2[2] = math.Clamp(angrand2[2] * 0.45, -yawLimit, yawLimit)
+				angrand2[3] = -angrand2[2] * 0.35
+			end
+			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
+			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
+
+			local huyang = angrand2 * mul / 2 * mulhuy
+			huyang[3] = 0
+			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 2 or 1) * 0.14)
+
+			local angpopa = angrand2 * mul
+			angpopa[3] = 0
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.25 or 0.55))
+			spray = spray + angRand * 2 * (self.randmul or 1)
+		end
+		local angrand3 = Angle(angrand2[1], math.Clamp(angrand2[2] * 0.65, -math.abs(angrand2[1]) * 0.18 - 0.08, math.abs(angrand2[1]) * 0.18 + 0.08), 0)
+
+		local prank3 = math.Rand(-ammoForce, ammoForce) / (ammoForce != 0 and ammoForce or 1) * 2
+		local angleprikol = Angle(0,0,prank3)
+
+		//ViewPunch2(angleprikol)
+
+		local mul = math.Clamp(mul * caliberMul * weightMul * 0.38 * (self:IsPistolHoldType() and 1.25 or 1) * (numBullet and math.sqrt(numBullet) or 1), 0.08, 2.5)
+		ViewPunch2(Angle(-math.Rand(1.25,2.2), math.Rand(-0.45,0.45), 0) * mul * 0.18)
+		ViewPunch(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul / -8)
+		timer.Simple(0.01, function() if IsValid(owner) then ViewPunch2(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul * 0.12) end end)
+		timer.Simple(0.02, function() if IsValid(owner) then ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul * 0.1) end end)
+
 		local eyeang = owner:EyeAngles()
 		if not finite_angle(eyeang) then return end
-		local spreadScale = math.Clamp(mul * self.addSprayMul * (self.randmul or 1), 0.45, 3.5)
-		local sprayAng = spray * spreadScale * (self:IsResting() and 0.15 or 1) * 6.5 * (eyeang.z == 180 and -1 or 1)
-		sprayAng[1] = math.Clamp(sprayAng[1], -2.5, 2.5)
-		sprayAng[2] = math.Clamp(sprayAng[2], -1.75, 1.75)
+		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 6.5 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
+		sprayAng[2] = math.Clamp(sprayAng[2], -math.abs(sprayAng[1]) * 0.22 - 0.12, math.abs(sprayAng[1]) * 0.22 + 0.12)
 		sprayAng[3] = 0
 
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		-- Apply spread to the real eye angles.  Because this is the actual aim state,
-		-- the next muzzle trace and bullet follow exactly what the player sees and
-		-- mouse compensation can counter it.
-		local newEyeAng = eyeang + sanitize_angle(sprayAng)
+		local longGunKickMul = not self:IsPistolHoldType() and 1.35 or 1
+		local gangstaHold = owner.posture == 7
+		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.7 * longGunKickMul, 0.7, 6.2)
+		local muzzleKick = sprayAng * self:GetCharacterRecoilMul() * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
+		if gangstaHold then
+			local rightKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.9, 0.35, 3.2)
+			muzzleKick[1] = math.Clamp(muzzleKick[1] * 0.15, -0.65, 0.12)
+			muzzleKick[2] = rightKick
+		else
+			muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
+			muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.7, -10.0, 1.2)
+			local muzzleYawCap = math.min(longGunKickMul > 1 and 0.12 or 0.18, math.abs(muzzleKick[1]) * 0.045 + 0.02)
+			muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.06, -muzzleYawCap, muzzleYawCap)
+		end
+		muzzleKick[3] = 0
+		muzzleKick = sanitize_angle(muzzleKick)
+		local newEyeAng = eyeang + muzzleKick
 		if finite_angle(newEyeAng) then
-			-- SetEyeAngles does not protect against spread pushing pitch past the
+			-- This happens after the shot, so the just-fired round keeps the exact
+			-- predicted trajectory while follow-up aim now needs compensation.
 			-- vertical pole. Crossing it flips the view and inverts mouse input.
 			newEyeAng[1] = math.Clamp(math.AngleDifference(newEyeAng[1], 0), -89, 89)
 			newEyeAng[3] = math.Clamp(math.AngleDifference(newEyeAng[3], 0), -45, 45)
 			owner:SetEyeAngles(newEyeAng)
 		end
-		
+
+		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
+		ViewPunch2(Angle(2 * rnd1, rnd2 * 1.1, 0) * mul * 0.12)
+		ViewPunch(Angle(-2 * rnd1, -rnd2 * 1.1, 0) * mul * 0.22)
+
+		local max_clip1 = self:GetMaxClip1()
+		if max_clip1 == 0 then max_clip1 = 1 end
+
+		local sprayvel = spray * mul * math.max(sprayI / max_clip1, 0.5) * self.addSprayMul * (self.cameraShakeMul or 1) * 5.6
+		self.sprayAngles[3] = math.Clamp((self.sprayAngles[3] or 0) + math.max(self.Primary.Damage / 100,1) * oneHandRecoilMul * self.addSprayMul * (self.cameraShakeMul or 1) * ((((self.NumBullet or 1) - 1) / 2) + 1) * (((self.podkid or 1) - 1) / 3 + 1) / 34, 0, 0.35)
+		self:ApplyEyeSprayVel(sprayvel * 0.9)
 	end
 end
 
@@ -332,7 +388,8 @@ function SWEP:Step_Spray(time,dtime)
 	if finite_angle(nextEyeAng) then
 		owner:SetEyeAngles(nextEyeAng)
 	end
-	local nextSpray = LerpAngle(hg.lerpFrameTime2(0.1,dtime), eyeSpray, angZero)
+	-- Let the old spray hang slightly longer so compensation is required between shots.
+	local nextSpray = LerpAngle(hg.lerpFrameTime2(0.06,dtime), eyeSpray, angZero)
 	eyeSpray:Set(sanitize_angle(nextSpray))
 end
 

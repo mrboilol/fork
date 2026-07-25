@@ -2978,6 +2978,7 @@ local ammoents = {
 		Scale = 1,
 	},
 	["metal_debris"] = {
+		Icon = "vgui/hud/bullets/high_caliber.png",
 		Material = "models/hmcd_ammobox_12",
 		Scale = 1.1,
 		Count = 12,
@@ -2990,7 +2991,7 @@ local ammoents = {
 		Count = 12,
 	},
 	["12/70beanbag"] = {
-		Icon = "vgui/hud/flech.png",
+		Icon = "vgui/hud/hmcd_round_beanbag.vmt",
 		Model = "models/ammo/beanbag12_ammo.mdl",
 		Scale = 1,
 		Count = 12,
@@ -3010,7 +3011,7 @@ local ammoents = {
 		Color = Color(22, 168, 221)
 	},
 	["12/70blank"] = {
-		Icon = "vgui/hud/slug.png",
+		Icon = "vgui/hud/12_70blankzcity.vmt",
 		Model = "models/ammo/beanbag12_ammo.mdl",
 		Scale = 1,
 		Count = 12,
@@ -3068,17 +3069,17 @@ local ammoents = {
 		Color = Color(154,154,154)
 	},
 	["9x18mm"] = {
-		Icon = "vgui/hud/bullet.png",
+		Icon = "vgui/hud/hmcd_round_918.vmt",
 		Model = "models/zcity/ammo/ammo_9x18_pmm.mdl",
 		Scale = 1
 	},
 	["9x18mmpbm"] = {
-		Icon = "vgui/hud/bullet.png",
+		Icon = "vgui/hud/hmcd_round_918.vmt",
 		Model = "models/zcity/ammo/ammo_9x18_pmm.mdl",
 		Scale = 1
 	},
 	["9x17mm"] = {
-		Icon = "vgui/hud/bullet.png",
+		Icon = "vgui/hud/hmcd_round_9.vmt",
 		Model = "models/zcity/ammo/ammo_9x18_pmm.mdl",
 		Scale = 1
 	},
@@ -3109,12 +3110,12 @@ local ammoents = {
 		Scale = 1
 	},
 	["9mmpakblank"] = {
-		Icon = "vgui/hud/45rub.png",
+		Icon = "vgui/hud/hmcd_round_9.vmt",
 		Model = "models/ammo/beanbag9_ammo.mdl",
 		Scale = 1
 	},
 	["9mmpakflashdefense"] = {
-		Icon = "vgui/hud/45rub.png",
+		Icon = "vgui/hud/hmcd_round_9.vmt",
 		Model = "models/ammo/beanbag9_ammo.mdl",
 		Scale = 1
 	},
@@ -3208,14 +3209,14 @@ local ammoents = {
 		Count = 20,
 	},
 	["14.5x114mmbztm"] = {
-		Icon = matPistolAmmo,
+		Icon = "vgui/hud/bztmzcity.vmt",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1,
 		Color = Color(246, 129, 5),
 		Count = 20,
 	},
 	["14.5x114mmb32"] = {
-		Icon = matPistolAmmo,
+		Icon = "vgui/hud/hmcd_round_145.vmt",
 		Material = "models/hmcd_ammobox_22",
 		Scale = 1,
 		Color = Color(55, 55, 2),
@@ -3248,44 +3249,44 @@ local ammoents = {
 		Scale = 1
 	},
 	["rpg-7projectile"] = {
-		Icon = matRfileAmmo,
+		Icon = "vgui/hud/bullets/high_caliber.png",
 		Model = "models/weapons/tfa_ins2/w_rpg7_projectile.mdl",
 		Count = 1
 	},
 	["nails"] = {
-		Icon = matRfileAmmo,
+		Icon = "vgui/hud/hmcd_nail.vmt",
 		Material = "models/fello/f_matchboxtex", -- "models/hmcd_nails"
 		Scale = 1,
 		Count = 3,
 	},
 	["armature"] = {
-		Icon = matRfileAmmo,
+		Icon = "vgui/hud/hmcd_crossbow_bolt.vmt",
 		Model = "models/Items/CrossbowRounds.mdl",
 		Count = 5
 	},
 	["arrow"] = {
-		Icon = matRfileAmmo,
+		Icon = "vgui/hud/hmcd_round_arrow.vmt",
 		Model = "models/z_city/nmrih/items/arrow/ammo_arrow_box.mdl",
 		Count = 5
 	},
 	["grenade_30x29mm"] = {
-		Icon = matRfileAmmo,
+		Icon = "vgui/hud/bullets/high_caliber.png",
 		Model = "models/Items/BoxMRounds.mdl",
 		Count = 15
 	},
 	["pulse"] = {
-		Icon = matRfileAmmo,
+		Icon = "vgui/hud/hmcd_energy_charge.vmt",
 		Model = "models/Items/combine_rifle_cartridge01.mdl",
 		Count = 30
 	},
 	["tasercartridge"] = {
-		Icon = matPistolAmmo,
+		Icon = "vgui/hud/hmcd_taser_cartridge.vmt",
 		Model = "models/ammo/taser_ammo.mdl",
 		Count = 1,
 		Material = "models/defcon/taser/taser",
 	},
 	["dihbattery"] = {
-		Icon = matPistolAmmo,
+		Icon = "vgui/hud/bullets/low_caliber.png",
 		Model = "models/Items/battery.mdl",
 		Scale = 0.75,
 		Count = 1,
@@ -3308,7 +3309,7 @@ local ammoents = {
 		Model = "models/zcity/ammo/ammo_1143x23_hydro.mdl"
 	},
 	["7.65x17mm"] = {
-		Icon = "vgui/hud/45fmj.png",
+		Icon = "vgui/hud/bullets/low_caliber.png",
 		Model = "models/zcity/ammo/ammo_1143x23_fmj.mdl"
 	},
 	[".40sw"] = {
@@ -3316,13 +3317,13 @@ local ammoents = {
 		Model = "models/zcity/ammo/ammo_1143x23_hydro.mdl"
 	},
 	["20mm"] = {
-		Icon = matPistolAmmo,
+		Icon = "vgui/hud/musketballzcity.vmt",
 		Material = "models/props_c17/paper01",
 		Scale = 0.8,
 		Count = 4,
 	},
 	["tranquilizerdarts"] = {
-		Icon = matPistolAmmo,
+		Icon = "vgui/hud/bullets/low_caliber.png",
 		Material = "models/hmcd_ammobox_9",
 		Scale = 0.8,
 	},
@@ -3330,132 +3331,98 @@ local ammoents = {
 
 hg.ammoents = ammoents
 
-local function normalizeAmmoIconName(value)
-	return string.lower(string.gsub(value or "", "[^%w]", ""))
+local defaultAmmoIconPaths = {
+	low = "vgui/hud/bullets/low_caliber.png",
+	high = "vgui/hud/bullets/high_caliber.png",
+	buck = "vgui/hud/bullets/buck_caliber.png"
+}
+
+local function normalizeAmmoLookupName(value)
+	return string.lower(string.gsub(tostring(value or ""), "[^%w]", ""))
 end
 
-local function levenshteinDistance(a, b)
-	a = a or ""
-	b = b or ""
+local function getAmmoKey(ammoName)
+	if isnumber(ammoName) then ammoName = game.GetAmmoName(ammoName) end
+	if not isstring(ammoName) then return end
+	if ammotypes[ammoName] then return ammoName end
 
-	local lenA = #a
-	local lenB = #b
-	if lenA == 0 then return lenB end
-	if lenB == 0 then return lenA end
-
-	local matrix = {}
-	for i = 0, lenA do
-		matrix[i] = {[0] = i}
-	end
-	for j = 0, lenB do
-		matrix[0][j] = j
-	end
-
-	for i = 1, lenA do
-		local charA = string.sub(a, i, i)
-		for j = 1, lenB do
-			local cost = (charA == string.sub(b, j, j)) and 0 or 1
-			local deletion = matrix[i - 1][j] + 1
-			local insertion = matrix[i][j - 1] + 1
-			local substitution = matrix[i - 1][j - 1] + cost
-			matrix[i][j] = math.min(deletion, insertion, substitution)
+	local normalized = normalizeAmmoLookupName(ammoName)
+	for key, ammoData in pairs(ammotypes) do
+		if normalizeAmmoLookupName(key) == normalized or normalizeAmmoLookupName(ammoData.name) == normalized then
+			return key
 		end
 	end
-
-	return matrix[lenA][lenB]
 end
 
-local function countSharedNumberTokens(a, b)
-	local tokenSet = {}
-	for token in string.gmatch(a or "", "%d+") do
-		tokenSet[token] = true
-	end
-
-	local matches = 0
-	for token in string.gmatch(b or "", "%d+") do
-		if tokenSet[token] then
-			matches = matches + 1
-		end
-	end
-
-	return matches
+local function getExistingAmmoIconPath(path)
+	if not isstring(path) or path == "" then return end
+	path = string.Replace(path, "\\", "/")
+	path = string.gsub(path, "^materials/", "")
+	if file.Exists("materials/" .. path, "GAME") then return path end
 end
 
-local ammoIconCache
-local generatedAmmoIconCache = {}
-local function getAmmoIconCache()
-	if ammoIconCache then return ammoIconCache end
+function hg.GetAmmoCaliberClass(ammoName)
+	local key = getAmmoKey(ammoName)
+	local ammoData = key and ammotypes[key]
+	local bulletSettings = ammoData and ammoData.BulletSettings or {}
+	local lowerName = string.lower((ammoData and ammoData.name) or tostring(ammoName or ""))
 
-	local files = file.Find("materials/vgui/ammoicons/*.png", "GAME") or {}
-	ammoIconCache = {
-		byExact = {},
-		list = {}
-	}
-
-	for _, fileName in ipairs(files) do
-		local iconName = string.StripExtension(fileName)
-		local lowerName = string.lower(iconName)
-		local iconPath = "vgui/ammoicons/" .. iconName .. ".png"
-		ammoIconCache.byExact[lowerName] = iconPath
-		ammoIconCache.list[#ammoIconCache.list + 1] = {
-			name = iconName,
-			path = iconPath,
-			normalized = normalizeAmmoIconName(iconName)
-		}
+	if (bulletSettings.NumBullet or 1) > 1
+		or string.find(lowerName, "gauge", 1, true)
+		or string.find(lowerName, "buck", 1, true)
+		or string.find(lowerName, "shot", 1, true)
+		or string.find(lowerName, "slug", 1, true)
+		or string.find(lowerName, "beanbag", 1, true)
+		or string.find(lowerName, "12/70", 1, true)
+		or string.find(lowerName, "20/70", 1, true)
+		or string.find(lowerName, "23x75", 1, true) then
+		return "buck"
 	end
 
-	return ammoIconCache
+	local diameter = tonumber(bulletSettings.Diameter) or 0
+	local damage = tonumber(bulletSettings.Damage) or 0
+	if damage >= 40 or diameter >= 12
+		or string.find(lowerName, "5.45", 1, true)
+		or string.find(lowerName, "5.56", 1, true)
+		or string.find(lowerName, "7.62", 1, true)
+		or string.find(lowerName, "12.7", 1, true)
+		or string.find(lowerName, "14.5", 1, true)
+		or string.find(lowerName, ".338", 1, true)
+		or string.find(lowerName, "rpg", 1, true)
+		or string.find(lowerName, "rocket", 1, true)
+		or string.find(lowerName, "grenade", 1, true) then
+		return "high"
+	end
+
+	return "low"
 end
 
-local function getTintedAmmoIcon(iconPath, ammoName, iconName, color)
-	if not CLIENT then return iconPath end
+function hg.GetAmmoIconPath(ammoName)
+	local key = getAmmoKey(ammoName)
+	local ammoEntityData = key and ammoents[key]
+	local exactPath = ammoEntityData and getExistingAmmoIconPath(ammoEntityData.Icon)
+	if exactPath then return exactPath end
+	if ammoEntityData and ammoEntityData.Icon == matPistolAmmo then return defaultAmmoIconPaths.low end
+	if ammoEntityData and ammoEntityData.Icon == matRfileAmmo then return defaultAmmoIconPaths.high end
+	if ammoEntityData and ammoEntityData.Icon == matShotgunAmmo then return defaultAmmoIconPaths.buck end
 
-	local clr = color or color_white
-	local materialName = "zcity_generated_ammoicon_" .. normalizeAmmoIconName(ammoName) .. "_" .. normalizeAmmoIconName(iconName) .. "_" .. clr.r .. "_" .. clr.g .. "_" .. clr.b
-	if not generatedAmmoIconCache[materialName] then
-		local tint = string.format("[%0.3f %0.3f %0.3f]", clr.r / 255, clr.g / 255, clr.b / 255)
-		local baseTexture = string.StripExtension(iconPath)
-		CreateMaterial(materialName, "UnlitGeneric", {
-			["$basetexture"] = baseTexture,
-			["$translucent"] = "1",
-			["$vertexalpha"] = "1",
-			["$vertexcolor"] = "1",
-			["$color"] = tint,
-			["$color2"] = tint
-		})
-		generatedAmmoIconCache[materialName] = true
-	end
+	local ammoData = key and ammotypes[key]
+	exactPath = ammoData and ammoData.BulletSettings and getExistingAmmoIconPath(ammoData.BulletSettings.Icon)
+	if exactPath then return exactPath end
+	if ammoData and ammoData.BulletSettings and ammoData.BulletSettings.Icon == matPistolAmmo then return defaultAmmoIconPaths.low end
+	if ammoData and ammoData.BulletSettings and ammoData.BulletSettings.Icon == matRfileAmmo then return defaultAmmoIconPaths.high end
+	if ammoData and ammoData.BulletSettings and ammoData.BulletSettings.Icon == matShotgunAmmo then return defaultAmmoIconPaths.buck end
 
-	return materialName
+	return defaultAmmoIconPaths[hg.GetAmmoCaliberClass(ammoName)] or defaultAmmoIconPaths.low
 end
 
-local function resolveAmmoIcon(ammoName, color)
-	local iconCache = getAmmoIconCache()
-	local exactIconPath = iconCache.byExact[string.lower(ammoName or "")]
-	if exactIconPath then
-		return exactIconPath
+if CLIENT then
+	local ammoIconMaterials = {}
+	function hg.GetAmmoIconMaterial(ammoName)
+		local path = hg.GetAmmoIconPath(ammoName)
+		ammoIconMaterials[path] = ammoIconMaterials[path] or Material(path)
+		return ammoIconMaterials[path]
 	end
-
-	local normalizedAmmoName = normalizeAmmoIconName(ammoName)
-	if normalizedAmmoName == "" then return nil end
-
-	local bestCandidate
-	local bestScore
-	for _, iconData in ipairs(iconCache.list) do
-		local score = levenshteinDistance(normalizedAmmoName, iconData.normalized)
-		score = score - (countSharedNumberTokens(ammoName, iconData.name) * 3)
-		if string.find(normalizedAmmoName, iconData.normalized, 1, true) or string.find(iconData.normalized, normalizedAmmoName, 1, true) then
-			score = score - 2
-		end
-
-		if not bestScore or score < bestScore then
-			bestScore = score
-			bestCandidate = iconData
-		end
-	end
-
-	if not bestCandidate then return nil end
-	return getTintedAmmoIcon(bestCandidate.path, ammoName, bestCandidate.name, color)
 end
 
 local function addAmmoTypes()
@@ -3475,7 +3442,7 @@ local function addAmmoTypes()
 			ammoent.ModelMaterial = ammoents[name].Material or ""
 			ammoent.ModelScale = ammoents[name].Scale or 1
 			ammoent.Color = ammoents[name].Color or Color(255, 255, 255)
-			local iconPath = resolveAmmoIcon(name, ammoent.Color)
+			local iconPath = hg.GetAmmoIconPath(name)
 			ammoent.IconOverride = iconPath
 			ammoent.IconTexture = iconPath
 			scripted_ents.Register(ammoent, "ent_ammo_" .. name)
@@ -3492,8 +3459,8 @@ if CLIENT then
 			local entTable = entData and entData.t
 			if not entTable then continue end
 			if not string.StartWith(className, "ent_ammo_") then continue end
-			local ammoName = string.sub(className, 10)
-			local iconPath = resolveAmmoIcon(ammoName, entTable.Color)
+			local ammoName = entTable.AmmoType or string.sub(className, 10)
+			local iconPath = hg.GetAmmoIconPath(ammoName)
 			if iconPath then
 				entTable.IconOverride = iconPath
 				entTable.IconTexture = iconPath
@@ -3703,22 +3670,11 @@ if CLIENT then
 
         local ammos = LocalPlayer():GetAmmo()
 
-        for k,v in pairs(ammos) do
-            local DermaButton = vgui.Create( "DButton", DPanel ) 
-            local ammoName = game.GetAmmoName(k)
-            local ammoType = hg.ammotypes[ammoName]
-            
-            -- Use caliber-based icons exclusively
-            local diameter = ammoType and ammoType.BulletSettings and ammoType.BulletSettings.Diameter or 0
-            local ammoNameLower = string.lower(ammoName or "")
-            local iconPath
-            if diameter >= 12 or string.find(ammoNameLower, "gauge", 1, true) or string.find(ammoNameLower, "buck", 1, true) or string.find(ammoNameLower, "shot", 1, true) then
-                iconPath = "vgui/hud/bullets/buck_caliber.png"
-            elseif diameter >= 6 then
-                iconPath = "vgui/hud/bullets/high_caliber.png"
-            else
-                iconPath = "vgui/hud/bullets/low_caliber.png"
-            end
+		for k,v in pairs(ammos) do
+			local DermaButton = vgui.Create( "DButton", DPanel )
+			local ammoName = game.GetAmmoName(k)
+
+			local iconPath = hg.GetAmmoIconPath(ammoName)
             
             DermaButton:SetText( "  "..ammoName..": "..v )
             if iconPath then

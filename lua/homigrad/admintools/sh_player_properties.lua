@@ -378,45 +378,211 @@ properties.Add("removeply", {
 	end 
 })
 
+local adminRoleSyncNet = "hg_admin_player_role_sync"
+
+local adminProfessionFallback = {
+	athlete = "Athlete",
+	builder = "Builder",
+	cook = "Cook",
+	engineer = "Engineer",
+	huntsman = "Huntsman",
+	lucky_guy = "Lucky Guy",
+	medic = "Medic",
+	thug = "Thug",
+}
+
+local adminTraitorClassFallback = {
+	traitor_assasin = "Assassin",
+	traitor_chemist = "Chemist",
+	traitor_custom = "Traitor",
+	traitor_default = "Legacy",
+	traitor_infiltrator = "Infiltrator",
+	traitor_martial_artist = "Martial Artist",
+	traitor_shadow = "Shadow",
+	traitor_zombie = "Zombie",
+}
+
+local function getHomicideMode()
+	return zb and zb.modes and zb.modes.hmcd
+end
+
+local function getAdminRoleOptions(roleType)
+	local options = {}
+	local fallback = roleType == "profession" and adminProfessionFallback or adminTraitorClassFallback
+
+	for id, name in pairs(fallback) do
+		options[id] = name
+	end
+
+	local mode = getHomicideMode()
+	local modeRoles = mode and (roleType == "profession" and mode.Professions or mode.SubRoles)
+
+	for id, roleInfo in pairs(modeRoles or {}) do
+		options[id] = roleInfo.Name or id
+	end
+
+	return options
+end
+
+local function resolvePlayerPropertyTarget(ent)
+	return hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
+end
+
+local function syncAdminPlayerRoles(actor, target)
+	if not SERVER then return end
+
+	net.Start(adminRoleSyncNet)
+		net.WriteEntity(target)
+		net.WriteString(target.Profession or "")
+		net.WriteString(target.SubRole or "")
+		net.WriteBool(target.isTraitor and true or false)
+		net.WriteBool(target.MainTraitor and true or false)
+		net.WriteBool(target.isGunner and true or false)
+
+	if actor == target then
+		net.Send(actor)
+	else
+		net.Send({actor, target})
+	end
+end
+
+if SERVER then
+	util.AddNetworkString(adminRoleSyncNet)
+else
+	net.Receive(adminRoleSyncNet, function()
+		local target = net.ReadEntity()
+		local profession = net.ReadString()
+		local subRole = net.ReadString()
+		local isTraitor = net.ReadBool()
+		local mainTraitor = net.ReadBool()
+		local isGunner = net.ReadBool()
+
+		if not IsValid(target) then return end
+
+		target.Profession = profession ~= "" and profession or nil
+		target.SubRole = subRole ~= "" and subRole or nil
+		target.isTraitor = isTraitor
+		target.MainTraitor = mainTraitor
+		target.isGunner = isGunner
+	end)
+end
+
+local function addAdminRoleOption(property, menu, ent, roleType, id, label, checked)
+	local opt = menu:AddOption(label)
+	opt:SetRadio(true)
+	opt:SetChecked(checked)
+	opt:SetIsCheckable(true)
+	opt.OnChecked = function(_, isChecked)
+		if not isChecked then return end
+
+		property:SetRole(ent, roleType, id)
+	end
+end
+
+local function addAdminRoleMenu(property, rootMenu, ent, label, roleType, currentRole)
+	local category = rootMenu:AddOption(label)
+	local menu = category:AddSubMenu()
+
+	addAdminRoleOption(property, menu, ent, roleType, "", "None", not currentRole or currentRole == "")
+
+	local sortedRoles = {}
+	for id, name in pairs(getAdminRoleOptions(roleType)) do
+		sortedRoles[#sortedRoles + 1] = {id = id, name = name}
+	end
+
+	table.sort(sortedRoles, function(a, b)
+		return string.lower(a.name) < string.lower(b.name)
+	end)
+
+	for _, role in ipairs(sortedRoles) do
+		addAdminRoleOption(property, menu, ent, roleType, role.id, role.name .. " (" .. role.id .. ")", currentRole == role.id)
+	end
+end
+
 properties.Add( "setplayerclass", {
 	MenuLabel = "Set player class", -- Name to display on the context menu
 	Order = 15, -- The order to display this property relative to other properties
 	MenuIcon = "vgui/entities/npc_nukude_proto_h", -- The icon to display next to the property
 
 	Filter = check,
-	Action = function( self, ent ) -- The action to perform upon using the property ( Clientside )
+	Action = function() end, -- Choices are handled by the three submenus below.
+	SetRole = function( self, ent, roleType, name )
 		self:MsgStart()
-			net.WriteEntity( ent )
-		self:MsgEnd()
-	end,
-	PlayerClass = function( self, ent, name )
-		self:MsgStart()
-			net.WriteEntity( ent )
-			net.WriteString( name )
+			net.WriteEntity(ent)
+			net.WriteString(roleType)
+			net.WriteString(name)
 		self:MsgEnd()
 	end,
 	Receive = function( self, length, ply )
 		local ent = net.ReadEntity()
-		if not self:Filter(ent, ply) then return end -- this line was not here before
-		local class = net.ReadString( )
+		if not self:Filter(ent, ply) then return end
 
-		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
-		if IsValid(ent) and ent:IsPlayer() and player.classList[class] then
-			ent:SetPlayerClass(class)
+		local roleType = net.ReadString()
+		local roleId = net.ReadString()
+
+		ent = resolvePlayerPropertyTarget(ent)
+		if not IsValid(ent) or not ent:IsPlayer() then return end
+
+		if roleType == "playerclass" then
+			if roleId ~= "" and not player.classList[roleId] then return end
+
+			ent:SetPlayerClass(roleId ~= "" and roleId or nil)
+		elseif roleType == "profession" then
+			if roleId ~= "" and not getAdminRoleOptions("profession")[roleId] then return end
+
+			local mode = getHomicideMode()
+			if mode and mode.ClearProfessionLoadout then
+				mode.ClearProfessionLoadout(ent)
+			end
+
+			ent.Profession = roleId ~= "" and roleId or nil
+			ent.HMCDPreferredProfession = ent.Profession
+
+			if mode and mode.ApplyProfessionLoadout then
+				mode.ApplyProfessionLoadout(ent)
+			end
+
+			syncAdminPlayerRoles(ply, ent)
+		elseif roleType == "traitor" then
+			if roleId ~= "" and not getAdminRoleOptions("traitor")[roleId] then return end
+
+			ent.SubRole = roleId ~= "" and roleId or nil
+			ent.isTraitor = ent.SubRole ~= nil
+			ent.MainTraitor = ent.isTraitor
+			if ent.isTraitor then
+				ent.isGunner = false
+			end
+
+			local mode = getHomicideMode()
+			local roleInfo = mode and mode.SubRoles and mode.SubRoles[ent.SubRole or ""]
+			if roleInfo and roleInfo.SpawnFunction and ent:Alive() then
+				roleInfo.SpawnFunction(ent)
+			end
+
+			syncAdminPlayerRoles(ply, ent)
 		end
 	end,
 	MenuOpen = function( self, option, ent, tr )
 		local submenu = option:AddSubMenu()
+		local target = resolvePlayerPropertyTarget(ent)
+		if not IsValid(target) or not target:IsPlayer() then return end
 
-		for name, tbl in pairs(player.classList) do
-			local opt = submenu:AddOption(name)
-			opt:SetRadio(true)
-			opt:SetChecked(ent.PlayerClassName == name)
-			opt:SetIsCheckable(true)
-			opt.OnChecked = function(s, checked)
-				self:PlayerClass(ent, name)
-			end	
+		local playerClassCategory = submenu:AddOption("Player classes")
+		local playerClassMenu = playerClassCategory:AddSubMenu()
+		addAdminRoleOption(self, playerClassMenu, ent, "playerclass", "", "None", not target:GetPlayerClass())
+
+		local sortedClasses = {}
+		for name in pairs(player.classList) do
+			sortedClasses[#sortedClasses + 1] = name
 		end
+		table.sort(sortedClasses, function(a, b) return string.lower(a) < string.lower(b) end)
+
+		for _, name in ipairs(sortedClasses) do
+			addAdminRoleOption(self, playerClassMenu, ent, "playerclass", name, name, target.PlayerClassName == name)
+		end
+
+		addAdminRoleMenu(self, submenu, ent, "Subroles", "profession", target.Profession)
+		addAdminRoleMenu(self, submenu, ent, "Traitor classes", "traitor", target.SubRole)
 	end
 } )
 

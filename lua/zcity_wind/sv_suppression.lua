@@ -90,8 +90,14 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
             end
 
             if dist <= 120 and isLooking then
+                local suppressionResponse = math.Clamp(0.25 * damage / math.max(dist / 2, 10), 0.08, 0.4)
                 if ply.AddNaturalAdrenaline then
-                    ply:AddNaturalAdrenaline(0.05 * damage / math.max(dist / 2, 10))
+                    ply:AddNaturalAdrenaline(suppressionResponse)
+                end
+
+                local disorientation = org.disorientation or 0
+                if disorientation < 2.5 then
+                    org.disorientation = math.min(disorientation + math.Clamp(suppressionResponse * 0.8, 0.08, 0.35), 2.5)
                 end
                 org.fearadd = (org.fearadd or 0) + 0.2
             end

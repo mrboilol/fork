@@ -393,7 +393,17 @@ module[2] = function(owner, org, timeValue)
 	local bloodO2Cap = math.Clamp(interpolateCurve(BloodO2, math.Clamp(org.blood or 5000, 0, 5000)), 0, o2.range)
 	org.bloodO2Cap = bloodO2Cap
 
-	local losing_oxy = timeValue * 1 * math.Clamp(org.o2[1] / 30, 0.25, 1)
+	local bodyTemperature = org.temperature or 36.7
+	local coldO2Stress = bodyTemperature < 35 and math.Clamp(math.Remap(bodyTemperature, 35, 26, 0, 1), 0, 1) or 0
+	local altitudeO2K = 1
+	org.altitudeMeters = 0
+	if ZCityWind and ZCityWind.Config and ZCityWind.Config.AtmosphereEnabled and ZCityWind.GetAtmosphereAtZ then
+		local altitude, _, _, _, _, _, pressureRatio = ZCityWind.GetAtmosphereAtZ(owner:GetPos().z)
+		org.altitudeMeters = altitude
+		altitudeO2K = math.Clamp(pressureRatio, 0.35, 1)
+	end
+	org.airPressureRatio = altitudeO2K
+	local losing_oxy = timeValue * math.Clamp(org.o2[1] / 30, 0.25, 1) * (1 + coldO2Stress * 0.75)
 
 	org.losing_oxy = losing_oxy
 
@@ -598,13 +608,18 @@ module[2] = function(owner, org, timeValue)
 		local circulationK = math.Clamp(org.cardiacOutput or (pulseMultiplier * pulsePerfusionK), 0.05, 1.5)
 
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
-		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * blood_pressure_k * coBreathePenalty
+		local coldO2RegenK = Lerp(coldO2Stress, 1, 0.55)
+		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * blood_pressure_k * coBreathePenalty
 		local tracheaDamage = math.Clamp(org.trachea or 0, 0, 1)
 		local tracheaIntakeK = 1 - (tracheaDamage * 0.15 + tracheaDamage * tracheaDamage * 0.55)
 		regenerate = regenerate * math.Clamp(tracheaIntakeK, 0.3, 1)
 
+		local coldO2Cap = o2.range * Lerp(coldO2Stress, 1, 0.7)
+		-- Thin air reduces intake directly, while blood saturation falls more
+		-- gradually than ambient pressure itself.
+		local altitudeO2Cap = o2.range * Lerp(altitudeO2K, 0.5, 1)
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap))
 
 
 

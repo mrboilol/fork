@@ -15,6 +15,8 @@ local BONE_DAMAGE_DURATION = 5
 local boneStates = {}
 local boneCache = {}
 local lastLifeState = nil
+local healthIndicatorOtrubStart
+local HEALTH_INDICATOR_OTRUB_FADE_TIME = 5
 local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
@@ -429,6 +431,7 @@ function HUD_DrawDynamicIndicator()
     local alive = ply:Alive()
     if lastLifeState ~= alive then
         ResetModels(ply)
+        healthIndicatorOtrubStart = nil
         lastLifeState = alive
     end
     
@@ -467,6 +470,21 @@ function HUD_DrawDynamicIndicator()
 
     local consciousness = 1
     local org = ply.organism
+
+    if org and org.otrub then
+        healthIndicatorOtrubStart = healthIndicatorOtrubStart or CurTime()
+    else
+        healthIndicatorOtrubStart = nil
+    end
+
+    local indicatorAlpha = healthIndicatorOtrubStart
+        and math.Clamp(1 - (CurTime() - healthIndicatorOtrubStart) / HEALTH_INDICATOR_OTRUB_FADE_TIME, 0, 1)
+        or 1
+
+    if indicatorAlpha <= 0 then
+        HUD.dynamicIndicator = { active = false }
+        return
+    end
     
     if org and org.consciousness then 
         consciousness = org.consciousness 
@@ -570,6 +588,7 @@ function HUD_DrawDynamicIndicator()
     local lookAng = Angle(11, 180, 0)
 
     cam.Start3D(camPos, lookAng, 50, viewX, viewY, w, h)
+        render.SetBlend(indicatorAlpha)
         render.SuppressEngineLighting(true)
         render.MaterialOverride(whiteMat)
         
@@ -680,6 +699,7 @@ function HUD_DrawDynamicIndicator()
 
         render.MaterialOverride(nil)
         render.SetColorModulation(1, 1, 1)
+        render.SetBlend(1)
         render.SuppressEngineLighting(false)
     cam.End3D()
 

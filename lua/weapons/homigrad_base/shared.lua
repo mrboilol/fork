@@ -42,7 +42,7 @@ SWEP.AmmoTypes2 = {
 	}, 
 	["9x18 mm"] = {
 		[1] = {"9x18 mm"},
-		[2] = {"9x18 mm PBM"}
+		[2] = {"9x18 mm PBM 7N25"}
 	}, 
 	[".366 TKM"] = {
 		[1] = {".366 TKM"},
@@ -959,6 +959,45 @@ function SWEP:PrimaryShoot()
 	self.drawBullet = false
 	if self.AutomaticDraw then self:Draw() end
 	self:PrimarySpread()
+	self:ApplyRecoilCameraKick()
+end
+
+-- A visible, post-shot camera jolt. It cannot alter the round that was just
+-- fired; it only moves the player's aim for the next shot.
+function SWEP:ApplyRecoilCameraKick()
+	if SERVER or not self:IsLocal2() then return end
+
+	local ply = self:GetOwner()
+	if not IsValid(ply) then return end
+
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local baseKick = math.Clamp(caliberMul * weightMul, 0.25, 3.6)
+	local supportMul = self:GetRecoilSupportMul()
+	local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
+	local restMul = (self.IsResting and self:IsResting()) and 0.55 or 1
+	local adsMul = self:IsZoom() and 0.72 or 1
+	local sprayI = self.SprayI or 0
+	local sprayClimb = 1 + math.Clamp(sprayI / 8, 0, 1) * 0.6
+	local pistolMul = self:IsPistolHoldType() and 1.08 or 1
+	local kickScale = math.Clamp(baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * self:GetCharacterRecoilMul() * self:GetArmHealthHandlingMul(), 0.1, 4)
+
+	local seed = math.floor(sprayI)
+	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
+	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
+	local gangstaHold = ply.posture == 7
+	local pitchKick = gangstaHold and -0.12 * kickScale or -0.68 * kickScale
+	local yawKick = gangstaHold and 0.72 * kickScale or 0.07 * kickScale * sideRand
+	local rollKick = gangstaHold and 0 or 0.08 * kickScale * rollRand
+	local punchAng = Angle(pitchKick, yawKick, rollKick)
+	local coolCamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()
+
+	if coolCamera then
+		ViewPunch(punchAng * 0.7)
+		ViewPunch2(punchAng * -0.18)
+	else
+		ViewPunch2(punchAng * 0.55)
+		ViewPunch(punchAng * 0.16)
+	end
 end
 
 SWEP.SightSlideOffset = 1
@@ -1269,66 +1308,12 @@ if CLIENT then
 	local coloruse = Color(255,255,255,255)
 
 	local matPistolAmmo = Material("vgui/hud/bullets/low_caliber.png")
-	local matRfileAmmo = Material("vgui/hud/bullets/high_caliber.png")
-	local matShotgunAmmo = Material("vgui/hud/bullets/buck_caliber.png")
 	local lerpAmmoCheck = 0
 	local ammoCheck = 0
 	local color_bg = Color(0,0,0,150)
 	local ammoLongCheck = 0
-	local bulletIconMaterials = {
-		low = matPistolAmmo,
-		high = matRfileAmmo,
-		buck = matShotgunAmmo
-	}
-
-	local function NormalizeAmmoIconPath(path)
-		if not isstring(path) or path == "" then return end
-		path = string.Replace(path, "\\", "/")
-		path = string.Replace(path, "materials/", "")
-
-		if not string.StartWith(path, "vgui/hud/bullets/") then
-			if string.StartWith(path, "hud/bullets/") then
-				path = "vgui/" .. path
-			elseif not string.StartWith(path, "vgui/") then
-				path = "vgui/hud/bullets/" .. path
-			end
-		end
-
-		if not string.EndsWith(path, ".png") then path = path .. ".png" end
-		return path
-	end
-
-	local function GetAmmoCaliberClass(ammoName, bulletSettings)
-		bulletSettings = bulletSettings or {}
-		ammoName = string.lower(ammoName or "")
-
-		if (bulletSettings.NumBullet or 1) > 1 or string.find(ammoName, "gauge", 1, true) or string.find(ammoName, "buck", 1, true) or string.find(ammoName, "shot", 1, true) then
-			return "buck"
-		end
-
-		local diameter = tonumber(bulletSettings.Diameter) or 0
-		if diameter >= 10 or string.find(ammoName, "12/70", 1, true) or string.find(ammoName, "20/70", 1, true) or string.find(ammoName, "23x75", 1, true) then
-			return "buck"
-		end
-
-		if diameter >= 6 or (bulletSettings.Damage or 0) >= 40 or string.find(ammoName, "5.56", 1, true) or string.find(ammoName, "7.62", 1, true) or string.find(ammoName, "14.5", 1, true) or string.find(ammoName, ".50", 1, true) then
-			return "high"
-		end
-
-		return "low"
-	end
-
 	local function GetAmmoIcon(ammoName)
-		local ammoInfo = hg.ammotypeshuy and hg.ammotypeshuy[ammoName]
-		local bulletSettings = ammoInfo and ammoInfo.BulletSettings or {}
-		local iconPath = NormalizeAmmoIconPath(bulletSettings.Icon)
-
-		if iconPath then
-			local mat = Material(iconPath)
-			if mat and not mat:IsError() then return mat end
-		end
-
-		return bulletIconMaterials[GetAmmoCaliberClass(ammoName, bulletSettings)] or matPistolAmmo
+		return hg.GetAmmoIconMaterial and hg.GetAmmoIconMaterial(ammoName) or matPistolAmmo
 	end
 
 	local function GetAmmoHudPosition(self, scrW, scrH, hudHPos)
@@ -2619,8 +2604,8 @@ function SWEP:GetAdditionalValues()
 		-- give the muzzle a real upward displacement as well, proportional to the
 		-- same shot impulse.  This is separate from the pitch kick so its vertical
 		-- offset remains visible on weapons with short barrels or low pitch recoil.
-		self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 4.5
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -0.35 * shit2
+		self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 7.5
+		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -0.12 * shit2
 		
 		local recoilSeed = math.floor(self.SprayI or 0)
 		self.AdditionalPos2:Add(Vector(
@@ -2633,9 +2618,10 @@ function SWEP:GetAdditionalValues()
 		
 		if self.podkid or self:IsPistolHoldType() then
 			local animpos2 = self:GetAnimShoot2(0.05 * mulhuy / host_timescale(), true)
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -18 * (self.podkid or 1)
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * 7 * (self.podkid or 1)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 8 * (self.podkid or 1)
+			local canted = ply.posture == 7
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (canted and -8 or -24) * (self.podkid or 1)
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (canted and 7 or 1.25) * (self.podkid or 1)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (canted and 8 or 2.5) * (self.podkid or 1)
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
 		end
 
@@ -2656,21 +2642,13 @@ function SWEP:GetAdditionalValues()
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local restMul = self:IsResting() and 0.3 or 1
 		local armHandlingMul = self:GetArmHealthHandlingMul()
-		local physicalRecoilMul = self.GetPhysicalRecoilMul and self:GetPhysicalRecoilMul() or 1
-		local handlingMul = math.Clamp(
-			caliberMul * weightMul * supportMul * armHandlingMul * physicalRecoilMul
-				* (self.RecoilMul or 1) * self:GetCharacterRecoilMul() * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul(),
-			0.25,
-			3.2
-		)
+		local handlingMul = math.Clamp(caliberMul * weightMul * supportMul * armHandlingMul, 0.25, 2.6)
 
 		local armInjury = math.Clamp(armHandlingMul - 1, 0, 2)
-		-- Healthy, supported arms return the muzzle quickly. Firing-arm damage keeps
-		-- the displacement alive longer and slows the automatic recovery.
-		local firing = sinceShot < Lerp(armInjury / 2, 0.11, 0.24)
-		local recoveryRate = Lerp(armInjury / 2, 0.09, 0.025)
-		recoveryRate = recoveryRate / math.max(stanceMul, 0.45)
-		if support.offhandImpaired then recoveryRate = math.max(recoveryRate, 0.055) end
+		local firing = sinceShot < (support.offhandImpaired and 0.14 or 0.2)
+		-- Restore the older damped recovery tail; firing-arm damage makes it slower.
+		local recoveryRate = Lerp(armInjury / 2, 0.018, 0.007)
+		if support.offhandImpaired then recoveryRate = math.max(recoveryRate, 0.03) end
 		local wobbleTarget = firing and (1.08 + armInjury * 0.12) * (support.offhandImpaired and 0.58 or 1) or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.38 or recoveryRate, wobbleDt), self.recoilWobbleAmp or 0, wobbleTarget)
 
@@ -2704,13 +2682,13 @@ function SWEP:GetAdditionalValues()
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
 			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.25
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 2.35
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.18
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.035
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.4
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.14
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.07
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.75
 			-- Lift the physical muzzle with the pitch impulse. GetTrace uses this
 			-- transform, so follow-up rounds climb with the visible barrel.
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 0.85 or 1.35)
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.4 or 2.2)
 		end
 	end
 

@@ -247,6 +247,13 @@ function SWEP:Think()
 				else
 					-- Ignite gasoline on touch (Dropped logic)
 					local pos = self:GetPos()
+					if hg and hg.TrySmallFlameIgnite then
+						for _, ent in ipairs(ents.FindInSphere(pos, 18)) do
+							if ent == self then continue end
+							hg.TrySmallFlameIgnite(ent, ent:NearestPoint(pos), vector_up, self:GetOwner(), "zippo", self)
+						end
+					end
+
 					if hg and hg.gasolinePath then
 						for k, v in pairs(hg.gasolinePath) do
 							local gasPos = v[1]
@@ -314,6 +321,10 @@ function SWEP:Think()
 			})
 			
 			if tr.Hit then
+				if IsValid(tr.Entity) and hg and hg.TrySmallFlameIgnite then
+					hg.TrySmallFlameIgnite(tr.Entity, tr.HitPos, tr.HitNormal, self:GetOwner(), "zippo", self)
+				end
+
 				-- Check gasoline path (Strictly following weapon_matches.lua logic)
 				if hg and hg.gasolinePath then
 					for k, v in pairs(hg.gasolinePath) do

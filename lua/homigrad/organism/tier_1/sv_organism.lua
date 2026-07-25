@@ -329,10 +329,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local blood = math.max(org.blood or 0, 0)
 	local bloodFraction = math.Clamp((blood - 1800) / 2700, 0, 1)
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
-	local arterialBleed = math.max(org.arterialBleed or 0, 0)
 	local venousBleed = math.max(org.venousBleed or 0, 0)
 	local internalBleed = math.max(org.internalBleedRate or 0, 0)
-	local arterialPenalty = math.Clamp(arterialBleed / 18, 0, 0.50)
 	local venousPenalty = math.Clamp(venousBleed / 65, 0, 0.18)
 	local internalPenalty = math.Clamp(internalBleed / 45, 0, 0.22)
 	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35)
@@ -342,9 +340,12 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
 
 	org.bodyoxygen = approachVital(org.bodyoxygen, oxygen, dt, 2.5)
-	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - arterialPenalty - venousPenalty - internalPenalty - shockPenalty * 0.45 - throatPenalty * 0.22, 0, 1)
+	-- Arterial loss already lowers blood volume and the blood-pressure target in
+	-- sv_pulse. Applying its live bleed rate again here made any open artery an
+	-- independent disorientation/otrub source instead of a blood-loss emergency.
+	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - venousPenalty - internalPenalty - shockPenalty * 0.45 - throatPenalty * 0.22, 0, 1)
 	local perfusionTarget = math.Clamp(pressureDelivery * Lerp(org.bodyoxygen, 0.55, 1), 0, 1)
-	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - arterialPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
+	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
 
 	org.perfusion = approachVital(org.perfusion, perfusionTarget, dt, 3.5)
 	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, pump, dt)
