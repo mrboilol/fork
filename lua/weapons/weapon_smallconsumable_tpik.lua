@@ -29,55 +29,9 @@ SWEP.Slot = 3
 SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
 
-SWEP.FoodModelsKCNNeutralizers = {
-	["models/jorddrink/7upcan01a.mdl"] = 10,
-	["models/jorddrink/barqcan1a.mdl"] = 10,
-	["models/jorddrink/cozcan01a.mdl"] = 10,
-	["models/jorddrink/crucan01a.mdl"] = 10,
-	["models/jorddrink/dewcan01a.mdl"] = 10,
-	["models/jorddrink/foscan01a.mdl"] = 10,
-	["models/jorddrink/heican01a.mdl"] = 10,
-	["models/jorddrink/mongcan1a.mdl"] = 10,
-	["models/jorddrink/pepcan01a.mdl"] = 10,
-	["models/jorddrink/redcan01a.mdl"] = 10,
-	["models/jorddrink/sprcan01a.mdl"] = 10,
-	["models/foodnhouseholditems/juicesmall.mdl"] = 10,
-}
-
-SWEP.FoodModels = {
-	"models/jorddrink/7upcan01a.mdl", 
-	"models/jorddrink/barqcan1a.mdl",
-	"models/jorddrink/cozcan01a.mdl",
-	"models/jorddrink/crucan01a.mdl",
-	"models/jorddrink/dewcan01a.mdl",
-	"models/jorddrink/foscan01a.mdl",
-	"models/jorddrink/heican01a.mdl",
-	"models/jorddrink/mongcan1a.mdl",
-	"models/jorddrink/pepcan01a.mdl",
-	"models/jorddrink/redcan01a.mdl",
-	"models/jorddrink/sprcan01a.mdl",
-	"models/jordfood/atun.mdl",
-	"models/foodnhouseholditems/chipsfritos.mdl",
-	"models/foodnhouseholditems/chipslays3.mdl",
-	"models/foodnhouseholditems/chipslays5.mdl",
-	"models/foodnhouseholditems/juicesmall.mdl",
-	"models/foodnhouseholditems/mcdburgerbox.mdl"
-}
-
-SWEP.WaterModel = {
-	["models/jorddrink/7upcan01a.mdl"] = true, 
-	["models/jorddrink/barqcan1a.mdl"] = true,
-	["models/jorddrink/cozcan01a.mdl"] = true,
-	["models/jorddrink/crucan01a.mdl"] = true,
-	["models/jorddrink/dewcan01a.mdl"] = true,
-	["models/jorddrink/foscan01a.mdl"] = true,
-	["models/jorddrink/heican01a.mdl"] = true,
-	["models/jorddrink/mongcan1a.mdl"] = true,
-	["models/jorddrink/pepcan01a.mdl"] = true,
-	["models/jorddrink/redcan01a.mdl"] = true,
-	["models/jorddrink/sprcan01a.mdl"] = true,
-	["models/foodnhouseholditems/juicesmall.mdl"] = true
-}
+SWEP.FoodModelsKCNNeutralizers = hg.consumable.SmallFoodModelsKCNNeutralizers
+SWEP.FoodModels = hg.consumable.SmallFoodModels
+SWEP.WaterModel = hg.consumable.SmallWaterModel
 
 SWEP.FallSnd = "snd_jack_hmcd_foodbounce.wav"
 SWEP.DeploySnd = "snd_jack_hmcd_foodbounce.wav"

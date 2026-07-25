@@ -27,28 +27,9 @@ SWEP.showstats = false
 SWEP.ofsV = Vector(-2,-10,8)
 SWEP.ofsA = Angle(90,-90,90)
 
-SWEP.FoodModelsKCNNeutralizers = {
-	["models/foodnhouseholditems/juice.mdl"] = 10,
-	["models/foodnhouseholditems/cola.mdl"] = 10,
-}
-
-SWEP.FoodModels = {
-	"models/jordfood/canned_burger.mdl", 
-	"models/jorddrink/the_bottle_of_water.mdl", 
-	"models/foodnhouseholditems/milk.mdl", 
-	"models/jordfood/can.mdl",
-	"models/foodnhouseholditems/juice.mdl",
-	"models/foodnhouseholditems/cola.mdl",
-	"models/foodnhouseholditems/bagette.mdl",
-	"models/jordfood/prongleclosedfilledgreen.mdl",
-}
-
-SWEP.WaterModel = {
-	["models/foodnhouseholditems/juice.mdl"] = true,
-	["models/foodnhouseholditems/cola.mdl"] = true,
-	["models/foodnhouseholditems/milk.mdl"] = true,
-	["models/jorddrink/the_bottle_of_water.mdl"] = true,
-}
+SWEP.FoodModelsKCNNeutralizers = hg.consumable.BigFoodModelsKCNNeutralizers
+SWEP.FoodModels = hg.consumable.BigFoodModels
+SWEP.WaterModel = hg.consumable.BigWaterModel
 
 SWEP.FallSnd = "snd_jack_hmcd_foodbounce.wav"
 SWEP.DeploySnd = "snd_jack_hmcd_foodbounce.wav"

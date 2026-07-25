@@ -78,34 +78,11 @@ if SERVER then
 end
 
 function SWEP:DrawWorldModel()
-	self.model = IsValid(self.model) and self.model or ClientsideModel(self.WorldModel)
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-	WorldModel:SetNoDraw(true)
-	WorldModel:SetModelScale(self.ModelScale)
-	if IsValid(owner) then
-		local offsetVec = self.offsetVec
-		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone("ValveBiped.Bip01_L_Hand")
-		if not boneid then return end
-		local matrix = owner:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
-
-	WorldModel:DrawModel()
+	hg.swep.DrawBoneAttachedModel(self, {boneName = "ValveBiped.Bip01_L_Hand"})
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 function SWEP:Think()
@@ -113,7 +90,7 @@ function SWEP:Think()
 end
 
 function SWEP:GetEyeTrace()
-	return hg.eyeTrace( self:GetOwner() )
+	return hg.swep.GetEyeTrace(self)
 end
 --;; Ненавижу работать над визуалом...
 if CLIENT then

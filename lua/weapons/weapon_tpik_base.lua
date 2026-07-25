@@ -69,9 +69,7 @@ SWEP.WorkWithFake = true
 SWEP.visualweight = 1.2
 
 function SWEP:SetHold(value)
-    self:SetWeaponHoldType(value)
-    self:SetHoldType(value)
-    self.holdtype = value
+    hg.swep.SetHold(self, value)
 end
 
 SWEP.modelscale = 1

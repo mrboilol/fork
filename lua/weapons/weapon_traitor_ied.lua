@@ -65,37 +65,11 @@ function SWEP:DrawWorldModel()
 end
 
 function SWEP:DrawWorldModel2()
-	self.model = IsValid(self.model) and self.model or ClientsideModel(self.WorldModel)
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-	WorldModel:SetNoDraw(true)
-	WorldModel:SetModelScale(self.ModelScale or 1)
-	local renderGuy = hg.GetCurrentCharacter(owner)
-	if IsValid(owner) then
-		local offsetVec = self.offsetVec
-		local offsetAng = self.offsetAng
-
-		local boneid = renderGuy:LookupBone("ValveBiped.Bip01_R_Hand")
-		if not boneid then return end
-		local matrix = renderGuy:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
-
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
-
-	WorldModel:DrawModel()
+	hg.swep.DrawBoneAttachedModel(self, {renderEnt = hg.GetCurrentCharacter(self:GetOwner()), boneName = "ValveBiped.Bip01_R_Hand"})
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 function SWEP:Think()
@@ -115,7 +89,7 @@ function SWEP:Think()
 end
 
 function SWEP:GetEyeTrace()
-	return hg.eyeTrace(self:GetOwner())
+	return hg.swep.GetEyeTrace(self)
 end
 
 SWEP.BlastDis = 18

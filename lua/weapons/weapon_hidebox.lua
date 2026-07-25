@@ -27,9 +27,7 @@ SWEP.ViewModel = "models/props_junk/wood_crate001a.mdl"
 SWEP.HoldType = "normal"
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 SWEP.offsetVec = Vector(2, 10, 0)

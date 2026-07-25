@@ -162,9 +162,7 @@ function SWEP:Animation()
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 function SWEP:PrimaryAttack()

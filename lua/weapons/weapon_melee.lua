@@ -335,9 +335,7 @@ SWEP.AttackingPos = Vector(16,0,0)
 SWEP.WorkWithFake = true
 
 function SWEP:SetHold(value)
-    self:SetWeaponHoldType(value)
-    self:SetHoldType(value)
-    self.holdtype = value
+    hg.swep.SetHold(self, value)
 end
 
 function SWEP:KeyDown(key)

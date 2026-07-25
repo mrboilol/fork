@@ -41,28 +41,7 @@ if SERVER then
 end
 
 function SWEP:DrawWorldModel()
-	self.model = IsValid(self.model) and self.model or ClientsideModel(self.WorldModel)
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-	WorldModel:SetNoDraw(true)
-	WorldModel:SetModelScale(self.ModelScale or 1)
-	if IsValid(owner) then
-		local offsetVec = self.offsetVec
-		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not owner.organism.larmamputated)) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
-		if not boneid then return end
-		local matrix = owner:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
-
-	WorldModel:DrawModel()
+	hg.swep.DrawBoneAttachedModel(self)
 end
 
 function SWEP:Initialize()
@@ -75,9 +54,7 @@ function SWEP:Initialize()
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 function SWEP:Think()
@@ -86,18 +63,12 @@ end
 SWEP.traceLen = 5
 
 function SWEP:GetEyeTrace()
-	return hg.eyeTrace( self:GetOwner())
+	return hg.swep.GetEyeTrace(self)
 end
 
 if CLIENT then
 	function SWEP:DrawHUD()
-		if GetViewEntity() ~= LocalPlayer() then return end
-		if LocalPlayer():InVehicle() then return end
-        local tr = self:GetEyeTrace()
-        local toScreen = tr.HitPos:ToScreen()
-
-        surface.SetDrawColor(255,255,255,155)
-        surface.DrawRect(toScreen.x-2.5, toScreen.y-2.5, 5, 5)
+		hg.swep.DrawSimpleCrosshair(self)
 	end
 end
 
@@ -115,29 +86,22 @@ function SWEP:DoPoison(tr)
 end
 
 if SERVER then
-    hook.Add("Org Clear", "RemovePoison3", function(org)
-        org.poison3 = nil
-		org.poison3notificate = nil
-    end)
-
-	hook.Add("Org Think", "poison3",function(owner, org, timeValue)
-		if not owner:IsPlayer() or not owner:Alive() then return end
-		if (not org.poison3) or (not org.alive) then return end
-		
-		if ((org.poison3 + 4) < CurTime()) and owner.Profession == "cook" then
-			org.owner:Notify("It smells like almonds in here... Perfume, perhaps?", true, "cyanide", 3)
-		end
-
-		if (not org.poison3notificate) and ((org.poison3 + 20) < CurTime()) then
-			org.poison3notificate = true
-			org.owner:Notify("It's getting difficult to breathe... for some reason...", true, "cyanide2", 3)
-			org.owner:EmitSound(ThatPlyIsFemale(org.owner) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav",65)	
-		end
-
-		if (org.poison3 + 30) < CurTime() then
-        	org.o2.regen = 0
-		end
-	end)
+	hg.poison.Register({
+		key = "poison3",
+		notifyDelay = 20,
+		notifyMsg = "It's getting difficult to breathe... for some reason...",
+		notifyTag = "cyanide2",
+		killDelay = 30,
+		hookSuffix = "poison3",
+		earlyCheck = function(owner, org, curtime)
+			if ((org.poison3 + 4) < curtime) and owner.Profession == "cook" then
+				org.owner:Notify("It smells like almonds in here... Perfume, perhaps?", true, "cyanide", 3)
+			end
+		end,
+		notifySound = function(ply)
+			ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav", 65)
+		end,
+	})
 end
 
 function SWEP:SecondaryAttack()

@@ -50,9 +50,7 @@ function SWEP:Deploy()
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 
 	if not self.FixedBG then
 		self:SetBodygroup(1, 1)

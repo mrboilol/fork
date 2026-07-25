@@ -61,9 +61,7 @@ if SERVER then
 end
 
 function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
+	hg.swep.SetHold(self, value)
 end
 
 function SWEP:SetupDataTables()
@@ -80,18 +78,12 @@ end
 SWEP.traceLen = 5
 
 function SWEP:GetEyeTrace()
-	return hg.eyeTrace( self:GetOwner())
+	return hg.swep.GetEyeTrace(self)
 end
 
 if CLIENT then
 	function SWEP:DrawHUD()
-		if GetViewEntity() ~= LocalPlayer() then return end
-		if LocalPlayer():InVehicle() then return end
-        local tr = self:GetEyeTrace()
-        local toScreen = tr.HitPos:ToScreen()
-
-        surface.SetDrawColor(255,255,255,155)
-        surface.DrawRect(toScreen.x-2.5, toScreen.y-2.5, 5, 5)
+		hg.swep.DrawSimpleCrosshair(self)
 	end
 end
 
