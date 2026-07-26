@@ -280,6 +280,9 @@ end
 
 local function EmitRingtone(phone)
 	if not IsValid(phone) then return end
+	-- EmitSound starts another instance every time. Clear the previous ring before
+	-- the call manager schedules the next one so long ringtone files cannot stack.
+	StopRingtone(phone)
 	local emitter = PHONE:GetUser(phone)
 	if not IsValid(emitter) then emitter = phone end
 	emitter:EmitSound(HG_PHONE.GetRingtone(phone), 68, 100, 0.9, CHAN_AUTO)

@@ -5,6 +5,14 @@ local letterInterval = 0.16
 local maxLetters = 48
 
 if SERVER then
+	-- These sounds are emitted from the server, so explicitly ship and precache
+	-- every letter instead of relying on clients already having this content.
+	for byte = string.byte("A"), string.byte("Z") do
+		local path = soundPrefix .. string.char(byte) .. ".wav"
+		resource.AddFile("sound/" .. path)
+		util.PrecacheSound(path)
+	end
+
 	function CHAT_SPEECH:Speak(ply, text)
 		if not IsValid(ply) or not ply:Alive() then return end
 

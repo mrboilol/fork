@@ -1099,7 +1099,7 @@ function hg.queueArterialWoundSound(ent, wound)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size)
+emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmount)
 	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
 	-- artery-marked blood trail with the original combined right/up oscillation.
 	-- Give the pressure pulse enough forward speed and lift to form an arc before
@@ -1115,7 +1115,10 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size)
 	end
 	-- Keep the oscillation, but let forward pressure dominate enough for the
 	-- arterial trail to read as a fast jet instead of a short local spray.
-	local forwardVelocityMul = 2.5
+	-- A fully open carotid (14 bleed) reaches four times the old distance;
+	-- smaller or closing arteries scale down from that using their live bleed.
+	local bleedRangeMul = 1 + 3 * math.Clamp((bleedAmount or 0) / 14, 0, 1)
+	local forwardVelocityMul = 2.5 * bleedRangeMul
 	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
 	local velocity = (VectorRand(-1, 1) * pulseMul
 		+ dir * 5 * forwardVelocityMul * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
@@ -1428,7 +1431,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, boneAng, org, i, size)
+							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, wound[1])
 						end
 
 						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))

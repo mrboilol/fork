@@ -22,6 +22,8 @@ SWEP.WorldModel = "models/w_models/weapons/w_eq_medkit.mdl"
 SWEP.WorkWithFake = true
 SWEP.offsetVec = Vector(4, -0.5, -3)
 SWEP.offsetAng = Angle(-30, 20, 90)
+SWEP.StatusScreenOffset = Vector(3.6, -3.1, 0.15)
+SWEP.StatusScreenAngle = Angle(0, 90, 90)
 
 SWEP.Slot = 3
 SWEP.SlotPos = 2
@@ -36,9 +38,9 @@ SWEP.Config = {
         ["Taser Cartridge"] = 100
     },
     BatteryCost = {
-        [1] = 1.5,
-        [2] = 3.5,
-        [3] = 0.1
+        [1] = 3,
+        [2] = 7,
+        [3] = 0.25
     },
     HealAmount = {
         [1] = 0.65,
@@ -50,6 +52,8 @@ SWEP.Config = {
         [2] = 1.5,
         [3] = 0.1
     },
+    SupportBloodAmount = 18,
+    SupportOxygenAmount = 1.5,
     Cooldown = {
         Primary = 0.25,
         Secondary = 0.25,
@@ -91,7 +95,7 @@ SWEP.TargetOrgans = {
         "rarmartery", "larmartery", "rlegartery", "llegartery",
         "liver", "stomach", "intestines", "spineartery",
         "lungsL", "lungsR", "pneumothorax", "hemothorax",
-        "rvein", "lvein", "spinevein", "pulmvein",
+        "rvein", "lvein", "spinevein", "pulmvein", "internalBleed",
         "rarmvein", "larmvein", "rlegvein", "llegvein"
     },
     [2] = {
@@ -180,6 +184,18 @@ function SWEP:OnRemove()
     if CLIENT then self:CancelBandageRotation() end
 end
 
+-- Do not inherit the bandage's full arm animation. Treatment only nudges the
+-- hand into position, with no looping or hold-progress pose.
+function SWEP:Animation()
+    if not self:GetIsHealing() then return end
+
+    local owner = self:GetOwner()
+    local target = self:GetTargetPly()
+    if not IsValid(owner) or not IsValid(target) then return end
+
+    local treatingSelf = target == owner
+    self:BoneSet("r_forearm", treatingSelf and Vector(1.25, 0, 0) or Vector(-1.25, 0, 0), angle_zero)
+end
 function SWEP:CanOperate(owner)
     if not IsValid(owner) or not owner.organism then return true end
     if not hg or not hg.organism then return true end
@@ -216,6 +232,9 @@ function SWEP:Notify(text, snd)
 end
 
 function SWEP:DamageValue(org, key)
+    if key == "internalBleed" then
+        return math.max((org.internalBleed or 0) - (org.internalBleedHeal or 0), 0)
+    end
     local val = org[key]
     if isnumber(val) then return val end
     if istable(val) and (key == "lungsL" or key == "lungsR") then return val[1] or 0 end
@@ -251,6 +270,7 @@ end
 function SWEP:StopProcedure(reason, snd)
     self:SetIsHealing(false)
     self:SetTargetPly(NULL)
+    self._asSupportNotified = nil
     if SERVER and reason then
         self:Notify(reason, snd or self.Sounds.Cancel)
     end
@@ -346,10 +366,25 @@ function SWEP:TickStitch()
     local target = self:GetTargetPly()
     if not IsValid(target) or not target.organism then return self:StopProcedure("Patient lost", self.Sounds.TargetLost) end
     local org = target.organism
-    if not org.wounds or #org.wounds == 0 then
+    if not org.wounds then
         self:StopProcedure("No bleeding", self.Sounds.Nothing)
         return
     end
+
+    -- Remove closed wound records left behind after bleeding has stopped.
+    for i = #org.wounds, 1, -1 do
+        if not org.wounds[i] or (org.wounds[i][1] or 0) <= 0 then
+            table.remove(org.wounds, i)
+        end
+    end
+    if #org.wounds == 0 then
+        if IsValid(org.owner) and org.owner.SetNetVar then
+            org.owner:SetNetVar("wounds", org.wounds)
+        end
+        self:StopProcedure("No bleeding", self.Sounds.Nothing)
+        return
+    end
+
     table.sort(org.wounds, function(a, b) return (a and a[1] or 0) > (b and b[1] or 0) end)
     local wound = org.wounds[1]
     if not wound or not wound[1] or wound[1] <= 0 then
@@ -372,7 +407,6 @@ function SWEP:TickStitch()
     end
     if org.pain then org.pain = math.max(org.pain - 1, 0) end
 end
-
 function SWEP:TickOrgans()
     local target = self:GetTargetPly()
     if not IsValid(target) or not target.organism then return self:StopProcedure("Patient lost", self.Sounds.TargetLost) end
@@ -390,10 +424,40 @@ function SWEP:TickOrgans()
         end
     end
     if not currentOrgan or maxDamage <= 0 then
-        self:StopProcedure("No damage detected", self.Sounds.Nothing)
+        if mode ~= 2 then
+            self:StopProcedure("No damage detected", self.Sounds.Nothing)
+            return
+        end
+
+        local blood = org.blood or 5000
+        local oxygen = org.o2 and org.o2[1] or 0
+        local oxygenMax = org.o2 and org.o2.range or 0
+        if blood >= 5000 and oxygen >= oxygenMax then
+            self:StopProcedure("Vitals stable", self.Sounds.Nothing)
+            return
+        end
+
+        local cost = self.Config.BatteryCost[mode]
+        if self:Clip1() < cost then
+            self:StopProcedure("Battery depleted", self.Sounds.Depleted)
+            return
+        end
+        self:SetClip1(math.max(0, self:Clip1() - cost))
+        org.blood = math.min(blood + self.Config.SupportBloodAmount, 5000)
+        if org.o2 then
+            org.o2[1] = math.min(oxygen + self.Config.SupportOxygenAmount, oxygenMax)
+        end
+        if self.RefreshPerfusionTreatment then
+            self:RefreshPerfusionTreatment(target, self.Config.HealTime[mode])
+        end
+        if not self._asSupportNotified then
+            self:Notify("No injuries found. Administering plasma and oxygen.", self.Sounds.Start)
+            self._asSupportNotified = true
+        end
         return
     end
 
+    self._asSupportNotified = nil
     local cost = self.Config.BatteryCost[mode]
     if self:Clip1() < cost then
         self:StopProcedure("Battery depleted", self.Sounds.Depleted)
@@ -404,7 +468,9 @@ function SWEP:TickOrgans()
     local heal = self.Config.HealAmount[mode]
     local newValue = math.max(0, old - heal)
 
-    if currentOrgan == "lungsL" or currentOrgan == "lungsR" then
+    if currentOrgan == "internalBleed" then
+        org.internalBleedHeal = (org.internalBleedHeal or 0) + (old - newValue)
+    elseif currentOrgan == "lungsL" or currentOrgan == "lungsR" then
         org[currentOrgan][1] = newValue
     else
         org[currentOrgan] = newValue
@@ -412,12 +478,14 @@ function SWEP:TickOrgans()
     self:SetClip1(math.max(0, self:Clip1() - cost))
 
     self:ClearDebuffs(org, currentOrgan)
+    if currentOrgan == "internalBleed" and self.RefreshPerfusionTreatment then
+        self:RefreshPerfusionTreatment(target, self.Config.HealTime[mode])
+    end
 
     if self.ArteryOrgans[currentOrgan] and newValue == 0 then
         self:RemoveArterialWound(org, currentOrgan)
     end
 end
-
 function SWEP:Think()
     self:SetHold(self.HoldType)
     self.ModelScale = 1
@@ -495,70 +563,36 @@ if CLIENT then
     SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.png"
     SWEP.BounceWeaponIcon = false
 
-    local colBrown = Color(40, 40, 40)
-    local colWhite = Color(255, 255, 255, 255)
-    local colGray = Color(200, 200, 200, 200)
-    local lerpthing = 1
-
-    local function DrawBatteryStats(self, x, y, alpha)
+    function SWEP:AfterDrawModel(WorldModel)
         local battery = self:Clip1()
         local maxBat = self.Config.BatteryMax
         local pct = math.Clamp(battery / maxBat, 0, 1)
         local val = math.Round(pct * 100)
-        local textWidth = 150
-        local barWidth = 100
-        local barHeight = 25
         local mode = self:GetMode()
-        local txt = string.NiceName(tostring(self.modeNames[mode])) .. " (" .. val .. "%)"
+        local status = self:GetIsHealing() and "OPERATING" or (battery <= 0 and "NO POWER" or "STANDBY")
+        local statusColor = self:GetIsHealing() and Color(90, 255, 120) or (battery <= 0 and Color(255, 75, 75) or Color(150, 220, 255))
+        local pos, ang = LocalToWorld(self.StatusScreenOffset, self.StatusScreenAngle, WorldModel:GetPos(), WorldModel:GetAngles())
 
-        colBrown.a = alpha * 185
-        draw.RoundedBox(2, x, y, textWidth + barWidth, barHeight, colBrown)
-        surface.SetFont("ZCity_Small")
-        draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255, 255, 255, alpha * 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
-
-        surface.SetDrawColor(0, 100, 0, alpha * 255)
-        surface.DrawRect(x + textWidth, y, barWidth * val / 100, barHeight)
-        surface.SetDrawColor(0, 0, 0, alpha * 255)
-        surface.DrawOutlinedRect(x + textWidth, y, barWidth, barHeight, 4)
+        cam.Start3D2D(pos, ang, 0.035)
+            local width, height = 84, 46
+            local left, top = -width / 2, -height / 2
+            surface.SetDrawColor(0, 0, 0, 245)
+            surface.DrawRect(left, top, width, height)
+            surface.SetDrawColor(75, 75, 75, 255)
+            surface.DrawOutlinedRect(left, top, width, height, 2)
+            draw.SimpleText("D.I.H. UNIT", "ZCity_Small", 0, top + 5, Color(220, 220, 220), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            draw.SimpleText(status, "ZCity_Small", 0, top + 16, statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            draw.SimpleText(string.upper(self.modeNames[mode] or "UNKNOWN") .. "  " .. val .. "%", "ZCity_Small", 0, top + 27, Color(220, 220, 220), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            surface.SetDrawColor(25, 25, 25, 255)
+            surface.DrawRect(left + 7, top + 38, width - 14, 4)
+            surface.SetDrawColor(statusColor)
+            surface.DrawRect(left + 7, top + 38, (width - 14) * pct, 4)
+        cam.End3D2D()
     end
 
     function SWEP:DrawHUD()
-        local owner = self:GetOwner()
-        if not IsValid(owner) or not owner:IsPlayer() then return end
-        if GetViewEntity() ~= owner then return end
-        if owner:InVehicle() then return end
-
-        local mdl = modelshuy[self.Model or self.WorldModel]
-        if not IsValid(mdl) then return end
-
-        local tr = hg.eyeTrace(owner)
-        if not tr then return end
-
-        local size = math.max(math.min(1 - tr.Fraction, 0.5), 0.1)
-        local sx, sy = tr.HitPos:ToScreen().x, tr.HitPos:ToScreen().y
-
-        if tr.Hit then
-            lerpthing = Lerp(0.1, lerpthing, 1)
-            colWhite.a = 255 * size
-            surface.SetDrawColor(colGray)
-            draw.NoTexture()
-            surface.SetDrawColor(colWhite)
-            draw.NoTexture()
-            surface.DrawRect(sx - 25 * lerpthing, sy - 2.5, 50 * lerpthing, 5)
-            surface.DrawRect(sx - 2.5, sy - 25 * lerpthing, 5, 50 * lerpthing)
-            local col = tr.Entity:GetPlayerColor():ToColor()
-            local outline = (col.r < 50 and col.g < 50 and col.b < 50) and Color(255, 255, 255) or Color(0, 0, 0)
-            outline.a = 255 * size * 2
-            local name = (tr.Entity:IsPlayer() or tr.Entity:IsRagdoll()) and tr.Entity:GetPlayerName() or ""
-            draw.DrawText(name, "HomigradFontLarge", sx + 1, sy + 31, outline, TEXT_ALIGN_CENTER)
-            draw.DrawText(name, "HomigradFontLarge", sx, sy + 30, col, TEXT_ALIGN_CENTER)
-        end
-
-        self:DrawWorldModel2(true)
-        local x2d, y2d = ScrW() / 2 - 125, ScrH() / 2 + 50
-        DrawBatteryStats(self, x2d, y2d, 1)
+        self:DrawWorldModel2()
     end
-
     local altWasDown = false
     hook.Add("Think", "AutosurgeonAltRadial", function()
         local ply = LocalPlayer()

@@ -110,6 +110,7 @@ end)
 
 local mat_huy = Material("effects/blood_core")
 local lightcolor = Color(0, 0, 0, 255)
+local arterialBrightness = 70
 
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
@@ -137,11 +138,11 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 			render_SetMaterial(part[4] or mat_huy)
 			if part.kishki then
 				render_SetMaterial(part[4])
-				lightcolor.r = math.min((part.artery and 45 or 10) * light[1], 255)
+				lightcolor.r = math.min((part.artery and arterialBrightness or 10) * light[1], 255)
 				lightcolor.g = 0
 				lightcolor.b = 0
 			else
-				lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+				lightcolor.r = math.min((part.artery and arterialBrightness or 20) * light[1], 255)
 				lightcolor.g = 0
 				lightcolor.b = 0
 			end
@@ -149,7 +150,7 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
 			render_SetMaterial(mat_huy)
-			lightcolor.r = math.min((part.artery and 45 or 20) * light[1], 255)
+			lightcolor.r = math.min((part.artery and arterialBrightness or 20) * light[1], 255)
 			lightcolor.g = 0
 			lightcolor.b = 0
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))

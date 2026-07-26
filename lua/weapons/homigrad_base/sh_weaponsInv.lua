@@ -127,7 +127,7 @@ if SERVER then
 				local ammo = wep:Clip1()
 				ply:GiveAmmo(ammo, wep:GetPrimaryAmmoType(), true)
 				wep:SetClip1(0)
-				ply:EmitSound("snd_jack_hmcd_ammotake.wav", 65)
+				ply:EmitSound("panoptisscon/mag_unload.ogg", 65)
 				ply.cooldown_grab = CurTime() + 0.1
 			elseif (wep:GetClass() == "weapon_hg_bow" and not wep.Initialzed) then
 				ply:GiveAmmo(1, wep.Ammo, true)
