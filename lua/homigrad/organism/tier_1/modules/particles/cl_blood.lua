@@ -189,7 +189,7 @@ local function playBloodDripImpact(pos, tr, artery)
 		return
 	end
 
-	sound.Play("gore/blood" .. math_random(1, 6) .. ".ogg", pos, math.random(10, 60), math.random(80, 120))
+	sound.Play("gore/blood" .. math_random(1, 6) .. ".ogg", pos, math.random(85, 95), math.random(80, 120))
 end
 
 local function decalBlood(pos, normal, tr, artery, owner, decalWeight)

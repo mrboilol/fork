@@ -370,7 +370,7 @@ function hg.organism.AmputateLimb(org, limb)
 	local dmgInfo = DamageInfo()
 	hg.organism.input_list[limb.."up"](org, 0, 5, dmgInfo)
 
-	org.owner:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
+	org.owner:EmitSound(sounds[math.random(#sounds)], 95, math.random(95, 105), 2)
 
 
 

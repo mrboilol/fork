@@ -173,6 +173,11 @@ hook.Add("PlayerCanHearPlayersVoice", "RealisticVoice", function(listener,speake
 		if speak then hook.Run( "StartVoice", speaker, listener ) else hook.Run( "EndVoice", speaker, listener )  end
 	end
 
+	if HG_PHONE_SERVER and HG_PHONE_SERVER.CanHearVoiceCall then
+		local phoneResult, phoneIs3D = HG_PHONE_SERVER:CanHearVoiceCall(listener, speaker)
+		if phoneResult ~= nil then return phoneResult, phoneIs3D end
+	end
+
 	local Hook = hook.Run("HG_PlayerCanHearPlayersVoice", listener, speaker )
 	if Hook ~= nil then
 		return Hook

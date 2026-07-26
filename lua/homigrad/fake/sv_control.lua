@@ -1138,20 +1138,6 @@ hook.Add("Think", "Fake", function()
 
 
 
-		local floppyBones = ragdoll.hg_floppy_bones or org.fake_floppy_bones
-		local leftArmFloppy = floppyBones and (floppyBones["ValveBiped.Bip01_L_UpperArm"] or floppyBones["ValveBiped.Bip01_L_Forearm"])
-		local rightArmFloppy = floppyBones and (floppyBones["ValveBiped.Bip01_R_UpperArm"] or floppyBones["ValveBiped.Bip01_R_Forearm"])
-
-		if leftArmFloppy and IsValid(ragdoll.ConsLH) then
-			ragdoll.ConsLH:Remove()
-			ragdoll.ConsLH = nil
-		end
-
-		if rightArmFloppy and IsValid(ragdoll.ConsRH) then
-			ragdoll.ConsRH:Remove()
-			ragdoll.ConsRH = nil
-		end
-
 		local tr = {}
 
 		tr.start = ply:GetPos()

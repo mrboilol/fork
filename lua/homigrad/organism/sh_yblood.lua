@@ -125,7 +125,7 @@ end
         local phys_obj = rag:GetPhysicsObjectNum(phys_bone)
         
         if (not gibRemove[phys_bone]) and (bone == rag:LookupBone("ValveBiped.Bip01_Head1")) then
-            rag:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
+            rag:EmitSound(sounds[math.random(#sounds)], 95, math.random(95, 105), 2)
 
             Gib_RemoveBone(rag, bone, phys_bone)
             rag:ManipulateBonePosition(rag:LookupBone("ValveBiped.Bip01_Neck1"),Vector(-1,0,0))

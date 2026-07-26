@@ -1099,14 +1099,18 @@ end
 
 emitArterialSpray = function(ent, pos, dir, ang, pulse, woundIndex, size)
 	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
-	-- artery-marked blood trail with the original forward pulse and combined
-	-- right/up oscillation instead of maintaining a local beam carrier.
+	-- artery-marked blood trail with the original combined right/up oscillation.
+	-- Give the pressure pulse enough forward speed and lift to form an arc before
+	-- gravity takes over instead of immediately pouring down the body.
 	local time = CurTime()
 	local pulseMul = pulse / 70
+	local forwardVelocityMul = 1.75
+	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
 	local velocity = VectorRand(-1, 1) * pulseMul
-		+ dir * 5 * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
+		+ dir * 5 * forwardVelocityMul * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
 		+ dir:Angle():Right() * 25 * math.sin(time * 2) * math.cos(time * 4)
 		+ ang:Up() * 25 * math.sin(time * 3) * math.cos(time)
+		+ vector_up * upwardVelocity
 		+ VectorRand(-1, 1) * pulseMul
 
 	hg.addBloodPart(pos, velocity, nil, size, size, true, nil, ent)

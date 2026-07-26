@@ -111,7 +111,12 @@ function SWEP:Think()
 	self:SetHold(self.HoldType)
 	if SERVER and self:GetPlanted() then
 		local phonesEnabled = GetConVar("hg_iedphones") and GetConVar("hg_iedphones"):GetBool() or false
-		if self:GetPhoneMode() ~= phonesEnabled then self:SetPhoneMode(phonesEnabled) end
+		if self:GetPhoneMode() ~= phonesEnabled then
+			self:SetPhoneMode(phonesEnabled)
+			if HG_PHONE_SERVER and HG_PHONE_SERVER.UpdateIEDPhone then HG_PHONE_SERVER:UpdateIEDPhone(self, phonesEnabled) end
+		elseif phonesEnabled and HG_PHONE_SERVER and HG_PHONE.GetNumber(self) == "" then
+			HG_PHONE_SERVER:RegisterPhone(self)
+		end
 	end
 	if SERVER and IsValid(self.HaveTheBomb) then
 		self.LastBombPos = self.IEDPlacementLocalPos and self.HaveTheBomb:LocalToWorld(self.IEDPlacementLocalPos) or (self.HaveTheBomb:GetPos() + self.HaveTheBomb:OBBCenter())
@@ -258,6 +263,7 @@ function SWEP:CreateFake() end
 
 MarkIEDDestroyed = function(self)
 	if not IsValid(self) then return end
+	if SERVER and HG_PHONE_SERVER and HG_PHONE.GetNumber(self) ~= "" then HG_PHONE_SERVER:UnregisterPhone(self) end
 
 	self:SetDialing(false)
 	self:SetDetonateAt(0)
@@ -338,6 +344,7 @@ local function RegisterIEDBomb(self, ent, tr)
 	self:SetDetonating(false)
 	self:SetPhoneMode(GetConVar("hg_iedphones") and GetConVar("hg_iedphones"):GetBool() or false)
 	self:SetPlanted(true)
+	if self:GetPhoneMode() and HG_PHONE_SERVER then HG_PHONE_SERVER:RegisterPhone(self) end
 	if not ent:IsWorld() then
 		ent.bombowner = self
 		ent.IEDOwner = self
@@ -725,6 +732,7 @@ end
 
 if SERVER then
 	function SWEP:OnRemove()
+		if HG_PHONE_SERVER and HG_PHONE.GetNumber(self) ~= "" then HG_PHONE_SERVER:UnregisterPhone(self) end
 		RemoveAttachedBombVisual(self)
 	end
 end

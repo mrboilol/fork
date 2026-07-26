@@ -1,107 +1,277 @@
--- IED phone client UI.
-
 if SERVER then return end
 
-local activePanel
+HG_PHONE_UI = HG_PHONE_UI or {registry = {}, history = {}}
+local UI = HG_PHONE_UI
 
-local function GetIEDStatus(phone)
-	if not IsValid(phone) then return "NO SIGNAL", Color(180, 45, 45) end
-	if phone:GetDestroyed() then return "DEVICE DESTROYED", Color(180, 45, 45) end
-	if phone:GetDetonating() then return "DETONATING", Color(255, 70, 45) end
-	if phone:GetDialing() then
-		local remaining = math.max(phone:GetDetonateAt() - CurTime(), 0)
-		return string.format("CALLING... %.1fs", remaining), Color(245, 185, 55)
-	end
-	if phone:GetPlanted() then return "ARMED / LINKED", Color(90, 220, 100) end
-	return "NOT ARMED", Color(180, 180, 180)
+local function PhoneMessage(...)
+	chat.AddText(Color(100, 190, 100), "[PHONE] ", Color(235, 235, 235), ...)
 end
 
-local function OpenIEDPhone(phone)
+local function SendPhoneEntity(name, phone)
 	if not IsValid(phone) then return end
-	local phoneLabel = "IED-" .. phone:EntIndex()
+	net.Start(name)
+		net.WriteEntity(phone)
+	net.SendToServer()
+end
 
-	if IsValid(activePanel) then activePanel:Remove() end
+local function AddHistory(senderName, senderNumber, message)
+	UI.history[#UI.history + 1] = {
+		name = senderName,
+		number = senderNumber,
+		message = message
+	}
+	if #UI.history > 60 then table.remove(UI.history, 1) end
+
+	if IsValid(UI.chatLog) then
+		UI.chatLog:InsertColorChange(120, 190, 255, 255)
+		UI.chatLog:AppendText(string.format("%s (%s): ", senderName, senderNumber))
+		UI.chatLog:InsertColorChange(235, 235, 235, 255)
+		UI.chatLog:AppendText(message .. "\n")
+		UI.chatLog:GotoTextEnd()
+	end
+end
+
+local function BuildPhonePanel(phone)
+	if not IsValid(phone) or not HG_PHONE.IsPhone(phone) then return end
+	if IsValid(UI.panel) then UI.panel:Remove() end
+	UI.currentPhone = phone
+	UI.selectedNumber = nil
 
 	local frame = vgui.Create("DFrame")
-	activePanel = frame
-	frame:SetSize(360, 430)
+	UI.panel = frame
+	frame:SetSize(780, 650)
 	frame:Center()
-	frame:SetTitle("Nokia IED Controller")
+	frame:SetTitle("Z-City Phone Network")
 	frame:SetDeleteOnClose(true)
 	frame:MakePopup()
 
-	local screen = vgui.Create("DPanel", frame)
-	screen:SetPos(24, 46)
-	screen:SetSize(312, 250)
-	screen.Paint = function(_, w, h)
-		draw.RoundedBox(4, 0, 0, w, h, Color(83, 106, 69))
-		draw.RoundedBox(2, 8, 8, w - 16, h - 16, Color(154, 176, 124))
+	local ownInfo = vgui.Create("DLabel", frame)
+	ownInfo:SetPos(16, 34)
+	ownInfo:SetSize(748, 24)
+	ownInfo:SetFont("DermaDefaultBold")
 
-		local status, statusColor = GetIEDStatus(phone)
-		draw.SimpleText("LINKED DEVICE", "DermaDefaultBold", w / 2, 24, Color(25, 35, 22), TEXT_ALIGN_CENTER)
-		draw.SimpleText(phoneLabel, "DermaLarge", w / 2, 70, Color(20, 30, 18), TEXT_ALIGN_CENTER)
-		draw.SimpleText(status, "DermaDefaultBold", w / 2, 125, statusColor, TEXT_ALIGN_CENTER)
-		draw.SimpleText("Reload opens this phone", "DermaDefault", w / 2, h - 30, Color(35, 48, 30), TEXT_ALIGN_CENTER)
-	end
+	local registryLabel = vgui.Create("DLabel", frame)
+	registryLabel:SetPos(16, 64)
+	registryLabel:SetSize(360, 20)
+	registryLabel:SetText("PHONE REGISTRY — MAP AND PLAYERS")
 
-	local detonate = vgui.Create("DButton", frame)
-	detonate:SetPos(24, 315)
-	detonate:SetSize(312, 55)
-	detonate:SetText("CALL LINKED IED")
-	detonate:SetFont("DermaDefaultBold")
-	detonate.DoClick = function()
-		if not IsValid(phone) then
-			frame:Close()
-			return
-		end
+	local registry = vgui.Create("DListView", frame)
+	registry:SetPos(16, 86)
+	registry:SetSize(430, 280)
+	registry:SetMultiSelect(false)
+	registry:AddColumn("Name")
+	registry:AddColumn("Number")
+	registry:AddColumn("State")
+	registry:AddColumn("Type")
 
-		net.Start("HG_IEDPhone_Detonate")
+	local selectedLabel = vgui.Create("DLabel", frame)
+	selectedLabel:SetPos(460, 86)
+	selectedLabel:SetSize(304, 42)
+	selectedLabel:SetWrap(true)
+	selectedLabel:SetText("Select a number from the registry.")
+
+	local callButton = vgui.Create("DButton", frame)
+	callButton:SetPos(460, 136)
+	callButton:SetSize(145, 38)
+	callButton:SetText("CALL")
+	callButton.DoClick = function()
+		if not UI.selectedNumber or not IsValid(phone) then return end
+		net.Start("HG_Phone_RequestCall")
 			net.WriteEntity(phone)
+			net.WriteString(UI.selectedNumber)
 		net.SendToServer()
 	end
 
+	local answerButton = vgui.Create("DButton", frame)
+	answerButton:SetPos(619, 136)
+	answerButton:SetSize(145, 38)
+	answerButton:SetText("ANSWER")
+	answerButton.DoClick = function() SendPhoneEntity("HG_Phone_AnswerCall", phone) end
+
+	local hangupButton = vgui.Create("DButton", frame)
+	hangupButton:SetPos(460, 182)
+	hangupButton:SetSize(304, 38)
+	hangupButton:SetText("HANG UP")
+	hangupButton.DoClick = function() SendPhoneEntity("HG_Phone_HangupCall", phone) end
+
+	local deviceButton = vgui.Create("DButton", frame)
+	deviceButton:SetPos(460, 228)
+	deviceButton:SetSize(304, 38)
+	if phone:GetClass() == "ent_phone" then
+		deviceButton:SetText("PICK UP AS HANDHELD")
+		deviceButton.DoClick = function() SendPhoneEntity("HG_Phone_Pickup", phone) end
+	elseif phone:GetClass() == "weapon_phone" then
+		deviceButton:SetText("PLACE PHONE DOWN")
+		deviceButton.DoClick = function() SendPhoneEntity("HG_Phone_PlaceDown", phone) end
+	else
+		deviceButton:SetVisible(false)
+	end
+
+	local iedButton = vgui.Create("DButton", frame)
+	iedButton:SetPos(460, 274)
+	iedButton:SetSize(304, 50)
+	iedButton:SetText("CALL / DETONATE LINKED IED")
+	iedButton:SetTextColor(Color(180, 35, 35))
+	iedButton:SetVisible(HG_PHONE.IsIEDPhone(phone))
+	iedButton.DoClick = function() SendPhoneEntity("HG_Phone_IEDDetonate", phone) end
+
+	local nameEntry = vgui.Create("DTextEntry", frame)
+	nameEntry:SetPos(460, 332)
+	nameEntry:SetSize(202, 28)
+	nameEntry:SetPlaceholderText("Phone display name")
+
+	local setName = vgui.Create("DButton", frame)
+	setName:SetPos(668, 332)
+	setName:SetSize(96, 28)
+	setName:SetText("SET NAME")
+	setName.DoClick = function()
+		local name = string.Trim(nameEntry:GetValue())
+		if name == "" or not IsValid(phone) then return end
+		net.Start("HG_Phone_SetDisplayName")
+			net.WriteEntity(phone)
+			net.WriteString(name)
+		net.SendToServer()
+	end
+
+	local ringtone = vgui.Create("DComboBox", frame)
+	ringtone:SetPos(460, 372)
+	ringtone:SetSize(202, 28)
+	for index, data in ipairs(HG_PHONE.RINGTONES) do ringtone:AddChoice(data.name, index) end
+	ringtone:SetValue("Choose ringtone")
+
+	local setRingtone = vgui.Create("DButton", frame)
+	setRingtone:SetPos(668, 372)
+	setRingtone:SetSize(96, 28)
+	setRingtone:SetText("SET / TEST")
+	setRingtone.DoClick = function()
+		local index = ringtone:GetSelectedID()
+		if not index or not HG_PHONE.RINGTONES[index] or not IsValid(phone) then return end
+		surface.PlaySound(HG_PHONE.RINGTONES[index].path)
+		net.Start("HG_Phone_SetRingtone")
+			net.WriteEntity(phone)
+			net.WriteUInt(index, 8)
+		net.SendToServer()
+	end
+
+	local chatLabel = vgui.Create("DLabel", frame)
+	chatLabel:SetPos(16, 378)
+	chatLabel:SetSize(420, 20)
+	chatLabel:SetText("CALL TEXT CHAT")
+
+	local chatLog = vgui.Create("RichText", frame)
+	UI.chatLog = chatLog
+	chatLog:SetPos(16, 400)
+	chatLog:SetSize(748, 174)
+	for _, entry in ipairs(UI.history) do
+		chatLog:InsertColorChange(120, 190, 255, 255)
+		chatLog:AppendText(string.format("%s (%s): ", entry.name, entry.number))
+		chatLog:InsertColorChange(235, 235, 235, 255)
+		chatLog:AppendText(entry.message .. "\n")
+	end
+	chatLog:GotoTextEnd()
+
+	local messageEntry = vgui.Create("DTextEntry", frame)
+	messageEntry:SetPos(16, 584)
+	messageEntry:SetSize(626, 32)
+	messageEntry:SetPlaceholderText("Text the person on the other end of the active call")
+
+	local sendButton = vgui.Create("DButton", frame)
+	sendButton:SetPos(650, 584)
+	sendButton:SetSize(114, 32)
+	sendButton:SetText("SEND")
+	local function SendText()
+		local message = string.Trim(messageEntry:GetValue())
+		if message == "" or not IsValid(phone) then return end
+		net.Start("HG_Phone_Text")
+			net.WriteEntity(phone)
+			net.WriteString(message)
+		net.SendToServer()
+		messageEntry:SetText("")
+	end
+	sendButton.DoClick = SendText
+	messageEntry.OnEnter = SendText
+
 	local hint = vgui.Create("DLabel", frame)
-	hint:SetPos(24, 380)
-	hint:SetSize(312, 28)
+	hint:SetPos(16, 620)
+	hint:SetSize(748, 18)
 	hint:SetContentAlignment(5)
-	hint:SetText("LMB also calls the currently linked charge.")
+	hint:SetText("Live voice chat is routed automatically while the call says IN CALL.")
 
-	frame.Think = function(self)
-		if not IsValid(phone) then
-			self:Close()
-			return
-		end
-
-		local busy = phone:GetDialing() or phone:GetDetonating() or phone:GetDestroyed() or not phone:GetPlanted()
-		detonate:SetEnabled(not busy)
-		if phone:GetDialing() then
-			detonate:SetText("CALL IN PROGRESS")
-		elseif phone:GetDetonating() then
-			detonate:SetText("DETONATING")
-		elseif phone:GetDestroyed() then
-			detonate:SetText("DEVICE DESTROYED")
-		else
-			detonate:SetText("CALL LINKED IED")
+	local function RefreshRegistry()
+		local selected = UI.selectedNumber
+		registry:Clear()
+		for _, entry in ipairs(UI.registry) do
+			if not IsValid(entry.phone) or not HG_PHONE.IsPhone(entry.phone) then continue end
+			local line = registry:AddLine(
+				HG_PHONE.GetDisplayName(entry.phone),
+				entry.number,
+				HG_PHONE.GetStateName(HG_PHONE.GetState(entry.phone)),
+				HG_PHONE.IsIEDPhone(entry.phone) and "IED PHONE" or (entry.phone:IsWeapon() and "HANDHELD" or "MAP / DESK")
+			)
+			line.PhoneNumber = entry.number
+			line.PhoneEntity = entry.phone
+			if selected == entry.number then registry:SelectItem(line) end
 		end
 	end
+
+	registry.OnRowSelected = function(_, _, line)
+		UI.selectedNumber = line.PhoneNumber
+		selectedLabel:SetText(string.format("Selected: %s\nNumber: %s", HG_PHONE.GetDisplayName(line.PhoneEntity), line.PhoneNumber))
+	end
+
+	frame.NextRefresh = 0
+	frame.Think = function(self)
+		if not IsValid(phone) or not HG_PHONE.IsPhone(phone) then return self:Close() end
+		if self.NextRefresh <= CurTime() then
+			self.NextRefresh = CurTime() + 0.5
+			RefreshRegistry()
+		end
+
+		local state = HG_PHONE.GetState(phone)
+		ownInfo:SetText(string.format("%s  |  %s  |  %s", HG_PHONE.GetDisplayName(phone), HG_PHONE.GetNumber(phone), HG_PHONE.GetStateName(state)))
+		callButton:SetEnabled(state == HG_PHONE.STATE_IDLE and UI.selectedNumber ~= nil)
+		answerButton:SetEnabled(state == HG_PHONE.STATE_RINGING)
+		hangupButton:SetEnabled(state ~= HG_PHONE.STATE_IDLE)
+		sendButton:SetEnabled(state == HG_PHONE.STATE_IN_CALL)
+		messageEntry:SetEnabled(state == HG_PHONE.STATE_IN_CALL)
+		iedButton:SetEnabled(HG_PHONE.IsIEDPhone(phone) and not phone:GetDialing() and not phone:GetDetonating())
+	end
+
+	frame.OnClose = function()
+		if UI.panel == frame then UI.panel = nil end
+		if UI.chatLog == chatLog then UI.chatLog = nil end
+	end
+
+	RefreshRegistry()
 end
 
-net.Receive("HG_IEDPhone_Open", function()
-	OpenIEDPhone(net.ReadEntity())
+net.Receive("HG_Phone_Registry", function()
+	local entries = {}
+	for _ = 1, net.ReadUInt(12) do
+		entries[#entries + 1] = {number = net.ReadString(), phone = net.ReadEntity()}
+	end
+	UI.registry = entries
 end)
 
-net.Receive("HG_IEDPhone_Feedback", function()
-	chat.AddText(Color(100, 190, 100), "[IED PHONE] ", Color(235, 235, 235), net.ReadString())
+net.Receive("HG_Phone_OpenUI", function()
+	BuildPhonePanel(net.ReadEntity())
+end)
+
+net.Receive("HG_Phone_Text", function()
+	local senderName, senderNumber, message = net.ReadString(), net.ReadString(), net.ReadString()
+	AddHistory(senderName, senderNumber, message)
+	if not IsValid(UI.panel) then PhoneMessage(senderName .. " (" .. senderNumber .. "): " .. message) end
+end)
+
+net.Receive("HG_Phone_Notification", function()
+	PhoneMessage(net.ReadString())
 end)
 
 concommand.Add("phone_dial", function()
 	local phone = LocalPlayer():GetActiveWeapon()
-	if not IsValid(phone) or phone:GetClass() ~= "weapon_traitor_ied" then
-		chat.AddText(Color(100, 190, 100), "[IED PHONE] ", Color(235, 235, 235), "Equip a planted IED phone first.")
+	if not IsValid(phone) or not HG_PHONE.IsPhone(phone) then
+		PhoneMessage("Equip a handheld or planted IED phone, or use a nearby map phone.")
 		return
 	end
-
-	net.Start("HG_IEDPhone_RequestOpen")
-		net.WriteEntity(phone)
-	net.SendToServer()
-end, nil, "Open the linked IED phone")
+	SendPhoneEntity("HG_Phone_RequestOpen", phone)
+end, nil, "Open the active phone")

@@ -83,7 +83,7 @@ local function playSkullFractureSound(ent)
 	if not IsValid(ent) then return end
 	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 75, math.random(90, 110), 1, CHAN_AUTO)
 	if math.random(3) == 1 then
-		ent:EmitSound("gore/skullopen" .. math.random(1, 3) .. ".wav", 75, math.random(90, 110), 1, CHAN_AUTO)
+		ent:EmitSound("gore/skullopen" .. math.random(1, 3) .. ".wav", 95, math.random(90, 110), 1, CHAN_AUTO)
 	end
 end
 

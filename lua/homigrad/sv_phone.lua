@@ -1,79 +1,469 @@
--- IED phone server bridge.
--- The planted weapon remains authoritative; this file only owns the phone UI
--- network boundary so clients cannot detonate arbitrary IED entities.
-
 if CLIENT then return end
 
 local hg_iedphones = ConVarExists("hg_iedphones") and GetConVar("hg_iedphones") or CreateConVar(
 	"hg_iedphones",
 	"1",
 	FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED,
-	"Give planted IEDs their linked Nokia phone controller and phone UI.",
+	"Give planted IEDs a linked full-service phone controller.",
 	0,
 	1
 )
 
-util.AddNetworkString("HG_IEDPhone_Open")
-util.AddNetworkString("HG_IEDPhone_RequestOpen")
-util.AddNetworkString("HG_IEDPhone_Detonate")
-util.AddNetworkString("HG_IEDPhone_Feedback")
+local netNames = {
+	"HG_Phone_OpenUI",
+	"HG_Phone_RequestOpen",
+	"HG_Phone_Registry",
+	"HG_Phone_RequestCall",
+	"HG_Phone_AnswerCall",
+	"HG_Phone_HangupCall",
+	"HG_Phone_Text",
+	"HG_Phone_SetRingtone",
+	"HG_Phone_SetDisplayName",
+	"HG_Phone_Pickup",
+	"HG_Phone_PlaceDown",
+	"HG_Phone_Notification",
+	"HG_Phone_IEDDetonate"
+}
+
+for _, name in ipairs(netNames) do util.AddNetworkString(name) end
 
 HG_PHONE_SERVER = HG_PHONE_SERVER or {}
+local PHONE = HG_PHONE_SERVER
+PHONE.Registry = PHONE.Registry or {}
+PHONE.ActiveUsers = PHONE.ActiveUsers or {}
+PHONE.ActivePhoneByPlayer = PHONE.ActivePhoneByPlayer or {}
 
-local function IsOwnedPlantedIED(ply, phone)
-	return IsValid(ply)
-		and ply:IsPlayer()
-		and ply:Alive()
-		and IsValid(phone)
-		and phone:GetClass() == "weapon_traitor_ied"
-		and phone:GetOwner() == ply
-		and phone.GetPlanted
-		and phone:GetPlanted()
-		and not phone:GetDestroyed()
-		and not phone.KABOOM
-end
-
-local function SendFeedback(ply, message)
+local function Notify(ply, message)
 	if not IsValid(ply) then return end
-
-	net.Start("HG_IEDPhone_Feedback")
+	net.Start("HG_Phone_Notification")
 		net.WriteString(message)
 	net.Send(ply)
 end
 
-function HG_PHONE_SERVER.OpenIEDPhone(ply, phone)
-	if not hg_iedphones:GetBool() then
-		SendFeedback(ply, "IED phones are disabled on this server.")
-		return false
+function PHONE:GetUser(phone)
+	if not IsValid(phone) then return nil end
+	if phone:IsWeapon() and IsValid(phone:GetOwner()) and phone:GetOwner():IsPlayer() then return phone:GetOwner() end
+	return IsValid(self.ActiveUsers[phone]) and self.ActiveUsers[phone] or nil
+end
+
+function PHONE:CanControl(ply, phone)
+	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() or not HG_PHONE.IsPhone(phone) then return false end
+	if phone:IsWeapon() then return phone:GetOwner() == ply end
+	return ply:GetPos():DistToSqr(phone:GetPos()) <= 180 * 180
+end
+
+function PHONE:GenerateNumber()
+	for _ = 1, 1000 do
+		local number = tostring(math.random(100000, 999999))
+		if not IsValid(self.Registry[number]) then return number end
+	end
+	return tostring(math.floor(SysTime() * 1000) % 900000 + 100000)
+end
+
+function PHONE:QueueRegistrySync(target)
+	if IsValid(target) then
+		timer.Simple(0, function()
+			if IsValid(target) then PHONE:SyncRegistry(target) end
+		end)
+		return
 	end
 
-	if not IsOwnedPlantedIED(ply, phone) then
-		SendFeedback(ply, "No linked IED is available.")
-		return false
+	if self.RegistrySyncQueued then return end
+	self.RegistrySyncQueued = true
+	timer.Simple(0.1, function()
+		PHONE.RegistrySyncQueued = false
+		PHONE:SyncRegistry()
+	end)
+end
+
+function PHONE:SyncRegistry(target)
+	local entries = {}
+	for number, phone in pairs(self.Registry) do
+		if HG_PHONE.IsPhone(phone) and HG_PHONE.GetNumber(phone) == number then
+			entries[#entries + 1] = {number = number, phone = phone}
+		else
+			self.Registry[number] = nil
+		end
 	end
 
-	net.Start("HG_IEDPhone_Open")
-		net.WriteEntity(phone)
-	net.Send(ply)
+	table.sort(entries, function(a, b) return a.number < b.number end)
+	net.Start("HG_Phone_Registry")
+		net.WriteUInt(#entries, 12)
+		for _, entry in ipairs(entries) do
+			net.WriteString(entry.number)
+			net.WriteEntity(entry.phone)
+		end
+	if IsValid(target) then net.Send(target) else net.Broadcast() end
+end
+
+function PHONE:SetIdentity(phone, number, displayName, ringtone)
+	if not IsValid(phone) then return false end
+
+	local oldNumber = HG_PHONE.GetNumber(phone)
+	if oldNumber ~= "" and self.Registry[oldNumber] == phone then self.Registry[oldNumber] = nil end
+
+	number = tostring(number or "")
+	if number == "" or (IsValid(self.Registry[number]) and self.Registry[number] ~= phone) then number = self:GenerateNumber() end
+	displayName = string.Trim(tostring(displayName or ""))
+	if displayName == "" then displayName = "Phone " .. number end
+	displayName = string.sub(displayName, 1, 32)
+	ringtone = tostring(ringtone or HG_PHONE.RINGTONES[1].path)
+
+	phone:SetNW2String("HGPhoneNumber", number)
+	phone:SetNW2String("HGPhoneName", displayName)
+	phone:SetNW2String("HGPhoneRingtone", ringtone)
+	self.Registry[number] = phone
+	self:QueueRegistrySync()
 	return true
 end
 
-net.Receive("HG_IEDPhone_RequestOpen", function(_, ply)
-	HG_PHONE_SERVER.OpenIEDPhone(ply, net.ReadEntity())
+function PHONE:RegisterPhone(phone, number, displayName, ringtone)
+	if not HG_PHONE.IsPhone(phone) then return false end
+	local currentNumber = HG_PHONE.GetNumber(phone)
+	if currentNumber ~= "" and self.Registry[currentNumber] == phone then return true end
+
+	if not displayName then
+		local owner = phone:IsWeapon() and phone:GetOwner() or nil
+		if HG_PHONE.IsIEDPhone(phone) then
+			displayName = IsValid(owner) and (owner:Nick() .. "'s IED Phone") or "IED Phone"
+		elseif IsValid(owner) and owner:IsPlayer() then
+			displayName = owner:Nick() .. "'s Phone"
+		elseif phone:GetNW2Bool("HGMapPhone", false) then
+			displayName = phone:GetName() ~= "" and phone:GetName() or "Map Phone"
+		end
+	end
+
+	phone:SetNW2Int("HGPhoneState", HG_PHONE.STATE_IDLE)
+	phone:SetNW2Entity("HGPhoneTarget", NULL)
+	return self:SetIdentity(phone, number, displayName, ringtone)
+end
+
+local function StopRingtone(phone)
+	if not IsValid(phone) then return end
+	phone:StopSound(HG_PHONE.GetRingtone(phone))
+	local user = PHONE:GetUser(phone)
+	if IsValid(user) and user ~= phone then user:StopSound(HG_PHONE.GetRingtone(phone)) end
+end
+
+function PHONE:EndCall(phone, reason)
+	if not IsValid(phone) then return end
+	local target = phone:GetNW2Entity("HGPhoneTarget")
+	local firstUser = self:GetUser(phone)
+	local secondUser = self:GetUser(target)
+
+	for _, item in ipairs({phone, target}) do
+		if IsValid(item) then
+			StopRingtone(item)
+			item:SetNW2Int("HGPhoneState", HG_PHONE.STATE_IDLE)
+			item:SetNW2Entity("HGPhoneTarget", NULL)
+			item._HGPhoneRingAt = nil
+			item._HGPhoneRingExpires = nil
+		end
+	end
+
+	if IsValid(firstUser) and self.ActivePhoneByPlayer[firstUser] == phone then self.ActivePhoneByPlayer[firstUser] = nil end
+	if IsValid(secondUser) and self.ActivePhoneByPlayer[secondUser] == target then self.ActivePhoneByPlayer[secondUser] = nil end
+	self.ActiveUsers[phone] = nil
+	self.ActiveUsers[target] = nil
+
+	if reason then
+		Notify(firstUser, reason)
+		if secondUser ~= firstUser then Notify(secondUser, reason) end
+	end
+end
+
+function PHONE:UnregisterPhone(phone, transferring)
+	if not IsValid(phone) then return end
+	if not transferring and HG_PHONE.GetState(phone) ~= HG_PHONE.STATE_IDLE then self:EndCall(phone, "Call ended.") end
+	local number = HG_PHONE.GetNumber(phone)
+	if number ~= "" and self.Registry[number] == phone then self.Registry[number] = nil end
+	self.ActiveUsers[phone] = nil
+	phone:SetNW2String("HGPhoneNumber", "")
+	self:QueueRegistrySync()
+end
+
+function PHONE:OpenPhone(ply, phone)
+	if not self:CanControl(ply, phone) then
+		Notify(ply, "You cannot use that phone.")
+		return false
+	end
+
+	self:RegisterPhone(phone)
+	net.Start("HG_Phone_OpenUI")
+		net.WriteEntity(phone)
+	net.Send(ply)
+	self:SyncRegistry(ply)
+	return true
+end
+
+function PHONE.OpenIEDPhone(ply, phone)
+	if not hg_iedphones:GetBool() then
+		Notify(ply, "IED phones are disabled on this server.")
+		return false
+	end
+	return PHONE:OpenPhone(ply, phone)
+end
+
+function PHONE:UpdateIEDPhone(phone, enabled)
+	if not IsValid(phone) then return end
+	if enabled and HG_PHONE.IsIEDPhone(phone) then
+		self:RegisterPhone(phone)
+	elseif HG_PHONE.GetNumber(phone) ~= "" then
+		self:UnregisterPhone(phone)
+	end
+end
+
+local function EmitRingtone(phone)
+	if not IsValid(phone) then return end
+	local emitter = PHONE:GetUser(phone)
+	if not IsValid(emitter) then emitter = phone end
+	emitter:EmitSound(HG_PHONE.GetRingtone(phone), 68, 100, 0.9, CHAN_AUTO)
+end
+
+local function StartCall(ply, source, targetNumber)
+	if not PHONE:CanControl(ply, source) then return Notify(ply, "You cannot use that phone.") end
+	if HG_PHONE.GetState(source) ~= HG_PHONE.STATE_IDLE then return Notify(ply, "This phone is already busy.") end
+	if IsValid(PHONE.ActivePhoneByPlayer[ply]) then return Notify(ply, "You are already in another call.") end
+
+	local target = PHONE.Registry[tostring(targetNumber or "")]
+	if not HG_PHONE.IsPhone(target) or target == source then return Notify(ply, "That number is unavailable.") end
+	if HG_PHONE.GetState(target) ~= HG_PHONE.STATE_IDLE then return Notify(ply, "That number is busy.") end
+	local targetUser = PHONE:GetUser(target)
+	if targetUser == ply then return Notify(ply, "You cannot call another phone you are carrying.") end
+	if IsValid(targetUser) and IsValid(PHONE.ActivePhoneByPlayer[targetUser]) then return Notify(ply, "That number is busy.") end
+
+	PHONE.ActiveUsers[source] = ply
+	source:SetNW2Entity("HGPhoneTarget", target)
+	target:SetNW2Entity("HGPhoneTarget", source)
+	source:SetNW2Int("HGPhoneState", HG_PHONE.STATE_CALLING)
+	target:SetNW2Int("HGPhoneState", HG_PHONE.STATE_RINGING)
+	target._HGPhoneRingAt = 0
+	target._HGPhoneRingExpires = CurTime() + 30
+	Notify(ply, "Calling " .. HG_PHONE.GetDisplayName(target) .. "...")
+
+	if IsValid(targetUser) then Notify(targetUser, "Incoming call from " .. HG_PHONE.GetNumber(source) .. ".") end
+end
+
+net.Receive("HG_Phone_RequestOpen", function(_, ply)
+	PHONE:OpenPhone(ply, net.ReadEntity())
 end)
 
-net.Receive("HG_IEDPhone_Detonate", function(_, ply)
+net.Receive("HG_Phone_RequestCall", function(_, ply)
+	StartCall(ply, net.ReadEntity(), string.sub(net.ReadString(), 1, 16))
+end)
+
+net.Receive("HG_Phone_AnswerCall", function(_, ply)
 	local phone = net.ReadEntity()
-	if not hg_iedphones:GetBool() or not IsOwnedPlantedIED(ply, phone) then
-		SendFeedback(ply, "That IED phone link is no longer valid.")
-		return
+	if not PHONE:CanControl(ply, phone) or HG_PHONE.GetState(phone) ~= HG_PHONE.STATE_RINGING then return end
+	if IsValid(PHONE.ActivePhoneByPlayer[ply]) then return Notify(ply, "You are already in another call.") end
+
+	local caller = phone:GetNW2Entity("HGPhoneTarget")
+	if not HG_PHONE.IsPhone(caller) or HG_PHONE.GetState(caller) ~= HG_PHONE.STATE_CALLING then return PHONE:EndCall(phone, "The caller hung up.") end
+
+	PHONE.ActiveUsers[phone] = ply
+	local callerUser = PHONE:GetUser(caller)
+	phone:SetNW2Int("HGPhoneState", HG_PHONE.STATE_IN_CALL)
+	caller:SetNW2Int("HGPhoneState", HG_PHONE.STATE_IN_CALL)
+	StopRingtone(phone)
+	PHONE.ActivePhoneByPlayer[ply] = phone
+	if IsValid(callerUser) then PHONE.ActivePhoneByPlayer[callerUser] = caller end
+	Notify(ply, "Call connected.")
+	Notify(callerUser, "Call connected.")
+end)
+
+net.Receive("HG_Phone_HangupCall", function(_, ply)
+	local phone = net.ReadEntity()
+	if PHONE:CanControl(ply, phone) then PHONE:EndCall(phone, "Call ended.") end
+end)
+
+net.Receive("HG_Phone_Text", function(_, ply)
+	local phone = net.ReadEntity()
+	local message = string.Trim(string.sub(net.ReadString(), 1, 256))
+	if message == "" or not PHONE:CanControl(ply, phone) or HG_PHONE.GetState(phone) ~= HG_PHONE.STATE_IN_CALL then return end
+	if PHONE:GetUser(phone) ~= ply then return end
+
+	local target = phone:GetNW2Entity("HGPhoneTarget")
+	local targetUser = PHONE:GetUser(target)
+	if not IsValid(targetUser) then return PHONE:EndCall(phone, "Call ended.") end
+
+	for _, recipient in ipairs({ply, targetUser}) do
+		net.Start("HG_Phone_Text")
+			net.WriteString(ply:Nick())
+			net.WriteString(HG_PHONE.GetNumber(phone))
+			net.WriteString(message)
+		net.Send(recipient)
+	end
+end)
+
+net.Receive("HG_Phone_SetRingtone", function(_, ply)
+	local phone = net.ReadEntity()
+	local index = net.ReadUInt(8)
+	if not PHONE:CanControl(ply, phone) or not HG_PHONE.RINGTONES[index] then return end
+	phone:SetNW2String("HGPhoneRingtone", HG_PHONE.RINGTONES[index].path)
+	Notify(ply, "Ringtone set to " .. HG_PHONE.RINGTONES[index].name .. ".")
+end)
+
+net.Receive("HG_Phone_SetDisplayName", function(_, ply)
+	local phone = net.ReadEntity()
+	local name = string.Trim(string.sub(net.ReadString(), 1, 32))
+	if name == "" or not PHONE:CanControl(ply, phone) then return end
+	phone:SetNW2String("HGPhoneName", name)
+	PHONE:QueueRegistrySync()
+	Notify(ply, "Phone name updated.")
+end)
+
+net.Receive("HG_Phone_Pickup", function(_, ply)
+	local phone = net.ReadEntity()
+	if not PHONE:CanControl(ply, phone) or phone:GetClass() ~= "ent_phone" then return end
+	if HG_PHONE.GetState(phone) ~= HG_PHONE.STATE_IDLE then return Notify(ply, "Hang up before picking up this phone.") end
+	if ply:HasWeapon("weapon_phone") then return Notify(ply, "You already have a handheld phone.") end
+
+	local number, displayName, ringtone = HG_PHONE.GetNumber(phone), HG_PHONE.GetDisplayName(phone), HG_PHONE.GetRingtone(phone)
+	PHONE:UnregisterPhone(phone, true)
+	local weapon = ply:Give("weapon_phone")
+	if not IsValid(weapon) then
+		PHONE:RegisterPhone(phone, number, displayName, ringtone)
+		return Notify(ply, "The phone could not be picked up.")
 	end
 
-	if phone:GetDialing() or phone:GetDetonating() then return end
-	if not phone.PhoneDetonate then
-		SendFeedback(ply, "The linked IED cannot receive the call.")
-		return
-	end
+	PHONE:SetIdentity(weapon, number, displayName, ringtone)
+	phone:Remove()
+	ply:SelectWeapon("weapon_phone")
+end)
 
-	phone:PhoneDetonate()
+net.Receive("HG_Phone_PlaceDown", function(_, ply)
+	local weapon = net.ReadEntity()
+	if not PHONE:CanControl(ply, weapon) or weapon:GetClass() ~= "weapon_phone" then return end
+	if HG_PHONE.GetState(weapon) ~= HG_PHONE.STATE_IDLE then return Notify(ply, "Hang up before placing this phone.") end
+
+	local tr = util.TraceLine({start = ply:EyePos(), endpos = ply:EyePos() + ply:GetAimVector() * 90, filter = ply})
+	if not tr.Hit or tr.HitSky then return Notify(ply, "Aim at a nearby surface.") end
+	local number, displayName, ringtone = HG_PHONE.GetNumber(weapon), HG_PHONE.GetDisplayName(weapon), HG_PHONE.GetRingtone(weapon)
+	local phone = ents.Create("ent_phone")
+	if not IsValid(phone) then return end
+	phone.PhoneModelOverride = HG_PHONE.MODEL_HANDHELD
+	phone:SetPos(tr.HitPos + tr.HitNormal * 3)
+	phone:SetAngles(Angle(0, ply:EyeAngles().y + 180, 0))
+	phone:Spawn()
+	phone:Activate()
+	PHONE:UnregisterPhone(weapon, true)
+	PHONE:SetIdentity(phone, number, displayName, ringtone)
+	weapon:Remove()
+end)
+
+net.Receive("HG_Phone_IEDDetonate", function(_, ply)
+	local phone = net.ReadEntity()
+	if not hg_iedphones:GetBool() or not PHONE:CanControl(ply, phone) or not HG_PHONE.IsIEDPhone(phone) then return end
+	if phone.PhoneDetonate then phone:PhoneDetonate() end
+end)
+
+function PHONE:CanHearVoiceCall(listener, speaker)
+	local source = PHONE.ActivePhoneByPlayer[speaker]
+	if not HG_PHONE.IsPhone(source) or HG_PHONE.GetState(source) ~= HG_PHONE.STATE_IN_CALL then return end
+	local target = source:GetNW2Entity("HGPhoneTarget")
+	if PHONE:GetUser(target) ~= listener then return end
+	if not speaker:Alive() or not listener:Alive() then return false, false end
+	if speaker.organism and (speaker.organism.otrub or speaker.organism.holdingbreath or speaker.organism.o2[1] < 15 or speaker.organism.brain > 0.05) then return false, false end
+	if listener.organism and (listener.organism.otrub or listener.organism.o2[1] < 15) then return false, false end
+	return true, false
+end
+
+hook.Add("HG_PlayerCanHearPlayersVoice", "HG_Phone_VoiceCall", function(listener, speaker)
+	return PHONE:CanHearVoiceCall(listener, speaker)
+end)
+
+hook.Add("Think", "HG_Phone_CallManager", function()
+	local now = CurTime()
+	for _, phone in pairs(PHONE.Registry) do
+		if not HG_PHONE.IsPhone(phone) then continue end
+		local state = HG_PHONE.GetState(phone)
+		if state == HG_PHONE.STATE_RINGING then
+			if (phone._HGPhoneRingExpires or 0) <= now then
+				PHONE:EndCall(phone, "No answer.")
+			elseif (phone._HGPhoneRingAt or 0) <= now then
+				EmitRingtone(phone)
+				phone._HGPhoneRingAt = now + math.max(SoundDuration(HG_PHONE.GetRingtone(phone)), 2.5)
+			end
+		elseif state == HG_PHONE.STATE_CALLING or state == HG_PHONE.STATE_IN_CALL then
+			local user = PHONE:GetUser(phone)
+			if not IsValid(user) or not user:Alive() or (not phone:IsWeapon() and user:GetPos():DistToSqr(phone:GetPos()) > 240 * 240) then
+				PHONE:EndCall(phone, "Call ended.")
+			end
+		end
+	end
+end)
+
+hook.Add("EntityRemoved", "HG_Phone_Unregister", function(ent)
+	for number, phone in pairs(PHONE.Registry) do
+		if phone == ent then
+			PHONE.Registry[number] = nil
+			PHONE:QueueRegistrySync()
+			break
+		end
+	end
+end)
+
+hook.Add("PlayerDisconnected", "HG_Phone_PlayerLeft", function(ply)
+	local phone = PHONE.ActivePhoneByPlayer[ply]
+	if IsValid(phone) then PHONE:EndCall(phone, "Call ended.") end
+end)
+
+local replaceClasses = {
+	prop_physics = true,
+	prop_physics_multiplayer = true,
+	prop_physics_override = true,
+	prop_dynamic = true,
+	prop_dynamic_override = true
+}
+local function ReplacePhoneProp(ent)
+	if not IsValid(ent) or ent._HGPhoneReplacing or not replaceClasses[ent:GetClass()] or not HG_PHONE.IsMapPhoneModel(ent:GetModel()) then return end
+	ent._HGPhoneReplacing = true
+
+	local model, pos, ang = ent:GetModel(), ent:GetPos(), ent:GetAngles()
+	local skin, color, material, scale = ent:GetSkin(), ent:GetColor(), ent:GetMaterial(), ent:GetModelScale()
+	local noDraw, renderMode, renderFX, collisionGroup = ent:GetNoDraw(), ent:GetRenderMode(), ent:GetRenderFX(), ent:GetCollisionGroup()
+	local name, parent = ent:GetName(), ent:GetParent()
+	local localPos, localAng = ent:GetLocalPos(), ent:GetLocalAngles()
+	local bodygroups = {}
+	for i = 0, ent:GetNumBodyGroups() - 1 do bodygroups[i] = ent:GetBodygroup(i) end
+	local oldPhys = ent:GetPhysicsObject()
+	local motionEnabled = IsValid(oldPhys) and oldPhys:IsMotionEnabled() or false
+
+	local phone = ents.Create("ent_phone")
+	if not IsValid(phone) then return end
+	phone.PhoneModelOverride = model
+	phone:SetPos(pos)
+	phone:SetAngles(ang)
+	phone:Spawn()
+	phone:Activate()
+	phone:SetSkin(skin)
+	phone:SetColor(color)
+	phone:SetMaterial(material)
+	phone:SetModelScale(scale, 0)
+	phone:SetNoDraw(noDraw)
+	phone:SetRenderMode(renderMode)
+	phone:SetRenderFX(renderFX)
+	phone:SetCollisionGroup(collisionGroup)
+	phone:SetNW2Bool("HGMapPhone", true)
+	if name ~= "" then phone:SetName(name) end
+	for id, value in pairs(bodygroups) do phone:SetBodygroup(id, value) end
+	if IsValid(parent) then
+		phone:SetParent(parent)
+		phone:SetLocalPos(localPos)
+		phone:SetLocalAngles(localAng)
+	end
+	local newPhys = phone:GetPhysicsObject()
+	if IsValid(newPhys) and not motionEnabled then newPhys:EnableMotion(false) end
+	PHONE:SetIdentity(phone, nil, name ~= "" and name or "Map Phone", nil)
+	ent:Remove()
+end
+
+hook.Add("InitPostEntity", "HG_Phone_ReplaceMapProps", function()
+	timer.Simple(0, function()
+		for _, ent in ipairs(ents.GetAll()) do ReplacePhoneProp(ent) end
+	end)
+end)
+
+hook.Add("OnEntityCreated", "HG_Phone_ReplaceSpawnedProps", function(ent)
+	timer.Simple(0, function() ReplacePhoneProp(ent) end)
 end)

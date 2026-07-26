@@ -84,9 +84,8 @@ local limbArteryWeakness = {
 }
 
 local o2DebuffArteries = {
-	-- A slit carotid is primarily a bleed/shock emergency. Keep its direct body
-	-- O2 penalty small so it does not overwhelm the separate airway and blood-loss paths.
-	arteria = 0.1,
+	-- Arteria uses the gradual drain in sv_lungs; do not layer the old fast drain over it.
+	arteria = 0,
 	spineartery = 0.85,
 }
 
