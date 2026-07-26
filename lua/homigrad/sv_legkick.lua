@@ -1,3 +1,7 @@
+if SERVER then
+    resource.AddFile("sound/HOYAA.mp3")
+end
+
 local PLAYER = FindMetaTable("Player")
 
 local vpang = Angle(2, 0, 0)
@@ -22,7 +26,7 @@ function PLAYER:LegAttack()
         self:EmitSound("HOYAA.mp3", 75, 100)
     end
 
-    self:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav",65)
+    self:EmitSound("panoptisscon/kickgrunt.wav", 65)
 
     local org = self.organism
     org.stamina.subadd = org.stamina.subadd + ((string.find(anim, "curbstomp")) and 8 or 30)
@@ -87,7 +91,7 @@ function PLAYER:LegAttack()
                 filter = {hg.GetCurrentCharacter(self),self}
             })
             if tr.Hit and (self:IsOnGround() or isMidAir) then
-                --self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                --self:EmitSound("panoptisscon/kick.wav")
                 self:SetVelocity(ang:Forward() * (isMidAir and -70 or -150))
             end
         end,
@@ -96,8 +100,6 @@ function PLAYER:LegAttack()
             if !self:IsOnGround() and !isMidAir then self:PlayCustomAnims("") return end
             local ang = self:EyeAngles()
             ang[1] = 0
-
-            self:EmitSound("player/shove_0" .. math.random(1,5) .. ".wav",65)
 
             local inDuck = (self:KeyDown(IN_DUCK) or self:Crouching())
             ang = self:EyeAngles()
@@ -135,7 +137,7 @@ function PLAYER:LegAttack()
                 if org.rleg == 1 or org.rlegdislocation then
                     org.painadd = org.painadd + 20
                 end
-                self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                self:EmitSound("panoptisscon/kick.wav")
             elseif isMidAir then
                 -- If it's a dropkick, we want a larger hit area or forward trace to ensure it lands
                 local tr_midair = util.TraceHull({
@@ -152,7 +154,7 @@ function PLAYER:LegAttack()
                         entss[#entss+1] = tr.Entity
                     end
                      soundplayed = true
-                     self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                     self:EmitSound("panoptisscon/kick.wav")
                 end
             end
 
@@ -201,7 +203,7 @@ function PLAYER:LegAttack()
                             org.painadd = org.painadd + 20
                         end
 
-                        self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                        self:EmitSound("panoptisscon/kick.wav")
                     end
 
                     local dmginfo = DamageInfo()

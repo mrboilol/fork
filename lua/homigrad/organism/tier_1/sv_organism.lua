@@ -300,6 +300,23 @@ local function approachVital(current, target, timeValue, fallRate, recoveryRate)
 	return math.Approach(value, target, math.max(timeValue or 0, 0) * rate)
 end
 
+-- Normalized delivery values are organism reserves, not smoothed readouts.
+-- They continuously recover toward the healthy 1.0 baseline, while the
+-- current physiological target can force them downward much more quickly.
+local function updateNormalizedVital(current, target, timeValue, recoveryRate, forcedLossRate)
+	local value = tonumber(current)
+	if value == nil or value != value then value = 1 end
+
+	local dt = math.max(timeValue or 0, 0)
+	local forcedTarget = math.Clamp(tonumber(target) or 1, 0, 1)
+	value = math.Approach(math.Clamp(value, 0, 1), 1, dt * recoveryRate)
+	if forcedTarget < value then
+		value = math.Approach(value, forcedTarget, dt * forcedLossRate)
+	end
+
+	return math.Clamp(value, 0, 1)
+end
+
 -- Vottur's perfusion model, adapted to this checkout's existing mmHg blood
 -- pressure.  Do not write bloodpressure here: sv_pulse remains the sole owner
 -- of pressure/ECG and this derives delivery from its result.
@@ -321,7 +338,7 @@ function hg.organism.UpdateIntracranialPressure(org, pressure, timeValue)
 
 	local pressurePenalty = math.Clamp(math.Remap(org.intracranialPressure, 0.15, 0.85, 0, 0.9), 0, 0.9)
 	local cerebralTarget = math.Clamp((pressure or 0) - pressurePenalty, 0, 1)
-	org.cerebralPerfusion = approachVital(org.cerebralPerfusion, cerebralTarget, dt, 0.3, 0.45)
+	org.cerebralPerfusion = updateNormalizedVital(org.cerebralPerfusion, cerebralTarget, dt, 0.45, 2.4)
 	return org.cerebralPerfusion
 end
 
@@ -350,6 +367,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 		bloodFraction = 0
 	end
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
+	local hypercapnia = math.Clamp(math.Remap(org.CO or 0, 5, 30, 0, 1), 0, 1)
+	local brainTrauma = math.Clamp(org.brain or 0, 0, 1)
 	local venousBleed = math.max(org.venousBleed or 0, 0)
 	local internalBleed = math.max(org.internalBleedRate or 0, 0)
 	local venousPenalty = math.Clamp(venousBleed / 65, 0, 0.18)
@@ -361,7 +380,10 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local pump = math.Clamp((org.bloodpressure or 0) / 93, 0, 1.2)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
 
-	org.bodyoxygen = approachVital(org.bodyoxygen, oxygen, dt, 0.35, 0.5)
+	-- Whole-body oxygen content follows the old O2 reservoir, but blood volume
+	-- and retained CO2/CO can now force the normalized reserve down directly.
+	local bodyOxygenTarget = math.Clamp(oxygen * Lerp(bloodFraction, 0.35, 1) * Lerp(hypercapnia, 1, 0.35), 0, 1)
+	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, 2.5)
 	-- Arterial loss already lowers blood volume and the blood-pressure target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an
 	-- independent disorientation/otrub source instead of a blood-loss emergency.
@@ -369,11 +391,11 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local perfusionTarget = math.Clamp(pressureDelivery * Lerp(org.bodyoxygen, 0.55, 1), 0, 1)
 	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
 
-	org.perfusion = approachVital(org.perfusion, perfusionTarget, dt, 0.28, 0.45)
+	org.perfusion = updateNormalizedVital(org.perfusion, perfusionTarget, dt, 0.5, 2.8)
 	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, pump, dt)
-	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82), 0, 1)
-	org.brainoxygen = approachVital(org.brainoxygen, brainTarget, dt, 0.22, 0.4)
-	org.peripheralperfusion = approachVital(org.peripheralperfusion, peripheralTarget, dt, 0.3, 0.5)
+	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
+	org.brainoxygen = updateNormalizedVital(org.brainoxygen, brainTarget, dt, 0.45, 2.6)
+	org.peripheralperfusion = updateNormalizedVital(org.peripheralperfusion, peripheralTarget, dt, 0.55, 2.8)
 
 	org.perfusionMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1)
 	org.perfusionGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1)

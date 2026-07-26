@@ -791,6 +791,27 @@ local function stopthings()
 
 end
 
+local function stopLowO2Soundtracks()
+	local lowO2Stations = {
+		NoiseStation2,
+		NoiseStation2Dying,
+		EndStation,
+		DyingStation,
+		Alto2Station,
+		SillydyingStation,
+		ItssooverStation,
+		SonimCookedStation,
+		RemDying1Station,
+		AltRemDyingStation
+	}
+
+	for _, station in pairs(lowO2Stations) do
+		if IsValid(station) then station:Stop() end
+	end
+
+	hg.consciousBeatIntensity = 0
+end
+
 local stations = {
 	0.06,
 	0.1,
@@ -1691,10 +1712,15 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 	
+	local deathStateActive = org.incapacitated and (org.deathStateEnd or 0) > 0
+	if deathStateActive then
+		stopLowO2Soundtracks()
+	end
+
 	if O2Lerp > 1 then
 		o2 = O2Lerp
 		
-		if o2 > 50 and !org.otrub then
+		if o2 > 50 and !org.otrub and !deathStateActive then
 			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then

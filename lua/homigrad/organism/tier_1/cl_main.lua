@@ -275,6 +275,7 @@ net.Receive("hg_forsaken_deathscene", function()
 	forsaken_scene_start = CurTime()
 	forsaken_scene_end = forsaken_scene_start + forsaken_scene_duration
 	forsaken_soundfade_release_until = forsaken_scene_end + 0.5
+	surface.PlaySound("panoptisscon/death.ogg")
 	RunConsoleCommand("soundfade", "0", "0")
 end)
 
@@ -1112,7 +1113,9 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size)
 		hg.addBloodPart(pos, bloodDown * 2 + VectorRand(-0.5, 0.5), nil, size, size, true, nil, ent)
 		return
 	end
-	local forwardVelocityMul = 1.75
+	-- Keep the oscillation, but let forward pressure dominate enough for the
+	-- arterial trail to read as a fast jet instead of a short local spray.
+	local forwardVelocityMul = 2.5
 	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
 	local velocity = (VectorRand(-1, 1) * pulseMul
 		+ dir * 5 * forwardVelocityMul * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
@@ -1266,6 +1269,18 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		end
 	end
 
+	local deathStateActive = org.incapacitated and (org.deathStateEnd or 0) > 0
+	if ply == lply then
+		if deathStateActive then
+			if not ent.pulse_breathe.deathStateStoppedLowO2 then
+				ply:StopSound("sonimcooked.mp3")
+				ent.pulse_breathe.deathStateStoppedLowO2 = true
+			end
+		else
+			ent.pulse_breathe.deathStateStoppedLowO2 = nil
+		end
+	end
+
 	--why? because
 	if org.pulse and (ent.pulse_breathe.lastbreathe or 0) < CurTime() and org.lastbreathed and org.lastbreathed + 5 < CurTime() then
 		local heartbeat = org.heartbeat or 0
@@ -1282,7 +1297,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				if org.timeValue and org.o2.curregen <= org.timeValue * 0.5 and org.o2[1] < 20 then
 					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_wheeze"..math.random(5)..".mp3", 40, nil, nil, nil, nil, 1)
 				end
-				if org.o2[1] < 12 and ply == lply and (ent.pulse_breathe.lastsonimcooked or 0) < CurTime() and math.random(4) == 1 then
+				if org.o2[1] < 12 and !deathStateActive and ply == lply and (ent.pulse_breathe.lastsonimcooked or 0) < CurTime() and math.random(4) == 1 then
 					ply:EmitSound("sonimcooked.mp3", 45, math.random(94, 106), 0.85)
 					ent.pulse_breathe.lastsonimcooked = CurTime() + math.Rand(12, 24)
 				end

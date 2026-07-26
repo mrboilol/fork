@@ -486,7 +486,7 @@ if SERVER then
         end
 
         wep:SetClip1(math.min(current + amount, maxBat))
-        wep:Notify("Recharged from " .. source, "snd_jack_hmcd_ammobox.wav")
+        wep:Notify("Recharged from " .. source, hasBattery and "panoptisscon/phone_simcard_insert.ogg" or "snd_jack_hmcd_ammobox.wav")
     end)
 end
 

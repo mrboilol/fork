@@ -215,7 +215,7 @@ function PLAYER:LegAttack()
         anim = self:EyeAngles()[1] > 60 and "curbstomp_midair" or self:EyeAngles()[1] > 35 and "kick_midair_25" or self:EyeAngles()[1] > 20 and "kick_midair_45" or "kick_midair"
     end
 
-    self:EmitSound("player/clothes_generic_foley_0" .. math.random(1,5) .. ".wav",65)
+    self:EmitSound("panoptisscon/kickgrunt.wav", 65)
 
     local org = self.organism
     local isCrouchKick = (self:KeyDown(IN_DUCK) or self:Crouching()) and not isMidAir
@@ -269,7 +269,7 @@ function PLAYER:LegAttack()
                 filter = {hg.GetCurrentCharacter(self),self}
             })
             if tr.Hit and (self:IsOnGround() or isMidAir) then
-                --self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                --self:EmitSound("panoptisscon/kick.wav")
                 self:SetVelocity(ang:Forward() * -150)
             end
         end,
@@ -300,7 +300,7 @@ function PLAYER:LegAttack()
                 if org.rleg == 1 or org.rlegdislocation then
                     org.painadd = org.painadd + 20
                 end
-                self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                self:EmitSound("panoptisscon/kick.wav")
             end
 
             if IsValid(tr.Entity) and tr.Entity.fires then
@@ -326,7 +326,7 @@ function PLAYER:LegAttack()
                             org.painadd = org.painadd + 20
                         end
 
-                        self:EmitSound("weapons/melee/blunt_light" .. math.random(1,8) .. ".wav")
+                        self:EmitSound("panoptisscon/kick.wav")
                     end
 
                     local hitDmg = dmg

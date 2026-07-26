@@ -19,6 +19,7 @@ local netNames = {
 	"HG_Phone_Text",
 	"HG_Phone_SetRingtone",
 	"HG_Phone_SetDisplayName",
+	"HG_Phone_SetPublic",
 	"HG_Phone_Pickup",
 	"HG_Phone_PlaceDown",
 	"HG_Phone_Notification",
@@ -131,7 +132,7 @@ end
 function PHONE:SyncRegistry(target)
 	local entries = {}
 	for number, phone in pairs(self.Registry) do
-		if HG_PHONE.IsPhone(phone) and HG_PHONE.GetNumber(phone) == number then
+		if HG_PHONE.IsPhone(phone) and HG_PHONE.GetNumber(phone) == number and (HG_PHONE.IsPublic(phone) or PHONE:CanControl(target, phone)) then
 			entries[#entries + 1] = {number = number, phone = phone}
 		else
 			self.Registry[number] = nil
@@ -165,6 +166,10 @@ function PHONE:SetIdentity(phone, number, displayName, ringtone)
 	phone:SetNW2String("HGPhoneNumber", number)
 	phone:SetNW2String("HGPhoneName", displayName)
 	phone:SetNW2String("HGPhoneRingtone", ringtone)
+	if phone:GetNW2Bool("HGPhonePublicInitialized", false) == false then
+		phone:SetNW2Bool("HGPhonePublic", phone:GetNW2Bool("HGMapPhone", false))
+		phone:SetNW2Bool("HGPhonePublicInitialized", true)
+	end
 	self.Registry[number] = phone
 	self:QueueRegistrySync()
 	return true
@@ -223,6 +228,13 @@ function PHONE:EndCall(phone, reason)
 		Notify(firstUser, reason)
 		if secondUser ~= firstUser then Notify(secondUser, reason) end
 	end
+end
+
+function PHONE:EmitPhoneSound(phone, path)
+	if not IsValid(phone) then return end
+	local user = self:GetUser(phone)
+	local emitter = IsValid(user) and user or phone
+	emitter:EmitSound(path, 60, 100, 0.75, CHAN_ITEM)
 end
 
 function PHONE:UnregisterPhone(phone, transferring)
@@ -322,11 +334,15 @@ net.Receive("HG_Phone_AnswerCall", function(_, ply)
 	if IsValid(callerUser) then PHONE.ActivePhoneByPlayer[callerUser] = caller end
 	Notify(ply, "Call connected.")
 	Notify(callerUser, "Call connected.")
+	PHONE:EmitPhoneSound(phone, "panoptisscon/phone_answer.ogg")
 end)
 
 net.Receive("HG_Phone_HangupCall", function(_, ply)
 	local phone = net.ReadEntity()
-	if PHONE:CanControl(ply, phone) then PHONE:EndCall(phone, "Call ended.") end
+	if PHONE:CanControl(ply, phone) then
+		PHONE:EmitPhoneSound(phone, "panoptisscon/phone_hangup.ogg")
+		PHONE:EndCall(phone, "Call ended.")
+	end
 end)
 
 net.Receive("HG_Phone_Text", function(_, ply)
@@ -338,6 +354,9 @@ net.Receive("HG_Phone_Text", function(_, ply)
 	local target = phone:GetNW2Entity("HGPhoneTarget")
 	local targetUser = PHONE:GetUser(target)
 	if not IsValid(targetUser) then return PHONE:EndCall(phone, "Call ended.") end
+	local talkSound = "talk" .. math.random(1, 3) .. ".ogg"
+	ply:EmitSound(talkSound, 60, math.random(92, 108), 0.7, CHAN_VOICE)
+	if targetUser ~= ply then targetUser:EmitSound(talkSound, 60, math.random(92, 108), 0.7, CHAN_VOICE) end
 
 	for _, recipient in ipairs({ply, targetUser}) do
 		net.Start("HG_Phone_Text")
@@ -363,6 +382,14 @@ net.Receive("HG_Phone_SetDisplayName", function(_, ply)
 	phone:SetNW2String("HGPhoneName", name)
 	PHONE:QueueRegistrySync()
 	Notify(ply, "Phone name updated.")
+end)
+
+net.Receive("HG_Phone_SetPublic", function(_, ply)
+	local phone = net.ReadEntity()
+	if not PHONE:CanControl(ply, phone) then return end
+	phone:SetNW2Bool("HGPhonePublic", net.ReadBool())
+	PHONE:QueueRegistrySync()
+	Notify(ply, HG_PHONE.IsPublic(phone) and "Phone number is public." or "Phone number is private.")
 end)
 
 net.Receive("HG_Phone_Pickup", function(_, ply)

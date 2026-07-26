@@ -129,7 +129,13 @@ if SERVER then
         end
     end)
 
-	hook.Add("StartVoice", "radio", function(output)
+	hook.Add("HG_PlayerCanHearPlayersVoice", "WalkieTalkieVoice", function(listener, speaker)
+	if listener == speaker then return end
+	local wep = listener:GetWeapon("weapon_walkie_talkie")
+	if IsValid(wep) and wep:CanListen(listener, speaker, false) then return true, false end
+end)
+
+hook.Add("StartVoice", "radio", function(output)
         local wep = output:GetWeapon("weapon_walkie_talkie")
 
 		if(not IsValid(wep))then 

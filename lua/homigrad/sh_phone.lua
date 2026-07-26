@@ -88,3 +88,6 @@ if ENTITY then
 	if not ENTITY.GetPhoneState then function ENTITY:GetPhoneState() return HG_PHONE.GetState(self) end end
 	if not ENTITY.GetRingtonePath then function ENTITY:GetRingtonePath() return HG_PHONE.GetRingtone(self) end end
 end
+function HG_PHONE.IsPublic(ent)
+	return IsValid(ent) and ent:GetNW2Bool("HGPhonePublic", false)
+end
