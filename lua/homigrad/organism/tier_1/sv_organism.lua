@@ -191,7 +191,7 @@ hook.Add("Org Clear", "Main", function(org)
 
 	org.health = 100
 	org.canmove = true
-	org.recoilmul = 1
+	org.recoilmul = hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "RecoilMul", 1) or 1
 	org.legstrength = 1
 	org.armstrength = 1
 	org.meleespeed = 1

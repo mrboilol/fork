@@ -1075,6 +1075,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local painMul = 	( bullet ~= nil and bullet.PainMultiplier ) or 
 						( IsValid(inf) and inf.PainMultiplier ) or 1
 
+	local rolePainMul = hg.GetSubRolePerk and hg.GetSubRolePerk(org.owner, "PainMul", 1) or 1
+	local roleShockMul = hg.GetSubRolePerk and hg.GetSubRolePerk(org.owner, "ShockMul", 1) or 1
+	painMul = painMul * rolePainMul
+	shockMul = shockMul * roleShockMul
+
 	local immobilizationMul = 	( bullet ~= nil and bullet.ImmobilizationMul) or 
 								( IsValid(inf) and inf.ImmobilizationMul ) or 1
 
@@ -1397,8 +1402,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		
 		local adrenalineMul = math.min(math.max(1 + org.adrenaline, 1), 1.2)
 		local adrenaline = org.adrenaline
-		local analgesiaMul = (org.analgesia * 4 + 1)
-		local painkillerMul = (org.painkiller * 0.5 + 1)
+		local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
+		local painkillerMul = 1
 		local inflictor = dmgInfo:GetInflictor()
 		local inflictorClass = IsValid(inflictor) and inflictor:GetClass() or ""
 		local inflictorBase = IsValid(inflictor) and inflictor.Base or ""

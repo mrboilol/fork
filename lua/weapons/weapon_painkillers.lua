@@ -24,15 +24,50 @@ SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modeNames = {
 	[1] = "painkiller"
 }
+local painkillerTypes = {
+	paracetamol = {
+		name = "Paracetamol", dose = 1,
+		description = "Paracetamol is a OTC medication that tends to alleviate acute and chronic pain. It is classified as a NSAID and is generally safe to take in moderate amounts.",
+		appearance = "This one is a white, thick pill that leaves dust around.",
+	},
+	tramadol = {
+		name = "Tramadol", dose = 0.4,
+		description = "Tramadol is a prescription only medication that is prescribed when non-opioid options seem inadequate. It is a moderate schedule IV opioid that might cause respiratory depression on excess use.",
+		appearance = "This one has a off-white color to it, and is a small pill.",
+	},
+	tapentadol = {
+		name = "Tapentadol", dose = 0.8,
+		description = "Tapentadol is a prescription only medication that is used for severe acute pain, this is used for certain nerve pain or when a opioid-level medication is required/prescribed. It is a strong schedule II opioid that might cause a risk in overdosing or respiratory depression. Do not take more than one.",
+		appearance = "This one has a off white color to it, and is a small pill. It also feels very brittle.",
+	},
+}
+local painkillerTypeOrder = {"paracetamol", "tramadol", "tapentadol"}
 
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
+	self.modeValues = {[1] = 1}
+	if not SERVER then return end
 
-	self.modeValues = {
-		[1] = 1
-	}
+	local medicineID = painkillerTypeOrder[math.random(#painkillerTypeOrder)]
+	local medicine = painkillerTypes[medicineID]
+	local labelRoll = math.random(100)
+	local labelID = medicineID
+	local detail = medicine.description .. "\n" .. medicine.appearance
+
+	if labelRoll > 50 then
+		if labelRoll <= 60 then
+			repeat
+			labelID = painkillerTypeOrder[math.random(#painkillerTypeOrder)]
+			until labelID ~= medicineID
+		else
+			labelID = nil
+		end
+	end
+
+	self:SetNWString("hg_painkiller_type", medicineID)
+	self:SetNWString("hg_painkiller_label", labelID and painkillerTypes[labelID].name or "Unlabeled Painkillers")
+	self:SetNWString("hg_painkiller_detail", detail)
 end
-
 SWEP.modeValuesdef = {
 	[1] = 1,
 }
@@ -49,8 +84,18 @@ function SWEP:Think()
 	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 4, 0))
 	end
-end
 
+	if CLIENT then
+		local label = self:GetNWString("hg_painkiller_label", "Painkillers")
+		local detail = self:GetNWString("hg_painkiller_detail", "")
+		local displayKey = label .. "\n" .. detail
+		if self.hg_painkiller_display_key ~= displayKey then
+			self.hg_painkiller_display_key = displayKey
+			self.PrintName = label
+			self.HudHintMarkup = markup.Parse("<font=ZCity_Tiny>" .. label .. "</font>\n<font=ZCity_SuperTiny><colour=125,125,125>" .. detail .. "</colour></font>\n" .. self.HowToUseInstructions, 450)
+		end
+	end
+end
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
 function SWEP:Animation()
 	local owner = self:GetOwner()
@@ -104,7 +149,18 @@ if SERVER then
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 		entOwner:EmitSound("snd_jack_hmcd_pillsuse.wav", 60, math.random(95, 105))
 
-		org.analgesiaAdd = math.min(org.analgesiaAdd + self.modeValues[1] * 0.4, 4)
+		local lacedAmount = self.HG_FentanylLacedAmount or 0
+		if lacedAmount > 0 then
+			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + lacedAmount, 25)
+			self.HG_FentanylLacedAmount = nil
+		end
+		local medicineID = self:GetNWString("hg_painkiller_type", "paracetamol")
+		local medicine = painkillerTypes[medicineID] or painkillerTypes.paracetamol
+		if medicineID == "paracetamol" then
+			org.painkiller = math.min((org.painkiller or 0) + medicine.dose, 5)
+		else
+			org.analgesiaAdd = math.min(org.analgesiaAdd + medicine.dose, 4)
+		end
 
 		if self.modeValues[1] > 0 then
 			self.modeValues[1] = 0

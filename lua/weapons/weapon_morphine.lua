@@ -112,6 +112,11 @@ if SERVER then
 
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 
+		local lacedAmount = self.HG_FentanylLacedAmount or 0
+		if lacedAmount > 0 then
+			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + lacedAmount, 25)
+			self.HG_FentanylLacedAmount = nil
+		end
 		local injected = math.min(FrameTime() * 0.5, self.modeValues[1])
 		org.analgesiaAdd = math.min(org.analgesiaAdd + injected, 4)
 		self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)

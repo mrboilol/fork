@@ -101,7 +101,9 @@ function SWEP:CanInject(ent,bone)
 	local DotProduct = LookVec:DotProduct( TrueVec )
 	local ApproachAngle=( -math.deg( math.asin(DotProduct) )+90 )
 
-    return ApproachAngle>=120
+    local owner = self:GetOwner()
+	local minAngle = owner.SubRole == "traitor_chemist" and 90 or 120
+	return ApproachAngle >= minAngle
 end
 
 if CLIENT then
@@ -129,7 +131,7 @@ function SWEP:DoPoison(ply)
     local org = ply.organism
     local Owner = self:GetOwner()
 
-	org.poison1 = CurTime()
+	org.poison1 = CurTime() - (Owner.SubRole == "traitor_chemist" and 10 or 0)
 
     Owner:EmitSound("snd_jack_hmcd_needleprick.wav",30)
 
@@ -153,7 +155,7 @@ if SERVER then
 			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav")
 		end
 
-		if (org.poison1 + 30) < curtime then
+		if (org.poison1 + (owner.SubRole == "traitor_chemist" and 50 or 30)) < curtime then
         	org.o2.regen = 0
 		end
 	end)

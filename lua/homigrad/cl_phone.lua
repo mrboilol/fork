@@ -175,21 +175,13 @@ local function BuildPhonePanel(phone)
 		deviceButton:SetVisible(false)
 	end
 
-	local iedButton = vgui.Create("DButton", frame)
-	iedButton:SetPos(460, 274)
-	iedButton:SetSize(304, 50)
-	iedButton:SetText("CALL / DETONATE LINKED IED")
-	iedButton:SetTextColor(Color(180, 35, 35))
-	iedButton:SetVisible(HG_PHONE.IsIEDPhone(phone))
-	iedButton.DoClick = function() SendPhoneEntity("HG_Phone_IEDDetonate", phone) end
-
 	local nameEntry = vgui.Create("DTextEntry", frame)
-	nameEntry:SetPos(460, 332)
+	nameEntry:SetPos(460, 274)
 	nameEntry:SetSize(202, 28)
 	nameEntry:SetPlaceholderText("Phone display name")
 
 	local setName = vgui.Create("DButton", frame)
-	setName:SetPos(668, 332)
+	setName:SetPos(668, 274)
 	setName:SetSize(96, 28)
 	setName:SetText("SET NAME")
 	setName.DoClick = function()
@@ -202,13 +194,13 @@ local function BuildPhonePanel(phone)
 	end
 
 	local ringtone = vgui.Create("DComboBox", frame)
-	ringtone:SetPos(460, 372)
+	ringtone:SetPos(460, 314)
 	ringtone:SetSize(202, 28)
 	for index, data in ipairs(HG_PHONE.RINGTONES) do ringtone:AddChoice(data.name, index) end
 	ringtone:SetValue("Choose ringtone")
 
 	local setRingtone = vgui.Create("DButton", frame)
-	setRingtone:SetPos(668, 372)
+	setRingtone:SetPos(668, 314)
 	setRingtone:SetSize(96, 28)
 	setRingtone:SetText("SET / TEST")
 	setRingtone.DoClick = function()
@@ -274,7 +266,7 @@ local function BuildPhonePanel(phone)
 				HG_PHONE.GetDisplayName(entry.phone),
 				entry.number,
 				HG_PHONE.GetStateName(HG_PHONE.GetState(entry.phone)),
-				HG_PHONE.IsIEDPhone(entry.phone) and "IED PHONE" or (entry.phone:IsWeapon() and "HANDHELD" or "MAP / DESK")
+				entry.phone:IsWeapon() and "HANDHELD" or "MAP / DESK"
 			)
 			line.PhoneNumber = entry.number
 			line.PhoneEntity = entry.phone
@@ -302,7 +294,6 @@ local function BuildPhonePanel(phone)
 		hangupButton:SetEnabled(state ~= HG_PHONE.STATE_IDLE)
 		sendButton:SetEnabled(state == HG_PHONE.STATE_IN_CALL)
 		messageEntry:SetEnabled(state == HG_PHONE.STATE_IN_CALL)
-		iedButton:SetEnabled(HG_PHONE.IsIEDPhone(phone) and not phone:GetDialing() and not phone:GetDetonating())
 	end
 
 	frame.OnClose = function()

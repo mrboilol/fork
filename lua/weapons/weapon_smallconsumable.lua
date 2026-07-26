@@ -117,6 +117,11 @@ if SERVER then
 	function SWEP:Heal(ent, mode, bone)
 		local org = ent.organism
 		if not org then return end
+		local lacedAmount = self.HG_FentanylLacedAmount or 0
+		if lacedAmount > 0 then
+			org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + lacedAmount, 25)
+			self.HG_FentanylLacedAmount = nil
+		end
 		local owner = self:GetOwner()
 
 

@@ -22,8 +22,7 @@ local netNames = {
 	"HG_Phone_SetPublic",
 	"HG_Phone_Pickup",
 	"HG_Phone_PlaceDown",
-	"HG_Phone_Notification",
-	"HG_Phone_IEDDetonate"
+	"HG_Phone_Notification"
 }
 
 for _, name in ipairs(netNames) do util.AddNetworkString(name) end
@@ -183,7 +182,8 @@ function PHONE:RegisterPhone(phone, number, displayName, ringtone)
 	if not displayName then
 		local owner = phone:IsWeapon() and phone:GetOwner() or nil
 		if HG_PHONE.IsIEDPhone(phone) then
-			displayName = IsValid(owner) and (owner:Nick() .. "'s IED Phone") or "IED Phone"
+			local names = HG_PHONE.IED_HANDHELD_NAMES or {}
+			displayName = #names > 0 and table.Random(names) or "Handheld"
 		elseif IsValid(owner) and owner:IsPlayer() then
 			displayName = owner:Nick() .. "'s Phone"
 		elseif phone:GetNW2Bool("HGMapPhone", false) then
@@ -262,10 +262,6 @@ function PHONE:OpenPhone(ply, phone)
 end
 
 function PHONE.OpenIEDPhone(ply, phone)
-	if not hg_iedphones:GetBool() then
-		Notify(ply, "IED phones are disabled on this server.")
-		return false
-	end
 	return PHONE:OpenPhone(ply, phone)
 end
 
@@ -295,6 +291,14 @@ local function StartCall(ply, source, targetNumber)
 
 	local target = PHONE.Registry[tostring(targetNumber or "")]
 	if not HG_PHONE.IsPhone(target) or target == source then return Notify(ply, "That number is unavailable.") end
+	-- IEDs do not answer calls: dialing their assigned number is the trigger.
+	if HG_PHONE.IsIEDPhone(target) then
+		if target:GetDestroyed() or target:GetDialing() or target:GetDetonating() then return Notify(ply, "That IED is unavailable.") end
+		if target.PhoneDetonate and target:PhoneDetonate() then
+			return Notify(ply, "Dialing " .. HG_PHONE.GetNumber(target) .. "...")
+		end
+		return Notify(ply, "That IED is unavailable.")
+	end
 	if HG_PHONE.GetState(target) ~= HG_PHONE.STATE_IDLE then return Notify(ply, "That number is busy.") end
 	local targetUser = PHONE:GetUser(target)
 	if targetUser == ply then return Notify(ply, "You cannot call another phone you are carrying.") end
@@ -444,11 +448,6 @@ net.Receive("HG_Phone_PlaceDown", function(_, ply)
 	weapon:Remove()
 end)
 
-net.Receive("HG_Phone_IEDDetonate", function(_, ply)
-	local phone = net.ReadEntity()
-	if not hg_iedphones:GetBool() or not PHONE:CanControl(ply, phone) or not HG_PHONE.IsIEDPhone(phone) then return end
-	if phone.PhoneDetonate then phone:PhoneDetonate() end
-end)
 
 function PHONE:CanHearVoiceCall(listener, speaker)
 	local source = PHONE.ActivePhoneByPlayer[speaker]

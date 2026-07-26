@@ -64,7 +64,7 @@ function ENT:Think()
 						local ply_cyanide_accumulated = mode_hmcd.AddChemicalToPlayer(ent, "HCN", 10)
 						
 						if(ply_cyanide_accumulated > 100)then
-							ent.organism.poison3 = CurTime()
+							ent.organism.poison3 = CurTime() - (self.ChemistPotency and 10 or 0)
 						end
 						
 						mode_hmcd.NetworkChemicalResistanceOfPlayer(ent)
@@ -73,10 +73,10 @@ function ENT:Think()
 						
 						-- ent:ChatPrint("cyanide = " .. math.Round(ply_cyanide_accumulated) .. " / " .. "10")
 					else
-						ent.organism.poison3 = CurTime()
+						ent.organism.poison3 = CurTime() - (self.ChemistPotency and 10 or 0)
 					end
 				else
-					ent.organism.poison3 = CurTime()
+					ent.organism.poison3 = CurTime() - (self.ChemistPotency and 10 or 0)
 				end
 			end
 		end

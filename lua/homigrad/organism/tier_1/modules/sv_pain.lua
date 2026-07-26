@@ -83,9 +83,9 @@ module[2] = function(owner, org, timeValue)
 
 	local adrenaline = org.adrenaline
 
-	local analgesiaMul = (org.analgesia * 4 + 1)
+	local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
 
-	local painkillerMul = (org.painkiller * 0.5 + 1)
+	local painkillerMul = 1
 
 	local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 
@@ -151,7 +151,7 @@ module[2] = function(owner, org, timeValue)
 	-- Otrub blocks incoming pain.  Apply that rule to the accumulator itself so
 	-- queued pain cannot keep avgpain pinned at its 150 cap indefinitely.
 	local add = shouldPainAdd and math.min(timeValue * 15, org.painadd) or 0
-	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
+	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
 	-- Adrenaline delays both the pain arriving and the body settling it, so the
 	-- stored injury survives the rush and catches up afterward.
@@ -258,7 +258,7 @@ module[2] = function(owner, org, timeValue)
 
 	-- Adrenaline can blunt pain, but it cannot erase nearly all of it.  Keep the
 	-- Remorseism 75% floor so injuries remain readable during the rush.
-	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - org.analgesia, 0)
+	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0)
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
 	if shouldPainAdd then

@@ -1,7 +1,3 @@
-if SERVER then
-    resource.AddFile("sound/HOYAA.mp3")
-end
-
 local PLAYER = FindMetaTable("Player")
 
 local vpang = Angle(2, 0, 0)

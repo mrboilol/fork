@@ -101,6 +101,7 @@ function SWEP:DoPoison(ent)
     owner:EmitSound("snd_jack_hmcd_needleprick.wav",30)
 
 	ent.poisoned = true
+ent.poisonedByChemist = owner.SubRole == "traitor_chemist"
 
     self:Remove()
 	owner:SelectWeapon("weapon_hands_sh")
@@ -110,8 +111,9 @@ if SERVER then
 	hook.Add("PlayerUse","nerve_agent_🤑 🤑 ",function(ply,ent)
 		if IsValid(ent) and ent.poisoned then
 			if IsValid(ply) and ply.organism then
-				ply.organism.poison2 = CurTime()
+				ply.organism.poison2 = CurTime() - (ent.poisonedByChemist and 10 or 0)
 				ent.poisoned = nil
+				ent.poisonedByChemist = nil
 			end
 		end
 	end)
@@ -131,7 +133,7 @@ if SERVER then
 			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav")
 		end
 
-		if (org.poison2 + 30) < CurTime() then
+		if (org.poison2 + (owner.SubRole == "traitor_chemist" and 50 or 30)) < CurTime() then
         	org.o2.regen = 0
 		end
 	end)

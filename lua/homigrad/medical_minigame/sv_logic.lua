@@ -389,8 +389,12 @@ end)
 
 local function GetMedicalMinigameType(wep)
     local class = wep:GetClass()
+    local medkitModeType = wep.HGMedkitTier and wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[wep.mode]
+    if medkitModeType == "bandage" then return "bandage" end
+    if medkitModeType == "tourniquet" then return "tourniquet" end
+    if medkitModeType then return "syringe" end
 
-    if class == "weapon_bruicekit" or class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or (class == "weapon_medkit_sh" and wep.mode == 1) then
+    if class == "weapon_bruicekit" or class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_packedbandage_sh" or class == "weapon_combatbandage_sh" or class == "weapon_quikclotbandage_sh" or (class == "weapon_medkit_sh" and wep.mode == 1) then
         return "bandage"
     end
 
@@ -399,7 +403,7 @@ local function GetMedicalMinigameType(wep)
     end
 
     if class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_needle" or
-       class == "weapon_painkillers" or class == "weapon_adrenaline" or class == "weapon_thiamine" or
+       class == "weapon_painkillers" or class == "weapon_tramadol" or class == "weapon_tapentadol" or class == "weapon_adrenaline" or class == "weapon_thiamine" or
        class == "weapon_mannitol" or class == "weapon_naloxone" or class == "weapon_tranexamic_acid" or
        class == "weapon_betablock" or class == "weapon_autoresuscitator" or class == "weapon_horse_tranq" or
        class == "weapon_fury13" or class == "weapon_fury16" or (class == "weapon_medkit_sh" and (wep.mode == 2 or wep.mode == 3 or wep.mode == 5)) then

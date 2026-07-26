@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_base"
 SWEP.PrintName = "Improvised Explosive Device"
-SWEP.Instructions = "A handmade C4 explosive put in a small cardboard box. The detonator is an old nokia phone. Put the bomb in different objects for shrapnel or fire. LMB to place in an object, RMB to simply place the bomb. After planting, LMB calls the IED and Reload opens its phone screen."
+SWEP.Instructions = "Reload chooses public or private before planting. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. Dial the assigned number from a phone to detonate."
 SWEP.Category = "Weapons - Explosive"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -47,14 +47,18 @@ function SWEP:SetupDataTables()
 	self:NetworkVar( "Bool", 2, "Destroyed" )
 	self:NetworkVar( "Bool", 3, "Detonating" )
 	self:NetworkVar( "Bool", 4, "PhoneMode" )
+	self:NetworkVar( "Bool", 5, "Planting" )
 	self:NetworkVar( "Float", 0, "DetonateAt" )
+	self:NetworkVar( "Float", 1, "PlantAt" )
 	if SERVER then
 		self:SetPlanted(false)
 		self:SetDialing(false)
 		self:SetDestroyed(false)
 		self:SetDetonating(false)
 		self:SetPhoneMode(false)
+		self:SetPlanting(false)
 		self:SetDetonateAt(0)
+		self:SetPlantAt(0)
 	end
 end
 
@@ -109,14 +113,23 @@ end
 
 function SWEP:Think()
 	self:SetHold(self.HoldType)
-	if SERVER and self:GetPlanted() then
-		local phonesEnabled = GetConVar("hg_iedphones") and GetConVar("hg_iedphones"):GetBool() or false
-		if self:GetPhoneMode() ~= phonesEnabled then
-			self:SetPhoneMode(phonesEnabled)
-			if HG_PHONE_SERVER and HG_PHONE_SERVER.UpdateIEDPhone then HG_PHONE_SERVER:UpdateIEDPhone(self, phonesEnabled) end
-		elseif phonesEnabled and HG_PHONE_SERVER and HG_PHONE.GetNumber(self) == "" then
-			HG_PHONE_SERVER:RegisterPhone(self)
+	if SERVER and not self:GetPlanted() then
+		local owner = self:GetOwner()
+		local left, right = IsValid(owner) and owner:KeyDown(IN_ATTACK), IsValid(owner) and owner:KeyDown(IN_ATTACK2)
+		if not IsValid(owner) or not owner:Alive() or (not left and not right) then
+			if self:GetPlanting() then self:CancelPlant() end
+		else
+			local mode = left and right and "combined" or right and "inside" or "silent"
+			local duration = mode == "combined" and self.CombinedPlantTime or mode == "inside" and self.InsidePlantTime or self.SilentPlantTime
+			if not self.PlantMode then self.PlantMode, self.PlantStartedAt = mode, CurTime() elseif mode == "combined" then self.PlantMode = mode end
+			self:SetPlanting(true)
+			self:SetPlantAt(self.PlantStartedAt + duration)
+			self:SetHold("slam")
+			if CurTime() >= self.PlantStartedAt + duration then self:FinishPlant() end
 		end
+	end
+	if SERVER and self:GetPlanted() and HG_PHONE_SERVER and HG_PHONE.GetNumber(self) == "" then
+		HG_PHONE_SERVER:RegisterPhone(self)
 	end
 	if SERVER and IsValid(self.HaveTheBomb) then
 		self.LastBombPos = self.IEDPlacementLocalPos and self.HaveTheBomb:LocalToWorld(self.IEDPlacementLocalPos) or (self.HaveTheBomb:GetPos() + self.HaveTheBomb:OBBCenter())
@@ -143,6 +156,13 @@ SWEP.MaxDialTime = 10
 SWEP.MaxDialDistance = 3000
 SWEP.CallSound = "rem_iedcall.mp3"
 SWEP.CallSoundLevel = 100
+SWEP.SilentPlantSound = "panoptisscon/phone_query.ogg"
+SWEP.SilentPlantSoundLevel = 30
+SWEP.CombinedPlantSoundLevel = 45
+SWEP.NormalPlantSound = "snd_jack_hmcd_bombrig.wav"
+SWEP.SilentPlantTime = 3.5
+SWEP.InsidePlantTime = 5
+SWEP.CombinedPlantTime = 7
 SWEP.DisorientationRange = 15
 SWEP.FireEntForceBonus = 70
 SWEP.BlastForce = 225000
@@ -230,14 +250,13 @@ if CLIENT then
 			end
 			draw.SimpleText( "Plant onto Object.", "HomigradFont", toScreen.x + 3, toScreen.y + 27, color_black, TEXT_ALIGN_CENTER )
 			draw.SimpleText( "Plant onto Object.", "HomigradFont", toScreen.x, toScreen.y + 25, color_white, TEXT_ALIGN_CENTER )
-		elseif self:GetPlanted() then		
+		elseif self:GetPlanting() then
+			draw.SimpleText("Planting IED: " .. math.Round(math.max(self:GetPlantAt() - CurTime(), 0), 1) .. "s", "HomigradFontMedium", toScreen.x, toScreen.y + 25, color_white, TEXT_ALIGN_CENTER)
+		elseif self:GetPlanted() then
 			local xrand,yrand = math.random(-1,1),math.random(-1,1)
-			draw.SimpleText( "LMB to explode.", "HomigradFontMedium", toScreen.x + 2 + xrand, toScreen.y + 26 + yrand, color_black, TEXT_ALIGN_CENTER )
-			draw.SimpleText( "LMB to explode.", "HomigradFontMedium", toScreen.x + xrand, toScreen.y + 25 + yrand, color_red, TEXT_ALIGN_CENTER )
-			if self:GetPhoneMode() then
-				draw.SimpleText( "Reload to open phone.", "HomigradFont", toScreen.x + 2, toScreen.y + 57, color_black, TEXT_ALIGN_CENTER )
-				draw.SimpleText( "Reload to open phone.", "HomigradFont", toScreen.x, toScreen.y + 55, color_white, TEXT_ALIGN_CENTER )
-			end
+			local number = HG_PHONE.GetNumber(self)
+			draw.SimpleText("Dial " .. number .. " from a phone.", "HomigradFontMedium", toScreen.x + 2 + xrand, toScreen.y + 26 + yrand, color_black, TEXT_ALIGN_CENTER)
+			draw.SimpleText("Dial " .. number .. " from a phone.", "HomigradFontMedium", toScreen.x + xrand, toScreen.y + 25 + yrand, color_red, TEXT_ALIGN_CENTER)
 		end
 	end
 end
@@ -266,6 +285,9 @@ MarkIEDDestroyed = function(self)
 	if SERVER and HG_PHONE_SERVER and HG_PHONE.GetNumber(self) ~= "" then HG_PHONE_SERVER:UnregisterPhone(self) end
 
 	self:SetDialing(false)
+	if self.CallLoopTimer then timer.Remove(self.CallLoopTimer) self.CallLoopTimer = nil end
+	self:SetPlanting(false)
+	self:SetPlantAt(0)
 	self:SetDetonateAt(0)
 	self:SetDestroyed(true)
 	self:SetDetonating(false)
@@ -336,15 +358,25 @@ local function CreateAttachedBombVisual(self, ent, tr)
 	self.AttachedBombVisual = visual
 end
 
-local function RegisterIEDBomb(self, ent, tr)
+local function RegisterIEDBomb(self, ent, tr, insideObject)
 	if not IsValid(ent) then return end
 
 	self.HaveTheBomb = ent
 	self:SetDestroyed(false)
 	self:SetDetonating(false)
-	self:SetPhoneMode(GetConVar("hg_iedphones") and GetConVar("hg_iedphones"):GetBool() or false)
+	local owner = self:GetOwner()
+	local hasPhone = IsValid(owner) and owner:HasWeapon("weapon_phone")
+	self:SetPhoneMode(hasPhone)
 	self:SetPlanted(true)
-	if self:GetPhoneMode() and HG_PHONE_SERVER then HG_PHONE_SERVER:RegisterPhone(self) end
+	if HG_PHONE_SERVER then
+		HG_PHONE_SERVER:RegisterPhone(self)
+		self:SetNW2Bool("HGPhonePublic", self.IEDPublicOnPlant == true)
+		HG_PHONE_SERVER:QueueRegistrySync()
+		if not hasPhone then
+			local phone = owner:Give("weapon_phone")
+			if IsValid(phone) then owner:SelectWeapon("weapon_phone") end
+		end
+	end
 	if not ent:IsWorld() then
 		ent.bombowner = self
 		ent.IEDOwner = self
@@ -363,10 +395,11 @@ local function RegisterIEDBomb(self, ent, tr)
 	if tr then
 		-- Store the attachment in the target's local space so the charge stays on
 		-- moving doors and props, and its blast always pushes through that face.
-		self.IEDPlacementLocalPos = ent:WorldToLocal(tr.HitPos + tr.HitNormal * 4)
+		local offset = insideObject and -4 or 4
+		self.IEDPlacementLocalPos = ent:WorldToLocal(tr.HitPos + tr.HitNormal * offset)
 		self.IEDPlacementLocalNormal = ent:WorldToLocalAngles(tr.HitNormal:Angle()):Forward()
 		self.IEDHasShrapnel = tr.MatType == MAT_METAL or (hgIsDoor and hgIsDoor(ent))
-		CreateAttachedBombVisual(self, ent, tr)
+		if not insideObject then CreateAttachedBombVisual(self, ent, tr) end
 	end
 end
 
@@ -398,18 +431,24 @@ local function StartIEDDetonation(self, ent)
 	self:EmitSound("buttonpress.ogg", 55)
 
 	timer.Simple(self.CallStartDelay, function()
-		if not IsValid(ent) then return end
-		if ent:IsWorld() then
-			sound.Play(self.CallSound, self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or self:GetPos(), self.CallSoundLevel, 100, 1)
-		else
-			ent:EmitSound(self.CallSound, self.CallSoundLevel, 100, 1, CHAN_AUTO)
-		end
+		if not IsValid(self) or not IsValid(ent) or not self:GetDialing() then return end
+		local timerName = "IEDCallLoop_" .. self:EntIndex()
+		self.CallLoopTimer = timerName
+		local pos = self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or ent:GetPos()
+		sound.Play(self.CallSound, pos, self.CallSoundLevel, 100, 1)
+		timer.Create(timerName, 1, 0, function()
+			if not IsValid(self) or not IsValid(ent) or not self:GetDialing() then return timer.Remove(timerName) end
+			local pos = self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or ent:GetPos()
+			sound.Play(self.CallSound, pos, self.CallSoundLevel, 100, 1)
+		end)
+		timer.Start(timerName)
 	end)
 
 	timer.Simple(delay, function()
 		if not IsValid(self) then return end
 
 		self:SetDialing(false)
+		if self.CallLoopTimer then timer.Remove(self.CallLoopTimer) self.CallLoopTimer = nil end
 		self:SetDetonateAt(0)
 		self:SetDetonating(true)
 
@@ -734,6 +773,7 @@ if SERVER then
 	function SWEP:OnRemove()
 		if HG_PHONE_SERVER and HG_PHONE.GetNumber(self) ~= "" then HG_PHONE_SERVER:UnregisterPhone(self) end
 		RemoveAttachedBombVisual(self)
+		if self.CallLoopTimer then timer.Remove(self.CallLoopTimer) end
 	end
 end
 
@@ -746,57 +786,61 @@ if SERVER then
 	SWEP.nextattackhuy = 0
 	SWEP.PlantedOnSelf = false
 
+	function SWEP:CancelPlant()
+		self.PlantMode = nil
+		self.PlantStartedAt = nil
+		self:SetPlanting(false)
+		self:SetPlantAt(0)
+		self:SetHold("normal")
+	end
+
+	function SWEP:FinishPlant()
+		local owner, tr, mode = self:GetOwner(), self:GetEyeTrace(), self.PlantMode
+		if not IsValid(owner) or not tr.Hit or tr.HitSky then return self:CancelPlant() end
+		local inside = mode == "inside" or mode == "combined"
+		if inside then
+			local phys = IsValid(tr.Entity) and tr.Entity:GetPhysicsObject()
+			local door = IsValid(tr.Entity) and hgIsDoor and hgIsDoor(tr.Entity)
+			if not IsValid(tr.Entity) or tr.HitWorld or not (door or (IsValid(phys) and phys:GetMass() < 500)) then return self:CancelPlant() end
+			RegisterIEDBomb(self, tr.Entity, tr, true)
+		else
+			local bomb = ents.Create("prop_physics")
+			if not IsValid(bomb) then return self:CancelPlant() end
+			bomb:SetModel("models/props_junk/cardboard_jox004a.mdl")
+			bomb:SetPos(tr.HitPos + tr.HitNormal * 4)
+			bomb:SetModelScale(0.4)
+			bomb:Spawn()
+			bomb:Activate()
+			if IsValid(bomb:GetPhysicsObject()) then bomb:GetPhysicsObject():SetMass(20) end
+			RegisterIEDBomb(self, bomb)
+		end
+		self:CancelPlant()
+		self.Planted = true
+		self:SetPlanted(true)
+		local sound, level = self.SilentPlantSound, self.SilentPlantSoundLevel
+		if mode == "inside" then sound, level = self.NormalPlantSound, 60 end
+		if mode == "combined" then level = self.CombinedPlantSoundLevel end
+		owner:EmitSound(sound, level, 100, 1, CHAN_AUTO)
+	end
+
 	function SWEP:PrimaryAttack()
-		self:AttackHuy()
+		if not self:GetPlanted() or not self:GetPhoneMode() or not HG_PHONE_SERVER or not HG_PHONE_SERVER.OpenIEDPhone then return end
+		self:SetNextPrimaryFire(CurTime() + 0.4)
+		HG_PHONE_SERVER.OpenIEDPhone(self:GetOwner(), self)
 	end
-	function SWEP:AttackHuy()
-		if not (self.Planted or self.HaveTheBomb or self.PlantedOnSelf) then
-			local Owner = self:GetOwner()
-			local Tr = self:GetEyeTrace()
-
-			local targetPhys = IsValid(Tr.Entity) and Tr.Entity:GetPhysicsObject()
-			local targetIsDoor = IsValid(Tr.Entity) and hgIsDoor and hgIsDoor(Tr.Entity)
-			local targetIsWorld = Tr.HitWorld and IsValid(Tr.Entity)
-			if Tr.Hit and not Tr.HitSky and IsValid(Tr.Entity) and (targetIsWorld or targetIsDoor or (IsValid(targetPhys) and targetPhys:GetMass() < 500)) then
-				if not targetIsWorld then
-					local min, max = Tr.Entity:GetModelBounds()
-					local minmaxs = (max - min)
-					local size = minmaxs[1] + minmaxs[2] + minmaxs[3]
-					if size <= 15 then return end
-				end
-
-				local bomb = Tr.Entity
-				--bomb:GetPhysicsObject():SetMass(bomb:GetPhysicsObject():GetMass()+20)
-
-				self.Planted = true
-				RegisterIEDBomb(self, bomb, Tr)
-
-				Owner:EmitSound("snd_jack_hmcd_bombrig.wav",50,100,1,CHAN_AUTO)
-				self:SetNextPrimaryFire(CurTime()+2)
-				self.nextattackhuy = CurTime() + 2
-				self:SetPlanted(true)
-				return
-			elseif hg.GetCurrentCharacter(Owner):IsRagdoll() then
-				self:SecondaryAttack(true)
-				return
-			end
-		end
-
-		if (self.nextattackhuy or 0) <= CurTime() and (self.Planted or self.HaveTheBomb or self.PlantedOnSelf) and not self.KABOOM and not self:GetDialing() then
-			if self.PlantedOnSelf then
-				StartIEDDetonation(self, self:GetOwner())
-			else
-				StartIEDDetonation(self, self.HaveTheBomb)
-			end
-		end
-	end
+	function SWEP:SecondaryAttack() end
 
 
 	function SWEP:Reload()
 		if (self.NextPhoneOpen or 0) > CurTime() then return end
 		self.NextPhoneOpen = CurTime() + 0.5
+		if not self:GetPlanted() then
+			self.IEDPublicOnPlant = not self.IEDPublicOnPlant
+			self:GetOwner():ChatPrint("IED number will be " .. (self.IEDPublicOnPlant and "public." or "private."))
+			return
+		end
 
-		if self:GetPlanted() and HG_PHONE_SERVER and HG_PHONE_SERVER.OpenIEDPhone then
+		if self:GetPhoneMode() and HG_PHONE_SERVER and HG_PHONE_SERVER.OpenIEDPhone then
 			HG_PHONE_SERVER.OpenIEDPhone(self:GetOwner(), self)
 		end
 

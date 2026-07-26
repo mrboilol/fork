@@ -3,6 +3,31 @@ HG_PHONE = HG_PHONE or {}
 HG_PHONE.MODEL_HANDHELD = "models/saraphines/insurgency explosives/ied/insurgency_ied_phone.mdl"
 HG_PHONE.DEFAULT_DESK_MODEL = "models/props/cs_office/phone.mdl"
 
+-- Add the preset names used by planted IEDs when they appear as handhelds.
+HG_PHONE.IED_HANDHELD_NAMES = {
+	"nigger",
+	"phone",
+	"telephone",
+	"reception",
+	"sancho",
+	"john",
+	"geal",
+	"sani",
+	"gio",
+	"luis",
+	"zack",
+	"timmy",
+	"mike",
+	"free robux",
+	"grandma",
+	"allah",
+	"microwave",
+	"uhhh",
+	"totally not an IED",
+	"cell phone duct taped to a device",
+	"plumber"
+}
+
 HG_PHONE.STATE_IDLE = 0
 HG_PHONE.STATE_CALLING = 1
 HG_PHONE.STATE_RINGING = 2
@@ -45,8 +70,6 @@ end
 function HG_PHONE.IsIEDPhone(ent)
 	return IsValid(ent)
 		and ent:GetClass() == "weapon_traitor_ied"
-		and ent.GetPhoneMode
-		and ent:GetPhoneMode()
 		and ent.GetPlanted
 		and ent:GetPlanted()
 end

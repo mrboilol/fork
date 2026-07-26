@@ -108,6 +108,7 @@ function SWEP:DoPoison(tr)
 
 	local ent = ents.Create("ent_hg_cyanide_canister")
 	ent:SetPos(owner:IsNPC() and owner:EyePos() or tr.HitPos)
+	ent.ChemistPotency = owner.SubRole == "traitor_chemist"
 	ent:Spawn()
 
     self:Remove()
@@ -134,7 +135,7 @@ if SERVER then
 			org.owner:EmitSound(ThatPlyIsFemale(org.owner) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav",65)	
 		end
 
-		if (org.poison3 + 30) < CurTime() then
+		if (org.poison3 + (owner.SubRole == "traitor_chemist" and 50 or 30)) < CurTime() then
         	org.o2.regen = 0
 		end
 	end)

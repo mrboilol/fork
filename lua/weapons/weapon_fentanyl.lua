@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Fentanyl"
-SWEP.Instructions = "Fentanyl is a highly potent synthetic piperidine opioid primarily used as an analgesic. Fentanyl dose must be strictly observed, as it can quickly lead to opiate overdose. Label says that ~20% is a maximum daily dose. RMB to inject into someone else."
+SWEP.Instructions = "Fentanyl is a highly potent synthetic piperidine opioid primarily used as an analgesic. Fentanyl dose must be strictly observed, as it can quickly lead to opiate overdose. Label says that ~20% is a maximum daily dose. RMB to inject into someone else. Press R while looking at dropped food, painkillers, or morphine to lace it with half the tube."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -68,6 +68,29 @@ function SWEP:Think()
 	end
 end
 
+function SWEP:Reload()
+	if not SERVER or not self:GetOwner():KeyPressed(IN_RELOAD) then return end
+	if not self.modeValues or (self.modeValues[1] or 0) < 0.5 then return end
+
+	local owner = self:GetOwner()
+	local trace = owner:GetEyeTrace()
+	local target = trace.Entity
+	if not IsValid(target) or target:GetPos():DistToSqr(owner:GetPos()) > 14400 then return end
+
+	local validTargets = {
+		weapon_bigconsumable = true,
+		weapon_smallconsumable = true,
+		weapon_painkillers = true,
+		weapon_morphine = true,
+	}
+	if not validTargets[target:GetClass()] or (target.HG_FentanylLacedAmount or 0) > 0 then return end
+
+	self.modeValues[1] = math.max(self.modeValues[1] - 0.5, 0)
+	self:SetRemainingAmount(self.modeValues[1])
+	target.HG_FentanylLacedAmount = 3
+	owner:EmitSound("pshiksnd", 60, math.random(95, 105))
+	owner:ChatPrint("You laced the item with fentanyl.")
+end
 function SWEP:Animation()
 	local hold = self:GetHolding()
     self:BoneSet("r_upperarm", vector_origin, Angle(0, -hold + (100 * (hold / 100)), 0))

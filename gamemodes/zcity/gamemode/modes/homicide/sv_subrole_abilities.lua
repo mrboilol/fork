@@ -106,6 +106,12 @@ end
 
 hook.Add("PlayerPostThink", "HMCD_SubRoles_Abilities", function(ply)
 	if(MODE.RoleChooseRoundTypes[MODE.Type])then
+		local subRole = ply.SubRole
+		local neck_break_allow = subRole == "traitor_infiltrator" or subRole == "traitor_infiltrator_soe" or subRole == "traitor_martial_artist"
+		local neck_break_down = ply:KeyDown(subRole == "traitor_martial_artist" and IN_RELOAD or IN_USE)
+		local neck_break_prev = ply.Ability_NeckBreak_KeyDownPrev
+		local can_break_neck = neck_break_allow
+		local can_disarm = subRole == "traitor_assasin" or subRole == "traitor_assasin_soe" or subRole == "traitor_martial_artist"
 		if(ply:Alive() and ply.organism and not ply.organism.otrub)then
 			if(MODE.IsShadowRole(ply.SubRole))then
 				local current_char = hg.GetCurrentCharacter(ply)

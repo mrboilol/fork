@@ -451,7 +451,8 @@ function SWEP:Initialize()
 	
 	self.SlotPos = self:IsPistolHoldType() and 1 or 2
 
-	self.deploy = CurTime() + self.CooldownDeploy / self.Ergonomics
+	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
+	self.deploy = CurTime() + self.CooldownDeploy / self.Ergonomics * roleDeployMul
 
 	self:ClearAttachments()
 

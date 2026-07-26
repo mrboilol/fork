@@ -308,8 +308,9 @@ function SWEP:ApplyForce()
 
 		if self.CarryEnt.poisoned then
 			if ply.organism then
-				ply.organism.poison2 = CurTime()
+				ply.organism.poison2 = CurTime() - (self.CarryEnt.poisonedByChemist and 10 or 0)
 				self.CarryEnt.poisoned = nil
+				self.CarryEnt.poisonedByChemist = nil
 			end
 		end
 
@@ -1211,7 +1212,7 @@ function SWEP:AttackFront(special_attack, rand)
                         end)
                 end
 
-                Mul = Mul * (owner.MeleeDamageMul or 1)
+                Mul = Mul * (owner.MeleeDamageMul or 1) * (hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "MeleeDamageMul", 1) or 1)
 
                 if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking then
                         Mul = Mul * (self:GetBlocking() and 0.5 or 1)

@@ -104,7 +104,8 @@ function SWEP:Deploy()
 	self.holster = nil
 	self:SetHolster(0)
 	
-	self.deploy = time + math.max(self.CooldownDeploy / self.Ergonomics, 0.35)
+	local roleDeployMul = hg.GetSubRolePerk and hg.GetSubRolePerk(self:GetOwner(), "DeployMul", 1) or 1
+	self.deploy = time + math.max(self.CooldownDeploy / self.Ergonomics * roleDeployMul, 0.35)
 	self:SetDeploy(self.deploy)
 
 	--self.endedholster = false

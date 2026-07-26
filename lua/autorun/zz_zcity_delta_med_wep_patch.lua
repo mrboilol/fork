@@ -5,13 +5,23 @@ local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") 
 local MEDICAL_WEAPON_CLASSES = {
     "weapon_bandage_sh",
     "weapon_bigbandage_sh",
+    "weapon_packedbandage_sh",
+    "weapon_combatbandage_sh",
+    "weapon_quikclotbandage_sh",
     "weapon_bruicekit",
     "weapon_tourniquet",
     "weapon_morphine",
     "weapon_fentanyl",
     "weapon_medkit_sh",
+    "weapon_medkit_basic_sh",
+    "weapon_medkit_standard_sh",
+    "weapon_medkit_emergency_sh",
+    "weapon_medkit_advanced_sh",
+    "weapon_medkit_surgical_sh",
     "weapon_needle",
     "weapon_painkillers",
+    "weapon_tramadol",
+    "weapon_tapentadol",
     "weapon_adrenaline",
     "weapon_thiamine",
     "weapon_mannitol",
@@ -64,7 +74,12 @@ local function GetMinigameType(wep)
     -- Fallback logic (matches homigrad's implementation)
     local class = wep:GetClass()
 
-    if class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_bruicekit" then
+    local medkitModeType = wep.HGMedkitTier and wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[wep.mode]
+    if medkitModeType == "bandage" then return "bandage" end
+    if medkitModeType == "tourniquet" then return "tourniquet" end
+    if medkitModeType then return "syringe" end
+
+    if class == "weapon_bandage_sh" or class == "weapon_bigbandage_sh" or class == "weapon_packedbandage_sh" or class == "weapon_combatbandage_sh" or class == "weapon_quikclotbandage_sh" or class == "weapon_bruicekit" then
         return "bandage"
     end
 
@@ -76,7 +91,7 @@ local function GetMinigameType(wep)
         return "syringe"
     end
 
-    if class == "weapon_painkillers" or class == "weapon_thiamine" or class == "weapon_betablock" then
+    if class == "weapon_painkillers" or class == "weapon_tramadol" or class == "weapon_tapentadol" or class == "weapon_thiamine" or class == "weapon_betablock" then
         return "syringe"
     end
 
@@ -95,10 +110,10 @@ end
 
 local function GetModeValueIndex(wep, minigameType)
     if not IsValid(wep) then return 1 end
-    if wep:GetClass() ~= "weapon_medkit_sh" then return 1 end
+    if wep:GetClass() ~= "weapon_medkit_sh" and not wep.HGMedkitTier then return 1 end
 
     if minigameType == "syringe" then return wep.mode or 3 end
-    if minigameType == "tourniquet" then return 4 end
+    if minigameType == "tourniquet" then return wep.HGMedkitTier and (wep.mode or 1) or 4 end
     return 1
 end
 
