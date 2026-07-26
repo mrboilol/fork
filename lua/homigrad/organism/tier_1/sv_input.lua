@@ -1177,8 +1177,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	local selfInflictedBrainShot = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 		and attacker == org.owner
+		and entryHitgroup == HITGROUP_HEAD
 	if selfInflictedBrainShot then
-		-- Point-blank self shots should not wander into throat/chest hitboxes.
+		-- Only point-blank head shots bypass the normal organ trace.
 		input_list.brain(org, 1, dmg / 25, dmgInfo)
 		org._directBrainDamageThisHit = true
 	elseif dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then

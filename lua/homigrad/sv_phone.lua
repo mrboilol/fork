@@ -131,10 +131,12 @@ end
 function PHONE:SyncRegistry(target)
 	local entries = {}
 	for number, phone in pairs(self.Registry) do
-		if HG_PHONE.IsPhone(phone) and HG_PHONE.GetNumber(phone) == number and (HG_PHONE.IsPublic(phone) or PHONE:CanControl(target, phone)) then
-			entries[#entries + 1] = {number = number, phone = phone}
-		else
+		if not HG_PHONE.IsPhone(phone) or HG_PHONE.GetNumber(phone) ~= number then
 			self.Registry[number] = nil
+		elseif HG_PHONE.IsPublic(phone) or (IsValid(target) and PHONE:CanControl(target, phone)) then
+			-- Private numbers remain registered so they can still be dialed manually.
+			-- They are simply omitted from registries sent to other players.
+			entries[#entries + 1] = {number = number, phone = phone}
 		end
 	end
 
@@ -477,7 +479,9 @@ hook.Add("Think", "HG_Phone_CallManager", function()
 			elseif (phone._HGPhoneRingAt or 0) <= now then
 				EmitRingtone(phone)
 				local duration = SoundDuration(HG_PHONE.GetRingtone(phone))
-				phone._HGPhoneRingAt = now + (duration > 0 and duration or 2.5)
+				-- Schedule the next ring from this playback, so it begins only after
+				-- the previous ringtone has ended instead of on a fixed interval.
+				phone._HGPhoneRingAt = CurTime() + (duration > 0 and duration or 2.5)
 			end
 		elseif state == HG_PHONE.STATE_CALLING or state == HG_PHONE.STATE_IN_CALL then
 			local user = PHONE:GetUser(phone)

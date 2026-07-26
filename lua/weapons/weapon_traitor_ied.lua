@@ -156,6 +156,7 @@ SWEP.MaxDialTime = 10
 SWEP.MaxDialDistance = 3000
 SWEP.CallSound = "rem_iedcall.mp3"
 SWEP.CallSoundLevel = 100
+SWEP.CallSoundFallbackDuration = 2.5
 SWEP.SilentPlantSound = "panoptisscon/phone_query.ogg"
 SWEP.SilentPlantSoundLevel = 30
 SWEP.CombinedPlantSoundLevel = 45
@@ -446,19 +447,21 @@ local function StartIEDDetonation(self, ent)
 	self:SetDetonateAt(CurTime() + delay)
 	self:EmitSound("buttonpress.ogg", 55)
 
-	timer.Simple(self.CallStartDelay, function()
-		if not IsValid(self) or not IsValid(ent) or not self:GetDialing() then return end
+	-- Start immediately. At close range the detonation delay equals CallStartDelay,
+	-- so delaying this sound could otherwise skip the first call entirely.
+	if IsValid(self) and IsValid(ent) and self:GetDialing() then
 		local timerName = "IEDCallLoop_" .. self:EntIndex()
 		self.CallLoopTimer = timerName
 		local pos = self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or ent:GetPos()
 		sound.Play(self.CallSound, pos, self.CallSoundLevel, 100, 1)
-		timer.Create(timerName, 1, 0, function()
+		local duration = SoundDuration(self.CallSound)
+		timer.Create(timerName, duration > 0 and duration or self.CallSoundFallbackDuration, 0, function()
 			if not IsValid(self) or not IsValid(ent) or not self:GetDialing() then return timer.Remove(timerName) end
 			local pos = self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or ent:GetPos()
 			sound.Play(self.CallSound, pos, self.CallSoundLevel, 100, 1)
 		end)
 		timer.Start(timerName)
-	end)
+	end
 
 	timer.Simple(delay, function()
 		if not IsValid(self) then return end

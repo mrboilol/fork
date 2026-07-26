@@ -22,7 +22,7 @@ SWEP.WorldModel = "models/w_models/weapons/w_eq_medkit.mdl"
 SWEP.WorkWithFake = true
 SWEP.offsetVec = Vector(4, -0.5, -3)
 SWEP.offsetAng = Angle(-30, 20, 90)
-SWEP.StatusScreenOffset = Vector(3.6, 3.1, -1.85)
+SWEP.StatusScreenOffset = Vector(3.6, -3.1, 0.15)
 SWEP.StatusScreenAngle = Angle(0, 90, 90)
 
 SWEP.Slot = 3
