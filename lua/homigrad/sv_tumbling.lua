@@ -25,9 +25,6 @@ local tumbleBoneBreakSounds = {
     "newbonebreak/break8.wav",
     "newbonebreak/break9.wav",
     "newbonebreak/break10.wav",
-    "gore/rotten_break.ogg",
-    "gore/rotten_break2.ogg",
-    "gore/rotten_break3.ogg",
 }
 
 local function PlayBoneBreakSound(entity)

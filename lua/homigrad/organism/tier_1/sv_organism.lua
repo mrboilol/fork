@@ -327,7 +327,10 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	local dt = timeValue or engine.TickInterval()
 	local blood = math.max(org.blood or 0, 0)
-	local bloodFraction = math.Clamp((blood - 1800) / 2700, 0, 1)
+	-- Keep 3000-3500 mL compensated. Blood-volume perfusion should become a
+	-- collapse source inside the established 2500-2000 mL danger band, rather
+	-- than multiplying the earlier pulse/O2 penalties into premature otrub.
+	local bloodFraction = blood >= 3000 and 1 or math.Remap(math.Clamp(blood, 1800, 3000), 1800, 3000, 0, 1)
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
 	local venousBleed = math.max(org.venousBleed or 0, 0)
 	local internalBleed = math.max(org.internalBleedRate or 0, 0)

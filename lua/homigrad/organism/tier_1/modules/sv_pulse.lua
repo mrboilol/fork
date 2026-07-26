@@ -5,14 +5,14 @@ local module = hg.organism.module.pulse
 
 local BloodBPM = {
 	{5000, 75},
-	{4500, 95},
-	{4200, 110},
-	{3800, 135},
-	{3400, 165},
-	{3000, 205},
-	{2600, 250},
-	{2300, 280},
-	{2000, 300},
+	{4500, 85},
+	{4000, 95},
+	{3500, 105},
+	{3000, 120},
+	{2750, 155},
+	{2500, 200},
+	{2300, 240},
+	{2000, 280},
 }
 
 -- 2000 mL is the beginning of severe shock, not an instant flatline. A
@@ -178,9 +178,9 @@ module[2] = function(owner, org, timeValue)
 	local effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 	local compensationPulseMultiplier = math.Clamp(1 - hemorrhageCompensation * 0.35 - hypovolemicShock * 0.1 - effectivePalpitations * 0.3, 0.35, 1)
 	org.compensationPulseMultiplier = compensationPulseMultiplier
-	-- Blood volume begins weakening effective perfusion at 3500 mL. Keeping
-	-- full perfusion above that point prevents compensation from starting early.
-	local bloodPerfusionK = bloodNow >= 3500 and 1 or math.Remap(math.Clamp(bloodNow, 1000, 3500), 1000, 3500, 0, 1)
+	-- Preserve effective circulation through 3000-3500 mL. The sharp preload
+	-- loss is reserved for the 2500-2000 mL decompensation band.
+	local bloodPerfusionK = bloodNow >= 3000 and 1 or math.Remap(math.Clamp(bloodNow, 1800, 3000), 1800, 3000, 0, 1)
 	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * compensationPulseMultiplier
@@ -400,7 +400,7 @@ module[2] = function(owner, org, timeValue)
 	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
 	local fillingK = (1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)) * (1 - effectivePalpitations * 0.2)
 	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.12)
-	local volumeMapK = blood >= 3500 and 1 or math.Remap(math.Clamp(blood, 1000, 3500), 1000, 3500, 0.12, 1)
+	local volumeMapK = blood >= 3000 and 1 or math.Remap(math.Clamp(blood, 1800, 3000), 1800, 3000, 0.12, 1)
 	local map = 93 * pulse_factor * hypertensionMul * compensation * volumeMapK
 	map = org.alive and map or 0
 

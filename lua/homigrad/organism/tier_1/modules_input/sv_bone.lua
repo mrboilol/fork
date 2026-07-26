@@ -45,9 +45,6 @@ local bonefracture_sounds = {
 	"bonefracture/rem_bonebreak1.wav",
 	"bonefracture/rem_bonebreak2.wav",
 	"bonefracture/rem_bonebreak3.wav",
-	"gore/rotten_break.ogg",
-	"gore/rotten_break2.ogg",
-	"gore/rotten_break3.ogg",
 }
 
 local skullfracture_sounds = {
