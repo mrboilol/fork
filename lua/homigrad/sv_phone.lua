@@ -31,6 +31,58 @@ HG_PHONE_SERVER = HG_PHONE_SERVER or {}
 local PHONE = HG_PHONE_SERVER
 PHONE.Registry = PHONE.Registry or {}
 PHONE.ActiveUsers = PHONE.ActiveUsers or {}
+local function CapturePhoneAppearance(ent)
+	local color = ent:GetColor()
+	local appearance = {
+		model = ent:GetModel(),
+		skin = ent:GetSkin(),
+		material = ent:GetMaterial(),
+		color = {r = color.r, g = color.g, b = color.b, a = color.a},
+		scale = ent:GetModelScale(),
+		renderMode = ent:GetRenderMode(),
+		renderFX = ent:GetRenderFX(),
+		bodygroups = {},
+		submaterials = {}
+	}
+
+	for id = 0, ent:GetNumBodyGroups() - 1 do
+		appearance.bodygroups[#appearance.bodygroups + 1] = {id = id, value = ent:GetBodygroup(id)}
+	end
+
+	for id = 0, #ent:GetMaterials() - 1 do
+		local material = ent:GetSubMaterial(id)
+		if material and material ~= "" then
+			appearance.submaterials[#appearance.submaterials + 1] = {id = id, value = material}
+		end
+	end
+
+	return appearance
+end
+
+local function ApplyPhoneAppearance(ent, appearance)
+	if not IsValid(ent) or not istable(appearance) then return end
+
+	ent:SetSkin(tonumber(appearance.skin) or 0)
+	ent:SetMaterial(tostring(appearance.material or ""))
+	local color = appearance.color or {}
+	ent:SetColor(Color(
+		math.Clamp(tonumber(color.r) or 255, 0, 255),
+		math.Clamp(tonumber(color.g) or 255, 0, 255),
+		math.Clamp(tonumber(color.b) or 255, 0, 255),
+		math.Clamp(tonumber(color.a) or 255, 0, 255)
+	))
+	ent:SetModelScale(tonumber(appearance.scale) or 1, 0)
+	ent:SetRenderMode(tonumber(appearance.renderMode) or RENDERMODE_NORMAL)
+	ent:SetRenderFX(tonumber(appearance.renderFX) or 0)
+
+	for _, bodygroup in ipairs(appearance.bodygroups or {}) do
+		ent:SetBodygroup(tonumber(bodygroup.id) or 0, tonumber(bodygroup.value) or 0)
+	end
+	for _, submaterial in ipairs(appearance.submaterials or {}) do
+		ent:SetSubMaterial(tonumber(submaterial.id) or 0, tostring(submaterial.value or ""))
+	end
+end
+
 PHONE.ActivePhoneByPlayer = PHONE.ActivePhoneByPlayer or {}
 
 local function Notify(ply, message)
@@ -108,6 +160,7 @@ function PHONE:SetIdentity(phone, number, displayName, ringtone)
 	if displayName == "" then displayName = "Phone " .. number end
 	displayName = string.sub(displayName, 1, 32)
 	ringtone = tostring(ringtone or HG_PHONE.RINGTONES[1].path)
+	if not HG_PHONE.RINGTONE_PATHS[ringtone] then ringtone = HG_PHONE.RINGTONES[1].path end
 
 	phone:SetNW2String("HGPhoneNumber", number)
 	phone:SetNW2String("HGPhoneName", displayName)
@@ -319,6 +372,8 @@ net.Receive("HG_Phone_Pickup", function(_, ply)
 	if ply:HasWeapon("weapon_phone") then return Notify(ply, "You already have a handheld phone.") end
 
 	local number, displayName, ringtone = HG_PHONE.GetNumber(phone), HG_PHONE.GetDisplayName(phone), HG_PHONE.GetRingtone(phone)
+	local isDeskPhone = not phone:GetPortableModel()
+	local appearanceJSON = isDeskPhone and util.TableToJSON(CapturePhoneAppearance(phone)) or ""
 	PHONE:UnregisterPhone(phone, true)
 	local weapon = ply:Give("weapon_phone")
 	if not IsValid(weapon) then
@@ -326,6 +381,8 @@ net.Receive("HG_Phone_Pickup", function(_, ply)
 		return Notify(ply, "The phone could not be picked up.")
 	end
 
+	weapon:SetNW2Bool("HGDeskPhoneCarry", isDeskPhone and appearanceJSON ~= "")
+	weapon:SetNW2String("HGPhoneDeskAppearance", appearanceJSON or "")
 	PHONE:SetIdentity(weapon, number, displayName, ringtone)
 	phone:Remove()
 	ply:SelectWeapon("weapon_phone")
@@ -334,18 +391,24 @@ end)
 net.Receive("HG_Phone_PlaceDown", function(_, ply)
 	local weapon = net.ReadEntity()
 	if not PHONE:CanControl(ply, weapon) or weapon:GetClass() ~= "weapon_phone" then return end
+	if not weapon:GetNW2Bool("HGDeskPhoneCarry", false) then return Notify(ply, "Handheld phones cannot be placed down.") end
 	if HG_PHONE.GetState(weapon) ~= HG_PHONE.STATE_IDLE then return Notify(ply, "Hang up before placing this phone.") end
 
 	local tr = util.TraceLine({start = ply:EyePos(), endpos = ply:EyePos() + ply:GetAimVector() * 90, filter = ply})
 	if not tr.Hit or tr.HitSky then return Notify(ply, "Aim at a nearby surface.") end
 	local number, displayName, ringtone = HG_PHONE.GetNumber(weapon), HG_PHONE.GetDisplayName(weapon), HG_PHONE.GetRingtone(weapon)
+	local appearance = util.JSONToTable(weapon:GetNW2String("HGPhoneDeskAppearance", ""))
+	if not istable(appearance) or not util.IsValidModel(appearance.model or "") then
+		return Notify(ply, "This desk phone has no valid saved appearance.")
+	end
 	local phone = ents.Create("ent_phone")
 	if not IsValid(phone) then return end
-	phone.PhoneModelOverride = HG_PHONE.MODEL_HANDHELD
+	phone.PhoneModelOverride = appearance.model
 	phone:SetPos(tr.HitPos + tr.HitNormal * 3)
 	phone:SetAngles(Angle(0, ply:EyeAngles().y + 180, 0))
 	phone:Spawn()
 	phone:Activate()
+	ApplyPhoneAppearance(phone, appearance)
 	PHONE:UnregisterPhone(weapon, true)
 	PHONE:SetIdentity(phone, number, displayName, ringtone)
 	weapon:Remove()
@@ -382,7 +445,8 @@ hook.Add("Think", "HG_Phone_CallManager", function()
 				PHONE:EndCall(phone, "No answer.")
 			elseif (phone._HGPhoneRingAt or 0) <= now then
 				EmitRingtone(phone)
-				phone._HGPhoneRingAt = now + math.max(SoundDuration(HG_PHONE.GetRingtone(phone)), 2.5)
+				local duration = SoundDuration(HG_PHONE.GetRingtone(phone))
+				phone._HGPhoneRingAt = now + (duration > 0 and duration or 2.5)
 			end
 		elseif state == HG_PHONE.STATE_CALLING or state == HG_PHONE.STATE_IN_CALL then
 			local user = PHONE:GetUser(phone)
@@ -426,6 +490,11 @@ local function ReplacePhoneProp(ent)
 	local localPos, localAng = ent:GetLocalPos(), ent:GetLocalAngles()
 	local bodygroups = {}
 	for i = 0, ent:GetNumBodyGroups() - 1 do bodygroups[i] = ent:GetBodygroup(i) end
+	local submaterials = {}
+	for i = 0, #ent:GetMaterials() - 1 do
+		local submaterial = ent:GetSubMaterial(i)
+		if submaterial and submaterial ~= "" then submaterials[i] = submaterial end
+	end
 	local oldPhys = ent:GetPhysicsObject()
 	local motionEnabled = IsValid(oldPhys) and oldPhys:IsMotionEnabled() or false
 
@@ -447,6 +516,7 @@ local function ReplacePhoneProp(ent)
 	phone:SetNW2Bool("HGMapPhone", true)
 	if name ~= "" then phone:SetName(name) end
 	for id, value in pairs(bodygroups) do phone:SetBodygroup(id, value) end
+	for id, value in pairs(submaterials) do phone:SetSubMaterial(id, value) end
 	if IsValid(parent) then
 		phone:SetParent(parent)
 		phone:SetLocalPos(localPos)

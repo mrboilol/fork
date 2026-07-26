@@ -182,9 +182,9 @@ local function playBloodDripImpact(pos, tr, artery)
 
 	if artery then
 		if tr.MatType == MAT_METAL then
-			sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), math.random(100, 120))
+			sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(98, 106), math.random(100, 120))
 		else
-			sound.Play("newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav", pos, math.random(10, 60), math.random(80, 120))
+			sound.Play("newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav", pos, math.random(96, 104), math.random(80, 120))
 		end
 		return
 	end

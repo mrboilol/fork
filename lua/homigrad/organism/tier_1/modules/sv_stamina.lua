@@ -194,7 +194,11 @@ module[2] = function(owner, org, timeValue)
 
 	local perfusionMoveMul = math.Clamp(org.perfusionMoveMul or 1, 0.25, 1)
 	local perfusionRegenMul = math.Clamp(org.perfusion or 1, 0.18, 1)
-	stamina.max = (org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) * math.Clamp(0.55 + perfusionMoveMul * 0.45, 0.55, 1) + goodmood * 20
+	local heatWeakness = math.Clamp(math.Remap(org.temperature or 36.7, 38, 41, 0, 0.65), 0, 0.65)
+	local heatStaminaMul = 1 - heatWeakness * 0.55
+	org.heatWeakness = heatWeakness
+	stamina.max = ((org.superfighter and 2 or 1) * ((stamina.range * (1 - (org.pneumothorax) / 2) + org.adrenaline * 20 ) * math.max(1 - org.hemotransfusionshock,0.2)) * math.max(1 - (org.hungry/100),0.65) * math.Clamp(0.55 + perfusionMoveMul * 0.45, 0.55, 1) + goodmood * 20) * heatStaminaMul
+	stamina[1] = math.min(stamina[1], stamina.max)
 	local staminaFraction = math.Clamp(stamina[1] / math.max(stamina.max, 1), 0, 1)
 	local lowStamina = 1 - staminaFraction
 	local staminaDrainMul = Lerp(lowStamina, 1, low_stamina_drain_max_mul)
@@ -239,7 +243,7 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * recentLossRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul, stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * recentLossRecoveryMul * timeValue * 3.75 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul * (1 - heatWeakness * 0.65), stamina.max)
 
 
 

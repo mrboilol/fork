@@ -519,11 +519,11 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, 
 	return trace, pos, ang
 end
 
-local firstShotMaxDeviationCos = math.cos(math.rad(8))
-
 -- A newly drawn/reloaded weapon can become usable one server tick before its
--- smoothed deploy pose reaches the aimed pose. Keep normal muzzle sway, but do
--- not let that stale pose throw the first round far away from the trajectory.
+-- smoothed deploy pose reaches the aimed pose. The previous correction only
+-- rejected errors above eight degrees, leaving smaller (but still very visible)
+-- first-shot offsets in place, especially for physical bullets. Always use the
+-- non-recoil pose for the first round while keeping the real muzzle origin.
 function SWEP:GetFireTrace()
 	local trace, pos, ang = self:GetTrace(true)
 	local owner = self:GetOwner()
@@ -540,12 +540,9 @@ function SWEP:GetFireTrace()
 	self.desiredPos, self.desiredAng = desiredPos, desiredAng
 	if not stableTrace or not stablePos or not stableAng then return trace, pos, ang end
 
-	if ang:Forward():Dot(stableAng:Forward()) >= firstShotMaxDeviationCos then
-		return trace, pos, ang
-	end
-
-	-- Keep the real muzzle origin/obstruction behavior; only reject the stale
-	-- angle. Re-trace from that muzzle so the cached trajectory matches the shot.
+	-- Keep the real muzzle origin/obstruction behavior; only replace the stale
+	-- first-shot angle. Re-trace from that muzzle so every bullet implementation
+	-- receives the same corrected snapshot.
 	local stableDir = stableAng:Forward()
 	local gun = self:GetWeaponEntity()
 	local correctedTrace = util_TraceLine({
@@ -614,7 +611,7 @@ end
 	ent:PrimaryAttack()
 end*/
 
-function SWEP:FireBullet()
+function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
     local gun = self:GetWeaponEntity()
     local owner = self:GetOwner()
 	local isply = IsValid(owner) and owner:IsPlayer()
@@ -652,8 +649,17 @@ function SWEP:FireBullet()
 		owner:LagCompensation(true)
 	end
 
-	self:WorldModel_Transform()
-	local tr, pos, ang = self:GetFireTrace()
+	local tr
+	if capturedTrace and capturedPos and capturedAng then
+		-- Copy the trigger-time snapshot. Physical bullets keep these vectors after
+		-- this function returns, so never hand them mutable pose references.
+		tr = capturedTrace
+		pos = Vector(capturedPos)
+		ang = Angle(capturedAng)
+	else
+		self:WorldModel_Transform()
+		tr, pos, ang = self:GetFireTrace()
+	end
 
 	if isply then
 		owner:LagCompensation(false)

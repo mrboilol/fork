@@ -9,16 +9,12 @@ local module = hg.organism.module.lungs
 local BloodO2 = {
 	{5000, 30},
 	{4500, 30},
-	{4000, 30},
-	{3500, 29},
-	{3000, 27},
-	{2750, 25},
-	{2500, 20},
-	{2300, 12},
-	{2000, 6},
-	{1750, 3},
-	{1500, 1},
-	{1250, 0},
+	{4000, 29},
+	{3500, 24},
+	{3000, 16},
+	{2500, 7},
+	{2250, 3},
+	{2000, 0},
 }
 
 local HypoxiaBands = {
@@ -723,9 +719,10 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		-- Gradual O2 drain for central arterial wounds.
+		-- Central arterial impairment develops over time instead of applying a
+		-- second instant O2 penalty on top of blood loss and pressure collapse.
 
-		if (org.arterialO2Drain or org.arteriaO2Drain) and org.arterialwounds then
+		if org.arterialwounds then
 
 			local arteryDrainMul = 0
 
@@ -743,23 +740,30 @@ module[2] = function(owner, org, timeValue)
 
 			end
 
+			local impairmentTarget = math.Clamp(arteryDrainMul, 0, 1)
+			local impairmentNow = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
+			local impairmentRate = impairmentTarget > impairmentNow and timeValue / 18 or timeValue / 8
+			org.arterialO2Impairment = math.Approach(impairmentNow, impairmentTarget, impairmentRate)
+
 			if arteryDrainMul <= 0 then
 
 				org.arteriaO2Drain = false
 				org.arterialO2Drain = false
 
-			else
+			elseif org.arterialO2Impairment > 0 then
 
-				local pulseMultiplier = math.Clamp((org.pulse or 70) / 70, 0.8, 1.5)
+				local pulseMultiplier = math.Clamp((org.pulse or 0) / 70, 0, 1.5)
 
 				-- Neck and spinal arterial wounds still compromise oxygen delivery, but
 				-- this is deliberately a slow secondary loss rather than a rapid O2 wipe.
-				local arteriaDrain = timeValue * 0.03 * pulseMultiplier * arteryDrainMul
+				local arteriaDrain = timeValue * 0.08 * pulseMultiplier * org.arterialO2Impairment
 
 				o2[1] = max(o2[1] - arteriaDrain, 0)
 
 			end
 
+		else
+			org.arterialO2Impairment = math.Approach(org.arterialO2Impairment or 0, 0, timeValue / 8)
 		end
 
 

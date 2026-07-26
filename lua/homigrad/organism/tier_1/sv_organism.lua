@@ -293,8 +293,11 @@ function hg.organism.OrganSystemsEnabled()
 	return hg_huyorgans:GetBool()
 end
 
-local function approachVital(current, target, timeValue, rate)
-	return math.Approach(tonumber(current) or target, target, math.max(timeValue or 0, 0) * rate)
+local function approachVital(current, target, timeValue, fallRate, recoveryRate)
+	local value = tonumber(current)
+	if value == nil or value != value then value = target end
+	local rate = target > value and (recoveryRate or fallRate) or fallRate
+	return math.Approach(value, target, math.max(timeValue or 0, 0) * rate)
 end
 
 -- Vottur's perfusion model, adapted to this checkout's existing mmHg blood
@@ -318,7 +321,7 @@ function hg.organism.UpdateIntracranialPressure(org, pressure, timeValue)
 
 	local pressurePenalty = math.Clamp(math.Remap(org.intracranialPressure, 0.15, 0.85, 0, 0.9), 0, 0.9)
 	local cerebralTarget = math.Clamp((pressure or 0) - pressurePenalty, 0, 1)
-	org.cerebralPerfusion = approachVital(org.cerebralPerfusion, cerebralTarget, dt, 2.5)
+	org.cerebralPerfusion = approachVital(org.cerebralPerfusion, cerebralTarget, dt, 0.3, 0.45)
 	return org.cerebralPerfusion
 end
 
@@ -327,10 +330,25 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	local dt = timeValue or engine.TickInterval()
 	local blood = math.max(org.blood or 0, 0)
-	-- Keep 3000-3500 mL compensated. Blood-volume perfusion should become a
-	-- collapse source inside the established 2500-2000 mL danger band, rather
-	-- than multiplying the earlier pulse/O2 penalties into premature otrub.
-	local bloodFraction = blood >= 3000 and 1 or math.Remap(math.Clamp(blood, 1800, 3000), 1800, 3000, 0, 1)
+	-- Compensation masks most of the loss above 4000 mL. Below that, delivery
+	-- falls in stages: definite weakness by 3500, balance trouble by 3000,
+	-- crippling perfusion at 2500, and no sustainable organ flow at 2000.
+	local bloodFraction
+	if blood >= 4500 then
+		bloodFraction = 1
+	elseif blood >= 4000 then
+		bloodFraction = math.Remap(blood, 4000, 4500, 0.98, 1)
+	elseif blood >= 3500 then
+		bloodFraction = math.Remap(blood, 3500, 4000, 0.92, 0.98)
+	elseif blood >= 3000 then
+		bloodFraction = math.Remap(blood, 3000, 3500, 0.75, 0.92)
+	elseif blood >= 2500 then
+		bloodFraction = math.Remap(blood, 2500, 3000, 0.4, 0.75)
+	elseif blood > 2000 then
+		bloodFraction = math.Remap(blood, 2000, 2500, 0, 0.4)
+	else
+		bloodFraction = 0
+	end
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
 	local venousBleed = math.max(org.venousBleed or 0, 0)
 	local internalBleed = math.max(org.internalBleedRate or 0, 0)
@@ -339,24 +357,23 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35)
 	local throatPenalty = math.Clamp(org.throatCutPressureShock or 0, 0, 1)
 	local neckPenalty = math.Clamp(org.neckBrainOxygenPenalty or 0, 0, 1)
+	local arterialImpairment = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
 	local pump = math.Clamp((org.bloodpressure or 0) / 93, 0, 1.2)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
 
-	org.bodyoxygen = approachVital(org.bodyoxygen, oxygen, dt, 2.5)
+	org.bodyoxygen = approachVital(org.bodyoxygen, oxygen, dt, 0.35, 0.5)
 	-- Arterial loss already lowers blood volume and the blood-pressure target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an
 	-- independent disorientation/otrub source instead of a blood-loss emergency.
-	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - venousPenalty - internalPenalty - shockPenalty * 0.45 - throatPenalty * 0.22, 0, 1)
+	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - venousPenalty - internalPenalty - shockPenalty * 0.45 - throatPenalty * 0.22 - arterialImpairment * 0.08, 0, 1)
 	local perfusionTarget = math.Clamp(pressureDelivery * Lerp(org.bodyoxygen, 0.55, 1), 0, 1)
 	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
 
-	org.perfusion = approachVital(org.perfusion, perfusionTarget, dt, 3.5)
+	org.perfusion = approachVital(org.perfusion, perfusionTarget, dt, 0.28, 0.45)
 	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, pump, dt)
-	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05), 0, 1)
-	org.brainoxygen = approachVital(org.brainoxygen, brainTarget, dt, 3.5)
-	org.peripheralperfusion = approachVital(org.peripheralperfusion, peripheralTarget, dt, 3.5)
-	org.neckBrainOxygenPenalty = math.Approach(neckPenalty, 0, dt * 1.5)
-	org.throatCutPressureShock = math.Approach(throatPenalty, 0, dt * 0.035)
+	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82), 0, 1)
+	org.brainoxygen = approachVital(org.brainoxygen, brainTarget, dt, 0.22, 0.4)
+	org.peripheralperfusion = approachVital(org.peripheralperfusion, peripheralTarget, dt, 0.3, 0.5)
 
 	org.perfusionMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1)
 	org.perfusionGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1)
@@ -1535,7 +1552,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-	if (org.blood < 2500) then org.needfake = true end
+	if (org.blood <= 2500) then org.needfake = true end
 
 	local just_went_uncon = not org.otrub and org.needotrub
 

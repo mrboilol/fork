@@ -54,6 +54,7 @@ module[1] = function(org)
 	org.hemothorax = 0
 	org.lastBleedTime = CurTime()
 	org.arterialO2Drain = false
+	org.arterialO2Impairment = 0
 	org.throatcut = false
 	org.throatCutTime = 0
 	org.throatCutUntil = 0
@@ -293,8 +294,6 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if org.arterialwounds and #org.arterialwounds > 0 then
-		local o2DebuffRate = 0
-
 		for _, wound in pairs(org.arterialwounds) do
 			local artery = wound[7]
 			if wound[1] and wound[1] > 0 then
@@ -302,23 +301,7 @@ module[2] = function(owner, org, mulTime)
 				if weakness and not org[weakness.limb .. "amputated"] then
 					org[weakness.limb] = math.max(org[weakness.limb] or 0, weakness.damage)
 				end
-
-				local o2Mul = o2DebuffArteries[artery]
-				if o2Mul then
-					o2DebuffRate = o2DebuffRate + 5 * o2Mul
-				end
 			end
-		end
-
-		if o2DebuffRate > 0 then
-			if org.blood <= 3750 then
-				o2DebuffRate = o2DebuffRate * 3
-				if org.isPly and not org.otrub then
-					org.owner:Notify("I can't breathe... blood's not getting where it should.", true, "arterial_o2", 0, nil, Color(200, 170, 170))
-				end
-			end
-
-			org.o2[1] = math.max(org.o2[1] - mulTime * o2DebuffRate, 0)
 		end
 	end
 
@@ -343,21 +326,18 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	-- Tiered blood loss progression
-	-- 4500: first symptoms - lightheaded, faint nausea
-	-- 4000: slight systemic debuffs begin (O2, consciousness soft-cap 0.95)
-	-- 5000-4500: compensation and the configured BPM curve begin rising
-	-- 3000: noticeable symptoms, still compensated
-	-- 2750: heavy compensation starts
-	-- 2500: severe tachycardia; decompensation and coma pressure begin
-	-- 2300: forced collapse pressure begins
-	-- 2200: unconscious/coma threshold
-	-- 2000: deadly hypovolemic shock zone
+	-- 4500: mild weakness and lightheadedness begin
+	-- 4000: noticeable weakness, but compensation still keeps it non-crippling
+	-- 3500: definite systemic/O2 impairment
+	-- 3000: severe weakness, poor balance, oxygen delivery and compensation
+	-- 2500: crippling decompensation with a real risk of cardiac failure
+	-- 2000: terminal volume loss; circulation can no longer sustain vital organs
 	local bloodConsciousnessCap = 1
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
 	local blood = org.blood or 5000
-	local bloodDeficit = math.Clamp((4000 - blood) / 2500, 0, 1)
-	local compensation = math.Clamp((5000 - blood) / (5000 - 2000), 0, 1)
-	local shockStage = math.Clamp((2500 - blood) / 750, 0, 1)
+	local bloodDeficit = math.Clamp((4500 - blood) / 2500, 0, 1)
+	local compensation = math.Clamp((4500 - blood) / 2000, 0, 1)
+	local shockStage = math.Clamp((3000 - blood) / 1000, 0, 1)
 
 	org.hypovolemia = bloodDeficit
 	org.hemorrhageCompensation = compensation
@@ -365,44 +345,48 @@ module[2] = function(owner, org, mulTime)
 	-- Hypovolemia also reduces heat delivery. Pulse uses this target on its
 	-- temperature tick, allowing severe blood loss to contribute to cold-driven
 	-- bradycardia without instantly forcing every bleed into the same rhythm.
-	local lowBloodCold = math.Clamp((3500 - blood) / 2500, 0, 1)
+	local lowBloodCold = math.Clamp((4000 - blood) / 2000, 0, 1)
 	org.lowBloodTemperatureTarget = 36.7 - lowBloodCold * 3.2
 
-	if org.blood < 4500 then
+	if org.blood <= 4500 then
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.99)
+		org.disorientation = math.max(org.disorientation or 0, 0.08 + bloodDeficit * 0.12)
 		-- One alert when this blood-loss stage is first reached.
 		if org.isPly and not org.otrub then
 			org.owner:Notify("I'm starting to feel faint...", true, "blood_4500", 0, nil, Color(200, 170, 170))
 		end
 	end
 
-	if org.blood < 4000 then
-		-- Soft consciousness cap at 0.95
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
+	if org.blood <= 4000 then
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.94)
+		org.disorientation = math.max(org.disorientation or 0, 0.2 + bloodDeficit * 0.25)
 		if org.isPly and not org.otrub then
 			org.owner:Notify("My body is hard to move...", true, "blood_4000", 0, nil, Color(200, 170, 170))
 		end
 	end
 
-	if org.blood < 3500 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
+	if org.blood <= 3500 then
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.84)
+		org.disorientation = math.max(org.disorientation or 0, 0.55 + bloodDeficit * 0.5)
 		if org.isPly and not org.otrub then
 			org.owner:Notify("Everything feels so heavy...", true, "blood_3500", 0, nil, Color(200, 170, 170))
 		end
 	end
 
-	if org.blood < 3000 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.9)
-		org.disorientation = math.max(org.disorientation or 0, 0.35 + bloodDeficit * 0.65)
+	if org.blood <= 3000 then
+		local severeStage = math.Clamp((3000 - org.blood) / 500, 0, 1)
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.68 - severeStage * 0.12)
+		org.disorientation = math.max(org.disorientation or 0, 1.35 + severeStage * 1.15)
+		org.shock = math.Approach(org.shock or 0, 10 + severeStage * 18, mulTime * (0.45 + severeStage * 0.8))
+		if org.stamina and org.stamina[1] then
+			org.stamina[1] = math.max(org.stamina[1] - mulTime * (0.4 + severeStage * 1.6), 0)
+		end
 		if org.isPly and not org.otrub then
 			org.owner:Notify("My eyes are starting to lose focus...", true, "blood_3000", 0, nil, Color(200, 170, 170))
 		end
 	end
 
-	if org.blood < 2750 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.82)
-	end
-
-	if org.blood < 2500 then
+	if org.blood <= 2500 then
 		-- Slow ischemia creep begins
 		if not adrenalineStabilizer and not hasAntiIschemia then
 			org.ischemia = math.min(org.ischemia + mulTime * 0.004, 1.0)
@@ -412,21 +396,21 @@ module[2] = function(owner, org, mulTime)
 			org.stamina[1] = math.max(org.stamina[1] - mulTime * shockStage * (org.stamina.max or 180) / 35, 0)
 		end
 		-- Consciousness now slides toward coma across the 2500-2000 range.
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.Clamp((org.blood - 2000) / 500 * 0.52 + 0.1, 0.1, 0.62))
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.Clamp((org.blood - 2000) / 500 * 0.5 + 0.05, 0.05, 0.55))
+		org.needfake = true
 		if org.isPly and not org.otrub then
 			org.owner:Notify("I feel cold... I can't think straight.", true, "blood_2500", 0, nil, Color(200, 170, 170))
 		end
 	end
 
-	-- Hard floor: at 2300 begin collapsing toward coma by 2000.
-	if org.blood < 2300 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((org.blood - 2000) / 300, 0))
-		org.needfake = true
-		if org.blood < 2200 then
+	-- Deep decompensation: collapse progresses rapidly toward coma by 2000.
+	if org.blood < 2250 then
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((org.blood - 2000) / 250 * 0.35, 0))
+		if org.blood < 2150 then
 			org.needotrub = true
 		end
 		if not adrenalineStabilizer and not hasAntiIschemia then
-			org.ischemia = math.min((org.ischemia or 0) + mulTime * math.Clamp((2300 - org.blood) / 600, 0, 1) * 0.02, 1.5)
+			org.ischemia = math.min((org.ischemia or 0) + mulTime * math.Clamp((2250 - org.blood) / 500, 0, 1) * 0.025, 1.5)
 		end
 	end
 
@@ -544,16 +528,18 @@ module[2] = function(owner, org, mulTime)
 	end
 	if org.throatcut then
 		local severity = math.Clamp(org.throatCutSeverity or 1, 0.35, 1.25)
-		if hasCarotidWound then
-			org.throatCutPressureShock = math.max(org.throatCutPressureShock or 0, severity)
-		else
-			org.throatCutPressureShock = math.Approach(org.throatCutPressureShock or 0, 0, mulTime / 8)
-		end
+		local pressureTarget = hasCarotidWound and severity or 0
+		local brainPenaltyTarget = hasCarotidWound and math.min(severity * 0.3, 0.45) or 0
+		local pressureRate = hasCarotidWound and mulTime / 14 or mulTime / 8
+		local brainPenaltyRate = hasCarotidWound and mulTime / 18 or mulTime / 8
+		org.throatCutPressureShock = math.Approach(org.throatCutPressureShock or 0, pressureTarget, pressureRate)
+		org.neckBrainOxygenPenalty = math.Approach(org.neckBrainOxygenPenalty or 0, brainPenaltyTarget, brainPenaltyRate)
 		-- The open airway continues to consume body oxygen even after a neck
 		-- bandage has stopped the arterial jet, but this stays secondary to the
 		-- bleeding and airway-function consequences of a slit throat.
 		if org.o2 and org.o2[1] then
-			org.o2[1] = math.max(org.o2[1] - mulTime * 0.25 * severity, 0)
+			local developedImpairment = math.Clamp((org.throatCutPressureShock or 0) / math.max(severity, 0.01), 0, 1)
+			org.o2[1] = math.max(org.o2[1] - mulTime * 0.12 * severity * developedImpairment, 0)
 		end
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump

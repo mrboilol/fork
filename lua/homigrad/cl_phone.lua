@@ -100,7 +100,7 @@ local function BuildPhonePanel(phone)
 	if phone:GetClass() == "ent_phone" then
 		deviceButton:SetText("PICK UP AS HANDHELD")
 		deviceButton.DoClick = function() SendPhoneEntity("HG_Phone_Pickup", phone) end
-	elseif phone:GetClass() == "weapon_phone" then
+	elseif phone:GetClass() == "weapon_phone" and phone.IsPlaceableDeskPhone and phone:IsPlaceableDeskPhone() then
 		deviceButton:SetText("PLACE PHONE DOWN")
 		deviceButton.DoClick = function() SendPhoneEntity("HG_Phone_PlaceDown", phone) end
 	else

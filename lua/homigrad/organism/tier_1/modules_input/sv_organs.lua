@@ -621,14 +621,10 @@ applyThroatCutEffects = function(owner, org, dmgInfo, severity, skipTracheaDamag
 	org.throatCutTime = org.throatCutTime and org.throatCutTime > 0 and org.throatCutTime or time
 	org.throatCutUntil = time + 24
 	org.throatCutSeverity = math.max(org.throatCutSeverity or 0, severity)
-	org.throatCutPressureShock = math.max(org.throatCutPressureShock or 0, severity)
-	org.neckBrainOxygenPenalty = math.max(org.neckBrainOxygenPenalty or 0, severity * 0.45)
+	org.throatCutPressureShock = org.throatCutPressureShock or 0
+	org.neckBrainOxygenPenalty = org.neckBrainOxygenPenalty or 0
 	org.shock = math.min(math.max(org.shock or 0, 40 * severity), 90)
 	org.fearadd = (org.fearadd or 0) + 1.5 * severity
-	-- This checkout expresses blood pressure in mmHg, unlike Vottur's 0..1.
-	org.bloodpressure = math.min(org.bloodpressure or 93, 42)
-	org.brainoxygen = math.min(org.brainoxygen or 1, 0.55)
-	if org.o2 and org.o2[1] then org.o2[1] = math.max(org.o2[1] - 6 * severity, 0) end
 
 	if firstCut then
 		for i = 1, 3 do

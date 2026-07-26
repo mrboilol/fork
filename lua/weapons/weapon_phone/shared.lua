@@ -65,11 +65,17 @@ function SWEP:Reload()
 	if SERVER and HG_PHONE_SERVER then HG_PHONE_SERVER:OpenPhone(self:GetOwner(), self) end
 end
 
+function SWEP:IsPlaceableDeskPhone()
+	return self:GetNW2Bool("HGDeskPhoneCarry", false)
+		and self:GetNW2String("HGPhoneDeskAppearance", "") ~= ""
+end
+
 function SWEP:GetInfo()
 	return {
 		phoneNumber = HG_PHONE.GetNumber(self),
 		displayName = HG_PHONE.GetDisplayName(self),
-		ringtone = HG_PHONE.GetRingtone(self)
+		ringtone = HG_PHONE.GetRingtone(self),
+		deskPhoneAppearance = self:GetNW2String("HGPhoneDeskAppearance", "")
 	}
 end
 
@@ -77,6 +83,9 @@ function SWEP:SetInfo(info)
 	if not SERVER or not istable(info) then return end
 	timer.Simple(0, function()
 		if IsValid(self) and HG_PHONE_SERVER then
+			local appearance = tostring(info.deskPhoneAppearance or "")
+			self:SetNW2Bool("HGDeskPhoneCarry", appearance ~= "")
+			self:SetNW2String("HGPhoneDeskAppearance", appearance)
 			HG_PHONE_SERVER:SetIdentity(self, info.phoneNumber, info.displayName, info.ringtone)
 		end
 	end)
@@ -93,12 +102,40 @@ if CLIENT then
 	end
 
 	function SWEP:DrawWorldModel2()
-		self.PhoneWorldModel = IsValid(self.PhoneWorldModel) and self.PhoneWorldModel or ClientsideModel(self.WorldModel)
+		local appearanceJSON = self:GetNW2String("HGPhoneDeskAppearance", "")
+		if self.PhoneWorldAppearanceJSON ~= appearanceJSON or not IsValid(self.PhoneWorldModel) then
+			if IsValid(self.PhoneWorldModel) then self.PhoneWorldModel:Remove() end
+			local appearance = util.JSONToTable(appearanceJSON) or {}
+			local modelPath = util.IsValidModel(appearance.model or "") and appearance.model or self.WorldModel
+			self.PhoneWorldModel = ClientsideModel(modelPath)
+			self.PhoneWorldAppearanceJSON = appearanceJSON
+
+			local model = self.PhoneWorldModel
+			if IsValid(model) then
+				model:SetNoDraw(true)
+				model:SetSkin(tonumber(appearance.skin) or 1)
+				model:SetMaterial(tostring(appearance.material or ""))
+				local color = appearance.color or {}
+				model:SetColor(Color(
+					math.Clamp(tonumber(color.r) or 255, 0, 255),
+					math.Clamp(tonumber(color.g) or 255, 0, 255),
+					math.Clamp(tonumber(color.b) or 255, 0, 255),
+					math.Clamp(tonumber(color.a) or 255, 0, 255)
+				))
+				model:SetModelScale(tonumber(appearance.scale) or self.ModelScale, 0)
+				model:SetRenderMode(tonumber(appearance.renderMode) or RENDERMODE_NORMAL)
+				model:SetRenderFX(tonumber(appearance.renderFX) or 0)
+				for _, bodygroup in ipairs(appearance.bodygroups or {}) do
+					model:SetBodygroup(tonumber(bodygroup.id) or 0, tonumber(bodygroup.value) or 0)
+				end
+				for _, submaterial in ipairs(appearance.submaterials or {}) do
+					model:SetSubMaterial(tonumber(submaterial.id) or 0, tostring(submaterial.value or ""))
+				end
+			end
+		end
 		local model = self.PhoneWorldModel
 		if not IsValid(model) then return end
 		model:SetNoDraw(true)
-		model:SetModelScale(self.ModelScale, 0)
-		model:SetSkin(1)
 
 		local owner = self:GetOwner()
 		local character = IsValid(owner) and hg.GetCurrentCharacter(owner) or nil

@@ -79,6 +79,13 @@ function ENT:Use(ply)
 	self.owner = ply
 end
 
+function ENT:OnTakeDamage(dmgInfo)
+	if self.Exploded or self.timer or not self.lpos then return end
+	if not dmgInfo:IsBulletDamage() and not dmgInfo:IsDamageType(DMG_BUCKSHOT) then return end
+
+	self:Arm(CurTime() - self.timeToBoom + 1)
+end
+
 local vecCone = Vector(0, 0, 0)
 local GRENADE_SOUND_RADIUS_SQR = 4500 * 4500
 local GRENADE_NEARBY_ENTITY_CAP = 20

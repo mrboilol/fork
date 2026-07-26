@@ -1959,17 +1959,24 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 	end
 
 	-- При жаре
-	if owner:Alive() and org.temperature > 40 then
-		org.VomitCD = org.VomitCD or CurTime() + math.random(35, 75)
+	if owner:Alive() and org.temperature > 38.4 then
+		local heatNausea = math.Clamp(math.Remap(org.temperature, 38.4, 41, 0, 1), 0, 1)
+		local vomitDelayMin = math.floor(Lerp(heatNausea, 24, 8))
+		local vomitDelayMax = math.floor(Lerp(heatNausea, 55, 18))
+		org.VomitCD = org.VomitCD or CurTime() + math.random(vomitDelayMin, vomitDelayMax)
 		
 		if org.VomitCD < CurTime() then
-			org.VomitCD = CurTime() + math.random(35, 75)
+			org.VomitCD = CurTime() + math.random(vomitDelayMin, vomitDelayMax)
 			owner:Notify(hg.get_phraselist(owner, "heatvomit"), 1, "phrase", 1, nil, Color(255, 85, 85, 255))
-			
+			local vomitOwner = org.owner
 			timer.Simple(3, function()
-				hg.organism.VomitNormal(org.owner)
+				if IsValid(vomitOwner) and vomitOwner:Alive() then
+					hg.organism.VomitNormal(vomitOwner)
+				end
 			end)
 		end
+	else
+		org.VomitCD = nil
 	end
 
 	org.HeatDMGCd = org.HeatDMGCd or CurTime()

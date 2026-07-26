@@ -968,13 +968,14 @@ end
 local function getCirculationStrength(org, pulseOverride)
 	local pulse = org.heartstop and 0 or math.max(pulseOverride or org.pulse or 70, 0)
 	local pressure = math.max(org.bloodpressure or 93, 0)
+	if pulse <= 0 or pressure <= 0 then return 0 end
 	local pulseStrength = math.Clamp(pulse / 70, 0, 1.55)
 	local pressureStrength = math.Clamp(pressure / 93, 0, 1.55)
 
 	-- Both pressure and an effective pulse contribute to how far blood can be
 	-- driven. A strong value can partly compensate for the other, but cannot hide
 	-- failed circulation.
-	return math.Clamp(math.sqrt(math.max(pulseStrength, 0.01) * math.max(pressureStrength, 0.01)), 0.08, 1.55)
+	return math.Clamp(math.sqrt(pulseStrength * pressureStrength), 0, 1.55)
 end
 
 local function emitNormalWoundParticles(ent, pos, outward, intensity, circulation)
@@ -1060,7 +1061,7 @@ local function playRandomArteryDrip(ent, wound, vol)
 	local pos = getArterialWoundPos(ent, wound)
 	if not pos then return end
 
-	sound.Play(arteryDelayedDripSound .. math.random(1, arteryDelayedDripCount) .. ".wav", pos, 70, randomArteryPitch(), vol or 1)
+	sound.Play(arteryDelayedDripSound .. math.random(1, arteryDelayedDripCount) .. ".wav", pos, 96, randomArteryPitch(), vol or 1)
 end
 
 function hg.queueArterialWoundSound(ent, wound)
@@ -1081,7 +1082,7 @@ function hg.queueArterialWoundSound(ent, wound)
 		if IsValid(target) then
 			local snd = CreateSound(target, arteryNeckSlitSound)
 			if snd then
-				snd:SetSoundLevel(75)
+				snd:SetSoundLevel(92)
 				snd:PlayEx(1, randomArteryPitch())
 				snd:ChangeVolume(0, delay)
 				timer.Simple(delay + 0.05, function()
@@ -1093,25 +1094,32 @@ function hg.queueArterialWoundSound(ent, wound)
 
 	timer.Simple(delay, function()
 		if not IsValid(ent) then return end
-		playRandomArteryDrip(ent, wound, artery == "arteria" and 0.85 or 1)
+		playRandomArteryDrip(ent, wound, 1)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, pulse, woundIndex, size)
+emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size)
 	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
 	-- artery-marked blood trail with the original combined right/up oscillation.
 	-- Give the pressure pulse enough forward speed and lift to form an arc before
 	-- gravity takes over instead of immediately pouring down the body.
 	local time = CurTime()
+	local pulse = math.max(org.pulse or 0, 0)
 	local pulseMul = pulse / 70
+	local circulation = getCirculationStrength(org, pulse)
+	local arterialPressureMul = circulation * 2.5
+	if arterialPressureMul <= 0 then
+		hg.addBloodPart(pos, bloodDown * 2 + VectorRand(-0.5, 0.5), nil, size, size, true, nil, ent)
+		return
+	end
 	local forwardVelocityMul = 1.75
 	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
-	local velocity = VectorRand(-1, 1) * pulseMul
+	local velocity = (VectorRand(-1, 1) * pulseMul
 		+ dir * 5 * forwardVelocityMul * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
 		+ dir:Angle():Right() * 25 * math.sin(time * 2) * math.cos(time * 4)
 		+ ang:Up() * 25 * math.sin(time * 3) * math.cos(time)
 		+ vector_up * upwardVelocity
-		+ VectorRand(-1, 1) * pulseMul
+		+ VectorRand(-1, 1) * pulseMul) * arterialPressureMul
 
 	hg.addBloodPart(pos, velocity, nil, size, size, true, nil, ent)
 end
@@ -1397,7 +1405,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local dir = wound[6]
-						local len = dir:Length() * pulse / 70
+						local len = dir:Length()
 						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, boneAng)
 						dir = -dir:Forward() * len
 
@@ -1405,7 +1413,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, boneAng, pulse, i, size)
+							emitArterialSpray(ent, pos, dir, boneAng, org, i, size)
 						end
 
 						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))

@@ -8,13 +8,14 @@ HG_PHONE.STATE_CALLING = 1
 HG_PHONE.STATE_RINGING = 2
 HG_PHONE.STATE_IN_CALL = 3
 
-HG_PHONE.RINGTONES = {
-	{name = "Classic", path = "michaelphone.mp3"},
-	{name = "Digital", path = "glide/ui/phone_notify.wav"},
-	{name = "Button", path = "buttons/button14.wav"},
-	{name = "Alarm", path = "ambient/alarms/alarm1.wav"},
-	{name = "Bell", path = "ambient/alarms/warningbell1.wav"}
-}
+HG_PHONE.RINGTONES = {}
+HG_PHONE.RINGTONE_PATHS = {}
+
+for index = 1, 7 do
+	local path = "ring" .. index .. ".ogg"
+	HG_PHONE.RINGTONES[index] = {name = "Ring " .. index, path = path}
+	HG_PHONE.RINGTONE_PATHS[path] = true
+end
 
 HG_PHONE.MAP_PHONE_MODELS = {
 	["models/props/cs_office/phone.mdl"] = true,
@@ -63,7 +64,9 @@ function HG_PHONE.GetDisplayName(ent)
 end
 
 function HG_PHONE.GetRingtone(ent)
-	return IsValid(ent) and ent:GetNW2String("HGPhoneRingtone", HG_PHONE.RINGTONES[1].path) or HG_PHONE.RINGTONES[1].path
+	local fallback = HG_PHONE.RINGTONES[1].path
+	local path = IsValid(ent) and ent:GetNW2String("HGPhoneRingtone", fallback) or fallback
+	return HG_PHONE.RINGTONE_PATHS[path] and path or fallback
 end
 
 function HG_PHONE.GetState(ent)

@@ -940,9 +940,14 @@ function SWEP:PrimaryShoot()
 		return
 	end
 
+	-- Capture the ballistic muzzle before sound/animation work and before any
+	-- recoil state is advanced. The authoritative physical projectile may not be
+	-- seen until a later frame, but it must retain the trigger-time direction.
+	local shotTrace, shotPos, shotAng = self:GetFireTrace()
+
 	self:EmitShoot()
 	--if SERVER or self:IsClient() then
-		self:FireBullet()
+		self:FireBullet(shotTrace, shotPos, shotAng)
 	--end
 	self.dwr_reverbDisable = nil
 	self.shooanim = self.ShootAnimMul

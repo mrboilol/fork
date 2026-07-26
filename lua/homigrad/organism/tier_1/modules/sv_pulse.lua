@@ -5,25 +5,33 @@ local module = hg.organism.module.pulse
 
 local BloodBPM = {
 	{5000, 75},
-	{4500, 85},
+	{4500, 78},
 	{4000, 95},
-	{3500, 105},
-	{3000, 120},
-	{2750, 155},
-	{2500, 200},
-	{2300, 240},
-	{2000, 280},
+	{3500, 120},
+	{3000, 155},
+	{2500, 210},
+	{2250, 150},
+	{2000, 35},
 }
 
--- 2000 mL is the beginning of severe shock, not an instant flatline. A
--- hemorrhaging organism can still compensate there; terminal bradycardia and
--- arrest need a further loss of preload/cardiac output.
-local cardiacArrestBlood = 900
+local BloodPerfusion = {
+	{5000, 1},
+	{4500, 1},
+	{4000, 0.99},
+	{3500, 0.96},
+	{3000, 0.82},
+	{2500, 0.50},
+	{2000, 0},
+}
+
+-- At 2000 mL there is no longer enough preload to sustain vital circulation.
+-- The 2500-2000 band is the short, unstable decompensation window before arrest.
+local cardiacArrestBlood = 2000
 local terminalHeartRate = 300
 local peaDuration = 6
 
 local function getPalpitationThreat(org, blood, o2Value)
-	local lowBlood = math.Clamp((4000 - blood) / 2000, 0, 1)
+	local lowBlood = math.Clamp((4500 - blood) / 2500, 0, 1)
 	local lowPressure = math.Clamp((65 - (org.bloodpressure or 93)) / 40, 0, 1)
 	local hypoxia = math.Clamp((12 - o2Value) / 12, 0, 1)
 	local shock = math.Clamp((org.shock or 0) / 60, 0, 1)
@@ -73,7 +81,7 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 	-- Conduction suppression begins in moderate hypothermia and grows toward
 	-- severe hypothermia.
 	local cold = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((1500 - (org.blood or 5000)) / 600, 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((2500 - (org.blood or 5000)) / 500, 0, 1)
 	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold, hemorrhagicDecompensation)
 
 	-- Complete/partial AV block is a direct conduction-system injury pattern,
@@ -178,9 +186,9 @@ module[2] = function(owner, org, timeValue)
 	local effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 	local compensationPulseMultiplier = math.Clamp(1 - hemorrhageCompensation * 0.35 - hypovolemicShock * 0.1 - effectivePalpitations * 0.3, 0.35, 1)
 	org.compensationPulseMultiplier = compensationPulseMultiplier
-	-- Preserve effective circulation through 3000-3500 mL. The sharp preload
-	-- loss is reserved for the 2500-2000 mL decompensation band.
-	local bloodPerfusionK = bloodNow >= 3000 and 1 or math.Remap(math.Clamp(bloodNow, 1800, 3000), 1800, 3000, 0, 1)
+	-- Mild loss is compensated, but effective circulation now falls in distinct
+	-- stages and reaches zero at the terminal 2000 mL threshold.
+	local bloodPerfusionK = interpolateCurve(BloodPerfusion, math.Clamp(bloodNow, 0, 5000))
 	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * compensationPulseMultiplier
@@ -237,7 +245,7 @@ module[2] = function(owner, org, timeValue)
 	-- node and conduction system progressively lose responsiveness. At terminal
 	-- blood volume, preload failure can also remove the prior tachycardia.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((1500 - bloodNow) / 600, 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((2500 - bloodNow) / 500, 0, 1)
 	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, hemorrhagicDecompensation)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
@@ -302,8 +310,8 @@ module[2] = function(owner, org, timeValue)
 	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
 	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 
-	-- At terminal blood volume, bradycardia/poor filling finally progress to
-	-- deterministic arrest. The 2000 mL band remains severe compensated shock.
+	-- At terminal blood volume, bradycardia/poor filling progress to
+	-- deterministic arrest. The 2500-2000 mL band remains briefly treatable.
 	local restartCirculationActive = (org.cardiacRestartUntil or 0) > CurTime()
 	if not org.heartstop and not restartCirculationActive and bloodNow <= cardiacArrestBlood and (org.heartbeat <= 40 or bradycardiaSeverity >= 0.7) then
 		org.heartstop = true
@@ -313,7 +321,7 @@ module[2] = function(owner, org, timeValue)
 	-- arrest. Keep transient AF/ectopy visible, but let VF be a no-output
 	-- electrical arrest rather than pretending it is a fast effective pulse.
 	local severeCold = organSystemsEnabled and coldSuppression >= 0.62
-	local terminalHemorrhage = hemorrhagicDecompensation >= 0.7
+	local terminalHemorrhage = bloodNow <= 2500
 	if not (severeCold or terminalHemorrhage) then
 		org.unstableRhythm = nil
 		org.terminalRhythm = nil
@@ -321,12 +329,12 @@ module[2] = function(owner, org, timeValue)
 		org.nextColdRhythmRoll = CurTime() + 3
 		local instability = math.max(coldSuppression, hemorrhagicDecompensation)
 		local roll = math.Rand(0, 1)
-		if roll < 0.025 + instability * 0.055 then
+		if roll < 0.005 + instability * 0.075 then
 			org.terminalRhythm = "ventricular_fibrillation"
 			org.heartstop = true
-		elseif roll < 0.2 + instability * 0.18 then
+		elseif roll < 0.08 + instability * 0.2 then
 			org.unstableRhythm = "atrial_fibrillation"
-		elseif roll < 0.45 + instability * 0.2 then
+		elseif roll < 0.22 + instability * 0.35 then
 			org.unstableRhythm = "ventricular_ectopy"
 		else
 			org.unstableRhythm = nil
@@ -400,7 +408,7 @@ module[2] = function(owner, org, timeValue)
 	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
 	local fillingK = (1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)) * (1 - effectivePalpitations * 0.2)
 	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.12)
-	local volumeMapK = blood >= 3000 and 1 or math.Remap(math.Clamp(blood, 1800, 3000), 1800, 3000, 0.12, 1)
+	local volumeMapK = interpolateCurve(BloodPerfusion, blood)
 	local map = 93 * pulse_factor * hypertensionMul * compensation * volumeMapK
 	map = org.alive and map or 0
 
@@ -557,7 +565,7 @@ module[2] = function(owner, org, timeValue)
 	-- epinephrine injection can affect an arrest before its normal decay tick.
 	local adren = math.max(org.adrenaline or 0, org.adrenalineAdd or 0)
 
-	local bloodCurveOwnsArrest = bloodNow <= 2300 and (org.heart or 0) < 0.8 and org.brain < 0.85
+	local bloodCurveOwnsArrest = bloodNow <= 2500 and (org.heart or 0) < 0.8 and org.brain < 0.85
 	if organSystemsEnabled then
 		local failedCirculation = (org.pulse < 10 or org.bloodpressure < 25) and not bloodCurveOwnsArrest and not restartCirculationActive
 		if failedCirculation or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
