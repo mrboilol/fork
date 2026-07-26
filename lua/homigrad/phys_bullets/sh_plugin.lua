@@ -72,6 +72,13 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 	end
 
 	local function translate_default_bullet_to_phys(bullet)
+		-- FireLuaBullets already enforces this marker after EntityFireBullets
+		-- hooks. Direct physical shots (crossbow and similar one-shot weapons)
+		-- need the same invariant before this routine applies its random cone.
+		if bullet.NoHiddenSpread then
+			bullet.Spread = vector_origin
+		end
+
 		bullet.Pos = bullet.Pos or bullet.Src
 		bullet.Shooter = bullet.Shooter or bullet.Attacker
 		bullet.Size = bullet.Size or bullet.HullSize or 0

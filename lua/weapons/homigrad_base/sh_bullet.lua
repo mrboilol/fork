@@ -457,8 +457,8 @@ local tr = {}
 local att
 local util_TraceLine = util.TraceLine
 
-function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
-	if SERVER and !bCacheTrace and self.cache_trace and !(desiredPos or desiredAng) then return self.cache_trace[1], self.cache_trace[2], self.cache_trace[3] end
+function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, bNoAdditional)
+	if SERVER and !bCacheTrace and !bNoAdditional and self.cache_trace and !(desiredPos or desiredAng) then return self.cache_trace[1], self.cache_trace[2], self.cache_trace[3] end
 	local owner = self:GetOwner()
 	
 	if IsValid(owner) and owner:IsNPC() then local att = self:GetMuzzleAtt() return nil,SERVER and owner:GetShootPos() or att.Pos,SERVER and owner:GetAimVector():Angle() or att.Ang end
@@ -468,10 +468,10 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
 
 	local gunpos, gunang
 
-	if CLIENT and !closeanim then
+	if CLIENT and !closeanim and !bNoAdditional then
 		gunpos, gunang = self.desiredPos, self.desiredAng
 	else
-		gunpos, gunang = self:WorldModel_Transform(true)
+		gunpos, gunang = self:WorldModel_Transform(true, bNoAdditional)
 	end
 	
 	gunpos = gunpos or gun:GetPos()
@@ -517,6 +517,49 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim)
 	end
 
 	return trace, pos, ang
+end
+
+local firstShotMaxDeviationCos = math.cos(math.rad(8))
+
+-- A newly drawn/reloaded weapon can become usable one server tick before its
+-- smoothed deploy pose reaches the aimed pose. Keep normal muzzle sway, but do
+-- not let that stale pose throw the first round far away from the trajectory.
+function SWEP:GetFireTrace()
+	local trace, pos, ang = self:GetTrace(true)
+	local owner = self:GetOwner()
+	if not trace or not pos or not ang or not IsValid(owner) or not owner:IsPlayer() then
+		return trace, pos, ang
+	end
+
+	local lastShot = self:LastShootTime() or 0
+	local firstShot = lastShot <= 0 or CurTime() - lastShot > 0.3
+	if not firstShot then return trace, pos, ang end
+
+	local desiredPos, desiredAng = self.desiredPos, self.desiredAng
+	local stableTrace, stablePos, stableAng = self:GetTrace(false, nil, nil, nil, nil, true)
+	self.desiredPos, self.desiredAng = desiredPos, desiredAng
+	if not stableTrace or not stablePos or not stableAng then return trace, pos, ang end
+
+	if ang:Forward():Dot(stableAng:Forward()) >= firstShotMaxDeviationCos then
+		return trace, pos, ang
+	end
+
+	-- Keep the real muzzle origin/obstruction behavior; only reject the stale
+	-- angle. Re-trace from that muzzle so the cached trajectory matches the shot.
+	local stableDir = stableAng:Forward()
+	local gun = self:GetWeaponEntity()
+	local correctedTrace = util_TraceLine({
+		start = pos,
+		endpos = pos + stableDir * 8000,
+		filter = {self, gun, not owner.suiciding and owner or NULL, not owner.suiciding and (CLIENT and owner.FakeRagdoll or nil)}
+	})
+
+	self.cache_trace = self.cache_trace or {}
+	self.cache_trace[1] = correctedTrace
+	self.cache_trace[2] = pos
+	self.cache_trace[3] = stableAng
+
+	return correctedTrace, pos, stableAng
 end
 
 SWEP.ShellEject = "EjectBrass_556"
@@ -610,7 +653,7 @@ function SWEP:FireBullet()
 	end
 
 	self:WorldModel_Transform()
-	local tr, pos, ang = self:GetTrace(true)
+	local tr, pos, ang = self:GetFireTrace()
 
 	if isply then
 		owner:LagCompensation(false)

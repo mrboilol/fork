@@ -319,6 +319,7 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 	local name2 = "fake_spine" .. number
 	if org[name] >= hg.organism[name2] then return 0 end
 	local oldDmg = org[name]
+	local breakThreshold = hg.organism[name2]
 
 	if name == "spine3" and isCrush(dmgInfo) and dmg > 0.3 and math.random() < 0.4 then
 		local skullResult, skullVec = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
@@ -341,6 +342,14 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
 		if org.owner:IsPlayer() then org.owner:Notify(huyasd[name], true, name, 2) end
 		org.painadd = org.painadd + 25
+	end
+
+	if name == "spine3" and oldDmg < breakThreshold and org[name] >= breakThreshold and hg.BreakNeck then
+		local damageForce = dmgInfo:GetDamageForce()
+		-- Projectile forces use a very different scale and already have their own
+		-- head-gib threshold. Only physical/crush force owns this neck-tear roll.
+		local force = isCrush(dmgInfo) and isvector(damageForce) and damageForce:Length() or 0
+		hg.BreakNeck(org.owner, true, force)
 	end
 
 	org.painadd = org.painadd + dmg * 2

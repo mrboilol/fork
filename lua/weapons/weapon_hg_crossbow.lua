@@ -149,10 +149,9 @@ function SWEP:Shoot(override)
 	if primary.Next > CurTime() then return false end
 	if (primary.NextFire or 0) > CurTime() then return false end
 	primary.Next = CurTime() + primary.Wait
-	self:SetLastShootTime(CurTime())
 	primary.Automatic = weapons.Get(self:GetClass()).Primary.Automatic
 	
-	local tr,pos,ang = self:GetTrace(true)
+	local tr,pos,ang = self:GetFireTrace()
 	local owner = self:GetOwner()
 	
 	if SERVER then
@@ -163,6 +162,8 @@ function SWEP:Shoot(override)
 			-- bullet.Num = 1
 		bullet.Pos = point
 		bullet.Dir = ang:Forward()
+		bullet.Spread = vector_origin
+		bullet.NoHiddenSpread = true
 		bullet.Speed = 310
 			-- bullet.Force = ammotype.Force or primary.Force
 		bullet.Damage = 500
@@ -171,6 +172,7 @@ function SWEP:Shoot(override)
 			-- bullet.Spread = ammotype.Spread or self.Primary.Spread or 0
 		bullet.AmmoType = "Armature"
 		bullet.Attacker = owner.suiciding and Entity(0) or owner
+		bullet.Inflictor = self
 		bullet.IgnoreEntity = not owner.suiciding and (owner.InVehicle and owner:InVehicle() and owner:GetVehicle() or hg.GetCurrentCharacter(owner)) or nil
 			-- bullet.Callback = bulletHit
 			-- bullet.TracerName = self.Tracer or "nil"

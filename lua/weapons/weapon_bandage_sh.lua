@@ -1095,22 +1095,36 @@ if SERVER then
 		target.tourniquets = target.tourniquets or {}
 		target.tourniquets[#target.tourniquets + 1] = {bestWound[2], bestWound[3], tourniquetBone}
 
-		-- A tourniquet controls bleeding; it does not erase the injury. Keeping
-		-- these wounds lets the shared bleed path suppress both current and future
-		-- wounds below the band consistently.
-		for _, wound in pairs(org.wounds or {}) do
-			local woundBone = getTourniquetWoundBone(target, wound)
+		-- Remove every wound controlled by the applied tourniquet. Merely setting
+		-- visualBleedRate to zero leaves arterialwounds and the artery status flag
+		-- active, allowing the arterial bleed loop to resume later.
+		for i = #(org.wounds or {}), 1, -1 do
+			local woundBone = getTourniquetWoundBone(target, org.wounds[i])
 			if woundBone and hg.IsBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
-				wound.visualBleedRate = 0
+				table.remove(org.wounds, i)
 			end
 		end
-		for _, wound in pairs(org.arterialwounds or {}) do
-			local woundBone = getTourniquetWoundBone(target, wound)
+
+		local removedArterial = false
+		local removedArteries = {}
+		for i = #(org.arterialwounds or {}), 1, -1 do
+			local arterialWound = org.arterialwounds[i]
+			local woundBone = getTourniquetWoundBone(target, arterialWound)
 			if woundBone and hg.IsBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
-				wound.visualBleedRate = 0
+				if arterialWound[7] then removedArteries[arterialWound[7]] = true end
+				table.remove(org.arterialwounds, i)
+				removedArterial = true
 			end
 		end
-		org.owner:SetNetVar("arterialwounds", org.arterialwounds or {})
+
+		if removedArterial and hg.organism.RebuildArteryWoundState then
+			hg.organism.RebuildArteryWoundState(org, true)
+		else
+			for artery in pairs(removedArteries) do
+				org[artery] = 0
+			end
+			org.owner:SetNetVar("arterialwounds", org.arterialwounds or {})
+		end
 		org.owner:SetNetVar("wounds", org.wounds or {})
 
 		target:SetNetVar("Tourniquets", target.tourniquets)
@@ -1130,7 +1144,7 @@ if SERVER then
 		end
 
 		SetNetVar("TourniquetGuys", hg.TourniquetGuys)
-		self:RefreshPerfusionTreatment(target, bestArterial and 0.45 or 0.25)
+		self:RefreshPerfusionTreatment(target, (bestArterial or removedArterial) and 0.45 or 0.25)
 
 		self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
 		return true

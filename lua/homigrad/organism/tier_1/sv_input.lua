@@ -28,6 +28,10 @@ local severe_damage_adrenaline_delay = 0.75
 local live_limb_gib_threshold = 135
 local live_head_gib_threshold = 85
 local destroyed_brain_head_gib_threshold = 45
+local neck_break_kill_force_start = 800
+local neck_break_kill_force_certain = 2400
+local neck_break_decap_force_start = 1600
+local neck_break_decap_force_certain = 3600
 local disfigured_player_name = "Unidentifiable person"
 local bonetohitgroup, hitgrouptolimb
 
@@ -1136,15 +1140,15 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			dmgPos = tr.HitPos
 		end
 	end
-	local entryPhysicsBone = tr.Entity == ent and tr.PhysicsBone
-	if entryPhysicsBone == nil then
+	local entryPhysicsBone = tr.Entity == ent and tr.PhysicsBone or nil
+	if type(entryPhysicsBone) ~= "number" then
 		local fallbackDir = -(dmgPos - (ent:GetPos() + ent:OBBCenter())):GetNormalized()
 		local fallbackTrace = util.QuickTrace(dmgPos, fallbackDir * 100)
-		if fallbackTrace.Entity == ent then
+		if fallbackTrace.Entity == ent and type(fallbackTrace.PhysicsBone) == "number" then
 			entryPhysicsBone = fallbackTrace.PhysicsBone
 		end
 	end
-	local entryBone = entryPhysicsBone ~= nil and ent:TranslatePhysBoneToBone(entryPhysicsBone) or nil
+	local entryBone = type(entryPhysicsBone) == "number" and ent:TranslatePhysBoneToBone(entryPhysicsBone) or nil
 	local entryBoneName = entryBone ~= nil and ent:GetBoneName(entryBone) or nil
 	local entryHitgroup = entryBoneName and bonetohitgroup[entryBoneName] or 0
 
@@ -2131,8 +2135,6 @@ local function velocityDamage(ent, data)
 			
 			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
 			
-			local neck_not_broken = org.spine3 < 0.8
-			
 			//if dmg > 0.5 then
 				hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1), dmgInfo)
 			//end
@@ -2140,10 +2142,6 @@ local function velocityDamage(ent, data)
 				org.needotrub = true
 				org.shock = org.shock + 10
 				org.consciousness = math.min(org.consciousness, head_otrub_consciousness_cap)
-			end
-
-			if neck_not_broken and org.spine3 >= 0.8 then
-				hg.BreakNeck(ent)
 			end
 
 			if oldSkull < 1 and org.skull == 1 then
@@ -2269,8 +2267,8 @@ local function removeFloppyBoneOffset(rag, key)
     rag.FloppyBoneOffsets[key] = nil
 end
 
-function hg.BreakNeck(ent, fromDamage)
-	print("[HG Floppy] BreakNeck called: ent=" .. tostring(ent) .. " fromDamage=" .. tostring(fromDamage))
+function hg.BreakNeck(ent, fromDamage, force)
+	print("[HG Floppy] BreakNeck called: ent=" .. tostring(ent) .. " fromDamage=" .. tostring(fromDamage) .. " force=" .. tostring(force))
 	if not IsValid(ent) then
 		print("[HG Floppy] BreakNeck FAIL: ent invalid")
 		return
@@ -2278,10 +2276,29 @@ function hg.BreakNeck(ent, fromDamage)
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 	print("[HG Floppy] BreakNeck: ply=" .. tostring(ply) .. " isRagdoll=" .. tostring(ent:IsRagdoll()))
-	
-	-- A broken spine3 is a paralyzing neck injury, not an immediate kill.
-	-- Keep the player alive long enough for the organism incapacitation state
-	-- and the floppy-neck constraint to take effect.
+
+	-- A low-force spine3 break remains a paralyzing floppy-neck injury. Higher
+	-- force progressively restores the old instant-death result, while extreme
+	-- force can tear the head free through the normal head-amputation pipeline.
+	local forceAmount = math.max(tonumber(force) or 0, 0)
+	local decapChance = math.Clamp(
+		(forceAmount - neck_break_decap_force_start) / (neck_break_decap_force_certain - neck_break_decap_force_start),
+		0,
+		1
+	)
+	if decapChance > 0 and math.Rand(0, 1) < decapChance then
+		hg.ExplodeHead(ent)
+		return
+	end
+
+	local killChance = math.Clamp(
+		(forceAmount - neck_break_kill_force_start) / (neck_break_kill_force_certain - neck_break_kill_force_start),
+		0,
+		1
+	)
+	if killChance > 0 and IsValid(ply) and ply:IsPlayer() and ply:Alive() and math.Rand(0, 1) < killChance then
+		ply:Kill()
+	end
 
 	-- Store the player reference for later
 	local playerRef = ply
@@ -3602,7 +3619,7 @@ local function breakSpineFromJointStress(ragdoll, org, ply, segment, stress)
 	end
 
 	if segment == "spine3" then
-		if hg.BreakNeck then hg.BreakNeck(ragdoll, false) end
+		if hg.BreakNeck then hg.BreakNeck(ragdoll, false, stress) end
 	elseif hg.BreakSpine and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() then
 		hg.BreakSpine(ragdoll, segment, false)
 	end
