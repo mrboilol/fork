@@ -1830,6 +1830,18 @@ function SWEP:IsBreakableGlass(ent)
     return material and string.find(material:GetName(), "glass", 1, true) ~= nil
 end
 
+function SWEP:IsDestructibleTarget(ent)
+    if not IsValid(ent) then return false end
+
+    local class = ent:GetClass()
+    return class == "prop_physics"
+        or class == "prop_physics_multiplayer"
+        or class == "func_physbox"
+        or class == "func_breakable"
+        or class == "func_breakable_surf"
+        or (hgIsDoor and hgIsDoor(ent))
+end
+
 function SWEP:BehindAttack(ent)
     local owner = self:GetOwner()
 
@@ -3171,7 +3183,7 @@ function SWEP:CustomThink()
             if not soft and not self:IsBreakableGlass(ent) and self:ShouldStopAttackOnWorldHit(1) then
                 -- Doors are world hits, so pass the swing through the shared damage path before
                 -- letting door-breaching weapons apply their own stronger special behavior.
-                if IsValid(ent) and hgIsDoor(ent) then
+                if IsValid(ent) and hgIsDoor(ent) and not self:IsDestructibleTarget(ent) then
                     local doorDamage = DamageInfo()
                     doorDamage:SetAttacker(owner)
                     doorDamage:SetInflictor(self)
@@ -3241,7 +3253,9 @@ function SWEP:CustomThink()
                 end
 
                 self.slash = self.MultiDmg1
-                ent:TakeDamageInfo(dmginfo)
+                if not self:IsDestructibleTarget(ent) then
+                    ent:TakeDamageInfo(dmginfo)
+                end
 
                 if SERVER and self.NeckBreakChance and (self.DamagePrimary or 0) >= (self.DamageSecondary or 0) and blockMul >= 1 then
                     local isHead = trace.HitGroup == HITGROUP_HEAD
@@ -3412,7 +3426,9 @@ function SWEP:CustomThink()
 
                 self.slash = self.MultiDmg2
                 --print(dmg)
-                ent:TakeDamageInfo(dmginfo)
+                if not self:IsDestructibleTarget(ent) then
+                    ent:TakeDamageInfo(dmginfo)
+                end
 
                 if SERVER and self.NeckBreakChance and (self.DamageSecondary or 0) > (self.DamagePrimary or 0) and blockMul >= 1 then
                     local isHead = trace.HitGroup == HITGROUP_HEAD
@@ -3581,7 +3597,9 @@ function SWEP:CustomThink()
                 local oldBreakBoneMul = self.BreakBoneMul
                 self.BreakBoneMul = (self.BreakBoneMul or 1) * (self.ReleasedChargeBoneMul or 1)
                 self.slash = self.MultiDmgCharge
-                ent:TakeDamageInfo(dmginfo)
+                if not self:IsDestructibleTarget(ent) then
+                    ent:TakeDamageInfo(dmginfo)
+                end
                 self.attackedOnce = true
                 self.slash = nil
                 self.BreakBoneMul = oldBreakBoneMul
@@ -4370,7 +4388,9 @@ function SWEP:NPCThink()
 					dmginfo:SetDamageForce(trace.Normal * dmg * MELEE_GLOBAL_KNOCKBACK_MUL)
 					dmginfo:SetDamageType(self.DamageType)
 					dmginfo:SetDamagePosition(trace.HitPos)
+					if not self:IsDestructibleTarget(trEnt) then
 					trEnt:TakeDamageInfo(dmginfo)
+					end
                     if blockState == "none" or blockState == "break" then
                         self:PlaySoftHitSounds(npc, trEnt, trace, false)
                     end

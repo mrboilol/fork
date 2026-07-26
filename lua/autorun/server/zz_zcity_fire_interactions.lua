@@ -170,6 +170,8 @@ end)
 
 hook.Add("PropBreak", "hg-WoodPropBreakModels", function(attacker, prop)
 	if not IsValid(prop) or prop.hgFallbackBreakGib then return end
+	-- Some watermelons report wood physics; never add artificial wood gibs.
+	if string.find(string.lower(prop:GetModel() or ""), "watermelon", 1, true) then return end
 	local class = prop:GetClass()
 	if class ~= "prop_physics" and class ~= "prop_physics_multiplayer" then return end
 	if not HasWoodMaterial(prop) or #VALID_WOOD_BREAK_MODELS == 0 then return end

@@ -154,7 +154,9 @@ function PHONE:SetIdentity(phone, number, displayName, ringtone)
 	local oldNumber = HG_PHONE.GetNumber(phone)
 	if oldNumber ~= "" and self.Registry[oldNumber] == phone then self.Registry[oldNumber] = nil end
 
-	number = tostring(number or "")
+	-- Re-registration can omit the number; retain the assigned private number.
+	-- This also keeps planted IED controller numbers stable.
+	number = tostring(number or oldNumber or "")
 	if number == "" or (IsValid(self.Registry[number]) and self.Registry[number] ~= phone) then number = self:GenerateNumber() end
 	displayName = string.Trim(tostring(displayName or ""))
 	if displayName == "" then displayName = "Phone " .. number end

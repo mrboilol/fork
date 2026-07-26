@@ -22,7 +22,7 @@ SWEP.WorldModel = "models/w_models/weapons/w_eq_medkit.mdl"
 SWEP.WorkWithFake = true
 SWEP.offsetVec = Vector(4, -0.5, -3)
 SWEP.offsetAng = Angle(-30, 20, 90)
-SWEP.StatusScreenOffset = Vector(3.6, -3.1, 0.15)
+SWEP.StatusScreenOffset = Vector(3.6, 3.1, -1.85)
 SWEP.StatusScreenAngle = Angle(0, 90, 90)
 
 SWEP.Slot = 3
@@ -573,7 +573,7 @@ if CLIENT then
         local statusColor = self:GetIsHealing() and Color(90, 255, 120) or (battery <= 0 and Color(255, 75, 75) or Color(150, 220, 255))
         local pos, ang = LocalToWorld(self.StatusScreenOffset, self.StatusScreenAngle, WorldModel:GetPos(), WorldModel:GetAngles())
 
-        cam.Start3D2D(pos, ang, 0.035)
+        cam.Start3D2D(pos, ang, 0.05)
             local width, height = 84, 46
             local left, top = -width / 2, -height / 2
             surface.SetDrawColor(0, 0, 0, 245)

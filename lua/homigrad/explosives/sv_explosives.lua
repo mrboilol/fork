@@ -1108,6 +1108,23 @@ hook.Add("EntityTakeDamage", "ExplosiveDamage", function(target, dmginfo)
 	if IsValid(target) and expItems[target:GetModel()] then
 		hook.Run("ExplosivesTakeDamage", target, dmginfo)
 		local rnd = CurrentRound and CurrentRound()
+		local isFuelContainer = hg.gas_models and hg.gas_models[target:GetModel()]
+		local wasShot = dmginfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		-- Bullet hits always add an old-style leak. Only a very rare hit ignites
+		-- the container outright, independent of the current round mode.
+		if isFuelContainer and wasShot then
+			if math.random() < 0.03 and not target.babahnut then
+				local tbl = expItems[target:GetModel()]
+				local phys = target:GetPhysicsObject()
+				local mass = IsValid(phys) and phys:GetMass() or 10
+				local iedBonus, ied = ConsumeIEDBonus(target)
+				target.babahnut = true
+				hg.PropExplosion(target, tbl.ExpType, ((target.Volume or tbl.Force) * 2) + iedBonus, mass, tbl)
+				if IsValid(ied) then ied:Remove() end
+			end
+			dmginfo:ScaleDamage(0)
+			return true
+		end
 		if (rnd and rnd.name == "coop" and dmginfo:IsDamageType(DMG_BLAST_SURFACE + DMG_BLAST + DMG_BURN + DMG_BULLET + DMG_BUCKSHOT + DMG_AIRBOAT) or dmginfo:IsDamageType(DMG_BLAST_SURFACE + DMG_BLAST + DMG_BURN)) and not target.babahnut then
 			target.hp = target.hp or 50
 			target.hp = target.hp - (dmginfo:GetDamage() / (dmginfo:IsDamageType(DMG_BURN) and 12.5 or 0.5))

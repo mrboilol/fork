@@ -112,16 +112,6 @@ local function getBlockerBounds(ent)
 	return blockerMins, blockerMaxs
 end
 
-local function hideOriginalMapProp(ent)
-	if not IsValid(ent) then return end
-
-	ent:SetNoDraw(true)
-	ent:SetNotSolid(true)
-	ent:SetSolid(SOLID_NONE)
-	ent:SetCollisionGroup(COLLISION_GROUP_WORLD)
-	ent.hg_collision_hidden = true
-end
-
 local function restoreOriginalMapProp(ent)
 	if not IsValid(ent) or not ent.hg_collision_hidden then return end
 
@@ -248,91 +238,6 @@ local function ensureCollisionBlocker(ent)
 	return true
 end
 
-local function ensureFurniturePhysicsProxy(ent)
-	if not IsValid(ent) then return false end
-	if IsValid(ent.hg_collision_proxy) then return true end
-
-	local model = ent:GetModel()
-	if not util.IsValidProp(model) then return false end
-
-	local proxy = ents.Create("base_anim")
-	if not IsValid(proxy) then return false end
-
-	proxy:SetModel(model)
-	proxy:SetPos(ent:GetPos())
-	proxy:SetAngles(ent:GetAngles())
-	proxy:SetSkin(ent:GetSkin() or 0)
-	proxy:SetModelScale(ent:GetModelScale(), 0)
-	proxy:Spawn()
-	proxy:Activate()
-	proxy:SetNoDraw(false)
-
-	local sourceColor = ent:GetColor()
-	if not IsColor(sourceColor) or sourceColor.a <= 0 then
-		sourceColor = color_white
-	end
-
-	proxy:SetColor(sourceColor)
-	proxy:SetRenderMode(sourceColor.a < 255 and RENDERMODE_TRANSALPHA or RENDERMODE_NORMAL)
-
-	local sourceMaterial = ent:GetMaterial()
-	if isstring(sourceMaterial) and sourceMaterial ~= "" then
-		proxy:SetMaterial(sourceMaterial)
-	end
-
-	if proxy.GetNumBodyGroups and ent.GetNumBodyGroups then
-		for index = 0, ent:GetNumBodyGroups() - 1 do
-			proxy:SetBodygroup(index, ent:GetBodygroup(index))
-		end
-	end
-
-	proxy:SetMoveType(MOVETYPE_NONE)
-	proxy:SetCollisionGroup(COLLISION_GROUP_NONE)
-	proxy:EnableCustomCollisions(true)
-
-	if proxy.PhysicsInitStatic then
-		proxy:PhysicsInitStatic(SOLID_VPHYSICS)
-	else
-		proxy:PhysicsInit(SOLID_VPHYSICS)
-	end
-
-	local phys = proxy:GetPhysicsObject()
-	if not IsValid(phys) then
-		proxy:Remove()
-		return false
-	end
-
-	proxy.zcity_collision_proxy = true
-	proxy:SetSolid(SOLID_VPHYSICS)
-	phys:EnableMotion(false)
-	phys:Sleep()
-
-	hideOriginalMapProp(ent)
-
-	ent.hg_collision_proxy = proxy
-	proxy.hg_collision_source = ent
-
-	proxy:CallOnRemove("zcity_restore_collision_source", function(proxyEnt)
-		local source = proxyEnt.hg_collision_source
-		if IsValid(source) and source.hg_collision_proxy == proxyEnt then
-			source.hg_collision_proxy = nil
-			source.hg_collision_repaired = nil
-			restoreOriginalMapProp(source)
-		end
-	end)
-
-	if ent.CallOnRemove then
-		ent:CallOnRemove("zcity_remove_collision_proxy", function(source)
-			local proxyEnt = source.hg_collision_proxy
-			if IsValid(proxyEnt) then
-				proxyEnt:Remove()
-			end
-		end)
-	end
-
-	return true
-end
-
 local function tryRepairMapPropCollision(ent)
 	if not shouldRepairMapProp(ent) then return false end
 
@@ -348,9 +253,20 @@ local function tryRepairMapPropCollision(ent)
 			return true
 		end
 
-		if ensureFurniturePhysicsProxy(ent) then
-			ent.hg_collision_repaired = "proxy"
-			return true
+		-- Do not hide a usable map entity behind a visual proxy. Keeping the
+		-- original solid preserves both player collision and its Use interaction.
+		local furnitureMins, furnitureMaxs = getBlockerBounds(ent)
+		if furnitureMins and furnitureMaxs then
+			restoreOriginalMapProp(ent)
+			ent:SetMoveType(MOVETYPE_NONE)
+			ent:SetCollisionGroup(COLLISION_GROUP_NONE)
+			ent:EnableCustomCollisions(true)
+			ent:SetSolid(SOLID_BBOX)
+			ent:SetCollisionBounds(furnitureMins, furnitureMaxs)
+			if ent:GetSolid() ~= SOLID_NONE then
+				ent.hg_collision_repaired = "bbox_furniture"
+				return true
+			end
 		end
 	end
 

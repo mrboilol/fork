@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_base"
 SWEP.PrintName = "Improvised Explosive Device"
-SWEP.Instructions = "Reload chooses public or private before planting. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. Dial the assigned number from a phone to detonate."
+SWEP.Instructions = "Press E to plant immediately. Hold LMB for a silent plant, hold RMB on an object to plant inside it, or hold both for a silent inside plant. Dial the assigned number from a phone to detonate."
 SWEP.Category = "Weapons - Explosive"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -403,6 +403,22 @@ local function RegisterIEDBomb(self, ent, tr, insideObject)
 	end
 end
 
+local function SpawnIEDBomb(pos)
+	local bomb = ents.Create("prop_physics")
+	if not IsValid(bomb) then return end
+
+	bomb:SetModel("models/props_junk/cardboard_jox004a.mdl")
+	bomb:SetPos(pos)
+	bomb:SetModelScale(0.4)
+	bomb:Spawn()
+	bomb:Activate()
+
+	local phys = bomb:GetPhysicsObject()
+	if IsValid(phys) then phys:SetMass(20) end
+
+	return bomb
+end
+
 local function GetIEDDialDelay(self, ent)
 	local owner = self:GetOwner()
 	local entPos = IsValid(ent) and (self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or (ent:GetPos() + ent:OBBCenter())) or vector_origin
@@ -737,28 +753,8 @@ function SWEP:SecondaryAttack(calledFrom)
 				return
 			end
 		end
-		if not self.Planted then
-			local Owner = self:GetOwner()
-			local Tr = self:GetEyeTrace()
+		self:PlaceNormally()
 
-			local bomb = ents.Create("prop_physics")
-			bomb:SetModel("models/props_junk/cardboard_jox004a.mdl")
-			bomb:SetPos(Tr.HitPos + Tr.HitNormal * 4)
-			bomb:SetModelScale(0.4)
-			bomb:Spawn()
-			bomb:Activate()
-
-			if IsValid(bomb:GetPhysicsObject()) then
-				bomb:GetPhysicsObject():SetMass(20)
-			end
-
-			self.Planted = true
-			RegisterIEDBomb(self, bomb)
-
-			Owner:EmitSound("snd_jack_hmcd_bombrig.wav",60,100,1,CHAN_AUTO)
-			self.nextattackhuy = CurTime() + 2
-			self:SetPlanted(true)
-		end
 	end
 end
 
@@ -794,6 +790,30 @@ if SERVER then
 		self:SetHold("normal")
 	end
 
+	function SWEP:PlaceNormally()
+		local owner = self:GetOwner()
+		if not IsValid(owner) or self:GetPlanted() or self.Planted then return false end
+
+		local tr = self:GetEyeTrace()
+		if tr.HitSky then return false end
+
+		local target = tr.Entity
+		if tr.Hit and IsValid(target) and not tr.HitWorld and not target:IsPlayer() and not target:IsRagdoll() then
+			RegisterIEDBomb(self, target, tr, false)
+		else
+			local pos = tr.Hit and (tr.HitPos + tr.HitNormal * 4) or (owner:GetShootPos() + owner:GetAimVector() * 80)
+			local bomb = SpawnIEDBomb(pos)
+			if not IsValid(bomb) then return false end
+			RegisterIEDBomb(self, bomb)
+		end
+
+		self.Planted = true
+		self:SetPlanted(true)
+		owner:EmitSound(self.NormalPlantSound, 60, 100, 1, CHAN_AUTO)
+		self.nextattackhuy = CurTime() + 2
+		return true
+	end
+
 	function SWEP:FinishPlant()
 		local owner, tr, mode = self:GetOwner(), self:GetEyeTrace(), self.PlantMode
 		if not IsValid(owner) or not tr.Hit or tr.HitSky then return self:CancelPlant() end
@@ -804,15 +824,14 @@ if SERVER then
 			if not IsValid(tr.Entity) or tr.HitWorld or not (door or (IsValid(phys) and phys:GetMass() < 500)) then return self:CancelPlant() end
 			RegisterIEDBomb(self, tr.Entity, tr, true)
 		else
-			local bomb = ents.Create("prop_physics")
-			if not IsValid(bomb) then return self:CancelPlant() end
-			bomb:SetModel("models/props_junk/cardboard_jox004a.mdl")
-			bomb:SetPos(tr.HitPos + tr.HitNormal * 4)
-			bomb:SetModelScale(0.4)
-			bomb:Spawn()
-			bomb:Activate()
-			if IsValid(bomb:GetPhysicsObject()) then bomb:GetPhysicsObject():SetMass(20) end
-			RegisterIEDBomb(self, bomb)
+			local target = tr.Entity
+			if IsValid(target) and not tr.HitWorld and not target:IsPlayer() and not target:IsRagdoll() then
+				RegisterIEDBomb(self, target, tr, false)
+			else
+				local bomb = SpawnIEDBomb(tr.HitPos + tr.HitNormal * 4)
+				if not IsValid(bomb) then return self:CancelPlant() end
+				RegisterIEDBomb(self, bomb)
+			end
 		end
 		self:CancelPlant()
 		self.Planted = true
@@ -822,6 +841,15 @@ if SERVER then
 		if mode == "combined" then level = self.CombinedPlantSoundLevel end
 		owner:EmitSound(sound, level, 100, 1, CHAN_AUTO)
 	end
+
+	hook.Add("KeyPress", "hg_ied_immediate_plant", function(ply, key)
+		if key ~= IN_USE then return end
+
+		local wep = ply:GetActiveWeapon()
+		if IsValid(wep) and wep:GetClass() == "weapon_traitor_ied" then
+			wep:PlaceNormally()
+		end
+	end)
 
 	function SWEP:PrimaryAttack()
 		if not self:GetPlanted() or not self:GetPhoneMode() or not HG_PHONE_SERVER or not HG_PHONE_SERVER.OpenIEDPhone then return end

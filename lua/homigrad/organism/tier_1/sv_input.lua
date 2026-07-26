@@ -1175,7 +1175,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
 		org._bulletImpactHitgroup = entryHitgroup ~= 0 and entryHitgroup or nil
 	end
-	if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
+	local selfInflictedBrainShot = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		and attacker == org.owner
+	if selfInflictedBrainShot then
+		-- Point-blank self shots should not wander into throat/chest hitboxes.
+		input_list.brain(org, 1, dmg / 25, dmgInfo)
+		org._directBrainDamageThisHit = true
+	elseif dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
 		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, boxs, pos, sphere, organs, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, ent.organism, organs, dmg / 25, dmgInfo, dir)
 	elseif dmgInfo:IsDamageType(DMG_BLAST) then
 		local organs = hg.organism.GetHitBoxOrgans(ent:GetModel(), ent)

@@ -164,7 +164,8 @@ hook.Add("PlayerCanHearPlayersVoice", "RealisticVoice", function(listener,speake
 	if not IsValid(listener) or not IsValid(speaker) then return false, false end
 	if speaker.ulx_gagged or speaker:GetNWBool("ulx_gagged", false) then return false, false end
 	local result,is3D = ChatLogic(speaker,listener,false,false)
-	local speak = speaker:IsSpeaking()
+	-- Server-emitted chat letters are not reported by IsSpeaking().
+	local speak = speaker:IsSpeaking() or (speaker.HGChatSpeechUntil or 0) > CurTime()
 	speaker.IsSpeak = speak
 	
 	if speaker.IsOldSpeak ~= speaker.IsSpeak then

@@ -23,6 +23,9 @@ if SERVER then
 		end
 		if #letters == 0 then return end
 
+		-- Keep generated letter speech in the same lifecycle as live voice.
+		local finishAt = CurTime() + #letters * letterInterval + 0.1
+		ply.HGChatSpeechUntil = math.max(ply.HGChatSpeechUntil or 0, finishAt)
 		hook.Run("StartVoice", ply, ply)
 		for index, letter in ipairs(letters) do
 			timer.Simple((index - 1) * letterInterval, function()
@@ -32,7 +35,10 @@ if SERVER then
 			end)
 		end
 		timer.Simple(#letters * letterInterval + 0.1, function()
-			if IsValid(ply) then hook.Run("EndVoice", ply, ply) end
+			if IsValid(ply) and (ply.HGChatSpeechUntil or 0) <= CurTime() then
+				ply.HGChatSpeechUntil = nil
+				hook.Run("EndVoice", ply, ply)
+			end
 		end)
 	end
 

@@ -176,6 +176,7 @@ local hg_old_blood = ConVarExists("hg_old_blood") and GetConVar("hg_old_blood") 
 hg.bloodpositions = hg.bloodpositions or {}
 hg.bloodcount = hg.bloodcount or 0
 local bloodDripSoundChance = 2 / 3
+local bloodDripSoundVolume = 0.2
 local bloodDecalCellSize = 4
 
 local function playBloodDripImpact(pos, tr, artery)
@@ -183,14 +184,14 @@ local function playBloodDripImpact(pos, tr, artery)
 
 	if artery then
 		if tr.MatType == MAT_METAL then
-			sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(98, 106), math.random(100, 120))
+			sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(98, 106), math.random(100, 120), bloodDripSoundVolume)
 		else
-			sound.Play("newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav", pos, math.random(96, 104), math.random(80, 120))
+			sound.Play("newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav", pos, math.random(96, 104), math.random(80, 120), bloodDripSoundVolume)
 		end
 		return
 	end
 
-	sound.Play("gore/blood" .. math_random(1, 6) .. ".ogg", pos, math.random(85, 95), math.random(80, 120))
+	sound.Play("gore/blood" .. math_random(1, 6) .. ".ogg", pos, math.random(85, 95), math.random(80, 120), bloodDripSoundVolume)
 end
 
 local function decalBlood(pos, normal, tr, artery, owner, decalWeight)
