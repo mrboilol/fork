@@ -53,7 +53,6 @@ function hg.organism.KillFatalBrainDamage(org)
 	org.deathStateEnd = nil
 	org.deathStateStart = nil
 	org.deathStatePendingEnd = nil
-	org.deathStateFadeStart = nil
 	hg.organism.ZeroVitals(org)
 
 	local owner = org.owner
@@ -98,7 +97,7 @@ local seizure_shake_freq = 5.8
 local seizure_shake_amp = 1.35
 local seizure_brain_trauma_gain_mul = 2
 local seizure_brain_heal_gain_mul = 1.1
-local seizure_temperature_gain_mul = 0.013
+local seizure_temperature_gain_mul = 0.0065
 local seizure_temperature_cold_gain_mul = 0.005
 local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
@@ -143,6 +142,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.peripheralperfusion = 1
 	org.perfusionMoveMul = 1
 	org.perfusionGripMul = 1
+	org.hypoxia = 0
 	org.hypoxiaTime = 0
 	org.severeHypoxiaTime = 0
 	org.neckBrainOxygenPenalty = 0
@@ -239,7 +239,6 @@ hook.Add("Org Clear", "Main", function(org)
 	org.deathStateEnd = nil
 	org.deathStateStart = nil
 	org.deathStatePendingEnd = nil
-	org.deathStateFadeStart = nil
 	org.deathStateKilled = nil
 
 	org.noradrenalineEndTime = nil
@@ -287,7 +286,6 @@ util.AddNetworkString("rem_deathstate_sound")
 local CurTime = CurTime
 local nullTbl = {}
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
-local hg_scavdying = ConVarExists("hg_scavdying") and GetConVar("hg_scavdying") or CreateConVar("hg_scavdying", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Incapacitated display mode: 0=fade ring then text, 1=flatline ring, 2=ring and countdown text", 0, 2)
 local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Incapacitated dying: 0=disabled, 1=immediate, 2=delayed by injury severity", 0, 2)
 local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable organ-system failure: 0=organs stay functional, 1=normal organ failure", 0, 1)
 
@@ -362,6 +360,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	local badHypoxia = org.brainoxygen < 0.45 or org.cerebralPerfusion < 0.4 or org.perfusion < 0.35
 	local severeHypoxia = org.brainoxygen < 0.22 or org.cerebralPerfusion < 0.18 or org.perfusion < 0.16
+	org.hypoxia = math.Clamp(1 - math.min(org.bodyoxygen, org.brainoxygen, org.cerebralPerfusion, org.perfusion), 0, 1)
 	org.hypoxiaTime = badHypoxia and math.min((org.hypoxiaTime or 0) + dt * (severeHypoxia and 2.25 or 1), 120) or math.Approach(org.hypoxiaTime or 0, 0, dt * 2)
 	org.severeHypoxiaTime = severeHypoxia and math.min((org.severeHypoxiaTime or 0) + dt, 120) or math.Approach(org.severeHypoxiaTime or 0, 0, dt * 1.5)
 
@@ -437,6 +436,10 @@ local function send_organism(org, ply)
 	sendtable.peripheralperfusion = org.peripheralperfusion
 	sendtable.cerebralPerfusion = org.cerebralPerfusion
 	sendtable.intracranialPressure = org.intracranialPressure
+	sendtable.hypoxia = org.hypoxia
+	sendtable.hypoxiaTime = org.hypoxiaTime
+	sendtable.severeHypoxiaTime = org.severeHypoxiaTime
+	sendtable.ischemia = org.ischemia
 	sendtable.throatcut = org.throatcut
 	sendtable.throatCutUntil = org.throatCutUntil
 	sendtable.throatCutSeverity = org.throatCutSeverity
@@ -492,7 +495,6 @@ local function send_organism(org, ply)
 	sendtable.deathStateEnd = org.deathStateEnd or 0
 	sendtable.deathStateStart = org.deathStateStart or 0
 	sendtable.deathStatePendingEnd = org.deathStatePendingEnd or 0
-	sendtable.deathStateFadeStart = org.deathStateFadeStart or 0
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.aiming_fatigue = org.aiming_fatigue
@@ -550,6 +552,10 @@ local function send_bareinfo(org)
 	sendtable.peripheralperfusion = org.peripheralperfusion
 	sendtable.cerebralPerfusion = org.cerebralPerfusion
 	sendtable.intracranialPressure = org.intracranialPressure
+	sendtable.hypoxia = org.hypoxia
+	sendtable.hypoxiaTime = org.hypoxiaTime
+	sendtable.severeHypoxiaTime = org.severeHypoxiaTime
+	sendtable.ischemia = org.ischemia
 	sendtable.throatcut = org.throatcut
 	sendtable.throatCutUntil = org.throatCutUntil
 	sendtable.throatCutSeverity = org.throatCutSeverity
@@ -1607,17 +1613,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	local incapacitationMode = hg_incapacitation:GetInt()
-	local scavDyingMode = hg_scavdying:GetInt()
 	local flatlined = org.heartstop or (org.heartbeat or 0) < 1 or (org.pulse or 0) < 1
 	local dyingIncapacitated = isPly and org.otrub and org.incapacitated
 
 	if incapacitationMode > 0 and dyingIncapacitated then
 		if not org.deathStateStart and not org.deathStatePendingEnd then
 			local delay = 0
-			-- Ring mode is an immediate, fixed twenty-second countdown once the
-			-- player is incapacitated.  Do not hold it behind the injury/asystole
-			-- delay used by the non-ring delayed-death mode.
-			if incapacitationMode == 2 and scavDyingMode ~= 1 then
+			if incapacitationMode == 2 then
 				local injury = math.max(
 					math.Clamp((3000 - (org.blood or 5000)) / 1800, 0, 1),
 					math.Clamp((10 - (org.o2 and org.o2[1] or 30)) / 10, 0, 1),
@@ -1626,8 +1628,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 				)
 				delay = Lerp(injury, 30, 10)
 			end
-			org.deathStateFadeStart = scavDyingMode == 0 and (CurTime() + delay) or nil
-			org.deathStatePendingEnd = CurTime() + delay + (scavDyingMode == 0 and 2 or 0)
+			org.deathStatePendingEnd = CurTime() + delay
 		end
 
 		if not org.deathStateStart and CurTime() >= org.deathStatePendingEnd then
@@ -1645,7 +1646,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.deathStateEnd = nil
 		org.deathStateStart = nil
 		org.deathStatePendingEnd = nil
-		org.deathStateFadeStart = nil
 		org.deathStateKilled = nil
 	end
 

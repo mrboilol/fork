@@ -1521,6 +1521,72 @@ local IsValid = IsValid
 		["ValveBiped.Bip01_R_Calf"] = "rleg",
 		["ValveBiped.Bip01_R_Foot"] = "rleg",
 	}
+	local tourniquetBoneChildren = {
+		["ValveBiped.Bip01_L_UpperArm"] = {
+			["ValveBiped.Bip01_L_Forearm"] = true,
+			["ValveBiped.Bip01_L_Hand"] = true,
+		},
+		["ValveBiped.Bip01_L_Forearm"] = { ["ValveBiped.Bip01_L_Hand"] = true },
+		["ValveBiped.Bip01_R_UpperArm"] = {
+			["ValveBiped.Bip01_R_Forearm"] = true,
+			["ValveBiped.Bip01_R_Hand"] = true,
+		},
+		["ValveBiped.Bip01_R_Forearm"] = { ["ValveBiped.Bip01_R_Hand"] = true },
+		["ValveBiped.Bip01_L_Thigh"] = {
+			["ValveBiped.Bip01_L_Calf"] = true,
+			["ValveBiped.Bip01_L_Foot"] = true,
+		},
+		["ValveBiped.Bip01_L_Calf"] = { ["ValveBiped.Bip01_L_Foot"] = true },
+		["ValveBiped.Bip01_R_Thigh"] = {
+			["ValveBiped.Bip01_R_Calf"] = true,
+			["ValveBiped.Bip01_R_Foot"] = true,
+		},
+		["ValveBiped.Bip01_R_Calf"] = { ["ValveBiped.Bip01_R_Foot"] = true },
+	}
+
+	function hg.IsBoneAtOrBelowTourniquet(tourniquetBone, woundBone)
+		return tourniquetBone == woundBone
+			or (tourniquetBoneChildren[tourniquetBone] and tourniquetBoneChildren[tourniquetBone][woundBone])
+			or false
+	end
+
+	local function getTourniquetTarget(ent)
+		if not IsValid(ent) then return end
+		if istable(ent.tourniquets) and next(ent.tourniquets) then return ent end
+		local org = ent.organism
+		if org and IsValid(org.owner) then
+			local owner = org.owner
+			if istable(owner.tourniquets) and next(owner.tourniquets) then return owner end
+			if IsValid(owner.FakeRagdoll) and istable(owner.FakeRagdoll.tourniquets) and next(owner.FakeRagdoll.tourniquets) then
+				return owner.FakeRagdoll
+			end
+			return owner
+		end
+		local owner = hg.RagdollOwner and hg.RagdollOwner(ent)
+		return IsValid(owner) and owner or ent
+	end
+
+	function hg.IsBoneControlledByTourniquet(ent, woundBone)
+		local target = getTourniquetTarget(ent)
+		if not IsValid(target) then return false end
+		if isnumber(woundBone) then woundBone = target:GetBoneName(woundBone) end
+		if not isstring(woundBone) then return false end
+
+		local tourniquets = istable(target.tourniquets) and target.tourniquets or nil
+		if not tourniquets or not next(tourniquets) then
+			tourniquets = target:GetNetVar("Tourniquets", {})
+		end
+		if not istable(tourniquets) then return false end
+		for _, tourniquet in ipairs(tourniquets or {}) do
+			if hg.IsBoneAtOrBelowTourniquet(tourniquet[3], woundBone) then return true end
+		end
+
+		return false
+	end
+
+	function hg.GetTourniquetBleedMultiplier(ent, woundBone)
+		return hg.IsBoneControlledByTourniquet(ent, woundBone) and 0 or 1
+	end
 
 	function hg.GetTourniquetLimbs(ent)
 		if not IsValid(ent) then return {} end

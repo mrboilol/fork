@@ -84,6 +84,13 @@ surface.CreateFont("RemDeathStateFont", {
 	outline = true
 })
 
+surface.CreateFont("RemDeathStateCountdownFont", {
+	font = "Lora",
+	size = ScreenScale(14),
+	weight = 900,
+	outline = true
+})
+
 local remDeathStateColor = Color(255, 255, 255, 0)
 local remDeathStateStation
 local remDeathStateLoading
@@ -91,6 +98,11 @@ local remDeathStatePath
 local remDeathStateLoadSerial = 0
 local remDeathStateOpeningPath = "sound/ngaimcooked.mp3"
 local remDeathStateMindwipePath = "sound/mindwipe.ogg"
+local remDeathStateMindwipeDelay = 15
+
+local function GetOtrubRingRadius()
+	return math.min(280, ScrH() * 0.32)
+end
 
 local function StopRemDeathStateSound()
 	remDeathStateLoadSerial = remDeathStateLoadSerial + 1
@@ -157,15 +169,16 @@ hook.Add("HUDPaint", "RemIncapacitationStatus", function()
 	end
 
 	local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
-	local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
 	remDeathStateColor.a = math.Clamp((CurTime() - (deathStateStart or CurTime())) / 2, 0, 1) * 255
 	local dyingElapsed = CurTime() - (deathStateStart or CurTime())
-	local dyingSoundPath = dyingElapsed >= 15 and remDeathStateMindwipePath or remDeathStateOpeningPath
+	local dyingSoundPath = dyingElapsed >= remDeathStateMindwipeDelay and remDeathStateMindwipePath or remDeathStateOpeningPath
 	PlayRemDeathStateSound(dyingSoundPath, dyingSoundPath ~= remDeathStateMindwipePath)
 
-	local text = scavDyingMode == 1 and "You are incapacitated" or "You are incapacitated, You will die in " .. seconds
-	local textY = math.min(ScrH() / 2 + ScreenScaleH(105), ScrH() - ScreenScaleH(28))
-	draw.SimpleText(text, "RemDeathStateFont", ScrW() / 2, textY, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	local countdownText = "You will die in " .. seconds .. (seconds == 1 and " second" or " seconds")
+	local lineSpacing = ScreenScaleH(26)
+	local textY = math.min(ScrH() / 2 + GetOtrubRingRadius() + ScreenScaleH(18), ScrH() - lineSpacing - ScreenScaleH(18))
+	draw.SimpleText("You are incapacitated", "RemDeathStateFont", ScrW() / 2, textY, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	draw.SimpleText(countdownText, "RemDeathStateCountdownFont", ScrW() / 2, textY + lineSpacing, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 local k1, k2, k3
@@ -928,19 +941,11 @@ local arterySoundDelayMin = 1
 local arterySoundDelayMax = 1.25
 local arterySoundPitchMin = 95
 local arterySoundPitchMax = 110
-local arterialPulseRetractRate = 85
 local normalBleedRateFull = 0.18
-local arterialBleedRateFull = 0.24
 local normalParticleSizeThin = 0.48
 local normalParticleSizeAverage = 0.7
 local normalParticleSizeThick = 0.9
-local arterialJetWidth = 1.6
-local arterialJetLengthMin = 4
-local arterialJetLengthMax = 40
-local arterialSideSway = 8
-local arterialVerticalSway = 3.5
-local arterialJetTravelSpeed = 24
-local arterialUpdateInterval = 0.04
+local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local bloodDown = Vector(0, 0, -1)
 
 local function getWoundVisualIntensity(org, totalBleedRate, wound, woundCount, fullRate)
@@ -1092,70 +1097,19 @@ function hg.queueArterialWoundSound(ent, wound)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, circulation, intensity, arteryType, wound)
-	if not wound then return end
+emitArterialSpray = function(ent, pos, dir, ang, pulse, woundIndex, size)
+	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
+	-- artery-marked blood trail with the original forward pulse and combined
+	-- right/up oscillation instead of maintaining a local beam carrier.
 	local time = CurTime()
-	local jet = wound.arterialJet
-	if intensity <= 0.005 then
-		if jet then jet.jetExpires = time end
-		return
-	end
+	local pulseMul = pulse / 70
+	local velocity = VectorRand(-1, 1) * pulseMul
+		+ dir * 5 * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
+		+ dir:Angle():Right() * 25 * math.sin(time * 2) * math.cos(time * 4)
+		+ ang:Up() * 25 * math.sin(time * 3) * math.cos(time)
+		+ VectorRand(-1, 1) * pulseMul
 
-	local direction = dir and dir:GetNormalized() or nil
-	if not direction or direction:LengthSqr() <= 0 then
-		direction = -ang:Forward()
-	end
-	local dirAng = direction:Angle()
-	local jetLength = math.Clamp(Lerp(intensity, arterialJetLengthMin, 32) * circulation, arterialJetLengthMin, arterialJetLengthMax)
-	local swayMul = math.Clamp(jetLength / 20, 0.2, 1)
-	local jetEnd = pos
-		+ direction * jetLength
-		+ dirAng:Right() * math.sin(time * 0.8) * arterialSideSway * swayMul
-		+ ang:Up() * math.sin(time * 0.6 + 1.1) * arterialVerticalSway * swayMul
-	local trace = util.TraceLine({start = pos, endpos = jetEnd, filter = ent})
-	if trace.Hit then jetEnd = trace.HitPos end
-
-	if not jet or not jet.active then
-		jet = hg.addBloodPart(pos, direction * jetLength, nil, arterialJetWidth, arterialJetWidth, arteryType or true, nil, ent)
-		wound.arterialJet = jet
-	end
-	if not jet then return end
-
-	-- Keep one persistent beam carrier and move its endpoint in place. This is the
-	-- old neat stream behavior: oscillation bends the existing jet instead of
-	-- spawning a fan or a succession of separate particle bursts.
-	jet.arterialJet = true
-	jet.jetOrigin = jet.jetOrigin or pos + vector_origin
-	jet.jetEnd = jet.jetEnd or pos + vector_origin
-
-	-- Advance the stream through space at a finite speed instead of teleporting
-	-- it to full length. Smooth the offset rather than the world position so the
-	-- stream still stays attached when its owner moves.
-	local jetOffset = jet.jetEnd - jet.jetOrigin
-	local targetOffset = jetEnd - pos
-	local offsetDelta = targetOffset - jetOffset
-	local deltaLength = offsetDelta:Length()
-	local deltaTime = math.Clamp(time - (jet.jetLastUpdate or time), 0, 0.1)
-	local maxTravel = arterialJetTravelSpeed * deltaTime
-	if deltaLength <= maxTravel then
-		jetOffset:Set(targetOffset)
-	elseif maxTravel > 0 then
-		jetOffset:Add(offsetDelta * (maxTravel / deltaLength))
-	end
-	jet.jetLastUpdate = time
-
-	local movingJetEnd = pos + jetOffset
-	local movingTrace = util.TraceLine({start = pos, endpos = movingJetEnd, filter = ent})
-	if movingTrace.Hit then movingJetEnd = movingTrace.HitPos end
-
-	jet.jetOrigin:Set(pos)
-	jet.jetEnd:Set(movingJetEnd)
-	jet[1]:Set(movingJetEnd)
-	jet[2]:Set(movingJetEnd)
-	jet[3]:Set(direction * jetLength)
-	jet.jetWidth = arteryType == "arteria" and arterialJetWidth + 0.2 or arterialJetWidth
-	jet.decalWeight = jet.jetWidth
-	jet.jetExpires = time + 0.12
+	hg.addBloodPart(pos, velocity, nil, size, size, true, nil, ent)
 end
 local hg_altberserk = GetConVar("hg_altberserk")
 local hg_altnoradrenaline = GetConVar("hg_altnoradrenaline")
@@ -1421,18 +1375,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
 			local pulse = math.max(org.pulse or 70, 0)
-			local visualPulse = wound.arterialVisualPulse
-			if visualPulse == nil or pulse >= visualPulse then
-				visualPulse = pulse
-			else
-				visualPulse = math.max(pulse, visualPulse - FrameTime() * arterialPulseRetractRate)
-			end
-			wound.arterialVisualPulse = visualPulse
-
-			local intensity = getWoundVisualIntensity(org, org.arterialBleed, wound, #arterialwounds, arterialBleedRateFull)
-			local circulation = getCirculationStrength(org, visualPulse)
-			if (wound[5] or 0) < time and ent:LookupBone(wound[4]) then
+			local addtime = seen and 1 / math.Clamp(pulse, 1, 15) * 0.25 or 0.06
+			if (wound[5] or 0) + addtime < time and ent:LookupBone(wound[4]) then
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
+					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5)
 					if seen and ent:LookupBone(wound[4]) then
 						local bone = wound[4]
 
@@ -1444,25 +1390,31 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if not mat then return end
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
-						local pos, ang = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
+						local pos = LocalToWorld(wound[2], wound[3], bonePos, boneAng)
 
 						local dir = wound[6]
-						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, ang)
-						
-						dir = -dir:Forward()
+						local len = dir:Length() * pulse / 70
+						local _, dir = LocalToWorld(vector_origin, dir:Angle(), vector_origin, boneAng)
+						dir = -dir:Forward() * len
 
 						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
 						if water then
-							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
-							hg.addBloodPart2(pos + VectorRand(-2, 2), VectorRand(-8, 8), nil, nil, nil, nil, true, nil, ent)
+							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, ang, circulation, intensity, wound[7], wound)
+							emitArterialSpray(ent, pos, dir, boneAng, pulse, i, size)
 						end
 
-						wound[5] = time + (water and 2 or arterialUpdateInterval)
+						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))
 					else
-						if wound.arterialJet then wound.arterialJet.jetExpires = time end
-						wound[5] = time + 0.15
+						local pos = ent:GetPos()
+						local water = bit.band(util.PointContents(pos), CONTENTS_WATER) == CONTENTS_WATER
+						if water then
+							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
+						else
+							hg.addBloodPart(pos, VectorRand(-15, 15), nil, size, size, true, nil, ent)
+						end
+
+						wound[5] = time + (water and 2 or 0)
 					end
 				end
 			end

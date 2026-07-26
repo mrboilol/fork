@@ -449,16 +449,17 @@ module[2] = function(owner, org, mulTime)
 		
 		local woundsToRemove = {}
 		for i, wound in pairs(org.wounds) do
+			local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
 			local rand1 = math.Rand(4, 10)
 			local rand2 = math.Rand(0.5, 1)
-			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * 1.35 * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02
+			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * 1.35 * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3
 			local woundBleedRate = bleed / rand1 * 3
 			coagulatespeed = coagulatespeed + coagulate / rand2
 			local rand1 = math.Rand(4, 10) * 1
 			local rand2 = math.Rand(0.5, 1) * 1
-			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02
+			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02 * tourniquetBleedMul
 			bleed = bleed * getHeldWoundBleedMul(org, wound)
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
@@ -468,8 +469,10 @@ module[2] = function(owner, org, mulTime)
 			wound[5] = time
 			org.blood = max(org.blood - bleed, 1)
 				
-			if isAlive or not isPlayer then
+			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) then
 				hg.organism.BloodDroplet2(owner, org, wound, entVel + VectorRand(-50, 50), false)
+			end
+			if isAlive or not isPlayer then
 				wound[1] = max(wound[1] - coagulate, 0)
 			end
 
@@ -491,11 +494,6 @@ module[2] = function(owner, org, mulTime)
 		bleedoutspeed = bleedoutspeed + mulTime * 100 * org.pulse / 70
 	end
 
-	if org.liver > 0.5 then
-		org.blood = math.max(org.blood - mulTime * 10 * org.pulse / 70 * org.liver,0)
-		bleedoutspeed = bleedoutspeed + mulTime * 10 * org.pulse / 70 * org.liver
-	end
-
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
 
 	local bleedoutspeed2 = 0
@@ -506,10 +504,11 @@ module[2] = function(owner, org, mulTime)
 	local arterialToRemove = {}
 	local hasCarotidWound = false
 	for i, wound in pairs(org.arterialwounds) do
+		local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
-		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80
+		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80 * tourniquetBleedMul
 		bleedoutspeed2 = bleedoutspeed2 + passiveArterialBleed
-		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80
+		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
 		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
 		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
 		wound.visualBleedRate = passiveArterialBleed + arterialBleed
@@ -517,9 +516,9 @@ module[2] = function(owner, org, mulTime)
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80, 1)
-			if isAlive or not isPlayer then
-			local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80
+			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80 * tourniquetBleedMul, 1)
+			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) then
+			local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
 			pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
 			org.blood = max(org.blood - pumpBleed, 1)
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
@@ -641,7 +640,6 @@ module[2] = function(owner, org, mulTime)
 	local canwakeup_pain = ((org.pain - 5) / (org.painlessen)) < timetouncon
 	org.timetouncon = (timetouncon ~= timetouncon) and timetouncon or Lerp(hg.lerpFrameTime2(0.01,mulTime), org.timetouncon or 10000, timetouncon)
 	
-	local scavDyingMode = GetConVar("hg_scavdying")
 	local organSystemsEnabled = not hg.organism.OrganSystemsEnabled or hg.organism.OrganSystemsEnabled()
 	local normallyIncapacitated
 	if organSystemsEnabled then
@@ -649,15 +647,7 @@ module[2] = function(owner, org, mulTime)
 	else
 		normallyIncapacitated = org.otrub and org.blood <= 2200
 	end
-	if (scavDyingMode and scavDyingMode:GetInt() == 1) and org.otrub then
-		-- The ring mode must begin when the player becomes incapacitated, not
-		-- wait for asystole/flatline to set the state.
-		org.incapacitated = normallyIncapacitated
-	elseif normallyIncapacitated then
-		org.incapacitated = true
-	else
-		org.incapacitated = false
-	end
+	org.incapacitated = normallyIncapacitated
 
 	local noNeedle = org.needle <= 0
 	local tracheaBlocking = org.trachea > 0.5 and noNeedle

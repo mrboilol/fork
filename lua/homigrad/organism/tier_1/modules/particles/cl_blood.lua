@@ -122,19 +122,6 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 	for i = 1, #hg.bloodparticles1 do
 		local part = hg.bloodparticles1[i]
 		if not part then continue end
-		if part.arterialJet then
-			local jetOrigin = part.jetOrigin
-			local jetEnd = part.jetEnd
-			if not jetOrigin or not jetEnd or (jetEnd - lplypos):LengthSqr() > dstsqr then continue end
-
-			local light = (render.GetLightColor(jetEnd) + render.ComputeLighting(jetEnd, vector_up) + render.ComputeDynamicLighting(jetEnd, vector_up)) * 3
-			render_SetMaterial(mat_huy)
-			lightcolor.r = math.min(70 * light[1], 255)
-			lightcolor.g = 0
-			lightcolor.b = 0
-			render_DrawBeam(jetOrigin, jetEnd, part.jetWidth or 1, 0, 1, lightcolor)
-			continue
-		end
 		if (pos - lplypos):Dot(lplyang) < 0 then continue end
 		if (part[2] - pos):LengthSqr() > dstsqr then continue end
 		--if !hg.isVisible(part[1],LocalPlayer():GetShootPos(),LocalPlayer(),MASK_VISIBLE) then continue end
@@ -193,16 +180,16 @@ local bloodDecalCellSize = 4
 local function playBloodDripImpact(pos, tr, artery)
 	if math.Rand(0, 1) > bloodDripSoundChance then return end
 
-	if tr.MatType == MAT_METAL then
-		sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), math.random(100, 120))
+	if artery then
+		if tr.MatType == MAT_METAL then
+			sound.Play("zbattle/blood_drop_metal.mp3", pos, math.random(10, 40), math.random(100, 120))
+		else
+			sound.Play("newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav", pos, math.random(10, 60), math.random(80, 120))
+		end
 		return
 	end
 
-	local impactSound = artery
-		and "newblooddrip/sndBloodDrip" .. math_random(1, 3) .. ".wav"
-		or "drip" .. math_random(1, 3) .. ".ogg"
-
-	sound.Play(impactSound, pos, math.random(10, 60), math.random(80, 120))
+	sound.Play("gore/blood" .. math_random(1, 6) .. ".ogg", pos, math.random(10, 60), math.random(80, 120))
 end
 
 local function decalBlood(pos, normal, tr, artery, owner, decalWeight)
@@ -232,10 +219,13 @@ local function decalBlood(pos, normal, tr, artery, owner, decalWeight)
 	local decalSize = math.Clamp(math.ceil(cell.volume / 2.2), 1, 5)
 	local grew = decalSize > cell.decalSize
 	if grew then cell.decalSize = decalSize end
+	local now = CurTime()
+	local placeArterialDecal = artery and (cell.lastArterialDecal or 0) + 1.5 <= now
+	if grew or placeArterialDecal then cell.lastArterialDecal = now end
 
 	if artery then
 		if !hg_old_blood:GetBool() then
-			if grew then
+			if grew or placeArterialDecal then
 				util.Decal("Arterial.Blood2"..decalSize, pos + normal, pos - normal, owner)
 			end
 			playBloodDripImpact(pos, tr, true)
@@ -283,20 +273,6 @@ bloodparticles_hook[2] = function(mul)
 	for i = #hg.bloodparticles1, 1, -1 do
 		local part = hg.bloodparticles1[i]
 		if not part then table_remove(hg.bloodparticles1, i) continue end
-		if part.arterialJet then
-			if not part.jetExpires or time >= part.jetExpires then
-				part.active = false
-				table_remove(hg.bloodparticles1, i)
-				continue
-			end
-
-			local jetTrace = util_TraceLine({start = part.jetOrigin, endpos = part.jetEnd, filter = part.owner})
-			if jetTrace.Hit and jetTrace.Entity:IsWorld() and (part.nextJetDecal or 0) <= time then
-				part.nextJetDecal = time + 0.2
-				decalBlood(jetTrace.HitPos, jetTrace.HitNormal, jetTrace, part.artery, part.owner, part.decalWeight)
-			end
-			continue
-		end
 		
 		local pos = part[1]
 		local posSet = part[2]

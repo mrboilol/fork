@@ -104,12 +104,15 @@ util.AddNetworkString("addfountain")
 hg.fountains = hg.fountains or {}
 local headboom_mdl = Model("models/gleb/zcity/headboom.mdl")
 local sounds = {
-	Sound("player/zombie_head_explode_01.wav"),
-	Sound("player/zombie_head_explode_02.wav"),
-	Sound("player/zombie_head_explode_03.wav"),
-	Sound("player/zombie_head_explode_04.wav"),
-	Sound("player/zombie_head_explode_05.wav"),
-	Sound("player/zombie_head_explode_06.wav")
+	Sound("gore/blast.ogg"),
+	Sound("gore/blast2.ogg"),
+	Sound("gore/blast3.ogg"),
+	Sound("gore/blast4.ogg"),
+	Sound("gore/chop2.ogg"),
+	Sound("gore/chop3.ogg"),
+	Sound("gore/chop4.ogg"),
+	Sound("gore/chop5.ogg"),
+	Sound("gore/chop6.ogg")
 }
 util.PrecacheModel(headboom_mdl)
 for _, snd in ipairs(sounds) do
@@ -131,7 +134,7 @@ function Gib_Input(rag, bone, force)
 	local phys_obj = rag:GetPhysicsObjectNum(phys_bone)
 	
 	if (not gibRemove[phys_bone]) and (bone == rag:LookupBone("ValveBiped.Bip01_Head1")) then
-		-- No sounds for head explosion
+		rag:EmitSound(sounds[math.random(#sounds)], 70, math.random(95, 105), 2)
 
 		Gib_RemoveBone(rag, bone, phys_bone)
 		

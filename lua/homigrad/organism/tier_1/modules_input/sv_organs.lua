@@ -316,11 +316,13 @@ local defaultBrainTraumaProfile = {
 	hemorrhage = 0.8,
 }
 
+local brain_concussion_per_damage = 112.5 -- 0.02 brain damage = 2.25 concussion
+
 local function applyBrainTraumaEffects(org, delta, dmgInfo, profile)
 	if delta <= 0 then return end
 	profile = profile or defaultBrainTraumaProfile
 
-	org.concussion = math.min((org.concussion or 0) + math.min(delta * 8, 4), 10)
+	org.concussion = math.min((org.concussion or 0) + math.min(delta * brain_concussion_per_damage, 4), 10)
 	org.consciousness = math.Approach(org.consciousness or 1, 0, delta * profile.consciousness * 1.6)
 	org.disorientation = (org.disorientation or 0) + delta * profile.disorientation * 1.5
 	org.shock = (org.shock or 0) + delta * profile.shock * 5
@@ -518,7 +520,7 @@ local arteryHitgroups = {
 	llegartery = HITGROUP_LEFTLEG,
 }
 
-hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
+hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, skipThroatCutTracheaDamage)
 	if isCrush(dmgInfo) then return 1 end
 	if dmgInfo:IsDamageType(DMG_BLAST) then return 1 end
 	-- The spine-artery debug box is a non-injuring trace marker.  A shot that
@@ -589,7 +591,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 	if hg.AddOrganismBloodDecal then hg.AddOrganismBloodDecal(owner) end
 	hg.organism.SyncWounds(org)
 	if artery == "arteria" and dmgInfo:IsDamageType(DMG_SLASH) and applyThroatCutEffects then
-		applyThroatCutEffects(owner, org, dmgInfo, math.Clamp(dmg / 4, 0.65, 1.15))
+		applyThroatCutEffects(owner, org, dmgInfo, math.Clamp(dmg / 4, 0.65, 1.15), skipThroatCutTracheaDamage)
 	end
 
 	--if IsValid(owner:GetNWEntity("RagdollDeath")) then owner:GetNWEntity("RagdollDeath"):SetNetVar("wounds",org.arterialwounds) end
@@ -597,7 +599,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit)
 end
 hg.hitArtery = hitArtery
 
-applyThroatCutEffects = function(owner, org, dmgInfo, severity)
+applyThroatCutEffects = function(owner, org, dmgInfo, severity, skipTracheaDamage)
 	if not IsValid(owner) or not org or not org.alive or org.superfighter then return false end
 
 	local firstCut = not org.throatcut
@@ -610,9 +612,11 @@ applyThroatCutEffects = function(owner, org, dmgInfo, severity)
 		end
 	end
 
-	local oldTrachea = org.trachea or 0
-	org.trachea = math.min(math.max(oldTrachea, 0.72 * severity), 1)
-	hg.AddHarmToAttacker(dmgInfo, math.max(org.trachea - oldTrachea, 0) * 12, "Throat cut trachea harm")
+	if not skipTracheaDamage then
+		local oldTrachea = org.trachea or 0
+		org.trachea = math.min(math.max(oldTrachea, 0.72 * severity), 1)
+		hg.AddHarmToAttacker(dmgInfo, math.max(org.trachea - oldTrachea, 0) * 12, "Throat cut trachea harm")
+	end
 	org.throatcut = true
 	org.throatCutTime = org.throatCutTime and org.throatCutTime > 0 and org.throatCutTime or time
 	org.throatCutUntil = time + 24
@@ -673,8 +677,8 @@ hook.Add("PreTraceOrganBulletDamage", "hg_melee_artery_hit", function(org, bone,
 	hitArtery(artery, org, dmg, dmgInfo, box[6], dir, hit)
 end)
 
-input_list.arteria = function(org, bone, dmg, dmgInfo, boneindex, dir, hit)
-	return hitArtery("arteria", org, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit)
+input_list.arteria = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, skipThroatCutTracheaDamage)
+	return hitArtery("arteria", org, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dir, hit, skipThroatCutTracheaDamage)
 end
 
 input_list.rarmartery = function(org, bone, dmg, dmgInfo, boneindex, dir, hit) return hitArtery("rarmartery", org, dmg, dmgInfo, boneindex, dir, hit) end

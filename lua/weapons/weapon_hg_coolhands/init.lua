@@ -374,7 +374,7 @@ function SWEP:ApplyForce()
 		end
 
 		if self.CarryEnt:GetClass() == "ent_hg_cyanide_canister" then
-			ply.Guilt = math.max(ply.Guilt, 5)
+			ply.Guilt = math.max(ply.Guilt or 0, 5)
 		end
 
             if self.CarryEnt:GetClass() == "prop_ragdoll" then
@@ -759,6 +759,13 @@ function SWEP:Think()
 		self:SetBlocking(false)
 		self:SetCarrying()
 		self:Reload()
+		return
+	end
+
+	if owner:GetNWBool("mcd_admiring", false) then
+		self:SetCheckingAfflictions(false)
+		self:SetFists(false)
+		self:SetBlocking(false)
 		return
 	end
 
@@ -1255,6 +1262,18 @@ function SWEP:AttackFront(special_attack, rand)
         end
 
         owner:LagCompensation(false)
+end
+
+function SWEP:StartAfflictionAnimation()
+	self:SetFists(false)
+	self:SetBlocking(false)
+	self:SetCheckingAfflictions(false)
+	self.admire_started = CurTime()
+end
+
+function SWEP:StopAfflictionAnimation()
+	self:SetCheckingAfflictions(false)
+	self.admire_started = nil
 end
 
 function SWEP:Reload()

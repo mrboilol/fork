@@ -2739,7 +2739,9 @@ function SWEP:CustomThink()
                 local ang = neckMat:GetAngles()
                 local _, ang = LocalToWorld(vector_origin, Angle(0, -60, 0), vector_origin, ang)
                 
-                hg.organism.input_list["arteria"](org, 0, 5, dmgInfo, nil, -ang:Forward())
+                -- The deliberate self-slit opens the carotid without directly
+                -- cutting the trachea; ordinary neck attacks retain that damage.
+                hg.organism.input_list["arteria"](org, 0, 5, dmgInfo, nil, -ang:Forward(), nil, true)
                 
                 for i = 1, 5 do
                     hg.organism.AddWoundManual(owner, 50, VectorRand(-2, 2), ang, "ValveBiped.Bip01_Neck1", CurTime() + math.Rand(0, 2))

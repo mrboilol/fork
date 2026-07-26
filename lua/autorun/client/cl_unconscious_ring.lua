@@ -66,6 +66,11 @@ end
 
 local dyingRingServerEnd
 local dyingRingLocalEnd
+local INCAPACITATION_DEATH_DURATION = 20
+
+local function GetOtrubRingRadius()
+	return math.min(280, ScrH() * 0.32)
+end
 
 local function GetDyingRingTimeLeft(deathStateStart, deathStateEnd)
 	if not deathStateEnd then
@@ -75,7 +80,7 @@ local function GetDyingRingTimeLeft(deathStateStart, deathStateEnd)
 	end
 
 	if dyingRingServerEnd ~= deathStateEnd then
-		local duration = math.Clamp(deathStateEnd - (deathStateStart or deathStateEnd - 20), 0, 20)
+		local duration = math.Clamp(deathStateEnd - (deathStateStart or deathStateEnd - INCAPACITATION_DEATH_DURATION), 0, INCAPACITATION_DEATH_DURATION)
 		dyingRingServerEnd = deathStateEnd
 		dyingRingLocalEnd = CurTime() + duration
 	end
@@ -733,12 +738,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 		unconsciousStartTime = nil
 	end
 
-	local scavDyingMode = GetConVar("hg_scavdying") and GetConVar("hg_scavdying"):GetInt() or 0
 	local deathStateEnd = org.deathStateEnd and org.deathStateEnd > 0 and org.deathStateEnd or nil
 	local deathStateStart = org.deathStateStart and org.deathStateStart > 0 and org.deathStateStart or nil
-	local deathStatePendingEnd = org.deathStatePendingEnd and org.deathStatePendingEnd > 0 and org.deathStatePendingEnd or nil
-	local deathStateFadeStart = org.deathStateFadeStart and org.deathStateFadeStart > 0 and org.deathStateFadeStart or nil
-	local hideDyingRing = org.incapacitated and scavDyingMode == 0 and (deathStateEnd or (deathStateFadeStart and CurTime() >= deathStateFadeStart))
+	local dyingRing = org.incapacitated and deathStateEnd
     local heartbeat = org.heartbeat or 75
     local pulse = org.pulse or 70
     local ecgState = org.ecgState or "normal_sinus"
@@ -818,10 +820,10 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local isElectricalArrest = org.heartstop or ecgState == "pea" or ecgState == "asystole"
     local abnormalECG = ecgState ~= "normal_sinus"
     local ecgStateChanged = UpdateECGStateAlert(ecgState)
-    local showAwakeECG = not isUnconscious and not lowConsciousness and ecgStateChanged
+    local showAwakeECG = not isUnconscious and not lowConsciousness and (ecgStateChanged or admiring)
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
-	if isUnconscious and not hideDyingRing and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
+	if isUnconscious and (dyingRing or unconsciousElapsed >= UNCONSCIOUS_RING_DELAY) then
         local currentShock = org.shock or 0
         if currentShock > peakShock then
             peakShock = currentShock
@@ -897,13 +899,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             surface.SetDrawColor(0, 0, 0, 90 * otrubECGAlpha)
             surface.DrawRect(0, 0, scrW, scrH)
             
-			local dyingRing = org.incapacitated and deathStateEnd and scavDyingMode > 0
 			local ringColor = (isCritical or dyingRing) and Color(200, 0, 0, 255 * otrubECGAlpha) or Color(220, 220, 220, 255 * otrubECGAlpha)
             local dotColor = isCritical and ringColor or Color(255, 255, 255, 255 * otrubECGAlpha)
             
             local progress = 0
 			if dyingRing then
-				progress = math.Clamp((GetDyingRingTimeLeft(deathStateStart, deathStateEnd) or 0) / 20, 0, 1)
+				progress = math.Clamp((GetDyingRingTimeLeft(deathStateStart, deathStateEnd) or 0) / INCAPACITATION_DEATH_DURATION, 0, 1)
 			elseif isCritical then
                 local brainProgress = math.Clamp((0.70 - lerpBrain) / (0.70 - 0.02), 0, 1)
                 local hemorrhageProgress = math.Clamp(1 - lerpBrainHemorrhage, 0, 1)
@@ -915,7 +916,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 progress = math.min(shockProgress, consciousnessProgress)
             end
             
-            local radius = 280
+            local radius = GetOtrubRingRadius()
             local thickness = 12
             
             DrawArc(centerX, centerY, radius, thickness, 0, 360, 60, Color(40, 40, 40, 100 * otrubECGAlpha))

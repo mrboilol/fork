@@ -5,12 +5,33 @@ local util_TraceHull = util.TraceHull
 local IsValid = IsValid
 local CurTime = CurTime
 
+local tumbleBoneBreakSounds = {
+    "owfuck1.ogg",
+    "owfuck2.ogg",
+    "owfuck3.ogg",
+    "owfuck4.ogg",
+    "owfuck5.ogg",
+    "owfuck6.ogg",
+    "owfuck7.ogg",
+    "owfuck8.ogg",
+    "owfuck9.ogg",
+    "newbonebreak/break1.wav",
+    "newbonebreak/break2.wav",
+    "newbonebreak/break3.wav",
+    "newbonebreak/break4.wav",
+    "newbonebreak/break5.wav",
+    "newbonebreak/break6.wav",
+    "newbonebreak/break7.wav",
+    "newbonebreak/break8.wav",
+    "newbonebreak/break9.wav",
+    "newbonebreak/break10.wav",
+    "gore/rotten_break.ogg",
+    "gore/rotten_break2.ogg",
+    "gore/rotten_break3.ogg",
+}
+
 local function PlayBoneBreakSound(entity)
-    if math.random() < 0.5 then
-                entity:EmitSound("owfuck"..math.random(1, 9)..".ogg")
-    else
-        entity:EmitSound("newbonebreak/break"..math.random(10)..".wav")
-    end
+    entity:EmitSound(tumbleBoneBreakSounds[math.random(#tumbleBoneBreakSounds)])
 end
 
 local TUMBLE_SPEED_THRESHOLD = 250

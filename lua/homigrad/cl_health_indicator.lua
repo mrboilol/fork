@@ -2,6 +2,7 @@ local healthModel
 local blinkModel
 local whiteMat = Material("models/debug/debugwhite")
 local statusCircleMat = Material("sef_icons/statuseffectcircle.png", "smooth")
+local boneTraceMat = Material("cable/white")
 local statusIconCache = {}
 
 local IND_SIZE_BASE = 180
@@ -10,7 +11,7 @@ local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
-local BONE_DAMAGE_DURATION = 5
+-- local BONE_DAMAGE_DURATION = 5 -- Damage-based limb painting is paused.
 
 local boneStates = {}
 local boneCache = {}
@@ -21,7 +22,6 @@ local iconsVisibility = 0
 local iconsAppearTime = 0
 local iconsTargetVisible = false
 local cachedAfflictionIcons = {}
-local lastKnownFacingAngle = 0
 
 local majorBones = {
     pelvis = { organ = "pelvis", bone = "ValveBiped.Bip01_Pelvis" },
@@ -45,6 +45,30 @@ local majorBones = {
     r_calf = { organ = "rleg", bone = "ValveBiped.Bip01_R_Calf" },
     l_foot = { organ = "lleg", bone = "ValveBiped.Bip01_L_Foot" },
     r_foot = { organ = "rleg", bone = "ValveBiped.Bip01_R_Foot" },
+}
+
+-- Trace fixed anatomical connections instead of guessing a bone's direction
+-- from its longest child. Some models expose extra helper/finger children in a
+-- different order, which made the old trace appear to jump at random.
+local boneTraceSegments = {
+    { "ValveBiped.Bip01_Pelvis", "ValveBiped.Bip01_Spine1" },
+    { "ValveBiped.Bip01_Spine1", "ValveBiped.Bip01_Spine2" },
+    { "ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_Neck1" },
+    { "ValveBiped.Bip01_Neck1", "ValveBiped.Bip01_Head1" },
+    { "ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_L_Clavicle" },
+    { "ValveBiped.Bip01_L_Clavicle", "ValveBiped.Bip01_L_UpperArm" },
+    { "ValveBiped.Bip01_L_UpperArm", "ValveBiped.Bip01_L_Forearm" },
+    { "ValveBiped.Bip01_L_Forearm", "ValveBiped.Bip01_L_Hand" },
+    { "ValveBiped.Bip01_Spine2", "ValveBiped.Bip01_R_Clavicle" },
+    { "ValveBiped.Bip01_R_Clavicle", "ValveBiped.Bip01_R_UpperArm" },
+    { "ValveBiped.Bip01_R_UpperArm", "ValveBiped.Bip01_R_Forearm" },
+    { "ValveBiped.Bip01_R_Forearm", "ValveBiped.Bip01_R_Hand" },
+    { "ValveBiped.Bip01_Pelvis", "ValveBiped.Bip01_L_Thigh" },
+    { "ValveBiped.Bip01_L_Thigh", "ValveBiped.Bip01_L_Calf" },
+    { "ValveBiped.Bip01_L_Calf", "ValveBiped.Bip01_L_Foot" },
+    { "ValveBiped.Bip01_Pelvis", "ValveBiped.Bip01_R_Thigh" },
+    { "ValveBiped.Bip01_R_Thigh", "ValveBiped.Bip01_R_Calf" },
+    { "ValveBiped.Bip01_R_Calf", "ValveBiped.Bip01_R_Foot" },
 }
 
 -- OPTIMIZATION: Reduced from 8 to 4 offsets. Cuts extra model draws by 50% for massive lag reduction.
@@ -90,47 +114,37 @@ local function InitBlinkModel(ent)
     end
 end
 
-local function GetBoneMarkerDimensions(ent, boneID)
-    local mat = ent:GetBoneMatrix(boneID)
-    if not mat then return end
-
-    local startPos = mat:GetTranslation()
-    local endPos
-    local longestDistance = 0
-
-    for _, childID in ipairs(ent:GetChildBones(boneID) or {}) do
-        local childMat = ent:GetBoneMatrix(childID)
-        if childMat then
-            local childPos = childMat:GetTranslation()
-            local distance = startPos:Distance(childPos)
-            if distance > longestDistance then
-                longestDistance = distance
-                endPos = childPos
-            end
-        end
-    end
-
-    local length = math.Clamp(longestDistance > 0 and longestDistance or 9, 7, 26)
-    local width = math.Clamp(length * 0.32, 3.5, 8)
-    local pos = endPos and (startPos + endPos) * 0.5 or startPos
-
-    return pos, width, length
-end
-
-local function DrawBoneMarker(ent, boneName, color, cameraPos)
+local function GetBonePosition(ent, boneName)
     local boneID = ent:LookupBone(boneName)
     if not boneID then return end
 
-    local pos, width, length = GetBoneMarkerDimensions(ent, boneID)
-    if not pos then return end
-
-    -- Pull the marker slightly toward the indicator camera so the smooth,
-    -- capsule-like circle remains readable over the traced skeleton.
-    pos = pos + (cameraPos - pos):GetNormalized() * 1.5
-    render.SetMaterial(statusCircleMat)
-    render.DrawSprite(pos, width * 2.1, length * 1.15, color)
+    local mat = ent:GetBoneMatrix(boneID)
+    return mat and mat:GetTranslation()
 end
 
+local function DrawBoneJoint(ent, boneName, color, cameraPos)
+    local pos = GetBonePosition(ent, boneName)
+    if not pos then return end
+
+    -- Pull joints slightly toward the camera so intersecting limbs stay legible.
+    pos = pos + (cameraPos - pos):GetNormalized() * 1.5
+    render.SetMaterial(statusCircleMat)
+    render.DrawSprite(pos, 6, 6, color)
+end
+
+local function DrawBoneSegment(ent, startBoneName, endBoneName, color, cameraPos)
+    local startPos = GetBonePosition(ent, startBoneName)
+    local endPos = GetBonePosition(ent, endBoneName)
+    if not startPos or not endPos then return end
+
+    local cameraOffset = (cameraPos - (startPos + endPos) * 0.5):GetNormalized() * 1.5
+    render.SetMaterial(boneTraceMat)
+    render.DrawBeam(startPos + cameraOffset, endPos + cameraOffset, 3.5, 0, 1, color)
+end
+
+-- Damage-based limb painting helpers are retained but commented out until the
+-- underlying injury-to-bone state is reliable enough to display.
+--[[
 local function GetDamageColor(severity)
     local damage = math.Clamp(severity or 0, 0, 1)
 
@@ -155,12 +169,14 @@ local function GetOrgValueNumber(value)
 
     return 0
 end
+]]
 
 local function IsSubrosaEnabled()
     local convar = GetConVar("hg_subrosa")
     return convar and convar:GetBool()
 end
 
+--[[
 local boneOrgans = {
     ["ValveBiped.Bip01_Pelvis"] = { "pelvis" },
     ["ValveBiped.Bip01_Spine1"] = { "spine1" },
@@ -203,6 +219,7 @@ local function IsTrackedBoneStillBroken(org, boneName)
 
     return false
 end
+]]
 
 local function ResetModels(ply)
     if IsValid(healthModel) then
@@ -246,7 +263,7 @@ local function SyncBonesCallback(ent, numbones)
     local src, isRag = GetIndicatorBoneSource(ply)
     
     local srcPos = src:GetPos()
-    local srcAng = src:GetAngles()
+    local srcAng = Angle(0, src:GetAngles().y, 0)
 
     if isRag then
         local minZ = math.huge
@@ -267,18 +284,6 @@ local function SyncBonesCallback(ent, numbones)
             end
         end
 
-        local ragYaw = srcAng.y
-        if srcAng.p == 0 and srcAng.r == 0 and (ragYaw == 0 or ragYaw == -90 or ragYaw == 90) then
-            local eyeAng = ply:EyeAngles()
-            srcAng = Angle(0, lastKnownFacingAngle ~= 0 and lastKnownFacingAngle or eyeAng.y, 0)
-        else
-            srcAng = Angle(0, ragYaw, 0)
-            lastKnownFacingAngle = ragYaw
-        end
-    else
-        local eyeAng = ply:EyeAngles()
-        srcAng = Angle(0, eyeAng.y, 0)
-        lastKnownFacingAngle = eyeAng.y
     end
     
     local srcWorld = Matrix()
@@ -491,7 +496,7 @@ function HUD_DrawDynamicIndicator()
     end
     
     local time = CurTime()
-    local damagedBones = {}
+    -- local damagedBones = {} -- Damage-based limb painting is paused.
 
     if org then
         for key, data in pairs(majorBones) do
@@ -542,9 +547,10 @@ function HUD_DrawDynamicIndicator()
             end
         end
 
-        -- Damage input records the exact model bone that was hit. Do not infer
-        -- it from aggregate larm/rarm/lleg/rleg values: medicine changes those
-        -- values too, and one limb value cannot identify an upper/lower bone.
+        -- Damage-based limb painting is intentionally disabled for now. Keep
+        -- the old state collection here so it can be restored after its damage
+        -- source is reliable without having to rebuild the presentation code.
+        --[[
         local damageTime = org.damagedBoneTime or 0
         if isstring(org.damagedBoneName) and damageTime > 0 and time - damageTime <= BONE_DAMAGE_DURATION then
             damagedBones[org.damagedBoneName] = {
@@ -564,6 +570,7 @@ function HUD_DrawDynamicIndicator()
                 broken = true
             }
         end
+        ]]
     end
     
     local size = IND_SIZE_BASE
@@ -584,8 +591,10 @@ function HUD_DrawDynamicIndicator()
         active = true
     }
     
-    local camPos = Vector(95, 0, 65) 
-    local lookAng = Angle(11, 180, 0)
+    -- View the copied skeleton from its left side. Source models face +X, so
+    -- this profile makes the indicator character face toward screen-right.
+    local camPos = Vector(0, 95, 65)
+    local lookAng = Angle(11, -90, 0)
 
     cam.Start3D(camPos, lookAng, 50, viewX, viewY, w, h)
         render.SetBlend(indicatorAlpha)
@@ -634,24 +643,20 @@ function HUD_DrawDynamicIndicator()
         end
 
         if IsSubrosaEnabled() then
-            -- Bone-only mode: every marker is sized from the copied bone and
-            -- its child, so the pose is traced without drawing the character.
+            -- Bone-only mode follows explicit anatomical bone-to-bone segments.
             cam.IgnoreZ(true)
+
+            local traceColor = Color(base_col * 255, base_col * 255, base_col * 255, 210)
+            for _, segment in ipairs(boneTraceSegments) do
+                DrawBoneSegment(healthModel, segment[1], segment[2], traceColor, camPos)
+            end
+
             local tracedBones = {}
             for _, data in pairs(majorBones) do
                 if tracedBones[data.bone] then continue end
                 tracedBones[data.bone] = true
 
-                local r, g, b, alpha = base_col, base_col, base_col, 185
-                local damage = damagedBones[data.bone]
-                if damage and damage.broken then
-                    local blink = 0.45 + (math.sin(time * 10) + 1) * 0.275
-                    r, g, b, alpha = 1, 0, 0, 255 * blink
-                elseif damage then
-                    r, g, b = GetDamageColor(damage.severity)
-                    alpha = 235
-                end
-                DrawBoneMarker(healthModel, data.bone, Color(r * 255, g * 255, b * 255, alpha), camPos)
+                DrawBoneJoint(healthModel, data.bone, traceColor, camPos)
             end
             cam.IgnoreZ(false)
         else
@@ -678,6 +683,9 @@ function HUD_DrawDynamicIndicator()
             DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val)
         end
 
+        -- Damage-based limb painting is intentionally disabled until its state
+        -- source is reliable. Amputation blinking above remains independent.
+        --[[
         if not IsSubrosaEnabled() then
             for _, damage in pairs(damagedBones) do
                 local boneID = blinkModel:LookupBone(damage.bone)
@@ -696,6 +704,7 @@ function HUD_DrawDynamicIndicator()
                 end
             end
         end
+        ]]
 
         render.MaterialOverride(nil)
         render.SetColorModulation(1, 1, 1)

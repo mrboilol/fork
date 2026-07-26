@@ -1014,39 +1014,6 @@ hg.TourniquetGuys = hg.TourniquetGuys or {}
 
 if SERVER then
 	util.AddNetworkString("send_tourniquets")
-	local tourniqet_bones = {
-		["ValveBiped.Bip01_L_UpperArm"] = {
-			["ValveBiped.Bip01_L_Forearm"] = true,
-			["ValveBiped.Bip01_L_Hand"] = true
-		},
-		["ValveBiped.Bip01_L_Forearm"] = {
-			["ValveBiped.Bip01_L_Hand"] = true
-		},
-
-		["ValveBiped.Bip01_R_UpperArm"] = {
-			["ValveBiped.Bip01_R_Forearm"] = true,
-			["ValveBiped.Bip01_R_Hand"] = true
-		},
-		["ValveBiped.Bip01_R_Forearm"] = {
-			["ValveBiped.Bip01_R_Hand"] = true
-		},
-
-		["ValveBiped.Bip01_L_Thigh"] = {
-			["ValveBiped.Bip01_L_Calf"] = true,
-			["ValveBiped.Bip01_L_Foot"] = true
-		},
-		["ValveBiped.Bip01_L_Calf"] = {
-			["ValveBiped.Bip01_L_Foot"] = true
-		},
-
-		["ValveBiped.Bip01_R_Thigh"] = {
-			["ValveBiped.Bip01_R_Calf"] = true,
-			["ValveBiped.Bip01_R_Foot"] = true
-		},
-		["ValveBiped.Bip01_R_Calf"] = {
-			["ValveBiped.Bip01_R_Foot"] = true
-		},
-	}
 	local tourniquet_bone_to_limb = {
 		["ValveBiped.Bip01_L_UpperArm"] = "larm",
 		["ValveBiped.Bip01_L_Forearm"] = "larm",
@@ -1071,15 +1038,15 @@ if SERVER then
 		return boneIndex and ent:GetBoneName(boneIndex) or nil
 	end
 
-	local function isBoneAtOrBelowTourniquet(tourniquetBone, woundBone)
-		return tourniquetBone == woundBone or (tourniqet_bones[tourniquetBone] and tourniqet_bones[tourniquetBone][woundBone]) or false
-	end
-
-	local distalTourniquetBones = {
+	local proximalTourniquetBones = {
 		["ValveBiped.Bip01_L_Hand"] = "ValveBiped.Bip01_L_Forearm",
 		["ValveBiped.Bip01_R_Hand"] = "ValveBiped.Bip01_R_Forearm",
+		["ValveBiped.Bip01_L_Forearm"] = "ValveBiped.Bip01_L_UpperArm",
+		["ValveBiped.Bip01_R_Forearm"] = "ValveBiped.Bip01_R_UpperArm",
 		["ValveBiped.Bip01_L_Foot"] = "ValveBiped.Bip01_L_Calf",
 		["ValveBiped.Bip01_R_Foot"] = "ValveBiped.Bip01_R_Calf",
+		["ValveBiped.Bip01_L_Calf"] = "ValveBiped.Bip01_L_Thigh",
+		["ValveBiped.Bip01_R_Calf"] = "ValveBiped.Bip01_R_Thigh",
 	}
 
 	function SWEP:Tourniquet(ent, bone)
@@ -1100,7 +1067,8 @@ if SERVER then
 		local function considerWound(wound, arterial)
 			local woundBone = getTourniquetWoundBone(target, wound)
 			if not woundBone or not tourniquet_bone_to_limb[woundBone] then return end
-			if bone and not isBoneAtOrBelowTourniquet(bone, woundBone) then return end
+			if bone and not hg.IsBoneAtOrBelowTourniquet(bone, woundBone) then return end
+			if hg.IsBoneControlledByTourniquet(target, woundBone) then return end
 
 			local bleed = tonumber(wound[1]) or 0
 			if bleed <= 0 then return end
@@ -1120,38 +1088,29 @@ if SERVER then
 		end
 
 		if not bestWound then return false end
-		local tourniquetBone = distalTourniquetBones[bestBone] or bestBone
+		-- Distal wounds get a band one segment closer to the torso. Upper-arm and
+		-- thigh wounds use the high-and-tight placement supported by the model.
+		local tourniquetBone = proximalTourniquetBones[bestBone] or bestBone
 
 		target.tourniquets = target.tourniquets or {}
 		target.tourniquets[#target.tourniquets + 1] = {bestWound[2], bestWound[3], tourniquetBone}
 
-		for i = #(org.wounds or {}), 1, -1 do
-			local woundBone = getTourniquetWoundBone(target, org.wounds[i])
-			if woundBone and isBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
-				table.remove(org.wounds, i)
+		-- A tourniquet controls bleeding; it does not erase the injury. Keeping
+		-- these wounds lets the shared bleed path suppress both current and future
+		-- wounds below the band consistently.
+		for _, wound in pairs(org.wounds or {}) do
+			local woundBone = getTourniquetWoundBone(target, wound)
+			if woundBone and hg.IsBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
+				wound.visualBleedRate = 0
 			end
 		end
-
-		local removedArterial = false
-		local removedArteries = {}
-		for i = #(org.arterialwounds or {}), 1, -1 do
-			local arterialWound = org.arterialwounds[i]
-			local woundBone = getTourniquetWoundBone(target, arterialWound)
-			if woundBone and isBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
-				if arterialWound[7] then removedArteries[arterialWound[7]] = true end
-				table.remove(org.arterialwounds, i)
-				removedArterial = true
+		for _, wound in pairs(org.arterialwounds or {}) do
+			local woundBone = getTourniquetWoundBone(target, wound)
+			if woundBone and hg.IsBoneAtOrBelowTourniquet(tourniquetBone, woundBone) then
+				wound.visualBleedRate = 0
 			end
 		end
-
-		if removedArterial and hg.organism.RebuildArteryWoundState then
-			hg.organism.RebuildArteryWoundState(org, true)
-		else
-			for artery in pairs(removedArteries) do
-				org[artery] = 0
-			end
-			org.owner:SetNetVar("arterialwounds", org.arterialwounds or {})
-		end
+		org.owner:SetNetVar("arterialwounds", org.arterialwounds or {})
 		org.owner:SetNetVar("wounds", org.wounds or {})
 
 		target:SetNetVar("Tourniquets", target.tourniquets)

@@ -27,6 +27,16 @@ local otrub_pain_tolerance = 90
 local pain_fake_threshold = 0.9
 local pain_drain_base = 8
 local pain_drain_otrub_mul = 4.5
+
+function hg.organism.GetAdrenalinePainPacing(adrenaline)
+	adrenaline = max(adrenaline or 0, 0)
+
+	-- Natural adrenaline doses are reserve-scaled and commonly land below 0.5.
+	-- Ramp smoothly from no effect so those ordinary rushes still delay both the
+	-- arrival and recovery of pain, while preserving the strong full-rush floor.
+	return max(max(1 - adrenaline, 0.05) / (1 + adrenaline * 1.5), 0.02)
+end
+
 module[1] = function(org)
 
 	org.shock = 0
@@ -143,16 +153,11 @@ module[2] = function(owner, org, timeValue)
 	local add = shouldPainAdd and math.min(timeValue * 15, org.painadd) or 0
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * (org.painkiller * 2) + timeValue * (org.analgesia * 4)) or (0)
 
-	if adrenaline > 0.5 then
-
-		-- A real rush strongly delays both the pain arriving and the body settling
-		-- it, so the stored injury survives the rush and catches up afterward.
-		local suppression = math.max(1 - adrenaline, 0.05) / 2.5
-
-		add = add * suppression
-		sub = sub * suppression
-
-	end
+	-- Adrenaline delays both the pain arriving and the body settling it, so the
+	-- stored injury survives the rush and catches up afterward.
+	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
+	add = add * adrenalinePainPacing
+	sub = sub * adrenalinePainPacing
 
 
 

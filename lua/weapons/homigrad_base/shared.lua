@@ -718,6 +718,7 @@ local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateCli
 local hg_distortedsounds = ConVarExists("hg_distortedsounds") and GetConVar("hg_distortedsounds") or CreateClientConVar("hg_distortedsounds", "0", true, false, "Toggle distorted sounds for the gunshots", 0, 1)
 
 local math_random = math.random
+local emptyBulletSound = {"panoptisscon/uhoh.ogg", 75, 97, 103}
 function SWEP:PlaySnd(snd, server, chan, vol, pitch, entity, tripleaffirmative)
 	if SERVER and not server then return end
 	local owner = self:GetOwner()
@@ -860,7 +861,7 @@ function SWEP:Shoot(override)
 	if !override and self:GetJammed() then
 		self.LastPrimaryDryFire = CurTime()
 		if SERVER then
-			self:PlaySnd("panoptisscon/uhoh.ogg", true, CHAN_AUTO)
+			self:PlaySnd(emptyBulletSound, true, CHAN_AUTO)
 		end
 		primary.Automatic = false
 
@@ -1006,7 +1007,7 @@ SWEP.SightSlideOffset = 1
 
 function SWEP:PrimaryShootEmpty()
 	if CLIENT then return end
-	self:PlaySnd(self.Primary.SoundEmpty, true, CHAN_AUTO)
+	self:PlaySnd(emptyBulletSound, true, CHAN_AUTO)
 end
 
 SWEP.DistSound = "m4a1/m4a1_dist.wav"

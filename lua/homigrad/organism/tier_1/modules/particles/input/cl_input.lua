@@ -307,18 +307,6 @@ hook.Add("HG_OrganismChanged", "injury_damage_mist", function(oldorg, org)
 		end
 	end
 
-	if not mistPos and #(org.arterialwounds or {}) > #(oldorg.arterialwounds or {}) then
-		local wound = org.arterialwounds[#org.arterialwounds]
-		local boneName = wound and wound[4]
-		local bone = boneName and ent:LookupBone(boneName)
-		local mat = bone and ent:GetBoneMatrix(bone)
-		if mat and wound[2] and wound[3] then
-			mistPos = LocalToWorld(wound[2], wound[3], mat:GetTranslation(), mat:GetAngles())
-		else
-			mistPos = getInjuryPos(ent, boneName)
-		end
-	end
-
 	emitInjuryMist(ent, mistPos, amputation)
 end)
 

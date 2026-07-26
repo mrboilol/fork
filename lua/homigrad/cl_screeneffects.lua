@@ -82,7 +82,6 @@ local otrubSoundPaths = {
 local OtrubModeStation
 local activeOtrubMode
 local AltRemDyingStation
-local warnedOtrubIncapacitationConflict = false
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
@@ -391,6 +390,7 @@ local painLayerFadeLerp = 0.06
 local painEffectIntensity = 0.8
 local unconsciousPainEffectIntensity = 1.55
 local painPulseIntensity = 0.25
+local painRapidShakeThreshold = 95
 local hiddenPainFlickerSeverity = 0
 local hiddenPainFlickerStart = 0
 local hiddenPainFlickerAttackEnd = 0
@@ -418,6 +418,17 @@ local NoiseStationLoading = false
 local NoiseStation2Loading = false
 local NoiseStation2DyingLoading = false
 local painAudioGeneration = 0
+
+local function isRapidPainShakeActive(org)
+	return not org.otrub and (org.pain or 0) > painRapidShakeThreshold
+end
+
+local function getPainPulse(org)
+	if isRapidPainShakeActive(org) then return 0 end
+
+	return math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
+end
+
 local painLayers = {
 	agony = {
 		path = "rem_agony.ogg",
@@ -802,7 +813,7 @@ drawFinalVitalsVignettes = function()
 	if not org or not org.brain or not org.o2 or not isnumber(org.o2[1]) or not org.analgesia then return end
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
-		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
+		local strobe = getPainPulse(org)
 		local pain = PainLerp + strobe
 		local shock = shockLerp
 
@@ -1469,7 +1480,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
-		local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * (org.otrub and 0.5 or painPulseIntensity)
+		local strobe = getPainPulse(org)
 		pain = PainLerp + strobe
 		shock = shockLerp
 
@@ -2068,16 +2079,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
-			local incapacitationMode = getServerSoundMode("hg_incapacitation", 0)
-			if otrubMode == 4 and incapacitationMode > 0 then
-				otrubMode = 0
-				if not warnedOtrubIncapacitationConflict then
-					print("dont do that kid")
-					warnedOtrubIncapacitationConflict = true
-				end
-			else
-				warnedOtrubIncapacitationConflict = false
-			end
+			local deathStateSoundOwnsNGA = org.incapacitated and (org.deathStateEnd or 0) > 0
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
@@ -2092,7 +2094,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if otrubMode == 0 then
+			if deathStateSoundOwnsNGA then
+				-- The incapacitation HUD owns the timed nga-im-cooked -> mindwipe
+				-- sequence. Silence the ordinary otrub loop so the two do not stack.
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+			elseif otrubMode == 0 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 			else
@@ -2602,11 +2609,20 @@ end)
 
 hook.Add("HG_CalcView", "ConsciousBeatShake", function(ply, pos, angles, fova, znear, zfar)
 	local pulse = GetConsciousBeatPulse()
-	if pulse > 0 then
-		local shakeAmt = pulse * 2.5
+	local painShake = 0
+	local org = IsValid(lply) and lply:Alive() and (lply.new_organism or lply.organism)
+	if org and isRapidPainShakeActive(org) then
+		painShake = math.Clamp(math.Remap(org.pain, painRapidShakeThreshold, painThresholdMax, 0.65, 1.4), 0.65, 1.4)
+	end
+
+	local shakeAmt = pulse * 2.5 + painShake
+	if shakeAmt > 0 then
 		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
 		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
 		angles.r = angles.r + math.Rand(-shakeAmt, shakeAmt)
+	end
+
+	if pulse > 0 then
 		-- Also modify fova for when RenderScene is disabled
 		fova[1] = (fova[1] or 0) - (pulse * 20)
 	end

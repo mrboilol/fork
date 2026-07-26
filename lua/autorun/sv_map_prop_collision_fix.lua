@@ -1,11 +1,11 @@
 if not SERVER then return end
 
+-- Never run this repair on physics props: map events can create them with a
+-- temporary SOLID_NONE state, and reinitializing them here freezes them.
 local repairClasses = {
 	["prop_static"] = true,
 	["prop_dynamic"] = true,
 	["prop_dynamic_override"] = true,
-	["prop_physics"] = true,
-	["prop_physics_multiplayer"] = true,
 }
 
 local ignoredModelHints = {

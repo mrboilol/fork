@@ -91,7 +91,7 @@ function impactSounds.PlayMaterialImpact(trace)
 	if not selection.always and math_random(2) ~= 1 then return false end
 
 	local choices = selection.sounds
-	sound.Play(choices[math_random(#choices)], trace.HitPos, 75, math_random(90, 110))
+	sound.Play(choices[math_random(#choices)], trace.HitPos, 75, math_random(97, 103))
 
 	return true
 end
@@ -99,7 +99,7 @@ end
 function impactSounds.PlayRicochet(pos)
 	if not SERVER or not pos or math_random(2) ~= 1 then return false end
 
-	sound.Play(ricochetSounds[math_random(#ricochetSounds)], pos, 75, math_random(90, 110))
+	sound.Play(ricochetSounds[math_random(#ricochetSounds)], pos, 75, math_random(97, 103))
 
 	return true
 end

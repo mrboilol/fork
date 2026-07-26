@@ -247,7 +247,7 @@ if SERVER then
 			local boneName = ent:GetBoneName(ent:TranslatePhysBoneToBone(tbl.PhysBoneID or 0))
 			
 			for i = 1, 5 do
-				hg.organism.AddWoundManual(org.owner, 50, vector_origin, AngleRand(-180, 180), boneName, CurTime() + math.Rand(0, 2))
+				hg.organism.AddWoundManual(org.owner, 50, lpos + VectorRand(-0.6, 0.6), lang or AngleRand(-180, 180), boneName, CurTime() + math.Rand(0, 2))
 			end
 
 			-- Check for organ damage based on bone location
@@ -284,26 +284,33 @@ if SERVER then
 					local damageChance = math.Rand(minChance, maxChance)
 					
 					if math.random() < damageChance then
+						local causesInternalBleed = false
 						if organName == "brain" then
 							org.brain = math.min(org.brain + math.Rand(0.05, 0.15), 1)
 						elseif organName == "heart" then
 							org.heart = math.min(org.heart + math.Rand(0.1, 0.3), 1)
+							causesInternalBleed = true
 						elseif organName == "liver" then
 							org.liver = math.min(org.liver + math.Rand(0.1, 0.25), 1)
+							causesInternalBleed = true
 						elseif organName == "lungsL" then
 							org.lungsL[1] = math.min(org.lungsL[1] + math.Rand(0.1, 0.25), 1)
+							causesInternalBleed = true
 							if math.random() < 0.3 then
 								org.lungsL[2] = math.min(org.lungsL[2] + math.Rand(0.1, 0.2), 1)
 							end
 						elseif organName == "lungsR" then
 							org.lungsR[1] = math.min(org.lungsR[1] + math.Rand(0.1, 0.25), 1)
+							causesInternalBleed = true
 							if math.random() < 0.3 then
 								org.lungsR[2] = math.min(org.lungsR[2] + math.Rand(0.1, 0.2), 1)
 							end
 						elseif organName == "stomach" then
 							org.stomach = math.min(org.stomach + math.Rand(0.1, 0.2), 1)
+							causesInternalBleed = true
 						elseif organName == "intestines" then
 							org.intestines = math.min(org.intestines + math.Rand(0.1, 0.2), 1)
+							causesInternalBleed = true
 						elseif organName == "arteria" then
 							-- Call hitArtery to create proper arterial wound with blood stream
 							if hg.hitArtery then hg.hitArtery("arteria", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
@@ -321,8 +328,11 @@ if SERVER then
 							if hg.hitArtery then hg.hitArtery("rlegartery", org, 0.5, DamageInfo(), boneName, extractDir, extractPos, true) end
 						end
 						
-						-- Add additional bleeding from organ damage
-						org.internalBleed = org.internalBleed + math.Rand(0.1, 0.3)
+						-- Limb artery extraction must remain a limb wound. Only actual
+						-- torso organs add internal (chest/abdominal) bleeding here.
+						if causesInternalBleed then
+							org.internalBleed = org.internalBleed + math.Rand(0.1, 0.3)
+						end
 					end
 				end
 			end

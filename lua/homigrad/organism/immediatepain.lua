@@ -7,7 +7,8 @@ if SERVER then
     hook.Add("Org Think", "ImmediatePainApply", function(owner, org, timeValue)
         if not org.painadd or org.painadd <= 0 then return end
         local adrenaline = math.min(org.adrenaline or 0, adrenalinePainaddPassiveCap)
-        local add = math.min(org.painadd, timeValue * painaddDrainRate)
+        local painPacing = hg.organism.GetAdrenalinePainPacing and hg.organism.GetAdrenalinePainPacing(adrenaline) or 1
+        local add = math.min(org.painadd, timeValue * painaddDrainRate * painPacing)
         local passiveDrain = 0
         if adrenaline > adrenalinePainaddPassiveMin then
             passiveDrain = math.min(org.painadd - add, timeValue * adrenalinePainaddPassiveRate * adrenaline)

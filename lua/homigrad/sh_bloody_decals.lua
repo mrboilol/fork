@@ -28,17 +28,16 @@ if SERVER then
     function hg.AddOrganismBloodDecal(ply, amount)
         if not IsValid(ply) then return end
 
-        amount = math.max(tonumber(amount) or 1, 1)
+        amount = math.max(math.floor(tonumber(amount) or 1), 1)
         local oldCount = ply.HG_BloodDecalCount or 0
         local newCount = math.min(oldCount + amount, bloodDecalReplayLimit)
         ply.HG_BloodDecalCount = newCount
 
         local target = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
-        -- Stop applying decals once this character has reached the same cap
-        -- used for ragdoll replay. Previously the count stopped at 16 but the
-        -- live player kept receiving decals forever, eventually covering every
-        -- material while a new ragdoll looked normal again.
-        for i = oldCount + 1, newCount do
+        -- Every wound event gets a visible mark. The compact replay count stays
+        -- capped so a later ragdoll can rebuild the appearance without a large
+        -- network burst, but reaching that cap must not hide subsequent wounds.
+        for i = 1, amount do
             ApplyBloodDecal(IsValid(target) and target or ply)
         end
     end
@@ -69,31 +68,16 @@ if SERVER then
         ReapplyBloodDecals(ply, ragdoll)
     end)
 
-    hook.Add("Player Think", "HG_WashBloodDecals", function(ply)
-        local character = hg.GetCurrentCharacter(ply)
-        local deathRagdoll = ply.RagdollDeath
-        if ply:WaterLevel() <= 0
-            and (not IsValid(character) or character:WaterLevel() <= 0)
-            and (not IsValid(deathRagdoll) or deathRagdoll:WaterLevel() <= 0) then return end
-        if ply.HG_NextBloodWash and ply.HG_NextBloodWash > CurTime() then return end
-
-        ply.HG_NextBloodWash = CurTime() + 0.5
+    -- Wound marks persist for the whole character life, including water and
+    -- player/fake/death-ragdoll entity swaps. A new spawn is the sole gameplay
+    -- reset for the player's body overlay state.
+    hook.Add("PlayerSpawn", "HG_ResetBloodDecals", function(ply)
         ply.HG_HeadBloodDecal = nil
         ply.HG_BloodDecalCount = nil
 
-        local targets = {
-            ply,
-            character,
-            deathRagdoll,
-        }
-
-        for _, ent in ipairs(targets) do
-            if IsValid(ent) then
-                net.Start("hg_clear_blood_decals")
-                net.WriteEntity(ent)
-                net.Broadcast()
-            end
-        end
+        net.Start("hg_clear_blood_decals")
+        net.WriteEntity(ply)
+        net.Broadcast()
     end)
 
     return

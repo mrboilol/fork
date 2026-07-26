@@ -2892,6 +2892,17 @@ function SWEP:Holster( wep )
 end
 
 if SERVER then
+	local function GetAfflictionHands(ply)
+		local class = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
+		local wep = ply:GetWeapon(class)
+
+		if not IsValid(wep) then
+			wep = ply:Give(class)
+		end
+
+		return wep, class
+	end
+
 	concommand.Add("mcd_admire", function(ply, cmd, args)
 		if not IsValid(ply) then return end
 		if (ply.mcd_admire_cooldown or 0) > CurTime() then return end
@@ -2902,17 +2913,20 @@ if SERVER then
 		ply.mcd_admire_cooldown = CurTime() + 1.5 -- Prevent spam
 		
 		if isAdmiring then
-			if not ply:HasWeapon("weapon_hands_sh") then
-				ply:Give("weapon_hands_sh")
-			end
-			ply:SelectWeapon("weapon_hands_sh")
+			local hands, handsClass = GetAfflictionHands(ply)
+			if not IsValid(hands) then return end
+			ply:SelectWeapon(handsClass)
 			
 			timer.Simple(0.1, function()
-				if IsValid(ply) and IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon():GetClass() == "weapon_hands_sh" then	
+				if IsValid(ply) and IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon():GetClass() == handsClass then
 					local wep = ply:GetActiveWeapon()
-					wep:SetFists(true)
-					wep.admire_started = CurTime()
-					wep:DoBFSAnimation("seq_admire", 5, true, true)
+					if wep.StartAfflictionAnimation then
+						wep:StartAfflictionAnimation()
+					else
+						wep:SetFists(true)
+						wep.admire_started = CurTime()
+						wep:DoBFSAnimation("seq_admire", 5, true, true)
+					end
 					
 					-- Ensure animation doesn't get interrupted
 					wep:SetNextPrimaryFire(CurTime() + 10)
@@ -2920,22 +2934,28 @@ if SERVER then
 				end
 			end)
 		else
-			if IsValid(ply) and IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon():GetClass() == "weapon_hands_sh" then
+			local handsClass = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
+			if IsValid(ply) and IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon():GetClass() == handsClass then
 				local wep = ply:GetActiveWeapon()
 				
 				wep:SetNextPrimaryFire(CurTime() + 1.5)
 				wep:SetNextSecondaryFire(CurTime() + 1.5)
 				
-				-- If they cancelled it, reverse the animation to put the hands away
-				wep.slowmoanim = nil
-				wep.animtime = CurTime()
-				wep:DoBFSAnimation("fists_draw", 1, false, true)
+				if wep.StopAfflictionAnimation then
+					wep:StopAfflictionAnimation()
+				else
+					-- If they cancelled it, reverse the animation to put the hands away
+					wep.slowmoanim = nil
+					wep.animtime = CurTime()
+					wep:DoBFSAnimation("fists_draw", 1, false, true)
+				end
 			end
 		end
 	end)
 
 	hook.Add("PlayerSwitchWeapon", "mcd_admire_prevent_switch", function(ply, oldWep, newWep)
-		if ply:GetNWBool("mcd_admiring", false) and IsValid(newWep) and newWep:GetClass() ~= "weapon_hands_sh" then
+		local handsClass = hg.GetHandsWeaponClass and hg.GetHandsWeaponClass(ply) or "weapon_hands_sh"
+		if ply:GetNWBool("mcd_admiring", false) and IsValid(newWep) and newWep:GetClass() ~= handsClass then
 			return true -- Prevent switching to anything other than hands
 		end
 	end)

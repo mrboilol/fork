@@ -95,12 +95,15 @@ util.AddNetworkString("addfountain")
 hg.fountains = hg.fountains or {}
 local headboom_mdl = Model("models/gleb/zcity/headboom.mdl")
 local sounds = {
-	Sound("player/zombie_head_explode_01.wav"),
-	Sound("player/zombie_head_explode_02.wav"),
-	Sound("player/zombie_head_explode_03.wav"),
-	Sound("player/zombie_head_explode_04.wav"),
-	Sound("player/zombie_head_explode_05.wav"),
-	Sound("player/zombie_head_explode_06.wav")
+	Sound("gore/blast.ogg"),
+	Sound("gore/blast2.ogg"),
+	Sound("gore/blast3.ogg"),
+	Sound("gore/blast4.ogg"),
+	Sound("gore/chop2.ogg"),
+	Sound("gore/chop3.ogg"),
+	Sound("gore/chop4.ogg"),
+	Sound("gore/chop5.ogg"),
+	Sound("gore/chop6.ogg")
 }
 util.PrecacheModel(headboom_mdl)
 for _, snd in ipairs(sounds) do

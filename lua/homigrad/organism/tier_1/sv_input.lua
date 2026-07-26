@@ -101,12 +101,30 @@ local function isFistInflictor(dmgInfo)
 	return class == "weapon_hands_sh" or class == "weapon_hg_coolhands"
 end
 
+local bulletLimbBoneHitgroups = {
+	larmup = HITGROUP_LEFTARM,
+	larmdown = HITGROUP_LEFTARM,
+	rarmup = HITGROUP_RIGHTARM,
+	rarmdown = HITGROUP_RIGHTARM,
+	llegup = HITGROUP_LEFTLEG,
+	llegdown = HITGROUP_LEFTLEG,
+	rlegup = HITGROUP_RIGHTLEG,
+	rlegdown = HITGROUP_RIGHTLEG,
+}
+
 local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	dmg = dmgInfo:GetDamage() / 25
 	local organ = box[6] and organs[box[6]][box[7]]
 	if not organ then return 0 end
 	local name = organ[1]
 	if not name then return 0 end
+	local requiredLimbHitgroup = bulletLimbBoneHitgroups[name]
+	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		and requiredLimbHitgroup
+		and org._bulletImpactHitgroup
+		and requiredLimbHitgroup ~= org._bulletImpactHitgroup then
+		return 0
+	end
 	local isBrain = name == "brain" or string.StartWith(name, "brain")
 	-- A fist can concuss through the skull, but cannot directly strike a protected
 	-- brain hitbox. Snapshot this at the start of the trace so one punch that
@@ -286,12 +304,15 @@ local function getHeadImpactPos(ent, fallback)
 end
 
 local sounds = {
-	Sound("player/zombie_head_explode_01.wav"),
-	Sound("player/zombie_head_explode_02.wav"),
-	Sound("player/zombie_head_explode_03.wav"),
-	Sound("player/zombie_head_explode_04.wav"),
-	Sound("player/zombie_head_explode_05.wav"),
-	Sound("player/zombie_head_explode_06.wav")
+	Sound("gore/blast.ogg"),
+	Sound("gore/blast2.ogg"),
+	Sound("gore/blast3.ogg"),
+	Sound("gore/blast4.ogg"),
+	Sound("gore/chop2.ogg"),
+	Sound("gore/chop3.ogg"),
+	Sound("gore/chop4.ogg"),
+	Sound("gore/chop5.ogg"),
+	Sound("gore/chop6.ogg")
 }
 
 local limb_loss_messages = {
@@ -1115,11 +1136,22 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			dmgPos = tr.HitPos
 		end
 	end
+	local entryPhysicsBone = tr.Entity == ent and tr.PhysicsBone
+	if entryPhysicsBone == nil then
+		local fallbackDir = -(dmgPos - (ent:GetPos() + ent:OBBCenter())):GetNormalized()
+		local fallbackTrace = util.QuickTrace(dmgPos, fallbackDir * 100)
+		if fallbackTrace.Entity == ent then
+			entryPhysicsBone = fallbackTrace.PhysicsBone
+		end
+	end
+	local entryBone = entryPhysicsBone ~= nil and ent:TranslatePhysBoneToBone(entryPhysicsBone) or nil
+	local entryBoneName = entryBone ~= nil and ent:GetBoneName(entryBone) or nil
+	local entryHitgroup = entryBoneName and bonetohitgroup[entryBoneName] or 0
 
 	attacker.harm = dmgInfo:GetDamage() / 100
 	
 	if ply or org.fakePlayer then
-		hook_Run("PreHomigradDamage", org.fakePlayer and ent or ply, dmgInfo, hitgroup, ent, attacker.harm, hitBoxs, inputHole)
+		hook_Run("PreHomigradDamage", org.fakePlayer and ent or ply, dmgInfo, entryHitgroup, ent, attacker.harm, hitBoxs, inputHole)
 	end
 	
 	local dmg_before = dmgInfo:GetDamage()
@@ -1129,10 +1161,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org._armorPainMul = nil
 	org._directBrainDamageThisHit = nil
 	org._fistHeadTraceSkullIntact = isFistInflictor(dmgInfo) and (org.skull or 0) < 1 or nil
-	-- Limb artery damage must stay on the side of the physics bone the bullet
-	-- actually entered; do not let a long trace rupture the opposite limb.
+	-- Limb bone and artery damage must stay on the physics limb the bullet
+	-- actually entered; a long penetration trace may still cross other limbs.
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
-		org._bulletImpactHitgroup = hitgroup ~= 0 and hitgroup or nil
+		org._bulletImpactHitgroup = entryHitgroup ~= 0 and entryHitgroup or nil
 	end
 	if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
 		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, boxs, pos, sphere, organs, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, ent.organism, organs, dmg / 25, dmgInfo, dir)
@@ -1660,9 +1692,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	takeRagdollDamage(ent, dmgInfo)
 
-	-- A head hit is not automatically a fatal brain hit. The organ trace must
-	-- have actually damaged a brain or brain-lobe hitbox during this shot.
-	if fatalBrainShotCandidate and directBrainDamageThisHit and hg.organism.KillFatalBrainDamage then
+	-- A head hit, or even a small direct-brain wound, is not automatically fatal.
+	-- Immediate death requires this shot to have hit brain tissue and pushed the
+	-- total brain injury into the same catastrophic range used by physiology.
+	if fatalBrainShotCandidate and directBrainDamageThisHit and (org.brain or 0) >= 0.7 and hg.organism.KillFatalBrainDamage then
 		hg.organism.KillFatalBrainDamage(org)
 	end
 
@@ -1995,6 +2028,8 @@ local function velocityDamage(ent, data)
 
 	local dmgInfo = DamageInfo()
 	dmgInfo:SetDamage(dmg * 20)
+	dmgInfo:SetDamagePosition(data.HitPos or ent:GetPos())
+	dmgInfo:SetDamageForce(data.OurOldVelocity - data.TheirOldVelocity)
 	local surfaceType = util.GetSurfacePropName(data["TheirSurfaceProps"])
 	--[[if surfaceType and surfaceType ~= nil and bleedSurfaces[surfaceType] then
 		--print(surfaceType)
@@ -2072,9 +2107,27 @@ local function velocityDamage(ent, data)
 			local head_otrub_chance = math.Clamp((dmg - head_otrub_min_damage) * head_otrub_chance_mul, 0, head_otrub_max_chance)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
+			local oldConcussion = org.concussion or 0
+			local oldBrain = org.brain or 0
 			
+			-- A head collision owns one flash for the whole impact. Defer the skull
+			-- and jaw sub-route flashes so they cannot consume the shared cooldown.
+			org._deferHeadTraumaFlash = true
 			hg.organism.input_list.skull(org, bone, dmg * 6 * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
 			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
+			org._deferHeadTraumaFlash = nil
+
+			if hg.organism.SendHeadTraumaFlash then
+				hg.organism.SendHeadTraumaFlash(
+					org,
+					dmg,
+					dmgInfo,
+					math.max((org.skull or 0) - oldSkull, 0),
+					math.max((org.concussion or 0) - oldConcussion, 0),
+					math.max((org.brain or 0) - oldBrain, 0),
+					"collision"
+				)
+			end
 			
 			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
 			

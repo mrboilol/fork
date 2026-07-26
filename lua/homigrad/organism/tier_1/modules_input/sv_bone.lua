@@ -45,6 +45,9 @@ local bonefracture_sounds = {
 	"bonefracture/rem_bonebreak1.wav",
 	"bonefracture/rem_bonebreak2.wav",
 	"bonefracture/rem_bonebreak3.wav",
+	"gore/rotten_break.ogg",
+	"gore/rotten_break2.ogg",
+	"gore/rotten_break3.ogg",
 }
 
 local skullfracture_sounds = {
@@ -82,6 +85,9 @@ end
 local function playSkullFractureSound(ent)
 	if not IsValid(ent) then return end
 	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 75, math.random(90, 110), 1, CHAN_AUTO)
+	if math.random(3) == 1 then
+		ent:EmitSound("gore/skullopen" .. math.random(1, 3) .. ".wav", 75, math.random(90, 110), 1, CHAN_AUTO)
+	end
 end
 
 local function addBoneInternalBleed(org, amount, cap)
@@ -141,26 +147,34 @@ end
 
 local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain, brainGain, traumaBone)
 	if not org.isPly or not IsValid(org.owner) or not org.owner:IsPlayer() then return end
+	if org._deferHeadTraumaFlash then return end
 
 	local target = org.owner
-	local cooldown = traumaBone == "jaw" and 0.35 or 0.2
+	local isCollision = traumaBone == "collision"
+	local cooldown = (traumaBone == "jaw" or isCollision) and 0.35 or 0.2
 	if (target.HeadDisorientFlashCooldown or 0) > CurTime() then return end
 
 	boneDelta = math.max(boneDelta or 0, 0)
 	concussionGain = math.max(concussionGain or 0, 0)
 	brainGain = math.max(brainGain or 0, 0)
 	dmg = math.max(dmg or 0, 0)
-	if boneDelta <= 0.01 and concussionGain <= 0.05 and brainGain <= 0 and dmg < 0.2 then return end
+	if not isCollision and boneDelta <= 0.01 and concussionGain <= 0.05 and brainGain <= 0 and dmg < 0.2 then return end
 
 	local hasBrainDamage = brainGain > 0
 	local hasConcussion = concussionGain > 0.05
 	local isCritical = hasBrainDamage or concussionGain >= 1.5
-	local timeScale = traumaBone == "jaw"
-		and math.Clamp(0.25 + boneDelta * 0.8 + concussionGain * 0.08, 0.25, 1.15)
-		or math.Clamp(0.3 + boneDelta * 0.8 + brainGain * 1.5, 0.3, 1.35)
-	local flashSize = traumaBone == "jaw"
-		and math.Clamp(1400 + boneDelta * 1400 + concussionGain * 120, 1400, 3000)
-		or math.Clamp(1500 + boneDelta * 1500 + brainGain * 900, 1500, 3200)
+	local timeScale
+	local flashSize
+	if isCollision then
+		timeScale = 0.6
+		flashSize = 2200
+	elseif traumaBone == "jaw" then
+		timeScale = math.Clamp(0.25 + boneDelta * 0.8 + concussionGain * 0.08, 0.25, 1.15)
+		flashSize = math.Clamp(1400 + boneDelta * 1400 + concussionGain * 120, 1400, 3000)
+	else
+		timeScale = math.Clamp(0.3 + boneDelta * 0.8 + brainGain * 1.5, 0.3, 1.35)
+		flashSize = math.Clamp(1500 + boneDelta * 1500 + brainGain * 900, 1500, 3200)
+	end
 
 	local eyePos = target:EyePos()
 	local eyeAng = target:EyeAngles()
@@ -185,6 +199,8 @@ local function sendHeadTraumaFlash(org, dmg, dmgInfo, boneDelta, concussionGain,
 
 	target.HeadDisorientFlashCooldown = CurTime() + cooldown
 end
+
+hg.organism.SendHeadTraumaFlash = sendHeadTraumaFlash
 
 local huyasd = {
 	["spine1"] = "I don't feel anything below my hips.",
@@ -350,6 +366,8 @@ local jaw_dislocated_msg = {
 
 local input_list = hg.organism.input_list
 local fist_skull_damage_mul = 0.35
+local jaw_concussion_per_damage = 15 -- 0.15 jaw damage = 2.25 concussion
+local skull_concussion_per_damage = 11.25 -- 0.2 skull damage = 2.25 concussion
 local function isFistInflictor(dmgInfo)
 	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
 	if not IsValid(inflictor) or not inflictor:IsWeapon() then return false end
@@ -372,7 +390,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 	-- directly injuring brain tissue like a penetrating skull hit.
 	if jawDelta > 0 or jawImpact >= 0.2 then
 		local impactConcussion = math.max(jawImpact - 0.15, 0) * (isCrush(dmgInfo) and 1.75 or 0.9)
-		local concussionAdd = math.min(jawDelta * 6 + impactConcussion, 5)
+		local concussionAdd = math.min(jawDelta * jaw_concussion_per_damage + impactConcussion, 5)
 		local consciousnessLoss = math.min(jawDelta * 0.75 + math.max(jawImpact - 0.55, 0) * 0.35, 0.8)
 		local disorientationAdd = math.min(jawDelta * 2.5 + jawImpact * 1.25, 5)
 
@@ -452,11 +470,16 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	org.shock = org.shock + dmg * 3
-	local rnd = math.random(10) == 1 or dmgInfo:IsDamageType(DMG_CRUSH)
-	org.consciousness = math.Approach(org.consciousness, 0, rnd and dmg * 2 or 0)
+	local penetratingHeadHit = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	-- The old one-in-ten skull roll made otherwise identical bullet headshots
+	-- randomly become brain injuries (and potentially deaths). Keep that
+	-- incidental transfer for blunt trauma; bullet brain injury is limited to
+	-- traced brain hitboxes and the deterministic newly-exposed-skull trauma below.
+	local brainImpact = dmgInfo:IsDamageType(DMG_CRUSH) or (not penetratingHeadHit and math.random(10) == 1)
+	org.consciousness = math.Approach(org.consciousness, 0, brainImpact and dmg * 2 or 0)
 	local brainExposure = math.Clamp(((org.skull or 0) - 0.6) / 0.4, 0, 1)
 	local bluntBrainDamage = 0
-	if brainExposure > 0 and rnd then
+	if brainExposure > 0 and brainImpact then
 		bluntBrainDamage = bluntBrainDamage + dmg * 0.05 * Lerp(brainExposure, 0.35, 1)
 	end
 
@@ -488,7 +511,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	end
 
 	if skullDelta > 0 or brainGain > 0 then
-		local concussionGain = math.min(skullDelta * 2.75 + brainGain * 7, 4.5)
+		-- Brain trauma adds its own concussion through ApplyBrainTraumaEffects;
+		-- only the skull damage belongs in this bone-specific contribution.
+		local concussionGain = math.min(skullDelta * skull_concussion_per_damage, 4.5)
 		org.concussion = math.min((org.concussion or 0) + concussionGain, 10)
 		org.consciousness = math.Approach(org.consciousness or 1, 0, skullDelta * 0.25)
 		org.disorientation = (org.disorientation or 0) + skullDelta * 0.9
@@ -503,7 +528,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
-	if org.brain >= 0.01 and math.random(3) == 1 and (rnd or skullDelta > 0.6) then
+	if org.brain >= 0.01 and math.random(3) == 1 and (brainImpact or skullDelta > 0.6) then
 		org.shock = 70
 		timer.Simple(0.1, function()
 			local rag = hg.GetCurrentCharacter(org.owner)

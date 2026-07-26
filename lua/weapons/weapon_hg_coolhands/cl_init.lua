@@ -565,11 +565,15 @@ function SWEP:SetHandPos(noset)
 	ply.rhold = rhmat
 	ply.lhold = lhmat
 
-	if self:GetCheckingAfflictions() then
+	local admiringAfflictions = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
+	local checkingAfflictions = self:GetCheckingAfflictions() or admiringAfflictions
+	self.afflictionPoseLerp = LerpFT(0.1, self.afflictionPoseLerp or 0, checkingAfflictions and 1 or 0)
+	if self.afflictionPoseLerp > 0.01 then
 		local chest = ply:GetBoneMatrix(ply:LookupBone("ValveBiped.Bip01_Spine2") or ply:LookupBone("ValveBiped.Bip01_Spine4"))
 		if chest then
 			local chestPos, chestAng = chest:GetTranslation(), chest:GetAngles()
 			local inspectPos = chestPos + chestAng:Forward() * 9 + chestAng:Right() * -4 + chestAng:Up() * 2
+			inspectPos = Lerp(self.afflictionPoseLerp, lhmat:GetTranslation(), inspectPos)
 			hg.DragHandsToPos(ply, self, inspectPos, false, 0, chestAng:Forward(), Angle(-80, -90, 0), Angle(-80, 90, 0))
 			return
 		end
