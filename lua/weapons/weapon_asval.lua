@@ -88,24 +88,35 @@ SWEP.Primary.Force = 42
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/m14/m14_suppressed_fp.wav", 65, 90, 100}
 SWEP.SupressedSound = {"zcitysnd/sound/weapons/m14/m14_suppressed_fp.wav", 65, 90, 100}
 SWEP.Primary.Wait = 0.066
-SWEP.ReloadTime = 3.5
-SWEP.ReloadSoundes = {
-	"none",
-	"none",
-	"none",
-	"none",
-	"weapons/tfa_ins2/ak103/ak103_magout.wav",
-	"none",
-	"none",
-	"none",
-	"weapons/tfa_ins2/akm_bw/magin.wav",
-	"none",
-	"weapons/tfa_inss/asval/slideback.wav",
-	"weapons/tfa_inss/asval/slideforward.wav",
-	"none",
-	"none",
-	"none",
-	"none"
+
+
+SWEP.PPSMuzzleEffect = "muzzleflash_FAMAS"
+
+SWEP.CustomShell = "9x39"
+SWEP.ShellEject = "EjectBrass_9x39"
+
+SWEP.LocalMuzzlePos = Vector(23.2, -1.75, 4.1)
+SWEP.LocalMuzzleAng = Angle(0, 0, 0)
+SWEP.WeaponEyeAngles = Angle(0, 0, 0)
+
+SWEP.HoldType = "rpg"
+
+SWEP.WepSelectIcon2 = Material("entities/arc9_eft_asval.png")
+SWEP.IconOverride = "entities/arc9_eft_asval.png"
+
+SWEP.weight = 3.0
+SWEP.ScrappersSlot = "Primary"
+
+SWEP.ShockMultiplier = 3
+
+SWEP.DistSound = "weapons/darsu_eft/val/val_dist.wav"
+
+SWEP.availableAttachments = {
+	sight = {
+		["mountType"] = {"dovetail"},
+		["mount"] = {["dovetail"] = Vector(-21, -0.4, 1.8)},
+		["mountAngle"] = Angle(0,0,90),
+	},
 }
 
 SWEP.LocalMuzzlePos = Vector(28,-0.2,4)

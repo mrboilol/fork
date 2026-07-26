@@ -205,7 +205,6 @@ SWEP.Primary.Wait = 0.15
 SWEP.NumBullet = 1
 SWEP.AnimShootMul = 1
 SWEP.AnimShootHandMul = 1
-SWEP.ReloadTime = 4
 SWEP.ReloadSoundes = {
 	"none",
 	"none",

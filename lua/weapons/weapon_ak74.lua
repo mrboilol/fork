@@ -150,19 +150,6 @@ SWEP.SupressedSoundFP = {"weapons/ak74/ak74_suppressed_fp.wav", 65, 90, 100}
 SWEP.DistSound = "weapons/ak74/ak74_dist.wav"
 
 SWEP.Primary.Wait = 0.085
-SWEP.ReloadTime = 5.5
-SWEP.ReloadSoundes = {
-	"none",
-	"none",
-	"weapons/tfa_ins2/akp/ak47/ak47_magout.wav",
-	"none",
-	"weapons/tfa_ins2/akp/ak47/ak47_magin.wav",
-	"weapons/tfa_ins2/akp/aks74u/aks_boltback.wav",
-	"weapons/tfa_ins2/akp/aks74u/aks_boltrelease.wav",
-	"none",
-	"none",
-	"none"
-}
 
 SWEP.PPSMuzzleEffect = "pcf_jack_mf_mrifle1" -- shared in sh_effects.lua
 
