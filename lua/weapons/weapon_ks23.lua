@@ -316,13 +316,13 @@ function SWEP:Reload(time)
 
 	if not self:CanReload() then return end
 
-	-- Apply arm penalties for reload
-	local armPain, armSpeedMul = self:GetReloadArmPenalty()
-	if armPain > 0 and ply.organism then
-		ply.organism.painadd = (ply.organism.painadd or 0) + armPain
-	end
-
 	if SERVER then
+		-- GetReloadArmPenalty is defined in the server-only reload module.
+		local armPain = self:GetReloadArmPenalty()
+		if armPain > 0 and ply.organism then
+			ply.organism.painadd = (ply.organism.painadd or 0) + armPain
+		end
+
 		self:SetNetVar("shootgunReload", CurTime() + 1.1)
 
 		self:PlayAnim(self.AnimList["start"] or "sgreload_start",1,false,function() 

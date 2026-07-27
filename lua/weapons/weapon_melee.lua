@@ -285,8 +285,9 @@ SWEP.HeavyAttackDamageType = nil -- Damage type for heavy attack (nil = use Prim
 SWEP.CanHeavyAttack = false
 -- Shared balance controls: preserve each weapon's relative stats while keeping
 -- normal hits from overwhelming players or constantly forcing knockdowns.
-local MELEE_GLOBAL_DAMAGE_MUL = 0.6
-local MELEE_GLOBAL_KNOCKBACK_MUL = 0.6
+local MELEE_GLOBAL_DAMAGE_MUL = 0.55
+local MELEE_GLOBAL_KNOCKBACK_MUL = 0.45
+local MELEE_GLOBAL_SHOVE_KNOCKDOWN_MUL = 0.35
 local MELEE_GLOBAL_STAMINA_COST_MUL = 1.2
 
 if CLIENT then
@@ -1888,7 +1889,7 @@ function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
 					+ damageFactor * 0.20
 					+ (1 - victimStamina) * (self.ShoveKnockdownVictimFatigueMul or 0.20)
 					+ staminaAdvantage * (self.ShoveKnockdownStaminaAdvantageMul or 0.10)
-				chance = chance * (0.35 + attackerStamina * 0.65)
+				chance = chance * (0.35 + attackerStamina * 0.65) * MELEE_GLOBAL_SHOVE_KNOCKDOWN_MUL
 
 				if math.Rand(0, 1) <= math.Clamp(chance, 0, 0.65) then
 					ply.ShoveKnockdownUntil = CurTime() + (self.ShoveKnockdownCooldown or 2)

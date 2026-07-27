@@ -472,9 +472,7 @@ local function addAdminRoleOption(property, menu, ent, roleType, id, label, chec
 	opt:SetRadio(true)
 	opt:SetChecked(checked)
 	opt:SetIsCheckable(true)
-	opt.OnChecked = function(_, isChecked)
-		if not isChecked then return end
-
+	opt.OnChecked = function()
 		property:SetRole(ent, roleType, id)
 	end
 end
@@ -547,6 +545,9 @@ properties.Add( "setplayerclass", {
 			if roleId ~= "" and not getAdminRoleOptions("traitor")[roleId] then return end
 
 			ent.SubRole = roleId ~= "" and roleId or nil
+			if ent.organism then
+				ent.organism.recoilmul = hg.GetSubRolePerk and hg.GetSubRolePerk(ent, "RecoilMul", 1) or 1
+			end
 			ent.isTraitor = ent.SubRole ~= nil
 			ent.MainTraitor = ent.isTraitor
 			if ent.isTraitor then

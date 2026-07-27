@@ -1304,8 +1304,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	local analgesia = org.analgesia or 0
-	AnalgesiaLerp = LerpFT(0.04, AnalgesiaLerp, math.Clamp((analgesia - 0.35) / 2.4, 0, 1))
-	local rainbowFx = math.Clamp((analgesia - 0.45) / 1.25, 0, 1) * math.max(AnalgesiaLerp, 0.35)
+	-- Keep therapeutic analgesia visually clear. Sedation and overdose physiology
+	-- are handled server-side; only the drug-screen effects wait for a full dose.
+	AnalgesiaLerp = LerpFT(0.04, AnalgesiaLerp, math.Clamp((analgesia - 1) / 1.75, 0, 1))
+	local rainbowFx = math.Clamp((analgesia - 1) / 1.25, 0, 1) * math.max(AnalgesiaLerp, 0.35)
 
 	tempLerp = LerpFT(0.01, tempLerp, org.temperature)
 

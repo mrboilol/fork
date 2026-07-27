@@ -116,6 +116,7 @@ local list = {
 	{"adrenaline", 5, true},
 	{"adrenalineStorage", 5, false},
 	{"adrenalineAdd", 5, true},
+	{"anger", 1, false},
 	{"panicattackadd", 1, true},
 	{"panicattack", 1, true},
 	0, 
