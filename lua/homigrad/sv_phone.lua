@@ -31,6 +31,10 @@ HG_PHONE_SERVER = HG_PHONE_SERVER or {}
 local PHONE = HG_PHONE_SERVER
 PHONE.Registry = PHONE.Registry or {}
 PHONE.ActiveUsers = PHONE.ActiveUsers or {}
+PHONE.CallSound = "rem_iedcall.mp3"
+PHONE.AnswerSound = "panoptisscon/phone_answer.ogg"
+PHONE.MaxCallTravelTime = 10
+PHONE.CallTravelDistance = 3000
 local function CapturePhoneAppearance(ent)
 	local color = ent:GetColor()
 	local appearance = {
@@ -182,6 +186,12 @@ function PHONE:RegisterPhone(phone, number, displayName, ringtone)
 	if not HG_PHONE.IsPhone(phone) then return false end
 	local currentNumber = HG_PHONE.GetNumber(phone)
 	if currentNumber ~= "" and self.Registry[currentNumber] == phone then return true end
+	-- An IED must be private before its generated number reaches any registry sync.
+	-- Its number stays registered so a player who knows it can still dial it.
+	if HG_PHONE.IsIEDPhone(phone) then
+		phone:SetNW2Bool("HGPhonePublic", false)
+		phone:SetNW2Bool("HGPhonePublicInitialized", true)
+	end
 
 	if not displayName then
 		local owner = phone:IsWeapon() and phone:GetOwner() or nil
@@ -239,6 +249,16 @@ function PHONE:EmitPhoneSound(phone, path)
 	local user = self:GetUser(phone)
 	local emitter = IsValid(user) and user or phone
 	emitter:EmitSound(path, 60, 100, 0.75, CHAN_ITEM)
+end
+
+function PHONE:GetCallPosition(phone)
+	local user = self:GetUser(phone)
+	return IsValid(user) and user:GetPos() or phone:GetPos()
+end
+
+function PHONE:GetCallTravelTime(source, target)
+	local distance = self:GetCallPosition(source):Distance(self:GetCallPosition(target))
+	return math.Clamp(distance / self.CallTravelDistance * self.MaxCallTravelTime, 0, self.MaxCallTravelTime)
 end
 
 function PHONE:UnregisterPhone(phone, transferring)
@@ -299,6 +319,7 @@ local function StartCall(ply, source, targetNumber)
 	if HG_PHONE.IsIEDPhone(target) then
 		if target:GetDestroyed() or target:GetDialing() or target:GetDetonating() then return Notify(ply, "That IED is unavailable.") end
 		if target.PhoneDetonate and target:PhoneDetonate() then
+			PHONE:EmitPhoneSound(source, PHONE.CallSound)
 			return Notify(ply, "Dialing " .. HG_PHONE.GetNumber(target) .. "...")
 		end
 		return Notify(ply, "That IED is unavailable.")
@@ -312,12 +333,12 @@ local function StartCall(ply, source, targetNumber)
 	source:SetNW2Entity("HGPhoneTarget", target)
 	target:SetNW2Entity("HGPhoneTarget", source)
 	source:SetNW2Int("HGPhoneState", HG_PHONE.STATE_CALLING)
-	target:SetNW2Int("HGPhoneState", HG_PHONE.STATE_RINGING)
-	target._HGPhoneRingAt = 0
-	target._HGPhoneRingExpires = CurTime() + 30
+	target:SetNW2Int("HGPhoneState", HG_PHONE.STATE_CONNECTING)
+	target._HGPhoneCallArrival = CurTime() + PHONE:GetCallTravelTime(source, target)
+	PHONE:EmitPhoneSound(source, PHONE.CallSound)
+	-- The receiver is notified only when the call has travelled to their phone.
 	Notify(ply, "Calling " .. HG_PHONE.GetDisplayName(target) .. "...")
 
-	if IsValid(targetUser) then Notify(targetUser, "Incoming call from " .. HG_PHONE.GetNumber(source) .. ".") end
 end
 
 net.Receive("HG_Phone_RequestOpen", function(_, ply)
@@ -345,7 +366,6 @@ net.Receive("HG_Phone_AnswerCall", function(_, ply)
 	if IsValid(callerUser) then PHONE.ActivePhoneByPlayer[callerUser] = caller end
 	Notify(ply, "Call connected.")
 	Notify(callerUser, "Call connected.")
-	PHONE:EmitPhoneSound(phone, "panoptisscon/phone_answer.ogg")
 end)
 
 net.Receive("HG_Phone_HangupCall", function(_, ply)
@@ -358,16 +378,14 @@ end)
 
 net.Receive("HG_Phone_Text", function(_, ply)
 	local phone = net.ReadEntity()
+	local targetNumber = string.sub(net.ReadString(), 1, 16)
 	local message = string.Trim(string.sub(net.ReadString(), 1, 256))
-	if message == "" or not PHONE:CanControl(ply, phone) or HG_PHONE.GetState(phone) ~= HG_PHONE.STATE_IN_CALL then return end
-	if PHONE:GetUser(phone) ~= ply then return end
+	if message == "" or not PHONE:CanControl(ply, phone) then return end
 
-	local target = phone:GetNW2Entity("HGPhoneTarget")
+	local target = PHONE.Registry[targetNumber]
+	if not HG_PHONE.IsNormalPhone(target) or target == phone then return Notify(ply, "That number cannot receive texts.") end
 	local targetUser = PHONE:GetUser(target)
-	if not IsValid(targetUser) then return PHONE:EndCall(phone, "Call ended.") end
-	local talkSound = "talk" .. math.random(1, 3) .. ".ogg"
-	ply:EmitSound(talkSound, 60, math.random(92, 108), 0.7, CHAN_VOICE)
-	if targetUser ~= ply then targetUser:EmitSound(talkSound, 60, math.random(92, 108), 0.7, CHAN_VOICE) end
+	if not IsValid(targetUser) or not targetUser:Alive() then return Notify(ply, "That number cannot receive texts right now.") end
 
 	for _, recipient in ipairs({ply, targetUser}) do
 		net.Start("HG_Phone_Text")
@@ -482,6 +500,21 @@ hook.Add("Think", "HG_Phone_CallManager", function()
 				-- Schedule the next ring from this playback, so it begins only after
 				-- the previous ringtone has ended instead of on a fixed interval.
 				phone._HGPhoneRingAt = CurTime() + (duration > 0 and duration or 2.5)
+			end
+		elseif state == HG_PHONE.STATE_CONNECTING then
+			if (phone._HGPhoneCallArrival or 0) <= now then
+				local caller = phone:GetNW2Entity("HGPhoneTarget")
+				if not HG_PHONE.IsPhone(caller) or HG_PHONE.GetState(caller) ~= HG_PHONE.STATE_CALLING then
+					PHONE:EndCall(phone, "The caller hung up.")
+				else
+					phone:SetNW2Int("HGPhoneState", HG_PHONE.STATE_RINGING)
+					phone._HGPhoneCallArrival = nil
+					phone._HGPhoneRingAt = CurTime()
+					phone._HGPhoneRingExpires = now + 30
+					PHONE:EmitPhoneSound(phone, PHONE.AnswerSound)
+					local targetUser = PHONE:GetUser(phone)
+					if IsValid(targetUser) then Notify(targetUser, "Incoming call from " .. HG_PHONE.GetNumber(caller) .. ".") end
+				end
 			end
 		elseif state == HG_PHONE.STATE_CALLING or state == HG_PHONE.STATE_IN_CALL then
 			local user = PHONE:GetUser(phone)

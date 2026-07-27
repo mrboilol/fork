@@ -2335,7 +2335,12 @@ function MODE.SpawnPlayers(spawn_with_subroles)
                             role_info = MODE.SubRoles[sub_role]
                         end
 
-                        if(current_ply.MainTraitor)then
+						if(!role_info)then
+							sub_role = "traitor_custom"
+							role_info = MODE.SubRoles[sub_role]
+						end
+
+						if(current_ply.MainTraitor and role_info and role_info.SpawnFunction)then
                             local spawn_func = role_info.SpawnFunction
                             current_ply.SubRole = sub_role
                             spawn_func(current_ply)

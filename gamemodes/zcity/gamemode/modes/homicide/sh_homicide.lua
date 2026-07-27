@@ -89,13 +89,15 @@ local TraitorSkillsetSubRoles = {
 	["chemist"] = "traitor_chemist",
 }
 
-local function ApplyTraitorLoadout(ply)
+local function ApplyTraitorLoadout(ply, forcedSkillset, preserveSubRole)
 	local loadout = ParseLoadoutString(ply:GetInfo("hmcd_traitor_loadout"))
 	if not loadout.skillset and not istable(loadout.weapons) then loadout = LegacyTraitorLoadout end
 
-	local skillset = loadout.skillset or "none"
+	local skillset = forcedSkillset or loadout.skillset or "none"
 	local weaponsList = loadout.weapons or {}
-	ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
+	if not preserveSubRole then
+		ply.SubRole = TraitorSkillsetSubRoles[skillset] or ply.SubRole
+	end
 
 	ply.organism.stamina.max = 220
 	ply.organism.recoilmul = 1
@@ -243,6 +245,14 @@ MODE.ApplyTraitorLoadout = ApplyTraitorLoadout
 MODE.ApplyHeroLoadout = ApplyHeroLoadout
 
 MODE.SubRoles = {
+	["traitor_default"] = {
+		Name = "Legacy",
+		Description = "You are a traitor with the standard loadout.",
+		Objective = "Use your loadout to murder everyone here.",
+		SpawnFunction = function(ply)
+			ApplyTraitorLoadout(ply, "none")
+		end,
+	},
 	["traitor_custom"] = {
 		Name = "Traitor",
 		Description = [[You are the custom traitor.
@@ -250,6 +260,46 @@ Your abilities and loadout are based on your selected preset or loadout.]],
 		Objective = "Use your loadout to murder everyone here.",
 		SpawnFunction = function(ply)
 			ApplyTraitorLoadout(ply)
+		end,
+	},
+	["traitor_infiltrator"] = {
+		Name = "Infiltrator",
+		Description = "Break necks and disguise yourself as victims.",
+		Objective = "Infiltrate and murder everyone here.",
+		SpawnFunction = function(ply)
+			ApplyTraitorLoadout(ply, "infiltrator")
+		end,
+	},
+	["traitor_assasin"] = {
+		Name = "Assassin",
+		Description = "Handle weapons more steadily and disarm your victims.",
+		Objective = "Assassinate everyone here.",
+		SpawnFunction = function(ply)
+			ApplyTraitorLoadout(ply, "assassin")
+		end,
+	},
+	["traitor_chemist"] = {
+		Name = "Chemist",
+		Description = "Resist chemical exposure and use toxins more effectively.",
+		Objective = "Poison everyone here.",
+		SpawnFunction = function(ply)
+			ApplyTraitorLoadout(ply, "chemist")
+		end,
+	},
+	["traitor_martial_artist"] = {
+		Name = "Martial Artist",
+		Description = "Disarm victims and break necks in close quarters.",
+		Objective = "Eliminate everyone in close quarters.",
+		SpawnFunction = function(ply)
+			ApplyTraitorLoadout(ply, "none", true)
+		end,
+	},
+	["traitor_shadow"] = {
+		Name = "Shadow",
+		Description = "Blend into nearby walls while standing still.",
+		Objective = "Hide in the shadows and murder everyone here.",
+		SpawnFunction = function(ply)
+			ApplyTraitorLoadout(ply, "none", true)
 		end,
 	},
 	["traitor_zombie"] = {

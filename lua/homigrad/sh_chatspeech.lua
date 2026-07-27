@@ -43,6 +43,9 @@ if SERVER then
 	end
 
 	hook.Add("PlayerSay", "HG_ChatSpeech", function(ply, text)
+		-- ZChat calls Speak directly before its PlayerSay hook; skip the duplicate.
+		if ply.HGChatSpeechText == text and (ply.HGChatSpeechAt or 0) >= CurTime() then return end
+
 		timer.Simple(0, function() CHAT_SPEECH:Speak(ply, text) end)
 	end)
 end

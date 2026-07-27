@@ -267,6 +267,15 @@ else
 			text = text:utf8sub(0, maxLen)
 		end
 
+
+		-- ZChat's PlayerSay hook returns an empty string, so later PlayerSay hooks
+		-- can miss this message. Run A-Z speech directly on this server path.
+		if HG_CHAT_SPEECH and HG_CHAT_SPEECH.Speak then
+			ply.HGChatSpeechText = text
+			ply.HGChatSpeechAt = CurTime() + 0.1
+			HG_CHAT_SPEECH:Speak(ply, text)
+		end
+
 		hook.Run("PlayerSay", ply, text)
 	end)
 

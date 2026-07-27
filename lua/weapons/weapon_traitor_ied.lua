@@ -371,6 +371,10 @@ local function RegisterIEDBomb(self, ent, tr, insideObject)
 	self:SetPlanted(true)
 	if HG_PHONE_SERVER then
 		HG_PHONE_SERVER:RegisterPhone(self)
+		-- Make the generated IED number private before it can be synced to contacts.
+		self:SetNW2Bool("HGPhonePublic", false)
+		self:SetNW2Bool("HGPhonePublicInitialized", true)
+		-- Registering keeps the private number dialable for anyone who knows it.
 		self:SetNW2Bool("HGPhonePublic", self.IEDPublicOnPlant == true)
 		HG_PHONE_SERVER:QueueRegistrySync()
 		if not hasPhone then

@@ -32,6 +32,7 @@ HG_PHONE.STATE_IDLE = 0
 HG_PHONE.STATE_CALLING = 1
 HG_PHONE.STATE_RINGING = 2
 HG_PHONE.STATE_IN_CALL = 3
+HG_PHONE.STATE_CONNECTING = 4
 
 HG_PHONE.RINGTONES = {}
 HG_PHONE.RINGTONE_PATHS = {}
@@ -100,6 +101,7 @@ function HG_PHONE.GetStateName(state)
 	if state == HG_PHONE.STATE_CALLING then return "CALLING" end
 	if state == HG_PHONE.STATE_RINGING then return "RINGING" end
 	if state == HG_PHONE.STATE_IN_CALL then return "IN CALL" end
+	if state == HG_PHONE.STATE_CONNECTING then return "CONNECTING" end
 	return "IDLE"
 end
 

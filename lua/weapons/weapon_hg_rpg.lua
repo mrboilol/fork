@@ -88,22 +88,23 @@ function SWEP:Shoot(override)
 	self:SetLastShootTime(CurTime())
 	primary.Automatic = weapons.Get(self:GetClass()).Primary.Automatic
 	
+    local owner = self:GetOwner()
     local gun = self:GetWeaponEntity()
 	local tr, pos, ang = self:GetTrace(true)
 	--self:GetOwner():Kick("lol")
 	self:TakePrimaryAmmo(1)
 	if SERVER then
 		local projectile = ents.Create("rpg_projectile")
-		projectile.owner = self:GetOwner()
+		projectile.owner = owner
 		projectile:SetPos(pos + ang:Forward() * 10 + ang:Right() * -6 + ang:Up() * 2)
 		projectile:SetAngles(ang)
-		projectile:SetOwner(IsValid(self:GetOwner()) and (self:GetOwner():InVehicle() and self:GetOwner():GetVehicle() or self:GetOwner()) or self)
+		projectile:SetOwner(IsValid(owner) and (owner:InVehicle() and owner:GetVehicle() or owner) or self)
 		projectile:Spawn()
 		projectile.Penetration = -(-self.Penetration)
 
 		local phys = projectile:GetPhysicsObject()
 		if IsValid(phys) then
-			local initialVelocity = owner:GetVelocity() + ang:Forward() * (projectile.InitialVelocity or projectile.Speed or 5249)
+			local initialVelocity = (IsValid(owner) and owner:GetVelocity() or vector_origin) + ang:Forward() * (projectile.InitialVelocity or projectile.Speed or 5249)
 			phys:SetVelocity(initialVelocity)
 			phys:EnableGravity(false)
 			timer.Simple(0.2, function()
