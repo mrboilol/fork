@@ -370,16 +370,26 @@ local function RegisterIEDBomb(self, ent, tr, insideObject)
 	self:SetPhoneMode(hasPhone)
 	self:SetPlanted(true)
 	if HG_PHONE_SERVER then
-		HG_PHONE_SERVER:RegisterPhone(self)
-		-- Make the generated IED number private before it can be synced to contacts.
+		-- Set privacy before registration; this number must never enter Contacts.
 		self:SetNW2Bool("HGPhonePublic", false)
 		self:SetNW2Bool("HGPhonePublicInitialized", true)
-		-- Registering keeps the private number dialable for anyone who knows it.
-		self:SetNW2Bool("HGPhonePublic", self.IEDPublicOnPlant == true)
-		HG_PHONE_SERVER:QueueRegistrySync()
-		if not hasPhone then
-			local phone = owner:Give("weapon_phone")
-			if IsValid(phone) then owner:SelectWeapon("weapon_phone") end
+		HG_PHONE_SERVER:RegisterPhone(self)
+		local number = HG_PHONE.GetNumber(self)
+		if IsValid(owner) then
+			if owner.Notify then
+				owner:Notify("IED planted. Dial " .. number .. " to detonate.", 0)
+			else
+				owner:ChatPrint("IED planted. Dial " .. number .. " to detonate.")
+			end
+			if not hasPhone then
+				local phone = owner:Give("weapon_phone")
+				if IsValid(phone) then owner:SelectWeapon("weapon_phone") end
+			end
+			self.IEDPlanter = owner
+			owner:DropWeapon(self)
+			self:SetNoDraw(true)
+			self:SetSolid(SOLID_NONE)
+			self:SetMoveType(MOVETYPE_NONE)
 		end
 	end
 	if not ent:IsWorld() then
@@ -425,7 +435,7 @@ local function SpawnIEDBomb(pos)
 end
 
 local function GetIEDDialDelay(self, ent)
-	local owner = self:GetOwner()
+	local owner = IsValid(self.IEDPlanter) and self.IEDPlanter or self:GetOwner()
 	local entPos = IsValid(ent) and (self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or (ent:GetPos() + ent:OBBCenter())) or vector_origin
 	local ownerPos = IsValid(owner) and owner:GetPos() or entPos
 	local distance = ownerPos:Distance(entPos)

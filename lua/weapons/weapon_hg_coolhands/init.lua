@@ -957,8 +957,10 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	self:UpdateNextIdle()
 
-	self:SetNextPrimaryFire(CurTime() + .55 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (special_attack and 0.45 or isfur and 0.35 or 0))
-	self:SetNextSecondaryFire(CurTime() + .55 + (special_attack and 0.45 or isfur and 0.35 or 0))
+	local anger = math_Clamp((org and org.anger) or 0, 0, 1)
+	local strikeDelayMul = 1 - anger * 0.18
+	self:SetNextPrimaryFire(CurTime() + .55 * strikeDelayMul * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (special_attack and 0.45 or isfur and 0.35 or 0))
+	self:SetNextSecondaryFire(CurTime() + .55 * strikeDelayMul + (special_attack and 0.45 or isfur and 0.35 or 0))
 	self:SetLastShootTime(CurTime())
 
 	if isfur then
@@ -1232,6 +1234,9 @@ function SWEP:AttackFront(special_attack, rand)
                         end
                 end
 
+                local anger = math_Clamp((owner.organism and owner.organism.anger) or 0, 0, 1)
+                Mul = Mul * (1 + anger * 0.18)
+
                 Mul = Mul * self:BlockingLogic(Ent, Mul, 0, trace)
 
                 local Dam = DamageInfo()
@@ -1242,6 +1247,14 @@ function SWEP:AttackFront(special_attack, rand)
                 Dam:SetDamageType((owner.PlayerClassName == "furry" or (Ent:GetClass() == "func_breakable_surf")) and DMG_SLASH or DMG_CLUB)
                 Dam:SetDamagePosition(HitPos)
                 Ent:TakeDamageInfo(Dam)
+
+                local target = hg.RagdollOwner(Ent) or Ent
+                if IsValid(target) and target:IsPlayer() and target ~= owner then
+                        hg.organism.RileAnger(owner.organism, 0.18)
+                        if target.organism then
+                                hg.organism.RileAnger(target.organism, 0.10)
+                        end
+                end
 
                 SendCoolHandsHitStop(self, trace.HitNormal, special_attack)
 
@@ -1259,7 +1272,9 @@ function SWEP:AttackFront(special_attack, rand)
         end
 
         if SERVER then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + (special_attack and owner:KeyDown(IN_SPEED) and sprintSpecialPunchStaminaCost or punchStaminaCost)
+                local anger = math_Clamp((owner.organism and owner.organism.anger) or 0, 0, 1)
+                local staminaCost = special_attack and owner:KeyDown(IN_SPEED) and sprintSpecialPunchStaminaCost or punchStaminaCost
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * (1 + anger * 0.6)
         end
 
         owner:LagCompensation(false)

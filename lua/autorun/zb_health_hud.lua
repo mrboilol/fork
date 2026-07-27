@@ -496,7 +496,7 @@ local status_sprites = {
 	trauma = nil,
 	
 	death = nil,
-	berserk = nil,
+	anger = nil,
 	amputant = nil,
 }
 local status_sprites_loaded = false
@@ -720,11 +720,11 @@ local tooltipTexts = {
 			[2] = {title = "Паника", text = "Сердце колотится, адреналин бьёт ключом. Ты пытаешься выжить."},
 			[1] = {title = "Отчаяние", text = "Всё идёт не так. Надежда тает, но ещё не пропала."}
 		},
-		berserk = {
-			[4] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
-			[3] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
-			[2] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."},
-			[1] = {title = "Берсерк", text = "Невообразимая сила, регенерация, и стойкость. Ты машина для убийств."}
+		anger = {
+			[4] = {title = "Ярость", text = "Боевой адреналин ускоряет удары, но каждый удар сильнее выматывает."},
+			[3] = {title = "Ярость", text = "Боевой адреналин ускоряет удары, но каждый удар сильнее выматывает."},
+			[2] = {title = "Ярость", text = "Боевой адреналин ускоряет удары, но каждый удар сильнее выматывает."},
+			[1] = {title = "Ярость", text = "Боевой адреналин ускоряет удары, но каждый удар сильнее выматывает."}
 		},
 		berserk_brain_damage = {title = "Повреждение мозга", text = "ЧУТЬ ЧУТЬ ОТЛЕЖУСЬ И НОРМАЛЬНО."},
 		berserk_fracture = {title = "Перелом", text = "МНЕ РАЗВЕ ДОЛЖНО БЫТЬ НЕ БОЛЬНО... А ПОХУЙ ВООБЩЕМ."},
@@ -899,11 +899,11 @@ local tooltipTexts = {
 			[4] = {title = "Death", text = "You are dead. Observe what's happening."},
 			[2] = {title = "Panic", text = "You are in panic."}
 		},
-		berserk = {
-			[4] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
-			[3] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
-			[2] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."},
-			[1] = {title = "Berserk", text = "Unimaginable strength, regeneration, and resilience. You are a killing machine."}
+		anger = {
+			[4] = {title = "Anger", text = "Combat adrenaline sharpens your strikes, but makes every swing more exhausting."},
+			[3] = {title = "Anger", text = "Combat adrenaline sharpens your strikes, but makes every swing more exhausting."},
+			[2] = {title = "Anger", text = "Combat adrenaline sharpens your strikes, but makes every swing more exhausting."},
+			[1] = {title = "Anger", text = "Combat adrenaline sharpens your strikes, but makes every swing more exhausting."}
 		},
 		berserk_brain_damage = {title = "Brain damage", text = "Even in rage, your damaged brain affects you."},
 		berserk_fracture = {title = "Fracture", text = "Adrenaline numbs the pain, but the bone is still broken."},
@@ -1106,7 +1106,7 @@ local function load_status_sprites()
 	status_sprites.trauma = loadMaterial("vgui/hud/status_trauma.png", suffix)
 	
 	status_sprites.death = loadMaterial("vgui/hud/status_death.png", suffix)
-	status_sprites.berserk = loadMaterial("vgui/hud/status_berserk.png", suffix)
+	status_sprites.anger = loadMaterial("vgui/hud/status_berserk.png", suffix)
 	status_sprites.amputant = loadMaterial("vgui/hud/status_amputant.png", suffix)
 	status_sprites.dislocated_jaw = loadMaterial("vgui/hud/dislocatedjaw.png", suffix)
 	status_sprites.broken_ribs = loadMaterial("vgui/hud/brokenribs.png", suffix)
@@ -1385,21 +1385,21 @@ local function draw_status_effects()
 			currentEffectNames["pain"] = true
 		end
 		
-		if berserkActive then
-			local berserk_val = org.berserk or 0
+		local anger_val = math_min(math_max(getOrgVal(org, "anger", 0), 0), 1)
+		if anger_val > 0.01 then
 			local level_num = 1
-			if berserk_val > 2.5 then level_num = 4
-			elseif berserk_val > 1.5 then level_num = 3
-			elseif berserk_val > 0.5 then level_num = 2 end
-			
+			if anger_val > 0.75 then level_num = 4
+			elseif anger_val > 0.5 then level_num = 3
+			elseif anger_val > 0.25 then level_num = 2 end
+
 			table.insert(effects, {
-				name = "berserk",
+				name = "anger",
 				level_num = level_num,
 				has_levels = true,
 				priority = -1,
-				value = math_floor(berserk_val * 10) / 10
+				value = math_floor(anger_val * 100) .. "%"
 			})
-			currentEffectNames["berserk"] = true
+			currentEffectNames["anger"] = true
 		end
 		
 		local showAllIcons = not berserkActive
@@ -2392,7 +2392,7 @@ local function draw_status_effects()
 				bg_color = Color(100, 100, 200, 220)
 			elseif effect.name == "trauma" then
 				bg_color = Color(150, 50, 150, 220)
-			elseif effect.name == "berserk" then
+			elseif effect.name == "anger" then
 				bg_color = Color(180, 0, 0, 220)
 			elseif effect.name == "amputant" then
 				bg_color = Color(80, 40, 40, 220)
@@ -2446,7 +2446,7 @@ local function draw_status_effects()
 		elseif effect.name == "hypercapnia" then icon_mat = status_sprites.hypercapnia
 		elseif effect.name == "concussion" then icon_mat = status_sprites.concussion
 		elseif effect.name == "death" then icon_mat = status_sprites.death
-		elseif effect.name == "berserk" then icon_mat = status_sprites.berserk
+		elseif effect.name == "anger" then icon_mat = status_sprites.anger
 		elseif effect.name == "amputant" then icon_mat = status_sprites.amputant
 		elseif effect.name == "fracture" then icon_mat = status_sprites.fracture
 		elseif effect.name == "dislocated_jaw" then icon_mat = status_sprites.dislocated_jaw
@@ -2540,8 +2540,8 @@ local function draw_status_effects()
 				if effect.value then
 					value_text = effect.value .. "%"
 				end
-			elseif effect.name == "berserk" then
-				letter = "⚡"
+			elseif effect.name == "anger" then
+				letter = "!"
 				value_text = effect.value .. ""
 			elseif effect.name == "amputant" then
 				letter = "✂"
@@ -2779,7 +2779,7 @@ concommand.Add("mzb_nopixelicons", function(ply, cmd, args)
 		shock = nil,
 		trauma = nil,
 		death = nil,
-		berserk = nil,
+		anger = nil,
 		amputant = nil,
 	}
 	

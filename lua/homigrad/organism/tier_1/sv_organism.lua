@@ -431,6 +431,7 @@ local function send_organism(org, ply)
 	sendtable.immobilization = org.immobilization
 	sendtable.adrenaline = org.adrenaline
 	sendtable.adrenalineAdd = org.adrenalineAdd
+	sendtable.anger = org.anger
 	sendtable.analgesia = org.analgesia
 	sendtable.lleg = org.lleg
 	sendtable.rleg = org.rleg

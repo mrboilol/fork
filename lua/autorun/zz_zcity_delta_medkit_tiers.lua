@@ -5,28 +5,47 @@ local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") 
 local MEDKIT_TYPES = {
     basic = {
         PrintName = "Basic Medkit",
+        Instructions = "A compact first-aid kit with a basic bandage roll and one tourniquet. Best for stopping a small wound before it becomes serious. RMB to apply on others, R to change use mode.",
         contents = {bandage = 40, tourniquet = 1},
     },
     standard = {
         PrintName = "Standard Medkit",
+        Instructions = "A general-purpose first-aid kit with bandages, a tourniquet and paracetamol for everyday injuries. RMB to apply on others, R to change use mode.",
         contents = {bandage = 60, tourniquet = 1, painkiller = 1},
         painkillerType = "paracetamol",
     },
     emergency = {
         PrintName = "Emergency Medkit",
+        Instructions = "An emergency trauma kit with extra bandages, two tourniquets, tramadol and naloxone for severe bleeding or overdose response. RMB to apply on others, R to change use mode.",
         contents = {bandage = 150, tourniquet = 2, painkiller = 0.4, naloxone = 1},
         painkillerType = "tramadol",
     },
     advanced = {
         PrintName = "Advanced Medkit",
-        contents = {bandage = 225, tourniquet = 2, painkiller = 0.4, tranexamic = 10},
+        Instructions = "An advanced trauma kit with large dressings, two tourniquets, tramadol, tranexamic acid and a decompression needle for severe trauma. RMB to apply on others, R to change use mode.",
+        contents = {bandage = 225, tourniquet = 2, painkiller = 0.4, tranexamic = 10, needle = 1},
         painkillerType = "tramadol",
     },
     surgical = {
         PrintName = "Surgical Medkit",
-        contents = {bandage = 375, tourniquet = 2, painkiller = 0.6, tranexamic = 10, naloxone = 1, mannitol = 1},
+        Instructions = "A fully stocked surgical kit with QuikClot-grade dressings, two tourniquets, tapentadol, tranexamic acid, naloxone, mannitol and a decompression needle. RMB to apply on others, R to change use mode.",
+        contents = {bandage = 375, tourniquet = 2, painkiller = 0.6, tranexamic = 10, naloxone = 1, mannitol = 1, needle = 1},
         painkillerType = "tapentadol",
     },
+}
+local NORMAL_MEDKIT = {
+    PrintName = "Medkit",
+    Instructions = "A standard medical bag with a quality bandage, painkiller, tranexamic acid, a tourniquet and a decompression needle. RMB to apply on others, R to change use mode.",
+    qualityBandageAmount = 150,
+}
+
+local MEDKIT_PICKUP_CLASSES = {
+    "weapon_medkit_sh",
+    "weapon_medkit_basic_sh",
+    "weapon_medkit_standard_sh",
+    "weapon_medkit_emergency_sh",
+    "weapon_medkit_advanced_sh",
+    "weapon_medkit_surgical_sh",
 }
 
 local modeNames = {
@@ -36,8 +55,9 @@ local modeNames = {
     naloxone = "naloxone",
     tranexamic = "tranexamic acid",
     mannitol = "mannitol",
+    needle = "decompression needle",
 }
-local modeOrder = {"bandage", "painkiller", "tourniquet", "naloxone", "tranexamic", "mannitol"}
+local modeOrder = {"bandage", "painkiller", "tourniquet", "naloxone", "tranexamic", "mannitol", "needle"}
 
 local function isTieredMedkit(wep)
     return IsValid(wep) and wep.HGMedkitTier ~= nil
@@ -93,6 +113,11 @@ local function applyMedkitMode(wep, ent, mode)
     elseif typeName == "mannitol" then
         org.mannitol = math.Approach(org.mannitol or 0, 4, amount * 2)
         org.headtrauma = 0
+    elseif typeName == "needle" then
+        org.needle = 1
+        if org.trachea and org.trachea > 0 then
+            org.trachea = math.max(org.trachea - 0.75, 0)
+        end
     else
         return
     end
@@ -111,7 +136,9 @@ local function registerTieredMedkits()
         local swep = table.Copy(base)
         swep.Base = "weapon_medkit_sh"
         swep.PrintName = definition.PrintName
+        swep.Instructions = definition.Instructions
         swep.HGMedkitTier = tier
+        swep.PickupFunc = nil
         swep.Spawnable = true
         swep.__hg_tiered_medkit = true
         swep.InitializeAdd = function(self)
@@ -134,6 +161,45 @@ local function registerTieredMedkits()
     return true
 end
 
+local function patchNormalMedkit()
+    local normal = weapons.GetStored("weapon_medkit_sh")
+    if not istable(normal) or normal.__hg_normal_medkit_patched then return end
+
+    normal.__hg_normal_medkit_patched = true
+    normal.PrintName = NORMAL_MEDKIT.PrintName
+    normal.Instructions = NORMAL_MEDKIT.Instructions
+    normal.modeNames = table.Copy(normal.modeNames or {})
+    normal.modeNames[1] = "quality bandage"
+    normal.modeValuesdef = table.Copy(normal.modeValuesdef or {})
+    normal.modeValuesdef[1] = {NORMAL_MEDKIT.qualityBandageAmount, true}
+
+    local initializeAdd = normal.InitializeAdd
+    normal.InitializeAdd = function(self)
+        initializeAdd(self)
+        self.modeValues[1] = NORMAL_MEDKIT.qualityBandageAmount
+    end
+
+    -- Ground pickups remain the generic medkit entity until a player takes
+    -- them. Resolve the result here so map loot, crates and dropped generic
+    -- medkits all use the same server-authoritative random selection.
+    normal.PickupFunc = function(self, ply)
+        if not IsValid(ply) or not ply:IsPlayer() then return end
+
+        local availableClasses = {}
+        for _, class in ipairs(MEDKIT_PICKUP_CLASSES) do
+            if not ply:HasWeapon(class) and weapons.GetStored(class) then
+                availableClasses[#availableClasses + 1] = class
+            end
+        end
+        if #availableClasses == 0 then return end
+
+        local replacement = ply:Give(availableClasses[math.random(#availableClasses)])
+        if not IsValid(replacement) then return end
+
+        self:Remove()
+        return true
+    end
+end
 local function patchPainkillerWeapons()
     local base = weapons.GetStored("weapon_painkillers")
     if not istable(base) then return end
@@ -222,11 +288,41 @@ local function patchMedicalMinigame()
 end
 
 local BANDAGE_GRADES = {
-    weapon_packedbandage_sh = {name = "Packed bandage", amount = 60, color = Color(205, 205, 205)},
-    weapon_combatbandage_sh = {name = "Combat bandage", amount = 225, color = Color(125, 125, 125)},
-    weapon_quikclotbandage_sh = {name = "QuikClot Bandage", amount = 375, color = Color(75, 75, 75)},
+    weapon_packedbandage_sh = {name = "Packed bandage", amount = 60, color = Color(205, 205, 205), instructions = "A sealed field dressing with more clean gauze than a loose bandage. RMB to use on someone else."},
+    weapon_combatbandage_sh = {name = "Combat bandage", amount = 225, color = Color(125, 125, 125), instructions = "A large military dressing for controlling serious bleeding in the field. RMB to use on someone else."},
+    weapon_quikclotbandage_sh = {name = "QuikClot Bandage", amount = 375, color = Color(75, 75, 75), instructions = "A hemostatic QuikClot dressing for heavy bleeding when ordinary gauze is not enough. RMB to use on someone else."},
 }
 
+local BANDAGE_PICKUP_CLASSES = {
+    "weapon_bandage_sh",
+    "weapon_bigbandage_sh",
+    "weapon_packedbandage_sh",
+    "weapon_combatbandage_sh",
+    "weapon_quikclotbandage_sh",
+}
+
+local function patchBandagePickupRandomizer()
+    local normal = weapons.GetStored("weapon_bandage_sh")
+    if not istable(normal) then return end
+
+    normal.PickupFunc = function(self, ply)
+        if not IsValid(ply) or not ply:IsPlayer() then return end
+
+        local availableClasses = {}
+        for _, class in ipairs(BANDAGE_PICKUP_CLASSES) do
+            if not ply:HasWeapon(class) and weapons.GetStored(class) then
+                availableClasses[#availableClasses + 1] = class
+            end
+        end
+        if #availableClasses == 0 then return end
+
+        local replacement = ply:Give(availableClasses[math.random(#availableClasses)])
+        if not IsValid(replacement) then return end
+
+        self:Remove()
+        return true
+    end
+end
 local function registerBandageGrades()
     local normal = weapons.GetStored("weapon_bandage_sh")
     local quality = weapons.GetStored("weapon_bigbandage_sh")
@@ -234,9 +330,11 @@ local function registerBandageGrades()
 
     -- The existing standard grades remain available under their requested names.
     normal.PrintName = "Bandage"
+    normal.Instructions = "A loose roll of gauze for light bleeding. It may not be sterile, but it is better than leaving a wound open. RMB to use on someone else."
     normal.Color = Color(235, 235, 235)
     if istable(quality) then
         quality.PrintName = "Quality bandage"
+        quality.Instructions = "A larger sterile dressing with quality gauze for wounds that need more than a basic bandage. RMB to use on someone else."
         quality.Color = Color(165, 165, 165)
     end
 
@@ -245,6 +343,8 @@ local function registerBandageGrades()
             local swep = table.Copy(normal)
             swep.Base = "weapon_bandage_sh"
             swep.PrintName = grade.name
+            swep.Instructions = grade.instructions
+            swep.PickupFunc = nil
             swep.Spawnable = true
             swep.AdminOnly = false
             swep.Category = "ZCity Medicine"
@@ -257,23 +357,36 @@ local function registerBandageGrades()
             end
             weapons.Register(swep, class)
         end
+
+        local registered = weapons.GetStored(class)
+        if istable(registered) then
+            registered.PrintName = grade.name
+            registered.Instructions = grade.instructions
+            registered.PickupFunc = nil
+        end
     end
 end
 hook.Add("Initialize", "zcity_delta_medkit_tiers", function()
     patchPainkillerWeapons()
     registerBandageGrades()
+    patchBandagePickupRandomizer()
+    patchNormalMedkit()
     registerTieredMedkits()
     patchMedicalMinigame()
 end)
 hook.Add("OnReloaded", "zcity_delta_medkit_tiers_reload", function()
     patchPainkillerWeapons()
     registerBandageGrades()
+    patchBandagePickupRandomizer()
+    patchNormalMedkit()
     registerTieredMedkits()
     patchMedicalMinigame()
 end)
 timer.Simple(0, function()
     patchPainkillerWeapons()
     registerBandageGrades()
+    patchBandagePickupRandomizer()
+    patchNormalMedkit()
     registerTieredMedkits()
     patchMedicalMinigame()
 end)

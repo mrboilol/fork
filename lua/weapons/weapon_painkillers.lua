@@ -43,30 +43,27 @@ local painkillerTypes = {
 }
 local painkillerTypeOrder = {"paracetamol", "tramadol", "tapentadol"}
 
+function SWEP:RandomizePainkillerType()
+	if not SERVER then return end
+
+	local medicineID = painkillerTypeOrder[math.random(#painkillerTypeOrder)]
+	local medicine = painkillerTypes[medicineID]
+	self:SetNWString("hg_painkiller_type", medicineID)
+	self:SetNWString("hg_painkiller_label", medicine.name)
+	self:SetNWString("hg_painkiller_detail", medicine.description .. "\n" .. medicine.appearance)
+end
+
+function SWEP:PickupFunc(ply)
+	if IsValid(ply) and ply:IsPlayer() then
+		self:RandomizePainkillerType()
+	end
+end
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 	self.modeValues = {[1] = 1}
 	if not SERVER then return end
 
-	local medicineID = painkillerTypeOrder[math.random(#painkillerTypeOrder)]
-	local medicine = painkillerTypes[medicineID]
-	local labelRoll = math.random(100)
-	local labelID = medicineID
-	local detail = medicine.description .. "\n" .. medicine.appearance
-
-	if labelRoll > 50 then
-		if labelRoll <= 60 then
-			repeat
-			labelID = painkillerTypeOrder[math.random(#painkillerTypeOrder)]
-			until labelID ~= medicineID
-		else
-			labelID = nil
-		end
-	end
-
-	self:SetNWString("hg_painkiller_type", medicineID)
-	self:SetNWString("hg_painkiller_label", labelID and painkillerTypes[labelID].name or "Unlabeled Painkillers")
-	self:SetNWString("hg_painkiller_detail", detail)
+	self:RandomizePainkillerType()
 end
 SWEP.modeValuesdef = {
 	[1] = 1,

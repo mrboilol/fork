@@ -13,6 +13,8 @@ local low_stamina_recovery_min_mul = 0.85
 local recent_stamina_loss_recovery_min_mul = 0.5
 local recent_stamina_loss_hold_time = 2
 local recent_stamina_loss_fade_time = 6
+local anger_combat_hold_time = 6
+local anger_decay_per_second = 0.075
 --local Organism = hg.organism
 
 hg.organism.module.stamina = {}
@@ -25,6 +27,8 @@ module[1] = function(org)
 
 	org.adrenalineAdd = 0
 	org._adrenalineHoldUntil = 0
+	org.anger = 0
+	org.angerCombatUntil = 0
 
 	org.adrenalineStorage = 5
 
@@ -78,6 +82,11 @@ end
 module[2] = function(owner, org, timeValue)
 
 	local stamina = org.stamina
+
+	local now = CurTime()
+	if now > (org.angerCombatUntil or 0) then
+		org.anger = math.max((org.anger or 0) - timeValue * anger_decay_per_second, 0)
+	end
 
 	
 
@@ -225,7 +234,6 @@ module[2] = function(owner, org, timeValue)
 	-- Apply breathing penalty from spine3 damage
 	local breathingMul = org.breathing or 1
 	local recentLossRecoveryMul = 1
-	local now = CurTime()
 	if now < (stamina.recoveryPenaltyUntil or 0) then
 		recentLossRecoveryMul = recent_stamina_loss_recovery_min_mul
 	elseif now < (stamina.recoveryPenaltyFadeUntil or 0) then
@@ -235,11 +243,13 @@ module[2] = function(owner, org, timeValue)
 
 	local postureRecoveryMul = 1
 	if owner:IsPlayer() then
-		local ragdolled = IsValid(owner.FakeRagdoll) or org.fake or (hg.GetCurrentCharacter(owner) and hg.GetCurrentCharacter(owner):IsRagdoll())
-		if ragdolled then
-			postureRecoveryMul = 1.3
-		elseif owner:Crouching() and velLen < 0.1 then
-			postureRecoveryMul = 1.15
+		local character = hg.GetCurrentCharacter(owner)
+		local ragdolled = IsValid(owner.FakeRagdoll) or org.fake or (character and character:IsRagdoll())
+		local climbing = IsValid(character) and character:IsRagdoll() and ((IsValid(character.ConsLH) and character.ConsLH.ZCClimbGrip) or (IsValid(character.ConsRH) and character.ConsRH.ZCClimbGrip))
+		if ragdolled and not climbing then
+			postureRecoveryMul = 1.55
+		elseif owner:Crouching() then
+			postureRecoveryMul = 1.25
 		end
 	end
 
@@ -312,6 +322,15 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 
 end
 
+-- Anger is a short combat-only surge using the normal adrenaline reserve.
+function hg.organism.RileAnger(org, amount)
+	if not org or not org.alive or org.otrub then return end
+	amount = math.max(amount or 0, 0)
+	if amount <= 0 then return end
+	org.anger = math.Clamp((org.anger or 0) + amount, 0, 1)
+	org.angerCombatUntil = math.max(org.angerCombatUntil or 0, CurTime() + anger_combat_hold_time)
+	hg.organism.AddNaturalAdrenaline(org, amount * 2)
+end
 
 
 local entMeta = FindMetaTable("Entity")
