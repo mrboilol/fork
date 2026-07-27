@@ -1,29 +1,26 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
-SWEP.PrintName = "Police Tonfa"
-SWEP.Instructions = "A side-handle baton issued to law enforcement officers for riot control and self-defense. Its long reach and heavy weight make it an effective tool for subduing suspects. The tonfa is typically used in pairs, one in each hand, to block and strike opponents. It is an essential part of a police officer's toolkit, and a powerful weapon in the right hands.\n\nLMB to attack.\nRMB to block."
+SWEP.PrintName = "Baton"
+SWEP.Instructions = "a self-defense baton is most commonly referred to as an expandable baton, telescopic baton, or tactical baton. It is a concealable distance-weapon used for striking, blocking, and compliance.\n\nLMB to attack.\nRMB to block."
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 
-SWEP.WorldModel = "models/weapons/tacint_melee/w_tonfa.mdl"
-SWEP.WorldModelReal = "models/cof/weapons/nightstick/v_nightstick.mdl"
-SWEP.ViewModel = ""
+SWEP.WorldModel = "models/dejtriyev/tacrp/w_dejbaton.mdl"
+SWEP.WorldModelReal = "models/dejtriyev/tacrp/v_dejbaton.mdl"
 
-SWEP.HoldType = "melee"
+SWEP.HoldType = "slam"
+SWEP.weight = 0.5
 
-SWEP.HoldPos = Vector(-5,0,0)
+SWEP.HoldPos = Vector(-13,-4,-8)
 SWEP.HoldAng = Angle(0,0,0)
 
 SWEP.AttackTime = 0.3
-SWEP.AnimTime1 = 1.2
+SWEP.AnimTime1 = 1.65
 SWEP.WaitTime1 = 1.15
 SWEP.ViewPunch1 = Angle(1,1,0)
 
-SWEP.Attack2Time = 0.3
-SWEP.AnimTime2 = 1
-SWEP.WaitTime2 = 0.8
-SWEP.ViewPunch2 = Angle(0,0,-4)
+SWEP.AnimAlwaysBack = true
 
 SWEP.attack_ang = Angle(0,0,0)
 SWEP.sprint_ang = Angle(15,0,0)
@@ -32,7 +29,7 @@ SWEP.basebone = 94
 
 SWEP.weaponPos = Vector(0,7,-8)
 SWEP.weaponAng = Angle(0,180,-90)
-SWEP.modelscale = 1.15
+SWEP.modelscale = 1
 
 SWEP.hitsoundextra = {
     {"hammer/BodyHit-1.wav", 70, {115, 125}},
@@ -61,7 +58,7 @@ SWEP.swingsoundextra = {
 
 
 SWEP.DamageType = DMG_CLUB
-SWEP.DamagePrimary = 18
+SWEP.DamagePrimary = 13
 
 SWEP.PenetrationPrimary = 3
 SWEP.PenetrationSecondary = 3
@@ -71,7 +68,7 @@ SWEP.MaxPenLen = 3
 SWEP.PenetrationSizePrimary = 2
 SWEP.PenetrationSizeSecondary = 2
 
-SWEP.StaminaPrimary = 12
+SWEP.StaminaPrimary = 11
 SWEP.StaminaSecondary = 8
 
 SWEP.AttackLen1 = 50
@@ -83,14 +80,14 @@ SWEP.BlockSound = {"Plastic_Box.ImpactHard", 68, {95, 102}}
 
 SWEP.AnimList = {
     ["idle"] = "idle1",
-    ["deploy"] = "draw",
-    ["attack"] = "attack1",
-    ["attack2"] = "Shove",
+    ["deploy"] = "unholster",
+    ["attack"] = "slash_forward1",
+    ["attack2"] = "slash_right2",
 }
 
 if CLIENT then
-	SWEP.WepSelectIcon = Material("vgui/wep_zac_hmcd_policebaton")
-	SWEP.IconOverride = "entities/tacrp_m_tonfa.png"
+	SWEP.WepSelectIcon = Material("vgui/baton.png")
+	SWEP.IconOverride = "vgui/baton.png"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -103,11 +100,6 @@ SWEP.Attack2Hit = "Plastic_Box.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "Plastic_Box.ImpactSoft"
-SWEP.SwingSoundPitch = 115
-
-SWEP.BlockTier = 2
-SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "Plastic_Box.ImpactHard"
 
 SWEP.AttackPos = Vector(0,0,0)
 --[[
