@@ -1,13 +1,16 @@
 CAI.Sound = CAI.Sound or {}
 local SND = CAI.Sound
+local string_find = string.find
+local string_lower = string.lower
 
 function SND.Classify(name, level)
-    name = string.lower(name or "")
+    if not isstring(name) then return end
+    name = string_lower(name)
     for _, p in ipairs(CAI.Config.SoundPatterns) do
-        if name:find(p.pattern, 1, true) then
+        if string_find(name, p.pattern, 1, true) then
             local radius = p.radius
 
-            if p.type == "gunshot" and (name:find("silenc") or name:find("suppress") or (level or 75) < 70) then
+            if p.type == "gunshot" and (string_find(name, "silenc", 1, true) or string_find(name, "suppress", 1, true) or (level or 75) < 70) then
                 radius = radius * CAI.Config.SuppressedGunshotMult
             end
             return p.type, radius
@@ -48,7 +51,8 @@ CAI.SafeHook("EntityEmitSound", "CAI_SoundIntel", function(t)
 
     if not IsValid(src) then return end
     local class = src:GetClass()
-    if not (src:IsPlayer() or class:find("door") or class:find("prop_") or class:find("func_break")) then
+    if not isstring(class) then return end
+    if not (src:IsPlayer() or string_find(class, "door", 1, true) or string_find(class, "prop_", 1, true) or string_find(class, "func_break", 1, true)) then
         return
     end
 

@@ -280,7 +280,7 @@ function SWEP:Reload(time)
 	if not self:CanReload() then return end
 
 	-- Apply arm penalties for reload
-	local armPain, armSpeedMul = self:GetReloadArmPenalty()
+	local armPain = SERVER and self:GetReloadArmPenalty() or 0
 	if armPain > 0 and ply.organism then
 		ply.organism.painadd = (ply.organism.painadd or 0) + armPain
 	end

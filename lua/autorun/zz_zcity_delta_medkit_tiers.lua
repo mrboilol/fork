@@ -40,7 +40,6 @@ local NORMAL_MEDKIT = {
 }
 
 local MEDKIT_PICKUP_CLASSES = {
-    "weapon_medkit_sh",
     "weapon_medkit_basic_sh",
     "weapon_medkit_standard_sh",
     "weapon_medkit_emergency_sh",
@@ -138,7 +137,7 @@ local function registerTieredMedkits()
         swep.PrintName = definition.PrintName
         swep.Instructions = definition.Instructions
         swep.HGMedkitTier = tier
-        swep.PickupFunc = nil
+        swep.PickupFunc = false -- do not inherit weapon_medkit_sh's generic reroll callback
         swep.Spawnable = true
         swep.__hg_tiered_medkit = true
         swep.InitializeAdd = function(self)
@@ -184,7 +183,7 @@ local function patchNormalMedkit()
     -- medkits all use the same server-authoritative random selection.
     normal.PickupFunc = function(self, ply)
         if not IsValid(ply) or not ply:IsPlayer() then return end
-        if ply.hgGivingTieredMedkit then return end
+        if ply.hgGivingTieredMedkit then return true end -- Give() already owns this nested pickup
 
         local availableClasses = {}
         for _, class in ipairs(MEDKIT_PICKUP_CLASSES) do
@@ -311,7 +310,7 @@ local function patchBandagePickupRandomizer()
     normal.PickupFunc = function(self, ply)
         if not IsValid(ply) or not ply:IsPlayer() then return end
 
-        if ply.hgGivingTieredBandage then return end
+        if ply.hgGivingTieredBandage then return true end -- Give() already owns this nested pickup
         local availableClasses = {}
         for _, class in ipairs(BANDAGE_PICKUP_CLASSES) do
             if not ply:HasWeapon(class) and weapons.GetStored(class) then
@@ -350,7 +349,7 @@ local function registerBandageGrades()
             swep.Base = "weapon_bandage_sh"
             swep.PrintName = grade.name
             swep.Instructions = grade.instructions
-            swep.PickupFunc = nil
+            swep.PickupFunc = false -- do not inherit weapon_bandage_sh's generic reroll callback
             swep.Spawnable = true
             swep.AdminOnly = false
             swep.Category = "ZCity Medicine"
@@ -368,7 +367,7 @@ local function registerBandageGrades()
         if istable(registered) then
             registered.PrintName = grade.name
             registered.Instructions = grade.instructions
-            registered.PickupFunc = nil
+            registered.PickupFunc = false -- do not inherit weapon_bandage_sh's generic reroll callback
         end
     end
 end

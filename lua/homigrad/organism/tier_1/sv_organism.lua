@@ -348,21 +348,21 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local dt = timeValue or engine.TickInterval()
 	local blood = math.max(org.blood or 0, 0)
 	-- Compensation masks most of the loss above 4000 mL. Below that, delivery
-	-- falls in stages: definite weakness by 3500, balance trouble by 3000,
-	-- crippling perfusion at 2500, and no sustainable organ flow at 2000.
+	-- falls in stages: mild weakness by 3500, trouble by 3000, then the severe
+	-- perfusion/otrub range starts at 2500 and reaches no sustainable flow at 2000.
 	local bloodFraction
 	if blood >= 4500 then
 		bloodFraction = 1
 	elseif blood >= 4000 then
 		bloodFraction = math.Remap(blood, 4000, 4500, 0.98, 1)
 	elseif blood >= 3500 then
-		bloodFraction = math.Remap(blood, 3500, 4000, 0.92, 0.98)
+		bloodFraction = math.Remap(blood, 3500, 4000, 0.95, 0.98)
 	elseif blood >= 3000 then
-		bloodFraction = math.Remap(blood, 3000, 3500, 0.75, 0.92)
+		bloodFraction = math.Remap(blood, 3000, 3500, 0.82, 0.95)
 	elseif blood >= 2500 then
-		bloodFraction = math.Remap(blood, 2500, 3000, 0.4, 0.75)
+		bloodFraction = math.Remap(blood, 2500, 3000, 0.3, 0.82)
 	elseif blood > 2000 then
-		bloodFraction = math.Remap(blood, 2000, 2500, 0, 0.4)
+		bloodFraction = math.Remap(blood, 2000, 2500, 0, 0.3)
 	else
 		bloodFraction = 0
 	end

@@ -53,11 +53,7 @@ function SWEP:RandomizePainkillerType()
 	self:SetNWString("hg_painkiller_detail", medicine.description .. "\n" .. medicine.appearance)
 end
 
-function SWEP:PickupFunc(ply)
-	if IsValid(ply) and ply:IsPlayer() then
-		self:RandomizePainkillerType()
-	end
-end
+
 function SWEP:InitializeAdd()
 	self:SetHold(self.HoldType)
 	self.modeValues = {[1] = 1}

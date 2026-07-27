@@ -7,6 +7,7 @@ local statusIconCache = {}
 
 local IND_SIZE_BASE = 180
 local IND_SIZE_MAX = 240
+local INDICATOR_CAMERA_FOV = 70
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
@@ -591,12 +592,12 @@ function HUD_DrawDynamicIndicator()
         active = true
     }
     
-    -- View the copied skeleton from its left side. Source models face +X, so
-    -- this profile makes the indicator character face toward screen-right.
-    local camPos = Vector(0, 95, 65)
-    local lookAng = Angle(11, -90, 0)
+    -- View the copied skeleton from its right side so it faces screen-left.
+    -- The wider HUD-only FOV keeps the full body and its overlays in frame.
+    local camPos = Vector(0, -95, 65)
+    local lookAng = Angle(11, 90, 0)
 
-    cam.Start3D(camPos, lookAng, 50, viewX, viewY, w, h)
+    cam.Start3D(camPos, lookAng, INDICATOR_CAMERA_FOV, viewX, viewY, w, h)
         render.SetBlend(indicatorAlpha)
         render.SuppressEngineLighting(true)
         render.MaterialOverride(whiteMat)

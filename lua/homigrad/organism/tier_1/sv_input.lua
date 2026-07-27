@@ -140,12 +140,17 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	local brainExposure = 1
 	if isBrain then
 		local skullDamage = math.Clamp(org.skull or 0, 0, brain_exposure_full)
-		if skullDamage < brain_exposure_partial then return 0 end
+		local bulletHeadPenetration = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+			and org._bulletImpactHitgroup == HITGROUP_HEAD
+			and not (org.owner and org.owner.armors and org.owner.armors["head"] ~= nil)
+		if skullDamage < brain_exposure_partial and not bulletHeadPenetration then return 0 end
 
-		brainExposure = math.Clamp((skullDamage - brain_exposure_partial) / (brain_exposure_full - brain_exposure_partial), 0, 1)
-		-- At 0.6 the brain has only just become reachable; damage then ramps to
-		-- its full traced value as the skull reaches complete destruction at 1.0.
-		dmg = dmg * Lerp(brainExposure, 0.25, 1)
+		if not bulletHeadPenetration then
+			brainExposure = math.Clamp((skullDamage - brain_exposure_partial) / (brain_exposure_full - brain_exposure_partial), 0, 1)
+			-- At 0.6 the brain has only just become reachable; damage then ramps to
+			-- its full traced value as the skull reaches complete destruction at 1.0.
+			dmg = dmg * Lerp(brainExposure, 0.25, 1)
+		end
 	end
 	local hook_info = {
 		restricted = false,

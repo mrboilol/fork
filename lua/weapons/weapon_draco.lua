@@ -64,7 +64,10 @@ SWEP.ReloadSoundes = {
 function SlipWeapon(self, bullet)
 	if CLIENT then return end
 	local owner = self:GetOwner()
-	local force = -bullet.Dir * bullet.Force * 1
+	if not IsValid(owner) then return end
+	local direction = bullet and bullet.Dir or owner:GetAimVector()
+	if not isvector(direction) then direction = owner:GetAimVector() end
+	local force = -direction * (tonumber(bullet and bullet.Force) or 0)
 	local pos = self:WorldModel_Transform(true)
 	if (owner.posture == 7 or owner.posture == 8) then
 		if math.random(5) == 1 then

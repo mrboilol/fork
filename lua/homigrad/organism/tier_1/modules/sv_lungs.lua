@@ -10,10 +10,12 @@ local BloodO2 = {
 	{5000, 30},
 	{4500, 30},
 	{4000, 29},
-	{3500, 24},
-	{3000, 16},
-	{2500, 7},
-	{2250, 3},
+	-- Keep 3000-3500 in the warning range. The incapacitating/otrub
+	-- transition starts with the marked volume-loss range at 2500 and below.
+	{3500, 28},
+	{3000, 23},
+	{2500, 6},
+	{2250, 2},
 	{2000, 0},
 }
 
