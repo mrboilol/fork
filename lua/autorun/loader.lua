@@ -5,7 +5,7 @@ hg.GitHub_ReposName = "fork" -- please add your real git fork!
 
 local hg_loadcontent = CreateConVar("hg_loadcontent", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Toggle loading content to clients using 'resource.AddWorkshop' (need server restart to apply)")
 if SERVER and hg_loadcontent:GetBool() then
-	resource.AddWorkshop("3670069780") -- ZCity Clothes content
+
 end
 
 -- if hg.GitHub_ReposOwner and hg.GitHub_ReposOwner != "" then

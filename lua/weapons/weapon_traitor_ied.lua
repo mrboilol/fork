@@ -664,7 +664,7 @@ ExplodeTheItem = function(self,ent)
 				hgBlastDoors(entValid and ent or self, EntPos, BlastDamage / 400, BlastDis/8, false)
 			end
 
-			if planted and not plantedWorld and not plantedDoor and plantedNormal then
+			if planted and entValid and not plantedWorld and not plantedDoor and plantedNormal then
 				local plantedPhys = ent:GetPhysicsObject()
 				if IsValid(plantedPhys) then
 					plantedPhys:ApplyForceOffset(-plantedNormal * self.PlantedObjectForce, EntPos)

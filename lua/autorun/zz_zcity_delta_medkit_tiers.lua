@@ -184,6 +184,7 @@ local function patchNormalMedkit()
     -- medkits all use the same server-authoritative random selection.
     normal.PickupFunc = function(self, ply)
         if not IsValid(ply) or not ply:IsPlayer() then return end
+        if ply.hgGivingTieredMedkit then return end
 
         local availableClasses = {}
         for _, class in ipairs(MEDKIT_PICKUP_CLASSES) do
@@ -193,7 +194,9 @@ local function patchNormalMedkit()
         end
         if #availableClasses == 0 then return end
 
+        ply.hgGivingTieredMedkit = true
         local replacement = ply:Give(availableClasses[math.random(#availableClasses)])
+        ply.hgGivingTieredMedkit = nil
         if not IsValid(replacement) then return end
 
         self:Remove()
@@ -308,6 +311,7 @@ local function patchBandagePickupRandomizer()
     normal.PickupFunc = function(self, ply)
         if not IsValid(ply) or not ply:IsPlayer() then return end
 
+        if ply.hgGivingTieredBandage then return end
         local availableClasses = {}
         for _, class in ipairs(BANDAGE_PICKUP_CLASSES) do
             if not ply:HasWeapon(class) and weapons.GetStored(class) then
@@ -316,7 +320,9 @@ local function patchBandagePickupRandomizer()
         end
         if #availableClasses == 0 then return end
 
+        ply.hgGivingTieredBandage = true
         local replacement = ply:Give(availableClasses[math.random(#availableClasses)])
+        ply.hgGivingTieredBandage = nil
         if not IsValid(replacement) then return end
 
         self:Remove()

@@ -931,7 +931,8 @@ local function q(self, u, v, w)
 		hg.AddForceRag(u, 2, self:GetOwner():EyeAngles():Forward() * 42500, -0.2)
 		hg.AddForceRag(u, 0, self:GetOwner():EyeAngles():Forward() * 42500, -0.2)
 		hg.LightStunPlayer(u, 5)
-        u:TakeDamageInfo((x / 2))
+        x:SetDamage(x:GetDamage() / 2)
+        u:TakeDamageInfo(x)
     elseif u:IsNPC() or u:IsNextBot() then
         if u:GetShouldServerRagdoll() ~= true then u:SetShouldServerRagdoll(true) end
         u:TakeDamageInfo(x)
