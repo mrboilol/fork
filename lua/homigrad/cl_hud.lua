@@ -73,7 +73,7 @@ hook.Add("HUDDrawPickupHistory", "HidePickedStuff", function()
 end)
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
-local hg_font_default = "Lora"
+local hg_font_default = "VCR OSD Mono"
 local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", hg_font_default, true, false, "Change UI text font")
 local hg_oldradialmenu = ConVarExists("hg_oldradialmenu") and GetConVar("hg_oldradialmenu") or CreateClientConVar("hg_oldradialmenu", "0", true, false, "Use the old radial menu style", 0, 1)
 

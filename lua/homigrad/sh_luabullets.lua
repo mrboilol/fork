@@ -729,6 +729,10 @@ function ENTITY:FireLuaBullets(tInfo)
 					mask = iMask,
 					filter = Filter
 				})
+
+			if SERVER and hg.TraceHeldWeaponShot then
+				tr = hg.TraceHeldWeaponShot(vNewSrc, tr.Hit and tr.HitPos or vEnd, pAttacker, iDamage, flForce, tr) or tr
+			end
 			
 			local tries = 50
 			while (tries > 0 and IsValid(tr.Entity) and tr.Entity.organism) do

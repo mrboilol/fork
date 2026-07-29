@@ -109,10 +109,10 @@ if CLIENT then
 		outline = false,
 	})
 
-	-- Pain and dying notifications use Remorseism's UI face at a more
-	-- prominent size than normal notifications.
+	-- Pain and dying notifications use the same VCR face at a more prominent
+	-- size than normal notifications.
 	surface.CreateFont("RemorseismNotificationLarge", {
-		font = "Lora",
+		font = "VCR OSD Mono",
 		extended = true,
 		size = ScreenScale(12),
 		weight = 700,

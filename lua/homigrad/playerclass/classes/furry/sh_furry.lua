@@ -230,7 +230,7 @@ local bluewhite = Color(187, 187, 255)
 
 if CLIENT then
 	surface.CreateFont("ZB_ProotLarge", {
-		font = "Courier Prime",
+		font = "VCR OSD Mono",
 		size = ScreenScale(8),
 		extended = true,
 		weight = 400,
@@ -238,7 +238,7 @@ if CLIENT then
 	})
 
 	surface.CreateFont("ZB_ProotLarge2", {
-		font = "Courier Prime",
+		font = "VCR OSD Mono",
 		size = ScreenScale(8),
 		extended = true,
 		weight = 400,

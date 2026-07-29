@@ -895,7 +895,7 @@ hook.Add("Move","PushAwayRagdolls",function(ply) --// lagging
 end)]]
 
 surface.CreateFont("HGWoundHoldPrompt", {
-	font = "Courier Prime",
+	font = "VCR OSD Mono",
 	size = 22,
 	weight = 500,
 	antialias = true,

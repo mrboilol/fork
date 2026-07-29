@@ -249,14 +249,14 @@ function MODE:RoundStart()
 end
 
 surface.CreateFont("ZB_TDM_MENU", {
-    font = "Courier Prime",
+    font = "VCR OSD Mono",
     size = ScreenScale(12),
     extended = true,
     weight = 400,
     antialias = true
 })
 surface.CreateFont("ZB_TDM_DESC", {
-    font = "Courier Prime",
+    font = "VCR OSD Mono",
     size = ScreenScale(7),
     extended = true,
     weight = 400,
@@ -264,7 +264,7 @@ surface.CreateFont("ZB_TDM_DESC", {
 })
 
 surface.CreateFont("ZB_TDM_CATEGORY", {
-    font = "Courier Prime",
+    font = "VCR OSD Mono",
     size = ScreenScale(6),
     extended = true,
     weight = 400,
@@ -272,7 +272,7 @@ surface.CreateFont("ZB_TDM_CATEGORY", {
 })
 
 surface.CreateFont("ZB_TDM_DESCSMALL", {
-    font = "Courier Prime",
+    font = "VCR OSD Mono",
     size = ScreenScale(5),
     extended = true,
     weight = 400,

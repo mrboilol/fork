@@ -356,7 +356,7 @@ end)
 surface.CreateFont(
 	"BODYCAMFONT",
 	{
-		font = "Courier Prime",
+		font = "VCR OSD Mono",
 		size = ScreenScale(16),
 		italic = true,
 		weight = 1500

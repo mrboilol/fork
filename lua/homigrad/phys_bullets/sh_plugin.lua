@@ -444,6 +444,10 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 			else
 				trace = util.TraceHull(hull_trace)
 			end
+
+			if(SERVER and hg.TraceHeldWeaponShot)then
+				trace = hg.TraceHeldWeaponShot(hull_trace.start, trace.Hit and trace.HitPos or hull_trace.endpos, self.Shooter, self.Damage, self.Force, trace) or trace
+			end
 			
 			trace_hit = trace.Hit
 			

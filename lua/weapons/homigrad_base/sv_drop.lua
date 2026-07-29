@@ -50,6 +50,8 @@ local function drop(ply, wep, newWeapon, vel)
 	if not IsValid(wep) or wep.NoDrop then return end
 	if ply:GetNWFloat("willsuicide", 0) > 0 then return end -- you cant escape.
 	local eyeAngles = ply:LocalEyeAngles()
+	local knockVelocity = isvector(vel) and vel or nil
+	local knockSpin = knockVelocity and VectorRand() * math.Rand(350, 650) or nil
 
 	hg.AccidentalFire(ply, wep, IsValid(ply.FakeRagdoll) and 0.55 or 0.18)
 
@@ -74,10 +76,12 @@ local function drop(ply, wep, newWeapon, vel)
 			ply:SetActiveWeapon(newWeapon)
 		end
 
-		ply:DropWeapon(wep, nil, not IsValid(wep.fakeGun) and (eyeAngles:Forward() * (isnumber(vel) and vel or 250)) + ply:GetVelocity() or nil)
+		local dropVelocity = knockVelocity and (knockVelocity + ply:GetVelocity() * 0.35) or (eyeAngles:Forward() * (isnumber(vel) and vel or 250)) + ply:GetVelocity()
+		ply:DropWeapon(wep, nil, not IsValid(wep.fakeGun) and dropVelocity or nil)
 		
 		wep.init = true
 		wep.IsSpawned = true
+
 
 		timer.Simple(0,function()
 			if pos and ang then
@@ -91,6 +95,12 @@ local function drop(ply, wep, newWeapon, vel)
 				wep:SetPos(pos)
 				wep:SetAngles(ang)
 			end
+
+			if knockSpin then
+				local phys = wep:GetPhysicsObject()
+				if IsValid(phys) then phys:AddAngleVelocity(knockSpin) end
+			end
+
 		end)
 
 		ply:ViewPunch(Angle(-1,5,-2))
@@ -101,6 +111,74 @@ end
 
 hg.drop = drop
 
+local function IsHeldGun(wep, owner)
+	if not IsValid(wep) or wep:GetOwner() ~= owner or wep.NoDrop or owner:GetNWFloat("willsuicide", 0) > 0 then return false end
+	if not ishgweapon(wep) then return false end
+	return wep.Primary and wep.Primary.Ammo and wep.Primary.Ammo ~= ""
+end
+
+function hg.TraceHeldWeaponShot(startPos, endPos, attacker, damage, force, originalTrace)
+	if not isvector(startPos) or not isvector(endPos) then return end
+
+	local ray = endPos - startPos
+	if ray:LengthSqr() <= 0 then return end
+
+	local closestFraction = 1
+	local hitPlayer, hitWeapon, hitPos, hitNormal
+	local attackerPlayer = IsValid(attacker) and (attacker:IsPlayer() and attacker or (attacker.GetOwner and attacker:GetOwner())) or nil
+
+	for _, ply in ipairs(player.GetAll()) do
+		if ply == attackerPlayer or not ply:Alive() or IsValid(ply.FakeRagdoll) then continue end
+		if util.DistanceToLine(startPos, endPos, ply:WorldSpaceCenter()) > 128 then continue end
+
+		local wep = ply:GetActiveWeapon()
+		if not IsHeldGun(wep, ply) or (wep.hg_knocked_from_hands or 0) > CurTime() then continue end
+		if not wep.WorldModel_Transform then continue end
+
+		local pos, ang = wep:WorldModel_Transform(true)
+		local model = wep.worldModel
+		if not pos or not ang or not IsValid(model) then continue end
+
+		local intersectPos, intersectNormal, fraction = util.IntersectRayWithOBB(startPos, ray, pos, ang, model:OBBMins(), model:OBBMaxs())
+		if intersectPos and fraction >= 0 and fraction < closestFraction then
+			closestFraction = fraction
+			hitPlayer = ply
+			hitWeapon = wep
+			hitPos = intersectPos
+			hitNormal = intersectNormal
+		end
+	end
+
+	if not IsValid(hitPlayer) or not IsValid(hitWeapon) then return end
+
+	hitWeapon.hg_knocked_from_hands = CurTime() + 0.25
+	local direction = ray:GetNormalized()
+	local impactSpeed = math.Clamp(250 + math.max(tonumber(damage) or 0, 0) * 12 + math.max(tonumber(force) or 0, 0) * 4, 350, 1000)
+	local knockVelocity = direction * impactSpeed + vector_up * math.Rand(80, 160) + VectorRand() * 55
+	hg.drop(hitPlayer, hitWeapon, nil, knockVelocity)
+
+	local trace = table.Copy(originalTrace or {})
+	trace.Hit = true
+	trace.HitWorld = false
+	trace.HitSky = false
+	trace.StartSolid = false
+	trace.AllSolid = false
+	trace.StartPos = startPos
+	trace.HitPos = hitPos
+	trace.Normal = direction
+	trace.HitNormal = hitNormal or -direction
+	trace.Fraction = closestFraction
+	trace.FractionLeftSolid = 0
+	trace.Entity = hitWeapon
+	trace.PhysicsBone = 0
+	trace.HitGroup = 0
+	trace.HitBox = 0
+	trace.MatType = MAT_METAL
+	trace.SurfaceProps = 0
+	trace.HitTexture = "**studio**"
+
+	return trace
+end
 concommand.Add("drop", drop)
 concommand.Add("dropweapon", drop)
 concommand.Add("-drop", drop)
