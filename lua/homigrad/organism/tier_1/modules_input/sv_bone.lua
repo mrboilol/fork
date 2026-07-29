@@ -571,7 +571,10 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 	org.painadd = org.painadd + dmg
 	org.shock = org.shock + dmg
-	if dmg >= 0.5 then org.hemothorax = math.min((org.hemothorax or 0) + dmg * 0.08, 1) end
+	if dmg >= 0.5 then
+		org.hemothoraxTrauma = math.min((org.hemothoraxTrauma or org.hemothorax or 0) + dmg * 0.08, 1)
+		org.hemothorax = math.max(org.hemothorax or 0, org.hemothoraxTrauma)
+	end
 	if oldBrokenRibs > 0 and math.Round(org.chest * 3) <= oldBrokenRibs and dmg >= 0.35 then addBrokenBoneHitTrauma(org, "chest", dmg * 0.35, 0.5) end
 
 	if org.isPly and (not org.brokenribs or org.brokenribs ~= math.Round(org.chest * 3)) then

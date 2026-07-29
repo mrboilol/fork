@@ -138,6 +138,14 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	local bone = organ[2] or 0
 	local func = input_list[name]
 	local brainExposure = 1
+	local thoracicTrachea = name == "trachea" and box[6] == "ValveBiped.Bip01_Spine2"
+	if thoracicTrachea then
+		-- The thoracic airway is behind the ribs. It only becomes reachable
+		-- after the ribcage has taken meaningful damage; neck hits remain direct.
+		local chestExposure = math.Clamp(((org.chest or 0) - 0.35) / 0.65, 0, 1)
+		if chestExposure <= 0 then return 0 end
+		dmg = dmg * Lerp(chestExposure, 0.2, 1)
+	end
 	if isBrain then
 		local skullDamage = math.Clamp(org.skull or 0, 0, brain_exposure_full)
 		local bulletHeadPenetration = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
@@ -1434,7 +1442,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			end)
 		end
 
-		if bullet and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.tranquilizer then
+		local hitAmmoType = bullet and bullet.AmmoType or dmgInfo:GetAmmoType()
+		if isnumber(hitAmmoType) then hitAmmoType = game.GetAmmoName(hitAmmoType) end
+		local hitAmmo = hitAmmoType and hg.ammotypeshuy[hitAmmoType]
+		if hitAmmo and hitAmmo.BulletSettings and hitAmmo.BulletSettings.tranquilizer then
 			org.tranquilizer = org.tranquilizer + dmgInfo:GetDamage()
 		end
 

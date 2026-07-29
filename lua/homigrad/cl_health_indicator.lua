@@ -80,10 +80,6 @@ local outlineOffsets = {
     Vector(0, -1.5, 1.5)
 }
 
-local function ScreenScaleFixed(size)
-    return size * (ScrH() / 480)
-end
-
 local function ScaleBoneAndChildren(ent, boneID, scale)
     ent:ManipulateBoneScale(boneID, scale)
     local children = ent:GetChildBones(boneID)
@@ -574,14 +570,19 @@ function HUD_DrawDynamicIndicator()
         ]]
     end
     
-    local size = IND_SIZE_BASE
-    local w, h = ScreenScaleFixed(size), ScreenScaleFixed(size)
+    -- This viewport used to pass its already-HUD-sized dimensions through the
+    -- old 480p ScreenScale helper. At 1080p that made the guy over 400px
+    -- tall, which covered nearby moodles and made the HUD look cropped/zoomed.
+    local hudScale = math.Clamp(ScrH() / 1080, 0.8, 1.35)
+    local size = math.Clamp(IND_SIZE_BASE * hudScale, IND_SIZE_BASE * 0.8, IND_SIZE_MAX)
+    local w, h = size, size
     
     local viewX, viewY
     
     -- Position at bottom left of screen
-    viewX = ScreenScaleFixed(30) -- Left margin
-    viewY = ScrH() - h - ScreenScaleFixed(50) -- Position at bottom with margin
+    local edgeMargin = math.max(14, 18 * hudScale)
+    viewX = edgeMargin
+    viewY = ScrH() - h - edgeMargin
     
     -- Store indicator position and size for moodle adjustment
     HUD.dynamicIndicator = {

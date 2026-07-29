@@ -49,9 +49,15 @@ module[1] = function(org)
 	org.hemotransfusionshock = 0
 	org.ischemia = 0
 	org.internalBleedDuration = 0
+	org.internalBleedPeak = 0
+	org.internalBleedComplication = 0
+	org.internalBleedComplicationDelay = 90
 
 	org.survivalchance = 1
 	org.hemothorax = 0
+	org.hemothoraxTrauma = 0
+	org.hemothoraxL = 0
+	org.hemothoraxR = 0
 	org.lastBleedTime = CurTime()
 	org.arterialO2Drain = false
 	org.arterialO2Impairment = 0
@@ -305,11 +311,28 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	-- Track how long internal bleed has been untreated
-	if org.internalBleed > 0 then
+	-- Internal bleeding has a delayed complication curve. The worst severity in
+	-- the current episode owns the grace period, so a catastrophic bleed can
+	-- begin compromising circulation quickly while a small persistent bleed
+	-- takes much longer to become dangerous.
+	local internalBleedSeverity = math.max(tonumber(org.internalBleed) or 0, 0)
+	if internalBleedSeverity > 0.05 then
 		org.internalBleedDuration = (org.internalBleedDuration or 0) + mulTime
+		org.internalBleedPeak = math.max(org.internalBleedPeak or 0, internalBleedSeverity)
+
+		local severityK = math.Clamp(((org.internalBleedPeak or 0) - 0.2) / 2.8, 0, 1)
+		local complicationDelay = Lerp(severityK, 90, 5)
+		local progressionTime = Lerp(severityK, 180, 20)
+		local severityLimit = math.Clamp((org.internalBleedPeak or 0) / 2, 0.1, 1)
+		local complicationTarget = math.Clamp(((org.internalBleedDuration or 0) - complicationDelay) / progressionTime, 0, 1) * severityLimit
+
+		org.internalBleedComplicationDelay = complicationDelay
+		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, complicationTarget, mulTime / progressionTime)
 	else
 		org.internalBleedDuration = 0
+		org.internalBleedPeak = 0
+		org.internalBleedComplicationDelay = 90
+		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, mulTime / 90)
 	end
 
 	if org.internalBleed > 2.5 and not adrenalineStabilizer and not hasAntiIschemia then

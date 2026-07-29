@@ -303,12 +303,18 @@ local BANDAGE_PICKUP_CLASSES = {
     "weapon_quikclotbandage_sh",
 }
 
+local BANDAGE_PICKUP_CLASS_SET = {}
+for _, class in ipairs(BANDAGE_PICKUP_CLASSES) do
+    BANDAGE_PICKUP_CLASS_SET[class] = true
+end
+
 local function patchBandagePickupRandomizer()
     local normal = weapons.GetStored("weapon_bandage_sh")
     if not istable(normal) then return end
 
     normal.PickupFunc = function(self, ply)
         if not IsValid(ply) or not ply:IsPlayer() then return end
+        if not BANDAGE_PICKUP_CLASS_SET[self:GetClass()] then return end
 
         if ply.hgGivingTieredBandage then return true end -- Give() already owns this nested pickup
         local availableClasses = {}

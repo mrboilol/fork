@@ -134,7 +134,13 @@ SWEP.DebuffClearers = {
         if org.lungsL then org.lungsL[2] = 0 end
         if org.lungsR then org.lungsR[2] = 0 end
     end,
-    ["hemothorax"] = function(org) org.hemothorax = 0 end,
+    ["hemothorax"] = function(org)
+        org.hemothorax = 0
+        org.hemothoraxTrauma = 0
+        org.hemothoraxL = 0
+        org.hemothoraxR = 0
+        org.internalBleedLungSide = nil
+    end,
     ["brain"] = function(org)
         org.consciousness = 1
         org.disorientation = 0

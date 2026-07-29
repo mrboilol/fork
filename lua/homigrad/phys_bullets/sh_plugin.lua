@@ -563,6 +563,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 						
 						dmg:SetDamage(self.Damage * math.sqrt(speedmul))--; скорость слишком быстро теряется... поэтому квадрат
 						dmg:SetDamageType(self.DamageType or DMG_BULLET)
+						dmg:SetAmmoType(self.AmmoID or -1)
 						dmg:SetDamagePosition(trace.HitPos)
 						dmg:SetDamageForce(self.AmmoForce * dir * (speedmul * self.Force * self.ForceMul))
 						
@@ -871,7 +872,7 @@ PLUGIN.Bullet_StandartMask = MASK_SHOT
 		
 		PLUGIN:RunHook("BulletPostSetup", bullet)
 		
-		if(SERVER and bullet.Shooter:IsPlayer())then
+		if(SERVER and IsValid(bullet.Shooter) and bullet.Shooter:IsPlayer())then
 			bullet.Vel = bullet.Vel + bullet.Shooter:GetVelocity()
 		end
 		

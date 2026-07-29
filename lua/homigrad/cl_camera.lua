@@ -876,7 +876,11 @@ local function renderscene(pos, angle, fov)
 
 	renderView.w = scrw
 	renderView.h = scrh
-	renderView.fov = fov
+	-- Render the scene with the completed Homigrad view. Reusing RenderScene's
+	-- incoming FOV discarded weapon/camera corrections and could leave clients
+	-- looking through an incorrectly zoomed 4:3 projection on wide displays.
+	renderView.fov = math.Clamp(tonumber(view.fov) or tonumber(fov) or 90, 40, 120)
+	renderView.aspectratio = scrh > 0 and (scrw / scrh) or 1
 	renderView.origin = view.origin
 	renderView.angles = view.angles
 	if mapswithfog[map] then

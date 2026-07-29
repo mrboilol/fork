@@ -371,8 +371,10 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local brainTrauma = math.Clamp(org.brain or 0, 0, 1)
 	local venousBleed = math.max(org.venousBleed or 0, 0)
 	local internalBleed = math.max(org.internalBleedRate or 0, 0)
+	local internalBleedComplication = math.Clamp(org.internalBleedComplication or 0, 0, 1)
 	local venousPenalty = math.Clamp(venousBleed / 65, 0, 0.18)
 	local internalPenalty = math.Clamp(internalBleed / 45, 0, 0.22)
+	local internalComplicationPenalty = internalBleedComplication * 0.22
 	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35)
 	local throatPenalty = math.Clamp(org.throatCutPressureShock or 0, 0, 1)
 	local neckPenalty = math.Clamp(org.neckBrainOxygenPenalty or 0, 0, 1)
@@ -387,7 +389,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Arterial loss already lowers blood volume and the blood-pressure target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an
 	-- independent disorientation/otrub source instead of a blood-loss emergency.
-	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - venousPenalty - internalPenalty - shockPenalty * 0.45 - throatPenalty * 0.22 - arterialImpairment * 0.08, 0, 1)
+	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - venousPenalty - internalPenalty - internalComplicationPenalty - shockPenalty * 0.45 - throatPenalty * 0.22 - arterialImpairment * 0.08, 0, 1)
 	local perfusionTarget = math.Clamp(pressureDelivery * Lerp(org.bodyoxygen, 0.55, 1), 0, 1)
 	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
 

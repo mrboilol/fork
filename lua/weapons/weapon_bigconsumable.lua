@@ -108,6 +108,7 @@ function SWEP:InitializeAdd()
 	self.WorldModel = model
 	if SERVER then
 		timer.Simple(0, function() 
+			if not IsValid(self) then return end
 			self:PhysicsInit(SOLID_VPHYSICS)
 
 			if IsValid(self:GetPhysicsObject()) then

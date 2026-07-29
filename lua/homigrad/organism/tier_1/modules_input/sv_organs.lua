@@ -753,16 +753,18 @@ input_list.lungsR = function(org, bone, dmg, dmgInfo)
 end
 
 input_list.trachea = function(org, bone, dmg, dmgInfo)
-    if math.random() < 0.25 then
+    -- A direct airway hit can still nick the carotid, but this should be an
+    -- uncommon complication rather than making every trachea wound catastrophic.
+    if math.random() < 0.1 then
         return input_list.arteria(org, bone, dmg, dmgInfo, "ValveBiped.Bip01_Neck1", dmgInfo:GetDamageForce():GetNormalized(), dmgInfo:GetDamagePosition())
     end
 
 	local oldDmg = org.trachea
 
-    dmg = dmg * 0.1 -- 90% resistance
+    dmg = dmg * 0.05 -- 95% resistance; the airway is no longer excessively delicate
 
     if isCrush(dmgInfo) then
-        if math.random() < 0.25 then
+        if math.random() < 0.5 then
             return 0
         else
             dmg = dmg * 10

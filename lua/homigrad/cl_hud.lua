@@ -1061,18 +1061,6 @@ hook.Add("radialOptions", "7", function()
     end
 end)
 
-hook.Add("radialOptions", "Afflictions", function()
-    local ply = LocalPlayer()
-    local organism = ply.organism or {}
-
-    if ply:Alive() and not organism.otrub and hg.GetCurrentCharacter(ply) == ply then
-        local tbl = {function()
-            RunConsoleCommand("mcd_admire")
-        end, "Afflictions"}
-        hg.radialOptions[#hg.radialOptions + 1] = tbl
-    end
-end)
-
 local font_size = 50
 surface.CreateFont("HG_font", {
 	font = "Arial",

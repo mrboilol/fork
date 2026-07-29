@@ -60,6 +60,35 @@ local function interpolateCurve(curve, value)
 	return curve[#curve][2]
 end
 
+local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
+local coldDamageTargets = {"heart", "liver", "stomach", "intestines"}
+
+local function applyTemperatureTrauma(org)
+	local temperature = org.temperature or 36.7
+	local heatStress = math.Clamp(math.Remap(temperature, 40, 42, 0, 1), 0, 1)
+	local coldStress = math.Clamp(math.Remap(temperature, 31, 27, 0, 1), 0, 1)
+
+	if heatStress <= 0 and coldStress <= 0 then
+		org.nextTemperatureTrauma = nil
+		return
+	end
+
+	if (org.nextTemperatureTrauma or 0) > CurTime() then return end
+	org.nextTemperatureTrauma = CurTime() + 2
+
+	local stress = heatStress > 0 and heatStress or coldStress
+	local targets = heatStress > 0 and heatDamageTargets or coldDamageTargets
+	local chance = heatStress > 0 and Lerp(heatStress, 0.08, 0.6) or Lerp(coldStress, 0.04, 0.3)
+	if math.Rand(0, 1) > chance then return end
+
+	-- Hyperthermia can injure the brain or a major organ. Hypothermic tissue
+	-- damage is deliberately much smaller; its main acute danger remains the
+	-- severe bradycardia/arrest progression below.
+	local damage = heatStress > 0 and math.Rand(0.0015, 0.004) * stress or math.Rand(0.0004, 0.0012) * stress
+	local key = targets[math.random(#targets)]
+	org[key] = math.min((org[key] or 0) + damage, 1)
+end
+
 function hg.organism.GetECGState(heartbeat, heartstop, org)
 	heartbeat = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
 	if heartstop then return heartbeat < 1 and "asystole" or "pea" end
@@ -170,6 +199,8 @@ module[2] = function(owner, org, timeValue)
 		end
 		return
 	end
+
+	if organSystemsEnabled then applyTemperatureTrauma(org) end
 
 	local pulse = org.heartstop and 0 or 70-- + 120 * ((stamina.max or 180) - stamina[1]) / (stamina.max or 180) * (org.lungsfunction and 1 or 0)
 	--pulse = pulse + math.min(org.adrenaline, 2) * 40 + (!org.otrub and math.max(org.fear * 50, 0) or 0)
@@ -416,25 +447,27 @@ module[2] = function(owner, org, timeValue)
 		map = 0
 	end
 
-	-- High velocity reduces blood pressure (falling or rapid acceleration only)
-	-- Skip for ragdolled players: ragdoll physics jitter causes false velocity spikes
+	-- High velocity reduces blood pressure (falling or rapid acceleration only).
+	-- Noclip and ragdoll motion are not physiological G-force, so neither may
+	-- contribute. Adrenaline can fully compensate for a short high-G episode.
 	local velocityPenalty = 0
 	local isRagdolled = owner:IsPlayer() and (IsValid(owner.FakeRagdoll) or IsValid(owner:GetNWEntity("FakeRagdoll", NULL)) or org.needfake or org.otrub)
-	if not isRagdolled then
+	local isNoclipping = owner:IsPlayer() and owner:GetMoveType() == MOVETYPE_NOCLIP
+	if not isRagdolled and not isNoclipping then
 		local velocity = owner:GetVelocity()
 		local speed = velocity:Length()
 		local fallSpeed = math.max(0, -velocity.z)
 
 		-- Falling causes G-force blood pressure loss
-		if fallSpeed > 100 then
-			velocityPenalty = math.Clamp((fallSpeed - 100) / 400, 0, 0.9)
+		if fallSpeed > 75 then
+			velocityPenalty = math.Clamp((fallSpeed - 75) / 275, 0, 0.95)
 		end
 
 		-- Rapid deceleration (e.g., vehicle crashes, slamming into walls) causes G-force loss
 		local prevSpeed = org._pulsePrevSpeed or speed
 		local decel = math.max(0, prevSpeed - speed) / math.max(timeValue, 0.001)
-		if decel > 800 and velocity.z <= 0 then
-			velocityPenalty = math.min(velocityPenalty + math.Clamp((decel - 800) / 800, 0, 0.2), 0.95)
+		if decel > 600 and velocity.z <= 0 then
+			velocityPenalty = math.min(velocityPenalty + math.Clamp((decel - 600) / 600, 0, 0.35), 0.98)
 		end
 		org._pulsePrevSpeed = speed
 	else
@@ -442,6 +475,8 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if velocityPenalty > 0 then
+		local adrenalineProtection = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
+		velocityPenalty = velocityPenalty * (1 - adrenalineProtection)
 		map = map * (1 - velocityPenalty)
 	end
 

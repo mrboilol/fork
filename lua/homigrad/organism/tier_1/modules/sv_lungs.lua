@@ -69,6 +69,10 @@ module[1] = function(org)
 	org.pneumothorax = 0
 
 	org.hemothorax = 0
+	org.hemothoraxTrauma = 0
+	org.hemothoraxL = 0
+	org.hemothoraxR = 0
+	org.internalBleedLungSide = nil
 
 	org.needle = 0
 
@@ -526,6 +530,9 @@ module[2] = function(owner, org, timeValue)
 	org.needle = math.max(tonumber(org.needle) or 0, 0)
 	org.pneumothorax = math.Clamp(tonumber(org.pneumothorax) or 0, 0, 1)
 	org.hemothorax = math.Clamp(tonumber(org.hemothorax) or 0, 0, 1)
+	org.hemothoraxTrauma = math.Clamp(tonumber(org.hemothoraxTrauma) or 0, 0, 1)
+	org.hemothoraxL = math.Clamp(tonumber(org.hemothoraxL) or 0, 0, 1)
+	org.hemothoraxR = math.Clamp(tonumber(org.hemothoraxR) or 0, 0, 1)
 
 	local hasPneumothorax = org.lungsR[2] == 1 or org.lungsL[2] == 1
 	local needleActive = org.needle > 0
@@ -540,17 +547,38 @@ module[2] = function(owner, org, timeValue)
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
 
-	-- Hemothorax is its own pleural-blood meter. A needle drains pressure while
-	-- active; otherwise significant internal bleeding can continue filling it.
+	-- Hemothorax from internal bleeding is delayed by the severity-scaled
+	-- complication state built in sv_blood. Moderate episodes choose one side;
+	-- catastrophic or advanced episodes can fill both pleural spaces. The public
+	-- aggregate remains compatible with the HUD and existing treatment code.
 	local internalBleedVal = org.internalBleed or 0
+	local internalBleedPeak = math.max(org.internalBleedPeak or internalBleedVal, internalBleedVal)
+	local bleedComplication = math.Clamp(org.internalBleedComplication or 0, 0, 1)
 	if needleActive then
-		org.hemothorax = max(org.hemothorax - timeValue / 120, 0)
-	elseif internalBleedVal > 0.3 then
-		local buildRate = math.Clamp((internalBleedVal - 0.3) / 3, 0, 1)
-		org.hemothorax = min(org.hemothorax + buildRate * timeValue / 100, 1)
-	elseif org.hemothorax > 0 and internalBleedVal <= 0.1 then
-		org.hemothorax = max(org.hemothorax - timeValue / 120, 0)
+		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
+		org.hemothoraxL = max(org.hemothoraxL - timeValue / 120, 0)
+		org.hemothoraxR = max(org.hemothoraxR - timeValue / 120, 0)
+	elseif internalBleedVal > 0.1 and bleedComplication > 0 then
+		if org.internalBleedLungSide != "L" and org.internalBleedLungSide != "R" then
+			org.internalBleedLungSide = math.random(2) == 1 and "L" or "R"
+		end
+
+		local severityK = math.Clamp((internalBleedPeak - 0.2) / 2.8, 0, 1)
+		local fillTime = Lerp(severityK, 240, 75)
+		local bilateral = internalBleedPeak >= 2.5 or bleedComplication >= 0.7
+		local targetL = (bilateral or org.internalBleedLungSide == "L") and bleedComplication or 0
+		local targetR = (bilateral or org.internalBleedLungSide == "R") and bleedComplication or 0
+
+		org.hemothoraxL = math.Approach(org.hemothoraxL, targetL, timeValue / fillTime)
+		org.hemothoraxR = math.Approach(org.hemothoraxR, targetR, timeValue / fillTime)
+	elseif internalBleedVal <= 0.1 then
+		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
+		org.hemothoraxL = max(org.hemothoraxL - timeValue / 180, 0)
+		org.hemothoraxR = max(org.hemothoraxR - timeValue / 180, 0)
+		if org.hemothoraxL <= 0 and org.hemothoraxR <= 0 then org.internalBleedLungSide = nil end
 	end
+
+	org.hemothorax = math.Clamp(max(org.hemothoraxTrauma, (org.hemothoraxL + org.hemothoraxR) / 2), 0, 1)
 
 
 
