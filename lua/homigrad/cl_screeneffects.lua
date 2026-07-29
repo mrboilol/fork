@@ -791,27 +791,6 @@ local function stopthings()
 
 end
 
-local function stopLowO2Soundtracks()
-	local lowO2Stations = {
-		NoiseStation2,
-		NoiseStation2Dying,
-		EndStation,
-		DyingStation,
-		Alto2Station,
-		SillydyingStation,
-		ItssooverStation,
-		SonimCookedStation,
-		RemDying1Station,
-		AltRemDyingStation
-	}
-
-	for _, station in pairs(lowO2Stations) do
-		if IsValid(station) then station:Stop() end
-	end
-
-	hg.consciousBeatIntensity = 0
-end
-
 local stations = {
 	0.06,
 	0.1,
@@ -1130,12 +1109,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 2)
-	if selectedDyingMode == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
+	if (selectedDyingMode == 8 or org.incapacitated) and canRetrySound("RemDying1Station", RemDying1Station) then
 		sound.PlayFile("sound/rem_dying1.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				station:SetTime(org.incapacitated and math.min(brain / 0.5 * station:GetLength(), 200) or math.min(math.Rand(0, station:GetLength()), 139))
 				RemDying1Station = station
 				station:EnableLooping(true)
 			end
@@ -1714,15 +1693,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 	
-	local deathStateActive = org.incapacitated and (org.deathStateEnd or 0) > 0
-	if deathStateActive then
-		stopLowO2Soundtracks()
-	end
-
 	if O2Lerp > 1 then
 		o2 = O2Lerp
 		
-		if o2 > 50 and !org.otrub and !deathStateActive then
+		if o2 > 50 and !org.otrub then
 			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
@@ -2107,7 +2081,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
-			local deathStateSoundOwnsNGA = org.incapacitated and (org.deathStateEnd or 0) > 0
+			local remorseismIncapacitated = org.incapacitated
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
@@ -2122,11 +2096,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if deathStateSoundOwnsNGA then
-				-- The incapacitation HUD owns the timed nga-im-cooked -> mindwipe
-				-- sequence. Silence the ordinary otrub loop so the two do not stack.
+			if remorseismIncapacitated then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
 			elseif otrubMode == 0 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
@@ -2143,7 +2116,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					local requestedMode = otrubMode
 					sound.PlayFile(otrubSoundPaths[requestedMode], "noblock noplay", function(station)
 						if not IsValid(station) then return end
-					if getServerSoundMode("hg_otrubsound", 4) ~= requestedMode then
+						if getServerSoundMode("hg_otrubsound", 4) ~= requestedMode then
 							station:Stop()
 							return
 						end
@@ -2158,21 +2131,22 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
-
-			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
-			if dyingMode == 6 and IsValid(ItssooverStation) then
-				ItssooverStation:SetVolume(otrubVol)
-			end
-			if dyingMode == 8 then
-				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
-			elseif dyingMode == 9 then
-				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-				if IsValid(AltRemDyingStation) then
-					AltRemDyingStation:SetVolume(math.min(otrubVol * 0.35, quietAltDyingVolume))
-					if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
+			if not remorseismIncapacitated then
+				local dyingMode = getServerSoundMode("hg_dyingsound", 2)
+				if dyingMode == 6 and IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(otrubVol)
+				end
+				if dyingMode == 8 then
+					if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+					if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+					if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
+				elseif dyingMode == 9 then
+					if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+					if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+					if IsValid(AltRemDyingStation) then
+						AltRemDyingStation:SetVolume(math.min(otrubVol * 0.35, quietAltDyingVolume))
+						if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
+					end
 				end
 			end
 		else

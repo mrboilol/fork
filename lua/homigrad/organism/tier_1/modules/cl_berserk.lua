@@ -4,6 +4,7 @@ hg.berserkStartTime = hg.berserkStartTime or 0
 hg.berserkStartTime2 = hg.berserkStartTime2 or 0
 hg.berserkStation = hg.berserkStation or nil
 hg.berserkMusicPlayed = hg.berserkMusicPlayed or false
+hg.berserkMusicLoading = hg.berserkMusicLoading or false
 hg.berserkFadeOut = hg.berserkFadeOut or false
 hg.berserkFadeOutStartTime = hg.berserkFadeOutStartTime or 0
 hg.berserkLastActivationTime = hg.berserkLastActivationTime or 0
@@ -37,7 +38,60 @@ local cc = Material( "effects/shaders/merc_chromaticaberration" )
 local offset = CreateClientConVar("berserk_offset", "0.85", true, false, "Set berserk music offset from start", 0, 5)
 local bpm = CreateClientConVar("berserk_bpm", "70", true, false, "Set berserk effect bpm", 1, 280)
 local path = CreateClientConVar("berserk_path", "sound/zbattle/pharmacia.mp3", true, false, "Set berserk effect music path")
-local altberserk = CreateClientConVar("hg_altberserk", "0", true, false, "Enable alternative berserk mode (11 min disoriented, NIGGARUN.ogg, 87 BPM)", 0, 1)
+local altberserk = CreateClientConVar("hg_altberserk", "0", true, false, "Enable alternative berserk mode (11s disoriented, NIGGARUN.ogg, 88 BPM)", 0, 1)
+local altberserk3 = CreateClientConVar("hg_altberserk3", "0", true, false, "Enable alternative berserk mode 3 (immediate rage.ogg loop and 75 BPM effect)", 0, 1)
+
+local function isAlternativeBerserk()
+	return altberserk:GetBool() or altberserk3:GetBool()
+end
+
+local function getBerserkMusicPath()
+	if altberserk3:GetBool() then return "sound/rage.ogg" end
+	if altberserk:GetBool() then return "sound/NIGGARUN.ogg" end
+
+	return path:GetString()
+end
+
+local function getBerserkBPM()
+	if altberserk3:GetBool() then return 75 end
+	if altberserk:GetBool() then return 88 end
+
+	return bpm:GetInt()
+end
+
+local function startBerserkMusic(musicPath)
+	if IsValid(hg.berserkStation) then
+		hg.berserkStation:EnableLooping(true)
+		hg.berserkStation:SetVolume(1)
+		hg.berserkFadeOut = false
+		hg.berserkMusicPlayed = true
+		return
+	end
+
+	if hg.berserkMusicLoading then return end
+
+	hg.berserkMusicLoading = true
+	hg.berserkMusicPlayed = true
+	sound.PlayFile(musicPath, "noblock", function(channel)
+		hg.berserkMusicLoading = false
+
+		if not IsValid(channel) then
+			hg.berserkMusicPlayed = false
+			return
+		end
+
+		if not hg.underberserk and not hg.underberserk2 then
+			channel:Stop()
+			hg.berserkMusicPlayed = false
+			return
+		end
+
+		hg.berserkStation = channel
+		channel:EnableLooping(true)
+		channel:SetVolume(1)
+		hg.berserkFadeOut = false
+	end)
+end
 
 hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	local organism = lply:Alive() and lply.organism
@@ -71,14 +125,9 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.berserkLastActivationTime = SysTime()
 		if not hg.berserkActivationSoundPlayed then
 			hg.berserkActivationSoundPlayed = true
-			if altberserk:GetBool() then
-				-- Start looping music immediately for altberserk to avoid duplicate at 11 seconds
-				sound.PlayFile("sound/NIGGARUN.ogg", "noblock", function(channel)
-					hg.berserkStation = channel
-					channel:EnableLooping(true)
-					channel:SetVolume(1)
-					hg.berserkMusicPlayed = true
-				end)
+			if isAlternativeBerserk() then
+				-- Start looping music immediately for alternate modes to avoid duplicate playback.
+				startBerserkMusic(getBerserkMusicPath())
 			else
 				surface.PlaySound("zbattle/deathsample.ogg")
 			end
@@ -92,7 +141,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.notifications = {}
 		hg.CreateNotificationBerserk("I feel...")
 
-		local disorientedDuration = altberserk:GetBool() and 11 or 3.95
+		local disorientedDuration = altberserk3:GetBool() and 0 or altberserk:GetBool() and 11 or 3.95
 		timer.Simple(disorientedDuration, function()
 			if IsValid(part) then
 				part:StopEmission( false, true, false )
@@ -109,19 +158,11 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 			-- Prevent music from playing again if it already played during this berserk session
 			if not hg.berserkMusicPlayed then
-				hg.berserkMusicPlayed = true
-				local musicPath = altberserk:GetBool() and "sound/NIGGARUN.ogg" or path:GetString()
-				if IsValid(hg.berserkStation) then
-					hg.berserkStation:SetVolume(1)
-					hg.berserkFadeOut = false
-				else
-					sound.PlayFile(musicPath, "noblock", function(channel)
-						hg.berserkStation = channel
-						channel:EnableLooping(true)
-						channel:SetVolume(1)
-						-- atlaschat.font:SetString("BerserkChatFont")
-					end)
-				end
+				startBerserkMusic(getBerserkMusicPath())
+			elseif IsValid(hg.berserkStation) then
+				hg.berserkStation:EnableLooping(true)
+				hg.berserkStation:SetVolume(1)
+				hg.berserkFadeOut = false
 			end
 
 			hg.currentNotification = nil
@@ -146,7 +187,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 
 	if hg.underberserk then
 		local intensity = (SysTime() - hg.berserkStartTime)
-		local altMultiplier = altberserk:GetBool() and 0.25 or 1
+		local altMultiplier = isAlternativeBerserk() and 0.25 or 1
 		tab[ "$pp_colour_contrast" ] = (intensity / 4) * altMultiplier
 		tab[ "$pp_colour_addr" ] = (intensity / 20) * altMultiplier
 		tab[ "$pp_colour_brightness" ] = (intensity / 20) * altMultiplier
@@ -163,7 +204,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	if hg.underberserk2 and IsValid(hg.berserkStation) then
 		--local intensity = ((hg.berserkStartTime2 + SysTime()) / 60) * 70 % 1
 		--intensity = math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
-		local currentBpm = altberserk:GetBool() and 88 or bpm:GetInt()
+		local currentBpm = getBerserkBPM()
 		local stationTime = hg.berserkStation:GetTime()
 		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
 		-- Guard against NaN from invalid station time
@@ -251,7 +292,7 @@ end)
 
 hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 	if ply:Alive() and hg.underberserk2 and IsValid(hg.berserkStation) and hg.berserkClamped then
-		local currentBpm = altberserk:GetBool() and 88 or bpm:GetInt()
+		local currentBpm = getBerserkBPM()
 		local stationTime = hg.berserkStation:GetTime()
 		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
 		-- Guard against NaN
@@ -355,6 +396,9 @@ hook.Add("Player_Death", "berserkCleanup", function(ply)
 	hg.underberserk = false
 	hg.underberserk2 = false
 	hg.berserkActivationSoundPlayed = false
+	hg.berserkMusicLoading = false
+	hg.berserkMusicPlayed = false
+	hg.berserkFadeOut = false
 
 	if IsValid(hg.berserkStation) then
 		hg.berserkStation:Stop()

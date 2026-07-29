@@ -6,7 +6,7 @@ hg.noradrenalineAltActive = hg.noradrenalineAltActive or false
 hg.noradrenalineFadeOut = hg.noradrenalineFadeOut or false
 hg.noradrenalineFadeOutStartTime = hg.noradrenalineFadeOutStartTime or 0
 
-local altnoradrenaline = CreateClientConVar("hg_altnoradrenaline", "0", true, false, "Enable alternative noradrenaline mode (11s delay, 87 BPM heartbeat, screen beat)", 0, 1)
+local altnoradrenaline = CreateClientConVar("hg_altnoradrenaline", "0", true, false, "Enable alternative noradrenaline mode (11s delay, 88 BPM heartbeat)", 0, 1)
 
 local tab = {
 	[ "$pp_colour_addr" ] = 0,
@@ -86,11 +86,6 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 			hg.noradrenalineAltActive = false
 		end
 
-		for i = 1, 90 do
-			timer.Simple(i/120,function()
-				ViewPunch(AngleRand(-1,1))
-			end)
-		end
 	elseif noradrenaline < 0.0001 then
 		if hg.undernoradrenaline then
 			if altnoradrenaline:GetBool() and IsValid(hg.noradrenalineStation) and not hg.noradrenalineFadeOut then
@@ -180,43 +175,6 @@ hook.Add("Post Post Processing", "noradrenalineEffect", function()
 	end
 end)
 
--- Screen beat effect for altnoradrenaline at 87 BPM
-hook.Add("RenderScreenspaceEffects", "noradrenalineBeatEffect", function()
-	if not (altnoradrenaline:GetBool() and hg.noradrenalineAltActive) then return end
-	if not IsValid(lply) or not lply:Alive() then return end
-
-	local org = lply.organism
-	if not org then return end
-
-	-- Calculate beat intensity at 88 BPM
-	local time = CurTime()
-	local beatPhase = (time * 88 / 60) % 1
-	local beatIntensity = math.abs(math.sin(beatPhase * math.pi * 2))
-
-	-- Removed red flashes and bloom, keeping only subtle screen shake (handled in noradrenalineBeatShake)
-end)
-
-hook.Add("HG_CalcView", "noradrenalineBeatShake", function(ply, pos, angles, fova)
-	if not (altnoradrenaline:GetBool() and hg.noradrenalineAltActive) then return end
-	if not IsValid(lply) or not lply:Alive() then return end
-
-	local org = lply.organism
-	if not org then return end
-
-	-- Calculate beat intensity at 88 BPM
-	local time = CurTime()
-	local beatPhase = (time * 88 / 60) % 1
-	local beatIntensity = math.abs(math.sin(beatPhase * math.pi * 2))
-
-	-- Apply camera shake on beat
-	if beatIntensity > 0.8 then
-		local shakeAmt = beatIntensity * 1.5 * hg.noradrenalineClamped
-		angles.p = angles.p + math.Rand(-shakeAmt, shakeAmt)
-		angles.y = angles.y + math.Rand(-shakeAmt, shakeAmt)
-		angles.r = angles.r + math.Rand(-shakeAmt, shakeAmt)
-		fova[1] = (fova[1] or 0) - (beatIntensity * 5 * hg.noradrenalineClamped)
-	end
-end)
 
 local META = FindMetaTable("Player")
 function META:IsStimulated()

@@ -50,9 +50,6 @@ function hg.organism.KillFatalBrainDamage(org)
 	org.needotrub = false
 	org.otrub = false
 	org.incapacitated = false
-	org.deathStateEnd = nil
-	org.deathStateStart = nil
-	org.deathStatePendingEnd = nil
 	hg.organism.ZeroVitals(org)
 
 	local owner = org.owner
@@ -236,10 +233,6 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastSeizureLobeDamage = 0
 	org.lastSeizureTemperature = org.temperature
 	org.fatalBrainDeath = nil
-	org.deathStateEnd = nil
-	org.deathStateStart = nil
-	org.deathStatePendingEnd = nil
-	org.deathStateKilled = nil
 
 	org.noradrenalineEndTime = nil
 	org.blindness = nil
@@ -282,12 +275,15 @@ end)
 
 util.AddNetworkString("organism_send")
 util.AddNetworkString("organism_sendply")
-util.AddNetworkString("rem_deathstate_sound")
 local CurTime = CurTime
 local nullTbl = {}
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
-local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Incapacitated dying: 0=disabled, 1=immediate, 2=delayed by injury severity", 0, 2)
+local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable Remorseism incapacitation", 0, 1)
 local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable organ-system failure: 0=organs stay functional, 1=normal organ failure", 0, 1)
+
+function hg.organism.IncapacitationEnabled()
+	return hg_incapacitation:GetBool()
+end
 
 function hg.organism.OrganSystemsEnabled()
 	return hg_huyorgans:GetBool()
@@ -537,9 +533,6 @@ local function send_organism(org, ply)
 
 	sendtable.critical = org.critical
 	sendtable.incapacitated = org.incapacitated
-	sendtable.deathStateEnd = org.deathStateEnd or 0
-	sendtable.deathStateStart = org.deathStateStart or 0
-	sendtable.deathStatePendingEnd = org.deathStatePendingEnd or 0
 	sendtable.berserkActive2 = org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.aiming_fatigue = org.aiming_fatigue
@@ -1657,42 +1650,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		--org.owner:ConCommand("soundfade 0 1")
 	end
 
-	local incapacitationMode = hg_incapacitation:GetInt()
-	local flatlined = org.heartstop or (org.heartbeat or 0) < 1 or (org.pulse or 0) < 1
-	local dyingIncapacitated = isPly and org.otrub and org.incapacitated
-
-	if incapacitationMode > 0 and dyingIncapacitated then
-		if not org.deathStateStart and not org.deathStatePendingEnd then
-			local delay = 0
-			if incapacitationMode == 2 then
-				local injury = math.max(
-					math.Clamp((3000 - (org.blood or 5000)) / 1800, 0, 1),
-					math.Clamp((10 - (org.o2 and org.o2[1] or 30)) / 10, 0, 1),
-					math.Clamp(((org.brain or 0) - 0.2) / 0.5, 0, 1),
-					flatlined and 1 or 0
-				)
-				delay = Lerp(injury, 30, 10)
-			end
-			org.deathStatePendingEnd = CurTime() + delay
-		end
-
-		if not org.deathStateStart and CurTime() >= org.deathStatePendingEnd then
-			org.deathStateStart = CurTime()
-			local duration = 20
-			org.deathStateEnd = org.deathStateStart + duration
-		end
-
-		if org.deathStateEnd and CurTime() >= org.deathStateEnd and not org.deathStateKilled then
-			org.deathStateKilled = true
-			owner:Kill()
-			return
-		end
-	else
-		org.deathStateEnd = nil
-		org.deathStateStart = nil
-		org.deathStatePendingEnd = nil
-		org.deathStateKilled = nil
-	end
 
 	if just_went_uncon then
 		org.owner.fullsend = true

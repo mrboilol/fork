@@ -27,6 +27,7 @@ local otrub_pain_tolerance = 90
 local pain_fake_threshold = 0.9
 local pain_drain_base = 8
 local pain_drain_otrub_mul = 4.5
+local anger_pain_reduction_max = 0.1
 
 function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	adrenaline = max(adrenaline or 0, 0)
@@ -82,6 +83,7 @@ module[2] = function(owner, org, timeValue)
 	local adrenalineMul = min(max(1 + org.adrenaline, 1), 1.2)
 
 	local adrenaline = org.adrenaline
+	local anger = Clamp(org.anger or 0, 0, 1)
 
 	local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
 
@@ -153,11 +155,16 @@ module[2] = function(owner, org, timeValue)
 	local add = shouldPainAdd and math.min(timeValue * 15, org.painadd) or 0
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
-	-- Adrenaline delays both the pain arriving and the body settling it, so the
-	-- stored injury survives the rush and catches up afterward.
+	-- Adrenaline normally delays both the pain arriving and the body settling it.
+	-- Combat anger reverses the recovery side: the stronger the rush, the faster
+	-- existing pain settles instead of being prolonged.
 	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
 	add = add * adrenalinePainPacing
-	sub = sub * adrenalinePainPacing
+	if anger > 0 then
+		sub = sub * (1 + adrenaline * (0.5 + anger * 0.5))
+	else
+		sub = sub * adrenalinePainPacing
+	end
 
 
 
@@ -258,7 +265,8 @@ module[2] = function(owner, org, timeValue)
 
 	-- Adrenaline can blunt pain, but it cannot erase nearly all of it.  Keep the
 	-- Remorseism 75% floor so injuries remain readable during the rush.
-	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0)
+	local angerPainMul = 1 - anger * anger_pain_reduction_max
+	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
 	if shouldPainAdd then

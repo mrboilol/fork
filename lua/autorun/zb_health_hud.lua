@@ -1283,6 +1283,11 @@ local function draw_bar()
 end
 
 local function draw_status_effects()
+	if HGCustomMoodlesActive then
+		statusEffectPositions = {}
+		return
+	end
+
 	if not HUD.enabled or not HUD.show_status_effects then 
 		statusEffectPositions = {}
 		return 
@@ -2626,8 +2631,7 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		
 		panel:CheckBox("Enable HUD", "mzb_MoodleHud_enabled")
 		panel:CheckBox("Always show limbs", "mzb_popalimbs")
-		panel:CheckBox("NoPixel icons(test)", "mzb_nopixelicons")
-		panel:CheckBox("Show moodles(Maybe it doesn't work:))", "mzb_Disable_moodle")
+		panel:CheckBox("Show moodles", "hg_moodles_enabled")
 		panel:CheckBox("Enable text change for brain damage", "mzb_brain_distortion")
 		
 		local langCombo = panel:ComboBox("Language", "mzb_language")

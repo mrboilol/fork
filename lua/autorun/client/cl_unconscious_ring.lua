@@ -37,26 +37,6 @@ local function GetShockConsciousnessThreshold(analgesia, painkiller)
     return 25 * (medication * 4 + 1)
 end
 
-local dyingRingServerEnd
-local dyingRingLocalEnd
-local INCAPACITATION_DEATH_DURATION = 20
-
-local function GetDyingRingTimeLeft(deathStateStart, deathStateEnd)
-	if not deathStateEnd then
-		dyingRingServerEnd = nil
-		dyingRingLocalEnd = nil
-		return
-	end
-
-	if dyingRingServerEnd ~= deathStateEnd then
-		local duration = math.Clamp(deathStateEnd - (deathStateStart or deathStateEnd - INCAPACITATION_DEATH_DURATION), 0, INCAPACITATION_DEATH_DURATION)
-		dyingRingServerEnd = deathStateEnd
-		dyingRingLocalEnd = CurTime() + duration
-	end
-
-	return math.max((dyingRingLocalEnd or CurTime()) - CurTime(), 0)
-end
-
 local ecgAlphaPulseCheck = 0
 local awakeECGAlpha = 0
 local lastECGState
@@ -824,9 +804,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 		wakeEstimateSmoothed = nil
 	end
 
-	local deathStateEnd = org.deathStateEnd and org.deathStateEnd > 0 and org.deathStateEnd or nil
-	local deathStateStart = org.deathStateStart and org.deathStateStart > 0 and org.deathStateStart or nil
-	local dyingRing = org.incapacitated and deathStateEnd
     local heartbeat = org.heartbeat or 75
     local pulse = org.pulse or 70
     local ecgState = org.ecgState or "normal_sinus"
@@ -893,7 +870,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         and (abnormalECG or sinusECGTail > 0 or admiring)
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
-	if isUnconscious and (dyingRing or unconsciousElapsed >= UNCONSCIOUS_RING_DELAY) then
+	if isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
         ringAlpha = SmoothAlpha(ringAlpha, 1, 1.5)
         dotBeat = math.floor(CurTime()) % 3
 	elseif isUnconscious then
@@ -964,13 +941,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             local statusText = FormatWakeEstimate(wakeSeconds)
             local statusColor = GetRecoveryColor(wakeProgress, otrubECGAlpha)
 
-            if dyingRing then
-                local timeLeft = GetDyingRingTimeLeft(deathStateStart, deathStateEnd) or 0
-                local failureProgress = 1 - math.Clamp(timeLeft / INCAPACITATION_DEATH_DURATION, 0, 1)
-                borderInset = failureProgress * 14 * boxScale
-                statusColor = Color(220, 35, 35, 255 * otrubECGAlpha)
-                statusText = string.format("FAILING ~%ds", math.ceil(timeLeft))
-            elseif not wakeSeconds then
+            if not wakeSeconds then
                 borderInset = (8 + math.sin(CurTime() * 2) * 2) * boxScale
                 statusColor = Color(220, 45, 40, 255 * otrubECGAlpha)
                 statusText = "UNSTABLE"

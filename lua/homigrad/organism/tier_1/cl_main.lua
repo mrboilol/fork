@@ -77,108 +77,17 @@ local tabblood = {
 	["$pp_colour_mulb"] = 0,
 }
 
-surface.CreateFont("RemDeathStateFont", {
-	font = "Lora",
-	size = ScreenScale(22),
-	weight = 1100,
-	outline = true
-})
-
-surface.CreateFont("RemDeathStateCountdownFont", {
-	font = "Lora",
-	size = ScreenScale(14),
-	weight = 900,
-	outline = true
-})
-
-local remDeathStateColor = Color(255, 255, 255, 0)
-local remDeathStateStation
-local remDeathStateLoading
-local remDeathStatePath
-local remDeathStateLoadSerial = 0
-local remDeathStateOpeningPath = "sound/ngaimcooked.mp3"
-local remDeathStateMindwipePath = "sound/mindwipe.ogg"
-local remDeathStateMindwipeDelay = 15
-
-local function GetOtrubRingRadius()
-	return math.min(280, ScrH() * 0.32)
-end
-
-local function StopRemDeathStateSound()
-	remDeathStateLoadSerial = remDeathStateLoadSerial + 1
-	remDeathStateLoading = nil
-	if IsValid(remDeathStateStation) then remDeathStateStation:Stop() end
-	remDeathStateStation = nil
-	remDeathStatePath = nil
-end
-
-local function PlayRemDeathStateSound(path, looping)
-	path = path or "sound/rem_deathstatefull.mp3"
-	if IsValid(remDeathStateStation) and remDeathStatePath == path then
-		remDeathStateStation:Play()
-		return
-	end
-	if remDeathStateLoading then return end
-	if IsValid(remDeathStateStation) then remDeathStateStation:Stop() end
-	remDeathStateStation = nil
-
-	remDeathStateLoadSerial = remDeathStateLoadSerial + 1
-	local loadSerial = remDeathStateLoadSerial
-	remDeathStateLoading = loadSerial
-	remDeathStatePath = path
-	sound.PlayFile(path, "noplay", function(station)
-		if remDeathStateLoading == loadSerial then remDeathStateLoading = nil end
-		if not IsValid(station) then
-			if loadSerial == remDeathStateLoadSerial then remDeathStatePath = nil end
-			return
-		end
-		if loadSerial ~= remDeathStateLoadSerial then station:Stop() return end
-		if not LocalPlayer():Alive() and path ~= remDeathStateMindwipePath then station:Stop() return end
-		remDeathStateStation = station
-		remDeathStatePath = path
-		station:EnableLooping(looping ~= false)
-		station:SetVolume(1)
-		station:Play()
-	end)
-end
-
-net.Receive("rem_deathstate_sound", PlayRemDeathStateSound)
-
-hook.Add("Think", "RemDeathStateSoundStop", function()
-	local ply = LocalPlayer()
-	if not IsValid(ply) or ply:Alive() or not IsValid(remDeathStateStation) then return end
-	if remDeathStatePath == remDeathStateMindwipePath then return end
-	StopRemDeathStateSound()
-end)
-
--- Keep the added incapacitation copy with the ring in HUDPaint.  Otrub's
--- original full-screen effects and memory replays are post-processing passes,
--- so drawing this there let either one cover the text.
+local remorseismIncapacitationStatus
 hook.Add("HUDPaint", "RemIncapacitationStatus", function()
 	local ply = LocalPlayer()
 	local org = IsValid(ply) and ply.organism
-	local deathStateEnd = org and org.deathStateEnd
-	local deathStateStart = org and org.deathStateStart
+	if not IsValid(ply) or not ply:Alive() or not org or not org.otrub or not org.incapacitated then return end
 
-	if not IsValid(ply) or not ply:Alive() or not org or not org.otrub or not org.incapacitated or not deathStateEnd or deathStateEnd <= 0 then
-		if IsValid(ply) and not ply:Alive() and remDeathStatePath == remDeathStateMindwipePath then return end
-		if remDeathStateLoading or IsValid(remDeathStateStation) or remDeathStatePath then
-			StopRemDeathStateSound()
-		end
-		return
-	end
-
-	local seconds = math.max(math.ceil(deathStateEnd - CurTime()), 0)
-	remDeathStateColor.a = math.Clamp((CurTime() - (deathStateStart or CurTime())) / 2, 0, 1) * 255
-	local dyingElapsed = CurTime() - (deathStateStart or CurTime())
-	local dyingSoundPath = dyingElapsed >= remDeathStateMindwipeDelay and remDeathStateMindwipePath or remDeathStateOpeningPath
-	PlayRemDeathStateSound(dyingSoundPath, dyingSoundPath ~= remDeathStateMindwipePath)
-
-	local countdownText = "You will die in " .. seconds .. (seconds == 1 and " second" or " seconds")
-	local lineSpacing = ScreenScaleH(26)
-	local textY = math.min(ScrH() / 2 + GetOtrubRingRadius() + ScreenScaleH(18), ScrH() - lineSpacing - ScreenScaleH(18))
-	draw.SimpleText("You are incapacitated", "RemDeathStateFont", ScrW() / 2, textY, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-	draw.SimpleText(countdownText, "RemDeathStateCountdownFont", ScrW() / 2, textY + lineSpacing, remDeathStateColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+	remorseismIncapacitationStatus = remorseismIncapacitationStatus or markup.Parse(
+		"<font=HomigradFontMedium>You are unconscious. " ..
+		"\n<colour=255,255,255,255>You will not get up without someone's help.</colour></font>"
+	)
+	remorseismIncapacitationStatus:Draw(ScrW() / 2, ScrH() / 1.1, TEXT_ALIGN_CENTER, nil, nil, TEXT_ALIGN_CENTER)
 end)
 
 local k1, k2, k3
@@ -343,7 +252,6 @@ hook.Add("Player Spawn", "hg.forsaken.deathscene.reset", function(ply)
 	forsaken_scene_end = 0
 	forsaken_soundfade_release_until = 0
 	forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
-	StopRemDeathStateSound()
 	resetPlayerSound(ply)
 end)
 
@@ -1272,19 +1180,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		end
 	end
 
-	local deathStateActive = org.incapacitated and (org.deathStateEnd or 0) > 0
-	if ply == lply then
-		if deathStateActive then
-			if not ent.pulse_breathe.deathStateStoppedLowO2 then
-				ply:StopSound("sonimcooked.mp3")
-				ent.pulse_breathe.deathStateStoppedLowO2 = true
-			end
-		else
-			ent.pulse_breathe.deathStateStoppedLowO2 = nil
-		end
-	end
-
-	--why? because
+--why? because
 	if org.pulse and (ent.pulse_breathe.lastbreathe or 0) < CurTime() and org.lastbreathed and org.lastbreathed + 5 < CurTime() then
 		local heartbeat = org.heartbeat or 0
 		ent.pulse_breathe.lastbreathe = CurTime() + (1 / math.Clamp(org.heartbeat + (org.o2[1] - 30) * 1, 1, 120)) * 90 + ( org.o2[1] < 20 and 5 or 0)
@@ -1300,7 +1196,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				if org.timeValue and org.o2.curregen <= org.timeValue * 0.5 and org.o2[1] < 20 then
 					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_wheeze"..math.random(5)..".mp3", 40, nil, nil, nil, nil, 1)
 				end
-				if org.o2[1] < 12 and !deathStateActive and ply == lply and (ent.pulse_breathe.lastsonimcooked or 0) < CurTime() and math.random(4) == 1 then
+				if org.o2[1] < 12 and ply == lply and (ent.pulse_breathe.lastsonimcooked or 0) < CurTime() and math.random(4) == 1 then
 					ply:EmitSound("sonimcooked.mp3", 45, math.random(94, 106), 0.85)
 					ent.pulse_breathe.lastsonimcooked = CurTime() + math.Rand(12, 24)
 				end

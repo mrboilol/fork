@@ -97,7 +97,7 @@ if CLIENT then
 	})
 
 	surface.CreateFont("HuyFont", {
-		font = "BudgetLabel",
+		font = "VCR OSD Mono",
 		extended = true,
 		size = ScreenScale(9),
 		weight = 0,
@@ -109,12 +109,12 @@ if CLIENT then
 		outline = false,
 	})
 
-	-- Pain and dying notifications are slightly larger, so use Remorseism's
-	-- normal UI face instead of enlarging the compact notification font.
+	-- Pain and dying notifications use Remorseism's UI face at a more
+	-- prominent size than normal notifications.
 	surface.CreateFont("RemorseismNotificationLarge", {
 		font = "Lora",
 		extended = true,
-		size = ScreenScale(10),
+		size = ScreenScale(12),
 		weight = 700,
 		antialias = true,
 		shadow = true,
@@ -149,7 +149,7 @@ if CLIENT then
 	surface.CreateFont("EmojiFontDesperate", {
 		font = "Segoe UI Emoji",
 		extended = true,
-		size = ScreenScale(10),
+		size = ScreenScale(12),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
