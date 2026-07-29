@@ -5,8 +5,8 @@ local statusCircleMat = Material("sef_icons/statuseffectcircle.png", "smooth")
 local boneTraceMat = Material("cable/white")
 local statusIconCache = {}
 
-local IND_SIZE_BASE = 180
-local IND_SIZE_MAX = 240
+local IND_SIZE_BASE = 220
+local IND_SIZE_MAX = 300
 local INDICATOR_CAMERA_FOV = 70
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
@@ -579,10 +579,11 @@ function HUD_DrawDynamicIndicator()
     
     local viewX, viewY
     
-    -- Position at bottom left of screen
+    -- Keep the body readout vertically centered on the left. The compact ECG
+    -- can then use the open space directly beneath it without covering moodles.
     local edgeMargin = math.max(14, 18 * hudScale)
     viewX = edgeMargin
-    viewY = ScrH() - h - edgeMargin
+    viewY = math.Clamp(ScrH() * 0.5 - h * 0.5, edgeMargin, ScrH() - h - edgeMargin)
     
     -- Store indicator position and size for moodle adjustment
     HUD.dynamicIndicator = {

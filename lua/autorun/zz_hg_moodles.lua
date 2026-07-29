@@ -21,8 +21,24 @@ local moodlePositions = {}
 local hover = {index = nil, scale = 1}
 
 surface.CreateFont("HG_MoodleRageText", {
-	font = "Who asks Satan",
+	font = "VCR OSD Mono",
 	size = ScreenScale(8),
+	weight = 500,
+	antialias = true,
+	extended = true,
+})
+
+surface.CreateFont("HG_MoodleTitle", {
+	font = "VCR OSD Mono",
+	size = ScreenScale(9),
+	weight = 700,
+	antialias = true,
+	extended = true,
+})
+
+surface.CreateFont("HG_MoodleText", {
+	font = "VCR OSD Mono",
+	size = ScreenScale(7),
 	weight = 500,
 	antialias = true,
 	extended = true,
@@ -317,6 +333,12 @@ local moodleTexts = {
 		[3] = {title = "Fight or Flight", description = "A strong surge is greatly improving stamina and pain tolerance."},
 		[4] = {title = "Focused", description = "Extreme adrenaline is driving your body at its limit."},
 	}},
+	zerlked = {levels = {
+		[1] = {title = "Zerlked", description = "Zerlkers are helping you shrug off pain, shock, weakness, and unconsciousness."},
+		[2] = {title = "Zerlked", description = "Zerlkers are helping you shrug off pain, shock, weakness, and unconsciousness."},
+		[3] = {title = "Zerlked", description = "Zerlkers are helping you shrug off pain, shock, weakness, and unconsciousness."},
+		[4] = {title = "Zerlked", description = "Zerlkers are helping you shrug off pain, shock, weakness, and unconsciousness."},
+	}},
 	anger = {levels = {
 		[1] = {title = "Irritated", description = "Slightly angered at something."},
 		[2] = {title = "Angry", description = "Anger due to combat is affecting your resolve and resilience."},
@@ -463,8 +485,8 @@ local function buildEffects(ply, org)
 		add(effects, "bleeding", ({"lowbleed", "bleeding", "bigbleed", "bigbadbleed"})[level], level, "bad", 20, math.Round(bleed, 2))
 	end
 	local pain = orgNumber(org, "pain", 0)
-	if pain > 10 and org.berserkActive2 ~= true then
-		local level = pain >= 60 and 4 or pain >= 40 and 3 or pain >= 25 and 2 or 1
+	if pain > 20 and org.berserkActive2 ~= true then
+		local level = pain >= 85 and 4 or pain >= 60 and 3 or pain > 45 and 2 or 1
 		add(effects, "pain", ({"smallpain", "pain", "superpain", "agony"})[level], level, "bad", 21, math.floor(pain))
 	end
 	local co = orgNumber(org, "CO", 0)
@@ -477,12 +499,12 @@ local function buildEffects(ply, org)
 	local pulse = orgNumber(org, "pulse", 70)
 	local palpitations = math.Clamp(orgNumber(org, "palpitations", 0), 0, 1)
 	if not org.heartstop and heartRate > 100 then
-		local level = math.max(highRank(heartRate, {100, 130, 160, 190}), math.ceil(palpitations * 4))
+		local level = highRank(heartRate, {100, 130, 160, 190})
 		add(effects, "tachycardia", "tachycardia", level, "bad", 23, math.floor(heartRate) .. " bpm")
 	end
-	if palpitations > 0 then add(effects, "palpitations", "palpitations", math.ceil(palpitations * 4), "bad", 24, math.floor(palpitations * 100) .. "%") end
+	if palpitations > 0 then add(effects, "palpitations", "palpitations", math.max(math.ceil(palpitations * 4), 1), "bad", 24, math.floor(palpitations * 100) .. "%") end
 	if not org.heartstop and pulse > 0 and heartRate < 60 then
-		local level = math.max(lowRank(heartRate, {60, 50, 40, 30}), math.ceil(palpitations * 4))
+		local level = lowRank(heartRate, {60, 50, 40, 30})
 		add(effects, "bradycardia", "bradycardia", level, "bad", 25, math.floor(heartRate) .. " bpm")
 	end
 
@@ -633,6 +655,8 @@ local function buildEffects(ply, org)
 
 	local adrenaline = orgNumber(org, "adrenaline", 0)
 	if adrenaline > 0.3 then add(effects, "adrenaline", "adrenaline", highRank(adrenaline, {0.3, 0.8, 1.5, 2.1}), "good", 11, math.Round(adrenaline, 1)) end
+	local zerlkers = orgNumber(org, "zerlkers", 0)
+	if zerlkers > 0 then add(effects, "zerlked", "zerlked", math.Clamp(math.ceil(zerlkers * 4), 1, 4), "good", 10.5, math.ceil(zerlkers * 120) .. "s") end
 	local anger = math.Clamp(orgNumber(org, "anger", 0), 0, 1)
 	if anger > 0.01 then add(effects, "anger", "anger", math.ceil(anger * 4), "good", 14, math.floor(anger * 100) .. "%") end
 	local armorCount = countEntries(ply:GetNetVar("Armor", {}) or {})
@@ -672,8 +696,8 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	local details = not rageActive and "Severity " .. tooltipLevel .. " of 4" or nil
 	if details and effect.value ~= nil then details = details .. " - " .. tostring(effect.value) end
 
-	local titleFont = "DermaDefaultBold"
-	local descriptionFont = rageActive and "HG_MoodleRageText" or "DermaDefault"
+	local titleFont = "HG_MoodleTitle"
+	local descriptionFont = rageActive and "HG_MoodleRageText" or "HG_MoodleText"
 	local descriptionLineSpacing = rageActive and 1 or 0
 	surface.SetFont(titleFont)
 	local titleWidth, titleHeight = surface.GetTextSize(title)
@@ -689,19 +713,19 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	descriptionHeight = descriptionHeight + math.max(#descriptionLines - 1, 0) * descriptionLineSpacing
 	local detailsWidth, detailsHeight = 0, 0
 	if details then
-		surface.SetFont("DermaDefault")
+		surface.SetFont("HG_MoodleText")
 		detailsWidth, detailsHeight = surface.GetTextSize(details)
 	end
 
 	local padding, lineSpacing = 10, 4
 	local totalWidth = math.max(titleWidth, descriptionWidth, detailsWidth) + padding * 2
 	local totalHeight = titleHeight + lineSpacing + descriptionHeight + (details and lineSpacing + detailsHeight or 0) + padding * 2
-	local baseX = pos.x - totalWidth - 10
-	local baseY = pos.y + (pos.size - totalHeight) * 0.5
-	local centerX, centerY = pos.x - totalWidth * 0.5 - 10, pos.y + pos.size * 0.5
+	local baseX = pos.x + pos.size * 0.5 - totalWidth * 0.5
+	local baseY = pos.y - totalHeight - 12
+	local centerX, centerY = pos.x + pos.size * 0.5, pos.y - totalHeight * 0.5 - 12
 	local parallaxX = math.Clamp((mx - centerX) * 0.1, -15, 15)
 	local parallaxY = math.Clamp((my - centerY) * 0.1, -15, 15)
-	local tooltipX = math.max(baseX + parallaxX, 10)
+	local tooltipX = math.Clamp(baseX + parallaxX, 10, ScrW() - totalWidth - 10)
 	local tooltipY = math.Clamp(baseY + parallaxY, 10, ScrH() - totalHeight - 10)
 
 	surface.SetDrawColor(25, 25, 35, 240)
@@ -723,8 +747,29 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	textY = textY - descriptionLineSpacing
 	if details then
 		textY = textY + lineSpacing
-		draw.SimpleText(details, "DermaDefault", textX, textY, outline, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+		draw.SimpleText(details, "HG_MoodleText", textX, textY, outline, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 	end
+end
+
+local function drawSevereBeam(x, y, size, alpha)
+	local beamHeight = size * 3.2
+	local beamWidth = size * 0.88
+	local beamX = x + (size - beamWidth) * 0.5
+	local beamTop = y + size - beamHeight
+	local slices = 18
+	local pulse = 0.82 + math.abs(math.sin(CurTime() * 3.5)) * 0.18
+
+	for slice = 0, slices - 1 do
+		local t = slice / (slices - 1)
+		local sliceY = beamTop + beamHeight * t
+		local sliceH = beamHeight / slices + 1
+		local sliceAlpha = (4 + t * t * 54) * pulse * alpha
+		surface.SetDrawColor(255, 20, 12, sliceAlpha)
+		surface.DrawRect(beamX, sliceY, beamWidth, sliceH)
+	end
+
+	surface.SetDrawColor(255, 25, 18, 26 * pulse * alpha)
+	surface.DrawRect(x - size * 0.15, y, size * 1.3, size)
 end
 local function clearMoodleDrawState()
 	moodlePositions = {}
@@ -765,6 +810,15 @@ local function drawMoodles()
 	local berserkActive = org.berserkActive2 == true
 	loadMaterials()
 	local effects, now = buildEffects(ply, org), CurTime()
+	table.sort(effects, function(a, b)
+		local aScore = (a.mood == "bad" and 100 or 0) + (a.level or 0) * 10
+		local bScore = (b.mood == "bad" and 100 or 0) + (b.level or 0) * 10
+		if aScore == bScore then
+			if a.priority == b.priority then return a.name < b.name end
+			return a.priority < b.priority
+		end
+		return aScore > bScore
+	end)
 	local active = {}
 	for _, effect in ipairs(effects) do
 		active[effect.name] = true
@@ -775,21 +829,19 @@ local function drawMoodles()
 		if not active[name] then appearances[name], lastLevels[name] = nil, nil end
 	end
 
-	local size = HUD and HUD.status_effects_size or 58
-	local spacing = HUD and HUD.status_effects_spacing or 55
-	local baseX = ScrW() + (HUD and HUD.status_effects_x or -10)
-	local baseY = HUD and HUD.status_effects_y or 80
-	if HUD and HUD.dynamicIndicator and HUD.dynamicIndicator.active and HUD.dynamicIndicator.x > ScrW() * 0.6 and HUD.dynamicIndicator.y < ScrH() * 0.4 then
-		baseY = math.max(baseY, HUD.dynamicIndicator.y + HUD.dynamicIndicator.h + 10 * (ScrH() / 480))
-	end
+	local size = HUD and HUD.status_effects_size or 62
+	local spacing = math.max(HUD and HUD.status_effects_spacing or 59, size + 4)
+	local edgeMargin = math.max(12, ScrH() * 0.015)
+	local baseX = ScrW() - edgeMargin - size
+	local baseY = ScrH() - edgeMargin - size
+	local columns = math.max(math.floor((ScrW() - edgeMargin * 2 + spacing - size) / spacing), 1)
+	while #effects > columns do table.remove(effects) end
 
-	local rows = math.max(math.floor((ScrH() - baseY - 10) / spacing), 1)
 	local rawPositions = {}
 	for index, effect in ipairs(effects) do
-		local row, column = (index - 1) % rows, math.floor((index - 1) / rows)
 		rawPositions[index] = {
-			x = baseX - size - column * spacing,
-			y = baseY + row * spacing,
+			x = baseX - (index - 1) * spacing,
+			y = baseY,
 			effect = effect,
 		}
 	end
@@ -828,6 +880,8 @@ local function drawMoodles()
 	moodlePositions = {}
 	for index, pos in ipairs(rawPositions) do
 		local effect = pos.effect
+		local stableRage = effect.name == "rage"
+		local distortThis = berserkActive and not stableRage
 		local scale, offsetX, offsetY = 1, 0, 0
 		local repelX, repelY = 0, 0
 
@@ -854,7 +908,7 @@ local function drawMoodles()
 		end
 
 		local beatShakeX, beatShakeY = 0, 0
-		if berserkActive then
+		if distortThis then
 			beatShakeX = math.sin(now * 75 + index * 2.3) * berserkKick * 6
 			beatShakeY = -berserkKick * 5 + math.cos(now * 63 + index * 1.7) * berserkKick * 3
 		end
@@ -866,16 +920,19 @@ local function drawMoodles()
 		local drawSize = size * scale * (1 + berserkKick * 0.1)
 		local drawX = finalX - (drawSize - size) * 0.5
 		local drawY = finalY - (drawSize - size) * 0.5
+		if effect.mood == "bad" and effect.level >= 3 then
+			drawSevereBeam(drawX, drawY, drawSize, stableRage and 1 or 0.9)
+		end
 
 		local background = effect.name == "rage" and backgrounds.bad[4] or backgrounds[effect.mood] and backgrounds[effect.mood][effect.level]
 		local distortionStrength = 1 + berserkKick * 2
-		local distortionX = berserkActive and math.sin(now * 9 + index * 2.1) * 2.5 * distortionStrength or 0
-		local distortionY = berserkActive and math.cos(now * 7 + index * 1.7) * 1.5 * distortionStrength or 0
-		local distortionAngle = berserkActive and math.sin(now * 5 + index) * 2.5 * distortionStrength or 0
+		local distortionX = distortThis and math.sin(now * 9 + index * 2.1) * 2.5 * distortionStrength or 0
+		local distortionY = distortThis and math.cos(now * 7 + index * 1.7) * 1.5 * distortionStrength or 0
+		local distortionAngle = distortThis and math.sin(now * 5 + index) * 2.5 * distortionStrength or 0
 		if background then
-			surface.SetDrawColor(255, 255, 255, berserkActive and 90 or 235)
+			surface.SetDrawColor(255, 255, 255, stableRage and 255 or (berserkActive and 90 or 235))
 			surface.SetMaterial(background)
-			if berserkActive then
+			if distortThis then
 				surface.DrawTexturedRectRotated(drawX + offsetX * 0.5 + drawSize * 0.5 + distortionX * 0.5, drawY + offsetY * 0.5 + drawSize * 0.5 + distortionY * 0.5, drawSize, drawSize, distortionAngle * 0.5)
 			else
 				surface.DrawTexturedRect(drawX + offsetX * 0.5, drawY + offsetY * 0.5, drawSize, drawSize)
@@ -887,7 +944,7 @@ local function drawMoodles()
 			local iconSize = drawSize - 4
 			local iconCenterX = drawX + 2 + offsetX + iconSize * 0.5
 			local iconCenterY = drawY + 2 + offsetY + iconSize * 0.5
-			if berserkActive then
+			if distortThis then
 				surface.SetDrawColor(255, 70, 70, 30)
 				surface.DrawTexturedRectRotated(iconCenterX - distortionX, iconCenterY - distortionY, iconSize, iconSize, -distortionAngle)
 				surface.SetDrawColor(255, 255, 255, 100)

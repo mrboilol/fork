@@ -277,7 +277,8 @@ module[2] = function(owner, org, timeValue)
 	-- blood volume, preload failure can also remove the prior tachycardia.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
 	local hemorrhagicDecompensation = math.Clamp((2500 - bloodNow) / 500, 0, 1)
-	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, hemorrhagicDecompensation)
+	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, hemorrhagicDecompensation, zerlkersSuppression)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
 

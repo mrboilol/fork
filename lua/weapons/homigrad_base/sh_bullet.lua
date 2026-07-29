@@ -1053,16 +1053,21 @@ if CLIENT then
 else
 	util.AddNetworkString("reject shell")
 	function SWEP:RejectShell(shell)
-		net.Start("reject shell")
-			net.WriteEntity(self)
-			net.WriteString(shell)
 		local owner = self:GetOwner()
+		local rf
+
 		if IsValid(owner) then
-			local rf = RecipientFilter()
+			rf = RecipientFilter()
 			rf:AddPVS(owner:GetPos())
 			if owner:IsPlayer() then
 				rf:AddPlayer(owner)
 			end
+		end
+
+		net.Start("reject shell")
+			net.WriteEntity(self)
+			net.WriteString(shell)
+		if rf then
 			net.Send(rf)
 		else
 			net.Broadcast()

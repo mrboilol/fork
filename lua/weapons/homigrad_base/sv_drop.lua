@@ -136,10 +136,14 @@ function hg.TraceHeldWeaponShot(startPos, endPos, attacker, damage, force, origi
 		if not wep.WorldModel_Transform then continue end
 
 		local pos, ang = wep:WorldModel_Transform(true)
-		local model = wep.worldModel
-		if not pos or not ang or not IsValid(model) then continue end
+		if not pos or not ang then continue end
 
-		local intersectPos, intersectNormal, fraction = util.IntersectRayWithOBB(startPos, ray, pos, ang, model:OBBMins(), model:OBBMaxs())
+		-- worldModel is clientside. Use the SWEP's server-side model bounds at
+		-- the transformed held pose so bullets can actually intersect the gun.
+		local mins, maxs = wep:OBBMins(), wep:OBBMaxs()
+		if not mins or not maxs or mins == maxs then continue end
+
+		local intersectPos, intersectNormal, fraction = util.IntersectRayWithOBB(startPos, ray, pos, ang, mins, maxs)
 		if intersectPos and fraction >= 0 and fraction < closestFraction then
 			closestFraction = fraction
 			hitPlayer = ply
@@ -151,11 +155,18 @@ function hg.TraceHeldWeaponShot(startPos, endPos, attacker, damage, force, origi
 
 	if not IsValid(hitPlayer) or not IsValid(hitWeapon) then return end
 
-	hitWeapon.hg_knocked_from_hands = CurTime() + 0.25
 	local direction = ray:GetNormalized()
-	local impactSpeed = math.Clamp(250 + math.max(tonumber(damage) or 0, 0) * 12 + math.max(tonumber(force) or 0, 0) * 4, 350, 1000)
-	local knockVelocity = direction * impactSpeed + vector_up * math.Rand(80, 160) + VectorRand() * 55
-	hg.drop(hitPlayer, hitWeapon, nil, knockVelocity)
+	local damageAmount = math.max(tonumber(damage) or 0, 0)
+	local forceAmount = math.max(tonumber(force) or 0, 0)
+	local dropChance = math.Clamp(0.12 + damageAmount / 220 + forceAmount / 650, 0.12, 0.55)
+	if math.random() < dropChance then
+		hitWeapon.hg_knocked_from_hands = CurTime() + 0.25
+		local impactSpeed = math.Clamp(250 + damageAmount * 12 + forceAmount * 4, 350, 1000)
+		local knockVelocity = direction * impactSpeed + vector_up * math.Rand(80, 160) + VectorRand() * 55
+		hg.drop(hitPlayer, hitWeapon, nil, knockVelocity)
+	else
+		hitWeapon.hg_knocked_from_hands = CurTime() + 0.05
+	end
 
 	local trace = table.Copy(originalTrace or {})
 	trace.Hit = true

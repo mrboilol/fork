@@ -382,8 +382,8 @@ local panicattackShakeIntervalMax = 1.4
 local panicattackShakeMul = 0.85
 local painBeatOverlayVolumeMul = 1.25
 local painThresholdMax = 120
-local painAgonyThreshold = 0.45
-local painExcruciatingThreshold = 0.87
+local painAgonyThreshold = 60 / painThresholdMax
+local painExcruciatingThreshold = 85 / painThresholdMax
 local painAgonyVolumeMul = 1.15
 local painExcruciatingVolumeMul = 0.85
 local painLayerFadeLerp = 0.06
@@ -811,10 +811,15 @@ drawFinalVitalsVignettes = function()
 
 	local org = lply.new_organism or lply.organism
 	if not org or not org.brain or not org.o2 or not isnumber(org.o2[1]) or not org.analgesia then return end
+	local normalizedPain = math.Clamp((org.pain or 0) / painThresholdMax, 0, 1)
+	local excruciatingBlend = getServerSoundMode("hg_painsound", 6) == 6
+		and math.Clamp(math.Remap(normalizedPain, painExcruciatingThreshold, 1, 0, 1), 0, 1)
+		or 0
+	painThresholdIntensityLerp = LerpFT(painLayerFadeLerp, painThresholdIntensityLerp or 1, 1 + excruciatingBlend * painEffectIntensity)
 
 	if (PainLerp > 0.001 or shockLerp > 5) or org.otrub then
 		local strobe = getPainPulse(org)
-		local pain = PainLerp + strobe
+		local pain = (PainLerp + strobe) * painThresholdIntensityLerp
 		local shock = shockLerp
 
 		render.UpdateScreenEffectTexture()
@@ -1493,7 +1498,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		//if pain > 10 then
 			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 6), 0, 6)
-			local normalizedPain = math.Clamp(pain / 120, 0, 1)
+			local painSoundFraction = math.Clamp((org.pain or 0) / painThresholdMax, 0, 1)
 
 			local targetPainVol = 0
 			local targetRealityVol = 0
@@ -1527,8 +1532,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				-- REM pain stack from the reference: beat + rem_pain + pain-intensity layers.
 				targetPainVol = painVol
 				targetRemPainVol = painVol * painBeatOverlayVolumeMul
-				targetRemAgonyVol = math.Clamp(math.Remap(normalizedPain, painAgonyThreshold, 1, 0, 1), 0, 1) * painVol * painAgonyVolumeMul
-				targetRemExcruciatingVol = math.Clamp(math.Remap(normalizedPain, painExcruciatingThreshold, 1, 0, 1), 0, 1) * painVol * painExcruciatingVolumeMul
+				targetRemAgonyVol = math.Clamp(math.Remap(painSoundFraction, painAgonyThreshold, 1, 0, 1), 0, 1) * painVol * painAgonyVolumeMul
+				targetRemExcruciatingVol = math.Clamp(math.Remap(painSoundFraction, painExcruciatingThreshold, 1, 0, 1), 0, 1) * painVol * painExcruciatingVolumeMul
 			end
 
 			if IsValid(PainStation) then PainStation:SetVolume(targetPainVol) end

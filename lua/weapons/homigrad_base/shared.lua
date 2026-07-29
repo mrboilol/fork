@@ -242,7 +242,10 @@ function SWEP:GetHandSupportState(ply)
 	local postureOneHanded = IsValid(ply) and (ply.posture == 7 or ply.posture == 8)
 
 	if IsValid(ply) then
-		local hands = ply:GetWeapon("weapon_hands_sh")
+		-- Predicted/non-player owners can still be valid entities, but they do not
+		-- expose the Player-only GetWeapon method. Treat them as having no hands
+		-- SWEP instead of crashing the recoil path.
+		local hands = ply.GetWeapon and ply:GetWeapon("weapon_hands_sh") or nil
 		local carryingMain = ply.GetNetVar and IsValid(ply:GetNetVar("carryent")) or false
 		local carryingOffhand = ply.GetNetVar and IsValid(ply:GetNetVar("carryent2")) or false
 		local zmanipLeft = ply.zmanipstart ~= nil and ply.zmanipseq == "interact" and not org.larmamputated

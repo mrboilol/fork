@@ -431,10 +431,13 @@ module[2] = function(owner, org, timeValue)
 	local painkillerLoad = math.Clamp(((org.painkiller or 0) - 2.4) / 1.6, 0, 1)
 	local naloxoneProtection = math.Clamp((org.naloxone or 0) / 4, 0, 1)
 	local opioidRespiratoryDepression = math.Clamp((analgesiaLoad + painkillerLoad) * (1 - naloxoneProtection), 0, 1)
+	local zerlkersRespiratoryDepression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
+	local drugRespiratoryDepression = math.max(opioidRespiratoryDepression, zerlkersRespiratoryDepression)
 	org.opioidRespiratoryDepression = opioidRespiratoryDepression
-	org.respiratoryArrest = opioidRespiratoryDepression >= opioidRespiratoryArrestThreshold
+	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
-	local bloodO2Cap = math.Clamp(interpolateCurve(BloodO2, math.Clamp(org.blood or 5000, 0, 5000)), 0, o2.range)
+	local oxygenBlood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or (org.blood or 5000)
+	local bloodO2Cap = math.Clamp(interpolateCurve(BloodO2, math.Clamp(oxygenBlood, 0, 5000)), 0, o2.range)
 	org.bloodO2Cap = bloodO2Cap
 
 	local bodyTemperature = org.temperature or 36.7
@@ -677,7 +680,7 @@ module[2] = function(owner, org, timeValue)
 
 		local coBreathePenalty = org.CO > 0 and (1 - math.Clamp(org.CO / 15, 0, 0.8)) or 1
 		local coldO2RegenK = Lerp(coldO2Stress, 1, 0.55)
-		local opioidBreathingK = math.Clamp(1 - opioidRespiratoryDepression * 1.15, 0.05, 1)
+		local opioidBreathingK = math.Clamp(1 - drugRespiratoryDepression * 1.15, 0.05, 1)
 		local roleO2RegenMul = hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "O2RegenMul", 1) or 1
 		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * blood_pressure_k * coBreathePenalty * opioidBreathingK * roleO2RegenMul
 		local tracheaDamage = math.Clamp(org.trachea or 0, 0, 1)
@@ -1114,11 +1117,20 @@ kaz
 
 	local k = halfValue2(o2[1], o2.range, o2.k)
 	local tissueO2 = math.Clamp(o2[1], 0, o2.range)
+	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
+	local hypoxiaBands = {
+		normal = HypoxiaBands.normal - resilience * 3,
+		impaired = HypoxiaBands.impaired - resilience * 3,
+		heavy = HypoxiaBands.heavy - resilience * 2,
+		incapacitating = HypoxiaBands.incapacitating - resilience * 1.5,
+		deep = HypoxiaBands.deep,
+		terminal = HypoxiaBands.terminal,
+	}
 	local staminaMax = org.stamina and math.max(org.stamina.max or 180, 1) or 180
-	if tissueO2 > HypoxiaBands.terminal then org._zeroO2Time = 0 end
+	if tissueO2 > hypoxiaBands.terminal then org._zeroO2Time = 0 end
 
-	if tissueO2 < HypoxiaBands.normal and tissueO2 >= HypoxiaBands.impaired then
-		local severity = math.Clamp((HypoxiaBands.normal - tissueO2) / (HypoxiaBands.normal - HypoxiaBands.impaired), 0, 1)
+	if tissueO2 < hypoxiaBands.normal and tissueO2 >= hypoxiaBands.impaired then
+		local severity = math.Clamp((hypoxiaBands.normal - tissueO2) / (hypoxiaBands.normal - hypoxiaBands.impaired), 0, 1)
 		org.disorientation = math.max(org.disorientation or 0, 0.15 + severity * 0.3)
 		-- Oxygen deprivation should affect awareness before it reaches the
 		-- heavy-hypoxia drain bands below.
@@ -1126,8 +1138,8 @@ kaz
 		if org.stamina and org.stamina[1] then
 			org.stamina[1] = math.max(org.stamina[1] - timeValue * severity * staminaMax / 180, 0)
 		end
-	elseif tissueO2 < HypoxiaBands.impaired and tissueO2 >= HypoxiaBands.heavy then
-		local severity = math.Clamp((HypoxiaBands.impaired - tissueO2) / (HypoxiaBands.impaired - HypoxiaBands.heavy), 0, 1)
+	elseif tissueO2 < hypoxiaBands.impaired and tissueO2 >= hypoxiaBands.heavy then
+		local severity = math.Clamp((hypoxiaBands.impaired - tissueO2) / (hypoxiaBands.impaired - hypoxiaBands.heavy), 0, 1)
 		org.needfake = true
 		org.disorientation = math.max(org.disorientation or 0, 0.55 + severity * 0.45)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.05 + severity * 0.12), 0)
@@ -1135,20 +1147,20 @@ kaz
 			org.stamina[1] = math.max(org.stamina[1] - timeValue * staminaMax / 75, 0)
 		end
 		if org.isPly then hg.LightStunPlayer(owner, 3) end
-	elseif tissueO2 < HypoxiaBands.heavy and tissueO2 >= HypoxiaBands.incapacitating then
-		local severity = math.Clamp((HypoxiaBands.heavy - tissueO2) / (HypoxiaBands.heavy - HypoxiaBands.incapacitating), 0, 1)
+	elseif tissueO2 < hypoxiaBands.heavy and tissueO2 >= hypoxiaBands.incapacitating then
+		local severity = math.Clamp((hypoxiaBands.heavy - tissueO2) / (hypoxiaBands.heavy - hypoxiaBands.incapacitating), 0, 1)
 		org.needfake = true
 		if tissueO2 < 7 or (org.consciousness or 1) < 0.35 then org.needotrub = true end
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.18 + severity * 0.28), 0)
 		org.brain = math.min((org.brain or 0) + timeValue * (0.0015 + severity * 0.0025), 1)
 		if org.isPly then hg.StunPlayer(owner, 3) end
-	elseif tissueO2 < HypoxiaBands.incapacitating and tissueO2 > HypoxiaBands.terminal then
-		local severity = math.Clamp((HypoxiaBands.incapacitating - tissueO2) / (HypoxiaBands.incapacitating - HypoxiaBands.deep), 0, 1)
+	elseif tissueO2 < hypoxiaBands.incapacitating and tissueO2 > hypoxiaBands.terminal then
+		local severity = math.Clamp((hypoxiaBands.incapacitating - tissueO2) / (hypoxiaBands.incapacitating - hypoxiaBands.deep), 0, 1)
 		org.needfake = true
 		org.needotrub = true
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.55 + severity * 0.55), 0)
 		org.brain = math.min((org.brain or 0) + timeValue * (0.004 + severity * 0.006), 1)
-	elseif tissueO2 <= HypoxiaBands.terminal then
+	elseif tissueO2 <= hypoxiaBands.terminal then
 		org.needfake = true
 		org.needotrub = true
 		org.consciousness = 0

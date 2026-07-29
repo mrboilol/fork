@@ -423,8 +423,8 @@ HUD = {
 	
 	status_effects_x = -10,
 	status_effects_y = 80,
-	status_effects_spacing = 55,
-	status_effects_size = 58,
+	status_effects_spacing = 59,
+	status_effects_size = 62,
 	show_status_effects = cvar_status_effects:GetBool(),
 	brain_distortion_enabled = cvar_brain_distortion:GetBool(),
 	

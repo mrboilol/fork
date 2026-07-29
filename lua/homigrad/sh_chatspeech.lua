@@ -1,7 +1,7 @@
 HG_CHAT_SPEECH = HG_CHAT_SPEECH or {}
 local CHAT_SPEECH = HG_CHAT_SPEECH
 local soundPrefix = "panoptisscon/"
-local letterInterval = 0.16
+local letterInterval = 0.10
 local maxLetters = 48
 
 if SERVER then

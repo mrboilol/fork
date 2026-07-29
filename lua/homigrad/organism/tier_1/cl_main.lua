@@ -516,6 +516,8 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local otrub = lply:Alive() and org.otrub or false
 	local analgesia = organism.analgesia or 0
 	local analgesiaVisual = analgesia >= 1 and (org.seizureActive and math.max(analgesia * 3, 3) or analgesia) or 0
+	local zerlkersOverdose = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
+	analgesiaVisual = math.max(analgesiaVisual, 1 + zerlkersOverdose * 2.5)
 	local health = health
 	local disorientation = org.disorientation or 0
 	local immobilization = org.immobilization or 0

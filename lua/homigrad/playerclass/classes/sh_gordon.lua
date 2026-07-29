@@ -436,8 +436,8 @@ if CLIENT then
         draw.GlowingText( hpTxt, "HEVFontDefault", pos[1]+size[1]*0.08, pos[2]+(size[2]/2) - txtSizeY/2, color_hp, color_glow, nil, TEXT_ALIGN_RIGHT)
         oldHpTxt = hpTxt
 
-        draw.DrawText("Medicine","HEVFontSmall",pos[1]+size[1]*0.085+1,pos[2]+(size[2]/1.8)+1,color_bg,TEXT_ALIGN_LEFT)
-        draw.DrawText("Medicine","HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/1.8),color_hp,TEXT_ALIGN_LEFT)
+        draw.DrawText("Medicine","HEVFontSmall",pos[1]+size[1]*0.14+1,pos[2]+(size[2]/1.8)+1,color_bg,TEXT_ALIGN_LEFT)
+        draw.DrawText("Medicine","HEVFontSmall",pos[1]+size[1]*0.14,pos[2]+(size[2]/1.8),color_hp,TEXT_ALIGN_LEFT)
         
         local armor = self:GetNetVar("HEVPower") or 0
         armorlerp = Lerp(FRT,armorlerp,armor > 1 and 1 or 0)
@@ -454,8 +454,8 @@ if CLIENT then
         color_glow_ar.a = math.Round( Lerp( FRT, color_glow_ar.a, oldArTxt ~= armorTxt and 255 or 0 ) ) 
         draw.GlowingText( armorTxt, "HEVFontDefault", pos[1]+size[1]*0.08, pos[2]+(size[2]/2) - txtSizeY/2, color_ar, color_glow_ar, nil, TEXT_ALIGN_RIGHT)
         oldArTxt = armorTxt
-        draw.DrawText("Armor","HEVFontSmall",pos[1]+size[1]*0.085+1,pos[2]+(size[2]/1.8)+1,color_bg,TEXT_ALIGN_LEFT)
-        draw.DrawText("Armor","HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/1.8),color_ar,TEXT_ALIGN_LEFT)
+        draw.DrawText("Armor","HEVFontSmall",pos[1]+size[1]*0.14+1,pos[2]+(size[2]/1.8)+1,color_bg,TEXT_ALIGN_LEFT)
+        draw.DrawText("Armor","HEVFontSmall",pos[1]+size[1]*0.14,pos[2]+(size[2]/1.8),color_ar,TEXT_ALIGN_LEFT)
         -- Sights
         local wep = self:GetActiveWeapon()
         if IsValid(wep) then
@@ -493,8 +493,8 @@ if CLIENT then
             draw.GlowingText( ammoTxt, "HEVFontDefault", pos[1]+size[1]*0.08, pos[2]+(size[2]/2) - txtSizeY/2, color_ar, color_glow_ammo,nil, TEXT_ALIGN_RIGHT)
             oldAmmoTxt = ammoTxt
 
-            draw.DrawText( "Ammo", "HEVFontSmall",pos[1]+size[1]*0.085+1,pos[2]+(size[2]/1.8)+1,color_bg,TEXT_ALIGN_LEFT)
-            draw.DrawText( "Ammo", "HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/1.8),color_ar,TEXT_ALIGN_LEFT)
+            draw.DrawText( "Ammo", "HEVFontSmall",pos[1]+size[1]*0.14+1,pos[2]+(size[2]/1.8)+1,color_bg,TEXT_ALIGN_LEFT)
+            draw.DrawText( "Ammo", "HEVFontSmall",pos[1]+size[1]*0.14,pos[2]+(size[2]/1.8),color_ar,TEXT_ALIGN_LEFT)
         end
         --Blood
         local pos, size = drawBGPanel(0.035,0.25)
@@ -512,8 +512,8 @@ if CLIENT then
         
         draw.DrawText(BloodTxt,"HEVFontSmall",pos[1]+size[1]*-0.09,pos[2]+(size[2]/2),color_bg,TEXT_ALIGN_LEFT)
         draw.DrawText(BloodTxt,"HEVFontSmall",pos[1]+size[1]*-0.09,pos[2]+(size[2]/2),color_bld,TEXT_ALIGN_LEFT)
-        draw.DrawText("Blood/Ml","HEVFontSmall",pos[1]+size[1]*0.085+1,pos[2]+(size[2]/2)+1,color_bg,TEXT_ALIGN_LEFT)
-        draw.DrawText("Blood/Ml","HEVFontSmall",pos[1]+size[1]*0.085,pos[2]+(size[2]/2),color_bld,TEXT_ALIGN_LEFT)
+        draw.DrawText("Blood/Ml","HEVFontSmall",pos[1]+size[1]*0.14+1,pos[2]+(size[2]/2)+1,color_bg,TEXT_ALIGN_LEFT)
+        draw.DrawText("Blood/Ml","HEVFontSmall",pos[1]+size[1]*0.14,pos[2]+(size[2]/2),color_bld,TEXT_ALIGN_LEFT)
     end
 
     local hevMat = Material("sprites/mat_jack_helmoverlay_r")

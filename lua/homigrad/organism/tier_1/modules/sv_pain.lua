@@ -83,6 +83,7 @@ module[2] = function(owner, org, timeValue)
 	local adrenalineMul = min(max(1 + org.adrenaline, 1), 1.2)
 
 	local adrenaline = org.adrenaline
+	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
 	local anger = Clamp(org.anger or 0, 0, 1)
 
 	local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
@@ -139,13 +140,14 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	org.pain_turn = org.otrub and adrenalineMul * otrub_pain_tolerance or adrenalineMul * pain_tolerance
+	local painToleranceMul = 1 + resilience * 0.2
+	org.pain_turn = (org.otrub and adrenalineMul * otrub_pain_tolerance or adrenalineMul * pain_tolerance) * painToleranceMul
 
 	local owner = org.owner
 
 	
 
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5), 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75), 0) end
 	org.immobilization = max(org.immobilization - timeValue * 5 * adrenalineMul, 0)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
@@ -155,16 +157,11 @@ module[2] = function(owner, org, timeValue)
 	local add = shouldPainAdd and math.min(timeValue * 15, org.painadd) or 0
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
-	-- Adrenaline normally delays both the pain arriving and the body settling it.
-	-- Combat anger reverses the recovery side: the stronger the rush, the faster
-	-- existing pain settles instead of being prolonged.
+	-- Adrenaline delays incoming pain while adrenaline and Zerlkers both help
+	-- existing pain settle faster, keeping an injured character functional.
 	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
 	add = add * adrenalinePainPacing
-	if anger > 0 then
-		sub = sub * (1 + adrenaline * (0.5 + anger * 0.5))
-	else
-		sub = sub * adrenalinePainPacing
-	end
+	sub = sub * (1 + resilience * 0.65 + adrenaline * anger * 0.5)
 
 
 
@@ -200,10 +197,11 @@ module[2] = function(owner, org, timeValue)
 	if org.pain > pain_shock_threshold then
 		local painShockTarget = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_target, pain_shock_max_target), pain_shock_target, pain_shock_max_target)
 		local painShockGain = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_gain, pain_shock_max_gain), pain_shock_gain, pain_shock_max_gain)
-		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain)
+		painShockTarget = painShockTarget * (1 - resilience * 0.25)
+		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain * (1 - resilience * 0.25))
 	end
 
-	local shockThreshold = shock_consciousness_threshold * analgesiaMul * painkillerMul
+	local shockThreshold = shock_consciousness_threshold * analgesiaMul * painkillerMul * (1 + resilience * 0.6)
 	local shockActive = org.shock > shockThreshold
 	if shockActive then
 		local shockTarget = Clamp(math.Remap(org.shock, shockThreshold, shock_consciousness_max, shock_consciousness_soft_target, shock_consciousness_hard_target), shock_consciousness_hard_target, shock_consciousness_soft_target)
@@ -218,7 +216,8 @@ module[2] = function(owner, org, timeValue)
 
 		org.consciousness = math.Approach(org.consciousness, 0, timeValue / 30 * org.tranquilizer)
 	elseif not shockActive then
-		local target = org.blood < 2500 and (org.blood - 2000) / 500 or 1
+		local effectiveBlood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood
+		local target = effectiveBlood < 2500 and (effectiveBlood - 2000) / 500 or 1
 		local recovery_speed = consciousness_recovery_speed
 		if org.otrub or org.consciousness < consciousness_otrub_threshold then
 			recovery_speed = otrub_consciousness_recovery_speed
@@ -241,14 +240,15 @@ module[2] = function(owner, org, timeValue)
 	end
 
 
-	if org.consciousness < consciousness_otrub_threshold then
+	local consciousnessResistance = 1 - resilience * 0.3
+	if org.consciousness < consciousness_otrub_threshold * consciousnessResistance then
 		org.needotrub = true
 
 	end
 
 
 
-	if org.consciousness < consciousness_fake_threshold then
+	if org.consciousness < consciousness_fake_threshold * consciousnessResistance then
 		org.needfake = true
 
 	end

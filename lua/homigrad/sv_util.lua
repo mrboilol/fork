@@ -1847,6 +1847,26 @@ end
 local hg_temperaturesystem = CreateConVar("hg_temperaturesystem", 1, FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Toggle temperature system", 0, 1)
 local sf2_get_temp = StormFox2 and StormFox2.Temperature and StormFox2.Temperature.Get or nil
 
+local armorInsulationByPlacement = {
+	torso = 0.32,
+	head = 0.12,
+	face = 0.08,
+	ears = 0.04,
+}
+
+local function getArmorInsulation(owner)
+	local equipped = owner:GetNetVar("Armor", owner.armors or {})
+	if not istable(equipped) then return 0 end
+	local insulation = 0
+	for placement, armorName in pairs(equipped) do
+		local armor = hg.armor and hg.armor[placement] and hg.armor[placement][armorName]
+		if armor then
+			insulation = insulation + math.max(tonumber(armor.insulation) or armorInsulationByPlacement[placement] or 0.04, 0)
+		end
+	end
+	return math.Clamp(insulation, 0, 0.6)
+end
+
 hook.Add("StormFox2.PostEntityScan","load-stormfox-support",function()
 	sf2_get_temp = StormFox2 and StormFox2.Temperature and StormFox2.Temperature.Get or nil
 end)
@@ -1919,6 +1939,13 @@ hook.Add("Org Think", "BodyTemperature", function(owner, org, timeValue) -- пе
 	if temp < -20 then
 		changeRate = changeRate * math.abs(temp) * 0.1
 	end
+	-- Armor slows heat loss according to the body area it covers. Individual
+	-- pieces may override the placement default with an insulation field.
+	local armorInsulation = getArmorInsulation(owner)
+	if temp < (org.needed_temp or 36.7) then
+		changeRate = changeRate * (1 - armorInsulation)
+	end
+	org.armorInsulation = armorInsulation
 	local result1,result2,result3 = hook.Run("ZC_BodyTemperature", owner, org, timeValue, changeRate, MaxWarmMul, warmLoseMul)
 	if result1 and result2 and result3 then
 		changeRate = result1

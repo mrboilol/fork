@@ -98,6 +98,7 @@ end
 
 -- Better sound system from oldring
 local SOUND_HEART = "health/critbeat.ogg"
+local SOUND_HEALTH_ALARM = "health/healthbeat.ogg"
 local SOUND_FLATLINE = "health/gg.ogg"
 local SOUND_FIBRILLATION = "criticalbeats.ogg"
 local CRITBEAT_VOLUME_SCALE = 0.6
@@ -203,6 +204,7 @@ local nearDeathClasses = {
 
 local hg_unconsciousring = CreateClientConVar("hg_unconsciousring", "1", true, false, "Enable unconscious ring", 0, 1)
 local hg_unconsciousclassic = CreateClientConVar("hg_unconsciousclassic", "0", true, false, "Use classic dots instead of EKG line", 0, 1)
+local hg_simpleecg = CreateClientConVar("hg_simpleecg", "1", true, false, "Use the compact ECG below the health indicator", 0, 1)
 
 local function GetHeartbeatVolume(org)
     if not org then return 0.2 end
@@ -372,6 +374,7 @@ end
 
 local function RequestFibrillationSound(volume)
     if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then return end
+    if hg and hg.healthAlarmActive then return end
     fibrillationRequested = true
     fibrillationVolume = math.max(fibrillationVolume, math.Clamp(volume or 1, 0, 1))
 end
@@ -443,10 +446,12 @@ local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
             beatVolume = 1.0
         end
 
-        if not fibrillating and (abnormalPulse or highStress) then
-            EmitRingSound(SOUND_HEART, beatVolume * CRITBEAT_VOLUME_SCALE)
+        if fibrillating and hg and hg.healthAlarmActive then
+            EmitRingSound(SOUND_HEALTH_ALARM, beatVolume)
+        elseif not fibrillating and (abnormalPulse or highStress) then
+            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or SOUND_HEART, beatVolume * CRITBEAT_VOLUME_SCALE)
         elseif not fibrillating then
-            EmitRingSound("sound/heartbeat/heartbeat_single.wav", beatVolume)
+            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.wav", beatVolume)
         end
     end
 end
@@ -768,6 +773,7 @@ end
 
 hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not hg_unconsciousring:GetBool() then
+        if hg then hg.healthAlarmActive = false end
         ringAlpha = 0
         lastPhaseMod = 0
         ResetRingAudio()
@@ -776,6 +782,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     local ply = LocalPlayer()
     if not IsValid(ply) or not ply:Alive() then
+        if hg then hg.healthAlarmActive = false end
         ringAlpha = 0
         unconsciousStartTime = nil
         lastPhaseMod = 0
@@ -785,6 +792,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     
     local org = ply.organism
     if not org then 
+        if hg then hg.healthAlarmActive = false end
         ringAlpha = 0
         unconsciousStartTime = nil
         lastPhaseMod = 0
@@ -842,13 +850,16 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or brainHemorrhage >= 0.25
         or (heartbeat < 30 or heartbeat > 170)
     
-    if not ply:Alive() or isUnconscious or not isInBadHealth then
+    local healthAlarmActive = ply:Alive() and not isUnconscious and isNearDeathClass and isInBadHealth
+    if hg then hg.healthAlarmActive = healthAlarmActive end
+
+    if not healthAlarmActive then
         if alertPlayed then
             if IsValid(alertSound) then alertSound:Stop() end
             alertPlayed = false
             alertSound = nil
         end
-    elseif isNearDeathClass and isInBadHealth and not alertPlayed then
+    elseif not alertPlayed then
         sound.PlayFile("sound/health/alert.ogg", "noblock noplay", function(s)
             if IsValid(s) then
                 s:EnableLooping(true)
@@ -931,9 +942,33 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if otrubECGAlpha > 0.01 then
         local scrW, scrH = ScrW(), ScrH()
         local boxScale = math.Clamp(scrH / 1080, 0.75, 1.2)
-        local boxW, boxH = 360 * boxScale, 150 * boxScale
+        local simpleECG = hg_simpleecg:GetBool()
+        local boxW = (simpleECG and 300 or 360) * boxScale
+        local boxH = (simpleECG and 100 or 150) * boxScale
         local edgeMargin = 24 * boxScale
         local boxX, boxY = scrW - boxW - edgeMargin, scrH - boxH - edgeMargin
+
+        if simpleECG then
+            local indicator = HUD and HUD.dynamicIndicator
+            if indicator and indicator.active then
+                boxX = indicator.x
+                boxY = math.Clamp(indicator.y + indicator.h + 10 * boxScale,
+                    edgeMargin, scrH - boxH - edgeMargin)
+            else
+                boxX = edgeMargin
+                boxY = math.Clamp(scrH * 0.5 + 120 * boxScale,
+                    edgeMargin, scrH - boxH - edgeMargin)
+            end
+
+            surface.SetDrawColor(0, 0, 0, 130 * otrubECGAlpha)
+            surface.DrawRect(boxX, boxY, boxW, boxH)
+            surface.SetDrawColor(110, 125, 120, 120 * otrubECGAlpha)
+            surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
+        end
+
+        local traceCenterY = simpleECG and (boxY + boxH * 0.5) or (boxY + boxH * 0.62)
+        local traceWidth = simpleECG and (boxW - 16 * boxScale) or (boxW - 28 * boxScale)
+        local traceHeight = simpleECG and (boxH - 16 * boxScale) or (boxH - 52 * boxScale)
         
         if isUnconscious or lowConsciousness then
             local wakeSeconds, wakeProgress = UpdateWakeEstimate(org)
@@ -952,10 +987,12 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                 statusText = "CONSCIOUSNESS FALLING"
             end
 
-            DrawECGStatusBox(boxX, boxY, boxW, boxH, borderInset, statusColor,
-                otrubECGAlpha, statusText, ecgState)
+            if not simpleECG then
+                DrawECGStatusBox(boxX, boxY, boxW, boxH, borderInset, statusColor,
+                    otrubECGAlpha, statusText, ecgState)
+            end
 
-            if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
+            if not simpleECG and hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
                 lastPhaseMod = 0
                 local dotText = isCritical and ({".!", "..!", "...!"})[dotBeat + 1]
                     or ({".", "..", "..."})[dotBeat + 1]
@@ -963,9 +1000,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             else
                 UpdateRingAudio(heartbeat, otrubECGAlpha, org, admiring)
-                DrawEKG(centerEKGState, boxX + boxW / 2, boxY + boxH * 0.62,
-                    boxW - 28 * boxScale, boxH - 52 * boxScale, heartbeat, pulse,
-                    ecgState, org.palpitations, statusColor, otrubECGAlpha)
+                DrawEKG(centerEKGState, boxX + boxW / 2, traceCenterY,
+                    traceWidth, traceHeight, heartbeat, pulse, ecgState,
+                    org.palpitations, statusColor, otrubECGAlpha)
             end
         else
             local severity = abnormalECG and GetAwakeECGSeverity(ecgState) or 0
@@ -975,11 +1012,13 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             local borderInset = severity * 10 * boxScale
             local statusText = abnormalECG and "RHYTHM ALERT" or "SINUS RHYTHM"
 
-            DrawECGStatusBox(boxX, boxY, boxW, boxH, borderInset, awakeColor,
-                otrubECGAlpha, statusText, ecgState)
-            DrawEKG(centerEKGState, boxX + boxW / 2, boxY + boxH * 0.62,
-                boxW - 28 * boxScale, boxH - 52 * boxScale, heartbeat, pulse,
-                ecgState, org.palpitations, awakeColor, otrubECGAlpha)
+            if not simpleECG then
+                DrawECGStatusBox(boxX, boxY, boxW, boxH, borderInset, awakeColor,
+                    otrubECGAlpha, statusText, ecgState)
+            end
+            DrawEKG(centerEKGState, boxX + boxW / 2, traceCenterY,
+                traceWidth, traceHeight, heartbeat, pulse, ecgState,
+                org.palpitations, awakeColor, otrubECGAlpha)
         end
     end
 
@@ -1054,12 +1093,16 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     local fibrillating = heartbeat > 250
                     if (abnormalPulse and hasHealthHUD) or highStress or admiring then
                         if fibrillating then
-                            RequestFibrillationSound(vol)
+                            if hg and hg.healthAlarmActive then
+                                EmitRingSound(SOUND_HEALTH_ALARM, vol)
+                            else
+                                RequestFibrillationSound(vol)
+                            end
                         else
-                            EmitRingSound(SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
+                            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
                         end
                     else
-                        EmitRingSound("sound/heartbeat/heartbeat_single.wav", vol)
+                        EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.wav", vol)
                     end
                 end
             end
@@ -1074,7 +1117,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     UpdateFibrillationSound()
     
-    if isNearDeathClass and isInBadHealth then
+    if healthAlarmActive then
         local flashCycle = math.floor(CurTime() / 0.65)
         local isVisible = flashCycle % 2 == 0
         if isVisible then
@@ -1088,7 +1131,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             elseif className == "furry" then
                 font = "ZB_ProotOSMedium"
             end
-            draw.SimpleText(msg, font, ScrW() / 2, ScrH() * 0.88, Color(255, 0, 0, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText(msg, font, ScrW() / 2, ScrH() * 0.2, Color(255, 0, 0, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         end
     end
 

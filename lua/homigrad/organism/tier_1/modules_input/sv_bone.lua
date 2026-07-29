@@ -70,6 +70,37 @@ local function emitRandomBoneBreakSound(ent, volume, level)
 	end
 end
 
+local armDropChances = {
+	shot = {larm = 0.006, rarm = 0.025},
+	dislocation = {larm = 0.09, rarm = 0.32},
+	fracture = {larm = 0.12, rarm = 0.42},
+}
+
+local function tryDropHeldItemFromArmInjury(org, key, reason)
+	if not SERVER or not org.isPly or (key ~= "larm" and key ~= "rarm") then return end
+	local owner = org.owner
+	if not IsValid(owner) or not owner:Alive() then return end
+	local chance = armDropChances[reason] and armDropChances[reason][key] or 0
+	if chance <= 0 or math.random() >= chance then return end
+	local wep = owner:GetActiveWeapon()
+	if not IsValid(wep) then owner:DropObject() return end
+	if wep.GetCarrying and wep.SetCarrying and IsValid(wep:GetCarrying()) then
+		if key == "larm" and wep.UsingLeftHand == false then return end
+		if key == "rarm" and wep.UsingRightHand == false then return end
+		wep:SetCarrying()
+		owner:DropObject()
+		return
+	end
+	if wep.NoDrop then return end
+	if key == "larm" then
+		local rightMissing = org.rarmamputated == true
+		local oneHandedItem = wep.OneHandedOnly == true or wep.TwoHanded == false
+		if oneHandedItem and not rightMissing then return end
+	end
+	hook.Run("PlayerDropWeapon", owner)
+	owner:DropObject()
+end
+
 local function playBoneFractureSound(ent)
 	emitRandomBoneBreakSound(ent)
 end
@@ -273,6 +304,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 
 	if org[key] == 1 then
 		addBrokenBoneHitTrauma(org, key, dmg, 0.5)
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot") end
 		return 0
 	end
 
@@ -281,8 +313,14 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	org[key] = org[key] * 0.5
 	markDamagedBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"), dmg)
 
-	if dmg < 0.6 then return 0 end
-	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then return 0 end
+	if dmg < 0.6 then
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot") end
+		return 0
+	end
+	if dmg < 1 and !dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) then
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then tryDropHeldItemFromArmInjury(org, key, "shot") end
+		return 0
+	end
 
 	if org.isPly and !org[key .. "amputated"] then org.just_damaged_bone = CurTime() end
 
@@ -297,6 +335,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.fearadd = org.fearadd + 0.5
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
+		tryDropHeldItemFromArmInjury(org, key, "fracture")
 	else
 		org[key .. "dislocation"] = true
 		markBrokenBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"))
@@ -306,6 +345,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.fearadd = org.fearadd + 0.5
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
+		tryDropHeldItemFromArmInjury(org, key, "dislocation")
 	end
 
 	hg.AddHarmToAttacker(dmgInfo, (org[key] - oldDmg) * 1.5, "Arms bone damage harm")

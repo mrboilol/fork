@@ -269,6 +269,8 @@ hook.Add("CreateMove", "surrender_weapon_lock_input", function(cmd)
     cmd:SetImpulse(0)
 end)
 
+local ExitSurrender
+
 hook.Add("Think", "surrender_kneel_weapon_watch", function()
     local ply = LocalPlayer()
     if not (inSurrender or inKneel or kneelExiting) then
@@ -310,7 +312,7 @@ local function CanExitSurrender()
     return CurTime() >= (surrenderStartTime + MIN_SURRENDER_TIME)
 end
 
-local function ExitSurrender(ply, silent)
+ExitSurrender = function(ply, silent)
     if not inSurrender then return end
     if not CanExitSurrender() then
         if SurrText() then ply:ChatPrint("You cannot lower your hands yet! ("..math.ceil(surrenderStartTime + MIN_SURRENDER_TIME - CurTime()).."s)") end

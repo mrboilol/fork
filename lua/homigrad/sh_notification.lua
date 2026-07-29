@@ -99,7 +99,7 @@ if CLIENT then
 	surface.CreateFont("HuyFont", {
 		font = "VCR OSD Mono",
 		extended = true,
-		size = ScreenScale(9),
+		size = ScreenScale(8),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -114,7 +114,7 @@ if CLIENT then
 	surface.CreateFont("RemorseismNotificationLarge", {
 		font = "VCR OSD Mono",
 		extended = true,
-		size = ScreenScale(12),
+		size = ScreenScale(10),
 		weight = 700,
 		antialias = true,
 		shadow = true,
@@ -123,7 +123,7 @@ if CLIENT then
 	surface.CreateFont("SmallHuyFont", {
 		font = "BudgetLabel",
 		extended = true,
-		size = ScreenScale(7),
+		size = ScreenScale(6),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -136,7 +136,7 @@ if CLIENT then
 	surface.CreateFont("EmojiFont", {
 		font = "Segoe UI Emoji",
 		extended = true,
-		size = ScreenScale(9),
+		size = ScreenScale(8),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -149,7 +149,7 @@ if CLIENT then
 	surface.CreateFont("EmojiFontDesperate", {
 		font = "Segoe UI Emoji",
 		extended = true,
-		size = ScreenScale(12),
+		size = ScreenScale(10),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,
@@ -425,7 +425,7 @@ if CLIENT then
 					tbl[2] = tbl[2] + FrameTime() / 1.5
 				end
 
-				if click != oldclick and not last_message then
+				if click != oldclick and not last_message and not (hg and hg.healthAlarmActive) then
 					sound.Play("peepsnd", render.GetViewSetup().origin - vector_up * 10)
 					//surface.PlaySound("peepsnd")
 					oldclick = click

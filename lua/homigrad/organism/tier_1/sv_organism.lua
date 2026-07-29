@@ -219,6 +219,8 @@ hook.Add("Org Clear", "Main", function(org)
 	org.assimilated = 0
 	org.berserk = 0
 	org.noradrenaline = 0
+	org.zerlkers = 0
+	org.zerlkersOverdose = 0
 	org.panicattackadd = 0
 	org.panicattack = 0
 	org.panicattackActive = false
@@ -268,7 +270,9 @@ end)
 
 hook.Add("Should Fake Up", "organism", function(ply)
 	local org = ply.organism
-	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (org.blood < 2900) or org.consciousness <= 0.4 then
+	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
+	local resilientBlood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood
+	if org.seizureActive or org.otrub or org.fake or org.nearpainlimit or org.shock > 40 * (1 + resilience * 0.5) or org.spine1 >= hg.organism.fake_spine1 or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3 or (org.lleg == 1 and org.rleg == 1) and org.berserk <= 0.3 or (resilientBlood < 2900) or org.consciousness <= 0.4 * (1 - resilience * 0.3) then
 		return false
 	end
 end)
@@ -338,11 +342,27 @@ function hg.organism.UpdateIntracranialPressure(org, pressure, timeValue)
 	return org.cerebralPerfusion
 end
 
+-- Zerlkers and adrenaline keep an injured character functional for longer.
+-- This is resistance, not replacement blood or oxygen: terminal physiology
+-- still wins, while the weakness and unconsciousness bands arrive later.
+function hg.organism.GetResilience(org)
+	if not org then return 0 end
+
+	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
+	local adrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
+	return math.max(zerlkers, adrenaline)
+end
+
+function hg.organism.GetResilientBlood(org)
+	return math.min((org and org.blood or 5000) + hg.organism.GetResilience(org) * 600, 5000)
+end
+
 function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if not org then return end
 
 	local dt = timeValue or engine.TickInterval()
-	local blood = math.max(org.blood or 0, 0)
+	local resilience = hg.organism.GetResilience(org)
+	local blood = math.max(hg.organism.GetResilientBlood(org), 0)
 	-- Compensation masks most of the loss above 4000 mL. Below that, delivery
 	-- falls in stages: mild weakness by 3500, trouble by 3000, then the severe
 	-- perfusion/otrub range starts at 2500 and reaches no sustainable flow at 2000.
@@ -371,7 +391,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local venousPenalty = math.Clamp(venousBleed / 65, 0, 0.18)
 	local internalPenalty = math.Clamp(internalBleed / 45, 0, 0.22)
 	local internalComplicationPenalty = internalBleedComplication * 0.22
-	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35)
+	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35) * (1 - resilience * 0.3)
 	local throatPenalty = math.Clamp(org.throatCutPressureShock or 0, 0, 1)
 	local neckPenalty = math.Clamp(org.neckBrainOxygenPenalty or 0, 0, 1)
 	local arterialImpairment = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
@@ -395,27 +415,31 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	org.brainoxygen = updateNormalizedVital(org.brainoxygen, brainTarget, dt, 0.45, 2.6)
 	org.peripheralperfusion = updateNormalizedVital(org.peripheralperfusion, peripheralTarget, dt, 0.55, 2.8)
 
-	org.perfusionMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1)
-	org.perfusionGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1)
+	local rawMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1)
+	local rawGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1)
+	org.perfusionMoveMul = math.min(rawMoveMul + resilience * 0.2, 1)
+	org.perfusionGripMul = math.min(rawGripMul + resilience * 0.15, 1)
 
-	local badHypoxia = org.brainoxygen < 0.45 or org.cerebralPerfusion < 0.4 or org.perfusion < 0.35
-	local severeHypoxia = org.brainoxygen < 0.22 or org.cerebralPerfusion < 0.18 or org.perfusion < 0.16
+	local thresholdMul = 1 - resilience * 0.25
+	local badHypoxia = org.brainoxygen < 0.45 * thresholdMul or org.cerebralPerfusion < 0.4 * thresholdMul or org.perfusion < 0.35 * thresholdMul
+	local severeHypoxia = org.brainoxygen < 0.22 * thresholdMul or org.cerebralPerfusion < 0.18 * thresholdMul or org.perfusion < 0.16 * thresholdMul
 	org.hypoxia = math.Clamp(1 - math.min(org.bodyoxygen, org.brainoxygen, org.cerebralPerfusion, org.perfusion), 0, 1)
 	org.hypoxiaTime = badHypoxia and math.min((org.hypoxiaTime or 0) + dt * (severeHypoxia and 2.25 or 1), 120) or math.Approach(org.hypoxiaTime or 0, 0, dt * 2)
 	org.severeHypoxiaTime = severeHypoxia and math.min((org.severeHypoxiaTime or 0) + dt, 120) or math.Approach(org.severeHypoxiaTime or 0, 0, dt * 1.5)
 
 	if owner and owner.IsBerserk and owner:IsBerserk() then return end
-	if org.brainoxygen < 0.55 and ((org.hypoxiaTime or 0) > 8 or (org.severeHypoxiaTime or 0) > 3) then
+	local delayMul = 1 + resilience * 0.6
+	if org.brainoxygen < 0.55 * thresholdMul and ((org.hypoxiaTime or 0) > 8 * delayMul or (org.severeHypoxiaTime or 0) > 3 * delayMul) then
 		org.consciousness = math.min(org.consciousness or 1, math.Clamp(math.Remap(org.brainoxygen, 0.18, 0.55, 0.05, 1), 0.05, 1))
 	end
-	if org.perfusion < 0.4 and ((org.hypoxiaTime or 0) > 10 or (org.severeHypoxiaTime or 0) > 4) then
+	if org.perfusion < 0.4 * thresholdMul and ((org.hypoxiaTime or 0) > 10 * delayMul or (org.severeHypoxiaTime or 0) > 4 * delayMul) then
 		org.disorientation = math.max(org.disorientation or 0, math.Remap(org.perfusion, 0.4, 0, 1.5, 6))
 	end
-	if org.peripheralperfusion < 0.32 then
+	if org.peripheralperfusion < 0.32 * thresholdMul then
 		org.immobilization = math.max(org.immobilization or 0, math.Remap(org.peripheralperfusion, 0.32, 0, 1.5, 7))
 	end
-	if (org.perfusion < 0.32 or org.brainoxygen < 0.35) and ((org.hypoxiaTime or 0) > 16 or (org.severeHypoxiaTime or 0) > 6) then org.needfake = true end
-	if (org.perfusion < 0.18 or org.brainoxygen < 0.2) and ((org.hypoxiaTime or 0) > 26 or (org.severeHypoxiaTime or 0) > 10) then org.needotrub = true end
+	if (org.perfusion < 0.32 * thresholdMul or org.brainoxygen < 0.35 * thresholdMul) and ((org.hypoxiaTime or 0) > 16 * delayMul or (org.severeHypoxiaTime or 0) > 6 * delayMul) then org.needfake = true end
+	if (org.perfusion < 0.18 * thresholdMul or org.brainoxygen < 0.2 * thresholdMul) and ((org.hypoxiaTime or 0) > 26 * delayMul or (org.severeHypoxiaTime or 0) > 10 * delayMul) then org.needotrub = true end
 end
 
 local function send_organism(org, ply)
@@ -429,6 +453,8 @@ local function send_organism(org, ply)
 	sendtable.immobilization = org.immobilization
 	sendtable.adrenaline = org.adrenaline
 	sendtable.adrenalineAdd = org.adrenalineAdd
+	sendtable.zerlkers = org.zerlkers
+	sendtable.zerlkersOverdose = org.zerlkersOverdose
 	sendtable.anger = org.anger
 	sendtable.analgesia = org.analgesia
 	sendtable.lleg = org.lleg
@@ -1097,6 +1123,22 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.incapacitated = false
 	org.critical = false
 
+	-- Two concurrent Zerlkers doses poison the nervous system. The overdose load
+	-- lingers after the concentration starts falling so the second dose has a
+	-- real physiological consequence instead of disappearing after one tick.
+	local zerlkers = math.max(org.zerlkers or 0, 0)
+	if zerlkers >= 2 then
+		org.zerlkersOverdose = math.max(org.zerlkersOverdose or 0, math.Clamp(zerlkers - 1, 1, 3))
+	end
+
+	local zerlkersOverdose = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
+	if zerlkersOverdose > 0 then
+		org.disorientation = math.max(org.disorientation or 0, 2.5 + zerlkersOverdose * 3.5)
+		org.immobilization = math.max(org.immobilization or 0, zerlkersOverdose * 5)
+		org.brain = math.min((org.brain or 0) + timeValue * (0.004 + zerlkersOverdose * 0.008), 1)
+	end
+	org.zerlkersOverdose = math.Approach(org.zerlkersOverdose or 0, 0, timeValue / 45)
+
 	-- Aiming fatigue tracking (affects recoil multipliers)
 	if isPly then
 		local wep = owner:GetActiveWeapon()
@@ -1269,6 +1311,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	org.berserk = math.Approach(org.berserk, 0, timeValue / 60)
 	org.noradrenaline = math.Approach(org.noradrenaline, 0, timeValue / 45)
+	org.zerlkers = math.Approach(org.zerlkers or 0, 0, timeValue / 120)
 	local oldPanicAttack = org.panicattack or 0
 	if not hg_panic:GetBool() then
 		org.panicattackadd = 0
@@ -1570,7 +1613,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-	if (org.blood <= 2500) then org.needfake = true end
+	if hg.organism.GetResilientBlood(org) <= 2500 then org.needfake = true end
 
 	local just_went_uncon = not org.otrub and org.needotrub
 
