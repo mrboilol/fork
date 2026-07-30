@@ -61,6 +61,18 @@ local specialDamageMul = 2.5
 local runningSpecialDamageMul = 3
 local incomingVelocityDamageMul = 2
 
+local function GetCombatStrengthMul(ply)
+	if not IsValid(ply) then return 1 end
+
+	local mul = (ply.MeleeDamageMul or 1) * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+	local org = ply.organism
+	if ply:IsBerserk() and org then
+		mul = mul * (1 + (org.berserk or 0) * 5)
+	end
+
+	return math.max(mul, 0)
+end
+
 local function PlayPunchSound(pos, level)
         local id = math_random(1, 11)
         sound.Play("punch/Punch-" .. (id < 10 and "0" or "") .. id .. ".wav", pos, level or 70, math_random(110, 125))
@@ -490,7 +502,7 @@ function SWEP:ApplyForce()
 				local trace = util.TraceLine(tr)
 				
 				if bone != "ValveBiped.Bip01_Spine2" or !trace.Hit then
-					phys:ApplyForceCenter(ply:GetAimVector() * math.min(5000, phys:GetMass() * 800))
+					phys:ApplyForceCenter(ply:GetAimVector() * math.min(5000, phys:GetMass() * 800) * GetCombatStrengthMul(ply))
 					self:SetCarrying()
 				end
 
@@ -598,7 +610,7 @@ function SWEP:ApplyForce()
 			end
 
 			if ply:KeyDown(IN_ATTACK) and (ply.organism.superfighter or ply:IsBerserk()) then
-				phys:ApplyForceCenter(ply:GetAimVector() * 40000 * self.Penetration * (1 + ply.organism.berserk / 10))
+				phys:ApplyForceCenter(ply:GetAimVector() * 40000 * self.Penetration * GetCombatStrengthMul(ply))
 				self:SetCarrying()
 			end
 		end
@@ -1033,11 +1045,12 @@ function SWEP:ShoveFront(sprintShove)
                 maxs = Vector(10, 10, 10),
         })
 
-        local ent = trace.Entity
-        local pushVel = owner:GetAimVector()
-        pushVel.z = math.max(pushVel.z, 0.08)
-        pushVel:Normalize()
-        pushVel = pushVel * shoveForce * (sprintShove and 1.3 or 1)
+		local ent = trace.Entity
+		local strengthMul = GetCombatStrengthMul(owner)
+		local pushVel = owner:GetAimVector()
+		pushVel.z = math.max(pushVel.z, 0.08)
+		pushVel:Normalize()
+		pushVel = pushVel * shoveForce * (sprintShove and 1.3 or 1) * strengthMul
 
         if IsValid(ent) and ent:IsRagdoll() then
                 sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", trace.HitPos, 75, 110)
@@ -1063,7 +1076,9 @@ function SWEP:ShoveFront(sprintShove)
                 local victimVel = victimSprinting and target:GetVelocity() * 0.5 or vector_origin
                 local ragdollPushVel = pushVel * (victimSprinting and 1.5 or 1) + victimVel
 
-			if (victimBlocking or victimSprinting or math_random(sprintShove and math.max(math.floor(shoveRagdollChance * 0.5), 1) or shoveRagdollChance) == 1) and hg.TriggerSprintCollisionRagdoll then
+			local baseRagdollChance = 1 / (sprintShove and math.max(math.floor(shoveRagdollChance * 0.5), 1) or shoveRagdollChance)
+			local strengthRagdoll = math.Rand(0, 1) <= math.Clamp(baseRagdollChance * strengthMul, 0, 1)
+			if (victimBlocking or victimSprinting or strengthRagdoll) and hg.TriggerSprintCollisionRagdoll then
                         ragdolled = true
                         hg.TriggerSprintCollisionRagdoll(target, trace, ragdollPushVel, ragdollPushVel:Length() * 0.45)
                         timer.Simple(0, function()

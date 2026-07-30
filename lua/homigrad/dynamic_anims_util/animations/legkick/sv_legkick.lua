@@ -32,6 +32,18 @@ local CURBSTOMP_HEAD_RADIUS = 16
 local CURBSTOMP_HEAD_STOMPS_TO_POP = 7
 local CURBSTOMP_HEAD_RESET = 8
 
+local function getKickDamageMul(ply)
+    local mul = ply.MeleeDamageMul or 1
+    mul = mul * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+
+    local org = ply.organism
+    if ply:IsBerserk() and org then
+        mul = mul * (1 + (org.berserk or 0) * 5)
+    end
+
+    return math.max(mul, 0)
+end
+
 local function getBoneWorld(ent, boneName)
     if not IsValid(ent) then return end
     local bone = ent:LookupBone(boneName)
@@ -227,7 +239,8 @@ function PLAYER:LegAttack()
     local speed = 1.5 * speedmul
     local animstopAdjust = 0.3 * speedmul
     local dmg = isCurbstomp and 22 or 10 * (2 - speedmul)
-    dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
+    dmg = dmg * getKickDamageMul(self)
+    dmg = dmg * (self.KickDamageMul or 1)
     dmg = dmg * (org.legstrength or 1)
     dmg = dmg * (isCurbstomp and CURBSTOMP_DAMAGE_MUL or LEG_KICK_DAMAGE_MUL)
     dmg = dmg * (isCrouchKick and CROUCH_KICK_DAMAGE_MUL or 1)

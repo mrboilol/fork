@@ -7,6 +7,8 @@ local statusIconCache = {}
 
 local IND_SIZE_BASE = 220
 local IND_SIZE_MAX = 300
+local IND_VISUAL_SCALE = 3
+local IND_RIGHT_OFFSET = 32
 local INDICATOR_CAMERA_FOV = 70
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
@@ -570,11 +572,14 @@ function HUD_DrawDynamicIndicator()
         ]]
     end
     
-    -- This viewport used to pass its already-HUD-sized dimensions through the
-    -- old 480p ScreenScale helper. At 1080p that made the guy over 400px
-    -- tall, which covered nearby moodles and made the HUD look cropped/zoomed.
+    -- Scale the body readout up independently from the normal HUD scale so the
+    -- silhouette remains easy to read without changing the model camera.
     local hudScale = math.Clamp(ScrH() / 1080, 0.8, 1.35)
-    local size = math.Clamp(IND_SIZE_BASE * hudScale, IND_SIZE_BASE * 0.8, IND_SIZE_MAX)
+    local size = math.Clamp(
+        IND_SIZE_BASE * hudScale * IND_VISUAL_SCALE,
+        IND_SIZE_BASE * 0.8 * IND_VISUAL_SCALE,
+        IND_SIZE_MAX * IND_VISUAL_SCALE
+    )
     local w, h = size, size
     
     local viewX, viewY
@@ -582,7 +587,7 @@ function HUD_DrawDynamicIndicator()
     -- Keep the body readout vertically centered on the left. The compact ECG
     -- can then use the open space directly beneath it without covering moodles.
     local edgeMargin = math.max(14, 18 * hudScale)
-    viewX = edgeMargin
+    viewX = edgeMargin + IND_RIGHT_OFFSET * hudScale
     viewY = math.Clamp(ScrH() * 0.5 - h * 0.5, edgeMargin, ScrH() - h - edgeMargin)
     
     -- Store indicator position and size for moodle adjustment

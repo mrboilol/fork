@@ -1,5 +1,17 @@
 local PLAYER = FindMetaTable("Player")
 
+local function getKickDamageMul(ply)
+    local mul = ply.MeleeDamageMul or 1
+    mul = mul * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+
+    local org = ply.organism
+    if ply:IsBerserk() and org then
+        mul = mul * (1 + (org.berserk or 0) * 5)
+    end
+
+    return math.max(mul, 0)
+end
+
 local vpang = Angle(2, 0, 0)
 function PLAYER:LegAttack()
     if not self:Alive() or hg.GetCurrentCharacter(self):IsRagdoll() or self:GetNWFloat("InLegKick",0) > CurTime() then return end
@@ -36,7 +48,7 @@ function PLAYER:LegAttack()
     local mult = Lerp(math.Clamp(vel / 800, 0, 1), 1.0, 3.5)
     dmg = dmg * mult
 
-    dmg = dmg * (self:IsBerserk() and org.berserk * 5 or 1)
+    dmg = dmg * getKickDamageMul(self)
     
     if isMidAir then
         dmg = math.min(dmg, 75)

@@ -94,10 +94,10 @@ local moodleTexts = {
 		[4] = {title = "Exhausted", description = "You can barely breathe or continue moving."},
 	}},
 	happy = {levels = {
-		[1] = {title = "Content", description = "A small lift in mood is helping you cope."},
-		[2] = {title = "Cheerful", description = "Your good mood is noticeably reducing stress."},
-		[3] = {title = "Happy", description = "Strong morale is helping you withstand pain and fear."},
-		[4] = {title = "Euphoric", description = "Your mood is exceptionally high and difficult to shake."},
+		[1] = {title = "Content", description = "A small lift in mood is helping recovery and resolve."},
+		[2] = {title = "Cheerful", description = "Your good mood is improving stamina recovery and strength."},
+		[3] = {title = "Happy", description = "Strong morale is improving recovery, damage, and resilience."},
+		[4] = {title = "Euphoric", description = "Peak morale is boosting stamina recovery, damage, and resilience."},
 	}},
 	bleeding = {levels = {
 		[1] = {title = "Small Bleed", description = "A wound is releasing blood at a small rate."},
@@ -543,7 +543,17 @@ local function buildEffects(ply, org)
 	local intracranialPressure = orgNumber(org, "intracranialPressure", 0)
 	if intracranialPressure >= 0.15 then add(effects, "intracranial_pressure", "intrapressure", highRank(intracranialPressure, {0.15, 0.35, 0.6, 0.85}), "bad", 32, math.floor(intracranialPressure * 100) .. "%") end
 
+	-- Match the pain and shock penalties used by movement's effective speed
+	-- multiplier so weakness reflects impaired control even when limb strength
+	-- and perfusion are otherwise normal. Zerlkers suppress those two functional
+	-- penalties, but not weakness from damaged limbs or poor circulation.
+	local zerlkersWeaknessResistance = math.Clamp(orgNumber(org, "zerlkers", 0), 0, 1)
+	local painControl = math.Clamp(60 / (pain + 1), 0.35, 1)
+	local shockControl = math.Clamp(10 / (orgNumber(org, "shock", 0) + 1), 0.45, 1)
+	painControl = Lerp(zerlkersWeaknessResistance, painControl, 1)
+	shockControl = Lerp(zerlkersWeaknessResistance, shockControl, 1)
 	local control = math.min(orgNumber(org, "peripheralperfusion", 1), orgNumber(org, "perfusionMoveMul", 1), orgNumber(org, "legstrength", 1), orgNumber(org, "armstrength", 1))
+	control = control * painControl * shockControl
 	if control < 0.75 then add(effects, "weakness", "weakness", lowRank(control, {0.75, 0.55, 0.35, 0.2}), "bad", 33, math.floor(control * 100) .. "%") end
 
 	local o2Regen = istable(org.o2) and number(org.o2.curregen, 0) or 0

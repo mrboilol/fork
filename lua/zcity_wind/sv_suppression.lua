@@ -100,6 +100,13 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
                     org.disorientation = math.min(disorientation + math.Clamp(suppressionResponse * 0.8, 0.08, 0.35), 2.5)
                 end
                 org.fearadd = (org.fearadd or 0) + 0.2
+
+                -- Near misses now feed the panic system as well as short-term
+                -- fear. Throttle rapid pellets so one shotgun blast cannot fill it.
+                if hg.organism and hg.organism.AddPanicAttack and CurTime() >= (org._panicSuppressionNext or 0) then
+                    org._panicSuppressionNext = CurTime() + 0.2
+                    hg.organism.AddPanicAttack(org, 0.055 + suppressionResponse * 0.16, true)
+                end
             end
         end
 

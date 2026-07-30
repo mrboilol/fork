@@ -621,6 +621,14 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		local target_run_speed = ply.hg_isJogging and (ply:GetRunSpeed() * 0.55) or ply:GetRunSpeed()
 		local move = target_run_speed * 1.1
+		-- A live Zerlkers dose suppresses functional weakness from pain and shock.
+		-- Structural penalties (damaged/dislocated legs, pelvis, tourniquets) and
+		-- overdose immobilization still apply below.
+		local zerlkersWeaknessResistance = math.Clamp(org.zerlkers or 0, 0, 1)
+		local shockMoveMul = math.Clamp(10 / ((org.shock or 0) + 1), 0.45, 1)
+		local painMoveMul = math.Clamp(60 / ((org.pain or 0) + 1), 0.35, 1)
+		shockMoveMul = Lerp(zerlkersWeaknessResistance, shockMoveMul, 1)
+		painMoveMul = Lerp(zerlkersWeaknessResistance, painMoveMul, 1)
 		k = 1 * weightmul
 		k = k * math.Clamp(consmul, 0.7, 1)
 		k = k * math.Clamp((org.temperature and (1 - (org.temperature - 38) * 0.25) or 1), 0.5, 1)
@@ -628,7 +636,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		k = k * math.Clamp(math.Round((org.stamina and org.stamina[1] or 180), 0) / 120, hg_movement_stamina_debuff:GetFloat(), 1)
 		k = k * math.Clamp(5 / ((org.immobilization or 0) + 1), 0.7, 1)
 		k = k * math.Clamp((org.blood or 0) / 5000, 0, 1)
-		k = k * math.Clamp(10 / ((org.shock or 0) + 1), 0.45, 1)
+		k = k * shockMoveMul
 		local adrenalineMoveBoost = math.min(math.Round((org.adrenaline or 0), 1) / 24, 0.3)
 		k = k * (adrenalineMoveBoost + 1)
 		k = k * math.Clamp((org.lleg and org.lleg >= 0.5 and math.max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math.max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
@@ -639,7 +647,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		end
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		k = k * ((IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) and math.Clamp(50 / math.max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
-		k = k * math.Clamp(60 / ((org.pain or 0) + 1), 0.35, 1)
+		k = k * painMoveMul
 				if org.bloodpressure and org.bloodpressure < 80 and runnin then
 			k = k * math.Clamp(math.Remap(org.bloodpressure, 20, 80, 0.65, 1), 0.65, 1)
 		end

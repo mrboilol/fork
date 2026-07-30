@@ -14,6 +14,7 @@ local recent_stamina_loss_recovery_min_mul = 0.65
 local recent_stamina_loss_hold_time = 1
 local recent_stamina_loss_fade_time = 4
 local stamina_recovery_per_second = 7
+local goodmood_stamina_recovery_max_bonus = 0.15
 local anger_combat_hold_time = 6
 local anger_decay_per_second = 0.075
 --local Organism = hg.organism
@@ -253,8 +254,9 @@ module[2] = function(owner, org, timeValue)
 			postureRecoveryMul = 1.25
 		end
 	end
+	local goodmoodRecoveryMul = 1 + goodmood * goodmood_stamina_recovery_max_bonus
 
-	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul * (1 - heatWeakness * 0.65), stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * goodmoodRecoveryMul * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul * (1 - heatWeakness * 0.65), stamina.max)
 
 
 

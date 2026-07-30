@@ -39,6 +39,18 @@ SWEP.PainMultiplier = 1
 SWEP.BreakBoneMul = 0.33
 SWEP.Penetration = 1
 SWEP.DamageMul = 1
+
+local function GetCombatStrengthMul(ply)
+	if not IsValid(ply) then return 1 end
+
+	local mul = (ply.MeleeDamageMul or 1) * (hg.GetSubRolePerk and hg.GetSubRolePerk(ply, "MeleeDamageMul", 1) or 1)
+	local org = ply.organism
+	if ply:IsBerserk() and org then
+		mul = mul * (1 + (org.berserk or 0) * 5)
+	end
+
+	return math.max(mul, 0)
+end
 SWEP.animtime = 0
 SWEP.HeadbuttReach = 25
 SWEP.HeadbuttCooldown = 2.35
@@ -1682,7 +1694,7 @@ function SWEP:ApplyForce()
 				if bone != "ValveBiped.Bip01_Spine2" or !trace.Hit then
 					local throwCap = self.TwoHandGrip and 8000 or 5000
 					local throwMassScale = self.TwoHandGrip and 1200 or 800
-					phys:ApplyForceCenter(ply:GetAimVector() * math.min(throwCap, phys:GetMass() * throwMassScale))
+					phys:ApplyForceCenter(ply:GetAimVector() * math.min(throwCap, phys:GetMass() * throwMassScale) * GetCombatStrengthMul(ply))
 					self:SetCarrying()
 				end
 
@@ -1798,7 +1810,7 @@ function SWEP:ApplyForce()
 			end
 
 			if ply:KeyDown(IN_ATTACK) and (ply.organism.superfighter or ply:IsBerserk()) then
-				phys:ApplyForceCenter(ply:GetAimVector() * 40000 * self.Penetration * (1 + ply.organism.berserk / 10))
+				phys:ApplyForceCenter(ply:GetAimVector() * 40000 * self.Penetration * GetCombatStrengthMul(ply))
 				self:SetCarrying()
 			end
 		end

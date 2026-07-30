@@ -77,8 +77,8 @@ hg.addBloodPart2 = addBloodPart2
 local Rand = math.Rand
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
-local bloodImpactCloudSize = 16
-local bloodImpactParticleSize = 0.75
+local bloodImpactCloudSize = 19
+local bloodImpactParticleSize = 0.85
 local pendingBulletImpacts = {}
 local pendingBulletImpactCount = 0
 local maxPendingBulletImpacts = 96
@@ -86,13 +86,13 @@ local impactsPerFrame = 3
 
 local function impact(pos,vel,mul,owner,severe)
 	local max = math.Clamp(math.ceil(mul or 1), 1, 8)
-	local iters = math.ceil(math.random(1, max) * 2.5)
+	local iters = math.ceil(math.random(1, max) * 3.25)
 	local velnorm = -vel:GetNormalized() * 5
-	local sprayDir = -vel * math.Rand(0.25, 0.4)
+	local sprayDir = -vel * math.Rand(0.35, 0.55)
 
 	-- The server sends separate entry and exit positions only when a shot passes through.
-	for i = 1, math.random(1, 2) do
-		addBloodPart2(pos + velnorm + VectorRand(-1.5, 1.5), sprayDir + VectorRand(-25, 25), nil, Rand(8, 12), Rand(8, 12), Rand(0.4, 0.65), true, owner)
+	for i = 1, math.random(2, 4) do
+		addBloodPart2(pos + velnorm + VectorRand(-2, 2), sprayDir + VectorRand(-32, 32), nil, Rand(9, 14), Rand(9, 14), Rand(0.55, 0.85), true, owner)
 	end
 	
 	if hg_bloodimpacts:GetBool() then
@@ -104,15 +104,15 @@ local function impact(pos,vel,mul,owner,severe)
 	for i = 1, iters do
 		local size = bloodImpactParticleSize
 		-- Bullet impacts are wound blood, not an arterial wound effect.
-		addBloodPart(pos, -vel * i / iters + Vector(Rand(-20, 20), Rand(-20, 20), 0), mat_huy, size, size, false, false, owner)
+		addBloodPart(pos, -vel * i / iters * 1.15 + Vector(Rand(-26, 26), Rand(-26, 26), Rand(-5, 16)), mat_huy, size, size, false, false, owner)
 	end
 
 	if severe then
 		-- Reuse the small physical pellets used by the forceful amputation burst,
 		-- without marking the shot itself as arterial.
-		for i = 1, math.random(4, 6) do
-			local velocity = -vel:GetNormalized() * Rand(80, 140) + VectorRand(-55, 55) + Vector(0, 0, Rand(20, 55))
-			addBloodPart(pos + VectorRand(-1, 1), velocity, mat_huy, Rand(0.65, 1), Rand(0.65, 1), false, false, owner)
+		for i = 1, math.random(7, 10) do
+			local velocity = -vel:GetNormalized() * Rand(110, 185) + VectorRand(-65, 65) + Vector(0, 0, Rand(25, 70))
+			addBloodPart(pos + VectorRand(-1.5, 1.5), velocity, mat_huy, Rand(0.7, 1.1), Rand(0.7, 1.1), false, false, owner)
 		end
 	end
 end
@@ -182,9 +182,9 @@ end)
 		ParticleEffect("headshot", pos, ang)
 		-- Keep the stock headshot effect, but give its physical blood spray enough
 		-- force to visibly travel away from the impact instead of dying at the head.
-		for i = 1, math.random(5, 7) do
-			local velocity = ang:Forward() * -Rand(130, 190) + VectorRand(-45, 45) + Vector(0, 0, Rand(20, 55))
-			hg.addBloodPart(pos + VectorRand(-1, 1), velocity, mat_huy, Rand(0.65, 1), Rand(0.65, 1), false, false, renderEnt or ent)
+		for i = 1, math.random(8, 11) do
+			local velocity = ang:Forward() * -Rand(165, 235) + VectorRand(-55, 55) + Vector(0, 0, Rand(25, 70))
+			hg.addBloodPart(pos + VectorRand(-1.5, 1.5), velocity, mat_huy, Rand(0.7, 1.1), Rand(0.7, 1.1), false, false, renderEnt or ent)
 		end
 	end
 	if redmist then

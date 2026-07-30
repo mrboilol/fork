@@ -20,6 +20,7 @@ local instant_pain_shock_scale = 0.75
 local melee_pain_scale = 0.85
 local melee_shock_scale = 0.45
 local melee_nosebleed_pain_scale = 0.3
+local goodmood_damage_max_bonus = 0.05
 local attacker_adrenaline_gain_window = 2
 local attacker_adrenaline_cooldown = 5
 local attacker_adrenaline_cap = 1.5
@@ -182,6 +183,17 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
         if isBrain and (org[name] or 0) > directBrainBefore then
             org._directBrainDamageThisHit = true
         end
+
+		-- Vital-organ hits are more likely to retain enough energy to leave an
+		-- exit wound. A negative resistance extends the remaining organ trace,
+		-- while keeping exits probabilistic rather than guaranteeing them.
+		if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and (isBrain or name == "heart") then
+			org._bulletHitVitalThisHit = true
+			local exitBoostChance = isBrain and 0.8 or 0.7
+			if math.Rand(0, 1) <= exitBoostChance then
+				return (result or 0) - (isBrain and 0.45 or 0.35)
+			end
+		end
 
         return result
     else
@@ -1052,6 +1064,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if isMeleeDmg then
 		dmgInfo:ScaleDamage(1.05)
 	end
+	local attackerOrg = attacker:IsPlayer() and attacker.organism or nil
+	if attackerOrg and attacker ~= ply then
+		local goodmood = math.Clamp(attackerOrg.goodmood or 0, 0, 1)
+		dmgInfo:ScaleDamage(1 + goodmood * goodmood_damage_max_bonus)
+	end
 	local isSharpMelee = isMeleeDmg and dmgInfo:IsDamageType(DMG_SLASH)
 	
 	local dmg = dmgInfo:GetDamage()
@@ -1185,6 +1202,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org._bulletImpactBleedAdd = nil
 	org._armorPainMul = nil
 	org._directBrainDamageThisHit = nil
+	org._bulletHitVitalThisHit = nil
 	org._fistHeadTraceSkullIntact = isFistInflictor(dmgInfo) and (org.skull or 0) < 1 or nil
 	-- Limb bone and artery damage must stay on the physics limb the bullet
 	-- actually entered; a long penetration trace may still cross other limbs.
@@ -1208,8 +1226,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hg.organism.AddWoundManual(ent,dmg,vector_origin,angle_zero,math.random(0,ent:GetBoneCount()),CurTime())
 	end
 	local directBrainDamageThisHit = org._directBrainDamageThisHit == true
+	local bulletHitVitalThisHit = org._bulletHitVitalThisHit == true
 	org._bulletImpactHitgroup = nil
 	org._directBrainDamageThisHit = nil
+	org._bulletHitVitalThisHit = nil
 	org._fistHeadTraceSkullIntact = nil
 	org._spineArteryTraceDmgInfo = nil
 
@@ -1372,7 +1392,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 		and not hasHeadArmor
 	local severeBulletImpact = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
-		and (dmg >= severe_damage_adrenaline_threshold or (hitgroup == HITGROUP_HEAD and dmg >= severe_damage_adrenaline_threshold * 0.5))
+		and (bulletHitVitalThisHit or dmg >= severe_damage_adrenaline_threshold or (hitgroup == HITGROUP_HEAD and dmg >= severe_damage_adrenaline_threshold * 0.5))
 	--print(dmg_before, 1)
 	--if ent:IsRagdoll() then
 		if RagdollForceBoneMul[hitgroup] then len = len * RagdollForceBoneMul[hitgroup] end

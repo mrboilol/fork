@@ -458,8 +458,8 @@ function hg.likely_to_phrase(ply)
 	return (broken_dislocated) and 5
 		or (pain > 65) and 5
 		or (panicattack > 0.55 and 1.2)
-		or (temperature < 31 and 0.5)
-		or (temperature > 38 and 0.5)
+		or (temperature < 35 and (temperature < 31 and 1.25 or 0.65))
+		or (temperature > 38 and (temperature >= 40 and 1.25 or 0.65))
 		or (blood < 3000 and 0.3)
 		or (fearBoost > 0 and fearBoost)
 		or (brain > 0.1 and brain * 5)
@@ -530,6 +530,16 @@ local function get_status_message(ply)
 		most_wanted_phraselist = sharp_pain
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
+	elseif temperature < 35 then
+		if temperature < 29 then
+			most_wanted_phraselist = numb_phraselist
+		elseif temperature < 31 then
+			most_wanted_phraselist = freezing_phraselist
+		else
+			most_wanted_phraselist = cold_phraselist
+		end
+	elseif temperature > 38 then
+		most_wanted_phraselist = temperature >= 40 and heatstroke_phraselist or hot_phraselist
 	elseif ((blood < 3250 and heartbeat >= 30 and heartbeat <= 250) or (broken_dislocated) or (broken_notify) or (dislocated_notify)) then
 		if pain > 75 and (broken_dislocated) then
 			most_wanted_phraselist = math.random(2) == 1 and audible_pain or (broken_notify and broken_limb or dislocated_limb)

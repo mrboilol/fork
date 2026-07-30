@@ -1,3 +1,23 @@
+local function DrawArc(x, y, radius, thickness, startAng, endAng, segments, color)
+    surface.SetDrawColor(color.r, color.g, color.b, color.a)
+    draw.NoTexture()
+
+    local step = (endAng - startAng) / segments
+    for i = 0, segments - 1 do
+        local a1 = math.rad(startAng + i * step)
+        local a2 = math.rad(startAng + (i + 1) * step)
+        local cos1, sin1 = math.cos(a1), math.sin(a1)
+        local cos2, sin2 = math.cos(a2), math.sin(a2)
+
+        surface.DrawPoly({
+            { x = x + cos1 * (radius - thickness), y = y - sin1 * (radius - thickness) },
+            { x = x + cos1 * radius, y = y - sin1 * radius },
+            { x = x + cos2 * radius, y = y - sin2 * radius },
+            { x = x + cos2 * (radius - thickness), y = y - sin2 * (radius - thickness) }
+        })
+    end
+end
+
 surface.CreateFont("UnconsciousDots", {
     font = "Bahnschrift",
     size = 120,
@@ -31,6 +51,9 @@ surface.CreateFont("HomigradFontTypewriterSmall", {
 
 local ringAlpha = 0
 local dotBeat = 0
+local compactBorderInset = 0
+local compactBoxX
+local compactBoxY
 
 local function GetShockConsciousnessThreshold(analgesia, painkiller)
     local medication = math.max((analgesia or 0) + (painkiller or 0) * 0.3, 0)
@@ -728,49 +751,6 @@ local function DrawEKG(state, centerX, centerY, width, height, heartbeat, pulse,
     end
 end
 
-local function GetRecoveryColor(progress, alpha)
-    progress = math.Clamp(progress or 0, 0, 1)
-    local r, g, b
-    if progress < 0.5 then
-        local stage = progress / 0.5
-        r, g, b = Lerp(stage, 210, 235), Lerp(stage, 55, 155), Lerp(stage, 45, 55)
-    else
-        local stage = (progress - 0.5) / 0.5
-        r, g, b = Lerp(stage, 235, 120), Lerp(stage, 155, 220), Lerp(stage, 55, 165)
-    end
-    return Color(r, g, b, 255 * alpha)
-end
-
-local function FormatWakeEstimate(seconds)
-    if not seconds then return "UNSTABLE" end
-    if seconds <= 1 then return "WAKING" end
-    if seconds >= 600 then return "WAKING >10m" end
-    if seconds >= 60 then
-        return string.format("WAKING ~%dm %02ds", math.floor(seconds / 60), math.ceil(seconds) % 60)
-    end
-    return string.format("WAKING ~%ds", math.ceil(seconds))
-end
-
-local function DrawECGStatusBox(x, y, w, h, borderInset, color, alpha, statusText, ecgState)
-    surface.SetDrawColor(0, 0, 0, 165 * alpha)
-    surface.DrawRect(x, y, w, h)
-
-    surface.SetDrawColor(45, 45, 45, 155 * alpha)
-    surface.DrawOutlinedRect(x, y, w, h)
-
-    local inset = math.Clamp(borderInset or 0, 0, math.min(w, h) * 0.2)
-    surface.SetDrawColor(color.r, color.g, color.b, color.a)
-    for thickness = 0, 1 do
-        surface.DrawOutlinedRect(x + inset + thickness, y + inset + thickness,
-            w - (inset + thickness) * 2, h - (inset + thickness) * 2)
-    end
-
-    draw.SimpleText(statusText, "HomigradFontTypewriterSmall", x + 10, y + 7, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-    local rhythmText = string.upper(string.gsub(ecgState or "normal_sinus", "_", " "))
-    draw.SimpleText(rhythmText, "HomigradFontTypewriterSmall", x + w - 10, y + 7,
-        Color(220, 220, 220, 210 * alpha), TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
-end
-
 hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     if not hg_unconsciousring:GetBool() then
         if hg then hg.healthAlarmActive = false end
@@ -877,8 +857,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local abnormalPulse = (heartbeat < 40 and heartbeat >= 1) or heartbeat > 100
     local abnormalECG = ecgState ~= "normal_sinus"
     local sinusECGTail = UpdateECGStateAlert(ecgState)
+    local simpleECG = hg_simpleecg:GetBool()
     local showAwakeECG = not isUnconscious and not lowConsciousness
-        and (abnormalECG or sinusECGTail > 0 or admiring)
+        and (simpleECG or abnormalECG or sinusECGTail > 0 or admiring)
     
 	local unconsciousElapsed = isUnconscious and (CurTime() - (unconsciousStartTime or CurTime())) or 0
 	if isUnconscious and unconsciousElapsed >= UNCONSCIOUS_RING_DELAY then
@@ -904,8 +885,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     -- a recovered sinus trace gets a short tail and then fades away.
     if showAwakeECG then
         local severity = abnormalECG and GetAwakeECGSeverity(ecgState) or 0
-        local awakeECGTargetAlpha = abnormalECG and Lerp(severity, 0.28, 0.92)
-            or (0.22 * sinusECGTail)
+        local awakeECGTargetAlpha = simpleECG and 1
+            or (abnormalECG and Lerp(severity, 0.28, 0.92) or (0.22 * sinusECGTail))
 
         if admiring then awakeECGTargetAlpha = math.max(awakeECGTargetAlpha, 0.24) end
         if ply:KeyDown(IN_ATTACK2) then awakeECGTargetAlpha = awakeECGTargetAlpha * 0.65 end
@@ -933,92 +914,103 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
 
     -- Determine if we should show otrub ECG (for unconscious or awake with abnormal heartbeat/admiring/recent sudden drop)
 
-    if ringAlpha <= 0 and awakeECGAlpha <= 0.01 and not showPulseCheckECG then
+    if not simpleECG and ringAlpha <= 0 and awakeECGAlpha <= 0.01 and not showPulseCheckECG then
         UpdateFibrillationSound()
         return
     end
-    local otrubECGAlpha = (isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha
+    local otrubECGAlpha = simpleECG and 1
+        or ((isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha)
     
     if otrubECGAlpha > 0.01 then
         local scrW, scrH = ScrW(), ScrH()
         local boxScale = math.Clamp(scrH / 1080, 0.75, 1.2)
-        local simpleECG = hg_simpleecg:GetBool()
-        local boxW = (simpleECG and 300 or 360) * boxScale
-        local boxH = (simpleECG and 100 or 150) * boxScale
-        local edgeMargin = 24 * boxScale
-        local boxX, boxY = scrW - boxW - edgeMargin, scrH - boxH - edgeMargin
-
         if simpleECG then
+            local boxW, boxH = 300 * boxScale, 100 * boxScale
+            local edgeMargin = 24 * boxScale
+            local boxX, boxY
             local indicator = HUD and HUD.dynamicIndicator
             if indicator and indicator.active then
                 boxX = indicator.x
                 boxY = math.Clamp(indicator.y + indicator.h + 10 * boxScale,
                     edgeMargin, scrH - boxH - edgeMargin)
+                compactBoxX, compactBoxY = boxX, boxY
+            elseif compactBoxX and compactBoxY then
+                boxX = math.Clamp(compactBoxX, edgeMargin, scrW - boxW - edgeMargin)
+                boxY = math.Clamp(compactBoxY, edgeMargin, scrH - boxH - edgeMargin)
             else
                 boxX = edgeMargin
                 boxY = math.Clamp(scrH * 0.5 + 120 * boxScale,
                     edgeMargin, scrH - boxH - edgeMargin)
+                compactBoxX, compactBoxY = boxX, boxY
             end
 
-            surface.SetDrawColor(0, 0, 0, 130 * otrubECGAlpha)
+            local consciousnessDanger = 1 - math.Clamp(consciousness, 0, 1)
+            local danger = math.max(consciousnessDanger, isUnconscious and 0.8 or 0, isCritical and 1 or 0)
+            local targetInset = danger * 14 * boxScale
+            compactBorderInset = SmoothAlpha(compactBorderInset, targetInset, 5)
+
+            local borderColor = Color(
+                Lerp(danger, 110, 235),
+                Lerp(danger, 205, 50),
+                Lerp(danger, 165, 40),
+                235
+            )
+
+            surface.SetDrawColor(0, 0, 0, 145)
             surface.DrawRect(boxX, boxY, boxW, boxH)
-            surface.SetDrawColor(110, 125, 120, 120 * otrubECGAlpha)
+            surface.SetDrawColor(70, 80, 76, 170)
             surface.DrawOutlinedRect(boxX, boxY, boxW, boxH)
-        end
-
-        local traceCenterY = simpleECG and (boxY + boxH * 0.5) or (boxY + boxH * 0.62)
-        local traceWidth = simpleECG and (boxW - 16 * boxScale) or (boxW - 28 * boxScale)
-        local traceHeight = simpleECG and (boxH - 16 * boxScale) or (boxH - 52 * boxScale)
-        
-        if isUnconscious or lowConsciousness then
-            local wakeSeconds, wakeProgress = UpdateWakeEstimate(org)
-            local borderInset = (1 - wakeProgress) * 14 * boxScale
-            local statusText = FormatWakeEstimate(wakeSeconds)
-            local statusColor = GetRecoveryColor(wakeProgress, otrubECGAlpha)
-
-            if not wakeSeconds then
-                borderInset = (8 + math.sin(CurTime() * 2) * 2) * boxScale
-                statusColor = Color(220, 45, 40, 255 * otrubECGAlpha)
-                statusText = "UNSTABLE"
-            elseif lowConsciousness and not isUnconscious then
-                wakeProgress = math.Clamp(consciousness / 0.4, 0, 1)
-                borderInset = (1 - wakeProgress) * 14 * boxScale
-                statusColor = GetRecoveryColor(wakeProgress, otrubECGAlpha)
-                statusText = "CONSCIOUSNESS FALLING"
+            surface.SetDrawColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
+            for thickness = 0, 1 do
+                local inset = compactBorderInset + thickness
+                surface.DrawOutlinedRect(boxX + inset, boxY + inset,
+                    boxW - inset * 2, boxH - inset * 2)
             end
 
-            if not simpleECG then
-                DrawECGStatusBox(boxX, boxY, boxW, boxH, borderInset, statusColor,
-                    otrubECGAlpha, statusText, ecgState)
-            end
-
-            if not simpleECG and hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
-                lastPhaseMod = 0
-                local dotText = isCritical and ({".!", "..!", "...!"})[dotBeat + 1]
-                    or ({".", "..", "..."})[dotBeat + 1]
-                draw.SimpleText(dotText, "UnconsciousDots", boxX + boxW / 2, boxY + boxH / 2 + 8,
-                    statusColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-            else
+            if isUnconscious or lowConsciousness or abnormalECG or admiring then
                 UpdateRingAudio(heartbeat, otrubECGAlpha, org, admiring)
-                DrawEKG(centerEKGState, boxX + boxW / 2, traceCenterY,
-                    traceWidth, traceHeight, heartbeat, pulse, ecgState,
-                    org.palpitations, statusColor, otrubECGAlpha)
             end
-        else
-            local severity = abnormalECG and GetAwakeECGSeverity(ecgState) or 0
-            local awakeColor = abnormalECG
-                and Color(Lerp(severity, 205, 255), Lerp(severity, 220, 55), Lerp(severity, 205, 45), 255 * otrubECGAlpha)
-                or Color(205, 225, 215, 255 * otrubECGAlpha)
-            local borderInset = severity * 10 * boxScale
-            local statusText = abnormalECG and "RHYTHM ALERT" or "SINUS RHYTHM"
 
-            if not simpleECG then
-                DrawECGStatusBox(boxX, boxY, boxW, boxH, borderInset, awakeColor,
-                    otrubECGAlpha, statusText, ecgState)
+            DrawEKG(centerEKGState, boxX + boxW / 2, boxY + boxH * 0.5,
+                boxW - 16 * boxScale, boxH - 16 * boxScale, heartbeat, pulse,
+                ecgState, org.palpitations, borderColor, 1)
+        else
+            local centerX, centerY = scrW * 0.5, scrH * 0.5
+            local showLegacyECG = abnormalECG
+                or (not isUnconscious and not lowConsciousness and (sinusECGTail > 0 or admiring))
+
+            if isUnconscious or lowConsciousness then
+                local _, wakeProgress = UpdateWakeEstimate(org)
+                local ringColor = isCritical
+                    and Color(210, 35, 30, 255 * ringAlpha)
+                    or Color(220, 220, 220, 255 * ringAlpha)
+                local radius = math.min(280, scrH * 0.32)
+
+                surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
+                surface.DrawRect(0, 0, scrW, scrH)
+                DrawArc(centerX, centerY, radius, 12, 0, 360, 60,
+                    Color(40, 40, 40, 100 * ringAlpha))
+                DrawArc(centerX, centerY, radius, 12, 90, 90 - wakeProgress * 360, 80, ringColor)
+
+                if hg_unconsciousclassic and hg_unconsciousclassic:GetBool() then
+                    lastPhaseMod = 0
+                    local dotText = isCritical and ({".!", "..!", "...!"})[dotBeat + 1]
+                        or ({".", "..", "..."})[dotBeat + 1]
+                    draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY,
+                        ringColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                end
+
+                UpdateRingAudio(heartbeat, ringAlpha, org, admiring)
             end
-            DrawEKG(centerEKGState, boxX + boxW / 2, traceCenterY,
-                traceWidth, traceHeight, heartbeat, pulse, ecgState,
-                org.palpitations, awakeColor, otrubECGAlpha)
+
+            if showLegacyECG and not (hg_unconsciousclassic and hg_unconsciousclassic:GetBool()) then
+                local severity = GetAwakeECGSeverity(ecgState)
+                local ecgColor = abnormalECG
+                    and Color(Lerp(severity, 220, 255), Lerp(severity, 220, 50), Lerp(severity, 220, 40), 255 * otrubECGAlpha)
+                    or Color(230, 230, 230, 255 * otrubECGAlpha)
+                DrawEKG(centerEKGState, centerX, centerY, 540, 140, heartbeat, pulse,
+                    ecgState, org.palpitations, ecgColor, otrubECGAlpha)
+            end
         end
     end
 

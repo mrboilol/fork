@@ -60,11 +60,11 @@ function hg.organism.KillFatalBrainDamage(org)
 	return true
 end
 
-local panicattack_threshold = 0.35
-local panicattack_add_decay_time = 120
-local panicattack_rise_time = 5
-local panicattack_decay_time = 200
-local panicattack_gain_mul = 0.5
+local panicattack_threshold = 0.3
+local panicattack_add_decay_time = 80
+local panicattack_rise_time = 4
+local panicattack_decay_time = 140
+local panicattack_gain_mul = 0.7
 local panicattack_disorientation = 0.45
 local panicattack_adrenaline_add_target = 4
 local panicattack_adrenaline_add_rise_time = 14
@@ -984,8 +984,40 @@ hook.Add("Org Think", "PanicAttackNearbyFire", function(owner, org)
 		-- Fire is a sustained threat: this tiny per-second gain only overtakes
 		-- normal panic decay when the player stays close to it for a while.
 		local falloff = math.Clamp(1 - closest / panicattack_fire_radius, 0, 1)
-		hg.organism.AddPanicAttack(org, 0.012 + falloff * 0.024, true)
+		hg.organism.AddPanicAttack(org, 0.02 + falloff * 0.04, true)
 	end
+end)
+
+hook.Add("EntityTakeDamage", "PanicAttackCombatTrauma", function(target, dmgInfo)
+	if not hg_panic:GetBool() then return end
+	if not IsValid(target) or not target:IsPlayer() or not target:Alive() then return end
+
+	local org = target.organism
+	if not org or org.otrub or (org.berserk or 0) > 0 then return end
+
+	local damage = math.max(dmgInfo:GetDamage(), 0)
+	if damage <= 0 then return end
+
+	-- Direct trauma is the most reliable panic trigger. Gunshots and hostile
+	-- attacks build it quickly, while blasts and fire add their own shock.
+	local amount = math.Clamp(damage / 110, 0.015, 0.22)
+	if dmgInfo:IsDamageType(DMG_BULLET) or dmgInfo:IsDamageType(DMG_BUCKSHOT) then
+		amount = amount * 1.25
+	end
+	if dmgInfo:IsExplosionDamage() then
+		amount = amount + 0.24
+	end
+	if dmgInfo:IsDamageType(DMG_BURN) or dmgInfo:IsDamageType(DMG_SLOWBURN) then
+		amount = amount + 0.09
+	end
+
+	local attacker = dmgInfo:GetAttacker()
+	if IsValid(attacker) and attacker ~= target and (attacker:IsPlayer() or attacker:IsNPC() or attacker:IsNextBot()) then
+		amount = amount + 0.04
+	end
+	if damage >= 35 then amount = amount + 0.12 end
+
+	hg.organism.AddPanicAttack(org, math.min(amount, 0.55), true)
 end)
 
 local function resolve_panic_attacker(victim, attacker)
