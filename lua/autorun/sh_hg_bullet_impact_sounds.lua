@@ -5,6 +5,12 @@ HG_BulletImpactSounds = HG_BulletImpactSounds or {}
 local impactSounds = HG_BulletImpactSounds
 local math_random = math.random
 
+local function addNumberedSounds(sounds, folder, count, prefix)
+	for index = 1, count do
+		sounds[#sounds + 1] = folder .. (prefix or "") .. index .. ".wav"
+	end
+end
+
 local fleshSounds = {
 	"bullet/ric_flesh1.ogg",
 	"bullet/ric_flesh2.ogg",
@@ -18,6 +24,7 @@ local fleshSounds = {
 	"panoptisscon/bullethit3 - Copy.ogg",
 	"panoptisscon/bullethit4 - Copy.ogg",
 }
+addNumberedSounds(fleshSounds, "bfx/flesh/", 10)
 
 local stoneSounds = {
 	"panoptisscon/rock1 - Copy.ogg",
@@ -37,6 +44,7 @@ local metalSounds = {
 	"bullet/ric_metal4.ogg",
 	"bullet/ric_metal5.ogg",
 }
+addNumberedSounds(metalSounds, "bfx/metal/", 29)
 
 local woodSounds = {
 	"bullet/ric_wood1.ogg",
@@ -44,6 +52,32 @@ local woodSounds = {
 	"bullet/ric_wood3.ogg",
 	"bullet/ric_wood4.ogg",
 }
+addNumberedSounds(woodSounds, "bfx/wood/", 15)
+
+local dirtSounds = {}
+addNumberedSounds(dirtSounds, "bfx/dirt/", 16)
+
+local genericSounds = {
+	"bfx/Misc1.wav",
+}
+addNumberedSounds(genericSounds, "bfx/generic/", 29)
+for index = 1, #genericSounds do
+	stoneSounds[#stoneSounds + 1] = genericSounds[index]
+end
+
+local glassSounds = {}
+addNumberedSounds(glassSounds, "bfx/glass/", 21)
+
+local plasticSounds = {}
+addNumberedSounds(plasticSounds, "bfx/plastic/", 10)
+
+local tileSounds = {}
+addNumberedSounds(tileSounds, "bfx/tile/", 8)
+
+local nearMissSounds = {}
+addNumberedSounds(nearMissSounds, "bfx/nearmiss/", 5)
+addNumberedSounds(nearMissSounds, "bfx/wizzes/", 9)
+addNumberedSounds(nearMissSounds, "bfx/wizzes/", 5, "energy")
 
 local ricochetSounds = {
 	"bullet/ricochet1.ogg",
@@ -56,6 +90,9 @@ local ricochetSounds = {
 	"panoptisscon/ric4 - Copy.ogg",
 	"panoptisscon/ric5 - Copy.ogg",
 }
+for index = 1, #genericSounds do
+	ricochetSounds[#ricochetSounds + 1] = genericSounds[index]
+end
 
 local materialSounds = {
 	[MAT_FLESH] = {sounds = fleshSounds, always = true},
@@ -64,20 +101,20 @@ local materialSounds = {
 	[MAT_BLOODYFLESH] = {sounds = fleshSounds, always = true},
 
 	[MAT_CONCRETE] = {sounds = stoneSounds, always = true},
-	[MAT_TILE] = {sounds = stoneSounds, always = true},
-	[MAT_SAND] = {sounds = stoneSounds, always = true},
-	[MAT_DIRT] = {sounds = stoneSounds, always = true},
-	[MAT_GRASS] = {sounds = stoneSounds, always = true},
-	[MAT_SNOW] = {sounds = stoneSounds, always = true},
-	[74] = {sounds = stoneSounds, always = true},
-	[85] = {sounds = stoneSounds, always = true},
+	[MAT_TILE] = {sounds = tileSounds, always = true},
+	[MAT_SAND] = {sounds = dirtSounds, always = true},
+	[MAT_DIRT] = {sounds = dirtSounds, always = true},
+	[MAT_GRASS] = {sounds = dirtSounds, always = true},
+	[MAT_SNOW] = {sounds = dirtSounds, always = true},
+	[74] = {sounds = dirtSounds, always = true},
+	[85] = {sounds = dirtSounds, always = true},
 
 	[MAT_METAL] = {sounds = metalSounds},
 	[MAT_COMPUTER] = {sounds = metalSounds},
 	[MAT_VENT] = {sounds = metalSounds},
 	[MAT_GRATE] = {sounds = metalSounds},
-	[MAT_GLASS] = {sounds = metalSounds},
-	[MAT_PLASTIC] = {sounds = metalSounds},
+	[MAT_GLASS] = {sounds = glassSounds},
+	[MAT_PLASTIC] = {sounds = plasticSounds},
 
 	[MAT_WOOD] = {sounds = woodSounds},
 	[MAT_FOLIAGE] = {sounds = woodSounds},
@@ -86,8 +123,7 @@ local materialSounds = {
 function impactSounds.PlayMaterialImpact(trace)
 	if not SERVER or not trace or trace.HitSky then return false end
 
-	local selection = materialSounds[trace.MatType]
-	if not selection then return false end
+	local selection = materialSounds[trace.MatType] or {sounds = genericSounds}
 	if not selection.always and math_random(2) ~= 1 then return false end
 
 	local choices = selection.sounds
@@ -100,6 +136,14 @@ function impactSounds.PlayRicochet(pos)
 	if not SERVER or not pos or math_random(2) ~= 1 then return false end
 
 	sound.Play(ricochetSounds[math_random(#ricochetSounds)], pos, 75, math_random(97, 103))
+
+	return true
+end
+
+function impactSounds.PlayNearMiss(pos)
+	if not CLIENT or not pos then return false end
+
+	sound.Play(nearMissSounds[math_random(#nearMissSounds)], pos, 75, math_random(97, 103), 1)
 
 	return true
 end

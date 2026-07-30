@@ -335,6 +335,8 @@ local function ApplyClientOverride()
 
                 local playPos = closestPos - bullet.Vel:GetNormalized() * 25
 
+                if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos) then return end
+
                 timer.Simple(0.02, function()
                     EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", playPos, 0, CHAN_ITEM, 1, 155)
                 end)
