@@ -642,12 +642,29 @@ local function processPostureGunfire(ply, ragdoll, org, wep)
 	wep = IsValid(org.postureGunfireWeapon) and org.postureGunfireWeapon or wep
 	if not IsValid(wep) then org.postureGunfireWeapon = nil return end
 	if not ishgweapon(wep) or wep.reload or wep.deploy then return end
-	if wep.Clip1 and wep:Clip1() <= 0 then return end
-	if not wep.TryDropMisfire then return end
 
 	local time = CurTime()
 	if (ragdoll.nextPostureGunFire or 0) > time then return end
-	ragdoll.nextPostureGunFire = time + math.Rand(0.08, 0.22)
+
+	if org.postureGunfireWeapon ~= wep then
+		org.postureGunfireWeapon = wep
+		ragdoll.nextPostureGunFire = nil
+	end
+
+	local primary = wep.Primary or {}
+	if primary.Next and primary.Next > time then return end
+	if (primary.NextFire or 0) > time then return end
+	if wep.GetNextPrimaryFire and wep:GetNextPrimaryFire() > time then return end
+
+	if wep.drawBullet == false then
+		ragdoll.nextPostureGunFire = math.max(primary.Next or 0, time + 0.35)
+		return
+	end
+
+	if wep.Clip1 and wep:Clip1() <= 0 then
+		ragdoll.nextPostureGunFire = time + math.Rand(0.4, 0.8)
+		return
+	end
 
 	if wep:GetOwner() == ply then
 		local hand = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll, 7))
@@ -655,7 +672,10 @@ local function processPostureGunfire(ply, ragdoll, org, wep)
 		local fireAng = Angle(math.Clamp(ang.p + math.Rand(-65, 65), -89, 89), ang.y + math.Rand(-140, 140), math.Rand(-45, 45))
 		ply:SetEyeAngles(fireAng)
 	end
-	wep:TryDropMisfire(1, 251, true)
+
+	if wep.PrimaryAttack then wep:PrimaryAttack(true) end
+	local wait = primary.Wait or 0.2
+	ragdoll.nextPostureGunFire = math.max(primary.Next or 0, primary.NextFire or 0, time + wait) + (primary.Automatic and math.Rand(0.01, 0.05) or math.Rand(0.12, 0.28))
 end
 
 local shadowControl = hg.ShadowControl
@@ -919,8 +939,26 @@ local models_female = {
 local vector_zero = Vector(0,0,0)
 
 local vector_usehull = Vector(6, 6, 6)
-
-
+local fall_cover_mins = Vector(-6, -6, -6)
+local fall_cover_maxs = Vector(6, 6, 6)
+local fall_cover_offsets = {
+	["male09"] = {
+		[2] = {ang = Angle(-25.820, -105.490, -100.210)},
+		[3] = {ang = Angle(-33.460, -72.240, -70.380)},
+		[4] = {ang = Angle(-10.640, 145.920, -34.760)},
+		[5] = {ang = Angle(12.380, 127.140, 75.320)},
+		[6] = {ang = Angle(-19.720, -33.680, -171.940)},
+		[7] = {ang = Angle(-1.960, 35.170, 116.580)}
+	},
+	["female06"] = {
+		[2] = {ang = Angle(-22.610, -99.190, -98.620)},
+		[3] = {ang = Angle(-29.870, -78.830, -71.760)},
+		[4] = {ang = Angle(-11.430, 139.440, -35.610)},
+		[5] = {ang = Angle(11.620, 117.010, 78.940)},
+		[6] = {ang = Angle(-20.210, -25.920, -171.180)},
+		[7] = {ang = Angle(-4.130, 45.020, 113.260)}
+	}
+}
 
 local hg_shitty_fake = CreateConVar("hg_shitty_fake", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "enable shitty fake", 0, 1)
 
@@ -1419,8 +1457,51 @@ hook.Add("Think", "Fake", function()
 		lhand = ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,5))
 
 		ang = spine:GetAngles()
+		local fallCoverActive = false
+		if org.alive and org.canmove and IsValid(spine) then
+			local vel = ragdoll:GetVelocity()
+			local fallSpeed = -vel.z
+			fallCoverActive = vel:LengthSqr() > 1000000
+
+			if not fallCoverActive and fallSpeed > 350 then
+				local fallTr = util.TraceHull({
+					start = spine:GetPos(),
+					endpos = spine:GetPos() - vector_up * fallSpeed,
+					mins = fall_cover_mins,
+					maxs = fall_cover_maxs,
+					filter = {ply, ragdoll},
+					mask = MASK_SOLID,
+				})
+
+				if fallTr.Hit and not fallTr.HitSky and fallTr.Fraction <= 1 then
+					fallCoverActive = true
+				end
+			end
+
+			if fallCoverActive then
+				inmove = true
+				if IsValid(ragdoll.ConsLH) then ragdoll.ConsLH:Remove() ragdoll.ConsLH = nil end
+				if IsValid(ragdoll.ConsRH) then ragdoll.ConsRH:Remove() ragdoll.ConsRH = nil end
+
+				local reference = ragdoll:GetPhysicsObjectNum(0)
+				if IsValid(reference) then
+					local offsets = string.find(string.lower(ragdoll:GetModel() or ""), "female", 1, true) and fall_cover_offsets.female06 or fall_cover_offsets.male09
+					local referenceAng = reference:GetAngles()
+					local coverForce = 1600 * ragdoll.power
+					local coverDamp = 900 * ragdoll.power
+
+					for physBone, offset in pairs(offsets) do
+						local canUseArm = ((physBone == 2 or physBone == 6 or physBone == 7) and not org.rarmamputated) or ((physBone == 3 or physBone == 4 or physBone == 5) and not org.larmamputated)
+						if canUseArm then
+							local _, targetAng = LocalToWorld(vector_origin, offset.ang, vector_origin, referenceAng)
+							shadowControl(ragdoll, physBone, 0.04, targetAng, coverForce, coverDamp, vector_origin, 0, 0)
+						end
+					end
+				end
+			end
+		end
 		local holdWound, holdWoundArterial = getHoldWound(org, ragdoll)
-		local wantsManualHold = holdWound and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP)
+		local wantsManualHold = not fallCoverActive and holdWound and org.canmove and hg.KeyDown(ply, IN_USE) and hg.KeyDown(ply, IN_JUMP)
 		local canHoldLeft = IsValid(lupper) and IsValid(lforearm) and IsValid(lhand) and not org.larmamputated
 		local canHoldRight = IsValid(rupper) and IsValid(rforearm) and IsValid(rhand) and not org.rarmamputated
 		local hasBothArms = canHoldLeft and canHoldRight
@@ -1498,12 +1579,12 @@ hook.Add("Think", "Fake", function()
 			shadowControl(ragdoll, 13, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
 			shadowControl(ragdoll, 14, otrub_ss, nil, nil, nil, fetalPos, otrub_maxspeed, otrub_maxspeeddamp)
 
-			if (org.larm or 0) > 0 or org.larmdislocation then
+			if not fallCoverActive and ((org.larm or 0) > 0 or org.larmdislocation) then
 				shadowControl(ragdoll, 3, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
 				shadowControl(ragdoll, 4, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
 				shadowControl(ragdoll, 5, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
 			end
-			if (org.rarm or 0) > 0 or org.rarmdislocation then
+			if not fallCoverActive and ((org.rarm or 0) > 0 or org.rarmdislocation) then
 				shadowControl(ragdoll, 2, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
 				shadowControl(ragdoll, 6, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
 				shadowControl(ragdoll, 7, otrub_ss, nil, nil, nil, armHoldPos, otrub_maxspeed, otrub_maxspeeddamp)
@@ -1564,7 +1645,7 @@ hook.Add("Think", "Fake", function()
 		
 		if not wep.RagdollFunc then
 			local force = math.max(1 - org.larm / 1.3, 0)
-			if not manualHoldWound and (!IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2)))) then// || ply:InVehicle() then
+			if not fallCoverActive and not manualHoldWound and (!IsValid(ragdoll.ConsLH) and (ply:KeyDown(IN_ATTACK) and !ishgweapon(wep)) or (((ishgweapon(wep) and (!wep:IsResting() or ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_BACK))) or wep.ismelee2) and (ply:KeyDown(IN_USE) or ply:KeyDown(IN_ATTACK2)))) then// || ply:InVehicle() then
 				if org.canmove then
 
 					//if !ply:InVehicle() then
@@ -1626,9 +1707,8 @@ hook.Add("Think", "Fake", function()
 					mask = MASK_SOLID,
 
 				}).Hit
-
-			if forward then
-
+			
+			if not fallCoverActive and forward then
 				if IsValid(ragdoll.ConsRH) then
 
 					local hand = ragdoll:GetPhysicsObjectNum(ragdoll.ConsRH.Bone1)
@@ -1709,8 +1789,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-			if back then
-
+			if not fallCoverActive and back then
 				if IsValid(ragdoll.ConsRH) then
 
 					local hand = ragdoll:GetPhysicsObjectNum(ragdoll.ConsRH.Bone1)
@@ -1769,7 +1848,7 @@ hook.Add("Think", "Fake", function()
 
 			local force = math.max(1 - org.rarm / 1.3, 0)
 
-			if (!IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or ((ishgweapon(wep) or wep.ismelee2) and ply:KeyDown(IN_USE))) then// || ply:InVehicle() then
+			if not fallCoverActive and (!IsValid(ragdoll.ConsRH) and ply:KeyDown(IN_ATTACK2) or ((ishgweapon(wep) or wep.ismelee2) and ply:KeyDown(IN_USE))) then// || ply:InVehicle() then
 				if org.canmove then
 
 					--if org.shock > 1 and not ply:KeyDown(IN_ATTACK2) then angles = spine:GetAngles() end
@@ -1832,8 +1911,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-			if ply:KeyDown(IN_SPEED) and ply:KeyDown(IN_WALK) then
-
+			if not fallCoverActive and ply:KeyDown(IN_SPEED) and ply:KeyDown(IN_WALK) then
 				local trace
 
 				tr.start = lhand:GetPos() + lhand:GetAngles():Forward() * 5
@@ -1910,8 +1988,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-			if ply:KeyDown(IN_SPEED) and org.canmove and !org.larmamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
-
+			if not fallCoverActive and ply:KeyDown(IN_SPEED) and org.canmove and !org.larmamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsLH) then
 
 					if hg_fake_stamina:GetBool() then
@@ -2223,8 +2300,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-			if ply:KeyDown(IN_WALK) and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
-
+			if not fallCoverActive and ply:KeyDown(IN_WALK) and org.canmove and !(ishgweapon(wep) or wep.ismelee2) and !org.rarmamputated and (!ply.HandsStun or ply.HandsStun < CurTime()) then
 				if IsValid(ragdoll.ConsRH) then
 
 					if hg_fake_stamina:GetBool() then
@@ -2384,9 +2460,7 @@ hook.Add("Think", "Fake", function()
 			end
 
 		else
-
-			if ply:KeyDown(IN_ATTACK2) and org.canmove then
-
+			if not fallCoverActive and ply:KeyDown(IN_ATTACK2) and org.canmove then
 				if wep.RagdollFunc then
 
 					wep:RagdollFunc(ragdoll:GetPhysicsObjectNum(realPhysNum(ragdoll,7)):GetPos() + angles:Forward() * 15 + ((vellen > 150 and ragdoll:GetPhysicsObject():GetVelocity() / 224) or vector_zero), angles, ragdoll)
@@ -2717,9 +2791,7 @@ hook.Add("Think", "Fake", function()
 				(ragdoll, physNumber, ss, ang, maxang, maxangdamp, pos, maxspeed, maxspeeddamp)
 
 			--]]
-
-			local mul = (vellen - 350) / 750
-
+			local mul = (vellen - 350) / 750 * (fallCoverActive and 0.25 or 1)
 			local maxangdamp = 500 * mul
 
 			local maxangspeed = 950 *  mul

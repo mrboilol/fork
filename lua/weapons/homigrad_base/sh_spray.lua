@@ -18,7 +18,9 @@ end
 SWEP.SprayRand = {Angle(0, 0, 0), Angle(0, 0, 0)}
 SWEP.addSprayMul = 1
 
-SWEP.RecoilMul = 1.0
+SWEP.RecoilMul = 0.8
+SWEP.ScreenRecoilMul = 0.6
+SWEP.WeaponRecoilMul = 1.25
 
 local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
 
@@ -221,6 +223,7 @@ function SWEP:PrimarySpread()
 		mul = mul * injuryRecoilMul
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
+		local screenRecoilMul = self.ScreenRecoilMul or 1
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
@@ -261,11 +264,11 @@ function SWEP:PrimarySpread()
 
 			local huyang = angrand2 * mul / 2 * mulhuy
 			huyang[3] = 0
-			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 2 or 1) * 0.14)
-
+			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.25 * screenRecoilMul)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			
 			local angpopa = angrand2 * mul
 			angpopa[3] = 0
-			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.25 or 0.55))
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1) * screenRecoilMul)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 		local angrand3 = Angle(angrand2[1], math.Clamp(angrand2[2] * 0.65, -math.abs(angrand2[1]) * 0.18 - 0.08, math.abs(angrand2[1]) * 0.18 + 0.08), 0)
@@ -275,11 +278,11 @@ function SWEP:PrimarySpread()
 
 		//ViewPunch2(angleprikol)
 
-		local mul = math.Clamp(mul * caliberMul * weightMul * 0.38 * (self:IsPistolHoldType() and 1.25 or 1) * (numBullet and math.sqrt(numBullet) or 1), 0.08, 2.5)
-		ViewPunch2(Angle(-math.Rand(1.25,2.2), math.Rand(-0.45,0.45), 0) * mul * 0.18)
-		ViewPunch(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul / -8)
-		timer.Simple(0.01, function() if IsValid(owner) then ViewPunch2(Angle(-math.Rand(1,2), math.Rand(-0.45,0.45), 0) * mul * 0.12) end end)
-		timer.Simple(0.02, function() if IsValid(owner) then ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul * 0.1) end end)
+		local mul = mul * self.Primary.Force2 / 100 * (self:IsPistolHoldType() and 2 or 1) * (self.NumBullet and self.NumBullet * 3 or 1)
+		ViewPunch2(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul * screenRecoilMul)
+		ViewPunch(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul / -2 * screenRecoilMul)
+		timer.Simple(0.01, function() ViewPunch2(Angle(-1 * math.Rand(1,2),1 * math.Rand(-1,1),0) * mul * screenRecoilMul) end)
+		timer.Simple(0.02, function() ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul * screenRecoilMul) end)
 
 		local eyeang = owner:EyeAngles()
 		if not finite_angle(eyeang) then return end
@@ -290,35 +293,11 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		local longGunKickMul = not self:IsPistolHoldType() and 1.35 or 1
-		local gangstaHold = owner.posture == 7
-		local verticalKick = math.Clamp(caliberMul * weightMul * recoilProgress * 1.7 * longGunKickMul, 0.7, 6.2)
-		local muzzleKick = sprayAng * self:GetCharacterRecoilMul() * (owner.posture == 1 and not self:IsZoom() and 0.32 or 1) * 0.6
-		if gangstaHold then
-			local rightKick = math.Clamp(caliberMul * weightMul * recoilProgress * 0.9, 0.35, 3.2)
-			muzzleKick[1] = math.Clamp(muzzleKick[1] * 0.15, -0.65, 0.12)
-			muzzleKick[2] = rightKick
-		else
-			muzzleKick[1] = math.min(muzzleKick[1] - verticalKick, -verticalKick)
-			muzzleKick[1] = math.Clamp(muzzleKick[1] * 1.7, -10.0, 1.2)
-			local muzzleYawCap = math.min(longGunKickMul > 1 and 0.12 or 0.18, math.abs(muzzleKick[1]) * 0.045 + 0.02)
-			muzzleKick[2] = math.Clamp(muzzleKick[2] * 0.06, -muzzleYawCap, muzzleYawCap)
-		end
-		muzzleKick[3] = 0
-		muzzleKick = sanitize_angle(muzzleKick)
-		local newEyeAng = eyeang + muzzleKick
-		if finite_angle(newEyeAng) then
-			-- This happens after the shot, so the just-fired round keeps the exact
-			-- predicted trajectory while follow-up aim now needs compensation.
-			-- vertical pole. Crossing it flips the view and inverts mouse input.
-			newEyeAng[1] = math.Clamp(math.AngleDifference(newEyeAng[1], 0), -89, 89)
-			newEyeAng[3] = math.Clamp(math.AngleDifference(newEyeAng[3], 0), -45, 45)
-			owner:SetEyeAngles(newEyeAng)
-		end
-
+		owner:SetEyeAngles(eyeang + sprayAng * 3 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.25 * screenRecoilMul)
+		
 		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
-		ViewPunch2(Angle(2 * rnd1, rnd2 * 1.1, 0) * mul * 0.12)
-		ViewPunch(Angle(-2 * rnd1, -rnd2 * 1.1, 0) * mul * 0.22)
+		ViewPunch2(Angle(2 * rnd1,2 * rnd2,0) * mul * 0.5 * screenRecoilMul)
+		ViewPunch(Angle(-2 * rnd1,-2 *rnd2,0) * mul * screenRecoilMul)
 
 		local max_clip1 = self:GetMaxClip1()
 		if max_clip1 == 0 then max_clip1 = 1 end

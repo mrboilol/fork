@@ -77,17 +77,121 @@ local tabblood = {
 	["$pp_colour_mulb"] = 0,
 }
 
-local remorseismIncapacitationStatus
-hook.Add("HUDPaint", "RemIncapacitationStatus", function()
-	local ply = LocalPlayer()
-	local org = IsValid(ply) and ply.organism
-	if not IsValid(ply) or not ply:Alive() or not org or not org.otrub or not org.incapacitated then return end
+surface.CreateFont("RemDeathStateFont", {
+	font = "Lora",
+	size = ScreenScale(22),
+	weight = 1100,
+	outline = true
+})
 
-	remorseismIncapacitationStatus = remorseismIncapacitationStatus or markup.Parse(
-		"<font=HomigradFontMedium>You are unconscious. " ..
-		"\n<colour=255,255,255,255>You will not get up without someone's help.</colour></font>"
-	)
-	remorseismIncapacitationStatus:Draw(ScrW() / 2, ScrH() / 1.1, TEXT_ALIGN_CENTER, nil, nil, TEXT_ALIGN_CENTER)
+local remDeathStateColor = Color(255, 255, 255, 0)
+local remDeathStateStation
+local remDeathStateLoading
+local remHeartStopped = false
+local remFibrillationStation
+local remFibrillationLoading
+local remFibrillationStopping
+local remHeartStopLoading
+
+local function PlayRemHeartStopSound(uncon)
+	if remHeartStopLoading then return end
+
+	remHeartStopLoading = true
+	sound.PlayFile("sound/" .. (uncon and "rem_heartstopuncon.wav" or "rem_heartstop.wav"), "noblock noplay", function(station)
+		remHeartStopLoading = nil
+		if not IsValid(station) then return end
+		station:SetVolume(1)
+		station:Play()
+	end)
+end
+
+local function PlayRemDeathStateSound()
+	if IsValid(remDeathStateStation) then
+		remDeathStateStation:Play()
+		return
+	end
+	if remDeathStateLoading then return end
+
+	remDeathStateLoading = true
+	sound.PlayFile("sound/rem_deathstatefull.mp3", "noplay", function(station)
+		remDeathStateLoading = nil
+		if not IsValid(station) then return end
+		if not LocalPlayer():Alive() then station:Stop() return end
+		remDeathStateStation = station
+		station:EnableLooping(true)
+		station:SetVolume(1)
+		station:Play()
+	end)
+end
+
+net.Receive("rem_deathstate_sound", PlayRemDeathStateSound)
+
+local function StartRemFibrillationSound()
+ if IsValid(remFibrillationStation) then
+  remFibrillationStopping = nil
+  remFibrillationStation:Play()
+  if remFibrillationStation.ChangeVolume then remFibrillationStation:ChangeVolume(1, 1) else remFibrillationStation:SetVolume(1) end
+  return
+ end
+ if remFibrillationLoading then return end
+
+ remFibrillationLoading = true
+ sound.PlayFile("sound/rem_fibrillation.mp3", "noplay", function(station)
+  remFibrillationLoading = nil
+  if not IsValid(station) then return end
+  local ply = LocalPlayer()
+  local org = IsValid(ply) and (ply.new_organism or ply.organism)
+  if not IsValid(ply) or not ply:Alive() or not org or not org.fibrillation then station:Stop() return end
+  remFibrillationStation = station
+  station:EnableLooping(true)
+  station:SetVolume(0)
+  station:Play()
+  if station.ChangeVolume then station:ChangeVolume(1, 1) else station:SetVolume(1) end
+ end)
+end
+
+local function StopRemFibrillationSound()
+ if not IsValid(remFibrillationStation) or remFibrillationStopping then return end
+ remFibrillationStopping = true
+ if remFibrillationStation.ChangeVolume then
+  remFibrillationStation:ChangeVolume(0, 1)
+ else
+  remFibrillationStation:Stop()
+  remFibrillationStation = nil
+  remFibrillationStopping = nil
+  return
+ end
+ timer.Simple(1.05, function()
+  if not remFibrillationStopping or not IsValid(remFibrillationStation) then return end
+  remFibrillationStation:Stop()
+  remFibrillationStation = nil
+  remFibrillationStopping = nil
+ end)
+end
+
+hook.Add("Think", "RemCardiacSounds", function()
+ local ply = LocalPlayer()
+ if not IsValid(ply) then return end
+
+ local org = ply:Alive() and (ply.new_organism or ply.organism)
+ local heartstop = org and org.heartstop or false
+ local fibrillation = org and org.fibrillation or false
+
+ if heartstop and not remHeartStopped then PlayRemHeartStopSound(org.otrub) end
+ remHeartStopped = heartstop
+
+ if fibrillation then
+  StartRemFibrillationSound()
+ else
+  StopRemFibrillationSound()
+ end
+end)
+
+hook.Add("Think", "RemDeathStateSoundStop", function()
+	local ply = LocalPlayer()
+	if not IsValid(ply) or ply:Alive() or not IsValid(remDeathStateStation) then return end
+	remDeathStateStation:Stop()
+	remDeathStateStation = nil
 end)
 
 local k1, k2, k3
@@ -777,7 +881,7 @@ hook.Add("OnNetVarSet","wounds_netvar",function(index, key, var)
 			local rag = IsValid(ent:GetNWEntity("FakeRagdoll")) and ent:GetNWEntity("FakeRagdoll")
 			rag = IsValid(rag) and rag or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
 			if IsValid(rag) then
-				rag.wounds = rag:GetNetVar("wounds") or var
+				rag.wounds = var
 			end
 		end
 	end
@@ -806,7 +910,7 @@ hook.Add("OnNetVarSet","wounds_netvar2",function(index, key, var)
 			rag = IsValid(rag) and rag or IsValid(ent:GetNWEntity("RagdollDeath")) and ent:GetNWEntity("RagdollDeath")
 			
 			if IsValid(rag) then
-				rag.arterialwounds = rag:GetNetVar("arterialwounds") or var
+				rag.arterialwounds = var
 			end
 		end
 	end
@@ -817,6 +921,12 @@ hook.Add("Player Spawn", "removewounds", function(ply)
 
 	ply.wounds = {}
 	ply.arterialwounds = {}
+
+	local rag = IsValid(ply:GetNWEntity("FakeRagdoll")) and ply:GetNWEntity("FakeRagdoll")
+	if IsValid(rag) then
+		rag.wounds = {}
+		rag.arterialwounds = {}
+	end
 end)
 
 hook.Add("Fake", "huyhuyhuy235", function(ply,ragdoll)
@@ -1260,14 +1370,20 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull)
 				local particleInterval = Lerp(intensity, 4.5, 0.22)
 				
-				if (wound[5] or 0) < time then
-					if seen and ent:LookupBone(wound[4]) then
-						local bone = wound[4]
+				if wound[5] + beatsPerSecond < time then
+					local bone = wound[4]
+					local boneID = wound[8]
+					if not boneID or ent:GetBoneName(boneID) != bone then
+						boneID = ent:LookupBone(bone)
+						wound[8] = boneID
+					end
+
+					if seen and boneID then
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
 
 						if !should then continue end
 
-						local mat = ent:GetBoneMatrix(ent:LookupBone(bone))
+						local mat = ent:GetBoneMatrix(boneID)
 						if not mat then return end
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end
@@ -1302,19 +1418,26 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-			local pulse = math.max(org.pulse or 70, 0)
-			local addtime = seen and 1 / math.Clamp(pulse, 1, 15) * 0.25 or 0.06
-			if (wound[5] or 0) + addtime < time and ent:LookupBone(wound[4]) then
+			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
+			if wound[5] + addtime < time then
+				local bone = wound[4]
+				local boneID = wound[8]
+				if not boneID or ent:GetBoneName(boneID) != bone then
+					boneID = ent:LookupBone(bone)
+					wound[8] = boneID
+				end
+				if not boneID then continue end
+
+				local pos, ang = ent:GetBonePosition(boneID)
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5)
-					if seen and ent:LookupBone(wound[4]) then
-						local bone = wound[4]
+					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
+					if seen then
 
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
 
 						if !should then continue end
 						
-						local mat = ent:GetBoneMatrix(ent:LookupBone(bone))
+						local mat = ent:GetBoneMatrix(boneID)
 						if not mat then return end
 						local bonePos, boneAng = mat:GetTranslation(), mat:GetAngles()
 						if not wound[2] or not wound[3] or not bonePos or not boneAng then return end

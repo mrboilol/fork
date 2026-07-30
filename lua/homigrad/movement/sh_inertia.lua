@@ -53,27 +53,27 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
         local function hg_GetMovementLagComp(ply)
                 if not hg_movement_lagcomp:GetBool() or not IsValid(ply) then return 1, 0 end
 
-                local ping_time = math.Clamp(ply:Ping() / 1000, 0, 0.18)
+		local ping_time = math.Clamp(ply:Ping() / 1000, 0, 0.12)
 
-                return math.Clamp(1 + ping_time * 4.5, 1, 1.8), ping_time
-        end
-        local sprint_collision_trace_mins = Vector(-12, -12, -20)
-        local sprint_collision_trace_maxs = Vector(12, 12, 20)
-        local sprint_collision_up = Vector(0, 0, 1)
-        local sprint_collision_force_mul = 0.55
-        local sprint_collision_torso_force_mul = 0.4
-        local sprint_collision_upward_mul = 0.2
-        local sprint_collision_full_speed_mul = 0.98
-        local sprint_collision_trip_chance = 3
-        local sprint_collision_stumble_slowdown = 450
-        local sprint_collision_stumble_time = 0.18
-        local sprint_collision_damage_mul = 0.08
-        local sprint_collision_damage_time = 0.9
-        local sprint_collision_sounds = {
-                "raminto/ram1.wav",
-                "raminto/ram2.wav",
-                "raminto/ram3.wav"
-        }
+		return math.Clamp(1 - ping_time * 1.25, 0.82, 1), ping_time
+	end
+	local sprint_collision_trace_mins = Vector(-12, -12, -20)
+	local sprint_collision_trace_maxs = Vector(12, 12, 20)
+	local sprint_collision_up = Vector(0, 0, 1)
+	local sprint_collision_force_mul = 0.55
+	local sprint_collision_torso_force_mul = 0.4
+	local sprint_collision_upward_mul = 0.2
+	local sprint_collision_full_speed_mul = 0.98
+	local sprint_collision_trip_chance = 3
+	local sprint_collision_stumble_slowdown = 450
+	local sprint_collision_stumble_time = 0.18
+	local sprint_collision_damage_mul = 0.08
+	local sprint_collision_damage_time = 0.9
+	local sprint_collision_sounds = {
+		"raminto/ram1.wav",
+		"raminto/ram2.wav",
+		"raminto/ram3.wav"
+	}
 
         local function hg_HoldShiftSprint(ply)
                 return IsValid(ply) and ply:GetInfoNum("hg_hold_shift_sprint", 0) >= 1
@@ -168,13 +168,14 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
         hg.TriggerSprintCollisionRagdoll = hg_TriggerSprintCollisionRagdoll
         hg.TriggerSprintCollisionStumble = hg_TriggerSprintCollisionStumble
 
-        local function hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
-                if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
-                if ply.hgSprintCollisionCooldown and ply.hgSprintCollisionCooldown > CurTime() then return end
-                if ply:InVehicle() or ply:GetMoveType() != MOVETYPE_WALK or ply:WaterLevel() >= 2 then return end
-                if not (ply.hg_isSprinting or (not ply:OnGround() and ply:KeyDown(IN_SPEED) and ply:KeyDown(IN_FORWARD))) then return end
-                local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
-                if velLen < 215 / lag_comp_mul then return end
+	local function hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
+		if not SERVER or not IsValid(ply) or not ply:Alive() or IsValid(ply.FakeRagdoll) then return end
+		if ply.hgSprintCollisionCooldown and ply.hgSprintCollisionCooldown > CurTime() then return end
+		if ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > CurTime() and ply:Ping() >= 45 then return end
+		if ply:InVehicle() or ply:GetMoveType() != MOVETYPE_WALK or ply:WaterLevel() >= 2 then return end
+		if not (ply.hg_isSprinting or (not ply:OnGround() and ply:KeyDown(IN_SPEED) and ply:KeyDown(IN_FORWARD))) then return end
+		local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
+		if velLen < 215 / lag_comp_mul then return end
 
                 local fullSpeed = math.max(ply:GetRunSpeed(), ply.move or 0)
                 if velLen < fullSpeed * math.Clamp(sprint_collision_full_speed_mul / lag_comp_mul, 0.78, sprint_collision_full_speed_mul) then return end
@@ -182,14 +183,14 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
                 local dir = vel:GetNormalized()
                 if dir:LengthSqr() <= 0.001 then return end
 
-                local tr = util.TraceHull({
-                        start = ply:WorldSpaceCenter(),
-                        endpos = ply:WorldSpaceCenter() + dir * math.Clamp(velLen * (engine.TickInterval() * 1.5 + lag_comp_time * 0.7), 18, 64),
-                        mins = sprint_collision_trace_mins,
-                        maxs = sprint_collision_trace_maxs,
-                        filter = {ply, ply:GetVehicle()},
-                        mask = MASK_PLAYERSOLID
-                })
+		local tr = util.TraceHull({
+			start = ply:WorldSpaceCenter(),
+			endpos = ply:WorldSpaceCenter() + dir * math.Clamp(velLen * (engine.TickInterval() * 1.5 + lag_comp_time * 0.25), 18, 48),
+			mins = sprint_collision_trace_mins,
+			maxs = sprint_collision_trace_maxs,
+			filter = {ply, ply:GetVehicle()},
+			mask = MASK_PLAYERSOLID
+		})
 
                 if not tr.Hit or tr.HitSky or tr.StartSolid then return end
 
@@ -232,9 +233,10 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
 		--\\ DeltaTime
-			local delta_time = engine.TickInterval()
-			local move_time = cmd:TickCount() > 0 and cmd:TickCount() * delta_time or CurTime()
-			local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
+			ply.LastStartCommand = ply.LastStartCommand or SysTime()
+		local tick_interval = engine.TickInterval()
+		local delta_time = math.Clamp(SysTime() - ply.LastStartCommand, 0, tick_interval * 1.25)--FrameTime()
+			ply.LastStartCommand = SysTime()
 		--//
 
 		if(not IsValid(ply) or not ply:Alive())then
@@ -342,12 +344,19 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
                         cmd:RemoveKey(IN_SPEED)
                 end
 
-                local wep = ply:GetActiveWeapon()
-                local vel = ply:GetVelocity()
-                local velLen = vel:Length()
-                hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
-				local fm = cmd:GetForwardMove() * (org.brain and org.brain > 0.1 and math.sin(move_time / 2) or 1)
-				local sm = cmd:GetSideMove() * (org.brain and org.brain > 0.1 and math.sin(move_time / 2) or 1)
+		local wep = ply:GetActiveWeapon()
+		local vel = ply:GetVelocity()
+		local velLen = vel:Length()
+		local on_ground = ply:OnGround()
+		if not on_ground then
+			ply.hg_WasAirborne = true
+		elseif ply.hg_WasAirborne then
+			ply.hg_LastLandingTime = CurTime()
+			ply.hg_WasAirborne = false
+		end
+		hg_CheckSprintCollisionRagdoll(ply, vel, velLen)
+		local fm = cmd:GetForwardMove() * (org.brain and org.brain > 0.1 and math.sin(CurTime() / 2) or 1)
+		local sm = cmd:GetSideMove() * (org.brain and org.brain > 0.1 and math.sin(CurTime() / 2) or 1)
 
                 local slow_walking = cmd:KeyDown(IN_WALK)
                 local aiming = cmd:KeyDown(IN_ATTACK2) and wep and IsValid(wep) and ishgweapon(wep)
@@ -595,8 +604,11 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			-- local new_inertia = LerpVector(1 - 0.5^(delta_time * ply.InertiaBlend), ply.MovementInertia, inertia_to)
 			//local new_inertia = approach_vector(ply.MovementInertia, inertia_to, 1000)//SERVER and delta_time * ply.InertiaBlend * ply:Ping() / 100 or delta_time * ply.InertiaBlend)
 			//local new_inertia = approach_vector_smooth(ply.MovementInertia, inertia_to, hg.lerpFrameTime2(0.075, delta_time))
-			if !ply:OnGround() then
-				ply.MovementInertia = ply.LastVelocity	
+		if !ply:OnGround() then
+			ply.MovementInertia = ply.LastVelocity
+			if ply:Ping() >= 45 and ply.MovementInertia:Length2D() > ply:GetRunSpeed() * 1.25 then
+				ply.MovementInertia = ply.MovementInertia:GetNormalized() * ply:GetRunSpeed() * 1.25
+			end
 			end
 
 			local new_inertia = approach_vector(ply.MovementInertia, inertia_to, delta_time * ply.InertiaBlend)
@@ -742,6 +754,10 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		if org.noradrenaline and org.noradrenaline > 0 and inertia_len > 0 then
 			inertia_len = inertia_len + 200 * math.Round(org.noradrenaline, 1)
+		end
+
+		if CLIENT and ply:Ping() >= 45 and ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > CurTime() then
+			inertia_len = math.min(inertia_len, ply:GetRunSpeed() * 1.1)
 		end
 		
 		mv:SetMaxSpeed(inertia_len)

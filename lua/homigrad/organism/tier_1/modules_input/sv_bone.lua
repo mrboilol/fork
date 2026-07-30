@@ -6,8 +6,8 @@ local function isCrush(dmgInfo)
 	return (not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT + DMG_BLAST)) or dmgInfo:GetInflictor().RubberBullets
 end
 
-local function isBluntBrainImpact(dmgInfo)
-	return dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
+local function isMelee(dmgInfo)
+	return dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC)
 end
 
 local halfValue2 = util.halfValue2
@@ -240,6 +240,57 @@ local huyasd = {
 	["skull"] = "My head is aching.",
 }
 
+local broke_arm = {
+	"AAAAH OH GOD, IT'S BROKEN! MY ARM! IT'S BROKEN!",
+	"FUCK MY FUCKING ARM IS BROKEN!",
+	"NONONO MY ARM IS BENT ALL WRONG!",
+	"IT'S.. MY ARM.. SNAPPED- I HEARD IT SNAP!",
+	"MY ARM IS NOT SUPPOSED TO BEND IN HALF!",
+}
+
+local dislocated_arm = {
+	"MY ARM- GOD, IT'S POPPED OUT OF THE SOCKET!",
+	"FUCK- THE SHOULDER'S JUST- HANGING LOOSE!",
+	"MY ARM..! IT'S DISLOCATED! I CAN SEE THE BULGE WHERE IT'S WRONG!",
+	"THE ARM'S JUST- DEAD WEIGHT- IT'S NOT ATTACHED RIGHT!",
+	"SHIT! I CAN FEEL THE BONE OUT OF PLACE!",
+}
+
+local broke_leg = {
+	"MY LEG- FUCK, IT'S BROKEN- I HEARD THE SNAP!",
+	"FUCK! THE SHIN'S SNAPPED CLEAN THROUGH!",
+	"THE KNEE'S WRONG- THE WHOLE LEG'S TWISTED WRONG!",
+	"MY LEG..! IT'S JUST- HANGING BY MUSCLE AND SKIN!",
+	"THE PAIN'S SHOOTING UP TO MY HIP- FUCK, IT'S BAD!",
+	"I CAN'T MOVE MY FOOT- THE ANKLE'S BROKEN TOO!",
+}
+
+local dislocated_leg = {
+	"MY LEG- FUCK, IT'S DISLOCATED AT THE KNEE!",
+	"I CAN SEE THE KNEECAP IN THE WRONG PLACE!",
+	"AGHH- THE HIP'S POPPED OUT- IT'S STUCK OUTWARD!",
+	"IT'S BENT BACKWARD- THE KNEE SHOULDN'T BEND THIS WAY!",
+	"FUCK! THE HIP'S DISLOCATED!",
+	"THE ANKLE'S TWISTED- BUT THE KNEE'S THE REAL PROBLEM!",
+}
+
+local limbName = {
+	rleg = "right leg",
+	lleg = "left leg",
+	rarm = "right arm",
+	larm = "left arm",
+}
+
+local function sendThought(org, msg, key, delay, clr)
+	if org.isPly and IsValid(org.owner) and org.owner.Thought then
+		org.owner:Thought(msg, delay or 1, key, 0, clr)
+	end
+end
+
+local function hasNewThoughts(org)
+	return org.isPly and IsValid(org.owner) and org.owner:GetInfoNum("hg_newthoughts", 0) > 0
+end
+
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
 	local oldDmg = org[key]
 	dmg = dmg * 4
@@ -275,7 +326,11 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.owner:AddNaturalAdrenaline(1)
 		org.immobilization = org.immobilization + dmg * 25
 		org.fearadd = org.fearadd + 0.5
-		timer.Simple(0, function() hg.LightStunPlayer(org.owner, 2) end)
+
+		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
+		sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+
+		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 	else
@@ -286,7 +341,11 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.immobilization = org.immobilization + dmg * 10
 		org.fearadd = org.fearadd + 0.5
-		timer.Simple(0, function() hg.LightStunPlayer(org.owner, 2) end)
+
+		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_leg[math.random(#dislocated_leg)], 1, "dislocated"..key, 1, nil, nil) end
+		sendThought(org, "Your " .. limbName[key] .. " is dislocated.", "thought_dislocated" .. key, 1, Color(255, 220, 220))
+
+		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
 	end
@@ -336,6 +395,11 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		addBoneInternalBleed(org, 0.35, 0.7)
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
+
+		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
+		sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+
+		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.35) end
 		tryDropHeldItemFromArmInjury(org, key, "fracture")
@@ -346,6 +410,11 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.painadd = org.painadd + 35
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5
+
+		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
+		sendThought(org, "Your " .. limbName[key] .. " is dislocated.", "thought_dislocated" .. key, 1, Color(255, 220, 220))
+
+		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 		playBoneFractureSound(org.owner)
 		if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 1) end
 		tryDropHeldItemFromArmInjury(org, key, "dislocation")
@@ -383,7 +452,12 @@ local function spine(org, bone, dmg, dmgInfo, number, boneindex, dir, hit, ricoc
 		markBrokenBone(org, number == 1 and "ValveBiped.Bip01_Spine1" or (number == 2 and "ValveBiped.Bip01_Spine2" or "ValveBiped.Bip01_Neck1"))
 		playBoneFractureSound(org.owner)
 		if hg.QueuePainScream then hg.QueuePainScream(org.owner, 1.1) end
-		if org.owner:IsPlayer() then org.owner:Notify(huyasd[name], true, name, 2) end
+		if org.owner:IsPlayer() and !hasNewThoughts(org) then
+			org.owner:Notify(huyasd[name], true, name, 2)
+		end
+		if org.owner:IsPlayer() then
+			sendThought(org, "Your spine is broken.", "thought_" .. name, 4, Color(255, 210, 210))
+		end
 		org.painadd = org.painadd + 25
 	end
 
@@ -455,7 +529,11 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		end
 	end
 
-	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
+	if org.jaw == 1 and (org.jaw - oldDmg) > 0 and org.isPly then
+		if !hasNewThoughts(org) then org.owner:Notify(jaw_broken_msg[math.random(#jaw_broken_msg)], true, "jaw", 2) end
+		sendThought(org, "Your jaw is broken.", "thought_jaw", 4, Color(255, 210, 210))
+	end
+
 	local dislocated = (org.jaw - oldDmg) > math.Rand(0.1, 0.3)
 
 	if org.jaw == 1 then
@@ -478,7 +556,11 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 			if org.isPly and hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.85) end
 		end
 		org.jawdislocation = true
-		if org.isPly then org.owner:Notify(jaw_dislocated_msg[math.random(#jaw_dislocated_msg)], true, "jaw", 2) end
+
+		if org.isPly then
+			if !hasNewThoughts(org) then org.owner:Notify(jaw_dislocated_msg[math.random(#jaw_dislocated_msg)], true, "jaw", 2) end
+			sendThought(org, "Your jaw is dislocated.", "thought_jawdislocated", 4, Color(255, 220, 220))
+		end
 	end
 
 	if dmg > 0.2 and org.isPly then timer.Simple(0, function() hg.LightStunPlayer(org.owner, 1 + dmg) end) end
@@ -489,7 +571,7 @@ end
 hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isChat, teamonly, text)
 	if IsValid(output) and (output.organism.jaw == 1 or output.organism.jawdislocation) and output:Alive() and (output:IsSpeaking() or isChat) then
 		output.organism.painadd = output.organism.painadd + 2 * (output:IsSpeaking() and 1 or (isChat and 5 or 0))
-		output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210))
+		if output:GetInfoNum("hg_newthoughts", 0) <= 0 then output:Notify("My jaw is really hurting when I speak.", 60, "painfromjawspeak", 0, nil, Color(255, 210, 210)) end
 	end
 end)
 
@@ -498,6 +580,8 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldConcussion = org.concussion or 0
 	if isFistInflictor(dmgInfo) then dmg = dmg * fist_skull_damage_mul end
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
+	if isMelee(dmgInfo) and oldDmg < 1 and org.skull < 1 and dmg < 1.35 then result = 1 end
+
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 	local skullDelta = org.skull - oldDmg
 	trySkullFractureHemorrhage(org, oldDmg, org.skull)
@@ -507,14 +591,10 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		markBrokenBone(org, "ValveBiped.Bip01_Head1")
 		org.shock = org.shock + dmg * 40
 		org.avgpain = org.avgpain + dmg * 30
+
 		if oldDmg != 1 then
 			playSkullFractureSound(org.owner)
-			playBoneFractureSound(org.owner)
-			sendSkullFractureGore(org, dmgInfo)
-			addBoneInternalBleed(org, 0.35, 0.55)
-			if IsValid(org.owner) then org.owner:SetNWBool("SkullBrokenFully", true) end
-		else
-			addBrokenBoneHitTrauma(org, "skull", dmg, 0.3)
+			sendThought(org, "Your skull is broken.", "thought_skull", 4, Color(255, 180, 180))
 		end
 	end
 
@@ -623,9 +703,9 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	if org.isPly and (not org.brokenribs or org.brokenribs ~= math.Round(org.chest * 3)) then
 		org.brokenribs = math.Round(org.chest * 3)
 		if org.brokenribs > 0 then
-			markBrokenBone(org, "ValveBiped.Bip01_Spine2")
-			org.painadd = org.painadd + 8
-			if IsValid(org.owner) and org.owner:IsPlayer() then org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4) end
+			//org.owner:Notify(ribs[math.random(#ribs)], 5, "ribs", 4)
+			sendThought(org, "You broke " .. org.brokenribs .. " ribs.", "thought_ribs", 3, Color(255, 210, 210))
+
 			playBoneFractureSound(org.owner)
 			if hg.QueuePainScream then hg.QueuePainScream(org.owner, 0.8) end
 			return math.min(0, result)
@@ -643,9 +723,12 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	local result = damageBone(org, bone, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
 	markDamagedBone(org, "ValveBiped.Bip01_Pelvis", org.pelvis)
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
-	if oldDmg >= 1 and dmg >= 0.35 then addBrokenBoneHitTrauma(org, "pelvis", dmg * 0.5, 0.45) end
-	if org.pelvis >= 1 and oldDmg < 1 and ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakSpine then hg.BreakSpine(org.owner, "spine1", false) end
-	if org.pelvis >= 1 then markBrokenBone(org, "ValveBiped.Bip01_Pelvis") end
+
+	if org.isPly and org.pelvis == 1 then
+		//org.owner:Notify("My pelvis is agonizingly hurting.", true, "pelvis", 4)
+		sendThought(org, "Your pelvis is broken.", "thought_pelvis", 4, Color(255, 210, 210))
+	end
+
 	return result
 end
 

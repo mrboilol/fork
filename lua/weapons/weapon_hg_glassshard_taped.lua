@@ -19,11 +19,14 @@ SWEP.SuicideTime = 0.5
 SWEP.CanSuicide = true
 SWEP.SuicideNoLH = true
 
+SWEP.CantClash = true
+
 SWEP.BreakBoneMul = 0.1
 
 SWEP.noreverse = true
 SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "none"
+SWEP.BlockSound = {"GlassBottle.ImpactHard", 68, {95, 102}}
 
 SWEP.AnimTime1 = 1.0
 SWEP.AttackTime = 0.2

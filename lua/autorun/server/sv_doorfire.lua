@@ -11,8 +11,9 @@ local ironHits = {
 
 hook.Add("EntityTakeDamage", "ShootToUnlockDoor", function(target, dmginfo)
     if not IsValid(target) or target:GetClass() ~= "prop_door_rotating" then return end
+    if target.breck then return end
 
-    if (target.LockedDoor and target.LockedDoor > 0) or target.LockedDoorNail then  --добавил проверку на гвозди и на прочую хуетень (для ZCity)
+    if (target.LockedDoor and target.LockedDoor > 0) or target.LockedDoorNail then
         if dmginfo:IsBulletDamage() then
             target:EmitSound("fire_extinguisher/fire_extinguisger_lever.wav", 70, 80)
         end
@@ -49,6 +50,9 @@ hook.Add("EntityTakeDamage", "ShootToUnlockDoor", function(target, dmginfo)
 
     if lockPos and hitPos:DistToSqr(lockPos) <= handleRadiusSqr then
         target:Fire("Unlock")
+        if target.destrutible_door then
+            target.door_origLocked = false
+        end
         target:EmitSound(table.Random(ironHits), 75, math.random(90, 110), 1, CHAN_ITEM)
         target:EmitSound("lock_break/unlock.wav", 70, math.random(110, 130), 0.8, CHAN_AUTO)
 

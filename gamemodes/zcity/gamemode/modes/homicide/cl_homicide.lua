@@ -16,6 +16,9 @@ MODE.TypeSounds = {
 local fade = 0
 local HMCD_ScreenDuration = 10
 net.Receive("HMCD_RoundStart",function()
+	local lply = LocalPlayer()
+	if not IsValid(lply) then return end
+
 	for i, ply in player.Iterator() do
 		ply.isTraitor = false
 		ply.isGunner = false
@@ -53,8 +56,20 @@ net.Receive("HMCD_RoundStart",function()
 			chat.AddText("Traitor secret words are: \"" .. MODE.TraitorWord .. "\" and \"" .. MODE.TraitorWordSecond .. "\".")
 		end
 
-		if(MODE.TraitorExpectedAmt > 1)then
-			chat.AddText("Traitor names:")
+		local associate_count = net.ReadUInt(4)
+		for key = 1, associate_count do
+			local traitor_info = {
+				color = net.ReadColor(false),
+				name = net.ReadString(),
+				ply = net.ReadEntity(),
+				model = net.ReadString(),
+				appearance = net.ReadTable(),
+				playerclass = net.ReadString()
+			}
+
+			MODE.TraitorAssociates[#MODE.TraitorAssociates + 1] = traitor_info
+
+			MODE.TraitorsLocal[#MODE.TraitorsLocal + 1] = {traitor_info.color, traitor_info.name, IsValid(traitor_info.ply) and traitor_info.ply:SteamID() or ""}
 		end
 
 		if(lply.isTraitor and MODE.TraitorExpectedAmt > 1)then
@@ -94,6 +109,7 @@ net.Receive("HMCD_RoundStart",function()
 	MODE.CursorLerpY = 0
 
 	fade = 0
+	hmcd_clear_associates()
 end)
 
 MODE.TypeNames = {
@@ -230,6 +246,8 @@ local function hmcd_draw_text(text, fontname, x, y, r, g, b, a, ang, xalign, yal
 end
 
 function MODE:HUDPaint()
+	local lply = LocalPlayer()
+	if not IsValid(lply) then return end
 	if not MODE.Type or not MODE.TypeObjectives[MODE.Type] then return end
 	if lply:Team() == TEAM_SPECTATOR then return end
 
@@ -294,22 +312,19 @@ function MODE:HUDPaint()
 
 	if(lply.isTraitor)then
 		cur_y = cur_y + ScreenScale(20)
+
 		MODE.TraitorsLocal = MODE.TraitorsLocal or {}
 
-		if(#MODE.TraitorsLocal > 1)then
-			draw.SimpleText("Traitors list:", "ZB_HomicideMedium", sw * 0.5, cur_y, ColorRole, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		if(#MODE.TraitorsLocal > 0)then
+			add("Traitors list:", "ZB_HomicideMedium", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+			stack_delay = stack_delay + 0.15
 
-			if(#MODE.TraitorsLocal > 1)then
-				add("Traitors list:", "ZB_HomicideMedium", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
+			for _, traitor_info in ipairs(MODE.TraitorsLocal) do
+				cur_y = cur_y + ScreenScale(15)
+				add(traitor_info[2], "ZB_HomicideMedium", Color(traitor_info[1].r, traitor_info[1].g, traitor_info[1].b), sw * 0.5, cur_y, "right", stack_delay, 1.05)
 				stack_delay = stack_delay + 0.15
-
-				for _, traitor_info in ipairs(MODE.TraitorsLocal) do
-					cur_y = cur_y + ScreenScale(15)
-					add(traitor_info[2], "ZB_HomicideMedium", Color(traitor_info[1].r, traitor_info[1].g, traitor_info[1].b), sw * 0.5, cur_y, "right", stack_delay, 1.05)
-					stack_delay = stack_delay + 0.15
-				end
 			end
-		else
+		elseif(!lply.MainTraitor)then
 			add("Traitor secret words:", "ZB_HomicideMedium", ColorRole, sw * 0.5, cur_y, "right", stack_delay, 1.05)
 			stack_delay = stack_delay + 0.15
 

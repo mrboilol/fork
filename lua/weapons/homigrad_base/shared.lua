@@ -508,10 +508,12 @@ function SWEP:TryDropMisfire(chance, speed, force)
 		if self.Clip1 and self:Clip1() <= 0 then return end
 		if self.Shoot then self:Shoot(true) else self:PrimaryAttack() end
 		if SERVER and self.Shoot then
+			self.hgShootEventID = ((self.hgShootEventID or 0) % 65535) + 1
 			net.Start("hgwep shoot", true)
 			net.WriteEntity(self)
 			net.WriteBool(true)
 			net.WriteBool(true)
+			net.WriteUInt(self.hgShootEventID, 16)
 			net.Broadcast()
 		end
 		self.lastshotfromhit = CurTime()
@@ -904,10 +906,12 @@ function SWEP:PrimaryAttack(broadcast)
 	local huy = self:Shoot() ~= false
 	
 	if SERVER and huy then
+		self.hgShootEventID = ((self.hgShootEventID or 0) % 65535) + 1
 		net.Start("hgwep shoot", true)
 		net.WriteEntity(self)
 		net.WriteBool(huy)
 		net.WriteBool(broadcast)
+		net.WriteUInt(self.hgShootEventID, 16)
 		net.Broadcast()
 	end
 end
@@ -2601,19 +2605,18 @@ function SWEP:GetAdditionalValues()
 	local speed_add = math.Clamp(1 / skillissue,0.5,1.5)
 	
 	if not suiciding and !self.norecoil then
+		local weaponRecoilMul = self.WeaponRecoilMul or 1
 		local mulhuy = (self:IsPistolHoldType() or self.PistolKinda) and 2 or (((ply.posture == 1 and not self:IsZoom()) or ply.posture == 7 or ply.posture == 8) and 2 or 0.75)
 		local animpos = self:GetAnimShoot2(0.09 * mulhuy / host_timescale(), true)
 		local shit = 0.2 * mulhuy / host_timescale()
 		local animpos3 = self:GetAnimShoot2(shit, true) / shit
 		
-		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1)
+		animpos = animpos * 0.15 * mulhuy * (self:IsPistolHoldType() and 1 or 1) * weaponRecoilMul
 		animpos = animpos * math.min((self.Primary.Force2 or self.Primary.Force) / 40,3) * ((self.NumBullet or 1) * 3 or 1) * (self.animposmul or 1) // * 4
 
 		self.AdditionalPos2 = self.AdditionalPos2 - (self.AdditionalAng + self.AdditionalAng2):Forward() * animpos * 9
-		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5
-		-- The model recoil should climb into the shoulder.  The old lateral
-		-- recovery was large enough to make the muzzle feel like random spread.
-		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 0.18 * shit2
+		local shit2 = (1 / self.weight) * (self.NumBullet or 3) / 3 * 0.5 * weaponRecoilMul
+		self.AdditionalPos2[2] = self.AdditionalPos2[2] + math.sin(animpos3) * 1 * shit2
 		self.AdditionalPos2[1] = self.AdditionalPos2[1] + math.sin(animpos3) * -1 * shit2
 		-- Recoil used to kick the model backward with only a sideways recovery sway;
 		-- give the muzzle a real upward displacement as well, proportional to the
@@ -2637,6 +2640,10 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (canted and -8 or -24) * (self.podkid or 1)
 			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (canted and 7 or 1.25) * (self.podkid or 1)
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (canted and 8 or 2.5) * (self.podkid or 1)
+			animpos2 = animpos2 * weaponRecoilMul
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * 20 * (self.podkid or 1)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 10 * (self.podkid or 1)
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -5 * (self.podkid or 1)
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
 		end
 

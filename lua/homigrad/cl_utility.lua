@@ -968,8 +968,6 @@ players : 1 humans, 0 bots (20 max)
 
 --\\ CL Utils setting adjustments
 	if CLIENT then
-		RunConsoleCommand("mp_decals", "4096")  -- "4194304" - if you set this value you will get crashed :3
-		
 		hook.Add("Think","RemoveMe_001",function()
 			hook.Remove("PostPlayerDraw","BA2_GasmaskDraw")
 			hook.Remove("Think","RemoveMe_001")
@@ -1144,30 +1142,6 @@ players : 1 humans, 0 bots (20 max)
 			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
 			surface.SetMaterial(mat2)
 			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
-		end
-	end)
-
-	hook.Add("DrawOverlay", "headtrauma_flashes", function()
-		if !IsValid(lply) or !lply:Alive() then return end
-		if #hg.flashes <= 0 then return end
-
-		for i = 1, #hg.flashes do
-			local flash = hg.flashes[i]
-			if not flash or not flash.is_headtrauma then continue end
-
-			local animpos = flash.animpos or ((flash.time - CurTime()) / flash.lentime)
-			if animpos <= 0 then continue end
-			local size = flash.size
-
-			local huy = (1 - animpos) * -100
-			local alpha = math.min(animpos * 255 + math.Rand(-10, 10) * animpos, 255)
-			surface.SetMaterial(mat)
-			surface.SetDrawColor(255, 255, 255, alpha)
-			surface.DrawTexturedRect(flash.x - size / 2 + huy, flash.y - size / 2 + huy, size, size)
-			surface.SetMaterial(mat2)
-			surface.SetDrawColor(255, 255, 255, alpha)
-			local glowSize = size * 1.5
-			surface.DrawTexturedRect(flash.x - glowSize / 2 + huy, flash.y - glowSize / 2 + huy, glowSize, glowSize)
 		end
 	end)
 --//

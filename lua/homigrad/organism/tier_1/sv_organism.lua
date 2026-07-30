@@ -235,6 +235,10 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastSeizureBrain = 0
 	org.lastSeizureLobeDamage = 0
 	org.lastSeizureTemperature = org.temperature
+	org.deathStateEnd = nil
+	org.deathStateKilled = nil
+	org.lastWoundsSig = nil
+	org.lastArterialWoundsSig = nil
 	org.fatalBrainDeath = nil
 
 	org.noradrenalineEndTime = nil
@@ -282,6 +286,20 @@ util.AddNetworkString("organism_send")
 util.AddNetworkString("organism_sendply")
 local CurTime = CurTime
 local nullTbl = {}
+local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer", 0, FCVAR_SERVER_CAN_EXECUTE, "Toggle developer mode (enables damage traces)", 0, 1)
+local function wounds_signature(wounds)
+	if not wounds or #wounds == 0 then return "0" end
+
+	local sig = tostring(#wounds)
+	for i = 1, #wounds do
+		local wound = wounds[i]
+		if wound then
+			sig = sig .. ":" .. tostring(wound[4]) .. ":" .. tostring(math.Round((wound[1] or 0) * 100)) .. ":" .. tostring(wound[7])
+		end
+	end
+
+	return sig
+end
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
 local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable Remorseism incapacitation", 0, 1)
 local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable organ-system failure: 0=organs stay functional, 1=normal organ failure", 0, 1)
@@ -568,6 +586,16 @@ local function send_organism(org, ply)
 	sendtable.shock = org.shock
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
+	sendtable.bloodPressure = org.bloodPressure
+	sendtable.systolic = org.systolic
+	sendtable.diastolic = org.diastolic
+	sendtable.cardiacOutput = org.cardiacOutput
+	sendtable.arrhythmia = org.arrhythmia
+	sendtable.fibrillation = org.fibrillation
+	sendtable.myocardialOxygen = org.myocardialOxygen
+	sendtable.heartStrain = org.heartStrain
+	sendtable.hypertension = org.hypertension
+	sendtable.hypotension = org.hypotension
 	sendtable.heartstop = org.heartstop
 	sendtable.ecgState = org.ecgState
 	sendtable.cardiacOutput = org.cardiacOutput
@@ -681,6 +709,16 @@ local function send_bareinfo(org)
 	sendtable.pulse = org.pulse
 	sendtable.blood = org.blood
 	sendtable.heartbeat = org.heartbeat
+	sendtable.bloodPressure = org.bloodPressure
+	sendtable.systolic = org.systolic
+	sendtable.diastolic = org.diastolic
+	sendtable.cardiacOutput = org.cardiacOutput
+	sendtable.arrhythmia = org.arrhythmia
+	sendtable.fibrillation = org.fibrillation
+	sendtable.myocardialOxygen = org.myocardialOxygen
+	sendtable.heartStrain = org.heartStrain
+	sendtable.hypertension = org.hypertension
+	sendtable.hypotension = org.hypotension
 	sendtable.heartstop = org.heartstop
 	sendtable.ecgState = org.ecgState
 	sendtable.cardiacOutput = org.cardiacOutput
@@ -1732,19 +1770,24 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	local just_went_uncon = not org.otrub and org.needotrub
 
-	if org.postureType == "decerebrate" then //-- the decerebrate one
-		local ent = hg.GetCurrentCharacter(org.owner)
+	if org.brain < 0.4 then
+		local naturalHeal = org.thiamine > 0 and timeValue / 480 or timeValue / 1800
+		-- full heal in ~30 minutes (really fast tho) -- Ну не идет столько раунд даже в каких-нибудь скраперсах ну какой даун это придумал
+		-- 8 minutes with thiamine -- ДАЖЕ СТОЛЬКО НЕ ВСЕГДА ДЛИТСЯ
 
-		local rleg = ent:GetPhysicsObjectNum(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_R_Foot")))
-		local lleg = ent:GetPhysicsObjectNum(ent:TranslateBoneToPhysBone(ent:LookupBone("ValveBiped.Bip01_L_Foot")))
+		org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
+		-- you'd need to give 1 thiamine each 4 minutes
 
-		local down = -ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Spine")):GetAngles():Forward()
-		if IsValid(rleg) and IsValid(lleg)then
-			rleg:ApplyForceCenter(down * 500)
-			lleg:ApplyForceCenter(down * 500)
-		end
-	end
-
+		if org.liver < 1 then org.liver = math.Approach(org.liver, 0, naturalHeal) end
+		if org.heart < 1 then org.heart = math.Approach(org.heart, 0, naturalHeal) end
+		org.heartStrain = math.Approach(org.heartStrain or 0, 0, naturalHeal * 0.5)
+		org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, naturalHeal)
+		if org.stomach < 1 then org.stomach = math.Approach(org.stomach, 0, naturalHeal) end
+		if org.intestines < 1 then org.intestines = math.Approach(org.intestines, 0, naturalHeal) end
+		if org.lungsR[1] < 1 then org.lungsR[1] = math.Approach(org.lungsR[1], 0, naturalHeal) end
+		if org.lungsL[1] < 1 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, naturalHeal) end
+		if (org.eyeL or 0) < 1 then org.eyeL = math.Approach(org.eyeL or 0, 0, naturalHeal) end
+		if (org.eyeR or 0) < 1 then org.eyeR = math.Approach(org.eyeR or 0, 0, naturalHeal) end
 	-- Thiamine healing logic
 	org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 
@@ -1809,6 +1852,19 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		--org.owner:ConCommand("soundfade 0 1")
 	end
 
+	if isPly and org.otrub and org.incapacitated then
+		org.deathStateEnd = org.deathStateEnd or CurTime() + 25
+		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
+
+		if CurTime() >= org.deathStateEnd and not org.deathStateKilled then
+			org.deathStateKilled = true
+			owner:Kill()
+			return
+		end
+	else
+		org.deathStateEnd = nil
+		org.deathStateKilled = nil
+	end
 
 	if just_went_uncon then
 		org.owner.fullsend = true
@@ -1902,6 +1958,18 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if (org.sendPlyTime > time) and !just_went_uncon then return end
 		org.sendPlyTime = CurTime() + 1 + (not isPly and 2 or 0)
 		send_bareinfo(org)
+
+		local woundsSig = wounds_signature(org.wounds)
+		if org.lastWoundsSig != woundsSig or org.owner.fullsend then
+			org.lastWoundsSig = woundsSig
+			org.owner:SetNetVar("wounds", org.wounds)
+		end
+
+		local arterialWoundsSig = wounds_signature(org.arterialwounds)
+		if org.lastArterialWoundsSig != arterialWoundsSig or org.owner.fullsend then
+			org.lastArterialWoundsSig = arterialWoundsSig
+			org.owner:SetNetVar("arterialwounds", org.arterialwounds)
+		end
 		hg.organism.SyncWounds(org)
 
 		if isPly and owner:Alive() then
@@ -1976,6 +2044,9 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 
 	org.lungsfunction = true
 	org.heartstop = false
+	org.fibrillation = false
+	org.arrhythmia = 0
+	org.heartStrain = math.max((org.heartStrain or 0) - regen, 0)
 
 	owner:SetRunSpeed(math.min(500, 400 + (25 * org.berserk)))
 end)
@@ -2022,6 +2093,7 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 
 	org.lungsfunction = true
 	org.heartstop = false
+	org.fibrillation = false
 end)
 
 concommand.Add("hg_organism_setvalue", function(ply, cmd, args)
@@ -2174,7 +2246,8 @@ local function fixlimb(org, key, fixer)
 			local dmgInfo = DamageInfo()
 			dmgInfo:SetDamage(50)
 			dmgInfo:SetDamageType(DMG_CLUB)
-			hg.organism.input_list[key.."down"](org.owner.organism, 1, 6, dmgInfo, 0, vector_up)
+			local func = hg.organism.input_list[key.."down"]
+			if func then func(org.owner.organism, 1, 6, dmgInfo, 0, vector_up) end
 		end
 
 		if fixer == org.owner and fixer.tries > 3 and math.random(3) == 1 then

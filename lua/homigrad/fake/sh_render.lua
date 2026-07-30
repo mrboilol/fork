@@ -82,8 +82,8 @@ end
 	end
 	
 	local hg_firstperson_ragdoll = ConVarExists("hg_firstperson_ragdoll") and GetConVar("hg_firstperson_ragdoll") or CreateConVar("hg_firstperson_ragdoll", "0", FCVAR_ARCHIVE, "Toggle first-person ragdoll camera view", 0, 1) --!! unused??
-	local hg_firstperson_death = ConVarExists("hg_firstperson_death") and GetConVar("hg_firstperson_death") or CreateClientConVar("hg_firstperson_death", "0", true, false, "Toggle first-person death camera view", 0, 1)
-	local hg_thirdperson = ConVarExists("hg_thirdperson") and GetConVar("hg_thirdperson") or CreateConVar("hg_thirdperson", 0, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Toggle third-person camera view", 0, 1)
+	local hg_firstperson_death = { GetBool = function() return false end }
+	local hg_thirdperson = ConVarExists("hg_thirdperson") and GetConVar("hg_thirdperson") or CreateConVar("hg_thirdperson", 0, FCVAR_REPLICATED, "Toggle third-person camera view", 0, 1)
 	local hg_gopro = ConVarExists("hg_gopro") and GetConVar("hg_gopro") or CreateClientConVar("hg_gopro", "0", true, false, "Toggle GoPro-like camera view", 0, 1)
 	local hg_no_camera_in_cars = ConVarExists("hg_no_camera_in_cars") and GetConVar("hg_no_camera_in_cars") or CreateConVar("hg_no_camera_in_cars", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED, "disables camera in cars", 0, 1)
 	local hg_deathfadeout = CreateClientConVar("hg_deathfadeout", "1", true, true, "Toggle screen fade and sound mute on death", 0, 1)
@@ -153,10 +153,11 @@ end
 			RenderArmors(ply, armors, ent)
 		end
 
-		if detailRender then
-			hg.RenderBandages(ent, ply)
-			hg.RenderTourniquets(ent, ply)
-		end
+		if hg.RenderDefibs then hg.RenderDefibs(ent, ply) end
+
+		hg.RenderBandages(ent, ply)
+
+		hg.RenderTourniquets(ent, ply)
 
 	if fullPoseRender then
 		hg.GoreCalc(ent, ply)

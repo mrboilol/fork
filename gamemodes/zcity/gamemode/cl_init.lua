@@ -296,7 +296,7 @@ net.Receive("RoundInfo", function()
 	end
 	
 	if zb.ROUND_STATE == 0 then
-		zb.fade = 7
+		zb.fade = 0.75
 	end
 
 	if zb.CROUND ~= "" then

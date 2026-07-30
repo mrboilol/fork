@@ -42,8 +42,9 @@ end
 		local wep = IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon()
 		local isAmputated = ply:IsBerserk() and ply.organism and (ply.organism.llegamputated or ply.organism.rlegamputated)
 		local speed = vel:Length()
-		if CLIENT and ply == LocalPlayer() and (ply.hg_isSprinting or ply.hg_isJogging) and ply:KeyDown(IN_FORWARD) then speed = math.max(speed, ply.hg_isJogging and 210 or 280) end
-		if (not ply:InVehicle()) and ply:IsOnGround() and speed > 180 and wep and runHoldTypes[wep:GetHoldType()] and not isAmputated then
+		local jogging = IsJogging(ply, vel)
+		if CLIENT and ply == LocalPlayer() and (ply.hg_isSprinting or ply.hg_isJogging) and ply:KeyDown(IN_FORWARD) then speed = math.max(speed, jogging and 210 or 280) end
+		if (not ply:InVehicle()) and ply:IsOnGround() and not hg.KeyDown(ply, IN_JUMP) and speed > 180 and wep and runHoldTypes[wep:GetHoldType()] and not isAmputated then
 			local isFurry = ply.PlayerClassName == "furry"
 			local anim = ACT_HL2MP_RUN_FAST
 			

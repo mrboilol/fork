@@ -51,6 +51,12 @@ local bulletHit
 local timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game = timer, util, math, IsValid, WorldToLocal, Vector, sound, EffectData, game
 local table_Copy = table.Copy
 local hg_bulletholes = CreateConVar("hg_bulletholes", "0", FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED, "Enable R6S bulletholes feature", 0, 1)
+local knockbackMul, knockbackMin = 0.35, 25
+
+local function scaleBulletForce(force, pellets)
+	pellets = math.max(pellets or 1, 1)
+	return math.max((force or 0) * (knockbackMul / pellets), knockbackMin / pellets)
+end
 
 local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 	if CLIENT then return end
@@ -122,7 +128,7 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			local tBullet = {
 				Attacker = IsValid(self) and IsValid(self:GetOwner()) and self:GetOwner() or self,
 				Damage = dmg * 0.65,
-				Force = force / 3,
+				Force = scaleBulletForce(force / 3, bullet.Pellets),
 				Num = 1,
 				Tracer = 0,
 				TracerName = "nil",
@@ -137,6 +143,7 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 				penetrated = bullet.penetrated + 1,
 				dmgtype = bullet.dmgtype or DMG_BULLET,
 				NpcShoot = bullet.NpcShoot,
+				Pellets = bullet.Pellets,
 				limit_ricochet = bullet.limit_ricochet + 1,
 				noricochet = bullet.noricochet,
 				AmmoType = bullet.AmmoType
@@ -230,7 +237,7 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 		local tBullet = {
 			Attacker = IsValid(self) and IsValid(self:GetOwner()) and self:GetOwner() or self,
 			Damage = (dmg or 1) * .85,
-			Force = force / 3,
+			Force = scaleBulletForce(force / 3, bullet.Pellets),
 			Num = 1,
 			Tracer = 0,
 			TracerName = "nil",
@@ -244,6 +251,7 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 			Diameter = bullet.Diameter,
 			penetrated = bullet.penetrated + 1,
 			dmgtype = bullet.dmgtype or DMG_BULLET,
+			Pellets = bullet.Pellets,
 			limit_ricochet = bullet.limit_ricochet + 1,
 			noricochet = bullet.noricochet,
 			AmmoType = bullet.AmmoType
@@ -345,13 +353,13 @@ bulletHit = function(ply, tr, dmgInfo, bullet, Weapon)
 		util.ScreenShake(trPos, 3, 1, 1, 128)
 	end
 	
-	-- if force >= 35 and dist <= 1400000 and (math.random(3) == 2 or force >= 45) and !tr.Entity:IsRagdoll() then
-	-- 	util.Decal("Impact.ShootPowderAdd", trPos + trNormal, trPos - trNormal)
-	-- 	util.ScreenShake(trPos, 3, 10, 1, 150)
-	-- end
+	 if force >= 35 and dist <= 1400000 and (math.random(3) == 2 or force >= 45) and !tr.Entity:IsRagdoll() then
+	 	util.Decal("Impact.ShootPowderAdd", trPos + trNormal, trPos - trNormal)
+	 	util.ScreenShake(trPos, 3, 10, 1, 150)
+	 end
 
-	-- gasInertia(trPos, force * 3, -tr.Normal, Weapon, tr)
-	-- gasInertia(trStart, force * 3, tr.Normal, Weapon, tr)
+	 gasInertia(trPos, force * 3, -tr.Normal, Weapon, tr)
+	 gasInertia(trStart, force * 3, tr.Normal, Weapon, tr)
 
 	local penetration, dmgmul
 	if tr.Entity:IsVehicle() then
@@ -771,7 +779,7 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 		bullet.Dir = (owner:GetAngles()+AngleRand(-4,4)+Angle(npcPitchOffset,npcYawOffset,0)):Forward()
 	end
 
-	bullet.Force = ammotype.Force and ammotype.Force / 1.5 or primary.Force
+	bullet.Force = scaleBulletForce(ammotype.Force and ammotype.Force / 1.5 or primary.Force, numbullet)
     bullet.Damage = ammotype.Damage or primary.Damage or 25
 	bullet.Damage = bullet.Damage * (self.Supressor and 0.9 or 1) * (self.DamageMultiplier or 1)
 
@@ -850,18 +858,7 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 		bullet.Spread = bullet.Spread * spreadMul * self:GetFearSpreadMul() * self:GetCognitiveHandlingMul() * self:GetWeaponWeightHandlingMul()
 	end
 	bullet.Num = 1
-	-- Single-projectile weapons already express inaccuracy through the animated
-	-- muzzle/debug trajectory. Do not add a second hidden random cone afterward.
-	-- FIRE_BULLETS_FIRST_SHOT_ACCURATE only affects the Lua-bullet path; physical
-	-- bullets apply Spread directly, so clear it here for both implementations.
-	if numbullet == 1 then
-		bullet.Spread = vector_origin
-		-- FireLuaBullets has a legacy random-cone branch.  This marker is checked
-		-- after EntityFireBullets hooks, so no hook can accidentally restore spread
-		-- to a normal projectile after the muzzle direction was chosen.
-		bullet.NoHiddenSpread = true
-		bullet.Flags = bit.bor(bullet.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)
-	end
+	bullet.Pellets = numbullet
 	
 	bullet.AmmoType = primary.Ammo
 	bullet.TracerName = self.Tracer or "nil"

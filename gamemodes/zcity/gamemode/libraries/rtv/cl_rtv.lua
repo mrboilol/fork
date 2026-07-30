@@ -46,6 +46,10 @@ local function FormatMapName(mapName)
     return table.concat(parts, " ")
 end
 
+function zb.IsRTVActive()
+    return rtvStarted
+end
+
 local function RTVUnit(num)
     return math.floor(num * math.min(ScrW(), ScrH()) / 1000)
 end

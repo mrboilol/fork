@@ -247,6 +247,7 @@ function PLAYER:LegAttack()
     dmg = dmg * (isMidAir and DROP_KICK_DAMAGE_MUL or 1)
     --print(dmg)
     --print(speedmul)
+    hook.Run("HomigradLegKick", self)
     self:PlayCustomAnims(anim, true, speed, true, animstopAdjust, {
         [0.12] = function(self)
             if hg.GetCurrentCharacter(self):IsRagdoll() then return end

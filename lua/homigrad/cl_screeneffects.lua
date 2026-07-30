@@ -320,6 +320,7 @@ local brainParietalLerp = 0
 local brainTemporalLerp = 0
 local brainOccipitalLerp = 0
 local brainHemorrhageLerp = 0
+local CardioLerp = 0
 local brainFrontalColor = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
@@ -387,6 +388,7 @@ local painExcruciatingThreshold = 85 / painThresholdMax
 local painAgonyVolumeMul = 1.15
 local painExcruciatingVolumeMul = 0.85
 local painLayerFadeLerp = 0.06
+local painPitchMax = 150
 local painEffectIntensity = 0.8
 local unconsciousPainEffectIntensity = 1.55
 local painPulseIntensity = 0.25
@@ -434,6 +436,7 @@ local painLayers = {
 		path = "rem_agony.ogg",
 		threshold = painAgonyThreshold,
 		volumeMul = painAgonyVolumeMul,
+		pitchMax = painPitchMax,
 		fadeLerp = painLayerFadeLerp,
 		currentVolume = 0,
 		targetVolume = 0
@@ -470,36 +473,22 @@ local seizureIntroTab = {
 	["$pp_colour_mulg"] = 0,
 	["$pp_colour_mulb"] = 0
 }
-seizureClientActive = false
-seizureClientStart = 0
-seizureClientEnd = 0
-nextSeizureFlash = 0
-nextSeizureCamShake = 0
-seizureFinalFlashFired = false
+local seizureChromatic = Material("effects/shaders/merc_chromaticaberration")
+local SeizureStationLoading = false
+local seizureAudioGeneration = 0
+local seizureClientActive = false
+local seizureClientStart = 0
+local seizureClientEnd = 0
+local nextSeizureFlash = 0
+local nextSeizureCamShake = 0
+local seizureFinalFlashFired = false
+local seizureMidazolamFadeEnd = 0
+local seizureMidazolamFadeDuration = 15
 
-local function getLobotomyFlashMat()
-	return lobotomy_mats[math.random(#lobotomy_mats)]
+function REM_MidazolamSeizureFade(time)
+	seizureMidazolamFadeDuration = time or 15
+	seizureMidazolamFadeEnd = CurTime() + seizureMidazolamFadeDuration
 end
-
-local function startLobotomyFlash(duration)
-	if hg.brain_damage_memory_active and lply.PlayerClassName ~= "headcrabzombie" then return end
-
-	show_image_time = math.max(duration or 45, 1)
-	lobotomy_memory_total = show_image_time
-	lobotomy_flash_mat = getLobotomyFlashMat()
-end
-
-local function drawLobotomyFlash(alpha, mat)
-	mat = mat or lobotomy_flash_mat or getLobotomyFlashMat()
-	if not mat then return end
-
-	local rand = 5
-	surface.SetDrawColor(255, 255, 255, alpha or 255)
-	surface.SetMaterial(mat)
-	surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand), ScrH() + math.random(rand))
-end
-
-local canRetrySound
 
 local function stopSeizureEffects()
 	if not seizureClientActive and not IsValid(SeizureStation) then return end
@@ -568,8 +557,9 @@ local function updateSeizureEffects(org)
 		end
 
 		if IsValid(SeizureStation) then
-			SeizureStation:SetVolume(seizureSoundVolume)
-			SeizureStation:SetPlaybackRate(1)
+			local midazolamFade = seizureMidazolamFadeEnd > CurTime() and math.Clamp((seizureMidazolamFadeEnd - CurTime()) / seizureMidazolamFadeDuration, 0, 1) or 1
+			SeizureStation:SetVolume((org.otrub and seizureSoundOtrubVolume or seizureSoundVolume) * midazolamFade)
+			SeizureStation:SetPlaybackRate(org.otrub and seizureSoundOtrubPlaybackRate or 1)
 		end
 
 		local seizureElapsed = math.max(CurTime() - seizureClientStart, 0)
@@ -608,12 +598,45 @@ local function updateSeizureEffects(org)
 	end
 end
 
-local function getPanicAttackFx(org)
-	if isnumber(org.panicattack) then
-		return math.Clamp(org.panicattack, 0, 1)
+local function stopPainLayer(layer)
+	layer.targetVolume = 0
+	layer.currentVolume = 0
+	if layer.station then
+		layer.station:Stop()
+		layer.station = nil
 	end
+end
 
-	return org.panicattackActive and 1 or 0
+local function stopPainLayers()
+	painAudioGeneration = painAudioGeneration + 1
+	for _, layer in pairs(painLayers) do
+		stopPainLayer(layer)
+	end
+end
+
+local function ensurePainLayer(layer)
+	if layer.station then return end
+	layer.station = CreateSound(lply, layer.path)
+	if !layer.station then return end
+	layer.station:PlayEx(0, 100)
+end
+
+local function updatePainLayer(layer, normalizedPain, baseVolume)
+	local shouldPlay = normalizedPain >= layer.threshold and baseVolume > 0.001
+	layer.targetVolume = shouldPlay and math.Clamp(math.Remap(normalizedPain, layer.threshold, 1, 0, layer.volumeMul), 0, layer.volumeMul) * math.min(baseVolume, 1) or 0
+	layer.currentVolume = LerpFT(layer.fadeLerp, layer.currentVolume or 0, layer.targetVolume)
+	if shouldPlay then
+		ensurePainLayer(layer)
+	end
+	if !layer.station then return end
+	layer.station:ChangeVolume(layer.currentVolume, 0)
+	if layer.pitchMax then
+		layer.station:ChangePitch(math.Clamp(math.Remap(normalizedPain, layer.threshold, 1, 100, layer.pitchMax), 100, layer.pitchMax), 0)
+	end
+	if !shouldPlay and layer.currentVolume <= 0.01 then
+		layer.station:Stop()
+		layer.station = nil
+	end
 end
 
 local function stopthings()
@@ -633,8 +656,7 @@ local function stopthings()
 	brainTemporalLerp = 0
 	brainOccipitalLerp = 0
 	brainHemorrhageLerp = 0
-	grayscaleLerp = 0
-	adrenalineVisualLerp = 0
+	CardioLerp = 0
 
 	lply.tinnitus = 0
 	nextPanicAttackShake = 0
@@ -1229,6 +1251,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	brainTemporalLerp = LerpFT(0.025, brainTemporalLerp, org.brainTemporal or 0)
 	brainOccipitalLerp = LerpFT(0.025, brainOccipitalLerp, org.brainOccipital or 0)
 	brainHemorrhageLerp = LerpFT(0.02, brainHemorrhageLerp, org.brainHemorrhage or 0)
+	CardioLerp = LerpFT(0.025, CardioLerp, math.max(org.hypotension or 0, (1 - (org.myocardialOxygen or 1)) * 0.9, (org.arrhythmia or 0) * 0.35, org.fibrillation and 0.85 or 0))
 
 	local o2 = org.o2[1] or 0
 	o2 = o2 + (org.CO or 0)
@@ -1509,53 +1532,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 		
 		//if pain > 10 then
-			local painVol = math.Clamp(math.Remap(pain, 0, 120, 0, 6), 0, 6)
-			local painSoundFraction = math.Clamp((org.pain or 0) / painThresholdMax, 0, 1)
-
-			local targetPainVol = 0
-			local targetRealityVol = 0
-			local targetAgonyVol = 0
-			local targetAltpainVol = 0
-			local targetSillypainVol = 0
-			local targetRemPainVol = 0
-			local targetRemAgonyVol = 0
-			local targetRemExcruciatingVol = 0
-
-			if painMode == 0 then
-				-- Default: both pain_beat and reality play
-				targetPainVol = painVol
-				targetRealityVol = painVol
-			elseif painMode == 1 then
-				-- Only pain_beat at same volume as reality.mp3
-				targetPainVol = painVol
-			elseif painMode == 2 then
-				-- Only agony.mp3 instead of reality or painbeat
-				targetAgonyVol = painVol
-			elseif painMode == 3 then
-				-- Only altpain.ogg instead of reality or painbeat
-				targetAltpainVol = painVol
-			elseif painMode == 4 then
-				-- Only reality.mp3
-				targetRealityVol = painVol
-			elseif painMode == 5 then
-				-- Only sillypain.mp3
-				targetSillypainVol = painVol
-			elseif painMode == 6 then
-				-- REM pain stack from the reference: beat + rem_pain + pain-intensity layers.
-				targetPainVol = painVol
-				targetRemPainVol = painVol * painBeatOverlayVolumeMul
-				targetRemAgonyVol = math.Clamp(math.Remap(painSoundFraction, painAgonyThreshold, 1, 0, 1), 0, 1) * painVol * painAgonyVolumeMul
-				targetRemExcruciatingVol = math.Clamp(math.Remap(painSoundFraction, painExcruciatingThreshold, 1, 0, 1), 0, 1) * painVol * painExcruciatingVolumeMul
+			painVolume = math.Clamp(math.Remap(pain, 0, painThresholdMax, 0, 2), 0, 2)
+			normalizedPain = math.Clamp(pain / painThresholdMax, 0, 1)
+			painPitch = math.Clamp(math.Remap(normalizedPain, 0, 1, 100, painPitchMax), 100, painPitchMax)
+			if IsValid(PainStation) then
+				PainStation:SetVolume(painVolume)
+				PainStation:SetPlaybackRate(painPitch / 100)
 			end
 
-			if IsValid(PainStation) then PainStation:SetVolume(targetPainVol) end
-			if IsValid(PainStationOverlay) then PainStationOverlay:SetVolume(targetRemPainVol) end
-			if IsValid(RealityStation) then RealityStation:SetVolume(targetRealityVol) end
-			if IsValid(AgonyStation) then AgonyStation:SetVolume(targetAgonyVol) end
-			if IsValid(AltpainStation) then AltpainStation:SetVolume(targetAltpainVol) end
-			if IsValid(RemAgonyStation) then RemAgonyStation:SetVolume(targetRemAgonyVol) end
-			if IsValid(RemExcruciatingPainStation) then RemExcruciatingPainStation:SetVolume(targetRemExcruciatingVol) end
-			if IsValid(SillypainStation) then SillypainStation:SetVolume(targetSillypainVol) end
+			if IsValid(PainStationOverlay) then
+				PainStationOverlay:SetVolume(painVolume * painBeatOverlayVolumeMul)
+				PainStationOverlay:SetPlaybackRate(painPitch / 100)
+			end
 		//else
 		//	if IsValid(PainStation) then
 		//		PainStation:Stop()
@@ -2478,17 +2466,82 @@ hook.Add("Post Pre Post Processing", "BrainLobeEffects", function()
 	end
 end)
 
+hook.Add("Post Pain Processing", "CardiologyEffects", function()
+	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
+	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
+
+	local org = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
+	if not org or org.otrub then return end
+
+	local cardio = math.Clamp(CardioLerp or 0, 0, 1)
+	if cardio <= 0.01 then return end
+
+	local beat = 0.75 + math.abs(math.sin(CurTime() * math.Clamp((org.heartbeat or 70) / 45, 0.8, 4))) * 0.25
+	local intensity = cardio * beat
+
+	render.UpdateScreenEffectTexture()
+	vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+	vignetteMat:SetFloat("$c0_z", intensity * 1.2)
+	vignetteMat:SetFloat("$c1_y", intensity * 2.1)
+	render.SetMaterial(vignetteMat)
+	render.DrawScreenQuad()
+
+	render.UpdateScreenEffectTexture()
+	painMat:SetFloat("$c2_x", CurTime() + 10000)
+	painMat:SetFloat("$c0_y", 0.88)
+	painMat:SetFloat("$c0_z", intensity * 0.35)
+	painMat:SetFloat("$c1_x", intensity * 0.25)
+	painMat:SetFloat("$c1_y", intensity * 0.35)
+	render.SetMaterial(painMat)
+	render.DrawScreenQuad()
+end)
+
+hook.Add("Post Pain Processing", "PainEffects", function()
+	local spect = IsValid(lply:GetNWEntity("spect")) and lply:GetNWEntity("spect")
+	if !lply:Alive() and (!IsValid(spect) or viewmode != 1) then return end
+
+	local org = lply:Alive() and lply.organism or (IsValid(spect) and spect.organism)
+	if not org or not org.brain then return end
+	if not ((PainLerp > 0.001 or shockLerp > 5) or org.otrub) then return end
+
+	local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
+	local pain = PainLerp + strobe
+	local shock = shockLerp
+	local thresholdReached = PainLerp >= painThresholdMax
+	painThresholdIntensityLerp = LerpFT(0.03, painThresholdIntensityLerp, thresholdReached and 5 or 1)
+	local intensityMul = painThresholdIntensityLerp
+	local coverage = thresholdReached and 1 or math.Clamp(pain / 70, 0, 0.95)
+	local effectIntensity = pain / 32 * painEffectIntensity * intensityMul + math.max(shock - 5, 0) / 2.4 * painEffectIntensity
+
+	render.UpdateScreenEffectTexture()
+
+	vignetteMat:SetFloat("$c2_x", CurTime() + 10000)
+	vignetteMat:SetFloat("$c0_z", org.otrub and 5 * unconsciousPainEffectIntensity or effectIntensity)
+	vignetteMat:SetFloat("$c1_y", org.otrub and 10 * unconsciousPainEffectIntensity or effectIntensity)
+
+	render.SetMaterial(vignetteMat)
+	render.DrawScreenQuad()
+
+	render.UpdateScreenEffectTexture()
+
+	painMat:SetFloat("$c2_x", CurTime() + 10000)
+	painMat:SetFloat("$c0_y", 0.8)
+	painMat:SetFloat("$c0_z", org.otrub and unconsciousPainEffectIntensity or painEffectIntensity * intensityMul)
+	painMat:SetFloat("$c1_x", coverage)
+	painMat:SetFloat("$c1_y", coverage)
+
+	render.SetMaterial(painMat)
+	render.DrawScreenQuad()
+end)
+
 hook.Add("Player_Death", "ItDoesntNow", function(ply)
-	local me = IsValid(lply) and lply or LocalPlayer()
-	if not IsValid(me) then return end
-	if !((ply == me) or (ply == me:GetNWEntity("spect"))) then return end
+	if !((ply == lply) or (ply == lply:GetNWEntity("spect"))) then return end
 
 	stopthings()
 end)
 
 hook.Add("Player Spawn", "ItDoesntNow", function(ply)
-	local me = IsValid(lply) and lply or LocalPlayer()
-	if not IsValid(me) or ply != me then return end
+	if ply != lply then return end
 
 	stopthings()
 end)
