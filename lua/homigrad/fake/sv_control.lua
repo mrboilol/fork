@@ -875,6 +875,8 @@ local tr = {
 
 
 local hg_fake_stamina = CreateConVar("hg_fake_stamina", "1", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Enables stamina when ragdolled", 0, 1)
+local RAGDOLL_DROP_KICK_STAMINA_COST = 8
+local RAGDOLL_SLIDE_KICK_STAMINA_COST = 18
 
 
 
@@ -3057,7 +3059,7 @@ hook.Add("Ragdoll Collide", "SlideDamage", function(ragdoll, data)
 	end
 
 	if hg_fake_stamina:GetBool() and ply.organism then
-		ply.organism.stamina.subadd = ply.organism.stamina.subadd + (isDropkick and 12 or 26)
+		ply.organism.stamina.subadd = ply.organism.stamina.subadd + (isDropkick and RAGDOLL_DROP_KICK_STAMINA_COST or RAGDOLL_SLIDE_KICK_STAMINA_COST)
 	end
 
 	ragdoll:EmitSound("kickland" .. math.random(1, 2) .. ".mp3", 75, math.random(95, 110))

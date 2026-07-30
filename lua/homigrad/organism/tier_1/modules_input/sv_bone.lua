@@ -10,6 +10,10 @@ local function isMelee(dmgInfo)
 	return dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC)
 end
 
+local function isBluntBrainImpact(dmgInfo)
+	return dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
+end
+
 local halfValue2 = util.halfValue2
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
 	local crush = isCrush(dmgInfo)

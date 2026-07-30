@@ -13,9 +13,10 @@ local DROP_KICK_DAMAGE_MUL = 2
 local DROP_KICK_RAG_FORCE_MUL = 1000
 local DROP_KICK_PLAYER_PUSH = 240
 local DROP_KICK_FAKE_CHANCE = 0.8
-local KICK_STAMINA_COST = 14
-local CROUCH_KICK_STAMINA_COST = 30
-local DROP_KICK_STAMINA_COST = 50
+local KICK_STAMINA_COST = 10
+local CROUCH_KICK_STAMINA_COST = 20
+local DROP_KICK_STAMINA_COST = 35
+local CURBSTOMP_STAMINA_COST = 12
 local LEG_KICK_TRACE_RANGE = 28
 local LEG_KICK_TRACE_SIZE = Vector(5, 5, 5)
 local LEG_KICK_SEGMENT_SIZE = Vector(6, 6, 6)
@@ -233,7 +234,7 @@ function PLAYER:LegAttack()
     local org = self.organism
     local isCrouchKick = (self:KeyDown(IN_DUCK) or self:Crouching()) and not isMidAir
     local isCurbstomp = anim == "curbstomp_base"
-    local staminaCost = isMidAir and DROP_KICK_STAMINA_COST or (isCurbstomp and 18 or (isCrouchKick and CROUCH_KICK_STAMINA_COST or KICK_STAMINA_COST))
+    local staminaCost = isMidAir and DROP_KICK_STAMINA_COST or (isCurbstomp and CURBSTOMP_STAMINA_COST or (isCrouchKick and CROUCH_KICK_STAMINA_COST or KICK_STAMINA_COST))
     org.stamina.subadd = org.stamina.subadd + staminaCost
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.5 * speedmul

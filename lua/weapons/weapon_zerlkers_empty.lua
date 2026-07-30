@@ -3,12 +3,15 @@ if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_zerlkers"
 SWEP.PrintName = "empty box of tic tacs"
 SWEP.Instructions = "Morty, go get their shit hurry up, I only had one of those things I threw, im holding a box of tic tacs right now."
-SWEP.Category = "Weapons - Melee"
-SWEP.Spawnable = false
+SWEP.Category = "ZCity Other"
+SWEP.Spawnable = true
 SWEP.AdminOnly = false
-SWEP.HoldType = "slam"
-SWEP.Primary.Wait = 0.5
+SWEP.HoldType = "grenade"
+SWEP.Primary.Wait = 0.75
 SWEP.Primary.Next = 0
+SWEP.ThrowDelay = 0.25
+SWEP.ThrowVelocity = 1600
+SWEP.ThrowDamage = 325
 
 SWEP.WorldModel = "models/tic tacs/winter_green.mdl"
 
@@ -22,7 +25,7 @@ SWEP.DamageType = DMG_CLUB
 SWEP.DeploySnd = "Plastic_Box.ImpactSoft"
 SWEP.showstats = false
 
-function SWEP:ThrowBox()
+function SWEP:FinishThrow()
 	if CLIENT then return end
 
 	local owner = self:GetOwner()
@@ -38,8 +41,8 @@ function SWEP:ThrowBox()
 	thrown.localshit = vector_origin
 	thrown.wep = self:GetClass()
 	thrown.owner = owner
-	thrown.damage = 250
-	thrown.MaxSpeed = 1000
+	thrown.damage = self.ThrowDamage
+	thrown.MaxSpeed = self.ThrowVelocity
 	thrown.DamageType = DMG_CLUB
 	thrown.AttackHit = "Plastic_Box.ImpactHard"
 	thrown.AttackHitFlesh = "Flesh.ImpactHard"
@@ -47,13 +50,28 @@ function SWEP:ThrowBox()
 
 	local phys = thrown:GetPhysicsObject()
 	if IsValid(phys) then
-		phys:SetVelocity(owner:GetAimVector() * thrown.MaxSpeed + owner:GetVelocity() * 0.5)
+		phys:SetVelocity(owner:GetAimVector() * self.ThrowVelocity + owner:GetVelocity() * 0.5)
 		phys:AddAngleVelocity(VectorRand() * 350)
 	end
 
 	owner:ViewPunch(Angle(0, 0, -6))
 	owner:SelectWeapon("weapon_hands_sh")
 	self:Remove()
+end
+
+function SWEP:ThrowBox()
+	if CLIENT or self.Throwing then return end
+
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+
+	self.Throwing = true
+	owner:AnimRestartGesture(GESTURE_SLOT_GRENADE, ACT_HL2MP_GESTURE_RANGE_ATTACK_GRENADE, true)
+
+	timer.Simple(self.ThrowDelay, function()
+		if not IsValid(self) then return end
+		self:FinishThrow()
+	end)
 end
 
 function SWEP:PrimaryAttack()

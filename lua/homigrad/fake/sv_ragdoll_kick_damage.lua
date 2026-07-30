@@ -8,6 +8,7 @@ local LEG_SHOVE_SPEED_THRESHOLD = 100
 local DROP_KICK_SPEED_THRESHOLD = 360
 local TACKLE_SPEED_THRESHOLD = 160
 local KICK_DAMAGE_COOLDOWN = 0.5 -- Cooldown between kick damage hits (seconds)
+local DROP_KICK_STAMINA_COST = 30
 
 -- Hit tracking to prevent damage multiplication
 local kickHitTracker = {}
@@ -403,7 +404,7 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
         local attackerOrg = attacker.organism
         if attackerOrg and (attackerOrg._ragdollDropkickStaminaUntil or 0) < CurTime() then
             attackerOrg._ragdollDropkickStaminaUntil = CurTime() + 0.75
-            attackerOrg.stamina.subadd = (attackerOrg.stamina.subadd or 0) + 45
+            attackerOrg.stamina.subadd = (attackerOrg.stamina.subadd or 0) + DROP_KICK_STAMINA_COST
 
             if attackerOrg.lleg == 1 or attackerOrg.rleg == 1 or attackerOrg.llegdislocation or attackerOrg.rlegdislocation then
                 attackerOrg.painadd = (attackerOrg.painadd or 0) + 35
