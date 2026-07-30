@@ -27,7 +27,7 @@ if CLIENT then
 	local fontAA = CreateClientConVar("zchat_fontaa", 1, true, false, "Font anti-aliasing", 0, 1)
 	local fontWeight = CreateClientConVar("zchat_fontweight", 1000, true, false, "Font weight", 0, 1000)
 
-	if fontName:GetString() == "Courier Prime" then
+	if fontName:GetString() == "VCR OSD Mono" then
 		RunConsoleCommand("zchat_font", "Lora")
 	end
 

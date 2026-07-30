@@ -332,7 +332,7 @@ end)
 
 --local hg_coolvetica = ConVarExists("hg_coolvetica") and GetConVar("hg_coolvetica") or CreateClientConVar("hg_coolvetica", "0", true, false, "changes every text to coolvetica because its good", 0, 1)
 local hg_font_default = "VCR OSD Mono"
-local hg_font_legacy_default = "Courier Prime"
+local hg_font_legacy_default = "VCR OSD Mono"
 local hg_font = ConVarExists("hg_font") and GetConVar("hg_font") or CreateClientConVar("hg_font", hg_font_default, true, false, "Change UI text font")
 local hg_font_value = hg_font:GetString()
 
@@ -341,7 +341,7 @@ if hg_font_value == "" or hg_font_value == hg_font_legacy_default then
 	hg_font_value = hg_font_default
 end
 
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
+local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "VCR OSD Mono"
     local usefont = hg_font_default
 
     if hg_font:GetString() != "" then
@@ -573,22 +573,22 @@ local function CreateScoreboardFonts()
 	local scale = math.min(ScrW(), ScrH()) / 1000
 
 	surface.CreateFont("ZCity_SB_Header", {
-		font = "Verily Serif Mono",
+		font = "VCR OSD Mono",
 		size = math.max(18, math.floor(30 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Title", {
-		font = "Verily Serif Mono",
+		font = "VCR OSD Mono",
 		size = math.max(15, math.floor(22 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Row", {
-		font = "Verily Serif Mono",
+		font = "VCR OSD Mono",
 		size = math.max(13, math.floor(18 * scale)),
 		weight = 300,
 	})
 	surface.CreateFont("ZCity_SB_Tiny", {
-		font = "Verily Serif Mono",
+		font = "VCR OSD Mono",
 		size = math.max(11, math.floor(14 * scale)),
 		weight = 300,
 	})

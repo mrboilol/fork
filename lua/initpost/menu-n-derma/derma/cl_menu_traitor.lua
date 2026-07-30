@@ -20,14 +20,14 @@ local TRAITOR_PREVIEW_START_OFFSET = 80
 
 local function CreateTraitorMenuFonts()
     surface.CreateFont(TRAITOR_MENU_FONT, {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(10),
         weight = 400,
         antialias = true
     })
 
     surface.CreateFont(TRAITOR_POINTS_FONT, {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(12),
         weight = 400,
         antialias = true

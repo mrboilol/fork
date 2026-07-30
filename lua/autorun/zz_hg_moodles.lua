@@ -833,28 +833,32 @@ local function drawMoodles()
 		if not active[name] then appearances[name], lastLevels[name] = nil, nil end
 	end
 
-	local size = HUD and HUD.status_effects_size or 62
-	local spacing = math.max(HUD and HUD.status_effects_spacing or 59, size + 4)
+	local baseSize = HUD and HUD.status_effects_size or 62
+	local spacing = math.max(HUD and HUD.status_effects_spacing or 59, baseSize + 4)
+	local gap = spacing - baseSize
 	local edgeMargin = math.max(12, ScrH() * 0.015)
-	local baseX = ScrW() - edgeMargin - size
-	local baseY = ScrH() - edgeMargin - size
-	local columns = math.max(math.floor((ScrW() - edgeMargin * 2 + spacing - size) / spacing), 1)
-	while #effects > columns do table.remove(effects) end
-
 	local rawPositions = {}
+	local nextX = edgeMargin
+	local rightEdge = ScrW() - edgeMargin
 	for index, effect in ipairs(effects) do
-		rawPositions[index] = {
-			x = baseX - (index - 1) * spacing,
-			y = baseY,
+		local effectSize = effect.name == "rage" and baseSize * 2 or baseSize
+		if nextX + effectSize > rightEdge and #rawPositions > 0 then break end
+		rawPositions[#rawPositions + 1] = {
+			x = nextX,
+			y = ScrH() - edgeMargin - effectSize,
+			size = effectSize,
 			effect = effect,
 		}
+		nextX = nextX + effectSize + gap
 	end
+	effects = {}
+	for index, pos in ipairs(rawPositions) do effects[index] = pos.effect end
 
 	local mx, my = gui.MousePos()
 	local hoveredIndex = nil
 	if mx and my and not (mx == 0 and my == 0) then
 		for index, pos in ipairs(rawPositions) do
-			if mx >= pos.x and mx <= pos.x + size and my >= pos.y and my <= pos.y + size then
+			if mx >= pos.x and mx <= pos.x + pos.size and my >= pos.y and my <= pos.y + pos.size then
 				hoveredIndex = index
 				break
 			end
@@ -866,8 +870,8 @@ local function drawMoodles()
 	local mouseOffsetX, mouseOffsetY = 0, 0
 	if hoveredIndex then
 		local hovered = rawPositions[hoveredIndex]
-		mouseOffsetX = math.Clamp((mx - hovered.x - size * 0.5) * 0.15, -30, 30)
-		mouseOffsetY = math.Clamp((my - hovered.y - size * 0.5) * 0.15, -30, 30)
+		mouseOffsetX = math.Clamp((mx - hovered.x - hovered.size * 0.5) * 0.15, -30, 30)
+		mouseOffsetY = math.Clamp((my - hovered.y - hovered.size * 0.5) * 0.15, -30, 30)
 	end
 
 	local pain = orgNumber(org, "pain", 0)
@@ -884,6 +888,7 @@ local function drawMoodles()
 	moodlePositions = {}
 	for index, pos in ipairs(rawPositions) do
 		local effect = pos.effect
+		local size = pos.size
 		local stableRage = effect.name == "rage"
 		local distortThis = berserkActive and not stableRage
 		local scale, offsetX, offsetY = 1, 0, 0

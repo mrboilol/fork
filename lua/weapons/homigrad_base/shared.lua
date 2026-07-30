@@ -1203,7 +1203,7 @@ local instructions
 local hg_weird_mags
 if CLIENT then
 	surface.CreateFont("AmmoFont",{
-		font = "Courier Prime",
+		font = "VCR OSD Mono",
 		size = ScreenScale(16),
 		extended = true,
 		weight = 500,
@@ -1211,7 +1211,7 @@ if CLIENT then
 	})
 
 	surface.CreateFont("DescFont",{
-		font = "Courier Prime",
+		font = "VCR OSD Mono",
 		size = ScreenScale(8),
 		extended = true,
 		shadow = true,

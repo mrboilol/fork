@@ -16,7 +16,7 @@ local function MenuUnit(num)
 end
 
 local function AchievementFontName()
-    return "Verily Serif Mono"
+    return "VCR OSD Mono"
 end
 
 local function CreateAchievementFonts()

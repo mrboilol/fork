@@ -67,32 +67,32 @@ local function CreateSettingsFonts()
     local scale = math.min(ScrW(), ScrH()) / 1000
 
     surface.CreateFont("ZCity_Menu_Small", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(20),
         weight = 200,
     })
     surface.CreateFont("ZCity_Menu_Tiny", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(8),
         weight = 200,
     })
     surface.CreateFont("ZCity_Menu_Settings_Medium", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = math.max(16, math.floor(32 * scale)),
         weight = 300,
     })
     surface.CreateFont("ZCity_Menu_Settings_Small", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = math.max(14, math.floor(22 * scale)),
         weight = 300,
     })
     surface.CreateFont("ZCity_Menu_Settings_Tiny", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = math.max(12, math.floor(16 * scale)),
         weight = 300,
     })
     surface.CreateFont("ZCity_Menu_Settings_Category", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(15),
         weight = 100
     })

@@ -127,13 +127,13 @@ end
 
 local function CreateMainMenuFonts()
     surface.CreateFont("ZCity_Menu_Tiny", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(8),
         weight = 200
     })
 
     surface.CreateFont("ZCity_Menu_Small", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(20),
         weight = 200
     })
@@ -144,13 +144,13 @@ CreateMainMenuFonts()
 
 local function CreateMainMenuFonts()
     surface.CreateFont("ZCity_Menu_Tiny", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(8),
         weight = 200
     })
 
     surface.CreateFont("ZCity_Menu_Small", {
-        font = "Verily Serif Mono",
+        font = "VCR OSD Mono",
         size = ScreenScale(20),
         weight = 200
     })
@@ -217,7 +217,7 @@ local splasheh = {
 
 --print(string.upper('I wish you good health, Jason Statham'))
 surface.CreateFont("ZC_MM_Title", {
-    font = "Verily Serif Mono",
+    font = "VCR OSD Mono",
     size = ScreenScale(40),
     weight = 800,
     antialias = true

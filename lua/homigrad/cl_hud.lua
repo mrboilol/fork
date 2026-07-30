@@ -81,7 +81,7 @@ if hg_font:GetString() != hg_font_default then
 	RunConsoleCommand("hg_font", hg_font_default)
 end
 
-local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "Courier Prime"
+local font = function() -- hg_coolvetica:GetBool() and "Coolvetica" or "VCR OSD Mono"
     return hg_font_default
 end
 

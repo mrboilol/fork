@@ -24,21 +24,21 @@ local textColor = Color(255, 255, 255, 255)
 local faintTextColor = Color(255, 255, 255, 220)
 
 surface.CreateFont("HGWeaponKeybindsTitle", {
-	font = "Verily Serif Mono",
+	font = "VCR OSD Mono",
 	size = 22,
 	weight = 700,
 	antialias = true
 })
 
 surface.CreateFont("HGWeaponKeybindsText", {
-	font = "Verily Serif Mono",
+	font = "VCR OSD Mono",
 	size = 18,
 	weight = 500,
 	antialias = true
 })
 
 surface.CreateFont("HGWeaponKeybindsKey", {
-	font = "Verily Serif Mono",
+	font = "VCR OSD Mono",
 	size = 18,
 	weight = 700,
 	antialias = true

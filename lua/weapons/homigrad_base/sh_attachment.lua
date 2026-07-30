@@ -685,7 +685,7 @@ if CLIENT then
 	end
 
 	surface.CreateFont("AttachFONT", {
-		font = "Courier Prime",
+		font = "VCR OSD Mono",
 		size = ScreenScale(5),
 		extended = true,
 		weight = 500,
