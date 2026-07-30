@@ -536,7 +536,13 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, 
 	if SERVER and !bCacheTrace and !bNoAdditional and self.cache_trace and !(desiredPos or desiredAng) then return self.cache_trace[1], self.cache_trace[2], self.cache_trace[3] end
 	local owner = self:GetOwner()
 	
-	if IsValid(owner) and owner:IsNPC() then local att = self:GetMuzzleAtt() return nil,SERVER and owner:GetShootPos() or att.Pos,SERVER and owner:GetAimVector():Angle() or att.Ang end
+	if IsValid(owner) and owner:IsNPC() then
+		local att = self:GetMuzzleAtt()
+		local npcPos = self.NPCShootPos or (SERVER and owner:GetShootPos() or att.Pos)
+		local npcDir = self.NPCShootDir
+		local npcAng = npcDir and npcDir:Angle() or (SERVER and owner:GetAimVector():Angle() or att.Ang)
+		return nil, npcPos, npcAng
+	end
 	
 	local gun = self:GetWeaponEntity()
 	if !IsValid(gun) then return end
@@ -792,7 +798,8 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 
 	if CLIENT then
 		if IsValid(ent) then
-			local head = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Head1"))
+			local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+			local head = headBone and ent:GetBoneMatrix(headBone)
 
 			if head then
 				headpos, headang = head:GetTranslation(), head:GetAngles()
@@ -806,7 +813,8 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 			headpos = headpos + headang:Forward() * 3-- - dir * 10
 		end]]
 		if IsValid(ent) then
-			local head = ent:GetBoneMatrix(ent:LookupBone("ValveBiped.Bip01_Head1"))
+			local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+			local head = headBone and ent:GetBoneMatrix(headBone)
 
 			if head then
 				headpos, headang = head:GetTranslation(), head:GetAngles()

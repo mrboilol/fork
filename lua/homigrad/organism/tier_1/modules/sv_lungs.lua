@@ -28,7 +28,7 @@ local HypoxiaBands = {
 	terminal = 0,
 }
 
-local cardiacArrestO2DrainTime = 10
+local cardiacArrestO2DrainTime = 20
 local lowStaminaO2Start = 50
 local criticalStaminaO2Start = 20
 local lowStaminaO2DebtMax = 8
@@ -1158,7 +1158,8 @@ kaz
 		org.needotrub = true
 		org.consciousness = 0
 		org._zeroO2Time = (org._zeroO2Time or 0) + timeValue
-		org.brain = math.min((org.brain or 0) + timeValue * 0.025, 1)
+		local anoxicBrainDamageRate = org.heartstop and 0.015 or 0.025
+		org.brain = math.min((org.brain or 0) + timeValue * anoxicBrainDamageRate, 1)
 		if org._zeroO2Time >= 5 then org.heartstop = true end
 	end
 

@@ -296,11 +296,13 @@ module[2] = function(owner, org, timeValue)
 	local vascularTone = Clamp(1 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
 	local circulationBase = bloodVolume * heart * vascularTone * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
-	local defibGrace = (org.defibDeathGrace or 0) > CurTime()
-	local arrestCirculation = defibGrace and 0.49 or 0
+	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
+	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()
+	local cprSupport = (org.cprSupportUntil or 0) > CurTime()
+	local arrestCirculation = dihSupport and (70 / 92) or (defibGrace and 0.49 or (cprSupport and 0.22 or 0))
 	local circulation = org.alive and (org.heartstop and arrestCirculation or circulationBase * rhythmMul) or 0
 	org.pulse = Approach(org.pulse, circulation * 92, heart == 0 and timeValue * 10 or timeValue * 5)
-	org.cardiacOutput = org.heartstop and (defibGrace and Clamp((org.pulse or 0) / 70 * 0.35, 0, 0.45) or 0) or Clamp(circulation * (92 / 90) * heart * rhythmMul, 0, 1.5)
+	org.cardiacOutput = org.heartstop and (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and 0.2 or 0))) or Clamp(circulation * (92 / 90) * heart * rhythmMul, 0, 1.5)
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and circulation > 0.6 then
 		org.cardiacOutput = Approach(org.cardiacOutput, Clamp(getBloodVolume(org) * heart, 0, 1), timeValue / 20)
 	end
@@ -710,8 +712,17 @@ module[2] = function(owner, org, timeValue)
 			org.terminalRhythm = nil
 		end
 
-		org.pulse = 0
-		org.strokeVolume = 0
+		if dihSupport then
+			org.pulse = 70
+			org.heartbeat = 70
+			org.strokeVolume = 1
+			org.cardiacOutput = 1
+			org.hypotension = 0
+			org.hypertension = 0
+		else
+			org.pulse = cprSupport and math.max(tonumber(org.cprSupportPulse) or 20, 12) or 0
+			org.strokeVolume = cprSupport and 0.2 or 0
+		end
 	else
 		org.cardiacArrestStart = nil
 		org.cardiacArrestO2Start = nil

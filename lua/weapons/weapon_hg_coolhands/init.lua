@@ -546,11 +546,15 @@ function SWEP:ApplyForce()
 							-- Improved oxygenation
 							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)
 							
-							-- Much better pulse restoration - works even from 0
-							org.pulse = math.min(org.pulse + 15 * skillMult, 70)
+							-- Compressions provide temporary circulation without implying a restart.
+							org.cprSupportUntil = CurTime() + 0.75
+							org.cprSupportPulse = skillMult > 1 and 30 or 22
 							
 							-- Chest compressions temporarily improve hypotension.
 							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)
+							org.arrhythmia = math.Approach(org.arrhythmia or 0, 0, 0.025 * skillMult)
+							org.heartStrain = math.Approach(org.heartStrain or 0, 0, 0.015 * skillMult)
+							org.myocardialOxygen = math.Approach(org.myocardialOxygen or 0, 1, 0.02 * skillMult)
 							
 							-- CO removal
 							org.CO = math.Approach(org.CO, 0, skillMult)
@@ -575,11 +579,14 @@ function SWEP:ApplyForce()
 							end
 							
 							local canRestartHeart = org.alive and (org.blood or 5000) >= 900 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
-							local durationChance = math.Clamp((self.CPRDuration or 0) / 8, 0, 0.75) * skillMult
-							local pulseChance = math.Clamp((org.pulse or 0) / 70, 0, 1) * 0.6 * skillMult
-							local adrenalineChance = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0)) / 4, 0, 1) * 0.45
-							local restartChance = math.Clamp(durationChance + pulseChance + adrenalineChance, 0, 0.98)
-							if canRestartHeart and org.heartstop and ((org.pulse or 0) > 5 or math.random() < restartChance) then
+							local durationChance = math.Clamp((self.CPRDuration or 0) / 120, 0, 0.08)
+							local rhythmChance = (org.fibrillation or (org.arrhythmia or 0) > 0.65) and 0.04 or 0
+							local adrenalineChance = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0)) / 4, 0, 1) * 0.03
+							local dihAssisted = (org.dihAutopulseUntil or 0) > CurTime()
+							local restartChance = math.Clamp((durationChance + rhythmChance + adrenalineChance + (dihAssisted and 0.42 or 0)) * (skillMult > 1 and 1.5 or 1), 0.01, dihAssisted and 0.78 or 0.16)
+							local canAttemptRestart = (org.nextCPRRestartAttempt or 0) <= CurTime()
+							if canAttemptRestart then org.nextCPRRestartAttempt = CurTime() + 2 end
+							if canRestartHeart and org.heartstop and canAttemptRestart and math.random() < restartChance then
 								org.heartstop = false
 								org.terminalRhythm = nil
 								org.unstableRhythm = nil

@@ -1158,7 +1158,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(org.incapacitated and math.min(brain / 0.5 * station:GetLength(), 200) or math.min(math.Rand(0, station:GetLength()), 139))
+				station:SetTime(org.incapacitated and math.min(org.brain / 0.5 * station:GetLength(), 200) or math.min(math.Rand(0, station:GetLength()), 139))
 				RemDying1Station = station
 				station:EnableLooping(true)
 			end

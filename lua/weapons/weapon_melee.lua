@@ -289,7 +289,7 @@ SWEP.CanHeavyAttack = false
 local MELEE_GLOBAL_DAMAGE_MUL = 0.55
 local MELEE_GLOBAL_KNOCKBACK_MUL = 0.45
 local MELEE_GLOBAL_SHOVE_KNOCKDOWN_MUL = 0.35
-local MELEE_GLOBAL_STAMINA_COST_MUL = 1.2
+local MELEE_GLOBAL_STAMINA_COST_MUL = 0.75
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")

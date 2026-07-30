@@ -63,4 +63,15 @@ end
 function SWEP:CanBePickedUpByNPCs()
 	return true
 end
+
+function SWEP:NPCShoot_Primary(shootPos, shootDir)
+	-- Source supplies an authoritative muzzle snapshot here. Preserve it through
+	-- PrimaryAttack instead of rebuilding the shot from an NPC eye angle that may
+	-- be stale (or unavailable on non-humanoid NPCs).
+	self.NPCShootPos = isvector(shootPos) and Vector(shootPos) or nil
+	self.NPCShootDir = isvector(shootDir) and Vector(shootDir):GetNormalized() or nil
+	self:PrimaryAttack()
+	self.NPCShootPos = nil
+	self.NPCShootDir = nil
+end
 --lua_run local npc = ents.Create("npc_metropolice") npc:Give("weapon_mp7") npc:Spawn() npc:Activate()

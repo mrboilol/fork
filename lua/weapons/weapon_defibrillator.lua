@@ -189,8 +189,8 @@ local function GetDefibOrganism(ply, target)
 end
 
 local function ShouldShock(org)
-	if not org or not org.alive or org.heartstop or org.deathStateKilled then return false end
-	return org.fibrillation or (org.arrhythmia or 0) > 0.65 or (org.heartbeat or 0) > 200
+	if not org or not org.alive or org.deathStateKilled then return false end
+	return org.heartstop or org.fibrillation or (org.arrhythmia or 0) > 0.45 or (org.heartbeat or 0) > 180
 end
 
 local function IsDefibDead(org)
@@ -362,6 +362,8 @@ end
 local function ApplyAEDLifeSupport(org, elapsed)
 	if not org or not org.alive or org.deathStateKilled then return end
 	elapsed = math.max(tonumber(elapsed) or 0, 0)
+	org.defibSupportUntil = CurTime() + 0.3
+	org.deathStateEnd = math.max(org.deathStateEnd or 0, CurTime() + 10)
 
 	if istable(org.o2) then
 		local oxygenMax = tonumber(org.o2.range) or 30
@@ -385,25 +387,54 @@ local function ApplyAEDLifeSupport(org, elapsed)
 	org.systemicIschemiaTime = math.Approach(tonumber(org.systemicIschemiaTime) or 0, 0, elapsed * 4)
 end
 
+local function ApplyAEDRhythmTherapy(org, elapsed)
+	if not org or org.heartstop then return end
+	elapsed = math.max(tonumber(elapsed) or 0, 0)
+	org.palpitationTreatmentUntil = CurTime() + 1
+	org.palpitations = math.Approach(tonumber(org.palpitations) or 0, 0, elapsed * 0.2)
+	org.arrhythmia = math.Approach(tonumber(org.arrhythmia) or 0, 0, elapsed * 0.1)
+	org.heartStrain = math.Approach(tonumber(org.heartStrain) or 0, 0, elapsed * 0.06)
+	if (org.arrhythmia or 0) < 0.12 and (org.palpitations or 0) < 0.08 then
+		org.unstableRhythm = nil
+	end
+end
+
 local function ApplyAEDShock(org)
 	if not org then return end
 
-	org.fibrillation = false
-	org.arrhythmia = 0
-	org.heartStrain = math.max((org.heartStrain or 0) - 0.2, 0)
+	local wasArrested = org.heartstop == true
+	local wasFibrillating = org.fibrillation == true
+	local bloodK = math.Clamp(((org.blood or 5000) - 700) / 3300, 0.2, 1)
+	local oxygenK = math.Clamp(((org.o2 and org.o2[1]) or 0) / 12, 0.35, 1)
+	local damageK = math.Clamp(1 - (org.heart or 0) * 0.55, 0.35, 1)
+	local baseChance = wasArrested and 72 or (wasFibrillating and 90 or 82)
+	local restartChance = math.Clamp(baseChance * (0.55 + bloodK * 0.45) * (0.65 + oxygenK * 0.35) * (0.55 + damageK * 0.45), 35, 92)
 
-	if math.random(100) <= 22 then
+	org.fibrillation = false
+	org.arrhythmia = math.max((org.arrhythmia or 0) - 0.75, 0)
+	org.heartStrain = math.max((org.heartStrain or 0) - 0.35, 0)
+	org.ischemia = math.max((org.ischemia or 0) - 0.2, 0)
+	org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.35)
+
+	if math.random(100) <= restartChance then
 		org.heartstop = false
-		org.heartbeat = math.Clamp(org.heartbeat or 70, 55, 90)
-		org.pulse = math.max(org.pulse or 0, 45)
-		org.hypotension = math.min(org.hypotension or 1, 0.35)
-		org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.35)
+		org.terminalRhythm = nil
+		org.unstableRhythm = nil
+		org.cardiacArrestStart = nil
+		org.cardiacArrestO2Start = nil
+		org._zeroO2Time = 0
+		org.heartbeat = math.Clamp((org.heartbeat or 0) > 0 and org.heartbeat or 80, 55, 100)
+		org.pulse = math.max(org.pulse or 0, 50)
+		org.hypotension = math.min(org.hypotension or 1, 0.3)
+		org.cardiacRestartUntil = CurTime() + 4
 	else
-		org.heartstop = true
-		org.heartbeat = 0
-		org.pulse = 0
-		org.hypotension = math.min(org.hypotension or 1, 0.8)
-		org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.2)
+		-- A failed shock must not turn a living arrhythmia patient into an arrest.
+		org.heartstop = wasArrested
+		if wasArrested then
+			org.heartbeat = 0
+			org.pulse = 0
+		end
+		org.hypotension = math.min(org.hypotension or 1, 0.65)
 	end
 
 	org.deathStateKilled = nil
@@ -431,8 +462,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses)
 		local target = GetCurrentDefibTarget(ply, getTarget())
 		if not IsValid(target) then return end
 		local org = GetDefibOrganism(ply, target)
-		if IsDefibDead(org) or org.heartstop then
-			if org and org.heartstop then PlayAEDSound(defib, AEDSounds.asystole, 75, 100, 2) end
+		if IsDefibDead(org) then
 			PlayAEDSound(defib, AEDSounds.shocknotdelivered, 75, 100, 2)
 			DropDefib(defib, target, uses)
 			return
@@ -750,6 +780,7 @@ function SWEP:AttachDefib(owner, target, ply)
 		if org and nextLifeSupport <= CurTime() then
 			nextLifeSupport = CurTime() + 0.1
 			ApplyAEDLifeSupport(org, 0.1)
+			ApplyAEDRhythmTherapy(org, 0.1)
 		end
 		if org and org.heartstop then
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end

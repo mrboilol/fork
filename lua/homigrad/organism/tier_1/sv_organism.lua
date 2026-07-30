@@ -1781,8 +1781,15 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if isPly and org.otrub and org.incapacitated then
-		org.deathStateEnd = org.deathStateEnd or curTime + 25
-		if (org.defibDeathGrace or 0) > curTime then org.deathStateEnd = org.defibDeathGrace end
+		if org.heartstop and not org.deathStateHeartstop then
+			-- A new cardiac arrest always receives a full resuscitation window,
+			-- even if the patient was already unconscious for another reason.
+			org.deathStateEnd = math.max(org.deathStateEnd or 0, curTime + 60)
+			org.deathStateHeartstop = true
+		else
+			org.deathStateEnd = org.deathStateEnd or curTime + 25
+		end
+		if (org.defibDeathGrace or 0) > curTime then org.deathStateEnd = math.max(org.deathStateEnd or 0, org.defibDeathGrace) end
 
 		if curTime >= org.deathStateEnd and not org.deathStateKilled then
 			org.deathStateKilled = true
@@ -1793,6 +1800,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.deathStateEnd = nil
 		org.deathStateKilled = nil
 	end
+	if not org.heartstop then org.deathStateHeartstop = nil end
 
 	if just_went_uncon then
 		org.owner.fullsend = true

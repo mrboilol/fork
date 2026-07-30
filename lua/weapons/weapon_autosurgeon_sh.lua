@@ -75,12 +75,14 @@ SWEP.Config = {
         ["D.I.H Battery"] = 250,
         ["Taser Cartridge"] = 100
     },
-    BatteryPerTick = 3,
-    TickInterval = 0.25,
-    InjuryHeal = 0.08,
-    BleedHeal = 2,
-    InternalBleedHeal = 0.75,
-    BloodRestore = 24
+    BatteryPerTick = 8,
+    AutopulseBatteryPerBeat = 14,
+    TickInterval = 0.5,
+    AutopulseInterval = 60 / 70,
+    InjuryHeal = 0.06,
+    BleedHeal = 1.5,
+    InternalBleedHeal = 0.5,
+    BloodRestore = 16
 }
 
 local ASSounds = {
@@ -91,22 +93,29 @@ local ASSounds = {
     checkpads = "defibrilator/rem_aed_checkpadsforcontact.mp3",
     heartbeat = "defibrilator/rem_aed_heartbeat.mp3",
     startcpr = "defibrilator/rem_aed_startcpr.mp3",
-    battery = "switch.ogg"
+    battery = "switch.ogg",
+    autopulse = "heartmax.ogg"
 }
 
--- Damage and complications only. O2/perfusion and cardiac-vital fields are
--- intentionally absent: the unit repairs lungs, trachea and heart tissue but
--- leaves oxygen content, rhythm, pulse, output and pressure to other treatment.
-local InjuryFields = {
-    "skull", "jaw", "chest", "pelvis", "lleg", "rleg", "larm", "rarm",
-    "heart", "brain", "liver", "stomach", "intestines", "spine1", "spine2", "spine3",
-    "eyeL", "eyeR", "headtrauma", "trachea", "pneumothorax", "hemothorax",
-    "hemothoraxTrauma", "hemothoraxL", "hemothoraxR", "internalBleedComplication",
-    "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital",
-    "brainHemorrhage", "brainSwelling", "intracranialPressure", "brainBleedRate",
-    "neckBrainOxygenPenalty", "arterialO2Impairment", "throatCutPressureShock",
+-- The D.I.H. intentionally works in three passes. The order matters: closing
+-- open vessels first prevents the later reconstruction passes from fighting an
+-- active bleed.
+local StitchFields = {
     "arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "spineartery",
     "rvein", "lvein", "spinevein", "pulmvein", "rarmvein", "larmvein", "rlegvein", "llegvein"
+}
+
+local ComplexFields = {
+    "skull", "chest", "heart", "brain", "trachea", "hemothorax", "hemothoraxTrauma",
+    "hemothoraxL", "hemothoraxR", "internalBleedComplication", "brainFrontal",
+    "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage", "brainSwelling",
+    "intracranialPressure", "brainBleedRate", "neckBrainOxygenPenalty", "arterialO2Impairment",
+    "throatCutPressureShock"
+}
+
+local SimpleFields = {
+    "jaw", "pelvis", "lleg", "rleg", "larm", "rarm", "spine1", "spine2", "spine3",
+    "eyeL", "eyeR", "headtrauma", "pneumothorax", "liver", "stomach", "intestines"
 }
 
 local RecoveryFields = {
@@ -190,7 +199,13 @@ end
 
 local function HasTreatableInjury(org)
     if not org then return false end
-    for _, key in ipairs(InjuryFields) do
+    for _, key in ipairs(StitchFields) do
+        if (tonumber(org[key]) or 0) > 0.001 then return true end
+    end
+    for _, key in ipairs(ComplexFields) do
+        if (tonumber(org[key]) or 0) > 0.001 then return true end
+    end
+    for _, key in ipairs(SimpleFields) do
         if (tonumber(org[key]) or 0) > 0.001 then return true end
     end
     for _, key in ipairs(RecoveryFields) do
@@ -223,38 +238,68 @@ local function HealWoundTable(tbl, amount)
     return changed
 end
 
-local function HealPatient(org, config)
-    local heal = config.InjuryHeal
-    for _, key in ipairs(InjuryFields) do
-        if isnumber(org[key]) then org[key] = math.Approach(org[key], 0, heal) end
+local function HealFields(org, fields, amount)
+    for _, key in ipairs(fields) do
+        if isnumber(org[key]) then org[key] = math.Approach(org[key], 0, amount) end
     end
-    for _, key in ipairs(RecoveryFields) do
-        if isnumber(org[key]) then org[key] = math.Approach(org[key], 0, heal * 12) end
-    end
-    if istable(org.lungsL) then
-        org.lungsL[1] = math.Approach(org.lungsL[1] or 0, 0, heal)
-        org.lungsL[2] = math.Approach(org.lungsL[2] or 0, 0, heal)
-    end
-    if istable(org.lungsR) then
-        org.lungsR[1] = math.Approach(org.lungsR[1] or 0, 0, heal)
-        org.lungsR[2] = math.Approach(org.lungsR[2] or 0, 0, heal)
-    end
-    org.internalBleed = math.Approach(org.internalBleed or 0, 0, config.InternalBleedHeal)
-    org.internalBleedHeal = math.max(org.internalBleedHeal or 0, config.InternalBleedHeal * 2)
-    org.blood = math.Approach(org.blood or 5000, 5000, config.BloodRestore)
-    org.lungsfunction = true
-    org.internalBleedLungSide = nil
-    org.tracheaPath = nil
-    org.eyeLDestroyed = nil
-    org.eyeRDestroyed = nil
-    for _, key in ipairs(ClearFlags) do org[key] = false end
+end
 
+local function HealStitching(org, config)
+    HealFields(org, StitchFields, config.InjuryHeal)
     local woundsChanged = HealWoundTable(org.wounds, config.BleedHeal)
     local arteriesChanged = HealWoundTable(org.arterialwounds, config.BleedHeal)
     if arteriesChanged and hg and hg.organism and hg.organism.RebuildArteryWoundState then
         hg.organism.RebuildArteryWoundState(org, true)
     elseif woundsChanged and IsValid(org.owner) and hg and hg.organism and hg.organism.SyncWounds then
         hg.organism.SyncWounds(org)
+    end
+end
+
+local function HealComplex(org, config)
+    HealFields(org, ComplexFields, config.InjuryHeal)
+    if istable(org.lungsL) then
+        org.lungsL[1] = math.Approach(org.lungsL[1] or 0, 0, config.InjuryHeal)
+        org.lungsL[2] = math.Approach(org.lungsL[2] or 0, 0, config.InjuryHeal)
+    end
+    if istable(org.lungsR) then
+        org.lungsR[1] = math.Approach(org.lungsR[1] or 0, 0, config.InjuryHeal)
+        org.lungsR[2] = math.Approach(org.lungsR[2] or 0, 0, config.InjuryHeal)
+    end
+    org.internalBleed = math.Approach(org.internalBleed or 0, 0, config.InternalBleedHeal)
+    org.internalBleedHeal = math.max(org.internalBleedHeal or 0, config.InternalBleedHeal * 2)
+    org.lungsfunction = true
+    org.internalBleedLungSide = nil
+    org.tracheaPath = nil
+end
+
+local function HealSimple(org, config)
+    HealFields(org, SimpleFields, config.InjuryHeal)
+    local heal = config.InjuryHeal
+    for _, key in ipairs(RecoveryFields) do
+        if isnumber(org[key]) then org[key] = math.Approach(org[key], 0, heal * 12) end
+    end
+    org.blood = math.Approach(org.blood or 5000, 5000, config.BloodRestore)
+    org.eyeLDestroyed = nil
+    org.eyeRDestroyed = nil
+    for _, key in ipairs(ClearFlags) do org[key] = false end
+end
+
+local function ApplyAutopulse(org, config)
+    org.dihAutopulseUntil = CurTime() + config.AutopulseInterval * 1.5
+    org.dihSupportUntil = org.dihAutopulseUntil
+    org.deathStateEnd = math.max(org.deathStateEnd or 0, CurTime() + 2)
+    org.pulse = 70
+    org.heartbeat = 70
+    org.cardiacOutput = 1
+    org.strokeVolume = 1
+    org.hypotension = 0
+    org.hypertension = 0
+    org.perfusion = 1
+    org.peripheralperfusion = 1
+    org.cerebralPerfusion = 1
+    org.myocardialOxygen = 1
+    if istable(org.o2) then
+        org.o2[1] = math.Approach(org.o2[1] or 0, org.o2.range or 30, 1.5)
     end
 end
 
@@ -403,8 +448,10 @@ function SWEP:AttachUnit(owner, target, ply)
     local timerName = "AutosurgeonFollow" .. unit:EntIndex()
     local activeTarget = target
     local nextTreatment = CurTime() + 1
+    local nextAutopulse = CurTime()
     local nextVoice = CurTime() + 6
     local voicePulse = true
+    local treatmentCycle = 1
     local movingSince
 
     unit:CallOnRemove("AutosurgeonCleanup", function()
@@ -450,19 +497,32 @@ function SWEP:AttachUnit(owner, target, ply)
             voicePulse = not voicePulse
             nextVoice = CurTime() + 6
         end
-        if CurTime() < nextTreatment then return end
-        nextTreatment = CurTime() + config.TickInterval
-
         local org = GetUnitOrganism(ply, activeTarget)
         if not org or not org.alive or org.deathStateKilled then
             DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
             return
         end
-        if not HasTreatableInjury(org) then
+        local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
+        if needsAutopulse and CurTime() >= nextAutopulse then
+            if battery < config.AutopulseBatteryPerBeat then
+                PlayUnitSound(unit, ASSounds.battery, 75, 100, 2)
+                DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
+                return
+            end
+            battery = battery - config.AutopulseBatteryPerBeat
+            unit:SetNWInt("AutosurgeonBattery", battery)
+            ApplyAutopulse(org, config)
+            PlayUnitSound(unit, ASSounds.autopulse, 70, 100, config.AutopulseInterval * 0.9)
+            nextAutopulse = CurTime() + config.AutopulseInterval
+        end
+        if CurTime() < nextTreatment then return end
+        nextTreatment = CurTime() + config.TickInterval
+        if not HasTreatableInjury(org) and not needsAutopulse then
             PlayUnitSound(unit, ASSounds.startcpr, 75, 100, 3)
             DropUnit(unit, activeTarget, ply, battery)
             return
         end
+        if not HasTreatableInjury(org) then return end
         if battery < config.BatteryPerTick then
             PlayUnitSound(unit, ASSounds.battery, 75, 100, 2)
             DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
@@ -471,7 +531,15 @@ function SWEP:AttachUnit(owner, target, ply)
 
         battery = battery - config.BatteryPerTick
         unit:SetNWInt("AutosurgeonBattery", battery)
-        HealPatient(org, config)
+        PlayUnitSound(unit, ASSounds.battery, 65, 100, 0.1)
+        if treatmentCycle == 1 then
+            HealStitching(org, config)
+        elseif treatmentCycle == 2 then
+            HealComplex(org, config)
+        else
+            HealSimple(org, config)
+        end
+        treatmentCycle = treatmentCycle % 3 + 1
         if org.heartbeat and org.heartbeat > 0 then PlayUnitSound(unit, ASSounds.heartbeat, 52, 100, 0.5) end
     end)
 

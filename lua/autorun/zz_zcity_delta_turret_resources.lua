@@ -6,3 +6,6 @@ resource.AddFile("sound/zcity_delta/sonarmegaouch.ogg")
 if file.Exists("sound/zcity_delta/aed.ogg", "GAME") then
 	resource.AddFile("sound/zcity_delta/aed.ogg")
 end
+if file.Exists("sound/heartmax.ogg", "GAME") then
+	resource.AddFile("sound/heartmax.ogg")
+end
