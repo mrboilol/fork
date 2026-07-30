@@ -21,6 +21,7 @@ SWEP.AutoSwitchFrom = false
 SWEP.Slot = 5
 SWEP.SlotPos = 1
 SWEP.WorkWithFake = true
+SWEP.HGMedicalMinigameType = "syringe"
 SWEP.offsetVec = Vector(5, -1.5, -2.5)
 SWEP.offsetAng = Angle(90, 00, -90)
 SWEP.modeNames = {

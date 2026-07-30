@@ -1,3 +1,5 @@
+hg.organism_ents = hg.organism_ents or {}
+
 net.Receive("organism_send", function()
 	local org = net.ReadTable()
 	local force = net.ReadBool()

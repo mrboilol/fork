@@ -31,6 +31,7 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_betablock",
     "weapon_autoresuscitator",
     "weapon_horse_tranq",
+    "weapon_midazolam",
     "weapon_fury13",
     "weapon_fury16"
 }
@@ -66,6 +67,7 @@ end
 
 local function GetMinigameType(wep)
     if not IsValid(wep) then return nil end
+    if wep.HGMedicalMinigameType then return wep.HGMedicalMinigameType end
 
     -- Use homigrad's function if available to avoid duplication
     if hg and hg.MedicalMinigame and hg.MedicalMinigame.GetMedicalMinigameType then

@@ -319,6 +319,27 @@ local defaultBrainTraumaProfile = {
 
 local brain_concussion_per_damage = 112.5 -- 0.02 brain damage = 2.25 concussion
 
+local function applyHeadTraumaDizziness(org, dmgInfo, impactDamage, brainDamage)
+	impactDamage = math.max(impactDamage or 0, 0)
+	brainDamage = math.max(brainDamage or 0, 0)
+	if impactDamage <= 0 and brainDamage <= 0 then return 0 end
+
+	local penetrating = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local traumatic = dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
+	if not penetrating and not traumatic then return 0 end
+
+	-- A skull strike can briefly throw off balance, while damage to brain tissue
+	-- makes the same reaction both substantially more likely and more severe.
+	local chance = math.Clamp(0.08 + impactDamage * 0.45 + brainDamage * 6, 0.08, 0.95)
+	if math.Rand(0, 1) > chance then return 0 end
+
+	local dizziness = math.Clamp(math.Rand(0.3, 0.75) + impactDamage * 0.8 + brainDamage * 12, 0, 5)
+	org.disorientation = math.min((org.disorientation or 0) + dizziness, 10)
+	return dizziness
+end
+
+hg.organism.ApplyHeadTraumaDizziness = applyHeadTraumaDizziness
+
 local function applyBrainTraumaEffects(org, delta, dmgInfo, profile)
 	if delta <= 0 then return end
 	profile = profile or defaultBrainTraumaProfile
@@ -328,6 +349,7 @@ local function applyBrainTraumaEffects(org, delta, dmgInfo, profile)
 	org.disorientation = (org.disorientation or 0) + delta * profile.disorientation * 1.5
 	org.shock = (org.shock or 0) + delta * profile.shock * 5
 	org.painadd = (org.painadd or 0) + delta * profile.pain
+	applyHeadTraumaDizziness(org, dmgInfo, 0, delta)
 
 	local penetrating = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 	local impact = dmgInfo:IsDamageType(DMG_CLUB + DMG_BLAST + DMG_CRUSH + DMG_FALL)
@@ -358,6 +380,7 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	org.disorientation = org.disorientation + delta * profile.disorientation
 	org.shock = org.shock + dmg * profile.shock
 	org.painadd = org.painadd + dmg * profile.pain
+	applyHeadTraumaDizziness(org, dmgInfo, 0, delta)
 
 	hg.AddHarmToAttacker(dmgInfo, delta * 15, key .. " damage harm")
 

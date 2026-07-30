@@ -22,6 +22,7 @@ local thoughtMessages = {
     pneumothorax2 = "It is getting harder to breathe.",
     pneumothorax3 = "You are struggling to breathe.",
     brain = "Your brain is damaged.",
+    jam = "Your weapon has jammed.",
     blood2 = "You are close to fainting.",
     internalbleed = "You are bleeding internally.",
     hungry = "You are hungry.",

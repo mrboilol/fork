@@ -62,6 +62,13 @@ function SWEP:IsJamImmune()
 	return false
 end
 
+function SWEP:NotifyJammed()
+	local owner = self:GetOwner()
+	if not IsValid(owner) or not owner:IsPlayer() or not owner.Notify then return end
+
+	owner:Notify("The weapon has jammed!", 5, "jam", 0)
+end
+
 function SWEP:TryJam()
 	if self:GetJammed() then return end
 	if self:IsJamImmune() then return end
@@ -70,22 +77,14 @@ function SWEP:TryJam()
 	if hg_jam and hg_jam:GetBool() then
 		hg_jam:SetInt(0)
 		self:SetJammed(true)
-
-		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() and owner.Notify then
-			owner:Notify("The weapon has jammed!", 5, "jam", 0)
-		end
+		self:NotifyJammed()
 		return
 	end
 
 	local chance = self:CalculateJamChance()
 	if math.random() < chance then
 		self:SetJammed(true)
-
-		local owner = self:GetOwner()
-		if IsValid(owner) and owner:IsPlayer() and owner.Notify then
-			owner:Notify("The weapon has jammed!", 5, "jam", 0)
-		end
+		self:NotifyJammed()
 	end
 end
 

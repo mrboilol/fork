@@ -388,6 +388,8 @@ hook.Add("PlayerDeath", "hg_medical_minigame_clear_amputation_progress", functio
 end)
 
 local function GetMedicalMinigameType(wep)
+    if wep.HGMedicalMinigameType then return wep.HGMedicalMinigameType end
+
     local class = wep:GetClass()
     local medkitModeType = wep.HGMedkitTier and wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[wep.mode]
     if medkitModeType == "bandage" then return "bandage" end

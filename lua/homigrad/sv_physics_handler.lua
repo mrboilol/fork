@@ -1,39 +1,3 @@
--- local server_is_crashed = false
-
--- local physenv, RunConsoleCommand, game = physenv, RunConsoleCommand, game
--- local physenv_GetPhysicsPaused = physenv.GetPhysicsPaused
-
--- local func = function()
--- 	local should_simulate = physenv_GetPhysicsPaused()
-
--- 	if server_is_crashed
--- 		or not should_simulate then
--- 		return
--- 	end
-
--- 	server_is_crashed = true
-
--- 	PrintMessage(HUD_PRINTTALK, "Physics are crashed, restart schedule created")
-
--- 	timer.Create("PhysicsCrashedSchedule", 10, 1, function()
--- 		engine.CloseServer()
--- 		timer.Simple(0, function()
--- 			RunConsoleCommand("changelevel", game.GetMap())
--- 		end)
--- 	end)
--- end
-
-timer.Create("vphysics_cathcer", 0.25, 0, func)
-
--- local CrazyPhysPerSec = 0
--- local CrazyPhysTime = 0
--- local CrazyPhysTrusthold = 500
---
--- 	if CrazyPhysTime > CurTime() and CrazyPhysPerSec > CrazyPhysTrusthold then
--- 		physenv.SetPhysicsPaused(true)
--- 	end
--- end)
-
 local hg_prop_settle_delay = ConVarExists("hg_prop_settle_delay") and GetConVar("hg_prop_settle_delay") or CreateConVar("hg_prop_settle_delay", "6", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Delay before loose props get put to sleep and moved to a lighter collision group.", 0, 300)
 local hg_prop_sleep_velocity = ConVarExists("hg_prop_sleep_velocity") and GetConVar("hg_prop_sleep_velocity") or CreateConVar("hg_prop_sleep_velocity", "22", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Maximum linear velocity for a prop to be considered settled by the optimizer.", 0, 500)
 local hg_prop_sleep_ang_velocity = ConVarExists("hg_prop_sleep_ang_velocity") and GetConVar("hg_prop_sleep_ang_velocity") or CreateConVar("hg_prop_sleep_ang_velocity", "35", FCVAR_ARCHIVE + FCVAR_NOTIFY, "Maximum angular velocity for a prop to be considered settled by the optimizer.", 0, 1000)

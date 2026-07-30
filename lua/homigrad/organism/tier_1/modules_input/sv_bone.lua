@@ -660,6 +660,12 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		end
 	end
 
+	-- Brain damage applies its stronger dizziness in the organ trauma handler;
+	-- this roll represents the impact transmitted by the skull itself.
+	if hg.organism.ApplyHeadTraumaDizziness then
+		hg.organism.ApplyHeadTraumaDizziness(org, dmgInfo, math.max(skullDelta, dmg * 0.15), 0)
+	end
+
 	if org.brain >= 0.01 and math.random(3) == 1 and (brainImpact or skullDelta > 0.6) then
 		org.shock = 70
 		timer.Simple(0.1, function()
