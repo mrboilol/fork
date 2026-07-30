@@ -310,10 +310,6 @@ function SWEP:SetupDataTables()
     self:NetworkVar("Bool", 0, "AttachSelf")
 end
 
-function SWEP:Initialize()
-    self:SetHoldType(self.HoldType)
-end
-
 function SWEP:CanOperate(owner)
     if not IsValid(owner) or not owner.organism or not hg or not hg.organism then return true end
     local fake2 = hg.organism.fake_spine2 or 1
@@ -382,6 +378,12 @@ function SWEP:AttachUnit(owner, target, ply)
 
     local battery = self:Clip1()
     if battery <= 0 then return end
+    local config = self.Config
+    local unitBone = self.UnitBone
+    local unitPos = self.UnitPos
+    local unitAng = self.UnitAng
+    local unitFemPos = self.UnitFemPos
+    local weaponClass = self:GetClass()
     local unit = ents.Create("prop_dynamic")
     if not IsValid(unit) then return end
     unit:SetModel(self.WorldModel)
@@ -389,7 +391,7 @@ function SWEP:AttachUnit(owner, target, ply)
     unit:Spawn()
     unit:SetMoveType(MOVETYPE_NONE)
     unit.ASSoundEmitter = target
-    PositionUnit(unit, target, bone, self.UnitPos, self.UnitAng, self.UnitFemPos)
+    PositionUnit(unit, target, bone, unitPos, unitAng, unitFemPos)
 
     target.AutosurgeonModelEnt = unit
     target.AutosurgeonInProgress = true
@@ -430,8 +432,8 @@ function SWEP:AttachUnit(owner, target, ply)
             ply.AutosurgeonInProgress = true
         end
         unit.ASSoundEmitter = activeTarget
-        local currentBone = activeTarget:LookupBone(self.UnitBone)
-        if currentBone then PositionUnit(unit, activeTarget, currentBone, self.UnitPos, self.UnitAng, self.UnitFemPos) end
+        local currentBone = activeTarget:LookupBone(unitBone)
+        if currentBone then PositionUnit(unit, activeTarget, currentBone, unitPos, unitAng, unitFemPos) end
 
         if activeTarget:GetVelocity():LengthSqr() > 160 * 160 then
             movingSince = movingSince or CurTime()
@@ -449,7 +451,7 @@ function SWEP:AttachUnit(owner, target, ply)
             nextVoice = CurTime() + 6
         end
         if CurTime() < nextTreatment then return end
-        nextTreatment = CurTime() + self.Config.TickInterval
+        nextTreatment = CurTime() + config.TickInterval
 
         local org = GetUnitOrganism(ply, activeTarget)
         if not org or not org.alive or org.deathStateKilled then
@@ -461,19 +463,19 @@ function SWEP:AttachUnit(owner, target, ply)
             DropUnit(unit, activeTarget, ply, battery)
             return
         end
-        if battery < self.Config.BatteryPerTick then
+        if battery < config.BatteryPerTick then
             PlayUnitSound(unit, ASSounds.battery, 75, 100, 2)
             DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
             return
         end
 
-        battery = battery - self.Config.BatteryPerTick
+        battery = battery - config.BatteryPerTick
         unit:SetNWInt("AutosurgeonBattery", battery)
-        HealPatient(org, self.Config)
+        HealPatient(org, config)
         if org.heartbeat and org.heartbeat > 0 then PlayUnitSound(unit, ASSounds.heartbeat, 52, 100, 0.5) end
     end)
 
-    owner:StripWeapon(self:GetClass())
+    owner:StripWeapon(weaponClass)
 end
 
 function SWEP:Think()
@@ -560,7 +562,12 @@ if CLIENT then
         if not IsValid(wep) or wep:GetClass() != "weapon_autosurgeon_sh" then altWasDown = false return end
         local altDown = input.IsKeyDown(KEY_LALT) or input.IsKeyDown(KEY_RALT)
         if altDown and not altWasDown and (ply:GetAmmoCount("D.I.H Battery") > 0 or ply:GetAmmoCount("Taser Cartridge") > 0) then
-            hg.CreateRadialMenu({{{function() net.Start("AS_Recharge") net.SendToServer() end, "Recharge D.I.H"}}[1]})
+            hg.CreateRadialMenu({
+                {
+                    function() net.Start("AS_Recharge") net.SendToServer() end,
+                    "Recharge D.I.H"
+                }
+            })
         end
         altWasDown = altDown
     end)

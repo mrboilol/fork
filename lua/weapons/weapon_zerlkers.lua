@@ -27,7 +27,7 @@ SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modeNames = {[1] = "zerlkers"}
 SWEP.modeValuesdef = {[1] = 1}
 SWEP.DeploySnd = "snd_jack_hmcd_pillsbounce.wav"
-SWEP.FallSnd = "snd_jack_hmcd_pillsbounce.wav"
+SWEP.FallSnd = "Metal_Barrel.ImpactHard"
 SWEP.showstats = false
 
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
@@ -97,12 +97,13 @@ if SERVER then
 		box.damage = 18
 		box.MaxSpeed = 750
 		box.DamageType = DMG_CLUB
-		box.AttackHit = "Plastic_Box.ImpactHard"
+		box.AttackHit = "Metal_Barrel.ImpactHard"
 		box.AttackHitFlesh = "Flesh.ImpactHard"
 		box.noStuck = true
 
 		local phys = box:GetPhysicsObject()
 		if IsValid(phys) then
+			phys:SetMaterial("metal_barrel")
 			phys:SetVelocity(owner:GetVelocity() + owner:GetAimVector() * 170 + VectorRand(-35, 35))
 			phys:AddAngleVelocity(VectorRand(-180, 180))
 		end

@@ -356,6 +356,35 @@ local function IsAEDState(defib, state)
 	return IsValid(defib) and not defib.AEDDropped and defib.AEDState == state
 end
 
+-- The pads provide temporary cardiopulmonary support while the AED is attached.
+-- This keeps the newer oxygen-delivery and pump stats involved in treatment
+-- without repairing physical organ damage or masking a shockable rhythm.
+local function ApplyAEDLifeSupport(org, elapsed)
+	if not org or not org.alive or org.deathStateKilled then return end
+	elapsed = math.max(tonumber(elapsed) or 0, 0)
+
+	if istable(org.o2) then
+		local oxygenMax = tonumber(org.o2.range) or 30
+		org.o2[1] = math.Approach(tonumber(org.o2[1]) or 0, oxygenMax, elapsed * 1.25)
+	end
+
+	org.bodyoxygen = math.Approach(tonumber(org.bodyoxygen) or 1, 1, elapsed * 0.055)
+	org.brainoxygen = math.Approach(tonumber(org.brainoxygen) or 1, 1, elapsed * 0.045)
+	org.cerebralPerfusion = math.Approach(tonumber(org.cerebralPerfusion) or 1, 1, elapsed * 0.04)
+	org.perfusion = math.Approach(tonumber(org.perfusion) or 1, 1, elapsed * 0.04)
+	org.peripheralperfusion = math.Approach(tonumber(org.peripheralperfusion) or 1, 1, elapsed * 0.035)
+	org.myocardialOxygen = math.Approach(tonumber(org.myocardialOxygen) or 1, 1, elapsed * 0.07)
+	org.cardiacOutput = math.Approach(tonumber(org.cardiacOutput) or 1, 1, elapsed * 0.055)
+	org.strokeVolume = math.Approach(tonumber(org.strokeVolume) or 1, 1, elapsed * 0.045)
+	org.hypotension = math.Approach(tonumber(org.hypotension) or 0, 0, elapsed * 0.045)
+	org.heartStrain = math.Approach(tonumber(org.heartStrain) or 0, 0, elapsed * 0.025)
+
+	org.hypoxia = math.Approach(tonumber(org.hypoxia) or 0, 0, elapsed * 0.06)
+	org.hypoxiaTime = math.Approach(tonumber(org.hypoxiaTime) or 0, 0, elapsed * 4)
+	org.severeHypoxiaTime = math.Approach(tonumber(org.severeHypoxiaTime) or 0, 0, elapsed * 4)
+	org.systemicIschemiaTime = math.Approach(tonumber(org.systemicIschemiaTime) or 0, 0, elapsed * 4)
+end
+
 local function ApplyAEDShock(org)
 	if not org then return end
 
@@ -380,6 +409,7 @@ local function ApplyAEDShock(org)
 	org.deathStateKilled = nil
 	org.defibDeathGrace = CurTime() + 45
 	org.deathStateEnd = math.max(org.deathStateEnd or 0, org.defibDeathGrace)
+	ApplyAEDLifeSupport(org, 4)
 end
 
 local function BeginAEDShock(defib, ply, getTarget, uses)
@@ -666,6 +696,7 @@ function SWEP:AttachDefib(owner, target, ply)
 	local defibAng = self.DefibAng
 	local defibFemPos = self.DefibFemPos
 	local nextHeartbeat = 0
+	local nextLifeSupport = 0
 	local movingSince
 	local fibrillationLoop
 	local asystolePlayed
@@ -716,6 +747,10 @@ function SWEP:AttachDefib(owner, target, ply)
 		PositionDefib(defib, activeTarget, currentBone, defibPos, defibAng, defibFemPos)
 
 		local org = GetDefibOrganism(ply, activeTarget)
+		if org and nextLifeSupport <= CurTime() then
+			nextLifeSupport = CurTime() + 0.1
+			ApplyAEDLifeSupport(org, 0.1)
+		end
 		if org and org.heartstop then
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end
 			if not asystolePlayed then

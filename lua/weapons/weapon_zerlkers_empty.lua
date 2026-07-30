@@ -140,12 +140,13 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	thrown.BleedMultiplier = 0
 	thrown.ImmobilizationMul = 0
 	thrown.HurtMultiplier = 0
-	thrown.AttackHit = "Plastic_Box.ImpactHard"
+	thrown.AttackHit = "Metal_Barrel.ImpactHard"
 	thrown.AttackHitFlesh = "Flesh.ImpactHard"
 	thrown.noStuck = true
 
 	local phys = thrown:GetPhysicsObject()
 	if IsValid(phys) then
+		phys:SetMaterial("metal_barrel")
 		phys:SetVelocity(owner:GetAimVector() * velocity + character:GetVelocity())
 		phys:AddAngleVelocity(VectorRand() * 350)
 	end
