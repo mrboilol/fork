@@ -461,23 +461,14 @@ local colorBGBlacky = Color(40,40,40,255)
 hg.muteall = false
 hg.mutespect = false
 
-local function GetVoiceIconPath(ply)
-	return ply:IsMuted() and "icon16/sound_mute.png" or "icon16/sound.png"
-end
-
-local function SetSoundButtonIcon(button, ply)
-	if not IsValid(button) or not IsValid(ply) then return end
-	local icon = GetVoiceIconPath(ply)
-	if button.SetImage then
-		button:SetImage(icon)
-		return
-	end
-	if button.SetIcon then
-		button:SetIcon(icon)
-		return
-	end
-	if button.SetMaterial then
-		button:SetMaterial(Material(icon))
+local function ApplyScoreboardVoiceMutes()
+	for _, ply in player.Iterator() do
+		if not IsValid(ply) then continue end
+		if hg.muteall or (hg.mutespect and (!ply:Alive() or ply:Team() == TEAM_SPECTATOR)) then
+			ply:SetVoiceVolumeScale(0)
+		else
+			ply:SetVoiceVolumeScale(hg.playerInfo[ply:SteamID()] and hg.playerInfo[ply:SteamID()][2] or 1)
+		end
 	end
 end
 
@@ -720,6 +711,16 @@ function GM:ScoreboardShow()
 		switchingPage = true
 	end)
 
+	local muteSpectBtn = SB_MakeButton(footer, "MUTE SPECTATORS", function() return hg.mutespect end, function()
+		hg.mutespect = !hg.mutespect
+		ApplyScoreboardVoiceMutes()
+	end)
+
+	local muteAllBtn = SB_MakeButton(footer, "MUTE ALL", function() return hg.muteall end, function()
+		hg.muteall = !hg.muteall
+		ApplyScoreboardVoiceMutes()
+	end)
+
 	footer.PerformLayout = function(pnl, w, h)
 		local bh = SB_Unit(30)
 		local pad = SB_Unit(14)
@@ -727,8 +728,16 @@ function GM:ScoreboardShow()
 
 		local viewW = SB_Unit(145)
 		local teamW = SB_Unit(170)
+		local muteSpectW = SB_Unit(190)
+		local muteAllW = SB_Unit(130)
+		local gap = SB_Unit(10)
+		local muteTotalW = muteSpectW + muteAllW + gap
 		viewBtn:SetSize(viewW, bh)
 		viewBtn:SetPos(pad, y)
+		muteSpectBtn:SetSize(muteSpectW, bh)
+		muteSpectBtn:SetPos(math.floor((w - muteTotalW) / 2), y)
+		muteAllBtn:SetSize(muteAllW, bh)
+		muteAllBtn:SetPos(math.floor((w - muteTotalW) / 2) + muteSpectW + gap, y)
 		teamBtn:SetSize(teamW, bh)
 		teamBtn:SetPos(w - pad - teamW, y)
 	end
