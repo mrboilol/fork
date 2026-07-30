@@ -458,7 +458,7 @@ local function OpenBuyMenu()
 	Sheet:SetFadeTime(0.1)
 
 	for k,category in SortedPairsByMemberValue(MODE.BuyItems, "Priority") do
-		local CategoryPanel = vgui.Create( "DScrollPanel", sheet )
+		local CategoryPanel = vgui.Create("DScrollPanel", Sheet)
 		--CategoryPanel:Dock()
 		CategoryPanel.Paint = function() end
 		for n,Item in pairs(category) do
@@ -470,7 +470,7 @@ local function OpenBuyMenu()
 			ItemPanel:SetSize(0,ScrH()*0.1)
 			ItemPanel:Dock(TOP)
 			ItemPanel:DockMargin(0,5,0,0)
-			ItemPanel.Paint = PaintPanel1
+			ItemPanel.Paint = PaintPanel
 			--print(Item.ItemClass,weapon)
 			if ( weapon ~= nil and ( (weapon.WepSelectIcon2 and weapon.WepSelectIcon2:GetName()) or (weapon.IconOverride)) ) or ((ent and ent.t.IconOverride)) then
 				local ItemButton = vgui.Create("DImage",ItemPanel)
@@ -577,7 +577,7 @@ local function OpenBuyMenu()
 						net.SendToServer()
 					end
 
-					Attach.Paint = PaintPanel2
+					Attach.Paint = PaintPanel
 					ItemAtt:AddItem(Attach)
 				end
 			end
@@ -586,7 +586,6 @@ local function OpenBuyMenu()
 		local rTab = tab["Tab"]
 		rTab.Paint = PaintPanel
 		rTab:SetFont("ZB_TDM_CATEGORY")
-		rTab.ApplySchemeSettings = rtabFunc
 		--rTab:SetTextInset(50)
 	end
 
@@ -609,10 +608,10 @@ local function OpenBuyMenu()
 		hg.PressRadialMenu(3)
 	end
 	tdm_e_wasdown = down
-end)
+end
 
 net.Receive("tdm_open_buymenu",function()
 	if zb.CROUND ~= "tdm" then return end
-	ToggleBuyMenu()
+	OpenBuyMenu()
 end)
 TDM_OpenedBuyMenu = TDM_OpenedBuyMenu or nil

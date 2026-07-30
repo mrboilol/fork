@@ -1383,6 +1383,11 @@ function hg.FakeUp(ply, forced, instant)
 		hg.ClearRagdollSlideState(ragdoll)
 	end
 
+	-- Fake-up is a state transition, not arm use. Preserve queued pain across
+	-- hooks so damaged or dislocated arms do not add pain merely by standing.
+	local org = ply.organism
+	local painAddBeforeFakeUp = org and org.painadd
+
 	if ragdoll.welds then
 		if ply:InVehicle() then
 			local veh = ply:GetVehicle()

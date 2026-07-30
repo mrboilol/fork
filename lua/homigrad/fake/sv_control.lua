@@ -1266,11 +1266,10 @@ hook.Add("Think", "Fake", function()
 				if bonepos and boneang then
 
 					local physobj = ragdoll:GetPhysicsObjectNum(i)
-					local mass = physobj:GetMass() / 5
-					
-					local name = ragdoll:GetBoneName(bone)
 
 					if IsValid(physobj) then
+						local mass = physobj:GetMass() / 5
+						local name = ragdoll:GetBoneName(bone)
 						local bone_impulse = ply.HitBones and ply.HitBones[name] or CurTime()
 						local amt_impulse = (2 - math.Clamp(bone_impulse - CurTime(),0,2)) / 2
 						
@@ -2830,6 +2829,7 @@ hook.Add("Think", "Fake", function()
 					org.painadd = org.painadd + ragdoll.dtime * 2 * (org.lleg + org.rleg)
 
 				end
+			end
 			end
 		else
 			clearSlideState(ragdoll)

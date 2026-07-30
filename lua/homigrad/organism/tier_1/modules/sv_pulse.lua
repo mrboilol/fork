@@ -183,11 +183,11 @@ module[1] = function(org)
 	org.palpitationTreatmentUntil = 0
 	org.cardiacArrestStart = nil
 	org.cardiacArrestO2Start = nil
-		org.bloodpressure = 93
+	org.bloodpressure = 93
 	org.systolic = 120
 	org.diastolic = 80
 	org.heartbeat = 70
-	org.bloodPressure = 90
+	org.bloodPressure = 93
 	org.systolic = 120
 	org.diastolic = 80
 	org.cardiacOutput = 1
@@ -221,11 +221,7 @@ module[2] = function(owner, org, timeValue)
 		org.unstableRhythm = nil
 	end
 
-	local heart = organSystemsEnabled and 1 - org.heart or 1
-	-- Brain damage weakens the heart's neurological drive.
-	local brain = organSystemsEnabled and math.Clamp(1 - org.brain * 1.5, 0, 1) or 1
 	local o2Value = org.o2 and org.o2[1] or 30
-	local o2 = organSystemsEnabled and halfValue2(o2Value, org.o2.range, org.o2.k) or 1
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.55 then
 		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 45)
 	end
@@ -248,6 +244,7 @@ module[2] = function(owner, org, timeValue)
 			org.heartbeat = 0
 			org.pulse = 0
 			org.bloodpressure = 0
+			org.bloodPressure = 0
 			org.systolic = 0
 			org.diastolic = 0
 		end
@@ -328,8 +325,6 @@ module[2] = function(owner, org, timeValue)
 	-- Exertion only elevates the heart rate once 50 stamina has actually been lost.
 	local exertionK = org.analgesia < 1 and math.Clamp((staminaMax - 50 - stamina) / math.max(staminaMax - 50, 1), 0, 1) or 0
 	local exertionHeartBoost = exertionK * 32
-	local heartbeat = org.bloodPressure < 70 and 70 + (70 - org.bloodPressure) * 3 or 70
-
 	local runnin_or_exhausted = org.analgesia < 1 and (org.stamina.sub > 0 or org.stamina[1] < (org.stamina.max * 0.66))
 	org.heartbeat = math.Approach(org.heartbeat, math.max(heartbeat - 10, runnin_or_exhausted and ((1 - math.min(1, org.stamina[1] / (org.stamina.max * 1))) * 110 + 90) or 60), !runnin_or_exhausted and timeValue * 2 or timeValue * 15)
 	
@@ -502,27 +497,6 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 	
-	local blood = math.Clamp(org.blood or 5000, 0, 5000)
-	local bloodK = math.Clamp((blood - 2000) / 2000, 0, 1)
-	local o2K = math.Clamp(o2, 0, 1)
-	local heartK = math.Clamp(1 - org.heart, 0, 1)
-	local brainK = math.Clamp(1 - org.brain * 1.25, 0, 1)
-	local hypothermiaK = math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.45, 1), 0.45, 1)
-	local adrenalineHyperMul = math.Clamp(org.adrenaline, 0, 5) * 0.025
-	local hypertensionMul = 1 + adrenalineHyperMul + math.Clamp(org.pain, 0, 120) / 120 * 0.06 + math.Clamp(org.shock, 0, 80) / 80 * 0.08
-	hypertensionMul = hypertensionMul * (1 - math.Clamp(org.analgesia / 4, 0, 1) * 0.08)
-	hypertensionMul = math.Clamp(hypertensionMul, 0.72, 1.45)
-
-	local compensation = 1 + hemorrhageCompensation * 0.45 * (1 - effectivePalpitations * 0.75)
-	compensation = compensation * (1 - hypovolemicShock * 0.2)
-	compensation = math.Clamp(compensation, 0.45, 1.4)
-
-	local pumpRateK = math.Clamp((org.heartbeat or 70) / 70, 0.25, 2.4)
-	local fillingK = (1 - math.Clamp(((org.heartbeat or 70) - 185) / 85, 0, 0.55)) * (1 - effectivePalpitations * 0.2)
-	local pulse_factor = (org.pulse / 70) * math.Clamp(pumpRateK * fillingK, 0.45, 1.12)
-	local volumeMapK = interpolateCurve(BloodPerfusion, blood)
-	local map = 93 * pulse_factor * hypertensionMul * compensation * volumeMapK
-	map = org.alive and map or 0
 	heartbeat = heartbeat + (org.hypotension or 0) * 55
 	heartbeat = heartbeat - (org.myocardialOxygen and (1 - org.myocardialOxygen) or 0) * 35
 	if (org.arrhythmia or 0) > 0.05 and not org.fibrillation then heartbeat = heartbeat + math.Rand(-70, 90) * org.arrhythmia end
@@ -556,73 +530,10 @@ module[2] = function(owner, org, timeValue)
 	end
 	if org.hypotension > 0.2 then org.consciousness = math.min(org.consciousness, Clamp(Remap(org.bloodPressure, 20, 65, 0, 1), 0, 1)) end
 
-	if org.heartstop then
-		map = 0
-	end
-
-	-- High velocity reduces blood pressure (falling or rapid acceleration only).
-	-- Noclip and ragdoll motion are not physiological G-force, so neither may
-	-- contribute. Adrenaline can fully compensate for a short high-G episode.
-	local velocityPenalty = 0
-	local isRagdolled = owner:IsPlayer() and (IsValid(owner.FakeRagdoll) or IsValid(owner:GetNWEntity("FakeRagdoll", NULL)) or org.needfake or org.otrub)
-	local isNoclipping = owner:IsPlayer() and owner:GetMoveType() == MOVETYPE_NOCLIP
-	if not isRagdolled and not isNoclipping then
-		local velocity = owner:GetVelocity()
-		local speed = velocity:Length()
-		local fallSpeed = math.max(0, -velocity.z)
-
-		-- Falling causes G-force blood pressure loss
-		if fallSpeed > 75 then
-			velocityPenalty = math.Clamp((fallSpeed - 75) / 275, 0, 0.95)
-		end
-
-		-- Rapid deceleration (e.g., vehicle crashes, slamming into walls) causes G-force loss
-		local prevSpeed = org._pulsePrevSpeed or speed
-		local decel = math.max(0, prevSpeed - speed) / math.max(timeValue, 0.001)
-		if decel > 600 and velocity.z <= 0 then
-			velocityPenalty = math.min(velocityPenalty + math.Clamp((decel - 600) / 600, 0, 0.35), 0.98)
-		end
-		org._pulsePrevSpeed = speed
-	else
-		org._pulsePrevSpeed = nil
-	end
-
-	if velocityPenalty > 0 then
-		local adrenalineProtection = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1)
-		velocityPenalty = velocityPenalty * (1 - adrenalineProtection)
-		map = map * (1 - velocityPenalty)
-	end
-
-	-- Keep the existing mmHg model, but make its pressure target respond to
-	-- Vottur's separate loss channels instead of waiting only for blood volume
-	-- to fall. Arterial loss causes the sharpest immediate pressure collapse.
-	local arterialLoss = math.max(org.arterialBleed or 0, 0)
-	local venousLoss = math.max(org.venousBleed or 0, 0)
-	local internalLoss = math.max(org.internalBleedRate or 0, 0)
-	local bleedPressureLoss = math.Clamp(arterialLoss / 18, 0, 0.50)
-		+ math.Clamp(venousLoss / 65, 0, 0.18)
-		+ math.Clamp(internalLoss / 45, 0, 0.22)
-	local throatPressureLoss = math.Clamp(org.throatCutPressureShock or 0, 0, 1) * 0.22
-	map = map * math.Clamp(1 - bleedPressureLoss - throatPressureLoss, 0.08, 1)
-
-	map = math.Clamp(map, 0, 190)
-	local bpTarget = map
-	local bpCurrent = org.bloodpressure or 93
-	local bpRate = (bpTarget > bpCurrent) and 14 or 10
-	if velocityPenalty > 0 then
-		bpRate = bpRate * (1 + velocityPenalty * 4)
-	end
-	org.bloodpressure = math.Approach(bpCurrent, bpTarget, timeValue * bpRate)
-
-	local pulsePressure = 40 * heartK * math.max(bloodK, 0.3)
-	pulsePressure = pulsePressure * (1 + math.Clamp((org.heartbeat - 70) / 180, -0.2, 0.6))
-	pulsePressure = math.Clamp(pulsePressure, 8, 95)
-
-	local targetDiastolic = math.Clamp(org.bloodpressure - pulsePressure * 0.5, 0, 180)
-	local targetSystolic = math.Clamp(targetDiastolic + pulsePressure, 0, 260)
-
-	org.diastolic = math.Approach(org.diastolic or 80, targetDiastolic, timeValue * 16)
-	org.systolic = math.Approach(org.systolic or 120, targetSystolic, timeValue * 16)
+	-- Compatibility is intentionally one-way. Remorseism owns bloodPressure and
+	-- its derived cardiac values; legacy consumers may read this mirror but can
+	-- no longer feed a second pressure calculation back into the new system.
+	org.bloodpressure = org.bloodPressure
 
     if org.bloodpressure < 50 then
         -- Adrenaline, tranexamic acid and thiamine prevent organ damage from low blood pressure
@@ -698,12 +609,6 @@ module[2] = function(owner, org, timeValue)
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
 		org.disorientation = math.max(org.disorientation, 0.25 + effectiveHighK * 1.5)
 		org.shock = math.Approach(org.shock, math.max(org.shock, 10 + effectiveHighK * 20), timeValue * (0.4 + effectiveHighK * 1.4))
-		org.heartbeat = 0
-		local arrestFallSpeed = defibGrace and 4 or 35
-		org.bloodPressure = Approach(org.bloodPressure or 0, arrestPressure, timeValue * arrestFallSpeed)
-		org.pulse = Approach(org.pulse or 0, arrestPressure, timeValue * arrestFallSpeed)
-		org.fibrillation = false
-		org.arrhythmia = 0
 	end
 
 	org.fear = math.Approach(org.fear, (org.otrub and 0 or (org.fearadd > 0 and 1 or -1)), org.otrub and timeValue * 0.5 or (org.fearadd > 0 and (org.fear < 0 and timeValue * 5 * org.fearadd or timeValue / 5 * org.fearadd) or (org.fear <= 0 and timeValue / 240 or timeValue / 50)))
@@ -714,7 +619,6 @@ module[2] = function(owner, org, timeValue)
 	local fearGainRate = gainfear and timeValue / 5 or 0
 	org.fearadd = math.Approach(org.fearadd, 1, fearGainRate)
 	
-	local adrenK = max(1 + org.adrenaline, 1)
 	-- Medication fills adrenalineAdd first; include that active dose so an
 	-- epinephrine injection can affect an arrest before its normal decay tick.
 	local adren = math.max(org.adrenaline or 0, org.adrenalineAdd or 0)
@@ -728,6 +632,8 @@ module[2] = function(owner, org, timeValue)
 	if org.pulse < 10 or org.brain >= 0.6 then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	if org.heartstop then
+		org.heartbeat = 0
+		org.bloodpressure = org.bloodPressure
 		org.fibrillation = false
 		org.arrhythmia = 0
 	end
@@ -808,21 +714,10 @@ module[2] = function(owner, org, timeValue)
 
 		org.pulse = 0
 		org.strokeVolume = 0
-		org.cardiacOutput = 0
-		org.bloodpressure = 0
-		org.systolic = 0
-		org.diastolic = 0
+		org.bloodpressure = org.bloodPressure
 	else
 		org.cardiacArrestStart = nil
 		org.cardiacArrestO2Start = nil
-		-- CO = HR x SV. Blood volume, cardiac damage, cold contractility, and
-		-- insufficient diastolic filling each reduce stroke volume; a high rate
-		-- alone cannot make a thready hypovolemic pulse look effective.
-		local rateK = math.Clamp((org.heartbeat or 0) / 75, 0, 2.5)
-		local fillingK = (1 - math.Clamp(((org.heartbeat or 75) - 180) / 120, 0, 0.7)) * (1 - effectivePalpitations * 0.25)
-		local strokeVolume = volumeMapK * (organSystemsEnabled and (1 - math.Clamp(org.heart or 0, 0, 1)) * hypothermiaK or 1) * fillingK
-		org.strokeVolume = math.Clamp(strokeVolume, 0, 1.2)
-		org.cardiacOutput = math.Clamp(rateK * org.strokeVolume, 0, 1.5)
 		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, false, org)
 	end
 

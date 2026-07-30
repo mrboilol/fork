@@ -11,6 +11,7 @@ function hg.organism.ZeroVitals(org)
 	org.ecgState = "asystole"
 	org.cardiacOutput = 0
 	org.bloodpressure = 0
+	org.bloodPressure = 0
 	org.systolic = 0
 	org.diastolic = 0
 end
@@ -286,7 +287,6 @@ util.AddNetworkString("organism_send")
 util.AddNetworkString("organism_sendply")
 local CurTime = CurTime
 local nullTbl = {}
-local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer", 0, FCVAR_SERVER_CAN_EXECUTE, "Toggle developer mode (enables damage traces)", 0, 1)
 local function wounds_signature(wounds)
 	if not wounds or #wounds == 0 then return "0" end
 
@@ -586,7 +586,7 @@ local function send_organism(org, ply)
 	sendtable.shock = org.shock
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
-	sendtable.bloodPressure = org.bloodPressure
+	sendtable.bloodPressure = org.bloodPressure or org.bloodpressure
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
@@ -598,7 +598,6 @@ local function send_organism(org, ply)
 	sendtable.hypotension = org.hypotension
 	sendtable.heartstop = org.heartstop
 	sendtable.ecgState = org.ecgState
-	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.hemorrhageCompensation = org.hemorrhageCompensation
 	sendtable.compensationPulseMultiplier = org.compensationPulseMultiplier
 	sendtable.compensationHeartRateTarget = org.compensationHeartRateTarget
@@ -709,7 +708,7 @@ local function send_bareinfo(org)
 	sendtable.pulse = org.pulse
 	sendtable.blood = org.blood
 	sendtable.heartbeat = org.heartbeat
-	sendtable.bloodPressure = org.bloodPressure
+	sendtable.bloodPressure = org.bloodPressure or org.bloodpressure
 	sendtable.systolic = org.systolic
 	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
@@ -721,7 +720,6 @@ local function send_bareinfo(org)
 	sendtable.hypotension = org.hypotension
 	sendtable.heartstop = org.heartstop
 	sendtable.ecgState = org.ecgState
-	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.hemorrhageCompensation = org.hemorrhageCompensation
 	sendtable.compensationPulseMultiplier = org.compensationPulseMultiplier
 	sendtable.compensationHeartRateTarget = org.compensationHeartRateTarget
@@ -1717,6 +1715,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if org.lungsL[1] < 1 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, naturalHeal) end
 		if (org.eyeL or 0) < 1 then org.eyeL = math.Approach(org.eyeL or 0, 0, naturalHeal) end
 		if (org.eyeR or 0) < 1 then org.eyeR = math.Approach(org.eyeR or 0, 0, naturalHeal) end
+	end
+
 	-- Thiamine healing logic
 	org.thiamine = math.Approach(org.thiamine, 0, timeValue / 240)
 

@@ -345,11 +345,7 @@ suicideViewAng = Angle()
 addtime = CurTime()
 show_image_time = 0
 show_some_images_time = 0
-lobotomy_memory_total = 1
-lobotomy_flash_mat = nil
-lobotomy_next_forced_flash = 0
-lobotomy_recent_trauma = 0
-lobotomy_recent_trauma_power = 0
+lobotomy_index = 0
 disorientationFxLerp = 0
 adrenalineVisualLerp = 0
 lastDisorientationFx = 0
@@ -1657,45 +1653,35 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end
 	end
 	
-	local brainDamaged = brain >= 0.05
-	local brainFlashScale = math.Clamp((brain - 0.05) / (0.35 - 0.05), 0, 1)
-	local recentSevereHeadTrauma = lobotomy_recent_trauma > CurTime()
-	local backgroundMemoryActive = hg.brain_damage_memory_active and lply.PlayerClassName ~= "headcrabzombie"
-	if backgroundMemoryActive then
-		brain_motionblur = false
-		show_image_time = 0
-		show_some_images_time = 0
-		lobotomy_flash_mat = nil
-	elseif (brainDamaged or recentSevereHeadTrauma) and not org.otrub then
-		if show_image_time > 0 then
-			brain_motionblur = true
-			DrawMotionBlur(0.04 + brainFlashScale * 0.06, 0.35 + brainFlashScale * 0.65, 0.1)
-
-			local alpha = 255 * math.Clamp(show_image_time / math.max(lobotomy_memory_total, 1), 0, 1)
-			show_image_time = show_image_time - 1
-
-			drawLobotomyFlash(alpha)
-		elseif brainDamaged and show_some_images_time > 0 then
-			brain_motionblur = true
-			DrawMotionBlur(0.035 + brainFlashScale * 0.065, 0.3 + brainFlashScale * 0.7, 0.1)
+	-- Keep the original lobotomy effect self-contained: intermittent material
+	-- overlays only. Head-trauma flashes are handled by their own net event.
+	if brain > 0.1 and not org.otrub then
+		if show_some_images_time > 0 then
 			show_some_images_time = show_some_images_time - 1
-			local flashChance = math.max(12, math.floor(28 - brainFlashScale * 12))
-			if math.random(flashChance) < 2 then
-				local flashDuration = (16 + brainFlashScale * 26) * math.Rand(0.75, 1.2)
-				startLobotomyFlash(flashDuration)
+
+			local flashRoll = math.max(math.floor(10 * (1 - brain)), 1)
+			if show_image_time <= 0 and math.random(flashRoll) < 2 then
+				show_image_time = 75 * math.Rand(0.1, 1) * (math.random(2) == 1 and 0.1 or 1)
+				lobotomy_index = math.random(#lobotomy_mats)
+			end
+
+			if show_image_time > 0 then
+				show_image_time = show_image_time - 1
+				local mat = lobotomy_mats[lobotomy_index]
+				if mat then
+					local rand = 5
+					surface.SetDrawColor(255, 255, 255, 255)
+					surface.SetMaterial(mat)
+					surface.DrawTexturedRect(-math.random(rand), -math.random(rand), ScrW() + math.random(rand), ScrH() + math.random(rand))
+				end
 			end
 		else
-			brain_motionblur = false
-			show_some_images_time = brainDamaged and math.random(1500) < (1 + brainFlashScale * 4) and math.floor(90 + brainFlashScale * 150) or 0
+			show_some_images_time = math.random(1200) < brain * 15 and 250 or 0
 		end
 	else
-		brain_motionblur = false
 		show_image_time = 0
 		show_some_images_time = 0
-		lobotomy_flash_mat = nil
-		if lobotomy_recent_trauma <= CurTime() then
-			lobotomy_recent_trauma_power = 0
-		end
+		lobotomy_index = 0
 	end
 	
 	if O2Lerp > 1 then
@@ -2762,19 +2748,7 @@ net.Receive("headtrauma_flash", function()
 
     -- Scale effects by the received flash duration (which is scaled by damage on the server)
     local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)
-    local traumaPower = math.Clamp(damageScale + (is_critical and 0.55 or 0) + (hasBrainDamage and 0.35 or 0) + (hasConcussion and 0.25 or 0), 0, 1.8)
-    local severeFlash = is_critical or hasBrainDamage
-    if severeFlash then
-        show_some_images_time = 0
-        lobotomy_recent_trauma = CurTime() + math.Clamp(2.5 + traumaPower * 1.5, 3, 5)
-        lobotomy_recent_trauma_power = math.max(lobotomy_recent_trauma_power or 0, traumaPower)
-        if (lobotomy_next_forced_flash or 0) <= CurTime() then
-			startLobotomyFlash(math.floor(16 + traumaPower * 14))
-            lobotomy_next_forced_flash = CurTime() + 5
-        end
-    end
-
-    if hasConcussion then
+	if hasConcussion then
         headtraumaSaturation = math.max(headtraumaSaturation or 0, math.min(time * 9, 10))
     end
 
