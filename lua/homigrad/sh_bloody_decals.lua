@@ -1,84 +1,24 @@
 
 if SERVER then
     util.AddNetworkString("bloody_decal_1")
-    util.AddNetworkString("hg_head_blood_decal")
-    util.AddNetworkString("hg_clear_blood_decals")
+    util.AddNetworkString("bruise_decal")
 
-    local function ApplyHeadBloodDecal(ent)
+    local bruiseDecalCount = 4
+
+    function hg.ApplyBruiseTo(ent, victim, hitPos, hitNormal)
         if not IsValid(ent) then return end
+        if not IsValid(victim) or not victim:IsPlayer() then return end
+        if math.random() > math.Rand(0.65, 0.75) then return end
 
-        net.Start("hg_head_blood_decal")
+        local idx = math.random(bruiseDecalCount)
+        net.Start("bruise_decal")
         net.WriteEntity(ent)
-        net.Broadcast()
+        net.WriteEntity(victim)
+        net.WriteUInt(idx, 4)
+        net.WriteVector(hitPos)
+        net.WriteVector(hitNormal)
+        net.SendPVS(hitPos)
     end
-
-    local bloodDecalReplayLimit = 16
-
-    local function ApplyBloodDecal(ent)
-        if not IsValid(ent) then return end
-
-        net.Start("bloody_decal_1")
-        net.WriteEntity(ent)
-        net.Broadcast()
-    end
-
-    -- Record ordinary hit blood server-side. The visible decal is emitted
-    -- immediately and the compact count lets a new ragdoll rebuild the same
-    -- bloodiness instead of starting clean after an entity swap.
-    function hg.AddOrganismBloodDecal(ply, amount)
-        if not IsValid(ply) then return end
-
-        amount = math.max(math.floor(tonumber(amount) or 1), 1)
-        local oldCount = ply.HG_BloodDecalCount or 0
-        local newCount = math.min(oldCount + amount, bloodDecalReplayLimit)
-        ply.HG_BloodDecalCount = newCount
-
-        local target = hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
-        -- Every wound event gets a visible mark. The compact replay count stays
-        -- capped so a later ragdoll can rebuild the appearance without a large
-        -- network burst, but reaching that cap must not hide subsequent wounds.
-        for i = 1, amount do
-            ApplyBloodDecal(IsValid(target) and target or ply)
-        end
-    end
-
-    local function ReapplyHeadBloodDecal(ply, ragdoll)
-        if not IsValid(ply) then return end
-        if ply.HG_HeadBloodDecal then
-            ApplyHeadBloodDecal(IsValid(ragdoll) and ragdoll or hg.GetCurrentCharacter(ply))
-        end
-    end
-
-    local function ReapplyBloodDecals(ply, ragdoll)
-        if not IsValid(ply) then return end
-
-        local target = IsValid(ragdoll) and ragdoll or hg.GetCurrentCharacter(ply)
-        for i = 1, ply.HG_BloodDecalCount or 0 do
-            ApplyBloodDecal(target)
-        end
-    end
-
-    hook.Add("Fake", "HG_HeadBloodDecal_Fake", function(ply, ragdoll)
-        ReapplyHeadBloodDecal(ply, ragdoll)
-        ReapplyBloodDecals(ply, ragdoll)
-    end)
-
-    hook.Add("RagdollDeath", "HG_HeadBloodDecal_Death", function(ply, ragdoll)
-        ReapplyHeadBloodDecal(ply, ragdoll)
-        ReapplyBloodDecals(ply, ragdoll)
-    end)
-
-    -- Wound marks persist for the whole character life, including water and
-    -- player/fake/death-ragdoll entity swaps. A new spawn is the sole gameplay
-    -- reset for the player's body overlay state.
-    hook.Add("PlayerSpawn", "HG_ResetBloodDecals", function(ply)
-        ply.HG_HeadBloodDecal = nil
-        ply.HG_BloodDecalCount = nil
-
-        net.Start("hg_clear_blood_decals")
-        net.WriteEntity(ply)
-        net.Broadcast()
-    end)
 
     return
 end
@@ -277,16 +217,25 @@ net.Receive("bloody_decal_1", function()
 	end
 end)
 
-net.Receive("hg_head_blood_decal", function()
+local bruiseSizeCvar = CreateClientConVar("hg_bruise_size", "0.04", true, false, "Bruise decal size (world units)", 0.01, 5)
+net.Receive("bruise_decal", function()
 	local ent = net.ReadEntity()
-	if not IsValid(ent) then return end
+	local victim = net.ReadEntity()
+	local idx = net.ReadUInt(4)
+	local pos = net.ReadVector()
+	local normal = net.ReadVector()
+	if not IsValid(ent) or not pos or not normal then return end
 
-	-- Keep a skull wound visible without covering every material in an opaque blood sheet.
-	AddDecalToEnt2(ent, ent:EntIndex(), matBlood, false, nil, nil, nil, 192, 110)
-end)
+	local mat = Material(util.DecalMaterial("Bruise.Add" .. idx))
+	if not mat then return end
 
-net.Receive("hg_clear_blood_decals", function()
-	ClearDecalToEnt(net.ReadEntity())
+	local s = bruiseSizeCvar:GetFloat()
+	local alpha = math.random(80, 180)
+	local col = Color(255, 255, 255, alpha)
+	util.DecalEx(mat, ent, pos + normal, normal, col, s, s)
+	if IsValid(victim) and victim ~= ent then
+		util.DecalEx(mat, victim, pos + normal, normal, col, s, s)
+	end
 end)
 
 --[[

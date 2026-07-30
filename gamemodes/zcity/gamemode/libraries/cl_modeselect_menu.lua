@@ -296,293 +296,451 @@ if CLIENT then
         end
         local dscroll = vgui.Create("DScrollPanel", leftPanel)
         dscroll:Dock(FILL)
-        StyleScroll(dscroll)
-        local queuePanel = vgui.Create("DPanel", body)
-        queuePanel:Dock(FILL)
-        queuePanel:DockMargin(6, 0, 0, 0)
-        queuePanel.Paint = nil
-        CreateCategoryBar(queuePanel, "Round Queue")
-        local btnBar = vgui.Create("DPanel", queuePanel)
-        btnBar:Dock(BOTTOM)
-        btnBar:SetTall(38)
-        btnBar:DockMargin(0, 8, 0, 0)
-        btnBar.Paint = nil
-        local applyBtn = vgui.Create("DButton", btnBar)
-        applyBtn:SetText("Apply Queue")
-        ZcityBUTT(applyBtn, COL_GREEN, COL_GREEN_H)
-        applyBtn.DoClick = function()
-            net.Start("ZB_UpdateRoundList")
-                net.WriteTable(table.Copy(zb.RoundList))
-                net.WriteBool(true)
-            net.SendToServer()
-            chat.AddText(COL_GREEN_H, "Game mode queue has been set!")
-            surface.PlaySound(SND_CLICK)
+        dscroll:DockMargin(5, 5, 5, 5)
+        
+        local modeItems = {}
+        
+        local function UpdateSearch(filter)
+            filter = filter:lower()
+            
+            for _, item in ipairs(modeItems) do
+                local visible = filter == "" or string.find(item.Mode.name:lower(), filter)
+                item:SetVisible(visible)
+            end
+            
+            dscroll:InvalidateLayout()
         end
-        local clearBtn = vgui.Create("DButton", btnBar)
-        clearBtn:SetText("Clear Queue")
-        ZcityBUTT(clearBtn, COL_ACCENT, COL_ACCENT_H)
-        clearBtn.DoClick = function()
-            zb.RoundList = {}
-            frame:QueueUpdate()
-            surface.PlaySound(SND_CLICK)
-            chat.AddText(COL_ORANGE, "Queue cleared (press Apply to save)")
+        
+        searchBar.OnChange = function(self)
+            UpdateSearch(self:GetValue())
         end
-        btnBar.PerformLayout = function(self, w, h)
-            local half = (w - 8) / 2
-            applyBtn:SetPos(0, 0)
-            applyBtn:SetSize(half, h)
-            clearBtn:SetPos(half + 8, 0)
-            clearBtn:SetSize(half, h)
-        end
-        local queueList = vgui.Create("DPanel", queuePanel)
-        queueList:Dock(FILL)
-        queueList.rows = {}
-        queueList.scroll = 0
-        queueList.scrollTarget = 0
-        queueList.dragging = nil
-        queueList.dragIndex = nil
-        queueList.grabDY = 0
-        queueList.Paint = function(self, w, h)
-            if #self.rows == 0 then
-                draw.SimpleText("Queue is empty, modes are picked randomly.", "ZB_QM_Item", 6, 12, COL_TEXT_DIM, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-            end
-        end
-        queueList.PaintOver = function(self, w, h)
-            local contentH = #self.rows * STRIDE
-            if contentH > h + 2 then
-                local barH = math.max(24, h * (h / contentH))
-                local maxScroll = contentH - h
-                local barY = maxScroll > 0 and (self.scroll / maxScroll) * (h - barH) or 0
-                surface.SetDrawColor(0, 0, 0, 60)
-                surface.DrawRect(w - 5, 0, 4, h)
-                surface.SetDrawColor(110, 110, 110, 255)
-                surface.DrawRect(w - 5, barY, 4, barH)
-            end
-        end
-        queueList.OnMouseWheeled = function(self, delta)
-            self.scrollTarget = self.scrollTarget - delta * STRIDE * 0.9
-            return true
-        end
-        queueList.Think = function(self)
-            local h = self:GetTall()
-            local w = self:GetWide()
-            local contentH = #self.rows * STRIDE
-            local maxScroll = math.max(0, contentH - h)
-            if self.dragging and IsValid(self.dragging) then
-                local _, my = self:LocalCursorPos()
-                local desiredY = math.Clamp(my - self.grabDY, -ROW_H * 0.5, h - ROW_H * 0.5)
-                self.dragging.animY = desiredY
-                self.dragging:SetPos(0, desiredY)
-                self.dragging:MoveToFront()
-                local minIndex = ForceActive() and 2 or 1
-                local newIndex = math.Clamp(math.Round((desiredY + self.scroll) / STRIDE) + 1, minIndex, #self.rows)
-                if newIndex ~= self.dragIndex then
-                    local rowObj = table.remove(self.rows, self.dragIndex)
-                    table.insert(self.rows, newIndex, rowObj)
-                    local key = table.remove(zb.RoundList, self.dragIndex)
-                    table.insert(zb.RoundList, newIndex, key)
-                    self.dragIndex = newIndex
-                    surface.PlaySound(SND_HOVER)
-                end
-                if my < 26 then self.scrollTarget = self.scrollTarget - 8 end
-                if my > h - 26 then self.scrollTarget = self.scrollTarget + 8 end
-            end
-            self.scrollTarget = math.Clamp(self.scrollTarget, 0, maxScroll)
-            self.scroll = Lerp(FrameTime() * 12, self.scroll, self.scrollTarget)
-            if math.abs(self.scroll - self.scrollTarget) < 0.4 then self.scroll = self.scrollTarget end
-            for i, row in ipairs(self.rows) do
-                if not IsValid(row) then continue end
-                row.queueIndex = i
-                if row:GetWide() ~= w then row:SetSize(w, ROW_H) end
-
-                local wantCursor = row:IsLocked() and "arrow" or "sizeall"
-                if row.curCursor ~= wantCursor then
-                    row:SetCursor(wantCursor)
-                    row.curCursor = wantCursor
-                end
-                if row ~= self.dragging then
-                    local targetY = (i - 1) * STRIDE - self.scroll
-                    row.animY = Lerp(FrameTime() * 16, row.animY or targetY, targetY)
-                    if math.abs(row.animY - targetY) < 0.4 then row.animY = targetY end
-                    row:SetPos(0, row.animY)
-                end
-            end
-        end
-
-        local function MakeQueueRow(modeKey)
-            local row = vgui.Create("DPanel", queueList)
-            row:SetTall(ROW_H)
-            row:SetCursor("sizeall")
-            row.animY = 0
-            row.Paint = function(self, w, h)
-                local idx = self.queueIndex or 1
-                local isNext = (idx == 1)
-                local forced = isNext and ForceActive()
-                local dragging = (queueList.dragging == self)
-                local bg
-                if dragging then bg = Color(72, 72, 72, 250)
-                elseif forced then bg = Color(62, 52, 34, 235)
-                elseif isNext then bg = Color(50, 62, 46, 235)
-                else bg = self:IsHovered() and COL_ROW_HOV or COL_ROW end
-                surface.SetDrawColor(bg)
-                surface.DrawRect(0, 0, w, h)
-                surface.SetDrawColor(forced and COL_ORANGE or (isNext and COL_GREEN_H or COL_ROWBAR))
-                surface.DrawRect(0, h - 3, w, 3)
-                if forced then
-                    surface.SetDrawColor(COL_ORANGE)
-                    surface.DrawRect(13, h / 2 - 2, 12, 9)
-                    surface.DrawOutlinedRect(15, h / 2 - 8, 8, 8, 2)
-                else
-                    surface.SetDrawColor(dragging and 190 or 110, dragging and 190 or 110, dragging and 190 or 110)
-                    for gy = 0, 2 do
-                        for gx = 0, 1 do
-                            surface.DrawRect(14 + gx * 5, h / 2 - 7 + gy * 6, 3, 3)
-                        end
-                    end
-                end
-                local label = isNext and (forced and "FORCE" or "NEXT") or ("#" .. idx)
-                local lcol = forced and COL_ORANGE or (isNext and COL_GREEN_H or COL_TEXT_DIM)
-                draw.SimpleText(label, "ZB_QM_Small", 34, h / 2, lcol, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-                draw.SimpleText(GetModeName(modeKey), "ZB_QM_Item", 92, h / 2, COL_TEXT, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-                if dragging then
-                    surface.SetDrawColor(COL_GREEN_H)
-                    surface.DrawOutlinedRect(0, 0, w, h, 2)
-                end
-            end
-            row.IsLocked = function(self)
-                return ForceActive() and (self.queueIndex or 1) == 1
-            end
-            row.OnMousePressed = function(self, code)
-                if code ~= MOUSE_LEFT then return end
-                if self:IsLocked() then
-                    surface.PlaySound(SND_RELEASE)
-                    return
-                end
-                queueList.dragging = self
-                queueList.dragIndex = self.queueIndex
-                local _, my = queueList:LocalCursorPos()
-                queueList.grabDY = my - self.animY
-                self:MouseCapture(true)
-                surface.PlaySound(SND_CLICK)
-            end
-            row.OnMouseReleased = function(self, code)
-                if queueList.dragging == self then
-                    queueList.dragging = nil
-                    queueList.dragIndex = nil
-                    self:MouseCapture(false)
-                    surface.PlaySound(SND_RELEASE)
-                end
-            end
-            local removeBtn = vgui.Create("DButton", row)
-            removeBtn:SetWide(30)
-            removeBtn:Dock(RIGHT)
-            removeBtn:DockMargin(4, 9, 12, 9)
-            removeBtn:SetText("✕") --;; fuck images
-            removeBtn:SetCursor("hand")
-            ZcityBUTT(removeBtn, COL_ACCENT, COL_ACCENT_H)
-            removeBtn.Think = function(self)
-                self:SetVisible(not row:IsLocked())
-            end
-            removeBtn.DoClick = function()
-                if row:IsLocked() then return end
-                table.remove(zb.RoundList, row.queueIndex or 1)
-                frame:QueueUpdate()
-            end
-            return row
-        end
-
+        
         local allowedModes = {
-            ["tdm"] = true, ["cstrike"] = true, ["hmcd"] = true,
-            ["hl2dm"] = true, ["riot"] = true, ["gwars"] = true,
+            ["tdm"] = true,
+            ["cstrike"] = true,
+            ["hmcd"] = true,
+            ["hl2dm"] = true,
+            ["riot"] = true,
+            ["gwars"] = true,
             ["criresp"] = true,
         }
+        
+        for i, mode in SortedPairsByMemberValue(zb.availableModes,"canlaunch",true) do
+            if !LocalPlayer():IsSuperAdmin() and !allowedModes[mode.key] then continue end
+            
+            local modeBtn = CreateModeItem(dscroll, mode)
+            table.insert(modeItems, modeBtn)
+            
+            modeBtn:SetCursor("hand")
+            modeBtn:SetTooltip("Click to select/unselect mode")
+            
+            local inQueue = false
+            for _, queuedModeKey in ipairs(zb.RoundList) do
+                if queuedModeKey == mode.key then
+                    inQueue = true
+                    break
+                end
+            end
 
-        function frame:RebuildModes()
-            dscroll:Clear()
-            local filter = (IsValid(searchBar) and searchBar:GetValue() or ""):lower()
-            for i, mode in SortedPairsByMemberValue(zb.availableModes, "canlaunch", true) do
-                if not LocalPlayer():IsSuperAdmin() and not allowedModes[mode.key] then continue end
-                if filter ~= "" and not string.find(mode.name:lower(), filter, 1, true) then continue end
-                CreateAvailableRow(dscroll, mode, self)
+            local indicator = vgui.Create("DPanel", modeBtn)
+            indicator:SetSize(16, 7)
+            indicator:SetPos(8, 4)
+            indicator.IndiColor = Color(0, 0, 0, 0)
+            indicator.Paint = function(self, w, h)
+                draw.RoundedBox(0, 0, 0, w, h, indicator.IndiColor)
+            end
+
+            if mode.canlaunch == 1 then
+                indicator.IndiColor = Color(0,255,34)
+                indicator:SetTooltip("This mode can launch")
+            end
+
+            if inQueue then
+                indicator.IndiColor = Color(255, 155, 0, 255)
+                indicator:SetTooltip("This mode is already in queue")
+            end
+     
+            if mode.canlaunch == 0 then
+                indicator.IndiColor = Color(255,0,0,255)
+                indicator:SetTooltip("This mode can't launch")
+            end
+            
+            if command == "setmode" or command == "setforcemode" then
+                local selectBtn = vgui.Create("DButton", modeBtn)
+                selectBtn:SetSize(80, 26)
+                selectBtn:Dock(RIGHT)
+                selectBtn:DockMargin(5, 7, 5, 7)
+                selectBtn:SetText("Select")
+                selectBtn.DoClick = function()
+                    net.Start("AdminSetGameMode")
+                    net.WriteString(command)
+                    net.WriteString(mode.key)
+                    net.WriteBool(false) 
+                    net.SendToServer()
+                    frame:Close()
+                end
+            end
+        end
+        
+
+        local batchPanel = vgui.Create("DPanel", leftPanel)
+        batchPanel:Dock(BOTTOM)
+        batchPanel:DockMargin(5, 5, 5, 5)
+        batchPanel:SetTall(80)
+        StyleElement(batchPanel, Color(40, 40, 40, 200))
+        
+        local batchTitle = vgui.Create("DLabel", batchPanel)
+        batchTitle:SetText("Batch Operations")
+        batchTitle:SetFont("DermaDefaultBold")
+        batchTitle:SetTextColor(Color(255, 255, 255))
+        batchTitle:Dock(TOP)
+        batchTitle:DockMargin(0, 5, 0, 5)
+        batchTitle:SetContentAlignment(5)
+        
+        local addToQueueBtn = vgui.Create("DButton", batchPanel)
+        addToQueueBtn:SetText("Add Selected to Beginning of Queue")
+        addToQueueBtn:Dock(TOP)
+        addToQueueBtn:DockMargin(5, 0, 5, 5)
+        addToQueueBtn:SetTall(26)
+        addToQueueBtn.DoClick = function()
+            local selectedCount = 0
+            
+            local selectedKeys = {}
+            for key, selected in pairs(selectedModes) do
+                if selected then
+                    table.insert(selectedKeys, 1, key) 
+                    selectedCount = selectedCount + 1
+                end
+            end
+            
+            for i = 1, #selectedKeys do
+                table.insert(zb.RoundList, 1, selectedKeys[i])
+            end
+            
+            if selectedCount > 0 then
+                queuePanel:QueueUpdate()
+                
+                /*net.Start("ZB_UpdateRoundList")
+                    net.WriteTable(zb.RoundList)
+                    net.WriteBool(false)
+                net.SendToServer()*/
+                
+                chat.AddText(Color(0, 255, 0), "Added " .. selectedCount .. " modes to beginning of queue!")
+                
+                selectedModes = {}
+                for _, item in ipairs(modeItems) do
+                    item.Selected = false
+                end
+            else
+                chat.AddText(Color(255, 0, 0), "No modes selected!")
+            end
+        end
+        
+        local addToEndBtn = vgui.Create("DButton", batchPanel)
+        addToEndBtn:SetText("Add Selected to End of Queue")
+        addToEndBtn:Dock(TOP)
+        addToEndBtn:DockMargin(5, 0, 5, 0)
+        addToEndBtn:SetTall(26)
+        addToEndBtn.DoClick = function()
+            local selectedCount = 0
+            
+            for key, selected in pairs(selectedModes) do
+                if selected then
+                    table.insert(zb.RoundList, key)
+                    selectedCount = selectedCount + 1
+                end
+            end
+            
+            if selectedCount > 0 then
+                queuePanel:QueueUpdate()
+                
+                /*net.Start("ZB_UpdateRoundList")
+                    net.WriteTable(zb.RoundList)
+                    net.WriteBool(false)
+                net.SendToServer()*/
+                
+                chat.AddText(Color(0, 255, 0), "Added " .. selectedCount .. " modes to end of queue!")
+                
+
+                selectedModes = {}
+                for _, item in ipairs(modeItems) do
+                    item.Selected = false
+                end
+            else
+                chat.AddText(Color(255, 0, 0), "No modes selected!")
+            end
+        end
+        
+        local refreshBtn = vgui.Create("DButton", leftPanel)
+        refreshBtn:SetText("Refresh Data")
+        refreshBtn:Dock(BOTTOM)
+        refreshBtn:DockMargin(5, 5, 5, 5)
+        refreshBtn:SetTall(30)
+        refreshBtn.DoClick = function()
+            net.Start("ZB_RequestRoundList")
+            net.SendToServer()
+        end
+        
+        timer.Create("QueueAutoRefresh", 5, 0, function()
+            if IsValid(frame) then
+                //net.Start("ZB_RequestRoundList")
+                //net.SendToServer()
+            else
+                timer.Remove("QueueAutoRefresh")
+            end
+        end)
+        
+        frame.OnClose = function()
+            timer.Remove("QueueAutoRefresh")
+            queuePanelInstance = nil
+        end
+        
+        net.Start("ZB_RequestRoundList")
+        net.SendToServer()
+    end
+
+    local statsPanelInstance = nil
+    local adminStatsRows = {}
+
+    net.Receive("ZB_AdminStatsSend", function()
+        adminStatsRows = net.ReadTable() or {}
+
+        if IsValid(statsPanelInstance) and statsPanelInstance.RefreshRows then
+            statsPanelInstance:RefreshRows()
+        end
+    end)
+
+    local function OpenPlayerStatsMenu()
+        if not LocalPlayer():IsSuperAdmin() then return end
+        if IsValid(statsPanelInstance) then return end
+
+        local frame = vgui.Create("ZFrame")
+        statsPanelInstance = frame
+        frame:SetSize(900, 560)
+        frame:Center()
+        frame:SetTitle("Player SQL Stats")
+        frame:MakePopup()
+
+        local topPanel = vgui.Create("DPanel", frame)
+        topPanel:Dock(TOP)
+        topPanel:SetTall(35)
+        topPanel:DockMargin(5, 5, 5, 5)
+
+        local search = vgui.Create("DTextEntry", topPanel)
+        search:Dock(FILL)
+        search:SetPlaceholderText("Search name or SteamID64")
+
+        local refreshBtn = vgui.Create("DButton", topPanel)
+        refreshBtn:Dock(RIGHT)
+        refreshBtn:SetWide(100)
+        refreshBtn:SetText("Refresh")
+        StyleElement(refreshBtn)
+
+        local leftPanel = vgui.Create("DPanel", frame)
+        leftPanel:Dock(LEFT)
+        leftPanel:SetWide(350)
+        leftPanel:DockMargin(5, 0, 5, 5)
+
+        local list = vgui.Create("DListView", leftPanel)
+        list:Dock(FILL)
+        list:AddColumn("Player")
+        list:AddColumn("SteamID64")
+        list:AddColumn("Status")
+
+        local rightPanel = vgui.Create("DScrollPanel", frame)
+        rightPanel:Dock(FILL)
+        rightPanel:DockMargin(0, 0, 5, 5)
+
+        local selectedRow
+        local entries = {}
+        local achievementEntries = {}
+
+        local function AddEntry(parent, label, key, value)
+            local row = vgui.Create("DPanel", parent)
+            row:Dock(TOP)
+            row:SetTall(28)
+            row:DockMargin(0, 0, 0, 4)
+
+            local title = vgui.Create("DLabel", row)
+            title:Dock(LEFT)
+            title:SetWide(110)
+            title:SetText(label)
+            title:SetTextColor(Color(255, 255, 255))
+
+            local entry = vgui.Create("DTextEntry", row)
+            entry:Dock(FILL)
+            entry:SetText(tostring(value or 0))
+
+            entries[key] = entry
+        end
+
+        local function AddAchievementEntry(parent, key, value)
+            local row = vgui.Create("DPanel", parent)
+            row:Dock(TOP)
+            row:SetTall(28)
+            row:DockMargin(0, 0, 0, 4)
+
+            local title = vgui.Create("DLabel", row)
+            title:Dock(LEFT)
+            title:SetWide(110)
+            title:SetText(key)
+            title:SetTextColor(Color(255, 255, 255))
+
+            local entry = vgui.Create("DTextEntry", row)
+            entry:Dock(FILL)
+            entry:SetText(tostring(value or 0))
+
+            achievementEntries[key] = entry
+        end
+
+        local function ShowPlayer(row)
+            selectedRow = row
+            entries = {}
+            achievementEntries = {}
+            rightPanel:Clear()
+
+            if not row then return end
+
+            local title = vgui.Create("DLabel", rightPanel)
+            title:Dock(TOP)
+            title:SetTall(32)
+            title:SetFont("DermaDefaultBold")
+            title:SetText(row.name .. " | " .. row.steamid .. (row.active and " | ACTIVE" or ""))
+            title:SetTextColor(Color(255, 255, 255))
+
+            AddEntry(rightPanel, "XP", "experience", row.experience)
+            AddEntry(rightPanel, "Skill", "skill", row.skill)
+            AddEntry(rightPanel, "Deaths", "deaths", row.deaths)
+            AddEntry(rightPanel, "Kills", "kills", row.kills)
+            AddEntry(rightPanel, "Suicides", "suicides", row.suicides)
+            AddEntry(rightPanel, "Headshots", "headshots", row.headshots)
+            AddEntry(rightPanel, "Karma", "karma", row.karma)
+
+            local achTitle = vgui.Create("DLabel", rightPanel)
+            achTitle:Dock(TOP)
+            achTitle:SetTall(28)
+            achTitle:SetFont("DermaDefaultBold")
+            achTitle:SetText("Achievements")
+            achTitle:SetTextColor(Color(255, 255, 255))
+
+            for key, value in SortedPairs(row.achievements or {}) do
+                AddAchievementEntry(rightPanel, key, value)
+            end
+
+            local saveBtn = vgui.Create("DButton", rightPanel)
+            saveBtn:Dock(TOP)
+            saveBtn:SetTall(34)
+            saveBtn:DockMargin(0, 8, 0, 0)
+            saveBtn:SetText("Save Stats")
+            StyleElement(saveBtn)
+            saveBtn.DoClick = function()
+                if not selectedRow then return end
+
+                local data = {name = selectedRow.name, achievements = {}}
+                for key, entry in pairs(entries) do
+                    data[key] = tonumber(entry:GetText()) or 0
+                end
+
+                for key, entry in pairs(achievementEntries) do
+                    data.achievements[key] = tonumber(entry:GetText()) or 0
+                end
+
+                net.Start("ZB_AdminStatsSave")
+                    net.WriteString(selectedRow.steamid)
+                    net.WriteTable(data)
+                net.SendToServer()
             end
         end
 
-        function frame:QueueUpdate()
-            for _, r in ipairs(queueList.rows) do
-                if IsValid(r) then r:Remove() end
+        function frame:RefreshRows()
+            local needle = search:GetText():lower()
+            list:Clear()
+
+            for _, row in ipairs(adminStatsRows) do
+                local name = tostring(row.name or "Unknown")
+                local steamID64 = tostring(row.steamid or "")
+
+                if needle == "" or name:lower():find(needle, 1, true) or steamID64:find(needle, 1, true) then
+                    local line = list:AddLine(name, steamID64, row.active and "Online" or "Offline")
+                    line.RowData = row
+                end
             end
-            queueList.rows = {}
-            queueList.dragging = nil
-            queueList.dragIndex = nil
-            local w = queueList:GetWide()
-            for idx, modeKey in ipairs(zb.RoundList) do
-                local row = MakeQueueRow(modeKey)
-                row.queueIndex = idx
-                row.animY = (idx - 1) * STRIDE - queueList.scroll
-                row:SetSize(w, ROW_H)
-                row:SetPos(0, row.animY)
-                queueList.rows[idx] = row
-            end
-            local maxScroll = math.max(0, #zb.RoundList * STRIDE - queueList:GetTall())
-            queueList.scrollTarget = math.Clamp(queueList.scrollTarget, 0, maxScroll)
         end
 
-        searchBar.OnChange = function()
-            frame:RebuildModes()
+        list.OnRowSelected = function(panel, index, line)
+            ShowPlayer(line.RowData)
         end
 
-        frame:RebuildModes()
-        frame:QueueUpdate()
+        search.OnValueChange = function()
+            frame:RefreshRows()
+        end
+
+        refreshBtn.DoClick = function()
+            net.Start("ZB_AdminStatsRequest")
+            net.SendToServer()
+        end
 
         frame.OnClose = function()
-            queueManagerInstance = nil
+            statsPanelInstance = nil
         end
 
-        net.Start("ZB_RequestRoundList")
+        net.Start("ZB_AdminStatsRequest")
         net.SendToServer()
     end
 
     local function OpenAdminMenu()
         if IsValid(isMenuOpen) then return end
-        local frame = vgui.Create("ZFrame")
-        isMenuOpen = frame
-        frame:SetSize(400, 200)
+
+        isMenuOpen = vgui.Create("ZFrame")
+        local frame = isMenuOpen
+        frame:SetSize(300, 252)
         frame:Center()
         frame:SetTitle("")
         frame:SetDraggable(true)
         frame:ShowCloseButton(false)
         frame:SetBorder(false)
         frame:MakePopup()
-        frame.Paint = DrawFrameBG
-        local content = MakeContent(frame)
-        local header = vgui.Create("DPanel", content)
-        header:Dock(TOP)
-        header:SetTall(42)
-        header:DockMargin(0, 0, 0, 12)
-        header.Paint = function(self, w, h)
-            surface.SetDrawColor(COL_CAT)
-            surface.DrawRect(0, 0, w, h)
-            surface.SetDrawColor(COL_CATBAR)
-            surface.DrawRect(0, h - 5, w, 5)
-            draw.SimpleText("Admin Panel", "ZB_QM_Title", w / 2, h / 2 - 2, COL_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+        local setModeBtn = vgui.Create("DButton", frame)
+        setModeBtn:SetText("Set Next Mode")
+        setModeBtn:Dock(TOP)
+        setModeBtn:DockMargin(5, 10, 5, 2)
+        setModeBtn:SetSize(300, 40)
+        StyleElement(setModeBtn)
+        setModeBtn.DoClick = function()
+            OpenModeSelection("setmode") 
         end
-        AddCloseButton(header, frame)
-        local function BigButton(text, base, hover)
-            local btn = vgui.Create("DButton", content)
-            btn:Dock(TOP)
-            btn:DockMargin(14, 0, 14, 12)
-            btn:SetTall(52)
-            btn:SetText(text)
-            btn:SetFont("ZB_QM_Category")
-            btn:SetTextColor(COL_TEXT)
-            btn.OnCursorEntered = function() surface.PlaySound(SND_HOVER) end
-            btn.Paint = function(self, w, h)
-                surface.SetDrawColor(self:IsHovered() and hover or base)
-                surface.DrawRect(0, 0, w, h)
-                surface.SetDrawColor(0, 0, 0, 55)
-                surface.DrawRect(0, h - 3, w, 3)
+
+        local setForceModeBtn = vgui.Create("DButton", frame)
+        setForceModeBtn:SetText("Set Auto Next Mode")
+        setForceModeBtn:Dock(TOP)
+        setForceModeBtn:DockMargin(5, 2, 5, 2)
+        setForceModeBtn:SetSize(300, 40)
+        StyleElement(setForceModeBtn)
+        setForceModeBtn.DoClick = function()
+            OpenModeSelection("setforcemode")
+        end
+        
+        local queueModeBtn = vgui.Create("DButton", frame)
+        queueModeBtn:SetText("Manage Game Mode Queue")
+        queueModeBtn:Dock(TOP)
+        queueModeBtn:DockMargin(5, 2, 5, 2)
+        queueModeBtn:SetSize(300, 40)
+        StyleElement(queueModeBtn)
+        queueModeBtn.DoClick = function()
+            OpenModeSelection("queue")
+        end
+
+        if LocalPlayer():IsSuperAdmin() then
+            local statsBtn = vgui.Create("DButton", frame)
+            statsBtn:SetText("Player SQL Stats")
+            statsBtn:Dock(TOP)
+            statsBtn:DockMargin(5, 2, 5, 2)
+            statsBtn:SetSize(300, 40)
+            StyleElement(statsBtn)
+            statsBtn.DoClick = function()
+                OpenPlayerStatsMenu()
             end
-            return btn
         end
 
         local manageBtn = BigButton("Manage Game Mode Queue", COL_ROW, COL_ROW_HOV)

@@ -17,7 +17,6 @@ local head_otrub_consciousness_cap = 0.04
 local brain_exposure_partial = 0.6
 local brain_exposure_full = 1
 local instant_pain_shock_scale = 0.75
-local goodmood_damage_max_bonus = 0.05
 local player_limb_gib_threshold = 130
 local player_head_gib_threshold = 140
 local player_stomach_gib_threshold = 260

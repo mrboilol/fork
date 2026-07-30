@@ -136,9 +136,9 @@ module[2] = function(owner, org, timeValue)
 
 		--print(velLen)
 		if (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isJogging and org.stamina[1] > 20 then
-			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 0.6 -- Jogging uses less
+			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.1 
 		elseif (owner:OnGround() or owner:WaterLevel() >= 2) and walk and not owner:InVehicle() and owner.hg_isSprinting and org.stamina[1] > 20 then
-			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.10 -- Sprinting uses more
+			stamina.sub = (owner:WaterLevel() >= 2 and 2 or 1) * (velLen ^ 0.5) * 1.51 
 		end
 
 	end
@@ -215,7 +215,7 @@ module[2] = function(owner, org, timeValue)
 	local staminaDrainMul = Lerp(lowStamina, 1, low_stamina_drain_max_mul)
 	local staminaRecoveryMul = Lerp(lowStamina, 1, low_stamina_recovery_min_mul)
 	local staminaBeforeDrain = stamina[1]
-	stamina[1] = max(stamina[1] - stamina.sub * staminaDrainMul * timeValue * 8 * (2 - (org.o2[1] / org.o2.range)), 0)
+	stamina[1] = max(stamina[1] - stamina.sub * staminaDrainMul * timeValue * 12 * (2 - (org.o2[1] / org.o2.range)), 0)
 	if staminaBeforeDrain - stamina[1] > 0.01 then
 		stamina.recoveryPenaltyUntil = CurTime() + recent_stamina_loss_hold_time
 		stamina.recoveryPenaltyFadeUntil = stamina.recoveryPenaltyUntil + recent_stamina_loss_fade_time

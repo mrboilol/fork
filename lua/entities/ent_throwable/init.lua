@@ -70,8 +70,17 @@ function ENT:PhysicsCollide(data, phys)
 
 	if data.HitEntity.organism then
 		self:EmitSound(self.AttackHitFlesh, 65)
-	elseif self.AttackHit then
-		self:EmitSound(self.AttackHit, 65)
+
+		if (self.DamageType or DMG_SLASH) == DMG_CLUB then
+			if data.HitEntity:IsPlayer() then
+				hg.ApplyBruiseTo(data.HitEntity, data.HitEntity, data.HitPos, data.HitNormal)
+			elseif data.HitEntity:GetClass() == "prop_ragdoll" then
+				local ragOwner = hg.RagdollOwner(data.HitEntity)
+				if IsValid(ragOwner) and ragOwner:IsPlayer() then
+					hg.ApplyBruiseTo(data.HitEntity, ragOwner, data.HitPos, data.HitNormal)
+				end
+			end
+		end
 	end
 
 	if (data.HitEntity.organism) and ((self.DamageType or DMG_SLASH) == DMG_SLASH) and !self.shouldntlodge then
