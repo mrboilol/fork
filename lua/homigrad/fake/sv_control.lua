@@ -2833,7 +2833,6 @@ hook.Add("Think", "Fake", function()
 
 				end
 			end
-			end
 		else
 			clearSlideState(ragdoll)
 			ragdoll.isDropkicking = false

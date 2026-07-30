@@ -1369,7 +1369,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull)
 				local particleInterval = Lerp(intensity, 4.5, 0.22)
 				
-				if wound[5] + beatsPerSecond < time then
+				if (wound[5] or 0) < time then
 					local bone = wound[4]
 					local boneID = wound[8]
 					if not boneID or ent:GetBoneName(boneID) != bone then
