@@ -279,11 +279,8 @@ module[2] = function(owner, org, mulTime)
 		local satietyMultiplier = 0.75 + math.Clamp((org.satiety or 0) / 100, 0, 1) * 0.25
 		local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
 		local goodmoodBonus = 1 + goodmood * 0.1
-		-- Normal MAP is 93 in the cardiovascular model.  Use that same reference
-		-- here so healthy circulation does not receive an unintended regeneration
-		-- penalty while high pressure cannot turn regeneration into a fast refill.
-		local pressurePerfusion = math.Clamp((org.bloodpressure or 93) / 93, 0.05, 1)
-		local regenerationRate = 0.3 * highHeartRateBoost * adrenalineBoost * satietyMultiplier * org.blood_regeneration_multiplier * pressurePerfusion * recoveryRamp * goodmoodBonus
+		local circulationPerfusion = math.Clamp(1 - (org.hypotension or 0), 0.05, 1)
+		local regenerationRate = 0.3 * highHeartRateBoost * adrenalineBoost * satietyMultiplier * org.blood_regeneration_multiplier * circulationPerfusion * recoveryRamp * goodmoodBonus
 		org.blood = min(org.blood + mulTime * regenerationRate, 5000)
 	end
 

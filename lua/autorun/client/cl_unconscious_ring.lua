@@ -826,7 +826,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
         or (org.heart and org.heart > 0.6)
         or (org.blood and org.blood < 3000)
         or (org.o2 and org.o2[1] and org.o2[1] < 10)
-        or (org.bloodpressure and org.bloodpressure < 50)
+        or (org.hypotension and org.hypotension > 0.55)
         or brainHemorrhage >= 0.25
         or (heartbeat < 30 or heartbeat > 170)
     
@@ -1047,7 +1047,6 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             local target_heartbeat = target_org.heartbeat or 75
             local target_pulse = target_org.pulse or 70
             local target_ecgState = target_org.ecgState or "normal_sinus"
-            local target_bp = target_org.bloodpressure or 93
             local target_brain = target_org.brain or 0
             local target_hemorrhage = target_org.brainHemorrhage or 0
             local target_isCritical = (target_org.critical == true) or (target_heartbeat < 1 and target_brain >= 0.02) or (target_brain > 0.4) or (target_hemorrhage >= 0.4)

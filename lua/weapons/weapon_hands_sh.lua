@@ -1319,8 +1319,8 @@ local function buildPerfusionDiagnosis(org, countedBPM)
 	if not org then return nil end
 	local messages = {}
 	local pulse = countedBPM or tonumber(org.pulse) or tonumber(org.heartbeat) or 0
-	local pressure = tonumber(org.bloodpressure) or 0
-	local perfusion = math.Clamp(tonumber(org.perfusion) or math.Clamp(pressure / 93, 0, 1), 0, 1)
+	local hypotension = math.Clamp(tonumber(org.hypotension) or 0, 0, 1)
+	local perfusion = math.Clamp(tonumber(org.perfusion) or (1 - hypotension), 0, 1)
 	local peripheral = math.Clamp(tonumber(org.peripheralperfusion) or perfusion, 0, 1)
 	local brainoxygen = math.Clamp(tonumber(org.brainoxygen) or perfusion, 0, 1)
 	local cerebral = math.Clamp(tonumber(org.cerebralPerfusion) or perfusion, 0, 1)
@@ -1329,17 +1329,17 @@ local function buildPerfusionDiagnosis(org, countedBPM)
 	local shock = tonumber(org.shock) or 0
 	local brainDamage = math.Clamp(tonumber(org.brain) or 0, 0, 1)
 
-	if pulse >= 105 and (pressure < 55 or perfusion < 0.5 or shock > 20) then
+	if pulse >= 105 and (hypotension > 0.5 or perfusion < 0.5 or shock > 20) then
 		messages[#messages + 1] = "Pulse is fast and weak."
-	elseif pulse > 0 and pulse <= 45 and pressure < 60 then
+	elseif pulse > 0 and pulse <= 45 and hypotension > 0.42 then
 		messages[#messages + 1] = "Pulse is slow and weak."
-	elseif pulse > 0 and pressure < 38 then
+	elseif pulse > 0 and hypotension > 0.74 then
 		messages[#messages + 1] = "Pulse is weak."
 	end
 	if peripheral < 0.45 or (org.blood or 5000) < 3500 then messages[#messages + 1] = "Skin is pale and cold." end
-	if shock > 35 or perfusion < 0.35 or pressure < 35 then messages[#messages + 1] = "They are in shock." end
-	if peripheral < 0.24 and pressure > 11 and pulse > 18 then messages[#messages + 1] = "No radial pulse, but carotid pulse is present." end
-	if pressure < 25 or perfusion < 0.22 or arterial > 3 or venous > 12 then messages[#messages + 1] = "Blood pressure is crashing." end
+	if shock > 35 or perfusion < 0.35 or hypotension > 0.78 then messages[#messages + 1] = "They are in shock." end
+	if peripheral < 0.24 and hypotension < 0.99 and pulse > 18 then messages[#messages + 1] = "No radial pulse, but carotid pulse is present." end
+	if hypotension > 0.92 or perfusion < 0.22 or arterial > 3 or venous > 12 then messages[#messages + 1] = "Circulation is crashing." end
 	if arterial > 0.5 then messages[#messages + 1] = "Active arterial bleeding needs immediate control." elseif venous > 4 then messages[#messages + 1] = "They have significant venous bleeding." end
 	if org.throatcut then messages[#messages + 1] = "Their throat is cut; control the neck bleeding and airway." end
 	if brainDamage > 0.3 then
@@ -1730,9 +1730,8 @@ function SWEP:ApplyForce()
 							-- Much better pulse restoration - works even from 0
 							org.pulse = math.min(org.pulse + 15 * skillMult, 70)
 							
-							-- Blood pressure restoration
-							local targetBP = org.pulse * 1.2
-							org.bloodpressure = math.Approach(org.bloodpressure or 0, targetBP, 3 * skillMult)
+							-- Chest compressions temporarily improve hypotension.
+							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)
 							
 							-- CO removal
 							org.CO = math.Approach(org.CO, 0, skillMult)
@@ -1773,7 +1772,7 @@ function SWEP:ApplyForce()
 								org._zeroO2Time = 0
 								org.heartbeat = math.Clamp(org.heartbeat > 0 and org.heartbeat or 90, 80, 140)
 								org.pulse = math.max(org.pulse or 0, 35)
-								org.bloodpressure = math.max(org.bloodpressure or 0, 55)
+								org.hypotension = math.min(org.hypotension or 1, 0.5)
 								org.o2[1] = math.max(org.o2[1], 8)
 							end
 

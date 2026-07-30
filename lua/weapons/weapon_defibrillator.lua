@@ -367,13 +367,13 @@ local function ApplyAEDShock(org)
 		org.heartstop = false
 		org.heartbeat = math.Clamp(org.heartbeat or 70, 55, 90)
 		org.pulse = math.max(org.pulse or 0, 45)
-		org.bloodPressure = math.max(org.bloodPressure or 0, 65)
+		org.hypotension = math.min(org.hypotension or 1, 0.35)
 		org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.35)
 	else
 		org.heartstop = true
 		org.heartbeat = 0
 		org.pulse = 0
-		org.bloodPressure = math.max(org.bloodPressure or 0, 35)
+		org.hypotension = math.min(org.hypotension or 1, 0.8)
 		org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.2)
 	end
 

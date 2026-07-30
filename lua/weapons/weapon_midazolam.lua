@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Midazolam Autoinjector"
-SWEP.Instructions = "Stops seizures. Must be administered to someone else."
+SWEP.Instructions = "Stops and temporarily prevents seizures while slightly reducing brain damage. Must be administered to someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1
@@ -68,6 +68,8 @@ end
 
 if SERVER then
 	util.AddNetworkString("rem_midazolam_seizure")
+	local midazolamBrainHealing = 0.015
+	local midazolamSeizureProtection = 120
 
 	function SWEP:Heal(ent, mode)
 		local org = ent.organism
@@ -79,7 +81,6 @@ if SERVER then
 		if org.owner == owner then return end
 
 		local victim = org.owner
-		local victimDeaths = victim:Deaths()
 
 		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
 			self:SetHolding(math.min(self:GetHolding() + 4, 100))
@@ -90,36 +91,29 @@ if SERVER then
 		local entOwner = IsValid(org.owner.FakeRagdoll) and org.owner.FakeRagdoll or org.owner
 		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
 
-		if org.seizureActive then
-			org.seizureEnd = math.max(org.seizureEnd or 0, CurTime() + 16)
+		local wasSeizing = org.seizureActive == true
+		org.brain = math.max((org.brain or 0) - midazolamBrainHealing, 0)
+		org.lastSeizureBrain = org.brain
+
+		if hg.organism.SuppressSeizure then
+			hg.organism.SuppressSeizure(org, midazolamSeizureProtection)
+		else
+			org.seizure = 0
+			org.seizureActive = false
+			org.seizureStart = 0
+			org.seizureEnd = 0
+			org.nextSeizureSpasm = 0
+			org.seizureSuppressedUntil = CurTime() + midazolamSeizureProtection
+		end
+
+		if wasSeizing then
 			net.Start("rem_midazolam_seizure")
 			net.Send(victim)
-
-			timer.Simple(15, function()
-				if not IsValid(victim) or not victim:Alive() or victim:Deaths() ~= victimDeaths or victim.organism ~= org then return end
-				org.seizure = 0
-				org.seizureActive = false
-				org.seizureStart = 0
-				org.seizureEnd = 0
-				org.nextSeizureSpasm = 0
-				org.consciousness = 0
-				victim.fakecd = 0
-				victim.fullsend = true
-				if hg.send_organism then hg.send_organism(org, victim) end
-			end)
-		else
-			for i = 1, 12 do
-				timer.Simple(i * 2, function()
-					if not IsValid(victim) or not victim:Alive() or victim:Deaths() ~= victimDeaths or victim.organism ~= org then return end
-					local frac = i / 12
-					org.bloodPressure = math.min(org.bloodPressure or 90, Lerp(frac, 90, 18))
-					org.pulse = math.min(org.pulse or 70, Lerp(frac, 70, 18))
-					org.hypotension = math.max(org.hypotension or 0, frac)
-					if org.o2 then org.o2[1] = math.min(org.o2[1] or 30, Lerp(frac, 30, 4)) end
-					if i == 12 and hg.organism.StartFibrillation then hg.organism.StartFibrillation(org) end
-				end)
-			end
 		end
+
+		victim.fakecd = 0
+		victim.fullsend = true
+		if hg.send_organism then hg.send_organism(org, victim) end
 
 		self.modeValues[1] = 0
 

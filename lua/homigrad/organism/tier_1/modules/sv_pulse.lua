@@ -1,4 +1,4 @@
-local min, max, Round, halfValue2 = math.min, math.max, math.Round, util.halfValue2
+local min, max, halfValue2 = math.min, math.max, util.halfValue2
 --local Organism = hg.organism
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
@@ -32,7 +32,7 @@ local peaDuration = 6
 
 local function getPalpitationThreat(org, blood, o2Value)
 	local lowBlood = math.Clamp((4500 - blood) / 2500, 0, 1)
-	local lowPressure = math.Clamp((65 - (org.bloodpressure or 93)) / 40, 0, 1)
+	local lowCirculation = math.Clamp(org.hypotension or 0, 0, 1)
 	local hypoxia = math.Clamp((12 - o2Value) / 12, 0, 1)
 	local shock = math.Clamp((org.shock or 0) / 60, 0, 1)
 	local heartDamage = math.Clamp(org.heart or 0, 0, 1)
@@ -41,7 +41,7 @@ local function getPalpitationThreat(org, blood, o2Value)
 		math.Clamp(((org.temperature or 36.7) - 39) / 3, 0, 1)
 	)
 
-	return math.max(lowBlood, lowPressure, hypoxia, shock, heartDamage, temperatureStress)
+	return math.max(lowBlood, lowCirculation, hypoxia, shock, heartDamage, temperatureStress)
 end
 
 local function interpolateCurve(curve, value)
@@ -183,13 +183,7 @@ module[1] = function(org)
 	org.palpitationTreatmentUntil = 0
 	org.cardiacArrestStart = nil
 	org.cardiacArrestO2Start = nil
-	org.bloodpressure = 93
-	org.systolic = 120
-	org.diastolic = 80
 	org.heartbeat = 70
-	org.bloodPressure = 93
-	org.systolic = 120
-	org.diastolic = 80
 	org.cardiacOutput = 1
 	org.arrhythmia = 0
 	org.fibrillation = false
@@ -243,10 +237,8 @@ module[2] = function(owner, org, timeValue)
 			org.heartstop = true
 			org.heartbeat = 0
 			org.pulse = 0
-			org.bloodpressure = 0
-			org.bloodPressure = 0
-			org.systolic = 0
-			org.diastolic = 0
+			org.hypotension = 1
+			org.hypertension = 0
 		end
 		return
 	end
@@ -285,25 +277,21 @@ module[2] = function(owner, org, timeValue)
 	local bloodVolume = getBloodVolume(org)
 	local oxygenation = Clamp(o2, 0, 1)
 	local vascularTone = Clamp(1 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
-	local pressureBase = 92 * bloodVolume * heart * vascularTone * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
+	local circulationBase = bloodVolume * heart * vascularTone * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime()
-	local arrestPressure = defibGrace and 45 or 0
-	local pressure = org.alive and (org.heartstop and arrestPressure or pressureBase * rhythmMul) or 0
-	local pressureFallSpeed = defibGrace and 4 or 18
-	org.bloodPressure = Approach(org.bloodPressure or pressure, pressure, pressure > (org.bloodPressure or 0) and timeValue * 12 or timeValue * pressureFallSpeed)
-	org.pulse = Approach(org.pulse, org.bloodPressure, heart == 0 and timeValue * 10 or timeValue * 5)
-	org.systolic = Round(Clamp(org.bloodPressure * 1.38 + (org.heartbeat or 70) * 0.12, 0, 240))
-	org.diastolic = Round(Clamp(org.bloodPressure * 0.88, 0, 160))
-	org.cardiacOutput = org.heartstop and (defibGrace and Clamp((org.pulse or org.bloodPressure) / 70 * 0.35, 0, 0.45) or 0) or Clamp((org.bloodPressure / 90) * heart * rhythmMul, 0, 1.5)
-	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and org.bloodPressure > 55 then
+	local arrestCirculation = defibGrace and 0.49 or 0
+	local circulation = org.alive and (org.heartstop and arrestCirculation or circulationBase * rhythmMul) or 0
+	org.pulse = Approach(org.pulse, circulation * 92, heart == 0 and timeValue * 10 or timeValue * 5)
+	org.cardiacOutput = org.heartstop and (defibGrace and Clamp((org.pulse or 0) / 70 * 0.35, 0, 0.45) or 0) or Clamp(circulation * (92 / 90) * heart * rhythmMul, 0, 1.5)
+	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and circulation > 0.6 then
 		org.cardiacOutput = Approach(org.cardiacOutput, Clamp(getBloodVolume(org) * heart, 0, 1), timeValue / 20)
 	end
-	local myocardialTarget = Clamp(oxygenation * bloodVolume * Clamp(org.bloodPressure / 70, 0, 1.2), 0, 1)
+	local myocardialTarget = Clamp(oxygenation * bloodVolume * Clamp(circulation * (92 / 70), 0, 1.2), 0, 1)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
-	org.hypotension = Approach(org.hypotension or 0, Clamp(Remap(org.bloodPressure, 55, 20, 0, 1), 0, 1), timeValue / 8)
-	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(org.bloodPressure, 115, 155, 0, 1), 0, 1), timeValue / 20)
+	org.hypotension = Approach(org.hypotension or 0, Clamp(Remap(circulation, 0.98, 0.22, 0, 1), 0, 1), timeValue / 8)
+	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
@@ -517,9 +505,9 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.fibrillation then
-		org.consciousness = math.min(org.consciousness, Clamp(org.bloodPressure / 55, 0, 1))
+		org.consciousness = math.min(org.consciousness, 1 - Clamp(org.hypotension or 0, 0, 1))
 		org.o2[1] = max(org.o2[1] - timeValue * 1.8, 0)
-		if (org.fibrillationStart or CurTime()) + 24 < CurTime() or org.bloodPressure < 8 then org.heartstop = true end
+		if (org.fibrillationStart or CurTime()) + 24 < CurTime() or (org.cardiacOutput or 0) < 0.08 then org.heartstop = true end
 	end
 	if org.hypertension > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * org.hypertension / 360, 0, 1) end
 	if ischemia > 0.35 then org.heartStrain = Clamp((org.heartStrain or 0) + timeValue * ischemia / 260, 0, 1) end
@@ -528,19 +516,14 @@ module[2] = function(owner, org, timeValue)
 		org.painadd = org.painadd + math.Rand(4, 9) * ischemia
 		org.shock = math.max(org.shock, 10 + ischemia * 22)
 	end
-	if org.hypotension > 0.2 then org.consciousness = math.min(org.consciousness, Clamp(Remap(org.bloodPressure, 20, 65, 0, 1), 0, 1)) end
+	if org.hypotension > 0.2 then org.consciousness = math.min(org.consciousness, 1 - Clamp(org.hypotension, 0, 1)) end
 
-	-- Compatibility is intentionally one-way. Remorseism owns bloodPressure and
-	-- its derived cardiac values; legacy consumers may read this mirror but can
-	-- no longer feed a second pressure calculation back into the new system.
-	org.bloodpressure = org.bloodPressure
-
-    if org.bloodpressure < 50 then
-        -- Adrenaline, tranexamic acid and thiamine prevent organ damage from low blood pressure
+    if org.hypotension > 0.55 then
+        -- Adrenaline, tranexamic acid and thiamine prevent low-circulation organ damage.
         local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
         local hasAntiIschemia = totalAdrenaline > 0.5 or (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
         if not hasAntiIschemia then
-            local ischemiaK = math.Clamp((50 - org.bloodpressure) / 30, 0, 1)
+            local ischemiaK = math.Clamp((org.hypotension - 0.55) / 0.45, 0, 1)
             local damage = timeValue * ischemiaK * 0.005
             org.brain = math.min(org.brain + damage * 0.2, 1)
             org.heart = math.min(org.heart + damage, 1)
@@ -573,27 +556,24 @@ module[2] = function(owner, org, timeValue)
 		org.ischemia = math.max(org.ischemia - decayRate, 0)
 	end
 
-	-- Disorientation: 0.5 at BP 75, 1.5 at BP 40
-	if org.bloodpressure < 75 then
-		local disorientK = math.Clamp((75 - org.bloodpressure) / 35, 0, 1)
+	if org.hypotension > 0.2 then
+		local disorientK = math.Clamp((org.hypotension - 0.2) / 0.5, 0, 1)
 		org.disorientation = math.max(org.disorientation, 0.5 + disorientK * 1.0)
 	end
 
-	-- Stamina loss: starts at BP 80, small/slow, builds to 2/3 at BP 50
-	if org.bloodpressure < 80 then
-		local staminaK = math.Clamp((80 - org.bloodpressure) / 30, 0, 1)
-		local staminaLoss = staminaK * staminaK * (org.stamina.max * 2 / 3) / 60 -- scales quadratically, reaches 2/3 over ~60 seconds at BP 50
+	if org.hypotension > 0.14 then
+		local staminaK = math.Clamp((org.hypotension - 0.14) / 0.41, 0, 1)
+		local staminaLoss = staminaK * staminaK * (org.stamina.max * 2 / 3) / 60
 		org.stamina[1] = math.max(org.stamina[1] - timeValue * staminaLoss, 0)
 	end
 
-	-- Shock: only starts at BP 45, slower buildup
-	if org.bloodpressure < 45 then
-		local shockK = math.Clamp((45 - org.bloodpressure) / 30, 0, 1)
+	if org.hypotension > 0.64 then
+		local shockK = math.Clamp((org.hypotension - 0.64) / 0.36, 0, 1)
 		org.shock = math.Approach(org.shock, 20 + shockK * 45, timeValue * (0.5 + shockK * 1.5))
 	end
 
-	if org.bloodpressure < 55 then
-		local lowK = math.Clamp((65 - org.bloodpressure) / 35, 0, 1)
+	if org.hypotension > 0.5 then
+		local lowK = math.Clamp((org.hypotension - 0.35) / 0.5, 0, 1)
 		org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
 	end
 
@@ -603,8 +583,8 @@ module[2] = function(owner, org, timeValue)
 		org.consciousness = math.max(org.consciousness - timeValue * pulseK * 0.15, 0)
 	end
 
-	if org.bloodpressure > 115 then
-		local highK = math.Clamp((org.bloodpressure - 115) / 55, 0, 1)
+	if org.hypertension > 0 then
+		local highK = math.Clamp(org.hypertension * 1.27, 0, 1)
 		local adrenalineMitigation = math.Clamp(org.adrenaline / 3, 0, 1) * 0.25
 		local effectiveHighK = highK * (1 - adrenalineMitigation)
 		org.disorientation = math.max(org.disorientation, 0.25 + effectiveHighK * 1.5)
@@ -625,7 +605,7 @@ module[2] = function(owner, org, timeValue)
 
 	local bloodCurveOwnsArrest = bloodNow <= 2500 and (org.heart or 0) < 0.8 and org.brain < 0.85
 	if organSystemsEnabled then
-		local failedCirculation = (org.pulse < 10 or org.bloodpressure < 25) and not bloodCurveOwnsArrest and not restartCirculationActive
+		local failedCirculation = (org.pulse < 10 or org.hypotension > 0.92) and not bloodCurveOwnsArrest and not restartCirculationActive
 		if failedCirculation or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
 		if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	end
@@ -633,7 +613,6 @@ module[2] = function(owner, org, timeValue)
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	if org.heartstop then
 		org.heartbeat = 0
-		org.bloodpressure = org.bloodPressure
 		org.fibrillation = false
 		org.arrhythmia = 0
 	end
@@ -662,7 +641,7 @@ module[2] = function(owner, org, timeValue)
 		-- Low dose (1): ~70% chance, Medium dose (2): ~90% chance, High dose (4+): near-certain
 		local chance = math.Clamp(adren * 60 + adren * adren * 12, 0, 99)
 		chance = chance * math.Clamp(1 - (org.heart or 0) * 0.65, 0.2, 1)
-		if (org.o2 and (org.o2[1] or 0) < 5) or (org.bloodpressure or 0) < 15 then
+		if (org.o2 and (org.o2[1] or 0) < 5) or (org.hypotension or 0) > 0.98 then
 			chance = chance * 0.6
 		end
 		local rand = math.random(100)
@@ -679,7 +658,7 @@ module[2] = function(owner, org, timeValue)
 			org._zeroO2Time = 0
 			org.heartbeat = math.Clamp(org.heartbeat > 0 and org.heartbeat or 90, 80, 140)
 			org.pulse = math.max(org.pulse or 0, 35)
-			org.bloodpressure = math.max(org.bloodpressure or 0, 55)
+			org.hypotension = math.min(org.hypotension or 1, 0.5)
 			org.cardiacRestartUntil = CurTime() + 2
 			if org.o2 then
 				local o2Restore = math.Clamp(adren * 2.5, 8, 12)
@@ -714,7 +693,6 @@ module[2] = function(owner, org, timeValue)
 
 		org.pulse = 0
 		org.strokeVolume = 0
-		org.bloodpressure = org.bloodPressure
 	else
 		org.cardiacArrestStart = nil
 		org.cardiacArrestO2Start = nil
@@ -739,8 +717,6 @@ module[2] = function(owner, org, timeValue)
 		
 		org.lastsoundtime = CurTime() + math.random(25,35)
 	end
-
-	local circulatoryRisk = (org.bloodpressure or 93) < 55 or (org.pulse or 70) < 35 or (org.blood or 5000) < 2200 or (org.o2 and (org.o2[1] or 30) < 8)
 
 end
 

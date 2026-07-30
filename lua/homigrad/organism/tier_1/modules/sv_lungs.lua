@@ -658,19 +658,7 @@ module[2] = function(owner, org, timeValue)
 
 
 
-        local blood_pressure_k = 1
-
-        if org.bloodpressure < 70 then
-
-            blood_pressure_k = math.Remap(org.bloodpressure, 0, 70, 0.1, 1)
-
-        elseif org.bloodpressure > 115 then -- from sv_pulse
-
-            blood_pressure_k = math.Remap(org.bloodpressure, 115, 190, 1, 0.75)
-
-        end
-
-        blood_pressure_k = math.Clamp(blood_pressure_k, 0.2, 1)
+		local circulationConditionK = math.Clamp(1 - (org.hypotension or 0) * 0.9 - (org.hypertension or 0) * 0.25, 0.2, 1)
 
 
 
@@ -682,7 +670,7 @@ module[2] = function(owner, org, timeValue)
 		local coldO2RegenK = Lerp(coldO2Stress, 1, 0.55)
 		local opioidBreathingK = math.Clamp(1 - drugRespiratoryDepression * 1.15, 0.05, 1)
 		local roleO2RegenMul = hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "O2RegenMul", 1) or 1
-		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * blood_pressure_k * coBreathePenalty * opioidBreathingK * roleO2RegenMul
+		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * circulationConditionK * coBreathePenalty * opioidBreathingK * roleO2RegenMul
 		local tracheaDamage = math.Clamp(org.trachea or 0, 0, 1)
 		local tracheaIntakeK = 1 - (tracheaDamage * 0.15 + tracheaDamage * tracheaDamage * 0.55)
 		regenerate = regenerate * math.Clamp(tracheaIntakeK, 0.3, 1)
@@ -696,13 +684,10 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		-- Low blood pressure slowly lowers O2 to 0 if very low
-
-		if org.bloodpressure and org.bloodpressure < 40 then
-
-			local bp_o2DropRate = (40 - org.bloodpressure) / 40
-
-			o2[1] = max(o2[1] - timeValue * bp_o2DropRate * 0.8, 0)
+		-- Severe hypotension slowly lowers O2 to zero.
+		if (org.hypotension or 0) > 0.7 then
+			local hypotensionO2DropRate = math.Clamp(((org.hypotension or 0) - 0.7) / 0.3, 0, 1)
+			o2[1] = max(o2[1] - timeValue * hypotensionO2DropRate * 0.8, 0)
 
 		end
 

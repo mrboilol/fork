@@ -977,7 +977,7 @@ local function getWoundVisualIntensity(org, totalBleedRate, wound, woundCount, f
 	woundBleedRate = math.max(woundBleedRate, 0)
 	local rateIntensity = math.Clamp((woundBleedRate - 0.005) / math.max(fullRate - 0.005, 0.001), 0, 1)
 	local bloodReserve = math.Clamp(((org.blood or 5000) - 2000) / 3000, 0, 1)
-	local perfusion = math.Clamp(org.perfusion or ((org.bloodpressure or 93) / 93), 0, 1)
+	local perfusion = math.Clamp(org.perfusion or (1 - (org.hypotension or 0)), 0, 1)
 	local threatMul = 1 + (1 - bloodReserve) * 0.35 + (1 - perfusion) * 0.15
 
 	-- Wound size and its initial peak do not participate. The visual is driven by
@@ -988,15 +988,14 @@ end
 
 local function getCirculationStrength(org, pulseOverride)
 	local pulse = org.heartstop and 0 or math.max(pulseOverride or org.pulse or 70, 0)
-	local pressure = math.max(org.bloodpressure or 93, 0)
-	if pulse <= 0 or pressure <= 0 then return 0 end
+	local circulation = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.55)
+	if pulse <= 0 or circulation <= 0 then return 0 end
 	local pulseStrength = math.Clamp(pulse / 70, 0, 1.55)
-	local pressureStrength = math.Clamp(pressure / 93, 0, 1.55)
 
-	-- Both pressure and an effective pulse contribute to how far blood can be
+	-- Both circulation state and an effective pulse contribute to how far blood can be
 	-- driven. A strong value can partly compensate for the other, but cannot hide
 	-- failed circulation.
-	return math.Clamp(math.sqrt(pulseStrength * pressureStrength), 0, 1.55)
+	return math.Clamp(math.sqrt(pulseStrength * circulation), 0, 1.55)
 end
 
 local function emitNormalWoundParticles(ent, pos, outward, intensity, circulation)

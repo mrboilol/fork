@@ -233,6 +233,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 	local vomitVPAng, vecZero = Angle(1, 0, 0), Vector()
 	hook.Add("SetupMove", "HG(StartCommand)", function(ply, mv, cmd)
 		--\\ DeltaTime
+		local move_time = CurTime()
 			ply.LastStartCommand = ply.LastStartCommand or SysTime()
 		local tick_interval = engine.TickInterval()
 		local delta_time = math.Clamp(SysTime() - ply.LastStartCommand, 0, tick_interval * 1.25)--FrameTime()
@@ -243,6 +244,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			return
 		end
 
+		local vomiting_until = tonumber(ply:GetNetVar("vomiting", 0)) or 0
 		local org = ply.organism
 
 		if( ( not org ) or ( not org.brain ) )then
@@ -411,7 +413,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 			end
 		end
 
-		if ply:GetNetVar("vomiting", 0) > move_time then
+		if vomiting_until > move_time then
 			cmd:AddKey(IN_DUCK)
 			mv:AddKey(IN_DUCK)
 			if ply == lply then ViewPunch(vomitVPAng) end
@@ -660,8 +662,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		k = k * (org.pelvis == 1 and 0.4 or 1)
 		k = k * ((IsValid(ply:GetNetVar("carryent")) or IsValid(ply:GetNetVar("carryent2"))) and math.Clamp(50 / math.max(ply:GetNetVar("carrymass", 0) + ply:GetNetVar("carrymass2", 0), 1), 0.5, 1) or 1)
 		k = k * painMoveMul
-				if org.bloodpressure and org.bloodpressure < 80 and runnin then
-			k = k * math.Clamp(math.Remap(org.bloodpressure, 20, 80, 0.65, 1), 0.65, 1)
+		if (org.hypotension or 0) > 0.14 and runnin then
+			k = k * math.Clamp(1 - org.hypotension * 0.35, 0.65, 1)
 		end
 		if org.panicattackActive then k = k * 0.5 end
 		//k = k * (ishgweapon(wep) and not wep:IsPistolHoldType() and not wep:ReadyStance() and 0.75 or 1)
@@ -678,7 +680,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
 		k = math.max(k, 20 / 200)
 
-		if ply:GetNetVar("vomiting", 0) > (move_time - 3) then
+		if vomiting_until > (move_time - 3) then
 			k = k * 0.25
 		end
 

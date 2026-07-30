@@ -377,6 +377,13 @@ local panicattackPulseIntensity = 0.2
 local panicattackShakeIntervalMin = 0.45
 local panicattackShakeIntervalMax = 1.4
 local panicattackShakeMul = 0.85
+local function getPanicAttackFx(org)
+	local panicConVar = GetConVar("hg_panic")
+	if not panicConVar or not panicConVar:GetBool() or org.otrub then return 0 end
+
+	local panic = math.Clamp(tonumber(org.panicattack) or 0, 0, 1)
+	return math.Clamp(math.Remap(panic, panicattackFadeStart, panicattackThreshold, 0, panicattackVolumeMul), 0, 1)
+end
 local painBeatOverlayVolumeMul = 1.25
 local painThresholdMax = 120
 local painAgonyThreshold = 60 / painThresholdMax

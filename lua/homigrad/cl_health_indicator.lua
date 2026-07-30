@@ -7,8 +7,8 @@ local statusIconCache = {}
 
 local IND_SIZE_BASE = 220
 local IND_SIZE_MAX = 300
-local IND_VISUAL_SCALE = 3
-local IND_RIGHT_OFFSET = 32
+local IND_VISUAL_SCALE = 2.6
+local IND_RIGHT_OFFSET = 16
 local INDICATOR_CAMERA_FOV = 70
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18

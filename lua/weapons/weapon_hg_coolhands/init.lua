@@ -15,25 +15,25 @@ local math_random, math_Clamp, CurTime, Color = math.random, math.Clamp, CurTime
 local function PrintPerfusionDiagnosis(ply, org)
 	if not IsValid(ply) or not org then return end
 
-	local pressure = tonumber(org.bloodpressure) or 0
-	local perfusion = math.Clamp(tonumber(org.perfusion) or math.Clamp(pressure / 93, 0, 1), 0, 1)
+	local hypotension = math.Clamp(tonumber(org.hypotension) or 0, 0, 1)
+	local perfusion = math.Clamp(tonumber(org.perfusion) or (1 - hypotension), 0, 1)
 	local peripheral = math.Clamp(tonumber(org.peripheralperfusion) or perfusion, 0, 1)
 	local brainoxygen = math.Clamp(tonumber(org.brainoxygen) or perfusion, 0, 1)
 	local arterial = tonumber(org.arterialBleed) or 0
 	local venous = tonumber(org.venousBleed) or tonumber(org.bleed) or 0
 	local pulse = tonumber(org.pulse) or 0
 
-	if pulse >= 105 and (pressure < 55 or perfusion < 0.5 or (org.shock or 0) > 20) then
+	if pulse >= 105 and (hypotension > 0.5 or perfusion < 0.5 or (org.shock or 0) > 20) then
 		ply:ChatPrint("Pulse is fast and weak.")
-	elseif pulse > 0 and pulse <= 45 and pressure < 60 then
+	elseif pulse > 0 and pulse <= 45 and hypotension > 0.42 then
 		ply:ChatPrint("Pulse is slow and weak.")
-	elseif pulse > 0 and pressure < 38 then
+	elseif pulse > 0 and hypotension > 0.74 then
 		ply:ChatPrint("Pulse is weak.")
 	end
 	if peripheral < 0.45 or (org.blood or 5000) < 3500 then ply:ChatPrint("Skin is pale and cold.") end
-	if (org.shock or 0) > 35 or perfusion < 0.35 or pressure < 35 then ply:ChatPrint("They are in shock.") end
-	if peripheral < 0.24 and pressure > 11 and pulse > 18 then ply:ChatPrint("No radial pulse, but carotid pulse is present.") end
-	if pressure < 25 or perfusion < 0.22 or arterial > 3 or venous > 12 then ply:ChatPrint("Blood pressure is crashing.") end
+	if (org.shock or 0) > 35 or perfusion < 0.35 or hypotension > 0.78 then ply:ChatPrint("They are in shock.") end
+	if peripheral < 0.24 and hypotension < 0.99 and pulse > 18 then ply:ChatPrint("No radial pulse, but carotid pulse is present.") end
+	if hypotension > 0.92 or perfusion < 0.22 or arterial > 3 or venous > 12 then ply:ChatPrint("Circulation is crashing.") end
 	if arterial > 0.5 then ply:ChatPrint("Active arterial bleeding needs immediate control.") elseif venous > 4 then ply:ChatPrint("They have significant venous bleeding.") end
 	if org.throatcut then ply:ChatPrint("Their throat is cut; control the neck bleeding and airway.") end
 	if (org.intracranialPressure or 0) >= 0.72 then ply:ChatPrint("Signs suggest critically raised pressure inside the skull.") end
@@ -549,10 +549,8 @@ function SWEP:ApplyForce()
 							-- Much better pulse restoration - works even from 0
 							org.pulse = math.min(org.pulse + 15 * skillMult, 70)
 							
-							-- Restore pressure into the cardiovascular model's MAP range instead
-							-- of using the old pulse-to-pressure scale (which topped out at 84).
-							local targetBP = math.Clamp(30 + org.pulse * 0.9, 35, 93)
-							org.bloodpressure = math.Approach(org.bloodpressure or 0, targetBP, 3 * skillMult)
+							-- Chest compressions temporarily improve hypotension.
+							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)
 							
 							-- CO removal
 							org.CO = math.Approach(org.CO, 0, skillMult)
@@ -590,7 +588,7 @@ function SWEP:ApplyForce()
 								org._zeroO2Time = 0
 								org.heartbeat = math.Clamp((org.heartbeat or 0) > 0 and org.heartbeat or 90, 80, 140)
 								org.pulse = math.max(org.pulse or 0, 35)
-								org.bloodpressure = math.max(org.bloodpressure or 0, 55)
+								org.hypotension = math.min(org.hypotension or 1, 0.5)
 								org.o2[1] = math.max(org.o2[1] or 0, 8)
 							end
 							if not org.heartstop then org.cardiacRestartUntil = CurTime() + 1 end

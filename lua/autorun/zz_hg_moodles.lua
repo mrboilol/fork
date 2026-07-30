@@ -515,14 +515,15 @@ local function buildEffects(ply, org)
 	end
 	if org.heartstop == true then add(effects, "asystole", "asystole", 4, "bad", -100) end
 
-	local bp = orgNumber(org, "bloodpressure", 93)
-	if not org.heartstop and (bp < 90 or pulse < 60) then
-		local level = math.max(lowRank(bp, {90, 75, 55, 35}), lowRank(pulse, {60, 50, 35, 20}))
-		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27, math.floor(bp) .. " mmHg")
+	local hypotension = math.Clamp(orgNumber(org, "hypotension", 0), 0, 1)
+	if not org.heartstop and hypotension > 0 then
+		local level = math.Clamp(math.ceil(hypotension * 4), 1, 4)
+		add(effects, "low_blood", level >= 3 and "superlowblood" or "lowblood", level, "bad", 27)
 	end
-	if not org.heartstop and (bp > 115 or heartRate > 100) then
-		local level = math.max(highRank(bp, {115, 135, 160, 185}), highRank(heartRate, {100, 130, 160, 190}))
-		add(effects, "high_blood", "highblood", level, "bad", 28, math.floor(bp) .. " mmHg")
+	local hypertension = math.Clamp(orgNumber(org, "hypertension", 0), 0, 1)
+	if not org.heartstop and hypertension > 0 then
+		local level = math.Clamp(math.ceil(hypertension * 4), 1, 4)
+		add(effects, "high_blood", "highblood", level, "bad", 28)
 	end
 
 	local flash = number(amtflashed, 0)

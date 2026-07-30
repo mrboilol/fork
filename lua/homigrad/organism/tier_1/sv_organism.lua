@@ -10,10 +10,8 @@ function hg.organism.ZeroVitals(org)
 	org.pulse = 0
 	org.ecgState = "asystole"
 	org.cardiacOutput = 0
-	org.bloodpressure = 0
-	org.bloodPressure = 0
-	org.systolic = 0
-	org.diastolic = 0
+	org.hypotension = 1
+	org.hypertension = 0
 end
 
 -- Wounds are owned by the organism, but both kinds of player ragdoll are
@@ -84,9 +82,9 @@ local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound
 local gunfight_adrenaline_delay = 1.5
 local gunfight_adrenaline_cap = 1.5
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
-local seizure_duration = 15
+local seizure_duration = 25
 local seizure_end_shock = 35
-local seizure_brain_damage_per_second = 0.0015
+local seizure_brain_damage_per_second = 0.004
 local seizure_shock_per_second = 1.5
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
@@ -101,8 +99,6 @@ local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
 local seizure_brain_roll_delay = 20
 local seizure_brain_roll_chance = 15
-local seizure_brain_roll_gain_min = 0.04
-local seizure_brain_roll_gain_max = 0.11
 local seizure_no_cause_decay_time = 90
 local seizure_mannitol_gain_reduction = 0.5
 local seizure_mannitol_recovery_bonus = 1
@@ -233,6 +229,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.seizureEnd = 0
 	org.nextSeizureSpasm = 0
 	org.nextSeizureRoll = 0
+	org.seizureSuppressedUntil = 0
 	org.lastSeizureBrain = 0
 	org.lastSeizureLobeDamage = 0
 	org.lastSeizureTemperature = org.temperature
@@ -336,9 +333,7 @@ local function updateNormalizedVital(current, target, timeValue, recoveryRate, f
 	return math.Clamp(value, 0, 1)
 end
 
--- Vottur's perfusion model, adapted to this checkout's existing mmHg blood
--- pressure.  Do not write bloodpressure here: sv_pulse remains the sole owner
--- of pressure/ECG and this derives delivery from its result.
+-- Vottur's perfusion model derives delivery from normalized circulation state.
 function hg.organism.UpdateIntracranialPressure(org, pressure, timeValue)
 	if not org then return 1 end
 
@@ -429,14 +424,14 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local throatPenalty = math.Clamp(org.throatCutPressureShock or 0, 0, 1)
 	local neckPenalty = math.Clamp(org.neckBrainOxygenPenalty or 0, 0, 1)
 	local arterialImpairment = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
-	local pump = math.Clamp((org.bloodpressure or 0) / 93, 0, 1.2)
+	local pump = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.2)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
 
 	-- Whole-body oxygen content follows the old O2 reservoir, but blood volume
 	-- and retained CO2/CO can now force the normalized reserve down directly.
 	local bodyOxygenTarget = math.Clamp(oxygen * Lerp(bloodFraction, 0.35, 1) * Lerp(hypercapnia, 1, 0.35), 0, 1)
 	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, 2.5)
-	-- Arterial loss already lowers blood volume and the blood-pressure target in
+	-- Arterial loss already lowers blood volume and the circulation target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an
 	-- independent disorientation/otrub source instead of a blood-loss emergency.
 	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - venousPenalty - internalPenalty - internalComplicationPenalty - shockPenalty * 0.45 - throatPenalty * 0.22 - arterialImpairment * 0.08, 0, 1)
@@ -586,9 +581,6 @@ local function send_organism(org, ply)
 	sendtable.shock = org.shock
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
-	sendtable.bloodPressure = org.bloodPressure or org.bloodpressure
-	sendtable.systolic = org.systolic
-	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.arrhythmia = org.arrhythmia
 	sendtable.fibrillation = org.fibrillation
@@ -620,9 +612,6 @@ local function send_organism(org, ply)
 	sendtable.throatcut = org.throatcut
 	sendtable.throatCutUntil = org.throatCutUntil
 	sendtable.throatCutSeverity = org.throatCutSeverity
-	sendtable.bloodpressure = org.bloodpressure
-	sendtable.systolic = org.systolic
-	sendtable.diastolic = org.diastolic
 	sendtable.timeValue = org.timeValue
 	sendtable.holdingbreath = org.holdingbreath
 	sendtable.arteria = org.arteria
@@ -708,9 +697,6 @@ local function send_bareinfo(org)
 	sendtable.pulse = org.pulse
 	sendtable.blood = org.blood
 	sendtable.heartbeat = org.heartbeat
-	sendtable.bloodPressure = org.bloodPressure or org.bloodpressure
-	sendtable.systolic = org.systolic
-	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.arrhythmia = org.arrhythmia
 	sendtable.fibrillation = org.fibrillation
@@ -742,9 +728,6 @@ local function send_bareinfo(org)
 	sendtable.throatcut = org.throatcut
 	sendtable.throatCutUntil = org.throatCutUntil
 	sendtable.throatCutSeverity = org.throatCutSeverity
-	sendtable.bloodpressure = org.bloodpressure
-	sendtable.systolic = org.systolic
-	sendtable.diastolic = org.diastolic
 	sendtable.analgesia = org.analgesia
 	sendtable.o2 = org.o2
 	sendtable.losing_oxy = org.losing_oxy
@@ -860,6 +843,10 @@ end
 
 function hg.organism.AddSeizure(org, amount)
 	if not org then return 0 end
+	if (org.seizureSuppressedUntil or 0) > CurTime() then
+		org.seizure = 0
+		return 0
+	end
 	if not isnumber(amount) or amount <= 0 then return org.seizure or 0 end
 
 	local mannitolStrength = getMannitolSeizureStrength(org)
@@ -917,6 +904,16 @@ local function stop_seizure(owner, org)
 		owner.fullsend = true
 		send_organism(org, owner)
 	end
+end
+
+function hg.organism.SuppressSeizure(org, duration)
+	if not org then return 0 end
+
+	local time = CurTime()
+	org.seizureSuppressedUntil = math.max(org.seizureSuppressedUntil or 0, time + math.max(tonumber(duration) or 0, 0))
+	stop_seizure(org.owner, org)
+
+	return org.seizureSuppressedUntil
 end
 
 local function start_seizure(owner, org)
@@ -1554,7 +1551,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if curTime >= org.nextSeizureRoll then
 			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
 			if math.random(seizure_brain_roll_chance) == 1 then
-				hg.organism.AddSeizure(org, math.Rand(seizure_brain_roll_gain_min, seizure_brain_roll_gain_max) * math.Clamp(math.Remap(seizureBrainDamage, 0.05, 1, 0.75, 1.5), 0.75, 1.5))
+				-- Brain damage can cause an abrupt seizure instead of only slowly
+				-- filling the warning meter over several successful rolls.
+				hg.organism.AddSeizure(org, 1)
 			end
 		end
 	else
@@ -1591,8 +1590,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			local injuryDelta = math.Clamp(time - lastInjuryTime, 0, 0.25)
 			org.lastSeizureInjuryTime = time
 
-			-- A seizure is physiologically stressful without becoming a major new
-			-- source of brain trauma: a full 15-second event adds only 0.0225.
+			-- An untreated full seizure now adds about 0.1 brain damage before
+			-- unconsciousness, making prompt anticonvulsant treatment meaningful.
 			org.brain = math.min((org.brain or 0) + injuryDelta * seizure_brain_damage_per_second, 1)
 			org.shock = math.min((org.shock or 0) + injuryDelta * seizure_shock_per_second, 85)
 
@@ -2000,9 +1999,8 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 
 	org.pulse = math.Approach(org.pulse, 70, regen * 10)
 	org.heartbeat = math.Approach(org.heartbeat, 220, regen * 10)
-	org.bloodpressure = math.Approach(org.bloodpressure or 93, 110, regen * 8)
-	org.systolic = math.Approach(org.systolic or 120, 140, regen * 8)
-	org.diastolic = math.Approach(org.diastolic or 80, 90, regen * 8)
+	org.hypotension = math.Approach(org.hypotension or 0, 0, regen / 8)
+	org.hypertension = math.Approach(org.hypertension or 0, 0, regen / 20)
 
 	org.lungsfunction = true
 	org.heartstop = false

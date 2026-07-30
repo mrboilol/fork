@@ -434,7 +434,6 @@ HUD = {
 	bleeding_threshold = 0,
 	internal_bleed_threshold = 0.05,
 	
-	hypotension_threshold = 90,
 	cardiac_arrest_threshold = true,
 	cold_threshold = 36,
 	heat_threshold = 37,
@@ -1866,19 +1865,15 @@ local function draw_status_effects()
 				currentEffectNames["dislocation"] = true
 			end
 			
-			local bp_val = smooth.bloodpressure or getOrgVal(org, "bloodpressure", 93)
-			if bp_val < HUD.hypotension_threshold then
-				local level_num = 1
-				if bp_val < 35 then level_num = 4
-				elseif bp_val < 55 then level_num = 3
-				elseif bp_val < 75 then level_num = 2 end
+			local hypotension = math.Clamp(getOrgVal(org, "hypotension", 0), 0, 1)
+			if hypotension > 0 then
+				local level_num = math.Clamp(math.ceil(hypotension * 4), 1, 4)
 				
 				table.insert(effects, {
 					name = "hypotension",
 					level_num = level_num,
 					has_levels = true,
-					priority = 0.1,
-					value = math_floor(bp_val)
+					priority = 0.1
 				})
 				currentEffectNames["hypotension"] = true
 			end
