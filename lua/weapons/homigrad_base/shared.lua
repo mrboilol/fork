@@ -675,7 +675,9 @@ end
 function SWEP:CanUse(ignoreSprint)
     local owner = self:GetOwner()
 	if not IsValid(owner) then return true end
-    if owner:IsNPC() then return true end
+	if owner:IsNPC() then
+		return not self.reload and not self.deploy and not self:IsJamClearing()
+	end
 	if owner:IsPlayer() and owner:GetNWBool("hg_hold_wound_twohand", false) then return false end
 	if owner.organism and owner.organism.rarmamputated and !self:IsPistolHoldType() then return false end
 	if self:IsJamClearing() then return false end
@@ -881,6 +883,13 @@ function SWEP:Shoot(override)
 		self.LastPrimaryDryFire = CurTime()
 		self:PrimaryShootEmpty()
 		primary.Automatic = false
+
+		-- The engine may ask an NPC to attack again before selecting its reload
+		-- schedule. Start the reload here as a fallback instead of dry-firing
+		-- indefinitely; Reload guards against an already active reload.
+		if SERVER and owner:IsNPC() and self.Reload and not self.reload then
+			self:Reload()
+		end
 
 		return false
 	end

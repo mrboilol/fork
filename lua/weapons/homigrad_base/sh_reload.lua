@@ -60,6 +60,20 @@ end
 
 function SWEP:InsertAmmo(need)
 	local owner = self:GetOwner()
+	if !IsValid(owner) then return end
+
+	-- NPCs do not expose the player reserve-ammo API. Their reserve is managed by
+	-- the engine, so refill the magazine directly when their reload completes.
+	if owner:IsNPC() then
+		need = need or self:GetMaxClip1() - self:Clip1()
+		need = math.min(need, self:GetMaxClip1() - self:Clip1())
+		if need <= 0 then return end
+
+		self:SetClip1(self:Clip1() + need)
+		if SERVER then self:SetNWInt("Clip1", self:Clip1()) end
+		return
+	end
+
 	local primaryAmmo = self:GetPrimaryAmmoType()
 	if !owner.GetAmmoCount then return end
 	local primaryAmmoCount = owner:GetAmmoCount(primaryAmmo)

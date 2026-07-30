@@ -89,6 +89,17 @@ local function applyTemperatureTrauma(org)
 	org[key] = math.min((org[key] or 0) + damage, 1)
 end
 
+local function notifyTemperatureStress(owner, org)
+	if not org.isPly or org.otrub or not IsValid(owner) or not owner:Alive() then return end
+
+	local temperature = org.temperature or 36.7
+	if temperature < 33 then
+		owner:Notify("I'm very cold...", 30, "temperature_very_cold", 0, nil, Color(150, 210, 255))
+	elseif temperature >= 40 then
+		owner:Notify("I'm very hot...", 30, "temperature_very_hot", 0, nil, Color(255, 145, 110))
+	end
+end
+
 function hg.organism.GetECGState(heartbeat, heartstop, org)
 	heartbeat = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
 	if heartstop then return heartbeat < 1 and "asystole" or "pea" end
@@ -213,6 +224,8 @@ end
 
 module[2] = function(owner, org, timeValue)
 	local organSystemsEnabled = hg.organism.OrganSystemsEnabled and hg.organism.OrganSystemsEnabled() or true
+	notifyTemperatureStress(owner, org)
+
 	if not organSystemsEnabled then
 		org.heartstop = false
 		org.terminalRhythm = nil

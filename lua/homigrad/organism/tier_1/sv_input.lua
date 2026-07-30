@@ -170,6 +170,8 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
     end
 end
 
+local hitgrouptolimb
+
 local function Trace_Blast(box, amt, org, organs, dmg, dmgInfo)
 	dmg = dmgInfo:GetDamage() / 25
 	local organ = box[6] and organs[box[6]][box[7]]
@@ -311,7 +313,7 @@ local function getGibbedHeadForcePhys(ent, bone)
 	return bone
 end
 
-local hitgrouptolimb = {
+hitgrouptolimb = {
 	[HITGROUP_LEFTLEG] = "lleg",
 	[HITGROUP_RIGHTLEG] = "rleg",
 	[HITGROUP_LEFTARM] = "larm",

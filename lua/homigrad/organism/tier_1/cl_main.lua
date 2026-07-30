@@ -1334,7 +1334,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 				local pos, ang = ent:GetBonePosition(boneID)
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5) * arterySizeMul
+					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5)
 					if seen then
 
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])

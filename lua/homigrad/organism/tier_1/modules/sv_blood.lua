@@ -146,6 +146,8 @@ local hold_wound_bleed_threshold = 0.35
 local hold_wound_bleed_slow_mul = 0.72
 local hold_wound_bleed_slow_twohand_mul = 0.55
 local hold_wound_arterial_slow_mul = 0.2
+local hold_wound_clot_mul = 1.35
+local hold_wound_clot_twohand_mul = 1.6
 local arterial_bleed_rate_mul = 0.9
 
 local function hasWound(wounds, target)
@@ -219,6 +221,16 @@ local function getHeldWoundBleedMul(org, wound)
 	end
 
 	return hold_wound_bleed_slow_mul
+end
+
+local function getHeldWoundClotMul(org, wound)
+	if not org.manualHoldWound or org.manualHoldWoundTarget != wound then return 1 end
+
+	if (org.manualHoldWoundHands or 0) >= 2 then
+		return hold_wound_clot_twohand_mul
+	end
+
+	return hold_wound_clot_mul
 end
 
 module[2] = function(owner, org, mulTime)
@@ -453,10 +465,11 @@ module[2] = function(owner, org, mulTime)
 		local woundsToRemove = {}
 		for i, wound in pairs(org.wounds) do
 			local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
+			local heldClotMul = getHeldWoundClotMul(org, wound)
 			local rand1 = math.Rand(4, 10)
 			local rand2 = math.Rand(0.5, 1)
 			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * 1.35 * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul * heldClotMul
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3
 			local woundBleedRate = bleed / rand1 * 3
 			coagulatespeed = coagulatespeed + coagulate / rand2
@@ -464,7 +477,7 @@ module[2] = function(owner, org, mulTime)
 			local rand2 = math.Rand(0.5, 1) * 1
 			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02 * tourniquetBleedMul
 			bleed = bleed * getHeldWoundBleedMul(org, wound)
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04-- / #org.wounds
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04 * heldClotMul-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
 			wound.visualBleedRate = woundBleedRate + bleed / rand1 * 3
 			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
@@ -506,9 +519,13 @@ module[2] = function(owner, org, mulTime)
 
 	local arterialToRemove = {}
 	local hasCarotidWound = false
+	local heldCarotidWound = false
 	for i, wound in pairs(org.arterialwounds) do
 		local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
+		if wound[7] == "arteria" and org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound then
+			heldCarotidWound = true
+		end
 		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80 * tourniquetBleedMul
 		bleedoutspeed2 = bleedoutspeed2 + passiveArterialBleed
 		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
@@ -548,8 +565,9 @@ module[2] = function(owner, org, mulTime)
 	end
 	if org.throatcut then
 		local severity = math.Clamp(org.throatCutSeverity or 1, 0.35, 1.25)
-		local pressureTarget = hasCarotidWound and severity or 0
-		local brainPenaltyTarget = hasCarotidWound and math.min(severity * 0.3, 0.45) or 0
+		local carotidPressureMul = heldCarotidWound and hold_wound_arterial_slow_mul or 1
+		local pressureTarget = hasCarotidWound and severity * carotidPressureMul or 0
+		local brainPenaltyTarget = hasCarotidWound and math.min(severity * 0.3, 0.45) * carotidPressureMul or 0
 		local pressureRate = hasCarotidWound and mulTime / 14 or mulTime / 8
 		local brainPenaltyRate = hasCarotidWound and mulTime / 18 or mulTime / 8
 		org.throatCutPressureShock = math.Approach(org.throatCutPressureShock or 0, pressureTarget, pressureRate)

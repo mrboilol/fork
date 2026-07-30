@@ -364,6 +364,7 @@ function ENT:Explode()
 	local disorientation_dis = GRENADE_DISORIENTATION_RADIUS / 0.01905
 	local entsCount = 0
 	local processedEnts = 0
+	local propForces = {}
 	for i, enta in ipairs(ents.FindInSphere(selfPos, disorientation_dis)) do
 		if processedEnts >= GRENADE_NEARBY_ENTITY_CAP then break end
 		if not IsValid(enta) then continue end
@@ -376,7 +377,7 @@ function ENT:Explode()
 			entsCount = entsCount + 1
 		end
 
-		local force = entPos - selfPos
+		local force = tracePos - selfPos
 		local len = force:Length()
 
 		if enta.organism then
@@ -397,8 +398,6 @@ function ENT:Explode()
 		local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)
 		local forceadd = force * physics_frac * GRENADE_KNOCKBACK_FORCE
 		local liftForce = Vector(0, 0, GRENADE_LIFT_FORCE * physics_frac * GRENADE_LIFT_FRAC)
-		local tracePos = enta:IsPlayer() and (entPos + enta:OBBCenter()) or entPos
-		local tr = hg.ExplosionTrace(selfPos, tracePos, {self})
 		if tr.Entity != enta then continue end
 
 		if enta:IsPlayer() then

@@ -2,6 +2,33 @@ CAI.Brain = CAI.Brain or {}
 local BR = CAI.Brain
 local STATE = nil
 
+local function HandleEmptyWeapon(data)
+    local npc = data.ent
+    local wep = npc.GetActiveWeapon and npc:GetActiveWeapon()
+    if not (IsValid(wep) and wep.Clip1 and wep.GetMaxClip1
+        and wep:GetMaxClip1() > 0 and wep:Clip1() == 0) then
+        data.reloadScheduleAt = nil
+        return false
+    end
+
+    -- Do not let cover/combat schedules immediately replace the reload. Some
+    -- SWEPs perform the actual refill asynchronously, so keep this state until
+    -- the clip changes and periodically retry the engine schedule if needed.
+    if not data.reloadScheduleAt or CurTime() >= data.reloadScheduleAt then
+        data.reloadScheduleAt = CurTime() + 1
+        npc:SetSchedule(SCHED_RELOAD)
+
+        -- Homigrad weapons own their reload timing instead of using
+        -- DefaultReload, so explicitly start it as well.
+        if wep.ishgweapon and wep.Reload and not wep.reload then
+            wep:Reload()
+        end
+    end
+
+    BR.SetState(data, CAI.STATE.COVER, "reloading")
+    return true
+end
+
 function BR.SetState(data, newState, reason)
     if data.state == newState then return end
     data.prevState = data.state
@@ -479,6 +506,8 @@ function BR.Think(data, dt)
     CAI.Morale.Regen(data, dt)
     CAI.Personality.ApplyProficiency(data)
     CAI.Nav.CheckStuck(data)
+
+    if HandleEmptyWeapon(data) then return end
 
     local newState, reason = Decide(data)
     BR.SetState(data, newState, reason)

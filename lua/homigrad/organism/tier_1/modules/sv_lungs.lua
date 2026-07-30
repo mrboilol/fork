@@ -744,16 +744,23 @@ module[2] = function(owner, org, timeValue)
 		if org.arterialwounds then
 
 			local arteryDrainMul = 0
+			local hasHeldCarotid = false
+			local hasUnheldCentralArtery = false
 
 			for _, wound in pairs(org.arterialwounds) do
 
 				if wound[7] == "arteria" and wound[1] > 0 then
 
-					arteryDrainMul = arteryDrainMul + 1
+					local held = org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound
+					local woundDrainMul = held and 0.2 or 1
+					arteryDrainMul = arteryDrainMul + woundDrainMul
+					hasHeldCarotid = hasHeldCarotid or held
+					hasUnheldCentralArtery = hasUnheldCentralArtery or not held
 
 				elseif wound[7] == "spineartery" and wound[1] > 0 then
 
 					arteryDrainMul = arteryDrainMul + 0.85
+					hasUnheldCentralArtery = true
 
 				end
 
@@ -775,7 +782,8 @@ module[2] = function(owner, org, timeValue)
 
 				-- Neck and spinal arterial wounds still compromise oxygen delivery, but
 				-- this is deliberately a slow secondary loss rather than a rapid O2 wipe.
-				local arteriaDrain = timeValue * 0.08 * pulseMultiplier * org.arterialO2Impairment
+				local immediatePressureMul = hasHeldCarotid and not hasUnheldCentralArtery and 0.2 or 1
+				local arteriaDrain = timeValue * 0.08 * pulseMultiplier * org.arterialO2Impairment * immediatePressureMul
 
 				o2[1] = max(o2[1] - arteriaDrain, 0)
 
