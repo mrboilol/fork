@@ -19,6 +19,28 @@ local DEATH_SOUNDS = {
     [0] = "rem_brutaldeath.mp3",
 }
 
+local DEATH_DESCRIPTIONS = {
+    "You are no longer a witness to the world.",
+    "go play roblox",
+    "wow you suck",
+    "back to the lobby",
+    "FUCK FUCKING FUCK NIGGER SHIT FUCK FUCK",
+    "how did you die so fast",
+    "gg ez",
+    "even john is better than you",
+    "wake up in the morning feeling like p diddy",
+    "reset organism",
+    "/kill niggers",
+    "karma police",
+    "lmfao you suck nga",
+    "just dont die next time",
+    "imagine dying",
+    "wait what happened i didnt see",
+    "cro new fluidmaster just arrived",
+    "ur weak kid",
+    "packwatch",
+}
+
 -- server convar values yesss
 local cfg_spectator     = true
 local cfg_compat        = false
@@ -87,6 +109,7 @@ local hasSpawned    = false
 local isDead        = false
 local stage2Started = false
 local deathTime     = 0
+local deathDescription = DEATH_DESCRIPTIONS[1]
 local stage2Time    = 0
 local autoCompatTriggered = false
 local deathCamPos   = Vector(0, 0, 0)
@@ -117,6 +140,19 @@ local lastReloadPressTime = 0
 local prevSpecReloadDown  = false
 local nextCamSync         = 0
 local nextSoundfade       = 0
+
+local function PickDeathDescription()
+    if #DEATH_DESCRIPTIONS < 2 then
+        return DEATH_DESCRIPTIONS[1] or ""
+    end
+
+    local previousDescription = deathDescription
+    repeat
+        deathDescription = DEATH_DESCRIPTIONS[math.random(#DEATH_DESCRIPTIONS)]
+    until deathDescription ~= previousDescription
+
+    return deathDescription
+end
 
 -- z-city bypassing
 local zcity_RenderScene = nil
@@ -265,6 +301,7 @@ local function CinematicDeathTracker()
         compatActiveTime = 0
         compatTriggered  = false
         deathTime        = CurTime()
+        PickDeathDescription()
         ragdollEnt       = ply:GetRagdollEntity()
         prevReloadDown   = false
         prevJumpDown     = false
@@ -588,7 +625,7 @@ local function CinematicDeathBackground()
         local textAlpha = math.floor(textFadeIn * overlayAlpha * (1 - fadeProgress))
         local shake = 5 * (1 - textFadeIn)
         local text = "Deceased."
-        local desc = "You are no longer a witness to the world."
+        local desc = deathDescription
         local slide = 1 - ((1 - textFadeIn) ^ 3)
         local textX = Lerp(slide, -650, 70) + math.sin(CurTime() * 95) * shake
         local textY = sh / 2 - 60 + math.cos(CurTime() * 110) * shake

@@ -226,71 +226,12 @@ local clr_black1 = Color( 0, 0, 0, 255)
 local clr_black2 = Color( 0, 0, 0, 255)
 local hg_forced_firstperson_death = ConVarExists("hg_firstperson_death") and GetConVar("hg_firstperson_death") or CreateClientConVar("hg_firstperson_death", "1", true, false, "Toggle first-person death camera view", 0, 1)
 local hg_forced_deathfadeout = ConVarExists("hg_deathfadeout") and GetConVar("hg_deathfadeout") or CreateClientConVar("hg_deathfadeout", "0", true, true, "Toggle screen fade and sound mute on death", 0, 1)
-local forsaken_overlay = Material("overlays/sonarimpact3.png")
-local forsaken_scene_start = 0
-local forsaken_scene_end = 0
-local forsaken_scene_duration = 4
-local forsaken_fadein = 0.15
-local forsaken_fadeout = 2
-local forsaken_text_phrases = {
-    "deathed",
-    "wow you fucking suck",
-    "ez",
-	"back to the lobby",
-	"died",
-	"dayum",
-	"that must have hurt",
-	"bind g fake",
-	"FORSAKEN",
-	"neck broken",
-	"how are you this bad",
-	"go play roblox",
-	"ouch",
-	"mortis",
-	"lmfao",
-	"that was bad",
-	"wait i didnt see that",
-	"jesus fucking christ",
-	"WHERES YO HEAD AT???",
-	"OW FUCKING FUCK FUCKER FUCKING SHIT",
-}
-
-local forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
-local forsaken_soundfade_release_until = 0
-surface.CreateFont("ZCity_Veteran_Forsaken", {
-	font = "Veteran Typewriter",
-	size = ScreenScaleH(42),
-	weight = 700,
-	antialias = true
-})
-
-local function getNormalDSP()
-	local cvar = hg_gopro or (ConVarExists("hg_gopro") and GetConVar("hg_gopro"))
-	return cvar and cvar:GetBool() and 55 or 0
-end
-
-local function resetPlayerSound(ply)
-	if not IsValid(ply) then return end
-	ply:SetDSP(getNormalDSP(), true)
-	ply:ConCommand("soundfade 0 0")
-	if IsValid(hg.chat) then
-		hg.chat:AnimateRealAlpha(255)
-	end
-end
 
 local mat1 = Material("vgui/gradient-u")
 local mat2 = Material("vgui/gradient-d")
 
 local ang1 = Angle()
 local ang2 = Angle()
-
-net.Receive("hg_forsaken_deathscene", function()
-	forsaken_scene_start = CurTime()
-	forsaken_scene_end = forsaken_scene_start + forsaken_scene_duration
-	forsaken_soundfade_release_until = forsaken_scene_end + 0.5
-	surface.PlaySound("panoptisscon/death.ogg")
-	RunConsoleCommand("soundfade", "0", "0")
-end)
 
 hook.Add("Think", "hg.force.death.convars", function()
 	if hg_forced_deathfadeout:GetInt() ~= 0 then
@@ -301,39 +242,12 @@ hook.Add("Think", "hg.force.death.convars", function()
 		RunConsoleCommand("hg_firstperson_death", "1")
 	end
 
-	if forsaken_soundfade_release_until > CurTime() then
-		RunConsoleCommand("soundfade", "0", "0")
-	end
 end)
 
 hook.Add("HUDShouldDraw", "hg.HUDShouldDraw", function(id)
 	if (fakeTimer and fakeTimer - 2 > CurTime()) then
 		return false
 	end
-end)
-
-hook.Add("DrawOverlay", "hg.forsaken.deathscene", function()
-	if forsaken_scene_end <= CurTime() then return end
-
-	local elapsed = CurTime() - forsaken_scene_start
-	local alphaMul = 1
-	if elapsed < forsaken_fadein then
-		alphaMul = math.Clamp(elapsed / forsaken_fadein, 0, 1)
-	elseif elapsed > forsaken_scene_duration - forsaken_fadeout then
-		alphaMul = math.Clamp((forsaken_scene_duration - elapsed) / forsaken_fadeout, 0, 1)
-	end
-
-	local overlayAlpha = math.floor(127 * alphaMul)
-	local textAlpha = math.floor(255 * alphaMul)
-	local shakeMul = math.Clamp(1 - (elapsed / 1), 0, 1)
-	local shakeX = math.sin(CurTime() * 150) * 14 * shakeMul + math.Rand(-3, 3) * shakeMul
-	local shakeY = math.cos(CurTime() * 140) * 14 * shakeMul + math.Rand(-3, 3) * shakeMul
-
-	surface.SetDrawColor(255, 255, 255, overlayAlpha)
-	surface.SetMaterial(forsaken_overlay)
-	surface.DrawTexturedRect(0, 0, ScrW(), ScrH())
-
-	draw.SimpleText(forsaken_text, "ZCity_Veteran_Forsaken", ScrW() * 0.5 + shakeX, ScrH() * 0.5 + shakeY, Color(255, 255, 255, textAlpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 end)
 
 hook.Add("HG_OnOtrub", "adsadsadhuy!!", function(ply)
@@ -348,15 +262,6 @@ hook.Add("Player_Death", "adsadsadhuy!!", function(ply)
 		lply:SetDSP(17)
 		plyCommand(lply,"soundfade 100 99999")
 	end
-end)
-
-hook.Add("Player Spawn", "hg.forsaken.deathscene.reset", function(ply)
-	if ply ~= LocalPlayer() then return end
-	forsaken_scene_start = 0
-	forsaken_scene_end = 0
-	forsaken_soundfade_release_until = 0
-	forsaken_text = forsaken_text_phrases[math.random(1, #forsaken_text_phrases)]
-	resetPlayerSound(ply)
 end)
 
 local alivestart = CurTime()

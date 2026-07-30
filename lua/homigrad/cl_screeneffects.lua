@@ -365,7 +365,9 @@ lobotomy_mats = {
 
 local consciousnessTypeBeatVolume = 0.18
 local dying2Volume = 0.4
-local quietAltDyingVolume = 0.28
+local alternateDyingForegroundVolume = 0.6
+local alternateDyingBackgroundVolume = 0.34
+local alternateDyingBackgroundMul = 0.42
 local painBeatOverlayPath = "sound/rem_pain.mp3"
 local panicattackOverlayPath = "sound/rem_panicattack.mp3"
 local panicattackFadeStart = 0
@@ -1538,15 +1540,52 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			painVolume = math.Clamp(math.Remap(pain, 0, painThresholdMax, 0, 2), 0, 2)
 			normalizedPain = math.Clamp(pain / painThresholdMax, 0, 1)
 			painPitch = math.Clamp(math.Remap(normalizedPain, 0, 1, 100, painPitchMax), 100, painPitchMax)
-			if IsValid(PainStation) then
-				PainStation:SetVolume(painVolume)
-				PainStation:SetPlaybackRate(painPitch / 100)
+			local targetPainVolume = 0
+			local targetRealityVolume = 0
+			local targetAgonyVolume = 0
+			local targetAltpainVolume = 0
+			local targetSillypainVolume = 0
+			local targetRemPainVolume = 0
+			local targetRemAgonyVolume = 0
+			local targetRemExcruciatingVolume = 0
+
+			if painMode == 0 then
+				targetPainVolume = painVolume
+				targetRealityVolume = painVolume
+			elseif painMode == 1 then
+				targetPainVolume = painVolume
+			elseif painMode == 2 then
+				targetAgonyVolume = painVolume
+			elseif painMode == 3 then
+				targetAltpainVolume = painVolume
+			elseif painMode == 4 then
+				targetRealityVolume = painVolume
+			elseif painMode == 5 then
+				targetSillypainVolume = painVolume
+			elseif painMode == 6 then
+				targetPainVolume = painVolume
+				targetRemPainVolume = painVolume * painBeatOverlayVolumeMul
+				targetRemAgonyVolume = math.Clamp(math.Remap(normalizedPain, painAgonyThreshold, 1, 0, 1), 0, 1) * painVolume * painAgonyVolumeMul
+				targetRemExcruciatingVolume = math.Clamp(math.Remap(normalizedPain, painExcruciatingThreshold, 1, 0, 1), 0, 1) * painVolume * painExcruciatingVolumeMul
 			end
 
+			if IsValid(PainStation) then
+				PainStation:SetVolume(targetPainVolume)
+				PainStation:SetPlaybackRate(painPitch / 100)
+			end
 			if IsValid(PainStationOverlay) then
-				PainStationOverlay:SetVolume(painVolume * painBeatOverlayVolumeMul)
+				PainStationOverlay:SetVolume(targetRemPainVolume)
 				PainStationOverlay:SetPlaybackRate(painPitch / 100)
 			end
+			if IsValid(RealityStation) then RealityStation:SetVolume(targetRealityVolume) end
+			if IsValid(AgonyStation) then AgonyStation:SetVolume(targetAgonyVolume) end
+			if IsValid(AltpainStation) then AltpainStation:SetVolume(targetAltpainVolume) end
+			if IsValid(RemAgonyStation) then
+				RemAgonyStation:SetVolume(targetRemAgonyVolume)
+				RemAgonyStation:SetPlaybackRate(painPitch / 100)
+			end
+			if IsValid(RemExcruciatingPainStation) then RemExcruciatingPainStation:SetVolume(targetRemExcruciatingVolume) end
+			if IsValid(SillypainStation) then SillypainStation:SetVolume(targetSillypainVolume) end
 		//else
 		//	if IsValid(PainStation) then
 		//		PainStation:Stop()
@@ -2023,11 +2062,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SonimCookedStation:SetVolume(0)
 				end
 				if IsValid(AltRemDyingStation) then
-					AltRemDyingStation:SetVolume(math.Clamp(consciousVol * 0.35, 0, quietAltDyingVolume))
+					AltRemDyingStation:SetVolume(math.Clamp(consciousVol * alternateDyingBackgroundMul, 0, alternateDyingBackgroundVolume))
 					if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
 				end
 				if IsValid(NoiseStation2Dying) then
-					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, dying2Volume))
+					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, alternateDyingForegroundVolume))
 				end
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
@@ -2142,8 +2181,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 					if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 					if IsValid(AltRemDyingStation) then
-						AltRemDyingStation:SetVolume(math.min(otrubVol * 0.35, quietAltDyingVolume))
+						AltRemDyingStation:SetVolume(math.min(otrubVol * alternateDyingBackgroundMul, alternateDyingBackgroundVolume))
 						if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
+					end
+					if IsValid(NoiseStation2Dying) then
+						NoiseStation2Dying:SetVolume(math.min(otrubVol, alternateDyingForegroundVolume))
 					end
 				end
 			end

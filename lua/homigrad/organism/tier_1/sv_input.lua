@@ -47,6 +47,20 @@ local body_part_heal = {
 	[HITGROUP_STOMACH] = 1,
 }
 
+-- Keep a penetrating bullet from damaging a limb bone belonging to a different
+-- limb that happens to overlap the trace. This table was removed
+-- with the old gib system even though Trace_Bullet still relies on it.
+local bulletLimbBoneHitgroups = {
+	larmup = HITGROUP_LEFTARM,
+	larmdown = HITGROUP_LEFTARM,
+	rarmup = HITGROUP_RIGHTARM,
+	rarmdown = HITGROUP_RIGHTARM,
+	llegup = HITGROUP_LEFTLEG,
+	llegdown = HITGROUP_LEFTLEG,
+	rlegup = HITGROUP_RIGHTLEG,
+	rlegdown = HITGROUP_RIGHTLEG,
+}
+
 local function isFistInflictor(dmgInfo)
 	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
 	if not IsValid(inflictor) or not inflictor:IsWeapon() then return false end
@@ -758,7 +772,7 @@ hook.Add("PlayerDeathThink","stoprespawning",function()
 	if hg_norespawn:GetBool() then return true end
 end)
 
-hook.Add("PlayerSpawn", "hg_forsaken_deathscene_reset", function(ply)
+hook.Add("PlayerSpawn", "hg_brain_burst_reset", function(ply)
 	local org = ply.organism
 	if not org then return end
 	org.brainBurstDamage = 0
@@ -773,12 +787,8 @@ hook.Add("PlayerSpawn", "hg_spine_floppy_reset", function(ply)
 	end
 end)
 
-hook.Add("PlayerDeath", "hg_forsaken_deathscene", function(victim)
+hook.Add("PlayerDeath", "hg_death_organism_cleanup", function(victim)
 	local org = victim.organism
-
-	-- Forsaken now represents every real death, not only a recent brain-damage burst.
-	net.Start("hg_forsaken_deathscene")
-	net.Send(victim)
 
 	if not org then return end
 
@@ -797,7 +807,6 @@ util.AddNetworkString("hg_bloodimpact")
 --util.AddNetworkString("blood particle explode")
 util.AddNetworkString("bloodsquirt")
 util.AddNetworkString("hg_brainmist")
-util.AddNetworkString("hg_forsaken_deathscene")
 
 
 --util.AddNetworkString("tracePosesSend")

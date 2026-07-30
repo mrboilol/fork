@@ -152,9 +152,11 @@ module[2] = function(owner, org, timeValue)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
 	
-	-- Otrub blocks incoming pain.  Apply that rule to the accumulator itself so
-	-- queued pain cannot keep avgpain pinned at its 150 cap indefinitely.
-	local add = shouldPainAdd and math.min(timeValue * 15, org.painadd) or 0
+	-- Otrub blocks queued pain from reaching avgpain, but the queue must still
+	-- be consumed. Otherwise it resumes on wake and can create an endless
+	-- pain-collapse cycle after one severe impact.
+	local queuedPain = math.min(timeValue * 15, org.painadd)
+	local add = shouldPainAdd and queuedPain or 0
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
 	-- Adrenaline delays incoming pain while adrenaline and Zerlkers both help
@@ -273,7 +275,7 @@ module[2] = function(owner, org, timeValue)
 		owner:Thought("You are experiencing excruciating pain.", 8, "thought_excruciatingpain", 0, Color(255, 160, 160))
 	end
 
-	org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
+	org.painadd = min(max(org.painadd - queuedPain * analgesiaMul, 0), 150)
 
 	//org.painkiller = Approach(org.painkiller, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 
