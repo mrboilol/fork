@@ -349,6 +349,7 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 		local wep = ply:GetActiveWeapon()
 		local vel = ply:GetVelocity()
 		local velLen = vel:Length()
+		local lag_comp_mul, lag_comp_time = hg_GetMovementLagComp(ply)
 		local on_ground = ply:OnGround()
 		if not on_ground then
 			ply.hg_WasAirborne = true

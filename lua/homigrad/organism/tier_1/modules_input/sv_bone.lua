@@ -74,15 +74,18 @@ local function emitRandomBoneBreakSound(ent, volume, level)
 end
 
 local armDropChances = {
-	shot = {larm = 0.006, rarm = 0.025},
-	dislocation = {larm = 0.09, rarm = 0.32},
-	fracture = {larm = 0.12, rarm = 0.42},
+	shot = {larm = 0.003, rarm = 0.008},
+	dislocation = {larm = 0.07, rarm = 0.14},
+	fracture = {larm = 0.10, rarm = 0.20},
 }
 
 local function tryDropHeldItemFromArmInjury(org, key, reason)
 	if not SERVER or not org.isPly or (key ~= "larm" and key ~= "rarm") then return end
 	local owner = org.owner
 	if not IsValid(owner) or not owner:Alive() then return end
+	owner.hg_arm_drop_roll = owner.hg_arm_drop_roll or {}
+	if (owner.hg_arm_drop_roll[key] or 0) > CurTime() then return end
+	owner.hg_arm_drop_roll[key] = CurTime() + 0.12
 	local chance = armDropChances[reason] and armDropChances[reason][key] or 0
 	if chance <= 0 or math.random() >= chance then return end
 	local wep = owner:GetActiveWeapon()

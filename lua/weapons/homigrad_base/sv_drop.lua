@@ -136,11 +136,13 @@ function hg.TraceHeldWeaponShot(startPos, endPos, attacker, damage, force, origi
 		if not wep.WorldModel_Transform then continue end
 
 		local pos, ang = wep:WorldModel_Transform(true)
-		if not pos or not ang then continue end
+		local model = wep.worldModel
+		if not pos or not ang or not IsValid(model) then continue end
 
-		-- worldModel is clientside. Use the SWEP's server-side model bounds at
-		-- the transformed held pose so bullets can actually intersect the gun.
-		local mins, maxs = wep:OBBMins(), wep:OBBMaxs()
+		-- The server creates a non-solid prop for the held world model. Trace
+		-- against that prop's bounds: SWEP collision bounds are commonly empty
+		-- or unrelated to the gun model while it is owned.
+		local mins, maxs = model:OBBMins(), model:OBBMaxs()
 		if not mins or not maxs or mins == maxs then continue end
 
 		local intersectPos, intersectNormal, fraction = util.IntersectRayWithOBB(startPos, ray, pos, ang, mins, maxs)

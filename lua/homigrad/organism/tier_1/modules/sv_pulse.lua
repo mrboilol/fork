@@ -117,7 +117,7 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 	-- while severe systemic failure falls back to an escape rhythm.
 	if cardiac >= 0.72 and heartbeat > 40 then return "av_block_complete" end
 	if cardiac >= 0.4 and heartbeat > 45 then return "av_block_partial" end
-	if org.terminalRhythm == "ventricular_fibrillation" then return "ventricular_fibrillation" end
+	if org.fibrillation or org.terminalRhythm == "ventricular_fibrillation" then return "ventricular_fibrillation" end
 	if org.unstableRhythm == "atrial_fibrillation" then return "atrial_fibrillation" end
 	if org.unstableRhythm == "ventricular_ectopy" then return "ventricular_ectopy" end
 	-- Moderate cold should retain its conduction/J-wave morphology while the
@@ -165,6 +165,10 @@ end
 function hg.organism.StartFibrillation(org)
 	if not org or org.heartstop then return end
 	org.fibrillation = true
+	-- Fibrillation replaces an organized palpitation rhythm; keeping both
+	-- active makes circulation, ECG, and status displays disagree.
+	org.palpitations = 0
+	org.palpitationTreatmentUntil = 0
 	org.arrhythmia = math.max(org.arrhythmia or 0, 0.8)
 	org.fibrillationStart = CurTime()
 end
@@ -394,7 +398,9 @@ module[2] = function(owner, org, timeValue)
 	-- once the rhythm settles.
 	local tachycardiaK = math.Clamp((org.heartbeat - 120) / 120, 0, 1)
 	local correctingPalpitations = (org.palpitationTreatmentUntil or 0) > CurTime()
-	if correctingPalpitations then
+	if org.fibrillation then
+		org.palpitations = 0
+	elseif correctingPalpitations then
 		org.palpitations = math.max(palpitations - timeValue / 4, 0)
 	elseif tachycardiaK > 0 and not org.heartstop then
 		org.palpitations = math.Clamp(palpitations + timeValue * (0.002 + tachycardiaK * 0.021), 0, 1)

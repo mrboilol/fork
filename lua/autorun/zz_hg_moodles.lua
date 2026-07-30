@@ -502,7 +502,7 @@ local function buildEffects(ply, org)
 		local level = highRank(heartRate, {100, 130, 160, 190})
 		add(effects, "tachycardia", "tachycardia", level, "bad", 23, math.floor(heartRate) .. " bpm")
 	end
-	if palpitations > 0 then add(effects, "palpitations", "palpitations", math.max(math.ceil(palpitations * 4), 1), "bad", 24, math.floor(palpitations * 100) .. "%") end
+	if not org.fibrillation and palpitations > 0 then add(effects, "palpitations", "palpitations", math.max(math.ceil(palpitations * 4), 1), "bad", 24, math.floor(palpitations * 100) .. "%") end
 	if not org.heartstop and pulse > 0 and heartRate < 60 then
 		local level = lowRank(heartRate, {60, 50, 40, 30})
 		add(effects, "bradycardia", "bradycardia", level, "bad", 25, math.floor(heartRate) .. " bpm")
