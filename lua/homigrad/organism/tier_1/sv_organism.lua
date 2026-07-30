@@ -1246,19 +1246,16 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		return
 	end
 
-	if owner:IsPlayer() and not owner:Alive() then
-		org.alive = false
-		hg.organism.ZeroVitals(org)
-		return
-	end
-
 	local isPly = owner:IsPlayer()
+	local alive = owner:Alive()
+	if isPly and not alive then return end
+	local curTime = CurTime()
 
 	org.isPly = isPly
 
 	if isPly or org.fakePlayer then
 		if not org.fakePlayer then
-			org.alive = owner:Alive()
+			org.alive = alive
 		end
 	else
 		org.alive = false
@@ -1452,7 +1449,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.furryinfected = false
 		end
 	else
-		if (org.lightstun - CurTime()) <= 0 then
+		if (org.lightstun - curTime) <= 0 then
 			org.assimilated = math.Approach(org.assimilated, 0, (timeValue / 60 * org.pulse / 70) * 6)
 		end
 	end
@@ -1487,7 +1484,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	if org.berserk > 0 and !org.berserkActive then
 		org.berserkActive = true
 
-		owner.lastBerserkLaughSoundCD = CurTime() + 5
+		owner.lastBerserkLaughSoundCD = curTime + 5
 
 		timer.Simple(3.95, function()
 			org.berserkActive2 = true
@@ -1519,8 +1516,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target), timeValue / panicattack_adrenaline_add_rise_time)
 
-		if organSystemsEnabled and isPly and CurTime() >= (org.nextPanicHeartRoll or 0) then
-			org.nextPanicHeartRoll = CurTime() + panicattack_heart_roll_delay
+		if isPly and curTime >= (org.nextPanicHeartRoll or 0) then
+			org.nextPanicHeartRoll = curTime + panicattack_heart_roll_delay
 			if math.random(100) <= panicattack_heart_roll_chance then
 				org.heartstop = true
 				owner:Notify("My heart just stopped.", 2, "panicattack_heartstop", 2, nil, Color(255, 120, 120))
@@ -1528,7 +1525,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 	else
 		org.panicattackActive = false
-		org.nextPanicHeartRoll = CurTime() + panicattack_heart_roll_delay
+		org.nextPanicHeartRoll = curTime + panicattack_heart_roll_delay
 	end
 
 	if organSystemsEnabled then
@@ -1553,23 +1550,18 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			hg.organism.AddSeizure(org, timeValue * coldStress * seizure_temperature_cold_gain_mul)
 		end
 
-		local curTime = CurTime()
-		local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
-		if seizureBrainDamage > 0.05 then
-			org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
-			if curTime >= org.nextSeizureRoll then
-				org.nextSeizureRoll = curTime + seizure_brain_roll_delay
-				if math.random(seizure_brain_roll_chance) == 1 then
-					hg.organism.AddSeizure(org, math.Rand(seizure_brain_roll_gain_min, seizure_brain_roll_gain_max) * math.Clamp(math.Remap(seizureBrainDamage, 0.05, 1, 0.75, 1.5), 0.75, 1.5))
-				end
-			end
-		else
+	local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
+	if seizureBrainDamage > 0.05 then
+		org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
+		if curTime >= org.nextSeizureRoll then
 			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
+			if math.random(seizure_brain_roll_chance) == 1 then
+				hg.organism.AddSeizure(org, math.Rand(seizure_brain_roll_gain_min, seizure_brain_roll_gain_max) * math.Clamp(math.Remap(seizureBrainDamage, 0.05, 1, 0.75, 1.5), 0.75, 1.5))
+			end
 		end
-
-		if not org.seizureActive and seizureBrainDamage <= 0.05 and heatStress <= 0 and coldStress <= 0 then
-			reduceSeizure(org, timeValue / seizure_no_cause_decay_time)
-		end
+	else
+		org.nextSeizureRoll = curTime + seizure_brain_roll_delay
+	end
 
 		org.lastSeizureBrain = org.brain or 0
 		org.lastSeizureLobeDamage = lobeDamage
@@ -1702,71 +1694,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	
-	-- Spine damage effects: reduce capabilities based on which part is damaged
-	-- spine1 = lower spine (legs), spine2 = chest (arms), spine3 = neck (breathing + everything)
-	-- Effects start at spine damage > 0.4 (broken at 0.8), never go below 0.1
-	local fake1 = hg.organism and hg.organism.fake_spine1 or 1
-	local fake2 = hg.organism and hg.organism.fake_spine2 or 1
-	local fake3 = hg.organism and hg.organism.fake_spine3 or 0.75
-	local threshold = 0.4
-	
-	-- Default values
-	org.legstrength = 1
-	org.armstrength = 1
-	org.meleespeed = 1
-	org.breathing = 1
-	
-	-- spine1 damage (> 0.4) reduces leg strength - affects walk/run/jump/kick
-	if org.spine1 and org.spine1 > threshold then
-		local damageFactor = (org.spine1 - threshold) / (fake1 - threshold)
-		org.legstrength = math.max(1 - damageFactor * 0.9, 0.1)
-	end
-	
-	-- spine2 damage (> 0.4) reduces arm strength and melee speed - affects weapon control/dragging/melee
-	if org.spine2 and org.spine2 > threshold then
-		local damageFactor = (org.spine2 - threshold) / (fake2 - threshold)
-		org.armstrength = math.max(1 - damageFactor * 0.9, 0.1)
-		org.meleespeed = math.max(1 - damageFactor * 0.6, 0.4)
-	end
-	
-	-- spine3 damage (> 0.4) reduces breathing and overall strength
-	if org.spine3 and org.spine3 > threshold then
-		local damageFactor = (org.spine3 - threshold) / (fake3 - threshold)
-		org.breathing = math.max(1 - damageFactor * 0.7, 0.1)
-		-- spine3 also affects leg and arm strength when severe
-		org.legstrength = org.legstrength * math.max(1 - damageFactor * 0.5, 0.1)
-		org.armstrength = org.armstrength * math.max(1 - damageFactor * 0.5, 0.1)
-	end
-
-	-- One-handed posture penalties (continuous effects when left arm is damaged/amputated)
-	if isPly then
-		-- Repair any multiplier accumulated by older builds before applying this
-		-- tick's fixed one-handed penalty.
-		org.recoilmul = math.Clamp(tonumber(org.recoilmul) or 1, 0.65, 1.5)
-		local leftArmDamaged = (org.larm and org.larm >= 1) or org.larmamputated or (org.larmdislocation or org.larmdislocated)
-		if leftArmDamaged then
-			-- This runs every organism tick. These are state penalties, not
-			-- per-tick multipliers: multiplying here made recoil grow forever until
-			-- a character reset.
-			local recoilPenalty = 1.15
-			local armStrengthPenalty = 0.85
-
-			-- A two-handed weapon without the supporting arm is harder to control,
-			-- but still must remain a fixed penalty.
-			local wep = owner:GetActiveWeapon()
-			if IsValid(wep) and wep.TwoHanded ~= false then
-				recoilPenalty = recoilPenalty * 1.3
-				armStrengthPenalty = armStrengthPenalty * 0.75
-			end
-
-			org.recoilmul = math.max(math.Clamp(tonumber(org.recoilmul) or 1, 0.65, 1.5), recoilPenalty)
-			org.armstrength = math.min(org.armstrength or 1, armStrengthPenalty)
-
-		end
-	end
-
-	if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-	if hg.organism.GetResilientBlood(org) <= 2500 then org.needfake = true end
+	if not (org.canmove and org.canmovehead and (org.stun - curTime) < 0) then org.needfake = true end
+	if (org.blood < 2700) then org.needfake = true end
 
 	local just_went_uncon = not org.otrub and org.needotrub
 
@@ -1853,10 +1782,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 
 	if isPly and org.otrub and org.incapacitated then
-		org.deathStateEnd = org.deathStateEnd or CurTime() + 25
-		if (org.defibDeathGrace or 0) > CurTime() then org.deathStateEnd = org.defibDeathGrace end
+		org.deathStateEnd = org.deathStateEnd or curTime + 25
+		if (org.defibDeathGrace or 0) > curTime then org.deathStateEnd = org.defibDeathGrace end
 
-		if CurTime() >= org.deathStateEnd and not org.deathStateKilled then
+		if curTime >= org.deathStateEnd and not org.deathStateKilled then
 			org.deathStateKilled = true
 			owner:Kill()
 			return
@@ -1932,31 +1861,15 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 	if !org.alive then
 		org.lungsfunction = false
-		hg.organism.ZeroVitals(org)
+		org.heartstop = true
 	end
 
-	-- A heartstop can be triggered by systems that run after the pulse module
-	-- (for example panic). Normalize the replicated state before clients draw
-	-- the ECG or organism stats so the rhythm can never lag behind heartstop.
-	if hg.organism.GetECGState then
-		org.ecgState = hg.organism.GetECGState(org.heartbeat or 0, org.heartstop, org)
-	end
-	if org.heartstop then
-		org.cardiacArrestStart = org.cardiacArrestStart or CurTime()
-		org.cardiacArrestO2Start = math.Clamp(org.cardiacArrestO2Start or (org.o2 and org.o2[1] or 0), 0, 6)
-		org.pulse = 0
-		org.cardiacOutput = 0
-		org.bloodpressure = 0
-		org.systolic = 0
-		org.diastolic = 0
-	end
-
-	time = CurTime()
+	time = curTime
 
 	if IsValid(owner) then
-		org.sendPlyTime = org.sendPlyTime or CurTime()
+		org.sendPlyTime = org.sendPlyTime or curTime
 		if (org.sendPlyTime > time) and !just_went_uncon then return end
-		org.sendPlyTime = CurTime() + 1 + (not isPly and 2 or 0)
+		org.sendPlyTime = curTime + 1 + (not isPly and 2 or 0)
 		send_bareinfo(org)
 
 		local woundsSig = wounds_signature(org.wounds)
@@ -1972,7 +1885,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 		hg.organism.SyncWounds(org)
 
-		if isPly and owner:Alive() then
+		if isPly and alive then
 			send_organism(org, owner)
 		end
 	end
