@@ -292,7 +292,7 @@ surface.CreateFont("ZB_TDM_MENU", {
     antialias = true
 })
 surface.CreateFont("ZB_TDM_MENU_BIG", {
-    font = "Verily Serif Mono",
+    font = "VCR OSD Mono",
     size = ScreenScale(24),
     extended = true,
     weight = 400,

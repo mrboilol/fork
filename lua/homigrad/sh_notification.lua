@@ -161,7 +161,7 @@ if CLIENT then
 	})
 
 	surface.CreateFont("ThoughtFont", {
-		font = "BudgetLabel",
+		font = "VCR OSD Mono",
 		extended = true,
 		size = ScreenScale(11),
 		weight = 0,
