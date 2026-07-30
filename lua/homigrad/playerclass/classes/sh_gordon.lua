@@ -736,6 +736,9 @@ elseif SERVER then
                 org.lungsR[2] = math.max(org.lungsR[2] - regen, 0)
                 org.lungsL[2] = math.max(org.lungsL[2] - regen, 0)
                 org.brain = math.max(org.brain - regen * 0.1, 0)
+                if hg.organism and hg.organism.RegenerateAdvancedAfflictions then
+                    hg.organism.RegenerateAdvancedAfflictions(org, regen * 0.1, regen)
+                end
             end
 
             if (org.pulse < 40) or (org.blood < 3000) or (org.o2[1] < 10) then

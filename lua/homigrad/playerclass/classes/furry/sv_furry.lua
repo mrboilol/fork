@@ -43,6 +43,9 @@ hook.Add("Org Think", "regenerationfurry", function(owner, org, timeValue)
 	org.lungsR[2] = math.max(org.lungsR[2] - regen, 0)
 	org.lungsL[2] = math.max(org.lungsL[2] - regen, 0)
 	org.brain = math.max(org.brain - regen * 0.1, 0)
+	if hg.organism and hg.organism.RegenerateAdvancedAfflictions then
+		hg.organism.RegenerateAdvancedAfflictions(org, regen * 0.1, regen)
+	end
 
 	org.hungry = 0
 end)

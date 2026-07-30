@@ -392,6 +392,10 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 			arm_tta_bonus = arm_tta_bonus + 0.4
 		end
 		tta = tta + arm_tta_bonus
+		-- With less constant injury shake, make poor arm control show up as a
+		-- modestly longer, more believable time to settle onto the sights.
+		if rarm_bad then tta = tta * 1.08 end
+		if larm_bad then tta = tta * 1.04 end
 	end
 	
 	if isvector(vellen) then

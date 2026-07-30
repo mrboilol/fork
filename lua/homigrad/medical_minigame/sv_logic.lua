@@ -403,7 +403,7 @@ local function GetMedicalMinigameType(wep)
     end
 
     if class == "weapon_morphine" or class == "weapon_fentanyl" or class == "weapon_needle" or
-       class == "weapon_painkillers" or class == "weapon_tramadol" or class == "weapon_tapentadol" or class == "weapon_adrenaline" or class == "weapon_thiamine" or
+       class == "weapon_painkillers" or class == "weapon_tramadol" or class == "weapon_tapentadol" or class == "weapon_zerlkers" or class == "weapon_adrenaline" or class == "weapon_thiamine" or
        class == "weapon_mannitol" or class == "weapon_naloxone" or class == "weapon_tranexamic_acid" or
        class == "weapon_betablock" or class == "weapon_autoresuscitator" or class == "weapon_horse_tranq" or
        class == "weapon_fury13" or class == "weapon_fury16" or (class == "weapon_medkit_sh" and (wep.mode == 2 or wep.mode == 3 or wep.mode == 5)) then
@@ -455,8 +455,8 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
         if class == "weapon_fury13" or class == "weapon_fury16" then
             entOwner:EmitSound("pshiksnd")
-        elseif class == "weapon_painkillers" then
-            -- Painkillers don't play injection sound
+        elseif class == "weapon_painkillers" or class == "weapon_zerlkers" then
+            -- Pills don't play an injection sound.
         else
             entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
         end
@@ -819,7 +819,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
             if not isIncremental then
                 if class == "weapon_tranexamic_acid" or class == "weapon_adrenaline" or class == "weapon_naloxone" or
                    class == "weapon_mannitol" or class == "weapon_thiamine" or class == "weapon_betablock" or
-                   class == "weapon_painkillers" or class == "weapon_needle" or class == "weapon_fury13" or
+                   class == "weapon_painkillers" or class == "weapon_zerlkers" or class == "weapon_needle" or class == "weapon_fury13" or
                    class == "weapon_fury16" or class == "weapon_autoresuscitator" then
                     ply:SelectWeapon("weapon_hands_sh")
                     wep:Remove()

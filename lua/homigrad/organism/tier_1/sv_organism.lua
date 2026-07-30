@@ -142,6 +142,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.hypoxia = 0
 	org.hypoxiaTime = 0
 	org.severeHypoxiaTime = 0
+	org.systemicIschemiaTime = 0
 	org.neckBrainOxygenPenalty = 0
 	org.eyeL = 0
 	org.eyeR = 0
@@ -424,8 +425,28 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local badHypoxia = org.brainoxygen < 0.45 * thresholdMul or org.cerebralPerfusion < 0.4 * thresholdMul or org.perfusion < 0.35 * thresholdMul
 	local severeHypoxia = org.brainoxygen < 0.22 * thresholdMul or org.cerebralPerfusion < 0.18 * thresholdMul or org.perfusion < 0.16 * thresholdMul
 	org.hypoxia = math.Clamp(1 - math.min(org.bodyoxygen, org.brainoxygen, org.cerebralPerfusion, org.perfusion), 0, 1)
-	org.hypoxiaTime = badHypoxia and math.min((org.hypoxiaTime or 0) + dt * (severeHypoxia and 2.25 or 1), 120) or math.Approach(org.hypoxiaTime or 0, 0, dt * 2)
-	org.severeHypoxiaTime = severeHypoxia and math.min((org.severeHypoxiaTime or 0) + dt, 120) or math.Approach(org.severeHypoxiaTime or 0, 0, dt * 1.5)
+	org.hypoxiaTime = badHypoxia and math.min((org.hypoxiaTime or 0) + dt * (severeHypoxia and 2.25 or 1), 120) or math.Approach(org.hypoxiaTime or 0, 0, dt * 2.5)
+	org.severeHypoxiaTime = severeHypoxia and math.min((org.severeHypoxiaTime or 0) + dt, 120) or math.Approach(org.severeHypoxiaTime or 0, 0, dt * 2)
+
+	-- Sustained failure of oxygen delivery eventually becomes systemic ischemia.
+	-- Brief hypoxic/perfusion dips recover without permanent organ damage; after
+	-- prolonged exposure, the existing ischemia pipeline distributes damage across
+	-- the brain, heart, liver and abdominal organs.
+	local systemicDelivery = math.min(org.bodyoxygen, org.perfusion, org.peripheralperfusion)
+	local systemicSeverity = math.Clamp((0.55 - systemicDelivery) / 0.45, 0, 1)
+	if systemicSeverity > 0 then
+		local exposureRate = 0.35 + systemicSeverity * 0.65
+		org.systemicIschemiaTime = math.min((org.systemicIschemiaTime or 0) + dt * exposureRate, 180)
+	else
+		org.systemicIschemiaTime = math.Approach(org.systemicIschemiaTime or 0, 0, dt * 2)
+	end
+
+	local systemicDelay = 20 * (1 + resilience * 0.6)
+	if (org.systemicIschemiaTime or 0) > systemicDelay then
+		local durationRamp = math.Clamp(((org.systemicIschemiaTime or 0) - systemicDelay) / 30, 0, 1)
+		local ischemiaRate = systemicSeverity * Lerp(durationRamp, 0.12, 0.3)
+		org.ischemia = math.min((org.ischemia or 0) + dt * ischemiaRate, 6)
+	end
 
 	if owner and owner.IsBerserk and owner:IsBerserk() then return end
 	local delayMul = 1 + resilience * 0.6
@@ -440,6 +461,53 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	end
 	if (org.perfusion < 0.32 * thresholdMul or org.brainoxygen < 0.35 * thresholdMul) and ((org.hypoxiaTime or 0) > 16 * delayMul or (org.severeHypoxiaTime or 0) > 6 * delayMul) then org.needfake = true end
 	if (org.perfusion < 0.18 * thresholdMul or org.brainoxygen < 0.2 * thresholdMul) and ((org.hypoxiaTime or 0) > 26 * delayMul or (org.severeHypoxiaTime or 0) > 10 * delayMul) then org.needotrub = true end
+end
+
+local advancedBrainAfflictions = {
+	"brainFrontal", "brainParietal", "brainTemporal", "brainOccipital",
+	"brainHemorrhage", "brainSwelling", "intracranialPressure"
+}
+
+local advancedDeliveryVitals = {
+	"bodyoxygen", "perfusion", "brainoxygen", "peripheralperfusion",
+	"cerebralPerfusion", "perfusionMoveMul", "perfusionGripMul"
+}
+
+-- Keep supernatural/automated healing paths in step with the newer brain and
+-- oxygen-delivery model. damageRecovery uses the same normalized scale as
+-- organ damage; deliveryRecovery controls recovery of the O2/perfusion reserves.
+function hg.organism.RegenerateAdvancedAfflictions(org, damageRecovery, deliveryRecovery)
+	if not org then return end
+
+	local damage = math.max(tonumber(damageRecovery) or 0, 0)
+	local delivery = math.max(tonumber(deliveryRecovery) or damage, 0)
+
+	for _, key in ipairs(advancedBrainAfflictions) do
+		org[key] = math.Approach(tonumber(org[key]) or 0, 0, damage)
+	end
+
+	-- Bleed rate is a much smaller value than normalized injury severity. Scaling
+	-- its recovery prevents even slow regeneration from erasing a fresh bleed in
+	-- one tick while still allowing the source to close completely.
+	org.brainBleedRate = math.Approach(tonumber(org.brainBleedRate) or 0, 0, damage * 0.01)
+	org.internalBleedComplication = math.Approach(tonumber(org.internalBleedComplication) or 0, 0, damage)
+	org.neckBrainOxygenPenalty = math.Approach(tonumber(org.neckBrainOxygenPenalty) or 0, 0, damage)
+	org.arterialO2Impairment = math.Approach(tonumber(org.arterialO2Impairment) or 0, 0, damage)
+	org.throatCutPressureShock = math.Approach(tonumber(org.throatCutPressureShock) or 0, 0, damage)
+
+	for _, key in ipairs(advancedDeliveryVitals) do
+		org[key] = math.Approach(tonumber(org[key]) or 1, 1, delivery)
+	end
+
+	if istable(org.o2) then
+		local oxygenMax = tonumber(org.o2.range) or 30
+		org.o2[1] = math.Approach(tonumber(org.o2[1]) or 0, oxygenMax, delivery * oxygenMax)
+	end
+
+	org.hypoxia = math.Approach(tonumber(org.hypoxia) or 0, 0, delivery)
+	org.hypoxiaTime = math.Approach(tonumber(org.hypoxiaTime) or 0, 0, delivery * 150)
+	org.severeHypoxiaTime = math.Approach(tonumber(org.severeHypoxiaTime) or 0, 0, delivery * 150)
+	org.systemicIschemiaTime = math.Approach(tonumber(org.systemicIschemiaTime) or 0, 0, delivery * 150)
 end
 
 local function send_organism(org, ply)
@@ -1682,6 +1750,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if org.lungsL and org.lungsL[1] > 0 then org.lungsL[1] = math.Approach(org.lungsL[1], 0, thiamineHealRate) end
 		if org.lungsR and org.lungsR[2] > 0 then org.lungsR[2] = math.Approach(org.lungsR[2], 0, thiamineHealRate) end
 		if org.lungsL and org.lungsL[2] > 0 then org.lungsL[2] = math.Approach(org.lungsL[2], 0, thiamineHealRate) end
+		hg.organism.RegenerateAdvancedAfflictions(org, thiamineHealRate, thiamineHealRate)
 	end
 
 	if org.otrub and isPly and org.owner:Alive() then
@@ -1847,6 +1916,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	org.brain = math.max(oldBrain - regen, 0)
 	reduceSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
 	org.lastSeizureBrain = org.brain
+	hg.organism.RegenerateAdvancedAfflictions(org, regen, regen)
 
 	org.hungry = 0
 
@@ -1892,6 +1962,9 @@ hook.Add("Org Think", "regenerationnoradrenaline", function(owner, org, timeValu
 		org.brain = math.Approach(oldBrain, 0.3, timeValue / 60)
 		reduceSeizure(org, math.Clamp((oldBrain - org.brain) * seizure_brain_heal_gain_mul, 0, 1))
 		org.lastSeizureBrain = org.brain
+		hg.organism.RegenerateAdvancedAfflictions(org, regen, regen)
+	else
+		hg.organism.RegenerateAdvancedAfflictions(org, 0, regen)
 	end
 
 	org.pulse = math.Approach(org.pulse, 70, regen * 10)

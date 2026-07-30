@@ -656,7 +656,13 @@ local function buildEffects(ply, org)
 	local adrenaline = orgNumber(org, "adrenaline", 0)
 	if adrenaline > 0.3 then add(effects, "adrenaline", "adrenaline", highRank(adrenaline, {0.3, 0.8, 1.5, 2.1}), "good", 11, math.Round(adrenaline, 1)) end
 	local zerlkers = orgNumber(org, "zerlkers", 0)
-	if zerlkers > 0 then add(effects, "zerlked", "zerlked", math.Clamp(math.ceil(zerlkers * 4), 1, 4), "good", 10.5, math.ceil(zerlkers * 120) .. "s") end
+	if zerlkers > 0 then
+		-- A second concurrent dose is the Zerlkers overdose threshold. Keep the
+		-- dedicated icon, but immediately swap it onto the bad moodle backing.
+		local zerlkersOverdose = orgNumber(org, "zerlkersOverdose", 0)
+		local mood = (zerlkers >= 2 or zerlkersOverdose > 0) and "bad" or "good"
+		add(effects, "zerlked", "zerlked", math.Clamp(math.ceil(zerlkers * 4), 1, 4), mood, 10.5, math.ceil(zerlkers * 120) .. "s")
+	end
 	local anger = math.Clamp(orgNumber(org, "anger", 0), 0, 1)
 	if anger > 0.01 then add(effects, "anger", "anger", math.ceil(anger * 4), "good", 14, math.floor(anger * 100) .. "%") end
 	local armorCount = countEntries(ply:GetNetVar("Armor", {}) or {})
@@ -751,25 +757,23 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	end
 end
 
-local function drawSevereBeam(x, y, size, alpha)
+local function drawSevereBeam(x, y, size, intensity, alpha)
 	local beamHeight = size * 3.2
 	local beamWidth = size * 0.88
 	local beamX = x + (size - beamWidth) * 0.5
 	local beamTop = y + size - beamHeight
 	local slices = 18
 	local pulse = 0.82 + math.abs(math.sin(CurTime() * 3.5)) * 0.18
+	intensity = math.Clamp(intensity or 1, 0.35, 1)
 
 	for slice = 0, slices - 1 do
 		local t = slice / (slices - 1)
 		local sliceY = beamTop + beamHeight * t
 		local sliceH = beamHeight / slices + 1
-		local sliceAlpha = (4 + t * t * 54) * pulse * alpha
+		local sliceAlpha = (3 + t * t * (24 + 46 * intensity)) * pulse * alpha * intensity
 		surface.SetDrawColor(255, 20, 12, sliceAlpha)
 		surface.DrawRect(beamX, sliceY, beamWidth, sliceH)
 	end
-
-	surface.SetDrawColor(255, 25, 18, 26 * pulse * alpha)
-	surface.DrawRect(x - size * 0.15, y, size * 1.3, size)
 end
 local function clearMoodleDrawState()
 	moodlePositions = {}
@@ -921,7 +925,8 @@ local function drawMoodles()
 		local drawX = finalX - (drawSize - size) * 0.5
 		local drawY = finalY - (drawSize - size) * 0.5
 		if effect.mood == "bad" and effect.level >= 3 then
-			drawSevereBeam(drawX, drawY, drawSize, stableRage and 1 or 0.9)
+			local beamIntensity = effect.level == 4 and 1 or 0.55
+			drawSevereBeam(drawX, drawY, drawSize, beamIntensity, stableRage and 1 or 0.9)
 		end
 
 		local background = effect.name == "rage" and backgrounds.bad[4] or backgrounds[effect.mood] and backgrounds[effect.mood][effect.level]

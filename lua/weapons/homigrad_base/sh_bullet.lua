@@ -532,7 +532,11 @@ function SWEP:GetFireTrace()
 	end
 
 	local lastShot = self:LastShootTime() or 0
-	local firstShot = lastShot <= 0 or CurTime() - lastShot > 0.3
+	-- Only repair the initial deploy shot. Treating every shot after a short pause
+	-- as a deploy shot discarded the weapon's real sway/recoil pose. Hitscan hid
+	-- most of that mismatch, while physical projectiles visibly left in a
+	-- different direction than the muzzle was pointing.
+	local firstShot = lastShot <= 0
 	if not firstShot then return trace, pos, ang end
 
 	local desiredPos, desiredAng = self.desiredPos, self.desiredAng

@@ -2661,13 +2661,16 @@ function SWEP:GetAdditionalValues()
 		-- Restore the older damped recovery tail; firing-arm damage makes it slower.
 		local recoveryRate = Lerp(armInjury / 2, 0.018, 0.007)
 		if support.offhandImpaired then recoveryRate = math.max(recoveryRate, 0.03) end
-		local wobbleTarget = firing and (1.08 + armInjury * 0.12) * (support.offhandImpaired and 0.58 or 1) or 0
+		-- Keep the recoil tail readable without making the gun vibrate around the
+		-- actual kick. Arm injuries still slow recovery; they do not multiply every
+		-- oscillation into violent shaking.
+		local wobbleTarget = firing and (0.38 + armInjury * 0.06) * (support.offhandImpaired and 0.72 or 1) or 0
 		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.38 or recoveryRate, wobbleDt), self.recoilWobbleAmp or 0, wobbleTarget)
 
 		if (self.recoilWobbleAmp or 0) > 0.00001 then
 			local t = CurTime()
 			local frequencyMul = Lerp(armInjury / 2, 1, 0.68)
-			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 2.45 * (1 + armInjury * 0.35)
+			local amp = self.recoilWobbleAmp * handlingMul * stanceMul * restMul * 1.15 * (1 + armInjury * 0.16)
 
 			local wobX = math.sin(t * 1.65 * frequencyMul) * 0.65 + math.sin(t * 2.95 * frequencyMul) * 0.35
 			local wobY = math.cos(t * 2.05 * frequencyMul) * 0.65 + math.cos(t * 3.45 * frequencyMul) * 0.35
@@ -2694,13 +2697,15 @@ function SWEP:GetAdditionalValues()
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
 			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.25
 
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.4
+			-- Put the recoil impulse into a clear upward muzzle climb. This affects the
+			-- weapon transform/next round, not either camera-punch layer.
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 4.8
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.14
 			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.07
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.75
 			-- Lift the physical muzzle with the pitch impulse. GetTrace uses this
 			-- transform, so follow-up rounds climb with the visible barrel.
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.4 or 2.2)
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 2.0 or 3.1)
 		end
 	end
 
@@ -2728,11 +2733,11 @@ function SWEP:GetAdditionalValues()
 		local armSway = 0
 		local support = self:GetHandSupportState(ply)
 		if rarm_amputated then
-			armSway = armSway + (support.onlyLeft and 0.8 or 2.2)
+			armSway = armSway + 2.4
 		elseif rarm >= 1 then
-			armSway = armSway + 1.4
+			armSway = armSway + 1.65
 		elseif rarm_dislocated then
-			armSway = armSway + 0.9
+			armSway = armSway + 1.1
 		else
 			armSway = armSway + rarm * 0.8
 		end
@@ -2746,21 +2751,23 @@ function SWEP:GetAdditionalValues()
 			armSway = armSway + larm * (support.offhandImpaired and 0.18 or 0.5)
 		end
 
-		local idleAmp = (0.5 + fatigue * 0.15 + fear * 0.35 + armSway * 0.4) * idleWeight * idleStance * idleRest * idleAim
+		-- Healthy hands should drift, not shake. A damaged dominant/right arm is
+		-- still immediately apparent relative to the much quieter baseline.
+		local idleAmp = (0.14 + fatigue * 0.07 + fear * 0.12 + armSway * 0.22) * idleWeight * idleStance * idleRest * idleAim
 
 		local st = CurTime() * 0.9
 		local swA = math.sin(st * 1.1) * 0.7 + math.sin(st * 1.9) * 0.3
 		local swB = math.cos(st * 0.8) * 0.7 + math.cos(st * 1.7) * 0.3
 		local swC = math.sin(st * 1.3) * 0.6 + math.cos(st * 2.1) * 0.4
 
-		local armSwayInstability = 1 + armSway * 0.12
-		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 1.05 * armSwayInstability
-		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 0.95 * armSwayInstability
-		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * 0.72 * armSwayInstability
+		local armSwayInstability = 1 + armSway * 0.08
+		self.AdditionalAng2[1] = self.AdditionalAng2[1] + swB * idleAmp * 0.82 * armSwayInstability
+		self.AdditionalAng2[3] = self.AdditionalAng2[3] + swC * idleAmp * 0.68 * armSwayInstability
+		self.AdditionalAng2[2] = self.AdditionalAng2[2] + swA * idleAmp * 0.48 * armSwayInstability
 
-		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.55
-		self.AdditionalPos2[2] = self.AdditionalPos2[2] + swB * idleAmp * 0.18
-		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.55
+		self.AdditionalPos2[1] = self.AdditionalPos2[1] + swC * idleAmp * 0.34
+		self.AdditionalPos2[2] = self.AdditionalPos2[2] + swB * idleAmp * 0.10
+		self.AdditionalPos2[3] = self.AdditionalPos2[3] + swA * idleAmp * 0.34
 	end
 
 	if self.GetAnimPos_Draw and CLIENT then

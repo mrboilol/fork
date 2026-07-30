@@ -22,6 +22,7 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_painkillers",
     "weapon_tramadol",
     "weapon_tapentadol",
+    "weapon_zerlkers",
     "weapon_adrenaline",
     "weapon_thiamine",
     "weapon_mannitol",
@@ -91,7 +92,7 @@ local function GetMinigameType(wep)
         return "syringe"
     end
 
-    if class == "weapon_painkillers" or class == "weapon_tramadol" or class == "weapon_tapentadol" or class == "weapon_thiamine" or class == "weapon_betablock" then
+    if class == "weapon_painkillers" or class == "weapon_tramadol" or class == "weapon_tapentadol" or class == "weapon_zerlkers" or class == "weapon_thiamine" or class == "weapon_betablock" then
         return "syringe"
     end
 

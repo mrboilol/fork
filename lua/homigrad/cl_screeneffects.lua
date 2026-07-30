@@ -459,8 +459,6 @@ local seizureFinalFlashLead = 2
 local seizureFinalFlashDuration = 5
 local seizureFinalFlashSize = 90000
 local seizureSoundVolume = 1
-local seizureSoundOtrubVolume = 0.3
-local seizureSoundOtrubPlaybackRate = 0.82
 local seizureIntroTab = {
 	["$pp_colour_addr"] = 0,
 	["$pp_colour_addg"] = 0,
@@ -531,6 +529,14 @@ local function addSeizureFlash(isFinal)
 end
 
 local function updateSeizureEffects(org)
+	-- Unconscious players should not receive the seizure's flashing, camera
+	-- punches, or audio. Stop an already-playing station immediately as otrub
+	-- can begin after the seizure effect has started.
+	if org.otrub then
+		stopSeizureEffects()
+		return
+	end
+
 	if org.seizureActive and (org.seizureStart or 0) > 0 and (org.seizureEnd or 0) > CurTime() then
 		if not seizureClientActive or seizureClientStart != org.seizureStart or seizureClientEnd != org.seizureEnd then
 			seizureClientActive = true
@@ -546,6 +552,12 @@ local function updateSeizureEffects(org)
 			local seizureTimeline = math.Clamp((CurTime() - seizureClientStart) / seizureDuration, 0, 1)
 			sound.PlayFile(seizureSoundPath, "noblock noplay", function(station)
 				if IsValid(station) then
+					local currentPlayer = LocalPlayer()
+					if not seizureClientActive or (IsValid(currentPlayer) and currentPlayer.organism and currentPlayer.organism.otrub) then
+						station:Stop()
+						return
+					end
+
 					station:SetVolume(0)
 					station:Play()
 					station:SetTime(seizureTimeline * station:GetLength())
@@ -556,8 +568,8 @@ local function updateSeizureEffects(org)
 		end
 
 		if IsValid(SeizureStation) then
-			SeizureStation:SetVolume(org.otrub and seizureSoundOtrubVolume or seizureSoundVolume)
-			SeizureStation:SetPlaybackRate(org.otrub and seizureSoundOtrubPlaybackRate or 1)
+			SeizureStation:SetVolume(seizureSoundVolume)
+			SeizureStation:SetPlaybackRate(1)
 		end
 
 		local seizureElapsed = math.max(CurTime() - seizureClientStart, 0)
@@ -2857,4 +2869,3 @@ hook.Add("HUDPaint", "DrawSkullBrokenBlackSquares", function()
 		end
 	end
 end)
-

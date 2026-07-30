@@ -9,11 +9,11 @@ SWEP.Primary.Wait = 1
 SWEP.Primary.Next = 0
 SWEP.HoldType = "slam"
 SWEP.ViewModel = ""
-SWEP.WorldModel = "models/bloocobalt/l4d/items/w_eq_pills.mdl"
+SWEP.WorldModel = "models/tic tacs/winter_green.mdl"
 
 if CLIENT then
-	SWEP.WepSelectIcon = Material("vgui/hud/moodels 2/zerlked.png", "smooth")
-	SWEP.IconOverride = "vgui/hud/moodels 2/zerlked.png"
+	SWEP.WepSelectIcon = Material("zerlkers/keepitzen.png", "smooth")
+	SWEP.IconOverride = "zerlkers/keepitzen.png"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -75,6 +75,39 @@ function SWEP:OwnerChanged()
 end
 
 if SERVER then
+	function SWEP:SpawnEmptyBox()
+		local owner = self:GetOwner()
+		if not IsValid(owner) then return end
+
+		local character = hg.GetCurrentCharacter(owner)
+		if not IsValid(character) then character = owner end
+		local bone = character:LookupBone("ValveBiped.Bip01_R_Hand")
+		local matrix = bone and character:GetBoneMatrix(bone)
+
+		local box = ents.Create("ent_throwable")
+		if not IsValid(box) then return end
+		box.WorldModel = self.WorldModel
+		box:SetPos(matrix and matrix:GetTranslation() or character:WorldSpaceCenter())
+		box:SetAngles(AngleRand(-180, 180))
+		box:SetOwner(owner)
+		box:Spawn()
+		box.localshit = vector_origin
+		box.wep = "weapon_zerlkers_empty"
+		box.owner = owner
+		box.damage = 18
+		box.MaxSpeed = 750
+		box.DamageType = DMG_CLUB
+		box.AttackHit = "Plastic_Box.ImpactHard"
+		box.AttackHitFlesh = "Flesh.ImpactHard"
+		box.noStuck = true
+
+		local phys = box:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:SetVelocity(owner:GetVelocity() + owner:GetAimVector() * 170 + VectorRand(-35, 35))
+			phys:AddAngleVelocity(VectorRand(-180, 180))
+		end
+	end
+
 	function SWEP:Heal(ent)
 		if ent:IsNPC() then
 			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
@@ -99,7 +132,7 @@ if SERVER then
 
 		self.modeValues[1] = 0
 		owner:SelectWeapon("weapon_hands_sh")
-		self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
+		self:SpawnEmptyBox()
 		self:Remove()
 		return true
 	end

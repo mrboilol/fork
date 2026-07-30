@@ -1315,6 +1315,7 @@ local function buildPerfusionDiagnosis(org, countedBPM)
 	local arterial = tonumber(org.arterialBleed) or 0
 	local venous = tonumber(org.venousBleed) or tonumber(org.bleed) or 0
 	local shock = tonumber(org.shock) or 0
+	local brainDamage = math.Clamp(tonumber(org.brain) or 0, 0, 1)
 
 	if pulse >= 105 and (pressure < 55 or perfusion < 0.5 or shock > 20) then
 		messages[#messages + 1] = "Pulse is fast and weak."
@@ -1329,6 +1330,15 @@ local function buildPerfusionDiagnosis(org, countedBPM)
 	if pressure < 25 or perfusion < 0.22 or arterial > 3 or venous > 12 then messages[#messages + 1] = "Blood pressure is crashing." end
 	if arterial > 0.5 then messages[#messages + 1] = "Active arterial bleeding needs immediate control." elseif venous > 4 then messages[#messages + 1] = "They have significant venous bleeding." end
 	if org.throatcut then messages[#messages + 1] = "Their throat is cut; control the neck bleeding and airway." end
+	if brainDamage > 0.3 then
+		messages[#messages + 1] = "Their pupils show signs of catastrophic brain damage."
+	elseif brainDamage > 0.25 then
+		messages[#messages + 1] = "Their pupils show signs of severe brain damage."
+	elseif brainDamage > 0.15 then
+		messages[#messages + 1] = "Their pupils show signs of moderate brain damage."
+	elseif brainDamage > 0.01 then
+		messages[#messages + 1] = "Their pupils show signs of small brain damage."
+	end
 	if (org.intracranialPressure or 0) >= 0.72 then messages[#messages + 1] = "Signs suggest critically raised pressure inside the skull."
 	elseif (org.intracranialPressure or 0) >= 0.45 then messages[#messages + 1] = "Their neurological responses suggest rising pressure inside the skull." end
 	if cerebral < 0.35 or brainoxygen < 0.35 then messages[#messages + 1] = "Their brain is being poorly oxygenated and perfused." end

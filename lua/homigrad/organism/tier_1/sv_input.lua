@@ -28,6 +28,9 @@ local severe_damage_adrenaline_delay = 0.75
 local live_limb_gib_threshold = 135
 local live_head_gib_threshold = 85
 local destroyed_brain_head_gib_threshold = 45
+local catastrophic_brain_shot_chance_min = 0.25
+local catastrophic_brain_shot_chance_max = 0.7
+local catastrophic_brain_shot_damage_max = 50
 local neck_break_kill_force_start = 800
 local neck_break_kill_force_certain = 2400
 local neck_break_decap_force_start = 1600
@@ -1724,9 +1727,21 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	takeRagdollDamage(ent, dmgInfo)
 
-	-- A head hit, or even a small direct-brain wound, is not automatically fatal.
-	-- Immediate death requires this shot to have hit brain tissue and pushed the
-	-- total brain injury into the same catastrophic range used by physiology.
+	-- A bullet which actually intersects unarmored brain tissue can either leave
+	-- regional damage or catastrophically destroy the brain. Higher-energy shots
+	-- are more likely to be immediately fatal, while a failed roll preserves the
+	-- lobe damage produced by the organ trace (commonly about 0.15-0.3 overall).
+	if fatalBrainShotCandidate and directBrainDamageThisHit and (org.brain or 0) < 0.7 then
+		local shotDamage = math.max(dmg, 0)
+		local damageFraction = math.Clamp(shotDamage / catastrophic_brain_shot_damage_max, 0, 1)
+		local catastrophicChance = Lerp(damageFraction, catastrophic_brain_shot_chance_min, catastrophic_brain_shot_chance_max)
+		if math.Rand(0, 1) <= catastrophicChance then
+			org.brain = 1
+		end
+	end
+
+	-- Direct central-brain destruction remains certainly fatal; regional wounds
+	-- only become fatal here when the catastrophic roll succeeds.
 	if fatalBrainShotCandidate and directBrainDamageThisHit and (org.brain or 0) >= 0.7 and hg.organism.KillFatalBrainDamage then
 		hg.organism.KillFatalBrainDamage(org)
 	end
