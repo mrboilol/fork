@@ -195,7 +195,8 @@ local Angle, Vector, AngleRand, VectorRand, math, hook, util, game = Angle, Vect
 
                 local hitEnt = tr.Entity
                 local impactSpeed = math.abs(vel:Dot(-tr.HitNormal))
-                local shouldTrip = math.random(sprint_collision_trip_chance) == 1
+                local traumaChanceMul = hg.organism.GetTraumaRagdollChanceMul and hg.organism.GetTraumaRagdollChanceMul(ply.organism) or 1
+                local shouldTrip = math.Rand(0, 1) <= (1 / sprint_collision_trip_chance) * traumaChanceMul
 
                 if IsValid(hitEnt) and hitEnt:IsPlayer() and hitEnt:Alive() then
                         impactSpeed = (vel - hitEnt:GetVelocity()):Length()

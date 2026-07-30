@@ -201,7 +201,7 @@ SWEP.ShoveKnockdownStaminaAdvantageMul = 0.10
 SWEP.ShoveKnockdownCooldown = 2
 SWEP.SwingForwardBoostMinSpeed = 20
 SWEP.HeadTraceFallbackRadius = 10
-SWEP.HeadRagdollChance = 0.55
+SWEP.HeadRagdollChance = 0.45
 SWEP.HeadRagdollMinDamage = 20
 
 SWEP.PenetrationPrimary = 8
@@ -1624,7 +1624,8 @@ function SWEP:ShouldHeadRagdoll(ent, trace)
     if trace and trace.HGPreventHeadRagdoll then return false end
     if weaponDamage <= damageThreshold then return false end
     if not self:IsHeadHit(ent, trace) then return false end
-    return math.Rand(0, 1) <= (self.HeadRagdollChance or 0.85)
+    local chanceMul = hg.organism.GetTraumaRagdollChanceMul and hg.organism.GetTraumaRagdollChanceMul(victim.organism) or 1
+    return math.Rand(0, 1) <= (self.HeadRagdollChance or 0.85) * chanceMul
 end
 
 function SWEP:ShouldPlayBrutalizeHitSound(ent, victim, trace, attacktype)
@@ -1890,6 +1891,8 @@ function SWEP:PunchPlayer(ent, attacktype, trnormal, dmg)
 					+ (1 - victimStamina) * (self.ShoveKnockdownVictimFatigueMul or 0.20)
 					+ staminaAdvantage * (self.ShoveKnockdownStaminaAdvantageMul or 0.10)
 				chance = chance * (0.35 + attackerStamina * 0.65) * MELEE_GLOBAL_SHOVE_KNOCKDOWN_MUL
+				local traumaChanceMul = hg.organism.GetTraumaRagdollChanceMul and hg.organism.GetTraumaRagdollChanceMul(ply.organism) or 1
+				chance = chance * traumaChanceMul
 
 				if math.Rand(0, 1) <= math.Clamp(chance, 0, 0.65) then
 					ply.ShoveKnockdownUntil = CurTime() + (self.ShoveKnockdownCooldown or 2)

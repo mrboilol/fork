@@ -10,9 +10,10 @@ local hg_organism_stamina_sprint_mul = CreateConVar("hg_organism_stamina_sprint_
 local panicattack_stamina_drain_mul = 1.35
 local low_stamina_drain_max_mul = 1.2
 local low_stamina_recovery_min_mul = 0.85
-local recent_stamina_loss_recovery_min_mul = 0.5
-local recent_stamina_loss_hold_time = 2
-local recent_stamina_loss_fade_time = 6
+local recent_stamina_loss_recovery_min_mul = 0.65
+local recent_stamina_loss_hold_time = 1
+local recent_stamina_loss_fade_time = 4
+local stamina_recovery_per_second = 7
 local anger_combat_hold_time = 6
 local anger_decay_per_second = 0.075
 --local Organism = hg.organism
@@ -253,7 +254,7 @@ module[2] = function(owner, org, timeValue)
 		end
 	end
 
-	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * recentLossRecoveryMul * timeValue * 5 * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul * (1 - heatWeakness * 0.65), stamina.max)
+	stamina[1] = min(stamina[1] + stamina.regen * staminaRecoveryMul * recentLossRecoveryMul * timeValue * stamina_recovery_per_second * (org.noradrenaline / 2 + 1) * (org.o2[1] / org.o2.range) * (org.adrenaline / 16 + 1) * (org.satiety/700 + 1) * pulseMultiplier * postureRecoveryMul * (org.holdingbreath and 0 or 1) * (org.lungsfunction and 1 or 0) * lungRecoveryMultiplier * breathingMul * perfusionRegenMul * (1 - heatWeakness * 0.65), stamina.max)
 
 
 

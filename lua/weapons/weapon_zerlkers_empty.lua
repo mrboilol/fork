@@ -6,7 +6,7 @@ SWEP.Instructions = "Morty, go get their shit hurry up, I only had one of those 
 SWEP.Category = "Weapons - Melee"
 SWEP.Spawnable = false
 SWEP.AdminOnly = false
-SWEP.HoldType = "melee"
+SWEP.HoldType = "slam"
 
 SWEP.WorldModel = "models/tic tacs/winter_green.mdl"
 SWEP.WorldModelReal = "models/weapons/combatknife/tactical_knife_iw7_vm.mdl"
@@ -41,6 +41,13 @@ SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "Plastic_Box.ImpactSoft"
 
+-- A click always starts the melee base's secondary/throw animation. The
+-- actual entity is released by CustomAttack2 at the animation's impact time.
+function SWEP:PrimaryAttack()
+	if not game.SinglePlayer() and not IsFirstTimePredicted() then return end
+	self:SecondaryAttack(true)
+end
+
 function SWEP:CustomAttack2()
 	if CLIENT then return true end
 
@@ -57,8 +64,8 @@ function SWEP:CustomAttack2()
 	thrown.localshit = vector_origin
 	thrown.wep = self:GetClass()
 	thrown.owner = owner
-	thrown.damage = 18
-	thrown.MaxSpeed = 750
+	thrown.damage = 20
+	thrown.MaxSpeed = 800
 	thrown.DamageType = DMG_CLUB
 	thrown.AttackHit = "Plastic_Box.ImpactHard"
 	thrown.AttackHitFlesh = "Flesh.ImpactHard"
@@ -67,7 +74,7 @@ function SWEP:CustomAttack2()
 	local phys = thrown:GetPhysicsObject()
 	if IsValid(phys) then
 		phys:SetVelocity(owner:GetAimVector() * thrown.MaxSpeed + owner:GetVelocity() * 0.5)
-		phys:AddAngleVelocity(VectorRand() * 400)
+		phys:AddAngleVelocity(VectorRand() * 350)
 	end
 
 	owner:ViewPunch(Angle(0, 0, -6))

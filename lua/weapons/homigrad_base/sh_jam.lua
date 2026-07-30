@@ -46,9 +46,25 @@ function SWEP:CalculateJamChance()
 	return math.Clamp(chance, self.JamChanceMin or 0.001, self.JamChanceMax or 0.05)
 end
 
+function SWEP:IsJamImmune()
+	if self:IsManuallyCycledWeapon() then return true end
+
+	-- Revolvers can have ammunition failures, but they do not suffer the
+	-- feed/ejection malfunctions represented by this jam mechanic.
+	local class = string.lower(self:GetClass() or "")
+	if string.find(class, "revolver", 1, true) or self.Base == "weapon_revolver2" then return true end
+
+	local description = tostring(self.PrintName or "") .. " " .. tostring(self.Instructions or "")
+	if string.find(string.lower(description), "revolver", 1, true) then
+		return true
+	end
+
+	return false
+end
+
 function SWEP:TryJam()
 	if self:GetJammed() then return end
-	if self:IsManuallyCycledWeapon() then return end
+	if self:IsJamImmune() then return end
 
 	local hg_jam = GetConVar("hg_jam")
 	if hg_jam and hg_jam:GetBool() then

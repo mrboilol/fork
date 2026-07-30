@@ -354,6 +354,21 @@ function hg.organism.GetResilience(org)
 	return math.max(zerlkers, adrenaline)
 end
 
+-- Short-lived combat chemistry helps a conscious character stay on their feet
+-- through blunt impacts, without preventing damage or medical incapacitation.
+function hg.organism.GetTraumaRagdollResistance(org)
+	if not org then return 0 end
+
+	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1) * 0.25
+	local adrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1) * 0.20
+	local anger = math.Clamp(org.anger or 0, 0, 1) * 0.15
+	return math.Clamp(zerlkers + adrenaline + anger, 0, 0.5)
+end
+
+function hg.organism.GetTraumaRagdollChanceMul(org)
+	return 1 - hg.organism.GetTraumaRagdollResistance(org)
+end
+
 function hg.organism.GetResilientBlood(org)
 	return math.min((org and org.blood or 5000) + hg.organism.GetResilience(org) * 600, 5000)
 end

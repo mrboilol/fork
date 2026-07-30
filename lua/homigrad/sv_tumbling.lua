@@ -274,9 +274,8 @@ hook.Add("Think", "stanleytumbler", function()
         if org.berserk and org.berserk > 0 then
             tripChance = tripChance * 0.1
         end
-        if org.adrenaline and org.adrenaline > 0 then
-            tripChance = tripChance * 0.75
-        end
+        local traumaChanceMul = hg.organism.GetTraumaRagdollChanceMul and hg.organism.GetTraumaRagdollChanceMul(org) or 1
+        tripChance = tripChance * traumaChanceMul
 
         tripChance = math.Clamp(tripChance, 0, MAX_TRIP_CHANCE)
 

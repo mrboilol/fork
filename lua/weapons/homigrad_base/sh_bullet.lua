@@ -1057,24 +1057,33 @@ if CLIENT then
 else
 	util.AddNetworkString("reject shell")
 	function SWEP:RejectShell(shell)
-		local owner = self:GetOwner()
-		local rf
+		if not isstring(shell) or shell == "" then return end
 
-		if IsValid(owner) then
-			rf = RecipientFilter()
-			rf:AddPVS(owner:GetPos())
-			if owner:IsPlayer() then
-				rf:AddPlayer(owner)
+		-- Shell ejection may be requested from inside weapon/organism hooks.
+		-- Build and finish its packet on the next tick so it cannot overlap a
+		-- packet already being assembled by one of those hook chains.
+		timer.Simple(0, function()
+			if not IsValid(self) then return end
+
+			local owner = self:GetOwner()
+			local rf
+
+			if IsValid(owner) then
+				rf = RecipientFilter()
+				rf:AddPVS(owner:GetPos())
+				if owner:IsPlayer() then
+					rf:AddPlayer(owner)
+				end
 			end
-		end
 
-		net.Start("reject shell")
+			net.Start("reject shell")
 			net.WriteEntity(self)
 			net.WriteString(shell)
-		if rf then
-			net.Send(rf)
-		else
-			net.Broadcast()
-		end
+			if rf then
+				net.Send(rf)
+			else
+				net.Broadcast()
+			end
+		end)
 	end
 end

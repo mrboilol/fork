@@ -372,7 +372,10 @@ function SWEP:IsManuallyCycledWeapon()
 	local instructions = self.Instructions
 	if isstring(instructions) then
 		instructions = string.lower(instructions)
-		if string.find(instructions, "bolt-action", 1, true) or string.find(instructions, "pump-action", 1, true) then
+		if string.find(instructions, "bolt-action", 1, true) or
+			string.find(instructions, "bolt action", 1, true) or
+			string.find(instructions, "pump-action", 1, true) or
+			string.find(instructions, "pump action", 1, true) then
 			return true
 		end
 	end

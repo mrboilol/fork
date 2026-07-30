@@ -1840,10 +1840,11 @@ local function draw_status_effects()
 			if getOrgVal(org, "stomach", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
 			if getOrgVal(org, "intestines", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
 			if getOrgVal(org, "heart", 0) > 0.1 then damaged_organs = damaged_organs + 1 end
-			if getOrgTableVal(org, "lungsR", 1, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
-			if getOrgTableVal(org, "lungsL", 1, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
-			if getOrgTableVal(org, "lungsR", 2, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
-			if getOrgTableVal(org, "lungsL", 2, nil, 0) > 0.1 then damaged_organs = damaged_organs + 1 end
+			if getOrgVal(org, "trachea", 0) > 0 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 1, nil, 0) > 0 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 1, nil, 0) > 0 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsR", 2, nil, 0) > 0 then damaged_organs = damaged_organs + 1 end
+			if getOrgTableVal(org, "lungsL", 2, nil, 0) > 0 then damaged_organs = damaged_organs + 1 end
 
 			if severely_damaged_vital_organs > 0 then
 				organ_damage_level = 3 -- Critical

@@ -27,7 +27,7 @@ local otrub_pain_tolerance = 90
 local pain_fake_threshold = 0.9
 local pain_drain_base = 8
 local pain_drain_otrub_mul = 4.5
-local anger_pain_reduction_max = 0.1
+local anger_pain_reduction_max = 0.16
 
 function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	adrenaline = max(adrenaline or 0, 0)
@@ -161,7 +161,7 @@ module[2] = function(owner, org, timeValue)
 	-- existing pain settle faster, keeping an injured character functional.
 	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
 	add = add * adrenalinePainPacing
-	sub = sub * (1 + resilience * 0.65 + adrenaline * anger * 0.5)
+	sub = sub * (1 + resilience * 0.85 + adrenaline * anger * 0.6)
 
 
 

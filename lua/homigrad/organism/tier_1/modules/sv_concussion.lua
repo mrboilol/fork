@@ -48,7 +48,8 @@ module[2] = function(ply, org, timeValue)
             org.consciousness = math.max(org.consciousness - (baseDrain + heavyDrain) * timeValue, 0)
         end
 
-        if org.concussion > 3 then
+        local traumaResistance = hg.organism.GetTraumaRagdollResistance and hg.organism.GetTraumaRagdollResistance(org) or 0
+        if org.concussion > 3 + traumaResistance * 1.5 then
              org.needfake = true
         end
     end
