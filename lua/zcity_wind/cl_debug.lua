@@ -20,6 +20,7 @@ local textOffset = Vector(0, 0, 15)
 net.Receive("ZCity_Wind_SuppressionForce", function()
     local pos = net.ReadVector()
     local force = net.ReadFloat()
+	local wasHit = net.ReadBool()
 
     local lply = LocalPlayer()
     if not IsValid(lply) or not lply:IsPlayer() or not lply:Alive() then return end
@@ -31,18 +32,19 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
         SIB_suppress.Force = math.Clamp((SIB_suppress.Force or 0) + force, 0, 10)
     end
 
-    local punchScale = math.Clamp(force / 8, 0.1, 1.5)
-    local punch = Angle(math.Rand(-0.9, 0.9) * punchScale, math.Rand(-0.9, 0.9) * punchScale, 0)
+	if not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool() then
+		local punchScale = math.Clamp(force / 6, 0.35, 2)
+		local hitScale = wasHit and 1.35 or 1
+		local punch = Angle(math.Rand(-2.8, 1.5), math.Rand(-1.8, 1.8), 0) * punchScale * hitScale
 
-    if type(ViewPunch) == "function" then
-        ViewPunch(punch)
-    elseif lply.ViewPunch then
-        lply:ViewPunch(punch)
-    end
-
-    if type(ViewPunch2) == "function" then
-        ViewPunch2(punch * -0.5)
-    end
+		if type(QuickViewPunch) == "function" then
+			QuickViewPunch(punch)
+		elseif type(ViewPunch) == "function" then
+			ViewPunch(punch)
+		elseif lply.ViewPunch then
+			lply:ViewPunch(punch)
+		end
+	end
 
     if config.Debug then
         MsgC(ZW.Colors.Gold, string.format("[Z-City Wind] Server suppression force %.2f at %s\n", force, tostring(pos)))
@@ -228,10 +230,9 @@ local function ApplyClientOverride()
                         local view = render.GetViewSetup(true)
                         local midPos = startPos + (hitPos - startPos) * 0.5
                         local time = view.origin:Distance(midPos) / 17836
-                        local mr = math.random(17)
                         local soundPos = startPos + (hitPos - startPos) * 0.35
                         timer.Simple(time, function()
-                            EmitSound("cracks/distant/dist_crack_" .. (mr < 9 and "0" or "") .. mr .. ".ogg", soundPos, 0, CHAN_AUTO, 1, SNDLVL_140dB)
+							EmitSound("bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav", soundPos, 0, CHAN_AUTO, 1, SNDLVL_140dB)
                         end)
                     end
                 end
@@ -280,16 +281,9 @@ local function ApplyClientOverride()
                 bullet._lastPos = bullet.Pos and Vector(bullet.Pos)
             end)
 
-            local function IsLookingAt(ply, targetVec)
-                if not IsValid(ply) or not ply.GetShootPos then return true end
-                local diff = targetVec - ply:GetShootPos()
-                local diffLen = diff:Length()
-                if diffLen <= 0.01 then return true end
-                return ply:GetAimVector():Dot(diff) / diffLen >= 0.8
-            end
-
             hook.Add(postEventName, "ZCity_Wind_BulletPostThink_Client", function(bullet)
                 if not bullet._lastPos or not bullet.Pos then return end
+				if bullet._ZCityCrackPlayed then return end
 
                 local lply = LocalPlayer()
                 if not IsValid(lply) or not lply:Alive() then return end
@@ -320,33 +314,16 @@ local function ApplyClientOverride()
 
                 if not isVisible then return end
 
-                -- Make sure the shooter was aiming at the player (Z-City original logic)
-                if bullet.Shooter and not IsLookingAt(bullet.Shooter, eyePos) then return end
-
                 local speed = bullet.Vel and (bullet.Vel:Length() / 52.5) or 343
                 local subsonic = speed < 340
-                local mr = math.random(9)
-                local damage = bullet.Damage or 10
-
-                local SND = subsonic and "weapons/bullets/fx/subsonic_0" .. mr .. ".wav"
-                    or damage >= 50 and "cracks/heavy/heav_crack_0" .. mr .. ".ogg"
-                    or damage >= 30 and "cracks/medium/med_crack_0" .. mr .. ".ogg"
-                    or "cracks/light/light_crack_0" .. mr .. ".ogg"
-
                 local playPos = closestPos - bullet.Vel:GetNormalized() * 25
+				bullet._ZCityCrackPlayed = true
 
-                if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos) then return end
+				if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic) then return end
 
-                timer.Simple(0.02, function()
-                    EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", playPos, 0, CHAN_ITEM, 1, 155)
-                end)
-
-                if not subsonic then
-                    EmitSound(SND, playPos, 0, CHAN_ITEM, 1, 155)
-                    EmitSound(SND, playPos, 0, CHAN_WEAPON, 1, 155)
-                    EmitSound(SND, playPos, 0, CHAN_REPLACE, 1, 155)
-                    EmitSound(SND, playPos, 0, CHAN_BODY, 1, 155)
-                end
+				local fallback = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
+					or "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"
+				EmitSound(fallback, playPos, 0, CHAN_ITEM, 1, 155)
             end)
 
             plugin._ZCityBulletCracksRegistered = true

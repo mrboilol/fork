@@ -46,6 +46,15 @@ local body_part_heal = {
 	[HITGROUP_RIGHTARM] = 1,
 	[HITGROUP_STOMACH] = 1,
 }
+
+local function isFistInflictor(dmgInfo)
+	local inflictor = dmgInfo and dmgInfo.GetInflictor and dmgInfo:GetInflictor() or nil
+	if not IsValid(inflictor) or not inflictor:IsWeapon() then return false end
+
+	local class = inflictor:GetClass()
+	return class == "weapon_hands_sh" or class == "weapon_hg_coolhands"
+end
+
 local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
 	dmg = dmgInfo:GetDamage() / 25
 	local organ = box[6] and organs[box[6]][box[7]]

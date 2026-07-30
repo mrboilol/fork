@@ -71,6 +71,7 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
         net.Start("ZCity_Wind_SuppressionForce")
             net.WriteVector(closestPos)
             net.WriteFloat(force)
+			net.WriteBool(false)
         net.Send(ply)
 
         -- Apply Z-City adrenaline and fear from nearby flying bullets
@@ -117,6 +118,29 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
         bullet._ZCityWindServerSuppressionSent = true
     end
 end
+
+-- A hit is suppression too. Physical bullets may die during their impact tick,
+-- so send this from damage dispatch rather than relying on a later path hook.
+hook.Add("EntityTakeDamage", "ZCity_Wind_BulletHitSuppression", function(ent, dmgInfo)
+	if not config.Suppression or not dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then return end
+
+	local ply = ent:IsPlayer() and ent or (hg and hg.RagdollOwner and hg.RagdollOwner(ent) or nil)
+	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
+
+	local now = CurTime()
+	if (ply._ZCityWindBulletHitSuppressionNext or 0) > now then return end
+	ply._ZCityWindBulletHitSuppressionNext = now + 0.03
+
+	local pos = dmgInfo:GetDamagePosition()
+	if not pos or pos:IsZero() then pos = ply:EyePos() end
+	local force = math.Clamp(6 + dmgInfo:GetDamage() / 12, 6, 10)
+
+	net.Start("ZCity_Wind_SuppressionForce")
+		net.WriteVector(pos)
+		net.WriteFloat(force)
+		net.WriteBool(true)
+	net.Send(ply)
+end)
 
 function ZW.RegisterServerSuppressionBridge()
     local plugin = hg and hg.PhysBullet

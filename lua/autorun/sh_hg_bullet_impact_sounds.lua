@@ -77,9 +77,10 @@ addNumberedSounds(plasticSounds, "bfx/plastic/", 10)
 local tileSounds = {}
 addNumberedSounds(tileSounds, "bfx/tile/", 8)
 
-local nearMissSounds = {}
-addNumberedSounds(nearMissSounds, "bfx/nearmiss/", 5)
-addNumberedSounds(nearMissSounds, "bfx/wizzes/", 9)
+local supersonicNearMissSounds = {}
+local subsonicNearMissSounds = {}
+addNumberedSounds(supersonicNearMissSounds, "bul_snap/supersonic_snap_", 18)
+addNumberedSounds(subsonicNearMissSounds, "bul_flyby/subsonic_", 27)
 
 local ricochetSounds = {
 	"bullet/ricochet1.ogg",
@@ -173,10 +174,11 @@ function impactSounds.PlayRicochet(pos)
 	return true
 end
 
-function impactSounds.PlayNearMiss(pos)
-	if not CLIENT or not pos or math_random(4) ~= 1 then return false end
+function impactSounds.PlayNearMiss(pos, subsonic)
+	if not CLIENT or not pos then return false end
 
-	sound.Play(nearMissSounds[math_random(#nearMissSounds)], pos, 75, math_random(97, 103), 1)
+	local choices = subsonic and subsonicNearMissSounds or supersonicNearMissSounds
+	sound.Play(choices[math_random(#choices)], pos, 155, math_random(97, 103), 1)
 
 	return true
 end

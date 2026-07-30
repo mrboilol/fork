@@ -249,6 +249,15 @@ players : 1 humans, 0 bots (20 max)
 		suppressionVec = Vector(0, 0, 0)
 		suppressionDist = 0
 		suppressionDistAdd = 0
+		local function ApplySuppressionPunch(angle)
+			if hg_suppression_viewpunch and not hg_suppression_viewpunch:GetBool() then return end
+			if type(QuickViewPunch) == "function" then
+				QuickViewPunch(angle)
+			elseif type(ViewPunch) == "function" then
+				ViewPunch(angle)
+			end
+		end
+
 		net.Receive("add_supression", function()
 			if not IsValid(lply) or not lply:IsPlayer() then return end
 			if !lply:Alive() or !lply.organism or lply.organism.otrub then return end
@@ -266,8 +275,7 @@ players : 1 humans, 0 bots (20 max)
 			if not isVisible then dist = dist * 2 end
 
 			Suppress(dist * 25)
-			ViewPunch(AngleRand(-1,1) * dist / 15)
-			ViewPunch2(AngleRand(-1,1) * dist / 15)
+			ApplySuppressionPunch(AngleRand(-1, 1) * math.Clamp(1000 / math.max(dist, 100), 1, 5))
 		end)
 
 		local anguse = Angle(0,0,0)
@@ -283,12 +291,11 @@ players : 1 humans, 0 bots (20 max)
 			local subsonic = !(CustomAmmoType and CustomAmmoType.BulletSettings and CustomAmmoType.BulletSettings.Speed and CustomAmmoType.BulletSettings.Speed > 340)
 			
 			local tr = bullet.Trace
-			local mr = math.random(17)
 			local view = render.GetViewSetup(true)
 			if tr.StartPos:Distance( tr.HitPos ) > 5000 and !subsonic then
 				local time = view.origin:Distance(tr.StartPos+tr.HitPos/2) / 17836
 				timer.Simple(time,function()
-					EmitSound("cracks/distant/dist_crack_" .. ( mr < 9 and "0" or "") .. mr .. ".ogg", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
+					EmitSound("bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
 				end)
 			end
 
@@ -296,12 +303,13 @@ players : 1 humans, 0 bots (20 max)
 			if tr.Entity == hg.GetCurrentCharacter(lply) then
 
 				Suppress( 10 )
+				ApplySuppressionPunch(Angle(math.Rand(-5, 2), math.Rand(-3, 3), 0))
 				return
 			end
 
 			if not IsValid(self) or self:GetOwner() == lply:GetViewEntity() then return end
 			local eyePos = view.origin
-			local dis, pos = util.DistanceToLine(tr.StartPos, tr.HitPos, eyePos)
+			local _, pos = util.DistanceToLine(tr.StartPos, tr.HitPos, eyePos)
 			local isVisible = not util.TraceLine({
 				start = pos,
 				endpos = eyePos,
@@ -312,22 +320,13 @@ players : 1 humans, 0 bots (20 max)
 			if not isVisible then return end
 
 			local dist = pos:Distance(eyePos)
-			local shooterdist = tr.StartPos:Distance(eyePos)
-			local mr = math.random(9)
-			local SND = subsonic and "weapons/bullets/fx/subsonic_0" .. mr .. ".wav"
-				or bullet.Damage >= 50 and "cracks/" .. "heavy/heav" .. "_crack_0" .. mr .. ".ogg"
-				or bullet.Damage >= 30 and "cracks/" .. "medium/med" .. "_crack_0" .. mr .. ".ogg"
-				or "cracks/" .. "light/light" .. "_crack_0" .. mr .. ".ogg"
+			local SND = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
+				or "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"
 
 			if dist < 500 then
-				timer.Simple(0.02,function()
-					EmitSound("weapons/bullets/fx/subsonic_0" .. mr .. ".wav", pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
-				end)
-				if !subsonic then
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_ITEM, 1, 155)
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_WEAPON, 1, 155)
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_REPLACE, 1, 155)
-					EmitSound(SND, pos - tr.Normal * 25, 0, CHAN_BODY, 1, 155)
+				local playPos = pos - tr.Normal * 25
+				if not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic) then
+					EmitSound(SND, playPos, 0, CHAN_ITEM, 1, 155)
 				end
 			else return end
 			-- if dist > 120 then return end
@@ -348,8 +347,7 @@ players : 1 humans, 0 bots (20 max)
 			local badass = lply.organism and lply.organism.recoilmul or 1
 			local bulletdmg = math.max(bullet.Damage / 15,1)
 			if hg_suppression_viewpunch and hg_suppression_viewpunch:GetBool() then
-				ViewPunch(anguse * badass * bulletdmg * 8)
-				ViewPunch2((anguse * badass * bulletdmg * 8)/-2)
+				ApplySuppressionPunch(anguse * badass * bulletdmg * 12)
 			end
 			Suppress((dist * 45) * badass * bulletdmg)
 		end)

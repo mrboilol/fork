@@ -31,6 +31,11 @@ local IsValid = IsValid
 		local vp_punch_angle_velocity4 = Angle()
 		vp_punch_angle_last4 = vp_punch_angle_last4 or vp_punch_angle4
 
+		-- Suppression needs a short camera jolt, not another oscillating spring.
+		-- This channel applies the impulse immediately and eases it straight back.
+		local vp_quick_angle = Angle()
+		local vp_quick_angle_last = Angle()
+
 		function hg.CalculateConsciousnessMul()
 			local consciousness = 1
 
@@ -121,13 +126,21 @@ local IsValid = IsValid
 				vp_punch_angle_velocity4 = Angle()
 			end
 
-			if not lply:Alive() and not vp_punch_angle:IsZero() then
+			if not vp_quick_angle:IsZero() then
+				vp_quick_angle = LerpAngle(math_Clamp(ftlerped * 22, 0, 1), vp_quick_angle, Angle())
+				if math.abs(vp_quick_angle.p) + math.abs(vp_quick_angle.y) + math.abs(vp_quick_angle.r) < 0.01 then
+					vp_quick_angle:Zero()
+				end
+			end
+
+			if not lply:Alive() and (not vp_punch_angle:IsZero() or not vp_quick_angle:IsZero()) then
 				vp_punch_angle:Zero() vp_punch_angle_velocity:Zero() vp_punch_angle2:Zero() vp_punch_angle_velocity2:Zero()
+				vp_quick_angle:Zero()
 			end
 
 			local consmulrev = 1 - consmul
-			if vp_punch_angle:IsZero() and vp_punch_angle_velocity:IsZero() and vp_punch_angle2:IsZero() and vp_punch_angle_velocity2:IsZero() and vp_punch_angle3:IsZero() and vp_punch_angle_velocity3:IsZero() and  vp_punch_angle4:IsZero() and vp_punch_angle_velocity4:IsZero() then return end
-			local add = vp_punch_angle - vp_punch_angle_last + vp_punch_angle2 - vp_punch_angle_last2 + vp_punch_angle3 - vp_punch_angle_last3 + vp_punch_angle4 * consmulrev - vp_punch_angle_last4 * consmulrev
+			if vp_punch_angle:IsZero() and vp_punch_angle_velocity:IsZero() and vp_punch_angle2:IsZero() and vp_punch_angle_velocity2:IsZero() and vp_punch_angle3:IsZero() and vp_punch_angle_velocity3:IsZero() and vp_punch_angle4:IsZero() and vp_punch_angle_velocity4:IsZero() and vp_quick_angle:IsZero() and vp_quick_angle_last:IsZero() then return end
+			local add = vp_punch_angle - vp_punch_angle_last + vp_punch_angle2 - vp_punch_angle_last2 + vp_punch_angle3 - vp_punch_angle_last3 + vp_punch_angle4 * consmulrev - vp_punch_angle_last4 * consmulrev + vp_quick_angle - vp_quick_angle_last
 			if lply.organism and lply.organism.otrub then add:Zero() end
 			
 			if hg.InGame() then
@@ -148,6 +161,7 @@ local IsValid = IsValid
 			vp_punch_angle_last2 = vp_punch_angle2
 			vp_punch_angle_last3 = vp_punch_angle3
 			vp_punch_angle_last4 = vp_punch_angle4 * consmul
+			vp_quick_angle_last = Angle(vp_quick_angle.p, vp_quick_angle.y, vp_quick_angle.r)
 		end)
 
 		function SetViewPunchAngles(angle)
@@ -218,6 +232,14 @@ local IsValid = IsValid
 
 		function ViewPunch4(angle)
 			Viewpunch4(angle)
+		end
+
+		function QuickViewPunch(angle)
+			if not angle then return end
+			vp_quick_angle = vp_quick_angle + angle
+			vp_quick_angle.p = math_Clamp(vp_quick_angle.p, -12, 12)
+			vp_quick_angle.y = math_Clamp(vp_quick_angle.y, -12, 12)
+			vp_quick_angle.r = math_Clamp(vp_quick_angle.r, -5, 5)
 		end
 
 		function GetAllViewPunchAngles()
