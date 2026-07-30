@@ -531,6 +531,11 @@ end)
 local function RemoveRag(self, ply)
 	if self.override then return end
 	if not IsValid(ply) or ply.FakeRagdoll ~= self then return end
+
+	if hg.ClearRagdollSlideState then
+		hg.ClearRagdollSlideState(self)
+	end
+
 	ply.FakeRagdoll = nil
 	ply.Removed = true
 	if ply:Alive() then ply:Kill() end
@@ -1374,10 +1379,9 @@ function hg.FakeUp(ply, forced, instant)
 	
 	if !IsValid(ragdoll) then return end
 
-	-- Standing up is a state transition, not arm use. Preserve queued pain so
-	-- damaged/dislocated arms cannot add pain through spawn or fake-up hooks.
-	local org = ply.organism
-	local painAddBeforeFakeUp = org and org.painadd
+	if hg.ClearRagdollSlideState then
+		hg.ClearRagdollSlideState(ragdoll)
+	end
 
 	if ragdoll.welds then
 		if ply:InVehicle() then
