@@ -918,12 +918,29 @@ function hg.ExplodeHead(ent, damage, slash, force)
 	if ply:IsPlayer() and ply:Alive() then ply:Kill() end
 	if ent:IsNPC() and ent.organism then ent.organism.shock = 100 end
 	local target = ent
+	target._headGibPending = target._headGibPending or false
+	if target._headGibPending then return end
+	target._headGibPending = true
 
-	timer.Simple(0, function()
+	local attempts = 0
+	local function finishHeadGib()
 		if not IsValid(target) then return end
 
 		local ent = target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
-		if not IsValid(ent) then return end
+		if not IsValid(ent) then ent = target.FakeRagdoll end
+		if not IsValid(ent) then
+			attempts = attempts + 1
+			if attempts < 6 then
+				timer.Simple(0.05, finishHeadGib)
+			else
+				target._headGibPending = nil
+			end
+			return
+		end
+		if ent.headexploded then
+			target._headGibPending = nil
+			return
+		end
 		--[[if not isbool(ent) then
 			hook.Run("OnHeadExplode", ply, ent)
 		end]]
@@ -939,7 +956,9 @@ function hg.ExplodeHead(ent, damage, slash, force)
 
 		ent.organism.owner.fullsend = true
 		hg.send_bareinfo(ent.organism)
-	end)
+	end
+
+	timer.Simple(0, finishHeadGib)
 end
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
@@ -1413,6 +1432,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if org.lastGibHitGroup and org.lastGibHitTime and org.lastGibHitTime + 0.1 > CurTime() then
 		hitgroup = org.lastGibHitGroup
 		bonename = hitgroup == HITGROUP_STOMACH and "ValveBiped.Bip01_Pelvis" or bonename
+	end
+	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.ForceHeadGib and !ent.headexploded then
+		hg.ExplodeHead(ent, dmg_before * 1000, false, dmgInfo:GetDamageForce())
+		return true
 	end
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.ForceHeadKnockout then
 		org.needotrub = true
