@@ -2,7 +2,7 @@ if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_tpik1_base"
 SWEP.PrintName = "AED"
-SWEP.Instructions = "AEDs are very useful in lifesaving situations when attempting to save someone out of cardiac arrest"
+SWEP.Instructions = "AEDs are very useful in lifesaving situations when attempting to save someone out of cardiac arrest when CPR just isnt enough."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -365,26 +365,19 @@ local function ApplyAEDLifeSupport(org, elapsed)
 	org.defibSupportUntil = CurTime() + 0.3
 	org.deathStateEnd = math.max(org.deathStateEnd or 0, CurTime() + 10)
 
-	if istable(org.o2) then
-		local oxygenMax = tonumber(org.o2.range) or 30
-		org.o2[1] = math.Approach(tonumber(org.o2[1]) or 0, oxygenMax, elapsed * 1.25)
+	if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
+		hg.organism.RestoreSupportedOxygen(org, elapsed * 0.07, {
+			oxygen = math.min(24, tonumber(org.o2 and org.o2.range) or 30),
+			bodyoxygen = 0.55, brainoxygen = 0.50, perfusion = 0.45,
+			peripheralperfusion = 0.40, cerebralPerfusion = 0.45, myocardialOxygen = 0.50,
+			hypoxiaTime = 12, severeHypoxiaTime = 3, systemicIschemiaTime = 12
+		})
 	end
-
-	org.bodyoxygen = math.Approach(tonumber(org.bodyoxygen) or 1, 1, elapsed * 0.055)
-	org.brainoxygen = math.Approach(tonumber(org.brainoxygen) or 1, 1, elapsed * 0.045)
-	org.cerebralPerfusion = math.Approach(tonumber(org.cerebralPerfusion) or 1, 1, elapsed * 0.04)
-	org.perfusion = math.Approach(tonumber(org.perfusion) or 1, 1, elapsed * 0.04)
-	org.peripheralperfusion = math.Approach(tonumber(org.peripheralperfusion) or 1, 1, elapsed * 0.035)
-	org.myocardialOxygen = math.Approach(tonumber(org.myocardialOxygen) or 1, 1, elapsed * 0.07)
 	org.cardiacOutput = math.Approach(tonumber(org.cardiacOutput) or 1, 1, elapsed * 0.055)
 	org.strokeVolume = math.Approach(tonumber(org.strokeVolume) or 1, 1, elapsed * 0.045)
 	org.hypotension = math.Approach(tonumber(org.hypotension) or 0, 0, elapsed * 0.045)
 	org.heartStrain = math.Approach(tonumber(org.heartStrain) or 0, 0, elapsed * 0.025)
 
-	org.hypoxia = math.Approach(tonumber(org.hypoxia) or 0, 0, elapsed * 0.06)
-	org.hypoxiaTime = math.Approach(tonumber(org.hypoxiaTime) or 0, 0, elapsed * 4)
-	org.severeHypoxiaTime = math.Approach(tonumber(org.severeHypoxiaTime) or 0, 0, elapsed * 4)
-	org.systemicIschemiaTime = math.Approach(tonumber(org.systemicIschemiaTime) or 0, 0, elapsed * 4)
 end
 
 local function ApplyAEDRhythmTherapy(org, elapsed)

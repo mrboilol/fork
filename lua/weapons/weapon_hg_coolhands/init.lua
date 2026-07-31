@@ -543,9 +543,16 @@ function SWEP:ApplyForce()
 							self.CPRDuration = (self.CPRDuration or 0) + (1 / 120) * 60
 							org.palpitationTreatmentUntil = CurTime() + 1
 							
-							-- Improved oxygenation
-							local oxygenFloor = math.min(28, org.o2.range or 30)
-							org.o2[1] = math.max(math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range), oxygenFloor)
+							-- CPR improves oxygen delivery gradually, but cannot bypass a
+							-- destroyed heart, airway, lungs, or critically low blood volume.
+							if hg.organism.RestoreSupportedOxygen then
+								hg.organism.RestoreSupportedOxygen(org, 0.018 * skillMult, {
+									oxygen = math.min(24, org.o2.range or 30), bodyoxygen = 0.52,
+									brainoxygen = 0.48, perfusion = 0.42, peripheralperfusion = 0.38,
+									cerebralPerfusion = 0.42, myocardialOxygen = 0.45,
+									hypoxiaTime = 14, severeHypoxiaTime = 4, systemicIschemiaTime = 14
+								})
+							end
 							
 							-- Compressions provide temporary circulation without implying a restart.
 							org.cprSupportUntil = CurTime() + 0.75
@@ -564,11 +571,6 @@ function SWEP:ApplyForce()
 							-- Blood regeneration boost during CPR
 							if org.blood < 5000 and org.bleed < 1 then
 								org.blood = math.min(org.blood + 2 * skillMult, 5000)
-							end
-							
-							-- Lungs function restoration
-							if math.random(2) == 1 then
-								org.lungsfunction = true
 							end
 							
 							-- Reduced chest damage chance for doctors

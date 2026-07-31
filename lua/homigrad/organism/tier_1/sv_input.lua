@@ -1414,6 +1414,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hitgroup = org.lastGibHitGroup
 		bonename = hitgroup == HITGROUP_STOMACH and "ValveBiped.Bip01_Pelvis" or bonename
 	end
+	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.ForceHeadKnockout then
+		org.needotrub = true
+		org.shock = math.max(org.shock or 0, 40)
+		org.consciousness = 0
+	end
 	--print(dmg_before, 1)
 	--if ent:IsRagdoll() then
 		if RagdollForceBoneMul[hitgroup] then len = len * RagdollForceBoneMul[hitgroup] end

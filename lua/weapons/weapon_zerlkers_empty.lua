@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_hg_grenade_tpik"
-SWEP.PrintName = "empty box of tic tacs"
+SWEP.PrintName = "morty go get their shit hurry up i only had one of those things i threw, im holding a box of tic tacs right now"
 SWEP.Instructions = [[LMB - high throw
 RMB - low throw]]
 SWEP.Category = "ZCity Other"
@@ -15,7 +15,11 @@ SWEP.Primary.Wait = 2
 SWEP.Primary.Next = 0
 SWEP.ThrowVelocity = 1600
 SWEP.LowThrowVelocity = 900
-SWEP.ThrowDamage = 325
+-- A little harder than a thrown brick (16), but still a light plastic box.
+SWEP.ThrowDamage = 18
+SWEP.HeadGibDamageMul = 1000
+SWEP.HeadImpactGibChance = 0.5
+SWEP.HeadImpactKnockout = true
 
 SWEP.WorldModel = "models/tic tacs/winter_green.mdl"
 SWEP.WorldModelReal = "models/weapons/zcity/c_molotov.mdl"
@@ -134,6 +138,12 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	thrown.owner = owner
 	thrown.damage = self.ThrowDamage
 	thrown.MaxSpeed = velocity > 0 and velocity or self.ThrowVelocity
+	-- On a head impact, this either has enough force to take the head off or
+	-- leaves the victim unconscious. ent_throwable applies the random outcome
+	-- only while this collision's damage is being processed.
+	thrown.HeadGibDamageMul = self.HeadGibDamageMul
+	thrown.HeadImpactGibChance = self.HeadImpactGibChance
+	thrown.HeadImpactKnockout = self.HeadImpactKnockout
 	-- Match thrown bricks and bottles so impact damage enters Homigrad's blunt
 	-- trauma path (bruising, pain, wounds) instead of only reducing health.
 	thrown.DamageType = DMG_CLUB

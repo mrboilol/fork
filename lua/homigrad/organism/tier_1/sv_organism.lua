@@ -386,6 +386,54 @@ function hg.organism.GetResilientBlood(org)
 	return math.min((org and org.blood or 5000) + hg.organism.GetResilience(org) * 600, 5000)
 end
 
+-- Mechanical support can keep an otherwise treatable patient in the livable
+-- band, but it cannot move oxygen through a destroyed pump, airway, lungs, or
+-- an almost empty circulatory system.  Keeping this rule here makes CPR, AEDs
+-- and the autosurgeon agree about when oxygen recovery is possible.
+function hg.organism.RestoreSupportedOxygen(org, recovery, floors)
+
+	if not org or not istable(org.o2) then return false end
+
+	local leftLung = istable(org.lungsL) and (tonumber(org.lungsL[1]) or 0) or 0
+	local rightLung = istable(org.lungsR) and (tonumber(org.lungsR[1]) or 0) or 0
+	local criticalFailure = (tonumber(org.heart) or 0) >= 0.55
+		or (tonumber(org.trachea) or 0) >= 0.55
+		or leftLung >= 0.70 or rightLung >= 0.70
+		-- Cardiac arrest itself marks lungsfunction false in sv_lungs; CPR and
+		-- automated compressions must still work when the airway and lungs are intact.
+		or (org.lungsfunction == false and not org.heartstop)
+		or org.respiratoryArrest
+		or (tonumber(org.blood) or 5000) < 2200
+	if criticalFailure then return false end
+
+	recovery = math.max(tonumber(recovery) or 0, 0)
+	floors = floors or {}
+	local oxygenMax = math.max(tonumber(org.o2.range) or 30, 1)
+	local oxygenFloor = math.Clamp(tonumber(floors.oxygen) or 0, 0, oxygenMax)
+	local oxygenTarget = math.Clamp(tonumber(floors.oxygenTarget) or oxygenFloor, oxygenFloor, oxygenMax)
+	org.o2[1] = math.max(math.Approach(tonumber(org.o2[1]) or 0, oxygenTarget, recovery * oxygenMax), oxygenFloor)
+
+	local vitalFloors = {
+		bodyoxygen = tonumber(floors.bodyoxygen) or 0,
+		brainoxygen = tonumber(floors.brainoxygen) or 0,
+		perfusion = tonumber(floors.perfusion) or 0,
+		peripheralperfusion = tonumber(floors.peripheralperfusion) or 0,
+		cerebralPerfusion = tonumber(floors.cerebralPerfusion) or 0,
+		myocardialOxygen = tonumber(floors.myocardialOxygen) or 0
+	}
+	for key, floor in pairs(vitalFloors) do
+		floor = math.Clamp(floor, 0, 1)
+		local target = math.Clamp(tonumber(floors[key .. "Target"]) or floor, floor, 1)
+		org[key] = math.max(math.Approach(tonumber(org[key]) or 0, target, recovery), floor)
+	end
+
+	org.hypoxia = math.Approach(tonumber(org.hypoxia) or 0, 0, recovery)
+	org.hypoxiaTime = math.min(math.Approach(tonumber(org.hypoxiaTime) or 0, 0, recovery * 18), tonumber(floors.hypoxiaTime) or math.huge)
+	org.severeHypoxiaTime = math.min(math.Approach(tonumber(org.severeHypoxiaTime) or 0, 0, recovery * 14), tonumber(floors.severeHypoxiaTime) or math.huge)
+	org.systemicIschemiaTime = math.min(math.Approach(tonumber(org.systemicIschemiaTime) or 0, 0, recovery * 14), tonumber(floors.systemicIschemiaTime) or math.huge)
+	return true
+end
+
 -- A normal Zerlkers dose is a last-resort stimulant, not a substitute for a
 -- functioning brain, circulation, or oxygen supply. Keep this check in one
 -- place so ordinary pain/shock collapse can be suppressed without allowing a

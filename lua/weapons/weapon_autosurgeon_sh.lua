@@ -2,7 +2,7 @@ if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_tpik1_base"
 SWEP.PrintName = "Portable D.I.H Unit"
-SWEP.Instructions = "Hold LMB to place on a patient. Hold RMB to place on yourself."
+SWEP.Instructions = "A portable Direct Injury Handler is a lifesaving device that you can use in any combat scenario to stabilize and treat internal injuries. It is not effective in terms of speed however, so it is still recommended to administer CPR and other lifesaving techniques in conjunction with the D.I.H. Comes with an autopulse, a organ mender, stimulators and a stitcher. This one is in a different language."
 SWEP.Category = "Medicine"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -80,7 +80,7 @@ SWEP.Config = {
     AutopulseBatteryPerBeat = 14,
     TickInterval = 0.5,
     AutopulseInterval = 60 / 70,
-    AutopulseOxygenFloor = 28,
+    AutopulseOxygenFloor = 24,
     SoundCooldown = 0.35,
     InjuryHeal = 0.06,
     BleedHeal = 1.5,
@@ -93,21 +93,21 @@ SWEP.Config = {
 local ASConfig = SWEP.Config
 
 local ASSounds = {
-    battery = "autonigger/buttons.ogg",
-    mounted = "autonigger/autosurgeonon.ogg",
-    pump = "autonigger/pump.ogg",
-    modeComplete = "autonigger/completemode.ogg",
-    modeSwitch = "autonigger/switchmode.ogg",
-    painkillerNeeded = "autonigger/switch.ogg",
-    stimulator = "autonigger/stimulator.ogg",
-    removed = "autonigger/desert.ogg",
-    complete = "autonigger/complete.ogg"
+    battery = "autonigger/buttons.wav",
+    mounted = "autonigger/autosurgeonon.wav",
+    pump = "autonigger/pump.wav",
+    modeComplete = "autonigger/completemode.wav",
+    modeSwitch = "autonigger/switchmode.wav",
+    painkillerNeeded = "autonigger/switch.wav",
+    stimulator = "autonigger/stimulator.wav",
+    removed = "autonigger/desert.wav",
+    complete = "autonigger/complete.wav"
 }
 
 local ASScanSounds = {
-    "autonigger/atireputas1.ogg",
-    "autonigger/atireputas2.ogg",
-    "autonigger/atireputas3.ogg"
+    "autonigger/atireputas1.wav",
+    "autonigger/atireputas2.wav",
+    "autonigger/atireputas3.wav"
 }
 
 -- The D.I.H. intentionally works in three passes. The order matters: closing
@@ -379,18 +379,16 @@ local function ApplyAutopulse(org, config)
     org.deathStateEnd = math.max(org.deathStateEnd or 0, CurTime() + 2)
     org.pulse = 70
     org.heartbeat = 70
-    org.cardiacOutput = 1
-    org.strokeVolume = 1
-    org.hypotension = 0
-    org.hypertension = 0
-    org.perfusion = 1
-    org.peripheralperfusion = 1
-    org.cerebralPerfusion = 1
-    org.myocardialOxygen = 1
-    if istable(org.o2) then
-        local maxOxygen = org.o2.range or 30
-        local oxygenFloor = math.min(config.AutopulseOxygenFloor, maxOxygen)
-        org.o2[1] = math.max(math.Approach(org.o2[1] or 0, maxOxygen, 1.5), oxygenFloor)
+    org.cardiacOutput = math.max(tonumber(org.cardiacOutput) or 0, 0.55)
+    org.strokeVolume = math.max(tonumber(org.strokeVolume) or 0, 0.50)
+    org.hypotension = math.min(tonumber(org.hypotension) or 1, 0.50)
+    if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
+        hg.organism.RestoreSupportedOxygen(org, 0.12, {
+            oxygen = config.AutopulseOxygenFloor,
+            bodyoxygen = 0.55, brainoxygen = 0.50, perfusion = 0.45,
+            peripheralperfusion = 0.40, cerebralPerfusion = 0.45, myocardialOxygen = 0.50,
+            hypoxiaTime = 12, severeHypoxiaTime = 3, systemicIschemiaTime = 12
+        })
     end
 end
 
@@ -539,9 +537,9 @@ function SWEP:AttachUnit(owner, target, ply)
     target.AutosurgeonInProgress = true
     ply.AutosurgeonModelEnt = unit
     ply.AutosurgeonInProgress = true
-    -- The scan is an explicit first phase.  Do not put it behind the mounting
-    -- sound queue: doing so delayed diagnosis (and every subsequent action)
-    -- until the mounting clip had finished playing.
+    -- The scan is an explicit first phase. Its WAV duration is tracked by the
+    -- sound processor, which also enforces SoundCooldown after it finishes;
+    -- treatment cannot begin until both have elapsed.
     local scanSound = ASScanSounds[math.random(#ASScanSounds)]
     unit.ASSoundEmitter = target
     PlayUnitSound(unit, ASSounds.mounted)
@@ -668,7 +666,6 @@ function SWEP:AttachUnit(owner, target, ply)
 
         battery = battery - config.BatteryPerTick
         unit:SetNWInt("AutosurgeonBattery", battery)
-        QueueUnitSound(unit, ASSounds.pump, 65, 100)
         if modeSwitchPending then
             QueueUnitSound(unit, ASSounds.modeSwitch)
             modeSwitchPending = false
