@@ -190,6 +190,19 @@ local function QueueUnitSound(unit, snd, level, pitch)
     table.insert(unit.ASSoundQueue, {sound = snd, level = level or 75, pitch = pitch or 100})
 end
 
+-- Keep sound routing identical to the AED: the attached model is visual-only,
+-- while the patient is a reliable replicated source for nearby listeners.
+local function GetUnitSoundEmitter(unit)
+    if not IsValid(unit) then return end
+    return IsValid(unit.ASSoundEmitter) and unit.ASSoundEmitter or unit
+end
+
+local function PlayUnitSound(unit, snd, level, pitch)
+    if not IsValid(unit) or not snd then return end
+    local emitter = GetUnitSoundEmitter(unit)
+    if IsValid(emitter) then emitter:EmitSound(snd, level or 75, pitch or 100) end
+end
+
 local function ProcessUnitSounds(unit, config)
     if not IsValid(unit) then return true end
     if (unit.ASBusyUntil or 0) > CurTime() then return true end
@@ -197,15 +210,14 @@ local function ProcessUnitSounds(unit, config)
     if not queue or #queue <= 0 then return false end
 
     local nextSound = table.remove(queue, 1)
-    local emitter = IsValid(unit.ASSoundEmitter) and unit.ASSoundEmitter or unit
-    emitter:EmitSound(nextSound.sound, nextSound.level, nextSound.pitch)
+    PlayUnitSound(unit, nextSound.sound, nextSound.level, nextSound.pitch)
     unit.ASBusyUntil = CurTime() + math.max(SoundDuration(nextSound.sound), 0) + config.SoundCooldown
     return true
 end
 
 local function StopUnitSounds(unit)
     if not IsValid(unit) then return end
-    local emitter = IsValid(unit.ASSoundEmitter) and unit.ASSoundEmitter or unit
+    local emitter = GetUnitSoundEmitter(unit)
     for _, snd in pairs(ASSounds) do
         unit:StopSound(snd)
         if IsValid(emitter) and emitter != unit then emitter:StopSound(snd) end
@@ -512,8 +524,9 @@ function SWEP:AttachUnit(owner, target, ply)
     -- sound queue: doing so delayed diagnosis (and every subsequent action)
     -- until the mounting clip had finished playing.
     local scanSound = ASScanSounds[math.random(#ASScanSounds)]
-    unit:EmitSound(ASSounds.mounted, 75, 100)
-    unit:EmitSound(scanSound, 75, 100)
+    unit.ASSoundEmitter = target
+    PlayUnitSound(unit, ASSounds.mounted)
+    PlayUnitSound(unit, scanSound)
     unit.ASBusyUntil = CurTime() + math.max(SoundDuration(scanSound), 0) + config.SoundCooldown
     owner:ViewPunch(Angle(5, 0, 0))
 
