@@ -73,24 +73,26 @@ SWEP.HoldClampMin = 35
 SWEP.Config = {
     BatteryMax = 1000,
     BatteryRecharge = {
-        ["D.I.H Battery"] = 250,
+        -- A dedicated battery restores half of the unit's capacity.  Taser
+        -- cartridges remain an intentionally weaker field-expedient option.
+        ["D.I.H Battery"] = 500,
         ["Taser Cartridge"] = 100
     },
-    BatteryPerTick = 8,
-    AutopulseBatteryPerBeat = 14,
-    TickInterval = 0.5,
+    BatteryPerTick = 3,
+    AutopulseBatteryPerBeat = 6,
+    TickInterval = 0.25,
     AutopulseInterval = 60 / 70,
-    AutopulseOxygenFloor = 24,
-    AutopulseOxygenRecovery = 0.08,
-    AutopulseBloodFloor = 3500,
-    AutopulseBloodRestore = 55,
+    AutopulseOxygenFloor = 28,
+    AutopulseOxygenRecovery = 0.35,
+    AutopulseBloodFloor = 4200,
+    AutopulseBloodRestore = 180,
     AutopulseMannitolTarget = 1.25,
     AutopulseMannitolDose = 0.08,
     SoundCooldown = 0.35,
-    InjuryHeal = 0.06,
-    BleedHeal = 1.5,
-    InternalBleedHeal = 0.5,
-    BloodRestore = 16
+    InjuryHeal = 0.14,
+    BleedHeal = 3,
+    InternalBleedHeal = 1.2,
+    BloodRestore = 100
 }
 
 -- SWEP is only guaranteed to exist while this file is being loaded. Deferred
@@ -105,6 +107,7 @@ local ASSounds = {
     modeSwitch = "autonigger/switchmode.wav",
     painkillerNeeded = "autonigger/switch.wav",
     stimulator = "autonigger/stimulator.wav",
+    suddenStop = "autonigger/suddenstop.wav",
     removed = "autonigger/desert.wav",
     complete = "autonigger/complete.wav"
 }
@@ -130,6 +133,17 @@ local ComplexFields = {
     "hemothoraxL", "hemothoraxR", "internalBleedComplication", "brainFrontal",
     "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage", "brainSwelling",
     "intracranialPressure", "brainBleedRate", "neckBrainOxygenPenalty", "arterialO2Impairment",
+    "throatCutPressureShock"
+}
+
+-- These are handled ahead of the remaining complex injuries.  Keeping them
+-- separate makes the triage order unambiguous: stop bleeding, restore volume,
+-- then protect the brain, heart, and respiratory system.
+local VitalFields = {
+    "brain", "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital",
+    "brainHemorrhage", "brainSwelling", "intracranialPressure", "brainBleedRate",
+    "neckBrainOxygenPenalty", "heart", "chest", "trachea", "hemothorax",
+    "hemothoraxTrauma", "hemothoraxL", "hemothoraxR", "arterialO2Impairment",
     "throatCutPressureShock"
 }
 
@@ -279,6 +293,16 @@ local function HasComplexWork(org)
         istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0)
 end
 
+local function HasBloodWork(org)
+    return (tonumber(org.blood) or 5000) < 4999
+end
+
+local function HasVitalWork(org)
+    if HasFieldsAbove(org, VitalFields, 0.001) then return true end
+    return istable(org.lungsL) and ((org.lungsL[1] or 0) > 0.001 or (org.lungsL[2] or 0) > 0) or
+        istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0)
+end
+
 local function HasSimpleWork(org)
     if HasFieldsAbove(org, SimpleFields, 0.001) or HasFieldsAbove(org, RecoveryFields, 0.01) or (org.blood or 5000) < 4999 then return true end
     for _, key in ipairs(ClearFlags) do
@@ -316,8 +340,10 @@ end
 -- whenever another category also needed attention.
 local function GetNextTreatmentMode(org)
     if HasStitchingWork(org) then return 1 end
-    if HasComplexWork(org) then return 2 end
-    if HasSimpleWork(org) then return 3 end
+    if HasBloodWork(org) then return 2 end
+    if HasVitalWork(org) then return 3 end
+    if HasComplexWork(org) then return 4 end
+    if HasSimpleWork(org) then return 5 end
 end
 
 local function HealWoundTable(tbl, amount)
@@ -371,6 +397,24 @@ local function HealComplex(org, config)
     org.tracheaPath = nil
 end
 
+local function HealVital(org, config)
+    HealFields(org, VitalFields, config.InjuryHeal * 1.5)
+    if istable(org.lungsL) then
+        org.lungsL[1] = math.Approach(org.lungsL[1] or 0, 0, config.InjuryHeal * 1.5)
+        org.lungsL[2] = math.Approach(org.lungsL[2] or 0, 0, config.InjuryHeal * 1.5)
+    end
+    if istable(org.lungsR) then
+        org.lungsR[1] = math.Approach(org.lungsR[1] or 0, 0, config.InjuryHeal * 1.5)
+        org.lungsR[2] = math.Approach(org.lungsR[2] or 0, 0, config.InjuryHeal * 1.5)
+    end
+    org.lungsfunction = true
+    org.tracheaPath = nil
+end
+
+local function HealBlood(org, config)
+    org.blood = math.Approach(tonumber(org.blood) or 5000, 5000, config.BloodRestore)
+end
+
 local function HealSimple(org, config)
     HealFields(org, SimpleFields, config.InjuryHeal)
     local heal = config.InjuryHeal
@@ -413,9 +457,14 @@ local function ApplyAutopulse(org, config)
     if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
         hg.organism.RestoreSupportedOxygen(org, config.AutopulseOxygenRecovery, {
             oxygen = config.AutopulseOxygenFloor,
-            bodyoxygen = 0.55, brainoxygen = 0.50, perfusion = 0.45,
-            peripheralperfusion = 0.40, cerebralPerfusion = 0.45, myocardialOxygen = 0.50,
-            hypoxiaTime = 12, severeHypoxiaTime = 3, systemicIschemiaTime = 12
+            oxygenTarget = 30,
+            bodyoxygen = 0.60, bodyoxygenTarget = 0.90,
+            brainoxygen = 0.60, brainoxygenTarget = 0.88,
+            perfusion = 0.55, perfusionTarget = 0.82,
+            peripheralperfusion = 0.50, peripheralperfusionTarget = 0.78,
+            cerebralPerfusion = 0.55, cerebralPerfusionTarget = 0.84,
+            myocardialOxygen = 0.60, myocardialOxygenTarget = 0.88,
+            hypoxiaTime = 0, severeHypoxiaTime = 0, systemicIschemiaTime = 0
         })
     end
 end
@@ -650,8 +699,10 @@ function SWEP:AttachUnit(owner, target, ply)
         local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
         if needsAutopulse and CurTime() >= nextAutopulse then
             if battery < config.AutopulseBatteryPerBeat then
-                QueueUnitSound(unit, ASSounds.battery)
-                unit.ASPendingDrop = true
+                -- Battery depletion is terminal for an attached unit: stop
+                -- treatment and eject it immediately instead of waiting for
+                -- the sound queue or another timer tick.
+                DropUnit(unit, activeTarget, ply, battery, ASSounds.suddenStop)
                 return
             end
             battery = battery - config.AutopulseBatteryPerBeat
@@ -694,8 +745,7 @@ function SWEP:AttachUnit(owner, target, ply)
             return
         end
         if battery < config.BatteryPerTick then
-            QueueUnitSound(unit, ASSounds.battery)
-            unit.ASPendingDrop = true
+            DropUnit(unit, activeTarget, ply, battery, ASSounds.suddenStop)
             return
         end
 
@@ -718,14 +768,20 @@ function SWEP:AttachUnit(owner, target, ply)
         if treatmentMode == 1 then
             HealStitching(org, config)
         elseif treatmentMode == 2 then
+            HealBlood(org, config)
+        elseif treatmentMode == 3 then
+            HealVital(org, config)
+        elseif treatmentMode == 4 then
             HealComplex(org, config)
         else
             HealSimple(org, config)
         end
 
         local modeStillNeeded = treatmentMode == 1 and HasStitchingWork(org) or
-            treatmentMode == 2 and HasComplexWork(org) or
-            treatmentMode == 3 and HasSimpleWork(org)
+            treatmentMode == 2 and HasBloodWork(org) or
+            treatmentMode == 3 and HasVitalWork(org) or
+            treatmentMode == 4 and HasComplexWork(org) or
+            treatmentMode == 5 and HasSimpleWork(org)
         if not modeStillNeeded then
             QueueUnitSound(unit, ASSounds.modeComplete)
             treatmentMode = nil

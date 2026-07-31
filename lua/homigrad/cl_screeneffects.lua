@@ -77,7 +77,8 @@ local otrubSoundPaths = {
 	[1] = "sound/altotrub.ogg",
 	[2] = "sound/sleepy.ogg",
 	[3] = "sound/itssoover.mp3",
-	[4] = "sound/ngaimcooked.mp3"
+	[4] = "sound/ngaimcooked.mp3",
+	[5] = "sound/rem_dying1.mp3"
 }
 local OtrubModeStation
 local activeOtrubMode
@@ -1156,12 +1157,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 2)
-	if (selectedDyingMode == 8 or org.incapacitated) and canRetrySound("RemDying1Station", RemDying1Station) then
+	if selectedDyingMode == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
 		sound.PlayFile("sound/rem_dying1.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(org.incapacitated and math.min(org.brain / 0.5 * station:GetLength(), 200) or math.min(math.Rand(0, station:GetLength()), 139))
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				RemDying1Station = station
 				station:EnableLooping(true)
 			end
@@ -2121,7 +2122,6 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
-			local remorseismIncapacitated = org.incapacitated
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
@@ -2136,11 +2136,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if remorseismIncapacitated then
-				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
-			elseif otrubMode == 0 then
+			-- Incapacitation must not override the configured otrub sound. The REM
+			-- track is available explicitly as hg_otrubsound 5 instead.
+			if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
+			if otrubMode == 0 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 			else
@@ -2171,7 +2170,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
-			if not remorseismIncapacitated then
+			if not org.incapacitated then
 				local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 				if dyingMode == 6 and IsValid(ItssooverStation) then
 					ItssooverStation:SetVolume(otrubVol)
@@ -2801,7 +2800,11 @@ net.Receive("headtrauma_flash", function()
         end
     end
 
-	hg.AddFlash(lply:EyePos(), 1, pos, time, size, true)
+	-- Head impacts need the same visible flare as other flash sources. Passing
+	-- the head-trauma flag suppresses them in the shared flash renderer.
+	if hg.AddFlash then
+		hg.AddFlash(lply:EyePos(), 1, pos, time, size)
+	end
 
     -- Scale effects by the received flash duration (which is scaled by damage on the server)
     local damageScale = math.Clamp(time / 1.5, 0.2, 1.0)

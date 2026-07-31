@@ -361,7 +361,7 @@ local function ApplyAEDLifeSupport(org, elapsed)
 		-- this support when the pump, airway, lungs, or blood volume cannot
 		-- actually carry oxygen.
 		local oxygenTarget = tonumber(org.o2 and org.o2.range) or 30
-		hg.organism.RestoreSupportedOxygen(org, elapsed * 0.25, {
+		hg.organism.RestoreSupportedOxygen(org, elapsed * 0.75, {
 			oxygen = math.min(24, tonumber(org.o2 and org.o2.range) or 30),
 			oxygenTarget = oxygenTarget,
 			bodyoxygen = 0.55, bodyoxygenTarget = 0.90,

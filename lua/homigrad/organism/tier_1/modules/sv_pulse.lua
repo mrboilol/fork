@@ -34,8 +34,13 @@ local peaDuration = 6
 -- return.  Keep this separate from blood loss: it is a reversible pressure
 -- problem, not a wound or a permanent reduction in blood volume.
 local function getMotionVelocity(owner)
+	if not IsValid(owner) then return vector_origin end
+
 	local motionEnt = owner
-	if owner:InVehicle() then
+	-- Organism owners are not always players (for example, a ragdoll during a
+	-- handoff). InVehicle is a player method, so only call it when present.
+	local inVehicle = isfunction(owner.InVehicle) and owner:InVehicle() or false
+	if inVehicle then
 		local vehicle = owner:GetVehicle()
 		if IsValid(vehicle) then
 			motionEnt = vehicle
@@ -51,6 +56,13 @@ local function getMotionVelocity(owner)
 end
 
 local function updateHighSpeedPressureShock(owner, org, timeValue)
+	if not IsValid(owner) then
+		org.highSpeedPressureShock = 0
+		org.lastHighSpeedVelocity = nil
+		org.lastHighSpeedVelocityTime = nil
+		return 0
+	end
+
 	-- Noclip movement is administrative/free-camera movement, not a physical
 	-- manoeuvre. Clear the cached sample too, so leaving noclip cannot create a
 	-- false acceleration spike on the first normal movement update.
@@ -76,7 +88,8 @@ local function updateHighSpeedPressureShock(owner, org, timeValue)
 	local speed = velocity:Length()
 	local speedStress = math.Clamp(math.Remap(speed, 900, 1900, 0, 0.65), 0, 0.65)
 	local fallStress = math.Clamp(math.Remap(-velocity.z, 850, 1750, 0, 0.75), 0, 0.75)
-	if velocity.z >= 0 or (not owner:InVehicle() and owner:OnGround()) then fallStress = 0 end
+	local inVehicle = isfunction(owner.InVehicle) and owner:InVehicle() or false
+	if velocity.z >= 0 or (not inVehicle and isfunction(owner.OnGround) and owner:OnGround()) then fallStress = 0 end
 
 	local sampleTime = math.Clamp(now - previousTime, 0.02, 0.5)
 	local acceleration = (velocity - previousVelocity) / sampleTime

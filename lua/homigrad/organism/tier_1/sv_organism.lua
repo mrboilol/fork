@@ -78,7 +78,7 @@ local panicattack_fire_check_delay = 1
 local hg_panic = ConVarExists("hg_panic") and GetConVar("hg_panic") or CreateConVar("hg_panic", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable panic attack logic", 0, 1)
 local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 3 = altpain, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
 local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = REM dying 2 + quiet itssofuckingover background", 0, 9)
-local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 1 = altotrub, 2 = sleepy, 3 = itssoover, 4 = nga im cooked", 0, 4)
+local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 1 = altotrub, 2 = sleepy, 3 = itssoover, 4 = nga im cooked, 5 = REM dying", 0, 5)
 local gunfight_adrenaline_delay = 1.5
 local gunfight_adrenaline_cap = 1.5
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
@@ -539,12 +539,16 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	org.severeHypoxiaTime = severeHypoxia and math.min((org.severeHypoxiaTime or 0) + dt, 120) or math.Approach(org.severeHypoxiaTime or 0, 0, dt * 2)
 
 	-- Sustained failure of oxygen delivery eventually becomes systemic ischemia.
-	-- Brief hypoxic/perfusion dips recover without permanent organ damage; after
-	-- prolonged exposure, the existing ischemia pipeline distributes damage across
-	-- the brain, heart, liver and abdominal organs.
+	-- Keep it tied to an actual catastrophic cause: severe blood loss, hypoxemia,
+	-- or hemotransfusion shock. A transient low-perfusion value on its own must
+	-- not quietly start systemic organ damage.
 	local systemicDelivery = math.min(org.bodyoxygen, org.perfusion, org.peripheralperfusion)
 	local systemicSeverity = math.Clamp((0.55 - systemicDelivery) / 0.45, 0, 1)
-	if systemicSeverity > 0 then
+	local severeBloodLoss = (org.blood or 5000) <= 2500 or (org.internalBleed or 0) > 2.5
+	local o2Value = istable(org.o2) and (org.o2[1] or 30) or (tonumber(org.o2) or 30)
+	local hypoxemia = (org.bodyoxygen or 1) < 0.55 or o2Value < 14
+	local ischemiaCauseActive = severeBloodLoss or hypoxemia or (org.hemotransfusionshock or 0) > 0
+	if systemicSeverity > 0 and ischemiaCauseActive then
 		local exposureRate = 0.35 + systemicSeverity * 0.65
 		org.systemicIschemiaTime = math.min((org.systemicIschemiaTime or 0) + dt * exposureRate, 180)
 	else
@@ -552,7 +556,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	end
 
 	local systemicDelay = 20 * (1 + resilience * 0.6)
-	if (org.systemicIschemiaTime or 0) > systemicDelay then
+	if ischemiaCauseActive and (org.systemicIschemiaTime or 0) > systemicDelay then
 		local durationRamp = math.Clamp(((org.systemicIschemiaTime or 0) - systemicDelay) / 30, 0, 1)
 		local ischemiaRate = systemicSeverity * Lerp(durationRamp, 0.12, 0.3)
 		org.ischemia = math.min((org.ischemia or 0) + dt * ischemiaRate, 6)

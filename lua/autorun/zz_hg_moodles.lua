@@ -103,6 +103,12 @@ local moodleTexts = {
 			[4] = {title = "Ruined Endurance", description = "Your stamina capacity is critically limited."},
 		},
 	},
+	exertion = {levels = {
+		[1] = {title = "Winded", description = "Your current stamina is beginning to run low."},
+		[2] = {title = "Exerted", description = "Low stamina is slowing your recovery and movement."},
+		[3] = {title = "Exhausted", description = "You need to rest before your body can perform normally."},
+		[4] = {title = "No Stamina", description = "You are completely spent and need immediate rest."},
+	}},
 	tired = {levels = {
 		[1] = {title = "Slightly Tired", description = "Activity has strained you, but you can keep going."},
 		[2] = {title = "Tired", description = "You should slow down and catch your breath."},
@@ -239,7 +245,7 @@ local moodleTexts = {
 		[1] = {title = "Jaw Strain", description = "Your jaw joint is damaged and painful to move."},
 		[2] = {title = "Dislocated Jaw", description = "Your jaw has been forced out of its normal socket."},
 		[3] = {title = "Severe Jaw Dislocation", description = "Your displaced jaw is causing major facial dysfunction."},
-		[4] = {title = "Destroyed Jaw Joint", description = "Catastrophic jaw damage has left the joint unusable."},
+		[4] = {title = "Broken Jaw", description = "Your jaw is fractured and painful to move or speak with."},
 	}},
 	organ_damage = {levels = {
 		[1] = {title = "Severe Organ Damage", description = "One or more internal organs are badly damaged."},
@@ -411,13 +417,13 @@ local function getMoodle3Icon(effect)
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "intercranial-hypertension",
-		weakness = "combat" .. level, bradypnea = "dyspnea", thorax = "hemothorax",
+		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
 		respiratory_arrest = "respiratory-arrest", ribs = "fractured", skull = "intercranial-hypertension",
-		dislocated_jaw = "dislocated", organ_damage = "combat" .. level, spine_break = "fractured",
-		shock = "shock", seizure = "seizure", internal_bleed = level == 1 and "blood-loss" or "blood-loss" .. level,
+		dislocated_jaw = level >= 4 and "dejawed" or "dislocated", organ_damage = effect.icon, spine_break = "fractured",
+		shock = "shock", seizure = "seizure", internal_bleed = "internal-bleeding",
 		panic = "panic", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
-		adrenaline = "adrenaline", zerlked = "drugged", armored = "combat" .. level,
+		adrenaline = "adrenaline", zerlked = "drugged",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
 	}
 	local name = names[effect.name]
@@ -529,7 +535,11 @@ local function buildEffects(ply, org)
 		end
 		local staminaFraction = math.Clamp(number(stamina[1], staminaMax) / math.max(staminaMax, 1), 0, 1)
 		if staminaFraction < 0.75 then
-			add(effects, "tired", "tired", lowRank(staminaFraction, {0.75, 0.5, 0.25, 0.1}), "bad", 13, math.floor(staminaFraction * 100) .. "%")
+			local level = lowRank(staminaFraction, {0.75, 0.5, 0.25, 0.1})
+			-- Moodle 3 reserves tired/very-tired for consciousness. Exertion shows
+			-- actual stamina depletion while the regular stamina moodle still shows
+			-- fitness or a reduced maximum capacity.
+			add(effects, isMoodle3() and "exertion" or "tired", isMoodle3() and "exertion" or "tired", level, "bad", 13, math.floor(staminaFraction * 100) .. "%")
 		end
 	end
 
@@ -651,7 +661,11 @@ local function buildEffects(ply, org)
 	if chest > 0.3 then add(effects, "ribs", "ribs", highRank(chest, {0.3, 0.6, 0.8, 0.95}), "bad", 52, math.floor(chest * 100) .. "%") end
 	local skull = orgNumber(org, "skull", 0)
 	if skull >= 0.6 then add(effects, "skull", skull >= 1 and "skull2" or "skull1", skull >= 1 and 4 or 3, "bad", 53, math.floor(skull * 100) .. "%") end
-	if org.jawdislocation == true or org.jawdislocated == true then add(effects, "dislocated_jaw", "dislocatedjaw", 2, "bad", 54) end
+	local jawBroken = orgNumber(org, "jaw", 0) >= 1
+	local jawDislocated = org.jawdislocation == true or org.jawdislocated == true
+	if jawBroken or jawDislocated then
+		add(effects, "dislocated_jaw", "dislocatedjaw", jawBroken and 4 or 2, "bad", 54)
+	end
 
 	local heart, trachea = orgNumber(org, "heart", 0), orgNumber(org, "trachea", 0)
 	local liver, stomach, intestines = orgNumber(org, "liver", 0), orgNumber(org, "stomach", 0), orgNumber(org, "intestines", 0)
@@ -660,10 +674,11 @@ local function buildEffects(ply, org)
 	local organPeak = math.max(heart, trachea, liver, stomach, intestines, lungL, lungR)
 	local hasRespiratoryOrganDamage = math.max(trachea, lungL, lungR, lungPenetratedL, lungPenetratedR) > 0
 	if organPeak >= 0.6 or hasRespiratoryOrganDamage then
-		local level = organPeak >= 1 and 2 or 1
-		if lungL >= 0.8 or lungR >= 0.8 or liver >= 0.8 then level = 3 end
-		if heart >= 1 or trachea >= 1 or (lungL >= 1 and lungR >= 1) then level = 4 end
-		add(effects, "organ_damage", "orangedamage", level, "bad", 55)
+		local combatLevel = organPeak >= 1 and 2 or 1
+		if lungL >= 0.8 or lungR >= 0.8 or liver >= 0.8 then combatLevel = 3 end
+		if heart >= 0.8 or trachea >= 0.8 or (lungL >= 0.8 and lungR >= 0.8) then combatLevel = 4 end
+		if heart >= 1 or trachea >= 1 or (lungL >= 1 and lungR >= 1) then combatLevel = 5 end
+		add(effects, "organ_damage", isMoodle3() and "combat" .. combatLevel or "orangedamage", math.min(combatLevel, 4), "bad", 55)
 	end
 
 	local spine1, spine2, spine3 = orgNumber(org, "spine1", 0), orgNumber(org, "spine2", 0), orgNumber(org, "spine3", 0)
@@ -876,8 +891,9 @@ local function drawSevereBeam(x, y, size, intensity, alpha)
 end
 
 local function drawMoodle3Severity(x, y, size, effect, age)
-	local severe = effect.mood == "bad" and effect.level >= 3
-	local severity = effect.mood == "bad" and math.Clamp((effect.level - 1) / 3, 0, 1) or 0
+	local exempt = effect.name == "full" or effect.name == "happy"
+	local severe = not exempt and effect.level >= 3
+	local severity = not exempt and math.Clamp((effect.level - 1) / 3, 0, 1) or 0
 	local fadeIn = math.Clamp((age or 0) * 0.8, 0, 1)
 	local pulse = 0.85 + math.sin(CurTime() * 2.5) * 0.15
 	local gradient = getMoodle3Material("SeverityGradient")
@@ -895,7 +911,7 @@ local function drawMoodle3Severity(x, y, size, effect, age)
 		if alert then
 			surface.SetMaterial(alert)
 			surface.SetDrawColor(255, 255, 255, math.floor(220 * fadeIn * pulse))
-			surface.DrawTexturedRect(x + size * 0.2, y - size * 0.32, size * 0.6, size * 0.38)
+			surface.DrawTexturedRect(x, y - size * 0.32, size, size * 0.38)
 		end
 	end
 end
@@ -961,6 +977,15 @@ local function drawMoodles()
 	local berserkActive = org.berserkActive2 == true
 	if type == 1 then loadMaterials() end
 	local effects, now = buildEffects(ply, org), CurTime()
+	if type == 2 then
+		-- Moodle 3 deliberately has no catch-all icon. Do not leave empty slots
+		-- for conditions that do not have a meaningful Moodle 3 representation.
+		local supported = {}
+		for _, effect in ipairs(effects) do
+			if effect.name == "rage" or getMoodle3Icon(effect) then supported[#supported + 1] = effect end
+		end
+		effects = supported
+	end
 	table.sort(effects, function(a, b)
 		local aScore = (a.mood == "bad" and 100 or 0) + (a.level or 0) * 10
 		local bScore = (b.mood == "bad" and 100 or 0) + (b.level or 0) * 10
