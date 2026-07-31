@@ -851,7 +851,7 @@ function PANEL:CompleteWrap()
     self.BandageCompletions = (self.BandageCompletions or 0) + 1
 
   
-    surface.PlaySound("tape_friction" .. math.random(3) .. ".mp3")
+    surface.PlaySound("autonigger/bandage.ogg")
 
     -- Reduced shake effect on wrap completion, no red flash
     self.RotationFlashAlpha = 0
@@ -1399,13 +1399,15 @@ function PANEL:Finish()
     end
     
     if self.GameType == "syringe" then
-        surface.PlaySound("snd_jack_hmcd_needleprick.wav")
+        surface.PlaySound("autonigger/stimulator.ogg")
     elseif self.GameType == "dislocation" then
         surface.PlaySound("physics/flesh/flesh_impact_hard6.wav")
     elseif self.GameType == "amputation" then
         surface.PlaySound("physics/body/body_medium_break3.wav")
+    elseif self.GameType == "bandage" then
+        surface.PlaySound("autonigger/bandage_end.ogg")
     else
-        surface.PlaySound("snd_jack_hmcd_bandage.wav")
+        surface.PlaySound("autonigger/bandage_end.ogg")
     end
     
     self:AlphaTo(0, 0.2, 0, function()

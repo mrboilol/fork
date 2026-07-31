@@ -79,6 +79,7 @@ SWEP.Config = {
     AutopulseBatteryPerBeat = 14,
     TickInterval = 0.5,
     AutopulseInterval = 60 / 70,
+    SoundCooldown = 0.35,
     InjuryHeal = 0.06,
     BleedHeal = 1.5,
     InternalBleedHeal = 0.5,
@@ -86,15 +87,21 @@ SWEP.Config = {
 }
 
 local ASSounds = {
-    deploy = "defibrilator/rem_aed_deploy.wav",
-    evaluating = "defibrilator/rem_aed_evaluating.mp3",
-    checkbreathing = "defibrilator/rem_aed_checkforbreathing.mp3",
-    checkpulse = "defibrilator/rem_aed_checkforpulse.mp3",
-    checkpads = "defibrilator/rem_aed_checkpadsforcontact.mp3",
-    heartbeat = "defibrilator/rem_aed_heartbeat.mp3",
-    startcpr = "defibrilator/rem_aed_startcpr.mp3",
-    battery = "switch.ogg",
-    autopulse = "heartmax.ogg"
+    battery = "autonigger/buttons.ogg",
+    mounted = "autonigger/autosurgeonon.ogg",
+    pump = "autonigger/pump.ogg",
+    modeComplete = "autonigger/completemode.ogg",
+    modeSwitch = "autonigger/switchmode.ogg",
+    painkillerNeeded = "autonigger/switch.ogg",
+    stimulator = "autonigger/stimulator.ogg",
+    removed = "autonigger/desert.ogg",
+    complete = "autonigger/complete.ogg"
+}
+
+local ASScanSounds = {
+    "autonigger/atireputas1.ogg",
+    "autonigger/atireputas2.ogg",
+    "autonigger/atireputas3.ogg"
 }
 
 -- The D.I.H. intentionally works in three passes. The order matters: closing
@@ -172,13 +179,23 @@ local function PositionUnit(unit, target, bone, posOffset, angOffset, femOffset)
     unit:SetAngles(ang)
 end
 
-local function PlayUnitSound(unit, snd, level, pitch, cooldown)
+local function QueueUnitSound(unit, snd, level, pitch)
     if not IsValid(unit) or not snd then return end
+    unit.ASSoundQueue = unit.ASSoundQueue or {}
+    table.insert(unit.ASSoundQueue, {sound = snd, level = level or 75, pitch = pitch or 100})
+end
+
+local function ProcessUnitSounds(unit, config)
+    if not IsValid(unit) then return true end
+    if (unit.ASBusyUntil or 0) > CurTime() then return true end
+    local queue = unit.ASSoundQueue
+    if not queue or #queue <= 0 then return false end
+
+    local nextSound = table.remove(queue, 1)
     local emitter = IsValid(unit.ASSoundEmitter) and unit.ASSoundEmitter or unit
-    unit.ASSoundCooldown = unit.ASSoundCooldown or {}
-    if (unit.ASSoundCooldown[snd] or 0) > CurTime() then return end
-    unit.ASSoundCooldown[snd] = CurTime() + (cooldown or 2)
-    emitter:EmitSound(snd, level or 75, pitch or 100)
+    emitter:EmitSound(nextSound.sound, nextSound.level, nextSound.pitch)
+    unit.ASBusyUntil = CurTime() + math.max(SoundDuration(nextSound.sound), 0) + config.SoundCooldown
+    return true
 end
 
 local function StopUnitSounds(unit)
@@ -188,11 +205,40 @@ local function StopUnitSounds(unit)
         unit:StopSound(snd)
         if IsValid(emitter) and emitter != unit then emitter:StopSound(snd) end
     end
+    for _, snd in ipairs(ASScanSounds) do
+        unit:StopSound(snd)
+        if IsValid(emitter) and emitter != unit then emitter:StopSound(snd) end
+    end
 end
 
 local function TableHasBleeding(tbl)
     for _, wound in pairs(tbl or {}) do
         if wound and (tonumber(wound[1]) or 0) > 0 then return true end
+    end
+    return false
+end
+
+local function HasFieldsAbove(org, fields, threshold)
+    for _, key in ipairs(fields) do
+        if (tonumber(org[key]) or 0) > threshold then return true end
+    end
+    return false
+end
+
+local function HasStitchingWork(org)
+    return HasFieldsAbove(org, StitchFields, 0.001) or TableHasBleeding(org.wounds) or TableHasBleeding(org.arterialwounds)
+end
+
+local function HasComplexWork(org)
+    if HasFieldsAbove(org, ComplexFields, 0.001) or (org.internalBleed or 0) > 0.01 then return true end
+    return istable(org.lungsL) and ((org.lungsL[1] or 0) > 0.001 or (org.lungsL[2] or 0) > 0) or
+        istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0)
+end
+
+local function HasSimpleWork(org)
+    if HasFieldsAbove(org, SimpleFields, 0.001) or HasFieldsAbove(org, RecoveryFields, 0.01) or (org.blood or 5000) < 4999 then return true end
+    for _, key in ipairs(ClearFlags) do
+        if org[key] then return true end
     end
     return false
 end
@@ -332,9 +378,13 @@ local function DropUnit(unit, target, ply, battery, snd)
         pickup:SetCollisionGroup(COLLISION_GROUP_WEAPON)
         pickup.IsDroppedAutosurgeon = true
         pickup.AutosurgeonBattery = math.max(math.floor(battery or 0), 0)
+        pickup:EmitSound(ASSounds.removed, 75, 100)
         if snd then pickup:EmitSound(snd, 75, 100) end
     elseif snd then
+        sound.Play(ASSounds.removed, pos, 75, 100)
         sound.Play(snd, pos, 75, 100)
+    else
+        sound.Play(ASSounds.removed, pos, 75, 100)
     end
     unit:Remove()
 end
@@ -436,37 +486,44 @@ function SWEP:AttachUnit(owner, target, ply)
     unit:Spawn()
     unit:SetMoveType(MOVETYPE_NONE)
     unit.ASSoundEmitter = target
+    unit:SetNWInt("AutosurgeonBattery", battery)
+    owner:SetNWEntity("AutosurgeonModelEnt", unit)
     PositionUnit(unit, target, bone, unitPos, unitAng, unitFemPos)
 
     target.AutosurgeonModelEnt = unit
     target.AutosurgeonInProgress = true
     ply.AutosurgeonModelEnt = unit
     ply.AutosurgeonInProgress = true
-    PlayUnitSound(unit, ASSounds.deploy)
+    QueueUnitSound(unit, ASSounds.mounted)
     owner:ViewPunch(Angle(5, 0, 0))
 
     local timerName = "AutosurgeonFollow" .. unit:EntIndex()
     local activeTarget = target
     local nextTreatment = CurTime() + 1
     local nextAutopulse = CurTime()
-    local nextVoice = CurTime() + 6
-    local voicePulse = true
     local treatmentCycle = 1
+    local previousTreatmentCycle
+    local activeModes = {}
+    local painkillerTarget
+    local painkillerAnnounced = false
     local movingSince
 
     unit:CallOnRemove("AutosurgeonCleanup", function()
         timer.Remove(timerName)
         StopUnitSounds(unit)
         ClearTargetState(activeTarget, ply, unit)
+        if IsValid(owner) and owner:GetNWEntity("AutosurgeonModelEnt") == unit then
+            owner:SetNWEntity("AutosurgeonModelEnt", NULL)
+        end
         unit.ASSoundEmitter = nil
     end)
 
-    PlayUnitSound(unit, ASSounds.evaluating)
+    QueueUnitSound(unit, ASScanSounds[math.random(#ASScanSounds)])
     timer.Create(timerName, 0, 0, function()
         if not IsValid(unit) then timer.Remove(timerName) return end
         local currentTarget = GetCurrentUnitTarget(ply, activeTarget)
         if not IsValid(currentTarget) or not IsValid(ply) then
-            DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
+            DropUnit(unit, activeTarget, ply, battery)
             return
         end
 
@@ -482,56 +539,77 @@ function SWEP:AttachUnit(owner, target, ply)
         local currentBone = activeTarget:LookupBone(unitBone)
         if currentBone then PositionUnit(unit, activeTarget, currentBone, unitPos, unitAng, unitFemPos) end
 
+        if ProcessUnitSounds(unit, config) then return end
+        if unit.ASPendingDrop then
+            DropUnit(unit, activeTarget, ply, battery)
+            return
+        end
+
         if activeTarget:GetVelocity():LengthSqr() > 160 * 160 then
             movingSince = movingSince or CurTime()
             if movingSince + 1.25 < CurTime() then
-                DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
+                DropUnit(unit, activeTarget, ply, battery)
                 return
             end
         else
             movingSince = nil
         end
 
-        if CurTime() >= nextVoice then
-            PlayUnitSound(unit, voicePulse and ASSounds.checkpulse or ASSounds.checkbreathing, 75, 100, 3)
-            voicePulse = not voicePulse
-            nextVoice = CurTime() + 6
-        end
         local org = GetUnitOrganism(ply, activeTarget)
         if not org or not org.alive or org.deathStateKilled then
-            DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
+            DropUnit(unit, activeTarget, ply, battery)
             return
         end
         local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
-        if needsAutopulse and CurTime() >= nextAutopulse then
+        local shouldAutopulse = needsAutopulse and ((tonumber(org.pulse) or 0) <= 0 or (org.dihAutopulseUntil or 0) <= CurTime())
+        if shouldAutopulse and CurTime() >= nextAutopulse then
             if battery < config.AutopulseBatteryPerBeat then
-                PlayUnitSound(unit, ASSounds.battery, 75, 100, 2)
-                DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
+                QueueUnitSound(unit, ASSounds.battery)
+                unit.ASPendingDrop = true
                 return
             end
             battery = battery - config.AutopulseBatteryPerBeat
             unit:SetNWInt("AutosurgeonBattery", battery)
             ApplyAutopulse(org, config)
-            PlayUnitSound(unit, ASSounds.autopulse, 70, 100, config.AutopulseInterval * 0.9)
+            QueueUnitSound(unit, ASSounds.pump, 65, 100)
             nextAutopulse = CurTime() + config.AutopulseInterval
         end
         if CurTime() < nextTreatment then return end
         nextTreatment = CurTime() + config.TickInterval
         if not HasTreatableInjury(org) and not needsAutopulse then
-            PlayUnitSound(unit, ASSounds.startcpr, 75, 100, 3)
-            DropUnit(unit, activeTarget, ply, battery)
+            QueueUnitSound(unit, ASSounds.complete)
+            unit.ASPendingDrop = true
             return
         end
         if not HasTreatableInjury(org) then return end
         if battery < config.BatteryPerTick then
-            PlayUnitSound(unit, ASSounds.battery, 75, 100, 2)
-            DropUnit(unit, activeTarget, ply, battery, ASSounds.checkpads)
+            QueueUnitSound(unit, ASSounds.battery)
+            unit.ASPendingDrop = true
             return
         end
 
         battery = battery - config.BatteryPerTick
         unit:SetNWInt("AutosurgeonBattery", battery)
-        PlayUnitSound(unit, ASSounds.battery, 65, 100, 0.1)
+        QueueUnitSound(unit, ASSounds.pump, 65, 100)
+        if previousTreatmentCycle and previousTreatmentCycle != treatmentCycle then
+            QueueUnitSound(unit, ASSounds.modeSwitch)
+        end
+        previousTreatmentCycle = treatmentCycle
+
+        local pain = tonumber(org.pain) or 0
+        if pain > 50 and (tonumber(org.painkiller) or 0) < 1 then
+            local safeDose = math.min(1, math.max(0.25, (pain - 50) / 100))
+            painkillerTarget = math.max(painkillerTarget or 0, safeDose)
+            if not painkillerAnnounced then
+                QueueUnitSound(unit, ASSounds.painkillerNeeded)
+                painkillerAnnounced = true
+            end
+        end
+        local modeWasNeeded = treatmentCycle == 1 and HasStitchingWork(org) or
+            treatmentCycle == 2 and HasComplexWork(org) or
+            treatmentCycle == 3 and HasSimpleWork(org)
+        if modeWasNeeded then activeModes[treatmentCycle] = true end
+
         if treatmentCycle == 1 then
             HealStitching(org, config)
         elseif treatmentCycle == 2 then
@@ -539,8 +617,24 @@ function SWEP:AttachUnit(owner, target, ply)
         else
             HealSimple(org, config)
         end
+
+        local modeStillNeeded = treatmentCycle == 1 and HasStitchingWork(org) or
+            treatmentCycle == 2 and HasComplexWork(org) or
+            treatmentCycle == 3 and HasSimpleWork(org)
+        if activeModes[treatmentCycle] and not modeStillNeeded then
+            activeModes[treatmentCycle] = nil
+            QueueUnitSound(unit, ASSounds.modeComplete)
+        end
+
+        if painkillerTarget then
+            org.painkiller = math.min((tonumber(org.painkiller) or 0) + 0.25, painkillerTarget, 1)
+            if org.painkiller >= painkillerTarget then
+                QueueUnitSound(unit, ASSounds.stimulator)
+                painkillerTarget = nil
+                painkillerAnnounced = false
+            end
+        end
         treatmentCycle = treatmentCycle % 3 + 1
-        if org.heartbeat and org.heartbeat > 0 then PlayUnitSound(unit, ASSounds.heartbeat, 52, 100, 0.5) end
     end)
 
     owner:StripWeapon(weaponClass)
@@ -638,5 +732,19 @@ if CLIENT then
             })
         end
         altWasDown = altDown
+    end)
+
+    hook.Add("HUDPaint", "AutosurgeonBatteryHUD", function()
+        local unit = LocalPlayer():GetNWEntity("AutosurgeonModelEnt")
+        if not IsValid(unit) then return end
+
+        local battery = math.max(unit:GetNWInt("AutosurgeonBattery", 0), 0)
+        local maxBattery = SWEP.Config.BatteryMax
+        local fraction = math.Clamp(battery / maxBattery, 0, 1)
+        local width, height = 260, 18
+        local x, y = (ScrW() - width) / 2, ScrH() - 82
+        draw.RoundedBox(4, x, y, width, height, Color(0, 0, 0, 180))
+        draw.RoundedBox(4, x + 2, y + 2, (width - 4) * fraction, height - 4, Color(90, 210, 120))
+        draw.SimpleText("D.I.H BATTERY: " .. battery .. " / " .. maxBattery, "HomigradFont", ScrW() / 2, y - 18, color_white, TEXT_ALIGN_CENTER)
     end)
 end
