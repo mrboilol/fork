@@ -28,7 +28,8 @@ SWEP.DrawCrosshair = false
 SWEP.AttachTime = 1
 SWEP.AttachRange = 80
 SWEP.UnitBone = "ValveBiped.Bip01_Spine2"
-SWEP.UnitPos = Vector(-8, 5, 0)
+-- Keep the unit clear of the torso instead of burying it in the chest.
+SWEP.UnitPos = Vector(2, 5, 0)
 SWEP.UnitAng = Angle(0, 90, 90)
 SWEP.UnitFemPos = Vector(-1.5, 0, 0.75)
 
@@ -85,6 +86,10 @@ SWEP.Config = {
     InternalBleedHeal = 0.5,
     BloodRestore = 16
 }
+
+-- SWEP is only guaranteed to exist while this file is being loaded. Deferred
+-- client hooks must retain the values they need instead of looking it up later.
+local ASConfig = SWEP.Config
 
 local ASSounds = {
     battery = "autonigger/buttons.ogg",
@@ -739,7 +744,7 @@ if CLIENT then
         if not IsValid(unit) then return end
 
         local battery = math.max(unit:GetNWInt("AutosurgeonBattery", 0), 0)
-        local maxBattery = SWEP.Config.BatteryMax
+        local maxBattery = ASConfig.BatteryMax
         local fraction = math.Clamp(battery / maxBattery, 0, 1)
         local width, height = 260, 18
         local x, y = (ScrW() - width) / 2, ScrH() - 82
