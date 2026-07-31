@@ -13,8 +13,8 @@ SWEP.WorkWithFake = true
 
 SWEP.Primary.Wait = 2
 SWEP.Primary.Next = 0
-SWEP.ThrowVelocity = 800
-SWEP.LowThrowVelocity = 400
+SWEP.ThrowVelocity = 1600
+SWEP.LowThrowVelocity = 900
 SWEP.ThrowDamage = 325
 
 SWEP.WorldModel = "models/tic tacs/winter_green.mdl"
@@ -76,12 +76,12 @@ end
 
 SWEP.AnimList = {
 	["deploy"] = {"base_draw", 1, false},
-	["attack"] = {"throw", 0.8, false, false, function(self)
+	["attack"] = {"throw", 0.45, false, false, function(self)
 		finishThrow(self, self.ThrowVelocity, Vector(2, 4, 0), Angle(-40, 0, 0))
-	end, 0.65},
-	["attack2"] = {"lowthrow", 0.8, false, false, function(self)
+	end, 0.24},
+	["attack2"] = {"lowthrow", 0.42, false, false, function(self)
 		finishThrow(self, self.LowThrowVelocity, Vector(0, 4, -6), Angle(40, 0, 0))
-	end, 0.6},
+	end, 0.22},
 	["pullbackhigh"] = {"pullback_high", 1.5, false, false, function(self)
 		self.ReadyToThrow = true
 	end, 0.8},
@@ -181,4 +181,35 @@ function SWEP:ThinkAdd()
 	self:PlayAnim(self.IsLowThrow and "attack2" or "attack")
 	self.InThrowing = true
 	self:SetShowGrenade(false)
+end
+
+-- Throw immediately so the inherited Molotov pullback sequence (and its lighter
+-- motion) is never played for the empty tic-tac box.
+function SWEP:PrimaryAttack()
+	if CLIENT then return end
+	if self.InThrowing or self.CoolDown > CurTime() then return end
+
+	local owner = self:GetOwner()
+	if not hg.CanUseLeftHand(owner) or not hg.CanUseRightHand(owner) then return end
+
+	self.CoolDown = CurTime() + 0.5
+	self.Thrower = owner
+	self.InThrowing = true
+	self:SetShowGrenade(false)
+	self:PlayAnim("attack")
+end
+
+function SWEP:SecondaryAttack()
+	if CLIENT then return end
+	if self.InThrowing or self.CoolDown > CurTime() then return end
+
+	local owner = self:GetOwner()
+	if not hg.CanUseLeftHand(owner) or not hg.CanUseRightHand(owner) then return end
+
+	self.CoolDown = CurTime() + 0.5
+	self.Thrower = owner
+	self.InThrowing = true
+	self.IsLowThrow = true
+	self:SetShowGrenade(false)
+	self:PlayAnim("attack2")
 end
