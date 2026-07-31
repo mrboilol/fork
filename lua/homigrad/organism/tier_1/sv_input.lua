@@ -412,14 +412,15 @@ function hg.organism.AmputateLimb(org, limb)
 
 	local bone = limbs[limb]
 	if !IsValid(org.owner) then return end
-	local len = org.owner:BoneLength(org.owner:LookupBone(bone))
+	local ownerBone = org.owner:LookupBone(bone)
+	local len = ownerBone and org.owner:BoneLength(ownerBone) or 8
 	local vec = Vector(len, 0, 0)
 	local ang = Angle()
-	local boneup = org.owner:GetBoneName(org.owner:LookupBone(bone) - 1)
+	local boneup = ownerBone and org.owner:GetBoneName(math.max(ownerBone - 1, 0)) or bone
 	
 	local wnds = {}
 
-	for i, tbl in pairs(org.arterialwounds) do
+	for i, tbl in pairs(org.arterialwounds or {}) do
 		if tbl[7] != limb.."artery" then
 			table.insert(wnds, tbl)
 		end
@@ -439,8 +440,11 @@ function hg.organism.AmputateLimb(org, limb)
 		hg.organism.AddWoundManual(org.owner, 50, vec + VectorRand(-2, 2), ang, boneup, CurTime() + math.Rand(0, 2))
 	end
 
-	local dmgInfo = DamageInfo()
-	hg.organism.input_list[limb.."up"](org, 0, 5, dmgInfo)
+	local damageInput = hg.organism.input_list[limb.."up"]
+	if damageInput then
+		local dmgInfo = DamageInfo()
+		damageInput(org, 0, 5, dmgInfo)
+	end
 
 	org.owner:EmitSound(sounds[math.random(#sounds)], 95, math.random(95, 105), 2)
 
@@ -448,7 +452,15 @@ function hg.organism.AmputateLimb(org, limb)
 
 	
 	local ent = hg.GetCurrentCharacter(org.owner)
-	SpawnMeatGore(ent, select(1, ent:GetBonePosition(ent:LookupBone(bone))), 4)
+	if IsValid(ent) then
+		local limbBone = ent:LookupBone(bone)
+		local pos = limbBone and select(1, ent:GetBonePosition(limbBone)) or ent:GetPos()
+		if hg.SpawnLimbGore then
+			hg.SpawnLimbGore(ent, pos, limb)
+		else
+			SpawnMeatGore(ent, pos, 4)
+		end
+	end
 
 	hook.Run("OnAmputateLimb", org, ent, limb)
 
@@ -1432,10 +1444,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	if org.lastGibHitGroup and org.lastGibHitTime and org.lastGibHitTime + 0.1 > CurTime() then
 		hitgroup = org.lastGibHitGroup
 		bonename = hitgroup == HITGROUP_STOMACH and "ValveBiped.Bip01_Pelvis" or bonename
-	end
-	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.ForceHeadGib and !ent.headexploded then
-		hg.ExplodeHead(ent, dmg_before * 1000, false, dmgInfo:GetDamageForce())
-		return true
 	end
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.ForceHeadKnockout then
 		org.needotrub = true
@@ -3655,6 +3663,13 @@ local function getRagdollOrganism(ragdoll)
 	if ragdoll.organism then return ragdoll.organism, ragdoll.organism.owner end
 end
 
+local function isUnderMedicalTreatment(ragdoll, org)
+	local now = CurTime()
+	if (ragdoll.HG_MedicalTreatmentUntil or 0) > now then return true end
+	local owner = org.owner
+	return IsValid(owner) and (owner.HG_MedicalTreatmentUntil or 0) > now
+end
+
 local function amputateFromCrushPressure(ragdoll, org, part, pressure)
 	if org[part .. "amputated"] then return end
 	if not IsValid(org.owner) then return end
@@ -3677,6 +3692,12 @@ local function checkRagdollCrushPressure(ragdoll)
 
 	local org = getRagdollOrganism(ragdoll)
 	if not org or org.godmode then return end
+	if isUnderMedicalTreatment(ragdoll, org) then
+		-- Do not let handling during medical treatment carry over as a delayed
+		-- crush amputation when the short protection window ends.
+		ragdoll.HG_CrushPressureTime = {}
+		return
+	end
 
 	local pressureByPart = {}
 	for physID = 0, ragdoll:GetPhysicsObjectCount() - 1 do

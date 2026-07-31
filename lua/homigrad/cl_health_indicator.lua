@@ -8,16 +8,14 @@ local statusIconCache = {}
 local IND_SIZE_BASE = 220
 local IND_SIZE_MAX = 300
 local IND_VISUAL_SCALE = 2.6
-local IND_RIGHT_OFFSET = 0
+local IND_RIGHT_OFFSET = -42
 local INDICATOR_CAMERA_FOV = 70
 local ICONS_SCREEN_EDGE_MARGIN = 20
 local ICONS_SCREEN_MARGIN_Y = 18
 local BLINK_SCALE = Vector(1.05, 1.05, 1.05)
 local BLINK_DURATION = 5
--- local BONE_DAMAGE_DURATION = 5 -- Damage-based limb painting is paused.
 
 local boneStates = {}
-local boneCache = {}
 local lastLifeState = nil
 local healthIndicatorOtrubStart
 local HEALTH_INDICATOR_OTRUB_FADE_TIME = 5
@@ -141,9 +139,6 @@ local function DrawBoneSegment(ent, startBoneName, endBoneName, color, cameraPos
     render.DrawBeam(startPos + cameraOffset, endPos + cameraOffset, 3.5, 0, 1, color)
 end
 
--- Damage-based limb painting helpers are retained but commented out until the
--- underlying injury-to-bone state is reliable enough to display.
---[[
 local function GetDamageColor(severity)
     local damage = math.Clamp(severity or 0, 0, 1)
 
@@ -168,57 +163,71 @@ local function GetOrgValueNumber(value)
 
     return 0
 end
-]]
 
 local function IsSubrosaEnabled()
     local convar = GetConVar("hg_subrosa")
     return convar and convar:GetBool()
 end
 
---[[
-local boneOrgans = {
-    ["ValveBiped.Bip01_Pelvis"] = { "pelvis" },
-    ["ValveBiped.Bip01_Spine1"] = { "spine1" },
-    ["ValveBiped.Bip01_Spine2"] = { "spine2", "chest" },
-    ["ValveBiped.Bip01_Neck1"] = { "spine3" },
-    ["ValveBiped.Bip01_Head1"] = { "skull", "jaw" },
-    ["ValveBiped.Bip01_L_Clavicle"] = { "larm" },
-    ["ValveBiped.Bip01_L_UpperArm"] = { "larm" },
-    ["ValveBiped.Bip01_L_Forearm"] = { "larm" },
-    ["ValveBiped.Bip01_L_Hand"] = { "larm" },
-    ["ValveBiped.Bip01_R_Clavicle"] = { "rarm" },
-    ["ValveBiped.Bip01_R_UpperArm"] = { "rarm" },
-    ["ValveBiped.Bip01_R_Forearm"] = { "rarm" },
-    ["ValveBiped.Bip01_R_Hand"] = { "rarm" },
-    ["ValveBiped.Bip01_L_Thigh"] = { "lleg" },
-    ["ValveBiped.Bip01_L_Calf"] = { "lleg" },
-    ["ValveBiped.Bip01_L_Foot"] = { "lleg" },
-    ["ValveBiped.Bip01_R_Thigh"] = { "rleg" },
-    ["ValveBiped.Bip01_R_Calf"] = { "rleg" },
-    ["ValveBiped.Bip01_R_Foot"] = { "rleg" },
+-- One overlay bone per visible region keeps the colour readout simple and
+-- avoids changing the skeleton used by the Sub Rosa bone trace.
+local damageRegions = {
+    { bone = "ValveBiped.Bip01_Head1", organs = { "skull", "jaw" } },
+    { bone = "ValveBiped.Bip01_Neck1", organs = { "spine3" }, onlyBone = true },
+    { bone = "ValveBiped.Bip01_Spine2", organs = { "chest" }, onlyBone = true },
+    { bone = "ValveBiped.Bip01_Pelvis", organs = { "pelvis" }, onlyBone = true },
+    { bone = "ValveBiped.Bip01_L_UpperArm", organs = { "larm" } },
+    { bone = "ValveBiped.Bip01_R_UpperArm", organs = { "rarm" } },
+    { bone = "ValveBiped.Bip01_L_Thigh", organs = { "lleg" } },
+    { bone = "ValveBiped.Bip01_R_Thigh", organs = { "rleg" } },
 }
 
-local function IsTrackedBoneStillBroken(org, boneName)
-    local organs = boneOrgans[boneName]
-    if not organs then return false end
+local function IsOrganBroken(org, organName)
+    if org[organName .. "dislocation"] then return true end
 
-    for _, organName in ipairs(organs) do
-        if org[organName .. "dislocation"] then return true end
-
-        local severity = GetOrgValueNumber(org[organName])
-        if organName == "chest" then
-            if (org.brokenribs or math.Round(severity * 3)) > 0 then return true end
-        elseif string.StartWith(organName, "spine") then
-            local threshold = hg.organism and hg.organism["fake_" .. organName] or 1
-            if severity >= threshold then return true end
-        elseif severity >= 1 then
-            return true
-        end
+    local severity = GetOrgValueNumber(org[organName])
+    local threshold = hg and hg.organism and hg.organism["fake_" .. organName] or 1
+    if organName == "chest" then
+        return (org.brokenribs or 0) > 0 or severity >= threshold
     end
 
+    return severity >= threshold
+end
+
+local function GetRegionDamage(org, organs)
+    local severity, broken = 0, false
+    for _, organName in ipairs(organs) do
+        severity = math.max(severity, GetOrgValueNumber(org[organName]))
+        broken = broken or IsOrganBroken(org, organName)
+    end
+    return math.Clamp(severity, 0, 1), broken
+end
+
+local function GetSpineBlackout(org)
+    if IsOrganBroken(org, "spine3") then return 3 end
+    if IsOrganBroken(org, "spine2") then return 2 end
+    if IsOrganBroken(org, "spine1") then return 1 end
+    return 0
+end
+
+local function IsRegionBlackedOut(region, blackout)
+    if blackout == 3 then return true end
+    if blackout == 2 then return region.bone ~= "ValveBiped.Bip01_Head1" end
+    if blackout == 1 then
+        return region.bone == "ValveBiped.Bip01_Pelvis"
+            or region.bone == "ValveBiped.Bip01_L_Thigh"
+            or region.bone == "ValveBiped.Bip01_R_Thigh"
+    end
     return false
 end
-]]
+
+local function SetIndicatorIdleSequence(ent)
+    local sequence = ent:LookupSequence("idle_suitcase")
+    if sequence and sequence >= 0 then
+        ent:SetSequence(sequence)
+        ent:SetCycle(0)
+    end
+end
 
 local function ResetModels(ply)
     if IsValid(healthModel) then
@@ -256,6 +265,10 @@ local function GetIndicatorBoneSource(ply)
 end
 
 local function SyncBonesCallback(ent, numbones)
+    -- The normal indicator is a stable, forward-facing idle model. Only the
+    -- bone-only readout needs to mirror a fake ragdoll's live transforms.
+    if not IsSubrosaEnabled() then return end
+
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
@@ -446,6 +459,7 @@ function HUD_DrawDynamicIndicator()
         healthModel = ClientsideModel(ply:GetModel(), RENDERGROUP_OTHER)
         healthModel:SetNoDraw(true)
         healthModel:SetIK(false)
+        SetIndicatorIdleSequence(healthModel)
         healthModel:AddCallback("BuildBonePositions", SyncBonesCallback)
     end
     
@@ -453,6 +467,7 @@ function HUD_DrawDynamicIndicator()
         blinkModel = ClientsideModel(ply:GetModel(), RENDERGROUP_OTHER)
         blinkModel:SetNoDraw(true)
         blinkModel:SetIK(false)
+        SetIndicatorIdleSequence(blinkModel)
         InitBlinkModel(blinkModel)
         blinkModel:AddCallback("BuildBonePositions", SyncBonesCallback)
     end
@@ -460,6 +475,8 @@ function HUD_DrawDynamicIndicator()
     if healthModel:GetModel() ~= ply:GetModel() or (ply.PlayerClassName ~= healthModel.lastPlayerClassName) then
         healthModel:SetModel(ply:GetModel())
         blinkModel:SetModel(ply:GetModel())
+        SetIndicatorIdleSequence(healthModel)
+        SetIndicatorIdleSequence(blinkModel)
         InitBlinkModel(blinkModel)
         boneStates = {}
         healthModel.lastPlayerClassName = ply.PlayerClassName
@@ -495,7 +512,6 @@ function HUD_DrawDynamicIndicator()
     end
     
     local time = CurTime()
-    -- local damagedBones = {} -- Damage-based limb painting is paused.
 
     if org then
         for key, data in pairs(majorBones) do
@@ -546,30 +562,6 @@ function HUD_DrawDynamicIndicator()
             end
         end
 
-        -- Damage-based limb painting is intentionally disabled for now. Keep
-        -- the old state collection here so it can be restored after its damage
-        -- source is reliable without having to rebuild the presentation code.
-        --[[
-        local damageTime = org.damagedBoneTime or 0
-        if isstring(org.damagedBoneName) and damageTime > 0 and time - damageTime <= BONE_DAMAGE_DURATION then
-            damagedBones[org.damagedBoneName] = {
-                bone = org.damagedBoneName,
-                severity = math.Clamp(org.damagedBoneSeverity or 0.5, 0, 1),
-                broken = false
-            }
-        end
-
-        -- Keep the exact most recently broken/dislocated segment red while its
-        -- underlying injury still exists. This validation prevents a medicine
-        -- heal from leaving a stale broken-bone trace behind.
-        if isstring(org.brokenBoneName) and IsTrackedBoneStillBroken(org, org.brokenBoneName) then
-            damagedBones[org.brokenBoneName] = {
-                bone = org.brokenBoneName,
-                severity = 1,
-                broken = true
-            }
-        end
-        ]]
     end
     
     -- Scale the body readout up independently from the normal HUD scale so the
@@ -599,10 +591,10 @@ function HUD_DrawDynamicIndicator()
         active = true
     }
     
-    -- View the copied skeleton from its right side so it faces screen-left.
-    -- The wider HUD-only FOV keeps the full body and its overlays in frame.
-    local camPos = Vector(0, -95, 65)
-    local lookAng = Angle(11, 90, 0)
+    -- Match the original indicator: a simple front-facing idle silhouette.
+    -- Sub Rosa tracing still copies its source skeleton in the callback above.
+    local camPos = Vector(95, 0, 65)
+    local lookAng = Angle(11, 180, 0)
 
     cam.Start3D(camPos, lookAng, INDICATOR_CAMERA_FOV, viewX, viewY, w, h)
         render.SetBlend(indicatorAlpha)
@@ -616,11 +608,16 @@ function HUD_DrawDynamicIndicator()
 
         local drawAng = Angle(0, 0, 0)
 
-        -- Always update sequence and cycle for proper animation sync
-        healthModel:SetSequence(srcEnt:GetSequence())
-        healthModel:SetCycle(srcEnt:GetCycle())
-        blinkModel:SetSequence(srcEnt:GetSequence())
-        blinkModel:SetCycle(srcEnt:GetCycle())
+        if IsSubrosaEnabled() then
+            -- Preserve the source pose exclusively for bone tracing.
+            healthModel:SetSequence(srcEnt:GetSequence())
+            healthModel:SetCycle(srcEnt:GetCycle())
+            blinkModel:SetSequence(srcEnt:GetSequence())
+            blinkModel:SetCycle(srcEnt:GetCycle())
+        else
+            healthModel:FrameAdvance(FrameTime())
+            blinkModel:FrameAdvance(FrameTime())
+        end
 
         healthModel:SetPos(modelOffset)
         healthModel:SetAngles(drawAng)
@@ -634,6 +631,7 @@ function HUD_DrawDynamicIndicator()
         healthModel:SetupBones()
 
         local base_col = math.max(0.2, consciousness)
+        local spineBlackout = GetSpineBlackout(org or {})
 
         local function DrawDamageBlinkState(blinkModel, r, g, b)
             blinkModel:SetupBones()
@@ -668,16 +666,19 @@ function HUD_DrawDynamicIndicator()
             end
             cam.IgnoreZ(false)
         else
-            render.SetColorModulation(base_col, base_col, base_col)
+            local bodyCol = spineBlackout == 3 and 0 or base_col
+            render.SetColorModulation(bodyCol, bodyCol, bodyCol)
             for _, offset in ipairs(outlineOffsets) do
                 healthModel:SetPos(modelOffset + offset)
                 healthModel:DrawModel()
             end
 
-            render.SetColorModulation(base_col, base_col, base_col)
+            render.SetColorModulation(bodyCol, bodyCol, bodyCol)
             healthModel:SetPos(modelOffset)
             healthModel:DrawModel()
-            DrawHealthAccessories(healthModel, ply, base_col)
+            if spineBlackout ~= 3 then
+                DrawHealthAccessories(healthModel, ply, base_col)
+            end
         end
 
         local hasAmputationBlink = false
@@ -691,28 +692,40 @@ function HUD_DrawDynamicIndicator()
             DrawDamageBlinkState(blinkModel, 1, 1 - val, 1 - val)
         end
 
-        -- Damage-based limb painting is intentionally disabled until its state
-        -- source is reliable. Amputation blinking above remains independent.
-        --[[
         if not IsSubrosaEnabled() then
-            for _, damage in pairs(damagedBones) do
-                local boneID = blinkModel:LookupBone(damage.bone)
+            for _, region in ipairs(damageRegions) do
+                local boneID = blinkModel:LookupBone(region.bone)
                 if boneID then
+                    local severity, broken = GetRegionDamage(org or {}, region.organs)
                     local r, g, b
-                    if damage.broken then
+
+                    if IsRegionBlackedOut(region, spineBlackout) then
+                        r, g, b = 0, 0, 0
+                    elseif broken then
                         r = 0.35 + (math.sin(time * 10) + 1) * 0.325
                         g, b = 0, 0
-                    else
-                        r, g, b = GetDamageColor(damage.severity)
+                    elseif severity > 0 then
+                        r, g, b = GetDamageColor(severity)
                     end
 
-                    ScaleBone(blinkModel, boneID, BLINK_SCALE, damage.bone)
-                    DrawDamageBlinkState(blinkModel, r, g, b)
-                    ScaleBone(blinkModel, boneID, Vector(0, 0, 0), damage.bone)
+                    if r then
+                        if region.onlyBone then
+                            ScaleBoneOnly(blinkModel, boneID, BLINK_SCALE)
+                        else
+                            ScaleBone(blinkModel, boneID, BLINK_SCALE, region.bone)
+                        end
+
+                        DrawDamageBlinkState(blinkModel, r, g, b)
+
+                        if region.onlyBone then
+                            ScaleBoneOnly(blinkModel, boneID, Vector(0, 0, 0))
+                        else
+                            ScaleBone(blinkModel, boneID, Vector(0, 0, 0), region.bone)
+                        end
+                    end
                 end
             end
         end
-        ]]
 
         render.MaterialOverride(nil)
         render.SetColorModulation(1, 1, 1)

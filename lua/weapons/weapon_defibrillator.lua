@@ -189,12 +189,12 @@ local function GetDefibOrganism(ply, target)
 end
 
 local function ShouldShock(org)
-	if not org or not org.alive or org.deathStateKilled then return false end
+	if not org or not org.alive then return false end
 	return org.heartstop or org.fibrillation or (org.arrhythmia or 0) > 0.45 or (org.heartbeat or 0) > 180
 end
 
 local function IsDefibDead(org)
-	if not org or not org.alive or org.deathStateKilled then return true end
+	if not org or not org.alive then return true end
 	local owner = org.owner
 	if IsValid(owner) and owner:IsPlayer() and not owner:Alive() then return true end
 	return false
@@ -204,7 +204,9 @@ local function ShockChest(target, forceMul)
 	if not IsValid(target) then return end
 
 	if target:IsPlayer() then
-		target:SetVelocity(-vector_up * 180 * forceMul)
+		-- An AED produces a brief muscle contraction, not a launch.  Large
+		-- impulses can turn into fall damage after the player ragdolls.
+		target:SetVelocity(-vector_up * 35 * forceMul)
 		return
 	end
 
@@ -212,24 +214,13 @@ local function ShockChest(target, forceMul)
 	local physbone = bone and target:TranslateBoneToPhysBone(bone) or 0
 	local phys = target:GetPhysicsObjectNum(physbone)
 	if not IsValid(phys) then phys = target:GetPhysicsObjectNum(0) end
-	local applied
-
 	if IsValid(phys) then
 		phys:Wake()
-		phys:ApplyForceCenter(-vector_up * 6000 * forceMul)
-		applied = true
+		-- Do not apply forces to every physics bone: that stresses ragdoll
+		-- constraints hard enough to detach limbs.  A small chest-only velocity
+		-- change gives the shock feedback without inflicting physical trauma.
+		phys:AddVelocity(-vector_up * 24 * forceMul)
 	end
-
-	for i = 0, target:GetPhysicsObjectCount() - 1 do
-		local obj = target:GetPhysicsObjectNum(i)
-		if IsValid(obj) and obj != phys then
-			obj:Wake()
-			obj:ApplyForceCenter(-vector_up * 2500 * forceMul)
-			applied = true
-		end
-	end
-
-	if not applied then return end
 end
 
 local function IsShockTarget(ent, target)
@@ -360,17 +351,26 @@ end
 -- This keeps the newer oxygen-delivery and pump stats involved in treatment
 -- without repairing physical organ damage or masking a shockable rhythm.
 local function ApplyAEDLifeSupport(org, elapsed)
-	if not org or not org.alive or org.deathStateKilled then return end
+	if not org or not org.alive then return end
 	elapsed = math.max(tonumber(elapsed) or 0, 0)
 	org.defibSupportUntil = CurTime() + 0.3
-	org.deathStateEnd = math.max(org.deathStateEnd or 0, CurTime() + 10)
 
 	if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
-		hg.organism.RestoreSupportedOxygen(org, elapsed * 0.07, {
+		-- An AED-assisted restart needs to restore oxygen delivery, not merely
+		-- hold it above a low survival floor.  The shared helper still refuses
+		-- this support when the pump, airway, lungs, or blood volume cannot
+		-- actually carry oxygen.
+		local oxygenTarget = tonumber(org.o2 and org.o2.range) or 30
+		hg.organism.RestoreSupportedOxygen(org, elapsed * 0.25, {
 			oxygen = math.min(24, tonumber(org.o2 and org.o2.range) or 30),
-			bodyoxygen = 0.55, brainoxygen = 0.50, perfusion = 0.45,
-			peripheralperfusion = 0.40, cerebralPerfusion = 0.45, myocardialOxygen = 0.50,
-			hypoxiaTime = 12, severeHypoxiaTime = 3, systemicIschemiaTime = 12
+			oxygenTarget = oxygenTarget,
+			bodyoxygen = 0.55, bodyoxygenTarget = 0.90,
+			brainoxygen = 0.50, brainoxygenTarget = 0.85,
+			perfusion = 0.45, perfusionTarget = 0.80,
+			peripheralperfusion = 0.40, peripheralperfusionTarget = 0.75,
+			cerebralPerfusion = 0.45, cerebralPerfusionTarget = 0.80,
+			myocardialOxygen = 0.50, myocardialOxygenTarget = 0.85,
+			hypoxiaTime = 2, severeHypoxiaTime = 0, systemicIschemiaTime = 3
 		})
 	end
 	org.cardiacOutput = math.Approach(tonumber(org.cardiacOutput) or 1, 1, elapsed * 0.055)
@@ -430,9 +430,7 @@ local function ApplyAEDShock(org)
 		org.hypotension = math.min(org.hypotension or 1, 0.65)
 	end
 
-	org.deathStateKilled = nil
 	org.defibDeathGrace = CurTime() + 45
-	org.deathStateEnd = math.max(org.deathStateEnd or 0, org.defibDeathGrace)
 	ApplyAEDLifeSupport(org, 4)
 end
 

@@ -16,14 +16,23 @@ function ZCityScopeZeroing.InitRender()
 	if ZCityScopeZeroing.Initialized then return end
 	
 	local rtsize = ZCityScopeZeroing.RTSize
-	ZCityScopeZeroing.RTMat = GetRenderTarget("huy-glass22", rtsize, rtsize)
-	ZCityScopeZeroing.RTView = GetRenderTarget("huy-glass22-zeroing-view", rtsize, rtsize)
+	-- Do not reuse homigrad_base's "huy-glass22" target.  The base creates it
+	-- with GetRenderTargetEx/BGR888, while this code used GetRenderTarget with
+	-- the same name.  Which version won depended on the client's load order and
+	-- could leave the scope sampling a blank or alpha-faded target.
+	local rtFlags = bit.bor(2, 256)
+	ZCityScopeZeroing.RTMat = GetRenderTargetEx(
+		"zcity_scope_zeroing_composite", rtsize, rtsize,
+		RT_SIZE_NO_CHANGE, MATERIAL_RT_DEPTH_SHARED, rtFlags, 0, IMAGE_FORMAT_BGR888
+	)
+	ZCityScopeZeroing.RTView = GetRenderTargetEx(
+		"zcity_scope_zeroing_view_rt", rtsize, rtsize,
+		RT_SIZE_NO_CHANGE, MATERIAL_RT_DEPTH_SHARED, rtFlags, 0, IMAGE_FORMAT_BGR888
+	)
 	ZCityScopeZeroing.RTViewMat = CreateMaterial("zcity_scope_zeroing_view", "UnlitGeneric", {
 		["$basetexture"] = ZCityScopeZeroing.RTView:GetName(),
 		["$ignorez"] = 1,
-		["$vertexcolor"] = 1,
-		["$vertexalpha"] = 1,
-		["$translucent"] = 1
+		["$vertexcolor"] = 1
 	})
 
 	ZCityScopeZeroing.Initialized = true
@@ -222,8 +231,16 @@ function ZCityScopeZeroing.SWEP_DoRT(self)
 	-- Убеждаемся, что RT инициализирован
 	ZCityScopeZeroing.InitRender()
 	
-	local mat = self.mat or Material("huy-glass")
+	-- The fallback lives under decals/.  Material("huy-glass") resolves to an
+	-- error material on clients that do not have another addon providing it.
+	local mat = self.mat or Material("decals/huy-glass")
 	mat:SetTexture("$basetexture", ZCityScopeZeroing.RTMat)
+	-- Scope lens materials are often shared with transparent glass.  Do not let
+	-- their model alpha/tint wash out the render target while the player aims.
+	mat:SetFloat("$alpha", 1)
+	mat:SetVector("$color", Vector(1, 1, 1))
+	mat:SetInt("$vertexcolor", 0)
+	mat:SetInt("$vertexalpha", 0)
 	
 	if hg_show_hitposmuzzle:GetBool() then
 		render.DrawLine(pos, point, Color(255, 255, 255))

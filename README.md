@@ -9,6 +9,11 @@ Optional Discord RPC module for clients:
 
 The current version in the repository is 1.4.0
 
+## Moodle HUD style
+
+`hg_moodletype` is a replicated server convar: `0` uses the original moodles,
+`1` uses the custom moodles, and `2` enables Moodle 3.
+
 ## The numbers in the version number indicate:
 A.Bcc -> 1.000
 - A -> Global updates

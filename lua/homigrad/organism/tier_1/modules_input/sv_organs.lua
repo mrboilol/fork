@@ -304,7 +304,9 @@ end
 
 local function addBrainHemorrhage(org, amount, rate)
 	org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + amount, 1)
-	org.brainBleedRate = math.min((org.brainBleedRate or 0) + (rate or amount * 0.0015), 0.008)
+	-- Intracranial bleeding has no room to safely drain.  Keep even moderate
+	-- traumatic bleeds dangerous enough to require treatment within minutes.
+	org.brainBleedRate = math.min((org.brainBleedRate or 0) + (rate or amount * 0.0015) * 2, 0.012)
 end
 
 hg.organism.AddBrainHemorrhage = addBrainHemorrhage

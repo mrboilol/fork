@@ -1,6 +1,6 @@
 ZCityScopeZeroing = ZCityScopeZeroing or {}
 
-ZCityScopeZeroing.Build = "2026-06-12"
+ZCityScopeZeroing.Build = "2026-07-31-clear-optics"
 ZCityScopeZeroing.NetMessage = "ZCity_ScopeZeroing_Update"
 
 -- Значения конфигурации по умолчанию

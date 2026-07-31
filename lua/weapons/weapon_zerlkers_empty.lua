@@ -1,9 +1,8 @@
 if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_hg_grenade_tpik"
-SWEP.PrintName = "morty go get their shit hurry up i only had one of those things i threw, im holding a box of tic tacs right now"
-SWEP.Instructions = [[LMB - high throw
-RMB - low throw]]
+SWEP.PrintName = "box of tic tacs"
+SWEP.Instructions = "morty go get their shit hurry up i only had one of those things i threw, im holding a box of tic tacs right now"
 SWEP.Category = "ZCity Other"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
@@ -17,6 +16,7 @@ SWEP.ThrowVelocity = 1600
 SWEP.LowThrowVelocity = 900
 -- A little harder than a thrown brick (16), but still a light plastic box.
 SWEP.ThrowDamage = 18
+SWEP.HeadGibDamageMul = 1000
 SWEP.HeadImpactGibChance = 0.5
 SWEP.HeadImpactKnockout = true
 
@@ -140,6 +140,7 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	-- On a head impact, this either has enough force to take the head off or
 	-- leaves the victim unconscious. ent_throwable applies the random outcome
 	-- only while this collision's damage is being processed.
+	thrown.HeadGibDamageMul = self.HeadGibDamageMul
 	thrown.HeadImpactGibChance = self.HeadImpactGibChance
 	thrown.HeadImpactKnockout = self.HeadImpactKnockout
 	-- Match thrown bricks and bottles so impact damage enters Homigrad's blunt

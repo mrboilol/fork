@@ -69,15 +69,15 @@ function ENT:PhysicsCollide(data, phys)
 
 	-- Weapons may opt into special head-impact outcomes. These fields are only
 	-- exposed during TakeDamageInfo, so a later collision rolls independently.
-	local forceHeadGib = self.ForceHeadGib
+	local headGibDamageMul = self.HeadGibDamageMul
 	local forceHeadKnockout = self.ForceHeadKnockout
-	if self.HeadImpactGibChance then
+	if headGibDamageMul and self.HeadImpactGibChance then
 		local gibImpact = math.Rand(0, 1) < self.HeadImpactGibChance
-		self.ForceHeadGib = gibImpact or nil
+		self.HeadGibDamageMul = gibImpact and headGibDamageMul or nil
 		self.ForceHeadKnockout = not gibImpact and self.HeadImpactKnockout or nil
 	end
 	data.HitEntity:TakeDamageInfo(dmginfo)
-	self.ForceHeadGib = forceHeadGib
+	self.HeadGibDamageMul = headGibDamageMul
 	self.ForceHeadKnockout = forceHeadKnockout
 
 	if data.HitEntity.organism then

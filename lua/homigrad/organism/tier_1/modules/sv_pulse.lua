@@ -5,22 +5,22 @@ local module = hg.organism.module.pulse
 
 local BloodBPM = {
 	{5000, 75},
-	{4500, 78},
-	{4000, 95},
-	{3500, 120},
-	{3000, 155},
-	{2500, 210},
-	{2250, 150},
-	{2000, 35},
+	{4500, 80},
+	{4000, 92},
+	{3500, 112},
+	{3000, 145},
+	{2500, 205},
+	{2250, 170},
+	{2000, 0},
 }
 
 local BloodPerfusion = {
 	{5000, 1},
 	{4500, 1},
-	{4000, 0.99},
-	{3500, 0.96},
-	{3000, 0.82},
-	{2500, 0.50},
+	{4000, 0.96},
+	{3500, 0.86},
+	{3000, 0.62},
+	{2500, 0.35},
 	{2000, 0},
 }
 
@@ -51,6 +51,16 @@ local function getMotionVelocity(owner)
 end
 
 local function updateHighSpeedPressureShock(owner, org, timeValue)
+	-- Noclip movement is administrative/free-camera movement, not a physical
+	-- manoeuvre. Clear the cached sample too, so leaving noclip cannot create a
+	-- false acceleration spike on the first normal movement update.
+	if owner:GetMoveType() == MOVETYPE_NOCLIP then
+		org.highSpeedPressureShock = 0
+		org.lastHighSpeedVelocity = nil
+		org.lastHighSpeedVelocityTime = nil
+		return 0
+	end
+
 	local now = CurTime()
 	local velocity = getMotionVelocity(owner)
 	local previousVelocity = org.lastHighSpeedVelocity
@@ -64,7 +74,7 @@ local function updateHighSpeedPressureShock(owner, org, timeValue)
 	end
 
 	local speed = velocity:Length()
-	local speedStress = math.Clamp(math.Remap(speed, 1100, 2200, 0, 0.55), 0, 0.55)
+	local speedStress = math.Clamp(math.Remap(speed, 900, 1900, 0, 0.65), 0, 0.65)
 	local fallStress = math.Clamp(math.Remap(-velocity.z, 850, 1750, 0, 0.75), 0, 0.75)
 	if velocity.z >= 0 or (not owner:InVehicle() and owner:OnGround()) then fallStress = 0 end
 
@@ -75,14 +85,17 @@ local function updateHighSpeedPressureShock(owner, org, timeValue)
 		local direction = velocity / speed
 		lateralAcceleration = acceleration - direction * acceleration:Dot(direction)
 	end
-	local turnStress = math.Clamp(math.Remap(speed, 750, 1500, 0, 1), 0, 1)
-		* math.Clamp(math.Remap(lateralAcceleration:Length(), 450, 1800, 0, 0.75), 0, 0.75)
+	-- Aircraft retain most of their speed in a turn, so lateral acceleration is
+	-- the useful signal here. Lower thresholds make abrupt high-speed turns
+	-- produce a meaningful but reversible pressure drop.
+	local turnStress = math.Clamp(math.Remap(speed, 500, 1150, 0, 1), 0, 1)
+		* math.Clamp(math.Remap(lateralAcceleration:Length(), 250, 1100, 0, 0.95), 0, 0.95)
 
 	local target = math.max(speedStress, fallStress, turnStress)
 	local current = org.highSpeedPressureShock or 0
 	-- A sharp manoeuvre takes effect quickly, but circulation recovers gradually
 	-- after the aircraft levels out or the player stops falling.
-	org.highSpeedPressureShock = math.Approach(current, target, target > current and timeValue * 1.2 or timeValue / 5)
+	org.highSpeedPressureShock = math.Approach(current, target, target > current and timeValue * 3.5 or timeValue / 4)
 	return org.highSpeedPressureShock
 end
 
@@ -151,8 +164,12 @@ local function notifyTemperatureStress(owner, org)
 	local temperature = org.temperature or 36.7
 	if temperature < 33 then
 		owner:Notify("I'm very cold...", 30, "temperature_very_cold", 0, nil, Color(150, 210, 255))
+	elseif temperature < 35 then
+		owner:Notify("I'm getting cold...", 30, "temperature_cold", 0, nil, Color(150, 210, 255))
 	elseif temperature >= 40 then
 		owner:Notify("I'm very hot...", 30, "temperature_very_hot", 0, nil, Color(255, 145, 110))
+	elseif temperature >= 38.5 then
+		owner:Notify("I'm getting hot...", 30, "temperature_hot", 0, nil, Color(255, 145, 110))
 	end
 end
 
@@ -354,7 +371,7 @@ module[2] = function(owner, org, timeValue)
 	local oxygenation = Clamp(o2, 0, 1)
 	local highSpeedPressureShock = updateHighSpeedPressureShock(owner, org, timeValue)
 	local vascularTone = Clamp(1 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
-	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.65
+	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.8
 	local circulationBase = bloodVolume * heart * vascularTone * accelerationPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
@@ -371,7 +388,9 @@ module[2] = function(owner, org, timeValue)
 	local myocardialTarget = Clamp(oxygenation * bloodVolume * Clamp(circulation * (92 / 70), 0, 1.2), 0, 1)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
-	org.hypotension = Approach(org.hypotension or 0, Clamp(Remap(circulation, 0.98, 0.22, 0, 1), 0, 1), timeValue / 8)
+	local hypotensionTarget = Clamp(Remap(circulation, 0.98, 0.22, 0, 1), 0, 1)
+	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
+	org.hypotension = Approach(org.hypotension or 0, hypotensionTarget, hypotensionRate)
 	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
@@ -488,10 +507,11 @@ module[2] = function(owner, org, timeValue)
 	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
 	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 
-	-- At terminal blood volume, bradycardia/poor filling progress to
-	-- deterministic arrest. The 2500-2000 mL band remains briefly treatable.
+	-- At 2000 mL there is no viable circulation left. The 2500-2000 mL band
+	-- remains briefly treatable, but is intentionally an aggressive VF/arrest
+	-- range rather than merely a low-pulse state.
 	local restartCirculationActive = (org.cardiacRestartUntil or 0) > CurTime()
-	if not org.heartstop and not restartCirculationActive and bloodNow <= cardiacArrestBlood and (org.heartbeat <= 40 or bradycardiaSeverity >= 0.7) then
+	if not org.heartstop and bloodNow <= cardiacArrestBlood then
 		org.heartstop = true
 	end
 
@@ -505,14 +525,19 @@ module[2] = function(owner, org, timeValue)
 		org.terminalRhythm = nil
 	elseif not org.heartstop and (org.nextColdRhythmRoll or 0) <= CurTime() then
 		org.nextColdRhythmRoll = CurTime() + 3
-		local instability = math.max(coldSuppression, hemorrhagicDecompensation)
+		-- Begin terminal electrical instability as soon as blood reaches 2500;
+		-- it escalates sharply to certain arrest at 2000. This is separate from
+		-- the ordinary arrhythmia system so a healthy heart can still briefly be
+		-- rescued in the upper part of this range.
+		local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2500, 2000, 0.3, 1), 0, 1)
+		local instability = math.max(coldSuppression, hemorrhagicDecompensation, hemorrhageInstability)
 		local roll = math.Rand(0, 1)
-		if roll < 0.005 + instability * 0.075 then
+		if roll < 0.04 + instability * 0.36 then
 			org.terminalRhythm = "ventricular_fibrillation"
 			org.heartstop = true
-		elseif roll < 0.08 + instability * 0.2 then
+		elseif roll < 0.20 + instability * 0.38 then
 			org.unstableRhythm = "atrial_fibrillation"
-		elseif roll < 0.22 + instability * 0.35 then
+		elseif roll < 0.48 + instability * 0.38 then
 			org.unstableRhythm = "ventricular_ectopy"
 		else
 			org.unstableRhythm = nil
@@ -578,6 +603,16 @@ module[2] = function(owner, org, timeValue)
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
 	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2)
 	org.arrhythmia = Approach(org.arrhythmia or 0, Clamp(stress * 0.42, 0, 1), stress > (org.arrhythmia or 0) and timeValue / 25 or timeValue / 90)
+	if org.isPly and not org.otrub then
+		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 then
+			owner:Notify("My heart rhythm feels irregular...", 45, "arrhythmia", 0, nil, Color(255, 170, 170))
+		end
+		if org.heartbeat >= 150 and not org.heartstop then
+			owner:Notify("My heart is racing...", 45, "tachycardia", 0, nil, Color(255, 170, 170))
+		elseif org.heartbeat > 0 and org.heartbeat <= 45 and not org.heartstop then
+			owner:Notify("My heartbeat is becoming dangerously slow...", 45, "bradycardia", 0, nil, Color(150, 210, 255))
+		end
+	end
 	if stress > 0.65 and CurTime() >= (org.nextArrhythmiaRoll or 0) then
 		org.nextArrhythmiaRoll = CurTime() + Clamp(Remap(stress, 0.65, 1.6, 14, 3), 3, 14)
 		if math.Rand(0, 1) < Clamp((stress - 0.65) * 0.12, 0.01, 0.18) then hg.organism.StartFibrillation(org) end
@@ -658,6 +693,9 @@ module[2] = function(owner, org, timeValue)
 	if org.hypotension > 0.5 then
 		local lowK = math.Clamp((org.hypotension - 0.35) / 0.5, 0, 1)
 		org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
+		if org.isPly and not org.otrub then
+			org.owner:Notify("My limbs feel weak... My circulation is failing.", true, "low_perfusion", 0, nil, Color(200, 170, 170))
+		end
 	end
 
 	-- Low pulse affects consciousness (below 40 BPM)

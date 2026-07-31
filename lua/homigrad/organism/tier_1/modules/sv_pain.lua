@@ -32,10 +32,10 @@ local anger_pain_reduction_max = 0.16
 function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	adrenaline = max(adrenaline or 0, 0)
 
-	-- Natural adrenaline doses are reserve-scaled and commonly land below 0.5.
-	-- Ramp smoothly from no effect so those ordinary rushes still delay both the
-	-- arrival and recovery of pain, while preserving the strong full-rush floor.
-	return max(max(1 - adrenaline, 0.05) / (1 + adrenaline * 1.5), 0.02)
+	-- This is a delivery rate, not a pain-reduction multiplier. A full rush
+	-- leaves most new pain in painadd, so it arrives after the rush instead of
+	-- disappearing from the injury entirely.
+	return max(1 / (1 + adrenaline * 2.5), 0.08)
 end
 
 module[1] = function(org)
@@ -156,18 +156,17 @@ module[2] = function(owner, org, timeValue)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
 	
-	-- Otrub blocks queued pain from reaching avgpain, but the queue must still
-	-- be consumed. Otherwise it resumes on wake and can create an endless
-	-- pain-collapse cycle after one severe impact.
+	-- Otrub blocks queued pain from reaching avgpain. Keep the queue intact so
+	-- stimulants and unconsciousness defer pain instead of deleting it.
 	local queuedPain = math.min(timeValue * 15, org.painadd)
 	local add = shouldPainAdd and queuedPain or 0
 	local sub = (add <= 0.2) and (timeValue * pain_drain_base * (org.otrub and pain_drain_otrub_mul or 1) + timeValue * ((org.painkiller * 0.3 + org.analgesia) * 4)) or (0)
 
-	-- Adrenaline delays incoming pain while adrenaline and Zerlkers both help
-	-- existing pain settle faster, keeping an injured character functional.
+	-- Adrenaline delays incoming pain. Zerlkers nearly stops it, preserving the
+	-- backlog so the injury catches up once the effect has ended.
 	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
-	add = add * Lerp(zerlkers, adrenalinePainPacing, 0.04)
-	sub = sub * (1 + resilience * 0.85 + zerlkers * 3 + adrenaline * anger * 0.6)
+	add = add * Lerp(zerlkers, adrenalinePainPacing, 0.025)
+	sub = sub * (1 + resilience * 0.35)
 
 
 
@@ -269,18 +268,19 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	-- Adrenaline can blunt pain, but it cannot erase nearly all of it.  Keep the
-	-- Remorseism 75% floor so injuries remain readable during the rush.
+	-- Anger grants a small pain resistance. Stimulants defer incoming pain via
+	-- painadd above instead of directly deleting pain already incurred.
 	local angerPainMul = 1 - anger * anger_pain_reduction_max
-	local zerlkersPainMul = 1 - zerlkers * 0.75
-	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * zerlkersPainMul * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
+	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
 	if org.isPly and org.pain >= 85 and IsValid(owner) and owner.Thought then
 		owner:Thought("You are experiencing excruciating pain.", 8, "thought_excruciatingpain", 0, Color(255, 160, 160))
 	end
 
-	org.painadd = min(max(org.painadd - queuedPain * analgesiaMul, 0), 150)
+	-- Remove only pain that actually entered avgpain. The old queuedPain
+	-- subtraction made adrenaline and Zerlkers erase deferred damage.
+	org.painadd = min(max(org.painadd - add * analgesiaMul, 0), 150)
 
 	//org.painkiller = Approach(org.painkiller, 0, timeValue / 240 * (org.naloxone * 25 + 1))
 

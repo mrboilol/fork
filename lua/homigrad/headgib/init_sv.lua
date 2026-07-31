@@ -4,12 +4,14 @@ local vecZero = Vector(0,0,0)
 local vecInf = Vector(0,0,0) / 0
 
 local function removeBone(rag, bone, phys_bone, nohuys)
+	if not IsValid(rag) or not bone or bone < 0 or not phys_bone or phys_bone < 0 then return end
 	if !nohuys then rag:ManipulateBoneScale(bone, vecZero) end
 	--rag:ManipulateBonePosition(bone,vecInf) -- Thanks Rama (only works on certain graphics cards!)
 
 	if rag.gibRemove[phys_bone] then return end
 
 	local phys_obj = rag:GetPhysicsObjectNum(phys_bone)
+	if not IsValid(phys_obj) then return end
 	phys_obj:EnableCollisions(false)
 	phys_obj:SetMass(0.1)
 	--rag:RemoveInternalConstraint(phys_bone)
@@ -19,7 +21,8 @@ local function removeBone(rag, bone, phys_bone, nohuys)
 end
 
 local function recursive_bone(rag, bone, list)
-	for i,bone in pairs(rag:GetChildBones(bone)) do
+	if not bone or bone < 0 then return end
+	for i,bone in pairs(rag:GetChildBones(bone) or {}) do
 		if bone == 0 then continue end--wtf
 
 		list[#list + 1] = bone
@@ -30,6 +33,7 @@ local function recursive_bone(rag, bone, list)
 end
 
 function Gib_RemoveBone(rag, bone, phys_bone, nohuys)
+	if not IsValid(rag) or not bone or bone < 0 then return end
 	rag.gibRemove = rag.gibRemove or {}
 
 	removeBone(rag, bone, phys_bone, nohuys)
@@ -67,12 +71,43 @@ local grub, mat, gamemod = Model("models/grub_nugget_small.mdl"), "models/flesh"
 local meatModels = {
 	Model("models/props_junk/watermelon01_chunk02a.mdl"),
 }
+local limbGibModels = {
+	larm = {
+		Model("models/gore/larm_armgoreupperl.mdl"),
+		Model("models/gore/larm_armgorelowerl.mdl"),
+		Model("models/gore/larm_armgorehandl.mdl"),
+	},
+	rarm = {
+		Model("models/gore/rarm_armgoreupperr.mdl"),
+		Model("models/gore/rarm_armgorelowerr.mdl"),
+		Model("models/gore/rarm_armgorehandr.mdl"),
+	},
+	lleg = {
+		Model("models/gore/lleg_legpartmidl.mdl"),
+		Model("models/gore/lleg_legpartfootl001.mdl"),
+		Model("models/gore/lleg_meatbit001l.mdl"),
+		Model("models/gore/lleg_meatbit002l.mdl"),
+		Model("models/gore/lleg_meatbit003l.mdl"),
+		Model("models/gore/lleg_meatbit004l.mdl"),
+	},
+	rleg = {
+		Model("models/gore/rleg_legpartmidr.mdl"),
+		Model("models/gore/rleg_legpartfootr001.mdl"),
+		Model("models/gore/rleg_meatbit001r.mdl"),
+		Model("models/gore/rleg_meatbit002r.mdl"),
+		Model("models/gore/rleg_meatbit003r.mdl"),
+		Model("models/gore/rleg_meatbit004r.mdl"),
+	},
+}
 local gibRemoveTime = 60 --120
 function SpawnMeatGore(mainent, pos, count, force, scale, models)
+	if not IsValid(mainent) or not pos then return end
 	force = force or Vector(0,0,0)
 	models = models or meatModels
+	if #models == 0 then return end
 	for i = 1, (count or math.random(8, 10)) do
 		local ent = ents_Create("prop_physics")
+		if not IsValid(ent) then continue end
 		ent:SetModel(models[math.random(#models)])
 		if models == meatModels then ent:SetSubMaterial(0, mat) end
 		ent:SetPos(pos)
@@ -106,6 +141,13 @@ function SpawnMeatGore(mainent, pos, count, force, scale, models)
 			net.Broadcast()
 		end)
 	end
+end
+
+function hg.SpawnLimbGore(mainent, pos, limb, force)
+	local models = limbGibModels[limb]
+	if not models then return end
+	SpawnMeatGore(mainent, pos, math.min(#models, 4), force, 0.85, models)
+	SpawnMeatGore(mainent, pos, 3, force, 0.45, models)
 end
 
 local headpos_male, headpos_female, headang = Vector(0,0,7), Vector(-2,0,6), Angle(0,0,-0)
@@ -146,6 +188,11 @@ local sounds = {
 	Sound("gore/chop6.ogg")
 }
 util.PrecacheModel(headboom_mdl)
+for _, models in pairs(limbGibModels) do
+	for _, mdl in ipairs(models) do
+		util.PrecacheModel(mdl)
+	end
+end
 for _, mdl in ipairs(zippyHeadGoreModels) do
 	util.PrecacheModel(mdl)
 end

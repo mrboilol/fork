@@ -82,9 +82,11 @@ local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound
 local gunfight_adrenaline_delay = 1.5
 local gunfight_adrenaline_cap = 1.5
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
-local seizure_duration = 25
+local seizure_min_duration = 10
+local seizure_max_duration = 30
 local seizure_end_shock = 35
-local seizure_brain_damage_per_second = 0.004
+local seizure_min_brain_damage_per_second = 0.0025
+local seizure_max_brain_damage_per_second = 0.005
 local seizure_shock_per_second = 1.5
 local seizure_pose_force = 850
 local seizure_pose_damp = 42
@@ -98,7 +100,8 @@ local seizure_temperature_cold_gain_mul = 0.005
 local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
 local seizure_brain_roll_delay = 20
-local seizure_brain_roll_chance = 15
+local seizure_brain_roll_min_chance = 3
+local seizure_brain_roll_max_chance = 30
 local seizure_no_cause_decay_time = 90
 local seizure_mannitol_gain_reduction = 0.5
 local seizure_mannitol_recovery_bonus = 1
@@ -233,8 +236,6 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastSeizureBrain = 0
 	org.lastSeizureLobeDamage = 0
 	org.lastSeizureTemperature = org.temperature
-	org.deathStateEnd = nil
-	org.deathStateKilled = nil
 	org.lastWoundsSig = nil
 	org.lastArterialWoundsSig = nil
 	org.fatalBrainDeath = nil
@@ -451,26 +452,42 @@ function hg.organism.ZerlkersCanPreventOtrub(org)
 	return not (terminalBrainDamage or terminalBloodLoss or terminalOxygenLoss or terminalFailure)
 end
 
+-- Zerlkers can also stop the non-terminal ragdoll/fake state caused by pain,
+-- shock, or moderate circulation/oxygen loss. Structural injuries and truly
+-- terminal physiology still take precedence.
+function hg.organism.ZerlkersCanPreventFake(org)
+	if not hg.organism.ZerlkersCanPreventOtrub(org) then return false end
+
+	local oxygen = org.o2 and org.o2[1] or math.huge
+	local mechanicalIncapacity = (org.spine2 or 0) >= hg.organism.fake_spine2
+		or (org.spine3 or 0) >= hg.organism.fake_spine3
+		or ((org.lleg or 0) >= 1 and (org.rleg or 0) >= 1)
+	local severePhysiology = (org.blood or 5000) < 2400 or oxygen < 10
+		or (org.brain or 0) >= 0.2 or org.choking or org.neckslit
+
+	return not (mechanicalIncapacity or severePhysiology)
+end
+
 function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if not org then return end
 
 	local dt = timeValue or engine.TickInterval()
 	local resilience = hg.organism.GetResilience(org)
 	local blood = math.max(hg.organism.GetResilientBlood(org), 0)
-	-- Compensation masks most of the loss above 4000 mL. Below that, delivery
-	-- falls in stages: mild weakness by 3500, trouble by 3000, then the severe
-	-- perfusion/otrub range starts at 2500 and reaches no sustainable flow at 2000.
+	-- 4500 starts the altered state, 4000 is clearly noticeable, 3500 weakens
+	-- the body, and 3000 leaves it barely functional and disoriented. The
+	-- 2500-2000 range is life-threatening; 2000 cannot sustain consciousness.
 	local bloodFraction
 	if blood >= 4500 then
 		bloodFraction = 1
 	elseif blood >= 4000 then
-		bloodFraction = math.Remap(blood, 4000, 4500, 0.98, 1)
+		bloodFraction = math.Remap(blood, 4000, 4500, 0.96, 1)
 	elseif blood >= 3500 then
-		bloodFraction = math.Remap(blood, 3500, 4000, 0.95, 0.98)
+		bloodFraction = math.Remap(blood, 3500, 4000, 0.85, 0.96)
 	elseif blood >= 3000 then
-		bloodFraction = math.Remap(blood, 3000, 3500, 0.82, 0.95)
+		bloodFraction = math.Remap(blood, 3000, 3500, 0.60, 0.85)
 	elseif blood >= 2500 then
-		bloodFraction = math.Remap(blood, 2500, 3000, 0.3, 0.82)
+		bloodFraction = math.Remap(blood, 2500, 3000, 0.28, 0.60)
 	elseif blood > 2000 then
 		bloodFraction = math.Remap(blood, 2000, 2500, 0, 0.3)
 	else
@@ -985,10 +1002,13 @@ local function start_seizure(owner, org)
 	if org.seizureActive or not IsValid(owner) or not owner:IsPlayer() or not owner:Alive() then return end
 
 	local time = CurTime()
+	local severity = math.Clamp(math.max(org.brain or 0, getSeizureLobeDamage(org)), 0, 1)
 	org.seizure = 1
 	org.seizureActive = true
 	org.seizureStart = time
-	org.seizureEnd = time + seizure_duration
+	-- Minor damage produces a short seizure; severe brain trauma can sustain one
+	-- for up to half a minute, but every episode ends on its own.
+	org.seizureEnd = time + seizure_min_duration + (seizure_max_duration - seizure_min_duration) * severity
 	org.nextSeizureSpasm = time
 	org.lastSeizureInjuryTime = time
 	owner.fullsend = true
@@ -1611,11 +1631,12 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		end
 
 	local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
-	if seizureBrainDamage > 0.05 then
+	if seizureBrainDamage >= 0.05 then
 		org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
 		if curTime >= org.nextSeizureRoll then
 			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
-			if math.random(seizure_brain_roll_chance) == 1 then
+			local rollChance = math.Remap(seizureBrainDamage, 0.05, 1, seizure_brain_roll_min_chance, seizure_brain_roll_max_chance)
+			if math.random(100) <= rollChance then
 				-- Brain damage can cause an abrupt seizure instead of only slowly
 				-- filling the warning meter over several successful rolls.
 				hg.organism.AddSeizure(org, 1)
@@ -1655,9 +1676,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			local injuryDelta = math.Clamp(time - lastInjuryTime, 0, 0.25)
 			org.lastSeizureInjuryTime = time
 
-			-- An untreated full seizure now adds about 0.1 brain damage before
-			-- unconsciousness, making prompt anticonvulsant treatment meaningful.
-			org.brain = math.min((org.brain or 0) + injuryDelta * seizure_brain_damage_per_second, 1)
+			-- Seizures progressively injure the brain. Mild episodes add only a little,
+			-- while longer severe-trauma seizures can become fatal if left untreated.
+			local seizureSeverity = math.Clamp(math.max(org.brain or 0, getSeizureLobeDamage(org)), 0, 1)
+			local brainDamageRate = seizure_min_brain_damage_per_second + (seizure_max_brain_damage_per_second - seizure_min_brain_damage_per_second) * seizureSeverity
+			org.brain = math.min((org.brain or 0) + injuryDelta * brainDamageRate, 1)
 			org.shock = math.min((org.shock or 0) + injuryDelta * seizure_shock_per_second, 85)
 
 			local rag = owner.FakeRagdoll
@@ -1853,28 +1876,9 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		--org.owner:ConCommand("soundfade 0 1")
 	end
 
-	if isPly and org.otrub and org.incapacitated then
-		if org.heartstop and not org.deathStateHeartstop then
-			-- A new cardiac arrest always receives a full resuscitation window,
-			-- even if the patient was already unconscious for another reason.
-			org.deathStateEnd = math.max(org.deathStateEnd or 0, curTime + 60)
-			org.deathStateHeartstop = true
-		else
-			org.deathStateEnd = org.deathStateEnd or curTime + 25
-		end
-		if (org.defibDeathGrace or 0) > curTime then org.deathStateEnd = math.max(org.deathStateEnd or 0, org.defibDeathGrace) end
-
-		if curTime >= org.deathStateEnd and not org.deathStateKilled then
-			org.deathStateKilled = true
-			owner:Kill()
-			return
-		end
-	else
-		org.deathStateEnd = nil
-		org.deathStateKilled = nil
-	end
-	if not org.heartstop then org.deathStateHeartstop = nil end
-
+	-- Cardiac arrest and unconsciousness are resuscitatable states.  Do not
+	-- convert either into death on a timer: fatality is handled exclusively by
+	-- KillFatalBrainDamage once brain injury crosses its terminal threshold.
 	if just_went_uncon then
 		org.owner.fullsend = true
 	end
@@ -1883,6 +1887,11 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end
+	end
+
+	if org.needfake and hg.organism.ZerlkersCanPreventFake(org) then
+		org.needfake = false
+		org.consciousness = math.max(org.consciousness or 0, 0.55)
 	end
 
 	if org.neckslitSoundName and (org.otrub or org.needotrub) then

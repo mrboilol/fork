@@ -995,19 +995,32 @@ local function OpenRoleEditor(parentPanel, roleId, returnPanel)
     lblPreviewName:SizeToContentsY()
 
     local lblPreviewDesc = vgui.Create("DLabel", previewPanel)
-    lblPreviewDesc:Dock(FILL)
+    lblPreviewDesc:Dock(TOP)
     lblPreviewDesc:DockMargin(MenuUnit(10), MenuUnit(10), MenuUnit(10), MenuUnit(10))
     lblPreviewDesc:SetFont(TRAITOR_MENU_FONT)
     lblPreviewDesc:SetTextColor(Color(200, 200, 200))
-    lblPreviewDesc:SetContentAlignment(7)
+    lblPreviewDesc:SetContentAlignment(8)
     lblPreviewDesc:SetWrap(true)
     lblPreviewDesc:SetText("")
+    lblPreviewDesc:SetZPos(2)
+
+    function lblPreviewDesc:PerformLayout(w)
+        surface.SetFont(TRAITOR_MENU_FONT)
+        local _, lineHeight = surface.GetTextSize("W")
+        local minHeight = lineHeight * 3
+        local maxHeight = lineHeight * 5
+
+        self:SetWide(w)
+        self:SizeToContentsY()
+        self:SetTall(math.Clamp(self:GetTall(), minHeight, maxHeight))
+    end
 
     local previewIconMat = nil
     local iconPanel = vgui.Create("DPanel", previewPanel)
     iconPanel:Dock(TOP)
     iconPanel:SetTall(MenuUnit(200))
     iconPanel:DockMargin(MenuUnit(10), MenuUnit(10), MenuUnit(10), 0)
+    iconPanel:SetZPos(1)
     iconPanel.Paint = function(pnl, w, h)
         if not previewIconMat then return end
         surface.SetDrawColor(255, 255, 255, 255)

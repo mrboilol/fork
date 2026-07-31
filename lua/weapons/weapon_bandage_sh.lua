@@ -611,6 +611,18 @@ if SERVER then
 			or org.jawdislocation
 
 		if self.modeValues[1] <= 0 or not hasInjuries then return end
+
+		-- Manipulating a player or their fake ragdoll can briefly create enough
+		-- physics stress to look like a crushing injury. Mark the patient before
+		-- the treatment work starts so the crush monitor ignores that handling.
+		local treatmentUntil = CurTime() + 1.5
+		ent.HG_MedicalTreatmentUntil = math.max(ent.HG_MedicalTreatmentUntil or 0, treatmentUntil)
+		if IsValid(org.owner) then
+			org.owner.HG_MedicalTreatmentUntil = math.max(org.owner.HG_MedicalTreatmentUntil or 0, treatmentUntil)
+			if IsValid(org.owner.FakeRagdoll) then
+				org.owner.FakeRagdoll.HG_MedicalTreatmentUntil = math.max(org.owner.FakeRagdoll.HG_MedicalTreatmentUntil or 0, treatmentUntil)
+			end
+		end
 		
 		local done = false
 		local bandaged = false

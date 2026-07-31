@@ -193,17 +193,17 @@ local is_aimed_at_phrases = {
 }
 
 local near_death_poetic = {
-	"Trying to stand... but I just can't...",
-	"Breathing's just shallow sips of nothing...",
-	"Can't tell if my eyes are open or not anymore...",
-	"Last thing I'll taste is my own blood and copper.",
-	"Eyes keep sliding off things.",
-	"Can't remember how standing works.",
-	"Everything echoes inside my skull.",
-	"Blinking takes too long to come back.",
-	"Fingers won't close around anything.",
-	"Lungs refuse to be full.",
-	"Regrets are pointless now.",
+	"I CANT STOP DYING. WHY CANT I STOP DYING, I DONT WANT TO GO YET, THIS ISNT HOW ITS SUPPOSED TO END",
+	"I cant go, I cant go yet. This isnt how its supposed to end I dont want to die I dont want to die...",
+	"Its hopeless, ill just die here like a dog without anyone willing to help a dying, helpless man.",
+	"Why is it me, out of all the people today why did it have to be me...",
+	"Everything is so dark and weak and heavy and I cant move and I cant breathe and I cant see and I cant think and I dont want to die...",
+	"Someone help me, please, I dont want to die like this, I dont want to die like this, I dont want to die like this...",
+	"What happens after death? Is this it? will I be accepted into heaven or hell? I never had time to think I dont want to die a sinner..",
+	"This is it isnt it? No one will fucking help me, no one will save me, no one will even notice me, I am going to die here and no one will care.",
+	"This is fucking hopeless, I cant move, I cant see, I cant do ANYTHING, IM GOING TO FUCKING DIE",
+	"I have so much regrets, so much I didnt do, so much I didnt say and experience, this is how I fucking die and its a pathetic way to die.",
+	"Why is it so dark and heavy and cold and I cant move and I cant breathe and I cant see and I cant think and I dont want to die...",
 }
 
 local near_death_positive = {
@@ -238,7 +238,7 @@ local broken_limb = {
 }
 
 local dislocated_limb = {
-	"Yeah that shouldn't be bending like that.",
+	"My limb is at a really weird angle...",
 	"I have to get this bone back in.",
 	"No... I have to move it back in place.",
 	"It just hurts so much there. I might need a check up.",
@@ -405,6 +405,36 @@ local heatvomit_phraselist = {
 	"Fuuck.. Oughhh.. I don't feel-"
 }
 
+local internal_bleeding_phrases = {
+	"Something is bleeding inside me...",
+	"I can feel blood building up inside...",
+	"Something inside me is badly wrong...",
+}
+
+local arrhythmia_phrases = {
+	"My heartbeat feels wrong...",
+	"My heart is skipping and stumbling...",
+	"My chest feels out of rhythm...",
+}
+
+local tachycardia_phrases = {
+	"My heart is racing...",
+	"My heart is beating far too fast...",
+	"I can feel my pulse pounding...",
+}
+
+local bradycardia_phrases = {
+	"My heartbeat is slowing down...",
+	"My heart is beating so slowly...",
+	"My heart is barely keeping up...",
+}
+
+local low_perfusion_phrases = {
+	"My limbs feel weak and cold...",
+	"I can barely move...",
+	"Everything feels heavy and sluggish...",
+}
+
 local hg_showthoughts = ConVarExists("hg_showthoughts") and GetConVar("hg_showthoughts") or CreateClientConVar("hg_showthoughts", "1", true, true, "Show the thoughts of your character", 0, 1)
 
 function string.Random(length)
@@ -449,6 +479,9 @@ function hg.likely_to_phrase(ply)
 	local blood = org.blood
 	local fear = org.fear
 	local panicattack = org.panicattack or 0
+	local internalBleed = org.internalBleed or 0
+	local arrhythmia = org.arrhythmia or 0
+	local hypotension = org.hypotension or 0
 	local temperature = org.temperature
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
 	local adrenaline = org.adrenaline or 0
@@ -501,6 +534,9 @@ local function get_status_message(ply)
 	local o2 = org.o2 and org.o2[1] or 30
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
+	local internalBleed = org.internalBleed or 0
+	local arrhythmia = org.arrhythmia or 0
+	local hypotension = org.hypotension or 0
 	local positive_thinking = goodmood and goodmood > 0.5
 
 	if fear >= 1.0 and math.random(10) > 3 then
@@ -524,12 +560,32 @@ local function get_status_message(ply)
 
 	local most_wanted_phraselist
 
-	if o2 < 12 then
+	if org.heartstop then
+		most_wanted_phraselist = bradycardia_phrases
+	elseif o2 < 12 then
 		most_wanted_phraselist = low_o2_phrases
+	elseif blood < 3750 then
+		-- These are the recurring dying thoughts. Keep the one-time threshold
+		-- alerts in sv_blood, but let blood loss win the periodic status slot so
+		-- pain, temperature, and incidental conditions do not drown it out.
+		local combined_phrases = {}
+		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
+		for _, phrase in ipairs(near_death_poetic) do table.insert(combined_phrases, phrase) end
+		most_wanted_phraselist = combined_phrases
 	elseif pain > 100 then
 		most_wanted_phraselist = sharp_pain
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
+	elseif internalBleed > 0.1 then
+		most_wanted_phraselist = internal_bleeding_phrases
+	elseif org.fibrillation or org.unstableRhythm or arrhythmia > 0.35 then
+		most_wanted_phraselist = arrhythmia_phrases
+	elseif heartbeat >= 150 then
+		most_wanted_phraselist = tachycardia_phrases
+	elseif heartbeat > 0 and heartbeat <= 45 then
+		most_wanted_phraselist = bradycardia_phrases
+	elseif hypotension > 0.5 then
+		most_wanted_phraselist = low_perfusion_phrases
 	elseif temperature < 35 then
 		if temperature < 29 then
 			most_wanted_phraselist = numb_phraselist
@@ -560,14 +616,6 @@ local function get_status_message(ply)
 		end
 	elseif after_unconscious_notify then
 		most_wanted_phraselist = after_unconscious
-	elseif not most_wanted_phraselist and blood < 3750 then
-		local combined_phrases = {}
-		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
-		for _, phrase in ipairs(near_death_poetic) do table.insert(combined_phrases, phrase) end
-		if hg.internalbleed_phrases then
-			for _, phrase in ipairs(hg.internalbleed_phrases) do table.insert(combined_phrases, phrase) end
-		end
-		most_wanted_phraselist = combined_phrases
 	elseif not most_wanted_phraselist and adrenaline > 1.5 then
 		most_wanted_phraselist = adrenaline_phrases
 	elseif panicattack > 0.55 then

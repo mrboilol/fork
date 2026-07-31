@@ -81,6 +81,11 @@ SWEP.Config = {
     TickInterval = 0.5,
     AutopulseInterval = 60 / 70,
     AutopulseOxygenFloor = 24,
+    AutopulseOxygenRecovery = 0.08,
+    AutopulseBloodFloor = 3500,
+    AutopulseBloodRestore = 55,
+    AutopulseMannitolTarget = 1.25,
+    AutopulseMannitolDose = 0.08,
     SoundCooldown = 0.35,
     InjuryHeal = 0.06,
     BleedHeal = 1.5,
@@ -118,6 +123,8 @@ local StitchFields = {
     "rvein", "lvein", "spinevein", "pulmvein", "rarmvein", "larmvein", "rlegvein", "llegvein"
 }
 
+-- Complex mode is reserved for immediately life-threatening trauma: vital
+-- organs, thoracic/cranial damage, and complications from internal bleeding.
 local ComplexFields = {
     "skull", "chest", "heart", "brain", "trachea", "hemothorax", "hemothoraxTrauma",
     "hemothoraxL", "hemothoraxR", "internalBleedComplication", "brainFrontal",
@@ -126,6 +133,9 @@ local ComplexFields = {
     "throatCutPressureShock"
 }
 
+-- Generic mode reconstructs bones and non-vital abdominal organs.  Keep these
+-- separate from ComplexFields so a patient is re-evaluated between the two
+-- passes instead of treating every injury as critical surgery.
 local SimpleFields = {
     "jaw", "pelvis", "lleg", "rleg", "larm", "rarm", "spine1", "spine2", "spine3",
     "eyeL", "eyeR", "headtrauma", "pneumothorax", "liver", "stomach", "intestines"
@@ -376,14 +386,32 @@ end
 local function ApplyAutopulse(org, config)
     org.dihAutopulseUntil = CurTime() + config.AutopulseInterval * 1.5
     org.dihSupportUntil = org.dihAutopulseUntil
-    org.deathStateEnd = math.max(org.deathStateEnd or 0, CurTime() + 2)
     org.pulse = 70
     org.heartbeat = 70
     org.cardiacOutput = math.max(tonumber(org.cardiacOutput) or 0, 0.55)
     org.strokeVolume = math.max(tonumber(org.strokeVolume) or 0, 0.50)
     org.hypotension = math.min(tonumber(org.hypotension) or 1, 0.50)
+
+    -- A circulation assist is only useful if it also has enough volume and
+    -- oxygen to circulate.  This is deliberately limited to an emergency
+    -- bridge, rather than replacing the unit's normal blood-restoration pass.
+    local blood = tonumber(org.blood) or 5000
+    if blood < config.AutopulseBloodFloor then
+        org.blood = math.min(blood + config.AutopulseBloodRestore, config.AutopulseBloodFloor)
+    end
+
+    -- Give a small mannitol dose only when cerebral pressure is actually a
+    -- concern; dosing every beat on an otherwise stable patient is needless.
+    local cerebralEmergency = (tonumber(org.intracranialPressure) or 0) > 0.20
+        or (tonumber(org.brainSwelling) or 0) > 0.20
+        or (tonumber(org.brainHemorrhage) or 0) > 0.15
+    if cerebralEmergency then
+        org.mannitol = math.Approach(tonumber(org.mannitol) or 0,
+            config.AutopulseMannitolTarget, config.AutopulseMannitolDose)
+    end
+
     if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
-        hg.organism.RestoreSupportedOxygen(org, 0.12, {
+        hg.organism.RestoreSupportedOxygen(org, config.AutopulseOxygenRecovery, {
             oxygen = config.AutopulseOxygenFloor,
             bodyoxygen = 0.55, brainoxygen = 0.50, perfusion = 0.45,
             peripheralperfusion = 0.40, cerebralPerfusion = 0.45, myocardialOxygen = 0.50,
@@ -560,6 +588,11 @@ function SWEP:AttachUnit(owner, target, ply)
     local painkillerAnnounced = false
     local movingSince
 
+    local function QueueRescan()
+        scanning = true
+        QueueUnitSound(unit, ASScanSounds[math.random(#ASScanSounds)])
+    end
+
     unit:CallOnRemove("AutosurgeonCleanup", function()
         timer.Remove(timerName)
         StopUnitSounds(unit)
@@ -590,15 +623,6 @@ function SWEP:AttachUnit(owner, target, ply)
         local currentBone = activeTarget:LookupBone(unitBone)
         if currentBone then PositionUnit(unit, activeTarget, currentBone, unitPos, unitAng, unitFemPos) end
 
-        if ProcessUnitSounds(unit, config) then return end
-
-        -- Start treatment in the same tick the scan ends.  When the scan did
-        -- not find a treatment mode, the normal completion path below removes
-        -- the unit instead of leaving it idle on the patient.
-        if scanning then
-            scanning = false
-            nextTreatment = CurTime()
-        end
         if unit.ASPendingDrop then
             DropUnit(unit, activeTarget, ply, battery)
             return
@@ -615,35 +639,46 @@ function SWEP:AttachUnit(owner, target, ply)
         end
 
         local org = GetUnitOrganism(ply, activeTarget)
-        if not org or not org.alive or org.deathStateKilled then
+        if not org or not org.alive then
             DropUnit(unit, activeTarget, ply, battery)
             return
         end
+
+        -- Autopulse is independent of scanning and repair sounds.  A queued
+        -- scan used to suspend this entire timer, which made an arrested
+        -- patient miss compressions whenever the unit rescanned its work.
+        local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
+        if needsAutopulse and CurTime() >= nextAutopulse then
+            if battery < config.AutopulseBatteryPerBeat then
+                QueueUnitSound(unit, ASSounds.battery)
+                unit.ASPendingDrop = true
+                return
+            end
+            battery = battery - config.AutopulseBatteryPerBeat
+            unit:SetNWInt("AutosurgeonBattery", battery)
+            ApplyAutopulse(org, config)
+            -- Do not queue this behind scan/mode announcements: one pump.wav
+            -- is emitted for every completed mechanical pulse.
+            PlayUnitSound(unit, ASSounds.pump, 65, 100)
+            nextAutopulse = CurTime() + config.AutopulseInterval
+        end
+
+        if ProcessUnitSounds(unit, config) then return end
+
+        -- Start treatment in the same tick the scan ends.  When the scan did
+        -- not find a treatment mode, the normal completion path below removes
+        -- the unit instead of leaving it idle on the patient.
+        if scanning then
+            scanning = false
+            nextTreatment = CurTime()
+        end
         if CurTime() < nextTreatment then return end
         nextTreatment = CurTime() + config.TickInterval
-        local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
         if not treatmentMode then treatmentMode = GetNextTreatmentMode(org) end
 
         -- Finish stitching, complex repair, and generic repair before using
         -- support functions such as stimulants or autopulse.
         if not treatmentMode then
-            if modeSwitchPending and (needsAutopulse or painkillerTarget) then
-                QueueUnitSound(unit, ASSounds.modeSwitch)
-                modeSwitchPending = false
-            end
-            if needsAutopulse and CurTime() >= nextAutopulse then
-                if battery < config.AutopulseBatteryPerBeat then
-                    QueueUnitSound(unit, ASSounds.battery)
-                    unit.ASPendingDrop = true
-                    return
-                end
-                battery = battery - config.AutopulseBatteryPerBeat
-                unit:SetNWInt("AutosurgeonBattery", battery)
-                ApplyAutopulse(org, config)
-                QueueUnitSound(unit, ASSounds.pump, 65, 100)
-                nextAutopulse = CurTime() + config.AutopulseInterval
-            end
-
             if painkillerTarget then
                 org.painkiller = math.min((tonumber(org.painkiller) or 0) + 0.25, painkillerTarget, 1)
                 if org.painkiller >= painkillerTarget then
@@ -695,6 +730,11 @@ function SWEP:AttachUnit(owner, target, ply)
             QueueUnitSound(unit, ASSounds.modeComplete)
             treatmentMode = nil
             modeSwitchPending = true
+            -- Damage can evolve while another category is being repaired
+            -- (for example, ischemia can injure several organs).  Treat each
+            -- completed mode as a full cycle and scan again before selecting
+            -- the next one, rather than immediately advancing next tick.
+            QueueRescan()
         end
     end)
 

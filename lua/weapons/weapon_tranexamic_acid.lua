@@ -1,7 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Tranexamic Acid"
-SWEP.Instructions = "Use to reduce internal bleeding."
+SWEP.Instructions = "Use to reduce internal bleeding, including traumatic brain hemorrhages."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.Primary.Wait = 1

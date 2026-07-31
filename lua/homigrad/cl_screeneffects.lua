@@ -366,6 +366,9 @@ lobotomy_mats = {
 local consciousnessTypeBeatVolume = 0.18
 local dying2Volume = 0.4
 local alternateDyingForegroundVolume = 0.6
+-- sonimcooked is the solo foreground track for hg_dyingsound 7. Its source
+-- file is quieter than the other dying tracks, so give it a higher ceiling.
+local sonimCookedForegroundVolume = 1
 local alternateDyingBackgroundVolume = 0.34
 local alternateDyingBackgroundMul = 0.42
 local painBeatOverlayPath = "sound/rem_pain.mp3"
@@ -2006,7 +2009,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					ItssooverStation:SetVolume(0)
 				end
 				if IsValid(SonimCookedStation) then
-					SonimCookedStation:SetVolume(consciousVol)
+					SonimCookedStation:SetVolume(math.Clamp(consciousVol * 1.5, 0, sonimCookedForegroundVolume))
 				end
 			elseif dyingMode == 8 then
 				-- REM low-O2 stack from the reference: rem_dying1 + rem_dying2.
@@ -2287,6 +2290,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	do
 		local grayscaleTarget = 0
 		if not org.otrub then
+		local zerlkersVisualMul = 1 - math.Clamp(org.zerlkers or 0, 0, 1) * 0.8
 
 		local suppForce = (SIB_suppress and SIB_suppress.Force or 0)
 		if suppForce > 1 then
@@ -2304,21 +2308,21 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if lowBloodVisual > 0 then
 			-- Blood loss starts with a restrained desaturation and blur, while the
 			-- existing consciousness/shock effects still own severe collapse.
-			grayscaleTarget = grayscaleTarget + lowBloodVisual * 0.18
-			DrawMotionBlur(0.04 + lowBloodVisual * 0.04, 0.18 + lowBloodVisual * 0.22, 0.02)
+			grayscaleTarget = grayscaleTarget + lowBloodVisual * 0.18 * zerlkersVisualMul
+			DrawMotionBlur((0.04 + lowBloodVisual * 0.04) * zerlkersVisualMul, (0.18 + lowBloodVisual * 0.22) * zerlkersVisualMul, 0.02)
 		end
 		if blood < 3500 then
-			grayscaleTarget = grayscaleTarget + math.Clamp((3500 - blood) / 3500, 0, 1) * 0.25
+			grayscaleTarget = grayscaleTarget + math.Clamp((3500 - blood) / 3500, 0, 1) * 0.25 * zerlkersVisualMul
 		end
 
 		local o2 = (org.o2 and isnumber(org.o2[1])) and org.o2[1] or 100
 		if o2 < 30 then
-			grayscaleTarget = grayscaleTarget + math.Clamp((30 - o2) / 30, 0, 1) * 0.22
+			grayscaleTarget = grayscaleTarget + math.Clamp((30 - o2) / 30, 0, 1) * 0.22 * zerlkersVisualMul
 		end
 
 		local shock = org.shock or 0
 		if shock > 20 then
-			grayscaleTarget = grayscaleTarget + math.Clamp((shock - 20) / 80, 0, 1) * 0.20
+			grayscaleTarget = grayscaleTarget + math.Clamp((shock - 20) / 80, 0, 1) * 0.20 * zerlkersVisualMul
 		end
 
 		local immobilization = org.immobilization or 0
@@ -2371,6 +2375,9 @@ hook.Add("Post Post Pre Post Processing", "HiddenPainFlicker", function()
 	local storedPain = math.Clamp(avgPain + painAdd, 0, 150)
 	local hiddenDifference = math.max(storedPain - feltPain, 0)
 	local targetSeverity = math.Clamp((hiddenDifference - 10) / 125, 0, 1)
+	-- Zerlkers intentionally suppresses these warning fragments as well as the
+	-- normal pain vignette; stored damage remains on the server and returns later.
+	targetSeverity = targetSeverity * (1 - math.Clamp(org.zerlkers or 0, 0, 1))
 
 	-- Felt pain starts quieting the warning between 40 and 60 pain depending on
 	-- how much avgpain is waiting underneath, then fully wins over 35 pain later.
@@ -2542,11 +2549,12 @@ hook.Add("Post Pain Processing", "PainEffects", function()
 	local strobe = math.ease.InOutSine(math.abs(math.cos(CurTime() * 2))) * PainLerp * painPulseIntensity
 	local pain = PainLerp + strobe
 	local shock = shockLerp
+	local zerlkersVisualMul = 1 - math.Clamp(org.zerlkers or 0, 0, 1) * 0.85
 	local thresholdReached = PainLerp >= painThresholdMax
 	painThresholdIntensityLerp = LerpFT(0.03, painThresholdIntensityLerp, thresholdReached and 5 or 1)
 	local intensityMul = painThresholdIntensityLerp
-	local coverage = thresholdReached and 1 or math.Clamp(pain / 70, 0, 0.95)
-	local effectIntensity = pain / 32 * painEffectIntensity * intensityMul + math.max(shock - 5, 0) / 2.4 * painEffectIntensity
+	local coverage = (thresholdReached and 1 or math.Clamp(pain / 70, 0, 0.95)) * zerlkersVisualMul
+	local effectIntensity = (pain / 32 * painEffectIntensity * intensityMul + math.max(shock - 5, 0) / 2.4 * painEffectIntensity) * zerlkersVisualMul
 
 	render.UpdateScreenEffectTexture()
 
@@ -2561,7 +2569,7 @@ hook.Add("Post Pain Processing", "PainEffects", function()
 
 	painMat:SetFloat("$c2_x", CurTime() + 10000)
 	painMat:SetFloat("$c0_y", 0.8)
-	painMat:SetFloat("$c0_z", org.otrub and unconsciousPainEffectIntensity or painEffectIntensity * intensityMul)
+	painMat:SetFloat("$c0_z", org.otrub and unconsciousPainEffectIntensity or painEffectIntensity * intensityMul * zerlkersVisualMul)
 	painMat:SetFloat("$c1_x", coverage)
 	painMat:SetFloat("$c1_y", coverage)
 

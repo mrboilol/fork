@@ -446,6 +446,13 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
+	-- 2000 mL is the terminal threshold. Do not wait for the next hypoxia timer
+	-- to run out: pulse will arrest the heart and blood loss immediately puts
+	-- the player into the unconscious/deadly state.
+	if blood <= 2000 then
+		org.needotrub = true
+	end
+
 	org.consciousness = math.min(org.consciousness, bloodConsciousnessCap * tempMul)
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
@@ -625,6 +632,13 @@ module[2] = function(owner, org, mulTime)
 	coagulatespeed = coagulatespeed + mulTime
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)
 
+	-- Do not tie the internal-bleeding alert to vomiting: pneumothorax and
+	-- hemothorax can also cause nausea. Only report it while blood is actually
+	-- accumulating internally.
+	if org.isPly and not org.otrub and org.internalBleed > 0.1 then
+		owner:Notify("I think I'm bleeding inside...", true, "internalbleed", 0, nil, Color(200, 170, 170))
+	end
+
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 	
 	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 2000 and org.o2[1] > 0 then
@@ -648,7 +662,7 @@ module[2] = function(owner, org, mulTime)
 				hg.organism.VomitNormal(owner)
 			end
 		else
-			if org.isPly then owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed") end
+			if org.isPly and org.internalBleed > 0.1 then owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed") end
 			hg.organism.Vomit(owner)
 		end
 	end

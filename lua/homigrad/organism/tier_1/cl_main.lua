@@ -526,6 +526,9 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	local analgesia = organism.analgesia or 0
 	local analgesiaVisual = analgesia >= 1 and (org.seizureActive and not org.otrub and math.max(analgesia * 3, 3) or analgesia) or 0
 	local zerlkersOverdose = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
+	-- Zerlkers does not cure these conditions; it reduces their distracting
+	-- visual feedback while the server keeps the real values and consequences.
+	local zerlkersVisualMul = 1 - math.Clamp(org.zerlkers or 0, 0, 1) * 0.8
 	analgesiaVisual = math.max(analgesiaVisual, 1 + zerlkersOverdose * 2.5)
 	local health = health
 	local disorientation = org.disorientation or 0
@@ -579,8 +582,8 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	
 	local adrenalineDisorientation = math.max(adrenaline - 2.5, 0)
 	k1 = Lerp(FrameTime() * 15, k1 or 0, math.min(adrenalineDisorientation, 1.5))
-	k2 = (30 - (o2 or 30)) / 30 + (1 - (consciousnessLerp or 1)) * 1-- + brain * 2
-	k3 = ((5000 / math.max(blood, 1000)) - 1) * 1.5
+	k2 = ((30 - (o2 or 30)) / 30 + (1 - (consciousnessLerp or 1))) * zerlkersVisualMul -- + brain * 2
+	k3 = ((5000 / math.max(blood, 1000)) - 1) * 1.5 * zerlkersVisualMul
 
 	DrawSharpen(k1 * 2, k1 * 1)
 	local lowpulse = math.max((70 - pulse) / 70, 0) + math.max(3000 * ((math.cos(CurTime()/2) + 1) / 2 * 0.1 + 1) - (blood * adrenK - 300),0) / 400
@@ -619,7 +622,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 		-- Pain-based screen shake
 	if pain > 55 and lply:Alive() and not otrub then
 		local painShakeIntensity = math.Clamp((pain - 55) / (120 - 55), 0, 1)
-		local shakeMul = painShakeIntensity * 0.5
+		local shakeMul = painShakeIntensity * 0.5 * zerlkersVisualMul
 		local time = CurTime() * (4 + painShakeIntensity * 4)
 
 		ang1[1] = math.sin(time) * shakeMul
@@ -657,7 +660,7 @@ hook.Add("Post Post Pre Post Processing", "organism-effects", function()
 	if (pain > 0) or (hurt > 0) or (immobilization > 0) or (brain > 0) then
 		local k = ((hurt + immobilization / 15) / 2)
 		--DrawToyTown(1, k * ScrH())
-		local newpain = pain - 10
+		local newpain = (pain - 10) * zerlkersVisualMul
 		if newpain > 0 then
 			//surface.SetDrawColor(0, 0, 0, (newpain / 20) * 255 - math.ease.InOutCirc(math.abs(math.cos(CurTime()))) * 50)
 			//surface.SetMaterial(pain_mat)
