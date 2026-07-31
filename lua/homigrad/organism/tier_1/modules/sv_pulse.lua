@@ -360,10 +360,11 @@ module[2] = function(owner, org, timeValue)
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()
 	local cprSupport = (org.cprSupportUntil or 0) > CurTime()
-	local arrestCirculation = dihSupport and (70 / 92) or (defibGrace and 0.49 or (cprSupport and 0.22 or 0))
+	local cprSupportPulse = math.Clamp(tonumber(org.cprSupportPulse) or 40, 0, 70)
+	local arrestCirculation = dihSupport and (70 / 92) or (defibGrace and 0.49 or (cprSupport and cprSupportPulse / 92 or 0))
 	local circulation = org.alive and (org.heartstop and arrestCirculation or circulationBase * rhythmMul) or 0
 	org.pulse = Approach(org.pulse, circulation * 92, heart == 0 and timeValue * 10 or timeValue * 5)
-	org.cardiacOutput = org.heartstop and (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and 0.2 or 0))) or Clamp(circulation * (92 / 90) * heart * rhythmMul, 0, 1.5)
+	org.cardiacOutput = org.heartstop and (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and cprSupportPulse / 110 or 0))) or Clamp(circulation * (92 / 90) * heart * rhythmMul, 0, 1.5)
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and circulation > 0.6 then
 		org.cardiacOutput = Approach(org.cardiacOutput, Clamp(getBloodVolume(org) * heart, 0, 1), timeValue / 20)
 	end
@@ -717,19 +718,20 @@ module[2] = function(owner, org, timeValue)
 		org.last_heartbeat = CurTime()
 	end
 
-	if org.heartstop and adren > 0 and (org.adrenaline_try or 0) < CurTime() then
+	-- Epinephrine can sometimes restore a reversible arrest, but each injector
+	-- dose receives exactly one attempt. Natural/combat adrenaline must not make
+	-- the patient reroll a restart every pulse tick.
+	if org.heartstop and org.epinephrineRestartPending then
+		org.epinephrineRestartPending = nil
 		local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (not organSystemsEnabled or ((org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42))
-		-- Scale chance with adrenaline level: significantly improved effectiveness
-		-- Low dose (1): ~70% chance, Medium dose (2): ~90% chance, High dose (4+): near-certain
-		local chance = math.Clamp(adren * 60 + adren * adren * 12, 0, 99)
+		local dose = math.Clamp(org.epinephrineRestartDose or adren or 0, 0, 4)
+		org.epinephrineRestartDose = nil
+		local chance = math.Clamp(35 + dose * 18, 0, 80)
 		chance = chance * math.Clamp(1 - (org.heart or 0) * 0.65, 0.2, 1)
 		if (org.o2 and (org.o2[1] or 0) < 5) or (org.hypotension or 0) > 0.98 then
 			chance = chance * 0.6
 		end
 		local rand = math.random(100)
-
-		-- High adrenaline retries faster (0.02s at adren>=3, 0.04s otherwise)
-		org.adrenaline_try = CurTime() + (adren >= 3 and 0.02 or 0.04)
 
 		if canRestartHeart and chance > rand then
 			org.heartstop = false

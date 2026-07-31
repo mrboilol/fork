@@ -2,7 +2,7 @@ if SERVER then AddCSLuaFile() end
 
 SWEP.Base = "weapon_tpik1_base"
 SWEP.PrintName = "AED"
-SWEP.Instructions = "Attach to chest"
+SWEP.Instructions = "AEDs are very useful in lifesaving situations when attempting to save someone out of cardiac arrest"
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true
 SWEP.AdminOnly = false

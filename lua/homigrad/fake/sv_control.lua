@@ -984,6 +984,7 @@ local player_GetHumans = player.GetHumans
 
 hook.Add("Think", "Fake", function()
 	hg.humans_cached = player_GetHumans()
+	local curTime = CurTime()
 
 	//for ply, ragdoll in pairs(hg.ragdollFake) do
 	for i, ply in player.Iterator() do

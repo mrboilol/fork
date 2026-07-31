@@ -544,11 +544,12 @@ function SWEP:ApplyForce()
 							org.palpitationTreatmentUntil = CurTime() + 1
 							
 							-- Improved oxygenation
-							org.o2[1] = math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range)
+							local oxygenFloor = math.min(28, org.o2.range or 30)
+							org.o2[1] = math.max(math.min(org.o2[1] + hg.organism.OxygenateBlood(org) * 3 * skillMult, org.o2.range), oxygenFloor)
 							
 							-- Compressions provide temporary circulation without implying a restart.
 							org.cprSupportUntil = CurTime() + 0.75
-							org.cprSupportPulse = skillMult > 1 and 30 or 22
+							org.cprSupportPulse = skillMult > 1 and 50 or 40
 							
 							-- Chest compressions temporarily improve hypotension.
 							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)
@@ -578,27 +579,8 @@ function SWEP:ApplyForce()
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
 							
-							local canRestartHeart = org.alive and (org.blood or 5000) >= 900 and (org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42
-							local durationChance = math.Clamp((self.CPRDuration or 0) / 120, 0, 0.08)
-							local rhythmChance = (org.fibrillation or (org.arrhythmia or 0) > 0.65) and 0.04 or 0
-							local adrenalineChance = math.Clamp(((org.adrenaline or 0) + (org.noradrenaline or 0)) / 4, 0, 1) * 0.03
-							local dihAssisted = (org.dihAutopulseUntil or 0) > CurTime()
-							local restartChance = math.Clamp((durationChance + rhythmChance + adrenalineChance + (dihAssisted and 0.42 or 0)) * (skillMult > 1 and 1.5 or 1), 0.01, dihAssisted and 0.78 or 0.16)
-							local canAttemptRestart = (org.nextCPRRestartAttempt or 0) <= CurTime()
-							if canAttemptRestart then org.nextCPRRestartAttempt = CurTime() + 2 end
-							if canRestartHeart and org.heartstop and canAttemptRestart and math.random() < restartChance then
-								org.heartstop = false
-								org.terminalRhythm = nil
-								org.unstableRhythm = nil
-								org.cardiacArrestStart = nil
-								org.cardiacArrestO2Start = nil
-								org._zeroO2Time = 0
-								org.heartbeat = math.Clamp((org.heartbeat or 0) > 0 and org.heartbeat or 90, 80, 140)
-								org.pulse = math.max(org.pulse or 0, 35)
-								org.hypotension = math.min(org.hypotension or 1, 0.5)
-								org.o2[1] = math.max(org.o2[1] or 0, 8)
-							end
-							if not org.heartstop then org.cardiacRestartUntil = CurTime() + 1 end
+							-- CPR is life support only: it preserves oxygenation and a small
+							-- compression pulse, but cannot restart an arrested heart.
 							
 							-- Reduce ischemia during CPR
 							org.ischemia = math.max((org.ischemia or 0) - 0.5 * skillMult, 0)

@@ -90,7 +90,12 @@ if SERVER then
 		-- conversion finishes, otherwise it cannot help a current cardiac arrest.
 		org.adrenaline = math.max(org.adrenaline or 0, 1.5)
 		org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, CurTime() + 4)
-		org.adrenaline_try = 0
+		-- A dose given during arrest gets one restart attempt in the pulse
+		-- simulation. Sustained adrenaline must not reroll it every tick.
+		if org.heartstop then
+			org.epinephrineRestartPending = true
+			org.epinephrineRestartDose = self.modeValues[1] * 1.5
+		end
 		org.palpitationTreatmentUntil = math.max(org.palpitationTreatmentUntil or 0, CurTime() + 8)
 		self:RefreshPerfusionTreatment(ent, 0.2)
 

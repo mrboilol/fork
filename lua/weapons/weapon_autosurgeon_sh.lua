@@ -80,6 +80,7 @@ SWEP.Config = {
     AutopulseBatteryPerBeat = 14,
     TickInterval = 0.5,
     AutopulseInterval = 60 / 70,
+    AutopulseOxygenFloor = 28,
     SoundCooldown = 0.35,
     InjuryHeal = 0.06,
     BleedHeal = 1.5,
@@ -203,29 +204,45 @@ local function PlayUnitSound(unit, snd, level, pitch)
     if IsValid(emitter) then emitter:EmitSound(snd, level or 75, pitch or 100) end
 end
 
+local function StopUnitSound(unit, snd, emitter)
+    if not IsValid(unit) or not snd then return end
+    emitter = IsValid(emitter) and emitter or GetUnitSoundEmitter(unit)
+    unit:StopSound(snd)
+    if IsValid(emitter) and emitter != unit then emitter:StopSound(snd) end
+end
+
 local function ProcessUnitSounds(unit, config)
     if not IsValid(unit) then return true end
-    if (unit.ASBusyUntil or 0) > CurTime() then return true end
+    local now = CurTime()
+    if unit.ASPlayingSound then
+        if (unit.ASSoundEndsAt or 0) > now then return true end
+        StopUnitSound(unit, unit.ASPlayingSound, unit.ASPlayingEmitter)
+        unit.ASPlayingSound = nil
+        unit.ASPlayingEmitter = nil
+        unit.ASSoundEndsAt = nil
+        unit.ASCooldownUntil = now + config.SoundCooldown
+    end
+    if (unit.ASCooldownUntil or 0) > now then return true end
+
     local queue = unit.ASSoundQueue
     if not queue or #queue <= 0 then return false end
 
     local nextSound = table.remove(queue, 1)
     PlayUnitSound(unit, nextSound.sound, nextSound.level, nextSound.pitch)
-    unit.ASBusyUntil = CurTime() + math.max(SoundDuration(nextSound.sound), 0) + config.SoundCooldown
+    unit.ASPlayingSound = nextSound.sound
+    unit.ASPlayingEmitter = GetUnitSoundEmitter(unit)
+    unit.ASSoundEndsAt = now + math.max(SoundDuration(nextSound.sound), 0)
     return true
 end
 
 local function StopUnitSounds(unit)
     if not IsValid(unit) then return end
-    local emitter = GetUnitSoundEmitter(unit)
-    for _, snd in pairs(ASSounds) do
-        unit:StopSound(snd)
-        if IsValid(emitter) and emitter != unit then emitter:StopSound(snd) end
-    end
-    for _, snd in ipairs(ASScanSounds) do
-        unit:StopSound(snd)
-        if IsValid(emitter) and emitter != unit then emitter:StopSound(snd) end
-    end
+    for _, snd in pairs(ASSounds) do StopUnitSound(unit, snd) end
+    for _, snd in ipairs(ASScanSounds) do StopUnitSound(unit, snd) end
+    unit.ASPlayingSound = nil
+    unit.ASPlayingEmitter = nil
+    unit.ASSoundEndsAt = nil
+    unit.ASCooldownUntil = nil
 end
 
 local function TableHasBleeding(tbl)
@@ -371,7 +388,9 @@ local function ApplyAutopulse(org, config)
     org.cerebralPerfusion = 1
     org.myocardialOxygen = 1
     if istable(org.o2) then
-        org.o2[1] = math.Approach(org.o2[1] or 0, org.o2.range or 30, 1.5)
+        local maxOxygen = org.o2.range or 30
+        local oxygenFloor = math.min(config.AutopulseOxygenFloor, maxOxygen)
+        org.o2[1] = math.max(math.Approach(org.o2[1] or 0, maxOxygen, 1.5), oxygenFloor)
     end
 end
 
@@ -527,7 +546,9 @@ function SWEP:AttachUnit(owner, target, ply)
     unit.ASSoundEmitter = target
     PlayUnitSound(unit, ASSounds.mounted)
     PlayUnitSound(unit, scanSound)
-    unit.ASBusyUntil = CurTime() + math.max(SoundDuration(scanSound), 0) + config.SoundCooldown
+    unit.ASPlayingSound = scanSound
+    unit.ASPlayingEmitter = GetUnitSoundEmitter(unit)
+    unit.ASSoundEndsAt = CurTime() + math.max(SoundDuration(scanSound), 0)
     owner:ViewPunch(Angle(5, 0, 0))
 
     local timerName = "AutosurgeonFollow" .. unit:EntIndex()
@@ -749,6 +770,15 @@ if CLIENT then
 
     function SWEP:DrawHUD()
         if GetViewEntity() != LocalPlayer() or LocalPlayer():InVehicle() then return end
+        local maxBattery = ASConfig.BatteryMax
+        local unit = LocalPlayer():GetNWEntity("AutosurgeonModelEnt")
+        local battery = IsValid(unit) and unit:GetNWInt("AutosurgeonBattery", 0) or self:Clip1()
+        local ratio = math.Clamp(battery / maxBattery, 0, 1)
+        local width, height = 240, 16
+        local barX, barY = (ScrW() - width) / 2, ScrH() - 58
+        draw.RoundedBox(4, barX, barY, width, height, Color(0, 0, 0, 185))
+        draw.RoundedBox(3, barX + 2, barY + 2, (width - 4) * ratio, height - 4, Color(80 + (1 - ratio) * 175, 200 * ratio, 70, 235))
+        draw.SimpleText("D.I.H BATTERY  " .. math.Round(ratio * 100) .. "%", "HomigradFont", ScrW() / 2, barY - 3, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
         local x, y = ScrW() / 2, ScrH() / 2 + 65
         local selfText = "Hold RMB to place autosurgeon on yourself"
         draw.SimpleText(selfText, "HomigradFont", x + 3, y + 26, color_black, TEXT_ALIGN_CENTER)
@@ -775,16 +805,5 @@ if CLIENT then
             })
         end
         altWasDown = altDown
-    end)
-
-    hook.Add("HUDPaint", "AutosurgeonBatteryHUD", function()
-        local weapon = LocalPlayer():GetActiveWeapon()
-        if not IsValid(weapon) or weapon:GetClass() != "weapon_autosurgeon_sh" then return end
-        local unit = LocalPlayer():GetNWEntity("AutosurgeonModelEnt")
-        if not IsValid(unit) then return end
-
-        local battery = math.max(unit:GetNWInt("AutosurgeonBattery", 0), 0)
-        local maxBattery = ASConfig.BatteryMax
-        draw.SimpleText("D.I.H BATTERY: " .. battery .. " / " .. maxBattery, "HomigradFont", ScrW() / 2, ScrH() - 100, color_white, TEXT_ALIGN_CENTER)
     end)
 end
