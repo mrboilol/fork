@@ -386,6 +386,23 @@ function hg.organism.GetResilientBlood(org)
 	return math.min((org and org.blood or 5000) + hg.organism.GetResilience(org) * 600, 5000)
 end
 
+-- A normal Zerlkers dose is a last-resort stimulant, not a substitute for a
+-- functioning brain, circulation, or oxygen supply. Keep this check in one
+-- place so ordinary pain/shock collapse can be suppressed without allowing a
+-- terminal condition to be silently cleared later in the tick.
+function hg.organism.ZerlkersCanPreventOtrub(org)
+
+	if not org or (org.zerlkers or 0) <= 0 or (org.zerlkersOverdose or 0) > 0 then return false end
+
+	local oxygen = org.o2 and org.o2[1] or math.huge
+	local terminalBrainDamage = (org.brain or 0) >= 0.325 or (org.brainHemorrhage or 0) >= 0.05
+	local terminalBloodLoss = (org.blood or 5000) < 2150
+	local terminalOxygenLoss = oxygen <= 7 or (org._zeroO2Time or 0) > 0
+	local terminalFailure = org.heartstop or org.respiratoryArrest or org.choking or org.neckslit
+
+	return not (terminalBrainDamage or terminalBloodLoss or terminalOxygenLoss or terminalFailure)
+end
+
 function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if not org then return end
 
@@ -1679,6 +1696,14 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.uncon_timer = org.uncon_timer + timeValue
 	else
 		org.uncon_timer = 0
+	end
+
+	-- Zerlkers should keep a patient conscious through pain, shock, and other
+	-- non-terminal collapse triggers. Terminal brain injury, hypoxia, severe
+	-- hemorrhage, airway failure, and overdose remain able to set needotrub.
+	if org.needotrub and hg.organism.ZerlkersCanPreventOtrub(org) then
+		org.needotrub = false
+		org.consciousness = math.max(org.consciousness or 0, 0.38)
 	end
 
 	local just_went_uncon = not org.otrub and org.needotrub

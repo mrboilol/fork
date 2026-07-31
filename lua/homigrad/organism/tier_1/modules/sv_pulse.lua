@@ -30,6 +30,62 @@ local cardiacArrestBlood = 2000
 local terminalHeartRate = 300
 local peaDuration = 6
 
+-- Extreme speed and sustained lateral acceleration can briefly reduce venous
+-- return.  Keep this separate from blood loss: it is a reversible pressure
+-- problem, not a wound or a permanent reduction in blood volume.
+local function getMotionVelocity(owner)
+	local motionEnt = owner
+	if owner:InVehicle() then
+		local vehicle = owner:GetVehicle()
+		if IsValid(vehicle) then
+			motionEnt = vehicle
+			-- Glide seats are usually parented to the aircraft, while regular seats
+			-- may already report the parent velocity. Walk up once so both cases use
+			-- the vehicle that is actually doing the turning.
+			local parent = vehicle:GetParent()
+			if IsValid(parent) then motionEnt = parent end
+		end
+	end
+
+	return IsValid(motionEnt) and motionEnt:GetVelocity() or vector_origin
+end
+
+local function updateHighSpeedPressureShock(owner, org, timeValue)
+	local now = CurTime()
+	local velocity = getMotionVelocity(owner)
+	local previousVelocity = org.lastHighSpeedVelocity
+	local previousTime = org.lastHighSpeedVelocityTime
+	org.lastHighSpeedVelocity = velocity
+	org.lastHighSpeedVelocityTime = now
+
+	if not previousVelocity or not previousTime then
+		org.highSpeedPressureShock = org.highSpeedPressureShock or 0
+		return org.highSpeedPressureShock
+	end
+
+	local speed = velocity:Length()
+	local speedStress = math.Clamp(math.Remap(speed, 1100, 2200, 0, 0.55), 0, 0.55)
+	local fallStress = math.Clamp(math.Remap(-velocity.z, 850, 1750, 0, 0.75), 0, 0.75)
+	if velocity.z >= 0 or (not owner:InVehicle() and owner:OnGround()) then fallStress = 0 end
+
+	local sampleTime = math.Clamp(now - previousTime, 0.02, 0.5)
+	local acceleration = (velocity - previousVelocity) / sampleTime
+	local lateralAcceleration = acceleration
+	if speed > 1 then
+		local direction = velocity / speed
+		lateralAcceleration = acceleration - direction * acceleration:Dot(direction)
+	end
+	local turnStress = math.Clamp(math.Remap(speed, 750, 1500, 0, 1), 0, 1)
+		* math.Clamp(math.Remap(lateralAcceleration:Length(), 450, 1800, 0, 0.75), 0, 0.75)
+
+	local target = math.max(speedStress, fallStress, turnStress)
+	local current = org.highSpeedPressureShock or 0
+	-- A sharp manoeuvre takes effect quickly, but circulation recovers gradually
+	-- after the aircraft levels out or the player stops falling.
+	org.highSpeedPressureShock = math.Approach(current, target, target > current and timeValue * 1.2 or timeValue / 5)
+	return org.highSpeedPressureShock
+end
+
 local function getPalpitationThreat(org, blood, o2Value)
 	local lowBlood = math.Clamp((4500 - blood) / 2500, 0, 1)
 	local lowCirculation = math.Clamp(org.hypotension or 0, 0, 1)
@@ -207,6 +263,9 @@ module[1] = function(org)
 	org.heartStrain = 0
 	org.hypertension = 0
 	org.hypotension = 0
+	org.highSpeedPressureShock = 0
+	org.lastHighSpeedVelocity = nil
+	org.lastHighSpeedVelocityTime = nil
 	org.nextArrhythmiaRoll = 0
 	org.lastCardiacPain = 0
 
@@ -293,8 +352,10 @@ module[2] = function(owner, org, timeValue)
 	org.pulse = math.Approach(org.pulse, pulse, dropRate)
 	local bloodVolume = getBloodVolume(org)
 	local oxygenation = Clamp(o2, 0, 1)
+	local highSpeedPressureShock = updateHighSpeedPressureShock(owner, org, timeValue)
 	local vascularTone = Clamp(1 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
-	local circulationBase = bloodVolume * heart * vascularTone * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
+	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.65
+	local circulationBase = bloodVolume * heart * vascularTone * accelerationPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()

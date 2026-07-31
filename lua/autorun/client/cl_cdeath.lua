@@ -39,6 +39,12 @@ local DEATH_DESCRIPTIONS = {
     "cro new fluidmaster just arrived",
     "ur weak kid",
     "packwatch",
+    "they're at our birthplace",
+    "go back to the pocketpussy",
+    "bro fuck this nigger grr fuck this game",
+    "yameater got you",
+    "bro i got 1000mm of armor!!1",
+    "huytown: guppy slaughter",
 }
 
 -- server convar values yesss

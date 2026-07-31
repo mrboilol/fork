@@ -84,6 +84,7 @@ module[2] = function(owner, org, timeValue)
 
 	local adrenaline = org.adrenaline
 	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
+	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
 	local anger = Clamp(org.anger or 0, 0, 1)
 
 	local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
@@ -140,7 +141,10 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	local painToleranceMul = 1 + resilience * 0.2
+	-- A Zerlkers dose is deliberately stronger than a natural adrenaline rush:
+	-- it delays new pain, rapidly settles existing pain, and raises the point at
+	-- which pain can force a ragdoll. It does not alter injury or vital damage.
+	local painToleranceMul = 1 + resilience * 0.2 + zerlkers * 1.3
 	org.pain_turn = (org.otrub and adrenalineMul * otrub_pain_tolerance or adrenalineMul * pain_tolerance) * painToleranceMul
 
 	local owner = org.owner
@@ -162,8 +166,8 @@ module[2] = function(owner, org, timeValue)
 	-- Adrenaline delays incoming pain while adrenaline and Zerlkers both help
 	-- existing pain settle faster, keeping an injured character functional.
 	local adrenalinePainPacing = hg.organism.GetAdrenalinePainPacing(adrenaline)
-	add = add * adrenalinePainPacing
-	sub = sub * (1 + resilience * 0.85 + adrenaline * anger * 0.6)
+	add = add * Lerp(zerlkers, adrenalinePainPacing, 0.04)
+	sub = sub * (1 + resilience * 0.85 + zerlkers * 3 + adrenaline * anger * 0.6)
 
 
 
@@ -268,7 +272,8 @@ module[2] = function(owner, org, timeValue)
 	-- Adrenaline can blunt pain, but it cannot erase nearly all of it.  Keep the
 	-- Remorseism 75% floor so injuries remain readable during the rush.
 	local angerPainMul = 1 - anger * anger_pain_reduction_max
-	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
+	local zerlkersPainMul = 1 - zerlkers * 0.75
+	org.pain = org.avgpain * math.max(1 - adrenaline / 4, 0.75) * zerlkersPainMul * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
 	if org.isPly and org.pain >= 85 and IsValid(owner) and owner.Thought then

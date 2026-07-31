@@ -508,12 +508,19 @@ function SWEP:AttachUnit(owner, target, ply)
     target.AutosurgeonInProgress = true
     ply.AutosurgeonModelEnt = unit
     ply.AutosurgeonInProgress = true
-    QueueUnitSound(unit, ASSounds.mounted)
+    -- The scan is an explicit first phase.  Do not put it behind the mounting
+    -- sound queue: doing so delayed diagnosis (and every subsequent action)
+    -- until the mounting clip had finished playing.
+    local scanSound = ASScanSounds[math.random(#ASScanSounds)]
+    unit:EmitSound(ASSounds.mounted, 75, 100)
+    unit:EmitSound(scanSound, 75, 100)
+    unit.ASBusyUntil = CurTime() + math.max(SoundDuration(scanSound), 0) + config.SoundCooldown
     owner:ViewPunch(Angle(5, 0, 0))
 
     local timerName = "AutosurgeonFollow" .. unit:EntIndex()
     local activeTarget = target
-    local nextTreatment = CurTime() + 1
+    local scanning = true
+    local nextTreatment = CurTime()
     local nextAutopulse = CurTime()
     local treatmentMode
     local modeSwitchPending = false
@@ -531,7 +538,6 @@ function SWEP:AttachUnit(owner, target, ply)
         unit.ASSoundEmitter = nil
     end)
 
-    QueueUnitSound(unit, ASScanSounds[math.random(#ASScanSounds)])
     timer.Create(timerName, 0, 0, function()
         if not IsValid(unit) then timer.Remove(timerName) return end
         local currentTarget = GetCurrentUnitTarget(ply, activeTarget)
@@ -553,6 +559,14 @@ function SWEP:AttachUnit(owner, target, ply)
         if currentBone then PositionUnit(unit, activeTarget, currentBone, unitPos, unitAng, unitFemPos) end
 
         if ProcessUnitSounds(unit, config) then return end
+
+        -- Start treatment in the same tick the scan ends.  When the scan did
+        -- not find a treatment mode, the normal completion path below removes
+        -- the unit instead of leaving it idle on the patient.
+        if scanning then
+            scanning = false
+            nextTreatment = CurTime()
+        end
         if unit.ASPendingDrop then
             DropUnit(unit, activeTarget, ply, battery)
             return
@@ -609,8 +623,7 @@ function SWEP:AttachUnit(owner, target, ply)
             end
 
             if needsAutopulse then return end
-            QueueUnitSound(unit, ASSounds.complete)
-            unit.ASPendingDrop = true
+            DropUnit(unit, activeTarget, ply, battery, ASSounds.complete)
             return
         end
         if battery < config.BatteryPerTick then
