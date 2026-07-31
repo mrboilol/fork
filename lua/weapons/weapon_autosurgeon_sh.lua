@@ -272,6 +272,15 @@ local function HasTreatableInjury(org)
     return false
 end
 
+-- Keep a treatment mode active until its entire category is complete.  Cycling
+-- through the modes every tick made the unit abandon a repair halfway through
+-- whenever another category also needed attention.
+local function GetNextTreatmentMode(org)
+    if HasStitchingWork(org) then return 1 end
+    if HasComplexWork(org) then return 2 end
+    if HasSimpleWork(org) then return 3 end
+end
+
 local function HealWoundTable(tbl, amount)
     local changed = false
     for i = #(tbl or {}), 1, -1 do
@@ -506,9 +515,8 @@ function SWEP:AttachUnit(owner, target, ply)
     local activeTarget = target
     local nextTreatment = CurTime() + 1
     local nextAutopulse = CurTime()
-    local treatmentCycle = 1
-    local previousTreatmentCycle
-    local activeModes = {}
+    local treatmentMode
+    local modeSwitchPending = false
     local painkillerTarget
     local painkillerAnnounced = false
     local movingSince
@@ -565,28 +573,46 @@ function SWEP:AttachUnit(owner, target, ply)
             DropUnit(unit, activeTarget, ply, battery)
             return
         end
-        local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
-        local shouldAutopulse = needsAutopulse and ((tonumber(org.pulse) or 0) <= 0 or (org.dihAutopulseUntil or 0) <= CurTime())
-        if shouldAutopulse and CurTime() >= nextAutopulse then
-            if battery < config.AutopulseBatteryPerBeat then
-                QueueUnitSound(unit, ASSounds.battery)
-                unit.ASPendingDrop = true
-                return
-            end
-            battery = battery - config.AutopulseBatteryPerBeat
-            unit:SetNWInt("AutosurgeonBattery", battery)
-            ApplyAutopulse(org, config)
-            QueueUnitSound(unit, ASSounds.pump, 65, 100)
-            nextAutopulse = CurTime() + config.AutopulseInterval
-        end
         if CurTime() < nextTreatment then return end
         nextTreatment = CurTime() + config.TickInterval
-        if not HasTreatableInjury(org) and not needsAutopulse then
+        local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
+        if not treatmentMode then treatmentMode = GetNextTreatmentMode(org) end
+
+        -- Finish stitching, complex repair, and generic repair before using
+        -- support functions such as stimulants or autopulse.
+        if not treatmentMode then
+            if modeSwitchPending and (needsAutopulse or painkillerTarget) then
+                QueueUnitSound(unit, ASSounds.modeSwitch)
+                modeSwitchPending = false
+            end
+            if needsAutopulse and CurTime() >= nextAutopulse then
+                if battery < config.AutopulseBatteryPerBeat then
+                    QueueUnitSound(unit, ASSounds.battery)
+                    unit.ASPendingDrop = true
+                    return
+                end
+                battery = battery - config.AutopulseBatteryPerBeat
+                unit:SetNWInt("AutosurgeonBattery", battery)
+                ApplyAutopulse(org, config)
+                QueueUnitSound(unit, ASSounds.pump, 65, 100)
+                nextAutopulse = CurTime() + config.AutopulseInterval
+            end
+
+            if painkillerTarget then
+                org.painkiller = math.min((tonumber(org.painkiller) or 0) + 0.25, painkillerTarget, 1)
+                if org.painkiller >= painkillerTarget then
+                    QueueUnitSound(unit, ASSounds.stimulator)
+                    painkillerTarget = nil
+                    painkillerAnnounced = false
+                end
+                return
+            end
+
+            if needsAutopulse then return end
             QueueUnitSound(unit, ASSounds.complete)
             unit.ASPendingDrop = true
             return
         end
-        if not HasTreatableInjury(org) then return end
         if battery < config.BatteryPerTick then
             QueueUnitSound(unit, ASSounds.battery)
             unit.ASPendingDrop = true
@@ -596,10 +622,10 @@ function SWEP:AttachUnit(owner, target, ply)
         battery = battery - config.BatteryPerTick
         unit:SetNWInt("AutosurgeonBattery", battery)
         QueueUnitSound(unit, ASSounds.pump, 65, 100)
-        if previousTreatmentCycle and previousTreatmentCycle != treatmentCycle then
+        if modeSwitchPending then
             QueueUnitSound(unit, ASSounds.modeSwitch)
+            modeSwitchPending = false
         end
-        previousTreatmentCycle = treatmentCycle
 
         local pain = tonumber(org.pain) or 0
         if pain > 50 and (tonumber(org.painkiller) or 0) < 1 then
@@ -610,36 +636,22 @@ function SWEP:AttachUnit(owner, target, ply)
                 painkillerAnnounced = true
             end
         end
-        local modeWasNeeded = treatmentCycle == 1 and HasStitchingWork(org) or
-            treatmentCycle == 2 and HasComplexWork(org) or
-            treatmentCycle == 3 and HasSimpleWork(org)
-        if modeWasNeeded then activeModes[treatmentCycle] = true end
-
-        if treatmentCycle == 1 then
+        if treatmentMode == 1 then
             HealStitching(org, config)
-        elseif treatmentCycle == 2 then
+        elseif treatmentMode == 2 then
             HealComplex(org, config)
         else
             HealSimple(org, config)
         end
 
-        local modeStillNeeded = treatmentCycle == 1 and HasStitchingWork(org) or
-            treatmentCycle == 2 and HasComplexWork(org) or
-            treatmentCycle == 3 and HasSimpleWork(org)
-        if activeModes[treatmentCycle] and not modeStillNeeded then
-            activeModes[treatmentCycle] = nil
+        local modeStillNeeded = treatmentMode == 1 and HasStitchingWork(org) or
+            treatmentMode == 2 and HasComplexWork(org) or
+            treatmentMode == 3 and HasSimpleWork(org)
+        if not modeStillNeeded then
             QueueUnitSound(unit, ASSounds.modeComplete)
+            treatmentMode = nil
+            modeSwitchPending = true
         end
-
-        if painkillerTarget then
-            org.painkiller = math.min((tonumber(org.painkiller) or 0) + 0.25, painkillerTarget, 1)
-            if org.painkiller >= painkillerTarget then
-                QueueUnitSound(unit, ASSounds.stimulator)
-                painkillerTarget = nil
-                painkillerAnnounced = false
-            end
-        end
-        treatmentCycle = treatmentCycle % 3 + 1
     end)
 
     owner:StripWeapon(weaponClass)
@@ -740,16 +752,13 @@ if CLIENT then
     end)
 
     hook.Add("HUDPaint", "AutosurgeonBatteryHUD", function()
+        local weapon = LocalPlayer():GetActiveWeapon()
+        if not IsValid(weapon) or weapon:GetClass() != "weapon_autosurgeon_sh" then return end
         local unit = LocalPlayer():GetNWEntity("AutosurgeonModelEnt")
         if not IsValid(unit) then return end
 
         local battery = math.max(unit:GetNWInt("AutosurgeonBattery", 0), 0)
         local maxBattery = ASConfig.BatteryMax
-        local fraction = math.Clamp(battery / maxBattery, 0, 1)
-        local width, height = 260, 18
-        local x, y = (ScrW() - width) / 2, ScrH() - 82
-        draw.RoundedBox(4, x, y, width, height, Color(0, 0, 0, 180))
-        draw.RoundedBox(4, x + 2, y + 2, (width - 4) * fraction, height - 4, Color(90, 210, 120))
-        draw.SimpleText("D.I.H BATTERY: " .. battery .. " / " .. maxBattery, "HomigradFont", ScrW() / 2, y - 18, color_white, TEXT_ALIGN_CENTER)
+        draw.SimpleText("D.I.H BATTERY: " .. battery .. " / " .. maxBattery, "HomigradFont", ScrW() / 2, ScrH() - 100, color_white, TEXT_ALIGN_CENTER)
     end)
 end
