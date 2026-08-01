@@ -214,8 +214,9 @@ hook.Add("PlayerLoadout", "giveHands", function(ply)
     if not IsValid(hands) then
         hands = ply:Give(class)
     end
-    if class == "weapon_hg_coolhands" and ply:HasWeapon("weapon_hands_sh") then
-        ply:StripWeapon("weapon_hands_sh")
+    local otherClass = class == "weapon_hg_coolhands" and "weapon_hands_sh" or "weapon_hg_coolhands"
+    if ply:HasWeapon(otherClass) then
+        ply:StripWeapon(otherClass)
     end
     if IsValid(hands) then
         ply:SelectWeapon(hands:GetClass())

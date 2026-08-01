@@ -97,6 +97,19 @@ end
 local math = math
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
 
+local function drainHemothorax(org, bloodRemoved)
+	if bloodRemoved <= 0 then return end
+
+	-- Drawing blood from yourself can relieve blood trapped in the chest. One
+	-- full 500 ml bag removes half a hemothorax; repeat extraction can finish it.
+	local relief = math.Clamp(bloodRemoved / 1000, 0, 1)
+	org.hemothoraxTrauma = math.max((org.hemothoraxTrauma or org.hemothorax or 0) - relief, 0)
+	org.hemothoraxL = math.max((org.hemothoraxL or 0) - relief, 0)
+	org.hemothoraxR = math.max((org.hemothoraxR or 0) - relief, 0)
+	org.hemothorax = math.max(org.hemothoraxTrauma, (org.hemothoraxL + org.hemothoraxR) / 2)
+	org.internalBleedComplication = math.max((org.internalBleedComplication or 0) - relief, 0)
+end
+
 if SERVER then
 	function SWEP:SecondaryAttack()
 		if not self:GetOwner():KeyPressed(IN_ATTACK2) then return end
@@ -166,6 +179,9 @@ if SERVER then
 						end
 						
 						ent.organism.blood = math.max(ent.organism.blood - (self.modeValues[1] - old) * 500,0)
+						if takingSelf then
+							drainHemothorax(ent.organism, (self.modeValues[1] - old) * 500)
+						end
 						if old ~= self.modeValues[1] and (self.nextPerfusionRefresh or 0) < CurTime() then
 							self.nextPerfusionRefresh = CurTime() + 0.25
 							self:RefreshPerfusionTreatment(ent, 0.18)

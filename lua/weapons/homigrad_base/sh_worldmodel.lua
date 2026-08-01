@@ -141,10 +141,9 @@ local math_ApproachAngle = math.ApproachAngle
 
 local torsoadd = Vector(5,5,3)
 
+-- Kept as a zero angle for camera compatibility. Physical idle sway now comes
+-- exclusively from GetAdditionalValues, where it is centered and state-aware.
 SWEP.prankang = Angle(0,0,0)
-
-local hg_setzoompos = CreateClientConVar("hg_setzoompos", "0", false, false, "settingzoom", 0, 1)
-local developer = GetConVar("developer")
 
 local localPos = Vector()
 local localAng = Angle()
@@ -210,19 +209,9 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 		ang[3] = ang[3] + (ply:EyeAngles()[3]) + 90
 	end
 	
-	local pranktime = CurTime() / 20
-	
-	if not (IsValid(lply) and lply:IsSuperAdmin() and hg_setzoompos:GetBool()) then
-		self.prankang[2] = 4 * math.cos(pranktime) * math.sin(pranktime - 2) * math.cos(pranktime + 1)
-		self.prankang[1] = 2 * math.sin(pranktime) * math.sin(pranktime - 5) * math.cos(pranktime + 15)
-	end
-
-	if ply.posture == 7 or ply.posture == 8 then
-		self.prankang = self.prankang * 2
-	end
-
-	ang[2] = ang[2] + self.prankang[2]
-	ang[1] = math.Clamp(ang[1] + self.prankang[1], -90, 90)
+	-- GetAdditionalValues already applies centered, state-aware idle muzzle sway.
+	-- The old prank angle duplicated it with a map-time phase that begins almost
+	-- two degrees left, making newly picked-up weapons miss left before recoil.
 
 	-- Do not rotate the ballistic muzzle with client-only render punch.  The
 	-- server never has these values, so including them here made the local

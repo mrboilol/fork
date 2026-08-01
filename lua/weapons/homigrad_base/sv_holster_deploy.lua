@@ -92,6 +92,7 @@ end)
 SWEP.Initialzed = false
 function SWEP:Deploy()
 	local time = CurTime()
+	self:ResetTransientAimState()
 	if SERVER and self.Initialzed and not self:GetOwner().noSound then
 		timer.Simple(math.min(self.CooldownDeploy / self.Ergonomics * 0.35, 0.25), function()
 			if IsValid(self) and IsValid(self:GetOwner()) then

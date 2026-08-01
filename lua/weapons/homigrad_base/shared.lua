@@ -339,6 +339,17 @@ function SWEP:GetRecoilImpulseFactors()
 	return caliber, weaponMass, recoilForce, numBullet, ammo
 end
 
+-- Keep recoil families distinct without requiring every weapon file to carry
+-- bespoke tuning. Small cartridges get a modest, quick snap; high-momentum
+-- cartridges push a little harder and take longer to settle back on target.
+function SWEP:GetRecoilTuning()
+	local caliber = self:GetRecoilImpulseFactors()
+	local caliberClass = math.Clamp((caliber - 0.55) / 2.2, 0, 1)
+	local kickMul = Lerp(caliberClass, 1.04, 1.10)
+	local recoveryMul = Lerp(caliberClass, 0.78, 1.28)
+	return kickMul, recoveryMul, caliberClass
+end
+
 function SWEP:GetRecoilSupportMul()
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return 1 end
@@ -999,7 +1010,8 @@ function SWEP:ApplyRecoilCameraKick()
 	if not IsValid(ply) then return end
 
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
-	local baseKick = math.Clamp(caliberMul * weightMul, 0.25, 3.6)
+	local recoilKickMul = self:GetRecoilTuning()
+	local baseKick = math.Clamp(caliberMul * weightMul * recoilKickMul, 0.25, 3.9)
 	local supportMul = self:GetRecoilSupportMul()
 	local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
 	local restMul = (self.IsResting and self:IsResting()) and 0.55 or 1
@@ -2682,13 +2694,15 @@ function SWEP:GetAdditionalValues()
 		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
 		local restMul = self:IsResting() and 0.3 or 1
 		local armHandlingMul = self:GetArmHealthHandlingMul()
-		local handlingMul = math.Clamp(caliberMul * weightMul * supportMul * armHandlingMul, 0.25, 2.6)
+		local recoilKickMul, recoilRecoveryMul, caliberClass = self:GetRecoilTuning()
+		local handlingMul = math.Clamp(caliberMul * weightMul * recoilKickMul * supportMul * armHandlingMul, 0.25, 2.9)
 
 		local armInjury = math.Clamp(armHandlingMul - 1, 0, 2)
 		local firing = sinceShot < (support.offhandImpaired and 0.14 or 0.2)
 		-- Restore the older damped recovery tail; firing-arm damage makes it slower.
-		local recoveryRate = Lerp(armInjury / 2, 0.018, 0.007)
-		if support.offhandImpaired then recoveryRate = math.max(recoveryRate, 0.03) end
+		local recoveryRate = Lerp(caliberClass, 0.032, 0.01)
+		recoveryRate = Lerp(armInjury / 2, recoveryRate, recoveryRate * 0.48)
+		if support.offhandImpaired then recoveryRate = recoveryRate * 0.72 end
 		-- Keep the recoil tail readable without making the gun vibrate around the
 		-- actual kick. Arm injuries still slow recovery; they do not multiply every
 		-- oscillation into violent shaking.
@@ -2714,7 +2728,7 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
 		end
 
-		local recoilDecay = self:GetAnimShoot2(0.28 * mulhuy / host_timescale(), true)
+		local recoilDecay = self:GetAnimShoot2(0.28 * recoilRecoveryMul * mulhuy / host_timescale(), true)
 		if recoilDecay > 0.001 then
 			local sprayI = self.SprayI or 0
 			local climb = 0.45 + math.Clamp(sprayI / 7, 0, 1) * 0.55
@@ -2835,7 +2849,10 @@ function SWEP:GetAdditionalValues()
 		self.AdditionalPos2[3] = self.AdditionalPos2[3] + ply.lean * 2
 	end
 
-	local poseLerp = hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add * (deploySettling and 3 or 1)
+	-- During the protected end of the draw animation, fully drain the large
+	-- temporary grab rotation. A multiplier of three left roughly a degree of
+	-- yaw on the first legal shot, which consistently appeared as a left miss.
+	local poseLerp = hg.lerpFrameTime(0.001,dtime) * self.Ergonomics * speed_add * (deploySettling and 5 or 1)
 	poseLerp = math.min(poseLerp, 1)
 	self.AdditionalPos = Lerp(poseLerp, self.AdditionalPos, self.AdditionalPosPreLerp)
 	self.AdditionalAng = Lerp(poseLerp, self.AdditionalAng, self.AdditionalAngPreLerp + self.weaponAng)

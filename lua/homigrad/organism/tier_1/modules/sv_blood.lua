@@ -58,6 +58,7 @@ module[1] = function(org)
 	org.hemothoraxTrauma = 0
 	org.hemothoraxL = 0
 	org.hemothoraxR = 0
+	org.cardiacTamponade = 0
 	org.lastBleedTime = CurTime()
 	org.arterialO2Drain = false
 	org.arterialO2Impairment = 0
@@ -351,6 +352,16 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, mulTime / 90)
 	end
 
+	-- Thoracic internal bleeding can collect around the lungs and heart.  The
+	-- complication meter supplies the delayed onset while the injury score sets
+	-- the ceiling: a score of 10 can become critical, but needs time untreated.
+	local thoracicSeverity = math.Clamp((internalBleedSeverity - 1) / 9, 0, 1)
+	local thoracicComplication = thoracicSeverity * (org.internalBleedComplication or 0)
+	local hemothoraxTarget = math.max(org.hemothoraxTrauma or 0, thoracicComplication * 0.7)
+	local tamponadeTarget = thoracicComplication * math.Clamp((internalBleedSeverity - 2.5) / 7.5, 0, 1) * 0.65
+	org.hemothorax = math.max(org.hemothorax or 0, math.Approach(org.hemothorax or 0, hemothoraxTarget, mulTime / 18))
+	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24))
+
 	if org.internalBleed > 2.5 and not adrenalineStabilizer and not hasAntiIschemia then
 		local untreatedTime = math.max((org.internalBleedDuration or 0) - 15, 0)
 		if untreatedTime > 0 then
@@ -626,7 +637,9 @@ module[2] = function(owner, org, mulTime)
 	-- It is multiplied by 100 when applied below. Keep the resulting loss in a
 	-- range where a serious injury needs treatment, but does not empty a player
 	-- from a few stacked organ hits before the delayed complications can matter.
-	local bleed = math.Clamp(org.internalBleed / 40, 0, 0.2) -- + org.lungsR[3] + org.lungsL[3]
+	-- An internal-bleed score of 10 produces 0.1 bleed (10 mL/s after the
+	-- existing x100 application below); lower injuries scale proportionally.
+	local bleed = math.Clamp(org.internalBleed / 100, 0, 0.2) -- + org.lungsR[3] + org.lungsL[3]
 	
 	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
 	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
@@ -647,7 +660,10 @@ module[2] = function(owner, org, mulTime)
 	-- Do not announce internal bleeding immediately: a player needs to have a
 	-- sustained bleed before they can reliably recognize the symptoms.
 	local internalBleedAlertReady = (org.internalBleedDuration or 0) >= 15
-	if org.isPly and not org.otrub and org.internalBleed > 0.1 and internalBleedAlertReady then
+	if org.internalBleed <= 0.1 then
+		org.internalBleedAlerted = nil
+	elseif org.isPly and not org.otrub and internalBleedAlertReady and not org.internalBleedAlerted then
+		org.internalBleedAlerted = true
 		owner:Notify("I think I'm bleeding inside...", true, "internalbleed", 0, nil, Color(200, 170, 170))
 	end
 

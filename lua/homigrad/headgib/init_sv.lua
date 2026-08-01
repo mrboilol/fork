@@ -181,7 +181,6 @@ local fullBodySounds = {
 	Sound("fullbodyexplode/rem_fullbodygib2.wav"),
 	Sound("fullbodyexplode/rem_fullbodygib3.wav"),
 }
-local fullBodyMainSound = Sound("fullbodyexplode/rem_fullbodygibmain.mp3")
 local fullBodyGibModels = {
 	stomach = {
 		Model("models/gore/pelvis.mdl"),
@@ -509,11 +508,9 @@ local function fullBodyExplodeAt(pos, force, velocity, org, soundEnt, owner, dmg
 	velocity = velocity or vector_origin
 
 	if IsValid(soundEnt) then
-		soundEnt:EmitSound(fullBodySounds[math.random(#fullBodySounds)], 85, math.random(95, 105), 1.4)
-		soundEnt:EmitSound(fullBodyMainSound, 90, math.random(96, 104), 1)
+		soundEnt:EmitSound(fullBodySounds[math.random(#fullBodySounds)], 140, math.random(95, 105), 1.5)
 	else
-		sound.Play(fullBodySounds[math.random(#fullBodySounds)], pos, 85, math.random(95, 105), 1.4)
-		sound.Play(fullBodyMainSound, pos, 90, math.random(96, 104), 1)
+		sound.Play(fullBodySounds[math.random(#fullBodySounds)], pos, 140, math.random(95, 105), 1.5)
 	end
 
 	fullBodyBloodMist(pos, force)
@@ -539,11 +536,16 @@ local function fullBodyExplodeAt(pos, force, velocity, org, soundEnt, owner, dmg
 	end
 
 	if IsValid(owner) then
-		owner.fullbodyexploded = true
-		owner:SetNWEntity("FakeRagdoll", NULL)
-		owner:SetNWEntity("RagdollDeath", NULL)
-		owner.FakeRagdoll = nil
-		if owner:Alive() then owner:Kill() end
+		-- A corpse can be removed after its owner has already respawned.  The
+		-- removal fallback still creates the gore effect, but must not clear the
+		-- new ragdoll state or kill that live player.
+		if IsValid(soundEnt) or not owner:Alive() then
+			owner.fullbodyexploded = true
+			owner:SetNWEntity("FakeRagdoll", NULL)
+			owner:SetNWEntity("RagdollDeath", NULL)
+			owner.FakeRagdoll = nil
+			if owner:Alive() then owner:Kill() end
+		end
 	end
 
 	if org then org.fullbodyexploded = true end

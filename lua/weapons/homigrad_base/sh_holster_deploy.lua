@@ -75,6 +75,7 @@ end
 function SWEP:Deploy()
 	--if not IsFirstTimePredicted() then return end
 	local time = CurTime()
+	self:ResetTransientAimState()
 
 	if self.MagIndex and IsValid(self:GetWM()) then
 		self:GetWM():ManipulateBoneScale(self.MagIndex, vector_origin)

@@ -1,6 +1,7 @@
 if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_bandage_sh"
 SWEP.PrintName = "Bruice kit"
+SWEP.Color = Color(0, 255, 150)
 SWEP.Instructions = "A medical kit designed to restore limb condition. RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
 SWEP.Spawnable = true

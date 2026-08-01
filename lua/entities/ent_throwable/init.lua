@@ -42,6 +42,44 @@ function ENT:Think()
 	self:SetCollisionGroup(speed < 220000 and COLLISION_GROUP_WEAPON or COLLISION_GROUP_NONE)
 end
 
+local function IsHeadImpact(ent, hitPos, velocity, thrown)
+	if not IsValid(ent) or not isvector(hitPos) then return false end
+
+	-- Ragdolls expose a reliable physics bone. Trace through the contact point
+	-- first so a small projectile does not have to rely on the generic damage
+	-- handler reconstructing its hitgroup after the collision has finished.
+	local direction = isvector(velocity) and velocity:GetNormalized() or vector_origin
+	if direction:LengthSqr() > 0 then
+		local impactTrace = util.TraceLine({
+			start = hitPos - direction * 12,
+			endpos = hitPos + direction * 12,
+			filter = thrown
+		})
+		local tracedEnt = impactTrace.Entity
+		if IsValid(tracedEnt) and tracedEnt == ent then
+			local bone = tracedEnt:TranslatePhysBoneToBone(impactTrace.PhysicsBone or 0)
+			local boneName = bone and tracedEnt:GetBoneName(bone) or nil
+			if boneName and string.find(string.lower(boneName), "head", 1, true) then
+				return true
+			end
+		end
+	end
+
+	-- Standing players often report only their collision hull, with no useful
+	-- physics bone. In that case use the animated head position and a deliberately
+	-- tight radius; chest/neck contacts must continue through normal blunt damage.
+	local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
+	local headMatrix = headBone and ent:GetBoneMatrix(headBone)
+	local headPos = headMatrix and headMatrix:GetTranslation()
+	if not isvector(headPos) then return false end
+
+	-- The standing player hull is roughly 16 units from its centre, so a sphere
+	-- around the bone would either miss the hull surface or also include shoulders.
+	-- Use a head-height slice wide enough to reach the hull instead.
+	local offset = hitPos - headPos
+	return math.abs(offset.z) <= 11 and offset.x * offset.x + offset.y * offset.y <= 20 * 20
+end
+
 function ENT:PhysicsCollide(data, phys)
 	if data.Speed < 400 then return end
 	if self.removed then return end
@@ -71,6 +109,14 @@ function ENT:PhysicsCollide(data, phys)
 	-- exposed during TakeDamageInfo, so a later collision rolls independently.
 	local headGibDamageMul = self.HeadGibDamageMul
 	local forceHeadKnockout = self.ForceHeadKnockout
+	local forceHeadGib = headGibDamageMul and IsHeadImpact(data.HitEntity, data.HitPos, data.OurOldVelocity, self)
+	-- Player collision hulls cannot reliably identify a thrown object's head hit.
+	-- Weapons that need a guaranteed standing-player kill can bypass that ambiguity;
+	-- ExplodeHead then waits until the death ragdoll exists before gibbing its head.
+	local forceStandingGib = self.GibStandingVictims
+		and data.HitEntity:IsPlayer()
+		and data.HitEntity:Alive()
+		and not IsValid(data.HitEntity.FakeRagdoll)
 	if headGibDamageMul and self.HeadImpactGibChance then
 		local gibImpact = math.Rand(0, 1) < self.HeadImpactGibChance
 		self.HeadGibDamageMul = gibImpact and headGibDamageMul or nil
@@ -79,6 +125,11 @@ function ENT:PhysicsCollide(data, phys)
 	data.HitEntity:TakeDamageInfo(dmginfo)
 	self.HeadGibDamageMul = headGibDamageMul
 	self.ForceHeadKnockout = forceHeadKnockout
+
+	-- ExplodeHead owns death-ragdoll timing and deduplicates repeated impacts.
+	if (forceHeadGib or forceStandingGib) and hg.ExplodeHead then
+		hg.ExplodeHead(data.HitEntity, dmginfo:GetDamage() * (headGibDamageMul or 1), false, data.OurOldVelocity)
+	end
 
 	if data.HitEntity.organism then
 		self:EmitSound(self.AttackHitFlesh, 65)

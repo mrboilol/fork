@@ -249,8 +249,10 @@ players : 1 humans, 0 bots (20 max)
 		suppressionVec = Vector(0, 0, 0)
 		suppressionDist = 0
 		suppressionDistAdd = 0
+		local SUPPRESSION_PUNCH_MULTIPLIER = 2.5
 		local function ApplySuppressionPunch(angle)
 			if hg_suppression_viewpunch and not hg_suppression_viewpunch:GetBool() then return end
+			angle = angle * SUPPRESSION_PUNCH_MULTIPLIER
 			if type(QuickViewPunch) == "function" then
 				QuickViewPunch(angle)
 			elseif type(ViewPunch) == "function" then
@@ -295,7 +297,7 @@ players : 1 humans, 0 bots (20 max)
 			if tr.StartPos:Distance( tr.HitPos ) > 5000 and !subsonic then
 				local time = view.origin:Distance(tr.StartPos+tr.HitPos/2) / 17836
 				timer.Simple(time,function()
-					EmitSound("bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
+					EmitSound("cracks/distant/dist_crack_" .. string.format("%02d", math.random(1, 17)) .. ".ogg", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
 				end)
 			end
 
@@ -321,13 +323,13 @@ players : 1 humans, 0 bots (20 max)
 
 			local dist = pos:Distance(eyePos)
 			local SND = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
-				or "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"
+				or bullet.Damage >= 50 and "cracks/heavy/heav_crack_0" .. math.random(1, 9) .. ".ogg"
+				or bullet.Damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
+				or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
 
 			if dist < 500 then
 				local playPos = pos - tr.Normal * 25
-				if not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic) then
-					EmitSound(SND, playPos, 0, CHAN_ITEM, 1, 155)
-				end
+				EmitSound(SND, playPos, 0, CHAN_ITEM, 1, 155)
 			else return end
 			-- if dist > 120 then return end
 			-- if !subsonic then

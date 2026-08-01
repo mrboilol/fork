@@ -139,23 +139,17 @@ local moodleTexts = {
 		[3] = {title = "Severe CO Poisoning", description = "Toxic gas is seriously impairing your brain and movement."},
 		[4] = {title = "Deadly CO Poisoning", description = "Your blood can no longer deliver enough oxygen to survive."},
 	}},
-	tachycardia = {levels = {
-		[1] = {title = "Elevated Heart Rate", description = "Your heart is beating faster than normal."},
-		[2] = {title = "Tachycardia", description = "Your rapid heartbeat is causing discomfort and strain."},
-		[3] = {title = "Severe Tachycardia", description = "Your heart is beating dangerously fast or irregularly."},
-		[4] = {title = "Critical Tachycardia", description = "Your racing heart may fail to circulate blood effectively."},
+	arrhythmia = {levels = {
+		[1] = {title = "Arrhythmia", description = "Your heartbeat is becoming irregular."},
+		[2] = {title = "Arrhythmia", description = "An abnormal heart rhythm is affecting circulation."},
+		[3] = {title = "Severe Arrhythmia", description = "Your heart rhythm is dangerously unstable."},
+		[4] = {title = "Critical Arrhythmia", description = "Your heart is struggling to maintain an effective rhythm."},
 	}},
-	palpitations = {levels = {
-		[1] = {title = "Fluttering Heart", description = "You can feel an occasional abnormal heartbeat."},
-		[2] = {title = "Palpitations", description = "Your heart is beating forcefully and irregularly."},
-		[3] = {title = "Ventricular Fibrillation", description = "A dangerously irregular rhythm is weakening circulation."},
-		[4] = {title = "Ventricular Flutter", description = "Your heart is contracting too chaotically to sustain you."},
-	}},
-	bradycardia = {levels = {
-		[1] = {title = "Slow Heart Rate", description = "Your heartbeat is unusually slow."},
-		[2] = {title = "Bradycardia", description = "Low heart rate is causing weakness and dizziness."},
-		[3] = {title = "Severe Bradycardia", description = "Your pulse is dangerously slow and consciousness may fade."},
-		[4] = {title = "Critical Bradycardia", description = "Your heart is barely contracting and may stop."},
+	fibrillation = {levels = {
+		[1] = {title = "Palpitations", description = "You can feel an abnormal fluttering heartbeat."},
+		[2] = {title = "Palpitations", description = "Your heartbeat is forceful and irregular."},
+		[3] = {title = "Ventricular Fibrillation", description = "A dangerously fast, irregular rhythm is weakening circulation."},
+		[4] = {title = "Ventricular Fibrillation", description = "Your heart is contracting too chaotically to sustain circulation."},
 	}},
 	hypoxemia = {levels = {
 		[1] = {title = "Hypoxemia", description = "Your blood oxygen level is mildly reduced."},
@@ -400,8 +394,7 @@ local function getMoodle3Icon(effect)
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
-		carbon_monoxide = "hypoxemia", tachycardia = "arrhythmia", bradycardia = "arrhythmia",
-		arrhythmia = "arrhythmia", palpitations = "fibrillation", fibrillation = "fibrillation",
+		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", fibrillation = "fibrillation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", blinded = "confused",
 		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
@@ -564,22 +557,17 @@ local function buildEffects(ply, org)
 	end
 
 	local heartRate = orgNumber(org, "heartbeat", orgNumber(org, "pulse", 70))
-	local pulse = orgNumber(org, "pulse", 70)
 	local palpitations = math.Clamp(orgNumber(org, "palpitations", 0), 0, 1)
-	if not org.heartstop and heartRate > 100 then
-		local level = highRank(heartRate, {100, 130, 160, 190})
-		add(effects, "tachycardia", "tachycardia", level, "bad", 23, math.floor(heartRate) .. " bpm")
-	end
-	if not org.fibrillation and palpitations > 0 then add(effects, "palpitations", "palpitations", math.max(math.ceil(palpitations * 4), 1), "bad", 24, math.floor(palpitations * 100) .. "%") end
-	if not org.heartstop and pulse > 0 and heartRate < 60 then
-		local level = lowRank(heartRate, {60, 50, 40, 30})
-		add(effects, "bradycardia", "bradycardia", level, "bad", 25, math.floor(heartRate) .. " bpm")
-	end
 	local arrhythmia = math.Clamp(orgNumber(org, "arrhythmia", 0), 0, 1)
-	if not org.heartstop and (arrhythmia > 0.1 or org.unstableRhythm) then
-		add(effects, "arrhythmia", "palpitations", highRank(arrhythmia, {0.1, 0.3, 0.6, 0.85}), "bad", 24.5)
+	local irregular = arrhythmia > 0.1 or org.unstableRhythm
+	local fibrillating = org.fibrillation == true or palpitations > 0
+		or (irregular and heartRate >= 190)
+	if not org.heartstop and fibrillating then
+		local level = org.fibrillation and 4 or highRank(math.max(palpitations, arrhythmia, math.Clamp((heartRate - 160) / 140, 0, 1)), {0.1, 0.3, 0.6, 0.85})
+		add(effects, "fibrillation", "fibrillation", level, "bad", org.fibrillation and -95 or 24, math.floor(heartRate) .. " bpm")
+	elseif not org.heartstop and irregular then
+		add(effects, "arrhythmia", "arrhythmia", highRank(arrhythmia, {0.1, 0.3, 0.6, 0.85}), "bad", 24.5, math.floor(heartRate) .. " bpm")
 	end
-	if org.fibrillation == true then add(effects, "fibrillation", "palpitations", 4, "bad", -95) end
 
 	local oxygen, oxygenMax = o2Value(org), o2Maximum(org)
 	if oxygen < math.min(28, oxygenMax) then

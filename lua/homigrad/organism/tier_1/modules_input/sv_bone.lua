@@ -135,11 +135,13 @@ local function trySkullFractureHemorrhage(org, oldDamage, newDamage)
 
 	local chance, amountMin, amountMax, rateMin, rateMax
 	if oldDamage < 1 and newDamage >= 1 then
-		chance, amountMin, amountMax = 0.45, 0.025, 0.07
-		rateMin, rateMax = 0.0004, 0.0012
+		-- A fully broken skull must create intracranial bleeding.  This is a
+		-- fracture consequence, not merely a cosmetic threshold to display.
+		chance, amountMin, amountMax = 1, 0.06, 0.14
+		rateMin, rateMax = 0.001, 0.0025
 	elseif oldDamage < 0.6 and newDamage >= 0.6 then
-		chance, amountMin, amountMax = 0.2, 0.01, 0.035
-		rateMin, rateMax = 0.00015, 0.00065
+		chance, amountMin, amountMax = 0.65, 0.025, 0.07
+		rateMin, rateMax = 0.0004, 0.0012
 	else
 		return
 	end

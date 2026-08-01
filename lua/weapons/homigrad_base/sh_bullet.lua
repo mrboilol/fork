@@ -911,11 +911,11 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 	end
 	bullet.Num = 1
 	bullet.Pellets = numbullet
-	-- FireBullet runs before PrimarySpread increments SprayI. Make only the first
-	-- single-projectile round of a fresh burst use the captured aim exactly; the
-	-- legacy Lua cone otherwise gives that opening shot a repeatable low-left miss.
-	-- Follow-up rounds retain mechanical spread, and pellet weapons retain theirs.
-	if numbullet == 1 and (self.SprayI or 0) == 0 then
+	-- Rifle and pistol accuracy is represented by the physical muzzle transform:
+	-- idle sway, handling instability, and the previous recoil impulse all rotate
+	-- the barrel before this shot is captured. Do not add a second invisible cone
+	-- afterward. Pellet weapons retain their real pattern around that same muzzle.
+	if numbullet == 1 then
 		bullet.Spread = vector_origin
 		bullet.NoHiddenSpread = true
 		bullet.Flags = bit.bor(bullet.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)

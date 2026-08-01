@@ -129,7 +129,7 @@ local StitchFields = {
 -- Complex mode is reserved for immediately life-threatening trauma: vital
 -- organs, thoracic/cranial damage, and complications from internal bleeding.
 local ComplexFields = {
-    "skull", "chest", "heart", "brain", "trachea", "hemothorax", "hemothoraxTrauma",
+    "skull", "chest", "heart", "brain", "trachea", "hemothorax", "hemothoraxTrauma", "cardiacTamponade",
     "hemothoraxL", "hemothoraxR", "internalBleedComplication", "brainFrontal",
     "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage", "brainSwelling",
     "intracranialPressure", "brainBleedRate", "neckBrainOxygenPenalty", "arterialO2Impairment",
@@ -142,7 +142,7 @@ local ComplexFields = {
 local VitalFields = {
     "brain", "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital",
     "brainHemorrhage", "brainSwelling", "intracranialPressure", "brainBleedRate",
-    "neckBrainOxygenPenalty", "heart", "chest", "trachea", "hemothorax",
+    "neckBrainOxygenPenalty", "heart", "chest", "trachea", "hemothorax", "cardiacTamponade",
     "hemothoraxTrauma", "hemothoraxL", "hemothoraxR", "arterialO2Impairment",
     "throatCutPressureShock"
 }

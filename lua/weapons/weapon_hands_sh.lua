@@ -7,6 +7,15 @@ local function RagdollOwner(ent)
 	return hg.RagdollOwner(ent)
 end
 
+local function addHandsGestureSafe(owner, sequenceName)
+	if not IsValid(owner) then return end
+
+	local seqID = owner:LookupSequence(sequenceName)
+	if not isnumber(seqID) or seqID < 0 or seqID >= owner:GetSequenceCount() then return end
+
+	owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD, seqID, 0, true)
+end
+
 SWEP.Category = "ZCity Other"
 SWEP.Instructions = "LMB - raise fists\nRELOAD - lower fists\n\nIn the raised state:\nLMB - strike\nRMB - block\n\nIn the lowered state: RMB - raise the object, RMB+R - check the pulse (when used on someone's head or hand)\n\nWhen holding the object: RELOAD - fix the object in air, E - spin the object in the air."
 SWEP.Spawnable = true
@@ -2325,15 +2334,6 @@ local vent = {
 	"doors/vent_open2.wav",
 	"doors/vent_open3.wav"
 }
-
-local function addHandsGestureSafe(owner, sequenceName)
-	if not IsValid(owner) then return end
-
-	local seqID = owner:LookupSequence(sequenceName)
-	if not isnumber(seqID) or seqID < 0 or seqID >= owner:GetSequenceCount() then return end
-
-	owner:AddVCDSequenceToGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD, seqID, 0, true)
-end
 
 function SWEP:AttackFront(special_attack, rand)
 	if CLIENT then return end

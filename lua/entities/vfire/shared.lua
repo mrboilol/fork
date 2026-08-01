@@ -62,7 +62,9 @@ if SERVER or CLIENT then
 
 		if SERVER then
 			-- Life misc
-			self.life = 1
+			-- A one-unit starting life can disappear before a new fire has time to
+			-- consume its feed. Start at medium size so unattended fires persist.
+			self.life = vFireStateToLife(3)
 			self.feed = 0
 
 			-- Two relaxing variables (one goes up, one goes down) used to decided possible fire states

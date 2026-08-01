@@ -64,6 +64,36 @@ local function ExplodeOilContainer(ent, owner)
 	return true
 end
 
+local ContainerBlazeLife = 60
+local ContainerBlazeDuration = 30
+local ContainerBlazeCount = 7
+
+local function CreateOilContainerBlaze(ent, owner)
+	local center = ent:WorldSpaceCenter()
+	local world = game.GetWorld()
+
+	for fire in pairs(ent.fires or {}) do
+		if IsValid(fire) then
+			fire.feed = math.max(fire.feed or 0, 180)
+			fire:ChangeLife(math.max(fire.life or 0, ContainerBlazeLife))
+			fire:Prioritize(ContainerBlazeDuration, true)
+		end
+	end
+
+	for i = 1, ContainerBlazeCount do
+		local offset = VectorRand(-140, 140)
+		offset.z = 0
+		local tr = util.QuickTrace(center + offset + vector_up * 96, -vector_up * 384, ent)
+		if not tr.Hit then continue end
+
+		local fire = CreateVFire(world, tr.HitPos, tr.HitNormal, 130, IsValid(owner) and owner or ent)
+		if IsValid(fire) then
+			fire:ChangeLife(ContainerBlazeLife)
+			fire:Prioritize(ContainerBlazeDuration, true)
+		end
+	end
+end
+
 local function CreateWoodFire(ent, hitPos, hitNormal, owner, feed, startingLife, allowFallback)
 	if not CreateVFire then
 		if allowFallback then ent:Ignite(30) end
@@ -159,6 +189,26 @@ local function AddImpactSmothering(ent)
 end
 
 hook.Add("vFireEntityStartedBurning", "hg-FireImpactSmothering", AddImpactSmothering)
+
+hook.Add("vFireEntityStartedBurning", "hg-FuelContainerIgnition", function(ent)
+	if not IsValid(ent) or not hg.gas_models or not hg.gas_models[ent:GetModel()] then return end
+	if ent.hgFuelFireReaction then return end
+	ent.hgFuelFireReaction = true
+
+	local owner = ent
+	for fire in pairs(ent.fires or {}) do
+		if IsValid(fire) and IsValid(fire:GetOwner()) then
+			owner = fire:GetOwner()
+			break
+		end
+	end
+
+	if math.Rand(0, 1) < 0.6 then
+		ExplodeOilContainer(ent, owner)
+	else
+		CreateOilContainerBlaze(ent, owner)
+	end
+end)
 
 hook.Add("EntityTakeDamage", "hg-FireBluntSmothering", function(ent, dmgInfo)
 	if not IsValid(ent) or not ent.fires then return end

@@ -37,7 +37,7 @@ local player_limb_gib_threshold = 130
 -- Heads should come apart before limbs under concentrated rifle fire.  This is
 -- still high enough that ordinary rifle rounds need repeated hits, while a
 -- true high-energy headshot can gib a standing target in one hit.
-local player_head_gib_threshold = 120
+local player_head_gib_threshold = 85
 local player_stomach_gib_threshold = 260
 local player_blast_limb_gib_threshold = 80
 local player_fall_head_gib_threshold = 1.2
@@ -2354,8 +2354,13 @@ local function velocityDamage(ent, data)
 				net.Broadcast()
 			end
 
-			if !ent.headexploded and dmg * headDamageMul > player_fall_head_gib_threshold then
-				hg.ExplodeHead(ent, dmg * 30, false, data.OurOldVelocity - data.TheirOldVelocity)
+			-- Collisions used to bypass the normal body-part gib health entirely,
+			-- leaving heads far more durable than arms against walls, falls and map
+			-- props.  Feed the impact into the same persistent pool as other gib
+			-- damage so repeated head impacts can destroy the head naturally.
+			local headGibDamage = DamageBodyPart(org, HITGROUP_HEAD, dmg * 30 * headDamageMul)
+			if !ent.headexploded and (headGibDamage >= player_head_gib_threshold or dmg * headDamageMul > player_fall_head_gib_threshold) then
+				hg.ExplodeHead(ent, headGibDamage, false, data.OurOldVelocity - data.TheirOldVelocity)
 			end
 		end
 	else

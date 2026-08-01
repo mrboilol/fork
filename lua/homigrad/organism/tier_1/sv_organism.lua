@@ -99,8 +99,10 @@ local seizure_temperature_gain_mul = 0.0065
 local seizure_temperature_cold_gain_mul = 0.005
 local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
-local seizure_brain_roll_delay = 20
-local seizure_brain_roll_min_chance = 3
+local seizure_brain_sustained_gain_min = 0.0008
+local seizure_brain_sustained_gain_max = 0.012
+local seizure_brain_roll_delay = 16
+local seizure_brain_roll_min_chance = 2
 local seizure_brain_roll_max_chance = 30
 local seizure_no_cause_decay_time = 90
 local seizure_mannitol_gain_reduction = 0.5
@@ -373,10 +375,13 @@ end
 function hg.organism.GetTraumaRagdollResistance(org)
 	if not org then return 0 end
 
-	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1) * 0.25
+	-- A live Zerlkers dose should make an otherwise mobile character very hard
+	-- to knock down. It cannot override broken spines/legs or terminal vitals,
+	-- which are checked separately before a fake state is cancelled.
+	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1) * 0.75
 	local adrenaline = math.Clamp((org.adrenaline or 0) / 1.5, 0, 1) * 0.20
 	local anger = math.Clamp(org.anger or 0, 0, 1) * 0.15
-	return math.Clamp(zerlkers + adrenaline + anger, 0, 0.5)
+	return math.Clamp(zerlkers + adrenaline + anger, 0, 0.85)
 end
 
 function hg.organism.GetTraumaRagdollChanceMul(org)
@@ -386,6 +391,14 @@ end
 function hg.organism.GetResilientBlood(org)
 	return math.min((org and org.blood or 5000) + hg.organism.GetResilience(org) * 600, 5000)
 end
+
+-- Keep the terminal gasp tied to the actual death event so every fatal route
+-- (damage, organ failure, or an explicit Kill call) gets the same cue once.
+hook.Add("PlayerDeath", "hg_organism_death_gasp", function(ply)
+	if IsValid(ply) then
+		ply:EmitSound("deathgasp.ogg", 75, 100)
+	end
+end)
 
 -- Mechanical support can keep an otherwise treatable patient in the livable
 -- band, but it cannot move oxygen through a destroyed pump, airway, lungs, or
@@ -447,9 +460,12 @@ function hg.organism.ZerlkersCanPreventOtrub(org)
 	if not org or (org.zerlkers or 0) <= 0 or (org.zerlkersOverdose or 0) > 0 then return false end
 
 	local oxygen = org.o2 and org.o2[1] or math.huge
-	local terminalBrainDamage = (org.brain or 0) >= 0.325 or (org.brainHemorrhage or 0) >= 0.05
-	local terminalBloodLoss = (org.blood or 5000) < 2150
-	local terminalOxygenLoss = oxygen <= 7 or (org._zeroO2Time or 0) > 0
+	-- Zerlkers is meant to carry a patient through severe trauma. Reserve its
+	-- failure for conditions that are genuinely close to fatal, rather than the
+	-- moderate vital penalties that normally start an otrub.
+	local terminalBrainDamage = (org.brain or 0) >= 0.38 or (org.brainHemorrhage or 0) >= 0.12
+	local terminalBloodLoss = (org.blood or 5000) < 1750
+	local terminalOxygenLoss = oxygen <= 3 or (org._zeroO2Time or 0) > 0
 	local terminalFailure = org.heartstop or org.respiratoryArrest or org.choking or org.neckslit
 
 	return not (terminalBrainDamage or terminalBloodLoss or terminalOxygenLoss or terminalFailure)
@@ -465,8 +481,8 @@ function hg.organism.ZerlkersCanPreventFake(org)
 	local mechanicalIncapacity = (org.spine2 or 0) >= hg.organism.fake_spine2
 		or (org.spine3 or 0) >= hg.organism.fake_spine3
 		or ((org.lleg or 0) >= 1 and (org.rleg or 0) >= 1)
-	local severePhysiology = (org.blood or 5000) < 2400 or oxygen < 10
-		or (org.brain or 0) >= 0.2 or org.choking or org.neckslit
+	local severePhysiology = (org.blood or 5000) < 1900 or oxygen < 5
+		or (org.brain or 0) >= 0.35 or org.choking or org.neckslit
 
 	return not (mechanicalIncapacity or severePhysiology)
 end
@@ -500,20 +516,40 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local pump = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.2)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
 
-	-- O2 delivery needs blood to carry it. Its target therefore follows the
-	-- same continuous volume calculation as cardiovascular perfusion.
-	local bodyOxygenTarget = math.Clamp(oxygenDelivery * bloodFraction * Lerp(hypercapnia, 1, 0.35), 0, 1)
+	-- The lungs' O2 value is already capped by the blood-volume curve in
+	-- sv_lungs. Combining it multiplicatively with bloodFraction here counted
+	-- the volume loss a second time. Oxygen availability and circulating volume
+	-- are both hard limits, so use the weaker one once.
+	local bodyOxygenTarget = math.Clamp(math.min(oxygenDelivery, bloodFraction) * Lerp(hypercapnia, 1, 0.35), 0, 1)
 	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, 2.5)
 	-- Arterial loss already lowers blood volume and the circulation target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an
 	-- independent disorientation/otrub source instead of a blood-loss emergency.
-	local pressureDelivery = math.Clamp(pump * bloodFraction * math.max(output, 0.15) - venousPenalty - internalPenalty - internalComplicationPenalty - shockPenalty * 0.45 - throatPenalty * 0.22 - arterialImpairment * 0.08, 0, 1)
-	local perfusionTarget = math.Clamp(pressureDelivery * Lerp(org.bodyoxygen, 0.55, 1), 0, 1)
+	-- Blood volume already owns the baseline circulation in sv_pulse. That
+	-- circulation then produces both cardiacOutput and hypotension, so multiplying
+	-- pump, bloodFraction and output here applied the same blood loss three times.
+	-- Around 3000-3250 mL that feedback drove perfusion (and the lungs' O2 cap)
+	-- into the lethal band even though this is still a compensated stage.
+	--
+	-- The weakest part of the circulation should cap delivery instead: low volume,
+	-- pump pressure, or cardiac output can each be decisive without compounding the
+	-- same deficit. This keeps moderate blood loss weak but viable, while the pump
+	-- still falls through the blackout/death bands near 2250-2000 mL.
+	local circulationLimit = math.min(pump, bloodFraction, math.max(output, 0.15))
+	-- Shock already lowers consciousness in sv_pain and weakens the limbs below.
+	-- Subtracting it from central flow as well made hemorrhagic shock reduce O2
+	-- twice and moved the blackout point back above 2500 mL.
+	local pressureDelivery = math.Clamp(circulationLimit - venousPenalty - internalPenalty - internalComplicationPenalty - throatPenalty * 0.22 - arterialImpairment * 0.08, 0, 1)
+	-- Perfusion is blood flow. Oxygen content affects the tissue supplied by that
+	-- flow, but must not feed back into the flow value that sv_lungs uses as its
+	-- O2 cap; that loop was the remaining sudden O2 crash at moderate blood loss.
+	local perfusionTarget = pressureDelivery
 	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
 
 	org.perfusion = updateNormalizedVital(org.perfusion, perfusionTarget, dt, 0.5, 2.8)
 	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, pump, dt)
-	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * oxygenDelivery * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
+	local cerebralOxygenDelivery = math.min(cerebralPerfusion, org.bodyoxygen, oxygenDelivery)
+	local brainTarget = math.Clamp(cerebralOxygenDelivery * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
 	org.brainoxygen = updateNormalizedVital(org.brainoxygen, brainTarget, dt, 0.45, 2.6)
 	org.peripheralperfusion = updateNormalizedVital(org.peripheralperfusion, peripheralTarget, dt, 0.55, 2.8)
 
@@ -653,6 +689,8 @@ local function send_organism(org, ply)
 	sendtable.chest = org.chest
 	sendtable.internalBleed = org.internalBleed
 	sendtable.internalBleedHeal = org.internalBleedHeal
+	sendtable.hemothorax = org.hemothorax
+	sendtable.cardiacTamponade = org.cardiacTamponade
 	sendtable.disorientation = org.disorientation
 	sendtable.brain = org.brain
 	sendtable.brainFrontal = org.brainFrontal
@@ -690,6 +728,8 @@ local function send_organism(org, ply)
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.venousBleed = org.venousBleed
 	sendtable.internalBleedRate = org.internalBleedRate
+	sendtable.hemothorax = org.hemothorax
+	sendtable.cardiacTamponade = org.cardiacTamponade
 	sendtable.bodyoxygen = org.bodyoxygen
 	sendtable.perfusion = org.perfusion
 	sendtable.brainoxygen = org.brainoxygen
@@ -806,6 +846,8 @@ local function send_bareinfo(org)
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.venousBleed = org.venousBleed
 	sendtable.internalBleedRate = org.internalBleedRate
+	sendtable.hemothorax = org.hemothorax
+	sendtable.cardiacTamponade = org.cardiacTamponade
 	sendtable.bodyoxygen = org.bodyoxygen
 	sendtable.perfusion = org.perfusion
 	sendtable.brainoxygen = org.brainoxygen
@@ -1639,12 +1681,19 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			hg.organism.AddSeizure(org, timeValue * coldStress * seizure_temperature_cold_gain_mul)
 		end
 
-	local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
-	if seizureBrainDamage >= 0.05 then
+	local seizureBrainDamage = math.Clamp(math.max(org.brain or 0, lobeDamage), 0, 1)
+	if seizureBrainDamage >= 0.01 then
+		-- Brain injury remains epileptogenic after the initial impact.  Even a
+		-- slight injury slowly fills the seizure meter; severe trauma ramps it
+		-- rapidly, so it cannot remain a harmless static value between hits.
+		local sustainedGain = math.Remap(seizureBrainDamage, 0.01, 1,
+			seizure_brain_sustained_gain_min, seizure_brain_sustained_gain_max)
+		hg.organism.AddSeizure(org, timeValue * sustainedGain)
+
 		org.nextSeizureRoll = org.nextSeizureRoll or (curTime + seizure_brain_roll_delay)
 		if curTime >= org.nextSeizureRoll then
 			org.nextSeizureRoll = curTime + seizure_brain_roll_delay
-			local rollChance = math.Remap(seizureBrainDamage, 0.05, 1, seizure_brain_roll_min_chance, seizure_brain_roll_max_chance)
+			local rollChance = math.Remap(seizureBrainDamage, 0.01, 1, seizure_brain_roll_min_chance, seizure_brain_roll_max_chance)
 			if math.random(100) <= rollChance then
 				-- Brain damage can cause an abrupt seizure instead of only slowly
 				-- filling the warning meter over several successful rolls.

@@ -364,7 +364,12 @@ module[2] = function(owner, org, timeValue)
 	local highSpeedPressureShock = updateHighSpeedPressureShock(owner, org, timeValue)
 	local vascularTone = Clamp(1 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
 	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.8
-	local circulationBase = bloodVolume * heart * vascularTone * accelerationPressureMul * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
+	-- Pericardial blood restricts filling before it directly damages the heart.
+	-- Its effect compounds with blood loss, causing obstructive shock and low
+	-- cardiac output without treating tamponade as an immediate flatline.
+	local tamponade = Clamp(org.cardiacTamponade or 0, 0, 1)
+	local tamponadePreload = Clamp(1 - tamponade * 0.82, 0.18, 1)
+	local circulationBase = bloodVolume * heart * vascularTone * accelerationPressureMul * tamponadePreload * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()
@@ -525,17 +530,16 @@ module[2] = function(owner, org, timeValue)
 	-- arrest. Keep transient AF/ectopy visible, but let VF be a no-output
 	-- electrical arrest rather than pretending it is a fast effective pulse.
 	local severeCold = organSystemsEnabled and coldSuppression >= 0.62
-	local terminalHemorrhage = bloodNow <= 2500
+	local terminalHemorrhage = bloodNow <= 2250
 	if not (severeCold or terminalHemorrhage) then
 		org.unstableRhythm = nil
 		org.terminalRhythm = nil
 	elseif not org.heartstop and (org.nextColdRhythmRoll or 0) <= CurTime() then
 		org.nextColdRhythmRoll = CurTime() + 3
-		-- Begin terminal electrical instability as soon as blood reaches 2500;
-		-- it escalates sharply to certain arrest at 1750. This is separate from
-		-- the ordinary arrhythmia system so a healthy heart can still briefly be
-		-- rescued in the upper part of this range.
-		local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2500, cardiacArrestBlood, 0.3, 1), 0, 1)
+		-- Terminal electrical instability belongs to decompensated hemorrhage,
+		-- after the compensated 3000-2250 mL range. It then escalates sharply to
+		-- certain arrest at 1750, leaving a short rescue window near 2250.
+		local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2250, cardiacArrestBlood, 0.3, 1), 0, 1)
 		local instability = math.max(coldSuppression, hemorrhagicDecompensation, hemorrhageInstability)
 		local roll = math.Rand(0, 1)
 		if roll < 0.04 + instability * 0.36 then
@@ -851,11 +855,13 @@ module[2] = function(owner, org, timeValue)
 		org.heartstoptime = nil
 	end
 
-	if org.alive and org.heartstoptime and org.heartstoptime + 30 < CurTime() and (org.lastsoundtime or 0) < CurTime() and org.otrub then
-		org.owner:EmitSound("breathing/agonalbreathing_"..math.random(13)..".wav", 60)
-		--org.owner:EmitSound("breathing/agonalbreathing_"..math.random(13)..".wav", 50)
-		
-		org.lastsoundtime = CurTime() + math.random(25,35)
+	-- A living, unconscious organism with no effective oxygenation or circulation
+	-- makes frequent agonal attempts at breathing. Do not wait for the old 30s
+	-- arrest delay: the first gasp is immediate and later ones stay irregular.
+	local noOxygen = org.o2 and (org.o2[1] or 0) <= 0.25
+	if org.alive and org.otrub and (org.heartstop or noOxygen) and (org.lastsoundtime or 0) < CurTime() then
+		org.owner:EmitSound("breathing/agonalbreathing_" .. math.random(13) .. ".wav", 60)
+		org.lastsoundtime = CurTime() + math.Rand(4, 7)
 	end
 
 end

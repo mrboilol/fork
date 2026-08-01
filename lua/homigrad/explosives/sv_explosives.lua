@@ -496,6 +496,82 @@ local expItems = {
 
 hg.expItems = expItems
 
+local FuelContainerImpactMinSpeed = 450
+local FuelContainerImpactMinEnergy = 3000000
+
+local function GetFuelContainerImpactAttacker(ent)
+	local owner = ent:GetOwner()
+	if IsValid(owner) then return owner end
+
+	local creator = ent:GetCreator()
+	if IsValid(creator) then return creator end
+
+	return IsValid(ent.LastAttacker) and ent.LastAttacker or ent
+end
+
+local function ExplodeFuelContainer(ent, explosion, attacker)
+	local phys = ent:GetPhysicsObject()
+	local mass = IsValid(phys) and phys:GetMass() or 10
+	local iedBonus, ied = ConsumeIEDBonus(ent)
+
+	ent.owner = IsValid(attacker) and attacker or ent
+	ent.babahnut = true
+	hg.PropExplosion(ent, explosion.ExpType, ((ent.Volume or explosion.Force) * 2) + iedBonus, mass, explosion)
+
+	if IsValid(ied) then ied:Remove() end
+end
+
+local function RegisterFuelContainerImpact(ent)
+	if not IsValid(ent) or not hg.gas_models or not hg.gas_models[ent:GetModel()] then return end
+	if ent.hgFuelImpactCallback then return end
+
+	ent.hgFuelImpactCallback = ent:AddCallback("PhysicsCollide", function(container, data)
+		if container.babahnut or container.HasExploded or not data or (data.Speed or 0) < FuelContainerImpactMinSpeed then return end
+
+		local phys = container:GetPhysicsObject()
+		if not IsValid(phys) then return end
+		local impactEnergy = phys:GetMass() * data.Speed * data.Speed
+		if impactEnergy < FuelContainerImpactMinEnergy then return end
+		if (container.hgNextFuelImpact or 0) > CurTime() then return end
+		container.hgNextFuelImpact = CurTime() + 0.15
+
+		local impactDamage = math.Clamp((data.Speed - 350) / 20 + math.sqrt(impactEnergy) / 1000, 12, 100)
+		local attacker = GetFuelContainerImpactAttacker(container)
+		local damage = DamageInfo()
+		damage:SetDamage(impactDamage)
+		damage:SetDamageType(DMG_CRUSH)
+		damage:SetDamagePosition(data.HitPos or container:WorldSpaceCenter())
+		damage:SetAttacker(attacker)
+		damage:SetInflictor(container)
+		hook.Run("ExplosivesTakeDamage", container, damage)
+
+		local explosion = expItems[container:GetModel()]
+		if not explosion or not hg.drums or not hg.drums[container:EntIndex()] then return end
+		local drum = hg.drums[container:EntIndex()]
+		if (drum.Volume or 0) <= 0.5 then return end
+
+		container.hp = (container.hp or 50) - impactDamage
+		local detonateChance = math.Clamp((impactDamage - 35) / 120, 0, 0.35)
+		if container.hp <= 0 or math.Rand(0, 1) < detonateChance then
+			ExplodeFuelContainer(container, explosion, attacker)
+		end
+	end)
+end
+
+hook.Add("OnEntityCreated", "hg_fuelcontainer_impact", function(ent)
+	timer.Simple(0, function()
+		RegisterFuelContainerImpact(ent)
+	end)
+end)
+
+hook.Add("InitPostEntity", "hg_fuelcontainer_impact_mapinit", function()
+	for model in pairs(hg.gas_models or {}) do
+		for _, ent in ipairs(ents.FindByModel(model)) do
+			RegisterFuelContainerImpact(ent)
+		end
+	end
+end)
+
 local function RegisterGasTank(ent)
 	if not IsValid(ent) then return end
 	if not GasTankModels[ent:GetModel()] then return end

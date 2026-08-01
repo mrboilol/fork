@@ -247,7 +247,7 @@ if SERVER then
 
 	hook.Add("ExplosivesTakeDamage", "drum_damage", function(ent, dmgInfo)
 		if !hg.drums[ent:EntIndex()] then return end
-		if !(dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) or (dmgInfo:IsDamageType(DMG_SLASH) and dmgInfo:GetDamage() >= 25)) then return end
+		if !(dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) or (dmgInfo:IsDamageType(DMG_SLASH) and dmgInfo:GetDamage() >= 25) or (dmgInfo:IsDamageType(DMG_CRUSH) and dmgInfo:GetDamage() >= 12)) then return end
 		
 		local dmgPos = dmgInfo:GetDamagePosition()
 		local tr = util.QuickTrace(dmgPos,(ent:GetPos() + ent:OBBCenter()) - dmgPos)

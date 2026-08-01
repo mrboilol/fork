@@ -435,6 +435,7 @@ HUD = {
 	cold_threshold = 36,
 	heat_threshold = 37,
 	hemothorax_threshold = 0.01,
+	tamponade_threshold = 0.01,
 	oxygen_threshold = 28,
 	vomit_threshold = 0.2,
 	brain_damage_threshold = 0.01,
@@ -468,6 +469,7 @@ local status_sprites = {
 	
 	hypotension = nil,
 	cardiac_arrest = nil,
+	tamponade = nil,
 	cold = nil,
 	heat = nil,
 	hemothorax = nil,
@@ -512,6 +514,7 @@ local smooth = {
 	o2 = 30,
 	bleed = 0,
 	internalBleed = 0,
+	cardiacTamponade = 0,
 	
 	temperature = 36.7,
 	pneumothorax = 0,
@@ -642,6 +645,7 @@ local tooltipTexts = {
 			[1] = {title = "Головокружение", text = "Артериальное давление понижено. Ты чувствуешь небольшую слабость, кружится голова."}
 		},
 		cardiac_arrest = {title = "Остановка сердца", text = "Твоё сердце перестало биться, а значит кислород в мозг больше не поступает."},
+		tamponade = {title = "Тампонада сердца", text = "Кровь сдавливает сердце и мешает ему наполняться. Нужна срочная помощь."},
 		cold = {
 			[4] = {title = "Замерзание до смерти", text = "По неизвестной причине тебе становится тепло..."},
 			[3] = {title = "Гипотермия", text = "Опасно низкая температура, тело и разум изнемогают от холода."},
@@ -823,6 +827,7 @@ local tooltipTexts = {
 			[1] = {title = "Lightheaded", text = "Your blood pressure is low, but you are probably just calm."}
 		},
 		cardiac_arrest = {title = "Cardiac arrest", text = "Your body already worked hard enough, lets rest for now."},
+		tamponade = {title = "Cardiac tamponade", text = "Blood around your heart is preventing it from filling and sustaining circulation."},
 		cold = {
 			[4] = {title = "Freezing to death", text = "Its so warm all of a sudden, and i feel a calming presence over me."},
 			[3] = {title = "Hypothermia", text = "Its so, SO COLD..."},
@@ -1170,6 +1175,7 @@ local function draw_bar()
 	smooth.o2 = Lerp(s * dt, smooth.o2 or o2_max, o2_val)
 	smooth.bleed = Lerp(s * dt, smooth.bleed or 0, getOrgVal(org, "bleed", 0))
 	smooth.internalBleed = Lerp(s * dt, smooth.internalBleed or 0, getOrgVal(org, "internalBleed", 0))
+	smooth.cardiacTamponade = Lerp(s * dt, smooth.cardiacTamponade or 0, getOrgVal(org, "cardiacTamponade", 0))
 	
 	smooth.temperature = Lerp(s * dt, smooth.temperature or 36.7, getOrgVal(org, "temperature", 36.7))
 	smooth.pneumothorax = Lerp(s * dt, smooth.pneumothorax or 0, getOrgVal(org, "pneumothorax", 0))
@@ -1499,6 +1505,18 @@ local function draw_status_effects()
 			if org.heartstop == true then
 				table.insert(effects, {name = "cardiac_arrest", priority = 0.15})
 				currentEffectNames["cardiac_arrest"] = true
+			end
+
+			local tamponade = smooth.cardiacTamponade or getOrgVal(org, "cardiacTamponade", 0)
+			if tamponade > HUD.tamponade_threshold then
+				table.insert(effects, {
+					name = "tamponade",
+					level_num = math.Clamp(math.ceil(tamponade * 4), 1, 4),
+					has_levels = true,
+					priority = 0.12,
+					value = math_floor(tamponade * 100)
+				})
+				currentEffectNames["tamponade"] = true
 			end
 			
 			if org.lungsfunction == false and not currentEffectNames["lungs_failure"] then
@@ -2306,6 +2324,8 @@ local function draw_status_effects()
 				bg_color = Color(150, 0, 0, 220)
 			elseif effect.name == "cardiac_arrest" then
 				bg_color = Color(100, 0, 100, 220)
+			elseif effect.name == "tamponade" then
+				bg_color = Color(125, 20, 20, 220)
 			elseif effect.name == "cold" then
 				bg_color = Color(0, 100, 200, 220)
 			elseif effect.name == "heat" then
@@ -2364,6 +2384,7 @@ local function draw_status_effects()
 		elseif effect.name == "internal_bleed" then icon_mat = status_sprites.internal_bleed_icon
 		elseif effect.name == "hypotension" then icon_mat = status_sprites.hypotension
 		elseif effect.name == "cardiac_arrest" then icon_mat = status_sprites.cardiac_arrest
+		elseif effect.name == "tamponade" then icon_mat = status_sprites.cardiac_arrest
 		elseif effect.name == "cold" then icon_mat = status_sprites.cold
 		elseif effect.name == "heat" then icon_mat = status_sprites.heat
 		elseif effect.name == "hemothorax" then icon_mat = status_sprites.hemothorax
@@ -2436,6 +2457,9 @@ local function draw_status_effects()
 				value_text = effect.value .. "mmHg"
 			elseif effect.name == "cardiac_arrest" then
 				letter = "CA"
+			elseif effect.name == "tamponade" then
+				letter = "CT"
+				value_text = effect.value .. "%"
 			elseif effect.name == "cold" then
 				letter = "C"
 				value_text = effect.value .. "°C"
@@ -2678,6 +2702,7 @@ concommand.Add("mzb_nopixelicons", function(ply, cmd, args)
 		fracture = nil,
 		hypotension = nil,
 		cardiac_arrest = nil,
+		tamponade = nil,
 		cold = nil,
 		heat = nil,
 		hemothorax = nil,

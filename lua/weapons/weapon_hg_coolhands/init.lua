@@ -1354,21 +1354,13 @@ hook.Add("PlayerSpawn", "Toggle_CoolHands", function(ply)
                         hands = ply:Give(class)
                 end
 
-                if ply:HasWeapon("weapon_hands_sh") then
-                        ply:StripWeapon("weapon_hands_sh")
+                local otherClass = class == "weapon_hg_coolhands" and "weapon_hands_sh" or "weapon_hg_coolhands"
+                if ply:HasWeapon(otherClass) then
+                        ply:StripWeapon(otherClass)
                 end
 
                 if IsValid(hands) then
                         ply:SelectWeapon(hands:GetClass())
                 end
         end)
-end)
-
-
-local hg_coolhands = CreateConVar("hg_coolhands", 1, {FCVAR_ARCHIVE, FCVAR_NOTIFY, FCVAR_REPLICATED}, "Give cool hands instead of default hands on spawn")
-hook.Add("PlayerSpawn", "Toggle_CoolHands", function(ply)
-        local hands = hg.GetHandsWeapon and hg.GetHandsWeapon(ply)
-        if IsValid(hands) then
-                ply:SelectWeapon(hands:GetClass())
-        end
 end)

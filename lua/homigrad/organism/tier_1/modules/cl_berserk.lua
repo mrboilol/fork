@@ -38,8 +38,10 @@ local cc = Material( "effects/shaders/merc_chromaticaberration" )
 local offset = CreateClientConVar("berserk_offset", "0.85", true, false, "Set berserk music offset from start", 0, 5)
 local bpm = CreateClientConVar("berserk_bpm", "70", true, false, "Set berserk effect bpm", 1, 280)
 local path = CreateClientConVar("berserk_path", "sound/zbattle/pharmacia.mp3", true, false, "Set berserk effect music path")
-local altberserk = CreateClientConVar("hg_altberserk", "0", true, false, "Enable alternative berserk mode (11s disoriented, NIGGARUN.ogg, 88 BPM)", 0, 1)
-local altberserk3 = CreateClientConVar("hg_altberserk3", "0", true, false, "Enable alternative berserk mode 3 (immediate rage.ogg loop and 75 BPM effect)", 0, 1)
+-- These replicated convars are created by sv_berserk.lua, so an admin's
+-- setting selects the alternate mode for every connected client.
+local altberserk = GetConVar("hg_altberserk") or CreateClientConVar("hg_altberserk", "0", true, false, "Enable alternative berserk mode", 0, 1)
+local altberserk3 = GetConVar("hg_altberserk3") or CreateClientConVar("hg_altberserk3", "0", true, false, "Enable alternative berserk mode 3", 0, 1)
 
 local function isAlternativeBerserk()
 	return altberserk:GetBool() or altberserk3:GetBool()
@@ -100,10 +102,10 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.underberserk = false
 		hg.underberserk2 = false
 
-		if IsValid(hg.berserkStation) and not hg.berserkFadeOut then
-			hg.berserkFadeOut = true
-			hg.berserkFadeOutStartTime = SysTime()
-		end
+		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
+		hg.berserkStation = nil
+		hg.berserkFadeOut = false
+		hg.berserkMusicPlayed = false
 
 		hg.notificationFont = "HuyFont"
 		hg.berserkIntensity = 0
@@ -176,10 +178,10 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.underberserk2 = false
 		hg.berserkActivationSoundPlayed = false
 		hg.berserkLastActivationTime = 0
-		if IsValid(hg.berserkStation) and not hg.berserkFadeOut then
-			hg.berserkFadeOut = true
-			hg.berserkFadeOutStartTime = SysTime()
-		end
+		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
+		hg.berserkStation = nil
+		hg.berserkFadeOut = false
+		hg.berserkMusicPlayed = false
 
 		hg.notificationFont = "HuyFont"
 		hg.berserkIntensity = 0
@@ -409,4 +411,3 @@ hook.Add("Player_Death", "berserkCleanup", function(ply)
 	hg.berserkIntensity = 0
 	hg.berserkClamped = 0
 end)
-

@@ -1325,11 +1325,11 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-			-- The old 1 / Clamp(pulse, 1, 15) expression caps every normal pulse at
-			-- a 60 Hz spray. Scale by seconds-per-beat instead, so jets visibly
-			-- pulse and amputations do not flood the world with arterial particles.
-			local addtime = seen and math.max(0.08, 12 / math.Clamp(org.pulse or 70, 20, 180)) or 0.06
-			if wound[5] + addtime < time then
+			-- Arterial blood is a continuous pressured stream.  The wound timer
+			-- below already limits particle emission to the player's blood-FPS
+			-- setting; a second pulse-scale gate here made every artery look like
+			-- a slow drip instead of a jet.
+			if (wound[5] or 0) < time then
 				local bone = wound[4]
 				local boneID = wound[8]
 				if not boneID or ent:GetBoneName(boneID) != bone then

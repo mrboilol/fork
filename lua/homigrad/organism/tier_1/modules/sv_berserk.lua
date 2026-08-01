@@ -1,3 +1,6 @@
+CreateConVar("hg_altberserk", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable alternative berserk mode server-wide", 0, 1)
+CreateConVar("hg_altberserk3", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable alternative berserk mode 3 server-wide", 0, 1)
+
 hook.Add("Player Think", "Berserk", function(ply, time, dtime)
     if !ply:IsBerserk() or ply:GetMoveType() == MOVETYPE_NOCLIP then return end
     local velocity = ply:GetVelocity():Length2DSqr()

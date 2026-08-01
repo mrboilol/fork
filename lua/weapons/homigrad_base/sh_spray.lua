@@ -1,9 +1,20 @@
 AddCSLuaFile()
 --
-function SWEP:Initialize_Spray()
+function SWEP:ResetTransientAimState()
 	self.EyeSpray = Angle(0, 0, 0)
+	self.EyeSprayVel = Angle(0, 0, 0)
+	self.sprayAngles = Angle(0, 0, 0)
 	self.SprayI = 0
-	self.LastRecoilDirection = Angle(-1, 0, 0)
+	self.LastRecoilDirection = Angle(0, 0, 0)
+	self.recoilWobbleAmp = 0
+	self.ShotMuzzleWobble = Angle(0, 0, 0)
+	self.ShotMuzzleOffset = Vector(0, 0, 0)
+	self.cache_trace = nil
+	self:SetLastShootTime(0)
+end
+
+function SWEP:Initialize_Spray()
+	self:ResetTransientAimState()
 	self.dmgStack = 0
 	self.dmgStack2 = 0
 end
@@ -43,8 +54,9 @@ local hg_spreadmul = ConVarExists("hg_spreadmul") and GetConVar("hg_spreadmul") 
 function SWEP:GetPrimaryMul()
 	local owner = self:GetOwner()
 	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local recoilKickMul = self:GetRecoilTuning()
 	local supportMul = self:GetRecoilSupportMul()
-	local mul = math.Clamp(caliberMul * weightMul * 0.68, 0.18, 2.7) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
+	local mul = math.Clamp(caliberMul * weightMul * recoilKickMul * 0.68, 0.18, 2.95) * supportMul * (owner.Crouching and owner:Crouching() and self.CrouchMul or 1) * (self.attachments and self.attachments.barrel and self.attachments.barrel[1] ~= "empty" and 0.75 or 1)
 	self:ApplyForce(mul)
 	mul = ((mul or 0) * (self.Supressor and 0.75 or 1) * self:GetCharacterRecoilMul()) * math.Clamp(hg_recoilmul:GetFloat(), 0.1, 3) * self:GetFearRecoilMul() * self:GetCognitiveHandlingMul()
 	return mul
@@ -61,25 +73,30 @@ local function IsSlugcatRecoilImmune(ply, wep)
 	return className == "slugcat" or (IsValid(wep) and wep:GetClass() == "weapon_slugcat")
 end
 
-local function BuildRecoilDirection(force, cantedHold)
+local function BuildRecoilDirection(force, cantedHold, seed)
+	local function shared(name, minimum, maximum, offset)
+		return util.SharedRandom(name, minimum, maximum, seed + offset)
+	end
+
 	if cantedHold then
 		-- With the pistol rolled clockwise its top faces screen-right, so the
 		-- dominant muzzle rise appears as a leftward kick. Retain a little vertical
 		-- and roll variation so Gangsta/Somalian fire does not trace a straight line.
 		return Angle(
-			force * math.Rand(-0.3, 0.24),
-			-force * math.Rand(0.72, 1.12),
-			force * math.Rand(-0.22, 0.22)
+			force * shared("hg_primary_recoil_pitch_canted", -0.3, 0.24, 101),
+			-force * shared("hg_primary_recoil_side_canted", 0.72, 1.12, 211),
+			force * shared("hg_primary_recoil_roll_canted", -0.22, 0.22, 307)
 		)
 	end
 
 	-- Recoil is biased upward, but grip, stance and the moving weapon can produce
 	-- a smaller downward impulse. Horizontal motion is independent on every shot.
-	local pitch = math.Rand(0, 1) < 0.22 and math.Rand(0.18, 0.55) or -math.Rand(0.58, 1.18)
+	local downKick = shared("hg_primary_recoil_pitch_sign", 0, 1, 401) < 0.22
+	local pitch = downKick and shared("hg_primary_recoil_pitch_down", 0.18, 0.55, 503) or -shared("hg_primary_recoil_pitch_up", 0.58, 1.18, 601)
 	return Angle(
 		force * pitch,
-		force * math.Rand(-0.65, 0.65),
-		force * math.Rand(-0.2, 0.2)
+		force * shared("hg_primary_recoil_side", -0.65, 0.65, 701),
+		force * shared("hg_primary_recoil_roll", -0.2, 0.2, 809)
 	)
 end
 
@@ -105,6 +122,13 @@ function SWEP:PrimarySpread()
 	self.dmgStack = self.dmgStack + self.Primary.Damage
 	self.dmgStack2 = math.min(self.dmgStack2 + 0.2, 60)
 	local sprayI = self.SprayI
+	local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+	local recoilKickMul = self:GetRecoilTuning()
+	local directionForce = math.Clamp(caliberMul * weightMul * recoilKickMul * self.addSprayMul, 0.1, 4)
+	local cantedHold = owner.posture == 7 or owner.posture == 9
+	local recoilSeed = self:EntIndex() * 1009 + sprayI * 9176
+	local recoilDirection = BuildRecoilDirection(directionForce, cantedHold, recoilSeed)
+	self.LastRecoilDirection = Angle(recoilDirection[1] / directionForce, recoilDirection[2] / directionForce, recoilDirection[3] / directionForce)
 	
 	if SERVER then
 		if owner:IsNPC() then return end
@@ -145,8 +169,6 @@ function SWEP:PrimarySpread()
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
 		local organism = owner.organism or {}
-		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
-
 		local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
 		local oneHandRecoilMul = 1
 		if support.oneHanded then oneHandRecoilMul = oneHandRecoilMul * (support.offhandImpaired and 1.12 or 1.45) end
@@ -156,7 +178,7 @@ function SWEP:PrimarySpread()
 		oneHandRecoilMul = math.Clamp(oneHandRecoilMul, 1, 1.6)
 
 		local recoilProgress = 0.55 + math.Clamp((sprayI - 1) / 10, 0, 1) * 0.45
-		local force = math.Clamp(math.Clamp(caliberMul * weightMul * 0.38, 0.1, 2.45) * oneHandRecoilMul * self.addSprayMul * recoilProgress, 0.1, 4)
+		local force = math.Clamp(math.Clamp(caliberMul * weightMul * recoilKickMul * 0.38, 0.1, 2.65) * oneHandRecoilMul * self.addSprayMul * recoilProgress, 0.1, 4)
 
 		-- Sway/debuff based on hand dominance and bone damage (using existing multiplier system)
 		local dominance = organism.hand_dominance or "right"
@@ -260,8 +282,7 @@ function SWEP:PrimarySpread()
 		angranda[3] = 0
 		spray = (spray + angranda * self.addSprayMul * mul * (self.randmul or 1)) * hg_spreadmul:GetFloat()
 
-		local cantedHold = owner.posture == 7 or owner.posture == 9
-		local angrand2 = BuildRecoilDirection(force, cantedHold)
+		local angrand2 = BuildRecoilDirection(force, cantedHold, recoilSeed)
 		self.LastRecoilDirection = Angle(angrand2[1] / force, angrand2[2] / force, angrand2[3] / force)
 		if not self.SprayRandOnly then
 			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
