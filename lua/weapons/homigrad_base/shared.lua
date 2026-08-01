@@ -2698,14 +2698,12 @@ function SWEP:GetAdditionalValues()
 			local wobZ = math.sin(t * 2.45 * frequencyMul) * 0.65 + math.cos(t * 3.2 * frequencyMul) * 0.35
 
 			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 2.15 or 1.55)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.32 or 1.05)
-			-- Keep the previous absolute yaw contribution while the added wobble
-			-- strength goes into pitch/roll and vertical recovery motion.
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.045 or 0.10)
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 1.75 or 1.55)
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.55 or 0.10)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.8 or 1.05)
 
 			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.03
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.26
 			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
 		end
 
@@ -2716,17 +2714,19 @@ function SWEP:GetAdditionalValues()
 			local seed = math.floor(sprayI)
 			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
 			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
+			local pitchRand = util.SharedRandom("hg_recoil_pitch", 0.72, 1.18, seed + 4451)
 			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.25
 
-			-- Put the recoil impulse into a clear upward muzzle climb. This affects the
-			-- weapon transform/next round, not either camera-punch layer.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 4.8
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.14
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.07
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.75
-			-- Lift the physical muzzle with the pitch impulse. GetTrace uses this
-			-- transform, so follow-up rounds climb with the visible barrel.
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 2.0 or 3.1)
+			-- The muzzle owns the follow-through.  A shot retains a readable upward
+			-- component, but each numbered shot gets a bounded side/roll impulse and
+			-- a matching local-space offset, so automatic fire arcs and settles rather
+			-- than tracing one identical diagonal.
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 4.2 * pitchRand
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.9
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.15
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * (0.62 + pitchRand * 0.18)
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + sideRand * kick * 0.52
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.7 or 2.65) * pitchRand + rollRand * kick * 0.22
 		end
 	end
 

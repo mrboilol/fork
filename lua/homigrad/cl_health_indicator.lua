@@ -462,6 +462,47 @@ function HUD_DrawDynamicIndicator()
         SetIndicatorIdleSequence(healthModel)
         healthModel:AddCallback("BuildBonePositions", SyncBonesCallback)
     end
+
+    if true then
+    -- Keep the base indicator dependable: it is an idle player model, with no
+    -- damage overlays or anatomical state required before it can be rendered.
+    if healthModel:GetModel() ~= ply:GetModel() or ply.PlayerClassName ~= healthModel.lastPlayerClassName then
+        healthModel:SetModel(ply:GetModel())
+        healthModel:SetIK(false)
+        SetIndicatorIdleSequence(healthModel)
+        healthModel.lastPlayerClassName = ply.PlayerClassName
+    end
+
+    local hudScale = math.Clamp(ScrH() / 1080, 0.8, 1.35)
+    local size = math.Clamp(IND_SIZE_BASE * hudScale, IND_SIZE_BASE * 0.8, IND_SIZE_MAX)
+    local edgeMargin = math.max(14, 18 * hudScale)
+    local viewX = edgeMargin
+    local viewY = math.Clamp(ScrH() * 0.5 - size * 0.5, edgeMargin, ScrH() - size - edgeMargin)
+
+    if HUD then
+        HUD.dynamicIndicator = {x = viewX, y = viewY, w = size, h = size, active = true}
+    end
+
+    cam.Start3D(Vector(95, 0, 65), Angle(11, 180, 0), INDICATOR_CAMERA_FOV, viewX, viewY, size, size)
+        render.SuppressEngineLighting(true)
+        render.MaterialOverride(whiteMat)
+        render.SetColorModulation(1, 1, 1)
+        healthModel:SetPos(Vector(0, 0, 10))
+        healthModel:SetAngles(Angle(0, 0, 0))
+        healthModel:SetSkin(ply:GetSkin())
+        for i = 0, ply:GetNumBodyGroups() - 1 do
+            healthModel:SetBodygroup(i, ply:GetBodygroup(i))
+        end
+        healthModel:FrameAdvance(FrameTime())
+        healthModel:SetupBones()
+        healthModel:DrawModel()
+        render.MaterialOverride(nil)
+        render.SetColorModulation(1, 1, 1)
+        render.SuppressEngineLighting(false)
+    cam.End3D()
+
+    return
+    end
     
     if not IsValid(blinkModel) then
         blinkModel = ClientsideModel(ply:GetModel(), RENDERGROUP_OTHER)

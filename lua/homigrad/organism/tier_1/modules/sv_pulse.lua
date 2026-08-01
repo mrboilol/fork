@@ -3,32 +3,27 @@ local min, max, halfValue2 = math.min, math.max, util.halfValue2
 hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
-local BloodBPM = {
-	{5000, 75},
-	{4500, 80},
-	{4000, 92},
-	{3500, 112},
-	{3000, 145},
-	{2500, 205},
-	{2250, 170},
-	{2000, 0},
-}
-
-local BloodPerfusion = {
-	{5000, 1},
-	{4500, 1},
-	{4000, 0.96},
-	{3500, 0.86},
-	{3000, 0.62},
-	{2500, 0.35},
-	{2000, 0},
-}
-
--- At 2000 mL there is no longer enough preload to sustain vital circulation.
--- The 2500-2000 band is the short, unstable decompensation window before arrest.
-local cardiacArrestBlood = 2000
+-- Blood-volume response is deliberately calculated rather than sampled from
+-- lookup tables. Perfusion falls continuously and reaches zero at 1750 mL.
+local cardiacArrestBlood = 1750
 local terminalHeartRate = 300
 local peaDuration = 6
+
+local function getBloodPerfusion(blood)
+	local volume = math.Clamp(((tonumber(blood) or 5000) - cardiacArrestBlood) / (5000 - cardiacArrestBlood), 0, 1)
+	-- This keeps early loss compensable while making the last quarter collapse
+	-- rapidly as there is no longer enough volume to fill the pump.
+	return volume ^ 0.45
+end
+
+local function getBloodCompensationRate(blood)
+	blood = tonumber(blood) or 5000
+	-- Every loss of blood increases the compensation rate. The curve is mild at
+	-- first, then accelerates into the terminal range: 70 BPM at 5000 mL and
+	-- 300 BPM at 2000 mL. Any further loss cannot produce a viable faster rate.
+	local loss = math.Clamp((5000 - blood) / (5000 - 2000), 0, 1)
+	return 70 + loss ^ 1.2 * (terminalHeartRate - 70)
+end
 
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
 -- return.  Keep this separate from blood loss: it is a reversible pressure
@@ -126,22 +121,6 @@ local function getPalpitationThreat(org, blood, o2Value)
 	return math.max(lowBlood, lowCirculation, hypoxia, shock, heartDamage, temperatureStress)
 end
 
-local function interpolateCurve(curve, value)
-	value = tonumber(value) or curve[1][1]
-	if value >= curve[1][1] then return curve[1][2] end
-
-	for i = 1, #curve - 1 do
-		local high = curve[i]
-		local low = curve[i + 1]
-		if value <= high[1] and value >= low[1] then
-			local fraction = math.Clamp((high[1] - value) / (high[1] - low[1]), 0, 1)
-			return Lerp(fraction, high[2], low[2])
-		end
-	end
-
-	return curve[#curve][2]
-end
-
 local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
 local coldDamageTargets = {"heart", "liver", "stomach", "intestines"}
 
@@ -207,7 +186,7 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 	-- Conduction suppression begins in moderate hypothermia and grows toward
 	-- severe hypothermia.
 	local cold = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((2500 - (org.blood or 5000)) / 500, 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((2000 - (org.blood or 5000)) / (2000 - cardiacArrestBlood), 0, 1)
 	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold, hemorrhagicDecompensation)
 
 	-- Complete/partial AV block is a direct conduction-system injury pattern,
@@ -237,7 +216,7 @@ end
 local Clamp, Approach, Remap = math.Clamp, math.Approach, math.Remap
 local CurTime = CurTime
 local function getBloodVolume(org)
-	return Clamp((org.blood - 900) / 4100, 0, 1)
+	return getBloodPerfusion(org.blood)
 end
 
 local function getHeartEfficiency(org)
@@ -366,9 +345,7 @@ module[2] = function(owner, org, timeValue)
 	local effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 	local compensationPulseMultiplier = math.Clamp(1 - hemorrhageCompensation * 0.35 - hypovolemicShock * 0.1 - effectivePalpitations * 0.3, 0.35, 1)
 	org.compensationPulseMultiplier = compensationPulseMultiplier
-	-- Mild loss is compensated, but effective circulation now falls in distinct
-	-- stages and reaches zero at the terminal 2000 mL threshold.
-	local bloodPerfusionK = interpolateCurve(BloodPerfusion, math.Clamp(bloodNow, 0, 5000))
+	local bloodPerfusionK = getBloodPerfusion(bloodNow)
 	local k = heart * o2 * math.Clamp(bloodPerfusionK, 0, 1) * brain * (org.heartstop and 0 or 1)
 	pulse = pulse * k
 	pulse = pulse * compensationPulseMultiplier
@@ -423,12 +400,12 @@ module[2] = function(owner, org, timeValue)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
-	-- Keep the existing pressure compensation, but let the configured blood
-	-- curve own the baseline heart-rate response to hemorrhage.
+	-- Keep the existing pressure compensation, with a continuous blood-volume
+	-- calculation owning the baseline heart-rate response to hemorrhage.
 	local perfusionPulse = org.pulse or 70
 	local compensationRate = perfusionPulse < 70 and 70 + (70 - perfusionPulse) * 4 or perfusionPulse
 	compensationRate = math.Clamp(compensationRate, 45, 300)
-	local bloodCompensationRate = interpolateCurve(BloodBPM, math.Clamp(bloodNow, 0, 5000))
+	local bloodCompensationRate = getBloodCompensationRate(bloodNow)
 	org.compensationHeartRateTarget = bloodCompensationRate
 	if bloodNow < 4500 then
 		compensationRate = math.min(compensationRate, bloodCompensationRate)
@@ -467,9 +444,11 @@ module[2] = function(owner, org, timeValue)
 	-- node and conduction system progressively lose responsiveness. At terminal
 	-- blood volume, preload failure can also remove the prior tachycardia.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((2500 - bloodNow) / 500, 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((2000 - bloodNow) / (2000 - cardiacArrestBlood), 0, 1)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
-	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, hemorrhagicDecompensation, zerlkersSuppression)
+	-- Low blood volume produces tachycardia up to the terminal threshold; it
+	-- must not be treated as a bradycardia source before the pump actually fails.
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
 
@@ -535,9 +514,8 @@ module[2] = function(owner, org, timeValue)
 	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
 	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 
-	-- At 2000 mL there is no viable circulation left. The 2500-2000 mL band
-	-- remains briefly treatable, but is intentionally an aggressive VF/arrest
-	-- range rather than merely a low-pulse state.
+	-- Blood loss drives the rhythm continuously toward 300 BPM at 2000 mL; at
+	-- 1750 mL perfusion is zero and circulation cannot be sustained.
 	local restartCirculationActive = (org.cardiacRestartUntil or 0) > CurTime()
 	if not org.heartstop and bloodNow <= cardiacArrestBlood then
 		org.heartstop = true
@@ -554,10 +532,10 @@ module[2] = function(owner, org, timeValue)
 	elseif not org.heartstop and (org.nextColdRhythmRoll or 0) <= CurTime() then
 		org.nextColdRhythmRoll = CurTime() + 3
 		-- Begin terminal electrical instability as soon as blood reaches 2500;
-		-- it escalates sharply to certain arrest at 2000. This is separate from
+		-- it escalates sharply to certain arrest at 1750. This is separate from
 		-- the ordinary arrhythmia system so a healthy heart can still briefly be
 		-- rescued in the upper part of this range.
-		local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2500, 2000, 0.3, 1), 0, 1)
+		local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2500, cardiacArrestBlood, 0.3, 1), 0, 1)
 		local instability = math.max(coldSuppression, hemorrhagicDecompensation, hemorrhageInstability)
 		local roll = math.Rand(0, 1)
 		if roll < 0.04 + instability * 0.36 then
@@ -646,7 +624,7 @@ module[2] = function(owner, org, timeValue)
 		if math.Rand(0, 1) < Clamp((stress - 0.65) * 0.12, 0.01, 0.18) then hg.organism.StartFibrillation(org) end
 	end
 
-	if org.heartbeat > 300 then
+	if org.heartbeat >= terminalHeartRate then
 		hg.organism.StartFibrillation(org)
 	end
 

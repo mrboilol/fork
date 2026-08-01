@@ -2123,6 +2123,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		if o2 > 20 and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
 			local remorseismIncapacitated = org.incapacitated
+			-- An explicit otrub selection takes precedence over the optional dying
+			-- soundtrack.  In particular, mode 4 must remain ngaimcooked instead of
+			-- being muted by the REM dying stack (rem_dying2).
+			local useSelectedOtrubSound = not remorseismIncapacitated and otrubMode ~= 0
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
@@ -2172,7 +2176,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
-			if not remorseismIncapacitated then
+			if not remorseismIncapacitated and not useSelectedOtrubSound then
 				local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 				if dyingMode == 6 and IsValid(ItssooverStation) then
 					ItssooverStation:SetVolume(otrubVol)

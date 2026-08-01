@@ -317,25 +317,6 @@ local braindamage_phraselist = {
 	"Bhrhraihin.",
 }
 
-local bleeding_out_phrases = {
-    "Why did this happen to me why...",
-    "I feel so weak...",
-    "So dark.. everything is so dark and cold...",
-    "I feel like i want to pass out, but i dont want to...",
-    "Its so hard to move...",
-    "Im so numb... but i can still feel the cold...",
-    "Im going to die arent i?",
-}
-
-local low_o2_phrases = {
-	"I can't get enough air.",
-	"My chest is fighting for every breath.",
-	"Everything is getting dark.",
-	"I need air right now.",
-	"My lungs aren't keeping up.",
-	"I can't breathe right.",
-}
-
 local internalbleed_phrases = {
 	"That's... that's blood I just vomited...",
 	"Oh, that's blood...",
@@ -563,15 +544,15 @@ local function get_status_message(ply)
 	if org.heartstop then
 		most_wanted_phraselist = bradycardia_phrases
 	elseif o2 < 12 then
-		most_wanted_phraselist = low_o2_phrases
+		-- sv_lungs owns the immediate breathing symptom alerts. Keep periodic
+		-- low-O2 thoughts in the shared dying-status pool so they do not repeat
+		-- those callouts.
+		most_wanted_phraselist = near_death_poetic
 	elseif blood < 3750 then
-		-- These are the recurring dying thoughts. Keep the one-time threshold
-		-- alerts in sv_blood, but let blood loss win the periodic status slot so
-		-- pain, temperature, and incidental conditions do not drown it out.
-		local combined_phrases = {}
-		for _, phrase in ipairs(bleeding_out_phrases) do table.insert(combined_phrases, phrase) end
-		for _, phrase in ipairs(near_death_poetic) do table.insert(combined_phrases, phrase) end
-		most_wanted_phraselist = combined_phrases
+		-- sv_blood owns the immediate faintness and hemorrhage alerts. Blood loss
+		-- still gets priority for recurring status thoughts, but shares the same
+		-- dying pool as the other terminal conditions.
+		most_wanted_phraselist = near_death_poetic
 	elseif pain > 100 then
 		most_wanted_phraselist = sharp_pain
 	elseif pain > 75 then

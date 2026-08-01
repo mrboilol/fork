@@ -1026,7 +1026,7 @@ function hg.queueArterialWoundSound(ent, wound)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmount)
+emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmount, isAmputation)
 	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
 	-- artery-marked blood trail with the original combined right/up oscillation.
 	-- Give the pressure pulse enough forward speed and lift to form an arc before
@@ -1035,7 +1035,7 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmo
 	local pulse = math.max(org.pulse or 0, 0)
 	local pulseMul = pulse / 70
 	local circulation = getCirculationStrength(org, pulse)
-	local arterialPressureMul = circulation * 2.5
+	local arterialPressureMul = circulation * (isAmputation and 1.15 or 2.5)
 	if arterialPressureMul <= 0 then
 		hg.addBloodPart(pos, bloodDown * 2 + VectorRand(-0.5, 0.5), nil, size, size, true, nil, ent)
 		return
@@ -1044,8 +1044,8 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmo
 	-- arterial trail to read as a fast jet instead of a short local spray.
 	-- A fully open carotid (14 bleed) reaches four times the old distance;
 	-- smaller or closing arteries scale down from that using their live bleed.
-	local bleedRangeMul = 1 + 3 * math.Clamp((bleedAmount or 0) / 14, 0, 1)
-	local forwardVelocityMul = 2.5 * bleedRangeMul
+	local bleedRangeMul = 1 + (isAmputation and 0.5 or 3) * math.Clamp((bleedAmount or 0) / 14, 0, 1)
+	local forwardVelocityMul = (isAmputation and 1.1 or 2.5) * bleedRangeMul
 	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
 	local velocity = (VectorRand(-1, 1) * pulseMul
 		+ dir * 5 * forwardVelocityMul * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
@@ -1325,7 +1325,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 	
 	if org and org.blood and org.blood > 10 and arterialwounds and #arterialwounds > 0 then
 		for i, wound in pairs(arterialwounds) do
-			local addtime = seen and 1 / math.Clamp(org.pulse or 70, 1,15) * 0.25 or 0.06
+			-- The old 1 / Clamp(pulse, 1, 15) expression caps every normal pulse at
+			-- a 60 Hz spray. Scale by seconds-per-beat instead, so jets visibly
+			-- pulse and amputations do not flood the world with arterial particles.
+			local addtime = seen and math.max(0.1, 15 / math.Clamp(org.pulse or 70, 20, 180)) or 0.06
 			if wound[5] + addtime < time then
 				local bone = wound[4]
 				local boneID = wound[8]
@@ -1359,7 +1362,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, wound[1])
+							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, wound[1], wound[9] == true)
 						end
 
 						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))

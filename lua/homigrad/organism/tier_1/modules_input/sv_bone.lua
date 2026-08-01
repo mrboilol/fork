@@ -119,10 +119,11 @@ end
 
 local function playSkullFractureSound(ent)
 	if not IsValid(ent) then return end
-	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 75, math.random(90, 110), 1, CHAN_AUTO)
-	if math.random(3) == 1 then
-		ent:EmitSound("gore/skullopen" .. math.random(1, 3) .. ".wav", 95, math.random(90, 110), 1, CHAN_AUTO)
-	end
+	-- Skull fractures need a larger audible radius than ordinary bone cracks;
+	-- the samples themselves are comparatively quiet and were often masked by
+	-- the simultaneous damage sounds.
+	ent:EmitSound(skullfracture_sounds[math.random(#skullfracture_sounds)], 105, math.random(90, 110), 1, CHAN_AUTO)
+	ent:EmitSound("gore/skullopen" .. math.random(1, 3) .. ".wav", 105, math.random(90, 110), 1, CHAN_AUTO)
 end
 
 local function addBoneInternalBleed(org, amount, cap)
@@ -612,6 +613,17 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	org.consciousness = math.Approach(org.consciousness, 0, brainImpact and dmg * 2 or 0)
 	local brainExposure = math.Clamp(((org.skull or 0) - 0.6) / 0.4, 0, 1)
 	local bluntBrainDamage = 0
+	-- A bullet that cracks the skull but narrowly misses a traced brain hitbox
+	-- should not be consequence-free.  Transfer a small, regional amount of
+	-- trauma for rifle-strength impacts.  The direct organ trace still owns the
+	-- devastating/fatal cases; this specifically supplies the one-lobe injury
+	-- outcome for survivable near-miss headshots.
+	if penetratingHeadHit then
+		local penetratingTrauma = math.max(dmg - 1, 0) * 0.08
+		if penetratingTrauma > 0 then
+			bluntBrainDamage = bluntBrainDamage + math.min(penetratingTrauma, 0.24)
+		end
+	end
 	if brainExposure > 0 and brainImpact then
 		bluntBrainDamage = bluntBrainDamage + dmg * 0.05 * Lerp(brainExposure, 0.35, 1)
 	end

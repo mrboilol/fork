@@ -8,14 +8,15 @@ local module = hg.organism.module.lungs
 
 local BloodO2 = {
 	{5000, 30},
-	{4500, 30},
-	{4000, 29},
-	-- Keep 3000-3500 in the warning range. The incapacitating/otrub
-	-- transition starts with the marked volume-loss range at 2500 and below.
-	{3500, 28},
-	{3000, 23},
-	{2500, 6},
-	{2250, 2},
+	-- Reduced blood volume starts lowering oxygen carrying capacity before it
+	-- becomes an incapacitating hemorrhage.  The 2500-2000 mL band remains the
+	-- collapse window rather than making 3500 mL an automatic otrub threshold.
+	{4500, 27.5},
+	{4000, 25},
+	{3500, 20},
+	{3000, 15},
+	{2500, 10},
+	{2250, 5},
 	{2000, 0},
 }
 
@@ -567,7 +568,7 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		local severityK = math.Clamp((internalBleedPeak - 0.2) / 2.8, 0, 1)
-		local fillTime = Lerp(severityK, 240, 75)
+		local fillTime = Lerp(severityK, 135, 45)
 		local bilateral = internalBleedPeak >= 2.5 or bleedComplication >= 0.7
 		local targetL = (bilateral or org.internalBleedLungSide == "L") and bleedComplication or 0
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and bleedComplication or 0
@@ -575,9 +576,11 @@ module[2] = function(owner, org, timeValue)
 		org.hemothoraxL = math.Approach(org.hemothoraxL, targetL, timeValue / fillTime)
 		org.hemothoraxR = math.Approach(org.hemothoraxR, targetR, timeValue / fillTime)
 	elseif internalBleedVal <= 0.1 then
-		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
-		org.hemothoraxL = max(org.hemothoraxL - timeValue / 180, 0)
-		org.hemothoraxR = max(org.hemothoraxR - timeValue / 180, 0)
+		-- Blood in the pleural space does not vanish on its own. It needs a
+		-- prolonged recovery period unless the player uses a needle.
+		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 480, 0)
+		org.hemothoraxL = max(org.hemothoraxL - timeValue / 360, 0)
+		org.hemothoraxR = max(org.hemothoraxR - timeValue / 360, 0)
 		if org.hemothoraxL <= 0 and org.hemothoraxR <= 0 then org.internalBleedLungSide = nil end
 	end
 
@@ -875,10 +878,22 @@ module[2] = function(owner, org, timeValue)
 
 	end
 
-	-- Blood volume and exertion debt cap tissue oxygen delivery. During cardiac
-	-- arrest, circulation no longer replenishes O2; the remaining (at most 6)
-	-- drains over about 10 s.
-	o2[1] = math.Clamp(min(o2[1], bloodO2Cap, exertionO2Cap), 0, o2.range)
+	-- Blood volume and exertion debt cap tissue oxygen delivery. When circulation
+	-- reaches zero, tissue oxygen reaches zero with it.
+	-- O2[1] is the tissue reserve, so it must follow actual circulation as well
+	-- as lung intake and blood volume.  Without this link a player could have
+	-- 0.4 perfusion while still carrying a full 30-point tissue-O2 reserve.
+	local tissuePerfusion = math.Clamp(org.perfusion or org.cardiacOutput or 1, 0, 1)
+	-- Tissue oxygen is a delivered value, not an independent reservoir. With no
+	-- perfusion there is no delivery, so its cap must be zero as well.
+	local perfusionO2Cap = o2.range * tissuePerfusion
+	org.perfusionO2Cap = perfusionO2Cap
+	if o2[1] > perfusionO2Cap then
+		local deliveryFailure = math.Clamp(1 - tissuePerfusion, 0, 1)
+		o2[1] = math.Approach(o2[1], perfusionO2Cap, timeValue * (1 + deliveryFailure * 8))
+	end
+
+	o2[1] = math.Clamp(min(o2[1], bloodO2Cap, perfusionO2Cap, exertionO2Cap), 0, o2.range)
 	if org.heartstop then
 		org.cardiacArrestO2Start = math.Clamp(org.cardiacArrestO2Start or min(o2[1], 6), 0, 6)
 		local arrestDrainRate = max(org.cardiacArrestO2Start, 0.1) / cardiacArrestO2DrainTime

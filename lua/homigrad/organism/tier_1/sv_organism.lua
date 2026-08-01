@@ -477,22 +477,9 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local dt = timeValue or engine.TickInterval()
 	local resilience = hg.organism.GetResilience(org)
 	local blood = math.max(hg.organism.GetResilientBlood(org), 0)
-	-- Blood loss above 3500 mL should not make the body physically weak. The
-	-- meaningful loss of strength begins around 3000 mL and becomes severe in
-	-- the 3000-2500 mL range. Below 2500 mL is life-threatening; 2000 cannot
-	-- sustain consciousness.
-	local bloodFraction
-	if blood >= 3500 then
-		bloodFraction = 1
-	elseif blood >= 3000 then
-		bloodFraction = math.Remap(blood, 3000, 3500, 0.75, 1)
-	elseif blood >= 2500 then
-		bloodFraction = math.Remap(blood, 2500, 3000, 0.35, 0.75)
-	elseif blood > 2000 then
-		bloodFraction = math.Remap(blood, 2000, 2500, 0, 0.3)
-	else
-		bloodFraction = 0
-	end
+	-- Continuous blood-volume delivery: 1750 mL has no viable perfusion, while
+	-- the exponent preserves partial compensation above the terminal range.
+	local bloodFraction = math.Clamp((blood - 1750) / (5000 - 1750), 0, 1) ^ 0.45
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
 	-- The O2 reservoir can remain nonzero after respiration fails. It is not a
 	-- source of new oxygen, so never let it drive a recovery while curregen is 0.
@@ -513,9 +500,9 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local pump = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.2)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
 
-	-- Whole-body oxygen content follows the old O2 reservoir, but blood volume
-	-- and retained CO2/CO can now force the normalized reserve down directly.
-	local bodyOxygenTarget = math.Clamp(oxygenDelivery * Lerp(bloodFraction, 0.35, 1) * Lerp(hypercapnia, 1, 0.35), 0, 1)
+	-- O2 delivery needs blood to carry it. Its target therefore follows the
+	-- same continuous volume calculation as cardiovascular perfusion.
+	local bodyOxygenTarget = math.Clamp(oxygenDelivery * bloodFraction * Lerp(hypercapnia, 1, 0.35), 0, 1)
 	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, 2.5)
 	-- Arterial loss already lowers blood volume and the circulation target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an

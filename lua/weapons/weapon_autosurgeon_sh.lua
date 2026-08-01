@@ -416,7 +416,32 @@ local function HealBlood(org, config)
 end
 
 local function HealSimple(org, config)
+    local oldSpine1 = tonumber(org.spine1) or 0
+    local oldSpine2 = tonumber(org.spine2) or 0
+    local oldSpine3 = tonumber(org.spine3) or 0
+    local oldPelvis = tonumber(org.pelvis) or 0
     HealFields(org, SimpleFields, config.InjuryHeal)
+
+    -- Spine damage also creates ragdoll constraints.  Healing the organism
+    -- value alone leaves the patient physically broken, so release each
+    -- repaired segment as soon as it crosses its movement threshold.
+    if hg and hg.RemoveSpineConstraints then
+        local organism = hg.organism or {}
+        local spine1Threshold = organism.fake_spine1 or 1
+        local spine2Threshold = organism.fake_spine2 or 1
+        local spine3Threshold = organism.fake_spine3 or 1
+        if (oldSpine1 >= spine1Threshold and (org.spine1 or 0) < spine1Threshold)
+            or (oldPelvis >= 1 and (org.pelvis or 0) < 1) then
+            hg.RemoveSpineConstraints(org.owner, "spine1")
+        end
+        if oldSpine2 >= spine2Threshold and (org.spine2 or 0) < spine2Threshold then
+            hg.RemoveSpineConstraints(org.owner, "spine2")
+        end
+        if oldSpine3 >= spine3Threshold and (org.spine3 or 0) < spine3Threshold then
+            hg.RemoveSpineConstraints(org.owner, "spine3")
+        end
+    end
+
     local heal = config.InjuryHeal
     for _, key in ipairs(RecoveryFields) do
         if isnumber(org[key]) then org[key] = math.Approach(org[key], 0, heal * 12) end
@@ -637,11 +662,6 @@ function SWEP:AttachUnit(owner, target, ply)
     local painkillerAnnounced = false
     local movingSince
 
-    local function QueueRescan()
-        scanning = true
-        QueueUnitSound(unit, ASScanSounds[math.random(#ASScanSounds)])
-    end
-
     unit:CallOnRemove("AutosurgeonCleanup", function()
         timer.Remove(timerName)
         StopUnitSounds(unit)
@@ -786,11 +806,10 @@ function SWEP:AttachUnit(owner, target, ply)
             QueueUnitSound(unit, ASSounds.modeComplete)
             treatmentMode = nil
             modeSwitchPending = true
-            -- Damage can evolve while another category is being repaired
-            -- (for example, ischemia can injure several organs).  Treat each
-            -- completed mode as a full cycle and scan again before selecting
-            -- the next one, rather than immediately advancing next tick.
-            QueueRescan()
+            -- The initial scan has already selected the treatment sequence.
+            -- Continue directly to the next needed mode; rescanning after
+            -- every completed mode caused repeated motions and needless idle
+            -- time before the unit could finish and eject.
         end
     end)
 

@@ -229,12 +229,6 @@ local moodleTexts = {
 		[3] = {title = "Agonal Breathing", description = "Only occasional ineffective breaths remain."},
 		[4] = {title = "Respiratory Arrest", description = "Effective breathing has completely stopped."},
 	}},
-	ribs = {levels = {
-		[1] = {title = "Chest Pain", description = "Rib damage is making movement and breathing painful."},
-		[2] = {title = "Broken Ribs", description = "Several ribs are fractured and may threaten the lungs."},
-		[3] = {title = "Penetrating Rib Injury", description = "Broken ribs are causing severe internal chest trauma."},
-		[4] = {title = "Crushed Rib Cage", description = "Your rib cage is catastrophically broken and unstable."},
-	}},
 	skull = {levels = {
 		[1] = {title = "Skull Trauma", description = "Your skull has sustained a concerning impact."},
 		[2] = {title = "Skull Fissure", description = "A developing crack is weakening your skull."},
@@ -282,12 +276,6 @@ local moodleTexts = {
 		[2] = {title = "Seizure Warning", description = "Muscle control and awareness are becoming unreliable."},
 		[3] = {title = "Imminent Seizure", description = "A severe seizure may begin at any moment."},
 		[4] = {title = "Seizing", description = "You are actively suffering an uncontrolled seizure."},
-	}},
-	lodged = {levels = {
-		[1] = {title = "Lodged Object", description = "One foreign object remains embedded in your body."},
-		[2] = {title = "Multiple Lodged Objects", description = "Two objects are embedded and worsening your injuries."},
-		[3] = {title = "Severely Impaled", description = "Three embedded objects are causing extensive trauma."},
-		[4] = {title = "Critically Impaled", description = "Four or more objects remain lodged throughout your body."},
 	}},
 	internal_bleed = {levels = {
 		[1] = {title = "Minor Internal Bleeding", description = "A small amount of blood is collecting inside your body."},
@@ -411,19 +399,20 @@ local function getMoodle3Icon(effect)
 	local level = effect.level or 1
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
-		stamina = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
+		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
 		carbon_monoxide = "hypoxemia", tachycardia = "arrhythmia", bradycardia = "arrhythmia",
 		arrhythmia = "arrhythmia", palpitations = "fibrillation", fibrillation = "fibrillation",
 		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", blinded = "confused",
-		brain_bleed = "brain-hemorrhage", intracranial_pressure = "intercranial-hypertension",
+		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
-		respiratory_arrest = "respiratory-arrest", ribs = "fractured", skull = "intercranial-hypertension",
+		respiratory_arrest = "respiratory-arrest", skull = "intercranial-hypertension",
 		dislocated_jaw = level >= 4 and "dejawed" or "dislocated", organ_damage = effect.icon, spine_break = "fractured",
 		shock = "shock", seizure = "seizure", internal_bleed = "internal-bleeding",
 		panic = "panic", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
-		adrenaline = "adrenaline", zerlked = "drugged",
+	adrenaline = "adrenaline", zerlked = "drugged",
+		rage = "anger5",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
 	}
 	local name = names[effect.name]
@@ -527,18 +516,20 @@ local function buildEffects(ply, org)
 	local stamina = istable(org.stamina) and org.stamina or nil
 	if stamina then
 		local staminaMax = number(stamina.max, number(stamina.range, 180))
-		if staminaMax >= 200 then
+		local staminaFraction = math.Clamp(number(stamina[1], staminaMax) / math.max(staminaMax, 1), 0, 1)
+		-- Moodle 3 uses one slot for fitness and exertion. Low current stamina
+		-- replaces the fitness state instead of displaying a duplicate icon.
+		local showFitness = not isMoodle3() or staminaFraction >= 0.75
+		if showFitness and staminaMax >= 200 then
 			add(effects, "stamina", "stamina", math.Clamp(math.floor((staminaMax - 200) / 100 * 3 + 1.001), 1, 4), "good", 12, math.floor(staminaMax))
-		elseif staminaMax < 160 then
+		elseif showFitness and staminaMax < 160 then
 			local level = staminaMax < 90 and 4 or staminaMax < 120 and 3 or staminaMax <= 140 and 2 or 1
 			add(effects, "stamina", "stamina", level, "bad", 12, math.floor(staminaMax))
 		end
-		local staminaFraction = math.Clamp(number(stamina[1], staminaMax) / math.max(staminaMax, 1), 0, 1)
 		if staminaFraction < 0.75 then
 			local level = lowRank(staminaFraction, {0.75, 0.5, 0.25, 0.1})
 			-- Moodle 3 reserves tired/very-tired for consciousness. Exertion shows
-			-- actual stamina depletion while the regular stamina moodle still shows
-			-- fitness or a reduced maximum capacity.
+			-- actual stamina depletion in place of the fitness moodle.
 			add(effects, isMoodle3() and "exertion" or "tired", isMoodle3() and "exertion" or "tired", level, "bad", 13, math.floor(staminaFraction * 100) .. "%")
 		end
 	end
@@ -657,8 +648,6 @@ local function buildEffects(ply, org)
 	if thorax > 0.01 then add(effects, "thorax", "superthorax", highRank(thorax, {0.01, 0.1, 0.3, 0.7}), "bad", 35, math.floor(thorax * 100) .. "%") end
 	if org.lungsfunction == false or org.respiratoryArrest == true then add(effects, "respiratory_arrest", "nolungs", 4, "bad", -90) end
 
-	local chest = orgNumber(org, "chest", 0)
-	if chest > 0.3 then add(effects, "ribs", "ribs", highRank(chest, {0.3, 0.6, 0.8, 0.95}), "bad", 52, math.floor(chest * 100) .. "%") end
 	local skull = orgNumber(org, "skull", 0)
 	if skull >= 0.6 then add(effects, "skull", skull >= 1 and "skull2" or "skull1", skull >= 1 and 4 or 3, "bad", 53, math.floor(skull * 100) .. "%") end
 	local jawBroken = orgNumber(org, "jaw", 0) >= 1
@@ -704,11 +693,7 @@ local function buildEffects(ply, org)
 	end
 	local shock = orgNumber(org, "shock", 0)
 	if shock > 10 then add(effects, "shock", "shock", highRank(shock, {10, 20, 30, 40}), "bad", 38, math.floor(shock)) end
-	local seizure = math.Clamp(orgNumber(org, "seizure", 0), 0, 1)
-	if org.seizureActive == true or seizure > 0.1 then add(effects, "seizure", "seizureing", org.seizureActive and 4 or highRank(seizure, {0.1, 0.25, 0.5, 0.75}), "bad", -80) end
-	local lodged = countEntries(org.LodgedEntities)
-	if lodged > 0 then add(effects, "lodged", "lodged", math.min(lodged, 4), "bad", 57, lodged) end
-
+	if org.seizureActive == true then add(effects, "seizure", "seizureing", 4, "bad", -80) end
 	local internalBleed = orgNumber(org, "internalBleed", 0)
 	local complication = orgNumber(org, "internalBleedComplication", 0)
 	if internalBleed > 0.05 then
@@ -911,7 +896,7 @@ local function drawMoodle3Severity(x, y, size, effect, age)
 		if alert then
 			surface.SetMaterial(alert)
 			surface.SetDrawColor(255, 255, 255, math.floor(220 * fadeIn * pulse))
-			surface.DrawTexturedRect(x, y - size * 0.32, size, size * 0.38)
+			surface.DrawTexturedRect(x, y - size, size, size)
 		end
 	end
 end
@@ -1126,8 +1111,9 @@ local function drawMoodles()
 		local icon
 		if type == 2 then
 			-- Berserk is Moodle 3's anger level 5: retain each moodle's frame and
-			-- severity, but replace every active symbol with the break marker.
-			icon = berserkActive and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect)
+			-- severity, but replace every active symbol except its own rage moodle
+			-- with the break marker.
+			icon = berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect)
 		else
 			icon = getIcon(effect.icon)
 		end

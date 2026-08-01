@@ -352,8 +352,10 @@ if CLIENT then
 		local traumatic = net.ReadBool()
 
 		if msg == "" then return end
-		if hg_newthoughts:GetBool() then return end
 
+		-- The server converts known injury keys into thoughts when that mode is
+		-- enabled.  Do not discard ordinary notifications whose key has no thought
+		-- mapping, otherwise they are sent successfully but can never be seen.
 		CreateNotification(msg, showtime, clr, traumatic)
 	end)
 

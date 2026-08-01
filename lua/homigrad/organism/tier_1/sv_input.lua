@@ -34,7 +34,10 @@ local neck_break_kill_force_certain = 2400
 local neck_break_decap_force_start = 1600
 local neck_break_decap_force_certain = 3600
 local player_limb_gib_threshold = 130
-local player_head_gib_threshold = 140
+-- Heads should come apart before limbs under concentrated rifle fire.  This is
+-- still high enough that ordinary rifle rounds need repeated hits, while a
+-- true high-energy headshot can gib a standing target in one hit.
+local player_head_gib_threshold = 120
 local player_stomach_gib_threshold = 260
 local player_blast_limb_gib_threshold = 80
 local player_fall_head_gib_threshold = 1.2
@@ -429,7 +432,10 @@ function hg.organism.AmputateLimb(org, limb)
 			table.insert(wnds, tbl)
 		end
 	end
-	table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery"})
+	-- Amputation has a broad stump bleed, not a full-pressure generic arterial
+	-- jet.  The final marker is consumed by blood/client effects to avoid the
+	-- normal arterial multipliers and excessive spray range.
+	table.insert(wnds, {10, vec, ang, boneup, CurTime(), Vector(-100, 0, 0), bone.."artery", false, true})
 	
 	org.arterialwounds = wnds
 	hg.organism.SyncWounds(org)
@@ -946,7 +952,12 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		if not IsValid(ent) then ent = target.FakeRagdoll end
 		if not IsValid(ent) then
 			attempts = attempts + 1
-			if attempts < 6 then
+			-- Player death and the death ragdoll are not guaranteed to be created in
+			-- the same tick.  A head hit can therefore kill the player successfully
+			-- while the old 0.25 second retry window expires before there is anything
+			-- to gib.  Keep the pending result alive long enough for the ragdoll path
+			-- to finish on busy servers as well.
+			if attempts < 30 then
 				timer.Simple(0.05, finishHeadGib)
 			else
 				target._headGibPending = nil
@@ -1286,6 +1297,13 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	local directBrainDamageThisHit = org._directBrainDamageThisHit == true
 	local bulletHitVitalThisHit = org._bulletHitVitalThisHit == true
+	-- `fatalBrainShotCandidate` used to be referenced below without ever being
+	-- created.  As a result, even a traced, unarmored brain hit could not use
+	-- the fatal-brain path.  Keep this deliberately limited to real head entry
+	-- wounds so body shots that happen to reach an organ trace cannot trigger it.
+	local fatalBrainShotCandidate = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+		and entryHitgroup == HITGROUP_HEAD
+		and not (org.owner and org.owner.armors and org.owner.armors["head"] ~= nil)
 	org._bulletImpactHitgroup = nil
 	org._directBrainDamageThisHit = nil
 	org._bulletHitVitalThisHit = nil
@@ -1677,6 +1695,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local lend = math.max(0.1, (ent:GetPos() - dmgInfo:GetDamagePosition()):Length())
 	local damageStack = dmg_before / (dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and RagdollDamageBoneMul[hitgroup] or 1)
 	if dmgInfo:IsDamageType(DMG_SLASH + DMG_CLUB + DMG_GENERIC) then damageStack = damageStack * melee_gib_damage_mul end
+	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
+		-- The hitgroup damage is intentionally reduced for normal ragdoll physics,
+		-- then restored above for the gib calculation.  Give only high-energy
+		-- rounds an additional cranial destruction bonus; a Beowulf-class round
+		-- remains a severe survivable head injury unless it actually reaches brain.
+		local highCaliberImpact = math.Clamp((dmg_before - 75) / 75, 0, 1)
+		damageStack = damageStack * Lerp(highCaliberImpact, 1, 1.75)
+	end
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.HeadGibDamageMul then damageStack = damageStack * inf.HeadGibDamageMul end
 	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_SLASH) then damageStack = damageStack * 25 end
 	local inflictorClass = IsValid(dmgInfo:GetInflictor()) and dmgInfo:GetInflictor():GetClass() or ""

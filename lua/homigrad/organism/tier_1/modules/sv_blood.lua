@@ -149,6 +149,7 @@ local hold_wound_arterial_slow_mul = 0.2
 local hold_wound_clot_mul = 1.35
 local hold_wound_clot_twohand_mul = 1.6
 local arterial_bleed_rate_mul = 0.9
+local amputation_arterial_bleed_mul = 0.35
 
 local function hasWound(wounds, target)
 	if not target or not wounds then return false end
@@ -330,8 +331,11 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedPeak = math.max(org.internalBleedPeak or 0, internalBleedSeverity)
 
 		local severityK = math.Clamp(((org.internalBleedPeak or 0) - 0.2) / 2.8, 0, 1)
-		local complicationDelay = Lerp(severityK, 90, 5)
-		local progressionTime = Lerp(severityK, 180, 20)
+		-- Internal injuries must have time to develop consequences. Even a
+		-- moderate untreated bleed can now progress into shock or a hemothorax,
+		-- while catastrophic trauma still deteriorates much faster.
+		local complicationDelay = Lerp(severityK, 45, 5)
+		local progressionTime = Lerp(severityK, 105, 18)
 		local severityLimit = math.Clamp((org.internalBleedPeak or 0) / 2, 0.1, 1)
 		local complicationTarget = math.Clamp(((org.internalBleedDuration or 0) - complicationDelay) / progressionTime, 0, 1) * severityLimit
 
@@ -529,13 +533,14 @@ module[2] = function(owner, org, mulTime)
 	local heldCarotidWound = false
 	for i, wound in pairs(org.arterialwounds) do
 		local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
+		local amputationMul = wound[9] and amputation_arterial_bleed_mul or 1
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		if wound[7] == "arteria" and org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound then
 			heldCarotidWound = true
 		end
-		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80 * tourniquetBleedMul
+		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * amputationMul * math.max(pulse, 20) / 80 * tourniquetBleedMul
 		bleedoutspeed2 = bleedoutspeed2 + passiveArterialBleed
-		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
+		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * amputationMul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
 		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
 		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
 		wound.visualBleedRate = passiveArterialBleed + arterialBleed
@@ -543,9 +548,9 @@ module[2] = function(owner, org, mulTime)
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * math.max(pulse, 20) / 80 * tourniquetBleedMul, 1)
+			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * amputationMul * math.max(pulse, 20) / 80 * tourniquetBleedMul, 1)
 			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) then
-			local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
+			local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * amputationMul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
 			pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
 			org.blood = max(org.blood - pumpBleed, 1)
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
@@ -614,23 +619,26 @@ module[2] = function(owner, org, mulTime)
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.01 * totalAdrenaline, 0)
 	end
 
-	local bleed = org.internalBleed / 55 -- + org.lungsR[3] + org.lungsL[3]
+	-- Internal blood loss is deliberately significant: a 0.3 injury is a
+	-- several-minute emergency, while severe torso trauma can rapidly become
+	-- fatal without hemostatic treatment.
+	local bleed = org.internalBleed / 4 -- + org.lungsR[3] + org.lungsL[3]
 	
 	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
 	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
 	local internalBleedHeal = org.internalBleedHeal or 0
 
-	-- internalBleedHeal actively helps against internal bleeding; natural healing works if liver is healthy or acid is present
-	local healRate = (internalBleedHeal > 0 or canHealInternalBleed) and mulTime / 2 or mulTime / 55
-
-	-- Excess internalBleedHeal significantly accelerates healing
-	if internalBleedHeal > org.internalBleed then
-		healRate = healRate * math.min(1 + (internalBleedHeal - org.internalBleed) * 0.5, 4)
+	-- Do not let an untreated internal injury seal itself in a fraction of a
+	-- second. Natural clotting is intentionally slow; medication provides a
+	-- meaningful but non-instant rescue path.
+	local healRate = mulTime / (canHealInternalBleed and 150 or 300)
+	if internalBleedHeal > 0 then
+		healRate = healRate + mulTime * math.Clamp(internalBleedHeal / 100, 0.015, 0.15)
 	end
 
 	org.internalBleed = math.Approach(org.internalBleed, 0, healRate)
 	coagulatespeed = coagulatespeed + mulTime
-	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 2)
+	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 30)
 
 	-- Do not tie the internal-bleeding alert to vomiting: pneumothorax and
 	-- hemothorax can also cause nausea. Only report it while blood is actually
@@ -691,7 +699,6 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
-	org.bleed = (bleedoutspeed + bleedoutspeed2)
 	org.venousBleed = bleedoutspeed
 	org.arterialBleed = bleedoutspeed2
 	org.internalBleedRate = bleed

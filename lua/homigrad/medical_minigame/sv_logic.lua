@@ -418,8 +418,12 @@ hg.MedicalMinigame.GetMedicalMinigameType = GetMedicalMinigameType
 
 local function GetMinigameModeValueIndex(wep, minigameType)
     if minigameType == "tourniquet" then
-        if wep:GetClass() == "weapon_medkit_sh" then
-            return 4
+        -- Tiered medkits build their supply slots dynamically, so their
+        -- tourniquet is not necessarily in the base medkit's fourth slot.
+        -- Consume the active mode instead of falling back to slot one
+        -- (bandages).
+        if wep:GetClass() == "weapon_medkit_sh" or wep.HGMedkitTier then
+            return wep.mode or 1
         end
 
         return 1

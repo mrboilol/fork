@@ -245,6 +245,31 @@ function PANEL:InitializeMarkup()
     return markup.Parse(text)
 end
 
+function PANEL:GetSplashLines(maxWidth)
+    maxWidth = math.max(1, math.floor(maxWidth or 1))
+    local text = self.SplashText or ""
+    local lines, line = {}, ""
+
+    surface.SetFont("ZCity_Menu_Tiny")
+    for word in string.gmatch(text, "%S+") do
+        local candidate = line == "" and word or line .. " " .. word
+        local candidateWidth = surface.GetTextSize(candidate)
+
+        if line != "" and candidateWidth > maxWidth then
+            table.insert(lines, line)
+            line = word
+        else
+            line = candidate
+        end
+    end
+
+    if line != "" then
+        table.insert(lines, line)
+    end
+
+    return lines
+end
+
 local color_red = Color(255,25,25,45)
 local clr_gray = Color(255,255,255,25)
 local clr_verygray = Color(10,10,19,235)
@@ -932,7 +957,8 @@ function PANEL:Init()
         local drawW = math.min(MenuUnit(menu_title.width), maxW)
         local drawH = drawW * logoAspect
         surface.SetFont("ZCity_Menu_Tiny")
-        local _, splashH = surface.GetTextSize(self.SplashText or "")
+        local _, lineH = surface.GetTextSize("W")
+        local splashH = lineH * #self:GetSplashLines(maxW)
         this:SetTall(math.ceil(drawH * (1 + menu_live.title_hover_scale) + splashH + MenuUnit(menu_title.splash_spacing + 7)))
     end
     logoPanel.Paint = function(this, w, h)
@@ -944,14 +970,22 @@ function PANEL:Init()
         local baseH = baseW * logoAspect
         local drawW = baseW * scale
         local drawH = baseH * scale
+        local splashLines = self:GetSplashLines(maxW)
+        surface.SetFont("ZCity_Menu_Tiny")
+        local _, lineH = surface.GetTextSize("W")
+        local splashH = lineH * #splashLines
         local maxX = math.max(0, w - drawW)
-        local maxY = math.max(0, h - drawH - MenuUnit(menu_title.splash_spacing + 3))
+        local maxY = math.max(0, h - drawH - splashH - MenuUnit(menu_title.splash_spacing + 3))
         local drawX = math.Clamp(MenuUnit(menu_title.offset_x) + driftX + shakeX, 0, maxX)
         local drawY = math.Clamp(driftY + shakeY, 0, maxY)
         surface.SetDrawColor(255, 255, 255, 255)
         surface.SetMaterial(LogoistMat)
         surface.DrawTexturedRect(drawX, drawY, drawW, drawH)
-        draw.SimpleText(self.SplashText or "", "ZCity_Menu_Tiny", drawX, drawY + drawH + MenuUnit(menu_title.splash_spacing), Color(105, 105, 105), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        local splashY = drawY + drawH + MenuUnit(menu_title.splash_spacing)
+        for _, line in ipairs(splashLines) do
+            draw.SimpleText(line, "ZCity_Menu_Tiny", drawX, splashY, Color(105, 105, 105), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            splashY = splashY + lineH
+        end
     end
 
 

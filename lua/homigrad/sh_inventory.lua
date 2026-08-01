@@ -312,7 +312,8 @@ if CLIENT then
 		local cols = ScrW() < 900 and 5 or 6
 		local gap = math.max(math.floor(ScrH() * 0.004), 4)
 		local scrollLane = 16
-		local minRows = ScrH() < 720 and 6 or 7
+		-- Keep more item rows visible before the loot grid needs scrolling.
+		local minRows = ScrH() < 720 and 8 or 9
 		local boardMaxW = sizeX - 28 - scrollLane
 		local boardMaxH = sizeY - 88
 		local cell = math.floor(math.max(math.min((boardMaxW - (cols + 1) * gap) / cols, (boardMaxH - (minRows + 1) * gap) / minRows), 42))
