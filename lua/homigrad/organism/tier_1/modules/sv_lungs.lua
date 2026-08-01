@@ -8,12 +8,14 @@ local module = hg.organism.module.lungs
 
 local BloodO2 = {
 	{5000, 30},
-	-- Hemorrhagic hypoxia becomes incapacitating at 4200 mL.  This has to cap
-	-- tissue O2 below the unconsciousness band here, rather than waiting for
-	-- the circulation model to collapse around 2500 mL.
-	{4500, 27.5},
-	{4200, 4},
-	{3500, 2},
+	-- Preserve useful oxygen delivery through compensated blood loss. The old
+	-- curve dropped tissue O2 to 4 at 4200 mL and 2 at 3500 mL, causing lethal
+	-- hypoxia long before the hemorrhage system's 2500-2000 mL collapse range.
+	{4500, 29},
+	{3500, 25},
+	{3000, 20},
+	{2500, 10},
+	{2250, 5},
 	{2000, 0},
 }
 

@@ -1009,17 +1009,21 @@ function SWEP:ApplyRecoilCameraKick()
 	local pistolMul = self:IsPistolHoldType() and 1.08 or 1
 	local kickScale = math.Clamp(baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * self:GetCharacterRecoilMul() * self:GetArmHealthHandlingMul(), 0.1, 4)
 
-	-- This runs client-side after the authoritative trace has been captured, so
-	-- a fresh random impulse is safe and avoids every weapon repeating the same
-	-- recoil sequence after a reload.
-	local sideRand = math.Rand(-1, 1)
-	local rollRand = math.Rand(-1, 1)
-	local gangstaHold = ply.posture == 7
-	local pitchKick = gangstaHold and -0.12 * kickScale or -0.68 * kickScale
-	local yawKick = gangstaHold and 0.72 * kickScale or 0.07 * kickScale * sideRand
-	local rollKick = gangstaHold and 0 or 0.08 * kickScale * rollRand
+	-- PrimarySpread owns the random impulse. Reusing it here prevents several
+	-- unrelated camera layers from forcing every shot back into the same up-right
+	-- path. Both clockwise-canted holds naturally drive left.
+	local cantedHold = ply.posture == 7 or ply.posture == 9
+	local recoilDir = self.LastRecoilDirection
+	if not isangle(recoilDir) then
+		recoilDir = cantedHold and Angle(0, -0.9, 0) or Angle(-0.8, math.Rand(-0.5, 0.5), 0)
+	end
+	local pitchKick = recoilDir[1] * kickScale
+	local yawKick = recoilDir[2] * kickScale * (cantedHold and 1.05 or 0.72)
+	local rollKick = recoilDir[3] * kickScale * 0.65
 	local punchAng = Angle(pitchKick, yawKick, rollKick)
 	local coolCamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera"):GetBool()
+	local realismMul = GetGlobalBool("FullRealismMode", false) and 1.7 or 1
+	punchAng:Mul(realismMul * (self.ScreenRecoilMul or 1))
 
 	if coolCamera then
 		ViewPunch(punchAng * 0.7)
@@ -2636,10 +2640,15 @@ function SWEP:GetAdditionalValues()
 		-- give the muzzle a real upward displacement as well, proportional to the
 		-- same shot impulse.  This is separate from the pitch kick so its vertical
 		-- offset remains visible on weapons with short barrels or low pitch recoil.
-		self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 7.5
+		local cantedHold = ply.posture == 7 or ply.posture == 9
+		if cantedHold then
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos * 7.5
+		else
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + animpos * 4.5
+		end
 		self.AdditionalAng2[2] = self.AdditionalAng2[2] + math.sin(animpos3) * -0.12 * shit2
 		
-		local recoilSeed = math.floor(self.SprayI or 0)
+		local recoilSeed = math.floor((self:LastShootTime() or 0) * 1000) + math.floor(self.SprayI or 0) * 37 + self:EntIndex() * 101
 		self.AdditionalPos2:Add(Vector(
 			util.SharedRandom("hg_recoil_pos_x", -0.02, 0.02, recoilSeed + 101),
 			util.SharedRandom("hg_recoil_pos_y", -0.015, 0.015, recoilSeed + 211),
@@ -2650,25 +2659,20 @@ function SWEP:GetAdditionalValues()
 		
 		if self.podkid or self:IsPistolHoldType() then
 			local animpos2 = self:GetAnimShoot2(0.05 * mulhuy / host_timescale(), true)
-			local canted = ply.posture == 7
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (canted and -8 or -24) * (self.podkid or 1)
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (canted and 7 or 1.25) * (self.podkid or 1)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (canted and 8 or 2.5) * (self.podkid or 1)
+			-- The directional impulse below owns angular recoil. Keep only the small
+			-- posture-specific hand snap here; the old fixed +20 yaw overwhelmed every
+			-- random component and made pistols travel right on every shot.
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * (cantedHold and 0 or -3) * (self.podkid or 1)
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * (cantedHold and -6 or 0) * (self.podkid or 1)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * (cantedHold and -2 or 0) * (self.podkid or 1)
 			animpos2 = animpos2 * weaponRecoilMul
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + animpos2 * 20 * (self.podkid or 1)
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 10 * (self.podkid or 1)
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -5 * (self.podkid or 1)
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * (cantedHold and 2.5 or 1) * (self.podkid or 1)
 		end
 
-		-- Firing wobble + recoil divergence: instead of punching the camera, physically
-		-- swing the GUN model around. This is driven mostly through pitch (AdditionalAng2[1])
-		-- and roll (AdditionalAng2[3]) - which rotate the gun and its muzzle without feeding
-		-- the camera-spray path (that path only reads the yaw [2] + Pos2[2] terms). So the
-		-- gun visibly wobbles/climbs, the muzzle (and therefore the bullet trajectory) goes
-		-- with it, and when recoil knocks the sights off target the rounds follow the gun.
-		-- Uses sine-of-time + a shared-random per-shot pattern so the server-authoritative
-		-- trajectory stays consistent with the client view.
+		-- Firing wobble + recoil divergence physically swings the rendered gun through
+		-- pitch, yaw and roll. The camera receives the same shot direction separately;
+		-- keeping those layers coherent makes the sights and follow-up aim move together.
+		-- Time-based sway supplies a damped recovery tail between individual impulses.
 		local wobbleDt = dtime or FrameTime()
 		local support = self:GetHandSupportState(ply)
 		local sinceShot = CurTime() - (self:LastShootTime() or 0)
@@ -2714,22 +2718,31 @@ function SWEP:GetAdditionalValues()
 		if recoilDecay > 0.001 then
 			local sprayI = self.SprayI or 0
 			local climb = 0.45 + math.Clamp(sprayI / 7, 0, 1) * 0.55
-			local seed = math.floor(sprayI)
-			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
-			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
-			local pitchRand = util.SharedRandom("hg_recoil_pitch", 0.72, 1.18, seed + 4451)
+			local seed = recoilSeed
+			local recoilDir = CLIENT and self:IsLocal2() and self.LastRecoilDirection or nil
+			local pitchDir, yawDir, rollDir
+			if isangle(recoilDir) then
+				pitchDir, yawDir, rollDir = recoilDir[1], recoilDir[2], recoilDir[3]
+			elseif cantedHold then
+				pitchDir = util.SharedRandom("hg_recoil_pitch_canted", -0.3, 0.24, seed + 4451)
+				yawDir = -util.SharedRandom("hg_recoil_side_canted", 0.72, 1.12, seed)
+				rollDir = util.SharedRandom("hg_recoil_roll_canted", -0.22, 0.22, seed + 9173)
+			else
+				local downKick = util.SharedRandom("hg_recoil_pitch_sign", 0, 1, seed + 2129) < 0.22
+				pitchDir = downKick and util.SharedRandom("hg_recoil_pitch_down", 0.18, 0.55, seed + 4451) or -util.SharedRandom("hg_recoil_pitch_up", 0.58, 1.18, seed + 4451)
+				yawDir = util.SharedRandom("hg_recoil_side", -0.65, 0.65, seed)
+				rollDir = util.SharedRandom("hg_recoil_roll", -0.2, 0.2, seed + 9173)
+			end
 			local kick = recoilDecay * handlingMul * stanceMul * restMul * climb * 2.25
 
-			-- The muzzle owns the follow-through.  A shot retains a readable upward
-			-- component, but each numbered shot gets a bounded side/roll impulse and
-			-- a matching local-space offset, so automatic fire arcs and settles rather
-			-- than tracing one identical diagonal.
-			self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 4.2 * pitchRand
-			self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.9
-			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 1.15
-			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * (0.62 + pitchRand * 0.18)
-			self.AdditionalPos2[2] = self.AdditionalPos2[2] + sideRand * kick * 0.52
-			self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.7 or 2.65) * pitchRand + rollRand * kick * 0.22
+			-- Apply the same four-direction impulse to angle and local-space position,
+			-- so automatic fire arcs and settles rather than tracing one diagonal.
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + kick * 4.2 * pitchDir
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + yawDir * kick * (cantedHold and 1.35 or 0.95)
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollDir * kick * 1.15
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * (0.72 + math.abs(pitchDir) * 0.18)
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + yawDir * kick * (cantedHold and 0.85 or 0.52)
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] - pitchDir * kick * (self:IsPistolHoldType() and 1.7 or 2.65) + rollDir * kick * 0.22
 		end
 	end
 

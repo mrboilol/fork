@@ -616,11 +616,10 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, 
 	return trace, pos, ang
 end
 
--- The rendered weapon contains bob, recoil and pose interpolation.  None of
--- those are authoritative aiming input, and mixing them into the trace made a
--- newly deployed weapon's first shot visibly miss the sight line.  Keep the
--- rendered muzzle origin (and its obstruction check), but always take the
--- firing direction from the stable, non-additional pose.
+-- Keep the rendered muzzle origin for obstruction, but use actual player aim
+-- for a live held weapon. A neutral model transform still contains muzzle and
+-- hold offsets; using it as aim caused the first round to consistently leave
+-- low-left before recoil had even started.
 function SWEP:GetFireTrace()
 	local trace, pos, ang = self:GetTrace(true)
 	local owner = self:GetOwner()
@@ -636,7 +635,22 @@ function SWEP:GetFireTrace()
 	-- Keep the real muzzle origin/obstruction behavior; only replace the stale
 	-- first-shot angle. Re-trace from that muzzle so every bullet implementation
 	-- receives the same corrected snapshot.
-	local stableDir = stableAng:Forward()
+	local firingAng = stableAng
+	if not owner.suiciding and not IsValid(owner.FakeRagdoll) then
+		local aimDir = owner:GetAimVector()
+		local aimTrace = util_TraceLine({
+			start = owner:EyePos(),
+			endpos = owner:EyePos() + aimDir * 8000,
+			filter = {owner, self, self:GetWeaponEntity()}
+		})
+		local convergedDir = aimTrace.HitPos - pos
+		if convergedDir:LengthSqr() > 0.0001 then
+			firingAng = convergedDir:Angle()
+		else
+			firingAng = aimDir:Angle()
+		end
+	end
+	local stableDir = firingAng:Forward()
 	local gun = self:GetWeaponEntity()
 	local correctedTrace = util_TraceLine({
 		start = pos,
@@ -647,9 +661,9 @@ function SWEP:GetFireTrace()
 	self.cache_trace = self.cache_trace or {}
 	self.cache_trace[1] = correctedTrace
 	self.cache_trace[2] = pos
-	self.cache_trace[3] = stableAng
+	self.cache_trace[3] = firingAng
 
-	return correctedTrace, pos, stableAng
+	return correctedTrace, pos, firingAng
 end
 
 SWEP.ShellEject = "EjectBrass_556"
@@ -940,6 +954,15 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 	end
 	bullet.Num = 1
 	bullet.Pellets = numbullet
+	-- FireBullet runs before PrimarySpread increments SprayI. Make only the first
+	-- single-projectile round of a fresh burst use the captured aim exactly; the
+	-- legacy Lua cone otherwise gives that opening shot a repeatable low-left miss.
+	-- Follow-up rounds retain mechanical spread, and pellet weapons retain theirs.
+	if numbullet == 1 and (self.SprayI or 0) == 0 then
+		bullet.Spread = vector_origin
+		bullet.NoHiddenSpread = true
+		bullet.Flags = bit.bor(bullet.Flags or 0, FIRE_BULLETS_FIRST_SHOT_ACCURATE)
+	end
 	
 	bullet.AmmoType = primary.Ammo
 	bullet.TracerName = self.Tracer or "nil"

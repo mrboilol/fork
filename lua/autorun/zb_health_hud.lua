@@ -1299,17 +1299,6 @@ local function draw_status_effects()
 	local base_x = ScrW() + HUD.status_effects_x
 	local base_y = HUD.status_effects_y
 	
-	-- Adjust moodle position when dynamic indicator is at top right (hg_indicator == 1 and indicator is in top-right quadrant)
-	local hg_indicator = GetConVar("hg_indicator")
-	local indMode = hg_indicator and hg_indicator:GetInt() or 0
-	if indMode == 1 and HUD.dynamicIndicator and HUD.dynamicIndicator.active and HUD.dynamicIndicator.x > ScrW() * 0.6 and HUD.dynamicIndicator.y < ScrH() * 0.4 then
-		-- Shift moodles down to not overlap with the dynamic indicator at top right
-		local indicatorBottom = HUD.dynamicIndicator.y + HUD.dynamicIndicator.h + (10 * (ScrH() / 480))
-		if base_y < indicatorBottom then
-			base_y = indicatorBottom
-		end
-	end
-	
 	local spacing = HUD.status_effects_spacing
 	local size = HUD.status_effects_size
 	local currentTime = CurTime()
@@ -2611,13 +2600,6 @@ local function draw_status_tooltips()
     end
 end
 
-local function draw_sprites()
-	if not HUD.enabled then return end
-
-	-- Always use dynamic indicator, remove sprite-based health indication
-	HUD_DrawDynamicIndicator()
-end
-
 hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 	spawnmenu.AddToolMenuOption("Utilities", "Zcity", "ZMoodle_Settings", "Zcity Moodle", "", "", function(panel)
 		panel:ClearControls()
@@ -2634,25 +2616,8 @@ hook.Add("PopulateToolMenu", "ZMoodle_PopulateMenu", function()
 		local currentLang = GetConVarString("mzb_language") or "eng"
 		langCombo:SetText(currentLang == "ru" and "Русский" or "English")
 
-		local indCombo = panel:ComboBox("Tarkov Indicator", "hg_indicator")
-		indCombo:AddChoice("Dynamic Old", "0")
-		indCombo:AddChoice("Dynamic New", "1")
-		indCombo:AddChoice("Furry Only", "2")
-		indCombo:AddChoice("Normal Only", "3")
-		
-		local currentInd = GetConVarString("hg_indicator") or "0"
-		if currentInd == "1" then indCombo:SetText("Dynamic New")
-		elseif currentInd == "2" then indCombo:SetText("Furry Only")
-		elseif currentInd == "3" then indCombo:SetText("Normal Only")
-		else indCombo:SetText("Dynamic Old") end
-		
 		function langCombo:OnSelect(index, value, data)
 			RunConsoleCommand("mzb_language", data)
-			self:SetText(value)
-		end
-
-		function indCombo:OnSelect(index, value, data)
-			RunConsoleCommand("hg_indicator", data)
 			self:SetText(value)
 		end
 		
@@ -2796,6 +2761,5 @@ cvars.AddChangeCallback("mzb_brain_distortion", function(name, old, new)
 end)
 
 hook.Add("HUDPaint", "ZB_Health_Bar", draw_bar)
-hook.Add("HUDPaint", "ZB_Health_Sprites", draw_sprites)
 hook.Add("HUDPaint", "ZB_Health_StatusEffects", draw_status_effects)
 hook.Add("HUDPaint", "ZB_Health_StatusTooltips", draw_status_tooltips)

@@ -17,8 +17,6 @@ SWEP.LowThrowVelocity = 900
 -- A little harder than a thrown brick (16), but still a light plastic box.
 SWEP.ThrowDamage = 18
 SWEP.HeadGibDamageMul = 1000
-SWEP.HeadImpactGibChance = 0.5
-SWEP.HeadImpactKnockout = true
 
 SWEP.WorldModel = "models/tic tacs/winter_green.mdl"
 SWEP.WorldModelReal = "models/weapons/zcity/c_molotov.mdl"
@@ -137,12 +135,10 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	thrown.owner = owner
 	thrown.damage = self.ThrowDamage
 	thrown.MaxSpeed = velocity > 0 and velocity or self.ThrowVelocity
-	-- On a head impact, this either has enough force to take the head off or
-	-- leaves the victim unconscious. ent_throwable applies the random outcome
-	-- only while this collision's damage is being processed.
+	-- A direct head impact must enter Homigrad's head-gib path. That path waits
+	-- for the death ragdoll, removes the head, and marks it amputated; do not
+	-- replace it with a lethal-damage/knockout roll.
 	thrown.HeadGibDamageMul = self.HeadGibDamageMul
-	thrown.HeadImpactGibChance = self.HeadImpactGibChance
-	thrown.HeadImpactKnockout = self.HeadImpactKnockout
 	-- Match thrown bricks and bottles so impact damage enters Homigrad's blunt
 	-- trauma path (bruising, pain, wounds) instead of only reducing health.
 	thrown.DamageType = DMG_CLUB
