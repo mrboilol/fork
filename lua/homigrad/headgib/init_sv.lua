@@ -233,7 +233,6 @@ end
 for _, snd in ipairs(fullBodySounds) do
 	util.PrecacheSound(snd)
 end
-util.PrecacheSound(fullBodyMainSound)
 
 local function getHeadGoreStage(damage)
 	return math.Clamp(math.ceil(math.max((damage or 0) - 175, 0) / 5), 1, 5)
