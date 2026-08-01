@@ -30,8 +30,11 @@ local HypoxiaBands = {
 
 local cardiacArrestO2DrainTime = 20
 local lowStaminaO2Start = 50
-local criticalStaminaO2Start = 20
-local lowStaminaO2DebtMax = 8
+-- Ordinary fatigue should make breathing harder, not turn a short sprint into
+-- an immediate blackout.  Only sustained, near-total exhaustion is allowed to
+-- build enough oxygen debt to cause hypoxia on its own.
+local criticalStaminaO2Start = 10
+local lowStaminaO2DebtMax = 4
 local opioidRespiratoryArrestThreshold = 0.85
 
 local function interpolateCurve(curve, value)
@@ -413,10 +416,13 @@ module[2] = function(owner, org, timeValue)
 	if activelyExerting and staminaValue < lowStaminaO2Start then
 		if staminaValue > criticalStaminaO2Start then
 			local severity = math.Clamp((lowStaminaO2Start - staminaValue) / (lowStaminaO2Start - criticalStaminaO2Start), 0, 1)
-			exertionO2Debt = math.Approach(exertionO2Debt, lowStaminaO2DebtMax * severity, timeValue * 0.8)
+			exertionO2Debt = math.Approach(exertionO2Debt, lowStaminaO2DebtMax * severity, timeValue * 0.45)
 		else
 			local criticalSeverity = math.Clamp((criticalStaminaO2Start - staminaValue) / criticalStaminaO2Start, 0, 1)
-			exertionO2Debt = math.min(exertionO2Debt + timeValue * (0.8 + criticalSeverity * 1.7), o2.range)
+			-- Reaching zero stamina is dangerous only if the player keeps pushing.
+			-- At full exhaustion this takes roughly forty seconds to reach the
+			-- blackout band, giving the player a meaningful chance to stop and rest.
+			exertionO2Debt = math.min(exertionO2Debt + timeValue * (0.2 + criticalSeverity * 0.35), o2.range)
 		end
 	else
 		exertionO2Debt = math.Approach(exertionO2Debt, 0, timeValue * 1.5)
@@ -887,14 +893,23 @@ module[2] = function(owner, org, timeValue)
 	-- perfusion there is no delivery, so its cap must be zero as well.
 	local perfusionO2Cap = o2.range * tissuePerfusion
 	org.perfusionO2Cap = perfusionO2Cap
-	if o2[1] > perfusionO2Cap then
-		local deliveryFailure = math.Clamp(1 - tissuePerfusion, 0, 1)
-		o2[1] = math.Approach(o2[1], perfusionO2Cap, timeValue * (1 + deliveryFailure * 8))
+	-- Do not snap the current reserve to a new cap. A minor, short-lived change
+	-- in cardiac output used to instantly delete O2 here, which made players
+	-- pass out far too often. Intake is still capped above; an existing reserve
+	-- now drains at a rate proportional to the actual delivery failure.
+	local deliveryO2Cap = min(bloodO2Cap, perfusionO2Cap, exertionO2Cap)
+	if o2[1] > deliveryO2Cap then
+		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
+		o2[1] = math.Approach(o2[1], deliveryO2Cap, timeValue * (0.35 + deliveryFailure * 5.5))
 	end
 
-	o2[1] = math.Clamp(min(o2[1], bloodO2Cap, perfusionO2Cap, exertionO2Cap), 0, o2.range)
+	o2[1] = math.Clamp(o2[1], 0, o2.range)
 	if org.heartstop then
 		org.cardiacArrestO2Start = math.Clamp(org.cardiacArrestO2Start or min(o2[1], 6), 0, 6)
+		-- A confirmed arrest has no circulation, unlike the transient output
+		-- fluctuations handled above. Keep its intended small residual reserve,
+		-- then drain that reserve over the arrest window.
+		o2[1] = min(o2[1], org.cardiacArrestO2Start)
 		local arrestDrainRate = max(org.cardiacArrestO2Start, 0.1) / cardiacArrestO2DrainTime
 		o2[1] = math.Approach(o2[1], 0, timeValue * arrestDrainRate)
 	end

@@ -555,16 +555,33 @@ function hg.FullBodyExplode(target, force, dmgInfo)
 
 	if target:IsPlayer() then
 		local ply = target
-		local rag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
+		local rag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll
+			or IsValid(ply:GetNWEntity("RagdollDeath")) and ply:GetNWEntity("RagdollDeath")
+			or ply:GetRagdollEntity()
 		if IsValid(rag) then return hg.FullBodyExplode(rag, force, dmgInfo) end
 		if ply:Alive() then
 			ply.fullbodyexploded = true
 			ply:Kill()
-			timer.Simple(0, function()
+
+			-- Death ragdolls are created by hooks, so they may not exist until a
+			-- subsequent tick. Retry briefly rather than leaving the fresh corpse
+			-- behind when hook order or an instant respawn delays its creation.
+			local attempts = 0
+			local function removeDeathRagdoll()
 				if not IsValid(ply) then return end
-				local rag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply:GetNWEntity("RagdollDeath")
-				if IsValid(rag) then hg.FullBodyExplode(rag, force, dmgInfo) end
-			end)
+
+				local deathRag = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll
+					or IsValid(ply:GetNWEntity("RagdollDeath")) and ply:GetNWEntity("RagdollDeath")
+					or ply:GetRagdollEntity()
+				if IsValid(deathRag) then
+					hg.FullBodyExplode(deathRag, force, dmgInfo)
+					return
+				end
+
+				attempts = attempts + 1
+				if attempts < 4 and not ply:Alive() then timer.Simple(0.05, removeDeathRagdoll) end
+			end
+			timer.Simple(0, removeDeathRagdoll)
 		end
 		return true
 	end

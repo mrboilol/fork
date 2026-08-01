@@ -45,7 +45,7 @@ local function UseDefaultHands(ply)
         local className = string_lower(ply.PlayerClassName or "")
 
         if className == "furry" then
-                return false
+                return not ply.hgUseCoolHands
         end
 
         return string_find(className, "zombie", 1, true) == nil
@@ -81,6 +81,34 @@ function hg.GetHandsWeapon(ply)
 end
 
 if SERVER then
+        util.AddNetworkString("hg_toggle_furry_hands")
+
+        function hg.SetFurryHands(ply, useCoolHands)
+                if not IsValid(ply) or string_lower(ply.PlayerClassName or "") ~= "furry" then return end
+
+                ply.hgUseCoolHands = useCoolHands and true or false
+
+                local class = hg.GetHandsWeaponClass(ply)
+                local hands = ply:GetWeapon(class)
+                if not IsValid(hands) then
+                        hands = ply:Give(class)
+                end
+
+                local otherClass = class == "weapon_hg_coolhands" and "weapon_hands_sh" or "weapon_hg_coolhands"
+                if ply:HasWeapon(otherClass) then
+                        ply:StripWeapon(otherClass)
+                end
+
+                if IsValid(hands) then
+                        ply:SelectWeapon(class)
+                end
+        end
+
+        net.Receive("hg_toggle_furry_hands", function(_, ply)
+                if not IsValid(ply) or string_lower(ply.PlayerClassName or "") ~= "furry" then return end
+                hg.SetFurryHands(ply, not ply.hgUseCoolHands)
+        end)
+
         hook.Add("WeaponEquip", "hg_coolhands_fallback", function(wep, ply)
                 if not IsValid(wep) or wep:GetClass() != "weapon_hands_sh" then return end
                 if not IsValid(ply) or hg.GetHandsWeaponClass(ply) != "weapon_hg_coolhands" then return end
@@ -104,6 +132,16 @@ if SERVER then
                                 ply:SelectWeapon("weapon_hg_coolhands")
                         end
                 end)
+        end)
+else
+        hook.Add("PlayerBindPress", "hg_toggle_furry_hands", function(ply, bind, pressed)
+                if not pressed or bind ~= "+reload" then return end
+                if string_lower(ply.PlayerClassName or "") ~= "furry" then return end
+                if not (input.IsKeyDown(KEY_LALT) or input.IsKeyDown(KEY_RALT)) then return end
+
+                net.Start("hg_toggle_furry_hands")
+                net.SendToServer()
+                return true
         end)
 end
 

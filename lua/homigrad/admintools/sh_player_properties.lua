@@ -693,9 +693,15 @@ properties.Add( "amputate_limb", {
 	Order = 14,
 	MenuIcon = "effects/arc9_eft/evil.png",
 
-	Filter = check,
+	Filter = function(self, ent, ply)
+		if not check(self, ent, ply) then return false end
+
+		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
+		return IsValid(ent) and ent.organism ~= nil
+	end,
 	MenuOpen = function( self, option, ent, tr )
 		ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
+		if not IsValid(ent) or not ent.organism then return end
 
 		local submenu = option:AddSubMenu()
 
@@ -742,7 +748,8 @@ properties.Add( "amputate_limb", {
 		local limb = net.ReadUInt( 8 )
         
 		if not self:Filter(ent, ply) then return end
-        ent = hg.RagdollOwner(ent) or ent
+        ent = hg.RagdollOwner(ent) or hg.GetCurrentCharacter(ent) or ent
+        if not IsValid(ent) or not ent.organism then return end
         
         local dmgInfo = DamageInfo()
 		if limb == 0 then

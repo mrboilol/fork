@@ -88,6 +88,10 @@ function CLASS.On(self, data)
             eightbit.EnableEffect(self:UserID(), eightbit.EFF_PROOT)
 		end
 
+		if hg.SetFurryHands then
+			hg.SetFurryHands(self, false)
+		end
+
 		if self.organism then
 			self.oldbloodtype = self.organism.bloodtype
 			self.organism.bloodtype = "c-"
