@@ -65,7 +65,11 @@ SWEP.AnimsEvents = {
 	},
 	["reload_empty0_0"] = {
 		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magout.ogg") end,
+<<<<<<<< HEAD:lua/weapons/weapon_asval_mod4.lua
 		[0.35] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magin.ogg") end,
+========
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magin.ogg") end,
+>>>>>>>> fe6c2e17 (New inspect sounds, VSK, AK545, ASVALm4, GP25):lua/weapons/weapon_asval.lua
 		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/val/val_boltout.ogg") end,
 		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/val/val_boltin.ogg") end,
 	},

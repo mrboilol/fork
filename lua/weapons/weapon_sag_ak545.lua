@@ -82,8 +82,8 @@ SWEP.AnimsEvents = {
 		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/ak/ak74_magrelease_button.ogg") end,
 		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/ak/akm_magout_metal.ogg") end,
 		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/ak/akm_magin_metal.ogg") end,
-		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/ak/akms_slider_up.ogg") end,
-		[0.83] = function(self) self:EmitSound("weapons/darsu_eft/ak/akms_slider_down.ogg") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/ak/akms_slider_up.ogg") end,
+		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/ak/akms_slider_down.ogg") end,
 	},
 }
 
