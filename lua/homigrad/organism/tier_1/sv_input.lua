@@ -972,6 +972,24 @@ function hg.ExplodeHead(ent, damage, slash, force)
 			hook.Run("OnHeadExplode", ply, ent)
 		end]]
 
+		-- sv_input can be hot-reloaded independently of the head-gib module.  Do
+		-- not mark the ragdoll as exploded until the implementation that removes
+		-- the head bone is actually present; otherwise later hits cannot recover
+		-- and this timer used to throw a nil-global error.
+		if not isfunction(Gib_Input) then
+			include("homigrad/headgib/init_sv.lua")
+		end
+
+		if not isfunction(Gib_Input) then
+			attempts = attempts + 1
+			if attempts < 30 then
+				timer.Simple(0.05, finishHeadGib)
+			else
+				target._headGibPending = nil
+			end
+			return
+		end
+
 		Gib_Input(ent, ent:LookupBone("ValveBiped.Bip01_Head1"), force, damage)
 		
 		ent.organism.headamputated = true
