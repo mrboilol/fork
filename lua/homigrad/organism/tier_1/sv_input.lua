@@ -38,6 +38,10 @@ local player_head_gib_threshold = 140
 local player_stomach_gib_threshold = 260
 local player_blast_limb_gib_threshold = 80
 local player_fall_head_gib_threshold = 1.2
+local full_body_blast_gib_threshold = 3500
+local full_body_blast_damage_threshold = 1000
+local full_body_physics_speed_threshold = 1600
+local full_body_physics_damage_threshold = 1000
 local blast_gib_damage_mul = 700
 local melee_gib_damage_mul = 0.35
 local ragdoll_fall_skull_damage_mul = 1.2
@@ -1680,6 +1684,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--print(damageStack, 3)
 	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER) and 0 or 1) * (ent:IsNPC() and 3 or 1)
 	--damageStack = damageStack * (bullet and bullet.AmmoType and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.Mass or 1) / 8
+	if hg.FullBodyExplode and !org.fullbodyexploded and dmgInfo:IsDamageType(DMG_BLAST) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold) then
+		return hg.FullBodyExplode(ent, dirCool * len, dmgInfo) or true
+	end
 	
 	org.dmgstack = org.dmgstack or {}
 	org.dmgstack[hitgroup] = org.dmgstack[hitgroup] or {}
@@ -2181,7 +2188,7 @@ local function velocityDamage(ent, data)
 	
 	if !ent.organism then return end
 	if dmg * 20 < 0.1 then return end
-	dmg = dmg * 2
+	dmg = dmg * 1.5
 
 	dmg = math.min(dmg, 7)
 
@@ -2242,6 +2249,9 @@ local function velocityDamage(ent, data)
 
 	local org = ent.organism
 	if org.godmode then return end
+	if hg.FullBodyExplode and !org.fullbodyexploded and (speed >= full_body_physics_speed_threshold or rawPhysicsDamage >= full_body_physics_damage_threshold) then
+		if hg.FullBodyExplode(ent, data.OurOldVelocity - data.TheirOldVelocity, dmgInfo) then return end
+	end
 	org.fearadd = org.fearadd + dmg * 0.5
 
 	if not org.superfighter then
@@ -2434,6 +2444,42 @@ local function removeFloppyBoneOffset(rag, key)
     rag.FloppyBoneOffsets[key] = nil
 end
 
+-- Preserve the original snapped-neck pose when the model exposes the expected
+-- head and upper-spine physics bones.  Some custom models do not, so callers
+-- must fall back to the model-agnostic neck implementation below.
+local function tryOriginalNeckFloppy(ragdoll, org)
+	if not IsValid(ragdoll) or not ragdoll:IsRagdoll() then return false end
+	if not org or (org.spine3 or 0) < hg.organism.fake_spine3 then return false end
+	if ragdoll.FloppyConstraints and IsValid(ragdoll.FloppyConstraints.neck) then return true end
+
+	local spineBone = ragdoll:LookupBone("ValveBiped.Bip01_Spine2")
+	local headBone = ragdoll:LookupBone("ValveBiped.Bip01_Head1")
+	if not spineBone or not headBone then return false end
+
+	local spinePhysBone = getPhysBoneForAnimationBone(ragdoll, spineBone)
+	local headPhysBone = getPhysBoneForAnimationBone(ragdoll, headBone)
+	if not spinePhysBone or not headPhysBone or spinePhysBone < 0 or headPhysBone < 0 or spinePhysBone == headPhysBone then return false end
+
+	local spinePhys = ragdoll:GetPhysicsObjectNum(spinePhysBone)
+	local headPhys = ragdoll:GetPhysicsObjectNum(headPhysBone)
+	if not IsValid(spinePhys) or not IsValid(headPhys) then return false end
+
+	local jointPos = headPhys:GetPos() + headPhys:GetAngles():Forward() * -2 + headPhys:GetAngles():Up() * -1.5
+	local localPos = WorldToLocal(jointPos, angle_zero, spinePhys:GetPos(), spinePhys:GetAngles())
+	if not localPos then return false end
+
+	-- This is the original neck break placement and angular range.  It is kept
+	-- separate from the generic implementation because it depends on Spine2.
+	ragdoll:RemoveInternalConstraint(headPhysBone)
+	headPhys:SetPos(spinePhys:GetPos() + spinePhys:GetAngles():Forward() * 12.9 + spinePhys:GetAngles():Right() * -1)
+	local constraintEnt = constraint.AdvBallsocket(ragdoll, ragdoll, spinePhysBone, headPhysBone, localPos, nil, 0, 0, -55, -90, -50, 55, 35, 50, 0, 0, 0, 0, 0)
+	if not IsValid(constraintEnt) then return false end
+
+	ragdoll.FloppyConstraints = ragdoll.FloppyConstraints or {}
+	ragdoll.FloppyConstraints.neck = constraintEnt
+	return true
+end
+
 function hg.BreakNeck(ent, fromDamage, force)
 	print("[HG Floppy] BreakNeck called: ent=" .. tostring(ent) .. " fromDamage=" .. tostring(fromDamage) .. " force=" .. tostring(force))
 	if not IsValid(ent) then
@@ -2442,6 +2488,7 @@ function hg.BreakNeck(ent, fromDamage, force)
 	end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
+
 	print("[HG Floppy] BreakNeck: ply=" .. tostring(ply) .. " isRagdoll=" .. tostring(ent:IsRagdoll()))
 
 	-- A low-force spine3 break remains a paralyzing floppy-neck injury. Higher
@@ -2495,9 +2542,18 @@ function hg.BreakNeck(ent, fromDamage, force)
 		print("[HG Floppy] BreakNeck timer: ragdoll valid")
 		
 		-- Update the organism if available
-		if playerRef.organism then
-			playerRef.organism.spine3 = 1
-			print("[HG Floppy] BreakNeck timer: set spine3 = 1")
+		local org = IsValid(playerRef) and playerRef.organism or ragdoll.organism
+		if org then
+			org.spine3 = math.max(org.spine3 or 0, hg.organism.fake_spine3)
+			print("[HG Floppy] BreakNeck timer: confirmed spine3 break")
+		end
+
+		-- Prefer the established snapped-neck effect for standard ragdolls.  The
+		-- generic version below remains available for models without its bones.
+		if tryOriginalNeckFloppy(ragdoll, org) then
+			if fromDamage then ragdoll:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO) end
+			print("[HG Floppy] BreakNeck timer: applied original neck floppy")
+			return
 		end
 		
 		-- Play sound on the ragdoll (only if from damage, not reapplication)
@@ -3268,7 +3324,7 @@ function hg.BreakLimb(ent, limb, segmentOverride, isDislocated)
         else
             print("[HG Floppy] BreakLimb timer: constraint creation FAILED")
         end
-    end)
+	end)
 end
 
 local function IsPlayerOwnedRagdoll(ent)
@@ -3911,6 +3967,8 @@ hook.Add("Player Spawn", "huyhuyhuy22", function(ply)
 		if !IsValid(ply) or !ply.organism then return end
 		ply.organism.gibhealth = nil
 		ply.organism.stomachgibbed = false
+		ply.organism.fullbodyexploded = false
+		ply.fullbodyexploded = nil
 	end)
 end)
 
