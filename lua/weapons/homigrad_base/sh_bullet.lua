@@ -616,54 +616,11 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, 
 	return trace, pos, ang
 end
 
--- Keep the rendered muzzle origin for obstruction, but use actual player aim
--- for a live held weapon. A neutral model transform still contains muzzle and
--- hold offsets; using it as aim caused the first round to consistently leave
--- low-left before recoil had even started.
+-- Fire along the barrel transform returned by GetTrace.  The muzzle debug's
+-- white marker uses this same trace; converging it onto the owner's eye trace
+-- made bullets travel toward the gray marker instead of where the gun points.
 function SWEP:GetFireTrace()
-	local trace, pos, ang = self:GetTrace(true)
-	local owner = self:GetOwner()
-	if not trace or not pos or not ang or not IsValid(owner) or not owner:IsPlayer() then
-		return trace, pos, ang
-	end
-
-	local desiredPos, desiredAng = self.desiredPos, self.desiredAng
-	local stableTrace, stablePos, stableAng = self:GetTrace(false, nil, nil, nil, nil, true)
-	self.desiredPos, self.desiredAng = desiredPos, desiredAng
-	if not stableTrace or not stablePos or not stableAng then return trace, pos, ang end
-
-	-- Keep the real muzzle origin/obstruction behavior; only replace the stale
-	-- first-shot angle. Re-trace from that muzzle so every bullet implementation
-	-- receives the same corrected snapshot.
-	local firingAng = stableAng
-	if not owner.suiciding and not IsValid(owner.FakeRagdoll) then
-		local aimDir = owner:GetAimVector()
-		local aimTrace = util_TraceLine({
-			start = owner:EyePos(),
-			endpos = owner:EyePos() + aimDir * 8000,
-			filter = {owner, self, self:GetWeaponEntity()}
-		})
-		local convergedDir = aimTrace.HitPos - pos
-		if convergedDir:LengthSqr() > 0.0001 then
-			firingAng = convergedDir:Angle()
-		else
-			firingAng = aimDir:Angle()
-		end
-	end
-	local stableDir = firingAng:Forward()
-	local gun = self:GetWeaponEntity()
-	local correctedTrace = util_TraceLine({
-		start = pos,
-		endpos = pos + stableDir * 8000,
-		filter = {self, gun, not owner.suiciding and owner or NULL, not owner.suiciding and (CLIENT and owner.FakeRagdoll or nil)}
-	})
-
-	self.cache_trace = self.cache_trace or {}
-	self.cache_trace[1] = correctedTrace
-	self.cache_trace[2] = pos
-	self.cache_trace[3] = firingAng
-
-	return correctedTrace, pos, firingAng
+	return self:GetTrace(true)
 end
 
 SWEP.ShellEject = "EjectBrass_556"

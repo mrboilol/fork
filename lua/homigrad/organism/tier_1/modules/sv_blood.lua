@@ -149,7 +149,10 @@ local hold_wound_arterial_slow_mul = 0.2
 local hold_wound_clot_mul = 1.35
 local hold_wound_clot_twohand_mul = 1.6
 local arterial_bleed_rate_mul = 0.9
-local amputation_arterial_bleed_mul = 0.35
+-- An amputated limb must remain an urgent arterial bleed.  This is lower than
+-- the old runaway jet, but high enough to be clearly visible and dangerous
+-- until the stump is controlled.
+local amputation_arterial_bleed_mul = 0.65
 
 local function hasWound(wounds, target)
 	if not target or not wounds then return false end

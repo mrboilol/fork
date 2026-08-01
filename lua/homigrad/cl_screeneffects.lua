@@ -1157,12 +1157,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	local selectedDyingMode = getServerSoundMode("hg_dyingsound", 2)
-	if (selectedDyingMode == 8 or org.incapacitated) and canRetrySound("RemDying1Station", RemDying1Station) then
+	if selectedDyingMode == 8 and canRetrySound("RemDying1Station", RemDying1Station) then
 		sound.PlayFile("sound/rem_dying1.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(org.incapacitated and math.min(org.brain / 0.5 * station:GetLength(), 200) or math.min(math.Rand(0, station:GetLength()), 139))
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				RemDying1Station = station
 				station:EnableLooping(true)
 			end
@@ -2122,11 +2122,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		
 		if o2 > 20 and org.otrub then
 			local otrubMode = getServerSoundMode("hg_otrubsound", 4)
-			local remorseismIncapacitated = org.incapacitated
-			-- An explicit otrub selection takes precedence over the optional dying
-			-- soundtrack.  In particular, mode 4 must remain ngaimcooked instead of
-			-- being muted by the REM dying stack (rem_dying2).
-			local useSelectedOtrubSound = not remorseismIncapacitated and otrubMode ~= 0
+			-- OTRU audio is selected solely by hg_otrubsound.  Remorseism
+			-- incapacitation is a gameplay state, not an audio override: otherwise it
+			-- replaced every configured OTRU track with rem_dying1.
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
@@ -2141,11 +2139,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
-			if remorseismIncapacitated then
-				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-				if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
-			elseif otrubMode == 0 then
+			if otrubMode == 0 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
 			else
@@ -2176,27 +2170,11 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
-			if not remorseismIncapacitated and not useSelectedOtrubSound then
-				local dyingMode = getServerSoundMode("hg_dyingsound", 2)
-				if dyingMode == 6 and IsValid(ItssooverStation) then
-					ItssooverStation:SetVolume(otrubVol)
-				end
-				if dyingMode == 8 then
-					if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-					if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-					if IsValid(RemDying1Station) then RemDying1Station:SetVolume(otrubVol) end
-				elseif dyingMode == 9 then
-					if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
-					if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
-					if IsValid(AltRemDyingStation) then
-						AltRemDyingStation:SetVolume(math.min(otrubVol * alternateDyingBackgroundMul, alternateDyingBackgroundVolume))
-						if AltRemDyingStation:GetTime() >= 120 then AltRemDyingStation:SetTime(0) end
-					end
-					if IsValid(NoiseStation2Dying) then
-						NoiseStation2Dying:SetVolume(math.min(otrubVol, alternateDyingForegroundVolume))
-					end
-				end
-			end
+			-- Do not let a dying-mode station bleed into the selected OTRU sound.
+			if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+			if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
+			if IsValid(AltRemDyingStation) then AltRemDyingStation:SetVolume(0) end
+			if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
 		else
 			if IsValid(NoiseStation) then
 				NoiseStation:SetVolume(0)

@@ -110,7 +110,21 @@ end)
 
 local mat_huy = Material("effects/blood_core")
 local lightcolor = Color(0, 0, 0, 255)
-local arterialBrightness = 70
+
+local function setBloodParticleColor(part, light)
+	if part.artery then
+		-- Arterial blood needs to remain visibly fresh-red even in dark areas;
+		-- multiplying pure red by map lighting made it look almost black indoors.
+		lightcolor.r = math.min(175 + light[1] * 100, 255)
+		lightcolor.g = math.min(24 + light[2] * 38, 90)
+		lightcolor.b = math.min(16 + light[3] * 24, 55)
+	else
+		local normalBrightness = part.kishki and 10 or 20
+		lightcolor.r = math.min(normalBrightness * light[1], 255)
+		lightcolor.g = 0
+		lightcolor.b = 0
+	end
+end
 
 bloodparticles_hook[1] = function(anim_pos, mul)
 	 
@@ -138,21 +152,15 @@ bloodparticles_hook[1] = function(anim_pos, mul)
 			render_SetMaterial(part[4] or mat_huy)
 			if part.kishki then
 				render_SetMaterial(part[4])
-				lightcolor.r = math.min((part.artery and arterialBrightness or 10) * light[1], 255)
-				lightcolor.g = 0
-				lightcolor.b = 0
+				setBloodParticleColor(part, light)
 			else
-				lightcolor.r = math.min((part.artery and arterialBrightness or 20) * light[1], 255)
-				lightcolor.g = 0
-				lightcolor.b = 0
+				setBloodParticleColor(part, light)
 			end
 			render_DrawSprite(pos, part[5], part[6], lightcolor)
 		else
 			local len = (part[2] - part[1]):LengthSqr()
 			render_SetMaterial(mat_huy)
-			lightcolor.r = math.min((part.artery and arterialBrightness or 20) * light[1], 255)
-			lightcolor.g = 0
-			lightcolor.b = 0
+			setBloodParticleColor(part, light)
 			--part.lerpeddiff = LerpVector(FrameTime() * 1, part.lerpeddiff or Vector(), (part[2] - part[1]))
 			--if len > 1 * 1 then
 				render_SetMaterial(mat_huy)
