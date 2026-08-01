@@ -240,10 +240,6 @@ end)
 	end
 end)
 
-local function explode(pos, size, force, owner)
-	for i = 1, amt do impact(pos,vel,mul) end
-end)
-
 net.Receive("hg_fullbody_bloodmist", function()
 	local pos = net.ReadVector()
 	local force = net.ReadVector()
