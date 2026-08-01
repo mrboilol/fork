@@ -2189,6 +2189,7 @@ local function velocityDamage(ent, data)
 	if !ent.organism then return end
 	if dmg * 20 < 0.1 then return end
 	dmg = dmg * 1.5
+	local rawPhysicsDamage = dmg * 20
 
 	dmg = math.min(dmg, 7)
 
