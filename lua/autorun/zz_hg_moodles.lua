@@ -1062,7 +1062,9 @@ local function drawMoodles()
 		local effect = pos.effect
 		local size = pos.size
 		local stableRage = effect.name == "rage"
-		local distortThis = berserkActive and not stableRage
+		-- Rage is also a moodle: let it receive the berserk crack/distortion
+		-- treatment so the effect remains visible even when it is the only one.
+		local distortThis = berserkActive
 		local scale, offsetX, offsetY = 1, 0, 0
 		local repelX, repelY = 0, 0
 

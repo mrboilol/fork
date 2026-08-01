@@ -90,6 +90,9 @@ if SERVER then
 		-- conversion finishes, otherwise it cannot help a current cardiac arrest.
 		org.adrenaline = math.max(org.adrenaline or 0, 1.5)
 		org._adrenalineHoldUntil = math.max(org._adrenalineHoldUntil or 0, CurTime() + 4)
+		-- Keep the dose's circulatory support separate from the adrenaline decay
+		-- curve so a single injector consistently stabilizes a viable patient.
+		org.epinephrineStabilizationUntil = math.max(org.epinephrineStabilizationUntil or 0, CurTime() + 12)
 		-- A dose given during arrest gets one restart attempt in the pulse
 		-- simulation. Sustained adrenaline must not reroll it every tick.
 		if org.heartstop then
@@ -97,6 +100,18 @@ if SERVER then
 			org.epinephrineRestartDose = self.modeValues[1] * 1.5
 		end
 		org.palpitationTreatmentUntil = math.max(org.palpitationTreatmentUntil or 0, CurTime() + 8)
+		if hg.organism and hg.organism.RestoreSupportedOxygen then
+			hg.organism.RestoreSupportedOxygen(org, 0.35, {
+				oxygen = 12, oxygenTarget = 22,
+				bodyoxygen = 0.5, bodyoxygenTarget = 0.8,
+				brainoxygen = 0.5, brainoxygenTarget = 0.8,
+				perfusion = 0.45, perfusionTarget = 0.75,
+				peripheralperfusion = 0.4, peripheralperfusionTarget = 0.7,
+				cerebralPerfusion = 0.45, cerebralPerfusionTarget = 0.75,
+				myocardialOxygen = 0.55, myocardialOxygenTarget = 0.85,
+				hypoxiaTime = 3, severeHypoxiaTime = 0, systemicIschemiaTime = 4
+			})
+		end
 		self:RefreshPerfusionTreatment(ent, 0.2)
 
 		if self.poisoned2 then

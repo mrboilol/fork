@@ -1087,7 +1087,7 @@ players : 1 humans, 0 bots (20 max)
 		end
 	end)
 
-	hook.Add("PreCleanupMap", "noflashesforyouMreowe", function()
+	hook.Add("PreCleanupMap", "noflashesforyounigge", function()
 		hg.flashes = {}
 		amtflashed = 0
 		amtflashed2 = 0

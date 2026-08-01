@@ -832,6 +832,11 @@ module[2] = function(owner, org, timeValue)
 
 
 		o2.curregen = regenerate
+		-- Downstream delivery values must only recover while the lungs are
+		-- actually supplying oxygen. Keeping this separate from the stored O2
+		-- pool prevents stale reserve from making vitals rebound after breathing
+		-- has stopped.
+		org.oxygenIntakeAvailable = regenerate > 0
 
 
 
@@ -858,6 +863,7 @@ module[2] = function(owner, org, timeValue)
 	else
 
 		o2.curregen = 0
+		org.oxygenIntakeAvailable = false
 
 	end
 

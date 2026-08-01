@@ -74,19 +74,18 @@ local function WS_GetWeaponDescription(wep)
 end
 
 local function WS_WrapDescription(text, maxWidth)
-    surface.SetFont("HomigradFontSmall")
+	surface.SetFont("HomigradFontSmall")
 
-    local lines, current = {}, ""
-    for _, word in ipairs(string.Explode(" ", text)) do
-        local candidate = current == "" and word or current .. " " .. word
-        local width = surface.GetTextSize(candidate)
+	local lines, current = {}, ""
+	for _, word in ipairs(string.Explode(" ", text)) do
+		local candidate = current == "" and word or current .. " " .. word
+		local width = surface.GetTextSize(candidate)
 
-        if current ~= "" and width > maxWidth then
-            lines[#lines + 1] = current
-            if #lines == 2 then break end
-            current = word
-        else
-            current = candidate
+		if current ~= "" and width > maxWidth then
+			lines[#lines + 1] = current
+			current = word
+		else
+			current = candidate
         end
     end
 
@@ -105,9 +104,11 @@ local function WS_DrawWeaponDescription(wep, alpha)
     surface.SetFont("HomigradFontSmall")
     local _, lineHeight = surface.GetTextSize("W")
     local padding = 8
-    local height = lineHeight * #lines + padding * 2
-    local x = scrW * 0.5 - maxWidth * 0.5
-    local y = scrH * WS_DescriptionY
+	local height = lineHeight * #lines + padding * 2
+	local x = scrW * 0.5 - maxWidth * 0.5
+	-- Keep every line visible even when a weapon has a long instruction block.
+	-- The old fixed position could push the bottom of the panel off-screen.
+	local y = math.Clamp(scrH * WS_DescriptionY, 8, scrH - height - 8)
 
     draw.RoundedBox(0, x, y, maxWidth, height, Color(0, 0, 0, alpha * 0.72))
     for index, line in ipairs(lines) do

@@ -1450,6 +1450,20 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		org.shock = math.max(org.shock or 0, 40)
 		org.consciousness = 0
 	end
+	-- Remorseism's headshot burst is a hit confirmation, not only a skull-gib
+	-- effect. Send it on a penetrating head hit and rate-limit shotgun pellets.
+	if hitgroup == HITGROUP_HEAD and dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and (org._headshotVisualNext or 0) <= CurTime() then
+		org._headshotVisualNext = CurTime() + 0.08
+		local visualAng = dirCool:LengthSqr() > 0 and dirCool:Angle() or angle_zero
+		net.Start("hg_brainmist")
+			net.WriteEntity(ent)
+			net.WriteVector(dmgPos)
+			net.WriteAngle(visualAng)
+			net.WriteBool(true)
+			net.WriteBool(false)
+			net.WriteBool(false)
+		net.Broadcast()
+	end
 	--print(dmg_before, 1)
 	--if ent:IsRagdoll() then
 		if RagdollForceBoneMul[hitgroup] then len = len * RagdollForceBoneMul[hitgroup] end

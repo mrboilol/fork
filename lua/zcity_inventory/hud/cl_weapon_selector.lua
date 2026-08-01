@@ -39,6 +39,20 @@ function WS.GetPrintName( self )
 	return phrase ~= class and phrase or self:GetPrintName()
 end
 
+local function ZCityGetWeaponDescription(wep)
+    if not IsValid(wep) then return "" end
+
+    local description = wep.Description
+    if not isstring(description) or string.Trim(description) == "" then description = wep.Instructions end
+    if not isstring(description) or string.Trim(description) == "" then description = wep.Purpose end
+    if not isstring(description) then return "" end
+
+    description = language.GetPhrase(description)
+    description = description:gsub("<.->", " ")
+    description = description:gsub("[%s\r\n]+", " ")
+    return string.Trim(description)
+end
+
 WS.Show = 0
 WS.Transparent = 0
 WS.LastSelectedSlot = 0
@@ -208,6 +222,53 @@ local zcity_slot_text = Color(245, 245, 245, 255)
 local zcity_slot_icon_tint = Color(255, 255, 255, 255)
 local zcity_slot_gradient = Material("vgui/gradient-d")
 local ZCityWeaponIconCache = {}
+
+local function ZCityWrapWeaponDescription(text, maxWidth)
+    surface.SetFont("ZCity_SuperTiny")
+
+    local lines, current = {}, ""
+    for word in string.gmatch(text, "%S+") do
+        local candidate = current == "" and word or current .. " " .. word
+        if current ~= "" and surface.GetTextSize(candidate) > maxWidth then
+            lines[#lines + 1] = current
+            current = word
+        else
+            current = candidate
+        end
+    end
+
+    if current ~= "" then lines[#lines + 1] = current end
+    return lines
+end
+
+local function ZCityDrawWeaponDescription(wep, slotX, slotY, slotSize, alpha)
+    local description = ZCityGetWeaponDescription(wep)
+    if description == "" then return end
+
+    local maxWidth = math.min(ScrW() * 0.34, 460)
+    local lines = ZCityWrapWeaponDescription(description, maxWidth - 16)
+    if #lines == 0 then return end
+
+    surface.SetFont("ZCity_SuperTiny")
+    local _, lineHeight = surface.GetTextSize("Hg")
+    local padding = 8
+    local width = maxWidth
+    local height = lineHeight * #lines + padding * 2
+    local x = math.Clamp(slotX + slotSize * 0.5 - width * 0.5, 8, ScrW() - width - 8)
+    local belowY = slotY + slotSize + 10
+    local y = belowY + height <= ScrH() - 8 and belowY or slotY - height - 10
+    y = math.Clamp(y, 8, ScrH() - height - 8)
+
+    surface.SetDrawColor(0, 0, 0, 210 * alpha)
+    surface.DrawRect(x, y, width, height)
+    surface.SetDrawColor(235, 235, 235, 95 * alpha)
+    surface.DrawOutlinedRect(x, y, width, height, 1)
+
+    for index, line in ipairs(lines) do
+        local textY = y + padding + (index - 1) * lineHeight
+        draw.SimpleTextOutlined(line, "ZCity_SuperTiny", x + width * 0.5, textY, Color(240, 240, 240, 255 * alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 1, Color(0, 0, 0, 230 * alpha))
+    end
+end
 
 local function ZCityWepText(wep, key)
     if not IsValid(wep) then return "" end
@@ -783,7 +844,7 @@ function WS.DrawBodySlotSelector(ply)
         local durationK = maxDuration > minDuration and math.Clamp((item.duration - minDuration) / (maxDuration - minDuration), 0, 1) or 0
         local isSelected = item.wep == selected
         local place = ZCityGetBodySlotForWeapon(item.wep)
-        ZCityDrawBodySquare(place, {
+        local drawX, drawY, drawSize = ZCityDrawBodySquare(place, {
             name = WS.GetPrintName(item.wep),
             selected = isSelected,
             wep = item.wep,
@@ -799,6 +860,10 @@ function WS.DrawBodySlotSelector(ply)
             pointer = isSelected,
             progress = isSelected
         })
+
+        if isSelected and drawX and drawY and drawSize then
+            ZCityDrawWeaponDescription(item.wep, drawX, drawY, drawSize, WS.BodyAlpha)
+        end
 
     end
 end

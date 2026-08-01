@@ -8,6 +8,11 @@ local armorBreakShotRanges = {
 }
 
 local armorBrokenProtectionRange = {0.1, 0.2}
+-- Armor remains a hard stop until its condition is low.  A worn plate can be
+-- penetrated, but still takes enough energy out of the round to soften the hit.
+local armorPenetrationCondition = 0.3
+local armorPenetrationDamageMul = 0.55
+local armorPenetrationForceMul = 0.6
 local armorBreakSound = "rem_armorbreak.mp3"
 local armorBreakSoundLevel = 140
 local armorBreakSoundVolume = 2
@@ -352,6 +357,9 @@ function hg.AddArmor(ply, equipment, ent)
 		end
 	end
 
+	ply.armors_health = ply.armors_health or {}
+	ply.armors_health[equipment] = ply.armors_health[equipment] or 1
+
 	ply.armors_shots = ply.armors_shots or {}
 	if not (ply.armors_broken and ply.armors_broken[equipment]) then
 		ply.armors_shots[equipment] = ply.armors_shots[equipment] or hg.GetArmorBreakShotCount(equipment)
@@ -385,6 +393,7 @@ function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
         equipmentEnt:SetAngles(ang or dropAng)
 		equipmentEnt:ReciveData(ent,equipment)
 		equipmentEnt.shotsLeft = ent.armors_shots and ent.armors_shots[equipment] or nil
+		equipmentEnt.condition = ent.armors_health and ent.armors_health[equipment] or nil
 		if brokenMul or ent.armors_broken and ent.armors_broken[equipment] then
 			equipmentEnt.brokenProtectionMul = brokenMul or ent.armors_broken_mul and ent.armors_broken_mul[equipment]
 			hg.SetArmorBrokenEntity(equipmentEnt)
@@ -403,6 +412,9 @@ function hg.DropArmorForce(ent, equipment, pos, ang, vel, brokenMul)
         if IsValid(equipmentEnt) then table.RemoveByValue(ent.armors, equipment) end
 		if ent.armors_shots then
 			ent.armors_shots[equipment] = nil
+		end
+		if ent.armors_health then
+			ent.armors_health[equipment] = nil
 		end
 		if ent.armors_broken then
 			ent.armors_broken[equipment] = nil
@@ -452,6 +464,7 @@ function hg.DropArmor(ply, equipment)
         equipmentEnt:SetAngles(ply:EyeAngles())
 		equipmentEnt:ReciveData(ply,equipment)
 		equipmentEnt.shotsLeft = ply.armors_shots and ply.armors_shots[equipment] or nil
+		equipmentEnt.condition = ply.armors_health and ply.armors_health[equipment] or nil
         
         if placement == "face" and ply:GetNetVar("zableval_masku", false) then
             equipmentEnt.zablevano = true
@@ -463,6 +476,9 @@ function hg.DropArmor(ply, equipment)
         if IsValid(equipmentEnt) then table.RemoveByValue(ply.armors, equipment) end
 		if ply.armors_shots then
 			ply.armors_shots[equipment] = nil
+		end
+		if ply.armors_health then
+			ply.armors_health[equipment] = nil
 		end
         
         if hg.armor[placement][equipment].voice_change then
@@ -604,14 +620,33 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 	
 	scale = scale * (dmgInfo:IsDamageType(DMG_SLASH) and 0.1 or 1)
 	
+	local condition = org.owner.armors_health[armor] or 1
+	local ballistic = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local weakArmor = condition <= (armorData and armorData.penetrationCondition or armorPenetrationCondition)
+		or (org.owner.armors_broken and org.owner.armors_broken[armor])
+
+	-- Do not allow a fresh armor piece to be bypassed solely by a weapon's
+	-- penetration value.  Condition, rather than caliber, decides when a piece
+	-- has become weak enough to let a projectile through.
+	if ballistic and not weakArmor then
+		prot = math.max(prot, 0)
+	end
+
 	ArmorEffect(placement, armor, dmgInfo, org, hit, prot)
-	hg.HandleArmorShot(org, placement, armor, dmgInfo, hit)
-	if armorData and (armorData.conditionDamageMul or armorData.bluntConditionDamageMul or armorData.conditionLossMin or armorData.conditionLossMax) then
+	-- Condition is the equipped armor's durability.  The old shot counter is
+	-- retained for loose armor entities, but must not randomly destroy worn gear
+	-- before its condition has actually degraded.
+	if armorData and protection > 0 then
 		DamageArmorCondition(org.owner, placement, armor, dmg, dmgInfo, hit)
 	end
 
+	if ballistic and weakArmor then
+		dmgInfo:SetDamageForce(dmgInfo:GetDamageForce() * (armorData and armorData.penetrationForceMul or armorPenetrationForceMul))
+		dmgInfo:ScaleDamage(armorData and armorData.penetrationDamageMul or armorPenetrationDamageMul)
+		return 0
+	end
+
 	if prot < 0 then
-		//dmgInfo:ScaleDamage(scale)
 		return 0
 	end
 

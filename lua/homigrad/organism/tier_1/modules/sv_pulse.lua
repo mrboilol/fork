@@ -381,7 +381,9 @@ module[2] = function(owner, org, timeValue)
 	local dropRate = (heart == 0 or org.heartstop or bloodCrash) and timeValue * 6 or timeValue * 5
 	org.pulse = math.Approach(org.pulse, pulse, dropRate)
 	local bloodVolume = getBloodVolume(org)
-	local oxygenation = Clamp(o2, 0, 1)
+	-- Stored O2 may outlast respiration briefly, but it cannot continue to
+	-- sustain the myocardium once the lungs have stopped delivering oxygen.
+	local oxygenation = Clamp(o2 * (org.oxygenIntakeAvailable == false and 0 or 1), 0, 1)
 	local highSpeedPressureShock = updateHighSpeedPressureShock(owner, org, timeValue)
 	local vascularTone = Clamp(1 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
 	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.8
@@ -405,6 +407,19 @@ module[2] = function(owner, org, timeValue)
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
 	org.hypotension = Approach(org.hypotension or 0, hypotensionTarget, hypotensionRate)
 	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
+
+	-- Epinephrine supports a functioning respiratory/circulatory system; it
+	-- must not manufacture cardiac or oxygen recovery after breathing has failed.
+	local epinephrineStabilizing = (org.epinephrineStabilizationUntil or 0) > CurTime()
+		and org.oxygenIntakeAvailable == true and not org.heartstop
+	if epinephrineStabilizing then
+		org.cardiacOutput = math.max(org.cardiacOutput or 0, 0.55)
+		org.strokeVolume = math.max(org.strokeVolume or 0, 0.55)
+		org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.7)
+		org.hypotension = math.min(org.hypotension or 1, 0.45)
+		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 8)
+		org.arrhythmia = Approach(org.arrhythmia or 0, 0, timeValue / 6)
+	end
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
@@ -743,7 +758,10 @@ module[2] = function(owner, org, timeValue)
 		if failedCirculation or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
 		if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	end
-	if org.pulse < 10 or org.brain >= 0.6 then org.heartstop = true end
+	-- A successful AED/epinephrine restart deliberately has a short window to
+	-- rebuild circulation.  Do not immediately overwrite it here just because
+	-- the previous arrest left the pulse at zero or caused temporary hypoxia.
+	if (org.pulse < 10 or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	if org.heartstop then
 		org.heartbeat = 0

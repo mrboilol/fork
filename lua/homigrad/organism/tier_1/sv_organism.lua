@@ -403,6 +403,9 @@ function hg.organism.RestoreSupportedOxygen(org, recovery, floors)
 		-- Cardiac arrest itself marks lungsfunction false in sv_lungs; CPR and
 		-- automated compressions must still work when the airway and lungs are intact.
 		or (org.lungsfunction == false and not org.heartstop)
+		-- Do not let medicine recover delivery from a stale O2 reservoir after
+		-- the lungs have reported zero active intake.
+		or (org.oxygenIntakeAvailable == false and not org.heartstop)
 		or org.respiratoryArrest
 		or (tonumber(org.blood) or 5000) < 2200
 	if criticalFailure then return false end
@@ -474,26 +477,27 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local dt = timeValue or engine.TickInterval()
 	local resilience = hg.organism.GetResilience(org)
 	local blood = math.max(hg.organism.GetResilientBlood(org), 0)
-	-- 4500 starts the altered state, 4000 is clearly noticeable, 3500 weakens
-	-- the body, and 3000 leaves it barely functional and disoriented. The
-	-- 2500-2000 range is life-threatening; 2000 cannot sustain consciousness.
+	-- Blood loss above 3500 mL should not make the body physically weak. The
+	-- meaningful loss of strength begins around 3000 mL and becomes severe in
+	-- the 3000-2500 mL range. Below 2500 mL is life-threatening; 2000 cannot
+	-- sustain consciousness.
 	local bloodFraction
-	if blood >= 4500 then
+	if blood >= 3500 then
 		bloodFraction = 1
-	elseif blood >= 4000 then
-		bloodFraction = math.Remap(blood, 4000, 4500, 0.96, 1)
-	elseif blood >= 3500 then
-		bloodFraction = math.Remap(blood, 3500, 4000, 0.85, 0.96)
 	elseif blood >= 3000 then
-		bloodFraction = math.Remap(blood, 3000, 3500, 0.60, 0.85)
+		bloodFraction = math.Remap(blood, 3000, 3500, 0.75, 1)
 	elseif blood >= 2500 then
-		bloodFraction = math.Remap(blood, 2500, 3000, 0.28, 0.60)
+		bloodFraction = math.Remap(blood, 2500, 3000, 0.35, 0.75)
 	elseif blood > 2000 then
 		bloodFraction = math.Remap(blood, 2000, 2500, 0, 0.3)
 	else
 		bloodFraction = 0
 	end
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
+	-- The O2 reservoir can remain nonzero after respiration fails. It is not a
+	-- source of new oxygen, so never let it drive a recovery while curregen is 0.
+	local oxygenIntakeAvailable = org.oxygenIntakeAvailable ~= false
+	local oxygenDelivery = oxygenIntakeAvailable and oxygen or 0
 	local hypercapnia = math.Clamp(math.Remap(org.CO or 0, 5, 30, 0, 1), 0, 1)
 	local brainTrauma = math.Clamp(org.brain or 0, 0, 1)
 	local venousBleed = math.max(org.venousBleed or 0, 0)
@@ -511,7 +515,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	-- Whole-body oxygen content follows the old O2 reservoir, but blood volume
 	-- and retained CO2/CO can now force the normalized reserve down directly.
-	local bodyOxygenTarget = math.Clamp(oxygen * Lerp(bloodFraction, 0.35, 1) * Lerp(hypercapnia, 1, 0.35), 0, 1)
+	local bodyOxygenTarget = math.Clamp(oxygenDelivery * Lerp(bloodFraction, 0.35, 1) * Lerp(hypercapnia, 1, 0.35), 0, 1)
 	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, 2.5)
 	-- Arterial loss already lowers blood volume and the circulation target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an
@@ -522,9 +526,23 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	org.perfusion = updateNormalizedVital(org.perfusion, perfusionTarget, dt, 0.5, 2.8)
 	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, pump, dt)
-	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
+	local brainTarget = math.Clamp(cerebralPerfusion * Lerp(org.bodyoxygen, 0.35, 1) * oxygenDelivery * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
 	org.brainoxygen = updateNormalizedVital(org.brainoxygen, brainTarget, dt, 0.45, 2.6)
 	org.peripheralperfusion = updateNormalizedVital(org.peripheralperfusion, peripheralTarget, dt, 0.55, 2.8)
+
+	-- A recent epinephrine dose strongly stabilizes oxygen delivery, but only
+	-- while the lungs are providing oxygen and the patient has enough blood to
+	-- carry it. This prevents stat spikes from treating zero regeneration as a
+	-- recoverable state.
+	local epinephrineStabilizing = (org.epinephrineStabilizationUntil or 0) > CurTime()
+		and oxygenIntakeAvailable and not org.heartstop and blood >= 2200
+	if epinephrineStabilizing then
+		org.bodyoxygen = math.max(org.bodyoxygen or 0, 0.55)
+		org.brainoxygen = math.max(org.brainoxygen or 0, 0.55)
+		org.perfusion = math.max(org.perfusion or 0, 0.50)
+		org.peripheralperfusion = math.max(org.peripheralperfusion or 0, 0.45)
+		org.cerebralPerfusion = math.max(org.cerebralPerfusion or 0, 0.50)
+	end
 
 	local rawMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1)
 	local rawGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1)

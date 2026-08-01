@@ -229,22 +229,19 @@ function SWEP:PrimarySpread()
 		mul = mul * (self:IsResting() and 0.1 or 1)
 		mul = math.Clamp(mul, 0.08, 3.5)
 
-		-- Old spray is post-shot camera motion, never a random bullet cone. The
-		-- round already left along the predicted muzzle trace before this moves aim.
-		local angRand = Angle(-math.Rand(0.035, 0.06), math.Rand(-0.016, 0.016), 0)
-		local spray
-
-		if sprayI < 3 then
-			spray = angRand
-		else
-			spray = self.Spray[sprayI] or Angle(0.01, 0)
-		end
+		-- This is post-shot camera motion, never a random bullet cone. Do not use
+		-- the old indexed cosine pattern here: each magazine then followed the same
+		-- rightward path. Recoil still climbs, but every impulse has a bounded,
+		-- independent horizontal component.
+		local climb = math.Clamp(0.035 + sprayI * 0.004, 0.035, 0.11)
+		local angRand = Angle(-math.Rand(climb * 0.7, climb * 1.3), math.Rand(-climb * 0.55, climb * 0.55), 0)
+		local spray = angRand
 		
 		local angranda = AngleRand(self.SprayRand[1], self.SprayRand[2])
 		angranda[3] = 0
 		spray = (spray + angranda * self.addSprayMul * mul * (self.randmul or 1)) * hg_spreadmul:GetFloat()
 
-		local angrand2 = AngleRand(-force, force)
+		local angrand2 = Angle(-force * math.Rand(0.62, 1.18), force * math.Rand(-0.52, 0.52), force * math.Rand(-0.18, 0.18))
 		if not self.SprayRandOnly then
 			local gangstaHold = owner.posture == 7
 			if gangstaHold then
@@ -253,11 +250,11 @@ function SWEP:PrimarySpread()
 				angrand2[2] = rightKick
 				angrand2[3] = 0
 			else
-				local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.62, 10)
-				local yawLimit = math.min(0.28, pitchMag * 0.26 + 0.04)
+				local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.5, 10)
+				local yawLimit = math.min(0.48, pitchMag * 0.42 + 0.06)
 				angrand2[1] = -pitchMag
-				angrand2[2] = math.Clamp(angrand2[2] * 0.45, -yawLimit, yawLimit)
-				angrand2[3] = -angrand2[2] * 0.35
+				angrand2[2] = math.Clamp(angrand2[2], -yawLimit, yawLimit)
+				angrand2[3] = math.Clamp(-angrand2[2] * math.Rand(0.2, 0.5), -0.22, 0.22)
 			end
 			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
 			mul = mul * (self.attachments and self.attachments.grip and not table.IsEmpty(self.attachments.grip) and hg.attachments.grip[self.attachments.grip[1]].recoilReduction or 1)
@@ -271,6 +268,11 @@ function SWEP:PrimarySpread()
 			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1) * screenRecoilMul)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
+
+		-- Render-only muzzle movement gives the weapon follow-through without ever
+		-- rotating a bullet away from the player’s authoritative aim trace.
+		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(-math.Rand(0.12, 0.42) * mul, math.Rand(-0.34, 0.34) * mul, math.Rand(-0.2, 0.2) * mul)
+		self.ShotMuzzleOffset = (self.ShotMuzzleOffset or Vector(0, 0, 0)) + Vector(-math.Rand(0.12, 0.38) * mul, math.Rand(-0.16, 0.16) * mul, math.Rand(-0.1, 0.1) * mul)
 		local angrand3 = Angle(angrand2[1], math.Clamp(angrand2[2] * 0.65, -math.abs(angrand2[1]) * 0.18 - 0.08, math.abs(angrand2[1]) * 0.18 + 0.08), 0)
 
 		local prank3 = math.Rand(-ammoForce, ammoForce) / (ammoForce != 0 and ammoForce or 1) * 2

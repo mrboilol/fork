@@ -76,10 +76,12 @@ function ENT:ApplyData(ply,equipment)
 	ply:SetNWString("ArmorMaterials" .. equipment, self.mat)
 	ply:SetNWInt("ArmorSkins" .. equipment, self.skin or 0)
 	ply.armors_shots = ply.armors_shots or {}
+	ply.armors_health = ply.armors_health or {}
 	ply.armors_broken = ply.armors_broken or {}
 	ply.armors_broken_mul = ply.armors_broken_mul or {}
 	ply.armors_broken[equipment] = self.broken or self:GetNWBool("ArmorBroken", false) or nil
 	ply.armors_broken_mul[equipment] = self.brokenProtectionMul or nil
+	ply.armors_health[equipment] = self.condition or 1
 	ply.armors_shots[equipment] = ply.armors_broken[equipment] and nil or self.shotsLeft or hg.GetArmorBreakShotCount(equipment)
 end
 
@@ -91,6 +93,7 @@ function ENT:ReciveData(ply,equipment)
 	self.skin = ply:GetNWInt("ArmorSkins" .. equipment, self.skin or 0)
 	self:SetSkin(self.skin)
 	self.shotsLeft = ply.armors_shots and ply.armors_shots[equipment] or self.shotsLeft
+	self.condition = ply.armors_health and ply.armors_health[equipment] or self.condition
 	self.brokenProtectionMul = ply.armors_broken_mul and ply.armors_broken_mul[equipment] or self.brokenProtectionMul
 	if ply.armors_broken and ply.armors_broken[equipment] then
 		hg.SetArmorBrokenEntity(self)
@@ -122,7 +125,9 @@ hook.Add("ItemTransfer", "TransferMats", function(ply, ent, placement, armor)
 	ply:SetNWInt("ArmorSkins" .. armor, ent:GetNWInt("ArmorSkins" .. armor))
 	ent:SetNWInt("ArmorSkins" .. armor, nil)
 	ply.armors_shots = ply.armors_shots or {}
+	ply.armors_health = ply.armors_health or {}
 	ply.armors_shots[armor] = ent.armors_shots and ent.armors_shots[armor] or ply.armors_shots[armor]
+	ply.armors_health[armor] = ent.armors_health and ent.armors_health[armor] or ply.armors_health[armor] or 1
 	ply.armors_broken = ply.armors_broken or {}
 	ply.armors_broken_mul = ply.armors_broken_mul or {}
 	ply.armors_broken[armor] = ent.armors_broken and ent.armors_broken[armor] or ply.armors_broken[armor]

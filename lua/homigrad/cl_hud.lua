@@ -518,11 +518,10 @@ local function GetRadialDescription(option)
 	return string.Trim(description)
 end
 
-local function WrapRadialDescription(text, maxWidth, maxLines)
+local function WrapRadialDescription(text, maxWidth)
 	surface.SetFont("HomigradFontRadialDescription")
 	local lines = {}
 	local current = ""
-	local truncated = false
 
 	for word in string.gmatch(text, "%S+") do
 		local candidate = current == "" and word or current .. " " .. word
@@ -531,24 +530,12 @@ local function WrapRadialDescription(text, maxWidth, maxLines)
 		elseif current ~= "" then
 			lines[#lines + 1] = current
 			current = word
-			if #lines >= maxLines then
-				truncated = true
-				break
-			end
 		else
 			current = word
 		end
 	end
 
-	if not truncated and current ~= "" and #lines < maxLines then
-		lines[#lines + 1] = current
-	elseif truncated and #lines > 0 then
-		local last = lines[#lines]
-		while last ~= "" and surface.GetTextSize(last .. "...") > maxWidth do
-			last = string.gsub(last, "%s*%S+$", "")
-		end
-		lines[#lines] = last .. "..."
-	end
+	if current ~= "" then lines[#lines + 1] = current end
 
 	local widest = 0
 	local _, lineHeight = surface.GetTextSize("Hg")
@@ -565,7 +552,7 @@ local function DrawRadialItemDescription(option, itemX, itemY, directionX, iconS
 	if description == "" then return end
 
 	local maxWidth = math.min(screenWidth * 0.22, 420)
-	local lines, textWidth, lineHeight = WrapRadialDescription(description, maxWidth, 6)
+	local lines, textWidth, lineHeight = WrapRadialDescription(description, maxWidth)
 	if #lines == 0 then return end
 
 	local side = directionX >= 0 and 1 or -1

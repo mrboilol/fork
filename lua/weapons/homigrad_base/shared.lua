@@ -1009,9 +1009,11 @@ function SWEP:ApplyRecoilCameraKick()
 	local pistolMul = self:IsPistolHoldType() and 1.08 or 1
 	local kickScale = math.Clamp(baseKick * supportMul * stanceMul * restMul * adsMul * sprayClimb * pistolMul * self:GetCharacterRecoilMul() * self:GetArmHealthHandlingMul(), 0.1, 4)
 
-	local seed = math.floor(sprayI)
-	local sideRand = util.SharedRandom("hg_camkick_side", -1, 1, seed + 1217)
-	local rollRand = util.SharedRandom("hg_camkick_roll", -1, 1, seed + 7331)
+	-- This runs client-side after the authoritative trace has been captured, so
+	-- a fresh random impulse is safe and avoids every weapon repeating the same
+	-- recoil sequence after a reload.
+	local sideRand = math.Rand(-1, 1)
+	local rollRand = math.Rand(-1, 1)
 	local gangstaHold = ply.posture == 7
 	local pitchKick = gangstaHold and -0.12 * kickScale or -0.68 * kickScale
 	local yawKick = gangstaHold and 0.72 * kickScale or 0.07 * kickScale * sideRand

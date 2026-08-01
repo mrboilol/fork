@@ -600,25 +600,17 @@ function SWEP:GetTrace(bCacheTrace, desiredPos, desiredAng, NoTrace, closeanim, 
 	return trace, pos, ang
 end
 
--- A newly drawn/reloaded weapon can become usable one server tick before its
--- smoothed deploy pose reaches the aimed pose. The previous correction only
--- rejected errors above eight degrees, leaving smaller (but still very visible)
--- first-shot offsets in place, especially for physical bullets. Always use the
--- non-recoil pose for the first round while keeping the real muzzle origin.
+-- The rendered weapon contains bob, recoil and pose interpolation.  None of
+-- those are authoritative aiming input, and mixing them into the trace made a
+-- newly deployed weapon's first shot visibly miss the sight line.  Keep the
+-- rendered muzzle origin (and its obstruction check), but always take the
+-- firing direction from the stable, non-additional pose.
 function SWEP:GetFireTrace()
 	local trace, pos, ang = self:GetTrace(true)
 	local owner = self:GetOwner()
 	if not trace or not pos or not ang or not IsValid(owner) or not owner:IsPlayer() then
 		return trace, pos, ang
 	end
-
-	local lastShot = self:LastShootTime() or 0
-	-- Only repair the initial deploy shot. Treating every shot after a short pause
-	-- as a deploy shot discarded the weapon's real sway/recoil pose. Hitscan hid
-	-- most of that mismatch, while physical projectiles visibly left in a
-	-- different direction than the muzzle was pointing.
-	local firstShot = lastShot <= 0
-	if not firstShot then return trace, pos, ang end
 
 	local desiredPos, desiredAng = self.desiredPos, self.desiredAng
 	local stableTrace, stablePos, stableAng = self:GetTrace(false, nil, nil, nil, nil, true)

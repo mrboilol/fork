@@ -392,6 +392,37 @@ local function ApplyAEDRhythmTherapy(org, elapsed)
 	end
 end
 
+-- A restored rhythm needs an immediate oxygen-delivery rebound; otherwise the
+-- hypoxia accumulated during arrest can trigger another arrest before normal
+-- circulation has time to recover.
+local function ApplySuccessfulShockOxygenRecovery(org)
+	if not org then return end
+
+	local recovery = math.Rand(0.35, 0.5)
+	local oxygenStats = {
+		"bodyoxygen",
+		"brainoxygen",
+		"perfusion",
+		"peripheralperfusion",
+		"cerebralPerfusion",
+		"myocardialOxygen"
+	}
+
+	for _, stat in ipairs(oxygenStats) do
+		org[stat] = math.Clamp((tonumber(org[stat]) or 0) + recovery, 0, 1)
+	end
+
+	if istable(org.o2) then
+		local oxygenMax = math.max(tonumber(org.o2.range) or 30, 1)
+		org.o2[1] = math.Clamp((tonumber(org.o2[1]) or 0) + oxygenMax * recovery, 0, oxygenMax)
+	end
+
+	org.hypoxia = math.max((tonumber(org.hypoxia) or 0) - recovery, 0)
+	org.hypoxiaTime = math.max((tonumber(org.hypoxiaTime) or 0) - recovery * 30, 0)
+	org.severeHypoxiaTime = math.max((tonumber(org.severeHypoxiaTime) or 0) - recovery * 20, 0)
+	org.systemicIschemiaTime = math.max((tonumber(org.systemicIschemiaTime) or 0) - recovery * 20, 0)
+end
+
 local function ApplyAEDShock(org)
 	if not org then return end
 
@@ -420,6 +451,7 @@ local function ApplyAEDShock(org)
 		org.pulse = math.max(org.pulse or 0, 50)
 		org.hypotension = math.min(org.hypotension or 1, 0.3)
 		org.cardiacRestartUntil = CurTime() + 4
+		ApplySuccessfulShockOxygenRecovery(org)
 	else
 		-- A failed shock must not turn a living arrhythmia patient into an arrest.
 		org.heartstop = wasArrested
