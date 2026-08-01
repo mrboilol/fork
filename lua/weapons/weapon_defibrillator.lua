@@ -347,9 +347,9 @@ local function IsAEDState(defib, state)
 	return IsValid(defib) and not defib.AEDDropped and defib.AEDState == state
 end
 
--- The pads provide temporary cardiopulmonary support while the AED is attached.
--- This keeps the newer oxygen-delivery and pump stats involved in treatment
--- without repairing physical organ damage or masking a shockable rhythm.
+-- A delivered shock provides a short period of cardiopulmonary support.  Merely
+-- attaching the pads must not improve the patient's condition or mask a
+-- shockable rhythm before the AED has actually discharged.
 local function ApplyAEDLifeSupport(org, elapsed)
 	if not org or not org.alive then return end
 	elapsed = math.max(tonumber(elapsed) or 0, 0)
@@ -464,6 +464,7 @@ local function ApplyAEDShock(org)
 
 	org.defibDeathGrace = CurTime() + 45
 	ApplyAEDLifeSupport(org, 4)
+	ApplyAEDRhythmTherapy(org, 4)
 end
 
 local function BeginAEDShock(defib, ply, getTarget, uses)
@@ -749,7 +750,6 @@ function SWEP:AttachDefib(owner, target, ply)
 	local defibAng = self.DefibAng
 	local defibFemPos = self.DefibFemPos
 	local nextHeartbeat = 0
-	local nextLifeSupport = 0
 	local movingSince
 	local fibrillationLoop
 	local asystolePlayed
@@ -800,11 +800,6 @@ function SWEP:AttachDefib(owner, target, ply)
 		PositionDefib(defib, activeTarget, currentBone, defibPos, defibAng, defibFemPos)
 
 		local org = GetDefibOrganism(ply, activeTarget)
-		if org and nextLifeSupport <= CurTime() then
-			nextLifeSupport = CurTime() + 0.1
-			ApplyAEDLifeSupport(org, 0.1)
-			ApplyAEDRhythmTherapy(org, 0.1)
-		end
 		if org and org.heartstop then
 			if fibrillationLoop and not fibrillationStop then fibrillationStop = CurTime() + 0.4 end
 			if not asystolePlayed then

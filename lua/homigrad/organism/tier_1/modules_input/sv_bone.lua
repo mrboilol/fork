@@ -133,22 +133,21 @@ end
 local function trySkullFractureHemorrhage(org, oldDamage, newDamage)
 	if not hg.organism.AddBrainHemorrhage then return end
 
-	local chance, amountMin, amountMax, rateMin, rateMax
+	local amountMin, amountMax, rateMin, rateMax
 	if oldDamage < 1 and newDamage >= 1 then
-		-- A fully broken skull must create intracranial bleeding.  This is a
-		-- fracture consequence, not merely a cosmetic threshold to display.
-		chance, amountMin, amountMax = 1, 0.06, 0.14
-		rateMin, rateMax = 0.001, 0.0025
+		-- An open skull always produces a substantial traumatic cerebral bleed.
+		amountMin, amountMax = 0.08, 0.16
+		rateMin, rateMax = 0.0015, 0.003
 	elseif oldDamage < 0.6 and newDamage >= 0.6 then
-		chance, amountMin, amountMax = 0.65, 0.025, 0.07
+		-- At 0.6 the skull is fractured enough to transmit and trap blood
+		-- inside the cranium.  Do not leave this threshold to a random roll.
+		amountMin, amountMax = 0.025, 0.07
 		rateMin, rateMax = 0.0004, 0.0012
 	else
 		return
 	end
 
-	if math.Rand(0, 1) <= chance then
-		hg.organism.AddBrainHemorrhage(org, math.Rand(amountMin, amountMax), math.Rand(rateMin, rateMax))
-	end
+	hg.organism.AddBrainHemorrhage(org, math.Rand(amountMin, amountMax), math.Rand(rateMin, rateMax))
 end
 
 local function addBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
@@ -166,7 +165,7 @@ local function addBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
 	end
 end
 
-local function sendSkullFractureGore(org, dmgInfo)
+local function sendSkullFractureGore(org, dmgInfo, openSkull)
 	local ent = hg.GetCurrentCharacter(org.owner)
 	if not IsValid(ent) then ent = org.owner end
 	if not IsValid(ent) then return end
@@ -179,7 +178,7 @@ local function sendSkullFractureGore(org, dmgInfo)
 	net.WriteAngle(ang)
 	net.WriteBool(true)
 	net.WriteBool(false)
-	net.WriteBool(false)
+	net.WriteBool(openSkull == true)
 	net.Broadcast()
 end
 
@@ -593,6 +592,15 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local skullDelta = org.skull - oldDmg
 	trySkullFractureHemorrhage(org, oldDmg, org.skull)
 	markDamagedBone(org, "ValveBiped.Bip01_Head1", org.skull)
+	if oldDmg < 0.6 and org.skull >= 0.6 then
+		-- A displaced fracture opens superficial vessels: emit a visible burst
+		-- immediately, rather than waiting for a later bullet wound effect.
+		sendSkullFractureGore(org, dmgInfo, false)
+	elseif oldDmg < 1 and org.skull >= 1 then
+		-- The complete break is an open cranial wound and deserves the larger,
+		-- wetter effect in addition to the guaranteed cerebral hemorrhage above.
+		sendSkullFractureGore(org, dmgInfo, true)
+	end
 
 	if org.skull == 1 then
 		markBrokenBone(org, "ValveBiped.Bip01_Head1")

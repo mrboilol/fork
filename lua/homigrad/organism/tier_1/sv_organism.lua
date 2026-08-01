@@ -345,9 +345,17 @@ function hg.organism.UpdateIntracranialPressure(org, pressure, timeValue)
 	local bleedStress = math.Clamp((org.brainBleedRate or 0) / 0.0035, 0, 1)
 	local brainTrauma = math.Clamp(org.brain or 0, 0, 1)
 	local skullTrauma = math.Clamp(org.skull or 0, 0, 1)
+	local zerlkers = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or 0
 	local mannitolRelief = math.Clamp((org.mannitol or 0) / 2, 0, 1)
 	local hypoxicEdema = math.Clamp(((org.hypoxiaTime or 0) - 25) / 50, 0, 1) * 0.16
-	local swellingTarget = math.Clamp(hemorrhage * 0.62 + bleedStress * 0.18 + brainTrauma * 0.24 + skullTrauma * 0.06 + hypoxicEdema - mannitolRelief * 0.22, 0, 1)
+	-- A fracture becomes clinically significant at 0.6 and an open skull at 1.0.
+	-- This keeps traumatic skull damage from being a purely cosmetic precursor to
+	-- brain injury: it raises pressure even before the hemorrhage has expanded.
+	local fracturedSkull = math.Clamp((skullTrauma - 0.6) / 0.4, 0, 1)
+	-- A live dose slows the secondary swelling response, buying treatment time.
+	-- The injury and hemorrhage still remain and can become terminal untreated.
+	local traumaResponse = 1 - zerlkers * 0.55
+	local swellingTarget = math.Clamp((hemorrhage * 0.62 + bleedStress * 0.18 + brainTrauma * 0.24 + skullTrauma * 0.06 + fracturedSkull * 0.12 + hypoxicEdema) * traumaResponse - mannitolRelief * 0.22, 0, 1)
 
 	org.brainSwelling = approachVital(org.brainSwelling, swellingTarget, dt, swellingTarget > (org.brainSwelling or 0) and 0.026 or (0.006 + mannitolRelief * 0.02))
 	local icpTarget = math.Clamp((org.brainSwelling or 0) * 0.78 + hemorrhage * 0.24 + bleedStress * 0.12 - mannitolRelief * 0.08, 0, 1)
@@ -370,6 +378,14 @@ function hg.organism.GetResilience(org)
 	return math.max(zerlkers, adrenaline)
 end
 
+-- Zerlkers has a stronger effect than ordinary adrenaline, but only while a
+-- single dose is active. Keeping it separate prevents other stimulants from
+-- inheriting its emergency circulation and trauma benefits.
+function hg.organism.GetZerlkersResistance(org)
+	if not org or (org.zerlkersOverdose or 0) > 0 then return 0 end
+	return math.Clamp(org.zerlkers or 0, 0, 1)
+end
+
 -- Short-lived combat chemistry helps a conscious character stay on their feet
 -- through blunt impacts, without preventing damage or medical incapacitation.
 function hg.organism.GetTraumaRagdollResistance(org)
@@ -389,7 +405,11 @@ function hg.organism.GetTraumaRagdollChanceMul(org)
 end
 
 function hg.organism.GetResilientBlood(org)
-	return math.min((org and org.blood or 5000) + hg.organism.GetResilience(org) * 600, 5000)
+	local resilience = hg.organism.GetResilience(org)
+	local zerlkers = hg.organism.GetZerlkersResistance(org)
+	-- This only extends the compensated low-volume band; it never adds real
+	-- blood or bypasses the 2 L terminal circulation threshold.
+	return math.min((org and org.blood or 5000) + resilience * 600 + zerlkers * 500, 5000)
 end
 
 -- Keep the terminal gasp tied to the actual death event so every fatal route
@@ -464,7 +484,7 @@ function hg.organism.ZerlkersCanPreventOtrub(org)
 	-- failure for conditions that are genuinely close to fatal, rather than the
 	-- moderate vital penalties that normally start an otrub.
 	local terminalBrainDamage = (org.brain or 0) >= 0.38 or (org.brainHemorrhage or 0) >= 0.12
-	local terminalBloodLoss = (org.blood or 5000) < 1750
+	local terminalBloodLoss = (org.blood or 5000) <= 2000
 	local terminalOxygenLoss = oxygen <= 3 or (org._zeroO2Time or 0) > 0
 	local terminalFailure = org.heartstop or org.respiratoryArrest or org.choking or org.neckslit
 
@@ -492,10 +512,18 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 
 	local dt = timeValue or engine.TickInterval()
 	local resilience = hg.organism.GetResilience(org)
-	local blood = math.max(hg.organism.GetResilientBlood(org), 0)
-	-- Continuous blood-volume delivery: 1750 mL has no viable perfusion, while
+	local zerlkers = hg.organism.GetZerlkersResistance(org)
+	-- Resilience can soften shock effects, but it cannot create circulating
+	-- volume. Use actual blood here so 2000 mL is always zero perfusion.
+	local blood = math.max(org.blood or 0, 0)
+	-- Continuous blood-volume delivery: 2000 mL has no viable perfusion, while
 	-- the exponent preserves partial compensation above the terminal range.
-	local bloodFraction = math.Clamp((blood - 1750) / (5000 - 1750), 0, 1) ^ 0.45
+	local bloodFraction = math.Clamp((blood - 2000) / (5000 - 2000), 0, 1) ^ 0.45
+	-- Improve vascular compensation while blood remains above the terminal 2 L
+	-- boundary. The reserve vanishes at that boundary, so Zerlkers cannot create
+	-- circulation from an empty system.
+	local lowBloodReserve = math.Clamp((blood - 2000) / 1000, 0, 1) * zerlkers * 0.35
+	bloodFraction = math.min(bloodFraction + lowBloodReserve, 1)
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
 	-- The O2 reservoir can remain nonzero after respiration fails. It is not a
 	-- source of new oxygen, so never let it drive a recovery while curregen is 0.
@@ -509,7 +537,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local venousPenalty = math.Clamp(venousBleed / 65, 0, 0.18)
 	local internalPenalty = math.Clamp(internalBleed / 45, 0, 0.22)
 	local internalComplicationPenalty = internalBleedComplication * 0.22
-	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35) * (1 - resilience * 0.3)
+	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35) * (1 - resilience * 0.3 - zerlkers * 0.45)
 	local throatPenalty = math.Clamp(org.throatCutPressureShock or 0, 0, 1)
 	local neckPenalty = math.Clamp(org.neckBrainOxygenPenalty or 0, 0, 1)
 	local arterialImpairment = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
@@ -572,7 +600,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	org.perfusionMoveMul = math.min(rawMoveMul + resilience * 0.2, 1)
 	org.perfusionGripMul = math.min(rawGripMul + resilience * 0.15, 1)
 
-	local thresholdMul = 1 - resilience * 0.25
+	local thresholdMul = 1 - resilience * 0.25 - zerlkers * 0.25
 	local badHypoxia = org.brainoxygen < 0.45 * thresholdMul or org.cerebralPerfusion < 0.4 * thresholdMul or org.perfusion < 0.35 * thresholdMul
 	local severeHypoxia = org.brainoxygen < 0.22 * thresholdMul or org.cerebralPerfusion < 0.18 * thresholdMul or org.perfusion < 0.16 * thresholdMul
 	org.hypoxia = math.Clamp(1 - math.min(org.bodyoxygen, org.brainoxygen, org.cerebralPerfusion, org.perfusion), 0, 1)
@@ -596,7 +624,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 		org.systemicIschemiaTime = math.Approach(org.systemicIschemiaTime or 0, 0, dt * 2)
 	end
 
-	local systemicDelay = 20 * (1 + resilience * 0.6)
+	local systemicDelay = 20 * (1 + resilience * 0.6 + zerlkers * 1.2)
 	if ischemiaCauseActive and (org.systemicIschemiaTime or 0) > systemicDelay then
 		local durationRamp = math.Clamp(((org.systemicIschemiaTime or 0) - systemicDelay) / 30, 0, 1)
 		local ischemiaRate = systemicSeverity * Lerp(durationRamp, 0.12, 0.3)
@@ -604,7 +632,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	end
 
 	if owner and owner.IsBerserk and owner:IsBerserk() then return end
-	local delayMul = 1 + resilience * 0.6
+	local delayMul = 1 + resilience * 0.6 + zerlkers * 1.2
 	if org.brainoxygen < 0.55 * thresholdMul and ((org.hypoxiaTime or 0) > 8 * delayMul or (org.severeHypoxiaTime or 0) > 3 * delayMul) then
 		org.consciousness = math.min(org.consciousness or 1, math.Clamp(math.Remap(org.brainoxygen, 0.18, 0.55, 0.05, 1), 0.05, 1))
 	end
@@ -817,7 +845,10 @@ end
 local function send_bareinfo(org)
 	if not IsValid(org.owner) then return end
 
-	org.owner:SetNWBool("SkullBrokenFully", (org.skull or 0) >= 1)
+	local skullDamage = org.skull or 0
+	org.owner:SetNWBool("SkullBrokenPartial", skullDamage >= 0.6 and skullDamage < 1)
+	org.owner:SetNWBool("SkullOpen", skullDamage >= 1)
+	org.owner:SetNWBool("SkullBrokenFully", skullDamage >= 1)
 
 	local sendtable = {}
 
@@ -1987,7 +2018,10 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		if not org.alive and owner:Alive() then owner:Kill() end
 	end
 
-	if not org.otrub and isPly then
+	-- A terminal condition often makes the player unconscious before the next
+	-- normal thought tick.  Keep status thoughts running while they are still
+	-- alive so the dying phrase pool can actually be seen.
+	if isPly and org.alive and owner:Alive() then
 		local mul = hg.likely_to_phrase(owner)
 
 		if not org.likely_phrase then org.likely_phrase = 0 end

@@ -535,15 +535,18 @@ local function fullBodyExplodeAt(pos, force, velocity, org, soundEnt, owner, dmg
 	end
 
 	if IsValid(owner) then
-		-- A corpse can be removed after its owner has already respawned.  The
-		-- removal fallback still creates the gore effect, but must not clear the
-		-- new ragdoll state or kill that live player.
-		if IsValid(soundEnt) or not owner:Alive() then
-			owner.fullbodyexploded = true
-			owner:SetNWEntity("FakeRagdoll", NULL)
-			owner:SetNWEntity("RagdollDeath", NULL)
+		-- Death ragdolls are no longer the owner's active FakeRagdoll by the
+		-- time this runs, so clear only references that still point at this exact
+		-- corpse.  Leaving RagdollDeath behind made clients recreate/show the
+		-- removed body after a full-body gib.
+		owner.fullbodyexploded = true
+		if owner.FakeRagdoll == soundEnt then
 			owner.FakeRagdoll = nil
-			if owner:Alive() then owner:Kill() end
+			owner:SetNWEntity("FakeRagdoll", NULL)
+		end
+		if owner.RagdollDeath == soundEnt or owner:GetNWEntity("RagdollDeath", NULL) == soundEnt then
+			owner.RagdollDeath = nil
+			owner:SetNWEntity("RagdollDeath", NULL)
 		end
 	end
 
@@ -589,7 +592,10 @@ function hg.FullBodyExplode(target, force, dmgInfo)
 
 	local ent = target
 	local org = ent.organism
-	local owner = ent:IsRagdoll() and hg.RagdollOwner(ent) or nil
+	-- hg.RagdollOwner deliberately only reports live fake ragdolls.  A death
+	-- ragdoll still retains .ply, which is the owner we need to clear its stale
+	-- RagdollDeath reference after gibbing it.
+	local owner = ent:IsRagdoll() and (IsValid(ent.ply) and ent.ply or hg.RagdollOwner(ent)) or nil
 	if not org and IsValid(owner) then org = owner.organism end
 	if org and org.godmode then return end
 

@@ -464,12 +464,18 @@ function hg.likely_to_phrase(ply)
 	local arrhythmia = org.arrhythmia or 0
 	local hypotension = org.hypotension or 0
 	local temperature = org.temperature
+	local o2 = org.o2 and org.o2[1] or 30
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
 	local adrenaline = org.adrenaline or 0
 
 	local fearBoost = (fear > 0.75 and adrenaline > 0.5) and 2.0 or 0
 
-	return (broken_dislocated) and 5
+	-- Terminal states need thoughts quickly.  They commonly force unconsciousness
+	-- before the normal low-blood cadence can reach its next phrase.
+	return (org.heartstop) and 6
+		or (o2 < 12) and 4
+		or (blood < 2500) and 3
+		or (broken_dislocated) and 5
 		or (pain > 65) and 5
 		or (panicattack > 0.55 and 1.2)
 		or (temperature < 35 and (temperature < 31 and 1.25 or 0.65))
@@ -542,7 +548,7 @@ local function get_status_message(ply)
 	local most_wanted_phraselist
 
 	if org.heartstop then
-		most_wanted_phraselist = bradycardia_phrases
+		most_wanted_phraselist = near_death_poetic
 	elseif o2 < 12 then
 		-- sv_lungs owns the immediate breathing symptom alerts. Keep periodic
 		-- low-O2 thoughts in the shared dying-status pool so they do not repeat

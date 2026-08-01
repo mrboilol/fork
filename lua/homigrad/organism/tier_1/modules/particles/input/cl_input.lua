@@ -216,7 +216,7 @@ end)
 			ang = headang
 		end
 	end
-	if headshot and not redmist then
+	if headshot then
 		ParticleEffect("headshot", pos, ang)
 		-- Keep the stock headshot effect, but give its physical blood spray enough
 		-- force to visibly travel away from the impact instead of dying at the head.
@@ -226,6 +226,8 @@ end)
 		end
 	end
 	if redmist then
+		-- An open skull retains the normal impact spray above and adds this dense
+		-- local mist, rather than replacing the stronger effect with a smaller one.
 		for i = 1, math.random(1, 2) do
 			local owner = renderEnt or ent
 			local velocity = VectorRand(-18, 18) + ang:Forward() * -8

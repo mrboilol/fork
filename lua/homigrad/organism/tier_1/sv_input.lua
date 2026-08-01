@@ -937,7 +937,17 @@ function hg.ExplodeHead(ent, damage, slash, force)
 	if !IsValid(ent) then return end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	if ply:IsPlayer() and ply:Alive() then ply:Kill() end
+	-- A standing victim has no ragdoll to gib yet.  Make the fatal state explicit
+	-- before killing them so the regular death/fake path creates the corpse that
+	-- finishHeadGib is waiting for, and the player can never recover headless.
+	if IsValid(ply) and ply:IsPlayer() and ply:Alive() then
+		local org = ply.organism
+		if org then
+			org.brain = 1.0
+			org.needfake = true
+		end
+		ply:Kill()
+	end
 	if ent:IsNPC() and ent.organism then ent.organism.shock = 100 end
 	local target = ent
 	target._headGibPending = target._headGibPending or false
@@ -1761,6 +1771,12 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local hitgroup_max = 100
 	if org.isPly then
 		hitgroup_max = hitgroup == HITGROUP_HEAD and player_head_gib_threshold or hitgrouptolimb[hitgroup] and player_limb_gib_threshold or hitgroup_max
+	end
+	-- Once the skull is open there is no intact cranial shell left to absorb a
+	-- follow-up impact.  Keep this scoped to the head so open-skull victims are
+	-- visibly more prone to decapitation without changing ordinary gib balance.
+	if hitgroup == HITGROUP_HEAD and (org.skull or 0) >= 1 then
+		hitgroup_max = hitgroup_max * 0.55
 	end
 	if dmgInfo:IsDamageType(DMG_BLAST) and hitgrouptolimb[hitgroup] then hitgroup_max = player_blast_limb_gib_threshold end
 	local instant = bodyPartMaxHealth and gibStack >= hitgroup_max or gibStack > hitgroup_max

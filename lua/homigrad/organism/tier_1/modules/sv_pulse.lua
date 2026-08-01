@@ -4,8 +4,8 @@ hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
 -- Blood-volume response is deliberately calculated rather than sampled from
--- lookup tables. Perfusion falls continuously and reaches zero at 1750 mL.
-local cardiacArrestBlood = 1750
+-- lookup tables. Perfusion falls continuously and reaches zero at 2000 mL.
+local cardiacArrestBlood = 2000
 local terminalHeartRate = 300
 local peaDuration = 6
 
@@ -18,11 +18,16 @@ end
 
 local function getBloodCompensationRate(blood)
 	blood = tonumber(blood) or 5000
-	-- Every loss of blood increases the compensation rate. The curve is mild at
-	-- first, then accelerates into the terminal range: 70 BPM at 5000 mL and
-	-- 300 BPM at 2000 mL. Any further loss cannot produce a viable faster rate.
-	local loss = math.Clamp((5000 - blood) / (5000 - 2000), 0, 1)
-	return 70 + loss ^ 1.2 * (terminalHeartRate - 70)
+	-- Early blood loss is compensated mostly by vascular tone. Keep 3500 mL in
+	-- the weakness range, then begin palpitations and rhythm instability around
+	-- 3000 mL before the terminal tachycardia at 2000 mL.
+	if blood >= 3000 then
+		local compensatedLoss = math.Clamp((5000 - blood) / 2000, 0, 1)
+		return 70 + compensatedLoss ^ 2 * 95 -- 165 BPM at 3000 mL
+	end
+
+	local decompensation = math.Clamp((3000 - blood) / 1000, 0, 1)
+	return 165 + decompensation ^ 1.15 * (terminalHeartRate - 165)
 end
 
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
@@ -186,7 +191,7 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 	-- Conduction suppression begins in moderate hypothermia and grows toward
 	-- severe hypothermia.
 	local cold = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((2000 - (org.blood or 5000)) / (2000 - cardiacArrestBlood), 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((2250 - (org.blood or 5000)) / (2250 - cardiacArrestBlood), 0, 1)
 	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold, hemorrhagicDecompensation)
 
 	-- Complete/partial AV block is a direct conduction-system injury pattern,
@@ -449,7 +454,7 @@ module[2] = function(owner, org, timeValue)
 	-- node and conduction system progressively lose responsiveness. At terminal
 	-- blood volume, preload failure can also remove the prior tachycardia.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((2000 - bloodNow) / (2000 - cardiacArrestBlood), 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((2250 - bloodNow) / (2250 - cardiacArrestBlood), 0, 1)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	-- Low blood volume produces tachycardia up to the terminal threshold; it
 	-- must not be treated as a bradycardia source before the pump actually fails.
@@ -519,38 +524,58 @@ module[2] = function(owner, org, timeValue)
 	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
 	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 
-	-- Blood loss drives the rhythm continuously toward 300 BPM at 2000 mL; at
-	-- 1750 mL perfusion is zero and circulation cannot be sustained.
+	-- Blood loss drives the rhythm continuously toward 300 BPM at 2000 mL,
+	-- where perfusion is zero and circulation cannot be sustained.
 	local restartCirculationActive = (org.cardiacRestartUntil or 0) > CurTime()
 	if not org.heartstop and bloodNow <= cardiacArrestBlood then
 		org.heartstop = true
 	end
 
-	-- Severe cold and terminal preload failure destabilize the myocardium before
-	-- arrest. Keep transient AF/ectopy visible, but let VF be a no-output
-	-- electrical arrest rather than pretending it is a fast effective pulse.
-	local severeCold = organSystemsEnabled and coldSuppression >= 0.62
+	-- Mild hypothermia produces a slow but organized sinus rhythm. Below 32 C,
+	-- conduction becomes electrically unstable; atrial fibrillation and ectopy
+	-- can appear before deep hypothermia makes ventricular fibrillation likely.
+	-- Keep VF as a no-output electrical arrest rather than a fast effective pulse.
+	local hypothermicArrhythmia = organSystemsEnabled and (org.temperature or 36.7) <= 32
+	local hypothermiaInstability = math.Clamp((32 - (org.temperature or 36.7)) / 4, 0, 1)
 	local terminalHemorrhage = bloodNow <= 2250
-	if not (severeCold or terminalHemorrhage) then
+	if not (hypothermicArrhythmia or terminalHemorrhage) then
 		org.unstableRhythm = nil
 		org.terminalRhythm = nil
 	elseif not org.heartstop and (org.nextColdRhythmRoll or 0) <= CurTime() then
-		org.nextColdRhythmRoll = CurTime() + 3
-		-- Terminal electrical instability belongs to decompensated hemorrhage,
-		-- after the compensated 3000-2250 mL range. It then escalates sharply to
-		-- certain arrest at 1750, leaving a short rescue window near 2250.
-		local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2250, cardiacArrestBlood, 0.3, 1), 0, 1)
-		local instability = math.max(coldSuppression, hemorrhagicDecompensation, hemorrhageInstability)
 		local roll = math.Rand(0, 1)
-		if roll < 0.04 + instability * 0.36 then
-			org.terminalRhythm = "ventricular_fibrillation"
-			org.heartstop = true
-		elseif roll < 0.20 + instability * 0.38 then
-			org.unstableRhythm = "atrial_fibrillation"
-		elseif roll < 0.48 + instability * 0.38 then
-			org.unstableRhythm = "ventricular_ectopy"
+		if terminalHemorrhage then
+			org.nextColdRhythmRoll = CurTime() + 3
+			-- Terminal electrical instability belongs to decompensated hemorrhage,
+			-- after the compensated 3000-2250 mL range. It then escalates sharply to
+			-- certain arrest at 2000, leaving a short rescue window near 2250.
+			local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2250, cardiacArrestBlood, 0.3, 1), 0, 1)
+			local instability = math.max(coldSuppression, hemorrhagicDecompensation, hemorrhageInstability)
+			if roll < 0.04 + instability * 0.36 then
+				org.terminalRhythm = "ventricular_fibrillation"
+				org.heartstop = true
+			elseif roll < 0.20 + instability * 0.38 then
+				org.unstableRhythm = "atrial_fibrillation"
+			elseif roll < 0.48 + instability * 0.38 then
+				org.unstableRhythm = "ventricular_ectopy"
+			else
+				org.unstableRhythm = nil
+			end
 		else
-			org.unstableRhythm = nil
+			-- Isolated hypothermia deteriorates less abruptly than hemorrhagic
+			-- collapse. Let mild/severe cold show ectopy or AF first; VF becomes a
+			-- real but still uncommon event below 30 C.
+			org.nextColdRhythmRoll = CurTime() + 6
+			local deepCold = math.Clamp((30 - (org.temperature or 36.7)) / 2, 0, 1)
+			if roll < deepCold * 0.08 then
+				org.terminalRhythm = "ventricular_fibrillation"
+				org.heartstop = true
+			elseif roll < 0.03 + hypothermiaInstability * 0.16 then
+				org.unstableRhythm = "atrial_fibrillation"
+			elseif roll < 0.15 + hypothermiaInstability * 0.24 then
+				org.unstableRhythm = "ventricular_ectopy"
+			else
+				org.unstableRhythm = nil
+			end
 		end
 	end
 
@@ -611,7 +636,7 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
-	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2)
+	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hypothermiaInstability * 0.35 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2)
 	org.arrhythmia = Approach(org.arrhythmia or 0, Clamp(stress * 0.42, 0, 1), stress > (org.arrhythmia or 0) and timeValue / 25 or timeValue / 90)
 	if org.isPly and not org.otrub then
 		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 then

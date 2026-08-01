@@ -352,7 +352,6 @@ local function SCPCBThoughtOwner(ent)
 end
 
 local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
-    if ply.organism and ply.organism.otrub then return end
     if ply.PlayerClassName and ply.PlayerClassName == "Gordon" and clr != hev_color then return end
     if msg == "" then return end
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end
@@ -397,7 +396,7 @@ local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
         if !IsValid(ply) then return end
         if !ply.msgs[msgKey] then return end
 
-        if (ply.organism and ply.organism.otrub) or !ply:Alive() then
+        if !ply:Alive() then
             return
         end
 
@@ -491,7 +490,6 @@ local function ResetNotification(ply, key)
 end
 
 CreateThought = function(ply, msg, delay, msgKey, showTime, clr)
-    if ply.organism and ply.organism.otrub then return end
     if msg == "" then return end
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end
     if not msg or not isstring(msg) then error("no message or message is invalid!") return false end
@@ -520,7 +518,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr)
     timer.Simple(showTime, function()
         if !IsValid(ply) then return end
         if !ply.thoughtmsgs[msgKey] then return end
-        if (ply.organism and ply.organism.otrub) or !ply:Alive() then return end
+        if !ply:Alive() then return end
 
         net.Start("HGThought")
         net.WriteString(msg)

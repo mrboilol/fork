@@ -303,10 +303,17 @@ local function getBrainLobeDamage(org)
 end
 
 local function addBrainHemorrhage(org, amount, rate)
+	-- Zerlkers does not erase a cerebral bleed, but it substantially slows the
+	-- initial secondary response so a treated patient has a real survival window.
+	local resistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or 0
+	local progression = 1 - resistance * 0.55
+	local baseAmount = amount or 0
+	amount = baseAmount * progression
+	rate = (rate or baseAmount * 0.0015) * progression
 	org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + amount, 1)
 	-- Intracranial bleeding has no room to safely drain.  Keep even moderate
 	-- traumatic bleeds dangerous enough to require treatment within minutes.
-	org.brainBleedRate = math.min((org.brainBleedRate or 0) + (rate or amount * 0.0015) * 2, 0.012)
+	org.brainBleedRate = math.min((org.brainBleedRate or 0) + rate * 2, 0.012)
 end
 
 hg.organism.AddBrainHemorrhage = addBrainHemorrhage
@@ -332,10 +339,12 @@ local function applyHeadTraumaDizziness(org, dmgInfo, impactDamage, brainDamage)
 
 	-- A skull strike can briefly throw off balance, while damage to brain tissue
 	-- makes the same reaction both substantially more likely and more severe.
-	local chance = math.Clamp(0.08 + impactDamage * 0.45 + brainDamage * 6, 0.08, 0.95)
+	local resistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or 0
+	local traumaResponse = 1 - resistance * 0.65
+	local chance = math.Clamp((0.08 + impactDamage * 0.45 + brainDamage * 6) * traumaResponse, 0.08, 0.95)
 	if math.Rand(0, 1) > chance then return 0 end
 
-	local dizziness = math.Clamp(math.Rand(0.3, 0.75) + impactDamage * 0.8 + brainDamage * 12, 0, 5)
+	local dizziness = math.Clamp((math.Rand(0.3, 0.75) + impactDamage * 0.8 + brainDamage * 12) * traumaResponse, 0, 5)
 	org.disorientation = math.min((org.disorientation or 0) + dizziness, 10)
 	return dizziness
 end
@@ -345,11 +354,13 @@ hg.organism.ApplyHeadTraumaDizziness = applyHeadTraumaDizziness
 local function applyBrainTraumaEffects(org, delta, dmgInfo, profile)
 	if delta <= 0 then return end
 	profile = profile or defaultBrainTraumaProfile
+	local resistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or 0
+	local traumaResponse = 1 - resistance * 0.65
 
-	org.concussion = math.min((org.concussion or 0) + math.min(delta * brain_concussion_per_damage, 4), 10)
-	org.consciousness = math.Approach(org.consciousness or 1, 0, delta * profile.consciousness * 1.6)
-	org.disorientation = (org.disorientation or 0) + delta * profile.disorientation * 1.5
-	org.shock = (org.shock or 0) + delta * profile.shock * 5
+	org.concussion = math.min((org.concussion or 0) + math.min(delta * brain_concussion_per_damage, 4) * traumaResponse, 10)
+	org.consciousness = math.Approach(org.consciousness or 1, 0, delta * profile.consciousness * 1.6 * traumaResponse)
+	org.disorientation = (org.disorientation or 0) + delta * profile.disorientation * 1.5 * traumaResponse
+	org.shock = (org.shock or 0) + delta * profile.shock * 5 * traumaResponse
 	org.painadd = (org.painadd or 0) + delta * profile.pain
 	applyHeadTraumaDizziness(org, dmgInfo, 0, delta)
 

@@ -85,6 +85,7 @@ module[2] = function(owner, org, timeValue)
 	local adrenaline = org.adrenaline
 	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
 	local zerlkers = math.Clamp(org.zerlkers or 0, 0, 1)
+	local zerlkersResistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or zerlkers
 	local anger = Clamp(org.anger or 0, 0, 1)
 
 	local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
@@ -151,7 +152,7 @@ module[2] = function(owner, org, timeValue)
 
 	
 
-	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75), 0) end
+	if !org.lasthit or org.lasthit + 1.5 < CurTime() then org.shock = max(org.shock - timeValue * 4 * (org.otrub and 1 or 0.5) * (1 + resilience * 0.75 + zerlkersResistance * 2.25), 0) end
 	org.immobilization = max(org.immobilization - timeValue * 5 * adrenalineMul, 0)
 
 	local shouldPainAdd = not (org.otrub or org.spine2 >= hg.organism.fake_spine2 or org.spine3 >= hg.organism.fake_spine3)
@@ -202,11 +203,12 @@ module[2] = function(owner, org, timeValue)
 	if org.pain > pain_shock_threshold then
 		local painShockTarget = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_target, pain_shock_max_target), pain_shock_target, pain_shock_max_target)
 		local painShockGain = Clamp(math.Remap(org.pain, pain_shock_threshold, pain_shock_ramp_end, pain_shock_gain, pain_shock_max_gain), pain_shock_gain, pain_shock_max_gain)
-		painShockTarget = painShockTarget * (1 - resilience * 0.25)
-		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain * (1 - resilience * 0.25))
+		local shockResistance = math.Clamp(resilience * 0.25 + zerlkersResistance * 0.50, 0, 0.75)
+		painShockTarget = painShockTarget * (1 - shockResistance)
+		org.shock = math.Approach(org.shock, painShockTarget, timeValue * painShockGain * (1 - shockResistance))
 	end
 
-	local shockThreshold = shock_consciousness_threshold * analgesiaMul * painkillerMul * (1 + resilience * 0.6)
+	local shockThreshold = shock_consciousness_threshold * analgesiaMul * painkillerMul * (1 + resilience * 0.6 + zerlkersResistance * 1.4)
 	local shockActive = org.shock > shockThreshold
 	if shockActive then
 		local shockTarget = Clamp(math.Remap(org.shock, shockThreshold, shock_consciousness_max, shock_consciousness_soft_target, shock_consciousness_hard_target), shock_consciousness_hard_target, shock_consciousness_soft_target)

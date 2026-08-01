@@ -352,10 +352,10 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, mulTime / 90)
 	end
 
-	-- Thoracic internal bleeding can collect around the lungs and heart.  The
-	-- complication meter supplies the delayed onset while the injury score sets
-	-- the ceiling: a score of 10 can become critical, but needs time untreated.
-	local thoracicSeverity = math.Clamp((internalBleedSeverity - 1) / 9, 0, 1)
+	-- Thoracic internal bleeding can collect around the lungs and heart. A
+	-- five-point internal bleed is severe enough to establish a hemothorax;
+	-- lower scores retain a smaller, delayed complication risk.
+	local thoracicSeverity = math.Clamp(internalBleedSeverity / 5, 0, 1)
 	local thoracicComplication = thoracicSeverity * (org.internalBleedComplication or 0)
 	local hemothoraxTarget = math.max(org.hemothoraxTrauma or 0, thoracicComplication * 0.7)
 	local tamponadeTarget = thoracicComplication * math.Clamp((internalBleedSeverity - 2.5) / 7.5, 0, 1) * 0.65

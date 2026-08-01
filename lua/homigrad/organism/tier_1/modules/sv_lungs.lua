@@ -1234,6 +1234,7 @@ kaz
 	local occipital = org.brainOccipital or 0
 	local hemorrhage = org.brainHemorrhage or 0
 	local bleedRate = org.brainBleedRate or 0
+	local zerlkersResistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or 0
 
 	-- Mannitol is the main emergency treatment here: it rapidly lowers edema
 	-- and bleeding pressure so recoverable brain trauma can stabilize before it
@@ -1268,11 +1269,12 @@ kaz
 	end
 
 	if bleedRate > 0 then
-		org.brainHemorrhage = min(hemorrhage + timeValue * bleedRate * 0.4, 1)
+		local traumaProgression = 1 - zerlkersResistance * 0.55
+		org.brainHemorrhage = min(hemorrhage + timeValue * bleedRate * 0.4 * traumaProgression, 1)
 		-- A sustained traumatic cerebral bleed should cross the fatal brain-damage
 		-- threshold in about five minutes. Mannitol and TXA above can still arrest
 		-- the source before this terminal progression is reached.
-		org.brain = min(org.brain + timeValue * bleedRate * (1 + hemorrhage) * 5, 1)
+		org.brain = min(org.brain + timeValue * bleedRate * (1 + hemorrhage) * 5 * traumaProgression, 1)
 		org.brainBleedRate = max(bleedRate - timeValue / 600000, 0)
 	end
 
