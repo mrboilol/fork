@@ -8,15 +8,12 @@ local module = hg.organism.module.lungs
 
 local BloodO2 = {
 	{5000, 30},
-	-- Reduced blood volume starts lowering oxygen carrying capacity before it
-	-- becomes an incapacitating hemorrhage.  The 2500-2000 mL band remains the
-	-- collapse window rather than making 3500 mL an automatic otrub threshold.
+	-- Hemorrhagic hypoxia becomes incapacitating at 4200 mL.  This has to cap
+	-- tissue O2 below the unconsciousness band here, rather than waiting for
+	-- the circulation model to collapse around 2500 mL.
 	{4500, 27.5},
-	{4000, 25},
-	{3500, 20},
-	{3000, 15},
-	{2500, 10},
-	{2250, 5},
+	{4200, 4},
+	{3500, 2},
 	{2000, 0},
 }
 

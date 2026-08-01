@@ -181,27 +181,24 @@ function SWEP:PrimarySpread()
 
 		local mitigation_mult = 1
 		if isRagdolled then
-			mitigation_mult = mitigation_mult * 0.85
+			mitigation_mult = mitigation_mult * 0.7
 		elseif isCrouching then
-			mitigation_mult = mitigation_mult * 0.90
+			mitigation_mult = mitigation_mult * 0.8
 		elseif isStandingStill then
 			mitigation_mult = mitigation_mult * 0.95
+		end
+
+		if self:IsZoom() then
+			mitigation_mult = mitigation_mult * 0.75
 		end
 
 		if isHoldingBreath then
 			mitigation_mult = mitigation_mult * 0.35
 		end
 
-		-- Broken arms bypass this mitigation
-		local bypass_mitigation = (organism.rarm and organism.rarm >= 1) or (organism.larm and organism.larm >= 1) or organism.rarmamputated or organism.larmamputated
-		if bypass_mitigation then
-			mitigation_mult = 1
-		end
-
-		if not bypass_mitigation then
-			arm_debuff = arm_debuff * mitigation_mult
-			amputate_debuff = amputate_debuff * mitigation_mult
-		end
+		-- A braced stance still damps recoil with broken or amputated arms.
+		arm_debuff = arm_debuff * mitigation_mult
+		amputate_debuff = amputate_debuff * mitigation_mult
 
 		-- Apply tourniquet handling penalty
 		local tourniquet_debuff = 0
@@ -229,19 +226,18 @@ function SWEP:PrimarySpread()
 		mul = mul * (self:IsResting() and 0.1 or 1)
 		mul = math.Clamp(mul, 0.08, 3.5)
 
-		-- This is post-shot camera motion, never a random bullet cone. Do not use
-		-- the old indexed cosine pattern here: each magazine then followed the same
-		-- rightward path. Recoil still climbs, but every impulse has a bounded,
-		-- independent horizontal component.
+		-- This is post-shot camera motion, never a random bullet cone. Give each
+		-- impulse an independent pitch and yaw direction so recoil can travel up,
+		-- down, left, or right instead of always climbing along one path.
 		local climb = math.Clamp(0.035 + sprayI * 0.004, 0.035, 0.11)
-		local angRand = Angle(-math.Rand(climb * 0.7, climb * 1.3), math.Rand(-climb * 0.55, climb * 0.55), 0)
+		local angRand = Angle(math.Rand(-climb * 1.3, climb * 1.3), math.Rand(-climb * 0.55, climb * 0.55), 0)
 		local spray = angRand
 		
 		local angranda = AngleRand(self.SprayRand[1], self.SprayRand[2])
 		angranda[3] = 0
 		spray = (spray + angranda * self.addSprayMul * mul * (self.randmul or 1)) * hg_spreadmul:GetFloat()
 
-		local angrand2 = Angle(-force * math.Rand(0.62, 1.18), force * math.Rand(-0.52, 0.52), force * math.Rand(-0.18, 0.18))
+		local angrand2 = Angle(force * math.Rand(-1.18, 1.18), force * math.Rand(-0.52, 0.52), force * math.Rand(-0.18, 0.18))
 		if not self.SprayRandOnly then
 			local gangstaHold = owner.posture == 7
 			if gangstaHold then
@@ -252,7 +248,7 @@ function SWEP:PrimarySpread()
 			else
 				local pitchMag = math.Clamp(math.abs(angrand2[1]), force * 0.5, 10)
 				local yawLimit = math.min(0.48, pitchMag * 0.42 + 0.06)
-				angrand2[1] = -pitchMag
+				angrand2[1] = math.Rand(0, 1) < 0.5 and -pitchMag or pitchMag
 				angrand2[2] = math.Clamp(angrand2[2], -yawLimit, yawLimit)
 				angrand2[3] = math.Clamp(-angrand2[2] * math.Rand(0.2, 0.5), -0.22, 0.22)
 			end

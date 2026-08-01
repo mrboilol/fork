@@ -128,15 +128,12 @@ if SERVER then
 	for _, path in ipairs(STATUS_SPRITES) do resource.AddFile(path) end
 	
 	AddCSLuaFile("autorun/zb_health_hud.lua")
-	AddCSLuaFile("homigrad/cl_health_indicator.lua")
 	
 	hook.Add("Initialize", "ZB_HealthHUD_ServerInit", function()
 	end)
 	
 	return
 end
-
-include("homigrad/cl_health_indicator.lua")
 
 local math_min, math_max, math_floor, math_sin, math_abs, math_cos, math_sqrt = math.min, math.max, math.floor, math.sin, math.abs, math.cos, math.sqrt
 local Color = Color

@@ -258,21 +258,19 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 
 	local mitigation_mult = 1
 	if isRagdolled then
-		mitigation_mult = mitigation_mult * 0.85
+		mitigation_mult = mitigation_mult * 0.7
 	elseif isCrouching then
-		mitigation_mult = mitigation_mult * 0.90
+		mitigation_mult = mitigation_mult * 0.8
 	elseif isStandingStill then
 		mitigation_mult = mitigation_mult * 0.95
 	end
 
-	if isHoldingBreath then
-		mitigation_mult = mitigation_mult * 0.35
+	if zooming then
+		mitigation_mult = mitigation_mult * 0.75
 	end
 
-	-- Broken arms bypass this mitigation
-	local bypass_mitigation = rarm_broken or larm_broken or rarm_amputated or larm_amputated
-	if bypass_mitigation then
-		mitigation_mult = 1
+	if isHoldingBreath then
+		mitigation_mult = mitigation_mult * 0.35
 	end
 
 	-- Broken arms/dislocations make the weapon heavier (more weighty things)
@@ -308,9 +306,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if handSupport.leftBusy then arm_weight_penalty = arm_weight_penalty + 1.4 end
 	if handSupport.rightBusy then arm_weight_penalty = arm_weight_penalty + 2.2 end
 
-	if not bypass_mitigation then
-		arm_weight_penalty = arm_weight_penalty * mitigation_mult
-	end
+	arm_weight_penalty = arm_weight_penalty * mitigation_mult
 
 	local effective_weight = (self.weight or self.Weight or 5) + arm_weight_penalty
 
@@ -354,7 +350,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		end
 	end
 
-	if tta_multiplier > 1 and not bypass_mitigation then
+	if tta_multiplier > 1 then
 		tta_multiplier = 1 + (tta_multiplier - 1) * mitigation_mult
 	end
 	tta_multiplier = tta_multiplier * oneHandCameraMul

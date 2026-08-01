@@ -915,28 +915,26 @@ function SWEP:FireBullet(capturedTrace, capturedPos, capturedAng)
 
 		local mitigation_mult = 1
 		if isRagdolled then
-			mitigation_mult = mitigation_mult * 0.6
+			mitigation_mult = mitigation_mult * 0.65
 		elseif isCrouching then
-			mitigation_mult = mitigation_mult * 0.75
+			mitigation_mult = mitigation_mult * 0.78
 		elseif isStandingStill then
 			mitigation_mult = mitigation_mult * 0.9
+		end
+
+		if self:IsZoom() then
+			mitigation_mult = mitigation_mult * 0.7
 		end
 
 		if isHoldingBreath then
 			mitigation_mult = mitigation_mult * 0.35
 		end
 
-		-- Broken arms bypass this mitigation
-		local bypass_mitigation = rarm_broken or larm_broken or rarm_amputated or larm_amputated
-		if bypass_mitigation then
-			mitigation_mult = 1
-		end
-
-		if not bypass_mitigation then
-			local debuff_portion = spreadMul - 1
-			debuff_portion = debuff_portion * mitigation_mult
-			spreadMul = 1 + debuff_portion
-		end
+		-- Stabilizing a weapon helps even with serious arm trauma; it reduces the
+		-- injury penalty, never removes the injury itself.
+		local debuff_portion = spreadMul - 1
+		debuff_portion = debuff_portion * mitigation_mult
+		spreadMul = 1 + debuff_portion
 
 		bullet.Spread = bullet.Spread * spreadMul * self:GetFearSpreadMul() * self:GetCognitiveHandlingMul() * self:GetWeaponWeightHandlingMul()
 	end

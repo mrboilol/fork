@@ -619,10 +619,10 @@ module[2] = function(owner, org, mulTime)
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.01 * totalAdrenaline, 0)
 	end
 
-	-- Internal blood loss is deliberately significant: a 0.3 injury is a
-	-- several-minute emergency, while severe torso trauma can rapidly become
-	-- fatal without hemostatic treatment.
-	local bleed = org.internalBleed / 4 -- + org.lungsR[3] + org.lungsL[3]
+	-- Internal-bleed severity is an injury score, not a direct mL/sec value.
+	-- It is multiplied by 100 when applied below, so keep catastrophic trauma
+	-- urgent without letting stacked organ hits drain hundreds of mL per second.
+	local bleed = math.Clamp(org.internalBleed / 12, 0, 0.5) -- + org.lungsR[3] + org.lungsL[3]
 	
 	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
 	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0

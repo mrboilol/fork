@@ -2371,11 +2371,14 @@ function SWEP:GetAdditionalValues()
 		if armDamage > 0.05 then
 			local sprintMul = self:IsSprinting() and 1.25 or 1
 			local painMul = 1 + math.Clamp((org.pain or 0) / 120, 0, 1)
-			-- Aiming braces a broken trigger arm against the weapon. It remains
-			-- visibly unsteady, but no longer shakes at full hip-fire strength.
-			local aimingBrokenRightArm = self:IsZoom() and (org.rarm or 0) >= 1 and not org.rarmamputated
-			local aimBraceMul = aimingBrokenRightArm and 0.7 or 1
-			local shake = armDamage * painMul * sprintMul * aimBraceMul
+			-- Weapon bracing reduces injury tremor in every arm state. The damage
+			-- remains visible, but ADS, breath control, crouching, and fake mode
+			-- all make it progressively easier to keep the sights on target.
+			local shakeStability = self:IsZoom() and 0.7 or 1
+			if org.holdingbreath then shakeStability = shakeStability * 0.35 end
+			if ply:Crouching() then shakeStability = shakeStability * 0.8 end
+			if IsValid(ply.FakeRagdoll) then shakeStability = shakeStability * 0.7 end
+			local shake = armDamage * painMul * sprintMul * shakeStability
 			local t = CurTime()
 			self.AdditionalPosPreLerp[1] = self.AdditionalPosPreLerp[1] + math.sin(t * 17.0) * 0.34 * shake
 			self.AdditionalPosPreLerp[2] = self.AdditionalPosPreLerp[2] + math.cos(t * 13.0) * 0.34 * shake
