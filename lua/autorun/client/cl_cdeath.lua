@@ -651,9 +651,10 @@ hook.Add("HUDShouldDraw", "HideDefaultDamage", HideDefaultDamage)
 local deathRenderView = {
     x = 0, y = 0, drawhud = true, drawviewmodel = false, dopostprocess = true, drawmonitors = true,
 }
+local renderingDeathView = false
 
 local function CinematicDeathRenderScene(pos, angle, fov)
-    if not isDead then return end
+    if not isDead or renderingDeathView then return end
 
     local view = BuildDeathView(fov)
     if not view then return end
@@ -665,7 +666,10 @@ local function CinematicDeathRenderScene(pos, angle, fov)
     deathRenderView.angles     = view.angles
     deathRenderView.drawviewer = view.drawviewer
 
+    renderingDeathView = true
     render.RenderView(deathRenderView)
+    renderingDeathView = false
+
     return true
 end
 hook.Add("RenderScene", "CinematicDeathRenderScene", CinematicDeathRenderScene)
