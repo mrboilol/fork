@@ -1072,6 +1072,8 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
         end)
     end
 
+	if hg.TryExtinguisherBulletBlock and hg.TryExtinguisherBulletBlock(ent, dmgInfo) then return true end
+
 	-- Glass damage to ragdoll...
 	if IsValid(ent) and string.find(ent:GetClass(),"break") and 
 		ent:GetBrushSurfaces() and ent:GetBrushSurfaces()[1] and string.find(ent:GetBrushSurfaces()[1]:GetMaterial():GetName(),"glass") and 
@@ -4076,6 +4078,7 @@ end)
 function hg.VehicleHitFunc(ent, tr, bullet, details)
 	local maxdmg = 0
 	local penetration = true
+	local bulletPenetration = bullet and bullet.Penetration or 0
 
 	for i, detail in pairs(details) do
 		local lpos, lang, mins, maxs = detail.lpos, detail.lang, detail.mins, detail.maxs
@@ -4095,7 +4098,7 @@ function hg.VehicleHitFunc(ent, tr, bullet, details)
 		
 		if hitpos then
 			maxdmg = math.max(maxdmg, detail.dmgmul)
-			penetration = penetration and detail.penetration < bullet.Penetration
+			penetration = penetration and detail.penetration < bulletPenetration
 
 			-- maybe some other effects
 		end
