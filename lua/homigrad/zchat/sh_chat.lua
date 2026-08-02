@@ -324,6 +324,7 @@ else
 		text = isstring(txtTbl[1]) and txtTbl[1] or text // checks to see if shit hits the ceiling
 
 		if ply:Alive() and ply.organism and ply.organism.otrub then return end
+		hook.Run("HG_PlayerChatSent", ply, text)
 
 		ply.ChatWhisper = ply:Alive() and ply.ChatWhisper or false
 
