@@ -167,7 +167,8 @@ SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/rpk")
 SWEP.WepSelectIcon2box = false
 SWEP.IconOverride = "pwb2/vgui/weapons/rpk"
 
-SWEP.Ergonomics = 1
+SWEP.Ergonomics = 0.5
+SWEP.RecoilMul = 1
 SWEP.WorldPos = Vector(5, -0.8, -1.1)
 SWEP.WorldAng = Angle(0, 0, 0)
 SWEP.UseCustomWorldModel = true
