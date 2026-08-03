@@ -189,8 +189,14 @@ local function GetDefibOrganism(ply, target)
 end
 
 local function ShouldShock(org)
-	if not org or not org.alive then return false end
-	return org.heartstop or org.fibrillation or (org.arrhythmia or 0) > 0.45 or (org.heartbeat or 0) > 180
+	if not org or not org.alive or org.heartstop or org.deathStateKilled then return false end
+	return org.fibrillation or (org.arrhythmia or 0) > 0.65 or (org.heartbeat or 0) > 200
+end
+
+local function ShouldFalseShock(org)
+	if not org or not org.alive or org.heartstop or org.deathStateKilled then return false end
+	if (org.fibrillation or false) or (org.arrhythmia or 0) > 0.65 then return false end
+	return (org.pulse or org.heartbeat or 0) >= 135 and math.random(100) <= 16
 end
 
 local function IsDefibDead(org)
@@ -216,11 +222,11 @@ local function ShockChest(target, forceMul)
 	if not IsValid(phys) then phys = target:GetPhysicsObjectNum(0) end
 	if IsValid(phys) then
 		phys:Wake()
-		-- Do not apply forces to every physics bone: that stresses ragdoll
-		-- constraints hard enough to detach limbs.  A small chest-only velocity
-		-- change gives the shock feedback without inflicting physical trauma.
-		phys:AddVelocity(-vector_up * 24 * forceMul)
+		phys:ApplyForceCenter(-vector_up * 1800 * forceMul)
+		applied = true
 	end
+
+	if not applied then return end
 end
 
 local function IsShockTarget(ent, target)
@@ -238,7 +244,6 @@ local function DropDefib(defib, target, uses, snd)
 	defib.AEDDropped = true
 	defib.AEDFinalized = true
 	defib.AEDState = "dropped"
-	StopAEDSounds(defib)
 
 	local pos = defib:GetPos()
 	local ang = defib:GetAngles()
@@ -347,92 +352,15 @@ local function IsAEDState(defib, state)
 	return IsValid(defib) and not defib.AEDDropped and defib.AEDState == state
 end
 
--- A delivered shock provides a short period of cardiopulmonary support.  Merely
--- attaching the pads must not improve the patient's condition or mask a
--- shockable rhythm before the AED has actually discharged.
-local function ApplyAEDLifeSupport(org, elapsed)
-	if not org or not org.alive then return end
-	elapsed = math.max(tonumber(elapsed) or 0, 0)
-	org.defibSupportUntil = CurTime() + 0.3
-
-	if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
-		-- An AED-assisted restart needs to restore oxygen delivery, not merely
-		-- hold it above a low survival floor.  The shared helper still refuses
-		-- this support when the pump, airway, lungs, or blood volume cannot
-		-- actually carry oxygen.
-		local oxygenTarget = tonumber(org.o2 and org.o2.range) or 30
-		hg.organism.RestoreSupportedOxygen(org, elapsed * 0.75, {
-			oxygen = math.min(24, tonumber(org.o2 and org.o2.range) or 30),
-			oxygenTarget = oxygenTarget,
-			bodyoxygen = 0.55, bodyoxygenTarget = 0.90,
-			brainoxygen = 0.50, brainoxygenTarget = 0.85,
-			perfusion = 0.45, perfusionTarget = 0.80,
-			peripheralperfusion = 0.40, peripheralperfusionTarget = 0.75,
-			cerebralPerfusion = 0.45, cerebralPerfusionTarget = 0.80,
-			myocardialOxygen = 0.50, myocardialOxygenTarget = 0.85,
-			hypoxiaTime = 2, severeHypoxiaTime = 0, systemicIschemiaTime = 3
-		})
-	end
-	org.cardiacOutput = math.Approach(tonumber(org.cardiacOutput) or 1, 1, elapsed * 0.055)
-	org.strokeVolume = math.Approach(tonumber(org.strokeVolume) or 1, 1, elapsed * 0.045)
-	org.hypotension = math.Approach(tonumber(org.hypotension) or 0, 0, elapsed * 0.045)
-	org.heartStrain = math.Approach(tonumber(org.heartStrain) or 0, 0, elapsed * 0.025)
-
-end
-
-local function ApplyAEDRhythmTherapy(org, elapsed)
-	if not org or org.heartstop then return end
-	elapsed = math.max(tonumber(elapsed) or 0, 0)
-	org.palpitationTreatmentUntil = CurTime() + 1
-	org.palpitations = math.Approach(tonumber(org.palpitations) or 0, 0, elapsed * 0.2)
-	org.arrhythmia = math.Approach(tonumber(org.arrhythmia) or 0, 0, elapsed * 0.1)
-	org.heartStrain = math.Approach(tonumber(org.heartStrain) or 0, 0, elapsed * 0.06)
-	if (org.arrhythmia or 0) < 0.12 and (org.palpitations or 0) < 0.08 then
-		org.unstableRhythm = nil
-	end
-end
-
--- A restored rhythm needs an immediate oxygen-delivery rebound; otherwise the
--- hypoxia accumulated during arrest can trigger another arrest before normal
--- circulation has time to recover.
-local function ApplySuccessfulShockOxygenRecovery(org)
+local function ApplyAEDShock(org, accidental)
 	if not org then return end
 
-	local recovery = math.Rand(0.35, 0.5)
-	local oxygenStats = {
-		"bodyoxygen",
-		"brainoxygen",
-		"perfusion",
-		"peripheralperfusion",
-		"cerebralPerfusion",
-		"myocardialOxygen"
-	}
-
-	for _, stat in ipairs(oxygenStats) do
-		org[stat] = math.Clamp((tonumber(org[stat]) or 0) + recovery, 0, 1)
+	if accidental then
+		org.arrhythmia = math.max(org.arrhythmia or 0, 0.35)
+		org.heartStrain = (org.heartStrain or 0) + 0.25
+		org.pulse = math.max(org.pulse or 0, 70)
+		return
 	end
-
-	if istable(org.o2) then
-		local oxygenMax = math.max(tonumber(org.o2.range) or 30, 1)
-		org.o2[1] = math.Clamp((tonumber(org.o2[1]) or 0) + oxygenMax * recovery, 0, oxygenMax)
-	end
-
-	org.hypoxia = math.max((tonumber(org.hypoxia) or 0) - recovery, 0)
-	org.hypoxiaTime = math.max((tonumber(org.hypoxiaTime) or 0) - recovery * 30, 0)
-	org.severeHypoxiaTime = math.max((tonumber(org.severeHypoxiaTime) or 0) - recovery * 20, 0)
-	org.systemicIschemiaTime = math.max((tonumber(org.systemicIschemiaTime) or 0) - recovery * 20, 0)
-end
-
-local function ApplyAEDShock(org)
-	if not org then return end
-
-	local wasArrested = org.heartstop == true
-	local wasFibrillating = org.fibrillation == true
-	local bloodK = math.Clamp(((org.blood or 5000) - 700) / 3300, 0.2, 1)
-	local oxygenK = math.Clamp(((org.o2 and org.o2[1]) or 0) / 12, 0.35, 1)
-	local damageK = math.Clamp(1 - (org.heart or 0) * 0.55, 0.35, 1)
-	local baseChance = wasArrested and 72 or (wasFibrillating and 90 or 82)
-	local restartChance = math.Clamp(baseChance * (0.55 + bloodK * 0.45) * (0.65 + oxygenK * 0.35) * (0.55 + damageK * 0.45), 35, 92)
 
 	org.fibrillation = false
 	org.arrhythmia = math.max((org.arrhythmia or 0) - 0.75, 0)
@@ -467,7 +395,7 @@ local function ApplyAEDShock(org)
 	ApplyAEDRhythmTherapy(org, 4)
 end
 
-local function BeginAEDShock(defib, ply, getTarget, uses)
+local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
 	if not SetAEDState(defib, "charging") then return end
 	if defib.AEDCharging or defib.AEDShocked then return end
 
@@ -498,7 +426,7 @@ local function BeginAEDShock(defib, ply, getTarget, uses)
 		PlayAEDSound(defib, AEDSounds.shocksound, 85, 100, 2)
 		PlayAEDSound(defib, AEDSounds.shockdelivered, 75, 100, 3)
 		ShockChest(target, 2)
-		ApplyAEDShock(org)
+		ApplyAEDShock(org, accidental)
 
 		if org then
 			org.painadd = (org.painadd or 0) + 150
@@ -596,6 +524,11 @@ local function StartAEDSequence(defib, ply, getTarget, uses)
 		end
 
 		if not ShouldShock(org) then
+			if ShouldFalseShock(org) then
+				BeginAEDShock(defib, ply, getTarget, uses, true)
+				return
+			end
+
 			StartNoShockWarnings(defib, ply, getTarget, uses)
 			return
 		end

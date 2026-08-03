@@ -254,6 +254,28 @@ function hg.organism.StartFibrillation(org)
 	org.fibrillationStart = CurTime()
 end
 
+function hg.organism.TryRestartHeartWithCPR(org, cprMul)
+	if not org or not org.alive or not org.heartstop or org.deathStateKilled then return false end
+	if (org.pulse or 0) <= 15 or (org.brain or 0) >= 0.6 or (org.heart or 0) >= 1 then return false end
+
+	cprMul = cprMul or 1
+	local adrenaline = Clamp(org.adrenaline or 0, 0, 3)
+	local chance = Clamp(6 * cprMul + adrenaline * 12, 6, 45)
+
+	if math.random(100) > chance then return false end
+
+	org.heartstop = false
+	org.fibrillation = false
+	org.arrhythmia = 0
+	org.heartbeat = Clamp(org.heartbeat or 70, 55, 90)
+	org.pulse = max(org.pulse or 0, 25)
+	org.bloodPressure = max(org.bloodPressure or 0, 35)
+	org.cardiacOutput = max(org.cardiacOutput or 0, 0.35)
+	org.myocardialOxygen = max(org.myocardialOxygen or 0, 0.35)
+
+	return true
+end
+
 module[1] = function(org)
 	org.heart = 0
 	org.heartstop = false

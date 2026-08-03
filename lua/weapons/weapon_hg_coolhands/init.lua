@@ -580,15 +580,8 @@ function SWEP:ApplyForce()
 								dmginfo:SetInflictor(self)
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
-							
-							-- CPR is life support only: it preserves oxygenation and a small
-							-- compression pulse, but cannot restart an arrested heart.
-							
-							-- Reduce ischemia during CPR
-							org.ischemia = math.max((org.ischemia or 0) - 0.5 * skillMult, 0)
-							if hg.organism.UpdatePerfusion then
-								hg.organism.UpdatePerfusion(org.owner or ply2, org, 0.2 * skillMult)
-							end
+
+							if hg.organism.TryRestartHeartWithCPR then hg.organism.TryRestartHeartWithCPR(org, cprMul) end
 						end
 
 						phys:ApplyForceCenter(-vector_up * 6000)

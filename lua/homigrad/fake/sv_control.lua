@@ -1137,12 +1137,12 @@ end
 hook.Add("Think", "Fake", function()
 	hg.humans_cached = player_GetHumans()
 	local curTime = CurTime()
+	local sysTime = SysTime()
+	local timeScale = game.GetTimeScale()
 
-	//for ply, ragdoll in pairs(hg.ragdollFake) do
-	for i, ply in player.Iterator() do
-		local ragdoll = hg.ragdollFake[ply]//ply.FakeRagdoll
-		if not IsValid(ragdoll) then
-			//hg.ragdollFake[ply] = nil
+	for ply, ragdoll in pairs(hg.ragdollFake) do
+		if not IsValid(ply) or not IsValid(ragdoll) then
+			hg.ragdollFake[ply] = nil
 			continue
 		end
 
@@ -1151,14 +1151,9 @@ hook.Add("Think", "Fake", function()
 
 			local torsopos, ang = ragdoll:GetBonePosition(torso)
 
-
-
 			if IsValid(ragdoll.bull) and (ragdoll.bull.lastposset or 0) < curTime then
-
 				ragdoll.bull.lastposset = curTime + 0.5
-
 				
-
 				ragdoll.bull:SetPos(torsopos + vector_up * 5)
 
 				--ragdoll.bull:Remove()
@@ -1179,9 +1174,8 @@ hook.Add("Think", "Fake", function()
 
 
 
-		ragdoll.dtime = (SysTime() - (ragdoll.lastCallTime or SysTime())) * game.GetTimeScale()
-
-		ragdoll.lastCallTime = SysTime()
+		ragdoll.dtime = (sysTime - (ragdoll.lastCallTime or sysTime)) * timeScale
+		ragdoll.lastCallTime = sysTime
 
 
 
@@ -1220,11 +1214,12 @@ hook.Add("Think", "Fake", function()
 		
 
 		local ragdollcombat = hg.RagdollCombatInUse(ply)
+		if !ragdollcombat and ragdoll == ply.FakeRagdoll then
+			hg.SetFreemove(ply, false)
+		end
 
-		if ragdollcombat and (org.lightstun < CurTime()) and (tracehuy.Hit or ply.FakeRagdoll ~= ragdoll) and org.spine1 < hg.organism.fake_spine1 and org.canmove and !ply.jumpedfake then
-
-			local power = org.legstrength or 1
-
+		if (org.lightstun < curTime) and (tracehuy.Hit or ply.FakeRagdoll ~= ragdoll) and org.spine1 < hg.organism.fake_spine1 and org.canmove and ((ply.lastFake and (ply.lastFake) > curTime) or ply.FakeRagdoll ~= ragdoll) and !ply.jumpedfake then
+			local power = 1
 			inmove = true
 
 			
@@ -1242,8 +1237,8 @@ hook.Add("Think", "Fake", function()
 					local physobj = ragdoll:GetPhysicsObjectNum(i)
 
 					if IsValid(physobj) then
-						local bone_impulse = ply.HitBones and ply.HitBones[bonename] or CurTime()
-						local amt_impulse = (2 - math.Clamp(bone_impulse - CurTime(),0,2)) / 2
+						local bone_impulse = ply.HitBones and ply.HitBones[name] or curTime
+						local amt_impulse = (2 - math.Clamp(bone_impulse - curTime,0,2)) / 2
 						
 						local p = {}
 
@@ -1399,7 +1394,7 @@ hook.Add("Think", "Fake", function()
 		end
 
 		local fakeKick = ragdoll.fakeLegKick
-		local fakeKickActive = fakeKick and CurTime() < fakeKick.finish and org.canmove
+		local fakeKickActive = fakeKick and curTime < fakeKick.finish and org.canmove
 
 		if (!ply:InVehicle() && (ply:KeyDown(IN_USE) || ((ishgweapon(wep)) && (ply:KeyDown(IN_ATTACK2) || (wep.IsResting and wep:IsResting()))) || (wep.ismelee && (ply:KeyDown(IN_ATTACK2) || ply:KeyDown(IN_ATTACK))))) || (ply:InVehicle() && not ply:KeyDown(IN_USE)) or ragdollcombat then
 
@@ -1545,17 +1540,10 @@ hook.Add("Think", "Fake", function()
 		local manualHoldWound = wantsManualHold and manualHoldHands > 0
 		setManualWoundHold(ply, org, manualHoldWound, holdWound, manualHoldHands, manualUseRight, holdWoundArterial)
 
-		-- Gripping, climbing, or holding a wound with a broken/dislocated arm should
-		-- be possible, but it continuously hurts while that arm is actually in use.
-		local leftArmActive = IsValid(ragdoll.ConsLH) or manualUseLeft or (ply:KeyDown(IN_ATTACK) and not ishgweapon(wep))
-		local rightArmActive = IsValid(ragdoll.ConsRH) or manualUseRight or (ply:KeyDown(IN_ATTACK2) and not ishgweapon(wep))
-		if leftArmActive then AddFakeArmUsePain(org, "larm", ragdoll.dtime) end
-		if rightArmActive then AddFakeArmUsePain(org, "rarm", ragdoll.dtime) end
-
-		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (CurTime() - ragdoll.otrubCollapseStart) < 1.5 then
+		if org.alive and IsValid(spine) and ragdoll.otrubCollapseStart and (curTime - ragdoll.otrubCollapseStart) < 1.5 then
 			inmove = true
 
-			local t = (CurTime() - ragdoll.otrubCollapseStart) / 1.5
+			local t = (curTime - ragdoll.otrubCollapseStart) / 1.5
 			local strength = 1 - t
 
 			local otrub_ss = 0.4
