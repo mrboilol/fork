@@ -1779,7 +1779,9 @@ hook.Add("PlayerUse", "DoorClose", function(ply, ent)
 			getdoor:Fire("close")
 			hg.RunZManipAnim(ply, "door_open_back", nil, 2, {self})
 
-	return false
+			return false
+		end
+	end
 end)
 
 hook.Add( "KeyPress", "snowballs_pickup", function( ply, key )
