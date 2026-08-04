@@ -14,9 +14,12 @@ local BloodO2 = {
 	{4500, 29},
 	{3500, 25},
 	{3000, 20},
-	{2500, 10},
-	{2250, 5},
-	{2000, 0},
+	-- Do not create a second hemorrhagic cliff after the compensated range.
+	-- Delivery tapers steadily until the remaining volume is terminal; at
+	-- 1750 mL or lower there is too little blood to carry usable tissue O2.
+	{2500, 18},
+	{2000, 14},
+	{1750, 0},
 }
 
 local HypoxiaBands = {

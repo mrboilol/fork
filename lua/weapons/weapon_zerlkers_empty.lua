@@ -135,11 +135,10 @@ function SWEP:Throw(velocity, _, nosound, throwPosAdjust, throwAngAdjust)
 	thrown.owner = owner
 	thrown.damage = self.ThrowDamage
 	thrown.MaxSpeed = velocity > 0 and velocity or self.ThrowVelocity
-	-- Standing player hulls do not report small tic-tac impacts as reliable head
-	-- hits. Force the death-gib sequence instead; ExplodeHead waits for their
-	-- death ragdoll before blowing its head off.
+	-- HeadGibDamageMul is consumed by Homigrad only for a confirmed head hit.
+	-- Do not force standing-player gibs: body impacts from this empty plastic box
+	-- should remain harmless.
 	thrown.HeadGibDamageMul = self.HeadGibDamageMul
-	thrown.GibStandingVictims = true
 	-- Match thrown bricks and bottles so impact damage enters Homigrad's blunt
 	-- trauma path (bruising, pain, wounds) instead of only reducing health.
 	thrown.DamageType = DMG_CLUB
