@@ -55,6 +55,15 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 	local hg_movement_speed_gain_mul = CreateConVar("hg_movement_speed_gain_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed gain", 0.01, 5)
 	local hg_movement_speed_lose_mul = CreateConVar("hg_movement_speed_lose_mul", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Multiply speed lose", 0.01, 5)
 	local hg_movement_lagcomp = CreateConVar("hg_movement_lagcomp", "1", {FCVAR_REPLICATED,FCVAR_ARCHIVE,FCVAR_NOTIFY}, "Compensate movement inertia for latency", 0, 1)
+	local function hg_NoJogging(ply)
+		if CLIENT then
+			local convar = GetConVar("hg_nojogging")
+			return convar and convar:GetBool() or false
+		end
+
+		return ply:GetInfoNum("hg_nojogging", 0) ~= 0
+	end
+
         local function hg_GetMovementLagComp(ply)
                 if not hg_movement_lagcomp:GetBool() or not IsValid(ply) then return 1, 0 end
 

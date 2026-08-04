@@ -893,11 +893,7 @@ local IsValid = IsValid
 --//
 --\\ Calculate Weight 
 	local weight_cache_lifetime = 0.15
-	function hg.CalculateWeight(ply,maxweight)
-		local time = CurTime()
-		local cache = ply.hg_weight_cache
-		if cache and cache.maxweight == maxweight and cache.time > time then return cache.value end
-
+	function hg.GetCarryWeight(ply)
 		local weight = 0
 
 		local weps = ply:GetWeapons()
@@ -927,6 +923,12 @@ local IsValid = IsValid
 	end
 
 	function hg.CalculateWeight(ply,maxweight)
+		maxweight = maxweight or 140
+
+		local time = CurTime()
+		local cache = ply.hg_weight_cache
+		if cache and cache.maxweight == maxweight and cache.time > time then return cache.value end
+
 		local weight = hg.GetCarryWeight(ply)
 		local weightmul = (1 / (weight / maxweight + 1))
 		ply.hg_weight_cache = { maxweight = maxweight, time = time + weight_cache_lifetime, value = weightmul }
