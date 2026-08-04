@@ -1229,6 +1229,7 @@ hook.Add("Think", "Fake", function()
 			for i = 0, ragbonecount - 1 do
 
 				local bone = ragdoll:TranslatePhysBoneToBone(i)
+				local name = ragdoll:GetBoneName(bone)
 
 				local bonepos, boneang = ply:GetBonePosition(bone)
 
@@ -1237,6 +1238,7 @@ hook.Add("Think", "Fake", function()
 					local physobj = ragdoll:GetPhysicsObjectNum(i)
 
 					if IsValid(physobj) then
+						local mass = physobj:GetMass()
 						local bone_impulse = ply.HitBones and ply.HitBones[name] or curTime
 						local amt_impulse = (2 - math.Clamp(bone_impulse - curTime,0,2)) / 2
 						
@@ -1248,13 +1250,13 @@ hook.Add("Think", "Fake", function()
 
 						p.angle = boneang
 
-						p.maxangular = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse * controlMul
+						p.maxangular = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse
 
-						p.maxangulardamp = 100 * (ragdollcombat and 1 or 0.9) * mass * power * amt_impulse * controlMul
+						p.maxangulardamp = 100 * (ragdollcombat and 1 or 0.9) * mass * power * amt_impulse
 
-						p.maxspeed = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse * controlMul
+						p.maxspeed = 250 * (ragdollcombat and 1 or 0.8) * mass * power * amt_impulse
 
-						p.maxspeeddamp = 100 * (ragdollcombat and 1 or 0.9) * mass * amt_impulse * controlMul
+						p.maxspeeddamp = 100 * (ragdollcombat and 1 or 0.9) * mass * amt_impulse
 
 						p.teleportdistance = 0
 

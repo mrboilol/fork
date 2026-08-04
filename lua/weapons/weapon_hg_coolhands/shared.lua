@@ -46,11 +46,11 @@ local function UseCoolHands(ply)
 
         local className = string_lower(ply.PlayerClassName or "")
 
-        if className == "furry" then
-                return ply.hgUseCoolHands == true
-        end
+	if className == "furry" then
+		return ply.hgUseCoolHands == true
+	end
 
-        return className == "default"
+	return true
 end
 
 function hg.GetHandsWeaponClass(ply)
