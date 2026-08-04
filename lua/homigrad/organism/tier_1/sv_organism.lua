@@ -514,15 +514,15 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local resilience = hg.organism.GetResilience(org)
 	local zerlkers = hg.organism.GetZerlkersResistance(org)
 	-- Resilience can soften shock effects, but it cannot create circulating
-	-- volume. Use actual blood here so 2000 mL is always zero perfusion.
+	-- volume.  Two litres is a severe blackout range, not instant zero flow.
 	local blood = math.max(org.blood or 0, 0)
-	-- Continuous blood-volume delivery: 2000 mL has no viable perfusion, while
-	-- the exponent preserves partial compensation above the terminal range.
-	local bloodFraction = math.Clamp((blood - 2000) / (5000 - 2000), 0, 1) ^ 0.45
-	-- Improve vascular compensation while blood remains above the terminal 2 L
+	-- Continuous blood-volume delivery: perfusion falls steadily through the
+	-- 2.5-2 L danger band and reaches zero only at terminal volume.
+	local bloodFraction = math.Clamp((blood - 1000) / (5000 - 1000), 0, 1) ^ 0.7
+	-- Improve vascular compensation while blood remains above the terminal 1 L
 	-- boundary. The reserve vanishes at that boundary, so Zerlkers cannot create
 	-- circulation from an empty system.
-	local lowBloodReserve = math.Clamp((blood - 2000) / 1000, 0, 1) * zerlkers * 0.35
+	local lowBloodReserve = math.Clamp((blood - 1000) / 1000, 0, 1) * zerlkers * 0.35
 	bloodFraction = math.min(bloodFraction + lowBloodReserve, 1)
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
 	-- The O2 reservoir can remain nonzero after respiration fails. It is not a

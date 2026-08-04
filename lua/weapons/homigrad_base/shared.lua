@@ -2876,6 +2876,24 @@ function SWEP:GetAdditionalValues()
 	
 	self.AdditionalPos2:Add(self.CloseAnimAddVec)
 	self.AdditionalAng2:Add(self.CloseAnimAddAng)
+
+	-- The close-wall pose is deliberately large enough to pull a barrel clear of
+	-- geometry.  It is evaluated after the normal shot pose, which used to hide
+	-- the gun's angular recoil whenever that pose was active.  Add a short,
+	-- camera-independent presentation kick after the wall correction so contact
+	-- with a wall cannot make a fired weapon look recoil-free.
+	if CLIENT and self:IsLocal2() and animpos > 0 and not self.norecoil then
+		local shotAge = CurTime() - (self:LastShootTime() or 0)
+		if shotAge >= 0 and shotAge < 0.16 then
+			local recoilDir = self.LastRecoilDirection
+			if isangle(recoilDir) then
+				local kick = (1 - shotAge / 0.16) * math.Clamp(animpos / 0.4, 0.35, 1)
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] + recoilDir[1] * kick * 2.2
+				self.AdditionalAng2[2] = self.AdditionalAng2[2] + recoilDir[2] * kick * 0.65
+				self.AdditionalAng2[3] = self.AdditionalAng2[3] + recoilDir[3] * kick * 0.5
+			end
+		end
+	end
 	
 	self.timetick2 = SysTime()
 end

@@ -160,7 +160,10 @@ function hg.reactions.ProcessInjured(ragdoll, ply, org)
     
     -- Randomly play dying animations
     if not hg.animator.IsPlaying(ragdoll) then
-        if math.random() < 0.05 then -- Low chance to start
+        -- Respiratory failure makes agonal movement less frequent, but does not
+        -- eliminate it: occasional reflexive breaths can still happen.
+        local startChance = org.lungsfunction == false and 0.02 or 0.05
+        if math.random() < startChance then -- Low chance to start
             local anims = {"Dying1", "Dying2", "Dying3", "Dying4", "Dying5"}
             local anim = anims[math.random(#anims)]
             hg.animator.Play(ragdoll, anim, math.Rand(0.8, 1.2), math.Rand(0.5, 1.0), false)

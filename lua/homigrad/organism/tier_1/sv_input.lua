@@ -937,16 +937,25 @@ function hg.ExplodeHead(ent, damage, slash, force)
 	if !IsValid(ent) then return end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	-- A standing victim has no ragdoll to gib yet.  Make the fatal state explicit
-	-- before killing them so the regular death/fake path creates the corpse that
-	-- finishHeadGib is waiting for, and the player can never recover headless.
+	-- Gib_Input can only remove a bone from a ragdoll. A standing player must
+	-- therefore enter the normal death-ragdoll path first; preserving the terminal
+	-- damage on their organism makes the newly-created corpse unambiguously dead
+	-- and ready to have its head removed on the next tick.
 	if IsValid(ply) and ply:IsPlayer() and ply:Alive() then
 		local org = ply.organism
 		if org then
 			org.brain = 1.0
+			org.skull = 1.0
 			org.needfake = true
+			if hg.organism.KillFatalBrainDamage then
+				hg.organism.KillFatalBrainDamage(org)
+			else
+				org.alive = false
+				ply:Kill()
+			end
+		else
+			ply:Kill()
 		end
-		ply:Kill()
 	end
 	if ent:IsNPC() and ent.organism then ent.organism.shock = 100 end
 	local target = ent
@@ -1003,6 +1012,9 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		Gib_Input(ent, ent:LookupBone("ValveBiped.Bip01_Head1"), force, damage)
 		
 		ent.organism.headamputated = true
+		ent.organism.brain = 1.0
+		ent.organism.skull = 1.0
+		ent.organism.alive = false
 		ent.headexploded = true
 
 		-- Track that head was previously amputated for stable healing approach

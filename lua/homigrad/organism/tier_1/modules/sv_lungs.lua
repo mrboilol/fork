@@ -15,11 +15,12 @@ local BloodO2 = {
 	{3500, 25},
 	{3000, 20},
 	-- Do not create a second hemorrhagic cliff after the compensated range.
-	-- Delivery tapers steadily until the remaining volume is terminal; at
-	-- 1750 mL or lower there is too little blood to carry usable tissue O2.
+	-- Delivery tapers through the blackout range and only reaches zero at
+	-- terminal volume, matching the circulation curve.
 	{2500, 18},
 	{2000, 14},
-	{1750, 0},
+	{1500, 7},
+	{1000, 0},
 }
 
 local HypoxiaBands = {
@@ -576,7 +577,10 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		local severityK = math.Clamp((internalBleedPeak - 0.2) / 2.8, 0, 1)
-		local fillTime = Lerp(severityK, 135, 45)
+		-- Pleural blood should become noticeable before the direct blood-loss
+		-- component becomes overwhelming. The complication target still caps the
+		-- final severity, while this makes its buildup feel responsive.
+		local fillTime = Lerp(severityK, 85, 30)
 		local bilateral = internalBleedPeak >= 2.5 or bleedComplication >= 0.7
 		local targetL = (bilateral or org.internalBleedLungSide == "L") and bleedComplication or 0
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and bleedComplication or 0
@@ -1273,11 +1277,14 @@ kaz
 
 	if bleedRate > 0 then
 		local traumaProgression = 1 - zerlkersResistance * 0.55
-		org.brainHemorrhage = min(hemorrhage + timeValue * bleedRate * 0.4 * traumaProgression, 1)
-		-- A sustained traumatic cerebral bleed should cross the fatal brain-damage
-		-- threshold in about five minutes. Mannitol and TXA above can still arrest
-		-- the source before this terminal progression is reached.
-		org.brain = min(org.brain + timeValue * bleedRate * (1 + hemorrhage) * 5 * traumaProgression, 1)
+		local cranialDamage = math.Clamp(math.max(org.brain or 0, org.skull or 0, hemorrhage), 0, 1)
+		-- The source accumulates gradually.  Its danger ramps with existing cranial
+		-- damage and trapped blood, rather than making a small fresh bleed fatal in
+		-- seconds.  Severe/open-skull trauma still escalates rapidly if untreated.
+		local hemorrhageRate = 0.25 + cranialDamage * 0.65
+		local brainDamageRate = 0.35 + cranialDamage * 1.65
+		org.brainHemorrhage = min(hemorrhage + timeValue * bleedRate * hemorrhageRate * traumaProgression, 1)
+		org.brain = min(org.brain + timeValue * bleedRate * brainDamageRate * traumaProgression, 1)
 		org.brainBleedRate = max(bleedRate - timeValue / 600000, 0)
 	end
 

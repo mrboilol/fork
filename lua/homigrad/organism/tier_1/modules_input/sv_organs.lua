@@ -311,9 +311,10 @@ local function addBrainHemorrhage(org, amount, rate)
 	amount = baseAmount * progression
 	rate = (rate or baseAmount * 0.0015) * progression
 	org.brainHemorrhage = math.min((org.brainHemorrhage or 0) + amount, 1)
-	-- Intracranial bleeding has no room to safely drain.  Keep even moderate
-	-- traumatic bleeds dangerous enough to require treatment within minutes.
-	org.brainBleedRate = math.min((org.brainBleedRate or 0) + rate * 2, 0.012)
+	-- Keep the initial rate small.  The secondary progression code scales danger
+	-- from cranial damage, so a 0.1-like display value cannot erase the brain in
+	-- a few seconds while an open skull remains a rapidly worsening emergency.
+	org.brainBleedRate = math.min((org.brainBleedRate or 0) + rate, 0.0035)
 end
 
 hg.organism.AddBrainHemorrhage = addBrainHemorrhage

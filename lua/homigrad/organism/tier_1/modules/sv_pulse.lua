@@ -4,16 +4,18 @@ hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
 -- Blood-volume response is deliberately calculated rather than sampled from
--- lookup tables. Perfusion falls continuously and reaches zero at 2000 mL.
-local cardiacArrestBlood = 2000
+-- lookup tables. Perfusion is already critically low near 2 L, but does not
+-- become physically impossible until roughly 1 L remains.
+local cardiacArrestBlood = 1000
 local terminalHeartRate = 300
 local peaDuration = 6
 
 local function getBloodPerfusion(blood)
 	local volume = math.Clamp(((tonumber(blood) or 5000) - cardiacArrestBlood) / (5000 - cardiacArrestBlood), 0, 1)
-	-- This keeps early loss compensable while making the last quarter collapse
-	-- rapidly as there is no longer enough volume to fill the pump.
-	return volume ^ 0.45
+	-- A smooth reserve curve makes 3.5 L noticeably weak, 2.5 L unsafe, and
+	-- 2 L a likely blackout range.  The old 2 L floor made a 100 mL change turn
+	-- a weakened patient into an immediate zero-flow cardiac arrest.
+	return volume ^ 0.7
 end
 
 local function getBloodCompensationRate(blood)
@@ -476,7 +478,7 @@ module[2] = function(owner, org, timeValue)
 	-- node and conduction system progressively lose responsiveness. At terminal
 	-- blood volume, preload failure can also remove the prior tachycardia.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((2250 - bloodNow) / (2250 - cardiacArrestBlood), 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((2000 - bloodNow) / (2000 - cardiacArrestBlood), 0, 1)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	-- Low blood volume produces tachycardia up to the terminal threshold; it
 	-- must not be treated as a bradycardia source before the pump actually fails.
@@ -559,7 +561,7 @@ module[2] = function(owner, org, timeValue)
 	-- Keep VF as a no-output electrical arrest rather than a fast effective pulse.
 	local hypothermicArrhythmia = organSystemsEnabled and (org.temperature or 36.7) <= 32
 	local hypothermiaInstability = math.Clamp((32 - (org.temperature or 36.7)) / 4, 0, 1)
-	local terminalHemorrhage = bloodNow <= 2250
+	local terminalHemorrhage = bloodNow <= 1750
 	if not (hypothermicArrhythmia or terminalHemorrhage) then
 		org.unstableRhythm = nil
 		org.terminalRhythm = nil
@@ -567,10 +569,10 @@ module[2] = function(owner, org, timeValue)
 		local roll = math.Rand(0, 1)
 		if terminalHemorrhage then
 			org.nextColdRhythmRoll = CurTime() + 3
-			-- Terminal electrical instability belongs to decompensated hemorrhage,
-			-- after the compensated 3000-2250 mL range. It then escalates sharply to
-			-- certain arrest at 2000, leaving a short rescue window near 2250.
-			local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 2250, cardiacArrestBlood, 0.3, 1), 0, 1)
+			-- Terminal electrical instability begins only after the blackout range.
+			-- It then escalates toward certain arrest at 1 L, leaving room for a
+			-- player at 2-2.5 L to be incapacitated and treated instead of instantly dead.
+			local hemorrhageInstability = math.Clamp(math.Remap(bloodNow, 1750, cardiacArrestBlood, 0.3, 1), 0, 1)
 			local instability = math.max(coldSuppression, hemorrhagicDecompensation, hemorrhageInstability)
 			if roll < 0.04 + instability * 0.36 then
 				org.terminalRhythm = "ventricular_fibrillation"

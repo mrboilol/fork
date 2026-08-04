@@ -637,9 +637,11 @@ module[2] = function(owner, org, mulTime)
 	-- It is multiplied by 100 when applied below. Keep the resulting loss in a
 	-- range where a serious injury needs treatment, but does not empty a player
 	-- from a few stacked organ hits before the delayed complications can matter.
-	-- An internal-bleed score of 10 produces 0.1 bleed (10 mL/s after the
+	-- An internal-bleed score of 10 produces 0.025 bleed (2.5 mL/s after the
 	-- existing x100 application below); lower injuries scale proportionally.
-	local bleed = math.Clamp(org.internalBleed / 100, 0, 0.2) -- + org.lungsR[3] + org.lungsL[3]
+	-- This keeps a score around 1.0 as an urgent injury instead of an
+	-- immediate blood-loss death sentence.
+	local bleed = math.Clamp(org.internalBleed / 400, 0, 0.08) -- + org.lungsR[3] + org.lungsL[3]
 	
 	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
 	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
@@ -662,8 +664,10 @@ module[2] = function(owner, org, mulTime)
 	local internalBleedAlertReady = (org.internalBleedDuration or 0) >= 15
 	if org.internalBleed <= 0.1 then
 		org.internalBleedAlerted = nil
+		org.internalBleedNextMessage = nil
 	elseif org.isPly and not org.otrub and internalBleedAlertReady and not org.internalBleedAlerted then
 		org.internalBleedAlerted = true
+		org.internalBleedNextMessage = CurTime() + 120
 		owner:Notify("I think I'm bleeding inside...", true, "internalbleed", 0, nil, Color(200, 170, 170))
 	end
 
@@ -690,7 +694,12 @@ module[2] = function(owner, org, mulTime)
 				hg.organism.VomitNormal(owner)
 			end
 		else
-			if org.isPly and org.internalBleed > 0.1 and internalBleedAlertReady then owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed") end
+			-- Vomiting can happen frequently during a sustained bleed; keep its
+			-- flavour notification to at most once every two minutes.
+			if org.isPly and org.internalBleed > 0.1 and internalBleedAlertReady and CurTime() >= (org.internalBleedNextMessage or 0) then
+				org.internalBleedNextMessage = CurTime() + 120
+				owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed")
+			end
 			hg.organism.Vomit(owner)
 		end
 	end
