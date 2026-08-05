@@ -190,6 +190,8 @@ end
 
 SWEP.NoHolster = true
 
+SWEP.noreverse = true
+
 SWEP.AttackTimeLength = 0.28
 SWEP.Attack2TimeLength = 0.01
 

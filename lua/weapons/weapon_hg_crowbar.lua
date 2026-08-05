@@ -174,6 +174,8 @@ end
 SWEP.AttackTimeLength = 0.10
 SWEP.Attack2TimeLength = 0.01
 
+SWEP.noreverse = true
+
 SWEP.AttackRads = 65
 SWEP.AttackRads2 = 0
 
