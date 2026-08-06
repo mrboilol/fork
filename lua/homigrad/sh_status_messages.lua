@@ -317,14 +317,6 @@ local braindamage_phraselist = {
 	"Bhrhraihin.",
 }
 
-local internalbleed_phrases = {
-	"That's... that's blood I just vomited...",
-	"Oh, that's blood...",
-	"Fuck, I just puked blood...",
-	"Oh shit... I don't feel good...",
-}
-hg.internalbleed_phrases = internalbleed_phrases
-
 local adrenaline_phrases = {
     "Im so incredibly anxious.",
     "Focus... just focus...",
@@ -384,12 +376,6 @@ local heatvomit_phraselist = {
 	"That heat..- I'm gonna vomit-",
 	"Ugghhh... I'm about to puke-",
 	"Fuuck.. Oughhh.. I don't feel-"
-}
-
-local internal_bleeding_phrases = {
-	"Something is bleeding inside me...",
-	"I can feel blood building up inside...",
-	"Something inside me is badly wrong...",
 }
 
 local arrhythmia_phrases = {
@@ -460,7 +446,6 @@ function hg.likely_to_phrase(ply)
 	local blood = org.blood
 	local fear = org.fear
 	local panicattack = org.panicattack or 0
-	local internalBleed = org.internalBleed or 0
 	local arrhythmia = org.arrhythmia or 0
 	local hypotension = org.hypotension or 0
 	local temperature = org.temperature
@@ -521,7 +506,6 @@ local function get_status_message(ply)
 	local o2 = org.o2 and org.o2[1] or 30
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
-	local internalBleed = org.internalBleed or 0
 	local arrhythmia = org.arrhythmia or 0
 	local hypotension = org.hypotension or 0
 	local positive_thinking = goodmood and goodmood > 0.5
@@ -563,8 +547,6 @@ local function get_status_message(ply)
 		most_wanted_phraselist = sharp_pain
 	elseif pain > 75 then
 		most_wanted_phraselist = audible_pain
-	elseif internalBleed > 0.1 then
-		most_wanted_phraselist = internal_bleeding_phrases
 	elseif org.fibrillation or org.unstableRhythm or arrhythmia > 0.35 then
 		most_wanted_phraselist = arrhythmia_phrases
 	elseif heartbeat >= 150 then

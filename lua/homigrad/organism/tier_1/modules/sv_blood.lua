@@ -69,13 +69,6 @@ module[1] = function(org)
 	org.throatCutPressureShock = 0
 end
 
-local internalbleed_phrases = {
-	"That's... that's blood I just vomited...",
-	"Oh, that's blood...",
-	"Fuck, I just puked blood...",
-	"Oh shit... I don't feel good...",
-}
-
 local about_to_puke = {
 	"I feel like I'm gonna puke any second now...",
 	"Not feeling good...",
@@ -288,17 +281,8 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and (hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood) < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",true,"blood2",0,nil,Color(200, 170, 170)) end
 
 	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
-		local timeSinceBleed = CurTime() - (org.lastBleedTime or 0)
-		local recoveryRamp = Lerp(math.Clamp(timeSinceBleed / 60, 0, 1), 0.75, 1)
-		local heartRate = org.heartbeat or org.pulse or 75
-		local highHeartRateBoost = 1 + math.Clamp((heartRate - 120) / 80, 0, 1) * 0.5
-		local adrenalineBoost = 1 + math.Clamp((adrenaline - 0.5) / 1.5, 0, 1) * 0.4
-		local satietyMultiplier = 0.75 + math.Clamp((org.satiety or 0) / 100, 0, 1) * 0.25
-		local goodmood = math.Clamp(org.goodmood or 0, 0, 1)
-		local goodmoodBonus = 1 + goodmood * 0.1
-		local circulationPerfusion = math.Clamp(1 - (org.hypotension or 0), 0.05, 1)
-		local regenerationRate = 0.3 * highHeartRateBoost * adrenalineBoost * satietyMultiplier * org.blood_regeneration_multiplier * circulationPerfusion * recoveryRamp * goodmoodBonus
-		org.blood = min(org.blood + mulTime * regenerationRate, 5000)
+		-- Blood recovery is intentionally predictable once bleeding has stopped.
+		org.blood = min(org.blood + mulTime * 10, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -416,8 +400,10 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	if blood <= 3500 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.84)
-		org.disorientation = math.max(org.disorientation or 0, 0.55 + bloodDeficit * 0.5)
+		-- 3.5 L is a serious loss, but it should remain a weakness stage rather
+		-- than feeding the unconsciousness pipeline on its own.
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
+		org.disorientation = math.max(org.disorientation or 0, 0.35 + bloodDeficit * 0.35)
 		if org.isPly and not org.otrub then
 			org.owner:Notify("Everything feels so heavy...", true, "blood_3500", 0, nil, Color(200, 170, 170))
 		end
@@ -425,9 +411,11 @@ module[2] = function(owner, org, mulTime)
 
 	if blood <= 3000 then
 		local severeStage = math.Clamp((3000 - blood) / 500, 0, 1)
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.68 - severeStage * 0.12)
-		org.disorientation = math.max(org.disorientation or 0, 1.35 + severeStage * 1.15)
-		org.shock = math.Approach(org.shock or 0, 10 + severeStage * 18, mulTime * (0.45 + severeStage * 0.8))
+		-- Keep 3.0-2.5 L debilitating, but conscious. The coma/otrub range
+		-- begins below in the 2.5-2.0 L stage.
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.85 - severeStage * 0.10)
+		org.disorientation = math.max(org.disorientation or 0, 0.85 + severeStage * 0.65)
+		org.shock = math.Approach(org.shock or 0, 8 + severeStage * 12, mulTime * (0.35 + severeStage * 0.6))
 		if org.stamina and org.stamina[1] then
 			org.stamina[1] = math.max(org.stamina[1] - mulTime * (0.4 + severeStage * 1.6), 0)
 		end
@@ -659,18 +647,6 @@ module[2] = function(owner, org, mulTime)
 	coagulatespeed = coagulatespeed + mulTime
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 30)
 
-	-- Do not announce internal bleeding immediately: a player needs to have a
-	-- sustained bleed before they can reliably recognize the symptoms.
-	local internalBleedAlertReady = (org.internalBleedDuration or 0) >= 15
-	if org.internalBleed <= 0.1 then
-		org.internalBleedAlerted = nil
-		org.internalBleedNextMessage = nil
-	elseif org.isPly and not org.otrub and internalBleedAlertReady and not org.internalBleedAlerted then
-		org.internalBleedAlerted = true
-		org.internalBleedNextMessage = CurTime() + 120
-		owner:Notify("I think I'm bleeding inside...", true, "internalbleed", 0, nil, Color(200, 170, 170))
-	end
-
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 	
 	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 2000 and org.o2[1] > 0 then
@@ -694,12 +670,6 @@ module[2] = function(owner, org, mulTime)
 				hg.organism.VomitNormal(owner)
 			end
 		else
-			-- Vomiting can happen frequently during a sustained bleed; keep its
-			-- flavour notification to at most once every two minutes.
-			if org.isPly and org.internalBleed > 0.1 and internalBleedAlertReady and CurTime() >= (org.internalBleedNextMessage or 0) then
-				org.internalBleedNextMessage = CurTime() + 120
-				owner:Notify(hg.internalbleed_phrases[math.random(#hg.internalbleed_phrases)], 15, "internalbleed")
-			end
 			hg.organism.Vomit(owner)
 		end
 	end

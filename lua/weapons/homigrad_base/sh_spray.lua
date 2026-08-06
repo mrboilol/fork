@@ -256,12 +256,12 @@ function SWEP:PrimarySpread()
 		arm_debuff = arm_debuff + tourniquet_debuff
 
 		local armHandlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
-		mul = mul * math.Clamp(0.72 + arm_debuff * 0.14 + amputate_debuff * 0.16, 0.72, 1.65)
+		mul = mul * math.Clamp(0.72 + arm_debuff * 0.22 + amputate_debuff * 0.28, 0.72, 2.15)
 		-- Injury/support penalties used to multiply one another without a useful
 		-- ceiling (and oneHandRecoilMul had already affected force above). Keep
 		-- the gun hard to control without allowing a broken arm to explode the
 		-- camera punch into several stacked multiples.
-		local injuryRecoilMul = math.Clamp(broken_arm_recoil_mult * oneHandRecoilMul * armHandlingMul, 1, 1.65)
+		local injuryRecoilMul = math.Clamp(broken_arm_recoil_mult * oneHandRecoilMul * armHandlingMul, 1, 2.2)
 		mul = mul * injuryRecoilMul
 		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
 		mul = mul * self.RecoilMul
@@ -269,7 +269,7 @@ function SWEP:PrimarySpread()
 		mul = mul * (owner:Crouching() and 0.75 or 1)
 		--mul = mul * (hg.IsOnGround(hg.GetCurrentCharacter(owner)) and 1 or 5)
 		mul = mul * (self:IsResting() and 0.1 or 1)
-		mul = math.Clamp(mul, 0.08, 3.5)
+		mul = math.Clamp(mul, 0.08, 4.25)
 
 		-- This is post-shot camera motion, never a random bullet cone. Give each
 		-- impulse an independent pitch and yaw direction so recoil can travel up,
@@ -291,8 +291,9 @@ function SWEP:PrimarySpread()
 
 		-- Render-only muzzle movement gives the weapon follow-through without ever
 		-- rotating a bullet away from the player’s authoritative aim trace.
-		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(-math.Rand(0.12, 0.42) * mul, math.Rand(-0.34, 0.34) * mul, math.Rand(-0.2, 0.2) * mul)
-		self.ShotMuzzleOffset = (self.ShotMuzzleOffset or Vector(0, 0, 0)) + Vector(-math.Rand(0.12, 0.38) * mul, math.Rand(-0.16, 0.16) * mul, math.Rand(-0.1, 0.1) * mul)
+		local muzzleInjuryMul = math.Clamp(1 + arm_debuff * 0.12 + amputate_debuff * 0.18, 1, 1.75)
+		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(-math.Rand(0.12, 0.42) * mul * muzzleInjuryMul, math.Rand(-0.34, 0.34) * mul * muzzleInjuryMul, math.Rand(-0.2, 0.2) * mul * muzzleInjuryMul)
+		self.ShotMuzzleOffset = (self.ShotMuzzleOffset or Vector(0, 0, 0)) + Vector(-math.Rand(0.12, 0.38) * mul * muzzleInjuryMul, math.Rand(-0.16, 0.16) * mul * muzzleInjuryMul, math.Rand(-0.1, 0.1) * mul * muzzleInjuryMul)
 		local aimYaw = cantedHold and angrand2[2] * 0.72 or math.Clamp(angrand2[2] * 0.65, -math.abs(angrand2[1]) * 0.32 - 0.12, math.abs(angrand2[1]) * 0.32 + 0.12)
 		local angrand3 = Angle(angrand2[1], aimYaw, 0)
 

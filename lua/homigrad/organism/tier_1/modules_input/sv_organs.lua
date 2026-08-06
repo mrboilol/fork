@@ -658,6 +658,9 @@ hg.hitArtery = hitArtery
 
 applyThroatCutEffects = function(owner, org, dmgInfo, severity, skipTracheaDamage)
 	if not IsValid(owner) or not org or not org.alive or org.superfighter then return false end
+	-- Berserk keeps the airway intact even when the rest of a throat cut lands.
+	-- Keep the cut's bleeding and shock consequences separate from trachea damage.
+	skipTracheaDamage = skipTracheaDamage or owner:IsBerserk()
 
 	local firstCut = not org.throatcut
 	local time = CurTime()
@@ -807,6 +810,12 @@ input_list.lungsR = function(org, bone, dmg, dmgInfo)
 end
 
 input_list.trachea = function(org, bone, dmg, dmgInfo)
+	if IsValid(org.owner) and org.owner:IsBerserk() then
+		org.trachea = 0
+		org.tracheaPath = nil
+		return 0
+	end
+
 	local oldDmg = org.trachea
 
     dmg = dmg * 0.05 -- 95% resistance; the airway is no longer excessively delicate

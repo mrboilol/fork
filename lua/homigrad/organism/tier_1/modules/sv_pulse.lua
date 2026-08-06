@@ -256,24 +256,49 @@ function hg.organism.StartFibrillation(org)
 	org.fibrillationStart = CurTime()
 end
 
-function hg.organism.TryRestartHeartWithCPR(org, cprMul)
+function hg.organism.TryRestartHeartWithResuscitation(org)
 	if not org or not org.alive or not org.heartstop or org.deathStateKilled then return false end
-	if (org.pulse or 0) <= 15 or (org.brain or 0) >= 0.6 or (org.heart or 0) >= 1 then return false end
+	if (org.brain or 0) >= 0.85 or (org.heart or 0) >= 1 then return false end
 
-	cprMul = cprMul or 1
-	local adrenaline = Clamp(org.adrenaline or 0, 0, 3)
-	local chance = Clamp(6 * cprMul + adrenaline * 12, 6, 45)
+	local now = CurTime()
+	local hasAED = (org.aedResuscitationUntil or 0) > now
+	local hasEpinephrine = (org.epinephrineResuscitationUntil or 0) > now
+	local hasCPR = (org.cprResuscitationUntil or 0) > now
+	if not ((hasAED and (hasEpinephrine or hasCPR)) or (hasEpinephrine and hasCPR)) then return false end
 
+	-- An intervention window receives one attempt. More compressions must not
+	-- turn a single AED/epinephrine dose into repeated restart rolls.
+	if (org.resuscitationAttemptUntil or 0) > now then return false end
+	org.resuscitationAttemptUntil = now + 15
+
+	local chance = hasAED and hasEpinephrine and 82 or 74
+	chance = chance * Clamp(1 - (org.heart or 0) * 0.35, 0.5, 1)
+	if (org.o2 and (org.o2[1] or 0) < 3) or (org.blood or 5000) < 800 then
+		chance = chance * 0.75
+	end
 	if math.random(100) > chance then return false end
 
 	org.heartstop = false
 	org.fibrillation = false
-	org.arrhythmia = 0
-	org.heartbeat = Clamp(org.heartbeat or 70, 55, 90)
-	org.pulse = max(org.pulse or 0, 25)
-	org.bloodPressure = max(org.bloodPressure or 0, 35)
-	org.cardiacOutput = max(org.cardiacOutput or 0, 0.35)
-	org.myocardialOxygen = max(org.myocardialOxygen or 0, 0.35)
+	org.arrhythmia = math.max((org.arrhythmia or 0) - 0.45, 0)
+	org.heart = math.max((org.heart or 0) - 0.08, 0)
+	org.heartStrain = math.max((org.heartStrain or 0) - 0.2, 0)
+	org.ischemia = math.max((org.ischemia or 0) - 0.15, 0)
+	org.heartbeat = Clamp(org.heartbeat or 70, 55, 100)
+	org.pulse = max(org.pulse or 0, 35)
+	org.bloodPressure = max(org.bloodPressure or 0, 40)
+	org.cardiacOutput = max(org.cardiacOutput or 0, 0.4)
+	org.myocardialOxygen = max(org.myocardialOxygen or 0, 0.5)
+	org.hypotension = math.min(org.hypotension or 1, 0.55)
+	org.cardiacRestartUntil = now + 3
+	if hg.organism.RestoreSupportedOxygen then
+		hg.organism.RestoreSupportedOxygen(org, 0.2, {
+			oxygen = 10, oxygenTarget = 18, bodyoxygen = 0.45, bodyoxygenTarget = 0.7,
+			brainoxygen = 0.4, brainoxygenTarget = 0.65, perfusion = 0.4,
+			perfusionTarget = 0.65, myocardialOxygen = 0.5, myocardialOxygenTarget = 0.75,
+			hypoxiaTime = 5, severeHypoxiaTime = 1, systemicIschemiaTime = 6
+		})
+	end
 
 	return true
 end
@@ -816,39 +841,6 @@ module[2] = function(owner, org, timeValue)
 	
 	if not org.heartstop then
 		org.last_heartbeat = CurTime()
-	end
-
-	-- Epinephrine can sometimes restore a reversible arrest, but each injector
-	-- dose receives exactly one attempt. Natural/combat adrenaline must not make
-	-- the patient reroll a restart every pulse tick.
-	if org.heartstop and org.epinephrineRestartPending then
-		org.epinephrineRestartPending = nil
-		local canRestartHeart = org.alive and (org.blood or 5000) >= 800 and (not organSystemsEnabled or ((org.heart or 0) < 1 and (org.brain or 0) < 0.85 and (org.temperature or 36.7) >= 28 and (org.temperature or 36.7) <= 42))
-		local dose = math.Clamp(org.epinephrineRestartDose or adren or 0, 0, 4)
-		org.epinephrineRestartDose = nil
-		local chance = math.Clamp(35 + dose * 18, 0, 80)
-		chance = chance * math.Clamp(1 - (org.heart or 0) * 0.65, 0.2, 1)
-		if (org.o2 and (org.o2[1] or 0) < 5) or (org.hypotension or 0) > 0.98 then
-			chance = chance * 0.6
-		end
-		local rand = math.random(100)
-
-		if canRestartHeart and chance > rand then
-			org.heartstop = false
-			org.terminalRhythm = nil
-			org.unstableRhythm = nil
-			org.cardiacArrestStart = nil
-			org.cardiacArrestO2Start = nil
-			org._zeroO2Time = 0
-			org.heartbeat = math.Clamp(org.heartbeat > 0 and org.heartbeat or 90, 80, 140)
-			org.pulse = math.max(org.pulse or 0, 35)
-			org.hypotension = math.min(org.hypotension or 1, 0.5)
-			org.cardiacRestartUntil = CurTime() + 2
-			if org.o2 then
-				local o2Restore = math.Clamp(adren * 2.5, 8, 12)
-				org.o2[1] = math.max(org.o2[1], o2Restore)
-			end
-		end
 	end
 
 	-- Electrical activity, a palpable pulse, and cardiac output are separate.

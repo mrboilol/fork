@@ -93,11 +93,11 @@ if SERVER then
 		-- Keep the dose's circulatory support separate from the adrenaline decay
 		-- curve so a single injector consistently stabilizes a viable patient.
 		org.epinephrineStabilizationUntil = math.max(org.epinephrineStabilizationUntil or 0, CurTime() + 12)
-		-- A dose given during arrest gets one restart attempt in the pulse
-		-- simulation. Sustained adrenaline must not reroll it every tick.
-		if org.heartstop then
-			org.epinephrineRestartPending = true
-			org.epinephrineRestartDose = self.modeValues[1] * 1.5
+		-- Epinephrine alone stabilizes circulation; a recent AED application or
+		-- active CPR is required before it can contribute to a restart attempt.
+		org.epinephrineResuscitationUntil = math.max(org.epinephrineResuscitationUntil or 0, CurTime() + 15)
+		if hg.organism and hg.organism.TryRestartHeartWithResuscitation then
+			hg.organism.TryRestartHeartWithResuscitation(org)
 		end
 		org.palpitationTreatmentUntil = math.max(org.palpitationTreatmentUntil or 0, CurTime() + 8)
 		if hg.organism and hg.organism.RestoreSupportedOxygen then

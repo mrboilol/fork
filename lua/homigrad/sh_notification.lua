@@ -110,17 +110,6 @@ if CLIENT then
 		outline = false,
 	})
 
-	-- Pain and dying notifications use the same VCR face at a more prominent
-	-- size than normal notifications.
-	surface.CreateFont("RemorseismNotificationLarge", {
-		font = "VCR OSD Mono",
-		extended = true,
-		size = ScreenScale(10),
-		weight = 700,
-		antialias = true,
-		shadow = true,
-	})
-
 	surface.CreateFont("SmallHuyFont", {
 		font = "BudgetLabel",
 		extended = true,
@@ -147,19 +136,6 @@ if CLIENT then
 		outline = false,
 	})
 
-	surface.CreateFont("EmojiFontDesperate", {
-		font = "Segoe UI Emoji",
-		extended = true,
-		size = ScreenScale(10),
-		weight = 0,
-		blursize = 0,
-		scanlines = 0,
-		antialias = true,
-		strikeout = false,
-		shadow = false,
-		outline = false,
-	})
-
 	surface.CreateFont("ThoughtFont", {
 		font = "VCR OSD Mono",
 		extended = true,
@@ -176,7 +152,6 @@ if CLIENT then
 	hg.notifications = hg.notifications or {}
 	hg.thoughts = hg.thoughts or {}
 	hg.notificationFont = "HuyFont"
-	hg.notificationDesperateFont = "RemorseismNotificationLarge"
 
 	local function isEmojiCode(code)
 		return (code >= 0x1F300 and code <= 0x1F9FF) or
@@ -247,9 +222,8 @@ if CLIENT then
 		end
 
 		local currentX = x
-		local emojiFont = baseFont == hg.notificationDesperateFont and "EmojiFontDesperate" or "EmojiFont"
 		for _, seg in ipairs(segments) do
-			local font = seg.isEmoji and emojiFont or baseFont
+			local font = seg.isEmoji and "EmojiFont" or baseFont
 			surface.SetFont(font)
 			local w, h = surface.GetTextSize(seg.text)
 			draw.SimpleTextOutlined(seg.text, font, currentX, y, color, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1.5, outlineColor)
@@ -322,7 +296,9 @@ if CLIENT then
 		if not hg_newthoughts:GetBool() then return end
 		if lply:IsBerserk() then return end
 
-		table.insert(hg.thoughts, {msg, CurTime(), clr or Color(255, 255, 255, 255)})
+		-- Keep the current screen position so existing thoughts can glide into
+		-- their new slot instead of jumping when another thought arrives.
+		table.insert(hg.thoughts, {msg, CurTime(), clr or Color(255, 255, 255, 255), nil})
 
 		while #hg.thoughts > 3 do
 			local tbl = hg.thoughts[1]
@@ -499,7 +475,7 @@ if CLIENT then
 				end
 
 				local desperateText = inPain or dying
-				local font = desperateText and hg.notificationDesperateFont or hg.notificationFont
+				local font = hg.notificationFont
 
 				surface.SetFont(font)
 				local txtw, txth = surface.GetTextSize(last_message or txt)
@@ -641,7 +617,11 @@ if CLIENT then
 			else
 				local clr = tbl[3]
 				local alpha = math.min(delta / fade, 1, (duration - delta) / fade) * 255
-				local y = ScrH() - ScrH() / 4 - (i - 1) * ScreenScale(14)
+				local targetY = ScrH() - ScrH() / 4 - (i - 1) * ScreenScale(14)
+				-- New thoughts are placed above the earlier ones.  Retaining a
+				-- per-thought position makes the whole stack ease into place.
+				tbl[4] = Lerp(math.Clamp(FrameTime() * 14, 0, 1), tbl[4] or targetY, targetY)
+				local y = tbl[4]
 
 				thoughtBrown.a = alpha
 				draw.SimpleTextOutlined(tbl[1], "ThoughtFont", ScrW() / 2, y, Color(clr.r, clr.g, clr.b, alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, thoughtBrown)

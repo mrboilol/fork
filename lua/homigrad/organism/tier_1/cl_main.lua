@@ -906,10 +906,27 @@ local function getCirculationStrength(org, pulseOverride)
 	return math.Clamp(math.sqrt(pulseStrength * circulation), 0, 1.55)
 end
 
-local function emitNormalWoundParticles(ent, pos, outward, intensity, circulation)
+local function getWoundPressure(org)
+	if org.heartstop then return 0, 0 end
+
+	local pulse = math.max(tonumber(org.pulse) or 0, 0)
+	local peripheralPressure = math.Clamp(1 - (tonumber(org.hypotension) or 0), 0, 1)
+	local cardiacOutput = math.Clamp(tonumber(org.cardiacOutput) or peripheralPressure, 0, 1.5)
+	local hypertension = math.Clamp(tonumber(org.hypertension) or 0, 0, 1)
+	local pressure = math.Clamp(peripheralPressure * 0.6 + cardiacOutput * 0.4 + hypertension * 0.2, 0, 1.35)
+
+	-- A wound has a brief, stronger outward push with each effective pulse. Low
+	-- pressure or a failed pulse therefore becomes a drip instead of a jet.
+	local beat = math.max(math.sin(CurTime() * pulse * math.pi / 30), 0)
+	return pressure, beat
+end
+
+local function emitNormalWoundParticles(ent, pos, outward, intensity, circulation, org)
 	local count = intensity >= 0.82 and 3 or intensity >= 0.48 and 2 or 1
-	local force = (0.35 + intensity * intensity * 25) * circulation
-	local spread = 0.2 + intensity * 3.2
+	local pressure, beat = getWoundPressure(org)
+	local pulseForce = math.Clamp((org.pulse or 0) / 70, 0, 1.5)
+	local force = (2 + intensity * intensity * 52) * circulation * pressure * (0.72 + beat * 0.58) * pulseForce
+	local spread = 0.8 + intensity * 5.5
 	local decalWeight = Lerp(intensity, 0.45, 3)
 	local particleSize = normalParticleSizeAverage
 	if decalWeight <= 0.8 then
@@ -924,9 +941,9 @@ local function emitNormalWoundParticles(ent, pos, outward, intensity, circulatio
 			direction = (VectorRand(-1, 1) + Vector(0, 0, -0.7)):GetNormalized()
 		end
 
-		local velocity = direction * force * math.Rand(0.85, 1.12)
+		local velocity = direction * force * math.Rand(0.82, 1.18)
 			+ VectorRand(-spread, spread)
-			+ bloodDown * Lerp(intensity, 1.4, 3.2)
+			+ bloodDown * Lerp(intensity, 0.8, 2.6)
 		local particle = hg.addBloodPart(pos + VectorRand(-0.45, 0.45), velocity, nil, particleSize, particleSize, false, nil, ent)
 		if particle then particle.decalWeight = decalWeight end
 	end
@@ -1275,7 +1292,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 			local circulation = getCirculationStrength(org)
 			for i, wound in pairs(wounds) do
 				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull)
-				local particleInterval = Lerp(intensity, 4.5, 0.22)
+				local particleInterval = Lerp(intensity, 3.2, 0.16)
 				
 				if (wound[5] or 0) < time then
 					local bone = wound[4]
@@ -1302,7 +1319,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 								hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 							end
 						else
-							emitNormalWoundParticles(ent, pos, -ang:Forward(), intensity, circulation)
+							emitNormalWoundParticles(ent, pos, -ang:Forward(), intensity, circulation, org)
 						end
 
 						wound[5] = time + (water and 2 or particleInterval)
@@ -1313,7 +1330,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitNormalWoundParticles(ent, pos, nil, intensity, circulation)
+							emitNormalWoundParticles(ent, pos, nil, intensity, circulation, org)
 						end
 
 						wound[5] = time + (water and 2 or particleInterval)

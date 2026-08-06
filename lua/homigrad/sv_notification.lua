@@ -5,6 +5,7 @@ util.AddNetworkString("HGThought")
 --local hg_old_notificate = ConVarExists("hg_old_notificate") and GetConVar("hg_old_notificate") or CreateConVar("hg_old_notificate",0,FCVAR_SERVER_CAN_EXECUTE,"enable old notifications (chatprints)",0,1)
 local hev_color = Color(255,125,0)
 local CreateThought
+local CreateNotification
 local thoughtMessages = {
     panicattack_start = "You are experiencing a panic attack.",
     panicattack_heartstop = "Your heart stopped.",
@@ -31,7 +32,6 @@ local thoughtMessages = {
     blood_2500 = "You are in severe hemorrhagic shock.",
     ischemic_collapse = "You are actively dying from blood loss.",
     low_perfusion = "Your limbs feel weak from poor circulation.",
-    internalbleed = "You are bleeding internally.",
     arrhythmia = "Your heartbeat is dangerously irregular.",
     tachycardia = "Your heart is beating dangerously fast.",
     bradycardia = "Your heart is beating dangerously slowly.",
@@ -305,8 +305,7 @@ local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
 end
 
 SCPCBCreateThought = function(ply, category, dmgType, isLethal)
-    if not CreateThought or not IsValid(ply) or not ply:IsPlayer() then return end
-    if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return end
+    if not IsValid(ply) or not ply:IsPlayer() then return end
     if isLethal then return end
 
     local curTime = CurTime()
@@ -330,7 +329,18 @@ SCPCBCreateThought = function(ply, category, dmgType, isLethal)
     local msg = string.gsub(options[math.random(1, #options)], "{weapon}", weaponStr)
     local delay = isLethal and 1 or (category == "near_miss" and 12 or 8)
 
-    if CreateThought(ply, msg, delay, "scpcb_damage_" .. targetCategory, 0, color_white) then
+    -- Combat feedback must work in both notification modes.  The stacked
+    -- thought UI is optional; players using the classic notification UI still
+    -- need to know when a round struck them or barely passed by.
+    local msgKey = "scpcb_damage_" .. targetCategory
+    local created
+    if ply:GetInfoNum("hg_newthoughts", 0) > 0 then
+        created = CreateThought and CreateThought(ply, msg, delay, msgKey, 0, color_white)
+    else
+        created = CreateNotification and CreateNotification(ply, msg, delay, msgKey, 0, nil, color_white)
+    end
+
+    if created then
         ply.scpcbThoughtNext = curTime + (isLethal and 1 or (category == "near_miss" and 6 or 4))
     end
 end
@@ -353,7 +363,7 @@ local function SCPCBThoughtOwner(ent)
     end
 end
 
-local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
+CreateNotification = function(ply, msg, delay, msgKey, showTime, func, clr)
     if ply.PlayerClassName and ply.PlayerClassName == "Gordon" and clr != hev_color then return end
     if msg == "" then return end
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end

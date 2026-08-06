@@ -686,7 +686,14 @@ module[2] = function(owner, org, timeValue)
 		local opioidBreathingK = math.Clamp(1 - drugRespiratoryDepression * 1.15, 0.05, 1)
 		local roleO2RegenMul = hg.GetSubRolePerk and hg.GetSubRolePerk(owner, "O2RegenMul", 1) or 1
 		local regenerate = regen * timeValue * 4 * circulationK * (mask_blevota and 0 or 1) * ((org.temperature > 38) and math.Clamp(math.Remap(org.temperature, 38, 41, 1, 0.1), 0.1, 1) or 1) * coldO2RegenK * altitudeO2K * circulationConditionK * coBreathePenalty * opioidBreathingK * roleO2RegenMul
-		local tracheaDamage = math.Clamp(org.trachea or 0, 0, 1)
+		-- Berserk repairs the airway and makes it immune to both the ongoing
+		-- breathing deterioration below and its associated oxygen penalties.
+		local berserkAirwayProtected = owner:IsBerserk()
+		if berserkAirwayProtected then
+			org.trachea = 0
+			org.tracheaPath = nil
+		end
+		local tracheaDamage = berserkAirwayProtected and 0 or math.Clamp(org.trachea or 0, 0, 1)
 		local tracheaIntakeK = 1 - (tracheaDamage * 0.15 + tracheaDamage * tracheaDamage * 0.55)
 		regenerate = regenerate * math.Clamp(tracheaIntakeK, 0.3, 1)
 
@@ -715,7 +722,7 @@ module[2] = function(owner, org, timeValue)
 
 		-- Needle prevents trachea damage, only triggers when trachea > 0.65
 
-		if org.trachea > 0.65 and org.trachea < 1.0 and org.needle <= 0 then
+		if not berserkAirwayProtected and org.trachea > 0.65 and org.trachea < 1.0 and org.needle <= 0 then
 
 			local breatheAmount = regenerate * 0.008
 
@@ -731,7 +738,7 @@ module[2] = function(owner, org, timeValue)
 
 		-- Trachea gradual deterioration from 0.5+ based on lung function (hyperventilating = more damage)
 
-		if org.trachea >= 0.5 and org.trachea < 1.0 and org.needle <= 0 then
+		if not berserkAirwayProtected and org.trachea >= 0.5 and org.trachea < 1.0 and org.needle <= 0 then
 
 			local breatheIntensity = math.max((regenerate / math.max(timeValue, 0.001)) / (o2.regen or 4), 0.1) * math.Clamp((org.pulse or 70) / 70, 0.8, 2.0)
 
@@ -814,7 +821,7 @@ module[2] = function(owner, org, timeValue)
 
 		-- Needle prevents both
 
-		if org.trachea > 0.65 and org.trachea < 1.0 and org.needle <= 0 and regenerate > 0 then
+		if not berserkAirwayProtected and org.trachea > 0.65 and org.trachea < 1.0 and org.needle <= 0 and regenerate > 0 then
 
 			-- First time above 0.65: choose path
 

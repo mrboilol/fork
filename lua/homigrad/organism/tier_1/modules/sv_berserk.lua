@@ -3,6 +3,14 @@ CreateConVar("hg_altberserk3", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOT
 
 hook.Add("Player Think", "Berserk", function(ply, time, dtime)
     if !ply:IsBerserk() or ply:GetMoveType() == MOVETYPE_NOCLIP then return end
+
+    local org = ply.organism
+    if org then
+        -- Berserk immediately restores and maintains the airway.
+        org.trachea = 0
+        org.tracheaPath = nil
+    end
+
     local velocity = ply:GetVelocity():Length2DSqr()
     if velocity > 100000 then
         local plyPos = ply:GetPos()

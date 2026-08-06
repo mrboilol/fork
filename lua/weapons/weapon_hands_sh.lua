@@ -1746,6 +1746,8 @@ function SWEP:ApplyForce()
 							-- heart itself has restarted.
 							org.cprSupportUntil = CurTime() + 0.75
 							org.cprSupportPulse = skillMult > 1 and 50 or 40
+							org.cprResuscitationUntil = CurTime() + 2
+							if hg.organism and hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org) end
 							
 							-- Chest compressions temporarily improve hypotension.
 							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)

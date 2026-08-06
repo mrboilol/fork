@@ -352,6 +352,14 @@ local function IsAEDState(defib, state)
 	return IsValid(defib) and not defib.AEDDropped and defib.AEDState == state
 end
 
+local function MarkAEDResuscitation(org)
+	if not org then return end
+	org.aedResuscitationUntil = math.max(org.aedResuscitationUntil or 0, CurTime() + 15)
+	if hg.organism and hg.organism.TryRestartHeartWithResuscitation then
+		hg.organism.TryRestartHeartWithResuscitation(org)
+	end
+end
+
 local function ApplyAEDShock(org, accidental)
 	if not org then return end
 
@@ -367,32 +375,19 @@ local function ApplyAEDShock(org, accidental)
 	org.heartStrain = math.max((org.heartStrain or 0) - 0.35, 0)
 	org.ischemia = math.max((org.ischemia or 0) - 0.2, 0)
 	org.myocardialOxygen = math.max(org.myocardialOxygen or 0, 0.35)
-
-	if math.random(100) <= restartChance then
-		org.heartstop = false
-		org.terminalRhythm = nil
-		org.unstableRhythm = nil
-		org.cardiacArrestStart = nil
-		org.cardiacArrestO2Start = nil
-		org._zeroO2Time = 0
-		org.heartbeat = math.Clamp((org.heartbeat or 0) > 0 and org.heartbeat or 80, 55, 100)
-		org.pulse = math.max(org.pulse or 0, 50)
-		org.hypotension = math.min(org.hypotension or 1, 0.3)
-		org.cardiacRestartUntil = CurTime() + 4
-		ApplySuccessfulShockOxygenRecovery(org)
-	else
-		-- A failed shock must not turn a living arrhythmia patient into an arrest.
-		org.heartstop = wasArrested
-		if wasArrested then
-			org.heartbeat = 0
-			org.pulse = 0
-		end
-		org.hypotension = math.min(org.hypotension or 1, 0.65)
-	end
-
+	org.defibSupportUntil = CurTime() + 4
 	org.defibDeathGrace = CurTime() + 45
-	ApplyAEDLifeSupport(org, 4)
-	ApplyAEDRhythmTherapy(org, 4)
+	if hg.organism and hg.organism.RestoreSupportedOxygen then
+		hg.organism.RestoreSupportedOxygen(org, 0.12, {
+			oxygen = 8, oxygenTarget = 16, bodyoxygen = 0.35, bodyoxygenTarget = 0.6,
+			brainoxygen = 0.3, brainoxygenTarget = 0.55, perfusion = 0.3,
+			perfusionTarget = 0.55, myocardialOxygen = 0.4, myocardialOxygenTarget = 0.65,
+			hypoxiaTime = 7, severeHypoxiaTime = 2, systemicIschemiaTime = 8
+		})
+	end
+	-- An AED only creates the resuscitation window; it cannot restart an
+	-- arrested heart unless epinephrine or CPR is also active.
+	MarkAEDResuscitation(org)
 end
 
 local function BeginAEDShock(defib, ply, getTarget, uses, accidental)
@@ -481,6 +476,9 @@ local function StartNoShockWarnings(defib, ply, getTarget, uses)
 		DropDefib(defib, getTarget(), uses)
 		return
 	end
+	-- Even when no shock is advised, the AED can be paired with epinephrine or
+	-- CPR during this assessment window; it never restarts a heart by itself.
+	MarkAEDResuscitation(org)
 	if org and org.heartstop then PlayAEDSound(defib, AEDSounds.asystole, 75, 100, 2) end
 	PlayAEDSound(defib, AEDSounds.noshock)
 

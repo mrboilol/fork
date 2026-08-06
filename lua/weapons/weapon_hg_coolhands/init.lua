@@ -557,6 +557,8 @@ function SWEP:ApplyForce()
 							-- Compressions provide temporary circulation without implying a restart.
 							org.cprSupportUntil = CurTime() + 0.75
 							org.cprSupportPulse = skillMult > 1 and 50 or 40
+							org.cprResuscitationUntil = CurTime() + 2
+							if hg.organism and hg.organism.TryRestartHeartWithResuscitation then hg.organism.TryRestartHeartWithResuscitation(org) end
 							
 							-- Chest compressions temporarily improve hypotension.
 							org.hypotension = math.Approach(org.hypotension or 1, 0, 0.05 * skillMult)
@@ -581,7 +583,6 @@ function SWEP:ApplyForce()
 								hg.organism.input_list.chest(org, 1, 5, dmginfo)
 							end
 
-							if hg.organism.TryRestartHeartWithCPR then hg.organism.TryRestartHeartWithCPR(org, cprMul) end
 						end
 
 						phys:ApplyForceCenter(-vector_up * 6000)

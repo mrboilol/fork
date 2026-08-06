@@ -241,13 +241,22 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if handSupport.oneHanded then oneHandCameraMul = oneHandCameraMul * (handSupport.onlyLeft and 1.75 or 1.38) end
 	if handSupport.leftBusy then oneHandCameraMul = oneHandCameraMul * 1.28 end
 	if handSupport.rightBusy then oneHandCameraMul = oneHandCameraMul * 1.45 end
-	-- Multiple busy/injured-arm states can overlap. Preserve visible instability,
-	-- but never let them compound into camera-breaking motion.
+	-- Multiple busy-arm states can overlap. Keep their motion bounded; arm injuries
+	-- themselves are handled below as a control/handling penalty instead of a
+	-- permanently violent camera shake.
 	oneHandCameraMul = math.Clamp(oneHandCameraMul, 1, 1.4)
 
 	-- Partial arm damage detection (0.25-0.99 damage range)
 	local rarm_partial = rarm_health >= 0.25 and rarm_health < 1 and not rarm_amputated
 	local larm_partial = larm_health >= 0.25 and larm_health < 1 and not larm_amputated
+	local armCameraShakeMul = 1
+	if rarm_bad then armCameraShakeMul = armCameraShakeMul * 0.42
+	elseif rarm_partial then armCameraShakeMul = armCameraShakeMul * (1 - ((rarm_health - 0.25) / 0.75) * 0.38) end
+	if larm_bad then armCameraShakeMul = armCameraShakeMul * 0.58
+	elseif larm_partial then armCameraShakeMul = armCameraShakeMul * (1 - ((larm_health - 0.25) / 0.75) * 0.24) end
+	-- Injury should make the weapon slow and difficult to control, not turn every
+	-- frame into camera jitter. Recoil is still amplified separately on each shot.
+	local cameraMotionMul = math.Clamp(oneHandCameraMul * armCameraShakeMul, 0.24, 1.4)
 
 	-- Mitigation calculation for overall control (weight, sway, alignment, control)
 	local plyVel = ply:GetVelocity()
@@ -278,27 +287,27 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	-- Partial damage (0.25-0.99) adds scaled penalty based on damage severity
 	local arm_weight_penalty = 0
 	if rarm_amputated then
-		arm_weight_penalty = arm_weight_penalty + 6.0 -- More severe for amputated
+		arm_weight_penalty = arm_weight_penalty + 8.0
 	elseif rarm_broken then
-		arm_weight_penalty = arm_weight_penalty + 4.5
+		arm_weight_penalty = arm_weight_penalty + 6.0
 	elseif rarm_dislocated then
-		arm_weight_penalty = arm_weight_penalty + 2.5
+		arm_weight_penalty = arm_weight_penalty + 3.5
 	elseif rarm_partial then
-		-- Partial damage: scale penalty from 0.5 (at 0.25 damage) to 2.0 (at 0.99 damage)
+		-- Partial damage: scale penalty from 0.75 (at 0.25 damage) to 2.75 (at 0.99 damage)
 		local partial_severity = (rarm_health - 0.25) / 0.75
-		arm_weight_penalty = arm_weight_penalty + 0.5 + partial_severity * 1.5
+		arm_weight_penalty = arm_weight_penalty + 0.75 + partial_severity * 2.0
 	end
 
 	if larm_amputated then
-		arm_weight_penalty = arm_weight_penalty + 4.5 -- More severe for amputated
+		arm_weight_penalty = arm_weight_penalty + 6.0
 	elseif larm_broken then
-		arm_weight_penalty = arm_weight_penalty + 3.0
+		arm_weight_penalty = arm_weight_penalty + 4.0
 	elseif larm_dislocated then
-		arm_weight_penalty = arm_weight_penalty + 1.5
+		arm_weight_penalty = arm_weight_penalty + 2.2
 	elseif larm_partial then
-		-- Partial damage: scale penalty from 0.3 (at 0.25 damage) to 1.2 (at 0.99 damage)
+		-- Partial damage: scale penalty from 0.45 (at 0.25 damage) to 1.65 (at 0.99 damage)
 		local partial_severity = (larm_health - 0.25) / 0.75
-		arm_weight_penalty = arm_weight_penalty + 0.3 + partial_severity * 0.9
+		arm_weight_penalty = arm_weight_penalty + 0.45 + partial_severity * 1.2
 	end
 	if handSupport.oneHanded then
 		arm_weight_penalty = arm_weight_penalty + (handSupport.onlyLeft and 3.2 or 2.0)
@@ -326,27 +335,27 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	if healthy_arms then
 		-- Base alignment time is used
 	elseif only_right_arm then
-		tta_multiplier = 2.5
-	elseif only_left_arm then
-		tta_multiplier = 4.5
-	elseif broken_right_arm then
 		tta_multiplier = 3.2
+	elseif only_left_arm then
+		tta_multiplier = 5.5
+	elseif broken_right_arm then
+		tta_multiplier = 4.0
 	elseif right_arm_broken_left then
 		tta_multiplier = larm_broken and 3.0 or 2.2
 	elseif rarm_partial or larm_partial then
 		-- Partial damage: scale multiplier based on severity
 		-- Right arm partial is worse than left arm partial
 		if rarm_partial and not larm_partial then
-			tta_multiplier = 1.0 + rarm_partial_severity * 2.5 -- 1.0 to 3.5
+			tta_multiplier = 1.0 + rarm_partial_severity * 3.2
 		elseif larm_partial and not rarm_partial then
-			tta_multiplier = 1.0 + larm_partial_severity * 1.5 -- 1.0 to 2.5
+			tta_multiplier = 1.0 + larm_partial_severity * 2.0
 		else
 			-- Both arms partially damaged
-			tta_multiplier = 1.0 + (rarm_partial_severity * 2.5 + larm_partial_severity * 1.5) * 0.7
+			tta_multiplier = 1.0 + (rarm_partial_severity * 3.2 + larm_partial_severity * 2.0) * 0.75
 		end
 	else
 		if rarm_bad or larm_bad then
-			tta_multiplier = (rarm_broken or larm_broken) and 3.5 or 2.2
+			tta_multiplier = (rarm_broken or larm_broken) and 4.2 or 2.8
 		end
 	end
 
@@ -390,8 +399,8 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 		tta = tta + arm_tta_bonus
 		-- With less constant injury shake, make poor arm control show up as a
 		-- modestly longer, more believable time to settle onto the sights.
-		if rarm_bad then tta = tta * 1.08 end
-		if larm_bad then tta = tta * 1.04 end
+		if rarm_bad then tta = tta * 1.16 end
+		if larm_bad then tta = tta * 1.08 end
 	end
 	
 	if isvector(vellen) then
@@ -468,9 +477,9 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local eyeSpray = -(-self.EyeSpray)
 	local mult = (hg.GunPositions[ply] and hg.GunPositions[ply][1] and (hg.GunPositions[ply][1] / 4 + 1) / 2 + 1 or 1) / 2
 	
-	local spray = self:GetCameraSprayValues(animpos) * mult * oneHandCameraMul
+	local spray = self:GetCameraSprayValues(animpos) * mult * cameraMotionMul
 
-	spray = spray + animpos * 6 * k * mult * oneHandCameraMul * ply:EyeAngles():Up()
+	spray = spray + animpos * 6 * k * mult * cameraMotionMul * ply:EyeAngles():Up()
 
 	//angIdle:Add(-angle_difference*2)
 	//angZoom:Add(-angle_difference*1)
@@ -482,7 +491,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local weight = math.max(self.weight or 1, 0.001)
 	local shit2 = (1 / weight) * (self.NumBullet or 3) / 3
 	angZoom:Add(self.prankang or angle_zero)
-	posZoom:Add(VectorRand(-0.1, 0.1) * animpos3 * shit2 * oneHandCameraMul)
+	posZoom:Add(VectorRand(-0.1, 0.1) * animpos3 * shit2 * cameraMotionMul)
 
 	local fraction2 = math.ease.InCubic(self:GetAnimPos_Shoot2(self.lastShoot or 0, 1))
 	
@@ -500,7 +509,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	
 	local fthuy = ftlerped * 150
 
-	local sprayShake = (self.sprayAngles[3] or 0) * game.GetTimeScale() * 0.7 * oneHandCameraMul
+	local sprayShake = (self.sprayAngles[3] or 0) * game.GetTimeScale() * 0.7 * cameraMotionMul
 	-- This is visual follow-through, not the recoil climb itself.  Keep all three
 	-- axes alive on long guns too: forcing pitch negative here made every burst
 	-- feel like it followed the same up-and-right rail.

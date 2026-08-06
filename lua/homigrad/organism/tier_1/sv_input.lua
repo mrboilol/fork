@@ -1559,7 +1559,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 
 	if outputHole and #outputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
-		queueBulletBloodImpact(ent, "exit", outputHole[#outputHole], -outputDir, dmg, severeBulletImpact)
+		-- An exit hole carries the projectile's remaining energy out of the body.
+		-- Give its spray enough velocity to reach surrounding geometry, unlike the
+		-- more contained entry impact.
+		queueBulletBloodImpact(ent, "exit", outputHole[#outputHole], -outputDir * 1.8, dmg, severeBulletImpact)
 	end
 
 	--print(dmg_before, 2)
