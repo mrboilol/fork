@@ -937,37 +937,19 @@ function hg.ExplodeHead(ent, damage, slash, force)
 	if !IsValid(ent) then return end
 
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
-	-- Gib_Input can only remove a bone from a ragdoll. A standing player must
-	-- therefore enter the normal death-ragdoll path first; preserving the terminal
-	-- damage on their organism makes the newly-created corpse unambiguously dead
-	-- and ready to have its head removed on the next tick.
-	if IsValid(ply) and ply:IsPlayer() and ply:Alive() then
-		local org = ply.organism
-		if org then
-			org.brain = 1.0
-			org.skull = 1.0
-			org.needfake = true
-			if hg.organism.KillFatalBrainDamage then
-				hg.organism.KillFatalBrainDamage(org)
-			else
-				org.alive = false
-				ply:Kill()
-			end
-		else
-			ply:Kill()
-		end
-	end
 	if ent:IsNPC() and ent.organism then ent.organism.shock = 100 end
 	local target = ent
 	target._headGibPending = target._headGibPending or false
 	if target._headGibPending then return end
 	target._headGibPending = true
+	local standingPlayer = IsValid(ply) and ply:IsPlayer() and ply:Alive() and ply or nil
+	local deathHookName = standingPlayer and "HG_StandingHeadGib_" .. standingPlayer:EntIndex() or nil
 
 	local attempts = 0
-	local function finishHeadGib()
+	local function finishHeadGib(createdRagdoll)
 		if not IsValid(target) then return end
 
-		local ent = target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
+		local ent = IsValid(createdRagdoll) and createdRagdoll or target:IsRagdoll() and target or target:GetNWEntity("RagdollDeath")
 		if not IsValid(ent) then ent = target.FakeRagdoll end
 		if not IsValid(ent) then
 			attempts = attempts + 1
@@ -1025,7 +1007,39 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		hg.send_bareinfo(ent.organism)
 	end
 
-	timer.Simple(0, finishHeadGib)
+	-- DoPlayerDeath creates the ragdoll and emits RagdollDeath during Kill(). Arm
+	-- this listener before making a standing player fatal so we gib the exact
+	-- corpse rather than hoping its replicated reference exists next frame.
+	if standingPlayer then
+		hook.Add("RagdollDeath", deathHookName, function(deadPlayer, ragdoll)
+			if deadPlayer != standingPlayer then return end
+			hook.Remove("RagdollDeath", deathHookName)
+			timer.Simple(0, function() finishHeadGib(ragdoll) end)
+		end)
+
+		local org = standingPlayer.organism
+		if org then
+			org.brain = 1.0
+			org.skull = 1.0
+			org.needfake = true
+			if hg.organism.KillFatalBrainDamage then
+				hg.organism.KillFatalBrainDamage(org)
+			else
+				org.alive = false
+				standingPlayer:Kill()
+			end
+		else
+			standingPlayer:Kill()
+		end
+
+		-- Keep a fallback for death paths that do not emit RagdollDeath.
+		timer.Simple(0.05, function()
+			if deathHookName then hook.Remove("RagdollDeath", deathHookName) end
+			finishHeadGib()
+		end)
+	else
+		timer.Simple(0, finishHeadGib)
+	end
 end
 
 local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodimpacts") or CreateConVar("hg_bloodimpacts", 0, FCVAR_ARCHIVE + FCVAR_REPLICATED, "Enable custom blood impact effects spray cool kill death", 0, 1)
