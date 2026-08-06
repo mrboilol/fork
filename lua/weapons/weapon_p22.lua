@@ -327,14 +327,6 @@ SWEP.ReloadAnimWepAng = {
 }
 
 
-function SWEP:AllowedInspect()
-	if not self:CanUse() then return end
-	if self.isReloading then return end
-	if self:Clip1() < self.Primary.ClipSize then return end
-	if self.drawBullet == false then return end
-	return true
-end
-
 -- Inspect Assault
 
 SWEP.InspectAnimWepAng = {
