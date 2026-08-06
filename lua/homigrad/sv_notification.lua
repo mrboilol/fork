@@ -194,7 +194,10 @@ local scpcbThoughts = {
         "A {weapon} grazed past you.",
         "A {weapon} passed within inches of your head.",
         "A {weapon} went past you.",
-        "A {weapon} missed you, but barely."
+        "A {weapon} missed you, but barely.",
+        "Jesus Christ, I almost got hit.",
+        "That was way too close.",
+        "I felt that {weapon} go past me."
     },
     armor_full = {
         "A {weapon} hit your chest. The vest absorbed most of the damage.",
@@ -576,19 +579,6 @@ function PLAYER:ResetNotification(key)
     ResetNotification(self,key)
 end
 
-hook.Add("EntityTakeDamage", "SCPCB_HGThoughtDamage", function(target, dmginfo)
-    if not dmginfo or dmginfo:GetDamage() <= 0 then return end
-
-    local ply = SCPCBThoughtOwner(target)
-    if not IsValid(ply) then return end
-    if dmginfo:IsDamageType(DMG_FALL) or dmginfo:IsDamageType(DMG_CRUSH) then return end
-
-    local dmgType = SCPCBThoughtDamageType(dmginfo, ply)
-    if not dmgType then return end
-
-    SCPCBHitThought(ply, target, dmgType, dmginfo:GetDamage(), nil, dmginfo)
-end)
-
 hook.Add("EntityFireBullets", "SCPCB_HGThoughtNearMiss", function(entity, data)
     if not IsValid(entity) then return end
     if (data.limit_ricochet or 0) > 0 or (data.penetrated or 0) > 0 then return end
@@ -599,13 +589,6 @@ hook.Add("EntityFireBullets", "SCPCB_HGThoughtNearMiss", function(entity, data)
     data.Callback = function(attacker, tr, dmginfo)
         shooter = IsValid(attacker) and attacker or shooter
         local hitPly = SCPCBThoughtOwner(tr.Entity)
-        local blocked = false
-
-        if IsValid(hitPly) and hitPly != shooter then
-            blocked = hg.TryExtinguisherBulletBlock and hg.TryExtinguisherBulletBlock(tr.Entity, dmginfo)
-            SCPCBHitThought(hitPly, tr.Entity, "bullet", dmginfo:GetDamage(), tr.HitPos, dmginfo)
-        end
-
         local src = data.Src
         local hitPos = tr.HitPos
         local dir = hitPos - src
@@ -615,12 +598,14 @@ hook.Add("EntityFireBullets", "SCPCB_HGThoughtNearMiss", function(entity, data)
             dir:Normalize()
 
             for _, ply in ipairs(player.GetAll()) do
-                if IsValid(ply) and ply:Alive() and ply != shooter and ply != entity and ply != hitPly and not blocked and (ply.scpcbThoughtHitTime or 0) < CurTime() then
+                if IsValid(ply) and ply:Alive() and ply != shooter and ply != entity and ply != hitPly and (ply.scpcbThoughtHitTime or 0) < CurTime() then
                     local plyPos = ply:GetPos() + Vector(0, 0, 50)
                     local projection = math.Clamp((plyPos - src):Dot(dir), 0, length)
                     local closestPoint = src + dir * projection
 
-                    if plyPos:Distance(closestPoint) < 125 then
+                    -- A passing round is still alarming at a wider distance,
+                    -- especially around the torso rather than the head.
+                    if plyPos:Distance(closestPoint) < 220 then
                         SCPCBCreateThought(ply, "near_miss", "bullet", false)
                     end
                 end

@@ -450,6 +450,7 @@ function hg.likely_to_phrase(ply)
 	local hypotension = org.hypotension or 0
 	local temperature = org.temperature
 	local o2 = org.o2 and org.o2[1] or 30
+	local bleedingOut = (org.bleed or 0) > 0.5
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
 	local adrenaline = org.adrenaline or 0
 
@@ -458,7 +459,8 @@ function hg.likely_to_phrase(ply)
 	-- Terminal states need thoughts quickly.  They commonly force unconsciousness
 	-- before the normal low-blood cadence can reach its next phrase.
 	return (org.heartstop) and 6
-		or (o2 < 12) and 4
+		or (o2 <= 15) and 4.5
+		or (bleedingOut and blood < 4000) and 4
 		or (blood < 2500) and 3
 		or (broken_dislocated) and 5
 		or (pain > 65) and 5
@@ -504,6 +506,7 @@ local function get_status_message(ply)
 	local panicattack = org.panicattack or 0
 	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
 	local o2 = org.o2 and org.o2[1] or 30
+	local bleedingOut = (org.bleed or 0) > 0.5
 	local fear = org.fear or 0
 	local adrenaline = org.adrenaline or 0
 	local arrhythmia = org.arrhythmia or 0
@@ -533,10 +536,12 @@ local function get_status_message(ply)
 
 	if org.heartstop then
 		most_wanted_phraselist = near_death_poetic
-	elseif o2 < 12 then
+	elseif o2 <= 15 then
 		-- sv_lungs owns the immediate breathing symptom alerts. Keep periodic
 		-- low-O2 thoughts in the shared dying-status pool so they do not repeat
 		-- those callouts.
+		most_wanted_phraselist = near_death_poetic
+	elseif bleedingOut and blood < 4000 then
 		most_wanted_phraselist = near_death_poetic
 	elseif blood < 3750 then
 		-- sv_blood owns the immediate faintness and hemorrhage alerts. Blood loss
@@ -663,7 +668,7 @@ function hg.get_notify_color(ply)
 	local recentDamage = lasthit > 0 and (CurTime() - lasthit) < 3
 
 	local dyingBlood = blood < 3750
-	local dyingO2 = o2 < 12
+	local dyingO2 = o2 <= 15
 	local dyingPulse = pulse < 40 and pulse > 0
 	local dying = dyingO2 or dyingPulse or (blood < 2500) or dyingBlood
 	local inPain = pain > 30

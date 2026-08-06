@@ -142,7 +142,7 @@ local hold_wound_bleed_slow_twohand_mul = 0.55
 local hold_wound_arterial_slow_mul = 0.2
 local hold_wound_clot_mul = 1.35
 local hold_wound_clot_twohand_mul = 1.6
-local arterial_bleed_rate_mul = 0.9
+local arterial_bleed_rate_mul = 0.6
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
 -- until the stump is controlled.
@@ -280,8 +280,8 @@ module[2] = function(owner, org, mulTime)
 
 	if org.isPly and not org.otrub and (hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood) < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",true,"blood2",0,nil,Color(200, 170, 170)) end
 
-	if org.internalBleed < 0.5 and org.bleed < 0.05 and org.pulse > 5 then
-		-- Blood recovery is intentionally predictable once bleeding has stopped.
+	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 then
+		-- Natural production is 10 mL/s and resumes only once all bleeding stops.
 		org.blood = min(org.blood + mulTime * 10, 5000)
 	end
 
@@ -434,7 +434,7 @@ module[2] = function(owner, org, mulTime)
 			org.stamina[1] = math.max(org.stamina[1] - mulTime * shockStage * (org.stamina.max or 180) / 35, 0)
 		end
 		-- Consciousness now slides toward coma across the 2500-2000 range.
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.Clamp((blood - 2000) / 500 * 0.5 + 0.05, 0.05, 0.55))
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.Clamp((blood - 2000) / 500 * 0.55 + 0.25, 0.25, 0.8))
 		org.needfake = true
 		if org.isPly and not org.otrub then
 			org.owner:Notify("I feel cold... I can't think straight.", true, "blood_2500", 0, nil, Color(200, 170, 170))
@@ -443,10 +443,7 @@ module[2] = function(owner, org, mulTime)
 
 	-- Deep decompensation: collapse progresses rapidly toward coma by 2000.
 	if blood < 2250 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((blood - 2000) / 250 * 0.35, 0))
-		if blood < 2150 then
-			org.needotrub = true
-		end
+		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((blood - 2000) / 250 * 0.25 + 0.15, 0.15))
 		if not adrenalineStabilizer and not hasAntiIschemia then
 			org.ischemia = math.min((org.ischemia or 0) + mulTime * math.Clamp((2250 - org.blood) / 500, 0, 1) * 0.025, 1.5)
 		end
@@ -488,7 +485,7 @@ module[2] = function(owner, org, mulTime)
 			coagulatespeed = coagulatespeed + coagulate / rand2
 			local rand1 = math.Rand(4, 10) * 1
 			local rand2 = math.Rand(0.5, 1) * 1
-			local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 2.0 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02 * tourniquetBleedMul
+		local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 1.25 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02 * tourniquetBleedMul
 			bleed = bleed * getHeldWoundBleedMul(org, wound)
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04 * heldClotMul-- / #org.wounds
 			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center

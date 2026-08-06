@@ -956,7 +956,9 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		if o2[1] < 12 then
+		-- The final warning band starts before severe hypoxia so the player gets
+		-- a clear dying message while there is still a brief response window.
+		if o2[1] <= 15 then
 
 
 

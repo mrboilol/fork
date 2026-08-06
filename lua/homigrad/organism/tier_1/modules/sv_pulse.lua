@@ -774,7 +774,9 @@ module[2] = function(owner, org, timeValue)
 		org.shock = math.Approach(org.shock, 20 + shockK * 45, timeValue * (0.5 + shockK * 1.5))
 	end
 
-	if org.hypotension > 0.5 then
+	-- Poor perfusion weakens a player, but low tissue oxygen must be the first
+	-- system to push them into the serious collapse state.
+	if org.hypotension > 0.5 and o2Value <= 15 then
 		local lowK = math.Clamp((org.hypotension - 0.35) / 0.5, 0, 1)
 		org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
 		if org.isPly and not org.otrub then
