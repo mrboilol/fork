@@ -117,6 +117,8 @@ local BlastWaveSpeed = 5200
 local BlastWaveThickness = 120
 local BlastWaveForce = 50000
 local BlastMaxTargets = 96
+local BlastMaxDistance = 1000
+local BlastMaxDamage = 150
 
 local function GetExplosionNetType(ent, defaultType)
 	return ent:GetModel() == PropaneModel and PropaneExplosionNetType or defaultType
@@ -196,9 +198,11 @@ local function ApplyBlastDamage(data, enta, tracePos, len)
 		end
 	end
 
-	if blocked then
-		forceadd = forceadd / 5
-		damageFrac = damageFrac / 5
+	if behindwall then
+		return
+	elseif blocked then
+		forceadd = forceadd / 3
+		damageFrac = damageFrac / 3
 	end
 
 	local dmginfo = DamageInfo()
@@ -236,11 +240,13 @@ local function ApplyBlastBurst(data)
 	data.HitEnts = {}
 	data.ForceMul = data.ForceMul or BlastWaveForce
 	data.MinForceFrac = data.MinForceFrac or 0.5
-	data.MinDamageFrac = data.MinDamageFrac or 0.5
+	data.MinDamageFrac = data.MinDamageFrac or 0.05
 	data.DamageExponent = data.DamageExponent or 1
 	data.DisorientPower = data.DisorientPower or 5
 	data.DisorientTime = data.DisorientTime or 6
 	data.BehindWallDisorientDiv = data.BehindWallDisorientDiv or 1
+	data.Distance = math_min(data.Distance, BlastMaxDistance)
+	data.Damage = math_min(data.Damage, BlastMaxDamage)
 	data.DistanceSqr = data.Distance * data.Distance
 	data.Attacker = IsValid(data.Owner) and data.Owner or game.GetWorld()
 	data.Inflictor = IsValid(data.Ent) and data.Ent or data.Attacker
@@ -361,7 +367,7 @@ local ExpTypes = {
 			DamageType = DMG_BLAST + DMG_BURN,
 			ForceMul = BlastWaveForce * (info.KnockbackMul or 1),
 			MinForceFrac = info.MinForceFrac or 0.5,
-			MinDamageFrac = info.MinDamageFrac or 0.5,
+			MinDamageFrac = info.MinDamageFrac or 0.05,
 			DamageExponent = info.DamageExponent or 1,
 			BehindWallDisorientDiv = 3
 		})
@@ -391,7 +397,7 @@ local ExpTypes = {
 			DamageType = DMG_BLAST,
 			ForceMul = BlastWaveForce * (info.KnockbackMul or 1),
 			MinForceFrac = info.MinForceFrac or 0.5,
-			MinDamageFrac = info.MinDamageFrac or 0.5,
+			MinDamageFrac = info.MinDamageFrac or 0.05,
 			DamageExponent = info.DamageExponent or 1,
 			BlockBehindWallDisorient = true
 		})
@@ -420,7 +426,7 @@ local ExpTypes = {
 			DamageType = DMG_BLAST,
 			ForceMul = BlastWaveForce * (info.KnockbackMul or 1),
 			MinForceFrac = info.MinForceFrac or 0.5,
-			MinDamageFrac = info.MinDamageFrac or 0.5,
+			MinDamageFrac = info.MinDamageFrac or 0.05,
 			DamageExponent = info.DamageExponent or 1,
 			BlockBehindWallDisorient = true,
 			OnFinish = function(data)
@@ -465,7 +471,7 @@ local ExpTypes = {
 			DamageType = DMG_BLAST + DMG_BURN,
 			ForceMul = BlastWaveForce * (info.KnockbackMul or 1.1),
 			MinForceFrac = info.MinForceFrac or 0.2,
-			MinDamageFrac = info.MinDamageFrac or 0.08,
+			MinDamageFrac = info.MinDamageFrac or 0.02,
 			DamageExponent = info.DamageExponent or 1.25,
 			BehindWallDisorientDiv = 2,
 			OnFinish = function(data)
@@ -960,7 +966,7 @@ function hg.GasTankDetonate(ent)
 		DamageMul = 1.2,
 		KnockbackMul = 1.1,
 		MinForceFrac = 0.2,
-		MinDamageFrac = 0.08,
+		MinDamageFrac = 0.02,
 		DamageExponent = 1.2
 	})
 	if IsValid(ied) then
