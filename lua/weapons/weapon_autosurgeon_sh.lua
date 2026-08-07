@@ -92,7 +92,8 @@ SWEP.Config = {
     InjuryHeal = 0.14,
     BleedHeal = 3,
     InternalBleedHeal = 1.2,
-    BloodRestore = 100
+    BloodRestore = 100,
+    OxygenRecovery = 0.20
 }
 
 -- SWEP is only guaranteed to exist while this file is being loaded. Deferred
@@ -118,9 +119,9 @@ local ASScanSounds = {
     "autonigger/atireputas3.wav"
 }
 
--- The D.I.H. intentionally works in three passes. The order matters: closing
--- open vessels first prevents the later reconstruction passes from fighting an
--- active bleed.
+-- The D.I.H. treats structural damage before physiological support. This keeps
+-- reconstruction, wound closure, and volume/oxygen replacement as distinct
+-- passes, with mechanical circulation reserved for the final emergency step.
 local StitchFields = {
     "arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "spineartery",
     "rvein", "lvein", "spinevein", "pulmvein", "rarmvein", "larmvein", "rlegvein", "llegvein"
@@ -133,17 +134,6 @@ local ComplexFields = {
     "hemothoraxL", "hemothoraxR", "internalBleedComplication", "brainFrontal",
     "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage", "brainSwelling",
     "intracranialPressure", "brainBleedRate", "neckBrainOxygenPenalty", "arterialO2Impairment",
-    "throatCutPressureShock"
-}
-
--- These are handled ahead of the remaining complex injuries.  Keeping them
--- separate makes the triage order unambiguous: stop bleeding, restore volume,
--- then protect the brain, heart, and respiratory system.
-local VitalFields = {
-    "brain", "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital",
-    "brainHemorrhage", "brainSwelling", "intracranialPressure", "brainBleedRate",
-    "neckBrainOxygenPenalty", "heart", "chest", "trachea", "hemothorax", "cardiacTamponade",
-    "hemothoraxTrauma", "hemothoraxL", "hemothoraxR", "arterialO2Impairment",
     "throatCutPressureShock"
 }
 
@@ -293,22 +283,20 @@ local function HasComplexWork(org)
         istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0)
 end
 
-local function HasBloodWork(org)
-    return (tonumber(org.blood) or 5000) < 4999
-end
-
-local function HasVitalWork(org)
-    if HasFieldsAbove(org, VitalFields, 0.001) then return true end
-    return istable(org.lungsL) and ((org.lungsL[1] or 0) > 0.001 or (org.lungsL[2] or 0) > 0) or
-        istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0)
-end
-
 local function HasSimpleWork(org)
-    if HasFieldsAbove(org, SimpleFields, 0.001) or HasFieldsAbove(org, RecoveryFields, 0.01) or (org.blood or 5000) < 4999 then return true end
+    if HasFieldsAbove(org, SimpleFields, 0.001) then return true end
     for _, key in ipairs(ClearFlags) do
         if org[key] then return true end
     end
     return false
+end
+
+local function HasRecoveryWork(org)
+    local oxygen = istable(org.o2) and (tonumber(org.o2[1]) or 0) or 0
+    local oxygenMax = istable(org.o2) and math.max(tonumber(org.o2.range) or 30, 1) or 0
+    return (tonumber(org.blood) or 5000) < 4999
+        or oxygen < oxygenMax - 0.01
+        or HasFieldsAbove(org, RecoveryFields, 0.01)
 end
 
 local function HasTreatableInjury(org)
@@ -327,7 +315,7 @@ local function HasTreatableInjury(org)
     end
     if istable(org.lungsL) and ((org.lungsL[1] or 0) > 0.001 or (org.lungsL[2] or 0) > 0) then return true end
     if istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0) then return true end
-    if (org.internalBleed or 0) > 0.01 or (org.blood or 5000) < 4999 then return true end
+    if (org.internalBleed or 0) > 0.01 or HasRecoveryWork(org) then return true end
     if TableHasBleeding(org.wounds) or TableHasBleeding(org.arterialwounds) then return true end
     for _, key in ipairs(ClearFlags) do
         if org[key] then return true end
@@ -339,11 +327,10 @@ end
 -- through the modes every tick made the unit abandon a repair halfway through
 -- whenever another category also needed attention.
 local function GetNextTreatmentMode(org)
-    if HasStitchingWork(org) then return 1 end
-    if HasBloodWork(org) then return 2 end
-    if HasVitalWork(org) then return 3 end
-    if HasComplexWork(org) then return 4 end
-    if HasSimpleWork(org) then return 5 end
+    if HasComplexWork(org) then return 1 end
+    if HasStitchingWork(org) then return 2 end
+    if HasSimpleWork(org) then return 3 end
+    if HasRecoveryWork(org) then return 4 end
 end
 
 local function HealWoundTable(tbl, amount)
@@ -397,24 +384,6 @@ local function HealComplex(org, config)
     org.tracheaPath = nil
 end
 
-local function HealVital(org, config)
-    HealFields(org, VitalFields, config.InjuryHeal * 1.5)
-    if istable(org.lungsL) then
-        org.lungsL[1] = math.Approach(org.lungsL[1] or 0, 0, config.InjuryHeal * 1.5)
-        org.lungsL[2] = math.Approach(org.lungsL[2] or 0, 0, config.InjuryHeal * 1.5)
-    end
-    if istable(org.lungsR) then
-        org.lungsR[1] = math.Approach(org.lungsR[1] or 0, 0, config.InjuryHeal * 1.5)
-        org.lungsR[2] = math.Approach(org.lungsR[2] or 0, 0, config.InjuryHeal * 1.5)
-    end
-    org.lungsfunction = true
-    org.tracheaPath = nil
-end
-
-local function HealBlood(org, config)
-    org.blood = math.Approach(tonumber(org.blood) or 5000, 5000, config.BloodRestore)
-end
-
 local function HealSimple(org, config)
     local oldSpine1 = tonumber(org.spine1) or 0
     local oldSpine2 = tonumber(org.spine2) or 0
@@ -442,14 +411,29 @@ local function HealSimple(org, config)
         end
     end
 
-    local heal = config.InjuryHeal
-    for _, key in ipairs(RecoveryFields) do
-        if isnumber(org[key]) then org[key] = math.Approach(org[key], 0, heal * 12) end
-    end
-    org.blood = math.Approach(org.blood or 5000, 5000, config.BloodRestore)
     org.eyeLDestroyed = nil
     org.eyeRDestroyed = nil
     for _, key in ipairs(ClearFlags) do org[key] = false end
+end
+
+local function RestoreBloodAndOxygen(org, config)
+    org.blood = math.Approach(tonumber(org.blood) or 5000, 5000, config.BloodRestore)
+
+    for _, key in ipairs(RecoveryFields) do
+        if isnumber(org[key]) then
+            org[key] = math.Approach(org[key], 0, config.InjuryHeal * 12)
+        end
+    end
+
+    if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
+        hg.organism.RestoreSupportedOxygen(org, config.OxygenRecovery, {
+            oxygen = 0,
+            oxygenTarget = istable(org.o2) and (tonumber(org.o2.range) or 30) or 30
+        })
+    elseif istable(org.o2) then
+        local oxygenMax = math.max(tonumber(org.o2.range) or 30, 1)
+        org.o2[1] = math.Approach(tonumber(org.o2[1]) or 0, oxygenMax, config.OxygenRecovery * oxygenMax)
+    end
 end
 
 local function ApplyAutopulse(org, config)
@@ -713,11 +697,11 @@ function SWEP:AttachUnit(owner, target, ply)
             return
         end
 
-        -- Autopulse is independent of scanning and repair sounds.  A queued
-        -- scan used to suspend this entire timer, which made an arrested
-        -- patient miss compressions whenever the unit rescanned its work.
+        -- CPR is deliberately last: complex repair, stitching, generic repair,
+        -- and blood/O2 recovery must finish before the unit starts circulation.
         local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
-        if needsAutopulse and CurTime() >= nextAutopulse then
+        local repairsPending = treatmentMode ~= nil or GetNextTreatmentMode(org) ~= nil
+        if needsAutopulse and not repairsPending and CurTime() >= nextAutopulse then
             if battery < config.AutopulseBatteryPerBeat then
                 -- Battery depletion is terminal for an attached unit: stop
                 -- treatment and eject it immediately instead of waiting for
@@ -747,8 +731,7 @@ function SWEP:AttachUnit(owner, target, ply)
         nextTreatment = CurTime() + config.TickInterval
         if not treatmentMode then treatmentMode = GetNextTreatmentMode(org) end
 
-        -- Finish stitching, complex repair, and generic repair before using
-        -- support functions such as stimulants or autopulse.
+        -- All repair and restoration passes complete before CPR begins.
         if not treatmentMode then
             if painkillerTarget then
                 org.painkiller = math.min((tonumber(org.painkiller) or 0) + 0.25, painkillerTarget, 1)
@@ -786,22 +769,19 @@ function SWEP:AttachUnit(owner, target, ply)
             end
         end
         if treatmentMode == 1 then
-            HealStitching(org, config)
-        elseif treatmentMode == 2 then
-            HealBlood(org, config)
-        elseif treatmentMode == 3 then
-            HealVital(org, config)
-        elseif treatmentMode == 4 then
             HealComplex(org, config)
-        else
+        elseif treatmentMode == 2 then
+            HealStitching(org, config)
+        elseif treatmentMode == 3 then
             HealSimple(org, config)
+        else
+            RestoreBloodAndOxygen(org, config)
         end
 
-        local modeStillNeeded = treatmentMode == 1 and HasStitchingWork(org) or
-            treatmentMode == 2 and HasBloodWork(org) or
-            treatmentMode == 3 and HasVitalWork(org) or
-            treatmentMode == 4 and HasComplexWork(org) or
-            treatmentMode == 5 and HasSimpleWork(org)
+        local modeStillNeeded = treatmentMode == 1 and HasComplexWork(org) or
+            treatmentMode == 2 and HasStitchingWork(org) or
+            treatmentMode == 3 and HasSimpleWork(org) or
+            treatmentMode == 4 and HasRecoveryWork(org)
         if not modeStillNeeded then
             QueueUnitSound(unit, ASSounds.modeComplete)
             treatmentMode = nil

@@ -267,7 +267,7 @@ hook.Add("Think", "hg_blastwaves", function()
 	end
 end)
 
-local function StartShrapnel(ent, selfPos, owner, force, mass, countMul)
+local function StartShrapnel(ent, selfPos, owner, force, mass, countMul, countBoost)
 	if not IsValid(ent) then return end
 	mass = math_max(mass or 10, 1)
 
@@ -289,7 +289,7 @@ local function StartShrapnel(ent, selfPos, owner, force, mass, countMul)
 	ent.ShrapnelDone = nil
 	co = coroutine.create(function()
 		local lastShrapnel = SysTime()
-		for i = 1, multi * countMul do
+		for i = 1, multi * countMul * (countBoost or 1) do
 			lastShrapnel = SysTime()
 			if not IsValid(ent) then return end
 			bullet.Dir = ent:GetAngles():Forward() * math_random(-1, 1)
@@ -325,6 +325,7 @@ local ExpTypes = {
 	Fire = function(ent, force, mass, info)
 		mass = mass or 10
 		info = info or {}
+		local fireBoost = info.FireBoost or 1
 		local scaledMass = math_min(mass / 10, 20)
 		local scaledForce = force * scaledMass
 		local selfPos = ent:LocalToWorld(ent:OBBCenter())
@@ -341,14 +342,15 @@ local ExpTypes = {
 		if IsValid(ent) then
 			local fireMulti = math_min(mass / 5, 20)
 			local tr = util.QuickTrace(selfPos, -vector_up * 500, {ent})
-			local fire = CreateVFire(game.GetWorld(), tr.HitPos, tr.HitNormal, 150 / 7 * fireMulti, ent)
+			local fire = CreateVFire(game.GetWorld(), tr.HitPos, tr.HitNormal, 150 / 7 * fireMulti * fireBoost, ent)
 			if IsValid(fire) then
-				fire:ChangeLife(150)
+				fire:ChangeLife(150 * fireBoost)
+				fire:Prioritize(20, true)
 			end
-			for i = 1, fireMulti / 2 do
+			for i = 1, math.ceil(fireMulti / 2 * fireBoost) do
 				local randvec = VectorRand(-1000, 1000)
 				randvec[3] = math_random(100, 1000)
-				CreateVFireBall(20, 50, selfPos + vector_up * 10, randvec)
+				CreateVFireBall(20 * fireBoost, 50 * fireBoost, selfPos + vector_up * 10, randvec)
 			end
 		end
 
@@ -361,7 +363,7 @@ local ExpTypes = {
 		})
 
 		util.ScreenShake(selfPos, 100, 900, 1, 5000)
-		StartShrapnel(ent, selfPos, owner, scaledForce, mass, 3)
+		StartShrapnel(ent, selfPos, owner, scaledForce, mass, 3, info.ShrapnelCountMul)
 	end,
 	Sharpnel = function(ent, force, mass, info)
 		mass = mass or 10
@@ -385,7 +387,7 @@ local ExpTypes = {
 		})
 
 		util.ScreenShake(selfPos, 100, 900, 1, 5000)
-		StartShrapnel(ent, selfPos, owner, force, mass, 5)
+		StartShrapnel(ent, selfPos, owner, force, mass, 5, info.ShrapnelCountMul)
 	end,
 	Normal = function(ent, force, mass, info)
 		info = info or {}

@@ -857,7 +857,10 @@ if SERVER then
 				if vFireIsCharacter(ent) and vFireEnableSpread then
 					-- If we're burning an NPC, spread to it, if it's a player, lower the chance of spread
 					if ent:IsPlayer() and math.random(1, 2) == 1 or !ent:IsPlayer() then
-						local newFeed = self.feed + vFireTakeFuel(ent, 12)
+						-- Keep a reserve on the source fire. Previously a successful spread
+						-- handed its entire fuel supply to one child, so fires often stalled
+						-- immediately after their first expansion.
+						local newFeed = self.feed * 0.6 + vFireTakeFuel(ent, 12)
 						if newFeed > 0 then
 							CreateVFire(ent, ent:GetPos(), Vector(), newFeed, self)
 						end
@@ -992,7 +995,7 @@ if SERVER then
 					if tr.Hit and tr.Fraction > 0 then
 						local ent = tr.Entity
 						if vFireIsVFireEnt(ent) then return end
-						local newFeed = self.feed + vFireTakeFuel(ent, 12)
+						local newFeed = self.feed * 0.6 + vFireTakeFuel(ent, 12)
 						if newFeed > 0 then
 							CreateVFire(ent, tr.HitPos, tr.HitNormal, newFeed, self)
 						end
@@ -1031,7 +1034,7 @@ if SERVER then
 						if vFireIsVFireEnt(ent) then return end
 
 						local newFire
-						local newFeed = self.feed + vFireTakeFuel(ent, 12)
+						local newFeed = self.feed * 0.6 + vFireTakeFuel(ent, 12)
 						if newFeed > 0 then
 							newFire = CreateVFire(ent, tr.HitPos, tr.HitNormal, newFeed, self)
 						end

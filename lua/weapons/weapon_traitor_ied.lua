@@ -149,8 +149,8 @@ function SWEP:GetEyeTrace()
 	return hg.eyeTrace(self:GetOwner())
 end
 
-SWEP.BlastDis = 18
-SWEP.BlastDamage = 350
+SWEP.BlastDis = 35
+SWEP.BlastDamage = 1000
 SWEP.CallStartDelay = 1
 SWEP.MaxDialTime = 10
 SWEP.MaxDialDistance = 3000
@@ -165,8 +165,8 @@ SWEP.SilentPlantTime = 3.5
 SWEP.InsidePlantTime = 5
 SWEP.CombinedPlantTime = 7
 SWEP.DisorientationRange = 15
-SWEP.FireEntForceBonus = 70
-SWEP.BlastForce = 225000
+SWEP.FireEntForceBonus = 350
+SWEP.BlastForce = 600000
 SWEP.PlantedBlastForceMul = 1.5
 SWEP.PlantedObjectForce = 350000
 SWEP.PlantedDoorVelocity = 3000
@@ -564,9 +564,17 @@ ExplodeTheItem = function(self,ent)
 	if entValid and fireData and hg and hg.PropExplosion then
 		local phys = ent:GetPhysicsObject()
 		local mass = IsValid(phys) and phys:GetMass() or 10
+		-- Fuel containers inherit the charge's full power. Use a copy because the
+		-- explosive definition table is shared by every map entity.
+		local iedFireData = table.Copy(fireData)
+		iedFireData.RangeMul = (iedFireData.RangeMul or 1) * 1.75
+		iedFireData.DamageMul = (iedFireData.DamageMul or 1) * 1.75
+		iedFireData.KnockbackMul = (iedFireData.KnockbackMul or 1) * 1.8
+		iedFireData.FireBoost = 2.5
+		iedFireData.ShrapnelCountMul = 3
 		ent.IEDBlastBonus = nil
 		ent.IEDOwner = nil
-		hg.PropExplosion(ent, fireData.ExpType, ((ent.Volume or fireData.Force) * 2) + self.FireEntForceBonus, mass, fireData)
+		hg.PropExplosion(ent, iedFireData.ExpType, ((ent.Volume or iedFireData.Force) * 2) + self.FireEntForceBonus, mass, iedFireData)
 		self.HaveTheBomb = nil
 		if IsValid(self) then
 			self:Remove()
@@ -687,14 +695,14 @@ ExplodeTheItem = function(self,ent)
 				local co = coroutine.create(function()
 					local LastShrapnel = SysTime()
 
-					for i = 1, math.Clamp(math.Round(shrapnelMass * 80), 200, 2400) do
+					for i = 1, math.Clamp(math.Round(shrapnelMass * 300), 800, 6000) do
 							LastShrapnel = SysTime()
 
 							local dir = VectorRand(-1,1):GetNormalized()--vector_up
 							dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
 							dir:Normalize()
 
-							local Tr = util.QuickTrace(EntPos, dir * 400, ent)
+							local Tr = util.QuickTrace(EntPos, dir * 900, ent)
 
 							if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
 								local bullet = {}
@@ -704,7 +712,7 @@ ExplodeTheItem = function(self,ent)
 								bullet.Damage = BlastDamage
 								bullet.AmmoType = "Metal Debris"
 								bullet.Attacker = IsValid(owner) and owner or game.GetWorld()
-								bullet.Distance = 400
+								bullet.Distance = 900
 								bullet.DisableLagComp = true
 								bullet.Filter = {ent}
 								bullet.Penetration = 8

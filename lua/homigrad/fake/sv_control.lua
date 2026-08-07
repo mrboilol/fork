@@ -984,6 +984,9 @@ local FAKE_LEG_KICK_TRACE_RANGE = 28
 local FAKE_LEG_KICK_TRACE_SIZE = Vector(5, 5, 5)
 local FAKE_LEG_KICK_SEGMENT_SIZE = Vector(6, 6, 6)
 local FAKE_LEG_KICK_EXTEND_TIME = 0.35
+local FAKE_LEG_KICK_SPEED_START = 110
+local FAKE_LEG_KICK_SPEED_DAMAGE_PER_UNIT = 0.045
+local FAKE_LEG_KICK_SPEED_DAMAGE_MAX = 4
 local FAKE_LEG_KICK_VIEWPUNCH = Angle(3, 0, 0)
 local FAKE_LEG_KICK_CHARGE_FORWARD_OFFSET = -90
 local FAKE_LEG_KICK_CHARGE_THIGH_RIGHT_OFFSET = -22
@@ -1059,21 +1062,27 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	local phys = ent:GetPhysicsObjectNum(tr.PhysicsBone or 0)
 	if !ent:IsPlayer() and not IsValid(phys) then return end
 
+	-- The kick carries the ragdoll's momentum.  Measuring it at contact means a
+	-- fast moving fake kick is strong, rather than only looking strong.
+	local impactSpeed = math.max((ragdoll:GetVelocity() or vector_origin):Length(), state.launchSpeed or 0)
+	local speedDamageMul = math.Clamp(1 + math.max(impactSpeed - FAKE_LEG_KICK_SPEED_START, 0) * FAKE_LEG_KICK_SPEED_DAMAGE_PER_UNIT, 1, FAKE_LEG_KICK_SPEED_DAMAGE_MAX)
+	local damage = state.dmg * speedDamageMul
+
 	local dmginfo = DamageInfo()
 	dmginfo:SetAttacker(ply)
 	dmginfo:SetInflictor(IsValid(ply:GetActiveWeapon()) and ply:GetActiveWeapon() or ply)
-	dmginfo:SetDamage(state.dmg)
-	dmginfo:SetDamageForce(state.dir * state.dmg * FAKE_LEG_KICK_RAG_FORCE_MUL)
+	dmginfo:SetDamage(damage)
+	dmginfo:SetDamageForce(state.dir * damage * FAKE_LEG_KICK_RAG_FORCE_MUL)
 	dmginfo:SetDamageType((ent:GetClass() == "func_breakable_surf") and DMG_SLASH or DMG_CLUB)
 	dmginfo:SetDamagePosition(tr.HitPos)
 
 	PenetrationGlobal = 1
 	MaxPenLenGlobal = 1
-	if hg.AddForceRag then hg.AddForceRag(ent, tr.PhysicsBone or 0, state.dir * state.dmg * FAKE_LEG_KICK_RAG_FORCE_MUL, 0.25) end
+	if hg.AddForceRag then hg.AddForceRag(ent, tr.PhysicsBone or 0, state.dir * damage * FAKE_LEG_KICK_RAG_FORCE_MUL, 0.25) end
 	ent:TakeDamageInfo(dmginfo)
 
 	if IsValid(phys) then
-		phys:ApplyForceOffset(state.dir * state.dmg * FAKE_LEG_KICK_PROP_FORCE_MUL, tr.HitPos)
+		phys:ApplyForceOffset(state.dir * damage * FAKE_LEG_KICK_PROP_FORCE_MUL, tr.HitPos)
 	end
 
 	if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
@@ -1092,10 +1101,25 @@ local function fakeLegKickHit(ply, ragdoll, state)
 
 	if hgIsDoor and hgIsDoor(ent) and !ent:GetNoDraw() then
 		ent.HP = ent.HP or 200
-		ent.HP = ent.HP - state.dmg * (tr.MatType == MAT_METAL and 1 or 2)
+		ent.HP = ent.HP - damage * (tr.MatType == MAT_METAL and 1 or 2)
 		ent:EmitSound("physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".wav")
 		if ent.HP <= 0 and hgBlastThatDoor then hgBlastThatDoor(ent, state.dir * 125) end
 	end
+end
+
+-- Collision callbacks run at the exact moment a leg reaches a target.  They
+-- use this to unfold the leg immediately, instead of letting a curled ragdoll
+-- body-check the target before the kick pose has reached its extension phase.
+function hg.TriggerFakeLegKickExtension(ply, ragdoll, impactSpeed)
+	if not IsValid(ply) or not IsValid(ragdoll) then return false end
+	local state = ragdoll.fakeLegKick
+	if not state or state.hit then return false end
+
+	state.extended = true
+	state.extendTime = CurTime()
+	state.hitTime = math.min(state.hitTime, CurTime())
+	state.impactSpeed = math.max(impactSpeed or 0, state.launchSpeed or 0)
+	return true
 end
 
 function hg.FakeLegAttack(ply)
@@ -1130,6 +1154,7 @@ function hg.FakeLegAttack(ply)
 		hitTime = CurTime() + duration * 0.55,
 		dmg = dmg,
 		dir = ang:Forward(),
+		launchSpeed = ragdoll:GetVelocity():Length(),
 		hit = false
 	}
 end
@@ -1622,7 +1647,16 @@ hook.Add("Think", "Fake", function()
 
 				local duration = fakeKick.finish - fakeKick.start
 				local phase = math.Clamp((time - fakeKick.start) / duration, 0, 1)
-				local kickExtend = phase >= FAKE_LEG_KICK_EXTEND_TIME
+				-- A target in reach snaps the leg straight out immediately.  This
+				-- makes a well aimed kick lead with the foot instead of a collision.
+				if not fakeKick.extended and phase < FAKE_LEG_KICK_EXTEND_TIME then
+					local contact = getFakeLegKickTrace(ply, ragdoll, fakeKick.dir)
+					if contact and contact.Hit and IsValid(contact.Entity) then
+						hg.TriggerFakeLegKickExtension(ply, ragdoll, ragdoll:GetVelocity():Length())
+					end
+				end
+
+				local kickExtend = fakeKick.extended or phase >= FAKE_LEG_KICK_EXTEND_TIME
 				local angle = -(-angles2)
 				angle:RotateAroundAxis(angle:Forward(), FAKE_LEG_KICK_CHARGE_FORWARD_OFFSET)
 

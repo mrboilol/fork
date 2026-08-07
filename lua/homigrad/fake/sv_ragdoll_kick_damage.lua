@@ -9,6 +9,9 @@ local DROP_KICK_SPEED_THRESHOLD = 360
 local TACKLE_SPEED_THRESHOLD = 160
 local KICK_DAMAGE_COOLDOWN = 0.5 -- Cooldown between kick damage hits (seconds)
 local DROP_KICK_STAMINA_COST = 30
+local FAKE_KICK_SPEED_DAMAGE_START = 110
+local FAKE_KICK_SPEED_DAMAGE_PER_UNIT = 0.06
+local FAKE_KICK_SPEED_DAMAGE_MAX = 4
 
 -- Hit tracking to prevent damage multiplication
 local kickHitTracker = {}
@@ -312,8 +315,11 @@ end
 -- Main kick damage handler
 hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     if ragdoll == data.HitEntity then return end
-    if data.DeltaTime < 0.25 then return end
     if not ragdoll:IsRagdoll() then return end
+    -- Do not delay a deliberately posed fake kick; its first contact is the
+    -- moment the extension must win over ordinary ragdoll collision handling.
+    local fakeKickActive = ragdoll.fakeLegKick and not ragdoll.fakeLegKick.hit
+    if data.DeltaTime < 0.25 and not fakeKickActive then return end
     if not IsValid(data.HitEntity) then return end
     if data.HitEntity:IsPlayerHolding() then return end
 
@@ -384,14 +390,37 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     local boneName = GetBoneNameFromPhysBone(ragdoll, physBone)
     if not boneName or not KICK_BONES[boneName] then return end
     
-    -- Calculate the distinct shove, dropkick, or tackle response for this impact.
+    -- A fake-ragdoll kick is intentional: unfold the leg at first contact and
+    -- turn its carried momentum into a proper kick, not an incidental limb hit.
     local speed = data.OurOldVelocity:Length()
-    local damage, impactForce, knockback, impactType = CalculateImpact(boneName, speed)
+    local fakeKick = ragdoll.fakeLegKick
+    local damage, impactForce, knockback, impactType
+
+    if LEG_BONES[boneName] and fakeKick and not fakeKick.hit then
+        local duration = math.max(fakeKick.finish - fakeKick.start, 0.001)
+        local phase = math.Clamp((CurTime() - fakeKick.start) / duration, 0, 1)
+        local timedExtension = phase >= 0.25 and phase <= 0.75
+        local kickSpeed = math.max(speed, fakeKick.launchSpeed or 0)
+        local speedMul = math.Clamp(1 + math.max(kickSpeed - FAKE_KICK_SPEED_DAMAGE_START, 0) * FAKE_KICK_SPEED_DAMAGE_PER_UNIT, 1, FAKE_KICK_SPEED_DAMAGE_MAX)
+        local timingMul = timedExtension and 1.45 or 1
+
+        hg.TriggerFakeLegKickExtension(attacker, ragdoll, kickSpeed)
+        damage = math.min(fakeKick.dmg * speedMul * timingMul, 65)
+        impactForce = math.max(1800, kickSpeed * 9) * timingMul
+        knockback = math.Clamp(280 + kickSpeed * 1.6, 350, 1000) * timingMul
+        impactType = timedExtension and "timed fake kick" or "fake kick"
+    else
+        damage, impactForce, knockback, impactType = CalculateImpact(boneName, speed)
+    end
     
     if damage <= 0 then return end
     
     -- Check if kick damage is on cooldown for this attacker-target pair
     if IsKickOnCooldown(attacker, target) then return end
+
+    if fakeKick and (impactType == "timed fake kick" or impactType == "fake kick") then
+        fakeKick.hit = true -- The collision is the kick's one authoritative hit.
+    end
     
     -- Calculate force direction and magnitude
     local forceDir = data.OurOldVelocity:GetNormalized()
