@@ -484,6 +484,7 @@ local function clearPainScream(ply, patch)
 	ply.painScreamPatch = nil
 	ply.painScreamEnt = nil
 	ply.painScreamPhrase = nil
+	ply:SetNWFloat("PainScreamUntil", 0)
 end
 
 function hg.StopPainScream(ply, fade)
@@ -526,6 +527,10 @@ function hg.StopPainScream(ply, fade)
 			end
 		end
 		stopOnEntities()
+	end
+
+	if IsValid(ply) then
+		ply:SetNWFloat("PainScreamUntil", 0)
 	end
 end
 
@@ -570,6 +575,8 @@ local function playPainScream(ply)
 
 	patch:SetSoundLevel(75)
 	patch:PlayEx(1, mClamp(ply.VoicePitch or 100, 92, 108))
+
+	ply:SetNWFloat("PainScreamUntil", CurTime() + duration + 0.15)
 
 	ply.painScreamPatch = patch
 	ply.painScreamEnt = ent
@@ -644,7 +651,7 @@ end)
 hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
 	local ply = ent:IsRagdoll() and hg.RagdollOwner(ent) or ent
 
-	if dmgInfo:IsDamageType(DMG_BURN) and IsValid(ply) and ply:IsPlayer() 
+		if dmgInfo:IsDamageType(DMG_BURN) and IsValid(ply) and ply:IsPlayer() 
 	and ply.organism and !ply.organism.otrub and ply:Alive() then
 		local phrase
 		if mRandom(1, 100) <= mClamp(burnScreamUniversalChance, 0, 1) * 100 then
@@ -658,6 +665,9 @@ hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
 		if override_ply ~= nil then
 			ply, phrase = override_ply, override_phrase
 		end
+
+		local burnDuration = SoundDuration(phrase)
+		ply:SetNWFloat("PainScreamUntil", CurTime() + (burnDuration or 2) + 0.15)
 
 		ply:Notify(hg.sharp_pain[math.random(#hg.sharp_pain)], 
 		SoundDuration(phrase), "ply_burn", 0.5, function(ply)
