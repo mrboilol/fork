@@ -463,6 +463,25 @@ function ENT:Explode()
 		local co = coroutine.create(function()
 
 			local LastShrapnel = SysTime()
+			local filter = {self}
+			local penetration = (ammotype.Penetration or (-(-self.Penetration))) * (self.PenetrationMultiplier or 1)
+			local diameter = ammotype.Diameter or 1
+			local bullet = {
+				Speed = ammotype.Speed,
+				Distance = 56756,
+				MaxPenLen = 100,
+				Diameter = diameter,
+				Src = selfPos,
+				Spread = vecCone,
+				Force = 20,
+				Damage = 40,
+				AmmoType = ammo,
+				Attacker = self.owner,
+				Inflictor = self,
+				DisableLagComp = true,
+				Filter = filter,
+				Callback = hg.bulletHit
+			}
 
 			for i = 1, self.Fragmentation do
 					LastShrapnel = SysTime()
