@@ -17,6 +17,21 @@ local colorDeviation = Color(0, 191, 255, 255)
 local colorTextShadow = Color(0, 0, 0, 255)
 local textOffset = Vector(0, 0, 15)
 
+-- The remote Z-City crack pack is mounted on the server.  Keep the modern
+-- snap sounds as a fallback for installations that do not have that pack.
+local function ResolveCrackSound(crack, fallback)
+    if file.Exists("sound/" .. crack, "GAME") then return crack end
+    return fallback
+end
+
+-- Suppression is determined on the server, while the physical-bullet client
+-- hook is not guaranteed to run for every remote bullet.  Play the fly-by
+-- sound from the same authoritative event that applies the suppression.
+local function PlaySuppressionCrack(pos)
+    local crack = "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"
+    EmitSound(crack, pos, 0, CHAN_ITEM, 1.35, 170)
+end
+
 net.Receive("ZCity_Wind_SuppressionForce", function()
     local pos = net.ReadVector()
     local force = net.ReadFloat()
@@ -32,10 +47,20 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
         SIB_suppress.Force = math.Clamp((SIB_suppress.Force or 0) + force, 0, 10)
     end
 
+    -- Hits have their own impact feedback; this event represents a clear
+    -- near-miss, so it must also provide the audible crack.
+    if not wasHit then
+        PlaySuppressionCrack(pos)
+    end
+
 	if not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool() then
-		local punchScale = math.Clamp(force / 6, 0.35, 2)
-		local hitScale = wasHit and 1.35 or 1
-		local punch = Angle(math.Rand(-2.8, 1.5), math.Rand(-1.8, 1.8), 0) * punchScale * hitScale
+		-- Force is calculated from the bullet's closest approach on the server.
+		-- Keep grazing shots noticeable, but make a round passing right by the
+		-- player's head violently kick the view.
+		local proximity = math.Clamp((force - 0.8) / 13.2, 0, 1)
+		local punchScale = Lerp(proximity * proximity, 0.75, 7.5)
+		local hitScale = wasHit and 1.6 or 1
+		local punch = Angle(math.Rand(-5.5, 3.5), math.Rand(-4.5, 4.5), math.Rand(-1.5, 1.5)) * punchScale * hitScale
 
 		if type(QuickViewPunch) == "function" then
 			QuickViewPunch(punch)
@@ -232,7 +257,8 @@ local function ApplyClientOverride()
                         local time = view.origin:Distance(midPos) / 17836
                         local soundPos = startPos + (hitPos - startPos) * 0.35
                         timer.Simple(time, function()
-							EmitSound("bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav", soundPos, 0, CHAN_AUTO, 1, SNDLVL_140dB)
+							local crack = "cracks/distant/dist_crack_" .. string.format("%02d", math.random(1, 17)) .. ".ogg"
+							EmitSound(ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"), soundPos, 0, CHAN_AUTO, 1.25, SNDLVL_150dB)
                         end)
                     end
                 end
@@ -319,11 +345,17 @@ local function ApplyClientOverride()
                 local playPos = closestPos - bullet.Vel:GetNormalized() * 25
 				bullet._ZCityCrackPlayed = true
 
-				if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic) then return end
+				local damage = tonumber(bullet.Damage) or 0
+				local crack = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
+					or damage >= 50 and "cracks/heavy/heav_crack_0" .. math.random(1, 9) .. ".ogg"
+					or damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
+					or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
+				crack = ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav")
 
-				local fallback = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
-					or "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"
-				EmitSound(fallback, playPos, 0, CHAN_ITEM, 1, 155)
+				-- Keep the remote Z-City damage-tiered crack selection, with a
+				-- louder near-miss mix so it is not buried by weapon reports.
+				if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic, 170, 1.35, crack) then return end
+				EmitSound(crack, playPos, 0, CHAN_ITEM, 1.35, 170)
             end)
 
             plugin._ZCityBulletCracksRegistered = true

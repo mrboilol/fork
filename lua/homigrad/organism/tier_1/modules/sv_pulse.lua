@@ -436,7 +436,12 @@ module[2] = function(owner, org, timeValue)
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and circulation > 0.6 then
 		org.cardiacOutput = Approach(org.cardiacOutput, Clamp(getBloodVolume(org) * heart, 0, 1), timeValue / 20)
 	end
-	local myocardialTarget = Clamp(oxygenation * bloodVolume * Clamp(circulation * (92 / 70), 0, 1.2), 0, 1)
+	-- circulationBase already contains bloodVolume. Applying it again here made
+	-- moderate hemorrhage reduce myocardial oxygen twice: the resulting ischemia
+	-- could trigger an arrhythmia/fibrillation cascade around 3.5 L.  Oxygen
+	-- content and actual circulation are the two limits on heart delivery; the
+	-- latter already falls to zero at the terminal blood-volume floor.
+	local myocardialTarget = Clamp(oxygenation * Clamp(circulation * (92 / 70), 0, 1.2), 0, 1)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
 	local hypotensionTarget = Clamp(Remap(circulation, 0.98, 0.22, 0, 1), 0, 1)
@@ -819,7 +824,17 @@ module[2] = function(owner, org, timeValue)
 	-- A successful AED/epinephrine restart deliberately has a short window to
 	-- rebuild circulation.  Do not immediately overwrite it here just because
 	-- the previous arrest left the pulse at zero or caused temporary hypoxia.
-	if (org.pulse < 10 or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
+	-- A momentary low pulse can happen while the circulation model settles after
+	-- treatment.  It is not cardiac arrest by itself: require a terminal cause
+	-- before switching to the arrest state (and its dying notifications/sounds).
+	local terminalPulseFailure = org.pulse < 10 and (
+		bloodNow <= 2500
+		or o2Value <= 6
+		or org.hypotension > 0.92
+		or (org.heart or 0) >= 0.8
+		or org.oxygenIntakeAvailable == false
+	)
+	if (terminalPulseFailure or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	if org.heartstop then
 		org.heartbeat = 0

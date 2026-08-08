@@ -52,6 +52,7 @@ module[1] = function(org)
 	org.internalBleedPeak = 0
 	org.internalBleedComplication = 0
 	org.internalBleedComplicationDelay = 90
+	org.hemothoraxAcute = false
 
 	org.survivalchance = 1
 	org.hemothorax = 0
@@ -336,14 +337,23 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, mulTime / 90)
 	end
 
-	-- Thoracic internal bleeding can collect around the lungs and heart. A
-	-- five-point internal bleed is severe enough to establish a hemothorax;
-	-- lower scores retain a smaller, delayed complication risk.
+	-- Pleural bleeding is deliberately a late complication. Normal internal
+	-- bleeding must persist for a full minute before it can start a hemothorax.
+	-- Massive bleeding (> 5) has a separate, probabilistic acute path so it can
+	-- still become a thoracic emergency, but not deterministically from a few hits.
+	if internalBleedSeverity > 5 and not org.hemothoraxAcute then
+		local acuteChancePerSecond = math.Clamp(0.04 + (internalBleedSeverity - 5) * 0.08, 0.04, 0.45)
+		if math.Rand(0, 1) < 1 - math.exp(-acuteChancePerSecond * mulTime) then
+			org.hemothoraxAcute = true
+		end
+	elseif internalBleedSeverity <= 0.05 then
+		org.hemothoraxAcute = false
+	end
+
+	org.hemothoraxInternalEligible = (org.internalBleedDuration or 0) >= 60 or org.hemothoraxAcute
 	local thoracicSeverity = math.Clamp(internalBleedSeverity / 5, 0, 1)
 	local thoracicComplication = thoracicSeverity * (org.internalBleedComplication or 0)
-	local hemothoraxTarget = math.max(org.hemothoraxTrauma or 0, thoracicComplication * 0.7)
 	local tamponadeTarget = thoracicComplication * math.Clamp((internalBleedSeverity - 2.5) / 7.5, 0, 1) * 0.65
-	org.hemothorax = math.max(org.hemothorax or 0, math.Approach(org.hemothorax or 0, hemothoraxTarget, mulTime / 18))
 	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24))
 
 	if org.internalBleed > 2.5 and not adrenalineStabilizer and not hasAntiIschemia then
@@ -637,12 +647,14 @@ module[2] = function(owner, org, mulTime)
 	-- meaningful but non-instant rescue path.
 	local healRate = mulTime / (canHealInternalBleed and 150 or 300)
 	if internalBleedHeal > 0 then
-		healRate = healRate + mulTime * math.Clamp(internalBleedHeal / 100, 0.015, 0.15)
+		-- A prepared TXA dose should stabilize a serious internal bleed quickly,
+		-- while its remaining dose still gradually expires below.
+		healRate = healRate + mulTime * math.Clamp(internalBleedHeal / 10 * 0.75, 0.15, 1.25)
 	end
 
 	org.internalBleed = math.Approach(org.internalBleed, 0, healRate)
 	coagulatespeed = coagulatespeed + mulTime
-	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 30)
+	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 60)
 
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 	

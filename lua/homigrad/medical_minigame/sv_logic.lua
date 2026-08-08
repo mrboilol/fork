@@ -567,6 +567,10 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
             end
         end
 
+        -- Keep presentation consumers in sync with the exact progress used
+        -- for treatment, including medical progress modifiers.
+        hook.Run("hg_medical_minigame_progress", ply, wep, minigameType, progressDelta)
+
         if minigameType == "syringe" then
             ApplySyringeProgress(wep, ply, target, progressDelta)
             return

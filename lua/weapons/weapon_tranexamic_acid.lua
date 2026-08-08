@@ -95,18 +95,9 @@ if SERVER then
 		local dose = self.modeValues[1]
 		if dose > 0 then
 			-- One full 10-unit syringe always supplies exactly 10 points of
-			-- internal-bleed healing, regardless of profession.
+			-- rapid internal-bleed healing, regardless of profession.
 			org.internalBleedHeal = (org.internalBleedHeal or 0) + dose
 			org.tranexamic_acid = math.min(org.tranexamic_acid + dose, 10)
-			-- TXA also gives an existing hemothorax a direct route to resolve.
-			-- A full syringe can clear it, while ongoing internal bleeding may still
-			-- refill the pleural space until the source is controlled.
-			local relief = math.Clamp(dose / 10, 0, 1)
-			org.hemothoraxTrauma = math.max((org.hemothoraxTrauma or org.hemothorax or 0) - relief, 0)
-			org.hemothoraxL = math.max((org.hemothoraxL or 0) - relief, 0)
-			org.hemothoraxR = math.max((org.hemothoraxR or 0) - relief, 0)
-			org.hemothorax = math.max(org.hemothoraxTrauma, (org.hemothoraxL + org.hemothoraxR) / 2)
-			org.internalBleedComplication = math.max((org.internalBleedComplication or 0) - relief, 0)
 			self.modeValues[1] = 0
 			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
 		end

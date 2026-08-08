@@ -66,7 +66,12 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
 
         if blocked then continue end
 
-        local force = math.Clamp((1 - dist / 180) * 7 + math.min(damage / 20, 3), 0.75, 10)
+        -- A near miss should be startling, not merely a little stronger than a
+        -- miss at the edge of the suppression radius.  Squaring the proximity
+        -- keeps the outer edge readable while making shots that shave the head
+        -- deliver the full suppression response.
+        local proximity = math.Clamp(1 - dist / 180, 0, 1)
+        local force = math.Clamp(0.8 + proximity * proximity * 11 + math.min(damage / 25, 2.5), 0.8, 14)
 
         net.Start("ZCity_Wind_SuppressionForce")
             net.WriteVector(closestPos)

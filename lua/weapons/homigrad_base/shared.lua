@@ -1889,7 +1889,9 @@ function SWEP:CoreStep()
 	end
 
 	local stam = (owner.organism ~= nil and owner.organism.stamina and owner.organism.stamina[1]) or 180
-	if owner:GetNWFloat("InLegKick",0) <= CurTime() and (!(IsValid(owner.FakeRagdoll) or IsValid(owner.FakeRagdollOld)) or false--[[self:Clip1() <= 0]]) and self:KeyDown(IN_ATTACK) and self:KeyDown(IN_USE) and ((self:GetButtstockAttack() + 1 * ((math.max(0, (self.weight - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 2))) < CurTime()) and owner:GetVelocity():LengthSqr() < 250 * 250 and (SERVER or IsFirstTimePredicted()) then
+	-- Fake mode already routes hg.eyeTrace through the ragdoll's head, so it can
+	-- use the same normal kick checks as a standing player.
+	if owner:GetNWFloat("InLegKick",0) <= CurTime() and self:KeyDown(IN_ATTACK) and self:KeyDown(IN_USE) and ((self:GetButtstockAttack() + 1 * ((math.max(0, (self.weight - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 2))) < CurTime()) and owner:GetVelocity():LengthSqr() < 250 * 250 and (SERVER or IsFirstTimePredicted()) then
 		self:SetButtstockAttack(CurTime())
 		self:GetOwner():EmitSound("weapons/tfa/melee"..math.random(1,6)..".wav")
 		if SERVER then

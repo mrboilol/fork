@@ -1,6 +1,7 @@
 if CLIENT then return end
 
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
+local HEAL_ANIMATION_RETURN_TIME = 0.35
 
 local MEDICAL_WEAPON_CLASSES = {
     "weapon_bandage_sh",
@@ -36,6 +37,26 @@ local MEDICAL_WEAPON_CLASSES = {
     "weapon_fury16"
 }
 
+local function SetHealAnimationTarget(wep, target)
+    if not IsValid(wep) or not wep.SetHolding then return end
+
+    wep.HGMedicalMinigameAnimationTarget = math.Clamp(target or 0, 0, 100)
+end
+
+local function UpdateHealAnimation(wep, immediate)
+    if not IsValid(wep) or not wep.SetHolding then return true end
+
+    local target = wep.HGMedicalMinigameAnimationTarget or 0
+    local holding = target
+    if not immediate and wep.HGMedicalMinigameAnimationReturnStarted then
+        local fraction = math.Clamp((CurTime() - wep.HGMedicalMinigameAnimationReturnStarted) / HEAL_ANIMATION_RETURN_TIME, 0, 1)
+        holding = Lerp(fraction, wep.HGMedicalMinigameAnimationReturnHolding or 0, 0)
+    end
+    wep:SetHolding(holding)
+
+    return holding <= 0 and target <= 0
+end
+
 local function StopHealAnimation(owner)
     if not IsValid(owner) then return end
 
@@ -44,10 +65,11 @@ local function StopHealAnimation(owner)
 
     if not IsValid(wep) then return end
     wep.HGMedicalMinigameActive = nil
-
-    if wep.SetHolding then
-        wep:SetHolding(0)
-    end
+    wep.HGMedicalMinigameProgress = nil
+    wep.HGMedicalMinigameAnimationReturnHolding = wep:GetHolding() or 0
+    wep.HGMedicalMinigameAnimationReturnStarted = CurTime()
+    SetHealAnimationTarget(wep, 0)
+    owner.HGMedicalMinigameReturningWeapon = wep
 end
 
 local function StartHealAnimation(owner, wep)
@@ -59,10 +81,11 @@ local function StartHealAnimation(owner, wep)
 
     owner.HGMedicalMinigameWeapon = wep
     wep.HGMedicalMinigameActive = true
-
-    if wep.SetHolding then
-        wep:SetHolding(hg_healanims:GetBool() and 100 or 0)
-    end
+    wep.HGMedicalMinigameProgress = 0
+    wep.HGMedicalMinigameAnimationReturnHolding = nil
+    wep.HGMedicalMinigameAnimationReturnStarted = nil
+    owner.HGMedicalMinigameReturningWeapon = nil
+    SetHealAnimationTarget(wep, 0)
 end
 
 local function GetMinigameType(wep)
@@ -118,6 +141,19 @@ local function GetModeValueIndex(wep, minigameType)
     if minigameType == "syringe" then return wep.mode or 3 end
     if minigameType == "tourniquet" then return wep.HGMedkitTier and (wep.mode or 1) or 4 end
     return 1
+end
+
+local function GetSyringeAnimationProgress(wep, progress)
+    if not IsValid(wep) then return 0 end
+
+    -- Fentanyl is potent enough that a fifth of a dose represents a full
+    -- injection motion.  Larger doses keep that pose instead of forcing the
+    -- player through multiple full syringe motions.
+    if wep:GetClass() == "weapon_fentanyl" then
+        return math.Clamp(progress / 0.2, 0, 1)
+    end
+
+    return math.Clamp(progress, 0, 1)
 end
 
 local function ResolveSecondaryTarget(owner)
@@ -232,11 +268,27 @@ hook.Add("Think", "zcity_delta_medical_healanim_progress", function()
     for _, owner in player.Iterator() do
         local wep = owner.HGMedicalMinigameWeapon
         if IsValid(wep) and wep.HGMedicalMinigameActive and owner:GetActiveWeapon() == wep then
-            if wep.SetHolding then
-                wep:SetHolding(hg_healanims:GetBool() and 100 or 0)
+            local minigameType = GetMinigameType(wep)
+            if minigameType == "bandage" or minigameType == "tourniquet" then
+                SetHealAnimationTarget(wep, hg_healanims:GetBool() and 100 or 0)
+            elseif minigameType == "syringe" then
+                local progress = GetSyringeAnimationProgress(wep, wep.HGMedicalMinigameProgress or 0)
+                SetHealAnimationTarget(wep, hg_healanims:GetBool() and progress * 100 or 0)
             end
+
+            -- Weapon Think functions normally lower Holding whenever attack
+            -- is released.  Set the current minigame pose directly so they
+            -- cannot pull a bandage pose down or lag behind syringe progress.
+            UpdateHealAnimation(wep, true)
         elseif wep ~= nil then
             StopHealAnimation(owner)
+        end
+
+        local returning = owner.HGMedicalMinigameReturningWeapon
+        if IsValid(returning) and UpdateHealAnimation(returning) then
+            owner.HGMedicalMinigameReturningWeapon = nil
+        elseif returning ~= nil and not IsValid(returning) then
+            owner.HGMedicalMinigameReturningWeapon = nil
         end
 
         local active = owner:GetActiveWeapon()
@@ -245,6 +297,15 @@ hook.Add("Think", "zcity_delta_medical_healanim_progress", function()
             active:SetHolding(hg_healanims:GetBool() and inUse and 100 or 0)
         end
     end
+end)
+
+-- The minigame owns its networking.  Its progress hook gives the animation
+-- the same accumulated completion value used by the actual treatment.
+hook.Add("hg_medical_minigame_progress", "zcity_delta_medical_healanim_syringe_progress", function(owner, wep, minigameType, progressDelta)
+    if not IsValid(owner) or not IsValid(wep) then return end
+    if owner.HGMedicalMinigameWeapon ~= wep or minigameType ~= "syringe" then return end
+
+    wep.HGMedicalMinigameProgress = math.Clamp((wep.HGMedicalMinigameProgress or 0) + math.max(progressDelta or 0, 0), 0, 1)
 end)
 
 hook.Add("hg_medical_minigame_ended", "zcity_delta_medical_healanim_end", function(owner)

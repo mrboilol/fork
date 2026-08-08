@@ -365,11 +365,15 @@ lobotomy_mats = {
 }
 
 local consciousnessTypeBeatVolume = 0.18
+-- rem_dying1 is intentionally more prominent than the general low-consciousness beat.
+local remDying1Volume = 0.75
 local dying2Volume = 0.4
 local alternateDyingForegroundVolume = 0.6
 -- sonimcooked is the solo foreground track for hg_dyingsound 7. Its source
 -- file is quieter than the other dying tracks, so give it a higher ceiling.
 local sonimCookedForegroundVolume = 1
+local hopelessForegroundVolume = 1
+local sharedDyingOtrubVolumeMul = 1.25
 local alternateDyingBackgroundVolume = 0.34
 local alternateDyingBackgroundMul = 0.42
 local painBeatOverlayPath = "sound/rem_pain.mp3"
@@ -794,6 +798,10 @@ local function stopthings()
 		ItssooverStation:Stop()
 		ItssooverStation = nil
 	end
+	if IsValid(ItshopelessStation) then
+		ItshopelessStation:Stop()
+		ItshopelessStation = nil
+	end
 
 	if IsValid(SonimCookedStation) then
 		SonimCookedStation:Stop()
@@ -1200,6 +1208,20 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
 				ItssooverStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	-- These channels are shared by their dying and unconscious modes. Keep them
+	-- playing silently between state changes so the track never restarts on otrub.
+	if canRetrySound("ItshopelessStation", ItshopelessStation) then
+		sound.PlayFile("sound/itshopeless.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				ItshopelessStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -2012,6 +2034,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(SonimCookedStation) then
 					SonimCookedStation:SetVolume(math.Clamp(consciousVol * 1.5, 0, sonimCookedForegroundVolume))
 				end
+			elseif dyingMode == 10 then
+				-- Shared with otrub mode 6: preserve the channel position on collapse.
+				if IsValid(NoiseStation2) then NoiseStation2:SetVolume(0) end
+				if IsValid(EndStation) then EndStation:SetVolume(0) end
+				if IsValid(DyingStation) then DyingStation:SetVolume(0) end
+				if IsValid(AltpainStation) then AltpainStation:SetVolume(0) end
+				if IsValid(SillydyingStation) then SillydyingStation:SetVolume(0) end
+				if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+				if IsValid(SonimCookedStation) then SonimCookedStation:SetVolume(0) end
+				if IsValid(ItshopelessStation) then
+					ItshopelessStation:SetVolume(math.Clamp(consciousVol * sharedDyingOtrubVolumeMul, 0, hopelessForegroundVolume))
+				end
 			elseif dyingMode == 8 then
 				-- REM low-O2 stack from the reference: rem_dying1 + rem_dying2.
 				if IsValid(NoiseStation2) then
@@ -2036,7 +2070,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 					SonimCookedStation:SetVolume(0)
 				end
 				if IsValid(RemDying1Station) then
-					RemDying1Station:SetVolume(math.Clamp(consciousVol, 0, consciousnessTypeBeatVolume))
+					RemDying1Station:SetVolume(math.Clamp(consciousVol, 0, remDying1Volume))
 				end
 				if IsValid(NoiseStation2Dying) then
 					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, dying2Volume))
@@ -2082,6 +2116,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if dyingMode != 9 and IsValid(AltRemDyingStation) then
 				AltRemDyingStation:SetVolume(0)
 			end
+			if dyingMode != 10 and IsValid(ItshopelessStation) then
+				ItshopelessStation:SetVolume(0)
+			end
 			if dyingMode != 8 and dyingMode != 9 and IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
 			end
@@ -2108,6 +2145,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if IsValid(ItssooverStation) then
 				ItssooverStation:SetVolume(0)
+			end
+			if IsValid(ItshopelessStation) then
+				ItshopelessStation:SetVolume(0)
 			end
 			if IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
@@ -2139,9 +2179,18 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
+			local sharedDyingOtrubStation = otrubMode == 6 and ItshopelessStation or otrubMode == 7 and ItssooverStation
 			if otrubMode == 0 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+			elseif otrubMode == 6 or otrubMode == 7 then
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+				-- The same station is used while dying, so collapsing merely raises its
+				-- volume instead of seeking or replaying the clip.
+				if IsValid(sharedDyingOtrubStation) then
+					sharedDyingOtrubStation:SetVolume(math.Clamp(otrubVol * sharedDyingOtrubVolumeMul, 0, 1))
+				end
 			else
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 
@@ -2172,6 +2221,10 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			-- Do not let a dying-mode station bleed into the selected OTRU sound.
 			if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+			if IsValid(ItshopelessStation) then ItshopelessStation:SetVolume(0) end
+			if IsValid(sharedDyingOtrubStation) then
+				sharedDyingOtrubStation:SetVolume(math.Clamp(otrubVol * sharedDyingOtrubVolumeMul, 0, 1))
+			end
 			if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
 			if IsValid(AltRemDyingStation) then AltRemDyingStation:SetVolume(0) end
 			if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
@@ -2180,6 +2233,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				NoiseStation:SetVolume(0)
 			end
 			if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+			if IsValid(ItshopelessStation) then ItshopelessStation:SetVolume(0) end
+			if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
 		end
 	else
 		if IsValid(NoiseStation) then

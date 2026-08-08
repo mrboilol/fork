@@ -80,6 +80,8 @@ module[1] = function(org)
 	org.hemothoraxL = 0
 	org.hemothoraxR = 0
 	org.internalBleedLungSide = nil
+	org.hemothoraxAcute = false
+	org.hemothoraxInternalEligible = false
 
 	org.needle = 0
 
@@ -560,10 +562,9 @@ module[2] = function(owner, org, timeValue)
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
 
-	-- Hemothorax from internal bleeding is delayed by the severity-scaled
-	-- complication state built in sv_blood. Moderate episodes choose one side;
-	-- catastrophic or advanced episodes can fill both pleural spaces. The public
-	-- aggregate remains compatible with the HUD and existing treatment code.
+	-- Hemothorax from internal bleeding can only begin after the one-minute
+	-- eligibility period established in sv_blood, unless a massive bleed wins its
+	-- acute chance roll. Ordinary cases fill slowly; acute cases fill faster.
 	local internalBleedVal = org.internalBleed or 0
 	local internalBleedPeak = math.max(org.internalBleedPeak or internalBleedVal, internalBleedVal)
 	local bleedComplication = math.Clamp(org.internalBleedComplication or 0, 0, 1)
@@ -571,16 +572,17 @@ module[2] = function(owner, org, timeValue)
 		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
 		org.hemothoraxL = max(org.hemothoraxL - timeValue / 120, 0)
 		org.hemothoraxR = max(org.hemothoraxR - timeValue / 120, 0)
-	elseif internalBleedVal > 0.1 and bleedComplication > 0 then
+	elseif org.hemothoraxInternalEligible and internalBleedVal > 0.1 and bleedComplication > 0 then
 		if org.internalBleedLungSide != "L" and org.internalBleedLungSide != "R" then
 			org.internalBleedLungSide = math.random(2) == 1 and "L" or "R"
 		end
 
-		local severityK = math.Clamp((internalBleedPeak - 0.2) / 2.8, 0, 1)
-		-- Pleural blood should become noticeable before the direct blood-loss
-		-- component becomes overwhelming. The complication target still caps the
-		-- final severity, while this makes its buildup feel responsive.
-		local fillTime = Lerp(severityK, 85, 30)
+		local fillTime
+		if org.hemothoraxAcute then
+			fillTime = Lerp(math.Clamp((internalBleedPeak - 5) / 5, 0, 1), 35, 15)
+		else
+			fillTime = 180
+		end
 		local bilateral = internalBleedPeak >= 2.5 or bleedComplication >= 0.7
 		local targetL = (bilateral or org.internalBleedLungSide == "L") and bleedComplication or 0
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and bleedComplication or 0
@@ -1277,7 +1279,9 @@ kaz
 		org.brain = min(org.brain + timeValue * hemorrhage / (hemorrhage < 0.3 and 900 or 300), 1)
 		org.disorientation = math.max(org.disorientation, hemorrhage * 0.9)
 		org.consciousness = math.min(org.consciousness, 1 - hemorrhage * 0.45)
-		org.painadd = math.max(org.painadd, hemorrhage * 25)
+		-- The impact already queues acute pain. Do not keep painadd at a
+		-- hemorrhage-derived floor here: this runs every physiology tick and
+		-- otherwise refills the queue faster than the pain module can drain it.
 	end
 
 	if hg.organism.AddSeizure and temporal > 0.2 then

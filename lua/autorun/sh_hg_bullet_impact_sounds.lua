@@ -152,7 +152,7 @@ function impactSounds.PlayMaterialImpact(trace)
 	local selection = materialSounds[trace.MatType]
 	if not selection then
 		if math_random(4) ~= 1 then return false end
-		sound.Play(genericSounds[math_random(#genericSounds)], trace.HitPos, 75, math_random(97, 103))
+		sound.Play(genericSounds[math_random(#genericSounds)], trace.HitPos, 95, math_random(97, 103), 1.2)
 		return true
 	end
 	if not selection.always and math_random(2) ~= 1 then return false end
@@ -160,7 +160,7 @@ function impactSounds.PlayMaterialImpact(trace)
 	local choices = selection.sounds
 	local newChoices = newMaterialSounds[trace.MatType]
 	if newChoices and math_random(4) == 1 then choices = newChoices end
-	sound.Play(choices[math_random(#choices)], trace.HitPos, 75, math_random(97, 103))
+	sound.Play(choices[math_random(#choices)], trace.HitPos, 95, math_random(97, 103), 1.2)
 
 	return true
 end
@@ -169,16 +169,17 @@ function impactSounds.PlayRicochet(pos)
 	if not SERVER or not pos or math_random(2) ~= 1 then return false end
 
 	local choices = math_random(4) == 1 and genericSounds or ricochetSounds
-	sound.Play(choices[math_random(#choices)], pos, 75, math_random(97, 103))
+	sound.Play(choices[math_random(#choices)], pos, 100, math_random(97, 103), 1.2)
 
 	return true
 end
 
-function impactSounds.PlayNearMiss(pos, subsonic)
+function impactSounds.PlayNearMiss(pos, subsonic, soundLevel, volume, soundOverride)
 	if not CLIENT or not pos then return false end
 
 	local choices = subsonic and subsonicNearMissSounds or supersonicNearMissSounds
-	sound.Play(choices[math_random(#choices)], pos, 155, math_random(97, 103), 1)
+	local soundName = soundOverride or choices[math_random(#choices)]
+	sound.Play(soundName, pos, soundLevel or 165, math_random(97, 103), volume or 1.25)
 
 	return true
 end
