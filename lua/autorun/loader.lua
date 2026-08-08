@@ -31,6 +31,25 @@ local sides = {
 	["_cl"] = "cl_",
 }
 
+-- Keep the font identifiers and layout data used throughout the addon intact,
+-- while giving every text font the same typeface. Icon glyphs use fontello and
+-- must retain their glyph map to keep the UI controls functional.
+if CLIENT and not surface.__zcity_vcr_osd_mono_font_override then
+	surface.__zcity_vcr_osd_mono_font_override = true
+
+	local createFont = surface.CreateFont
+	function surface.CreateFont(name, data)
+		if istable(data) then
+			data = table.Copy(data)
+			if data.font ~= "fontello" then
+				data.font = "VCR OSD Mono"
+			end
+		end
+
+		return createFont(name, data)
+	end
+end
+
 local function AddFile(File, dir)
 	local fileSide = string.lower(string.Left(File, 3))
 	local fileSide2 = string.lower(string.Right(string.sub(File, 1, -5), 3))
