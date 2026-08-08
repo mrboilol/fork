@@ -10,6 +10,10 @@ hook.Add("OnNetVarSet", "Guilt",function(index, key, var)
     end
 end)
 
+net.Receive("karma_down_sound", function()
+    surface.PlaySound("karmadown.mp3")
+end)
+
 hook.Add("Player Spawn", "GuiltKnown",function(ply)
     --if (ply == LocalPlayer()) and ply.Karma then
     --    ply:ChatPrint("Your current karma is "..tostring(math.Round(ply.Karma)).."")
@@ -43,8 +47,14 @@ local OpenMenu
 
 net.Receive("open_guilt_menu", function()
     local tbl = net.ReadTable()
-    
-    OpenMenu(tbl)
+
+    OpenMenu(tbl, karma)
+end)
+
+net.Receive("karma_down_sound", function()
+    local pitch = net.ReadFloat()
+    if not IsValid(LocalPlayer()) then return end
+    sound.Play("karmadown.mp3", LocalPlayer():GetPos(), 100, pitch)
 end)
 
 local colGray = Color(122,122,122,255)
@@ -58,7 +68,7 @@ local gradient_u = Material("vgui/gradient-u")
 local gradient_d = Material("vgui/gradient-d")
 
 local function ScaleMenu(v)
-    return math.Round(v * math.Clamp(math.min(ScrW(), ScrH()) / 1080, 0.65, 1))
+    return math.Round(v * math.Clamp(ScrH() / 1080, 0.75, 1.15))
 end
 
 local function PaintGuiltBlur(self)
@@ -157,7 +167,10 @@ hook.Add("HUDPaint","shownotification",function()
     end
 end)
 
-OpenMenu = function(tbl)
+local myKarma = 100
+OpenMenu = function(tbl, karma)
+    myKarma = karma or myKarma or 100
+
     if IsValid(guiltMenu) then
 		guiltMenu:Remove()
 		guiltMenu = nil
@@ -172,8 +185,8 @@ OpenMenu = function(tbl)
 	local margin = math.max(8, math.min(ScaleMenu(20), ScrW() * 0.05, ScrH() * 0.05))
 	local maxX = ScrW() - margin * 2
 	local maxY = ScrH() - margin * 2
-	local sizeX = math.min(ScaleMenu(520), maxX)
-	local sizeY = math.Clamp(ScaleMenu(70) + math.max(playerCount, 3) * (rowH + ScaleMenu(5)) + ScaleMenu(16), math.min(ScaleMenu(210), maxY), math.min(ScaleMenu(440), maxY))
+	local sizeX = math.min(ScaleMenu(660), maxX)
+	local sizeY = math.Clamp(ScaleMenu(90) + math.max(playerCount, 3) * (rowH + ScaleMenu(6)) + ScaleMenu(20), math.min(ScaleMenu(260), maxY), math.min(ScaleMenu(580), maxY))
 
 	guiltMenu = vgui.Create("ZFrame")
 	guiltMenu:SetTitle("")
@@ -192,7 +205,7 @@ OpenMenu = function(tbl)
     local title = vgui.Create("DLabel", guiltMenu)
     title:SetPos(ScaleMenu(12), ScaleMenu(8))
     title:SetTextColor(color_white)
-    title:SetText("karma")
+    title:SetText("your karma: "..math.Round(myKarma))
     title:SetFont("ZCity_Menu_Settings_Small")
     title:SizeToContents()
 
@@ -246,7 +259,7 @@ OpenMenu = function(tbl)
 		but:DockMargin(mg, first and mg or 0, mg, ScaleMenu(4))
         first = false
 		but:SetText("")
-		but.guiltText = "Forgive "..ply:Name().."? You will restore "..math.Round(harm,1).." karma and get "..math.Round(harm).." XP."
+		but.guiltText = "Forgive "..ply:Name().."? You will forgive him "..math.Round(harm,1).." karma."
 		but:SetTextColor(color_white)
         but.ply = ply
         but.name = ply:Name()
@@ -258,7 +271,7 @@ OpenMenu = function(tbl)
             net.WriteEntity(ply)
             net.SendToServer()
             tbl[ply] = nil
-            OpenMenu(tbl)
+            OpenMenu(tbl, myKarma)
         end
 
 		scroll:AddItem(but)

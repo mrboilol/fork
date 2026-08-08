@@ -17,9 +17,15 @@ end
 local halfValue2 = util.halfValue2
 local function damageBone(org, bone, dmg, dmgInfo, key, boneindex, dir, hit, ricochet, nodmgchange)
 	local crush = isCrush(dmgInfo)
-
-	dmg = dmg * (dmgInfo:GetInflictor().BreakBoneMul or 1)
-
+	
+	if dmgInfo:IsDamageType(DMG_SLASH) and dmg > 1.5 then
+		//crush = false
+	end
+	
+	local breakBoneMul = dmgInfo:GetInflictor().BreakBoneMul or 1
+	if dmgInfo:IsDamageType(DMG_CLUB) then breakBoneMul = breakBoneMul * 0.8 end
+	dmg = dmg * breakBoneMul
+	
 	if crush then
 		crush = halfValue2(1 - org[key], 1, 0.5)
 		dmg = dmg / math.max(10 * crush * (bone or 1), 1)

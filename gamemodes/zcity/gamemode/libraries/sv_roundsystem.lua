@@ -17,6 +17,7 @@ local ZB_FORCED_TEMP_MODE_WEIGHTS = {
 }
 local ZB_FORCED_MODE_POOL = {
         ["hmcd"] = true,
+        ["suicidelunatic"] = true,
         ["dm"] = true,
         ["tdm"] = true,
         ["riot"] = true
@@ -31,8 +32,9 @@ local ZB_HAS_CHANGELEVEL
 local function ZB_IsForcedModeAllowed(mode)
         if !isstring(mode) or !ZB_FORCED_MODE_POOL[mode] then return false end
 
-        local tbl = zb.modes[mode]
-        return tbl and (!tbl.CanLaunch or tbl:CanLaunch())
+	local parentMode = zb:GetMode(mode)
+	local tbl = parentMode and zb.modes[parentMode]
+	return tbl and (!tbl.CanLaunch or tbl:CanLaunch())
 end
 
 local function ZB_GetForcedTempMode()

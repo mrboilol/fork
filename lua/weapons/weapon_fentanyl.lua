@@ -25,25 +25,24 @@ SWEP.modeNames = {
 	[1] = "analgesic"
 }
 
-SWEP.DeploySnd = ""
-SWEP.HolsterSnd = ""
+SWEP.UseSpeed = 3
+SWEP.CallbackTimeAdjust = 0.5
 
-function SWEP:SetupDataTables()
-    self:NetworkVar("Float",0,"Holding")
-    self:NetworkVar("Float",1,"RemainingAmount")
-end
+SWEP.AnimList = {
+	["deploy"] = { "deploy", 0.5, false },
+	["use"] = { "use", 3, true },
+	["idle"] = { "idle", 5, true }
+}
 
-function SWEP:InitializeAdd()
-	self:SetHold(self.HoldType)
+SWEP.TimedSoundsSelf = {
+	{"weapons/universal/uni_crawl_l_02.wav", 0.3},
+	{"snd_jack_hmcd_needleprick.wav", 0.8},
+	{"cof/weapons/syringe/syringe_insert.wav", 1.0},
+}
 
-	self.modeValues = {
-		[1] = 1,
-	}
-	self.ModelScale = 1
-end
-
-SWEP.ofsV = Vector(0,8,-3)
-SWEP.ofsA = Angle(-90,-90,90)
+SWEP.TimedSoundsOther = {
+	{"cof/weapons/syringe/syringe_insert.wav", 0.5},
+}
 
 SWEP.modeValuesdef = {
 	[1] = {1, true},
@@ -105,30 +104,48 @@ function SWEP:OwnerChanged()
 	end
 end
 
-if SERVER then
-	function SWEP:Heal(ent, mode)
-		if ent:IsNPC() then
-			self:SpawnGarbage()
-			self:NPCHeal(ent, 0.4, "snd_jack_hmcd_needleprick.ogg")
+	if self.healing and not owner:KeyDown(IN_ATTACK) and not owner:KeyDown(IN_ATTACK2) then
+		self.healing = false
+		self:SetHealingOther(false)
+		self.setlh = true
+		self._injectStartTime = nil
+		self._slowed = false
+		self._animStarted = false
+		self.callback = nil
+		hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+		if SERVER then
+			if self.modeValues[1] > 0 then
+				self.reverseanim = true
+			else
+				self:PlayAnim("idle")
+			end
 		end
-
-		local org = ent.organism
-		if not org then return end
-
-		if self.modeValues[1] <= 0 then return end
-
-		local owner = self:GetOwner()
-		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
-			self:SetHolding(math.min(self:GetHolding() + 4, 100))
-
-			if self:GetHolding() < 100 then return end
+		if CLIENT then
+			if self.modeValues[1] > 0 then
+				self.reverseanim = true
+			end
 		end
-		
-		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+	end
 
-		local injected = math.min(FrameTime() * 1, self.modeValues[1])
-		org.analgesiaAdd = math.min(org.analgesiaAdd + injected * 5, 25)
-		self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)
+	if self.healing and self._injectStartTime then
+		local timeSinceStart = curTime - self._injectStartTime
+
+		if timeSinceStart >= 1 then
+			if not self._slowed then
+				self._slowed = true
+				if SERVER then
+					self.animspeed = self.animspeed * 2
+					self.animtime = curTime + (self.animtime - curTime) * 2
+				end
+			end
+
+			local ent = self:GetHealingOther() and IsValid(self.healbuddy) and self.healbuddy or owner
+			local org = ent.organism
+			if org and self.modeValues[1] > 0 then
+				local injected = math.min(FrameTime() * 1, self.modeValues[1])
+				org.analgesiaAdd = math.min(org.analgesiaAdd + injected, 4)
+				self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)
+				self:SetDose(self.modeValues[1])
 
 		owner.injectedinto = owner.injectedinto or {}
 		owner.injectedinto[org.owner] = owner.injectedinto[org.owner] or 0

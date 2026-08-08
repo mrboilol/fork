@@ -4,14 +4,43 @@ zb = zb or {}
 zb.GuiltTable = zb.GuiltTable or {}
 zb.HarmDone = zb.HarmDone or {}
 zb.HarmDoneKarma = zb.HarmDoneKarma or {}
-zb.HarmReturnedKarma = zb.HarmReturnedKarma or {}
-zb.HarmReceivedKarma = zb.HarmReceivedKarma or {}
 zb.HarmDoneDetailed = zb.HarmDoneDetailed or {}
 zb.HarmAttacked = zb.HarmAttacked or {}
 zb.GuiltSQL = zb.GuiltSQL or {}
 zb.GuiltSQL.PlayerInstances = zb.GuiltSQL.PlayerInstances or {}
 
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
+
+util.AddNetworkString("karma_down_sound")
+if file.Exists("sound/karmadown.mp3", "GAME") then
+    resource.AddFile("sound/karmadown.mp3")
+end
+
+local function SetKarma(ply, value)
+    ply.Karma = math.Clamp(value, -60, zb.MaxKarma)
+    ply:SetNetVar("Karma", ply.Karma)
+end
+
+local function AddRoundKarmaLoss(ply, amount)
+    if amount <= 0 then return end
+
+    local oldLoss = ply.KarmaLostThisRound or 0
+    ply.KarmaLostThisRound = oldLoss + amount
+
+    if not ply.KarmaDownSoundPlayed and not ply.KarmaDownSoundPending and oldLoss <= zb.KarmaDownSoundThreshold and ply.KarmaLostThisRound > zb.KarmaDownSoundThreshold then
+        ply.KarmaDownSoundPending = true
+        timer.Simple(0.3, function()
+            if not IsValid(ply) then return end
+
+            ply.KarmaDownSoundPending = nil
+            if ply.KarmaDownSoundPlayed or (ply.KarmaLostThisRound or 0) <= zb.KarmaDownSoundThreshold then return end
+
+            ply.KarmaDownSoundPlayed = true
+            net.Start("karma_down_sound")
+            net.Send(ply)
+        end)
+    end
+end
 
 hook.Add("DatabaseConnected", "GuiltCreateData", function()
 	local query
@@ -47,7 +76,7 @@ hook.Add( "PlayerInitialSpawn","ZB_GuiltSQL", function( ply )
 
 				zb.GuiltSQL.PlayerInstances[steamID64] = {}
 
-                zb.GuiltSQL.PlayerInstances[steamID64].value = tonumber(result[1].value)
+                zb.GuiltSQL.PlayerInstances[steamID64].value = math.min(tonumber(result[1].value), zb.MaxKarma)
 
                 ply.Karma = ply:guilt_GetValue()
                 ply:SetNetVar("Karma", ply.Karma)
@@ -60,8 +89,9 @@ hook.Add( "PlayerInitialSpawn","ZB_GuiltSQL", function( ply )
                     ply:SetNetVar("Karma", ply.Karma)
 
                     timer.Simple(0, function()
-                        ply:Ban(5, false)
-                        ply:Kick("Your karma is too low: " .. math.Round( karma, 0 ) .. ". Try again in 5 minutes." )
+                        local banTime = zb.KarmaReconnectBanTime
+                        ply:Ban(banTime, false)
+                        ply:Kick("Your karma is too low: " .. math.Round( karma, 0 ) .. ". Try again in " .. banTime .. " minutes." )
                     end)
                 end
 			else
@@ -127,18 +157,6 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     local id = Victim:IsPlayer() and Victim:SteamID() or Victim:EntIndex()
     local id2 = Attacker:IsPlayer() and Attacker:SteamID() or Attacker:EntIndex()
     local maxharm = zb.MaximumHarm
-    local damage = dmgInfo:GetDamage()
-    harm = tonumber(harm) or 0
-
-    if damage and damage > 0 then
-        local damageHarm = math.Clamp(damage / 10, 0, maxharm)
-        if hitgroup == HITGROUP_HEAD and damage >= 15 then
-            damageHarm = math.max(damageHarm, maxharm * 0.75)
-        end
-
-        harm = math.max(harm, damageHarm)
-    end
-
     zb.HarmDone[Victim] = zb.HarmDone[Victim] or {}
     zb.HarmDoneDetailed[id] = zb.HarmDoneDetailed[id] or {}
     zb.HarmDoneKarma[Victim] = zb.HarmDoneKarma[Victim] or {}
@@ -159,7 +177,13 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
         --print("They contributed a total of "..math.Round(newharm / maxharm * 100, 0).."% of "..(Victim:IsPlayer() and Victim:Name() or (tostring(Victim))).."'s death")
     end
 
+    if zb and zb.hostage and Victim == zb.hostage then
+        zb.hostageLastTouched = Attacker
+    end
+
     local attackerTeam = dmgInfo:GetInflictor().team or (Attacker:IsPlayer() and Attacker:Team()) or Attacker.team
+    local inflictor = dmgInfo:GetInflictor()
+    local isDropkick = IsValid(inflictor) and inflictor == Attacker.FakeRagdoll and inflictor.isDropkicking
     zb.HarmDoneDetailed[id][id2] = {
         harm = newharm,
         amt = newharm / maxharm,
@@ -222,6 +246,7 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
 
     add = add * (Victim:IsPlayer() and Attacker:PlayerClassEvent("Guilt", Victim) or 1)
     add = add * 2
+    add = add * (isDropkick and zb.DropkickKarmaMul or 1)
 
     local mul, shouldBanGuilt
     
@@ -232,37 +257,24 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
     end
     
     local guiltadd = amt * 60
-    local maxLoss = zb.IsForce(Attacker) and 50 or 30
-    local karmaDone = zb.HarmDoneKarma[Victim][Attacker]
-    zb.HarmReturnedKarma[Attacker] = zb.HarmReturnedKarma[Attacker] or {}
-    local karmaReturn = math.max(((zb.HarmDoneKarma[Attacker] and zb.HarmDoneKarma[Attacker][Victim] or 0) * 0.5) - (zb.HarmReturnedKarma[Attacker][Victim] or 0), 0)
-    zb.HarmReturnedKarma[Attacker][Victim] = (zb.HarmReturnedKarma[Attacker][Victim] or 0) + karmaReturn
-    add = math.Clamp(add, 0, math.max(maxLoss - karmaDone, 0))
-
-    if Victim:IsPlayer() and add > 0 then
-        zb.HarmReceivedKarma[Victim] = zb.HarmReceivedKarma[Victim] or 0
-        local victimAdd = math.Clamp(add * 0.5, 0, math.max(30 - zb.HarmReceivedKarma[Victim], 0))
-        zb.HarmReceivedKarma[Victim] = zb.HarmReceivedKarma[Victim] + victimAdd
-        Victim.Karma = math.Clamp((Victim.Karma or 100) + victimAdd, 0, zb.MaxKarma)
-        Victim:SetNetVar("Karma", Victim.Karma)
-    end
-
     Attacker.Guilt = (Attacker.Guilt or 0) + guiltadd
-    Attacker.Karma = math.Clamp((Attacker.Karma or 100) - add + karmaReturn, -60, zb.MaxKarma)
+    local karmaLoss = add
+    SetKarma(Attacker, (Attacker.Karma or 100) - karmaLoss)
+    AddRoundKarmaLoss(Attacker, karmaLoss)
 
-    zb.HarmDoneKarma[Victim][Attacker] = zb.HarmDoneKarma[Victim][Attacker] + add
+    zb.HarmDoneKarma[Victim][Attacker] = zb.HarmDoneKarma[Victim][Attacker] + karmaLoss
 
-    if shouldBanGuilt and Attacker.Guilt >= 100 then
+    if shouldBanGuilt and Attacker.Guilt >= 100 and not Attacker.KarmaTeamDamageBanned then
+		Attacker.KarmaTeamDamageBanned = true
+		local banTime = zb.KarmaTeamDamageBanTime
 		-- if ULib then
-        	ULib.addBan( Attacker:SteamID(), 30, "Kicked and banned for dealing too much team damage.", Attacker:Name(), "System" )
+			ULib.addBan( Attacker:SteamID(), banTime, "Kicked and banned for dealing too much team damage.", Attacker:Name(), "System" )
 		-- else
 		-- 	Attacker:Ban(30, true)
 		-- end
 
-        PrintMessage(HUD_PRINTTALK, "Player "..Attacker:Name().." has been banned for 30 minutes for RDMing in a team based gamemode.")
+        PrintMessage(HUD_PRINTTALK, "Player "..Attacker:Name().." has been banned for "..banTime.." minutes for RDMing in a team based gamemode.")
     end
-
-    Attacker:SetNetVar("Karma", Attacker.Karma)
     
     zb.GuiltTable[Attacker][Victim] = math.Clamp((zb.GuiltTable[Attacker][Victim] or 0) + guiltadd, 0, 200)
 
@@ -271,19 +283,23 @@ hook.Add("HomigradDamage", "GuiltReg", function(ply, dmgInfo, hitgroup, ent, har
         local name = Attacker:Name()
         local karma = Attacker.Karma
 
-        Attacker:guilt_SetValue( 10 )
-
         -- we wait one tick to make them pay for all the murders they've done
         -- also makes sure the message is displayed only once
-        timer.Create("simplewaitforkarmadrop"..Attacker:EntIndex(), 0, 1, function()
-            if IsValid(Attacker) then -- if the player haven't left in that exact tick then we do him dirty
+        timer.Create("simplewaitforkarmadrop"..Attacker:EntIndex(), 1, 1, function()
+            if IsValid(Attacker) then
                 karma = Attacker.Karma
+                if karma > 0 then return end
             end
 
-            local time = math.Round(60 - karma * 4, 0)
+            local severity = math.Clamp(-karma / 60, 0, 1)
+            local time = math.Round(Lerp(severity, zb.KarmaLowBanMinTime, zb.KarmaLowBanMaxTime))
+
+            if IsValid(Attacker) then
+                Attacker:guilt_SetValue(10)
+            end
 
 			-- if ULib then
-				ULib.addBan( steamID, 60, "Kicked and banned for having too low karma.", name, "System" )
+				ULib.addBan( steamID, time, "Kicked and banned for having too low karma.", name, "System" )
 			-- else
 			-- 	Attacker:Ban(60, true)
 			-- end
@@ -296,6 +312,35 @@ end)
 function zb.IsForce(Attacker)
     return Attacker.PlayerClassName == "police" or Attacker.PlayerClassName == "nationalguard" or Attacker.PlayerClassName == "swat"
 end
+
+hook.Add("CanPlayerSuicide", "KarmaTrackOtrubKillCommand", function(ply)
+    if IsValid(ply) and ply:Alive() and ply.organism and ply.organism.otrub then
+        ply.KarmaOtrubKillCommandTime = CurTime()
+    end
+end)
+
+hook.Add("PlayerDeath", "KarmaSoftenOtrubKillCommand", function(victim)
+    local commandTime = victim.KarmaOtrubKillCommandTime
+    victim.KarmaOtrubKillCommandTime = nil
+
+    if not commandTime or CurTime() - commandTime > 0.25 then return end
+
+    local harmed = zb.HarmDoneKarma[victim]
+    if not harmed then return end
+
+    for attacker, karmaLoss in pairs(harmed) do
+        if IsValid(attacker) and attacker:IsPlayer() and karmaLoss > 0 then
+            local refund = karmaLoss * (1 - zb.OtrubKillPenaltyMul)
+            SetKarma(attacker, (attacker.Karma or 100) + refund)
+            attacker.KarmaLostThisRound = math.max((attacker.KarmaLostThisRound or 0) - refund, 0)
+            harmed[attacker] = karmaLoss - refund
+
+            if zb.HarmDone[victim] then
+                zb.HarmDone[victim][attacker] = (zb.HarmDone[victim][attacker] or 0) * zb.OtrubKillPenaltyMul
+            end
+        end
+    end
+end)
 
 local function IsLookingAt(ply, targetVec)
     if not IsValid(ply) or not ply:IsPlayer() then return false end
@@ -323,6 +368,8 @@ hook.Add("Player Spawn","SlowlyRestoreKarma",function(ply)
     //ply:guilt_SetValue( ply.Karma or 100 )
     
     ply.Guilt = 0
+    ply.KarmaTeamDamageBanned = nil
+    ply.KarmaOtrubKillCommandTime = nil
 end)
 
 hook.Add("Player Think", "karmagain", function(ply)
@@ -372,13 +419,17 @@ hook.Add("ZB_StartRound","NO_HARM",function()
             ply.KarmaGain = 0.75
         end
 
+        ply.KarmaLostThisRound = 0
+        ply.KarmaDownSoundPlayed = nil
+        ply.KarmaDownSoundPending = nil
+        ply.KarmaTeamDamageBanned = nil
+        ply.KarmaOtrubKillCommandTime = nil
+
         //ply:guilt_SetValue( ply.Karma or 100 )
     end
     
     zb.HarmDone = {}
     zb.HarmDoneKarma = {}
-    zb.HarmReturnedKarma = {}
-    zb.HarmReceivedKarma = {}
 end)
 
 util.AddNetworkString("get_karma")
@@ -397,68 +448,15 @@ net.Receive("get_karma",function(len, ply)
 end)
 
 concommand.Add("hg_setkarma",function(ply,cmd,args)
-    if IsValid(ply) and not ply:IsAdmin() then return end
+    if not ply:IsAdmin() then return end
     
     local lenargs = #args
     local newply = player.GetListByName(lenargs > 1 and args[1] or ply:Name())[1]
     if not IsValid(newply) then return end
 
-    newply.Karma = tonumber(lenargs > 1 and args[2] or args[1])
-    newply:SetNetVar("Karma",newply.Karma)
+	newply.Karma = math.Clamp(karma, 0, zb.MaxKarma or 100)
+	newply:SetNetVar("Karma",newply.Karma)
     //newply:guilt_SetValue( ply.Karma or 100 )
-end)
-
-local function ResolvePlayerForKarma(query)
-    if not isstring(query) or query == "" then return nil end
-    local trimmed = string.Trim(query)
-    local lowerQuery = string.lower(trimmed)
-
-    for _, pl in player.Iterator() do
-        if pl:SteamID64() == trimmed then
-            return pl
-        end
-    end
-
-    for _, pl in player.Iterator() do
-        if pl:SteamID() == trimmed then
-            return pl
-        end
-    end
-
-    for _, pl in player.Iterator() do
-        if string.lower(pl:Name()) == lowerQuery then
-            return pl
-        end
-    end
-
-    for _, pl in player.Iterator() do
-        if string.find(string.lower(pl:Name()), lowerQuery, 1, true) then
-            return pl
-        end
-    end
-end
-
-concommand.Add("hg_addkarma", function(ply, cmd, args)
-    if IsValid(ply) and not ply:IsAdmin() then return end
-
-    local targetQuery = args[1]
-    local addAmount = tonumber(args[2] or "")
-    if not targetQuery or not addAmount or addAmount <= 0 then return end
-
-    local target = ResolvePlayerForKarma(targetQuery)
-    if not IsValid(target) then return end
-
-    local oldKarma = target.Karma or target:guilt_GetValue() or 100
-    local newKarma = math.Clamp(oldKarma + addAmount, -60, zb.MaxKarma)
-    target.Karma = newKarma
-    target:SetNetVar("Karma", newKarma)
-    target:guilt_SetValue(newKarma)
-
-    if IsValid(ply) then
-        ply:ChatPrint("Added " .. tostring(addAmount) .. " karma to " .. target:Name() .. ". New karma: " .. tostring(math.Round(newKarma, 2)))
-    else
-        print("[hg_addkarma] Added " .. tostring(addAmount) .. " karma to " .. target:Name() .. ". New karma: " .. tostring(math.Round(newKarma, 2)))
-    end
 end)
 
 util.AddNetworkString("open_guilt_menu")
@@ -481,7 +479,7 @@ net.Receive("forgive_player", function(len, ply)
 
     ent.Karma = math.Clamp(ent.Karma + harm, 0, zb.MaxKarma)
     ent:SetNetVar("Karma",ent.Karma)
-    if ply.GiveExp then ply:GiveExp(math.Round(harm)) end
+    //ent:guilt_SetValue((ent.Karma or 100))
 
     zb.HarmDone[ply][ent] = 0
     zb.HarmDoneKarma[ply][ent] = 0

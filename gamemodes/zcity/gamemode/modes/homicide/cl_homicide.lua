@@ -96,7 +96,10 @@ net.Receive("HMCD_RoundStart",function()
 			MODE.RoundBeginSound = nil
 		end
 
-		MODE.RoundBeginSound = CreateSound(LocalPlayer(), "rem_newroundcommence.mp3")
+		local roundSound = MODE.TypeSounds[MODE.Type] or "rem_newroundcommence.mp3"
+		if istable(roundSound) then roundSound = table.Random(roundSound) end
+
+		MODE.RoundBeginSound = CreateSound(LocalPlayer(), roundSound)
 		MODE.RoundBeginSound:PlayEx(1, 100)
 	end
 
@@ -196,8 +199,29 @@ MODE.TypeObjectives.standard = {
 	},
 
 	innocent = {
-		objective = "You are a bystander of a murder scene, although it didn't happen to you, you better be cautious.",
-		name = "a Bystander",
+		objective = "You are a potential victim. Survive, stay cautious and help identify the Executioner.",
+		name = "a Victim",
+		color1 = Color(0,120,190)
+	},
+}
+
+MODE.TypeObjectives.suicidelunatic = {
+	traitor = {
+		objective = "Protect your brother at all costs. Do not let him down",
+		name = "a Saboteur",
+		color1 = Color(190,0,0),
+		color2 = Color(190,0,0)
+	},
+
+	gunner = {
+		objective = "Someone is seriously armed with explosives, now you need to survive.",
+		name = "an Savior",
+		color1 = Color(0,120,190)
+	},
+
+	innocent = {
+		objective = "Someone is seriously armed with explosives, now you need to survive.",
+		name = "an Innocent",
 		color1 = Color(0,120,190)
 	},
 }
@@ -292,7 +316,7 @@ function MODE:HUDPaint()
 		}
 	end
 
-	add("Homicide", "ZB_HomicideHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
+	add(MODE.TypeNames[MODE.Type] or "Homicide", "ZB_HomicideHeader", Color(255, 255, 255), sw * 0.5, sh * 0.1, "left", 0, 0.9)
 	add("You are " .. Rolename, "ZB_HomicideMediumLarge", ColorRole, sw * 0.5, sh * 0.5, "right", 0.7, 1.1)
 
 	local cur_y = sh * 0.5

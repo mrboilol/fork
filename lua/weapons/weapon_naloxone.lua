@@ -82,11 +82,79 @@ function SWEP:DrawWorldModel()
 	WorldModel:DrawModel()
 end
 
-function SWEP:OwnerChanged()
-	local owner = self:GetOwner()
-	if IsValid(owner) and owner:IsNPC() then
-		self:SpawnGarbage("models/bloocobalt/l4d/items/w_eq_adrenaline.mdl", nil, nil, nil, "2211")
-		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_needleprick.ogg")
+function SWEP:PostSetHandPos()
+	local ply = self:GetOwner()
+	if not IsValid(ply) then return end
+
+	local ent = hg.GetCurrentCharacter(ply)
+	if not IsValid(ent) then return end
+
+	local rhBone = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+	if rhBone then
+		local mat = ent:GetBoneMatrix(rhBone)
+		if mat then
+			local pos = mat:GetTranslation() + self.handPosOffset
+			local ang = mat:GetAngles()
+			ang.p = ang.p + self.handAngOffset.p
+			ang.y = ang.y + self.handAngOffset.y
+			ang.r = ang.r + self.handAngOffset.r
+			mat:SetTranslation(pos)
+			mat:SetAngles(ang)
+			ent:SetBoneMatrix(rhBone, mat)
+		end
+	end
+
+	if not self.lhandik then return end
+
+	local lhBone = ent:LookupBone("ValveBiped.Bip01_L_Hand")
+	if lhBone then
+		local mat = ent:GetBoneMatrix(lhBone)
+		if mat then
+			local pos = mat:GetTranslation()
+			local offset = self.handPosOffset
+			pos.x = pos.x - offset.x
+			pos.y = pos.y - offset.y
+			pos.z = pos.z + offset.z
+			local ang = mat:GetAngles()
+			ang.p = ang.p - self.handAngOffset.p
+			ang.y = ang.y - self.handAngOffset.y
+			ang.r = ang.r + self.handAngOffset.r
+			mat:SetTranslation(pos)
+			mat:SetAngles(ang)
+			ent:SetBoneMatrix(lhBone, mat)
+		end
+	end
+end
+
+local colWhite = Color(255, 255, 255, 255)
+local colGray = Color(200, 200, 200, 200)
+local lerpthing = 1
+
+if CLIENT then
+	function SWEP:DrawHUD()
+		local owner = self:GetOwner()
+		if !owner:IsPlayer() then return end
+		if GetViewEntity() ~= owner then return end
+		if owner:InVehicle() then return end
+		local Tr = hg.eyeTrace(owner)
+		if !Tr then return end
+		local Size = math.max(math.min(1 - Tr.Fraction, 0.5), 0.1)
+		local x, y = Tr.HitPos:ToScreen().x, Tr.HitPos:ToScreen().y
+		if Tr.Hit then
+			lerpthing = Lerp(0.1, lerpthing or 1, 1)
+			colWhite.a = 255 * Size
+			surface.SetDrawColor(colGray)
+			draw.NoTexture()
+			surface.SetDrawColor(colWhite)
+			draw.NoTexture()
+			surface.DrawRect(x - 25 * lerpthing, y - 2.5, 50 * lerpthing, 5)
+			surface.DrawRect(x - 2.5, y - 25 * lerpthing, 5, 50 * lerpthing)
+			local col = Tr.Entity:GetPlayerColor():ToColor()
+			local coloutline = (col.r < 50 and col.g < 50 and col.b < 50) and Color(255,255,255) or Color(0,0,0)
+			coloutline.a = 255 * Size * 2
+			draw.DrawText(Tr.Entity:IsPlayer() and Tr.Entity:GetPlayerName() or Tr.Entity:IsRagdoll() and Tr.Entity:GetPlayerName() or "", "HomigradFontLarge", x + 1, y + 31, coloutline, TEXT_ALIGN_CENTER)
+			draw.DrawText(Tr.Entity:IsPlayer() and Tr.Entity:GetPlayerName() or Tr.Entity:IsRagdoll() and Tr.Entity:GetPlayerName() or "", "HomigradFontLarge", x, y + 30, col, TEXT_ALIGN_CENTER)
+		end
 	end
 end
 

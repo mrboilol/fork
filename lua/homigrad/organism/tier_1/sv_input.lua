@@ -930,7 +930,7 @@ function hg.AddHarm(ply, harm, reason)
 		//ply:ChatPrint(reason..": harm count is "..math.Round(harm,2))
 	end
 
-	ply.harm = ply.harm + harm
+	ply.harm = (ply.harm or 0) + (harm or 0)
 end
 
 function hg.ExplodeHead(ent, damage, slash, force)
@@ -1178,25 +1178,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	inf = IsValid(inf.weapon) and inf.weapon or inf
 	if IsValid(inf) then dmgInfo:SetInflictor(inf) end
 
-	local inflictorClass = IsValid(inf) and inf:GetClass() or ""
-	local inflictorBase = IsValid(inf) and inf.Base or ""
-	local isClubMelee = dmgInfo:IsDamageType(DMG_CLUB) and (inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee")
-	if isClubMelee then
-		dmgInfo:ScaleDamage(1.65)
+	if dmgInfo:IsDamageType(DMG_BUCKSHOT) then
+		dmgInfo:ScaleDamage(1.35)
+	elseif dmgInfo:IsDamageType(DMG_BULLET) then
+		dmgInfo:ScaleDamage(1.15)
 	end
-
-	local isMeleeDmg = dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH + DMG_CRUSH) and
-		(inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee" or
-		 inflictorClass == "weapon_hands_sh" or inflictorClass == "weapon_hg_coolhands")
-	if isMeleeDmg then
-		dmgInfo:ScaleDamage(1.05)
-	end
-	local attackerOrg = attacker:IsPlayer() and attacker.organism or nil
-	if attackerOrg and attacker ~= ply then
-		local goodmood = math.Clamp(attackerOrg.goodmood or 0, 0, 1)
-		dmgInfo:ScaleDamage(1 + goodmood * goodmood_damage_max_bonus)
-	end
-	local isSharpMelee = isMeleeDmg and dmgInfo:IsDamageType(DMG_SLASH)
 	
 	local dmg = dmgInfo:GetDamage()
 
@@ -1578,7 +1564,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		dmgBlood = dmgBlood * 1.5
 		local bleed_add = dmgBlood * bleedMul// / (RagdollDamageBoneMul[hitgroup] or 1)
 		--org.bleed = org.bleed + bleed_add
-		attacker.harm = attacker.harm + bleed_add / 50
+		attacker.harm = (attacker.harm or 0) + bleed_add / 50
 		local hurt_add = dmgHurt * 0.5 * hurtMul
 		org.hurtadd = org.hurtadd + hurt_add
 		local painadd = dmgHurt * painMul * 1.5 * (isMeleeDmg and melee_pain_scale or 1)
@@ -1609,19 +1595,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 		
 
-		local shockFakeThreshold = org.shock_turn * 3.6 * analgesiaMul * painkillerMul * (meleeHit and 1.5 or 1)
-		if shockAdd > 2 and org.shock > shockFakeThreshold and (org.nextShockFake or 0) < CurTime() then
-			org.nextShockFake = CurTime() + (meleeHit and 3.5 or 2.75)
-			timer.Simple(0, function()
-				if not IsValid(org.owner) then return end
-				hg.Fake(org.owner)
-			end)
+		if org.shock > collapseThreshold then
+			timer.Simple(0, function() hg.Fake(org.owner) end)
 		end
 
-		local hitAmmoType = bullet and bullet.AmmoType or dmgInfo:GetAmmoType()
-		if isnumber(hitAmmoType) then hitAmmoType = game.GetAmmoName(hitAmmoType) end
-		local hitAmmo = hitAmmoType and hg.ammotypeshuy[hitAmmoType]
-		if hitAmmo and hitAmmo.BulletSettings and hitAmmo.BulletSettings.tranquilizer then
+		if bullet and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.tranquilizer then
 			org.tranquilizer = org.tranquilizer + dmgInfo:GetDamage()
 		end
 
@@ -2258,6 +2236,11 @@ local bleedSurfaces = { -- https://developer.valvesoftware.com/wiki/Material_sur
 	["glass_breakable"] = true
 }
 
+local hg_safe_landing_legmul = 0.6
+local hg_safe_landing_painmul = 0.7
+local hg_safe_landing_minspeed = 350
+local hg_safe_landing_maxspeed = 900
+
 local function velocityDamage(ent, data)
 	local speed = (data.OurOldVelocity - data.TheirOldVelocity):Length()
 	if speed < 250 then return end
@@ -2324,7 +2307,14 @@ local function velocityDamage(ent, data)
                 dmg = dmg * (ply.hgSprintCollisionDamageMul or 0.08)
         end
 
-	local traceResult = GetTraceDamage(ent, data.HitPos, -(data.OurOldVelocity - data.TheirOldVelocity))
+	-- Crouching only softens moderate, mostly vertical impacts.
+	local safeLanding = false
+	local safeLegMul = hg_safe_landing_legmul
+	local safePainMul = hg_safe_landing_painmul
+	if normalSpeed >= hg_safe_landing_minspeed and normalSpeed <= hg_safe_landing_maxspeed
+		and IsValid(ply) and ply:Alive() and ply:KeyDown(IN_DUCK) then
+		safeLanding = true
+	end
 
     if not bone then
         bone = traceResult.PhysicsBone
