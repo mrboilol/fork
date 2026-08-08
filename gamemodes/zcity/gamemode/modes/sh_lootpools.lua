@@ -195,11 +195,7 @@ LP.Shotguns = {
 	{0.25, "weapon_aa12"},
 
 	{1, "weapon_870"},
-	{1, "weapon_remington870"},
-	{0.8, "weapon_remington870_long"},
-	{0.7, "weapon_remington870_sawed_off"},
 	{0.5, "weapon_spas12"},
-	{0.4, "weapon_xm1014"},
 }
 
 LP.AssaultRifles = {
