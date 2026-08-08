@@ -319,6 +319,7 @@ if CLIENT then
             ["tdm"] = true,
             ["cstrike"] = true,
             ["hmcd"] = true,
+            ["suicidelunatic"] = true,
             ["hl2dm"] = true,
             ["riot"] = true,
             ["gwars"] = true,
