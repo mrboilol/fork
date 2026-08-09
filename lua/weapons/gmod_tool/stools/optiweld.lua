@@ -987,3 +987,4 @@ hook.Add("EntityRemoved", "OptiWeldClearList", function(ent)
 	end
 
 end)
+

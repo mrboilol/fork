@@ -14,6 +14,20 @@ model_ext[ WOS_DYNABASE.MALE  ] = "_male"
 model_ext[ WOS_DYNABASE.FEMALE  ] = "_female"
 model_ext[ WOS_DYNABASE.ZOMBIE  ] = "_zombie"
 
+local missing_model_warnings = {}
+local function OpenBaseModel( type )
+	local base_path = model_table[ type ]
+	if not base_path then return end
+
+	local mdl_file = file.Open( base_path, "r", "GAME" )
+	if mdl_file then return mdl_file end
+
+	if not missing_model_warnings[ base_path ] then
+		missing_model_warnings[ base_path ] = true
+		ErrorNoHalt( "[wOS-Dynabase] Missing required base model: " .. base_path .. "\n" )
+	end
+end
+
 local INCLUDE_MODEL_START = 737
 local INCLUDE_MODEL_END_SHARED = 806
 
@@ -50,7 +64,8 @@ local function WRITE_TO_LOCAL( start, finish, type )
 	local base_path = model_table[ type  ]
 	if not base_path then return end
 
-	local mdl_file = file.Open( base_path, "r", "GAME" )
+	local mdl_file = OpenBaseModel( type )
+	if not mdl_file then return end
 	local dat = {}
 	local str = ""
 	for i=0, mdl_file:Size() do
@@ -139,7 +154,8 @@ local function WRITE_TO_POINTER( start, finish, type )
 	local base_path = model_table[ type ]
 	if not base_path then return end
 
-	local mdl_file = file.Open( base_path, "r", "GAME" )
+	local mdl_file = OpenBaseModel( type )
+	if not mdl_file then return end
 	local str = ""
 	for i=0, mdl_file:Size() do
 		local byte = mdl_file:ReadByte()

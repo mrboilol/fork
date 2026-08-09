@@ -31,6 +31,15 @@ local sides = {
 	["_cl"] = "cl_",
 }
 
+if CLIENT then
+	local function CacheLocalPlayer()
+		lply = LocalPlayer()
+	end
+
+	CacheLocalPlayer()
+	hook.Add("InitPostEntity", "hg.CacheLocalPlayer", CacheLocalPlayer)
+end
+
 -- Keep the font identifiers and layout data used throughout the addon intact,
 -- while giving every text font the same typeface. Icon glyphs use fontello and
 -- must retain their glyph map to keep the UI controls functional.
