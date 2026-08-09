@@ -368,7 +368,8 @@ module[2] = function(owner, org, mulTime)
 	-- 2000: terminal volume loss; circulation can no longer sustain vital organs
 	local bloodConsciousnessCap = 1
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
-	local blood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or (org.blood or 5000)
+	local rawBlood = tonumber(org.blood) or 5000
+	local blood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or rawBlood
 	local bloodDeficit = math.Clamp((4500 - blood) / 2500, 0, 1)
 	local compensation = math.Clamp((4500 - blood) / 2000, 0, 1)
 	local shockStage = math.Clamp((3000 - blood) / 1000, 0, 1)
@@ -449,11 +450,16 @@ module[2] = function(owner, org, mulTime)
 		end
 	end
 
-	-- 2000 mL is the terminal threshold. Do not wait for the next hypoxia timer
-	-- to run out: pulse will arrest the heart and blood loss immediately puts
-	-- the player into the unconscious/deadly state.
-	if blood <= 2000 then
-		org.needotrub = true
+	-- Raw circulating volume owns the lethal cutoff. Resilience may soften the
+	-- preceding symptoms but cannot manufacture blood or move this threshold.
+	if rawBlood <= (hg.organism.terminalBloodVolume or 2000) then
+		if hg.organism.KillFatalBloodLoss then
+			hg.organism.KillFatalBloodLoss(org)
+		else
+			org.alive = false
+			org.needotrub = true
+		end
+		return
 	end
 
 	org.consciousness = math.min(org.consciousness, bloodConsciousnessCap * tempMul)
@@ -645,6 +651,19 @@ module[2] = function(owner, org, mulTime)
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 30)
 
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
+
+	-- Wounds and internal bleeding are applied later in this tick than the stage
+	-- calculations above. Recheck here so crossing 2000 mL kills immediately
+	-- instead of leaving one extra simulation tick with nonzero vital stats.
+	if org.blood <= (hg.organism.terminalBloodVolume or 2000) then
+		if hg.organism.KillFatalBloodLoss then
+			hg.organism.KillFatalBloodLoss(org)
+		else
+			org.alive = false
+			org.needotrub = true
+		end
+		return
+	end
 	
 	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 2000 and org.o2[1] > 0 then
 		org.wantToVomit = org.wantToVomit or 0

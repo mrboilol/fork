@@ -7,3 +7,5 @@ DO NOT USE THIS FOR YOUR OWN "PUBLIC" SERVER WITHOUT MY PERMISSION, please
 The August 8, 2026 batch cherry-pick dropped core files that later code still depends on. The CAI runtime, Homigrad utility/fake/appearance modules, attachment registry, weapon-base modules, base SWEPs, and `projectile_base` were recovered to stop the downstream nil/base-registration cascade.
 
 The organism subsystem uses this repository's last pre-batch snapshot, commit `959d1868`, as its compatibility source of truth. Its server modules keep the original names `sv_blood.lua`, `sv_lungs.lua`, and `sv_pain.lua`. Do not replace them with Judge's overlapping `sv_circulation.lua`, `sv_respiration.lua`, or `sv_physical.lua`; those files register the same module owners and create a mixed-generation organism runtime.
+
+Blood-dependent organism stats use continuous formulas rather than lookup tables. Oxygen capacity, perfusion, pulse, cardiac output, and the normalized delivery stats reach exactly zero at the shared 2000 mL terminal threshold; raw blood volume owns that lethal cutoff and resilience effects cannot move it.

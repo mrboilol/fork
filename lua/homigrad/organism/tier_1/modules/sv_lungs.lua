@@ -6,31 +6,12 @@ hg.organism.module.lungs = {}
 
 local module = hg.organism.module.lungs
 
-local BloodO2 = {
-	{5000, 30},
-	-- Preserve useful oxygen delivery through compensated blood loss. The old
-	-- curve dropped tissue O2 to 4 at 4200 mL and 2 at 3500 mL, causing lethal
-	-- hypoxia long before the hemorrhage system's 2500-2000 mL collapse range.
-	{4500, 29},
-	{3500, 25},
-	{3000, 20},
-	-- Do not create a second hemorrhagic cliff after the compensated range.
-	-- Delivery tapers through the blackout range and only reaches zero at
-	-- terminal volume, matching the circulation curve.
-	{2500, 18},
-	{2000, 14},
-	{1500, 7},
-	{1000, 0},
-}
-
-local HypoxiaBands = {
-	normal = 25,
-	impaired = 15,
-	heavy = 10,
-	incapacitating = 5,
-	deep = 1,
-	terminal = 0,
-}
+local hypoxiaNormalO2 = 25
+local hypoxiaImpairedO2 = 15
+local hypoxiaHeavyO2 = 10
+local hypoxiaIncapacitatingO2 = 5
+local hypoxiaDeepO2 = 1
+local hypoxiaTerminalO2 = 0
 
 local cardiacArrestO2DrainTime = 20
 local lowStaminaO2Start = 50
@@ -40,22 +21,6 @@ local lowStaminaO2Start = 50
 local criticalStaminaO2Start = 10
 local lowStaminaO2DebtMax = 4
 local opioidRespiratoryArrestThreshold = 0.85
-
-local function interpolateCurve(curve, value)
-	value = tonumber(value) or curve[1][1]
-	if value >= curve[1][1] then return curve[1][2] end
-
-	for i = 1, #curve - 1 do
-		local high = curve[i]
-		local low = curve[i + 1]
-		if value <= high[1] and value >= low[1] then
-			local fraction = math.Clamp((high[1] - value) / (high[1] - low[1]), 0, 1)
-			return Lerp(fraction, high[2], low[2])
-		end
-	end
-
-	return curve[#curve][2]
-end
 
 module[1] = function(org)
 
@@ -392,6 +357,17 @@ local color_white, color_red, color_red2, color_red3 = Color(255, 255, 255), Col
 module[2] = function(owner, org, timeValue)
 
 	local o2 = org.o2
+	local rawBlood = tonumber(org.blood) or 5000
+	local terminalBlood = hg.organism.terminalBloodVolume or 2000
+	if not org.alive or rawBlood <= terminalBlood then
+		o2[1] = 0
+		o2.curregen = 0
+		org.bloodO2Cap = 0
+		org.oxygenIntakeAvailable = false
+		org.lungsfunction = false
+		return
+	end
+
 	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
 		o2[1] = o2.range
 		org.lungsfunction = true
@@ -446,8 +422,10 @@ module[2] = function(owner, org, timeValue)
 	org.opioidRespiratoryDepression = opioidRespiratoryDepression
 	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
-	local oxygenBlood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or (org.blood or 5000)
-	local bloodO2Cap = math.Clamp(interpolateCurve(BloodO2, math.Clamp(oxygenBlood, 0, 5000)), 0, o2.range)
+	-- Oxygen-carrying capacity is calculated directly from raw circulating
+	-- volume. The shallow exponent preserves compensation at moderate loss while
+	-- still producing an exact zero at the shared terminal threshold.
+	local bloodO2Cap = o2.range * hg.organism.GetBloodDeliveryFraction(rawBlood, 0.3)
 	org.bloodO2Cap = bloodO2Cap
 
 	local bodyTemperature = org.temperature or 36.7
@@ -1162,19 +1140,15 @@ kaz
 	local k = halfValue2(o2[1], o2.range, o2.k)
 	local tissueO2 = math.Clamp(o2[1], 0, o2.range)
 	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
-	local hypoxiaBands = {
-		normal = HypoxiaBands.normal - resilience * 3,
-		impaired = HypoxiaBands.impaired - resilience * 3,
-		heavy = HypoxiaBands.heavy - resilience * 2,
-		incapacitating = HypoxiaBands.incapacitating - resilience * 1.5,
-		deep = HypoxiaBands.deep,
-		terminal = HypoxiaBands.terminal,
-	}
+	local normalO2 = hypoxiaNormalO2 - resilience * 3
+	local impairedO2 = hypoxiaImpairedO2 - resilience * 3
+	local heavyO2 = hypoxiaHeavyO2 - resilience * 2
+	local incapacitatingO2 = hypoxiaIncapacitatingO2 - resilience * 1.5
 	local staminaMax = org.stamina and math.max(org.stamina.max or 180, 1) or 180
-	if tissueO2 > hypoxiaBands.terminal then org._zeroO2Time = 0 end
+	if tissueO2 > hypoxiaTerminalO2 then org._zeroO2Time = 0 end
 
-	if tissueO2 < hypoxiaBands.normal and tissueO2 >= hypoxiaBands.impaired then
-		local severity = math.Clamp((hypoxiaBands.normal - tissueO2) / (hypoxiaBands.normal - hypoxiaBands.impaired), 0, 1)
+	if tissueO2 < normalO2 and tissueO2 >= impairedO2 then
+		local severity = math.Clamp((normalO2 - tissueO2) / (normalO2 - impairedO2), 0, 1)
 		org.disorientation = math.max(org.disorientation or 0, 0.15 + severity * 0.3)
 		-- Oxygen deprivation should affect awareness before it reaches the
 		-- heavy-hypoxia drain bands below.
@@ -1182,8 +1156,8 @@ kaz
 		if org.stamina and org.stamina[1] then
 			org.stamina[1] = math.max(org.stamina[1] - timeValue * severity * staminaMax / 180, 0)
 		end
-	elseif tissueO2 < hypoxiaBands.impaired and tissueO2 >= hypoxiaBands.heavy then
-		local severity = math.Clamp((hypoxiaBands.impaired - tissueO2) / (hypoxiaBands.impaired - hypoxiaBands.heavy), 0, 1)
+	elseif tissueO2 < impairedO2 and tissueO2 >= heavyO2 then
+		local severity = math.Clamp((impairedO2 - tissueO2) / (impairedO2 - heavyO2), 0, 1)
 		org.needfake = true
 		org.disorientation = math.max(org.disorientation or 0, 0.55 + severity * 0.45)
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.05 + severity * 0.12), 0)
@@ -1191,20 +1165,20 @@ kaz
 			org.stamina[1] = math.max(org.stamina[1] - timeValue * staminaMax / 75, 0)
 		end
 		if org.isPly then hg.LightStunPlayer(owner, 3) end
-	elseif tissueO2 < hypoxiaBands.heavy and tissueO2 >= hypoxiaBands.incapacitating then
-		local severity = math.Clamp((hypoxiaBands.heavy - tissueO2) / (hypoxiaBands.heavy - hypoxiaBands.incapacitating), 0, 1)
+	elseif tissueO2 < heavyO2 and tissueO2 >= incapacitatingO2 then
+		local severity = math.Clamp((heavyO2 - tissueO2) / (heavyO2 - incapacitatingO2), 0, 1)
 		org.needfake = true
 		if tissueO2 < 7 or (org.consciousness or 1) < 0.35 then org.needotrub = true end
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.18 + severity * 0.28), 0)
 		org.brain = math.min((org.brain or 0) + timeValue * (0.0015 + severity * 0.0025), 1)
 		if org.isPly then hg.StunPlayer(owner, 3) end
-	elseif tissueO2 < hypoxiaBands.incapacitating and tissueO2 > hypoxiaBands.terminal then
-		local severity = math.Clamp((hypoxiaBands.incapacitating - tissueO2) / (hypoxiaBands.incapacitating - hypoxiaBands.deep), 0, 1)
+	elseif tissueO2 < incapacitatingO2 and tissueO2 > hypoxiaTerminalO2 then
+		local severity = math.Clamp((incapacitatingO2 - tissueO2) / (incapacitatingO2 - hypoxiaDeepO2), 0, 1)
 		org.needfake = true
 		org.needotrub = true
 		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.55 + severity * 0.55), 0)
 		org.brain = math.min((org.brain or 0) + timeValue * (0.004 + severity * 0.006), 1)
-	elseif tissueO2 <= hypoxiaBands.terminal then
+	elseif tissueO2 <= hypoxiaTerminalO2 then
 		org.needfake = true
 		org.needotrub = true
 		org.consciousness = 0

@@ -3,6 +3,22 @@ hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
 
+hg.organism.normalBloodVolume = 5000
+hg.organism.terminalBloodVolume = 2000
+
+-- Blood-dependent organism stats use a continuous formula rather than sampled
+-- lookup tables. Different systems can choose their own curve exponent, but
+-- they all become physically impossible at the same terminal blood volume.
+function hg.organism.GetBloodDeliveryFraction(blood, exponent)
+	local normalVolume = hg.organism.normalBloodVolume
+	local terminalVolume = hg.organism.terminalBloodVolume
+	local volume = math.Clamp(tonumber(blood) or normalVolume, 0, normalVolume)
+	if volume <= terminalVolume then return 0 end
+
+	local fraction = (volume - terminalVolume) / (normalVolume - terminalVolume)
+	return math.Clamp(fraction, 0, 1) ^ (tonumber(exponent) or 0.4)
+end
+
 function hg.organism.ZeroVitals(org)
 	if not org then return end
 	org.heartstop = true
@@ -12,6 +28,19 @@ function hg.organism.ZeroVitals(org)
 	org.cardiacOutput = 0
 	org.hypotension = 1
 	org.hypertension = 0
+	org.bloodO2Cap = 0
+	org.bodyoxygen = 0
+	org.perfusion = 0
+	org.brainoxygen = 0
+	org.peripheralperfusion = 0
+	org.cerebralPerfusion = 0
+	org.myocardialOxygen = 0
+	org.oxygenIntakeAvailable = false
+	org.lungsfunction = false
+	if istable(org.o2) then
+		org.o2[1] = 0
+		org.o2.curregen = 0
+	end
 end
 
 -- Wounds are owned by the organism, but both kinds of player ragdoll are
@@ -45,6 +74,24 @@ function hg.organism.KillFatalBrainDamage(org)
 	if not org or org.fatalBrainDeath then return false end
 
 	org.fatalBrainDeath = true
+	org.alive = false
+	org.needotrub = false
+	org.otrub = false
+	org.incapacitated = false
+	hg.organism.ZeroVitals(org)
+
+	local owner = org.owner
+	if IsValid(owner) and owner:IsPlayer() and owner:Alive() then
+		owner:Kill()
+	end
+
+	return true
+end
+
+function hg.organism.KillFatalBloodLoss(org)
+	if not org or org.fatalBloodLoss then return false end
+
+	org.fatalBloodLoss = true
 	org.alive = false
 	org.needotrub = false
 	org.otrub = false
@@ -514,15 +561,28 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local resilience = hg.organism.GetResilience(org)
 	local zerlkers = hg.organism.GetZerlkersResistance(org)
 	-- Resilience can soften shock effects, but it cannot create circulating
-	-- volume.  Two litres is a severe blackout range, not instant zero flow.
+	-- volume or move the terminal blood threshold.
 	local blood = math.max(org.blood or 0, 0)
-	-- Continuous blood-volume delivery: perfusion falls steadily through the
-	-- 2.5-2 L danger band and reaches zero only at terminal volume.
-	local bloodFraction = math.Clamp((blood - 1000) / (5000 - 1000), 0, 1) ^ 0.7
-	-- Improve vascular compensation while blood remains above the terminal 1 L
+	local terminalBlood = hg.organism.terminalBloodVolume or 2000
+	if blood <= terminalBlood then
+		org.bodyoxygen = 0
+		org.perfusion = 0
+		org.brainoxygen = 0
+		org.peripheralperfusion = 0
+		org.cerebralPerfusion = 0
+		org.perfusionMoveMul = 0
+		org.perfusionGripMul = 0
+		org.hypoxia = 1
+		return
+	end
+
+	-- Continuous blood-volume delivery falls steadily through the danger band
+	-- and reaches exactly zero at the shared 2 L terminal threshold.
+	local bloodFraction = hg.organism.GetBloodDeliveryFraction(blood, 0.4)
+	-- Improve vascular compensation while blood remains above the terminal
 	-- boundary. The reserve vanishes at that boundary, so Zerlkers cannot create
 	-- circulation from an empty system.
-	local lowBloodReserve = math.Clamp((blood - 1000) / 1000, 0, 1) * zerlkers * 0.35
+	local lowBloodReserve = math.Clamp((blood - terminalBlood) / 1000, 0, 1) * zerlkers * 0.35
 	bloodFraction = math.min(bloodFraction + lowBloodReserve, 1)
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
 	-- The O2 reservoir can remain nonzero after respiration fails. It is not a
