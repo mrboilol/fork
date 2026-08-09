@@ -5,11 +5,11 @@ hg.organism.module.concussion = {}
 local module = hg.organism.module.concussion
 
 local CONCUSSION_MAX = 6.0
-local DECAY_BASE = 0.025
-local DECAY_SEVERE_BONUS = 0.015
+local DECAY_BASE = 0.05
+local DECAY_SEVERE_BONUS = 0.03
 local ONSET_SPEED = 0.4
 local POST_CONCUSSION_THRESHOLD = 0.3
-local POST_CONCUSSION_DECAY = 0.008
+local POST_CONCUSSION_DECAY = 0.02
 local SECOND_IMPACT_WINDOW = 8.0
 local SECOND_IMPACT_SCALE = 0.35
 local LOC_THRESHOLD = 3.8

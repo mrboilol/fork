@@ -10,6 +10,8 @@ SWEP.JamChanceMax = 0.05
 SWEP.JamClearBaseTime = 2.5
 SWEP.JamClearMaxTime = 5.0
 SWEP.JamClearInspectLoop = 2.0
+SWEP.JamTriggerSound = "jam.ogg"
+SWEP.JamTriggerCooldown = 0.18
 
 SWEP.LowCaliberAmmo = {
 	["9x19 mm Parabellum"] = true,
@@ -67,6 +69,16 @@ function SWEP:NotifyJammed()
 	if not IsValid(owner) or not owner:IsPlayer() or not owner.Notify then return end
 
 	owner:Notify("The weapon has jammed!", 5, "jam", 0)
+end
+
+function SWEP:PlayJammedTriggerSound()
+	if CLIENT then return end
+
+	local curTime = CurTime()
+	if (self.nextJamTriggerSound or 0) > curTime then return end
+	self.nextJamTriggerSound = curTime + (self.JamTriggerCooldown or 0.18)
+
+	self:EmitSound(self.JamTriggerSound or "jam.ogg", 65, math.random(97, 103), 0.9, CHAN_WEAPON)
 end
 
 function SWEP:TryJam()

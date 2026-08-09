@@ -52,6 +52,8 @@ module[1] = function(org)
 	org.internalBleedPeak = 0
 	org.internalBleedComplication = 0
 	org.internalBleedComplicationDelay = 90
+	org.internalBleedHemothoraxRoll = nil
+	org.internalBleedHemothoraxRisk = false
 
 	org.survivalchance = 1
 	org.hemothorax = 0
@@ -281,8 +283,8 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and (hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood) < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",true,"blood2",0,nil,Color(200, 170, 170)) end
 
 	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 then
-		-- Natural production is 10 mL/s and resumes only once all bleeding stops.
-		org.blood = min(org.blood + mulTime * 10, 5000)
+		-- Natural production is 5 mL/s and resumes only once all bleeding stops.
+		org.blood = min(org.blood + mulTime * 5, 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -315,6 +317,14 @@ module[2] = function(owner, org, mulTime)
 	-- takes much longer to become dangerous.
 	local internalBleedSeverity = math.max(tonumber(org.internalBleed) or 0, 0)
 	if internalBleedSeverity > 0.05 then
+		-- Non-thoracic internal bleeding can cause a hemothorax, but it should be
+		-- an uncommon complication rather than the guaranteed result of every
+		-- bleeding episode. Keep one roll for the episode so worsening severity
+		-- raises the risk without rerolling every simulation tick.
+		if org.internalBleedHemothoraxRoll == nil then
+			org.internalBleedHemothoraxRoll = math.Rand(0, 1)
+		end
+
 		org.internalBleedDuration = (org.internalBleedDuration or 0) + mulTime
 		org.internalBleedPeak = math.max(org.internalBleedPeak or 0, internalBleedSeverity)
 
@@ -329,21 +339,23 @@ module[2] = function(owner, org, mulTime)
 
 		org.internalBleedComplicationDelay = complicationDelay
 		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, complicationTarget, mulTime / progressionTime)
+
+		local incidentalHemothoraxChance = math.Clamp(((org.internalBleedPeak or 0) - 0.5) / 9.5, 0, 1) * 0.25
+		org.internalBleedHemothoraxRisk = org.internalBleedHemothoraxRoll <= incidentalHemothoraxChance
 	else
 		org.internalBleedDuration = 0
 		org.internalBleedPeak = 0
 		org.internalBleedComplicationDelay = 90
 		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, mulTime / 90)
+		org.internalBleedHemothoraxRoll = nil
+		org.internalBleedHemothoraxRisk = false
 	end
 
-	-- Thoracic internal bleeding can collect around the lungs and heart. A
-	-- five-point internal bleed is severe enough to establish a hemothorax;
-	-- lower scores retain a smaller, delayed complication risk.
+	-- Severe internal bleeding can still compromise the pericardium. Pleural
+	-- accumulation is owned by sv_lungs so it has one progression path.
 	local thoracicSeverity = math.Clamp(internalBleedSeverity / 5, 0, 1)
 	local thoracicComplication = thoracicSeverity * (org.internalBleedComplication or 0)
-	local hemothoraxTarget = math.max(org.hemothoraxTrauma or 0, thoracicComplication * 0.7)
 	local tamponadeTarget = thoracicComplication * math.Clamp((internalBleedSeverity - 2.5) / 7.5, 0, 1) * 0.65
-	org.hemothorax = math.max(org.hemothorax or 0, math.Approach(org.hemothorax or 0, hemothoraxTarget, mulTime / 18))
 	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24))
 
 	if org.internalBleed > 2.5 and not adrenalineStabilizer and not hasAntiIschemia then

@@ -124,8 +124,8 @@ local panicattack_fire_radius = 450
 local panicattack_fire_check_delay = 1
 local hg_panic = ConVarExists("hg_panic") and GetConVar("hg_panic") or CreateConVar("hg_panic", "0", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable panic attack logic", 0, 1)
 local hg_painsound = ConVarExists("hg_painsound") and GetConVar("hg_painsound") or CreateConVar("hg_painsound", "6", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Pain audio: 0 = pain beat + reality, 1 = pain beat, 2 = agony, 3 = altpain, 4 = reality, 5 = sillypain, 6 = REM pain stack", 0, 6)
-local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = REM dying 2 + quiet itssofuckingover background", 0, 9)
-local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 1 = altotrub, 2 = sleepy, 3 = itssoover, 4 = nga im cooked, 5 = REM dying", 0, 5)
+local hg_dyingsound = ConVarExists("hg_dyingsound") and GetConVar("hg_dyingsound") or CreateConVar("hg_dyingsound", "2", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Dying audio: 0 = conscious beat + ending, 1 = conscious beat, 2 = dying, 3 = alto2, 4 = ending, 5 = sillydying, 6 = fuck, 7 = sonimcooked, 8 = REM dying 1 + 2, 9 = REM dying 2 + quiet itssofuckingover background, 10 = itshopeless", 0, 10)
+local hg_otrubsound = ConVarExists("hg_otrubsound") and GetConVar("hg_otrubsound") or CreateConVar("hg_otrubsound", "4", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Unconscious (otrub) audio: 0 = unconscious beat, 1 = altotrub, 2 = sleepy, 3 = itssoover, 4 = nga im cooked, 5 = REM dying, 6 = fuck, 7 = itshopeless", 0, 7)
 local gunfight_adrenaline_delay = 1.5
 local gunfight_adrenaline_cap = 1.5
 local debug_destroy_eyes = CreateConVar("hg_debug_destroy_eyes", "0", FCVAR_CHEAT, "Force eye destruction for visual debugging: 0 = off, 1 = left, 2 = right, 3 = both", 0, 3)
@@ -572,6 +572,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 		org.cerebralPerfusion = 0
 		org.perfusionMoveMul = 0
 		org.perfusionGripMul = 0
+		org.hypothermicSurvivalPriority = 0
 		org.hypoxia = 1
 		return
 	end
@@ -585,10 +586,13 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local lowBloodReserve = math.Clamp((blood - terminalBlood) / 1000, 0, 1) * zerlkers * 0.35
 	bloodFraction = math.min(bloodFraction + lowBloodReserve, 1)
 	local oxygen = org.o2 and math.Clamp((org.o2[1] or 0) / math.max(org.o2.range or 30, 1), 0, 1) or 1
-	-- The O2 reservoir can remain nonzero after respiration fails. It is not a
-	-- source of new oxygen, so never let it drive a recovery while curregen is 0.
+	-- Losing fresh intake does not instantly remove oxygen already carried in
+	-- blood and tissue. Cap residual delivery at the current body-O2 level so it
+	-- can preserve and then drain the reserve, but can never regenerate a patient
+	-- merely because the stored O2 value is still high.
 	local oxygenIntakeAvailable = org.oxygenIntakeAvailable ~= false
-	local oxygenDelivery = oxygenIntakeAvailable and oxygen or 0
+	local residualOxygenDelivery = math.min(oxygen, math.Clamp(org.bodyoxygen or oxygen, 0, 1))
+	local oxygenDelivery = oxygenIntakeAvailable and oxygen or residualOxygenDelivery
 	local hypercapnia = math.Clamp(math.Remap(org.CO or 0, 5, 30, 0, 1), 0, 1)
 	local brainTrauma = math.Clamp(org.brain or 0, 0, 1)
 	local venousBleed = math.max(org.venousBleed or 0, 0)
@@ -603,13 +607,23 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local arterialImpairment = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
 	local pump = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.2)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
+	-- Hypothermia progressively lowers metabolic demand and constricts peripheral
+	-- vessels. Model that as a redistribution rather than free oxygen: the effect
+	-- is bounded by the oxygen, blood and central circulation that still exist.
+	-- It begins with mild hypothermia and is fully active near 30 C; the rhythm
+	-- instability and arrest rules in sv_pulse still make deeper cold dangerous.
+	local bodyTemperature = org.temperature or 36.7
+	local hypothermicPriority = bodyTemperature < 35 and math.Clamp(math.Remap(bodyTemperature, 35, 30, 0, 1), 0, 1) or 0
+	local centralOxygenSupply = math.min(oxygenDelivery, bloodFraction)
+	org.hypothermicSurvivalPriority = hypothermicPriority
 
 	-- The lungs' O2 value is already capped by the blood-volume curve in
 	-- sv_lungs. Combining it multiplicatively with bloodFraction here counted
 	-- the volume loss a second time. Oxygen availability and circulating volume
 	-- are both hard limits, so use the weaker one once.
-	local bodyOxygenTarget = math.Clamp(math.min(oxygenDelivery, bloodFraction) * Lerp(hypercapnia, 1, 0.35), 0, 1)
-	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, 2.5)
+	local bodyOxygenTarget = math.Clamp(centralOxygenSupply * Lerp(hypercapnia, 1, 0.35), 0, 1)
+	local coldBodyOxygenLossRate = 2.5 * Lerp(hypothermicPriority, 1, 0.72)
+	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, coldBodyOxygenLossRate)
 	-- Arterial loss already lowers blood volume and the circulation target in
 	-- sv_pulse. Applying its live bleed rate again here made any open artery an
 	-- independent disorientation/otrub source instead of a blood-loss emergency.
@@ -628,18 +642,42 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Subtracting it from central flow as well made hemorrhagic shock reduce O2
 	-- twice and moved the blackout point back above 2500 mL.
 	local pressureDelivery = math.Clamp(circulationLimit - venousPenalty - internalPenalty - internalComplicationPenalty - throatPenalty * 0.22 - arterialImpairment * 0.08, 0, 1)
+	local centralFlowSupply = org.heartstop and 0 or math.min(pressureDelivery, bloodFraction)
 	-- Perfusion is blood flow. Oxygen content affects the tissue supplied by that
 	-- flow, but must not feed back into the flow value that sv_lungs uses as its
 	-- O2 cap; that loop was the remaining sudden O2 crash at moderate blood loss.
-	local perfusionTarget = pressureDelivery
-	local peripheralTarget = math.Clamp(perfusionTarget - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
+	-- Reduced whole-body flow is the price of preserving the core. Peripheral
+	-- flow falls much further, so cold patients lose movement and grip before the
+	-- protected brain and myocardium lose their remaining oxygen reserve.
+	local perfusionTarget = pressureDelivery * Lerp(hypothermicPriority, 1, 0.84)
+	local peripheralTarget = math.Clamp(pressureDelivery - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1)
+	peripheralTarget = peripheralTarget * Lerp(hypothermicPriority, 1, 0.48)
 
 	org.perfusion = updateNormalizedVital(org.perfusion, perfusionTarget, dt, 0.5, 2.8)
-	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, pump, dt)
-	local cerebralOxygenDelivery = math.min(cerebralPerfusion, org.bodyoxygen, oxygenDelivery)
+	-- Vasoconstriction can preserve a modest central pressure advantage, but it
+	-- cannot bypass absent circulation or the terminal blood-volume cutoff.
+	local centralPressureSupport = hypothermicPriority * centralFlowSupply * 0.18
+	local cerebralPerfusion = hg.organism.UpdateIntracranialPressure(org, math.Clamp(pump + centralPressureSupport, 0, 1.2), dt)
+	-- In the cold, systemic oxygen is preferentially routed toward the brain.
+	-- This lets cerebral oxygen exceed the whole-body delivery stat without ever
+	-- exceeding actual oxygen-carrying capacity.
+	local brainOxygenSupply = Lerp(hypothermicPriority, math.min(org.bodyoxygen, centralOxygenSupply), centralOxygenSupply)
+	local cerebralOxygenDelivery = math.min(cerebralPerfusion, brainOxygenSupply)
 	local brainTarget = math.Clamp(cerebralOxygenDelivery * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.82) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
-	org.brainoxygen = updateNormalizedVital(org.brainoxygen, brainTarget, dt, 0.45, 2.6)
+	local coldBrainOxygenLossRate = 2.6 * Lerp(hypothermicPriority, 1, 0.58)
+	org.brainoxygen = updateNormalizedVital(org.brainoxygen, brainTarget, dt, 0.45, coldBrainOxygenLossRate)
 	org.peripheralperfusion = updateNormalizedVital(org.peripheralperfusion, peripheralTarget, dt, 0.55, 2.8)
+
+	-- Lower cardiac metabolic demand preserves myocardial oxygen from the same
+	-- finite central supply. Recovery remains deliberately slow and impossible
+	-- without breathing, circulating blood and central flow.
+	if hypothermicPriority > 0 and centralFlowSupply > 0 then
+		local demandAdjustedCentralFlow = math.Clamp(centralFlowSupply / Lerp(hypothermicPriority, 1, 0.8), 0, 1)
+		local myocardialColdTarget = math.min(centralOxygenSupply, demandAdjustedCentralFlow)
+		if myocardialColdTarget > (org.myocardialOxygen or 0) then
+			org.myocardialOxygen = math.Approach(org.myocardialOxygen or 0, myocardialColdTarget, dt * 0.12 * hypothermicPriority)
+		end
+	end
 
 	-- A recent epinephrine dose strongly stabilizes oxygen delivery, but only
 	-- while the lungs are providing oxygen and the patient has enough blood to
@@ -655,15 +693,19 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 		org.cerebralPerfusion = math.max(org.cerebralPerfusion or 0, 0.50)
 	end
 
-	local rawMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1)
-	local rawGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1)
+	local rawMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1) * Lerp(hypothermicPriority, 1, 0.72)
+	local rawGripMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.18, 0.7, 0.35, 1), 0.35, 1) * Lerp(hypothermicPriority, 1, 0.65)
 	org.perfusionMoveMul = math.min(rawMoveMul + resilience * 0.2, 1)
 	org.perfusionGripMul = math.min(rawGripMul + resilience * 0.15, 1)
 
-	local thresholdMul = 1 - resilience * 0.25 - zerlkers * 0.25
-	local badHypoxia = org.brainoxygen < 0.45 * thresholdMul or org.cerebralPerfusion < 0.4 * thresholdMul or org.perfusion < 0.35 * thresholdMul
-	local severeHypoxia = org.brainoxygen < 0.22 * thresholdMul or org.cerebralPerfusion < 0.18 * thresholdMul or org.perfusion < 0.16 * thresholdMul
-	org.hypoxia = math.Clamp(1 - math.min(org.bodyoxygen, org.brainoxygen, org.cerebralPerfusion, org.perfusion), 0, 1)
+	-- Cold tissue tolerates a lower systemic flow because its metabolic demand is
+	-- lower. Use demand-adjusted perfusion for ischemia/death timing while keeping
+	-- the raw perfusion stat low so the physical penalty remains visible.
+	local demandAdjustedPerfusion = math.Clamp(org.perfusion / Lerp(hypothermicPriority, 1, 0.84), 0, 1)
+	local thresholdMul = (1 - resilience * 0.25 - zerlkers * 0.25) * Lerp(hypothermicPriority, 1, 0.82)
+	local badHypoxia = org.brainoxygen < 0.45 * thresholdMul or org.cerebralPerfusion < 0.4 * thresholdMul or demandAdjustedPerfusion < 0.35 * thresholdMul
+	local severeHypoxia = org.brainoxygen < 0.22 * thresholdMul or org.cerebralPerfusion < 0.18 * thresholdMul or demandAdjustedPerfusion < 0.16 * thresholdMul
+	org.hypoxia = math.Clamp(1 - math.min(org.bodyoxygen, org.brainoxygen, org.cerebralPerfusion, demandAdjustedPerfusion), 0, 1)
 	org.hypoxiaTime = badHypoxia and math.min((org.hypoxiaTime or 0) + dt * (severeHypoxia and 2.25 or 1), 120) or math.Approach(org.hypoxiaTime or 0, 0, dt * 2.5)
 	org.severeHypoxiaTime = severeHypoxia and math.min((org.severeHypoxiaTime or 0) + dt, 120) or math.Approach(org.severeHypoxiaTime or 0, 0, dt * 2)
 
@@ -671,7 +713,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Keep it tied to an actual catastrophic cause: severe blood loss, hypoxemia,
 	-- or hemotransfusion shock. A transient low-perfusion value on its own must
 	-- not quietly start systemic organ damage.
-	local systemicDelivery = math.min(org.bodyoxygen, org.perfusion, org.peripheralperfusion)
+	local demandAdjustedPeripheral = math.Clamp(org.peripheralperfusion / Lerp(hypothermicPriority, 1, 0.48), 0, 1)
+	local systemicDelivery = math.min(org.bodyoxygen, demandAdjustedPerfusion, demandAdjustedPeripheral)
 	local systemicSeverity = math.Clamp((0.55 - systemicDelivery) / 0.45, 0, 1)
 	local severeBloodLoss = (org.blood or 5000) <= 2500 or (org.internalBleed or 0) > 2.5
 	local o2Value = istable(org.o2) and (org.o2[1] or 30) or (tonumber(org.o2) or 30)

@@ -2220,6 +2220,7 @@ hg.armor.back = {
 		effect = "Impact",
 		surfaceprop = 67,
 		mass = 5,
+		underwaterOxygen = true,
 		ScrappersSlot = "Armor",
 	}
 }

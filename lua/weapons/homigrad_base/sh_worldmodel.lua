@@ -144,6 +144,11 @@ function SWEP:ChangeGunPos(dtime)
 	self.weaponAng[1] = 0
 	self.weaponAng[2] = 0
 	self.weaponAng[3] = 0
+
+	if CLIENT then
+		self.ShotMuzzleWobble = LerpAngle(hg.lerpFrameTime2(0.075, dtime), self.ShotMuzzleWobble or angle_zero, angle_zero)
+		self.ShotMuzzleOffset = LerpVector(hg.lerpFrameTime2(0.075, dtime), self.ShotMuzzleOffset or vector_origin, vector_origin)
+	end
 	
 	if ply.viewingGun and ply.viewingGun > CurTime() then
 		self.weaponAng:Add(Angle(math.sin(ply.viewingGun - CurTime()) * -5, math.sin(ply.viewingGun - CurTime()) * -5, math.cos(ply.viewingGun+1.5 - CurTime()) * 30))
@@ -345,6 +350,17 @@ function SWEP:PosAngChanges(ply, desiredPos, desiredAng, bNoAdditional, closeani
 	desiredPos = LocalToWorld(veccopy, angZero, desiredPos, angnorm)
 
 	desiredPos:Add(desiredAng:Up() * 1)
+
+	if CLIENT and not bNoAdditional then
+		local muzzleWobble = self.ShotMuzzleWobble
+		local muzzleOffset = self.ShotMuzzleOffset
+		if muzzleWobble then desiredAng:Add(muzzleWobble) end
+		if muzzleOffset then
+			desiredPos:Add(desiredAng:Forward() * muzzleOffset.x)
+			desiredPos:Add(desiredAng:Right() * muzzleOffset.y)
+			desiredPos:Add(desiredAng:Up() * muzzleOffset.z)
+		end
+	end
 	
 	local matr = Matrix()
 	--matr:SetAngles(self.LocalMuzzleAng - self.WorldAng)
@@ -1098,5 +1114,4 @@ end)
 function SWEP:ShouldDrawViewModel()
 	return false
 end
-
 

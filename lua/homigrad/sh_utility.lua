@@ -876,28 +876,49 @@ local IsValid = IsValid
 	end
 --//
 --\\ Calculate Weight 
-	function hg.CalculateWeight(ply,maxweight)
+	local weight_cache_lifetime = 0.15
+
+	function hg.GetCarryWeight(ply)
+		if not IsValid(ply) then return 0 end
+
 		local weight = 0
 
-		local weps = ply:GetWeapons()
-
-		for i,wep in ipairs(weps) do
+		for _,wep in ipairs(ply:GetWeapons()) do
 			weight = weight + (wep.weight or 1)
 		end
 
 		weight = math.max(weight - 1,0)
 
-		local ammo = ply:GetAmmo()
-		for id,count in pairs(ammo) do
-			weight = weight + (game.GetAmmoForce(id) * count) / 1500
+		for id,count in pairs(ply:GetAmmo()) do
+			local ammoName = game.GetAmmoName(id)
+			local ammoData = hg.ammotypes and hg.ammotypes[ammoName]
+			local bulletSettings = ammoData and ammoData.BulletSettings
+
+			if bulletSettings and bulletSettings.Mass then
+				weight = weight + (bulletSettings.Mass * count) / 1000
+			end
 		end
 
 		ply.armors = ply:GetNetVar("Armor",{})
 		for plc,arm in pairs(ply.armors) do
-			weight = weight + (hg.armor[plc][arm].mass or 1)
+			local armorSlot = hg.armor and hg.armor[plc]
+			local armor = armorSlot and armorSlot[arm]
+			weight = weight + (armor and armor.mass or 1)
 		end
 
+		return weight
+	end
+
+	function hg.CalculateWeight(ply,maxweight)
+		maxweight = maxweight or 140
+
+		local time = CurTime()
+		local cache = ply.hg_weight_cache
+		if cache and cache.maxweight == maxweight and cache.time > time then return cache.value end
+
+		local weight = hg.GetCarryWeight(ply)
 		local weightmul = (1 / (weight / maxweight + 1))
+		ply.hg_weight_cache = {maxweight = maxweight, time = time + weight_cache_lifetime, value = weightmul}
 		return weightmul
 	end
 --//
@@ -1509,9 +1530,12 @@ local IsValid = IsValid
 	}
 
 	hook.Add("FindUseEntity","findhguse",function(ply,heldent)
+		local pickupEnt = hg.GetPickupUseEntity and hg.GetPickupUseEntity(ply)
+		if IsValid(pickupEnt) then return pickupEnt end
 		if IsValid(heldent) and heldent:GetClass() == "button" then return heldent end
 
 		if not ply:KeyDown(IN_USE) then return false end
+
 		local eyetr = hg.eyeTrace(ply,100,nil,nil,nil,checkUse)
 
 		local ent = eyetr.Entity
@@ -1870,4 +1894,14 @@ if CLIENT then
             ply:SetHullDuck(Vector(-8, -8, 0), Vector(8, 8, 36))
         end
     end)
+end
+
+-- ZManip animations are authored for the left hand, so this helper reports
+-- that arm's current condition to shared interaction callers.
+function hg.GetPrioritizedArm(ply)
+	if not IsValid(ply) or not ply.organism then return "left", false, false end
+
+	local org = ply.organism
+	local isBroken = ((org.larm and org.larm >= 1) or org.larmdislocation) == true
+	return "left", false, isBroken
 end

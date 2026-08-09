@@ -16,6 +16,7 @@ include("cl_camera.lua")
 include("cl_optics.lua")
 include("cl_shells.lua")
 include("sh_options.lua")
+include("sh_jam.lua")
 include("sh_gp25.lua")
 
 matproxy.Add({

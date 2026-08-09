@@ -10,7 +10,9 @@ local terminalHeartRate = 300
 local peaDuration = 6
 
 local function getBloodPerfusion(blood)
-	return hg.organism.GetBloodDeliveryFraction(blood, 0.4)
+	-- Preserve enough central circulation at 3000 mL to keep an undamaged heart
+	-- out of the myocardial-ischemia band; the formula still reaches zero at 2 L.
+	return hg.organism.GetBloodDeliveryFraction(blood, 0.35)
 end
 
 local function getBloodCompensationRate(blood)
@@ -20,11 +22,11 @@ local function getBloodCompensationRate(blood)
 	-- 3000 mL before the terminal tachycardia at 2000 mL.
 	if blood >= 3000 then
 		local compensatedLoss = math.Clamp((5000 - blood) / 2000, 0, 1)
-		return 70 + compensatedLoss ^ 2 * 95 -- 165 BPM at 3000 mL
+		return 70 + compensatedLoss ^ 2 * 70 -- 140 BPM at 3000 mL
 	end
 
 	local decompensation = math.Clamp((3000 - blood) / 1000, 0, 1)
-	return 165 + decompensation ^ 1.15 * (terminalHeartRate - 165)
+	return 140 + decompensation ^ 1.5 * (terminalHeartRate - 140)
 end
 
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
@@ -110,10 +112,13 @@ local function updateHighSpeedPressureShock(owner, org, timeValue)
 end
 
 local function getPalpitationThreat(org, blood, o2Value)
-	local lowBlood = math.Clamp((4500 - blood) / 2500, 0, 1)
-	local lowCirculation = math.Clamp(org.hypotension or 0, 0, 1)
+	-- Compensated loss down to 3000 mL may cause palpitations, but must not make
+	-- those palpitations lethal on its own. Rhythm danger begins as volume falls
+	-- below 3 L or pressure crosses into genuinely severe hypotension.
+	local lowBlood = math.Clamp((3000 - blood) / 1000, 0, 1)
+	local lowCirculation = math.Clamp(((org.hypotension or 0) - 0.5) / 0.5, 0, 1)
 	local hypoxia = math.Clamp((12 - o2Value) / 12, 0, 1)
-	local shock = math.Clamp((org.shock or 0) / 60, 0, 1)
+	local shock = math.Clamp(((org.shock or 0) - 20) / 40, 0, 1)
 	local heartDamage = math.Clamp(org.heart or 0, 0, 1)
 	local temperatureStress = math.max(
 		math.Clamp((34 - (org.temperature or 36.7)) / 6, 0, 1),
@@ -431,7 +436,12 @@ module[2] = function(owner, org, timeValue)
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and circulation > 0.6 then
 		org.cardiacOutput = Approach(org.cardiacOutput, Clamp(getBloodVolume(org) * heart, 0, 1), timeValue / 20)
 	end
-	local myocardialTarget = Clamp(oxygenation * bloodVolume * Clamp(circulation * (92 / 70), 0, 1.2), 0, 1)
+	-- Oxygenation, blood volume, and circulation already contain the same
+	-- hemorrhage penalty. Multiplying them made a healthy heart at 3000 mL see
+	-- roughly one-third oxygen, causing an arrhythmia/fibrillation death spiral.
+	-- The weakest link should cap delivery once without compounding blood loss.
+	local circulationDelivery = Clamp(circulation * (92 / 70), 0, 1.2)
+	local myocardialTarget = Clamp(math.min(oxygenation, bloodVolume, circulationDelivery), 0, 1)
 	if org.heartstop and defibGrace then myocardialTarget = math.max(myocardialTarget, 0.25) end
 	org.myocardialOxygen = Approach(org.myocardialOxygen or 1, myocardialTarget, timeValue / 8)
 	local hypotensionTarget = Clamp(Remap(circulation, 0.98, 0.22, 0, 1), 0, 1)

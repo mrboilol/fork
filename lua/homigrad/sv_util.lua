@@ -640,7 +640,7 @@ function hg.ExplosionEffect(pos, dis, dmg)
 end
 
 -- MANUAL PICKUP
-local hlguns = {
+local hlguns = hg.PickupBlockedWeapons or {
 	["weapon_357"] = true,
 	["weapon_pistol"] = true,
 	["weapon_crossbow"] = true,
@@ -653,6 +653,7 @@ local hlguns = {
 	["weapon_smg1"] = true,
 	["weapon_stunstick"] = true
 }
+hg.PickupBlockedWeapons = hlguns
 
 hook.Add( "PlayerCanPickupWeapon", "CanPickup", function( ply, weapon )
 	if hlguns[weapon:GetClass()] then return false end

@@ -96,9 +96,22 @@ end
 
 
 
+function hg.organism.HasUnderwaterOxygen(org)
+	local owner = org and org.owner
+	if not IsValid(owner) then return false end
+
+	local armors = owner.armors or owner:GetNetVar("Armor", {})
+	local backArmor = istable(armors) and armors.back
+	local armorData = backArmor and hg.armor and hg.armor.back and hg.armor.back[backArmor]
+	return armorData and armorData.underwaterOxygen == true or false
+end
+
+
+
 function hg.organism.OxygenateBlood(org)
 
-	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea * 0.8)) * org.o2.regen / 4 * (org.owner:WaterLevel() < 3 and 1 or 0)// * (1 - org.pneumothorax)
+	local canDrawBreath = org.owner:WaterLevel() < 3 or hg.organism.HasUnderwaterOxygen(org)
+	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea * 0.8)) * org.o2.regen / 4 * (canDrawBreath and 1 or 0)// * (1 - org.pneumothorax)
 
 end
 
@@ -430,6 +443,12 @@ module[2] = function(owner, org, timeValue)
 
 	local bodyTemperature = org.temperature or 36.7
 	local coldO2Stress = bodyTemperature < 35 and math.Clamp(math.Remap(bodyTemperature, 35, 26, 0, 1), 0, 1) or 0
+	-- Shivering raises demand early in hypothermia, then deeper cooling reduces
+	-- whole-body metabolism and oxygen consumption. This is protective only while
+	-- the lungs and circulation still provide oxygen; the cold lung penalties
+	-- below continue to limit regeneration and maximum O2.
+	local shiveringO2Demand = bodyTemperature < 35 and math.Clamp(math.Remap(bodyTemperature, 35, 32, 0, 0.25), 0, 0.25) or 0
+	local coldMetabolicPreservation = bodyTemperature < 32 and math.Clamp(math.Remap(bodyTemperature, 32, 28, 0, 0.45), 0, 0.45) or 0
 	local altitudeO2K = 1
 	org.altitudeMeters = 0
 	if ZCityWind and ZCityWind.Config and ZCityWind.Config.AtmosphereEnabled and ZCityWind.GetAtmosphereAtZ then
@@ -438,7 +457,8 @@ module[2] = function(owner, org, timeValue)
 		altitudeO2K = math.Clamp(pressureRatio, 0.35, 1)
 	end
 	org.airPressureRatio = altitudeO2K
-	local losing_oxy = timeValue * math.Clamp(org.o2[1] / 30, 0.25, 1) * (1 + coldO2Stress * 0.75)
+	local coldOxygenUseMul = (1 + shiveringO2Demand) * (1 - coldMetabolicPreservation)
+	local losing_oxy = timeValue * math.Clamp(org.o2[1] / 30, 0.25, 1) * coldOxygenUseMul
 
 	org.losing_oxy = losing_oxy
 
@@ -505,12 +525,14 @@ module[2] = function(owner, org, timeValue)
 	
 
 	local inwater = bit_band(util_PointContents(head),CONTENTS_WATER) == CONTENTS_WATER
+	local scubaOxygenActive = owner:IsPlayer() and inwater and hg.organism.HasUnderwaterOxygen(org)
+	org.scubaOxygenActive = scubaOxygenActive
 
 	
 
 	local success = owner:IsBerserk() or (not org.heartstop and not org.respiratoryArrest and org.alive and not (org.brain >= 0.4 and math.random(10 - (org.brain * 10)) < 4) and org.lungsfunction)
 
-	if success and owner:IsPlayer() and inwater then success = false end
+	if success and owner:IsPlayer() and inwater and not scubaOxygenActive then success = false end
 
 	if success and org.choking then org.needfake = true success = false end
 
@@ -539,29 +561,38 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	-- Hemothorax from internal bleeding is delayed by the severity-scaled
-	-- complication state built in sv_blood. Moderate episodes choose one side;
-	-- catastrophic or advanced episodes can fill both pleural spaces. The public
-	-- aggregate remains compatible with the HUD and existing treatment code.
+	-- complication state built in sv_blood. Damage to a thoracic organ guarantees
+	-- this progression, while unrelated internal bleeding must pass the single
+	-- complication roll for its current episode. Moderate episodes choose one
+	-- side; catastrophic or advanced episodes can fill both pleural spaces.
 	local internalBleedVal = org.internalBleed or 0
 	local internalBleedPeak = math.max(org.internalBleedPeak or internalBleedVal, internalBleedVal)
 	local bleedComplication = math.Clamp(org.internalBleedComplication or 0, 0, 1)
+	local thoracicOrganDamage = math.Clamp(math.max(
+		org.heart or 0,
+		org.trachea or 0,
+		org.lungsL[1] or 0,
+		org.lungsR[1] or 0
+	), 0, 1)
+	local canDevelopHemothorax = thoracicOrganDamage > 0.01 or org.internalBleedHemothoraxRisk == true
 	if needleActive then
 		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
 		org.hemothoraxL = max(org.hemothoraxL - timeValue / 120, 0)
 		org.hemothoraxR = max(org.hemothoraxR - timeValue / 120, 0)
-	elseif internalBleedVal > 0.1 and bleedComplication > 0 then
+	elseif canDevelopHemothorax and (internalBleedVal > 0.1 or thoracicOrganDamage > 0.01) then
 		if org.internalBleedLungSide != "L" and org.internalBleedLungSide != "R" then
 			org.internalBleedLungSide = math.random(2) == 1 and "L" or "R"
 		end
 
 		local severityK = math.Clamp((internalBleedPeak - 0.2) / 2.8, 0, 1)
-		-- Pleural blood should become noticeable before the direct blood-loss
-		-- component becomes overwhelming. The complication target still caps the
-		-- final severity, while this makes its buildup feel responsive.
-		local fillTime = Lerp(severityK, 85, 30)
+		-- Pleural filling is deliberately measured in minutes. Severe injuries
+		-- progress faster, but no longer jump from a routine bleed to respiratory
+		-- failure in under a minute.
+		local fillTime = Lerp(severityK, 360, 150)
 		local bilateral = internalBleedPeak >= 2.5 or bleedComplication >= 0.7
-		local targetL = (bilateral or org.internalBleedLungSide == "L") and bleedComplication or 0
-		local targetR = (bilateral or org.internalBleedLungSide == "R") and bleedComplication or 0
+		local hemothoraxTarget = math.Clamp(math.max(bleedComplication, thoracicOrganDamage * 0.65), 0, 1)
+		local targetL = (bilateral or org.internalBleedLungSide == "L") and hemothoraxTarget or 0
+		local targetR = (bilateral or org.internalBleedLungSide == "R") and hemothoraxTarget or 0
 
 		org.hemothoraxL = math.Approach(org.hemothoraxL, targetL, timeValue / fillTime)
 		org.hemothoraxR = math.Approach(org.hemothoraxR, targetR, timeValue / fillTime)

@@ -1,8 +1,20 @@
 AddCSLuaFile()
 --
-function SWEP:Initialize_Spray()
+function SWEP:ResetTransientAimState()
 	self.EyeSpray = Angle(0, 0, 0)
+	self.EyeSprayVel = Angle(0, 0, 0)
+	self.sprayAngles = Angle(0, 0, 0)
 	self.SprayI = 0
+	self.LastRecoilDirection = Angle(0, 0, 0)
+	self.recoilWobbleAmp = 0
+	self.ShotMuzzleWobble = Angle(0, 0, 0)
+	self.ShotMuzzleOffset = Vector(0, 0, 0)
+	self.cache_trace = nil
+	self:SetLastShootTime(0)
+end
+
+function SWEP:Initialize_Spray()
+	self:ResetTransientAimState()
 	self.dmgStack = 0
 	self.dmgStack2 = 0
 end
@@ -109,6 +121,21 @@ function SWEP:PrimarySpread()
 			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1) * screenRecoilMul)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
+
+		-- The old recoil system kicked the muzzle itself, not only the camera.
+		-- Keep this render-side so authoritative shot spread remains predictable;
+		-- sh_worldmodel applies the offset and eases it back after every shot.
+		local muzzleKickMul = math.Clamp(mul, 0.08, 3.5)
+		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(
+			-math.Rand(0.12, 0.42) * muzzleKickMul,
+			math.Rand(-0.34, 0.34) * muzzleKickMul,
+			math.Rand(-0.2, 0.2) * muzzleKickMul
+		)
+		self.ShotMuzzleOffset = (self.ShotMuzzleOffset or Vector(0, 0, 0)) + Vector(
+			-math.Rand(0.12, 0.38) * muzzleKickMul,
+			math.Rand(-0.16, 0.16) * muzzleKickMul,
+			math.Rand(-0.1, 0.1) * muzzleKickMul
+		)
 
 		local prank3 = math.Rand(-self.Primary.Force2,self.Primary.Force2) / (self.Primary.Force2 != 0 and self.Primary.Force2 or 1) * 2
 		local angleprikol = Angle(0,0,prank3)

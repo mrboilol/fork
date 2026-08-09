@@ -106,6 +106,49 @@ SWEP.AmmoTypes2 = {
 	},
 }
 
+function SWEP:IsManuallyCycledWeapon()
+	if self.ManualAction ~= nil then return self.ManualAction end
+	if self.IsBoltAction or self.IsPumpAction then return true end
+
+	if self.Base == "weapon_m4super" and self.AutomaticDraw == false then
+		return true
+	end
+
+	local instructions = self.Instructions
+	if isstring(instructions) then
+		instructions = string.lower(instructions)
+		if string.find(instructions, "bolt-action", 1, true) or
+			string.find(instructions, "bolt action", 1, true) or
+			string.find(instructions, "pump-action", 1, true) or
+			string.find(instructions, "pump action", 1, true) then
+			return true
+		end
+	end
+
+	return false
+end
+
+function SWEP:GetManualActionBlockReason(ply)
+	if not self:IsManuallyCycledWeapon() then return end
+	if not IsValid(ply) then return end
+
+	local org = ply.organism
+	if not org then return end
+
+	local leftBroken = org.larmamputated or (org.larm or 0) >= 1 or org.larmdislocation or org.larmdislocated
+	if leftBroken then
+		return "I need my left arm to cycle this."
+	end
+
+	if IsValid(ply.FakeRagdoll) and IsValid(ply.FakeRagdoll.ConsLH) then
+		return "I can't cycle it while my left hand is busy."
+	end
+end
+
+function SWEP:CanRackOrReloadManualAction(ply)
+	return self:GetManualActionBlockReason(ply or self:GetOwner()) == nil
+end
+
 function SWEP:OnReloaded()
 	if self.newammotype then
 		self:ApplyAmmoChanges(self.newammotype)
@@ -536,14 +579,19 @@ function SWEP:Shoot(override)
 	self:PrimaryShootPre()
 
 	local owner = self:GetOwner()
+	local primary = self.Primary
 	if owner:IsNPC() then self.drawBullet = true end
 
 	if !override and IsValid(owner) and owner:IsPlayer() and self:IsSprinting() then return false end
 	if !override and !self:CanPrimaryAttack() then return false end
 	if !override and !self:CanUse(true) then return false end
+	if self.GetJammed and self:GetJammed() then
+		primary.Next = CurTime() + (self.JamTriggerCooldown or 0.18)
+		if SERVER and self.PlayJammedTriggerSound then self:PlayJammedTriggerSound() end
+		return false
+	end
 	if CLIENT and owner != LocalPlayer() and !override then return false end
 
-	local primary = self.Primary
 	if override then self.drawBullet = true end
 	
 	if !self.drawBullet or (self:Clip1() == 0 and !override) then
@@ -563,7 +611,7 @@ function SWEP:Shoot(override)
 	
 	if CLIENT then self:SetClip1(self:GetNWInt("Clip1")) end
 	
-	self:PrimaryShoot()
+	if self:PrimaryShoot() == false then return false end
 	self:PrimaryShootPost()
 	self:ShotgunAfterShot()
 	if self.ManualCycle then
@@ -609,9 +657,10 @@ SWEP.ShootAnimMul = 2
 SWEP.shot2 = 0
 SWEP.shot = 0
 function SWEP:PrimaryShoot()
-	local ammotype = hg.ammotypeshuy[self.Primary.Ammo]
-	local ammoSettings = ammotype and ammotype.BulletSettings
-	if ammoSettings and ammoSettings.IsBlank then
+	local ammoSettings = self:GetBulletSettings()
+	if not ammoSettings then return false end
+
+	if ammoSettings.IsBlank then
 		self.dwr_reverbDisable = nil
 		self.shooanim = self.ShootAnimMul
 
@@ -629,8 +678,12 @@ function SWEP:PrimaryShoot()
 
 	self:EmitShoot()
 	--if SERVER or self:IsClient() then
-		local ok, err = pcall(self.FireBullet, self)
-		if not ok then ErrorNoHalt("[HG] FireBullet error: " .. tostring(err)) end
+		local ok, result = pcall(self.FireBullet, self)
+		if not ok then
+			ErrorNoHalt("[HG] FireBullet error: " .. tostring(result))
+			return false
+		end
+		if result == false then return false end
 	--end
 	self.dwr_reverbDisable = nil
 	self.shooanim = self.ShootAnimMul
@@ -646,6 +699,7 @@ function SWEP:PrimaryShoot()
 	self.drawBullet = false
 	if self.AutomaticDraw then self:Draw() end
 	self:PrimarySpread()
+	if SERVER and self.TryJam then self:TryJam() end
 end
 
 SWEP.SightSlideOffset = 1
@@ -820,7 +874,8 @@ end
 local col = Color(0, 0, 0)
 local col2 = Color(0, 0, 0)
 local dynamicmags
-local instructions 
+local instructions
+local hg_weird_mags
 if CLIENT then
 	surface.CreateFont("AmmoFont",{
 		font = "Courier Prime",
@@ -841,6 +896,12 @@ if CLIENT then
 
 	dynamicmags = CreateClientConVar("hg_dynamic_mags", "0", true, false, "Enables dynamic ammo show when shooting",0,1)
 	instructions = CreateClientConVar("hg_instructions","1", true, false, "Enables gun instructions",0,1)
+end
+
+if SERVER then
+	hg_weird_mags = ConVarExists("hg_weirdmags") and GetConVar("hg_weirdmags") or CreateConVar("hg_weirdmags", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Use old block magazine ammo HUD instead of bullet icons", 0, 1)
+elseif CLIENT then
+	hg_weird_mags = GetConVar("hg_weirdmags")
 end
 
 function SWEP:DrawHUDAdd()
@@ -927,7 +988,6 @@ local function DrawBullet(matIcon, x, y, size, cColor)
 end
 
 if CLIENT then
-	local scrW, scrH = ScrW(), ScrH()
 	local lastShoot = 0
 	local StopShowBullet = false
 	local WhiteColor = Color(200,200,200,255)
@@ -941,22 +1001,40 @@ if CLIENT then
 	local ammoCheck = 0
 	local color_bg = Color(0,0,0,150)
 	local ammoLongCheck = 0
+
+	local function GetAmmoHudPosition(self, scrW, scrH, hudHPos)
+		local posX = scrW * 0.75
+		local posY = scrH * hudHPos
+		local att = self.GetMuzzleAtt and self:GetMuzzleAtt(nil, true, true)
+		local screen = att and att.Pos and att.Pos:ToScreen()
+
+		if screen and screen.visible ~= false and screen.x > -scrW * 0.25 and screen.x < scrW * 1.25 and screen.y > -scrH * 0.25 and screen.y < scrH * 1.25 then
+			posX = math.Clamp(screen.x + scrW * 0.035, scrW * 0.56, scrW * 0.9)
+			posY = math.Clamp(screen.y + scrH * 0.045, scrH * 0.42, scrH * 0.88)
+		end
+
+		return posX, posY
+	end
+
 	SWEP.DrawAmmoMetods = {
 		["Default"] = function(self,texture)
+			local scrW, scrH = ScrW(), ScrH()
 			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
+			if clipsize <= 0 then clipsize = 1 end
 			local clip = self:Clip1()
 			local owner = self:GetOwner()
 			local shoot = CurTime() - self:LastShootTime()
 			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
 			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
-			local posX = scrW*0.75
-			local posX2 = scrW*0.8
 			local HudHPos = 0.8
+			local showDynamic = true
+			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, HudHPos)
+			local posX2 = posX + scrH * 0.11
 			
 			lastShoot = LerpFT(0.5,lastShoot, shoot > 0 and 1 or 0)
 			lastShootFor = lastShoot
 			self.hudinspect = self.hudinspect or 0
-			if self.hudinspect > CurTime() or (clip < clipsize/3 and lastShoot < 0.9 and dynamicmags:GetBool()) or self:KeyDown(IN_RELOAD) then
+			if self.hudinspect > CurTime() or (clip < clipsize/3 and lastShoot < 0.9 and showDynamic) or self:KeyDown(IN_RELOAD) then
 				ammoCheck = CurTime() + 1	
 			end
 			ammoLongCheck = LerpFT(0.025,ammoLongCheck, (self:KeyDown(IN_RELOAD) or self.hudinspect > CurTime()) and 5 or 0)
@@ -973,16 +1051,16 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",scrW*0.8 + 2, scrH*HudHPos + scrH*0.05 + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",posX2 + 2, posY + scrH*0.05 + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
 				coloruse.a = 210*math.max(ammoLongCheck-4,0)
-				draw.SimpleText(text,"AmmoFont",scrW*0.8, scrH*HudHPos + scrH*0.05,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText(text,"AmmoFont",posX2, posY + scrH*0.05,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 
 			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
-			local Yellow = (( clipsize/clip )-1)/(clipsize/5)
+			local Yellow = clip > 0 and ((clipsize / clip) - 1) / (clipsize / 5) or 1
 			--print(Yellow)
 			color_bg.r = 55*Yellow
 			--draw.RoundedBox(0,scrW*0.75-(scrH*0.12/2),scrH*0.72,scrH*0.12,scrH*0.18,ColorAlpha(color_black,50))
@@ -991,8 +1069,8 @@ if CLIENT then
 			local PosLerp = Lerp(math.ease.OutExpo(lerpAmmoCheck),150,0)
 			--print(PosLerp)
 			if clip > 0 then
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,scrH*(HudHPos) + 2,scrH*0.08, color_bg)
-				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,scrH*(HudHPos),scrH*0.08, WhiteColor)
+				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + 2 + PosLerp,posY + 2,scrH*0.08, color_bg)
+				DrawBullet(texture,posX - (scrH*0.16)+(scrH*0.08)*(1+lastShoot) + PosLerp,posY,scrH*0.08, WhiteColor)
 				--if lastShoot < 0.2 then StopShowBullet = true end
 			end
 			--if StopShowBullet then
@@ -1010,13 +1088,13 @@ if CLIENT then
 				local PosAdjust = math.max(PosLerp - i*15,0)
 				--print(PosAdjust)
 				if i < 2 then
-					DrawBullet(texture,posX + 2 + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,scrH*((HudHPos) + i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX + 2 + PosAdjust,posY + scrH*(i*(0.026*lastShoot))+2,scrH*0.08, color_bg)
+					DrawBullet(texture,posX + PosAdjust,posY + scrH*(i*(0.026*lastShoot)),scrH*0.08, WhiteColor)
 				else
 					color_bg.a = (210 - (20 * i)) * lerpAmmoCheck
 					WhiteColor.a = (210 - (20 * i) )* lerpAmmoCheck
-					DrawBullet(texture,posX+2 + PosAdjust,scrH*((HudHPos - 0.026) + i*0.026+(0.026*lastShootFor))+2,scrH*0.08, color_bg)
-					DrawBullet(texture,posX + PosAdjust,scrH*((HudHPos - 0.026) + i*0.026+(0.026*lastShootFor)),scrH*0.08, WhiteColor)
+					DrawBullet(texture,posX+2 + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor))+2,scrH*0.08, color_bg)
+					DrawBullet(texture,posX + PosAdjust,posY + scrH*((-0.026) + i*0.026+(0.026*lastShootFor)),scrH*0.08, WhiteColor)
 				end
 			end
 
@@ -1025,14 +1103,68 @@ if CLIENT then
 				coloruse.g = 0
 				coloruse.b = 0
 				coloruse.a = 210*lerpAmmoCheck
-				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2, scrH*HudHPos + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText("+"..magCount,"AmmoFont",posX2 + 2, posY + 2,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 				coloruse.r = 255
 				coloruse.g = 255
 				coloruse.b = 255
 				coloruse.a = 210*lerpAmmoCheck
-				draw.SimpleText("+"..magCount,"AmmoFont",posX2, scrH*HudHPos,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
+				draw.SimpleText("+"..magCount,"AmmoFont",posX2, posY,coloruse,TEXT_ALIGN_LEFT,TEXT_ALIGN_CENTER)
 			end
 			--draw.SimpleText("lastShoot: "..lastShoot,"Default",0,0)
+		end,
+		["MagazineBlocks"] = function(self)
+			local scrW, scrH = ScrW(), ScrH()
+			local clipsize = self:GetMaxClip1() + (self.OpenBolt and 0 or 1)
+			if clipsize <= 0 then clipsize = 1 end
+
+			local owner = self:GetOwner()
+			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, 0.8)
+			local sizeX = (clipsize == 1 and scrH / 15 or scrW / 40) * scale
+			local sizeY = (clipsize == 1 and scrH / 80 or scrH / 10) * scale
+			local clip = math.max(self:Clip1(), 0)
+			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
+			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
+
+			self.hudinspect = self.hudinspect or 0
+			if self.hudinspect > CurTime() or self:KeyDown(IN_RELOAD) or dynamicmags:GetBool() then
+				ammoCheck = CurTime() + 1
+			end
+
+			lerpAmmoCheck = LerpFT((ammoCheck > CurTime()) and 0.2 or 0.1, lerpAmmoCheck, ammoCheck > CurTime() and 1 or 0)
+			if lerpAmmoCheck <= 0.01 then return end
+
+			local ammoLeft = math.ceil(clip / clipsize * sizeY)
+			col:SetUnpacked(LerpColor(clip / clipsize, yellow, color_white))
+			col.a = 255 * lerpAmmoCheck
+			DrawBlurRect(posX - sizeX * (clipsize ~= 1 and 0.2 or 0.3), posY - sizeY * (clipsize ~= 1 and 0.1 or 0.7), (sizeX + sizeX * (clipsize ~= 1 and 0.12 or 0.2)) * math.max(math.min(magCount + 1, clipsize ~= 1 and 5 or 4), 1.3), sizeY + (clipsize ~= 1 and 20 or 60), 7, col.a * 5)
+
+			surface.SetDrawColor(col)
+			surface.DrawRect(posX, posY - ammoLeft + sizeY, sizeX, ammoLeft)
+			surface.DrawOutlinedRect(posX - 5, posY - 5, sizeX + 10, sizeY + 10, 1)
+
+			local magX = posX + (clipsize == 1 and scrW / 40 or scrW / 50)
+			local magY = posY + (clipsize == 1 and scrH / 70 or scrH / 20)
+			local smallX = sizeX / 2
+			local smallY = sizeY / 2
+			local reserveAmmo = ammo
+
+			for i = 1, math.min(magCount, 3) do
+				local magAmmo = math.min(clipsize, reserveAmmo)
+				reserveAmmo = reserveAmmo - magAmmo
+				local reserveLeft = math.ceil(magAmmo / clipsize * smallY)
+
+				col2:SetUnpacked(LerpColor(magAmmo / clipsize, yellow, color_white))
+				col2.a = 255 * lerpAmmoCheck
+				surface.SetDrawColor(col2)
+				surface.DrawRect(magX + (smallX + 15) * i, magY - reserveLeft + smallY, smallX, reserveLeft)
+				surface.DrawOutlinedRect(magX - 5 + (smallX + 15) * i, magY - 5, smallX + 10, smallY + 10, 1)
+			end
+
+			if magCount > 3 then
+				local extraMags = "+" .. (magCount - 3)
+				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4 + 1, magY + smallX / 2 + 1, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4, magY + smallX / 2, Color(255, 255, 255, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			end
 		end
 	}
 
@@ -1041,7 +1173,10 @@ if CLIENT then
 	function SWEP:DrawHUD()
 		if not IsValid(self:GetOwner()) then return end
 		local ammotype = hg.ammotypeshuy[self.Primary.Ammo] and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings and hg.ammotypeshuy[self.Primary.Ammo].BulletSettings.Icon or matPistolAmmo
-		self.DrawAmmoMetods[self.AmmoDrawMetod](self,ammotype)
+		hg_weird_mags = hg_weird_mags or GetConVar("hg_weirdmags")
+		local drawMethod = hg_weird_mags and hg_weird_mags:GetBool() and "MagazineBlocks" or self.AmmoDrawMetod
+		local drawFunc = self.DrawAmmoMetods[drawMethod] or self.DrawAmmoMetods.Default
+		drawFunc(self, ammotype)
 		
 		self.isscoping = false
 		if self.attachments then
@@ -2085,6 +2220,42 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalAng2[3] = self.AdditionalAng2[3] + animpos2 * 10 * (self.podkid or 1)
 			self.AdditionalAng2[1] = self.AdditionalAng2[1] + animpos2 * -5 * (self.podkid or 1)
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * 1 * (self.podkid or 1)
+		end
+
+		-- Restore the old dynamic recoil tail: the weapon keeps moving after the
+		-- initial kick, with heavier guns settling more slowly and injured arms
+		-- producing a wider wobble. This changes the muzzle pose instead of adding
+		-- another screen punch.
+		if CLIENT then
+			local sinceShot = CurTime() - (self:LastShootTime() or 0)
+			local firing = sinceShot >= 0 and sinceShot < 0.22
+			local weaponMass = math.max((self.weight or 1) + (self.addweight or 0), 0.5)
+			local recoilForce = math.max(self.Primary.Force2 or self.Primary.Force or 0, 0)
+			local forceScale = math.Clamp(recoilForce / (55 * math.sqrt(weaponMass)), 0.12, 1.25)
+			local org = ply.organism or {}
+			local armInjury = math.Clamp((org.larm or 0) + (org.rarm or 0)
+				+ (org.larmamputated and 1 or 0) + (org.rarmamputated and 1 or 0), 0, 3)
+			local stanceMul = self:IsResting() and 0.25 or self:IsZoom() and 0.65 or ply:Crouching() and 0.8 or 1
+			local burstMul = 0.75 + math.Clamp((self.SprayI or 0) / 8, 0, 1) * 0.45
+			local wobbleTarget = firing and forceScale * burstMul * (1 + armInjury * 0.22) * stanceMul or 0
+			local recoveryRate = math.Clamp(0.055 / (1 + armInjury * 0.35 + weaponMass * 0.08), 0.018, 0.05)
+			self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.4 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
+
+			if (self.recoilWobbleAmp or 0) > 0.0001 then
+				local t = CurTime()
+				local amp = self.recoilWobbleAmp
+				local longGun = not self:IsPistolHoldType() and not self.PistolKinda
+				local wobX = math.sin(t * 1.65) * 0.65 + math.sin(t * 2.95) * 0.35
+				local wobY = math.cos(t * 2.05) * 0.65 + math.cos(t * 3.45) * 0.35
+				local wobZ = math.sin(t * 2.45) * 0.65 + math.cos(t * 3.2) * 0.35
+
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 2.15 or 1.55)
+				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.045 or 0.1)
+				self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.32 or 1.05)
+				self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
+				self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.03
+				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
+			end
 		end
 	end
 

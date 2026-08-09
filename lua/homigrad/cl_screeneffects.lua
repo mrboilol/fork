@@ -83,6 +83,7 @@ local otrubSoundPaths = {
 local OtrubModeStation
 local activeOtrubMode
 local AltRemDyingStation
+local ItsHopelessStation
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
@@ -779,6 +780,10 @@ local function stopthings()
 		AltRemDyingStation:Stop()
 		AltRemDyingStation = nil
 	end
+	if IsValid(ItsHopelessStation) then
+		ItsHopelessStation:Stop()
+		ItsHopelessStation = nil
+	end
 
 	if IsValid(SillydyingStation) then
 		SillydyingStation:Stop()
@@ -1176,6 +1181,20 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				station:Play()
 				station:SetTime(math.min(math.Rand(0, station:GetLength()), 119))
 				AltRemDyingStation = station
+				station:EnableLooping(true)
+			end
+		end)
+	end
+
+	-- Shared by dying mode 10 and OTRUB mode 7. Keep this channel alive at zero
+	-- volume between states so losing consciousness does not restart the track.
+	if canRetrySound("ItsHopelessStation", ItsHopelessStation) then
+		sound.PlayFile("sound/itshopeless.mp3", "noblock noplay", function(station)
+			if IsValid(station) then
+				station:SetVolume(0)
+				station:Play()
+				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				ItsHopelessStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -1807,6 +1826,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(AltRemDyingStation) then
 				AltRemDyingStation:SetVolume(0)
 			end
+			if IsValid(ItsHopelessStation) then
+				ItsHopelessStation:SetVolume(0)
+			end
 
 			if dyingMode == 0 then
 				-- Default: both conscioustypebeat and itsallcomingtoanend play
@@ -2072,6 +2094,35 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(NoiseStation2Dying) then
 					NoiseStation2Dying:SetVolume(math.Clamp(consciousVol, 0, alternateDyingForegroundVolume))
 				end
+			elseif dyingMode == 10 then
+				-- Only itshopeless.mp3, no screen shake.
+				if IsValid(NoiseStation2) then
+					NoiseStation2:SetVolume(0)
+				end
+				if IsValid(EndStation) then
+					EndStation:SetVolume(0)
+				end
+				if IsValid(DyingStation) then
+					DyingStation:SetVolume(0)
+				end
+				if IsValid(Alto2Station) then
+					Alto2Station:SetVolume(0)
+				end
+				if IsValid(AltpainStation) then
+					AltpainStation:SetVolume(0)
+				end
+				if IsValid(SillydyingStation) then
+					SillydyingStation:SetVolume(0)
+				end
+				if IsValid(ItssooverStation) then
+					ItssooverStation:SetVolume(0)
+				end
+				if IsValid(SonimCookedStation) then
+					SonimCookedStation:SetVolume(0)
+				end
+				if IsValid(ItsHopelessStation) then
+					ItsHopelessStation:SetVolume(consciousVol)
+				end
 			end
 			if dyingMode != 7 and IsValid(SonimCookedStation) then
 				SonimCookedStation:SetVolume(0)
@@ -2081,6 +2132,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 			if dyingMode != 9 and IsValid(AltRemDyingStation) then
 				AltRemDyingStation:SetVolume(0)
+			end
+			if dyingMode != 10 and IsValid(ItsHopelessStation) then
+				ItsHopelessStation:SetVolume(0)
 			end
 			if dyingMode != 8 and dyingMode != 9 and IsValid(NoiseStation2Dying) then
 				NoiseStation2Dying:SetVolume(0)
@@ -2118,6 +2172,9 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(AltRemDyingStation) then
 				AltRemDyingStation:SetVolume(0)
 			end
+			if IsValid(ItsHopelessStation) then
+				ItsHopelessStation:SetVolume(0)
+			end
 		end
 		
 		if o2 > 20 and org.otrub then
@@ -2139,9 +2196,14 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				end)
 			end
 
+			local sharedOtrubStation = otrubMode == 6 and ItssooverStation or otrubMode == 7 and ItsHopelessStation
 			if otrubMode == 0 then
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(otrubVol) end
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+			elseif otrubMode == 6 or otrubMode == 7 then
+				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
+				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(0) end
+				if IsValid(sharedOtrubStation) then sharedOtrubStation:SetVolume(otrubVol) end
 			else
 				if IsValid(NoiseStation) then NoiseStation:SetVolume(0) end
 
@@ -2171,9 +2233,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 				if IsValid(OtrubModeStation) then OtrubModeStation:SetVolume(otrubVol) end
 			end
 			-- Do not let a dying-mode station bleed into the selected OTRU sound.
-			if IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
+			-- Modes 6 and 7 deliberately reuse their dying channel so playback
+			-- continues from the exact point where consciousness was lost.
+			if otrubMode != 6 and IsValid(ItssooverStation) then ItssooverStation:SetVolume(0) end
 			if IsValid(RemDying1Station) then RemDying1Station:SetVolume(0) end
 			if IsValid(AltRemDyingStation) then AltRemDyingStation:SetVolume(0) end
+			if otrubMode != 7 and IsValid(ItsHopelessStation) then ItsHopelessStation:SetVolume(0) end
 			if IsValid(NoiseStation2Dying) then NoiseStation2Dying:SetVolume(0) end
 		else
 			if IsValid(NoiseStation) then

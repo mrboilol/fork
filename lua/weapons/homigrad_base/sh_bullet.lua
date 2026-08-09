@@ -1,5 +1,20 @@
 ﻿AddCSLuaFile()
 --
+function SWEP:GetBulletSettings()
+	local primary = self.Primary
+	local ammoName = primary and primary.Ammo
+	local ammo = hg.ammotypeshuy and hg.ammotypeshuy[ammoName]
+	local settings = ammo and ammo.BulletSettings
+	if settings then return settings end
+
+	if not self.hg_missingBulletSettingsWarned then
+		self.hg_missingBulletSettingsWarned = true
+		ErrorNoHalt(string.format("[HG] Missing BulletSettings for %s ammo %q; shot cancelled.\n", self:GetClass(), tostring(ammoName)))
+	end
+
+	return nil
+end
+
 local surface_hardness = {
 	[MAT_METAL] = 1,
 	[MAT_COMPUTER] = 0.9,
@@ -608,7 +623,8 @@ function SWEP:FireBullet()
     	ent = hg.GetCurrentCharacter(owner)
 	end
 
-    local ammotype = hg.ammotypeshuy[self.Primary.Ammo].BulletSettings
+	local ammotype = self:GetBulletSettings()
+	if not ammotype then return false end
     
 	if SERVER and !timer.Exists("ShootWeaponAfterDeath"..self:EntIndex()) then
 		timer.Create("ShootWeaponAfterDeath"..self:EntIndex(), 0.1, 1, function()
@@ -730,29 +746,38 @@ function SWEP:FireBullet()
     bullet.Damage = ammotype.Damage or primary.Damage or 25
 	bullet.Damage = bullet.Damage * 0.95 * (self.Supressor and (self.SupressorDamageMultiplier or 0.9) or 1) * (self.DamageMultiplier or 1)
 
-	local baseSpread = (ammotype.Spread or self.Primary.Spread or 0) * 3
-	if self.ShotgunTubeReload and self.ShotgunManualCycle then
-		baseSpread = baseSpread * (self.ShotgunSpreadMul or 1 / 3)
-	end
-	local accuracyMul = 1
-	if isply then
-		if isnumber(baseSpread) then baseSpread = math.max(baseSpread, 0.00075) end
-		local speed = owner:GetVelocity():Length2D()
-		accuracyMul = accuracyMul * (1 + math.Clamp(speed / 220, 0, 1) * 0.9)
-		accuracyMul = accuracyMul * (owner:Crouching() and 0.75 or 1)
-		accuracyMul = accuracyMul * (self:IsZoom() and 0.72 or 1)
-		accuracyMul = accuracyMul * (owner:OnGround() and 1 or 2.25)
-		accuracyMul = accuracyMul * (self:IsResting() and 0.45 or 1)
-		local organism = owner.organism
-		if organism then
-			accuracyMul = accuracyMul * (1 + ((organism.larm or 0) + (organism.rarm or 0)) * 0.65)
+	if numbullet > 1 then
+		-- Shotgun pellets still need a cone; posture and movement control its size.
+		local baseSpread = (ammotype.Spread or self.Primary.Spread or 0) * 3
+		if self.ShotgunTubeReload and self.ShotgunManualCycle then
+			baseSpread = baseSpread * (self.ShotgunSpreadMul or 1 / 3)
 		end
-		local readiness = self.weaponReadiness or 1
-		local stability = self.weaponStability or 0
-		accuracyMul = accuracyMul * Lerp(readiness, 2.2, 1)
-		accuracyMul = accuracyMul * Lerp(stability, 1, 0.82)
+
+		local accuracyMul = 1
+		if isply then
+			if isnumber(baseSpread) then baseSpread = math.max(baseSpread, 0.00075) end
+			local speed = owner:GetVelocity():Length2D()
+			accuracyMul = accuracyMul * (1 + math.Clamp(speed / 220, 0, 1) * 0.9)
+			accuracyMul = accuracyMul * (owner:Crouching() and 0.75 or 1)
+			accuracyMul = accuracyMul * (self:IsZoom() and 0.72 or 1)
+			accuracyMul = accuracyMul * (owner:OnGround() and 1 or 2.25)
+			accuracyMul = accuracyMul * (self:IsResting() and 0.45 or 1)
+			local organism = owner.organism
+			if organism then
+				accuracyMul = accuracyMul * (1 + ((organism.larm or 0) + (organism.rarm or 0)) * 0.65)
+			end
+			local readiness = self.weaponReadiness or 1
+			local stability = self.weaponStability or 0
+			accuracyMul = accuracyMul * Lerp(readiness, 2.2, 1)
+			accuracyMul = accuracyMul * Lerp(stability, 1, 0.82)
+		end
+		bullet.Spread = baseSpread * accuracyMul
+	else
+		-- Recoil, sway and spray already move the physical weapon/camera. Do not
+		-- add a second invisible cone after resolving the live muzzle direction.
+		bullet.Spread = vector_origin
+		bullet.NoHiddenSpread = true
 	end
-	bullet.Spread = baseSpread * accuracyMul
 	bullet.Num = 1
 	bullet.Pellets = numbullet
 	
@@ -926,7 +951,8 @@ if CLIENT then
 		end
 		if self.EjectAng then _,ang = LocalToWorld(vecZero,self.EjectAng,vecZero,ang) end
 
-		local ammotype = hg.ammotypeshuy[self.Primary.Ammo].BulletSettings
+		local ammotype = self:GetBulletSettings()
+		if not ammotype then return end
 		local ejectAng = attmuzle.Ang
 		if self.EjectAddAng then
 			_,ejectAng = LocalToWorld(vecZero,self.EjectAddAng,vecZero,attmuzle.Ang) 

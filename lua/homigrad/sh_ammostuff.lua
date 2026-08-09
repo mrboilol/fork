@@ -2873,6 +2873,127 @@ hg.ammotypes = {
 			tranquilizer = true,
 		}
 	},
+	["9x21mm"] = {
+		name = "9x21 mm",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 110,
+		maxcarry = 80,
+		minsplash = 1,
+		maxsplash = 1,
+		BulletSettings = {
+			Damage = 31,
+			Force = 31,
+			Penetration = 11,
+			Shell = "9x21",
+			Speed = 410,
+			Diameter = 9,
+			Mass = 6.7,
+			Icon = matPistolAmmo
+		}
+	},
+	[".366tkm_bpm"] = {
+		name = ".366 TKM BP-M",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 160,
+		maxcarry = 120,
+		minsplash = 8,
+		maxsplash = 8,
+		BulletSettings = {
+			Damage = 60,
+			Force = 55,
+			Penetration = 8,
+			Shell = "366tkm",
+			Speed = 730,
+			Diameter = 9.58,
+			Mass = 12,
+			Icon = matRfileAmmo
+		}
+	},
+	["6.8x51fmj"] = {
+		name = "6.8x51 mm FMJ",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 250,
+		maxcarry = 120,
+		minsplash = 10,
+		maxsplash = 10,
+		BulletSettings = {
+			Damage = 72,
+			Force = 70,
+			Penetration = 22,
+			Shell = "762x51",
+			Speed = 914,
+			Diameter = 6.8,
+			Mass = 9.5,
+			Icon = matRfileAmmo
+		}
+	},
+	[".300blk"] = {
+		name = ".300 Blackout",
+		allowed = true,
+		dmgtype = DMG_BULLET,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 180,
+		maxcarry = 120,
+		minsplash = 8,
+		maxsplash = 8,
+		BulletSettings = {
+			Damage = 55,
+			Force = 50,
+			Penetration = 12,
+			Shell = "762x39",
+			Speed = 720,
+			Diameter = 7.62,
+			Mass = 12.5,
+			Icon = matRfileAmmo
+		}
+	},
+	[".50bmgslap"] = {
+		name = ".50 BMG Slap",
+		allowed = true,
+		dmgtype = DMG_BULLET + DMG_AIRBOAT,
+		tracer = TRACER_LINE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 500,
+		maxcarry = 60,
+		minsplash = 20,
+		maxsplash = 20,
+		BulletSettings = {
+			Damage = 350,
+			Force = 200,
+			Penetration = 80,
+			Shell = "50cal",
+			Speed = 1100,
+			Diameter = 12.7,
+			Mass = 50,
+			Icon = matRfileAmmo
+		}
+	},
+	["grenade_40x381"] = {
+		name = "40mm Grenade M381",
+		dmgtype = DMG_BLAST,
+		tracer = TRACER_NONE,
+		plydmg = 0,
+		npcdmg = 0,
+		force = 150,
+		maxcarry = 20,
+		minsplash = 10,
+		maxsplash = 5
+	},
 	["dihbattery"] = {
 		name = "D.I.H Battery",
 		allowed = true,
@@ -2889,6 +3010,37 @@ hg.ammotypes = {
 
 local ammotypes = hg.ammotypes
 local ammoents = {
+	["9x21mm"] = {
+		Icon = "vgui/hud/hmcd_round_9x19",
+		Material = "models/hmcd_ammobox_9",
+		Scale = 1
+	},
+	[".366tkm_bpm"] = {
+		Icon = "vgui/hud/366fmj.png",
+		Model = "models/items/ammo_76239.mdl",
+		Scale = 1
+	},
+	["6.8x51fmj"] = {
+		Icon = "vgui/hud/hmcd_round_556",
+		Material = "models/hmcd_ammobox_556",
+		Scale = 1
+	},
+	[".300blk"] = {
+		Icon = "vgui/hud/545zcity",
+		Material = "models/hmcd_ammobox_556",
+		Scale = 1
+	},
+	[".50bmgslap"] = {
+		Material = "models/hmcd_ammobox_792",
+		Scale = 1.6,
+		Color = Color(155, 122, 75),
+		Count = 10
+	},
+	["grenade_40x381"] = {
+		Model = "models/items/ar2_grenade.mdl",
+		Scale = 1,
+		Count = 5
+	},
 	["5.56x45mm"] = {
 		Icon = "vgui/hud/556fmj.png",
 		Material = "models/hmcd_ammobox_556",
