@@ -165,18 +165,11 @@ surface.CreateFont("HomigradFontVSmall", {
 })
 
 surface.CreateFont("ZCity_Veteran", {
-<<<<<<< HEAD
 	font = "Typewriter",
 	size = ScreenScale(9),
 	weight = 800,
 	antialias = true,
 	shadow = true
-=======
-	font = "x14y24pxHeadUpDaisy",
-	size = ScreenScale(10),
-	weight = 500,
-	outline = false
->>>>>>> 8e5ef9bd (some changes i already made)
 })
 
 local w, h

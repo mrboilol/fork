@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 if SERVER then AddCSLuaFile() end
-=======
-﻿if SERVER then AddCSLuaFile() end
->>>>>>> 8e5ef9bd (some changes i already made)
 SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Gravity Gun"
 SWEP.Instructions = "The Zero Point Energy Field Manipulator. \nCommonly known as the Gravity Gun, is a Tractor beam-type weapon designed for handling hazardous materials.\n\nLMB To Punt RMB To Pull"
@@ -935,12 +931,8 @@ local function q(self, u, v, w)
 		hg.AddForceRag(u, 2, self:GetOwner():EyeAngles():Forward() * 42500, -0.2)
 		hg.AddForceRag(u, 0, self:GetOwner():EyeAngles():Forward() * 42500, -0.2)
 		hg.LightStunPlayer(u, 5)
-<<<<<<< HEAD
         x:SetDamage(x:GetDamage() / 2)
         u:TakeDamageInfo(x)
-=======
-        u:TakeDamageInfo((x / 2))
->>>>>>> 8e5ef9bd (some changes i already made)
     elseif u:IsNPC() or u:IsNextBot() then
         if u:GetShouldServerRagdoll() ~= true then u:SetShouldServerRagdoll(true) end
         u:TakeDamageInfo(x)
@@ -1837,8 +1829,4 @@ if SERVER then
     function SWEP:RemoveGlow()
         self:SetGlow(false)
     end
-<<<<<<< HEAD
 end
-=======
-end
->>>>>>> 8e5ef9bd (some changes i already made)

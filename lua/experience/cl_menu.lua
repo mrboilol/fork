@@ -84,12 +84,9 @@ function EXP.AccountMenu( ply )
     needCallback = true
     EXP.OpenMenu( ply )
 end
-<<<<<<< HEAD:gamemodes/zcity/gamemode/libraries/experience/cl_menu.lua
-=======
 
 concommand.Add("xp_menu", function()
     if IsValid(LocalPlayer()) then
         EXP.AccountMenu(LocalPlayer())
     end
 end)
->>>>>>> 8e5ef9bd (some changes i already made):lua/experience/cl_menu.lua

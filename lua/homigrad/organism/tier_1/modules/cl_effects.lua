@@ -1,5 +1,3 @@
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
-=======
 local hg = hg or {}
 if CLIENT then
 	print("Concussion module loaded.")
@@ -194,21 +192,17 @@ local META2 = FindMetaTable("Entity")
 function META2:IsStimulated()
 	return false
 end
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 hg.underberserk = hg.underberserk or false
 hg.underberserk2 = hg.underberserk2 or false
 hg.berserkStartTime = hg.berserkStartTime or 0
 hg.berserkStartTime2 = hg.berserkStartTime2 or 0
 hg.berserkStation = hg.berserkStation or nil
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 hg.berserkMusicPlayed = hg.berserkMusicPlayed or false
 hg.berserkMusicLoading = hg.berserkMusicLoading or false
 hg.berserkFadeOut = hg.berserkFadeOut or false
 hg.berserkFadeOutStartTime = hg.berserkFadeOutStartTime or 0
 hg.berserkLastActivationTime = hg.berserkLastActivationTime or 0
 
-=======
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 local tab = {
 	[ "$pp_colour_addr" ] = 0,
 	[ "$pp_colour_addg" ] = 0,
@@ -235,7 +229,6 @@ local cc = Material( "effects/shaders/merc_chromaticaberration" )
 local offset = CreateClientConVar("berserk_offset", "0.85", true, false, "Set berserk music offset from start", 0, 5)
 local bpm = CreateClientConVar("berserk_bpm", "70", true, false, "Set berserk effect bpm", 1, 280)
 local path = CreateClientConVar("berserk_path", "sound/zbattle/pharmacia.mp3", true, false, "Set berserk effect music path")
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 -- These replicated convars are created by sv_berserk.lua, so an admin's
 -- setting selects the alternate mode for every connected client.
 local altberserk = GetConVar("hg_altberserk") or CreateClientConVar("hg_altberserk", "0", true, false, "Enable alternative berserk mode", 0, 1)
@@ -293,26 +286,17 @@ local function startBerserkMusic(musicPath)
 	end)
 end
 
-=======
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	local organism = lply:Alive() and lply.organism
 	if !organism then
 		hg.underberserk = false
 		hg.underberserk2 = false
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 
 		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
 		hg.berserkStation = nil
 		hg.berserkFadeOut = false
 		hg.berserkMusicPlayed = false
 
-=======
-		if IsValid(hg.berserkStation) then
-			hg.berserkStation:Stop()
-			hg.berserkStation = nil
-		end
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 		hg.notificationFont = "HuyFont"
 		hg.berserkIntensity = 0
 		return
@@ -326,7 +310,6 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		end
 
 		hg.underberserk = true
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 		hg.berserkMusicPlayed = false
 		hg.berserkLastActivationTime = SysTime()
 		if not hg.berserkActivationSoundPlayed then
@@ -339,15 +322,11 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 			end
 		end
 
-=======
-		surface.PlaySound("zbattle/deathsample.ogg")
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 		hg.berserkStartTime = SysTime()
 		local part = CreateParticleSystem( LocalPlayer(), "[2]sparkle1", PATTACH_POINT_FOLLOW, 1)
 		hg.currentNotification = nil
 		hg.notifications = {}
 		hg.CreateNotificationBerserk("I feel...")
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 
 		local disorientedDuration = altberserk3:GetBool() and 0 or altberserk:GetBool() and 11 or 3.95
 		timer.Simple(disorientedDuration, function()
@@ -358,20 +337,10 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 			for i = 1, 30 do
 				timer.Simple(i/120,function()
 					ViewPunch(AngleRand(-1,1))
-=======
-		timer.Simple(3.95, function()
-			if IsValid(part) then
-				part:StopEmission( false, true, false )
-			end
-			for i = 1, 120 do
-				timer.Simple(i/90,function()
-					ViewPunch(AngleRand(-1.5,1.5))
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 				end)
 			end
 			hg.underberserk = false
 			hg.underberserk2 = true
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 
 			-- Prevent music from playing again if it already played during this berserk session
 			if not hg.berserkMusicPlayed then
@@ -382,12 +351,6 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 				hg.berserkFadeOut = false
 			end
 
-=======
-			sound.PlayFile(path:GetString(), "noblock", function(channel)
-				hg.berserkStation = channel
-				channel:EnableLooping(true)
-			end)
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 			hg.currentNotification = nil
 			hg.notifications = {}
 			hg.CreateNotificationBerserk("GREAT.")
@@ -396,7 +359,6 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	elseif berserk < 0.0001 then
 		hg.underberserk = false
 		hg.underberserk2 = false
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 		hg.berserkActivationSoundPlayed = false
 		hg.berserkLastActivationTime = 0
 		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
@@ -404,12 +366,6 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.berserkFadeOut = false
 		hg.berserkMusicPlayed = false
 
-=======
-		if IsValid(hg.berserkStation) then
-			hg.berserkStation:Stop()
-			hg.berserkStation = nil
-		end
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 		hg.notificationFont = "HuyFont"
 		hg.berserkIntensity = 0
 	end
@@ -420,12 +376,8 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		tab[ "$pp_colour_addr" ] = (intensity / 20) * altMultiplier
 		tab[ "$pp_colour_brightness" ] = (intensity / 20) * altMultiplier
 		DrawColorModify(tab)
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 		DrawBloom( 0.65, (intensity * 2) * altMultiplier, 9, 9, 1, 1, (intensity / 32) * altMultiplier, 0.2, 0.2 )
 
-=======
-		DrawBloom( 0.65, intensity * 4, 9, 9, 1, 1, intensity / 16, 0.2, 0.2 )
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 		render.UpdateScreenEffectTexture()
 			cc:SetFloat("$c0_x", ((3.5 - intensity) * altMultiplier) * 1.5)
 			cc:SetInt("$c0_y", 1)
@@ -433,7 +385,6 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		render.DrawScreenQuad()
 	end
 	if hg.underberserk2 and IsValid(hg.berserkStation) then
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 		--local intensity = ((hg.berserkStartTime2 + SysTime()) / 60) * 70 % 1
 		--intensity = math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
 		local currentBpm = getBerserkBPM()
@@ -441,18 +392,12 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
 		-- Guard against NaN from invalid station time
 		if intensity ~= intensity then intensity = 0 end
-=======
-		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * bpm:GetInt())
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 		intensity = (intensity - math.Round(intensity)) % 1
 		intensity = math.Clamp((intensity * 0.25 + 0.75), 0, 1)
 		intensity = math.ease.InExpo(intensity) * berserkClamped * 2--math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 		-- Guard against NaN from easing function
 		if intensity ~= intensity then intensity = 0 end
 
-=======
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 		tab2[ "$pp_colour_mulr" ] = (1.5 * math.min(1, berserk * 4)) + (intensity / 5)
 		tab2[ "$pp_colour_addr" ] = (0.1 * math.min(1, berserk * 4)) + intensity / 64
 		tab2[ "$pp_colour_colour" ] = 1 - math.Clamp(intensity, 0, 0.9)
@@ -533,16 +478,9 @@ hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 end)
 local META = FindMetaTable("Player")
 function META:IsBerserk()
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 	if !self:Alive() then return false end
 
 	return hg.underberserk2 or false
-=======
-	if !IsValid(self) then return false end
-	if self:IsPlayer() and not self:Alive() then return false end
-	local org = self.organism
-	return org and org.berserkActive2 or false
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 end
 local META2 = FindMetaTable("Entity")
 function META2:IsBerserk()
@@ -591,7 +529,6 @@ hook.Add("PostDrawTranslucentRenderables", "berserkSky", function(depth, drawsky
 		local sun_info = util.GetSunInfo()
 		if sun_info != nil then HM_sky_material:SetVector("$sunnormal", sun_info.direction) end
 		HM_sky_material:SetFloat("$duskscale",math.abs(math.sin(CurTime()*1.5))*1)
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 		-- Fix division by zero / NaN
 		local duskIntensity = 0
 		if hg.berserkIntensity and hg.berserkIntensity > 0.001 then
@@ -600,9 +537,6 @@ hook.Add("PostDrawTranslucentRenderables", "berserkSky", function(depth, drawsky
 		HM_sky_material:SetFloat("$duskintensity", duskIntensity)
 
 		--print(hg.berserkIntensity)
-=======
-		HM_sky_material:SetFloat("$duskintensity",0.2*hg.berserkIntensity/(hg.berserkIntensity/3))
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua
 		cam.Start3D(vector_origin, EyeAngles())
 			render.SetMaterial(HM_sky_material)
 			cam.IgnoreZ(true)
@@ -610,7 +544,6 @@ hook.Add("PostDrawTranslucentRenderables", "berserkSky", function(depth, drawsky
 		cam.End3D()
 	end
 end)
-<<<<<<< HEAD:lua/homigrad/organism/tier_1/modules/cl_berserk.lua
 
 hook.Add("Player_Death", "berserkCleanup", function(ply)
 	if ply ~= LocalPlayer() then return end
@@ -631,5 +564,3 @@ hook.Add("Player_Death", "berserkCleanup", function(ply)
 	hg.berserkIntensity = 0
 	hg.berserkClamped = 0
 end)
-=======
->>>>>>> 8e5ef9bd (some changes i already made):lua/homigrad/organism/tier_1/modules/cl_effects.lua

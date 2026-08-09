@@ -16,7 +16,6 @@ hook.Add("Player Think", "Berserk", function(ply, time, dtime)
         local plyPos = ply:GetPos()
         for _, v in ipairs(ents.FindInSphere(plyPos, 64)) do
             if v == ply then continue end
-<<<<<<< HEAD
             local isPlayer = v:IsPlayer()
             local Phys = isPlayer and v:GetPhysicsObject() or v:GetPhysicsObjectNum(0)
 
@@ -25,23 +24,11 @@ hook.Add("Player Think", "Berserk", function(ply, time, dtime)
             end
 
             local AimVec = (v:GetPos() - plyPos):GetNormalized()
-=======
-            local Phys = v:IsPlayer() and v:GetPhysicsObject() or v:GetPhysicsObjectNum(0)
-            if v:IsPlayer() then
-                v:ViewPunch(Angle(-5,0,0))
-            end
-            local AimVec = (v:GetPos() - ply:GetPos()):GetNormalized()
->>>>>>> 8e5ef9bd (some changes i already made)
             local force = velocity / 800000
             if IsValid(Phys) then
-<<<<<<< HEAD
                 if isPlayer then v:SetVelocity(AimVec * 500 * force) end
                 Phys:ApplyForceOffset(AimVec * 500 * force, plyPos)
 
-=======
-                if v:IsPlayer() then v:SetVelocity(AimVec * 500 * force) end
-                Phys:ApplyForceOffset(AimVec * 500 * force, ply:GetPos())
->>>>>>> 8e5ef9bd (some changes i already made)
                 v:SetPhysicsAttacker(ply, 5)
             end
         end

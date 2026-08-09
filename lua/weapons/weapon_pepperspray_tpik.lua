@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 --tpiss pepperspray
 
 if SERVER then AddCSLuaFile() end
@@ -9,14 +8,6 @@ local sprayDrain = CreateConVar("pepperspray_drain_per_tick", "1", FCVAR_REPLICA
 SWEP.PrintName = "Pepper Spray"
 SWEP.Instructions = "Pick a number from one to ten."
 SWEP.Category = "ZCity Other"
-=======
-if SERVER then AddCSLuaFile() end
-SWEP.Base = "weapon_tpik_base"
-local sprayRange = CreateConVar("pepperspray_range", "160", FCVAR_REPLICATED + FCVAR_ARCHIVE, "Effective range of the pepper spray")
-SWEP.PrintName = "Pepper Spray"
-SWEP.Instructions = "Non-lethal self-defense tool. Causes temporary blindness and irritation."
-SWEP.Category = "ZCity"
->>>>>>> 8e5ef9bd (some changes i already made)
 SWEP.Spawnable = true
 SWEP.AdminOnly = false
 SWEP.Slot = 1
@@ -70,14 +61,14 @@ sound.Add({
     sound = "weapons/pepperspray/shake.wav"
 })
 
-<<<<<<< HEAD
 local function StopSpraying(self)
     if self.IsSpraying then
         self:PlayAnim("stop_spray")
     end
     self:SetNWBool("IsSpraying", false)
     self.IsSpraying = false
-=======
+end
+
 local function GetSprayTarget(ent)
     if not IsValid(ent) then return nil end
     if ent.organism then return ent end
@@ -127,23 +118,18 @@ local function GetExposureProfile(owner, ent, tr)
     end
 
     return eyeSeverity * rangeFrac, airwaySeverity * rangeFrac, faceHit
->>>>>>> 8e5ef9bd (some changes i already made)
 end
 
 function SWEP:PrimaryAttack()
     if self:GetNextPrimaryFire() > CurTime() then return end
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
-<<<<<<< HEAD
     self.SprayAmount = self.SprayAmount or sprayCapacity:GetFloat()
     if owner:KeyDown(IN_ATTACK) then
         if self.SprayAmount <= 0 then
             StopSpraying(self)
             return
         end
-=======
-    if owner:KeyDown(IN_ATTACK) then
->>>>>>> 8e5ef9bd (some changes i already made)
         self:SetNextPrimaryFire(CurTime() + 0.05)
         self:SetNWBool("IsSpraying", true)
         if not self.IsSpraying then
@@ -151,10 +137,7 @@ function SWEP:PrimaryAttack()
             self.IsSpraying = true
         end
         if SERVER then
-<<<<<<< HEAD
             self.SprayAmount = math.max(self.SprayAmount - sprayDrain:GetFloat(), 0)
-=======
->>>>>>> 8e5ef9bd (some changes i already made)
             local tr = util.TraceLine({
                 start = owner:GetShootPos(),
                 endpos = owner:GetShootPos() + owner:GetAimVector() * sprayRange:GetFloat(),
@@ -163,33 +146,6 @@ function SWEP:PrimaryAttack()
             local dist = tr.StartPos:Distance(tr.HitPos)
             if tr.Hit then
                 local ent = tr.Entity
-<<<<<<< HEAD
-                local org = ent.organism or (ent:IsPlayer() and IsValid(ent.FakeRagdoll) and ent.FakeRagdoll.organism)
-                if org then
-                    local isFace = false
-                    if tr.HitGroup == HITGROUP_HEAD then
-                        isFace = true
-                        local headBone = ent:LookupBone("ValveBiped.Bip01_Head1")
-                        if headBone then
-                            local bonePos, boneAng = ent:GetBonePosition(headBone)
-                            local hitPos = tr.HitPos
-                            local localHitPos = (hitPos - bonePos):GetNormalized()
-                            local dRight = localHitPos:Dot(boneAng:Right())
-                            if dRight < 0.2 then isFace = true end
-                        end
-                    end
-                    if isFace then
-                        org.painadd = (org.painadd or 0) + 1.2
-                        org.disorientation = math.min((org.disorientation or 0) + 2.5, 14)
-                        if ent:IsPlayer() then
-                            local curExposure = ent:GetNWFloat("PS_Exposure", 0)
-                            ent:SetNWFloat("PS_Exposure", curExposure + 0.09)
-                            ent:SetNWFloat("PS_LastHitTime", CurTime())
-                            local curTint = ent:GetNWFloat("PS_LingeringTint", 0)
-                            ent:SetNWFloat("PS_LingeringTint", math.min(curTint + 22, 100))
-                        end
-                    end
-=======
                 local target = GetSprayTarget(ent)
                 local org = IsValid(target) and target.organism or nil
                 if org then
@@ -214,17 +170,12 @@ function SWEP:PrimaryAttack()
                         end
                     end
 
->>>>>>> 8e5ef9bd (some changes i already made)
                     hg.send_bareinfo(org)
                 end
             end
         end
     else
-<<<<<<< HEAD
         StopSpraying(self)
-=======
-        self:SetNWBool("IsSpraying", false)
->>>>>>> 8e5ef9bd (some changes i already made)
     end
 end
 if CLIENT then
@@ -233,8 +184,6 @@ if CLIENT then
     local offY = CreateClientConVar("pepperspray_offset_y", "3", true, false, "Spray offset Right")
     local offZ = CreateClientConVar("pepperspray_offset_z", "-6", true, false, "Spray offset Up")
     local sndDelay = CreateClientConVar("pepperspray_sound_delay", "0.04", true, false, "Delay between spray sound loops")
-<<<<<<< HEAD
-=======
     local function EmitSprayCone(emitterObj, muzzle, dir, aimang)
         local right = aimang:Right()
         local up = aimang:Up()
@@ -290,7 +239,6 @@ if CLIENT then
         end
     end
 
->>>>>>> 8e5ef9bd (some changes i already made)
     hook.Add("Think", "PepperSprayParticles", function()
         for _, swep in ipairs(ents.FindByClass("weapon_pepperspray_tpik")) do
             if swep:GetNWBool("IsSpraying", false) then
@@ -308,53 +256,17 @@ if CLIENT then
                              + aimang:Up() * offZ:GetFloat()
                 local dir = aimang:Forward()
                 swep.NextParticle = swep.NextParticle or 0
-<<<<<<< HEAD
-                if swep.NextParticle < CurTime() then
-                    swep.NextParticle = CurTime() + 0.03
-                    local p = emitter:Add("effects/splash2", muzzle)
-                    if p then
-                        p:SetVelocity(dir * math.Rand(400, 600) + VectorRand() * 30)
-                        p:SetDieTime(math.Rand(0.4, 0.6))
-                        p:SetStartAlpha(180)
-                        p:SetEndAlpha(0)
-                        p:SetStartSize(math.Rand(1, 2))
-                        p:SetEndSize(math.Rand(8, 12))
-                        p:SetRoll(math.Rand(0, 360))
-                        p:SetRollDelta(math.Rand(-5, 5))
-                        p:SetColor(255, 150, 0)
-                        p:SetAirResistance(150)
-                        p:SetGravity(Vector(0, 0, -100))
-                        p:SetLighting(false)
-                    end
-=======
                 swep.NextMistParticle = swep.NextMistParticle or 0
                 if swep.NextParticle < CurTime() then
                     swep.NextParticle = CurTime() + 0.02
                     EmitSprayCone(emitter, muzzle, dir, aimang)
                     EmitSprayCone(emitter, muzzle + dir * 2, dir, aimang)
->>>>>>> 8e5ef9bd (some changes i already made)
                     local trImpact = util.TraceLine({
                         start = muzzle,
                         endpos = muzzle + dir * sprayRange:GetFloat(),
                         filter = owner
                     })
                     if trImpact.Hit then
-<<<<<<< HEAD
-                        local p = emitter:Add("effects/splash2", trImpact.HitPos + trImpact.HitNormal * 2)
-                        if p then
-                            p:SetVelocity(trImpact.HitNormal * math.Rand(1, 3))
-                            p:SetDieTime(math.Rand(15, 25))
-                            p:SetStartAlpha(220)
-                            p:SetEndAlpha(0)
-                            p:SetStartSize(math.Rand(3, 5))
-                            p:SetEndSize(math.Rand(5, 7))
-                            p:SetRoll(math.Rand(0, 360))
-                            p:SetColor(255, 130, 0)
-                            p:SetGravity(Vector(0, 0, -5))
-                        end
-                    end
-                end
-=======
                         for i = 1, 2 do
                             local p = emitter:Add("effects/splash2", trImpact.HitPos + trImpact.HitNormal * 1.5)
                             if p then
@@ -396,7 +308,6 @@ if CLIENT then
                         EmitLingeringMist(emitter, farCloudPos, dir, 1.0, false)
                     end
                 end
->>>>>>> 8e5ef9bd (some changes i already made)
                 swep.NextSoundPlayCL = swep.NextSoundPlayCL or 0
                 if swep.NextSoundPlayCL < CurTime() then
                     swep:EmitSound("PepperSpray.Loop", 65, 100, 1, CHAN_WEAPON)
@@ -410,13 +321,7 @@ function SWEP:ThinkAdd()
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
     if self.IsSpraying and not owner:KeyDown(IN_ATTACK) then
-<<<<<<< HEAD
         StopSpraying(self)
-=======
-        self:SetNWBool("IsSpraying", false)
-        self:PlayAnim("stop_spray")
-        self.IsSpraying = false
->>>>>>> 8e5ef9bd (some changes i already made)
     end
 end
 function SWEP:PreDrawViewModel(vm, wep, ply)
@@ -430,16 +335,8 @@ function SWEP:SecondaryAttack()
 end
 function SWEP:Initialize()
     self:SetHold(self.HoldType)
-<<<<<<< HEAD
     self.SprayAmount = sprayCapacity:GetFloat()
     self:InitAdd()
 end
 function SWEP:InitAdd()
 end
-=======
-    self:InitAdd()
-end
-function SWEP:InitAdd()
-end
-
->>>>>>> 8e5ef9bd (some changes i already made)
