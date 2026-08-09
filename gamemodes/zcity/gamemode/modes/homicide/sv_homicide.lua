@@ -2013,6 +2013,9 @@ end
 function MODE:RoundStart()
 	MODE.StartRoundTime = CurTime()
 	MODE.RoleChooseRound = false
+
+	MODE.TraitorWord = MODE.TraitorWord or MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
+	MODE.TraitorWordSecond = MODE.TraitorWordSecond or MODE.TraitorWords[math.random(1, #MODE.TraitorWords)]
 	
 
 	self.roundStartType = self.Type
