@@ -568,7 +568,7 @@ if SERVER then
 	Damage data cacher for fast damage info builds
 	---------------------------------------------------------------------------]]
 	function vFireSetDamageData(ent)
-		if ent.IsPlayer() then
+		if ent:IsPlayer() then
 			ent.vFireDamageData = {dmgMul = 10, dmgType = DMG_BURN}
 		elseif ent:IsNPC() then
 			ent.vFireDamageData = {dmgMul = 5, dmgType = DMG_DIRECT}

@@ -53,7 +53,59 @@ SWEP.ShouldDeleteOnFullUse = false
 
 SWEP.showstats = true
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
+SWEP.HoldType = "slam"
+
+sound.Add({
+	name = "pshiksnd",
+	channel = CHAN_AUTO,
+	volume = 0.02,
+	level = 65,
+	pitch = {5555, 5555},
+	sound = "snd_jack_sss.wav",
+})
+
+function SWEP:CanPrimaryAttack()
+	return true
+end
+
+function SWEP:InitAdd()
+	self:SetDose(1)
+	self.modeValues = {
+		[1] = 1
+	}
+end
+
+function SWEP:Deploy()
+	if self.DeploySounds and #self.DeploySounds > 0 then
+		self.DeploySnd = self.DeploySounds[math.random(#self.DeploySounds)]
+	end
+	local snd = self.DeploySnd
+	self.DeploySnd = ""
+	local base = weapons.GetStored("weapon_tpik_base")
+	if base and base.Deploy then
+		local ret = base.Deploy(self)
+		if SERVER and snd and snd ~= "" and not self._deploySndPlayed and self:GetOwner() and not self:GetOwner().noSound then
+			self._deploySndPlayed = true
+			self:GetOwner():EmitSound(snd, 65, math.random(95, 105))
+		end
+		return ret
+	end
+	return true
+end
+
+function SWEP:Holster()
+	self._deploySndPlayed = false
+	self:SetHealingOther(false)
+	self.setlh = true
+	self.healing = false
+	self.callback = nil
+	hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+	self._wasInUse = false
+	self._injectStartTime = nil
+	self._slowed = false
+	self._animStarted = false
+	return true
+end
 
 function SWEP:Think()
 	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
@@ -117,14 +169,9 @@ end
 		hook.Remove("Think", "AnimCallback" .. self:EntIndex())
 		if SERVER then
 			if self.modeValues[1] > 0 then
-				self.reverseanim = true
+				self:ReverseAnimToIdle("use")
 			else
 				self:PlayAnim("idle")
-			end
-		end
-		if CLIENT then
-			if self.modeValues[1] > 0 then
-				self.reverseanim = true
 			end
 		end
 	end
@@ -175,5 +222,164 @@ end
 			-- owner:SelectWeapon("weapon_hands_sh")
 			-- self:Remove()
 		end
+	end
+
+	self:ThinkReverseAnimToIdle(curTime)
+end
+
+function SWEP:SetHandPos(noset)
+	if self:GetHealingOther() then
+		self.setlh = false
+	else
+		self.setlh = true
+	end
+
+	local base = weapons.GetStored("weapon_tpik_base")
+	if base and base.SetHandPos then return base.SetHandPos(self, noset) end
+end
+
+function SWEP:PostSetHandPos()
+	local ply = self:GetOwner()
+	if not IsValid(ply) then return end
+
+	local ent = hg.GetCurrentCharacter(ply)
+	if not IsValid(ent) then return end
+
+	local rhBone = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+	if rhBone then
+		local mat = ent:GetBoneMatrix(rhBone)
+		if mat then
+			local pos = mat:GetTranslation() + self.handPosOffset
+			local ang = mat:GetAngles()
+			ang.p = ang.p + self.handAngOffset.p
+			ang.y = ang.y + self.handAngOffset.y
+			ang.r = ang.r + self.handAngOffset.r
+			mat:SetTranslation(pos)
+			mat:SetAngles(ang)
+			ent:SetBoneMatrix(rhBone, mat)
+		end
+	end
+
+	if not self.lhandik then return end
+
+	local lhBone = ent:LookupBone("ValveBiped.Bip01_L_Hand")
+	if lhBone then
+		local mat = ent:GetBoneMatrix(lhBone)
+		if mat then
+			local pos = mat:GetTranslation()
+			local offset = self.handPosOffset
+			pos.x = pos.x - offset.x
+			pos.y = pos.y - offset.y
+			pos.z = pos.z + offset.z
+			local ang = mat:GetAngles()
+			ang.p = ang.p - self.handAngOffset.p
+			ang.y = ang.y - self.handAngOffset.y
+			ang.r = ang.r + self.handAngOffset.r
+			mat:SetTranslation(pos)
+			mat:SetAngles(ang)
+			ent:SetBoneMatrix(lhBone, mat)
+		end
+	end
+end
+
+if CLIENT then
+	local colWhite = Color(255, 255, 255, 255)
+	local colGray = Color(200, 200, 200, 200)
+	local lerpthing = 1
+	local colBrown = Color(40,40,40)
+	SWEP.showstats = true
+	local vector_one = Vector(1,1,1)
+	function SWEP:DrawHUD()
+		local owner = self:GetOwner()
+		if !owner:IsPlayer() then return end
+		if GetViewEntity() ~= owner then return end
+		if owner:InVehicle() then return end
+		local Tr = hg.eyeTrace(owner)
+		if !Tr then return end
+		local Size = math.max(math.min(1 - Tr.Fraction, 0.5), 0.1)
+		local x, y = Tr.HitPos:ToScreen().x, Tr.HitPos:ToScreen().y
+		if Tr.Hit then
+			lerpthing = Lerp(0.1, lerpthing, 1)
+			colWhite.a = 255 * Size
+			surface.SetDrawColor(colGray)
+			draw.NoTexture()
+			surface.SetDrawColor(colWhite)
+			draw.NoTexture()
+			surface.DrawRect(x - 25 * lerpthing, y - 2.5, 50 * lerpthing, 5)
+			surface.DrawRect(x - 2.5, y - 25 * lerpthing, 5, 50 * lerpthing)
+			local col = Tr.Entity:GetPlayerColor():ToColor()
+			local coloutline = (col.r < 50 and col.g < 50 and col.b < 50) and Color(255,255,255) or Color(0,0,0)
+			coloutline.a = 255 * Size * 2
+			draw.DrawText(Tr.Entity:IsPlayer() and Tr.Entity:GetPlayerName() or Tr.Entity:IsRagdoll() and Tr.Entity:GetPlayerName() or "", "HomigradFontLarge", x + 1, y + 31, coloutline, TEXT_ALIGN_CENTER)
+			draw.DrawText(Tr.Entity:IsPlayer() and Tr.Entity:GetPlayerName() or Tr.Entity:IsRagdoll() and Tr.Entity:GetPlayerName() or "", "HomigradFontLarge", x, y + 30, col, TEXT_ALIGN_CENTER)
+		end
+		self:DrawWorldModel2(true)
+		if self.showstats and self.modeValues and istable(self.modeValues) then
+			render.PushFilterMag( TEXFILTER.LINEAR )
+			render.PushFilterMin( TEXFILTER.LINEAR )
+			local m = Matrix()
+			m:Translate( Vector(  ScrW() / 2-ScreenScale(60), ScrH() / 2 + ScreenScaleH(125), 0 ) )
+			m:Scale( vector_one * 0.5 )
+
+			cam.PushModelMatrix( m, true )
+				local dose = self:GetDose() or 0
+				local maxDose = self.modeValuesdef and self.modeValuesdef[1] and self.modeValuesdef[1][1] or 1
+				local val = math.Round(dose / maxDose * 100)
+				local x,y = 0, ScrH() / 20
+				local reveal = 1
+				colBrown.a = reveal * 185
+				draw.RoundedBox(2,x,y,x + ScreenScale(210) + ScrW() / 10,ScrH() / 25,colBrown)
+				surface.SetFont("ZCity_Small")
+				surface.SetTextPos(x,y)
+				surface.SetTextColor(255,255,255,255 * reveal)
+				local txt = string.NiceName(tostring(self.modeNames[1]))
+				local w, h = surface.GetTextSize(txt)
+				colBrown.a = reveal * 255
+				draw.SimpleTextOutlined(txt, "ZCity_Small", x, y, Color(255,50,50, 255 * reveal), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1.5, colBrown)
+
+				surface.SetDrawColor(0,100,0,255 * reveal)
+				surface.DrawRect(x + ScreenScale(210),y,ScrW() / 10 * val / 100,ScrH() / 25)
+				surface.SetDrawColor(0,0,0,255 * reveal)
+				surface.DrawOutlinedRect(x + ScreenScale(210),y,ScrW() / 10,ScrH() / 25, 4)
+			cam.PopModelMatrix()
+
+			render.PopFilterMag()
+			render.PopFilterMin()
+		end
+	end
+end
+
+if SERVER then
+	function SWEP:PrimaryAttack()
+		local owner = self:GetOwner()
+		if not IsValid(owner) then return end
+		if self.modeValues[1] <= 0 then return end
+		if self.healing then return end
+
+		self:SetHealingOther(false)
+		self.setlh = true
+		self.healing = true
+	end
+
+	function SWEP:SecondaryAttack()
+		local owner = self:GetOwner()
+		if not IsValid(owner) then return end
+		if self.modeValues[1] <= 0 then return end
+		if self.healing then return end
+
+		local tr = hg.eyeTrace(owner)
+		if not tr then return end
+
+		local ent = tr.Entity
+		if not IsValid(ent) then return end
+
+		local chr = hg.GetCurrentCharacter(ent)
+		if chr == hg.GetCurrentCharacter(owner) then return end
+		if not (ent:IsPlayer() or ent:IsNPC() or hg.RagdollOwner(ent)) then return end
+
+		self.healbuddy = ent
+		self:SetHealingOther(true)
+		self.setlh = false
+		self.healing = true
 	end
 end

@@ -46,9 +46,99 @@ SWEP.modeValuesdef = {
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
 
 function SWEP:Think()
-	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
-		self:SetHolding(math.max(self:GetHolding() - 4, 0))
+	if hg.SWEPEditor_Apply then hg.SWEPEditor_Apply(self) end
+
+	local curTime = CurTime()
+	local anim = self.anim
+
+	local inUse = anim == "use" and self.animtime and self.animtime > curTime
+
+	if not IsFirstTimePredicted() then return end
+
+	if inUse ~= self._wasInUse then
+		self._wasInUse = inUse
+		if inUse then
+			self._timedApplied = {}
+			self._soundIdx = 1
+
+			self.TimedSounds = self:GetHealingOther() and self.TimedSoundsOther or self.TimedSoundsSelf
+			self._timedSndCache = nil
+
+			if self.TimedSounds and #self.TimedSounds > 0 then
+				local sorted = {}
+				for i, data in ipairs(self.TimedSounds) do
+					if data[1] ~= "" then
+						sorted[#sorted + 1] = {data[1], data[2]}
+					end
+				end
+				table.sort(sorted, function(a, b) return a[2] < b[2] end)
+				self._timedSndCache = sorted
+				self._timedSndCount = #sorted
+			end
+		end
 	end
+
+	if inUse and self.animtime and self.animspeed then
+		local elapsed = self.animspeed - (self.animtime - curTime)
+
+		if self._timedSndCache then
+			local idx = self._soundIdx or 1
+			local cache = self._timedSndCache
+			local count = self._timedSndCount
+			while idx <= count and elapsed >= cache[idx][2] do
+				local data = cache[idx]
+				idx = idx + 1
+				if CLIENT then
+					local owner = self:GetOwner()
+					if IsValid(owner) then
+						owner:EmitSound(data[1], 60, math.random(95, 105), 1, CHAN_STATIC)
+					end
+				end
+			end
+			self._soundIdx = idx
+		end
+	end
+
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+
+	if not self.healing and anim == "deploy" and self.animtime and self.animtime <= curTime then
+		if SERVER then
+			self:PlayAnim("idle")
+		end
+	end
+
+	if self.healing and not self._animStarted then
+		local buttonHeld = owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2)
+		if buttonHeld and self.modeValues[1] > 0 then
+			self._animStarted = true
+			if SERVER then
+				self:PlayAnim("use", self.UseSpeed, false, nil, false)
+			end
+		elseif not buttonHeld then
+			self.healing = false
+			self:SetHealingOther(false)
+			self.setlh = true
+		end
+	end
+
+	if self.healing and not owner:KeyDown(IN_ATTACK) and not owner:KeyDown(IN_ATTACK2) then
+		self.healing = false
+		self:SetHealingOther(false)
+		self.setlh = true
+		self._animStarted = false
+		self.callback = nil
+		hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+		if SERVER then
+			if self.modeValues[1] > 0 then
+				self:ReverseAnimToIdle("use")
+			else
+				self:PlayAnim("idle")
+			end
+		end
+	end
+
+	self:ThinkReverseAnimToIdle(curTime)
 end
 
 function SWEP:Animation()

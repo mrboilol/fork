@@ -320,6 +320,7 @@ Despite being zombie, still bears appearance of a normal human.]],
 --\\Professions
 MODE.ProfessionsRoundTypes = {
 	["standard"] = true,
+	["suicidelunatic"] = true,
 }
 
 MODE.Professions = {
@@ -455,6 +456,23 @@ MODE.Professions = {
 			--; It's a bad practice to give professions any weapons or tools
 		end,
 	},
+	["reporter"] = {
+		Name = "Reporter",
+		SpawnFunction = function(ply)
+			ply:Give("weapon_tpik_microphone")
+			hg.AddArmor(ply, "ent_armor_vest3")
+			hg.AddArmor(ply, "ent_armor_helmet3")
+		end,
+	},
+}
+
+MODE.ProfessionsPool = {
+	["doctor"] = { Chance = 1 },
+	["huntsman"] = { Chance = 1 },
+	["engineer"] = { Chance = 1 },
+	["cook"] = { Chance = 1 },
+	["builder"] = { Chance = 1 },
+	["reporter"] = { Chance = 1 },
 }
 --//
 
@@ -471,65 +489,7 @@ MODE.RoleChooseRoundTypes = {
 		Traitor = {
 			["traitor_custom"] = true,
 		},
-		Professions = {
-			["medic"] = {
-				Chance = 1,
-			},
-			["lucky_guy"] = {
-				Chance = 1,
-			},
-			["athlete"] = {
-				Chance = 1,
-			},
-			["thug"] = {
-				Chance = 1,
-			},
-			["huntsman"] = {
-				Chance = 1,
-			},
-			["engineer"] = {
-				Chance = 1,
-			},
-			["cook"] = {
-				Chance = 1,
-			},
-			["builder"] = {
-				Chance = 1,
-			},
-		},
-	},	
-	["gunfreezone"] = {
-		TraitorDefaultRole = "traitor_default",
-		Traitor = {
-			["traitor_default"] = true,
-			["traitor_infiltrator"] = true,
-			["traitor_chemist"] = true,
-			--["traitor_assasin"] = true,	there's no gunman so why have an assassin?
-			--["traitor_maniac"] = true,	having a maniac in gfz is crazy
-		},
-		Professions = {
-			["medic"] = {
-				Chance = 1,
-			},
-			["lucky_guy"] = {
-				Chance = 1,
-			},
-			["athlete"] = {
-				Chance = 1,
-			},
-			["huntsman"] = {
-				Chance = 1,
-			},
-			["engineer"] = {
-				Chance = 1,
-			},
-			["cook"] = {
-				Chance = 1,
-			},
-			["builder"] = {
-				Chance = 1,
-			},
-		},
+		Professions = MODE.ProfessionsPool,
 	},
 }
 --//

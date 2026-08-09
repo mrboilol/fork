@@ -60,9 +60,98 @@ end
 
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
-	if IsValid(owner) and owner:IsNPC() then
-		self:SpawnGarbage("models/bloocobalt/l4d/items/w_eq_adrenaline.mdl", nil, nil, nil, "2211")
-		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_needleprick.ogg")
+	if not IsValid(owner) then return end
+
+	if not self.healing and anim == "deploy" and self.animtime and self.animtime <= curTime then
+		if SERVER then
+			self:PlayAnim("idle")
+		end
+	end
+
+	if self.healing and not self._animStarted then
+		local buttonHeld = owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2)
+		if buttonHeld and self.modeValues[1] > 0 then
+			self._animStarted = true
+			if SERVER then
+				self:PlayAnim("use", self.UseSpeed, false, nil, false)
+			end
+		elseif not buttonHeld then
+			self.healing = false
+			self:SetHealingOther(false)
+			self.setlh = true
+		end
+	end
+
+	if self.healing and not owner:KeyDown(IN_ATTACK) and not owner:KeyDown(IN_ATTACK2) then
+		self.healing = false
+		self:SetHealingOther(false)
+		self.setlh = true
+		self._animStarted = false
+		self.callback = nil
+		hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+		if SERVER then
+			if self.modeValues[1] > 0 then
+				self:ReverseAnimToIdle("use")
+			else
+				self:PlayAnim("idle")
+			end
+		end
+	end
+
+	self:ThinkReverseAnimToIdle(curTime)
+end
+
+function SWEP:SetHandPos(noset)
+	if self:GetHealingOther() then
+		self.setlh = false
+	else
+		self.setlh = true
+	end
+
+	return self.BaseClass.SetHandPos(self, noset)
+end
+
+function SWEP:PostSetHandPos()
+	local ply = self:GetOwner()
+	if not IsValid(ply) then return end
+
+	local ent = hg.GetCurrentCharacter(ply)
+	if not IsValid(ent) then return end
+
+	local rhBone = ent:LookupBone("ValveBiped.Bip01_R_Hand")
+	if rhBone then
+		local mat = ent:GetBoneMatrix(rhBone)
+		if mat then
+			local pos = mat:GetTranslation() + self.handPosOffset
+			local ang = mat:GetAngles()
+			ang.p = ang.p + self.handAngOffset.p
+			ang.y = ang.y + self.handAngOffset.y
+			ang.r = ang.r + self.handAngOffset.r
+			mat:SetTranslation(pos)
+			mat:SetAngles(ang)
+			ent:SetBoneMatrix(rhBone, mat)
+		end
+	end
+
+	if not self.lhandik then return end
+
+	local lhBone = ent:LookupBone("ValveBiped.Bip01_L_Hand")
+	if lhBone then
+		local mat = ent:GetBoneMatrix(lhBone)
+		if mat then
+			local pos = mat:GetTranslation()
+			local offset = self.handPosOffset
+			pos.x = pos.x - offset.x
+			pos.y = pos.y - offset.y
+			pos.z = pos.z + offset.z
+			local ang = mat:GetAngles()
+			ang.p = ang.p - self.handAngOffset.p
+			ang.y = ang.y - self.handAngOffset.y
+			ang.r = ang.r + self.handAngOffset.r
+			mat:SetTranslation(pos)
+			mat:SetAngles(ang)
+			ent:SetBoneMatrix(lhBone, mat)
+		end
 	end
 end
 

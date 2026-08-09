@@ -819,14 +819,13 @@ if SERVER then
 
 
 		-- Loop through whatever we're burning
-		for _, ent in pairs(self.burning) do
+		for k, ent in pairs(self.burning) do
 			
 			if IsValid(ent) then
 
-				-- Don't burn players that are in vehicles
-				if ent:IsPlayer() and ent:InVehicle() and !vFireEnableDamageInVehicles then continue end
+				local canDamage = not (ent:IsPlayer() and ent:InVehicle() and !vFireEnableDamageInVehicles)
 
-				if damageEnabled then
+				if damageEnabled and canDamage then
 
 					-- Create the damage information
 					local dmg = DamageInfo()
@@ -854,15 +853,22 @@ if SERVER then
 				
 
 				-- If we're burning a character, use the oppurtunity to spread to it
-				if vFireIsCharacter(ent) and vFireEnableSpread then
-					-- If we're burning an NPC, spread to it, if it's a player, lower the chance of spread
-					if ent:IsPlayer() and math.random(1, 2) == 1 or !ent:IsPlayer() then
-						-- Keep a reserve on the source fire. Previously a successful spread
-						-- handed its entire fuel supply to one child, so fires often stalled
-						-- immediately after their first expansion.
-						local newFeed = self.feed * 0.6 + vFireTakeFuel(ent, 12)
-						if newFeed > 0 then
-							CreateVFire(ent, ent:GetPos(), Vector(), newFeed, self)
+				if vFireIsCharacter(ent) then
+					local character = hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ent) or ent
+					if IsValid(character) then
+						local hasAttachedFire = false
+						for fire in pairs(character.fires or {}) do
+							if IsValid(fire) then
+								hasAttachedFire = true
+								break
+							end
+						end
+
+						if not hasAttachedFire then
+							local newFeed = self.feed + vFireTakeFuel(ent, 12)
+							if newFeed > 0 then
+								CreateVFire(character, character:GetPos(), Vector(), newFeed, self)
+							end
 						end
 					end
 				end
@@ -954,7 +960,7 @@ if SERVER then
 	}
 
 	function ENT:SpreadThink(ran)
-		if SERVER and hg.IgniteGasolineAt then
+		if SERVER and hg and hg.IgniteGasolineAt then
 			hg.IgniteGasolineAt(self:GetPos(), self:GetOwner(), vFireBaseRadius(self:GetFireState() or 1) or 32)
 		end
 
