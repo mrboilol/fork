@@ -878,7 +878,7 @@ local function send_organism(org, ply)
 	sendtable.consciousness = org.consciousness
 	sendtable.concussion = org.concussion
 	sendtable.assimilated = org.assimilated
-	sendtable.berserk = org.berserk
+	sendtable.berserk = org.silentBerserk and 0 or org.berserk
 	sendtable.noradrenaline = org.noradrenaline
 	sendtable.panicattackadd = org.panicattackadd
 	sendtable.panicattack = org.panicattack
@@ -897,7 +897,7 @@ local function send_organism(org, ply)
 	sendtable.critical = org.critical
 	sendtable.incapacitated = org.incapacitated
 	sendtable.deathStateEnd = org.deathStateEnd or 0
-	sendtable.berserkActive2 = org.berserkActive2
+	sendtable.berserkActive2 = org.silentBerserk and false or org.berserkActive2
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.aiming_fatigue = org.aiming_fatigue
 	sendtable.hand_dominance = org.hand_dominance
@@ -997,7 +997,7 @@ local function send_bareinfo(org)
 	sendtable.larmamputated = org.larmamputated
 	sendtable.headamputated = org.headamputated
 	sendtable.LodgedEntities = org.LodgedEntities
-	sendtable.berserkActive2 = org.berserkActive2
+	sendtable.berserkActive2 = org.silentBerserk and false or org.berserkActive2
 	sendtable.CantCheckPulse = org.CantCheckPulse
 	sendtable.noradrenalineActive = org.noradrenalineActive
 	sendtable.panicattackadd = org.panicattackadd
@@ -1937,6 +1937,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	else
 		org.uncon_timer = 0
 	end
+	local just_went_uncon = not org.otrub and org.needotrub and not org.NoKnockdown
+	local just_woke_up = not org.needotrub and org.otrub
 
 	-- Zerlkers should keep a patient conscious through pain, shock, and other
 	-- non-terminal collapse triggers. Terminal brain injury, cerebral hypoxia,
@@ -1952,6 +1954,16 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	local just_woke_up = not org.needotrub and org.otrub and (org.uncon_timer or 0) > 6
 	if isPly and just_went_uncon then hook.Run("HG_OnOtrub", owner); hook.Run("PlayerDropWeapon", owner) end
 	if isPly and just_woke_up then hook.Run("HG_OnWakeOtrub", owner) end
+	if org.NoKnockdown then
+		org.canmove = true
+		org.canmovehead = true
+	else
+		org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
+		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
+		if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
+		if (org.blood < 2700) then org.needfake = true end
+		if org.neckslit and not org.otrub then org.needfake = true end
+	end
 
 	org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
 	org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
@@ -2072,6 +2084,16 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 			org.needfake = true
 		end
 	end
+	if org.NoKnockdown then
+		org.otrub = false
+		org.needotrub = false
+		org.fake = false
+		org.needfake = false
+	else
+		org.otrub = org.needotrub
+		org.fake = org.needfake
+	end
+	if org.needfake and owner:IsNPC() then
 
 	if org.needfake and hg.organism.ZerlkersCanPreventFake(org) then
 		org.needfake = false
@@ -2169,6 +2191,7 @@ end)
 
 hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	if not owner:IsPlayer() or not owner:Alive() then return end
+	if zb and zb.modes and zb.modes.juggernaut and zb.modes.juggernaut:IsJuggernaut(owner) then return end
 	if !owner:IsBerserk() then return end
 	//if org.heartstop then return end
 

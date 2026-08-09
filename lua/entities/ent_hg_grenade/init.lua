@@ -23,32 +23,8 @@ end
 
 ENT.LegacyInDoorSound = false
 
-ENT.ExplosionExtraSounds = {
-	"explosionextra/explode_1.wav",
-	"explosionextra/explode_2.wav",
-	"explosionextra/explode_3.wav",
-	"explosionextra/explode_4.wav",
-	"explosionextra/explode_5.wav",
-	"explosionextra/explode_6.wav",
-	"explosionextra/explode_7.wav",
-	"explosionextra/explode_8.wav",
-	"explosionextra/explode_9.wav"
-}
-
-function ENT:PlayExtraExplosionSound(pos)
-	if hg and hg.PlayExtraExplosionSound then
-		hg.PlayExtraExplosionSound(pos, self:EntIndex(), 1)
-		return
-	end
-
-	local snd = self.ExplosionExtraSounds[math.random(#self.ExplosionExtraSounds)]
-	EmitSound(snd, pos, self:EntIndex() + 600, CHAN_ITEM, 1, 145, 0, math.random(95, 105))
-	timer.Simple(0.04, function()
-		if IsValid(self) then
-			EmitSound(snd, pos, self:EntIndex() + 601, CHAN_AUTO, 0.7, 135, 0, math.random(90, 100))
-		end
-	end)
-end
+ENT.TrapSettleTime = 1.5
+ENT.TrapSettleLen = 40
 
 function ENT:Initialize()
 	self:SetModel(self.Model)
@@ -140,26 +116,45 @@ function ENT:Think()
 	end
 
 	if not self.timer then
+		if self.Disarmed then return true end
+
+		local settling = ( curTime - ( self.trapSetTime or curTime ) ) < ( self.TrapSettleTime or 1.5 )
+
 		if IsValid(self.ent) or self.ent == Entity(0) then
+			if not self.trapSetTime then
+				self.trapSetTime = curTime
+			end
+
 			local ent,lpos,origlen = self.ent,self.lpos,self.origlen
 			
 			local wpos = ent:LocalToWorld(lpos)
+			local dist = wpos:Distance(self:GetPos())
 
-			if wpos:Distance(self:GetPos()) > origlen + 20 then
-				self:Arm(curTime - self.timeToBoom + 1)
-			end
+			if settling then
+				if dist > origlen + ( self.TrapSettleLen or 40 ) then
+					self:DisarmTrap()
+				end
+			else
+				if dist > origlen + 20 then
+					self:Arm(curTime - self.timeToBoom + 1)
+				end
 
-			local tr = {}
-			tr.start = self:GetPos()
-			tr.endpos = wpos
-			tr.filter = {self,self.ent2,self.ent}
-			local trace = util.TraceLine(tr)
-			if IsValid(trace.Entity) then
-				self:Arm(curTime - self.timeToBoom + 1,trace.Entity:GetVelocity())
+				local tr = {}
+				tr.start = self:GetPos()
+				tr.endpos = wpos
+				tr.filter = {self,self.ent2,self.ent,self.peg}
+				local trace = util.TraceLine(tr)
+				if IsValid(trace.Entity) and trace.Entity != self.ent and trace.Entity != self.peg then
+					self:Arm(curTime - self.timeToBoom + 1,trace.Entity:GetVelocity())
+				end
 			end
 		end
 		if not IsValid(self.cons2) then
-			self:Arm(curTime - self.timeToBoom + 1,0)
+			if settling then
+				self:DisarmTrap()
+			else
+				self:Arm(curTime - self.timeToBoom + 1,0)
+			end
 		end
 		return true
 	end
@@ -169,6 +164,19 @@ function ENT:Think()
 	if time > self.timeToBoom and not self.Exploded then self:Explode() end
 	
 	return true
+end
+
+function ENT:DisarmTrap()
+	if self.Disarmed then return end
+	self.Disarmed = true
+	if IsValid(self.cons) then self.cons:Remove() end
+	if IsValid(self.ent2) then self.ent2:Remove() end
+	if IsValid(self.cons2) then self.cons2:Remove() end
+	if IsValid(self.peg) then self.peg:Remove() end
+	if IsValid(self.peg2) then self.peg2:Remove() end
+	self.ent = nil
+	self.lpos = nil
+	self.origlen = nil
 end
 
 local clr = Color(50, 40, 0)
@@ -216,6 +224,12 @@ function ENT:Arm(time,vel)
 		end
 		if IsValid(self.ent2) then
 			self.ent2:Remove()
+		end
+		if IsValid(self.peg) then
+			self.peg:Remove()
+		end
+		if IsValid(self.peg2) then
+			self.peg2:Remove()
 		end
 		self.ent = nil
 		self.lpos = nil
