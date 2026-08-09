@@ -1577,9 +1577,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local slow_pain = (1 - instantPainMul) * painadd
 		org.painadd = org.painadd + slow_pain
 		//org.avgpain = org.avgpain + instant_pain
-		local meleeShockMul = isMeleeDmg and melee_shock_scale * (isSharpMelee and 0.44 or 0.56) or 1
-		local shockAdd = instaPain * shockMul * 4.5 * instant_pain_shock_scale * meleeShockMul * math.Clamp(pen / 5,1,2)
-		org.shock = math.min(org.shock + shockAdd, 70)
+		org.shock = math.min(org.shock + instaPain * shockMul * 4.5 * instant_pain_shock_scale * math.Clamp(pen / 5,1,2), 70)
 		org.immobilization = math.min(org.immobilization + immobilization * immobilizationMul, 30)
 		org.lasthit = CurTime()
 		

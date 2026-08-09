@@ -41,14 +41,26 @@ function ENT:Initialize()
             if ent1:GetFireLeft() <= 0 then return end
             local pos = ent1:GetPos()
             local ent = data.HitEntity
-            if IsValid(ent) and hg.TrySmallFlameIgnite then
-                hg.TrySmallFlameIgnite(ent, data.HitPos, data.HitNormal, ent1.debil, "match", ent1)
+            --print(IsValid(ent), ignitable[ent:GetModel()], ent:GetModel())
+            if IsValid(ent) and ignitable[ent:GetModel()] then
+                ent:Ignite()
             end
 
-            for _,v in ipairs(hg.gasolinePath) do
-                if v[1]:Distance(pos) > 30 or v[2] ~= false then continue end
-                v[2] = CurTime()
-                v[3] = ent1.debil
+            if hg.IgniteGasolineAt then
+                local ok = hg.IgniteGasolineAt(pos, ent1.debil, 40)
+                if ok then MsgN("[HGBENZIN] match ignited gasoline at " .. tostring(pos)) end
+            end
+            if IsValid(data.HitEntity) and hg.drums[data.HitEntity:EntIndex()] then
+                local drum = hg.drums[data.HitEntity:EntIndex()]
+                local drumEnt = data.HitEntity
+                local tbl = hg.expItems[drumEnt:GetModel()]
+                for i, point in ipairs(drum.high_point) do
+                    local pos2 = LocalToWorld(point[1], angle_zero, drumEnt:GetPos(), drumEnt:GetAngles())
+                    if pos:DistToSqr(pos2) < 5 * 5 then
+                        drumEnt.owner = ent1.debil
+                        hg.PropExplosion( drumEnt, tbl.ExpType, (drumEnt.Volume or tbl.Force) * 2, drumEnt:GetPhysicsObject():GetMass() )
+                    end
+                end
             end
         end)
     end
@@ -96,7 +108,15 @@ end
 local color_b = Color(255,255,255)
 function ENT:Think()
     if SERVER then
-        self:SetFireLeft(math.max(0,self:GetFireLeft() - 1 * FrameTime()))
+        local fireLeft = math.max(0,self:GetFireLeft() - 1 * FrameTime())
+        self:SetFireLeft(fireLeft)
+
+        if fireLeft > 0 and (self.GasolineIgniteCheck or 0) <= CurTime() then
+            self.GasolineIgniteCheck = CurTime() + 0.1
+            if hg.IgniteGasolineAt then
+                hg.IgniteGasolineAt(self:GetPos(), self.debil, 40)
+            end
+        end
     end
 
     if CLIENT then

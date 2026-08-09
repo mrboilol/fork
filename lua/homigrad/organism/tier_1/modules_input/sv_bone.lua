@@ -729,8 +729,8 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
 	markDamagedBone(org, "ValveBiped.Bip01_Spine2", org.chest)
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
-	org.painadd = org.painadd + dmg
-	org.shock = org.shock + dmg
+	org.painadd = org.painadd + dmg * 1.5
+	org.shock = org.shock + dmg* 1.5
 	if dmg >= 0.5 then
 		org.hemothoraxTrauma = math.min((org.hemothoraxTrauma or org.hemothorax or 0) + dmg * 0.08, 1)
 		org.hemothorax = math.max(org.hemothorax or 0, org.hemothoraxTrauma)
