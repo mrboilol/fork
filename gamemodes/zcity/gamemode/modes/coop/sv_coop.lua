@@ -9,7 +9,7 @@ hg.NextMap = ""
 
 local coop_rts = CreateConVar("zb_coop_rts", "1", FCVAR_PROTECTED, "Toggle NPC rebel possess in Half-Life 2 CO-OP mode", 0, 1)
 local coop_rts_cmb = CreateConVar("zb_coop_rts_cmb", "1", FCVAR_PROTECTED, "Toggle NPC combine possess in Half-Life 2 CO-OP mode if zb_coop_rts is enabled", 0, 1)
-local coop_rts_zmb = CreateConVar("zb_coop_rts_zmb", "0", FCVAR_PROTECTED, "Toggle NPC zombie possess in Half-Life 2 CO-OP mode if zb_coop_rts is enabled", 0, 1) 
+local coop_rts_zmb = CreateConVar("zb_coop_rts_zmb", "0", FCVAR_PROTECTED, "Toggle NPC zombie possess in Half-Life 2 CO-OP mode if zb_coop_rts is enabled", 0, 1) --!! WIP
 
 MODE.LootSpawn = false
 
@@ -59,10 +59,8 @@ MODE.LootTable = {
 		{4,"ent_ammo_9x19mmparabellum"},
 		{3,"ent_ammo_4.6x30mm"},
 		{3,"weapon_bigconsumable"},
-		{3,"weapon_painkillers_tpik"},
+		{3,"weapon_painkillers"},
 		{3,"weapon_bigbandage_sh"},
-		{2,"weapon_betablock_tpik"},
-		{1.5,"weapon_thiamine_tpik"},
 		
         {2,"weapon_medkit_sh"},
 		{2,"weapon_bloodbag"},
@@ -85,18 +83,17 @@ MODE.LootTable = {
         {6,"ent_ammo_rpg-7projectile"},
         
         {8,"weapon_bigconsumable"},
-		{7,"weapon_painkillers_tpik"},
+		{7,"weapon_painkillers"},
 		{6,"weapon_bigbandage_sh"},
         {5,"weapon_morphine"},
         {5,"weapon_naloxone"},
         {4,"weapon_mannitol"},
-        {4,"weapon_betablock_tpik"},
-        {3,"weapon_thiamine_tpik"},
         
         {9,"weapon_hk_usp"},
         {8,"weapon_revolver357"},
 		{6,"weapon_spas12"},
 		{5,"weapon_mp7"},
+		{5,"weapon_osipr"},
         {2,"weapon_ash12"},
         {4,"weapon_akm"},
         {3,"weapon_rpk"},
@@ -118,25 +115,6 @@ MODE.LootTable = {
 		{5,"weapon_hg_slam"},
 	}},
 }
-
--- Rebel (civilian) loot: melee + light armor only, weapons stay rare.
-hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.MeleeCommon, 1)
-hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.MeleeRare, 0.6)
-hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.Sidearms, 0.5)
-hg.AppendLootPool(MODE.LootTable[1][2], hg.LootPools.ArmorLight, 0.6)
-
--- Combine (equipped) loot: full arsenal, heavy stuff still rare.
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.MeleeCommon, 1)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.MeleeRare, 0.7)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.Sidearms, 0.6)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.SMGs, 0.5)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.Shotguns, 0.5)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.AssaultRifles, 0.4)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.Marksman, 0.3)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.LMG, 0.25)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.Explosives, 0.4)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.ArmorMedium, 0.5)
-hg.AppendLootPool(MODE.LootTable[2][2], hg.LootPools.ArmorHeavy, 0.4)
 
 local RemoveGordonWeapons = {
     ["weapon_hg_crowbar"] = true,
@@ -317,14 +295,13 @@ function MODE:GetTeamSpawn()
 	return {getspawnpos(math.random(50))}, {getspawnpos(math.random(50))}
 end
 
-local clr_rebel, clr_medic, clr_grenadier, clr_bulldozer = Color(255, 155, 0), Color(190, 0, 0), Color(190, 90, 0), Color(120, 120, 130)
+local clr_rebel, clr_medic, clr_grenadier = Color(255, 155, 0), Color(190, 0, 0), Color(190, 90, 0)
 function MODE:GiveEquipment()
     self.COOPPoints = zb.GetMapPoints("HMCD_COOP_SPAWN")
     timer.Simple(0, function()
         local players = player.GetAll()
         local medicCount = 0
         local grenadierCount = 0
-        local bulldozerCount = 0
         local hasGordon = false
 
         local currentMap = game.GetMap()
@@ -333,7 +310,6 @@ function MODE:GiveEquipment()
         
         local maxMedics = math.max(1, math.min(3, math.floor(#players / 5)))
         local maxGrenadier = math.max(1, math.min(3, math.floor(#players / 5)))
-        local maxBulldozer = 1
 
         local savedGordonExists, savedGordonSteamID = false, nil
         if hg.CoopPersistence and hg.CoopPersistence.HasSurvivedGordon then
@@ -395,17 +371,6 @@ function MODE:GiveEquipment()
                             ply:SetPlayerClass(savedPlayerClass or "Rebel", {bNoEquipment = true})
                         end
                         zb.GiveRole(ply, "Grenadier", clr_grenadier)
-                    elseif savedSubClass == "bulldozer" then
-                        ply.subClass = "bulldozer"
-                        bulldozerCount = bulldozerCount + 1
-                        
-                        
-                        if savedPlayerClass == "Refugee" then
-                            ply:SetPlayerClass("Refugee", {bNoEquipment = true})
-                        else
-                            ply:SetPlayerClass(savedPlayerClass or "Rebel", {bNoEquipment = true})
-                        end
-                        zb.GiveRole(ply, "Bulldozer", clr_bulldozer)
                     else
                         ply.subClass = nil
                         
@@ -421,7 +386,7 @@ function MODE:GiveEquipment()
                     
                     hg.CoopPersistence.MarkPlayerRestored(ply:SteamID())
                 else
-                    self:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxMedics, grenadierCount, maxGrenadier, bulldozerCount, maxBulldozer, savedGordonExists)
+                    self:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxMedics, savedGordonExists)
                     if not hasGordon and not ply:IsBot() and not savedGordonExists then
                         hasGordon = true
                     elseif medicCount < maxMedics then
@@ -429,11 +394,10 @@ function MODE:GiveEquipment()
                     end
                 end
             else
-                local wasGordon, wasMedic, wasGrenadier, wasBulldozer = self:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxMedics, grenadierCount, maxGrenadier, bulldozerCount, maxBulldozer, savedGordonExists)
+                local wasGordon, wasMedic, wasGrenadier = self:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxMedics, grenadierCount, maxGrenadier, savedGordonExists)
                 if wasGordon then hasGordon = true end
                 if wasMedic then medicCount = medicCount + 1 end
                 if wasGrenadier then grenadierCount = grenadierCount + 1 end
-                if wasBulldozer then bulldozerCount = bulldozerCount + 1 end
             end
 
             local hands = ply:Give("weapon_hands_sh")
@@ -448,11 +412,10 @@ function MODE:GiveEquipment()
     end)
 end
 
-function MODE:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxMedics, grenadierCount, maxGrenadier, bulldozerCount, maxBulldozer, savedGordonExists)
+function MODE:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxMedics, grenadierCount, maxGrenadier, savedGordonExists)
     local wasGordon = false
     local wasMedic = false
     local wasGrenadier = false
-    local wasBulldozer = false
     
     local inv = ply:GetNetVar("Inventory")
     inv["Weapons"]["hg_sling"] = true
@@ -480,14 +443,13 @@ function MODE:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxM
             wasGrenadier = true
         end
 
-        local isBulldozer = false
-        if not isMedic and not isGrenadier and bulldozerCount < maxBulldozer then
-            ply.subClass = "bulldozer"
-            isBulldozer = true
-            wasBulldozer = true
-        end
-
-        
+        --[[if playerClass == "refugee" or playerClass == "citizen" then
+            ply:SetPlayerClass("Refugee", {bNoEquipment = playerClass == "citizen"})
+            zb.GiveRole(ply, isMedic and "Medic" or "Refugee", isMedic and clr_medic or clr_rebel)
+        elseif playerClass == "rebel" then
+            ply:SetPlayerClass("Rebel")
+            zb.GiveRole(ply, isMedic and "Medic" or "Rebel", isMedic and clr_medic or clr_rebel)
+        end]]
 
         if playerClass == "refugee" or playerClass == "citizen" then
             ply:SetPlayerClass("Refugee", {bNoEquipment = playerClass == "citizen"})
@@ -499,8 +461,6 @@ function MODE:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxM
             zb.GiveRole(ply, "Medic", clr_medic)
         elseif isGrenadier then
             zb.GiveRole(ply, "Grenadier", clr_grenadier)
-        elseif isBulldozer then
-            zb.GiveRole(ply, "Bulldozer", clr_bulldozer)
         elseif playerClass == "refugee" or playerClass == "citizen" then
             zb.GiveRole(ply, "Refugee", clr_rebel)
         elseif playerClass == "rebel" then
@@ -508,7 +468,7 @@ function MODE:GiveDefaultEquipment(ply, playerClass, hasGordon, medicCount, maxM
         end
     end
     
-    return wasGordon, wasMedic, wasGrenadier, wasBulldozer
+    return wasGordon, wasMedic, wasGrenadier
 end
 
 util.AddNetworkString("coop_roundend")
@@ -610,7 +570,7 @@ local function PossessNPC(ply, npc)
             ply:SetNetVar("Inventory", inv)
         end
         
-        if isCombine then 
+        if isCombine then --!! TODO: rewrite all of this elseif shit to beautiful table
             if npcClass == "npc_combine_s" then
                 ply:SetPlayerClass("Combine")
                 zb.GiveRole(ply, "Combine", clr_combine)

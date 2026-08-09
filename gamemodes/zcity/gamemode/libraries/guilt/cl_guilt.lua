@@ -1,3 +1,8 @@
+--[[    TO-DO
+    -- Добавить менюшку с прощением! |
+    -- Добавить нетворкинг |
+    -- Ну и все | 
+--]]
 
 hook.Add("OnNetVarSet", "Guilt",function(index, key, var)
     if key == "Karma" then
@@ -6,6 +11,9 @@ hook.Add("OnNetVarSet", "Guilt",function(index, key, var)
 end)
 
 hook.Add("Player Spawn", "GuiltKnown",function(ply)
+    --if (ply == LocalPlayer()) and ply.Karma then
+    --    ply:ChatPrint("Your current karma is "..tostring(math.Round(ply.Karma)).."")
+    --end
 end)
 
 concommand.Add("hg_getkarma",function(ply)
@@ -34,16 +42,9 @@ end)
 local OpenMenu
 
 net.Receive("open_guilt_menu", function()
-    local karma = net.ReadFloat()
     local tbl = net.ReadTable()
-
-    OpenMenu(tbl, karma)
-end)
-
-net.Receive("karma_down_sound", function()
-    local pitch = net.ReadFloat()
-    if not IsValid(LocalPlayer()) then return end
-    sound.Play("karmadown.mp3", LocalPlayer():GetPos(), 100, pitch)
+    
+    OpenMenu(tbl)
 end)
 
 local colGray = Color(122,122,122,255)
@@ -156,10 +157,7 @@ hook.Add("HUDPaint","shownotification",function()
     end
 end)
 
-local myKarma = 100
-OpenMenu = function(tbl, karma)
-    myKarma = karma or myKarma or 100
-
+OpenMenu = function(tbl)
     if IsValid(guiltMenu) then
 		guiltMenu:Remove()
 		guiltMenu = nil
@@ -170,12 +168,12 @@ OpenMenu = function(tbl, karma)
 		if IsValid(ply) and harm > 0.01 then playerCount = playerCount + 1 end
 	end
 
-	local rowH = ScaleMenu(40)
+	local rowH = ScaleMenu(34)
 	local margin = math.max(8, math.min(ScaleMenu(20), ScrW() * 0.05, ScrH() * 0.05))
 	local maxX = ScrW() - margin * 2
 	local maxY = ScrH() - margin * 2
-	local sizeX = math.min(ScaleMenu(660), maxX)
-	local sizeY = math.Clamp(ScaleMenu(90) + math.max(playerCount, 3) * (rowH + ScaleMenu(6)) + ScaleMenu(20), math.min(ScaleMenu(260), maxY), math.min(ScaleMenu(580), maxY))
+	local sizeX = math.min(ScaleMenu(520), maxX)
+	local sizeY = math.Clamp(ScaleMenu(70) + math.max(playerCount, 3) * (rowH + ScaleMenu(5)) + ScaleMenu(16), math.min(ScaleMenu(210), maxY), math.min(ScaleMenu(440), maxY))
 
 	guiltMenu = vgui.Create("ZFrame")
 	guiltMenu:SetTitle("")
@@ -194,7 +192,7 @@ OpenMenu = function(tbl, karma)
     local title = vgui.Create("DLabel", guiltMenu)
     title:SetPos(ScaleMenu(12), ScaleMenu(8))
     title:SetTextColor(color_white)
-    title:SetText("your karma: "..math.Round(myKarma))
+    title:SetText("karma")
     title:SetFont("ZCity_Menu_Settings_Small")
     title:SizeToContents()
 
@@ -260,7 +258,7 @@ OpenMenu = function(tbl, karma)
             net.WriteEntity(ply)
             net.SendToServer()
             tbl[ply] = nil
-            OpenMenu(tbl, myKarma)
+            OpenMenu(tbl)
         end
 
 		scroll:AddItem(but)

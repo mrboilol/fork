@@ -25,6 +25,7 @@ hook.Add("Player Think", "Berserk", function(ply, time, dtime)
 
             local AimVec = (v:GetPos() - plyPos):GetNormalized()
             local force = velocity / 800000
+
             if IsValid(Phys) then
                 if isPlayer then v:SetVelocity(AimVec * 500 * force) end
                 Phys:ApplyForceOffset(AimVec * 500 * force, plyPos)

@@ -166,9 +166,10 @@ MODE.LootTable = {
         {8,"weapon_deagle"},
         {8,"weapon_doublebarrel_short"},
         {8,"weapon_doublebarrel"},
-		{8,"weapon_m590a1"},
-		{7,"weapon_saiga12"},
-		{6,"weapon_aa12"},
+        {8,"weapon_remington870"},
+        {8,"weapon_glock18c"},
+        {7,"weapon_mp5"},
+        {6,"weapon_xm1014"},
         {6,"ent_armor_vest3"},
         {5,"ent_armor_helmet1"},
         {5,"weapon_mp7"},
@@ -266,9 +267,6 @@ net.Receive("event_loot_add", function(len, ply)
     local itemData = net.ReadTable()
     
     if not itemData or not itemData.weight or not itemData.class then return end
-	if #MODE.CustomLootTable[1][2] >= 128 then return end
-	if not isnumber(itemData.weight) or itemData.weight < 1 or itemData.weight > 1000 then return end
-	if not isstring(itemData.class) or #itemData.class > 96 or (not scripted_ents.GetStored(itemData.class) and not weapons.GetStored(itemData.class)) then return end
     
     table.insert(MODE.CustomLootTable[1][2], {itemData.weight, itemData.class})
     
@@ -325,7 +323,7 @@ concommand.Add("zb_event_loot_reset", function(ply, _, _, _)
     
     local recipients = {}
     for _, p in player.Iterator() do
-		if p:IsAdmin() or MODE.EventersList[p:SteamID()] then
+        if p:IsAdmin() or MODE.EventersList[ply:SteamID()] then
             table.insert(recipients, p)
         end
     end

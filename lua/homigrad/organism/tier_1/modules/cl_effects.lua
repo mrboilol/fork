@@ -197,12 +197,6 @@ hg.underberserk2 = hg.underberserk2 or false
 hg.berserkStartTime = hg.berserkStartTime or 0
 hg.berserkStartTime2 = hg.berserkStartTime2 or 0
 hg.berserkStation = hg.berserkStation or nil
-hg.berserkMusicPlayed = hg.berserkMusicPlayed or false
-hg.berserkMusicLoading = hg.berserkMusicLoading or false
-hg.berserkFadeOut = hg.berserkFadeOut or false
-hg.berserkFadeOutStartTime = hg.berserkFadeOutStartTime or 0
-hg.berserkLastActivationTime = hg.berserkLastActivationTime or 0
-
 local tab = {
 	[ "$pp_colour_addr" ] = 0,
 	[ "$pp_colour_addg" ] = 0,
@@ -229,74 +223,15 @@ local cc = Material( "effects/shaders/merc_chromaticaberration" )
 local offset = CreateClientConVar("berserk_offset", "0.85", true, false, "Set berserk music offset from start", 0, 5)
 local bpm = CreateClientConVar("berserk_bpm", "70", true, false, "Set berserk effect bpm", 1, 280)
 local path = CreateClientConVar("berserk_path", "sound/zbattle/pharmacia.mp3", true, false, "Set berserk effect music path")
--- These replicated convars are created by sv_berserk.lua, so an admin's
--- setting selects the alternate mode for every connected client.
-local altberserk = GetConVar("hg_altberserk") or CreateClientConVar("hg_altberserk", "0", true, false, "Enable alternative berserk mode", 0, 1)
-local altberserk3 = GetConVar("hg_altberserk3") or CreateClientConVar("hg_altberserk3", "0", true, false, "Enable alternative berserk mode 3", 0, 1)
-
-local function isAlternativeBerserk()
-	return altberserk:GetBool() or altberserk3:GetBool()
-end
-
-local function getBerserkMusicPath()
-	if altberserk3:GetBool() then return "sound/rage.ogg" end
-	if altberserk:GetBool() then return "sound/NIGGARUN.ogg" end
-
-	return path:GetString()
-end
-
-local function getBerserkBPM()
-	if altberserk3:GetBool() then return 75 end
-	if altberserk:GetBool() then return 88 end
-
-	return bpm:GetInt()
-end
-
-local function startBerserkMusic(musicPath)
-	if IsValid(hg.berserkStation) then
-		hg.berserkStation:EnableLooping(true)
-		hg.berserkStation:SetVolume(1)
-		hg.berserkFadeOut = false
-		hg.berserkMusicPlayed = true
-		return
-	end
-
-	if hg.berserkMusicLoading then return end
-
-	hg.berserkMusicLoading = true
-	hg.berserkMusicPlayed = true
-	sound.PlayFile(musicPath, "noblock", function(channel)
-		hg.berserkMusicLoading = false
-
-		if not IsValid(channel) then
-			hg.berserkMusicPlayed = false
-			return
-		end
-
-		if not hg.underberserk and not hg.underberserk2 then
-			channel:Stop()
-			hg.berserkMusicPlayed = false
-			return
-		end
-
-		hg.berserkStation = channel
-		channel:EnableLooping(true)
-		channel:SetVolume(1)
-		hg.berserkFadeOut = false
-	end)
-end
-
 hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	local organism = lply:Alive() and lply.organism
 	if !organism then
 		hg.underberserk = false
 		hg.underberserk2 = false
-
-		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
-		hg.berserkStation = nil
-		hg.berserkFadeOut = false
-		hg.berserkMusicPlayed = false
-
+		if IsValid(hg.berserkStation) then
+			hg.berserkStation:Stop()
+			hg.berserkStation = nil
+		end
 		hg.notificationFont = "HuyFont"
 		hg.berserkIntensity = 0
 		return
@@ -304,53 +239,28 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	local berserk = (organism.berserk or 0)
 	local berserkClamped = math.Clamp(berserk, 0, 3) * (organism.consciousness or 1)
 	if berserk > 0.0001 and (!hg.underberserk and !hg.underberserk2) then
-		-- Prevent re-activation within 15 seconds of last activation
-		if SysTime() - hg.berserkLastActivationTime < 15 then
-			return
-		end
-
 		hg.underberserk = true
-		hg.berserkMusicPlayed = false
-		hg.berserkLastActivationTime = SysTime()
-		if not hg.berserkActivationSoundPlayed then
-			hg.berserkActivationSoundPlayed = true
-			if isAlternativeBerserk() then
-				-- Start looping music immediately for alternate modes to avoid duplicate playback.
-				startBerserkMusic(getBerserkMusicPath())
-			else
-				surface.PlaySound("zbattle/deathsample.ogg")
-			end
-		end
-
+		surface.PlaySound("zbattle/deathsample.ogg")
 		hg.berserkStartTime = SysTime()
 		local part = CreateParticleSystem( LocalPlayer(), "[2]sparkle1", PATTACH_POINT_FOLLOW, 1)
 		hg.currentNotification = nil
 		hg.notifications = {}
 		hg.CreateNotificationBerserk("I feel...")
-
-		local disorientedDuration = altberserk3:GetBool() and 0 or altberserk:GetBool() and 11 or 3.95
-		timer.Simple(disorientedDuration, function()
+		timer.Simple(3.95, function()
 			if IsValid(part) then
 				part:StopEmission( false, true, false )
 			end
-
-			for i = 1, 30 do
-				timer.Simple(i/120,function()
-					ViewPunch(AngleRand(-1,1))
+			for i = 1, 120 do
+				timer.Simple(i/90,function()
+					ViewPunch(AngleRand(-1.5,1.5))
 				end)
 			end
 			hg.underberserk = false
 			hg.underberserk2 = true
-
-			-- Prevent music from playing again if it already played during this berserk session
-			if not hg.berserkMusicPlayed then
-				startBerserkMusic(getBerserkMusicPath())
-			elseif IsValid(hg.berserkStation) then
-				hg.berserkStation:EnableLooping(true)
-				hg.berserkStation:SetVolume(1)
-				hg.berserkFadeOut = false
-			end
-
+			sound.PlayFile(path:GetString(), "noblock", function(channel)
+				hg.berserkStation = channel
+				channel:EnableLooping(true)
+			end)
 			hg.currentNotification = nil
 			hg.notifications = {}
 			hg.CreateNotificationBerserk("GREAT.")
@@ -359,45 +269,31 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	elseif berserk < 0.0001 then
 		hg.underberserk = false
 		hg.underberserk2 = false
-		hg.berserkActivationSoundPlayed = false
-		hg.berserkLastActivationTime = 0
-		if IsValid(hg.berserkStation) then hg.berserkStation:Stop() end
-		hg.berserkStation = nil
-		hg.berserkFadeOut = false
-		hg.berserkMusicPlayed = false
-
+		if IsValid(hg.berserkStation) then
+			hg.berserkStation:Stop()
+			hg.berserkStation = nil
+		end
 		hg.notificationFont = "HuyFont"
 		hg.berserkIntensity = 0
 	end
 	if hg.underberserk then
 		local intensity = (SysTime() - hg.berserkStartTime)
-		local altMultiplier = isAlternativeBerserk() and 0.25 or 1
-		tab[ "$pp_colour_contrast" ] = (intensity / 4) * altMultiplier
-		tab[ "$pp_colour_addr" ] = (intensity / 20) * altMultiplier
-		tab[ "$pp_colour_brightness" ] = (intensity / 20) * altMultiplier
+		tab[ "$pp_colour_contrast" ] = intensity / 2
+		tab[ "$pp_colour_addr" ] = intensity / 10
+		tab[ "$pp_colour_brightness" ] = intensity / 10
 		DrawColorModify(tab)
-		DrawBloom( 0.65, (intensity * 2) * altMultiplier, 9, 9, 1, 1, (intensity / 32) * altMultiplier, 0.2, 0.2 )
-
+		DrawBloom( 0.65, intensity * 4, 9, 9, 1, 1, intensity / 16, 0.2, 0.2 )
 		render.UpdateScreenEffectTexture()
-			cc:SetFloat("$c0_x", ((3.5 - intensity) * altMultiplier) * 1.5)
+			cc:SetFloat("$c0_x", 3.5 - intensity)
 			cc:SetInt("$c0_y", 1)
 			render.SetMaterial(cc)
 		render.DrawScreenQuad()
 	end
 	if hg.underberserk2 and IsValid(hg.berserkStation) then
-		--local intensity = ((hg.berserkStartTime2 + SysTime()) / 60) * 70 % 1
-		--intensity = math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
-		local currentBpm = getBerserkBPM()
-		local stationTime = hg.berserkStation:GetTime()
-		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
-		-- Guard against NaN from invalid station time
-		if intensity ~= intensity then intensity = 0 end
+		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * bpm:GetInt())
 		intensity = (intensity - math.Round(intensity)) % 1
 		intensity = math.Clamp((intensity * 0.25 + 0.75), 0, 1)
 		intensity = math.ease.InExpo(intensity) * berserkClamped * 2--math.abs(math.cos(1 - (intensity * 2))) * berserkClamped
-		-- Guard against NaN from easing function
-		if intensity ~= intensity then intensity = 0 end
-
 		tab2[ "$pp_colour_mulr" ] = (1.5 * math.min(1, berserk * 4)) + (intensity / 5)
 		tab2[ "$pp_colour_addr" ] = (0.1 * math.min(1, berserk * 4)) + intensity / 64
 		tab2[ "$pp_colour_colour" ] = 1 - math.Clamp(intensity, 0, 0.9)
@@ -410,19 +306,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 		hg.berserkClamped = berserkClamped
 	end
 	if IsValid(hg.berserkStation) then
-		if hg.berserkFadeOut then
-			local fadeProgress = (SysTime() - hg.berserkFadeOutStartTime) / 30
-			local volume = math.max(0, 1 - fadeProgress)
-			hg.berserkStation:SetVolume(volume)
-			if fadeProgress >= 1 then
-				hg.berserkStation:Stop()
-				hg.berserkStation = nil
-				hg.berserkFadeOut = false
-				hg.berserkMusicPlayed = false
-			end
-		else
-			hg.berserkStation:SetVolume(math.min(1, (organism.otrub and 0) or berserkClamped))
-		end
+		hg.berserkStation:SetVolume(math.min(1, (organism.otrub and 0) or berserkClamped))
 	end
 end)
 local grainMat = CreateMaterial("grain2berserk","screenspace_general",{
@@ -463,14 +347,7 @@ hook.Add("Post Post Processing", "berserkEffect", function()
 end)
 hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 	if ply:Alive() and hg.underberserk2 and IsValid(hg.berserkStation) and hg.berserkClamped then
-		local currentBpm = getBerserkBPM()
-		local stationTime = hg.berserkStation:GetTime()
-		local intensity = 1 - ((stationTime - offset:GetFloat()) / 60 * currentBpm)
-		-- Guard against NaN
-		if intensity ~= intensity then intensity = 0 end
-		if hg.berserkIntensity ~= hg.berserkIntensity then hg.berserkIntensity = 0 end
-		if hg.berserkClamped ~= hg.berserkClamped then hg.berserkClamped = 0 end
-		
+		local intensity = 1 - ((hg.berserkStation:GetTime() - offset:GetFloat()) / 60 * bpm:GetInt())
 		angles[1] = angles[1] - hg.berserkIntensity * 0.2
 		angles[3] = math.cos(CurTime() * 0.3) * hg.berserkClamped + hg.berserkIntensity * 2 * (intensity % 2 > 1 and 1 or -1)
 		fova[1] = fova[1] + hg.berserkIntensity * -2
@@ -478,9 +355,10 @@ hook.Add("HG_CalcView","InsaneRollCam",function(ply, origin, angles, fova)
 end)
 local META = FindMetaTable("Player")
 function META:IsBerserk()
-	if !self:Alive() then return false end
-
-	return hg.underberserk2 or false
+	if !IsValid(self) then return false end
+	if self:IsPlayer() and not self:Alive() then return false end
+	local org = self.organism
+	return org and org.berserkActive2 or false
 end
 local META2 = FindMetaTable("Entity")
 function META2:IsBerserk()
@@ -529,38 +407,11 @@ hook.Add("PostDrawTranslucentRenderables", "berserkSky", function(depth, drawsky
 		local sun_info = util.GetSunInfo()
 		if sun_info != nil then HM_sky_material:SetVector("$sunnormal", sun_info.direction) end
 		HM_sky_material:SetFloat("$duskscale",math.abs(math.sin(CurTime()*1.5))*1)
-		-- Fix division by zero / NaN
-		local duskIntensity = 0
-		if hg.berserkIntensity and hg.berserkIntensity > 0.001 then
-			duskIntensity = 0.2 * hg.berserkIntensity / (hg.berserkIntensity / 3)
-		end
-		HM_sky_material:SetFloat("$duskintensity", duskIntensity)
-
-		--print(hg.berserkIntensity)
+		HM_sky_material:SetFloat("$duskintensity",0.2*hg.berserkIntensity/(hg.berserkIntensity/3))
 		cam.Start3D(vector_origin, EyeAngles())
 			render.SetMaterial(HM_sky_material)
 			cam.IgnoreZ(true)
 			cam.IgnoreZ(false)
 		cam.End3D()
 	end
-end)
-
-hook.Add("Player_Death", "berserkCleanup", function(ply)
-	if ply ~= LocalPlayer() then return end
-
-	hg.underberserk = false
-	hg.underberserk2 = false
-	hg.berserkActivationSoundPlayed = false
-	hg.berserkMusicLoading = false
-	hg.berserkMusicPlayed = false
-	hg.berserkFadeOut = false
-
-	if IsValid(hg.berserkStation) then
-		hg.berserkStation:Stop()
-		hg.berserkStation = nil
-	end
-
-	hg.notificationFont = "HuyFont"
-	hg.berserkIntensity = 0
-	hg.berserkClamped = 0
 end)

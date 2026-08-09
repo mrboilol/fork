@@ -1,22 +1,3 @@
--- Preserve every existing font ID and sizing rule, but normalize the actual
--- text face before mode and library UI files create their fonts. fontello is
--- an icon glyph map, so replacing it would break the affected controls.
-if CLIENT and not surface.__zcity_vcr_osd_mono_font_override then
-    surface.__zcity_vcr_osd_mono_font_override = true
-
-    local createFont = surface.CreateFont
-    function surface.CreateFont(name, data)
-        if istable(data) then
-            data = table.Copy(data)
-            if data.font ~= "fontello" then
-                data.font = "VCR OSD Mono"
-            end
-        end
-
-        return createFont(name, data)
-    end
-end
-
 local function IncluderFunc(fileName)
 	if (fileName:find("sv_")) then
 		include(fileName)

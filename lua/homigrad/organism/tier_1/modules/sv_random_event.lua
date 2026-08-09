@@ -1,8 +1,10 @@
+--local Organism = hg.organism
 hg.organism.module.random_events = {}
 local module = hg.organism.module.random_events
 module[1] = function(org)
 	org.timeToRandom = CurTime() + math.random(120,320)
 end
+
 local RandomEvents = {
     ["Sneeze"] = function( owner, org )
         owner:EmitSound(ThatPlyIsFemale(owner) and "zcitysnd/female/sneez_"..math.random(1,4)..".mp3" or "zcitysnd/male/sneez_"..math.random(1,4)..".mp3", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
@@ -31,7 +33,7 @@ local RandomEvents = {
                 if not IsValid(owner) then return end
                 owner:ViewPunch(AngleRand(-.1,.1))
             end)
-        end
+        end 
     end,
     ["Cough"] = function( owner, org )
         owner:EmitSound(ThatPlyIsFemale(owner) and "zcitysnd/female/cough_"..math.random(1,6)..".mp3" or "zcitysnd/male/cough_"..math.random(1,6)..".mp3",75,100 + (owner.PlayerClassName == "furry" and 20 or 0),1)
@@ -40,61 +42,32 @@ local RandomEvents = {
             timer.Simple(.3,function()
                 owner:ViewPunch(Angle(2,0,0))
             end)
-        end)
+        end) -- жаль что сломалось, а ради этого неты делать ну, такое... | update уже неважно
     end,
-    ["Hiccup"] = function( owner, org )
-        owner:ViewPunch(Angle(-1,0,0))
-        owner:Notify(table.Random({
-            "Hic!",
-            "Hic... hic!",
-            "Where did that hiccup come from...?",
-            "Ugh... hic... the hiccups...",
-        }), 5, "rnd_hiccup", 0)
-    end,
-    ["Yawn"] = function( owner, org )
-        owner:ViewPunch(Angle(1,0,0))
-        owner:Notify(table.Random({
-            "Haaaah... I'm so tired...",
-            "Yawn... been a long day...",
-            "Can't stop yawning...",
-            "I need a nap...",
-        }), 5, "rnd_yawn", 0)
-    end,
-    ["Sigh"] = function( owner, org )
-        owner:Notify(table.Random({
-            "What a day...",
-            "Ahh... whatever...",
-            "This is fine. Everything's fine.",
-            "Can I just sit down for a minute...?",
-        }), 5, "rnd_sigh", 0)
-    end,
-    ["Groan"] = function( owner, org )
-        owner:ViewPunch(AngleRand(-1,1))
-        owner:Notify(table.Random({
-            "Ugh... my everything hurts...",
-            "Groan... I don't feel so good...",
-            "Ughh... should not have done that...",
-            "My body is screaming at me...",
-        }), 5, "rnd_groan", 0)
-    end,
-}
+} 
+
 function module.TriggerRandomEvent(owner, eventName)
     if RandomEvents[eventName] then
         if owner:IsRagdoll() then return end
         RandomEvents[eventName](owner, owner.organism)
     end
 end
+
 module[2] = function(owner, org, timeValue)
+    --print("huy")
     if org.timeToRandom < CurTime() and owner:IsPlayer() and owner:Alive() then
 		if owner:GetPlayerClass() and owner:GetPlayerClass().CanEmitRNDSound ~= nil and not owner:GetPlayerClass().CanEmitRNDSound then
 			return
 		end
+
         if not org.otrub then
             table.Random(RandomEvents)(owner,org)
         end
+
         org.timeToRandom = CurTime() + math.random(120,320)
     end
 end
+
 hook.Add("Org Think", "VirusRandomEvents", function(owner, org, timeValue)
     if not owner:IsPlayer() or not owner:Alive() then return end
     if owner:IsPlayer() and owner.Virus and owner.Virus.Infected and (owner.Virus.Stage == 1 or owner.Virus.Stage == 2) then
@@ -106,7 +79,8 @@ hook.Add("Org Think", "VirusRandomEvents", function(owner, org, timeValue)
         end
     end
 end)
-hook.Add("Org Think", "TemperatureSounds", function(owner, org, timeValue)
+
+hook.Add("Org Think", "TemperatureSounds", function(owner, org, timeValue) -- добавил звуки при низкой температуре Ж))
     if not owner:IsPlayer() or not owner:Alive() or org.otrub then return end
     if owner:IsPlayer() and org.temperature > 24 and org.temperature < 35 then
         local curTime = CurTime()
