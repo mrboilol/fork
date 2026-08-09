@@ -5,6 +5,10 @@ SWEP.PrintName = "AS «Val»"
 SWEP.Author = "TsNIITochmash Tula arms plant"
 SWEP.Instructions = "An incredibly potent armament, this steel/polymer 9x39mm gas-operated, selective-fire, integrally suppressed rifle, the ASVAL, is the epitome of Soviet special operations units in the mid-1980s. With a 20-round-capacity magazine, a folding stock, and a pistol grip, it's designed for precision and stealth. Its unique design allows it to fire subsonic ammunition, reducing muzzle flash and report to a mere whisper. This makes the ASVAL a formidable weapon in the right hands, symbolizing the silent but deadly efficiency of specialized warfare. \n\nRate of fire 900 rounds per minute"
 SWEP.Category = "Weapons - Assault Rifles"
+SWEP.WeaponRecoilMul = 0.7
+SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
+SWEP.holsteredPos = Vector(4, 6, -6)
+SWEP.holsteredAng = Angle(220, 0, 180)
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -82,7 +86,7 @@ SWEP.Primary.DefaultClip = 20
 SWEP.Primary.Automatic = true
 SWEP.Primary.Ammo = "9x39 mm"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 42
+SWEP.Primary.Damage = 46
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 42
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/m14/m14_suppressed_fp.ogg", 65, 90, 100}
@@ -108,23 +112,9 @@ SWEP.ReloadSoundes = {
 	"none"
 }
 
-SWEP.LocalMuzzlePos = Vector(28,-0.2,4)
-SWEP.LocalMuzzleAng = Angle(0,0,0)
-SWEP.WeaponEyeAngles = Angle(0,0,0)
-
-SWEP.PPSMuzzleEffectSuppress = "muzzleflash_suppressed"
-
-SWEP.HoldType = "rpg"
-SWEP.ZoomPos = Vector(0, -0.0762, 6.0112)
-SWEP.RHandPos = Vector(-5, -1, 1)
-SWEP.LHandPos = Vector(7, -2, -2)
-SWEP.ShockMultiplier = 3
-SWEP.CustomShell = "762x39"
---SWEP.EjectPos = Vector(-4,0,4)
---SWEP.EjectAng = Angle(0,0,-65)
-
-SWEP.weight = 4
-
+SWEP.RHandPos = Vector(4, -5.5, 3.5)
+SWEP.LHandPos = Vector(12, 0.2, -3.5)
+SWEP.Penetration = 19
 SWEP.Spray = {}
 for i = 1, 20 do
 	SWEP.Spray[i] = Angle(-0.01 - math.cos(i) * 0.01, math.cos(i * i) * 0.02, 0) * 1

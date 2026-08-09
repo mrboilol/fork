@@ -101,7 +101,7 @@ SWEP.Primary.DefaultClip = 200
 SWEP.Primary.Automatic = true
 SWEP.Primary.Ammo = "7.62x51 mm"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 65
+SWEP.Primary.Damage = 68
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 65
 SWEP.Primary.Sound = {"homigrad/weapons/rifle/hmg2.ogg", 75, 100, 110}
@@ -162,7 +162,7 @@ end
 
 SWEP.Ergonomics = 0.6
 SWEP.OpenBolt = true
-SWEP.Penetration = 20
+SWEP.Penetration = 23
 SWEP.WorldPos = Vector(4, 0, 0)
 SWEP.WorldAng = Angle(0, 0, 0)
 SWEP.UseCustomWorldModel = true

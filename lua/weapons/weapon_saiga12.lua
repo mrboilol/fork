@@ -5,6 +5,9 @@ SWEP.PrintName = "Saiga-12"
 SWEP.Author = "Izhevsk Machine-Building Plant"
 SWEP.Instructions = "Semi-automatic shotgun chambered in 12/70"
 SWEP.Category = "Weapons - Shotguns"
+SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
+SWEP.holsteredPos = Vector(-1, 4, -13)
+SWEP.holsteredAng = Angle(230, 0, 180)
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -71,8 +74,8 @@ SWEP.Primary.DefaultClip = 5
 SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "12/70 gauge"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 16
-SWEP.Primary.Spread = Vector(0.005, 0.005, 0.005)
+SWEP.Primary.Damage = 21
+SWEP.Primary.Spread = Vector(0.01, 0.01, 0.01)
 SWEP.Primary.Force = 12
 SWEP.Primary.Sound = {"toz_shotgun/toz_fp.wav", 80, 70, 75}
 SWEP.Primary.Wait = 0.2
@@ -92,7 +95,13 @@ SWEP.ReloadSoundes = {
 	"none"
 }
 
-SWEP.PPSMuzzleEffect = "muzzleflash_M3" -- shared in sh_effects.lua
+SWEP.RHandPos = Vector(0, -1, 0)
+SWEP.LHandPos = Vector(7, -2, -2)
+SWEP.Penetration = 12
+SWEP.Spray = {}
+for i = 1, 20 do
+	SWEP.Spray[i] = Angle(-0.0, 0, 0) * 1
+end
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
 SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}

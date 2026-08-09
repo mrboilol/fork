@@ -154,7 +154,7 @@ SWEP.Primary.DefaultClip = 30
 SWEP.Primary.Automatic = true
 SWEP.Primary.Ammo = "9x19 mm Parabellum"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 20
+SWEP.Primary.Damage = 24
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 25
 SWEP.animposmul = 2
@@ -187,17 +187,7 @@ SWEP.ZoomPos = Vector(0, -0.4991, 5.782)
 
 SWEP.RHandPos = Vector(0, -1, 0)
 SWEP.LHandPos = Vector(7, -2, -2)
-SWEP.availableAttachments = {
-	barrel = {
-		[1] = {"supressor4", Vector(0,0,0), {}},
-		[2] = {"supressor6", Vector(0,0,0), {}},
-		["mount"] = Vector(-2,0.45,0),
-	}
-}
-
-SWEP.attPos = Vector(1,0,0)
-SWEP.attAng = Angle(-0.02,0,0)
-
+SWEP.Penetration = 9
 SWEP.Spray = {}
 for i = 1, 30 do
 	SWEP.Spray[i] = Angle(-0.0, 0, 0) * 1

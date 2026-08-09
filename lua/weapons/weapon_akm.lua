@@ -5,6 +5,10 @@ SWEP.PrintName = "AKM"
 SWEP.Author = "Izhevsk Machine-Building Plant"
 SWEP.Instructions = "An extraordinarily potent instrument of power, this steel 7.62x39mm selective fire, gas-operated rifle with a rotating bolt, capable of firing in either semi-automatic or fully automatic mode, is the epitome of Soviet military might in the mid-20th century. With a cyclic rate of fire of around 600 rounds per minute and a 10-, 20-, or 30-round detachable box magazine, this AKM, designed by the renowned Mikhail Kalashnikov, stands as a symbol of the USSR’s technological progress. Its robust design and reliable performance in harsh conditions underline its reputation as a weapon that has left an indelible mark on global warfare"
 SWEP.Category = "Weapons - Assault Rifles"
+SWEP.WeaponRecoilMul = 0.7
+SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
+SWEP.holsteredPos = Vector(4, 6, -6)
+SWEP.holsteredAng = Angle(220, 0, 180)
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -129,7 +133,7 @@ SWEP.Primary.DefaultClip = 30
 SWEP.Primary.Automatic = true
 SWEP.Primary.Ammo = "7.62x39 mm"
 SWEP.Primary.Cone = 0
-SWEP.Primary.Damage = 50
+SWEP.Primary.Damage = 42
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 50
 SWEP.ShockMultiplier = 2
@@ -174,45 +178,17 @@ SWEP.availableAttachments = {
 			["mountType"] = "dovetail",
 		},
 	},
-	underbarrel = {
-		["mountType"] = "picatinny",
-		["mount"] = Vector(-7,1.4,-0.2),
-		["mountAngle"] = Angle(0, 0, 0),
-	},
-	grip = {
-		["mount"] = Vector(-16.2,-0.1,-0.2),
-		["mountType"] = "akm"
+	stock = {
+		[1] = {"stock_akm_std", Vector(0, 0, 0), {}},
+		["mountType"] = "ak_stock",
+		["mountBone"] = "weapon",
+		["mount"] = Vector(0.65, -9.6, -0.8),
 	},
 }
 
-SWEP.Primary.Wait = 0.095
-SWEP.ReloadTime = 5
-SWEP.ReloadSoundes = {
-	"none",
-	"none",
-	"none",
-	"weapons/tfa_ins2/ak103/ak103_magout.ogg",
-	"none",
-	"weapons/tfa_ins2/ak103/ak103_magin.ogg",
-	"none",
-	"weapons/tfa_ins2/ak103/ak103_boltback.ogg",
-	"weapons/tfa_ins2/ak103/ak103_boltrelease.ogg",
-	"none",
-	"none",
-	"none"
-}
-
-SWEP.LocalMuzzlePos = Vector(26.986,-0.2,2.741)
-SWEP.LocalMuzzleAng = Angle(-0.4,0,0)
-SWEP.WeaponEyeAngles = Angle(0,0,0)
-
-SWEP.PPSMuzzleEffect = "pcf_jack_mf_mrifle1" -- shared in sh_effects.lua
-
-SWEP.HoldType = "rpg"
-SWEP.ZoomPos = Vector(0, -0.0054, 4.8688)
-
-SWEP.RHandPos = Vector(-12, -1, 4)
-SWEP.LHandPos = Vector(7, -3, -2)
+SWEP.RHandPos = Vector(0, -1, 0)
+SWEP.LHandPos = Vector(7, -2, -2)
+SWEP.Penetration = 19
 SWEP.Spray = {}
 for i = 1, 30 do
 	SWEP.Spray[i] = Angle(-0.02 - math.cos(i) * 0.03, math.cos(i * i) * 0.02, 0) * 2
