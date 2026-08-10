@@ -1354,7 +1354,34 @@ function PANEL:PostInit()
 
     savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
 
-    savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
+    UI.SectionLabel(sidebar, "Identity")
+    UI.ButtonGrid(sidebar, {
+        {"Model", function() OpenModelMenu() end, function() return main.ActiveSection=="Model" end},
+        {"Facemap", function() OpenFacemapMenu() end, function() return main.ActiveSection=="Facemap" end}
+    })
+    UI.SectionLabel(sidebar, "Accessories")
+    UI.ButtonGrid(sidebar, {
+        {"Hat", function() OpenAccessorySlot(1,"Hat",{head=true,ears=true}) end, function() return main.ActiveSection=="Hat" end},
+        {"Face", function() OpenAccessorySlot(2,"Face",{face=true}) end, function() return main.ActiveSection=="Face" end},
+        {"Body", function() OpenAccessorySlot(3,"Body",{torso=true,spine=true}) end, function() return main.ActiveSection=="Body" end},
+        {"Hair", function() OpenAccessorySlot(4,"Hair",{head1=true}) end, function() return main.ActiveSection=="Hair" end},
+        {"Mask", function() OpenAccessorySlot(5,"Mask",{face2=true,mask=true}) end, function() return main.ActiveSection=="Mask" end},
+        {"Body 2", function() OpenAccessorySlot(6,"Body 2",{spine2=true}) end, function() return main.ActiveSection=="Body 2" end},
+        {"Tint", function() OpenAccessoryColorMenu() end, function() return main.ActiveSection=="Acc. Tint" end},
+        {"Poses", function() OpenPosesMenu() end, function() return main.ActiveSection=="Poses" end}
+    })
+    UI.SectionLabel(sidebar, "Clothing")
+    UI.ButtonGrid(sidebar, {
+        {"Jacket", function() OpenClothesMenu("main","Jacket",true) end, function() return main.ActiveSection=="Jacket" end},
+        {"Pants", function() OpenClothesMenu("pants","Pants") end, function() return main.ActiveSection=="Pants" end},
+        {"Boots", function() OpenClothesMenu("boots","Boots") end, function() return main.ActiveSection=="Boots" end},
+        {"Gloves", function() OpenGlovesMenu() end, function() return main.ActiveSection=="Gloves" end}
+    })
+    UI.SectionLabel(sidebar, "Bodygroups")
+    UI.ButtonGrid(sidebar, {
+        {"Torso", function() OpenBodygroupMenu("TORSO","Torso Shape") end, function() return main.ActiveSection=="Torso Shape" end},
+        {"Legs", function() OpenBodygroupMenu("LEGS","Legs Shape") end, function() return main.ActiveSection=="Legs Shape" end}
+    })
 
     CreateAppearanceTextButton(sidebar, "Model", function() OpenModelMenu() end, function() return main.ActiveSection == "Model" end)
     CreateAppearanceTextButton(sidebar, "Hat", function() OpenAccessorySlot(1, "Hat", {head = true, ears = true}) end, function() return main.ActiveSection == "Hat" end)
