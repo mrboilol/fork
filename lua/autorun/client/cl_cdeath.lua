@@ -1,6 +1,5 @@
 if not CLIENT then return end
 
--- config. maybe i'll make more of these customizable soon?
 local CLICK_SOUND         = "player/dfujiclick.wav"
 local STAGE_1_DURATION    = 0
 local STAGE_1_MIN_DIST    = 60
@@ -14,6 +13,15 @@ local DEATH_TEXT_FADE_IN  = 1
 local OPTIONS_FADE_IN     = 1.0
 local TRANSITION_DURATION = 0.6
 local DOUBLE_CLICK_WINDOW = 0.5
+
+local DEATH_MESSAGES = {
+    { title = "Deceased.", desc = "You are no longer a witness to the world." },
+    { title = "No Response.", desc = "Your body remains. You do not." },
+    { title = "Gone.", desc = "The world continues without your testimony." },
+    { title = "Expired.", desc = "All signs of breath has left you." },
+    { title = "Terminated.", desc = "Your perspective has been permanently interrupted." },
+    { title = "Silenced.", desc = "Nothing answers from inside the body." },
+}
 
 local DEATH_SOUNDS = {
     [0] = "rem_brutaldeath.mp3",
@@ -118,17 +126,21 @@ end
 local m_pitch = GetConVar("m_pitch")
 local m_yaw   = GetConVar("m_yaw")
 
-local hasSpawned    = false
-local isDead        = false
-local stage2Started = false
-local deathTime     = 0
-local deathDescription = DEATH_DESCRIPTIONS[1]
-local stage2Time    = 0
-local autoCompatTriggered = false
-local deathCamPos   = Vector(0, 0, 0)
-local deathCamAng   = Angle(0, 0, 0)
-local deathPos      = Vector(0, 0, 0)
-local ragdollEnt    = nil
+local CDeath = {}
+
+CDeath.hasSpawned    = false
+CDeath.isDead        = false
+CDeath.stage2Started = false
+CDeath.deathTime     = 0
+CDeath.stage2Time    = 0
+CDeath.autoCompatTriggered = false
+CDeath.deathCamPos   = Vector(0, 0, 0)
+CDeath.deathCamAng   = Angle(0, 0, 0)
+CDeath.deathPos      = Vector(0, 0, 0)
+CDeath.ragdollEnt    = nil
+CDeath.deathMessage  = DEATH_MESSAGES[1]
+CDeath.deathColor    = DEATH_COLORS[1]
+
 local matWhite      = Material("models/debug/debugwhite")
 
 local deathSoundChannels = {}
