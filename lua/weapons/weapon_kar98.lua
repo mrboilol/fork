@@ -273,7 +273,7 @@ function SWEP:Reload(time)
 			ply.organism.painadd = (ply.organism.painadd or 0) + painAmount
 		end
 		cock(self,1.5)
-		self:SetNetVar("shootgunReload",CurTime() + 1.3)
+		self:SetNetVar("shootgunReload",CurTime() + 1.6)
 		self:PlayAnim(self.AnimList["cycle"] or "cycle", 1.5, false, nil, false, true)
 		return
 	end
