@@ -12,12 +12,24 @@ SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_rif_m4a1.mdl"
-SWEP.WorldModelFake = "models/weapons/arc9_fas/shotguns/saiga.mdl"
-//PrintAnims(Entity(1):GetActiveWeapon():GetWM())
---uncomment for funny
-SWEP.FakePos = Vector(-24, 5, 11.5)
-SWEP.FakeAng = Angle(1.3, 0, 0)
-SWEP.AttachmentPos = Vector(37,-4.5,4.5)
+SWEP.WorldModelFake = "models/weapons/c_saiga12k.mdl"
+
+
+SWEP.ModularParts = {
+	pistolgrip = {
+		model = "models/weapons/mods/ak_pgrip_ak74_bakelit.mdl",
+		bonemerge = false,
+		bone = "mod_pistol_grip",
+		pos = Vector(0, 0, 0),
+		ang = Angle(0, 0, 0)
+	},
+}
+SWEP.HeldMagOffsetPos = Vector(0, 0, 0)
+SWEP.HeldMagOffsetAng = Angle(0, 0, 0)
+
+SWEP.FakePos = Vector(-13, 3, 12)
+SWEP.FakeAng = Angle(0, 0, -0.5)
+SWEP.AttachmentPos = Vector(0,0,-0)
 SWEP.AttachmentAng = Angle(0,0,0)
 SWEP.FakeAttachment = "1"
 SWEP.FakeBodyGroups = "00900080302"
@@ -82,17 +94,42 @@ SWEP.Primary.Wait = 0.2
 SWEP.NumBullet = 8
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
-SWEP.ReloadTime = 5.6
-SWEP.ReloadSoundes = {
-	"none",
-	"none",
-	"weapons/tfa_ins2/ak103/ak103_magout.ogg",
-	"weapons/tfa_ins2/ak103/ak103_magoutrattle.ogg",
-	"weapons/tfa_ins2/ak103/ak103_magin.ogg",
-	"weapons/tfa_ins2/ak103/ak103_boltback.ogg",
-	"weapons/tfa_ins2/ak103/ak103_boltrelease.ogg",
-	"none",
-	"none"
+SWEP.ReloadTime = 3
+
+SWEP.PPSMuzzleEffect = "pcf_jack_mf_mshotgun"
+
+SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HoldType = "rpg"
+
+SWEP.WepSelectIcon2 = Material("entities/arc9_eft_saiga12k.png")
+SWEP.IconOverride = "entities/arc9_eft_saiga12k.png"
+
+SWEP.weight = 3.6
+SWEP.ScrappersSlot = "Primary"
+
+SWEP.CustomShell = "12x70"
+SWEP.ShellEject = "ShotgunShellEject"
+
+SWEP.LocalMuzzlePos = Vector(25,-3.28,6.55)
+SWEP.LocalMuzzleAng = Angle(0,0,0)
+SWEP.WeaponEyeAngles = Angle(0, 0, 0)
+
+SWEP.DistSound = "weapons/darsu_eft/saiga12/saiga12_dist.wav"
+
+SWEP.StartAtt = {"holo7"}
+SWEP.availableAttachments = {
+	sight = {
+		["mountType"] = {"picatinny"},
+		["mount"] = {["picatinny"] = Vector(-22.5, 0.02, 2)},
+		["mountAngle"] = Angle(0,0,90) 
+	},
+    barrel = {
+        [1] = {"supressor13", Vector(0, 0, 0), {}},
+        [2] = {"supressor12", Vector(0, 0, 0), {}},
+        ["mount"] = Vector(-0.5, -0, 0),
+        ["mountAngle"] = Angle(0, -0, 90),
+    },
 }
 
 SWEP.RHandPos = Vector(0, -1, 0)
