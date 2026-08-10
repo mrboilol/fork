@@ -855,7 +855,7 @@ players : 1 humans, 0 bots (20 max)
 			fallSndStation:Stop()
 			fallSndStation = nil
 		end
-		sound.PlayFile( "sound/zcity/other/fallstatic.wav", "noplay noblock", function(station, _, _)
+		sound.PlayFile( "sound/zcity/other/fallstatic.ogg", "noplay noblock", function(station, _, _)
 			if IsValid(station) then
 				station:EnableLooping( true )
 				station:SetVolume( 0 )
@@ -867,7 +867,7 @@ players : 1 humans, 0 bots (20 max)
 			windSndStation:Stop()
 			windSndStation = nil
 		end
-		sound.PlayFile( "sound/zcity/other/runwind.wav", "noplay noblock", function(station, _, _)
+		sound.PlayFile( "sound/zcity/other/runwind.ogg", "noplay noblock", function(station, _, _)
 			if IsValid(station) then
 				station:EnableLooping( true )
 				station:SetVolume( 0 )

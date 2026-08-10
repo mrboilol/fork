@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "???"
 SWEP.Instructions = "I have no idea how to handle this."
@@ -90,7 +90,7 @@ SWEP.weight = 1.2
 
 SWEP.BlockTier = 10
 SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.ogg"
 
 SWEP.AnimList = {
     ["idle"] = "idle",
@@ -109,10 +109,10 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = true
 
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "slayerevent/slayerhit1.ogg"
-SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.wav"
+SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.ogg"
 SWEP.DeploySnd = "slayerevent/slayerequip.ogg"
 SWEP.HitFleshExtra = {
     "slayerevent/slayerhit1.ogg",

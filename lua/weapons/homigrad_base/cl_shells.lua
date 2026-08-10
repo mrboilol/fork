@@ -5,7 +5,7 @@ Shells["9x18"] = {m = "models/shells/fhell_9x18mm.mdl", s = "Shell"}
 Shells["45acp"] = {m = "models/shells/fhell_45cal.mdl", s = "Shell"}
 Shells["380acp"] = {m = "models/shells/fhell_380acp.mdl", s = "Shell"}
 Shells["50ae"] = {m = "models/shells/fhell_50ae.mdl", s = "Shell"}
-Shells["50cal"] = {m = "models/shells/fhell_50cal.mdl", s = {"weapons/shells/m249_link_concrete_01.wav","weapons/shells/m249_link_concrete_02.wav","weapons/shells/m249_link_concrete_03.wav","weapons/shells/m249_link_concrete_04.wav","weapons/shells/m249_link_concrete_05.wav","weapons/shells/m249_link_concrete_06.wav","weapons/shells/m249_link_concrete_07.wav","weapons/shells/m249_link_concrete_08.wav"}}
+Shells["50cal"] = {m = "models/shells/fhell_50cal.mdl", s = {"weapons/shells/m249_link_concrete_01.ogg","weapons/shells/m249_link_concrete_02.ogg","weapons/shells/m249_link_concrete_03.ogg","weapons/shells/m249_link_concrete_04.ogg","weapons/shells/m249_link_concrete_05.ogg","weapons/shells/m249_link_concrete_06.ogg","weapons/shells/m249_link_concrete_07.ogg","weapons/shells/m249_link_concrete_08.ogg"}}
 Shells["545x39"] = {m = "models/shells/fhell_545.mdl", s = "Shell"}
 Shells["556x45"] = {m = "models/shells/fhell_556.mdl", s = "Shell"}
 Shells["762x39"] = {m = "models/shells/fhell_762x39.mdl", s = "Shell"}
@@ -226,7 +226,7 @@ function hg.CreateMag( self, vel, bodygroups, bDontChangePhys )
 
 	ent:AddCallback("PhysicsCollide",function(ent,data)
 		if data.Speed > 100 then
-			ent:EmitSound("physics/metal/weapon_impact_hard"..math.random(1,3)..".wav", 60, 110)   
+			ent:EmitSound("physics/metal/weapon_impact_hard"..math.random(1,3)..".ogg", 60, 110)
 		end
 	end)
 

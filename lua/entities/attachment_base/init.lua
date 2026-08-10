@@ -33,7 +33,7 @@ function ENT:TakeByPlayer(activator)
 		activator.inventory = activator:GetNetVar("Inventory") or activator.inventory
 		activator.inventory.Attachments[#activator.inventory.Attachments + 1] = self.name
 		activator:SetNetVar("Inventory",activator.inventory)
-		self:EmitSound("physics/metal/weapon_impact_soft" .. math.random(3) .. ".wav", 65, math.random(90, 110), 1, CHAN_ITEM)
+		self:EmitSound("physics/metal/weapon_impact_soft" .. math.random(3) .. ".ogg", 65, math.random(90, 110), 1, CHAN_ITEM)
 		self:Remove()
 	end
 end

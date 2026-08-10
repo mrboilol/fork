@@ -36,7 +36,7 @@ end
 
 function ENT:PhysicsCollide(data, physobj)
 	if data.DeltaTime > .2 and data.Speed > 120 then
-		sound.Play("physics/metal/weapon_impact_hard" .. math.random(3) .. ".wav", self:LocalToWorld(self:OBBCenter()), 85)
+		sound.Play("physics/metal/weapon_impact_hard" .. math.random(3) .. ".ogg", self:LocalToWorld(self:OBBCenter()), 85)
 	end
 end
 

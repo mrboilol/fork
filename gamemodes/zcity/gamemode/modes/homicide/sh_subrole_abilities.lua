@@ -149,7 +149,7 @@ function MODE.BreakOtherNeck(ply, other_ply, aim_ent)
 		
 		aim_ent.organism.spine3 = 1
 		
-		aim_ent:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+		aim_ent:EmitSound("neck_snap_01.ogg", 60, 100, 1, CHAN_AUTO)
 
 		timer.Simple(0.1, function()
 			local ent = other_ply:GetNWEntity("RagdollDeath")

@@ -26,7 +26,7 @@ SWEP.offsetVec = Vector(2.5, -2.5, 0)
 SWEP.offsetAng = Angle(-30, 20, 180)
 SWEP.modeNames = {[1] = "zerlkers"}
 SWEP.modeValuesdef = {[1] = 1}
-SWEP.DeploySnd = "snd_jack_hmcd_pillsbounce.wav"
+SWEP.DeploySnd = "snd_jack_hmcd_pillsbounce.ogg"
 SWEP.FallSnd = "Metal_Barrel.ImpactHard"
 SWEP.showstats = false
 
@@ -69,8 +69,8 @@ end
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
-		self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
-		self:NPCHeal(owner, 0.2, "snd_jack_hmcd_pillsuse.wav")
+		self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.ogg")
+		self:NPCHeal(owner, 0.2, "snd_jack_hmcd_pillsuse.ogg")
 	end
 end
 
@@ -111,8 +111,8 @@ if SERVER then
 
 	function SWEP:Heal(ent)
 		if ent:IsNPC() then
-			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
-			self:NPCHeal(ent, 0.2, "snd_jack_hmcd_pillsuse.wav")
+			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.ogg")
+			self:NPCHeal(ent, 0.2, "snd_jack_hmcd_pillsuse.ogg")
 		end
 
 		local org = ent.organism
@@ -125,7 +125,7 @@ if SERVER then
 		end
 
 		local entOwner = IsValid(org.owner.FakeRagdoll) and org.owner.FakeRagdoll or org.owner
-		entOwner:EmitSound("snd_jack_hmcd_pillsuse.wav", 60, math.random(95, 105))
+		entOwner:EmitSound("snd_jack_hmcd_pillsuse.ogg", 60, math.random(95, 105))
 		-- Preserve active doses so taking another pill can cross the overdose
 		-- threshold. Round the remaining dose up because any still-active pill
 		-- counts as a full concurrent dose for toxicity.

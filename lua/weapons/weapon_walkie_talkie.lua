@@ -56,7 +56,7 @@ local ST_TYPE_LOCALFILE = 0
 local ST_TYPE_URL = 1
 
 SWEP.FMStations = {
-	[97.5] = {ST_TYPE_LOCALFILE, function() return "radiorandom/radio" .. math.random(1,10) .. ".wav", 0 end},
+	[97.5] = {ST_TYPE_LOCALFILE, function() return "radiorandom/radio" .. math.random(1,10) .. ".ogg", 0 end},
 
 	--[98.2] = {ST_TYPE_LOCALFILE, function()
 	--	local track = "zc_dyna_music/medge/a".. math.random(1,15) ..".mp3"
@@ -65,7 +65,7 @@ SWEP.FMStations = {
 }
 
 function SWEP:BippSound(ent, pitch)
-    ent:EmitSound("radio/voip_end_transmit_beep_0" .. math.random(1,8) .. ".wav", 35, pitch)
+    ent:EmitSound("radio/voip_end_transmit_beep_0" .. math.random(1,8) .. ".ogg", 35, pitch)
 end
 
 if SERVER then

@@ -160,7 +160,7 @@ local function CreateFallingAirdrop(items, requester)
     smoke:Spawn()
     smoke:Activate()
 
-    crate:EmitSound("ambient/machines/train_horn_distant1.wav", 100, 100)
+    crate:EmitSound("ambient/machines/train_horn_distant1.ogg", 100, 100)
     
 
     local fallTimer = "airdrop_fall_" .. crate:EntIndex()
@@ -187,7 +187,7 @@ local function CreateFallingAirdrop(items, requester)
  
         if distToTarget < 10 then
             timer.Remove(fallTimer)
-            crate:EmitSound("physics/metal/metal_box_impact_hard" .. math.random(1, 3) .. ".wav", 100)
+            crate:EmitSound("physics/metal/metal_box_impact_hard" .. math.random(1, 3) .. ".ogg", 100)
             
             if IsValid(light) then light:Remove() end
             if IsValid(smoke) then smoke:Remove() end
@@ -326,7 +326,7 @@ local function SpawnSupportTeam(requester)
             end
         end
         
-        requester:EmitSound("ambient/levels/streetwar/city_battle" .. math.random(1, 7) .. ".wav")
+        requester:EmitSound("ambient/levels/streetwar/city_battle" .. math.random(1, 7) .. ".ogg")
         
         return true
     end
@@ -479,7 +479,7 @@ local function RespawnDeadPlayers(requester)
             effectData:SetOrigin(ply:GetPos() + Vector(0, 0, 30))
             util.Effect("ManhackSparks", effectData)
             
-            ply:EmitSound("items/suitchargeok1.wav")
+            ply:EmitSound("items/suitchargeok1.ogg")
             
             respawnedCount = respawnedCount + 1
         end
@@ -493,13 +493,13 @@ local function RespawnDeadPlayers(requester)
         
 
         for _, ply in player.Iterator() do
-            ply:EmitSound("ambient/alarms/combine_bank_alarm_loop1.wav")
+            ply:EmitSound("ambient/alarms/combine_bank_alarm_loop1.ogg")
         end
         
         timer.Simple(2, function()
             for _, ply in player.Iterator() do
 				if not IsValid(ply) then return end
-                ply:StopSound("ambient/alarms/combine_bank_alarm_loop1.wav")
+                ply:StopSound("ambient/alarms/combine_bank_alarm_loop1.ogg")
             end
         end)
         

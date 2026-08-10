@@ -24,7 +24,7 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 80
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 80
-SWEP.Primary.Sound = {"weapons/tfa_hl2r/ar2/ar2_secondary_fire.wav", 120, 90, 100}
+SWEP.Primary.Sound = {"weapons/tfa_hl2r/ar2/ar2_secondary_fire.ogg", 120, 90, 100}
 SWEP.Primary.Wait = 1.0
 SWEP.ShellEject = true
 SWEP.MuzzleEffectType = 0
@@ -42,7 +42,7 @@ SWEP.WorldAng = Angle(0, 0, 0)
 SWEP.attPos = Vector(0,0,2)
 SWEP.attAng = Angle(-90,0,0)
 
-SWEP.DistSound = "weapons/tfa_ins2/m40a1/m40a1_fire.wav"
+SWEP.DistSound = "weapons/tfa_ins2/m40a1/m40a1_fire.ogg"
 
 SWEP.mat = Material("combine_sniper/huyhuy")
 SWEP.scopemat = Material("decals/scope.png")
@@ -113,14 +113,14 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magout.wav",
+	"weapons/ar2/ar2_magout.ogg",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magin.wav",
+	"weapons/ar2/ar2_magin.ogg",
 	"none",
-	"weapons/ar2/ar2_reload_rotate.wav",
+	"weapons/ar2/ar2_reload_rotate.ogg",
 	"none",
-	"weapons/ar2/ar2_push.wav",
+	"weapons/ar2/ar2_push.ogg",
 	"none",
 	"none",
 	"none",

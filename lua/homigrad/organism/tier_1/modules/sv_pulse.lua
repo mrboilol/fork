@@ -4,29 +4,23 @@ hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
 -- Blood-volume response is calculated rather than sampled from lookup tables.
--- All circulation reaches zero at the organism's shared 2 L terminal volume.
-local cardiacArrestBlood = 2000
+-- It approaches zero with the actual circulating volume; volume itself never
+-- acts as a cardiac-arrest switch.
 local terminalHeartRate = 300
 local peaDuration = 6
 
 local function getBloodPerfusion(blood)
-	-- Preserve enough central circulation at 3000 mL to keep an undamaged heart
-	-- out of the myocardial-ischemia band; the formula still reaches zero at 2 L.
+	-- Preserve enough central circulation at moderate loss while allowing an
+	-- almost empty circulation to become correspondingly ineffective.
 	return hg.organism.GetBloodDeliveryFraction(blood, 0.35)
 end
 
 local function getBloodCompensationRate(blood)
 	blood = tonumber(blood) or 5000
-	-- Early blood loss is compensated mostly by vascular tone. Keep 3500 mL in
-	-- the weakness range, then begin palpitations and rhythm instability around
-	-- 3000 mL before the terminal tachycardia at 2000 mL.
-	if blood >= 3000 then
-		local compensatedLoss = math.Clamp((5000 - blood) / 2000, 0, 1)
-		return 70 + compensatedLoss ^ 2 * 70 -- 140 BPM at 3000 mL
-	end
-
-	local decompensation = math.Clamp((3000 - blood) / 1000, 0, 1)
-	return 140 + decompensation ^ 1.5 * (terminalHeartRate - 140)
+	-- A smooth sympathetic curve tops out below ventricular-tachycardia rates;
+	-- near-empty volume cannot force an otherwise healthy heart to fibrillate.
+	local volumeLoss = 1 - math.Clamp(blood / 5000, 0, 1)
+	return 70 + volumeLoss ^ 1.7 * 110
 end
 
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
@@ -193,7 +187,7 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 	-- Conduction suppression begins in moderate hypothermia and grows toward
 	-- severe hypothermia.
 	local cold = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = math.Clamp((2250 - (org.blood or 5000)) / (2250 - cardiacArrestBlood), 0, 1)
+	local hemorrhagicDecompensation = math.Clamp((0.22 - (org.blood or 5000) / 5000) / 0.22, 0, 1)
 	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold, hemorrhagicDecompensation)
 
 	-- Complete/partial AV block is a direct conduction-system injury pattern,
@@ -405,11 +399,10 @@ module[2] = function(owner, org, timeValue)
 	pulse = pulse * compensationPulseMultiplier
 	pulse = pulse * (math.Clamp(math.Remap(org.temperature, 28, 36.7, 0.5, 1), 0.5, 1))
 
-	local bloodCrash = org.blood ~= nil and org.blood <= cardiacArrestBlood
 	-- Loss of circulation is progressive while the organism is still alive. This
 	-- leaves a short treatment window instead of turning a heart stop into an
 	-- immediate zero-pulse state on the next organism tick.
-	local dropRate = (heart == 0 or org.heartstop or bloodCrash) and timeValue * 6 or timeValue * 5
+	local dropRate = (heart == 0 or org.heartstop) and timeValue * 6 or timeValue * 5
 	org.pulse = math.Approach(org.pulse, pulse, dropRate)
 	local bloodVolume = getBloodVolume(org)
 	-- Stored O2 may outlast respiration briefly, but it cannot continue to
@@ -505,13 +498,13 @@ module[2] = function(owner, org, timeValue)
 	local hypoxiaSuppression = math.Clamp((12 - o2Value) / 12, 0, 1)
 	local cardiacSuppression = math.Clamp(org.heart or 0, 0, 1)
 	-- Compensation remains effective through mild cold. Below 34 C the sinus
-	-- node and conduction system progressively lose responsiveness. At terminal
-	-- blood volume, preload failure can also remove the prior tachycardia.
+	-- node and conduction system progressively lose responsiveness. Extremely low
+	-- preload can also remove the prior tachycardia without directly stopping it.
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
-	local hemorrhagicDecompensation = bloodNow <= cardiacArrestBlood and 1 or 0
+	local hemorrhagicDecompensation = math.Clamp((0.22 - bloodNow / 5000) / 0.22, 0, 1)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
-	-- Low blood volume produces tachycardia up to the terminal threshold; it
-	-- must not be treated as a bradycardia source before the pump actually fails.
+	-- Low blood volume produces tachycardia until preload becomes extremely poor;
+	-- it is not a bradycardia source before that point.
 	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression)
 	org.bradycardiaSeverity = bradycardiaSeverity
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
@@ -554,7 +547,7 @@ module[2] = function(owner, org, timeValue)
 	-- The cardiovascular response accelerates with blood loss. The old fixed
 	-- 2.4 BPM/s rise lagged so far behind active bleeding that the target curve
 	-- was never reached before pressure collapse.
-	local compensationResponse = math.Clamp((5000 - bloodNow) / (5000 - cardiacArrestBlood), 0, 1)
+	local compensationResponse = 1 - math.Clamp(bloodNow / 5000, 0, 1)
 	local riseRate = Lerp(compensationResponse, 5, 35)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * riseRate or timeValue * 4.5)
 	org.heartbeat = math.Clamp(org.heartbeat, 0, terminalHeartRate)
@@ -578,12 +571,9 @@ module[2] = function(owner, org, timeValue)
 	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
 	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
 
-	-- Blood loss drives the rhythm continuously toward 300 BPM at 2000 mL,
-	-- where perfusion is zero and circulation cannot be sustained.
+	-- Blood loss raises the compensation target continuously, but volume does not
+	-- flip the heart into an arrest state at an arbitrary threshold.
 	local restartCirculationActive = (org.cardiacRestartUntil or 0) > CurTime()
-	if not org.heartstop and bloodNow <= cardiacArrestBlood then
-		org.heartstop = true
-	end
 
 	-- Mild hypothermia produces a slow but organized sinus rhythm. Below 32 C,
 	-- conduction becomes electrically unstable; atrial fibrillation and ectopy
@@ -591,44 +581,25 @@ module[2] = function(owner, org, timeValue)
 	-- Keep VF as a no-output electrical arrest rather than a fast effective pulse.
 	local hypothermicArrhythmia = organSystemsEnabled and (org.temperature or 36.7) <= 32
 	local hypothermiaInstability = math.Clamp((32 - (org.temperature or 36.7)) / 4, 0, 1)
-	local terminalHemorrhage = bloodNow <= cardiacArrestBlood
-	if not (hypothermicArrhythmia or terminalHemorrhage) then
+	if not hypothermicArrhythmia then
 		org.unstableRhythm = nil
 		org.terminalRhythm = nil
 	elseif not org.heartstop and (org.nextColdRhythmRoll or 0) <= CurTime() then
 		local roll = math.Rand(0, 1)
-		if terminalHemorrhage then
-			org.nextColdRhythmRoll = CurTime() + 3
-			-- Reaching terminal blood volume is already certain arrest; this branch
-			-- only selects the final electrical presentation before death completes.
-			local hemorrhageInstability = 1
-			local instability = math.max(coldSuppression, hemorrhagicDecompensation, hemorrhageInstability)
-			if roll < 0.04 + instability * 0.36 then
-				org.terminalRhythm = "ventricular_fibrillation"
-				org.heartstop = true
-			elseif roll < 0.20 + instability * 0.38 then
-				org.unstableRhythm = "atrial_fibrillation"
-			elseif roll < 0.48 + instability * 0.38 then
-				org.unstableRhythm = "ventricular_ectopy"
-			else
-				org.unstableRhythm = nil
-			end
+		-- Isolated hypothermia deteriorates less abruptly than hemorrhagic
+		-- collapse. Let mild/severe cold show ectopy or AF first; VF becomes a
+		-- real but still uncommon event below 30 C.
+		org.nextColdRhythmRoll = CurTime() + 6
+		local deepCold = math.Clamp((30 - (org.temperature or 36.7)) / 2, 0, 1)
+		if roll < deepCold * 0.08 then
+			org.terminalRhythm = "ventricular_fibrillation"
+			org.heartstop = true
+		elseif roll < 0.03 + hypothermiaInstability * 0.16 then
+			org.unstableRhythm = "atrial_fibrillation"
+		elseif roll < 0.15 + hypothermiaInstability * 0.24 then
+			org.unstableRhythm = "ventricular_ectopy"
 		else
-			-- Isolated hypothermia deteriorates less abruptly than hemorrhagic
-			-- collapse. Let mild/severe cold show ectopy or AF first; VF becomes a
-			-- real but still uncommon event below 30 C.
-			org.nextColdRhythmRoll = CurTime() + 6
-			local deepCold = math.Clamp((30 - (org.temperature or 36.7)) / 2, 0, 1)
-			if roll < deepCold * 0.08 then
-				org.terminalRhythm = "ventricular_fibrillation"
-				org.heartstop = true
-			elseif roll < 0.03 + hypothermiaInstability * 0.16 then
-				org.unstableRhythm = "atrial_fibrillation"
-			elseif roll < 0.15 + hypothermiaInstability * 0.24 then
-				org.unstableRhythm = "ventricular_ectopy"
-			else
-				org.unstableRhythm = nil
-			end
+			org.unstableRhythm = nil
 		end
 	end
 
@@ -711,7 +682,8 @@ module[2] = function(owner, org, timeValue)
 	end
 
 	if org.fibrillation then
-		org.consciousness = math.min(org.consciousness, 1 - Clamp(org.hypotension or 0, 0, 1))
+		local pressureReserve = 1 - Clamp(org.hypotension or 0, 0, 1)
+		org.consciousness = math.min(org.consciousness, 0.33 + pressureReserve ^ 1.35 * 0.67)
 		org.o2[1] = max(org.o2[1] - timeValue * 1.8, 0)
 		if (org.fibrillationStart or CurTime()) + 24 < CurTime() or (org.cardiacOutput or 0) < 0.08 then org.heartstop = true end
 	end
@@ -722,22 +694,11 @@ module[2] = function(owner, org, timeValue)
 		org.painadd = org.painadd + math.Rand(4, 9) * ischemia
 		org.shock = math.max(org.shock, 10 + ischemia * 22)
 	end
-	if org.hypotension > 0.2 then org.consciousness = math.min(org.consciousness, 1 - Clamp(org.hypotension, 0, 1)) end
-
-    if org.hypotension > 0.55 then
-        -- Adrenaline, tranexamic acid and thiamine prevent low-circulation organ damage.
-        local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
-        local hasAntiIschemia = totalAdrenaline > 0.5 or (org.tranexamic_acid or 0) > 0 or (org.thiamine or 0) > 0
-        if not hasAntiIschemia then
-            local ischemiaK = math.Clamp((org.hypotension - 0.55) / 0.45, 0, 1)
-            local damage = timeValue * ischemiaK * 0.005
-            org.brain = math.min(org.brain + damage * 0.2, 1)
-            org.heart = math.min(org.heart + damage, 1)
-            org.liver = math.min(org.liver + damage * 0.5, 1)
-            org.stomach = math.min(org.stomach + damage * 0.3, 1)
-            org.intestines = math.min(org.intestines + damage * 0.3, 1)
-        end
-    end
+	if org.hypotension > 0.2 then
+		local pressureReserve = 1 - Clamp(org.hypotension, 0, 1)
+		local pressureConsciousness = 0.33 + pressureReserve ^ 1.35 * 0.67
+		org.consciousness = math.min(org.consciousness, pressureConsciousness)
+	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
 	local adrenalineStabilizer = totalAdrenaline > 0.8
@@ -775,7 +736,7 @@ module[2] = function(owner, org, timeValue)
 
 	if org.hypotension > 0.64 then
 		local shockK = math.Clamp((org.hypotension - 0.64) / 0.36, 0, 1)
-		org.shock = math.Approach(org.shock, 20 + shockK * 45, timeValue * (0.5 + shockK * 1.5))
+		org.shock = math.Approach(org.shock, math.max(org.shock, shockK * 20), timeValue * (0.5 + shockK * 1.5))
 	end
 
 	-- Poor perfusion weakens a player, but low tissue oxygen must be the first
@@ -790,8 +751,9 @@ module[2] = function(owner, org, timeValue)
 
 	-- Low pulse affects consciousness (below 40 BPM)
 	if org.pulse < 40 then
-		local pulseK = math.Clamp((40 - org.pulse) / 40, 0, 1)
-		org.consciousness = math.max(org.consciousness - timeValue * pulseK * 0.15, 0)
+		local pulseReserve = math.Clamp(org.pulse / 40, 0, 1)
+		local pulseConsciousness = 0.33 + pulseReserve ^ 1.35 * 0.67
+		org.consciousness = math.Approach(org.consciousness, math.min(org.consciousness, pulseConsciousness), timeValue * 0.15)
 	end
 
 	if org.hypertension > 0 then
@@ -814,16 +776,16 @@ module[2] = function(owner, org, timeValue)
 	-- epinephrine injection can affect an arrest before its normal decay tick.
 	local adren = math.max(org.adrenaline or 0, org.adrenalineAdd or 0)
 
-	local bloodCurveOwnsArrest = bloodNow <= 2500 and (org.heart or 0) < 0.8 and org.brain < 0.85
+	local volumeExplainsLowOutput = bloodNow <= 2500 and (org.heart or 0) < 0.8 and org.brain < 0.6
 	if organSystemsEnabled then
-		local failedCirculation = (org.pulse < 10 or org.hypotension > 0.92) and not bloodCurveOwnsArrest and not restartCirculationActive
-		if failedCirculation or org.brain >= 0.85 or (org.heart >= 0.8 and org.blood < 1500) then org.heartstop = true end
+		local failedCirculation = (org.pulse < 10 or org.hypotension > 0.92) and not volumeExplainsLowOutput and not restartCirculationActive
+		if failedCirculation or org.brain >= 0.85 or org.heart >= 0.9 then org.heartstop = true end
 		if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	end
 	-- A successful AED/epinephrine restart deliberately has a short window to
 	-- rebuild circulation.  Do not immediately overwrite it here just because
 	-- the previous arrest left the pulse at zero or caused temporary hypoxia.
-	if (org.pulse < 10 or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
+	if ((org.pulse < 10 and not volumeExplainsLowOutput) or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
 	if org.heartstop then
 		org.heartbeat = 0
@@ -854,7 +816,7 @@ module[2] = function(owner, org, timeValue)
 	if org.heartstop then
 		if not org.cardiacArrestStart then
 			org.cardiacArrestStart = CurTime()
-			org.cardiacArrestO2Start = math.Clamp(org.o2 and org.o2[1] or 0, 0, 6)
+			org.cardiacArrestO2Start = math.Clamp(org.o2 and org.o2[1] or 0, 0, org.o2 and org.o2.range or 30)
 		end
 
 		local arrestElapsed = math.max(CurTime() - org.cardiacArrestStart, 0)
@@ -907,7 +869,7 @@ module[2] = function(owner, org, timeValue)
 	-- arrest delay: the first gasp is immediate and later ones stay irregular.
 	local noOxygen = org.o2 and (org.o2[1] or 0) <= 0.25
 	if org.alive and org.otrub and (org.heartstop or noOxygen) and (org.lastsoundtime or 0) < CurTime() then
-		org.owner:EmitSound("breathing/agonalbreathing_" .. math.random(13) .. ".wav", 60)
+		org.owner:EmitSound("breathing/agonalbreathing_" .. math.random(13) .. ".ogg", 60)
 		org.lastsoundtime = CurTime() + math.Rand(4, 7)
 	end
 

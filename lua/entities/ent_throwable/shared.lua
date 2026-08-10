@@ -8,7 +8,7 @@ ENT.MaxLodgedEntities = 8
 ENT.NoDismemberment = true
 
 ENT.AttackHit = "Canister.ImpactHard"
-ENT.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+ENT.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
 ENT.Throwable = true
 
 -- Shared throwable defaults.

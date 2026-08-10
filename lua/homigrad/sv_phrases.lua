@@ -1,20 +1,20 @@
 local painPhrases = {
 	[1] = {
-		{"vo/npc/male01/moan", ".wav", 1, 5},
+		{"vo/npc/male01/moan", ".ogg", 1, 5},
 	},
 	[2] = {
-		{"vo/npc/female01/moan", ".wav", 1, 5},
+		{"vo/npc/female01/moan", ".ogg", 1, 5},
 	}
 }
 
 local bigPainPhrases = {
 	[1] = {
-		{"vo/npc/male01/pain", ".wav", 7, 9},
+		{"vo/npc/male01/pain", ".ogg", 7, 9},
 	},
 	[2] = {
-		{"vo/npc/female01/pain", ".wav", 9, 9},
-		{"vo/npc/female01/pain", ".wav", 6, 6},
-		{"vo/npc/female01/ow", ".wav", 2, 2},
+		{"vo/npc/female01/pain", ".ogg", 9, 9},
+		{"vo/npc/female01/pain", ".ogg", 6, 6},
+		{"vo/npc/female01/ow", ".ogg", 2, 2},
 	}
 }
 

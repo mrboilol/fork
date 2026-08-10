@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Hatchet"
 SWEP.Instructions = "A single-handed striking tool with a sharp blade on one side used to cut and split wood, and a hammerhead on the other side.\n\nLMB to attack.\nRMB to block.\nRMB + LMB to throw."
@@ -89,7 +89,7 @@ SWEP.swingsoundextra = {
 
 SWEP.BlockTier = 2
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {125, 145}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {125, 145}}
 SWEP.BlockDirectionalPrimary = "overhead"
 
 if CLIENT then
@@ -106,9 +106,9 @@ SWEP.TwoHanded = false
 
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.wav"
+SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.ogg"
 
 SWEP.AttackPos = Vector(0,0,0)
 
@@ -157,7 +157,7 @@ function SWEP:CustomAttack2()
     ent.PenetrationSize = 10
     ent.StickInWorld = true
     ent.StickPhysics = false
-    ent.UnstickSnd = "physics/metal/metal_solid_impact_hard3.wav"
+    ent.UnstickSnd = "physics/metal/metal_solid_impact_hard3.ogg"
     ent.ArteryChance = 1.45
     ent.StickDepth = -1.3
     ent.BodyStickDepth = -12

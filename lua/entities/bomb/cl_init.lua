@@ -264,7 +264,7 @@ CreateMenu = function(bomb)
 		but:SetText(i)
 		but:SetSize(138 * size,150 * size)
 		but.DoClick = function()
-			surface.PlaySound("weapons/p99/fireselect.wav")
+			surface.PlaySound("weapons/p99/fireselect.ogg")
 			--if surface.GetTextSize(txt) >= 56 then return end
 			if #txt >= 6 then return end
 			txt = txt..i
@@ -285,7 +285,7 @@ CreateMenu = function(bomb)
 	end
 
 	clearbut.DoClick = function()
-		surface.PlaySound("weapons/ins2/p80/m9_empty.wav")
+		surface.PlaySound("weapons/ins2/p80/m9_empty.ogg")
 		txt = ""
 	end
 
@@ -320,7 +320,7 @@ CreateMenu = function(bomb)
 			chat.AddText("The code must be of 6 numbers.")
 			return 
 		end
-		surface.PlaySound("weapons/tfa_ins2_sr25_eft/m14_empty.wav")
+		surface.PlaySound("weapons/tfa_ins2_sr25_eft/m14_empty.ogg")
 		net.Start("bomb_enter")
 		net.WriteString(txt)
 		net.SendToServer()

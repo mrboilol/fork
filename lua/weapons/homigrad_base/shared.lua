@@ -6,8 +6,8 @@ SWEP.Category = "Other"
 SWEP.Spawnable = false
 SWEP.AdminOnly = true
 SWEP.ReloadTime = 1
-SWEP.ReloadSound = "weapons/smg1/smg1_reload.wav"
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m14/handling/m14_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.ReloadSound = "weapons/smg1/smg1_reload.ogg"
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m14/handling/m14_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.1
 SWEP.Primary.Next = 0
 SWEP.ManualCycle = false
@@ -749,7 +749,7 @@ function SWEP:EmitShoot()
 	if SERVER then return end
 	local snd_new = "sounds_zcity/"..(string.Replace(self:GetClass(),"weapon_","")).."/"
 	local snd_close = snd_new.."close.wav"
-	local snd_suppressor = snd_new.."supressor.wav"
+	local snd_suppressor = snd_new.."supressor.ogg"
 	local snd_dist = snd_new.."dist.wav"
 
 	local vol = hg_gunshotvolume:GetFloat()
@@ -784,28 +784,28 @@ function SWEP:EmitShoot()
 	end
 
 	if self.Supressor then
-		self:PlaySnd(self.SupressedSound or "homigrad/weapons/pistols/sil.wav", nil, nil, vol * 1.5, 100, 55560, true)
+		self:PlaySnd(self.SupressedSound or "homigrad/weapons/pistols/sil.ogg", nil, nil, vol * 1.5, 100, 55560, true)
 
 		if !self.SupressorOnly then
-			self:PlaySnd("rifle_win1892/win1892_fire_01.wav", nil, nil, vol * (1 - insideVal / 16) * 0.3, math.Clamp(1 / self.Primary.Force / (self.NumBullet or 1) * 100 * 50,90,150), 55555, true)
+			self:PlaySnd("rifle_win1892/win1892_fire_01.ogg", nil, nil, vol * (1 - insideVal / 16) * 0.3, math.Clamp(1 / self.Primary.Force / (self.NumBullet or 1) * 100 * 50,90,150), 55555, true)
 
-			self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.wav", nil, nil, vol * (insideVal / 16) * 0.25, 150, 51256, true)
-			self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.wav", nil, nil, vol * (insideVal / 16) * 0.25, 80, 50256, true)
+			self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", nil, nil, vol * (insideVal / 16) * 0.25, 150, 51256, true)
+			self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", nil, nil, vol * (insideVal / 16) * 0.25, 80, 50256, true)
 			
 			if hg_highpitchgunfire:GetBool() or hg_gopro:GetBool() then
-				self:PlaySnd("grenades/grenade_flash_start_indoor_distant.wav", nil, nil, vol * (insideVal / 16) * 0.2, 80, 50257, true)
+				self:PlaySnd("grenades/grenade_flash_start_indoor_distant.ogg", nil, nil, vol * (insideVal / 16) * 0.2, 80, 50257, true)
 			end
 
 			self:PlaySnd("weapons/shoot/shot1.wav", nil, nil, vol * 0.35, 150, 52256, true)
 		end
 	elseif !self.NoWINCHESTERFIRE then
-		self:PlaySnd("rifle_win1892/win1892_fire_01.wav", nil, nil, vol * (1 - insideVal / 16), math.Clamp(1 / self.Primary.Force / (self.NumBullet or 1) * 100 * 50,90,150), 55555, true)
+		self:PlaySnd("rifle_win1892/win1892_fire_01.ogg", nil, nil, vol * (1 - insideVal / 16), math.Clamp(1 / self.Primary.Force / (self.NumBullet or 1) * 100 * 50,90,150), 55555, true)
 
-		self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.wav", nil, nil, vol * (insideVal / 16), 150, 51256, true)
-		self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.wav", nil, nil, vol * (insideVal / 16), 80, 50256, true)
+		self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", nil, nil, vol * (insideVal / 16), 150, 51256, true)
+		self:PlaySnd("zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", nil, nil, vol * (insideVal / 16), 80, 50256, true)
 		
 		if hg_highpitchgunfire:GetBool() or hg_gopro:GetBool() then
-			self:PlaySnd("grenades/grenade_flash_start_indoor_distant.wav", nil, nil, vol * (insideVal / 16), 80, 50257, true)
+			self:PlaySnd("grenades/grenade_flash_start_indoor_distant.ogg", nil, nil, vol * (insideVal / 16), 80, 50257, true)
 		end
 
 		self:PlaySnd("weapons/shoot/shot1.wav", nil, nil, vol * 1, 150, 52256, true)
@@ -828,7 +828,7 @@ function SWEP:EmitShoot()
 			self:PlaySnd(self.Primary.SoundFP, nil, nil, vol * 0.3, nil, 55534, true)
 		end
 	else
-		self:PlaySnd(self.Supressor and (self.SupressedSound or (self:IsPistolHoldType() and "homigrad/weapons/pistols/sil.wav" or "m4a1/m4a1_suppressed_fp.wav")) or self.Primary.Sound, nil, nil, vol, nil, 55533, not self.Supressor)
+		self:PlaySnd(self.Supressor and (self.SupressedSound or (self:IsPistolHoldType() and "homigrad/weapons/pistols/sil.ogg" or "m4a1/m4a1_suppressed_fp.ogg")) or self.Primary.Sound, nil, nil, vol, nil, 55533, not self.Supressor)
 		if self.Supressor and self.Primary.Sound and !self.SupressorOnly then
 			self:PlaySnd(self.Primary.Sound, nil, nil, vol * 0.3, nil, 55534, true)
 		end
@@ -1523,7 +1523,7 @@ function SWEP:CoreStep()
 	local stam = (owner.organism ~= nil and owner.organism.stamina and owner.organism.stamina[1]) or 180
 	if owner:GetNWFloat("InLegKick",0) <= CurTime() and (!(IsValid(owner.FakeRagdoll) or IsValid(owner.FakeRagdollOld)) or false--[[self:Clip1() <= 0]]) and self:KeyDown(IN_ATTACK) and self:KeyDown(IN_USE) and ((self:GetButtstockAttack() + 1 * ((math.max(0, (self.weight - 3)) * 0.2) + 1) * (math.Clamp((180 - stam) / 90, 1, 2))) < CurTime()) and owner:GetVelocity():LengthSqr() < 250 * 250 and (SERVER or IsFirstTimePredicted()) then
 		self:SetButtstockAttack(CurTime())
-		self:GetOwner():EmitSound("weapons/tfa/melee"..math.random(1,6)..".wav")
+		self:GetOwner():EmitSound("weapons/tfa/melee"..math.random(1,6)..".ogg")
 		if SERVER then
 			//timer.Simple(0.15, function()
 				owner:LagCompensation(true)
@@ -1543,9 +1543,9 @@ function SWEP:CoreStep()
 					ent:TakeDamageInfo(dmgInfo)
 
 					if ent:IsPlayer() or ent:IsRagdoll() or ent:IsNPC() then
-						owner:EmitSound("weapons/tfa/melee_hit_world"..math.random(1,3)..".wav", 65)
+						owner:EmitSound("weapons/tfa/melee_hit_world"..math.random(1,3)..".ogg", 65)
 					else
-						owner:EmitSound("physics/metal/weapon_impact_hard3.wav", 65)
+						owner:EmitSound("physics/metal/weapon_impact_hard3.ogg", 65)
 					end
 
 					if ent:IsPlayer() then
@@ -1591,8 +1591,8 @@ function SWEP:CoreStep()
 	if CLIENT then
 		if self:IsZoom() then
 			if not self.zoomsound then
-				//self:PlaySnd({"pwb2/weapons/p90/cloth3.wav",60,80,120},false,CHAN_BODY)
-				sound.Play("pwb2/weapons/p90/cloth3.wav", self:GetPos(), 55)
+				//self:PlaySnd({"pwb2/weapons/p90/cloth3.ogg",60,80,120},false,CHAN_BODY)
+				sound.Play("pwb2/weapons/p90/cloth3.ogg", self:GetPos(), 55)
 				self.zoomsound = true
 				
 				if self:IsClient() then
@@ -1601,8 +1601,8 @@ function SWEP:CoreStep()
 			end
 		else
 			if self.zoomsound then
-				sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.wav", self:GetPos(), 55)
-				//self:PlaySnd({"pwb2/weapons/matebahomeprotection/mateba_cloth.wav",60,80,120},false,CHAN_BODY)
+				sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.ogg", self:GetPos(), 55)
+				//self:PlaySnd({"pwb2/weapons/matebahomeprotection/mateba_cloth.ogg",60,80,120},false,CHAN_BODY)
 			end
 			self.zoomsound = nil
 		end
@@ -1986,11 +1986,11 @@ function SWEP:GetAdditionalValues()
 			ViewPunch2(-punchAng)
 		end
 		if not self.zoomingBigSnd and self.k > 0.6 and not self:IsPistolHoldType() then
-			self:EmitSound("weapons/universal/uni_ads_in_0" .. math.random(6) .. ".wav",40)
+			self:EmitSound("weapons/universal/uni_ads_in_0" .. math.random(6) .. ".ogg",40)
 			self.zoomingBigSnd = true
 		end
 	elseif self.zoomingBigSnd and self:IsClient() and self.k < 0.75 then
-		self:EmitSound("weapons/universal/uni_ads_out_01.wav",40)
+		self:EmitSound("weapons/universal/uni_ads_out_01.ogg",40)
 		self.zoomingBigSnd = false
 	end
 
@@ -2243,18 +2243,19 @@ function SWEP:GetAdditionalValues()
 
 			if (self.recoilWobbleAmp or 0) > 0.0001 then
 				local t = CurTime()
-				local amp = self.recoilWobbleAmp
+				local amp = self.recoilWobbleAmp * 1.2
+				local sideAmp = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 				local longGun = not self:IsPistolHoldType() and not self.PistolKinda
 				local wobX = math.sin(t * 1.65) * 0.65 + math.sin(t * 2.95) * 0.35
 				local wobY = math.cos(t * 2.05) * 0.65 + math.cos(t * 3.45) * 0.35
 				local wobZ = math.sin(t * 2.45) * 0.65 + math.cos(t * 3.2) * 0.35
 
 				self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (longGun and 2.15 or 1.55)
-				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.045 or 0.1)
-				self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.32 or 1.05)
+				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (longGun and 0.55 or 0.1) * sideAmp
+				self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.7 or 1.05) * sideAmp
 				self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
-				self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.03
-				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.42
+				self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.26 * sideAmp
+				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.5
 			end
 		end
 	end
@@ -2893,7 +2894,7 @@ end
 hook.Add( "EntityEmitSound", "WeaponDropSound", function( t )
 	--print(string.find(t.SoundName,"physics/metal/weapon_impact_*"))
 	if string.find(t.SoundName,"physics/metal/weapon_impact_*") then
-		t.SoundName = "weapon_impact_soft"..math_random(1,3)..".wav"
+		t.SoundName = "weapon_impact_soft"..math_random(1,3)..".ogg"
 		t.Pitch = t.Pitch - 10
 		return true
 	end 
@@ -2902,11 +2903,11 @@ end)
 --[[
 ["Entity"]      =       Entity [0][worldspawn]
 ["Flags"]       =       0
-["OriginalSoundName"]   =       physics/metal/weapon_impact_hard2.wav
+["OriginalSoundName"]   =       physics/metal/weapon_impact_hard2.ogg
 ["Pitch"]       =       98
 ["Pos"] =       805.196838 -249.144257 -139.931976
 ["SoundLevel"]  =       75
-["SoundName"]   =       physics/metal/weapon_impact_hard2.wav
+["SoundName"]   =       physics/metal/weapon_impact_hard2.ogg
 ["SoundTime"]   =       0
 ["Volume"]      =       0.599609375
 ["Ambient"]     =       false

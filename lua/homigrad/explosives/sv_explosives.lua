@@ -22,15 +22,15 @@ function hg.MakeCombinedExplosion()
 end
 
 local DebrisSounds = {
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave01.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave010.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave02.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave03.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave04.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave05.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave06.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave07.wav",
-	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave09.wav"
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave01.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave010.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave02.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave03.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave04.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave05.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave06.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave07.ogg",
+	"explosion_debris/interior/explosion_debris_sprinkle_interior_wave09.ogg"
 }
 
 local ExplosionExtraSounds = {

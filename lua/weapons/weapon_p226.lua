@@ -54,11 +54,11 @@ SWEP.AnimsEvents = {
         [0.6] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_magin.wav") end,
     },
     ["reload_empty"] = {
-        [0.025] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_boltrelease.wav") end,
+        [0.025] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg") end,
 		[0.1] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_magout.wav") end,
 		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.ogg") end,
 		[0.5] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_magin.wav") end,
-		[0.8] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_boltrelease.wav") end,
+		[0.8] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg") end,
     },
 }
 

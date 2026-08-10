@@ -21,26 +21,26 @@ DEFENSE_WAVE_DEFINITIONS = {}
 
 DEFENSE_MUSIC = {
     WAVE = {
-        [1] = "music_themes/defense/wave01.wav",
-        [2] = "music_themes/defense/wave02.wav",
-        [3] = "music_themes/defense/wave03.wav",
-        [4] = "music_themes/defense/wave04.wav",
+        [1] = "music_themes/defense/wave01.ogg",
+        [2] = "music_themes/defense/wave02.ogg",
+        [3] = "music_themes/defense/wave03.ogg",
+        [4] = "music_themes/defense/wave04.ogg",
         [5] = "music_themes/exhaustion.mp3",
-        [6] = "music_themes/defense/wave02.wav",
-        [7] = "music_themes/defense/wave01.wav",
-        [8] = "music_themes/defense/wave02.wav",
-        [9] = "music_themes/defense/wave03.wav",
-        [10] = "music_themes/defense/wave04.wav",
+        [6] = "music_themes/defense/wave02.ogg",
+        [7] = "music_themes/defense/wave01.ogg",
+        [8] = "music_themes/defense/wave02.ogg",
+        [9] = "music_themes/defense/wave03.ogg",
+        [10] = "music_themes/defense/wave04.ogg",
         [11] = "music_themes/exhaustion.mp3",
-        [12] = "music_themes/defense/wave02.wav",
+        [12] = "music_themes/defense/wave02.ogg",
     },
     WAITING = {
-        [0] = "music_themes/dm/mpdkick.wav",
-        [1] = "music_themes/defense/waiting_theme01.wav",
-        [2] = "music_themes/defense/waiting_theme02.wav",
+        [0] = "music_themes/dm/mpdkick.ogg",
+        [1] = "music_themes/defense/waiting_theme01.ogg",
+        [2] = "music_themes/defense/waiting_theme02.ogg",
         [3] = "music_themes/unnamed.mp3",
         [4] = "music_themes/roll.mp3",
-        [5] = "music_themes/defense/waiting_theme02.wav"
+        [5] = "music_themes/defense/waiting_theme02.ogg"
     }
 }
 

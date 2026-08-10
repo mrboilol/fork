@@ -292,9 +292,9 @@ function SWEP:InitializeAdd()
 	self.ModelScale = 0.9
 end
 
-SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
+SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.ogg"
 SWEP.HolsterSnd = ""
-SWEP.FallSnd = "physics/body/body_medium_impact_soft5.wav"
+SWEP.FallSnd = "physics/body/body_medium_impact_soft5.ogg"
 
 if CLIENT then
 	SWEP.HowToUseInstructions = "<font=ZCity_Tiny>"..string.upper( (input.LookupBinding("+use") or "BIND YOUR +USE KEY PLEASE. WRITE \"bind e +use\" IN CONSOLE FOR THE LOVE OF GOD") ).." to pickup</font>"
@@ -314,7 +314,7 @@ function SWEP:Initialize()
 	util.PrecacheSound(self.DeploySnd)
 	util.PrecacheSound(self.HolsterSnd)
 	util.PrecacheSound(self.FallSnd)
-	util.PrecacheSound("snd_jack_hmcd_needleprick.wav")
+	util.PrecacheSound("snd_jack_hmcd_needleprick.ogg")
 	
 	self:AddCallback("PhysicsCollide",function(ent,data)
 		if data.Speed > 200 then
@@ -599,7 +599,7 @@ if SERVER then
 		end
 
 		if done then
-			owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
+			owner:EmitSound("snd_jack_hmcd_bandage.ogg", 60, math.random(95, 105))
 
 			if self.poisoned2 then
 				org.poison4 = CurTime()
@@ -613,7 +613,7 @@ if SERVER then
 
 	function SWEP:Heal(ent, mode, bone)
 		if ent:IsNPC() then
-			self:NPCHeal(ent, 0.15, "snd_jack_hmcd_bandage.wav")
+			self:NPCHeal(ent, 0.15, "snd_jack_hmcd_bandage.ogg")
 		end
 
 		local org = ent.organism
@@ -858,7 +858,7 @@ if SERVER then
 
 			SetNetVar("TourniquetGuys",hg.TourniquetGuys)
 
-			self:GetOwner():EmitSound("snd_jack_hmcd_bandage.wav", 65, math.random(95, 105))
+			self:GetOwner():EmitSound("snd_jack_hmcd_bandage.ogg", 65, math.random(95, 105))
 			return true
 		end
 	end
@@ -1215,7 +1215,7 @@ function SWEP:NPCHeal(npc, mul, snd)
 			mul = 0.3
 		end
 		npc:SetHealth(math.Clamp(npc:Health() + (npc:GetMaxHealth() * 1 * mul), 0, npc:GetMaxHealth() * math.Clamp(2 * mul, 2, 100)))
-		npc:EmitSound(snd or "snd_jack_hmcd_bandage.wav", 75, math.random(95, 105))
+		npc:EmitSound(snd or "snd_jack_hmcd_bandage.ogg", 75, math.random(95, 105))
 
 		if SERVER then
 			self:Remove()
@@ -1226,7 +1226,7 @@ end
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
-		self:NPCHeal(owner, 0.15, "snd_jack_hmcd_bandage.wav")
+		self:NPCHeal(owner, 0.15, "snd_jack_hmcd_bandage.ogg")
 	end
 end
 

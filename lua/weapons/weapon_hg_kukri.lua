@@ -17,7 +17,7 @@ SWEP.SuicideAng = Angle(-90, -180, 90)
 SWEP.SuicideCutVec = Vector(3, -6, 0)
 SWEP.SuicideCutAng = Angle(10, 0, 0)
 SWEP.SuicideTime = 0.5
-SWEP.SuicideSound = "weapons/knife/knife_hit1.wav"
+SWEP.SuicideSound = "weapons/knife/knife_hit1.ogg"
 SWEP.CanSuicide = true
 SWEP.SuicideNoLH = true
 SWEP.SuicidePunchAng = Angle(0, -15, 0)
@@ -139,16 +139,16 @@ SWEP.setlh = false
 SWEP.setrh = true
 SWEP.TwoHanded = false
 
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "weapons/darsu_eft/melee/body3.ogg"
 SWEP.Attack2HitFlesh = "weapons/darsu_eft/melee/body4.ogg"
-SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
+SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {145, 155}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {145, 155}}
 
 SWEP.BlockDirectionalCharge = "overhead"
 
@@ -157,9 +157,9 @@ function SWEP:CanSecondaryAttack()
     if owner.organism and owner.organism.larmamputated then return end
 
     self.DamageType = DMG_CLUB
-    self.AttackHit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".wav"
-    self.Attack2Hit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".wav"
-    self.Attack2HitFlesh = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".wav"
+    self.AttackHit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".ogg"
+    self.Attack2Hit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".ogg"
+    self.Attack2HitFlesh = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".ogg"
     self.setlh = true
     self.HoldType = "duel"
     timer.Simple(0.5,function()
@@ -174,8 +174,8 @@ end
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
     self.AttackHit = "Canister.ImpactHard"
-    self.Attack2Hit = "snd_jack_hmcd_axehit.wav"
-    self.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+    self.Attack2Hit = "snd_jack_hmcd_axehit.ogg"
+    self.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
     return true
 end
 

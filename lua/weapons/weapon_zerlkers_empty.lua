@@ -44,7 +44,7 @@ SWEP.HideMeshOnlyScale = {Weapon = true}
 SWEP.NoSpoon = true
 SWEP.NoTrap = true
 SWEP.spoon = false
-SWEP.throwsound = "weapons/m67/m67_throw_01.wav"
+SWEP.throwsound = "weapons/m67/m67_throw_01.ogg"
 SWEP.DeploySnd = "Plastic_Box.ImpactSoft"
 SWEP.showstats = false
 

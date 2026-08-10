@@ -146,8 +146,8 @@ if SERVER then
         end
     end
 
-    local GRAB_SOUND = "physics/metal/metal_solid_strain%d.wav"
-    local MOVE_SOUND = "physics/metal/metal_box_strain%d.wav" -- up to 4
+    local GRAB_SOUND = "physics/metal/metal_solid_strain%d.ogg"
+    local MOVE_SOUND = "physics/metal/metal_box_strain%d.ogg" -- up to 4
 
     function ENT:OnSeatInput( seatIndex, action, pressed )
         if action ~= "attack" or seatIndex > 1 or not self.HasMagnet then

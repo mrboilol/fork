@@ -71,7 +71,7 @@ function PANEL:Init()
         self.rightName:SetText(self.victim)
         self.rightName:SetTextColor(!self.victimteam and ctcolor or tcolor)
     end)
-	sound.PlayFile("homigrad/vgui/deathnotice.wav", "", function() end)
+	sound.PlayFile("homigrad/vgui/deathnotice.ogg", "", function() end)
 
     
 

@@ -66,7 +66,7 @@ function SWEP:PrimaryAttack()
     ent.damage = 25
     ent.MaxSpeed = 1200
     ent.DamageType = DMG_CLUB
-    ent.AttackHit = "physics/metal/metal_solid_impact_soft" .. math.random(1, 3) .. ".wav"
+    ent.AttackHit = "physics/metal/metal_solid_impact_soft" .. math.random(1, 3) .. ".ogg"
     ent.AttackHitFlesh = "Flesh.ImpactHard"
     ent.noStuck = true
     ent.modelscale = self.modelscale or 1.0
@@ -89,7 +89,7 @@ function SWEP:PrimaryAttack()
         end
     end
 
-    ply:EmitSound("weapons/slam/throw.wav", 75, math.random(95, 105))
+    ply:EmitSound("weapons/slam/throw.ogg", 75, math.random(95, 105))
     ply:ViewPunch(Angle(-8, 0, -10))
     
     ply:SelectWeapon("weapon_hands_sh")

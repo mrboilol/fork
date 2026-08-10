@@ -80,14 +80,14 @@ sound.Add( {
 	volume = 0.02,
 	level = 65,
 	pitch = {5555, 5555},
-	sound = "snd_jack_sss.wav",
+	sound = "snd_jack_sss.ogg",
 } )
 
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage()
-		self:NPCHeal(owner, 0.3, "snd_jack_hmcd_needleprick.wav")
+		self:NPCHeal(owner, 0.3, "snd_jack_hmcd_needleprick.ogg")
 	end
 end
 
@@ -95,7 +95,7 @@ if SERVER then
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage()
-			self:NPCHeal(ent, 0.3, "snd_jack_hmcd_needleprick.wav")
+			self:NPCHeal(ent, 0.3, "snd_jack_hmcd_needleprick.ogg")
 		end
 
 		local org = ent.organism

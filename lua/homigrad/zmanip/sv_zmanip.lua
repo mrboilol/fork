@@ -49,7 +49,7 @@ hook.Add("Player Think", "ZManipSwimAnim", function(ply, time, dtime)
 		ply.ZManipSwimCD = CurTime() + 0.95
 		if not (ply:WaterLevel() > 2) then
 			local snd = math.random(1,11)
-			ply:EmitSound("zcitysnd/player/footsteps/wade" .. ( snd ) .. ".wav")
+			ply:EmitSound("zcitysnd/player/footsteps/wade" .. ( snd ) .. ".ogg")
 		end
 		if IsValid(ply:GetActiveWeapon()) and ishgweapon(ply:GetActiveWeapon()) then
 			if ply:KeyDown(IN_FORWARD) or ply:KeyDown(IN_MOVERIGHT) then

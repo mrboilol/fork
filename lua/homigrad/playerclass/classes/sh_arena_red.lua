@@ -51,7 +51,7 @@ hook.Add("HG_PlayerFootstep", "arena_red_footsteps", function(ply, pos, foot, so
             snd = sound
         end
 
-        EmitSound("homigrad/player/footsteps/new/bass_0" .. math.random(9) .. ".wav", pos, ply:EntIndex(), CHAN_AUTO, volume, 75, nil, changePitch(math.random(95, 105)))
+        EmitSound("homigrad/player/footsteps/new/bass_0" .. math.random(9) .. ".ogg", pos, ply:EntIndex(), CHAN_AUTO, volume, 75, nil, changePitch(math.random(95, 105)))
         EmitSound(snd, pos, ply:EntIndex(), CHAN_AUTO, volume, 75, nil, changePitch(math.random(95, 105)))
     end
 end)

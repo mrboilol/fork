@@ -1249,7 +1249,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if canRetrySound("ConsciousnessWhiteNoise", ConsciousnessWhiteNoise) then
-		sound.PlayFile("sound/homigrad/whitenoise.wav", "noblock noplay", function(station)
+		sound.PlayFile("sound/homigrad/whitenoise.ogg", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1517,7 +1517,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 
 	if org.consciousness < 0.5 then
         if canRetrySound("WhiteNoiseStation", WhiteNoiseStation) then
-            sound.PlayFile("sound/whitenoise.wav", "noblock noplay", function(station)
+            sound.PlayFile("sound/whitenoise.ogg", "noblock noplay", function(station)
                 if IsValid(station) then
                     station:EnableLooping(true)
                     station:Play()

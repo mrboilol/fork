@@ -44,7 +44,7 @@ SWEP.CanSuicide = false
 
 SWEP.ReloadSound = "weapons/tfa_ins2/k98/m40a1_boltlatch.wav"
 SWEP.CockSound = "weapons/tfa_ins2/k98/m40a1_boltlatch.wav"
-SWEP.DistSound = "mosin/mosin_dist.wav"
+SWEP.DistSound = "mosin/mosin_dist.ogg"
 SWEP.weight = 4
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
@@ -60,7 +60,7 @@ SWEP.Primary.Spread = 0
 SWEP.Primary.Damage = 320
 SWEP.Primary.Force = 320
 SWEP.Primary.Sound = {"weapons/easternfront/ptrd41/ptrd41_fp.wav", 80, 90, 100}
-SWEP.SupressedSound = {"mosin/mosin_suppressed_fp.wav", 80, 90, 100}
+SWEP.SupressedSound = {"mosin/mosin_suppressed_fp.ogg", 80, 90, 100}
 SWEP.availableAttachments = {}
 
 SWEP.Primary.Wait = 0.25

@@ -35,7 +35,7 @@ function ENT:TakeByPlayer(activator)
 		activator:SetNetVar("Inventory",activator.inventory)
 		activator:SetNetVar("flashlight",self:GetNetVar("enabled"))
 		activator:ViewPunch(AngleRand(-1, 1))
-		self:EmitSound("snd_jack_tinyequip.wav", 65, math.random(95, 105), 1, CHAN_ITEM)
+		self:EmitSound("snd_jack_tinyequip.ogg", 65, math.random(95, 105), 1, CHAN_ITEM)
 		self:Remove()
 	end
 end

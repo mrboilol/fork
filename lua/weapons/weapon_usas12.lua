@@ -45,7 +45,7 @@ SWEP.FakeReloadSounds = {
 }
 
 SWEP.FakeEmptyReloadSounds = {
-	--[0.22] = "weapons/ak74/ak74_magrelease.wav",
+	--[0.22] = "weapons/ak74/ak74_magrelease.ogg",
 	[0.22] = "weapons/universal/uni_crawl_l_03.wav",
 	[0.34] = "weapons/darsu_eft/aa12/aa12_drum_out_0.ogg",
 	--[0.4] = "weapons/ak74/ak74_magout_rattle.wav",
@@ -139,8 +139,8 @@ SWEP.Primary.Damage = 35
 SWEP.Primary.Spread = Vector(0.01, 0.01, 0.01)
 SWEP.NumBullet = 8
 SWEP.Primary.Force = 35
-SWEP.Primary.Sound = {"weapons/usas_fire.wav", 75, 120, 140}
-SWEP.Primary.SoundEmpty = {"weapons/usas_dryfire.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"weapons/usas_fire.ogg", 75, 120, 140}
+SWEP.Primary.SoundEmpty = {"weapons/usas_dryfire.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.13636
 SWEP.ReloadTime = 3.5
 
@@ -171,7 +171,7 @@ SWEP.attPos = Vector(0.25, -2.1, 28)
 SWEP.attAng = Angle(0, 0.4, 0)
 SWEP.lengthSub = 25
 SWEP.handsAng = Angle(1, -1.5, 0)
-SWEP.DistSound = "ak74/ak74_dist.wav"
+SWEP.DistSound = "ak74/ak74_dist.ogg"
 
 SWEP.availableAttachments = {
 	sight = {

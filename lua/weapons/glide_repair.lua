@@ -109,7 +109,7 @@ function SWEP:PrimaryAttack()
         for i = 1, #rotors do
             if not IsValid( rotors[i] ) then
                 ent:Repair()
-                user:EmitSound( "buttons/lever4.wav", 75, 150, 0.3 )
+                user:EmitSound( "buttons/lever4.ogg", 75, 150, 0.3 )
                 break
             end
         end
@@ -137,7 +137,7 @@ function SWEP:PrimaryAttack()
         engineHealth = 1
 
         ent:Repair()
-        user:EmitSound( "buttons/lever6.wav", 75, math.random( 110, 120 ), 0.5 )
+        user:EmitSound( "buttons/lever6.ogg", 75, math.random( 110, 120 ), 0.5 )
     end
 
     if chassisHealth >= ent.MaxChassisHealth then

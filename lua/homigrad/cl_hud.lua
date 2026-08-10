@@ -1162,7 +1162,35 @@ hook.Add("HUDPaint","EntHints",function()
 
 	if not trace then return end
 
-	HintBackgroundColor.a = LerpFT(0.1, HintBackgroundColor.a, (IsValid(trace.Entity) and trace.Entity.HudHintMarkup) and 200 or 0)
+	local pickupPrompts, selectedPickup
+	if hg.GetPickupPromptEntities then
+		pickupPrompts, selectedPickup = hg.GetPickupPromptEntities(lply, trace.Entity)
+	end
+
+	local showNearbyPickups = lply:KeyDown(IN_WALK) and pickupPrompts and #pickupPrompts > 0
+	local selectedPickupValid = IsValid(selectedPickup) and pickupPrompts and #pickupPrompts > 0
+	local generatedPickupHint = IsValid(trace.Entity) and trace.Entity.hgGeneratedPickupHudHint == trace.Entity.HudHintMarkup
+	local traceHasHint = IsValid(trace.Entity) and trace.Entity.HudHintMarkup and not generatedPickupHint
+	local hasHint = selectedPickupValid or traceHasHint
+	HintBackgroundColor.a = LerpFT(0.1, HintBackgroundColor.a, hasHint and 200 or 0)
+
+	if showNearbyPickups then
+		for _, ent in ipairs(pickupPrompts) do
+			if IsValid(ent) and ent ~= selectedPickup then
+				hg.BasicHudHint(ent, {HitPos = ent:WorldSpaceCenter()})
+			end
+		end
+
+		if IsValid(selectedPickup) then
+			hg.BasicHudHint(selectedPickup, {HitPos = selectedPickup:WorldSpaceCenter()})
+		end
+		return
+	end
+
+	if selectedPickupValid then
+		hg.BasicHudHint(selectedPickup, {HitPos = selectedPickup:WorldSpaceCenter()})
+		return
+	end
 
 	hg.BasicHudHint(trace.Entity, trace, hint)
 end)

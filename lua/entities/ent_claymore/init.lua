@@ -38,7 +38,7 @@ end
 function ENT:Use(activator)
 	if not self.MotionTriggerIsActivated then
 		self.MotionTriggerIsActivated = true
-		self:EmitSound("snds_jack_gmod/toolbox" .. math.random(1,7) .. ".wav",55,100,1)
+		self:EmitSound("snds_jack_gmod/toolbox" .. math.random(1,7) .. ".ogg",55,100,1)
 		if IsValid(activator) and activator:IsPlayer() then
 			activator:ViewPunch(Angle(2,0,0))
 		end

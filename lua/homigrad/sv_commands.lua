@@ -264,7 +264,7 @@ if SERVER then
         net.WriteEntity(target)
         net.Broadcast()
 
-        target:EmitSound("snd_jack_hmcd_lightning.wav")
+        target:EmitSound("snd_jack_hmcd_lightning.ogg")
 
         local dmg = DamageInfo()
         dmg:SetDamage(1000)

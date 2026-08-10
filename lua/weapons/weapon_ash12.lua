@@ -56,8 +56,8 @@ SWEP.LocalMuzzleAng = Angle(0,0,0)
 SWEP.WeaponEyeAngles = Angle(0,0,0)
 
 SWEP.CustomShell = "50cal"
-SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.wav"
-SWEP.CockSound = "pwb2/weapons/ithaca37stakeout/pump.wav"
+SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.ogg"
+SWEP.CockSound = "pwb2/weapons/ithaca37stakeout/pump.ogg"
 SWEP.weight = 5
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1

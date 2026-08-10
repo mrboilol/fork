@@ -153,7 +153,7 @@ function SWEP:PrimaryAttack()
         if self.activated then return end
         self.activated = true
 
-        self:EmitSound("weapons/tfa_ins2/mp5a4/mp5k_boltback.wav")
+        self:EmitSound("weapons/tfa_ins2/mp5a4/mp5k_boltback.ogg")
 
         if SERVER then
             timer.Simple(0.5,function()

@@ -428,10 +428,10 @@ SWEP.FakeReloadSounds = {
 }
 
 SWEP.FakeEmptyReloadSounds = {
-	--[0.22] = "weapons/m4a1/m4a1_magrelease.wav",
+	--[0.22] = "weapons/m4a1/m4a1_magrelease.ogg",
 	--[0.25] = "weapons/m4a1/m4a1_magout.wav",
 	--[0.65] = "weapons/m4a1/m4a1_magain.wav",
-	--[0.77] = "weapons/m4a1/m4a1_hit.wav",
+	--[0.77] = "weapons/m4a1/m4a1_hit.ogg",
 	--[0.94] = "weapons/m4a1/m4a1_boltarelease.wav",
 }
 

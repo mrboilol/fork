@@ -111,7 +111,7 @@ function SWEP:NPCHeal(npc, mul, snd)
 		self:SetHold("melee")
 		if not mul then mul = 0.3 end
 		npc:SetHealth(math.Clamp(npc:Health() + (npc:GetMaxHealth() * 1 * mul), 0, npc:GetMaxHealth() * math.Clamp(2 * mul, 2, 100)))
-		npc:EmitSound(snd or "snd_jack_hmcd_needleprick.wav", 80, math.random(95, 105))
+		npc:EmitSound(snd or "snd_jack_hmcd_needleprick.ogg", 80, math.random(95, 105))
 		npc:SetPlaybackRate(2)
 		npc:SetKeyValue("m_flPlaybackSpeed", 2)
 
@@ -154,7 +154,7 @@ function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage()
-		self:NPCHeal(owner, 100, "snd_jack_hmcd_needleprick.wav")
+		self:NPCHeal(owner, 100, "snd_jack_hmcd_needleprick.ogg")
 	end
 end
 
@@ -162,7 +162,7 @@ if SERVER then
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage(nil, nil, nil, self.Color, "2211")
-			self:NPCHeal(ent, 100, "snd_jack_hmcd_needleprick.wav")
+			self:NPCHeal(ent, 100, "snd_jack_hmcd_needleprick.ogg")
 		end
 
 		local org = ent.organism
@@ -176,7 +176,7 @@ if SERVER then
 		end
 
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 80, math.random(75, 90))
+		entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 80, math.random(75, 90))
 
 		if org.noradrenaline >= 0.4 then
 			hg.ExplodeHead(ent)

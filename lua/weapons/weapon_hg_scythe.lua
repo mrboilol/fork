@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Scythe"
 SWEP.Instructions = "An axe is an implement that has been used for millennia to shape, split, and cut wood. Can break down doors.\n\nLMB to attack.\nR + LMB to charge.\nRMB to block.\n\nA fully charged hit can sever a limb or explode the head, but drains almost all of your stamina."
@@ -120,11 +120,11 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.ChargeAttackHit = "Canister.ImpactHard"
-SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
+SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
 
 SWEP.hitsoundbrutalize = {
     {"axe/axehit1.wav", 95, {95, 105}},
@@ -170,7 +170,7 @@ SWEP.swingsoundextra = {
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 4
 SWEP.BlockMaterial = "wood"
-SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.wav", 70, {96, 104}}
+SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.ogg", 70, {96, 104}}
 SWEP.BlockDirectionalCharge = "overhead"
 
 SWEP.NoHolster = true
@@ -205,7 +205,7 @@ function SWEP:CanChargeAttack()
     self.AttackHit = "Canister.ImpactHard"
     self.Attack2Hit = "Canister.ImpactHard"
     self.ChargeAttackHit = "Canister.ImpactHard"
-    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
     return true
 end
 

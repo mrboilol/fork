@@ -8,8 +8,8 @@ ENT.AdminOnly   = true
 
 ENT.Model       = "models/weapons/40x46_m381.mdl"
 ENT.Sound       = "ex2.wav"
-ENT.SoundFar    = "m67/m67_detonate_far_dist_01.wav"
-ENT.SoundWater  = "m67/water/m67_water_detonate_01.wav"
+ENT.SoundFar    = "m67/m67_detonate_far_dist_01.ogg"
+ENT.SoundWater  = "m67/water/m67_water_detonate_01.ogg"
 
 ENT.Speed        = 76
 ENT.TruhstTime   = 0
@@ -55,7 +55,7 @@ if SERVER then
 
         if dist >= (self.SafetyDistance / 0.01905) and not self.SafetyArmed then
             self.SafetyArmed = true
-            self:EmitSound("buttons/button16.wav", 50, 150, 0.3)
+            self:EmitSound("buttons/button16.ogg", 50, 150, 0.3)
         end
 
         return self.SafetyArmed

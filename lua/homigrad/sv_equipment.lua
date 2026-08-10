@@ -801,7 +801,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 		if org.alive and org.organism and dmgInfo:IsDamageType(DMG_BUCKSHOT + DMG_BULLET) then
 			org.owner:ViewPunch(AngleRand(-5, 5))
 
-			org.owner:EmitSound("homigrad/physics/shield/bullet_hit_shield_0"..math.random(7)..".wav", 80, math.random(95,105))
+			org.owner:EmitSound("homigrad/physics/shield/bullet_hit_shield_0"..math.random(7)..".ogg", 80, math.random(95,105))
 
 			org.owner:AddTinnitus(0.8, true)
 			net.Start("AddFlash")
@@ -899,7 +899,7 @@ local function protec(org, bone, dmg, dmgInfo, placement, armor, scale, scalepro
 			trdata:SetOrigin(hitPos + reflect * 160)
 			util.Effect("Tracer", trdata)
 
-			EmitSound("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".wav", hitPos, 0, CHAN_AUTO, 1, 80, nil, 100)
+			EmitSound("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".ogg", hitPos, 0, CHAN_AUTO, 1, 80, nil, 100)
 		end
 	end
 
@@ -1011,7 +1011,7 @@ ArmorEffect = function(placement, armor, dmgInfo, org, hit, prot)
 	effdata:SetSurfaceProp(prot < 0 and 67 or armdata.surfaceprop or 67)
 	effdata:SetDamageType(dmgInfo:GetDamageType())
 
-	EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".wav",dmgInfo:GetDamagePosition(),0,CHAN_AUTO,1,55,nil,100)
+	EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".ogg",dmgInfo:GetDamagePosition(),0,CHAN_AUTO,1,55,nil,100)
 	util.Effect(eff,effdata)
 end
 
@@ -1030,7 +1030,7 @@ local ArmorEffectEx = function(ent,dmgInfo,eff,surfaceprop)
 	effdata:SetSurfaceProp(surfaceprop or 67)
 	effdata:SetDamageType(dmgInfo:GetDamageType())
 
-	EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".wav",dmgInfo:GetDamagePosition(),0,CHAN_AUTO,1,55,nil,100)
+	EmitSound("physics/metal/metal_solid_impact_bullet"..math.random(4)..".ogg",dmgInfo:GetDamagePosition(),0,CHAN_AUTO,1,55,nil,100)
 	util.Effect(eff,effdata)
 end
 
@@ -1266,7 +1266,7 @@ hook.Add("Think", "HG_HelmetRagdollHeadImpact", function()
 		DamageArmor(fakeOrg, "head", headArmor, nil, damageLike)
 
 		if damageLike >= 20 then
-			sound.Play("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".wav", headPos, 80, 100, 1)
+			sound.Play("physics/metal/metal_solid_impact_bullet" .. math.random(4) .. ".ogg", headPos, 80, 100, 1)
 		end
 	end
 end)

@@ -186,7 +186,7 @@ function wOS.DynaBase:CreateLocalMenu( parent, old_data )
         local name = name_ent:GetText()
         if #name < 1 then
             name_lab:SetTextColor( Color( 255, 0, 0 ) )
-            surface.PlaySound( "buttons/button10.wav" )
+            surface.PlaySound( "buttons/button10.ogg" )
             return
         end
 

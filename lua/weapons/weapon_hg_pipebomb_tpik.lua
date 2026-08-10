@@ -155,28 +155,28 @@ SWEP.AnimList = {
 SWEP.AnimsEvents = {
 	["pullback_high"] = {
 		[0.01] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_lighter_open.wav",65)
+			self:EmitSound("weapons/molotov/handling/molotov_lighter_open.ogg",65)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.11] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_lighter_strike.wav",65,100,CHAN_BODY)
+			self:EmitSound("weapons/molotov/handling/molotov_lighter_strike.ogg",65,100,CHAN_BODY)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.21] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_ignite.wav",65,100,CHAN_ITEM)
+			self:EmitSound("weapons/molotov/handling/molotov_ignite.ogg",65,100,CHAN_ITEM)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.24] = function(self)
-			self.idleSnd = self:StartLoopingSound("weapons/molotov/handling/molotov_idle_burn_loop.wav")
+			self.idleSnd = self:StartLoopingSound("weapons/molotov/handling/molotov_idle_burn_loop.ogg")
 			self.Burn = true
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.55] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_lighter_close.wav",65)
+			self:EmitSound("weapons/molotov/handling/molotov_lighter_close.ogg",65)
 			self:GetOwner():PullLHTowards("ValveBiped.Bip01_Spine", 0.5)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
@@ -184,17 +184,17 @@ SWEP.AnimsEvents = {
 	},
 	["pullback_low"] = {
 		[0.01] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_lighter_open.wav",65)
+			self:EmitSound("weapons/molotov/handling/molotov_lighter_open.ogg",65)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.11] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_lighter_strike.wav",65,100,CHAN_BODY)
+			self:EmitSound("weapons/molotov/handling/molotov_lighter_strike.ogg",65,100,CHAN_BODY)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.21] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_ignite.wav",65,100,CHAN_ITEM)
+			self:EmitSound("weapons/molotov/handling/molotov_ignite.ogg",65,100,CHAN_ITEM)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
@@ -205,7 +205,7 @@ SWEP.AnimsEvents = {
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.55] = function(self)
-			self:EmitSound("weapons/molotov/handling/molotov_lighter_close.wav",65)
+			self:EmitSound("weapons/molotov/handling/molotov_lighter_close.ogg",65)
 			self:GetOwner():PullLHTowards("ValveBiped.Bip01_Spine", 0.5)
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
@@ -246,7 +246,7 @@ SWEP.ItemsBones = {
 
 SWEP.spoon = false
 
-SWEP.throwsound = "weapons/molotov/handling/molotov_throw_burning.wav"
+SWEP.throwsound = "weapons/molotov/handling/molotov_throw_burning.ogg"
 
 SWEP.CoolDown = 0
 

@@ -214,7 +214,7 @@ SWEP.IconOverride = "entities/arc9_eft_mk47_mutant.png"
 SWEP.weight = 3.6
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/mk47/mk47_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/mk47/mk47_dist.ogg"
 
 
 SWEP.StartAtt = {"holo4", "stock_ar15_fab_defense_gl_core_s"}

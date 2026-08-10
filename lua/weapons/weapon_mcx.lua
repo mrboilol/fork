@@ -185,7 +185,7 @@ SWEP.Primary.Force = 28
 SWEP.animposmul = 2
 SWEP.Primary.Sound = {"weapons/darsu_eft/mcxmpx/fire_new/mcx_outdoor_close2.wav", 85, 90, 100}
 SWEP.SupressedSound = {"weapons/darsu_eft/mcxmpx/fire_new/mcx_outdoor_silenced_close1.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"weapons/darsu_eft/mcx/mcx_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"weapons/darsu_eft/mcx/mcx_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.06818
 SWEP.ReloadTime = 3
 
@@ -206,7 +206,7 @@ SWEP.IconOverride = "entities/arc9_eft_mcx.png"
 SWEP.weight = 2.9
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/mcx/mcx_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/mcx/mcx_dist.ogg"
 
 SWEP.StartAtt = {"supressor9","holo14"}
 SWEP.availableAttachments = {

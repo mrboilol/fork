@@ -3,12 +3,12 @@ ab_MedicalGarbageTypes = {
 	["common"] = {"models/plane_glove_01.mdl","models/plane_glove_02.mdl","models/plane_glove_03.mdl","models/plane_glove_pack.mdl","models/plane_bandage_burn.mdl"},
 }
 
---snd_jack_hmcd_bandage.wav -- Bandage 
---snds_jack_gmod/ez_medical/15.wav -- Pain meds
---snd_jack_hmcd_needleprick.wav - Needle
+--snd_jack_hmcd_bandage.ogg -- Bandage
+--snds_jack_gmod/ez_medical/15.ogg -- Pain meds
+--snd_jack_hmcd_needleprick.ogg - Needle
 
 local sound_Table = {
-	["snd_jack_hmcd_bandage.wav"] = function(ent)
+	["snd_jack_hmcd_bandage.ogg"] = function(ent)
 		ab_GarbageSpawn(ent:GetPos(), "bandage")
 
 	end,
@@ -16,7 +16,7 @@ local sound_Table = {
 		ab_GarbageSpawn(ent:GetPos(), "bandage")
 
 	end,
-	["snd_jack_hmcd_needleprick.wav"] = function(ent)
+	["snd_jack_hmcd_needleprick.ogg"] = function(ent)
 		ab_GarbageSpawn(ent:GetPos(), "bandage")
 	end,
 }

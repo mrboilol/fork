@@ -20,7 +20,7 @@ local explosionDamageRadius = 30
 local disorientationRadius = 300
 function ENT:Explode()
     if self:PoopBomb() then
-        self:EmitSound("weapons/p99/slideback.wav", 75)
+        self:EmitSound("weapons/p99/slideback.ogg", 75)
         self.Exploded = true
         return
     end
@@ -63,7 +63,7 @@ function ENT:Explode()
     EmitSound(self.SoundMain, SelfPos, self:EntIndex() + 102, CHAN_STATIC, 1, 70, nil, 100)
     EmitSound(self.SoundFar, SelfPos, self:EntIndex() + 103, CHAN_STATIC, 1, 140, nil, 100)
     
-    EmitSound("snd_jack_fireworkpop5.wav", SelfPos, self:EntIndex() + 200, CHAN_VOICE, 1, 150, nil, math.random(100, 110))
+    EmitSound("snd_jack_fireworkpop5.ogg", SelfPos, self:EntIndex() + 200, CHAN_VOICE, 1, 150, nil, math.random(100, 110))
     
     --util.BlastDamage(self, self.owner, SelfPos, self.BlastDis / 0.01905, 5)
 

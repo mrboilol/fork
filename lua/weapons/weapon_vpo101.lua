@@ -175,7 +175,7 @@ SWEP.IconOverride = "entities/arc9_eft_vpo101.png"
 SWEP.weight = 3.3
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/ak74/ak74_dist.wav"
+SWEP.DistSound = "weapons/ak74/ak74_dist.ogg"
 
 SWEP.availableAttachments = {
 	barrel = {

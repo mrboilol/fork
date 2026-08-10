@@ -93,7 +93,7 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 		local phys = ent:GetPhysicsObject()
 
 		hg.SetCarryEnt2(ply, ent, 0, phys:GetMass(), vector_origin, ply:GetAimVector() * 10 + ply:GetUp() * -25 + ply:GetShootPos(), ply:EyeAngles())
-		ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".wav", 55)
+		ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".ogg", 55)
 		ply:ViewPunch(AngleRand(-2, 2))
 		ply:SetNW2Bool("FloorReloading", true) -- отсюда начинается фейлсейф..
 
@@ -115,9 +115,9 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 								heldents[ent2:EntIndex()] = nil
 							end
 
-							ent:EmitSound("physics/metal/weapon_impact_hard"..mRandom(3)..".wav", 65)
+							ent:EmitSound("physics/metal/weapon_impact_hard"..mRandom(3)..".ogg", 65)
 							ply:Notify(randomgovno[mRandom(#randomgovno)], 10)
-							ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".wav", 55)
+							ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".ogg", 55)
 							ply:ViewPunch(AngleRand(-3, 3))
 							FailSafe(ply)
 
@@ -135,7 +135,7 @@ concommand.Add("hg_reloadfloorweapon", function(ply, cmd, args)
 		timer.Create("FloorReload_"..ply:SteamID64(), (ent.ReloadTime + mRand(0.8, 1.8) * ((isshotgun and ammocount <= 0 and not ent.drawBullet) and 0.5 or 1)) or 5, 1, function()
 			if not SafeCheck(ply, ent, dist) then FailSafe(ply) return end
 
-			ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".wav", 55)
+			ply:EmitSound("physics/body/body_medium_impact_soft"..mRandom(7)..".ogg", 55)
 			ply:ViewPunch(AngleRand(-2, 2))
 			ply:PickupWeapon(ent)
 			ply:SetActiveWeapon(ent)

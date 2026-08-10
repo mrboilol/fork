@@ -4,9 +4,9 @@ ENT.PrintName = "ent_hg_slam"
 ENT.Spawnable = false
 ENT.WorldModel = "models/mmod/weapons/w_slam.mdl"
 
-ENT.SoundFar = {"iedins/ied_detonate_dist_01.wav", "ied/ied_detonate_dist_02.wav", "ied/ied_detonate_dist_03.wav"}
-ENT.Sound = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"}
-ENT.SoundWater = "iedins/water/ied_water_detonate_01.wav"
+ENT.SoundFar = {"iedins/ied_detonate_dist_01.ogg", "ied/ied_detonate_dist_02.ogg", "ied/ied_detonate_dist_03.ogg"}
+ENT.Sound = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"}
+ENT.SoundWater = "iedins/water/ied_water_detonate_01.ogg"
 ENT.BlastDis = 3
 ENT.BlastDamage = 70
 
@@ -36,7 +36,7 @@ function ENT:Think()
         self.Played = self.Played or false
         if self.Safety > CurTime() and beepSnd > 0.9 and not self.Played then
             self.Played = true
-            self:EmitSound("buttons/button24.wav",60,100 + (25 * (3-(self.Safety - CurTime()))) )
+            self:EmitSound("buttons/button24.ogg",60,100 + (25 * (3-(self.Safety - CurTime()))) )
         elseif beepSnd < 0.9 then
             self.Played = false
         end

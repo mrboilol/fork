@@ -119,11 +119,11 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.ChargeAttackHit = "Canister.ImpactHard"
-SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
+SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
 
 SWEP.hitsoundbrutalize = {
     {"axe/axehit1.wav", 95, {95, 105}},
@@ -165,7 +165,7 @@ SWEP.swingsoundextra = {
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 4
 SWEP.BlockMaterial = "wood"
-SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.wav", 70, {96, 104}}
+SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.ogg", 70, {96, 104}}
 SWEP.BlockDirectionalCharge = "overhead" --left, right, overhead, center, neutral
 
 SWEP.NoHolster = true
@@ -207,7 +207,7 @@ SWEP.HeavyAttackWeaponAngTransitionSpeed = 10 -- Speed of the smooth transition
 
 SWEP.BlockTier = 4
 SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
+SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.ogg"
 
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
@@ -228,7 +228,7 @@ function SWEP:CanChargeAttack()
     self.AttackHit = "Canister.ImpactHard"
     self.Attack2Hit = "Canister.ImpactHard"
     self.ChargeAttackHit = "Canister.ImpactHard"
-    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+    self.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
     return true
 end
 

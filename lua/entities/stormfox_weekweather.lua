@@ -29,7 +29,7 @@ end
 if SERVER then
 	function ENT:Use()
 		self:SetNWBool("hourly", not self:GetNWBool("hourly", true ) )
-		self:EmitSound("buttons/button14.wav")
+		self:EmitSound("buttons/button14.ogg")
 	end
 	function ENT:SpawnFunction( ply, tr, ClassName )
 		if ( !tr.Hit ) then return end

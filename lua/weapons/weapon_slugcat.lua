@@ -50,7 +50,7 @@ SWEP.FakeEmptyReloadSounds = {
 
 	[0.70] = "zcitysnd/sound/weapons/m9/handling/m9_magin.wav",
 	[0.9] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
-	[1.05] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.wav",
+	[1.05] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg",
 }
 SWEP.MagModel = "models/weapons/upgrades/w_magazine_m45_8.mdl"
 local vector_full = Vector(1,1,1)
@@ -115,7 +115,7 @@ SWEP.Primary.Ammo = "14.5x114mm B32"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 555555
 SWEP.Primary.Sound = {"zcity/voice/slugcat_1/waw_1.mp3", 0, 100, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 555555
 SWEP.Primary.Wait = 0.01
 SWEP.ReloadTime = 0

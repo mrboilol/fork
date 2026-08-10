@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 ENT.Base = "ent_hg_grenade"
 ENT.Spawnable = false
 ENT.Model = "models/weapons/eftnades/darsu_eft/w_vog17.mdl"
@@ -19,7 +19,7 @@ end
 function ENT:AddThink()
 	if not self.timer or not self.timeToBoom or self.playedSound then return end
 	--if (CurTime() - self.timer) <= 0.25 then
-		//self:EmitSound("m9/m9_fp.wav", 80)
+		//self:EmitSound("m9/m9_fp.ogg", 80)
 		self.playedSound = true
 	--end
 end

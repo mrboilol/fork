@@ -224,7 +224,7 @@ SWEP.attPos = Vector(1, 0, 0)
 SWEP.attAng = Angle(-0.02, 0, 0)
 SWEP.lengthSub = 25
 SWEP.handsAng = Angle(7, 2, 0)
-SWEP.DistSound = "weapons/eft/sr1/gyrza_indoor_close1.wav"
+SWEP.DistSound = "weapons/eft/sr1/gyrza_indoor_close1.ogg"
 
 -- tpik hand positions
 SWEP.RHPos = Vector(3, -7, 3.5)

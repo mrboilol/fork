@@ -302,17 +302,17 @@ Glide.AddSoundSet( "Glide.Collision.BoatLandOnWater", 80, 90, 110, {
 ----- Collision sounds for exploded vehicle gibs
 
 Glide.AddSoundSet( "Glide.Collision.GibSoft", 70, 80, 120, {
-    "vehicles/v8/vehicle_impact_medium1.wav",
-    "vehicles/v8/vehicle_impact_medium2.wav",
-    "vehicles/v8/vehicle_impact_medium3.wav",
-    "vehicles/v8/vehicle_impact_medium4.wav"
+    "vehicles/v8/vehicle_impact_medium1.ogg",
+    "vehicles/v8/vehicle_impact_medium2.ogg",
+    "vehicles/v8/vehicle_impact_medium3.ogg",
+    "vehicles/v8/vehicle_impact_medium4.ogg"
 } )
 
 Glide.AddSoundSet( "Glide.Collision.GibHard", 70, 80, 120, {
-    "vehicles/v8/vehicle_impact_heavy1.wav",
-    "vehicles/v8/vehicle_impact_heavy2.wav",
-    "vehicles/v8/vehicle_impact_heavy3.wav",
-    "vehicles/v8/vehicle_impact_heavy4.wav"
+    "vehicles/v8/vehicle_impact_heavy1.ogg",
+    "vehicles/v8/vehicle_impact_heavy2.ogg",
+    "vehicles/v8/vehicle_impact_heavy3.ogg",
+    "vehicles/v8/vehicle_impact_heavy4.ogg"
 } )
 
 ----- Siren sounds
@@ -330,14 +330,14 @@ Glide.AddSoundSet( "Glide.Wail.Interrupt", 90, 95, 105, {
 ----- Helicopter rotor sounds
 
 Glide.AddSoundSet( "Glide.Rotor.Collision", 80, 90, 95, {
-    "physics/metal/metal_computer_impact_bullet1.wav",
-    "physics/metal/metal_computer_impact_bullet2.wav",
-    "physics/metal/metal_computer_impact_bullet3.wav"
+    "physics/metal/metal_computer_impact_bullet1.ogg",
+    "physics/metal/metal_computer_impact_bullet2.ogg",
+    "physics/metal/metal_computer_impact_bullet3.ogg"
 } )
 
 Glide.AddSoundSet( "Glide.Rotor.Slice", 80, 90, 100, {
-    "ambient/machines/slicer2.wav",
-    "ambient/machines/slicer3.wav"
+    "ambient/machines/slicer2.ogg",
+    "ambient/machines/slicer3.ogg"
 } )
 
 -- Generic

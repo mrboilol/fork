@@ -159,20 +159,20 @@ SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 25
 SWEP.animposmul = 2
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/mp5k/mp5k_fp.wav", 75, 120, 130}
-SWEP.SupressedSound = {"zcitysnd/sound/weapons/mp5k/mp5k_suppressed_fp.wav", 65, 90, 100}
+SWEP.SupressedSound = {"zcitysnd/sound/weapons/mp5k/mp5k_suppressed_fp.ogg", 65, 90, 100}
 SWEP.Primary.Wait = 0.07
 SWEP.ReloadTime = 4.5
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"weapons/kryceks_swep/mp5/boltback.wav",
+	"weapons/kryceks_swep/mp5/boltback.ogg",
 	"none",
 	"none",
-	"weapons/kryceks_swep/mp5/magout.wav",
+	"weapons/kryceks_swep/mp5/magout.ogg",
 	"none",
-	"weapons/kryceks_swep/mp5/magin2.wav",
+	"weapons/kryceks_swep/mp5/magin2.ogg",
 	"none",
-	"weapons/kryceks_swep/mp5/boltslap.wav",
+	"weapons/kryceks_swep/mp5/boltslap.ogg",
 	"none",
 	"none",
 	"none",
@@ -210,7 +210,7 @@ SWEP.WorldAng = Angle(0, 0, 0)
 SWEP.UseCustomWorldModel = true
 SWEP.lengthSub = 30
 SWEP.handsAng = Angle(7, 2, 0)
-SWEP.DistSound = "zcitysnd/sound/weapons/mp5k/mp5k_dist.wav"
+SWEP.DistSound = "zcitysnd/sound/weapons/mp5k/mp5k_dist.ogg"
 
 --local to head
 SWEP.RHPos = Vector(3,-7,3.5)

@@ -449,7 +449,7 @@ local function SniperShot(ply)
 		Distance = 8000
 	})
 
-	sound.Play("mosin/mosin_dist.wav", src, 120, math.random(95, 105))
+	sound.Play("mosin/mosin_dist.ogg", src, 120, math.random(95, 105))
 end
 
 local function SniperZoneThink()

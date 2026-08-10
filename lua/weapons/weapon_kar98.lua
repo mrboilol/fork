@@ -47,7 +47,7 @@ SWEP.CustomShell = "762x51"
 
 SWEP.ReloadSound = "weapons/tfa_ins2/k98/m40a1_boltlatch.wav"
 SWEP.CockSound = "weapons/tfa_ins2/k98/m40a1_boltlatch.wav"
-SWEP.DistSound = "mosin/mosin_dist.wav"
+SWEP.DistSound = "mosin/mosin_dist.ogg"
 SWEP.weight = 4
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
@@ -61,7 +61,7 @@ SWEP.Primary.Ammo = "7.62x51 mm"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = 0
 SWEP.Primary.Sound = {"weapons/tfa_ins2/k98/m40a1_fp.wav", 80, 90, 100}
-SWEP.SupressedSound = {"mosin/mosin_suppressed_fp.wav", 80, 90, 100}
+SWEP.SupressedSound = {"mosin/mosin_suppressed_fp.ogg", 80, 90, 100}
 SWEP.availableAttachments = {
 	barrel = {
 		[1] = {"supressor7", Vector(9,0,0), {}},

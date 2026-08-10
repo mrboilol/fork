@@ -47,9 +47,9 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = ".45 ACP"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 25
-SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.wav", 75, 90, 100}
-SWEP.SupressedSound = {"m9/m9_suppressed_fp.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", 75, 90, 100}
+SWEP.SupressedSound = {"m9/m9_suppressed_fp.ogg", 65, 90, 100}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 25
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.ReloadTime = 3
@@ -63,16 +63,16 @@ SWEP.FakeEmptyReloadSounds = {
 	[0.2] = "zcitysnd/sound/weapons/m9/handling/m9_magout.wav",
 	[0.8] = "zcitysnd/sound/weapons/m9/handling/m9_magin.wav",
 	[0.9] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
-	[1.02] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.wav",
+	[1.02] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg",
 }
 
 SWEP.ReloadSoundes = {
 	"none",
-	"pwb/weapons/fnp45/clipout.wav",
+	"pwb/weapons/fnp45/clipout.ogg",
 	"none",
 	"none",
-	"pwb/weapons/fnp45/clipin.wav",
-	"pwb/weapons/fnp45/sliderelease.wav",
+	"pwb/weapons/fnp45/clipin.ogg",
+	"pwb/weapons/fnp45/sliderelease.ogg",
 	"none",
 	"none",
 	"none"

@@ -213,7 +213,7 @@ SWEP.IconOverride = "entities/arc9_eft_rsass.png"
 SWEP.weight = 4.2
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/rsass/rsass_fire_close5.ogg.wav"
+SWEP.DistSound = "weapons/darsu_eft/rsass/rsass_fire_close5.ogg"
 
 SWEP.StartAtt = {"optic5"}
 SWEP.availableAttachments = {

@@ -712,7 +712,7 @@ function SWEP:AttachUnit(owner, target, ply)
             battery = battery - config.AutopulseBatteryPerBeat
             unit:SetNWInt("AutosurgeonBattery", battery)
             ApplyAutopulse(org, config)
-            -- Do not queue this behind scan/mode announcements: one pump.wav
+            -- Do not queue this behind scan/mode announcements: one pump.ogg
             -- is emitted for every completed mechanical pulse.
             PlayUnitSound(unit, ASSounds.pump, 65, 100)
             nextAutopulse = CurTime() + config.AutopulseInterval
@@ -851,7 +851,7 @@ if SERVER then
         local source = hasBattery and "D.I.H Battery" or "Taser Cartridge"
         ply:RemoveAmmo(1, source)
         wep:SetClip1(math.min(current + wep.Config.BatteryRecharge[source], wep.Config.BatteryMax))
-        wep:EmitSound(hasBattery and "panoptisscon/phone_simcard_insert.ogg" or "snd_jack_hmcd_ammobox.wav")
+        wep:EmitSound(hasBattery and "panoptisscon/phone_simcard_insert.ogg" or "snd_jack_hmcd_ammobox.ogg")
     end)
 end
 

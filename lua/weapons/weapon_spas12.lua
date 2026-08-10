@@ -89,7 +89,7 @@ SWEP.Primary.Wait = 0.2
 SWEP.HoldType = "rpg"
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
 SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
-SWEP.ReloadSound = "weapons/spas12/handling/toz_shell_insert_2.wav"
+SWEP.ReloadSound = "weapons/spas12/handling/toz_shell_insert_2.ogg"
 SWEP.ZoomPos = Vector(-3, 0.3971, 2.3896)
 SWEP.RHandPos = Vector(-14, -1, 4)
 SWEP.LHandPos = Vector(7, -2, 0)
@@ -239,7 +239,7 @@ local function cock(self,time)
 	net.Broadcast()
 	
 	self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-	--self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.wav",true,CHAN_AUTO)
+	--self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.ogg",true,CHAN_AUTO)
 
 	local ply = self:GetOwner()
 

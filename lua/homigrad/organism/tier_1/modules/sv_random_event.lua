@@ -19,7 +19,7 @@ local RandomEvents = {
         owner:EmitSound("zcitysnd/uni/hungry_"..math.random(1,6)..".mp3", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
     end,
     ["Burp"] = function( owner, org )
-        owner:EmitSound("snd_jack_hmcd_burp.wav", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
+        owner:EmitSound("snd_jack_hmcd_burp.ogg", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
         for i = 1, 10 do
             timer.Simple(i/20,function()
                 owner:ViewPunch(AngleRand(-.3,.3))
@@ -27,7 +27,7 @@ local RandomEvents = {
         end
     end,
     ["Fart"] = function( owner, org )
-        owner:EmitSound("snd_jack_hmcd_fart.wav")
+        owner:EmitSound("snd_jack_hmcd_fart.ogg")
         for i = 1, 30 do
             timer.Simple(i/60,function()
                 if not IsValid(owner) then return end

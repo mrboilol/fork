@@ -62,7 +62,7 @@ SWEP.BleedMultiplier = 1.8
 SWEP.AttackLen1 = 40
 
 SWEP.AttackHit = "GlassBottle.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
 
 SWEP.DeploySnd = "GlassBottle.ImpactSoft"
 
@@ -103,8 +103,8 @@ function SWEP:CustomAttack2()
     ent.damage = self.DamagePrimary * 0.7
     ent.MaxSpeed = 1200
     ent.DamageType = self.DamageType
-    ent.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
-	ent.AttackHit = "snd_jack_hmcd_knifehit.wav"
+    ent.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
+	ent.AttackHit = "snd_jack_hmcd_knifehit.ogg"
     ent.penetration = 5
     ent.BodyStickDepth = -48
     ent.PenetrationSize = 5
@@ -115,7 +115,7 @@ function SWEP:CustomAttack2()
         timer.Simple(0, function()
             if not IsValid(ent) then return end
             ent:GibBreakServer(vector_origin)
-            ent:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".wav")
+            ent:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".ogg")
             ent:Remove()
         end)
     end
@@ -131,7 +131,7 @@ function SWEP:CustomAttack2()
         phys:AddAngleVelocity(VectorRand() * 500)
     end
 
-    //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+    //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
     ply:ViewPunch(self.ViewPunch1 * 0.6)
     ply:SelectWeapon("weapon_hands_sh")
 

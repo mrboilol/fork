@@ -94,7 +94,7 @@ function SWEP:CustomAttack2()
         timer.Simple(0, function()
             if not IsValid(ent) then return end
             ent:GibBreakServer(vector_origin)
-            ent:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".wav")
+            ent:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".ogg")
             ent:Remove()
         end)
     end
@@ -113,7 +113,7 @@ function SWEP:CustomAttack2()
         phys:AddAngleVelocity(VectorRand() * 500)
     end
 
-    //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+    //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
     ply:ViewPunch(Angle(0, 0, -8))
     ply:SelectWeapon("weapon_hands_sh")
 
@@ -142,7 +142,7 @@ function SWEP:PrimaryAttackAdd(ent,trace)
 		self:CreateBottle(trace.HitPos)
 
 		local owner = self:GetOwner()
-		owner:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".wav")
+		owner:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".ogg")
         owner:Give("weapon_hg_bottlebroken")
         owner:SelectWeapon("weapon_hg_bottlebroken")
         self:Remove()
@@ -158,7 +158,7 @@ function SWEP:SecondaryAttackAdd(ent,trace)
         self:CreateBottle(trace.HitPos)
 
 		local owner = self:GetOwner()
-		owner:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".wav")
+		owner:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".ogg")
         owner:Give("weapon_hg_bottlebroken")
         owner:SelectWeapon("weapon_hg_bottlebroken")
         self:Remove()

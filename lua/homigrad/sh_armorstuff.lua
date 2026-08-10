@@ -2003,7 +2003,7 @@ sound.Add( {
 	volume = 0.2,
 	level = 55,
 	pitch = 100,
-	sound = "breath_normal.wav"
+	sound = "breath_normal.ogg"
 } )
 
 local colormodify01 = {
@@ -2194,7 +2194,7 @@ hg.armor.face = {
 			surface.DrawRect(-w + (w * 1.5) / 2, (h + 20) - viewpunching.x * 6, w * 1.5, h + 40)
 			surface.DrawRect(-w + (w * 1.5) / 2, -(h + 40) - viewpunching.x * 6, w * 1.5, h + 40)
 		end,
-		CustomSnd = "snds_jack_gmod/tinycapcharge.wav",
+		CustomSnd = "snds_jack_gmod/tinycapcharge.ogg",
 		AfterPickup = function(ply)
 			--timer.Simple(1,function()
 			--	if IsValid(ply) and ply:IsPlayer() then

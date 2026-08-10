@@ -70,7 +70,7 @@ function ENT:Detonate(data)
 			npc:AddRelationship("player D_LI 99")
 			npc:SetLastPosition(self:GetPos())
 			npc:SetSchedule(SCHED_FORCED_GO_RUN)
-			npc:EmitSound("npc/antlion/distract1.wav", 100, math.random(80, 120))
+			npc:EmitSound("npc/antlion/distract1.ogg", 100, math.random(80, 120))
 			npc.SatisfactionEndTime = CurTime() + 60
 
 			if not npc.SatisfactionEndTime then

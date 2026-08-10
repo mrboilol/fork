@@ -296,7 +296,7 @@ function SWEP:DetonateC4()
 	hgBlastDoors(charge, pos, self.BlastDamage / 400, self.DoorBlastRange, false)
 	util.ScreenShake(pos, 45, 225, 2.5, 3000)
 	ParticleEffect("pcf_jack_groundsplode_medium", pos, -vector_up:Angle())
-	charge:EmitSound("ied/ied_detonate_01.wav", 100, math.random(90, 105))
+	charge:EmitSound("ied/ied_detonate_01.ogg", 100, math.random(90, 105))
 	charge:Remove()
 
 	self.C4Charge = nil

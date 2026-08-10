@@ -376,31 +376,31 @@ end
 
 if SERVER then
 	local cmb_phrases = {
-		"npc/combine_soldier/vo/reportingclear.wav",
-		"npc/combine_soldier/vo/ripcordripcord.wav",
-		"npc/combine_soldier/vo/reportallpositionsclear.wav",
-		"npc/combine_soldier/vo/readyweaponshostilesinbound.wav",
-		"npc/combine_soldier/vo/overwatchrequestreserveactivation.wav",
-		"npc/combine_soldier/vo/overwatchconfirmhvtcontained.wav",
-		"npc/combine_soldier/vo/onedown.wav",
-		"npc/combine_soldier/vo/heavyresistance.wav",
-		"npc/combine_soldier/vo/containmentproceeding.wav",
-		"npc/combine_soldier/vo/contactconfirmprosecuting.wav",
-		"npc/combine_soldier/vo/movein.wav",
-		"npc/combine_soldier/vo/overwatchteamisdown.wav",
-		"npc/combine_soldier/vo/prosecuting.wav",
-		"npc/combine_soldier/vo/stayalertreportsightlines.wav",
-		"npc/combine_soldier/vo/teamdeployedandscanning.wav",
-		"npc/combine_soldier/vo/copythat.wav",
-		"npc/combine_soldier/vo/engagedincleanup.wav",
-		"npc/combine_soldier/vo/executingfullresponse.wav",
-		"npc/combine_soldier/vo/goactiveintercept.wav",
-		"npc/combine_soldier/vo/necroticsinbound.wav",
-		"npc/combine_soldier/vo/standingby].wav",
-		"npc/combine_soldier/vo/stayalert.wav",
-		"npc/combine_soldier/vo/targetmyradial.wav",
-		"npc/combine_soldier/vo/weareinaninfestationzone.wav",
-		"npc/combine_soldier/vo/wehavenontaggedviromes.wav"
+		"npc/combine_soldier/vo/reportingclear.ogg",
+		"npc/combine_soldier/vo/ripcordripcord.ogg",
+		"npc/combine_soldier/vo/reportallpositionsclear.ogg",
+		"npc/combine_soldier/vo/readyweaponshostilesinbound.ogg",
+		"npc/combine_soldier/vo/overwatchrequestreserveactivation.ogg",
+		"npc/combine_soldier/vo/overwatchconfirmhvtcontained.ogg",
+		"npc/combine_soldier/vo/onedown.ogg",
+		"npc/combine_soldier/vo/heavyresistance.ogg",
+		"npc/combine_soldier/vo/containmentproceeding.ogg",
+		"npc/combine_soldier/vo/contactconfirmprosecuting.ogg",
+		"npc/combine_soldier/vo/movein.ogg",
+		"npc/combine_soldier/vo/overwatchteamisdown.ogg",
+		"npc/combine_soldier/vo/prosecuting.ogg",
+		"npc/combine_soldier/vo/stayalertreportsightlines.ogg",
+		"npc/combine_soldier/vo/teamdeployedandscanning.ogg",
+		"npc/combine_soldier/vo/copythat.ogg",
+		"npc/combine_soldier/vo/engagedincleanup.ogg",
+		"npc/combine_soldier/vo/executingfullresponse.ogg",
+		"npc/combine_soldier/vo/goactiveintercept.ogg",
+		"npc/combine_soldier/vo/necroticsinbound.ogg",
+		"npc/combine_soldier/vo/standingby].ogg",
+		"npc/combine_soldier/vo/stayalert.ogg",
+		"npc/combine_soldier/vo/targetmyradial.ogg",
+		"npc/combine_soldier/vo/weareinaninfestationzone.ogg",
+		"npc/combine_soldier/vo/wehavenontaggedviromes.ogg"
 	}
 
 	hook.Add("HG_ReplacePhrase", "combine_phrase", function(ply, phrase, muffed, pitch)
@@ -723,7 +723,7 @@ if SERVER then
             --;; Если есть ragdoll и т.п.
             ply.CombineLerpedFootStep = LerpFT(0.5,ply.CombineLerpedFootStep or 60, (not ply:IsSprinting() and (ply:KeyDown(IN_DUCK) or ply:KeyDown(IN_WALK))) and 20 or 60)
             if IsValid(ply.FakeRagdoll) and ply:GetNetVar("lastFake") == 0 then return end
-            chr:EmitSound("npc/combine_soldier/gear" .. math.random(1,6) .. ".wav",
+            chr:EmitSound("npc/combine_soldier/gear" .. math.random(1,6) .. ".ogg",
                 ply.CombineLerpedFootStep, math.random(92, 108), 0.7
             )
         end
@@ -741,7 +741,7 @@ if SERVER then
         --[[if ply.PlayerClassName == "Combine" then
             ply.painCD = ply.painCD or 0
             if hitgroups_sounds[hitgroup] and ply.painCD < CurTime() and ply.organism and not ply.organism.otrub and ply:Alive() then
-                local snd = "npc/combine_soldier/pain" .. math.random(1,3) .. ".wav"
+                local snd = "npc/combine_soldier/pain" .. math.random(1,3) .. ".ogg"
                 ent:EmitSound(snd,80,ply.VoicePitch)
                 ply.painCD = CurTime() + SoundDuration(snd)
                 ply.lastPhr = snd
@@ -756,7 +756,7 @@ if SERVER then
         for _,mate in ipairs(nearPlayers) do
             if mate:IsPlayer() and mate ~= ply and mate:Alive() and mate.PlayerClassName == "Combine" then
                 if ply:Alive() and not ply.organism.otrub and ply.PlayerClassName == "Combine" and wep.ShellEject ~= "ShotgunShellEject" then
-                    local phrase = (math.random(1,2) == 2) and "npc/combine_soldier/vo/coverme.wav" or "npc/combine_soldier/vo/coverhurt.wav"
+                    local phrase = (math.random(1,2) == 2) and "npc/combine_soldier/vo/coverme.ogg" or "npc/combine_soldier/vo/coverhurt.ogg"
                     ply:EmitSound(phrase,75,ply.VoicePitch)
                     ply.phrCld = CurTime() + (SoundDuration(phrase) or 0)
                     ply.lastPhr = phrase
@@ -778,14 +778,14 @@ if SERVER then
 
     hook.Add("HG_PlayerSay","CombineChatMessage",function(ply, txtTbl, text)
         if ply.PlayerClassName == "Combine" and ply:Alive() and not ply.organism.otrub then
-            ply:EmitSound("npc/metropolice/vo/on1.wav")
+            ply:EmitSound("npc/metropolice/vo/on1.ogg")
         end
     end)
 end
 
 
 if CLIENT then
-    local radio_end_sound = Sound("npc/metropolice/vo/off4.wav")
+    local radio_end_sound = Sound("npc/metropolice/vo/off4.ogg")
     hook.Add("PlayerStartVoice","CombineRadioStart",function(ply)
         if ply.PlayerClassName == "Combine" and ply:Alive() then
             ply:EmitSound(radio_end_sound)
@@ -841,7 +841,7 @@ if CLIENT then
         if ply.PlayerClassName ~= "Combine" or not ply:Alive() then
             if pnv_enabled then
                 pnv_enabled = false
-                surface.PlaySound("items/nvg_off.wav")
+                surface.PlaySound("items/nvg_off.ogg")
                 hook.Remove("RenderScreenspaceEffects","PNV_ColorCorrection")
                 if IsValid(pnv_light) then
                     pnv_light:Remove()
@@ -856,7 +856,7 @@ if CLIENT then
 
         if pnv_enabled then
             transitioning = true
-            surface.PlaySound("items/nvg_on.wav")
+            surface.PlaySound("items/nvg_on.ogg")
             hook.Add("RenderScreenspaceEffects","PNV_ColorCorrection",function()
                 if ply.PlayerClassName ~= "Combine" then return end
                 local progress = math.min((CurTime() - transition_start)/transition_time,1)
@@ -871,7 +871,7 @@ if CLIENT then
             end)
         else
             transitioning = false
-            surface.PlaySound("items/nvg_off.wav")
+            surface.PlaySound("items/nvg_off.ogg")
             hook.Remove("RenderScreenspaceEffects","PNV_ColorCorrection")
         end
     end

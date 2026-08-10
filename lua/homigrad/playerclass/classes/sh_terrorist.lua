@@ -49,7 +49,7 @@ hook.Add("HG_PlayerFootstep", "terrorist_footsteps", function(ply, pos, foot, so
 				snd = sound -- missing footsteps fix
 			end
 
-			hg.EmitFootstepSound("homigrad/player/footsteps/new/bass_0"..math.random(9)..".wav", pos, ply, volume, 75, changePitch(math.random(95,105)))
+			hg.EmitFootstepSound("homigrad/player/footsteps/new/bass_0"..math.random(9)..".ogg", pos, ply, volume, 75, changePitch(math.random(95,105)))
 			hg.EmitFootstepSound(snd, pos, ply, volume, 75, changePitch(math.random(95,105)))
 		end
 	end

@@ -62,7 +62,7 @@ function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage(nil, nil, nil, nil, "2211")
-		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_bandage.wav")
+		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_bandage.ogg")
 	end
 end
 
@@ -70,7 +70,7 @@ if SERVER then
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage(nil, nil, nil, nil, "2211")
-			self:NPCHeal(ent, 0.1, "snd_jack_hmcd_bandage.wav")
+			self:NPCHeal(ent, 0.1, "snd_jack_hmcd_bandage.ogg")
 		end
 
 		local org = ent.organism
@@ -87,7 +87,7 @@ if SERVER then
 		
 		//if ent != owner and !org.otrub then return end -- meh??
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
+		entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
 
 		-- The needle vents a punctured lung and drains collected pleural blood.
 		-- It does not create a puncture when used on a healthy target.

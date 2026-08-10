@@ -164,7 +164,7 @@ SWEP.ScrappersSlot = "Primary"
 
 SWEP.ShockMultiplier = 3
 
-SWEP.DistSound = "weapons/darsu_eft/sr3m/sr3m_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/sr3m/sr3m_dist.ogg"
 
 SWEP.availableAttachments = {
 	sight = {

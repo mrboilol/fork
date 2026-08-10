@@ -294,18 +294,18 @@ function CLASS.Think(self)
 end
 
 --// Phrase stuff
-local zomb_pain = {"npc/zombie/zombie_die2.wav"}
+local zomb_pain = {"npc/zombie/zombie_die2.ogg"}
 for i = 1, 6 do
-	table.insert(zomb_pain, "npc/zombie/zombie_pain" .. i .. ".wav")
+	table.insert(zomb_pain, "npc/zombie/zombie_pain" .. i .. ".ogg")
 end
 
 local zomb_phrases, zomb_burnphrases = {}, {}
 for i = 1, 3 do
-	table.insert(zomb_phrases, "npc/zombie/zombie_alert" .. i .. ".wav")
+	table.insert(zomb_phrases, "npc/zombie/zombie_alert" .. i .. ".ogg")
 end
 for i = 1, 14 do
-	table.insert(zomb_phrases, "npc/zombie/zombie_voice_idle" .. i .. ".wav")
-	table.insert(zomb_burnphrases, "npc/zombie/zombie_voice_idle" .. i .. ".wav")
+	table.insert(zomb_phrases, "npc/zombie/zombie_voice_idle" .. i .. ".ogg")
+	table.insert(zomb_burnphrases, "npc/zombie/zombie_voice_idle" .. i .. ".ogg")
 end
 
 hook.Add("HG_ReplaceBurnPhrase", "ZombBurnPhrases", function(ply, phrase)
@@ -383,9 +383,9 @@ if SERVER then
 		if ply:Alive() and ply.PlayerClassName == "headcrabzombie" then
 			if IsValid(ply.FakeRagdoll) and ply:GetNetVar("lastFake") == 0 then return end
 			if not ply:IsSprinting() and (ply:KeyDown(IN_DUCK) or ply:KeyDown(IN_WALK)) then
-				chr:EmitSound("npc/zombie/foot_slide" .. math.random(3) .. ".wav", 60, math.random(95, 105), 0.5)
+				chr:EmitSound("npc/zombie/foot_slide" .. math.random(3) .. ".ogg", 60, math.random(95, 105), 0.5)
 			else
-				chr:EmitSound("npc/zombie/foot" .. math.random(3) .. ".wav", 65, math.random(95, 105))
+				chr:EmitSound("npc/zombie/foot" .. math.random(3) .. ".ogg", 65, math.random(95, 105))
 			end
 			return true
 		end

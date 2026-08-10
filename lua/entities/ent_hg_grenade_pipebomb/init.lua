@@ -33,7 +33,7 @@ function ENT:AddThink()
 	
 	if not self.Exploded and not self.SndStarted then
 		self.SndStarted = true
-		self.snd = self:StartLoopingSound("snds_jack_gmod/flareburn.wav")
+		self.snd = self:StartLoopingSound("snds_jack_gmod/flareburn.ogg")
 		hg.EmitAISound(self:GetPos(), 256, 5, 8)
 	end
 

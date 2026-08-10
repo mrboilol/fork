@@ -50,8 +50,8 @@ SWEP.WaterModel = {
 	["models/jorddrink/the_bottle_of_water.mdl"] = true,
 }
 
-SWEP.FallSnd = "snd_jack_hmcd_foodbounce.wav"
-SWEP.DeploySnd = "snd_jack_hmcd_foodbounce.wav"
+SWEP.FallSnd = "snd_jack_hmcd_foodbounce.ogg"
+SWEP.DeploySnd = "snd_jack_hmcd_foodbounce.ogg"
 
 function SWEP:SetupDataTables()
 
@@ -97,7 +97,7 @@ function SWEP:InitializeAdd()
 	if owner:IsNPC() then
 		self:SetHold("melee")
 		owner:SetHealth(math.Clamp(owner:Health() + (owner:GetMaxHealth() * 0.15), 0, owner:GetMaxHealth() * 2))
-		owner:EmitSound("snd_jack_hmcd_eat"..math.random(4)..".wav", 75, math.random(95, 105))
+		owner:EmitSound("snd_jack_hmcd_eat"..math.random(4)..".ogg", 75, math.random(95, 105))
 		self:Remove()
 	end
 
@@ -185,7 +185,7 @@ if SERVER then
 		local ply = self:GetOwner()
 		ply:ViewPunch(Angle(3,0,0))
 		
-		ent:EmitSound( self.WaterModel[self.WorldModel] and "snd_jack_hmcd_drink"..math.random(3)..".wav" or "snd_jack_hmcd_eat"..math.random(4)..".wav", 60, math.random(95, 105))
+		ent:EmitSound( self.WaterModel[self.WorldModel] and "snd_jack_hmcd_drink"..math.random(3)..".ogg" or "snd_jack_hmcd_eat"..math.random(4)..".ogg", 60, math.random(95, 105))
 		self.CDEating = CurTime() + 0.5
 		self.Eating = self.Eating + 1
 		self:SetHolding(0)

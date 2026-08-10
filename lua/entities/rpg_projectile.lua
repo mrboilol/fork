@@ -10,9 +10,9 @@ ENT.PrintName = "RPG-7 Rocket"
 ENT.Spawnable = true
 ENT.AdminOnly = true
 ENT.Model = "models/weapons/tfa_ins2/w_rpg7_projectile.mdl"
-ENT.Sound = "snd_jack_bigsplodeclose.wav"
-ENT.SoundFar = "mortar_strike_far_dist_03.wav"
-ENT.SoundWater = "iedins/water/ied_water_detonate_01.wav"
+ENT.Sound = "snd_jack_bigsplodeclose.ogg"
+ENT.SoundFar = "mortar_strike_far_dist_03.ogg"
+ENT.SoundWater = "iedins/water/ied_water_detonate_01.ogg"
 ENT.InitialVelocity = 1200
 ENT.Speed = 2200
 ENT.TruhstTime = 0.4
@@ -75,7 +75,7 @@ function ENT:CheckSafetyDistance()
     
     if distance >= self.SafetyDistance and not self.SafetyArmed then
         self.SafetyArmed = true
-        self:EmitSound("buttons/button16.wav", 50, 150, 0.3)
+        self:EmitSound("buttons/button16.ogg", 50, 150, 0.3)
     end
     
     return self.SafetyArmed
@@ -229,8 +229,8 @@ function ENT:PhysicsCollide2(data, physobj)
             
             self.Duded = false 
             self.Deactivated = true 
-            self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
-            self:EmitSound("weapons/pistol/pistol_empty.wav", 60, 100, 0.8)
+            self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.ogg")
+            self:EmitSound("weapons/pistol/pistol_empty.ogg", 60, 100, 0.8)
         else
             self:Detonate()
         end

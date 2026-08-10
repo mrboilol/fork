@@ -1194,7 +1194,7 @@ if CLIENT then
 
 		-- Play a sound that reflects the stack
 		-- local sndID = math.random(1, math.Min(6, magnitude))
-		-- local sndStr = "ambient/explosions/explode_"..sndID..".wav"
+		-- local sndStr = "ambient/explosions/explode_"..sndID..".ogg"
 		-- sound.Play(
 		-- 	sndStr,								-- Sound
 		-- 	pos,								-- Position

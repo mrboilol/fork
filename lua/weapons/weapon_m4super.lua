@@ -16,8 +16,8 @@ SWEP.WorldModel = "models/weapons/w_rif_m4a1.mdl"
 SWEP.Spawnable = false
 SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/m4super90.png")
 SWEP.IconOverride = "pwb2/vgui/weapons/m4super90.png"
-SWEP.ReloadSound = "weapons/tfa_ins2/m1014/toz_shell_insert_2.wav"
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/toz_shotgun/handling/toz_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.ReloadSound = "weapons/tfa_ins2/m1014/toz_shell_insert_2.ogg"
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/toz_shotgun/handling/toz_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.CustomShell = "12x70"
 --SWEP.EjectPos = Vector(0,-20,5)
 --SWEP.EjectAng = Angle(0,90,0)
@@ -128,7 +128,7 @@ if SERVER then
 			net.WriteFloat(CurTime())
 			net.Broadcast()
 			self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-			self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.wav",true,CHAN_AUTO)
+			self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.ogg",true,CHAN_AUTO)
 			local ply = self:GetOwner()
 			if IsValid(ply:GetNetVar("carryent2")) then
 				if SERVER then
@@ -151,7 +151,7 @@ if SERVER then
 		self:ReloadStart()
 		self:ReloadStartPost()
 		if not self.DontOnReloadSnd then
-			self:PlaySnd(self.ReloadSound or "pwb2/weapons/ksg/shellinsert1.wav",true,CHAN_AUTO)
+			self:PlaySnd(self.ReloadSound or "pwb2/weapons/ksg/shellinsert1.ogg",true,CHAN_AUTO)
 		end
 		local org = self:GetOwner().organism
 		self.StaminaReloadTime = self.ReloadTime * ( IsValid( self:GetOwner() ) and org and org.stamina and org.pain and (2 - (self:GetOwner().organism.stamina[1] / 180 ) ) + (( org.pain / 40 ) + (org.larm/3) + (org.rarm/3)) or 1 )
@@ -202,7 +202,7 @@ function SWEP:ReloadEnd()
 			net.Broadcast()
 			if self.Chocking then
 				self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-				self:GetOwner():EmitSound(self.CockSound or "weapons/shotgun/shotgun_cock.wav")
+				self:GetOwner():EmitSound(self.CockSound or "weapons/shotgun/shotgun_cock.ogg")
 			end
 		end
 	end

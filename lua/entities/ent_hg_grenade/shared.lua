@@ -15,22 +15,22 @@ ENT.BlastDis = 14 --meters
 ENT.Penetration = 12
 ENT.ishggrenade = true
 ENT.spoon = "models/weapons/m67_skoba.mdl"
-ENT.Sound = {"m67/m67_detonate_01.wav", "m67/m67_detonate_02.wav", "m67/m67_detonate_03.wav"}
-ENT.SoundFar = {"m67/m67_detonate_far_dist_01.wav", "m67/m67_detonate_far_dist_02.wav", "m67/m67_detonate_far_dist_03.wav"}
-ENT.SoundWater = "m67/water/m67_water_detonate_01.wav"
+ENT.Sound = {"m67/m67_detonate_01.ogg", "m67/m67_detonate_02.ogg", "m67/m67_detonate_03.ogg"}
+ENT.SoundFar = {"m67/m67_detonate_far_dist_01.ogg", "m67/m67_detonate_far_dist_02.ogg", "m67/m67_detonate_far_dist_03.ogg"}
+ENT.SoundWater = "m67/water/m67_water_detonate_01.ogg"
 ENT.SoundBass = {
-    "snd_jack_fragsplodeclose.wav", --;; Мне насрать если чет не нравится можете изменить!!!
-    "m67/m67_detonate_02.wav",
-    "snd_jack_bigsplodeclose.wav"
+    "snd_jack_fragsplodeclose.ogg", --;; Мне насрать если чет не нравится можете изменить!!!
+    "m67/m67_detonate_02.ogg",
+    "snd_jack_bigsplodeclose.ogg"
 }
 ENT.DebrisSounds = {
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave01.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave010.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave02.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave03.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave04.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave05.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave06.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave07.wav",
-    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave09.wav"
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave01.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave010.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave02.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave03.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave04.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave05.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave06.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave07.ogg",
+    "explosion_debris/interior/explosion_debris_sprinkle_interior_wave09.ogg"
 }

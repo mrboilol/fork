@@ -201,15 +201,15 @@ if CLIENT then
     ]]
     ENT.FallOnWaterSound = "Glide.Collision.BoatLandOnWater"
 
-    ENT.WaterSideSlideLoop = ")ambient/levels/canals/dam_water_loop2.wav"
+    ENT.WaterSideSlideLoop = ")ambient/levels/canals/dam_water_loop2.ogg"
     ENT.WaterSideSlideVolume = 0.8
     ENT.WaterSideSlidePitch = 255
 
-    ENT.FastWaterLoop = "vehicles/airboat/pontoon_fast_water_loop1.wav"
+    ENT.FastWaterLoop = "vehicles/airboat/pontoon_fast_water_loop1.ogg"
     ENT.FastWaterPitch = 110
     ENT.FastWaterVolume = 0.5
 
-    ENT.CalmWaterLoop = ")vehicles/airboat/pontoon_stopped_water_loop1.wav"
+    ENT.CalmWaterLoop = ")vehicles/airboat/pontoon_stopped_water_loop1.ogg"
     ENT.CalmWaterPitch = 100
     ENT.CalmWaterVolume = 0.9
 

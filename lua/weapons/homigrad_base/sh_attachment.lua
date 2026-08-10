@@ -652,7 +652,7 @@ if SERVER then
 		if not IsValid(wep) or not wep.attachments then return end
 		if not wep:HasAttachment("underbarrel") then return end
 		wep.lasertoggle = laserThingies[wep.lasertoggle or 0]
-		ply:EmitSound("weapons/ump45/ump45_fireselect.wav", 65)
+		ply:EmitSound("weapons/ump45/ump45_fireselect.ogg", 65)
 		net.Start("hmcd_togglelaser")
 		net.WriteEntity(wep)
 		net.WriteInt(wep.lasertoggle, 5)
@@ -671,7 +671,7 @@ if SERVER then
 		if not IsValid(wep) or not wep.attachments then return end
 		if not wep:HasAttachment("underbarrel") then return false end
 		wep.lasertoggle = flashlightThingies[wep.lasertoggle or 0]
-		ply:EmitSound("weapons/ump45/ump45_fireselect.wav", 65)
+		ply:EmitSound("weapons/ump45/ump45_fireselect.ogg", 65)
 		net.Start("hmcd_togglelaser")
 		net.WriteEntity(wep)
 		net.WriteInt(wep.lasertoggle, 5)

@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 if SERVER then
     util.AddNetworkString("hg_extinguisher_explode_fx")
 end
@@ -66,7 +66,7 @@ SWEP.AttackLen2 = 30
 
 SWEP.BlockTier = 5
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
+SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.ogg", 68, {95, 102}}
 
 
 SWEP.AnimList = {
@@ -92,7 +92,7 @@ SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft1.wav"
+SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft1.ogg"
 
 SWEP.hitsoundextra = {
     {"hammer/BodyHit-1.wav", 70, {115, 125}},
@@ -256,7 +256,7 @@ local function ExplodeExtinguisher(wep, attacker, pos)
     end
 
     sound.Play("rem_extinguisherexp.mp3", explodePos, 95, math.random(115, 125), 0.8)
-    sound.Play("physics/metal/metal_barrel_impact_hard5.wav", explodePos, 85, math.random(85, 95), 0.9)
+    sound.Play("physics/metal/metal_barrel_impact_hard5.ogg", explodePos, 85, math.random(85, 95), 0.9)
     util.ScreenShake(explodePos, 18, 80, 0.6, 360)
     SendExtinguisherExplosionFx(explodePos)
     ExtinguishNearbyFires(explodePos, fireRadius)
@@ -475,7 +475,7 @@ function SWEP:CanSecondaryAttack()
             end
         end
 
-        self.sound = self:StartLoopingSound("fire_extinguisher/fire_extinguisger_startloop.wav")
+        self.sound = self:StartLoopingSound("fire_extinguisher/fire_extinguisger_startloop.ogg")
         
         timer.Create("extinguisher"..self:EntIndex(), 0.1, 1, function()
             if IsValid(self) then

@@ -78,8 +78,8 @@ SWEP.WeaponEyeAngles = Angle(-0.7,0.1,0)
 
 SWEP.CustomShell = "12x70"
 
-SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.wav"
-SWEP.CockSound = "pwb2/weapons/ithaca37stakeout/pump.wav"
+SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.ogg"
+SWEP.CockSound = "pwb2/weapons/ithaca37stakeout/pump.ogg"
 SWEP.weight = 4.6
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
@@ -93,7 +93,7 @@ SWEP.Primary.Ammo = "12/70 gauge"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = Vector(0.005, 0.005, 0.005)
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/shtg_remington870/remington_fire_01.wav", 80, 90, 100}
-SWEP.SupressedSound = {"toz_shotgun/toz_suppressed_fp.wav", 65, 90, 100}
+SWEP.SupressedSound = {"toz_shotgun/toz_suppressed_fp.ogg", 65, 90, 100}
 SWEP.availableAttachments = {
 	sight = {
 		["mountType"] = "picatinny",
@@ -255,7 +255,7 @@ local function cock(self,time)
 	net.Broadcast()
 	
 	self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-	if CLIENT then self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.wav",true,CHAN_AUTO) end
+	if CLIENT then self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.ogg",true,CHAN_AUTO) end
 
 	local ply = self:GetOwner()
 

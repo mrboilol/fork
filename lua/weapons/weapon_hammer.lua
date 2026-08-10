@@ -70,7 +70,7 @@ SWEP.hitsoundbrutalize = {
 }
 
 SWEP.hitsoundplus = {
-    {"snd_jack_hmcd_hammerhit.wav", 55, {105, 115}},
+    {"snd_jack_hmcd_hammerhit.ogg", 55, {105, 115}},
 }
 
 SWEP.swingsoundextra = {
@@ -87,7 +87,7 @@ SWEP.AttackHit = "Concrete.ImpactHard"
 SWEP.Attack2Hit = "Concrete.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.wav"
+SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.ogg"
 SWEP.BlockDirectionalPrimary = "overhead"
 
 
@@ -101,7 +101,7 @@ SWEP.AttackPos = Vector(0, 0, 0)
 SWEP.noreverse = true
 SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
+SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.ogg", 68, {95, 102}}
 SWEP.UnNailables = {MAT_METAL, MAT_SAND, MAT_SLOSH, MAT_GLASS}
 SWEP.CantClash = true
 game.AddDecal("hmcd_jackanail", "decals/mat_jack_hmcd_nailhead")
@@ -354,7 +354,7 @@ function SWEP:ThrowHammer()
 		ply.organism.stamina.subadd = ply.organism.stamina.subadd + 30
 	end
 
-	ply:EmitSound("weapons/slam/throw.wav", 50, math.random(95, 105))
+	ply:EmitSound("weapons/slam/throw.ogg", 50, math.random(95, 105))
 	ply:SelectWeapon("weapon_hands_sh")
 	ply:ViewPunch(Angle(0, 0, -8))
 
@@ -427,7 +427,7 @@ function SWEP:SecondaryAttack(override)
 							Tr.Entity.LockedDoorNail = true
 							Tr.Entity.CadedByBuilder = (Owner.Profession and Owner.Profession == "builder") and true or false
 							Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - (Owner.Profession and Owner.Profession == "builder" and 2 or 3), self.Ammo)
-							sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
+							sound.Play("snd_jack_hmcd_hammerhit.ogg", Tr.HitPos, 65, math.random(90, 110))
 							self:SprayDecals()
 							Owner:PrintMessage(HUD_PRINTCENTER, "Door Sealed")
 							Owner:ViewPunch(vpang)
@@ -467,7 +467,7 @@ function SWEP:SecondaryAttack(override)
 						local Strength, Weld = BindObjects(Tr.Entity, Tr.HitPos, NewEnt, NewTr.HitPos, 3.5, Tr.PhysicsBone or 0, NewTr.PhysicsBone or 0)
 						--print(Tr.Entity,Weld)
 						if Weld or Weld == nil then Owner:SetAmmo(Owner:GetAmmoCount(self.Ammo) - 1, self.Ammo) end
-						sound.Play("snd_jack_hmcd_hammerhit.wav", Tr.HitPos, 65, math.random(90, 110))
+						sound.Play("snd_jack_hmcd_hammerhit.ogg", Tr.HitPos, 65, math.random(90, 110))
 						util.Decal("hmcd_jackanail", Tr.HitPos + Tr.HitNormal, Tr.HitPos - Tr.HitNormal)
 						Owner:ChatPrint("Bond strength: " .. tostring(Strength))
 						Owner:ViewPunch(vpang)

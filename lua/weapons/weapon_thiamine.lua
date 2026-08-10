@@ -39,8 +39,8 @@ SWEP.modeValuesdef = {
 
 SWEP.showstats = false
 
-SWEP.DeploySnd = "snd_jack_hmcd_pillsbounce.wav"
-SWEP.FallSnd = "snd_jack_hmcd_pillsbounce.wav"
+SWEP.DeploySnd = "snd_jack_hmcd_pillsbounce.ogg"
+SWEP.FallSnd = "snd_jack_hmcd_pillsbounce.ogg"
 
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
 
@@ -78,16 +78,16 @@ end
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
-		self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
-		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_pillsuse.wav")
+		self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.ogg")
+		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_pillsuse.ogg")
 	end
 end
 
 if SERVER then
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
-			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
-			self:NPCHeal(ent, 0.1, "snd_jack_hmcd_pillsuse.wav")
+			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.ogg")
+			self:NPCHeal(ent, 0.1, "snd_jack_hmcd_pillsuse.ogg")
 		end
 
 		local org = ent.organism
@@ -103,14 +103,14 @@ if SERVER then
 		end
 
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-		entOwner:EmitSound("snd_jack_hmcd_pillsuse.wav", 60, math.random(95, 105))
+		entOwner:EmitSound("snd_jack_hmcd_pillsuse.ogg", 60, math.random(95, 105))
 
 		org.thiamine = math.min(org.thiamine + 1, 1)
 		
 		if self.modeValues[1] > 0 then
 			self.modeValues[1] = 0
 			owner:SelectWeapon("weapon_hands_sh")
-			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
+			self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.ogg")
 			self:Remove()
 		end
 		

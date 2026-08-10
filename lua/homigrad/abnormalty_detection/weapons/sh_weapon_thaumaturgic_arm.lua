@@ -67,10 +67,10 @@ SWEP.AttackLen2 = 50
 
 
 SWEP.AttackSwing = ""
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = ""
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.ogg"
 SWEP.DeploySnd = ""
 
 SWEP.AnimList = {

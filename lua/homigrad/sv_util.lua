@@ -723,7 +723,7 @@ concommand.Add("hg_dropsling",function(ply)
 	ent:SetPos(ply:EyePos())
 	ent:SetAngles(ply:EyeAngles())
 	ent:Spawn()
-	ent:EmitSound("npc/footsteps/softshoe_generic6.wav", 75, math.random(90, 110), 1, CHAN_ITEM)
+	ent:EmitSound("npc/footsteps/softshoe_generic6.ogg", 75, math.random(90, 110), 1, CHAN_ITEM)
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then
 		phys:ApplyForceCenter(ply:GetAimVector() * 200 * phys:GetMass())
@@ -750,7 +750,7 @@ concommand.Add("hg_dropkastet",function(ply)
 	ent:SetPos(ply:EyePos())
 	ent:SetAngles(ply:EyeAngles())
 	ent:Spawn()
-	ent:EmitSound("npc/footsteps/softshoe_generic6.wav", 75, math.random(90, 110), 1, CHAN_ITEM)
+	ent:EmitSound("npc/footsteps/softshoe_generic6.ogg", 75, math.random(90, 110), 1, CHAN_ITEM)
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then
 		phys:ApplyForceCenter(ply:GetAimVector() * 200 * phys:GetMass())
@@ -1152,7 +1152,7 @@ hook.Add( "Move", "hg_RagdollIntoWalls", function( ply, mv)
 						phys:Wake()
 					end
 				end
-				ply:EmitSound("physics/concrete/boulder_impact_hard"..math.random(1,4)..".wav",75)
+				ply:EmitSound("physics/concrete/boulder_impact_hard"..math.random(1,4)..".ogg",75)
 				util.Decal("Rollermine.Crater",tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, ply)
 			else
 				hg.Fake(ply)
@@ -1519,7 +1519,7 @@ end
 		net.WriteBool(true)
 		net.Broadcast()
 
-		ply:EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".wav", 65)
+		ply:EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".ogg", 65)
 	end
 
 	local glassCutPhrases = {
@@ -1817,7 +1817,7 @@ hook.Add("PlayerUse", "DoorBashOnRun", function(ply, ent)
 	
 	ply.DoorBashCD = CurTime() + 1
 	
-	door:EmitSound("physics/wood/wood_crate_impact_hard3.wav", 80, math.Rand(90, 110))
+	door:EmitSound("physics/wood/wood_crate_impact_hard3.ogg", 80, math.Rand(90, 110))
 	
 	local ragdoll = hg.Ragdoll_Create(ply)
 	if IsValid(ragdoll) then

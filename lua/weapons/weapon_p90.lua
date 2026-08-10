@@ -129,16 +129,16 @@ SWEP.Primary.Damage = 32
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 25
 SWEP.Primary.Sound = {"weapons/tfa_ins2/mwr_p90/p90_fire1.wav", 75, 120, 130}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m14/handling/m14_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m14/handling/m14_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.05
 SWEP.ReloadTime = 4.2
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"pwb2/weapons/p90/magout.wav",
+	"pwb2/weapons/p90/magout.ogg",
 	"none",
-	"pwb2/weapons/p90/magin.wav",
-	"pwb2/weapons/p90/bolt.wav",
+	"pwb2/weapons/p90/magin.ogg",
+	"pwb2/weapons/p90/bolt.ogg",
 	"none",
 	"none",
 	"none",

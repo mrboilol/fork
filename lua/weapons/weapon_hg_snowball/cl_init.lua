@@ -18,12 +18,12 @@ SWEP.BounceWeaponIcon = false
 SWEP.AnimsEvents = {
 	["draw"] = {
 		[0.1] = function(self)
-			self:EmitSound("weapons/m67/handling/m67_armdraw.wav",70)
+			self:EmitSound("weapons/m67/handling/m67_armdraw.ogg",70)
 		end,
 	},
 	["drawback"] = {
 		[0.1] = function(self)
-			self:EmitSound("weapons/m67/handling/m67_armdraw.wav",65)
+			self:EmitSound("weapons/m67/handling/m67_armdraw.ogg",65)
 		end,
 	}
 }

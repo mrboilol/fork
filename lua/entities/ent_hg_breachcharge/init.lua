@@ -28,7 +28,7 @@ end
 function ENT:Think()
 	if self.NextBeep < CurTime() and self.Allowed then
 		self.NextBeep = CurTime() + self.NextTime
-		self:EmitSound("npc/turret_floor/ping.wav")
+		self:EmitSound("npc/turret_floor/ping.ogg")
 		self.TickAmount = self.TickAmount + 1
 
 		if self.TickAmount >= 3 then
@@ -82,7 +82,7 @@ function ENT:Detonate()
 	timer.Simple(.01, function()
 		if not IsValid(self) then return end
 		self:EmitSound("snd_jack_hmcd_explosion_debris.mp3", 85, math.random(90, 110))
-		self:EmitSound("m67/m67_detonate_far_dist_0" .. math.random(1, 3) .. ".wav", 140, 100)
+		self:EmitSound("m67/m67_detonate_far_dist_0" .. math.random(1, 3) .. ".ogg", 140, 100)
 		self:EmitSound("snd_jack_hmcd_debris.mp3", 85, math.random(90, 110))
 
 		for i = 0, 10 do
@@ -96,8 +96,8 @@ function ENT:Detonate()
 
 	timer.Simple(.02, function()
 		if not IsValid(self) then return end
-		self:EmitSound("m67/m67_detonate_0" .. math.random(1, 3) .. ".wav", 80, 100)
-		self:EmitSound("m67/m67_detonate_0" .. math.random(1, 3) .. ".wav", 80, 100)
+		self:EmitSound("m67/m67_detonate_0" .. math.random(1, 3) .. ".ogg", 80, 100)
+		self:EmitSound("m67/m67_detonate_0" .. math.random(1, 3) .. ".ogg", 80, 100)
 	end)
 
 	timer.Simple(.04, function()

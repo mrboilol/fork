@@ -207,7 +207,7 @@ SWEP.IconOverride = "entities/arc9_eft_nl545_di.png"
 SWEP.weight = 3.2
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/nl545/fire_new/cgnl_di_outdoor_close_02.wav"
+SWEP.DistSound = "weapons/darsu_eft/nl545/fire_new/cgnl_di_outdoor_close_02.ogg"
 
 SWEP.StartAtt = {"holo4", "stock_ar15_fab_defense_gl_core_s"}
 SWEP.availableAttachments = {

@@ -54,7 +54,7 @@ CreateAchievementFonts()
 
 local SOUND_ACH_CLICK = "ui/rem_click.wav"
 local SOUND_ACH_SELECT = "ui/rem_select.wav"
-local SOUND_TYPEWRITER = "shitty/tap-resonant.wav"
+local SOUND_TYPEWRITER = "shitty/tap-resonant.ogg"
 local SOUND_TYPEWRITER_LEVEL = 55
 local SOUND_TYPEWRITER_VOLUME = 0.25
 local SOUND_TYPEWRITER_PITCH = 102
@@ -933,7 +933,7 @@ local function PlayAchievementSound(rarity)
             return
         end
 
-        surface.PlaySound("homigrad/vgui/achievement_earned.wav")
+        surface.PlaySound("homigrad/vgui/achievement_earned.ogg")
     end)
 end
 

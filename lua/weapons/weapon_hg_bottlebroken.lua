@@ -17,7 +17,7 @@ SWEP.SuicideCutVec = Vector(-1, 5, 4)
 SWEP.SuicideCutAng = Angle(10, 0, 0)
 SWEP.SuicideTime = 0.5
 SWEP.CanSuicide = true
-SWEP.SuicideSound = "snd_jack_hmcd_knifestab.wav"
+SWEP.SuicideSound = "snd_jack_hmcd_knifestab.ogg"
 SWEP.SuicideNoLH = true
 
 SWEP.BreakBoneMul = 0.1
@@ -49,7 +49,7 @@ SWEP.BleedMultiplier = 1.5
 SWEP.AttackLen1 = 40
 
 SWEP.AttackHit = "GlassBottle.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
 
 SWEP.DeploySnd = "GlassBottle.ImpactSoft"
 
@@ -90,7 +90,7 @@ function SWEP:PrimaryAttackAdd(ent, trace)
     if SERVER and ent and math.random(1, self:IsEntSoft(ent) and 30 or 10) == 1 then
         self:PrecacheGibs()
         self:GibBreakServer(trace.HitNormal * -100)
-        self:GetOwner():EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".wav")
+        self:GetOwner():EmitSound("physics/glass/glass_pottery_break" .. math.random(1, 4) .. ".ogg")
         self:Remove()
     end
 end

@@ -192,7 +192,7 @@ SWEP.IconOverride = "entities/arc9_eft_scarl.png"
 SWEP.weight = 3.6
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/scarh/scarh_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/scarh/scarh_dist.ogg"
 
 SWEP.StartAtt = {}
 SWEP.availableAttachments = {

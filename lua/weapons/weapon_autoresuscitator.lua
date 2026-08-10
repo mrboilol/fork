@@ -93,7 +93,7 @@ if SERVER then
 
 		local entOwner = IsValid(org.owner and org.owner.FakeRagdoll) and org.owner.FakeRagdoll or org.owner
 		if IsValid(entOwner) then
-			entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
+			entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
 		end
 
 		org.autoResuscitator = 1

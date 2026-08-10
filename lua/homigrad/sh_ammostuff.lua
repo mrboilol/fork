@@ -264,8 +264,8 @@ local function onstopped_explosive(self, last_unsure_penetration_pos, reason, tr
 			end)
 
 			net.Start("projectileFarSound")
-				net.WriteString("m67/m67_detonate_01.wav")
-				net.WriteString("m67/m67_detonate_far_dist_03.wav")
+				net.WriteString("m67/m67_detonate_01.ogg")
+				net.WriteString("m67/m67_detonate_far_dist_03.ogg")
 				net.WriteVector(pos)
 				net.WriteEntity(Entity(0))
 				net.WriteBool(false)
@@ -3913,7 +3913,7 @@ if SERVER then
 			end
 		end
         ply:SetAmmo(ply:GetAmmoCount(ammotype)-count,ammotype)
-        ply:EmitSound("snd_jack_hmcd_ammobox.wav", 75, math.random(80,90), 1, CHAN_ITEM )
+        ply:EmitSound("snd_jack_hmcd_ammobox.ogg", 75, math.random(80,90), 1, CHAN_ITEM )
 		ply.inventory.Ammo = ply:GetAmmo()
 		ply:SetNetVar("Inventory",ply.inventory)
     end)

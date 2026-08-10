@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_hg_grenade_tpik"
 SWEP.PrintName = "Flashbang"
 SWEP.Instructions = 
@@ -143,7 +143,7 @@ SWEP.ItemsBones = {
 }
 SWEP.SpoonSounds = {
 	[1] = {"snd_jack_spoonfling.ogg", 65},
-	[2] = {"m9/m9_fp.wav", 70, 200, true}
+	[2] = {"m9/m9_fp.ogg", 70, 200, true}
 }
 
 SWEP.spoon = "models/weapons/m67_skoba.mdl"

@@ -30,17 +30,17 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = ".40 SW"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 30
-SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.wav", 75, 90, 100}
+SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/hndg_colt1911/colt_1911_fire1.ogg", 75, 90, 100}
 SWEP.SupressedSound = {"weapons/tfa_ins2/usp_tactical/fp_suppressed1.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m1911/handling/m1911_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m1911/handling/m1911_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 30
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.ReloadTime = 4
 SWEP.ReloadSoundes = {
 	"none",
 	"weapons/tfa_ins2/usp_tactical/magout.wav",
-	"weapons/tfa_ins2/browninghp/magin.wav",
-	"weapons/tfa_ins2/browninghp/boltrelease.wav",
+	"weapons/tfa_ins2/browninghp/magin.ogg",
+	"weapons/tfa_ins2/browninghp/boltrelease.ogg",
 	"none",
 	"none"
 }

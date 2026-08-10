@@ -36,15 +36,15 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "20mm"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 65
-SWEP.Primary.Sound = {"weapons/awoi/musket_3_fire.wav", 75, 60, 70}
-SWEP.SupressedSound = {"weapons/awoi/musket_3_fire.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m1911/handling/m1911_empty.wav", 75, 95, 100, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"weapons/awoi/musket_3_fire.ogg", 75, 60, 70}
+SWEP.SupressedSound = {"weapons/awoi/musket_3_fire.ogg", 65, 90, 100}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m1911/handling/m1911_empty.ogg", 75, 95, 100, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 80
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.Primary.Spread = Vector(0.012, 0.012, 0.012)
 
 SWEP.ReloadTime = 5
-SWEP.ReloadSound = "weapons/awoi/pistol_reload.wav"
+SWEP.ReloadSound = "weapons/awoi/pistol_reload.ogg"
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
 SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
 SWEP.HoldType = "revolver"
@@ -68,7 +68,7 @@ SWEP.availableAttachments = {}
 
 SWEP.ShockMultiplier = 2
 
-SWEP.DistSound = "toz_shotgun/toz_dist.wav"--SWEP.DistSound = "weapons/awoi/musket_1_fire.wav"
+SWEP.DistSound = "toz_shotgun/toz_dist.wav"--SWEP.DistSound = "weapons/awoi/musket_1_fire.ogg"
 SWEP.holsteredBone = "ValveBiped.Bip01_Spine2"
 SWEP.holsteredPos = Vector(5, 7, -4)
 SWEP.holsteredAng = Angle(-150, -10, 180)

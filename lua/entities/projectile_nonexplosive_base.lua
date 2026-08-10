@@ -7,8 +7,8 @@ ENT.Spawnable = false
 ENT.AdminOnly = true
 
 ENT.Model = ""
-ENT.HitSound = "weapons/crossbow/hit1.wav"
-ENT.FleshHit = "weapons/crossbow/bolt_skewer1.wav"
+ENT.HitSound = "weapons/crossbow/hit1.ogg"
+ENT.FleshHit = "weapons/crossbow/bolt_skewer1.ogg"
 
 ENT.Damage = 200
 ENT.Force = 0.2
@@ -256,7 +256,7 @@ if SERVER then
 		net.WriteBool(true)
 		net.Broadcast()
 
-		ent:EmitSound("arrow_tear.wav")
+		ent:EmitSound("arrow_tear.ogg")
 	end
 
 	concommand.Add("hg_takearrow", function(ply, cmd, args)

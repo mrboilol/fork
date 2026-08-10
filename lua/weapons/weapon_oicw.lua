@@ -124,8 +124,8 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 40
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 32
-SWEP.Primary.Sound = {"weapons/hmcd_ar2/fire1.wav", 85, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/mk18/handling/mk18_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"weapons/hmcd_ar2/fire1.ogg", 85, 90, 100}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/mk18/handling/mk18_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.EjectPos = Vector(5, 20, -4)
 SWEP.EjectAng = Angle(15, -90, 0)
 SWEP.weight = 4.5
@@ -144,14 +144,14 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magout.wav",
+	"weapons/ar2/ar2_magout.ogg",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magin.wav",
+	"weapons/ar2/ar2_magin.ogg",
 	"none",
-	"weapons/ar2/ar2_reload_rotate.wav",
+	"weapons/ar2/ar2_reload_rotate.ogg",
 	"none",
-	"weapons/ar2/ar2_push.wav",
+	"weapons/ar2/ar2_push.ogg",
 	"none",
 	"none",
 	"none",
@@ -162,7 +162,7 @@ SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-21, -0.365, 7.4)
 
 
-SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.wav", 75, 100, 110}
+SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.ogg", 75, 100, 110}
 
 SWEP.Ergonomics = 0.85
 SWEP.Penetration = 15

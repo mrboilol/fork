@@ -50,7 +50,7 @@ function MODE:RandomStuff()
 	end
 
 	if math.random(1, 25) == 1 and !IsValid(crysound) then
-		local snd = math.random(2) == 1 and "cry2.wav" or "cry1.wav"
+		local snd = math.random(2) == 1 and "cry2.ogg" or "cry1.ogg"
 		if crysound then return end
 		local tbl = ents.FindByClass("func_door_rotating")
 		table.Add(ents.FindByClass("prop_door_rotating"))

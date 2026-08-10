@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_hg_legacy_grenade"
 SWEP.PrintName = "Molotov Cocktail"
 SWEP.Instructions = "A handmade molotov cocktail is an incendiary weapon consisting of a frangible container filled with flammable substances and equipped with a fuse."
@@ -26,7 +26,7 @@ SWEP.lefthandmodel = "models/weapons/gleb/w_firematch.mdl"
 SWEP.offsetVec2 = Vector(4,-1.2,1)
 SWEP.offsetAng2 = Angle(10,0,90)
 SWEP.ModelScale2 = 1.5
-SWEP.throwsound = "snd_jack_hmcd_lighter.wav"
+SWEP.throwsound = "snd_jack_hmcd_lighter.ogg"
 
 SWEP.offsetVec = Vector(3, -2, -1)
 SWEP.offsetAng = Angle(145, 0, 0)

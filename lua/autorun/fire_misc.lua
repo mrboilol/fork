@@ -935,11 +935,11 @@ PrecacheParticleSystem("vFire_Burst_Trail_Plume")
 --[[-------------------------------------------------------------------------
 Loop sounds
 ---------------------------------------------------------------------------]]
-list.Add("vFireLoopSounds", "ambient/fire/firebig.wav")
-list.Add("vFireLoopSounds", "ambient/fire/fire_big_loop1.wav")
-list.Add("vFireLoopSounds", "ambient/fire/fire_med_loop1.wav")
-list.Add("vFireLoopSounds", "ambient/fire/fire_small1.wav")
-list.Add("vFireLoopSounds", "ambient/fire/fire_small_loop2.wav")
+list.Add("vFireLoopSounds", "ambient/fire/firebig.ogg")
+list.Add("vFireLoopSounds", "ambient/fire/fire_big_loop1.ogg")
+list.Add("vFireLoopSounds", "ambient/fire/fire_med_loop1.ogg")
+list.Add("vFireLoopSounds", "ambient/fire/fire_small1.ogg")
+list.Add("vFireLoopSounds", "ambient/fire/fire_small_loop2.ogg")
 
 
 --[[-------------------------------------------------------------------------

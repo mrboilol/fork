@@ -22,7 +22,7 @@ SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_shot_xm1014.mdl"
-SWEP.ReloadSound = "weapons/tfa_ins2/m1014/toz_shell_insert_2.wav"
+SWEP.ReloadSound = "weapons/tfa_ins2/m1014/toz_shell_insert_2.ogg"
 SWEP.WepSelectIcon2 = Material("pwb/sprites/xm1014.png")
 SWEP.IconOverride = "entities/weapon_pwb_xm1014.png"
 SWEP.WorldModelFake = "models/weapons/arccw/c_ud_m1014.mdl"
@@ -229,7 +229,7 @@ local function cock(self,time)
 	net.Broadcast()
 	
 	self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-	--self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.wav",true,CHAN_AUTO)
+	--self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.ogg",true,CHAN_AUTO)
 
 	local ply = self:GetOwner()
 

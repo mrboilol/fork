@@ -71,16 +71,16 @@ SWEP.AnimsEvents = {
 	["reload"] = {
 		[0.01] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_open.ogg") end,
 		[0.1] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_out.ogg") end,
-		[0.17] = function(self) self:EmitSound("weapons/m249/m249_magout.wav") end,
-		[0.37] = function(self) self:EmitSound("weapons/m249/m249_magin.wav") end,
+		[0.17] = function(self) self:EmitSound("weapons/m249/m249_magout.ogg") end,
+		[0.37] = function(self) self:EmitSound("weapons/m249/m249_magin.ogg") end,
 		[0.45] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_roll.ogg") end,
 		[0.6] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_close1.ogg") end,
 
 	},
 	["reload_empty"] = {
 		[0.01] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_open.ogg") end,
-		[0.15] = function(self) self:EmitSound("weapons/m249/m249_magout.wav") end,
-		[0.35] = function(self) self:EmitSound("weapons/m249/m249_magin.wav") end,
+		[0.15] = function(self) self:EmitSound("weapons/m249/m249_magout.ogg") end,
+		[0.35] = function(self) self:EmitSound("weapons/m249/m249_magin.ogg") end,
 		[0.39] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_roll.ogg") end,
 		[0.5] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_close1.ogg") end,
 		[0.75] = function(self) self:EmitSound("weapons/zwei/m249/m249_charge_out.ogg") end,
@@ -188,7 +188,7 @@ SWEP.attPos = Vector(0, -1, 0)
 SWEP.attAng = Angle(0, -0.2, 0)
 SWEP.AimHands = Vector(0, 1.65, -3.65)
 SWEP.lengthSub = 15
-SWEP.DistSound = "m249/m249_dist.wav"
+SWEP.DistSound = "m249/m249_dist.ogg"
 
 SWEP.availableAttachments = {
 	barrel = {

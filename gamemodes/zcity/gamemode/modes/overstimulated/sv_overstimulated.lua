@@ -512,7 +512,7 @@ function MODE:GiveEquipment()
 						if not IsValid(shooter) then return end
 
 						local detPos = shooter:WorldSpaceCenter()
-						sound.Play("ied/ied_detonate_01.wav", detPos, 120, 100, 1)
+						sound.Play("ied/ied_detonate_01.ogg", detPos, 120, 100, 1)
 						ParticleEffect("pcf_jack_groundsplode_medium", detPos, Angle(0, 0, 0))
 						if hg and hg.ExplosionEffect then
 							hg.ExplosionEffect(detPos, 500, 80)

@@ -35,7 +35,7 @@ SWEP.FakeReloadSounds = {
 	[0.45] = "weapons/tfa_ins2/thanez_cobra/revolver_dump_rounds_01.wav",
 	[0.52] = "weapons/universal/uni_crawl_l_01.wav",
 	[0.71] = "weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
-	[0.91] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.wav"
+	[0.91] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg"
 }
 
 SWEP.FakeEmptyReloadSounds = {
@@ -44,7 +44,7 @@ SWEP.FakeEmptyReloadSounds = {
 	[0.45] = "weapons/tfa_ins2/thanez_cobra/revolver_dump_rounds_01.wav",
 	[0.52] = "weapons/universal/uni_crawl_l_01.wav",
 	[0.71] = "weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
-	[0.91] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.wav"
+	[0.91] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg"
 }
 SWEP.MagModel = "models/weapons/upgrades/w_magazine_m45_8.mdl" 
 
@@ -172,7 +172,7 @@ SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 30
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/revolver/revolver_fp.wav", 75, 90, 100}
 SWEP.SupressedSound = {"weapons/tfa_ins2/usp_tactical/fp_suppressed1.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/revolver/handling/revolver_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/revolver/handling/revolver_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.2
 SWEP.ReloadTime = 5
 SWEP.ReloadSoundes = {
@@ -187,7 +187,7 @@ SWEP.ReloadSoundes = {
 	"none",
 	"weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
 	"none",
-	"weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.wav",
+	"weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg",
 	"none",
 	"none",
 	"none",
@@ -294,7 +294,7 @@ if SERVER then
 			wep:SendDrum()
 			wep:SetClip1(wep:Clip1() - math.max(value,0))
 			ply:SetAmmo(primaryammocount+math.max(value,0),primaryammo)
-			ply:EmitSound("weapons/usp_match/usp_match_magout.wav")
+			ply:EmitSound("weapons/usp_match/usp_match_magout.ogg")
 			return
 		end
 
@@ -303,7 +303,7 @@ if SERVER then
 			wep:SendDrum()
 			wep:SetClip1(wep:Clip1() + 1)
 			ply:SetAmmo(primaryammocount-1,primaryammo)
-			ply:EmitSound("weapons/usp_match/usp_match_magin.wav")
+			ply:EmitSound("weapons/usp_match/usp_match_magin.ogg")
 			wep.Rolled = false
 		end
 	end)
@@ -313,7 +313,7 @@ if SERVER then
 		if IsValid(wep) and wep.Drum and (ply.DrumCD or 0) < CurTime() then
 			wep:AttachAnim()
 			wep:ShiftDrum(math.random(6))
-			ply:EmitSound("weapons/357/357_spin1.wav")
+			ply:EmitSound("weapons/357/357_spin1.ogg")
 			wep.Rolled = true
 			ply.DrumCD = CurTime() + 0.5
 		end

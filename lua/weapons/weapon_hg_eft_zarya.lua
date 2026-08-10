@@ -162,7 +162,7 @@ SWEP.SpoonSounds = {
 	[1] = {"snd_jack_spoonfling.ogg", 65},
 	[2] = {"weapons/darsu_eft/grenades/gren_fuze1.ogg", 70, 200, true}
 }
---self:EmitSound("snds_jack_gmod/flamethrower_ignite_try.wav",65)
+--self:EmitSound("snds_jack_gmod/flamethrower_ignite_try.ogg",65)
 
 
 

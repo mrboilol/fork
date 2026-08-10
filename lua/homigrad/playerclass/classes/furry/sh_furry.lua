@@ -849,7 +849,7 @@ if CLIENT then
         if ply.PlayerClassName ~= "furry" or not ply:Alive() then
             if pnv_enabled then
                 pnv_enabled = false
-                surface.PlaySound("items/nvg_off.wav")
+                surface.PlaySound("items/nvg_off.ogg")
                 hook.Remove("RenderScreenspaceEffects","PNV_ColorCorrectionFur")
                 if IsValid(pnv_light) then
                     pnv_light:Remove()
@@ -864,7 +864,7 @@ if CLIENT then
 
         if pnv_enabled then
             transitioning = true
-            surface.PlaySound("items/nvg_on.wav")
+            surface.PlaySound("items/nvg_on.ogg")
             hook.Add("RenderScreenspaceEffects","PNV_ColorCorrectionFur",function()
                 if ply.PlayerClassName ~= "furry" then return end
                 local progress = math.min((CurTime() - transition_start)/transition_time,1)
@@ -878,7 +878,7 @@ if CLIENT then
             end)
         else
             transitioning = false
-            surface.PlaySound("items/nvg_off.wav")
+            surface.PlaySound("items/nvg_off.ogg")
             hook.Remove("RenderScreenspaceEffects","PNV_ColorCorrectionFur")
         end
     end

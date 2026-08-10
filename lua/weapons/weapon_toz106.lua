@@ -27,15 +27,15 @@ SWEP.AttachmentPos = Vector(0.5,0.1,0.3)
 SWEP.AttachmentAng = Angle(0,0,0)
 
 SWEP.FakeReloadSounds = {
-	[0.51] = "weapons/tfa_nam_svd/svd_magout.wav",
-	[0.95] = "weapons/tfa_nam_svd/svd_magin.wav",
+	[0.51] = "weapons/tfa_nam_svd/svd_magout.ogg",
+	[0.95] = "weapons/tfa_nam_svd/svd_magin.ogg",
 }
 
 SWEP.FakeEmptyReloadSounds = {
 	[0.1] = "weapons/tfa_ins2/k98/m40a1_boltlatch.wav",
 	[0.15] = "weapons/tfa_ins2/k98/m40a1_boltrelease.wav",
-	[0.5] = "weapons/tfa_nam_svd/svd_magout.wav",
-	[0.87] = "weapons/tfa_nam_svd/svd_magin.wav",
+	[0.5] = "weapons/tfa_nam_svd/svd_magout.ogg",
+	[0.87] = "weapons/tfa_nam_svd/svd_magin.ogg",
 	[0.97] = "weapons/tfa_ins2/k98/m40a1_boltrelease.wav",
 }
 
@@ -210,12 +210,12 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"none",
-	"weapons/tfa_ins2/ak103/ak103_magout.wav",
+	"weapons/tfa_ins2/ak103/ak103_magout.ogg",
 	"none",
-	"weapons/tfa_ins2/ak103/ak103_magoutrattle.wav",
-	"weapons/tfa_ins2/ak103/ak103_magin.wav",
-	"weapons/tfa_ins2/ak103/ak103_boltback.wav",
-	"weapons/tfa_ins2/ak103/ak103_boltrelease.wav",
+	"weapons/tfa_ins2/ak103/ak103_magoutrattle.ogg",
+	"weapons/tfa_ins2/ak103/ak103_magin.ogg",
+	"weapons/tfa_ins2/ak103/ak103_boltback.ogg",
+	"weapons/tfa_ins2/ak103/ak103_boltrelease.ogg",
 	"none",
 	"none",
 	"none"

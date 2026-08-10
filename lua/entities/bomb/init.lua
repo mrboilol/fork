@@ -202,7 +202,7 @@ function ENT:Think()
 					ent.organism.fear = math.min(ent.organism.fear + 0.02 / beep, 1)
 				end
 			end
-			self:EmitSound("snd_jack_chargecapacitor.wav")
+			self:EmitSound("snd_jack_chargecapacitor.ogg")
 		end
 
 		return true

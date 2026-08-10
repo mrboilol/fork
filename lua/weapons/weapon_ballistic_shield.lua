@@ -64,12 +64,12 @@ SWEP.StaminaPrimary = 30
 SWEP.StaminaSecondary = 20
 SWEP.PainMultiplier = 1.2
 
-SWEP.AttackSwing = "weapons/slam/throw.wav"
-SWEP.AttackHit = "physics/metal/metal_barrel_impact_hard7.wav"
-SWEP.Attack2Hit = "physics/metal/metal_barrel_impact_hard7.wav"
-SWEP.AttackHitFlesh = "physics/body/body_medium_break3.wav"
-SWEP.Attack2HitFlesh = "physics/body/body_medium_break3.wav"
-SWEP.DeploySnd = "physics/metal/metal_canister_impact_soft2.wav"
+SWEP.AttackSwing = "weapons/slam/throw.ogg"
+SWEP.AttackHit = "physics/metal/metal_barrel_impact_hard7.ogg"
+SWEP.Attack2Hit = "physics/metal/metal_barrel_impact_hard7.ogg"
+SWEP.AttackHitFlesh = "physics/body/body_medium_break3.ogg"
+SWEP.Attack2HitFlesh = "physics/body/body_medium_break3.ogg"
+SWEP.DeploySnd = "physics/metal/metal_canister_impact_soft2.ogg"
 
 
 SWEP.ShieldMaxSpeed = 600
@@ -144,7 +144,7 @@ hook.Add("PostEntityFireBullets", "hg_shield_block", function(shooter, data)
 	end
 
 	if SERVER then
-		sound.Play("physics/metal/metal_solid_impact_bullet" .. math.random(2, 4) .. ".wav", data.Trace.HitPos, 80, math.random(90, 110))
+		sound.Play("physics/metal/metal_solid_impact_bullet" .. math.random(2, 4) .. ".ogg", data.Trace.HitPos, 80, math.random(90, 110))
 	end
 
 	return false

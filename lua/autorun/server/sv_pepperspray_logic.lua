@@ -98,7 +98,7 @@ hook.Add("Org Think", "PepperSprayRegression", function(ply, org, dt)
             if hg and hg.organism and hg.organism.module and hg.organism.module.random_events then
                 hg.organism.module.random_events.TriggerRandomEvent(ply, "Cough")
             else
-                ply:EmitSound("ambient/voices/cough" .. math.random(1,4) .. ".wav", 75, 100)
+                ply:EmitSound("ambient/voices/cough" .. math.random(1,4) .. ".ogg", 75, 100)
             end
             ply.PS_NextCough = CurTime() + math.Rand(2.0, 4.5)
         end

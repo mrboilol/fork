@@ -345,10 +345,10 @@ local function EnterSurrender(ply)
     net.Start("hg_surrender_enter") net.WriteUInt(vi, 4) net.SendToServer()
 
     local scaredLines = {
-        "vo/episode_1/npc/male01/cit_evac_casualty10.wav", "vo/npc/male01/ohno.wav",
-        "vo/npc/male01/startle01.wav", "vo/npc/male01/startle02.wav",
-        "vo/episode_1/npc/male01/cit_alert_head06.wav", "vo/episode_1/npc/male01/cit_buddykilled04.wav",
-        "vo/episode_1/npc/male01/cit_evac_casualty09.wav"
+        "vo/episode_1/npc/male01/cit_evac_casualty10.ogg", "vo/npc/male01/ohno.ogg",
+        "vo/npc/male01/startle01.ogg", "vo/npc/male01/startle02.ogg",
+        "vo/episode_1/npc/male01/cit_alert_head06.ogg", "vo/episode_1/npc/male01/cit_buddykilled04.ogg",
+        "vo/episode_1/npc/male01/cit_evac_casualty09.ogg"
     }
     local phrase = scaredLines[math.random(#scaredLines)]
     if ThatPlyIsFemale(ply) then phrase = string.Replace(phrase, "male01", "female01") end

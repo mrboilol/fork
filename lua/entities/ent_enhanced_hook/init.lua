@@ -492,14 +492,14 @@ function ENT:TryDetach(ply, rag)
 	if CurTime() < (self.NextDetach or 0) then
 		if (self.NextDeny or 0) < CurTime() then
 			self.NextDeny = CurTime() + .5
-			ply:EmitSound("buttons/lightswitch2.wav", 50, 90, .4)
+			ply:EmitSound("buttons/lightswitch2.ogg", 50, 90, .4)
 		end
 		return
 	end
 
 	local pos = rag:GetPos() + Vector(0, 0, 25)
 	self:DropToSnap(pos, rag:GetVelocity())
-	sound.Play("snds_jack_hmcd_grapple/soft.wav", pos, 70, 110)
+	sound.Play("snds_jack_hmcd_grapple/soft.ogg", pos, 70, 110)
 end
 
 function ENT:DropToSnap(pos, vel)
@@ -558,7 +558,7 @@ function ENT:LockToSurface(ent)
 	constraint.Weld(self, ent, 0, 0, 0, true, false)
 	local phys = self:GetPhysicsObject()
 	if IsValid(phys) then phys:SetMass(IsValid(ent) and not ent:IsWorld() and 20 or 100) end
-	sound.Play("snds_jack_hmcd_grapple/lock.wav", self:GetPos(), 75, 100)
+	sound.Play("snds_jack_hmcd_grapple/lock.ogg", self:GetPos(), 75, 100)
 end
 
 function ENT:GetRelativeVelocity()
@@ -619,7 +619,7 @@ function ENT:Use(ply)
 			hook:AttachTo(ply, hook.Fixed + ply:GetPos():Distance(hook:AnchPos()) + 50)
 		end
 
-		sound.Play("snds_jack_hmcd_grapple/lock.wav", self:GetPos(), 70, 100)
+		sound.Play("snds_jack_hmcd_grapple/lock.ogg", self:GetPos(), 70, 100)
 		self:Remove()
 		return
 	end
@@ -638,7 +638,7 @@ function ENT:Use(ply)
 		ply:SelectWeapon("weapon_enhanced_hook")
 	end
 
-	sound.Play("snds_jack_hmcd_grapple/soft.wav", self:GetPos(), 60, 100)
+	sound.Play("snds_jack_hmcd_grapple/soft.ogg", self:GetPos(), 60, 100)
 	self:Remove()
 end
 
@@ -647,7 +647,7 @@ function ENT:PhysicsCollide(data, physobj)
 	if data.Speed > 20 and data.DeltaTime > .15 then
 		if not self:GetNWBool("Impacted", false) then self:SetNWBool("Impacted", true) end
 		if data.Speed > 300 then
-			sound.Play("snds_jack_hmcd_grapple/hard.wav", self:GetPos(), 70, math.random(90, 110))
+			sound.Play("snds_jack_hmcd_grapple/hard.ogg", self:GetPos(), 70, math.random(90, 110))
 			local ent = data.HitEntity
 			timer.Simple(0, function()
 				if IsValid(ent) and ent:IsPlayer() and ent:Alive() and hg and hg.LightStunPlayer then
@@ -659,7 +659,7 @@ function ENT:PhysicsCollide(data, physobj)
 				end
 			end)
 		else
-			sound.Play("snds_jack_hmcd_grapple/soft.wav", self:GetPos(), 65, math.random(90, 110))
+			sound.Play("snds_jack_hmcd_grapple/soft.ogg", self:GetPos(), 65, math.random(90, 110))
 		end
 	end
 end

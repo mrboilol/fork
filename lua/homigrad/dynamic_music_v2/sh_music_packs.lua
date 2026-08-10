@@ -24,11 +24,11 @@ hg.DynamicMusicV2.Trakcs = hg.DynamicMusicV2.Trakcs or {}
         },
 
         ["Layers"] = {
-            ["Название для слоев1"] = ".wav .mp3 путь к любому файлу который может сожрать игра",
-            ["Название для слоев2"] = ".wav .mp3 путь к любому файлу который может сожрать игра",
-            ["Название для слоев3"] = ".wav .mp3 путь к любому файлу который может сожрать игра",
-            ["Название для слоев4"] = ".wav .mp3 путь к любому файлу который может сожрать игра",
-            ["Название для слоев5"] = ".wav .mp3 путь к любому файлу который может сожрать игра",
+            ["Название для слоев1"] = ".ogg .mp3 путь к любому файлу который может сожрать игра",
+            ["Название для слоев2"] = ".ogg .mp3 путь к любому файлу который может сожрать игра",
+            ["Название для слоев3"] = ".ogg .mp3 путь к любому файлу который может сожрать игра",
+            ["Название для слоев4"] = ".ogg .mp3 путь к любому файлу который может сожрать игра",
+            ["Название для слоев5"] = ".ogg .mp3 путь к любому файлу который может сожрать игра",
         }
     }
 --]]
@@ -89,14 +89,14 @@ AddTrack(
         }
     },
     { -- Layers
-        ["bass"] = "zcity_ost/mrpoint/highrise/highrise_bass.wav",
-        ["cymbals"] = "zcity_ost/mrpoint/highrise/highrise_cymbals.wav",
-        ["hats"] = "zcity_ost/mrpoint/highrise/highrise_hats.wav",
-        ["kick"] = "zcity_ost/mrpoint/highrise/highrise_kick.wav",
-        ["perc"] = "zcity_ost/mrpoint/highrise/highrise_perc.wav",
-        ["piano"] = "zcity_ost/mrpoint/highrise/highrise_piano.wav",
-        ["pluck"] = "zcity_ost/mrpoint/highrise/highrise_pluck.wav",
-        ["snare"] = "zcity_ost/mrpoint/highrise/highrise_snare.wav"
+        ["bass"] = "zcity_ost/mrpoint/highrise/highrise_bass.ogg",
+        ["cymbals"] = "zcity_ost/mrpoint/highrise/highrise_cymbals.ogg",
+        ["hats"] = "zcity_ost/mrpoint/highrise/highrise_hats.ogg",
+        ["kick"] = "zcity_ost/mrpoint/highrise/highrise_kick.ogg",
+        ["perc"] = "zcity_ost/mrpoint/highrise/highrise_perc.ogg",
+        ["piano"] = "zcity_ost/mrpoint/highrise/highrise_piano.ogg",
+        ["pluck"] = "zcity_ost/mrpoint/highrise/highrise_pluck.ogg",
+        ["snare"] = "zcity_ost/mrpoint/highrise/highrise_snare.ogg"
     },
     function(ply)
         local intens = 0

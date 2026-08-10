@@ -98,7 +98,7 @@ SWEP.Primary.Damage = 35
 SWEP.Primary.Spread = Vector(0.01, 0.01, 0.01)
 SWEP.NumBullet = 8
 SWEP.Primary.Force = 35
-SWEP.Primary.Sound = {"sound/weapons/darsu_eft/aa12_outdoor_close_loop1.wav", 75, 120, 140}
+SWEP.Primary.Sound = {"sound/weapons/darsu_eft/aa12_outdoor_close_loop1.ogg", 75, 120, 140}
 SWEP.SupressedSound = {"weapons/darsu_eft/m3s90/m3_fire_outdoor_silenced_close.wav", 65, 100, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_hammer.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.18182
@@ -128,7 +128,7 @@ SWEP.attPos = Vector(0.25, -2.1, 28)
 SWEP.attAng = Angle(0, 0.4, 0)
 SWEP.lengthSub = 25
 SWEP.handsAng = Angle(1, -1.5, 0)
-SWEP.DistSound = "ak74/ak74_dist.wav"
+SWEP.DistSound = "ak74/ak74_dist.ogg"
 
 SWEP.weight = 3
 

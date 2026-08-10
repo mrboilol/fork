@@ -54,7 +54,7 @@ if SERVER then
 				end
 			end
 
-			self:EmitSound("arrow_tear.wav")
+			self:EmitSound("arrow_tear.ogg")
 		end
 		
 		self:Remove()

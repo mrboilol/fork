@@ -104,7 +104,7 @@ end
 function SWEP:DoPoison(tr)
     local owner = self:GetOwner()
 
-    owner:EmitSound("physics/metal/soda_can_impact_hard2.wav", owner:IsNPC() and 75 or 40)
+    owner:EmitSound("physics/metal/soda_can_impact_hard2.ogg", owner:IsNPC() and 75 or 40)
 
 	local ent = ents.Create("ent_hg_cyanide_canister")
 	ent:SetPos(owner:IsNPC() and owner:EyePos() or tr.HitPos)
@@ -132,7 +132,7 @@ if SERVER then
 		if (not org.poison3notificate) and ((org.poison3 + 20) < CurTime()) then
 			org.poison3notificate = true
 			org.owner:Notify("It's getting difficult to breathe... for some reason...", true, "cyanide2", 3)
-			org.owner:EmitSound(ThatPlyIsFemale(org.owner) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav",65)	
+			org.owner:EmitSound(ThatPlyIsFemale(org.owner) and "breathing/inhale/female/inhale_0"..math.random(5)..".ogg" or "breathing/inhale/male/inhale_0"..math.random(4)..".ogg",65)
 		end
 
 		if (org.poison3 + (owner.SubRole == "traitor_chemist" and 50 or 30)) < CurTime() then

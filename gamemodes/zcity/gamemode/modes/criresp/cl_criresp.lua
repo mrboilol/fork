@@ -21,7 +21,7 @@ local criPanelLight = Color(55, 12, 12, 230)
 local criWhite = Color(240, 240, 240)
 local criDim = Color(190, 150, 150, 200)
 
-local sndClick, sndHover = "shitty/tap_depress.wav", "shitty/tap-resonant.wav"
+local sndClick, sndHover = "shitty/tap_depress.ogg", "shitty/tap-resonant.ogg"
 
 --;; если кому то в заебень ждать пока кто то включит режим чтоб вы могли все настроить
 local cv_music = CreateClientConVar("criresp_menumusic", "1", true, false, "Crisis Response menu music", 0, 1)
@@ -791,7 +791,7 @@ local function OpenMenu()
 				elseif GearCount() < slots then
 					selGear[i] = true
 				else
-					surface.PlaySound("shitty/tap_release.wav")
+					surface.PlaySound("shitty/tap_release.ogg")
 				end
 			end)
 			tile:SetSize(tileSize, tileSize + ScreenScale(14))
@@ -977,7 +977,7 @@ function MODE:RenderScreenspaceEffects()
 		if songfade <= 0.01 and IsValid(song) then
 			song:Stop()
 			song = nil
-			surface.PlaySound(lply:Team() == 0 and "zbattle/criresp/barricadedsuspectstart.mp3" or "snd_jack_hmcd_policesiren.wav")
+			surface.PlaySound(lply:Team() == 0 and "zbattle/criresp/barricadedsuspectstart.mp3" or "snd_jack_hmcd_policesiren.ogg")
 		elseif IsValid(song) then
 			songfade = Lerp(0.01, songfade, 0)
 			song:SetVolume(songfade)
@@ -1077,7 +1077,7 @@ net.Receive("cri_roundend", function()
 		total = net.ReadUInt(8),
 	}
 
-	surface.PlaySound(endStats.winner == 2 and "zbattle/criresp/failedSWAT.mp3" or "ambient/alarms/warningbell1.wav")
+	surface.PlaySound(endStats.winner == 2 and "zbattle/criresp/failedSWAT.mp3" or "ambient/alarms/warningbell1.ogg")
 end)
 
 local function EndLockActive()

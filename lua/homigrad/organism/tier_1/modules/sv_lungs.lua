@@ -1,17 +1,10 @@
-local max, min, Round, Lerp, halfValue2 = math.max, math.min, math.Round, Lerp, util.halfValue2
+local max, min, Round, Lerp = math.max, math.min, math.Round, Lerp
 
 --local Organism = hg.organism
 
 hg.organism.module.lungs = {}
 
 local module = hg.organism.module.lungs
-
-local hypoxiaNormalO2 = 25
-local hypoxiaImpairedO2 = 15
-local hypoxiaHeavyO2 = 10
-local hypoxiaIncapacitatingO2 = 5
-local hypoxiaDeepO2 = 1
-local hypoxiaTerminalO2 = 0
 
 local cardiacArrestO2DrainTime = 20
 local lowStaminaO2Start = 50
@@ -169,7 +162,7 @@ local function togglebreath(ply, toggle)
 
 				ply.organism.holdingbreath = true
 
-				ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav",65)	
+				ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/inhale/female/inhale_0"..math.random(5)..".ogg" or "breathing/inhale/male/inhale_0"..math.random(4)..".ogg",65)
 
 				insta_send_holdingbreath(ply.organism)
 
@@ -179,7 +172,7 @@ local function togglebreath(ply, toggle)
 
 			if ply.organism.holdingbreath then
 
-				ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/exhale/female/exhale_0"..math.random(5)..".wav" or "breathing/exhale/male/exhale_0"..math.random(5)..".wav",65)
+				ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/exhale/female/exhale_0"..math.random(5)..".ogg" or "breathing/exhale/male/exhale_0"..math.random(5)..".ogg",65)
 
 				ply.organism.holdingbreath = false
 
@@ -195,7 +188,7 @@ local function togglebreath(ply, toggle)
 
 		if ply.organism.holdingbreath then
 
-			ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/exhale/female/exhale_0"..math.random(5)..".wav" or "breathing/exhale/male/exhale_0"..math.random(5)..".wav",65)
+			ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/exhale/female/exhale_0"..math.random(5)..".ogg" or "breathing/exhale/male/exhale_0"..math.random(5)..".ogg",65)
 
 			ply.organism.holdingbreath = false
 
@@ -207,7 +200,7 @@ local function togglebreath(ply, toggle)
 
 			ply.organism.holdingbreath = true
 
-			ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/inhale/female/inhale_0"..math.random(5)..".wav" or "breathing/inhale/male/inhale_0"..math.random(4)..".wav",65)	
+			ply:EmitSound(ThatPlyIsFemale(ply) and "breathing/inhale/female/inhale_0"..math.random(5)..".ogg" or "breathing/inhale/male/inhale_0"..math.random(4)..".ogg",65)
 
 			insta_send_holdingbreath(ply.organism)
 
@@ -371,8 +364,7 @@ module[2] = function(owner, org, timeValue)
 
 	local o2 = org.o2
 	local rawBlood = tonumber(org.blood) or 5000
-	local terminalBlood = hg.organism.terminalBloodVolume or 2000
-	if not org.alive or rawBlood <= terminalBlood then
+	if not org.alive then
 		o2[1] = 0
 		o2.curregen = 0
 		org.bloodO2Cap = 0
@@ -436,8 +428,7 @@ module[2] = function(owner, org, timeValue)
 	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
 	-- Oxygen-carrying capacity is calculated directly from raw circulating
-	-- volume. The shallow exponent preserves compensation at moderate loss while
-	-- still producing an exact zero at the shared terminal threshold.
+	-- volume and reaches zero only with zero blood.
 	local bloodO2Cap = o2.range * hg.organism.GetBloodDeliveryFraction(rawBlood, 0.3)
 	org.bloodO2Cap = bloodO2Cap
 
@@ -812,9 +803,10 @@ module[2] = function(owner, org, timeValue)
 				local pulseMultiplier = math.Clamp((org.pulse or 0) / 70, 0, 1.5)
 
 				-- Neck and spinal arterial wounds still compromise oxygen delivery, but
-				-- this is deliberately a slow secondary loss rather than a rapid O2 wipe.
+				-- catastrophic blood loss is their primary danger. Keep the direct O2
+				-- drain secondary to the continuous circulation failure it causes.
 				local immediatePressureMul = hasHeldCarotid and not hasUnheldCentralArtery and 0.2 or 1
-				local arteriaDrain = timeValue * 0.08 * pulseMultiplier * org.arterialO2Impairment * immediatePressureMul
+				local arteriaDrain = timeValue * 0.04 * pulseMultiplier * org.arterialO2Impairment * immediatePressureMul
 
 				o2[1] = max(o2[1] - arteriaDrain, 0)
 
@@ -923,15 +915,16 @@ module[2] = function(owner, org, timeValue)
 	local deliveryO2Cap = min(bloodO2Cap, perfusionO2Cap, exertionO2Cap)
 	if o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
-		o2[1] = math.Approach(o2[1], deliveryO2Cap, timeValue * (0.35 + deliveryFailure * 5.5))
+		local deliveryResponse = 1 - math.exp(-timeValue * (0.08 + deliveryFailure * 0.12))
+		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse
 	end
 
 	o2[1] = math.Clamp(o2[1], 0, o2.range)
 	if org.heartstop then
-		org.cardiacArrestO2Start = math.Clamp(org.cardiacArrestO2Start or min(o2[1], 6), 0, 6)
-		-- A confirmed arrest has no circulation, unlike the transient output
-		-- fluctuations handled above. Keep its intended small residual reserve,
-		-- then drain that reserve over the arrest window.
+		org.cardiacArrestO2Start = math.Clamp(org.cardiacArrestO2Start or o2[1], 0, o2.range)
+		-- Arrest stops new delivery, but it does not erase already oxygenated tissue.
+		-- Drain the captured reserve over the arrest window without snapping it to
+		-- an arbitrary low cap first.
 		o2[1] = min(o2[1], org.cardiacArrestO2Start)
 		local arrestDrainRate = max(org.cardiacArrestO2Start, 0.1) / cardiacArrestO2DrainTime
 		o2[1] = math.Approach(o2[1], 0, timeValue * arrestDrainRate)
@@ -1083,7 +1076,7 @@ module[2] = function(owner, org, timeValue)
 
 			org.nextCough = CurTime() + math.random(15,30 - timeSub + math.max(10 - o2[1],0))
 
-			owner:EmitSound("homigrad/player/male/male_cough"..math.random(5)..".wav",50 + Round(timeSub * 2.5))
+			owner:EmitSound("homigrad/player/male/male_cough"..math.random(5)..".ogg",50 + Round(timeSub * 2.5))
 kaz
 		end
 
@@ -1168,55 +1161,22 @@ kaz
 
 
 
-	local k = halfValue2(o2[1], o2.range, o2.k)
 	local tissueO2 = math.Clamp(o2[1], 0, o2.range)
 	local resilience = hg.organism.GetResilience and hg.organism.GetResilience(org) or 0
-	local normalO2 = hypoxiaNormalO2 - resilience * 3
-	local impairedO2 = hypoxiaImpairedO2 - resilience * 3
-	local heavyO2 = hypoxiaHeavyO2 - resilience * 2
-	local incapacitatingO2 = hypoxiaIncapacitatingO2 - resilience * 1.5
 	local staminaMax = org.stamina and math.max(org.stamina.max or 180, 1) or 180
-	if tissueO2 > hypoxiaTerminalO2 then org._zeroO2Time = 0 end
-
-	if tissueO2 < normalO2 and tissueO2 >= impairedO2 then
-		local severity = math.Clamp((normalO2 - tissueO2) / (normalO2 - impairedO2), 0, 1)
-		org.disorientation = math.max(org.disorientation or 0, 0.15 + severity * 0.3)
-		-- Oxygen deprivation should affect awareness before it reaches the
-		-- heavy-hypoxia drain bands below.
-		org.consciousness = math.min(org.consciousness or 1, 1 - severity * 0.1)
+	local tissueFraction = tissueO2 / math.max(o2.range, 1)
+	local tissueHypoxia = math.Clamp((0.84 - tissueFraction) / 0.84, 0, 1)
+	local functionalLoss = tissueHypoxia ^ (1.45 + resilience * 0.35)
+	if functionalLoss > 0 then
+		org.disorientation = math.max(org.disorientation or 0, functionalLoss * 1.4)
+		org.immobilization = math.max(org.immobilization or 0, functionalLoss ^ 1.35 * 6)
 		if org.stamina and org.stamina[1] then
-			org.stamina[1] = math.max(org.stamina[1] - timeValue * severity * staminaMax / 180, 0)
+			org.stamina[1] = math.max(org.stamina[1] - timeValue * functionalLoss ^ 1.2 * staminaMax / 55, 0)
 		end
-	elseif tissueO2 < impairedO2 and tissueO2 >= heavyO2 then
-		local severity = math.Clamp((impairedO2 - tissueO2) / (impairedO2 - heavyO2), 0, 1)
-		org.needfake = true
-		org.disorientation = math.max(org.disorientation or 0, 0.55 + severity * 0.45)
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.05 + severity * 0.12), 0)
-		if org.stamina and org.stamina[1] then
-			org.stamina[1] = math.max(org.stamina[1] - timeValue * staminaMax / 75, 0)
-		end
-		if org.isPly then hg.LightStunPlayer(owner, 3) end
-	elseif tissueO2 < heavyO2 and tissueO2 >= incapacitatingO2 then
-		local severity = math.Clamp((heavyO2 - tissueO2) / (heavyO2 - incapacitatingO2), 0, 1)
-		org.needfake = true
-		if tissueO2 < 7 or (org.consciousness or 1) < 0.35 then org.needotrub = true end
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.18 + severity * 0.28), 0)
-		org.brain = math.min((org.brain or 0) + timeValue * (0.0015 + severity * 0.0025), 1)
-		if org.isPly then hg.StunPlayer(owner, 3) end
-	elseif tissueO2 < incapacitatingO2 and tissueO2 > hypoxiaTerminalO2 then
-		local severity = math.Clamp((incapacitatingO2 - tissueO2) / (incapacitatingO2 - hypoxiaDeepO2), 0, 1)
-		org.needfake = true
-		org.needotrub = true
-		org.consciousness = math.max((org.consciousness or 1) - timeValue * (0.55 + severity * 0.55), 0)
-		org.brain = math.min((org.brain or 0) + timeValue * (0.004 + severity * 0.006), 1)
-	elseif tissueO2 <= hypoxiaTerminalO2 then
-		org.needfake = true
-		org.needotrub = true
-		org.consciousness = 0
-		org._zeroO2Time = (org._zeroO2Time or 0) + timeValue
-		local anoxicBrainDamageRate = org.heartstop and 0.015 or 0.025
-		org.brain = math.min((org.brain or 0) + timeValue * anoxicBrainDamageRate, 1)
-		if org._zeroO2Time >= 5 then org.heartstop = true end
+		-- Tissue hypoxia disables posture and movement. It never requests OTRUB;
+		-- that decision is made from brainoxygen in UpdatePerfusion.
+		if functionalLoss > 0.62 then org.needfake = true end
+		if org.isPly and functionalLoss > 0.72 then hg.LightStunPlayer(owner, 3) end
 	end
 
 
@@ -1244,10 +1204,6 @@ kaz
 	end
 
 
-
-	if org.skull >= 0.6 then k = 0 end
-
-	if org.brain >= 0.6 then k = 0 end
 
 	local frontal = org.brainFrontal or 0
 	local parietal = org.brainParietal or 0
@@ -1375,9 +1331,13 @@ kaz
 
 	org.mannitol = math.Approach(org.mannitol, 0, timeValue / 200)
 	
-	if k < 0.25 then
-		org.brain = min(org.brain + timeValue / (org.brain < 0.3 and 300 or 120) * math.min(((org.o2[1] < 0.25 and 1 or 0) + (org.brainHemorrhage or 0)), 1), 1)
-	end --~120 seconds to fully die (0.3 of 300 and 0.4 of 60 seconds after)
+	-- Tissue oxygen no longer writes brain injury. Intracranial bleeding remains
+	-- damaging here; cerebral hypoxia is handled from brainoxygen in UpdatePerfusion.
+	local hemorrhageInjury = math.Clamp(org.brainHemorrhage or 0, 0, 1)
+	if hemorrhageInjury > 0 then
+		local injuryTime = org.brain < 0.3 and 300 or 120
+		org.brain = min(org.brain + timeValue / injuryTime * hemorrhageInjury, 1)
+	end
 
 end
 

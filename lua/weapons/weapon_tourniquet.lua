@@ -86,7 +86,7 @@ end
 function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
-		self:NPCHeal(owner, 0.25, "snd_jack_hmcd_bandage.wav")
+		self:NPCHeal(owner, 0.25, "snd_jack_hmcd_bandage.ogg")
 	end
 end
 
@@ -103,7 +103,7 @@ end
 
 function SWEP:Heal(ent, mode)
 	if ent:IsNPC() then
-		self:NPCHeal(ent, 0.25, "snd_jack_hmcd_bandage.wav")
+		self:NPCHeal(ent, 0.25, "snd_jack_hmcd_bandage.ogg")
 	end
 
 	local owner = self:GetOwner()

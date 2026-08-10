@@ -15,7 +15,7 @@ hook.Add("EntityTakeDamage", "ShootToUnlockDoor", function(target, dmginfo)
 
     if (target.LockedDoor and target.LockedDoor > 0) or target.LockedDoorNail then
         if dmginfo:IsBulletDamage() then
-            target:EmitSound("fire_extinguisher/fire_extinguisger_lever.wav", 70, 80)
+            target:EmitSound("fire_extinguisher/fire_extinguisger_lever.ogg", 70, 80)
         end
         return 
     end

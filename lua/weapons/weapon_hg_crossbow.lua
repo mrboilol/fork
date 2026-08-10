@@ -35,9 +35,9 @@ SWEP.FakeReloadSounds = {}
 
 SWEP.FakeEmptyReloadSounds = {
 	[0.18] = "weapons/universal/uni_crawl_l_03.wav",
-	--[0.37] = "weapons/m4a1/m4a1_magrelease.wav",
-	[0.62] = "weapons/tfa_hl2r/crossbow/reload1.wav",
-	[0.75] = "weapons/tfa_hl2r/crossbow/bolt_load2.wav",
+	--[0.37] = "weapons/m4a1/m4a1_magrelease.ogg",
+	[0.62] = "weapons/tfa_hl2r/crossbow/reload1.ogg",
+	[0.75] = "weapons/tfa_hl2r/crossbow/bolt_load2.ogg",
 	[0.84] = "weapons/universal/uni_crawl_l_04.wav",
 	--[0.92] = "weapons/m45/m45_boltrelease.wav",
 }
@@ -70,12 +70,12 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "Armature"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 1
-SWEP.Primary.Sound = {"weapons/crossbow/fire1.wav", 75, 90, 100}
+SWEP.Primary.Sound = {"weapons/crossbow/fire1.ogg", 75, 90, 100}
 SWEP.Primary.Force = 25
 SWEP.Primary.Wait = 0.1
 SWEP.ReloadTime = 3
-SWEP.DeploySnd = {"weapons/crossbow/crossbow_deploy.wav", 55, 100, 110}
-SWEP.HolsterSnd = {"snds_jack_gmod/ez_weapons/amsr/in.wav", 45, 100, 110}
+SWEP.DeploySnd = {"weapons/crossbow/crossbow_deploy.ogg", 55, 100, 110}
+SWEP.HolsterSnd = {"snds_jack_gmod/ez_weapons/amsr/in.ogg", 45, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-4, 2.22, 6.8796)
 SWEP.RHandPos = Vector(0,0,0)
@@ -112,14 +112,14 @@ SWEP.FOVMax = 15
 SWEP.perekrestieSize = false
 SWEP.blackoutsize = 3100
 
-SWEP.ReloadSound = "weapons/crossbow/reload1.wav"
+SWEP.ReloadSound = "weapons/crossbow/reload1.ogg"
 SWEP.ReloadSoundes = {
 	"none",
-	"weapons/tfa_hl2r/crossbow/crossbow_deploy.wav",
+	"weapons/tfa_hl2r/crossbow/crossbow_deploy.ogg",
 	"none",	
-	"weapons/tfa_hl2r/crossbow/bolt_load2.wav",
+	"weapons/tfa_hl2r/crossbow/bolt_load2.ogg",
 	"none",
-	"weapons/tfa_hl2r/ar2/weapon_movement1.wav",
+	"weapons/tfa_hl2r/ar2/weapon_movement1.ogg",
 	"none",
 	"none",
 	"none"

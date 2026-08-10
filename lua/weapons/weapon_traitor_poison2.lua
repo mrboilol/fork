@@ -98,7 +98,7 @@ end
 function SWEP:DoPoison(ent)
     local owner = self:GetOwner()
 
-    owner:EmitSound("snd_jack_hmcd_needleprick.wav",30)
+    owner:EmitSound("snd_jack_hmcd_needleprick.ogg",30)
 
 	ent.poisoned = true
 ent.poisonedByChemist = owner.SubRole == "traitor_chemist"
@@ -130,7 +130,7 @@ if SERVER then
 		if (not org.poison2notificate) and ((org.poison2 + 15) < CurTime()) then
 			org.poison2notificate = true
 			org.owner:Notify("Something stops me from breathing normally.", true, "poison2", 3)
-			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".wav" ) or "vo/npc/male01/moan0"..math.random(5)..".wav")
+			org.owner:EmitSound( ( ThatPlyIsFemale(org.owner) and "vo/npc/female01/moan0"..math.random(5)..".ogg" ) or "vo/npc/male01/moan0"..math.random(5)..".ogg")
 		end
 
 		if (org.poison2 + (owner.SubRole == "traitor_chemist" and 50 or 30)) < CurTime() then

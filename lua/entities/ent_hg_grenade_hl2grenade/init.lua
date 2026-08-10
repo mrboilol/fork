@@ -33,7 +33,7 @@ function ENT:AddThink()
 	self.nextthink = CurTime() + 0.5 * math.max(time / (self.timeToBoom * 0.75),0.5) 
 	
 	if not self.Exploded then
-		self:EmitSound("weapons/grenade/tick1.wav",65)
+		self:EmitSound("weapons/grenade/tick1.ogg",65)
 		hg.EmitAISound(self:GetPos(), 256, 2, 8)
 	end
 

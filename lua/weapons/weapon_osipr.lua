@@ -21,19 +21,19 @@ SWEP.AttachmentAng = Angle(0,0,0)
 SWEP.FakeEjectBrassATT = "punch"
 
 SWEP.FakeReloadSounds = {
-	[0.17] = "weapons/hmcd_ar2/ar2_rotate.wav",
-	[0.35] = "weapons/hmcd_ar2/ar2_magout.wav",
-	[0.75] = "weapons/hmcd_ar2/ar2_magin.wav",
-	[0.85] = "weapons/hmcd_ar2/ar2_push.wav"
-	--[0.82] = "weapons/ar2/ar2_reload_rotate.wav",
-	--[0.92] = "weapons/ar2/ar2_reload_push.wav"
+	[0.17] = "weapons/hmcd_ar2/ar2_rotate.ogg",
+	[0.35] = "weapons/hmcd_ar2/ar2_magout.ogg",
+	[0.75] = "weapons/hmcd_ar2/ar2_magin.ogg",
+	[0.85] = "weapons/hmcd_ar2/ar2_push.ogg"
+	--[0.82] = "weapons/ar2/ar2_reload_rotate.ogg",
+	--[0.92] = "weapons/ar2/ar2_reload_push.ogg"
 }
 SWEP.FakeEmptyReloadSounds = {
-	[0.17] = "weapons/hmcd_ar2/ar2_rotate.wav",
-	[0.35] = "weapons/hmcd_ar2/ar2_magout.wav",
-	[0.75] = "weapons/hmcd_ar2/ar2_magin.wav",
-	[0.82] = "weapons/hmcd_ar2/ar2_reload_rotate.wav",
-	[0.92] = "weapons/hmcd_ar2/ar2_reload_push.wav"
+	[0.17] = "weapons/hmcd_ar2/ar2_rotate.ogg",
+	[0.35] = "weapons/hmcd_ar2/ar2_magout.ogg",
+	[0.75] = "weapons/hmcd_ar2/ar2_magin.ogg",
+	[0.82] = "weapons/hmcd_ar2/ar2_reload_rotate.ogg",
+	[0.92] = "weapons/hmcd_ar2/ar2_reload_push.ogg"
 }
 SWEP.MagModel = "models/Items/combine_rifle_cartridge01.mdl"
 SWEP.FakeMagDropBone = 1
@@ -93,8 +93,8 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 50
 SWEP.Primary.Spread = 0 
 SWEP.Primary.Force = 50
-SWEP.Primary.Sound = {"weapons/hmcd_ar2/fire1.wav", 85, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/mk18/handling/mk18_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"weapons/hmcd_ar2/fire1.ogg", 85, 90, 100}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/mk18/handling/mk18_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.ShootEffect = 5
 SWEP.ShellEject = true
 SWEP.MuzzleEffectType = 0
@@ -123,14 +123,14 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magout.wav",
+	"weapons/ar2/ar2_magout.ogg",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magin.wav",
+	"weapons/ar2/ar2_magin.ogg",
 	"none",
-	"weapons/ar2/ar2_reload_rotate.wav",
+	"weapons/ar2/ar2_reload_rotate.ogg",
 	"none",
-	"weapons/ar2/ar2_push.wav",
+	"weapons/ar2/ar2_push.ogg",
 	"none",
 	"none",
 	"none",
@@ -144,7 +144,7 @@ for i = 1, 30 do
 	SWEP.Spray[i] = Angle(-0.06 - math.cos(i) * 0.03, math.cos(i * i) * 0.04, 0) * 2
 end
 
-SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.wav", 75, 100, 110}
+SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.ogg", 75, 100, 110}
 
 SWEP.Ergonomics = 0.8
 SWEP.HaveModel = "models/weapons/arccw/w_irifle.mdl"

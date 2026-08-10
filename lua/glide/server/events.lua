@@ -19,7 +19,7 @@ hook.Add( "CanPlayerEnterVehicle", "Glide.CheckVehicleLock", function( ply, seat
     if not parent:GetIsLocked() then return end
 
     if not Glide.CanEnterLockedVehicle( ply, parent ) then
-        ply:EmitSound( "doors/latchlocked2.wav", 50, 100, 1.0, 6, 0, 0 )
+        ply:EmitSound( "doors/latchlocked2.ogg", 50, 100, 1.0, 6, 0, 0 )
 
         return false
     end

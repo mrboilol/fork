@@ -6,9 +6,9 @@ ENT.PrintName = "RSHG-2 Rocket"
 ENT.Spawnable = true
 ENT.AdminOnly = true
 ENT.Model = "models/weapons/EFTNades/darsu_eft/rshg2_rocket.mdl"
-ENT.Sound = "snd_jack_bigsplodeclose.wav"
-ENT.SoundFar = "mortar_strike_far_dist_03.wav"
-ENT.SoundWater = "iedins/water/ied_water_detonate_01.wav"
+ENT.Sound = "snd_jack_bigsplodeclose.ogg"
+ENT.SoundFar = "mortar_strike_far_dist_03.ogg"
+ENT.SoundWater = "iedins/water/ied_water_detonate_01.ogg"
 ENT.Speed = 144
 ENT.TruhstTime = 0.4
 
@@ -42,7 +42,7 @@ function ENT:CheckSafetyDistance()
     
     if distance >= self.SafetyDistance and not self.SafetyArmed then
         self.SafetyArmed = true
-        self:EmitSound("buttons/button16.wav", 50, 150, 0.3)
+        self:EmitSound("buttons/button16.ogg", 50, 150, 0.3)
     end
     
     return self.SafetyArmed
@@ -196,8 +196,8 @@ function ENT:PhysicsCollide2(data, physobj)
             
             self.Duded = false 
             self.Deactivated = true 
-            self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
-            self:EmitSound("weapons/pistol/pistol_empty.wav", 60, 100, 0.8)
+            self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.ogg")
+            self:EmitSound("weapons/pistol/pistol_empty.ogg", 60, 100, 0.8)
         else
             self:Detonate()
         end

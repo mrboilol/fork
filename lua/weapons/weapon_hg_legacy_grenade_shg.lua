@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_hg_legacy_grenade"
 SWEP.PrintName = "Stielhandgranate"
 SWEP.Instructions = "A working replica of a WWII nazi-germany offensive grenade. It has a pyrotechnic delay of 5-8 seconds"
@@ -19,7 +19,7 @@ SWEP.ENT = "ent_hg_grenade_shg"
 
 SWEP.nofunnyfunctions = true
 SWEP.timetothrow = 0.5
-SWEP.throwsound = "weapons/m67/m67_pullpin.wav"
+SWEP.throwsound = "weapons/m67/m67_pullpin.ogg"
 SWEP.offsetVec = Vector(3, -2, -1)
 SWEP.offsetAng = Angle(145, 0, 0)
 

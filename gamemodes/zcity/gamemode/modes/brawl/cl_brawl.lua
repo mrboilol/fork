@@ -205,7 +205,7 @@ net.Receive("brawl_start", function()
     lastStageName = ""
     uiRevealAt = math.huge
     chat.AddText(Color(255, 200, 120), "Get kills to unlock the next weapon.")
-    surface.PlaySound("buttons/button15.wav")
+    surface.PlaySound("buttons/button15.ogg")
 end)
 
 net.Receive("brawl_grace", function()
@@ -242,7 +242,7 @@ net.Receive("brawl_progress", function()
     kills = net.ReadUInt(16)
     currentWeapon = net.ReadString()
     isFinalStage = net.ReadBool()
-    surface.PlaySound("items/itempickup.wav")
+    surface.PlaySound("items/itempickup.ogg")
 end)
 
 net.Receive("brawl_final", function()
@@ -251,7 +251,7 @@ net.Receive("brawl_final", function()
     lastStageName = IsValid(ply) and ply:Nick() or "Unknown"
     lastStageBannerUntil = CurTime() + 5
     chat.AddText(color_white, "[BRAWL] " .. lastStageName .. " reached the FINAL STAGE")
-    surface.PlaySound("buttons/button15.wav")
+    surface.PlaySound("buttons/button15.ogg")
 end)
 
 net.Receive("brawl_loop_music", function()

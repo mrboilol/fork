@@ -65,8 +65,8 @@ SWEP.Primary.Spread = Vector(0.001, 0.001, 0.001)
 SWEP.Primary.Damage = 85
 SWEP.Primary.Force = 85
 SWEP.NumBullet = 1
-SWEP.Primary.Sound = {"weapons/awoi/musket_5_fire.wav", 65, 60, 65}
-SWEP.SupressedSound = {"weapons/awoi/musket_5_fire.wav", 65, 60, 65}
+SWEP.Primary.Sound = {"weapons/awoi/musket_5_fire.ogg", 65, 60, 65}
+SWEP.SupressedSound = {"weapons/awoi/musket_5_fire.ogg", 65, 60, 65}
 SWEP.availableAttachments = {
 	--[[barrel = {
 		[1] = {"supressor1", Vector(0,0,0), {}},
@@ -85,8 +85,8 @@ SWEP.WeaponEyeAngles = Angle(0,0,0)
 SWEP.handsAng = Angle(0, 0, 0)
 SWEP.handsAng2 = Angle(-3, -2, 0)
 
-SWEP.CockSound = "weapons/tfa_ins2/mosin/mosin_boltforward.wav"
-SWEP.ReloadSound = "weapons/awoi/musket_reload.wav"
+SWEP.CockSound = "weapons/tfa_ins2/mosin/mosin_boltforward.ogg"
+SWEP.ReloadSound = "weapons/awoi/musket_reload.ogg"
 
 SWEP.ReloadDrawTime = 0.3
 SWEP.ReloadDrawCooldown = 0.4
@@ -127,7 +127,7 @@ SWEP.FOVMax = 10
 SWEP.huyRotate = 25
 SWEP.FOVScoped = 40
 
-SWEP.DistSound = "toz_shotgun/toz_dist.wav"--SWEP.DistSound = "weapons/awoi/musket_1_fire.wav"
+SWEP.DistSound = "toz_shotgun/toz_dist.wav"--SWEP.DistSound = "weapons/awoi/musket_1_fire.ogg"
 SWEP.lengthSub = 25
 SWEP.ShootAnimMul = 12
 SWEP.punchmul = 1
@@ -344,12 +344,12 @@ end
 local charge_up = 100
 local charge_down = 100
 
---; ambient/energy/electric_loop.wav
---; physics/metal/metal_box_scrape_rough_loop1.wav
---; physics/concrete/rock_scrape_rough_loop1.wav
---; physics/cardboard/cardboard_box_scrape_rough_loop1.wav
---; ambient/fire/fire_med_loop1.wav
---; ambient/fire/firebig.wav
+--; ambient/energy/electric_loop.ogg
+--; physics/metal/metal_box_scrape_rough_loop1.ogg
+--; physics/concrete/rock_scrape_rough_loop1.ogg
+--; physics/cardboard/cardboard_box_scrape_rough_loop1.ogg
+--; ambient/fire/fire_med_loop1.ogg
+--; ambient/fire/firebig.ogg
 --; 
 
 function SWEP:DrawPost()
@@ -421,8 +421,8 @@ function SWEP:Step()
 		
 		if(charge > 0)then
 			if(!c_sound)then
-				self.CSoundCharge = CreateSound(self, "physics/cardboard/cardboard_box_scrape_rough_loop1.wav")
-				-- self.CSoundCharge = CreateSound(self, "physics/metal/metal_box_scrape_rough_loop1.wav")
+				self.CSoundCharge = CreateSound(self, "physics/cardboard/cardboard_box_scrape_rough_loop1.ogg")
+				-- self.CSoundCharge = CreateSound(self, "physics/metal/metal_box_scrape_rough_loop1.ogg")
 				c_sound = self.CSoundCharge
 			end
 			

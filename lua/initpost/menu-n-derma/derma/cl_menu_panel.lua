@@ -18,7 +18,7 @@ DISCORD_URL = "https://discord.gg/475EmEdTgH"
 
 local SOUND_MENU_SELECT = "ui/rem_select.wav"
 local SOUND_MENU_HOVER = "ui/rem_hover.wav"
-local SOUND_TYPEWRITER = "shitty/tap-resonant.wav"
+local SOUND_TYPEWRITER = "shitty/tap-resonant.ogg"
 local SOUND_TYPEWRITER_LEVEL = 55
 local SOUND_TYPEWRITER_VOLUME = 0.25
 local SOUND_TYPEWRITER_PITCH = 102

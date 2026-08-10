@@ -32,8 +32,8 @@ SWEP.Primary.Spread = Vector(0.0075, 0.0075, 0.0075)
 SWEP.Primary.Damage = 100
 SWEP.Primary.Force = 120
 SWEP.NumBullet = 3
-SWEP.Primary.Sound = {"weapons/awoi/musket_5_fire.wav", 65, 80, 85}
-SWEP.SupressedSound = {"weapons/awoi/musket_5_fire.wav", 65, 80, 85}
+SWEP.Primary.Sound = {"weapons/awoi/musket_5_fire.ogg", 65, 80, 85}
+SWEP.SupressedSound = {"weapons/awoi/musket_5_fire.ogg", 65, 80, 85}
 SWEP.availableAttachments = {
 	--[[barrel = {
 		[1] = {"supressor1", Vector(0,0,0), {}},
@@ -52,8 +52,8 @@ SWEP.WeaponEyeAngles = Angle(0,0,0)
 SWEP.handsAng = Angle(0, 0, 0)
 SWEP.handsAng2 = Angle(-3, -2, 0)
 
-SWEP.CockSound = "weapons/tfa_ins2/mosin/mosin_boltforward.wav"
-SWEP.ReloadSound = "weapons/awoi/musket_reload.wav"
+SWEP.CockSound = "weapons/tfa_ins2/mosin/mosin_boltforward.ogg"
+SWEP.ReloadSound = "weapons/awoi/musket_reload.ogg"
 
 SWEP.ReloadDrawTime = 0.3
 SWEP.ReloadDrawCooldown = 0.4
@@ -94,7 +94,7 @@ SWEP.FOVMax = 10
 SWEP.huyRotate = 25
 SWEP.FOVScoped = 40
 
-SWEP.DistSound = "toz_shotgun/toz_dist.wav"--SWEP.DistSound = "weapons/awoi/musket_1_fire.wav"
+SWEP.DistSound = "toz_shotgun/toz_dist.wav"--SWEP.DistSound = "weapons/awoi/musket_1_fire.ogg"
 SWEP.lengthSub = 25
 SWEP.ShootAnimMul = 12
 SWEP.punchmul = 12

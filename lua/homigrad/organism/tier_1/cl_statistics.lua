@@ -697,8 +697,8 @@ hook.Add("HUDPaint","homigrad-wound-debug",function()
 		if timeHuy and ((timeHuy + traveltime) > CurTime()) then
 			local tbl = tracePoses
 			
-			--[[snd1 = snd1 or CreateSound(csmodel,"player/general/flesh_burn.wav")
-			snd2 = snd2 or CreateSound(csmodel,"ambient/wind/windgust.wav")
+			--[[snd1 = snd1 or CreateSound(csmodel,"player/general/flesh_burn.ogg")
+			snd2 = snd2 or CreateSound(csmodel,"ambient/wind/windgust.ogg")
 			
 			if not snd1:IsPlaying() then
 				snd1:Play()

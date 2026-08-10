@@ -379,7 +379,7 @@ function PLAYER:LegAttack()
                     end
 
 					if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
-						ent:EmitSound("physics/body/body_medium_impact_hard"..math.random(6)..".wav", 60, math.random(85, 105), 0.6)
+						ent:EmitSound("physics/body/body_medium_impact_hard"..math.random(6)..".ogg", 60, math.random(85, 105), 0.6)
 					end
 
                     if ent:IsPlayer() then

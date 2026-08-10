@@ -198,7 +198,7 @@ if SERVER then
             net.Send(self:GetOwner())
         end
 
-        self:EmitSound("garrysmod/content_downloaded.wav",40,100,1)
+        self:EmitSound("garrysmod/content_downloaded.ogg",40,100,1)
     end
 end
 

@@ -25,10 +25,10 @@ function ENT:ActivateAlarm(tr)
 	local pitch = math.random(90, 110)
 	self:EmitSound(self.Sound, 100, pitch)
 	sound.Play(self.Sound, selfPos, 70, pitch)
-	sound.Play(self.Sound, selfPos, 100, pitch) -- "npc/stalker/go_alert2a.wav"
+	sound.Play(self.Sound, selfPos, 100, pitch) -- "npc/stalker/go_alert2a.ogg"
 
 	if tr and tr ~= nil then
-		self:EmitSound("ambient/water/water_splash"..math.random(3)..".wav", 60)
+		self:EmitSound("ambient/water/water_splash"..math.random(3)..".ogg", 60)
 		for i = 1, 5 do
 			local Spark = EffectData()
 			Spark:SetOrigin(self:GetPos())

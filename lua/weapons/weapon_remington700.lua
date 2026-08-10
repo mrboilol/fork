@@ -160,16 +160,16 @@ SWEP.AnimsEvents = {
     
     -- Draw/Holster
     ["draw"] = {
-        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.wav") end,
+        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.ogg") end,
     },
     ["draw_empty"] = {
-        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.wav") end,
+        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.ogg") end,
     },
     ["holster"] = {
-        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.wav") end,
+        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.ogg") end,
     },
     ["holster_empty"] = {
-        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.wav") end,
+        [0] = function(self) self:EmitSound("weapons/ak74/ak74_draw.ogg") end,
     },
     
     -- Fire
@@ -178,7 +178,7 @@ SWEP.AnimsEvents = {
         [0.3] = function(self) self:EmitSound("weapons/tfa_ins2/k98/mosin_boltforward.wav") end,
     },
     ["fire_dry"] = {
-        [0] = function(self) self:EmitSound("weapons/ak74/ak74_trigger.wav") end,
+        [0] = function(self) self:EmitSound("weapons/ak74/ak74_trigger.ogg") end,
     },
     
     -- Bolt (cycle)
@@ -377,10 +377,10 @@ SWEP.AnimsEvents = {
     
     -- Mod switch
     ["mod_switch"] = {
-        [0] = function(self) self:EmitSound("buttons/button14.wav") end,
+        [0] = function(self) self:EmitSound("buttons/button14.ogg") end,
     },
     ["mod_switch_empty"] = {
-        [0] = function(self) self:EmitSound("buttons/button14.wav") end,
+        [0] = function(self) self:EmitSound("buttons/button14.ogg") end,
     },
     
     -- Jams

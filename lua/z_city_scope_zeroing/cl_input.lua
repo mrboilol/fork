@@ -93,7 +93,7 @@ hook.Add("Think", "HG_ScopeZeroingGlobal", function()
 			
 			if clicked then
 				ZCityScopeZeroing.SendScopeZeroingState(wep)
-				wep:EmitSound("buttons/lightswitch2.wav", 35, 150, 0.4, CHAN_ITEM)
+				wep:EmitSound("buttons/lightswitch2.ogg", 35, 150, 0.4, CHAN_ITEM)
 				wep.LastZeroingAdjustTime = CurTime()
 				ZCityScopeZeroing.NextClick = CurTime() + 0.15
 			end

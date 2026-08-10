@@ -57,6 +57,7 @@ local shoveStumbleChance = 1
 local shoveStaminaCost = 9
 local punchStaminaCost = 6
 local sprintSpecialPunchStaminaCost = 12
+local attackStaminaCostMul = 0.8
 local specialDamageMul = 2.5
 local runningSpecialDamageMul = 3
 local incomingVelocityDamageMul = 2
@@ -79,7 +80,7 @@ local function PlayPunchSound(pos, level, highPitch)
 end
 
 local function PlayShoveBodyImpact(pos, level)
-        sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", pos, level or 72, math_random(110, 125))
+        sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".ogg", pos, level or 72, math_random(110, 125))
 end
 
 local function PlayKnuckledusterSound(pos, level, highPitch)
@@ -208,7 +209,7 @@ function SWEP:SecondaryAttack()
                 self:GetOwner():ViewPunch(Angle(2, 0, 0))
                 sound.Play("player/shove_0"..math_random(5)..".wav", self:GetPos(), 65, math_random(105, 115))
                 if self:GetOwner().organism then
-                        self:GetOwner().organism.stamina.subadd = self:GetOwner().organism.stamina.subadd + shoveStaminaCost
+                        self:GetOwner().organism.stamina.subadd = self:GetOwner().organism.stamina.subadd + shoveStaminaCost * attackStaminaCostMul
                 end
                 self:ShoveFront(sprintShove)
                 return
@@ -587,8 +588,8 @@ function SWEP:ApplyForce()
 
 						phys:ApplyForceCenter(-vector_up * 6000)
 
-						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".wav")
-						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".wav")
+						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".ogg")
+						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".ogg")
 					end
 				end
 			else
@@ -737,7 +738,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                                 self:PunchPlayer(ent, attacktype, owner:GetAimVector(), selfdmg / 2)
                         end
 
-			ent:EmitSound("physics/body/body_medium_impact_soft6.wav") -- parry sound
+			ent:EmitSound("physics/body/body_medium_impact_soft6.ogg") -- parry sound
 
 			if wep.SetLastBlocked then
 				wep:SetLastBlocked(CurTime())
@@ -929,7 +930,7 @@ function SWEP:PrimaryAttack(forcespecial)
 	if not self:GetFists() then
 		self:SetFists(true)
 		if CLIENT then
-			self:EmitSound("pwb2/weapons/matebahomeprotection/mateba_cloth.wav", 60, math.random(90, 100), 1, CHAN_BODY)
+			self:EmitSound("pwb2/weapons/matebahomeprotection/mateba_cloth.ogg", 60, math.random(90, 100), 1, CHAN_BODY)
 		end
 		owner:ViewPunch(depang)
 		if not isfur then
@@ -1021,10 +1022,10 @@ function SWEP:PrimaryAttack(forcespecial)
 end
 
 local concrete = {
-	"physics/concrete/boulder_impact_hard1.wav",
-	"physics/concrete/boulder_impact_hard2.wav",
-	"physics/concrete/boulder_impact_hard3.wav",
-	"physics/concrete/boulder_impact_hard4.wav"
+	"physics/concrete/boulder_impact_hard1.ogg",
+	"physics/concrete/boulder_impact_hard2.ogg",
+	"physics/concrete/boulder_impact_hard3.ogg",
+	"physics/concrete/boulder_impact_hard4.ogg"
 }
 
 function SWEP:ShoveFront(sprintShove)
@@ -1049,7 +1050,7 @@ function SWEP:ShoveFront(sprintShove)
 		pushVel = pushVel * shoveForce * (sprintShove and 1.3 or 1) * strengthMul
 
         if IsValid(ent) and ent:IsRagdoll() then
-                sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", trace.HitPos, 75, 110)
+                sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".ogg", trace.HitPos, 75, 110)
                 PushRagdoll(ent, trace.PhysicsBone or 0, pushVel * 0.45, trace.HitPos)
                 WriteShoveHarm(owner, ent, self, sprintShove and 2 or 1.25)
                 owner:LagCompensation(false)
@@ -1059,7 +1060,7 @@ function SWEP:ShoveFront(sprintShove)
         local target = hg.RagdollOwner(ent) or ent
 
         if IsValid(ent) and IsValid(target) and target:IsPlayer() and target ~= owner then
-                sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", trace.HitPos, 75, 110)
+                sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".ogg", trace.HitPos, 75, 110)
         elseif IsValid(ent) and not ent:IsWorld() then
                 PlayShoveBodyImpact(trace.HitPos, 72)
         end
@@ -1134,7 +1135,7 @@ function SWEP:AttackFront(special_attack, rand)
         local isfur = owner.PlayerClassName == "furry"
         if IsValid(Ent) or (Ent and Ent.IsWorld and Ent:IsWorld()) then
                 if string.find(Ent:GetClass(),"break") and Ent:GetBrushSurfaces()[1] and string.find(Ent:GetBrushSurfaces()[1]:GetMaterial():GetName(),"glass") then
-                        //Ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math_random(3)..".wav")
+                        //Ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math_random(3)..".ogg")
 
                         //if math_random(1,8) == 8 and Ent:Health() < 250 then
                                 hg.organism.AddWoundManual(owner, math.Rand(50,75) * 1, vector_origin, AngleRand(), owner:LookupBone("ValveBiped.Bip01_"..(rand and "R" or "L").."_Hand"), CurTime())
@@ -1154,7 +1155,7 @@ function SWEP:AttackFront(special_attack, rand)
                         SelfForce = 25
                     if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking and Ent:GetActiveWeapon():GetBlocking() and not hg.RagdollOwner(Ent) then
                                 if owner.PlayerClassName == "furry" then
-                                        sound.Play("pwb/weapons/knife/hit"..math_random(1,4)..".wav", HitPos, 60, math_random(90, 110))
+                                        sound.Play("pwb/weapons/knife/hit"..math_random(1,4)..".ogg", HitPos, 60, math_random(90, 110))
                                 elseif special_attack then
                                         sound.Play("weapons/melee/blunt_light"..math_random(8)..".wav", HitPos, 58, math_random(90, 110))
                                         PlayPunchSound(HitPos, 60)
@@ -1167,7 +1168,7 @@ function SWEP:AttackFront(special_attack, rand)
                         else
                                 local snd = special_attack and "weapons/melee/blunt_heavy"..math_random(6)..".wav" or "Flesh.ImpactHard"
                                 if owner.PlayerClassName == "furry" then
-                                        sound.Play("pwb/weapons/knife/hit"..math_random(1,4)..".wav", HitPos, 80, math_random(105, 125))
+                                        sound.Play("pwb/weapons/knife/hit"..math_random(1,4)..".ogg", HitPos, 80, math_random(105, 125))
                                 elseif special_attack then
                                         sound.Play(snd, HitPos, 60, math_random(90, 110))
                                         PlayPunchSound(HitPos, 62)
@@ -1197,7 +1198,7 @@ function SWEP:AttackFront(special_attack, rand)
                                 owner.organism.painadd = owner.organism.painadd + (math.random(3, 6) * (special_attack and 2.5 or 1.5))
                                 hg.organism.AddWoundManual(owner, math_random(6, 8) * (special_attack and 2 or 1), vector_origin, AngleRand(), owner:LookupBone("ValveBiped.Bip01_"..(rand and "R" or "L").."_Hand"), CurTime())
                         end
-                        sound.Play(owner.PlayerClassName == "furry" and "pwb/weapons/knife/hitwall.wav" or "weapons/melee/blunt_light"..math_random(8)..".wav", HitPos, 65, special_attack and math_random(90, 110) or math_random(105, 125))
+                        sound.Play(owner.PlayerClassName == "furry" and "pwb/weapons/knife/hitwall.ogg" or "weapons/melee/blunt_light"..math_random(8)..".wav", HitPos, 65, special_attack and math_random(90, 110) or math_random(105, 125))
                         if owner:IsBerserk() then
                                 sound.Play(table.Random(concrete), HitPos, 90, math_random(90, 110), 0.1 + owner.organism.berserk / 2)
                                 util.Decal("Rollermine.Crater",HitPos + owner:EyeAngles():Forward() * -1,HitPos - owner:EyeAngles():Forward() * -1, Ent)
@@ -1288,7 +1289,7 @@ function SWEP:AttackFront(special_attack, rand)
         if SERVER then
                 local anger = math_Clamp((owner.organism and owner.organism.anger) or 0, 0, 1)
                 local staminaCost = special_attack and owner:KeyDown(IN_SPEED) and sprintSpecialPunchStaminaCost or punchStaminaCost
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * (1 + anger * 0.6)
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * attackStaminaCostMul * (1 + anger * 0.6)
         end
 
         owner:LagCompensation(false)

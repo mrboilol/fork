@@ -118,13 +118,13 @@ if CLIENT then
         [MAT_DIRT] = "glide/wheels/roll_dirt.wav",
         [MAT_GRATE] = "glide/wheels/roll_metal.wav",
         [MAT_SNOW] = "glide/wheels/roll_dirt.wav",
-        [MAT_PLASTIC] = "physics/plastic/plastic_barrel_scrape_rough_loop1.wav",
+        [MAT_PLASTIC] = "physics/plastic/plastic_barrel_scrape_rough_loop1.ogg",
         [MAT_METAL] = "glide/wheels/roll_metal.wav",
         [MAT_SAND] = "glide/wheels/roll_dirt.wav",
         [MAT_FOLIAGE] = "glide/wheels/roll_dirt.wav",
         [MAT_SLOSH] = "glide/wheels/roll_road_wet.wav",
         [MAT_GRASS] = "glide/wheels/roll_dirt.wav",
-        [MAT_VENT] = "ambient/machines/wall_ambient_loop1.wav",
+        [MAT_VENT] = "ambient/machines/wall_ambient_loop1.ogg",
         [MAT_WOOD] = "glide/wheels/roll_wood.wav"
     }
 
@@ -143,29 +143,29 @@ if CLIENT then
         [MAT_CONCRETE] = "glide/wheels/side_skid_road_1.wav",
         [MAT_TILE] = "glide/wheels/side_skid_road_1.wav",
         [MAT_DIRT] = "glide/wheels/side_skid_dirt.wav",
-        [MAT_SNOW] = "physics/body/body_medium_scrape_smooth_loop1.wav",
-        [MAT_PLASTIC] = "physics/plastic/plastic_barrel_scrape_smooth_loop1.wav",
-        [MAT_SAND] = "physics/body/body_medium_scrape_rough_loop1.wav",
-        [MAT_FOLIAGE] = "physics/cardboard/cardboard_box_scrape_rough_loop1.wav",
+        [MAT_SNOW] = "physics/body/body_medium_scrape_smooth_loop1.ogg",
+        [MAT_PLASTIC] = "physics/plastic/plastic_barrel_scrape_smooth_loop1.ogg",
+        [MAT_SAND] = "physics/body/body_medium_scrape_rough_loop1.ogg",
+        [MAT_FOLIAGE] = "physics/cardboard/cardboard_box_scrape_rough_loop1.ogg",
         [MAT_SLOSH] = "glide/wheels/side_skid_road_wet.wav",
         [MAT_GRASS] = "glide/wheels/side_skid_dirt.wav",
-        [MAT_VENT] = "physics/metal/metal_box_scrape_smooth_loop1.wav",
+        [MAT_VENT] = "physics/metal/metal_box_scrape_smooth_loop1.ogg",
         [MAT_WOOD] = "glide/wheels/side_skid_road_1.wav",
-        [MAT_GLASS] = "physics/metal/metal_grenade_scrape_rough_loop1.wav"
+        [MAT_GLASS] = "physics/metal/metal_grenade_scrape_rough_loop1.ogg"
     }
 
     Glide.WHEEL_SOUNDS.FORWARD_SLIP = {
         [MAT_DEFAULT] = "glide/wheels/torque_skid_road.wav",
-        [MAT_DIRT] = "physics/body/body_medium_scrape_smooth_loop1.wav",
-        [MAT_SNOW] = "physics/body/body_medium_scrape_smooth_loop1.wav",
-        [MAT_PLASTIC] = "physics/plastic/plastic_barrel_scrape_smooth_loop1.wav",
-        [MAT_SAND] = "physics/body/body_medium_scrape_rough_loop1.wav",
-        [MAT_FOLIAGE] = "physics/cardboard/cardboard_box_scrape_rough_loop1.wav",
+        [MAT_DIRT] = "physics/body/body_medium_scrape_smooth_loop1.ogg",
+        [MAT_SNOW] = "physics/body/body_medium_scrape_smooth_loop1.ogg",
+        [MAT_PLASTIC] = "physics/plastic/plastic_barrel_scrape_smooth_loop1.ogg",
+        [MAT_SAND] = "physics/body/body_medium_scrape_rough_loop1.ogg",
+        [MAT_FOLIAGE] = "physics/cardboard/cardboard_box_scrape_rough_loop1.ogg",
         [MAT_SLOSH] = "glide/wheels/side_skid_road_wet.wav",
-        [MAT_GRASS] = "physics/body/body_medium_scrape_smooth_loop1.wav",
-        [MAT_VENT] = "physics/metal/metal_box_scrape_smooth_loop1.wav",
+        [MAT_GRASS] = "physics/body/body_medium_scrape_smooth_loop1.ogg",
+        [MAT_VENT] = "physics/metal/metal_box_scrape_smooth_loop1.ogg",
         [MAT_WOOD] = "glide/wheels/side_skid_wood.wav",
-        [MAT_GLASS] = "physics/metal/metal_grenade_scrape_rough_loop1.wav"
+        [MAT_GLASS] = "physics/metal/metal_grenade_scrape_rough_loop1.ogg"
     }
 end
 

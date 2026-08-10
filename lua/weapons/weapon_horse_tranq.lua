@@ -78,7 +78,7 @@ function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage()
-		self:NPCHeal(owner, 0.4, "snd_jack_hmcd_needleprick.wav")
+		self:NPCHeal(owner, 0.4, "snd_jack_hmcd_needleprick.ogg")
 	end
 end
 
@@ -86,7 +86,7 @@ end
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage()
-			self:NPCHeal(ent, 0.4, "snd_jack_hmcd_needleprick.wav")
+			self:NPCHeal(ent, 0.4, "snd_jack_hmcd_needleprick.ogg")
 		end
 
 		local org = ent.organism

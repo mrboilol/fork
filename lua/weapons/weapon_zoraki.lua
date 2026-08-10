@@ -34,17 +34,17 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 8
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/hndg_beretta92fs/beretta92_fire1.wav", 75, 90, 100}
 SWEP.SupressedSound = {"zcitysnd/sound/weapons/makarov/makarov_suppressed_fp.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 5
 SWEP.ReloadTime = 5
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"pwb/weapons/fnp45/clipout.wav",
+	"pwb/weapons/fnp45/clipout.ogg",
 	"none",
 	"none",
-	"pwb/weapons/fnp45/clipin.wav",
-	"pwb/weapons/fnp45/sliderelease.wav",
+	"pwb/weapons/fnp45/clipin.ogg",
+	"pwb/weapons/fnp45/sliderelease.ogg",
 	"none",
 	"none",
 	"none"

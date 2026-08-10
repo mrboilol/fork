@@ -572,7 +572,7 @@ function PANEL:AllowInput(newCharacter)
 
 	-- we can't check for the proper length using utf-8 since AllowInput is called for single bytes instead of full characters
 	if (string.len(text .. newCharacter) > maxLen) then
-		surface.PlaySound("common/talk.wav")
+		surface.PlaySound("common/talk.ogg")
 		return true
 	end
 end

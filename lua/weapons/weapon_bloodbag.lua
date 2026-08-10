@@ -90,7 +90,7 @@ function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage()
-		self:NPCHeal(owner, 0.3, "zcity/healing/bloodbag_spear_0.wav")
+		self:NPCHeal(owner, 0.3, "zcity/healing/bloodbag_spear_0.ogg")
 	end
 end
 
@@ -116,7 +116,7 @@ if SERVER then
 		local ent = hg.eyeTrace(self:GetOwner()).Entity
 		if ent:IsPlayer() or ent:IsRagdoll() then
 			self.sndcd = CurTime() + 1
-			self:GetOwner():EmitSound("zcity/healing/bloodbag_spear_0.wav")
+			self:GetOwner():EmitSound("zcity/healing/bloodbag_spear_0.ogg")
 			self:SetNextSecondaryFire(CurTime() + 1)
 		end
 	end
@@ -132,7 +132,7 @@ if SERVER then
 		if not self:GetOwner():KeyPressed(IN_ATTACK) then return end
 
 		self.sndcd = CurTime() + 1
-		self:GetOwner():EmitSound("zcity/healing/bloodbag_spear_0.wav")
+		self:GetOwner():EmitSound("zcity/healing/bloodbag_spear_0.ogg")
 		self:SetNextPrimaryFire(CurTime() + 1)
 	end
 
@@ -187,7 +187,7 @@ if SERVER then
 							self:RefreshPerfusionTreatment(ent, 0.18)
 						end
 						if self.sndcd < CurTime() and old ~= self.modeValues[1] then
-							owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".wav")
+							owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".ogg")
 							self.sndcd = CurTime() + 0.7
 						end
 					end
@@ -227,7 +227,7 @@ if SERVER then
 							self:RefreshPerfusionTreatment(ent, good_type and 0.3 or 0.12)
 						end
 						if self.sndcd < CurTime() and old ~= ent.organism.blood  then
-							owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".wav")
+							owner:EmitSound("zcity/healing/bloodbag_loop_".. math.random(8) ..".ogg")
 							self.sndcd = CurTime() + 0.7
 						end
 					end

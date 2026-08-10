@@ -118,7 +118,7 @@ CreateEndMenu = function()
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
 
-    surface.PlaySound("ambient/alarms/warningbell1.wav")
+    surface.PlaySound("ambient/alarms/warningbell1.ogg")
 
 	local sizeX,sizeY = ScrW() / 2.5 ,ScrH() / 1.2
 	local posX,posY = ScrW() / 1.3 - sizeX / 2,ScrH() / 2 - sizeY / 2
@@ -382,7 +382,7 @@ local function CreateLootPollingMenu()
         })
         net.SendToServer()
         
-        surface.PlaySound("buttons/button14.wav")
+        surface.PlaySound("buttons/button14.ogg")
     end
     
     local buttonPanel = vgui.Create("DPanel", LootPollingMenu)
@@ -415,7 +415,7 @@ local function CreateLootPollingMenu()
         end
         btn.DoClick = function()
             clickFunc()
-            surface.PlaySound("buttons/button14.wav")
+            surface.PlaySound("buttons/button14.ogg")
         end
         return btn
     end

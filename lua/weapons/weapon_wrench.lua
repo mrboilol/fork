@@ -59,7 +59,7 @@ SWEP.AttackHit = "Concrete.ImpactHard"
 SWEP.Attack2Hit = "Concrete.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.wav"
+SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.ogg"
 SWEP.HitFleshExtra = {
     "shovelcrowbarshared/shovelhit1.ogg",
     "shovelcrowbarshared/shovelhit2.ogg",
@@ -87,7 +87,7 @@ end
 
 SWEP.BlockTier = 2
 SWEP.MeleeMaterial = "metal	"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_soft1.wav"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_soft1.ogg"
 
 SWEP.CanHeavyAttack = true -- Set to true to enable
 SWEP.NeckBreakChance = 0.01

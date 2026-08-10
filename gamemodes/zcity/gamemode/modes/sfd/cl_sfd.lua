@@ -230,7 +230,7 @@ CreateEndMenu = function()
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
 
-    surface.PlaySound("ambient/alarms/warningbell1.wav")
+    surface.PlaySound("ambient/alarms/warningbell1.ogg")
 
 	local sizeX,sizeY = ScrW() / 2.5 ,ScrH() / 1.2
 	local posX,posY = ScrW() / 1.3 - sizeX / 2,ScrH() / 2 - sizeY / 2

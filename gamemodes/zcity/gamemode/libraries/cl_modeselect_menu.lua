@@ -32,9 +32,9 @@ if CLIENT then
     surface.CreateFont("ZB_QM_Small",    {font = menufont, size = 14, weight = 300, antialias = true})
     surface.CreateFont("ZB_QM_Btn",      {font = menufont, size = 16, weight = 500, antialias = true})
 
-    local SND_CLICK   = "shitty/tap_depress.wav"
-    local SND_RELEASE = "shitty/tap_release.wav"
-    local SND_HOVER   = "shitty/tap-resonant.wav"
+    local SND_CLICK   = "shitty/tap_depress.ogg"
+    local SND_RELEASE = "shitty/tap_release.ogg"
+    local SND_HOVER   = "shitty/tap-resonant.ogg"
 
 
 

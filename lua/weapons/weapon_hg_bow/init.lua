@@ -45,7 +45,7 @@ function SWEP:PrimaryAttack()
 	elseif self.CurState == -1 and not ply:IsSprinting() then --and hg.KeyDown(ply, IN_USE)
 		self.CurState = 0.5
 		self:PlayAnim(ply:GetAmmoCount("Arrow") == 0 and "meleeattack_empty" or "meleeattack")
-		self:SoundEmit("weapons/slam/throw.wav", 50, math.random(95, 105), 1)
+		self:SoundEmit("weapons/slam/throw.ogg", 50, math.random(95, 105), 1)
 
 		ply:LagCompensation(true)
 		local tr = hg.eyeTrace(ply)
@@ -62,9 +62,9 @@ function SWEP:PrimaryAttack()
 			ent:TakeDamageInfo(dmgInfo)
 
 			if ent:IsPlayer() or ent:IsRagdoll() or ent:IsNPC() then
-				ply:EmitSound("weapons/tfa/melee_hit_world"..math.random(1,3)..".wav", 65)
+				ply:EmitSound("weapons/tfa/melee_hit_world"..math.random(1,3)..".ogg", 65)
 			else
-				ply:EmitSound("physics/metal/weapon_impact_hard3.wav", 65)
+				ply:EmitSound("physics/metal/weapon_impact_hard3.ogg", 65)
 			end
 
 			if ent:IsPlayer() then

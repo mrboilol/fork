@@ -79,8 +79,8 @@ SWEP.WaterModel = {
 	["models/foodnhouseholditems/juicesmall.mdl"] = true
 }
 
-SWEP.FallSnd = "snd_jack_hmcd_foodbounce.wav"
-SWEP.DeploySnd = "snd_jack_hmcd_foodbounce.wav"
+SWEP.FallSnd = "snd_jack_hmcd_foodbounce.ogg"
+SWEP.DeploySnd = "snd_jack_hmcd_foodbounce.ogg"
 
 function SWEP:SetupDataTables()
 	self:NetworkVar( "String", "CurModel" ) 
@@ -139,7 +139,7 @@ if SERVER then
 		if ent ~= self:GetOwner() and not ent.organism.otrub then return end
 		local owner = self:GetOwner()
 		local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
-		ent:EmitSound( self.WaterModel[self.WorldModel] and "snd_jack_hmcd_drink"..math.random(3)..".wav" or "snd_jack_hmcd_eat"..math.random(4)..".wav", 60, math.random(95, 105))
+		ent:EmitSound( self.WaterModel[self.WorldModel] and "snd_jack_hmcd_drink"..math.random(3)..".ogg" or "snd_jack_hmcd_eat"..math.random(4)..".ogg", 60, math.random(95, 105))
 		org.satiety = org.satiety + 10
 		owner:SelectWeapon("weapon_hands_sh")
 		self:Remove()

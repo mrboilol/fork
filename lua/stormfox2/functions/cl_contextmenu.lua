@@ -74,12 +74,12 @@ end
 			label:SetExpensiveShadow( 1, Color( 0, 0, 0, 200 ) )
 			label:SizeToContentsX()
 		sv.DoClick = function()
-			surface.PlaySound("buttons/button14.wav")
+			surface.PlaySound("buttons/button14.ogg")
 			window:Remove()
 			StormFox2.Menu.OpenSV()
 		end
 		cl.DoClick = function()
-			surface.PlaySound("buttons/button14.wav")
+			surface.PlaySound("buttons/button14.ogg")
 			window:Remove()
 			StormFox2.Menu.Open()
 		end
@@ -99,7 +99,7 @@ end
 			label:SetTextColor( Color( 255,255,255, 105) )
 			sv:SetToolTip(niceName(language.GetPhrase("#administrator_applications")))
 		end
-		surface.PlaySound("garrysmod/ui_click.wav")
+		surface.PlaySound("garrysmod/ui_click.ogg")
 	end
 
 	local function OpenWindow(icon, window)

@@ -170,7 +170,7 @@ hook.Add("PlayerPostThink", "HMCD_SubRoles_Abilities", function(ply)
 							if char:IsRagdoll() then
 								hg.Appearance.ForceApplyAppearance(char, other_appearance, true)
 							end
-							ply:EmitSound("snd_jack_hmcd_disguise.wav",35,math.random(90,110),0.5)
+							ply:EmitSound("snd_jack_hmcd_disguise.ogg",35,math.random(90,110),0.5)
 
 							--local duplicator_data = duplicator.CopyEntTable(ply)
 							--duplicator.DoGeneric(aim_ent, duplicator_data)

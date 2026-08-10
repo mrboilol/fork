@@ -1,4 +1,4 @@
-﻿AddCSLuaFile()
+AddCSLuaFile()
 --
 function SWEP:GetBulletSettings()
 	local primary = self.Primary
@@ -251,8 +251,8 @@ local function callbackBullet(self, tr, dmg, force, bullet, penetration)
 		local rnd = math.random(12)
 		if rnd == 8 then rnd = 9 end
 		sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", hitPos, 75, math.random(90, 110))
-		--sound.Play("snd_jack_hmcd_ricochet_" .. math.random(1, 2) .. ".wav", hitPos, 75, math.random(90, 110))
-		--sound.Play("weapons/arccw/ricochet0" .. math.random(1, 5) .. "_quiet.wav", hitPos, 75, math.random(90, 110))
+		--sound.Play("snd_jack_hmcd_ricochet_" .. math.random(1, 2) .. ".ogg", hitPos, 75, math.random(90, 110))
+		--sound.Play("weapons/arccw/ricochet0" .. math.random(1, 5) .. "_quiet.ogg", hitPos, 75, math.random(90, 110))
 		util.Decal("ManhackCut", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal)
 		local NewVec = dir:Angle()
 		NewVec:RotateAroundAxis(hitNormal, 180)

@@ -1559,7 +1559,7 @@ function MODE:RoundThink()
 				SetGlobalBool("HMCDPoliceArrived", true)
 				BroadcastHMCDPoliceArrivedState(true)
 				PrintMessage(HUD_PRINTTALK, "Police have arrived.")
-				EmitSound("snd_jack_hmcd_policesiren.wav", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
+				EmitSound("snd_jack_hmcd_policesiren.ogg", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
 			end
 		end
 	end

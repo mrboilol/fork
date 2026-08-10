@@ -180,7 +180,7 @@ SWEP.IconOverride = "entities/arc9_eft_g36.png"
 SWEP.weight = 3.6
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/g36/g36_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/g36/g36_dist.ogg"
 
 SWEP.availableAttachments = {
 	barrel = {

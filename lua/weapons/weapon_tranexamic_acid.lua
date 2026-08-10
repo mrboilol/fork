@@ -99,7 +99,7 @@ if SERVER then
 			org.internalBleedHeal = (org.internalBleedHeal or 0) + dose
 			org.tranexamic_acid = math.min(org.tranexamic_acid + dose, 10)
 			self.modeValues[1] = 0
-			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
+			owner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
 		end
 
 		-- Sync remaining amount to client

@@ -218,7 +218,7 @@ SWEP.attPos = Vector(1, 0, 0)
 SWEP.attAng = Angle(-0.02, 0, 0)
 SWEP.lengthSub = 20
 SWEP.handsAng = Angle(7, 2, 0)
-SWEP.DistSound = "weapons/darsu_eft/scorpion/scorpion_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/scorpion/scorpion_dist.ogg"
 
 -- tpik hand positions
 SWEP.RHPos = Vector(3, -7, 3.5)

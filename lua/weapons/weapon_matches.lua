@@ -113,7 +113,7 @@ function SWEP:PrimaryAttack()
     if self:GetHolding() < 100 then return end
 
     self:SetNextPrimaryFire(CurTime() + 1)
-    self:EmitSound("f_firematch_strike.wav")
+    self:EmitSound("f_firematch_strike.ogg")
 
     local tr = hg.eyeTrace(self:GetOwner(), 120)
     if tr.Entity and tr.Entity.OnMatches then

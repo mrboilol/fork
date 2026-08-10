@@ -32,7 +32,7 @@ SWEP.FakeEmptyReloadSounds = {
 
 	[0.8] = "zcitysnd/sound/weapons/m9/handling/m9_magin.wav",
 	[0.87] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
-	[1.07] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.wav",
+	[1.07] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg",
 }
 SWEP.MagModel = "models/joshzemlinsky/weapons/sof3_beretta_px4_mag.mdl"
 
@@ -97,15 +97,15 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 21
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/hndg_beretta92fs/beretta92_fire1.wav", 75, 90, 100}
 SWEP.SupressedSound = {"zcitysnd/sound/weapons/m45/m45_suppressed_fp.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 23
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.ReloadTime = 2
 SWEP.ReloadSoundes = {
 	"none",
 	"weapons/tfa_ins2/usp_tactical/magout.wav",
-	"weapons/tfa_ins2/browninghp/magin.wav",
-	"pwb/weapons/fnp45/sliderelease.wav",
+	"weapons/tfa_ins2/browninghp/magin.ogg",
+	"pwb/weapons/fnp45/sliderelease.ogg",
 	"none",
 	"none"
 }

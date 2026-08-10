@@ -3,7 +3,7 @@ MODE.name = "hl2dm"
 local MODE = MODE
 
 net.Receive("hl2dm_start",function()
-    surface.PlaySound("hl2mode1.wav")
+    surface.PlaySound("hl2mode1.ogg")
 	zb.RemoveFade()
 	hg.DynaMusic:Start( "hl_coop" )
 end)
@@ -100,25 +100,25 @@ end)
 local CreateEndMenu
 local winnersounds = {
 	[0] = { -- rebel wins
-		"vo/episode_1/npc/male01/cit_kill04.wav",
-		"vo/episode_1/npc/male01/cit_kill01.wav",
-		"vo/episode_1/npc/male01/cit_kill09.wav",
-		"vo/episode_1/npc/male01/cit_kill14.wav"
+		"vo/episode_1/npc/male01/cit_kill04.ogg",
+		"vo/episode_1/npc/male01/cit_kill01.ogg",
+		"vo/episode_1/npc/male01/cit_kill09.ogg",
+		"vo/episode_1/npc/male01/cit_kill14.ogg"
 	},
 	[1] = { -- combine wins
-		"vo/episode_1/npc/male01/cit_buddykilled11.wav",
-		"vo/episode_1/npc/male01/cit_buddykilled07.wav",
-		"vo/episode_1/npc/male01/cit_buddykilled10.wav",
-		"vo/episode_1/npc/male01/cit_buddykilled04.wav"
+		"vo/episode_1/npc/male01/cit_buddykilled11.ogg",
+		"vo/episode_1/npc/male01/cit_buddykilled07.ogg",
+		"vo/episode_1/npc/male01/cit_buddykilled10.ogg",
+		"vo/episode_1/npc/male01/cit_buddykilled04.ogg"
 	},
-	[2] = {"npc/combine_soldier/vo/overwatchtargetcontained.wav"}, -- draw
-	[3] = {"npc/combine_soldier/vo/overwatchsectoroverrun.wav"} -- everybody died
+	[2] = {"npc/combine_soldier/vo/overwatchtargetcontained.ogg"}, -- draw
+	[3] = {"npc/combine_soldier/vo/overwatchsectoroverrun.ogg"} -- everybody died
 }
 
 net.Receive("hl2dm_roundend", function()
 	local winnerteam = net.ReadInt(3)
 
-	surface.PlaySound("ambient/alarms/warningbell1.wav")
+	surface.PlaySound("ambient/alarms/warningbell1.ogg")
 
     CreateEndMenu()
 end)

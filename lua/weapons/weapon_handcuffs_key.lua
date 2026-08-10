@@ -151,7 +151,7 @@ function SWEP:UnTie(ent)
 				ent.handcuffed = false
 			end
 
-			ent:EmitSound("weapons/357/357_reload1.wav")
+			ent:EmitSound("weapons/357/357_reload1.ogg")
 
 			local ply = hg.RagdollOwner(ent)
 			local org = ent.organism

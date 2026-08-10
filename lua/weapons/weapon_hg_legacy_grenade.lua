@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.PrintName = "F1"
 SWEP.Category = "Weapons - Explosive"
 SWEP.Instructions = "A famous soviet WWII offensive grenade. It's still widely exported and used to this day. It has a pyrotechnic delay of 3.2-4.2 seconds."
@@ -255,7 +255,7 @@ function SWEP:Step1()
 			if ply:KeyDown(IN_ATTACK) and not self.startedattack then
 				if self.nofunnyfunctions then
 					if not self.throwin then
-						ply:EmitSound(self.throwsound or "weapons/m67/m67_throw_01.wav",65)
+						ply:EmitSound(self.throwsound or "weapons/m67/m67_throw_01.ogg",65)
 					end
 					self.startedattack = time
 					self.throwin = self.throwin or time + self.timetothrow
@@ -265,7 +265,7 @@ function SWEP:Step1()
 					return
 				end
 				
-				entownr:EmitSound("weapons/m67/m67_pullpin.wav",65)
+				entownr:EmitSound("weapons/m67/m67_pullpin.ogg",65)
 				self.startedattack = time
 				net.Start("hg_started_attack")
 				net.WriteEntity(self)
@@ -298,7 +298,7 @@ function SWEP:Step1()
 		else
 			if self.nofunnyfunctions then
 				if self.startedattack then
-					self:EmitSound("weapons/m67/m67_throw_01.wav", 90, math.random(95, 105))
+					self:EmitSound("weapons/m67/m67_throw_01.ogg", 90, math.random(95, 105))
 					self:Throw(800, time)
 				end
 				return
@@ -451,7 +451,7 @@ function SWEP:Throw(mul, time, nosound)
 	local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or IsValid(owner) and owner
 	local hand = IsValid(entOwner) and owner:EyePos() - vector_up * 5 or self:GetPos()
 	if not nosound and IsValid(entOwner) then
-		entOwner:EmitSound(self.throwsound or "weapons/m67/m67_throw_01.wav", 90, math.random(95, 105))
+		entOwner:EmitSound(self.throwsound or "weapons/m67/m67_throw_01.ogg", 90, math.random(95, 105))
 	end
 
 	if IsValid(owner) then

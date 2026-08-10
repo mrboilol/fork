@@ -62,7 +62,7 @@ function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage("models/bloocobalt/l4d/items/w_eq_adrenaline.mdl", nil, nil, nil, "2211")
-		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_needleprick.wav")
+		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_needleprick.ogg")
 	end
 end
 
@@ -70,7 +70,7 @@ if SERVER then
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage("models/bloocobalt/l4d/items/w_eq_adrenaline.mdl", nil, nil, nil, "2211")
-			self:NPCHeal(ent, 0.1, "snd_jack_hmcd_needleprick.wav")
+			self:NPCHeal(ent, 0.1, "snd_jack_hmcd_needleprick.ogg")
 		end
 
 		local org = ent.organism
@@ -84,7 +84,7 @@ if SERVER then
 		end
 
 		local entOwner = IsValid(org.owner.FakeRagdoll) and org.owner.FakeRagdoll or org.owner
-		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
+		entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd, 4, self.modeValues[1] * 4)
 		-- The injector has to act before the normal adrenalineAdd-to-adrenaline
 		-- conversion finishes, otherwise it cannot help a current cardiac arrest.

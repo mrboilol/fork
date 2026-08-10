@@ -72,7 +72,7 @@ function SWEP:PrimaryAttackAdd(ent, trace)
                     Poof:SetNormal(-trace.HitNormal)
                     util.Effect("eff_jack_hmcd_poof", Poof, true, true)
                 end)
-                owner:EmitSound("physics/concrete/concrete_break" .. math.random(2, 3) .. ".wav",45,140)
+                owner:EmitSound("physics/concrete/concrete_break" .. math.random(2, 3) .. ".ogg",45,140)
                 self:Remove()
             end
 		end
@@ -111,7 +111,7 @@ function SWEP:CustomAttack2()
         phys:AddAngleVelocity(VectorRand() * 300)
     end
 
-    //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+    //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
     ply:ViewPunch(Angle(0, 0, -8))
     ply:SelectWeapon("weapon_hands_sh")
 

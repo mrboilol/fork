@@ -230,7 +230,7 @@ end
 
 function ENT:Explode()
 	if self:PoopBomb() or (!self.shouldBoom and !IsValid(self.owner)) then
-		self:EmitSound("weapons/p99/slideback.wav", 75)
+		self:EmitSound("weapons/p99/slideback.ogg", 75)
 		self.Exploded = true
 		return
 	end
@@ -603,5 +603,5 @@ function ENT:PlaySndDebris(snd, vol, pitch)
 end
 
 function ENT:PhysicsCollide(phys, deltaTime)
-	if phys.Speed > 20 then self:EmitSound("physics/metal/metal_grenade_impact_hard" .. math.random(3) .. ".wav", 65, math.random(95, 105)) end
+	if phys.Speed > 20 then self:EmitSound("physics/metal/metal_grenade_impact_hard" .. math.random(3) .. ".ogg", 65, math.random(95, 105)) end
 end

@@ -42,7 +42,7 @@ if SERVER then
 		if phys:IsValid() then
 			phys:SetMass(20)
 			phys:Wake()
-			self.snd = self:StartLoopingSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
+			self.snd = self:StartLoopingSound("weapons/ins2rpg7/rpg_rocket_loop.ogg")
 		end
 		
 		self:CallOnRemove("RemoveSound",function()
@@ -105,7 +105,7 @@ if SERVER then
 		local forward = self:GetAngles():Forward()
 
 		AeroDrag(self, forward, .75)
-		if self.Osejka then self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav") return end
+		if self.Osejka then self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.ogg") return end
 		self.Truhst = self.Truhst or curTime + self.TruhstTime
 		local Eff = EffectData()
 		Eff:SetOrigin(self:GetPos())
@@ -297,7 +297,7 @@ if SERVER then
 			coroutine.resume(co)
 			if self.ShrapnelDone then
 				if not IsValid(self) then return end
-				self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.wav")
+				self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.ogg")
 				SafeRemoveEntity(self)
 				timer.Remove("GrenadeCheck_" .. index)
 			end

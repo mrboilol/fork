@@ -144,7 +144,7 @@ local math_random, math_Rand = math.random, math.Rand
 
 				local bugbait = ply:Give("weapon_hg_bugbait")
 				ply:SelectWeapon(bugbait)
-				ent:EmitSound("npc/barnacle/barnacle_pull2.wav", 80, math_random(90, 110))
+				ent:EmitSound("npc/barnacle/barnacle_pull2.ogg", 80, math_random(90, 110))
 			end
 		end
 	end)
@@ -384,7 +384,7 @@ local math_random, math_Rand = math.random, math.Rand
 
 							npc:TakeDamageInfo(d)
 							if fallVel >= 30 then
-								npc:EmitSound("player/pl_pain"..math_random(5, 7)..".wav", 75, math_random(95, 105))
+								npc:EmitSound("player/pl_pain"..math_random(5, 7)..".ogg", 75, math_random(95, 105))
 							end
 							npc:EmitSound(math_random() == 2 and "player/pl_fallpain1.wav" or "player/pl_fallpain3.wav", 75, math_random(95, 105))
 						end

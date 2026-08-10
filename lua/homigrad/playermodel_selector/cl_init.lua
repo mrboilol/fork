@@ -24,7 +24,7 @@ for name, tbl in pairs({Title = {26, 500}, Category = {21, 400}, Item = {19, 400
 	surface.CreateFont("ZB_PMS_" .. name, {font = "Bahnschrift", size = tbl[1], weight = tbl[2], antialias = true})
 end
 
-local sndClick, sndRelease, sndHover = "shitty/tap_depress.wav", "shitty/tap_release.wav", "shitty/tap-resonant.wav"
+local sndClick, sndRelease, sndHover = "shitty/tap_depress.ogg", "shitty/tap_release.ogg", "shitty/tap-resonant.ogg"
 local idleAnims = {"idle_all_01", "menu_walk", "pose_standing_02", "idle_fist", "idle"}
 local Menu
 

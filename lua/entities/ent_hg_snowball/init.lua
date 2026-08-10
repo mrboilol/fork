@@ -74,7 +74,7 @@ function ENT:Detonate(data)
 
 	timer.Simple(.02, function()
 		if not IsValid(self) then return end
-		sound.Play("weapons/snowball/snowball_impact0"..math.random(1, 2)..".wav", SelfPos, 80, math.random(95, 105))
+		sound.Play("weapons/snowball/snowball_impact0"..math.random(1, 2)..".ogg", SelfPos, 80, math.random(95, 105))
 	end)
 
 	timer.Simple(.06, function()

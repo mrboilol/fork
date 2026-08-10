@@ -500,7 +500,7 @@ function hg.organism.CompleteDislocationFix(org, limb, ply)
 	org.fearadd = (org.fearadd or 0) + 0.1
 
 	if IsValid(org.owner) then
-		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.wav", 65)
+		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.ogg", 65)
 	end
 
 	-- Reapply floppy limb constraints if the limb is broken
@@ -1080,6 +1080,7 @@ local function queueBulletBloodImpact(ent, stream, pos, velocity, damage, severe
 		net.WriteFloat(queued.damage)
 		net.WriteInt(queued.amount, 8)
 		net.WriteBool(queued.severe or false)
+		net.WriteBool(stream == "exit")
 		net.Broadcast()
 	end)
 end
@@ -1983,6 +1984,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		net.WriteFloat(brokenSkullHeadImpact and math.max(dmg / 8, 1) or dmg / 10)
 		net.WriteInt(1, 8)
 		net.WriteBool(brokenSkullHeadImpact or severeBulletImpact)
+		net.WriteBool(false)
 		net.Broadcast()
 	end
 
@@ -2020,37 +2022,37 @@ end)
 
 local paintable = {
 	[HITGROUP_STOMACH] = function(ply,ent)
-		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".wav" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/mygut02.wav"
+		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".ogg" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/mygut02.ogg"
 		ent:EmitSound(snd,75,ply.VoicePitch)
 		ply.painCD = CurTime() + SoundDuration(snd)
 		ply.lastPhr = snd
 	end,
 	[HITGROUP_CHEST] = function(ply,ent)
-		local snd = "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".wav"
+		local snd = "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".ogg"
 		ent:EmitSound(snd,75,ply.VoicePitch)
 		ply.painCD = CurTime() + SoundDuration(snd)
 		ply.lastPhr = snd
 	end,
 	[HITGROUP_LEFTARM] = function(ply,ent)
-		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".wav" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myarm0"..math.random(1,2)..".wav"
+		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".ogg" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myarm0"..math.random(1,2)..".ogg"
 		ent:EmitSound(snd,75,ply.VoicePitch)
 		ply.painCD = CurTime() + SoundDuration(snd)
 		ply.lastPhr = snd
 	end,
 	[HITGROUP_RIGHTARM] = function(ply,ent)
-		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".wav" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myarm0"..math.random(1,2)..".wav"
+		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".ogg" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myarm0"..math.random(1,2)..".ogg"
 		ent:EmitSound(snd,75,ply.VoicePitch)
 		ply.painCD = CurTime() + SoundDuration(snd)
 		ply.lastPhr = snd
 	end,
 	[HITGROUP_RIGHTLEG] = function(ply,ent)
-		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".wav" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myleg0"..math.random(1,2)..".wav"
+		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".ogg" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myleg0"..math.random(1,2)..".ogg"
 		ent:EmitSound(snd,75,ply.VoicePitch)
 		ply.painCD = CurTime() + SoundDuration(snd)
 		ply.lastPhr = snd
 	end,
 	[HITGROUP_LEFTLEG] = function(ply,ent)
-		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".wav" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myleg0"..math.random(1,2)..".wav"
+		local snd = (ply.painCD and CurTime() < ply.painCD + 10 ) and "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/pain0"..math.random(1,9)..".ogg" or "vo/npc/"..(ThatPlyIsFemale(ply) and "female" or "male").."01/myleg0"..math.random(1,2)..".ogg"
 		ent:EmitSound(snd,75,ply.VoicePitch)
 		ply.painCD = CurTime() + SoundDuration(snd)
 		ply.lastPhr = snd
@@ -2416,6 +2418,7 @@ local function velocityDamage(ent, data)
 				net.WriteFloat(math.max(dmg * ragdoll_fall_skull_break_blood_mul, 1))
 				net.WriteInt(1, 8)
 				net.WriteBool(true)
+				net.WriteBool(false)
 				net.Broadcast()
 			end
 
@@ -2648,14 +2651,14 @@ function hg.BreakNeck(ent, fromDamage, force)
 		-- Prefer the established snapped-neck effect for standard ragdolls.  The
 		-- generic version below remains available for models without its bones.
 		if tryOriginalNeckFloppy(ragdoll, org) then
-			if fromDamage then ragdoll:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO) end
+			if fromDamage then ragdoll:EmitSound("neck_snap_01.ogg", 60, 100, 1, CHAN_AUTO) end
 			print("[HG Floppy] BreakNeck timer: applied original neck floppy")
 			return
 		end
 		
 		-- Play sound on the ragdoll (only if from damage, not reapplication)
 		if fromDamage then
-			ragdoll:EmitSound("neck_snap_01.wav", 60, 100, 1, CHAN_AUTO)
+			ragdoll:EmitSound("neck_snap_01.ogg", 60, 100, 1, CHAN_AUTO)
 		end
 
 		-- Lookup bones and validate

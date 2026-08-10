@@ -175,7 +175,7 @@ SWEP.IconOverride = "entities/arc9_eft_mdr.png"
 SWEP.weight = 3.5
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/mdr/mdr_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/mdr/mdr_dist.ogg"
 
 
 SWEP.StartAtt = {"holo14"}

@@ -106,7 +106,7 @@ gasparticles_hook[2] = function(mul)
 					if place_decal(hitPos, result.HitNormal, result.HitTexture) then
 						recent_hits[key] = now + DEDUP_COOLDOWN
 						placed = placed + 1
-						sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", hitPos, math.random(10, 60), math.random(80, 120))
+						sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".ogg", hitPos, math.random(10, 60), math.random(80, 120))
 					end
 				end
 			end

@@ -19,7 +19,7 @@ function ENT:Initialize()
 		phys:SetMass(5)
 		phys:Wake()
 	end
-	self.sndid = self:StartLoopingSound("ambient/fire/fire_small_loop1.wav")
+	self.sndid = self:StartLoopingSound("ambient/fire/fire_small_loop1.ogg")
 end
 
 function ENT:PhysicsCollide(data, physobj)
@@ -32,9 +32,9 @@ function ENT:PhysicsCollide(data, physobj)
 			
 			if math.random(1, 100) <= detonateChance then
 				self:Detonate()
-				self:EmitSound("weapons/molotov/molotov_detonate.wav")
+				self:EmitSound("weapons/molotov/molotov_detonate.ogg")
 			else
-				self:EmitSound("physics/glass/glass_bottle_impact_hard" .. math.random(1, 3) .. ".wav", 75, math.random(90, 110))
+				self:EmitSound("physics/glass/glass_bottle_impact_hard" .. math.random(1, 3) .. ".ogg", 75, math.random(90, 110))
 			end
 		end
 	end
@@ -62,7 +62,7 @@ function ENT:Think()
 	local cookTime = self.timer or CurTime()
 	if CurTime() > cookTime + (self.timeToBoom or 5) and not self.Exploded then
 		self:Detonate()
-		self:EmitSound("weapons/molotov/molotov_detonate.wav")
+		self:EmitSound("weapons/molotov/molotov_detonate.ogg")
 	elseif self:WaterLevel() > 0 and not self.Exploded then
 		local ent = ents.Create("weapon_hg_molotov_tpik")
 		ent:SetPos(self:GetPos())
@@ -119,7 +119,7 @@ function ENT:Detonate()
 
 	timer.Simple(.05, function()
 		if not IsValid(self) then return end
-		sound.Play("snd_jack_firebomb.wav", SelfPos, 80, 100)
+		sound.Play("snd_jack_firebomb.ogg", SelfPos, 80, 100)
 	end)
 
 	--for i = 1, 2 do

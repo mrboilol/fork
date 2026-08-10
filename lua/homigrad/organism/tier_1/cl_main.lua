@@ -93,6 +93,22 @@ local remFibrillationLoading
 local remFibrillationStopping
 local remHeartStopLoading
 
+local function GetLocalDeathState()
+	local ply = LocalPlayer()
+	if not IsValid(ply) or not ply:Alive() then return end
+
+	local org = ply.new_organism or ply.organism
+	local deathStateEnd = org and tonumber(org.deathStateEnd)
+	if not org or not org.otrub or not org.incapacitated or not deathStateEnd or deathStateEnd <= CurTime() then return end
+
+	return org, deathStateEnd
+end
+
+local function StopRemDeathStateSound()
+	if IsValid(remDeathStateStation) then remDeathStateStation:Stop() end
+	remDeathStateStation = nil
+end
+
 local function PlayRemHeartStopSound(uncon)
 	if remHeartStopLoading then return end
 
@@ -106,25 +122,20 @@ local function PlayRemHeartStopSound(uncon)
 end
 
 local function PlayRemDeathStateSound()
-	if IsValid(remDeathStateStation) then
-		remDeathStateStation:Play()
-		return
-	end
+	if IsValid(remDeathStateStation) then return end
 	if remDeathStateLoading then return end
 
 	remDeathStateLoading = true
 	sound.PlayFile("sound/rem_deathstatefull.mp3", "noplay", function(station)
 		remDeathStateLoading = nil
 		if not IsValid(station) then return end
-		if not LocalPlayer():Alive() then station:Stop() return end
+		if not GetLocalDeathState() then station:Stop() return end
 		remDeathStateStation = station
 		station:EnableLooping(true)
 		station:SetVolume(1)
 		station:Play()
 	end)
 end
-
-net.Receive("rem_deathstate_sound", PlayRemDeathStateSound)
 
 local function StartRemFibrillationSound()
  if IsValid(remFibrillationStation) then
@@ -187,11 +198,12 @@ hook.Add("Think", "RemCardiacSounds", function()
  end
 end)
 
-hook.Add("Think", "RemDeathStateSoundStop", function()
-	local ply = LocalPlayer()
-	if not IsValid(ply) or ply:Alive() or not IsValid(remDeathStateStation) then return end
-	remDeathStateStation:Stop()
-	remDeathStateStation = nil
+hook.Add("Think", "RemDeathStateSound", function()
+	if GetLocalDeathState() then
+		PlayRemDeathStateSound()
+	else
+		StopRemDeathStateSound()
+	end
 end)
 
 local k1, k2, k3
@@ -1166,7 +1178,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 				end
 
-				ply:EmitSound("snds_jack_hmcd_breathing/" .. (ThatPlyIsFemale(ent) and "f" or "m") .. math.random(4) .. ".wav", min(heartbeat * 1.0 / ( muffed and 2.5 or 4), 45), pitch + pitchadd + math.Rand(-2, 2), vol, CHAN_AUTO, 0, muffed and 16 or 0)
+				ply:EmitSound("snds_jack_hmcd_breathing/" .. (ThatPlyIsFemale(ent) and "f" or "m") .. math.random(4) .. ".ogg", min(heartbeat * 1.0 / ( muffed and 2.5 or 4), 45), pitch + pitchadd + math.Rand(-2, 2), vol, CHAN_AUTO, 0, muffed and 16 or 0)
 			elseif org.breathed and sin >= 0.1 then
 				org.breathed = false
 			end
@@ -1207,11 +1219,11 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				vol = math.Clamp(vol, 0, 0.7) * hg_heartbeat_volume:GetFloat()
 			end
 
-			--ply:EmitSound("heartbeat/heartbeat_single.wav", 55, 60, vol)
+			--ply:EmitSound("heartbeat/heartbeat_single.ogg", 55, 60, vol)
 			if ent:GetVelocity():LengthSqr() < 10 then
-				sound.Play("heartbeat/heartbeat_single.wav", ply:EyePos(), 55, 60, vol * 1.5)
+				sound.Play("heartbeat/heartbeat_single.ogg", ply:EyePos(), 55, 60, vol * 1.5)
 			else
-				EmitSound("heartbeat/heartbeat_single.wav", ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
+				EmitSound("heartbeat/heartbeat_single.ogg", ply:EyePos(), ply:EntIndex(), CHAN_AUTO, vol, 55, nil, 60)
 			end
 		end
 	end

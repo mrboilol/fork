@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_hg_grenade_tpik"
 SWEP.PrintName = "Combine Frag Grenade"
 SWEP.Instructions = 
@@ -131,12 +131,12 @@ SWEP.AnimsEvents = {
 	},
 	["drawbacklow"] = {
 		[0.42] = function(self)
-			self:EmitSound("weapons/m67/handling/m67_armdraw.wav",65)
+			self:EmitSound("weapons/m67/handling/m67_armdraw.ogg",65)
 		end,
 	},
 	["drawbackhigh"] = {
 		[0.42] = function(self)
-			self:EmitSound("weapons/m67/handling/m67_armdraw.wav",65)
+			self:EmitSound("weapons/m67/handling/m67_armdraw.ogg",65)
 		end,
 	},
 }
@@ -169,7 +169,7 @@ function SWEP:AddStep()
         self.nextgrenadetick = self.nextgrenadetick or CurTime()
         if self.nextgrenadetick > CurTime() then return end
         
-        hg.GetCurrentCharacter(self:GetOwner()):EmitSound("weapons/grenade/tick1.wav",65)
+        hg.GetCurrentCharacter(self:GetOwner()):EmitSound("weapons/grenade/tick1.ogg",65)
 
         self.nextgrenadetick = CurTime() + 0.5 * math.max(time / (ent.timeToBoom * 1.5),0.5)
     end

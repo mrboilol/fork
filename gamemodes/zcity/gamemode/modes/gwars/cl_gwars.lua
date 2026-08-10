@@ -12,7 +12,7 @@ net.Receive("gwars_start", function()
 	playstart = true
 	ended = nil
 
-	sound.PlayFile("sound/music_themes/ghetto_loop.wav", "noblock noplay", function(station)
+	sound.PlayFile("sound/music_themes/ghetto_loop.ogg", "noblock noplay", function(station)
 		if IsValid(station) then
 			GWARS_LoopStation = station
 			station:SetVolume(1 * MusicVolume:GetFloat())
@@ -20,7 +20,7 @@ net.Receive("gwars_start", function()
 		end
 	end)
 
-	sound.PlayFile("sound/music_themes/ghetto_police.wav", "noblock noplay", function(station)
+	sound.PlayFile("sound/music_themes/ghetto_police.ogg", "noblock noplay", function(station)
 		if IsValid(station) then
 			GWARS_LoopStation2 = station
 			station:SetVolume(1 * MusicVolume:GetFloat())
@@ -28,8 +28,8 @@ net.Receive("gwars_start", function()
 		end
 	end)
 
-	//music_themes/ghetto_loop.wav
-	//music_themes/ghetto_start.wav
+	//music_themes/ghetto_loop.ogg
+	//music_themes/ghetto_start.ogg
 	
 end)
 
@@ -85,7 +85,7 @@ function MODE:HUDPaint()
 
 	if zb.ROUND_START + 8 < CurTime() then
 		if playstart then
-			sound.PlayFile("sound/music_themes/ghetto_start.wav", "noblock noplay", function(station)
+			sound.PlayFile("sound/music_themes/ghetto_start.ogg", "noblock noplay", function(station)
 				if IsValid(station) then
 					station:SetVolume(0.3 * MusicVolume:GetFloat())
 					station:Play()
@@ -182,7 +182,7 @@ CreateEndMenu = function()
 
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
-	surface.PlaySound("ambient/alarms/warningbell1.wav")
+	surface.PlaySound("ambient/alarms/warningbell1.ogg")
 	local sizeX, sizeY = ScrW() / 2.5, ScrH() / 1.2
 	local posX, posY = ScrW() / 1.3 - sizeX / 2, ScrH() / 2 - sizeY / 2
 	hmcdEndMenu:SetPos(posX, posY)

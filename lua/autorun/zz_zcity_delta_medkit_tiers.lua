@@ -102,7 +102,7 @@ local function applyMedkitMode(wep, ent, mode)
             org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + amount, 4)
         end
         wep.modeValues[modeIndex] = 0
-        entOwner:EmitSound("snd_jack_hmcd_pillsuse.wav", 60, math.random(95, 105))
+        entOwner:EmitSound("snd_jack_hmcd_pillsuse.ogg", 60, math.random(95, 105))
         return true
     elseif typeName == "naloxone" then
         org.naloxoneadd = math.min((org.naloxoneadd or 0) + amount, 1)
@@ -122,7 +122,7 @@ local function applyMedkitMode(wep, ent, mode)
     end
 
     wep.modeValues[modeIndex] = 0
-    entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
+    entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
     return true
 end
 
@@ -229,9 +229,9 @@ local function patchPainkillerWeapons()
                 end
                 org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + self.modeValues[1], 4)
                 self.modeValues[1] = 0
-                owner:EmitSound("snd_jack_hmcd_pillsuse.wav", 60, math.random(95, 105))
+                owner:EmitSound("snd_jack_hmcd_pillsuse.ogg", 60, math.random(95, 105))
                 owner:SelectWeapon("weapon_hands_sh")
-                self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.wav")
+                self:SpawnGarbage(nil, nil, "snd_jack_hmcd_foodbounce.ogg")
                 self:Remove()
                 return true
             end

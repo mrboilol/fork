@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Aluminium Bat"
 SWEP.Instructions = "An Aluminium bat. The design features of the bat allow it to deliver powerful and heavy blows.\n\nLMB to attack.\nRMB to block."
@@ -133,16 +133,16 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = true
 
-SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.wav"
-SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.wav"
+SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.ogg"
+SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.ogg"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {125, 145}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {125, 145}}
 
 SWEP.NoHolster = true
 

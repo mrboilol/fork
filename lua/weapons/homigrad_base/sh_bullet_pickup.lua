@@ -85,7 +85,7 @@ if SERVER then
 			ply:GiveAmmo(ammoAmount, ammoType)
 			
 			-- Play pickup sound
-			ent:EmitSound("items/ammo_pickup.wav", 75, 100, 1)
+			ent:EmitSound("items/ammo_pickup.ogg", 75, 100, 1)
 			
 			-- Send effect to clients
 			net.Start("hg_bullet_pickup_effect")
@@ -131,7 +131,7 @@ else
 		util.Effect("cball_explode", effectdata)
 		
 		-- Play pickup sound locally
-		LocalPlayer():EmitSound("items/ammo_pickup.wav", 75, 100, 1)
+		LocalPlayer():EmitSound("items/ammo_pickup.ogg", 75, 100, 1)
 	end)
 end
 

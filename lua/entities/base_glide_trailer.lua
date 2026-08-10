@@ -38,9 +38,9 @@ ENT.BulletDamageMultiplier = 0
 ENT.CollisionDamageMultiplier = 0
 
 -- Trailer sounds
-ENT.AttachSound = "buttons/lever3.wav"
+ENT.AttachSound = "buttons/lever3.ogg"
 ENT.AttachSoundPitch = 85
-ENT.DetachSound = "buttons/lever5.wav"
+ENT.DetachSound = "buttons/lever5.ogg"
 ENT.DetachSoundPitch = 90
 
 --- Implement this base class function.

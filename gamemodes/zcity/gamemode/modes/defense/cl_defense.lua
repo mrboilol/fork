@@ -7,7 +7,7 @@ local highlightNPCs = {}
 
 
 net.Receive("npc_defense_start",function()
-    surface.PlaySound("csgo_round.wav")
+    surface.PlaySound("csgo_round.ogg")
 end)
 
 local teams = {
@@ -149,7 +149,7 @@ CreateEndMenu = function()
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
 
-    surface.PlaySound("ambient/alarms/warningbell1.wav")
+    surface.PlaySound("ambient/alarms/warningbell1.ogg")
 
 	local sizeX,sizeY = ScrW() / 2.5 ,ScrH() / 1.2
 	local posX,posY = ScrW() / 1.3 - sizeX / 2,ScrH() / 2 - sizeY / 2
@@ -712,7 +712,7 @@ local function CreateVoteMenu()
         
         button.DoClick = function()
             if isDisabled then
-                surface.PlaySound("buttons/button10.wav")
+                surface.PlaySound("buttons/button10.ogg")
                 return
             end
             
@@ -720,7 +720,7 @@ local function CreateVoteMenu()
             selectedMode = index
             
             if previousSelection ~= selectedMode then
-                surface.PlaySound("ui/buttonclick.wav")
+                surface.PlaySound("ui/buttonclick.ogg")
                 
 
                 net.Start("defense_change_vote")
@@ -798,7 +798,7 @@ net.Receive("defense_vote_result", function()
         voteMenu:Remove()
     end
     
-    surface.PlaySound("buttons/button14.wav")
+    surface.PlaySound("buttons/button14.ogg")
 end)
 
 net.Receive("defense_show_selected_mode", function()
@@ -808,11 +808,11 @@ net.Receive("defense_show_selected_mode", function()
     selectedModeDisplayTime = CurTime()
     
     if mode == "ZOMBIE" then
-        surface.PlaySound("npc/zombie/zombie_alert1.wav")
+        surface.PlaySound("npc/zombie/zombie_alert1.ogg")
     elseif mode == "EXTENDED" then
-        surface.PlaySound("ambient/alarms/klaxon1.wav")
+        surface.PlaySound("ambient/alarms/klaxon1.ogg")
     else
-        surface.PlaySound("buttons/combine_button1.wav")
+        surface.PlaySound("buttons/combine_button1.ogg")
     end
 end)
 
@@ -925,9 +925,9 @@ net.Receive("defense_boss_incoming", function()
     bossWaveData.scale = 0
     
 
-    surface.PlaySound("ambient/alarms/razortrain_horn1.wav")
+    surface.PlaySound("ambient/alarms/razortrain_horn1.ogg")
     timer.Simple(0.8, function()
-        surface.PlaySound("ambient/alarms/klaxon1.wav")
+        surface.PlaySound("ambient/alarms/klaxon1.ogg")
     end)
 end)
 
@@ -1032,9 +1032,9 @@ hook.Add("HUDPaint", "DrawBossIncomingBanner", DrawBossIncomingBanner)
     bossWaveData.scale = 0
     
 
-    surface.PlaySound("ambient/alarms/razortrain_horn1.wav")
+    surface.PlaySound("ambient/alarms/razortrain_horn1.ogg")
     timer.Simple(0.8, function()
-        surface.PlaySound("ambient/alarms/klaxon1.wav")
+        surface.PlaySound("ambient/alarms/klaxon1.ogg")
     end)
     
     --chat.AddText(Color(255, 50, 50), "[DEFENSE] ", Color(255, 255, 255), "Boss banner test activated!")

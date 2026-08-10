@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_hg_legacy_grenade"
 SWEP.PrintName = "Combine Frag Grenade"
 SWEP.Instructions = "The Grenade comes equipped with a red blinking light and a chirping timer that are played when the grenade is thrown, letting both the attacker and the victim know when an active grenade is in their vicinity. Most Combine Soldiers carry at least a few of these and use them to flush out and/or kill enemies."
@@ -44,7 +44,7 @@ function SWEP:AddStep()
         self.nextgrenadetick = self.nextgrenadetick or CurTime()
         if self.nextgrenadetick > CurTime() then return end
         
-        hg.GetCurrentCharacter(self:GetOwner()):EmitSound("weapons/grenade/tick1.wav",65)
+        hg.GetCurrentCharacter(self:GetOwner()):EmitSound("weapons/grenade/tick1.ogg",65)
 
         self.nextgrenadetick = CurTime() + 0.5 * math.max(time / (ent.timeToBoom * 0.75),0.5)
     end

@@ -134,20 +134,15 @@ local WAKE_CONSCIOUSNESS_THRESHOLD = 0.3
 local OTRUB_CONSCIOUSNESS_RECOVERY_SPEED = 20
 local OTRUB_SHOCK_DECAY_PER_SECOND = 4
 local OTRUB_PAIN_DRAIN_PER_SECOND = 8 * 4.5
+local INCAPACITATION_DEATH_TIME = 20
 local wakeEstimateAnchor = 0
 local wakeEstimateSmoothed
 
-local function GetOxygenLevel(org)
-    return istable(org.o2) and (org.o2[1] or 100) or 100
-end
-
 local function EstimateWakeSeconds(org)
-    local oxygen = GetOxygenLevel(org)
+    local brainOxygen = math.Clamp(org.brainoxygen or 1, 0, 1)
     local cannotWake = org.incapacitated
         or org.heartstop
-        or (org.blood or 5000) <= 2500
-        or (org.pulse or 70) < 15
-        or oxygen < 7
+        or brainOxygen < 0.20
         or (org.trachea or 0) >= 0.5
 
     local brainSeverity = math.Clamp(((org.brain or 0) - 0.325) / 0.675, 0, 1)
@@ -474,7 +469,7 @@ local function UpdateRingAudio(pulse, ringAlpha, org, admiring)
         elseif not fibrillating and (abnormalPulse or highStress) then
             EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or SOUND_HEART, beatVolume * CRITBEAT_VOLUME_SCALE)
         elseif not fibrillating then
-            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.wav", beatVolume)
+            EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.ogg", beatVolume)
         end
     end
 end
@@ -798,6 +793,9 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     local brain = org.brain or 0
     local brainHemorrhage = org.brainHemorrhage or 0
     local consciousness = org.consciousness or 0
+    local replicatedOrg = ply.new_organism or org
+    local incapacitated = replicatedOrg.incapacitated or org.incapacitated or false
+    local deathStateEnd = tonumber(replicatedOrg.deathStateEnd or org.deathStateEnd)
     local isCritical = (org.critical == true) or (heartbeat < 1 and brain >= 0.02) or (brain > 0.4) or (brainHemorrhage >= 0.4)
     local admiring = ply:GetNWBool("mcd_admiring", false) and not ply.mcd_admire_local_cancel
     fibrillationRequested = false
@@ -920,6 +918,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
     end
     local otrubECGAlpha = simpleECG and 1
         or ((isUnconscious or lowConsciousness) and ringAlpha or awakeECGAlpha)
+    local incapPromptX, incapPromptY
     
     if otrubECGAlpha > 0.01 then
         local scrW, scrH = ScrW(), ScrH()
@@ -974,6 +973,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             DrawEKG(centerEKGState, boxX + boxW / 2, boxY + boxH * 0.5,
                 boxW - 16 * boxScale, boxH - 16 * boxScale, heartbeat, pulse,
                 ecgState, org.palpitations, borderColor, 1)
+            incapPromptX = boxX + boxW / 2
+            incapPromptY = math.min(boxY + boxH + 15 * boxScale, scrH - ScreenScaleH(30))
         else
             local centerX, centerY = scrW * 0.5, scrH * 0.5
             local showLegacyECG = abnormalECG
@@ -985,6 +986,8 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     and Color(210, 35, 30, 255 * ringAlpha)
                     or Color(220, 220, 220, 255 * ringAlpha)
                 local radius = math.min(280, scrH * 0.32)
+                incapPromptX = centerX
+                incapPromptY = math.min(centerY + radius + ScreenScaleH(18), scrH - ScreenScaleH(30))
 
                 surface.SetDrawColor(0, 0, 0, 90 * ringAlpha)
                 surface.DrawRect(0, 0, scrW, scrH)
@@ -1012,6 +1015,38 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                     ecgState, org.palpitations, ecgColor, otrubECGAlpha)
             end
         end
+    end
+
+    if isUnconscious and incapacitated and deathStateEnd and deathStateEnd > CurTime() then
+        local remaining = math.max(deathStateEnd - CurTime(), 0)
+        local seconds = math.max(math.ceil(remaining), 0)
+        local fade = math.Clamp((INCAPACITATION_DEATH_TIME - remaining) / 1.25, 0, 1)
+        local urgency = math.Clamp((5 - remaining) / 5, 0, 1)
+        local pulseAlpha = 0.82 + math.abs(math.sin(CurTime() * 6)) * 0.18 * urgency
+        local promptColor = Color(
+            235,
+            Lerp(urgency, 235, 55),
+            Lerp(urgency, 235, 45),
+            245 * fade * pulseAlpha
+        )
+
+        if not incapPromptX then
+            local radius = math.min(280, ScrH() * 0.32)
+            incapPromptX = ScrW() * 0.5
+            incapPromptY = math.min(ScrH() * 0.5 + radius + ScreenScaleH(18), ScrH() - ScreenScaleH(30))
+        end
+
+        draw.SimpleTextOutlined(
+            "You are incapacitated - death in " .. seconds .. "s",
+            "OtrubCriticalMessage",
+            incapPromptX,
+            incapPromptY,
+            promptColor,
+            TEXT_ALIGN_CENTER,
+            TEXT_ALIGN_TOP,
+            2,
+            Color(0, 0, 0, 220 * fade)
+        )
     end
 
     if showPulseCheckECG then
@@ -1093,7 +1128,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
                             EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or SOUND_HEART, vol * CRITBEAT_VOLUME_SCALE)
                         end
                     else
-                        EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.wav", vol)
+                        EmitRingSound(hg and hg.healthAlarmActive and SOUND_HEALTH_ALARM or "sound/heartbeat/heartbeat_single.ogg", vol)
                     end
                 end
             end

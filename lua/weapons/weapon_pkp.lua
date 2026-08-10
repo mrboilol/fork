@@ -75,7 +75,7 @@ SWEP.attPos = Vector(0, 0, 0)
 SWEP.attAng = Angle(-0.05, -0.2, 0)
 SWEP.AimHands = Vector(0, 1, -3.5)
 SWEP.lengthSub = 15
-SWEP.DistSound = "weapons/darsu_eft/pkm/fire/pkm_indoor_distant_loop1.wav"
+SWEP.DistSound = "weapons/darsu_eft/pkm/fire/pkm_indoor_distant_loop1.ogg"
 SWEP.bipodAvailable = true
 SWEP.bipodsub = 15
 

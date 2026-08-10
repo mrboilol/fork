@@ -41,21 +41,21 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "7.62x39 mm"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 50
-SWEP.Primary.Sound = {"homigrad/weapons/rifle/fal.wav", 85, 90, 100}
-SWEP.SupressedSound = {"ak74/ak74_suppressed_fp.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/ak47/handling/ak47_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"homigrad/weapons/rifle/fal.ogg", 85, 90, 100}
+SWEP.SupressedSound = {"ak74/ak74_suppressed_fp.ogg", 65, 90, 100}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/ak47/handling/ak47_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 30
 SWEP.Primary.Wait = 0.12
 SWEP.ReloadTime = 4.8
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"weapons/tfa_ins2/akp/ak47/ak47_magout.wav",
+	"weapons/tfa_ins2/akp/ak47/ak47_magout.ogg",
 	"none",
-	"weapons/tfa_ins2/akp/ak47/ak47_magin.wav",
+	"weapons/tfa_ins2/akp/ak47/ak47_magin.ogg",
 	"none",
-	"weapons/tfa_ins2/akp/aks74u/aks_boltback.wav",
-	"weapons/tfa_ins2/akp/aks74u/aks_boltrelease.wav",
+	"weapons/tfa_ins2/akp/aks74u/aks_boltback.ogg",
+	"weapons/tfa_ins2/akp/aks74u/aks_boltrelease.ogg",
 	"none",
 	"none",
 	"none"
@@ -240,7 +240,7 @@ function SWEP:ReloadEnd()
 end
 
 SWEP.lengthSub = 10
-SWEP.DistSound = "ak74/ak74_dist.wav"
+SWEP.DistSound = "ak74/ak74_dist.ogg"
 SWEP.holsteredPos = Vector(5, 7, -4)
 SWEP.holsteredAng = Angle(-150, -10, 180)
 

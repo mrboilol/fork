@@ -198,8 +198,8 @@ SWEP.swingsoundextra = {
     {"knife/knife_bayonet_swing2.ogg", 30, {80, 90}},
 }
 
-SWEP.AttackHit = "weapons/knife/knife_hitwall1.wav"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
+SWEP.AttackHit = "weapons/knife/knife_hitwall1.ogg"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "knife/knifestabin-3.wav"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_knifehit.wav"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_knifehit.ogg"
 SWEP.DeploySnd = "weapons/darsu_eft/knife_bayonet_equip.ogg"

@@ -160,7 +160,7 @@ SWEP.CallSoundFallbackDuration = 2.5
 SWEP.SilentPlantSound = "panoptisscon/phone_query.ogg"
 SWEP.SilentPlantSoundLevel = 30
 SWEP.CombinedPlantSoundLevel = 45
-SWEP.NormalPlantSound = "snd_jack_hmcd_bombrig.wav"
+SWEP.NormalPlantSound = "snd_jack_hmcd_bombrig.ogg"
 SWEP.SilentPlantTime = 3.5
 SWEP.InsidePlantTime = 5
 SWEP.CombinedPlantTime = 7
@@ -182,9 +182,9 @@ SWEP.ExplosionSoundPitchMin = 85
 SWEP.ExplosionSoundPitchMax = 90
 SWEP.KABOOM = false
 
-SWEP.SoundFar = {"iedins/ied_detonate_dist_01.wav","ied/ied_detonate_dist_02.wav","ied/ied_detonate_dist_03.wav"}
-SWEP.Sound = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"}
-SWEP.SoundWater = "iedins/water/ied_water_detonate_01.wav"
+SWEP.SoundFar = {"iedins/ied_detonate_dist_01.ogg","ied/ied_detonate_dist_02.ogg","ied/ied_detonate_dist_03.ogg"}
+SWEP.Sound = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"}
+SWEP.SoundWater = "iedins/water/ied_water_detonate_01.ogg"
 
 local FireEnts = {
 	["models/props_c17/oildrum001_explosive.mdl"] = true,
@@ -910,7 +910,7 @@ if SERVER then
 		--	net.WriteEntity(self)
 		--	net.Broadcast()
 --
-		--	Owner:EmitSound("snd_jack_hmcd_bombrig.wav",50,100,1,CHAN_AUTO)
+		--	Owner:EmitSound("snd_jack_hmcd_bombrig.ogg",50,100,1,CHAN_AUTO)
 --
 		--	self.Planted = true
 --

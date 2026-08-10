@@ -144,7 +144,11 @@ local hold_wound_bleed_slow_twohand_mul = 0.55
 local hold_wound_arterial_slow_mul = 0.2
 local hold_wound_clot_mul = 1.35
 local hold_wound_clot_twohand_mul = 1.6
-local arterial_bleed_rate_mul = 0.6
+-- Keep the reported bleed rate tied to the blood that is actually removed.
+-- Ordinary wounds are a little more dangerous, while arterial wounds lose
+-- blood much faster and remain the true hemorrhage emergency.
+local wound_bleed_rate_mul = 1.4
+local arterial_bleed_rate_mul = 0.9
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
 -- until the stump is controlled.
@@ -371,115 +375,44 @@ module[2] = function(owner, org, mulTime)
 		hg.applyNosebleed(owner, org.internalBleed * 8)
 	end
 
-	-- Tiered blood loss progression
-	-- 4500: mild weakness and lightheadedness begin
-	-- 4000: noticeable weakness, but compensation still keeps it non-crippling
-	-- 3500: definite systemic/O2 impairment
-	-- 3000: severe weakness, poor balance, oxygen delivery and compensation
-	-- 2500: crippling decompensation with a real risk of cardiac failure
-	-- 2000: terminal volume loss; circulation can no longer sustain vital organs
-	local bloodConsciousnessCap = 1
+	-- Blood loss is one continuous pressure problem rather than a set of sampled
+	-- stages. The curve starts softly after the normal reserve is lost and becomes
+	-- steep near empty circulation. Pressure can leave the patient barely aware,
+	-- but cerebral oxygen owns unconsciousness and eventual brain injury.
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
 	local rawBlood = tonumber(org.blood) or 5000
 	local blood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or rawBlood
-	local bloodDeficit = math.Clamp((4500 - blood) / 2500, 0, 1)
-	local compensation = math.Clamp((4500 - blood) / 2000, 0, 1)
-	local shockStage = math.Clamp((3000 - blood) / 1000, 0, 1)
+	local volumeFraction = math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
+	local volumeLoss = 1 - volumeFraction
+	local symptomaticLoss = math.Clamp((volumeLoss - 0.08) / 0.92, 0, 1)
+	local pressureFailure = math.Clamp((volumeLoss - 0.32) / 0.68, 0, 1)
+	local decompensation = pressureFailure ^ 1.35
 
-	org.hypovolemia = bloodDeficit
-	org.hemorrhageCompensation = compensation
-	org.hypovolemicShock = shockStage
-	-- Hypovolemia also reduces heat delivery. Pulse uses this target on its
-	-- temperature tick, allowing severe blood loss to contribute to cold-driven
-	-- bradycardia without instantly forcing every bleed into the same rhythm.
-	local lowBloodCold = math.Clamp((4000 - blood) / 2000, 0, 1)
-	org.lowBloodTemperatureTarget = 36.7 - lowBloodCold * 3.2
+	org.hypovolemia = symptomaticLoss
+	org.hemorrhageCompensation = math.Clamp(volumeLoss / 0.72, 0, 1)
+	org.hypovolemicShock = decompensation
+	org.lowBloodTemperatureTarget = 36.7 - volumeLoss ^ 1.4 * 3.2
+	org.disorientation = math.max(org.disorientation or 0, symptomaticLoss ^ 1.25 * 6)
 
-	if blood <= 4500 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.99)
-		org.disorientation = math.max(org.disorientation or 0, 0.08 + bloodDeficit * 0.12)
-		-- One alert when this blood-loss stage is first reached.
-		if org.isPly and not org.otrub then
-			org.owner:Notify("I'm starting to feel faint...", true, "blood_4500", 0, nil, Color(200, 170, 170))
-		end
+	-- Hypovolemic stress stays below the generic shock-LOC threshold. Pressure
+	-- lowers awareness directly; cerebral oxygen decides whether that becomes OTRUB.
+	local shockTarget = decompensation * 20
+	org.shock = math.Approach(org.shock or 0, math.max(org.shock or 0, shockTarget), mulTime * (0.35 + decompensation * 2.65))
+	if org.stamina and org.stamina[1] then
+		local staminaLoss = decompensation ^ 1.2 * (org.stamina.max or 180) / 38
+		org.stamina[1] = math.max(org.stamina[1] - mulTime * staminaLoss, 0)
 	end
-
-	if blood <= 4000 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.94)
-		org.disorientation = math.max(org.disorientation or 0, 0.2 + bloodDeficit * 0.25)
-		if org.isPly and not org.otrub then
-			org.owner:Notify("My body is hard to move...", true, "blood_4000", 0, nil, Color(200, 170, 170))
-		end
+	-- A pressure-only consciousness floor stays just above the OTRUB threshold.
+	-- Falling brain oxygen can still carry consciousness through that floor later.
+	local pressureConsciousness = 1 - decompensation ^ 1.1 * 0.67
+	org.consciousness = math.min(org.consciousness, pressureConsciousness * tempMul)
+	if symptomaticLoss > 0 and org.isPly and not org.otrub then
+		org.owner:Notify("I'm getting weak and lightheaded...", true, "blood_pressure_low", 0, nil, Color(200, 170, 170))
 	end
-
-	if blood <= 3500 then
-		-- 3.5 L is a serious loss, but it should remain a weakness stage rather
-		-- than feeding the unconsciousness pipeline on its own.
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.95)
-		org.disorientation = math.max(org.disorientation or 0, 0.35 + bloodDeficit * 0.35)
-		if org.isPly and not org.otrub then
-			org.owner:Notify("Everything feels so heavy...", true, "blood_3500", 0, nil, Color(200, 170, 170))
-		end
-	end
-
-	if blood <= 3000 then
-		local severeStage = math.Clamp((3000 - blood) / 500, 0, 1)
-		-- Keep 3.0-2.5 L debilitating, but conscious. The coma/otrub range
-		-- begins below in the 2.5-2.0 L stage.
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, 0.85 - severeStage * 0.10)
-		org.disorientation = math.max(org.disorientation or 0, 0.85 + severeStage * 0.65)
-		org.shock = math.Approach(org.shock or 0, 8 + severeStage * 12, mulTime * (0.35 + severeStage * 0.6))
-		if org.stamina and org.stamina[1] then
-			org.stamina[1] = math.max(org.stamina[1] - mulTime * (0.4 + severeStage * 1.6), 0)
-		end
-		if org.isPly and not org.otrub then
-			org.owner:Notify("My eyes are starting to lose focus...", true, "blood_3000", 0, nil, Color(200, 170, 170))
-		end
-	end
-
-	if blood <= 2500 then
-		-- Slow ischemia creep begins
-		if not adrenalineStabilizer and not hasAntiIschemia then
-			org.ischemia = math.min(org.ischemia + mulTime * 0.004, 1.0)
-		end
-		org.shock = math.Approach(org.shock or 0, 18 + shockStage * 42, mulTime * (1 + shockStage * 2))
-		if org.stamina and org.stamina[1] then
-			org.stamina[1] = math.max(org.stamina[1] - mulTime * shockStage * (org.stamina.max or 180) / 35, 0)
-		end
-		-- Consciousness now slides toward coma across the 2500-2000 range.
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.Clamp((blood - 2000) / 500 * 0.55 + 0.25, 0.25, 0.8))
-		org.needfake = true
-		if org.isPly and not org.otrub then
-			org.owner:Notify("I feel cold... I can't think straight.", true, "blood_2500", 0, nil, Color(200, 170, 170))
-		end
-	end
-
-	-- Deep decompensation: collapse progresses rapidly toward coma by 2000.
-	if blood < 2250 then
-		bloodConsciousnessCap = math.min(bloodConsciousnessCap, math.max((blood - 2000) / 250 * 0.25 + 0.15, 0.15))
-		if not adrenalineStabilizer and not hasAntiIschemia then
-			org.ischemia = math.min((org.ischemia or 0) + mulTime * math.Clamp((2250 - org.blood) / 500, 0, 1) * 0.025, 1.5)
-		end
-	end
-
-	-- Raw circulating volume owns the lethal cutoff. Resilience may soften the
-	-- preceding symptoms but cannot manufacture blood or move this threshold.
-	if rawBlood <= (hg.organism.terminalBloodVolume or 2000) then
-		if hg.organism.KillFatalBloodLoss then
-			hg.organism.KillFatalBloodLoss(org)
-		else
-			org.alive = false
-			org.needotrub = true
-		end
-		return
-	end
-
-	org.consciousness = math.min(org.consciousness, bloodConsciousnessCap * tempMul)
 
 	local beatsPerSecond = max(min(60 / math.max(org.pulse,2) / (org.bleed / 15), 7), 0.3)
 	time = CurTime()
 
-	local coagulatespeed = 0
 	local bleedoutspeed = 0
 	local pulse = org.pulse
 	local bleedMul = org.bleedingmul
@@ -496,19 +429,12 @@ module[2] = function(owner, org, mulTime)
 			local heldClotMul = getHeldWoundClotMul(org, wound)
 			local rand1 = math.Rand(4, 10)
 			local rand2 = math.Rand(0.5, 1)
-			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * 1.35 * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul * heldClotMul
-			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3
-			local woundBleedRate = bleed / rand1 * 3
-			coagulatespeed = coagulatespeed + coagulate / rand2
-			local rand1 = math.Rand(4, 10) * 1
-			local rand2 = math.Rand(0.5, 1) * 1
-		local bleed = rand1 * wound[1] * mulTime * math.max(org.pulse, 20) / 70 * 1.25 * (1 - math.min(adrenaline / 6, 0.5)) * org.bleedingmul * 0.02 * tourniquetBleedMul
+			local bleed = rand1 * wound[1] * mulTime * math.max(pulse, 20) / 70 * wound_bleed_rate_mul * (1 - math.min(adrenaline / 6, 0.5)) * bleedMul * 0.02 * tourniquetBleedMul
 			bleed = bleed * getHeldWoundBleedMul(org, wound)
-			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * 0.04 * heldClotMul-- / #org.wounds
-			bleedoutspeed = bleedoutspeed + bleed / rand1 * 3--we pray for the luck of it being in the center
-			wound.visualBleedRate = woundBleedRate + bleed / rand1 * 3
-			coagulatespeed = coagulatespeed + coagulate / rand2 * 1
+			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul * heldClotMul
+			local woundBleedRate = bleed / rand1 * 3
+			bleedoutspeed = bleedoutspeed + woundBleedRate
+			wound.visualBleedRate = woundBleedRate
 			
 			wound[5] = time
 			org.blood = max(org.blood - bleed, 1)
@@ -611,24 +537,6 @@ module[2] = function(owner, org, mulTime)
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
-	-- At 2000: ischemic collapse begins. Pulse owns the terminal BPM/arrest
-	-- transition and lungs owns the blood-volume O2 cap.
-	if org.blood <= 2000 then
-		local ischemicDepth = math.Clamp((2000 - org.blood) / 600, 0, 1)
-		local ischemicRate = 0.015 + ischemicDepth * 0.08
-		if not adrenalineStabilizer and not hasAntiIschemia then
-			org.ischemia = math.min(org.ischemia + mulTime * ischemicRate, 1.0)
-		end
-		-- Consciousness is already capped above; add direct drain inside fatal volume loss.
-		if blood < 1900 then
-			org.consciousness = math.max((org.consciousness or 1) - mulTime * (0.35 + ischemicDepth * 1.4), 0)
-		end
-		-- One alert when ischemic collapse starts.
-		if org.isPly and not org.otrub then
-			org.owner:Notify("My chest... I can't breathe right...", true, "ischemic_collapse", 0, nil, Color(200, 170, 170))
-		end
-	end
-	
 	if hasAntiIschemia then
 		org.ischemia = math.max((org.ischemia or 0) - mulTime * 0.05, 0)
 	end
@@ -659,25 +567,11 @@ module[2] = function(owner, org, mulTime)
 	end
 
 	org.internalBleed = math.Approach(org.internalBleed, 0, healRate)
-	coagulatespeed = coagulatespeed + mulTime
 	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 30)
 
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 
-	-- Wounds and internal bleeding are applied later in this tick than the stage
-	-- calculations above. Recheck here so crossing 2000 mL kills immediately
-	-- instead of leaving one extra simulation tick with nonzero vital stats.
-	if org.blood <= (hg.organism.terminalBloodVolume or 2000) then
-		if hg.organism.KillFatalBloodLoss then
-			hg.organism.KillFatalBloodLoss(org)
-		else
-			org.alive = false
-			org.needotrub = true
-		end
-		return
-	end
-	
-	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 2000 and org.o2[1] > 0 then
+	if (org.internalBleed > 1 or org.pneumothorax > 0 or (org.hemothorax or 0) > 0.3) and org.blood > 0 and org.o2[1] > 0 then
 		org.wantToVomit = org.wantToVomit or 0
 
 		org.wantToVomit = org.wantToVomit + math.Rand(0, org.internalBleed / 1000 + org.pneumothorax / 200 + (org.hemothorax or 0) / 150) * mulTime * 5
@@ -706,14 +600,11 @@ module[2] = function(owner, org, mulTime)
 
 	if org.bleed > 0 then org.lastBleedTime = CurTime() end
 
-	local timetouncon = (org.blood - 2500) / org.bleed
-	
-	local bleeding_will_stop = (timetouncon ~= timetouncon) or ((coagulatespeed * timetouncon - org.bleed) > 0)
-	local canwakeup_pain = ((org.pain - 5) / (org.painlessen)) < timetouncon
-	org.timetouncon = (timetouncon ~= timetouncon) and timetouncon or Lerp(hg.lerpFrameTime2(0.01,mulTime), org.timetouncon or 10000, timetouncon)
-	
 	local incapacitationEnabled = not hg.organism.IncapacitationEnabled or hg.organism.IncapacitationEnabled()
-	org.incapacitated = incapacitationEnabled and org.otrub and ((not bleeding_will_stop and not (canwakeup_pain and org.blood > 3000)) or (org.brain > 0.4) or (org.pulse < 15) or (org.o2[1] < 5) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) or false
+	-- Blood volume and tissue O2 never start the terminal OTRUB timer directly.
+	-- Cerebral oxygen, brain/airway injury, cardiac arrest, and spinal failure do.
+	local cerebralFailure = (org.brainoxygen or 1) < 0.16
+	org.incapacitated = incapacitationEnabled and org.otrub and (cerebralFailure or (org.brain > 0.4) or (org.trachea >= 0.5) or org.heartstop or (org.spine3 >= hg.organism.fake_spine3) or (org.spine2 >= hg.organism.fake_spine2)) or false
 
 	local noNeedle = org.needle <= 0
 	local tracheaBlocking = org.trachea > 0.5 and noNeedle

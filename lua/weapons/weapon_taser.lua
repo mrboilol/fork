@@ -37,24 +37,24 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "Taser Cartridge"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 8
-SWEP.Primary.Sound = {"realtasesound.wav", 75, 90, 100}
+SWEP.Primary.Sound = {"realtasesound.ogg", 75, 90, 100}
 SWEP.Primary.Force = 5
 SWEP.ReloadTime = 2.5
 SWEP.FakeReloadSounds = {
-	[0.45] = "weapons/kryceks_swep/mp5/magout.wav",
-	[0.9] = "weapons/kryceks_swep/mp5/magin2.wav",
+	[0.45] = "weapons/kryceks_swep/mp5/magout.ogg",
+	[0.9] = "weapons/kryceks_swep/mp5/magin2.ogg",
 }
 
 SWEP.FakeEmptyReloadSounds = {
-	[0.45] = "weapons/kryceks_swep/mp5/magout.wav",
-	[0.9] = "weapons/kryceks_swep/mp5/magin2.wav",
+	[0.45] = "weapons/kryceks_swep/mp5/magout.ogg",
+	[0.9] = "weapons/kryceks_swep/mp5/magin2.ogg",
 }
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"weapons/kryceks_swep/mp5/magout.wav",
+	"weapons/kryceks_swep/mp5/magout.ogg",
 	"none",
-	"weapons/kryceks_swep/mp5/magin2.wav",
+	"weapons/kryceks_swep/mp5/magin2.ogg",
 	"none",
 	"none"
 }
@@ -195,9 +195,9 @@ function SWEP:Shoot(override)
             local ragdoll = (IsValid(ply) and ply:Alive()) and ply.FakeRagdoll or ent
             local tasered =  CurTime() + time
 			local cons1, cons2
-            ragdoll:EmitSound("tazer.wav")
+            ragdoll:EmitSound("tazer.ogg")
 			ragdoll:CallOnRemove("stoptazersnd", function(ent)
-				ent:StopSound("tazer.wav")
+				ent:StopSound("tazer.ogg")
 			end)
 			timer.Simple(0.1,function()
 				for i = 0, 1 do
@@ -292,7 +292,7 @@ function SWEP:Shoot(override)
 
                 if i == max then
                     if IsValid(ragdoll) then
-                        ragdoll:StopSound("tazer.wav")
+                        ragdoll:StopSound("tazer.ogg")
                     end
                 end
             end)

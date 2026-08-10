@@ -320,8 +320,8 @@ else
 	local FarStrikes = {}
 
 	if IsMounted("csgo") or IsMounted("left4dead2") then
-		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_1.wav")
-		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_4.wav")
+		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_1.ogg")
+		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_4.ogg")
 	end
 	if #FarStrikes < 1 then
 		table.insert(FarStrikes, "sound/stormfox2/amb/thunder_strike2.ogg")
@@ -402,7 +402,7 @@ else
 	local function Strike( tList, b_InSkybox, n_Length, n_Light )
 		table.insert(lightningStrikes, {CurTime() + n_Length, n_Length, b_InSkybox, tList, true})
 		local pos = tList[#tList][1]
-		sound.Play("ambient/energy/weld" .. math.random(1,2) .. ".wav", pos)
+		sound.Play("ambient/energy/weld" .. math.random(1,2) .. ".ogg", pos)
 		if not b then
 			hook.Add("Think","StormFox2.Thunder.SndDis", SndThink)
 		end
@@ -419,7 +419,7 @@ else
 		_Light = n_Light
 		_Length = n_Length
 		_Stop = math.max(c + n_Length, _Stop)
-		sound.Play("ambient/atmosphere/thunder" .. math.random(3,4) .. ".wav", StormFox2.util.ViewEntity():GetPos(), 150)
+		sound.Play("ambient/atmosphere/thunder" .. math.random(3,4) .. ".ogg", StormFox2.util.ViewEntity():GetPos(), 150)
 
 	end
 	local Sway = 120

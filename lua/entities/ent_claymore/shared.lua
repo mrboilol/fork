@@ -4,9 +4,9 @@ ENT.PrintName = "ent_claymore"
 ENT.Spawnable = false
 ENT.WorldModel = "models/hoff/weapons/seal6_claymore/w_claymore.mdl"
 
-ENT.SoundFar = {"iedins/ied_detonate_dist_01.wav", "ied/ied_detonate_dist_02.wav", "ied/ied_detonate_dist_03.wav"}
-ENT.Sound = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"}
-ENT.SoundWater = "iedins/water/ied_water_detonate_01.wav"
+ENT.SoundFar = {"iedins/ied_detonate_dist_01.ogg", "ied/ied_detonate_dist_02.ogg", "ied/ied_detonate_dist_03.ogg"}
+ENT.Sound = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"}
+ENT.SoundWater = "iedins/water/ied_water_detonate_01.ogg"
 
 ENT.DetectionAngle = 60
 ENT.DetectionDistance = 700

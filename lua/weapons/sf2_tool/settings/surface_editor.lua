@@ -4,7 +4,7 @@ TOOL.RealName  = "Surface Editor"
 TOOL.PrintName = "#sf_tool.surface_editor"
 TOOL.ToolTip = "#sf_tool.surface_editor.desc"
 TOOL.NoPrintName = false
-TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.wav")
+TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.ogg")
 
 local mat = Material("stormfox2/weapons/sf_tool_mat")
 local function FindTexture( str )
@@ -29,8 +29,8 @@ local c_red = Color(255,55,55)
 local m_roof = Material("stormfox2/hud/tool/texture_roof.png")
 local m_ground = Material("stormfox2/hud/tool/texture_ground.png")
 
-local snd_accept = Sound("buttons/button3.wav")
-local snd_deny = Sound("buttons/button2.wav")
+local snd_accept = Sound("buttons/button3.ogg")
+local snd_deny = Sound("buttons/button2.ogg")
 
 if SERVER then
 	function TOOL:SendFunc( tex, a )

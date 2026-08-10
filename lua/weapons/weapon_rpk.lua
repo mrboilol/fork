@@ -134,17 +134,17 @@ SWEP.Primary.Damage = 35
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 35
 SWEP.Primary.Sound = {"weapons/newsndw/rpk2_fp.wav", 75, 120, 140}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/ak74/handling/ak74_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/ak74/handling/ak74_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.09091
 SWEP.ReloadTime = 5.5
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"weapons/tfa_ins2/akp/ak47/ak47_magout.wav",
+	"weapons/tfa_ins2/akp/ak47/ak47_magout.ogg",
 	"none",
-	"weapons/tfa_ins2/akp/ak47/ak47_magin.wav",
-	"weapons/tfa_ins2/akp/aks74u/aks_boltback.wav",
-	"weapons/tfa_ins2/akp/aks74u/aks_boltrelease.wav",
+	"weapons/tfa_ins2/akp/ak47/ak47_magin.ogg",
+	"weapons/tfa_ins2/akp/aks74u/aks_boltback.ogg",
+	"weapons/tfa_ins2/akp/aks74u/aks_boltrelease.ogg",
 	"none",
 	"none",
 	"none"

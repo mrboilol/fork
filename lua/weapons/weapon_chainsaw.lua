@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Chainsaw"
 SWEP.Instructions = "chainsawbrrttt aysss, we wont need a description since remorse doesnt have it"
@@ -16,7 +16,7 @@ SWEP.SuicideAng = Angle(-90, -180, 90)
 SWEP.SuicideCutVec = Vector(3, -6, 0)
 SWEP.SuicideCutAng = Angle(10, 0, 0)
 SWEP.SuicideTime = 0.5
-SWEP.SuicideSound = "weapons/knife/knife_hit1.wav"
+SWEP.SuicideSound = "weapons/knife/knife_hit1.ogg"
 SWEP.CanSuicide = false
 SWEP.SuicideNoLH = true
 SWEP.SuicidePunchAng = Angle(5, -15, 0)
@@ -27,7 +27,7 @@ SWEP.bloodID = 3
 
 SWEP.BlockTier = 5
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {145, 155}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {145, 155}}
 
 SWEP.NoHolster = true
 
@@ -182,7 +182,7 @@ SWEP.ChainsawPlayerHitSounds = {
     {"pocketknife/melee_character_knife_plr_05.ogg", 55, {105, 115}},
 }
 
-SWEP.ChainsawHardHitSound = "snd_jack_hmcd_knifehit.wav"
+SWEP.ChainsawHardHitSound = "snd_jack_hmcd_knifehit.ogg"
 
 SWEP.swingsoundextra = {
     {"bat/baseball_swing_1st_layer_01.wav", 60, {85, 95}},
@@ -253,16 +253,16 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = false
 
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
-SWEP.AttackHitFlesh = "weapons/knife/knife_hit1.wav"
-SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.wav"
-SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.AttackHitFlesh = "weapons/knife/knife_hit1.ogg"
+SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.ogg"
+SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {145, 155}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {145, 155}}
 
 SWEP.BlockDirectionalCharge = "overhead" --left, right, overhead, center, neutral
 
@@ -281,8 +281,8 @@ end
 function SWEP:CanPrimaryAttack()
     self.DamageType = DMG_SLASH
     self.AttackHit = "Canister.ImpactHard"
-    self.Attack2Hit = "snd_jack_hmcd_axehit.wav"
-    self.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
+    self.Attack2Hit = "snd_jack_hmcd_axehit.ogg"
+    self.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
     return true
 end
 

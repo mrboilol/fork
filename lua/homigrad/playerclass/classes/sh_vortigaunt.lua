@@ -47,7 +47,7 @@ if SERVER then
 	local vort_phrases = {}
 
 	for i = 1, 30 do
-		vort_phrases[i] = string.format("vortigaunt/06_%05d.wav", i)
+		vort_phrases[i] = string.format("vortigaunt/06_%05d.ogg", i)
 	end
 
 	hook.Add("HG_ReplacePhrase", "vortigaunt_phrase", function(ply, phrase, muffed, pitch)

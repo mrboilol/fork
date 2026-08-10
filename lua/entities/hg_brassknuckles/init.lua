@@ -30,8 +30,8 @@ function ENT:TakeByPlayer(activator)
             activator.inventory["Weapons"]["hg_brassknuckles"] = count + 1
 		activator:SetNetVar("Inventory",activator.inventory)
 		activator:ViewPunch(AngleRand(-1, 1))
-		self:EmitSound("snd_jack_tinyequip.wav", 65, math.random(95, 105), 1, CHAN_BODY)
-		self:EmitSound("physics/metal/metal_solid_impact_soft1.wav", 65, math.random(110, 120), 0.6, CHAN_ITEM)
+		self:EmitSound("snd_jack_tinyequip.ogg", 65, math.random(95, 105), 1, CHAN_BODY)
+		self:EmitSound("physics/metal/metal_solid_impact_soft1.ogg", 65, math.random(110, 120), 0.6, CHAN_ITEM)
 		self:Remove()
 	end
 end

@@ -85,7 +85,7 @@ function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage()
-		self:NPCHeal(owner, 0.6, "snd_jack_hmcd_bandage.wav")
+		self:NPCHeal(owner, 0.6, "snd_jack_hmcd_bandage.ogg")
 	end
 end
 
@@ -93,7 +93,7 @@ if SERVER then
 	function SWEP:Heal(ent, mode)
 		if ent:IsNPC() then
 			self:SpawnGarbage()
-			self:NPCHeal(ent, 0.6, "snd_jack_hmcd_bandage.wav")
+			self:NPCHeal(ent, 0.6, "snd_jack_hmcd_bandage.ogg")
 		end
 
 		local org = ent.organism
@@ -113,7 +113,7 @@ if SERVER then
 			//self.modeValues[2] = 0
 			org.analgesiaAdd = math.min(org.analgesiaAdd + self.modeValues[2] * 0.3, 4)
 			self.modeValues[2] = 0
-			entOwner:EmitSound("snds_jack_gmod/ez_medical/15.wav", 60, math.random(95, 105))
+			entOwner:EmitSound("snds_jack_gmod/ez_medical/15.ogg", 60, math.random(95, 105))
 		elseif self.mode == 3 then
 			if self.modeValues[3] == 0 then return end
 			/*local val = org.lungsL[1]
@@ -136,7 +136,7 @@ if SERVER then
 				local healed = math.max(internalBleed - self.modeValues[3], 0)
 				self.modeValues[3] = self.modeValues[3] - (internalBleed - healed) * (owner.Profession == "doctor" and 0.5 or 1)
 				org.internalBleedHeal = org.internalBleedHeal + (internalBleed - healed)
-				entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
+				entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
 			end
 		elseif self.mode == 1 then
 			self:Bandage(ent, bone)
@@ -159,7 +159,7 @@ if SERVER then
 				end
 
 				self.modeValues[5] = 0
-				entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
+				entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
 			//end
 		end
 

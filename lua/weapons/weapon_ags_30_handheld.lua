@@ -40,17 +40,17 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 65
 SWEP.Primary.Spread = Vector(0,0,0)
 SWEP.Primary.Force = 125
-SWEP.Primary.Sound = {"snds_jack_gmod/ez_weapons/heavy_autoloader.wav", 75, 80, 90}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/fnfal/handling/fnfal_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"snds_jack_gmod/ez_weapons/heavy_autoloader.ogg", 75, 80, 90}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/fnfal/handling/fnfal_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.13636
 SWEP.ReloadTime = 7.5
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"pwb/weapons/hk23e/magout.wav",
+	"pwb/weapons/hk23e/magout.ogg",
 	"none",
 	"none",
-	"pwb/weapons/hk23e/magin.wav",
+	"pwb/weapons/hk23e/magin.ogg",
 	"none",
 	"none",
 	"weapons/tfa_ins2/mp7/boltback.wav",
@@ -81,7 +81,7 @@ SWEP.WorldAng = Angle(0, -90, -6)
 SWEP.UseCustomWorldModel = true
 SWEP.AimHands = Vector(0, 1.8, -4.5)
 SWEP.lengthSub = 15
-SWEP.DistSound = "snds_jack_gmod/ez_weapons/shotgun_far.wav"
+SWEP.DistSound = "snds_jack_gmod/ez_weapons/shotgun_far.ogg"
 SWEP.bipodAvailable = true
 SWEP.bipodsub = 15
 

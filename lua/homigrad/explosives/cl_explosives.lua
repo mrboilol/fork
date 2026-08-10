@@ -16,32 +16,32 @@ local math_max = math.max
 
 local ExplosiveSound = {
 	Fire = {
-		Near = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"},
-		Far = {"ied/ied_detonate_dist_01.wav", "ied/ied_detonate_dist_02.wav", "ied/ied_detonate_dist_03.wav"},
+		Near = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"},
+		Far = {"ied/ied_detonate_dist_01.ogg", "ied/ied_detonate_dist_02.ogg", "ied/ied_detonate_dist_03.ogg"},
 		Effect = "pcf_jack_incendiary_ground_sm2",
 		ShockwaveColor = Color(255, 180, 120, 45)
 	},
 	PropaneSC500 = {
-		Near = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"},
-		Far = {"ied/ied_detonate_dist_01.wav", "ied/ied_detonate_dist_02.wav", "ied/ied_detonate_dist_03.wav"},
+		Near = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"},
+		Far = {"ied/ied_detonate_dist_01.ogg", "ied/ied_detonate_dist_02.ogg", "ied/ied_detonate_dist_03.ogg"},
 		Effect = PropaneExplosionEffect,
 		ShockwaveColor = Color(220, 220, 220, 50)
 	},
 	Sharpnel = {
-		Near = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"},
-		Far = {"ied/ied_detonate_dist_01.wav", "ied/ied_detonate_dist_02.wav", "ied/ied_detonate_dist_03.wav"},
+		Near = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"},
+		Far = {"ied/ied_detonate_dist_01.ogg", "ied/ied_detonate_dist_02.ogg", "ied/ied_detonate_dist_03.ogg"},
 		Effect = "pcf_jack_groundsplode_medium",
 		ShockwaveColor = Color(255, 225, 160, 42)
 	},
 	Normal = {
-		Near = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"},
-		Far = {"ied/ied_detonate_dist_01.wav", "ied/ied_detonate_dist_02.wav", "ied/ied_detonate_dist_03.wav"},
+		Near = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"},
+		Far = {"ied/ied_detonate_dist_01.ogg", "ied/ied_detonate_dist_02.ogg", "ied/ied_detonate_dist_03.ogg"},
 		Effect = "pcf_jack_groundsplode_small",
 		ShockwaveColor = Color(255, 215, 155, 38)
 	},
 	CustomBarrel = {
-		Near = {"ied/ied_detonate_01.wav", "ied/ied_detonate_02.wav", "ied/ied_detonate_03.wav"},
-		Far = {"ied/ied_detonate_dist_01.wav", "ied/ied_detonate_dist_02.wav", "ied/ied_detonate_dist_03.wav"},
+		Near = {"ied/ied_detonate_01.ogg", "ied/ied_detonate_02.ogg", "ied/ied_detonate_03.ogg"},
+		Far = {"ied/ied_detonate_dist_01.ogg", "ied/ied_detonate_dist_02.ogg", "ied/ied_detonate_dist_03.ogg"},
 		Effect = "pcf_jack_incendiary_ground_sm2",
 		ShockwaveColor = Color(255, 190, 130, 58)
 	}
@@ -158,7 +158,7 @@ net.Receive("hg_gastank_leak", function()
 	end
 
 	if mode == "smoke" and not data.SmokeSound then
-		data.SmokeSound = CreateSound(ent, "ambient/gas/cannister_loop.wav")
+		data.SmokeSound = CreateSound(ent, "ambient/gas/cannister_loop.ogg")
 		if data.SmokeSound then
 			data.SmokeSound:SetSoundLevel(65)
 			data.SmokeSound:Play()

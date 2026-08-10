@@ -464,7 +464,7 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         elseif class == "weapon_painkillers" or class == "weapon_zerlkers" then
             -- Pills don't play an injection sound.
         else
-            entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
+            entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
         end
         return
     end
@@ -526,13 +526,13 @@ local function ApplySyringeProgress(wep, ply, target, progressDelta)
         local healAmount = math.min(internalBleed, consumedAmount / efficiency)
 
         org.internalBleedHeal = (org.internalBleedHeal or 0) + healAmount
-        entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
+        entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
     elseif class == "weapon_tranexamic_acid" then
         -- Match direct use: consuming the full 10-unit dose supplies exactly
         -- 10 points of internal-bleed healing for every profession.
         org.internalBleedHeal = (org.internalBleedHeal or 0) + consumedAmount
         org.tranexamic_acid = math.min((org.tranexamic_acid or 0) + consumedAmount, 10)
-        entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".wav", 60, math.random(95, 105))
+        entOwner:EmitSound("snds_jack_gmod/ez_medical/" .. math.random(16, 18) .. ".ogg", 60, math.random(95, 105))
     end
 
     if wep.poisoned2 then
@@ -751,7 +751,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
             org[limb .. "dislocation"] = false
             org.painadd = (org.painadd or 0) + 6
             org.fearadd = (org.fearadd or 0) + 0.1
-            target:EmitSound("physics/flesh/flesh_impact_hard6.wav", 65)
+            target:EmitSound("physics/flesh/flesh_impact_hard6.ogg", 65)
         end
 
         return

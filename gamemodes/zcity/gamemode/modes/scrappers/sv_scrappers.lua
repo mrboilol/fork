@@ -312,7 +312,7 @@ function MODE:LoadPlayers()
         for k, v in ipairs(player.GetAll()) do
             if !v:Alive() then continue end
 
-            v:EmitSound("zbattle/alarm.wav")
+            v:EmitSound("zbattle/alarm.ogg")
         end
     end)
 

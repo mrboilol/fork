@@ -78,20 +78,20 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 44
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 44
-SWEP.Primary.Sound = {"rifle_win1892/win1892_fire_01.wav", 75, 90, 100}
-SWEP.SupressedSound = {"m4a1/m4a1_suppressed_fp.wav", 65, 90, 100}
+SWEP.Primary.Sound = {"rifle_win1892/win1892_fire_01.ogg", 75, 90, 100}
+SWEP.SupressedSound = {"m4a1/m4a1_suppressed_fp.ogg", 65, 90, 100}
 SWEP.Primary.Wait = 0.12
 SWEP.ReloadTime = 3.5
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"pwb2/weapons/m4a1/ru-556 clip out 1.wav",
+	"pwb2/weapons/m4a1/ru-556 clip out 1.ogg",
 	"none",
 	"none",
-	"pwb2/weapons/m4a1/ru-556 clip in 2.wav",
+	"pwb2/weapons/m4a1/ru-556 clip in 2.ogg",
 	"none",
-	"pwb2/weapons/m4a1/ru-556 bolt back.wav",
-	"pwb2/weapons/m4a1/ru-556 bolt forward.wav",
+	"pwb2/weapons/m4a1/ru-556 bolt back.ogg",
+	"pwb2/weapons/m4a1/ru-556 bolt forward.ogg",
 	"none",
 	"none",
 	"none",

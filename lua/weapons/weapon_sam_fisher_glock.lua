@@ -45,7 +45,7 @@ SWEP.ModularParts = {
 
 SWEP.MagModel = "models/weapons/mods/mag_glock_magex_30.mdl"
 SWEP.HeldMagModel = "models/weapons/mods/mag_glock_magex_30.mdl"
-SWEP.Primary.Sound = {"weapons/darsu_eft/glock/glock17_close.wav", 75, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/glock/glock17_close.ogg", 75, 90, 100}
 SWEP.SupressedSound = {"weapons/darsu_eft/glock/glock17_close_silenced.ogg", 65, 90, 100}
 SWEP.Primary.ClipSize = 30
 SWEP.Primary.DefaultClip = 30

@@ -134,7 +134,7 @@ else
 
 		local gun = ply:GetActiveWeapon()
 		if IsValid(gun) and ishgweapon(gun) then
-			ply:EmitSound("weapons/zmirli/shared/foley_light" .. math.random(1,4) .. ".wav", 45, math.random(95,105))
+			ply:EmitSound("weapons/zmirli/shared/foley_light" .. math.random(1,4) .. ".ogg", 45, math.random(95,105))
 		end
 
 		if pos ~= -1 then

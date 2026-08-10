@@ -63,7 +63,7 @@ SWEP.AnimsEvents = {
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.55] = function(self)
-			self:EmitSound("weapons/m67/handling/m67_armdraw.wav",65)
+			self:EmitSound("weapons/m67/handling/m67_armdraw.ogg",65)
 		end,
 	},
 	["pullbacklow"] = {
@@ -73,7 +73,7 @@ SWEP.AnimsEvents = {
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.55] = function(self)
-			self:EmitSound("weapons/m67/handling/m67_armdraw.wav",65)
+			self:EmitSound("weapons/m67/handling/m67_armdraw.ogg",65)
 		end,
 	},
 }
@@ -269,7 +269,7 @@ function SWEP:Throw(mul, time, nosound, throwPosAdjust, throwAngAdjust)
 	ent.steamid = owner:SteamID()
 
 	if not nosound and IsValid(entOwner) then
-		entOwner:EmitSound(self.throwsound or "weapons/m67/m67_throw_01.wav", 90, math.random(95, 105))
+		entOwner:EmitSound(self.throwsound or "weapons/m67/m67_throw_01.ogg", 90, math.random(95, 105))
 	end
 
 	if SERVER and IsValid(owner) and owner:IsPlayer() then

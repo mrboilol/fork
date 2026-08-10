@@ -196,7 +196,7 @@ function SWEP:PrimaryAttack()
             self:SetNWBool("HasDistance", false)
         end
 
-        self:EmitSound("buttons/button14.wav", 60, 100)
+        self:EmitSound("buttons/button14.ogg", 60, 100)
     end
 end
 

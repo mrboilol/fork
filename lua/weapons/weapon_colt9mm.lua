@@ -68,7 +68,7 @@ SWEP.Primary.Ammo = "9x19 mm Parabellum"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 25
 SWEP.Primary.Sound = {"m16a4/m16a4_fp.wav", 75, 120, 130}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 25
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.ReloadTime = 3.3
@@ -81,14 +81,14 @@ SWEP.punchspeed = 1
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"weapons/tfa_ins2/mp5k/mp5k_magout.wav",
+	"weapons/tfa_ins2/mp5k/mp5k_magout.ogg",
 	"none",
 	"none",
-	"weapons/tfa_ins2/browninghp/magin.wav",
-	"weapons/tfa_ins2/browninghp/maghit.wav",
-	"weapons/tfa_ins2/browninghp/boltback.wav",
+	"weapons/tfa_ins2/browninghp/magin.ogg",
+	"weapons/tfa_ins2/browninghp/maghit.ogg",
+	"weapons/tfa_ins2/browninghp/boltback.ogg",
 	"none",
-	"weapons/tfa_ins2/browninghp/boltrelease.wav",
+	"weapons/tfa_ins2/browninghp/boltrelease.ogg",
 	"none",
 	"none",
 	"none",

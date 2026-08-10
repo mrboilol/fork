@@ -232,6 +232,7 @@ SWEP.PenetrationSizeSecondary = 2.5
 
 SWEP.StaminaPrimary = 10
 SWEP.StaminaSecondary = 8.5
+SWEP.StaminaCostMul = 0.4
 
 SWEP.ViewPunch1 = Angle(2,0,0)
 SWEP.ViewPunch2 = Angle(0,1,0)
@@ -278,12 +279,12 @@ if CLIENT then
 	SWEP.BounceWeaponIcon = false
 end
 
-SWEP.AttackSwing = "weapons/slam/throw.wav" --!! заменить звуки
-SWEP.AttackHit = "snd_jack_hmcd_knifehit.wav"
-SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.wav"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.wav"
-SWEP.DeploySnd = "snd_jack_hmcd_knifedraw.wav"
+SWEP.AttackSwing = "weapons/slam/throw.ogg" --!! заменить звуки
+SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_slash.ogg"
+SWEP.DeploySnd = "snd_jack_hmcd_knifedraw.ogg"
 SWEP.swingsoundextra = nil
 SWEP.hitsoundextra = nil
 SWEP.hitsoundplus = nil
@@ -1375,7 +1376,7 @@ function SWEP:PlaySwingSound(owner, attacktype)
         return
     end
 
-    owner:EmitSound(self:GetAttackSwingSound(attacktype) or "weapons/slam/throw.wav", 50, math.random(95,105))
+    owner:EmitSound(self:GetAttackSwingSound(attacktype) or "weapons/slam/throw.ogg", 50, math.random(95,105))
 end
 
 function SWEP:PrecacheConfiguredHitSoundLayer(layer)
@@ -1559,7 +1560,7 @@ function SWEP:Attack(owner, ent, vellen, attacktype, inattackLength)
             self:PlaySwingSound(owner, attacktype)
             
             if owner.organism then
-                owner.organism.stamina.subadd = owner.organism.stamina.subadd + self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+                owner.organism.stamina.subadd = owner.organism.stamina.subadd + self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) * (self.StaminaCostMul or 0.4) * math.Clamp(vellen / 200, 1, 1.25)
             end
 
             if charge then
@@ -1791,6 +1792,8 @@ function SWEP:PlayEffects(trace, attacktype)
                 net.WriteVector(impactDir / 8)
                 net.WriteFloat(2.5)
                 net.WriteInt(2, 8)
+				net.WriteBool(false)
+				net.WriteBool(false)
                 net.SendPVS(trace.HitPos)
             end
         end
@@ -1809,7 +1812,7 @@ end
 function SWEP:BreakGlass(ent)
 	if not IsValid(ent) then return end
     if string.find(ent:GetClass(),"break") and ent:GetBrushSurfaces()[1] and string.find(ent:GetBrushSurfaces()[1]:GetMaterial():GetName(),"glass") then
-        //ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math.random(3)..".wav")
+        //ent:EmitSound("physics/glass/glass_sheet_impact_hard"..math.random(3)..".ogg")
         
         if math.random(1, 4) == 4 and ent:Health() < 250 then
             //ent:Fire("Break")
@@ -2081,16 +2084,16 @@ end
 
 function SWEP:GetDefaultBlockSound(material, state)
     if material == "wood" then
-        if state == "break" then return {"physics/wood/wood_box_impact_hard3.wav", 76, {92, 98}} end
-        if state == "parry" then return {"physics/wood/wood_plank_impact_hard3.wav", 73, {98, 106}} end
-        if state == "weaken" then return {"physics/wood/wood_plank_impact_hard4.wav", 71, {94, 101}} end
-        return {"physics/wood/wood_plank_impact_hard2.wav", 70, {96, 104}}
+        if state == "break" then return {"physics/wood/wood_box_impact_hard3.ogg", 76, {92, 98}} end
+        if state == "parry" then return {"physics/wood/wood_plank_impact_hard3.ogg", 73, {98, 106}} end
+        if state == "weaken" then return {"physics/wood/wood_plank_impact_hard4.ogg", 71, {94, 101}} end
+        return {"physics/wood/wood_plank_impact_hard2.ogg", 70, {96, 104}}
     end
 
-    if state == "break" then return {"physics/metal/metal_solid_impact_hard3.wav", 78, {92, 98}} end
-    if state == "parry" then return {"physics/metal/metal_sheet_impact_hard2.wav", 74, {98, 105}} end
-    if state == "weaken" then return {"physics/metal/metal_solid_impact_hard2.wav", 72, {94, 101}} end
-    return {"physics/metal/metal_sheet_impact_hard2.wav", 70, {95, 103}}
+    if state == "break" then return {"physics/metal/metal_solid_impact_hard3.ogg", 78, {92, 98}} end
+    if state == "parry" then return {"physics/metal/metal_sheet_impact_hard2.ogg", 74, {98, 105}} end
+    if state == "weaken" then return {"physics/metal/metal_solid_impact_hard2.ogg", 72, {94, 101}} end
+    return {"physics/metal/metal_sheet_impact_hard2.ogg", 70, {95, 103}}
 end
 
 function SWEP:PlayConfiguredWorldSound(layer, pos, volumeMul)
@@ -2340,7 +2343,7 @@ function SWEP:Feint()
         local attacktype = self:GetAttackType()
         local vellen = IsValid(owner) and owner:GetVelocity():Length() or 0
         local staminaCost = self:GetAttackConfigValue(self.StaminaPrimary, self.StaminaSecondary, self.ChargeStamina, attacktype) or 0
-        owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * 0.5 * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
+        owner.organism.stamina.subadd = owner.organism.stamina.subadd + staminaCost * (self.StaminaCostMul or 0.4) * 0.5 * math.Clamp(vellen / 200, 1, 1.25)
     end
 
     self:SetInAttack(false)
@@ -2993,12 +2996,12 @@ function SWEP:CustomThink()
 
 	if self:GetBlocking() then
 		if not self.blockPoseSoundState then
-			sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.wav", self:GetPos(), 65)
+			sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.ogg", self:GetPos(), 65)
 			self.blockPoseSoundState = true
 		end
 	else
 		if self.blockPoseSoundState then
-			sound.Play("pwb2/weapons/mac11/draw.wav", self:GetPos(), 55)
+			sound.Play("pwb2/weapons/mac11/draw.ogg", self:GetPos(), 55)
 		end
 		self.blockPoseSoundState = nil
 	end
@@ -4721,7 +4724,7 @@ end
         phys:AddAngleVelocity(VectorRand() * 500)
     end
 
-    //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+    //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
     ply:ViewPunch(self.ViewPunch1 * 0.6)
     ply:SelectWeapon("weapon_hands_sh")
 

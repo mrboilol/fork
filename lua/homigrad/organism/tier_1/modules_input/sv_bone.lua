@@ -523,7 +523,7 @@ input_list.jaw = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet
 		local consciousnessLoss = math.min(jawDelta * 0.75 + math.max(jawImpact - 0.55, 0) * 0.35, 0.8)
 		local disorientationAdd = math.min(jawDelta * 2.5 + jawImpact * 1.25, 5)
 
-		org.concussion = math.min((org.concussion or 0) + concussionAdd, 10)
+		hg.organism.module.concussion.AddImmediateConcussion(org, concussionAdd)
 		org.consciousness = math.Approach(org.consciousness or 1, 0, consciousnessLoss)
 		org.disorientation = math.min((org.disorientation or 0) + disorientationAdd, 10)
 
@@ -670,7 +670,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		-- Brain trauma adds its own concussion through ApplyBrainTraumaEffects;
 		-- only the skull damage belongs in this bone-specific contribution.
 		local concussionGain = math.min(skullDelta * skull_concussion_per_damage, 4.5)
-		org.concussion = math.min((org.concussion or 0) + concussionGain, 10)
+		hg.organism.module.concussion.AddImmediateConcussion(org, concussionGain)
 		org.consciousness = math.Approach(org.consciousness or 1, 0, skullDelta * 0.25)
 		org.disorientation = (org.disorientation or 0) + skullDelta * 0.9
 	end

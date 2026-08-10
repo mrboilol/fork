@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_hg_legacy_grenade"
 SWEP.PrintName = "Pipe-Bomb"
 SWEP.Instructions = "A pipe-bomb is an explosive device made from a piece of pipe and an explosive. It has bolts inside that give it a fragmentation effect."
@@ -26,7 +26,7 @@ SWEP.lefthandmodel = "models/weapons/gleb/w_firematch.mdl"
 SWEP.offsetVec2 = Vector(4,-1.2,1)
 SWEP.offsetAng2 = Angle(10,0,90)
 SWEP.ModelScale2 = 1.5
-SWEP.throwsound = "snd_jack_hmcd_lighter.wav"
+SWEP.throwsound = "snd_jack_hmcd_lighter.ogg"
 
 SWEP.nofunnyfunctions = true
 SWEP.timetothrow = 0.5
@@ -54,5 +54,5 @@ function SWEP:AddStep()
 end
 
 function SWEP:ThrowAdd()
-    self:StopSound("snds_jack_gmod/flareburn.wav")
+    self:StopSound("snds_jack_gmod/flareburn.ogg")
 end

@@ -614,7 +614,7 @@ hg.attachments.sight = {
 					if not self.keypr then
 						self.viewmode1 = not self.viewmode1
 						self.keypr = true
-						self:EmitSound("universal/uni_lean_"..(self.viewmode1 and "in" or "out").."_0"..math.random(4)..".wav",35,math.random(95,105))
+						self:EmitSound("universal/uni_lean_"..(self.viewmode1 and "in" or "out").."_0"..math.random(4)..".ogg",35,math.random(95,105))
 					end
 				else
 					self.keypr = false
@@ -773,7 +773,7 @@ hg.attachments.sight = {
 					if not self.keypr then
 						self.viewmode1 = not self.viewmode1
 						self.keypr = true
-						self:EmitSound("universal/uni_lean_"..(self.viewmode1 and "in" or "out").."_0"..math.random(4)..".wav",35,math.random(95,105))
+						self:EmitSound("universal/uni_lean_"..(self.viewmode1 and "in" or "out").."_0"..math.random(4)..".ogg",35,math.random(95,105))
 					end
 				else
 					self.keypr = false
@@ -1202,7 +1202,7 @@ hg.attachments.sight = {
 					if not self.keypr then
 						self.viewmode1 = not self.viewmode1
 						self.keypr = true
-						self:EmitSound("universal/uni_lean_" .. (self.viewmode1 and "in" or "out") .. "_0" .. math.random(4) .. ".wav", 35, math.random(95, 105))
+						self:EmitSound("universal/uni_lean_" .. (self.viewmode1 and "in" or "out") .. "_0" .. math.random(4) .. ".ogg", 35, math.random(95, 105))
 					end
 				else
 					self.keypr = false
@@ -1322,7 +1322,7 @@ hg.attachments.sight = {
 					if not self.keypr then
 						self.viewmode1 = not self.viewmode1
 						self.keypr = true
-						self:EmitSound("universal/uni_lean_" .. (self.viewmode1 and "in" or "out") .. "_0" .. math.random(4) .. ".wav", 35, math.random(95, 105))
+						self:EmitSound("universal/uni_lean_" .. (self.viewmode1 and "in" or "out") .. "_0" .. math.random(4) .. ".ogg", 35, math.random(95, 105))
 					end
 				else
 					self.keypr = false

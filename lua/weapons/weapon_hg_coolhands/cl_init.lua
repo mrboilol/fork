@@ -769,7 +769,7 @@ function SWEP:Think()
 
 	if self:GetBlocking() then
 		if not self.blockSound then
-			sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.wav", self:GetPos(), 65)
+			sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.ogg", self:GetPos(), 65)
 			self.blockSound = true
 			if self:IsClient() then
 				ViewPunch2(blockvp)
@@ -777,7 +777,7 @@ function SWEP:Think()
 		end
 	else
 		if self.blockSound then
-			sound.Play("pwb2/weapons/mac11/draw.wav", self:GetPos(), 55)
+			sound.Play("pwb2/weapons/mac11/draw.ogg", self:GetPos(), 55)
 			if self:IsClient() then
 				ViewPunch2(-blockvp)
 			end
@@ -907,6 +907,6 @@ end
 function SWEP:Reload()
 	if not IsFirstTimePredicted() then return end
 	if CLIENT and (self:GetFists() or self:GetBlocking()) then
-		self:EmitSound("pwb2/weapons/mac11/draw.wav", 35, math.random(95, 105), 1, CHAN_BODY)
+		self:EmitSound("pwb2/weapons/mac11/draw.ogg", 35, math.random(95, 105), 1, CHAN_BODY)
 	end
 end

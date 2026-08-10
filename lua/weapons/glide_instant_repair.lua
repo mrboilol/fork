@@ -51,7 +51,7 @@ function SWEP:PrimaryAttack()
         end
 
 		ent:Repair()
-		user:EmitSound( "buttons/lever6.wav", 75, math.random( 110, 120 ), 0.5 ) 
+		user:EmitSound( "buttons/lever6.ogg", 75, math.random( 110, 120 ), 0.5 )
 		ent:SetChassisHealth( ent.MaxChassisHealth )
 		ent:SetEngineHealth( ent.MaxEngineHealth )
     end

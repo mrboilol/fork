@@ -28,7 +28,7 @@ function SWEP:RevolverPostInit()
 		[0.45] = "weapons/tfa_ins2/thanez_cobra/revolver_dump_rounds_01.wav",
 		[0.52] = "weapons/universal/uni_crawl_l_01.wav",
 		[0.85] = "weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
-		[0.97] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.wav"
+		[0.97] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg"
 	}
 	self.FakeReloadSounds = {
 		[0.16] = "weapons/universal/uni_crawl_l_03.wav",
@@ -36,7 +36,7 @@ function SWEP:RevolverPostInit()
 		[0.45] = "weapons/tfa_ins2/thanez_cobra/revolver_dump_rounds_01.wav",
 		[0.52] = "weapons/universal/uni_crawl_l_01.wav",
 		[0.85] = "weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
-		[0.97] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.wav"
+		[0.97] = "weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg"
 	}
 
 	function self:DrawPost()
@@ -67,36 +67,36 @@ end
 SWEP.AnimsEvents = {
 	["inspect1"] = {
 		[0.1] = function(self)
-			self:EmitSound("universal/uni_crawl_r_05.wav",55)
+			self:EmitSound("universal/uni_crawl_r_05.ogg",55)
 		end,
 		[0.4] = function(self)
-			self:EmitSound("weapons/tfa_ins2/thanez_cobra/revolver_cock_hammer_ready.wav",55)
+			self:EmitSound("weapons/tfa_ins2/thanez_cobra/revolver_cock_hammer_ready.ogg",55)
 		end,
 		[0.45] = function(self)
-			--self:EmitSound("weapons/kf2_winchester/leveropen.wav",55)
+			--self:EmitSound("weapons/kf2_winchester/leveropen.ogg",55)
 		end,
 		[0.7] = function(self)
-			self:EmitSound("weapons/tfa_ins2/thanez_cobra/revolver_cock_hammer.wav",55)
+			self:EmitSound("weapons/tfa_ins2/thanez_cobra/revolver_cock_hammer.ogg",55)
 		end,
 		[0.8] = function(self)
-			self:EmitSound("universal/uni_crawl_r_04.wav",55)
+			self:EmitSound("universal/uni_crawl_r_04.ogg",55)
 		end,
 	},
 	["inspect2"] = {
 		[0.1] = function(self)
-			self:EmitSound("universal/uni_crawl_r_05.wav",55)
+			self:EmitSound("universal/uni_crawl_r_05.ogg",55)
 		end,
 		[0.3] = function(self)
 			self:EmitSound("weapons/tfa_ins2/swmodel10/revolver_open_chamber.wav",55)
 		end,
 		[0.5] = function(self)
-			self:EmitSound("weapons/tfa_ins2/swmodel10/revolver_dump_rounds_03.wav",55)
+			self:EmitSound("weapons/tfa_ins2/swmodel10/revolver_dump_rounds_03.ogg",55)
 		end,
 		[0.7] = function(self)
-			self:EmitSound("weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.wav",55)
+			self:EmitSound("weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg",55)
 		end,
 		[0.8] = function(self)
-			self:EmitSound("universal/uni_crawl_r_04.wav",55)
+			self:EmitSound("universal/uni_crawl_r_04.ogg",55)
 		end,
 	},
 }
@@ -240,7 +240,7 @@ SWEP.ReloadSoundes = {
 	"none",
 	"weapons/tfa_ins2/thanez_cobra/revolver_speed_loader_insert_01.wav",
 	"none",
-	"weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.wav",
+	"weapons/tfa_ins2/thanez_cobra/revolver_close_chamber.ogg",
 	"none",
 	"none",
 	"none"

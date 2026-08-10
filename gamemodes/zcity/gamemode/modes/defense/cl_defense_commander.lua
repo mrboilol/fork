@@ -240,7 +240,7 @@ local function CreateCloseButton(parent)
     
     closeBtn.DoClick = function()
         parent:Close()
-        surface.PlaySound("ui/buttonclickrelease.wav")
+        surface.PlaySound("ui/buttonclickrelease.ogg")
     end
     
     return closeBtn
@@ -406,7 +406,7 @@ function CreateCommanderMenu()
             removeButton.DoClick = function()
                 table.remove(currentCart, i)
                 UpdateCartDisplay()
-                surface.PlaySound("ui/buttonclickrelease.wav")
+                surface.PlaySound("ui/buttonclickrelease.ogg")
             end
             
 
@@ -423,7 +423,7 @@ function CreateCommanderMenu()
                 if item.quantity and item.quantity > 1 then
                     item.quantity = item.quantity - 1
                     UpdateCartDisplay()
-                    surface.PlaySound("ui/buttonclick.wav")
+                    surface.PlaySound("ui/buttonclick.ogg")
                 end
             end
             
@@ -439,7 +439,7 @@ function CreateCommanderMenu()
             plusButton.DoClick = function()
                 item.quantity = (item.quantity or 1) + 1
                 UpdateCartDisplay()
-                surface.PlaySound("ui/buttonclick.wav")
+                surface.PlaySound("ui/buttonclick.ogg")
             end
         end
     end
@@ -471,7 +471,7 @@ function CreateCommanderMenu()
         local totalCost = CalculateCartCost()
         if totalCost > points then
             chat.AddText(COMMANDER_UI.PRIMARY_COLOR, "Not enough supply points!")
-            surface.PlaySound("buttons/button10.wav")
+            surface.PlaySound("buttons/button10.ogg")
             return
         end
         
@@ -483,7 +483,7 @@ function CreateCommanderMenu()
         currentCart = {}
         UpdateCartDisplay()
         
-        surface.PlaySound("items/ammocrate_open.wav")
+        surface.PlaySound("items/ammocrate_open.ogg")
         commanderMenu:Close()
     end
     
@@ -556,7 +556,7 @@ function CreateCommanderMenu()
                 if quantity > 1 then
                     quantity = quantity - 1
                     quantityLabel:SetText("x" .. quantity)
-                    surface.PlaySound("ui/buttonclick.wav")
+                    surface.PlaySound("ui/buttonclick.ogg")
                 end
             end
             
@@ -575,7 +575,7 @@ function CreateCommanderMenu()
                 if quantity < maxPossibleItems then
                     quantity = quantity + 1
                     quantityLabel:SetText("x" .. quantity)
-                    surface.PlaySound("ui/buttonclick.wav")
+                    surface.PlaySound("ui/buttonclick.ogg")
                 end
             end
             
@@ -602,7 +602,7 @@ function CreateCommanderMenu()
             addToCartBtn.DoClick = function()
                 if item.price * quantity > points then
                     chat.AddText(COMMANDER_UI.PRIMARY_COLOR, "Not enough supply points for this item!")
-                    surface.PlaySound("buttons/button10.wav")
+                    surface.PlaySound("buttons/button10.ogg")
                     return
                 end
                 
@@ -629,7 +629,7 @@ function CreateCommanderMenu()
                 end
                 
                 UpdateCartDisplay()
-                surface.PlaySound("ui/buttonclick.wav")
+                surface.PlaySound("ui/buttonclick.ogg")
             end
         end
     end
@@ -650,7 +650,7 @@ function CreateCommanderMenu()
         end
         categoryButton.DoClick = function()
             PopulateItems(category)
-            surface.PlaySound("ui/buttonclick.wav")
+            surface.PlaySound("ui/buttonclick.ogg")
         end
         
         yPos = yPos + 50
@@ -691,7 +691,7 @@ net.Receive("defense_commander_notification", function()
     chat.AddText(color, message)
     
     if pointChange ~= 0 then
-        surface.PlaySound("items/ammo_pickup.wav")
+        surface.PlaySound("items/ammo_pickup.ogg")
     end
 end)
 
@@ -770,7 +770,7 @@ local function ShowCommanderHint()
     
     COMMANDER_HINT.endTime = nil
 
-    surface.PlaySound("buttons/button24.wav")
+    surface.PlaySound("buttons/button24.ogg")
     --print("[DEFENSE] Commander hint activated")
 end
 
@@ -836,7 +836,7 @@ local function DrawCommanderHint()
         
 
         if math.random(1, 3) == 1 then 
-            surface.PlaySound("ui/buttonclick.wav")
+            surface.PlaySound("ui/buttonclick.ogg")
         end
     end
     

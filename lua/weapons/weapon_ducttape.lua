@@ -34,7 +34,7 @@ SWEP.l_forearm = Angle(0, 0, 0)
 SWEP.l_upperarm = Angle(0, 0, 0)
 
 SWEP.weaponInvCategory = false
-SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
+SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.ogg"
 SWEP.HolsterSnd = ""
 SWEP.modeNames = {
 	[true] = "huy",
@@ -322,7 +322,7 @@ if SERVER then
 	local function TapeLimbEffects(self, tr, Owner, text)
 		self.TapeAmount = self.TapeAmount - TAPE_LIMB_COST
 		self:SetTapeAmount(self.TapeAmount)
-		sound.Play("snd_jack_hmcd_ducttape.wav", tr.HitPos, 65, math.random(80, 120))
+		sound.Play("snd_jack_hmcd_ducttape.ogg", tr.HitPos, 65, math.random(80, 120))
 		Owner:SetAnimation(PLAYER_ATTACK1)
 		Owner:ViewPunch(Angle(3, 0, 0))
 		Owner:ChatPrint(text)
@@ -363,7 +363,7 @@ if SERVER then
 			ply:SetNetVar("ducttaped_limbs", ply.ducttaped_limbs)
 		end
 
-		ragdoll:EmitSound("snd_jack_hmcd_ducttape.wav", 70, math.random(80, 120))
+		ragdoll:EmitSound("snd_jack_hmcd_ducttape.ogg", 70, math.random(80, 120))
 		return true
 	end
 
@@ -400,7 +400,7 @@ if SERVER then
 			ply:SetNetVar("ducttaped_limbs", ply.ducttaped_limbs)
 		end
 
-		ragdoll:EmitSound("snd_jack_hmcd_ducttape.wav", 70, math.random(80, 120))
+		ragdoll:EmitSound("snd_jack_hmcd_ducttape.ogg", 70, math.random(80, 120))
 		return true
 	end
 
@@ -679,7 +679,7 @@ if SERVER then
 		end
 
 		if tape < tapeStart then
-			owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
+			owner:EmitSound("snd_jack_hmcd_bandage.ogg", 60, math.random(95, 105))
 		end
 
 		self:SetTapeAmount(tape)
@@ -806,7 +806,7 @@ function SWEP:PrimaryAttack()
 			if DoorSealed then
 				self.TapeAmount = self.TapeAmount - 100
 				self:SetTapeAmount(self.TapeAmount)
-				sound.Play("snd_jack_hmcd_ducttape.wav", TrOne.HitPos, 65, math.random(80, 120))
+				sound.Play("snd_jack_hmcd_ducttape.ogg", TrOne.HitPos, 65, math.random(80, 120))
 				Owner:SetAnimation(PLAYER_ATTACK1)
 				Owner:ViewPunch(Angle(3, 0, 0))
 				self:SprayDecals()
@@ -818,7 +818,7 @@ function SWEP:PrimaryAttack()
 				if not self.TapeAmount then self.TapeAmount = 100 end
 				self.TapeAmount = self.TapeAmount - 10
 				self:SetTapeAmount(self.TapeAmount)
-				sound.Play("snd_jack_hmcd_ducttape.wav", TrOne.HitPos, 65, math.random(80, 120))
+				sound.Play("snd_jack_hmcd_ducttape.ogg", TrOne.HitPos, 65, math.random(80, 120))
 				Owner:SetAnimation(PLAYER_ATTACK1)
 				Owner:ViewPunch(Angle(3, 0, 0))
 				util.Decal("hmcd_jackatape", TrOne.HitPos + TrOne.HitNormal, TrOne.HitPos - TrOne.HitNormal)
@@ -1191,11 +1191,11 @@ if SERVER then
 
 		if ent.ducttaped_hands then
 			RemoveLimbTape(ent, "hands")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
 			ply:ChatPrint("Cut hand tape.")
 		elseif ent.ducttaped_legs then
 			RemoveLimbTape(ent, "legs")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
 			ply:ChatPrint("Cut leg tape.")
 		end
 	end)
@@ -1228,11 +1228,11 @@ if SERVER then
 		local ent = tr.Entity
 		if ent.ducttaped_hands then
 			RemoveLimbTape(ent, "hands")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
 			ply:ChatPrint("Cut hand tape.")
 		elseif ent.ducttaped_legs then
 			RemoveLimbTape(ent, "legs")
-			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".wav", 65)
+			ent:EmitSound("physics/cardboard/cardboard_box_break" .. math.random(1, 3) .. ".ogg", 65)
 			ply:ChatPrint("Cut leg tape.")
 		else
 			ply:ChatPrint("This ragdoll has no tape.")

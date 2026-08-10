@@ -122,27 +122,45 @@ local pendingBulletImpactCount = 0
 local maxPendingBulletImpacts = 96
 local impactsPerFrame = 3
 
-local function impact(pos,vel,mul,owner,severe)
+local function impact(pos,vel,mul,owner,severe,isExit)
 	local max = math.Clamp(math.ceil(mul or 1), 1, 8)
 	local iters = math.ceil(math.random(1, max) * 3.25)
-	local velnorm = -vel:GetNormalized() * 5
-	local sprayDir = -vel * math.Rand(0.65, 0.95)
+	local outward = -vel:GetNormalized()
+	local velnorm = outward * 5
+	local speed = vel:Length()
+	local mistCount = isExit and math.random(5, 8) or math.random(2, 3)
+	local mistSpread = isExit and 72 or 11
+	local mistSpeedMin = isExit and 0.78 or 0.9
+	local mistSpeedMax = isExit and 1.08 or 1.12
+	local spawnSpread = isExit and 3.5 or 0.8
 
-	-- The server sends separate entry and exit positions only when a shot passes through.
-	for i = 1, math.random(2, 4) do
-		addBloodPart2(pos + velnorm + VectorRand(-2, 2), sprayDir + VectorRand(-32, 32), nil, Rand(9, 14), Rand(9, 14), Rand(0.55, 0.85), true, owner)
+	-- Entry blood leaves as a tight jet back toward the shot. Exit blood carries
+	-- fragments and disrupted tissue forward in a wider, denser burst.
+	for i = 1, mistCount do
+		local mistVelocity = outward * speed * Rand(mistSpeedMin, mistSpeedMax) + VectorRand(-mistSpread, mistSpread)
+		addBloodPart2(pos + velnorm + VectorRand(-spawnSpread, spawnSpread), mistVelocity, nil, Rand(9, 14), Rand(9, 14), Rand(0.6, 0.9), true, owner)
 	end
 	
 	if hg_bloodimpacts:GetBool() then
-		addBloodPart2(pos + velnorm, -vel + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 2 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
-		addBloodPart2(pos + velnorm, -vel / 3 + Vector(Rand(-10, 10), Rand(-10, 10), Rand(-10, 10)) * 5, nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+		local cloudSpread = isExit and 65 or 16
+		addBloodPart2(pos + velnorm, outward * speed + VectorRand(-cloudSpread, cloudSpread), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+		addBloodPart2(pos + velnorm, outward * speed * 0.55 + VectorRand(-cloudSpread, cloudSpread), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+		addBloodPart2(pos + velnorm, outward * speed * 0.38 + VectorRand(-cloudSpread, cloudSpread), nil, bloodImpactCloudSize, bloodImpactCloudSize, 0.3)
+	end
+
+	if isExit then
+		iters = math.ceil(iters * 1.65) + math.random(3, 6)
 	end
 
 	for i = 1, iters do
 		local size = bloodImpactParticleSize
 		-- Bullet impacts are wound blood, not an arterial wound effect.
-		addBloodPart(pos, -vel * i / iters * math.Rand(1.55, 1.95) + Vector(Rand(-32, 32), Rand(-32, 32), Rand(-2, 24)), mat_huy, size, size, false, false, owner)
+		local travel = Lerp(i / iters, isExit and 0.5 or 0.72, 1)
+		local velocitySpread = isExit and 105 or 13
+		local velocity = outward * speed * travel * Rand(isExit and 1.7 or 1.72, isExit and 2.15 or 2.18)
+		velocity:Add(VectorRand(-velocitySpread, velocitySpread))
+		velocity[3] = velocity[3] + Rand(isExit and -18 or -3, isExit and 75 or 22)
+		addBloodPart(pos + VectorRand(isExit and -2.5 or -0.5, isExit and 2.5 or 0.5), velocity, mat_huy, size, size, false, false, owner)
 	end
 
 	if severe then
@@ -161,6 +179,7 @@ net.Receive("hg_bloodimpact", function()
 	local mul = net.ReadFloat()
 	local amt = net.ReadInt(8)
 	local severe = net.ReadBool()
+	local isExit = net.ReadBool()
 	amt = math.Clamp(amt,0,32)
 	//debugoverlay.Line(pos, vel, 5, color_white)
 		
@@ -183,6 +202,7 @@ net.Receive("hg_bloodimpact", function()
 		owner = owner,
 		amount = amt,
 		severe = severe,
+		isExit = isExit,
 	}
 end)
 
@@ -190,7 +210,7 @@ hook.Add("Think", "hg.bloodimpact.render_queue", function()
 	local budget = impactsPerFrame
 	while budget > 0 and pendingBulletImpacts[1] do
 		local queued = pendingBulletImpacts[1]
-		impact(queued.pos, queued.vel, queued.mul, queued.owner, queued.severe)
+		impact(queued.pos, queued.vel, queued.mul, queued.owner, queued.severe, queued.isExit)
 		queued.amount = queued.amount - 1
 		pendingBulletImpactCount = pendingBulletImpactCount - 1
 		budget = budget - 1

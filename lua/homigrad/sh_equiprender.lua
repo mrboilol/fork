@@ -506,7 +506,7 @@ if CLIENT then
 				end
 			end
 			if hg.armor.face[armors["face"]].CustomSnd and not CustomSndPlayed and NVGEnabled then
-				surface.PlaySound("snds_jack_gmod/equip2.wav")
+				surface.PlaySound("snds_jack_gmod/equip2.ogg")
 				timer.Simple(0.6,function()
 					surface.PlaySound(hg.armor.face[armors["face"]].CustomSnd)
 					ViewPunch2(Angle(1,1,-2))
@@ -533,14 +533,14 @@ if CLIENT then
 
 			if hg.armor.face[armors["face"]].loopsound and (lply.organism and lply.organism.pulse <= 85) then
 				if not lply.soundhuy then
-					//lply.soundhuy = lply.organism and lply.organism.pulse > 80 and "scp cb/breath1gas.wav" or hg.armor.face[armors["face"]].loopsound
+					//lply.soundhuy = lply.organism and lply.organism.pulse > 80 and "scp cb/breath1gas.ogg" or hg.armor.face[armors["face"]].loopsound
 					lply.soundhuy = hg.armor.face[armors["face"]].loopsound
 					lply:StartLoopingSound(lply.soundhuy)
 				end
 			end
 		end
 		
-		//local shouldplaysnd = lply.organism and lply.organism.pulse > 80 and "scp cb/breath1gas.wav" or hg.armor.face[armors["face"]].loopsound
+		//local shouldplaysnd = lply.organism and lply.organism.pulse > 80 and "scp cb/breath1gas.ogg" or hg.armor.face[armors["face"]].loopsound
 		if lply.soundhuy and ((not (armors["face"] and hg.armor.face[armors["face"]].loopsound)) or (lply.organism and lply.organism.pulse > 85)) then// or shouldplaysnd != lply.soundhuy) then
 			lply:StopSound(lply.soundhuy)
 			lply.soundhuy = nil
@@ -574,7 +574,7 @@ if CLIENT then
 		if IsValid(lply.EZNVGlamp) and armors and ((not armors["face"]) or (armors["face"] and !NVGEnabled)) then
 			CustomSndPlayed = false
 			lply.EZNVGlamp:Remove()
-			surface.PlaySound("snds_jack_gmod/equip1.wav")
+			surface.PlaySound("snds_jack_gmod/equip1.ogg")
 			BlurAfterNVG = 5
 			NVGEnabled = false
 			ViewPunch2(Angle(-2,-1,2))

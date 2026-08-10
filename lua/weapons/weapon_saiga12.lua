@@ -83,11 +83,11 @@ SWEP.ReloadTime = 5.6
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"weapons/tfa_ins2/ak103/ak103_magout.wav",
-	"weapons/tfa_ins2/ak103/ak103_magoutrattle.wav",
-	"weapons/tfa_ins2/ak103/ak103_magin.wav",
-	"weapons/tfa_ins2/ak103/ak103_boltback.wav",
-	"weapons/tfa_ins2/ak103/ak103_boltrelease.wav",
+	"weapons/tfa_ins2/ak103/ak103_magout.ogg",
+	"weapons/tfa_ins2/ak103/ak103_magoutrattle.ogg",
+	"weapons/tfa_ins2/ak103/ak103_magin.ogg",
+	"weapons/tfa_ins2/ak103/ak103_boltback.ogg",
+	"weapons/tfa_ins2/ak103/ak103_boltrelease.ogg",
 	"none",
 	"none"
 }

@@ -3,7 +3,7 @@ MODE.name = "hl3"
 local MODE = MODE
 
 net.Receive("hl3_start", function()
-	surface.PlaySound("hl2mode1.wav")
+	surface.PlaySound("hl2mode1.ogg")
 	zb.RemoveFade()
 	hg.DynaMusic:Start("hl_coop")
 end)
@@ -186,7 +186,7 @@ local CreateEndMenu
 
 net.Receive("hl3_roundend", function()
 	net.ReadInt(3)
-	surface.PlaySound("ambient/alarms/warningbell1.wav")
+	surface.PlaySound("ambient/alarms/warningbell1.ogg")
 	CreateEndMenu()
 end)
 

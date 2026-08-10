@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Barbed Bat"
 SWEP.Instructions = "The mighty bat upgraded with barb wires. Can fracture skulls, use discreetly.\n\nLMB to attack.\nRMB to block.\nE+LMB to charge up a heavy attack."
@@ -77,11 +77,11 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = true
 
-SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.wav"
-SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.wav"
+SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.ogg"
+SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.ogg"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
 SWEP.SwingSound = "baseballbat/swing.ogg"
 SWEP.HitFleshExtra = {
     "baseballbat/hit1.ogg",
@@ -130,7 +130,7 @@ SWEP.CanHeavyAttack = true -- Set to true to enable
 
 SWEP.BlockTier = 3
 SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
+SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.ogg"
 
 function SWEP:CanSecondaryAttack()
     local owner = self:GetOwner()

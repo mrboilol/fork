@@ -218,7 +218,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             local noneedarmor = ply.HEV.Power == maxPower
             if noneedarmor then
                 if not ply.keypresseduse then
-                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.wav" or "items/medshotno1.wav")
+                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.ogg" or "items/medshotno1.ogg")
                 end
                 ply.keypresseduse = true
                 if ent.snd then ent:StopLoopingSound(ent.snd) ent.snd = nil end
@@ -226,9 +226,9 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             end
 
             if not ply.keypresseduse then
-                ent:EmitSound("items/suitchargeok1.wav")
+                ent:EmitSound("items/suitchargeok1.ogg")
                 
-                ent.snd = ent:StartLoopingSound("items/suitcharge1.wav")
+                ent.snd = ent:StartLoopingSound("items/suitcharge1.ogg")
             end
 
             ply.HEV.Power = math.min(ply.HEV.Power + 1, maxPower)
@@ -240,7 +240,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             
             if noneedhealth then
                 if not ply.keypresseduse then
-                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.wav" or "items/medshotno1.wav")
+                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.ogg" or "items/medshotno1.ogg")
                 end
                 ply.keypresseduse = true
                 if ent.snd then ent:StopLoopingSound(ent.snd) ent.snd = nil end
@@ -248,9 +248,9 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             end
 
             if not ply.keypresseduse then
-                ent:EmitSound("items/medshot4.wav")
+                ent:EmitSound("items/medshot4.ogg")
                 
-                ent.snd = ent:StartLoopingSound("items/medcharge4.wav")
+                ent.snd = ent:StartLoopingSound("items/medcharge4.ogg")
             end
 
             ply.HEV.Medicine = math.min(ply.HEV.Medicine + 5, maxMedicine)
@@ -260,7 +260,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
         end
     else
         if not ply.keypresseduse then
-            ent:EmitSound(ent.armorcharger and "items/suitchargeno1.wav" or "items/medshotno1.wav")
+            ent:EmitSound(ent.armorcharger and "items/suitchargeno1.ogg" or "items/medshotno1.ogg")
         end
         if ent.snd then ent:StopLoopingSound(ent.snd) ent.snd = nil end
     end
@@ -580,7 +580,7 @@ elseif SERVER then
 
         if org.HEV and not org.alive and not org.emitflatline then
             org.emitflatline = true
-            hg.GetCurrentCharacter(ply):EmitSound("hl1/fvox/flatline.wav")
+            hg.GetCurrentCharacter(ply):EmitSound("hl1/fvox/flatline.ogg")
 
             if CurrentRound and CurrentRound().name == "coop" then
                 if zChatPrint then
@@ -600,7 +600,7 @@ elseif SERVER then
                 
                 ply:Notify("HEV suit has detected a traumatic brain injury. Injecting mannitol.",true,"mannitol_hev",0.5,function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.wav")
+                        net.WriteString("hl1/fvox/automedic_on.ogg")
                     net.Send(ply)
                 end, hev_color)
             else
@@ -615,7 +615,7 @@ elseif SERVER then
 
                 ply:Notify("HEV suit has detected pneumothorax. Repairing.", true, "needle_hev", 0.5, function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.wav")
+                        net.WriteString("hl1/fvox/automedic_on.ogg")
                     net.Send(ply)
                 end, hev_color)
             end
@@ -635,7 +635,7 @@ elseif SERVER then
                         ply:Notify("HEV suit has detected pain receptors almost reaching the threshold. Injecting morphine.", 10, "morphine_hev", 0.5,
                         function(ply)
                             net.Start("HEV_DAMAGE")
-                                net.WriteString("hl1/fvox/morphine_shot.wav")
+                                net.WriteString("hl1/fvox/morphine_shot.ogg")
                             net.Send(ply)
                         end, hev_color)
                     end
@@ -645,7 +645,7 @@ elseif SERVER then
             if (org.CO > 10) or (org.COregen > 10) then
                 ply:Notify("HEV suit has detected a carbon monoxide presence in the organism. Neutralising.",60,"co_hev",0.5,function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.wav")
+                        net.WriteString("hl1/fvox/automedic_on.ogg")
                     net.Send(ply)
                 end, hev_color)
 
@@ -677,7 +677,7 @@ elseif SERVER then
                 if bonesfixed then
                     ply:Notify("HEV suit has detected fractures. Repairing.",60,"bones_hev",0.5,function(ply)
                         net.Start("HEV_DAMAGE")
-                            net.WriteString("hl1/fvox/automedic_on.wav")
+                            net.WriteString("hl1/fvox/automedic_on.ogg")
                         net.Send(ply)
                     end, hev_color)
                 end
@@ -723,7 +723,7 @@ elseif SERVER then
             if (org.pulse < 40) or (org.blood < 3000) or (org.o2[1] < 10) then
                 ply:Notify("HEV suit has detected a critically low pulse. Epinephrine injected. Auto-pulse enabled. Plasma injected.", 60, "pulse_hev", 0.5, function(ply)
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/health_critical.wav")
+                        net.WriteString("hl1/fvox/health_critical.ogg")
                     net.Send(ply)
                 end, hev_color)
                 
@@ -762,7 +762,7 @@ elseif SERVER then
                     
                     if ply:Health() < 35 then
                         net.Start("HEV_DAMAGE")
-                            net.WriteString("hl1/fvox/health_critical.wav")
+                            net.WriteString("hl1/fvox/health_critical.ogg")
                         net.Send(ply)
                     end
                 end)
@@ -774,7 +774,7 @@ elseif SERVER then
                     local org = ply.organism
 
                     net.Start("HEV_DAMAGE")
-                        net.WriteString("hl1/fvox/automedic_on.wav")
+                        net.WriteString("hl1/fvox/automedic_on.ogg")
                     net.Send(ply)
 
                     local oldMedicine = ply.HEV.Medicine
@@ -800,7 +800,7 @@ elseif SERVER then
 
                         if oldMedicine ~= ply.HEV.Medicine then
                             net.Start("HEV_DAMAGE")
-                                net.WriteString("hl1/fvox/medical_repaired.wav")
+                                net.WriteString("hl1/fvox/medical_repaired.ogg")
                             net.Send(ply)
                         end
                     end)
@@ -808,9 +808,9 @@ elseif SERVER then
 
                 if #ply.organism.wounds > 0 or #ply.organism.arterialwounds > 0 or ply.organism.internalBleed > 0 then
                     if ply.organism.bleed > 0.025 and (!ply.HEV.BloodLossDetect or ply.HEV.BloodLossDetect < CurTime()) then
-                        snd = "hl1/fvox/blood_loss.wav"
+                        snd = "hl1/fvox/blood_loss.ogg"
                         if ply.organism.internalBleed > 0.02 then
-                            snd = "hl1/fvox/internal_bleeding.wav"
+                            snd = "hl1/fvox/internal_bleeding.ogg"
                         end
                         net.Start("HEV_DAMAGE")
                             net.WriteString(snd)
@@ -833,9 +833,9 @@ elseif SERVER then
                         table.Empty(ply.organism.wounds)
 
                         ply.HEV.Medicine = ply.HEV.Medicine - #ply.organism.arterialwounds * 2.5
-                        local snd = "hl1/fvox/bleeding_stopped.wav"
+                        local snd = "hl1/fvox/bleeding_stopped.ogg"
                         if #ply.organism.arterialwounds > 0 then
-                            snd = "hl1/fvox/torniquette_applied.wav"
+                            snd = "hl1/fvox/torniquette_applied.ogg"
                         end
                         
                         for i, wound in pairs(ply.organism.arterialwounds) do

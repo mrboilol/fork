@@ -46,7 +46,7 @@ local function CreateBrainChunk(origin, direction)
     piece:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
     piece:Spawn()
 
-    piece:EmitSound("physics/flesh/flesh_squishy_impact_hard"..math.random(1,4)..".wav", 60, math.random(200, 255))
+    piece:EmitSound("physics/flesh/flesh_squishy_impact_hard"..math.random(1,4)..".ogg", 60, math.random(200, 255))
 
     piece.GoreState = {
         Sticking = false,
@@ -358,7 +358,7 @@ local function applyBrainTraumaEffects(org, delta, dmgInfo, profile)
 	local resistance = hg.organism.GetZerlkersResistance and hg.organism.GetZerlkersResistance(org) or 0
 	local traumaResponse = 1 - resistance * 0.65
 
-	org.concussion = math.min((org.concussion or 0) + math.min(delta * brain_concussion_per_damage, 4) * traumaResponse, 10)
+	hg.organism.module.concussion.AddImmediateConcussion(org, math.min(delta * brain_concussion_per_damage, 4) * traumaResponse)
 	org.consciousness = math.Approach(org.consciousness or 1, 0, delta * profile.consciousness * 1.6 * traumaResponse)
 	org.disorientation = (org.disorientation or 0) + delta * profile.disorientation * 1.5 * traumaResponse
 	org.shock = (org.shock or 0) + delta * profile.shock * 5 * traumaResponse

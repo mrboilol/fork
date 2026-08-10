@@ -131,7 +131,7 @@ if SERVER then
 
 	function SWEP:Heal(ent, mode, bone)
 		if ent:IsNPC() then
-			self:NPCHeal(ent, 0.25, "snd_jack_hmcd_bandage.wav")
+			self:NPCHeal(ent, 0.25, "snd_jack_hmcd_bandage.ogg")
 		end
 
 		local org = ent.organism
@@ -211,7 +211,7 @@ if SERVER then
 		local analgesiaAdd = math.Clamp(amountHealed * 0.4, 0.2, 0.4)
 		org.analgesiaAdd = math.min((org.analgesiaAdd or 0) + analgesiaAdd, 4)
 
-		owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
+		owner:EmitSound("snd_jack_hmcd_bandage.ogg", 60, math.random(95, 105))
 
 		if (self.modeValues[1] <= 0) and self.ShouldDeleteOnFullUse then
 			owner:SelectWeapon("weapon_hands_sh")

@@ -32,7 +32,7 @@ SWEP.FakeEmptyReloadSounds = {
 
 	[0.70] = "zcitysnd/sound/weapons/m9/handling/m9_magin.wav",
 	[0.9] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
-	[1.05] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.wav",
+	[1.05] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg",
 }
 SWEP.MagModel = "models/weapons/zcity/c_p22.mdl"
 local vector_full = Vector(1,1,1)
@@ -153,7 +153,7 @@ SWEP.SupressedSound = {"arccw_uc/common/fire-22-sup-01.ogg", 65, 90, 100}
 SWEP.SupressedSoundFP = {"arccw_uc/common/fire-22-sup-01.ogg", 65, 90, 100}
 SWEP.SupressorOnly = true
 
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.availableAttachments = {
 	barrel = {
 		[1] = {"supressor1", Vector(0,0,0), {}},
@@ -174,10 +174,10 @@ SWEP.ReloadTime = 3
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"pwb/weapons/fnp45/clipout.wav",
+	"pwb/weapons/fnp45/clipout.ogg",
 	"none",
-	"pwb/weapons/fnp45/clipin.wav",
-	"pwb/weapons/fnp45/sliderelease.wav",
+	"pwb/weapons/fnp45/clipin.ogg",
+	"pwb/weapons/fnp45/sliderelease.ogg",
 	"none",
 	"none",
 	"none"

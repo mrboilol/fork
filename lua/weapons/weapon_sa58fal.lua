@@ -186,7 +186,7 @@ SWEP.IconOverride = "entities/arc9_eft_sa58.png"
 SWEP.weight = 4.5
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/fal/fal_outdoor_close_loop3.wav"
+SWEP.DistSound = "weapons/darsu_eft/fal/fal_outdoor_close_loop3.ogg"
 
 SWEP.availableAttachments = {
 	barrel = {

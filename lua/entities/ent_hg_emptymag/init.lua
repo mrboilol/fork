@@ -58,7 +58,7 @@ function ENT:Detonate(data)
 	local SelfPos = self:LocalToWorld(self:OBBCenter())
 	timer.Simple(.02, function()
 		if not IsValid(self) then return end
-		sound.Play("physics/metal/weapon_impact_hard" .. math.random(3) .. ".wav", SelfPos, 85)
+		sound.Play("physics/metal/weapon_impact_hard" .. math.random(3) .. ".ogg", SelfPos, 85)
 	end)
 
 	--SafeRemoveEntityDelayed(self, 320) 

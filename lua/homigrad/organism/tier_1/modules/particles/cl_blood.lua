@@ -323,7 +323,7 @@ bloodparticles_hook[2] = function(mul)
 			
 			
 			--sound.Play("zbattle/blood_drop.mp3", hitPos, math.random(10, 60), math.random(120, 120))
-			--sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".wav", hitPos, math.random(10, 60), math.random(80, 120))
+			--sound.Play("homigrad/blooddrip" .. math_random(1, 4) .. ".ogg", hitPos, math.random(10, 60), math.random(80, 120))
 			
 			continue
 		else

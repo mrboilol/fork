@@ -82,7 +82,7 @@ function SWEP:PrimaryAttackAdd(ent,trace)
     if SERVER and ent and math.random(1,2) == 2 then -- я либо забыл это добавить либо ктото убрал если шо простите
         self:PrecacheGibs()
         self:GibBreakServer(trace.HitNormal * -100)
-        self:GetOwner():EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".wav")
+        self:GetOwner():EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".ogg")
         self:Remove()
     end
 end
@@ -114,7 +114,7 @@ function SWEP:CustomAttack2()
         timer.Simple(0, function()
             if not IsValid(ent) then return end
             ent:GibBreakServer(vector_origin)
-            ent:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".wav")
+            ent:EmitSound("physics/glass/glass_pottery_break"..math.random(1,4)..".ogg")
             ent:Remove()
         end)
     end
@@ -132,7 +132,7 @@ function SWEP:CustomAttack2()
         phys:AddAngleVelocity(VectorRand() * 500)
     end
 
-    //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+    //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
     ply:ViewPunch(self.ViewPunch1 * 0.6)
     ply:SelectWeapon("weapon_hands_sh")
 

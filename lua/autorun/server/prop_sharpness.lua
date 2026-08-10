@@ -213,15 +213,15 @@ function PROP_SHARPNESS.SHARP_PLANAR( sharpEnt, dirRef, collisonNormal ) -- flat
 end
 
 PROP_SHARPNESS.skewerSnd = {
-    "ambient/machines/slicer1.wav",
-    "ambient/machines/slicer2.wav",
-    "ambient/machines/slicer3.wav",
-    "ambient/machines/slicer4.wav",
+    "ambient/machines/slicer1.ogg",
+    "ambient/machines/slicer2.ogg",
+    "ambient/machines/slicer3.ogg",
+    "ambient/machines/slicer4.ogg",
 
 }
 PROP_SHARPNESS.skewerSndNonMetallic = {
-    "ambient/machines/slicer2.wav",
-    "ambient/machines/slicer3.wav",
+    "ambient/machines/slicer2.ogg",
+    "ambient/machines/slicer3.ogg",
 
 }
 
@@ -231,24 +231,24 @@ PROP_SHARPNESS.sawbladeSliceSound = {
 }
 
 PROP_SHARPNESS.bashingSound = {
-    "physics/body/body_medium_break2.wav",
-    "physics/body/body_medium_break3.wav",
-    "physics/body/body_medium_break4.wav",
+    "physics/body/body_medium_break2.ogg",
+    "physics/body/body_medium_break3.ogg",
+    "physics/body/body_medium_break4.ogg",
 
 }
 
 PROP_SHARPNESS.metalstickSounds = {
-    "physics/metal/sawblade_stick1.wav",
-    "physics/metal/sawblade_stick2.wav",
-    "physics/metal/sawblade_stick3.wav",
+    "physics/metal/sawblade_stick1.ogg",
+    "physics/metal/sawblade_stick2.ogg",
+    "physics/metal/sawblade_stick3.ogg",
 
 }
 
 PROP_SHARPNESS.woodStickSounds = {
-    "physics/wood/wood_solid_impact_bullet2.wav",
-    "physics/wood/wood_solid_impact_bullet3.wav",
-    "physics/wood/wood_box_impact_bullet1.wav",
-    "physics/wood/wood_box_impact_bullet4.wav",
+    "physics/wood/wood_solid_impact_bullet2.ogg",
+    "physics/wood/wood_solid_impact_bullet3.ogg",
+    "physics/wood/wood_box_impact_bullet1.ogg",
+    "physics/wood/wood_box_impact_bullet4.ogg",
 
 }
 

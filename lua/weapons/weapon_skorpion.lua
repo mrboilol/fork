@@ -25,22 +25,22 @@ SWEP.FakeAttachment = "silencer"
 
 SWEP.FakeReloadSounds = {
 	[0.22] = "weapons/universal/uni_crawl_l_03.wav",
-	[0.3] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipout_v1.wav",
+	[0.3] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipout_v1.ogg",
 
 	[0.65] = "weapons/universal/uni_crawl_l_02.wav",
-	[0.82] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipin_v1.wav",
+	[0.82] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipin_v1.ogg",
 	[0.94] = "weapons/universal/uni_crawl_l_04.wav",
 	--[0.9] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
 
 }
 SWEP.FakeEmptyReloadSounds = {
 	[0.16] = "weapons/universal/uni_crawl_l_03.wav",
-	[0.21] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipout_v1.wav",
+	[0.21] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipout_v1.ogg",
 
 	[0.42] = "weapons/universal/uni_crawl_l_02.wav",
-	[0.76] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipin_v1.wav",
+	[0.76] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_clipin_v1.ogg",
 	[0.79] = "weapons/universal/uni_crawl_l_05.wav",
-	[0.95] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_chamber_v1.wav",
+	[0.95] = "weapons/tfa_cod/mwr/skorpion/wpfoly_skorpion_reload_chamber_v1.ogg",
 	[1.02] = "weapons/universal/uni_crawl_l_04.wav",
 	--[0.9] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
 

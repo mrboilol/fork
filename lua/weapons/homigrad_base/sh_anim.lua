@@ -415,7 +415,7 @@ hook.Add("Bones", "homigrad-lean-bone", function(ply, dtime)
 		elseif not (right or left) and ply.leanHolding then
 			if ply.leanHolding then
 				if ply.armors["torso"] ~= nil then
-					ply:EmitSound("weapons/universal/uni_crawl_r_0"..math.random(6)..".wav", 40, math.random(90, 100))
+					ply:EmitSound("weapons/universal/uni_crawl_r_0"..math.random(6)..".ogg", 40, math.random(90, 100))
 				else
 					ply:EmitSound("player/clothes_generic_foley_01.wav", 35, math.random(90, 100))
 				end

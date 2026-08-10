@@ -49,7 +49,7 @@ end
 
 function ENT:LockToSurface(ent)
 	constraint.Weld(self, ent, 0, 0, 0, true, false)
-	sound.Play("snds_jack_hmcd_grapple/lock.wav", self:GetPos(), 75, 100)
+	sound.Play("snds_jack_hmcd_grapple/lock.ogg", self:GetPos(), 75, 100)
 end
 
 function ENT:GetRelativeVelocity()
@@ -82,7 +82,7 @@ function ENT:PhysicsCollide(data, physobj)
 	if data.Speed > 20 and data.DeltaTime > .15 then
 		if not self:GetNWBool("Impacted", false) then self:SetNWBool("Impacted", true) end
 		if data.Speed > 300 then
-			sound.Play("snds_jack_hmcd_grapple/hard.wav", self:GetPos(), 70, math.random(90, 110))
+			sound.Play("snds_jack_hmcd_grapple/hard.ogg", self:GetPos(), 70, math.random(90, 110))
 			local ent = data.HitEntity
 			timer.Simple(0,function()
 				if IsValid(ent) and ent:IsPlayer() and ent:Alive() then
@@ -94,7 +94,7 @@ function ENT:PhysicsCollide(data, physobj)
 				end
 			end)
 		else
-			sound.Play("snds_jack_hmcd_grapple/soft.wav", self:GetPos(), 65, math.random(90, 110))
+			sound.Play("snds_jack_hmcd_grapple/soft.ogg", self:GetPos(), 65, math.random(90, 110))
 		end
 	end
 end

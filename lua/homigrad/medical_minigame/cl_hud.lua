@@ -1061,7 +1061,7 @@ function PANEL:ThinkAmputation(mx, my)
 
             self.LastProgressSent = self.Progress
             self.AmputationMaxSwipeSpeed = 0
-            surface.PlaySound("physics/flesh/flesh_squishy_impact_hard2.wav")
+            surface.PlaySound("physics/flesh/flesh_squishy_impact_hard2.ogg")
         end
     end
 
@@ -1103,7 +1103,7 @@ function PANEL:ThinkDislocation(mx, my)
 
             -- Play body hitting sound
             if LocalPlayer() then
-                LocalPlayer():EmitSound("physics/flesh/flesh_impact_hard" .. math.random(1, 6) .. ".wav", 55, math.random(90, 110))
+                LocalPlayer():EmitSound("physics/flesh/flesh_impact_hard" .. math.random(1, 6) .. ".ogg", 55, math.random(90, 110))
             end
         end
     else
@@ -1401,9 +1401,9 @@ function PANEL:Finish()
     if self.GameType == "syringe" then
         surface.PlaySound("autonigger/stimulator.ogg")
     elseif self.GameType == "dislocation" then
-        surface.PlaySound("physics/flesh/flesh_impact_hard6.wav")
+        surface.PlaySound("physics/flesh/flesh_impact_hard6.ogg")
     elseif self.GameType == "amputation" then
-        surface.PlaySound("physics/body/body_medium_break3.wav")
+        surface.PlaySound("physics/body/body_medium_break3.ogg")
     elseif self.GameType == "bandage" then
         surface.PlaySound("autonigger/bandage_end.ogg")
     else

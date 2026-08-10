@@ -241,7 +241,7 @@ function PLAYER:LegAttack()
                     end
 
 					if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
-						ent:EmitSound("physics/body/body_medium_impact_hard"..math.random(6)..".wav", 60, math.random(85, 105), 0.6)
+						ent:EmitSound("physics/body/body_medium_impact_hard"..math.random(6)..".ogg", 60, math.random(85, 105), 0.6)
 					end
 
                     if ent:IsPlayer() then
@@ -260,7 +260,7 @@ function PLAYER:LegAttack()
                     if hgIsDoor(ent) and !ent:GetNoDraw() then
                         ent.HP = ent.HP or 200
                         ent.HP = ent.HP - dmg * (tr.MatType == MAT_METAL and 1 or 2)
-                        ent:EmitSound( "physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".wav" )
+                        ent:EmitSound( "physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".ogg" )
                         
                         if DoorIsOpen(ent) then
                             if !DoorIsOpen2(ent) then
@@ -279,7 +279,7 @@ function PLAYER:LegAttack()
                                 ent:Fire("Close", oldname, 0, self, self)
                             end
 
-                            ent:EmitSound("physics/wood/wood_box_impact_hard3.wav")
+                            ent:EmitSound("physics/wood/wood_box_impact_hard3.ogg")
                         end
 
                         local locked = not DoorIsOpen(ent)

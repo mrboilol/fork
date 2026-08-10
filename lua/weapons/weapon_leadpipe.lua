@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Lead Pipe"
 SWEP.Instructions = "Part of a lead pipe, you could beat someone up with it, good stuff for a riot.\n\nLMB to attack.\nRMB to block."
@@ -95,7 +95,7 @@ SWEP.swingsoundextra = {
 
 SWEP.BlockTier = 2
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {125, 145}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {125, 145}}
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/pipe.png")
@@ -111,7 +111,7 @@ SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
 SWEP.HitFleshPlus = "leadpipe/hit1.ogg"
 SWEP.HitFleshExtraPitch = {110, 115}
 SWEP.SwingSound = "baseballbat/swing.ogg"
@@ -160,7 +160,7 @@ SWEP.MinSensivity = 0.5
 
 SWEP.BlockTier = 3
 SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.ogg"
 
 function SWEP:ThinkAdd()
 	local state = self.GetChargeState and self:GetChargeState() or self:GetDTInt(6)

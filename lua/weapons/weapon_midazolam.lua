@@ -63,7 +63,7 @@ function SWEP:OwnerChanged()
 	local owner = self:GetOwner()
 	if IsValid(owner) and owner:IsNPC() then
 		self:SpawnGarbage("models/bloocobalt/l4d/items/w_eq_adrenaline.mdl", nil, nil, nil, "2211")
-		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_needleprick.wav")
+		self:NPCHeal(owner, 0.1, "snd_jack_hmcd_needleprick.ogg")
 	end
 end
 
@@ -90,7 +90,7 @@ if SERVER then
 		end
 
 		local entOwner = IsValid(org.owner.FakeRagdoll) and org.owner.FakeRagdoll or org.owner
-		entOwner:EmitSound("snd_jack_hmcd_needleprick.wav", 60, math.random(95, 105))
+		entOwner:EmitSound("snd_jack_hmcd_needleprick.ogg", 60, math.random(95, 105))
 
 		local wasSeizing = org.seizureActive == true
 		org.brain = math.max((org.brain or 0) - midazolamBrainHealing, 0)

@@ -124,7 +124,7 @@ if CLIENT then
     function SWEP:OpenCostumeMenu()
         if self.IsCostumeActive then
             notification.AddLegacy("You must remove your current costume first!", NOTIFY_ERROR, 3)
-            --surface.PlaySound("buttons/button10.wav")
+            --surface.PlaySound("buttons/button10.ogg")
             return
         end
         
@@ -228,7 +228,7 @@ if CLIENT then
                 net.WriteInt(i, 8) 
                 net.SendToServer()
                 
-                --surface.PlaySound("buttons/button14.wav")
+                --surface.PlaySound("buttons/button14.ogg")
             end
             
             grid:AddItem(costumePanel)
@@ -275,7 +275,7 @@ if SERVER then
                     net.WriteBool(true)
                 net.Send(ply)
 
-                wep:EmitSound("snds_jack_gmod/equip"..math.random(1,5)..".wav")
+                wep:EmitSound("snds_jack_gmod/equip"..math.random(1,5)..".ogg")
 
                 wep.StoredPluv = ply:GetNetVar("CurPluv", "pluv")
                 ply:SetNetVar("CurPluv", "pluv51")
@@ -288,7 +288,7 @@ function SWEP:SecondaryAttack()
     if SERVER then
         if self.IsCostumeActive and self.StoredIdentity then
             hg.Appearance.ForceApplyAppearance(self:GetOwner(), self.StoredIdentity)
-            self:EmitSound("snds_jack_gmod/equip"..math.random(1,5)..".wav")
+            self:EmitSound("snds_jack_gmod/equip"..math.random(1,5)..".ogg")
             
             self.IsCostumeActive = false
             

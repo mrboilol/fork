@@ -1086,7 +1086,7 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	end
 
 	if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
-		ent:EmitSound("physics/body/body_medium_impact_hard" .. math.random(6) .. ".wav", 60, math.random(85, 105), 0.6)
+		ent:EmitSound("physics/body/body_medium_impact_hard" .. math.random(6) .. ".ogg", 60, math.random(85, 105), 0.6)
 	end
 
 	if ent:IsPlayer() then
@@ -1102,7 +1102,7 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	if hgIsDoor and hgIsDoor(ent) and !ent:GetNoDraw() then
 		ent.HP = ent.HP or 200
 		ent.HP = ent.HP - damage * (tr.MatType == MAT_METAL and 1 or 2)
-		ent:EmitSound("physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".wav")
+		ent:EmitSound("physics/wood/wood_crate_impact_hard" .. math.random(1,4) .. ".ogg")
 		if ent.HP <= 0 and hgBlastThatDoor then hgBlastThatDoor(ent, state.dir * 125) end
 	end
 end
@@ -2338,7 +2338,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 50, math.random(95, 105))
+							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".ogg", 50, math.random(95, 105))
 
 							
 
@@ -2499,7 +2499,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 55, math.random(95, 105))
+							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".ogg", 55, math.random(95, 105))
 
 							
 
@@ -2549,7 +2549,7 @@ hook.Add("Think", "Fake", function()
 
 			--rhand:SetPos(head:GetPos())
 			if not ragdoll.chokingSound then
-				ragdoll:EmitSound("physics/flesh/flesh_impact_hard"..math.random(3, 6)..".wav", 65, math.random(95, 105), 0.7)
+				ragdoll:EmitSound("physics/flesh/flesh_impact_hard"..math.random(3, 6)..".ogg", 65, math.random(95, 105), 0.7)
 				ragdoll.chokingSound = true
 			end
 			local org = choking1.organism

@@ -223,8 +223,10 @@ module[2] = function(owner, org, timeValue)
 
 		org.consciousness = math.Approach(org.consciousness, 0, timeValue / 30 * org.tranquilizer)
 	elseif not shockActive then
-		local effectiveBlood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood
-		local target = effectiveBlood < 2500 and (effectiveBlood - 2000) / 500 or 1
+		-- Blood pressure applies its own continuous consciousness ceiling in the
+		-- circulation modules. Recovery itself must not contain a second hidden
+		-- low-volume path to OTRUB.
+		local target = 1
 		local recovery_speed = consciousness_recovery_speed
 		if org.otrub or org.consciousness < consciousness_otrub_threshold then
 			recovery_speed = otrub_consciousness_recovery_speed

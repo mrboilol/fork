@@ -611,7 +611,7 @@ function StormFox2.Menu._OpenController()
 	settings:SetText("")
 	settings:SetToolTip("#spawnmenu.utilities.server_settings")
 	function settings:DoClick()
-		surface.PlaySound("buttons/button14.wav")
+		surface.PlaySound("buttons/button14.ogg")
 		RunConsoleCommand("stormfox2_svmenu")
 	end
 	function settings:Paint() end
@@ -668,7 +668,7 @@ end
 		onewindow	= true,
 		init		= function( icon, window )
 			window:Remove()
-			surface.PlaySound("buttons/button14.wav")
+			surface.PlaySound("buttons/button14.ogg")
 			StormFox2.Menu.OpenController()
 		end
 	} )

@@ -47,7 +47,7 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 8
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/makarov/makarov_fp.wav", 75, 90, 100}
 SWEP.SupressedSound = {"zcitysnd/sound/weapons/makarov/makarov_suppressed_fp.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 5
 SWEP.ReloadTime = 4
 SWEP.FakeReloadSounds = {
@@ -60,7 +60,7 @@ SWEP.FakeEmptyReloadSounds = {
 	[0.35] = "zcitysnd/sound/weapons/m9/handling/m9_magout.wav",
 	[0.8] = "zcitysnd/sound/weapons/m9/handling/m9_magin.wav",
 	[0.92] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
-	[1.02] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.wav",
+	[1.02] = "zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg",
 }
 
 SWEP.FakeVPShouldUseHand = false

@@ -5,11 +5,12 @@ hg.organism.module.concussion = {}
 local module = hg.organism.module.concussion
 
 local CONCUSSION_MAX = 6.0
-local DECAY_BASE = 0.05
-local DECAY_SEVERE_BONUS = 0.03
+local DECAY_BASE = 0.12
+local DECAY_SEVERE_BONUS = 0.08
+local DECAY_OVERFLOW_PER_POINT = 0.04
 local ONSET_SPEED = 0.4
 local POST_CONCUSSION_THRESHOLD = 0.3
-local POST_CONCUSSION_DECAY = 0.02
+local POST_CONCUSSION_DECAY = 0.05
 local SECOND_IMPACT_WINDOW = 8.0
 local SECOND_IMPACT_SCALE = 0.35
 local LOC_THRESHOLD = 3.8
@@ -37,6 +38,17 @@ local FATIGUE_DRAIN = 0.15
 local COGNITIVE_THRESHOLD = 1.5
 local PHOTOPHOBIA_THRESHOLD = 2.0
 local PHONOPHOBIA_THRESHOLD = 1.8
+
+local function getConcussionDecay(concussion)
+    concussion = math.max(tonumber(concussion) or 0, 0)
+
+    -- Some older damage paths could raise concussion above this module's cap.
+    -- Keep recovery monotonic there instead of allowing the severe bonus to
+    -- become negative and stall (or reverse) decay.
+    local severityRatio = math.Clamp(concussion / CONCUSSION_MAX, 0, 1)
+    local overflow = math.max(concussion - CONCUSSION_MAX, 0)
+    return DECAY_BASE + DECAY_SEVERE_BONUS * severityRatio + overflow * DECAY_OVERFLOW_PER_POINT
+end
 
 local concussion_phrases = {
     "My head is ringing...",
@@ -206,17 +218,27 @@ module[2] = function(ply, org, timeValue)
 
     local hasConcussion = org.concussion > 0 or org.concussion_onset > 0
     local hasNausea = org.nausea > 0 or org.nausea_target > 0 or org.nausea_pending > 0
-    local hasPost = org.concussion_post > POST_CONCUSSION_THRESHOLD
+    local hasPost = org.concussion_post > 0
     local hasHeadache = org.concussion_headache > 0.1
     local hasFatigue = org.concussion_fatigue > 0.1
 
-    if not hasConcussion and not hasNausea and not hasPost and not hasHeadache and not hasFatigue then return end
+    if not hasConcussion and not hasNausea and not hasPost and not hasHeadache and not hasFatigue then
+        -- A completed concussion must not leave peak/impact history behind.
+        -- Those values describe the current episode, not permanent brain or
+        -- skull damage, and retaining them makes later injuries artificially
+        -- stronger and eligible for stale lucid intervals.
+        org.concussion_peak = 0
+        org.concussion_impacts = 0
+        org.concussion_lucid_end = 0
+        org.concussion_loc_timer = 0
+        return
+    end
 
     local now = CurTime()
 
     if org.concussion_lucid_end > now then
         if org.concussion > 0 then
-            org.concussion = math.max(org.concussion - timeValue * DECAY_BASE * 0.3, 0)
+            org.concussion = math.max(org.concussion - timeValue * getConcussionDecay(org.concussion), 0)
         end
         return
     end
@@ -228,12 +250,8 @@ module[2] = function(ply, org, timeValue)
     end
 
     if org.concussion > 0 then
-        local severityRatio = org.concussion / CONCUSSION_MAX
-        local decayMul = 1.0 - severityRatio * 0.4
-        local decay = DECAY_BASE * decayMul
-        if org.concussion > 3.0 then
-            decay = decay + DECAY_SEVERE_BONUS * (1.0 - severityRatio)
-        end
+        local severityRatio = math.Clamp(org.concussion / CONCUSSION_MAX, 0, 1)
+        local decay = getConcussionDecay(org.concussion)
         org.concussion = math.max(org.concussion - timeValue * decay, 0)
 
         if org.concussion < POST_CONCUSSION_THRESHOLD and org.concussion_peak > 1.0 then
@@ -474,6 +492,20 @@ module[2] = function(ply, org, timeValue)
             org.nextDryHeave = now + math.Rand(4.0, 8.0)
         end
     end
+end
+
+function module.AddImmediateConcussion(org, intensity)
+    if not org then return 0 end
+
+    local before = math.Clamp(tonumber(org.concussion) or 0, 0, CONCUSSION_MAX)
+    local add = math.max(tonumber(intensity) or 0, 0)
+    org.concussion = math.min(before + add, CONCUSSION_MAX)
+    org.concussion_peak = math.max(
+        tonumber(org.concussion_peak) or 0,
+        org.concussion + math.max(tonumber(org.concussion_onset) or 0, 0)
+    )
+
+    return org.concussion - before
 end
 
 function module.AddConcussion(org, intensity, duration)

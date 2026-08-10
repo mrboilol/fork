@@ -26,16 +26,16 @@ SWEP.AnimList = {
 }
 
 SWEP.FakeReloadSounds = {
-	[0.3] = "weapons/universal/uni_pistol_draw_01.wav",
+	[0.3] = "weapons/universal/uni_pistol_draw_01.ogg",
 	[0.5] = "zcitysnd/sound/weapons/m9/handling/m9_magout.wav",
 	--[0.45] = "weapons/tfa_ins2/usp_tactical/magout.wav",
-	--[0.37] = "weapons/m4a1/m4a1_magrelease.wav",
+	--[0.37] = "weapons/m4a1/m4a1_magrelease.ogg",
 	[0.6] = "zcitysnd/sound/weapons/m9/handling/m9_magin.wav",
 	[0.7] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
-	[0.85] = "weapons/universal/uni_pistol_holster.wav",
+	[0.85] = "weapons/universal/uni_pistol_holster.ogg",
 	[1.02] = "weapons/universal/uni_crawl_l_02.wav"
 	--[1] = "weapons/tfa_ins2/usp_match/usp_match_boltrelease.wav",
-	--[0.77] = "weapons/tfa_ins2/usp_match/usp_match_maghit.wav",
+	--[0.77] = "weapons/tfa_ins2/usp_match/usp_match_maghit.ogg",
 	--[0.95] = "weapons/tfa_ins2/usp_match/usp_match_boltrelease.wav",
 }
 
@@ -43,8 +43,8 @@ SWEP.FakeEmptyReloadSounds = {
 	[0.15] = "weapons/universal/uni_crawl_l_03.wav",
 	[0.22] = "weapons/tfa_ins2/usp_tactical/magrelease.wav",
 	[0.3] = "weapons/tfa_ins2/usp_tactical/magout.wav",
-	--[0.37] = "weapons/m4a1/m4a1_magrelease.wav",
-	[0.37] = "weapons/universal/uni_pistol_draw_01.wav",
+	--[0.37] = "weapons/m4a1/m4a1_magrelease.ogg",
+	[0.37] = "weapons/universal/uni_pistol_draw_01.ogg",
 	[0.41] = "weapons/universal/uni_crawl_l_05.wav",
 	[0.6] = "zcitysnd/sound/weapons/m9/handling/m9_magin.wav",
 	[0.8] = "zcitysnd/sound/weapons/m9/handling/m9_maghit.wav",
@@ -138,8 +138,8 @@ SWEP.Primary.Ammo = "9x19 mm Parabellum"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 25
 SWEP.Primary.Sound = {"zcitysnd/sound/weapons/firearms/hndg_mkiii/mkiii_fire_01.wav", 75, 90, 100}
-SWEP.SupressedSound = {"m9/m9_suppressed_fp.wav", 65, 90, 100}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.SupressedSound = {"m9/m9_suppressed_fp.ogg", 65, 90, 100}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 25
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.ReloadTime = 4
@@ -147,8 +147,8 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"weapons/tfa_ins2/usp_tactical/magout.wav",
-	"weapons/tfa_ins2/browninghp/magin.wav",
-	"pwb/weapons/fnp45/sliderelease.wav",
+	"weapons/tfa_ins2/browninghp/magin.ogg",
+	"pwb/weapons/fnp45/sliderelease.ogg",
 	"none",
 	"none",
 	"none"

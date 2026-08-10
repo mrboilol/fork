@@ -115,7 +115,7 @@ function SWEP:Reload()
 			npc:AddRelationship("player D_LI 99")
 			npc:SetLastPosition(SelfPos)
 			npc:SetSchedule(SCHED_FORCED_GO_RUN)
-			npc:EmitSound("npc/antlion/distract1.wav", 80, math.random(90, 110))
+			npc:EmitSound("npc/antlion/distract1.ogg", 80, math.random(90, 110))
 			npc.SatisfactionEndTime = CurTime() + 60
 
 			if not npc.SatisfactionEndTime then

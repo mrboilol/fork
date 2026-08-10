@@ -290,7 +290,7 @@ function ENT:Explode()
 	if self.Exploded or self.Burning then return end
 
 	if (!self.shouldBoom and !IsValid(self.owner)) then
-		self:EmitSound("weapons/p99/slideback.wav", 75)
+		self:EmitSound("weapons/p99/slideback.ogg", 75)
 		self.Exploded = true
 		return
 	end
@@ -313,7 +313,7 @@ function ENT:Explode()
 
 	timer.Simple(.05, function()
 		if not IsValid(self) then return end
-		sound.Play("snd_jack_firebomb.wav", SelfPos, 80, 100)
+		sound.Play("snd_jack_firebomb.ogg", SelfPos, 80, 100)
 		
 		timer.Simple(0.1, function()
 			if not IsValid(self) then return end
@@ -325,5 +325,5 @@ function ENT:Explode()
 end
 
 function ENT:PhysicsCollide(phys, deltaTime)
-	if phys.Speed > 20 then self:EmitSound("physics/metal/metal_grenade_impact_hard" .. math.random(3) .. ".wav", 65, math.random(95, 105)) end
+	if phys.Speed > 20 then self:EmitSound("physics/metal/metal_grenade_impact_hard" .. math.random(3) .. ".ogg", 65, math.random(95, 105)) end
 end

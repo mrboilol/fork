@@ -35,29 +35,29 @@ SWEP.FakeViewBobBaseBone = "ValveBiped.Bip01_R_UpperArm"
 SWEP.ViewPunchDiv = 40
 
 SWEP.FakeReloadSounds = {
-	[0.25] = "weapons/m249/m249_coveropen.wav",
-	[0.4] = "weapons/m249/m249_magout_full.wav",
-	[0.63] = "weapons/m249/m249_shoulder.wav",
-	[0.7] = "weapons/m249/m249_magin.wav",
-	[0.75] = "weapons/m249/m249_beltpullout.wav",
-	[0.77] = "weapons/m249/m249_fetchmag.wav",
-	[0.94] = "weapons/m249/m249_coverclose.wav",
-	[1.04] = "weapons/m249/m249_shoulder.wav"
+	[0.25] = "weapons/m249/m249_coveropen.ogg",
+	[0.4] = "weapons/m249/m249_magout_full.ogg",
+	[0.63] = "weapons/m249/m249_shoulder.ogg",
+	[0.7] = "weapons/m249/m249_magin.ogg",
+	[0.75] = "weapons/m249/m249_beltpullout.ogg",
+	[0.77] = "weapons/m249/m249_fetchmag.ogg",
+	[0.94] = "weapons/m249/m249_coverclose.ogg",
+	[1.04] = "weapons/m249/m249_shoulder.ogg"
 }
 
 SWEP.FakeEmptyReloadSounds = {
-	[0.15] = "weapons/m249/m249_shoulder.wav",
-	[0.25] = "weapons/m249/m249_boltback.wav",
-	[0.28] = "weapons/m249/m249_boltrelease.wav",
-	--[0.37] = "weapons/m4a1/m4a1_magrelease.wav",
-	[0.45] = "weapons/m249/m249_coveropen.wav",
-	[0.54] = "weapons/m249/m249_magout.wav",
-	[0.73] = "weapons/m249/m249_shoulder.wav",
-	[0.8] = "weapons/m249/m249_magin.wav",
-	[0.83] = "weapons/m249/m249_beltpullout.wav",
-	[0.85] = "weapons/m249/m249_fetchmag.wav",
-	[1] = "weapons/m249/m249_coverclose.wav",
-	[1.04] = "weapons/m249/m249_shoulder.wav"
+	[0.15] = "weapons/m249/m249_shoulder.ogg",
+	[0.25] = "weapons/m249/m249_boltback.ogg",
+	[0.28] = "weapons/m249/m249_boltrelease.ogg",
+	--[0.37] = "weapons/m4a1/m4a1_magrelease.ogg",
+	[0.45] = "weapons/m249/m249_coveropen.ogg",
+	[0.54] = "weapons/m249/m249_magout.ogg",
+	[0.73] = "weapons/m249/m249_shoulder.ogg",
+	[0.8] = "weapons/m249/m249_magin.ogg",
+	[0.83] = "weapons/m249/m249_beltpullout.ogg",
+	[0.85] = "weapons/m249/m249_fetchmag.ogg",
+	[1] = "weapons/m249/m249_coverclose.ogg",
+	[1.04] = "weapons/m249/m249_shoulder.ogg"
 }
 SWEP.MagModel = "models/weapons/zcity/w_glockmag.mdl"
 SWEP.FakeReloadEvents = {
@@ -104,19 +104,19 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 65
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 65
-SWEP.Primary.Sound = {"homigrad/weapons/rifle/hmg2.wav", 75, 100, 110}
-SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/fnfal/handling/fnfal_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
+SWEP.Primary.Sound = {"homigrad/weapons/rifle/hmg2.ogg", 75, 100, 110}
+SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/fnfal/handling/fnfal_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.11
 SWEP.ReloadTime = 14.9
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"pwb/weapons/m249/coverup.wav",
+	"pwb/weapons/m249/coverup.ogg",
 	"none",
 	"none",
-	"pwb/weapons/m249/boxout.wav",
+	"pwb/weapons/m249/boxout.ogg",
 	"none",
-	"pwb/weapons/m249/boxin.wav",
+	"pwb/weapons/m249/boxin.ogg",
 	"none",
 	"none",
 	"none",
@@ -170,7 +170,7 @@ SWEP.attPos = Vector(0, 0, 0)
 SWEP.attAng = Angle(0, -0.1, 0)
 SWEP.AimHands = Vector(0, 1.75, -4.2)
 SWEP.lengthSub = 15
-SWEP.DistSound = "m249/m249_dist.wav"
+SWEP.DistSound = "m249/m249_dist.ogg"
 SWEP.bipodAvailable = true
 SWEP.bipodsub = 15
 SWEP.RecoilMul = 0.3

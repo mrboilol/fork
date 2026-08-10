@@ -119,9 +119,9 @@ SWEP.showstats = false
 SWEP.DeploySounds = {
 	"weapons/tfa_nmrih/items/medpills_draw_01.wav",
 	"weapons/tfa_nmrih/items/pills_draw_01.wav",
-	"snd_jack_hmcd_pillsbounce.wav",
+	"snd_jack_hmcd_pillsbounce.ogg",
 }
-SWEP.FallSnd = "snd_jack_hmcd_pillsbounce.wav"
+SWEP.FallSnd = "snd_jack_hmcd_pillsbounce.ogg"
 
 function SWEP:CanPrimaryAttack()
 	return true

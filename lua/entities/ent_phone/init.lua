@@ -39,7 +39,7 @@ function ENT:OnTakeDamage(dmginfo)
 	if self:Health() > 0 then return end
 
 	self._HGBroken = true
-	self:EmitSound("physics/plastic/plastic_box_break1.wav", 75, math.random(95, 105))
+	self:EmitSound("physics/plastic/plastic_box_break1.ogg", 75, math.random(95, 105))
 	local effect = EffectData()
 	effect:SetOrigin(self:WorldSpaceCenter())
 	effect:SetMagnitude(2)

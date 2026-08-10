@@ -57,7 +57,7 @@ SWEP.LocalMuzzleAng = Angle(0, -0.0, 0)
 SWEP.WeaponEyeAngles = Angle(-0.7, 0.1, 0)
 
 SWEP.CustomShell = "12x70"
-SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.wav"
+SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.ogg"
 SWEP.CockSound = "weapons/darsu_eft/m870/rem870_pump_in.ogg"
 SWEP.weight = 4
 SWEP.ScrappersSlot = "Primary"

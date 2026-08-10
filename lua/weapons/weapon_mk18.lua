@@ -195,7 +195,7 @@ SWEP.IconOverride = "entities/arc9_eft_mk18_mjolnir.png"
 SWEP.weight = 3.8
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/mk18/mk18_dist.wav"
+SWEP.DistSound = "weapons/mk18/mk18_dist.ogg"
 
 SWEP.StartAtt = {"optic21"}
 SWEP.availableAttachments = {

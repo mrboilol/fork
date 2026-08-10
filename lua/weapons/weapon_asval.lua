@@ -22,16 +22,16 @@ SWEP.FakeAttachment = "muzzle"
 --PrintAnims(Entity(1):GetActiveWeapon():GetWM())
 SWEP.FakeEjectBrassATT = "2"
 SWEP.FakeReloadSounds = {
-	[0.32] = "weapons/tfa_ins2/akm_bw/magout.wav",
-	[0.8] = "weapons/ak47/ak47_magin.wav",
+	[0.32] = "weapons/tfa_ins2/akm_bw/magout.ogg",
+	[0.8] = "weapons/ak47/ak47_magin.ogg",
 }
 SWEP.DOZVUK = true
 
 SWEP.FakeEmptyReloadSounds = {
-	[0.3] = "weapons/tfa_ins2/akm_bw/magout.wav",
-	[0.65] = "weapons/ak47/ak47_magin.wav",
-	[0.92] = "weapons/ak47/ak47_boltback.wav",
-	[0.97] = "weapons/ak47/ak47_boltrelease.wav"
+	[0.3] = "weapons/tfa_ins2/akm_bw/magout.ogg",
+	[0.65] = "weapons/ak47/ak47_magin.ogg",
+	[0.92] = "weapons/ak47/ak47_boltback.ogg",
+	[0.97] = "weapons/ak47/ak47_boltrelease.ogg"
 }
 SWEP.MagModel = "models/weapons/arc9/darsu_eft/mods/mag_ak_custom_sawed_off_762x39_10.mdl"
 local vector_full = Vector(1,1,1)
@@ -85,8 +85,8 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 42
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 42
-SWEP.Primary.Sound = {"zcitysnd/sound/weapons/m14/m14_suppressed_fp.wav", 65, 90, 100}
-SWEP.SupressedSound = {"zcitysnd/sound/weapons/m14/m14_suppressed_fp.wav", 65, 90, 100}
+SWEP.Primary.Sound = {"zcitysnd/sound/weapons/m14/m14_suppressed_fp.ogg", 65, 90, 100}
+SWEP.SupressedSound = {"zcitysnd/sound/weapons/m14/m14_suppressed_fp.ogg", 65, 90, 100}
 SWEP.Primary.Wait = 0.066
 SWEP.ReloadTime = 3.5
 SWEP.ReloadSoundes = {
@@ -94,14 +94,14 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"none",
-	"weapons/tfa_ins2/ak103/ak103_magout.wav",
+	"weapons/tfa_ins2/ak103/ak103_magout.ogg",
 	"none",
 	"none",
 	"none",
-	"weapons/tfa_ins2/akm_bw/magin.wav",
+	"weapons/tfa_ins2/akm_bw/magin.ogg",
 	"none",
-	"weapons/tfa_inss/asval/slideback.wav",
-	"weapons/tfa_inss/asval/slideforward.wav",
+	"weapons/tfa_inss/asval/slideback.ogg",
+	"weapons/tfa_inss/asval/slideforward.ogg",
 	"none",
 	"none",
 	"none",

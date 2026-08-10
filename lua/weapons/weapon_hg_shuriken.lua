@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.PrintName = "Shuriken"
 SWEP.Category = "ZCity Other"
 SWEP.Instructions = "Shuriken, also called throwing stars, or ninja stars, are a Japanese concealed weapon used by samurai or ninja or in martial arts as a hidden dagger to distract or misdirect."
@@ -181,8 +181,8 @@ function SWEP:ThrowShuriken()
 	end
 
 	ent.damage = 15
-	ent.AttackHitFlesh = "snd_jack_hmcd_knifestab.wav"
-	ent.AttackHit = "snd_jack_hmcd_knifehit.wav"
+	ent.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
+	ent.AttackHit = "snd_jack_hmcd_knifehit.ogg"
 	ent.dont_account_for_placement = true
 	ent.StickInWorld = true
 	ent.StickDepth = -2.5
@@ -190,7 +190,7 @@ function SWEP:ThrowShuriken()
 	ent.StickAnywhere = true
 	ent.ProtectFlatWorldStick = true
 	ent.StickPhysics = false
-	ent.UnstickSnd = "physics/metal/metal_grenade_impact_soft1.wav"
+	ent.UnstickSnd = "physics/metal/metal_grenade_impact_soft1.ogg"
 	ent.ArteryChance = 1.6
 	ent.penetration = 8
 	ent.PenetrationSize = 3
@@ -202,7 +202,7 @@ function SWEP:ThrowShuriken()
 		phys:SetVelocity(ply:GetAimVector() * ent.MaxSpeed)
 		phys:AddAngleVelocity(Vector(0,0, -ent.MaxSpeed))
 	end
-	ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+	ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
 
 	if not ply:IsNPC() then
 		ply:SelectWeapon("weapon_hands_sh")

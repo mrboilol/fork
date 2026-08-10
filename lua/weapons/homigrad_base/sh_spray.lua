@@ -125,16 +125,18 @@ function SWEP:PrimarySpread()
 		-- The old recoil system kicked the muzzle itself, not only the camera.
 		-- Keep this render-side so authoritative shot spread remains predictable;
 		-- sh_worldmodel applies the offset and eases it back after every shot.
-		local muzzleKickMul = math.Clamp(mul, 0.08, 3.5)
+		-- Recoil owns the dominant rise while addSprayMul widens only side travel.
+		local muzzleKickMul = math.Clamp(mul * (self.WeaponRecoilMul or 1), 0.1, 4.5)
+		local muzzleSideMul = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(
-			-math.Rand(0.12, 0.42) * muzzleKickMul,
-			math.Rand(-0.34, 0.34) * muzzleKickMul,
-			math.Rand(-0.2, 0.2) * muzzleKickMul
+			-math.Rand(0.32, 0.72) * muzzleKickMul,
+			math.Rand(-0.24, 0.24) * muzzleKickMul * muzzleSideMul,
+			math.Rand(-0.14, 0.14) * muzzleKickMul * muzzleSideMul
 		)
 		self.ShotMuzzleOffset = (self.ShotMuzzleOffset or Vector(0, 0, 0)) + Vector(
-			-math.Rand(0.12, 0.38) * muzzleKickMul,
-			math.Rand(-0.16, 0.16) * muzzleKickMul,
-			math.Rand(-0.1, 0.1) * muzzleKickMul
+			-math.Rand(0.18, 0.42) * muzzleKickMul,
+			math.Rand(-0.13, 0.13) * muzzleKickMul * muzzleSideMul,
+			math.Rand(0.2, 0.48) * muzzleKickMul
 		)
 
 		local prank3 = math.Rand(-self.Primary.Force2,self.Primary.Force2) / (self.Primary.Force2 != 0 and self.Primary.Force2 or 1) * 2

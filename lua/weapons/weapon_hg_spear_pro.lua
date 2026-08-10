@@ -1,4 +1,4 @@
-﻿if SERVER then AddCSLuaFile() end
+if SERVER then AddCSLuaFile() end
 SWEP.Base = "weapon_melee"
 SWEP.PrintName = "Pro Spear"
 SWEP.Instructions = "Spear of some slug creature...\n\nLMB to attack.\nRMB to block.\nRMB + LMB to throw."
@@ -78,9 +78,9 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "Concrete.ImpactHard"
 SWEP.Attack2Hit = "Concrete.ImpactHard"
-SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.wav"
-SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.wav"
-SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
+SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
+SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
 
 SWEP.AttackPos = Vector(0,0,0)
 
@@ -120,7 +120,7 @@ if SERVER then
             phys:AddAngleVelocity(Vector(0,0,0))
         end
 
-        //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
+        //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
         ply:SelectWeapon("weapon_hands_sh")
         ply:ViewPunch(Angle(0, 0, -8))
 

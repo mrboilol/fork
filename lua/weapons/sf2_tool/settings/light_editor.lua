@@ -3,7 +3,7 @@ TOOL.RealName  = "Light Editor"
 TOOL.PrintName = "#sf_tool.light_editor"
 TOOL.ToolTip = "#sf_tool.light_editor.desc"
 TOOL.NoPrintName = false
--- TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.wav")
+-- TOOL.ShootSound = Sound("weapons/irifle/irifle_fire2.ogg")
 
 local SPAWN 	= 0
 local DELETE 	= 1
@@ -142,7 +142,7 @@ if SERVER then
 		end
 	end
 
-	local popsnd = Sound("garrysmod/balloon_pop_cute.wav")
+	local popsnd = Sound("garrysmod/balloon_pop_cute.ogg")
 	function TOOL:SendFunc( a, b, c, d )
 		if a == SPAWN and type(b) == "number" and c and d then -- Spawn, n_type, pos, ang
 			if IsLightNear(c) then return end 
@@ -151,17 +151,17 @@ if SERVER then
 			ent:SetAngles(d)
 			ent:Spawn()
 			ent:SetLightType(b)
-			self:EmitSound("weapons/ar2/ar2_reload_rotate.wav")
+			self:EmitSound("weapons/ar2/ar2_reload_rotate.ogg")
 		elseif a == DELETE and IsValid(b) and b.GetClass then -- Delete, entity
 			if b:GetClass()~="stormfox_streetlight_invisible" then return end -- Can't delete things
 			b:EmitSound(popsnd)
 			SafeRemoveEntity(b)
 		elseif a == SPAWN_ALL then
 			SpawnMissingLights(b)
-			self:EmitSound("weapons/ar2/ar2_reload_rotate.wav")
+			self:EmitSound("weapons/ar2/ar2_reload_rotate.ogg")
 		elseif a == DELETE_ALL then
 			DeleteAllLights(b)
-			self:EmitSound("weapons/ar2/ar2_reload_rotate.wav")
+			self:EmitSound("weapons/ar2/ar2_reload_rotate.ogg")
 		end
 	end
 else

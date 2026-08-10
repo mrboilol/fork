@@ -29,7 +29,7 @@ SWEP.SwingCooldown = 0.75
 SWEP.SwingGateTime = 0.28
 SWEP.AttackTime = 0.10
 SWEP.SwingDamageMul = 1.25
-SWEP.FistStaminaCost = 1
+SWEP.FistStaminaCost = 0.8
 SWEP.SwingBackDuration = 1
 SWEP.JabAnimTime = 1
 SWEP.Primary.ClipSize = -1
@@ -117,7 +117,7 @@ function SWEP:ApplyHeadbuttNeuro(ply, concussion, disorientation)
 	if not IsValid(ply) then return end
 	local org = ply.organism
 	if not org then return end
-	org.concussion = math.min((org.concussion or 0) + concussion, 10)
+	hg.organism.module.concussion.AddImmediateConcussion(org, concussion)
 	org.disorientation = math.min((org.disorientation or 0) + disorientation, 10)
 end
 
@@ -1784,7 +1784,7 @@ function SWEP:ApplyForce()
 
 						phys:ApplyForceCenter(-vector_up * 6000)
 
-						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".wav")
+						--self.CarryEnt:EmitSound("physics/body/body_medium_impact_soft" .. tostring(math.random(7)) .. ".ogg")
 					end
 				end
 			else
@@ -2002,7 +2002,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                 local perfectblock = CurTime() - wep:GetStartedBlocking() < 0.5
                 
                 if perfectblock then
-                    -- ent:EmitSound("tasty/empty.wav")
+                    -- ent:EmitSound("tasty/empty.ogg")
                 else
                     if ent.organism then
                         ent.organism.stamina.subadd = ent.organism.stamina.subadd + 15
@@ -2134,7 +2134,7 @@ function SWEP:Think()
 
 			if CLIENT then
 				if not self.blockSound then
-					sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.wav", self:GetPos(), 65)
+					sound.Play("pwb2/weapons/matebahomeprotection/mateba_cloth.ogg", self:GetPos(), 65)
 					self.blockSound = true
 					if self:IsClient() then
 						ViewPunch2(blockvp)
@@ -2145,7 +2145,7 @@ function SWEP:Think()
 			--HoldType = "camera"
 		else
 			if self.blockSound then
-				sound.Play("pwb2/weapons/mac11/draw.wav", self:GetPos(), 55)
+				sound.Play("pwb2/weapons/mac11/draw.ogg", self:GetPos(), 55)
 				if self:IsClient() then
 					ViewPunch2(-blockvp)
 				end
@@ -2270,9 +2270,9 @@ function SWEP:PrimaryAttack(forcespecial)
 		self.swingBackRightEnd = CurTime()
 	end
 
-	local snd, pitch = "weapons/slam/throw.wav", math.random(110, 120)
+	local snd, pitch = "weapons/slam/throw.ogg", math.random(110, 120)
 	if owner.PlayerClassName == "headcrabzombie" then
-		snd, pitch = "npc/zombie/claw_miss"..math.random(2)..".wav", math.random(95, 110)
+		snd, pitch = "npc/zombie/claw_miss"..math.random(2)..".ogg", math.random(95, 110)
 	end
 	if owner.PlayerClassName == "furry" then
 		local Ent = WhomILookinAt(owner, .3, 45)
@@ -2325,16 +2325,16 @@ function SWEP:PrimaryAttack(forcespecial)
 end
 
 local concrete = {
-	"physics/concrete/boulder_impact_hard1.wav",
-	"physics/concrete/boulder_impact_hard2.wav",
-	"physics/concrete/boulder_impact_hard3.wav",
-	"physics/concrete/boulder_impact_hard4.wav"
+	"physics/concrete/boulder_impact_hard1.ogg",
+	"physics/concrete/boulder_impact_hard2.ogg",
+	"physics/concrete/boulder_impact_hard3.ogg",
+	"physics/concrete/boulder_impact_hard4.ogg"
 }
 
 local vent = {
-	"doors/vent_open1.wav",
-	"doors/vent_open2.wav",
-	"doors/vent_open3.wav"
+	"doors/vent_open1.ogg",
+	"doors/vent_open2.ogg",
+	"doors/vent_open3.ogg"
 }
 
 function SWEP:AttackFront(special_attack, rand)
@@ -2379,7 +2379,7 @@ function SWEP:AttackFront(special_attack, rand)
 				hgBlastThatDoor(Ent,self:GetOwner():GetAimVector() * 50 + self:GetOwner():GetVelocity())
 			else
 				sound.Play(vent[math.random(#vent)], HitPos, 90, math.random(90, 110), 1)
-				sound.Play("physics/wood/wood_crate_impact_hard" .. math.random(4) .. ".wav", HitPos, 90, math.random(90, 110), 1)
+				sound.Play("physics/wood/wood_crate_impact_hard" .. math.random(4) .. ".ogg", HitPos, 90, math.random(90, 110), 1)
 			end
 			Ent.Clawed = (Ent.Clawed or 0) + 1
 		elseif self:IsEntSoft(Ent) then
@@ -2387,9 +2387,9 @@ function SWEP:AttackFront(special_attack, rand)
 			if Ent:IsPlayer() and IsValid(Ent:GetActiveWeapon()) and Ent:GetActiveWeapon().GetBlocking and Ent:GetActiveWeapon():GetBlocking() and not RagdollOwner(Ent) then
 				local snd = "Flesh.ImpactSoft"
 				if isZomb then
-					snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
+					snd = "npc/zombie/claw_strike"..math.random(3)..".ogg"
 				elseif owner.PlayerClassName == "furry" then
-					snd = "pwb/weapons/knife/hit"..math.random(4)..".wav"
+					snd = "pwb/weapons/knife/hit"..math.random(4)..".ogg"
 				end
 				sound.Play(snd, HitPos, 65, math.random(90, 110))
 				if owner:IsBerserk() then
@@ -2398,9 +2398,9 @@ function SWEP:AttackFront(special_attack, rand)
 			else
 				local snd = "Flesh.ImpactHard"
 				if isZomb then
-					snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
+					snd = "npc/zombie/claw_strike"..math.random(3)..".ogg"
 				elseif owner.PlayerClassName == "furry" then
-					snd = "pwb/weapons/knife/hit"..math.random(4)..".wav"
+					snd = "pwb/weapons/knife/hit"..math.random(4)..".ogg"
 				end
 				sound.Play(snd, HitPos, 65, math.random(90, 110))
 				if owner:IsBerserk() then
@@ -2421,9 +2421,9 @@ function SWEP:AttackFront(special_attack, rand)
 		else
 			local snd = "Flesh.ImpactSoft"
 			if isZomb then
-				snd = "npc/zombie/claw_strike"..math.random(3)..".wav"
+				snd = "npc/zombie/claw_strike"..math.random(3)..".ogg"
 			elseif owner.PlayerClassName == "furry" then
-				snd = "pwb/weapons/knife/hitwall.wav"
+				snd = "pwb/weapons/knife/hitwall.ogg"
 			end
 			sound.Play(snd, HitPos, 65, math.random(90, 110))
 			if owner:IsBerserk() then

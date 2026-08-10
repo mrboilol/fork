@@ -202,7 +202,7 @@ SWEP.IconOverride = "entities/arc9_eft_spear.png"
 SWEP.weight = 4.3
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/spear/spear_dist.wav"
+SWEP.DistSound = "weapons/darsu_eft/spear/spear_dist.ogg"
 
 SWEP.StartAtt = {"supressor9", "optic23"}
 SWEP.availableAttachments = {

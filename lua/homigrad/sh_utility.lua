@@ -1409,8 +1409,8 @@ local IsValid = IsValid
 --//
 --\\ other ents use our bullets
 	local npcs = {
-		["npc_strider"] = {multi = 5, snd = "npc/strider/strider_minigun.wav", force = 5, AmmoType = "14.5x114mm BZTM", PenetrationMul = 10, noricochet = true},
-		["npc_combinegunship"] = {multi = 5, snd = "npc/strider/strider_minigun.wav", force = 3, AmmoType = "14.5x114mm BZTM", PenetrationMul = 10},
+		["npc_strider"] = {multi = 5, snd = "npc/strider/strider_minigun.ogg", force = 5, AmmoType = "14.5x114mm BZTM", PenetrationMul = 10, noricochet = true},
+		["npc_combinegunship"] = {multi = 5, snd = "npc/strider/strider_minigun.ogg", force = 3, AmmoType = "14.5x114mm BZTM", PenetrationMul = 10},
 		["npc_helicopter"] = {multi = 4, force = 2, AmmoType = "14.5x114mm BZTM", PenetrationMul = 10},
 		["lunasflightschool_ah6"] = {multi = 20, AmmoType = "14.5x114mm BZTM"},
 		["npc_turret_floor"] = {multi = 1.25, AmmoType = "9x19 mm Parabellum"},

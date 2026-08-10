@@ -296,7 +296,7 @@ if CLIENT then
 		volume = 0.5,
 		level = 30,
 		pitch = {150, 150},
-		sound = "snd_jack_peep.wav"
+		sound = "snd_jack_peep.ogg"
 	})
 
 	local last_message
