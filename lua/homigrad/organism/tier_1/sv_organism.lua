@@ -1769,6 +1769,20 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.panicattackActive = false
 		org.nextPanicHeartRoll = curTime + panicattack_heart_roll_delay
 	end
+	local brainDelta = (org.brain or 0) - oldSeizureBrain
+	local lobeDelta = lobeDamage - oldSeizureLobeDamage
+	local traumaDelta = math.max(brainDelta, lobeDelta)
+	if traumaDelta > 0 then
+		hg.organism.AddSeizure(org, math.Clamp(traumaDelta * seizure_brain_trauma_gain_mul, 0, 1))
+	elseif brainDelta < 0 and oldSeizureBrain > 0 then
+		hg.organism.AddSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
+	end
+	-- Отключено: перепад температуры (холод/жара) больше не вызывает судороги.
+	-- Раньше на зимних картах это давало случайные припадки из-за переохлаждения.
+	local temperature = org.temperature or 36.7
+	local curTime = CurTime()
+	local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
+	if seizureBrainDamage > 0.05 then
 
 	if organSystemsEnabled then
 		local brainDelta = (org.brain or 0) - oldSeizureBrain

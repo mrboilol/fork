@@ -1055,11 +1055,321 @@ function PANEL:PostInit()
             end)
             for k, v in SortedPairs(hg.Accessories or {}) do
                 if not placements[v.placement] then continue end
-                if not lply:PS_HasItem(k) and v.bPointShop and not hg.Appearance.GetAccessToAll(lply) then continue end
-                AddSelectorModelRow(scroll, string.NiceName(v.name or k), v, function()
-                    return GetAttachmentValue(slotID) == k
-                end, function()
-                    main.AppearanceTable.AAttachments[slotID] = k
+                local hasItem = lply.PS_HasItem and lply:PS_HasItem(k)
+                if not hasItem and v.bPointShop and not hg.Appearance.GetAccessToAll(lply) then continue end
+                if v.allowed and not v.allowed[lply:SteamID()] and not hg.Appearance.GetAccessToAll(lply) then continue end
+                local fk = BuildAccessoryFamilyKey(v)
+                local fam = families[fk]
+                if not fam then
+                    fam = { model = v.model, variants = {} }
+                    families[fk] = fam
+                    table.insert(ordered, fam)
+                end
+                table.insert(fam.variants, { key = k, data = v })
+            end
+            local function skinVal(vr)
+                local s = vr.data.skin
+                if isfunction(s) then s = nil end
+                return s or 0
+            end
+            for _,fam in ipairs(ordered) do
+                table.sort(fam.variants, function(a,b)
+                    local sa, sb = skinVal(a), skinVal(b)
+                    if sa ~= sb then return sa < sb end
+                    return a.key < b.key
+                end)
+            end
+            for _,fam in ipairs(ordered) do
+                if #fam.variants == 1 then
+                    local vr = fam.variants[1]
+                    local k = vr.key
+                    local v = vr.data
+                    UI.ModelRow(scroll, string.NiceName(v.name or k), v, function() return GetAttachmentValue(slotID)==k end, function()
+                        main.AppearanceTable.AAttachments[slotID] = k
+                        main:SyncSharedPreview()
+                        PlayCloth()
+                    end, v.placement or title)
+                else
+                    local base = fam.variants[1]
+                    local famTitle = string.NiceName(tostring(base.data.name or base.key):gsub("%s*%d+%s*$", ""))
+                    UI.SkinRow(scroll, famTitle, fam, main, slotID, function() return AccessoryFamilyActive(fam, slotID) end)
+                end
+            end
+        end)
+    end
+
+    local function GetAccessoryName(key)
+        if not key or key=="" or key=="none" then return nil end
+        local d = hg.Accessories and hg.Accessories[key]
+        if d and d.name and d.name != "" then return tostring(d.name) end
+        return string.NiceName(tostring(key))
+    end
+
+    local function GetColorableAccessories()
+        local result, seen = {}, {}
+        for _,key in ipairs(main.AppearanceTable.AAttachments or {}) do
+            local d = hg.Accessories and hg.Accessories[key]
+            if d and d.bSetColor and not seen[key] then seen[key]=true table.insert(result, key) end
+        end
+        return result
+    end
+
+    local function OpenAccessoryColorMenu()
+        local colorable = GetColorableAccessories()
+        OpenSelector("Acc. Tint", "Acc. Tint", "Accessory Color", function(scroll)
+            if #colorable == 0 then
+                local lbl = vgui.Create("DLabel", scroll)
+                lbl:Dock(TOP)
+                lbl:DockMargin(MU(6),MU(6),MU(6),MU(6))
+                lbl:SetFont("ZCity_Menu_Settings_Tiny")
+                lbl:SetTextColor(CLR.dim)
+                lbl:SetText("Equip an accessory with color support to tint it.")
+                lbl:SizeToContents()
+                return
+            end
+            local targetKey = colorable[1]
+            local function getClr()
+                local base = main.AppearanceTable.AColor or color_white
+                local stored = main.AppearanceTable.AAttachmentColors and main.AppearanceTable.AAttachmentColors[targetKey]
+                if IsColor(stored) then return stored end
+                if istable(stored) and stored.r and stored.g and stored.b then return Color(stored.r,stored.g,stored.b) end
+                return base
+            end
+            local lbl = vgui.Create("DLabel", scroll)
+            lbl:Dock(TOP)
+            lbl:DockMargin(MU(6),MU(6),MU(6),MU(3))
+            lbl:SetFont("ZCity_Menu_Settings_Tiny")
+            lbl:SetTextColor(CLR.text)
+            lbl:SetText("Select accessory:")
+            lbl:SizeToContents()
+            local picker = vgui.Create("DComboBox", scroll)
+            picker:Dock(TOP)
+            picker:DockMargin(MU(6),MU(3),MU(6),MU(6))
+            picker:SetTall(MU(22))
+            for _,key in ipairs(colorable) do picker:AddChoice(GetAccessoryName(key) or key, key, key==targetKey) end
+            picker:SetValue(GetAccessoryName(targetKey) or targetKey)
+            local mixer = vgui.Create("DColorMixer", scroll)
+            mixer:Dock(TOP)
+            mixer:DockMargin(MU(6),MU(3),MU(6),MU(6))
+            mixer:SetTall(MU(160))
+            mixer:SetPalette(false)
+            mixer:SetAlphaBar(false)
+            mixer:SetWangs(true)
+            mixer:SetColor(getClr())
+            main.AppearanceTable.AAttachmentColors = main.AppearanceTable.AAttachmentColors or {}
+            function mixer:ValueChanged(c) main.AppearanceTable.AAttachmentColors[targetKey] = IsColor(c) and c or Color(c.r,c.g,c.b) end
+            function picker:OnSelect(i,v,d) targetKey=d mixer:SetColor(getClr()) end
+            local resetBtn = vgui.Create("DButton", scroll)
+            resetBtn:Dock(TOP)
+            resetBtn:DockMargin(MU(6),MU(3),MU(6),MU(6))
+            resetBtn:SetTall(MU(24))
+            resetBtn:SetText("Reset Color")
+            resetBtn:SetFont("ZCity_Menu_Settings_Tiny")
+            function resetBtn:Paint(w,h)
+                surface.SetDrawColor(22,20,17,220)
+                surface.DrawRect(0,0,w,h)
+                surface.SetDrawColor(CLR.gold.r,CLR.gold.g,CLR.gold.b,80)
+                surface.DrawOutlinedRect(0,0,w,h,1)
+                draw.SimpleText("Reset Color", "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, CLR.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            end
+            function resetBtn:DoClick()
+                main.AppearanceTable.AAttachmentColors = main.AppearanceTable.AAttachmentColors or {}
+                main.AppearanceTable.AAttachmentColors[targetKey] = nil
+                mixer:SetColor(main.AppearanceTable.AColor or color_white)
+            end
+        end)
+    end
+
+    local function OpenPosesMenu()
+        local equipped = {}
+        for i = 1, 6 do
+            local key = main.AppearanceTable.AAttachments and main.AppearanceTable.AAttachments[i]
+            if key and key != "" and key != "none" and hg.Accessories[key] then
+                table.insert(equipped, key)
+            end
+        end
+        OpenSelector("Poses", "Poses", "Adjust accessory poses", function(scroll)
+            if #equipped == 0 then
+                local lbl = vgui.Create("DLabel", scroll)
+                lbl:Dock(TOP)
+                lbl:DockMargin(MU(6),MU(6),MU(6),MU(6))
+                lbl:SetFont("ZCity_Menu_Settings_Tiny")
+                lbl:SetTextColor(CLR.dim)
+                lbl:SetText("Equip an accessory first.")
+                lbl:SizeToContents()
+                return
+            end
+            local targetKey = equipped[1]
+            local function getAcc() return hg.Accessories[targetKey] end
+            local function isFem() local md = main:GetCurrentModelData() return md and md.sex end
+            local function getPose()
+                local acc = getAcc()
+                if not acc then return nil end
+                return isFem() and acc.fempos or acc.malepos
+            end
+            local function setPose(pos, ang, scale)
+                local acc = getAcc()
+                if not acc then return end
+                local pose = {pos, ang, scale}
+                if isFem() then acc.fempos = pose else acc.malepos = pose end
+                acc._poseModified = true
+                main:SyncSharedPreview()
+            end
+            local lbl = vgui.Create("DLabel", scroll)
+            lbl:Dock(TOP)
+            lbl:DockMargin(MU(6),MU(6),MU(6),MU(3))
+            lbl:SetFont("ZCity_Menu_Settings_Tiny")
+            lbl:SetTextColor(CLR.text)
+            lbl:SetText("Select accessory:")
+            lbl:SizeToContents()
+            local picker = vgui.Create("DComboBox", scroll)
+            picker:Dock(TOP)
+            picker:DockMargin(MU(6),MU(3),MU(6),MU(6))
+            picker:SetTall(MU(22))
+            for _,key in ipairs(equipped) do picker:AddChoice(GetAccessoryName(key) or key, key, key==targetKey) end
+            picker:SetValue(GetAccessoryName(targetKey) or targetKey)
+            local function makeSlider(parent, title, min, max, initVal, onChange)
+                local row = vgui.Create("DPanel", parent)
+                row:Dock(TOP)
+                row:SetTall(MU(26))
+                row:DockMargin(MU(2),0,MU(2),MU(1))
+                row.Paint = function() end
+                local tl = vgui.Create("DLabel", row)
+                tl:Dock(LEFT)
+                tl:SetWidth(MU(28))
+                tl:SetFont("ZCity_Menu_Settings_Tiny")
+                tl:SetText(title)
+                tl:SetTextColor(CLR.text)
+                tl:SetContentAlignment(4)
+                local te = vgui.Create("DTextEntry", row)
+                te:Dock(RIGHT)
+                te:SetWidth(MU(48))
+                te:SetFont("ZCity_Menu_Settings_Tiny")
+                te:SetTextColor(CLR.text)
+                te:SetDrawLanguageID(false)
+                te:SetText(string.format("%.2f", initVal))
+                te:SetCursorColor(CLR.text)
+                te:SetHighlightColor(Color(80,80,80))
+                te.Paint = function(this, w, h)
+                    draw.RoundedBox(3, 0, 0, w, h, Color(28,28,28,200))
+                    surface.SetDrawColor(CLR.gold.r,CLR.gold.g,CLR.gold.b,60)
+                    surface.DrawOutlinedRect(0,0,w,h,1)
+                    this:DrawTextEntryText(CLR.text, CLR.accent, CLR.text)
+                end
+                local slider = vgui.Create("DSlider", row)
+                slider:Dock(FILL)
+                slider:DockMargin(MU(3),MU(4),MU(3),MU(4))
+                slider:SetTrapInside(true)
+                function slider:Paint(w,h)
+                    draw.RoundedBox(3,0,h*0.5-3,w,6,Color(40,40,40,220))
+                    surface.SetDrawColor(CLR.accent.r,CLR.accent.g,CLR.accent.b,50)
+                    surface.DrawOutlinedRect(0,h*0.5-3,w,6,1)
+                end
+                if IsValid(slider.Knob) then
+                    function slider.Knob:Paint(w,h)
+                        draw.RoundedBox(3,2,MU(1),w-4,h-MU(2),CLR.accent)
+                    end
+                end
+                row.Value = initVal
+                local function applyVal(val)
+                    val = math.Clamp(math.Round(val, 2), min, max)
+                    row.Value = val
+                    te._lock = true
+                    te:SetText(string.format("%.2f", val))
+                    te._lock = nil
+                    slider._lock = true
+                    slider:SetSlideX((val - min) / (max - min))
+                    slider._lock = nil
+                    if onChange then onChange(val) end
+                end
+                slider._lock = true
+                slider:SetSlideX((initVal - min) / (max - min))
+                slider._lock = nil
+                function slider:OnValueChanged(fr)
+                    if self._lock then return end
+                    applyVal(min + (max - min) * fr)
+                end
+                function te:OnChange()
+                    if self._lock then return end
+                    local num = tonumber(self:GetValue())
+                    if not num then return end
+                    applyVal(num)
+                end
+                function te:OnEnter()
+                    local num = tonumber(self:GetValue())
+                    if not num then
+                        self._lock = true
+                        self:SetText(string.format("%.2f", row.Value))
+                        self._lock = nil
+                        return
+                    end
+                    applyVal(num)
+                end
+                return row
+            end
+            local poseSliders = {}
+            local origPoses = hg._OrigAccPoses or {}
+            local function rebuildSliders()
+                for _,p in ipairs(poseSliders) do if IsValid(p) then p:Remove() end end
+                poseSliders = {}
+                local pose = getPose()
+                if not pose then return end
+                local orig = origPoses[targetKey]
+                local origPos = isFem() and orig and orig.fempos and orig.fempos[1] or orig and orig.malepos and orig.malepos[1] or pose[1]
+                local origAng = isFem() and orig and orig.fempos and orig.fempos[2] or orig and orig.malepos and orig.malepos[2] or pose[2]
+                local curPos = Vector(pose[1].x, pose[1].y, pose[1].z)
+                local curAng = Angle(pose[2].p, pose[2].y, pose[2].r)
+                local function updatePose()
+                    setPose(Vector(curPos.x, curPos.y, curPos.z), Angle(curAng.p, curAng.y, curAng.r), pose[3] or 1)
+                end
+                local function addPanel(p)
+                    poseSliders[#poseSliders+1] = p
+                    return p
+                end
+                local posLabel = addPanel(vgui.Create("DLabel", scroll))
+                posLabel:Dock(TOP)
+                posLabel:DockMargin(MU(6),MU(6),MU(6),MU(2))
+                posLabel:SetFont("ZCity_Menu_Settings_Tiny")
+                posLabel:SetTextColor(CLR.accent)
+                posLabel:SetText("Position (offset)")
+                posLabel:SizeToContents()
+                addPanel(makeSlider(scroll, "X", -5, 5, curPos.x - origPos.x, function(v) curPos.x = origPos.x + v updatePose() end))
+                addPanel(makeSlider(scroll, "Y", -5, 5, curPos.y - origPos.y, function(v) curPos.y = origPos.y + v updatePose() end))
+                addPanel(makeSlider(scroll, "Z", -5, 5, curPos.z - origPos.z, function(v) curPos.z = origPos.z + v updatePose() end))
+                local angLabel = addPanel(vgui.Create("DLabel", scroll))
+                angLabel:Dock(TOP)
+                angLabel:DockMargin(MU(6),MU(6),MU(6),MU(2))
+                angLabel:SetFont("ZCity_Menu_Settings_Tiny")
+                angLabel:SetTextColor(CLR.accent)
+                angLabel:SetText("Angle (offset)")
+                angLabel:SizeToContents()
+                addPanel(makeSlider(scroll, "P", -180, 180, curAng.p - origAng.p, function(v) curAng.p = origAng.p + v updatePose() end))
+                addPanel(makeSlider(scroll, "Y", -180, 180, curAng.y - origAng.y, function(v) curAng.y = origAng.y + v updatePose() end))
+                addPanel(makeSlider(scroll, "R", -180, 180, curAng.r - origAng.r, function(v) curAng.r = origAng.r + v updatePose() end))
+
+                local resetBtn = addPanel(vgui.Create("DButton", scroll))
+                resetBtn:Dock(TOP)
+                resetBtn:DockMargin(MU(6),MU(3),MU(6),MU(3))
+                resetBtn:SetTall(MU(28))
+                resetBtn:SetText("")
+                resetBtn.Paint = function(this,w,h)
+                    surface.SetDrawColor(22,20,17,220)
+                    surface.DrawRect(0,0,w,h)
+                    surface.SetDrawColor(CLR.gold.r,CLR.gold.g,CLR.gold.b,80)
+                    surface.DrawOutlinedRect(0,0,w,h,1)
+                    draw.SimpleText("Reset Pose", "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, CLR.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                end
+                resetBtn.DoClick = function()
+                    local acc = getAcc()
+                    if not acc then return end
+                    local orig = origPoses[targetKey]
+                    if not orig then return end
+                    if isFem() and orig.fempos then
+                        acc.fempos = {Vector(orig.fempos[1]), Angle(orig.fempos[2]), orig.fempos[3]}
+                    elseif orig.malepos then
+                        acc.malepos = {Vector(orig.malepos[1]), Angle(orig.malepos[2]), orig.malepos[3]}
+                    end
+                    acc._poseModified = nil
                     main:SyncSharedPreview()
                     surface.PlaySound("player/clothes_generic_foley_0" .. math.random(5) .. ".wav")
                 end, v.placement or title)

@@ -2368,13 +2368,10 @@ local function velocityDamage(ent, data)
 			local head_otrub_chance = math.Clamp((dmg - head_otrub_min_damage) * head_otrub_chance_mul, 0, head_otrub_max_chance)
 			local headDamageMul = hadhelmet and 0.2 or 1
 			local oldSkull = org.skull
-			local oldConcussion = org.concussion or 0
-			local oldBrain = org.brain or 0
+			local isMeleeHit = dmgInfo:IsDamageType(DMG_CLUB) or dmgInfo:IsDamageType(DMG_SLASH)
+			local skullDmgMul = isMeleeHit and 0.08 or 6
 			
-			-- A head collision owns one flash for the whole impact. Defer the skull
-			-- and jaw sub-route flashes so they cannot consume the shared cooldown.
-			org._deferHeadTraumaFlash = true
-			hg.organism.input_list.skull(org, bone, dmg * 6 * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
+			hg.organism.input_list.skull(org, bone, dmg * skullDmgMul * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
 			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 			org._deferHeadTraumaFlash = nil
 

@@ -596,7 +596,18 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldConcussion = org.concussion or 0
 	if isFistInflictor(dmgInfo) then dmg = dmg * fist_skull_damage_mul end
 	local result, vecrand = damageBone(org, 0.25, dmg, dmgInfo, "skull", boneindex, dir, hit, ricochet)
-	if isMelee(dmgInfo) and oldDmg < 1 and org.skull < 1 and dmg < 1.35 then result = 1 end
+	local inflictor = dmgInfo:GetInflictor()
+	local rawDamageType = impact and impact.rawDamageType or dmgInfo:GetDamageType()
+	local isStab = bit.band(rawDamageType, DMG_SLASH) != 0 and not (IsValid(inflictor) and inflictor.slash)
+	local helmet = org.owner.armors and org.owner.armors["head"]
+	local functionalHelmet = helmet and hg.armor.head and hg.armor.head[helmet]
+		and not (org.owner.armors_broken and org.owner.armors_broken[helmet])
+	local helmetApplied = (org.lastHeadArmorMitigation or 1) < 1
+
+	if isStab and functionalHelmet and helmetApplied then
+		org.skull = oldDmg
+	end
+	if isMelee(dmgInfo) and oldDmg < 1 and org.skull < 1 and dmg > 0.3 and dmg < 1.35 then result = 1 end
 
 	hg.AddHarmToAttacker(dmgInfo, (org.skull - oldDmg) * 4, "Skull bone damage harm")
 	local skullDelta = org.skull - oldDmg

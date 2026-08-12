@@ -313,8 +313,1376 @@ hg.Accessories = {
     ["bandana"] = {
         model = "models/fix/grinchfox/gangwrap/gangwrap.mdl",
         bone = "ValveBiped.Bip01_Head1",
-        malepos = {Vector(-63.5,-12,0),Angle(90,10,0),1},
-        fempos = {Vector(-63.6,-12,0),Angle(90,10,0),1},
+        malepos = {Vector(-30,-8.8,0),Angle(0,-75,-90), 1.12},
+        fempos = {Vector(-31,-8.8,0),Angle(0,-75,-90), 1.125},
+        skin = 0,
+        norender = true,
+        placement = "face2",
+    },
+
+
+    ["gaiter"] = {
+        model = "models/gaiter/gaiter.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-26.5,-8.3,.15),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8.3,0),Angle(180,105,90),.9},
+        skin = 0,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta0"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 0,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta1"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 1,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta2"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 2,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta3"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 3,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta4"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 4,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta5"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 5,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta6"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 6,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta7"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 7,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta8"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 8,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["bandana gta9"] = {
+        model = "models/bandana01/bandana01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-27,-8.4,0.1),Angle(180,105,90),1},
+        fempos = {Vector(-24.5,-8,0),Angle(180,105,90),.9},
+        skin = 9,
+        norender = true,
+        placement = "face2",
+        ScreenSpaceEffects = function()
+            -- DrawColorModify(AviatorColor)
+            surface.SetMaterial(bandanamat)
+            surface.SetDrawColor(255,255,255)
+            surface.DrawTexturedRect(-1,0,ScrW()*1.01,ScrH()*1.2)
+         end,
+    },
+
+    ["arctic_balaclava"] = {
+        model = "models/d/balaklava/arctic_reference.mdl",
+        femmodel = "models/distac/feminine_mask.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,-0.95,0),Angle(180,100,90),1.1},
+        fempos = {Vector(-1,-0.8,0),Angle(180,105,90),1.05},
+        skin = 0,
+        norender = true,
+        disallowinapperance = true,
+        bonemerge = true,
+    },
+
+    ["phoenix_balaclava"] = {
+        model = "models/d/balaklava/phoenix_balaclava.mdl",
+        femmodel = "models/distac/feminine_mask.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.6,-0.95,0),Angle(180,100,90),0.95},
+        fempos = {Vector(-0.6,-0.6,0),Angle(180,100,90),0.95},
+        skin = 0,
+        norender = true,
+        disallowinapperance = true,
+        bonemerge = true,
+    },
+    ["terrorist_band"] = {
+        model = "models/distac/band_team.mdl",
+        femmodel = "models/distac/band_team_f.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.6,-0.95,0),Angle(180,100,90),0.95},
+        fempos = {Vector(-0.6,-0.6,0),Angle(180,100,90),0.95},
+        skin = 0,
+        disallowinapperance = true,
+        bonemerge = true,
+        needcoolRender = true,
+        flex = true,
+    },
+
+    ["chain0"] = {
+        model = "models/ls/ls.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-19.2,8.3,0),Angle(0,75,90),1},
+        fempos = {Vector(-21.4,6,0),Angle(0,80,90),1},
+        skin = 0,
+        norender = false,
+        placement = "spine"
+    },
+
+    ["chain1"] = {
+        model = "models/ls/ls.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-19.2,8.3,0),Angle(0,75,90),1},
+        fempos = {Vector(-21.4,6,0),Angle(0,80,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine"
+    },
+
+    ["chain2"] = {
+        model = "models/teef/teef.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-19,8.3,0),Angle(0,75,90),1},
+        fempos = {Vector(-21.4,6,0),Angle(0,80,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        allowed = {
+            ["STEAM_0:0:633165354"] = true,
+            ["STEAM_0:1:550657857"] = true,
+        },
+        name = "Chain of a buster",
+    },
+    -- scarfs
+    ["white scarf"] = {
+        model = "models/sal/acc/fix/scarf01.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-18,8,0),Angle(0,75,90),1},
+        fempos = {Vector(-18,5.5,0),Angle(0,80,90),.9},
+        skin = 0,
+        norender = false,
+        hideWhenAim = true,
+        placement = "spine"
+    },
+
+    ["gray scarf"] = {
+        model = "models/sal/acc/fix/scarf01.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-18,8,0),Angle(0,75,90),1},
+        fempos = {Vector(-18,5.5,0),Angle(0,80,90),.9},
+        skin = 1,
+        norender = false,
+        hideWhenAim = true,
+        placement = "spine",
+    },
+
+    ["black scarf"] = {
+        model = "models/sal/acc/fix/scarf01.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-18,8,0),Angle(0,75,90),1},
+        fempos = {Vector(-18,5.5,0),Angle(0,80,90),.9},
+        skin = 2,
+        norender = false,
+        hideWhenAim = true,
+        placement = "spine",
+    },
+
+    ["blue scarf"] = {
+        model = "models/sal/acc/fix/scarf01.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-18,8,0),Angle(0,75,90),1},
+        fempos = {Vector(-18,5.5,0),Angle(0,80,90),.9},
+        skin = 3,
+        norender = false,
+        hideWhenAim = true,
+        placement = "spine",
+    },
+
+    ["red scarf"] = {
+        model = "models/sal/acc/fix/scarf01.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-18,8,0),Angle(0,75,90),1},
+        fempos = {Vector(-18,5.5,0),Angle(0,80,90),.9},
+        skin = 4,
+        norender = false,
+        hideWhenAim = true,
+        placement = "spine",
+    },
+
+    ["green scarf"] = {
+        model = "models/sal/acc/fix/scarf01.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-18,8,0),Angle(0,75,90),1},
+        fempos = {Vector(-18,5.5,0),Angle(0,80,90),.9},
+        skin = 5,
+        norender = false,
+        hideWhenAim = true,
+        placement = "spine",
+    },
+
+    ["pink scarf"] = {
+        model = "models/sal/acc/fix/scarf01.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-18,8,0),Angle(0,75,90),1},
+        fempos = {Vector(-18,5.5,0),Angle(0,80,90),.9},
+        skin = 6,
+        norender = false,
+        hideWhenAim = true,
+        placement = "spine",
+    },
+    -- earmuffs
+    ["red earmuffs"] = {
+        model = "models/modified/headphones.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(2.8,-1,0),Angle(180,105,90),1},
+        fempos = {Vector(1.8,-1,0),Angle(180,105,90),0.95},
+        skin = 0,
+        norender = true,
+        placement = "ears",
+    },
+
+    ["green earmuffs"] = {
+        model = "models/modified/headphones.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(2.8,-1,0),Angle(180,105,90),1},
+        fempos = {Vector(1.8,-1,0),Angle(180,105,90),0.95},
+        skin = 2,
+        norender = true,
+        placement = "ears",
+    },
+
+    ["yellow earmuffs"] = {
+        model = "models/modified/headphones.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(2.8,-1,0),Angle(180,105,90),1},
+        fempos = {Vector(1.8,-1,0),Angle(180,105,90),0.95},
+        skin = 3,
+        norender = true,
+        placement = "ears",
+    },
+    -- fedoras
+
+    ["gray fedora"] = {
+        model = "models/modified/hat01_fix.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        fempos = {Vector(3,0.2,0),Angle(180,105,90),1},
+        skin = 0,
+        norender = true,
+        placement = "head",
+    },
+
+    ["black fedora"] = {
+        model = "models/modified/hat01_fix.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        fempos = {Vector(3,0.2,0),Angle(180,105,90),1},
+        skin = 1,
+        norender = true,
+        placement = "head",
+    },
+
+    ["white fedora"] = {
+        model = "models/modified/hat01_fix.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        fempos = {Vector(3,0.2,0),Angle(180,105,90),1},
+        skin = 2,
+        norender = true,
+        placement = "head",
+    },
+
+    ["beige fedora"] = {
+        model = "models/modified/hat01_fix.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        fempos = {Vector(3,0.2,0),Angle(180,105,90),1},
+        skin = 3,
+        norender = true,
+        placement = "head",
+    },
+
+    ["black/red fedora"] = {
+        model = "models/modified/hat01_fix.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        fempos = {Vector(3,0.2,0),Angle(180,105,90),1},
+        skin = 5,
+        norender = true,
+        placement = "head",
+    },
+
+    ["blue fedora"] = {
+        model = "models/modified/hat01_fix.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        fempos = {Vector(3,0.2,0),Angle(180,105,90),1},
+        skin = 7,
+        norender = true,
+        placement = "head",
+    },
+    -- beanies
+
+    ["striped beanie"] = {
+        model = "models/modified/hat03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(4,0,0),Angle(180,105,90),1},
+        fempos = {Vector(3,0.2,0),Angle(180,105,90),1},
+        skin = 0,
+        norender = true,
+        placement = "head",
+    },
+
+    ["striped beanie"] = {
+        model = "models/modified/hat03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(4,0,0),Angle(180,105,90),1},
+        fempos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        skin = 0,
+        norender = true,
+        placement = "head",
+    },
+
+    ["periwinkle beanie"] = {
+        model = "models/modified/hat03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(4,0,0),Angle(180,105,90),1},
+        fempos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        skin = 1,
+        norender = true,
+        placement = "head",
+    },
+
+    ["fuschia beanie"] = {
+        model = "models/modified/hat03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(4,0,0),Angle(180,105,90),1},
+        fempos = {Vector(3.8,0.2,0),Angle(180,105,90),1},
+        skin = 2,
+        norender = true,
+        placement = "head",
+    },
+
+    ["white beanie"] = {
+        model = "models/modified/hat03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(4,0,0),Angle(180,105,90),1},
+        fempos = {Vector(3.8,0.2,0),Angle(180,100,90),1},
+        skin = 3,
+        norender = true,
+        placement = "head",
+    },
+
+    ["gray beanie"] = {
+        model = "models/modified/hat03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(4,0,0),Angle(180,105,90),1},
+        fempos = {Vector(3.8,0.2,0),Angle(180,100,90),1},
+        skin = 4,
+        norender = true,
+        placement = "head",
+    },
+    -- backpacks
+    ["large red backpack"] = {
+        model = "models/modified/backpack_1.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-7.5,5.2,0),Angle(0,80,90),1},
+        fempos = {Vector(-8,4,0),Angle(0,80,90),0.9},
+        skin = 0,
+        norender = false,
+        placement = "spine2",
+    },
+
+    ["large gray backpack"] = {
+        model = "models/modified/backpack_1.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-7.5,5.2,0),Angle(0,80,90),1},
+        fempos = {Vector(-8,4,0),Angle(0,80,90),0.9},
+        skin = 1,
+        norender = false,
+        placement = "spine2",
+    },
+
+    ["robberybag"] = {
+        model = "models/robberybag/robberybag.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-17.5,12,2),Angle(0,60,95),1},
+        fempos = {Vector(-20,5,-0.1),Angle(0,80,90),0.9},
+        skin = 0,
+        norender = false,
+        placement = "spine2",
+    },
+
+    ["medium backpack"] = {
+        model = "models/modified/backpack_3.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-7.5,4,0),Angle(0,80,90),1},
+        fempos = {Vector(-8,3,0),Angle(0,80,90),0.9},
+        skin = 0,
+        norender = false,
+        placement = "spine2",
+    },
+
+    ["medium gray backpack"] = {
+        model = "models/modified/backpack_3.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(-7.5,4,0),Angle(0,80,90),1},
+        fempos = {Vector(-8,3,0),Angle(0,80,90),0.9},
+        skin = 1,
+        norender = false,
+        placement = "spine2",
+    },
+
+    ["monokl"] = {
+        model = "models/distac/monokl.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-63.5,-12,0),Angle(180,100,90),1},
+        fempos = {Vector(-63.56,-12.06,0),Angle(180,100,90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = false,
+        placement = "face",
+        vpos = Vector(0,0,69)
+    },
+    
+    ["china hat"] = {
+        model = "models/distac/china_hat.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(4.5,-0.35,0),Angle(180,100,90),1},
+        fempos = {Vector(3,-0.8,0),Angle(180,105,90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "head",
+        vpos = Vector(0,0,0)
+    },
+
+    ["helicopter cap"] = {
+        model = "models/distac/cap_helecopterkid.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-70,-13.5,0),Angle(180,100,90),1.1},
+        fempos = {Vector(-63,-18.5,0),Angle(180,105,90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = false,
+        placement = "head",
+        vpos = Vector(0,0,69)
+    },
+    
+    ["welding glasses"] = {
+        model = "models/distac/glassis_welding glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,-0.95,0),Angle(180,100,90),1},
+        fempos = {Vector(0,0,0),Angle(0,0,0),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        vpos = Vector(0,0,69)
+    },
+
+    ["big glasses"] = {
+        model = "models/distac/big_ahhh_glassis.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,-0.95,0),Angle(180,100,90),1},
+        fempos = {Vector(0,0,0),Angle(0,0,0),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+    
+    ["eyeglasses gta0"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta1"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 1,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta2"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 2,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta3"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 3,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta4"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 4,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta5"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 5,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta6"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 6,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta7"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 7,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta8"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 8,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta9"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 9,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta10"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 10,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["eyeglasses gta11"] = {
+        model = "models/eyeglasses_03/eyeglasses_03.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-0.5,-0.8,0.1),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.6,-0.4,0.1),Angle(0,-80,-90),1},
+        skin = 11,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses0"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses1"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 1,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses2"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 2,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses3"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 3,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses4"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 4,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses5"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 5,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses6"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 6,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["exclusive glasses7"] = {
+        model = "models/exclusive_glasses/exclusive_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 7,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses0"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses1"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 1,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses2"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 2,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses3"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 3,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses4"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 4,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses5"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 5,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses6"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 6,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["business glasses7"] = {
+        model = "models/business_nerd_glasses_01/business_nerd_glasses_01.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1.1,0.3,0.1),Angle(0,90,-90),1},
+        fempos = {Vector(-0.5,-0.6,0.1),Angle(0,103,-90),1},
+        skin = 7,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["snowboard gta0"] = {
+        model = "models/biker_glasses/biker_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.4,-0.4,0),Angle(0,100,90),1},
+        fempos = {Vector(-0.5,-0.4,-0.1),Angle(0,100,90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["snowboard gta1"] = {
+        model = "models/biker_glasses/biker_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.4,-0.4,-0),Angle(0,100,90),1},
+        fempos = {Vector(-0.5,-0.4,-0.1),Angle(0,100,90),1},
+        skin = 1,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["snowboard gta2"] = {
+        model = "models/biker_glasses/biker_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.4,-0.4,-0),Angle(0,100,90),1},
+        fempos = {Vector(-0.5,-0.4,-0.1),Angle(0,100,90),1},
+        skin = 2,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["snowboard gta3"] = {
+        model = "models/biker_glasses/biker_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.4,-0.4,-0),Angle(0,100,90),1},
+        fempos = {Vector(-0.5,-0.4,-0.1),Angle(0,100,90),1},
+        skin = 3,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["snowboard gta4"] = {
+        model = "models/biker_glasses/biker_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.4,-0.4,-0),Angle(0,100,90),1},
+        fempos = {Vector(-0.5,-0.4,-0.1),Angle(0,100,90),1},
+        skin = 4,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["snowboard gta5"] = {
+        model = "models/biker_glasses/biker_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.4,-0.4,-0),Angle(0,100,90),1},
+        fempos = {Vector(-0.5,-0.4,-0.1),Angle(0,100,90),1},
+        skin = 5,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["snowboard gta6"] = {
+        model = "models/biker_glasses/biker_glasses.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.4,-0.4,-0),Angle(0,100,90),1},
+        fempos = {Vector(-0.5,-0.4,-0.1),Angle(0,100,90),1},
+        skin = 6,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["glasses with nose"] = {
+        model = "models/distac/glasses_with_mustache.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,-0.95,0),Angle(180,100,90),1},
+        fempos = {Vector(0,0,0),Angle(0,0,0),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+    ["glasses fmf"] = {
+        model = "models/distac/street_kid_fmf.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,-0.95,0),Angle(180,100,90),1},
+        fempos = {Vector(0,0,0),Angle(0,0,0),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "face",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["warmcap"] = {
+        model = "models/distac/warmcap.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,-0.95,0),Angle(180,100,90),1},
+        fempos = {Vector(0,0,0),Angle(0,0,0),1},
+        skin = 0,
+        norender = true,
+        bonemerge = true,
+        placement = "head",
+        flex = true,
+        vpos = Vector(0,0,69)
+    },
+    -- SCUGS!!!
+    ["slugcat"] = {
+        model = "models/salat_port/slugcat_figure.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        bodygroups = "0",
+        vpos = Vector(0,0,0)
+    },
+    ["slugcat monk"] = {
+        model = "models/salat_port/slugcat_figure.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(0.6,5,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        bodygroups = "1",
+        vpos = Vector(0,0,0)
+    },
+    ["slugcat gourmand"] = {
+        model = "models/salat_port/slugcat_figure.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        bodygroups = "2",
+        vpos = Vector(0,0,0)
+    },
+    ["slugcat arti"] = {
+        model = "models/salat_port/slugcat_figure.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        bodygroups = "3",
+        vpos = Vector(0,0,0)
+    },
+    ["slugcat rivulet"] = {
+        model = "models/salat_port/slugcat_figure.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        bodygroups = "4",
+        vpos = Vector(0,0,0)
+    },
+    ["slugcat speermaster"] = {
+        model = "models/salat_port/slugcat_figure.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        bodygroups = "5",
+        vpos = Vector(0,0,0)
+    },
+    ["slugcat saint"] = {
+        model = "models/salat_port/slugcat_figure.mdl",
+        bone = "ValveBiped.Bip01_Spine4",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "spine",
+        bodygroups = "6",
+        vpos = Vector(0,0,0)
+    },
+    ["headband"] = {
+        model = "models/distac/headband.mdl",
+        femmodel = "models/distac/headband_f.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 0,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        vpos = Vector(0,0,69)
+    },
+    ["occluder"] = {
+        model = "models/distac/occluder.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-63.5,-11.96,-0.6),Angle(0,-80,-89.5),1},
+        fempos = {Vector(-63.7,-12.1,0),Angle(0,-80,-90),1},
+        skin = 1,
+        norender = true,
+        bonemerge = false,
+        placement = "face",
+        vpos = Vector(0,0,69)
+    },
+    ["shapka ushanka"] = {
+        model = "models/eft_props/gear/headwear/head_ushanka.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(2.7,-0.6,0.1),Angle(180,105,90),1},
+        fempos = {Vector(2,-1,0),Angle(180,105,90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = false,
+        placement = "head",
+        vpos = Vector(0,0,69)
+    },
+    ["cap gop"] = {
+        model = "models/distac/cap_gop.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(-64.0,0),Angle(0,-90,-90),1},
+        fempos = {Vector(-64.5,-0.2,0),Angle(0,-90,-90),1},
+        skin = 0,
+        norender = true,
+        bonemerge = false,
+        placement = "head",
+        vpos = Vector(0,0,69)
+    },
+    ["headband kamikadze"] = {
+        model = "models/distac/headband.mdl",
+        femmodel = "models/distac/headband_f.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["mfdoom mask"] = {
+        model = "models/distac/mfdoom.mdl",
+        femmodel = "models/distac/mfdoom.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "face",
+        norender = true,
+        bonemerge = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["hood"] = {
+        model = "models/distac/kapishon.mdl",
+        femmodel = "models/distac/kapishon.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,4.8,0),Angle(0,90,90),1},
+        fempos = {Vector(-1.2,3.5,0),Angle(0,90,90),1},
+        skin = 1,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        bSetColor = true,
+        vpos = Vector(0,0,69)
+    },
+
+    ["christmas hat"] = {
+        model = "models/grinchfox/head_wear/christmas_hat.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(2,0.5,0),Angle(180,90,90),1},
+        fempos = {Vector(0.2,0,0),Angle(180,90,90),1},
+        skin = 0,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        bSetColor = true,
+    },
+
+    ["cap deeper"] = {
+        model = "models/grinchfox/head_wear/caphat.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1,0.4,0),Angle(0,-95,-90),1},
+        fempos = {Vector(0,0.1,0),Angle(0,-95,-90),1},
+        skin = 7,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        bSetColor = false,
+        vpos = Vector(0,0,5)
+    },
+
+    ["cap nurse"] = {
+        model = "models/grinchfox/head_wear/caphat.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1,0.4,0),Angle(0,-95,-90),1},
+        fempos = {Vector(0,0.1,0),Angle(0,-95,-90),1},
+        skin = 9,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        bSetColor = false,
+        vpos = Vector(0,0,5)
+    },
+
+    ["deal glasses"] = {
+        model = "models/grinchfox/head_wear/dealglasses_fix.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.6,0.5,0),Angle(0,-90,-90),1.1},
+        fempos = {Vector(-0.5,.5,0),Angle(0,-90,-90),1.1},
+        skin = 0,
+        norender = true,
+        placement = "face",
+        norender = true,
+        bonemerge = true,
+        bSetColor = false,
+        vpos = Vector(0,0,5)
+    },
+
+    ["cool glasses"] = {
+        model = "models/grinchfox/head_wear/fancyglasses2.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.6,0.2,0),Angle(0,-90,-90),1.1},
+        fempos = {Vector(-0.5,.2,0),Angle(0,-90,-90),1.1},
+        skin = 0,
+        norender = true,
+        placement = "face",
+        norender = true,
+        bonemerge = true,
+        bSetColor = false,
+        vpos = Vector(0,0,5)
+    },
+
+    ["retro glasses"] = {
+        model = "models/grinchfox/head_wear/fancyglasses3.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.6,0.2,0),Angle(0,-90,-90),1.1},
+        fempos = {Vector(-0.5,.2,0),Angle(0,-90,-90),1.1},
+        skin = 0,
+        norender = true,
+        placement = "face",
+        norender = true,
+        bonemerge = true,
+        bSetColor = false,
+        vpos = Vector(0,0,5)
+    },
+
+    ["tophat white"] = {
+        model = "models/grinchfox/head_wear/tophat.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(2,0.4,0),Angle(0,-95,-90),1},
+        fempos = {Vector(1,0.1,0),Angle(0,-95,-90),1},
+        skin = 1,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        bSetColor = false,
+        vpos = Vector(0,0,5)
+    },
+
+    ["baseball hub"] = {
+        model = "models/grinchfox/head_wear/baseballhat.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(1,0.4,0),Angle(0,-95,-90),1.1},
+        fempos = {Vector(0,0.1,0),Angle(0,-95,-90),1},
+        skin = 6,
+        norender = false,
+        placement = "head",
+        norender = true,
+        bonemerge = true,
+        bSetColor = false,  
+        vpos = Vector(0,0,5)
+    },
+
+    ["beard 1"] = {
+        model = "models/mosi/fallout4/character/facialhair/smoothoperator.mdl",
+        bone = "ValveBiped.Bip01_Head1",
+        malepos = {Vector(0.2,-4.89,0),Angle(0,-70,-90),1},
+        fempos = {Vector(-0.7,-5,0),Angle(0,-70,-90),1},
         skin = 0,
         bSetColor = true,
         vecColorOveride = Vector(0.2,0.2,0.2),
