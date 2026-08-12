@@ -84,6 +84,8 @@ local OtrubModeStation
 local activeOtrubMode
 local AltRemDyingStation
 local ItsHopelessStation
+local ITS_HOPELESS_LOOP_START = 5
+local ITS_HOPELESS_LOOP_END_TRIM = 12
 local hg_dyingpulse = CreateClientConVar("hg_dyingpulse", "1", true, false, "Detect peaks for screen shake when dying", 0, 1)
 local hg_laivlik = CreateClientConVar("hg_laivlik", "1", true, false, "Show black square on skull destruction: 0=off, 1=on", 0, 1)
 local hg_damage_corner_distortion = CreateClientConVar("hg_damage_corner_distortion", "1", true, false, "Distort screen corners from pain and head trauma", 0, 1)
@@ -1193,11 +1195,20 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				station:SetTime(math.min(math.Rand(0, station:GetLength()), 139))
+				station:SetTime(ITS_HOPELESS_LOOP_START)
 				ItsHopelessStation = station
 				station:EnableLooping(true)
 			end
 		end)
+	end
+
+	if IsValid(ItsHopelessStation) then
+		local trackLength = ItsHopelessStation:GetLength()
+		local loopEnd = trackLength - ITS_HOPELESS_LOOP_END_TRIM
+		local playbackTime = ItsHopelessStation:GetTime()
+		if loopEnd > ITS_HOPELESS_LOOP_START and (playbackTime < ITS_HOPELESS_LOOP_START or playbackTime >= loopEnd) then
+			ItsHopelessStation:SetTime(ITS_HOPELESS_LOOP_START)
+		end
 	end
 
 	if canRetrySound("SillydyingStation", SillydyingStation) then
@@ -2794,7 +2805,10 @@ end)
 local HEADHIT_VOLUME = 1.0
 local HEADHIT_BASE_BOOST = 1.2 -- every head hit is louder than full volume
 local CONCUSSION_VOLUME = 0.45
-local CONCUSSION_SOUND_PATH = "sound/concussion"
+local CONCUSSION_SOUND_PATHS = {
+    "sound/concussion1.mp3",
+    "sound/concussion2.mp3"
+}
 local last_headhit_sound = 0
 local last_concussion_sound = 0
 
@@ -2816,7 +2830,8 @@ local function PlayConcussionSound(volumeScale)
     if CurTime() < last_concussion_sound + 0.15 then return end
     last_concussion_sound = CurTime()
     volumeScale = math.Clamp(volumeScale or 1, 0.3, 1.2)
-    sound.PlayFile(CONCUSSION_SOUND_PATH .. math.random(1, 4) .. ".mp3", "noblock noplay", function(station)
+    local soundPath = CONCUSSION_SOUND_PATHS[math.random(#CONCUSSION_SOUND_PATHS)]
+    sound.PlayFile(soundPath, "noblock noplay", function(station)
         if IsValid(station) then
             station:SetVolume(CONCUSSION_VOLUME * volumeScale)
             station:Play()

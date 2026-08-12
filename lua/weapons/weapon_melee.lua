@@ -1911,7 +1911,6 @@ end
 
 function SWEP:CanClashWeapon()
     if self.CantClash then return false end
-    if self:IsKnifeWeapon() then return false end
 
     return self:GetClashMaterial() ~= nil
 end
@@ -2387,15 +2386,6 @@ function SWEP:SendClashAnimStop(wep, normal)
     net.SendPVS(wep:GetPos())
 end
 
-function SWEP:SendClashRewind(wep, normal)
-    if not SERVER or not IsValid(wep) then return end
-
-    net.Start("hg_melee_clash_rewind")
-    net.WriteEntity(wep)
-    net.WriteVector(normal and normal:GetNormalized() or vector_up)
-    net.SendPVS(wep:GetPos())
-end
-
 function SWEP:HandleMeleeClash(otherWep, clashPos, hitNormal, attacktype, otherAttacktype)
     if not IsValid(otherWep) or not clashPos then return end
     if (self.NextClashTime or 0) > CurTime() or (otherWep.NextClashTime or 0) > CurTime() then return end
@@ -2412,21 +2402,18 @@ function SWEP:HandleMeleeClash(otherWep, clashPos, hitNormal, attacktype, otherA
     self:PlayConfiguredWorldSound(self:GetClashSoundData(otherWep, attacktype, otherAttacktype), clashPos, 1)
     self:DispatchBlockImpactFx(clashTrace, self, "parry")
     self:DispatchBlockImpactFx(clashTrace, otherWep, "parry")
-
-    self:AbortClashAttack()
-    self:SendClashRewind(self, clashTrace.HitNormal)
-
-    otherWep:AbortClashAttack()
-    self:SendClashRewind(otherWep, -clashTrace.HitNormal)
-
-    local owner1 = self:GetOwner()
-    local owner2 = otherWep:GetOwner()
-    local regenVal = self.ClashRegenMul or 0.2
-    if IsValid(owner1) and owner1.organism and owner1.organism.stamina then
-        owner1.organism.stamina.regenMul = math.min(owner1.organism.stamina.regenMul or 1, regenVal)
+    if self:IsChargeAttackType(attacktype) then
+        self:SendMeleeHitStop(attacktype, clashTrace.HitNormal, "parry")
+    else
+        self:AbortClashAttack()
+        self:SendClashAnimStop(self, clashTrace.HitNormal)
     end
-    if IsValid(owner2) and owner2.organism and owner2.organism.stamina then
-        owner2.organism.stamina.regenMul = math.min(owner2.organism.stamina.regenMul or 1, regenVal)
+
+    if otherWep.IsChargeAttackType and otherWep:IsChargeAttackType(otherAttacktype) then
+        otherWep:SendMeleeHitStop(otherAttacktype, -clashTrace.HitNormal, "parry")
+    else
+        otherWep:AbortClashAttack()
+        self:SendClashAnimStop(otherWep, -clashTrace.HitNormal)
     end
 
     return {
@@ -2438,7 +2425,7 @@ function SWEP:HandleMeleeClash(otherWep, clashPos, hitNormal, attacktype, otherA
     }
 end
 
-function SWEP:FindMeleeClash(owner, ent, attacktype, inattackLength, tr, windupOnly)
+function SWEP:FindMeleeClash(owner, ent, attacktype, inattackLength, tr)
     if not SERVER then return end
     if not IsValid(owner) or not IsValid(ent) then return end
     if not self:CanClashWeapon() then return end
@@ -2458,10 +2445,8 @@ function SWEP:FindMeleeClash(owner, ent, attacktype, inattackLength, tr, windupO
         if not otherWep.ismelee2 and otherWep.Base ~= "weapon_melee" then continue end
         if not otherWep.CanClashWeapon or not otherWep:CanClashWeapon() then continue end
         if not otherWep.GetInAttack or not otherWep:GetInAttack() then continue end
-        if windupOnly and (otherWep.GetLastAttack and otherWep:GetLastAttack() or 0) <= CurTime() then continue end
 
         local otherAttacktype = otherWep.GetAttackType and otherWep:GetAttackType() or 1
-        if otherAttacktype == 3 and attacktype ~= 3 then continue end
         local otherEnt = hg.GetCurrentCharacter(clashOwner)
 
         if not IsValid(otherEnt) then continue end
@@ -2646,24 +2631,12 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
             end
 
             if ent.organism and ent.organism.stamina then
-                local w = wep.weight or 0.4
-                ent.organism.stamina[1] = math.max(0, ent.organism.stamina[1] - ((self.BlockDefenderStaminaBase or 8) + w * (self.BlockDefenderStaminaPerWeight or 6)))
-                ent.organism.stamina.regenMul = math.min(ent.organism.stamina.regenMul or 1, self.BlockRegenMul or 0.3)
-
-                if cvars.Number("developer", 0) >= 1 then
-                    print("[block] defender=" .. tostring(ent) .. " weight=" .. math.Round(wep.weight or 0, 2) .. " stamina[1]=" .. math.Round(ent.organism.stamina[1], 1) .. " regenMul=" .. math.Round(ent.organism.stamina.regenMul, 2))
-                end
+                ent.organism.stamina.subadd = ent.organism.stamina.subadd + blockStaminaCost
             end
 
             if tierDiff >= (self.BlockBreakTierDiff or 2) then
                 if ent.organism and ent.organism.stamina then
-                    local w = wep.weight or 0.4
-                    ent.organism.stamina[1] = math.max(0, ent.organism.stamina[1] - ((self.BlockBreakDefenderStaminaBase or 12) + w * (self.BlockBreakDefenderStaminaPerWeight or 8)))
-                ent.organism.stamina.regenMul = math.min(ent.organism.stamina.regenMul or 1, self.BlockRegenMul or 0.3)
-
-                if cvars.Number("developer", 0) >= 1 then
-                    print("[block] defender=" .. tostring(ent) .. " weight=" .. math.Round(wep.weight or 0, 2) .. " stamina[1]=" .. math.Round(ent.organism.stamina[1], 1) .. " regenMul=" .. math.Round(ent.organism.stamina.regenMul, 2))
-                end
+                    ent.organism.stamina.subadd = ent.organism.stamina.subadd + selfdmg * (wep.BlockBreakStaminaMul or self.BlockBreakStaminaMul or 0.75)
                 end
 
                 if wep.SetBlocking then
@@ -2718,20 +2691,15 @@ local matBlood = Material("zbattle/blood")
 SWEP.BlockTier = 1
 SWEP.BlockMaterial = nil
 SWEP.BlockSound = nil
-SWEP.BlockParryWindow = 0.07
-SWEP.BlockParryWindowBonus = 0
+SWEP.BlockParryWindow = 0.35
+SWEP.BlockParryWindowBonus = 0.08
 SWEP.BlockWeakenDamageMul = 0.35
 SWEP.BlockBreakTierDiff = 2
 SWEP.BlockBreakCooldown = 0.65
-SWEP.BlockBreakStaminaMul = 1.5
+SWEP.BlockBreakStaminaMul = 0.75
 SWEP.BlockStaminaTierMul = 0.35
-SWEP.BlockHitStaminaMul = 2
+SWEP.BlockHitStaminaMul = 0.5
 SWEP.BlockParryStaminaMul = 0.5
-SWEP.BlockDefenderStaminaBase = 8
-SWEP.BlockDefenderStaminaPerWeight = 6
-SWEP.BlockBreakDefenderStaminaBase = 12
-SWEP.BlockBreakDefenderStaminaPerWeight = 8
-SWEP.BlockRegenMul = 0.15
 SWEP.BlockParryStaminaReward = 4
 SWEP.BlockRiposteWindow = 0.6
 SWEP.BlockRiposteSpeedMul = 0.7
@@ -2779,9 +2747,6 @@ SWEP.ClashSearchRadius = 22
 SWEP.ClashFrontDot = 0.2
 SWEP.ClashFacingDot = -0.2
 SWEP.ClashCooldown = nil
-SWEP.ClashRegenMul = 0.2
-SWEP.ClashRewindTime = 0.7
-SWEP.ClashMinWindupTime = 0.7
 SWEP.BlockHitShakeClashMul = 0.9
 SWEP.FeintTime = 0.25
 SWEP.FeintRecovery = 0.18
@@ -3586,44 +3551,6 @@ function SWEP:CustomThink()
                 self.ComboAppliedThisAttack = nil
             end
         else
-            if SERVER and not self:ShouldAbortForClash() then
-                local attacktype = self:GetAttackType()
-                local inattackLen = attacktype == 2 and inattackL2 or attacktype == 3 and inattackL3 or inattackL1
-                local secondary = self:IsSecondaryAttackType(attacktype)
-                local charge = self:IsChargeAttackType(attacktype)
-
-                local attackTime = attacktype == 2 and self.Attack2Time or attacktype == 3 and (self.ChargeAttackTime or self.AttackTime) or self.AttackTime
-                local swingElapsed = attackTime * (1 - inattackLen)
-                if swingElapsed < (self.ClashMinWindupTime or 0.7) then
-                    goto meleeskip_clash
-                end
-
-                local vellen2 = math.min(owner:GetVelocity():Length() * 0.05, 40)
-                local eyetr = hg.eyeTrace(owner, (self:GetAttackLength() + vellen2), ent, owner:GetAimVector())
-                local swingAng = self:GetAttackConfigValue(self.SwingAng, self.SwingAng2, self.ChargeSwingAng, attacktype) or -90
-                local attackRads = self:GetAttackConfigValue(self.AttackRads, self.AttackRads2, self.ChargeAttackRads, attacktype) or 65
-                local normal = eyetr.Normal:Angle()
-                normal:RotateAroundAxis(normal:Forward(), swingAng)
-                normal:RotateAroundAxis(normal:Up(), ((0.5 - inattackLen) * attackRads))
-
-                local isKnife = self:IsKnifeWeapon()
-                local knifeBonus = isKnife and (self.MeleeKnifeBonus or 22) or 0
-                local baseReach = self.MeleeRange or (self:GetAttackLength() + vellen2 + knifeBonus)
-                local defMul = self.MeleeRange and 1 or (isKnife and (self.MeleeKnifeMul or 1.15) or 0.7)
-                local reachLen = baseReach * (self.MeleeReachMul or defMul)
-
-                local tr = {
-                    start = eyetr.StartPos,
-                    endpos = eyetr.StartPos + normal:Forward() * reachLen,
-                }
-
-                local clashTrace = self:FindMeleeClash(owner, ent, attacktype, inattackLen, tr, true)
-                if clashTrace and clashTrace.HGClash then
-                    return
-                end
-            end
-
-            ::meleeskip_clash::
             self.attackedOnce = nil
             self.SoftHitPlayed = false
             self.ComboAppliedThisAttack = nil
@@ -3973,7 +3900,6 @@ if SERVER then
     util.AddNetworkString("hg_melee_block_shake")
     util.AddNetworkString("hg_melee_clash_stop")
     util.AddNetworkString("hg_melee_feint")
-    util.AddNetworkString("hg_melee_clash_rewind")
     util.AddNetworkString("MeleeBlockEffect")
     util.AddNetworkString("MeleeBlockPush")
 elseif CLIENT then
@@ -4185,23 +4111,6 @@ elseif CLIENT then
         end
         if IsValid(owner) and owner == LocalPlayer() then
             AddBlockImpact(0.4, wep, wep:GetPos())
-        end
-    end)
-
-    net.Receive("hg_melee_clash_rewind", function()
-        local wep = net.ReadEntity()
-        local normal = net.ReadVector()
-
-        if not IsValid(wep) then return end
-
-        wep:StartReverseRewind(wep.ClashRewindTime or 0.35, "clash")
-
-        local owner = wep:GetOwner()
-        if IsValid(owner) then
-            owner:AnimResetGestureSlot(GESTURE_SLOT_ATTACK_AND_RELOAD)
-        end
-        if IsValid(owner) and owner == LocalPlayer() then
-            AddBlockImpact(0.7, wep, wep:GetPos())
         end
     end)
 
