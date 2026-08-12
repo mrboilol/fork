@@ -768,7 +768,80 @@ ExplodeTheItem = function(self,ent)
 end
 
 function SWEP:CanSecondaryAttack()
-	return IsValid(self:GetOwner()) and not hg.GetCurrentCharacter(self:GetOwner()):IsRagdoll()
+	return not self.IEDPlantPending and IsValid(self:GetOwner()) and not hg.GetCurrentCharacter(self:GetOwner()):IsRagdoll()
+end
+
+function SWEP:BeginIEDPlant(mode, tr)
+	if self.IEDPlantPending or self:GetPlanted() then return end
+
+	self.IEDPlantPending = true
+	self.IEDPlantMode = mode
+	self.IEDPlantEntity = tr.Entity
+	self.IEDPlantPos = tr.HitPos
+	self.IEDPlantNormal = tr.HitNormal
+	self:PlayAnim("plant")
+end
+
+function SWEP:FinishIEDPlant()
+	if not self.IEDPlantPending or self:GetPlanted() then return end
+
+	local owner = self:GetOwner()
+	local mode = self.IEDPlantMode
+	local bomb
+
+	if mode == "attached" then
+		bomb = self.IEDPlantEntity
+		if not IsValid(bomb) or not IsValid(bomb:GetPhysicsObject()) then
+			self.IEDPlantPending = false
+			self:PlayAnim("idle")
+			return
+		end
+	else
+		bomb = ents.Create("prop_physics")
+		if not IsValid(bomb) then
+			self.IEDPlantPending = false
+			self:PlayAnim("idle")
+			return
+		end
+
+		bomb:SetModel("models/saraphines/insurgency explosives/ied/insurgency_ied.mdl")
+		bomb:SetModelScale(0.8)
+		bomb:SetPos(self.IEDPlantPos + self.IEDPlantNormal * 16)
+		bomb:Spawn()
+		bomb:Activate()
+
+		local mins, maxs = bomb:OBBMins(), bomb:OBBMaxs()
+		local placement = util.TraceHull({
+			start = self.IEDPlantPos + self.IEDPlantNormal * 16,
+			endpos = self.IEDPlantPos,
+			mins = mins,
+			maxs = maxs,
+			filter = {owner, bomb},
+			mask = MASK_SOLID
+		})
+bomb:SetPos(placement.HitPos + placement.HitNormal * 0.5)
+
+		local phys = bomb:GetPhysicsObject()
+		if IsValid(phys) then
+			phys:SetMass(20)
+			phys:EnableMotion(true)
+			phys:SetBuoyancyRatio(0.05)
+			phys:Wake()
+		end
+	end
+
+	self.Planted = true
+	RegisterIEDBomb(self, bomb, mode == "attached" and {
+		HitPos = self.IEDPlantPos,
+		HitNormal = self.IEDPlantNormal
+	} or nil)
+	owner:EmitSound("snd_jack_hmcd_bombrig.wav", mode == "attached" and 50 or 60, 100, 1, CHAN_AUTO)
+	self:SetNextPrimaryFire(CurTime() + 2)
+	self.nextattackhuy = CurTime() + 2
+	self:SetPlanted(true)
+	self.IEDPlantPending = false
+	self.IEDPlantMode = nil
+	self.IEDPlantEntity = nil
 end
 
 function SWEP:SecondaryAttack(calledFrom)

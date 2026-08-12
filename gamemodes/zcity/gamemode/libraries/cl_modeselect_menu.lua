@@ -101,152 +101,197 @@ if CLIENT then
             surface.DrawRect(0, h - 3, w, 3)
         end
     end
-
-    local function CreateToggle(parent, getState, onClick)
-        local toggle = vgui.Create("DButton", parent)
-        toggle:SetText("")
-        toggle:SetSize(52, 24)
-        local animProgress = getState() and 1 or 0
-        toggle.Paint = function(self, w, h)
-                local target = getState() and 1 or 0
-                animProgress = Lerp(FrameTime() * 10, animProgress, target)
-                local bgColor = Color(
-                    Lerp(animProgress, 180, 80),
-                    Lerp(animProgress, 30, 120),
-                    Lerp(animProgress, 30, 50)
-                )
-            draw.RoundedBox(0, 0, 0, w, h, COL_TOGGLE_BG)
-            draw.RoundedBox(0, 2, 2, w - 4, h - 4, Color(0, 0, 0, 30))
-            local slsize = h - 12
-            local slPos = Lerp(animProgress, 6, w - slsize - 6)
-            draw.RoundedBox(0, slPos, 6, slsize, slsize, bgColor)
-            surface.SetDrawColor(0, 0, 0, Lerp(animProgress, 150, 40))
-            surface.DrawRect(slPos, slsize + 4, slsize, 3)
-        end
-        toggle.OnCursorEntered = function() surface.PlaySound(SND_HOVER) end
-        toggle.DoClick = function()
-            surface.PlaySound(SND_CLICK)
-            onClick()
-        end
-        return toggle
-    end
-
-    local function StyleScroll(scroll)
-            local bar = scroll:GetVBar()
-            bar:SetWide(8)
-            bar:SetHideButtons(true)
-            bar.Paint = function(self, w, h)
-                surface.SetDrawColor(0, 0, 0, 70)
-                surface.DrawRect(1, 0, w - 2, h)
+    
+    local function CreateModeItem(parent, mode, queue, index)
+        local modePanel = vgui.Create("DPanel", parent)
+        modePanel:SetTall(40)
+        modePanel:Dock(TOP)
+        modePanel:DockMargin(5, 2, 5, 2)
+        modePanel.Mode = mode
+        modePanel.Index = index 
+        modePanel.Selectable = true
+        modePanel.Selected = selectedModes[mode.key] or false
+        
+        StyleElement(modePanel, Color(50, 50, 50, 200))
+        
+        local title = vgui.Create("DLabel", modePanel)
+        title:SetFont("DermaDefaultBold")
+        title:SetText(mode.name)
+        title:SetTextColor(Color(255, 255, 255))
+        title:Dock(LEFT)
+        title:DockMargin(10, 0, 0, 0)
+        title:SizeToContents()
+        
+        if queue then
+            local posLabel = vgui.Create("DLabel", modePanel)
+            posLabel:SetFont("DermaDefault")
+            posLabel:SetText("#" .. index)
+            posLabel:SetTextColor(Color(180, 180, 180))
+            posLabel:Dock(LEFT)
+            posLabel:DockMargin(5, 0, 0, 0)
+            posLabel:SizeToContents()
+            
+            local upBtn = vgui.Create("DButton", modePanel)
+            upBtn:SetSize(24, 24)
+            upBtn:Dock(RIGHT)
+            upBtn:DockMargin(2, 8, 5, 8)
+            upBtn:SetText("▲")
+            upBtn.DoClick = function()
+                if index > 1 then
+					local item = table.remove(zb.RoundList, index)
+					table.insert(zb.RoundList, index - 1, item)
+					queue:QueueUpdate()
+					
+					net.Start("ZB_UpdateRoundList")
+						net.WriteTable(zb.RoundList)
+						net.WriteBool(false) 
+					net.SendToServer()
+                end
             end
-        bar.btnGrip.Paint = function(self, w, h)
-            surface.SetDrawColor(self:IsHovered() and Color(120, 120, 120) or Color(90, 90, 90))
-            surface.DrawRect(1, 0, w - 2, h)
-        end
-    end
+            
+            local downBtn = vgui.Create("DButton", modePanel)
+            downBtn:SetSize(24, 24)
+            downBtn:Dock(RIGHT)
+            downBtn:DockMargin(2, 8, 2, 8)
+            downBtn:SetText("▼")
+            downBtn.DoClick = function()
+                if index < #zb.RoundList then
+					local item = table.remove(zb.RoundList, index)
+					table.insert(zb.RoundList, index + 1, item)
+					queue:QueueUpdate()
+					
+					net.Start("ZB_UpdateRoundList")
+						net.WriteTable(zb.RoundList)
+						net.WriteBool(false)
+					net.SendToServer()
+                end
+            end
+            
+            local removeBtn = vgui.Create("DButton", modePanel)
+            removeBtn:SetSize(24, 24)
+            removeBtn:Dock(RIGHT)
+            removeBtn:DockMargin(2, 8, 2, 8)
+            removeBtn:SetText("✕")
+			removeBtn.DoClick = function()
+				table.remove(zb.RoundList, index)
+				queue:QueueUpdate()
 
-    local function CreateCategoryBar(parent, text)
-        local bar = vgui.Create("DPanel", parent)
-        bar:Dock(TOP)
-        bar:SetTall(38)
-        bar:DockMargin(0, 0, 0, 8)
-        bar.Paint = function(self, w, h)
-            surface.SetDrawColor(COL_CAT)
-            surface.DrawRect(0, 0, w, h)
-            surface.SetDrawColor(COL_CATBAR)
-            surface.DrawRect(0, h - 5, w, 5)
-            draw.SimpleText(text, "ZB_QM_Category", w / 2, h / 2 - 2, COL_TEXT, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        end
-        return bar
-    end
+				net.Start("ZB_UpdateRoundList")
+					net.WriteTable(zb.RoundList)
+					net.WriteBool(false)
+				net.SendToServer()
+			end
+        else
 
-    local function AddCloseButton(parent, frame)
-        local btn = vgui.Create("DButton", parent)
-        btn:SetSize(38, 38)
-        btn:Dock(RIGHT)
-        btn:DockMargin(0, 1, 6, 1)
-        btn:SetText("")
-        btn.Paint = function(self, w, h)
-            local col = self:IsHovered() and Color(255, 110, 110) or COL_TEXT
-            local m = 12
-            surface.SetDrawColor(col)
-            for i = -1, 1 do
-                surface.DrawLine(m, m + i, w - m, h - m + i)
-                surface.DrawLine(w - m, m + i, m, h - m + i)
+            modePanel.OnMousePressed = function()
+                modePanel.Selected = not modePanel.Selected
+                selectedModes[mode.key] = modePanel.Selected
+                
+                if modePanel.Selected then
+                    surface.PlaySound("buttons/button9.wav")
+                else
+                    surface.PlaySound("buttons/button17.wav")
+                end
             end
         end
-        btn.OnCursorEntered = function() surface.PlaySound(SND_HOVER) end
-        btn.DoClick = function()
-            surface.PlaySound(SND_RELEASE)
-            frame:Close()
-        end
-        return btn
+        
+        return modePanel
     end
-
-    local function MakeContent(frame)
-        local content = vgui.Create("DPanel", frame)
-        content.Paint = nil
-        frame.PerformLayout = function(_, w, h)
-            content:SetPos(2, 2)
-            content:SetSize(w - 4, h - 4)
-        end
-        return content
-    end
-
-    local function CreateAvailableRow(parent, mode, manager)
-        local row = vgui.Create("DPanel", parent)
-        row:SetTall(54)
-        row:Dock(TOP)
-        row:DockMargin(0, 0, 0, 8)
-        local statusText, statusCol
-            if mode.canlaunch == 1 then
-                statusText, statusCol = "Ready to launch", COL_GREEN_H
-            elseif mode.canlaunch == 0 then
-                statusText, statusCol = "Cannot launch (no points / blocked)", COL_ACCENT_H
-            else
-                statusText, statusCol = mode.key, COL_TEXT_DIM
-            end
-        row.Paint = function(self, w, h)
-            local forced = (zb.forcemode == mode.key)
-            surface.SetDrawColor(self:IsHovered() and COL_ROW_HOV or COL_ROW)
-            surface.DrawRect(0, 0, w, h)
-            surface.SetDrawColor(forced and COL_ORANGE or COL_ROWBAR)
-            surface.DrawRect(0, h - 3, w, 3)
-            draw.RoundedBox(0, 16, h / 2 - 4, 8, 8, statusCol)
-            draw.SimpleText(mode.name, "ZB_QM_Item", 34, h / 2 - 8, COL_TEXT, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            --draw.SimpleText(forced and "proverka" or statusText, "ZB_QM_Small", 34, h / 2 + 11, forced and COL_ORANGE or COL_TEXT_DIM, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        end
-        local toggle = CreateToggle(row,
-            function() return zb.forcemode == mode.key end,
-            function()
-                local target = (zb.forcemode == mode.key) and "random" or mode.key
-                net.Start("AdminSetGameMode")
-                    net.WriteString("setforcemode")
-                    net.WriteString(target)
-                    net.WriteBool(false)
+    
+    local function CreateQueuePanel(frame)
+        local queuePanel = vgui.Create("DPanel", frame)
+        queuePanel:SetSize(frame:GetWide() / 2 - 10, frame:GetTall())
+        queuePanel:Dock(RIGHT)
+        queuePanel:DockMargin(5, 5, 5, 5)
+        StyleElement(queuePanel, Color(30, 30, 30, 200))
+        
+        queuePanelInstance = queuePanel
+        
+        local titleLabel = vgui.Create("DLabel", queuePanel)
+        titleLabel:SetText("Game Mode Queue")
+        titleLabel:SetFont("DermaLarge")
+        titleLabel:SetTextColor(Color(255, 200, 0))
+        titleLabel:Dock(TOP)
+        titleLabel:DockMargin(0, 5, 0, 5)
+        titleLabel:SetContentAlignment(5) 
+        
+        local queueScroll = vgui.Create("DScrollPanel", queuePanel)
+        queueScroll:Dock(FILL)
+        queueScroll:DockMargin(5, 5, 5, 5)
+        
+        local saveBtn = vgui.Create("DButton", queuePanel)
+        saveBtn:SetText("Apply Queue")
+        saveBtn:Dock(BOTTOM)
+        saveBtn:DockMargin(5, 5, 5, 5)
+        saveBtn:SetTall(30)
+        saveBtn.DoClick = function()
+            //if #zb.RoundList > 0 then
+                local tbl = table.Copy(zb.RoundList)
+                //table.insert(tbl, 1, zb.nextround)
+                net.Start("ZB_UpdateRoundList")
+                    net.WriteTable(tbl)
+                    net.WriteBool(true)
                 net.SendToServer()
-                zb.forcemode = target
-            end)
-        toggle:Dock(RIGHT)
-        toggle:DockMargin(10, 15, 16, 15)
-        toggle:SetTooltip("Force this mode every round")
-        local addBtn = vgui.Create("DButton", row)
-        addBtn:SetWide(90)
-        addBtn:Dock(RIGHT)
-        addBtn:DockMargin(8, 12, 0, 12)
-        addBtn:SetText("+ Queue")
-        ZcityBUTT(addBtn, COL_GREEN, COL_GREEN_H)
-        addBtn.DoClick = function()
-            table.insert(zb.RoundList, mode.key)
-            surface.PlaySound(SND_CLICK)
-            manager:QueueUpdate()
+                
+                chat.AddText(Color(0, 255, 0), "Game mode queue has been set!")
+            //else
+                //chat.AddText(Color(255, 0, 0), "Game mode queue is empty!")
+            //end
         end
-        return row
+        
+        local clearBtn = vgui.Create("DButton", queuePanel)
+        clearBtn:SetText("Clear Queue")
+        clearBtn:Dock(BOTTOM)
+        clearBtn:DockMargin(5, 5, 5, 5)
+        clearBtn:SetTall(30)
+		clearBtn.DoClick = function()
+			zb.RoundList = {}
+			queuePanel:QueueUpdate()
+			
+			net.Start("ZB_UpdateRoundList")
+				net.WriteTable({})
+				net.WriteBool(false)
+			net.SendToServer()
+			
+			chat.AddText(Color(255, 165, 0), "Game mode queue cleared!")
+		end
+        
+        function queuePanel:QueueUpdate()
+            queueScroll:Clear()
+            
+            if zb.nextround and zb.nextround ~= "" then
+                local nextRoundLabel = vgui.Create("DLabel", queueScroll)
+                nextRoundLabel:SetText("Next Mode: " .. zb.nextround)
+                nextRoundLabel:SetFont("DermaDefaultBold")
+                nextRoundLabel:SetTextColor(Color(100, 255, 100))
+                nextRoundLabel:Dock(TOP)
+                nextRoundLabel:DockMargin(5, 0, 0, 10)
+                nextRoundLabel:SizeToContents()
+            end
+            
+            for idx, modeKey in ipairs(zb.RoundList) do
+                local mode = nil
+                
+                for _, availableMode in ipairs(zb.availableModes) do
+                    if availableMode.key == modeKey then
+                        mode = availableMode
+                        break
+                    end
+                end
+                
+                if not mode then
+                    mode = {key = modeKey, name = modeKey}
+                end
+                
+                CreateModeItem(queueScroll, mode, queuePanel, idx)
+            end
+        end
+        
+        queuePanel:QueueUpdate()
+        return queuePanel
     end
-    local ROW_H, ROW_GAP = 44, 8
-    local STRIDE = ROW_H + ROW_GAP
-    local function OpenQueueManager()
-        if IsValid(queueManagerInstance) then queueManagerInstance:Close() end
+
+    local function OpenModeSelection(command)
         local frame = vgui.Create("ZFrame")
         frame:SetSize(math.Clamp(ScrW() * 0.62, 900, 1280), math.Clamp(ScrH() * 0.72, 560, 780))
         frame:Center()
@@ -419,15 +464,15 @@ if CLIENT then
                 table.insert(zb.RoundList, 1, selectedKeys[i])
             end
             
-            if selectedCount > 0 then
-                queuePanel:QueueUpdate()
-                
-                /*net.Start("ZB_UpdateRoundList")
-                    net.WriteTable(zb.RoundList)
-                    net.WriteBool(false)
-                net.SendToServer()*/
-                
-                chat.AddText(Color(0, 255, 0), "Added " .. selectedCount .. " modes to beginning of queue!")
+			if selectedCount > 0 then
+				queuePanel:QueueUpdate()
+				
+				net.Start("ZB_UpdateRoundList")
+					net.WriteTable(zb.RoundList)
+					net.WriteBool(false)
+				net.SendToServer()
+				
+				chat.AddText(Color(0, 255, 0), "Added " .. selectedCount .. " modes to beginning of queue!")
                 
                 selectedModes = {}
                 for _, item in ipairs(modeItems) do
@@ -453,15 +498,15 @@ if CLIENT then
                 end
             end
             
-            if selectedCount > 0 then
-                queuePanel:QueueUpdate()
-                
-                /*net.Start("ZB_UpdateRoundList")
-                    net.WriteTable(zb.RoundList)
-                    net.WriteBool(false)
-                net.SendToServer()*/
-                
-                chat.AddText(Color(0, 255, 0), "Added " .. selectedCount .. " modes to end of queue!")
+			if selectedCount > 0 then
+				queuePanel:QueueUpdate()
+				
+				net.Start("ZB_UpdateRoundList")
+					net.WriteTable(zb.RoundList)
+					net.WriteBool(false)
+				net.SendToServer()
+				
+				chat.AddText(Color(0, 255, 0), "Added " .. selectedCount .. " modes to end of queue!")
                 
 
                 selectedModes = {}
