@@ -24,12 +24,12 @@ SWEP.EpicRunPos = Vector(2,10,6)
 
 SWEP.FakeReloadSounds = {
 	[0.22] = "weapons/universal/uni_crawl_l_03.wav",
-	[0.29] = "weapons/arccw_ud/m16/grab.ogg",
-	[0.34] = "weapons/arccw_ud/m16/magout.ogg",
-	[0.38] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.29] = "weapons/arccw_ud/m16/grab.mp3",
+	[0.34] = "weapons/arccw_ud/m16/magout.mp3",
+	[0.38] = "weapons/ak74/ak74_magout_rattle.mp3",
 
-	[0.64] = "weapons/arccw_ud/m16/grab.ogg",
-	[0.64] = "weapons/arccw_ud/m16/magin.ogg",
+	[0.64] = "weapons/arccw_ud/m16/grab.mp3",
+	[0.64] = "weapons/arccw_ud/m16/magin.mp3",
 	[0.81] = "weapons/universal/uni_crawl_l_03.wav",
 	[0.99] = "weapons/universal/uni_crawl_l_04.wav",
 
@@ -38,10 +38,10 @@ SWEP.FakeReloadSounds = {
 SWEP.FakeEmptyReloadSounds = {
 
 	[0.22] = "weapons/universal/uni_crawl_l_03.wav",
-	[0.29] = "weapons/arccw_ud/m16/magout_empty.ogg",
-	[0.32] = "weapons/ak74/ak74_magout_rattle.wav",
-	[0.59] = "weapons/arccw_ud/m16/grab.ogg",
-	[0.62] = "weapons/arccw_ud/m16/magin.ogg",
+	[0.29] = "weapons/arccw_ud/m16/magout_empty.mp3",
+	[0.32] = "weapons/ak74/ak74_magout_rattle.mp3",
+	[0.59] = "weapons/arccw_ud/m16/grab.mp3",
+	[0.62] = "weapons/arccw_ud/m16/magin.mp3",
 
 	[0.83] = "weapons/arccw_ud/m16/magtap.ogg",
 	[1.01] = "weapons/universal/uni_crawl_l_04.wav",
@@ -85,13 +85,13 @@ SWEP.ReloadTime = 3.5
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"pwb2/weapons/m4a1/ru-556 clip out 1.ogg",
+	"pwb2/weapons/m4a1/ru-556 clip out 1.wav",
 	"none",
 	"none",
-	"pwb2/weapons/m4a1/ru-556 clip in 2.ogg",
+	"pwb2/weapons/m4a1/ru-556 clip in 2.wav",
 	"none",
-	"pwb2/weapons/m4a1/ru-556 bolt back.ogg",
-	"pwb2/weapons/m4a1/ru-556 bolt forward.ogg",
+	"pwb2/weapons/m4a1/ru-556 bolt back.wav",
+	"pwb2/weapons/m4a1/ru-556 bolt forward.wav",
 	"none",
 	"none",
 	"none",

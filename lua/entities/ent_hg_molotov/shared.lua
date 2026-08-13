@@ -4,5 +4,5 @@ ENT.Category = "ZCity Other"
 ENT.PrintName = "Molotov Cocktail"
 ENT.Spawnable = true
 ENT.AdminOnly = true
-ENT.IconOverride = "vgui/wep_jack_hmcd_molotov.png"
+ENT.IconOverride = "vgui/wep_jack_hmcd_molotov.vmt"
 ENT.timeToBoom = 5

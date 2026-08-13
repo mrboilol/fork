@@ -74,8 +74,8 @@ local function getServerSoundMode(name, fallback)
 	return convar and convar:GetInt() or fallback
 end
 local otrubSoundPaths = {
-	[1] = "sound/altotrub.ogg",
-	[2] = "sound/sleepy.ogg",
+	[1] = "sound/altotrub.mp3",
+	[2] = "sound/sleepy.mp3",
 	[3] = "sound/itssoover.mp3",
 	[4] = "sound/ngaimcooked.mp3",
 	[5] = "sound/rem_dying1.mp3"
@@ -445,7 +445,7 @@ end
 
 local painLayers = {
 	agony = {
-		path = "rem_agony.ogg",
+		path = "rem_agony.mp3",
 		threshold = painAgonyThreshold,
 		volumeMul = painAgonyVolumeMul,
 		pitchMax = painPitchMax,
@@ -454,7 +454,7 @@ local painLayers = {
 		targetVolume = 0
 	},
 	excruciating = {
-		path = "rem_excruciatingpain.ogg",
+		path = "rem_excruciatingpain.mp3",
 		threshold = painExcruciatingThreshold,
 		volumeMul = painExcruciatingVolumeMul,
 		fadeLerp = painLayerFadeLerp,
@@ -462,7 +462,7 @@ local painLayers = {
 		targetVolume = 0
 	}
 }
-local seizureSoundPath = "sound/rem_seizure.ogg"
+local seizureSoundPath = "sound/rem_seizure.mp3"
 local seizureIntroDuration = 3
 local seizureFlashDelayMin = 0.12
 local seizureFlashDelayMax = 0.55
@@ -1049,7 +1049,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	local painMode = getServerSoundMode("hg_painsound", 6)
 
 	if canRetrySound("PainStation", PainStation) then
-		sound.PlayFile("sound/zbattle/pain_beat.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/zbattle/pain_beat.mp3", "noblock noplay", function(station)
 			PainStationLoading = false
 			if generation != painAudioGeneration then
 				if IsValid(station) then
@@ -1104,7 +1104,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if canRetrySound("AltpainStation", AltpainStation) then
-		sound.PlayFile("sound/altpain.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/altpain.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1116,7 +1116,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if painMode == 6 and canRetrySound("RemAgonyStation", RemAgonyStation) then
-		sound.PlayFile("sound/rem_agony.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/rem_agony.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1128,7 +1128,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if painMode == 6 and canRetrySound("RemExcruciatingPainStation", RemExcruciatingPainStation) then
-		sound.PlayFile("sound/rem_excruciatingpain.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/rem_excruciatingpain.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1152,7 +1152,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if canRetrySound("DyingStation", DyingStation) then
-		sound.PlayFile("sound/dying.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/dying.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1248,7 +1248,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if canRetrySound("Alto2Station", Alto2Station) then
-		sound.PlayFile("sound/alto2.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/alto2.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1271,7 +1271,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if canRetrySound("NoisesStation", NoisesStation) then
-		sound.PlayFile("sound/noises.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/noises.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
@@ -1469,7 +1469,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		assimilationMat:SetFloat("$c1_x", val2 - 0.5)
 
 		if canRetrySound("AssimilationStation", AssimilationStation) then
-			sound.PlayFile("sound/zbattle/furry/conversion/assimilation_noise3.ogg", "noblock noplay", function(station, err)
+			sound.PlayFile("sound/zbattle/furry/conversion/assimilation_noise3.mp3", "noblock noplay", function(station, err)
 				AssimilationStationLoading = false
 				if IsValid(station) then
 					station:SetVolume(0)
@@ -1649,7 +1649,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			end
 
 			BrainTraumaStationLoading = true
-			sound.PlayFile("sound/zcitysnd/real_sonar/brainhemorrhagestage"..chooser..".mp3", "noblock noplay", function(station, err)
+			sound.PlayFile("sound/zcitysnd/real_sonar/brainhemorrhagestage"..chooser..".ogg", "noblock noplay", function(station, err)
 				BrainTraumaStationLoading = false
 				if IsValid(station) then
 					station:SetVolume(0)
@@ -1710,7 +1710,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			elseif choice == 2 then
 				soundFile = "sound/tinnituslong.wav"
 			else
-				soundFile = "sound/zcitysnd/real_sonar/tinnitus"..math.random(3)..".mp3"
+				soundFile = "sound/zcitysnd/real_sonar/tinnitus"..math.random(3)..".ogg"
 			end
 
 			sound.PlayFile(soundFile, "noblock noplay", function(station, err)
@@ -1771,7 +1771,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local dyingMode = getServerSoundMode("hg_dyingsound", 2)
 
 			if canRetrySound("NoiseStation2", NoiseStation2) then
-				sound.PlayFile("sound/zbattle/conscioustypebeat.ogg", "noblock noplay", function(station)
+				sound.PlayFile("sound/zbattle/conscioustypebeat.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
 						station:Play()
@@ -2196,7 +2196,7 @@ hook.Add("Post Post Processing", "ItHurts", function()
 			local otrubVol = math.Clamp((o2 - 30) / 100 + (brain > 0.3 and (brain - 0.3) * 5 or 0), 0, 1)
 
 			if canRetrySound("NoiseStation", NoiseStation) then
-				sound.PlayFile("sound/zbattle/unconscious_type_beat.ogg", "noblock noplay", function(station)
+				sound.PlayFile("sound/zbattle/unconscious_type_beat.mp3", "noblock noplay", function(station)
 					if IsValid(station) then
 						station:SetVolume(0)
 						station:Play()
@@ -2892,7 +2892,7 @@ end)
 
 hook.Add("HG_OnOtrub", "FUCKINGSHITOW", function(ply)
 	if ply == LocalPlayer() then
-		sound.PlayFile("sound/owfuck.ogg", "noblock noplay", function(station)
+		sound.PlayFile("sound/owfuck.mp3", "noblock noplay", function(station)
 			if IsValid(station) then station:Play() end
 		end)
 	end

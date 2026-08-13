@@ -77,7 +77,7 @@ function PANEL:Init()
     self.time = self.time or CurTime() + MODE.LobbyTime
 
     if !ShopSound then
-        sound.PlayFile("sound/zbattle/shop.mp3", "", function(station)
+        sound.PlayFile("sound/zbattle/shop.ogg", "", function(station)
             ShopSound = station
             station:SetVolume(0.2)
         end)

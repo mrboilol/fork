@@ -23,7 +23,7 @@ SWEP.SlotPos = 10
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_shot_xm1014.mdl"
 SWEP.ReloadSound = "weapons/tfa_ins2/m1014/toz_shell_insert_2.ogg"
-SWEP.WepSelectIcon2 = Material("pwb/sprites/xm1014.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/xm1014.vmt")
 SWEP.IconOverride = "entities/weapon_pwb_xm1014.png"
 SWEP.WorldModelFake = "models/weapons/arccw/c_ud_m1014.mdl"
 
@@ -42,7 +42,7 @@ SWEP.FakeEjectBrassATT = "2"
 SWEP.FakeViewBobBone = "CAM_Homefield"
 SWEP.FakeReloadSounds = {
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.85] = "weapons/ak74/ak74_magin.wav",
 	[0.95] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -51,7 +51,7 @@ SWEP.FakeReloadSounds = {
 SWEP.FakeEmptyReloadSounds = {
 
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.65] = "weapons/ak74/ak74_magin.wav",
 	[0.75] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -106,7 +106,7 @@ SWEP.NumBullet = 8
 SWEP.Primary.Sound = {"toz_shotgun/toz_fp.wav", 80, 70, 75}
 SWEP.Primary.Wait = 0.2
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 65, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 65, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 65, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-3, 0.3264, 2.2564)
 SWEP.RHandPos = Vector(-10, -2, 4)
@@ -340,11 +340,11 @@ end
 SWEP.AnimsEvents = {
 	["sgreload_start_empty"] = {
 		[0.2] = function(self)
-			self:EmitSound("weapons/arccw_ud/m1014/breechload.ogg")
+			self:EmitSound("weapons/arccw_ud/m1014/breechload.mp3")
 			setXM1014LoadingPortScale(self, vector_full)
 		end,
 		[0.8] = function(self)
-			self:EmitSound("weapons/arccw_ud/m1014/breechclose.ogg")
+			self:EmitSound("weapons/arccw_ud/m1014/breechclose.mp3")
 		end,
 		[0.9] = function(self)
 			setXM1014LoadingPortScale(self, vector_origin)
@@ -352,7 +352,7 @@ SWEP.AnimsEvents = {
 	},
 	["sgreload_insert"] = {
 		[0.0] = function(self)
-			self:EmitSound("weapons/arccw_ud/m1014/shell-insert-0"..math.random(1,3)..".ogg")
+			self:EmitSound("weapons/arccw_ud/m1014/shell-insert-0"..math.random(1,3)..".mp3")
 			--
 			setXM1014LoadingPortScale(self, vector_full)
 		end,

@@ -48,8 +48,8 @@ local function isAlternativeBerserk()
 end
 
 local function getBerserkMusicPath()
-	if altberserk3:GetBool() then return "sound/rage.ogg" end
-	if altberserk:GetBool() then return "sound/NIGGARUN.ogg" end
+	if altberserk3:GetBool() then return "sound/rage.mp3" end
+	if altberserk:GetBool() then return "sound/NIGGARUN.mp3" end
 
 	return path:GetString()
 end
@@ -131,7 +131,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 				-- Start looping music immediately for alternate modes to avoid duplicate playback.
 				startBerserkMusic(getBerserkMusicPath())
 			else
-				surface.PlaySound("zbattle/deathsample.ogg")
+				surface.PlaySound("zbattle/deathsample.mp3")
 			end
 		end
 

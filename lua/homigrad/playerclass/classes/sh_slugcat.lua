@@ -189,10 +189,10 @@ end
 
 if SERVER then
 	local slugy_phrases = {
-		"zcity/voice/slugcat_1/waw_1.mp3",
-		"zcity/voice/slugcat_1/waw_2.mp3",
-		"zcity/voice/slugcat_1/waw_3.mp3",
-		"zcity/voice/slugcat_1/waw_4.mp3"
+		"zcity/voice/slugcat_1/waw_1.ogg",
+		"zcity/voice/slugcat_1/waw_2.ogg",
+		"zcity/voice/slugcat_1/waw_3.ogg",
+		"zcity/voice/slugcat_1/waw_4.ogg"
 	}
 
 	hook.Add("HG_ReplacePhrase", "ScugPhrases", function(ply, phrase, muffed, pitch)

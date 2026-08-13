@@ -38,7 +38,7 @@ function PANEL:Init()
 	self.textpos = 0
 	self.currenttext = ""
 
-	surface.PlaySound("zbattle/dialogue/radio_talk.ogg")
+	surface.PlaySound("zbattle/dialogue/radio_talk.mp3")
 
 	-- timer.Simple(1.2, function()
 	--     self:CreateAnimation(#text / 20, {
@@ -52,7 +52,7 @@ function PANEL:Init()
 	--             local newtext = string.sub(text, 0, self.textpos)
 
 	--             if self.currenttext != newtext then
-	--                 sound.PlayFile("sound/zbattle/dialogue/commander_talk2.ogg", "", function() end)
+	--                 sound.PlayFile("sound/zbattle/dialogue/commander_talk2.mp3", "", function() end)
 	--                 self.currenttext = newtext
 	--                 self.text:SetText(newtext)
 	--             end
@@ -145,7 +145,7 @@ function PANEL:Think()
 		local newtext = string.sub(self.textread, 0, self.textpos)
 
 		if self.currenttext != newtext then
-			sound.PlayFile("sound/zbattle/dialogue/commander_talk2.ogg", "", function() end)
+			sound.PlayFile("sound/zbattle/dialogue/commander_talk2.mp3", "", function() end)
 			self.currenttext = newtext
 			self.text:SetText(newtext)
 		end

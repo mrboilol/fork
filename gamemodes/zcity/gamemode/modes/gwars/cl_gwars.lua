@@ -7,7 +7,7 @@ local ended
 local MusicVolume = GetConVar("snd_musicvolume")
 
 net.Receive("gwars_start", function()
-	surface.PlaySound("zbattle/nigshit.mp3")
+	surface.PlaySound("zbattle/nigshit.ogg")
 	zb.RemoveFade()
 	playstart = true
 	ended = nil

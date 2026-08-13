@@ -1,13 +1,13 @@
 local attachsounds = {
-	"arc9_eft_shared/weap_bolt_catch.ogg",
-	"arc9_eft_shared/weap_ar_pickup.ogg",
-	"arc9_eft_shared/weap_bolt_out.ogg",
-	"arc9_eft_shared/weap_dmr_pickup.ogg",
-	"arc9_eft_shared/weap_dmr_use.ogg",
-	"arc9_eft_shared/weap_pump_drop.ogg",
-	"arc9_eft_shared/weap_rifle_pickup.ogg",
-	"arc9_eft_shared/weap_rifle_drop.ogg",
-	"arc9_eft_shared/weap_rifle_use.ogg"
+	"arc9_eft_shared/weap_bolt_catch.mp3",
+	"arc9_eft_shared/weap_ar_pickup.mp3",
+	"arc9_eft_shared/weap_bolt_out.mp3",
+	"arc9_eft_shared/weap_dmr_pickup.mp3",
+	"arc9_eft_shared/weap_dmr_use.mp3",
+	"arc9_eft_shared/weap_pump_drop.mp3",
+	"arc9_eft_shared/weap_rifle_pickup.mp3",
+	"arc9_eft_shared/weap_rifle_drop.mp3",
+	"arc9_eft_shared/weap_rifle_use.mp3"
 }
 
 util.AddNetworkString("ZB_AttachAdd")

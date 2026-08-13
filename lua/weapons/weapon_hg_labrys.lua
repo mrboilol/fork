@@ -160,11 +160,11 @@ SWEP.hitsoundplus = {
 }
 
 SWEP.swingsoundextra = {
-    {"weapons/darsu_eft/melee/scythe_whoosh_01.ogg", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_02.ogg", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_03.ogg", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_04.ogg", 90, {95, 100}},
-    {"weapons/darsu_eft/melee/scythe_whoosh_05.ogg", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_01.mp3", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_02.mp3", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_03.mp3", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_04.mp3", 90, {95, 100}},
+    {"weapons/darsu_eft/melee/scythe_whoosh_05.mp3", 90, {95, 100}},
 }
 
 SWEP.AttackPos = Vector(0,0,0)

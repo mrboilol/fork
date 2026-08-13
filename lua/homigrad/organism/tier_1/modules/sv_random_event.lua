@@ -7,7 +7,7 @@ end
 
 local RandomEvents = {
     ["Sneeze"] = function( owner, org )
-        owner:EmitSound(ThatPlyIsFemale(owner) and "zcitysnd/female/sneez_"..math.random(1,4)..".mp3" or "zcitysnd/male/sneez_"..math.random(1,4)..".mp3", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
+        owner:EmitSound(ThatPlyIsFemale(owner) and "zcitysnd/female/sneez_"..math.random(1,4)..".ogg" or "zcitysnd/male/sneez_"..math.random(1,4)..".ogg", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
         timer.Simple(.5,function()
             owner:ViewPunch(Angle(-2,0,0))
             timer.Simple(.3,function()
@@ -16,7 +16,7 @@ local RandomEvents = {
         end)
     end,
     ["Hungry"] = function( owner, org )
-        owner:EmitSound("zcitysnd/uni/hungry_"..math.random(1,6)..".mp3", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
+        owner:EmitSound("zcitysnd/uni/hungry_"..math.random(1,6)..".ogg", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
     end,
     ["Burp"] = function( owner, org )
         owner:EmitSound("snd_jack_hmcd_burp.ogg", nil, 100 + (owner.PlayerClassName == "furry" and 20 or 0))
@@ -36,7 +36,7 @@ local RandomEvents = {
         end 
     end,
     ["Cough"] = function( owner, org )
-        owner:EmitSound(ThatPlyIsFemale(owner) and "zcitysnd/female/cough_"..math.random(1,6)..".mp3" or "zcitysnd/male/cough_"..math.random(1,6)..".mp3",75,100 + (owner.PlayerClassName == "furry" and 20 or 0),1)
+        owner:EmitSound(ThatPlyIsFemale(owner) and "zcitysnd/female/cough_"..math.random(1,6)..".ogg" or "zcitysnd/male/cough_"..math.random(1,6)..".ogg",75,100 + (owner.PlayerClassName == "furry" and 20 or 0),1)
         timer.Simple(.3,function()
             owner:ViewPunch(Angle(3,0,0))
             timer.Simple(.3,function()

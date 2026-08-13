@@ -41,7 +41,7 @@ SWEP.FakeReloadSounds = {
 
 SWEP.FakeEmptyReloadSounds = {
 	[0.15] = "weapons/universal/uni_crawl_l_03.wav",
-	[0.22] = "weapons/tfa_ins2/usp_tactical/magrelease.wav",
+	[0.22] = "weapons/tfa_ins2/usp_tactical/magrelease.mp3",
 	[0.3] = "weapons/tfa_ins2/usp_tactical/magout.wav",
 	--[0.37] = "weapons/m4a1/m4a1_magrelease.ogg",
 	[0.37] = "weapons/universal/uni_pistol_draw_01.ogg",
@@ -117,7 +117,7 @@ if CLIENT then
 end
 
 
-SWEP.WepSelectIcon2 = Material("pwb/sprites/cz75.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/cz75.vmt")
 SWEP.IconOverride = "entities/weapon_pwb_cz75.png"
 
 SWEP.CustomShell = "9x19"
@@ -154,7 +154,7 @@ SWEP.ReloadSoundes = {
 	"none"
 }
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "revolver"
 SWEP.ZoomPos = Vector(-30, 0.9078, 8.355)
 SWEP.RHandPos = Vector(-13.5, 0, 4)

@@ -90,8 +90,8 @@ SWEP.swingsoundextra = {
 }
 
 SWEP.hitsoundplus = {
-    {"shovelcrowbarshared/shovelhit1.ogg", 70, {100, 105}},
-    {"shovelcrowbarshared/shovelhit2.ogg", 70, {100, 105}},
+    {"shovelcrowbarshared/shovelhit1.mp3", 70, {100, 105}},
+    {"shovelcrowbarshared/shovelhit2.mp3", 70, {100, 105}},
 }
 
 SWEP.hitsoundextra = {
@@ -144,11 +144,11 @@ SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
 SWEP.HitFleshExtra = {
-    "shovelcrowbarshared/shovelhit1.ogg",
-    "shovelcrowbarshared/shovelhit2.ogg",
+    "shovelcrowbarshared/shovelhit1.mp3",
+    "shovelcrowbarshared/shovelhit2.mp3",
 }
 SWEP.HitFleshExtraPitch = 85
-SWEP.SwingSound = "baseballbat/swing.ogg"
+SWEP.SwingSound = "baseballbat/swing.mp3"
 SWEP.SwingSoundPitch = {115, 125}
 
 

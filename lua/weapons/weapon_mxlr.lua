@@ -65,7 +65,7 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = ".357 Magnum"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = 0
-SWEP.Primary.Sound = {"weapons/darsu_eft/mxlr/marlin_outdoor_close_3.ogg", 80, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/mxlr/marlin_outdoor_close_3.mp3", 80, 90, 100}
 SWEP.SupressedSound = {"mosin/mosin_suppressed_fp.ogg", 65, 90, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
 
@@ -84,7 +84,7 @@ SWEP.NumBullet = 2
 SWEP.AnimShootMul = 1
 SWEP.AnimShootHandMul = 1
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.6667, 5.0008)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -139,25 +139,25 @@ SWEP.AnimList = {
 
 -- Звуки анимаций из ARC9 EFT
 local path = "weapons/darsu_eft/mxlr/"
-local randspin = {"arc9_eft_shared/weapon_generic_rifle_spin1.ogg","arc9_eft_shared/weapon_generic_rifle_spin2.ogg","arc9_eft_shared/weapon_generic_rifle_spin3.ogg","arc9_eft_shared/weapon_generic_rifle_spin4.ogg","arc9_eft_shared/weapon_generic_rifle_spin5.ogg","arc9_eft_shared/weapon_generic_rifle_spin6.ogg","arc9_eft_shared/weapon_generic_rifle_spin7.ogg","arc9_eft_shared/weapon_generic_rifle_spin8.ogg","arc9_eft_shared/weapon_generic_rifle_spin9.ogg","arc9_eft_shared/weapon_generic_rifle_spin10.ogg"}
+local randspin = {"arc9_eft_shared/weapon_generic_rifle_spin1.mp3","arc9_eft_shared/weapon_generic_rifle_spin2.mp3","arc9_eft_shared/weapon_generic_rifle_spin3.mp3","arc9_eft_shared/weapon_generic_rifle_spin4.mp3","arc9_eft_shared/weapon_generic_rifle_spin5.mp3","arc9_eft_shared/weapon_generic_rifle_spin6.mp3","arc9_eft_shared/weapon_generic_rifle_spin7.mp3","arc9_eft_shared/weapon_generic_rifle_spin8.mp3","arc9_eft_shared/weapon_generic_rifle_spin9.mp3","arc9_eft_shared/weapon_generic_rifle_spin10.mp3"}
 
 SWEP.AnimsEvents = {
     ["ready"] = {
-        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_draw.ogg") end,
+        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_draw.mp3") end,
         [0.41] = function(self) self:EmitSound(path .. "marlin_bolt_out_empt.ogg") end,
         [0.64] = function(self) self:EmitSound(path .. "marlin_bolt_in.ogg") end,
     },
     ["draw"] = {
-        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_draw.ogg") end,
+        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_draw.mp3") end,
     },
     ["draw_empty"] = {
-        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_draw.ogg") end,
+        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_draw.mp3") end,
     },
     ["holster"] = {
-        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_holster.ogg") end,
+        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_holster.mp3") end,
     },
     ["holster_empty"] = {
-        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_holster.ogg") end,
+        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/mr133_holster.mp3") end,
     },
     ["fire"] = {
         [0] = function(self) self:EmitSound(path .. "marlin_hammer_in.ogg") end,
@@ -176,7 +176,7 @@ SWEP.AnimsEvents = {
     ["reload_single"] = {
         [0] = function(self) self:EmitSound(path .. "marlin_bolt_out_shell.ogg") end,
         [0.3] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
-        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.ogg") end,
+        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.mp3") end,
         [1.05] = function(self) self:EmitSound(path .. "marlin_round_in_chamber.ogg") end,
         [1.56] = function(self) self:EmitSound(path .. "marlin_bolt_in.ogg") end,
         [1.75] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
@@ -184,7 +184,7 @@ SWEP.AnimsEvents = {
     ["reload_single_empty"] = {
         [0] = function(self) self:EmitSound(path .. "marlin_bolt_out_shell.ogg") end,
         [0.3] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
-        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.ogg") end,
+        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.mp3") end,
         [1.05] = function(self) self:EmitSound(path .. "marlin_round_in_chamber.ogg") end,
         [1.56] = function(self) self:EmitSound(path .. "marlin_bolt_in.ogg") end,
         [1.75] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
@@ -195,7 +195,7 @@ SWEP.AnimsEvents = {
     ["sgreload_start_empty"] = {
         [0] = function(self) self:EmitSound(path .. "marlin_bolt_out_shell.ogg") end,
         [0.3] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
-        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.ogg") end,
+        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.mp3") end,
         [1.05] = function(self) self:EmitSound(path .. "marlin_round_in_chamber.ogg") end,
         [1.74] = function(self) self:EmitSound(path .. "marlin_bolt_in.ogg") end,
         [1.9] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
@@ -203,13 +203,13 @@ SWEP.AnimsEvents = {
     ["sgreload_start_empty_empty"] = {
         [0] = function(self) self:EmitSound(path .. "marlin_bolt_out_shell.ogg") end,
         [0.3] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
-        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.ogg") end,
+        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.mp3") end,
         [1.05] = function(self) self:EmitSound(path .. "marlin_round_in_chamber.ogg") end,
         [1.74] = function(self) self:EmitSound(path .. "marlin_bolt_in.ogg") end,
         [1.9] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
     },
     ["sgreload_insert"] = {
-        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.ogg") end,
+        [0] = function(self) self:EmitSound("weapons/darsu_eft/mosin/ammo_singleround_pickup.mp3") end,
         [0.32] = function(self) 
             local sounds = { path .. "marlin_round_in_1.ogg", path .. "marlin_round_in_2.ogg", path .. "marlin_round_in_3.ogg", path .. "marlin_round_in_4.ogg", path .. "marlin_round_in_5.ogg" }
             self:EmitSound(sounds[math.random(#sounds)]) 
@@ -220,9 +220,9 @@ SWEP.AnimsEvents = {
         [0.1] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
     },
     ["look"] = {
-        [0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-        [0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-        [0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+        [0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+        [0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+        [0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["look_empty"] = {
         [0.17] = function(self) self:EmitSound(randspin[math.random(#randspin)]) end,
@@ -253,13 +253,13 @@ SWEP.AnimsEvents = {
     },
     ["mod_switch"] = {
         [0] = function(self) 
-            local sounds = {"arc9_eft_shared/weapon_light_switcher1.ogg", "arc9_eft_shared/weapon_light_switcher2.ogg", "arc9_eft_shared/weapon_light_switcher3.ogg"}
+            local sounds = {"arc9_eft_shared/weapon_light_switcher1.mp3", "arc9_eft_shared/weapon_light_switcher2.mp3", "arc9_eft_shared/weapon_light_switcher3.mp3"}
             self:EmitSound(sounds[math.random(#sounds)]) 
         end,
     },
     ["mod_switch_empty"] = {
         [0] = function(self) 
-            local sounds = {"arc9_eft_shared/weapon_light_switcher1.ogg", "arc9_eft_shared/weapon_light_switcher2.ogg", "arc9_eft_shared/weapon_light_switcher3.ogg"}
+            local sounds = {"arc9_eft_shared/weapon_light_switcher1.mp3", "arc9_eft_shared/weapon_light_switcher2.mp3", "arc9_eft_shared/weapon_light_switcher3.mp3"}
             self:EmitSound(sounds[math.random(#sounds)]) 
         end,
     },

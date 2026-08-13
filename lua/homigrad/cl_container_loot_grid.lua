@@ -248,7 +248,7 @@ function hg.OpenContainerLootGrid(options)
 				if self.RevealProgress >= 1 then
 					foundLoot[itemID] = true
 					self.HoldLock = true
-					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".ogg")
+					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".mp3")
 				end
 			else
 				self.RevealStart = nil
@@ -262,7 +262,7 @@ function hg.OpenContainerLootGrid(options)
 			if cooldown > CurTime() then return end
 			cooldown = CurTime() + 0.3
 			if options.onTake then options.onTake(ent, itemID, item) end
-			surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".ogg")
+			surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".mp3")
 			self:Remove()
 		end
 
@@ -273,7 +273,7 @@ function hg.OpenContainerLootGrid(options)
 			if self:IsHovered() then
 				self.SoundKD = self.SoundKD or 0
 				if self.SoundKD < CurTime() then
-					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_out" .. math.random(7) .. ".ogg")
+					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_out" .. math.random(7) .. ".mp3")
 				end
 				self.SoundKD = CurTime() + 0.1
 			end

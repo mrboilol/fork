@@ -23,7 +23,7 @@ SWEP.AnimList = {
 	["reload_empty"] = "base_reloadempty",
 }
 
-SWEP.WepSelectIcon2 = Material("vgui/hud/tfa_ins2_pm.png")
+SWEP.WepSelectIcon2 = Material("vgui/hud/tfa_ins2_pm.vmt")
 SWEP.IconOverride = "entities/weapon_insurgencymakarov.png"
 
 SWEP.CustomShell = "9x18"
@@ -74,7 +74,7 @@ SWEP.PPSMuzzleEffect = "pcf_jack_mf_tpistol" -- shared in sh_effects.lua
 
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.DrawAmmo = true

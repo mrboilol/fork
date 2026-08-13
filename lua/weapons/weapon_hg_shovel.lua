@@ -74,8 +74,8 @@ SWEP.swingsoundextra = {
 }
 
 SWEP.hitsoundplus = {
-    {"shovelcrowbarshared/shovelhit1.ogg", 70, {80, 95}},
-    {"shovelcrowbarshared/shovelhit2.ogg", 70, {80, 95}},
+    {"shovelcrowbarshared/shovelhit1.mp3", 70, {80, 95}},
+    {"shovelcrowbarshared/shovelhit2.mp3", 70, {80, 95}},
 }
 
 SWEP.hitsoundextra = {
@@ -126,11 +126,11 @@ SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "SolidMetal.ImpactSoft"
 SWEP.HitFleshExtra = {
-    "shovelcrowbarshared/shovelhit1.ogg",
-    "shovelcrowbarshared/shovelhit2.ogg",
+    "shovelcrowbarshared/shovelhit1.mp3",
+    "shovelcrowbarshared/shovelhit2.mp3",
 }
 SWEP.HitFleshExtraPitch = 60
-SWEP.SwingSound = "baseballbat/swing.ogg"
+SWEP.SwingSound = "baseballbat/swing.mp3"
 SWEP.SwingSoundPitch = {85, 90}
 
 SWEP.HeavyAttackDamageType = DMG_SLASH

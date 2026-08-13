@@ -9,7 +9,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/tfa_ins2/w_m67.mdl"
 if CLIENT then
     SWEP.WepSelectIcon = Material("vgui/hud/tfa_ins2_m67")
-    SWEP.IconOverride = "vgui/hud/tfa_ins2_m67.png"
+    SWEP.IconOverride = "vgui/hud/tfa_ins2_m67.vmt"
     SWEP.BounceWeaponIcon = false
 end
 

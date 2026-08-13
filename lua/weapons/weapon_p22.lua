@@ -116,8 +116,8 @@ function SWEP:ModelCreated(model)
 end
 
 
-SWEP.WepSelectIcon2 = Material("vgui/wep_jack_hmcd_suppressed.png")
-SWEP.IconOverride = "vgui/wep_jack_hmcd_suppressed.png"
+SWEP.WepSelectIcon2 = Material("vgui/wep_jack_hmcd_suppressed.vmt")
+SWEP.IconOverride = "vgui/wep_jack_hmcd_suppressed.vmt"
 
 SWEP.weaponInvCategory = 4
 
@@ -144,13 +144,13 @@ SWEP.SupressorDamageMultiplier = 1
 SWEP.PenetrationMultiplier = 0.7
 SWEP.StopsInJaw = true
 
-SWEP.Primary.Sound = {"arccw_uc/common/fire-22-01.ogg", 70, 90, 100}
-SWEP.Primary.SoundFP = {"arccw_uc/common/fire-22-01.ogg", 70, 90, 100}
+SWEP.Primary.Sound = {"arccw_uc/common/fire-22-01.mp3", 70, 90, 100}
+SWEP.Primary.SoundFP = {"arccw_uc/common/fire-22-01.mp3", 70, 90, 100}
 
 SWEP.DistSound = "arccw_uc/common/fire-22-dist-01.ogg"
 
-SWEP.SupressedSound = {"arccw_uc/common/fire-22-sup-01.ogg", 65, 90, 100}
-SWEP.SupressedSoundFP = {"arccw_uc/common/fire-22-sup-01.ogg", 65, 90, 100}
+SWEP.SupressedSound = {"arccw_uc/common/fire-22-sup-01.mp3", 65, 90, 100}
+SWEP.SupressedSoundFP = {"arccw_uc/common/fire-22-sup-01.mp3", 65, 90, 100}
 SWEP.SupressorOnly = true
 
 SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
@@ -186,7 +186,7 @@ SWEP.ReloadSoundes = {
 SWEP.PPSMuzzleEffect = "pcf_jack_mf_tpistol" -- shared in sh_effects.lua
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "revolver"
 SWEP.ZoomPos = Vector(-3, -0.0136, 2.9594)
 SWEP.RHandPos = Vector(-2, 0, 0)

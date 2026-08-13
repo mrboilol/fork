@@ -10,7 +10,7 @@ SWEP.SlotPos = 10
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/escape from tarkov/static/weapons/ags-30.mdl"
 
-SWEP.WepSelectIcon2 = Material("pwb/sprites/hk23e.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/hk23e.vmt")
 SWEP.IconOverride = "entities/weapon_pwb_hk23e.png"
 
 SWEP.CustomShell = "762x51"
@@ -61,7 +61,7 @@ SWEP.ReloadSoundes = {
 	"none"
 }
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.015, 24.5262)
 

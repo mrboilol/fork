@@ -1,1 +1,1 @@
-resource.AddFile("sound/exhaustedloop.ogg")
+resource.AddFile("sound/exhaustedloop.mp3")

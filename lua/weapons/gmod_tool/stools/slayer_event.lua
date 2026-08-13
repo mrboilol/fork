@@ -22,7 +22,7 @@ if SERVER then
             return false
         end
         ply:Give("weapon_hg_slayersword")
-        ent:EmitSound("slayerevent/slayerequip.ogg", 75, 100, 1, CHAN_AUTO)
+        ent:EmitSound("slayerevent/slayerequip.mp3", 75, 100, 1, CHAN_AUTO)
         ent:Remove()
         return false
     end)

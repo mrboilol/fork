@@ -58,12 +58,12 @@ SWEP.spoon = "models/weapons/m67_skoba.mdl"
 SWEP.AnimsEvents = {
 	["draw"] = {
 		[0.1] = function(self)
-			self:EmitSound("weapons/darsu_eft/grenades/rgd_draw.ogg",65)
+			self:EmitSound("weapons/darsu_eft/grenades/rgd_draw.mp3",65)
 		end,
 	},
 	["fire_start"] = {
 		[0.31] = function(self)
-			self:EmitSound("weapons/darsu_eft/grenades/rgd_pin.ogg",65)
+			self:EmitSound("weapons/darsu_eft/grenades/rgd_pin.mp3",65)
 		end,
 	},
 }
@@ -160,7 +160,7 @@ SWEP.CoolDown = 0
 
 SWEP.SpoonSounds = {
 	[1] = {"snd_jack_spoonfling.ogg", 65},
-	[2] = {"weapons/darsu_eft/grenades/gren_fuze1.ogg", 70, 200, true}
+	[2] = {"weapons/darsu_eft/grenades/gren_fuze1.mp3", 70, 200, true}
 }
 
 

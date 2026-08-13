@@ -79,7 +79,7 @@ hg.attachments.sight = {
 		mountType = "picatinny",
 		holotex = "models/weapons/arc9_eft_shared/atts/optic/transparent_glass",
 
-		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_walther_mrs_mark_001.png"),
+		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_walther_mrs_mark_001.vmt"),
 		holo_size = CLIENT and ScreenScale(0.3) or 1, --size of the holo
 		PhysModel = "models/hunter/plates/plate025.mdl",
 		PhysPos = Vector(1, 0, 0),
@@ -164,7 +164,7 @@ hg.attachments.sight = {
 		mountType = "picatinny",
 		holotex = "models/weapons/arc9_eft_shared/atts/optic/transparent_glass",
 
-		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_belomo_pk_06_mark_000.png"),
+		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_belomo_pk_06_mark_000.vmt"),
 		holo_size = CLIENT and ScreenScale(0.4) or 1, --size of the holo
 		PhysModel = "models/hunter/plates/plate025.mdl",
 		PhysPos = Vector(0, 0, 0),
@@ -199,7 +199,7 @@ hg.attachments.sight = {
 		mountType = "picatinny",
 		holotex = "models/weapons/arc9_eft_shared/atts/optic/transparent_glass",
 
-		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_leapers_utg_38_ita_1x30_mark2.png"),
+		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_leapers_utg_38_ita_1x30_mark2.vmt"),
 		holo_size = CLIENT and ScreenScale(0.3) or 1, --size of the holo
 		PhysModel = "models/hunter/plates/plate025.mdl",
 		PhysPos = Vector(0, 0, 0),
@@ -558,7 +558,7 @@ hg.attachments.sight = {
 		PhysPos = Vector(1, 0, 0),
 		PhysAng = Angle(0, 90, 0),
 
-		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_walther_mrs_mark_001.png"),
+		holo = Material("vgui/arc9_eft_shared/reticles/new/scope_all_walther_mrs_mark_001.vmt"),
 		holo_size = CLIENT and ScreenScale(0.45) or 1, --size of the holo
 
 		holomodel = "models/weapons/arc9/darsu_eft/mods/scope_base_burris_fast_fire_3.mdl",

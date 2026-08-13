@@ -118,23 +118,23 @@ local nationalguard_phrases = {
 
 local commanderforces_phrases = {
 	normal = {
-		"n51/spot/spot.ogg",
-		"n51/spot/spot1.ogg",
-		"n51/spot/spot2.ogg",
-		"n51/spot/spot3.ogg",
-		"n51/spot/spot4.ogg",
-		"n51/spot/spot5.ogg",
-		"n51/spot/spot6.ogg",
-		"n51/spot/spot7.ogg",
-		"n51/spot/spot8.ogg"
+		"n51/spot/spot.mp3",
+		"n51/spot/spot1.mp3",
+		"n51/spot/spot2.mp3",
+		"n51/spot/spot3.mp3",
+		"n51/spot/spot4.mp3",
+		"n51/spot/spot5.mp3",
+		"n51/spot/spot6.mp3",
+		"n51/spot/spot7.mp3",
+		"n51/spot/spot8.mp3"
 
 	},
 	kill = {
-		"n51/kill/kill.ogg",
-		"n51/kill/kill1.ogg",
-		"n51/kill/kill2.ogg",
-		"n51/kill/kill3.ogg",
-		"n51/kill/kill4.ogg"
+		"n51/kill/kill.mp3",
+		"n51/kill/kill1.mp3",
+		"n51/kill/kill2.mp3",
+		"n51/kill/kill3.mp3",
+		"n51/kill/kill4.mp3"
 	}
 }
 
@@ -215,22 +215,22 @@ local swat_phrases = {
 
 
 local laugh = {
-	"zbattle/laugh/laugh1.ogg",
-	"zbattle/laugh/laugh2.ogg",
-	"zbattle/laugh/laugh3.ogg",
-	"zbattle/laugh/laugh4.ogg",
-	"zbattle/laugh/laugh5.ogg",
-	"zbattle/laugh/laugh6.ogg",
-	"zbattle/laugh/laugh7.ogg",
+	"zbattle/laugh/laugh1.mp3",
+	"zbattle/laugh/laugh2.mp3",
+	"zbattle/laugh/laugh3.mp3",
+	"zbattle/laugh/laugh4.mp3",
+	"zbattle/laugh/laugh5.mp3",
+	"zbattle/laugh/laugh6.mp3",
+	"zbattle/laugh/laugh7.mp3",
 }
 
 local f_laugh = {
-	"zbattle/laugh/f_laugh1.ogg",
-	"zbattle/laugh/f_laugh2.ogg",
-	"zbattle/laugh/f_laugh3.ogg",
-	"zbattle/laugh/f_laugh4.ogg",
-	"zbattle/laugh/f_laugh5.ogg",
-	"zbattle/laugh/f_laugh6.ogg",
+	"zbattle/laugh/f_laugh1.mp3",
+	"zbattle/laugh/f_laugh2.mp3",
+	"zbattle/laugh/f_laugh3.mp3",
+	"zbattle/laugh/f_laugh4.mp3",
+	"zbattle/laugh/f_laugh5.mp3",
+	"zbattle/laugh/f_laugh6.mp3",
 }
 
 local file, math, table, CurTime, timer, string = file, math, table, CurTime, timer, string

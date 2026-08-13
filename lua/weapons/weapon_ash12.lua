@@ -97,7 +97,7 @@ SWEP.availableAttachments = {
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.8856, 5.6616)
 SWEP.RHandPos = Vector(-32, -111, 14)
@@ -145,7 +145,7 @@ SWEP.AnimsSounds = {
         [1.47] = function(self) self:EmitSound(path .. "ash12_bolt_handle_bounce.ogg") end,
     },
     ["draw"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
     },
     ["fire"] = {
         [0] = function(self) self:EmitSound(path .. "ash12_trigger_hammer.wav") end,

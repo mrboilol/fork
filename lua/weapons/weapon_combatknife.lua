@@ -47,8 +47,8 @@ SWEP.DamageSecondary = 15
 SWEP.ArteryChance = 1.5
 
 SWEP.swingsoundextra = {
-    {"knife/knife_bayonet_swing1.ogg", 60, {80, 90}},
-    {"knife/knife_bayonet_swing2.ogg", 60, {80, 90}},
+    {"knife/knife_bayonet_swing1.mp3", 60, {80, 90}},
+    {"knife/knife_bayonet_swing2.mp3", 60, {80, 90}},
 }
 
 SWEP.hitsoundextra = {

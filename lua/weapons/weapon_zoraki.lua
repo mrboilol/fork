@@ -54,7 +54,7 @@ SWEP.PPSMuzzleEffect = "pcf_jack_mf_tpistol" -- shared in sh_effects.lua
 
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.DrawAmmo = true

@@ -301,7 +301,7 @@ function ZW.PerformCustomBulletHit(bullet, plugin, trace, len, len_before)
         if SERVER and (not HG_BulletImpactSounds or not HG_BulletImpactSounds.PlayRicochet(trace.HitPos)) then
             local rnd = math.random(12)
             if rnd == 8 then rnd = 9 end
-            sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".ogg", trace.HitPos, 75, math.random(90, 110))
+            sound.Play("arc9_eft_shared/ricochet/ricochet" .. rnd .. ".wav", trace.HitPos, 75, math.random(90, 110))
         end
 
         if bullet.PostRicochet then

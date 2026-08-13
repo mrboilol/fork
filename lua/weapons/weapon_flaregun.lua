@@ -110,7 +110,7 @@ SWEP.Primary.Wait = 1
 SWEP.Tracer = "AR2Tracer"
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "revolver"
 SWEP.ZoomPos = Vector(2, -3.55, 2.0)
 SWEP.RHandPos = Vector(-5, -1.5, 2)

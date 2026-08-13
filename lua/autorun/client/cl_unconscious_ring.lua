@@ -120,10 +120,10 @@ local function UpdateECGStateAlert(ecgState)
 end
 
 -- Better sound system from oldring
-local SOUND_HEART = "health/critbeat.ogg"
-local SOUND_HEALTH_ALARM = "health/healthbeat.ogg"
-local SOUND_FLATLINE = "health/gg.ogg"
-local SOUND_FIBRILLATION = "criticalbeats.ogg"
+local SOUND_HEART = "health/critbeat.mp3"
+local SOUND_HEALTH_ALARM = "health/healthbeat.mp3"
+local SOUND_FLATLINE = "health/gg.mp3"
+local SOUND_FIBRILLATION = "criticalbeats.mp3"
 local CRITBEAT_VOLUME_SCALE = 0.6
 
 local lastPhaseMod = 0
@@ -838,7 +838,7 @@ hook.Add("HUDPaint", "DrawUnconsciousRing", function()
             alertSound = nil
         end
     elseif not alertPlayed then
-        sound.PlayFile("sound/health/alert.ogg", "noblock noplay", function(s)
+        sound.PlayFile("sound/health/alert.mp3", "noblock noplay", function(s)
             if IsValid(s) then
                 s:EnableLooping(true)
                 s:SetVolume(1.0)

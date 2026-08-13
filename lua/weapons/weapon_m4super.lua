@@ -14,8 +14,8 @@ SWEP.SlotPos = 10
 SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_rif_m4a1.mdl"
 SWEP.Spawnable = false
-SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/m4super90.png")
-SWEP.IconOverride = "pwb2/vgui/weapons/m4super90.png"
+SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/m4super90.vmt")
+SWEP.IconOverride = "pwb2/vgui/weapons/m4super90.vmt"
 SWEP.ReloadSound = "weapons/tfa_ins2/m1014/toz_shell_insert_2.ogg"
 SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/toz_shotgun/handling/toz_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.CustomShell = "12x70"
@@ -36,7 +36,7 @@ SWEP.Primary.Sound = {"toz_shotgun/toz_fp.wav", 80, 70, 75}
 SWEP.Primary.Wait = 0.2
 SWEP.NumBullet = 8
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 --[type_] = {1 = name,2 = spread,3 = dmg,4 = pen,5 = numbullet,6 = isrubber,7 = shockmul},
 
 SWEP.addSprayMul = 1

@@ -27,7 +27,7 @@ SWEP.WorldModel = "models/sirgibs/ragdoll/css/terror_arctic_radio.mdl"
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_walkietalkie")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_walkietalkie.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_walkietalkie.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -108,7 +108,7 @@ if CLIENT then
 
 	net.Receive("callbomber_nuke_explode", function()
 		nukeFlashEnd = CurTime() + 1
-		surface.PlaySound("rem_nuke.ogg")
+		surface.PlaySound("rem_nuke.mp3")
 		surface.PlaySound("rem_blast.mp3")
 	end)
 

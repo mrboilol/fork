@@ -42,7 +42,7 @@ SWEP.FakeEjectBrassATT = "2"
 SWEP.FakeViewBobBone = "CAM_Homefield"
 SWEP.FakeReloadSounds = {
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.85] = "weapons/ak74/ak74_magin.wav",
 	[0.95] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -51,7 +51,7 @@ SWEP.FakeReloadSounds = {
 SWEP.FakeEmptyReloadSounds = {
 
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.65] = "weapons/ak74/ak74_magin.wav",
 	[0.75] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -84,11 +84,11 @@ SWEP.Primary.Ammo = "12/70 gauge"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = Vector(0.005, 0.005, 0.005)
 SWEP.NumBullet = 8
-SWEP.Primary.Sound = {"weapons/arccw_ud/870/fire-01.ogg", 80, 70, 75}
+SWEP.Primary.Sound = {"weapons/arccw_ud/870/fire-01.mp3", 80, 70, 75}
 SWEP.Primary.Wait = 0.2
 SWEP.HoldType = "rpg"
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.ReloadSound = "weapons/spas12/handling/toz_shell_insert_2.ogg"
 SWEP.ZoomPos = Vector(-3, 0.3971, 2.3896)
 SWEP.RHandPos = Vector(-14, -1, 4)
@@ -147,11 +147,11 @@ SWEP.AnimList = {
 SWEP.AnimsEvents = {
 	["sgreload_start_empty"] = {
 		[0.2] = function(self)
-			self:EmitSound("weapons/arccw_ud/m1014/breechload.ogg")
+			self:EmitSound("weapons/arccw_ud/m1014/breechload.mp3")
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.8] = function(self)
-			self:EmitSound("weapons/arccw_ud/m1014/breechclose.ogg")
+			self:EmitSound("weapons/arccw_ud/m1014/breechclose.mp3")
 		end,
 		[0.9] = function(self)
 			--self:GetWM():ManipulateBoneScale(47, vector_origin)
@@ -159,7 +159,7 @@ SWEP.AnimsEvents = {
 	},
 	["sgreload_insert"] = {
 		[0.0] = function(self)
-			self:EmitSound("weapons/arccw_ur/spas12/shell-insert-0"..math.random(1,9)..".ogg")
+			self:EmitSound("weapons/arccw_ur/spas12/shell-insert-0"..math.random(1,9)..".mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
@@ -169,12 +169,12 @@ SWEP.AnimsEvents = {
 	},
 	["cycle"] = {
 		[0.0] = function(self)
-			self:EmitSound("weapons/arccw_ur/spas12/forearm_back.ogg")
+			self:EmitSound("weapons/arccw_ur/spas12/forearm_back.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.3] = function(self)
-			self:EmitSound("weapons/arccw_ur/spas12/forearm_forward.ogg")
+			self:EmitSound("weapons/arccw_ur/spas12/forearm_forward.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end

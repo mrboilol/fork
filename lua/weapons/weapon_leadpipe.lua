@@ -112,12 +112,12 @@ SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
-SWEP.HitFleshPlus = "leadpipe/hit1.ogg"
+SWEP.HitFleshPlus = "leadpipe/hit1.mp3"
 SWEP.HitFleshExtraPitch = {110, 115}
-SWEP.SwingSound = "baseballbat/swing.ogg"
+SWEP.SwingSound = "baseballbat/swing.mp3"
 SWEP.SwingSoundPitch = {120, 130}
 SWEP.HitFleshExtra = {
-    "leadpipe/hit1.ogg",
+    "leadpipe/hit1.mp3",
 }
 
 SWEP.AttackPos = Vector(0,0,0)

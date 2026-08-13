@@ -55,7 +55,7 @@ SWEP.PPSMuzzleEffect = "pcf_jack_mf_mshotgun"
 
 SWEP.CustomShell = "12x70"
 SWEP.ReloadSound = "weapons/remington_870/870_shell_in_1.ogg"
-SWEP.CockSound = "weapons/darsu_eft/m870/rem870_pump_in.ogg"
+SWEP.CockSound = "weapons/darsu_eft/m870/rem870_pump_in.mp3"
 SWEP.weight = 4
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
@@ -97,7 +97,7 @@ SWEP.availableAttachments = {
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.6725, 5.376)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -130,9 +130,9 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
     ["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["ready0"] = {
         [0.01] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,

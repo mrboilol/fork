@@ -39,12 +39,12 @@ SWEP.ViewPunchDiv = 1
 
 -- Фейковые звуки (для совместимости)
 SWEP.FakeReloadSounds = {
-    [0.25] = "sound/weapons/pulserifle/magout.ogg",
-    [0.85] = "sound/weapons/pulserifle/magin.ogg",
+    [0.25] = "sound/weapons/pulserifle/magout.mp3",
+    [0.85] = "sound/weapons/pulserifle/magin.mp3",
 }
 SWEP.FakeEmptyReloadSounds = {
-    [0.25] = "sound/weapons/pulserifle/magout.ogg",
-    [0.85] = "sound/weapons/pulserifle/magin.ogg",
+    [0.25] = "sound/weapons/pulserifle/magout.mp3",
+    [0.85] = "sound/weapons/pulserifle/magin.mp3",
 }
 
 SWEP.MagModel = "models/weapons/upgrades/w_magazine_m1a1_30.mdl" -- Если есть модель магазина M41A, впиши сюда
@@ -59,8 +59,8 @@ SWEP.LocalMuzzleAng = Angle(0,0,0)
 SWEP.WeaponEyeAngles = Angle(0,0,0)
 
 SWEP.CustomShell = "556x45"
-SWEP.ReloadSound = "sound/weapons/pulserifle/magin.ogg"
-SWEP.CockSound = "sound/weapons/pulserifle/struggle.ogg"
+SWEP.ReloadSound = "sound/weapons/pulserifle/magin.mp3"
+SWEP.CockSound = "sound/weapons/pulserifle/struggle.mp3"
 SWEP.weight = 3
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1

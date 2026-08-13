@@ -199,15 +199,15 @@ local fullBodyGibModels = {
 }
 
 local sounds = {
-	Sound("gore/blast.ogg"),
-	Sound("gore/blast2.ogg"),
-	Sound("gore/blast3.ogg"),
-	Sound("gore/blast4.ogg"),
-	Sound("gore/chop2.ogg"),
-	Sound("gore/chop3.ogg"),
-	Sound("gore/chop4.ogg"),
-	Sound("gore/chop5.ogg"),
-	Sound("gore/chop6.ogg")
+	Sound("gore/blast.mp3"),
+	Sound("gore/blast2.mp3"),
+	Sound("gore/blast3.mp3"),
+	Sound("gore/blast4.mp3"),
+	Sound("gore/chop2.mp3"),
+	Sound("gore/chop3.mp3"),
+	Sound("gore/chop4.mp3"),
+	Sound("gore/chop5.mp3"),
+	Sound("gore/chop6.mp3")
 }
 util.PrecacheModel(headboom_mdl)
 for _, models in pairs(limbGibModels) do

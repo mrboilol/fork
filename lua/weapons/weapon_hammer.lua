@@ -374,7 +374,7 @@ function SWEP:SecondaryAttack(override)
 	if self:GetNetVar("AttackMode", 1) == 2 then
 		if self:CutDuct() then return end
 		if ((Tr.Entity.Nails and Tr.Entity.Nails[Tr.PhysicsBone]) or Tr.Entity.LockedDoorNail) and not self.pulling then
-			Owner:EmitSound("nail_pull.mp3", 65, 100, 1, CHAN_AUTO)
+			Owner:EmitSound("nail_pull.ogg", 65, 100, 1, CHAN_AUTO)
 			self.pulling = true
 			timer.Simple(2, function()
 				self.pulling = false

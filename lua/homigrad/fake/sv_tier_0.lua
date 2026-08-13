@@ -1617,7 +1617,7 @@ hook.Add("PlayerLeaveVehicle","allowweapons",function(ply,veh)
 				ragdoll:GetPhysicsObject():ApplyForceCenter(ragdoll:GetVelocity():GetNormalized() * 10000)
 				ragdoll:GetPhysicsObject():ApplyForceCenter(vector_up * 10000)
 
-				veh:EmitSound("zbattle/glass_shatter.ogg")
+				veh:EmitSound("zbattle/glass_shatter.mp3")
 			end
 		else
 			ply:SetCollisionGroup(COLLISION_GROUP_PLAYER)

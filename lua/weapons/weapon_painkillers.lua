@@ -11,7 +11,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/bloocobalt/l4d/items/w_eq_pills.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_painpills")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_painpills.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_painpills.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 SWEP.AutoSwitchTo = false

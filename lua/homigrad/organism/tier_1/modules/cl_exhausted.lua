@@ -1,6 +1,6 @@
 local hg = hg or {}
 
-local EXHAUSTED_SOUND = "exhaustedloop.ogg"
+local EXHAUSTED_SOUND = "exhaustedloop.mp3"
 local EXHAUSTED_STAMINA_START = 100 -- sound begins at this stamina level (quiet)
 local EXHAUSTED_STAMINA_END = 15 -- sound reaches max volume at this stamina level
 

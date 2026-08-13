@@ -81,9 +81,9 @@ function ENT:Detonate()
 
 	timer.Simple(.01, function()
 		if not IsValid(self) then return end
-		self:EmitSound("snd_jack_hmcd_explosion_debris.mp3", 85, math.random(90, 110))
+		self:EmitSound("snd_jack_hmcd_explosion_debris.ogg", 85, math.random(90, 110))
 		self:EmitSound("m67/m67_detonate_far_dist_0" .. math.random(1, 3) .. ".ogg", 140, 100)
-		self:EmitSound("snd_jack_hmcd_debris.mp3", 85, math.random(90, 110))
+		self:EmitSound("snd_jack_hmcd_debris.ogg", 85, math.random(90, 110))
 
 		for i = 0, 10 do
 			local Tr = util.QuickTrace(Pos, VectorRand() * math.random(10, 150), {self})

@@ -43,20 +43,20 @@ end
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
     ["reload"] = {
         [0.1] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_magout.wav") end,
-        [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.ogg") end,
-        [0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.ogg") end,
+        [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.mp3") end,
+        [0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
         [0.6] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_magin.wav") end,
     },
     ["reload_empty"] = {
         [0.025] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg") end,
 		[0.1] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_magout.wav") end,
-		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.ogg") end,
+		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
 		[0.5] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_magin.wav") end,
 		[0.8] = function(self) self:EmitSound("zcitysnd/sound/weapons/m9/handling/m9_boltrelease.ogg") end,
     },
@@ -92,14 +92,14 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "9x19 mm Parabellum"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 21
-SWEP.Primary.Sound = {"weapons/darsu_eft/p226/p226_fire_close.ogg", 75, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/p226/p226_fire_close.mp3", 75, 90, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_hammer.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 22
 SWEP.Primary.Wait = PISTOLS_WAIT
 SWEP.ReloadTime = 3.5
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "revolver"
 SWEP.ZoomPos = Vector(0, -2.2911, 2.8963)
 SWEP.RHandPos = Vector(-3, -1, 0)

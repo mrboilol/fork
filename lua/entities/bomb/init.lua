@@ -190,7 +190,7 @@ function ENT:Think()
 		local timeLeft = self:GetNetVar("timer") - CurTime()
 		if timeLeft <= 1.5 and timeLeft > 0 and not self.wtfPlayed and math.random(1, 100) <= 5 then
 			self.wtfPlayed = true
-			self:EmitSound("snds_jack_gmod/wtfboom.mp3")
+			self:EmitSound("snds_jack_gmod/wtfboom.ogg")
 		end
 
 		if self.nextbeep < CurTime() and self:GetNetVar("timer") > CurTime() then

@@ -585,7 +585,7 @@ function WS.ChangeSelectionWep( ply, key )
 
         WS.Show = CurTime() + 4
         --print(key)
-        surface.PlaySound("arc9_eft_shared/weapon_generic_rifle_spin"..math.random(10)..".ogg")
+        surface.PlaySound("arc9_eft_shared/weapon_generic_rifle_spin"..math.random(10)..".mp3")
         if iPos then
             iPos = iPos - 1
             if LastSelected ~= iPos then
@@ -646,7 +646,7 @@ function WS.SetActuallyWeapon( ply, cmd )
             WS.PendingWeapon = WS.GetSelectedWeapon()
             WS.GrabAnim = 1
             WS.Show = CurTime() + 0.28
-            surface.PlaySound("arc9_eft_shared/weapon_generic_spin"..math.random(1,10)..".ogg")
+            surface.PlaySound("arc9_eft_shared/weapon_generic_spin"..math.random(1,10)..".mp3")
         end
     end
 end

@@ -112,7 +112,7 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = 0
 
 -- Исправленные пути к звукам выстрела (SVDS)
-SWEP.Primary.Sound = {"weapons/darsu_eft/svds/svd_fire_close.ogg", 85, 100, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/svds/svd_fire_close.mp3", 85, 100, 100}
 SWEP.SupressedSound = {"weapons/darsu_eft/svds/svd_fire_silenced_close.ogg", 65, 100, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.45 
@@ -138,7 +138,7 @@ SWEP.availableAttachments = {
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-3, -3.3, 5.126)
 SWEP.RHandPos = Vector(-8, -2, 6)
@@ -182,7 +182,7 @@ SWEP.AnimsSounds = {
         [1.02] = function(self) self:EmitSound(path .. "svd_slider_out.ogg") end,
     },
     ["draw"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
     },
     ["fire"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
@@ -195,9 +195,9 @@ SWEP.AnimsSounds = {
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 }
 

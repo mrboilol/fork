@@ -42,7 +42,7 @@ SWEP.FakeBodyGroupsPresets = {
 
 SWEP.FakeReloadSounds = {
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.85] = "weapons/ak74/ak74_magin.wav",
 	[0.95] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -51,7 +51,7 @@ SWEP.FakeReloadSounds = {
 SWEP.FakeEmptyReloadSounds = {
 
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.65] = "weapons/ak74/ak74_magin.wav",
 	[0.75] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -69,8 +69,8 @@ SWEP.ViewPunchDiv = 1
 
 SWEP.FakeVPShouldUseHand = false
 
-SWEP.WepSelectIcon2 = Material("vgui/wep_jack_hmcd_shotgun.png")
-SWEP.IconOverride = "vgui/wep_jack_hmcd_shotgun.png"
+SWEP.WepSelectIcon2 = Material("vgui/wep_jack_hmcd_shotgun.vmt")
+SWEP.IconOverride = "vgui/wep_jack_hmcd_shotgun.vmt"
 
 SWEP.LocalMuzzlePos = Vector(33.739,0.09,5.098)
 SWEP.LocalMuzzleAng = Angle(0.2,-0.0,0)
@@ -92,7 +92,7 @@ SWEP.Primary.Automatic = false
 SWEP.Primary.Ammo = "12/70 gauge"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = Vector(0.005, 0.005, 0.005)
-SWEP.Primary.Sound = {"ithaca.ogg", 80, 90, 100}
+SWEP.Primary.Sound = {"ithaca.mp3", 80, 90, 100}
 SWEP.SupressedSound = {"toz_shotgun/toz_suppressed_fp.ogg", 65, 90, 100}
 SWEP.availableAttachments = {
 	barrel = {
@@ -110,7 +110,7 @@ SWEP.NumBullet = 8
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, 0.0571, 5.6841)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -139,7 +139,7 @@ SWEP.AnimList = {
 SWEP.AnimsEvents = {
 	["sgreload_insert"] = {
 		[0.0] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/shell-insert-0"..math.random(1,3)..".ogg")
+			self:EmitSound("weapons/arccw_ud/870/shell-insert-0"..math.random(1,3)..".mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
@@ -149,7 +149,7 @@ SWEP.AnimsEvents = {
 	},
 	["cycle"] = {
 		[0.0] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/rack_1.ogg")
+			self:EmitSound("weapons/arccw_ud/870/rack_1.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
@@ -159,19 +159,19 @@ SWEP.AnimsEvents = {
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.2] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/rack_2.ogg")
+			self:EmitSound("weapons/arccw_ud/870/rack_2.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end
 	},
 	["sgreload_finish_empty"] = {
 		[0.0] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/rack_1.ogg")
+			self:EmitSound("weapons/arccw_ud/870/rack_1.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.3] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/rack_2.ogg")
+			self:EmitSound("weapons/arccw_ud/870/rack_2.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end

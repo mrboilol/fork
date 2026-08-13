@@ -22,7 +22,7 @@ SWEP.Primary.Wait = 0.09091
 SWEP.ReloadTime = 6
 SWEP.ReloadSound = "weapons/ar2/ar2_reload.ogg"
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -34,8 +34,8 @@ SWEP.CanSuicide = false
 
 SWEP.RestPosition = Vector(-15, -1, 5)
 
-SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/pkm.png")
-SWEP.IconOverride = "pwb2/vgui/weapons/pkm.png"
+SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/pkm.vmt")
+SWEP.IconOverride = "pwb2/vgui/weapons/pkm.vmt"
 
 SWEP.CustomShell = "50cal"
 SWEP.EjectPos = Vector(0,-20,5)

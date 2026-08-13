@@ -111,8 +111,8 @@ SWEP.Primary.Damage = 65
 SWEP.Primary.Force = 65
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = 0
-SWEP.Primary.Sound = {"weapons/darsu_eft/vpo215/vpo215_fire_close.ogg", 80, 90, 100}
-SWEP.SupressedSound = {"weapons/darsu_eft/vpo215/vpo215_fire_silenced_close.ogg", 65, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/vpo215/vpo215_fire_close.mp3", 80, 90, 100}
+SWEP.SupressedSound = {"weapons/darsu_eft/vpo215/vpo215_fire_silenced_close.mp3", 65, 90, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.25
 SWEP.NumBullet = 1
@@ -135,7 +135,7 @@ SWEP.availableAttachments = {
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -1.8, 4.5)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -179,50 +179,50 @@ SWEP.AnimsSounds = {
         [1.05] = function(self) self:EmitSound(path .. "vpo215_boltin.ogg") end,
     },
     ["draw"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
     },
     ["draw_empty"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
     },
     ["holster"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_out.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_out.mp3") end,
     },
     ["holster_empty"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_out.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_out.mp3") end,
     },
     ["fire"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
     },
     ["fire_dry"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
     },
     ["bolt0"] = {
         [0.24] = function(self) self:EmitSound(path .. "vpo215_boltout.ogg") end,
         [0.55] = function(self) self:EmitSound(path .. "vpo215_boltin.ogg") end,
     },
     ["look"] = {
-        [0.3] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin1.ogg") end,
-        [1.41] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin2.ogg") end,
-        [2.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin3.ogg") end,
+        [0.3] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin1.mp3") end,
+        [1.41] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin2.mp3") end,
+        [2.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin3.mp3") end,
     },
     ["look_empty"] = {
-        [0.3] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin1.ogg") end,
-        [1.41] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin2.ogg") end,
-        [2.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin3.ogg") end,
+        [0.3] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin1.mp3") end,
+        [1.41] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin2.mp3") end,
+        [2.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_rifle_spin3.mp3") end,
     },
     ["mod_switch"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weapon_light_switcher1.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weapon_light_switcher1.mp3") end,
     },
     ["mod_switch_empty"] = {
-        [0] = function(self) self:EmitSound("arc9_eft_shared/weapon_light_switcher1.ogg") end,
+        [0] = function(self) self:EmitSound("arc9_eft_shared/weapon_light_switcher1.mp3") end,
     },
 }
 
 SWEP.AnimsEvents = {
 	["look"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 }
 

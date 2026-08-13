@@ -878,7 +878,7 @@ local function PressRadialMenu(mouseClick)
 		local func = options[current_option][1]
 		if isfunction(func) then 
 			needed_mouseclick = func(mouseClick, current_option_select)
-			LocalPlayer():EmitSound("hover.ogg", 75, 110, 1, CHAN_AUTO)
+			LocalPlayer():EmitSound("hover.mp3", 75, 110, 1, CHAN_AUTO)
 		end
 	end
 

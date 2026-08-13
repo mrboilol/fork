@@ -11,7 +11,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/morphine_syrette/morphine.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_morphine")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_morphine.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_morphine.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 SWEP.AutoSwitchTo = false

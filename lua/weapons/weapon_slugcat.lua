@@ -87,8 +87,8 @@ SWEP.AnimList = {
 	["reload_empty"] = "base_reloadempty",
 }
 
-SWEP.WepSelectIcon2 = Material("vgui/wep_jack_hmcd_suppressed.png")
-SWEP.IconOverride = "vgui/wep_jack_hmcd_suppressed.png"
+SWEP.WepSelectIcon2 = Material("vgui/wep_jack_hmcd_suppressed.vmt")
+SWEP.IconOverride = "vgui/wep_jack_hmcd_suppressed.vmt"
 
 SWEP.weaponInvCategory = 4
 
@@ -114,7 +114,7 @@ SWEP.Primary.Automatic = true
 SWEP.Primary.Ammo = "14.5x114mm B32"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 555555
-SWEP.Primary.Sound = {"zcity/voice/slugcat_1/waw_1.mp3", 0, 100, 100}
+SWEP.Primary.Sound = {"zcity/voice/slugcat_1/waw_1.ogg", 0, 100, 100}
 SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/makarov/handling/makarov_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Force = 555555
 SWEP.Primary.Wait = 0.01
@@ -137,10 +137,10 @@ SWEP.ReloadTime = 4
 SWEP.ReloadSoundes = {
 	"none",
 	"none",
-	"zcity/voice/slugcat_1/waw_2.mp3",
-	"zcity/voice/slugcat_1/waw_1.mp3",
+	"zcity/voice/slugcat_1/waw_2.ogg",
+	"zcity/voice/slugcat_1/waw_1.ogg",
 	"none",
-	"zcity/voice/slugcat_1/waw_1.mp3",
+	"zcity/voice/slugcat_1/waw_1.ogg",
 	"none",
 	"none",
 	"none"
@@ -149,7 +149,7 @@ SWEP.ReloadSoundes = {
 SWEP.PPSMuzzleEffect = "pcf_jack_mf_tpistol" -- shared in sh_effects.lua
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "revolver"
 SWEP.ZoomPos = Vector(-3, -0.0136, 2.9594)
 SWEP.RHandPos = Vector(-2, 0, 0)
@@ -166,7 +166,7 @@ SWEP.UseCustomWorldModel = true
 SWEP.attPos = Vector(0, 0, 0)
 SWEP.attAng = Angle(-0.1,-0.9,0)
 SWEP.lengthSub = 25
-SWEP.DistSound = "zcity/voice/slugcat_1/waw_1.mp3"
+SWEP.DistSound = "zcity/voice/slugcat_1/waw_1.ogg"
 
 SWEP.holsteredBone = "ValveBiped.Bip01_R_Thigh"
 SWEP.holsteredPos = Vector(0, -2, 1)

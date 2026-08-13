@@ -29,7 +29,7 @@ SWEP.DeployHoldAngLow = Angle(6, 0, -6)
 SWEP.DeployHoldTime = 1.1
 SWEP.DeploySoundPitch = 70
 SWEP.FirstEquipFXDuration = 2.4
-SWEP.FirstEquipFXSound = "slayerevent/slayerequipzap.ogg"
+SWEP.FirstEquipFXSound = "slayerevent/slayerequipzap.mp3"
 SWEP.FirstEquipFXSoundDelay = 0.85
 SWEP.FirstEquipFXSoundLevel = 140
 SWEP.FirstEquipFXSoundPitch = 80
@@ -111,19 +111,19 @@ SWEP.TwoHanded = true
 
 SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.AttackHitFlesh = "slayerevent/slayerhit1.ogg"
+SWEP.AttackHitFlesh = "slayerevent/slayerhit1.mp3"
 SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.ogg"
-SWEP.DeploySnd = "slayerevent/slayerequip.ogg"
+SWEP.DeploySnd = "slayerevent/slayerequip.mp3"
 SWEP.HitFleshExtra = {
-    "slayerevent/slayerhit1.ogg",
-    "slayerevent/slayerhit2.ogg",
-    "slayerevent/slayerhit3.ogg",
-    "slayerevent/slayerhit4.ogg",
-    "slayerevent/slayerhit5.ogg",
+    "slayerevent/slayerhit1.mp3",
+    "slayerevent/slayerhit2.mp3",
+    "slayerevent/slayerhit3.mp3",
+    "slayerevent/slayerhit4.mp3",
+    "slayerevent/slayerhit5.mp3",
     "slayerevent/slayerhit6.ogg",
 }
 SWEP.HitFleshExtraPitch = 85
-SWEP.SwingSound = "slayerevent/slayerswing.ogg"
+SWEP.SwingSound = "slayerevent/slayerswing.mp3"
 
 SWEP.AttackPos = Vector(0,0,0)
 
@@ -165,7 +165,7 @@ function SWEP:Deploy()
         self:SetNWFloat("FirstEquipFXStart", CurTime() + fxDelay)
         timer.Simple(fxDelay, function()
             if IsValid(self) then
-                self:EmitSound(self.FirstEquipFXSound or "slayerevent/slayerequipzap.ogg", self.FirstEquipFXSoundLevel or 140, self.FirstEquipFXSoundPitch or 80)
+                self:EmitSound(self.FirstEquipFXSound or "slayerevent/slayerequipzap.mp3", self.FirstEquipFXSoundLevel or 140, self.FirstEquipFXSoundPitch or 80)
                 local shakeDuration = self.FirstEquipFXDuration or 2.4
                 util.ScreenShake(self:GetPos(), self.FirstEquipFXShakeAmplitude or 12, self.FirstEquipFXShakeFrequency or 120, shakeDuration, self.FirstEquipFXShakeRadius or 700)
             end

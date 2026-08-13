@@ -55,25 +55,25 @@ local path = "weapons/darsu_eft/ak/"
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 	["reload0"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_up.ogg") end,
-		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_out.ogg") end,
-		[0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in3.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_in.ogg") end,
-		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_down.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_up.mp3") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_out.mp3") end,
+		[0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in3.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.mp3") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_in.mp3") end,
+		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_down.mp3") end,
 	},
 	["reload_empty0"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_magrelease_button.ogg") end,
-		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_out.ogg") end,
-		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_in.ogg") end,
-		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_up.ogg") end,
-		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_down.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_magrelease_button.mp3") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_out.mp3") end,
+		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.mp3") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_mag_in.mp3") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_up.mp3") end,
+		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/sks/sks_slider_down.mp3") end,
 	},
 }
 

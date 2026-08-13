@@ -1,7 +1,7 @@
 AddCSLuaFile()
 --
 SWEP.CooldownHolster = 0.75
-SWEP.HolsterSnd = {"homigrad/weapons/holster_rifle.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_rifle.ogg", 55, 100, 110}
 SWEP.CooldownDeploy = 1
 SWEP.DeploySnd = {"homigrad/weapons/draw_rifle.mp3", 65, 100, 110}
 

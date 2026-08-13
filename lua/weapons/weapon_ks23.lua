@@ -44,14 +44,14 @@ SWEP.FakeBodyGroupsPresets = {
 
 SWEP.FakeReloadSounds = {
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.85] = "weapons/ak74/ak74_magin.wav",
 	[0.95] = "weapons/universal/uni_crawl_l_05.wav",
 }
 
 SWEP.FakeEmptyReloadSounds = {
 	[0.25] = "weapons/ak74/ak74_magout.wav",
-	[0.34] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.34] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.65] = "weapons/ak74/ak74_magin.wav",
 	[0.75] = "weapons/universal/uni_crawl_l_05.wav",
 	[0.91] = "weapons/ak74/ak74_boltback.wav",
@@ -93,7 +93,7 @@ SWEP.Primary.Force = 12
 SWEP.Primary.Ammo = "23x75 SH10"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = Vector(0.005, 0.005, 0.005)
-SWEP.Primary.Sound = {"weapons/darsu_eft/ks23/ks23_fire_outdoor_close.ogg", 80, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/ks23/ks23_fire_outdoor_close.mp3", 80, 90, 100}
 SWEP.SupressedSound = {"toz_shotgun/toz_suppressed_fp.ogg", 65, 90, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_hammer.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.availableAttachments = {}
@@ -104,7 +104,7 @@ SWEP.NumBullet = 8
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.26, 6.55)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -143,32 +143,32 @@ end
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 	["reload_start2"] = {
 		[0.45] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/shell-insert-0"..math.random(1,3)..".ogg")
+			self:EmitSound("weapons/arccw_ud/870/shell-insert-0"..math.random(1,3)..".mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 	},
 	["reload_loop2"] = {
 		[0.45] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/shell-insert-0"..math.random(1,3)..".ogg")
+			self:EmitSound("weapons/arccw_ud/870/shell-insert-0"..math.random(1,3)..".mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 	},
 	["pump1"] = {
 		[0.0] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/rack_1.ogg")
+			self:EmitSound("weapons/arccw_ud/870/rack_1.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,
 		[0.21] = function(self)
-			self:EmitSound("weapons/arccw_ud/870/rack_2.ogg")
+			self:EmitSound("weapons/arccw_ud/870/rack_2.mp3")
 			--
 			--self:GetWM():ManipulateBoneScale(47, vector_full)
 		end,

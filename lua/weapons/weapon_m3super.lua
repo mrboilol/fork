@@ -95,7 +95,7 @@ SWEP.availableAttachments = {
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.6816, 5.6011)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -133,9 +133,9 @@ local snd_path = "weapons/darsu_eft/m3s90/"
 
 SWEP.AnimsEvents = {
     ["inspect"] = {
-        [0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-        [0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-        [0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+        [0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+        [0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+        [0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["fistful_start"] = {
         [0.05] = function(self) self:EmitSound(snd_path .. "mr133_shell_pickup.ogg") end,

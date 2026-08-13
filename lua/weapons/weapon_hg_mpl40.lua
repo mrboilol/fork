@@ -71,7 +71,7 @@ SWEP.hitsoundbrutalize = {
 }
 
 SWEP.swingsoundextra = {
-    {"weapons/darsu_eft/melee/taran_swing_02.ogg", 90, {95, 105}},
+    {"weapons/darsu_eft/melee/taran_swing_02.mp3", 90, {95, 105}},
 }
 
 SWEP.BlockTier = 2

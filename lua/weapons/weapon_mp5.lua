@@ -28,7 +28,7 @@ SWEP.FakeViewBobBone = "CAM_Homefield"
 SWEP.FakeReloadSounds = {
 	[0.22] = "weapons/universal/uni_crawl_l_03.wav",
 	[0.34] = "weapons/arccw_ur/mp5/magout.ogg",
-	[0.38] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.38] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.51] = "weapons/universal/uni_crawl_l_02.wav",
 	[0.62] = "weapons/arccw_ur/mp5/magin.ogg",
 	[0.85] = "weapons/universal/uni_crawl_l_05.wav",
@@ -135,8 +135,8 @@ SWEP.ReloadHold = nil
 SWEP.FakeVPShouldUseHand = false
 
 
-SWEP.WepSelectIcon2 = Material("vgui/hud/tfa_ins2_mp5a4.png")
-SWEP.IconOverride = "vgui/hud/tfa_ins2_mp5a4.png"
+SWEP.WepSelectIcon2 = Material("vgui/hud/tfa_ins2_mp5a4.vmt")
+SWEP.IconOverride = "vgui/hud/tfa_ins2_mp5a4.vmt"
 
 SWEP.CustomShell = "9x19"
 --SWEP.EjectPos = Vector(0,-20,5)

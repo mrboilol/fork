@@ -175,11 +175,11 @@ SWEP.ChainsawFleshHitSounds = {
 }
 
 SWEP.ChainsawPlayerHitSounds = {
-    {"pocketknife/melee_character_knife_plr_02.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_01.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_03.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_04.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_05.ogg", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_02.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_01.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_03.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_04.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_05.mp3", 55, {105, 115}},
 }
 
 SWEP.ChainsawHardHitSound = "snd_jack_hmcd_knifehit.ogg"

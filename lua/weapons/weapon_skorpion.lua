@@ -103,7 +103,7 @@ SWEP.AnimList = {
 
 SWEP.punchmul = 1.5
 SWEP.punchspeed = 3
-SWEP.WepSelectIcon2 = Material("pwb/sprites/vz61.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/vz61.vmt")
 SWEP.IconOverride = "entities/tfa_mwr_vz61.png"
 SWEP.weight = 1
 SWEP.weaponInvCategory = 2
@@ -136,7 +136,7 @@ SWEP.ReloadSoundes = {
 	"none"
 }
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-3, 0.0571, 8.4824)
 SWEP.RHandPos = Vector(-13.5, -1, 3)

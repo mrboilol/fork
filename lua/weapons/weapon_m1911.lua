@@ -159,7 +159,7 @@ SWEP.AnimsEvents = {
 }
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.UseCustomWorldModel = true
 SWEP.WorldPos = Vector(11, -0.8, 2.6)
 SWEP.WorldAng = Angle(0, 0, 0)

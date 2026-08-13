@@ -12,49 +12,49 @@ local function addNumberedSounds(sounds, folder, count, prefix)
 end
 
 local fleshSounds = {
-	"bullet/ric_flesh1.ogg",
-	"bullet/ric_flesh2.ogg",
-	"bullet/ric_flesh3.ogg",
-	"bullet/ric_flesh4.ogg",
-	"panoptisscon/blt_flesh1 - Copy.ogg",
-	"panoptisscon/blt_flesh2 - Copy.ogg",
-	"panoptisscon/blt_flesh3 - Copy.ogg",
-	"panoptisscon/bullethit1 - Copy.ogg",
-	"panoptisscon/bullethit2 - Copy.ogg",
-	"panoptisscon/bullethit3 - Copy.ogg",
-	"panoptisscon/bullethit4 - Copy.ogg",
+	"bullet/ric_flesh1.mp3",
+	"bullet/ric_flesh2.mp3",
+	"bullet/ric_flesh3.mp3",
+	"bullet/ric_flesh4.mp3",
+	"panoptisscon/blt_flesh1 - Copy.mp3",
+	"panoptisscon/blt_flesh2 - Copy.mp3",
+	"panoptisscon/blt_flesh3 - Copy.mp3",
+	"panoptisscon/bullethit1 - Copy.mp3",
+	"panoptisscon/bullethit2 - Copy.mp3",
+	"panoptisscon/bullethit3 - Copy.mp3",
+	"panoptisscon/bullethit4 - Copy.mp3",
 }
 
 local bfxFleshSounds = {}
 addNumberedSounds(bfxFleshSounds, "bfx/flesh/", 10)
 
 local stoneSounds = {
-	"panoptisscon/rock1 - Copy.ogg",
-	"panoptisscon/rock2 - Copy.ogg",
-	"panoptisscon/rock3 - Copy.ogg",
-	"panoptisscon/rock4 - Copy.ogg",
-	"panoptisscon/rock5 - Copy.ogg",
-	"bullet/ric_stone1.ogg",
-	"bullet/ric_stone2.ogg",
-	"bullet/ric_stone3.ogg",
+	"panoptisscon/rock1 - Copy.mp3",
+	"panoptisscon/rock2 - Copy.mp3",
+	"panoptisscon/rock3 - Copy.mp3",
+	"panoptisscon/rock4 - Copy.mp3",
+	"panoptisscon/rock5 - Copy.mp3",
+	"bullet/ric_stone1.mp3",
+	"bullet/ric_stone2.mp3",
+	"bullet/ric_stone3.mp3",
 }
 
 local metalSounds = {
-	"bullet/ric_metal1.ogg",
-	"bullet/ric_metal2.ogg",
-	"bullet/ric_metal3.ogg",
-	"bullet/ric_metal4.ogg",
-	"bullet/ric_metal5.ogg",
+	"bullet/ric_metal1.mp3",
+	"bullet/ric_metal2.mp3",
+	"bullet/ric_metal3.mp3",
+	"bullet/ric_metal4.mp3",
+	"bullet/ric_metal5.mp3",
 }
 
 local bfxMetalSounds = {}
 addNumberedSounds(bfxMetalSounds, "bfx/metal/", 29)
 
 local woodSounds = {
-	"bullet/ric_wood1.ogg",
-	"bullet/ric_wood2.ogg",
-	"bullet/ric_wood3.ogg",
-	"bullet/ric_wood4.ogg",
+	"bullet/ric_wood1.mp3",
+	"bullet/ric_wood2.mp3",
+	"bullet/ric_wood3.mp3",
+	"bullet/ric_wood4.mp3",
 }
 
 local bfxWoodSounds = {}
@@ -83,15 +83,15 @@ addNumberedSounds(supersonicNearMissSounds, "bul_snap/supersonic_snap_", 18)
 addNumberedSounds(subsonicNearMissSounds, "bul_flyby/subsonic_", 27)
 
 local ricochetSounds = {
-	"bullet/ricochet1.ogg",
-	"bullet/ricochet2.ogg",
-	"bullet/ricochet3.ogg",
-	"bullet/ricochet4.ogg",
-	"panoptisscon/ric1 - Copy.ogg",
-	"panoptisscon/ric2 - Copy.ogg",
-	"panoptisscon/ric3 - Copy.ogg",
-	"panoptisscon/ric4 - Copy.ogg",
-	"panoptisscon/ric5 - Copy.ogg",
+	"bullet/ricochet1.mp3",
+	"bullet/ricochet2.mp3",
+	"bullet/ricochet3.mp3",
+	"bullet/ricochet4.mp3",
+	"panoptisscon/ric1 - Copy.mp3",
+	"panoptisscon/ric2 - Copy.mp3",
+	"panoptisscon/ric3 - Copy.mp3",
+	"panoptisscon/ric4 - Copy.mp3",
+	"panoptisscon/ric5 - Copy.mp3",
 }
 
 local materialSounds = {

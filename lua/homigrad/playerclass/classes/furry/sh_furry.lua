@@ -598,7 +598,7 @@ if CLIENT then
 						time = CurTime() + 5
 					}
 
-					surface.PlaySound("zbattle/sonarping.ogg")
+					surface.PlaySound("zbattle/sonarping.mp3")
 				end
 			end
 		else
@@ -653,10 +653,10 @@ if CLIENT then
 				scan = false
 				foundPrey = {}
 
-				surface.PlaySound("zbattle/flashcharge.ogg")
+				surface.PlaySound("zbattle/flashcharge.mp3")
 			end)
 
-			surface.PlaySound("zbattle/sonar.ogg")
+			surface.PlaySound("zbattle/sonar.mp3")
 
 			for i = 1, 30 do
 				timer.Simple(i/60,function()

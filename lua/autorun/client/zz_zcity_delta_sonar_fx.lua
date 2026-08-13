@@ -51,13 +51,13 @@ net.Receive("hg_autoresus_fx", function()
 
 	StopAutoresusSound()
 	autoresusBlackUntil = CurTime() + duration
-	autoresusStation = CreateLoopSound("zcity_delta/aed.ogg")
+	autoresusStation = CreateLoopSound("zcity_delta/aed.mp3")
 end)
 
 net.Receive("hg_autoresus_after_fx", function()
 	StopAutoresusSound()
 	StopSonarSound()
-	-- sonarStation = CreateLoopSound("zcity_delta/sonarmegaouch.ogg")
+	-- sonarStation = CreateLoopSound("zcity_delta/sonarmegaouch.mp3")
 end)
 
 net.Receive("zcity_delta_sonar_hit", function()
@@ -65,7 +65,7 @@ net.Receive("zcity_delta_sonar_hit", function()
 	if not IsValid(lp) or not lp:Alive() then return end
 
 	StopSonarSound()
-	sonarStation = CreateLoopSound("zcity_delta/sonarmegaouch.ogg")
+	sonarStation = CreateLoopSound("zcity_delta/sonarmegaouch.mp3")
 end)
 
 hook.Add("PlayerDeath", "zcity_delta_sonar_stop", function(ply)

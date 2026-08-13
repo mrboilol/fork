@@ -38,7 +38,7 @@ function LockOnHandler:Setup( vehicle )
 
     if self.beepSound ~= nil then return end
 
-    local path = "sound/glide/weapons/incoming_missile_2.ogg"
+    local path = "sound/glide/weapons/incoming_missile_2.mp3"
 
     sound.PlayFile( path, "noplay noblock", function( snd, _, err )
         if not IsValid( snd ) then

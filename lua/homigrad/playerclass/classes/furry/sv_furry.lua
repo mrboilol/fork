@@ -52,7 +52,7 @@ end)
 
 hook.Add("PlayerDeath", "FurDeathSound", function(ply)
 	if ply.PlayerClassName == "furry" then
-		ply:EmitSound("zbattle/robot_death.ogg")
+		ply:EmitSound("zbattle/robot_death.mp3")
 	end
 end)
 
@@ -75,9 +75,9 @@ hook.Add("HomigradDamage","FurCrackHit",function(ply, dmgInfo, hitgroup, ent)
 			net.Send(ply)
 
 			if intensity > 0.1 then
-				ply:EmitSound("zbattle/glass_shatter.ogg", nil, math.random(70, 130))
+				ply:EmitSound("zbattle/glass_shatter.mp3", nil, math.random(70, 130))
 			else
-				ply:EmitSound("zbattle/glass_break.ogg", nil, math.random(70, 130), math.random(10, 30))
+				ply:EmitSound("zbattle/glass_break.mp3", nil, math.random(70, 130), math.random(10, 30))
 			end
 		end
 	end
@@ -104,13 +104,13 @@ local fur_pain = {
 }
 
 local uwuspeak_phrases = {
-	"zbattle/furry/cat_mrrp1.ogg",
-	"zbattle/furry/cat_mrrp1.ogg",
-	"zbattle/furry/cat_purr1.ogg",
-	"zbattle/furry/cat_purr2.ogg",
-	"zbattle/furry/mewo.ogg",
-	"zbattle/furry/mrrp.ogg",
-	"zbattle/furry/prbt.ogg",
+	"zbattle/furry/cat_mrrp1.mp3",
+	"zbattle/furry/cat_mrrp1.mp3",
+	"zbattle/furry/cat_purr1.mp3",
+	"zbattle/furry/cat_purr2.mp3",
+	"zbattle/furry/mewo.mp3",
+	"zbattle/furry/mrrp.mp3",
+	"zbattle/furry/prbt.mp3",
 	"zbattle/furry/beep1.wav",
 	"zbattle/furry/beep2.wav",
 }

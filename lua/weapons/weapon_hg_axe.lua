@@ -159,7 +159,7 @@ SWEP.hitsoundplus = {
 }
 
 SWEP.swingsoundextra = {
-    {"baseballbat/swing.ogg", 60, {85, 95}},
+    {"baseballbat/swing.mp3", 60, {85, 95}},
 }
 
 SWEP.AttackPos = Vector(0,0,0)

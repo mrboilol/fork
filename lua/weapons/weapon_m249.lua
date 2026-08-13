@@ -39,7 +39,7 @@ SWEP.CanSuicide = false
 SWEP.PPSMuzzleEffect = "muzzleflash_m14"
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -64,27 +64,27 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 	["reload"] = {
-		[0.01] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_open.ogg") end,
-		[0.1] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_out.ogg") end,
+		[0.01] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_open.mp3") end,
+		[0.1] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_out.mp3") end,
 		[0.17] = function(self) self:EmitSound("weapons/m249/m249_magout.ogg") end,
 		[0.37] = function(self) self:EmitSound("weapons/m249/m249_magin.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_roll.ogg") end,
-		[0.6] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_close1.ogg") end,
+		[0.45] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_roll.mp3") end,
+		[0.6] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_close1.mp3") end,
 
 	},
 	["reload_empty"] = {
-		[0.01] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_open.ogg") end,
+		[0.01] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_open.mp3") end,
 		[0.15] = function(self) self:EmitSound("weapons/m249/m249_magout.ogg") end,
 		[0.35] = function(self) self:EmitSound("weapons/m249/m249_magin.ogg") end,
-		[0.39] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_roll.ogg") end,
-		[0.5] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_close1.ogg") end,
-		[0.75] = function(self) self:EmitSound("weapons/zwei/m249/m249_charge_out.ogg") end,
-		[0.8] = function(self) self:EmitSound("weapons/zwei/m249/m249_charge_in.ogg") end,
+		[0.39] = function(self) self:EmitSound("weapons/zwei/m249/m249_belt_roll.mp3") end,
+		[0.5] = function(self) self:EmitSound("weapons/zwei/m249/m249_dust_close1.mp3") end,
+		[0.75] = function(self) self:EmitSound("weapons/zwei/m249/m249_charge_out.mp3") end,
+		[0.8] = function(self) self:EmitSound("weapons/zwei/m249/m249_charge_in.mp3") end,
 	},
 }
 

@@ -21,8 +21,8 @@ SWEP.WorldModel = "models/pwb/weapons/w_f1.mdl"
 SWEP.ScrappersSlot = "Other"
 
 if CLIENT then
-	SWEP.WepSelectIcon = Material("pwb/sprites/f1.png")
-	SWEP.IconOverride = "pwb/sprites/f1.png"
+	SWEP.WepSelectIcon = Material("pwb/sprites/f1.vmt")
+	SWEP.IconOverride = "pwb/sprites/f1.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

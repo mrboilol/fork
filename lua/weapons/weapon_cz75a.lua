@@ -6,7 +6,7 @@ SWEP.Instructions = "Automatic pistol chambered in 9x19 mm"
 SWEP.Category = "Weapons - Pistols"
 SWEP.WorldModel = "models/weapons/w_pist_deagle.mdl"
 
-SWEP.WepSelectIcon2 = Material("pwb/sprites/cz75.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/cz75.vmt")
 SWEP.IconOverride = "entities/weapon_pwb_cz75.png"
 
 SWEP.Primary.Wait = 0.05455

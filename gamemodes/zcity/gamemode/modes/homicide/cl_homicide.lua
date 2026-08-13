@@ -11,7 +11,7 @@ end
 --//
 
 MODE.TypeSounds = {
-	["standard"] = {"snd_jack_hmcd_psycho.mp3","snd_jack_hmcd_shining.mp3"},
+	["standard"] = {"snd_jack_hmcd_psycho.ogg","snd_jack_hmcd_shining.ogg"},
 }
 local fade = 0
 local HMCD_ScreenDuration = 10

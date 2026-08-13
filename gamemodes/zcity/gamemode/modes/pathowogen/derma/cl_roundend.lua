@@ -84,7 +84,7 @@ function PANEL:Init()
 		end
 	})
 
-	surface.PlaySound("zbattle/dialogue/radio_talk.ogg")
+	surface.PlaySound("zbattle/dialogue/radio_talk.mp3")
 
 	timer.Simple(10, function()
 		if IsValid(self) then

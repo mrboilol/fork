@@ -21,7 +21,7 @@ hook.Add( "Glide_OnLocalEnterVehicle", "Glide.WindNoise", function( vehicle, sea
     if not allow then return end
     if windSound then return end
 
-    sound.PlayFile( "sound/glide/streams/wind.ogg", "noplay noblock", function( snd )
+    sound.PlayFile( "sound/glide/streams/wind.mp3", "noplay noblock", function( snd )
         if not IsValid( snd ) then return end
 
         if not IsValid( vehicle ) then

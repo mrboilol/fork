@@ -104,7 +104,7 @@ local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera
 			if !(ply:IsWalking() or ply:Crouching()) and ent == ply then
 				local snd
 				if ply.PlayerClassName == "furry" then
-					snd = "zbattle/footstep/hardbarefoot" .. math.random(1, 5) .. ".ogg"
+					snd = "zbattle/footstep/hardbarefoot" .. math.random(1, 5) .. ".mp3"
 				else
 					snd = sound
 				end
@@ -117,7 +117,7 @@ local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera
 
 		if SERVER then
 			if ply:GetNetVar("Armor", {})["torso"] then
-				EmitSound("arc9_eft_shared/weapon_generic_rifle_spin"..math.random(9)..".ogg", pos, ply:EntIndex(), CHAN_AUTO, changePitch(math.min(len / 100, 0.89)), 80)
+				EmitSound("arc9_eft_shared/weapon_generic_rifle_spin"..math.random(9)..".mp3", pos, ply:EntIndex(), CHAN_AUTO, changePitch(math.min(len / 100, 0.89)), 80)
 			end
 
 			local Hook = hook_Run("HG_PlayerFootstep", ply, pos, foot, sound, volume, rf)
@@ -126,7 +126,7 @@ local hg_coolcamera = ConVarExists("hg_coolcamera") and GetConVar("hg_coolcamera
 			if !(ply:IsWalking() or ply:Crouching()) and ent == ply then
 				local snd
 				if ply.PlayerClassName == "furry" then
-					snd = "zbattle/footstep/hardbarefoot" .. math.random(1, 5) .. ".ogg"
+					snd = "zbattle/footstep/hardbarefoot" .. math.random(1, 5) .. ".mp3"
 				else
 					snd = sound
 				end

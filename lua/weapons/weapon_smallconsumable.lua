@@ -11,7 +11,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/jordfood/canned_burger.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_fooddrink")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_fooddrink.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_fooddrink.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

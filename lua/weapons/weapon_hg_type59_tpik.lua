@@ -41,7 +41,7 @@ SWEP.ENT = "ent_hg_grenade_type59"
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_oldgrenade")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_oldgrenade.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_oldgrenade.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

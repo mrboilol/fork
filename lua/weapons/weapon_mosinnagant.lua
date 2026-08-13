@@ -60,8 +60,8 @@ SWEP.Primary.Damage = 55 -- Высокий урон для снайперки
 SWEP.Primary.Force = 55
 SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = 0
-SWEP.Primary.Sound = {"weapons/darsu_eft/mosin/mosin_outdoor_close1.ogg", 80, 90, 100}
-SWEP.SupressedSound = {"weapons/darsu_eft/mosin/mosin_outdoor_silenced_close1.ogg", 65, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/mosin/mosin_outdoor_close1.mp3", 80, 90, 100}
+SWEP.SupressedSound = {"weapons/darsu_eft/mosin/mosin_outdoor_silenced_close1.mp3", 65, 90, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
 
 SWEP.DisableMuzzleDevices = true
@@ -83,7 +83,7 @@ SWEP.NumBullet = 8
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.4272, 6.192)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -139,21 +139,21 @@ SWEP.AnimList = {
 -- Звуки анимаций для Mosin (исправленные названия)
 local path = "weapons/darsu_eft/mosin/"
 local randspin = {
-    "arc9_eft_shared/weapon_generic_rifle_spin1.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin2.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin3.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin4.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin5.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin6.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin7.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin8.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin9.ogg",
-    "arc9_eft_shared/weapon_generic_rifle_spin10.ogg"
+    "arc9_eft_shared/weapon_generic_rifle_spin1.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin2.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin3.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin4.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin5.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin6.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin7.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin8.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin9.mp3",
+    "arc9_eft_shared/weapon_generic_rifle_spin10.mp3"
 }
 
 -- Звуки анимаций для Mosin (с правильными путями)
 local randspin = {
-    "weapons/ak74/ak74_magout_rattle.wav",
+    "weapons/ak74/ak74_magout_rattle.mp3",
 }
 
 SWEP.AnimsEvents = {
@@ -268,27 +268,27 @@ SWEP.AnimsEvents = {
     
     -- Look (осмотр)
     ["look"] = {
-        [0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-        [0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-        [0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+        [0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+        [0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+        [0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["look_empty"] = {
-        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
-        [1.5] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
+        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
+        [1.5] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
     },
     
     -- Check
     ["check_0"] = {
-        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
+        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
     },
     ["check_0_empty"] = {
-        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
+        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
     },
     ["check_1"] = {
-        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
+        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
     },
     ["check_1_empty"] = {
-        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
+        [0.2] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
     },
     ["check_chamber"] = {
         [0.15] = function(self) self:EmitSound("weapons/tfa_ins2/k98/mosin_boltback.wav") end,
@@ -327,10 +327,10 @@ SWEP.AnimsEvents = {
     
     -- Action
     ["action"] = {
-        [0] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
+        [0] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
     },
     ["action_empty"] = {
-        [0] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.wav") end,
+        [0] = function(self) self:EmitSound("weapons/ak74/ak74_magout_rattle.mp3") end,
     },
 }
 

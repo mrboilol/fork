@@ -24,7 +24,7 @@ game.AddParticles("particles/pcfs_jack_explosions_incendiary2.pcf")
 ENT.RocketTrail =  "gf2_firework_trail_main"
 
 function ENT:OnMatches()
-	self.LoopSndID = self:StartLoopingSound("garrys_fireworks_2/fireworks/flares/flare_sound.mp3")
+	self.LoopSndID = self:StartLoopingSound("garrys_fireworks_2/fireworks/flares/flare_sound.ogg")
 	timer.Simple(0.5,function()
 		if IsValid(self) then
 			self.Activated = true

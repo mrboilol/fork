@@ -96,19 +96,19 @@ local path = "weapons/darsu_eft/vss/"
 
 SWEP.AnimsEvents = {
 	["look_new"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 	["reload0"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magout.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magin.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magout.mp3") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magin.mp3") end,
 	},
 	["reload_empty0_0"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magout.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magin.ogg") end,
-		[0.55] = function(self) self:EmitSound("weapons/darsu_eft/val/val_boltout.ogg") end,
-		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/val/val_boltin.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magout.mp3") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/val/val_magin.mp3") end,
+		[0.55] = function(self) self:EmitSound("weapons/darsu_eft/val/val_boltout.mp3") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/val/val_boltin.mp3") end,
 	},
 }
 

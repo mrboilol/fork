@@ -12,7 +12,7 @@ ENT.playedSound = false
 function ENT:PhysicsCollide(data, phys)
     self.BaseClass.PhysicsCollide(self, data, phys)
 	if data.Speed > 100 then
-        self:EmitSound("weapons/darsu_eft/grenades/grenade_collision_concrete1.ogg", 75, math.random(95, 110), 1)
+        self:EmitSound("weapons/darsu_eft/grenades/grenade_collision_concrete1.mp3", 75, math.random(95, 110), 1)
 	end
 end
 

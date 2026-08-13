@@ -146,7 +146,7 @@ SWEP.DistSound = "weapons/newakm/akmm_dist.wav"
 
 
 
-SWEP.WepSelectIcon2 = Material("pwb/sprites/akm.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/akm.vmt")
 SWEP.IconOverride = "entities/arc9_eft_akm.png"
 SWEP.ScrappersSlot = "Primary"
 SWEP.availableAttachments = {

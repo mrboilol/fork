@@ -66,7 +66,7 @@ else
 			net.Start("unload_ammo")
 			net.WriteEntity(wep)
 			net.Broadcast()
-			hg.GetCurrentCharacter(ply):EmitSound("panoptisscon/mag_unload.ogg")
+			hg.GetCurrentCharacter(ply):EmitSound("panoptisscon/mag_unload.mp3")
 		end
 	end)
 

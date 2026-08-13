@@ -130,7 +130,7 @@ if SERVER then
 		-- threshold. Round the remaining dose up because any still-active pill
 		-- counts as a full concurrent dose for toxicity.
 		org.zerlkers = math.min(math.ceil(org.zerlkers or 0) + 1, 4)
-		entOwner:EmitSound("panoptisscon/Stare.ogg", 60, 100)
+		entOwner:EmitSound("panoptisscon/Stare.mp3", 60, 100)
 
 		self.modeValues[1] = 0
 		owner:SelectWeapon("weapon_hands_sh")

@@ -60,22 +60,22 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
 	["reload0"] = {
-		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_out_0.ogg") end,
-		[0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in2.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out2.ogg") end,	
-		[0.60] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_in_0.ogg") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_out_0.mp3") end,
+		[0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in2.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out2.mp3") end,
+		[0.60] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_in_0.mp3") end,
 	},
 	["reload_empty0_0"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_bolt_out.ogg") end,
-		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_bolt_in.ogg") end,
-		[0.25] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_out_0.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out2.ogg") end,
-		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_in_0.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_bolt_out.mp3") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_bolt_in.mp3") end,
+		[0.25] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_out_0.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out2.mp3") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/aa12/aa12_drum_in_0.mp3") end,
 	},
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 }
 

@@ -164,7 +164,7 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Spread = Vector(0.006, 0.006, 0.006)
 SWEP.Primary.Damage = 12
 SWEP.Primary.Force = 12
-SWEP.Primary.Sound = {"weapons/darsu_eft/toz106/toz_fire_close1.ogg", 65, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/toz106/toz_fire_close1.mp3", 65, 90, 100}
 SWEP.SupressedSound = {"homigrad/weapons/rifle/m4a1-1.wav", 65, 90, 100}
 SWEP.availableAttachments = {
 	barrel = {
@@ -221,7 +221,7 @@ SWEP.ReloadSoundes = {
 	"none"
 }
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-3, -0.3, 5.2)
 SWEP.RHandPos = Vector(-8, -2, 6)

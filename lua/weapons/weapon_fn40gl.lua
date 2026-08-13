@@ -39,16 +39,16 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
 	["reload"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_tube_button.ogg") end,
-		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_tube_open.ogg") end,
-		[0.25] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_grenade_remove.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_grenade_insert.ogg") end,
-		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_tube_close.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_tube_button.mp3") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_tube_open.mp3") end,
+		[0.25] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_grenade_remove.mp3") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_grenade_insert.mp3") end,
+		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/fn40/fn40gl_tube_close.mp3") end,
 	},
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 }
 
@@ -60,8 +60,8 @@ SWEP.Primary.Wait = 2
 SWEP.Primary.Ammo = "40mm Grenade M381"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 25
-SWEP.Primary.Sound = {"weapons/darsu_eft/fn40/fn40gl_fire_close.ogg", 100, 50, 50}
-SWEP.SupressedSound = {"weapons/darsu_eft/fn40/fn40gl_fire_close.ogg", 100, 50, 50}
+SWEP.Primary.Sound = {"weapons/darsu_eft/fn40/fn40gl_fire_close.mp3", 100, 50, 50}
+SWEP.SupressedSound = {"weapons/darsu_eft/fn40/fn40gl_fire_close.mp3", 100, 50, 50}
 SWEP.Primary.Force = 25
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -1.8, 4)

@@ -145,17 +145,17 @@ function PANEL:Init()
 	self:SetSize(sw, sh)
 	self:RequestFocus()
 
-	-- sound.PlayFile("sound/zbattle/boot.ogg", "", function()
+	-- sound.PlayFile("sound/zbattle/boot.mp3", "", function()
 	-- end)
 
-	sound.PlayFile("sound/zbattle/startup2.ogg", "", function()
+	sound.PlayFile("sound/zbattle/startup2.mp3", "", function()
 	end)
 
-	sound.PlayFile("sound/zbattle/startup_scan.ogg", "", function()
+	sound.PlayFile("sound/zbattle/startup_scan.mp3", "", function()
 	end)
 
 	timer.Simple(4.4, function()
-		sound.PlayFile("sound/zbattle/scan_flash.ogg", "", function()
+		sound.PlayFile("sound/zbattle/scan_flash.mp3", "", function()
 		end)
 	end)
 

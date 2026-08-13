@@ -936,7 +936,7 @@ net.Receive("criresp_begin", function()
 	end
 
 	timer.Simple(3, function()
-		sound.PlayFile("sound/zbattle/criresp/criepmission.mp3", "mono noblock", function(station)
+		sound.PlayFile("sound/zbattle/criresp/criepmission.ogg", "mono noblock", function(station)
 			if IsValid(station) then
 				station:Play()
 				song = station
@@ -977,7 +977,7 @@ function MODE:RenderScreenspaceEffects()
 		if songfade <= 0.01 and IsValid(song) then
 			song:Stop()
 			song = nil
-			surface.PlaySound(lply:Team() == 0 and "zbattle/criresp/barricadedsuspectstart.mp3" or "snd_jack_hmcd_policesiren.ogg")
+			surface.PlaySound(lply:Team() == 0 and "zbattle/criresp/barricadedsuspectstart.ogg" or "snd_jack_hmcd_policesiren.ogg")
 		elseif IsValid(song) then
 			songfade = Lerp(0.01, songfade, 0)
 			song:SetVolume(songfade)
@@ -1077,7 +1077,7 @@ net.Receive("cri_roundend", function()
 		total = net.ReadUInt(8),
 	}
 
-	surface.PlaySound(endStats.winner == 2 and "zbattle/criresp/failedSWAT.mp3" or "ambient/alarms/warningbell1.ogg")
+	surface.PlaySound(endStats.winner == 2 and "zbattle/criresp/failedSWAT.ogg" or "ambient/alarms/warningbell1.ogg")
 end)
 
 local function EndLockActive()

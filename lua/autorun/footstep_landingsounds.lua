@@ -6,90 +6,90 @@ end
 local LANDING_SOUNDS = {
     default = {
         light = {
-            "footsteps/landing/light/stone-01.ogg",
-            "footsteps/landing/light/stone-02.ogg",
-            "footsteps/landing/light/stone-03.ogg"
+            "footsteps/landing/light/stone-01.mp3",
+            "footsteps/landing/light/stone-02.mp3",
+            "footsteps/landing/light/stone-03.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/stone-01.ogg",
-            "footsteps/landing/heavy/stone-02.ogg",
-            "footsteps/landing/heavy/stone-03.ogg"
+            "footsteps/landing/heavy/stone-01.mp3",
+            "footsteps/landing/heavy/stone-02.mp3",
+            "footsteps/landing/heavy/stone-03.mp3"
         }
     },
     metal = {
         light = {
-            "footsteps/landing/light/metal-01.ogg",
-            "footsteps/landing/light/metal-02.ogg",
-            "footsteps/landing/light/metal-03.ogg"
+            "footsteps/landing/light/metal-01.mp3",
+            "footsteps/landing/light/metal-02.mp3",
+            "footsteps/landing/light/metal-03.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/metal-01.ogg",
-            "footsteps/landing/heavy/metal-02.ogg",
-            "footsteps/landing/heavy/metal-03.ogg"
+            "footsteps/landing/heavy/metal-01.mp3",
+            "footsteps/landing/heavy/metal-02.mp3",
+            "footsteps/landing/heavy/metal-03.mp3"
         }
     },
     vent = {
         light = {
-            "footsteps/landing/light/metallight-01.ogg",
-            "footsteps/landing/light/metallight-02.ogg",
-            "footsteps/landing/light/metallight-03.ogg"
+            "footsteps/landing/light/metallight-01.mp3",
+            "footsteps/landing/light/metallight-02.mp3",
+            "footsteps/landing/light/metallight-03.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/metallight-01.ogg",
-            "footsteps/landing/heavy/metallight-02.ogg",
-            "footsteps/landing/heavy/metallight-03.ogg"
+            "footsteps/landing/heavy/metallight-01.mp3",
+            "footsteps/landing/heavy/metallight-02.mp3",
+            "footsteps/landing/heavy/metallight-03.mp3"
         }
     },
     dirt = {
         light = {
-            "footsteps/landing/light/dirt-01.ogg",
-            "footsteps/landing/light/dirt-02.ogg",
-            "footsteps/landing/light/dirt-03.ogg"
+            "footsteps/landing/light/dirt-01.mp3",
+            "footsteps/landing/light/dirt-02.mp3",
+            "footsteps/landing/light/dirt-03.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/dirt-01.ogg",
-            "footsteps/landing/heavy/dirt-02.ogg",
-            "footsteps/landing/heavy/dirt-03.ogg"
+            "footsteps/landing/heavy/dirt-01.mp3",
+            "footsteps/landing/heavy/dirt-02.mp3",
+            "footsteps/landing/heavy/dirt-03.mp3"
         }
     },
     sand = {
         light = {
-            "footsteps/landing/light/sand-01.ogg",
-            "footsteps/landing/light/sand-02.ogg",
-			"footsteps/landing/light/sand-03.ogg"
+            "footsteps/landing/light/sand-01.mp3",
+            "footsteps/landing/light/sand-02.mp3",
+			"footsteps/landing/light/sand-03.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/sand-01.ogg",
-            "footsteps/landing/heavy/sand-02.ogg",
-			"footsteps/landing/heavy/sand-03.ogg"
+            "footsteps/landing/heavy/sand-01.mp3",
+            "footsteps/landing/heavy/sand-02.mp3",
+			"footsteps/landing/heavy/sand-03.mp3"
         }
     },
     grass = {
         light = {
-            "footsteps/landing/light/grass-01.ogg",
-            "footsteps/landing/light/grass-02.ogg",
-            "footsteps/landing/light/grass-03.ogg",
-            "footsteps/landing/light/grass-04.ogg"
+            "footsteps/landing/light/grass-01.mp3",
+            "footsteps/landing/light/grass-02.mp3",
+            "footsteps/landing/light/grass-03.mp3",
+            "footsteps/landing/light/grass-04.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/grass-01.ogg",
-            "footsteps/landing/heavy/grass-02.ogg",
-            "footsteps/landing/heavy/grass-03.ogg",
-            "footsteps/landing/heavy/grass-04.ogg"
+            "footsteps/landing/heavy/grass-01.mp3",
+            "footsteps/landing/heavy/grass-02.mp3",
+            "footsteps/landing/heavy/grass-03.mp3",
+            "footsteps/landing/heavy/grass-04.mp3"
         }
     },
     gravel = {
         light = {
-            "footsteps/landing/light/gravel-01.ogg",
-            "footsteps/landing/light/gravel-02.ogg",
-            "footsteps/landing/light/gravel-03.ogg",
-            "footsteps/landing/light/gravel-04.ogg"
+            "footsteps/landing/light/gravel-01.mp3",
+            "footsteps/landing/light/gravel-02.mp3",
+            "footsteps/landing/light/gravel-03.mp3",
+            "footsteps/landing/light/gravel-04.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/gravel-01.ogg",
-            "footsteps/landing/heavy/gravel-02.ogg",
-            "footsteps/landing/heavy/gravel-03.ogg",
-            "footsteps/landing/heavy/gravel-04.ogg"
+            "footsteps/landing/heavy/gravel-01.mp3",
+            "footsteps/landing/heavy/gravel-02.mp3",
+            "footsteps/landing/heavy/gravel-03.mp3",
+            "footsteps/landing/heavy/gravel-04.mp3"
         }
     },
     glass = {
@@ -99,88 +99,88 @@ local LANDING_SOUNDS = {
 			"physics/glass/glass_sheet_impact_soft3.ogg",
         },
         hard = {
-            "footsteps/landing/heavy/glass-01.ogg",
-            "footsteps/landing/heavy/glass-02.ogg",
-            "footsteps/landing/heavy/glass-03.ogg",
-            "footsteps/landing/heavy/glass-04.ogg"
+            "footsteps/landing/heavy/glass-01.mp3",
+            "footsteps/landing/heavy/glass-02.mp3",
+            "footsteps/landing/heavy/glass-03.mp3",
+            "footsteps/landing/heavy/glass-04.mp3"
         }
     },
     snow = {
         light = {
-            "footsteps/landing/light/snow-01.ogg",
-            "footsteps/landing/light/snow-02.ogg",
-            "footsteps/landing/light/snow-03.ogg",
-            "footsteps/landing/light/snow-04.ogg"
+            "footsteps/landing/light/snow-01.mp3",
+            "footsteps/landing/light/snow-02.mp3",
+            "footsteps/landing/light/snow-03.mp3",
+            "footsteps/landing/light/snow-04.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/snow-01.ogg",
-            "footsteps/landing/heavy/snow-02.ogg",
-            "footsteps/landing/heavy/snow-03.ogg",
-            "footsteps/landing/heavy/snow-04.ogg"
+            "footsteps/landing/heavy/snow-01.mp3",
+            "footsteps/landing/heavy/snow-02.mp3",
+            "footsteps/landing/heavy/snow-03.mp3",
+            "footsteps/landing/heavy/snow-04.mp3"
         }
     },
     wood = {
         light = {
-            "footsteps/landing/light/wood-01.ogg",
-            "footsteps/landing/light/wood-02.ogg",
-            "footsteps/landing/light/wood-03.ogg"
+            "footsteps/landing/light/wood-01.mp3",
+            "footsteps/landing/light/wood-02.mp3",
+            "footsteps/landing/light/wood-03.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/wood-01.ogg",
-            "footsteps/landing/heavy/wood-02.ogg",
-            "footsteps/landing/heavy/wood-03.ogg"
+            "footsteps/landing/heavy/wood-01.mp3",
+            "footsteps/landing/heavy/wood-02.mp3",
+            "footsteps/landing/heavy/wood-03.mp3"
         }
     },
     tile = {
         light = {
-            "footsteps/landing/light/tile-01.ogg",
-            "footsteps/landing/light/tile-02.ogg",
-			"footsteps/landing/light/tile-03.ogg"
+            "footsteps/landing/light/tile-01.mp3",
+            "footsteps/landing/light/tile-02.mp3",
+			"footsteps/landing/light/tile-03.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/tile-01.ogg",
-            "footsteps/landing/heavy/tile-02.ogg",
-			"footsteps/landing/heavy/tile-03.ogg"
+            "footsteps/landing/heavy/tile-01.mp3",
+            "footsteps/landing/heavy/tile-02.mp3",
+			"footsteps/landing/heavy/tile-03.mp3"
         }
     },
     mud = {
         light = {
-            "footsteps/landing/light/mud-01.ogg",
-			"footsteps/landing/light/mud-02.ogg",
-			"footsteps/landing/light/mud-03.ogg",
-			"footsteps/landing/light/mud-04.ogg",
-			"footsteps/landing/light/mud-05.ogg",
-			"footsteps/landing/light/mud-06.ogg",
-			"footsteps/landing/light/mud-07.ogg",
-			"footsteps/landing/light/mud-08.ogg",
-			"footsteps/landing/light/mud-09.ogg",
-			"footsteps/landing/light/mud-10.ogg",
-			"footsteps/landing/light/mud-11.ogg",
-			"footsteps/landing/light/mud-12.ogg",
-			"footsteps/landing/light/mud-13.ogg",
-			"footsteps/landing/light/mud-14.ogg",
-			"footsteps/landing/light/mud-15.ogg",
-			"footsteps/landing/light/mud-16.ogg",
-			"footsteps/landing/light/mud-17.ogg"
+            "footsteps/landing/light/mud-01.mp3",
+			"footsteps/landing/light/mud-02.mp3",
+			"footsteps/landing/light/mud-03.mp3",
+			"footsteps/landing/light/mud-04.mp3",
+			"footsteps/landing/light/mud-05.mp3",
+			"footsteps/landing/light/mud-06.mp3",
+			"footsteps/landing/light/mud-07.mp3",
+			"footsteps/landing/light/mud-08.mp3",
+			"footsteps/landing/light/mud-09.mp3",
+			"footsteps/landing/light/mud-10.mp3",
+			"footsteps/landing/light/mud-11.mp3",
+			"footsteps/landing/light/mud-12.mp3",
+			"footsteps/landing/light/mud-13.mp3",
+			"footsteps/landing/light/mud-14.mp3",
+			"footsteps/landing/light/mud-15.mp3",
+			"footsteps/landing/light/mud-16.mp3",
+			"footsteps/landing/light/mud-17.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/mud-01.ogg",
-            "footsteps/landing/heavy/mud-02.ogg",
-            "footsteps/landing/heavy/mud-03.ogg"
+            "footsteps/landing/heavy/mud-01.mp3",
+            "footsteps/landing/heavy/mud-02.mp3",
+            "footsteps/landing/heavy/mud-03.mp3"
         }
     },
     water = {
         light = {
-            "footsteps/landing/light/water-new-01.ogg",
-            "footsteps/landing/light/water-new-02.ogg",
-			"footsteps/landing/light/water-new-03.ogg",
-			"footsteps/landing/light/water-new-04.ogg",
-			"footsteps/landing/light/water-new-05.ogg"
+            "footsteps/landing/light/water-new-01.mp3",
+            "footsteps/landing/light/water-new-02.mp3",
+			"footsteps/landing/light/water-new-03.mp3",
+			"footsteps/landing/light/water-new-04.mp3",
+			"footsteps/landing/light/water-new-05.mp3"
         },
         hard = {
-            "footsteps/landing/heavy/water-new-01.ogg",
-            "footsteps/landing/heavy/water-new-02.ogg",
-            "footsteps/landing/heavy/water-new-03.ogg"
+            "footsteps/landing/heavy/water-new-01.mp3",
+            "footsteps/landing/heavy/water-new-02.mp3",
+            "footsteps/landing/heavy/water-new-03.mp3"
         }
     }
 }

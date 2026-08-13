@@ -275,7 +275,7 @@ SWEP.AnimList = {
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")
-	SWEP.IconOverride = "vgui/hud/tfa_iw7_tactical_knife.png"
+	SWEP.IconOverride = "vgui/hud/tfa_iw7_tactical_knife.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -3680,7 +3680,7 @@ function SWEP:CutDuct()
             if (ent.SoundTime or 0) < CurTime() then
                 ent.SoundTime = CurTime() + 5
 
-                self:GetOwner():EmitSound("tapetear.mp3",65)
+                self:GetOwner():EmitSound("tapetear.ogg",65)
                 self:PlayAnim("duct_cut",5)
             end
 
@@ -3696,7 +3696,7 @@ function SWEP:CutDuct()
             if (ent.SoundTime or 0) < CurTime() then
                 ent.SoundTime = CurTime() + 5
 
-                self:GetOwner():EmitSound("tapetear.mp3",65)
+                self:GetOwner():EmitSound("tapetear.ogg",65)
                 self:PlayAnim("duct_cut",5)
             end
             

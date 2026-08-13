@@ -36,22 +36,22 @@ end
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
     ["reload"] = {
-        [0.1] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_out.ogg") end,
-        [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.ogg") end,
-        [0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.ogg") end,
-        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_in.ogg") end,
+        [0.1] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_out.mp3") end,
+        [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.mp3") end,
+        [0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
+        [0.55] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_in.mp3") end,
     },
     ["reload_empty"] = {
-        [0.025] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_chamber_out.ogg") end,
-		[0.2] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_out_all.ogg") end,
-		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.ogg") end,
-		[0.5] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_in.ogg") end,
-		[0.7] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_chamber_in.ogg") end,
+        [0.025] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_chamber_out.mp3") end,
+		[0.2] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_out_all.mp3") end,
+		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
+		[0.5] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_mag_in.mp3") end,
+		[0.7] = function(self) self:EmitSound("weapons/darsu_eft/deagle/deagle_chamber_in.mp3") end,
     },
 }
 
@@ -140,7 +140,7 @@ SWEP.ReloadTime = 3.5
 
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.HoldType = "revolver"
 SWEP.ZoomPos = Vector(0, 0.2169, 4.1947)
 SWEP.SprayRand = {Angle(-0.03, -0.03, 0), Angle(-0.05, 0.03, 0)}

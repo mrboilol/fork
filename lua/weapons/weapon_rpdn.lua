@@ -36,7 +36,7 @@ SWEP.CanSuicide = false
 SWEP.PPSMuzzleEffect = "muzzleflash_MINIMI"
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -60,11 +60,11 @@ SWEP.AnimList = {
 -- Тут затвора нет, поэтому звуки начинаются раньше.
 SWEP.FakeReloadSounds = {
 	-- 1. Открытие крышки (Твой тайминг - 0.2)
-	[0.20] = "weapons/darsu_eft/rpd/rpd_dust_open.ogg",   
+	[0.20] = "weapons/darsu_eft/rpd/rpd_dust_open.mp3",
 	
 	-- 2. Вытаскиваем короб
 	-- Сдвигаем на 0.12 вперед (на 32%), чтобы рука успела опуститься от крышки к магазину
-	[0.32] = "weapons/darsu_eft/rpd/rpd_mag_out.ogg",     
+	[0.32] = "weapons/darsu_eft/rpd/rpd_mag_out.mp3",
 	
 	-- 3. Звук ленты (чуть позже короба)
 	[0.36] = "weapons/darsu_eft/pkm/pk_belt_out.wav",    
@@ -73,14 +73,14 @@ SWEP.FakeReloadSounds = {
 	
 	-- 4. Вставляем новый короб
 	-- Ставим на 0.65. Если рука поднимается раньше звука -> уменьши до 0.60
-	[0.65] = "weapons/darsu_eft/rpd/rpd_mag_in.ogg",      
+	[0.65] = "weapons/darsu_eft/rpd/rpd_mag_in.mp3",
 	
 	-- 5. Прокрутка ленты
 	[0.78] = "weapons/darsu_eft/pkm/pk_belt_roll.wav",    
 	
 	-- 6. Закрытие крышки
 	-- Ставим в самый конец (0.90), чтобы рука успела подняться от магазина наверх
-	[0.90] = "weapons/darsu_eft/rpd/rpd_dust_close2.ogg", 
+	[0.90] = "weapons/darsu_eft/rpd/rpd_dust_close2.mp3",
 }
 
 
@@ -92,15 +92,15 @@ SWEP.GetDebug = false
 -- В ARC9 затвор дергают В НАЧАЛЕ (0.38с). Я перенес его сюда.
 SWEP.FakeEmptyReloadSounds = {
 	-- 0.38 сек (0.04) - Затвор НАЗАД (В НАЧАЛЕ!)
-	[0.2] = "weapons/darsu_eft/rpd/rpd_charge_out.ogg", 
+	[0.2] = "weapons/darsu_eft/rpd/rpd_charge_out.mp3",
 	-- 0.87 сек (0.09) - Затвор ВПЕРЕД
-	[0.25] = "weapons/darsu_eft/rpd/rpd_charge_in.ogg", 
+	[0.25] = "weapons/darsu_eft/rpd/rpd_charge_in.mp3",
 
 	-- Теперь рука тянется от затвора к крышке (даем ей время до 0.38)
-	[0.38] = "weapons/darsu_eft/rpd/rpd_dust_open.ogg",   
+	[0.38] = "weapons/darsu_eft/rpd/rpd_dust_open.mp3",
 	
 	-- Рука опускается за магазином
-	[0.48] = "weapons/darsu_eft/rpd/rpd_mag_out.ogg",     
+	[0.48] = "weapons/darsu_eft/rpd/rpd_mag_out.mp3",
 	
 	-- Звук ленты
 	[0.52] = "weapons/darsu_eft/pkm/pk_belt_out.wav",    
@@ -108,20 +108,20 @@ SWEP.FakeEmptyReloadSounds = {
 	-- Большая пауза (рука меняет магазин)...
 	
 	-- Вставляем магазин
-	[0.72] = "weapons/darsu_eft/rpd/rpd_mag_in.ogg",      
+	[0.72] = "weapons/darsu_eft/rpd/rpd_mag_in.mp3",
 	
 	-- Лента
 	[0.82] = "weapons/darsu_eft/pkm/pk_belt_roll.wav",    
 	
 	-- Закрываем крышку в самом конце
-	[0.92] = "weapons/darsu_eft/rpd/rpd_dust_close2.ogg", 
+	[0.92] = "weapons/darsu_eft/rpd/rpd_dust_close2.mp3",
 }    
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 }
 

@@ -129,7 +129,7 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 	hg.noradrenalineClamped = noradrenalineClamped
 	if noradrenaline > 0.0001 and !hg.undernoradrenaline then
 		hg.undernoradrenaline = true
-		surface.PlaySound("shitty/music/mi_deathcam.mp3")
+		surface.PlaySound("shitty/music/mi_deathcam.ogg")
 		hg.DynamicMusicV2.Player.Start("overdose")
 		hg.noradrenalineStartTime = SysTime()
 		for i = 1, 90 do
@@ -240,7 +240,7 @@ hook.Add("RenderScreenspaceEffects", "berserkEffect", function()
 	local berserkClamped = math.Clamp(berserk, 0, 3) * (organism.consciousness or 1)
 	if berserk > 0.0001 and (!hg.underberserk and !hg.underberserk2) then
 		hg.underberserk = true
-		surface.PlaySound("zbattle/deathsample.ogg")
+		surface.PlaySound("zbattle/deathsample.mp3")
 		hg.berserkStartTime = SysTime()
 		local part = CreateParticleSystem( LocalPlayer(), "[2]sparkle1", PATTACH_POINT_FOLLOW, 1)
 		hg.currentNotification = nil

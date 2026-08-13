@@ -88,19 +88,19 @@ local path_reload = "weapons/darsu_eft/sa58/"
 
 SWEP.AnimsEvents = {
 	["inspect0"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 	["reload0"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_out.ogg") end,
-		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_in.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_out.mp3") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_in.mp3") end,
 	},
 	["reload_empty0_0"] = {
-		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_release_button.ogg") end,
-		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_out.ogg") end,
-		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_in.ogg") end,
-		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_release_button.ogg") end,
+		[0.10] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_release_button.mp3") end,
+		[0.15] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_out.mp3") end,
+		[0.45] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_in.mp3") end,
+		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/sa58/fal_mag_release_button.mp3") end,
 	},
 }
 
@@ -189,8 +189,8 @@ SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 65
 SWEP.Primary.Spread = 0
 SWEP.Primary.Force = 30
-SWEP.Primary.Sound = {"weapons/darsu_eft/rsass/rsass_fire_close5.ogg", 85, 90, 100}
-SWEP.SupressedSound = {"weapons/darsu_eft/rsass/rsass_close_silenced1.ogg", 65, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/rsass/rsass_fire_close5.mp3", 85, 90, 100}
+SWEP.SupressedSound = {"weapons/darsu_eft/rsass/rsass_close_silenced1.mp3", 65, 90, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_empty.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.2
 SWEP.ReloadTime = 3.5
@@ -213,7 +213,7 @@ SWEP.IconOverride = "entities/arc9_eft_rsass.png"
 SWEP.weight = 4.2
 SWEP.ScrappersSlot = "Primary"
 
-SWEP.DistSound = "weapons/darsu_eft/rsass/rsass_fire_close5.ogg"
+SWEP.DistSound = "weapons/darsu_eft/rsass/rsass_fire_close5.mp3"
 
 SWEP.StartAtt = {"optic5"}
 SWEP.availableAttachments = {

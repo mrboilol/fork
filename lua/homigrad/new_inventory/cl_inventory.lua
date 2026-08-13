@@ -50,7 +50,7 @@ local function SelectWeapon(ply, wep)
 	net.SendToServer()
 
 	if IsValid(ply:GetActiveWeapon()) and wep ~= ply:GetActiveWeapon() then
-		surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(10) .. ".ogg")
+		surface.PlaySound("arc9_eft_shared/weapon_generic_spin" .. math.random(10) .. ".mp3")
 	end
 end
 

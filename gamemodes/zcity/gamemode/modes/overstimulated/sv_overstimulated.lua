@@ -506,7 +506,7 @@ function MODE:GiveEquipment()
 					if not IsValid(shooter) or not shooter:Alive() then continue end
 
 					local center = shooter:WorldSpaceCenter()
-					sound.Play("nokia.mp3", center, 70, 100, 1)
+					sound.Play("nokia.ogg", center, 70, 100, 1)
 
 					timer.Simple(0.4, function()
 						if not IsValid(shooter) then return end

@@ -11,7 +11,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/w_models/weapons/w_eq_medkit.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_medkit")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

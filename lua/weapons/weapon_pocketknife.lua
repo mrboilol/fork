@@ -50,16 +50,16 @@ SWEP.ModeAnimLists = {
 }
 
 SWEP.swingsoundextra = {
-    {"knife/knife_bayonet_swing1.ogg", 60, {80, 90}},
-    {"knife/knife_bayonet_swing2.ogg", 60, {80, 90}},
+    {"knife/knife_bayonet_swing1.mp3", 60, {80, 90}},
+    {"knife/knife_bayonet_swing2.mp3", 60, {80, 90}},
 }
 
 SWEP.hitsoundextra = {
-    {"pocketknife/melee_character_knife_plr_02.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_01.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_03.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_04.ogg", 55, {105, 115}},
-    {"pocketknife/melee_character_knife_plr_05.ogg", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_02.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_01.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_03.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_04.mp3", 55, {105, 115}},
+    {"pocketknife/melee_character_knife_plr_05.mp3", 55, {105, 115}},
 }
 
 

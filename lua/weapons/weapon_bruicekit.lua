@@ -12,7 +12,7 @@ local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") 
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_medkit")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

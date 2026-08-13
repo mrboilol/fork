@@ -64,7 +64,7 @@ SWEP.HoldType = "rpg"
 
 -- Deploy / Holster Sounds
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 
 -- Positioning offsets for the model on the hands
 SWEP.RHPos = Vector(5.5, -7.5, 4)

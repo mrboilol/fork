@@ -904,7 +904,7 @@ else
 	SWEP.ViewModelFOV = 45
 	SWEP.BounceWeaponIcon = false
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_hands")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_hands.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_hands.vmt"
 	local colWhite = Color(255, 255, 255, 255)
 	local colGray = Color(200, 200, 200, 200)
 	local lerpthing = 1

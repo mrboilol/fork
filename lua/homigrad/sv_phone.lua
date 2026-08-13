@@ -32,7 +32,7 @@ local PHONE = HG_PHONE_SERVER
 PHONE.Registry = PHONE.Registry or {}
 PHONE.ActiveUsers = PHONE.ActiveUsers or {}
 PHONE.CallSound = "rem_iedcall.mp3"
-PHONE.AnswerSound = "panoptisscon/phone_answer.ogg"
+PHONE.AnswerSound = "panoptisscon/phone_answer.mp3"
 PHONE.MaxCallTravelTime = 10
 PHONE.CallTravelDistance = 3000
 local function CapturePhoneAppearance(ent)
@@ -371,7 +371,7 @@ end)
 net.Receive("HG_Phone_HangupCall", function(_, ply)
 	local phone = net.ReadEntity()
 	if PHONE:CanControl(ply, phone) then
-		PHONE:EmitPhoneSound(phone, "panoptisscon/phone_hangup.ogg")
+		PHONE:EmitPhoneSound(phone, "panoptisscon/phone_hangup.mp3")
 		PHONE:EndCall(phone, "Call ended.")
 	end
 end)

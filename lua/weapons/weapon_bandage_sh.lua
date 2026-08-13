@@ -20,7 +20,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/bandages.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_bandage")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_bandage.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_bandage.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

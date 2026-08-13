@@ -50,7 +50,7 @@ if CLIENT then
 		channel = CHAN_AUTO,
 		volume = 1.0,
 		level = 80,
-		sound = "rem_banished.ogg"
+		sound = "rem_banished.mp3"
 	})
 
 	net.Receive("remorseism_ban_notify", function()
@@ -62,7 +62,7 @@ if CLIENT then
 			admin = net.ReadString(),
 			startTime = CurTime()
 		}
-		surface.PlaySound("rem_banished.ogg")
+		surface.PlaySound("rem_banished.mp3")
 	end)
 
 	local fontCache = {}

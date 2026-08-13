@@ -79,8 +79,8 @@ end
 
 SWEP.FakeMagDropBone = "magazine"
 
-SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/m60.png")
-SWEP.IconOverride = "pwb2/vgui/weapons/m60.png"
+SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/m60.vmt")
+SWEP.IconOverride = "pwb2/vgui/weapons/m60.vmt"
 
 SWEP.CustomShell = "762x51"
 SWEP.CustomSecShell = "m60len"
@@ -129,7 +129,7 @@ SWEP.ReloadSoundes = {
 SWEP.PPSMuzzleEffect = "muzzleflash_m24" -- shared in sh_effects.lua
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-9, 0.2677, 7.235)
 SWEP.RHandPos = Vector(-4, -2, 0)

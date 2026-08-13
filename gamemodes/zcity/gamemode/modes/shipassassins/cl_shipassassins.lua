@@ -499,7 +499,7 @@ net.Receive("ShipAssassins_RoundStart", function()
 	contractRemaining = 0
 	contractGraceRemaining = 0
 
-	surface.PlaySound("snd_jack_hmcd_psycho.mp3")
+	surface.PlaySound("snd_jack_hmcd_psycho.ogg")
 	zb.RemoveFade()
 end)
 

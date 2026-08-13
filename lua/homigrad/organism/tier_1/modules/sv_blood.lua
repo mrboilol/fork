@@ -280,7 +280,7 @@ module[2] = function(owner, org, mulTime)
 			net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
 			net.Broadcast()
 
-			ent:EmitSound("vomit/vomit5.mp3")
+			ent:EmitSound("vomit/vomit5.ogg")
 		end
 	end
 
@@ -690,7 +690,7 @@ function hg.organism.Vomit(owner, snd)
 
 	owner:SetNetVar("vomiting", CurTime() + 1.5)
 
-	ent:EmitSound(snd or "vomit/vomit5.mp3")
+	ent:EmitSound(snd or "vomit/vomit5.ogg")
 	
 	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
 		owner:SetNetVar("zableval_masku", true)
@@ -730,7 +730,7 @@ function hg.organism.VomitNormal(owner, snd)
 	org.hungry = math.min(math.max((org.hungry or 0) + 7, 0), 100)
 	org.satiety = math.max((org.satiety or 0) - 20, 0)
 
-	ent:EmitSound(snd or "vomit/vomit5.mp3")
+	ent:EmitSound(snd or "vomit/vomit5.ogg")
 
 	if owner.armors and owner.armors.face and hg.armor.face[owner.armors.face].voice_change then
 		owner:SetNetVar("zableval_masku", true)
@@ -761,7 +761,7 @@ end
 
 function hg.organism.CoughBlood(org)
 	local ply = org.owner
-	local phr = "zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".mp3"
+	local phr = "zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".ogg"
 	ply:EmitSound(phr)
 	ply.phrCld = CurTime() + 2
 	ply.lastPhr = phr
@@ -777,7 +777,7 @@ function hg.organism.CoughBlood(org)
 		net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
 		net.Broadcast()
 
-		ent:EmitSound("vomit/vomit5.mp3")
+		ent:EmitSound("vomit/vomit5.ogg")
 	end
 end
 

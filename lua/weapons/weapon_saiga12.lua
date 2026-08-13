@@ -26,7 +26,7 @@ SWEP.FakeScale = 0.79
 SWEP.FakeViewBobBone = "CAM_Homefield"
 SWEP.FakeReloadSounds = {
 	[0.35] = "weapons/ak74/ak74_magout.wav",
-	[0.4] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.4] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.85] = "weapons/ak74/ak74_magin.wav",
 	[0.95] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -35,7 +35,7 @@ SWEP.FakeReloadSounds = {
 SWEP.FakeEmptyReloadSounds = {
 
 	[0.33] = "weapons/ak74/ak74_magout.wav",
-	[0.37] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.37] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.65] = "weapons/ak74/ak74_magin.wav",
 	[0.75] = "weapons/universal/uni_crawl_l_05.wav",
 
@@ -58,7 +58,7 @@ SWEP.AnimList = {
 
 SWEP.FakeVPShouldUseHand = false
 
-SWEP.WepSelectIcon2 = Material("pwb/sprites/saiga_12.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/saiga_12.vmt")
 SWEP.IconOverride = "entities/weapon_pwb_saiga_12.png"
 
 SWEP.addSprayMul = 1
@@ -95,7 +95,7 @@ SWEP.ReloadSoundes = {
 SWEP.PPSMuzzleEffect = "muzzleflash_M3" -- shared in sh_effects.lua
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-3, 0.52, 10.04)
 SWEP.RHandPos = Vector(-15, -2, 4)

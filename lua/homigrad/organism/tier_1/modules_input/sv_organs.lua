@@ -619,7 +619,7 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, skipThroatC
 		
 		local ent = hg.GetCurrentCharacter(owner)
 		if IsValid(ent) and not org.otrub and not org.needotrub and (owner:IsPlayer() and owner:Alive() or not owner:IsPlayer()) then
-			ent:EmitSound("neckslit.ogg", 70, 100, 1, CHAN_AUTO)
+			ent:EmitSound("neckslit.mp3", 70, 100, 1, CHAN_AUTO)
 		end
 		
 		local snd = (ThatPlyIsFemale and ThatPlyIsFemale(owner)) and "femaleneck.mp3" or "maleneck.mp3"

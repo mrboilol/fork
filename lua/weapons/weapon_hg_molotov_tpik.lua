@@ -33,7 +33,7 @@ SWEP.WorldModelExchange = false
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_molotov")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_molotov.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_molotov.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

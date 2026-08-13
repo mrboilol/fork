@@ -11,7 +11,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/weapons/w_pist_deagle.mdl"
 SWEP.WorldModelFake = "models/weapons/c_ins2_pist_fnp45.mdl"
 
-SWEP.WepSelectIcon2 = Material("pwb/sprites/fnp45.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/fnp45.vmt")
 SWEP.IconOverride = "entities/weapon_pwb_fnp45.png"
 
 SWEP.FakePos = Vector(-19.5, 2.4, 7.7)
@@ -78,7 +78,7 @@ SWEP.ReloadSoundes = {
 	"none"
 }
 SWEP.DeploySnd = {"homigrad/weapons/draw_pistol.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/holster_pistol.ogg", 55, 100, 110}
 SWEP.UseCustomWorldModel = true
 SWEP.WorldPos = Vector(11, -0.8, 2.6)
 SWEP.WorldAng = Angle(0, 0, 0)

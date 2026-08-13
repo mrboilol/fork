@@ -160,7 +160,7 @@ do return end
 -- 	if SERVER then
 -- 		local ply = self:GetOwner()
 
--- 		ply:EmitSound("zbattle/pointinator.mp3")
+-- 		ply:EmitSound("zbattle/pointinator.ogg")
 -- 	end
 -- end
 

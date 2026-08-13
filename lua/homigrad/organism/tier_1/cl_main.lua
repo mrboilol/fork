@@ -877,7 +877,7 @@ local checkpulsebones = {
 }
 local arteryDelayedDripSound = "arteryblooddrip/splat-blood"
 local arteryDelayedDripCount = 10
-local arteryNeckSlitSound = "rem_neckslit.ogg"
+local arteryNeckSlitSound = "rem_neckslit.mp3"
 local arterySoundDelayMin = 1
 local arterySoundDelayMax = 1.25
 local arterySoundPitchMin = 95
@@ -1242,7 +1242,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				end
 				
 				if org.timeValue and org.o2.curregen <= org.timeValue * 0.5 and org.o2[1] < 20 then
-					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_wheeze"..math.random(5)..".mp3", 40, nil, nil, nil, nil, 1)
+					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_wheeze"..math.random(5)..".ogg", 40, nil, nil, nil, nil, 1)
 				end
 				if org.o2[1] < 12 and ply == lply and (ent.pulse_breathe.lastsonimcooked or 0) < CurTime() and math.random(4) == 1 then
 					ply:EmitSound("sonimcooked.mp3", 45, math.random(94, 106), 0.85)
@@ -1250,7 +1250,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				end
 			else
 				if org.o2[1] < 15 then
-					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_drown"..math.random(5)..".mp3", 60)
+					ply:EmitSound("zcitysnd/real_sonar/"..(ThatPlyIsFemale(ent) and "fe" or "").."male_drown"..math.random(5)..".ogg", 60)
 				end
 			end
 		end

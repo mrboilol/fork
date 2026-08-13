@@ -38,8 +38,8 @@ SWEP.WorldModelReal = "models/weapons/zcity/c_f1.mdl"
 SWEP.WorldModelExchange = false
 
 if CLIENT then
-	SWEP.WepSelectIcon = Material("pwb/sprites/f1.png")
-	SWEP.IconOverride = "pwb/sprites/f1.png"
+	SWEP.WepSelectIcon = Material("pwb/sprites/f1.vmt")
+	SWEP.IconOverride = "pwb/sprites/f1.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

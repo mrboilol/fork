@@ -9,7 +9,7 @@ SWEP.ViewModel = ""
 SWEP.WorldModel = "models/props_junk/jlare.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_smokebomb")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_smokebomb.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_smokebomb.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

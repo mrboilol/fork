@@ -140,14 +140,14 @@ SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "weapons/knife/knife_hit1.ogg"
 SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.ogg"
 SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
-SWEP.SwingSound = "machete/macheteswing1.ogg"
+SWEP.SwingSound = "machete/macheteswing1.mp3"
 SWEP.HitFleshExtra = {
-    "machete/machetehit1.ogg",
-    "machete/machetehit2.ogg",
-    "machete/machetehit3.ogg",
-    "machete/machetehit4.ogg",
-    "machete/machetehit5.ogg",
-    "machete/machetehit6.ogg",
+    "machete/machetehit1.mp3",
+    "machete/machetehit2.mp3",
+    "machete/machetehit3.mp3",
+    "machete/machetehit4.mp3",
+    "machete/machetehit5.mp3",
+    "machete/machetehit6.mp3",
 }
 SWEP.HitFleshExtraPitch = 75
 SWEP.ArteryChance = 1

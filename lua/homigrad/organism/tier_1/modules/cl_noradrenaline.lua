@@ -56,14 +56,14 @@ hook.Add("RenderScreenspaceEffects", "noradrenalineEffect", function()
 
 	if noradrenaline > 0.0001 and !hg.undernoradrenaline then
 		hg.undernoradrenaline = true
-		surface.PlaySound("shitty/music/mi_deathcam.mp3")
+		surface.PlaySound("shitty/music/mi_deathcam.ogg")
 
 		if altnoradrenaline:GetBool() then
 			if IsValid(hg.noradrenalineStation) then
 				hg.noradrenalineStation:SetVolume(1)
 				hg.noradrenalineFadeOut = false
 			else
-				sound.PlayFile("sound/NIGGARUN.ogg", "noblock", function(channel)
+				sound.PlayFile("sound/NIGGARUN.mp3", "noblock", function(channel)
 					hg.noradrenalineStation = channel
 					channel:EnableLooping(true)
 					channel:SetVolume(1)

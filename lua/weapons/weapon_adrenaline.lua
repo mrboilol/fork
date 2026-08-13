@@ -12,7 +12,7 @@ SWEP.WorldModel = "models/weapons/tfa_ins2/upgrades/phy_optic_eotech.mdl"
 SWEP.Model = "models/weapons/w_models/w_jyringe_jroj.mdl"
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_adrenaline")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_adrenaline.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_adrenaline.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

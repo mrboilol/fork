@@ -15,12 +15,12 @@ local function SendPhoneEntity(name, phone)
 end
 
 local function PlayPhoneButtonSound()
-	LocalPlayer():EmitSound("panoptisscon/phone_query.ogg", 60, math.random(45, 165), 0.75, CHAN_ITEM)
+	LocalPlayer():EmitSound("panoptisscon/phone_query.mp3", 60, math.random(45, 165), 0.75, CHAN_ITEM)
 end
 
 local function PlayPhoneNumberSound()
 	local suffix = math.random(1, 4)
-	surface.PlaySound("panoptisscon/phone_press" .. (suffix == 1 and "" or suffix) .. ".ogg")
+	surface.PlaySound("panoptisscon/phone_press" .. (suffix == 1 and "" or suffix) .. ".mp3")
 end
 
 local function OpenNumberPanel(phone)

@@ -302,7 +302,7 @@ if CLIENT then
 					if self.Created and (self.Created < CurTime()) then
 						self:SetSize(sizeX / 5.8, sizeY / 5.8)
 						self:SetAlpha(0)
-						surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".ogg")
+						surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".mp3")
 						self:AlphaTo(255,0.3,0)
 						ent.foundloot[i] = true
 						self.Created = nil
@@ -324,7 +324,7 @@ if CLIENT then
 						thing["render"] = {}
 					end
 					
-					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".ogg")
+					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".mp3")
 					grid.SoundKD = CurTime() + 0.2
 					button:Remove()
 					TakeItem(tab, i, thing, ent)
@@ -349,7 +349,7 @@ if CLIENT then
 						thing["render"] = {}
 					end
 					
-					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".ogg")
+					surface.PlaySound("arc9_eft_shared/generic_mag_pouch_in" .. math.random(7) .. ".mp3")
 					grid.SoundKD = CurTime() + 0.2
 					--button:Remove()
 					local OptionsMenu = DermaMenu() 
@@ -366,7 +366,7 @@ if CLIENT then
 					button.col1 = Lerp(0.1, button.col1, button:IsHovered() and 255 or 100)
 					if button:IsHovered() then
 						button.SoundKD = button.SoundKD or 0
-						if (grid.SoundKD or 0) < CurTime() and button.SoundKD < CurTime() then surface.PlaySound("arc9_eft_shared/generic_mag_pouch_out" .. math.random(7) .. ".ogg") end
+						if (grid.SoundKD or 0) < CurTime() and button.SoundKD < CurTime() then surface.PlaySound("arc9_eft_shared/generic_mag_pouch_out" .. math.random(7) .. ".mp3") end
 						button.SoundKD = CurTime() + 0.1
 					end
 

@@ -61,11 +61,11 @@ SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.ogg"
 SWEP.HitFleshExtra = {
-    "shovelcrowbarshared/shovelhit1.ogg",
-    "shovelcrowbarshared/shovelhit2.ogg",
+    "shovelcrowbarshared/shovelhit1.mp3",
+    "shovelcrowbarshared/shovelhit2.mp3",
 }
 SWEP.HitFleshExtraPitch = 115
-SWEP.SwingSound = "baseballbat/swing.ogg"
+SWEP.SwingSound = "baseballbat/swing.mp3"
 SWEP.SwingSoundPitch = {145, 152}
 SWEP.AttackTimeLength = 0.15
 SWEP.Attack2TimeLength = 0.1

@@ -31,7 +31,7 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_gun_flip_3.ogg") end,
+		[0.01] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_gun_flip_3.mp3") end,
 	},
 }
 
@@ -68,8 +68,8 @@ SWEP.Primary.Wait = 2
 SWEP.Primary.Ammo = "RPG-7 Projectile"
 SWEP.Primary.Cone = 0
 SWEP.Primary.Damage = 25
-SWEP.Primary.Sound = {"weapons/darsu_eft/rpg26/rpg26_fire_outdoor_close1.ogg", 75, 90, 100}
-SWEP.SupressedSound = {"weapons/darsu_eft/rpg26/rpg26_fire_outdoor_close1.ogg", 75, 90, 100}
+SWEP.Primary.Sound = {"weapons/darsu_eft/rpg26/rpg26_fire_outdoor_close1.mp3", 75, 90, 100}
+SWEP.SupressedSound = {"weapons/darsu_eft/rpg26/rpg26_fire_outdoor_close1.mp3", 75, 90, 100}
 SWEP.Primary.Force = 25
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -2.02, 7.88)

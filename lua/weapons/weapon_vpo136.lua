@@ -13,7 +13,7 @@ SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.FakeBodyGroups = "0A0000C0010002"
 
-SWEP.WepSelectIcon2 = Material("pwb/sprites/akm.png")
+SWEP.WepSelectIcon2 = Material("pwb/sprites/akm.vmt")
 SWEP.IconOverride = "entities/arc9_eft_vpo136.png"
 
 --local mat = "models/weapons/tfa_ins2/ak_pack/ak74n/ak74n_stock"

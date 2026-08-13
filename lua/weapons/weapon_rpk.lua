@@ -33,7 +33,7 @@ SWEP.FakeViewBobBone = "CAM_Homefield"
 SWEP.FakeReloadSounds = {
 	[0.22] = "weapons/universal/uni_crawl_l_03.wav",
 	[0.34] = "weapons/ak74/ak74_magout.wav",
-	[0.38] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.38] = "weapons/ak74/ak74_magout_rattle.mp3",
 
 	[0.62] = "weapons/ak74/ak74_magin.wav",
 	[0.81] = "weapons/universal/uni_crawl_l_03.wav",
@@ -45,7 +45,7 @@ SWEP.FakeEmptyReloadSounds = {
 
 	[0.22] = "weapons/universal/uni_crawl_l_03.wav",
 	[0.34] = "weapons/ak74/ak74_magout.wav",
-	[0.4] = "weapons/ak74/ak74_magout_rattle.wav",
+	[0.4] = "weapons/ak74/ak74_magout_rattle.mp3",
 	[0.62] = "weapons/ak74/ak74_magin.wav",
 
 	[0.83] = "weapons/ak74/ak74_boltback.wav",

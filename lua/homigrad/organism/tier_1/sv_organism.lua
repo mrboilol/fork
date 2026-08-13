@@ -441,7 +441,7 @@ end
 -- (damage, organ failure, or an explicit Kill call) gets the same cue once.
 hook.Add("PlayerDeath", "hg_organism_death_gasp", function(ply)
 	if IsValid(ply) then
-		ply:EmitSound("deathgasp.ogg", 75, 100)
+		ply:EmitSound("deathgasp.mp3", 75, 100)
 	end
 end)
 

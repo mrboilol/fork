@@ -28,7 +28,7 @@ SWEP.WorldModel = "models/sirgibs/ragdoll/css/terror_arctic_radio.mdl"
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_walkietalkie")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_walkietalkie.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_walkietalkie.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 
@@ -382,7 +382,7 @@ function SWEP:AdjustFrequency(numAdjust)
 	self:SetHudFrequency(self.Frequency)
 
 	local owner = self:GetOwner()
-	owner:EmitSound("radiotune.mp3", 45, math.random(95, 105))
+	owner:EmitSound("radiotune.ogg", 45, math.random(95, 105))
 	owner:SetAnimation(PLAYER_ATTACK1)
 
 	return self.Frequency

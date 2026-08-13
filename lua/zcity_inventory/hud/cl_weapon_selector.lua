@@ -1073,7 +1073,7 @@ function WS.ChangeSelectionWep( ply, key, pressed, code )
         local selectorWasOpen = WS.Show > CurTime()
         WS.Show = CurTime() + 4
         --print(key)
-        surface.PlaySound("arc9_eft_shared/weapon_generic_rifle_spin"..math.random(10)..".ogg")
+        surface.PlaySound("arc9_eft_shared/weapon_generic_rifle_spin"..math.random(10)..".mp3")
         if iPos then
             iPos = iPos - 1
             if not Weapons[iPos] or not Weapons[iPos][0] then return true end
@@ -1182,7 +1182,7 @@ function WS.SetActuallyWeapon( ply, cmd )
         WS.Selected = CurTime() + 0.2
         WS.Show = CurTime() + 0.2
         ZCityResetSlotHold(false, true)
-        surface.PlaySound("arc9_eft_shared/weapon_generic_spin"..math.random(1,10)..".ogg")
+        surface.PlaySound("arc9_eft_shared/weapon_generic_spin"..math.random(1,10)..".mp3")
     end
 end
 

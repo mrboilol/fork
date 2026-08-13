@@ -20,7 +20,7 @@ SWEP.modelscale2 = 1
 SWEP.basebone = 56
 if CLIENT then
 	SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_fooddrink")
-	SWEP.IconOverride = "vgui/wep_jack_hmcd_fooddrink.png"
+	SWEP.IconOverride = "vgui/wep_jack_hmcd_fooddrink.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 SWEP.AutoSwitchTo = false

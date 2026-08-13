@@ -72,8 +72,8 @@ function SWEP:ModelCreated(model)
 	self:GetWM():ManipulateBoneScale(49, vecPochtiZero)
 end
 
-SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/asval.png")
-SWEP.IconOverride = "pwb2/vgui/weapons/asval.png"
+SWEP.WepSelectIcon2 = Material("pwb2/vgui/weapons/asval.vmt")
+SWEP.IconOverride = "pwb2/vgui/weapons/asval.vmt"
 SWEP.ScrappersSlot = "Primary"
 SWEP.weaponInvCategory = 1
 SWEP.dwr_customIsSuppressed = true

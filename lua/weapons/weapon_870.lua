@@ -95,7 +95,7 @@ SWEP.NumBullet = 8
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(0, -0.6777, 5.3976)
 SWEP.RHandPos = Vector(0, 0, -1)
@@ -132,43 +132,43 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
     ["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["reload_start_empty0"] = {
         [0.2] = function(self) self:EmitSound(path .. "mr133_shell_pickup.ogg") end,
         [0.8] = function(self) self:EmitSound(path .. "mr133_magcover.ogg") end,
     },
     ["reload_start_empty0"] = {
-        [0.2] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_pickup.ogg") end,
-        [0.8] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_magcover.ogg") end,
+        [0.2] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_pickup.mp3") end,
+        [0.8] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_magcover.mp3") end,
     },
     ["reload_start0"] = {
-        [0.2] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_pickup.ogg") end,
-        [0.6] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_magcover.ogg") end,
+        [0.2] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_pickup.mp3") end,
+        [0.6] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_magcover.mp3") end,
         [0.71] = function(self) self:EmitSound("wweapons/darsu_eft/m590/mr133_shell_in_mag2.ogg") end,
     },
     ["reload_loop0"] = {
-        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.ogg") end,
+        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.mp3") end,
     },
     ["reload_loop1"] = {
-        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.ogg") end,
+        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.mp3") end,
     },
     ["reload_loop2"] = {
-        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.ogg") end,
+        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.mp3") end,
     },
     ["reload_loop3"] = {
-        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.ogg") end,
+        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.mp3") end,
     },
     ["reload_loop4"] = {
-        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.ogg") end,
+        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.mp3") end,
     },
     ["reload_loop5"] = {
-        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.ogg") end,
+        [0.05] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_in_mag2.mp3") end,
     },
     ["reload_end"] = {
-        [0.1] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_magcover.ogg") end,
+        [0.1] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_magcover.mp3") end,
     },
     ["pump2"] = {
         [0.05] = function(self) self:EmitSound(path .. "rem870_pump_in.ogg") end,

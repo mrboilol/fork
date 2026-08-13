@@ -851,13 +851,13 @@ if SERVER then
         local source = hasBattery and "D.I.H Battery" or "Taser Cartridge"
         ply:RemoveAmmo(1, source)
         wep:SetClip1(math.min(current + wep.Config.BatteryRecharge[source], wep.Config.BatteryMax))
-        wep:EmitSound(hasBattery and "panoptisscon/phone_simcard_insert.ogg" or "snd_jack_hmcd_ammobox.ogg")
+        wep:EmitSound(hasBattery and "panoptisscon/phone_simcard_insert.mp3" or "snd_jack_hmcd_ammobox.ogg")
     end)
 end
 
 if CLIENT then
     SWEP.WepSelectIcon = Material("vgui/wep_jack_hmcd_medkit")
-    SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.png"
+    SWEP.IconOverride = "vgui/wep_jack_hmcd_medkit.vmt"
     SWEP.BounceWeaponIcon = false
 
     function SWEP:DrawHUD()

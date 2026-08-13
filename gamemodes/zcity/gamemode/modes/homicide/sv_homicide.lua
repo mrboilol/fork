@@ -1144,7 +1144,7 @@ MODE.Types.soe = {
 		ply:SetNetVar("CurPluv", "pluvberet")
 	end,
 	PoliceText = "National guards have arrived.",
-	PoliceSound = "snd_jack_hmcd_heli2.mp3"
+	PoliceSound = "snd_jack_hmcd_heli2.ogg"
 }
 
 MODE.Types = {
@@ -1581,7 +1581,7 @@ function MODE:RoundThink()
 	
 			if count > 0 then
 				PrintMessage(HUD_PRINTTALK, "SWAT team incoming!")
-				EmitSound("snd_jack_hmcd_heli2.mp3", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
+				EmitSound("snd_jack_hmcd_heli2.ogg", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
 				MODE:SpawnForce("swat", count)
 			end
 		end)
@@ -1598,7 +1598,7 @@ function MODE:RoundThink()
 				SetGlobalBool("HMCDPoliceArrived", true)
 				BroadcastHMCDPoliceArrivedState(true)
 				PrintMessage(HUD_PRINTTALK, self.Types[self.Type].PoliceText or "National Guard have arrived.")
-				EmitSound(self.Types[self.Type].PoliceSound or "snd_jack_hmcd_heli2.mp3", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
+				EmitSound(self.Types[self.Type].PoliceSound or "snd_jack_hmcd_heli2.ogg", vector_origin, 0, CHAN_AUTO, 1, 125, 0, 100)
 			end
 		end
 	end

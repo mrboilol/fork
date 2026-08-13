@@ -36,7 +36,7 @@ SWEP.CanSuicide = false
 SWEP.PPSMuzzleEffect = "muzzleflash_MINIMI"
 
 SWEP.DeploySnd = {"homigrad/weapons/draw_hmg.mp3", 55, 100, 110}
-SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.mp3", 55, 100, 110}
+SWEP.HolsterSnd = {"homigrad/weapons/hmg_holster.ogg", 55, 100, 110}
 SWEP.Slot = 2
 SWEP.SlotPos = 10
 SWEP.ViewModel = ""
@@ -58,26 +58,26 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
     ["reload"] = {
-        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_open.ogg") end,
+        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_open.mp3") end,
         [0.20] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_belt_out.wav") end,
-		[0.30] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_out.ogg") end,
-		[0.55] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_in.ogg") end,
+		[0.30] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_out.mp3") end,
+		[0.55] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_in.mp3") end,
 		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_belt_in.wav") end,
-		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_close.ogg") end,
+		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_close.mp3") end,
     },
     ["reload_empty"] = {
-        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_open.ogg") end,
+        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_open.mp3") end,
         [0.20] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_belt_out.wav") end,
-		[0.30] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_out.ogg") end,
-		[0.48] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_in.ogg") end,
+		[0.30] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_out.mp3") end,
+		[0.48] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_mag_in.mp3") end,
 		[0.65] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_belt_in.wav") end,
-		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_close.ogg") end,
-		[0.82] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_charge_full.ogg") end,
+		[0.75] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_cover_close.mp3") end,
+		[0.82] = function(self) self:EmitSound("weapons/darsu_eft/pkm/pk_charge_full.mp3") end,
     },
 }
 

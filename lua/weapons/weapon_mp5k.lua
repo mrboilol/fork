@@ -60,23 +60,23 @@ local path = "weapons/darsu_eft/mp5/"
 
 SWEP.AnimsEvents = {
 	["inspect"] = {
-		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.ogg") end,
-		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.ogg") end,
+		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin9.mp3") end,
+		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
     ["reload"] = {
-        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_out.ogg") end,
-		[0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in3.ogg") end,
-		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.ogg") end,	
-		[0.40] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_in.ogg") end,
+        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_out.mp3") end,
+		[0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in3.mp3") end,
+		[0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.mp3") end,
+		[0.40] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_in.mp3") end,
 
     },
     ["reload_empty"] = {
-        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_bolt_out.ogg") end,
-		[0.30] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_out.ogg") end,
-		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.ogg") end,
-		[0.55] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_in.ogg") end,
-		[0.80] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_bolt_in.ogg") end,
+        [0.10] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_bolt_out.mp3") end,
+		[0.30] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_out.mp3") end,
+		[0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out3.mp3") end,
+		[0.55] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_mag_in.mp3") end,
+		[0.80] = function(self) self:EmitSound("weapons/darsu_eft/mp5/mp5_weap_bolt_in.mp3") end,
     },
 }
 

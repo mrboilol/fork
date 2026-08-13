@@ -50,7 +50,7 @@ SWEP.AnimList = {
 
 if CLIENT then
 	--SWEP.WepSelectIcon = Material("vgui/hud/tfa_iw7_tactical_knife")
-	--SWEP.IconOverride = "vgui/hud/tfa_iw7_tactical_knife.png"
+	--SWEP.IconOverride = "vgui/hud/tfa_iw7_tactical_knife.vmt"
 	SWEP.BounceWeaponIcon = false
 end
 

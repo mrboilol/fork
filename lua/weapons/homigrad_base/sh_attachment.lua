@@ -1097,8 +1097,8 @@ if CLIENT then
 	}
 	-- Value from 0 to 1: 0.5 pauses inspect at 50%, 0.2 at 20%, and so on.
 	local inspectFreezeFraction = 0.3
-	local inspectOpenSound = "arc9_eft_shared/weap_handon.ogg"
-	local inspectCloseSound = "arc9_eft_shared/weapon_generic_spin6.ogg"
+	local inspectOpenSound = "arc9_eft_shared/weap_handon.mp3"
+	local inspectCloseSound = "arc9_eft_shared/weapon_generic_spin6.mp3"
 	local fallbackAccent = Color(55, 55, 55)
 	local fallbackPanel = Color(10, 10, 10)
 	local menuText = Color(235, 235, 235)
