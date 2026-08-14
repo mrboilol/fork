@@ -2081,12 +2081,30 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 		if curTime >= org.deathStateEnd and not org.deathStateKilled then
 			org.deathStateKilled = true
+			if org.analgesia > 1.5 or org.painkiller > 2.4 then
+				hg.achievements.AddPlayerAchievement(owner, "drugs", 1)
+			end
 			owner:Kill()
 			return
 		end
 	else
 		org.deathStateEnd = nil
 		org.deathStateKilled = nil
+	end
+
+	if isPly and org.neckslit and org.neckslitDeadline and CurTime() >= org.neckslitDeadline and owner:Alive() and not org.deathStateKilled then
+		org.deathStateKilled = true
+		owner:Kill()
+		return
+	end
+
+	if isPly and org.brain and org.brain >= 1 and owner:Alive() and not org.deathStateKilled then
+		org.deathStateKilled = true
+		if org.analgesia > 1.5 or org.painkiller > 2.4 then
+			hg.achievements.AddPlayerAchievement(owner, "drugs", 1)
+		end
+		owner:Kill()
+		return
 	end
 
 	if just_went_uncon then
@@ -2146,7 +2164,12 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	if isPly then
 		if org.otrub or org.fake then hg.Fake(owner,nil,true) end
-		if not org.alive and owner:Alive() then owner:Kill() end
+		if not org.alive and owner:Alive() then
+			if org.analgesia > 1.5 or org.painkiller > 2.4 then
+				hg.achievements.AddPlayerAchievement(owner, "drugs", 1)
+			end
+			owner:Kill()
+		end
 	end
 
 	-- A terminal condition often makes the player unconscious before the next

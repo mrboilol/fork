@@ -851,12 +851,9 @@ local function renderscene(pos, angle, fov)
 	local view = CalcView(lply, pos, angle, fov)
 	viewOverride = view
 	
-	local invert = invertCam:GetBool()
-	local oldrt
-	
 	if not view then return end
 	if not isvector(view.origin) or not isangle(view.angles) then return end
-	hg.ApplyScreenShakes(view, lply, IsValid(follow))
+	if hg.ApplyScreenShakes then hg.ApplyScreenShakes(view, lply, IsValid(follow)) end
 
 	--hook.Run("HG_RenderScene", pos, angle, fov)
 
@@ -869,6 +866,18 @@ local function renderscene(pos, angle, fov)
 	renderView.aspectratio = scrh > 0 and (scrw / scrh) or 1
 	renderView.origin = view.origin
 	renderView.angles = view.angles
+	if isvector(renderView.origin) and isangle(renderView.angles) then
+		hg.LastMainRenderView = {
+			x = renderView.x or 0,
+			y = renderView.y or 0,
+			w = renderView.w,
+			h = renderView.h,
+			fov = renderView.fov,
+			aspectratio = renderView.w / renderView.h,
+			origin = Vector(renderView.origin.x, renderView.origin.y, renderView.origin.z),
+			angles = Angle(renderView.angles.p, renderView.angles.y, renderView.angles.r),
+		}
+	end
 	if mapswithfog[map] then
 		renderView.zfar = zfar
 	end
@@ -879,18 +888,8 @@ local function renderscene(pos, angle, fov)
 	local ok, result = pcall(render_RenderView, renderView)
 	lply.norender = nil
 	
-	if invert then
-		render.SetRenderTarget( oldrt )
-		fliprtmat:SetTexture( "$basetexture", fliprt )
-		render.SetMaterial( fliprtmat )
-		render.DrawScreenQuad()
-	end
-
-	RENDERSCENE = nil
-	renderSceneActive = false
-
 	if not ok then
-		ErrorNoHalt("[cl_camera] RenderScene RenderView failed: " .. tostring(result) .. "\n")
+		ErrorNoHaltWithStack(tostring(err))
 		return
 	end
 

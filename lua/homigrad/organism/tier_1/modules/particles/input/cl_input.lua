@@ -515,3 +515,86 @@ net.Receive("bloodsquirt2", function()
 	end)
 	timer.Adjust(name, 0)
 end)
+
+net.Receive("vomitConcussionMouth", function()
+	local ent = net.ReadEntity()
+	if not IsValid(ent) then return end
+
+	local bone = net.ReadString()
+	local boneIdx = ent:LookupBone(bone)
+	local mat = net.ReadMatrix()
+	local pos = net.ReadVector()
+	local dir = net.ReadVector()
+	local len = dir:Length()
+
+	local ent = hg.RagdollOwner(ent) or ent
+	local ply = ent
+
+	local localPos, localDir = WorldToLocal(pos, dir:Angle(), mat:GetTranslation(), mat:GetAngles())
+
+	if ply == lply then localPos:Add(-Vector(2,-2,0)) end
+
+	local name = "vomitConcussionMouth"..ent:EntIndex()
+	local i = 24
+	local maxI = i
+	timer.Create(name, 0.025, i + 5, function()
+		if not IsValid(ent) then timer.Remove(name) return end
+		local ent = IsValid(ent.FakeRagdoll) and ent.FakeRagdoll or ent
+		local amt = math.max(i / maxI, 0.2)
+		if math.random(3) == 1 then return end
+		local mat = ent:GetBoneMatrix(boneIdx)
+		if not mat then timer.Remove(name) return end
+
+		if ply == lply and (i == 24 or i == 12) then
+			ViewPunch(Angle(8,0,0))
+		end
+
+		local pos, dir = LocalToWorld(localPos, localDir, mat:GetTranslation(), mat:GetAngles())
+
+		if lply == ply then dir = lply:EyeAngles() end
+		dir = dir:Forward() * len
+
+		local tr = util.TraceLine({
+			start = pos,
+			endpos = pos + dir * amt * 28 + VectorRand(-amt * 18, amt * 18) + Vector(0, 0, -70),
+			filter = ent,
+			mask = MASK_SOLID_BRUSHONLY
+		})
+		if tr.Hit and not tr.HitSky then
+			local decal = "Concussion.VomitSmall"
+			util.Decal(decal, tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal, ent)
+		end
+		i = i - 1
+	end)
+	timer.Adjust(name, 0)
+end)
+
+local shitMat
+local function GetShitMat()
+	if not shitMat then
+		shitMat = CreateMaterial("hg_organism_shit_decal", "DecalModulate", {
+			["$basetexture"] = util.DecalMaterial("Concussion.VomitMedium"),
+			["$decalscale"] = "0.02",
+			["$decalscalevariation"] = "0.02",
+			["$vertexcolor"] = "1",
+			["$vertexalpha"] = "1",
+			["$nocull"] = "1",
+			["$translucent"] = "1",
+		})
+	end
+	return shitMat
+end
+net.Receive("hg_organism_defecate", function()
+	local ent = net.ReadEntity()
+	if not IsValid(ent) then return end
+	local pos = ent:GetPos()
+	local tr = util.TraceLine({
+		start = pos + Vector(0, 0, 30),
+		endpos = pos + Vector(0, 0, -120),
+		mask = MASK_SOLID_BRUSHONLY,
+		filter = ent,
+	})
+	if not tr.Hit or tr.HitSky or not tr.HitWorld then return end
+	local size = math.Rand(5, 9)
+	util.DecalEx(GetShitMat(), tr.Entity, tr.HitPos + tr.HitNormal * 2, tr.HitNormal, Color(math.random(95, 125), math.random(65, 82), math.random(32, 48), 255), size, size)
+end)
