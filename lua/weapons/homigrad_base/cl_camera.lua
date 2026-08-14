@@ -195,7 +195,7 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local justzoomed = zooming and !oldzoom
 	lastzoom = (justzoomed or (cocking or self.shot2 == 1)) and CurTime() or lastzoom
 
-	local tta = math.Clamp(self.weight / 4, 0.25, 1) * 0.5
+	local tta = self.GetAimAlignmentTime and self:GetAimAlignmentTime(ply) or math.Clamp(self.weight / 4, 0.25, 1) * 0.5
 	if isvector(vellen) then
 		vellen = vellen:Length()
 	end
@@ -252,8 +252,12 @@ function SWEP:Camera(eyePos, eyeAng, view, vellen, ply)
 	local sp2  = isnumber(organism.spine2) and organism.spine2 or 0
 	local sp3  = isnumber(organism.spine3) and organism.spine3 or 0
 
-	local shakeMul = (((larm > 0.75 and (larm - 0.75) * (ply.posture != 7 and ply.posture != 8 and 1 or 0)) or 0)
-		+ ((rarm > 0.1 and (rarm - 0.1)) or 0)) / 4
+	local support = self.GetHandSupportState and self:GetHandSupportState(ply) or {}
+	local handling = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
+	local shakeMul = (((larm > 0.25 and (larm - 0.25) * 0.45) or 0)
+		+ ((rarm > 0.1 and (rarm - 0.1) * 0.7) or 0)
+		+ ((handling - 1) * 0.2)
+		+ (support.oneHanded and 0.08 or 0)) / 4
 
 	local addview = AngleRand(-shakeMul - 0.01, shakeMul + 0.01) * (organism.holdingbreath and 0.1 or 1)
 	addview[3] = 0

@@ -5,12 +5,12 @@ hg.organism.module.concussion = {}
 local module = hg.organism.module.concussion
 
 local CONCUSSION_MAX = 6.0
-local DECAY_BASE = 0.2
-local DECAY_SEVERE_BONUS = 0.12
-local DECAY_OVERFLOW_PER_POINT = 0.06
+local DECAY_BASE = 0.35
+local DECAY_SEVERE_BONUS = 0.2
+local DECAY_OVERFLOW_PER_POINT = 0.1
 local ONSET_SPEED = 0.4
 local POST_CONCUSSION_THRESHOLD = 0.3
-local POST_CONCUSSION_DECAY = 0.08
+local POST_CONCUSSION_DECAY = 0.15
 local SECOND_IMPACT_WINDOW = 8.0
 local SECOND_IMPACT_SCALE = 0.35
 local LOC_THRESHOLD = 3.8
@@ -408,9 +408,17 @@ module[2] = function(ply, org, timeValue)
         end
     end
 
-    org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 0.2)
-    org.concussion_headache = math.Approach(org.concussion_headache or 0, 0, timeValue * 0.07)
-    org.concussion_fatigue = math.Approach(org.concussion_fatigue or 0, 0, timeValue * 0.04)
+    org.concussion_tinnitus = math.Approach(org.concussion_tinnitus or 0, 0, timeValue * 0.35)
+    org.concussion_headache = math.Approach(org.concussion_headache or 0, 0, timeValue * 0.12)
+    org.concussion_fatigue = math.Approach(org.concussion_fatigue or 0, 0, timeValue * 0.07)
+
+    -- Once the active injury has cleared, let the nausea target recover too.
+    -- Otherwise a target left over from the final concussion tick can keep the
+    -- nausea loop alive indefinitely even though concussion itself is zero.
+    if org.concussion <= 0 and org.concussion_onset <= 0 then
+        org.nausea_target = math.Approach(org.nausea_target or 0, 0, timeValue * 0.15)
+        org.nausea_pending = math.Approach(org.nausea_pending or 0, 0, timeValue * 0.15)
+    end
 
     org.nausea_wave_timer = (org.nausea_wave_timer or 0) + timeValue * NAUSEA_WAVE_FREQ
     local waveOffset = math.sin(org.nausea_wave_timer * math.pi * 2) * NAUSEA_WAVE_AMP
@@ -424,7 +432,7 @@ module[2] = function(ply, org, timeValue)
             org.nausea = math.Approach(org.nausea, nauseaTargetWithWave, timeValue * 0.03)
         end
     else
-        org.nausea = math.max(org.nausea - timeValue * 0.05, 0)
+        org.nausea = math.max(org.nausea - timeValue * 0.09, 0)
     end
 
     if org.nausea <= 0.05 then

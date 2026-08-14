@@ -1341,6 +1341,82 @@ local IsValid = IsValid
 	end
 --//
 --\\ Can use hands
+	function hg.GetArmEffectiveness(ent, side)
+		if not IsValid(ent) then return 1 end
+
+		local limb = side
+		if limb == "left" or limb == "l" then
+			limb = "larm"
+		elseif limb == "right" or limb == "r" then
+			limb = "rarm"
+		end
+		if limb ~= "larm" and limb ~= "rarm" then return 1 end
+
+		local org = ent.organism
+		if not org and hg.RagdollOwner then
+			local owner = hg.RagdollOwner(ent)
+			org = IsValid(owner) and owner.organism or nil
+		end
+		if not org then return 1 end
+
+		local hand = limb == "larm" and "lhand" or "rhand"
+		if org[limb .. "amputated"] or org[hand .. "amputated"] or org[limb .. "upamputated"] then
+			return 0
+		end
+
+		local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
+		local effectiveness = damage < 0.25 and 1 or Lerp((damage - 0.25) / 0.75, 0.82, 0.12)
+		if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
+			effectiveness = math.min(effectiveness, 0.18)
+		end
+		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(ent, limb) then
+			effectiveness = math.min(effectiveness, 0.2)
+		end
+		if org.armstrength and org.armstrength > 0 and org.armstrength < 1 then
+			effectiveness = effectiveness * org.armstrength
+		end
+
+		return math.Clamp(effectiveness, 0, 1)
+	end
+
+	function hg.GetLegEffectiveness(ent, side)
+		if not IsValid(ent) then return 1 end
+
+		local limb = side
+		if limb == "left" or limb == "l" then
+			limb = "lleg"
+		elseif limb == "right" or limb == "r" then
+			limb = "rleg"
+		end
+		if limb ~= "lleg" and limb ~= "rleg" then return 1 end
+
+		local org = ent.organism
+		if not org and hg.RagdollOwner then
+			local owner = hg.RagdollOwner(ent)
+			org = IsValid(owner) and owner.organism or nil
+		end
+		if not org then return 1 end
+
+		local foot = limb == "lleg" and "lfoot" or "rfoot"
+		if org[limb .. "amputated"] or org[foot .. "amputated"] or org[limb .. "upamputated"] then
+			return 0
+		end
+
+		local damage = math.Clamp(tonumber(org[limb]) or 0, 0, 1)
+		local effectiveness = damage < 0.2 and 1 or Lerp((damage - 0.2) / 0.8, 0.85, 0.2)
+		if org[limb .. "dislocation"] or org[limb .. "dislocated"] then
+			effectiveness = math.min(effectiveness, 0.15)
+		end
+		if hg.HasTourniquetOnLimb and hg.HasTourniquetOnLimb(ent, limb) then
+			effectiveness = math.min(effectiveness, 0.2)
+		end
+		if org.legstrength and org.legstrength > 0 and org.legstrength < 1 then
+			effectiveness = effectiveness * org.legstrength
+		end
+
+		return math.Clamp(effectiveness, 0, 1)
+	end
+
 	function hg.CanUseLeftHand(ply)
 		local ent = IsValid(ply.FakeRagdoll) and ply.FakeRagdoll or ply
 

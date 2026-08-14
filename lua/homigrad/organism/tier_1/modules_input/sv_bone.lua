@@ -325,8 +325,8 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
 		markBrokenBone(org, key == "lleg" and (segment == "up" and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_L_Calf") or (segment == "up" and "ValveBiped.Bip01_R_Thigh" or "ValveBiped.Bip01_R_Calf"))
-		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
-		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true, {state = "broken", limb = key, segment = segment}) end
+		if hg.BreakLimb then hg.BreakLimb(org.owner, key, segment, false) end
 		org.painadd = org.painadd + 55
 		addBoneInternalBleed(org, 0.45, 0.8)
 		org.owner:AddNaturalAdrenaline(1)
@@ -342,7 +342,8 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	else
 		org[key .. "dislocation"] = true
 		markBrokenBone(org, key == "lleg" and (segment == "up" and "ValveBiped.Bip01_L_Thigh" or "ValveBiped.Bip01_L_Calf") or (segment == "up" and "ValveBiped.Bip01_R_Thigh" or "ValveBiped.Bip01_R_Calf"))
-		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true, {state = "dislocated", limb = key, segment = segment}) end
+		if hg.BreakLimb then hg.BreakLimb(org.owner, key, segment, true) end
 		org.painadd = org.painadd + 35
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.immobilization = org.immobilization + dmg * 10
@@ -395,8 +396,8 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	if dmg >= 1 and (!dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL) or math.random(3) != 1) then
 		org[key] = 1
 		markBrokenBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"))
-		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
-		if ConVarExists("hg_floppy_limbs") and GetConVar("hg_floppy_limbs"):GetBool() and hg.BreakLimb then hg.BreakLimb(org.owner, key, nil, false) end
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true, {state = "broken", limb = key, segment = segment}) end
+		if hg.BreakLimb then hg.BreakLimb(org.owner, key, segment, false) end
 		org.painadd = org.painadd + 55
 		addBoneInternalBleed(org, 0.35, 0.7)
 		org.owner:AddNaturalAdrenaline(1)
@@ -412,7 +413,8 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 	else
 		org[key .. "dislocation"] = true
 		markBrokenBone(org, key == "larm" and (segment == "up" and "ValveBiped.Bip01_L_UpperArm" or "ValveBiped.Bip01_L_Forearm") or (segment == "up" and "ValveBiped.Bip01_R_UpperArm" or "ValveBiped.Bip01_R_Forearm"))
-		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true) end
+		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true, {state = "dislocated", limb = key, segment = segment}) end
+		if hg.BreakLimb then hg.BreakLimb(org.owner, key, segment, true) end
 		org.painadd = org.painadd + 35
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5

@@ -463,6 +463,36 @@ end
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
 if SERVER then
+	function SWEP:RefreshPerfusionTreatment(ent, amount)
+		local org = ent and ent.organism
+		if not org then return end
+
+		amount = math.Clamp(tonumber(amount) or 0.2, 0.05, 1)
+		local oldPerfusion = org.perfusion or 1
+		local oldBrainOxygen = org.brainoxygen or oldPerfusion
+
+		if not istable(org.arterialwounds) or #org.arterialwounds == 0 then
+			org.arterialBleed = 0
+		end
+
+		if not istable(org.wounds) or #org.wounds == 0 then
+			org.venousBleed = 0
+		end
+
+		if (org.internalBleed or 0) <= (org.internalBleedHeal or 0) then
+			org.internalBleedRate = 0
+		end
+
+		if hg.organism and hg.organism.UpdatePerfusion then
+			hg.organism.UpdatePerfusion(org.owner or ent, org, amount)
+		end
+
+		if (org.perfusion or 0) > oldPerfusion or (org.brainoxygen or 0) > oldBrainOxygen then
+			org.hypoxiaTime = math.Approach(org.hypoxiaTime or 0, 0, amount * 4)
+			org.severeHypoxiaTime = math.Approach(org.severeHypoxiaTime or 0, 0, amount * 3)
+		end
+	end
+
 	function SWEP:Bandage(ent, bone)
 		local org = ent.organism
 		local owner = self:GetOwner()

@@ -386,6 +386,10 @@ module[2] = function(owner, org, timeValue)
 	org.pulse = math.Approach(org.pulse, pulse, pulse > org.pulse and timeValue * 2 or timeValue * 2)
 	
 	local bloodNow = org.blood or 5000
+	-- Severe blood loss remains survivable, but the myocardium becomes steadily
+	-- less stable throughout the 3000-1750 mL danger band.
+	local hemorrhageRhythmStress = math.Clamp((3000 - bloodNow) / 1250, 0, 1)
+	org.hemorrhageRhythmStress = hemorrhageRhythmStress
 	local hemorrhageCompensation = math.Clamp(org.hemorrhageCompensation or 0, 0, 1)
 	local hypovolemicShock = math.Clamp(org.hypovolemicShock or 0, 0, 1)
 	local palpitations = math.Clamp(org.palpitations or 0, 0, 1)
@@ -557,13 +561,14 @@ module[2] = function(owner, org, timeValue)
 	-- extreme rates build the condition rapidly; it then clears only gradually
 	-- once the rhythm settles.
 	local tachycardiaK = math.Clamp((org.heartbeat - 120) / 120, 0, 1)
+	local palpitationGain = (tachycardiaK > 0 and 0.002 or 0) + tachycardiaK * 0.021 + hemorrhageRhythmStress * 0.006
 	local correctingPalpitations = (org.palpitationTreatmentUntil or 0) > CurTime()
 	if org.fibrillation then
 		org.palpitations = 0
 	elseif correctingPalpitations then
 		org.palpitations = math.max(palpitations - timeValue / 4, 0)
-	elseif tachycardiaK > 0 and not org.heartstop then
-		org.palpitations = math.Clamp(palpitations + timeValue * (0.002 + tachycardiaK * 0.021), 0, 1)
+	elseif palpitationGain > 0 and not org.heartstop then
+		org.palpitations = math.Clamp(palpitations + timeValue * palpitationGain, 0, 1)
 	else
 		org.palpitations = math.max(palpitations - timeValue / 90, 0)
 	end
@@ -660,7 +665,7 @@ module[2] = function(owner, org, timeValue)
 	org.heartbeat = math.Approach(org.heartbeat, heartbeat, heartbeat > org.heartbeat and timeValue * 5 or timeValue * 3)
 	
 	local ischemia = Clamp(1 - (org.myocardialOxygen or 1), 0, 1)
-	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hypothermiaInstability * 0.35 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2)
+	local stress = Clamp((org.heart or 0) * 0.9 + ischemia * 0.8 + (org.hypertension or 0) * 0.35 + (org.hypotension or 0) * 0.3 + hemorrhageRhythmStress * 0.25 + hypothermiaInstability * 0.35 + Clamp(org.shock, 0, 80) / 180 + max(org.pain - 60, 0) / 220 + max(org.heartbeat - 165, 0) / 190, 0, 2)
 	org.arrhythmia = Approach(org.arrhythmia or 0, Clamp(stress * 0.42, 0, 1), stress > (org.arrhythmia or 0) and timeValue / 25 or timeValue / 90)
 	if org.isPly and not org.otrub then
 		if org.fibrillation or org.unstableRhythm or org.arrhythmia > 0.35 then

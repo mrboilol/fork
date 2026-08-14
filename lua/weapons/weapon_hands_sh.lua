@@ -2198,14 +2198,27 @@ function SWEP:PrimaryAttack(forcespecial)
 	end
 
 	if owner.organism and owner.organism.larmamputated then
-		rand = 1
+		rand = true
 		side = "fists_right"
 	end
 
 	if owner.organism and owner.organism.rarmamputated then
-		rand = 2
+		rand = false
 		side = "fists_left"
 	end
+
+	local rightEff = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "rarm") or 1
+	local leftEff = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "larm") or 1
+	if rand and rightEff < 0.25 and leftEff > rightEff then
+		rand = false
+		side = "fists_left"
+	elseif not rand and leftEff < 0.25 and rightEff > leftEff then
+		rand = true
+		side = "fists_right"
+	end
+	local armEffectiveness = rand and rightEff or leftEff
+	if armEffectiveness <= 0 then return end
+	local armSpeedMul = Lerp(armEffectiveness, 0.4, 1)
 
 	if owner:KeyDown(IN_ATTACK2) and owner.PlayerClassName ~= "sc_infiltrator" and owner.PlayerClassName ~= "headcrabzombie" then return end
 	if owner:GetNetVar("handcuffed",false) then return end
@@ -2256,7 +2269,7 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	self:UpdateNextIdle()
 
-	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
+	self:SetNextPrimaryFire(CurTime() + self.SwingCooldown / armSpeedMul * math.Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetNextSecondaryFire(CurTime() + self.SwingCooldown + (math.max(special_attack and 0.5 or 0, clawClasses[owner.PlayerClassName] or 0)))
 	self:SetLastShootTime(CurTime())
 	if SERVER and owner.organism and owner.organism.stamina then
@@ -2436,7 +2449,8 @@ function SWEP:AttackFront(special_attack, rand)
 			self.DamageMul = special_attack and 1.6 or 3
 		end
 
-		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul
+		local armEffectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, rand and "rarm" or "larm") or 1
+		local DamageAmt = (math.random(3, 5) * (special_attack and 3 or 1)) * (self.DamageMul or 1) * self.SwingDamageMul * Lerp(armEffectiveness, 0.2, 1)
 		local ent = Ent
 		local vec = AimVec
 

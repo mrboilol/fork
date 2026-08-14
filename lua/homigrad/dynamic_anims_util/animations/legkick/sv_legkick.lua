@@ -220,6 +220,9 @@ function PLAYER:LegAttack()
     if self:IsSprinting() and not isMidAir then return end
 
     if isMidAir and self.organism.stamina[1] < 70 then return end
+	local org = self.organism
+	local kickingLegEffectiveness = hg.GetLegEffectiveness and hg.GetLegEffectiveness(self, "rleg") or (org.legstrength or 1)
+	if kickingLegEffectiveness <= 0 then return end
 
     local anim = "kick_pistol_base"
     anim = (self:KeyDown(IN_DUCK) or self:Crouching()) and "kick_pistol_base_crouch" or self:EyeAngles()[1] > 60 and "curbstomp_base" or self:EyeAngles()[1] > 35 and "kick_pistol_25_base" or self:EyeAngles()[1] > 20 and "kick_pistol_45_base" or anim
@@ -231,7 +234,6 @@ function PLAYER:LegAttack()
 
     self:EmitSound("panoptisscon/kickgrunt.wav", 65)
 
-    local org = self.organism
     local isCrouchKick = (self:KeyDown(IN_DUCK) or self:Crouching()) and not isMidAir
     local isCurbstomp = anim == "curbstomp_base"
     local staminaCost = isMidAir and DROP_KICK_STAMINA_COST or (isCurbstomp and CURBSTOMP_STAMINA_COST or (isCrouchKick and CROUCH_KICK_STAMINA_COST or KICK_STAMINA_COST))
@@ -239,13 +241,19 @@ function PLAYER:LegAttack()
     local speedmul = (2 - (org.stamina[1] / org.stamina.max))
     local speed = 1.5 * speedmul
     local animstopAdjust = 0.3 * speedmul
+	local kickSpeedMul = Lerp(kickingLegEffectiveness, 0.45, 1)
+	speed = speed / kickSpeedMul
+	animstopAdjust = animstopAdjust / kickSpeedMul
     local dmg = isCurbstomp and 22 or 10 * (2 - speedmul)
     dmg = dmg * getKickDamageMul(self)
     dmg = dmg * (self.KickDamageMul or 1)
-    dmg = dmg * (org.legstrength or 1)
+	dmg = dmg * Lerp(kickingLegEffectiveness, 0.2, 1)
     dmg = dmg * (isCurbstomp and CURBSTOMP_DAMAGE_MUL or LEG_KICK_DAMAGE_MUL)
     dmg = dmg * (isCrouchKick and CROUCH_KICK_DAMAGE_MUL or 1)
     dmg = dmg * (isMidAir and DROP_KICK_DAMAGE_MUL or 1)
+	if kickingLegEffectiveness < 0.95 then
+		org.painadd = (org.painadd or 0) + (1 - kickingLegEffectiveness) * 8
+	end
     --print(dmg)
     --print(speedmul)
     hook.Run("HomigradLegKick", self)

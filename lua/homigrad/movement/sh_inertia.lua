@@ -657,8 +657,9 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		k = k * math_Clamp((org.blood or 0) / 5000, 0, 1)
 		k = k * math_Clamp(10 / ((org.shock or 0) + 1), 0.25, 1)
 		k = k * (math_min(math_Round((org.adrenaline or 0), 1) / 24, 0.3) + 1)
-		k = k * math_Clamp((org.lleg and org.lleg >= 0.5 and math_max(1 - org.lleg, 0.6) or 1) * (org.lleg and org.rleg >= 0.5 and math_max(1 - org.rleg, 0.6) or 1) * ((org.analgesia * 1 + 1)), 0, 1)
-		k = k * (org.llegdislocation and 0.75 or 1) * (org.rlegdislocation and 0.75 or 1)
+		local leftLeg = hg.GetLegEffectiveness and hg.GetLegEffectiveness(ply, "lleg") or (org.llegdislocation and 0.15 or math_max(1 - (org.lleg or 0) * 0.8, 0.2))
+		local rightLeg = hg.GetLegEffectiveness and hg.GetLegEffectiveness(ply, "rleg") or (org.rlegdislocation and 0.15 or math_max(1 - (org.rleg or 0) * 0.8, 0.2))
+		k = k * math_Clamp((leftLeg + rightLeg) * 0.5, 0.15, 1)
 		if hg.HasTourniquetOnLimb then
 			local weakenedLegs = (hg.HasTourniquetOnLimb(ply, "lleg") and 1 or 0) + (hg.HasTourniquetOnLimb(ply, "rleg") and 1 or 0)
 			k = k * (0.6 ^ weakenedLegs)

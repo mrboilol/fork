@@ -68,16 +68,32 @@ function SWEP:PrimarySpread()
 		if owner:IsNPC() then return end
 		local org = owner.organism
 		if org then
-			org.painadd = org.painadd + (org.larm * 0 + org.rarm * 2) * self.Primary.Force / 20 * (self.NumBullet or 1)
+			local support = self.GetHandSupportState and self:GetHandSupportState(owner) or {}
+			local firingArm = support.firingArm or "rarm"
+			local effectiveness = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, firingArm) or 1
+			local recoilForce = self.Primary.Force
+			if self.GetRecoilImpulseFactors then
+				local _, _, resolvedForce = self:GetRecoilImpulseFactors()
+				recoilForce = resolvedForce
+			end
+			local injuryPain = math.max(0, 1 - effectiveness) * math.Clamp((recoilForce or self.Primary.Force or 30) / 15, 0.5, 6)
+			if support.oneHanded then injuryPain = injuryPain + math.max((recoilForce or 0) - 25, 0) * 0.035 end
+			org.painadd = (org.painadd or 0) + injuryPain
 		end
 	end
 
 	if CLIENT and (owner == LocalPlayer() or (not LocalPlayer():Alive() and owner == LocalPlayer():GetNWEntity("spect"))) and !self.norecoil then
 		local organism = owner.organism or {}
-		
-		local force = self.Primary.Damage / 100 * self.addSprayMul * (self.NumBullet or 1) * math.min(sprayI / 30,0.6)--(self.Primary.Automatic and math.min(sprayI / 30,1) or 1)
-		mul = mul * (((organism.larm or 0) + (organism.rarm or 0) + 2) / 1 + ((organism.larmamputated and 5 or 0) + (organism.rarmamputated and 5 or 0)))
-		mul = mul * ((owner.posture == 7 or owner.posture == 8 or owner.holdingWeapon) and 2 or 1)
+		local caliberMul, weightMul = 1, 1
+		if self.GetRecoilImpulseFactors then
+			caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		end
+		local supportMul = self.GetRecoilSupportMul and self:GetRecoilSupportMul() or 1
+		local handlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
+		local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
+		local cantedHold = owner.posture == 7 or owner.posture == 9
+		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * stanceMul * (0.65 + math.min(sprayI / 12, 0.6)), 0.15, 4)
+		mul = mul * supportMul * handlingMul
 		mul = mul * self.RecoilMul
 		local screenRecoilMul = self.ScreenRecoilMul or 1
 		mul = mul * (owner:Crouching() and 0.75 or 1)
@@ -101,24 +117,33 @@ function SWEP:PrimarySpread()
 		angranda[3] = 0
 		spray = spray + angranda * self.addSprayMul * mul * (self.randmul or 1)
 
-		local angrand2 = AngleRand(-force, force)
+		local angrand2
+		if cantedHold then
+			-- Clockwise-canted Gangsta/Somalian holds rotate muzzle rise into leftward travel.
+			angrand2 = Angle(math.Rand(-force * 0.18, force * 0.08), -math.Rand(force * 0.72, force * 1.15), -math.Rand(force * 0.12, force * 0.35))
+		else
+			angrand2 = Angle(-math.Rand(force * 0.65, force), math.Rand(-force * 0.22, force * 0.22), math.Rand(-force * 0.08, force * 0.08))
+		end
+		self.LastRecoilDirection = Angle(angrand2[1] / math.max(force, 0.001), angrand2[2] / math.max(force, 0.001), angrand2[3] / math.max(force, 0.001))
 		
 		local angrand3 = -(-angrand2)
 		angrand3[3] = 0
 		if not self.SprayRandOnly then
-			angrand2[1] = math.Clamp(-math.abs(angrand2[1]),-10,-force/1.5)
-			angrand2[2] = math.Clamp(angrand2[2],-1,1)
-			angrand2[3] = -angrand2[2] * 1
+			if not cantedHold then
+				angrand2[1] = math.Clamp(-math.abs(angrand2[1]), -10, -force / 1.5)
+				angrand2[2] = math.Clamp(angrand2[2], -1, 1)
+				angrand2[3] = -angrand2[2]
+			end
 			local mulhuy = GetGlobalBool("FullRealismMode",false) and 10 or 1
 			mul = mul * self:GetAttachmentRecoilMul()
 			
 			local huyang = angrand2 * mul / 2 * mulhuy
 			huyang[3] = 0
-			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.25 * screenRecoilMul)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.12 * screenRecoilMul)
 			
 			local angpopa = angrand2 * mul
 			angpopa[3] = 0
-			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 3 or 1) * screenRecoilMul)-- ^ ((not self.Primary.Automatic and 0.5 or 1)))
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.2 or 0.45) * screenRecoilMul)
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 
@@ -126,17 +151,17 @@ function SWEP:PrimarySpread()
 		-- Keep this render-side so authoritative shot spread remains predictable;
 		-- sh_worldmodel applies the offset and eases it back after every shot.
 		-- Recoil owns the dominant rise while addSprayMul widens only side travel.
-		local muzzleKickMul = math.Clamp(mul * (self.WeaponRecoilMul or 1), 0.1, 4.5)
+		local muzzleKickMul = math.Clamp(force * (self.WeaponRecoilMul or 1), 0.1, 5)
 		local muzzleSideMul = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(
-			-math.Rand(0.32, 0.72) * muzzleKickMul,
-			math.Rand(-0.24, 0.24) * muzzleKickMul * muzzleSideMul,
-			math.Rand(-0.14, 0.14) * muzzleKickMul * muzzleSideMul
+			(cantedHold and math.Rand(-0.12, 0.08) or -math.Rand(0.42, 0.82)) * muzzleKickMul,
+			(cantedHold and -math.Rand(0.65, 1.05) or math.Rand(-0.22, 0.22)) * muzzleKickMul * muzzleSideMul,
+			(cantedHold and -math.Rand(0.18, 0.38) or math.Rand(-0.14, 0.14)) * muzzleKickMul * muzzleSideMul
 		)
 		self.ShotMuzzleOffset = (self.ShotMuzzleOffset or Vector(0, 0, 0)) + Vector(
 			-math.Rand(0.18, 0.42) * muzzleKickMul,
-			math.Rand(-0.13, 0.13) * muzzleKickMul * muzzleSideMul,
-			math.Rand(0.2, 0.48) * muzzleKickMul
+			(cantedHold and -math.Rand(0.28, 0.55) or math.Rand(-0.13, 0.13)) * muzzleKickMul * muzzleSideMul,
+			(cantedHold and math.Rand(-0.08, 0.12) or math.Rand(0.2, 0.48)) * muzzleKickMul
 		)
 
 		local prank3 = math.Rand(-self.Primary.Force2,self.Primary.Force2) / (self.Primary.Force2 != 0 and self.Primary.Force2 or 1) * 2
@@ -144,11 +169,9 @@ function SWEP:PrimarySpread()
 
 		//ViewPunch2(angleprikol)
 
-		local mul = mul * self.Primary.Force2 / 100 * (self:IsPistolHoldType() and 2 or 1) * (self.NumBullet and self.NumBullet * 3 or 1)
-		ViewPunch2(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul * screenRecoilMul)
-		ViewPunch(Angle(-1 * math.Rand(1,2),-1 * math.Rand(-1,1),0) * mul / -2 * screenRecoilMul)
-		timer.Simple(0.01, function() ViewPunch2(Angle(-1 * math.Rand(1,2),1 * math.Rand(-1,1),0) * mul * screenRecoilMul) end)
-		timer.Simple(0.02, function() ViewPunch2(Angle(1 * math.Rand(1,2.4),0,0) * mul * screenRecoilMul) end)
+		local cameraKick = math.Clamp(force * self.Primary.Force2 / 100, 0.05, 1.2) * screenRecoilMul
+		ViewPunch2(angrand2 * cameraKick * 0.2)
+		ViewPunch(angrand2 * cameraKick * 0.08)
 
 		local eyeang = owner:EyeAngles()
 		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 8 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
@@ -157,12 +180,8 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		owner:SetEyeAngles(eyeang + sprayAng * 2 * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.25 * screenRecoilMul)
+		owner:SetEyeAngles(eyeang + sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.12 * screenRecoilMul)
 		
-		local rnd1, rnd2 = math.Rand(1,2), math.Rand(-1,1)
-		ViewPunch2(Angle(2 * rnd1,2 * rnd2,0) * mul * 0.5 * screenRecoilMul)
-		ViewPunch(Angle(-2 * rnd1,-2 *rnd2,0) * mul * screenRecoilMul)
-
 		local max_clip1 = self:GetMaxClip1()
 		
 		if(max_clip1 == 0)then
