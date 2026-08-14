@@ -95,7 +95,88 @@ end
 	local DETAIL_RENDER_DIST_SQR = 2000 * 2000
 	local angfuck = Angle()
 
-	function DrawPlayerRagdoll(ent, ply, fromRender) --// actually not only ragdoll render but player too
+	local bandageBGNames = {
+		[0] = "belly",
+		[1] = "groin",
+		[2] = "belly",
+		[3] = "Chest",
+		[4] = "HandUpLeft",
+		[5] = "HandDownLeft",
+		[6] = "HandLeft",
+		[7] = "HandUpRight",
+		[8] = "HandDownRight",
+		[9] = "HandRight",
+		[10] = "LegUpLeft",
+		[11] = "LegDownLeft",
+		[12] = "LegUpRught",
+		[13] = "LegDownRught",
+	}
+
+	local bandageHandsOnly = "00000010010000"
+
+	function hg.RenderBandageGloves(ent, ply)
+		local mdl = ply.PlayerClassName ~= "swat" and ply.PlayerClassName ~= "police" and ply:GetNWString("BandageGlovesMdl", "") or ""
+		if mdl == "" then
+			if IsValid(ent.bandageGlovesModel) then
+				ent.bandageGlovesModel:Remove()
+				ent.bandageGlovesModel = nil
+			end
+			return
+		end
+
+		if not IsValid(ent.bandageGlovesModel) or ent.bandageGlovesModel:GetModel() ~= mdl then
+			if IsValid(ent.bandageGlovesModel) then ent.bandageGlovesModel:Remove() end
+			ent.bandageGlovesModel = ClientsideModel(mdl, RENDERGROUP_BOTH)
+			local model = ent.bandageGlovesModel
+			ent:CallOnRemove("removebandagegloves", function()
+				if IsValid(model) then
+					model:Remove()
+				end
+			end)
+		end
+
+		local model = ent.bandageGlovesModel
+		model:SetNoDraw(true)
+		model:SetPos(ent:GetPos() + vector_up * 1)
+		model:SetParent(ent)
+		model:AddEffects(EF_BONEMERGE)
+
+		local org = ply.organism or {}
+		local amputatedHands = tostring(org.larmupamputated or org.larmamputated or org.lhandamputated) .. tostring(org.rarmupamputated or org.rarmamputated or org.rhandamputated)
+		if model.BandageAmputatedHands ~= amputatedHands then
+			for i = 0, 13 do
+				local charVal = string.byte(bandageHandsOnly, i + 1) - 48
+				if i == 6 and (org.larmupamputated or org.larmamputated or org.lhandamputated) then charVal = 0 end
+				if i == 9 and (org.rarmupamputated or org.rarmamputated or org.rhandamputated) then charVal = 0 end
+				local bgName = bandageBGNames[i]
+				if not bgName then continue end
+				local bgIdx = model:FindBodygroupByName(bgName)
+				if not bgIdx or bgIdx < 0 then bgIdx = model:FindBodygroupByName(bgName .. "-f") end
+				if bgIdx and bgIdx >= 0 then model:SetBodygroup(bgIdx, charVal) end
+			end
+			model.BandageAmputatedHands = amputatedHands
+		end
+
+		local clr = ply.CurAppearance and ply.CurAppearance.AColor
+			or (ply.GetNWVector and ply:GetNWVector("PlayerColor", nil))
+			or (ply.GetPlayerColor and ply:GetPlayerColor())
+		if clr then
+			if IsColor(clr) then
+				render.SetColorModulation(clr.r / 255, clr.g / 255, clr.b / 255)
+			elseif isvector(clr) then
+				render.SetColorModulation(clr.x, clr.y, clr.z)
+			end
+		end
+
+		model:DrawModel()
+
+		if clr then
+			render.SetColorModulation(1, 1, 1)
+		end
+	end
+
+	function DrawPlayerRagdoll(ent, ply) --// actually not only ragdoll render but player too
+		if CLIENT and hg.TPIKDebug then hg.TPIKDebug(ply, "DrawPlayerRagdoll entry, ent=", tostring(ent), "ent==ply=", tostring(ent == ply), "FakeRagdoll=", tostring(IsValid(ply.FakeRagdoll) and ply.FakeRagdoll)) end
 		if ply.prevragdoll_index != nil and ply.prevragdoll_index != ply.ragdoll_index and ply.ragdoll_index == 0 then
 			//print(ply.ragdoll_index, ply.prevragdoll_index, Entity(ply.ragdoll_index))
 

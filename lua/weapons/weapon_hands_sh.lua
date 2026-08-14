@@ -684,28 +684,16 @@ local idleAng = Angle(60,0,50)
 local ang180, ang1, ang2 = Angle(0,180,0), Angle(-110,-90,0), Angle(-70,-90,0)
 function SWEP:SetHandPos(noset)
 	local ply = self:GetOwner()
-	if CLIENT and self.IsLocal and not self:IsLocal() and IsValid(ply) and ply.PlayerClassName == "headcrabzombie" and not IsValid(ply:GetNetVar("carryent")) then return end
-
-	if not IsValid(ply) then return end
-
-	local wm = self:GetWM()
-	if not IsValid(wm) then return end
+	if CLIENT and hg.TPIKDebug then hg.TPIKDebug(ply, "HANDS SetHandPos entry, fists=", tostring(self:GetFists()), "shouldTransmit=", tostring(ply and ply.shouldTransmit), "NotSeen=", tostring(ply and ply.NotSeen), "IsLocal=", tostring(self.IsLocal and self:IsLocal())) end
+	if CLIENT and self.IsLocal and not self:IsLocal() and IsValid(ply) and IsZombieHandsClass(ply.PlayerClassName) and not IsValid(ply:GetNetVar("carryent")) then return end
 
 	if IsValid(ply) and (not ply.shouldTransmit or ply.NotSeen) then return end
 	-- ply:SetupBones()
 
-	local ent = self.CarryEnt
-	
-	-- Use the actual hand usage state from pickup logic
-	if IsValid(ent) then
-		-- When carrying, use the stored hand usage state
-		self.rhandik = self.UsingRightHand or false
-		self.lhandik = self.UsingLeftHand or false
-	else
-		-- When not carrying, use fists state
-		self.rhandik = self:GetFists()
-		self.lhandik = self:GetFists() and hg.CanUseLeftHand(ply)
-	end
+	local ent = self:GetNWEntity("carryent")
+	self.rhandik = (self:GetFists()) or (IsValid(ent) and twohands)
+	self.lhandik = (self:GetFists() and hg.CanUseLeftHand(ply)) or IsValid(ent)
+	if CLIENT and hg.TPIKDebug then hg.TPIKDebug(ply, "HANDS SetHandPos -> rhandik=", tostring(self.rhandik), "lhandik=", tostring(self.lhandik)) end
 
 	local bones2 = hg.TPIKBonesOther
 
