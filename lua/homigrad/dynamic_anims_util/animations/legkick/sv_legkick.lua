@@ -342,7 +342,12 @@ function PLAYER:LegAttack()
             for k,ent in ipairs(entss) do
                 if IsValid(ent) and not blacklist[ent] then
                     local phys = ent:GetPhysicsObjectNum(tr.PhysicsBone or 0)
-                    if !ent:IsPlayer() and not IsValid(phys) and not hgIsDoor(ent) then continue end
+                    if !ent:IsPlayer() and not IsValid(phys) then continue end
+
+					local shieldTarget = hg.RagdollOwner(ent) or ent
+					local inflictor = self:GetWeapon(handClass)
+					if IsValid(shieldTarget) and shieldTarget:IsPlayer() and hook.Run("hg_ShieldKickBlock", shieldTarget, self, inflictor, self:EyePos(), tr.HitPos) then continue end
+
                     if not soundplayed then
                         soundplayed = true
 
@@ -362,8 +367,8 @@ function PLAYER:LegAttack()
                     local dmginfo = DamageInfo()
 
                     dmginfo:SetAttacker(self)
-                    dmginfo:SetInflictor(self)
-                    dmginfo:SetDamage(hitDmg)
+                    dmginfo:SetInflictor(inflictor)
+                    dmginfo:SetDamage(dmg)
                     local ragForceMul = isCurbstomp and CURBSTOMP_RAG_FORCE_MUL or LEG_KICK_RAG_FORCE_MUL
                     local propForceMul = isCurbstomp and CURBSTOMP_PROP_FORCE_MUL or LEG_KICK_PROP_FORCE_MUL
                     local playerPush = isCurbstomp and CURBSTOMP_PLAYER_PUSH or LEG_KICK_PLAYER_PUSH

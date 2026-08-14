@@ -1961,6 +1961,9 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
 	local ent = hg.RagdollOwner(ent) or ent
     local owner = self:GetOwner()
 
+	local shieldBlock = hook.Run("hg_MeleeShieldBlock", self, ent, attacktype, trace)
+	if shieldBlock then return 0 end
+
 	if ent:IsPlayer() then
         local wep = ent:GetActiveWeapon()
 
@@ -2170,6 +2173,111 @@ function SWEP:Think()
 		HoldType = "normal"
 	end
 	if SERVER then self:SetHoldType(HoldType) end
+end
+
+local function ApexSoundPath(prefix, maxCount, suffix)
+	suffix = suffix or ".wav"
+	return prefix .. math.random(1, maxCount) .. suffix
+end
+
+local function GetApexMeleeSwingSound(special_attack, rand)
+	if special_attack then
+		return ApexSoundPath("weapons/pilot_mvmt_melee_uppercut_1p_2ch_v1_", 3)
+	end
+
+	return ApexSoundPath(rand and "weapons/pilot_mvmt_melee_righthook_1p_2ch_v1_" or "weapons/pilot_mvmt_melee_lefthook_1p_2ch_v1_", 3)
+end
+
+local function GetApexImpactSound(trace, hitSoft)
+	if hitSoft then
+		return ApexSoundPath("weapons/pilot_mvmt_melee_hit_flesh_1p_2ch_v1_", 6)
+	end
+
+	local matType = trace and trace.MatType
+	if matType == MAT_METAL then
+		return ApexSoundPath("weapons/imp_player_meleepunch_metal_1ch_v1_", 4)
+	elseif matType == MAT_CONCRETE then
+		return ApexSoundPath("weapons/imp_player_meleepunch_concrete_1ch_v1_", 4)
+	elseif matType == MAT_SLOSH or matType == MAT_WADE then
+		return ApexSoundPath("weapons/imp_player_meleepunch_water_1ch_v1_", 4)
+	end
+
+	return ApexSoundPath("weapons/imp_player_meleepunch_default_1ch_v1_", 4)
+end
+
+function SWEP:ShoveFront()
+	if CLIENT then return end
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+
+	owner:LagCompensation(true)
+
+	local AimVec = owner:GetAimVector()
+	local Ent, HitPos, _, physbone, trace = WhomILookinAt(owner, .35, SHOVE_RANGE)
+	if IsValid(Ent) then
+		if Ent:IsPlayer() and hook.Run("hg_ShieldKickBlock", Ent, owner, self, owner:EyePos(), HitPos or Ent:WorldSpaceCenter()) then
+			owner:LagCompensation(false)
+			return
+		end
+
+		local Phys = Ent:IsPlayer() and Ent:GetPhysicsObject() or Ent:GetPhysicsObjectNum(physbone or 0)
+		local forceMul = 1
+		local backHit = false
+		local isAirborne = Ent:IsPlayer() and not Ent:OnGround()
+
+		if Ent:IsPlayer() then
+			local fromTargetToOwner = owner:WorldSpaceCenter() - Ent:WorldSpaceCenter()
+			fromTargetToOwner.z = 0
+			if fromTargetToOwner:LengthSqr() > 0.0001 then
+				fromTargetToOwner:Normalize()
+				backHit = Ent:GetForward():Dot(fromTargetToOwner) < -0.2
+			end
+		end
+
+		if backHit then
+			forceMul = forceMul * SHOVE_BACK_FORCE_MULT
+		end
+		if isAirborne then
+			forceMul = forceMul * SHOVE_AIR_FORCE_MULT
+		end
+
+		if Ent:IsPlayer() then
+			Ent:SetVelocity(AimVec * SHOVE_PLAYER_FORCE * forceMul)
+			Ent:ViewPunch(Angle(-14 * forceMul, 0, 0))
+
+			if not IsValid(Ent.FakeRagdoll) then
+				local ragdollChance = SHOVE_RAGDOLL_CHANCE
+				if backHit then
+					ragdollChance = ragdollChance + SHOVE_RAGDOLL_BACK_BONUS
+				end
+				if isAirborne then
+					ragdollChance = ragdollChance + SHOVE_RAGDOLL_AIR_BONUS
+				end
+				ragdollChance = math.Clamp(ragdollChance, 0, SHOVE_RAGDOLL_CHANCE_MAX)
+
+				if math.Rand(0, 1) <= ragdollChance then
+					timer.Simple(0, function()
+						if IsValid(Ent) and Ent:IsPlayer() and Ent:Alive() and not IsValid(Ent.FakeRagdoll) then
+							hg.Fake(Ent)
+						end
+					end)
+				end
+			end
+		end
+
+		if IsValid(Phys) then
+			Phys:ApplyForceOffset(AimVec * SHOVE_PHYS_FORCE * forceMul, HitPos or Ent:WorldSpaceCenter())
+		end
+
+		local impactSnd = GetApexImpactSound(trace, self:IsEntSoft(Ent))
+		sound.Play(impactSnd, HitPos or Ent:WorldSpaceCenter(), 65, math.random(92, 108))
+	end
+
+	if owner.organism and owner.organism.stamina then
+		owner.organism.stamina.subadd = owner.organism.stamina.subadd + SHOVE_STAMINA_COST
+	end
+
+	owner:LagCompensation(false)
 end
 
 function SWEP:PrimaryAttack(forcespecial)

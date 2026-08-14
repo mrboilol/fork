@@ -62,85 +62,119 @@ function SWEP:SetupDataTables()
 	end
 end
 
-SWEP.ViewModel = ""
+SWEP.AnimList = {
+	["idle"] = {"idle", 1, true},
+	["plant"] = {"plant", 1.2, false, false, function(self)
+		if SERVER then self:FinishIEDPlant() end
+		self:PlayAnim("det_draw")
+	end},
+	["det_draw"] = {"det_draw", 1, false, false, function(self)
+		self:PlayAnim("det_idle")
+	end},
+	["det_idle"] = {"det_idle", 1, true},
+	["det_detonate"] = {"det_detonate", 1, false}
+}
 
-function SWEP:DrawWorldModel()
-	if not IsValid(self:GetOwner()) then
-		self:DrawWorldModel2()
-	end
-end
+SWEP.AnimsEvents = {
+	["plant"] = {
+		[0.04] = function(self)
+			self:EmitSound("weapons/c4/handling/c4_plant_armmovement.wav", 65)
+		end,
+		[0.68] = function(self)
+			self:EmitSound("weapons/c4/handling/c4_plant_place.wav", 65)
+		end
+	},
+	["det_detonate"] = {
+		[0.05] = function(self)
+			self:EmitSound("weapons/ied/handling/ied_trigger_ins.wav", 65)
+		end
+	}
+}
 
-function SWEP:DrawWorldModel2()
-	local desiredModel = self:GetPhoneMode()
-		and "models/saraphines/insurgency explosives/ied/insurgency_ied_phone.mdl"
-		or "models/props_junk/cardboard_jox004a.mdl"
-	if not IsValid(self.model) or self.model:GetModel() ~= desiredModel then
-		if IsValid(self.model) then self.model:Remove() end
-		self.model = ClientsideModel(desiredModel)
-	end
-	local WorldModel = self.model
-	local owner = self:GetOwner()
-	WorldModel:SetNoDraw(true)
-	WorldModel:SetModelScale(self:GetPhoneMode() and 1 or (self.ModelScale or 1))
-	WorldModel:SetSkin(self:GetPhoneMode() and 1 or 0)
-	local renderGuy = hg.GetCurrentCharacter(owner)
-	if IsValid(owner) then
-		local offsetVec = self:GetPhoneMode() and Vector(5, 0.5, -15) or self.offsetVec
-		local offsetAng = self:GetPhoneMode() and Angle(0, 70, 180) or self.offsetAng
+if CLIENT then
+	local hiddenBoneScale = Vector(0.0001, 0.0001, 0.0001)
+	local visibleBoneScale = Vector(1, 1, 1)
+	local bombBones = {
+		"INSEXP",
+		"INS_EXP_Wire_A_0",
+		"INS_EXP_Wire_A_01",
+		"INS_EXP_Wire_A_02",
+		"INS_EXP_Wire_A_03",
+		"INS_EXP_Wire_A_04",
+		"INS_EXP_Wire_A_05",
+		"INS_EXP_Wire_B_02",
+		"INS_EXP_Wire_B_03",
+		"INS_EXP_Wire_B_04"
+	}
+	local phoneAnimations = {
+		det_draw = true,
+		det_idle = true,
+		det_detonate = true
+	}
 
-		local boneid = renderGuy:LookupBone("ValveBiped.Bip01_R_Hand")
-		if not boneid then return end
-		local matrix = renderGuy:GetBoneMatrix(boneid)
-		if not matrix then return end
-		local newPos, newAng = LocalToWorld(offsetVec, offsetAng, matrix:GetTranslation(), matrix:GetAngles())
+	function SWEP:SetHandPos()
+		local ply = self:GetOwner()
+		local model = self:GetWM()
+		if not IsValid(ply) or not IsValid(model) then return end
+		if not ply.shouldTransmit or ply.NotSeen then return end
 
-		WorldModel:SetPos(newPos)
-		WorldModel:SetAngles(newAng)
-		WorldModel:SetupBones()
-	else
-		WorldModel:SetPos(self:GetPos())
-		WorldModel:SetAngles(self:GetAngles())
-	end
+		local ent = hg.GetCurrentCharacter(ply)
+		if not IsValid(ent) then return end
 
-	WorldModel:DrawModel()
-end
+		self.rhandik = self.setrh
+		self.lhandik = self.setlh and not phoneAnimations[self.anim] and (ply:GetTable().ChatGestureWeight < 0.1)
 
-function SWEP:SetHold(value)
-	self:SetWeaponHoldType(value)
-	self:SetHoldType(value)
-	self.holdtype = value
-end
+		local canUseRight = self.rhandik and hg.CanUseRightHand(ply)
+		local canUseLeft = self.lhandik and hg.CanUseLeftHand(ply)
+		local rightBones = hg.TPIKBonesRHDict
+		local leftBones = hg.TPIKBonesLHDict
+		local bombScale = self:GetPlanted() and hiddenBoneScale or visibleBoneScale
 
-function SWEP:Think()
-	self:SetHold(self.HoldType)
-	if SERVER and not self:GetPlanted() then
-		local owner = self:GetOwner()
-		local left, right = IsValid(owner) and owner:KeyDown(IN_ATTACK), IsValid(owner) and owner:KeyDown(IN_ATTACK2)
-		if not IsValid(owner) or not owner:Alive() or (not left and not right) then
-			if self:GetPlanting() then self:CancelPlant() end
-		else
-			local mode = left and right and "combined" or right and "inside" or "silent"
-			local duration = mode == "combined" and self.CombinedPlantTime or mode == "inside" and self.InsidePlantTime or self.SilentPlantTime
-			if not self.PlantMode then self.PlantMode, self.PlantStartedAt = mode, CurTime() elseif mode == "combined" then self.PlantMode = mode end
-			self:SetPlanting(true)
-			self:SetPlantAt(self.PlantStartedAt + duration)
-			self:SetHold("slam")
-			if CurTime() >= self.PlantStartedAt + duration then self:FinishPlant() end
+		for _, boneName in ipairs(bombBones) do
+			local bone = model:LookupBone(boneName)
+			if bone then model:ManipulateBoneScale(bone, bombScale) end
+		end
+
+		local detonatorBone = model:LookupBone("INS_DET")
+		if detonatorBone then
+			model:ManipulateBoneScale(detonatorBone, self.anim == "idle" and hiddenBoneScale or visibleBoneScale)
+		end
+
+		for modelBone = 0, model:GetBoneCount() - 1 do
+			local modelBoneName = model:GetBoneName(modelBone)
+			local playerBoneName = rightBones[modelBoneName] or leftBones[modelBoneName]
+			if not playerBoneName then continue end
+			if rightBones[modelBoneName] and not canUseRight then continue end
+			if leftBones[modelBoneName] and not canUseLeft then continue end
+
+			local modelMatrix = model:GetBoneMatrix(modelBone)
+			local playerBone = ent:LookupBone(playerBoneName)
+			if not modelMatrix or not playerBone then continue end
+
+			ent:SetBoneMatrix(playerBone, modelMatrix)
 		end
 	end
-	if SERVER and self:GetPlanted() and HG_PHONE_SERVER and HG_PHONE.GetNumber(self) == "" then
-		HG_PHONE_SERVER:RegisterPhone(self)
-	end
+end
+
+local ExplodeTheItem
+local RemoveAttachedBombVisual
+local MarkIEDDestroyed
+
+function SWEP:ThinkAdd()
 	if SERVER and IsValid(self.HaveTheBomb) then
-		self.LastBombPos = self.IEDPlacementLocalPos and self.HaveTheBomb:LocalToWorld(self.IEDPlacementLocalPos) or (self.HaveTheBomb:GetPos() + self.HaveTheBomb:OBBCenter())
+		self.LastBombPos = self.HaveTheBomb:LocalToWorld(self.HaveTheBomb:OBBCenter())
 		self.LastBombModel = self.HaveTheBomb:GetModel()
 	end
 
 	if SERVER and self:GetPlanted() and not self:GetDialing() and not self:GetDetonating() and not self.KABOOM and not self.PlantedOnSelf then
 		if not IsValid(self.HaveTheBomb) then
 			MarkIEDDestroyed(self)
-		elseif not self.HaveTheBomb:IsWorld() and not (hgIsDoor and hgIsDoor(self.HaveTheBomb)) and not IsValid(self.HaveTheBomb:GetPhysicsObject()) then
-			ExplodeTheItem(self, self.HaveTheBomb)
+		elseif not self.HaveTheBomb:IsPlayer()
+			and not self.HaveTheBomb:IsNPC()
+			and not self.HaveTheBomb:IsRagdoll()
+			and not IsValid(self.HaveTheBomb:GetPhysicsObject())
+		then
+			MarkIEDDestroyed(self)
 		end
 	end
 end
@@ -149,9 +183,9 @@ function SWEP:GetEyeTrace()
 	return hg.eyeTrace(self:GetOwner())
 end
 
-SWEP.BlastDis = 35
-SWEP.BlastDamage = 1000
-SWEP.CallStartDelay = 1
+SWEP.BlastDis = 12
+SWEP.BlastDamage = 600
+SWEP.CallStartDelay = 0.4
 SWEP.MaxDialTime = 10
 SWEP.MaxDialDistance = 3000
 SWEP.CallSound = "rem_iedcall.mp3"
@@ -293,6 +327,8 @@ MarkIEDDestroyed = function(self)
 	self:SetDestroyed(true)
 	self:SetDetonating(false)
 	self:SetPlanted(false)
+	self.Planted = false
+	self.PlantedOnSelf = false
 	self.HaveTheBomb = nil
 	self.IEDPlacementLocalPos = nil
 	self.IEDPlacementLocalNormal = nil
@@ -435,8 +471,8 @@ local function SpawnIEDBomb(pos)
 end
 
 local function GetIEDDialDelay(self, ent)
-	local owner = IsValid(self.IEDPlanter) and self.IEDPlanter or self:GetOwner()
-	local entPos = IsValid(ent) and (self.IEDPlacementLocalPos and ent:LocalToWorld(self.IEDPlacementLocalPos) or (ent:GetPos() + ent:OBBCenter())) or vector_origin
+	local owner = self:GetOwner()
+	local entPos = IsValid(ent) and ent:LocalToWorld(ent:OBBCenter()) or vector_origin
 	local ownerPos = IsValid(owner) and owner:GetPos() or entPos
 	local distance = ownerPos:Distance(entPos)
 	return Lerp(math.Clamp(distance / self.MaxDialDistance, 0, 1), self.CallStartDelay, self.MaxDialTime)
@@ -513,7 +549,7 @@ end
 ExplodeTheItem = function(self,ent)
 	local ent = ent
 	local entValid = IsValid(ent)
-	local EntPos = entValid and (ent:GetPos() + ent:OBBCenter()) or self.LastBombPos
+	local EntPos = entValid and ent:LocalToWorld(ent:OBBCenter()) or self.LastBombPos
 	if not EntPos then self:Remove() return end
 
 	local entModel = entValid and ent:GetModel() or self.LastBombModel
@@ -591,18 +627,10 @@ ExplodeTheItem = function(self,ent)
 				net.WriteVector(EntPos)
 				net.WriteEntity(entValid and ent or Entity(0))
 				net.WriteBool(entWaterLevel > 0)
-				net.WriteString(self.SoundWater)
-			net.Broadcast()
-			if hg and hg.PlayExtraExplosionSound then
-				hg.PlayExtraExplosionSound(EntPos, entValid and ent:EntIndex() or self:EntIndex(), 1)
-			else
-				local soundIndex = entValid and ent:EntIndex() or self:EntIndex()
-				EmitSound("explosionextra/explode_" .. math.random(1, 9) .. ".wav", EntPos, soundIndex + 800, CHAN_ITEM, 1, 145, 0, math.random(95, 105))
-			end
+				net.WriteString(soundWater)
+			hg.SendNetToPlayersWithin(EntPos, 25000)
 
-			if entWaterLevel == 0 then
-				ParticleEffect("pcf_jack_groundsplode_medium",EntPos,-vector_up:Angle())
-			else
+			if entWaterLevel > 0 then
 				local effectdata = EffectData()
 				effectdata:SetOrigin(EntPos)
 				effectdata:SetScale(3)
@@ -620,7 +648,16 @@ ExplodeTheItem = function(self,ent)
 		end)
 
 		timer.Simple(0.2,function()
-			util.BlastDamage(self, IsValid(self:GetOwner()) and self:GetOwner() or self, EntPos, BlastDis / 0.01905, BlastDamage * 0.1) -- эта функция полное говно кстати. бьет сковзь любые пропы...
+			local inflictor = IsValid(ent) and ent or attacker
+			if hg and hg.BlastDamageWithShockwave then
+				hg.BlastDamageWithShockwave(inflictor, attacker, EntPos, BlastDis / 0.01905, BlastDamage * 0.3, {
+					Force = 50000,
+					ExplosionType = "IED",
+					Filter = IsValid(ent) and {ent} or {}
+				})
+			else
+				util.BlastDamage(inflictor, attacker, EntPos, BlastDis / 0.01905, BlastDamage * 0.3)
+			end
 			
 			local dis = BlastDis / 0.01905
 			local disorientation_dis = self.DisorientationRange / 0.01905
@@ -628,13 +665,8 @@ ExplodeTheItem = function(self,ent)
 				local tracePos = enta:IsPlayer() and (enta:GetPos() + enta:OBBCenter()) or enta:GetPos()
 				local tr = hg.ExplosionTrace(EntPos, tracePos, {ent})
 
-				local phys = enta:GetPhysicsObject()
-				local force = (enta:GetPos() - EntPos)
-				local len = force:Length()
-				force:Div(len)
+				local len = enta:GetPos():Distance(EntPos)
 				local frac = math.Clamp((disorientation_dis - len) / disorientation_dis, 0.1, 1)  
-				local physics_frac = math.Clamp((dis - len) / dis, 0.5, 1)  
-				local forceadd = force * physics_frac * BlastForce
 
 				if enta.organism then
 					local behindwall = tr.Entity != enta and tr.MatType != MAT_GLASS
@@ -644,41 +676,11 @@ ExplodeTheItem = function(self,ent)
 					end
 				end
 
-				if len > dis then continue end
-				if tr.Entity != enta then 					
-					if IsValid(phys) then
-						phys:ApplyForceCenter((forceadd/20) + vector_up * math.random(500,550))
-					end
-
-					continue
-				end
-
-				if enta:IsPlayer() then
-					hg.AddForceRag(enta, 0, forceadd * 0.5, 0.5)
-					hg.AddForceRag(enta, 1, forceadd * 0.5, 0.5)
-
-					hg.LightStunPlayer(enta)
-				end
-
-				if not IsValid(phys) then continue end
-				phys:ApplyForceCenter(forceadd)
 			end
 
-			-- A charge planted on a door breaches it away from the face it was placed
-			-- on, instead of using the weak radial fallback for nearby doors.
-			if plantedDoor and plantedNormal then
-				hgBlastThatDoor(ent, -plantedNormal * self.PlantedDoorVelocity)
-			else
-				hgBlastDoors(entValid and ent or self, EntPos, BlastDamage / 400, BlastDis/8, false)
-			end
-
-			if planted and entValid and not plantedWorld and not plantedDoor and plantedNormal then
-				local plantedPhys = ent:GetPhysicsObject()
-				if IsValid(plantedPhys) then
-					plantedPhys:ApplyForceOffset(-plantedNormal * self.PlantedObjectForce, EntPos)
-				end
-			end
-			util.ScreenShake( EntPos, 45, 225, 2.5, 3000 )
+			--hgWreckBuildings(ent, EntPos, BlastDamage / 400, BlastDis/8, false)
+			hgBlastDoors(IsValid(ent) and ent or attacker, EntPos, BlastDamage / 400, BlastDis/8, false)
+			util.ScreenShake( EntPos, 50, 300, 3.5, 4000 )
 
 			if FireEnts[entModel] then
 				local Tr = util.QuickTrace(EntPos, -vector_up*500, {EntPos})
@@ -688,34 +690,40 @@ ExplodeTheItem = function(self,ent)
 				end
 			end
 
-			if hasShrapnel and entValid then
-				local shrapnelPhys = ent:GetPhysicsObject()
-				local shrapnelMass = IsValid(shrapnelPhys) and shrapnelPhys:GetMass() or 20
-				local shrapnelDone = false
+			local shrapnelActive = false
+
+			if IsValid(ent) and IsValid(ent:GetPhysicsObject()) then
+				shrapnelActive = true
+				local fragmentCount = math.Clamp(1200 + math.Round(ent:GetPhysicsObject():GetMass() * 20), 1200, 3000)
+				if ent.iedFreePlant then
+					fragmentCount = math.max(math.Round(fragmentCount * 0.75), 900)
+				end
 				local co = coroutine.create(function()
 					local LastShrapnel = SysTime()
 
-					for i = 1, math.Clamp(math.Round(shrapnelMass * 300), 800, 6000) do
+					for i = 1, fragmentCount do
+							if not IsValid(ent) then return end
 							LastShrapnel = SysTime()
 
 							local dir = VectorRand(-1,1):GetNormalized()--vector_up
 							dir[3] = dir[3] > 0 and math.abs(dir[3] - 0.5) or -math.abs(dir[3] + 0.5)
 							dir:Normalize()
 
-							local Tr = util.QuickTrace(EntPos, dir * 900, ent)
+							local Tr = util.QuickTrace(EntPos, dir * 400, ent)
 
-							if Tr.Hit and !Tr.HitSky and !Tr.HitWorld then
+							if Tr.Hit and !Tr.HitSky and (!Tr.HitWorld or Tr.Fraction >= 0.2) then
+								if not IsValid(ent) then return end
 								local bullet = {}
 								bullet.Dir = dir
 								bullet.Src = EntPos
 								bullet.Force = 0.01
 								bullet.Damage = BlastDamage
 								bullet.AmmoType = "Metal Debris"
-								bullet.Attacker = IsValid(owner) and owner or game.GetWorld()
-								bullet.Distance = 900
+								bullet.Attacker = attacker
+								bullet.Distance = 400
 								bullet.DisableLagComp = true
 								bullet.Filter = {ent}
-								bullet.Penetration = 8
+								bullet.Penetration = 6
 								--bullet.Spread = vecCone * i / self.Fragmentation
 								ent:FireLuaBullets(bullet, true)
 							end
@@ -730,7 +738,10 @@ ExplodeTheItem = function(self,ent)
 					shrapnelDone = true
 				end)
 
-				coroutine.resume(co)
+				local ok = coroutine.resume(co)
+				if not ok then
+					ent.ShrapnelDone = true
+				end
 
 				local index = self:EntIndex()
 
@@ -744,13 +755,16 @@ ExplodeTheItem = function(self,ent)
 						return
 					end
 
-					if coroutine.status(co) != "dead" then
-						coroutine.resume(co)
-					end
-					if shrapnelDone then
-						if not plantedWorld and not plantedDoor then
-							ent:Remove()
+					if coroutine.status(co) ~= "dead" then
+						local ok = coroutine.resume(co)
+						if not ok then
+							timer.Remove("IEDCheck_" .. index)
+							return
 						end
+					end
+
+					if ent.ShrapnelDone then
+						ent:Remove()
 						timer.Remove("IEDCheck_" .. index)
 					end
 				end)
@@ -760,7 +774,7 @@ ExplodeTheItem = function(self,ent)
 				self:Remove()
 			end
 
-			if not hasShrapnel and not plantedWorld and not plantedDoor and IsValid(ent) then
+			if not shrapnelActive and IsValid(ent) then
 				ent:Remove()
 			end
 		end)
@@ -768,17 +782,23 @@ ExplodeTheItem = function(self,ent)
 end
 
 function SWEP:CanSecondaryAttack()
-	return not self.IEDPlantPending and IsValid(self:GetOwner()) and not hg.GetCurrentCharacter(self:GetOwner()):IsRagdoll()
+	local owner = self:GetOwner()
+	local character = IsValid(owner) and hg.GetCurrentCharacter(owner)
+	return not self.IEDPlantPending and IsValid(character) and not character:IsRagdoll()
 end
 
 function SWEP:BeginIEDPlant(mode, tr)
-	if self.IEDPlantPending or self:GetPlanted() then return end
+	if self.IEDPlantPending or self:GetPlanted() or not tr then return end
 
 	self.IEDPlantPending = true
 	self.IEDPlantMode = mode
 	self.IEDPlantEntity = tr.Entity
 	self.IEDPlantPos = tr.HitPos
 	self.IEDPlantNormal = tr.HitNormal
+	if mode == "embedded" and IsValid(tr.Entity) then
+		self.IEDPlantLocalPos = tr.Entity:WorldToLocal(tr.HitPos)
+		self.IEDPlantLocalAng = tr.Entity:WorldToLocalAngles(tr.HitNormal:Angle())
+	end
 	self:PlayAnim("plant")
 end
 
@@ -788,13 +808,27 @@ function SWEP:FinishIEDPlant()
 	local owner = self:GetOwner()
 	local mode = self.IEDPlantMode
 	local bomb
+	if not IsValid(owner) then
+		self.IEDPlantPending = false
+		self.IEDPlantMode = nil
+		self.IEDPlantEntity = nil
+		self.IEDPlantLocalPos = nil
+		self.IEDPlantLocalAng = nil
+		return
+	end
 
-	if mode == "attached" then
+	if mode == "embedded" then
 		bomb = self.IEDPlantEntity
-		if not IsValid(bomb) or not IsValid(bomb:GetPhysicsObject()) then
+		local isCharacter = IsValid(bomb) and (bomb:IsPlayer() or bomb:IsNPC() or bomb:IsRagdoll())
+		if not IsValid(bomb) or not isCharacter and not IsValid(bomb:GetPhysicsObject()) then
 			self.IEDPlantPending = false
 			self:PlayAnim("idle")
 			return
+		end
+
+		if self.IEDPlantLocalPos and self.IEDPlantLocalAng then
+			self.IEDPlantPos = bomb:LocalToWorld(self.IEDPlantLocalPos)
+			self.IEDPlantNormal = bomb:LocalToWorldAngles(self.IEDPlantLocalAng):Forward()
 		end
 	else
 		bomb = ents.Create("prop_physics")
@@ -806,42 +840,58 @@ function SWEP:FinishIEDPlant()
 
 		bomb:SetModel("models/saraphines/insurgency explosives/ied/insurgency_ied.mdl")
 		bomb:SetModelScale(0.8)
-		bomb:SetPos(self.IEDPlantPos + self.IEDPlantNormal * 16)
+		local bombAng = self.IEDPlantNormal:Angle()
+		bombAng:RotateAroundAxis(bombAng:Right(), 90)
+		bombAng:RotateAroundAxis(bombAng:Up(), 90)
+		bomb:SetPos(self.IEDPlantPos + self.IEDPlantNormal * 2)
+		bomb:SetAngles(bombAng)
 		bomb:Spawn()
 		bomb:Activate()
+		bomb.iedFreePlant = true
 
 		local mins, maxs = bomb:OBBMins(), bomb:OBBMaxs()
 		local placement = util.TraceHull({
-			start = self.IEDPlantPos + self.IEDPlantNormal * 16,
-			endpos = self.IEDPlantPos,
+			start = self.IEDPlantPos + self.IEDPlantNormal * 8,
+			endpos = self.IEDPlantPos - self.IEDPlantNormal * 4,
 			mins = mins,
 			maxs = maxs,
 			filter = {owner, bomb},
 			mask = MASK_SOLID
 		})
-bomb:SetPos(placement.HitPos + placement.HitNormal * 0.5)
+		if placement.Hit then
+			bomb:SetPos(placement.HitPos + placement.HitNormal * 0.5)
+		end
 
 		local phys = bomb:GetPhysicsObject()
-		if IsValid(phys) then
-			phys:SetMass(20)
-			phys:EnableMotion(true)
-			phys:SetBuoyancyRatio(0.05)
-			phys:Wake()
+		if not IsValid(phys) then
+			bomb:Remove()
+			self.IEDPlantPending = false
+			self.IEDPlantMode = nil
+			self.IEDPlantEntity = nil
+			self:PlayAnim("idle")
+			return
 		end
+
+		phys:SetMass(20)
+		phys:SetBuoyancyRatio(0.05)
+		phys:EnableMotion(true)
+		phys:Wake()
 	end
 
 	self.Planted = true
-	RegisterIEDBomb(self, bomb, mode == "attached" and {
+	RegisterIEDBomb(self, bomb, mode == "embedded" and {
 		HitPos = self.IEDPlantPos,
 		HitNormal = self.IEDPlantNormal
 	} or nil)
-	owner:EmitSound("snd_jack_hmcd_bombrig.wav", mode == "attached" and 50 or 60, 100, 1, CHAN_AUTO)
+	owner:EmitSound("snd_jack_hmcd_bombrig.wav", mode == "embedded" and 50 or 60, 100, 1, CHAN_AUTO)
 	self:SetNextPrimaryFire(CurTime() + 2)
 	self.nextattackhuy = CurTime() + 2
 	self:SetPlanted(true)
 	self.IEDPlantPending = false
 	self.IEDPlantMode = nil
 	self.IEDPlantEntity = nil
+	self.IEDPlantLocalPos = nil
+	self.IEDPlantLocalAng = nil
 end
 
 function SWEP:SecondaryAttack(calledFrom)
@@ -851,8 +901,46 @@ function SWEP:SecondaryAttack(calledFrom)
 				return
 			end
 		end
-		self:PlaceNormally()
+		if not self.Planted then
+			local owner = self:GetOwner()
+			local character = IsValid(owner) and hg.GetCurrentCharacter(owner)
+			local filter = {owner, character}
+			local aimPos = owner:EyePos() + owner:GetAimVector() * 85
 
+			local tr = util.TraceLine({
+				start = owner:EyePos(),
+				endpos = aimPos,
+				filter = filter,
+				mask = MASK_SOLID
+			})
+
+			local plantTrace
+			if tr.Hit then
+				plantTrace = {
+					Entity = tr.Entity,
+					HitPos = tr.HitPos,
+					HitNormal = tr.HitNormal
+				}
+			else
+				local down = util.TraceLine({
+					start = aimPos,
+					endpos = aimPos - Vector(0, 0, 1000),
+					filter = filter,
+					mask = MASK_SOLID
+				})
+				if down.Hit then
+					plantTrace = {
+						Entity = down.Entity,
+						HitPos = down.HitPos,
+						HitNormal = down.HitNormal
+					}
+				end
+			end
+
+			if plantTrace then
+				self:BeginIEDPlant("free", plantTrace)
+			end
+		end
 	end
 end
 
@@ -887,22 +975,35 @@ if SERVER then
 		self:SetPlantAt(0)
 		self:SetHold("normal")
 	end
+	function SWEP:AttackHuy()
+		if self.IEDPlantPending then return end
+		if not (self.Planted or self.HaveTheBomb or self.PlantedOnSelf) then
+			local Owner = self:GetOwner()
+			local Tr = self:GetEyeTrace()
+			local character = IsValid(Owner) and hg.GetCurrentCharacter(Owner)
+			local target = Tr and Tr.Entity
+			local targetPhys = IsValid(target) and target:GetPhysicsObject()
+			local canEmbed = IsValid(target) and (
+				target:IsPlayer()
+				or target:IsNPC()
+				or target:IsRagdoll()
+				or IsValid(targetPhys) and targetPhys:GetMass() < 500
+			)
 
-	function SWEP:PlaceNormally()
-		local owner = self:GetOwner()
-		if not IsValid(owner) or self:GetPlanted() or self.Planted then return false end
+			if canEmbed then
+				if not target:IsPlayer() and not target:IsNPC() and not target:IsRagdoll() then
+					local min, max = target:GetModelBounds()
+					local minmaxs = max - min
+					local size = minmaxs[1] + minmaxs[2] + minmaxs[3]
+					if size <= 15 then return end
+				end
 
-		local tr = self:GetEyeTrace()
-		if tr.HitSky then return false end
-
-		local target = tr.Entity
-		if tr.Hit and IsValid(target) and not tr.HitWorld and not target:IsPlayer() and not target:IsRagdoll() then
-			RegisterIEDBomb(self, target, tr, false)
-		else
-			local pos = tr.Hit and (tr.HitPos + tr.HitNormal * 4) or (owner:GetShootPos() + owner:GetAimVector() * 80)
-			local bomb = SpawnIEDBomb(pos)
-			if not IsValid(bomb) then return false end
-			RegisterIEDBomb(self, bomb)
+				self:BeginIEDPlant("embedded", Tr)
+				return
+			elseif IsValid(character) and character:IsRagdoll() then
+				self:SecondaryAttack(true)
+				return
+			end
 		end
 
 		self.Planted = true

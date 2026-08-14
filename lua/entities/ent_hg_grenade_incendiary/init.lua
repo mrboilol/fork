@@ -8,8 +8,11 @@ end
 ENT.TrapSettleTime = 1.5
 ENT.TrapSettleLen = 40
 
+local clr = Color(50, 40, 0)
+
 local function createSpoon(self)
 	local entasd = ents.Create("ent_hg_spoon")
+	if not IsValid(entasd) then return end
 	entasd:SetModel(self.spoon)
 	entasd:SetPos(self:GetPos())
 	entasd:SetAngles(self:GetAngles())
@@ -126,7 +129,10 @@ function ENT:Arm(time,vel)
 
 		timer.Simple(0.1,function()
 			if wpos and IsValid(self) then
-				self:GetPhysicsObject():SetVelocity((wpos - self:GetPos()):GetNormalized())
+				local phys = self:GetPhysicsObject()
+				if IsValid(phys) then
+					phys:SetVelocity((wpos - self:GetPos()):GetNormalized())
+				end
 			end
 		end)
 
@@ -318,8 +324,6 @@ function ENT:Burn()
 		CreateVFireBall(10, 50, self:GetPos(), (vel / 2) - vector_up + VectorRand() * 150, self.owner or self)
 	end
 end
-
-local clr = Color(50, 40, 0)
 
 local vecCone = Vector(0, 0, 0)
 
