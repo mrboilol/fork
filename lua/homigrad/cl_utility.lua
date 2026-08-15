@@ -582,7 +582,7 @@ players : 1 humans, 0 bots (20 max)
 --//
 
 --\\ Can see or not
-	--local checkcd = 0
+	local nextVisibilityCheck = 0
 	local ents_FindByClass = ents.FindByClass
 	local player_GetAll = player.GetAll
 	local render_GetViewSetup = render.GetViewSetup

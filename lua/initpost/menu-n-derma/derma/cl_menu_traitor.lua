@@ -36,14 +36,14 @@ local function CreateTraitorMenuFonts()
     })
 
 	surface.CreateFont(ARENA_META_FONT, {
-		font = "Verily Serif Mono",
+		font = "VCR OSD Mono",
 		size = ScreenScale(7),
 		weight = 400,
 		antialias = true
 	})
 
 	surface.CreateFont(ARENA_DESC_FONT, {
-		font = "Verily Serif Mono",
+		font = "VCR OSD Mono",
 		size = ScreenScale(5),
 		weight = 400,
 		antialias = true

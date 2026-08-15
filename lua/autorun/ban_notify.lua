@@ -68,7 +68,7 @@ if CLIENT then
 	local fontCache = {}
 	local function getFont(name, size, weight)
 		if fontCache[name] then return end
-		surface.CreateFont(name, { font = "Verily Serif Mono", size = size, weight = weight })
+		surface.CreateFont(name, { font = "VCR OSD Mono", size = size, weight = weight })
 		fontCache[name] = true
 	end
 
