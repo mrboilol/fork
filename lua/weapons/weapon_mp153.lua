@@ -74,7 +74,7 @@ SWEP.Primary.Spread = 0.04
 SWEP.Primary.NumShots = 8
 
 local path = "weapons/darsu_eft/mr133/"
-SWEP.Primary.Sound = {path .. "mr153_fire_close2.ogg", 85, 100, 100}
+SWEP.Primary.Sound = {path .. "mr153_fire_close2.mp3", 85, 100, 100}
 SWEP.SupressedSound = {path .. "mr153_fire_silenced_indoor_close.wav", 65, 100, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_hammer.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.25
@@ -135,28 +135,28 @@ SWEP.AnimsEvents = {
 		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["ready0"] = {
-        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
-        [0.63] = function(self) self:EmitSound(path .. "mr133_pump_in_fast.ogg") end,
-        [0.87] = function(self) self:EmitSound(path .. "mr133_pump_out_fast.ogg") end,
+        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
+        [0.63] = function(self) self:EmitSound(path .. "mr133_pump_in_fast.mp3") end,
+        [0.87] = function(self) self:EmitSound(path .. "mr133_pump_out_fast.mp3") end,
     },
     ["draw"] = {
-        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
+        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
     },
     ["fire"] = {
         [0] = function(self) self:EmitSound(path .. "mr133_trigger.wav") end,
     },
     ["reload_start2"] = {
-        [0.2] = function(self) self:EmitSound(path .. "mr133_shell_pickup.ogg") end,
-        [0.8] = function(self) self:EmitSound(path .. "mr133_magcover.ogg") end,
-        [1.0] = function(self) self:EmitSound(path .. "mr133_shell_in_port.ogg") end,
+        [0.2] = function(self) self:EmitSound(path .. "mr133_shell_pickup.mp3") end,
+        [0.8] = function(self) self:EmitSound(path .. "mr133_magcover.mp3") end,
+        [1.0] = function(self) self:EmitSound(path .. "mr133_shell_in_port.mp3") end,
     },
     ["reload_loop2"] = {
-        [0.2] = function(self) self:EmitSound(path .. "mr133_shell_pickup.ogg") end,
-        [0.6] = function(self) self:EmitSound(path .. "mr133_magcover.ogg") end,
-        [0.71] = function(self) self:EmitSound(path .. "mr133_shell_in_port.ogg") end,
+        [0.2] = function(self) self:EmitSound(path .. "mr133_shell_pickup.mp3") end,
+        [0.6] = function(self) self:EmitSound(path .. "mr133_magcover.mp3") end,
+        [0.71] = function(self) self:EmitSound(path .. "mr133_shell_in_port.mp3") end,
     },
     ["reload_end"] = {
-        [0.1] = function(self) self:EmitSound(path .. "mr133_magcover.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "mr133_magcover.mp3") end,
     },
 }
 

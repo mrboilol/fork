@@ -30,9 +30,9 @@ end
 SWEP.SprayRand = {Angle(0, 0, 0), Angle(0, 0, 0)}
 SWEP.addSprayMul = 1
 
-SWEP.RecoilMul = 0.7
-SWEP.ScreenRecoilMul = 0.6
-SWEP.WeaponRecoilMul = 1.25
+SWEP.RecoilMul = 0.8
+SWEP.ScreenRecoilMul = 0.7
+SWEP.WeaponRecoilMul = 1.45
 
 local cos, sin, math_max, math_min = math.cos, math.sin, math.max, math.min
 function SWEP:GetPrimaryMul()
@@ -92,8 +92,10 @@ function SWEP:PrimarySpread()
 		local handlingMul = self.GetArmHealthHandlingMul and self:GetArmHealthHandlingMul() or 1
 		local stanceMul = self.GetPostureStabilityMul and self:GetPostureStabilityMul(self:IsZoom()) or 1
 		local cantedHold = owner.posture == 7 or owner.posture == 9
-		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * stanceMul * (0.65 + math.min(sprayI / 12, 0.6)), 0.15, 4)
-		mul = mul * supportMul * handlingMul
+		local force = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * stanceMul * (0.75 + math.min(sprayI / 10, 0.75)) * 1.18, 0.18, 5.5)
+		-- Arm trauma can make the physical muzzle movement extreme, but cap the
+		-- camera-side multiplier so recoil cannot pin the player's view vertically.
+		mul = mul * math.Clamp(supportMul * handlingMul, 0.65, 3.75)
 		mul = mul * self.RecoilMul
 		local screenRecoilMul = self.ScreenRecoilMul or 1
 		mul = mul * (owner:Crouching() and 0.75 or 1)
@@ -139,11 +141,11 @@ function SWEP:PrimarySpread()
 			
 			local huyang = angrand2 * mul / 2 * mulhuy
 			huyang[3] = 0
-			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.12 * screenRecoilMul)
+			ViewPunch2(huyang * (owner.posture == 1 and not self:IsZoom() and 3 or 1) * 0.17 * screenRecoilMul)
 			
 			local angpopa = angrand2 * mul
 			angpopa[3] = 0
-			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.2 or 0.45) * screenRecoilMul)
+			ViewPunch(angpopa * (hg_coolcamera:GetBool() and 1.8 or 0.7) * screenRecoilMul)
 			spray = spray + angRand * 2 * (self.randmul or 1)
 		end
 
@@ -151,7 +153,7 @@ function SWEP:PrimarySpread()
 		-- Keep this render-side so authoritative shot spread remains predictable;
 		-- sh_worldmodel applies the offset and eases it back after every shot.
 		-- Recoil owns the dominant rise while addSprayMul widens only side travel.
-		local muzzleKickMul = math.Clamp(force * (self.WeaponRecoilMul or 1), 0.1, 5)
+		local muzzleKickMul = math.Clamp(force * (self.WeaponRecoilMul or 1), 0.12, 7)
 		local muzzleSideMul = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
 		self.ShotMuzzleWobble = (self.ShotMuzzleWobble or Angle(0, 0, 0)) + Angle(
 			(cantedHold and math.Rand(-0.12, 0.08) or -math.Rand(0.42, 0.82)) * muzzleKickMul,
@@ -169,9 +171,9 @@ function SWEP:PrimarySpread()
 
 		//ViewPunch2(angleprikol)
 
-		local cameraKick = math.Clamp(force * self.Primary.Force2 / 100, 0.05, 1.2) * screenRecoilMul
-		ViewPunch2(angrand2 * cameraKick * 0.2)
-		ViewPunch(angrand2 * cameraKick * 0.08)
+		local cameraKick = math.Clamp(force * self.Primary.Force2 / 100, 0.06, 1.5) * screenRecoilMul
+		ViewPunch2(angrand2 * cameraKick * 0.24)
+		ViewPunch(angrand2 * cameraKick * 0.1)
 
 		local eyeang = owner:EyeAngles()
 		local sprayAng = (spray * (self:IsResting() and 0.1 or 1) * 8 + angrand3 * self.addSprayMul) * (eyeang.z == 180 and -1 or 1)
@@ -180,7 +182,7 @@ function SWEP:PrimarySpread()
 		sprayAng:RotateAroundAxis(angle_zero:Forward(), eyeang.roll)
 		sprayAng.roll = 0
 
-		owner:SetEyeAngles(eyeang + sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.12 * screenRecoilMul)
+		owner:SetEyeAngles(eyeang + sprayAng * (organism.recoilmul or 1) * (owner.posture == 1 and not self:IsZoom() and 0.1 or 1) * 0.18 * screenRecoilMul)
 		
 		local max_clip1 = self:GetMaxClip1()
 		

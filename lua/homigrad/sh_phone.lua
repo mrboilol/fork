@@ -38,7 +38,7 @@ HG_PHONE.RINGTONES = {}
 HG_PHONE.RINGTONE_PATHS = {}
 
 for index = 1, 7 do
-	local path = "ring" .. index .. ".ogg"
+	local path = "ring" .. index .. ".mp3"
 	HG_PHONE.RINGTONES[index] = {name = "Ring " .. index, path = path}
 	HG_PHONE.RINGTONE_PATHS[path] = true
 end

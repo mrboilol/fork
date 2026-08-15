@@ -195,6 +195,13 @@ function SWEP:GetRecoilImpulseFactors()
 	return caliber, math.Clamp(3 / weaponWeight, 0.55, 1.75), recoilForce, numBullet, ammo
 end
 
+local function getSevereArmTrauma(org, arm)
+	local broken = (tonumber(org[arm]) or 0) >= 1
+	local dislocated = org[arm .. "dislocation"] or org[arm .. "dislocated"]
+	local amputated = org[arm .. "amputated"]
+	return broken, dislocated, amputated
+end
+
 function SWEP:GetArmHealthHandlingMul()
 	local owner = self:GetOwner()
 	if not IsValid(owner) then return 1, 0 end
@@ -204,17 +211,31 @@ function SWEP:GetArmHealthHandlingMul()
 	local left = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "larm") or 1
 	local firing = support.firingArm == "larm" and left or right
 	local brace = support.firingArm == "larm" and right or left
-	local loss = (1 - firing) * 1.35
-	if support.wantsTwoHands then loss = loss + (1 - brace) * 0.65 end
-	if support.oneHanded then loss = loss + 0.38 end
+	local firingArm = support.firingArm or "rarm"
+	local braceArm = firingArm == "larm" and "rarm" or "larm"
+	local org = owner.organism or {}
+	local firingBroken, firingDislocated, firingAmputated = getSevereArmTrauma(org, firingArm)
+	local braceBroken, braceDislocated, braceAmputated = getSevereArmTrauma(org, braceArm)
+	local loss = (1 - firing) * 1.55
+	if support.wantsTwoHands then loss = loss + (1 - brace) * 0.85 end
+	if support.oneHanded then loss = loss + 0.5 end
+	-- A fracture/dislocation is more than gradual weakness: recoil is being
+	-- caught by an unstable joint or a broken lever. Keep this explicit so the
+	-- severe state remains much worse than an arm that is merely wounded.
+	if firingBroken then loss = loss + 0.5 end
+	if firingDislocated then loss = loss + 0.6 end
+	if firingAmputated then loss = loss + 0.7 end
+	if support.wantsTwoHands and braceBroken then loss = loss + 0.3 end
+	if support.wantsTwoHands and braceDislocated then loss = loss + 0.4 end
+	if support.wantsTwoHands and braceAmputated then loss = loss + 0.5 end
+	if support.onlyLeft then loss = loss + 0.25 end
 	if support.leftBusy then loss = loss + 0.3 end
 	if support.rightBusy then loss = loss + 0.5 end
 
-	local org = owner.organism or {}
 	loss = loss + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.045
 	loss = loss + math.Clamp(org.permanent_aim_impairment or 0, 0, 2) * 0.4
 
-	return math.Clamp(1 + loss, 0.8, 3), loss
+	return math.Clamp(1 + loss, 0.8, 4.5), loss
 end
 
 function SWEP:GetRecoilSupportMul()
@@ -249,15 +270,15 @@ function SWEP:GetAimAlignmentTime(ply)
 
 	local support = self:GetHandSupportState(ply)
 	local handling = self:GetArmHealthHandlingMul()
-	local base = math.Clamp((self.weight or self.Weight or 5) / 4, 0.25, 1) * 0.75
-	local supportMul = support.supportHands >= 2 and 1 or 1.45
-	if support.onlyLeft then supportMul = supportMul * 1.3 end
+	local base = math.Clamp((self.weight or self.Weight or 5) / 4, 0.25, 1) * 0.9
+	local supportMul = support.supportHands >= 2 and 1 or 1.6
+	if support.onlyLeft then supportMul = supportMul * 1.35 end
 	if support.leftBusy or support.rightBusy then supportMul = supportMul * 1.2 end
 
 	local org = ply.organism or {}
 	local brainPenalty = math.Clamp(org.brain or 0, 0, 1) * 2.5
 	local fatigueMul = 1 + math.Clamp(org.aiming_fatigue or 0, 0, 10) * 0.1
-	return math.Clamp(base * handling * supportMul * fatigueMul + brainPenalty, 0.18, 5)
+	return math.Clamp(base * handling * supportMul * fatigueMul + brainPenalty, 0.2, 8)
 end
 
 function SWEP:IsManuallyCycledWeapon()
@@ -2377,41 +2398,66 @@ function SWEP:GetAdditionalValues()
 			self.AdditionalPos2[2] = self.AdditionalPos2[2] - animpos2 * (cantedHold and 2.5 or 1) * (self.podkid or 1)
 		end
 
-		-- Restore the old dynamic recoil tail: the weapon keeps moving after the
-		-- initial kick, with heavier guns settling more slowly and injured arms
-		-- producing a wider wobble. This changes the muzzle pose instead of adding
-		-- another screen punch.
-		if CLIENT then
-			local sinceShot = CurTime() - (self:LastShootTime() or 0)
-			local firing = sinceShot >= 0 and sinceShot < 0.22
-			local weaponMass = math.max((self.weight or 1) + (self.addweight or 0), 0.5)
-			local recoilForce = math.max(self.Primary.Force2 or self.Primary.Force or 0, 0)
-			local forceScale = math.Clamp(recoilForce / (55 * math.sqrt(weaponMass)), 0.12, 1.25)
-			local support = self:GetHandSupportState(ply)
-			local handlingMul = self:GetArmHealthHandlingMul()
-			local armInjury = math.Clamp(handlingMul - 1, 0, 2)
-			local stanceMul = self:IsResting() and 0.25 or self:IsZoom() and 0.65 or ply:Crouching() and 0.8 or 1
-			local burstMul = 0.75 + math.Clamp((self.SprayI or 0) / 8, 0, 1) * 0.45
-			local wobbleTarget = firing and forceScale * burstMul * handlingMul * self:GetRecoilSupportMul() * stanceMul or 0
-			local recoveryRate = math.Clamp(0.055 / (1 + armInjury * 0.7 + weaponMass * 0.08 + (support.oneHanded and 0.45 or 0)), 0.012, 0.05)
-			self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.4 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
+		-- Recoil moves the shared gun transform, not only the view. Both realms run
+		-- this deterministic tail so the live muzzle ray follows the visible climb.
+		local sinceShot = CurTime() - (self:LastShootTime() or 0)
+		local firing = sinceShot >= 0 and sinceShot < 0.24
+		local weaponMass = math.max((self.weight or 1) + (self.addweight or 0), 0.5)
+		local caliberMul, weightMul = self:GetRecoilImpulseFactors()
+		local support = self:GetHandSupportState(ply)
+		local supportMul = self:GetRecoilSupportMul()
+		local handlingMul = self:GetArmHealthHandlingMul()
+		local armInjury = math.Clamp(handlingMul - 1, 0, 3.5)
+		local stanceMul = self:GetPostureStabilityMul(self:IsZoom())
+		local restMul = self:IsResting() and 0.35 or 1
+		local burstMul = 0.85 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
+		local physicalImpulse = math.Clamp(caliberMul * weightMul * supportMul * handlingMul * 1.2, 0.3, 5.5)
+		local recoveryRate = math.Clamp(0.026 / (1 + armInjury * 0.85 + weaponMass * 0.1 + (support.oneHanded and 0.5 or 0)), 0.0045, 0.024)
+		local wobbleTarget = firing and physicalImpulse * burstMul * stanceMul * restMul or 0
+		self.recoilWobbleAmp = Lerp(hg.lerpFrameTime2(firing and 0.42 or recoveryRate, dtime), self.recoilWobbleAmp or 0, wobbleTarget)
 
-			if (self.recoilWobbleAmp or 0) > 0.0001 then
-				local t = CurTime()
-				local amp = self.recoilWobbleAmp * 1.2
-				local sideAmp = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
-				local longGun = not self:IsPistolHoldType() and not self.PistolKinda
-				local wobX = math.sin(t * 1.65) * 0.65 + math.sin(t * 2.95) * 0.35
-				local wobY = math.cos(t * 2.05) * 0.65 + math.cos(t * 3.45) * 0.35
-				local wobZ = math.sin(t * 2.45) * 0.65 + math.cos(t * 3.2) * 0.35
+		if (self.recoilWobbleAmp or 0) > 0.0001 then
+			local t = CurTime()
+			local frequencyMul = Lerp(armInjury / 3.5, 1, 0.62)
+			local amp = self.recoilWobbleAmp * (1.35 + armInjury * 0.22)
+			local sideAmp = math.Clamp(self.addSprayMul or 1, 0.08, 2.5)
+			local longGun = not self:IsPistolHoldType() and not self.PistolKinda
+			local wobX = math.sin(t * 1.65 * frequencyMul) * 0.65 + math.sin(t * 2.95 * frequencyMul) * 0.35
+			local wobY = math.cos(t * 2.05 * frequencyMul) * 0.65 + math.cos(t * 3.45 * frequencyMul) * 0.35
+			local wobZ = math.sin(t * 2.45 * frequencyMul) * 0.65 + math.cos(t * 3.2 * frequencyMul) * 0.35
 
-				self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (cantedHold and 0.35 or (longGun and 2.15 or 1.55))
-				self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (cantedHold and 1.5 or (longGun and 0.55 or 0.1)) * sideAmp
-				self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.7 or 1.05) * sideAmp
-				self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.55
-				self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * 0.26 * sideAmp
-				self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.5
+			self.AdditionalAng2[1] = self.AdditionalAng2[1] + wobY * amp * (cantedHold and 0.45 or (longGun and 2.3 or 1.7))
+			self.AdditionalAng2[2] = self.AdditionalAng2[2] + wobX * amp * (cantedHold and -1.65 or (longGun and 0.08 or 0.14)) * sideAmp
+			self.AdditionalAng2[3] = self.AdditionalAng2[3] + wobZ * amp * (longGun and 0.55 or 1.1) * sideAmp
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + wobY * amp * 0.6
+			self.AdditionalPos2[2] = self.AdditionalPos2[2] + wobX * amp * (cantedHold and -0.42 or 0.08) * sideAmp
+			self.AdditionalPos2[3] = self.AdditionalPos2[3] + wobZ * amp * 0.58
+		end
+
+		-- Keep a strong, readable rearward/upward impulse after the instant shot
+		-- offset has started easing. This is what makes automatic fire climb and
+		-- makes an injured shooter visibly fight the weapon back onto target.
+		local recoilDecay = self:GetAnimShoot2(0.32 * mulhuy / host_timescale(), true)
+		if recoilDecay > 0.001 then
+			local climb = 0.55 + math.Clamp((self.SprayI or 0) / 7, 0, 1) * 0.65
+			local seed = math.floor(self.SprayI or 0)
+			local sideRand = util.SharedRandom("hg_recoil_side", -1, 1, seed)
+			local rollRand = util.SharedRandom("hg_recoil_roll", -1, 1, seed + 9173)
+			local kick = recoilDecay * physicalImpulse * stanceMul * restMul * climb * (self.WeaponRecoilMul or 1) * 1.35
+
+			if cantedHold then
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 0.75
+				self.AdditionalAng2[2] = self.AdditionalAng2[2] - kick * 2.8
+				self.AdditionalAng2[3] = self.AdditionalAng2[3] - kick * 0.7
+				self.AdditionalPos2[2] = self.AdditionalPos2[2] - kick * 1.15
+				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * 0.65
+			else
+				self.AdditionalAng2[1] = self.AdditionalAng2[1] - kick * 3.4
+				self.AdditionalAng2[2] = self.AdditionalAng2[2] + sideRand * kick * 0.09
+				self.AdditionalAng2[3] = self.AdditionalAng2[3] + rollRand * kick * 0.18
+				self.AdditionalPos2[3] = self.AdditionalPos2[3] + kick * (self:IsPistolHoldType() and 1.6 or 2.4)
 			end
+			self.AdditionalPos2[1] = self.AdditionalPos2[1] + kick * 0.85
 		end
 	end
 

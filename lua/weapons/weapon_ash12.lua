@@ -139,17 +139,17 @@ local path = "weapons/darsu_eft/ash12/"
 
 SWEP.AnimsSounds = {
     ["ready"] = {
-        [0.91] = function(self) self:EmitSound(path .. "ash12_bolt_handle_grab.ogg") end,
-        [1.09] = function(self) self:EmitSound(path .. "ash12_bolt_out.ogg") end,
-        [1.29] = function(self) self:EmitSound(path .. "ash12_bolt_in.ogg") end,
-        [1.47] = function(self) self:EmitSound(path .. "ash12_bolt_handle_bounce.ogg") end,
+        [0.91] = function(self) self:EmitSound(path .. "ash12_bolt_handle_grab.mp3") end,
+        [1.09] = function(self) self:EmitSound(path .. "ash12_bolt_out.mp3") end,
+        [1.29] = function(self) self:EmitSound(path .. "ash12_bolt_in.mp3") end,
+        [1.47] = function(self) self:EmitSound(path .. "ash12_bolt_handle_bounce.mp3") end,
     },
     ["draw"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
     },
     ["fire"] = {
         [0] = function(self) self:EmitSound(path .. "ash12_trigger_hammer.wav") end,
-        [0.02] = function(self) self:EmitSound(path .. "ash12_bolt_handle_bounce.ogg") end,
+        [0.02] = function(self) self:EmitSound(path .. "ash12_bolt_handle_bounce.mp3") end,
     },
 }
 
@@ -233,16 +233,16 @@ function SWEP:Reload(time)
         if isEmpty then
             -- reload_empty
             timer.Simple(0.03, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_1.ogg") end end) -- Заглушка, если gunflip нет
-            timer.Simple(0.53, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_out.ogg") end end) -- Быстрый сброс
-            timer.Simple(1.95, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_in.ogg") end end)
+            timer.Simple(0.53, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_out.mp3") end end) -- Быстрый сброс
+            timer.Simple(1.95, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_in.mp3") end end)
             -- Болт (из конфига reload_empty)
-            timer.Simple(3.3, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_bolt_out.ogg") end end)
-            timer.Simple(3.96, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_bolt_in.ogg") end end)
+            timer.Simple(3.3, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_bolt_out.mp3") end end)
+            timer.Simple(3.96, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_bolt_in.mp3") end end)
         else
             -- reload_tactical
             timer.Simple(0.03, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_1.ogg") end end) -- Заглушка
-            timer.Simple(0.53, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_out.ogg") end end) -- Быстрый сброс
-            timer.Simple(2.9, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_in.ogg") end end)
+            timer.Simple(0.53, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_out.mp3") end end) -- Быстрый сброс
+            timer.Simple(2.9, function() if IsValid(wep) then wep:EmitSound(path .. "ash12_mag_in.mp3") end end)
         end
     end
 end

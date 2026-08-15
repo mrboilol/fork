@@ -340,10 +340,10 @@ function SWEP:Reload(time)
         
         local wep = self
         -- Звуки болта (rem700, так как они в конфиге)
-        timer.Simple(0.13, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_1.ogg") end end)
-        timer.Simple(0.35, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_2.ogg") end end)
-        timer.Simple(0.70, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_3.ogg") end end)
-        timer.Simple(0.92, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_4.ogg") end end)
+        timer.Simple(0.13, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_1.mp3") end end)
+        timer.Simple(0.35, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_2.mp3") end end)
+        timer.Simple(0.70, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_3.mp3") end end)
+        timer.Simple(0.92, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_4.mp3") end end)
         return
     end
 
@@ -395,14 +395,14 @@ function SWEP:Reload(time)
         -- Звуки перезарядки (rem700 по конфигу)
         if isEmpty then
             -- Полная: Out 0.36, In 2.0, BoltBack 2.6, BoltFwd 3.4
-            timer.Simple(0.36, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_out.ogg") end end)
-            timer.Simple(1.30, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_in.ogg") end end)
-            timer.Simple(2.10, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_1.ogg") end end)
-            timer.Simple(2.60, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_4.ogg") end end)
+            timer.Simple(0.36, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_out.mp3") end end)
+            timer.Simple(1.30, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_in.mp3") end end)
+            timer.Simple(2.10, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_1.mp3") end end)
+            timer.Simple(2.60, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_bolt_4.mp3") end end)
         else
             -- Тактическая: Out 0.5, In 2.3
-            timer.Simple(0.50, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_out.ogg") end end)
-            timer.Simple(2.65, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_in.ogg") end end)
+            timer.Simple(0.50, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_out.mp3") end end)
+            timer.Simple(2.65, function() if IsValid(wep) then wep:EmitSound(path .. "rem700_mag_in.mp3") end end)
         end
     end
 end

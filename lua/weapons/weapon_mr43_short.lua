@@ -72,16 +72,16 @@ SWEP.AnimList = {
 
 SWEP.AnimsEvents = {
 	["reload"] = {
-		[0.10] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_open.ogg") end,
-		[0.25] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_unload_single1.ogg") end,
-		[0.6] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_load_single1.ogg") end,
-		[0.85] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_close.ogg") end,
+		[0.10] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_open.mp3") end,
+		[0.25] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_unload_single1.mp3") end,
+		[0.6] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_load_single1.mp3") end,
+		[0.85] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_close.mp3") end,
 	},
 	["reload_empty"] = {
-		[0.10] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_open.ogg") end,
-		[0.25] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_unload_double.ogg") end,
-		[0.6] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_load_double.ogg") end,
-		[0.85] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_close.ogg") end,
+		[0.10] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_open.mp3") end,
+		[0.25] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_unload_double.mp3") end,
+		[0.6] = function(self) self:EmitSound(mr43_path .. "mr43_ammo_load_double.mp3") end,
+		[0.85] = function(self) self:EmitSound(mr43_path .. "mr43_barrels_close.mp3") end,
 	},
 	["look"] = {
 		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,

@@ -286,8 +286,8 @@ function SWEP:Reload(time)
         cock(self, boltTime)
 
         local wep = self
-        timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.ogg") end end)
-        timer.Simple(0.69, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.ogg") end end)
+        timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.mp3") end end)
+        timer.Simple(0.69, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.mp3") end end)
         return
     end
 
@@ -335,13 +335,13 @@ function SWEP:Reload(time)
         end, false, true)
 
         if isEmpty then
-            timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout_fast.ogg") end end)
-            timer.Simple(1.5, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.ogg") end end)
-            timer.Simple(2.4, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.ogg") end end)
-            timer.Simple(3, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.ogg") end end)
+            timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout_fast.mp3") end end)
+            timer.Simple(1.5, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.mp3") end end)
+            timer.Simple(2.4, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.mp3") end end)
+            timer.Simple(3, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.mp3") end end)
         else
-            timer.Simple(0.55, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout.ogg") end end)
-            timer.Simple(2.38, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.ogg") end end)
+            timer.Simple(0.55, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout.mp3") end end)
+            timer.Simple(2.38, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.mp3") end end)
         end
     end
 end

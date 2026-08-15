@@ -51,42 +51,42 @@ SWEP.AnimsEvents = {
 		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
     ["fistful_start__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.mp3") end,
         [0.23] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
-        [0.25] = function(self) self:EmitSound(path .. "rsh_12_purge_shells.ogg") end,
+        [0.25] = function(self) self:EmitSound(path .. "rsh_12_purge_shells.mp3") end,
     },
     ["sg_reload_start1__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.mp3") end,
         [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.mp3") end,
         [0.4] = function(self)
-            self:EmitSound(path .. "rsh_12_ammo_out.ogg")
+            self:EmitSound(path .. "rsh_12_ammo_out.mp3")
             self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3")
         end,
-        [0.55] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
-        [0.65] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
-        [0.95] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
+        [0.55] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
+        [0.65] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
+        [0.95] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
 
     },
     ["sg_reload_start2__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.mp3") end,
         [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.mp3") end,
         [0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
-        [0.5] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
-        [0.65] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
-        [0.85] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
+        [0.5] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
+        [0.65] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
+        [0.85] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
     },
     ["sg_reload_start3__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.mp3") end,
         [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.mp3") end,
         [0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
-        [0.5] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
-        [0.75] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
+        [0.5] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
+        [0.75] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
     },
     ["sg_reload_start4__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "rsh_12_reload_start.mp3") end,
         [0.2] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_in1.mp3") end,
         [0.4] = function(self) self:EmitSound("arc9_eft_shared/generic_mag_pouch_out1.mp3") end,
-        [0.6] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.ogg") end,
+        [0.6] = function(self) self:EmitSound(path .. "rsh_12_ammo_out.mp3") end,
     },
 }
 
@@ -256,7 +256,7 @@ local function RSh12_PlayFistfulChain(wep, step, targetStep)
 			RSh12_FinishReload(wep)
 		end, false, true)
 
-		wep:EmitSound(path .. "rsh_12_reload_end.ogg")
+		wep:EmitSound(path .. "rsh_12_reload_end.mp3")
 		return
 	end
 
@@ -267,7 +267,7 @@ local function RSh12_PlayFistfulChain(wep, step, targetStep)
 
 	timer.Simple(0.4, function()
 		if IsValid(wep) then
-			wep:EmitSound(path .. "rsh_12_ammo_in.ogg")
+			wep:EmitSound(path .. "rsh_12_ammo_in.mp3")
 		end
 	end)
 end
@@ -287,7 +287,7 @@ local function RSh12_PlaySgInsertChain(wep, idx, lastIdx)
 			RSh12_FinishReload(wep)
 		end, false, true)
 
-		wep:EmitSound(path .. "rsh_12_reload_end.ogg")
+		wep:EmitSound(path .. "rsh_12_reload_end.mp3")
 		return
 	end
 
@@ -298,7 +298,7 @@ local function RSh12_PlaySgInsertChain(wep, idx, lastIdx)
 
 	timer.Simple(0.4, function()
 		if IsValid(wep) then
-			wep:EmitSound(path .. "rsh_12_ammo_in.ogg")
+			wep:EmitSound(path .. "rsh_12_ammo_in.mp3")
 		end
 	end)
 end
@@ -355,7 +355,7 @@ function SWEP:Reload(time)
 
 			self:PlayAnim(startAnim, startDur, false, function()
 				if not IsValid(self) then return end
-				self:EmitSound(path .. "rsh_12_ammo_out.ogg")
+				self:EmitSound(path .. "rsh_12_ammo_out.mp3")
 				RSh12_PlaySgInsertChain(self, firstIndex, lastIndex)
 			end, false, true)
 		end

@@ -224,11 +224,11 @@ function SWEP:Reload(time)
         
         -- ЗВУКИ ПЕРЕЗАРЯДКИ (MP-18)
         -- lock 0.89, open 0.97, out 1.92, in 3.41, close 4.35
-        timer.Simple(0.59, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_barrel_lock.ogg") end end)
-        timer.Simple(0.77, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_barrel_open.ogg") end end)
-        timer.Simple(1.42, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_round_out1.ogg") end end)
-        timer.Simple(2.21, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_round_in1.ogg") end end)
-        timer.Simple(3.15, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_barrel_close.ogg") end end)
+        timer.Simple(0.59, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_barrel_lock.mp3") end end)
+        timer.Simple(0.77, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_barrel_open.mp3") end end)
+        timer.Simple(1.42, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_round_out1.mp3") end end)
+        timer.Simple(2.21, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_round_in1.mp3") end end)
+        timer.Simple(3.15, function() if IsValid(wep) then wep:EmitSound(path .. "mr18_barrel_close.mp3") end end)
     end
 end
 

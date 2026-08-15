@@ -4,6 +4,30 @@
 /resource
 /shaders
 /sound
+
+# Keep the generated antique pistol runtime files in the addon. Other mounted
+# binary content remains ignored.
+!/models/
+/models/*
+!/models/weapons/
+/models/weapons/*
+!/models/weapons/antique_pistol.mdl
+!/models/weapons/antique_pistol.vvd
+!/models/weapons/antique_pistol.dx80.vtx
+!/models/weapons/antique_pistol.dx90.vtx
+!/models/weapons/antique_pistol.phy
+
+!/materials/
+/materials/*
+!/materials/models/
+/materials/models/*
+!/materials/models/weapons/
+/materials/models/weapons/*
+!/materials/models/weapons/antique_pistol/
+/materials/models/weapons/antique_pistol/*
+!/materials/models/weapons/antique_pistol/antique_pistol.vmt
+!/materials/models/weapons/antique_pistol/antique_pistol_albedo.vtf
+!/materials/models/weapons/antique_pistol/antique_pistol_normal.vtf
 .aider*
 /readme NOW
 .vscode

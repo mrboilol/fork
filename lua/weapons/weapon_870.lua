@@ -86,8 +86,8 @@ SWEP.Primary.NumShots = 8
 
 -- ЗВУКИ ВЫСТРЕЛА (REMINGTON)
 local path = "weapons/darsu_eft/m870/" 
-SWEP.Primary.Sound = {path .. "rem870_fire_close1.ogg", 85, 100, 100}
-SWEP.SupressedSound = {path .. "rem870_fire_indoor_close.ogg", 65, 100, 100}
+SWEP.Primary.Sound = {path .. "rem870_fire_close1.mp3", 85, 100, 100}
+SWEP.SupressedSound = {path .. "rem870_fire_indoor_close.mp3", 65, 100, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_hammer.wav", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.8
 SWEP.NumBullet = 8
@@ -137,8 +137,8 @@ SWEP.AnimsEvents = {
 		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["reload_start_empty0"] = {
-        [0.2] = function(self) self:EmitSound(path .. "mr133_shell_pickup.ogg") end,
-        [0.8] = function(self) self:EmitSound(path .. "mr133_magcover.ogg") end,
+        [0.2] = function(self) self:EmitSound(path .. "mr133_shell_pickup.mp3") end,
+        [0.8] = function(self) self:EmitSound(path .. "mr133_magcover.mp3") end,
     },
     ["reload_start_empty0"] = {
         [0.2] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_shell_pickup.mp3") end,
@@ -171,17 +171,17 @@ SWEP.AnimsEvents = {
         [0.1] = function(self) self:EmitSound("weapons/darsu_eft/m590/mr133_magcover.mp3") end,
     },
     ["pump2"] = {
-        [0.05] = function(self) self:EmitSound(path .. "rem870_pump_in.ogg") end,
+        [0.05] = function(self) self:EmitSound(path .. "rem870_pump_in.mp3") end,
         [0.12] = function(self) self:EmitSound(path .. "pump_jam_extract.ogg") end,
-        [0.24] = function(self) self:EmitSound(path .. "rem870_pump_out.ogg") end,
+        [0.24] = function(self) self:EmitSound(path .. "rem870_pump_out.mp3") end,
     },
     ["ready0"] = {
-        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
-        [0.63] = function(self) self:EmitSound(path .. "rem870_pump_in.ogg") end,
-        [0.87] = function(self) self:EmitSound(path .. "rem870_pump_out.ogg") end,
+        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
+        [0.63] = function(self) self:EmitSound(path .. "rem870_pump_in.mp3") end,
+        [0.87] = function(self) self:EmitSound(path .. "rem870_pump_out.mp3") end,
     },
     ["draw"] = {
-        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
+        [0.01] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
     },
 }
 

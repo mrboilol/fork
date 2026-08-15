@@ -66,15 +66,15 @@ local path = "weapons/darsu_eft/svds/"
 
 SWEP.AnimsEvents = {
 	["reload"] = {
-		[0.10] = function(self) self:EmitSound(path .. "svd_mag_button.ogg") end,
-		[0.2] = function(self) self:EmitSound(path .. "svd_mag_out.ogg") end,
-		[0.53] = function(self) self:EmitSound(path .. "svd_mag_in.ogg") end,
+		[0.10] = function(self) self:EmitSound(path .. "svd_mag_button.mp3") end,
+		[0.2] = function(self) self:EmitSound(path .. "svd_mag_out.mp3") end,
+		[0.53] = function(self) self:EmitSound(path .. "svd_mag_in.mp3") end,
 	},
 	["reload_empty"] = {
-		[0.10] = function(self) self:EmitSound(path .. "svd_mag_button.ogg") end,
-		[0.2] = function(self) self:EmitSound(path .. "svd_mag_out_quick.ogg") end,
-		[0.4] = function(self) self:EmitSound(path .. "svd_mag_in.ogg") end,
-		[0.6] = function(self) self:EmitSound(path .. "svd_slider_out.ogg") end,
+		[0.10] = function(self) self:EmitSound(path .. "svd_mag_button.mp3") end,
+		[0.2] = function(self) self:EmitSound(path .. "svd_mag_out_quick.mp3") end,
+		[0.4] = function(self) self:EmitSound(path .. "svd_mag_in.mp3") end,
+		[0.6] = function(self) self:EmitSound(path .. "svd_slider_out.mp3") end,
 	},
 	["inspect"] = {
 		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,

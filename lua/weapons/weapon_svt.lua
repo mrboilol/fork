@@ -170,20 +170,20 @@ local pathsks = "weapons/darsu_eft/svt/"
 
 SWEP.AnimsSounds = {
     ["ready0"] = {
-        [0.05] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
-        [0.57] = function(self) self:EmitSound(pathsks .. "svd_slider_check_in.ogg") end,
-        [0.83] = function(self) self:EmitSound(pathsks .. "svd_slider_check_out.ogg") end,
-        [1.14] = function(self) self:EmitSound(path .. "m203_flip_2.ogg") end,
+        [0.05] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
+        [0.57] = function(self) self:EmitSound(pathsks .. "svd_slider_check_in.mp3") end,
+        [0.83] = function(self) self:EmitSound(pathsks .. "svd_slider_check_out.mp3") end,
+        [1.14] = function(self) self:EmitSound(path .. "m203_flip_2.mp3") end,
     },
     ["draw"] = {
-        [0] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
+        [0] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
     },
     ["fire"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
     },
     ["bolt0"] = {
-        [0.24] = function(self) self:EmitSound(pathsks .. "svd_slider_check_in.ogg") end,
-        [0.55] = function(self) self:EmitSound(pathsks .. "svd_slider_check_out.ogg") end,
+        [0.24] = function(self) self:EmitSound(pathsks .. "svd_slider_check_in.mp3") end,
+        [0.55] = function(self) self:EmitSound(pathsks .. "svd_slider_check_out.mp3") end,
     },
 }
 
@@ -274,8 +274,8 @@ function SWEP:Reload(time)
                 end, false, true)
                 
                            -- Звуки болта (запускаются сразу после начала анимации ready)
-                timer.Simple(0.2, function() if IsValid(wep) then wep:EmitSound(pathsks .. "svd_slider_check_in.ogg") end end)
-                timer.Simple(0.6, function() if IsValid(wep) then wep:EmitSound(pathsks .. "svd_slider_check_out.ogg") end end)
+                timer.Simple(0.2, function() if IsValid(wep) then wep:EmitSound(pathsks .. "svd_slider_check_in.mp3") end end)
+                timer.Simple(0.6, function() if IsValid(wep) then wep:EmitSound(pathsks .. "svd_slider_check_out.mp3") end end)
                 
             else
                 local currentClip = wep:Clip1()
@@ -295,10 +295,10 @@ function SWEP:Reload(time)
         end, false, true)
         
            -- Звуки смены магазина
-        timer.Simple(0.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_down.ogg") end end)
-        timer.Simple(1.0, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_out.ogg") end end)
-        timer.Simple(2.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_in.ogg") end end) -- Чуть раньше чем 2.84
-        timer.Simple(3.2, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_up.ogg") end end)
+        timer.Simple(0.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_down.mp3") end end)
+        timer.Simple(1.0, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_out.mp3") end end)
+        timer.Simple(2.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_in.mp3") end end) -- Чуть раньше чем 2.84
+        timer.Simple(3.2, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_up.mp3") end end)
     end
 end
 

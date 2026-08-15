@@ -76,12 +76,12 @@ SWEP.AnimDurations = {
 }
 
 -- ЗВУКИ ВЫСТРЕЛА
-SWEP.Primary.Sound = {path .. "mts255_outdoor_close.ogg", 90, 100, 100}
-SWEP.SupressedSound = {path .. "mts255_indoor_close.ogg", 80, 100, 100}
+SWEP.Primary.Sound = {path .. "mts255_outdoor_close.mp3", 90, 100, 100}
+SWEP.SupressedSound = {path .. "mts255_indoor_close.mp3", 80, 100, 100}
 SWEP.Primary.SoundEmpty = {"arc9_eft_shared/weap_trigger_hammer.wav", 75, 100, 105, CHAN_WEAPON, 2}
 
-SWEP.DeploySnd = {path .. "mr133_draw.ogg", 55, 100, 100}
-SWEP.HolsterSnd = {path .. "mr133_holster.ogg", 55, 100, 100}
+SWEP.DeploySnd = {path .. "mr133_draw.mp3", 55, 100, 100}
+SWEP.HolsterSnd = {path .. "mr133_holster.mp3", 55, 100, 100}
 
 SWEP.AnimShootMul = 3
 SWEP.AnimShootHandMul = 10
@@ -132,37 +132,37 @@ SWEP.AnimsEvents = {
 		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["draw__0"] = {
-        [0.05] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
+        [0.05] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
     },
     ["holster__0"] = {
-        [0.05] = function(self) self:EmitSound(path .. "mr133_holster.ogg") end,
+        [0.05] = function(self) self:EmitSound(path .. "mr133_holster.mp3") end,
     },
     ["fistful_start__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.ogg") end,
-        [0.25] = function(self) self:EmitSound(path .. "mts255_baraban_purge_all.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.mp3") end,
+        [0.25] = function(self) self:EmitSound(path .. "mts255_baraban_purge_all.mp3") end,
     },
     ["sg_reload_start1__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.ogg") end,
-        [0.4] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
-        [0.55] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
-        [0.65] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
-        [0.95] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.mp3") end,
+        [0.4] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
+        [0.55] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
+        [0.65] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
+        [0.95] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
 
     },
     ["sg_reload_start2__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.ogg") end,
-        [0.5] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
-        [0.65] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
-        [0.85] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.mp3") end,
+        [0.5] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
+        [0.65] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
+        [0.85] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
     },
     ["sg_reload_start3__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.ogg") end,
-        [0.5] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
-        [0.75] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.mp3") end,
+        [0.5] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
+        [0.75] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
     },
     ["sg_reload_start4__0"] = {
-        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.ogg") end,
-        [0.6] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.ogg") end,
+        [0.1] = function(self) self:EmitSound(path .. "mts255_baraban_open.mp3") end,
+        [0.6] = function(self) self:EmitSound(path .. "mts255_baraban_purge_single.mp3") end,
     },
 }
 
@@ -290,7 +290,7 @@ local function MTS255_PlayFistfulChain(wep, step, targetStep)
             MTS255_FinishReload(wep)
         end, false, true)
 
-        wep:EmitSound(path .. "mts255_baraban_close.ogg")
+        wep:EmitSound(path .. "mts255_baraban_close.mp3")
         return
     end
 
@@ -301,7 +301,7 @@ local function MTS255_PlayFistfulChain(wep, step, targetStep)
 
     timer.Simple(0.4, function()
         if IsValid(wep) then
-            wep:EmitSound(path .. "mts255_round_insert1.ogg")
+            wep:EmitSound(path .. "mts255_round_insert1.mp3")
         end
     end)
 end
@@ -326,7 +326,7 @@ local function MTS255_PlaySgInsertChain(wep, idx, lastIdx)
             MTS255_FinishReload(wep)
         end, false, true)
 
-        wep:EmitSound(path .. "mts255_baraban_close.ogg")
+        wep:EmitSound(path .. "mts255_baraban_close.mp3")
         return
     end
 
@@ -337,7 +337,7 @@ local function MTS255_PlaySgInsertChain(wep, idx, lastIdx)
 
     timer.Simple(0.4, function()
         if IsValid(wep) then
-            wep:EmitSound(path .. "mts255_round_insert2.ogg")
+            wep:EmitSound(path .. "mts255_round_insert2.mp3")
         end
     end)
 end
@@ -400,7 +400,7 @@ function SWEP:Reload(time)
 
             self:PlayAnim(startAnim, startDur, false, function()
                 if not IsValid(self) then return end
-                self:EmitSound(path .. "mts255_round_extract1.ogg")
+                self:EmitSound(path .. "mts255_round_extract1.mp3")
                 MTS255_PlaySgInsertChain(self, firstIndex, lastIndex)
             end, false, true)
         end

@@ -172,8 +172,8 @@ local path = "weapons/darsu_eft/axmc/"
 
 SWEP.AnimsSounds = {
     ["ready0"] = {
-        [0.72] = function(self) self:EmitSound(path .. "aiax_bolt_out.ogg") end,
-        [1.21] = function(self) self:EmitSound(path .. "aiax_bolt_in.ogg") end,
+        [0.72] = function(self) self:EmitSound(path .. "aiax_bolt_out.mp3") end,
+        [1.21] = function(self) self:EmitSound(path .. "aiax_bolt_in.mp3") end,
     },
     ["draw"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
@@ -194,8 +194,8 @@ SWEP.AnimsSounds = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
     },
     ["bolt0"] = {
-        [0.26] = function(self) self:EmitSound(path .. "aiax_bolt_out.ogg") end,
-        [0.69] = function(self) self:EmitSound(path .. "aiax_bolt_in.ogg") end,
+        [0.26] = function(self) self:EmitSound(path .. "aiax_bolt_out.mp3") end,
+        [0.69] = function(self) self:EmitSound(path .. "aiax_bolt_in.mp3") end,
     },
     ["reload0t"] = {
         [0.55] = function(self) self:EmitSound(path .. "t5000_mag_out.ogg") end,
@@ -204,8 +204,8 @@ SWEP.AnimsSounds = {
     ["reload_empty0"] = {
         [0.26] = function(self) self:EmitSound(path .. "t5000_magout_fast.ogg") end,
         [0.9] = function(self) self:EmitSound(path .. "t5000_magin.ogg") end,
-        [1] = function(self) self:EmitSound(path .. "aiax_bolt_out.ogg") end,
-        [1.05] = function(self) self:EmitSound(path .. "aiax_bolt_in.ogg") end,
+        [1] = function(self) self:EmitSound(path .. "aiax_bolt_out.mp3") end,
+        [1.05] = function(self) self:EmitSound(path .. "aiax_bolt_in.mp3") end,
     },
 }
 
@@ -294,8 +294,8 @@ function SWEP:Reload(time)
         cock(self, boltTime)
 
         local wep = self
-        timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.ogg") end end)
-        timer.Simple(0.69, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.ogg") end end)
+        timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.mp3") end end)
+        timer.Simple(0.69, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.mp3") end end)
         return
     end
 
@@ -343,13 +343,13 @@ function SWEP:Reload(time)
         end, false, true)
 
         if isEmpty then
-            timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout_fast.ogg") end end)
-            timer.Simple(1.39, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.ogg") end end)
-            timer.Simple(2.38, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.ogg") end end)
-            timer.Simple(2.5, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.ogg") end end)
+            timer.Simple(0.26, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout_fast.mp3") end end)
+            timer.Simple(1.39, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.mp3") end end)
+            timer.Simple(2.38, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_out.mp3") end end)
+            timer.Simple(2.5, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_bolt_in.mp3") end end)
         else
-            timer.Simple(0.55, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout.ogg") end end)
-            timer.Simple(2.38, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.ogg") end end)
+            timer.Simple(0.55, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magout.mp3") end end)
+            timer.Simple(2.38, function() if IsValid(wep) then wep:EmitSound(path .. "aiax_magin.mp3") end end)
         end
     end
 end

@@ -138,39 +138,39 @@ SWEP.AnimsEvents = {
         [0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
     },
     ["fistful_start"] = {
-        [0.05] = function(self) self:EmitSound(snd_path .. "mr133_shell_pickup.ogg") end,
-        [0.3] = function(self) self:EmitSound(snd_path .. "mr133_magcover.ogg") end,
+        [0.05] = function(self) self:EmitSound(snd_path .. "mr133_shell_pickup.mp3") end,
+        [0.3] = function(self) self:EmitSound(snd_path .. "mr133_magcover.mp3") end,
     },
     ["fistful1"] = {
-        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in1.ogg") end,
+        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in1.mp3") end,
     },
     ["fistful2"] = {
-        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in2.ogg") end,
+        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in2.mp3") end,
     },
     ["fistful3"] = {
-        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in1.ogg") end,
+        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in1.mp3") end,
     },
     ["fistful4"] = {
-        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in2.ogg") end,
+        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in2.mp3") end,
     },
     ["fistful5"] = {
-        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in1.ogg") end,
+        [0.05] = function(self) self:EmitSound(snd_path .. "m3_shell_in1.mp3") end,
     },
     ["fistful_end"] = {
-        [0.05] = function(self) self:EmitSound(snd_path .. "mr133_magcover.ogg") end,
+        [0.05] = function(self) self:EmitSound(snd_path .. "mr133_magcover.mp3") end,
     },
     ["pump2"] = {
-        [0.08] = function(self) self:EmitSound(snd_path .. "m3_pump_in.ogg") end,
+        [0.08] = function(self) self:EmitSound(snd_path .. "m3_pump_in.mp3") end,
         [0.15] = function(self) self:EmitSound(snd_path .. "pump_jam_extract.ogg") end,
-        [0.28] = function(self) self:EmitSound(snd_path .. "m3_pump_out.ogg") end,
+        [0.28] = function(self) self:EmitSound(snd_path .. "m3_pump_out.mp3") end,
     },
     ["ready0_pa"] = {
-        [0.01] = function(self) self:EmitSound(snd_path .. "mr133_draw.ogg") end,
-        [0.63] = function(self) self:EmitSound(snd_path .. "m3_pump_in.ogg") end,
-        [0.87] = function(self) self:EmitSound(snd_path .. "m3_pump_out.ogg") end,
+        [0.01] = function(self) self:EmitSound(snd_path .. "mr133_draw.mp3") end,
+        [0.63] = function(self) self:EmitSound(snd_path .. "m3_pump_in.mp3") end,
+        [0.87] = function(self) self:EmitSound(snd_path .. "m3_pump_out.mp3") end,
     },
     ["draw"] = {
-        [0.01] = function(self) self:EmitSound(snd_path .. "mr133_draw.ogg") end,
+        [0.01] = function(self) self:EmitSound(snd_path .. "mr133_draw.mp3") end,
     },
 }
 

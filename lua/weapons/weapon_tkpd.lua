@@ -178,8 +178,8 @@ local path = "weapons/darsu_eft/svds/"
 
 SWEP.AnimsSounds = {
     ["ready0"] = {
-        [0.67] = function(self) self:EmitSound(path .. "svd_slider_in.ogg") end,
-        [1.02] = function(self) self:EmitSound(path .. "svd_slider_out.ogg") end,
+        [0.67] = function(self) self:EmitSound(path .. "svd_slider_in.mp3") end,
+        [1.02] = function(self) self:EmitSound(path .. "svd_slider_out.mp3") end,
     },
     ["draw"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
@@ -188,8 +188,8 @@ SWEP.AnimsSounds = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
     },
     ["bolt0"] = {
-        [0.24] = function(self) self:EmitSound(path .. "svd_slider_in.ogg") end,
-        [0.55] = function(self) self:EmitSound(path .. "svd_slider_out.ogg") end,
+        [0.24] = function(self) self:EmitSound(path .. "svd_slider_in.mp3") end,
+        [0.55] = function(self) self:EmitSound(path .. "svd_slider_out.mp3") end,
     },
 }
 
@@ -280,15 +280,15 @@ function SWEP:Reload(time)
         -- ЗВУКИ (Оригинальные тайминги, чтобы влезть в 3.2/4.0 сек)
         if isEmpty then
             -- reload_empty0_0
-            timer.Simple(0.68, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_out.ogg") end end)
-            timer.Simple(2.10, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_in.ogg") end end)
-            timer.Simple(3.45, function() if IsValid(wep) then wep:EmitSound(path .. "svd_slider_in.ogg") end end)
-            timer.Simple(4.0, function() if IsValid(wep) then wep:EmitSound(path .. "svd_slider_out.ogg") end end)
+            timer.Simple(0.68, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_out.mp3") end end)
+            timer.Simple(2.10, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_in.mp3") end end)
+            timer.Simple(3.45, function() if IsValid(wep) then wep:EmitSound(path .. "svd_slider_in.mp3") end end)
+            timer.Simple(4.0, function() if IsValid(wep) then wep:EmitSound(path .. "svd_slider_out.mp3") end end)
         else
             -- reload0
-            timer.Simple(0.50, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_button.ogg") end end)
-            timer.Simple(0.68, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_out.ogg") end end)
-            timer.Simple(2.9, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_in.ogg") end end)
+            timer.Simple(0.50, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_button.mp3") end end)
+            timer.Simple(0.68, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_out.mp3") end end)
+            timer.Simple(2.9, function() if IsValid(wep) then wep:EmitSound(path .. "svd_mag_in.mp3") end end)
         end
     end
 end

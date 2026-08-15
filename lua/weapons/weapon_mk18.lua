@@ -117,16 +117,16 @@ SWEP.AnimsEvents = {
 		[0.8] = function(self) self:EmitSound("arc9_eft_shared/weapon_generic_spin6.mp3") end,
 	},
 	["reload"] = {
-		[0.10] = function(self) self:EmitSound(path .. "mk18_magrelease_button.ogg") end,
-		[0.20] = function(self) self:EmitSound(path .. "mk18_mag_out.ogg") end,
-		[0.55] = function(self) self:EmitSound(path .. "mk18_mag_in.ogg") end,
+		[0.10] = function(self) self:EmitSound(path .. "mk18_magrelease_button.mp3") end,
+		[0.20] = function(self) self:EmitSound(path .. "mk18_mag_out.mp3") end,
+		[0.55] = function(self) self:EmitSound(path .. "mk18_mag_in.mp3") end,
 	},
 	["reload_empty0"] = {
-		[0.10] = function(self) self:EmitSound(path .. "mk18_magrelease_button.ogg") end,
-		[0.20] = function(self) self:EmitSound(path .. "mk18_mag_out.ogg") end,
-		[0.45] = function(self) self:EmitSound(path .. "mk18_mag_in.ogg") end,
-		[0.65] = function(self) self:EmitSound(path .. "mk18_bolt_out.ogg") end,
-		[0.75] = function(self) self:EmitSound(path .. "mk18_bolt_in.ogg") end,
+		[0.10] = function(self) self:EmitSound(path .. "mk18_magrelease_button.mp3") end,
+		[0.20] = function(self) self:EmitSound(path .. "mk18_mag_out.mp3") end,
+		[0.45] = function(self) self:EmitSound(path .. "mk18_mag_in.mp3") end,
+		[0.65] = function(self) self:EmitSound(path .. "mk18_bolt_out.mp3") end,
+		[0.75] = function(self) self:EmitSound(path .. "mk18_bolt_in.mp3") end,
 	},
 }
 

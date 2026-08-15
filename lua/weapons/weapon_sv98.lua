@@ -167,16 +167,16 @@ local path = "weapons/darsu_eft/sv98/"
 
 SWEP.AnimsSounds = {
     ["ready0"] = {
-        [0.67] = function(self) self:EmitSound(path .. "sv98_boltout.ogg") end,
-        [1.05] = function(self) self:EmitSound(path .. "sv98_boltin.ogg") end,
+        [0.67] = function(self) self:EmitSound(path .. "sv98_boltout.mp3") end,
+        [1.05] = function(self) self:EmitSound(path .. "sv98_boltin.mp3") end,
     },
     ["ready1"] = {
-        [0.67] = function(self) self:EmitSound(path .. "sv98_boltout.ogg") end,
-        [1.05] = function(self) self:EmitSound(path .. "sv98_boltin.ogg") end,
+        [0.67] = function(self) self:EmitSound(path .. "sv98_boltout.mp3") end,
+        [1.05] = function(self) self:EmitSound(path .. "sv98_boltin.mp3") end,
     },
     ["ready2"] = {
-        [0.67] = function(self) self:EmitSound(path .. "sv98_boltout.ogg") end,
-        [1.05] = function(self) self:EmitSound(path .. "sv98_boltin.ogg") end,
+        [0.67] = function(self) self:EmitSound(path .. "sv98_boltout.mp3") end,
+        [1.05] = function(self) self:EmitSound(path .. "sv98_boltin.mp3") end,
     },
     ["draw"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
@@ -197,16 +197,16 @@ SWEP.AnimsSounds = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
     },
     ["bolt0"] = {
-        [0.24] = function(self) self:EmitSound(path .. "sv98_boltout.ogg") end,
-        [0.55] = function(self) self:EmitSound(path .. "sv98_boltin.ogg") end,
+        [0.24] = function(self) self:EmitSound(path .. "sv98_boltout.mp3") end,
+        [0.55] = function(self) self:EmitSound(path .. "sv98_boltin.mp3") end,
     },
     ["bolt1"] = {
-        [0.24] = function(self) self:EmitSound(path .. "sv98_boltout.ogg") end,
-        [0.55] = function(self) self:EmitSound(path .. "sv98_boltin.ogg") end,
+        [0.24] = function(self) self:EmitSound(path .. "sv98_boltout.mp3") end,
+        [0.55] = function(self) self:EmitSound(path .. "sv98_boltin.mp3") end,
     },
     ["bolt2"] = {
-        [0.24] = function(self) self:EmitSound(path .. "sv98_boltout.ogg") end,
-        [0.55] = function(self) self:EmitSound(path .. "sv98_boltin.ogg") end,
+        [0.24] = function(self) self:EmitSound(path .. "sv98_boltout.mp3") end,
+        [0.55] = function(self) self:EmitSound(path .. "sv98_boltin.mp3") end,
     },
     ["look"] = {
 		[0.01] = function(self) self:EmitSound("arc9_eft_shared/weap_handon.mp3") end,
@@ -341,8 +341,8 @@ function SWEP:Reload(time)
         cock(self, boltTime)
         
         local wep = self
-        timer.Simple(0.24, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltout.ogg") end end)
-        timer.Simple(0.55, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltin.ogg") end end)
+        timer.Simple(0.24, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltout.mp3") end end)
+        timer.Simple(0.55, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltin.mp3") end end)
         return
     end
 
@@ -392,13 +392,13 @@ function SWEP:Reload(time)
         
         -- Звуки с таймингами * 4
         if isEmpty then
-            timer.Simple(0.16, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_out.ogg") end end)
-            timer.Simple(1.40, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_in.ogg") end end)
-            timer.Simple(2.64, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltout.ogg") end end)
-            timer.Simple(2.96, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltin.ogg") end end)
+            timer.Simple(0.16, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_out.mp3") end end)
+            timer.Simple(1.40, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_in.mp3") end end)
+            timer.Simple(2.64, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltout.mp3") end end)
+            timer.Simple(2.96, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_boltin.mp3") end end)
         else
-            timer.Simple(0.32, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_out.ogg") end end)
-            timer.Simple(1.84, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_in.ogg") end end)
+            timer.Simple(0.32, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_out.mp3") end end)
+            timer.Simple(1.84, function() if IsValid(wep) then wep:EmitSound(path .. "sv98_mag_in.mp3") end end)
         end
     end
 end

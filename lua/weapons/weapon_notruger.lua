@@ -126,13 +126,13 @@ local pathsks = "weapons/darsu_eft/sks/"
 
 SWEP.AnimsSounds = {
     ["ready0"] = {
-        [0.05] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
-        [0.57] = function(self) self:EmitSound(pathsks .. "sks_slider_up.ogg") end,
-        [0.83] = function(self) self:EmitSound(pathsks .. "sks_slider_down.ogg") end,
-        [1.14] = function(self) self:EmitSound(path .. "m203_flip_2.ogg") end,
+        [0.05] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
+        [0.57] = function(self) self:EmitSound(pathsks .. "sks_slider_up.mp3") end,
+        [0.83] = function(self) self:EmitSound(pathsks .. "sks_slider_down.mp3") end,
+        [1.14] = function(self) self:EmitSound(path .. "m203_flip_2.mp3") end,
     },
     ["draw"] = {
-        [0] = function(self) self:EmitSound(path .. "mr133_draw.ogg") end,
+        [0] = function(self) self:EmitSound(path .. "mr133_draw.mp3") end,
     },
     ["fire"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_trigger_hammer.wav") end,
@@ -228,8 +228,8 @@ function SWEP:Reload(time)
                 end, false, true)
                 
                            -- Р—РІСѓРєРё Р±РѕР»С‚Р° (Р·Р°РїСѓСЃРєР°СЋС‚СЃСЏ СЃСЂР°Р·Сѓ РїРѕСЃР»Рµ РЅР°С‡Р°Р»Р° Р°РЅРёРјР°С†РёРё ready)
-                timer.Simple(0.2, function() if IsValid(wep) then wep:EmitSound(pathsks .. "sks_slider_up.ogg") end end)
-                timer.Simple(0.6, function() if IsValid(wep) then wep:EmitSound(pathsks .. "sks_slider_down.ogg") end end)
+                timer.Simple(0.2, function() if IsValid(wep) then wep:EmitSound(pathsks .. "sks_slider_up.mp3") end end)
+                timer.Simple(0.6, function() if IsValid(wep) then wep:EmitSound(pathsks .. "sks_slider_down.mp3") end end)
                 
             else
                 local currentClip = wep:Clip1()
@@ -249,10 +249,10 @@ function SWEP:Reload(time)
         end, false, true)
         
            -- Р—РІСѓРєРё СЃРјРµРЅС‹ РјР°РіР°Р·РёРЅР°
-        timer.Simple(0.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_down.ogg") end end)
-        timer.Simple(1.0, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_out.ogg") end end)
-        timer.Simple(2.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_in.ogg") end end) -- Р§СѓС‚СЊ СЂР°РЅСЊС€Рµ С‡РµРј 2.84
-        timer.Simple(3.2, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_up.ogg") end end)
+        timer.Simple(0.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_down.mp3") end end)
+        timer.Simple(1.0, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_out.mp3") end end)
+        timer.Simple(2.5, function() if IsValid(wep) then wep:EmitSound(path .. "avt_mag_in.mp3") end end) -- Р§СѓС‚СЊ СЂР°РЅСЊС€Рµ С‡РµРј 2.84
+        timer.Simple(3.2, function() if IsValid(wep) then wep:EmitSound(path .. "avt_magrelease_button_up.mp3") end end)
     end
 end
 

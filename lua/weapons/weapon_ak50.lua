@@ -208,16 +208,16 @@ local path = "weapons/darsu_eft/ak50/"
 
 SWEP.AnimsSounds = {
     ["ready"] = {
-        [0.15] = function(self) self:EmitSound(path .. "ak50_gunflip_1.ogg") end,
-        [1.39] = function(self) self:EmitSound(path .. "ak50_bolt_out.ogg") end,
-        [1.74] = function(self) self:EmitSound(path .. "ak50_bolt_in.ogg") end,
-        [2.10] = function(self) self:EmitSound(path .. "ak50_gunflip_3.ogg") end,
+        [0.15] = function(self) self:EmitSound(path .. "ak50_gunflip_1.mp3") end,
+        [1.39] = function(self) self:EmitSound(path .. "ak50_bolt_out.mp3") end,
+        [1.74] = function(self) self:EmitSound(path .. "ak50_bolt_in.mp3") end,
+        [2.10] = function(self) self:EmitSound(path .. "ak50_gunflip_3.mp3") end,
     },
     ["draw"] = {
         [0] = function(self) self:EmitSound("arc9_eft_shared/weap_in.mp3") end,
     },
     ["fire"] = {
-        [0] = function(self) self:EmitSound(path .. "ak50_hammer_in.ogg") end, -- Звук механизма
+        [0] = function(self) self:EmitSound(path .. "ak50_hammer_in.mp3") end, -- Звук механизма
     },
 }
 
@@ -338,22 +338,22 @@ function SWEP:Reload(time)
                -- Звуки (Без умножения на 5, чтобы влезть в reloadTime)
         if isEmpty then
             -- reload_empty (всего 5.0 сек)
-            timer.Simple(0.03, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_1.ogg") end end)
-            timer.Simple(0.53, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_out_fast.ogg") end end)
-            timer.Simple(1.40, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_2.ogg") end end)
-            timer.Simple(2.28, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_in.ogg") end end)
-            timer.Simple(2.64, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_3.ogg") end end)
+            timer.Simple(0.03, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_1.mp3") end end)
+            timer.Simple(0.53, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_out_fast.mp3") end end)
+            timer.Simple(1.40, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_2.mp3") end end)
+            timer.Simple(2.28, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_in.mp3") end end)
+            timer.Simple(2.64, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_3.mp3") end end)
             -- Болт
-            timer.Simple(3.60, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_bolt_out.ogg") end end)
-            timer.Simple(3.92, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_bolt_in.ogg") end end)
-            timer.Simple(4.26, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_look_3.ogg") end end)
+            timer.Simple(3.60, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_bolt_out.mp3") end end)
+            timer.Simple(3.92, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_bolt_in.mp3") end end)
+            timer.Simple(4.26, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_look_3.mp3") end end)
         else
             -- reload (всего 4.5 сек)
-            timer.Simple(0.10, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_1.ogg") end end)
-            timer.Simple(1.58, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_out.ogg") end end)
-            timer.Simple(2.40, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_2.ogg") end end)
-            timer.Simple(3.32, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_in.ogg") end end)
-            timer.Simple(3.74, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_3.ogg") end end)
+            timer.Simple(0.10, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_1.mp3") end end)
+            timer.Simple(1.58, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_out.mp3") end end)
+            timer.Simple(2.40, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_2.mp3") end end)
+            timer.Simple(3.32, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_mag_in.mp3") end end)
+            timer.Simple(3.74, function() if IsValid(wep) then wep:EmitSound(path .. "ak50_gunflip_3.mp3") end end)
         end
     end
 end
