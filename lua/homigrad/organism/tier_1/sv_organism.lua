@@ -2122,8 +2122,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.otrub = org.needotrub
 		org.fake = org.needfake
 	end
-	if org.needfake and owner:IsNPC() then
-
 	if org.needfake and hg.organism.ZerlkersCanPreventFake(org) then
 		org.needfake = false
 		org.consciousness = math.max(org.consciousness or 0, 0.55)
