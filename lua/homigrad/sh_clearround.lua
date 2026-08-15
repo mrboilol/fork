@@ -4,12 +4,33 @@ local DURATION   = 4
 local TARGET_FOV = 40     
 local SLOW_SCALE = 0.35   
 
+local CLEAR_TEXTS = {
+	"ez",
+	"CLEAR",
+	"gg no re",
+	"yall suck butt",
+	"back to the lobby",
+	"yay",
+}
+
 
 
 if SERVER then
 	util.AddNetworkString("rem_clearround")
 
 	local startSys
+	local lastTextIndex
+
+	local function GetRandomClearText()
+		local textIndex = math.random(#CLEAR_TEXTS)
+
+		if #CLEAR_TEXTS > 1 and textIndex == lastTextIndex then
+			textIndex = textIndex % #CLEAR_TEXTS + 1
+		end
+
+		lastTextIndex = textIndex
+		return CLEAR_TEXTS[textIndex]
+	end
 
 	local function TimeScaleThink()
 		local e = SysTime() - (startSys or 0)
@@ -34,6 +55,7 @@ if SERVER then
 
 	hook.Add("ZB_EndRound", "rem_clearround", function()
 		net.Start("rem_clearround")
+		net.WriteString(GetRandomClearText())
 		net.Broadcast()
 
 		startSys = SysTime()
@@ -58,6 +80,7 @@ local hg_fov = ConVarExists("hg_fov") and GetConVar("hg_fov")
 local active  = false
 local startSys = 0
 local channel  = nil
+local clearText = CLEAR_TEXTS[1]
 
 local function PlayClearSound()
 	if IsValid(channel) then
@@ -80,6 +103,7 @@ end
 net.Receive("rem_clearround", function()
 	active   = true
 	startSys = SysTime()
+	clearText = net.ReadString()
 	PlayClearSound()
 end)
 
@@ -150,7 +174,7 @@ hook.Add("HUDPaint", "rem_clearround_hud", function()
 	local outline = math.max(2, math.floor(ScrH() * 0.004))
 
 	draw.SimpleTextOutlined(
-		"CLEAR", "Rem_ClearRound", x, y,
+		clearText, "Rem_ClearRound", x, y,
 		Color(0, 0, 0, alpha),                
 		TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER,
 		outline, Color(255, 255, 255, alpha)   

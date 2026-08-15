@@ -130,17 +130,21 @@ end
 function SWEP:DoPoison(ply)
     local org = ply.organism
     local Owner = self:GetOwner()
+	if not org or not IsValid(Owner) then return false end
 
 	org.poison1 = CurTime() - (Owner.SubRole == "traitor_chemist" and 10 or 0)
 
     Owner:EmitSound("snd_jack_hmcd_needleprick.ogg",30)
 
-    self:Remove()
+	self:Remove()
 	Owner:SelectWeapon("weapon_hands_sh")
+	return true
 end
 
 if SERVER then
     hook.Add("Org Clear", "RemovePoison1", function(org)
+		if not org then return end
+
         org.poison1 = nil
 		org.poison1notificate = nil
     end)

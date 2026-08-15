@@ -14,6 +14,8 @@ function hg.organism.Add(ent)
 end
 
 function hg.organism.Clear(org)
+	if not org then return end
+
 	hook_Run("Org Clear", org)
 	if not IsValid(org.owner) then return end
 	
@@ -36,7 +38,10 @@ function hg.organism.Remove(ent)
 end
 
 hook.Add("PlayerInitialSpawn", "homigrad-organism", function(ply) hg.organism.Add(ply) end)
-hook.Add("Player Spawn", "homigrad-organism", function(ply) hg.organism.Clear(ply.organism) end)
+hook.Add("Player Spawn", "homigrad-organism", function(ply)
+	local org = ply.organism or hg.organism.Add(ply)
+	hg.organism.Clear(org)
+end)
 hook.Add("PlayerDisconnected", "homigrad-organism", function(ply) hg.organism.Remove(ply) end)
 hook.Add("PostPlayerDeath", "homigrad-organism", function(ply)
 	ply.lastDeathTime = CurTime()
