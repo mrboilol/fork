@@ -1570,7 +1570,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		attacker.harm = (attacker.harm or 0) + bleed_add / 50
 		local hurt_add = dmgHurt * 0.5 * hurtMul
 		org.hurtadd = org.hurtadd + hurt_add
-		local painadd = dmgHurt * painMul * 1.5 * (isMeleeDmg and melee_pain_scale or 1)
+		local painadd = dmgHurt * painMul * 0.75 * (org.painresist or 1)
 		local instantPainMul = 0.2
 		local instant_pain = (instantPainMul or 0) * painadd
 		local slow_pain = (1 - (instantPainMul or 0)) * painadd
@@ -2457,7 +2457,7 @@ if (not ply:Alive() or not org.alive) and (math.Round(ply:GetInfoNum("hg_deathfa
 
 	att.harm = 0
 
-	local dmghuy = dmg * 20
+	local dmghuy = dmg * 20 * (safeLanding and safePainMul or 1) * (org.painresist or 1)
 
 	if not org.superfighter then
 		org.painadd = org.painadd + dmghuy

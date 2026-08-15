@@ -967,10 +967,8 @@ function SWEP:PrimaryAttack(forcespecial)
 
 	self:UpdateNextIdle()
 
-	local anger = math_Clamp((org and org.anger) or 0, 0, 1)
-	local strikeDelayMul = 1 - anger * 0.18
-	self:SetNextPrimaryFire(CurTime() + .55 * strikeDelayMul * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) + (special_attack and 0.45 or isfur and 0.35 or 0))
-	self:SetNextSecondaryFire(CurTime() + .55 * strikeDelayMul + (special_attack and 0.45 or isfur and 0.35 or 0))
+	self:SetNextPrimaryFire(CurTime() + .6 * math_Clamp((180 - owner.organism.stamina[1]) / 90,1,2) / (owner.organism.meleespeed or 1) + (special_attack and 0.5 or isfur and 0.4 or 0))
+	self:SetNextSecondaryFire(CurTime() + .6 / (owner.organism.meleespeed or 1) + (special_attack and 0.5 or isfur and 0.4 or 0))
 	self:SetLastShootTime(CurTime())
 
 	if isfur then
