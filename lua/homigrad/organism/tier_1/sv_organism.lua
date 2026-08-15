@@ -329,6 +329,7 @@ end
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
 local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable Remorseism incapacitation", 0, 1)
 local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable organ-system failure: 0=organs stay functional, 1=normal organ failure", 0, 1)
+local incapacitation_death_delay = 25
 
 function hg.organism.IncapacitationEnabled()
 	return hg_incapacitation:GetBool()
@@ -2048,7 +2049,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	-- fixed rescue window before death.
 	if isPly and owner:Alive() and org.otrub and org.incapacitated then
 		if not org.deathStateEnd then
-			org.deathStateEnd = curTime + 20
+			org.deathStateEnd = curTime + incapacitation_death_delay
 			owner.fullsend = true
 		end
 

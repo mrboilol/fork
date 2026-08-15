@@ -135,7 +135,7 @@ function TOOL:Deploy()
 	if SERVER then
 		local ply = self:GetOwner()
 
-		ply:EmitSound("zbattle/pointinator.mp3")
+		ply:EmitSound("zbattle/pointinator.ogg")
 
 		zb.SendPointsToPly(ply)
 	end

@@ -104,7 +104,7 @@ module[2] = function(owner, org, timeValue)
         if not org.randomPainSound or org.randomPainSound < CurTime() then
             org.randomPainSound = CurTime() + math.random(20,45)
             local painVol = math.Clamp(math.Remap(org.pain or 0, 0, 120, 0.5, 1.0), 0.5, 1.0)
-            owner:EmitSound("zcitysnd/"..(ThatPlyIsFemale(owner) and "female" or "male").."/pain_"..math.random(1,8)..".mp3", 75, 100, painVol)
+            owner:EmitSound("zcitysnd/"..(ThatPlyIsFemale(owner) and "female" or "male").."/pain_"..math.random(1,8)..".ogg", 75, 100, painVol)
             org.painadd = org.painadd + 20
             //owner:TakeDamage(5,owner,owner)
         end

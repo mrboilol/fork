@@ -604,13 +604,9 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		sendSkullFractureGore(org, dmgInfo, true)
 	end
 
-	-- Fracture pain belongs to the moment the skull breaks. Keeping this active
-	-- after it is already fully damaged lets incidental physics/head impacts
-	-- continuously refill avgpain and effectively makes the injury permanent.
 	if org.skull == 1 and oldDmg < 1 then
 		markBrokenBone(org, "ValveBiped.Bip01_Head1")
 		org.shock = org.shock + dmg * 40
-		org.avgpain = org.avgpain + dmg * 30
 
 		playSkullFractureSound(org.owner)
 		sendThought(org, "Your skull is broken.", "thought_skull", 4, Color(255, 180, 180))

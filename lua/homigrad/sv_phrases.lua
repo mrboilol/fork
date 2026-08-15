@@ -657,7 +657,7 @@ hook.Add("PreHomigradDamage","BurnScream", function( ent, dmgInfo )
 		if mRandom(1, 100) <= mClamp(burnScreamUniversalChance, 0, 1) * 100 then
 			phrase = burnScreamSounds[mRandom(#burnScreamSounds)]
 		else
-			phrase = "zcitysnd/"..(ThatPlyIsFemale(ply) and "fe" or "").."male/burn/death_burn"..mRandom(1,ThatPlyIsFemale(ply) and femaleCount or maleCount)..".mp3"
+			phrase = "zcitysnd/"..(ThatPlyIsFemale(ply) and "fe" or "").."male/burn/death_burn"..mRandom(1,ThatPlyIsFemale(ply) and femaleCount or maleCount)..".ogg"
 		end
 
 		-- overrides

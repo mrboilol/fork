@@ -28,6 +28,9 @@ local pain_fake_threshold = 0.9
 local pain_drain_base = 8
 local pain_drain_otrub_mul = 4.5
 local anger_pain_reduction_max = 0.16
+local pain_syncope_start = 55
+local pain_syncope_full = 120
+local pain_syncope_max_rate = 0.055
 
 function hg.organism.GetAdrenalinePainPacing(adrenaline)
 	adrenaline = max(adrenaline or 0, 0)
@@ -276,6 +279,16 @@ module[2] = function(owner, org, timeValue)
 	-- painadd above instead of directly deleting pain already incurred.
 	local angerPainMul = 1 - anger * anger_pain_reduction_max
 	org.pain = org.avgpain * math.max(1 - (org.analgesia + org.painkiller * 0.3), 0) * angerPainMul
+	-- Pain can now produce a vasovagal blackout before the slower shock drain has
+	-- finished lowering consciousness. The smooth severity curve keeps moderate
+	-- pain occasional and makes sustained extreme pain progressively less stable.
+	local syncopeSeverity = Clamp((org.pain - pain_syncope_start) / (pain_syncope_full - pain_syncope_start), 0, 1)
+	local syncopeResistance = Clamp(resilience * 0.35 + zerlkersResistance * 0.8, 0, 0.9)
+	local syncopeRate = syncopeSeverity ^ 1.7 * pain_syncope_max_rate * (1 - syncopeResistance)
+	if not org.otrub and syncopeRate > 0 and math.random() < Clamp(syncopeRate * timeValue, 0, 1) then
+		org.consciousness = math.min(org.consciousness or 1, 0.2)
+		org.needotrub = true
+	end
 	org.nearpainlimit = not org.otrub and org.pain >= org.pain_turn * pain_fake_threshold
 
 	if org.isPly and org.pain >= 85 and IsValid(owner) and owner.Thought then

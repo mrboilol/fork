@@ -442,7 +442,11 @@ function SWEP:GetMuzzleAtt(ent, trueAtt, supressorAdd)
 
 	--if true then return {Pos = self.desiredPos or vector_origin,Ang = self.desiredAng or angle_zero} end
 
-	local att = gun:GetAttachment(gun:LookupAttachment( self:ShouldUseFakeModel() and self.FakeAttachment or "muzzle"))
+	local useFakeModel = self:ShouldUseFakeModel()
+	local fakeAttachment = self.FakeAttachment or "muzzle"
+	local fakeAttachmentPos = self.AttachmentPos or vecZero
+	local fakeAttachmentAng = self.AttachmentAng or angZero
+	local att = gun:GetAttachment(gun:LookupAttachment(useFakeModel and fakeAttachment or "muzzle"))
 	local att = att ~= nil and att or gun:GetAttachment(gun:LookupAttachment("muzzle_flash"))
 	--local att = gun:GetAttachment(gun:LookupAttachment("muzzle"))
 	--local att = att!=nil and att or gun:GetAttachment(gun:LookupAttachment("muzzle_flash"))
@@ -459,7 +463,7 @@ function SWEP:GetMuzzleAtt(ent, trueAtt, supressorAdd)
 		posHuy:Add(angHuy:Up() * attPos[1] + angHuy:Right() * attPos[2] + angHuy:Forward() * attPos[3])
 		if supressorAdd and self:HasAttachment("barrel", "supressor") then posHuy:Add(angHuy:Forward() * 10) end
 
-		if self:ShouldUseFakeModel() then posHuy, angHuy = LocalToWorld(self.AttachmentPos, self.AttachmentAng, posHuy, angHuy) end
+		if useFakeModel then posHuy, angHuy = LocalToWorld(fakeAttachmentPos, fakeAttachmentAng, posHuy, angHuy) end
 
 		attTbl.Pos = posHuy
 		attTbl.Ang = angHuy
@@ -477,14 +481,14 @@ function SWEP:GetMuzzleAtt(ent, trueAtt, supressorAdd)
 		att.Ang = ang
 		ang:RotateAroundAxis(ang:Forward(),self.rotatehuy or 0)
 		
-		if self:ShouldUseFakeModel() then pos, ang = LocalToWorld(self.AttachmentPos, self.AttachmentAng, pos, ang) end
+		if useFakeModel then pos, ang = LocalToWorld(fakeAttachmentPos, fakeAttachmentAng, pos, ang) end
 
 		--ang:Add(attAng)
 		if supressorAdd and self:HasAttachment("barrel", "supressor") then pos:Add(ang:Forward() * 10) end
 		--pos:Add(ang:Up() * attPos[1] + ang:Right() * attPos[2] + ang:Forward() * attPos[3])
 	end
 
-	if self:ShouldUseFakeModel() then att.Pos, att.Ang = LocalToWorld(self.AttachmentPos, self.AttachmentAng, att.Pos, att.Ang) end
+	if useFakeModel then att.Pos, att.Ang = LocalToWorld(fakeAttachmentPos, fakeAttachmentAng, att.Pos, att.Ang) end
 
 	return att
 end

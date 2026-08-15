@@ -4,8 +4,8 @@ hg.organism.module.pulse = {}
 local module = hg.organism.module.pulse
 
 -- Blood-volume response is calculated rather than sampled from lookup tables.
--- It approaches zero with the actual circulating volume; volume itself never
--- acts as a cardiac-arrest switch.
+-- Delivery approaches zero with actual circulating volume; sustained severe
+-- loss also contributes a smooth collapse hazard rather than a hard cutoff.
 local terminalHeartRate = 300
 local peaDuration = 6
 
@@ -120,6 +120,16 @@ local function getPalpitationThreat(org, blood, o2Value)
 	)
 
 	return math.max(lowBlood, lowCirculation, hypoxia, shock, heartDamage, temperatureStress)
+end
+
+local function getHemorrhagicCollapseChance(blood)
+	-- A shallow root term introduces uncommon complications through the upper
+	-- danger band, while the high-order term makes deep blood loss accelerate
+	-- sharply. This remains one continuous per-second hazard, not a table of
+	-- independent rolls for named blood-volume thresholds.
+	local riskDepth = math.Clamp((3500 - (tonumber(blood) or 5000)) / 1500, 0, 1.25)
+	if riskDepth <= 0 then return 0 end
+	return math.Clamp(math.sqrt(riskDepth) * 0.0032 + riskDepth ^ 6 * 0.043, 0, 0.08)
 end
 
 local heatDamageTargets = {"brain", "heart", "liver", "stomach", "intestines"}
@@ -325,6 +335,7 @@ module[1] = function(org)
 	org.lastHighSpeedVelocityTime = nil
 	org.nextArrhythmiaRoll = 0
 	org.lastCardiacPain = 0
+	org.hemorrhagicCollapseExposure = 0
 
 	org.tempchanging = 0
 	org.heatbuff = 30 -- seconds of heat supply
@@ -575,6 +586,15 @@ module[2] = function(owner, org, timeValue)
 	palpitations = org.palpitations
 	palpitationThreat = getPalpitationThreat(org, bloodNow, o2Value)
 	effectivePalpitations = palpitations * Lerp(palpitationThreat, 0.2, 1)
+	-- Collapse risk needs several seconds to develop, so merely crossing a blood
+	-- value cannot instantly kill an unlucky player. Transfusion or recovery above
+	-- the danger band clears the accumulated exposure again.
+	local collapseExposureTarget = bloodNow < 3500 and 1 or 0
+	org.hemorrhagicCollapseExposure = math.Approach(
+		org.hemorrhagicCollapseExposure or 0,
+		collapseExposureTarget,
+		timeValue / (collapseExposureTarget > 0 and 8 or 12)
+	)
 
 	-- Blood loss raises the compensation target continuously, but volume does not
 	-- flip the heart into an arrest state at an arbitrary threshold.
@@ -616,8 +636,8 @@ module[2] = function(owner, org, timeValue)
 		org._tachycardiaSince = nil
 	end
 
-	-- Probabilistic heartstop based on heart rate (kept as a softer fallback for
-	-- the 200-300 range where rhythms become dangerous but not yet lethal).
+	-- Probabilistic heartstop from an unstable rhythm or sustained hypovolemic
+	-- collapse. Blood volume supplies a smooth hazard rather than a lethal cutoff.
 	if organSystemsEnabled and not org.heartstop and (not org._heart_rate_check_time or CurTime() > org._heart_rate_check_time) then
 		org._heart_rate_check_time = CurTime() + 1 -- check every second
 
@@ -638,6 +658,11 @@ module[2] = function(owner, org, timeValue)
 		end
 
 		if org.panicattackActive then chance = chance * 0.5 end
+		local hemorrhagicChance = getHemorrhagicCollapseChance(bloodNow) * (org.hemorrhagicCollapseExposure or 0)
+		-- Combine independent hazards without allowing their sum to exceed one.
+		-- Panic only softens its own tachyarrhythmia path; it cannot protect against
+		-- loss of circulating volume.
+		chance = 1 - (1 - chance) * (1 - hemorrhagicChance)
 		if chance > 0 and math.random() < chance then
 			org.heartstop = true
 		end

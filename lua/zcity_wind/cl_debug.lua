@@ -16,6 +16,10 @@ local colorServerText = Color(255, 50, 50)
 local colorDeviation = Color(0, 191, 255, 255)
 local colorTextShadow = Color(0, 0, 0, 255)
 local textOffset = Vector(0, 0, 15)
+local SUPPRESSION_SOUND_VOLUME = 2.5
+local SUPPRESSION_SOUND_LEVEL = 180
+local DISTANT_CRACK_VOLUME = 2
+local DISTANT_CRACK_SOUND_LEVEL = 170
 
 -- The remote Z-City crack pack is mounted on the server.  Keep the modern
 -- snap sounds as a fallback for installations that do not have that pack.
@@ -29,7 +33,7 @@ end
 -- sound from the same authoritative event that applies the suppression.
 local function PlaySuppressionCrack(pos)
     local crack = "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"
-    EmitSound(crack, pos, 0, CHAN_ITEM, 1.35, 170)
+    EmitSound(crack, pos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
 end
 
 net.Receive("ZCity_Wind_SuppressionForce", function()
@@ -58,8 +62,8 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
 		-- Keep grazing shots noticeable, but make a round passing right by the
 		-- player's head violently kick the view.
 		local proximity = math.Clamp((force - 0.8) / 13.2, 0, 1)
-		local punchScale = Lerp(proximity * proximity, 0.75, 7.5)
-		local hitScale = wasHit and 1.6 or 1
+		local punchScale = Lerp(proximity * proximity, 1, 10)
+		local hitScale = wasHit and 1.75 or 1
 		local punch = Angle(math.Rand(-5.5, 3.5), math.Rand(-4.5, 4.5), math.Rand(-1.5, 1.5)) * punchScale * hitScale
 
 		if type(QuickViewPunch) == "function" then
@@ -258,7 +262,7 @@ local function ApplyClientOverride()
                         local soundPos = startPos + (hitPos - startPos) * 0.35
                         timer.Simple(time, function()
 							local crack = "cracks/distant/dist_crack_" .. string.format("%02d", math.random(1, 17)) .. ".ogg"
-							EmitSound(ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"), soundPos, 0, CHAN_AUTO, 1.25, SNDLVL_150dB)
+							EmitSound(ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"), soundPos, 0, CHAN_AUTO, DISTANT_CRACK_VOLUME, DISTANT_CRACK_SOUND_LEVEL)
                         end)
                     end
                 end
@@ -354,8 +358,8 @@ local function ApplyClientOverride()
 
 				-- Keep the remote Z-City damage-tiered crack selection, with a
 				-- louder near-miss mix so it is not buried by weapon reports.
-				if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic, 170, 1.35, crack) then return end
-				EmitSound(crack, playPos, 0, CHAN_ITEM, 1.35, 170)
+				if HG_BulletImpactSounds and HG_BulletImpactSounds.PlayNearMiss(playPos, subsonic, SUPPRESSION_SOUND_LEVEL, SUPPRESSION_SOUND_VOLUME, crack) then return end
+				EmitSound(crack, playPos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
             end)
 
             plugin._ZCityBulletCracksRegistered = true

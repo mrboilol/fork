@@ -500,7 +500,7 @@ if SERVER then
 				for i, tbl in pairs(dtape) do
 					if tbl[2] > 0 then
 						tbl[2] = tbl[2] - 0.2
-						ply.FakeRagdoll:EmitSound("tape_friction" .. math.random(3) .. ".mp3", 65)
+						ply.FakeRagdoll:EmitSound("tape_friction" .. math.random(3) .. ".ogg", 65)
 						if tbl[2] <= 0 then
 							if IsValid(tbl[1]) then
 								tbl[1]:Remove()
@@ -1140,7 +1140,7 @@ if SERVER then
 
 		if ragdoll.ducttaped_legs and ragdoll.ducttapeLegsStr and ragdoll.ducttapeLegsStr > 0 then
 			ragdoll.ducttapeLegsStr = ragdoll.ducttapeLegsStr - 2
-			ragdoll:EmitSound("tape_friction" .. math.random(3) .. ".mp3", 65)
+			ragdoll:EmitSound("tape_friction" .. math.random(3) .. ".ogg", 65)
 
 			if ragdoll.ducttapeLegsStr <= 0 then
 				RemoveLimbTape(ragdoll, "legs")
@@ -1151,7 +1151,7 @@ if SERVER then
 
 		if ragdoll.ducttaped_hands and ragdoll.ducttapeHandsStr and ragdoll.ducttapeHandsStr > 0 then
 			ragdoll.ducttapeHandsStr = ragdoll.ducttapeHandsStr - 2
-			ragdoll:EmitSound("tape_friction" .. math.random(3) .. ".mp3", 65)
+			ragdoll:EmitSound("tape_friction" .. math.random(3) .. ".ogg", 65)
 
 			if ragdoll.ducttapeHandsStr <= 0 then
 				RemoveLimbTape(ragdoll, "hands")

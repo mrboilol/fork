@@ -31,8 +31,10 @@ local IsValid = IsValid
 		local vp_punch_angle_velocity4 = Angle()
 		vp_punch_angle_last4 = vp_punch_angle_last4 or vp_punch_angle4
 
-		-- Suppression needs a short camera jolt, not another oscillating spring.
-		-- This channel applies the impulse immediately and eases it straight back.
+		-- Suppression needs a forceful camera jolt, not another oscillating spring.
+		-- This channel applies the impulse immediately and eases it straight back
+		-- slowly enough that the heavier kick does not feel like a single-frame snap.
+		local QUICK_PUNCH_RETURN_SPEED = 14
 		local vp_quick_angle = Angle()
 		local vp_quick_angle_last = Angle()
 
@@ -127,7 +129,7 @@ local IsValid = IsValid
 			end
 
 			if not vp_quick_angle:IsZero() then
-				vp_quick_angle = LerpAngle(math_Clamp(ftlerped * 22, 0, 1), vp_quick_angle, Angle())
+				vp_quick_angle = LerpAngle(math_Clamp(ftlerped * QUICK_PUNCH_RETURN_SPEED, 0, 1), vp_quick_angle, Angle())
 				if math.abs(vp_quick_angle.p) + math.abs(vp_quick_angle.y) + math.abs(vp_quick_angle.r) < 0.01 then
 					vp_quick_angle:Zero()
 				end

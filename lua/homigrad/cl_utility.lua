@@ -249,7 +249,11 @@ players : 1 humans, 0 bots (20 max)
 		suppressionVec = Vector(0, 0, 0)
 		suppressionDist = 0
 		suppressionDistAdd = 0
-		local SUPPRESSION_PUNCH_MULTIPLIER = 2.5
+		local SUPPRESSION_PUNCH_MULTIPLIER = 3.5
+		local SUPPRESSION_SOUND_VOLUME = 2.5
+		local SUPPRESSION_SOUND_LEVEL = 180
+		local DISTANT_CRACK_VOLUME = 2
+		local DISTANT_CRACK_SOUND_LEVEL = 170
 		local function ApplySuppressionPunch(angle)
 			if hg_suppression_viewpunch and not hg_suppression_viewpunch:GetBool() then return end
 			angle = angle * SUPPRESSION_PUNCH_MULTIPLIER
@@ -297,7 +301,7 @@ players : 1 humans, 0 bots (20 max)
 			if tr.StartPos:Distance( tr.HitPos ) > 5000 and !subsonic then
 				local time = view.origin:Distance(tr.StartPos+tr.HitPos/2) / 17836
 				timer.Simple(time,function()
-					EmitSound("cracks/distant/dist_crack_" .. string.format("%02d", math.random(1, 17)) .. ".ogg", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, 1,SNDLVL_140dB)
+					EmitSound("cracks/distant/dist_crack_" .. string.format("%02d", math.random(1, 17)) .. ".ogg", tr.StartPos+tr.HitPos*0.35, 0, CHAN_AUTO, DISTANT_CRACK_VOLUME, DISTANT_CRACK_SOUND_LEVEL)
 				end)
 			end
 
@@ -329,7 +333,7 @@ players : 1 humans, 0 bots (20 max)
 
 			if dist < 500 then
 				local playPos = pos - tr.Normal * 25
-				EmitSound(SND, playPos, 0, CHAN_ITEM, 1, 155)
+				EmitSound(SND, playPos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
 			else return end
 			-- if dist > 120 then return end
 			-- if !subsonic then
