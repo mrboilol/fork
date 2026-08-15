@@ -28,6 +28,8 @@ Hemothorax progression is owned by `sv_lungs.lua`: thoracic organ damage guarant
 
 Remorseism incapacitation uses a server-owned 25-second deadline. The deadline is replicated with the organism state so the OTRUB HUD can draw its countdown below either ring layout and the client can start and stop `rem_deathstatefull.mp3` from the same state transition; ordinary recoverable unconsciousness does not start this timer.
 
+The cinematic death client uses the complete `judge/main` `CDeath` state-table implementation. Keep its paired title/description messages, randomized overlay colors, skip cleanup, and single camera-rendering path together; do not restore the older standalone description list, bare state globals, or duplicate `RenderScene` renderer. This branch intentionally keeps `rem_brutaldeath.mp3` as the cinematic death track.
+
 Sound references use `.wav` only when the referenced WAV is shipped under this add-on's `sound` folder. References to sounds supplied by external content use `.ogg`, including dynamically constructed sound names.
 
 ## Antique pistol source asset
