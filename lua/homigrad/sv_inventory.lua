@@ -140,8 +140,8 @@ hook.Add("PlayerAmmoChanged", "homigrad-inventory", function(ply,ammoID,oldcount
 end)
 
 local vecZero = Vector(0, 0, 0)
-hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply)
-    local wep = ply:GetActiveWeapon()
+hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply, weapon)
+    local wep = IsValid(weapon) and weapon or ply:GetActiveWeapon()
     if not IsValid(wep) or wep.NoDrop then return end
     local eyeAngles = ply:EyeAngles()
     eyeAngles.x = 0
@@ -157,6 +157,12 @@ hook.Add("PlayerDropWeapon", "homigrad-inventory", function(ply)
     ply:SetNetVar("Inventory", ply.inventory)
     ply:SetActiveWeapon(NULL)
 	if ply.organism and ishgweapon(wep) then ply.organism.postureGunfireWeapon = wep end
+
+    if ply:Alive() then
+        wep:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+        wep.IsSpawned = true
+        return
+    end
 
     timer.Simple(0.1,function()
         if not IsValid(wep) then return end

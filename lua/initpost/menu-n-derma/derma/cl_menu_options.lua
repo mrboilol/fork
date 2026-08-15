@@ -276,13 +276,12 @@ local info_sections = {
     {title = "Credits", key = "credits", disabled = true, disabledColor = Color(105, 105, 105, 180)},
     {title = "Socials", key = "socials"}
 }
-local info_credit_lines = {
-    "PLACEHOLDER",
-    "PLACEHOLDER",
-    "PLACEHOLDER",
-    "PLACEHOLDER",
-    "PLACEHOLDER",
-    "PLACEHOLDER"
+local info_credit_entries = {
+    {name = "Wiley", merit = "The main developer of judge.", steamid = "76561199162536724", img = "wiley"},
+    {name = "CodeOrange", merit = "Contributor of judge.", steamid = "76561198893264087", img = "codeorange"},
+    {name = "Lazzy", merit = "Main weapons developer.", steamid = "76561198876700603", img = "lazzy"},
+    {name = "Kazoo", merit = "Developer of \"Remorseism\".", steamid = "76561199404982388", img = "kazoo"},
+    {name = "fuzyaker", merit = "Manhunt execution animations", img = "fuzyaker", url = "https://steamcommunity.com/sharedfiles/filedetails/?id=3782848810"}
 }
 local info_fallback_band = {
     icon = Material("vgui/mats_jack_awards/10")
@@ -2110,120 +2109,32 @@ function InfoRefreshContent()
         holder:Dock(FILL)
         holder.Paint = function() end
 
-        local bottomLogo = vgui.Create("DPanel", holder)
-        bottomLogo:Dock(BOTTOM)
-        bottomLogo:SetTall(MenuUnit(270))
-        bottomLogo.Paint = function() end
+            local merit = vgui.Create("DLabel", row)
+            merit:SetPos(textX, MenuUnit(40))
+            merit:SetFont("ZCity_Menu_Settings_Tiny")
+            merit:SetTextColor(settings_color_text_dim)
+            merit:SetText(entry.merit or "")
+            merit:SizeToContents()
 
-        local alsoCheck = vgui.Create("DLabel", bottomLogo)
-        alsoCheck:Dock(TOP)
-        alsoCheck:SetTall(MenuUnit(30))
-        alsoCheck:SetFont("ZCity_Menu_Settings_Small")
-        alsoCheck:SetTextColor(settings_color_text)
-        alsoCheck:SetContentAlignment(5)
-        alsoCheck:SetText("Also check out:")
+            if entry.url then
+                local linkButton = vgui.Create("DButton", row)
+                linkButton:SetText("")
+                linkButton:SetCursor("hand")
+                linkButton:SetPos(textX, MenuUnit(40))
+                linkButton:SetSize(merit:GetWide(), merit:GetTall())
+                linkButton.Paint = function(self, w, h)
+                    if not self:IsHovered() then return end
 
-        local judgeButton = vgui.Create("DButton", bottomLogo)
-        judgeButton:SetText("")
-        judgeButton.HoverLerp = 0
-        judgeButton:SetCursor("hand")
-        judgeButton.DoClick = function()
-            gui.OpenURL(info_judge_url)
-        end
-        judgeButton.Think = function(self)
-            self.HoverLerp = LerpFT(0.12, self.HoverLerp or 0, self:IsHovered() and 1 or 0)
-        end
-        judgeButton.Paint = function(self, w, h)
-            local scale = 1 + (self.HoverLerp or 0) * 0.08
-            local maxW = w / 1.08
-            local maxH = h / 1.08
-            local aspect = math.max(1, info_judge_logo:Height()) / math.max(1, info_judge_logo:Width())
-            local baseW = math.min(maxW, maxH / aspect)
-            local baseH = baseW * aspect
-            local drawW = baseW * scale
-            local drawH = baseH * scale
-            local drawX = math.floor(w * 0.5 - drawW * 0.5)
-            local drawY = math.floor(h * 0.5 - drawH * 0.5)
-
-            surface.SetMaterial(info_judge_logo)
-            surface.SetDrawColor(255, 255, 255, 255)
-            surface.DrawTexturedRect(drawX, drawY, drawW, drawH)
-        end
-        bottomLogo.PerformLayout = function(self, w, h)
-            local areaH = h - alsoCheck:GetTall()
-            local aspect = math.max(1, info_judge_logo:Height()) / math.max(1, info_judge_logo:Width())
-            local buttonW = math.min(w - MenuUnit(20), MenuUnit(390))
-            local buttonH = math.min(areaH - MenuUnit(10), MenuUnit(210), buttonW * aspect)
-            buttonW = buttonH / aspect
-            judgeButton:SetSize(math.ceil(buttonW * 1.08), math.ceil(buttonH * 1.08))
-            judgeButton:SetPos(math.floor(w * 0.5 - judgeButton:GetWide() * 0.5), alsoCheck:GetTall() + math.floor(areaH * 0.5 - judgeButton:GetTall() * 0.5))
-        end
-
-        local scroll = vgui.Create("DScrollPanel", holder)
-        scroll:Dock(FILL)
-        scroll:DockMargin(MenuUnit(24), MenuUnit(24), MenuUnit(24), MenuUnit(24))
-        scroll.Paint = function() end
-
-        local sbar = scroll:GetVBar()
-        sbar:SetWide(MenuUnit(4))
-        sbar:SetHideButtons(true)
-        function sbar:Paint(w, h)
-            surface.SetDrawColor(0, 0, 0, 80)
-            surface.DrawRect(0, 0, w, h)
-        end
-        function sbar.btnGrip:Paint(w, h)
-            local col = self:IsHovered() and settings_color_whitey or settings_color_dim
-            draw.RoundedBox(2, 1, 1, w - 2, h - 2, col)
-        end
-
-        for _, social in ipairs(info_social_links) do
-            local row = vgui.Create("DButton", scroll)
-            row:Dock(TOP)
-            row:DockMargin(0, 0, 0, MenuUnit(10))
-            row:SetTall(MenuUnit(70))
-            row:SetText("")
-            row.HoverLerp = 0
-            row.DoClick = function()
-                if social.url and social.url ~= "" then
-                    gui.OpenURL(social.url)
+                    surface.SetFont("ZCity_Menu_Settings_Tiny")
+                    surface.SetTextColor(settings_color_text)
+                    surface.SetTextPos(0, 0)
+                    surface.DrawText(entry.merit or "")
+                    surface.SetDrawColor(settings_color_text)
+                    surface.DrawRect(0, h - 1, w, 1)
                 end
-            end
-            row.Think = function(self)
-                self.HoverLerp = LerpFT(0.2, self.HoverLerp or 0, self:IsHovered() and 1 or 0)
-            end
-            row.Paint = function(self, w, h)
-                local alpha = 120 + 30 * (self.HoverLerp or 0)
-                local iconSize = info_social_icon_size
-                local iconX = info_social_icon_x
-                local iconY = math.floor(h * 0.5 - iconSize * 0.5)
-                local buttonW = info_social_button_w
-                local buttonH = info_social_button_h
-                local buttonX = w - info_social_button_right - buttonW
-                local buttonY = math.floor(h * 0.5 - buttonH * 0.5)
-                local iconSize = info_social_icon_size
-                local iconX = info_social_icon_x
-                local iconY = math.floor(h * 0.5 - iconSize * 0.5)
-                local buttonW = info_social_button_w
-                local buttonH = info_social_button_h
-                local buttonX = w - info_social_button_right - buttonW
-                local buttonY = math.floor(h * 0.5 - buttonH * 0.5)
-                surface.SetDrawColor(20, 20, 30, alpha)
-                surface.DrawRect(0, 0, w, h)
-                surface.SetDrawColor(settings_color_whitey.r, settings_color_whitey.g, settings_color_whitey.b, 80 + 80 * (self.HoverLerp or 0))
-                surface.DrawRect(0, h - MenuUnit(1), w, MenuUnit(1))
-                if social.icon then
-                    surface.SetMaterial(social.icon)
-                    surface.SetDrawColor(255, 255, 255, 220)
-                    surface.DrawTexturedRect(iconX, iconY, iconSize, iconSize)
-                    surface.DrawTexturedRect(iconX, iconY, iconSize, iconSize)
+                linkButton.DoClick = function()
+                    gui.OpenURL(entry.url)
                 end
-                draw.SimpleText(social.title, "ZCity_Menu_Settings_Small", info_social_text_x, MenuUnit(20), settings_color_text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-                draw.SimpleText(social.subtitle, "ZCity_Menu_Settings_Tiny", info_social_text_x, MenuUnit(42), settings_color_text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-                surface.SetDrawColor(0, 0, 0, 245)
-                surface.DrawRect(buttonX, buttonY, buttonW, buttonH)
-                surface.SetDrawColor(255, 255, 255, 210)
-                surface.DrawOutlinedRect(buttonX, buttonY, buttonW, buttonH, 1)
-                draw.SimpleText("Join", "ZCity_Menu_Settings_Tiny", buttonX + buttonW * 0.5, buttonY + buttonH * 0.5, settings_color_whitey, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
         end
     end

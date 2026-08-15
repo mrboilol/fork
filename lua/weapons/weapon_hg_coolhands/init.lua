@@ -99,14 +99,13 @@ local function WriteShoveHarm(owner, target, wep, harm)
         target = hg.RagdollOwner(target) or target
         if not IsValid(owner) or not IsValid(target) or not target:IsPlayer() or target == owner then return end
 
-        local dmginfo = DamageInfo()
-        dmginfo:SetAttacker(owner)
-        dmginfo:SetInflictor(wep)
-        dmginfo:SetDamage(harm * 10)
-        dmginfo:SetDamageType(DMG_CLUB)
-        dmginfo:SetDamagePosition(target:GetPos())
-
-        hook.Run("HomigradDamage", target, dmginfo, HITGROUP_CHEST, target, harm)
+	local dmgInfo = DamageInfo()
+	dmgInfo:SetAttacker(owner)
+	dmgInfo:SetInflictor(wep)
+	dmgInfo:SetDamage(harm * 10)
+	dmgInfo:SetDamageType(DMG_CLUB)
+	dmgInfo:SetDamagePosition(target:GetPos())
+	target:TakeDamageInfo(dmgInfo)
 end
 
 local function PushRagdoll(rag, physbone, pushVel, hitPos)
