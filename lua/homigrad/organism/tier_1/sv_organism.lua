@@ -1781,9 +1781,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	-- Раньше на зимних картах это давало случайные припадки из-за переохлаждения.
 	local temperature = org.temperature or 36.7
 	local curTime = CurTime()
-	local seizureBrainDamage = math.max(org.brain or 0, lobeDamage)
-	if seizureBrainDamage > 0.05 then
-
 	if organSystemsEnabled then
 		local brainDelta = (org.brain or 0) - oldSeizureBrain
 		local lobeDelta = lobeDamage - oldSeizureLobeDamage
