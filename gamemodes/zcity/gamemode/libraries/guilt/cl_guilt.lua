@@ -51,12 +51,6 @@ net.Receive("open_guilt_menu", function()
     OpenMenu(tbl, karma)
 end)
 
-net.Receive("karma_down_sound", function()
-    local pitch = net.ReadFloat()
-    if not IsValid(LocalPlayer()) then return end
-    sound.Play("karmadown.mp3", LocalPlayer():GetPos(), 100, pitch)
-end)
-
 local colGray = Color(122,122,122,255)
 local BlurBackground = hg.BlurBackground
 local guiltMenuOutline = Color(255, 255, 255, 255)
@@ -167,10 +161,7 @@ hook.Add("HUDPaint","shownotification",function()
     end
 end)
 
-local myKarma = 100
 OpenMenu = function(tbl, karma)
-    myKarma = karma or myKarma or 100
-
     if IsValid(guiltMenu) then
 		guiltMenu:Remove()
 		guiltMenu = nil
@@ -185,8 +176,8 @@ OpenMenu = function(tbl, karma)
 	local margin = math.max(8, math.min(ScaleMenu(20), ScrW() * 0.05, ScrH() * 0.05))
 	local maxX = ScrW() - margin * 2
 	local maxY = ScrH() - margin * 2
-	local sizeX = math.min(ScaleMenu(660), maxX)
-	local sizeY = math.Clamp(ScaleMenu(90) + math.max(playerCount, 3) * (rowH + ScaleMenu(6)) + ScaleMenu(20), math.min(ScaleMenu(260), maxY), math.min(ScaleMenu(580), maxY))
+	local sizeX = math.Clamp(ScrW() * 0.4, math.min(ScaleMenu(480), maxX), math.min(ScaleMenu(640), maxX))
+	local sizeY = math.Clamp(ScaleMenu(100) + math.max(playerCount, 5) * (rowH + ScaleMenu(5)) + ScaleMenu(20), math.min(ScaleMenu(340), maxY), math.min(ScrH() * 0.72, maxY))
 
 	guiltMenu = vgui.Create("ZFrame")
 	guiltMenu:SetTitle("")
@@ -205,7 +196,7 @@ OpenMenu = function(tbl, karma)
     local title = vgui.Create("DLabel", guiltMenu)
     title:SetPos(ScaleMenu(12), ScaleMenu(8))
     title:SetTextColor(color_white)
-    title:SetText("your karma: "..math.Round(myKarma))
+    title:SetText("your karma: "..math.Round(karma or LocalPlayer().Karma or 100, 1))
     title:SetFont("ZCity_Menu_Settings_Small")
     title:SizeToContents()
 
@@ -271,7 +262,7 @@ OpenMenu = function(tbl, karma)
             net.WriteEntity(ply)
             net.SendToServer()
             tbl[ply] = nil
-            OpenMenu(tbl, myKarma)
+            OpenMenu(tbl, karma)
         end
 
 		scroll:AddItem(but)
