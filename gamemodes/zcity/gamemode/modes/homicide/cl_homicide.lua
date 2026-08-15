@@ -38,6 +38,7 @@ net.Receive("HMCD_RoundStart",function()
 	local traitor_list_count = net.ReadUInt(8)
 	StartTime = CurTime()
 	MODE.TraitorsLocal = {}
+	MODE.TraitorAssociates = {}
 
 	for key = 1, traitor_list_count do
 		local traitor_info = {net.ReadColor(false), net.ReadString()}
@@ -113,7 +114,13 @@ net.Receive("HMCD_RoundStart",function()
 	MODE.CursorLerpY = 0
 
 	fade = 0
-	hmcd_clear_associates()
+end)
+
+net.Receive("HMCD(SetProfession)", function()
+	local lply = LocalPlayer()
+	if not IsValid(lply) then return end
+
+	lply.Profession = net.ReadString()
 end)
 
 MODE.TypeNames = {
@@ -179,6 +186,23 @@ surface.CreateFont("ZB_HomicideHeader", {
 surface.CreateFont("ZB_HomicideHumongous", {
 	font = font(),
 	size = 255,
+	weight = 400,
+	antialias = true
+})
+
+-- Keep the end-of-round reveal and player statistics visually tied to the
+-- homicide intro.  These preserve the previous panel sizes while using the
+-- same configurable homicide typeface as the title card.
+surface.CreateFont("ZB_HomicideEndText", {
+	font = font(),
+	size = ScreenScale(10),
+	weight = 400,
+	antialias = true
+})
+
+surface.CreateFont("ZB_HomicideEndStats", {
+	font = font(),
+	size = 35,
 	weight = 400,
 	antialias = true
 })
@@ -561,7 +585,7 @@ CreateEndMenu = function(traitor)
 	closebutton.Paint = function(self,w,h)
 		surface.SetDrawColor(122, 122, 122, 255)
 		surface.DrawOutlinedRect(0, 0, w, h, 2.5)
-		surface.SetFont("ZB_InterfaceMedium")
+		surface.SetFont("ZB_HomicideEndText")
 		surface.SetTextColor(col.r, col.g, col.b, col.a)
 		local lengthX, lengthY = surface.GetTextSize("Close")
 		surface.SetTextPos(lengthX - lengthX / 1.1, 4)
@@ -569,7 +593,7 @@ CreateEndMenu = function(traitor)
 	end
 
 	hmcdEndMenu.PaintOver = function(self,w,h)
-		surface.SetFont( "ZB_InterfaceMediumLarge" )
+		surface.SetFont("ZB_HomicideEndStats")
 		surface.SetTextColor(col.r,col.g,col.b,col.a)
 		local lengthX, lengthY = surface.GetTextSize(traitorName .. " was a traitor ("..traitorNick..")")
 		surface.SetTextPos(w / 2 - lengthX / 2, 20)
@@ -599,7 +623,7 @@ CreateEndMenu = function(traitor)
 			surface.DrawRect(0, h / 2, w, h / 2)
 
 			local col = info.col
-			surface.SetFont("ZB_InterfaceMediumLarge")
+			surface.SetFont("ZB_HomicideEndStats")
 			local lengthX, lengthY = surface.GetTextSize(name)
 
 			surface.SetTextColor(0, 0, 0, 255)
@@ -612,13 +636,13 @@ CreateEndMenu = function(traitor)
 
 
 			local col = colSpect2
-			surface.SetFont("ZB_InterfaceMediumLarge")
+			surface.SetFont("ZB_HomicideEndStats")
 			surface.SetTextColor(col.r,col.g,col.b,col.a)
 			local lengthX, lengthY = surface.GetTextSize(info.name)
 			surface.SetTextPos(15, h / 2 - lengthY / 2)
 			surface.DrawText(info.name .. ((!info.alive and " - died") or (info.incapacitated and " - incapacitated") or ""))
 
-			surface.SetFont("ZB_InterfaceMediumLarge")
+			surface.SetFont("ZB_HomicideEndStats")
 			surface.SetTextColor(col.r, col.g, col.b, col.a)
 			local lengthX, lengthY = surface.GetTextSize(info.frags)
 			surface.SetTextPos(w - lengthX -15,h/2 - lengthY/2)

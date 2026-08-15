@@ -1601,6 +1601,11 @@ function SWEP:ReverseAnimToIdle(...)
 	if base and base.ReverseAnimToIdle then return base.ReverseAnimToIdle(self, ...) end
 end
 
+function SWEP:ThinkReverseAnimToIdle(...)
+	local base = weapons.GetStored("weapon_tpik_base")
+	if base and base.ThinkReverseAnimToIdle then return base.ThinkReverseAnimToIdle(self, ...) end
+end
+
 
 SWEP:EnableBandageTPIK()
 

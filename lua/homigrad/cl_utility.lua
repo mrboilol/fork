@@ -619,6 +619,8 @@ players : 1 humans, 0 bots (20 max)
 		local view = render_GetViewSetup()
 		local origin = view.origin
 		local angles = view.angles
+		local forward = angles:Forward()
+		local fovCos = math_cos(math_rad((view.fov or hg_fov:GetFloat()) * 0.5))
 
 		for i = 1, #entities do
 			v = entities[i]

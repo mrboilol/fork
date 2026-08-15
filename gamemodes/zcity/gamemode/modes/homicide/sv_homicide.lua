@@ -316,6 +316,7 @@ SetGlobalBool("HMCDPoliceArrived", false)
 util.AddNetworkString("HMCDPoliceRole")
 util.AddNetworkString("HMCD(StartPlayersRoleSelection)")
 util.AddNetworkString("HMCD(EndPlayersRoleSelection)")
+util.AddNetworkString("HMCD(SetProfession)")
 util.AddNetworkString("HMCD(SetSubRole)")
 util.AddNetworkString("hmcd_announce_traitor_lose")
 util.AddNetworkString("hg_surrender_hmcd_police_state")
@@ -2634,12 +2635,12 @@ function MODE.SpawnPlayers(spawn_with_subroles)
                     timer.Simple(0.5, function()
                         if IsValid(this_player) and this_player.isTraitor then
                             net.Start("HMCD_UpdateTraitorAssistants")
-                                net.WriteUInt(#traitor_associates, 8)
-                                
-                                for _, info in ipairs(traitor_associates) do
+                                net.WriteUInt(#traitor_assistants, 8)
+
+                                for _, info in ipairs(traitor_assistants) do
                                     net.WriteColor(info[1])
                                     net.WriteString(info[2])
-									net.WriteString(IsValid(info[3]) and (info[3]:SteamID() or "") or "")
+                                    net.WriteString(info[3] or "")
                                 end
                             net.Send(this_player)
                         end

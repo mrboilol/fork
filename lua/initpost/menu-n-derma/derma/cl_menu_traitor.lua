@@ -1645,11 +1645,8 @@ local ArenaLoadout = ReadArenaLoadout()
 local function SaveArenaLoadout()
     ArenaLoadout = SanitizeArenaLoadout(ArenaLoadout)
 	local json = util.TableToJSON(ArenaLoadout) or "{\"weapons\":[],\"attachments\":{},\"armor\":[],\"medical\":[]}"
-    file.Write("zcity_arena_loadout.txt", json)
+	file.Write("zcity_arena_loadout.txt", json)
     GetConVar("zcity_arena_loadout"):SetString(json)
-	net.Start("arena_loadout_sync")
-		net.WriteString(json)
-	net.SendToServer()
 end
 
 local function RandomArenaLoadout()

@@ -2244,7 +2244,8 @@ local hg_safe_landing_minspeed = 350
 local hg_safe_landing_maxspeed = 900
 
 local function velocityDamage(ent, data)
-	local speed = (data.OurOldVelocity - data.TheirOldVelocity):Length()
+	local impactVelocity = data.OurOldVelocity - data.TheirOldVelocity
+	local speed = impactVelocity:Length()
 	if speed < 250 then return end
 	if data.HitEntity.Throwable then return end
 	
@@ -2313,14 +2314,11 @@ local function velocityDamage(ent, data)
 	local safeLanding = false
 	local safeLegMul = hg_safe_landing_legmul
 	local safePainMul = hg_safe_landing_painmul
+	local normalSpeed = math.abs(impactVelocity:Dot(data.HitNormal or vector_up))
 	if normalSpeed >= hg_safe_landing_minspeed and normalSpeed <= hg_safe_landing_maxspeed
 		and IsValid(ply) and ply:Alive() and ply:KeyDown(IN_DUCK) then
 		safeLanding = true
 	end
-
-    if not bone then
-        bone = traceResult.PhysicsBone
-    end
 
 	if IsValid(att) and att:IsPlayer() and att.organism and att.organism.fear and att.organism.fear < 0 then
 		att.organism.fear = 0
@@ -2341,8 +2339,8 @@ local function velocityDamage(ent, data)
 	org.fearadd = org.fearadd + dmg * 0.5
 
 	if not org.superfighter then
-		if hitgroup == HITGROUP_LEFTLEG and (dmg * 3 > 0.25) then hg.organism.input_list.llegup(org, bone, dmg * 1 * math.Rand(1, 2), dmgInfo) end--org.lleg = math.min(org.lleg + dmg, 1) end
-		if hitgroup == HITGROUP_RIGHTLEG and (dmg * 3 > 0.25) then hg.organism.input_list.rlegup(org, bone, dmg * 1 * math.Rand(1, 2), dmgInfo) end
+		if hitgroup == HITGROUP_LEFTLEG and (dmg * 3 > 0.25) then hg.organism.input_list.llegup(org, bone, dmg * (safeLanding and safeLegMul or 1) * math.Rand(1, 2), dmgInfo) end--org.lleg = math.min(org.lleg + dmg, 1) end
+		if hitgroup == HITGROUP_RIGHTLEG and (dmg * 3 > 0.25) then hg.organism.input_list.rlegup(org, bone, dmg * (safeLanding and safeLegMul or 1) * math.Rand(1, 2), dmgInfo) end
 		if hitgroup == HITGROUP_LEFTARM and (dmg * 2 > 0.2) then hg.organism.input_list.larmup(org, bone, dmg * 1 * math.Rand(1, 2), dmgInfo) end
 		if hitgroup == HITGROUP_RIGHTARM and (dmg * 2 > 0.2) then hg.organism.input_list.rarmup(org, bone, dmg * 1 * math.Rand(1, 2), dmgInfo) end
 		if hitgroup == HITGROUP_CHEST and (dmg * 3 > 0.25) then hg.organism.input_list.chest(org, bone, dmg * 3, dmgInfo) end

@@ -399,16 +399,7 @@ local function InfoCanStartNet(messageName)
     return util.NetworkStringToID(messageName) ~= 0
 end
 
-local INFO_STORED_STAT_NET = "get_svPData"
-local INFO_RANK_NET = "zb_xp_get"
-
-local function InfoCanStartNet(messageName)
-    return util.NetworkStringToID(messageName) ~= 0
-end
-
 local function InfoRequestStoredStat(ply, key)
-    if not IsValid(ply) or not InfoCanStartNet(INFO_STORED_STAT_NET) then return end
-    net.Start(INFO_STORED_STAT_NET)
     if not IsValid(ply) or not InfoCanStartNet(INFO_STORED_STAT_NET) then return end
     net.Start(INFO_STORED_STAT_NET)
         net.WriteEntity(ply)
@@ -425,12 +416,6 @@ local function InfoRefreshLocalRankData()
             net.WriteEntity(ply)
         net.SendToServer()
     end
-    if InfoCanStartNet(INFO_RANK_NET) then
-        net.Start(INFO_RANK_NET)
-            net.WriteEntity(ply)
-        net.SendToServer()
-    end
-
     for _, statData in ipairs(info_stat_rows) do
         InfoRequestStoredStat(ply, statData[2])
     end

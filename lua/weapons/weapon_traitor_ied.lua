@@ -161,6 +161,32 @@ local RemoveAttachedBombVisual
 local MarkIEDDestroyed
 
 function SWEP:ThinkAdd()
+	-- The base weapon only supplies ThinkAdd, so keep the hold-to-plant input
+	-- here instead of relying on PrimaryAttack (which becomes the phone control
+	-- after the IED is armed).
+	if SERVER and not self:GetPlanted() then
+		local owner = self:GetOwner()
+		local left = IsValid(owner) and owner:KeyDown(IN_ATTACK)
+		local right = IsValid(owner) and owner:KeyDown(IN_ATTACK2)
+		if not IsValid(owner) or not owner:Alive() or (not left and not right) then
+			if self:GetPlanting() then self:CancelPlant() end
+		else
+			local mode = left and right and "combined" or right and "inside" or "silent"
+			local duration = mode == "combined" and self.CombinedPlantTime
+				or mode == "inside" and self.InsidePlantTime
+				or self.SilentPlantTime
+			if not self.PlantMode then
+				self.PlantMode, self.PlantStartedAt = mode, CurTime()
+			elseif mode == "combined" then
+				self.PlantMode = mode
+			end
+			self:SetPlanting(true)
+			self:SetPlantAt(self.PlantStartedAt + duration)
+			self:SetHold("slam")
+			if CurTime() >= self.PlantStartedAt + duration then self:FinishPlant() end
+		end
+	end
+
 	if SERVER and IsValid(self.HaveTheBomb) then
 		self.LastBombPos = self.HaveTheBomb:LocalToWorld(self.HaveTheBomb:OBBCenter())
 		self.LastBombModel = self.HaveTheBomb:GetModel()
@@ -471,7 +497,7 @@ local function SpawnIEDBomb(pos)
 end
 
 local function GetIEDDialDelay(self, ent)
-	local owner = self:GetOwner()
+	local owner = IsValid(self.IEDPlanter) and self.IEDPlanter or self:GetOwner()
 	local entPos = IsValid(ent) and ent:LocalToWorld(ent:OBBCenter()) or vector_origin
 	local ownerPos = IsValid(owner) and owner:GetPos() or entPos
 	local distance = ownerPos:Distance(entPos)
@@ -584,7 +610,8 @@ ExplodeTheItem = function(self,ent)
 	end
 	local BlastDamage = self.BlastDamage
 	local BlastDis = self.BlastDis
-	local owner = self:GetOwner()
+	local owner = IsValid(self.IEDPlanter) and self.IEDPlanter or self:GetOwner()
+	local attacker = IsValid(owner) and owner or self
 	local BlastForce = self.BlastForce * (planted and self.PlantedBlastForceMul or 1)
 
 	if entValid and hg and hg.GasTank and hg.GasTank.ActiveTanks and hg.GasTank.ActiveTanks[ent:EntIndex()] and hg.GasTankDetonate then
@@ -627,7 +654,7 @@ ExplodeTheItem = function(self,ent)
 				net.WriteVector(EntPos)
 				net.WriteEntity(entValid and ent or Entity(0))
 				net.WriteBool(entWaterLevel > 0)
-				net.WriteString(soundWater)
+				net.WriteString(self.SoundWater)
 			hg.SendNetToPlayersWithin(EntPos, 25000)
 
 			if entWaterLevel > 0 then
@@ -648,7 +675,7 @@ ExplodeTheItem = function(self,ent)
 		end)
 
 		timer.Simple(0.2,function()
-			local inflictor = IsValid(ent) and ent or attacker
+			local inflictor = IsValid(ent) and ent or self
 			if hg and hg.BlastDamageWithShockwave then
 				hg.BlastDamageWithShockwave(inflictor, attacker, EntPos, BlastDis / 0.01905, BlastDamage * 0.3, {
 					Force = 50000,
@@ -735,10 +762,11 @@ ExplodeTheItem = function(self,ent)
 							end
 					end
 
-					shrapnelDone = true
-				end)
+				ent.ShrapnelDone = true
+			end)
 
-				local ok = coroutine.resume(co)
+			ent.ShrapnelDone = false
+			local ok = coroutine.resume(co)
 				if not ok then
 					ent.ShrapnelDone = true
 				end
@@ -1004,6 +1032,31 @@ if SERVER then
 				self:SecondaryAttack(true)
 				return
 			end
+		end
+
+		return self:PlaceNormally()
+	end
+
+	-- E is an immediate plant.  This used to call a deleted method, leaving the
+	-- weapon in hand and throwing an error every time the advertised control was
+	-- used.  Keep it independent from the timed planting animation.
+	function SWEP:PlaceNormally()
+		local owner = self:GetOwner()
+		if not IsValid(owner) or self:GetPlanted() or self.Planted or self.IEDPlantPending then return false end
+
+		local tr = self:GetEyeTrace()
+		if not tr or tr.HitSky then return false end
+
+		local bomb
+		if tr.Hit and IsValid(tr.Entity) and not tr.HitWorld
+			and not tr.Entity:IsPlayer() and not tr.Entity:IsNPC() and not tr.Entity:IsRagdoll()
+		then
+			RegisterIEDBomb(self, tr.Entity, tr, false)
+		else
+			local pos = tr.Hit and (tr.HitPos + tr.HitNormal * 4) or (owner:GetShootPos() + owner:GetAimVector() * 80)
+			bomb = SpawnIEDBomb(pos)
+			if not IsValid(bomb) then return false end
+			RegisterIEDBomb(self, bomb)
 		end
 
 		self.Planted = true
