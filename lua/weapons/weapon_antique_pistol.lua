@@ -45,7 +45,11 @@ SWEP.CustomShell = "10mm"
 SWEP.ShellEject = "EjectBrass_357"
 SWEP.FakeEjectBrassATT = "ejectbrass"
 SWEP.ManualCycle = true
+SWEP.IsBoltAction = true
+SWEP.ManualAction = true
 SWEP.OpenBolt = false
+-- Keep the fired casing in the chamber until the player works the bolt.
+SWEP.AutomaticDraw = false
 SWEP.NumBullet = 1
 SWEP.Penetration = 8
 SWEP.weight = 1.4
@@ -78,7 +82,9 @@ SWEP.AnimsEvents = {
     cycle = {
         -- PlayAnim uses normalized event fractions: 0.47 * 0.90 = 0.423 s.
         [0.47] = function(self)
-            self:RejectShell(self.ShellEject)
+            if self:GetNetVar("antiqueSpentCase", false) then
+                self:RejectShell(self.ShellEject)
+            end
         end,
     },
 }
@@ -88,11 +94,18 @@ function SWEP:Reload()
 
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
+    if not self:CanUse() then return end
     if (self.AntiqueCycleEnd or 0) > CurTime() then return end
-    if self:Clip1() >= self.Primary.ClipSize and self.drawBullet ~= false then return end
+
+    local spentCase = self:GetNetVar("antiqueSpentCase", false)
+    local canLoad = self:Clip1() < self.Primary.ClipSize and owner:GetAmmoCount(self.Primary.Ammo) > 0
+    -- An empty chamber may be cycled once to remove its spent case, but a dry
+    -- pistol has no action left to perform. This prevents R from making shells.
+    if not spentCase and not canLoad then return end
 
     self.AntiqueCycleEnd = CurTime() + self.ReloadTime
     self:SetNetVar("shootgunReload", self.AntiqueCycleEnd)
+    self.Primary.Next = self.AntiqueCycleEnd
     self:PlayAnim("cycle", self.ReloadTime, false, function(weapon)
         if not IsValid(weapon) then return end
 
@@ -106,12 +119,22 @@ function SWEP:Reload()
         end
 
         weapon.drawBullet = weapon:Clip1() > 0
+        weapon:SetNetVar("antiqueSpentCase", false)
         weapon:SetNetVar("shootgunReload", 0)
         weapon:PlayAnim("idle", 1, true, nil, false, true)
     end, false, true)
 end
 
+function SWEP:CanPrimaryAttack()
+    return not (self:GetNetVar("shootgunReload", 0) > CurTime())
+end
+
 function SWEP:PostFireBullet()
+    if SERVER then
+        -- The ejection event consumes this marker during the next bolt cycle.
+        self:SetNetVar("antiqueSpentCase", true)
+    end
+
     self:PlayAnim("trigger_pull", 0.2, false, function(weapon)
         if IsValid(weapon) then
             weapon:PlayAnim("idle", 1, true, nil, false, true)

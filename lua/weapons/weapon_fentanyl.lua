@@ -119,6 +119,8 @@ function SWEP:Think()
 	else
 		self.ModelScale = self.ModelScale or 1
 	end
+
+	self:ThinkAdd()
 end
 
 function SWEP:Reload()
@@ -156,7 +158,31 @@ function SWEP:OwnerChanged()
 		self:SpawnGarbage()
 		self:NPCHeal(owner, 0.4, "snd_jack_hmcd_needleprick.ogg")
 	end
+
+	local base = weapons.GetStored("weapon_bandage_sh")
+	if base and base.OwnerChanged then base.OwnerChanged(self) end
 end
+
+function SWEP:ThinkAdd()
+	local owner = self:GetOwner()
+	if not IsValid(owner) then return end
+	local curTime = CurTime()
+
+	if self.healing and not self._animStarted then
+		local buttonHeld = owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2)
+		if buttonHeld and self.modeValues[1] > 0 then
+			self._animStarted = true
+			self._injectStartTime = curTime
+			self._slowed = false
+			if SERVER then
+				self:PlayAnim("use", self.UseSpeed, true, nil, false)
+			end
+		elseif not buttonHeld then
+			self.healing = false
+			self:SetHealingOther(false)
+			self.setlh = true
+		end
+	end
 
 	if self.healing and not owner:KeyDown(IN_ATTACK) and not owner:KeyDown(IN_ATTACK2) then
 		self.healing = false
@@ -196,32 +222,35 @@ end
 				self.modeValues[1] = math.max(self.modeValues[1] - injected, 0)
 				self:SetDose(self.modeValues[1])
 
-		owner.injectedinto = owner.injectedinto or {}
-		owner.injectedinto[org.owner] = owner.injectedinto[org.owner] or 0
-		owner.injectedinto[org.owner] = owner.injectedinto[org.owner] + injected
+				owner.injectedinto = owner.injectedinto or {}
+				owner.injectedinto[org.owner] = owner.injectedinto[org.owner] or 0
+				owner.injectedinto[org.owner] = owner.injectedinto[org.owner] + injected
 
-		if owner.injectedinto[org.owner] > 1 and injected > 0 then
-			local dmgInfo = DamageInfo()
-			dmgInfo:SetAttacker(owner)
-			hook.Run("HomigradDamage", org.owner, dmgInfo, HITGROUP_RIGHTARM, hg.GetCurrentCharacter(org.owner), injected * (zb.MaximumHarm or 10))
-		end
+				if owner.injectedinto[org.owner] > 1 and injected > 0 then
+					local dmgInfo = DamageInfo()
+					dmgInfo:SetAttacker(owner)
+					hook.Run("HomigradDamage", org.owner, dmgInfo, HITGROUP_RIGHTARM, hg.GetCurrentCharacter(org.owner), injected * (zb.MaximumHarm or 10))
+				end
 
-		if self.poisoned2 then
-			org.poison4 = CurTime()
+				if self.poisoned2 then
+					org.poison4 = CurTime()
 
-			self.poisoned2 = nil
-		end
+					self.poisoned2 = nil
+				end
 
-		-- Sync remaining amount to client
-		self:SetRemainingAmount(self.modeValues[1])
+				-- Sync remaining amount to client
+				self:SetRemainingAmount(self.modeValues[1])
 		
-		if self.modeValues[1] != 0 then
-			entOwner:EmitSound("pshiksnd")
-		else
-			-- No deletion - syringe stays even when empty
-			-- owner:SelectWeapon("weapon_hands_sh")
-			-- self:Remove()
+				if self.modeValues[1] != 0 then
+					local entOwner = IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
+					entOwner:EmitSound("pshiksnd")
+				else
+					-- No deletion - syringe stays even when empty
+					-- owner:SelectWeapon("weapon_hands_sh")
+					-- self:Remove()
+				end
 		end
+	end
 	end
 
 	self:ThinkReverseAnimToIdle(curTime)

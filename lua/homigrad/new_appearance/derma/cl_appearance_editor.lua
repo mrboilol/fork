@@ -1372,7 +1372,11 @@ function PANEL:PostInit()
                     acc._poseModified = nil
                     main:SyncSharedPreview()
                     surface.PlaySound("player/clothes_generic_foley_0" .. math.random(5) .. ".wav")
-                end, v.placement or title)
+                end
+                function picker:OnSelect(_, _, key)
+                    targetKey = key
+                    rebuildSliders()
+                end
             end
         end)
     end
