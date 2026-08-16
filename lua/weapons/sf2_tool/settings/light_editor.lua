@@ -151,17 +151,17 @@ if SERVER then
 			ent:SetAngles(d)
 			ent:Spawn()
 			ent:SetLightType(b)
-			self:EmitSound("weapons/ar2/ar2_reload_rotate.ogg")
+			self:EmitSound("weapons/ar2/ar2_reload_rotate.wav")
 		elseif a == DELETE and IsValid(b) and b.GetClass then -- Delete, entity
 			if b:GetClass()~="stormfox_streetlight_invisible" then return end -- Can't delete things
 			b:EmitSound(popsnd)
 			SafeRemoveEntity(b)
 		elseif a == SPAWN_ALL then
 			SpawnMissingLights(b)
-			self:EmitSound("weapons/ar2/ar2_reload_rotate.ogg")
+			self:EmitSound("weapons/ar2/ar2_reload_rotate.wav")
 		elseif a == DELETE_ALL then
 			DeleteAllLights(b)
-			self:EmitSound("weapons/ar2/ar2_reload_rotate.ogg")
+			self:EmitSound("weapons/ar2/ar2_reload_rotate.wav")
 		end
 	end
 else

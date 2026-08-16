@@ -19,7 +19,7 @@ function ENT:Initialize()
 		phys:SetMass(5)
 		phys:Wake()
 	end
-	self.sndid = self:StartLoopingSound("ambient/fire/fire_small_loop1.ogg")
+	self.sndid = self:StartLoopingSound("ambient/fire/fire_small_loop1.wav")
 end
 
 function ENT:PhysicsCollide(data, physobj)

@@ -90,7 +90,7 @@ SWEP.weight = 1.2
 
 SWEP.BlockTier = 10
 SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.ogg"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 SWEP.AnimList = {
     ["idle"] = "idle",
@@ -112,7 +112,7 @@ SWEP.TwoHanded = true
 SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "slayerevent/slayerhit1.mp3"
-SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.ogg"
+SWEP.Attack2HitFlesh = "physics/flesh/flesh_impact_hard1.wav"
 SWEP.DeploySnd = "slayerevent/slayerequip.mp3"
 SWEP.HitFleshExtra = {
     "slayerevent/slayerhit1.mp3",

@@ -320,8 +320,8 @@ else
 	local FarStrikes = {}
 
 	if IsMounted("csgo") or IsMounted("left4dead2") then
-		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_1.ogg")
-		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_4.ogg")
+		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_1.wav")
+		table.insert(FarStrikes, "ambient/weather/thunderstorm/lightning_strike_4.wav")
 	end
 	if #FarStrikes < 1 then
 		table.insert(FarStrikes, "sound/stormfox2/amb/thunder_strike2.ogg")

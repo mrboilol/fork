@@ -144,7 +144,7 @@ local math_random, math_Rand = math.random, math.Rand
 
 				local bugbait = ply:Give("weapon_hg_bugbait")
 				ply:SelectWeapon(bugbait)
-				ent:EmitSound("npc/barnacle/barnacle_pull2.ogg", 80, math_random(90, 110))
+				ent:EmitSound("npc/barnacle/barnacle_pull2.wav", 80, math_random(90, 110))
 			end
 		end
 	end)

@@ -70,7 +70,7 @@ function ENT:Use( activator )
     if self:WaterLevel() > 2 then return end
 
     if self:GetIsLocked() or self:GetNWBool("HGDoorKeyVehicleLocked", false) then
-        activator:EmitSound("doors/latchlocked2.ogg", 50, 100, 1.0, 6, 0, 0)
+        activator:EmitSound("doors/latchlocked2.wav", 50, 100, 1.0, 6, 0, 0)
         return
     end
 

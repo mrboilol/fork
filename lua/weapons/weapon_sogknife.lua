@@ -35,7 +35,7 @@ SWEP.DamageSecondary = 10
 
 SWEP.BlockTier = 2
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {145, 155}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {145, 155}}
 
 
 SWEP.setlh = true

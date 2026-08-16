@@ -126,11 +126,11 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = true
 
-SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.ogg"
-SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.ogg"
+SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.wav"
+SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.wav"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 SWEP.SwingSound = "baseballbat/swing.mp3"
 SWEP.HitFleshExtra = {
     "baseballbat/hit1.mp3",
@@ -142,7 +142,7 @@ SWEP.HitFleshExtraPitch = 112
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
 SWEP.BlockMaterial = "wood"
-SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.ogg", 68, {95, 102}}
+SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.wav", 68, {95, 102}}
 SWEP.BlockDirectionalCharge = "overhead" --left, right, overhead, center, neutral
 SWEP.NoHolster = true
 
@@ -151,7 +151,7 @@ SWEP.PainMultiplier = 0.65
 
 SWEP.BlockTier = 3
 SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.ogg"
+SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
 
 SWEP.Attack_Charge_Begin = "Attack_Charge_Begin"
 SWEP.Attack_Charge_Idle = "Attack_Charge_Idle"

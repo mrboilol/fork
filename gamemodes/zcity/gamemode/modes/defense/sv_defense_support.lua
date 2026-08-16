@@ -160,7 +160,7 @@ local function CreateFallingAirdrop(items, requester)
     smoke:Spawn()
     smoke:Activate()
 
-    crate:EmitSound("ambient/machines/train_horn_distant1.ogg", 100, 100)
+    crate:EmitSound("ambient/machines/train_horn_distant1.wav", 100, 100)
     
 
     local fallTimer = "airdrop_fall_" .. crate:EntIndex()
@@ -479,7 +479,7 @@ local function RespawnDeadPlayers(requester)
             effectData:SetOrigin(ply:GetPos() + Vector(0, 0, 30))
             util.Effect("ManhackSparks", effectData)
             
-            ply:EmitSound("items/suitchargeok1.ogg")
+            ply:EmitSound("items/suitchargeok1.wav")
             
             respawnedCount = respawnedCount + 1
         end
@@ -493,13 +493,13 @@ local function RespawnDeadPlayers(requester)
         
 
         for _, ply in player.Iterator() do
-            ply:EmitSound("ambient/alarms/combine_bank_alarm_loop1.ogg")
+            ply:EmitSound("ambient/alarms/combine_bank_alarm_loop1.wav")
         end
         
         timer.Simple(2, function()
             for _, ply in player.Iterator() do
 				if not IsValid(ply) then return end
-                ply:StopSound("ambient/alarms/combine_bank_alarm_loop1.ogg")
+                ply:StopSound("ambient/alarms/combine_bank_alarm_loop1.wav")
             end
         end)
         

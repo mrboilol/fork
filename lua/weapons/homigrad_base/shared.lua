@@ -6,7 +6,7 @@ SWEP.Category = "Other"
 SWEP.Spawnable = false
 SWEP.AdminOnly = true
 SWEP.ReloadTime = 1
-SWEP.ReloadSound = "weapons/smg1/smg1_reload.ogg"
+SWEP.ReloadSound = "weapons/smg1/smg1_reload.wav"
 SWEP.Primary.SoundEmpty = {"zcitysnd/sound/weapons/m14/handling/m14_empty.ogg", 75, 100, 105, CHAN_WEAPON, 2}
 SWEP.Primary.Wait = 0.1
 SWEP.Primary.Next = 0
@@ -3127,11 +3127,11 @@ end)
 --[[
 ["Entity"]      =       Entity [0][worldspawn]
 ["Flags"]       =       0
-["OriginalSoundName"]   =       physics/metal/weapon_impact_hard2.ogg
+["OriginalSoundName"]   =       physics/metal/weapon_impact_hard2.wav
 ["Pitch"]       =       98
 ["Pos"] =       805.196838 -249.144257 -139.931976
 ["SoundLevel"]  =       75
-["SoundName"]   =       physics/metal/weapon_impact_hard2.ogg
+["SoundName"]   =       physics/metal/weapon_impact_hard2.wav
 ["SoundTime"]   =       0
 ["Volume"]      =       0.599609375
 ["Ambient"]     =       false

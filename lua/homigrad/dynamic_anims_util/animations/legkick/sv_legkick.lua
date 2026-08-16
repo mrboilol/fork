@@ -345,7 +345,13 @@ function PLAYER:LegAttack()
                     if !ent:IsPlayer() and not IsValid(phys) then continue end
 
 					local shieldTarget = hg.RagdollOwner(ent) or ent
-					local inflictor = self:GetWeapon(handClass)
+					-- Leg kicks are unarmed attacks. Resolve the current hands SWEP so
+					-- shield effects and damage attribution get a valid inflictor even
+					-- when the player has no active weapon.
+					local inflictor = hg.GetHandsWeapon and hg.GetHandsWeapon(self) or self
+					if not IsValid(inflictor) then
+						inflictor = self
+					end
 					if IsValid(shieldTarget) and shieldTarget:IsPlayer() and hook.Run("hg_ShieldKickBlock", shieldTarget, self, inflictor, self:EyePos(), tr.HitPos) then continue end
 
                     if not soundplayed then

@@ -23,6 +23,10 @@ module[1] = function(org)
 	org.bleed = 0
 	org.venousBleed = 0
 	org.arterialBleed = 0
+	-- Live per-wound rates let clients draw the blood actually being lost after
+	-- clotting, adrenaline, pressure, and tourniquet effects are applied.
+	org.woundBleedRates = {}
+	org.arterialWoundBleedRates = {}
 	org.internalBleedRate = 0
 	org.internalBleed = 0
 	org.internalBleedHeal = 0
@@ -321,21 +325,13 @@ module[2] = function(owner, org, mulTime)
 	-- takes much longer to become dangerous.
 	local internalBleedSeverity = math.max(tonumber(org.internalBleed) or 0, 0)
 	if internalBleedSeverity > 0.05 then
-		-- Non-thoracic internal bleeding can cause a hemothorax, but it should be
-		-- an uncommon complication rather than the guaranteed result of every
-		-- bleeding episode. Keep one roll for the episode so worsening severity
-		-- raises the risk without rerolling every simulation tick.
-		if org.internalBleedHemothoraxRoll == nil then
-			org.internalBleedHemothoraxRoll = math.Rand(0, 1)
-		end
-
 		org.internalBleedDuration = (org.internalBleedDuration or 0) + mulTime
 		org.internalBleedPeak = math.max(org.internalBleedPeak or 0, internalBleedSeverity)
 
 		local severityK = math.Clamp(((org.internalBleedPeak or 0) - 0.2) / 2.8, 0, 1)
-		-- Internal injuries must have time to develop consequences. Even a
-		-- moderate untreated bleed can now progress into shock or a hemothorax,
-		-- while catastrophic trauma still deteriorates much faster.
+		-- Internal injuries must have time to develop consequences. Moderate
+		-- untreated bleeding can progress into shock, while catastrophic trauma
+		-- deteriorates much faster.
 		local complicationDelay = Lerp(severityK, 45, 5)
 		local progressionTime = Lerp(severityK, 105, 18)
 		local severityLimit = math.Clamp((org.internalBleedPeak or 0) / 2, 0.1, 1)
@@ -344,8 +340,18 @@ module[2] = function(owner, org, mulTime)
 		org.internalBleedComplicationDelay = complicationDelay
 		org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, complicationTarget, mulTime / progressionTime)
 
-		local incidentalHemothoraxChance = math.Clamp(((org.internalBleedPeak or 0) - 0.5) / 9.5, 0, 1) * 0.25
-		org.internalBleedHemothoraxRisk = org.internalBleedHemothoraxRoll <= incidentalHemothoraxChance
+		-- An abdominal/internal bleed only reaches the pleural space as a rare
+		-- catastrophic complication. Roll once after the episode becomes severe;
+		-- routine and moderate internal bleeding cannot create a hemothorax.
+		if (org.internalBleedPeak or 0) >= 4 then
+			if org.internalBleedHemothoraxRoll == nil then
+				org.internalBleedHemothoraxRoll = math.Rand(0, 1)
+			end
+			local incidentalHemothoraxChance = math.Clamp(((org.internalBleedPeak or 0) - 4) / 8, 0, 1) * 0.08
+			org.internalBleedHemothoraxRisk = org.internalBleedHemothoraxRoll <= incidentalHemothoraxChance
+		else
+			org.internalBleedHemothoraxRisk = false
+		end
 	else
 		org.internalBleedDuration = 0
 		org.internalBleedPeak = 0
@@ -414,6 +420,7 @@ module[2] = function(owner, org, mulTime)
 	time = CurTime()
 
 	local bleedoutspeed = 0
+	local woundBleedRates = {}
 	local pulse = org.pulse
 	local bleedMul = org.bleedingmul
 	local coagMul = org.coagulation_multiplier
@@ -434,7 +441,9 @@ module[2] = function(owner, org, mulTime)
 			local coagulate = 2 * mulTime * rand2 * (adrenaline * 0.1 + 1) * (org.satiety / 100 + 1) * 0.05 * coagMul * heldClotMul
 			local woundBleedRate = bleed / rand1 * 3
 			bleedoutspeed = bleedoutspeed + woundBleedRate
-			wound.visualBleedRate = woundBleedRate
+			local visualWoundBleedRate = bleed / math.max(mulTime, 0.001)
+			woundBleedRates[i] = visualWoundBleedRate
+			wound.visualBleedRate = visualWoundBleedRate
 			
 			wound[5] = time
 			org.blood = max(org.blood - bleed, 1)
@@ -467,6 +476,7 @@ module[2] = function(owner, org, mulTime)
 	bleedoutspeed = bleedoutspeed / (beatsPerSecond + 2)
 
 	local bleedoutspeed2 = 0
+	local arterialWoundBleedRates = {}
 	local next_arterypump = 1 / math.max(pulse, 10)
 	local ent = isPlayer and IsValid(owner.FakeRagdoll) and owner.FakeRagdoll or owner
 	local ownerVel = owner:GetVelocity()
@@ -486,16 +496,19 @@ module[2] = function(owner, org, mulTime)
 		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * amputationMul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
 		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
 		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
-		wound.visualBleedRate = passiveArterialBleed + arterialBleed
+		local woundBleedRate = (passiveArterialBleed + arterialBleed) / math.max(mulTime, 0.001)
 
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			org.blood = max(org.blood - wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * amputationMul * math.max(pulse, 20) / 80 * tourniquetBleedMul, 1)
+			local pulseBleed = wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * amputationMul * math.max(pulse, 20) / 80 * tourniquetBleedMul
+			org.blood = max(org.blood - pulseBleed, 1)
+			woundBleedRate = woundBleedRate + pulseBleed / math.max(mulTime, 0.001)
 			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) then
 			local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * amputationMul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
 			pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
 			org.blood = max(org.blood - pumpBleed, 1)
+			woundBleedRate = woundBleedRate + pumpBleed / math.max(mulTime, 0.001)
 			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 				local dir = wound[6]
 				local len = dir:Length()
@@ -510,6 +523,8 @@ module[2] = function(owner, org, mulTime)
 				org[wound[7]] = 0
 			end
 		end
+		arterialWoundBleedRates[i] = woundBleedRate
+		wound.visualBleedRate = woundBleedRate
 	end
 
 	for idx = #arterialToRemove, 1, -1 do
@@ -619,12 +634,15 @@ module[2] = function(owner, org, mulTime)
 	org.bleed = (bleedoutspeed + bleedoutspeed2 + bleed)
 	org.venousBleed = bleedoutspeed
 	org.arterialBleed = bleedoutspeed2
+	org.woundBleedRates = woundBleedRates
+	org.arterialWoundBleedRates = arterialWoundBleedRates
 	org.internalBleedRate = bleed
 	updateHoldWound(org)
 end
 
 util.AddNetworkString("bloodsquirt2")
 util.AddNetworkString("vomitsquirt2")
+util.AddNetworkString("hg_organism_defecate")
 
 local function GetVomitDecal()
 	return math.random(6) == 1 and "Organism.VomitMedium" or "Organism.VomitSmall"
@@ -757,6 +775,20 @@ function hg.organism.VomitNormal(owner, snd)
 			end)
 		end
 	end
+end
+
+-- Judge's overdose client effect already has a matching decal receiver in this
+-- branch. Keep the server event with the blood module that owns vomiting and
+-- other expelled-fluid effects instead of loading the overlapping circulation
+-- module from Judge.
+function hg.organism.Defecate(owner)
+	if !hg.IsValidPlayer(owner) then return end
+
+	owner:EmitSound("snd_jack_hmcd_fart.ogg", 75)
+	owner:ViewPunch(AngleRand(-0.3, 0.3))
+	net.Start("hg_organism_defecate")
+		net.WriteEntity(owner)
+	net.SendPVS(owner:GetPos())
 end
 
 function hg.organism.CoughBlood(org)

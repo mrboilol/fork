@@ -560,7 +560,7 @@ local function openPostureMaker()
 		output[#output + 1] = "}"
 		SetClipboardText(table.concat(output, "\n"))
 		notification.AddLegacy("ShadowControl posture angles copied.", NOTIFY_GENERIC, 4)
-		surface.PlaySound("buttons/button15.ogg")
+		surface.PlaySound("buttons/button15.wav")
 	end
 
 	frame.OnRemove = function()

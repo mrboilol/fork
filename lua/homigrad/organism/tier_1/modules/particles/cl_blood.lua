@@ -403,7 +403,11 @@ bloodparticles_hook[2] = function(mul)
 
 		part[3] = LerpVector(0.25 * mul, part[3], vecZero)
 		if !(result.Hit) then
-			part[3]:Add(gravvec)
+			local gravityMul = 1
+			if part.gravityRampEnd and time < part.gravityRampEnd then
+				gravityMul = math.Clamp(math.Remap(time, part.gravityRampStart or part[7], part.gravityRampEnd, 0.12, 1), 0.12, 1)
+			end
+			part[3]:Add(gravvec * gravityMul)
 		--else
 			--part[3]:Set(vecDown * mul * (math.max(0.1, grav)))
 		end

@@ -1446,7 +1446,7 @@ if CLIENT then
 				if math.random(1, 3) == 1 then
 					local lifePercent = state * math.Rand(0.5, 1.25) / vFireMaxState
 					sound.Play(
-						"ambient/fire/mtov_flame2.ogg",		-- Sound
+						"ambient/fire/mtov_flame2.wav",		-- Sound
 						self:GetPos(),						-- Position
 						80,									-- Level
 						140 - 100 * lifePercent,			-- Pitch

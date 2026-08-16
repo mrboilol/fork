@@ -107,7 +107,7 @@ SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
 SWEP.swingsoundextra = {
     {"bat/baseball_swing_1st_layer_01.wav", 60, {80, 90}},
@@ -133,7 +133,7 @@ SWEP.hitsoundbrutalize = {
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 5
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.ogg", 68, {95, 102}}
+SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 
 SWEP.Attack_Charge_Begin = "Attack_Charge_Begin"
 SWEP.Attack_Charge_Idle = "Attack_Charge_Idle"
@@ -156,7 +156,7 @@ SWEP.CanHeavyAttack = true -- Set to true to enable
 
 SWEP.BlockTier = 5
 SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.ogg"
+SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
 
 function SWEP:CanSecondaryAttack()
     self.DamageType = DMG_CLUB

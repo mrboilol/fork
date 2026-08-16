@@ -128,7 +128,7 @@ if SERVER then
 			net.WriteFloat(CurTime())
 			net.Broadcast()
 			self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-			self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.ogg",true,CHAN_AUTO)
+			self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.wav",true,CHAN_AUTO)
 			local ply = self:GetOwner()
 			if IsValid(ply:GetNetVar("carryent2")) then
 				if SERVER then
@@ -202,7 +202,7 @@ function SWEP:ReloadEnd()
 			net.Broadcast()
 			if self.Chocking then
 				self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-				self:GetOwner():EmitSound(self.CockSound or "weapons/shotgun/shotgun_cock.ogg")
+				self:GetOwner():EmitSound(self.CockSound or "weapons/shotgun/shotgun_cock.wav")
 			end
 		end
 	end

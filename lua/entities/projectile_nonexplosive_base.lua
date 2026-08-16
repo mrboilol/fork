@@ -7,8 +7,8 @@ ENT.Spawnable = false
 ENT.AdminOnly = true
 
 ENT.Model = ""
-ENT.HitSound = "weapons/crossbow/hit1.ogg"
-ENT.FleshHit = "weapons/crossbow/bolt_skewer1.ogg"
+ENT.HitSound = "weapons/crossbow/hit1.wav"
+ENT.FleshHit = "weapons/crossbow/bolt_skewer1.wav"
 
 ENT.Damage = 200
 ENT.Force = 0.2

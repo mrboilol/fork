@@ -218,7 +218,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             local noneedarmor = ply.HEV.Power == maxPower
             if noneedarmor then
                 if not ply.keypresseduse then
-                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.ogg" or "items/medshotno1.ogg")
+                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.wav" or "items/medshotno1.wav")
                 end
                 ply.keypresseduse = true
                 if ent.snd then ent:StopLoopingSound(ent.snd) ent.snd = nil end
@@ -226,9 +226,9 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             end
 
             if not ply.keypresseduse then
-                ent:EmitSound("items/suitchargeok1.ogg")
+                ent:EmitSound("items/suitchargeok1.wav")
                 
-                ent.snd = ent:StartLoopingSound("items/suitcharge1.ogg")
+                ent.snd = ent:StartLoopingSound("items/suitcharge1.wav")
             end
 
             ply.HEV.Power = math.min(ply.HEV.Power + 1, maxPower)
@@ -240,7 +240,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             
             if noneedhealth then
                 if not ply.keypresseduse then
-                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.ogg" or "items/medshotno1.ogg")
+                    ent:EmitSound(ent.armorcharger and "items/suitchargeno1.wav" or "items/medshotno1.wav")
                 end
                 ply.keypresseduse = true
                 if ent.snd then ent:StopLoopingSound(ent.snd) ent.snd = nil end
@@ -248,9 +248,9 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
             end
 
             if not ply.keypresseduse then
-                ent:EmitSound("items/medshot4.ogg")
+                ent:EmitSound("items/medshot4.wav")
                 
-                ent.snd = ent:StartLoopingSound("items/medcharge4.ogg")
+                ent.snd = ent:StartLoopingSound("items/medcharge4.wav")
             end
 
             ply.HEV.Medicine = math.min(ply.HEV.Medicine + 5, maxMedicine)
@@ -260,7 +260,7 @@ hook.Add("Player Think","health_armor_gordonthings",function(ply)
         end
     else
         if not ply.keypresseduse then
-            ent:EmitSound(ent.armorcharger and "items/suitchargeno1.ogg" or "items/medshotno1.ogg")
+            ent:EmitSound(ent.armorcharger and "items/suitchargeno1.wav" or "items/medshotno1.wav")
         end
         if ent.snd then ent:StopLoopingSound(ent.snd) ent.snd = nil end
     end

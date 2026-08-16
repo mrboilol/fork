@@ -29,8 +29,8 @@ local c_red = Color(255,55,55)
 local m_roof = Material("stormfox2/hud/tool/texture_roof.png")
 local m_ground = Material("stormfox2/hud/tool/texture_ground.png")
 
-local snd_accept = Sound("buttons/button3.ogg")
-local snd_deny = Sound("buttons/button2.ogg")
+local snd_accept = Sound("buttons/button3.wav")
+local snd_deny = Sound("buttons/button2.wav")
 
 if SERVER then
 	function TOOL:SendFunc( tex, a )

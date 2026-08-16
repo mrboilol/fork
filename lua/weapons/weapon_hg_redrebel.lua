@@ -17,7 +17,7 @@ SWEP.SuicideAng = Angle(-90, -180, 90)
 SWEP.SuicideCutVec = Vector(3, -6, 0)
 SWEP.SuicideCutAng = Angle(10, 0, 0)
 SWEP.SuicideTime = 0.5
-SWEP.SuicideSound = "weapons/knife/knife_hit1.ogg"
+SWEP.SuicideSound = "weapons/knife/knife_hit1.wav"
 SWEP.CanSuicide = true
 SWEP.SuicideNoLH = true
 SWEP.SuicidePunchAng = Angle(0, -15, 0)
@@ -139,12 +139,12 @@ SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "weapons/darsu_eft/melee/body3.mp3"
 SWEP.Attack2HitFlesh = "weapons/darsu_eft/melee/body4.mp3"
-SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {145, 155}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {145, 155}}
 
 SWEP.BlockDirectionalCharge = "overhead"
 

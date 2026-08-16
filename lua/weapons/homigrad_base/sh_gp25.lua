@@ -194,7 +194,7 @@ if SERVER then
 
 			self.GP25NextAction = CurTime() + 0.35
 			local emptySound = istable(self.Primary.SoundEmpty) and self.Primary.SoundEmpty[1] or self.Primary.SoundEmpty
-			self:EmitSound(emptySound or "weapons/pistol/pistol_empty.ogg", 65, 100)
+			self:EmitSound(emptySound or "weapons/pistol/pistol_empty.wav", 65, 100)
 			return false
 		end
 

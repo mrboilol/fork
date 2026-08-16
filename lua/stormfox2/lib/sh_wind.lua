@@ -283,20 +283,20 @@ if CLIENT then
 		local wForce = StormFox2.Wind.GetForce()
 		if math.random(50) > 40 then
 			if wForce > 17 and math.random(1,2) > 1 then
-				AddGuest("ambient/wind/windgust.ogg",math.Rand(0.8, 1) * vM)
+				AddGuest("ambient/wind/windgust.wav",math.Rand(0.8, 1) * vM)
 			elseif wForce > 14 and wForce < 30 then
 				AddGuest("ambient/wind/wind_med" .. math.random(1,2) .. ".ogg", math.min(maxVol, wForce / 30) * vM)
 			end
 		end
 		if wForce > 27 and math.random(50) > 30 then
-			AddGuest("ambient/wind/windgust_strong.ogg",math.min(maxVol, wForce / 30) * vM)
+			AddGuest("ambient/wind/windgust_strong.wav",math.min(maxVol, wForce / 30) * vM)
 		end
 	end)
 
 	-- Cold "empty" wind: ambience/wind1.ogg
-	--					ambient/wind/wind1.ogg
-	-- ambient/wind/wind_rooftop1.ogg
-	-- ambient/wind/wind1.ogg
+	--					ambient/wind/wind1.wav
+	-- ambient/wind/wind_rooftop1.wav
+	-- ambient/wind/wind1.wav
 	-- StormFox2.Ambience.ForcePlay
 	hook.Add("StormFox2.Ambiences.OnSound", "StormFox2.Ambiences.Wind", function()
 		if windSnd < 0 then return end -- No wind
@@ -304,7 +304,7 @@ if CLIENT then
 		local vM = (400 - windSnd) / 400
 		if vM <= 0 then return end
 		-- Main loop
-		StormFox2.Ambience.ForcePlay( "ambient/wind/wind_rooftop1.ogg", math.min((wForce - 1) / 35, maxVol) * vM * 0.8, math.min(1.2, 0.9 + wForce / 100) )
+		StormFox2.Ambience.ForcePlay( "ambient/wind/wind_rooftop1.wav", math.min((wForce - 1) / 35, maxVol) * vM * 0.8, math.min(1.2, 0.9 + wForce / 100) )
 		-- Wind gusts
 		for snd,data in pairs(windGusts) do
 			if data[2] <= CurTime() then

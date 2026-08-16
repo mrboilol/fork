@@ -134,7 +134,7 @@ if SERVER then
 		if math.abs(diff) > 75 * 75 and drum.Volume > 1 then
 			ent.lastvel = ent:GetVelocity()
 
-			ent:EmitSound("player/footsteps/wade3.ogg", 65, math.random(55, 75) * math.Clamp(2 - drum.Volume * 0.1, 1, 2))
+			ent:EmitSound("player/footsteps/wade3.wav", 65, math.random(55, 75) * math.Clamp(2 - drum.Volume * 0.1, 1, 2))
 		--elseif diff > 0 then
 			--ent.lastvel = ent:GetVelocity()
 		end
@@ -157,7 +157,7 @@ if SERVER then
 			if math_Round(high_point[3], 1) < math_Round(volumePos[3], 1) + 1 then
 				drum.Volume = math_max(drum.Volume - 0.1, 0)
 				drum.leaking = true
-				drum.loopsound = drum.loopsound or CreateSound(ent,"ambient/water/leak_1.ogg")
+				drum.loopsound = drum.loopsound or CreateSound(ent,"ambient/water/leak_1.wav")
 				drum.loopsound:Play()
 
 				local tr = {}

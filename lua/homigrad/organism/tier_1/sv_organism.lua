@@ -21,7 +21,11 @@ function hg.organism.ZeroVitals(org)
 	org.heartbeat = 0
 	org.pulse = 0
 	org.ecgState = "asystole"
+	org.bloodPressure = 0
+	org.systolic = 0
+	org.diastolic = 0
 	org.cardiacOutput = 0
+	org.strokeVolume = 0
 	org.hypotension = 1
 	org.hypertension = 0
 	org.bloodO2Cap = 0
@@ -817,7 +821,11 @@ local function send_organism(org, ply)
 	sendtable.shock = org.shock
 	sendtable.pulse = org.pulse
 	sendtable.heartbeat = org.heartbeat
+	sendtable.bloodPressure = org.bloodPressure
+	sendtable.systolic = org.systolic
+	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
+	sendtable.strokeVolume = org.strokeVolume
 	sendtable.arrhythmia = org.arrhythmia
 	sendtable.fibrillation = org.fibrillation
 	sendtable.myocardialOxygen = org.myocardialOxygen
@@ -834,14 +842,15 @@ local function send_organism(org, ply)
 	sendtable.bloodO2Cap = org.bloodO2Cap
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.venousBleed = org.venousBleed
+	sendtable.woundBleedRates = org.woundBleedRates
+	sendtable.arterialWoundBleedRates = org.arterialWoundBleedRates
 	sendtable.internalBleedRate = org.internalBleedRate
-	sendtable.hemothorax = org.hemothorax
-	sendtable.cardiacTamponade = org.cardiacTamponade
 	sendtable.bodyoxygen = org.bodyoxygen
 	sendtable.perfusion = org.perfusion
 	sendtable.brainoxygen = org.brainoxygen
 	sendtable.peripheralperfusion = org.peripheralperfusion
 	sendtable.cerebralPerfusion = org.cerebralPerfusion
+	sendtable.brainSwelling = org.brainSwelling
 	sendtable.intracranialPressure = org.intracranialPressure
 	sendtable.hypoxia = org.hypoxia
 	sendtable.hypoxiaTime = org.hypoxiaTime
@@ -939,7 +948,11 @@ local function send_bareinfo(org)
 	sendtable.pulse = org.pulse
 	sendtable.blood = org.blood
 	sendtable.heartbeat = org.heartbeat
+	sendtable.bloodPressure = org.bloodPressure
+	sendtable.systolic = org.systolic
+	sendtable.diastolic = org.diastolic
 	sendtable.cardiacOutput = org.cardiacOutput
+	sendtable.strokeVolume = org.strokeVolume
 	sendtable.arrhythmia = org.arrhythmia
 	sendtable.fibrillation = org.fibrillation
 	sendtable.myocardialOxygen = org.myocardialOxygen
@@ -956,6 +969,8 @@ local function send_bareinfo(org)
 	sendtable.bloodO2Cap = org.bloodO2Cap
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.venousBleed = org.venousBleed
+	sendtable.woundBleedRates = org.woundBleedRates
+	sendtable.arterialWoundBleedRates = org.arterialWoundBleedRates
 	sendtable.internalBleedRate = org.internalBleedRate
 	sendtable.hemothorax = org.hemothorax
 	sendtable.cardiacTamponade = org.cardiacTamponade
@@ -964,6 +979,7 @@ local function send_bareinfo(org)
 	sendtable.brainoxygen = org.brainoxygen
 	sendtable.peripheralperfusion = org.peripheralperfusion
 	sendtable.cerebralPerfusion = org.cerebralPerfusion
+	sendtable.brainSwelling = org.brainSwelling
 	sendtable.intracranialPressure = org.intracranialPressure
 	sendtable.hypoxia = org.hypoxia
 	sendtable.hypoxiaTime = org.hypoxiaTime
@@ -2470,7 +2486,7 @@ local function fixlimb(org, key, fixer)
 		org.painadd = org.painadd + 5 * math.random(1, 3)
 		org.fearadd = org.fearadd + 0.1
 
-		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.ogg", 65)
+		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.wav", 65)
 
 		if fixer == org.owner and (fixer.tries or 0) > 3 and math.random(3) == 1 then
 			fixer:Notify(finally_fixed[math.random(#finally_fixed)], 1, "dislocations_unlucky", 1, nil, Color(255, 255, 255, 255))
@@ -2483,7 +2499,7 @@ local function fixlimb(org, key, fixer)
 
 		org.fearadd = org.fearadd + 0.3
 
-		org.owner:EmitSound("physics/body/body_medium_impact_soft"..math.random(7)..".ogg", 65)
+		org.owner:EmitSound("physics/body/body_medium_impact_soft"..math.random(7)..".wav", 65)
 		
 		if fixer.Profession != "doctor" and math.random(5) == 1 then
 			local dmgInfo = DamageInfo()

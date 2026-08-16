@@ -2393,7 +2393,7 @@ function SWEP:PrimaryAttack(forcespecial)
 		self.swingBackRightEnd = CurTime()
 	end
 
-	local snd, pitch = "weapons/slam/throw.ogg", math.random(110, 120)
+	local snd, pitch = "weapons/slam/throw.wav", math.random(110, 120)
 	if owner.PlayerClassName == "headcrabzombie" then
 		snd, pitch = "npc/zombie/claw_miss"..math.random(2)..".ogg", math.random(95, 110)
 	end
@@ -2448,16 +2448,16 @@ function SWEP:PrimaryAttack(forcespecial)
 end
 
 local concrete = {
-	"physics/concrete/boulder_impact_hard1.ogg",
-	"physics/concrete/boulder_impact_hard2.ogg",
-	"physics/concrete/boulder_impact_hard3.ogg",
-	"physics/concrete/boulder_impact_hard4.ogg"
+	"physics/concrete/boulder_impact_hard1.wav",
+	"physics/concrete/boulder_impact_hard2.wav",
+	"physics/concrete/boulder_impact_hard3.wav",
+	"physics/concrete/boulder_impact_hard4.wav"
 }
 
 local vent = {
-	"doors/vent_open1.ogg",
-	"doors/vent_open2.ogg",
-	"doors/vent_open3.ogg"
+	"doors/vent_open1.wav",
+	"doors/vent_open2.wav",
+	"doors/vent_open3.wav"
 }
 
 function SWEP:AttackFront(special_attack, rand)
@@ -2546,7 +2546,7 @@ function SWEP:AttackFront(special_attack, rand)
 			if isZomb then
 				snd = "npc/zombie/claw_strike"..math.random(3)..".ogg"
 			elseif owner.PlayerClassName == "furry" then
-				snd = "pwb/weapons/knife/hitwall.ogg"
+				snd = "pwb/weapons/knife/hitwall.wav"
 			end
 			sound.Play(snd, HitPos, 65, math.random(90, 110))
 			if owner:IsBerserk() then

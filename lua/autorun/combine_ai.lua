@@ -1283,7 +1283,7 @@ else
 
                 file.CreateDir("combine_ai_presets")
                 file.Write("combine_ai_presets/" .. presetName .. ".json", util.TableToJSON(preset, true))
-                surface.PlaySound("buttons/button15.ogg")
+                surface.PlaySound("buttons/button15.wav")
                 parent:Close()
                 timer.Simple(0, function()
                     RunConsoleCommand("open_combine_ai_ui")
@@ -1323,7 +1323,7 @@ else
                 RunConsoleCommand(fullName, value)
             end
 
-            surface.PlaySound("buttons/button14.ogg")
+            surface.PlaySound("buttons/button14.wav")
             parent:Close()
             timer.Simple(0, function()
                 RunConsoleCommand("open_combine_ai_ui")
@@ -1340,7 +1340,7 @@ else
                 local fullName = cvarPrefix .. value.name
                 RunConsoleCommand(fullName, value.default)
             end
-            surface.PlaySound("buttons/button19.ogg")
+            surface.PlaySound("buttons/button19.wav")
             parent:Close()
             timer.Simple(0, function()
                 RunConsoleCommand("open_combine_ai_ui")
@@ -1363,7 +1363,7 @@ else
 
                 menu:AddOption("Delete: " .. presetName, function()
                     file.Delete("combine_ai_presets/" .. presetName .. ".json")
-                    surface.PlaySound("buttons/button10.ogg")
+                    surface.PlaySound("buttons/button10.wav")
                     parent:Close()
                     timer.Simple(0, function()
                         RunConsoleCommand("open_combine_ai_ui")
@@ -1400,7 +1400,7 @@ else
             draw.SimpleText("Combine AI Settings", "CombineUIFont", 15, 10, Color(0, 180, 255), TEXT_ALIGN_LEFT)
         end
 
-        surface.PlaySound("ui/buttonclickrelease.ogg")
+        surface.PlaySound("ui/buttonclickrelease.wav")
 
         local dragZone = vgui.Create("DButton", frame)
         dragZone:SetText("")

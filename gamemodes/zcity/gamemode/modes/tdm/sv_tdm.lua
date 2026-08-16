@@ -204,7 +204,7 @@ net.Receive("tdm_buyitem",function(len,ply)
 		local wep = ply:GetWeapon(item.ItemClass)
 		hg.AddAttachmentForce( ply,wep,tItem[3] )
 		ply:SetNWInt( "TDM_Money", ply:GetNWInt("TDM_Money",0) - AttachmentPrice )
-		ply:EmitSound("items/itempickup.ogg")
+		ply:EmitSound("items/itempickup.wav")
 
 		return
 	end
@@ -230,5 +230,5 @@ net.Receive("tdm_buyitem",function(len,ply)
 	end
 
 	ply:SetNWInt( "TDM_Money", ply:GetNWInt("TDM_Money",0) - item.Price )
-	ply:EmitSound("items/itempickup.ogg")
+	ply:EmitSound("items/itempickup.wav")
 end)

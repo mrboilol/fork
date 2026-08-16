@@ -93,7 +93,7 @@ local function isFistInflictor(dmgInfo)
 	return class == "weapon_hands_sh" or class == "weapon_hg_coolhands"
 end
 
-local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
+local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInfo, dir)
 	dmg = dmgInfo:GetDamage() / 25
 	local organ = box[6] and organs[box[6]][box[7]]
 	if not organ then return 0 end
@@ -156,7 +156,10 @@ local function Trace_Bullet(box, hit, ricochet, org, organs, dmg, dmgInfo, dir)
     if func and !hook_info.restricted then
         local old_consciousness = org.consciousness
         local directBrainBefore = isBrain and (org[name] or 0) or nil
-        local result = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet)
+        -- Keep the per-shot ballistic state with every layer in the organ trace.
+        -- Armor handlers use it to consume penetration/energy and report a stopped
+        -- round back to the caller.
+        local result = func(org, bone, dmg, dmgInfo, box[6], dir, hit, ricochet, impact)
         if isBrain and (org[name] or 0) > directBrainBefore then
             org._directBrainDamageThisHit = true
         end
@@ -501,7 +504,7 @@ function hg.organism.CompleteDislocationFix(org, limb, ply)
 	org.fearadd = (org.fearadd or 0) + 0.1
 
 	if IsValid(org.owner) then
-		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.ogg", 65)
+		org.owner:EmitSound("physics/flesh/flesh_impact_hard6.wav", 65)
 	end
 
 	-- Reapply floppy limb constraints if the limb is broken
@@ -1322,8 +1325,19 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org._fistHeadTraceSkullIntact = isFistInflictor(dmgInfo) and (org.skull or 0) < 1 or nil
 	-- Limb bone and artery damage must stay on the physics limb the bullet
 	-- actually entered; a long penetration trace may still cross other limbs.
+	local impact
 	if dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) then
 		org._bulletImpactHitgroup = entryHitgroup ~= 0 and entryHitgroup or nil
+		impact = {
+			ballisticVersion = true,
+			initialPenetration = math.max(pen, 0),
+			penetrationBefore = math.max(pen, 0),
+			initialEnergy = math.max(dmg, 0),
+			energy = math.max(dmg, 0),
+			rawDamage = dmg,
+			entity = ent,
+			layerIndex = 0,
+		}
 	end
 	local selfInflictedBrainShot = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
 		and attacker == org.owner
@@ -1333,7 +1347,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		input_list.brain(org, 1, dmg / 25, dmgInfo)
 		org._directBrainDamageThisHit = true
 	elseif dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
-		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, boxs, pos, sphere, organs, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, ent.organism, organs, dmg / 25, dmgInfo, dir)
+		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, boxs, pos, sphere, organs, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, impact, ent.organism, organs, dmg / 25, dmgInfo, dir)
 	elseif dmgInfo:IsDamageType(DMG_BLAST) then
 		local organs = hg.organism.GetHitBoxOrgans(ent:GetModel(), ent)
 		local boxs, pos, sphere = hg.organism.ShootMatrix(ent, organs)
@@ -1568,6 +1582,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local bleed_add = dmgBlood * bleedMul// / (RagdollDamageBoneMul[hitgroup] or 1)
 		--org.bleed = org.bleed + bleed_add
 		attacker.harm = (attacker.harm or 0) + bleed_add / 50
+		-- Ragdolls restored from an older/partial organism state can be hit before
+		-- the pain module has populated shock. Keep the damage pipeline numeric.
+		org.shock = tonumber(org.shock) or 0
 		local hurt_add = dmgHurt * 0.5 * hurtMul
 		org.hurtadd = org.hurtadd + hurt_add
 		local painadd = dmgHurt * painMul * 0.75 * (org.painresist or 1)
@@ -1593,6 +1610,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local meleeHit = dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH) or inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee"
 	
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
+		local collapseThreshold = org.shock_turn * 1.5 * analgesiaMul * painkillerMul
 	
 		
 
@@ -1748,7 +1766,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local grenadeBlastMul = string.find(inflictorClass, "ent_hg_grenade") and 1.8 or 1
 	--print(damageStack, 3)
 	damageStack = damageStack * (dmgInfo:IsDamageType(DMG_BLAST) and blast_gib_damage_mul / lend * grenadeBlastMul or 1) * (!dmgInfo:IsDamageType(DMG_CLUB+DMG_SLASH+DMG_BULLET+DMG_BUCKSHOT+DMG_BLAST+DMG_SNIPER) and 0 or 1) * (ent:IsNPC() and 3 or 1)
-	if impact.armorStopped then damageStack = 0 end
+	if impact and impact.armorStopped then damageStack = 0 end
 	--damageStack = damageStack * (bullet and bullet.AmmoType and hg.ammotypeshuy[bullet.AmmoType] and hg.ammotypeshuy[bullet.AmmoType].BulletSettings and hg.ammotypeshuy[bullet.AmmoType].BulletSettings.Mass or 1) / 8
 	if hg.FullBodyExplode and !org.fullbodyexploded and dmgInfo:IsDamageType(DMG_BLAST) and hg.CanFullBodyGib and hg.CanFullBodyGib(ent, org, ply) and (damageStack >= full_body_blast_gib_threshold or dmg_before >= full_body_blast_damage_threshold) then
 		return hg.FullBodyExplode(ent, dirCool * len, dmgInfo) or true
@@ -2367,10 +2385,16 @@ local function velocityDamage(ent, data)
 			local hadhelmet = org.owner.armors and org.owner.armors["head"] != nil
 			local head_otrub_chance = math.Clamp((dmg - head_otrub_min_damage) * head_otrub_chance_mul, 0, head_otrub_max_chance)
 			local headDamageMul = hadhelmet and 0.2 or 1
-			local oldSkull = org.skull
+			local oldSkull = org.skull or 0
+			local oldConcussion = org.concussion or 0
+			local oldBrain = org.brain or 0
 			local isMeleeHit = dmgInfo:IsDamageType(DMG_CLUB) or dmgInfo:IsDamageType(DMG_SLASH)
 			local skullDmgMul = isMeleeHit and 0.08 or 6
 			
+			-- The skull and jaw handlers normally emit their own trauma flashes.
+			-- Defer them so a collision produces one combined event using the
+			-- before/after values captured above.
+			org._deferHeadTraumaFlash = true
 			hg.organism.input_list.skull(org, bone, dmg * skullDmgMul * headDamageMul * ragdoll_fall_skull_damage_mul, dmgInfo)
 			hg.organism.input_list.jaw(org, bone, dmg * headDamageMul * ragdoll_fall_jaw_damage_mul, dmgInfo)
 			org._deferHeadTraumaFlash = nil
@@ -2389,9 +2413,12 @@ local function velocityDamage(ent, data)
 			
 			org.consciousness = math.Approach(org.consciousness, 0, dmg * head_consciousness_mul * headDamageMul)
 			
-			//if dmg > 0.5 then
-				hg.organism.input_list.spine3(org, bone, dmg * (math.random(4) == 1 and 1 or 0) * 3 * (hadhelmet and 0.5 or 1), dmgInfo)
-			//end
+			-- A head-first collision also loads the neck.  This used to be an
+			-- all-or-nothing 25% roll, so most skull impacts never reached spine3.
+			-- Keep the previous average damage, but apply it consistently alongside
+			-- the skull and upper-spine impact handling.
+			local neckImpact = dmg * 0.75 * (hadhelmet and 0.5 or 1)
+			hg.organism.input_list.spine3(org, bone, neckImpact, dmgInfo)
 			if dmg > head_otrub_min_damage and !hadhelmet and math.Rand(0, 1) < head_otrub_chance then
 				org.needotrub = true
 				org.shock = org.shock + 10

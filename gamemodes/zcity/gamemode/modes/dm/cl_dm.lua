@@ -68,7 +68,7 @@ net.Receive("dm_start",function()
         MODE.RoundBeginSound = CreateSound(LocalPlayer(), "rem_dmround.mp3")
         MODE.RoundBeginSound:PlayEx(1, 100)
 
-	sound.PlayFile( "sound/ambient/energy/force_field_loop1.ogg", "noblock", function( station, errCode, errStr )
+	sound.PlayFile( "sound/ambient/energy/force_field_loop1.wav", "noblock", function( station, errCode, errStr )
 		if ( IsValid( station ) ) then
 			zb.SoundStation = station
 			
@@ -346,7 +346,7 @@ CreateEndMenu = function()
 	Dynamic = 0
 	hmcdEndMenu = vgui.Create("ZFrame")
 
-    surface.PlaySound("ambient/alarms/warningbell1.ogg")
+    surface.PlaySound("ambient/alarms/warningbell1.wav")
 
 	local sizeX,sizeY = ScrW() / 2.5 ,ScrH() / 1.2
 	local posX,posY = ScrW() / 1.3 - sizeX / 2,ScrH() / 2 - sizeY / 2

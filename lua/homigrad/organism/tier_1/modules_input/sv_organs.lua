@@ -149,6 +149,16 @@ local organBulletBleedMultipliers = {
 	trachea = 1.25,
 }
 
+-- Keep organ-specific bleed additions in one place. Stomach and intestinal
+-- handlers calculate their damage after damageOrgan has clamped the organ
+-- value, so a fully damaged organ cannot add more bleed from a zero delta.
+local function addInternalBleed(org, amount)
+	amount = tonumber(amount) or 0
+	if amount <= 0 then return end
+
+	org.internalBleed = (tonumber(org.internalBleed) or 0) + amount
+end
+
 local function damageOrgan(org, dmg, dmgInfo, key)
 	local prot = math.max(0.3 - org[key],0)
 	local oldval = org[key]
@@ -773,45 +783,41 @@ input_list.eyeR = function(org, bone, dmg, dmgInfo)
 	return 0
 end
 
-input_list.lungsL = function(org, bone, dmg, dmgInfo)
-	local prot = math.max(0.3 - org.lungsL[1],0)
-	local oldval = org.lungsL[1]
+local function damageLung(org, dmg, dmgInfo, key, label)
+	local lung = org[key]
+	local oldDamage = lung[1]
+	local blast = dmgInfo:IsDamageType(DMG_BLAST)
+	local traumaDamage = dmg * (blast and 1.65 or 1)
 
-	hg.AddHarmToAttacker(dmgInfo, (dmg * 0.25), "Lung left damage harm")
+	hg.AddHarmToAttacker(dmgInfo, traumaDamage * 0.25, label .. " lung damage harm")
 
-	org.lungsL[1] = math.min(org.lungsL[1] + dmg / 4, 1)
-	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsL[2] = math.min(org.lungsL[2] + dmg * 1, 1) end
+	lung[1] = math.min(lung[1] + traumaDamage / 4, 1)
+	local penetrating = dmgInfo:IsDamageType(DMG_BULLET + DMG_SLASH + DMG_BUCKSHOT)
+	local blastRupture = blast and traumaDamage >= 0.55 and math.random(2) == 1
+	if penetrating or blastRupture or (not blast and math.random(3) == 1) then
+		lung[2] = math.min(lung[2] + traumaDamage, 1)
+	end
 
-	org.internalBleed = org.internalBleed + (org.lungsL[1] - oldval) * 2
+	local damageDelta = lung[1] - oldDamage
+	org.internalBleed = org.internalBleed + damageDelta * (blast and 3 or 2)
 
-	-- Expel air when lung is hit
+	-- Blast overpressure produces a stronger oxygen shock than an ordinary hit,
+	-- even when it bruises the lung without rupturing it.
 	if org.o2 and org.o2[1] then
-		org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2, 5), 15) -- Cap at -5 O2 per hit, minimum 15 overall
+		local oxygenLossCap = blast and 7 or 5
+		org.o2[1] = math.max(org.o2[1] - math.min(traumaDamage * 2, oxygenLossCap), 15)
 	end
 
 	dmgInfo:ScaleDamage(0.8)
+	return 0
+end
 
-	return 0//isCrush(dmgInfo) and 1 or prot
+input_list.lungsL = function(org, bone, dmg, dmgInfo)
+	return damageLung(org, dmg, dmgInfo, "lungsL", "Left")
 end
 
 input_list.lungsR = function(org, bone, dmg, dmgInfo)
-	local oldval = org.lungsR[1]
-
-	hg.AddHarmToAttacker(dmgInfo, (dmg * 0.25), "Lung right damage harm")
-
-	org.lungsR[1] = math.min(org.lungsR[1] + dmg / 4, 1)
-	if (dmgInfo:IsDamageType(DMG_BULLET+DMG_SLASH+DMG_BUCKSHOT)) or (math.random(3) == 1) then org.lungsR[2] = math.min(org.lungsR[2] + dmg * 1, 1) end
-
-	org.internalBleed = org.internalBleed + (org.lungsR[1] - oldval) * 2
-
-	-- Expel air when lung is hit
-	if org.o2 and org.o2[1] then
-		org.o2[1] = math.max(org.o2[1] - math.min(dmg * 2, 5), 15) -- Cap at -5 O2 per hit, minimum 15 overall
-	end
-
-	dmgInfo:ScaleDamage(0.8)
-
-	return 0//isCrush(dmgInfo) and 1 or prot
+	return damageLung(org, dmg, dmgInfo, "lungsR", "Right")
 end
 
 input_list.trachea = function(org, bone, dmg, dmgInfo)

@@ -100,25 +100,25 @@ end)
 local CreateEndMenu
 local winnersounds = {
 	[0] = { -- rebel wins
-		"vo/episode_1/npc/male01/cit_kill04.ogg",
-		"vo/episode_1/npc/male01/cit_kill01.ogg",
-		"vo/episode_1/npc/male01/cit_kill09.ogg",
-		"vo/episode_1/npc/male01/cit_kill14.ogg"
+		"vo/episode_1/npc/male01/cit_kill04.wav",
+		"vo/episode_1/npc/male01/cit_kill01.wav",
+		"vo/episode_1/npc/male01/cit_kill09.wav",
+		"vo/episode_1/npc/male01/cit_kill14.wav"
 	},
 	[1] = { -- combine wins
-		"vo/episode_1/npc/male01/cit_buddykilled11.ogg",
-		"vo/episode_1/npc/male01/cit_buddykilled07.ogg",
-		"vo/episode_1/npc/male01/cit_buddykilled10.ogg",
-		"vo/episode_1/npc/male01/cit_buddykilled04.ogg"
+		"vo/episode_1/npc/male01/cit_buddykilled11.wav",
+		"vo/episode_1/npc/male01/cit_buddykilled07.wav",
+		"vo/episode_1/npc/male01/cit_buddykilled10.wav",
+		"vo/episode_1/npc/male01/cit_buddykilled04.wav"
 	},
-	[2] = {"npc/combine_soldier/vo/overwatchtargetcontained.ogg"}, -- draw
-	[3] = {"npc/combine_soldier/vo/overwatchsectoroverrun.ogg"} -- everybody died
+	[2] = {"npc/combine_soldier/vo/overwatchtargetcontained.wav"}, -- draw
+	[3] = {"npc/combine_soldier/vo/overwatchsectoroverrun.wav"} -- everybody died
 }
 
 net.Receive("hl2dm_roundend", function()
 	local winnerteam = net.ReadInt(3)
 
-	surface.PlaySound("ambient/alarms/warningbell1.ogg")
+	surface.PlaySound("ambient/alarms/warningbell1.wav")
 
     CreateEndMenu()
 end)

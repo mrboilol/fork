@@ -492,7 +492,7 @@ function ENT:TryDetach(ply, rag)
 	if CurTime() < (self.NextDetach or 0) then
 		if (self.NextDeny or 0) < CurTime() then
 			self.NextDeny = CurTime() + .5
-			ply:EmitSound("buttons/lightswitch2.ogg", 50, 90, .4)
+			ply:EmitSound("buttons/lightswitch2.wav", 50, 90, .4)
 		end
 		return
 	end

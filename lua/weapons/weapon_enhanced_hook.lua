@@ -103,7 +103,7 @@ function SWEP:SecondaryAttack()
 	local tr = owner:GetEyeTrace()
 	if not tr.Hit or tr.HitSky then return end
 	if tr.HitPos:DistToSqr(owner:GetShootPos()) > 130 * 130 then
-		owner:EmitSound("buttons/lightswitch2.ogg", 50, 90, .4)
+		owner:EmitSound("buttons/lightswitch2.wav", 50, 90, .4)
 		return
 	end
 
@@ -195,7 +195,7 @@ function SWEP:Think()
 					if self.NextSpinWhooshTime < CurTime() then
 						local Pow = self:GetThrowPower()
 						self.NextSpinWhooshTime = CurTime() + math.Clamp(10 / Pow, .3, 1.25)
-						sound.Play("weapons/slam/throw.ogg", self:GetPos(), 65, math.Clamp(Pow, 60, 130))
+						sound.Play("weapons/slam/throw.wav", self:GetPos(), 65, math.Clamp(Pow, 60, 130))
 						owner:ViewPunch(Angle(-1, 0, 0))
 						if owner.organism then owner.organism.stamina.subadd = 1.5 end
 					end
@@ -236,9 +236,9 @@ function SWEP:Throw()
 	local ThrowPos = Pos + Vec * 30
 	local Tr = util.QuickTrace(Pos, Vec * 35, {owner})
 	if Tr.Hit then ThrowPos = Pos + Vec * 10 end
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 75, 80)
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 70, 80)
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 65, 80)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 75, 80)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 70, 80)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 65, 80)
 
 	local Gr = ents.Create(self.ENT)
 	Gr:SetPos(ThrowPos)

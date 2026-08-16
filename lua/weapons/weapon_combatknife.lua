@@ -59,7 +59,7 @@ SWEP.hitsoundextra = {
 
 SWEP.BlockTier = 2
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {145, 155}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {145, 155}}
 
 
 SWEP.PenetrationPrimary = 8
@@ -98,7 +98,7 @@ if CLIENT then
 	SWEP.BounceWeaponIcon = false
 end
 
-SWEP.AttackSwing = "weapons/slam/throw.ogg"
+SWEP.AttackSwing = "weapons/slam/throw.wav"
 SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"

@@ -53,7 +53,7 @@ local function CheckSetAPI(self, str )
 end
 
 local function ResetPromt( paste )
-	LocalPlayer():EmitSound("buttons/combine_button7.ogg")
+	LocalPlayer():EmitSound("buttons/combine_button7.wav")
 	local f = vgui.Create("DFrame")
 	f:SetTitle("#addons.warning")
 	f:MakePopup()
@@ -75,7 +75,7 @@ local function ResetPromt( paste )
 	end
 	y.paste = paste
 	function y.DoClick(self)
-		LocalPlayer():EmitSound("buttons/button6.ogg")
+		LocalPlayer():EmitSound("buttons/button6.wav")
 		local s = StormFox2.Setting.GetCVSDefault()
 		self.paste:SetText(s)
 		StormFox2.Permission.RequestSetting("cvslist", s)

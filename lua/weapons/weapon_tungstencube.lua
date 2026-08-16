@@ -89,7 +89,7 @@ function SWEP:PrimaryAttack()
         end
     end
 
-    ply:EmitSound("weapons/slam/throw.ogg", 75, math.random(95, 105))
+    ply:EmitSound("weapons/slam/throw.wav", 75, math.random(95, 105))
     ply:ViewPunch(Angle(-8, 0, -10))
     
     ply:SelectWeapon("weapon_hands_sh")

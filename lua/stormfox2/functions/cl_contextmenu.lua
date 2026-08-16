@@ -74,12 +74,12 @@ end
 			label:SetExpensiveShadow( 1, Color( 0, 0, 0, 200 ) )
 			label:SizeToContentsX()
 		sv.DoClick = function()
-			surface.PlaySound("buttons/button14.ogg")
+			surface.PlaySound("buttons/button14.wav")
 			window:Remove()
 			StormFox2.Menu.OpenSV()
 		end
 		cl.DoClick = function()
-			surface.PlaySound("buttons/button14.ogg")
+			surface.PlaySound("buttons/button14.wav")
 			window:Remove()
 			StormFox2.Menu.Open()
 		end

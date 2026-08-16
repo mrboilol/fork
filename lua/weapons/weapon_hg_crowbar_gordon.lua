@@ -64,7 +64,7 @@ SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
-SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0, 0, 0)
 
@@ -154,7 +154,7 @@ function SWEP:Think()
             end
             if CurTime() >= self.NextBreakSound then
                 if IsValid(self.DoorEntity) then
-                    self.DoorEntity:EmitSound("physics/wood/wood_crate_break2.ogg", 75, 100)
+                    self.DoorEntity:EmitSound("physics/wood/wood_crate_break2.wav", 75, 100)
                 end
                 self.NextBreakSound = CurTime() + math.Rand(1, 2)
             end

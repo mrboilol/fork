@@ -175,12 +175,12 @@ hook.Add("HG_PlayerCanHearPlayersVoice","BrainDamage", function(listener, speake
 end)
 
 local braindeadphrase_male = {
-	"vo/episode_1/npc/male01/cit_behindyousfx01.ogg",
-	"vo/episode_1/npc/male01/cit_behindyousfx02.ogg",
+	"vo/episode_1/npc/male01/cit_behindyousfx01.wav",
+	"vo/episode_1/npc/male01/cit_behindyousfx02.wav",
 }
 local braindeadphrase_female = {
-	"vo/episode_1/npc/female01/cit_behindyousfx01.ogg",
-	"vo/episode_1/npc/female01/cit_behindyousfx02.ogg",
+	"vo/episode_1/npc/female01/cit_behindyousfx01.wav",
+	"vo/episode_1/npc/female01/cit_behindyousfx02.wav",
 }
 hook.Add("HG_ReplacePhrase", "BraindeadPhrase", function(ply, phrase, muffed, pitch)
 	if IsValid(ply) and ply.organism and ply.organism.brain >= 0.1 then

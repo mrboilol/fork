@@ -36,7 +36,7 @@ function ENT:Think()
         self.Played = self.Played or false
         if self.Safety > CurTime() and beepSnd > 0.9 and not self.Played then
             self.Played = true
-            self:EmitSound("buttons/button24.ogg",60,100 + (25 * (3-(self.Safety - CurTime()))) )
+            self:EmitSound("buttons/button24.wav",60,100 + (25 * (3-(self.Safety - CurTime()))) )
         elseif beepSnd < 0.9 then
             self.Played = false
         end

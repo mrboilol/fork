@@ -308,6 +308,12 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
     -- the amount healed per completed wrap unchanged.
     requiredCompletions = math.max(math.ceil(requiredCompletions * 0.65 * GetMedicalMinigameOtherSpeedMultiplier(ply, target)), 1)
 
+    -- The weapon wrapper uses this to map each completed wrap to the same
+    -- fraction of its animation instead of conflicting with normal medicines.
+    if IsValid(wep) then
+        wep.HGMedicalMinigameRequiredProgress = requiredCompletions
+    end
+
     local existingSession = hg.MedicalMinigame.BandageSessions[ply]
     if not existingSession or existingSession.target ~= target then
         existingSession = {
@@ -751,7 +757,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
             org[limb .. "dislocation"] = false
             org.painadd = (org.painadd or 0) + 6
             org.fearadd = (org.fearadd or 0) + 0.1
-            target:EmitSound("physics/flesh/flesh_impact_hard6.ogg", 65)
+            target:EmitSound("physics/flesh/flesh_impact_hard6.wav", 65)
         end
 
         return

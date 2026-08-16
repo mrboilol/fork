@@ -453,7 +453,7 @@ hook.Add("PlayerButtonDown", "TraitorPanelToggle", function(ply, btn)
     traitor_panel.visible = not traitor_panel.visible
     
     if traitor_panel.visible then
-        surface.PlaySound("buttons/button14.ogg")
+        surface.PlaySound("buttons/button14.wav")
     end
 end)
 

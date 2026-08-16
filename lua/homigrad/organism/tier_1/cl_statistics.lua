@@ -78,6 +78,9 @@ local list = {
 	"fearadd",
 	{"blood", 5000}, 
 	{"bleed", 100, true}, 
+	{"venousBleed", 10, true},
+	{"arterialBleed", 25, true},
+	{"internalBleedRate", 10, true},
 	"bloodtype",
 	"hemotransfusionshock",
 	{"internalBleed", 10, true}, 
@@ -128,6 +131,7 @@ local list = {
 	{{"stamina.max", "stamina", "max"}, 
 	{"stamina", "range"}}, 
 	{{"stamina.regen", "stamina", "regen"}, 1}, 
+	{{"stamina.regenMul", "stamina", "regenMul"}, 1},
 	{{"stamina.sub", "stamina", "sub"}, 1, true}, 
 	0, 
 	{"brain", 1, true},
@@ -137,7 +141,9 @@ local list = {
 	{"brainOccipital", 1, true},
 	{"brainHemorrhage", 1, true},
 	{"brainBleedRate", 0.008, true},
+	{"brainSwelling", 1, true},
 	{"seizure", 1, true, "seizure chance"},
+	{"seizureActive", true, true},
 	{"concussion", 6, true},
 	{"consciousness", 1, false},
 	{"skull", 1, true},
@@ -153,7 +159,9 @@ local list = {
 	{"heartstop", true, true}, 
 	{"fibrillation", true, true},
 	{"arrhythmia", 1, true},
-	{"cardiacOutput", 1},
+	{"bloodPressure", 90},
+	{"systolic", 120},
+	{"diastolic", 80},
 	{"myocardialOxygen", 1},
 	{"heartStrain", 1, true},
 	{"hypertension", 1, true},
@@ -162,6 +170,7 @@ local list = {
 	{"pulse", 70}, 
 	{"heartbeat", 300, true},
 	{"cardiacOutput", 1.5},
+	{"strokeVolume", 1.5},
 	{"hemorrhageCompensation", 1, true},
 	{"compensationPulseMultiplier", 1},
 	{"compensationHeartRateTarget", 300, true},
@@ -182,6 +191,8 @@ local list = {
 	{{"lungsR.penetrated", "lungsR", 2}, 1,true},
 	{"trachea", 1, true}, 
 	{"pneumothorax", 1, true}, 
+	{"hemothorax", 1, true},
+	{"cardiacTamponade", 1, true},
 	{"needle", 1, true},
 	0, 
 	{"o2", {"o2", "range"}, false, "Tissue O2"},
@@ -697,8 +708,8 @@ hook.Add("HUDPaint","homigrad-wound-debug",function()
 		if timeHuy and ((timeHuy + traveltime) > CurTime()) then
 			local tbl = tracePoses
 			
-			--[[snd1 = snd1 or CreateSound(csmodel,"player/general/flesh_burn.ogg")
-			snd2 = snd2 or CreateSound(csmodel,"ambient/wind/windgust.ogg")
+			--[[snd1 = snd1 or CreateSound(csmodel,"player/general/flesh_burn.wav")
+			snd2 = snd2 or CreateSound(csmodel,"ambient/wind/windgust.wav")
 			
 			if not snd1:IsPlaying() then
 				snd1:Play()

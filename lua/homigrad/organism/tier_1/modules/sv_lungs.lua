@@ -551,11 +551,10 @@ module[2] = function(owner, org, timeValue)
 		org.pneumothorax = max(org.pneumothorax - timeValue / 10, 0)
 	end
 
-	-- Hemothorax from internal bleeding is delayed by the severity-scaled
-	-- complication state built in sv_blood. Damage to a thoracic organ guarantees
-	-- this progression, while unrelated internal bleeding must pass the single
-	-- complication roll for its current episode. Moderate episodes choose one
-	-- side; catastrophic or advanced episodes can fill both pleural spaces.
+	-- Hemothorax requires a badly damaged thoracic organ together with a severe
+	-- active internal bleed. Unrelated bleeding only qualifies through its rare
+	-- catastrophic complication roll. Routine chest and abdominal injuries do
+	-- not slowly fill the pleural space.
 	local internalBleedVal = org.internalBleed or 0
 	local internalBleedPeak = math.max(org.internalBleedPeak or internalBleedVal, internalBleedVal)
 	local bleedComplication = math.Clamp(org.internalBleedComplication or 0, 0, 1)
@@ -565,23 +564,28 @@ module[2] = function(owner, org, timeValue)
 		org.lungsL[1] or 0,
 		org.lungsR[1] or 0
 	), 0, 1)
-	local canDevelopHemothorax = thoracicOrganDamage > 0.01 or org.internalBleedHemothoraxRisk == true
+	local severeThoracicDamage = math.Clamp((thoracicOrganDamage - 0.55) / 0.45, 0, 1)
+	local severeInternalBleed = math.Clamp((internalBleedPeak - 1.5) / 4.5, 0, 1)
+	local severeThoracicBleed = severeThoracicDamage > 0 and severeInternalBleed > 0 and internalBleedVal > 1.25
+	local catastrophicBleed = org.internalBleedHemothoraxRisk == true and internalBleedPeak >= 4 and bleedComplication >= 0.35
 	if needleActive then
 		org.hemothoraxTrauma = max(org.hemothoraxTrauma - timeValue / 120, 0)
 		org.hemothoraxL = max(org.hemothoraxL - timeValue / 120, 0)
 		org.hemothoraxR = max(org.hemothoraxR - timeValue / 120, 0)
-	elseif canDevelopHemothorax and (internalBleedVal > 0.1 or thoracicOrganDamage > 0.01) then
+	elseif severeThoracicBleed or catastrophicBleed then
 		if org.internalBleedLungSide != "L" and org.internalBleedLungSide != "R" then
 			org.internalBleedLungSide = math.random(2) == 1 and "L" or "R"
 		end
 
-		local severityK = math.Clamp((internalBleedPeak - 0.2) / 2.8, 0, 1)
+		local severityK = math.Clamp((internalBleedPeak - 1.5) / 4.5, 0, 1)
 		-- Pleural filling is deliberately measured in minutes. Severe injuries
 		-- progress faster, but no longer jump from a routine bleed to respiratory
 		-- failure in under a minute.
-		local fillTime = Lerp(severityK, 360, 150)
-		local bilateral = internalBleedPeak >= 2.5 or bleedComplication >= 0.7
-		local hemothoraxTarget = math.Clamp(math.max(bleedComplication, thoracicOrganDamage * 0.65), 0, 1)
+		local fillTime = Lerp(severityK, 420, 180)
+		local bilateral = internalBleedPeak >= 6 and (severeThoracicDamage >= 0.75 or bleedComplication >= 0.75)
+		local injuryTarget = severeThoracicDamage * severeInternalBleed
+		local complicationTarget = catastrophicBleed and bleedComplication * math.Clamp((internalBleedPeak - 4) / 6, 0, 1) or 0
+		local hemothoraxTarget = math.Clamp(math.max(injuryTarget, complicationTarget), 0, 1)
 		local targetL = (bilateral or org.internalBleedLungSide == "L") and hemothoraxTarget or 0
 		local targetR = (bilateral or org.internalBleedLungSide == "R") and hemothoraxTarget or 0
 
@@ -1002,10 +1006,35 @@ module[2] = function(owner, org, timeValue)
 
 
 
-	if org.analgesia > 1.5 then
+	local analgesia = tonumber(org.analgesia) or 0
+	local painkiller = tonumber(org.painkiller) or 0
+	if analgesia > 1.5 or painkiller > 2.4 then
 
 		org.owner:Notify(drugged[math.random(#drugged)], 30, "drugged", 0, nil, color_white)
 
+	end
+
+	-- Complete Judge's latest overdose path using this repository's existing
+	-- respiration and blood-module owners. Accumulators make the effects scale
+	-- with sustained dose without relying on tick-rate-dependent random rolls.
+	if analgesia > 1.5 or painkiller > 2.4 then
+		if org.isPly and org.alive then
+			local overdose = analgesia + painkiller
+			org.overdoseNausea = (org.overdoseNausea or 0) + timeValue * overdose * 0.08
+			org.overdoseShit = (org.overdoseShit or 0) + timeValue * overdose * 0.05
+
+			if org.overdoseNausea > 1.1 then
+				org.overdoseNausea = 0
+				hg.organism.Vomit(owner)
+			end
+			if org.overdoseShit > 2 then
+				org.overdoseShit = 0
+				hg.organism.Defecate(owner)
+			end
+		end
+	else
+		org.overdoseNausea = nil
+		org.overdoseShit = nil
 	end
 
 

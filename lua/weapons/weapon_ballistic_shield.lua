@@ -65,12 +65,12 @@ SWEP.StaminaSecondary = 20
 SWEP.PainMultiplier = 1.2
 SWEP.HeadRagdollChance = 0.08
 
-SWEP.AttackSwing = "weapons/slam/throw.ogg"
-SWEP.AttackHit = "physics/metal/metal_barrel_impact_hard7.ogg"
-SWEP.Attack2Hit = "physics/metal/metal_barrel_impact_hard7.ogg"
-SWEP.AttackHitFlesh = "physics/body/body_medium_break3.ogg"
-SWEP.Attack2HitFlesh = "physics/body/body_medium_break3.ogg"
-SWEP.DeploySnd = "physics/metal/metal_canister_impact_soft2.ogg"
+SWEP.AttackSwing = "weapons/slam/throw.wav"
+SWEP.AttackHit = "physics/metal/metal_barrel_impact_hard7.wav"
+SWEP.Attack2Hit = "physics/metal/metal_barrel_impact_hard7.wav"
+SWEP.AttackHitFlesh = "physics/body/body_medium_break3.wav"
+SWEP.Attack2HitFlesh = "physics/body/body_medium_break3.wav"
+SWEP.DeploySnd = "physics/metal/metal_canister_impact_soft2.wav"
 
 
 SWEP.ShieldMaxSpeed = 600

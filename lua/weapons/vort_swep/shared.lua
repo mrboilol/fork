@@ -110,7 +110,7 @@ SWEP.HealLoop = Sound("NPC_Vortigaunt.StartHealLoop")
 SWEP.AttackLoop = Sound("NPC_Vortigaunt.ZapPowerup")
 SWEP.AttackSound = Sound("NPC_Vortigaunt.ClawBeam")
 SWEP.Deny = Sound("Buttons.snd19")
-SWEP.AllyHealSound = Sound("npc/vort/health_charge.ogg")
+SWEP.AllyHealSound = Sound("npc/vort/health_charge.wav")
 
 SWEP.ArmorLimit = 100
 SWEP.BeamDamage = 360
@@ -997,7 +997,7 @@ function SWEP:CreateVortRift(owner, pos, normal)
 	self:VortBurstEffect(origin, 1.5)
 	self:CreateImpactSprite(2.4, origin)
 	owner:EmitSound("NPC_Vortigaunt.Dispell", 95, 82)
-	owner:EmitSound("ambient/levels/citadel/weapon_disintegrate3.ogg", 95, 125)
+	owner:EmitSound("ambient/levels/citadel/weapon_disintegrate3.wav", 95, 125)
 
 	if self:IsHL3HighLoad() then
 		for _, ply in ipairs(player.GetAll()) do
@@ -1162,7 +1162,7 @@ function SWEP:TryVortBlink()
 	self:VortBlinkShockwave(owner, wanted)
 
 	owner:EmitSound("NPC_Vortigaunt.Dispell", 90, 120)
-	owner:EmitSound("ambient/levels/citadel/weapon_disintegrate1.ogg", 80, 150)
+	owner:EmitSound("ambient/levels/citadel/weapon_disintegrate1.wav", 80, 150)
 
 	local nextTime = now + 0.3
 	self:SetNextPrimaryFire(nextTime)

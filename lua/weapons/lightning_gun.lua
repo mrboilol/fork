@@ -99,7 +99,7 @@ function SWEP:PrimaryAttack()
 	if SERVER then
 		Strike(self, Owner:KeyDown(IN_SPEED))
 	else
-		--self:EmitSound("weapons/physcannon/energy_disintegrate4.ogg", 75, 100, 0.2)
+		--self:EmitSound("weapons/physcannon/energy_disintegrate4.wav", 75, 100, 0.2)
 		local hitPos = Owner:GetEyeTrace().HitPos or Owner:GetShootPos()
 	end
 end
@@ -112,7 +112,7 @@ function SWEP:SecondaryAttack()
 	if SERVER then
 		Rumble(self)
 	else
-		self:EmitSound("weapons/slam/mine_mode.ogg")
+		self:EmitSound("weapons/slam/mine_mode.wav")
 	end
 end
 
@@ -120,7 +120,7 @@ function SWEP:Think()
 	if self._bUsed and self:HasPower() then
 		self:SendWeaponAnim( ACT_VM_IDLE_TO_LOWERED )
 		self._bUsed = false
-		self:EmitSound("weapons/physcannon/superphys_small_zap1.ogg", 75, 100, 0.2)
+		self:EmitSound("weapons/physcannon/superphys_small_zap1.wav", 75, 100, 0.2)
 	end
 end
 

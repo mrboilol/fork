@@ -294,7 +294,7 @@ function CLASS.Think(self)
 end
 
 --// Phrase stuff
-local zomb_pain = {"npc/zombie/zombie_die2.ogg"}
+local zomb_pain = {"npc/zombie/zombie_die2.wav"}
 for i = 1, 6 do
 	table.insert(zomb_pain, "npc/zombie/zombie_pain" .. i .. ".ogg")
 end

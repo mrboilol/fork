@@ -254,7 +254,7 @@ local function cock(self, time)
 	net.Broadcast()
 	
 	self.Primary.Next = CurTime() + self.AnimDraw + self.Primary.Wait
-	if CLIENT then self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.ogg",true,CHAN_AUTO) end
+	if CLIENT then self:PlaySnd(self.CockSound or "weapons/shotgun/shotgun_cock.wav",true,CHAN_AUTO) end
 
 	local ply = self:GetOwner()
 

@@ -279,7 +279,7 @@ function PLAYER:LegAttack()
                                 ent:Fire("Close", oldname, 0, self, self)
                             end
 
-                            ent:EmitSound("physics/wood/wood_box_impact_hard3.ogg")
+                            ent:EmitSound("physics/wood/wood_box_impact_hard3.wav")
                         end
 
                         local locked = not DoorIsOpen(ent)

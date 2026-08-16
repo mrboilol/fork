@@ -77,11 +77,11 @@ SWEP.setlh = true
 SWEP.setrh = true
 SWEP.TwoHanded = true
 
-SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.ogg"
-SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.ogg"
+SWEP.AttackHit = "physics/wood/wood_plank_impact_hard1.wav"
+SWEP.Attack2Hit = "physics/wood/wood_plank_impact_hard1.wav"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 SWEP.SwingSound = "baseballbat/swing.mp3"
 SWEP.HitFleshExtra = {
     "baseballbat/hit1.mp3",
@@ -130,7 +130,7 @@ SWEP.CanHeavyAttack = true -- Set to true to enable
 
 SWEP.BlockTier = 3
 SWEP.MeleeMaterial = "wood"
-SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.ogg"
+SWEP.BlockImpactSound = "physics/wood/wood_plank_impact_hard1.wav"
 
 function SWEP:CanSecondaryAttack()
     local owner = self:GetOwner()

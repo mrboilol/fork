@@ -28,10 +28,10 @@ function ENT:Lit()
 end
 
 local snd_tab = {
-	Sound("player/halloween/ghost_swish_c_01.ogg"),
-	Sound("player/halloween/ghost_swish_c_02.ogg"),
-	Sound("player/halloween/ghost_swish_c_03.ogg"),
-	Sound("player/halloween/ghost_swish_c_04.ogg")
+	Sound("player/halloween/ghost_swish_c_01.wav"),
+	Sound("player/halloween/ghost_swish_c_02.wav"),
+	Sound("player/halloween/ghost_swish_c_03.wav"),
+	Sound("player/halloween/ghost_swish_c_04.wav")
 }
 
 function ENT:UnLit()

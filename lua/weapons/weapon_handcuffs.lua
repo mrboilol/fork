@@ -152,7 +152,7 @@ function SWEP:Tie(tr)
 
 				if ent:IsRagdoll() then handcuff(ent) end
 
-				ent:EmitSound("weapons/357/357_reload3.ogg")
+				ent:EmitSound("weapons/357/357_reload3.wav")
 				ent:PhysWake()
 
 				local org = ent.organism
@@ -222,7 +222,7 @@ function SWEP:PrimaryAttack()
 		self:PlayAnim("attack")
 		timer.Simple(0.5,function()
 			if IsValid(self) then return end
-			self:EmitSound("weapons/357/357_reload3.ogg")
+			self:EmitSound("weapons/357/357_reload3.wav")
 		end)
 		--if self:GetHolding() < 100 then return end
 		self.CoolDown = CurTime() + 2

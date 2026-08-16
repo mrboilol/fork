@@ -34,7 +34,7 @@ SWEP.l_forearm = Angle(0, 0, 0)
 SWEP.l_upperarm = Angle(0, 0, 0)
 
 SWEP.weaponInvCategory = false
-SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.ogg"
+SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
 SWEP.HolsterSnd = ""
 SWEP.modeNames = {
 	[true] = "huy",
@@ -139,7 +139,7 @@ end
 --end
 
 local bone, name
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Heal animation type: 0 = progressive minigames, 1 = Judge animations, 2 = progressive Judge minigames", 0, 2)
 function SWEP:BoneSet(lookup_name, vec, ang)
 	if IsValid(self:GetOwner()) and not self:GetOwner():IsPlayer() then return end
 	hg.bone.Set(self:GetOwner(), lookup_name, vec, ang)

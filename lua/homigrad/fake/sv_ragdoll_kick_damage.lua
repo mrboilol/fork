@@ -68,9 +68,9 @@ local BONE_HITGROUPS = {
 
 -- Sound effects for different impact types
 local KICK_SOUNDS = {
-    flesh = "physics/flesh/flesh_impact_hard1.ogg",
-    body = "physics/body/body_medium_impact_hard1.ogg",
-    generic = "physics/concrete/concrete_impact_hard3.ogg",
+    flesh = "physics/flesh/flesh_impact_hard1.wav",
+    body = "physics/body/body_medium_impact_hard1.wav",
+    generic = "physics/concrete/concrete_impact_hard3.wav",
 }
 
 -- Get the bone name from physics bone number

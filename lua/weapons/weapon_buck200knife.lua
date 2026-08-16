@@ -36,7 +36,7 @@ SWEP.DamageSecondary = 10
 
 SWEP.BlockTier = 2
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {145, 155}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {145, 155}}
 
 SWEP.setlh = true
 SWEP.setrh = true
@@ -71,7 +71,7 @@ SWEP.HadBackBonus = true
 
 SWEP.BlockTier = 2
 SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.ogg"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 SWEP.attack_ang = Angle(0,0,0)
 function SWEP:Initialize()

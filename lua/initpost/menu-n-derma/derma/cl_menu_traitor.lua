@@ -1238,7 +1238,7 @@ local function OpenRoleEditor(parentPanel, roleId, returnPanel)
                     local oldCost = config.skillsets[oldSkillset] and config.skillsets[oldSkillset].cost or 0
                     local costDiff = info.cost - oldCost
                     if currentPoints + costDiff > config.maxPoints then
-                        surface.PlaySound("buttons/button10.ogg")
+                        surface.PlaySound("buttons/button10.wav")
                         return
                     end
                     state.loadout.skillset = id
@@ -1281,7 +1281,7 @@ local function OpenRoleEditor(parentPanel, roleId, returnPanel)
             btn.DoClick = function()
                 local isDisabled = not table.HasValue(state.loadout.weapons, id) and HasWeaponConflict(config, state.loadout.weapons, id)
                 if isDisabled then
-                    surface.PlaySound("buttons/button10.ogg")
+                    surface.PlaySound("buttons/button10.wav")
                     return
                 end
                 if table.HasValue(state.loadout.weapons, id) then
@@ -1294,7 +1294,7 @@ local function OpenRoleEditor(parentPanel, roleId, returnPanel)
                     end
                 else
                     if currentPoints + info.cost > config.maxPoints then
-                        surface.PlaySound("buttons/button10.ogg")
+                        surface.PlaySound("buttons/button10.wav")
                         return
                     end
                     table.insert(state.loadout.weapons, id)
@@ -1333,14 +1333,14 @@ local function OpenRoleEditor(parentPanel, roleId, returnPanel)
                         end
                         addonBtn.DoClick = function()
                             if not table.HasValue(state.loadout.weapons, id) then
-                                surface.PlaySound("buttons/button10.ogg")
+                                surface.PlaySound("buttons/button10.wav")
                                 return
                             end
                             if table.HasValue(state.loadout.weapons, addonId) then
                                 table.RemoveByValue(state.loadout.weapons, addonId)
                             else
                                 if currentPoints + addonInfo.cost > config.maxPoints then
-                                    surface.PlaySound("buttons/button10.ogg")
+                                    surface.PlaySound("buttons/button10.wav")
                                     return
                                 end
                                 table.insert(state.loadout.weapons, addonId)

@@ -30,7 +30,7 @@ function ENT:OnTakeDamage(cmd)
 	if WireAddon then
 		Wire_TriggerOutput(self, "IsBroken", 1)
 	end
-	self:EmitSound("physics/glass/glass_largesheet_break1.ogg")
+	self:EmitSound("physics/glass/glass_largesheet_break1.wav")
 	self:SetNWBool("broken",true)
 	self.respawn = CurTime() + 30
 	for i = 1,5 do
@@ -63,9 +63,9 @@ function ENT:SetOn(boolean)
 	self:SetNWInt("on",boolean and 1 or 0)
 	self.on = boolean
 	if boolean then
-		self:EmitSound("ambient/fire/mtov_flame2.ogg", 50, 110, 0.2)
+		self:EmitSound("ambient/fire/mtov_flame2.wav", 50, 110, 0.2)
 	else
-		self:EmitSound("ambient/atmosphere/hole_hit4.ogg", 50, 50,0.4)
+		self:EmitSound("ambient/atmosphere/hole_hit4.wav", 50, 50,0.4)
 	end
 end
 
@@ -101,9 +101,9 @@ function ENT:Think()
 	if self:GetNWInt("on") == on then return end
 	self:SetNWInt("on",on )
 	if on == 1 then
-		self:EmitSound("ambient/fire/mtov_flame2.ogg", 50, 110, 0.2)
+		self:EmitSound("ambient/fire/mtov_flame2.wav", 50, 110, 0.2)
 	else
-		self:EmitSound("ambient/atmosphere/hole_hit4.ogg", 50, 50,0.4)
+		self:EmitSound("ambient/atmosphere/hole_hit4.wav", 50, 50,0.4)
 	end
 	return true
 end

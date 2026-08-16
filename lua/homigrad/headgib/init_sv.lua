@@ -3,7 +3,7 @@ local net, hg, pairs, Vector, ents, IsValid, util = net, hg, pairs, Vector, ents
 local vecZero = Vector(0,0,0)
 local vecInf = Vector(0,0,0) / 0
 
-local function removeBone(rag, bone, phys_bone, nohuys)
+local function removeBone(rag, bone, phys_bone, nohuys, keepCollision)
 	if not IsValid(rag) or not bone or bone < 0 or not phys_bone or phys_bone < 0 then return end
 	if !nohuys then rag:ManipulateBoneScale(bone, vecZero) end
 	--rag:ManipulateBonePosition(bone,vecInf) -- Thanks Rama (only works on certain graphics cards!)
@@ -12,7 +12,10 @@ local function removeBone(rag, bone, phys_bone, nohuys)
 
 	local phys_obj = rag:GetPhysicsObjectNum(phys_bone)
 	if not IsValid(phys_obj) then return end
-	phys_obj:EnableCollisions(false)
+	-- A destroyed head is hidden and replaced with gore, but its physics body
+	-- must remain collidable.  Otherwise the first open-skull impact turns the
+	-- head into a ghost and later wall/floor strikes never reach collision damage.
+	if not keepCollision then phys_obj:EnableCollisions(false) end
 	phys_obj:SetMass(0.1)
 	--rag:RemoveInternalConstraint(phys_bone)
 
@@ -32,11 +35,11 @@ local function recursive_bone(rag, bone, list)
 
 end
 
-function Gib_RemoveBone(rag, bone, phys_bone, nohuys)
+function Gib_RemoveBone(rag, bone, phys_bone, nohuys, keepCollision)
 	if not IsValid(rag) or not bone or bone < 0 then return end
 	rag.gibRemove = rag.gibRemove or {}
 
-	removeBone(rag, bone, phys_bone, nohuys)
+	removeBone(rag, bone, phys_bone, nohuys, keepCollision)
 
 	local list = {}
 	recursive_bone(rag, bone, list)
@@ -345,11 +348,11 @@ function Gib_Input(rag, bone, force, damage)
 	if (not gibRemove[phys_bone]) and (bone == rag:LookupBone("ValveBiped.Bip01_Head1")) then
 		--sound.Emit(rag,"player/headshot" .. math.random(1, 2) .. ".ogg")
 		--sound.Emit(rag,"physics/flesh/flesh_squishy_impact_hard" .. math.random(2, 4) .. ".ogg")
-		--sound.Emit(rag,"physics/body/body_medium_break3.ogg")
+		--sound.Emit(rag,"physics/body/body_medium_break3.wav")
 		--sound.Emit(rag,"physics/glass/glass_sheet_step" .. math.random(1,4) .. ".ogg", 90, 50, 2)
 		rag:EmitSound(sounds[math.random(#sounds)], 70, math.random(115, 125), 2)
 
-		Gib_RemoveBone(rag, bone, phys_bone)
+		Gib_RemoveBone(rag, bone, phys_bone, nil, true)
 		
 		--rag:ManipulateBoneScale(rag:LookupBone("ValveBiped.Bip01_Neck1"),vecZero)
 		rag:ManipulateBonePosition(rag:LookupBone("ValveBiped.Bip01_Neck1"),Vector(-1,0,0))

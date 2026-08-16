@@ -222,12 +222,12 @@ function Glide.SwitchSeat( ply, seatIndex )
 
     local seat = vehicle.seats[seatIndex]
     if not IsValid( seat ) then
-        ply:EmitSound( "player/suit_denydevice.ogg", 50, 100, 1.0, 6, 0, 0 )
+        ply:EmitSound( "player/suit_denydevice.wav", 50, 100, 1.0, 6, 0, 0 )
         return
     end
 
     if IsValid( seat:GetDriver() ) then
-        ply:EmitSound( "player/suit_denydevice.ogg", 50, 100, 1.0, 6, 0, 0 )
+        ply:EmitSound( "player/suit_denydevice.wav", 50, 100, 1.0, 6, 0, 0 )
         return
     end
     

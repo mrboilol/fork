@@ -1077,7 +1077,7 @@ net.Receive("cri_roundend", function()
 		total = net.ReadUInt(8),
 	}
 
-	surface.PlaySound(endStats.winner == 2 and "zbattle/criresp/failedSWAT.ogg" or "ambient/alarms/warningbell1.ogg")
+	surface.PlaySound(endStats.winner == 2 and "zbattle/criresp/failedSWAT.ogg" or "ambient/alarms/warningbell1.wav")
 end)
 
 local function EndLockActive()

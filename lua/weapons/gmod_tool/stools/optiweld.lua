@@ -135,7 +135,7 @@ local function selectEntity(Ply, Ent, FastMode)
 		net.Send(Ply)
 
 		net.Start("OptiWeldSound")
-			net.WriteString("buttons/button22.ogg")
+			net.WriteString("buttons/button22.wav")
 		net.Send(Ply)
 
 	else
@@ -154,7 +154,7 @@ local function selectEntity(Ply, Ent, FastMode)
 			net.Send(Ply)
 
 			net.Start("OptiWeldSound")
-				net.WriteString("buttons/button22.ogg")
+				net.WriteString("buttons/button22.wav")
 			net.Send(Ply)
 
 		end
@@ -295,7 +295,7 @@ end
 
 local function notifyPlayer(Ply, Msg)
 
-	Ply:SendLua("GAMEMODE:AddNotify( '"..Msg.."', 0, 2 )\nsurface.PlaySound('buttons/button16.ogg')")
+	Ply:SendLua("GAMEMODE:AddNotify( '"..Msg.."', 0, 2 )\nsurface.PlaySound('buttons/button16.wav')")
 
 end
 
@@ -403,7 +403,7 @@ function TOOL:RightClick(tr)
 
 								elseif(Weld == 0 && NoCollide == 0) then
 
-									Owner:SendLua("GAMEMODE:AddNotify( 'Please select the type of constraint.', 1, 4 )\nsurface.PlaySound('buttons/button10.ogg')")
+									Owner:SendLua("GAMEMODE:AddNotify( 'Please select the type of constraint.', 1, 4 )\nsurface.PlaySound('buttons/button10.wav')")
 
 									return
 
@@ -428,7 +428,7 @@ function TOOL:RightClick(tr)
 			end
 
 			net.Start("OptiWeldSound")
-				net.WriteString("buttons/button24.ogg")
+				net.WriteString("buttons/button24.wav")
 			net.Send(Owner)
 
 			Owner:SendLua("GAMEMODE:AddNotify( '"..tostring(table.Count(ConstraintTable)).." constraints made.', 0, 4 )")
@@ -512,7 +512,7 @@ function TOOL:RightClick(tr)
 
 								elseif(Weld == 0 && NoCollide == 0) then
 
-									Owner:SendLua("GAMEMODE:AddNotify( 'Please select the type of constraint.', 1, 4 )\nsurface.PlaySound('buttons/button10.ogg')")
+									Owner:SendLua("GAMEMODE:AddNotify( 'Please select the type of constraint.', 1, 4 )\nsurface.PlaySound('buttons/button10.wav')")
 
 									return
 
@@ -537,7 +537,7 @@ function TOOL:RightClick(tr)
 			end
 
 			net.Start("OptiWeldSound")
-				net.WriteString("buttons/button24.ogg")
+				net.WriteString("buttons/button24.wav")
 			net.Send(Owner)
 
 			Owner:SendLua("GAMEMODE:AddNotify( '"..tostring(table.Count(ConstraintTable)).." constraints made.', 0, 4 )")
@@ -603,7 +603,7 @@ function TOOL:Reload(tr)
 		end
 
 		net.Start("OptiWeldSound")
-			net.WriteString("buttons/blip1.ogg")
+			net.WriteString("buttons/blip1.wav")
 		net.Send(Owner)
 
 	end

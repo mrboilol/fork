@@ -76,7 +76,7 @@ SWEP.swingsoundextra = {
 
 SWEP.BlockTier = 2
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {125, 145}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {125, 145}}
 
 if CLIENT then
 	SWEP.WepSelectIcon = Material("entities/arc9_eft_melee_mpl50.png")
@@ -92,7 +92,7 @@ SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 

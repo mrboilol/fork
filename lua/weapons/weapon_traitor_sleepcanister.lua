@@ -100,7 +100,7 @@ end
 
 function SWEP:DeployCanister(tr)
 	local owner = self:GetOwner()
-	owner:EmitSound("physics/metal/soda_can_impact_hard2.ogg", owner:IsNPC() and 75 or 40)
+	owner:EmitSound("physics/metal/soda_can_impact_hard2.wav", owner:IsNPC() and 75 or 40)
 
 	local ent = ents.Create("ent_hg_sleep_canister")
 	ent:SetPos(owner:IsNPC() and owner:EyePos() or tr.HitPos)

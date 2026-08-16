@@ -361,7 +361,7 @@ if SERVER then
 			end
 			
 			wep:SetNWFloat("Fuel", wep.MaxFuel)
-			wep:EmitSound("ambient/water/water_spray1.ogg")
+			wep:EmitSound("ambient/water/water_spray1.wav")
 			ply:ChatPrint("Lighter refilled!")
 			
 			drumData.Volume = math.max(0, drumData.Volume - 10)

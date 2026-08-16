@@ -279,7 +279,7 @@ if CLIENT then
 	SWEP.BounceWeaponIcon = false
 end
 
-SWEP.AttackSwing = "weapons/slam/throw.ogg" --!! заменить звуки
+SWEP.AttackSwing = "weapons/slam/throw.wav" --!! заменить звуки
 SWEP.AttackHit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "snd_jack_hmcd_knifestab.ogg"
@@ -1404,7 +1404,7 @@ function SWEP:PlaySwingSound(owner, attacktype)
         return
     end
 
-    owner:EmitSound(self:GetAttackSwingSound(attacktype) or "weapons/slam/throw.ogg", 50, math.random(95,105))
+    owner:EmitSound(self:GetAttackSwingSound(attacktype) or "weapons/slam/throw.wav", 50, math.random(95,105))
 end
 
 function SWEP:PrecacheConfiguredHitSoundLayer(layer)
@@ -2111,16 +2111,16 @@ end
 
 function SWEP:GetDefaultBlockSound(material, state)
     if material == "wood" then
-        if state == "break" then return {"physics/wood/wood_box_impact_hard3.ogg", 76, {92, 98}} end
-        if state == "parry" then return {"physics/wood/wood_plank_impact_hard3.ogg", 73, {98, 106}} end
-        if state == "weaken" then return {"physics/wood/wood_plank_impact_hard4.ogg", 71, {94, 101}} end
-        return {"physics/wood/wood_plank_impact_hard2.ogg", 70, {96, 104}}
+        if state == "break" then return {"physics/wood/wood_box_impact_hard3.wav", 76, {92, 98}} end
+        if state == "parry" then return {"physics/wood/wood_plank_impact_hard3.wav", 73, {98, 106}} end
+        if state == "weaken" then return {"physics/wood/wood_plank_impact_hard4.wav", 71, {94, 101}} end
+        return {"physics/wood/wood_plank_impact_hard2.wav", 70, {96, 104}}
     end
 
-    if state == "break" then return {"physics/metal/metal_solid_impact_hard3.ogg", 78, {92, 98}} end
-    if state == "parry" then return {"physics/metal/metal_sheet_impact_hard2.ogg", 74, {98, 105}} end
-    if state == "weaken" then return {"physics/metal/metal_solid_impact_hard2.ogg", 72, {94, 101}} end
-    return {"physics/metal/metal_sheet_impact_hard2.ogg", 70, {95, 103}}
+    if state == "break" then return {"physics/metal/metal_solid_impact_hard3.wav", 78, {92, 98}} end
+    if state == "parry" then return {"physics/metal/metal_sheet_impact_hard2.wav", 74, {98, 105}} end
+    if state == "weaken" then return {"physics/metal/metal_solid_impact_hard2.wav", 72, {94, 101}} end
+    return {"physics/metal/metal_sheet_impact_hard2.wav", 70, {95, 103}}
 end
 
 function SWEP:PlayConfiguredWorldSound(layer, pos, volumeMul)
@@ -4670,7 +4670,7 @@ end
         phys:AddAngleVelocity(VectorRand() * 500)
     end
 
-    //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
+    //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
     ply:ViewPunch(self.ViewPunch1 * 0.6)
     ply:SelectWeapon("weapon_hands_sh")
 

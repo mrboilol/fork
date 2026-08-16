@@ -79,9 +79,9 @@ SWEP.setlh = false
 SWEP.setrh = true
 SWEP.TwoHanded = false
 
-SWEP.AttackHit = "weapons/knife/knife_hitwall1.ogg"
+SWEP.AttackHit = "weapons/knife/knife_hitwall1.wav"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
-SWEP.DeploySnd = "weapons/knife/knife_deploy1.ogg"
+SWEP.DeploySnd = "weapons/knife/knife_deploy1.wav"
 
 SWEP.Attack2HitFlesh = "knife/NEWRapierSlash1.wav"
 
@@ -92,7 +92,7 @@ SWEP.DamageSecondary = 8
 
 SWEP.BlockTier = 1.15
 SWEP.BlockMaterial = "none"
-SWEP.BlockSound = {"weapons/knife/knife_hitwall1.ogg", 85, {145, 155}}
+SWEP.BlockSound = {"weapons/knife/knife_hitwall1.wav", 85, {145, 155}}
 
 SWEP.PenetrationPrimary = 5
 SWEP.PenetrationSecondary = 3

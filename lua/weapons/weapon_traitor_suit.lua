@@ -124,7 +124,7 @@ if CLIENT then
     function SWEP:OpenCostumeMenu()
         if self.IsCostumeActive then
             notification.AddLegacy("You must remove your current costume first!", NOTIFY_ERROR, 3)
-            --surface.PlaySound("buttons/button10.ogg")
+            --surface.PlaySound("buttons/button10.wav")
             return
         end
         
@@ -228,7 +228,7 @@ if CLIENT then
                 net.WriteInt(i, 8) 
                 net.SendToServer()
                 
-                --surface.PlaySound("buttons/button14.ogg")
+                --surface.PlaySound("buttons/button14.wav")
             end
             
             grid:AddItem(costumePanel)

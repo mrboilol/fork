@@ -904,8 +904,8 @@ local normalParticleSizeThick = 0.9
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local bloodDown = Vector(0, 0, -1)
 
-local function getWoundVisualIntensity(org, totalBleedRate, wound, woundCount, fullRate)
-	local woundBleedRate = tonumber(wound.visualBleedRate)
+local function getWoundVisualIntensity(org, totalBleedRate, wound, woundCount, fullRate, woundIndex, woundRates)
+	local woundBleedRate = woundRates and tonumber(woundRates[woundIndex]) or tonumber(wound.visualBleedRate)
 	if woundBleedRate == nil then
 		woundBleedRate = math.max(totalBleedRate or 0, 0) / math.max(woundCount or 1, 1)
 	end
@@ -919,6 +919,21 @@ local function getWoundVisualIntensity(org, totalBleedRate, wound, woundCount, f
 	-- current blood loss, with only a restrained boost when that loss is especially
 	-- dangerous to the organism's remaining circulation.
 	return math.Clamp(rateIntensity * threatMul, 0, 1)
+end
+
+local function getArterialVisualIntensity(org, wounds, wound, woundIndex)
+	local rates = org.arterialWoundBleedRates
+	local rate = rates and tonumber(rates[woundIndex])
+	if rate == nil then
+		local totalWeight = 0
+		for _, other in pairs(wounds or {}) do
+			totalWeight = totalWeight + math.max(tonumber(other[1]) or 0, 0)
+		end
+		local share = math.max(tonumber(wound[1]) or 0, 0) / math.max(totalWeight, 0.001)
+		rate = math.max(org.arterialBleed or 0, 0) * share
+	end
+
+	return math.Clamp((rate - 0.04) / 1.2, 0, 1)
 end
 
 local function getCirculationStrength(org, pulseOverride)
@@ -952,7 +967,10 @@ local function emitNormalWoundParticles(ent, pos, outward, intensity, circulatio
 	local count = intensity >= 0.82 and 3 or intensity >= 0.48 and 2 or 1
 	local pressure, beat = getWoundPressure(org)
 	local pulseForce = math.Clamp((org.pulse or 0) / 70, 0, 1.5)
-	local force = (2 + intensity * intensity * 52) * circulation * pressure * (0.72 + beat * 0.58) * pulseForce
+	-- Even a mild venous wound should leave the surface before gravity wins.
+	-- Pressure and bleed intensity still decide the range, but the launch floor
+	-- prevents ordinary blood from appearing to fall straight through the wound.
+	local force = (10 + intensity * intensity * 44) * circulation * pressure * (0.72 + beat * 0.58) * pulseForce
 	local spread = 0.8 + intensity * 5.5
 	local decalWeight = Lerp(intensity, 0.45, 3)
 	local particleSize = normalParticleSizeAverage
@@ -968,11 +986,16 @@ local function emitNormalWoundParticles(ent, pos, outward, intensity, circulatio
 			direction = (VectorRand(-1, 1) + Vector(0, 0, -0.7)):GetNormalized()
 		end
 
-		local velocity = direction * force * math.Rand(0.82, 1.18)
+		direction = direction:GetNormalized()
+		local velocity = direction * force * math.Rand(0.9, 1.2)
 			+ VectorRand(-spread, spread)
-			+ bloodDown * Lerp(intensity, 0.8, 2.6)
+			+ bloodDown * Lerp(intensity, 0.15, 1.4)
 		local particle = hg.addBloodPart(pos + VectorRand(-0.45, 0.45), velocity, nil, particleSize, particleSize, false, nil, ent)
-		if particle then particle.decalWeight = decalWeight end
+		if particle then
+			particle.decalWeight = decalWeight
+			particle.gravityRampStart = CurTime() + 0.035
+			particle.gravityRampEnd = CurTime() + Lerp(intensity, 0.11, 0.16)
+		end
 	end
 end
 
@@ -1070,7 +1093,7 @@ function hg.queueArterialWoundSound(ent, wound)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmount, isAmputation)
+emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensity, isAmputation)
 	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
 	-- artery-marked blood trail with the original combined right/up oscillation.
 	-- Give the pressure pulse enough forward speed and lift to form an arc before
@@ -1088,7 +1111,7 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmo
 	-- arterial trail to read as a fast jet instead of a short local spray.
 	-- A fully open carotid (14 bleed) reaches four times the old distance;
 	-- smaller or closing arteries scale down from that using their live bleed.
-	local bleedRangeMul = 1 + (isAmputation and 1 or 3) * math.Clamp((bleedAmount or 0) / 14, 0, 1)
+	local bleedRangeMul = 1 + (isAmputation and 1 or 3) * intensity
 	local forwardVelocityMul = (isAmputation and 1.55 or 2.5) * bleedRangeMul
 	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
 	local velocity = (VectorRand(-1, 1) * pulseMul
@@ -1098,7 +1121,11 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, bleedAmo
 		+ vector_up * upwardVelocity
 		+ VectorRand(-1, 1) * pulseMul) * arterialPressureMul
 
-	hg.addBloodPart(pos, velocity, nil, size, size, true, nil, ent)
+	local count = intensity >= 0.78 and 3 or intensity >= 0.42 and 2 or 1
+	for _ = 1, count do
+		local particle = hg.addBloodPart(pos + VectorRand(-0.35, 0.35), velocity + VectorRand(-2, 2), nil, size, size, true, nil, ent)
+		if particle then particle.decalWeight = Lerp(intensity, 0.7, 4.5) end
+	end
 end
 local hg_altberserk = GetConVar("hg_altberserk")
 local hg_altnoradrenaline = GetConVar("hg_altnoradrenaline")
@@ -1318,7 +1345,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			local circulation = getCirculationStrength(org)
 			for i, wound in pairs(wounds) do
-				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull)
+				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull, i, org.woundBleedRates)
 				local particleInterval = Lerp(intensity, 3.2, 0.16)
 				
 				if (wound[5] or 0) < time then
@@ -1384,7 +1411,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 
 				local pos, ang = ent:GetBonePosition(boneID)
 				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-					local size = math.random(1, 2) * math.max(math.min(wound[1], 1), 0.5)
+					local intensity = getArterialVisualIntensity(org, arterialwounds, wound, i)
+					local size = math.Rand(0.65, 1.25) * Lerp(intensity, 0.45, 2.1)
 					if seen then
 
 						local should = !(hg.amputatedlimbs2[bone] and org[hg.amputatedlimbs2[bone].."amputated"])
@@ -1406,7 +1434,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, wound[1], wound[9] == true)
+							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, intensity, wound[9] == true)
 						end
 
 						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))

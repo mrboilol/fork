@@ -151,12 +151,12 @@ SWEP.CanHeavyAttack = true -- Set to true to enable
 
 SWEP.BlockTier = 3
 SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.ogg"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 3
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.ogg", 68, {95, 102}}
+SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 SWEP.BlockDirectionalCharge = "overhead" --left, right, overhead, center, neutral
 
 function SWEP:CanSecondaryAttack()

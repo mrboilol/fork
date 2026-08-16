@@ -37,7 +37,7 @@ if SERVER then
 	function ENT:Use( activator )
 		self.mode = (self.mode + 1) % 3
 		self:SetNWInt("mode", self.mode)
-		self:EmitSound("buttons/button24.ogg")
+		self:EmitSound("buttons/button24.wav")
 	end
 else
 	function ENT:Initialize()

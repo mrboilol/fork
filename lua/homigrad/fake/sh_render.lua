@@ -253,11 +253,17 @@ end
 		local hideGettingUpHead = firstPersonCamera and ent.hgGettingUpView and follow == ent
 		local hideLocalFirstPersonHead = GetViewEntity() == ply and (ent == ply or follow == ent)
 			and firstPersonCamera
+		-- The ragdoll camera follows the local body even while the player is not the
+		-- current view entity in every render pass.  Do not depend on the transient
+		-- camera-distance flag here: a physics/update ordering change would briefly
+		-- draw the head around the camera.
+		local hideLocalRagdollHead = firstPersonCamera and ply == lply
+			and IsValid(ply.FakeRagdoll) and ent == ply.FakeRagdoll and follow == ent
 		local hideSpectatedHead = firstPersonCamera and !lply:Alive()
 			and lply:GetNWEntity("spect") == ply and viewmode == 1
 		local hideFollowedFirstPersonHead = hg.cameraAtHead and (follow == ent or ent == GetViewEntity() or ent == lply)
 			and (firstPersonCamera or hg_gopro:GetBool())
-		local hideHead = hideLocalFirstPersonHead or hideGettingUpHead or hideSpectatedHead or hideFollowedFirstPersonHead
+		local hideHead = hideLocalFirstPersonHead or hideLocalRagdollHead or hideGettingUpHead or hideSpectatedHead or hideFollowedFirstPersonHead
 		local wawanted = hideHead and vector_small or vector_full
 		--print(ent, wawanted, GetViewEntity(), ply, (GetViewEntity() != ply), !fountains[ent], !(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1))
 		--if !current:IsEqualTol(wawanted, 0.01) then
@@ -267,10 +273,13 @@ end
 			if mat and (ent.headexploded or (org and org.headamputated)) then
 				mat:SetScale(vector_small)
 			elseif mat and !(Glide and Glide.Camera and !Glide.Camera.isInFirstPerson and lply == ply and lply:InVehicle() and hg_no_camera_in_cars:GetBool()) then
-				if hideLocalFirstPersonHead or hideGettingUpHead or hideSpectatedHead or hideFollowedFirstPersonHead or (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
+				if hideLocalFirstPersonHead or hideLocalRagdollHead or hideGettingUpHead or hideSpectatedHead or hideFollowedFirstPersonHead or (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
 					mat:SetScale(wawanted)
 				end
 			end
+			-- GetBoneMatrix returns a copy on some client builds.  Commit the
+			-- render-only scale so the head cannot pop back in before DrawModel.
+			if mat then ent:SetBoneMatrix(lkp, mat) end
 		--end
 
 		--hg.CoolGloves(ent, ply, wep)

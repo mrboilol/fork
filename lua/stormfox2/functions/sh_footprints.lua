@@ -118,7 +118,7 @@ end
 					data.OriginalSoundName = cT.footprintSnds[2] .. (foot == 0 and "left" or "right")
 				end
 				if not cT.footprintSnds[1] then
-					data.SoundName = "ambient/_period.ogg"
+					data.SoundName = "ambient/_period.wav"
 				else
 					data.SoundName = table.Random(cT.footprintSnds[1])
 					data.OriginalSoundName = data.SoundName

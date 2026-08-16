@@ -745,7 +745,7 @@ concommand.Add("hg_dropsling",function(ply)
 	ent:SetPos(ply:EyePos())
 	ent:SetAngles(ply:EyeAngles())
 	ent:Spawn()
-	ent:EmitSound("npc/footsteps/softshoe_generic6.ogg", 75, math.random(90, 110), 1, CHAN_ITEM)
+	ent:EmitSound("npc/footsteps/softshoe_generic6.wav", 75, math.random(90, 110), 1, CHAN_ITEM)
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then
 		phys:ApplyForceCenter(ply:GetAimVector() * 200 * phys:GetMass())
@@ -772,7 +772,7 @@ concommand.Add("hg_dropkastet",function(ply)
 	ent:SetPos(ply:EyePos())
 	ent:SetAngles(ply:EyeAngles())
 	ent:Spawn()
-	ent:EmitSound("npc/footsteps/softshoe_generic6.ogg", 75, math.random(90, 110), 1, CHAN_ITEM)
+	ent:EmitSound("npc/footsteps/softshoe_generic6.wav", 75, math.random(90, 110), 1, CHAN_ITEM)
 	local phys = ent:GetPhysicsObject()
 	if IsValid(phys) then
 		phys:ApplyForceCenter(ply:GetAimVector() * 200 * phys:GetMass())
@@ -1847,7 +1847,7 @@ hook.Add("PlayerUse", "DoorBashOnRun", function(ply, ent)
 	
 	ply.DoorBashCD = CurTime() + 1
 	
-	door:EmitSound("physics/wood/wood_crate_impact_hard3.ogg", 80, math.Rand(90, 110))
+	door:EmitSound("physics/wood/wood_crate_impact_hard3.wav", 80, math.Rand(90, 110))
 	
 	local ragdoll = hg.Ragdoll_Create(ply)
 	if IsValid(ragdoll) then

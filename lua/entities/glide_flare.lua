@@ -19,7 +19,7 @@ local CurTime = CurTime
 if CLIENT then
     function ENT:Initialize()
         if not self.flareLoop then
-            self.flareLoop = CreateSound( self, ")weapons/flaregun/burn.ogg" )
+            self.flareLoop = CreateSound( self, ")weapons/flaregun/burn.wav" )
             self.flareLoop:SetSoundLevel( 75 )
             self.flareLoop:PlayEx( 0.5, 110 )
         end

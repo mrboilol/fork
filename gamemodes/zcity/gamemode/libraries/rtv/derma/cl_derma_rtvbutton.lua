@@ -84,7 +84,7 @@ function PANEL:Paint(w, h)
 
     if self.Win and self.BipCD < CurTime() then
         self.alpha = 255
-        surface.PlaySound("buttons/blip1.ogg")
+        surface.PlaySound("buttons/blip1.wav")
         self.BipCD = CurTime() + 1
         self:CreateAnimation(0.5, {
             index = 1,

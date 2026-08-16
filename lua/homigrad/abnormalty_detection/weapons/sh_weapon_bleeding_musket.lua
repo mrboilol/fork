@@ -345,9 +345,9 @@ local charge_up = 100
 local charge_down = 100
 
 --; ambient/energy/electric_loop.ogg
---; physics/metal/metal_box_scrape_rough_loop1.ogg
---; physics/concrete/rock_scrape_rough_loop1.ogg
---; physics/cardboard/cardboard_box_scrape_rough_loop1.ogg
+--; physics/metal/metal_box_scrape_rough_loop1.wav
+--; physics/concrete/rock_scrape_rough_loop1.wav
+--; physics/cardboard/cardboard_box_scrape_rough_loop1.wav
 --; ambient/fire/fire_med_loop1.ogg
 --; ambient/fire/firebig.ogg
 --; 
@@ -421,8 +421,8 @@ function SWEP:Step()
 		
 		if(charge > 0)then
 			if(!c_sound)then
-				self.CSoundCharge = CreateSound(self, "physics/cardboard/cardboard_box_scrape_rough_loop1.ogg")
-				-- self.CSoundCharge = CreateSound(self, "physics/metal/metal_box_scrape_rough_loop1.ogg")
+				self.CSoundCharge = CreateSound(self, "physics/cardboard/cardboard_box_scrape_rough_loop1.wav")
+				-- self.CSoundCharge = CreateSound(self, "physics/metal/metal_box_scrape_rough_loop1.wav")
 				c_sound = self.CSoundCharge
 			end
 			

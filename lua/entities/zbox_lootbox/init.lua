@@ -144,7 +144,7 @@ function ENT:OpenContainer( ply ) --| Открываем контейнер иг
     for k, data in pairs( self.Loot ) do --| Запись в таблицу.
         OptimizedTable[ k ] = { class = data.class }
     end
-    self:EmitSound("items/ammocrate_open.ogg")
+    self:EmitSound("items/ammocrate_open.wav")
     SendLootTable( self, ply, OptimizedTable ) --| Отправка клиенту.
     self.ShowContainer[ ply:EntIndex() ] = ply
 end

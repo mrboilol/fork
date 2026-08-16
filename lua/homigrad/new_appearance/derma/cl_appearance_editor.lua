@@ -932,13 +932,13 @@ function PANEL:PostInit()
             if not isstring(presetName) then return end
             presetName = string.Trim(presetName)
             if presetName == "" or #presetName < 2 then
-                surface.PlaySound("buttons/button10.ogg")
+                surface.PlaySound("buttons/button10.wav")
                 notification.AddLegacy("Enter a preset name (min 2 chars)", NOTIFY_ERROR, 3)
                 return
             end
             presetName = string.gsub(presetName, "[^%w%s_-]", "")
             SavePreset(presetName, main.AppearanceTable)
-            surface.PlaySound("buttons/button14.ogg")
+            surface.PlaySound("buttons/button14.wav")
             notification.AddLegacy("Preset '" .. presetName .. "' saved!", NOTIFY_GENERIC, 3)
         end)
     end
@@ -946,7 +946,7 @@ function PANEL:PostInit()
     local function LoadCurrentPreset()
         local presetList = GetPresetList()
         if #presetList == 0 then
-            surface.PlaySound("buttons/button10.ogg")
+            surface.PlaySound("buttons/button10.wav")
             notification.AddLegacy("No presets saved yet!", NOTIFY_ERROR, 3)
             return
         end
@@ -983,10 +983,10 @@ function PANEL:PostInit()
                 local loadedPreset = LoadPreset(presetName)
                 if loadedPreset then
                     UpdateAppearance(loadedPreset)
-                    surface.PlaySound("buttons/button14.ogg")
+                    surface.PlaySound("buttons/button14.wav")
                     notification.AddLegacy("Preset '" .. presetName .. "' loaded!", NOTIFY_GENERIC, 3)
                 else
-                    surface.PlaySound("buttons/button10.ogg")
+                    surface.PlaySound("buttons/button10.wav")
                     notification.AddLegacy("Failed to load preset!", NOTIFY_ERROR, 3)
                 end
                 presetMenu:Close()
@@ -995,7 +995,7 @@ function PANEL:PostInit()
                 local confirmMenu = DermaMenu()
                 confirmMenu:AddOption("Delete '" .. presetName .. "'", function()
                     DeletePreset(presetName)
-                    surface.PlaySound("buttons/button15.ogg")
+                    surface.PlaySound("buttons/button15.wav")
                     notification.AddLegacy("Preset deleted!", NOTIFY_HINT, 2)
                     presetBtn:Remove()
                 end):SetIcon("icon16/cross.png")
@@ -1009,15 +1009,15 @@ function PANEL:PostInit()
             if not isstring(presetName) then return end
             presetName = string.Trim(presetName)
             if presetName == "" then
-                surface.PlaySound("buttons/button10.ogg")
+                surface.PlaySound("buttons/button10.wav")
                 notification.AddLegacy("Enter preset name to delete", NOTIFY_ERROR, 3)
                 return
             end
             if DeletePreset(presetName) then
-                surface.PlaySound("buttons/button15.ogg")
+                surface.PlaySound("buttons/button15.wav")
                 notification.AddLegacy("Preset '" .. presetName .. "' deleted!", NOTIFY_HINT, 3)
             else
-                surface.PlaySound("buttons/button10.ogg")
+                surface.PlaySound("buttons/button10.wav")
                 notification.AddLegacy("Preset not found!", NOTIFY_ERROR, 3)
             end
         end)

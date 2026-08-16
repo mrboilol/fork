@@ -145,14 +145,14 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magout.ogg",
+	"weapons/ar2/ar2_magout.wav",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magin.ogg",
+	"weapons/ar2/ar2_magin.wav",
 	"none",
-	"weapons/ar2/ar2_reload_rotate.ogg",
+	"weapons/ar2/ar2_reload_rotate.wav",
 	"none",
-	"weapons/ar2/ar2_push.ogg",
+	"weapons/ar2/ar2_push.wav",
 	"none",
 	"none",
 	"none",
@@ -163,7 +163,7 @@ SWEP.HoldType = "rpg"
 SWEP.ZoomPos = Vector(-21, -0.365, 7.4)
 
 
-SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.ogg", 75, 100, 110}
+SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.wav", 75, 100, 110}
 
 SWEP.Ergonomics = 0.85
 SWEP.Penetration = 19

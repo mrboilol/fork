@@ -142,7 +142,7 @@ SWEP.AttackHit = "Canister.ImpactHard"
 SWEP.Attack2Hit = "Canister.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
-SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/metal/metal_grenade_impact_soft2.wav"
 SWEP.HitFleshExtra = {
     "shovelcrowbarshared/shovelhit1.mp3",
     "shovelcrowbarshared/shovelhit2.mp3",
@@ -155,7 +155,7 @@ SWEP.SwingSoundPitch = {115, 125}
 SWEP.AttackPos = Vector(0, 0, 0)
 SWEP.BlockTier = 3
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.ogg", 85, {125, 145}}
+SWEP.BlockSound = {"physics/metal/metal_sheet_impact_hard2.wav", 85, {125, 145}}
 
 function SWEP:CanSecondaryAttack()
     self.DamageType = DMG_SLASH
@@ -202,7 +202,7 @@ SWEP.CanHeavyAttack = true -- Set to true to enable
 
 SWEP.BlockTier = 3
 SWEP.MeleeMaterial = "metal"
-SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.ogg"
+SWEP.BlockImpactSound = "physics/metal/metal_solid_impact_bullet1.wav"
 
 
 function SWEP:PrimaryAttack()
@@ -230,7 +230,7 @@ function SWEP:Think()
             end
             if CurTime() >= self.NextBreakSound then
                 if IsValid(self.DoorEntity) then
-                    self.DoorEntity:EmitSound("physics/wood/wood_crate_break2.ogg", 75, 100)
+                    self.DoorEntity:EmitSound("physics/wood/wood_crate_break2.wav", 75, 100)
                 end
                 self.NextBreakSound = CurTime() + math.Rand(1, 2)
             end

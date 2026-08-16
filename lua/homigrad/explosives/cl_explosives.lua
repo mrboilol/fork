@@ -230,7 +230,7 @@ net.Receive("hg_gastank_leak", function()
 	end
 
 	if mode == "smoke" and not data.SmokeSound then
-		data.SmokeSound = CreateSound(ent, "ambient/gas/cannister_loop.ogg")
+		data.SmokeSound = CreateSound(ent, "ambient/gas/cannister_loop.wav")
 		if data.SmokeSound then
 			data.SmokeSound:SetSoundLevel(65)
 			data.SmokeSound:Play()

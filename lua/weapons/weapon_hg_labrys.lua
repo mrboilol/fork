@@ -124,7 +124,7 @@ SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
 SWEP.ChargeAttackHit = "Canister.ImpactHard"
 SWEP.ChargeAttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
 SWEP.hitsoundbrutalize = {
     {"axe/axehit1.wav", 95, {95, 105}},
@@ -170,7 +170,7 @@ SWEP.swingsoundextra = {
 SWEP.AttackPos = Vector(0,0,0)
 SWEP.BlockTier = 4
 SWEP.BlockMaterial = "wood"
-SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.ogg", 70, {96, 104}}
+SWEP.BlockSound = {"physics/wood/wood_plank_impact_hard1.wav", 70, {96, 104}}
 SWEP.BlockDirectionalCharge = "overhead"
 
 SWEP.NoHolster = true

@@ -310,19 +310,20 @@ end
 module[1] = function(org)
 	org.heart = 0
 	org.heartstop = false
-	org.pulse = 70 -- that's the blood pressure
-	org.heartbeat = 75
-	org.ecgState = "normal_sinus"
+	org.pulse = 70
+	org.heartbeat = 70
+	org.bloodPressure = 90
+	org.systolic = 120
+	org.diastolic = 80
 	org.cardiacOutput = 1
 	org.strokeVolume = 1
+	org.ecgState = "normal_sinus"
 	org.compensationPulseMultiplier = 1
 	org.compensationHeartRateTarget = 75
 	org.palpitations = 0
 	org.palpitationTreatmentUntil = 0
 	org.cardiacArrestStart = nil
 	org.cardiacArrestO2Start = nil
-	org.heartbeat = 70
-	org.cardiacOutput = 1
 	org.arrhythmia = 0
 	org.fibrillation = false
 	org.fibrillationStart = 0
@@ -440,6 +441,18 @@ module[2] = function(owner, org, timeValue)
 	local arrestCirculation = dihSupport and (70 / 92) or (defibGrace and 0.49 or (cprSupport and cprSupportPulse / 92 or 0))
 	local circulation = org.alive and (org.heartstop and arrestCirculation or circulationBase * rhythmMul) or 0
 	org.pulse = Approach(org.pulse, circulation * 92, heart == 0 and timeValue * 10 or timeValue * 5)
+	-- Keep a real mean arterial pressure alongside the legacy palpable-pulse
+	-- value. Judge's pressure readout is useful to medicine/UI code, while the
+	-- current circulation model remains the single owner of the actual target.
+	local pressureTarget = Clamp(circulation * 92, 0, 180)
+	local pressureNow = tonumber(org.bloodPressure) or pressureTarget
+	local pressureFallRate = org.heartstop and not (dihSupport or defibGrace or cprSupport) and 22 or 12
+	org.bloodPressure = Approach(pressureNow, pressureTarget, timeValue * (pressureTarget > pressureNow and 12 or pressureFallRate))
+	-- Treat bloodPressure as mean arterial pressure and derive a pulse pressure
+	-- which collapses with circulation. At healthy values this settles near 120/80.
+	local pulsePressure = Clamp(40 * Clamp(org.bloodPressure / 92, 0, 1.5) + ((org.heartbeat or 70) - 70) * 0.1, 0, 80)
+	org.systolic = math.Round(Clamp(org.bloodPressure + pulsePressure * 2 / 3, 0, 240))
+	org.diastolic = math.Round(Clamp(org.bloodPressure - pulsePressure / 3, 0, 160))
 	org.cardiacOutput = org.heartstop and (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and cprSupportPulse / 110 or 0))) or Clamp(circulation * (92 / 90) * heart * rhythmMul, 0, 1.5)
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and circulation > 0.6 then
 		org.cardiacOutput = Approach(org.cardiacOutput, Clamp(getBloodVolume(org) * heart, 0, 1), timeValue / 20)
@@ -469,6 +482,10 @@ module[2] = function(owner, org, timeValue)
 		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 8)
 		org.arrhythmia = Approach(org.arrhythmia or 0, 0, timeValue / 6)
 	end
+	-- Normalized stroke volume separates a fast electrical rate from how much
+	-- blood each effective beat is actually moving.
+	local rateFactor = math.max((org.heartbeat or 0) / 70, 0.1)
+	org.strokeVolume = Clamp((org.cardiacOutput or 0) / rateFactor, 0, 1.5)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 

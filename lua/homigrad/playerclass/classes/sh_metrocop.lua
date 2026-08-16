@@ -235,7 +235,7 @@ end
 
 if SERVER then
 	local mtcop_phrases = {}
-	local files,_ = file.Find("sound/npc/metropolice/vo/*.ogg","GAME")
+	local files,_ = file.Find("sound/npc/metropolice/vo/*.wav","GAME")
 	for k,v in ipairs(files) do
 		mtcop_phrases[k] = "npc/metropolice/vo/" .. v
 	end

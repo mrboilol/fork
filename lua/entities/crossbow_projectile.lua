@@ -6,7 +6,7 @@ ENT.PrintName = "Crossbow Projectile"
 ENT.Spawnable = false
 ENT.AdminOnly = true
 ENT.Model = "models/crossbow_bolt.mdl"
-ENT.HitSound = "weapons/crossbow/hit1.ogg"
+ENT.HitSound = "weapons/crossbow/hit1.wav"
 
 ENT.Damage = 0
 ENT.Force = 0

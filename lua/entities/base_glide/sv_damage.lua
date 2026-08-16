@@ -195,7 +195,7 @@ function ENT:PhysicsCollide( data )
         PlaySoundSet( self.HardCollisionSound, self, speed / 400, nil, isHardHit and 80 or 75 )
 
         if self.IsHeavyVehicle then
-            self:EmitSound( "physics/metal/metal_barrel_impact_hard5.ogg", 90, RandomInt( 70, 90 ), 1 )
+            self:EmitSound( "physics/metal/metal_barrel_impact_hard5.wav", 90, RandomInt( 70, 90 ), 1 )
         end
 
     elseif isPlayer then

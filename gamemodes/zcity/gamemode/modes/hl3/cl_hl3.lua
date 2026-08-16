@@ -186,7 +186,7 @@ local CreateEndMenu
 
 net.Receive("hl3_roundend", function()
 	net.ReadInt(3)
-	surface.PlaySound("ambient/alarms/warningbell1.ogg")
+	surface.PlaySound("ambient/alarms/warningbell1.wav")
 	CreateEndMenu()
 end)
 

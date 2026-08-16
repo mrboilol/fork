@@ -87,7 +87,7 @@ SWEP.AttackHit = "Concrete.ImpactHard"
 SWEP.Attack2Hit = "Concrete.ImpactHard"
 SWEP.AttackHitFlesh = "Flesh.ImpactHard"
 SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.ogg"
+SWEP.DeploySnd = "physics/metal/metal_solid_impact_soft1.wav"
 SWEP.BlockDirectionalPrimary = "overhead"
 
 
@@ -101,7 +101,7 @@ SWEP.AttackPos = Vector(0, 0, 0)
 SWEP.noreverse = true
 SWEP.BlockTier = 1.5
 SWEP.BlockMaterial = "metal"
-SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.ogg", 68, {95, 102}}
+SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 SWEP.UnNailables = {MAT_METAL, MAT_SAND, MAT_SLOSH, MAT_GLASS}
 SWEP.CantClash = true
 game.AddDecal("hmcd_jackanail", "decals/mat_jack_hmcd_nailhead")
@@ -354,7 +354,7 @@ function SWEP:ThrowHammer()
 		ply.organism.stamina.subadd = ply.organism.stamina.subadd + 30
 	end
 
-	ply:EmitSound("weapons/slam/throw.ogg", 50, math.random(95, 105))
+	ply:EmitSound("weapons/slam/throw.wav", 50, math.random(95, 105))
 	ply:SelectWeapon("weapon_hands_sh")
 	ply:ViewPunch(Angle(0, 0, -8))
 

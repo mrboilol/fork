@@ -584,5 +584,5 @@ function ENT:PlaySndDebris(snd, vol, pitch)
 end
 
 function ENT:PhysicsCollide(phys, deltaTime)
-	if phys.Speed > 20 then self:EmitSound("physics/metal/metal_grenade_impact_hard" .. math.random(3) .. ".ogg", 65, math.random(95, 105)) end
+	if phys.Speed > 20 then self:EmitSound("physics/metal/metal_grenade_impact_hard" .. math.random(3) .. ".wav", 65, math.random(95, 105)) end
 end

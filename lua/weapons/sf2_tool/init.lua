@@ -31,7 +31,7 @@ function SWEP:HasAccessToSettings( onSuccess, ... )
 	CAMI.PlayerHasAccess(ply,"StormFox Settings",function(b)
 		if not b then
 			if IsValid(ply) then
-				ply:EmitSound("ambient/alarms/klaxon1.ogg")
+				ply:EmitSound("ambient/alarms/klaxon1.wav")
 			end
 			SafeRemoveEntity(self)
 		end
@@ -80,7 +80,7 @@ function SWEP:Reload()
 	local Owner = self:GetOwner()
 	if ( !Owner:KeyPressed( IN_RELOAD ) ) then return end
 	self:SwitchTool()
-	Owner:EmitSound("buttons/button14.ogg")
+	Owner:EmitSound("buttons/button14.wav")
 end
 
 function SWEP:Think()

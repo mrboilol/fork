@@ -313,7 +313,7 @@ if SERVER then
 		if IsValid(wep) and wep.Drum and (ply.DrumCD or 0) < CurTime() then
 			wep:AttachAnim()
 			wep:ShiftDrum(math.random(6))
-			ply:EmitSound("weapons/357/357_spin1.ogg")
+			ply:EmitSound("weapons/357/357_spin1.wav")
 			wep.Rolled = true
 			ply.DrumCD = CurTime() + 0.5
 		end

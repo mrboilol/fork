@@ -80,7 +80,7 @@ SWEP.AttackHit = "Concrete.ImpactHard"
 SWEP.Attack2Hit = "Concrete.ImpactHard"
 SWEP.AttackHitFlesh = "snd_jack_hmcd_axehit.ogg"
 SWEP.Attack2HitFlesh = "snd_jack_hmcd_axehit.ogg"
-SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
+SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
 SWEP.AttackPos = Vector(0,0,0)
 
@@ -128,7 +128,7 @@ if SERVER then
             phys:AddAngleVelocity(Vector(0,0,0))
         end
 
-        //ply:EmitSound("weapons/slam/throw.ogg",50,math.random(95,105))
+        //ply:EmitSound("weapons/slam/throw.wav",50,math.random(95,105))
         ply:SelectWeapon("weapon_hands_sh")
         ply:ViewPunch(Angle(0, 0, -8))
         
@@ -162,11 +162,11 @@ if SERVER then
             ply:GetWeapon("weapon_ducttape"):Remove()
             ply:GetWeapon("weapon_pocketknife"):Remove()
             ply:Give("weapon_hg_spear_knife")
-            ply:EmitSound("physics/wood/wood_plank_impact_soft1.ogg")
+            ply:EmitSound("physics/wood/wood_plank_impact_soft1.wav")
             ply:ViewPunch(Angle(-2,4,0))
             timer.Simple(0.2,function()
                 if not IsValid(ply) then return end
-                ply:EmitSound("physics/metal/weapon_impact_soft1.ogg")
+                ply:EmitSound("physics/metal/weapon_impact_soft1.wav")
                 ply:ViewPunch(Angle(-3,-4,-2))
             end)
             timer.Simple(0.4,function()

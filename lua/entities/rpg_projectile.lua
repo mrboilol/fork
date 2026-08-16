@@ -75,7 +75,7 @@ function ENT:CheckSafetyDistance()
     
     if distance >= self.SafetyDistance and not self.SafetyArmed then
         self.SafetyArmed = true
-        self:EmitSound("buttons/button16.ogg", 50, 150, 0.3)
+        self:EmitSound("buttons/button16.wav", 50, 150, 0.3)
     end
     
     return self.SafetyArmed
@@ -230,7 +230,7 @@ function ENT:PhysicsCollide2(data, physobj)
             self.Duded = false 
             self.Deactivated = true 
             self:StopSound("weapons/ins2rpg7/rpg_rocket_loop.ogg")
-            self:EmitSound("weapons/pistol/pistol_empty.ogg", 60, 100, 0.8)
+            self:EmitSound("weapons/pistol/pistol_empty.wav", 60, 100, 0.8)
         else
             self:Detonate()
         end

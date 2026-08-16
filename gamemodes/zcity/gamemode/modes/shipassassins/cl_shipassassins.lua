@@ -519,7 +519,7 @@ net.Receive("ShipAssassins_Sync", function()
 
 	if not newPortraitSpectatorView and newGraceRemaining <= 0 and IsValid(newTarget) and IsValid(lastTarget) and newTarget ~= lastTarget then
 		chat.AddText(targetColor, "New target assigned.")
-		surface.PlaySound("buttons/blip1.ogg")
+		surface.PlaySound("buttons/blip1.wav")
 	end
 
 	lply.ShipAssassinsTarget = newTarget
@@ -537,7 +537,7 @@ end)
 net.Receive("ShipAssassins_CashHint", function()
 	cashHintAmount = net.ReadUInt(16)
 	cashHintUntil = CurTime() + 4
-	surface.PlaySound("buttons/button14.ogg")
+	surface.PlaySound("buttons/button14.wav")
 end)
 
 net.Receive("ShipAssassins_RoundEnd", function()

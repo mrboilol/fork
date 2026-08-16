@@ -219,9 +219,9 @@ function SWEP:Throw()
 	local ThrowPos = Pos + Vec * 30
 	local Tr = util.QuickTrace(Pos, Vec * 35, {owner})
 	if Tr.Hit then ThrowPos = Pos + Vec * 10 end
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 75, 80)
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 70, 80)
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 65, 80)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 75, 80)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 70, 80)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 65, 80)
 
 	local Gr = ents.Create(self.ENT)
 	Gr:SetPos(ThrowPos)
@@ -314,9 +314,9 @@ function SWEP:Fail()
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return end
 
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 75, 110)
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 70, 110)
-	sound.Play("weapons/slam/throw.ogg", self:GetPos(), 65, 110)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 75, 110)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 70, 110)
+	sound.Play("weapons/slam/throw.wav", self:GetPos(), 65, 110)
 	owner:ViewPunch(VectorRand():Angle())
 	self:Reload()
 end
@@ -377,7 +377,7 @@ function SWEP:CustomThink(State, Sprintin, HiddenAmt, BackAmt)
 		if self.NextSpinWhooshTime < CurTime() then
 			local Pow = self:GetThrowPower()
 			self.NextSpinWhooshTime = CurTime() + math.Clamp(10 / Pow, .3, 1.25)
-			sound.Play("weapons/slam/throw.ogg", self:GetPos(), 65, math.Clamp(Pow, 60, 130))
+			sound.Play("weapons/slam/throw.wav", self:GetPos(), 65, math.Clamp(Pow, 60, 130))
 			owner:ViewPunch(Angle(-1, 0, 0))
 			if owner.organism then owner.organism.stamina.subadd = 1.5 end
 		end

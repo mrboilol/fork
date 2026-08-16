@@ -65,14 +65,14 @@
     SWEP.Attack2Hit = "Canister.ImpactHard"
     SWEP.AttackHitFlesh = "Flesh.ImpactHard"
     SWEP.Attack2HitFlesh = "Flesh.ImpactHard"
-    SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.ogg"
+    SWEP.DeploySnd = "physics/wood/wood_plank_impact_soft2.wav"
 
     SWEP.AttackPos = Vector(0,0,0)
 
     SWEP.CantClash = true 
     SWEP.BlockTier = 4
     SWEP.BlockMaterial = "metal"
-    SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.ogg", 68, {95, 102}}
+    SWEP.BlockSound = {"physics/metal/metal_solid_impact_hard1.wav", 68, {95, 102}}
 
     function SWEP:CustomBlockAnim(addPosLerp, addAngLerp)
         addPosLerp.z = addPosLerp.z + (self:GetBlocking() and 5 or 0)

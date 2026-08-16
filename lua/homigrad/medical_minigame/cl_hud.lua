@@ -464,6 +464,9 @@ function PANEL:Init()
     self.AccumulatedAngle = 0
     self.WrapAngle = 0
     self.GameType = (hg and hg.MedicalMinigame and hg.MedicalMinigame.NextType) or "bandage"
+    local animType = ConVarExists("hg_healanims") and GetConVar("hg_healanims"):GetInt() or 0
+    self.ProgressiveJudgeMode = animType == 2
+    self.MinigameDifficultyMultiplier = self.ProgressiveJudgeMode and 1.15 or 1
     self.TargetTurns = (self.GameType == "bandage") and 1 or (hg.MedicalMinigame.RequiredTurns or 6)
     self.BandageCompletions = hg.MedicalMinigame.NextCompletions or 0
     self.BandageRequiredCompletions = hg.MedicalMinigame.NextRequiredCompletions or 3
@@ -471,9 +474,9 @@ function PANEL:Init()
     self.CenterX = ScrW() / 2
     self.CenterY = ScrH() / 2
     self.Radius = 150
-    self.MaxBandageDistance = 450
-    self.BandageFollowSpeed = 3.2
-    self.WrapSpeedMultiplier = 0.9
+    self.MaxBandageDistance = 450 / self.MinigameDifficultyMultiplier
+    self.BandageFollowSpeed = 3.2 / self.MinigameDifficultyMultiplier
+    self.WrapSpeedMultiplier = 0.9 / self.MinigameDifficultyMultiplier
     self.VisualWrapThicknessStep = 1.5
 
     -- Fear/adrenaline bandage state
@@ -498,7 +501,8 @@ function PANEL:Init()
     self.TourniquetStrapGrabbed = false
     self.TourniquetTubeAccumulatedAngle = 0
     self.TourniquetTubeRotation = 0
-    self.TourniquetTubeRequiredTurns = 4.5 * (IsHelpingOtherPlayer() and 0.7 or 1)
+    self.TourniquetTubeRequiredTurns = 4.5 * self.MinigameDifficultyMultiplier * (IsHelpingOtherPlayer() and 0.7 or 1)
+    self.TourniquetLastProgressSent = 0
     self.TourniquetLastTubeAngle = nil
     self.TourniquetStageSwitchUntil = 0
     self.TourniquetTurnCount = 0 -- Track turns for increasing pain
@@ -932,6 +936,19 @@ function PANEL:ThinkTourniquet(mx, my)
             self.TourniquetLastTubeAngle = nil
         end
     end
+
+    -- Tourniquets do not apply treatment incrementally, so this is purely a
+    -- presentation update for the server-side animation wrapper.
+    local progress = self.TourniquetStage == 1
+        and (self.TourniquetStrapProgress * 0.25)
+        or (0.25 + math.Clamp(self.TourniquetTubeAccumulatedAngle / (2 * math.pi * self.TourniquetTubeRequiredTurns), 0, 1) * 0.75)
+    local delta = math.max(progress - (self.TourniquetLastProgressSent or 0), 0)
+    if delta >= 0.01 then
+        net.Start("hg_medical_minigame_progress")
+        net.WriteFloat(delta)
+        net.SendToServer()
+        self.TourniquetLastProgressSent = progress
+    end
 end
 
 function PANEL:GetSyringeLayout()
@@ -1061,7 +1078,7 @@ function PANEL:ThinkAmputation(mx, my)
 
             self.LastProgressSent = self.Progress
             self.AmputationMaxSwipeSpeed = 0
-            surface.PlaySound("physics/flesh/flesh_squishy_impact_hard2.ogg")
+            surface.PlaySound("physics/flesh/flesh_squishy_impact_hard2.wav")
         end
     end
 
@@ -1401,9 +1418,9 @@ function PANEL:Finish()
     if self.GameType == "syringe" then
         surface.PlaySound("autonigger/stimulator.wav")
     elseif self.GameType == "dislocation" then
-        surface.PlaySound("physics/flesh/flesh_impact_hard6.ogg")
+        surface.PlaySound("physics/flesh/flesh_impact_hard6.wav")
     elseif self.GameType == "amputation" then
-        surface.PlaySound("physics/body/body_medium_break3.ogg")
+        surface.PlaySound("physics/body/body_medium_break3.wav")
     elseif self.GameType == "bandage" then
         surface.PlaySound("autonigger/bandage_end.wav")
     else

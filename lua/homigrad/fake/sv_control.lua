@@ -1086,7 +1086,7 @@ local function fakeLegKickHit(ply, ragdoll, state)
 	end
 
 	if ent:IsPlayer() or ent:GetClass() == "prop_ragdoll" then
-		ent:EmitSound("physics/body/body_medium_impact_hard" .. math.random(6) .. ".ogg", 60, math.random(85, 105), 0.6)
+		ent:EmitSound("physics/body/body_medium_impact_hard" .. math.random(6) .. ".wav", 60, math.random(85, 105), 0.6)
 	end
 
 	if ent:IsPlayer() then
@@ -2343,7 +2343,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".ogg", 50, math.random(95, 105))
+							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 50, math.random(95, 105))
 
 							
 
@@ -2502,7 +2502,7 @@ hook.Add("Think", "Fake", function()
 
 
 
-							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".ogg", 55, math.random(95, 105))
+							ragdoll:EmitSound("physics/body/body_medium_impact_soft" .. math.random(1, 7) .. ".wav", 55, math.random(95, 105))
 
 							
 

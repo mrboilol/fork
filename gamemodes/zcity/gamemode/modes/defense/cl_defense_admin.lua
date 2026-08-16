@@ -80,7 +80,7 @@ function CreateAdminWaveMenu(subMode, currentWave, totalWaves, isActive)
     
     closeBtn.DoClick = function()
         adminWaveMenu:Close()
-        surface.PlaySound("ui/buttonclickrelease.ogg")
+        surface.PlaySound("ui/buttonclickrelease.wav")
     end
     
     adminWaveMenu.Paint = function(self, w, h)
@@ -159,7 +159,7 @@ function CreateAdminWaveMenu(subMode, currentWave, totalWaves, isActive)
             net.SendToServer()
             
             adminWaveMenu:Close()
-            surface.PlaySound("ui/buttonclick.ogg")
+            surface.PlaySound("ui/buttonclick.wav")
         end
     end
     

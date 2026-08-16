@@ -74,7 +74,7 @@ function hg.AdminTools:Timer( str, time )
             local beep = math.ceil(math.cos(CurTime() * 12))
             if beep == 0 then
                 if not played then
-                    surface.PlaySound("buttons/blip1.ogg")
+                    surface.PlaySound("buttons/blip1.wav")
                     played = true
                 end
 				return

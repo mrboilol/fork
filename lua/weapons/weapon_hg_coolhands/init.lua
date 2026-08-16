@@ -80,7 +80,7 @@ local function PlayPunchSound(pos, level, highPitch)
 end
 
 local function PlayShoveBodyImpact(pos, level)
-        sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".ogg", pos, level or 72, math_random(110, 125))
+        sound.Play("physics/body/body_medium_impact_soft" .. math_random(1, 7) .. ".wav", pos, level or 72, math_random(110, 125))
 end
 
 local function PlayKnuckledusterSound(pos, level, highPitch)
@@ -739,7 +739,7 @@ function SWEP:BlockingLogic(ent, mul, attacktype, trace)
                                 self:PunchPlayer(ent, attacktype, owner:GetAimVector(), selfdmg / 2)
                         end
 
-			ent:EmitSound("physics/body/body_medium_impact_soft6.ogg") -- parry sound
+			ent:EmitSound("physics/body/body_medium_impact_soft6.wav") -- parry sound
 
 			if wep.SetLastBlocked then
 				wep:SetLastBlocked(CurTime())
@@ -1021,10 +1021,10 @@ function SWEP:PrimaryAttack(forcespecial)
 end
 
 local concrete = {
-	"physics/concrete/boulder_impact_hard1.ogg",
-	"physics/concrete/boulder_impact_hard2.ogg",
-	"physics/concrete/boulder_impact_hard3.ogg",
-	"physics/concrete/boulder_impact_hard4.ogg"
+	"physics/concrete/boulder_impact_hard1.wav",
+	"physics/concrete/boulder_impact_hard2.wav",
+	"physics/concrete/boulder_impact_hard3.wav",
+	"physics/concrete/boulder_impact_hard4.wav"
 }
 
 function SWEP:ShoveFront(sprintShove)

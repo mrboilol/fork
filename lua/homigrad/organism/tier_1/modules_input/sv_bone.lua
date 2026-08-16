@@ -591,7 +591,7 @@ hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isC
 	end
 end)
 
-input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet)
+input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
 	local oldDmg = org.skull
 	local oldConcussion = org.concussion or 0
 	if isFistInflictor(dmgInfo) then dmg = dmg * fist_skull_damage_mul end
@@ -740,13 +740,27 @@ input_list.chest = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local oldBrokenRibs = org.brokenribs or math.Round(oldDmg * 3)
 	if dmgInfo:IsDamageType(DMG_SLASH + DMG_BULLET + DMG_BUCKSHOT) and math.random(5) == 1 then return 0, vector_origin end
 	local result, vecrand = damageBone(org, 0.1, dmg / 4, dmgInfo, "chest", boneindex, dir, hit, ricochet, true)
+	local chestDamageDelta = math.max(org.chest - oldDmg, 0)
 	markDamagedBone(org, "ValveBiped.Bip01_Spine2", org.chest)
 	hg.AddHarmToAttacker(dmgInfo, (org.chest - oldDmg) * 3, "Ribs bone damage harm")
 	org.painadd = org.painadd + dmg * 1.5
 	org.shock = org.shock + dmg* 1.5
-	if dmg >= 0.5 then
-		org.hemothoraxTrauma = math.min((org.hemothoraxTrauma or org.hemothorax or 0) + dmg * 0.08, 1)
-		org.hemothorax = math.max(org.hemothorax or 0, org.hemothoraxTrauma)
+
+	-- Rib/chest trauma bruises both lungs; blast overpressure amplifies the
+	-- contusion. Hemothorax itself remains limited to a devastated chest with
+	-- badly damaged lungs and substantial internal bleeding.
+	if chestDamageDelta > 0 and org.lungsL and org.lungsR then
+		local blast = dmgInfo:IsDamageType(DMG_BLAST)
+		local chestSeverity = math.Clamp((org.chest - 0.2) / 0.8, 0, 1)
+		local lungContusion = chestDamageDelta * Lerp(chestSeverity, 0.3, 0.8) * (blast and 1.8 or 1)
+		org.lungsL[1] = math.min((org.lungsL[1] or 0) + lungContusion, 1)
+		org.lungsR[1] = math.min((org.lungsR[1] or 0) + lungContusion, 1)
+		org.internalBleed = (org.internalBleed or 0) + lungContusion * (blast and 1.5 or 0.75)
+
+		local worstLung = math.max(org.lungsL[1], org.lungsR[1])
+		if org.chest >= 0.9 and worstLung >= 0.65 and org.internalBleed >= 1.5 then
+			org.hemothoraxTrauma = math.min((org.hemothoraxTrauma or 0) + chestDamageDelta * (blast and 0.2 or 0.1), 1)
+		end
 	end
 	if oldBrokenRibs > 0 and math.Round(org.chest * 3) <= oldBrokenRibs and dmg >= 0.35 then addBrokenBoneHitTrauma(org, "chest", dmg * 0.35, 0.5) end
 

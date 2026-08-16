@@ -91,7 +91,7 @@ function SWEP:SecondaryAttack()
 	self:Heal(hg.GetCurrentCharacter(owner) or owner)
 end
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Toggle heal/food animations", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Heal animation type: 0 = progressive minigames, 1 = Judge animations, 2 = progressive Judge minigames", 0, 2)
 
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
 function SWEP:Animation()

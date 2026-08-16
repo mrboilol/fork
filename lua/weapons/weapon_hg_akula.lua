@@ -198,7 +198,7 @@ SWEP.swingsoundextra = {
     {"knife/knife_bayonet_swing2.mp3", 30, {80, 90}},
 }
 
-SWEP.AttackHit = "weapons/knife/knife_hitwall1.ogg"
+SWEP.AttackHit = "weapons/knife/knife_hitwall1.wav"
 SWEP.Attack2Hit = "snd_jack_hmcd_knifehit.ogg"
 SWEP.AttackHitFlesh = "knife/knifestabin-3.wav"
 SWEP.Attack2HitFlesh = "snd_jack_hmcd_knifehit.ogg"

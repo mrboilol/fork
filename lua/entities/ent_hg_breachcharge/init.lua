@@ -28,7 +28,7 @@ end
 function ENT:Think()
 	if self.NextBeep < CurTime() and self.Allowed then
 		self.NextBeep = CurTime() + self.NextTime
-		self:EmitSound("npc/turret_floor/ping.ogg")
+		self:EmitSound("npc/turret_floor/ping.wav")
 		self.TickAmount = self.TickAmount + 1
 
 		if self.TickAmount >= 3 then

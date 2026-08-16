@@ -301,10 +301,10 @@ SWEP.AnimsEvents = {
     
     -- Mod switch
     ["mod_switch"] = {
-        [0] = function(self) self:EmitSound("buttons/button14.ogg") end,
+        [0] = function(self) self:EmitSound("buttons/button14.wav") end,
     },
     ["mod_switch_empty"] = {
-        [0] = function(self) self:EmitSound("buttons/button14.ogg") end,
+        [0] = function(self) self:EmitSound("buttons/button14.wav") end,
     },
     
     -- Jams

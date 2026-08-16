@@ -188,9 +188,9 @@ function SWEP:InitializeAdd()
 	self.ModelScale = 0.9
 end
 
-SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.ogg"
+SWEP.DeploySnd = "physics/body/body_medium_impact_soft5.wav"
 SWEP.HolsterSnd = ""
-SWEP.FallSnd = "physics/body/body_medium_impact_soft5.ogg"
+SWEP.FallSnd = "physics/body/body_medium_impact_soft5.wav"
 
 if CLIENT then
 	SWEP.HowToUseInstructions = "<font=ZCity_Tiny>"..string.upper( (input.LookupBinding("+use") or "BIND YOUR +USE KEY PLEASE. WRITE \"bind e +use\" IN CONSOLE FOR THE LOVE OF GOD") ).." to pickup</font>"

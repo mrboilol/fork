@@ -58,7 +58,7 @@ if SERVER then
  
         if dist >= (self.SafetyDistance / 0.01905) and not self.SafetyArmed then
             self.SafetyArmed = true
-            self:EmitSound("buttons/button16.ogg", 50, 150, 0.3)
+            self:EmitSound("buttons/button16.wav", 50, 150, 0.3)
         end
  
         return self.SafetyArmed

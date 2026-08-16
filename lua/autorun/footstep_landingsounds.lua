@@ -94,9 +94,9 @@ local LANDING_SOUNDS = {
     },
     glass = {
         light = {
-            "physics/glass/glass_sheet_impact_soft1.ogg",
-			"physics/glass/glass_sheet_impact_soft2.ogg",
-			"physics/glass/glass_sheet_impact_soft3.ogg",
+            "physics/glass/glass_sheet_impact_soft1.wav",
+			"physics/glass/glass_sheet_impact_soft2.wav",
+			"physics/glass/glass_sheet_impact_soft3.wav",
         },
         hard = {
             "footsteps/landing/heavy/glass-01.mp3",

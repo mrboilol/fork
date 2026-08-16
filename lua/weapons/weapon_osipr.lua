@@ -26,8 +26,8 @@ SWEP.FakeReloadSounds = {
 	[0.35] = "weapons/hmcd_ar2/ar2_magout.ogg",
 	[0.75] = "weapons/hmcd_ar2/ar2_magin.ogg",
 	[0.85] = "weapons/hmcd_ar2/ar2_push.ogg"
-	--[0.82] = "weapons/ar2/ar2_reload_rotate.ogg",
-	--[0.92] = "weapons/ar2/ar2_reload_push.ogg"
+	--[0.82] = "weapons/ar2/ar2_reload_rotate.wav",
+	--[0.92] = "weapons/ar2/ar2_reload_push.wav"
 }
 SWEP.FakeEmptyReloadSounds = {
 	[0.17] = "weapons/hmcd_ar2/ar2_rotate.ogg",
@@ -124,14 +124,14 @@ SWEP.ReloadSoundes = {
 	"none",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magout.ogg",
+	"weapons/ar2/ar2_magout.wav",
 	"none",
 	"none",
-	"weapons/ar2/ar2_magin.ogg",
+	"weapons/ar2/ar2_magin.wav",
 	"none",
-	"weapons/ar2/ar2_reload_rotate.ogg",
+	"weapons/ar2/ar2_reload_rotate.wav",
 	"none",
-	"weapons/ar2/ar2_push.ogg",
+	"weapons/ar2/ar2_push.wav",
 	"none",
 	"none",
 	"none",
@@ -145,7 +145,7 @@ for i = 1, 30 do
 	SWEP.Spray[i] = Angle(-0.06 - math.cos(i) * 0.03, math.cos(i * i) * 0.04, 0) * 2
 end
 
-SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.ogg", 75, 100, 110}
+SWEP.DeploySnd = {"weapons/ar2/ar2_deploy.wav", 75, 100, 110}
 
 SWEP.Ergonomics = 0.8
 SWEP.HaveModel = "models/weapons/arccw/w_irifle.mdl"

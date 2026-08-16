@@ -36,19 +36,19 @@ function ENT:Initialize()
 end
 
 local physicsProfiles = {
-	weapon_brick = {"concrete", "physics/concrete/concrete_impact_hard1.ogg", "physics/concrete/concrete_impact_hard2.ogg", "physics/concrete/concrete_impact_hard3.ogg"},
-	weapon_hammer = {"metal", "physics/metal/metal_solid_impact_hard1.ogg", "physics/metal/metal_solid_impact_hard4.ogg", "physics/metal/metal_solid_impact_hard5.ogg"},
-	weapon_hg_bottle = {"glass", "physics/glass/glass_impact_hard1.ogg", "physics/glass/glass_impact_hard2.ogg", "physics/glass/glass_impact_hard3.ogg"},
-	weapon_hatchet = {"metal", "physics/metal/metal_solid_impact_hard1.ogg", "physics/metal/metal_solid_impact_hard4.ogg"},
-	weapon_hg_glassshard = {"glass", "physics/glass/glass_impact_hard1.ogg", "physics/glass/glass_impact_hard2.ogg"},
-	weapon_hg_glassshard_taped = {"glass", "physics/glass/glass_impact_hard1.ogg", "physics/glass/glass_impact_hard2.ogg"},
-	weapon_hg_woodaxe = {"metal", "physics/metal/metal_solid_impact_hard1.ogg", "physics/metal/metal_solid_impact_hard4.ogg"},
-	weapon_hg_shuriken = {"metal", "physics/metal/metal_solid_impact_hard1.ogg", "physics/metal/metal_solid_impact_hard4.ogg"},
-	weapon_hg_mug = {"pottery", "physics/glass/glass_impact_hard1.ogg", "physics/glass/glass_impact_hard2.ogg"},
-	weapon_hg_spear = {"wood", "physics/wood/wood_solid_impact_hard1.ogg", "physics/wood/wood_solid_impact_hard2.ogg", "physics/wood/wood_solid_impact_hard3.ogg"},
-	weapon_hg_spear_knife = {"wood", "physics/wood/wood_solid_impact_hard1.ogg", "physics/wood/wood_solid_impact_hard2.ogg", "physics/wood/wood_solid_impact_hard3.ogg"},
-	weapon_hg_spear_pro = {"metal", "physics/metal/metal_solid_impact_hard1.ogg", "physics/metal/metal_solid_impact_hard4.ogg"},
-	weapon_tpik_microphone = {"plastic", "physics/plastic/plastic_box_impact_hard1.ogg", "physics/plastic/plastic_box_impact_hard2.ogg", "physics/plastic/plastic_box_impact_hard3.ogg"},
+	weapon_brick = {"concrete", "physics/concrete/concrete_impact_hard1.wav", "physics/concrete/concrete_impact_hard2.wav", "physics/concrete/concrete_impact_hard3.wav"},
+	weapon_hammer = {"metal", "physics/metal/metal_solid_impact_hard1.wav", "physics/metal/metal_solid_impact_hard4.wav", "physics/metal/metal_solid_impact_hard5.wav"},
+	weapon_hg_bottle = {"glass", "physics/glass/glass_impact_hard1.wav", "physics/glass/glass_impact_hard2.wav", "physics/glass/glass_impact_hard3.wav"},
+	weapon_hatchet = {"metal", "physics/metal/metal_solid_impact_hard1.wav", "physics/metal/metal_solid_impact_hard4.wav"},
+	weapon_hg_glassshard = {"glass", "physics/glass/glass_impact_hard1.wav", "physics/glass/glass_impact_hard2.wav"},
+	weapon_hg_glassshard_taped = {"glass", "physics/glass/glass_impact_hard1.wav", "physics/glass/glass_impact_hard2.wav"},
+	weapon_hg_woodaxe = {"metal", "physics/metal/metal_solid_impact_hard1.wav", "physics/metal/metal_solid_impact_hard4.wav"},
+	weapon_hg_shuriken = {"metal", "physics/metal/metal_solid_impact_hard1.wav", "physics/metal/metal_solid_impact_hard4.wav"},
+	weapon_hg_mug = {"pottery", "physics/glass/glass_impact_hard1.wav", "physics/glass/glass_impact_hard2.wav"},
+	weapon_hg_spear = {"wood", "physics/wood/wood_solid_impact_hard1.wav", "physics/wood/wood_solid_impact_hard2.wav", "physics/wood/wood_solid_impact_hard3.wav"},
+	weapon_hg_spear_knife = {"wood", "physics/wood/wood_solid_impact_hard1.wav", "physics/wood/wood_solid_impact_hard2.wav", "physics/wood/wood_solid_impact_hard3.wav"},
+	weapon_hg_spear_pro = {"metal", "physics/metal/metal_solid_impact_hard1.wav", "physics/metal/metal_solid_impact_hard4.wav"},
+	weapon_tpik_microphone = {"plastic", "physics/plastic/plastic_box_impact_hard1.wav", "physics/plastic/plastic_box_impact_hard2.wav", "physics/plastic/plastic_box_impact_hard3.wav"},
 }
 
 local wallOnlyThrowables = {
@@ -231,7 +231,7 @@ hook.Add("PhysgunPickup", "ThrowableUnstick", function(ply, ent)
 	ent.StuckSurface = nil
 	ent.Stuck = false
 	ent.Stress = 0
-	ent:EmitSound("physics/wood/wood_plank_impact_hard3.ogg", 65, math.random(110, 130))
+	ent:EmitSound("physics/wood/wood_plank_impact_hard3.wav", 65, math.random(110, 130))
 end)
 
 function ENT:Think()
@@ -255,12 +255,12 @@ function ENT:Think()
 			self.StuckSurface = nil
 			self.Stuck = false
 			self.Stress = 0
-			self:EmitSound("physics/wood/wood_plank_impact_hard3.ogg", 75, math.random(90, 110))
+			self:EmitSound("physics/wood/wood_plank_impact_hard3.wav", 75, math.random(90, 110))
 			self:NextThink(CurTime() + 0.1)
 			return true
 		elseif (self.Stress or 0) > 300 and not self.CreakPlayed then
 			self.CreakPlayed = true
-			self:EmitSound("physics/wood/wood_plank_impact_hard2.ogg", 45, math.random(130, 150))
+			self:EmitSound("physics/wood/wood_plank_impact_hard2.wav", 45, math.random(130, 150))
 		elseif (self.Stress or 0) <= 300 then
 			self.CreakPlayed = false
 		end
@@ -486,7 +486,7 @@ function ENT:Use(ply)
 		self.removed = true
 
 		if self.Stuck then
-			self:EmitSound(self.UnstickSnd or "physics/wood/wood_plank_impact_hard3.ogg", 65, math.random(110, 130))
+			self:EmitSound(self.UnstickSnd or "physics/wood/wood_plank_impact_hard3.wav", 65, math.random(110, 130))
 		end
 
 		local wep = ents.Create(self.wep)

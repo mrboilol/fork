@@ -4,7 +4,7 @@ ENT.PrintName = "Motion Detector"
 ENT.Spawnable = false
 ENT.WorldModel = "models/mmod/weapons/w_slam.mdl"
 
-ENT.Sound = "ambient/alarms/klaxon1.ogg"
+ENT.Sound = "ambient/alarms/klaxon1.wav"
 ENT.AlarmCD = 0
 
 local developer = GetConVar("developer")

@@ -205,7 +205,7 @@ if SERVER then
 			ent:Fire("AddOutput", "soundmoveoverride " .. (ent.door_origSoundMove   or ""))
 			ent:Fire("AddOutput", "soundopenoverride " .. (ent.door_origSoundOpen   or ""))
 			ent:Fire("AddOutput", "soundcloseoverride " .. (ent.door_origSoundClose or ""))
-			ent:EmitSound("ambient/materials/concrete_break1.ogg")
+			ent:EmitSound("ambient/materials/concrete_break1.wav")
 		end)
 	end
 
