@@ -131,7 +131,7 @@ local function getPalpitationThreat(org, blood, o2Value)
 	local temperatureStress = math.max(
 		math.Clamp((34 - (org.temperature or 36.7)) / 6, 0, 1),
 		math.Clamp(((org.temperature or 36.7) - 39) / 3, 0, 1)
-1	)
+	)
 
 	return math.max(lowBlood, lowCirculation, hypoxia, shock, heartDamage, temperatureStress)
 end
@@ -1059,4 +1059,3 @@ function hg.organism.Pulse(owner, org, timeValue)
 		net.Send(owner)
 	end
 end
-
