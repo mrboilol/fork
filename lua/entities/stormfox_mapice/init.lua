@@ -14,11 +14,15 @@ local function IsStandingOnMapIce(ply)
 		return true
 	end
 
+	-- Do not use the player's OBB here. SetupMove can run while a player's
+	-- collision bounds are being changed, which can give TraceHull invalid
+	-- extents and panic the server. This small, fixed hull is enough to find
+	-- the ice directly beneath their feet.
 	local tr = util.TraceHull({
 		start = ply:GetPos() + Vector(0, 0, 4),
-		endpos = ply:GetPos() - Vector(0, 0, 8),
-		mins = ply:OBBMins(),
-		maxs = ply:OBBMaxs(),
+		endpos = ply:GetPos() - Vector(0, 0, 12),
+		mins = Vector(-8, -8, 0),
+		maxs = Vector(8, 8, 8),
 		filter = ply,
 		mask = MASK_PLAYERSOLID
 	})
