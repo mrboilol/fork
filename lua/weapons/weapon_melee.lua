@@ -1435,6 +1435,25 @@ function SWEP:IsHeadHit(ent, trace)
     return self:IsHeadTrace(trace and trace.Entity, trace) or self:IsHeadTrace(victim, trace)
 end
 
+-- DamageInfo does not retain a trace hitgroup.  The organism damage handler
+-- consequently has to recreate the contact from DamagePosition/Force, which
+-- is especially unreliable for a swinging hull that catches the head at its
+-- edge.  Preserve this server-side contact just for TakeDamageInfo so the
+-- physiology path receives the same body part the melee trace actually hit.
+function SWEP:SetMeleeDamageContact(ent, trace)
+    if not SERVER then return end
+    if not IsValid(ent) or not trace then return end
+
+    self.MeleeDamageContact = {
+        entity = ent,
+        physicsBone = trace.PhysicsBone,
+        hitBoxBone = trace.HitBoxBone,
+        hitGroup = trace.HitGroup,
+        head = self:IsHeadHit(ent, trace),
+        expires = CurTime() + 0.1,
+    }
+end
+
 function SWEP:IsHeadTrace(ent, trace)
     if not trace then return false end
     if trace.HitGroup == HITGROUP_HEAD then return true end
@@ -3155,7 +3174,9 @@ function SWEP:CustomThink()
                 dmginfo:SetDamagePosition(trace.HitPos)
                 
                 self.slash = self.MultiDmg1
+                self:SetMeleeDamageContact(ent, trace)
                 ent:TakeDamageInfo(dmginfo)
+                self.MeleeDamageContact = nil
                 self.attackedOnce = true
                 self.slash = nil
                 if blockState == "none" or blockState == "break" then
@@ -3324,8 +3345,10 @@ function SWEP:CustomThink()
                 dmginfo:SetDamagePosition(trace.HitPos)
 
                 self.slash = self.MultiDmg2
+                self:SetMeleeDamageContact(ent, trace)
                 --print(dmg)
                 ent:TakeDamageInfo(dmginfo)
+                self.MeleeDamageContact = nil
                 self.attackedOnce = true
                 self.slash = nil
                 if blockState == "none" or blockState == "break" then
@@ -3511,7 +3534,9 @@ function SWEP:CustomThink()
                 local oldBreakBoneMul = self.BreakBoneMul
                 self.BreakBoneMul = (self.BreakBoneMul or 1) * (self.ReleasedChargeBoneMul or 1)
                 self.slash = self.MultiDmgCharge
+                self:SetMeleeDamageContact(ent, trace)
                 ent:TakeDamageInfo(dmginfo)
+                self.MeleeDamageContact = nil
                 self.attackedOnce = true
                 self.slash = nil
                 self.BreakBoneMul = oldBreakBoneMul
@@ -4422,8 +4447,10 @@ function SWEP:NPCThink()
 					dmginfo:SetDamageForce(trace.Normal * dmg * 1)
 					dmginfo:SetDamageType(self.DamageType)
 					dmginfo:SetDamagePosition(trace.HitPos)
+					self:SetMeleeDamageContact(trEnt, trace)
 					trEnt:TakeDamageInfo(dmginfo)
-                    if blockState == "none" or blockState == "break" then
+					self.MeleeDamageContact = nil
+					if blockState == "none" or blockState == "break" then
                         self:PlaySoftHitSounds(npc, trEnt, trace, false)
                     end
 

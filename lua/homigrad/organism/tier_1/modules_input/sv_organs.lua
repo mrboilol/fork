@@ -46,7 +46,7 @@ local function CreateBrainChunk(origin, direction)
     piece:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
     piece:Spawn()
 
-    piece:EmitSound("physics/flesh/flesh_squishy_impact_hard"..math.random(1,4)..".ogg", 60, math.random(200, 255))
+    piece:EmitSound("physics/flesh/flesh_squishy_impact_hard"..math.random(1,4)..".wav", 60, math.random(200, 255))
 
     piece.GoreState = {
         Sticking = false,

@@ -40,6 +40,7 @@ end
 local math = math
 local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
 function SWEP:Think()
+	self:ApplyBandageVisualMode()
 	if self:UseJudgeBandageTPIK() then
 		local base = weapons.GetStored("weapon_bandage_sh")
 		if base and base.Think then return base.Think(self) end
@@ -55,6 +56,7 @@ end
 
 SWEP.isFirstDeploy = true
 function SWEP:Deploy()
+	self:ApplyBandageVisualMode()
 	if self:UseJudgeBandageTPIK() then
 		local base = weapons.GetStored("weapon_bandage_sh")
 		if base and base.Deploy then return base.Deploy(self) end

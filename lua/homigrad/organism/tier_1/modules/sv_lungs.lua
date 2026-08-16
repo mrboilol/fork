@@ -79,6 +79,9 @@ module[1] = function(org)
 	org.lastCOBreathe = nil
 	org.exertionO2Debt = 0
 	org.opioidRespiratoryDepression = 0
+	org.drugRespiratoryDepression = 0
+	org.bradyapnea = 0
+	org.respiratoryRate = 14
 	org.respiratoryArrest = false
 
 
@@ -104,7 +107,11 @@ end
 function hg.organism.OxygenateBlood(org)
 
 	local canDrawBreath = org.owner:WaterLevel() < 3 or hg.organism.HasUnderwaterOxygen(org)
-	return (math.max(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0.5) * (1 - org.trachea * 0.8)) * org.o2.regen / 4 * (canDrawBreath and 1 or 0)// * (1 - org.pneumothorax)
+	-- Each lung contributes its remaining functional tissue.  The former 50%
+	-- floor let heavily damaged lungs oxygenate blood exactly like a single
+	-- healthy lung, so lung damage never reached tissue O2 until total failure.
+	local lungFunction = math.Clamp(((1 - org.lungsL[1]) + (1 - org.lungsR[1])) / 2, 0, 1)
+	return (lungFunction * (1 - org.trachea * 0.8)) * org.o2.regen / 4 * (canDrawBreath and 1 or 0)// * (1 - org.pneumothorax)
 
 end
 
@@ -381,6 +388,9 @@ module[2] = function(owner, org, timeValue)
 		org.lungsfunction = true
 		org.exertionO2Debt = 0
 		org.opioidRespiratoryDepression = 0
+		org.drugRespiratoryDepression = 0
+		org.bradyapnea = 0
+		org.respiratoryRate = 14
 		org.respiratoryArrest = false
 		org._zeroO2Time = 0
 		if org.brain >= 0.7 and org.alive then
@@ -427,12 +437,16 @@ module[2] = function(owner, org, timeValue)
 	local opioidRespiratoryDepression = math.Clamp((analgesiaLoad + painkillerLoad) * (1 - naloxoneProtection), 0, 1)
 	local zerlkersRespiratoryDepression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
 	local drugRespiratoryDepression = math.max(opioidRespiratoryDepression, zerlkersRespiratoryDepression)
+	local bradyapnea = math.Clamp((drugRespiratoryDepression - 0.08) / 0.92, 0, 1)
 	org.opioidRespiratoryDepression = opioidRespiratoryDepression
+	org.drugRespiratoryDepression = drugRespiratoryDepression
+	org.bradyapnea = bradyapnea
+	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
 	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
 	-- Oxygen-carrying capacity is calculated directly from raw circulating
 	-- volume and reaches zero only with zero blood.
-	local bloodO2Cap = o2.range * hg.organism.GetBloodDeliveryFraction(rawBlood, 0.3)
+	local bloodO2Cap = o2.range * hg.organism.GetBloodDeliveryFraction(rawBlood, 0.5)
 	org.bloodO2Cap = bloodO2Cap
 
 	local bodyTemperature = org.temperature or 36.7
@@ -708,7 +722,10 @@ module[2] = function(owner, org, timeValue)
 		-- Thin air reduces intake directly, while blood saturation falls more
 		-- gradually than ambient pressure itself.
 		local altitudeO2Cap = o2.range * Lerp(altitudeO2K, 0.5, 1)
-		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.5)
+		-- The reserve cap must follow remaining lung tissue as well as the intake
+		-- rate above.  A small floor keeps a critically injured but not yet fully
+		-- failed lung from snapping to zero in one tick.
+		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.1)
 		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
 
 
@@ -880,6 +897,10 @@ module[2] = function(owner, org, timeValue)
 
 		end
 
+		if bradyapnea > 0 and not org.heartstop then
+			o2[1] = max(o2[1] - timeValue * bradyapnea ^ 1.35 * 0.55, 0)
+		end
+
 
 
 		o2[1] = max(o2[1] - (org.CO > 0 and o2.curregen * 1.1 * (org.CO / 30) or 0),0)
@@ -922,7 +943,7 @@ module[2] = function(owner, org, timeValue)
 	local deliveryO2Cap = min(bloodO2Cap, perfusionO2Cap, exertionO2Cap)
 	if o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
-		local deliveryResponse = 1 - math.exp(-timeValue * (0.08 + deliveryFailure * 0.12))
+		local deliveryResponse = 1 - math.exp(-timeValue * (0.16 + deliveryFailure * 0.45))
 		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse
 	end
 

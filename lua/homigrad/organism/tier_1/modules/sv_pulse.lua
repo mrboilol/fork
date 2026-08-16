@@ -12,15 +12,22 @@ local peaDuration = 6
 local function getBloodPerfusion(blood)
 	-- Preserve enough central circulation at moderate loss while allowing an
 	-- almost empty circulation to become correspondingly ineffective.
-	return hg.organism.GetBloodDeliveryFraction(blood, 0.35)
+	return hg.organism.GetBloodDeliveryFraction(blood, 0.5)
 end
 
 local function getBloodCompensationRate(blood)
 	blood = tonumber(blood) or 5000
-	-- A smooth sympathetic curve tops out below ventricular-tachycardia rates;
-	-- near-empty volume cannot force an otherwise healthy heart to fibrillate.
+	-- Compensation remains measured through the survivable loss band, then can
+	-- approach the terminal electrical-rate boundary as preload disappears.
 	local volumeLoss = 1 - math.Clamp(blood / 5000, 0, 1)
-	return 70 + volumeLoss ^ 1.7 * 110
+	return 70 + volumeLoss ^ 1.85 * 220
+end
+
+local function getRateOutput(heartbeat)
+	local rate = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
+	local rateSupport = math.Clamp((rate / 70) ^ 0.55, 0.18, 1.35)
+	local filling = 1 - math.Clamp((rate - 150) / 150, 0, 0.72)
+	return math.Clamp(rateSupport * filling, 0.08, 1.35)
 end
 
 -- Extreme speed and sustained lateral acceleration can briefly reduce venous
@@ -176,8 +183,38 @@ local function notifyTemperatureStress(owner, org)
 	end
 end
 
+local function stabilizeECGState(org, candidate, heartbeat)
+	local current = org.ecgState
+	if not current then
+		org._ecgStateSince = CurTime()
+		return candidate
+	end
+	if current == candidate then
+		org._ecgStateSince = org._ecgStateSince or CurTime()
+		return candidate
+	end
+
+	local immediate = candidate == "asystole" or candidate == "pea"
+		or candidate == "ventricular_fibrillation"
+	if immediate then
+		org._ecgStateSince = CurTime()
+		return candidate
+	end
+
+	if current == "normal_sinus" and candidate == "sinus_tachycardia" and heartbeat < 104 then return current end
+	if current == "sinus_tachycardia" and candidate == "normal_sinus" and heartbeat > 96 then return current end
+	if current == "normal_sinus" and candidate == "sinus_bradycardia" and heartbeat > 56 then return current end
+	if current == "sinus_bradycardia" and candidate == "normal_sinus" and heartbeat < 64 then return current end
+
+	local since = org._ecgStateSince or CurTime()
+	if CurTime() - since < 1.25 then return current end
+	org._ecgStateSince = CurTime()
+	return candidate
+end
+
 function hg.organism.GetECGState(heartbeat, heartstop, org)
 	heartbeat = math.Clamp(tonumber(heartbeat) or 0, 0, terminalHeartRate)
+	org = org or {}
 	if heartstop then return heartbeat < 1 and "asystole" or "pea" end
 	if heartbeat < 1 then return "asystole" end
 	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
@@ -188,38 +225,61 @@ function hg.organism.GetECGState(heartbeat, heartstop, org)
 		return "terminal_tachycardia"
 	end
 
-	org = org or {}
 	local o2 = org.o2 and org.o2[1] or 30
 	local hypoxia = math.Clamp((12 - o2) / 12, 0, 1)
 	local cerebral = math.Clamp(math.max((org.brain or 0) * 0.8, org.brainHemorrhage or 0), 0, 1)
 	local cardiac = math.Clamp(org.heart or 0, 0, 1)
-	-- Mild cold (34-35 C) does not override a needed hemorrhage response.
-	-- Conduction suppression begins in moderate hypothermia and grows toward
-	-- severe hypothermia.
 	local cold = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
 	local hemorrhagicDecompensation = math.Clamp((0.22 - (org.blood or 5000) / 5000) / 0.22, 0, 1)
 	local suppression = math.max(cerebral * 0.9, hypoxia, cardiac * 0.9, cold, hemorrhagicDecompensation)
+	local output = math.Clamp(tonumber(org.cardiacOutput) or 1, 0, 1.5)
+	local perfusion = math.Clamp(tonumber(org.perfusion) or output, 0, 1)
+	local pulse = math.max(tonumber(org.pulse) or 0, 0)
+	local arrhythmia = math.Clamp(tonumber(org.arrhythmia) or 0, 0, 1)
+	local ischemia = math.max(math.Clamp(1 - (org.myocardialOxygen or 1), 0, 1), math.Clamp(org.ischemia or 0, 0, 1))
+	local candidate
 
-	-- Complete/partial AV block is a direct conduction-system injury pattern,
-	-- while severe systemic failure falls back to an escape rhythm.
-	if cardiac >= 0.72 and heartbeat > 40 then return "av_block_complete" end
-	if cardiac >= 0.4 and heartbeat > 45 then return "av_block_partial" end
-	if org.fibrillation or org.terminalRhythm == "ventricular_fibrillation" then return "ventricular_fibrillation" end
-	if org.unstableRhythm == "atrial_fibrillation" then return "atrial_fibrillation" end
-	if org.unstableRhythm == "ventricular_ectopy" then return "ventricular_ectopy" end
-	-- Moderate cold should retain its conduction/J-wave morphology while the
-	-- rhythm is still sinus-driven; a slower escape rhythm takes precedence.
-	if cold >= 0.18 and heartbeat > 40 and cold >= math.max(cerebral * 0.9, hypoxia, cardiac * 0.9) then return "hypothermia_bradycardia" end
-	if heartbeat <= 40 and (hypoxia >= 0.65 or cardiac >= 0.65 or cold >= 0.75 or hemorrhagicDecompensation >= 0.75) then return "ventricular_escape" end
-	if heartbeat <= 60 and suppression >= 0.52 then return "junctional_escape" end
-	if heartbeat < 50 and suppression >= 0.32 then return "sinus_pause" end
-	if cerebral >= 0.28 then return heartbeat < 60 and "cerebral_bradycardia" or "cerebral_irregular" end
-	if heartbeat < 60 then return "sinus_bradycardia" end
-	if heartbeat <= 100 then return "normal_sinus" end
-	if heartbeat <= 150 then return "sinus_tachycardia" end
-	if heartbeat <= 200 then return "compressed_tachycardia" end
-	if heartbeat < 280 then return "extreme_tachycardia" end
-	return "terminal_tachycardia"
+	if org.fibrillation or org.terminalRhythm == "ventricular_fibrillation" then
+		candidate = "ventricular_fibrillation"
+	elseif arrhythmia >= 0.72 and heartbeat >= 140 and (ischemia >= 0.35 or (org.heartStrain or 0) >= 0.3 or heartbeat >= 200) then
+		candidate = "terminal_tachycardia"
+	elseif pulse <= 5 and output <= 0.08 and perfusion <= 0.08 then
+		candidate = "pea"
+	elseif cardiac >= 0.72 and heartbeat > 40 then
+		candidate = "av_block_complete"
+	elseif cardiac >= 0.4 and heartbeat > 45 then
+		candidate = "av_block_partial"
+	elseif org.unstableRhythm == "atrial_fibrillation" then
+		candidate = "atrial_fibrillation"
+	elseif org.unstableRhythm == "ventricular_ectopy" then
+		candidate = "ventricular_ectopy"
+	elseif cold >= 0.18 and heartbeat > 40 and cold >= math.max(cerebral * 0.9, hypoxia, cardiac * 0.9) then
+		candidate = "hypothermia_bradycardia"
+	elseif heartbeat <= 40 and (hypoxia >= 0.65 or cardiac >= 0.65 or cold >= 0.75 or hemorrhagicDecompensation >= 0.75) then
+		candidate = "ventricular_escape"
+	elseif heartbeat <= 60 and suppression >= 0.52 then
+		candidate = "junctional_escape"
+	elseif heartbeat < 50 and suppression >= 0.32 then
+		candidate = "sinus_pause"
+	elseif cerebral >= 0.28 then
+		candidate = heartbeat < 60 and "cerebral_bradycardia" or "cerebral_irregular"
+	elseif heartbeat < 60 then
+		candidate = "sinus_bradycardia"
+	elseif heartbeat <= 100 then
+		candidate = "normal_sinus"
+	elseif heartbeat <= 150 then
+		candidate = "sinus_tachycardia"
+	elseif heartbeat <= 220 and arrhythmia >= 0.35 and output > 0.12 and perfusion > 0.12 then
+		candidate = "compressed_tachycardia"
+	elseif heartbeat < 250 and arrhythmia < 0.35 then
+		candidate = "sinus_tachycardia"
+	elseif heartbeat < 280 then
+		candidate = "extreme_tachycardia"
+	else
+		candidate = "terminal_tachycardia"
+	end
+
+	return stabilizeECGState(org, candidate, heartbeat)
 end
 
 
@@ -454,14 +514,15 @@ module[2] = function(owner, org, timeValue)
 	-- sustain the myocardium once the lungs have stopped delivering oxygen.
 	local oxygenation = Clamp(o2 * (org.oxygenIntakeAvailable == false and 0 or 1), 0, 1)
 	local highSpeedPressureShock = updateHighSpeedPressureShock(owner, org, timeValue)
-	local vascularTone = Clamp(1 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
+	local vascularTone = Clamp(1 + hemorrhageCompensation * 0.24 + min(org.adrenaline, 3) * 0.12 + max(org.fear, 0) * 0.08 + Clamp(org.shock, 0, 45) / 360, 0.65, 1.55)
 	local accelerationPressureMul = 1 - highSpeedPressureShock * 0.8
 	-- Pericardial blood restricts filling before it directly damages the heart.
 	-- Its effect compounds with blood loss, causing obstructive shock and low
 	-- cardiac output without treating tamponade as an immediate flatline.
 	local tamponade = Clamp(org.cardiacTamponade or 0, 0, 1)
 	local tamponadePreload = Clamp(1 - tamponade * 0.82, 0.18, 1)
-	local circulationBase = bloodVolume * heart * vascularTone * accelerationPressureMul * tamponadePreload * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
+	local rateOutput = getRateOutput(org.heartstop and 0 or (org.heartbeat or 70))
+	local circulationBase = bloodVolume * heart * compensationPulseMultiplier * rateOutput * vascularTone * accelerationPressureMul * tamponadePreload * Clamp(Remap(org.temperature, 28, 36.7, 0.55, 1), 0.45, 1.1)
 	local rhythmMul = org.fibrillation and 0.18 or Clamp(1 - (org.arrhythmia or 0) * 0.22, 0.5, 1)
 	local dihSupport = (org.dihSupportUntil or 0) > CurTime()
 	local defibGrace = (org.defibDeathGrace or 0) > CurTime() or (org.defibSupportUntil or 0) > CurTime()
@@ -482,10 +543,7 @@ module[2] = function(owner, org, timeValue)
 	local pulsePressure = Clamp(40 * Clamp(org.bloodPressure / 92, 0, 1.5) + ((org.heartbeat or 70) - 70) * 0.1, 0, 80)
 	org.systolic = math.Round(Clamp(org.bloodPressure + pulsePressure * 2 / 3, 0, 240))
 	org.diastolic = math.Round(Clamp(org.bloodPressure - pulsePressure / 3, 0, 160))
-	org.cardiacOutput = org.heartstop and (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and cprSupportPulse / 110 or 0))) or Clamp(circulation * (92 / 90) * heart * rhythmMul, 0, 1.5)
-	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.65 and circulation > 0.6 then
-		org.cardiacOutput = Approach(org.cardiacOutput, Clamp(getBloodVolume(org) * heart, 0, 1), timeValue / 20)
-	end
+	org.cardiacOutput = org.heartstop and (dihSupport and 1 or (defibGrace and 0.35 or (cprSupport and cprSupportPulse / 110 or 0))) or Clamp(circulation, 0, 1.5)
 	-- Oxygenation, blood volume, and circulation already contain the same
 	-- hemorrhage penalty. Multiplying them made a healthy heart at 3000 mL see
 	-- roughly one-third oxygen, causing an arrhythmia/fibrillation death spiral.
@@ -564,10 +622,12 @@ module[2] = function(owner, org, timeValue)
 	local coldSuppression = math.Clamp((34 - (org.temperature or 36.7)) / 7, 0, 1)
 	local hemorrhagicDecompensation = math.Clamp((0.22 - bloodNow / 5000) / 0.22, 0, 1)
 	local zerlkersSuppression = math.Clamp(org.zerlkersOverdose or 0, 0, 1)
+	local drugBradycardia = math.Clamp(((org.drugRespiratoryDepression or 0) - 0.12) / 0.88, 0, 1)
 	-- Low blood volume produces tachycardia until preload becomes extremely poor;
 	-- it is not a bradycardia source before that point.
-	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression)
+	local bradycardiaSeverity = math.max(cerebralSuppression, hypoxiaSuppression, cardiacSuppression * 0.9, coldSuppression, zerlkersSuppression, drugBradycardia * 0.9)
 	org.bradycardiaSeverity = bradycardiaSeverity
+	org.drugBradycardia = drugBradycardia
 	org.hemorrhagicDecompensation = hemorrhagicDecompensation
 
 	local bradyTarget
@@ -863,6 +923,11 @@ module[2] = function(owner, org, timeValue)
 	-- the previous arrest left the pulse at zero or caused temporary hypoxia.
 	if ((org.pulse < 10 and not volumeExplainsLowOutput) or org.brain >= 0.6) and not restartCirculationActive then org.heartstop = true end
 	if org.temperature < 28 or org.temperature > 42 then org.heartstop = true end
+	if org.heartstop and not org.fibrillation and org.terminalRhythm ~= "ventricular_fibrillation"
+		and (org.heartbeat or 0) >= 140 and (org.arrhythmia or 0) >= 0.72
+		and (ischemia >= 0.35 or (org.heartStrain or 0) >= 0.3 or (org.heartbeat or 0) >= 200) then
+		org.terminalRhythm = "terminal_tachycardia"
+	end
 	if org.heartstop then
 		org.heartbeat = 0
 		org.fibrillation = false
@@ -899,6 +964,9 @@ module[2] = function(owner, org, timeValue)
 		if org.terminalRhythm == "ventricular_fibrillation" and arrestElapsed < peaDuration then
 			org.heartbeat = 260
 			org.ecgState = "ventricular_fibrillation"
+		elseif org.terminalRhythm == "terminal_tachycardia" and arrestElapsed < peaDuration then
+			org.heartbeat = 180
+			org.ecgState = "terminal_tachycardia"
 		elseif arrestElapsed < peaDuration then
 			local peaTarget = Lerp(math.Clamp(arrestElapsed / peaDuration, 0, 1), 60, 20)
 			org.heartbeat = math.Approach(org.heartbeat or terminalHeartRate, peaTarget, timeValue * 120)

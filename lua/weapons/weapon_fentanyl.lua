@@ -70,11 +70,21 @@ function SWEP:CanPrimaryAttack()
 	return true
 end
 
-function SWEP:InitAdd()
+function SWEP:SetupDataTables()
+	self:NetworkVar("Float", 0, "Holding")
+	self:NetworkVar("Float", 1, "RemainingAmount")
+	self:NetworkVar("Float", 2, "Dose")
+	self:NetworkVar("Bool", 0, "HealingOther")
+end
+
+function SWEP:InitializeAdd()
+	self:SetHold(self.HoldType)
 	self:SetDose(1)
+	self:SetRemainingAmount(1)
 	self.modeValues = {
 		[1] = 1
 	}
+	self.ModelScale = 1
 end
 
 function SWEP:Deploy()

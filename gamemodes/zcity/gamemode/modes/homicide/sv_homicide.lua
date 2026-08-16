@@ -1988,6 +1988,10 @@ end
 --//
 
 function MODE:ShouldRoundEnd()
+	if not MODE.RoundSpawnReady then
+		return false
+	end
+
 	if(MODE.StartRoundTime and MODE.RoleChooseRound)then
 		if(MODE.StartRoundTime > CurTime())then
 			return false
@@ -2018,6 +2022,7 @@ function MODE:RoundStart()
 	
 
 	self.roundStartType = self.Type
+	MODE.RoundSpawnReady = false
 	
 
 	self.deadPoliceCount = 0
@@ -2031,6 +2036,7 @@ function MODE:RoundStart()
 
 	MODE.ChoosingPlayersList = {}
 	MODE.SpawnPlayers(true)
+	MODE.RoundSpawnReady = true
 end
 
 function MODE:GiveEquipment()

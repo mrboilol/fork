@@ -15,6 +15,7 @@ local tumbleBoneBreakSounds = {
     "owfuck7.mp3",
     "owfuck8.mp3",
     "owfuck9.mp3",
+    "owfuck10.mp3",
     "newbonebreak/break1.wav",
     "newbonebreak/break2.wav",
     "newbonebreak/break3.wav",

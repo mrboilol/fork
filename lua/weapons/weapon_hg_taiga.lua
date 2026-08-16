@@ -157,9 +157,9 @@ function SWEP:CanSecondaryAttack()
     if owner.organism and owner.organism.larmamputated then return end
 
     self.DamageType = DMG_CLUB
-    self.AttackHit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".ogg"
-    self.Attack2Hit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".ogg"
-    self.Attack2HitFlesh = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".ogg"
+    self.AttackHit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".wav"
+    self.Attack2Hit = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".wav"
+    self.Attack2HitFlesh = "physics/flesh/flesh_impact_hard"..math.random(1,6)..".wav"
     self.setlh = true
     self.HoldType = "duel"
     timer.Simple(0.5,function()

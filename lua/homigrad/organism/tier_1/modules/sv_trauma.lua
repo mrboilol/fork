@@ -83,20 +83,16 @@ local concussion_phrases_severe = {
     "Everything is blurred...",
     "I'm going to be sick...",
     "Make it stop...",
-    "I can't breathe right...",
     "My head's splitting open...",
-    "6lling... I'm falling...",
+    "I'm falling...",
     "Everything's going black...",
-    "I can't feel my legs...",
     "Please... somebody help...",
     "It hurts... it hurts so much...",
     "I'm losing consciousness...",
     "The ground won't stop moving...",
     "I can't tell up from down...",
     "My eyes won't focus...",
-    "I think I'm dying...",
     "Everything's spinning too fast...",
-    "I can't move my arms...",
     "Get this noise out of my head..."
 }
 local concussion_phrases_vomit = {
@@ -164,6 +160,38 @@ local concussion_phrases_fatigue = {
     "I need to rest... I can't go on..."
 }
 
+-- Concussion used to give every symptom family its own timer.  A single hit
+-- could consequently produce several unrelated thoughts at once.  Keep one
+-- shared cadence and describe the symptom that is actually most prominent.
+local function selectConcussionPhrase(org, effectiveConcussion)
+    local choices
+
+    if (org.nausea or 0) >= 1.25 then
+        choices = concussion_phrases_vomit
+    elseif effectiveConcussion >= 3.2 or (org.consciousness or 1) <= 0.45 then
+        choices = concussion_phrases_severe
+    elseif (org.concussion_headache or 0) >= 0.75 then
+        choices = concussion_phrases_headache
+    elseif effectiveConcussion >= PHOTOPHOBIA_THRESHOLD and math.random() < 0.4 then
+        choices = math.random() < 0.5 and concussion_phrases_photophobia or concussion_phrases_phonophobia
+    elseif (org.concussion_fatigue or 0) >= 0.5 and math.random() < 0.35 then
+        choices = concussion_phrases_fatigue
+    elseif effectiveConcussion >= COGNITIVE_THRESHOLD and math.random() < 0.3 then
+        choices = concussion_phrases_cognitive
+    elseif effectiveConcussion >= 0.8 then
+        choices = concussion_phrases
+    end
+
+    if not choices then return end
+
+    local index = math.random(#choices)
+    if #choices > 1 and choices[index] == org.lastConcussionPhrase then
+        index = index % #choices + 1
+    end
+    org.lastConcussionPhrase = choices[index]
+    return choices[index]
+end
+
 module[1] = function(org)
     org.concussion = 0
     org.concussion_onset = 0
@@ -179,12 +207,9 @@ module[1] = function(org)
     org.nausea_wave_timer = 0
     org.nausea_vomit_count = 0
     org.nextConcussionVomit = 0
-    org.nextConcussionPhrase = 0
+    org.nextConcussionThought = 0
+    org.lastConcussionPhrase = nil
     org.nextDryHeave = 0
-    org.nextCognitivePhrase = 0
-    org.nextSensoryPhrase = 0
-    org.nextHeadachePhrase = 0
-    org.nextFatiguePhrase = 0
     org.concussion_tinnitus = 0
     org.concussion_headache = 0
     org.concussion_fatigue = 0
@@ -313,7 +338,7 @@ module[2] = function(ply, org, timeValue)
                 end
                 org.concussion_loc_timer = 0
                 if org.isPly and IsValid(ply) and ply:IsPlayer() then
-                    ply:Notify("Everything goes black...", 6, "concussion_loc", 0)
+                    ply:Notify("Everything goes black...", 15, "concussion_loc", 0)
                 end
             end
         else
@@ -346,45 +371,14 @@ module[2] = function(ply, org, timeValue)
         end
 
         if org.isPly and not org.otrub and IsValid(ply) and ply:IsPlayer() then
-            if (org.nextConcussionPhrase or 0) < now then
-                local phrase
-                if org.nausea > 1.0 then
-                    phrase = concussion_phrases_vomit[math.random(#concussion_phrases_vomit)]
-                elseif effectiveConcussion > 2.5 then
-                    phrase = concussion_phrases_severe[math.random(#concussion_phrases_severe)]
-                elseif effectiveConcussion > 0.8 then
-                    phrase = concussion_phrases[math.random(#concussion_phrases)]
-                end
+            if (org.nextConcussionThought or 0) < now then
+                local phrase = selectConcussionPhrase(org, effectiveConcussion)
                 if phrase then
-                    ply:Notify(phrase, 5, "concussion_phrase", 0)
-                    local phraseDelay = 10 + math.random(0, 12)
-                    if stage >= 3 then phraseDelay = 6 + math.random(0, 8) end
-                    org.nextConcussionPhrase = now + phraseDelay
+                    ply:Notify(phrase, 5, "concussion_thought", 0)
+                    -- Severe symptoms can recur sooner, but never stack into a
+                    -- constant stream of notifications.
+                    org.nextConcussionThought = now + (stage >= 3 and math.Rand(14, 20) or math.Rand(22, 32))
                 end
-            end
-
-            if effectiveConcussion > COGNITIVE_THRESHOLD and (org.nextCognitivePhrase or 0) < now then
-                ply:Notify(concussion_phrases_cognitive[math.random(#concussion_phrases_cognitive)], 5, "concussion_cognitive", 0)
-                org.nextCognitivePhrase = now + math.Rand(12, 20)
-            end
-
-            if effectiveConcussion > PHOTOPHOBIA_THRESHOLD and (org.nextSensoryPhrase or 0) < now then
-                if math.random() < 0.5 then
-                    ply:Notify(concussion_phrases_photophobia[math.random(#concussion_phrases_photophobia)], 5, "concussion_photophobia", 0)
-                else
-                    ply:Notify(concussion_phrases_phonophobia[math.random(#concussion_phrases_phonophobia)], 5, "concussion_phonophobia", 0)
-                end
-                org.nextSensoryPhrase = now + math.Rand(15, 25)
-            end
-
-            if org.concussion_headache > 0.5 and (org.nextHeadachePhrase or 0) < now then
-                ply:Notify(concussion_phrases_headache[math.random(#concussion_phrases_headache)], 5, "concussion_headache", 0)
-                org.nextHeadachePhrase = now + math.Rand(10, 18)
-            end
-
-            if org.concussion_fatigue > 0.4 and (org.nextFatiguePhrase or 0) < now then
-                ply:Notify(concussion_phrases_fatigue[math.random(#concussion_phrases_fatigue)], 5, "concussion_fatigue", 0)
-                org.nextFatiguePhrase = now + math.Rand(14, 22)
             end
         end
 
@@ -481,7 +475,7 @@ module[2] = function(ply, org, timeValue)
             if stage >= 4 and math.random() < 0.35 then
                 org.vomitInThroat = true
                 if org.isPly and IsValid(ply) and ply:IsPlayer() then
-                    ply:Notify("I'm choking... I can't breathe...", 4, "concussion_choke", 0)
+                    ply:Notify("I'm choking... I can't breathe...", 15, "concussion_choke", 0)
                 end
             end
         end
@@ -497,8 +491,10 @@ module[2] = function(ply, org, timeValue)
             if org.stamina then
                 org.stamina.subadd = (org.stamina.subadd or 0) + VOMIT_STAMINA_DRAIN * 0.4
             end
-            org.nextDryHeave = now + math.Rand(4.0, 8.0)
         end
+        -- A failed roll must still schedule the next check; otherwise it rolls
+        -- every organism tick until it succeeds.
+        org.nextDryHeave = now + math.Rand(16.0, 26.0)
     end
 end
 

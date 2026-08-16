@@ -69,6 +69,14 @@ local function StopHealAnimation(owner)
     local wep = owner.HGMedicalMinigameWeapon
     owner.HGMedicalMinigameWeapon = nil
 
+    local medical = hg and hg.MedicalMinigame
+    if medical and medical.BandageSessions then
+        medical.BandageSessions[owner] = nil
+    end
+    if medical and medical.TourniquetSessions then
+        medical.TourniquetSessions[owner] = nil
+    end
+
     if not IsValid(wep) then return end
     wep.HGMedicalMinigameActive = nil
     wep.HGMedicalMinigameProgress = nil
@@ -316,6 +324,10 @@ hook.Add("OnReloaded", "zcity_delta_patch_med_weps_reload", SchedulePatchRetries
 hook.Add("Think", "zcity_delta_medical_healanim_progress", function()
     for _, owner in player.Iterator() do
         local wep = owner.HGMedicalMinigameWeapon
+        if GetMedicalAnimationType() ~= 1 and wep ~= nil then
+            StopHealAnimation(owner)
+            wep = nil
+        end
         if IsValid(wep) and wep.HGMedicalMinigameActive and owner:GetActiveWeapon() == wep then
             local minigameType = GetMinigameType(wep)
             local animtype = GetMedicalAnimationType()

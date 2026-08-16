@@ -76,7 +76,7 @@ local function emitRandomBoneBreakSound(ent, volume, level)
 	if soundType == 1 then
 		ent:EmitSound(bonefracture_sounds[math.random(#bonefracture_sounds)], volume or 75, math.random(135, 155), level or 1, CHAN_AUTO)
 	elseif soundType == 2 then
-		ent:EmitSound("owfuck" .. math.random(1, 8) .. ".mp3", volume or 75, 100, level or 1, CHAN_AUTO)
+		ent:EmitSound("owfuck" .. math.random(1, 10) .. ".mp3", volume or 75, 100, level or 1, CHAN_AUTO)
 	else
 		ent:EmitSound("newbonebreak/break" .. math.random(10) .. ".wav", volume or 75, math.random(120, 135), level or 1, CHAN_AUTO)
 	end

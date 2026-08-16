@@ -93,6 +93,11 @@ end
 
 local function Trace_Bullet(box, hit, ricochet, impact, org, organs, dmg, dmgInfo, dir)
 	dmg = dmgInfo:GetDamage() / 25
+	-- Expanded wound channels can catch an organ beside the bullet path, but a
+	-- direct intersection remains substantially more damaging.
+	if impact and impact.nearbyOrgan then
+		dmg = dmg * (impact.nearbyDamageMul or 0.45)
+	end
 	local organ = box[6] and organs[box[6]][box[7]]
 	if not organ then return 0 end
 	local name = organ[1]
@@ -1245,6 +1250,14 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local inf = IsValid(dmgInfo:GetInflictor()) and not dmgInfo:GetInflictor():IsPlayer() and dmgInfo:GetInflictor() or (dmgInfo:GetAttacker():IsPlayer() and dmgInfo:GetAttacker():GetActiveWeapon()) or dmgInfo:GetAttacker()
 	inf = IsValid(inf.weapon) and inf.weapon or inf
 	if IsValid(inf) then dmgInfo:SetInflictor(inf) end
+	-- Melee hulls can make a legitimate head contact while their normal points
+	-- through a shoulder or chest.  Unlike bullets, DamageInfo carries no
+	-- hitgroup, so consume the base weapon's one-hit contact record here.
+	local meleeContact = IsValid(inf) and inf.MeleeDamageContact or nil
+	local meleeHeadContact = meleeContact
+		and meleeContact.entity == ent
+		and meleeContact.expires >= CurTime()
+		and meleeContact.head == true
 
 	if dmgInfo:IsDamageType(DMG_BUCKSHOT) then
 		dmgInfo:ScaleDamage(1.35)
@@ -1265,6 +1278,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	
 	local size = 	( bullet ~= nil and bullet.Diameter ) or 
 					( IsValid(inf) and inf.PenetrationSize ) or pen / 50
+	-- Diameter is in millimetres for normal ammunition.  Treat 7.62 mm as the
+	-- baseline, so wider calibres create a wider temporary cavity while small
+	-- rounds need more damage to reach the same nearby-organ risk.
+	local caliber = math.Clamp(tonumber(size) or 7.62, 2, 25)
+	local caliberExpansionMul = math.Clamp(math.sqrt(caliber / 7.62), 0.65, 1.65)
 
 	local maxpen = 	( bullet ~= nil and bullet.MaxPenLen ) or 
 					( IsValid(inf) and inf.MaxPenLen ) or 0
@@ -1371,6 +1389,15 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local entryBone = type(entryPhysicsBone) == "number" and ent:TranslatePhysBoneToBone(entryPhysicsBone) or nil
 	local entryBoneName = entryBone ~= nil and ent:GetBoneName(entryBone) or nil
 	local entryHitgroup = entryBoneName and bonetohitgroup[entryBoneName] or 0
+	if meleeHeadContact then
+		-- The recorded source trace is authoritative over the reconstruction
+		-- above.  A head strike must not be redistributed to the chest/arms.
+		entryHitgroup = HITGROUP_HEAD
+		entryBoneName = "ValveBiped.Bip01_Head1"
+		if type(meleeContact.physicsBone) == "number" then
+			entryPhysicsBone = meleeContact.physicsBone
+		end
+	end
 
 	attacker.harm = dmgInfo:GetDamage() / 100
 	
@@ -1399,6 +1426,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 			initialEnergy = math.max(dmg, 0),
 			energy = math.max(dmg, 0),
 			rawDamage = dmg,
+			-- Damage supplies the energy; calibre controls the cavity's width.
+			-- Together they determine whether a nearby organ is caught.
+			expansionChance = math.Clamp(((dmg - 15) / 110) * caliberExpansionMul, 0.04, 0.72),
+			expansionRadius = math.Clamp(((dmg - 15) / 45) * caliberExpansionMul, 0.2, 2.8),
+			nearbyDamageMul = 0.45,
 			entity = ent,
 			layerIndex = 0,
 		}
@@ -1410,6 +1442,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		-- Only point-blank head shots bypass the normal organ trace.
 		input_list.brain(org, 1, dmg / 25, dmgInfo)
 		org._directBrainDamageThisHit = true
+	elseif meleeHeadContact and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH) then
+		-- Closed-head impacts are resolved by the skull handler below.  Do not
+		-- send the re-traced swing through unrelated torso organ boxes first.
 	elseif dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_CLUB+DMG_GENERIC) then
 		lastPos, hitBoxs, inputHole, outputHole, outputDir, distance, tracePoses = hg.organism.Trace(dmgPos, dir, size, maxpen, boxs, pos, sphere, organs, dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT), Trace_Bullet, impact, ent.organism, organs, dmg / 25, dmgInfo, dir)
 	elseif dmgInfo:IsDamageType(DMG_BLAST) then
@@ -1548,6 +1583,9 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	
 	local bone = tr.Entity == ent and tr.PhysicsBone
+	if meleeHeadContact and type(meleeContact.physicsBone) == "number" then
+		bone = meleeContact.physicsBone
+	end
 	if not bone then
 		local dir = -(dmgPos - (ent:GetPos() + ent:OBBCenter())):GetNormalized()
 		local tr = util.QuickTrace(dmgPos, dir * 100)
@@ -1587,6 +1625,10 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	local len = math.abs(dmgInfo:GetDamageForce():Length())
 
 	local hitgroup, bonename = getDamageHitgroup(ent, bone, dmgPos)
+	if meleeHeadContact then
+		hitgroup = HITGROUP_HEAD
+		bonename = "ValveBiped.Bip01_Head1"
+	end
 	if org.lastGibHitGroup and org.lastGibHitTime and org.lastGibHitTime + 0.1 > CurTime() then
 		hitgroup = org.lastGibHitGroup
 		bonename = hitgroup == HITGROUP_STOMACH and "ValveBiped.Bip01_Pelvis" or bonename

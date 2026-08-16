@@ -538,11 +538,11 @@ local ecgStateLabels = {
     normal_sinus = "SINUS",
     sinus_bradycardia = "SINUS BRADY",
     sinus_tachycardia = "SINUS TACHY",
-    compressed_tachycardia = "NARROW TACHY",
+    compressed_tachycardia = "SVT",
     extreme_tachycardia = "EXTREME TACHY",
     terminal_tachycardia = "VENTRICULAR TACHY",
     atrial_fibrillation = "ATRIAL FIB",
-    ventricular_ectopy = "VENTRICULAR ECTOPY",
+    ventricular_ectopy = "PVCs",
     ventricular_fibrillation = "VENTRICULAR FIB",
     sinus_pause = "SINUS PAUSE",
     junctional_escape = "JUNCTIONAL ESCAPE",
@@ -566,6 +566,7 @@ local function DrawECGVitals(org, x, y, width, alpha)
     local stroke = math.Clamp(tonumber(org.strokeVolume) or 0, 0, 9.99)
     local ecgState = org.ecgState or "normal_sinus"
     local rhythm = ecgStateLabels[ecgState] or string.upper(string.Replace(ecgState, "_", " "))
+    if (tonumber(org.cardiacTamponade) or 0) >= 0.55 then rhythm = rhythm .. " + ALT" end
     local vitalText = string.format("HR %d   BP %d/%d", heartRate, systolic, diastolic)
     local outputText = string.format("CO %.2f   SV %.2f", output, stroke)
     local danger = IsCirculationCritical(org) or IsVentricularFibrillation(org)
@@ -582,6 +583,18 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
     local heartbeat = math.Clamp(tonumber(org.heartbeat) or 0, 0, 300)
     local ecgState = org.ecgState or "normal_sinus"
     local palpitations = tonumber(org.palpitations) or 0
+    local arrhythmia = math.Clamp(tonumber(org.arrhythmia) or 0, 0, 1)
+    local ischemia = math.max(
+        math.Clamp(1 - (tonumber(org.myocardialOxygen) or 1), 0, 1),
+        math.Clamp(tonumber(org.ischemia) or 0, 0, 1)
+    )
+    local hypoxia = math.max(
+        math.Clamp(tonumber(org.hypoxia) or 0, 0, 1),
+        math.Clamp((12 - ((org.o2 and tonumber(org.o2[1])) or 30)) / 12, 0, 1)
+    )
+    local tamponade = math.Clamp(tonumber(org.cardiacTamponade) or 0, 0, 1)
+    local temperature = tonumber(org.temperature) or 36.7
+    local fibrillationFine = math.Clamp((tonumber(org.severeHypoxiaTime) or 0) / 35, 0, 1)
     local time = CurTime()
     if state.lastUpdate == 0 then state.lastUpdate = time end
     local dt = time - state.lastUpdate
@@ -671,8 +684,16 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
 
     local function getVentricularFibrillationH(phase, beatIndex)
         -- Chaotic electrical activity with no pulse-producing QRS complexes.
-        return math.sin((phase * 9 + beatIndex * 0.63) * math.pi * 2) * 0.38
-            + math.sin((phase * 17 + beatIndex * 0.19) * math.pi * 2) * 0.16
+        local amplitude = Lerp(fibrillationFine, 0.54, 0.20)
+        return math.sin((phase * 9 + beatIndex * 0.63) * math.pi * 2) * amplitude
+            + math.sin((phase * 17 + beatIndex * 0.19) * math.pi * 2) * amplitude * 0.42
+    end
+
+    local function getPVCH(phase)
+        if phase < 0.12 or phase > 0.7 then return 0 end
+        local p = (phase - 0.12) / 0.58
+        if p < 0.64 then return math.sin(p / 0.64 * math.pi) * 1.15 end
+        return math.sin((p - 0.64) / 0.36 * math.pi) * 0.42
     end
 
     local function getPalpitationH(phase)
@@ -709,13 +730,20 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         return h
     end
 
-    local function getH(rawPhase)
+    local function getH(rawPhase, tracePos)
         local rhythm = ecgState or "normal_sinus"
-        if rhythm == "asystole" or heartbeat < 1 then return 0 end
+        if rhythm == "asystole" or heartbeat < 1 then
+            return math.sin((tracePos or 0) * math.pi * 15 + time * 0.7) * 0.007
+                + math.sin((tracePos or 0) * math.pi * 33 + time * 0.19) * 0.003
+        end
 
         local phase = rawPhase % 1
         local beatIndex = math.floor(rawPhase)
         local h
+        local pvcStrength = math.max(arrhythmia * 0.7, palpitations * 0.8, ischemia * 0.55, hypoxia * 0.45)
+        local pvcPeriod = math.max(3, math.floor(Lerp(math.Clamp(pvcStrength, 0, 1), 14, 4)))
+        local pvcBeat = pvcStrength >= 0.18 and beatIndex % pvcPeriod == pvcPeriod - 1
+        local compensatoryPause = pvcStrength >= 0.18 and beatIndex % pvcPeriod == 0
 
         if rhythm == "ventricular_fibrillation" then
             h = getVentricularFibrillationH(phase, beatIndex)
@@ -723,8 +751,10 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             h = getAtrialFibrillationH(phase, beatIndex)
         elseif rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia" then
             h = getWideComplexH(phase)
-        elseif rhythm == "ventricular_ectopy" and beatIndex % 4 == 3 then
-            h = getWideComplexH(phase)
+        elseif rhythm == "ventricular_ectopy" and beatIndex % 3 == 2 then
+            h = getPVCH(phase)
+        elseif rhythm == "ventricular_ectopy" and beatIndex % 3 == 0 then
+            h = 0
         elseif rhythm == "junctional_escape" then
             h = getJunctionalH(phase)
         elseif rhythm == "hypothermia_bradycardia" then
@@ -752,6 +782,12 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
             end
         end
 
+        if pvcBeat and rhythm ~= "ventricular_fibrillation" and rhythm ~= "terminal_tachycardia" then
+            h = getPVCH(phase)
+        elseif compensatoryPause and rhythm ~= "ventricular_fibrillation" and rhythm ~= "terminal_tachycardia" then
+            h = 0
+        end
+
         local palpitationK = math.Clamp(tonumber(palpitations) or 0, 0, 1)
 		palpitationK = palpitationK * math.Clamp((heartbeat - 120) / 100, 0, 1)
         if rhythm ~= "asystole" and rhythm ~= "pea" and rhythm ~= "ventricular_fibrillation" and palpitationK > 0 then
@@ -759,7 +795,27 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         end
 
         if rhythm == "pea" then
-            h = getSinusH(phase) * 0.18
+            h = getSinusH(phase) * 0.72
+        end
+
+        if rhythm ~= "ventricular_fibrillation" and rhythm ~= "asystole" then
+            if phase > 0.33 and phase < 0.44 then
+                h = h - ischemia * 0.12
+            elseif phase > 0.45 and phase < 0.65 then
+                h = h - math.sin((phase - 0.45) / 0.2 * math.pi) * ischemia * 0.52
+            end
+
+            local cold = math.Clamp((35 - temperature) / 6, 0, 1)
+            if cold > 0 and phase > 0.33 and phase < 0.42 then
+                h = h + math.sin((phase - 0.33) / 0.09 * math.pi) * cold * 0.23
+            end
+
+            if tamponade >= 0.55 then
+                local qrs = (phase > 0.2 and phase < 0.32)
+                    or ((rhythm == "ventricular_escape" or rhythm == "terminal_tachycardia") and phase > 0.08 and phase < 0.58)
+                    or (rhythm == "hypothermia_bradycardia" and phase > 0.29 and phase < 0.59)
+                if qrs then h = h * (beatIndex % 2 == 0 and 1 or Lerp(tamponade, 1, 0.45)) end
+            end
         end
 
         return h
@@ -773,7 +829,7 @@ local function DrawEKG(state, centerX, centerY, width, height, org, color, ringA
         local p = (oldSweepPos + i) % width
         -- Interpolate heartPhase for this specific pixel
         local p_phase = state.phase - (dt * (heartbeat / 60) * (1 - i/steps))
-        state.points[math.floor(p)] = getH(p_phase)
+        state.points[math.floor(p)] = getH(p_phase, p / width)
     end
 
     -- Clear a small gap ahead of the sweepPos

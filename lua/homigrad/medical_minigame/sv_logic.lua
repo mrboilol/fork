@@ -6,6 +6,12 @@ hg.MedicalMinigame.DislocationSessions = hg.MedicalMinigame.DislocationSessions 
 hg.MedicalMinigame.BandageSessions = hg.MedicalMinigame.BandageSessions or {}
 hg.MedicalMinigame.TourniquetSessions = hg.MedicalMinigame.TourniquetSessions or {}
 
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+
+local function HealingMinigamesEnabled()
+    return hg_healanims:GetBool()
+end
+
 local function GetMedicalMinigameOtherMultiplier(ply, target)
     if not IsValid(ply) or not IsValid(target) or target == ply then return 1 end
     return 0.5
@@ -269,6 +275,7 @@ function hg.MedicalMinigame.StartDislocationMinigame(ply, ent, group)
 end
 
 function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
+    if not HealingMinigamesEnabled() then return false end
     local target = ResolveMinigameTarget(ent) or ply
     if not CanUseMedicalMinigameTarget(ply, target) then return false end
 
@@ -336,6 +343,7 @@ function hg.MedicalMinigame.StartBandageMinigame(ply, ent)
 end
 
 function hg.MedicalMinigame.StartTourniquetMinigame(ply, ent)
+    if not HealingMinigamesEnabled() then return false end
     local target = ResolveMinigameTarget(ent) or ply
     if not CanUseMedicalMinigameTarget(ply, target) then return false end
 
@@ -557,6 +565,7 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
     local minigameType = IsValid(wep) and GetMedicalMinigameType(wep) or nil
 
     if minigameType then
+        if not HealingMinigamesEnabled() then return end
         if minigameType == "bandage" and wep:GetClass() == "weapon_medkit_sh" and wep.mode ~= 1 then return end
         if minigameType == "syringe" and wep:GetClass() == "weapon_medkit_sh" and wep.mode ~= 3 then return end
 
@@ -677,6 +686,14 @@ end)
 net.Receive("hg_medical_minigame_finish", function(len, ply)
     local requestedType = net.ReadString()
     local reportedProgress = math.Clamp(net.ReadFloat() or 0, 0, 1)
+
+    if (requestedType == "bandage" or requestedType == "tourniquet" or requestedType == "syringe") and not HealingMinigamesEnabled() then
+        hook.Run("hg_medical_minigame_ended", ply, requestedType, false)
+        ClearBandageSessionsForPlayer(ply)
+        ClearTourniquetSessionsForPlayer(ply)
+        return
+    end
+
     timer.Simple(0, function()
         if IsValid(ply) then
             hook.Run("hg_medical_minigame_ended", ply, requestedType, true)
@@ -878,6 +895,7 @@ local function ResolveEyeTarget(ply)
 end
 
 local function StartWeaponMinigameFromCommand(ply, requestedType, useTarget)
+    if not HealingMinigamesEnabled() then return end
     if not IsValid(ply) or not ply:Alive() then return end
     if ply.organism and ply.organism.otrub then return end
 

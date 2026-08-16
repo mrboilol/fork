@@ -874,6 +874,26 @@ function hgIsDoor(ent)
 	return (Class == "prop_door") or (Class == "prop_door_rotating") or (Class == "func_door") or (Class == "func_door_rotating")
 end
 
+-- Shared light-impact path for systems which can damage a door without
+-- immediately blasting it apart (ragdoll strikes, body combat, etc.).  The
+-- destructible-door addon owns the actual health/stage work when it is
+-- present; callers can use the return value to decide whether to fall back to
+-- their regular locked-door behaviour.
+function hgDamageDoor(ent, damage, force, attacker)
+	if not IsValid(ent) or not hgIsDoor(ent) or not SDD_DamageDoor then return false end
+
+	local damageInfo = DamageInfo()
+	damageInfo:SetDamage(math.max(tonumber(damage) or 0, 0))
+	damageInfo:SetDamageType(DMG_CLUB)
+	if force then damageInfo:SetDamageForce(force) end
+	if IsValid(attacker) then
+		damageInfo:SetAttacker(attacker)
+		damageInfo:SetInflictor(attacker)
+	end
+
+	return SDD_DamageDoor(ent, damageInfo:GetDamage(), damageInfo) == true
+end
+
 function hgBlastDoors(blaster, pos, power, range, ignoreVisChecks) -- taken from JMod
 	for k, door in pairs(ents.FindInSphere(pos, 40 * power * (range or 1))) do
 		if hgIsDoor(door) and hook.Run("hg_CanDestroyDoor", door, blaster, pos, power, range, ignore) ~= false then

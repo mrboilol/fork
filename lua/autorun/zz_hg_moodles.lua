@@ -401,14 +401,14 @@ local function getMoodle3Icon(effect)
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
 		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", fibrillation = "fibrillation",
-		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "terror", asystole = "heart-failure",
+		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
 		low_blood = "hypotension", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
 		brain_bleed = "terror", intracranial_pressure = "terror",
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
 		respiratory_arrest = "respiratory-arrest", skull = "intercranial-hypertension",
 		dislocated_jaw = "dejawed", organ_damage = effect.icon, spine_break = "fractured",
 		shock = "trauma", seizure = "seizure", internal_bleed = "internal-bleeding",
-		panic = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
+		panic = "trauma", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
 		adrenaline = "adrenaline", zerlked = "drugged",
 		rage = "anger5",
@@ -423,8 +423,8 @@ local function getMoodle3Icon(effect)
 	if effect.name == "consciousness" then name = level == 4 and "unconscious" or level >= 2 and "very-tired" or "tired" end
 	if effect.name == "happy" then name = level == 1 and "happy" or "happy" .. level end
 	if effect.name == "anger" then name = "anger" .. level end
-	if effect.name == "blinded" then name = level >= 3 and "last-stand" or "confused" end
-	if effect.name == "brain_damage" then name = "terror" end
+	if effect.name == "blinded" then name = "confused" end
+	if effect.name == "brain_damage" then name = level == 1 and "brain-damage" or "brain-damage" .. level end
 	if effect.name == "temperature" then
 		name = effect.icon == "veryhot" and "hyperthermia" or effect.icon == "heated" and "hot" or level >= 3 and "hypothermia" or "cold"
 	end
@@ -680,9 +680,9 @@ local function buildEffects(ply, org)
 		if lungL >= 0.8 or lungR >= 0.8 or liver >= 0.8 then combatLevel = 3 end
 		if heart >= 0.8 or trachea >= 0.8 or (lungL >= 0.8 and lungR >= 0.8) then combatLevel = 4 end
 		if heart >= 1 or trachea >= 1 or (lungL >= 1 and lungR >= 1) then combatLevel = 5 end
-		-- Moodle 3 groups damaged lungs and trachea under dyspnea; other damaged
-		-- organs retain the generic combat-trauma ladder.
-		local organIcon = isMoodle3() and (hasRespiratoryOrganDamage and "dyspnea" or "combat" .. combatLevel) or "orangedamage"
+		-- Organ loss is trauma in Moodle 3 as well, including lungs and trachea.
+		-- Reserve dyspnea for the separate breathing-deficit moodle above.
+		local organIcon = isMoodle3() and "combat" .. combatLevel or "orangedamage"
 		add(effects, "organ_damage", organIcon, math.min(combatLevel, 4), "bad", 55)
 	end
 
@@ -723,6 +723,10 @@ local function buildEffects(ply, org)
 	local panic = math.Clamp(orgNumber(org, "panicattack", 0), 0, 1)
 	if panicConVar and panicConVar:GetBool() and (org.panicattackActive == true or panic > 0.1) then
 		add(effects, "panic", "panicmaxxing", org.panicattackActive and 4 or highRank(panic, {0.1, 0.35, 0.6, 0.85}), "bad", 40, math.floor(panic * 100) .. "%")
+	end
+	local fear = math.Clamp(orgNumber(org, "fear", 0), 0, 1)
+	if fear > 0.1 then
+		add(effects, "fear", isMoodle3() and "trauma" or "panicmaxxing", highRank(fear, {0.1, 0.35, 0.6, 0.85}), "bad", 39.5, math.floor(fear * 100) .. "%")
 	end
 
 	local tinnitusTime = math.max(number(ply.tinnitus, 0) - CurTime(), 0)

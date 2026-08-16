@@ -389,8 +389,7 @@ module[2] = function(owner, org, mulTime)
 	-- steep near empty circulation. Pressure can leave the patient barely aware,
 	-- but cerebral oxygen owns unconsciousness and eventual brain injury.
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
-	local rawBlood = tonumber(org.blood) or 5000
-	local blood = hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or rawBlood
+	local blood = math.max(tonumber(org.blood) or 5000, 0)
 	local volumeFraction = math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
 	local volumeLoss = 1 - volumeFraction
 	local symptomaticLoss = math.Clamp((volumeLoss - 0.08) / 0.92, 0, 1)
@@ -398,7 +397,7 @@ module[2] = function(owner, org, mulTime)
 	local decompensation = pressureFailure ^ 1.35
 
 	org.hypovolemia = symptomaticLoss
-	org.hemorrhageCompensation = math.Clamp(volumeLoss / 0.72, 0, 1)
+	org.hemorrhageCompensation = math.Clamp((volumeLoss - 0.04) / 0.68, 0, 1)
 	org.hypovolemicShock = decompensation
 	org.lowBloodTemperatureTarget = 36.7 - volumeLoss ^ 1.4 * 3.2
 	org.disorientation = math.max(org.disorientation or 0, symptomaticLoss ^ 1.25 * 6)

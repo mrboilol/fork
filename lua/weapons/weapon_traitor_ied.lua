@@ -160,10 +160,13 @@ local ExplodeTheItem
 local RemoveAttachedBombVisual
 local MarkIEDDestroyed
 
+function SWEP:SetHold(value)
+	self:SetWeaponHoldType(value)
+	self:SetHoldType(value)
+	self.holdtype = value
+end
+
 function SWEP:ThinkAdd()
-	-- The base weapon only supplies ThinkAdd, so keep the hold-to-plant input
-	-- here instead of relying on PrimaryAttack (which becomes the phone control
-	-- after the IED is armed).
 	if SERVER and not self:GetPlanted() then
 		local owner = self:GetOwner()
 		local left = IsValid(owner) and owner:KeyDown(IN_ATTACK)
@@ -203,6 +206,11 @@ function SWEP:ThinkAdd()
 			MarkIEDDestroyed(self)
 		end
 	end
+end
+
+function SWEP:Think()
+	self:SetHold(self.HoldType)
+	self:ThinkAdd()
 end
 
 function SWEP:GetEyeTrace()

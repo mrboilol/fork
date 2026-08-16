@@ -1,6 +1,56 @@
 --
 local CurTime = CurTime
 util.AddNetworkString("hgwep reload")
+
+SWEP.ArmReloadPenalty = {
+	PainOnReload = 35,
+	MissingRightArmSpeedMul = 0.4,
+	MissingRightArmPain = 55,
+	LeftArmBrokenReloadSlow = 1.5,
+	BrokenArmPickupPain = 20
+}
+
+function SWEP:CanRackWithOneHand()
+	local ply = self:GetOwner()
+	return self:CanRackOrReloadManualAction(ply)
+end
+
+function SWEP:HasRightArmMissing()
+	local ply = self:GetOwner()
+	if not IsValid(ply) or not ply.organism then return false end
+	return ply.organism.rarmamputated
+end
+
+function SWEP:GetReloadArmPenalty()
+	local ply = self:GetOwner()
+	if not IsValid(ply) or not ply.organism then return 0, 1 end
+
+	local org = ply.organism
+	local penalty = self.ArmReloadPenalty or SWEP.ArmReloadPenalty
+	local pain = 0
+	local speedMul = 1
+	local rightArmHealthy = org.rarm and org.rarm < 1 and not org.rarmdislocation and not org.rarmamputated
+	local leftArmBroken = ((org.larm and org.larm > 0) or org.larmdislocation) and not org.larmamputated
+
+	if leftArmBroken then
+		pain = pain + (penalty.PainOnReload or 35) * (org.larm or 0)
+		if org.larmdislocation then pain = pain + 15 end
+	end
+
+	if leftArmBroken and not rightArmHealthy then
+		speedMul = speedMul * (1 + (penalty.LeftArmBrokenReloadSlow or 0.5))
+	end
+
+	if org.rarmamputated and not org.larmamputated then
+		speedMul = speedMul * (penalty.MissingRightArmSpeedMul or 0.4)
+		if leftArmBroken then
+			pain = pain + (penalty.MissingRightArmPain or 55)
+		end
+	end
+
+	return pain, speedMul
+end
+
 function SWEP:Reload(time)
 	if self.reload then return end
 	if IsValid(self:GetOwner().FakeRagdoll) and self:GetOwner().FakeRagdoll.ConsLH then return end

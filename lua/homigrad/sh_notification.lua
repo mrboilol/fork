@@ -100,7 +100,7 @@ if CLIENT then
 	surface.CreateFont("HuyFont", {
 		font = "BudgetLabel",
 		extended = true,
-		size = ScreenScale(9),
+		size = ScreenScale(8),
 		weight = 0,
 		blursize = 0,
 		scanlines = 0,

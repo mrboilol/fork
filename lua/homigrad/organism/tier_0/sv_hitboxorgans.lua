@@ -18,10 +18,18 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 	tracePos:Set(pos)
 
 	local hitBoxs = {}
+	local nearbyAttempts = {}
 	local tracePoses = {}
 	local inputHole, outputHole = {}, {}
 	local inBody, hitSomething
 	local box
+	-- Ballistic impacts may expand their effective wound channel.  This is kept
+	-- in the server-side trace so a near miss can only affect real organ boxes,
+	-- never the model hitboxes used to enter the body.
+	local expansionRadius = impact and impact.expansionRadius or 0
+	local expansionChance = impact and impact.expansionChance or 0
+	local nearbyDamageMul = impact and impact.nearbyDamageMul or 1
+	local expansion = expansionRadius > 0 and Vector(expansionRadius, expansionRadius, expansionRadius) or nil
 
 	local distance = math_ceil(dir:Length())
 	distance = math.Clamp(distance, 0, 512)
@@ -39,6 +47,7 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 
 		local frac = 1
 		local iHit, normal, hit
+		local impactNearby = false
 		local segDir = dir * segLen
 
 		for i = 1, #boxs do
@@ -48,12 +57,24 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 			if not organs[box[6]] then continue end
 
 			local hit_, normal_, frac_ = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3], box[4])
+			local nearby = false
+			if not hit_ and expansion and box[6] and not nearbyAttempts[i] then
+				local expandedHit, expandedNormal, expandedFrac = util_IntersectRayWithOBB(tracePos, segDir, box[1], box[2], box[3] - expansion, box[4] + expansion)
+				if expandedHit then
+					nearbyAttempts[i] = true
+					if math.Rand(0, 1) < expansionChance then
+						hit_, normal_, frac_ = expandedHit, expandedNormal, expandedFrac
+						nearby = true
+					end
+				end
+			end
 
 			if hit_ and frac_ < frac then
 				iHit = i
 				frac = frac_
 				normal = normal_
 				hit = tracePos + segDir * frac_
+				impactNearby = nearby
 			end
 		end
 
@@ -71,6 +92,8 @@ function hg.organism.Trace(pos, dir, size, maxpen, boxs, center, endDis, organs,
 				impact.normal = normal
 				impact.penetrationBefore = distance
 				impact.energyBefore = impact.energy
+				impact.nearbyOrgan = impactNearby or false
+				impact.nearbyDamageMul = nearbyDamageMul
 				dirSub = funcInput(box, tracePos, false, impact, ...)
 			else
 				dirSub = funcInput(box, tracePos, false, impact, ...)

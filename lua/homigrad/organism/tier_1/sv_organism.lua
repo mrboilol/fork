@@ -128,11 +128,11 @@ local seizure_temperature_gain_mul = 0.0065
 local seizure_temperature_cold_gain_mul = 0.005
 local seizure_temperature_low_start = 35
 local seizure_temperature_high_start = 39
-local seizure_brain_sustained_gain_min = 0.0008
-local seizure_brain_sustained_gain_max = 0.012
-local seizure_brain_roll_delay = 16
-local seizure_brain_roll_min_chance = 2
-local seizure_brain_roll_max_chance = 30
+local seizure_brain_sustained_gain_min = 0.004
+local seizure_brain_sustained_gain_max = 0.075
+local seizure_brain_roll_delay = 8
+local seizure_brain_roll_min_chance = 5
+local seizure_brain_roll_max_chance = 55
 local seizure_no_cause_decay_time = 90
 local seizure_mannitol_gain_reduction = 0.5
 local seizure_mannitol_recovery_bonus = 1
@@ -737,6 +737,10 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	if anoxicBrainSeverity > 0 and (org.severeHypoxiaTime or 0) > 3 * delayMul then
 		org.brain = math.min((org.brain or 0) + dt * anoxicBrainSeverity ^ 2 * 0.025, 1)
 	end
+	local drugNeurotoxicity = math.Clamp(((org.drugRespiratoryDepression or 0) - 0.35) / 0.65, 0, 1)
+	if drugNeurotoxicity > 0 then
+		org.brain = math.min((org.brain or 0) + dt * drugNeurotoxicity ^ 2 * 0.0015, 1)
+	end
 end
 
 local advancedBrainAfflictions = {
@@ -837,6 +841,7 @@ local function send_organism(org, ply)
 	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.strokeVolume = org.strokeVolume
 	sendtable.arrhythmia = org.arrhythmia
+	sendtable.palpitations = org.palpitations
 	sendtable.fibrillation = org.fibrillation
 	sendtable.myocardialOxygen = org.myocardialOxygen
 	sendtable.heartStrain = org.heartStrain
@@ -964,6 +969,7 @@ local function send_bareinfo(org)
 	sendtable.cardiacOutput = org.cardiacOutput
 	sendtable.strokeVolume = org.strokeVolume
 	sendtable.arrhythmia = org.arrhythmia
+	sendtable.palpitations = org.palpitations
 	sendtable.fibrillation = org.fibrillation
 	sendtable.myocardialOxygen = org.myocardialOxygen
 	sendtable.heartStrain = org.heartStrain
@@ -998,6 +1004,7 @@ local function send_bareinfo(org)
 	sendtable.throatcut = org.throatcut
 	sendtable.throatCutUntil = org.throatCutUntil
 	sendtable.throatCutSeverity = org.throatCutSeverity
+	sendtable.temperature = org.temperature
 	sendtable.analgesia = org.analgesia
 	sendtable.o2 = org.o2
 	sendtable.losing_oxy = org.losing_oxy
