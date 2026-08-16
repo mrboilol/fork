@@ -444,9 +444,7 @@ module[2] = function(owner, org, timeValue)
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
 	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
-	-- Oxygen-carrying capacity is calculated directly from raw circulating
-	-- volume and reaches zero only with zero blood.
-	local bloodO2Cap = o2.range * hg.organism.GetBloodDeliveryFraction(rawBlood, 0.5)
+	local bloodO2Cap = o2.range * hg.organism.GetBloodDeliveryFraction(rawBlood, 0.75)
 	org.bloodO2Cap = bloodO2Cap
 
 	local bodyTemperature = org.temperature or 36.7
@@ -940,12 +938,25 @@ module[2] = function(owner, org, timeValue)
 	-- in cardiac output used to instantly delete O2 here, which made players
 	-- pass out far too often. Intake is still capped above; an existing reserve
 	-- now drains at a rate proportional to the actual delivery failure.
-	local deliveryO2Cap = min(bloodO2Cap, perfusionO2Cap, exertionO2Cap)
+	local pulseValue = math.max(tonumber(org.pulse) or 70, 0)
+	local pulseO2K = pulseValue >= 60 and 1 or math.Clamp((pulseValue - 15) / 45, 0.05, 1)
+	local pulseO2Cap = o2.range * pulseO2K
+	local deliveryO2Cap = min(bloodO2Cap, pulseO2Cap, perfusionO2Cap, exertionO2Cap)
 	if o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
 		local deliveryResponse = 1 - math.exp(-timeValue * (0.16 + deliveryFailure * 0.45))
 		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse
 	end
+
+	local lowBloodO2Stress = math.Clamp((3000 - rawBlood) / 1250, 0, 1)
+	local activeBleedO2Stress = math.Clamp((org.bleed or 0) / 0.18, 0, 1)
+	local lowPulseO2Stress = math.Clamp((55 - pulseValue) / 40, 0, 1)
+	local circulatoryO2Drain = timeValue * (
+		lowBloodO2Stress ^ 1.2 * 0.28
+		+ activeBleedO2Stress ^ 1.15 * 0.18
+		+ lowPulseO2Stress ^ 1.2 * 0.42
+	)
+	o2[1] = math.max(o2[1] - circulatoryO2Drain, 0)
 
 	o2[1] = math.Clamp(o2[1], 0, o2.range)
 	if org.heartstop then

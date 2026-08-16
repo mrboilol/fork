@@ -694,7 +694,7 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 	local brainTraumaApplied = false
 	if bluntBrainDamage > 0 then
 		if isBluntBrainImpact(dmgInfo) and hg.organism.ApplyBluntBrainTrauma then
-			brainGain = hg.organism.ApplyBluntBrainTrauma(org, bluntBrainDamage, dmgInfo, 0.5)
+			brainGain = hg.organism.ApplyBluntBrainTrauma(org, bluntBrainDamage, dmgInfo, 0.85)
 			brainTraumaApplied = true
 		else
 			local brainBefore = org.brain or 0

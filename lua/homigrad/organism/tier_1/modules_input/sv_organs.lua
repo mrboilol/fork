@@ -309,10 +309,10 @@ input_list.intestines = function(org, bone, dmg, dmgInfo)
 end
 
 local brainLobeProfiles = {
-	brainFrontal = {brain = 0.8, consciousness = 1.2, disorientation = 1.5, shock = 2, pain = 7, hemorrhage = 0.6},
-	brainParietal = {brain = 0.7, consciousness = 1.4, disorientation = 2.2, shock = 2.5, pain = 8, hemorrhage = 0.7},
-	brainTemporal = {brain = 0.9, consciousness = 1.1, disorientation = 1.3, shock = 2.5, pain = 8, hemorrhage = 0.9},
-	brainOccipital = {brain = 0.75, consciousness = 1.3, disorientation = 1.1, shock = 2, pain = 7, hemorrhage = 0.75}
+	brainFrontal = {brain = 0.13, consciousness = 1.2, disorientation = 1.5, shock = 2, pain = 7, hemorrhage = 0.6},
+	brainParietal = {brain = 0.12, consciousness = 1.4, disorientation = 2.2, shock = 2.5, pain = 8, hemorrhage = 0.7},
+	brainTemporal = {brain = 0.15, consciousness = 1.1, disorientation = 1.3, shock = 2.5, pain = 8, hemorrhage = 0.9},
+	brainOccipital = {brain = 0.10, consciousness = 1.3, disorientation = 1.1, shock = 2, pain = 7, hemorrhage = 0.75}
 }
 
 local brainLobeKeys = {
@@ -327,7 +327,10 @@ local function isBluntBrainDamage(dmgInfo)
 end
 
 local function getBrainLobeDamage(org)
-	return math.min(org.brainFrontal or 0, 0.2) + math.min(org.brainParietal or 0, 0.2) + math.min(org.brainTemporal or 0, 0.2) + math.min(org.brainOccipital or 0, 0.2)
+	return math.Clamp(org.brainFrontal or 0, 0, 1) * brainLobeProfiles.brainFrontal.brain
+		+ math.Clamp(org.brainParietal or 0, 0, 1) * brainLobeProfiles.brainParietal.brain
+		+ math.Clamp(org.brainTemporal or 0, 0, 1) * brainLobeProfiles.brainTemporal.brain
+		+ math.Clamp(org.brainOccipital or 0, 0, 1) * brainLobeProfiles.brainOccipital.brain
 end
 
 local function addBrainHemorrhage(org, amount, rate)
@@ -418,7 +421,7 @@ local function damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	local result = damageOrgan(org, dmg, dmgInfo, key)
 	local delta = (org[key] or 0) - oldDmg
 
-	org.brain = math.min((org.brain or 0) + (getBrainLobeDamage(org) - oldBrainLobeDamage) * 1.5, 1)
+	org.brain = math.min((org.brain or 0) + math.max(getBrainLobeDamage(org) - oldBrainLobeDamage, 0), 1)
 	org.consciousness = math.Approach(org.consciousness, 0, delta * profile.consciousness)
 	org.disorientation = org.disorientation + delta * profile.disorientation
 	org.shock = org.shock + dmg * profile.shock
@@ -456,14 +459,14 @@ local function applyBluntBrainTrauma(org, amount, dmgInfo, regionalChance)
 	amount = math.max(amount or 0, 0)
 	if amount <= 0 then return 0 end
 
-	if math.Rand(0, 1) <= (regionalChance or 0.5) then
+	if math.Rand(0, 1) <= (regionalChance or 0.85) then
 		local key = brainLobeKeys[math.random(#brainLobeKeys)]
 		local oldLobeDamage = getBrainLobeDamage(org)
 		local oldDmg = org[key] or 0
 		org[key] = math.min(oldDmg + amount, 1)
 		local delta = (org[key] or 0) - oldDmg
 
-		org.brain = math.min((org.brain or 0) + getBrainLobeDamage(org) - oldLobeDamage, 1)
+		org.brain = math.min((org.brain or 0) + math.max(getBrainLobeDamage(org) - oldLobeDamage, 0), 1)
 		applyBrainTraumaEffects(org, delta, dmgInfo, brainLobeProfiles[key])
 
 		if key == "brainTemporal" and delta > 0.02 and math.random(2) == 1 and IsValid(org.owner) and org.owner.AddTinnitus then
@@ -487,7 +490,9 @@ input_list.brainParietal = function(org, bone, dmg, dmgInfo) return damageBrainL
 input_list.brainTemporal = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainTemporal") end
 input_list.brainOccipital = function(org, bone, dmg, dmgInfo) return damageBrainLobe(org, bone, dmg, dmgInfo, "brainOccipital") end
 input_list.brain = function(org, bone, dmg, dmgInfo)
-	if isBluntBrainDamage(dmgInfo) and math.random(2) == 1 then
+	local lobeChance = isBluntBrainDamage(dmgInfo) and 0.85
+		or dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT) and 0.08
+	if lobeChance and math.Rand(0, 1) <= lobeChance then
 		local key = brainLobeKeys[math.random(#brainLobeKeys)]
 		return damageBrainLobe(org, bone, dmg, dmgInfo, key)
 	end

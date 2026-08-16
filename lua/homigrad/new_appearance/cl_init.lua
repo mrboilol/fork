@@ -125,7 +125,7 @@ function RenderAccessories(ply, accessories, setup)
 		return
 	end
 
-	if not ent.shouldTransmit or ent.NotSeen then
+	if ent.shouldTransmit == false or ent.NotSeen then
 		ClearAccessoryModels(ent)
 		return
 	end
@@ -225,7 +225,7 @@ function DrawAccesories(ply, ent, accessories,accessData, islply, force, setup)
 		return
 	end
 
-	if not force and ((ent.NotSeen or not ent.shouldTransmit) or (ply:IsPlayer() and not ply:Alive())) then
+	if not force and ((ent.NotSeen or ent.shouldTransmit == false) or (ply:IsPlayer() and not ply:Alive())) then
 
 		return
 	end
@@ -452,7 +452,7 @@ function CoolRenderAccessories(ply, accessories)
 		return
 	end
 
-	if not ent.shouldTransmit or ent.NotSeen then
+	if ent.shouldTransmit == false or ent.NotSeen then
 		if not ent.modelAccess then return end
 		for k,v in ipairs(ent.modelAccess) do
 			if IsValid(v) then

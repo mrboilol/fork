@@ -3,36 +3,21 @@
 if SERVER then
 	AddCSLuaFile()
 
-	local files = file.Find("materials/vgui/hud/moodels 2/*.png", "GAME")
-	for _, name in ipairs(files) do
-		resource.AddFile("materials/vgui/hud/moodels 2/" .. name)
-	end
 	local moodle3Files = file.Find("materials/vgui/hud/moodles 3/*.png", "GAME")
 	for _, name in ipairs(moodle3Files) do
 		resource.AddFile("materials/vgui/hud/moodles 3/" .. name)
 	end
 
-	-- 0 = legacy HUD, 1 = current custom HUD, 2 = Moodle 3.
-	CreateConVar("hg_moodletype", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY}, "Server-wide moodle style: 0 legacy, 1 custom, 2 Moodle 3", 0, 2)
+	local moodleType = CreateConVar("hg_moodletype", "2", {FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY}, "Moodle 3 moodles", 2, 2)
+	if moodleType:GetInt() ~= 2 then moodleType:SetInt(2) end
 
 	return
 end
 
-local moodleType = GetConVar("hg_moodletype")
-local function getMoodleType()
-	moodleType = moodleType or GetConVar("hg_moodletype")
-	return math.Clamp(moodleType and moodleType:GetInt() or 1, 0, 2)
-end
-local function isMoodle3() return getMoodleType() == 2 end
+HGCustomMoodlesActive = true
 
--- zb_health_hud.lua reads this every frame. Keep its original moodles alive
--- only when the server has selected type 0.
-HGCustomMoodlesActive = getMoodleType() ~= 0
-
-local ROOT = "vgui/hud/moodels 2/"
 local enabled = CreateClientConVar("hg_moodles_enabled", "1", true, false, "Show Homigrad moodles")
-local backgrounds = {good = {}, bad = {}}
-local icons, moodle3Icons, appearances, lastLevels = {}, {}, {}, {}
+local moodle3Icons, appearances, lastLevels = {}, {}, {}
 local moodlePositions = {}
 local hover = {index = nil, scale = 1}
 
@@ -367,24 +352,6 @@ local moodleTexts = {
 		[4] = {title = "Fully Armored", description = "Two or more major armor pieces provide excellent protection."},
 	}},
 }
-local function loadMaterial(name)
-	local mat = Material(ROOT .. name .. ".png", "smooth")
-	return mat and not mat:IsError() and mat or nil
-end
-
-local function loadMaterials()
-	if backgrounds.good[1] then return end
-	for level = 1, 4 do
-		backgrounds.good[level] = loadMaterial("good" .. level)
-		backgrounds.bad[level] = loadMaterial("bad" .. level)
-	end
-end
-
-local function getIcon(name)
-	if icons[name] == nil then icons[name] = loadMaterial(name) or false end
-	return icons[name] or nil
-end
-
 local function getMoodle3Material(name)
 	if moodle3Icons[name] == nil then
 		local mat = Material("vgui/hud/moodles 3/" .. name .. ".png", "smooth")
@@ -395,7 +362,8 @@ end
 
 -- Moodle 3 has purpose-made medical symbols. The effects themselves remain
 -- shared with the existing renderer, which keeps every threshold in one place.
-local function getMoodle3Icon(effect)
+local function getMoodle3IconName(effect)
+	if effect.moodle3Icon then return effect.moodle3Icon end
 	local level = effect.level or 1
 	local names = {
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
@@ -410,13 +378,13 @@ local function getMoodle3Icon(effect)
 		shock = "trauma", seizure = "seizure", internal_bleed = "internal-bleeding",
 		panic = "trauma", fear = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
-		adrenaline = "adrenaline", zerlked = "drugged",
+		adrenaline = "adrenaline", zerlked = "zerlked",
 		rage = "anger5",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
 	}
 	local name = names[effect.name]
 	if effect.name == "burning" then
-		return getMoodle3Material("burning") or getMoodle3Material("hyperthermia")
+		return getMoodle3Material("burning") and "burning" or "hyperthermia"
 	end
 	if effect.name == "pain" then name = level == 4 and "agony" or level == 3 and "extreme-pain" or "pain" end
 	if effect.name == "tired" then name = level >= 3 and "very-tired" or "tired" end
@@ -428,7 +396,54 @@ local function getMoodle3Icon(effect)
 	if effect.name == "temperature" then
 		name = effect.icon == "veryhot" and "hyperthermia" or effect.icon == "heated" and "hot" or level >= 3 and "hypothermia" or "cold"
 	end
+	return name
+end
+
+local function getMoodle3Icon(effect)
+	local name = getMoodle3IconName(effect)
 	return name and getMoodle3Material(name) or nil
+end
+
+local sharedMoodle3Texts = {
+	terror = {levels = {
+		[1] = {title = "Neurological Distress", description = "Something is wrong with your brain, but the cause is unclear."},
+		[2] = {title = "Brain Dysfunction", description = "A problem inside your skull is affecting normal brain function."},
+		[3] = {title = "Severe Brain Dysfunction", description = "Your brain is under serious strain and your condition is worsening."},
+		[4] = {title = "Critical Brain Dysfunction", description = "Your brain is failing and vital functions are in danger."},
+	}},
+	trauma = {levels = {
+		[1] = {title = "Distress", description = "Your body is under strain and something is affecting your welfare."},
+		[2] = {title = "Severe Distress", description = "Your body is struggling with a serious condition."},
+		[3] = {title = "Critical Distress", description = "A serious condition is rapidly worsening your overall state."},
+		[4] = {title = "Extreme Distress", description = "Your body is in extreme danger and vital functions are failing."},
+	}},
+	default = {levels = {
+		[1] = {title = "Multiple Conditions", description = "More than one condition is affecting your welfare."},
+		[2] = {title = "Worsening Condition", description = "Several conditions are beginning to impair your body."},
+		[3] = {title = "Severe Condition", description = "Multiple serious conditions are impairing your body."},
+		[4] = {title = "Critical Condition", description = "Multiple critical conditions are threatening your life."},
+	}},
+}
+
+local function mergeMoodle3Effects(effects)
+	local result, byIcon = {}, {}
+	for _, effect in ipairs(effects) do
+		local iconName = getMoodle3IconName(effect)
+		local current = iconName and byIcon[iconName] or nil
+		if not current then
+			effect.moodle3Icon = iconName
+			if iconName then byIcon[iconName] = effect end
+			result[#result + 1] = effect
+		else
+			current.name = "moodle3_shared_" .. string.gsub(iconName, "[^%w_]", "_")
+			current.level = math.max(current.level, effect.level)
+			current.priority = math.min(current.priority, effect.priority)
+			if current.mood == "bad" or effect.mood == "bad" then current.mood = "bad" end
+			current.value = nil
+			current.sharedMoodle3Text = sharedMoodle3Texts[iconName] or sharedMoodle3Texts.default
+		end
+	end
+	return result
 end
 
 local function number(value, fallback) return isnumber(value) and value or (fallback or 0) end
@@ -527,7 +542,7 @@ local function buildEffects(ply, org)
 		local staminaFraction = math.Clamp(number(stamina[1], staminaMax) / math.max(staminaMax, 1), 0, 1)
 		-- Moodle 3 uses one slot for fitness and exertion. Low current stamina
 		-- replaces the fitness state instead of displaying a duplicate icon.
-		local showFitness = not isMoodle3() or staminaFraction >= 0.75
+		local showFitness = staminaFraction >= 0.75
 		if showFitness and staminaMax >= 200 then
 			add(effects, "stamina", "stamina", math.Clamp(math.floor((staminaMax - 200) / 100 * 3 + 1.001), 1, 4), "good", 12, math.floor(staminaMax))
 		elseif showFitness and staminaMax < 160 then
@@ -538,21 +553,19 @@ local function buildEffects(ply, org)
 			local level = lowRank(staminaFraction, {0.75, 0.5, 0.25, 0.1})
 			-- Moodle 3 reserves tired/very-tired for consciousness. Exertion shows
 			-- actual stamina depletion in place of the fitness moodle.
-			add(effects, isMoodle3() and "exertion" or "tired", isMoodle3() and "exertion" or "tired", level, "bad", 13, math.floor(staminaFraction * 100) .. "%")
+			add(effects, "exertion", "exertion", level, "bad", 13, math.floor(staminaFraction * 100) .. "%")
 		end
 	end
 
 	local goodmood = math.Clamp(orgNumber(org, "goodmood", 0), 0, 1)
 	if goodmood > 0 then add(effects, "happy", "happy", math.ceil(goodmood * 4), "good", 15, math.floor(goodmood * 100) .. "%") end
 	if org.berserkActive2 == true then add(effects, "rage", "rage", 4, "bad", -90) end
-	if isMoodle3() then
-		local hungry = math.Clamp(orgNumber(org, "hungry", 0), 0, 100)
-		local satiety = math.Clamp(orgNumber(org, "satiety", 0), 0, 100)
-		if hungry > 10 then
-			add(effects, "hunger", "hunger", highRank(hungry, {10, 30, 55, 75}), "bad", 17, math.floor(hungry) .. "%")
-		elseif satiety >= 80 then
-			add(effects, "full", "full", satiety >= 95 and 2 or 1, "good", 17, math.floor(satiety) .. "%")
-		end
+	local hungry = math.Clamp(orgNumber(org, "hungry", 0), 0, 100)
+	local satiety = math.Clamp(orgNumber(org, "satiety", 0), 0, 100)
+	if hungry > 10 then
+		add(effects, "hunger", "hunger", highRank(hungry, {10, 30, 55, 75}), "bad", 17, math.floor(hungry) .. "%")
+	elseif satiety >= 80 then
+		add(effects, "full", "full", satiety >= 95 and 2 or 1, "good", 17, math.floor(satiety) .. "%")
 	end
 
 	local bleed = orgNumber(org, "bleed", 0)
@@ -599,12 +612,10 @@ local function buildEffects(ply, org)
 		local level = oxygen < 8 and 4 or oxygen < 14 and 3 or oxygen < 23 and 2 or 1
 		add(effects, "hypoxemia", "hypoxemia", level, "bad", 26, math.floor(oxygen))
 	end
-	if isMoodle3() then
-		local brainOxygen = math.Clamp(orgNumber(org, "brainoxygen", 1), 0, 1)
-		local hypoxiaTime = orgNumber(org, "hypoxiaTime", 0)
-		if brainOxygen < 0.55 and hypoxiaTime > 2 then
-			add(effects, "brain_hypoxia", "hypoxemia", lowRank(brainOxygen, {0.55, 0.42, 0.28, 0.15}), "bad", 26.5, math.floor(brainOxygen * 100) .. "%")
-		end
+	local brainOxygen = math.Clamp(orgNumber(org, "brainoxygen", 1), 0, 1)
+	local hypoxiaTime = orgNumber(org, "hypoxiaTime", 0)
+	if brainOxygen < 0.55 and hypoxiaTime > 2 then
+		add(effects, "brain_hypoxia", "hypoxemia", lowRank(brainOxygen, {0.55, 0.42, 0.28, 0.15}), "bad", 26.5, math.floor(brainOxygen * 100) .. "%")
 	end
 	if org.heartstop == true then add(effects, "asystole", "asystole", 4, "bad", -100) end
 
@@ -682,7 +693,7 @@ local function buildEffects(ply, org)
 		if heart >= 1 or trachea >= 1 or (lungL >= 1 and lungR >= 1) then combatLevel = 5 end
 		-- Organ loss is trauma in Moodle 3 as well, including lungs and trachea.
 		-- Reserve dyspnea for the separate breathing-deficit moodle above.
-		local organIcon = isMoodle3() and "combat" .. combatLevel or "orangedamage"
+		local organIcon = "combat" .. combatLevel
 		add(effects, "organ_damage", organIcon, math.min(combatLevel, 4), "bad", 55)
 	end
 
@@ -726,7 +737,7 @@ local function buildEffects(ply, org)
 	end
 	local fear = math.Clamp(orgNumber(org, "fear", 0), 0, 1)
 	if fear > 0.1 then
-		add(effects, "fear", isMoodle3() and "trauma" or "panicmaxxing", highRank(fear, {0.1, 0.35, 0.6, 0.85}), "bad", 39.5, math.floor(fear * 100) .. "%")
+		add(effects, "fear", "trauma", highRank(fear, {0.1, 0.35, 0.6, 0.85}), "bad", 39.5, math.floor(fear * 100) .. "%")
 	end
 
 	local tinnitusTime = math.max(number(ply.tinnitus, 0) - CurTime(), 0)
@@ -759,10 +770,10 @@ local function buildEffects(ply, org)
 	if concussion > 0.1 then add(effects, "concussion", "concussion", highRank(concussion, {0.1, 0.25, 0.5, 0.75}), "bad", 44, math.floor(concussion * 100) .. "%") end
 	local brain = orgNumber(org, "brain", 0)
 	if brain > 0.01 then
-		if isMoodle3() and brain >= 0.35 then
+		if brain >= 0.35 then
 			add(effects, "brain_dying", "dranbamage", 4, "bad", -85, math.floor(brain * 100) .. "%")
 		else
-			local level = isMoodle3() and highRank(brain, {0.01, 0.1, 0.18, 0.25}) or highRank(brain, {0.01, 0.1, 0.25, 0.4})
+			local level = highRank(brain, {0.01, 0.1, 0.18, 0.25})
 			add(effects, "brain_damage", "dranbamage", level, "bad", 45, math.floor(brain * 100) .. "%")
 		end
 	end
@@ -812,7 +823,7 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	local rageActive = effect.name == "rage"
 	local tooltipMood = effect.mood
 	local tooltipLevel = effect.level
-	local textData = moodleTexts[effect.name] or {}
+	local textData = effect.sharedMoodle3Text or moodleTexts[effect.name] or {}
 	local textLevels = textData[tooltipMood] or textData.levels
 	local levelText = rageActive and textData.fixed or textLevels and textLevels[tooltipLevel] or nil
 	local title = levelText and levelText.title or effect.name
@@ -876,25 +887,6 @@ local function drawTooltip(effect, pos, mx, my, berserkActive)
 	end
 end
 
-local function drawSevereBeam(x, y, size, intensity, alpha)
-	local beamHeight = size * 3.2
-	local beamWidth = size * 0.88
-	local beamX = x + (size - beamWidth) * 0.5
-	local beamTop = y + size - beamHeight
-	local slices = 18
-	local pulse = 0.82 + math.abs(math.sin(CurTime() * 3.5)) * 0.18
-	intensity = math.Clamp(intensity or 1, 0.35, 1)
-
-	for slice = 0, slices - 1 do
-		local t = slice / (slices - 1)
-		local sliceY = beamTop + beamHeight * t
-		local sliceH = beamHeight / slices + 1
-		local sliceAlpha = (3 + t * t * (24 + 46 * intensity)) * pulse * alpha * intensity
-		surface.SetDrawColor(255, 20, 12, sliceAlpha)
-		surface.DrawRect(beamX, sliceY, beamWidth, sliceH)
-	end
-end
-
 local function drawMoodle3Severity(x, y, size, effect, age)
 	local exempt = effect.name == "full" or effect.name == "happy"
 	local severe = not exempt and effect.level >= 3
@@ -940,12 +932,6 @@ local function getBerserkBeatPulse()
 end
 
 local function drawMoodles()
-	local type = getMoodleType()
-	HGCustomMoodlesActive = type ~= 0
-	if type == 0 then
-		clearMoodleDrawState()
-		return
-	end
 	if not enabled:GetBool() or (HUD and HUD.enabled == false) then
 		clearMoodleDrawState()
 		return
@@ -958,17 +944,15 @@ local function drawMoodles()
 	end
 	if not ply:Alive() then
 		clearMoodleDrawState()
-		if type == 2 then
-			local size = HUD and HUD.status_effects_size or 62
-			local x, y = math.max(12, ScrH() * 0.015), ScrH() - math.max(12, ScrH() * 0.015) - size
-			local deceased = {name = "deceased", level = 4, mood = "bad"}
-			drawMoodle3Severity(x, y, size, deceased, 1)
-			local icon = getMoodle3Material("deceased")
-			if icon then
-				surface.SetMaterial(icon)
-				surface.SetDrawColor(255, 255, 255, 255)
-				surface.DrawTexturedRect(x + 2, y + 2, size - 4, size - 4)
-			end
+		local size = HUD and HUD.status_effects_size or 62
+		local x, y = math.max(12, ScrH() * 0.015), ScrH() - math.max(12, ScrH() * 0.015) - size
+		local deceased = {name = "deceased", level = 4, mood = "bad"}
+		drawMoodle3Severity(x, y, size, deceased, 1)
+		local icon = getMoodle3Material("deceased")
+		if icon then
+			surface.SetMaterial(icon)
+			surface.SetDrawColor(255, 255, 255, 255)
+			surface.DrawTexturedRect(x + 2, y + 2, size - 4, size - 4)
 		end
 		return
 	end
@@ -980,17 +964,14 @@ local function drawMoodles()
 	end
 
 	local berserkActive = org.berserkActive2 == true
-	if type == 1 then loadMaterials() end
 	local effects, now = buildEffects(ply, org), CurTime()
-	if type == 2 then
-		-- Moodle 3 deliberately has no catch-all icon. Do not leave empty slots
-		-- for conditions that do not have a meaningful Moodle 3 representation.
-		local supported = {}
-		for _, effect in ipairs(effects) do
-			if effect.name == "rage" or getMoodle3Icon(effect) then supported[#supported + 1] = effect end
-		end
-		effects = supported
+	-- Moodle 3 deliberately has no catch-all icon. Do not leave empty slots
+	-- for conditions that do not have a meaningful Moodle 3 representation.
+	local supported = {}
+	for _, effect in ipairs(effects) do
+		if effect.name == "rage" or getMoodle3Icon(effect) then supported[#supported + 1] = effect end
 	end
+	effects = mergeMoodle3Effects(supported)
 	table.sort(effects, function(a, b)
 		local aScore = (a.mood == "bad" and 100 or 0) + (a.level or 0) * 10
 		local bScore = (b.mood == "bad" and 100 or 0) + (b.level or 0) * 10
@@ -1018,7 +999,7 @@ local function drawMoodles()
 	local nextX = edgeMargin
 	local rightEdge = ScrW() - edgeMargin
 	for index, effect in ipairs(effects) do
-		local effectSize = effect.name == "rage" and type == 1 and baseSize * 2 or baseSize
+		local effectSize = baseSize
 		if nextX + effectSize > rightEdge and #rawPositions > 0 then break end
 		rawPositions[#rawPositions + 1] = {
 			x = nextX,
@@ -1066,7 +1047,6 @@ local function drawMoodles()
 	for index, pos in ipairs(rawPositions) do
 		local effect = pos.effect
 		local size = pos.size
-		local stableRage = effect.name == "rage"
 		-- Rage is also a moodle: let it receive the berserk crack/distortion
 		-- treatment so the effect remains visible even when it is the only one.
 		local distortThis = berserkActive
@@ -1108,50 +1088,16 @@ local function drawMoodles()
 		local drawSize = size * scale * (1 + berserkKick * 0.1)
 		local drawX = finalX - (drawSize - size) * 0.5
 		local drawY = finalY - (drawSize - size) * 0.5
-		if type == 1 and effect.mood == "bad" and effect.level >= 3 then
-			local beamIntensity = effect.level == 4 and 1 or 0.55
-			drawSevereBeam(drawX, drawY, drawSize, beamIntensity, stableRage and 1 or 0.9)
-		end
-
-		local background = type == 1 and (effect.name == "rage" and backgrounds.bad[4] or backgrounds[effect.mood] and backgrounds[effect.mood][effect.level]) or nil
-		local distortionStrength = 1 + berserkKick * 2
-		local distortionX = distortThis and math.sin(now * 9 + index * 2.1) * 2.5 * distortionStrength or 0
-		local distortionY = distortThis and math.cos(now * 7 + index * 1.7) * 1.5 * distortionStrength or 0
-		local distortionAngle = distortThis and math.sin(now * 5 + index) * 2.5 * distortionStrength or 0
-		if background then
-			surface.SetDrawColor(255, 255, 255, stableRage and 255 or (berserkActive and 90 or 235))
-			surface.SetMaterial(background)
-			if distortThis then
-				surface.DrawTexturedRectRotated(drawX + offsetX * 0.5 + drawSize * 0.5 + distortionX * 0.5, drawY + offsetY * 0.5 + drawSize * 0.5 + distortionY * 0.5, drawSize, drawSize, distortionAngle * 0.5)
-			else
-				surface.DrawTexturedRect(drawX + offsetX * 0.5, drawY + offsetY * 0.5, drawSize, drawSize)
-			end
-		end
-		if type == 2 then drawMoodle3Severity(drawX, drawY, drawSize, effect, age) end
-		local icon
-		if type == 2 then
-			-- Berserk is Moodle 3's anger level 5: retain each moodle's frame and
-			-- severity, but replace every active symbol except its own rage moodle
-			-- with the break marker.
-			icon = berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect)
-		else
-			icon = getIcon(effect.icon)
-			if not icon and effect.name == "burning" then icon = getIcon("veryhot") end
-		end
+		drawMoodle3Severity(drawX, drawY, drawSize, effect, age)
+		-- Berserk is Moodle 3's anger level 5: retain each moodle's frame and
+		-- severity, but replace every active symbol except its own rage moodle
+		-- with the break marker.
+		local icon = berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect)
 		if icon then
 			surface.SetMaterial(icon)
 			local iconSize = drawSize - 4
-			local iconCenterX = drawX + 2 + offsetX + iconSize * 0.5
-			local iconCenterY = drawY + 2 + offsetY + iconSize * 0.5
-			if distortThis and type == 1 then
-				surface.SetDrawColor(255, 70, 70, 30)
-				surface.DrawTexturedRectRotated(iconCenterX - distortionX, iconCenterY - distortionY, iconSize, iconSize, -distortionAngle)
-				surface.SetDrawColor(255, 255, 255, 100)
-				surface.DrawTexturedRectRotated(iconCenterX + distortionX, iconCenterY + distortionY, iconSize, iconSize, distortionAngle)
-			else
-				surface.SetDrawColor(255, 255, 255, 255)
-				surface.DrawTexturedRect(drawX + 2 + offsetX, drawY + 2 + offsetY, iconSize, iconSize)
-			end
+			surface.SetDrawColor(255, 255, 255, 255)
+			surface.DrawTexturedRect(drawX + 2 + offsetX, drawY + 2 + offsetY, iconSize, iconSize)
 		end
 
 		moodlePositions[index] = {x = finalX, y = finalY, size = size, effect = effect}

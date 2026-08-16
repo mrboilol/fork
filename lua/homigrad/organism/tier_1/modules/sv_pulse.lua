@@ -17,10 +17,11 @@ end
 
 local function getBloodCompensationRate(blood)
 	blood = tonumber(blood) or 5000
-	-- Compensation remains measured through the survivable loss band, then can
-	-- approach the terminal electrical-rate boundary as preload disappears.
-	local volumeLoss = 1 - math.Clamp(blood / 5000, 0, 1)
-	return 70 + volumeLoss ^ 1.85 * 220
+	local response = math.Clamp((3500 - blood) / 1500, 0, 1)
+	response = response * response * (3 - response * 2)
+	local rate = 70 + response * 230
+	local preloadFailure = math.Clamp((1750 - blood) / 1000, 0, 1)
+	return Lerp(preloadFailure, rate, 45)
 end
 
 local function getRateOutput(heartbeat)
@@ -650,6 +651,9 @@ module[2] = function(owner, org, timeValue)
 	local survivalK = math.Clamp(k, 0, 1)
 	local maxCompensatedRate = math.Clamp(150 + survivalK * 110 + hemorrhageCompensation * 60 - hypovolemicShock * 12, 110, terminalHeartRate)
 	maxCompensatedRate = math.max(maxCompensatedRate, bloodCompensationRate)
+	if bloodNow < 3500 then
+		maxCompensatedRate = math.min(maxCompensatedRate, bloodCompensationRate + 35)
+	end
 	if heart < 0.35 or brain < 0.35 then
 		maxCompensatedRate = math.min(maxCompensatedRate, 85)
 	end
