@@ -1,12 +1,3 @@
-local max, halfValue = math.max, util.halfValue
-hg.organism.module.liver = {}
-local module = hg.organism.module.liver
-module[1] = function(org)
-	org.liver = 0
-end
-module[2] = function(owner, org, mulTime)
-	if not org.alive or org.hearstop then return end
-end
 local min, max, Clamp, Approach = math.min, math.max, math.Clamp, math.Approach
 hg.organism.module.medical_system = {}
 local module = hg.organism.module.medical_system
@@ -133,6 +124,31 @@ function hg.organism.ApplyMedicalAction(actor, target, action, ctx)
 	org.next_med_error_check = CurTime() + 0.6
 	apply_med_error(actor, org, action, ctx)
 end
+
+hook.Add("hg_medical_minigame_finished", "organism-medical-system-action", function(actor, target, minigameType)
+	if not IsValid(actor) or not IsValid(target) then return end
+
+	local action
+	if minigameType == "bandage" or minigameType == "tourniquet" then
+		action = minigameType
+	elseif minigameType == "syringe" then
+		local wep = actor:GetActiveWeapon()
+		if not IsValid(wep) then return end
+
+		local class = wep:GetClass()
+		local medkitType = wep.HGMedkitModeTypes and wep.HGMedkitModeTypes[wep.mode]
+		if class == "weapon_tranexamic_acid" or medkitType == "tranexamic" or (class == "weapon_medkit_sh" and wep.mode == 3) then
+			action = "internal_bleed_treat"
+		elseif class == "weapon_needle" or medkitType == "needle" or (class == "weapon_medkit_sh" and wep.mode == 5) then
+			action = "needle"
+		end
+	end
+
+	if action then
+		hg.organism.ApplyMedicalAction(actor, target, action, {success = true})
+	end
+end)
+
 module[1] = function(org)
 	org.rehab_otrub = 0
 	org.rehab_otrub_duration = 0

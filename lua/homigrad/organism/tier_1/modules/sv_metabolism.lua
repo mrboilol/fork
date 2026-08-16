@@ -18,17 +18,28 @@ end
 
 local colorRed = Color(125,25,25)
 module[2] = function(owner, org, timeValue)
+    local hungerEnabled = hg_hungersystem:GetBool()
+
+    if not hungerEnabled then
+        -- Disabled hunger means the player remains completely fed.
+        org.satiety = 100
+        org.hungry = 0
+        org._prevSatiety = 100
+        org._satietyLastClimbed = CurTime()
+        org._starvingStartTime = nil
+    end
+
     -- Satiety mechanics
     local satiety = org.satiety or 0
     local timeSinceClimbed = CurTime() - (org._satietyLastClimbed or 0)
     
     -- Satiety slowly regains over time
-    if satiety < 100 then
+    if hungerEnabled and satiety < 100 then
         org.satiety = min(satiety + timeValue * 0.05, 100)
     end
     
     -- Track when satiety increases (eating)
-    if satiety > (org._prevSatiety or 0) then
+    if hungerEnabled and satiety > (org._prevSatiety or 0) then
         org._satietyLastClimbed = CurTime()
     end
     org._prevSatiety = org.satiety
@@ -37,7 +48,9 @@ module[2] = function(owner, org, timeValue)
     local hungerRate = 0
     
     -- If satiety is high (>60) and recently climbed (<2 minutes), reduce hunger
-    if satiety > 60 and timeSinceClimbed < 45 then
+    if not hungerEnabled then
+        hungerRate = 0
+    elseif satiety > 60 and timeSinceClimbed < 45 then
         hungerRate = -timeValue * 0.1
     -- If satiety is moderate (30-60), slowly reduce hunger
     elseif satiety > 30 then
@@ -54,7 +67,7 @@ module[2] = function(owner, org, timeValue)
     org.hungry = Round(org.hungry or 0, 3)
     
     -- Pain and O2 loss when really hungry (>70) - only if hunger system enabled
-    if hg_hungersystem:GetBool() then
+    if hungerEnabled then
         if org.hungry > 70 then
             local painAdd = (org.hungry - 70) / 30 * timeValue * 2
             org.painadd = (org.painadd or 0) + painAdd
@@ -112,7 +125,9 @@ module[2] = function(owner, org, timeValue)
 
     if org.satiety == 0 then return end
 
-    org.satiety = min(max(org.satiety - timeValue * 0.25, 0), 100)
+    if hungerEnabled then
+        org.satiety = min(max(org.satiety - timeValue * 0.25, 0), 100)
+    end
     -- Passive blood-volume recovery scales with nourishment. A well-fed
     -- character now restores up to 20 ml/sec instead of 10 ml/sec.
     org.blood = min(org.blood + timeValue * (org.satiety/5), 5000)

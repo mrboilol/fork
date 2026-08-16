@@ -3,6 +3,9 @@ local config = ZW.Config
 local distanceToLine = util.DistanceToLine
 local traceLine = util.TraceLine
 local maskShot = MASK_SHOT
+local SUPPRESSION_RADIUS = 180
+local SUPERSONIC_AUDIBLE_RADIUS = 1400
+local SUBSONIC_AUDIBLE_RADIUS = 900
 
 local function PlayerIterator()
     if player.Iterator then
@@ -36,15 +39,24 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
 
     local shooter = GetBulletShooterEntity(bullet)
     local damage = tonumber(bullet.Damage) or 10
-    local sentAny = false
-
+    local speed = isvector(bullet.Vel) and bullet.Vel:Length() / 52.5 or tonumber(bullet.Speed) or 343
+    local subsonic = speed < 340
+    local audibleRadius = subsonic and SUBSONIC_AUDIBLE_RADIUS or SUPERSONIC_AUDIBLE_RADIUS
+    local sentPlayers = bullet._ZCityWindSuppressionPlayers
+    if not sentPlayers then
+        sentPlayers = {}
+        bullet._ZCityWindSuppressionPlayers = sentPlayers
+    end
     for _, ply in PlayerIterator() do
         if not IsValid(ply) or not ply:Alive() then continue end
         if IsSuppressionShooter(ply, shooter) then continue end
 
+        local playerState = sentPlayers[ply]
+        if playerState and playerState.suppression then continue end
+
         local eyePos = ply:EyePos()
         local dist, closestPos = distanceToLine(startPos, endPos, eyePos)
-        if not dist or dist > 180 then continue end
+        if not dist or dist > audibleRadius then continue end
 
         local filter = {ply}
         if IsValid(shooter) then filter[#filter + 1] = shooter end
@@ -66,18 +78,29 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
 
         if blocked then continue end
 
-        -- A near miss should be startling, not merely a little stronger than a
-        -- miss at the edge of the suppression radius.  Squaring the proximity
-        -- keeps the outer edge readable while making shots that shave the head
-        -- deliver the full suppression response.
-        local proximity = math.Clamp(1 - dist / 180, 0, 1)
-        local force = math.Clamp(0.8 + proximity * proximity * 11 + math.min(damage / 25, 2.5), 0.8, 14)
+        -- Cracks carry much farther than the tight radius that causes camera
+        -- kick and panic. Keep those two ranges independent so an audible
+        -- round at distance does not behave like it shaved the player's head.
+        local soundOnly = dist > SUPPRESSION_RADIUS
+        if playerState and soundOnly then continue end
+
+        local playSound = not playerState
+        local proximity = math.Clamp(1 - dist / SUPPRESSION_RADIUS, 0, 1)
+        local force = soundOnly and 0 or math.Clamp(0.8 + proximity * proximity * 11 + math.min(damage / 25, 2.5), 0.8, 14)
 
         net.Start("ZCity_Wind_SuppressionForce")
             net.WriteVector(closestPos)
             net.WriteFloat(force)
-			net.WriteBool(false)
+            net.WriteBool(false)
+            net.WriteBool(soundOnly)
+            net.WriteBool(subsonic)
+            net.WriteFloat(damage)
+            net.WriteBool(playSound)
         net.Send(ply)
+        playerState = playerState or {}
+        playerState.audio = true
+        playerState.suppression = playerState.suppression or not soundOnly
+        sentPlayers[ply] = playerState
 
         -- Apply Z-City adrenaline and fear from nearby flying bullets
         local org = ply.organism
@@ -115,12 +138,6 @@ function ZW.SendServerSuppressionForBullet(bullet, startPos, endPos)
                 end
             end
         end
-
-        sentAny = true
-    end
-
-    if sentAny then
-        bullet._ZCityWindServerSuppressionSent = true
     end
 end
 
@@ -144,13 +161,20 @@ hook.Add("EntityTakeDamage", "ZCity_Wind_BulletHitSuppression", function(ent, dm
 		net.WriteVector(pos)
 		net.WriteFloat(force)
 		net.WriteBool(true)
+		net.WriteBool(false)
+		net.WriteBool(false)
+		net.WriteFloat(dmgInfo:GetDamage())
+		net.WriteBool(false)
 	net.Send(ply)
 end)
 
 function ZW.RegisterServerSuppressionBridge()
     local plugin = hg and hg.PhysBullet
     if not plugin then return false end
-    if plugin._ZCityWindServerSuppressionBridgeRegistered then return true end
+    if plugin._ZCityWindServerSuppressionBridgeRegistered then
+        SetGlobalBool("ZCity_Wind_ServerSuppressionAudio", true)
+        return true
+    end
 
     local pluginID = plugin.ID or "PhysBullet"
     local preEventName = "HG.Plugin.List[" .. pluginID .. "].Hooks[BulletPreThink]"
@@ -164,12 +188,13 @@ function ZW.RegisterServerSuppressionBridge()
 
     hook.Add(postEventName, "ZCity_Wind_ServerSuppressionBridge_Post", function(bullet)
         if not config.Suppression then return end
-        if not bullet or bullet._ZCityWindServerSuppressionSent then return end
+        if not bullet then return end
 
         ZW.SendServerSuppressionForBullet(bullet, bullet._ZCityWindServerSuppressionLastPos, bullet.Pos)
     end)
 
     plugin._ZCityWindServerSuppressionBridgeRegistered = true
+    SetGlobalBool("ZCity_Wind_ServerSuppressionAudio", true)
     MsgC(ZW.Colors.Magenta, "[Z-City Wind] Physical bullet server suppression fallback registered successfully!\n")
     return true
 end

@@ -510,6 +510,12 @@ local smooth = {
 	conscious = 1.0,
 	pain = 0,
 	pulse = 70,
+	heartbeat = 70,
+	bloodPressure = 92,
+	systolic = 120,
+	diastolic = 80,
+	cardiacOutput = 1,
+	strokeVolume = 1,
 	assimilation = 0,
 	o2 = 30,
 	bleed = 0,
@@ -520,6 +526,7 @@ local smooth = {
 	pneumothorax = 0,
 	analgesia = 0,
 	brain = 0,
+	brainSwelling = 0,
 	wantToVomit = 0,
 	
 	adrenaline = 0,
@@ -1171,6 +1178,12 @@ local function draw_bar()
 	smooth.conscious = Lerp(s * dt, smooth.conscious or 1.0, getOrgVal(org, "consciousness", 1))
 	smooth.pain = Lerp(s * dt, smooth.pain or 0, getOrgVal(org, "pain", 0))
 	smooth.pulse = Lerp(s * dt, smooth.pulse or 70, getOrgVal(org, "pulse", 70))
+	smooth.heartbeat = Lerp(s * dt, smooth.heartbeat or 70, getOrgVal(org, "heartbeat", 70))
+	smooth.bloodPressure = Lerp(s * dt, smooth.bloodPressure or 92, getOrgVal(org, "bloodPressure", 92))
+	smooth.systolic = Lerp(s * dt, smooth.systolic or 120, getOrgVal(org, "systolic", 120))
+	smooth.diastolic = Lerp(s * dt, smooth.diastolic or 80, getOrgVal(org, "diastolic", 80))
+	smooth.cardiacOutput = Lerp(s * dt, smooth.cardiacOutput or 1, getOrgVal(org, "cardiacOutput", 1))
+	smooth.strokeVolume = Lerp(s * dt, smooth.strokeVolume or 1, getOrgVal(org, "strokeVolume", 1))
 	smooth.assimilation = Lerp(s * dt, smooth.assimilation or 0, getOrgVal(org, "assimilated", 0))
 	smooth.o2 = Lerp(s * dt, smooth.o2 or o2_max, o2_val)
 	smooth.bleed = Lerp(s * dt, smooth.bleed or 0, getOrgVal(org, "bleed", 0))
@@ -1183,6 +1196,7 @@ local function draw_bar()
 	smooth.analgesia = Lerp(s * dt, smooth.analgesia or 0, getOrgVal(org, "analgesia", 0))
 	smooth.brain = Lerp(s * dt, smooth.brain or 0, getOrgVal(org, "brain", 0))
 	smooth.brainHemorrhage = Lerp(s * dt, smooth.brainHemorrhage or 0, getOrgVal(org, "brainHemorrhage", 0))
+	smooth.brainSwelling = Lerp(s * dt, smooth.brainSwelling or 0, getOrgVal(org, "brainSwelling", 0))
 	smooth.wantToVomit = Lerp(s * dt, smooth.wantToVomit or 0, getOrgVal(org, "wantToVomit", 0))
 	
 	smooth.adrenaline = Lerp(s * dt, smooth.adrenaline or 0, getOrgVal(org, "adrenaline", 0))
@@ -1192,7 +1206,7 @@ local function draw_bar()
 	smooth.ischemia = Lerp(s * dt, smooth.ischemia or 0, getOrgVal(org, "ischemia", 0))
     smooth.hemotransfusionshock = Lerp(s * dt, smooth.hemotransfusionshock or 0, getOrgVal(org, "hemotransfusionshock", 0))
 	
-	update_stability(smooth.blood or 5000, smooth.pulse or 70)
+	update_stability(smooth.blood or 5000, smooth.heartbeat or 70)
 	
 	local segs = {}
 	
@@ -1216,11 +1230,25 @@ local function draw_bar()
 		table.insert(segs, {label = "ASSIMILATION", val = math_floor(assim_val * 100), suf = "%", ratio = r_assim, col = Color(180, 50, 255, 255), w = math_floor(105 * scale), icon = "assimilation", prio = 3})
 	end
 	
-	local pulse_val = smooth.pulse or 70
+	-- heartbeat is the electrical rate in BPM; pulse is the legacy palpable
+	-- circulation-strength value and must not be presented as a rate.
+	local pulse_val = smooth.heartbeat or 70
 	if not stability.pulse.hidden then
-		local r_pulse = math_min(pulse_val / 100, 1)
+		local r_pulse = math_min(pulse_val / 180, 1)
 		local c_pulse = (pulse_val < 50 or pulse_val > 130) and Color(255, 80, 80) or Color(180, 220, 255)
-		table.insert(segs, {label = "PULSE", val = math_floor(pulse_val), suf = "bpm", ratio = r_pulse, col = c_pulse, w = math_floor(80 * scale), icon = "pulse", prio = 4})
+		table.insert(segs, {label = "HR", val = math_floor(pulse_val), suf = "bpm", ratio = r_pulse, col = c_pulse, w = math_floor(80 * scale), icon = "pulse", prio = 4})
+	end
+
+	local hasPressure = tonumber(org.systolic) ~= nil and tonumber(org.diastolic) ~= nil
+	if hasPressure then
+		local systolic = math_floor((smooth.systolic or 0) + 0.5)
+		local diastolic = math_floor((smooth.diastolic or 0) + 0.5)
+		local pressureAbnormal = systolic < 100 or systolic > 140 or diastolic < 60 or diastolic > 90
+		if pressureAbnormal then
+			local map = smooth.bloodPressure or (diastolic + (systolic - diastolic) / 3)
+			local pressureColor = map < 60 and Color(255, 70, 70) or (map > 110 and Color(255, 165, 65) or Color(180, 220, 255))
+			table.insert(segs, {label = "BP", val = systolic .. "/" .. diastolic, suf = "", ratio = math.Clamp(map / 110, 0, 1), col = pressureColor, w = math_floor(92 * scale), icon = "pulse", prio = 5})
+		end
 	end
 	
 	if #segs == 0 then return end
@@ -1408,7 +1436,10 @@ local function draw_status_effects()
 		end
 		
 		if berserkActive then
-			local brain_val = smooth.brain or getOrgVal(org, "brain", 0)
+			local brain_val = math.max(
+				smooth.brain or getOrgVal(org, "brain", 0),
+				smooth.brainSwelling or getOrgVal(org, "brainSwelling", 0)
+			)
 			if brain_val > HUD.brain_damage_threshold then
 				local level_num = 1
 				if brain_val > 0.3 then level_num = 4
@@ -2001,7 +2032,10 @@ local function draw_status_effects()
 				currentEffectNames["vomit"] = true
 			end
 			
-			local brain_val = smooth.brain or getOrgVal(org, "brain", 0)
+			local brain_val = math.max(
+				smooth.brain or getOrgVal(org, "brain", 0),
+				smooth.brainSwelling or getOrgVal(org, "brainSwelling", 0)
+			)
 			if brain_val > HUD.brain_damage_threshold then
 				local level_num = 1
 				if brain_val > 0.3 then level_num = 4

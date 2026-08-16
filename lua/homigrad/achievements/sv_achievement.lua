@@ -2,6 +2,57 @@ hg.achievements = hg.achievements or {}
 hg.achievements.achievements_data = hg.achievements.achievements_data or {}
 hg.achievements.achievements_data.player_achievements = hg.achievements.achievements_data.player_achievements or {}
 hg.achievements.achievements_data.created_achevements = {}
+hg.achievements.achievements_data.rarity = hg.achievements.achievements_data.rarity or {}
+
+local function getRarityName(percent, owners)
+    owners = tonumber(owners) or 0
+    if owners == 0 then return "Exotic" end
+    if owners == 1 or percent < 5 then return "Mythic" end
+    if percent < 10 then return "Legendary" end
+    if percent < 25 then return "Epic" end
+    if percent < 50 then return "Rare" end
+    return "Uncommon"
+end
+
+function hg.achievements.RefreshRarity()
+    if not hg.achievements.SqlActive or hg.achievements.RarityRefreshing then return end
+
+    hg.achievements.RarityRefreshing = true
+    local query = mysql:Select("hg_achievements")
+        query:Select("achievements")
+        query:Callback(function(result)
+            hg.achievements.RarityRefreshing = false
+            if not istable(result) then return end
+
+            local total = #result
+            local owners = {}
+            for _, row in ipairs(result) do
+                local playerAchievements = util.JSONToTable(row.achievements or "") or {}
+                for key, achievement in pairs(playerAchievements) do
+                    local info = hg.achievements.GetAchievementInfo(key)
+                    if info and istable(achievement) and (tonumber(achievement.value) or info.start_value) >= info.needed_value then
+                        owners[key] = (owners[key] or 0) + 1
+                    end
+                end
+            end
+
+            local rarity = {}
+            for key in pairs(hg.achievements.GetAchievements()) do
+                local count = owners[key] or 0
+                local percent = total > 0 and count / total * 100 or 0
+                rarity[key] = {
+                    name = getRarityName(percent, count),
+                    owners = count,
+                    total = total,
+                    percent = math.Round(percent, 2)
+                }
+            end
+
+            hg.achievements.achievements_data.rarity = rarity
+            hg.achievements.RarityUpdatedAt = CurTime()
+        end)
+    query:Execute()
+end
 
 local function syncPlayerHeadshotAchievements(ply)
     if not IsValid(ply) or not hg.achievements.GetAchievementInfo("gollavo") then return end
@@ -174,18 +225,37 @@ end
 util.AddNetworkString("hg_NewAchievement")
 
 function hg.achievements.SetPlayerAchievement(ply, key, val)
+    if not IsValid(ply) or not ply:IsPlayer() then return false end
+
     local ach = hg.achievements.GetAchievementInfo(key)
-    if not ach then return end
+    if not ach then return false end
+
+    val = tonumber(val)
+    if not val then return false end
 
     local steamID = ply:SteamID64()
     hg.achievements.achievements_data.player_achievements[steamID] = hg.achievements.achievements_data.player_achievements[steamID] or {}
     local playerAchievements = hg.achievements.achievements_data.player_achievements[steamID]
     playerAchievements[key] = playerAchievements[key] or {}
 
-    if isAchievementCompleted(ply, key, val) then
+    local completedNow = isAchievementCompleted(ply, key, val)
+    playerAchievements[key].value = val
+
+    if completedNow then
+        local wasObtainedBefore = playerAchievements[key].obtained_at ~= nil
+        playerAchievements[key].obtained_at = playerAchievements[key].obtained_at or os.time()
+
+        local rarity = hg.achievements.achievements_data.rarity[key] or {owners = 0, total = 0, percent = 0}
+        rarity.total = math.max(tonumber(rarity.total) or 0, 1)
+        rarity.owners = math.min((tonumber(rarity.owners) or 0) + (wasObtainedBefore and 0 or 1), rarity.total)
+        rarity.percent = math.Round(rarity.owners / rarity.total * 100, 2)
+        rarity.name = getRarityName(rarity.percent, rarity.owners)
+        hg.achievements.achievements_data.rarity[key] = rarity
+
         net.Start("hg_NewAchievement")
             net.WriteString(ach.name)
             net.WriteString(ach.img)
+            net.WriteString(rarity.name)
         net.Send(ply)
 
         timer.Remove("hg_achievement_save_" .. steamID)
@@ -197,7 +267,7 @@ function hg.achievements.SetPlayerAchievement(ply, key, val)
         end)
     end
 
-    playerAchievements[key].value = val
+    return true
 end
 
 function hg.achievements.AddPlayerAchievement(ply, key, val)
@@ -216,6 +286,7 @@ net.Receive("req_ach", function(len, ply)
     net.Start("req_ach")
         net.WriteTable(hg.achievements.GetAchievements())
         net.WriteTable(hg.achievements.GetPlayerAchievements(ply))
+        net.WriteTable(hg.achievements.achievements_data.rarity)
     net.Send(ply)
 
     if (hg.achievements.RarityUpdatedAt or 0) + 300 < CurTime() then

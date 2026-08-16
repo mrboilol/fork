@@ -140,6 +140,16 @@ local abdominal_organs = {
     ["intestines"] = true,
 }
 
+-- Intracranial bleeding has its own brainHemorrhage/brainBleedRate model. Do
+-- not also turn brain trauma into an abdominal-style blood loss injury.
+local systemicBleedOrgans = {
+	heart = true,
+	liver = true,
+	stomach = true,
+	intestines = true,
+	trachea = true,
+}
+
 local organBulletBleedMultipliers = {
 	heart = 2,
 	liver = 1.75,
@@ -189,7 +199,9 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 		local repeatTrauma = math.min(rawDamage, 0.25)
 		local abdominalMul = 0.5
 
-		org.internalBleed = org.internalBleed + repeatTrauma * (1 + abdominalMul * 2.5)
+		if systemicBleedOrgans[key] then
+			org.internalBleed = org.internalBleed + repeatTrauma * (1 + abdominalMul * 2.5)
+		end
 		org.painadd = (org.painadd or 0) + repeatTrauma * (10 + abdominalMul * 15)
 		org.stamina_damage = (org.stamina_damage or 0) + repeatTrauma * (5 + abdominalMul * 15)
 
@@ -200,7 +212,9 @@ local function damageOrgan(org, dmg, dmgInfo, key)
 		end
 	end
 	if damage_dealt > 0 then
-		org.internalBleed = org.internalBleed + damage_dealt * 1.0 -- Base internal bleeding for any organ damage (increased from 0.5)
+		if systemicBleedOrgans[key] then
+			org.internalBleed = org.internalBleed + damage_dealt
+		end
 		org.stamina_damage = (org.stamina_damage or 0) + damage_dealt * 5 -- Base stamina loss
 		if hg.organism.AddBulletImpactBleeding then
 			hg.organism.AddBulletImpactBleeding(org, dmgInfo, organBulletBleedMul)
@@ -842,10 +856,13 @@ input_list.trachea = function(org, bone, dmg, dmgInfo)
 	if dmgInfo:IsDamageType(DMG_BLAST) then dmg = dmg / 5 end
 
 	local result = damageOrgan(org, dmg * 2, dmgInfo, "trachea")
+	local damageDelta = math.max((org.trachea or 0) - oldDmg, 0)
 
 	hg.AddHarmToAttacker(dmgInfo, (org.trachea - oldDmg) * 8, "Trachea damage harm")
 
-	org.internalBleed = org.internalBleed + dmg * 2
+	-- Only actual airway injury contributes to the systemic pool. The former
+	-- raw-damage addition could create bleeding even when the organ did not move.
+	addInternalBleed(org, damageDelta * 1.25)
 
 	return result
 end

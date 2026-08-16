@@ -23,6 +23,7 @@ local hungerThoughts = {
 
 local hungerThoughtIndex = 0
 local hungerThoughtNextTime = 0
+local hungerThoughtColor = Color(255, 165, 0)
 
 hook.Add("Think", "hg_hunger_thoughts_notify", function()
 	local org = get_target_organism()
@@ -48,8 +49,11 @@ hook.Add("Think", "hg_hunger_thoughts_notify", function()
 			-- More frequent thoughts as hunger increases
 			local thoughtInterval = math.Remap(hungry, 30, 100, 30, 10)
 			
-			if hg and hg.CreateNotification then
-				hg.CreateNotification(thought, 2, Color(255, 165, 0), true)
+			local newThoughts = GetConVar("hg_newthoughts")
+			if newThoughts and newThoughts:GetBool() and hg and hg.CreateThought then
+				hg.CreateThought(thought, hungerThoughtColor)
+			elseif hg and hg.CreateNotification then
+				hg.CreateNotification(thought, 2, hungerThoughtColor)
 			end
 			
 			hungerThoughtNextTime = time + thoughtInterval

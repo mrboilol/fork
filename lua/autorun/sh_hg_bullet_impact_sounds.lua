@@ -179,7 +179,7 @@ function impactSounds.PlayNearMiss(pos, subsonic, soundLevel, volume, soundOverr
 
 	local choices = subsonic and subsonicNearMissSounds or supersonicNearMissSounds
 	local soundName = soundOverride or choices[math_random(#choices)]
-	sound.Play(soundName, pos, soundLevel or 180, math_random(97, 103), volume or 2.5)
+	sound.Play(soundName, pos, soundLevel or 200, math_random(97, 103), volume or 4)
 
 	return true
 end

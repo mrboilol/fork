@@ -45,7 +45,7 @@ SWEP.FallSnd = "snd_jack_hmcd_pillsbounce.ogg"
 
 SWEP.showstats = false
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Heal animation type: 0 = progressive minigames, 1 = Judge animations, 2 = progressive Judge minigames", 0, 2)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
 
 function SWEP:Think()
 	self:SetBodyGroups("111")

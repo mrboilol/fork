@@ -163,7 +163,6 @@ local function addBrokenBoneHitTrauma(org, key, dmg, soundThreshold)
 	if severity <= 0 then return end
 
 	org.painadd = (org.painadd or 0) + math.Clamp(severity * 7, 2, 18)
-	addBoneInternalBleed(org, severity * 0.025, 0.12)
 
 	if severity >= (soundThreshold or 0.45) then
 		if (org._brokenBoneHitSound and org._brokenBoneHitSound[key] or 0) > CurTime() then return end
@@ -288,13 +287,6 @@ local dislocated_leg = {
 	"THE ANKLE'S TWISTED- BUT THE KNEE'S THE REAL PROBLEM!",
 }
 
-local limbName = {
-	rleg = "right leg",
-	lleg = "left leg",
-	rarm = "right arm",
-	larm = "left arm",
-}
-
 local function sendThought(org, msg, key, delay, clr)
 	if org.isPly and IsValid(org.owner) and org.owner.Thought then
 		org.owner:Thought(msg, delay or 1, key, 0, clr)
@@ -303,6 +295,28 @@ end
 
 local function hasNewThoughts(org)
 	return org.isPly and IsValid(org.owner) and org.owner:GetInfoNum("hg_newthoughts", 0) > 0
+end
+
+local function sendLimbThought(org, messages, key, clr)
+	if not org.isPly or not IsValid(org.owner) or not istable(messages) or #messages == 0 then return end
+
+	org.lastLimbThought = org.lastLimbThought or {}
+	local index = math.random(#messages)
+	if #messages > 1 and index == org.lastLimbThought[key] then
+		index = index % #messages + 1
+	end
+	org.lastLimbThought[key] = index
+
+	local msg = messages[index]
+	if hasNewThoughts(org) then
+		sendThought(org, msg, "thought_" .. key, 10, clr)
+	elseif org.owner.Notify then
+		org.owner:Notify(msg, 10, key, 0.15, nil, clr)
+	end
+
+	-- This injury was already reported immediately. Do not let the periodic
+	-- status-thought path report the same break or dislocation again.
+	org.just_damaged_bone = nil
 end
 
 local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, ricochet)
@@ -336,13 +350,14 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true, {state = "broken", limb = key, segment = segment}) end
 		if hg.BreakLimb then hg.BreakLimb(org.owner, key, segment, false) end
 		org.painadd = org.painadd + 55
-		addBoneInternalBleed(org, 0.45, 0.8)
+		if dmgInfo:IsDamageType(DMG_BLAST + DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE) then
+			addBoneInternalBleed(org, 0.45, 0.8)
+		end
 		org.owner:AddNaturalAdrenaline(1)
 		org.immobilization = org.immobilization + dmg * 25
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_leg[math.random(#broke_leg)], 1, "broke"..key, 1, nil, nil) end
-		sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+		sendLimbThought(org, broke_leg, "broke_" .. key, Color(255, 210, 210))
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		playBoneFractureSound(org.owner)
@@ -357,8 +372,7 @@ local function legs(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.immobilization = org.immobilization + dmg * 10
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_leg[math.random(#dislocated_leg)], 1, "dislocated"..key, 1, nil, nil) end
-		sendThought(org, "Your " .. limbName[key] .. " is dislocated.", "thought_dislocated" .. key, 1, Color(255, 220, 220))
+		sendLimbThought(org, dislocated_leg, "dislocated_" .. key, Color(255, 220, 220))
 
 		timer.Simple(0, function() hg.LightStunPlayer(org.owner,2) end)
 		playBoneFractureSound(org.owner)
@@ -407,12 +421,13 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		if hg.fakeBoneFlop then hg.fakeBoneFlop.SetLimbSegmentState(org, key, segment, true, {state = "broken", limb = key, segment = segment}) end
 		if hg.BreakLimb then hg.BreakLimb(org.owner, key, segment, false) end
 		org.painadd = org.painadd + 55
-		addBoneInternalBleed(org, 0.35, 0.7)
+		if dmgInfo:IsDamageType(DMG_BLAST + DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE) then
+			addBoneInternalBleed(org, 0.35, 0.7)
+		end
 		org.owner:AddNaturalAdrenaline(1)
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(broke_arm[math.random(#broke_arm)], 1, "broke"..key, 1, nil, nil) end
-		sendThought(org, "Your " .. limbName[key] .. " is broken.", "thought_broke" .. key, 1, Color(255, 210, 210))
+		sendLimbThought(org, broke_arm, "broke_" .. key, Color(255, 210, 210))
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 		playBoneFractureSound(org.owner)
@@ -427,8 +442,7 @@ local function arms(org, bone, dmg, dmgInfo, key, segment, boneindex, dir, hit, 
 		org.owner:AddNaturalAdrenaline(0.5)
 		org.fearadd = org.fearadd + 0.5
 
-		--if org.isPly and !org[key.."amputated"] then org.owner:Notify(dislocated_arm[math.random(#dislocated_arm)], 1, "dislocated"..key, 1, nil, nil) end
-		sendThought(org, "Your " .. limbName[key] .. " is dislocated.", "thought_dislocated" .. key, 1, Color(255, 220, 220))
+		sendLimbThought(org, dislocated_arm, "dislocated_" .. key, Color(255, 220, 220))
 
 		--timer.Simple(0, function() hg.LightStunPlayer(org.owner,1) end)
 		playBoneFractureSound(org.owner)
@@ -592,6 +606,7 @@ hook.Add("CanListenOthers", "CantHaveShitInDetroit", function(output, input, isC
 end)
 
 input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricochet, impact)
+	org._skullImpactThisHit = true
 	local oldDmg = org.skull
 	local oldConcussion = org.concussion or 0
 	if isFistInflictor(dmgInfo) then dmg = dmg * fist_skull_damage_mul end
@@ -633,11 +648,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 
 	org.shock = org.shock + dmg * 3
 	local penetratingHeadHit = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
-	-- The old one-in-ten skull roll made otherwise identical bullet headshots
-	-- randomly become brain injuries (and potentially deaths). Keep that
-	-- incidental transfer for blunt trauma; bullet brain injury is limited to
-	-- traced brain hitboxes and the deterministic newly-exposed-skull trauma below.
-	local brainImpact = dmgInfo:IsDamageType(DMG_CRUSH) or (not penetratingHeadHit and math.random(10) == 1)
+	-- Bullet brain injury is limited to traced brain hitboxes and newly exposed
+	-- skull trauma. Blunt impacts become deterministic once they are severe.
+	local bluntHeadImpact = isBluntBrainImpact(dmgInfo)
+	local severeBluntHeadImpact = bluntHeadImpact and dmg >= 0.35
+	local brainImpact = bluntHeadImpact and (severeBluntHeadImpact or math.random(10) == 1)
 	org.consciousness = math.Approach(org.consciousness, 0, brainImpact and dmg * 2 or 0)
 	local brainExposure = math.Clamp(((org.skull or 0) - 0.6) / 0.4, 0, 1)
 	local bluntBrainDamage = 0
@@ -651,6 +666,11 @@ input_list.skull = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoch
 		if penetratingTrauma > 0 then
 			bluntBrainDamage = bluntBrainDamage + math.min(penetratingTrauma, 0.24)
 		end
+	end
+	-- A hard club, bat, or punch can injure the brain without opening the skull.
+	-- Scale this from impact energy so light taps remain concussion-only.
+	if severeBluntHeadImpact then
+		bluntBrainDamage = bluntBrainDamage + math.min(math.max(dmg - 0.35, 0) * 0.04, 0.2)
 	end
 	if brainExposure > 0 and brainImpact then
 		bluntBrainDamage = bluntBrainDamage + dmg * 0.05 * Lerp(brainExposure, 0.35, 1)
@@ -783,8 +803,14 @@ input_list.pelvis = function(org, bone, dmg, dmgInfo, boneindex, dir, hit, ricoc
 	local oldDmg = org.pelvis
 	org.painadd = org.painadd + dmg
 	org.shock = org.shock + dmg
-	addBoneInternalBleed(org, dmg * 4, 4)
 	local result = damageBone(org, bone, dmg * 0.5, dmgInfo, "pelvis", boneindex, dir, hit, ricochet)
+	local pelvisDamageDelta = math.max((org.pelvis or 0) - oldDmg, 0)
+	local blast = dmgInfo:IsDamageType(DMG_BLAST)
+	local severeBlunt = dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH + DMG_FALL + DMG_VEHICLE)
+		and pelvisDamageDelta >= 0.2
+	if blast or severeBlunt then
+		addBoneInternalBleed(org, pelvisDamageDelta * (blast and 4 or 2.5), blast and 4 or 2)
+	end
 	markDamagedBone(org, "ValveBiped.Bip01_Pelvis", org.pelvis)
 	hg.AddHarmToAttacker(dmgInfo, (org.pelvis - oldDmg) / 2, "Pelvis bone damage harm")
 

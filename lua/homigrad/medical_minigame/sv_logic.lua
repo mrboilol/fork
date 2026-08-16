@@ -76,6 +76,7 @@ end
 
 local function CanUseMedicalMinigameTarget(ply, target)
     if not IsValid(ply) or not ply:Alive() then return false end
+    if hg.MedicalMinigame.GetArmSpeedMultiplier(ply) <= 0 then return false end
     if not IsValid(target) or not target:IsPlayer() or not target:Alive() then return false end
     if not target.organism then return false end
     if target ~= ply then
@@ -566,15 +567,9 @@ net.Receive("hg_medical_minigame_progress", function(len, ply)
         local org = target.organism
         if not org then return end
 
-        if GetMedicalProgressModifier then
-            local mul = GetMedicalProgressModifier(ply, target, minigameType, progressDelta)
-            if mul and mul ~= 1 then
-                progressDelta = progressDelta * mul
-            end
-        end
-
         -- Keep presentation consumers in sync with the exact progress used
-        -- for treatment, including medical progress modifiers.
+        -- for treatment. Arm impairment is applied by the client interaction,
+        -- so incremental medicine consumption stays aligned with its display.
         hook.Run("hg_medical_minigame_progress", ply, wep, minigameType, progressDelta)
 
         if minigameType == "syringe" then
@@ -837,6 +832,7 @@ net.Receive("hg_medical_minigame_finish", function(len, ply)
                    class == "weapon_mannitol" or class == "weapon_thiamine" or class == "weapon_betablock" or
                    class == "weapon_painkillers" or class == "weapon_zerlkers" or class == "weapon_needle" or class == "weapon_fury13" or
                    class == "weapon_fury16" or class == "weapon_autoresuscitator" then
+                    hook.Run("hg_medical_minigame_finished", ply, target, minigameType)
                     ply:SelectWeapon("weapon_hands_sh")
                     wep:Remove()
                     return

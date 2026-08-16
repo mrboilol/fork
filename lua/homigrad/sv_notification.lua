@@ -23,7 +23,19 @@ local thoughtMessages = {
     pneumothorax3 = "You are struggling to breathe.",
     brain = "Your brain is damaged.",
     blood2 = "You are close to fainting.",
-    internalbleed = "You are bleeding internally.",
+    internalbleed = {
+        "Something inside me is bleeding.",
+        "I can feel blood pooling inside me.",
+        "That hit did something bad inside.",
+        "I'm bleeding internally. I need treatment.",
+        "Something ruptured inside me."
+    },
+    nosebleed = {
+        "My nose is bleeding.",
+        "I can taste blood from my nose.",
+        "Blood is running out of my nose.",
+        "My nose won't stop bleeding."
+    },
     hungry = "You are hungry.",
     heart = "You feel a sharp pain from your chest.",
     heartstop = "Your heart stopped.",
@@ -271,6 +283,29 @@ end
 
 local SCPCBCreateThought
 
+local conditionThoughtCooldowns = {
+    internalbleed = 30,
+    nosebleed = 30,
+}
+
+local function GetConditionThought(ply, msgKey)
+    local options = thoughtMessages[msgKey]
+    if not istable(options) then return options end
+
+    local optionCount = #options
+    if optionCount <= 0 then return end
+
+    ply.lastConditionThought = ply.lastConditionThought or {}
+    local index = math.random(optionCount)
+    local lastIndex = ply.lastConditionThought[msgKey]
+    if optionCount > 1 and index == lastIndex then
+        index = index % optionCount + 1
+    end
+
+    ply.lastConditionThought[msgKey] = index
+    return options[index]
+end
+
 local function SCPCBHitThought(ply, target, dmgType, dmg, hitPos, dmginfo)
     if not dmg or dmg <= 0 then return end
 
@@ -339,16 +374,29 @@ local function SCPCBThoughtOwner(ent)
 end
 
 local function CreateNotification(ply, msg, delay, msgKey, showTime, func, clr)
-    if ply.organism and ply.organism.otrub then return end
-    if ply.PlayerClassName and ply.PlayerClassName == "Gordon" and clr != hev_color then return end
-    if msg == "" then return end
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end
     if not msg or not isstring(msg) then error("no message or message is invalid!") return false end
+    if ply.organism and ply.organism.otrub then return end
+    if ply.PlayerClassName and ply.PlayerClassName == "Gordon" and clr != hev_color then return end
     msgKey = msgKey or msg
 
-    if ply:GetInfoNum("hg_newthoughts", 0) > 0 and thoughtMessages[msgKey] and CreateThought then
-        return CreateThought(ply, thoughtMessages[msgKey], delay, "thought_" .. msgKey, showTime, clr)
+    -- Stacked thoughts replace the legacy notification renderer. Route every
+    -- message through that channel while it is enabled; otherwise messages
+    -- without a special wording entry are sent over HGNotificate and then
+    -- deliberately discarded by the client.
+    if ply:GetInfoNum("hg_newthoughts", 0) > 0 and CreateThought then
+        local thought = thoughtMessages[msgKey] and GetConditionThought(ply, msgKey) or msg
+        if not thought then return false end
+
+        local conditionCooldown = conditionThoughtCooldowns[msgKey]
+        if conditionCooldown and (delay == nil or isnumber(delay)) then
+            delay = math.max(tonumber(delay) or 0, conditionCooldown)
+        end
+
+        return CreateThought(ply, thought, delay, "thought_" .. msgKey, showTime, clr, func)
     end
+
+    if msg == "" then return end
 
     ply.msgs = ply.msgs or {}
     if msgKey and ply.msgs[msgKey] then
@@ -474,11 +522,11 @@ local function ResetNotification(ply, key)
     ply.msgs[key] = nil
 end
 
-CreateThought = function(ply, msg, delay, msgKey, showTime, clr)
-    if ply.organism and ply.organism.otrub then return end
-    if msg == "" then return end
+CreateThought = function(ply, msg, delay, msgKey, showTime, clr, func)
     if not IsValid(ply) or not ply:IsPlayer() then error("player is not valid!") return false end
     if not msg or not isstring(msg) then error("no message or message is invalid!") return false end
+    if ply.organism and ply.organism.otrub then return end
+    if msg == "" then return end
     if ply:GetInfoNum("hg_newthoughts", 0) <= 0 then return false end
 
     msgKey = msgKey or msg
@@ -505,6 +553,7 @@ CreateThought = function(ply, msg, delay, msgKey, showTime, clr)
         if !IsValid(ply) then return end
         if !ply.thoughtmsgs[msgKey] then return end
         if (ply.organism and ply.organism.otrub) or !ply:Alive() then return end
+        if func and isfunction(func) and func(ply) then return end
 
         net.Start("HGThought")
         net.WriteString(msg)
@@ -520,16 +569,19 @@ hg.CreateNotification = CreateNotification
 hook.Add("Player Spawn","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
+    ply.lastConditionThought = {}
 end)
 
 hook.Add("HG_OnOtrub","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
+    ply.lastConditionThought = {}
 end)
 
 hook.Add("Player_Death","removeNotifications",function(ply)
     ply.msgs = {}
     ply.thoughtmsgs = {}
+    ply.lastConditionThought = {}
 end)
 
 local PLAYER = FindMetaTable("Player")

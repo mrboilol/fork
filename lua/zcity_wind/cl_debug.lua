@@ -16,10 +16,12 @@ local colorServerText = Color(255, 50, 50)
 local colorDeviation = Color(0, 191, 255, 255)
 local colorTextShadow = Color(0, 0, 0, 255)
 local textOffset = Vector(0, 0, 15)
-local SUPPRESSION_SOUND_VOLUME = 2.5
-local SUPPRESSION_SOUND_LEVEL = 180
-local DISTANT_CRACK_VOLUME = 2
-local DISTANT_CRACK_SOUND_LEVEL = 170
+local SUPPRESSION_SOUND_VOLUME = 4
+local SUPPRESSION_SOUND_LEVEL = 200
+local SUPERSONIC_AUDIBLE_RADIUS = 1400
+local SUBSONIC_AUDIBLE_RADIUS = 900
+local DISTANT_CRACK_VOLUME = 3.5
+local DISTANT_CRACK_SOUND_LEVEL = 190
 
 -- The remote Z-City crack pack is mounted on the server.  Keep the modern
 -- snap sounds as a fallback for installations that do not have that pack.
@@ -31,8 +33,12 @@ end
 -- Suppression is determined on the server, while the physical-bullet client
 -- hook is not guaranteed to run for every remote bullet.  Play the fly-by
 -- sound from the same authoritative event that applies the suppression.
-local function PlaySuppressionCrack(pos)
-    local crack = "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav"
+local function PlaySuppressionCrack(pos, subsonic, damage)
+    local crack = subsonic and "bul_flyby/subsonic_" .. math.random(1, 27) .. ".wav"
+        or damage >= 50 and "cracks/heavy/heav_crack_0" .. math.random(1, 9) .. ".ogg"
+        or damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
+        or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
+    crack = ResolveCrackSound(crack, "bul_snap/supersonic_snap_" .. math.random(1, 18) .. ".wav")
     EmitSound(crack, pos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
 end
 
@@ -40,24 +46,30 @@ net.Receive("ZCity_Wind_SuppressionForce", function()
     local pos = net.ReadVector()
     local force = net.ReadFloat()
 	local wasHit = net.ReadBool()
+    local soundOnly = net.ReadBool()
+    local subsonic = net.ReadBool()
+    local damage = net.ReadFloat()
+    local playSound = net.ReadBool()
 
     local lply = LocalPlayer()
     if not IsValid(lply) or not lply:IsPlayer() or not lply:Alive() then return end
 
-    if type(Suppress) == "function" then
-        Suppress(force)
-    else
-        SIB_suppress = SIB_suppress or {}
-        SIB_suppress.Force = math.Clamp((SIB_suppress.Force or 0) + force, 0, 10)
+    if not soundOnly then
+        if type(Suppress) == "function" then
+            Suppress(force)
+        else
+            SIB_suppress = SIB_suppress or {}
+            SIB_suppress.Force = math.Clamp((SIB_suppress.Force or 0) + force, 0, 10)
+        end
     end
 
     -- Hits have their own impact feedback; this event represents a clear
     -- near-miss, so it must also provide the audible crack.
-    if not wasHit then
-        PlaySuppressionCrack(pos)
+    if not wasHit and playSound then
+        PlaySuppressionCrack(pos, subsonic, damage)
     end
 
-	if not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool() then
+	if not soundOnly and (not hg_suppression_viewpunch or hg_suppression_viewpunch:GetBool()) then
 		-- Force is calculated from the bullet's closest approach on the server.
 		-- Keep grazing shots noticeable, but make a round passing right by the
 		-- player's head violently kick the view.
@@ -314,6 +326,7 @@ local function ApplyClientOverride()
             hook.Add(postEventName, "ZCity_Wind_BulletPostThink_Client", function(bullet)
                 if not bullet._lastPos or not bullet.Pos then return end
 				if bullet._ZCityCrackPlayed then return end
+				if config.Suppression and GetGlobalBool("ZCity_Wind_ServerSuppressionAudio", false) then return end
 
                 local lply = LocalPlayer()
                 if not IsValid(lply) or not lply:Alive() then return end
@@ -324,7 +337,7 @@ local function ApplyClientOverride()
 
                 local eyePos = lply:EyePos()
                 local dist, closestPos = util.DistanceToLine(bullet._lastPos, bullet.Pos, eyePos)
-                if not dist or dist >= 180 then return end
+                if not dist then return end
 
                 -- Make sure closest point lies on the actual segment
                 local segmentVec = bullet.Pos - bullet._lastPos
@@ -344,9 +357,12 @@ local function ApplyClientOverride()
 
                 if not isVisible then return end
 
-                local speed = bullet.Vel and (bullet.Vel:Length() / 52.5) or 343
+                local velocity = bullet.Vel
+                local speed = velocity and (velocity:Length() / 52.5) or 343
                 local subsonic = speed < 340
-                local playPos = closestPos - bullet.Vel:GetNormalized() * 25
+                local audibleRadius = subsonic and SUBSONIC_AUDIBLE_RADIUS or SUPERSONIC_AUDIBLE_RADIUS
+                if dist >= audibleRadius then return end
+                local playPos = velocity and closestPos - velocity:GetNormalized() * 25 or closestPos
 				bullet._ZCityCrackPlayed = true
 
 				local damage = tonumber(bullet.Damage) or 0

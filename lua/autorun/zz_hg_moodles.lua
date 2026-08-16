@@ -133,6 +133,12 @@ local moodleTexts = {
 		[3] = {title = "Severe Pain", description = "Intense pain is disrupting movement and concentration."},
 		[4] = {title = "Agony", description = "Overwhelming pain is pushing you toward unconsciousness."},
 	}},
+	burning = {levels = {
+		[1] = {title = "Burning", description = "Fire has caught on your clothing or body."},
+		[2] = {title = "Burning", description = "The flames are spreading and causing serious burns."},
+		[3] = {title = "Engulfed", description = "Much of your body is engulfed in flames."},
+		[4] = {title = "Consumed by Fire", description = "You are fully ablaze and need to extinguish yourself immediately."},
+	}},
 	carbon_monoxide = {levels = {
 		[1] = {title = "Carbon Monoxide Exposure", description = "A mild headache signals toxic gas exposure."},
 		[2] = {title = "Carbon Monoxide Poisoning", description = "Dizziness and confusion are developing from poor oxygen delivery."},
@@ -395,26 +401,30 @@ local function getMoodle3Icon(effect)
 		fracture = "fractured", dislocated = "dislocated", analgesia = "drugged",
 		stamina = "exertion", exertion = "exertion", bleeding = level == 1 and "bleeding" or "bleeding" .. level,
 		carbon_monoxide = "hypoxemia", arrhythmia = "arrhythmia", fibrillation = "fibrillation",
-		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "brain-dying", asystole = "heart-failure",
-		low_blood = "hypotension", high_blood = "hypertension", blinded = "confused",
-		brain_bleed = "brain-hemorrhage", intracranial_pressure = "terror",
+		hypoxemia = "hypoxemia", brain_hypoxia = "brain-hypoxia", brain_dying = "terror", asystole = "heart-failure",
+		low_blood = "hypotension", high_blood = "hypertension", no_eye = "last-stand", blinded = "confused",
+		brain_bleed = "terror", intracranial_pressure = "terror",
 		weakness = "encumbered", bradypnea = "dyspnea", thorax = "hemothorax",
 		respiratory_arrest = "respiratory-arrest", skull = "intercranial-hypertension",
-		dislocated_jaw = level >= 4 and "dejawed" or "dislocated", organ_damage = effect.icon, spine_break = "fractured",
-		shock = "shock", seizure = "seizure", internal_bleed = "internal-bleeding",
-		panic = "panic", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
+		dislocated_jaw = "dejawed", organ_damage = effect.icon, spine_break = "fractured",
+		shock = "trauma", seizure = "seizure", internal_bleed = "internal-bleeding",
+		panic = "trauma", tinnitus = "tinnitus", deaf = "deafness", encumbered = "encumbered",
 		nausea = "sick", amputated = "amputation", concussion = "stress", sepsis = "sepsis",
-	adrenaline = "adrenaline", zerlked = "drugged",
+		adrenaline = "adrenaline", zerlked = "drugged",
 		rage = "anger5",
 		hunger = level == 1 and "hunger" or "hunger" .. level, full = level == 1 and "full" or "full2",
 	}
 	local name = names[effect.name]
+	if effect.name == "burning" then
+		return getMoodle3Material("burning") or getMoodle3Material("hyperthermia")
+	end
 	if effect.name == "pain" then name = level == 4 and "agony" or level == 3 and "extreme-pain" or "pain" end
 	if effect.name == "tired" then name = level >= 3 and "very-tired" or "tired" end
 	if effect.name == "consciousness" then name = level == 4 and "unconscious" or level >= 2 and "very-tired" or "tired" end
 	if effect.name == "happy" then name = level == 1 and "happy" or "happy" .. level end
 	if effect.name == "anger" then name = "anger" .. level end
-	if effect.name == "brain_damage" then name = level == 4 and "brain-dying" or level == 1 and "brain-damage" or "brain-damage" .. level end
+	if effect.name == "blinded" then name = level >= 3 and "last-stand" or "confused" end
+	if effect.name == "brain_damage" then name = "terror" end
 	if effect.name == "temperature" then
 		name = effect.icon == "veryhot" and "hyperthermia" or effect.icon == "heated" and "hot" or level >= 3 and "hypothermia" or "cold"
 	end
@@ -447,6 +457,11 @@ local function add(effects, name, icon, level, mood, priority, value)
 		name = name, icon = icon, level = math.Clamp(math.floor(number(level, 1)), 1, 4),
 		mood = mood or "bad", priority = priority or 100, value = value,
 	}
+end
+
+local function burningFireCount(ent)
+	if not IsValid(ent) or not ent:IsOnFire() then return 0 end
+	return math.max(istable(ent.fires) and table.Count(ent.fires) or 0, 1)
 end
 
 local limbKeys = {"larm", "rarm", "lleg", "rleg"}
@@ -550,6 +565,13 @@ local function buildEffects(ply, org)
 		local level = pain >= 85 and 4 or pain >= 60 and 3 or pain > 45 and 2 or 1
 		add(effects, "pain", ({"smallpain", "pain", "superpain", "agony"})[level], level, "bad", 21, math.floor(pain))
 	end
+	-- vFire is attached to the fake ragdoll while the player is unconscious.
+	-- Read both entities so the moodle survives fake/downed state transitions.
+	local character = hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
+	local fireCount = math.max(burningFireCount(ply), burningFireCount(character))
+	if fireCount > 0 then
+		add(effects, "burning", "burning", math.Clamp(fireCount, 1, 4), "bad", -75, fireCount)
+	end
 	local co = orgNumber(org, "CO", 0)
 	if co > 5 then
 		local level = co >= 25 and 4 or co >= 20 and 3 or co >= 10 and 2 or 1
@@ -559,8 +581,11 @@ local function buildEffects(ply, org)
 	local heartRate = orgNumber(org, "heartbeat", orgNumber(org, "pulse", 70))
 	local palpitations = math.Clamp(orgNumber(org, "palpitations", 0), 0, 1)
 	local arrhythmia = math.Clamp(orgNumber(org, "arrhythmia", 0), 0, 1)
-	local irregular = arrhythmia > 0.1 or org.unstableRhythm
-	local fibrillating = org.fibrillation == true or palpitations > 0
+	local unstableRhythm = org.unstableRhythm
+	local irregular = arrhythmia > 0.1 or unstableRhythm ~= nil
+	local fibrillating = org.fibrillation == true
+		or palpitations > 0.05
+		or unstableRhythm == "atrial_fibrillation"
 		or (irregular and heartRate >= 190)
 	if not org.heartstop and fibrillating then
 		local level = org.fibrillation and 4 or highRank(math.max(palpitations, arrhythmia, math.Clamp((heartRate - 160) / 140, 0, 1)), {0.1, 0.3, 0.6, 0.85})
@@ -655,7 +680,10 @@ local function buildEffects(ply, org)
 		if lungL >= 0.8 or lungR >= 0.8 or liver >= 0.8 then combatLevel = 3 end
 		if heart >= 0.8 or trachea >= 0.8 or (lungL >= 0.8 and lungR >= 0.8) then combatLevel = 4 end
 		if heart >= 1 or trachea >= 1 or (lungL >= 1 and lungR >= 1) then combatLevel = 5 end
-		add(effects, "organ_damage", isMoodle3() and "combat" .. combatLevel or "orangedamage", math.min(combatLevel, 4), "bad", 55)
+		-- Moodle 3 groups damaged lungs and trachea under dyspnea; other damaged
+		-- organs retain the generic combat-trauma ladder.
+		local organIcon = isMoodle3() and (hasRespiratoryOrganDamage and "dyspnea" or "combat" .. combatLevel) or "orangedamage"
+		add(effects, "organ_damage", organIcon, math.min(combatLevel, 4), "bad", 55)
 	end
 
 	local spine1, spine2, spine3 = orgNumber(org, "spine1", 0), orgNumber(org, "spine2", 0), orgNumber(org, "spine3", 0)
@@ -1104,6 +1132,7 @@ local function drawMoodles()
 			icon = berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect)
 		else
 			icon = getIcon(effect.icon)
+			if not icon and effect.name == "burning" then icon = getIcon("veryhot") end
 		end
 		if icon then
 			surface.SetMaterial(icon)

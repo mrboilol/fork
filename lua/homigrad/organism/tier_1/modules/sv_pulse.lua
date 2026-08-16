@@ -251,6 +251,7 @@ end
 
 function hg.organism.StartFibrillation(org)
 	if not org or org.heartstop then return end
+	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then return false end
 	org.fibrillation = true
 	-- Fibrillation replaces an organized palpitation rhythm; keeping both
 	-- active makes circulation, ECG, and status displays disagree.
@@ -258,6 +259,35 @@ function hg.organism.StartFibrillation(org)
 	org.palpitationTreatmentUntil = 0
 	org.arrhythmia = math.max(org.arrhythmia or 0, 0.8)
 	org.fibrillationStart = CurTime()
+end
+
+local function maintainSimplifiedCirculation(org)
+	-- hg_huyorgans 0 keeps one intentionally small cardiovascular model. Organ
+	-- hits may still bleed and hurt, but the protected heart continues pumping.
+	org.heartstop = false
+	org.heartbeat = 70
+	org.pulse = 70
+	org.ecgState = "normal_sinus"
+	org.bloodPressure = 90
+	org.systolic = 120
+	org.diastolic = 80
+	org.cardiacOutput = 1
+	org.strokeVolume = 1
+	org.compensationPulseMultiplier = 1
+	org.compensationHeartRateTarget = 70
+	org.cardiacArrestStart = nil
+	org.cardiacArrestO2Start = nil
+	org.terminalRhythm = nil
+	org.unstableRhythm = nil
+	org.fibrillation = false
+	org.fibrillationStart = 0
+	org.arrhythmia = 0
+	org.palpitations = 0
+	org.myocardialOxygen = 1
+	org.heartStrain = 0
+	org.hypotension = 0
+	org.hypertension = 0
+	org.hemorrhagicCollapseExposure = 0
 end
 
 function hg.organism.TryRestartHeartWithResuscitation(org)
@@ -354,12 +384,6 @@ module[2] = function(owner, org, timeValue)
 	local organSystemsEnabled = hg.organism.OrganSystemsEnabled and hg.organism.OrganSystemsEnabled() or true
 	notifyTemperatureStress(owner, org)
 
-	if not organSystemsEnabled then
-		org.heartstop = false
-		org.terminalRhythm = nil
-		org.unstableRhythm = nil
-	end
-
 	local o2Value = org.o2 and org.o2[1] or 30
 	if not org.heartstop and not org.fibrillation and (org.arrhythmia or 0) < 0.25 and (org.myocardialOxygen or 1) > 0.55 then
 		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 45)
@@ -385,6 +409,11 @@ module[2] = function(owner, org, timeValue)
 			org.hypotension = 1
 			org.hypertension = 0
 		end
+		return
+	end
+
+	if not organSystemsEnabled then
+		maintainSimplifiedCirculation(org)
 		return
 	end
 
@@ -469,6 +498,10 @@ module[2] = function(owner, org, timeValue)
 	local hypotensionRate = highSpeedPressureShock > 0.25 and timeValue / 2.5 or timeValue / 8
 	org.hypotension = Approach(org.hypotension or 0, hypotensionTarget, hypotensionRate)
 	org.hypertension = Approach(org.hypertension or 0, Clamp(Remap(circulation, 1.25, 1.68, 0, 1), 0, 1), timeValue / 20)
+	-- Normalized stroke volume separates a fast electrical rate from how much
+	-- blood each effective beat is actually moving.
+	local rateFactor = math.max((org.heartbeat or 0) / 70, 0.1)
+	org.strokeVolume = Clamp((org.cardiacOutput or 0) / rateFactor, 0, 1.5)
 
 	-- Epinephrine supports a functioning respiratory/circulatory system; it
 	-- must not manufacture cardiac or oxygen recovery after breathing has failed.
@@ -482,10 +515,6 @@ module[2] = function(owner, org, timeValue)
 		org.heartStrain = Approach(org.heartStrain or 0, 0, timeValue / 8)
 		org.arrhythmia = Approach(org.arrhythmia or 0, 0, timeValue / 6)
 	end
-	-- Normalized stroke volume separates a fast electrical rate from how much
-	-- blood each effective beat is actually moving.
-	local rateFactor = math.max((org.heartbeat or 0) / 70, 0.1)
-	org.strokeVolume = Clamp((org.cardiacOutput or 0) / rateFactor, 0, 1.5)
 
 	org.fearadd = math.Clamp(org.fearadd, 0, 3)
 
@@ -792,7 +821,7 @@ module[2] = function(owner, org, timeValue)
 		local lowK = math.Clamp((org.hypotension - 0.35) / 0.5, 0, 1)
 		org.consciousness = math.Approach(org.consciousness, 0.75, timeValue * (0.08 + lowK * 0.11))
 		if org.isPly and not org.otrub then
-			org.owner:Notify("My limbs feel weak... My circulation is failing.", true, "low_perfusion", 0, nil, Color(200, 170, 170))
+			org.owner:Notify("My limbs feel weak...", true, "low_perfusion", 0, nil, Color(200, 170, 170))
 		end
 	end
 

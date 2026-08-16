@@ -451,7 +451,8 @@ function hg.likely_to_phrase(ply)
 	local temperature = org.temperature
 	local o2 = org.o2 and org.o2[1] or 30
 	local bleedingOut = (org.bleed or 0) > 0.5
-	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone - CurTime()) < -3)
+	local boneThoughtAge = org.just_damaged_bone and (CurTime() - org.just_damaged_bone)
+	local broken_dislocated = boneThoughtAge and boneThoughtAge >= 0 and boneThoughtAge <= 8
 	local adrenaline = org.adrenaline or 0
 
 	local fearBoost = (fear > 0.75 and adrenaline > 0.5) and 2.0 or 0
@@ -504,7 +505,8 @@ local function get_status_message(ply)
 	local thirst = org.thirst
 	local goodmood = org.goodmood
 	local panicattack = org.panicattack or 0
-	local broken_dislocated = org.just_damaged_bone and ((org.just_damaged_bone + 3 - CurTime()) < -3)
+	local boneThoughtAge = org.just_damaged_bone and (CurTime() - org.just_damaged_bone)
+	local broken_dislocated = boneThoughtAge and boneThoughtAge >= 0 and boneThoughtAge <= 8
 	local o2 = org.o2 and org.o2[1] or 30
 	local bleedingOut = (org.bleed or 0) > 0.5
 	local fear = org.fear or 0
@@ -611,7 +613,14 @@ local function get_status_message(ply)
 	end
 	
 	if most_wanted_phraselist then
-		str = most_wanted_phraselist[math.random(#most_wanted_phraselist)]
+		local phraseIndex = math.random(#most_wanted_phraselist)
+		local previousPhrase = org.last_status_phrase
+		if #most_wanted_phraselist > 1 and most_wanted_phraselist[phraseIndex] == previousPhrase then
+			phraseIndex = phraseIndex % #most_wanted_phraselist + 1
+		end
+
+		str = most_wanted_phraselist[phraseIndex]
+		org.last_status_phrase = str
 
 		return str
 	else

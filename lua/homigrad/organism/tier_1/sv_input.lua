@@ -21,11 +21,9 @@ local melee_pain_scale = 0.85
 local melee_shock_scale = 0.45
 local melee_nosebleed_pain_scale = 0.3
 local goodmood_damage_max_bonus = 0.05
-local attacker_adrenaline_gain_window = 2
-local attacker_adrenaline_cooldown = 5
-local attacker_adrenaline_cap = 1.5
 local severe_damage_adrenaline_threshold = 25
 local severe_damage_adrenaline_delay = 0.75
+local combat_response_cooldown = 0.35
 local catastrophic_brain_shot_chance_min = 0.25
 local catastrophic_brain_shot_chance_max = 0.7
 local catastrophic_brain_shot_damage_max = 50
@@ -597,11 +595,17 @@ function hg.organism.AddWoundManual(ent,dmgBlood,localPos,localAng,bone,time)
 end
 
 local NOSEBLEED_MIN_HARM = 18
-local NOSEBLEED_COOLDOWN = 12
+local NOSEBLEED_COOLDOWN = 30
 local NOSEBLEED_PAIN_MIN = 4
 local NOSEBLEED_PAIN_MAX = 11
 local nosebleedLocalPos = Vector(3.5, 0, -3.5)
 local nosebleedLocalAng = Angle(90, 0, 0)
+local nosebleedThoughts = {
+	"My nose is bleeding.",
+	"I can taste blood from my nose.",
+	"Blood is running out of my nose.",
+	"My nose won't stop bleeding.",
+}
 
 local function nosebleedTimerName(ply)
 	return "ZCity_NosebleedCleanup" .. ply:EntIndex()
@@ -657,6 +661,9 @@ local function applyNosebleed(ent, harm, ignoreCooldown)
 
 	local time = CurTime()
 	if not ignoreCooldown and (org.nextNosebleed or 0) > time then return end
+	-- An active nosebleed already owns its wound, particles, and thought. Repeated
+	-- internal-bleed rolls should not stack another wound or alert every few ticks.
+	if not ignoreCooldown and ply:GetNWFloat("ZCity_NosebleedUntil", 0) > time then return end
 
 	local character = hg and hg.GetCurrentCharacter and hg.GetCurrentCharacter(ply) or ply
 	if not IsValid(character) or not character.organism then character = ply end
@@ -675,7 +682,12 @@ local function applyNosebleed(ent, harm, ignoreCooldown)
 	queueNosebleedCleanup(ply, bleedUntil)
 
 	if ply.Notify then
-		ply:Notify("My nose is bleeding.", 8, "nosebleed", 0)
+		local thoughtIndex = math.random(#nosebleedThoughts)
+		if #nosebleedThoughts > 1 and thoughtIndex == org.lastNosebleedThought then
+			thoughtIndex = thoughtIndex % #nosebleedThoughts + 1
+		end
+		org.lastNosebleedThought = thoughtIndex
+		ply:Notify(nosebleedThoughts[thoughtIndex], NOSEBLEED_COOLDOWN, "nosebleed", 0)
 	end
 
 	return true
@@ -1051,6 +1063,56 @@ local hg_bloodimpacts = ConVarExists("hg_bloodimpacts") and GetConVar("hg_bloodi
 local net, math, hg, IsValid = net, math, hg, IsValid
 local takeRagdollDamage
 
+local function getCombatPlayer(ent)
+	if not IsValid(ent) then return nil end
+	if ent:IsPlayer() then return ent end
+	local owner = hg.RagdollOwner and hg.RagdollOwner(ent)
+	return IsValid(owner) and owner:IsPlayer() and owner or nil
+end
+
+local function addCombatResponse(org, angerAmount, adrenalineAmount)
+	if not org or not hg.organism.RileAnger then return end
+	local now = CurTime()
+	if (org._combatResponseNext or 0) > now then return end
+	org._combatResponseNext = now + combat_response_cooldown
+	hg.organism.RileAnger(org, angerAmount, adrenalineAmount)
+end
+
+local function triggerCombatResponses(targetPlayer, attacker, inflictor, dmgInfo, damage)
+	local bullet = dmgInfo:IsDamageType(DMG_BULLET + DMG_BUCKSHOT)
+	local inflictorClass = IsValid(inflictor) and inflictor:GetClass() or ""
+	local inflictorBase = IsValid(inflictor) and inflictor.Base or ""
+	local melee = dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH)
+		or (IsValid(inflictor) and inflictor.ismelee2)
+		or inflictorBase == "weapon_melee"
+		or inflictorClass == "weapon_melee"
+	local blast = dmgInfo:IsDamageType(DMG_BLAST)
+	if not bullet and not melee and not blast then return end
+
+	local attackerPlayer = getCombatPlayer(attacker)
+	local validTarget = IsValid(targetPlayer) and targetPlayer:IsPlayer()
+	if validTarget and attackerPlayer == targetPlayer then return end
+	if not validTarget and not IsValid(attackerPlayer) then return end
+
+	local severity = math.Clamp((tonumber(damage) or 0) / 40, 0.25, 1)
+	local attackerAnger, attackerAdrenaline = 0.08, 0.18
+	local victimAnger, victimAdrenaline = 0.16, 0.5
+	if melee then
+		attackerAnger, attackerAdrenaline = 0.14, 0.25
+		victimAnger, victimAdrenaline = 0.2, 0.35
+	elseif blast then
+		attackerAnger, attackerAdrenaline = 0.08, 0.25
+		victimAnger, victimAdrenaline = 0.18, 0.65
+	end
+
+	if IsValid(attackerPlayer) and attackerPlayer.organism then
+		addCombatResponse(attackerPlayer.organism, attackerAnger * severity, attackerAdrenaline * severity)
+	end
+	if validTarget and targetPlayer.organism and IsValid(attacker) and not attacker:IsWorld() then
+		addCombatResponse(targetPlayer.organism, victimAnger * severity, victimAdrenaline * severity)
+	end
+end
+
 -- Rapid-fire damage can arrive several times inside one server tick.  Keep the
 -- entry and exit streams separate, but coalesce each stream without replacing
 -- its pending timer or losing the accumulated impact count.
@@ -1191,6 +1253,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	end
 	
 	local dmg = dmgInfo:GetDamage()
+	triggerCombatResponses(ply, attacker, inf, dmgInfo, dmg)
 
 	local bullet = inf.bullet
 	
@@ -1323,6 +1386,7 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	org._directBrainDamageThisHit = nil
 	org._bulletHitVitalThisHit = nil
 	org._fistHeadTraceSkullIntact = isFistInflictor(dmgInfo) and (org.skull or 0) < 1 or nil
+	org._skullImpactThisHit = nil
 	-- Limb bone and artery damage must stay on the physics limb the bullet
 	-- actually entered; a long penetration trace may still cross other limbs.
 	local impact
@@ -1527,6 +1591,19 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		hitgroup = org.lastGibHitGroup
 		bonename = hitgroup == HITGROUP_STOMACH and "ValveBiped.Bip01_Pelvis" or bonename
 	end
+	-- The head contains several small face, eye, and jaw boxes. A valid blunt
+	-- melee head hit can intersect one of those (or miss the manual OBBs due to
+	-- model differences) without ever reaching the skull handler. Guarantee one
+	-- skull impact for the physical head bone, while avoiding duplicate damage
+	-- when the organ trace already struck it.
+	local bluntMeleeHeadHit = (hitgroup == HITGROUP_HEAD or entryHitgroup == HITGROUP_HEAD)
+		and isBluntMeleeInflictor(dmgInfo)
+		and dmgInfo:IsDamageType(DMG_CLUB + DMG_CRUSH)
+	if bluntMeleeHeadHit and not org._skullImpactThisHit then
+		local helmetMul = org.owner.armors and org.owner.armors["head"] ~= nil and 0.2 or 1
+		input_list.skull(org, 1, math.max(dmg_before, 0) / 25 * helmetMul, dmgInfo)
+	end
+	org._skullImpactThisHit = nil
 	if hitgroup == HITGROUP_HEAD and IsValid(inf) and inf.ForceHeadKnockout then
 		org.needotrub = true
 		org.shock = math.max(org.shock or 0, 40)
@@ -1604,10 +1681,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 		local adrenaline = org.adrenaline
 		local analgesiaMul = ((org.analgesia + org.painkiller * 0.3) * 4 + 1)
 		local painkillerMul = 1
-		local inflictor = dmgInfo:GetInflictor()
-		local inflictorClass = IsValid(inflictor) and inflictor:GetClass() or ""
-		local inflictorBase = IsValid(inflictor) and inflictor.Base or ""
-		local meleeHit = dmgInfo:IsDamageType(DMG_CLUB + DMG_SLASH) or inflictorBase == "weapon_melee" or inflictorClass == "weapon_melee"
 	
 		org.shock_turn = 10 * (!org.otrub and 1 or 0.1)
 		local collapseThreshold = org.shock_turn * 1.5 * analgesiaMul * painkillerMul
@@ -1624,22 +1697,6 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 
 		if dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT+DMG_SLASH+DMG_BURN) then
 			org.fearadd = org.fearadd + 0.3
-			if IsValid(att) and att ~= org.owner and att:IsPlayer() and att.organism then
-				local attackerOrg = att.organism
-				local now = CurTime()
-
-				if now >= (attackerOrg._attackAdrenalineCooldownUntil or 0) then
-					attackerOrg._attackAdrenalineGainUntil = now + attacker_adrenaline_gain_window
-					attackerOrg._attackAdrenalineCooldownUntil = attackerOrg._attackAdrenalineGainUntil + attacker_adrenaline_cooldown
-				end
-
-				if now <= (attackerOrg._attackAdrenalineGainUntil or 0) then
-					if (attackerOrg.adrenaline or 0) < attacker_adrenaline_cap then
-						att:AddNaturalAdrenaline(0.15)
-						attackerOrg.adrenaline = math.min(attackerOrg.adrenaline or 0, attacker_adrenaline_cap)
-					end
-				end
-			end
 		end
 
 		org.fearadd = org.fearadd + hurt_add * 0.5
@@ -2375,8 +2432,10 @@ local function velocityDamage(ent, data)
 			--PrintTable(org.wounds)
 		end
 		--print(dmg)
-		if dmg > 0.2 then
-			org.internalBleed = org.internalBleed + (dmg * 2.5) 
+		-- Ordinary tumbles and limb bumps should not create systemic bleeding.
+		-- Reserve it for genuinely severe whole-body blunt impacts.
+		if dmg >= 0.85 then
+			org.internalBleed = (org.internalBleed or 0) + math.Clamp((dmg - 0.65) * 1.5, 0.25, 3)
 		end
 
 		org.owner:AddNaturalAdrenaline( math.min( dmg * 0.5, 4) )

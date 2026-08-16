@@ -140,6 +140,12 @@ if CLIENT then
 	hg.thoughts = hg.thoughts or {}
 	hg.notificationFont = "HuyFont"
 
+	cvars.AddChangeCallback("hg_newthoughts", function()
+		hg.currentNotification = nil
+		hg.notifications = {}
+		hg.thoughts = {}
+	end, "hg_clear_notification_mode_switch")
+
 	hook.Add("Player_Death","removeNotifications",function(ply)
 		if ply != lply then return end
 

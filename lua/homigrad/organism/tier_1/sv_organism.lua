@@ -151,6 +151,8 @@ hook.Add("Org Clear", "Main", function(org)
 	module.random_events[1](org)
 	module.goodmood[1](org)
 	if module.teeth and module.teeth[1] then module.teeth[1](org) end
+	if module.medical_system and module.medical_system[1] then module.medical_system[1](org) end
+	if module.trauma_combo and module.trauma_combo[1] then module.trauma_combo[1](org) end
 	org.brain = 0
 	org.brainFrontal = 0
 	org.brainParietal = 0
@@ -332,7 +334,7 @@ local function wounds_signature(wounds)
 end
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
 local hg_incapacitation = ConVarExists("hg_incapacitation") and GetConVar("hg_incapacitation") or CreateConVar("hg_incapacitation", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable Remorseism incapacitation", 0, 1)
-local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Enable organ-system failure: 0=organs stay functional, 1=normal organ failure", 0, 1)
+local hg_huyorgans = ConVarExists("hg_huyorgans") and GetConVar("hg_huyorgans") or CreateConVar("hg_huyorgans", "1", FCVAR_ARCHIVE + FCVAR_REPLICATED + FCVAR_NOTIFY, "Organ complexity: 0=simple heart/lungs with bones and head trauma, 1=full organ failure", 0, 1)
 local incapacitation_death_delay = 25
 
 function hg.organism.IncapacitationEnabled()
@@ -683,9 +685,17 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local demandAdjustedPeripheral = math.Clamp(org.peripheralperfusion / Lerp(hypothermicPriority, 1, 0.48), 0, 1)
 	local systemicDelivery = math.min(org.bodyoxygen, demandAdjustedPerfusion, demandAdjustedPeripheral)
 	local systemicSeverity = math.Clamp((0.55 - systemicDelivery) / 0.45, 0, 1)
-	local severeBloodLoss = bloodFraction < 0.72 or (org.internalBleed or 0) > 2.5
+	-- internalBleed is an injury-severity score, not lost circulating volume.
+	-- Let it become dangerous through its real bleed rate/complications and the
+	-- resulting blood loss instead of treating the score itself as ischemia.
+	local severeBloodLoss = bloodFraction < 0.72
 	local o2Value = istable(org.o2) and (org.o2[1] or 30) or (tonumber(org.o2) or 30)
-	local hypoxemia = (org.bodyoxygen or 1) < 0.55 or o2Value < 14
+	local o2Range = istable(org.o2) and math.max(org.o2.range or 30, 1) or 30
+	-- Exertion debt deliberately lowers the displayed tissue-O2 reserve while a
+	-- player is exhausted. Add that temporary demand back for the pathological
+	-- hypoxemia gate so ordinary fatigue cannot start systemic organ damage.
+	local nonExertionO2 = math.min(o2Value + math.max(org.exertionO2Debt or 0, 0), o2Range)
+	local hypoxemia = nonExertionO2 / o2Range < 14 / 30
 	local ischemiaCauseActive = severeBloodLoss or hypoxemia or (org.hemotransfusionshock or 0) > 0
 	if systemicSeverity > 0 and ischemiaCauseActive then
 		local exposureRate = 0.35 + systemicSeverity * 0.65
@@ -1251,13 +1261,18 @@ end)
 hook.Add("EntityFireBullets", "GunfightNaturalAdrenaline", function(shooter)
 	if not IsValid(shooter) or not shooter:IsPlayer() or not shooter:Alive() then return end
 	local org = shooter.organism
-	if not org or org.otrub or (org.adrenaline or 0) >= gunfight_adrenaline_cap then return end
+	if not org or org.otrub then return end
 	if (org._gunfightAdrenalineNext or 0) > CurTime() then return end
 
-	-- Firing under pressure should produce the same short survival response as
-	-- taking a serious hit, without allowing sustained fire to fill the meter.
+	-- Sustained gunfire creates a small combat response even before a shot lands;
+	-- actual hits add the stronger attacker/victim response in sv_input.
 	org._gunfightAdrenalineNext = CurTime() + gunfight_adrenaline_delay
-	shooter:AddNaturalAdrenaline(0.3)
+	local adrenalineAmount = (org.adrenaline or 0) < gunfight_adrenaline_cap and 0.3 or 0
+	if hg.organism.RileAnger then
+		hg.organism.RileAnger(org, 0.05, adrenalineAmount)
+	elseif adrenalineAmount > 0 then
+		shooter:AddNaturalAdrenaline(0.3)
+	end
 end)
 
 hook.Add("Org Think", "PanicAttackNearbyFire", function(owner, org)
@@ -1661,9 +1676,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.blindness = 0
 	end
 
-	if isPly then
-		module.liver[2](owner, org, timeValue)
-	end
+	if module.liver and module.liver[2] then module.liver[2](owner, org, timeValue) end
 
 	--module.blood[3](owner,org,timeValue)--arteria
 	module.blood[2](owner, org, timeValue)
@@ -1685,6 +1698,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.random_events[2](owner, org, timeValue)
 		module.goodmood[2](owner, org, timeValue)
 		if module.teeth and module.teeth[2] then module.teeth[2](owner, org, timeValue) end
+		if module.medical_system and module.medical_system[2] then module.medical_system[2](owner, org, timeValue) end
 	end
 
 
@@ -1693,6 +1707,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	-- Derive systemic/brain delivery only after the blood and pulse modules
 	-- have supplied this tick's bleed rates, oxygen and pump output.
 	hg.organism.UpdatePerfusion(owner, org, timeValue)
+	if module.trauma_combo and module.trauma_combo[2] then module.trauma_combo[2](owner, org, timeValue) end
 
 	if org.owner.PlayerClassName == "furry" then
 		org.assimilated = 0
@@ -1774,7 +1789,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.disorientation = math.max(org.disorientation, 0.6 + panicattack_disorientation * org.panicattack)
 		org.adrenalineAdd = math.Approach(org.adrenalineAdd or 0, math.Remap(org.panicattack, panicattack_threshold, 1, panicattack_adrenaline_add_target * 0.5, panicattack_adrenaline_add_target), timeValue / panicattack_adrenaline_add_rise_time)
 
-		if isPly and curTime >= (org.nextPanicHeartRoll or 0) then
+		if organSystemsEnabled and isPly and curTime >= (org.nextPanicHeartRoll or 0) then
 			org.nextPanicHeartRoll = curTime + panicattack_heart_roll_delay
 			if math.random(100) <= panicattack_heart_roll_chance then
 				org.heartstop = true
@@ -1785,31 +1800,21 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.panicattackActive = false
 		org.nextPanicHeartRoll = curTime + panicattack_heart_roll_delay
 	end
+	local temperature = org.temperature or 36.7
 	local brainDelta = (org.brain or 0) - oldSeizureBrain
 	local lobeDelta = lobeDamage - oldSeizureLobeDamage
-	local traumaDelta = math.max(brainDelta, lobeDelta)
-	if traumaDelta > 0 then
-		hg.organism.AddSeizure(org, math.Clamp(traumaDelta * seizure_brain_trauma_gain_mul, 0, 1))
+	if brainDelta > 0 then
+		hg.organism.AddSeizure(org, math.Clamp(brainDelta * seizure_brain_trauma_gain_mul, 0, 1))
 	elseif brainDelta < 0 and oldSeizureBrain > 0 then
-		hg.organism.AddSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
+		reduceSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
 	end
-	-- Отключено: перепад температуры (холод/жара) больше не вызывает судороги.
-	-- Раньше на зимних картах это давало случайные припадки из-за переохлаждения.
-	local temperature = org.temperature or 36.7
-	local curTime = CurTime()
-	if organSystemsEnabled then
-		local brainDelta = (org.brain or 0) - oldSeizureBrain
-		local lobeDelta = lobeDamage - oldSeizureLobeDamage
-		if brainDelta > 0 then
-			hg.organism.AddSeizure(org, math.Clamp(brainDelta * seizure_brain_trauma_gain_mul, 0, 1))
-		elseif brainDelta < 0 and oldSeizureBrain > 0 then
-			reduceSeizure(org, math.Clamp(-brainDelta * seizure_brain_heal_gain_mul, 0, 1))
-		end
-		if lobeDelta > 0 then
-			hg.organism.AddSeizure(org, math.Clamp(lobeDelta * seizure_brain_trauma_gain_mul, 0, 1))
-		end
+	if lobeDelta > 0 then
+		hg.organism.AddSeizure(org, math.Clamp(lobeDelta * seizure_brain_trauma_gain_mul, 0, 1))
+	end
 
-		local temperature = org.temperature or 36.7
+	-- Temperature-driven seizures belong to the full physiology mode. Direct
+	-- brain and skull trauma remains consequential in both modes.
+	if organSystemsEnabled then
 		local previousTemperature = oldSeizureTemperature
 		local heatStress = math.max(temperature - seizure_temperature_high_start, previousTemperature - seizure_temperature_high_start, 0)
 		local coldStress = math.max(seizure_temperature_low_start - temperature, seizure_temperature_low_start - previousTemperature, 0)
@@ -1818,6 +1823,8 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		elseif coldStress > 0 then
 			hg.organism.AddSeizure(org, timeValue * coldStress * seizure_temperature_cold_gain_mul)
 		end
+
+	end
 
 	local seizureBrainDamage = math.Clamp(math.max(org.brain or 0, lobeDamage), 0, 1)
 	if seizureBrainDamage >= 0.01 then
@@ -1842,16 +1849,13 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.nextSeizureRoll = curTime + seizure_brain_roll_delay
 	end
 
-		org.lastSeizureBrain = org.brain or 0
-		org.lastSeizureLobeDamage = lobeDamage
-		org.lastSeizureTemperature = temperature
+	org.lastSeizureBrain = org.brain or 0
+	org.lastSeizureLobeDamage = lobeDamage
+	org.lastSeizureTemperature = temperature
 
-		if org.seizure >= 1 and !org.seizureActive and isPly and owner:Alive() then
-			start_seizure(owner, org)
-		elseif org.seizureActive and org.seizure <= 0 then
-			stop_seizure(owner, org)
-		end
-	elseif org.seizureActive then
+	if org.seizure >= 1 and !org.seizureActive and isPly and owner:Alive() then
+		start_seizure(owner, org)
+	elseif org.seizureActive and org.seizure <= 0 then
 		stop_seizure(owner, org)
 	end
 
@@ -2124,7 +2128,7 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.owner.fullsend = true
 	end
 
-	if organSystemsEnabled and org.brain > 0.05 then
+	if org.brain > 0.05 then
 		if math.random(600) < org.brain * 20 then
 			org.needfake = true
 		end
@@ -2191,15 +2195,21 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 		if not org.likely_phrase then org.likely_phrase = 0 end
 
-				org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 50, 0)
+				org.likely_phrase = math.max(org.likely_phrase + math.Rand(0, mul) / 25, 0)
 		//print(org.likely_phrase)
-		if org.likely_phrase >= 1 and !hg.GetCurrentCharacter(owner):IsOnFire() then
-			org.likely_phrase = 0
-
+		if org.likely_phrase >= 1 and (org.next_status_phrase or 0) <= curTime and !hg.GetCurrentCharacter(owner):IsOnFire() then
 			local str = hg.get_status_message(owner)
 			//print(str)
-			-- (msg, delay, msgKey, showTime, func, clr)
-			owner:Notify(str, 1, "phrase", 1, nil, hg.get_notify_color(owner))
+			if str and str != "" then
+				org.likely_phrase = 0
+				org.next_status_phrase = curTime + math.Rand(7, 11)
+				-- (msg, delay, msgKey, showTime, func, clr)
+				owner:Notify(str, 7, "phrase", 0.15, nil, hg.get_notify_color(owner))
+			else
+				-- Keep most of the accumulated urgency when a transient state has no
+				-- phrase, rather than making the player wait through another full roll.
+				org.likely_phrase = 0.8
+			end
 		end
 	end
 

@@ -464,9 +464,9 @@ function PANEL:Init()
     self.AccumulatedAngle = 0
     self.WrapAngle = 0
     self.GameType = (hg and hg.MedicalMinigame and hg.MedicalMinigame.NextType) or "bandage"
-    local animType = ConVarExists("hg_healanims") and GetConVar("hg_healanims"):GetInt() or 0
-    self.ProgressiveJudgeMode = animType == 2
-    self.MinigameDifficultyMultiplier = self.ProgressiveJudgeMode and 1.15 or 1
+    local armSpeed = hg.MedicalMinigame.GetArmSpeedMultiplier(LocalPlayer())
+    self.MedicalArmSpeedMultiplier = math.max(armSpeed, 0.25)
+    self.MinigameDifficultyMultiplier = 1 / self.MedicalArmSpeedMultiplier
     self.TargetTurns = (self.GameType == "bandage") and 1 or (hg.MedicalMinigame.RequiredTurns or 6)
     self.BandageCompletions = hg.MedicalMinigame.NextCompletions or 0
     self.BandageRequiredCompletions = hg.MedicalMinigame.NextRequiredCompletions or 3
@@ -1008,7 +1008,8 @@ function PANEL:ThinkSyringe(mx, my)
     end
 
     local handleTargetY = my - (self.SyringeGrabOffsetY or 0)
-    local normalized = math.Clamp((handleTargetY - layout.handleBaseY) / layout.sessionTravel, 0, 1)
+    local requiredTravel = layout.sessionTravel * (self.MinigameDifficultyMultiplier or 1)
+    local normalized = math.Clamp((handleTargetY - layout.handleBaseY) / requiredTravel, 0, 1)
     local newProgress = math.max(self.Progress, normalized)
     if newProgress <= self.Progress then return end
 
@@ -1064,7 +1065,11 @@ function PANEL:ThinkAmputation(mx, my)
     local swipeSpeed = moveDistance / math.max(FrameTime(), 0.001)
     local cappedSwipeSpeed = math.min(swipeSpeed, self.AmputationFillSpeedCap or 520)
     local effectiveMoveDistance = cappedSwipeSpeed * FrameTime()
-    local delta = math.min(effectiveMoveDistance / math.max(self.AmputationRequiredTravel or 5600, 1), 1 - self.Progress)
+    local delta = math.min(
+        effectiveMoveDistance / math.max(self.AmputationRequiredTravel or 5600, 1)
+            * (self.MedicalArmSpeedMultiplier or 1),
+        1 - self.Progress
+    )
 
     if delta > 0 then
         self.Progress = math.min(self.Progress + delta, 1)
@@ -1189,6 +1194,7 @@ function PANEL:ThinkDislocation(mx, my)
         local distanceFactor = 1 - math.Clamp(distanceToSocket / math.max(self.DislocationSnapWindow or 24, 1), 0, 1)
         local speedFactor = 1 - math.Clamp(speed / math.max(self.DislocationStableSpeed or 120, 1), 0, 1)
         local gain = math.max(distanceFactor * speedFactor, 0) * dt * 0.9
+            * (self.MedicalArmSpeedMultiplier or 1)
         local newProgress = math.min(self.Progress + gain, 1)
 
         if newProgress > self.Progress then

@@ -85,7 +85,7 @@ local concussion_phrases_severe = {
     "Make it stop...",
     "I can't breathe right...",
     "My head's splitting open...",
-    "I'm falling... I'm falling...",
+    "6lling... I'm falling...",
     "Everything's going black...",
     "I can't feel my legs...",
     "Please... somebody help...",

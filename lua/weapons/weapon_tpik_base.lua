@@ -444,7 +444,7 @@ function SWEP:SetHandPos(noset)
 
 	local bones = hg.TPIKBonesRH or {}
 
-	if self.rhandik and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) then
+	if self.rhandik and hg.CanUseRightHand(ply) and (ent == ply or hg.KeyDown(ply,IN_USE) or (ply:GetNetVar("lastFake",0) > CurTime())) then
 		for _, bone in ipairs(bones) do
 			local wm_boneindex = wm:LookupBone(bone)
 			if !wm_boneindex then continue end

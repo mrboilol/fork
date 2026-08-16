@@ -897,28 +897,35 @@ local arterySoundDelayMin = 1
 local arterySoundDelayMax = 1.25
 local arterySoundPitchMin = 95
 local arterySoundPitchMax = 110
-local normalBleedRateFull = 0.18
+-- Per-wound rates are replicated as actual blood loss per second.  The old
+-- 0.18 threshold belonged to the pre-normalized, per-think value and made even
+-- tiny wounds render at maximum intensity after the rate was normalized.
+local normalBleedRateVisible = 0.02
+local normalBleedRateFull = 6
 local normalParticleSizeThin = 0.48
 local normalParticleSizeAverage = 0.7
 local normalParticleSizeThick = 0.9
 local hg_blood_fps = ConVarExists("hg_blood_fps") and GetConVar("hg_blood_fps") or CreateClientConVar("hg_blood_fps", 24, true, nil, "fps to draw blood", 12, 165)
 local bloodDown = Vector(0, 0, -1)
 
-local function getWoundVisualIntensity(org, totalBleedRate, wound, woundCount, fullRate, woundIndex, woundRates)
+local function getWoundVisualIntensity(totalBleedRate, wound, woundCount, fullRate, woundIndex, woundRates)
 	local woundBleedRate = woundRates and tonumber(woundRates[woundIndex]) or tonumber(wound.visualBleedRate)
 	if woundBleedRate == nil then
 		woundBleedRate = math.max(totalBleedRate or 0, 0) / math.max(woundCount or 1, 1)
 	end
 	woundBleedRate = math.max(woundBleedRate, 0)
-	local rateIntensity = math.Clamp((woundBleedRate - 0.005) / math.max(fullRate - 0.005, 0.001), 0, 1)
-	local bloodReserve = math.Clamp(((org.blood or 5000) - 2000) / 3000, 0, 1)
-	local perfusion = math.Clamp(org.perfusion or (1 - (org.hypotension or 0)), 0, 1)
-	local threatMul = 1 + (1 - bloodReserve) * 0.35 + (1 - perfusion) * 0.15
 
-	-- Wound size and its initial peak do not participate. The visual is driven by
-	-- current blood loss, with only a restrained boost when that loss is especially
-	-- dangerous to the organism's remaining circulation.
-	return math.Clamp(rateIntensity * threatMul, 0, 1)
+	-- Wound size and remaining blood reserve do not participate.  Pressure still
+	-- affects how far particles travel, while this value controls only how much
+	-- blood is drawn from the loss the wound is currently applying.
+	local intensity = math.Clamp(
+		(woundBleedRate - normalBleedRateVisible)
+			/ math.max(fullRate - normalBleedRateVisible, 0.001),
+		0,
+		1
+	)
+
+	return intensity, woundBleedRate
 end
 
 local function getArterialVisualIntensity(org, wounds, wound, woundIndex)
@@ -1345,9 +1352,10 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 		if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
 			local circulation = getCirculationStrength(org)
 			for i, wound in pairs(wounds) do
-				local intensity = getWoundVisualIntensity(org, org.venousBleed, wound, #wounds, normalBleedRateFull, i, org.woundBleedRates)
-				local particleInterval = Lerp(intensity, 3.2, 0.16)
-				
+				local intensity, woundBleedRate = getWoundVisualIntensity(org.venousBleed, wound, #wounds, normalBleedRateFull, i, org.woundBleedRates)
+				if woundBleedRate <= 0.001 then continue end
+				local particleInterval = Lerp(intensity, 5, 0.16)
+
 				if (wound[5] or 0) < time then
 					local bone = wound[4]
 					local boneID = wound[8]

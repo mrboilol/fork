@@ -29,8 +29,10 @@ SWEP.DeploySnd = ""
 SWEP.HolsterSnd = ""
 
 function SWEP:SetupDataTables()
-    self:NetworkVar("Float",0,"Holding")
-    self:NetworkVar("Float",1,"RemainingAmount")
+    self:NetworkVar("Float", 0, "Holding")
+    self:NetworkVar("Float", 1, "RemainingAmount")
+    self:NetworkVar("Float", 2, "Dose")
+    self:NetworkVar("Bool", 0, "HealingOther")
 end
 
 function SWEP:InitializeAdd()
@@ -39,6 +41,8 @@ function SWEP:InitializeAdd()
 	self.modeValues = {
 		[1] = 1,
 	}
+	self:SetDose(self.modeValues[1])
+	self:SetRemainingAmount(self.modeValues[1])
 	self.ModelScale = 1
 end
 
@@ -52,7 +56,7 @@ SWEP.ShouldDeleteOnFullUse = false
 
 SWEP.showstats = true
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Heal animation type: 0 = progressive minigames, 1 = Judge animations, 2 = progressive Judge minigames", 0, 2)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
 
 function SWEP:Think()
 	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then

@@ -310,12 +310,16 @@ local appearance_unsaved_fade_in_time = 0.12
 local appearance_unsaved_fade_out_time = 0.1
 local appearance_unsaved_box_rise = 10
 
-local function BuildComparableAppearanceTable(tblAppearance)
-    local appearance = table.Copy(tblAppearance or {})
+local function NormalizeAttachmentSlots(appearance)
     appearance.AAttachments = appearance.AAttachments or {}
-    appearance.AAttachments[1] = appearance.AAttachments[1] or "none"
-    appearance.AAttachments[2] = appearance.AAttachments[2] or "none"
-    appearance.AAttachments[3] = appearance.AAttachments[3] or "none"
+    for slotID = 1, 6 do
+        appearance.AAttachments[slotID] = appearance.AAttachments[slotID] or "none"
+    end
+    return appearance
+end
+
+local function BuildComparableAppearanceTable(tblAppearance)
+    local appearance = NormalizeAttachmentSlots(table.Copy(tblAppearance or {}))
     appearance.AClothes = appearance.AClothes or {}
     appearance.ABodygroups = appearance.ABodygroups or {}
     if IsColor(appearance.AColor) then
@@ -433,6 +437,79 @@ local function CreateAppearanceTextButton(pParent, strTitle, fnClick, fnIsActive
     end
 
     return btn
+end
+
+local function CreateAppearanceSectionLabel(parent, title)
+    local label = vgui.Create("DPanel", parent)
+    label:Dock(TOP)
+    label:DockMargin(MenuUnit(10), MenuUnit(7), MenuUnit(10), MenuUnit(2))
+    label:SetTall(MenuUnit(17))
+    label.Title = string.upper(title)
+    label.Paint = function(this, w, h)
+        draw.SimpleText(this.Title, "ZCity_Menu_Settings_Tiny", 0, h * 0.5, appearance_color_text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        surface.SetFont("ZCity_Menu_Settings_Tiny")
+        local textWidth = surface.GetTextSize(this.Title)
+        surface.SetDrawColor(255, 255, 255, 24)
+        surface.DrawLine(textWidth + MenuUnit(7), math.floor(h * 0.5), w, math.floor(h * 0.5))
+    end
+    return label
+end
+
+local function CreateAppearanceButtonGrid(parent, entries)
+    local gap = MenuUnit(3)
+    local buttonHeight = MenuUnit(31)
+    local grid = vgui.Create("DPanel", parent)
+    grid:Dock(TOP)
+    grid:DockMargin(MenuUnit(8), 0, MenuUnit(8), MenuUnit(2))
+    grid:SetTall(math.ceil(#entries / 2) * (buttonHeight + gap) - gap)
+    grid.Paint = function() end
+    grid.Buttons = {}
+
+    for _, entry in ipairs(entries) do
+        local button = vgui.Create("DButton", grid)
+        button:SetText("")
+        button:SetCursor("hand")
+        button.Title = entry[1]
+        button.ClickFunc = entry[2]
+        button.ActiveFunc = entry[3]
+        function button:DoClick()
+            if self.ClickFunc then
+                self.ClickFunc()
+            end
+        end
+        function button:Think()
+            self.IsActive = self.ActiveFunc and self.ActiveFunc() or false
+        end
+        function button:Paint(w, h)
+            local hovered = self:IsHovered()
+            local background = self.IsActive and Color(44, 44, 58, 235) or Color(20, 20, 30, 205)
+            if hovered then
+                background = Color(36, 36, 48, 235)
+            end
+            surface.SetDrawColor(background)
+            surface.DrawRect(0, 0, w, h)
+            surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, self.IsActive and 150 or 55)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            if self.IsActive then
+                surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 210)
+                surface.DrawRect(0, 0, MenuUnit(3), h)
+            end
+            draw.SimpleText(self.Title, "ZCity_Menu_Settings_Tiny", MenuUnit(9), h * 0.5, self.IsActive and appearance_color_white or appearance_color_text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        end
+        grid.Buttons[#grid.Buttons + 1] = button
+    end
+
+    function grid:PerformLayout(w)
+        local buttonWidth = math.floor((w - gap) / 2)
+        for index, button in ipairs(self.Buttons) do
+            local column = (index - 1) % 2
+            local row = math.floor((index - 1) / 2)
+            button:SetPos(column * (buttonWidth + gap), row * (buttonHeight + gap))
+            button:SetSize(column == 0 and buttonWidth or w - buttonWidth - gap, buttonHeight)
+        end
+    end
+
+    return grid
 end
 
 local function CreateAppearanceInfoRow(pParent, strTitle, fnValue)
@@ -583,7 +660,7 @@ function PANEL:PostInit()
         luaMenu:UseAppearanceMenuMusic()
     end
     self.AppearanceTable = table.Copy(self.AppearanceTable or hg.Appearance.LoadAppearanceFile(hg.Appearance.SelectedAppearance:GetString()) or APmodule.GetRandomAppearance())
-    self.AppearanceTable.AAttachments = self.AppearanceTable.AAttachments or {"none", "none", "none"}
+    NormalizeAttachmentSlots(self.AppearanceTable)
     self.AppearanceTable.AClothes = self.AppearanceTable.AClothes or {}
     self.AppearanceTable.ABodygroups = self.AppearanceTable.ABodygroups or {}
     self.AppearanceTable.AColor = self.AppearanceTable.AColor or color_white
@@ -602,8 +679,10 @@ function PANEL:PostInit()
     local CloseSelectorPanel
     local savedAppearanceSnapshot
     local unsavedOverlay
-    local savedAppearanceSnapshot
-    local unsavedOverlay
+
+    local function PlayCloth()
+        surface.PlaySound("player/clothes_generic_foley_0" .. math.random(5) .. ".wav")
+    end
 
     local function CloseAllAccessoryMenus()
     end
@@ -719,6 +798,163 @@ function PANEL:PostInit()
         return row
     end
 
+    local function AddSelectorSkinRow(parent, strTitle, family, slotID, fnIsActive)
+        local row = vgui.Create("DPanel", parent)
+        row:Dock(TOP)
+        row:SetTall(MenuUnit(122))
+        row:DockMargin(MenuUnit(12), MenuUnit(4), MenuUnit(12), 0)
+        row.Family = family
+        row.CurrentIndex = 1
+        row.SpinAngle = 20
+
+        function row:GetCurrentIndex()
+            local key = main.AppearanceTable.AAttachments and main.AppearanceTable.AAttachments[slotID]
+            if key then
+                for index, variant in ipairs(self.Family.variants) do
+                    if variant.key == key then
+                        return index
+                    end
+                end
+            end
+            return math.Clamp(self.CurrentIndex or 1, 1, #self.Family.variants)
+        end
+
+        function row:GetCurrentVariant()
+            return self.Family.variants[self:GetCurrentIndex()]
+        end
+
+        local selectButton = vgui.Create("DButton", row)
+        selectButton:Dock(TOP)
+        selectButton:SetTall(MenuUnit(94))
+        selectButton:SetText("")
+        selectButton:SetCursor("hand")
+        function selectButton:DoClick()
+            local variant = row:GetCurrentVariant()
+            if not variant then return end
+            main.AppearanceTable.AAttachments[slotID] = variant.key
+            main:SyncSharedPreview()
+            PlayCloth()
+        end
+        function selectButton:Think()
+            self.IsActive = fnIsActive and fnIsActive() or false
+            self.HoverLerp = LerpFT(0.2, self.HoverLerp or 0, self:IsHovered() and 1 or 0)
+            row.SpinAngle = (row.SpinAngle or 20) + RealFrameTime() * 18 * (self.HoverLerp or 0)
+        end
+        function selectButton:Paint(w, h)
+            local background = self.IsActive and Color(28, 28, 38, 220) or Color(18, 18, 26, 180)
+            if self:IsHovered() then
+                background = Color(34, 34, 46, 235)
+            end
+            surface.SetDrawColor(background)
+            surface.DrawRect(0, 0, w, h)
+            surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, self.IsActive and 180 or 90)
+            surface.DrawOutlinedRect(0, 0, w, h, 1)
+            draw.SimpleText(strTitle, "ZCity_Menu_Settings_Small", MenuUnit(86), MenuUnit(18), appearance_color_text, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            local variant = row:GetCurrentVariant()
+            local variantName = variant and (variant.data.name or variant.key) or ""
+            draw.SimpleText(string.NiceName(tostring(variantName)), "ZCity_Menu_Settings_Tiny", MenuUnit(86), MenuUnit(46), appearance_color_text_dim, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        end
+
+        local icon = vgui.Create("DModelPanel", row)
+        icon:SetPos(MenuUnit(8), MenuUnit(8))
+        icon:SetSize(MenuUnit(68), MenuUnit(78))
+        icon:SetMouseInputEnabled(false)
+        icon:SetModel(tostring(family.model or "models/error.mdl"))
+        icon:SetFOV(24)
+        function icon:PreDrawModel()
+            local variant = row:GetCurrentVariant()
+            local data = variant and variant.data
+            if data and data.bSetColor then
+                local colorDraw = data.vecColorOveride or (lply.GetPlayerColor and lply:GetPlayerColor() or lply:GetNWVector("PlayerColor", Vector(1, 1, 1)))
+                render.SetColorModulation(colorDraw[1], colorDraw[2], colorDraw[3])
+            end
+        end
+        function icon:PostDrawModel()
+            local variant = row:GetCurrentVariant()
+            if variant and variant.data and variant.data.bSetColor then
+                render.SetColorModulation(1, 1, 1)
+            end
+        end
+        function icon:LayoutEntity(ent)
+            ent:SetAngles(Angle(0, row.SpinAngle or 20, 0))
+            local variant = row:GetCurrentVariant()
+            local data = variant and variant.data
+            local skin = data and data.skin
+            ent:SetSkin((isfunction(skin) and skin(ent) or skin) or 0)
+            if data and data.bodygroups then
+                ent:SetBodyGroups(data.bodygroups)
+            else
+                for _, bodygroup in ipairs(ent:GetBodyGroups()) do
+                    ent:SetBodygroup(bodygroup.id, 0)
+                end
+            end
+            ent:SetSubMaterial(0, data and data.SubMat or "")
+            self:SetLookAt(data and data.vpos or Vector(0, 0, 0))
+        end
+
+        local sliderStrip = vgui.Create("DPanel", row)
+        sliderStrip:Dock(BOTTOM)
+        sliderStrip:SetTall(MenuUnit(24))
+        sliderStrip:DockMargin(MenuUnit(10), 0, MenuUnit(10), MenuUnit(4))
+        sliderStrip.Paint = function() end
+
+        local valueLabel = vgui.Create("DLabel", sliderStrip)
+        valueLabel:Dock(RIGHT)
+        valueLabel:SetWide(MenuUnit(54))
+        valueLabel:SetFont("ZCity_Menu_Settings_Tiny")
+        valueLabel:SetTextColor(appearance_color_text_dim)
+        valueLabel:SetContentAlignment(6)
+
+        local slider = vgui.Create("DSlider", sliderStrip)
+        slider:Dock(FILL)
+        slider:DockMargin(MenuUnit(2), MenuUnit(5), MenuUnit(2), MenuUnit(5))
+        slider:SetTrapInside(true)
+        function slider:Paint(w, h)
+            draw.RoundedBox(3, 0, h * 0.5 - 3, w, 6, Color(40, 40, 40, 220))
+            surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 60)
+            surface.DrawOutlinedRect(0, h * 0.5 - 3, w, 6, 1)
+        end
+        if IsValid(slider.Knob) then
+            function slider.Knob:Paint(w, h)
+                draw.RoundedBox(3, 2, MenuUnit(1), w - 4, h - MenuUnit(2), appearance_color_white)
+            end
+        end
+
+        local function RefreshSlider()
+            local index = row:GetCurrentIndex()
+            row.CurrentIndex = index
+            slider._lock = true
+            slider:SetSlideX((index - 1) / math.max(1, #family.variants - 1))
+            slider._lock = nil
+            valueLabel:SetText(index .. " / " .. #family.variants)
+        end
+
+        function slider:OnValueChanged(fraction)
+            if self._lock then return end
+            local index = math.Clamp(math.Round(1 + fraction * math.max(1, #family.variants - 1)), 1, #family.variants)
+            local variant = family.variants[index]
+            if variant and main.AppearanceTable.AAttachments[slotID] != variant.key then
+                main.AppearanceTable.AAttachments[slotID] = variant.key
+                main:SyncSharedPreview()
+                if RealTime() - (row.LastClothSound or 0) > 0.12 then
+                    PlayCloth()
+                    row.LastClothSound = RealTime()
+                end
+            end
+            row.CurrentIndex = index
+            valueLabel:SetText(index .. " / " .. #family.variants)
+        end
+
+        function row:Think()
+            if self:GetCurrentIndex() != (self.CurrentIndex or 1) then
+                RefreshSlider()
+            end
+        end
+
+        RefreshSlider()
+        return row
+    end
+
     local function AddSelectorNoneRow(parent, fnIsActive, fnClick)
         local row = vgui.Create("DButton", parent)
         row:Dock(TOP)
@@ -796,7 +1032,7 @@ function PANEL:PostInit()
 
     local function UpdateAppearance(tbl)
         main.AppearanceTable = table.Copy(tbl or main.AppearanceTable or {})
-        main.AppearanceTable.AAttachments = main.AppearanceTable.AAttachments or {"none", "none", "none"}
+        NormalizeAttachmentSlots(main.AppearanceTable)
         main.AppearanceTable.AClothes = main.AppearanceTable.AClothes or {}
         main.AppearanceTable.ABodygroups = main.AppearanceTable.ABodygroups or {}
         main.AppearanceTable.AColor = main.AppearanceTable.AColor or color_white
@@ -1044,6 +1280,26 @@ function PANEL:PostInit()
         end)
     end
 
+    local function BuildAccessoryFamilyKey(accessory)
+        return table.concat({
+            tostring(accessory.model or ""),
+            tostring(accessory.bone or ""),
+            tostring(accessory.placement or ""),
+            tostring(accessory.norender and 1 or 0),
+            tostring(accessory.bonemerge and 1 or 0)
+        }, "|")
+    end
+
+    local function AccessoryFamilyActive(family, slotID)
+        local current = GetAttachmentValue(slotID)
+        for _, variant in ipairs(family.variants) do
+            if variant.key == current then
+                return true
+            end
+        end
+        return false
+    end
+
     local function OpenAccessorySlot(slotID, title, placements)
         OpenSelectorPanel(title, title, "Select " .. title, function(scroll)
             AddSelectorNoneRow(scroll, function()
@@ -1051,8 +1307,10 @@ function PANEL:PostInit()
             end, function()
                 main.AppearanceTable.AAttachments[slotID] = "none"
                 main:SyncSharedPreview()
-                surface.PlaySound("player/clothes_generic_foley_0" .. math.random(5) .. ".wav")
+                PlayCloth()
             end)
+            local families = {}
+            local ordered = {}
             for k, v in SortedPairs(hg.Accessories or {}) do
                 if not placements[v.placement] then continue end
                 local hasItem = lply.PS_HasItem and lply:PS_HasItem(k)
@@ -1084,7 +1342,7 @@ function PANEL:PostInit()
                     local vr = fam.variants[1]
                     local k = vr.key
                     local v = vr.data
-                    UI.ModelRow(scroll, string.NiceName(v.name or k), v, function() return GetAttachmentValue(slotID)==k end, function()
+                    AddSelectorModelRow(scroll, string.NiceName(v.name or k), v, function() return GetAttachmentValue(slotID)==k end, function()
                         main.AppearanceTable.AAttachments[slotID] = k
                         main:SyncSharedPreview()
                         PlayCloth()
@@ -1092,7 +1350,7 @@ function PANEL:PostInit()
                 else
                     local base = fam.variants[1]
                     local famTitle = string.NiceName(tostring(base.data.name or base.key):gsub("%s*%d+%s*$", ""))
-                    UI.SkinRow(scroll, famTitle, fam, main, slotID, function() return AccessoryFamilyActive(fam, slotID) end)
+                    AddSelectorSkinRow(scroll, famTitle, fam, slotID, function() return AccessoryFamilyActive(fam, slotID) end)
                 end
             end
         end)
@@ -1116,13 +1374,13 @@ function PANEL:PostInit()
 
     local function OpenAccessoryColorMenu()
         local colorable = GetColorableAccessories()
-        OpenSelector("Acc. Tint", "Acc. Tint", "Accessory Color", function(scroll)
+        OpenSelectorPanel("Acc. Tint", "Acc. Tint", "Accessory Color", function(scroll)
             if #colorable == 0 then
                 local lbl = vgui.Create("DLabel", scroll)
                 lbl:Dock(TOP)
-                lbl:DockMargin(MU(6),MU(6),MU(6),MU(6))
+                lbl:DockMargin(MenuUnit(6), MenuUnit(6), MenuUnit(6), MenuUnit(6))
                 lbl:SetFont("ZCity_Menu_Settings_Tiny")
-                lbl:SetTextColor(CLR.dim)
+                lbl:SetTextColor(appearance_color_text_dim)
                 lbl:SetText("Equip an accessory with color support to tint it.")
                 lbl:SizeToContents()
                 return
@@ -1137,45 +1395,49 @@ function PANEL:PostInit()
             end
             local lbl = vgui.Create("DLabel", scroll)
             lbl:Dock(TOP)
-            lbl:DockMargin(MU(6),MU(6),MU(6),MU(3))
+            lbl:DockMargin(MenuUnit(6), MenuUnit(6), MenuUnit(6), MenuUnit(3))
             lbl:SetFont("ZCity_Menu_Settings_Tiny")
-            lbl:SetTextColor(CLR.text)
+            lbl:SetTextColor(appearance_color_text)
             lbl:SetText("Select accessory:")
             lbl:SizeToContents()
             local picker = vgui.Create("DComboBox", scroll)
             picker:Dock(TOP)
-            picker:DockMargin(MU(6),MU(3),MU(6),MU(6))
-            picker:SetTall(MU(22))
+            picker:DockMargin(MenuUnit(6), MenuUnit(3), MenuUnit(6), MenuUnit(6))
+            picker:SetTall(MenuUnit(22))
             for _,key in ipairs(colorable) do picker:AddChoice(GetAccessoryName(key) or key, key, key==targetKey) end
             picker:SetValue(GetAccessoryName(targetKey) or targetKey)
             local mixer = vgui.Create("DColorMixer", scroll)
             mixer:Dock(TOP)
-            mixer:DockMargin(MU(6),MU(3),MU(6),MU(6))
-            mixer:SetTall(MU(160))
+            mixer:DockMargin(MenuUnit(6), MenuUnit(3), MenuUnit(6), MenuUnit(6))
+            mixer:SetTall(MenuUnit(160))
             mixer:SetPalette(false)
             mixer:SetAlphaBar(false)
             mixer:SetWangs(true)
             mixer:SetColor(getClr())
             main.AppearanceTable.AAttachmentColors = main.AppearanceTable.AAttachmentColors or {}
-            function mixer:ValueChanged(c) main.AppearanceTable.AAttachmentColors[targetKey] = IsColor(c) and c or Color(c.r,c.g,c.b) end
+            function mixer:ValueChanged(c)
+                main.AppearanceTable.AAttachmentColors[targetKey] = IsColor(c) and c or Color(c.r, c.g, c.b)
+                main:SyncSharedPreview()
+            end
             function picker:OnSelect(i,v,d) targetKey=d mixer:SetColor(getClr()) end
             local resetBtn = vgui.Create("DButton", scroll)
             resetBtn:Dock(TOP)
-            resetBtn:DockMargin(MU(6),MU(3),MU(6),MU(6))
-            resetBtn:SetTall(MU(24))
+            resetBtn:DockMargin(MenuUnit(6), MenuUnit(3), MenuUnit(6), MenuUnit(6))
+            resetBtn:SetTall(MenuUnit(24))
             resetBtn:SetText("Reset Color")
             resetBtn:SetFont("ZCity_Menu_Settings_Tiny")
             function resetBtn:Paint(w,h)
                 surface.SetDrawColor(22,20,17,220)
                 surface.DrawRect(0,0,w,h)
-                surface.SetDrawColor(CLR.gold.r,CLR.gold.g,CLR.gold.b,80)
+                surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 80)
                 surface.DrawOutlinedRect(0,0,w,h,1)
-                draw.SimpleText("Reset Color", "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, CLR.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText("Reset Color", "ZCity_Menu_Settings_Tiny", w * 0.5, h * 0.5, appearance_color_text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
             function resetBtn:DoClick()
                 main.AppearanceTable.AAttachmentColors = main.AppearanceTable.AAttachmentColors or {}
                 main.AppearanceTable.AAttachmentColors[targetKey] = nil
                 mixer:SetColor(main.AppearanceTable.AColor or color_white)
+                main:SyncSharedPreview()
             end
         end)
     end
@@ -1188,13 +1450,13 @@ function PANEL:PostInit()
                 table.insert(equipped, key)
             end
         end
-        OpenSelector("Poses", "Poses", "Adjust accessory poses", function(scroll)
+        OpenSelectorPanel("Poses", "Poses", "Adjust accessory poses", function(scroll)
             if #equipped == 0 then
                 local lbl = vgui.Create("DLabel", scroll)
                 lbl:Dock(TOP)
-                lbl:DockMargin(MU(6),MU(6),MU(6),MU(6))
+                lbl:DockMargin(MenuUnit(6), MenuUnit(6), MenuUnit(6), MenuUnit(6))
                 lbl:SetFont("ZCity_Menu_Settings_Tiny")
-                lbl:SetTextColor(CLR.dim)
+                lbl:SetTextColor(appearance_color_text_dim)
                 lbl:SetText("Equip an accessory first.")
                 lbl:SizeToContents()
                 return
@@ -1217,57 +1479,57 @@ function PANEL:PostInit()
             end
             local lbl = vgui.Create("DLabel", scroll)
             lbl:Dock(TOP)
-            lbl:DockMargin(MU(6),MU(6),MU(6),MU(3))
+            lbl:DockMargin(MenuUnit(6), MenuUnit(6), MenuUnit(6), MenuUnit(3))
             lbl:SetFont("ZCity_Menu_Settings_Tiny")
-            lbl:SetTextColor(CLR.text)
+            lbl:SetTextColor(appearance_color_text)
             lbl:SetText("Select accessory:")
             lbl:SizeToContents()
             local picker = vgui.Create("DComboBox", scroll)
             picker:Dock(TOP)
-            picker:DockMargin(MU(6),MU(3),MU(6),MU(6))
-            picker:SetTall(MU(22))
+            picker:DockMargin(MenuUnit(6), MenuUnit(3), MenuUnit(6), MenuUnit(6))
+            picker:SetTall(MenuUnit(22))
             for _,key in ipairs(equipped) do picker:AddChoice(GetAccessoryName(key) or key, key, key==targetKey) end
             picker:SetValue(GetAccessoryName(targetKey) or targetKey)
             local function makeSlider(parent, title, min, max, initVal, onChange)
                 local row = vgui.Create("DPanel", parent)
                 row:Dock(TOP)
-                row:SetTall(MU(26))
-                row:DockMargin(MU(2),0,MU(2),MU(1))
+                row:SetTall(MenuUnit(26))
+                row:DockMargin(MenuUnit(2), 0, MenuUnit(2), MenuUnit(1))
                 row.Paint = function() end
                 local tl = vgui.Create("DLabel", row)
                 tl:Dock(LEFT)
-                tl:SetWidth(MU(28))
+                tl:SetWidth(MenuUnit(28))
                 tl:SetFont("ZCity_Menu_Settings_Tiny")
                 tl:SetText(title)
-                tl:SetTextColor(CLR.text)
+                tl:SetTextColor(appearance_color_text)
                 tl:SetContentAlignment(4)
                 local te = vgui.Create("DTextEntry", row)
                 te:Dock(RIGHT)
-                te:SetWidth(MU(48))
+                te:SetWidth(MenuUnit(48))
                 te:SetFont("ZCity_Menu_Settings_Tiny")
-                te:SetTextColor(CLR.text)
+                te:SetTextColor(appearance_color_text)
                 te:SetDrawLanguageID(false)
                 te:SetText(string.format("%.2f", initVal))
-                te:SetCursorColor(CLR.text)
+                te:SetCursorColor(appearance_color_text)
                 te:SetHighlightColor(Color(80,80,80))
                 te.Paint = function(this, w, h)
                     draw.RoundedBox(3, 0, 0, w, h, Color(28,28,28,200))
-                    surface.SetDrawColor(CLR.gold.r,CLR.gold.g,CLR.gold.b,60)
+                    surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 60)
                     surface.DrawOutlinedRect(0,0,w,h,1)
-                    this:DrawTextEntryText(CLR.text, CLR.accent, CLR.text)
+                    this:DrawTextEntryText(appearance_color_text, appearance_color_white, appearance_color_text)
                 end
                 local slider = vgui.Create("DSlider", row)
                 slider:Dock(FILL)
-                slider:DockMargin(MU(3),MU(4),MU(3),MU(4))
+                slider:DockMargin(MenuUnit(3), MenuUnit(4), MenuUnit(3), MenuUnit(4))
                 slider:SetTrapInside(true)
                 function slider:Paint(w,h)
                     draw.RoundedBox(3,0,h*0.5-3,w,6,Color(40,40,40,220))
-                    surface.SetDrawColor(CLR.accent.r,CLR.accent.g,CLR.accent.b,50)
+                    surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 50)
                     surface.DrawOutlinedRect(0,h*0.5-3,w,6,1)
                 end
                 if IsValid(slider.Knob) then
                     function slider.Knob:Paint(w,h)
-                        draw.RoundedBox(3,2,MU(1),w-4,h-MU(2),CLR.accent)
+                        draw.RoundedBox(3, 2, MenuUnit(1), w - 4, h - MenuUnit(2), appearance_color_white)
                     end
                 end
                 row.Value = initVal
@@ -1308,7 +1570,17 @@ function PANEL:PostInit()
                 return row
             end
             local poseSliders = {}
-            local origPoses = hg._OrigAccPoses or {}
+            hg._OrigAccPoses = hg._OrigAccPoses or {}
+            local origPoses = hg._OrigAccPoses
+            for _, key in ipairs(equipped) do
+                if not origPoses[key] then
+                    local accessory = hg.Accessories[key]
+                    origPoses[key] = {
+                        fempos = accessory.fempos and {Vector(accessory.fempos[1]), Angle(accessory.fempos[2]), accessory.fempos[3]} or nil,
+                        malepos = accessory.malepos and {Vector(accessory.malepos[1]), Angle(accessory.malepos[2]), accessory.malepos[3]} or nil
+                    }
+                end
+            end
             local function rebuildSliders()
                 for _,p in ipairs(poseSliders) do if IsValid(p) then p:Remove() end end
                 poseSliders = {}
@@ -1328,9 +1600,9 @@ function PANEL:PostInit()
                 end
                 local posLabel = addPanel(vgui.Create("DLabel", scroll))
                 posLabel:Dock(TOP)
-                posLabel:DockMargin(MU(6),MU(6),MU(6),MU(2))
+                posLabel:DockMargin(MenuUnit(6), MenuUnit(6), MenuUnit(6), MenuUnit(2))
                 posLabel:SetFont("ZCity_Menu_Settings_Tiny")
-                posLabel:SetTextColor(CLR.accent)
+                posLabel:SetTextColor(appearance_color_white)
                 posLabel:SetText("Position (offset)")
                 posLabel:SizeToContents()
                 addPanel(makeSlider(scroll, "X", -5, 5, curPos.x - origPos.x, function(v) curPos.x = origPos.x + v updatePose() end))
@@ -1338,9 +1610,9 @@ function PANEL:PostInit()
                 addPanel(makeSlider(scroll, "Z", -5, 5, curPos.z - origPos.z, function(v) curPos.z = origPos.z + v updatePose() end))
                 local angLabel = addPanel(vgui.Create("DLabel", scroll))
                 angLabel:Dock(TOP)
-                angLabel:DockMargin(MU(6),MU(6),MU(6),MU(2))
+                angLabel:DockMargin(MenuUnit(6), MenuUnit(6), MenuUnit(6), MenuUnit(2))
                 angLabel:SetFont("ZCity_Menu_Settings_Tiny")
-                angLabel:SetTextColor(CLR.accent)
+                angLabel:SetTextColor(appearance_color_white)
                 angLabel:SetText("Angle (offset)")
                 angLabel:SizeToContents()
                 addPanel(makeSlider(scroll, "P", -180, 180, curAng.p - origAng.p, function(v) curAng.p = origAng.p + v updatePose() end))
@@ -1349,15 +1621,15 @@ function PANEL:PostInit()
 
                 local resetBtn = addPanel(vgui.Create("DButton", scroll))
                 resetBtn:Dock(TOP)
-                resetBtn:DockMargin(MU(6),MU(3),MU(6),MU(3))
-                resetBtn:SetTall(MU(28))
+                resetBtn:DockMargin(MenuUnit(6), MenuUnit(3), MenuUnit(6), MenuUnit(3))
+                resetBtn:SetTall(MenuUnit(28))
                 resetBtn:SetText("")
                 resetBtn.Paint = function(this,w,h)
                     surface.SetDrawColor(22,20,17,220)
                     surface.DrawRect(0,0,w,h)
-                    surface.SetDrawColor(CLR.gold.r,CLR.gold.g,CLR.gold.b,80)
+                    surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 80)
                     surface.DrawOutlinedRect(0,0,w,h,1)
-                    draw.SimpleText("Reset Pose", "ZCity_Menu_Settings_Tiny", w*0.5, h*0.5, CLR.text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                    draw.SimpleText("Reset Pose", "ZCity_Menu_Settings_Tiny", w * 0.5, h * 0.5, appearance_color_text, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                 end
                 resetBtn.DoClick = function()
                     local acc = getAcc()
@@ -1371,13 +1643,15 @@ function PANEL:PostInit()
                     end
                     acc._poseModified = nil
                     main:SyncSharedPreview()
-                    surface.PlaySound("player/clothes_generic_foley_0" .. math.random(5) .. ".wav")
-                end
-                function picker:OnSelect(_, _, key)
-                    targetKey = key
                     rebuildSliders()
+                    PlayCloth()
                 end
             end
+            function picker:OnSelect(_, _, key)
+                targetKey = key
+                rebuildSliders()
+            end
+            rebuildSliders()
         end)
     end
 
@@ -1419,6 +1693,25 @@ function PANEL:PostInit()
                     surface.SetDrawColor(appearance_color_white.r, appearance_color_white.g, appearance_color_white.b, 120)
                     surface.DrawOutlinedRect(w - MenuUnit(30), MenuUnit(6), MenuUnit(18), h - MenuUnit(12), 1)
                 end
+            end
+        end)
+    end
+
+    local function OpenBodygroupMenu(bodygroupKey, title)
+        local modelData = main:GetCurrentModelData()
+        if not modelData then return end
+        local bodygroups = hg.Appearance.Bodygroups[bodygroupKey]
+        bodygroups = bodygroups and bodygroups[modelData.sex and 2 or 1] or {}
+        OpenSelectorPanel(title, title, "Select " .. title, function(scroll)
+            for key in SortedPairs(bodygroups) do
+                AddSelectorTextRow(scroll, key, function()
+                    return main.AppearanceTable.ABodygroups and main.AppearanceTable.ABodygroups[bodygroupKey] == key
+                end, function()
+                    main.AppearanceTable.ABodygroups = main.AppearanceTable.ABodygroups or {}
+                    main.AppearanceTable.ABodygroups[bodygroupKey] = key
+                    main:SyncSharedPreview()
+                    surface.PlaySound("player/weapon_draw_0" .. math.random(2, 5) .. ".wav")
+                end)
             end
         end)
     end
@@ -1668,13 +1961,13 @@ function PANEL:PostInit()
 
     savedAppearanceSnapshot = BuildComparableAppearanceTable(main.AppearanceTable)
 
-    UI.SectionLabel(sidebar, "Identity")
-    UI.ButtonGrid(sidebar, {
+    CreateAppearanceSectionLabel(sidebar, "Identity")
+    CreateAppearanceButtonGrid(sidebar, {
         {"Model", function() OpenModelMenu() end, function() return main.ActiveSection=="Model" end},
         {"Facemap", function() OpenFacemapMenu() end, function() return main.ActiveSection=="Facemap" end}
     })
-    UI.SectionLabel(sidebar, "Accessories")
-    UI.ButtonGrid(sidebar, {
+    CreateAppearanceSectionLabel(sidebar, "Accessories")
+    CreateAppearanceButtonGrid(sidebar, {
         {"Hat", function() OpenAccessorySlot(1,"Hat",{head=true,ears=true}) end, function() return main.ActiveSection=="Hat" end},
         {"Face", function() OpenAccessorySlot(2,"Face",{face=true}) end, function() return main.ActiveSection=="Face" end},
         {"Body", function() OpenAccessorySlot(3,"Body",{torso=true,spine=true}) end, function() return main.ActiveSection=="Body" end},
@@ -1684,28 +1977,18 @@ function PANEL:PostInit()
         {"Tint", function() OpenAccessoryColorMenu() end, function() return main.ActiveSection=="Acc. Tint" end},
         {"Poses", function() OpenPosesMenu() end, function() return main.ActiveSection=="Poses" end}
     })
-    UI.SectionLabel(sidebar, "Clothing")
-    UI.ButtonGrid(sidebar, {
+    CreateAppearanceSectionLabel(sidebar, "Clothing")
+    CreateAppearanceButtonGrid(sidebar, {
         {"Jacket", function() OpenClothesMenu("main","Jacket",true) end, function() return main.ActiveSection=="Jacket" end},
         {"Pants", function() OpenClothesMenu("pants","Pants") end, function() return main.ActiveSection=="Pants" end},
         {"Boots", function() OpenClothesMenu("boots","Boots") end, function() return main.ActiveSection=="Boots" end},
         {"Gloves", function() OpenGlovesMenu() end, function() return main.ActiveSection=="Gloves" end}
     })
-    UI.SectionLabel(sidebar, "Bodygroups")
-    UI.ButtonGrid(sidebar, {
+    CreateAppearanceSectionLabel(sidebar, "Bodygroups")
+    CreateAppearanceButtonGrid(sidebar, {
         {"Torso", function() OpenBodygroupMenu("TORSO","Torso Shape") end, function() return main.ActiveSection=="Torso Shape" end},
         {"Legs", function() OpenBodygroupMenu("LEGS","Legs Shape") end, function() return main.ActiveSection=="Legs Shape" end}
     })
-
-    CreateAppearanceTextButton(sidebar, "Model", function() OpenModelMenu() end, function() return main.ActiveSection == "Model" end)
-    CreateAppearanceTextButton(sidebar, "Hat", function() OpenAccessorySlot(1, "Hat", {head = true, ears = true}) end, function() return main.ActiveSection == "Hat" end)
-    CreateAppearanceTextButton(sidebar, "Face", function() OpenAccessorySlot(2, "Face", {face = true}) end, function() return main.ActiveSection == "Face" end)
-    CreateAppearanceTextButton(sidebar, "Body", function() OpenAccessorySlot(3, "Body", {torso = true, spine = true}) end, function() return main.ActiveSection == "Body" end)
-    CreateAppearanceTextButton(sidebar, "Jacket", function() OpenClothesMenu("main", "Jacket", true) end, function() return main.ActiveSection == "Jacket" end)
-    CreateAppearanceTextButton(sidebar, "Pants", function() OpenClothesMenu("pants", "Pants") end, function() return main.ActiveSection == "Pants" end)
-    CreateAppearanceTextButton(sidebar, "Boots", function() OpenClothesMenu("boots", "Boots") end, function() return main.ActiveSection == "Boots" end)
-    CreateAppearanceTextButton(sidebar, "Gloves", function() OpenGlovesMenu() end, function() return main.ActiveSection == "Gloves" end)
-    CreateAppearanceTextButton(sidebar, "Facemap", function() OpenFacemapMenu() end, function() return main.ActiveSection == "Facemap" end)
 
     local returnBtn = vgui.Create("DLabel", sidebar)
     returnBtn:Dock(BOTTOM)

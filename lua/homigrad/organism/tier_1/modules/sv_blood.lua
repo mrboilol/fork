@@ -58,6 +58,8 @@ module[1] = function(org)
 	org.internalBleedComplicationDelay = 90
 	org.internalBleedHemothoraxRoll = nil
 	org.internalBleedHemothoraxRisk = false
+	org.internalBleedThoughtLevel = 0
+	org.nextInternalBleedThought = 0
 
 	org.survivalchance = 1
 	org.hemothorax = 0
@@ -80,6 +82,14 @@ local about_to_puke = {
 	"Not feeling good...",
 	"Gonna puke right now...",
 	"I want to vomit...",
+}
+
+local internalBleedThoughts = {
+	"Something inside me is bleeding.",
+	"That hit did something bad inside.",
+	"I can feel blood pooling inside me.",
+	"I'm bleeding internally. I need treatment.",
+	"Something ruptured inside me.",
 }
 
 local vecZero = Vector(0, 0, 0)
@@ -148,11 +158,12 @@ local hold_wound_bleed_slow_twohand_mul = 0.55
 local hold_wound_arterial_slow_mul = 0.2
 local hold_wound_clot_mul = 1.35
 local hold_wound_clot_twohand_mul = 1.6
--- Keep the reported bleed rate tied to the blood that is actually removed.
--- Ordinary wounds are a little more dangerous, while arterial wounds lose
--- blood much faster and remain the true hemorrhage emergency.
-local wound_bleed_rate_mul = 1.4
-local arterial_bleed_rate_mul = 0.9
+-- Wounds must threaten the larger survivable blood-loss reserve quickly enough
+-- that several cuts or an untreated gunshot still demand immediate treatment.
+-- Coagulation, wound pressure, tourniquets, and adrenaline continue to modify
+-- these rates normally rather than being bypassed by an instant-loss shortcut.
+local wound_bleed_rate_mul = 2.25
+local arterial_bleed_rate_mul = 1.35
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
 -- until the stump is controlled.
@@ -244,22 +255,11 @@ end
 module[2] = function(owner, org, mulTime)
 	local adrenaline = math.Clamp(org.adrenaline or 0, 0, 2)
 	local isPlayer = owner:IsPlayer()
-	org.coagulation_multiplier = 1
-	org.blood_regeneration_multiplier = 1
-
-	org.bleedingmul = 1.0
-
-	if org.liver > 0 then
-		org.coagulation_multiplier = org.coagulation_multiplier * (1 - org.liver * 0.5)
-		org.blood_regeneration_multiplier = org.blood_regeneration_multiplier * (1 - org.liver * 0.75)
-		org.bleedingmul = org.bleedingmul * (1 + org.liver * 0.5)
-		-- Liver trauma adds internal bleeding when the organ is damaged. Do not
-		-- generate more forever from the persistent liver-damage value here.
-	else
-		org.coagulation_multiplier = 1.2
-		org.blood_regeneration_multiplier = 1.2
-		org.bleedingmul = 0.8
-	end
+	-- sv_liver owns the continuous base modifiers. These fallbacks only protect
+	-- hot reloads or unusual construction order before its first tick.
+	org.coagulation_multiplier = tonumber(org.coagulation_multiplier) or 1.2
+	org.blood_regeneration_multiplier = tonumber(org.blood_regeneration_multiplier) or 1.2
+	org.bleedingmul = tonumber(org.bleedingmul) or 0.8
 
 	-- Internal bleeding increases external wound bleeding rate
 	if org.internalBleed > 0 then
@@ -324,6 +324,17 @@ module[2] = function(owner, org, mulTime)
 	-- begin compromising circulation quickly while a small persistent bleed
 	-- takes much longer to become dangerous.
 	local internalBleedSeverity = math.max(tonumber(org.internalBleed) or 0, 0)
+	local internalThoughtLevel = internalBleedSeverity >= 3 and 3 or internalBleedSeverity >= 1.5 and 2 or internalBleedSeverity > 0.75 and 1 or 0
+	if internalThoughtLevel > 0 and org.isPly and IsValid(owner) and not org.otrub then
+		if internalThoughtLevel > (org.internalBleedThoughtLevel or 0) and (org.nextInternalBleedThought or 0) <= CurTime() then
+			owner:Notify(internalBleedThoughts[math.random(#internalBleedThoughts)], 30, "internalbleed", 0, nil, Color(220, 170, 170))
+			org.internalBleedThoughtLevel = internalThoughtLevel
+			org.nextInternalBleedThought = CurTime() + 30
+		end
+	elseif internalBleedSeverity <= 0.05 then
+		org.internalBleedThoughtLevel = 0
+	end
+
 	if internalBleedSeverity > 0.05 then
 		org.internalBleedDuration = (org.internalBleedDuration or 0) + mulTime
 		org.internalBleedPeak = math.max(org.internalBleedPeak or 0, internalBleedSeverity)
@@ -367,14 +378,6 @@ module[2] = function(owner, org, mulTime)
 	local thoracicComplication = thoracicSeverity * (org.internalBleedComplication or 0)
 	local tamponadeTarget = thoracicComplication * math.Clamp((internalBleedSeverity - 2.5) / 7.5, 0, 1) * 0.65
 	org.cardiacTamponade = math.max(org.cardiacTamponade or 0, math.Approach(org.cardiacTamponade or 0, tamponadeTarget, mulTime / 24))
-
-	if org.internalBleed > 2.5 and not adrenalineStabilizer and not hasAntiIschemia then
-		local untreatedTime = math.max((org.internalBleedDuration or 0) - 15, 0)
-		if untreatedTime > 0 then
-			local durationFactor = untreatedTime / 45
-			org.ischemia = org.ischemia + durationFactor * org.internalBleed * mulTime * 0.015
-		end
-	end
 
 	-- Nosebleed from severe internal bleeding
 	if org.internalBleed > 0.75 and hg.applyNosebleed and math.random() < org.internalBleed * 0.02 * mulTime then
@@ -563,26 +566,33 @@ module[2] = function(owner, org, mulTime)
 	-- It is multiplied by 100 when applied below. Keep the resulting loss in a
 	-- range where a serious injury needs treatment, but does not empty a player
 	-- from a few stacked organ hits before the delayed complications can matter.
-	-- An internal-bleed score of 10 produces 0.025 bleed (2.5 mL/s after the
+	-- An internal-bleed score of 10 produces about 0.033 bleed (3.3 mL/s after the
 	-- existing x100 application below); lower injuries scale proportionally.
 	-- This keeps a score around 1.0 as an urgent injury instead of an
 	-- immediate blood-loss death sentence.
-	local bleed = math.Clamp(org.internalBleed / 400, 0, 0.08) -- + org.lungsR[3] + org.lungsL[3]
+	local bleed = math.Clamp(org.internalBleed / 300, 0, 0.11) -- + org.lungsR[3] + org.lungsL[3]
 	
 	-- Damaged liver prevents natural internal bleeding healing unless tranexamic acid is present
 	local canHealInternalBleed = org.liver <= 0 or (org.tranexamic_acid or 0) > 0
 	local internalBleedHeal = org.internalBleedHeal or 0
 
-	-- Do not let an untreated internal injury seal itself in a fraction of a
-	-- second. Natural clotting is intentionally slow; medication provides a
-	-- meaningful but non-instant rescue path.
-	local healRate = mulTime / (canHealInternalBleed and 150 or 300)
+	-- Natural clotting remains slow. internalBleedHeal is pending treatment,
+	-- though, so consume it in lockstep with the injury it actually repairs. This
+	-- makes medicine act within seconds and prevents its healing budget from
+	-- fading away before it reaches the wound.
+	local naturalHeal = mulTime / (canHealInternalBleed and 150 or 300)
+	local treatmentHeal = 0
 	if internalBleedHeal > 0 then
-		healRate = healRate + mulTime * math.Clamp(internalBleedHeal / 100, 0.015, 0.15)
+		local treatmentRate = math.Clamp(0.35 + internalBleedHeal * 0.15, 0.35, 1.1)
+		treatmentHeal = math.min(internalBleedHeal, mulTime * treatmentRate)
 	end
 
-	org.internalBleed = math.Approach(org.internalBleed, 0, healRate)
-	org.internalBleedHeal = math.Approach(org.internalBleedHeal, 0, mulTime / 30)
+	local bleedBeforeHeal = math.max(org.internalBleed or 0, 0)
+	local naturalApplied = math.min(bleedBeforeHeal, naturalHeal)
+	local treatmentApplied = math.min(math.max(bleedBeforeHeal - naturalApplied, 0), treatmentHeal)
+	org.internalBleed = math.max(bleedBeforeHeal - naturalApplied - treatmentApplied, 0)
+	org.internalBleedHeal = math.max(internalBleedHeal - treatmentApplied, 0)
+	if org.internalBleed <= 0 then org.internalBleedHeal = 0 end
 
 	if bleed > 0 then org.blood = max(org.blood - bleed * mulTime * 100 * org.pulse / 70, 1) end
 

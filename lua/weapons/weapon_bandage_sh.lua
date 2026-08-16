@@ -66,12 +66,16 @@ end
 SWEP.offsetVec = Vector(4, -3.5, 0)
 SWEP.offsetAng = Angle(90, 90, 0)
 
-local hg_healanims = CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Heal animation type: 0 = progressive minigames, 1 = Judge animations, 2 = progressive Judge minigames", 0, 2)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+
+function SWEP:UseJudgeBandageTPIK()
+	return self.BandageTPIK == true and hg_healanims:GetInt() == 0
+end
 
 modelshuy = modelshuy or {}
 
 function SWEP:DrawWorldModel()
-	if self.BandageTPIK then
+	if self:UseJudgeBandageTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
 		if base and base.DrawWorldModel then return base.DrawWorldModel(self) end
 	end
@@ -82,7 +86,7 @@ function SWEP:DrawWorldModel()
 end
 
 function SWEP:DrawWorldModel2(nodraw)
-	if self.BandageTPIK then
+	if self:UseJudgeBandageTPIK() then
 		local base = weapons.GetStored("weapon_tpik_base")
 		if base and base.DrawWorldModel2 then return base.DrawWorldModel2(self) end
 	end
@@ -95,7 +99,8 @@ function SWEP:DrawWorldModel2(nodraw)
 	modelshuy[mdl] = IsValid(modelshuy[mdl]) and modelshuy[mdl] or ClientsideModel(mdl)
 	modelshuy[mdl]:SetNoDraw(true)
 	local WorldModel = modelshuy[mdl]
-	local owner = self:GetOwner()
+	local weaponOwner = self:GetOwner()
+	local owner = weaponOwner
 	owner = hg.GetCurrentCharacter(owner)
 	if not IsValid(WorldModel) then return end
 
@@ -113,7 +118,10 @@ function SWEP:DrawWorldModel2(nodraw)
 	if IsValid(owner) then
 		local offsetVec = self.offsetVec
 		local offsetAng = self.offsetAng
-		local boneid = owner:LookupBone(((owner.organism and owner.organism.rarmamputated) or (owner.zmanipstart ~= nil and owner.zmanipseq == "interact" and not ( owner.organism and owner.organism.larmamputated ))) and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
+		local medical = hg and hg.MedicalMinigame
+		local preferredArm = medical and medical.GetPreferredArm and medical.GetPreferredArm(weaponOwner)
+		local useLeft = preferredArm == "left"
+		local boneid = owner:LookupBone(useLeft and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 		if not boneid then return end
 		local matrix = owner:GetBoneMatrix(boneid)
 		if not matrix then return end
@@ -166,6 +174,17 @@ local bone, name
 function SWEP:BoneSet(lookup_name, vec, ang)
 	local owner = self:GetOwner()
 	if not IsValid(owner) or not owner:IsPlayer() then return end
+
+	local medical = hg and hg.MedicalMinigame
+	local preferredArm = medical and medical.GetPreferredArm and medical.GetPreferredArm(owner)
+	if preferredArm == "left" then
+		if string.sub(lookup_name, 1, 2) == "r_" then
+			lookup_name = "l_" .. string.sub(lookup_name, 3)
+		elseif string.sub(lookup_name, 1, 2) == "l_" then
+			lookup_name = "r_" .. string.sub(lookup_name, 3)
+		end
+	end
+
 	hg.bone.Set(owner, lookup_name, vec, ang, "bandage", 0.01)
 end
 
@@ -182,7 +201,10 @@ end
 SWEP.usetime = 2
 local math = math
 function SWEP:Think()
-	if self.BandageTPIK then return self:BandageTPIKThink() end
+	if self.bandageTPIKUsing and not self:UseJudgeBandageTPIK() then
+		self:CancelBandageTPIK(false)
+	end
+	if self:UseJudgeBandageTPIK() then return self:BandageTPIKThink() end
 
 	self:SetHold(self.HoldType)
 
@@ -233,7 +255,7 @@ function SWEP:Think()
 end
 SWEP.net_cooldown2 = 0
 function SWEP:PrimaryAttack()
-	if self.BandageTPIK then return self:StartBandageTPIK(self:GetOwner(), IN_ATTACK) end
+	if self:UseJudgeBandageTPIK() then return self:StartBandageTPIK(self:GetOwner(), IN_ATTACK) end
 
 	if SERVER then--and not self.modeValuesdef[self.mode][2] then
 
@@ -389,7 +411,7 @@ function SWEP:SetInfo(info)
 end
 
 function SWEP:SecondaryAttack()
-	if self.BandageTPIK then
+	if self:UseJudgeBandageTPIK() then
 		if IsValid(self:GetNWEntity("fakeGun")) then return end
 		local ent = hg.eyeTrace(self:GetOwner()).Entity
 		if not IsValid(ent) then return end
@@ -680,7 +702,7 @@ if SERVER then
 		end
 
 		if done then
-			if not self.BandageTPIK then
+			if not self:UseJudgeBandageTPIK() then
 			owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105))
 			end
 
@@ -1278,8 +1300,10 @@ function SWEP:IsLocal()
 end
 
 function SWEP:Holster(wep)
-	if self.BandageTPIK then
+	if self.bandageTPIKUsing then
 		self:CancelBandageTPIK(false)
+	end
+	if self:UseJudgeBandageTPIK() then
 		return true
 	end
 
@@ -1319,7 +1343,7 @@ function SWEP:OwnerChanged()
 end
 
 function SWEP:Deploy()
-	if self.BandageTPIK then
+	if self:UseJudgeBandageTPIK() then
 		self:CancelBandageTPIK(false)
 		self._idleScheduled = nil
 		local base = weapons.GetStored("weapon_tpik_base")
@@ -1413,6 +1437,9 @@ end
 function SWEP:StartBandageTPIK(target, button)
 	if not SERVER or self.bandageTPIKUsing or self.bandageTPIKAwaitRelease or self._reverseToIdle then return end
 	if not self:CanBandageTPIK(target) then return end
+	local armSpeed = hg.MedicalMinigame and hg.MedicalMinigame.GetArmSpeedMultiplier
+		and hg.MedicalMinigame.GetArmSpeedMultiplier(self:GetOwner()) or 1
+	if armSpeed <= 0 then return end
 
 	self.bandageTPIKUsing = true
 	self.bandageTPIKAwaitRelease = true
@@ -1420,7 +1447,7 @@ function SWEP:StartBandageTPIK(target, button)
 	self.bandageTPIKButton = button
 	self.bandageTPIKStart = CurTime()
 	self._idleScheduled = nil
-	local fullUseTime = self:GetBandageTPIKUseTime(target)
+	local fullUseTime = self:GetBandageTPIKUseTime(target) / armSpeed
 	local endCycle = 1 - self.BandageAnimEndTrim / self.BandageSequenceTime
 	local visibleFraction = endCycle
 	self.bandageTPIKUseTime = math.max(fullUseTime * visibleFraction, self.BandageMinUseTime)
@@ -1537,13 +1564,13 @@ function SWEP:BandageTPIKThink()
 end
 
 function SWEP:Camera(eyePos, eyeAng, view, vellen)
-	if not self.BandageTPIK then return end
+	if not self:UseJudgeBandageTPIK() then return end
 	local base = weapons.GetStored("weapon_tpik_base")
 	if base and base.Camera then return base.Camera(self, eyePos, eyeAng, view, vellen) end
 end
 
 function SWEP:SetHandPos(noset)
-	if not self.BandageTPIK then return end
+	if not self:UseJudgeBandageTPIK() then return end
 	local base = weapons.GetStored("weapon_tpik_base")
 	if base and base.SetHandPos then return base.SetHandPos(self, noset) end
 end
@@ -1554,7 +1581,7 @@ function SWEP:GetWM()
 end
 
 function SWEP:GetHideMeshBones()
-	if not self.BandageTPIK then return self.HideMeshBones end
+	if not self:UseJudgeBandageTPIK() then return self.HideMeshBones end
 	if self.anim == "idle" then return self.BandageTPIKHiddenBonesIdle end
 	if self.anim == "use" then
 		local cycle = self:GetCurrentAnimCycle()
@@ -1570,7 +1597,7 @@ function SWEP:GetHideMeshCollapseBone()
 end
 
 function SWEP:GetTPIKHoldPos(holdPos)
-	if not self.BandageTPIK or self.anim ~= "use" then return holdPos end
+	if not self:UseJudgeBandageTPIK() or self.anim ~= "use" then return holdPos end
 
 	local switchCycle = self.BandageAnimStart / self.BandageSequenceTime
 	local distance = math.abs(self:GetCurrentAnimCycle() - switchCycle)

@@ -132,7 +132,7 @@ if not game.IsDedicated() then
 	hg.settings:AddOpt("Server-side settings","hg_movement_stamina_debuff", "Movement stamina debuff")
 	hg.settings:AddOpt("Server-side settings","hg_furcity", "Furcity")
 	hg.settings:AddOpt("Server-side settings","hg_appearance_access_for_all", "Appearance full access for all", nil, nil, "bool")
-	hg.settings:AddOpt("Server-side settings","hg_healanims", "Heal animations: 0 = progressive minigames; 1 = Judge/no minigame; 2 = progressive Judge", nil, nil, "int")
+	hg.settings:AddOpt("Server-side settings","hg_healanims", "Healing method: 0 = Judge animations; 1 = progressive minigames", nil, nil, "int")
 	hg.settings:AddOpt("Server-side settings","hg_aimtoshoot", "Toggle DarkRP-like shooting system (aim to shoot): 0 - disabled; 1 - hipfire only; 2 - aiming only", nil, nil, "int")
 	hg.settings:AddOpt("Server-side settings","hg_slings", "Sling system")
 	hg.settings:AddOpt("Server-side settings","hg_allow_gopro", "Allow GoPro-like first-person camera")

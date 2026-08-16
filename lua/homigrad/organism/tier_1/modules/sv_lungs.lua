@@ -375,6 +375,9 @@ module[2] = function(owner, org, timeValue)
 
 	if hg.organism.OrganSystemsEnabled and not hg.organism.OrganSystemsEnabled() then
 		o2[1] = o2.range
+		o2.curregen = o2.regen
+		org.bloodO2Cap = o2.range
+		org.oxygenIntakeAvailable = true
 		org.lungsfunction = true
 		org.exertionO2Debt = 0
 		org.opioidRespiratoryDepression = 0

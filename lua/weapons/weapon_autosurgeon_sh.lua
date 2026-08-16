@@ -93,7 +93,11 @@ SWEP.Config = {
     BleedHeal = 3,
     InternalBleedHeal = 1.2,
     BloodRestore = 100,
-    OxygenRecovery = 0.20
+    OxygenRecovery = 0.20,
+    ModeMinTicks = 3,
+    ModeClearTicks = 3,
+    StableTicks = 4,
+    ModePreemptRatio = 1.35
 }
 
 -- SWEP is only guaranteed to exist while this file is being loaded. Deferred
@@ -119,9 +123,9 @@ local ASScanSounds = {
     "autonigger/atireputas3.wav"
 }
 
--- The D.I.H. treats structural damage before physiological support. This keeps
--- reconstruction, wound closure, and volume/oxygen replacement as distinct
--- passes, with mechanical circulation reserved for the final emergency step.
+-- The D.I.H. keeps reconstruction, wound closure, and volume/oxygen support as
+-- distinct passes. The live planner below orders them by current danger while
+-- mechanical circulation can operate concurrently during cardiac arrest.
 local StitchFields = {
     "arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "spineartery",
     "rvein", "lvein", "spinevein", "pulmvein", "rarmvein", "larmvein", "rlegvein", "llegvein"
@@ -130,11 +134,18 @@ local StitchFields = {
 -- Complex mode is reserved for immediately life-threatening trauma: vital
 -- organs, thoracic/cranial damage, and complications from internal bleeding.
 local ComplexFields = {
-    "skull", "chest", "heart", "brain", "trachea", "hemothorax", "hemothoraxTrauma", "cardiacTamponade",
-    "hemothoraxL", "hemothoraxR", "internalBleedComplication", "brainFrontal",
-    "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage", "brainSwelling",
-    "intracranialPressure", "brainBleedRate", "neckBrainOxygenPenalty", "arterialO2Impairment",
-    "throatCutPressureShock"
+    "skull", "chest", "heart", "brain", "trachea", "hemothoraxTrauma", "cardiacTamponade",
+    "hemothoraxL", "hemothoraxR", "brainFrontal",
+    "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage",
+    "brainBleedRate"
+}
+
+-- These are consequences recalculated by the organism from the injuries above.
+-- Relieve them during surgery, but never use them by themselves to select a new
+-- complex pass or the unit can repeatedly announce the same completed mode.
+local ComplexReliefFields = {
+    "hemothorax", "brainSwelling", "intracranialPressure", "internalBleedComplication",
+    "neckBrainOxygenPenalty", "arterialO2Impairment", "throatCutPressureShock"
 }
 
 -- Generic mode reconstructs bones and non-vital abdominal organs.  Keep these
@@ -146,14 +157,33 @@ local SimpleFields = {
 }
 
 local RecoveryFields = {
-    "pain", "painadd", "avgpain", "shock", "immobilization", "disorientation",
-    "concussion", "stamina_damage", "ischemia"
+    "painadd", "avgpain", "shock", "concussion", "stamina_damage", "ischemia", "seizure",
+    "hypoxiaTime", "severeHypoxiaTime", "systemicIschemiaTime", "arrhythmia",
+    "palpitations", "heartStrain"
+}
+
+local RecoveryReliefFields = {
+    "pain", "immobilization", "disorientation", "hypoxia"
+}
+
+local DeliveryFields = {
+    "bodyoxygen", "perfusion", "brainoxygen", "peripheralperfusion",
+    "cerebralPerfusion", "myocardialOxygen"
+}
+
+local DeliveryColdTargets = {
+    bodyoxygen = 0.82,
+    perfusion = 0.70,
+    brainoxygen = 0.86,
+    peripheralperfusion = 0.46,
+    cerebralPerfusion = 0.86,
+    myocardialOxygen = 0.86
 }
 
 local ClearFlags = {
     "llegdislocation", "rlegdislocation", "larmdislocation", "rarmdislocation",
     "llegdislocated", "rlegdislocated", "larmdislocated", "rarmdislocated",
-    "jawdislocation", "throatcut", "neckslit"
+    "jawdislocation"
 }
 
 local function GetUnitTarget(ent)
@@ -261,9 +291,27 @@ end
 
 local function TableHasBleeding(tbl)
     for _, wound in pairs(tbl or {}) do
-        if wound and (tonumber(wound[1]) or 0) > 0 then return true end
+        if wound and (tonumber(wound[1]) or 0) > 0.01 then return true end
     end
     return false
+end
+
+local function SumFields(org, fields)
+    local total = 0
+    for _, key in ipairs(fields) do total = total + math.max(tonumber(org[key]) or 0, 0) end
+    return total
+end
+
+local function GetWoundBurden(tbl)
+    local count, burden = 0, 0
+    for _, wound in pairs(tbl or {}) do
+        local amount = wound and math.max(tonumber(wound[1]) or 0, 0) or 0
+        if amount > 0.01 then
+            count = count + 1
+            burden = burden + amount
+        end
+    end
+    return count, burden
 end
 
 local function HasFieldsAbove(org, fields, threshold)
@@ -278,7 +326,10 @@ local function HasStitchingWork(org)
 end
 
 local function HasComplexWork(org)
-    if HasFieldsAbove(org, ComplexFields, 0.001) or (org.internalBleed or 0) > 0.01 then return true end
+    if HasFieldsAbove(org, ComplexFields, 0.001)
+        or (tonumber(org.brainBleedRate) or 0) > 0.00001
+        or (org.internalBleed or 0) > 0.01
+        or org.choking or org.vomitInThroat then return true end
     return istable(org.lungsL) and ((org.lungsL[1] or 0) > 0.001 or (org.lungsL[2] or 0) > 0) or
         istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0)
 end
@@ -291,46 +342,126 @@ local function HasSimpleWork(org)
     return false
 end
 
-local function HasRecoveryWork(org)
-    local oxygen = istable(org.o2) and (tonumber(org.o2[1]) or 0) or 0
-    local oxygenMax = istable(org.o2) and math.max(tonumber(org.o2.range) or 30, 1) or 0
-    return (tonumber(org.blood) or 5000) < 4999
-        or oxygen < oxygenMax - 0.01
-        or HasFieldsAbove(org, RecoveryFields, 0.01)
+local function HasAnatomicalSupportBlocker(org)
+    local leftLung = istable(org.lungsL) and (tonumber(org.lungsL[1]) or 0) or 0
+    local rightLung = istable(org.lungsR) and (tonumber(org.lungsR[1]) or 0) or 0
+    return (tonumber(org.heart) or 0) >= 0.55
+        or (tonumber(org.trachea) or 0) >= 0.55
+        or leftLung >= 0.70 or rightLung >= 0.70
+        or org.choking or org.vomitInThroat
 end
 
-local function HasTreatableInjury(org)
-    if not org then return false end
-    for _, key in ipairs(StitchFields) do
-        if (tonumber(org[key]) or 0) > 0.001 then return true end
-    end
-    for _, key in ipairs(ComplexFields) do
-        if (tonumber(org[key]) or 0) > 0.001 then return true end
-    end
-    for _, key in ipairs(SimpleFields) do
-        if (tonumber(org[key]) or 0) > 0.001 then return true end
-    end
-    for _, key in ipairs(RecoveryFields) do
-        if (tonumber(org[key]) or 0) > 0.01 then return true end
-    end
-    if istable(org.lungsL) and ((org.lungsL[1] or 0) > 0.001 or (org.lungsL[2] or 0) > 0) then return true end
-    if istable(org.lungsR) and ((org.lungsR[1] or 0) > 0.001 or (org.lungsR[2] or 0) > 0) then return true end
-    if (org.internalBleed or 0) > 0.01 or HasRecoveryWork(org) then return true end
-    if TableHasBleeding(org.wounds) or TableHasBleeding(org.arterialwounds) then return true end
-    for _, key in ipairs(ClearFlags) do
-        if org[key] then return true end
+local function HasDeliveryDeficit(org)
+    local coldPriority = math.Clamp((35 - (tonumber(org.temperature) or 36.7)) / 5, 0, 1)
+    for _, key in ipairs(DeliveryFields) do
+        local target = Lerp(coldPriority, 0.92, DeliveryColdTargets[key] or 0.92)
+        if (tonumber(org[key]) or 1) < target then return true end
     end
     return false
 end
 
--- Keep a treatment mode active until its entire category is complete.  Cycling
--- through the modes every tick made the unit abandon a repair halfway through
--- whenever another category also needed attention.
-local function GetNextTreatmentMode(org)
-    if HasComplexWork(org) then return 1 end
-    if HasStitchingWork(org) then return 2 end
-    if HasSimpleWork(org) then return 3 end
-    if HasRecoveryWork(org) then return 4 end
+local function HasRecoveryWork(org)
+    local oxygen = istable(org.o2) and (tonumber(org.o2[1]) or 0) or 0
+    local oxygenMax = istable(org.o2) and math.max(tonumber(org.o2.range) or 30, 1) or 0
+    return (tonumber(org.blood) or 5000) < 4975
+        or oxygen < oxygenMax * 0.96
+        or HasDeliveryDeficit(org)
+        or HasFieldsAbove(org, RecoveryFields, 0.01)
+        or (tonumber(org.opioidRespiratoryDepression) or 0) > 0.15
+        or org.respiratoryArrest == true
+end
+
+local function HasTreatableInjury(org)
+    if not org then return false end
+    return HasComplexWork(org) or HasStitchingWork(org) or HasSimpleWork(org) or HasRecoveryWork(org)
+end
+
+local function ModeHasWork(org, mode)
+    if mode == 1 then return HasComplexWork(org) end
+    if mode == 2 then return HasStitchingWork(org) end
+    if mode == 3 then return HasSimpleWork(org) end
+    if mode == 4 then return HasRecoveryWork(org) end
+    return false
+end
+
+-- Score actual causes and live danger rather than walking a fixed mode list.
+-- The active mode gets a small hysteresis bonus, so modest stat movement does
+-- not make the device oscillate between two modes every treatment tick.
+local function GetTreatmentModeScore(org, mode, activeMode)
+    if not ModeHasWork(org, mode) then return 0 end
+
+    local score = 0
+    if mode == 1 then
+        local leftLung = istable(org.lungsL) and ((tonumber(org.lungsL[1]) or 0) + (tonumber(org.lungsL[2]) or 0)) or 0
+        local rightLung = istable(org.lungsR) and ((tonumber(org.lungsR[1]) or 0) + (tonumber(org.lungsR[2]) or 0)) or 0
+        score = SumFields(org, ComplexFields) * 5
+            + ((tonumber(org.heart) or 0) + (tonumber(org.trachea) or 0)) * 24
+            + ((tonumber(org.brain) or 0) + (tonumber(org.brainHemorrhage) or 0)) * 20
+            + math.Clamp((tonumber(org.brainBleedRate) or 0) / 0.0035, 0, 1) * 18
+            + (leftLung + rightLung) * 12
+            + math.Clamp((tonumber(org.internalBleed) or 0) / 4, 0, 2.5) * 14
+            + (tonumber(org.cardiacTamponade) or 0) * 18
+        if HasAnatomicalSupportBlocker(org) then score = score + 40 end
+        if org.choking or org.vomitInThroat then score = score + 24 end
+    elseif mode == 2 then
+        local woundCount, woundBurden = GetWoundBurden(org.wounds)
+        local arteryCount, arteryBurden = GetWoundBurden(org.arterialwounds)
+        score = SumFields(org, StitchFields) * 10
+            + woundCount * 3 + math.Clamp(woundBurden / 8, 0, 8)
+            + arteryCount * 12 + math.Clamp(arteryBurden / 4, 0, 16)
+            + math.Clamp((tonumber(org.venousBleed) or 0) / 8, 0, 8)
+            + math.Clamp((tonumber(org.arterialBleed) or 0) / 4, 0, 18)
+    elseif mode == 3 then
+        score = SumFields(org, SimpleFields) * 6
+        for _, key in ipairs(ClearFlags) do
+            if org[key] then score = score + 4 end
+        end
+    else
+        local blood = tonumber(org.blood) or 5000
+        local oxygen = istable(org.o2) and (tonumber(org.o2[1]) or 0) or 30
+        local oxygenMax = istable(org.o2) and math.max(tonumber(org.o2.range) or 30, 1) or 30
+        score = math.Clamp((5000 - blood) / 5000, 0, 1) * 20
+            + math.Clamp(1 - oxygen / oxygenMax, 0, 1) * 16
+            + math.Clamp((tonumber(org.pain) or 0) / 100, 0, 1) * 4
+            + math.Clamp((tonumber(org.painadd) or 0) / 100, 0, 1) * 3
+            + math.Clamp((tonumber(org.avgpain) or 0) / 100, 0, 1) * 3
+            + math.Clamp((tonumber(org.shock) or 0) / 10, 0, 1) * 5
+            + math.Clamp((tonumber(org.immobilization) or 0) / 10, 0, 1) * 2
+            + math.Clamp((tonumber(org.disorientation) or 0) / 10, 0, 1) * 2
+            + math.Clamp((tonumber(org.concussion) or 0) / 6, 0, 1) * 4
+            + math.Clamp(tonumber(org.ischemia) or 0, 0, 1) * 10
+            + math.Clamp(tonumber(org.seizure) or 0, 0, 1) * 7
+            + math.Clamp(tonumber(org.hypoxia) or 0, 0, 1) * 8
+            + math.Clamp((tonumber(org.hypoxiaTime) or 0) / 120, 0, 1) * 6
+            + math.Clamp((tonumber(org.severeHypoxiaTime) or 0) / 120, 0, 1) * 8
+            + math.Clamp((tonumber(org.systemicIschemiaTime) or 0) / 180, 0, 1) * 6
+            + math.Clamp(tonumber(org.arrhythmia) or 0, 0, 1) * 6
+            + math.Clamp(tonumber(org.palpitations) or 0, 0, 1) * 4
+            + math.Clamp(tonumber(org.heartStrain) or 0, 0, 1) * 6
+        local coldPriority = math.Clamp((35 - (tonumber(org.temperature) or 36.7)) / 5, 0, 1)
+        for _, key in ipairs(DeliveryFields) do
+            local target = Lerp(coldPriority, 0.92, DeliveryColdTargets[key] or 0.92)
+            score = score + math.Clamp((target - (tonumber(org[key]) or 1)) / math.max(target, 0.01), 0, 1) * 4
+        end
+        if org.respiratoryArrest then score = score + 24 end
+        score = score + math.Clamp(tonumber(org.opioidRespiratoryDepression) or 0, 0, 1) * 16
+        if HasAnatomicalSupportBlocker(org) then score = score * 0.25 end
+    end
+
+    score = math.max(score, 0.1)
+    if mode == activeMode then score = score * 1.15 end
+    return score
+end
+
+local function GetNextTreatmentMode(org, activeMode)
+    local bestMode, bestScore
+    for mode = 1, 4 do
+        local score = GetTreatmentModeScore(org, mode, activeMode)
+        if score > 0 and (not bestScore or score > bestScore) then
+            bestMode, bestScore = mode, score
+        end
+    end
+    return bestMode, bestScore or 0
 end
 
 local function HealWoundTable(tbl, amount)
@@ -369,6 +500,7 @@ end
 
 local function HealComplex(org, config)
     HealFields(org, ComplexFields, config.InjuryHeal)
+    HealFields(org, ComplexReliefFields, config.InjuryHeal * 0.75)
     if istable(org.lungsL) then
         org.lungsL[1] = math.Approach(org.lungsL[1] or 0, 0, config.InjuryHeal)
         org.lungsL[2] = math.Approach(org.lungsL[2] or 0, 0, config.InjuryHeal)
@@ -379,7 +511,21 @@ local function HealComplex(org, config)
     end
     org.internalBleed = math.Approach(org.internalBleed or 0, 0, config.InternalBleedHeal)
     org.internalBleedHeal = math.max(org.internalBleedHeal or 0, config.InternalBleedHeal * 2)
+    if org.internalBleed <= 0.01 then
+        -- Clear progression memory only after the source is repaired. Keeping a
+        -- high historical peak made the organism rebuild complications and send
+        -- the unit straight back into complex mode after it had just completed.
+        org.internalBleed = 0
+        org.internalBleedDuration = 0
+        org.internalBleedPeak = 0
+        org.internalBleedHemothoraxRisk = false
+        org.internalBleedComplication = math.Approach(org.internalBleedComplication or 0, 0, config.InjuryHeal)
+    end
     org.lungsfunction = true
+    org.choking = false
+    org.vomitInThroat = false
+    org.throatcut = false
+    org.neckslit = false
     org.internalBleedLungSide = nil
     org.tracheaPath = nil
 end
@@ -418,17 +564,35 @@ end
 
 local function RestoreBloodAndOxygen(org, config)
     org.blood = math.Approach(tonumber(org.blood) or 5000, 5000, config.BloodRestore)
+    HealFields(org, ComplexReliefFields, config.InjuryHeal * 0.5)
 
     for _, key in ipairs(RecoveryFields) do
         if isnumber(org[key]) then
             org[key] = math.Approach(org[key], 0, config.InjuryHeal * 12)
         end
     end
+    HealFields(org, RecoveryReliefFields, config.InjuryHeal * 12)
+
+    -- The current organism derives respiratory arrest from opioid load. Give
+    -- antidote support before attempting oxygen recovery so the support helper
+    -- does not correctly reject an airway whose drive is still suppressed.
+    local opioidDepression = tonumber(org.opioidRespiratoryDepression) or 0
+    if opioidDepression > 0.15 or org.respiratoryArrest then
+        org.naloxoneadd = math.max(tonumber(org.naloxoneadd) or 0, 0.65)
+        org.naloxone = math.max(tonumber(org.naloxone) or 0, 1.5)
+    end
 
     if hg and hg.organism and hg.organism.RestoreSupportedOxygen then
         hg.organism.RestoreSupportedOxygen(org, config.OxygenRecovery, {
-            oxygen = 0,
-            oxygenTarget = istable(org.o2) and (tonumber(org.o2.range) or 30) or 30
+            oxygen = 8,
+            oxygenTarget = istable(org.o2) and (tonumber(org.o2.range) or 30) or 30,
+            bodyoxygen = 0.45, bodyoxygenTarget = 0.96,
+            brainoxygen = 0.45, brainoxygenTarget = 0.96,
+            perfusion = 0.42, perfusionTarget = 0.94,
+            peripheralperfusion = 0.38, peripheralperfusionTarget = 0.92,
+            cerebralPerfusion = 0.42, cerebralPerfusionTarget = 0.95,
+            myocardialOxygen = 0.45, myocardialOxygenTarget = 0.96,
+            hypoxiaTime = 2, severeHypoxiaTime = 1, systemicIschemiaTime = 2
         })
     elseif istable(org.o2) then
         local oxygenMax = math.max(tonumber(org.o2.range) or 30, 1)
@@ -437,8 +601,16 @@ local function RestoreBloodAndOxygen(org, config)
 end
 
 local function ApplyAutopulse(org, config)
-    org.dihAutopulseUntil = CurTime() + config.AutopulseInterval * 1.5
+    local now = CurTime()
+    org.dihAutopulseUntil = now + config.AutopulseInterval * 1.5
     org.dihSupportUntil = org.dihAutopulseUntil
+    org.cprResuscitationUntil = math.max(tonumber(org.cprResuscitationUntil) or 0, now + 2)
+    org.aedResuscitationUntil = math.max(tonumber(org.aedResuscitationUntil) or 0, now + 15)
+    org.defibDeathGrace = math.max(tonumber(org.defibDeathGrace) or 0, now + 20)
+    org.fibrillation = false
+    if org.terminalRhythm == "ventricular_fibrillation" then org.terminalRhythm = nil end
+    org.arrhythmia = math.max((tonumber(org.arrhythmia) or 0) - 0.35, 0)
+    org.heartStrain = math.max((tonumber(org.heartStrain) or 0) - 0.18, 0)
     org.pulse = 70
     org.heartbeat = 70
     org.cardiacOutput = math.max(tonumber(org.cardiacOutput) or 0, 0.55)
@@ -475,6 +647,10 @@ local function ApplyAutopulse(org, config)
             myocardialOxygen = 0.60, myocardialOxygenTarget = 0.88,
             hypoxiaTime = 0, severeHypoxiaTime = 0, systemicIschemiaTime = 0
         })
+    end
+
+    if hg and hg.organism and hg.organism.TryRestartHeartWithResuscitation then
+        hg.organism.TryRestartHeartWithResuscitation(org)
     end
 end
 
@@ -641,7 +817,11 @@ function SWEP:AttachUnit(owner, target, ply)
     local nextTreatment = CurTime()
     local nextAutopulse = CurTime()
     local treatmentMode
-    local modeSwitchPending = false
+    local modeTicks = 0
+    local modeClearTicks = 0
+    local stableTicks = 0
+    local completedModeAnnouncements = {}
+    local lastAnnouncedMode
     local painkillerTarget
     local painkillerAnnounced = false
     local movingSince
@@ -697,11 +877,13 @@ function SWEP:AttachUnit(owner, target, ply)
             return
         end
 
-        -- CPR is deliberately last: complex repair, stitching, generic repair,
-        -- and blood/O2 recovery must finish before the unit starts circulation.
-        local needsAutopulse = org.heartstop or (tonumber(org.pulse) or 0) <= 0
-        local repairsPending = treatmentMode ~= nil or GetNextTreatmentMode(org) ~= nil
-        if needsAutopulse and not repairsPending and CurTime() >= nextAutopulse then
+        -- Mechanical support runs alongside surgery. An arrested patient should
+        -- not spend several seconds without circulation while the unit closes a
+        -- wound or repairs the organ that caused the arrest.
+        local needsAutopulse = org.heartstop or org.fibrillation
+            or org.terminalRhythm == "ventricular_fibrillation"
+            or ((tonumber(org.pulse) or 0) <= 0 and (tonumber(org.cardiacOutput) or 0) <= 0.08)
+        if needsAutopulse and CurTime() >= nextAutopulse then
             if battery < config.AutopulseBatteryPerBeat then
                 -- Battery depletion is terminal for an attached unit: stop
                 -- treatment and eject it immediately instead of waiting for
@@ -718,7 +900,8 @@ function SWEP:AttachUnit(owner, target, ply)
             nextAutopulse = CurTime() + config.AutopulseInterval
         end
 
-        if ProcessUnitSounds(unit, config) then return end
+        local soundBusy = ProcessUnitSounds(unit, config)
+        if scanning and soundBusy then return end
 
         -- Start treatment in the same tick the scan ends.  When the scan did
         -- not find a treatment mode, the normal completion path below removes
@@ -729,10 +912,59 @@ function SWEP:AttachUnit(owner, target, ply)
         end
         if CurTime() < nextTreatment then return end
         nextTreatment = CurTime() + config.TickInterval
-        if not treatmentMode then treatmentMode = GetNextTreatmentMode(org) end
 
-        -- All repair and restoration passes complete before CPR begins.
+        -- Require several clear observations before completing a mode. Derived
+        -- organism values update on a different timer and can briefly lag one
+        -- tick behind their repaired source. Do this before considering another
+        -- mode so an apparently finished pass cannot be abandoned and rebound.
+        if treatmentMode and not ModeHasWork(org, treatmentMode) then
+            modeClearTicks = modeClearTicks + 1
+            if modeClearTicks >= config.ModeClearTicks then
+                if not completedModeAnnouncements[treatmentMode] then
+                    QueueUnitSound(unit, ASSounds.modeComplete)
+                    completedModeAnnouncements[treatmentMode] = true
+                end
+                treatmentMode = nil
+                modeTicks = 0
+                modeClearTicks = 0
+            end
+            return
+        end
+        modeClearTicks = 0
+
+        local recommendedMode, recommendedScore = GetNextTreatmentMode(org, treatmentMode)
         if not treatmentMode then
+            treatmentMode = recommendedMode
+            if treatmentMode then
+                modeTicks = 0
+                modeClearTicks = 0
+                stableTicks = 0
+                if lastAnnouncedMode and lastAnnouncedMode != treatmentMode then
+                    QueueUnitSound(unit, ASSounds.modeSwitch)
+                end
+                lastAnnouncedMode = treatmentMode
+            end
+        elseif recommendedMode and recommendedMode != treatmentMode and modeTicks >= config.ModeMinTicks then
+            local activeScore = GetTreatmentModeScore(org, treatmentMode, treatmentMode)
+            if activeScore <= 0 or recommendedScore >= activeScore * config.ModePreemptRatio then
+                treatmentMode = recommendedMode
+                modeTicks = 0
+                modeClearTicks = 0
+                stableTicks = 0
+                if lastAnnouncedMode != treatmentMode then QueueUnitSound(unit, ASSounds.modeSwitch) end
+                lastAnnouncedMode = treatmentMode
+            end
+        end
+
+        if not treatmentMode then
+            local unsafePainkiller = org.respiratoryArrest
+                or (tonumber(org.opioidRespiratoryDepression) or 0) > 0.15
+                or (tonumber(org.analgesia) or 0) > 1.2
+                or (tonumber(org.painkiller) or 0) > 1.5
+            if unsafePainkiller then
+                painkillerTarget = nil
+                painkillerAnnounced = false
+            end
             if painkillerTarget then
                 org.painkiller = math.min((tonumber(org.painkiller) or 0) + 0.25, painkillerTarget, 1)
                 if org.painkiller >= painkillerTarget then
@@ -743,7 +975,16 @@ function SWEP:AttachUnit(owner, target, ply)
                 return
             end
 
-            if needsAutopulse then return end
+            if needsAutopulse or HasTreatableInjury(org) then
+                stableTicks = 0
+                return
+            end
+            if soundBusy then
+                stableTicks = 0
+                return
+            end
+            stableTicks = stableTicks + 1
+            if stableTicks < config.StableTicks then return end
             DropUnit(unit, activeTarget, ply, battery, ASSounds.complete)
             return
         end
@@ -754,13 +995,14 @@ function SWEP:AttachUnit(owner, target, ply)
 
         battery = battery - config.BatteryPerTick
         unit:SetNWInt("AutosurgeonBattery", battery)
-        if modeSwitchPending then
-            QueueUnitSound(unit, ASSounds.modeSwitch)
-            modeSwitchPending = false
-        end
+        modeTicks = modeTicks + 1
 
         local pain = tonumber(org.pain) or 0
-        if pain > 50 and (tonumber(org.painkiller) or 0) < 1 then
+        local canGivePainkiller = not org.respiratoryArrest
+            and (tonumber(org.opioidRespiratoryDepression) or 0) <= 0.15
+            and (tonumber(org.analgesia) or 0) <= 1.2
+            and (tonumber(org.painkiller) or 0) < 1
+        if pain > 50 and canGivePainkiller then
             local safeDose = math.min(1, math.max(0.25, (pain - 50) / 100))
             painkillerTarget = math.max(painkillerTarget or 0, safeDose)
             if not painkillerAnnounced then
@@ -776,20 +1018,6 @@ function SWEP:AttachUnit(owner, target, ply)
             HealSimple(org, config)
         else
             RestoreBloodAndOxygen(org, config)
-        end
-
-        local modeStillNeeded = treatmentMode == 1 and HasComplexWork(org) or
-            treatmentMode == 2 and HasStitchingWork(org) or
-            treatmentMode == 3 and HasSimpleWork(org) or
-            treatmentMode == 4 and HasRecoveryWork(org)
-        if not modeStillNeeded then
-            QueueUnitSound(unit, ASSounds.modeComplete)
-            treatmentMode = nil
-            modeSwitchPending = true
-            -- The initial scan has already selected the treatment sequence.
-            -- Continue directly to the next needed mode; rescanning after
-            -- every completed mode caused repeated motions and needless idle
-            -- time before the unit could finish and eject.
         end
     end)
 

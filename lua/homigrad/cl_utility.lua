@@ -250,10 +250,12 @@ players : 1 humans, 0 bots (20 max)
 		suppressionDist = 0
 		suppressionDistAdd = 0
 		local SUPPRESSION_PUNCH_MULTIPLIER = 3.5
-		local SUPPRESSION_SOUND_VOLUME = 2.5
-		local SUPPRESSION_SOUND_LEVEL = 180
-		local DISTANT_CRACK_VOLUME = 2
-		local DISTANT_CRACK_SOUND_LEVEL = 170
+		local SUPPRESSION_SOUND_VOLUME = 4
+		local SUPPRESSION_SOUND_LEVEL = 200
+		local SUPERSONIC_AUDIBLE_RADIUS = 1400
+		local SUBSONIC_AUDIBLE_RADIUS = 900
+		local DISTANT_CRACK_VOLUME = 3.5
+		local DISTANT_CRACK_SOUND_LEVEL = 190
 		local function ApplySuppressionPunch(angle)
 			if hg_suppression_viewpunch and not hg_suppression_viewpunch:GetBool() then return end
 			angle = angle * SUPPRESSION_PUNCH_MULTIPLIER
@@ -331,7 +333,8 @@ players : 1 humans, 0 bots (20 max)
 				or bullet.Damage >= 30 and "cracks/medium/med_crack_0" .. math.random(1, 9) .. ".ogg"
 				or "cracks/light/light_crack_0" .. math.random(1, 9) .. ".ogg"
 
-			if dist < 500 then
+			local audibleRadius = subsonic and SUBSONIC_AUDIBLE_RADIUS or SUPERSONIC_AUDIBLE_RADIUS
+			if dist < audibleRadius then
 				local playPos = pos - tr.Normal * 25
 				EmitSound(SND, playPos, 0, CHAN_ITEM, SUPPRESSION_SOUND_VOLUME, SUPPRESSION_SOUND_LEVEL)
 			else return end

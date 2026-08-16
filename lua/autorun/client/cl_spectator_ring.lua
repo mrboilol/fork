@@ -46,6 +46,7 @@ local ekgPoints = {}
 local sweepPos = 0
 local lastSweepUpdate = 0
 local heartPhase = 0
+local organismEKGState = {points = {}, sweepPos = 0, lastUpdate = 0, phase = 0}
 
 local function DrawEKG(centerX, centerY, width, height, heartbeat, pulse, color, ringAlpha)
     local time = CurTime()
@@ -193,6 +194,7 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
         ekgPoints = {}
         sweepPos = 0
         lastSweepUpdate = 0
+        organismEKGState = {points = {}, sweepPos = 0, lastUpdate = 0, phase = 0}
     end
 
     local org = target.organism
@@ -217,6 +219,7 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
             ekgPoints = {}
             sweepPos = 0
             lastSweepUpdate = 0
+            organismEKGState = {points = {}, sweepPos = 0, lastUpdate = 0, phase = 0}
         end
     end
     
@@ -226,11 +229,18 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
     lerpShock = math.Approach(lerpShock, org.shock or 0, FrameTime() * 50)
     lerpConsciousness = math.Approach(lerpConsciousness, org.consciousness or 0, FrameTime() * 2)
     
-    local pulse = org.heartbeat or org.pulse or 70
+    local heartRate = org.heartbeat or 0
     local brain = org.brain or 0
     local consciousness = org.consciousness or 0
     local shock = org.shock or 0
-    local isCritical = (org.critical == true) or (pulse < 1 and brain >= 0.02) or (brain > 0.4)
+    local circulationCritical = hg and hg.IsOrganismCirculationCritical and hg.IsOrganismCirculationCritical(org)
+    local isCritical = (org.critical == true)
+        or circulationCritical
+        or org.ecgState == "ventricular_fibrillation"
+        or (org.ecgState == "asystole" and brain >= 0.02)
+        or (brain > 0.4)
+        or (tonumber(org.brainHemorrhage) or 0) >= 0.4
+        or (tonumber(org.brainSwelling) or 0) >= 0.45
     
     local scrW, scrH = ScrW(), ScrH()
     local centerX, centerY = scrW / 2, scrH / 2
@@ -271,6 +281,13 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
         
         draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     else
-        DrawEKG(centerX, centerY, 540, 140, org.heartbeat or 70, org.pulse or 70, dotColor, ringAlpha)
+        if hg and hg.DrawOrganismECG then
+            if hg.DrawOrganismECGVitals then
+                hg.DrawOrganismECGVitals(org, centerX - 270, centerY - 112, 540, ringAlpha)
+            end
+            hg.DrawOrganismECG(organismEKGState, centerX, centerY, 540, 140, org, dotColor, ringAlpha)
+        else
+            DrawEKG(centerX, centerY, 540, 140, heartRate, org.pulse or 70, dotColor, ringAlpha)
+        end
     end
 end)

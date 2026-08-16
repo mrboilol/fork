@@ -55,6 +55,8 @@ SWEP.showstats = true
 
 SWEP.HoldType = "slam"
 
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+
 sound.Add({
 	name = "pshiksnd",
 	channel = CHAN_AUTO,

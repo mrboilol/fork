@@ -91,9 +91,7 @@ local function ApplyServerOverride()
                     MsgC(ZW.Colors.Magenta, "[Z-City Wind] Server bullet removed! Key=" .. tostring(self.Key) .. " Pos=" .. tostring(self.Pos) .. " CreationTime=" .. tostring(self.CreationTime) .. "\n")
                 end
 
-                if not self._ZCityWindServerSuppressionSent then
-                    ZW.SendServerSuppressionForBullet(self, self._ZCityWindServerSuppressionLastPos, self.Pos)
-                end
+                ZW.SendServerSuppressionForBullet(self, self._ZCityWindServerSuppressionLastPos, self.Pos)
 
                 if config.Debug and self.CreationTime ~= CurTime() then
                     net.Start("ZCity_WindDebug_Hit")
@@ -194,4 +192,3 @@ hook.Add("PostEntityTakeDamage", "ZCity_Wind_Armor_PhysBulletPenetration_Cleanup
         end
     end
 end)
-

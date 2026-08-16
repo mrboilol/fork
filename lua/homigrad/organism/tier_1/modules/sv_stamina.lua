@@ -329,13 +329,19 @@ function hg.organism.AddNaturalAdrenaline(org, fAmount)
 end
 
 -- Anger is a short combat-only surge using the normal adrenaline reserve.
-function hg.organism.RileAnger(org, amount)
+-- Callers may provide a separate adrenaline amount so firing, landing a hit,
+-- and taking serious trauma can produce different physiological responses.
+function hg.organism.RileAnger(org, amount, adrenalineAmount)
 	if not org or not org.alive or org.otrub then return end
 	amount = math.max(amount or 0, 0)
-	if amount <= 0 then return end
-	org.anger = math.Clamp((org.anger or 0) + amount, 0, 1)
-	org.angerCombatUntil = math.max(org.angerCombatUntil or 0, CurTime() + anger_combat_hold_time)
-	hg.organism.AddNaturalAdrenaline(org, amount * 2)
+	adrenalineAmount = math.max(adrenalineAmount == nil and amount * 2 or adrenalineAmount, 0)
+	if amount > 0 then
+		org.anger = math.Clamp((org.anger or 0) + amount, 0, 1)
+		org.angerCombatUntil = math.max(org.angerCombatUntil or 0, CurTime() + anger_combat_hold_time)
+	end
+	if adrenalineAmount > 0 then
+		hg.organism.AddNaturalAdrenaline(org, adrenalineAmount)
+	end
 end
 
 

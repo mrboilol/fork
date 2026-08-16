@@ -82,6 +82,7 @@ local otrubSoundPaths = {
 }
 local OtrubModeStation
 local activeOtrubMode
+local ConsciousnessSleepyStation
 local AltRemDyingStation
 local ItsHopelessStation
 local ITS_HOPELESS_LOOP_START = 5
@@ -818,20 +819,15 @@ local function stopthings()
 		NoisesStation = nil
 	end
 
-	if IsValid(ConsciousnessWhiteNoise) then
-		ConsciousnessWhiteNoise:Stop()
-		ConsciousnessWhiteNoise = nil
+	if IsValid(ConsciousnessSleepyStation) then
+		ConsciousnessSleepyStation:Stop()
+		ConsciousnessSleepyStation = nil
 	end
 
 	if IsValid(EndStation) then
 		EndStation:Stop()
 		EndStation = nil
 	end
-	if IsValid(WhiteNoiseStation) then
-        WhiteNoiseStation:Stop()
-        WhiteNoiseStation = nil
-    end
-
 	if IsValid(Alto2Station) then
 		Alto2Station:Stop()
 		Alto2Station = nil
@@ -852,7 +848,6 @@ local stations = {
 local choosera = 1
 local tempolerp = 0
 local grayscaleLerp = 0
-local WhiteNoiseStation
 local soundRetry = {}
 
 drawFinalVitalsVignettes = function()
@@ -1026,7 +1021,8 @@ hook.Add("Post Post Processing", "ItHurts", function()
 	end
 
 	if (org.consciousness < 0.7) then
-		lerpblood = LerpFT(0.01, lerpblood or 0, math.Clamp((0.7 - org.consciousness) * 5, 0, 1) * 255)
+		-- Reach full black only at the server's standard OTRUB consciousness threshold.
+		lerpblood = LerpFT(0.01, lerpblood or 0, math.Clamp(math.Remap(org.consciousness, 0.7, 0.3, 0, 1), 0, 1) * 255)
 		local lowblood = (3600 - (org.blood or 5000)) / 600
 
 		addtime = addtime + FrameTime() / 6
@@ -1259,12 +1255,12 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		end)
 	end
 
-	if canRetrySound("ConsciousnessWhiteNoise", ConsciousnessWhiteNoise) then
-		sound.PlayFile("sound/homigrad/whitenoise.ogg", "noblock noplay", function(station)
+	if canRetrySound("ConsciousnessSleepyStation", ConsciousnessSleepyStation) then
+		sound.PlayFile("sound/sleepy.mp3", "noblock noplay", function(station)
 			if IsValid(station) then
 				station:SetVolume(0)
 				station:Play()
-				ConsciousnessWhiteNoise = station
+				ConsciousnessSleepyStation = station
 				station:EnableLooping(true)
 			end
 		end)
@@ -1512,41 +1508,20 @@ hook.Add("Post Post Processing", "ItHurts", function()
 		render.DrawScreenQuad()
 	end
 
-	-- Consciousness whitenoise ramps up from 0 at 0.95 consciousness to full at 0.1.
+	-- The sleepy OTRUB track fades in while consciousness falls, then hands off to
+	-- the configured OTRUB audio once the player is unconscious.
 	if not org.otrub and (org.consciousness or 1) < 0.95 then
-		local consciousnessVol = math.Remap(org.consciousness, 0.95, 0.1, 0, 1)
+		local consciousnessVol = math.Remap(org.consciousness, 0.95, 0.3, 0, 1)
 		consciousnessVol = math.Clamp(consciousnessVol, 0, 1)
 
-		if IsValid(ConsciousnessWhiteNoise) then
-			ConsciousnessWhiteNoise:SetVolume(consciousnessVol * 0.333)
+		if IsValid(ConsciousnessSleepyStation) then
+			ConsciousnessSleepyStation:SetVolume(consciousnessVol * 0.333)
 		end
 	else
-		if IsValid(ConsciousnessWhiteNoise) then
-			ConsciousnessWhiteNoise:SetVolume(0)
+		if IsValid(ConsciousnessSleepyStation) then
+			ConsciousnessSleepyStation:SetVolume(0)
 		end
 	end
-
-	if org.consciousness < 0.5 then
-        if canRetrySound("WhiteNoiseStation", WhiteNoiseStation) then
-            sound.PlayFile("sound/whitenoise.ogg", "noblock noplay", function(station)
-                if IsValid(station) then
-                    station:EnableLooping(true)
-                    station:Play()
-                    WhiteNoiseStation = station
-                end
-            end)
-        end
-    else
-        if IsValid(WhiteNoiseStation) then
-            WhiteNoiseStation:Stop()
-            WhiteNoiseStation = nil
-        end
-    end
-
-    if IsValid(WhiteNoiseStation) then
-        local vol = math.Remap(org.consciousness, 0, 0.5, 0.6, 0)
-        WhiteNoiseStation:SetVolume(vol * 0.5)
-    end
 
 	local tempo = math.Clamp((5 - (tempLerp - 29)) * 0.5 - 5 * (org.heartbeat < 1 and 1 or 0), 0, 5)
 	tempolerp = LerpFT(0.01, tempolerp, tempo)

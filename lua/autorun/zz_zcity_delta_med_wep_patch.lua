@@ -1,9 +1,8 @@
 if CLIENT then return end
 
--- This replaces the old boolean.  Existing medicines still use GetBool(), so
--- modes 1 and 2 retain their Judge animation behavior without a second,
--- conflicting convar.
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Heal animation type: 0 = progressive minigames, 1 = Judge animations, 2 = progressive Judge minigames", 0, 2)
+-- Keep this binary so the medicines' existing GetBool() checks naturally mean
+-- "our progressive method" while zero cleanly selects Judge's treatment path.
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
 local HEAL_ANIMATION_RETURN_TIME = 0.35
 
 local MEDICAL_WEAPON_CLASSES = {
@@ -41,7 +40,7 @@ local MEDICAL_WEAPON_CLASSES = {
 }
 
 local function GetMedicalAnimationType()
-    return math.Clamp(hg_healanims:GetInt(), 0, 2)
+    return math.Clamp(hg_healanims:GetInt(), 0, 1)
 end
 
 local function SetHealAnimationTarget(wep, target)
@@ -182,9 +181,22 @@ local function ResolveSecondaryTarget(owner)
     return ent
 end
 
+local function CanUseMedicalArms(owner)
+    if not IsValid(owner) then return false end
+    if not hg or not hg.MedicalMinigame or not hg.MedicalMinigame.GetArmSpeedMultiplier then return true end
+    if hg.MedicalMinigame.GetArmSpeedMultiplier(owner) > 0 then return true end
+
+    if (owner.HGMedicalNoArmsNotice or 0) <= CurTime() then
+        owner.HGMedicalNoArmsNotice = CurTime() + 1
+        owner:ChatPrint("You need at least one usable arm to perform treatment.")
+    end
+    return false
+end
+
 local function StartMinigame(wep, owner, minigameType, target)
     if not IsValid(wep) or not IsValid(owner) then return false end
     if not minigameType then return false end
+    if not CanUseMedicalArms(owner) then return false end
 
     local modeValueIndex = GetModeValueIndex(wep, minigameType)
     local startValue = wep.modeValues and wep.modeValues[modeValueIndex] or nil
@@ -244,7 +256,11 @@ local function PatchWeapon(class)
     function stored:PrimaryAttack()
         local owner = self:GetOwner()
         local minigameType = GetMinigameType(self)
-        if IsValid(owner) and minigameType and GetMedicalAnimationType() ~= 1 then
+        if IsValid(owner) and minigameType and not CanUseMedicalArms(owner) then
+            self:SetNextPrimaryFire(CurTime() + 0.5)
+            return
+        end
+        if IsValid(owner) and minigameType and GetMedicalAnimationType() == 1 then
             if StartMinigame(self, owner, minigameType, owner) then
                 self:SetNextPrimaryFire(CurTime() + (minigameType == "bandage" and 0.25 or 1))
                 return
@@ -259,7 +275,11 @@ local function PatchWeapon(class)
     function stored:SecondaryAttack()
         local owner = self:GetOwner()
         local minigameType = GetMinigameType(self)
-        if IsValid(owner) and minigameType and GetMedicalAnimationType() ~= 1 then
+        if IsValid(owner) and minigameType and not CanUseMedicalArms(owner) then
+            self:SetNextSecondaryFire(CurTime() + 0.5)
+            return
+        end
+        if IsValid(owner) and minigameType and GetMedicalAnimationType() == 1 then
             local target = ResolveSecondaryTarget(owner)
             if IsValid(target) then
                 if StartMinigame(self, owner, minigameType, target) then
@@ -300,10 +320,10 @@ hook.Add("Think", "zcity_delta_medical_healanim_progress", function()
             local minigameType = GetMinigameType(wep)
             local animtype = GetMedicalAnimationType()
             if minigameType == "bandage" or minigameType == "tourniquet" then
-                SetHealAnimationTarget(wep, animtype ~= 1 and (wep.HGMedicalMinigameProgress or 0) * 100 or 0)
+                SetHealAnimationTarget(wep, animtype == 1 and (wep.HGMedicalMinigameProgress or 0) * 100 or 0)
             elseif minigameType == "syringe" then
                 local progress = GetSyringeAnimationProgress(wep, wep.HGMedicalMinigameProgress or 0)
-                SetHealAnimationTarget(wep, animtype ~= 1 and progress * 100 or 0)
+                SetHealAnimationTarget(wep, animtype == 1 and progress * 100 or 0)
             end
 
             -- Weapon Think functions normally lower Holding whenever attack
