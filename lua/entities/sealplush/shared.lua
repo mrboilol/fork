@@ -1,0 +1,8 @@
+ENT.Type = "anim"
+ENT.Base = "base_anim"
+ENT.PrintName = "Seal Plush"
+ENT.Author = "HacPaL_B_kOlяCkY"
+ENT.Category = "Seal"
+ENT.Spawnable = true
+ENT.AdminSpawnable = true
+ENT.ClassName = "sealplush"
