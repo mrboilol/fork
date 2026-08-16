@@ -862,19 +862,9 @@ hook.Add("PlayerDeath", "hg_death_organism_cleanup", function(victim)
 	end
 end)
 
---util.AddNetworkString("tracePosesSend")
---util.AddNetworkString("wound_debug")
 util.AddNetworkString("hg_bloodimpact")
---util.AddNetworkString("blood particle explode")
 util.AddNetworkString("bloodsquirt")
 util.AddNetworkString("hg_brainmist")
-
-
---util.AddNetworkString("tracePosesSend")
---util.AddNetworkString("wound_debug")
-util.AddNetworkString("hg_bloodimpact")
---util.AddNetworkString("blood particle explode")
-util.AddNetworkString("bloodsquirt")
 
 local hg_developer = ConVarExists("hg_developer") and GetConVar("hg_developer") or CreateConVar("hg_developer",0,FCVAR_SERVER_CAN_EXECUTE,"Toggle developer mode (enables damage traces)",0,1)
 
@@ -954,6 +944,33 @@ function hg.AddHarm(ply, harm, reason)
 	ply.harm = (ply.harm or 0) + (harm or 0)
 end
 
+local function addHeadGibArterialWound(org, ent, force)
+	if not org or org.headGibArterialWoundAdded or not IsValid(ent) then return end
+
+	local boneName = "ValveBiped.Bip01_Neck1"
+	local bone = ent:LookupBone(boneName)
+	if not bone then
+		boneName = "ValveBiped.Bip01_Spine4"
+		bone = ent:LookupBone(boneName)
+	end
+	if not bone then return end
+
+	local direction = Vector(-10, 0, 0)
+	if isvector(force) and force:LengthSqr() > 1 then
+		local _, boneAng = ent:GetBonePosition(bone)
+		if boneAng then
+			local _, localAng = WorldToLocal(vector_origin, force:GetNormalized():Angle(), vector_origin, boneAng)
+			direction = localAng:Forward() * 10
+		end
+	end
+
+	local woundSize = hg.organism.config and hg.organism.config.HEADGIB_ARTERIAL_WOUND_SIZE or 34
+	table.insert(org.arterialwounds, {woundSize, vector_origin, angle_zero, boneName, CurTime() - 1, direction, "arteria", false, false, "headgib"})
+	org.arteria = 1
+	org.headGibArterialWoundAdded = true
+	hg.organism.SyncWounds(org)
+end
+
 function hg.ExplodeHead(ent, damage, slash, force)
 	if !IsValid(ent) then return end
 
@@ -1013,11 +1030,15 @@ function hg.ExplodeHead(ent, damage, slash, force)
 		end
 
 		Gib_Input(ent, ent:LookupBone("ValveBiped.Bip01_Head1"), force, damage)
+		addHeadGibArterialWound(ent.organism, ent, force)
 		
 		ent.organism.headamputated = true
 		ent.organism.brain = 1.0
 		ent.organism.skull = 1.0
 		ent.organism.alive = false
+		if hg.organism.BeginPostMortemDecay then
+			hg.organism.BeginPostMortemDecay(ent.organism)
+		end
 		ent.headexploded = true
 
 		-- Track that head was previously amputated for stable healing approach
@@ -1043,10 +1064,12 @@ function hg.ExplodeHead(ent, damage, slash, force)
 			org.brain = 1.0
 			org.skull = 1.0
 			org.needfake = true
+			addHeadGibArterialWound(org, standingPlayer, force)
 			if hg.organism.KillFatalBrainDamage then
 				hg.organism.KillFatalBrainDamage(org)
 			else
 				org.alive = false
+				if hg.organism.BeginPostMortemDecay then hg.organism.BeginPostMortemDecay(org) end
 				standingPlayer:Kill()
 			end
 		else
@@ -1537,10 +1560,11 @@ hook.Add("EntityTakeDamage", "homigrad-damage", function(ent, dmgInfo)
 	--//
 
 	local att = dmgInfo:GetAttacker()
-	if true and outputHole and #outputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
+	if outputHole and #outputHole > 0 and dmgInfo:IsDamageType(DMG_BULLET+DMG_BUCKSHOT) then
 		local bullet = inf.bullet
-		org.blood = org.blood - 75
-		
+		-- Entry/exit wounds own hemorrhage; penetration must not also delete a
+		-- fixed amount of circulating blood on the same hit.
+
 		timer.Simple(0, function()
 			if !IsValid(ent) then return end
 

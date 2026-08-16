@@ -333,7 +333,7 @@ module[2] = function(owner, org, timeValue)
 
 	if org.adrenalineAdd > 0 then
 
-		local critical = (org.blood and org.blood < 1500) or (org.brain and org.brain > 1.5)
+		local critical = (org.hemorrhagicCollapseExposure or 0) > 0.8 or (org.brain and org.brain > 1.5)
 		local reserveK = math.Clamp(((org.adrenalineStorage or 0) / 5) * 0.75 + 0.25, 0.25, 1)
 
 		if critical then

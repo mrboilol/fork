@@ -19,7 +19,7 @@ hg.organism.bloodtypes = {
 }
 
 module[1] = function(org)
-	org.blood = 5000
+	org.blood = hg.organism.normalBloodVolume or 5000
 	org.bleed = 0
 	org.venousBleed = 0
 	org.arterialBleed = 0
@@ -101,9 +101,9 @@ local limbArteryWeakness = {
 }
 
 local o2DebuffArteries = {
-	-- Arteria uses the gradual drain in sv_lungs; do not layer the old fast drain over it.
-	arteria = 0,
-	spineartery = 0.85,
+	-- Legacy state flags only; oxygen delivery is derived elsewhere.
+	arteria = true,
+	spineartery = true,
 }
 
 local arteryStatusKeys = {
@@ -167,7 +167,8 @@ local arterial_bleed_rate_mul = 1.35
 -- An amputated limb must remain an urgent arterial bleed.  This is lower than
 -- the old runaway jet, but high enough to be clearly visible and dangerous
 -- until the stump is controlled.
-local amputation_arterial_bleed_mul = 0.65
+local amputation_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_AMPUTATION_BLEED_MULTIPLIER) or 0.65
+local headgib_arterial_bleed_mul = (hg.organism.config and hg.organism.config.ARTERIAL_HEADGIB_BLEED_MULTIPLIER) or 1.65
 
 local function hasWound(wounds, target)
 	if not target or not wounds then return false end
@@ -291,8 +292,10 @@ module[2] = function(owner, org, mulTime)
 	if org.isPly and not org.otrub and (hg.organism.GetResilientBlood and hg.organism.GetResilientBlood(org) or org.blood) < 2900 then org.owner:Notify(math.random(2) == 1 and "I cant feel anything..." or (math.random(2) == 1 and "I think I'm gonna faint right now...") or "I dont feel so good...",true,"blood2",0,nil,Color(200, 170, 170)) end
 
 	if org.internalBleed < 0.5 and org.bleed <= 0 and org.pulse > 5 then
-		-- Natural production is 5 mL/s and resumes only once all bleeding stops.
-		org.blood = min(org.blood + mulTime * 5, 5000)
+		-- Slow game-scaled recovery. Do not refill hundreds of mL per minute simply
+		-- because bleeding has stopped.
+		local regenRate = (hg.organism.config and hg.organism.config.BLOOD_REGEN_RATE_ML_S) or 0.5
+		org.blood = min(org.blood + mulTime * regenRate, hg.organism.normalBloodVolume or 5000)
 	end
 
 	local totalAdrenaline = (org.adrenaline or 0) + (org.noradrenaline or 0)
@@ -488,14 +491,22 @@ module[2] = function(owner, org, mulTime)
 	local heldCarotidWound = false
 	for i, wound in pairs(org.arterialwounds) do
 		local tourniquetBleedMul = hg.GetTourniquetBleedMultiplier and hg.GetTourniquetBleedMultiplier(owner, wound[4]) or 1
-		local amputationMul = wound[9] and amputation_arterial_bleed_mul or 1
+		local isAmputation = wound[9] == true
+		local isHeadGib = wound[10] == "headgib"
+		local woundSeverityMul = isAmputation and amputation_arterial_bleed_mul or (isHeadGib and headgib_arterial_bleed_mul or 1)
+		local circulationOutput = math.max(tonumber(org.cardiacOutput) or 0, 0)
+		local pressureFactor = math.Clamp((tonumber(org.bloodPressure) or 0) / 92, 0, 1.5)
+		local pulseFactor = math.Clamp((tonumber(org.pulse) or 0) / 70, 0, 1.5)
+		local residualPostMortemFlow = hg.organism.IsPostMortemDecaying and hg.organism.IsPostMortemDecaying(org)
+		local arterialDrive = (org.heartstop and not residualPostMortemFlow) and 0 or math.Clamp(math.sqrt(math.max(circulationOutput * pressureFactor * pulseFactor, 0)), 0, 1.5)
+		local passiveDrive = math.Clamp(0.08 + arterialDrive * 0.92, 0.08, 1.5)
 		if wound[7] == "arteria" and (wound[1] or 0) > 0 then hasCarotidWound = true end
 		if wound[7] == "arteria" and org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound then
 			heldCarotidWound = true
 		end
-		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * amputationMul * math.max(pulse, 20) / 80 * tourniquetBleedMul
+		local passiveArterialBleed = wound[1] * mulTime * 0.14 * arterial_bleed_rate_mul * woundSeverityMul * passiveDrive * tourniquetBleedMul
 		bleedoutspeed2 = bleedoutspeed2 + passiveArterialBleed
-		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * amputationMul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
+		local arterialBleed = wound[1] * mulTime * 0.2 * arterial_bleed_rate_mul * woundSeverityMul * arterialDrive * tourniquetBleedMul
 		arterialBleed = arterialBleed * getHeldWoundBleedMul(org, wound)
 		bleedoutspeed2 = bleedoutspeed2 + arterialBleed
 		local woundBleedRate = (passiveArterialBleed + arterialBleed) / math.max(mulTime, 0.001)
@@ -503,21 +514,21 @@ module[2] = function(owner, org, mulTime)
 		if wound[5] + next_arterypump * 2 < time then
 			local pos, ang = ent:GetBonePosition(ent:LookupBone(wound[4]))
 			wound[5] = time
-			local pulseBleed = wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * amputationMul * math.max(pulse, 20) / 80 * tourniquetBleedMul
+			local pulseBleed = wound[1] * mulTime * 3.2 * arterial_bleed_rate_mul * woundSeverityMul * arterialDrive * tourniquetBleedMul
 			org.blood = max(org.blood - pulseBleed, 1)
 			woundBleedRate = woundBleedRate + pulseBleed / math.max(mulTime, 0.001)
 			if tourniquetBleedMul > 0 and (isAlive or not isPlayer) then
-			local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * amputationMul * math.max(org.pulse, 20) / 80 * tourniquetBleedMul
-			pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
-			org.blood = max(org.blood - pumpBleed, 1)
-			woundBleedRate = woundBleedRate + pumpBleed / math.max(mulTime, 0.001)
-			if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
-				local dir = wound[6]
-				local len = dir:Length()
-				local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
-				dir = -dir:Forward() * len
-				hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
-			end
+				local pumpBleed = wound[1] * mulTime * 4.5 * arterial_bleed_rate_mul * woundSeverityMul * arterialDrive * tourniquetBleedMul
+				pumpBleed = pumpBleed * getHeldWoundBleedMul(org, wound)
+				org.blood = max(org.blood - pumpBleed, 1)
+				woundBleedRate = woundBleedRate + pumpBleed / math.max(mulTime, 0.001)
+				if arterialDrive > 0.01 then
+					local dir = wound[6]
+					local len = dir:Length()
+					local _, dir = LocalToWorld(vecZero, dir:Angle(), vecZero, ang)
+					dir = -dir:Forward() * len
+					hg.organism.BloodDroplet2(owner, org, wound, ownerVel + VectorRand(-10, 10) + dir, true)
+				end
 			end
 
 			if wound[1] == 0 then
@@ -544,13 +555,8 @@ module[2] = function(owner, org, mulTime)
 		local brainPenaltyRate = hasCarotidWound and mulTime / 18 or mulTime / 8
 		org.throatCutPressureShock = math.Approach(org.throatCutPressureShock or 0, pressureTarget, pressureRate)
 		org.neckBrainOxygenPenalty = math.Approach(org.neckBrainOxygenPenalty or 0, brainPenaltyTarget, brainPenaltyRate)
-		-- The open airway continues to consume body oxygen even after a neck
-		-- bandage has stopped the arterial jet, but this stays secondary to the
-		-- bleeding and airway-function consequences of a slit throat.
-		if org.o2 and org.o2[1] then
-			local developedImpairment = math.Clamp((org.throatCutPressureShock or 0) / math.max(severity, 0.01), 0, 1)
-			org.o2[1] = math.max(org.o2[1] - mulTime * 0.12 * severity * developedImpairment, 0)
-		end
+		-- Airway damage is owned by the trachea/ventilation model. Do not drain O2
+		-- again here just because the same throat injury also opened an artery.
 	end
 	bleedoutspeed2 = bleedoutspeed2 / next_arterypump
 
@@ -701,7 +707,7 @@ function hg.organism.Vomit(owner, snd)
 	if !hg.IsValidPlayer(owner) then return end
 	
 	local org = owner.organism
-	org.blood = math.max(org.blood - 200, 0)
+	-- Vomiting loses GI fluid, not 200 mL of circulating blood per episode.
 	local ent = hg.GetCurrentCharacter(owner)
 
 	local bon = "ValveBiped.Bip01_Head1"
@@ -802,20 +808,27 @@ end
 
 function hg.organism.CoughBlood(org)
 	local ply = org.owner
+	if not IsValid(ply) then return end
 	local phr = "zcitysnd/real_sonar/" .. (ThatPlyIsFemale(ply) and "female" or "male") .. "_cough" .. math.random(4) .. ".ogg"
 	ply:EmitSound(phr)
 	ply.phrCld = CurTime() + 2
 	ply.lastPhr = phr
 
 	if math.random(5) == 1 then
-		org.vomitInThroat = nil
+		local ent = hg.GetCurrentCharacter(ply)
+		if not IsValid(ent) then return end
+		local bon = "ValveBiped.Bip01_Head1"
+		local bone = ent:LookupBone(bon)
+		local mat = bone and ent:GetBoneMatrix(bone)
+		if not mat then return end
 
+		org.vomitInThroat = nil
 		net.Start("bloodsquirt2")
 		net.WriteEntity(ent)
 		net.WriteString(bon)
 		net.WriteMatrix(mat)
-		net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward() * 1)
-		net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp(org.pulse / 70, 0.4, 1))
+		net.WriteVector(mat:GetTranslation() + mat:GetAngles():Right() * 6 + mat:GetAngles():Forward())
+		net.WriteVector(mat:GetAngles():Right() * 2 * math.Clamp((org.pulse or 0) / 70, 0.4, 1))
 		net.Broadcast()
 
 		ent:EmitSound("vomit/vomit5.ogg")

@@ -541,7 +541,7 @@ function PROP_SHARPNESS.DoSharpPoke( sharpData, currSharpDat, sharpEnt, takingDa
 
     local dealingsCenter = sharpEnt:WorldSpaceCenter()
     local takingsCenter = takingDamage:WorldSpaceCenter()
-    local nearest = sharpEnt:NearestPoint( takingsCenter )
+    local nearest = isvector( currSharpDat.hitPos ) and currSharpDat.hitPos or sharpEnt:NearestPoint( takingsCenter )
 
     local localPos = sharpData.localPos -- some specific part of the ent is sharp
     local localPosDist = sharpData.localPosDist
@@ -592,6 +592,15 @@ function PROP_SHARPNESS.DoSharpPoke( sharpData, currSharpDat, sharpEnt, takingDa
 
     local overMin = speed - minSharpSpeed
     local damage = overMin * sharpness
+
+    -- Cutting energy depends on both speed and the mass carrying the edge.
+    -- Ten kilograms is neutral; very light/heavy props are smoothly bounded.
+    local sharpPhys = entsMeta.GetPhysicsObject( sharpEnt )
+    if IsValid( sharpPhys ) then
+        local mass = math.max( physMeta.GetMass( sharpPhys ), 0.1 )
+        local massFactor = math.Clamp( math.sqrt( mass / 10 ), 0.55, 1.5 )
+        damage = damage * massFactor
+    end
 
     local sharpEntsMat, takingDamagesMat
 
@@ -728,7 +737,12 @@ function PROP_SHARPNESS.DoSharpPoke( sharpData, currSharpDat, sharpEnt, takingDa
 
     end
 
+    -- Homigrad distinguishes cutting lacerations from point punctures through
+    -- the inflictor's slash marker. Set it only for this synchronous damage call.
+    local oldSlash = sharpEnt.slash
+    if sharpData.canSlice then sharpEnt.slash = true end
     takingDamage:TakeDamageInfo( dmgInfo )
+    sharpEnt.slash = oldSlash
 
     if cvarMeta.GetBool( doSelfDamageVar ) then -- for servers with simple prop damage, etc
         local multiplier = 0.05
@@ -831,6 +845,7 @@ do
                 oldVel = oldVel,
                 preCollideAng = preCollideAng,
                 collisonNormal = collisonNormal,
+                hitPos = colData.HitPos,
 
             }
 
@@ -897,7 +912,7 @@ hook.Add( "GetFallDamage", "prop_sharpness_sharplanding", function( ply, speed )
     local model = landEnt:GetModel()
     if not model then return end
 
-    local sharpData = PROP_SHARPNESS.ModelData[model]
+    local sharpData = PROP_SHARPNESS.ModelData[string_lower( model )]
     if not sharpData then return end
 
     local plyVel = ply:GetVelocity()
@@ -921,7 +936,7 @@ hook.Add( "GetTermFallDamage", "prop_sharpness_sharplanding", function( bot, lan
     local model = landEnt:GetModel()
     if not model then return end
 
-    local sharpData = PROP_SHARPNESS.ModelData[model]
+    local sharpData = PROP_SHARPNESS.ModelData[string_lower( model )]
     if not sharpData then return end
 
     local botsVel = Vector( 0, 0, -fallHeight / 2 )
@@ -1187,7 +1202,7 @@ hook.Add( "GravGunPunt", "prop_sharpness", function( punter, punted )
 
 end )
 
-hook.Add( "OnPlayerPhysicsPickup", "prop_sharpness", function( _, picked )
+hook.Add( "OnPlayerPhysicsPickup", "prop_sharpness", function( picker, picked )
     if not picked.IsSharp then return end
     picked.sharpness_Holder = picker
 

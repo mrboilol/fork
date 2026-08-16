@@ -288,5 +288,4 @@ hook.Add("Fake", "kneel_cleanup_ragdoll", function(ply)
     ClearKneelState(ply)
 end)
 
--- if this breaks its not my fault, also why are you here ?
 print("ZCITY / Surrender Made by adodser! c:")

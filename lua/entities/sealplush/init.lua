@@ -18,6 +18,7 @@ function ENT:Initialize()
     self:PhysicsInit(SOLID_VPHYSICS)
     self:SetMoveType(MOVETYPE_VPHYSICS)
     self:SetSolid(SOLID_VPHYSICS)
+    self:SetUseType(SIMPLE_USE)
 
     local phys = self:GetPhysicsObject()
     if IsValid(phys) then
@@ -61,11 +62,118 @@ function ENT:Initialize()
     self.WantsSleep          = false
     self.AIDisabled          = false
 
+    local cfg = HG_SEAL_CONFIG or {}
+    self.SealAlive = true
+    self.SealBlood = cfg.MAX_BLOOD_ML or 1200
+    self.SealMaxBlood = self.SealBlood
+    self.SealBleedRate = 0
+    self.SealPhysiologyTime = CurTime()
+    self:SetMaxHealth(cfg.MAX_HEALTH or 100)
+    self:SetHealth(cfg.MAX_HEALTH or 100)
+    self:SetNW2Bool("SealAlive", true)
+    self:SetNW2Float("SealBlood", self.SealBlood)
+    self:SetNW2Float("SealBleedRate", 0)
+
     self:SetSkin(0)
     self:EmitSound("sealplush/ohmygah.wav", 75, 100)
     self:StartBlinking()
     self:StartIdleMovement()
     self:StartRandomSounds()
+end
+
+local function RemoveSealTimers(ent)
+    local idx = ent:EntIndex()
+    timer.Remove("SealHop_" .. idx)
+    timer.Remove("SealPlay_" .. idx)
+    timer.Remove("SealBuddy_" .. idx)
+    timer.Remove("SealChaseFish_" .. idx)
+    timer.Remove("SealRandomSound_" .. idx)
+    if ent.BlinkTimerID then timer.Remove(ent.BlinkTimerID) end
+end
+
+function ENT:SyncPhysiology()
+    self:SetNW2Bool("SealAlive", self.SealAlive == true)
+    self:SetNW2Float("SealBlood", math.max(self.SealBlood or 0, 0))
+    self:SetNW2Float("SealBleedRate", math.max(self.SealBleedRate or 0, 0))
+end
+
+function ENT:KillSeal(reason)
+    if not self.SealAlive then return end
+    local cfg = HG_SEAL_CONFIG or {}
+    self.SealAlive = false
+    self.SealDeathReason = reason
+    self.SealDeathTime = CurTime()
+    self.SealBleedRate = 0
+    self:SetHealth(0)
+    self:SetState("dead")
+    self.IsSleeping = false
+    self.IsEating = false
+    self.AIDisabled = true
+    RemoveSealTimers(self)
+    self:StopSound("sealplush/snop.wav")
+    self:SyncPhysiology()
+
+    local phys = self:GetPhysicsObject()
+    if IsValid(phys) then phys:Wake() end
+    self:SetRenderMode(RENDERMODE_TRANSCOLOR)
+    self.SealRemoveAt = self.SealDeathTime + (cfg.CORPSE_LIFETIME or 15)
+end
+
+function ENT:UpdatePhysiology(now)
+    local cfg = HG_SEAL_CONFIG or {}
+    local last = self.SealPhysiologyTime or now
+    local dt = math.Clamp(now - last, 0, 0.25)
+    self.SealPhysiologyTime = now
+
+    if self.SealAlive then
+        local bleedRate = math.max(self.SealBleedRate or 0, 0)
+        if bleedRate > 0 and dt > 0 then
+            self.SealBlood = math.max((self.SealBlood or 0) - bleedRate * dt, 0)
+            self.SealBleedRate = bleedRate * math.exp(-(cfg.BLEED_CLOT_RATE or 0.02) * dt)
+        end
+
+        if bleedRate >= 0.5 and now >= (self.NextSealBleedFX or 0) then
+            local intensity = math.Clamp(bleedRate / 25, 0, 1)
+            self.NextSealBleedFX = now + Lerp(intensity, 1.1, 0.28)
+            local pos = self.SealLastWoundLocal and self:LocalToWorld(self.SealLastWoundLocal) or self:WorldSpaceCenter()
+            local effect = EffectData()
+            effect:SetOrigin(pos)
+            effect:SetNormal(VectorRand():GetNormalized())
+            effect:SetColor(BLOOD_COLOR_RED)
+            effect:SetScale(Lerp(intensity, 0.35, 0.9))
+            util.Effect("BloodImpact", effect, true, true)
+            local tr = util.TraceLine({start = pos, endpos = pos + Vector(0, 0, -80), filter = self, mask = MASK_SOLID})
+            if tr.Hit then util.Decal("Blood", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal) end
+        end
+
+        local maxBlood = self.SealMaxBlood or cfg.MAX_BLOOD_ML or 1200
+        if maxBlood - (self.SealBlood or 0) >= (cfg.FATAL_BLOOD_LOSS_ML or 500) then
+            self:KillSeal("bloodloss")
+        elseif self:Health() <= 0 then
+            self:KillSeal("damage")
+        end
+        self:SyncPhysiology()
+        return
+    end
+
+    local removeAt = self.SealRemoveAt or (now + (cfg.CORPSE_LIFETIME or 15))
+    self.SealRemoveAt = removeAt
+    local fadeTime = math.max(cfg.CORPSE_FADE_TIME or 3, 0.1)
+    local fadeStart = removeAt - fadeTime
+    if now >= fadeStart then
+        local alpha = math.Clamp((removeAt - now) / fadeTime, 0, 1) * 255
+        local color = self:GetColor()
+        self:SetColor(Color(color.r, color.g, color.b, alpha))
+    end
+    if now >= removeAt then self:Remove() end
+end
+
+function ENT:ArmThrownImpact(thrower, speed)
+    local cfg = HG_SEAL_CONFIG or {}
+    self.SealThrower = IsValid(thrower) and thrower or nil
+    self.SealThrowMaxSpeed = math.max(speed or cfg.THROW_SPEED or 760, 1)
+    self.SealThrowDamageUntil = CurTime() + (cfg.THROW_DAMAGE_WINDOW or 2)
+    self.SealThrowDamageSpent = false
 end
 
 function ENT:SetState(newState)
@@ -202,19 +310,25 @@ function ENT:ChooseBehavior()
 end
 
 function ENT:Think()
-    local now   = CurTime()
-    local state = self.State
+    local now = CurTime()
+    self:UpdatePhysiology(now)
+    if not IsValid(self) then return end
 
+    if not self.SealAlive then
+        self:NextThink(now + 0.1)
+        return true
+    end
+
+    local state = self.State
     local isBeingHeld = self:IsPlayerHolding()
     if isBeingHeld and state ~= "held" then
         self:OnPickedUp()
     elseif not isBeingHeld and state == "held" then
-        if not self.PickupDelay or now > self.PickupDelay then
-            self:OnPutDown()
-        end
+        if not self.PickupDelay or now > self.PickupDelay then self:OnPutDown() end
     end
 
-    local globalAIDisabled = GetConVar("ai_disabled"):GetBool()
+    local aiDisabled = GetConVar("ai_disabled")
+    local globalAIDisabled = aiDisabled and aiDisabled:GetBool() or false
     if globalAIDisabled ~= self.AIDisabled then
         self.AIDisabled = globalAIDisabled
         if globalAIDisabled then self:DisableAI() else self:EnableAI() end
@@ -229,20 +343,17 @@ function ENT:Think()
         self.NextSwimCheck = now + 0.1
         self:CheckSwimming()
     end
-
     if state ~= "held" then
         self:UpdateDrives()
         self:UpdateMood()
     end
-
     if state == "idle" and not self.IsSwimming and now > self.NextBehaviorCheck then
         self.NextBehaviorCheck = now + 3
         self:ChooseBehavior()
     end
 
-    self:NextThink(now + 0.05)
     self:CheckFlipped()
-
+    self:NextThink(now + 0.05)
     return true
 end
 
@@ -311,22 +422,38 @@ function ENT:OnPutDown()
 end
 
 function ENT:Use(activator, caller)
-    if not IsValid(caller) or not caller:IsPlayer() then return end
-    self:SetState("held")
-    local idx = self:EntIndex()
-    timer.Remove("SealHop_"       .. idx)
-    timer.Remove("SealPlay_"      .. idx)
-    timer.Remove("SealBuddy_"     .. idx)
-    timer.Remove("SealChaseFish_" .. idx)
-    self.PlayTarget = nil
-    self.BuddySeal  = nil
+    if not self.SealAlive or self.SealConverting then return end
+    if not IsValid(caller) or not caller:IsPlayer() or not caller:Alive() then return end
+    if IsValid(caller.FakeRagdoll) then return end
+    if IsValid(caller:GetWeapon("sealweapon")) then return end
+
+    self.SealConverting = true
+    local wep = ents.Create("sealweapon")
+    if not IsValid(wep) then self.SealConverting = false return end
+    wep:SetPos(self:GetPos())
+    wep:SetAngles(self:GetAngles())
+    wep:Spawn()
+    wep.CurrentSkin = self:GetSkin()
+    wep.WMSkin = self:GetSkin()
+    wep.SealStoredHealth = self:Health()
+    wep.SealStoredBlood = self.SealBlood
+    wep.SealStoredBleedRate = self.SealBleedRate
+
+    if hook.Run("PlayerCanPickupWeapon", caller, wep) == false then
+        wep:Remove()
+        self.SealConverting = false
+        return
+    end
+
+    caller:PickupWeapon(wep)
+    if wep:GetOwner() ~= caller then
+        wep:Remove()
+        self.SealConverting = false
+        return
+    end
+
     self:EmitSound("sealplush/squeak4.wav", 50, 100)
-    self:SetSkin(2)
-    self.PickupDelay = CurTime() + 0.5
-    timer.Simple(2, function()
-        if IsValid(self) and self.State == "held" then self:SetSkin(0) end
-    end)
-    caller:PickupObject(self)
+    self:Remove()
 end
 
 function ENT:IsUpsideDown()
@@ -438,6 +565,7 @@ function ENT:TryFlip()
 end
 
 function ENT:StartBlinking()
+    if self.SealAlive == false then return end
     if not IsValid(self) then return end
     if self.State == "scared" then return end
     if self.State == "flipped" and self.IsSleeping then return end
@@ -468,6 +596,7 @@ function ENT:StartBlinking()
 end
 
 function ENT:StartRandomSounds()
+    if self.SealAlive == false then return end
     if not IsValid(self) then return end
     local id = "SealRandomSound_" .. self:EntIndex()
     timer.Create(id, math.random(15, 30), 0, function()
@@ -480,6 +609,7 @@ function ENT:StartRandomSounds()
 end
 
 function ENT:StartIdleMovement(immediate)
+    if self.SealAlive == false then return end
     if not IsValid(self) then return end
     if self.State == "held" or self.State == "flipped" then return end
 
@@ -528,6 +658,7 @@ function ENT:PerformHop()
 end
 
 function ENT:Scare()
+    if self.SealAlive == false then return end
     if self.State == "scared" or self.State == "held" then return end
     if self.IsSleeping then return end
     self:SetState("scared")
@@ -547,8 +678,26 @@ function ENT:Scare()
 end
 
 function ENT:OnTakeDamage(dmg)
-    local amount = dmg:GetDamage()
     self:TakePhysicsDamage(dmg)
+    if not self.SealAlive then return end
+
+    local amount = math.max(dmg:GetDamage(), 0)
+    if amount <= 0 then return end
+    local damagePos = dmg:GetDamagePosition()
+    if isvector(damagePos) and damagePos:LengthSqr() > 0 then self.SealLastWoundLocal = self:WorldToLocal(damagePos) end
+    self:SetHealth(math.max(self:Health() - amount, 0))
+
+    local bleedAdd = 0
+    if dmg:IsDamageType(DMG_BULLET) or dmg:IsDamageType(DMG_BUCKSHOT) then
+        bleedAdd = amount * 0.5
+    elseif dmg:IsDamageType(DMG_SLASH) then
+        bleedAdd = amount * 0.4
+    elseif dmg:IsDamageType(DMG_BLAST) then
+        bleedAdd = amount * 0.18
+    elseif (dmg:IsDamageType(DMG_CRUSH) or dmg:IsDamageType(DMG_CLUB)) and amount >= 15 then
+        bleedAdd = amount * 0.08
+    end
+    self.SealBleedRate = math.min((self.SealBleedRate or 0) + bleedAdd, 80)
 
     if amount >= 20 and CurTime() - self.LastBigDamageTime > 10 then
         self.LastBigDamageTime = CurTime()
@@ -559,17 +708,50 @@ function ENT:OnTakeDamage(dmg)
         self:StopSound(soundToPlay)
         self:EmitSound(soundToPlay, 299, math.random(95, 110))
         timer.Simple(3, function()
-            if IsValid(self) and self.State ~= "scared" then self:SetSkin(0) end
+            if IsValid(self) and self.SealAlive and self.State ~= "scared" then self:SetSkin(0) end
         end)
     elseif amount >= 5 then
         self:Scare()
     end
+
+    if self:Health() <= 0 then self:KillSeal("damage") end
+    self:SyncPhysiology()
 end
 
 function ENT:PhysicsCollide(data, physobj)
-    if data.DeltaTime > 0.2 and data.Speed > 150 then
-        self:Scare()
+    if self.SealAlive and not self.SealThrowDamageSpent and CurTime() <= (self.SealThrowDamageUntil or 0) then
+        local hit = data.HitEntity
+        local ragOwner = IsValid(hit) and hit:IsRagdoll() and hg.RagdollOwner and hg.RagdollOwner(hit) or nil
+        local target = IsValid(ragOwner) and ragOwner or hit
+        local cfg = HG_SEAL_CONFIG or {}
+        local speed = math.max(data.Speed or 0, 0)
+        if IsValid(target) and target ~= self and speed >= (cfg.THROW_MIN_DAMAGE_SPEED or 300) then
+            local maxSpeed = math.max(self.SealThrowMaxSpeed or cfg.THROW_SPEED or 760, 1)
+            local speedFraction = math.Clamp((speed - (cfg.THROW_MIN_DAMAGE_SPEED or 300)) / math.max(maxSpeed - (cfg.THROW_MIN_DAMAGE_SPEED or 300), 1), 0, 1)
+            local mass = IsValid(physobj) and math.max(physobj:GetMass(), 0.1) or (cfg.THROW_REFERENCE_MASS or 8)
+            local massFactor = math.Clamp(math.sqrt(mass / math.max(cfg.THROW_REFERENCE_MASS or 8, 0.1)), 0.75, 1.35)
+            local damage = (cfg.THROW_DAMAGE or 19) * speedFraction * massFactor
+            if damage > 1 then
+                local dmg = DamageInfo()
+                dmg:SetAttacker(IsValid(self.SealThrower) and self.SealThrower or self)
+                dmg:SetInflictor(self)
+                dmg:SetDamage(damage)
+                dmg:SetDamageType(DMG_CLUB)
+                dmg:SetDamagePosition(data.HitPos)
+                dmg:SetDamageForce(data.OurOldVelocity * massFactor)
+                target:TakeDamageInfo(dmg)
+                self.SealThrowDamageSpent = true
+            end
+        end
     end
+
+    if self.SealAlive and data.DeltaTime > 0.2 and data.Speed > 150 then self:Scare() end
+end
+
+function ENT:OnRemove()
+    RemoveSealTimers(self)
+    if IsValid(self.CarryWeld) then self.CarryWeld:Remove() end
+    self:StopSound("sealplush/snop.wav")
 end
 
 function ENT:HandleFishDetection()

@@ -944,7 +944,8 @@ local function getArterialVisualIntensity(org, wounds, wound, woundIndex)
 end
 
 local function getCirculationStrength(org, pulseOverride)
-	local pulse = org.heartstop and 0 or math.max(pulseOverride or org.pulse or 70, 0)
+	local residualPostMortemFlow = not org.alive and (tonumber(org.postMortemDecayEnd) or 0) > CurTime()
+	local pulse = (org.heartstop and not residualPostMortemFlow) and 0 or math.max(pulseOverride or org.pulse or 70, 0)
 	local circulation = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.55)
 	if pulse <= 0 or circulation <= 0 then return 0 end
 	local pulseStrength = math.Clamp(pulse / 70, 0, 1.55)
@@ -1100,26 +1101,19 @@ function hg.queueArterialWoundSound(ent, wound)
 	end)
 end
 
-emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensity, isAmputation)
-	-- Upstream Z-City arterial visual (zcity/main). Each update launches one
-	-- artery-marked blood trail with the original combined right/up oscillation.
-	-- Give the pressure pulse enough forward speed and lift to form an arc before
-	-- gravity takes over instead of immediately pouring down the body.
+emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensity, isAmputation, isHeadGib)
+	-- Pressure-driven jet; amputation keeps its separate legacy tuning.
 	local time = CurTime()
 	local pulse = math.max(org.pulse or 0, 0)
 	local pulseMul = pulse / 70
 	local circulation = getCirculationStrength(org, pulse)
-	local arterialPressureMul = circulation * (isAmputation and 1.7 or 2.5)
+	local arterialPressureMul = circulation * (isAmputation and 1.7 or (isHeadGib and 4.4 or 3.1))
 	if arterialPressureMul <= 0 then
 		hg.addBloodPart(pos, bloodDown * 2 + VectorRand(-0.5, 0.5), nil, size, size, true, nil, ent)
 		return
 	end
-	-- Keep the oscillation, but let forward pressure dominate enough for the
-	-- arterial trail to read as a fast jet instead of a short local spray.
-	-- A fully open carotid (14 bleed) reaches four times the old distance;
-	-- smaller or closing arteries scale down from that using their live bleed.
-	local bleedRangeMul = 1 + (isAmputation and 1 or 3) * intensity
-	local forwardVelocityMul = (isAmputation and 1.55 or 2.5) * bleedRangeMul
+	local bleedRangeMul = 1 + (isAmputation and 1 or (isHeadGib and 5.5 or 4)) * intensity
+	local forwardVelocityMul = (isAmputation and 1.55 or (isHeadGib and 3.8 or 2.9)) * bleedRangeMul
 	local upwardVelocity = 14 * math.Clamp(pulseMul, 0, 1.5)
 	local velocity = (VectorRand(-1, 1) * pulseMul
 		+ dir * 5 * forwardVelocityMul * (math.abs(math.sin(time * 2) + math.cos(time * (5 + woundIndex * 2)) + math.sin(time * (1 + woundIndex))) * 0.6 + math.sin(time * 2) + 4) * 0.1
@@ -1128,7 +1122,7 @@ emitArterialSpray = function(ent, pos, dir, ang, org, woundIndex, size, intensit
 		+ vector_up * upwardVelocity
 		+ VectorRand(-1, 1) * pulseMul) * arterialPressureMul
 
-	local count = intensity >= 0.78 and 3 or intensity >= 0.42 and 2 or 1
+	local count = isHeadGib and (intensity >= 0.65 and 3 or 2) or (intensity >= 0.78 and 3 or intensity >= 0.42 and 2 or 1)
 	for _ = 1, count do
 		local particle = hg.addBloodPart(pos + VectorRand(-0.35, 0.35), velocity + VectorRand(-2, 2), nil, size, size, true, nil, ent)
 		if particle then particle.decalWeight = Lerp(intensity, 0.7, 4.5) end
@@ -1418,7 +1412,8 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 				if not boneID then continue end
 
 				local pos, ang = ent:GetBonePosition(boneID)
-				if (owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer() then
+				local residualCirculation = getCirculationStrength(org, org.pulse or 0)
+				if ((owner:IsPlayer() and owner:Alive()) or not owner:IsPlayer()) and residualCirculation > 0.005 then
 					local intensity = getArterialVisualIntensity(org, arterialwounds, wound, i)
 					local size = math.Rand(0.65, 1.25) * Lerp(intensity, 0.45, 2.1)
 					if seen then
@@ -1442,7 +1437,7 @@ hook.Add("Player-Ragdoll think", "organism-think-client-blood", function(ply, en
 						if water then
 							hg.addBloodPart2(pos, VectorRand(-5, 5), nil, nil, nil, nil, true, nil, ent)
 						else
-							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, intensity, wound[9] == true)
+							emitArterialSpray(ent, pos, dir, boneAng, org, i, size, intensity, wound[9] == true, wound[10] == "headgib")
 						end
 
 						wound[5] = time + (water and 2 or (0.5 / hg_blood_fps:GetInt()))

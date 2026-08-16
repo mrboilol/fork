@@ -48,6 +48,73 @@ local function SetSealSkin(wep, skin)
     end
 end
 
+local function SpawnPhysicalSeal(self, thrown, positionOverride, angleOverride, ownerOverride)
+    if CLIENT or self.SealConvertedToEntity then return end
+    local cfg = HG_SEAL_CONFIG or {}
+    local owner = IsValid(ownerOverride) and ownerOverride or self:GetOwner()
+    local character = IsValid(owner) and hg.GetCurrentCharacter and hg.GetCurrentCharacter(owner) or owner
+    if not IsValid(character) then character = owner end
+
+    local seal = ents.Create("sealplush")
+    if not IsValid(seal) then return end
+
+    local pos = isvector(positionOverride) and positionOverride or self:GetPos()
+    local ang = isangle(angleOverride) and angleOverride or self:GetAngles()
+    if thrown and IsValid(owner) and owner:IsPlayer() and not positionOverride then
+        ang = owner:EyeAngles()
+        pos = owner:EyePos() + ang:Forward() * 18 + ang:Right() * 5 - ang:Up() * 5
+    end
+    seal:SetPos(pos)
+    seal:SetAngles(ang)
+    seal:Spawn()
+    seal:SetSkin(self.CurrentSkin or 0)
+    if self.SealStoredHealth then seal:SetHealth(math.max(self.SealStoredHealth, 0)) end
+    if self.SealStoredBlood then seal.SealBlood = math.max(self.SealStoredBlood, 0) end
+    if self.SealStoredBleedRate then seal.SealBleedRate = math.max(self.SealStoredBleedRate, 0) end
+    seal:SyncPhysiology()
+
+    if thrown and IsValid(owner) and owner:IsPlayer() then
+        local speed = cfg.THROW_SPEED or 760
+        local phys = seal:GetPhysicsObject()
+        if IsValid(phys) then
+            local inherited = IsValid(character) and character:GetVelocity() or owner:GetVelocity()
+            phys:SetVelocity(owner:GetAimVector() * speed + inherited * 0.5)
+            phys:AddAngleVelocity(VectorRand() * 320)
+        end
+        seal:ArmThrownImpact(owner, speed)
+        seal:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+        timer.Simple(0.15, function()
+            if IsValid(seal) then seal:SetCollisionGroup(COLLISION_GROUP_INTERACTIVE) end
+        end)
+    end
+
+    self.SealConvertedToEntity = true
+    return seal
+end
+
+local function FinishSealThrow(self)
+    if CLIENT or not IsValid(self) then return end
+    local owner = self:GetOwner()
+    local seal = SpawnPhysicalSeal(self, true)
+    if not IsValid(seal) then
+        self.SealThrowPending = false
+        return
+    end
+
+    self.SealThrowPending = false
+    if IsValid(owner) and owner:IsPlayer() then
+        owner:ViewPunch(Angle(2, 0, -5))
+        owner:SelectWeapon("weapon_hands_sh")
+    end
+    self:Remove()
+end
+
+SWEP.AnimList = {
+    ["deploy"] = {"base_draw", 1, false},
+    ["attack"] = {"throw", 0.45, false, false, FinishSealThrow, 0.24},
+    ["idle"] = {"draw", 1, false}
+}
+
 function SWEP:Initialize()
     if self.BaseClass.Initialize then self.BaseClass.Initialize(self) end
 
@@ -60,10 +127,16 @@ function SWEP:Initialize()
     self.BlinkEnd          = 0
     self.IsBlinking        = false
     self._lastHP           = -1
+    local cfg = HG_SEAL_CONFIG or {}
+    self.SealStoredHealth = self.SealStoredHealth or cfg.MAX_HEALTH or 100
+    self.SealStoredBlood = self.SealStoredBlood or cfg.MAX_BLOOD_ML or 1200
+    self.SealStoredBleedRate = self.SealStoredBleedRate or 0
+    self.SealPhysiologyTime = CurTime()
 end
 
 function SWEP:Deploy()
     self:SetHold(self.HoldType)
+    if self.PlayAnim then self:PlayAnim("deploy") end
     self.LastActivity = CurTime()
     self.NextBlink    = CurTime() + 2
     self.IsBlinking   = false
@@ -100,6 +173,7 @@ function SWEP:Deploy()
 end
 
 function SWEP:Holster()
+    if self.SealThrowPending then return false end
     timer.Remove("SealDeploySkin_" .. self:EntIndex())
     timer.Remove("SealHurt_" .. self:EntIndex())
     self.WasAsleepHolster = self.Sleeping
@@ -107,13 +181,15 @@ function SWEP:Holster()
 end
 
 function SWEP:PrimaryAttack()
-    self:SealWake()
+    if self.SealThrowPending or self.SealConvertedToEntity then return end
+    local owner = self:GetOwner()
+    if not IsValid(owner) then return end
 
-    if SERVER then
-        net.Start("SealSound")
-        net.WriteString("sealplush/sealsound1.wav")
-        net.Send(self:GetOwner())
-    end
+    self:SealWake()
+    self.SealThrowPending = true
+    self.Thrower = owner
+    self:SetNextPrimaryFire(CurTime() + 0.6)
+    if self.PlayAnim then self:PlayAnim("attack") end
 end
 
 function SWEP:SecondaryAttack()
@@ -126,10 +202,37 @@ function SWEP:SecondaryAttack()
     end
 end
 
+function SWEP:UpdateSealPhysiology(now)
+    if CLIENT or self.SealConvertedToEntity then return end
+    local cfg = HG_SEAL_CONFIG or {}
+    local last = self.SealPhysiologyTime or now
+    local dt = math.Clamp(now - last, 0, 0.25)
+    self.SealPhysiologyTime = now
+    local bleedRate = math.max(self.SealStoredBleedRate or 0, 0)
+    if bleedRate > 0 and dt > 0 then
+        self.SealStoredBlood = math.max((self.SealStoredBlood or cfg.MAX_BLOOD_ML or 1200) - bleedRate * dt, 0)
+        self.SealStoredBleedRate = bleedRate * math.exp(-(cfg.BLEED_CLOT_RATE or 0.02) * dt)
+    end
+
+    local maxBlood = cfg.MAX_BLOOD_ML or 1200
+    if (self.SealStoredHealth or cfg.MAX_HEALTH or 100) <= 0 or maxBlood - (self.SealStoredBlood or maxBlood) >= (cfg.FATAL_BLOOD_LOSS_ML or 500) then
+        local seal = SpawnPhysicalSeal(self, false)
+        if IsValid(seal) then
+            seal:KillSeal((self.SealStoredHealth or 0) <= 0 and "damage" or "bloodloss")
+            local owner = self:GetOwner()
+            if IsValid(owner) and owner:IsPlayer() then owner:SelectWeapon("weapon_hands_sh") end
+            self:Remove()
+        end
+    end
+end
+
 function SWEP:Think()
     local now   = CurTime()
+    if SERVER then self:UpdateSealPhysiology(now) end
+    if not IsValid(self) then return end
     local owner = self:GetOwner()
     if not IsValid(owner) then return end
+    self.SealLastOwner = owner
 
     self:SetHold(self.HoldType)
 
@@ -201,6 +304,45 @@ function SWEP:SealWake()
         net.WriteInt(0, 8)
         net.Send(self:GetOwner())
     end
+end
+
+function SWEP:OnDrop()
+    if CLIENT or self.SealConvertedToEntity or self.SealDropPending then return end
+    self.SealDropPending = true
+
+    local owner = IsValid(self.SealLastOwner) and self.SealLastOwner or nil
+    local pos = self:GetPos()
+    local ang = self:GetAngles()
+    if IsValid(owner) then
+        local rag = owner:GetNWEntity("RagdollDeath")
+        if not IsValid(rag) then rag = owner.FakeRagdoll end
+        if IsValid(rag) then
+            pos = rag:WorldSpaceCenter() + Vector(0, 0, 6)
+            ang = rag:GetAngles()
+        else
+            pos = owner:EyePos()
+            ang = owner:EyeAngles()
+        end
+    end
+
+    timer.Simple(0, function()
+        if not IsValid(self) or self.SealConvertedToEntity then return end
+        -- If another system re-owned the SWEP during the deferred Homicide drop
+        -- cleanup, abort conversion rather than duplicating/removing it in-hand.
+        if IsValid(self:GetOwner()) then
+            self.SealDropPending = false
+            return
+        end
+        local seal = SpawnPhysicalSeal(self, false, pos, ang, owner)
+        if IsValid(seal) then self:Remove() else self.SealDropPending = false end
+    end)
+end
+
+function SWEP:OnRemove()
+    timer.Remove("SealDeploySkin_" .. self:EntIndex())
+    timer.Remove("SealHurt_" .. self:EntIndex())
+    hook.Remove("Think", "AnimCallback" .. self:EntIndex())
+    if self.BaseClass.OnRemove then self.BaseClass.OnRemove(self) end
 end
 
 if CLIENT then

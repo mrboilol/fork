@@ -372,9 +372,10 @@ module[2] = function(owner, org, timeValue)
 	local o2 = org.o2
 	local rawBlood = tonumber(org.blood) or 5000
 	if not org.alive then
-		o2[1] = 0
+		if hg.organism and hg.organism.BeginPostMortemDecay then
+			hg.organism.BeginPostMortemDecay(org)
+		end
 		o2.curregen = 0
-		org.bloodO2Cap = 0
 		org.oxygenIntakeAvailable = false
 		org.lungsfunction = false
 		return
@@ -384,6 +385,7 @@ module[2] = function(owner, org, timeValue)
 		o2[1] = o2.range
 		o2.curregen = o2.regen
 		org.bloodO2Cap = o2.range
+		org.bloodCarryO2Cap = o2.range
 		org.oxygenIntakeAvailable = true
 		org.lungsfunction = true
 		org.exertionO2Debt = 0
@@ -444,8 +446,14 @@ module[2] = function(owner, org, timeValue)
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
 	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
-	local bloodO2Cap = o2.range * hg.organism.GetBloodDeliveryFraction(rawBlood, 0.75)
-	org.bloodO2Cap = bloodO2Cap
+	-- Arterial oxygenation and oxygen-carrying capacity are separate. Acute
+	-- hemorrhage removes circulating RBC mass/volume, but it does not directly
+	-- desaturate the blood that still passes through functioning lungs.
+	local normalBloodVolume = hg.organism.normalBloodVolume or 5000
+	local bloodCarryK = math.Clamp(rawBlood / math.max(normalBloodVolume, 1), 0, 1)
+	local bloodCarryO2Cap = o2.range * bloodCarryK
+	org.bloodCarryO2Cap = bloodCarryO2Cap
+	local bloodO2Cap = org.bloodO2Cap or o2.range
 
 	local bodyTemperature = org.temperature or 36.7
 	local coldO2Stress = bodyTemperature < 35 and math.Clamp(math.Remap(bodyTemperature, 35, 26, 0, 1), 0, 1) or 0
@@ -617,6 +625,24 @@ module[2] = function(owner, org, timeValue)
 
 	org.hemothorax = math.Clamp(max(org.hemothoraxTrauma, (org.hemothoraxL + org.hemothoraxR) / 2), 0, 1)
 
+	-- Relative arterial oxygenation (0..30 game scale). The nonlinear reserve
+	-- means moderate gas-exchange impairment does not immediately equal severe
+	-- arterial desaturation.
+	local lungGasExchange = math.Clamp(((1 - (org.lungsL[1] or 0)) + (1 - (org.lungsR[1] or 0))) / 2, 0, 1)
+	local airwayGasExchange = math.Clamp(1 - (org.trachea or 0) * 0.8, 0, 1)
+	local thoracicGasExchange = math.Clamp(1 - (org.pneumothorax or 0) * 0.70 - (org.hemothorax or 0) * 0.65, 0, 1)
+	local respiratoryDrive = math.Clamp(1 - drugRespiratoryDepression * 0.95, 0, 1)
+	local ventilationAvailable = success and 1 or 0
+	local rawGasExchange = math.Clamp(lungGasExchange * airwayGasExchange * thoracicGasExchange * respiratoryDrive * ventilationAvailable, 0, 1)
+	local saturationReserve = rawGasExchange > 0 and (1 - (1 - rawGasExchange) ^ 3.2) or 0
+	local altitudeSaturation = Lerp(altitudeO2K, 0.55, 1)
+	local arterialO2Target = o2.range * saturationReserve * altitudeSaturation
+	-- Desaturation/reoxygenation takes time instead of teleporting with one tick.
+	local currentBloodO2 = math.Clamp(tonumber(org.bloodO2Cap) or o2.range, 0, o2.range)
+	local arterialChangeRate = arterialO2Target < currentBloodO2 and 0.055 or 0.22
+	bloodO2Cap = math.Approach(currentBloodO2, arterialO2Target, timeValue * o2.range * arterialChangeRate)
+	org.bloodO2Cap = bloodO2Cap
+
 
 
 		if org.lastCOBreathe and org.lastCOBreathe + 1 > CurTime() then
@@ -724,21 +750,12 @@ module[2] = function(owner, org, timeValue)
 		-- rate above.  A small floor keeps a critically injured but not yet fully
 		-- failed lung from snapping to zero in one tick.
 		local lungO2Cap = o2.range * math.max(1 - org.pneumothorax * org.pneumothorax, 0.1) * math.max(1 - (org.hemothorax or 0) * (org.hemothorax or 0), 0.1) * math.max(1 - (org.lungsL[1] + org.lungsR[1]) / 2, 0.1)
-		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
+		o2[1] = min(o2[1] + regenerate * math.Clamp(org.o2[1] / 30, 0.25, 1) * (org.holdingbreath and 0 or 1) * (sprayed and 0 or 1) * min((10 / max(org.CO,1)),1), min(lungO2Cap, bloodO2Cap, bloodCarryO2Cap, coldO2Cap, altitudeO2Cap, exertionO2Cap))
 
 
 
-		-- Severe hypotension slowly lowers O2 to zero.
-		if (org.hypotension or 0) > 0.7 then
-			local hypotensionO2DropRate = math.Clamp(((org.hypotension or 0) - 0.7) / 0.3, 0, 1)
-			o2[1] = max(o2[1] - timeValue * hypotensionO2DropRate * 0.8, 0)
-
-		end
-
-		if org.pulse and org.pulse < 45 then
-			local pulseO2DropRate = math.Clamp((45 - org.pulse) / 45, 0, 1)
-			o2[1] = max(o2[1] - timeValue * pulseO2DropRate * 0.65, 0)
-		end
+		-- Hypotension/low pulse are applied once through current cardiac output
+		-- and the delivery cap below; do not drain tissue O2 a second time here.
 
 		-- Trachea damage from breathing - damages trachea when breathing, more breathing = more damage
 
@@ -782,58 +799,29 @@ module[2] = function(owner, org, timeValue)
 
 
 
-		-- Central arterial impairment develops over time instead of applying a
-		-- second instant O2 penalty on top of blood loss and pressure collapse.
-
+		-- Open central arteries reduce cerebral inflow locally. Their systemic
+		-- effect is already represented by actual blood loss -> preload/output ->
+		-- perfusion, so do not delete arterial O2 here as a second hemorrhage path.
 		if org.arterialwounds then
-
-			local arteryDrainMul = 0
-			local hasHeldCarotid = false
-			local hasUnheldCentralArtery = false
-
+			local centralImpairment = 0
 			for _, wound in pairs(org.arterialwounds) do
-
-				if wound[7] == "arteria" and wound[1] > 0 then
-
+				local artery = wound[7]
+				local boneName = string.lower(tostring(wound[4] or ""))
+				local isCerebralInflow = artery == "arteria"
+					and (string.find(boneName, "neck", 1, true) or string.find(boneName, "head", 1, true) or string.find(boneName, "spine4", 1, true))
+				if isCerebralInflow and (wound[1] or 0) > 0 then
 					local held = org.manualHoldWound and org.manualHoldWoundArterial and org.manualHoldWoundTarget == wound
-					local woundDrainMul = held and 0.2 or 1
-					arteryDrainMul = arteryDrainMul + woundDrainMul
-					hasHeldCarotid = hasHeldCarotid or held
-					hasUnheldCentralArtery = hasUnheldCentralArtery or not held
-
-				elseif wound[7] == "spineartery" and wound[1] > 0 then
-
-					arteryDrainMul = arteryDrainMul + 0.85
-					hasUnheldCentralArtery = true
-
+					local heldMul = held and 0.2 or 1
+					centralImpairment = centralImpairment + heldMul
 				end
-
 			end
 
-			local impairmentTarget = math.Clamp(arteryDrainMul, 0, 1)
+			local impairmentTarget = math.Clamp(centralImpairment, 0, 1)
 			local impairmentNow = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
 			local impairmentRate = impairmentTarget > impairmentNow and timeValue / 18 or timeValue / 8
 			org.arterialO2Impairment = math.Approach(impairmentNow, impairmentTarget, impairmentRate)
-
-			if arteryDrainMul <= 0 then
-
-				org.arteriaO2Drain = false
-				org.arterialO2Drain = false
-
-			elseif org.arterialO2Impairment > 0 then
-
-				local pulseMultiplier = math.Clamp((org.pulse or 0) / 70, 0, 1.5)
-
-				-- Neck and spinal arterial wounds still compromise oxygen delivery, but
-				-- catastrophic blood loss is their primary danger. Keep the direct O2
-				-- drain secondary to the continuous circulation failure it causes.
-				local immediatePressureMul = hasHeldCarotid and not hasUnheldCentralArtery and 0.2 or 1
-				local arteriaDrain = timeValue * 0.04 * pulseMultiplier * org.arterialO2Impairment * immediatePressureMul
-
-				o2[1] = max(o2[1] - arteriaDrain, 0)
-
-			end
-
+			org.arteriaO2Drain = false
+			org.arterialO2Drain = false
 		else
 			org.arterialO2Impairment = math.Approach(org.arterialO2Impairment or 0, 0, timeValue / 8)
 		end
@@ -929,7 +917,9 @@ module[2] = function(owner, org, timeValue)
 	-- O2[1] is the tissue reserve, so it must follow actual circulation as well
 	-- as lung intake and blood volume.  Without this link a player could have
 	-- 0.4 perfusion while still carrying a full 30-point tissue-O2 reserve.
-	local tissuePerfusion = math.Clamp(org.perfusion or org.cardiacOutput or 1, 0, 1)
+	-- Use current pump output directly. org.perfusion is derived after lungs/O2,
+	-- so feeding it back here produced a one-tick self-amplifying O2 loop.
+	local tissuePerfusion = math.Clamp(org.cardiacOutput or 1, 0, 1)
 	-- Tissue oxygen is a delivered value, not an independent reservoir. With no
 	-- perfusion there is no delivery, so its cap must be zero as well.
 	local perfusionO2Cap = o2.range * tissuePerfusion
@@ -941,22 +931,15 @@ module[2] = function(owner, org, timeValue)
 	local pulseValue = math.max(tonumber(org.pulse) or 70, 0)
 	local pulseO2K = pulseValue >= 60 and 1 or math.Clamp((pulseValue - 15) / 45, 0.05, 1)
 	local pulseO2Cap = o2.range * pulseO2K
-	local deliveryO2Cap = min(bloodO2Cap, pulseO2Cap, perfusionO2Cap, exertionO2Cap)
+	local deliveryO2Cap = min(bloodO2Cap, bloodCarryO2Cap, pulseO2Cap, perfusionO2Cap, exertionO2Cap)
 	if o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
 		local deliveryResponse = 1 - math.exp(-timeValue * (0.16 + deliveryFailure * 0.45))
 		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse
 	end
 
-	local lowBloodO2Stress = math.Clamp((3000 - rawBlood) / 1250, 0, 1)
-	local activeBleedO2Stress = math.Clamp((org.bleed or 0) / 0.18, 0, 1)
-	local lowPulseO2Stress = math.Clamp((55 - pulseValue) / 40, 0, 1)
-	local circulatoryO2Drain = timeValue * (
-		lowBloodO2Stress ^ 1.2 * 0.28
-		+ activeBleedO2Stress ^ 1.15 * 0.18
-		+ lowPulseO2Stress ^ 1.2 * 0.42
-	)
-	o2[1] = math.max(o2[1] - circulatoryO2Drain, 0)
+	-- Hemorrhage is already represented by carrying capacity and current cardiac
+	-- output. Do not add another raw-blood/bleed/pulse drain on top of delivery.
 
 	o2[1] = math.Clamp(o2[1], 0, o2.range)
 	if org.heartstop then

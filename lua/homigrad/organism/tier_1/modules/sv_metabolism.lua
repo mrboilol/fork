@@ -104,14 +104,15 @@ module[2] = function(owner, org, timeValue)
         if org.alive and org.thirstDmgCd < CurTime() and org.thirst > 35 then
             org.painadd = org.painadd + 20 * (org.thirst / 55)
             org.thirstDmgCd = CurTime() + (math.random(30, 45) - (org.thirst / 6.5))
-            if org.thirst > 60 then
-                org.blood = max(org.blood - timeValue * 15, 1000)
-            end
+            -- Pain/damage cadence remains intermittent; the circulation penalty
+            -- itself is updated continuously below from the current thirst state.
         end
     else
         org.thirst = min(max(org.thirst - timeValue * 2, 0), 100)
     end
     org.thirst = Round(org.thirst or 0, 3)
+    org.dehydrationCirculationPenalty = (hg_thirstsystem:GetBool() and org.hydration <= 0)
+        and math.Clamp((org.thirst - 60) / 40, 0, 1) or 0
 
     if (org.intestines > 0.5 or org.stomach > 0.5) and not org.otrub and owner:IsPlayer() and org.satiety > 1 then
         if not org.randomPainSound or org.randomPainSound < CurTime() then
@@ -128,9 +129,8 @@ module[2] = function(owner, org, timeValue)
     if hungerEnabled then
         org.satiety = min(max(org.satiety - timeValue * 0.25, 0), 100)
     end
-    -- Passive blood-volume recovery scales with nourishment. A well-fed
-    -- character now restores up to 20 ml/sec instead of 10 ml/sec.
-    org.blood = min(org.blood + timeValue * (org.satiety/5), 5000)
+    -- Food supports healing/regeneration but does not instantly manufacture
+    -- circulating blood. Blood-volume recovery is owned by sv_blood.
     org.regeneratehp = (!((org.regeneratehp or 0) >= 1) and min( (org.regeneratehp or 0) + timeValue * (org.satiety/100), 1)) or 0
     owner:SetHealth(min(owner:Health() + org.regeneratehp,100))
 end

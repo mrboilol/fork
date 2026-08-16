@@ -3,16 +3,38 @@ hg.organism.module = hg.organism.module or {}
 local module = hg.organism.module
 hg.organism.lastindex = hg.organism.lastindex or 1000000
 
-hg.organism.normalBloodVolume = 5000
+hg.organism.config = hg.organism.config or {
+	NORMAL_BLOOD_VOLUME_ML = 5000,
+	HEMORRHAGE_COMPENSATION_START_ML = 3500,
+	HEMORRHAGE_COMPENSATION_RANGE_ML = 1500,
+	PRELOAD_FAILURE_START_ML = 1750,
+	PRELOAD_FAILURE_RANGE_ML = 1000,
+	BLOOD_DELIVERY_COLLAPSE_FRACTION = 0.12,
+	BLOOD_DELIVERY_COMPENSATED_FRACTION = 0.75,
+	CRITICAL_CIRCULATION_RESERVE = 0.68,
+	CRITICAL_CIRCULATION_RANGE = 0.50,
+	ARTERIAL_AMPUTATION_BLEED_MULTIPLIER = 0.65,
+	ARTERIAL_HEADGIB_BLEED_MULTIPLIER = 1.65,
+	POSTMORTEM_DECAY_SECONDS = 5,
+	HEADGIB_ARTERIAL_WOUND_SIZE = 34,
+	BLOOD_REGEN_RATE_ML_S = 0.5
+}
+hg.organism.normalBloodVolume = hg.organism.config.NORMAL_BLOOD_VOLUME_ML or 5000
 
 -- Blood volume limits delivery continuously. There is deliberately no lethal
 -- volume cutoff here: an almost empty circulation produces almost no delivery,
 -- and the resulting pressure and cerebral hypoxia decide the outcome over time.
 function hg.organism.GetBloodDeliveryFraction(blood, exponent)
+	local cfg = hg.organism.config or {}
 	local normalVolume = hg.organism.normalBloodVolume
 	local volume = math.Clamp(tonumber(blood) or normalVolume, 0, normalVolume)
 	local fraction = volume / normalVolume
-	return math.Clamp(fraction, 0, 1) ^ (tonumber(exponent) or 0.4)
+	local collapseFraction = math.Clamp(cfg.BLOOD_DELIVERY_COLLAPSE_FRACTION or 0.12, 0, 0.95)
+	local compensatedFraction = math.Clamp(cfg.BLOOD_DELIVERY_COMPENSATED_FRACTION or 0.75, collapseFraction + 0.01, 1)
+	local reserve = math.Clamp((fraction - collapseFraction) / (compensatedFraction - collapseFraction), 0, 1)
+	-- Smoothstep models compensation at mild loss and preload collapse at severe loss.
+	reserve = reserve * reserve * (3 - reserve * 2)
+	return math.Clamp(reserve, 0, 1) ^ math.max(tonumber(exponent) or 1, 0.1)
 end
 
 function hg.organism.ZeroVitals(org)
@@ -29,6 +51,7 @@ function hg.organism.ZeroVitals(org)
 	org.hypotension = 1
 	org.hypertension = 0
 	org.bloodO2Cap = 0
+	org.bloodCarryO2Cap = 0
 	org.bodyoxygen = 0
 	org.perfusion = 0
 	org.brainoxygen = 0
@@ -41,6 +64,89 @@ function hg.organism.ZeroVitals(org)
 		org.o2[1] = 0
 		org.o2.curregen = 0
 	end
+end
+
+local postMortemVitalKeys = {
+	heartbeat = "pulse",
+	pulse = "pulse",
+	bloodPressure = "pressure",
+	systolic = "pressure",
+	diastolic = "pressure",
+	cardiacOutput = "pressure",
+	strokeVolume = "pressure",
+	bloodO2Cap = "oxygen",
+	bloodCarryO2Cap = "oxygen",
+	bodyoxygen = "oxygen",
+	perfusion = "pressure",
+	brainoxygen = "oxygen",
+	peripheralperfusion = "pressure",
+	cerebralPerfusion = "pressure",
+	myocardialOxygen = "oxygen",
+	consciousness = "brain"
+}
+
+function hg.organism.BeginPostMortemDecay(org, duration)
+	if not org or org.postMortemDecayStart then return end
+
+	local now = CurTime()
+	duration = math.max(tonumber(duration) or hg.organism.config.POSTMORTEM_DECAY_SECONDS or 5, 0.1)
+	org.postMortemDecayStart = now
+	org.postMortemDecayEnd = now + duration
+	org.postMortemInitialVitals = {}
+	for key in pairs(postMortemVitalKeys) do
+		org.postMortemInitialVitals[key] = math.max(tonumber(org[key]) or 0, 0)
+	end
+	if istable(org.o2) then
+		org.postMortemInitialVitals.o2 = math.max(tonumber(org.o2[1]) or 0, 0)
+	end
+
+	-- Structural death is immediate; numerical circulation/gas stores decay below.
+	org.heartstop = true
+	org.oxygenIntakeAvailable = false
+	org.lungsfunction = false
+end
+
+function hg.organism.IsPostMortemDecaying(org)
+	return org and not org.alive and (tonumber(org.postMortemDecayEnd) or 0) > CurTime()
+end
+
+function hg.organism.UpdatePostMortemVitals(org)
+	if not org or org.alive then return false end
+	if not org.postMortemDecayStart then hg.organism.BeginPostMortemDecay(org) end
+
+	local startTime = tonumber(org.postMortemDecayStart) or CurTime()
+	local endTime = tonumber(org.postMortemDecayEnd) or startTime
+	local duration = math.max(endTime - startTime, 0.1)
+	local progress = math.Clamp((CurTime() - startTime) / duration, 0, 1)
+	if progress >= 1 then
+		hg.organism.ZeroVitals(org)
+		return false
+	end
+
+	local initial = org.postMortemInitialVitals or {}
+	local factors = {
+		pulse = (1 - progress) ^ 1.55,
+		pressure = (1 - progress) ^ 2.15,
+		oxygen = (1 - progress) ^ 0.8,
+		brain = (1 - progress) ^ 1.25
+	}
+	for key, curve in pairs(postMortemVitalKeys) do
+		local starting = tonumber(initial[key]) or math.max(tonumber(org[key]) or 0, 0)
+		org[key] = math.min(math.max(tonumber(org[key]) or 0, 0), starting * factors[curve])
+	end
+	if istable(org.o2) then
+		local startingO2 = tonumber(initial.o2) or math.max(tonumber(org.o2[1]) or 0, 0)
+		org.o2[1] = math.min(math.max(tonumber(org.o2[1]) or 0, 0), startingO2 * factors.oxygen)
+		org.o2.curregen = 0
+	end
+
+	org.hypotension = math.max(tonumber(org.hypotension) or 0, progress)
+	org.hypertension = math.min(tonumber(org.hypertension) or 0, 1 - progress)
+	org.ecgState = progress > 0.35 and "asystole" or org.ecgState
+	org.heartstop = true
+	org.oxygenIntakeAvailable = false
+	org.lungsfunction = false
+	return true
 end
 
 -- Wounds are owned by the organism, but both kinds of player ragdoll are
@@ -78,7 +184,7 @@ function hg.organism.KillFatalBrainDamage(org)
 	org.needotrub = false
 	org.otrub = false
 	org.incapacitated = false
-	hg.organism.ZeroVitals(org)
+	hg.organism.BeginPostMortemDecay(org)
 
 	local owner = org.owner
 	if IsValid(owner) and owner:IsPlayer() and owner:Alive() then
@@ -139,6 +245,9 @@ local seizure_mannitol_recovery_bonus = 1
 hook.Add("Org Clear", "Main", function(org)
 	org.alive = true
 	org.otrub = false
+	org.postMortemDecayStart = nil
+	org.postMortemDecayEnd = nil
+	org.postMortemInitialVitals = nil
 	org.entindex = IsValid(org.owner) and org.owner:EntIndex() or hg.organism.lastindex + 1
 	module.pulse[1](org)
 	module.blood[1](org)
@@ -274,6 +383,7 @@ hook.Add("Org Clear", "Main", function(org)
 	org.lastWoundsSig = nil
 	org.lastArterialWoundsSig = nil
 	org.fatalBrainDeath = nil
+	org.headGibArterialWoundAdded = nil
 
 	org.noradrenalineEndTime = nil
 	org.blindness = nil
@@ -472,14 +582,22 @@ function hg.organism.RestoreSupportedOxygen(org, recovery, floors)
 		-- the lungs have reported zero active intake.
 		or (org.oxygenIntakeAvailable == false and not org.heartstop)
 		or org.respiratoryArrest
-		or (tonumber(org.blood) or 5000) < 2200
 	if criticalFailure then return false end
 
-	recovery = math.max(tonumber(recovery) or 0, 0)
+	local supportBlood = math.max(tonumber(org.blood) or 5000, 0)
+	local normalBlood = math.max(hg.organism.normalBloodVolume or 5000, 1)
+	local flowSupport = hg.organism.GetBloodDeliveryFraction(supportBlood, 1)
+	local carryingCapacity = math.Clamp(supportBlood / normalBlood, 0, 1)
+	local bloodSupportK = math.min(flowSupport, carryingCapacity)
+	if bloodSupportK <= 0 then return false end
+
+	recovery = math.max(tonumber(recovery) or 0, 0) * bloodSupportK
 	floors = floors or {}
 	local oxygenMax = math.max(tonumber(org.o2.range) or 30, 1)
-	local oxygenFloor = math.Clamp(tonumber(floors.oxygen) or 0, 0, oxygenMax)
-	local oxygenTarget = math.Clamp(tonumber(floors.oxygenTarget) or oxygenFloor, oxygenFloor, oxygenMax)
+	local supportCeiling = bloodSupportK
+	local supportedOxygenMax = oxygenMax * supportCeiling
+	local oxygenFloor = math.Clamp(tonumber(floors.oxygen) or 0, 0, supportedOxygenMax)
+	local oxygenTarget = math.Clamp(tonumber(floors.oxygenTarget) or oxygenFloor, oxygenFloor, supportedOxygenMax)
 	org.o2[1] = math.max(math.Approach(tonumber(org.o2[1]) or 0, oxygenTarget, recovery * oxygenMax), oxygenFloor)
 
 	local vitalFloors = {
@@ -491,8 +609,8 @@ function hg.organism.RestoreSupportedOxygen(org, recovery, floors)
 		myocardialOxygen = tonumber(floors.myocardialOxygen) or 0
 	}
 	for key, floor in pairs(vitalFloors) do
-		floor = math.Clamp(floor, 0, 1)
-		local target = math.Clamp(tonumber(floors[key .. "Target"]) or floor, floor, 1)
+		floor = math.Clamp(floor, 0, supportCeiling)
+		local target = math.Clamp(tonumber(floors[key .. "Target"]) or floor, floor, supportCeiling)
 		org[key] = math.max(math.Approach(tonumber(org[key]) or 0, target, recovery), floor)
 	end
 
@@ -546,10 +664,10 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Resilience can soften shock effects, but it cannot create circulating volume.
 	local blood = math.max(org.blood or 0, 0)
 
-	-- Continuous blood-volume delivery reaches zero only when circulating volume
-	-- itself reaches zero. Low volume therefore degrades pressure and oxygen
-	-- delivery without acting as a hidden death event.
-	local bloodFraction = hg.organism.GetBloodDeliveryFraction(blood, 0.4)
+	-- Continuous blood-volume delivery stays near compensated values through
+	-- mild loss, then collapses nonlinearly as preload becomes critically small.
+	-- This is a flow curve, not a hidden death event.
+	local bloodFraction = hg.organism.GetBloodDeliveryFraction(blood, 1)
 	-- Compensation is strongest in the middle of the curve and vanishes at both
 	-- zero and normal volume, so stimulants cannot manufacture circulation.
 	local lowBloodReserve = bloodFraction * (1 - bloodFraction) * zerlkers * 0.35
@@ -564,15 +682,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local oxygenDelivery = oxygenIntakeAvailable and oxygen or residualOxygenDelivery
 	local hypercapnia = math.Clamp(math.Remap(org.CO or 0, 5, 30, 0, 1), 0, 1)
 	local brainTrauma = math.Clamp(org.brain or 0, 0, 1)
-	local venousBleed = math.max(org.venousBleed or 0, 0)
-	local internalBleed = math.max(org.internalBleedRate or 0, 0)
-	local internalBleedComplication = math.Clamp(org.internalBleedComplication or 0, 0, 1)
-	local venousPenalty = math.Clamp(venousBleed / 65, 0, 0.18)
-	local internalPenalty = math.Clamp(internalBleed / 45, 0, 0.22)
-	local internalComplicationPenalty = internalBleedComplication * 0.22
 	local shockPenalty = math.Clamp((org.shock or 0) / 100, 0, 0.35) * (1 - resilience * 0.3 - zerlkers * 0.45)
-	local throatPenalty = math.Clamp(org.throatCutPressureShock or 0, 0, 1)
-	local neckPenalty = math.Clamp(org.neckBrainOxygenPenalty or 0, 0, 1)
 	local arterialImpairment = math.Clamp(org.arterialO2Impairment or 0, 0, 1)
 	local pump = math.Clamp(1 - (org.hypotension or 0) + (org.hypertension or 0) * 0.2, 0, 1.2)
 	local output = math.Clamp(org.cardiacOutput or ((org.pulse or 0) / 70), 0, 1.2)
@@ -586,10 +696,9 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	local centralOxygenSupply = math.min(oxygenDelivery, bloodFraction)
 	org.hypothermicSurvivalPriority = hypothermicPriority
 
-	-- The lungs' O2 value is already capped by the blood-volume curve in
-	-- sv_lungs. Combining it multiplicatively with bloodFraction here counted
-	-- the volume loss a second time. Oxygen availability and circulating volume
-	-- are both hard limits, so use the weaker one once.
+	-- Tissue O2 already has a separate carrying-capacity limit in sv_lungs.
+	-- Keep oxygen availability and circulating-volume support as hard limits
+	-- rather than multiplying several hemorrhage penalties together.
 	local bodyOxygenTarget = math.Clamp(centralOxygenSupply * Lerp(hypercapnia, 1, 0.35), 0, 1)
 	local coldBodyOxygenLossRate = 2.5 * Lerp(hypothermicPriority, 1, 0.72)
 	org.bodyoxygen = updateNormalizedVital(org.bodyoxygen, bodyOxygenTarget, dt, 0.55, coldBodyOxygenLossRate)
@@ -610,7 +719,11 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Shock already lowers consciousness in sv_pain and weakens the limbs below.
 	-- Subtracting it from central flow as well made hemorrhagic shock reduce O2
 	-- twice and moved the blackout point back above 2500 mL.
-	local pressureDelivery = math.Clamp(circulationLimit - venousPenalty - internalPenalty - internalComplicationPenalty - throatPenalty * 0.22 - arterialImpairment * 0.04, 0, 1)
+	-- Active venous/arterial/internal bleeding already changes circulating volume,
+	-- and thoracic complications already feed their own lung/tamponade models.
+	-- Systemic perfusion therefore follows the circulation limit once, rather than
+	-- subtracting the same hemorrhage again from the downstream result.
+	local pressureDelivery = math.Clamp(circulationLimit, 0, 1)
 	local centralFlowSupply = org.heartstop and 0 or math.min(pressureDelivery, bloodFraction)
 	-- Perfusion is blood flow. Oxygen content affects the tissue supplied by that
 	-- flow, but must not feed back into the flow value that sv_lungs uses as its
@@ -619,7 +732,7 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- flow falls much further, so cold patients lose movement and grip before the
 	-- protected brain and myocardium lose their remaining oxygen reserve.
 	local perfusionTarget = centralFlowSupply * Lerp(hypothermicPriority, 1, 0.84)
-	local peripheralTarget = math.min(centralFlowSupply, math.Clamp(pressureDelivery - shockPenalty * 0.35 - venousPenalty * 0.15 - throatPenalty * 0.2, 0, 1))
+	local peripheralTarget = math.min(centralFlowSupply, math.Clamp(pressureDelivery - shockPenalty * 0.35, 0, 1))
 	peripheralTarget = peripheralTarget * Lerp(hypothermicPriority, 1, 0.48)
 
 	org.perfusion = updateNormalizedVital(org.perfusion, perfusionTarget, dt, 0.30, 0.16)
@@ -632,7 +745,10 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- exceeding actual oxygen-carrying capacity.
 	local brainOxygenSupply = Lerp(hypothermicPriority, math.min(org.bodyoxygen, centralOxygenSupply), centralOxygenSupply)
 	local cerebralOxygenDelivery = math.min(cerebralPerfusion, brainOxygenSupply)
-	local brainTarget = math.Clamp(cerebralOxygenDelivery * Lerp(throatPenalty, 1, 0.45) * Lerp(neckPenalty, 1, 0.05) * Lerp(arterialImpairment, 1, 0.91) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
+	-- A carotid wound has one distinct local effect in addition to systemic blood
+	-- loss: reduced cerebral inflow. Keep that effect here instead of also
+	-- deleting arterial O2 or systemic pressure elsewhere.
+	local brainTarget = math.Clamp(cerebralOxygenDelivery * Lerp(arterialImpairment, 1, 0.45) * Lerp(brainTrauma, 1, 0.35) * Lerp(hypercapnia, 1, 0.5), 0, 1)
 	local coldBrainOxygenLossRate = 2.6 * Lerp(hypothermicPriority, 1, 0.58)
 	org.brainoxygen = updateNormalizedVital(org.brainoxygen, brainTarget, dt, 0.28, coldBrainOxygenLossRate * 0.085)
 	org.peripheralperfusion = updateNormalizedVital(org.peripheralperfusion, peripheralTarget, dt, 0.34, 0.20)
@@ -653,13 +769,17 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- carry it. This prevents stat spikes from treating zero regeneration as a
 	-- recoverable state.
 	local epinephrineStabilizing = (org.epinephrineStabilizationUntil or 0) > CurTime()
-		and oxygenIntakeAvailable and not org.heartstop and blood >= 2200
+		and oxygenIntakeAvailable and not org.heartstop
 	if epinephrineStabilizing then
-		org.bodyoxygen = math.max(org.bodyoxygen or 0, 0.55)
-		org.brainoxygen = math.max(org.brainoxygen or 0, 0.55)
-		org.perfusion = math.max(org.perfusion or 0, 0.50)
-		org.peripheralperfusion = math.max(org.peripheralperfusion or 0, 0.45)
-		org.cerebralPerfusion = math.max(org.cerebralPerfusion or 0, 0.50)
+		local epiFlowSupport = hg.organism.GetBloodDeliveryFraction(blood, 1)
+		local epiCarryingCapacity = math.Clamp(blood / math.max(hg.organism.normalBloodVolume or 5000, 1), 0, 1)
+		local epiBloodSupport = math.min(epiFlowSupport, epiCarryingCapacity)
+		local epiFloor = 0.55 * epiBloodSupport
+		org.bodyoxygen = math.max(org.bodyoxygen or 0, epiFloor)
+		org.brainoxygen = math.max(org.brainoxygen or 0, epiFloor)
+		org.perfusion = math.max(org.perfusion or 0, 0.50 * epiBloodSupport)
+		org.peripheralperfusion = math.max(org.peripheralperfusion or 0, 0.45 * epiBloodSupport)
+		org.cerebralPerfusion = math.max(org.cerebralPerfusion or 0, 0.50 * epiBloodSupport)
 	end
 
 	local rawMoveMul = math.Clamp(math.Remap(org.peripheralperfusion, 0.22, 0.75, 0.25, 1), 0.25, 1) * Lerp(hypothermicPriority, 1, 0.72)
@@ -796,6 +916,8 @@ local function send_organism(org, ply)
 
 	sendtable.alive = org.alive
 	sendtable.otrub = org.otrub
+	sendtable.postMortemDecayStart = org.postMortemDecayStart
+	sendtable.postMortemDecayEnd = org.postMortemDecayEnd
 	sendtable.owner = org.owner
 	sendtable.stamina = org.stamina
 	sendtable.immobilization = org.immobilization
@@ -855,6 +977,7 @@ local function send_organism(org, ply)
 	sendtable.hypovolemia = org.hypovolemia
 	sendtable.hypovolemicShock = org.hypovolemicShock
 	sendtable.bloodO2Cap = org.bloodO2Cap
+	sendtable.bloodCarryO2Cap = org.bloodCarryO2Cap
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.venousBleed = org.venousBleed
 	sendtable.woundBleedRates = org.woundBleedRates
@@ -931,7 +1054,7 @@ local function send_organism(org, ply)
 	sendtable.superfighter = org.superfighter
 
 	net.Start("organism_send")
-	net.WriteTable(org)
+	net.WriteTable(sendtable)
 	net.WriteBool(org.owner.fullsend)
 	net.WriteBool(false)
 	net.WriteBool(true)
@@ -958,10 +1081,31 @@ local function send_bareinfo(org)
 
 	sendtable.alive = org.alive
 	sendtable.otrub = org.otrub
+	sendtable.postMortemDecayStart = org.postMortemDecayStart
+	sendtable.postMortemDecayEnd = org.postMortemDecayEnd
 	sendtable.owner = org.owner
 	sendtable.bloodtype = org.bloodtype
 	sendtable.pulse = org.pulse
 	sendtable.blood = org.blood
+	sendtable.bleed = org.bleed
+	sendtable.hurt = org.hurt
+	sendtable.pain = org.pain
+	sendtable.shock = org.shock
+	sendtable.brain = org.brain
+	sendtable.consciousness = org.consciousness
+	sendtable.disorientation = org.disorientation
+	sendtable.adrenaline = org.adrenaline
+	sendtable.adrenalineAdd = org.adrenalineAdd
+	sendtable.fear = org.fear
+	sendtable.fearadd = org.fearadd
+	sendtable.stamina = org.stamina
+	sendtable.immobilization = org.immobilization
+	sendtable.critical = org.critical
+	sendtable.incapacitated = org.incapacitated
+	sendtable.deathStateEnd = org.deathStateEnd or 0
+	sendtable.holdingbreath = org.holdingbreath
+	sendtable.zerlkers = org.zerlkers
+	sendtable.zerlkersOverdose = org.zerlkersOverdose
 	sendtable.heartbeat = org.heartbeat
 	sendtable.bloodPressure = org.bloodPressure
 	sendtable.systolic = org.systolic
@@ -983,6 +1127,7 @@ local function send_bareinfo(org)
 	sendtable.hypovolemia = org.hypovolemia
 	sendtable.hypovolemicShock = org.hypovolemicShock
 	sendtable.bloodO2Cap = org.bloodO2Cap
+	sendtable.bloodCarryO2Cap = org.bloodCarryO2Cap
 	sendtable.arterialBleed = org.arterialBleed
 	sendtable.venousBleed = org.venousBleed
 	sendtable.woundBleedRates = org.woundBleedRates
@@ -1011,8 +1156,6 @@ local function send_bareinfo(org)
 	sendtable.timeValue = org.timeValue
 	sendtable.superfighter = org.superfighter
 	sendtable.lungsfunction = org.lungsfunction
-	sendtable.eyeL = org.eyeL
-	sendtable.eyeR = org.eyeR
 	sendtable.eyeL = org.eyeL
 	sendtable.eyeR = org.eyeR
 	sendtable.lleg = org.lleg
@@ -1056,7 +1199,7 @@ local function send_bareinfo(org)
 	if org.owner:IsPlayer() then rf:RemovePlayer(org.owner) end
 
 	net.Start("organism_send")
-	net.WriteTable(org)
+	net.WriteTable(sendtable)
 	net.WriteBool(org.owner.fullsend)
 	net.WriteBool(true)
 	net.WriteBool(false)
@@ -1649,10 +1792,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		module.stamina[2](owner, org, timeValue)
 	end
 
-	if isPly or org.fakePlayer then
-		module.lungs[2](owner, org, timeValue)
-	end
-
 	local debugEyes = debug_destroy_eyes:GetInt()
 	if debugEyes ~= (org.debugEyesMode or 0) then
 		if debugEyes == 1 or debugEyes == 3 then
@@ -1711,9 +1850,14 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 
 
 	module.pulse[2](owner, org, timeValue)
-	-- Derive systemic/brain delivery only after the blood and pulse modules
-	-- have supplied this tick's bleed rates, oxygen and pump output.
+	-- Lungs/tissue delivery must see this tick's blood volume and cardiac output.
+	if isPly or org.fakePlayer then
+		module.lungs[2](owner, org, timeValue)
+	end
+	-- Derive systemic/brain delivery only after blood, pump output and tissue O2
+	-- have all been updated for the same tick.
 	hg.organism.UpdatePerfusion(owner, org, timeValue)
+	if not org.alive then hg.organism.UpdatePostMortemVitals(org) end
 	if module.trauma_combo and module.trauma_combo[2] then module.trauma_combo[2](owner, org, timeValue) end
 
 	if org.owner.PlayerClassName == "furry" then
@@ -1999,7 +2143,6 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 		org.canmove = (org.spine2 < hg.organism.fake_spine2 and org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		org.canmovehead = (org.spine3 < hg.organism.fake_spine3) and not org.otrub
 		if not (org.canmove and org.canmovehead and (org.stun - CurTime()) < 0) then org.needfake = true end
-		if (org.blood < 2700) then org.needfake = true end
 		if org.neckslit and not org.otrub then org.needfake = true end
 	end
 
@@ -2260,7 +2403,7 @@ hook.Add("Org Think", "regenerationberserk", function(owner, org, timeValue)
 	if !owner:IsBerserk() then return end
 	//if org.heartstop then return end
 
-	org.blood = math.Approach(org.blood, 5000, timeValue * 60)
+	org.blood = math.Approach(org.blood, hg.organism.normalBloodVolume or 5000, timeValue * 60)
 
 	for i, wound in pairs(org.wounds) do
 		wound[1] = math.max(wound[1] - timeValue * 10,0)
