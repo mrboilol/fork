@@ -350,8 +350,9 @@ local panicattack_adrenaline_add_target = 4
 local panicattack_adrenaline_add_rise_time = 14
 local panicattack_heart_roll_delay = 15
 local panicattack_heart_roll_chance = 1
-local panicattack_damage_scale = 0.022
-local panicattack_witness_radius = 850
+local panicattack_damage_scale = 0.011
+local panicattack_damage_cooldown = 2.5
+local panicattack_witness_radius = 700
 local panicattack_death_radius = 900
 local panicattack_corpse_radius = 400
 local panicattack_corpse_total = 0.3
@@ -1451,9 +1452,6 @@ function hg.organism.AddPanicAttack(org, amount, silent, chanceMultiplier)
 	if silent and IsValid(org.owner) and org.owner:IsPlayer() and (org.owner.lastKillTime or 0) > CurTime() - 4 then
 		return org.panicattackadd or 0
 	end
-	if IsValid(org.owner) and org.owner:IsPlayer() then
-		org.owner:PrintMessage(HUD_PRINTCONSOLE, "[PANIC:ADD] +" .. amount)
-	end
 	if math.random(panicattack_gain_chance) != 1 then return org.panicattackadd or 0 end
 	org.panicattackadd = math.Clamp((org.panicattackadd or 0) + amount * panicattack_gain_mul, 0, 1)
 	return org.panicattackadd
@@ -1714,6 +1712,7 @@ local function panic_witness_event(victim, attacker, amount, radius, chanceMulti
 	for _, watcher in ipairs(ents.FindInSphere(victimPos, radius)) do
 		if not watcher:IsPlayer() or watcher == victim then continue end
 		if not watcher:Alive() or not watcher.organism or watcher.organism.otrub then continue end
+		if watcher.isTraitor then continue end
 		if IsValid(attacker) and watcher == attacker then continue end
 
 		if IsValid(victim.killedBy) and watcher == victim.killedBy then continue end
@@ -1726,9 +1725,6 @@ local function panic_witness_event(victim, attacker, amount, radius, chanceMulti
 		})
 
 		if tr.Hit then continue end
-
-		hg.organism.AddPanicAttack(watcher.organism, amount, true, chanceMultiplier)
-		watcher:PrintMessage(HUD_PRINTCONSOLE, "[PANIC:WITNESS] +" .. amount .. " attacker=" .. (IsValid(attacker) and attacker:Nick() or "NIL") .. " victim=" .. (IsValid(victim) and victim:Nick() or "NIL") .. " killedBy=" .. (IsValid(victim.killedBy) and victim.killedBy:Nick() or "NIL"))
 		hg.organism.AddPanicAttack(watcher.organism, amount, true)
 	end
 end
@@ -1879,15 +1875,16 @@ end)
 hook.Add("HomigradDamage", "PanicAttackDamage", function(ply, dmgInfo)
 	if not IsValid(ply) or not ply:IsPlayer() or not ply:Alive() then return end
 	if not ply.organism then return end
+	if (ply.nextPanicAttackTime or 0) > CurTime() then return end
 	local amount = math.Clamp(dmgInfo:GetDamage() * panicattack_damage_scale + (dmgInfo:IsDamageType(DMG_BLAST) and 0.08 or 0), 0.03, 0.55)
 	local attacker = resolve_panic_attacker(ply, dmgInfo:GetAttacker())
 	if not IsValid(attacker) and IsValid(ply.lastPanicAttacker) and (ply.lastPanicAttackTime or 0) > CurTime() - 30 then
 		attacker = ply.lastPanicAttacker
 	end
-	ply:PrintMessage(HUD_PRINTCONSOLE, "[PANIC:DAMAGE] +" .. amount .. " attacker=" .. (IsValid(attacker) and attacker:Nick() or "NIL"))
 	hg.organism.AddPanicAttack(ply.organism, amount)
 	if dmgInfo:GetDamage() <= 0 and not dmgInfo:IsDamageType(DMG_BLAST) then return end
 	panic_witness_event(ply, attacker, math.Clamp(amount * 0.75, 0.04, 0.2), panicattack_witness_radius)
+	ply.nextPanicAttackTime = CurTime() + panicattack_damage_cooldown
 end)
 local function stopNeckSlitSound(owner, org)
 	if not org or not org.neckslitSoundName then return end
