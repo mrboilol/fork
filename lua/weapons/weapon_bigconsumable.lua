@@ -171,23 +171,30 @@ if SERVER then
 		self.CDEating = self.CDEating or 0
 		if self.CDEating > CurTime() then return end
 
-		org.satiety = org.satiety + 50/5
-		org.hungry = math.max((org.hungry or 0) - 15, 0)
-		
-		-- Stamina regeneration boost
-		if org.stamina and org.stamina[1] then
-			org.stamina[1] = math.min(org.stamina[1] + 20, org.stamina.max or 180)
+		local owner = self:GetOwner()
+		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+			self:SetHolding(math.min(self:GetHolding() + 10, 100))
+
+			if self:GetHolding() < 100 then
+				return
+			end
 		end
+
+		local isDrink = self.WaterModel[self.WorldModel]
+		local teethLost = math.Clamp(org.teethLost or 0, 0, 32)
+		local chewPenalty = isDrink and 0 or teethLost / 32
+
+		org.satiety = org.satiety + 25/5
+		owner:ViewPunch(ang_eat)
 		
-		-- Pain relief
-		org.pain = math.max((org.pain or 0) - 8, 0)
-		org.painadd = math.max((org.painadd or 0) - 5, 0)
-		
-		local ply = self:GetOwner()
-		ply:ViewPunch(Angle(3,0,0))
-		
-		ent:EmitSound( self.WaterModel[self.WorldModel] and "snd_jack_hmcd_drink"..math.random(3)..".ogg" or "snd_jack_hmcd_eat"..math.random(4)..".ogg", 60, math.random(95, 105))
-		self.CDEating = CurTime() + 0.5
+		ent:EmitSound(isDrink and "snd_jack_hmcd_drink"..math.random(3)..".wav" or "snd_jack_hmcd_eat"..math.random(4)..".wav", 60, math.random(95, 105))
+		self.CDEating = CurTime() + 0.5 + chewPenalty * 0.9
+		if not isDrink and teethLost >= 4 then
+			org.painadd = math.min((org.painadd or 0) + 0.5 + chewPenalty * 2.5, 150)
+		end
+		if not isDrink and (org.jaw == 1 or org.jawdislocation) then
+			org.painadd = math.min((org.painadd or 0) + 3, 150)
+		end
 		self.Eating = self.Eating + 1
 		self:SetHolding(0)
 		if self.Eating > 5 then

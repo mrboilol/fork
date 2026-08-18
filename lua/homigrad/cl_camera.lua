@@ -841,7 +841,8 @@ local eyepos = entmeta.EyePos
 local eyeangles = entmeta.EyeAngles
 local fLPly = LocalPlayer
 local IsValid = IsValid
-local renderSceneActive = false
+local renderingScene = false
+
 local function renderscene(pos, angle, fov)
 	if renderSceneActive or RENDERSCENE then return end
 	lply = IsValid(lply) and lply or fLPly()

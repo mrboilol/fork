@@ -307,6 +307,11 @@ hook.Add("Player Spawn", "screenshot_game", function(ply)
 
 	if ply == lply then
 		disorientationLerp = 0
+		concLerp = 0
+		nauseaLerp = 0
+		tinnitusConcLerp = 0
+		lply:SetDSP(0)
+		lply:ConCommand("soundfade 0 1")
 
 		alivestart = CurTime()
 		lply.tried_fixing_limb = nil

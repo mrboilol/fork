@@ -176,7 +176,6 @@ end
 	end
 
 	function DrawPlayerRagdoll(ent, ply) --// actually not only ragdoll render but player too
-		if CLIENT and hg.TPIKDebug then hg.TPIKDebug(ply, "DrawPlayerRagdoll entry, ent=", tostring(ent), "ent==ply=", tostring(ent == ply), "FakeRagdoll=", tostring(IsValid(ply.FakeRagdoll) and ply.FakeRagdoll)) end
 		if ply.prevragdoll_index != nil and ply.prevragdoll_index != ply.ragdoll_index and ply.ragdoll_index == 0 then
 			//print(ply.ragdoll_index, ply.prevragdoll_index, Entity(ply.ragdoll_index))
 
@@ -195,37 +194,28 @@ end
 		end
 		lkp = lkp == false and nil or lkp
 		if !ent.GetManipulateBoneScale or !lkp then return end
-		if not ent:GetManipulateBoneScale(lkp):IsEqualTol(vector_full, 0.001) then
-			ent:ManipulateBoneScale(lkp, vector_full)
-		end
 
-		local smoothingUnfake = IsValid(ply.OldRagdoll) and ply.gettingup and (ply.gettingup + 1 - CurTime()) > 0
-		local distSqr = EyePos():DistToSqr(ent:GetPos())
-		local criticalView = ply == lply or GetViewEntity() == ply or follow == ent or smoothingUnfake
-		local fullPoseRender = criticalView or distSqr <= FULL_POSE_RENDER_DIST_SQR
-		local armorRender = criticalView or distSqr <= ARMOR_RENDER_DIST_SQR
-		local detailRender = distSqr <= DETAIL_RENDER_DIST_SQR
-		if smoothingUnfake then
+		if IsValid(ply.OldRagdoll) then
 			ply:SetupBones()
 		end
 
-		hg.RenderWeapons(ent, ply, distSqr, criticalView)
+		hg.RenderWeapons(ent, ply)
 
-		if fullPoseRender then
-			ent:SetupBones()
+		ent:SetupBones()
+
+		if IsValid(wep) and (wep.ismelee or wep.isTPIKBase) and wep.DrawWorldModel2 then
+			wep:DrawWorldModel2(true)
 		end
 
-		if fullPoseRender then
-			hg.MainTPIKFunction(ent, ply, wep)
-		end
+		hg.MainTPIKFunction(ent, ply, wep)
 
-		if smoothingUnfake and fullPoseRender then
+		if IsValid(ply.OldRagdoll) then
 			hg.SmoothUnfake(ent, ply)
 		end
 
-		if ply:GetNetVar("handcuffed", false) and fullPoseRender then hg.CuffedAnim(ent, ply) end
+		if ply:GetNetVar("handcuffed", false) then hg.CuffedAnim(ent, ply) end
 
-		if fullPoseRender and IsValid(wep) then
+		if IsValid(wep) then
 			//if wep.isTPIKBase then hg.RenderTPIKBase(ent, ply, wep) end
 			//if wep.ismelee then hg.RenderMelees(ent, ply, wep) end
 			if wep.DrawWorldModel2 then wep:DrawWorldModel2() end
@@ -247,33 +237,23 @@ end
 		hg.GoreCalc(ent, ply)
 	end
 
-	--local current = ent:GetManipulateBoneScale(lkp)
+--local current = ent:GetManipulateBoneScale(lkp)
 		local fountains = GetNetVar("fountains") or {}
-		local firstPersonCamera = !hg_thirdperson:GetBool() and !hg_gopro:GetBool()
-		local hideGettingUpHead = firstPersonCamera and ent.hgGettingUpView and follow == ent
-		local hideLocalFirstPersonHead = GetViewEntity() == ply and (ent == ply or follow == ent)
-			and firstPersonCamera
-		-- The ragdoll camera follows the local body even while the player is not the
-		-- current view entity in every render pass.  Do not depend on the transient
-		-- camera-distance flag here: a physics/update ordering change would briefly
-		-- draw the head around the camera.
-		local hideLocalRagdollHead = firstPersonCamera and ply == lply
-			and IsValid(ply.FakeRagdoll) and ent == ply.FakeRagdoll and follow == ent
-		local hideSpectatedHead = firstPersonCamera and !lply:Alive()
-			and lply:GetNWEntity("spect") == ply and viewmode == 1
-		local hideFollowedFirstPersonHead = hg.cameraAtHead and (follow == ent or ent == GetViewEntity() or ent == lply)
-			and (firstPersonCamera or hg_gopro:GetBool())
-		local hideHead = hideLocalFirstPersonHead or hideLocalRagdollHead or hideGettingUpHead or hideSpectatedHead or hideFollowedFirstPersonHead
-		local wawanted = hideHead and vector_small or vector_full
+		local wawanted = (GetViewEntity() != ply) and !fountains[ent] and (!(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1) and !(hg_firstperson_death:GetBool() and follow == ent)) and vector_full or vector_small
+		local org = ent.new_organism or ent.organism
+		local hideHead = (ent.headexploded or (org and org.headamputated)) or ((!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent)) and wawanted == vector_small
+		local headScale = hideHead and vector_small or vector_full
+		if not ent:GetManipulateBoneScale(lkp):IsEqualTol(headScale, 0.001) then
+			ent:ManipulateBoneScale(lkp, headScale)
+		end
 		--print(ent, wawanted, GetViewEntity(), ply, (GetViewEntity() != ply), !fountains[ent], !(!lply:Alive() and lply:GetNWEntity("spect") == ply and viewmode == 1))
 		--if !current:IsEqualTol(wawanted, 0.01) then
 			--ent:ManipulateBoneScale(lkp, wawanted)
 			local mat = ent:GetBoneMatrix(lkp)
-			local org = ent.new_organism or ent.organism
 			if mat and (ent.headexploded or (org and org.headamputated)) then
 				mat:SetScale(vector_small)
 			elseif mat and !(Glide and Glide.Camera and !Glide.Camera.isInFirstPerson and lply == ply and lply:InVehicle() and hg_no_camera_in_cars:GetBool()) then
-				if hideLocalFirstPersonHead or hideLocalRagdollHead or hideGettingUpHead or hideSpectatedHead or hideFollowedFirstPersonHead or (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
+				if (!hg_thirdperson:GetBool() and !hg_gopro:GetBool() and (ent == ply or (!hg_ragdollcombat:GetBool() or hg_firstperson_ragdoll:GetBool()))) or (hg_firstperson_death:GetBool() and follow == ent) then
 					mat:SetScale(wawanted)
 				end
 			end

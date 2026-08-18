@@ -1250,6 +1250,22 @@ local modes = {
 }
 
 util.AddNetworkString("HMCD_RoundStart")
+util.AddNetworkString("HMCD_RoundBeginSound")
+util.AddNetworkString("HMCD_SetNextTraitorRole")
+
+MODE.NextRoundTraitorRoles = MODE.NextRoundTraitorRoles or {}
+
+net.Receive("HMCD_SetNextTraitorRole", function(_, ply)
+	if not IsValid(ply) or not ply:IsSuperAdmin() then return end
+
+	local target = net.ReadEntity()
+	local role = net.ReadString()
+	if not IsValid(target) or not target:IsPlayer() then return end
+	if role ~= "traitor" and role ~= "assistant" then return end
+
+	MODE.NextRoundTraitorRoles[target:SteamID()] = role
+	ply:ChatPrint(target:Nick() .. " will be " .. (role == "traitor" and "traitor" or "traitor assistant") .. " next round.")
+end)
 
 function MODE:GetPlySpawn(ply)
 end
@@ -2014,6 +2030,13 @@ function MODE:ShouldRoundEnd()
 end
 
 function MODE:RoundStart()
+	MODE.RoundBeginSoundSequence = ((MODE.RoundBeginSoundSequence or 0) + 1) % 65536
+	net.Start("HMCD_RoundBeginSound")
+		net.WriteString(MODE.Type or "standard")
+		net.WriteUInt(MODE.RoundBeginSoundSequence, 16)
+	net.Broadcast()
+
+	local roles_choose = MODE.ShouldStartRoleRound()
 	MODE.StartRoundTime = CurTime()
 	MODE.RoleChooseRound = false
 

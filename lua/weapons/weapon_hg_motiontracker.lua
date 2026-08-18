@@ -76,46 +76,6 @@ local SLAMPlacementRadius = 80
 end]]
 
 if CLIENT then
-	local function initializeSequenceState(mdl)
-		if not IsValid(mdl) then return end
-
-		mdl.ZCLastSequenceModel = mdl:GetModel()
-		mdl.ZCSequenceReadyAt = CurTime() + 0.25
-		mdl.ZCAnimAssigned = false
-
-		if mdl.ResetSequenceInfo then
-			mdl:ResetSequenceInfo()
-		end
-	end
-
-	local function normalizeSequenceState(mdl, desiredModel)
-		if not IsValid(mdl) then return false end
-
-		if desiredModel and mdl:GetModel() ~= desiredModel then
-			mdl:SetModel(desiredModel)
-		end
-
-		local currentModel = mdl:GetModel()
-		if mdl.ZCLastSequenceModel ~= currentModel then
-			mdl.ZCLastSequenceModel = currentModel
-			mdl.ZCSequenceReadyAt = CurTime() + 0.1
-			mdl.ZCAnimAssigned = false
-		end
-
-		if (mdl.ZCSequenceReadyAt or 0) > CurTime() then return false end
-
-		local seqCount = mdl.GetSequenceCount and mdl:GetSequenceCount() or 0
-		if seqCount <= 0 then return false end
-
-		local seq = mdl:GetSequence()
-		if not isnumber(seq) or seq < 0 or seq >= seqCount then
-			mdl.ZCAnimAssigned = false
-			return false
-		end
-
-		return true
-	end
-
 	function SWEP:DrawWorldModel2()
 		render.SetColorModulation(0.45,0.52,1)
 		local owner = self:GetOwner()
@@ -198,6 +158,8 @@ if CLIENT then
 		end
 
 		WorldModel:SetupBones()
+
+		if prepareOnly then return end
 		
 		if IsValid(self.worldModel2) then
 			self.worldModel2:SetNoDraw(true)
