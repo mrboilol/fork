@@ -2075,6 +2075,33 @@ hook.Add("Org Think", "Main", function(owner, org, timeValue)
 	end
 	org.neckslit = neckslit
 
+	if org.neckslit and not org.otrub then
+		org.needfake = true
+		if not org.neckslitDeadline then
+			org.neckslitDeadline = CurTime() + 15
+			org.neckslitWarned = nil
+		elseif org.neckslitWarned ~= true and org.neckslitDeadline - CurTime() <= 4 then
+			org.neckslitWarned = true
+			if isPly and owner:Alive() then
+				owner:Notify("I'm fading... someone save me!", true, "neckslit_save", 0)
+			end
+		end
+	elseif org.neckslitDeadline then
+		org.neckslitDeadline = nil
+		org.neckslitWarned = nil
+	end
+
+	if isPly and (org.lleg == 1 or org.rleg == 1) and not org.NoKnockdown then
+		if (org.legBreakFallNext or 0) < CurTime() then
+			org.legBreakFallNext = CurTime() + 0.5
+			local spd = owner:GetVelocity():Length()
+			if not IsValid(owner.FakeRagdoll) and spd > 200 and math.random(100) < math.Clamp((spd - 200) / 4, 2, 30) then
+				org.needfake = true
+			end
+		end
+	end
+
+	module.pain[2](owner, org, timeValue)
 	if isPly then
 		module.pain[2](owner, org, timeValue)
 		module.metabolism[2](owner, org, timeValue)

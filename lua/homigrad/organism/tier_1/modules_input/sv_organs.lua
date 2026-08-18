@@ -659,6 +659,10 @@ hitArtery = function(artery, org, dmg, dmgInfo, boneindex, dir, hit, skipThroatC
 		and requiredHitgroup ~= org._bulletImpactHitgroup then
 		return 0
 	end
+	org.painadd = math.min(org.painadd + dmg * 1 + 45, 150)
+	org.shock = math.min(org.shock + 15, 95)
+	org.fearadd = math.min(org.fearadd + 1.5, 3)
+	org.panicattackadd = math.max(org.panicattackadd or 0, 0.9)
 	org.painadd = org.painadd + dmg * 1
 	
 	-- Central arterial wounds impair oxygen delivery while they are open.

@@ -1121,9 +1121,7 @@ function SWEP:SecondaryAttack()
 	--[[if self:GetFists() and owner.PlayerClassName == "headcrabzombie" then
 		self:SetFists(false)
 	end--]]
-	if owner:GetNetVar("handcuffed",false) then return end
-
-	-- Prevent grabbing and using stuff at same time if one arm is missing
+	if owner:GetNetVar("handcuffed",false) or owner:GetNetVar("ducttaped_hands",false) then return end
 	local org = owner.organism
 	if org and (org.larmamputated or org.rarmamputated) then
 		if IsValid(owner:GetNetVar("carryent")) or IsValid(owner:GetNetVar("carryent2")) then return end
@@ -2310,21 +2308,8 @@ function SWEP:PrimaryAttack(forcespecial)
 		side = "fists_left"
 	end
 
-	local rightEff = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "rarm") or 1
-	local leftEff = hg.GetArmEffectiveness and hg.GetArmEffectiveness(owner, "larm") or 1
-	if rand and rightEff < 0.25 and leftEff > rightEff then
-		rand = false
-		side = "fists_left"
-	elseif not rand and leftEff < 0.25 and rightEff > leftEff then
-		rand = true
-		side = "fists_right"
-	end
-	local armEffectiveness = rand and rightEff or leftEff
-	if armEffectiveness <= 0 then return end
-	local armSpeedMul = Lerp(armEffectiveness, 0.4, 1)
-
-	if owner:KeyDown(IN_ATTACK2) and owner.PlayerClassName ~= "sc_infiltrator" and owner.PlayerClassName ~= "headcrabzombie" then return end
-	if owner:GetNetVar("handcuffed",false) then return end
+	if owner:KeyDown(IN_ATTACK2) and owner.PlayerClassName ~= "sc_infiltrator" and not IsZombieHandsClass(owner.PlayerClassName) then return end
+	if owner:GetNetVar("handcuffed",false) or owner:GetNetVar("ducttaped_hands",false) then return end
 	local olddown = self:GetNextDown()
 	self:SetNextDown(CurTime() + 7)
 	if not self:GetFists() then

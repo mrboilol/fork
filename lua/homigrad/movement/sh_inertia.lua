@@ -799,6 +799,10 @@ local math_abs, math_Approach, math_AngleDifference, math_Clamp, math_cos, math_
 		if CLIENT and ply:Ping() >= 45 and ply.hg_LastLandingTime and ply.hg_LastLandingTime + 0.35 > curTime then
 			inertia_len = math_min(inertia_len, run_speed * 1.1)
 		end
+
+		if org.lleg == 1 or org.rleg == 1 or org.llegdislocation or org.rlegdislocation then
+			inertia_len = math.min(inertia_len, (ply:GetSlowWalkSpeed() or 100) * 0.78)
+		end
 		
 		mv:SetMaxSpeed(inertia_len)
 		mv:SetMaxClientSpeed(inertia_len)
