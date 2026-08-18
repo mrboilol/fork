@@ -1761,11 +1761,6 @@ function SWEP:ApplyForce()
 							org.CO = math.Approach(org.CO, 0, skillMult)
 							org.COregen = math.Approach(org.COregen, 0, skillMult)
 							
-							-- Blood regeneration boost during CPR
-							if org.blood < 5000 and org.bleed < 1 then
-								org.blood = math.min(org.blood + 2 * skillMult, 5000)
-							end
-							
 							-- Reduced chest damage chance for doctors
 							if math.random(50) == 1 and (ply.Profession != "doctor") then
 								local dmginfo = DamageInfo()

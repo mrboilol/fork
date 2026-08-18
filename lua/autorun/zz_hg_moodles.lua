@@ -1092,7 +1092,7 @@ local function drawMoodles()
 		-- Berserk is Moodle 3's anger level 5: retain each moodle's frame and
 		-- severity, but replace every active symbol except its own rage moodle
 		-- with the break marker.
-		local icon = berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect)
+		local icon = effect.name == "zerlked" and getMoodle3Material("zerlked") or (berserkActive and effect.name ~= "rage" and getMoodle3Material("moodlebreak") or getMoodle3Icon(effect))
 		if icon then
 			surface.SetMaterial(icon)
 			local iconSize = drawSize - 4

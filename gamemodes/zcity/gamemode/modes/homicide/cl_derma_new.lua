@@ -30,7 +30,7 @@ local sw, sh = ScrW(), ScrH()
 
 surface.CreateFont("ZB_TraitorSelectionFont", {
 	font = "VCR OSD Mono",
-	size = ScreenScale(6),
+	size = ScreenScale(5),
 	extended = true,
 	weight = 400,
 	antialias = true,

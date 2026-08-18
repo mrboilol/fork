@@ -341,6 +341,13 @@ function PLAYER:LegAttack()
 
             for k,ent in ipairs(entss) do
                 if IsValid(ent) and not blacklist[ent] then
+                    if hgIsDoor(ent) and not ent:GetNoDraw() then
+                        local moveSpeed = self:GetVelocity():Length2D()
+                        local impact = math.Clamp((dmg / 18) * 0.7 + moveSpeed / 900 + (isMidAir and 0.32 or 0), 0.2, 1.5)
+                        hgKickDoor(ent, self, impact, normal, isMidAir)
+                        continue
+                    end
+
                     local phys = ent:GetPhysicsObjectNum(tr.PhysicsBone or 0)
                     if !ent:IsPlayer() and not IsValid(phys) then continue end
 

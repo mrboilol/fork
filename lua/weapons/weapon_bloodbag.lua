@@ -96,7 +96,7 @@ function SWEP:OwnerChanged()
 end
 
 local math = math
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 local function drainHemothorax(org, bloodRemoved)
 	if bloodRemoved <= 0 then return end
@@ -124,7 +124,7 @@ if SERVER then
 
 	function SWEP:PrimaryAttack()
 		local owner = self:GetOwner()
-		if hg_healanims:GetBool() then
+		if not hg_healanims:GetBool() then
 			self:SetHolding(math.min(self:GetHolding() + 50, 100))
 
 			if self:GetHolding() < 100 then return end
@@ -153,7 +153,7 @@ if SERVER then
 		self.net_cooldown = self.net_cooldown or CurTime()
 		local owner = self:GetOwner()
 
-		if not owner:KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+		if not owner:KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 			self:SetHolding(math.max(self:GetHolding() - 12, 0))
 		end
 		

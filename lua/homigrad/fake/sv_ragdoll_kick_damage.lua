@@ -254,64 +254,6 @@ local function ApplyKickDamage(attacker, target, damage, hitPos, force, boneName
 	end
 end
 
--- Function to open door faster and restore original speed
-local function OpenDoorFaster(door)
-    if not IsValid(door) then return end
-    
-    -- Play door breaking sounds for normal kicks
-    sound.Play("Wood_Crate.Break", door:GetPos(), 60, 100)
-    sound.Play("Wood_Furniture.Break", door:GetPos(), 60, 100)
-    
-    -- Set faster speed temporarily
-    door:SetKeyValue("speed", "400")
-    door:Fire("toggle", "", 0)
-    
-    -- Restore original speed after 2 seconds
-    timer.Simple(2, function()
-        if IsValid(door) then
-            door:SetKeyValue("speed", "100") -- Default door speed
-        end
-    end)
-end
-
--- Function to apply bleeding and random dislocation to ragdoll
-local function ApplyInjuriesToRagdoll(ragdoll)
-    local owner = hg.RagdollOwner(ragdoll)
-    if not IsValid(owner) or not owner.organism then return end
-    
-    -- Add bleeding (15-25 points)
-    owner.organism.bleed = (owner.organism.bleed or 0) + math.random(15, 25)
-    
-    -- Apply random dislocation (leg, arm, or jaw) only if none already present
-    local dislocations = {
-        "llegdislocation",
-        "rlegdislocation",
-        "larmdislocation",
-        "rarmdislocation",
-        "jawdislocation"
-    }
-    
-    local hasDislocation = false
-    for _, key in ipairs(dislocations) do
-        if owner.organism[key] then
-            hasDislocation = true
-            break
-        end
-    end
-    
-    if not hasDislocation then
-        local randomDislocation = dislocations[math.random(1, #dislocations)]
-        owner.organism[randomDislocation] = true
-    end
-    
-    -- Debug output
-    if GetConVar("developer"):GetInt() == 1 then
-        print(string.format("[DOOR BREAK] %s suffered %d bleeding from door impact", 
-            owner:GetName(), 
-            owner.organism.bleed or 0))
-    end
-end
-
 -- Main kick damage handler
 hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
     if ragdoll == data.HitEntity then return end
@@ -325,39 +267,14 @@ hook.Add("Ragdoll Collide", "RagdollKickDamage", function(ragdoll, data)
 
     local attacker = hg.RagdollOwner(ragdoll)
 
-    -- Door handling with two different behaviors
+    -- Ragdoll/dropkick door impacts use the same structural model as ordinary kicks.
     if hgIsDoor(data.HitEntity) then
-        local impactDamage = math.max((data.Speed - 180) / 12, 6)
-        if hgDamageDoor(data.HitEntity, impactDamage, data.HitNormal, attacker) then
-            ApplyInjuriesToRagdoll(ragdoll)
-            return
-        end
-
-        if data.Speed > 560 then
-            -- High-speed impact: Break door + bleeding + dislocation
-            -- Play fire axe door breaking sounds
-            sound.Play("Wood_Crate.Break", data.HitEntity:GetPos(), 60, 100)
-            sound.Play("Wood_Furniture.Break", data.HitEntity:GetPos(), 60, 100)
-            hgBlastThatDoor(data.HitEntity, data.HitNormal * 200)
-            ApplyInjuriesToRagdoll(ragdoll)
-        elseif data.Speed > 320 then
-            -- A weaker locked-door impact can still breach, with the chance rising toward the full-force threshold.
-            local locked = data.HitEntity:GetInternalVariable("m_bLocked")
-            local breachChance
-
-            if IsRagdollDropkick(ragdoll, data) then
-                -- A committed ragdoll dropkick is more likely to force a locked door than a regular kick.
-                breachChance = math.Clamp(0.45 + (data.Speed - DROP_KICK_SPEED_THRESHOLD) / 1000, 0.45, 0.6)
-            else
-                breachChance = math.Clamp((data.Speed - 320) / 800, 0.03, 0.3)
-            end
-
-            if locked and math.Rand(0, 1) <= breachChance then
-                hgBlastThatDoor(data.HitEntity, data.HitNormal * 200)
-                ApplyInjuriesToRagdoll(ragdoll)
-            else
-                OpenDoorFaster(data.HitEntity)
-            end
+        local isDropkick = IsRagdollDropkick(ragdoll, data)
+        if isDropkick or fakeKickActive or data.Speed >= 320 then
+            local impact = math.Clamp((data.Speed - 170) / 310, 0, 1.5)
+            if fakeKickActive then impact = math.max(impact, 0.35) end
+            if isDropkick then impact = math.min(impact * 1.15, 1.5) end
+            hgKickDoor(data.HitEntity, attacker, impact, data.HitNormal, isDropkick)
         end
         return
     end

@@ -6,10 +6,10 @@ hg.MedicalMinigame.DislocationSessions = hg.MedicalMinigame.DislocationSessions 
 hg.MedicalMinigame.BandageSessions = hg.MedicalMinigame.BandageSessions or {}
 hg.MedicalMinigame.TourniquetSessions = hg.MedicalMinigame.TourniquetSessions or {}
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 local function HealingMinigamesEnabled()
-    return hg_healanims:GetBool()
+    return not hg_healanims:GetBool()
 end
 
 local function GetMedicalMinigameOtherMultiplier(ply, target)

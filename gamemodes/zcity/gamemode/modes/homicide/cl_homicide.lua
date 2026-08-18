@@ -150,42 +150,42 @@ end
 
 surface.CreateFont("ZB_HomicideSmall", {
 	font = font(),
-	size = ScreenScale(15),
+	size = ScreenScale(11),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideMedium", {
 	font = font(),
-	size = ScreenScale(15),
+	size = ScreenScale(11),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideMediumLarge", {
 	font = font(),
-	size = ScreenScale(25),
+	size = ScreenScale(18),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideLarge", {
 	font = font(),
-	size = ScreenScale(30),
+	size = ScreenScale(22),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideHeader", {
 	font = font(),
-	size = ScreenScale(45),
+	size = ScreenScale(32),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideHumongous", {
 	font = font(),
-	size = 255,
+	size = 180,
 	weight = 400,
 	antialias = true
 })
@@ -195,14 +195,14 @@ surface.CreateFont("ZB_HomicideHumongous", {
 -- same configurable homicide typeface as the title card.
 surface.CreateFont("ZB_HomicideEndText", {
 	font = font(),
-	size = ScreenScale(10),
+	size = ScreenScale(8),
 	weight = 400,
 	antialias = true
 })
 
 surface.CreateFont("ZB_HomicideEndStats", {
 	font = font(),
-	size = 35,
+	size = 26,
 	weight = 400,
 	antialias = true
 })
@@ -455,7 +455,7 @@ function MODE:HUDPaint()
 		surface.SetDrawColor(255, 255, 255, math.random(175, 255) * pluv_a / 2)
 		surface.DrawTexturedRect(sw * 0.25 + cox, sh * 0.44 - ScreenScale(15) + coy, sw / 2, ScreenScale(30))
 
-		draw.SimpleText("SOMEWHERE IN PLUVTOWN", "ZB_ScrappersLarge", sw / 2 + cox, sh * 0.44 - ScreenScale(2) + coy, Color(0, 0, 0, 255 * pluv_a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText("SOMEWHERE IN PLUVTOWN", "ZB_ScrappersSmall", sw / 2 + cox, sh * 0.44 - ScreenScale(2) + coy, Color(0, 0, 0, 255 * pluv_a), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 end
 

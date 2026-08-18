@@ -3,7 +3,7 @@ SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Painkillers"
 SWEP.Instructions = "Can be used to relieve pain (thanks Mr. Obvious). RMB to use on someone else."
 SWEP.Category = "ZCity Medicine"
-SWEP.Spawnable = true
+SWEP.Spawnable = false
 SWEP.AdminOnly = false
 
 SWEP.WorldModel = "models/weapons/nmrih/items/phalanx/w_phalanx.mdl"

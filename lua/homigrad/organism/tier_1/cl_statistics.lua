@@ -197,7 +197,7 @@ local list = {
 	0, 
 	{"o2", {"o2", "range"}, false, "Tissue O2"},
 	{"bloodO2Cap", 30, false, "Arterial O2"},
-	{"bloodCarryO2Cap", 30, false, "O2 Carrying Capacity"},
+	{"bloodCarryO2Cap", 30, false, "O2 Transport Reserve"},
 	"CO",
 	{"lungsfunction", true, false},
 	"COregen",
@@ -276,7 +276,7 @@ local function getTextTable(org)
 		elseif v == 0 then
 
 		else
-			if not org[v] then continue end
+			if org[v] == nil then continue end
 			text1 = tostring(v)
 			text2 = isnumber(org[v]) and string.sub(string.format("%f", org[v]),1,-5) or org[v]
 		end

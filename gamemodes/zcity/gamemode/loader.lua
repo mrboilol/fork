@@ -90,7 +90,7 @@ local function addModeHook(MODE, hookName, func)
 end
 
 local function InitMode(mode)
-	if table.IsEmpty(mode) then return end
+	if table.IsEmpty(mode) or mode.Abstract == true then return end
 	if not isstring(mode.name) or mode.name == "" then
 		ErrorNoHalt("[ZCity] Refusing to register a mode without a name.\n")
 		return

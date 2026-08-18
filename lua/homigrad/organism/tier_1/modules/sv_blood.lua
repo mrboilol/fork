@@ -387,22 +387,22 @@ module[2] = function(owner, org, mulTime)
 		hg.applyNosebleed(owner, org.internalBleed * 8)
 	end
 
-	-- Blood loss is one continuous pressure problem rather than a set of sampled
-	-- stages. The curve starts softly after the normal reserve is lost and becomes
-	-- steep near empty circulation. Pressure can leave the patient barely aware,
-	-- but cerebral oxygen owns unconsciousness and eventual brain injury.
+	-- Hemorrhagic symptoms use the same preload reserve as cardiac output. This
+	-- keeps compensation, shock, pressure and oxygen delivery on one curve.
 	local tempMul = math.Clamp(((org.temperature < 30 and org.temperature - 30 or 0) * 0.25 + 1), 0.25, 1)
 	local blood = math.max(tonumber(org.blood) or 5000, 0)
-	local volumeFraction = math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
-	local volumeLoss = 1 - volumeFraction
-	local symptomaticLoss = math.Clamp((volumeLoss - 0.08) / 0.92, 0, 1)
-	local pressureFailure = math.Clamp((volumeLoss - 0.32) / 0.68, 0, 1)
-	local decompensation = pressureFailure ^ 1.35
+	local preloadReserve = hg.organism.GetBloodDeliveryFraction and hg.organism.GetBloodDeliveryFraction(blood, 1)
+		or math.Clamp(blood / (hg.organism.normalBloodVolume or 5000), 0, 1)
+	local reserveLoss = 1 - preloadReserve
+	local criticalReserve = math.Clamp((hg.organism.config and hg.organism.config.CRITICAL_CIRCULATION_RESERVE) or 0.62, 0.1, 0.95)
+	local symptomaticLoss = math.Clamp((reserveLoss - 0.06) / 0.94, 0, 1)
+	local decompensation = math.Clamp((criticalReserve - preloadReserve) / criticalReserve, 0, 1) ^ 1.35
+	local compensationDemand = math.Clamp(reserveLoss / math.max(1 - criticalReserve, 0.05), 0, 1)
 
 	org.hypovolemia = symptomaticLoss
-	org.hemorrhageCompensation = math.Clamp((volumeLoss - 0.04) / 0.68, 0, 1)
+	org.hemorrhageCompensation = compensationDemand * (1 - decompensation)
 	org.hypovolemicShock = decompensation
-	org.lowBloodTemperatureTarget = 36.7 - volumeLoss ^ 1.4 * 3.2
+	org.lowBloodTemperatureTarget = 36.7 - reserveLoss ^ 1.4 * 3.2
 	org.disorientation = math.max(org.disorientation or 0, symptomaticLoss ^ 1.25 * 6)
 
 	-- Hypovolemic stress stays below the generic shock-LOC threshold. Pressure

@@ -375,7 +375,7 @@ end
 
 function SWEP:ReloadEnd()
 	--if not self.CustomAmmoInsertEvent then
-	self:InsertAmmo(self:GetMaxClip1() - self:Clip1() + (self.drawBullet ~= nil and not self.OpenBolt and 1 or 0))
+	self:InsertAmmo(math.max(self:GetReloadCapacity() - self:Clip1(), 0))
 	--end
 	self.ReloadNext = CurTime() + self.ReloadCooldown --я хуй знает чо это
 	if CLIENT and self.drawBullet == nil then

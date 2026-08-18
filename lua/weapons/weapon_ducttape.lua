@@ -139,7 +139,7 @@ end
 --end
 
 local bone, name
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 function SWEP:BoneSet(lookup_name, vec, ang)
 	if IsValid(self:GetOwner()) and not self:GetOwner():IsPlayer() then return end
 	hg.bone.Set(self:GetOwner(), lookup_name, vec, ang)
@@ -305,6 +305,24 @@ end
 function hgCheckDuctTapeObjects(ent1)
 	if not ent1.DuctTape then return end
 	return (ent1.DuctTape and ent1.DuctTape[0] and #ent1.DuctTape[0]) or 0
+end
+
+local function ResolveSealTreatmentTarget(ent, allowPlayerProxy)
+	if not IsValid(ent) then return end
+	if ent:GetClass() == "sealplush" then return ent end
+
+	if allowPlayerProxy and ent:IsPlayer() then
+		local active = ent:GetActiveWeapon()
+		if IsValid(active) and active:GetClass() == "sealweapon" then return active end
+	end
+
+	if allowPlayerProxy and ent:IsRagdoll() and hg.RagdollOwner then
+		local ply = hg.RagdollOwner(ent)
+		if IsValid(ply) then
+			local active = ply:GetActiveWeapon()
+			if IsValid(active) and active:GetClass() == "sealweapon" then return active end
+		end
+	end
 end
 
 if SERVER then
@@ -549,6 +567,30 @@ local function NearestBoneName(ent, pos)
 end
 
 if SERVER then
+	function SWEP:TreatSeal(ent)
+		local owner = self:GetOwner()
+		local seal = ResolveSealTreatmentTarget(ent, ent ~= owner)
+		if not IsValid(seal) or not seal.ApplySealTreatment then return end
+
+		local cfg = HG_SEAL_CONFIG or {}
+		local fullCost = cfg.DUCT_TAPE_TREATMENT_COST or 15
+		local available = math.max(self:GetTapeAmount() or self.TapeAmount or 0, 0)
+		if available <= 0 then return end
+
+		local used = math.min(fullCost, available)
+		local done = seal:ApplySealTreatment("ducttape", owner, used / math.max(fullCost, 0.01))
+		if not done then return end
+
+		self.TapeAmount = math.max(available - used, 0)
+		self:SetTapeAmount(self.TapeAmount)
+		local pos = seal:GetPos()
+		if seal:GetClass() == "sealweapon" and IsValid(seal:GetOwner()) then pos = seal:GetOwner():WorldSpaceCenter() end
+		sound.Play("snd_jack_hmcd_ducttape.ogg", pos, 65, math.random(90, 110))
+		self:SetHolding(25)
+		timer.Simple(0.1, function() if IsValid(self) and self.TapeAmount <= 0 then self:Remove() end end)
+		return true
+	end
+
 	function SWEP:Bandage(ent, bone)
 		local org = ent.organism
 		local owner = self:GetOwner()
@@ -687,11 +729,13 @@ if SERVER then
 	end
 
 	function SWEP:Heal(ent, bone)
+		if self:TreatSeal(ent) then return true end
+
 		local org = ent.organism
 		if not org then return end
 
 		local owner = self:GetOwner()
-		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+		if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
 			self:SetHolding(math.min(self:GetHolding() + 10, 100))
 		end
 		local done = self:Bandage(ent, bone)

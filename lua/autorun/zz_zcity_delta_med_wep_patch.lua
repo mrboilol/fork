@@ -1,8 +1,8 @@
 if CLIENT then return end
 
--- Keep this binary so the medicines' existing GetBool() checks naturally mean
--- "our progressive method" while zero cleanly selects Judge's treatment path.
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+-- Public semantics: 0 uses the original models with progressive minigames;
+-- 1 uses Judge-style animation-only medical items where those variants exist.
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 local HEAL_ANIMATION_RETURN_TIME = 0.35
 
 local MEDICAL_WEAPON_CLASSES = {
@@ -40,7 +40,7 @@ local MEDICAL_WEAPON_CLASSES = {
 }
 
 local function GetMedicalAnimationType()
-    return math.Clamp(hg_healanims:GetInt(), 0, 1)
+    return 1 - math.Clamp(hg_healanims:GetInt(), 0, 1)
 end
 
 local function SetHealAnimationTarget(wep, target)
@@ -233,6 +233,68 @@ local function StartMinigame(wep, owner, minigameType, target)
     return started
 end
 
+local JUDGE_REPLACEMENTS = {
+    weapon_painkillers = "weapon_painkillers_tpik",
+    weapon_thiamine = "weapon_thiamine_tpik",
+    weapon_betablock = "weapon_betablock_tpik"
+}
+local ORIGINAL_REPLACEMENTS = {}
+for original, judge in pairs(JUDGE_REPLACEMENTS) do ORIGINAL_REPLACEMENTS[judge] = original end
+
+local function DesiredMedicalClass(class)
+    if hg_healanims:GetBool() then return JUDGE_REPLACEMENTS[class] end
+    return ORIGINAL_REPLACEMENTS[class]
+end
+
+local function ReplaceMedicalWeapon(ent)
+    if not IsValid(ent) or not ent:IsWeapon() then return end
+    local targetClass = DesiredMedicalClass(ent:GetClass())
+    if not targetClass or not weapons.GetStored(targetClass) then return end
+
+    local owner = ent:GetOwner()
+    local modeValues = istable(ent.modeValues) and table.Copy(ent.modeValues) or nil
+    local wasActive = IsValid(owner) and owner:IsPlayer() and owner:GetActiveWeapon() == ent
+    if IsValid(owner) and owner:IsPlayer() then
+        local replacement = owner:GetWeapon(targetClass)
+        if not IsValid(replacement) then replacement = owner:Give(targetClass) end
+        if IsValid(replacement) then
+            if modeValues then replacement.modeValues = modeValues end
+            if wasActive then owner:SelectWeapon(targetClass) end
+            ent:Remove()
+        end
+        return
+    end
+
+    local replacement = ents.Create(targetClass)
+    if not IsValid(replacement) then return end
+    replacement:SetPos(ent:GetPos())
+    replacement:SetAngles(ent:GetAngles())
+    replacement:Spawn()
+    replacement:Activate()
+    if modeValues then replacement.modeValues = modeValues end
+    local phys = ent:GetPhysicsObject()
+    local newPhys = replacement:GetPhysicsObject()
+    if IsValid(phys) and IsValid(newPhys) then
+        newPhys:SetVelocity(phys:GetVelocity())
+        newPhys:AddAngleVelocity(phys:GetAngleVelocity())
+    end
+    ent:Remove()
+end
+
+local function ConvertExistingMedicalWeapons()
+    for _, ent in ipairs(ents.GetAll()) do
+        if IsValid(ent) and ent:IsWeapon() then ReplaceMedicalWeapon(ent) end
+    end
+end
+
+hook.Add("OnEntityCreated", "zcity_delta_healanims_replace_items", function(ent)
+    timer.Simple(0, function() if IsValid(ent) then ReplaceMedicalWeapon(ent) end end)
+end)
+
+cvars.AddChangeCallback("hg_healanims", function()
+    timer.Simple(0, ConvertExistingMedicalWeapons)
+end, "zcity_delta_healanims_replace_existing")
+
 local function PatchWeapon(class)
     local stored = weapons.GetStored(class)
     if not istable(stored) then return false end
@@ -356,7 +418,7 @@ hook.Add("Think", "zcity_delta_medical_healanim_progress", function()
         local active = owner:GetActiveWeapon()
         if IsValid(active) and active:GetClass() == "weapon_defibrilator_homigrad" and active.SetHolding then
             local inUse = owner:KeyDown(IN_ATTACK) or owner:KeyDown(IN_ATTACK2)
-            active:SetHolding(hg_healanims:GetBool() and inUse and 100 or 0)
+            active:SetHolding((not hg_healanims:GetBool()) and inUse and 100 or 0)
         end
     end
 end)

@@ -1916,7 +1916,7 @@ hook.Add("Think", "hg_medical_minigame_clear_amputation_on_death", function()
 end)
 
 cvars.AddChangeCallback("hg_healanims", function(_, _, value)
-    if tonumber(value) ~= 0 then return end
+    if tonumber(value) ~= 1 then return end
 
     local panel = hg.MedicalMinigame and hg.MedicalMinigame.Panel
     if IsValid(panel) and (panel.GameType == "bandage" or panel.GameType == "tourniquet" or panel.GameType == "syringe") then
@@ -1926,7 +1926,7 @@ end, "hg_medical_minigame_close_on_healanims_change")
 
 net.Receive("hg_medical_minigame_start", function()
     local healanims = GetConVar("hg_healanims")
-    if healanims and not healanims:GetBool() then return end
+    if healanims and healanims:GetBool() then return end
     if IsValid(hg.MedicalMinigame.Panel) then return end
     if IsLocalPlayerUnconscious() then return end
     hg.MedicalMinigame.NextType = net.ReadString()

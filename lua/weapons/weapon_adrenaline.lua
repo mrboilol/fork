@@ -51,10 +51,10 @@ SWEP.HolsterSnd = ""
 
 SWEP.showstats = false
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 function SWEP:Think()
-	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+	if not self:GetOwner():KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 4, 0))
 	end
 end
@@ -173,7 +173,7 @@ if SERVER then
 		if not org then return end
 
 		local owner = self:GetOwner()
-		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+		if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
 			self:SetHolding(math.min(self:GetHolding() + 4, 100))
 
 			if self:GetHolding() < 100 then return end

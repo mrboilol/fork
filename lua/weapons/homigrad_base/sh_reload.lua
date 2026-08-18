@@ -58,6 +58,11 @@ if SERVER then
 	util.AddNetworkString("hg_insertAmmo")
 end
 
+function SWEP:GetReloadCapacity()
+	local chambered = self.drawBullet == true and not self.OpenBolt
+	return math.max(self:GetMaxClip1() + (chambered and 1 or 0), 0)
+end
+
 function SWEP:InsertAmmo(need)
 	local owner = self:GetOwner()
 	if !IsValid(owner) then return end
@@ -77,9 +82,11 @@ function SWEP:InsertAmmo(need)
 	local primaryAmmo = self:GetPrimaryAmmoType()
 	if !owner.GetAmmoCount then return end
 	local primaryAmmoCount = owner:GetAmmoCount(primaryAmmo)
-	need = need or self:GetMaxClip1() - self:Clip1()
-	need = math.min(primaryAmmoCount, need)
-	need = math.min(need, self:GetMaxClip1())
+	local capacity = self:GetReloadCapacity()
+	local room = math.max(capacity - self:Clip1(), 0)
+	need = need or room
+	need = math.max(math.min(primaryAmmoCount, need, room), 0)
+	if need <= 0 then return end
 	self:SetClip1(self:Clip1() + need)
 	owner:SetAmmo(primaryAmmoCount - need, primaryAmmo)
 
@@ -112,7 +119,7 @@ SWEP.ReloadCooldown = 0.1
 local math_min = math.min
 function SWEP:ReloadEnd()
 	--if not self.CustomAmmoInsertEvent then
-	self:InsertAmmo(self:GetMaxClip1() - self:Clip1() + (self.drawBullet ~= nil and not self.OpenBolt and 1 or 0))
+	self:InsertAmmo(math.max(self:GetReloadCapacity() - self:Clip1(), 0))
 	--end
 	self.ReloadNext = CurTime() + self.ReloadCooldown --я хуй знает чо это
 	self:Draw()

@@ -5,14 +5,19 @@ hg.organism.lastindex = hg.organism.lastindex or 1000000
 
 hg.organism.config = hg.organism.config or {
 	NORMAL_BLOOD_VOLUME_ML = 5000,
-	HEMORRHAGE_COMPENSATION_START_ML = 3500,
-	HEMORRHAGE_COMPENSATION_RANGE_ML = 1500,
-	PRELOAD_FAILURE_START_ML = 1750,
-	PRELOAD_FAILURE_RANGE_ML = 1000,
-	BLOOD_DELIVERY_COLLAPSE_FRACTION = 0.12,
-	BLOOD_DELIVERY_COMPENSATED_FRACTION = 0.75,
-	CRITICAL_CIRCULATION_RESERVE = 0.68,
-	CRITICAL_CIRCULATION_RANGE = 0.50,
+	BLOOD_PRELOAD_ZERO_ML = 2000,
+	BLOOD_PRELOAD_FULL_ML = 3500,
+	BLOOD_PRELOAD_CURVE_POWER = 2.5,
+	BLOOD_OXYGEN_TRANSPORT_ZERO_ML = 2000,
+	BLOOD_OXYGEN_TRANSPORT_FULL_ML = 3000,
+	BLOOD_OXYGEN_TRANSPORT_CURVE_POWER = 1.08,
+	HEMORRHAGE_MAX_COMPENSATED_HR = 220,
+	HEMORRHAGE_BRADYCARDIC_HR = 45,
+	HEMORRHAGE_BRADYCARDIA_RESERVE = 0.35,
+	CRITICAL_CIRCULATION_RESERVE = 0.62,
+	CRITICAL_CIRCULATION_RANGE = 0.52,
+	TERMINAL_CIRCULATION_RESERVE = 0.035,
+	TERMINAL_CARDIAC_OUTPUT = 0.04,
 	ARTERIAL_AMPUTATION_BLEED_MULTIPLIER = 0.65,
 	ARTERIAL_HEADGIB_BLEED_MULTIPLIER = 1.65,
 	POSTMORTEM_DECAY_SECONDS = 5,
@@ -21,20 +26,33 @@ hg.organism.config = hg.organism.config or {
 }
 hg.organism.normalBloodVolume = hg.organism.config.NORMAL_BLOOD_VOLUME_ML or 5000
 
--- Blood volume limits delivery continuously. There is deliberately no lethal
--- volume cutoff here: an almost empty circulation produces almost no delivery,
--- and the resulting pressure and cerebral hypoxia decide the outcome over time.
+-- Effective preload/venous-return reserve. Mild-to-moderate hemorrhage is
+-- strongly compensated, then reserve falls rapidly as circulating volume nears
+-- the terminal band. This is a continuous flow curve, not a death threshold.
 function hg.organism.GetBloodDeliveryFraction(blood, exponent)
 	local cfg = hg.organism.config or {}
-	local normalVolume = hg.organism.normalBloodVolume
+	local normalVolume = hg.organism.normalBloodVolume or 5000
 	local volume = math.Clamp(tonumber(blood) or normalVolume, 0, normalVolume)
-	local fraction = volume / normalVolume
-	local collapseFraction = math.Clamp(cfg.BLOOD_DELIVERY_COLLAPSE_FRACTION or 0.12, 0, 0.95)
-	local compensatedFraction = math.Clamp(cfg.BLOOD_DELIVERY_COMPENSATED_FRACTION or 0.75, collapseFraction + 0.01, 1)
-	local reserve = math.Clamp((fraction - collapseFraction) / (compensatedFraction - collapseFraction), 0, 1)
-	-- Smoothstep models compensation at mild loss and preload collapse at severe loss.
-	reserve = reserve * reserve * (3 - reserve * 2)
+	local zeroVolume = math.Clamp(cfg.BLOOD_PRELOAD_ZERO_ML or 2000, 0, normalVolume - 1)
+	local fullVolume = math.Clamp(cfg.BLOOD_PRELOAD_FULL_ML or 3500, zeroVolume + 1, normalVolume)
+	local x = math.Clamp((volume - zeroVolume) / (fullVolume - zeroVolume), 0, 1)
+	local shape = math.max(tonumber(cfg.BLOOD_PRELOAD_CURVE_POWER) or 2.5, 0.1)
+	local reserve = 1 - (1 - x) ^ shape
 	return math.Clamp(reserve, 0, 1) ^ math.max(tonumber(exponent) or 1, 0.1)
+end
+
+-- Whole-body oxygen transport reserve caused by hemorrhage. This is deliberately
+-- separate from arterial oxygenation: healthy lungs can keep the remaining blood
+-- saturated while insufficient circulating blood still cannot deliver enough O2.
+function hg.organism.GetHemorrhageOxygenTransportFraction(blood)
+	local cfg = hg.organism.config or {}
+	local normalVolume = hg.organism.normalBloodVolume or 5000
+	local volume = math.Clamp(tonumber(blood) or normalVolume, 0, normalVolume)
+	local zeroVolume = math.Clamp(cfg.BLOOD_OXYGEN_TRANSPORT_ZERO_ML or 2000, 0, normalVolume - 1)
+	local fullVolume = math.Clamp(cfg.BLOOD_OXYGEN_TRANSPORT_FULL_ML or 3000, zeroVolume + 1, normalVolume)
+	local x = math.Clamp((volume - zeroVolume) / (fullVolume - zeroVolume), 0, 1)
+	local shape = math.max(tonumber(cfg.BLOOD_OXYGEN_TRANSPORT_CURVE_POWER) or 1.08, 0.1)
+	return math.Clamp(1 - (1 - x) ^ shape, 0, 1)
 end
 
 function hg.organism.ZeroVitals(org)
@@ -708,8 +726,8 @@ function hg.organism.UpdatePerfusion(owner, org, timeValue)
 	-- Blood volume already owns the baseline circulation in sv_pulse. That
 	-- circulation then produces both cardiacOutput and hypotension, so multiplying
 	-- pump, bloodFraction and output here applied the same blood loss three times.
-	-- Around 3000-3250 mL that feedback drove perfusion (and the lungs' O2 cap)
-	-- into the lethal band even though this is still a compensated stage.
+	-- Moderate hemorrhage remains compensated; the shared preload curve only
+	-- becomes steep as volume approaches the severe/terminal range.
 	--
 	-- The weakest part of the circulation should cap delivery instead: low volume,
 	-- pump pressure, or cardiac output can each be decisive without compounding the
@@ -910,6 +928,40 @@ function hg.organism.RegenerateAdvancedAfflictions(org, damageRecovery, delivery
 	org.systemicIschemiaTime = math.Approach(tonumber(org.systemicIschemiaTime) or 0, 0, delivery * 150)
 end
 
+-- Statistics is intentionally an allow-list: it exposes every physiological field
+-- shown by cl_statistics without networking the organism's internal functions/caches.
+local statisticSyncKeys = {
+	"temperature", "tempchanging", "heatbuff", "blindness", "fear", "goodmood", "assimilated", "berserk", "noradrenaline", "fearadd",
+	"blood", "bleed", "venousBleed", "arterialBleed", "internalBleedRate", "bloodtype", "hemotransfusionshock", "internalBleed", "internalBleedHeal",
+	"arteria", "rarmartery", "larmartery", "rlegartery", "llegartery", "spineartery",
+	"llegdislocation", "rlegdislocation", "larmdislocation", "rarmdislocation", "jawdislocation",
+	"llegamputated", "rlegamputated", "larmamputated", "rarmamputated",
+	"likely_phrase", "alive", "otrub", "incapacitated", "critical", "pain", "painadd", "avgpain", "immobilization",
+	"painkiller", "analgesia", "naloxone", "shock", "hurt", "tranquilizer", "wantToVomit", "satiety",
+	"adrenaline", "adrenalineStorage", "adrenalineAdd", "anger", "panicattackadd", "panicattack", "stamina",
+	"brain", "brainFrontal", "brainParietal", "brainTemporal", "brainOccipital", "brainHemorrhage", "brainBleedRate", "brainSwelling",
+	"seizure", "seizureActive", "concussion", "consciousness", "skull", "disorientation", "jaw", "spine1", "spine2", "spine3", "chest", "pelvis",
+	"heart", "heartstop", "fibrillation", "arrhythmia", "bloodPressure", "systolic", "diastolic", "myocardialOxygen", "heartStrain",
+	"hypertension", "hypotension", "ecgState", "pulse", "heartbeat", "cardiacOutput", "strokeVolume", "hemorrhageCompensation",
+	"compensationPulseMultiplier", "compensationHeartRateTarget", "palpitations", "hypovolemia", "hypovolemicShock",
+	"stomach", "liver", "intestines", "thiamine", "vomitInThroat",
+	"lungsL", "lungsR", "eyeL", "eyeR", "trachea", "pneumothorax", "hemothorax", "cardiacTamponade", "needle",
+	"o2", "bloodO2Cap", "bloodCarryO2Cap", "CO", "lungsfunction", "COregen", "LodgedEntities", "holdingbreath",
+	"bodyoxygen", "perfusion", "peripheralperfusion", "cerebralPerfusion", "brainoxygen", "hypoxia", "hypoxiaTime",
+	"severeHypoxiaTime", "ischemia", "intracranialPressure", "lleg", "rleg", "larm", "rarm", "superfighter"
+}
+
+local function CopyStatisticFields(sendtable, org)
+	for _, key in ipairs(statisticSyncKeys) do
+		local value = org[key]
+		if value ~= nil then sendtable[key] = value end
+	end
+	-- health belongs to the player entity rather than the organism table.
+	if IsValid(org.owner) and org.owner.Health then sendtable.health = org.owner:Health() end
+	-- silent berserk is deliberately hidden from clients.
+	if org.silentBerserk then sendtable.berserk = 0 end
+end
+
 local function send_organism(org, ply)
 	if not IsValid(org.owner) then return end
 	local sendtable = {}
@@ -1052,6 +1104,7 @@ local function send_organism(org, ply)
 	sendtable.panicattackActive = org.panicattackActive
 
 	sendtable.superfighter = org.superfighter
+	CopyStatisticFields(sendtable, org)
 
 	net.Start("organism_send")
 	net.WriteTable(sendtable)
@@ -1192,6 +1245,7 @@ local function send_bareinfo(org)
 	sendtable.brainOccipital = org.brainOccipital
 	sendtable.brainHemorrhage = org.brainHemorrhage
 	sendtable.brainBleedRate = org.brainBleedRate
+	CopyStatisticFields(sendtable, org)
 
 	local rf = RecipientFilter()
 	--rf:AddAllPlayers()

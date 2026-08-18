@@ -1278,21 +1278,6 @@ local observe_bone_sets = {
 				[HITGROUP_RIGHTLEG] = true
 			}
 		}
-	},
-	Vitals = {
-		{
-			label = "ECG",
-			bones = {"ValveBiped.Bip01_Spine2"},
-			side = 1,
-			offset = 12,
-			status_func = function(org)
-				local rhythm = string.NiceName(string.Replace(org.ecgState or "normal_sinus", "_", " "))
-				if org.heartstop then
-					return "ECG: Cardiac arrest (" .. rhythm .. ")"
-				end
-				return "ECG: " .. rhythm
-			end
-		}
 	}
 }
 

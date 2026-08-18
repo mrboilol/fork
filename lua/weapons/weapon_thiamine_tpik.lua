@@ -3,7 +3,7 @@ SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Thiamine"
 SWEP.Instructions = "A water-soluble vitamin (B1) that plays a big part in the organism's metabolism of carbohydrates, fats and proteins."
 SWEP.Category = "ZCity Medicine"
-SWEP.Spawnable = true
+SWEP.Spawnable = false
 SWEP.AdminOnly = false
 
 SWEP.WorldModel = "models/weapons/nmrih/items/phalanx/w_phalanx.mdl"

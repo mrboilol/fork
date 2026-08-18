@@ -1211,7 +1211,9 @@ if CLIENT then
 			local owner = self:GetOwner()
 			local shoot = CurTime() - self:LastShootTime()
 			local ammo = owner:GetAmmoCount(self:GetPrimaryAmmoType())
-			local magCount = self.AnimInsert and ammo or math.ceil(ammo / clipsize)
+			local looseRoundReserve = self.AnimInsert or self.ShotgunTubeReload or (self.IsManuallyCycledWeapon and self:IsManuallyCycledWeapon())
+			local magCount = looseRoundReserve and ammo or math.ceil(ammo / clipsize)
+			local visibleReserve = looseRoundReserve and math.min(magCount, 8) or math.min(magCount, 3)
 			local HudHPos = 0.8
 			local showDynamic = true
 			local posX, posY = GetAmmoHudPosition(self, scrW, scrH, HudHPos)
@@ -1322,7 +1324,8 @@ if CLIENT then
 			local ammoLeft = math.ceil(clip / clipsize * sizeY)
 			col:SetUnpacked(LerpColor(clip / clipsize, yellow, color_white))
 			col.a = 255 * lerpAmmoCheck
-			DrawBlurRect(posX - sizeX * (clipsize ~= 1 and 0.2 or 0.3), posY - sizeY * (clipsize ~= 1 and 0.1 or 0.7), (sizeX + sizeX * (clipsize ~= 1 and 0.12 or 0.2)) * math.max(math.min(magCount + 1, clipsize ~= 1 and 5 or 4), 1.3), sizeY + (clipsize ~= 1 and 20 or 60), 7, col.a * 5)
+			local hudBlockCount = looseRoundReserve and math.min(visibleReserve + 1, 10) or math.min(magCount + 1, clipsize ~= 1 and 5 or 4)
+			DrawBlurRect(posX - sizeX * (clipsize ~= 1 and 0.2 or 0.3), posY - sizeY * (clipsize ~= 1 and 0.1 or 0.7), (sizeX + sizeX * (clipsize ~= 1 and 0.12 or 0.2)) * math.max(hudBlockCount, 1.3), sizeY + (clipsize ~= 1 and 20 or 60), 7, col.a * 5)
 
 			surface.SetDrawColor(col)
 			surface.DrawRect(posX, posY - ammoLeft + sizeY, sizeX, ammoLeft)
@@ -1334,22 +1337,30 @@ if CLIENT then
 			local smallY = sizeY / 2
 			local reserveAmmo = ammo
 
-			for i = 1, math.min(magCount, 3) do
-				local magAmmo = math.min(clipsize, reserveAmmo)
-				reserveAmmo = reserveAmmo - magAmmo
-				local reserveLeft = math.ceil(magAmmo / clipsize * smallY)
-
-				col2:SetUnpacked(LerpColor(magAmmo / clipsize, yellow, color_white))
-				col2.a = 255 * lerpAmmoCheck
-				surface.SetDrawColor(col2)
-				surface.DrawRect(magX + (smallX + 15) * i, magY - reserveLeft + smallY, smallX, reserveLeft)
-				surface.DrawOutlinedRect(magX - 5 + (smallX + 15) * i, magY - 5, smallX + 10, smallY + 10, 1)
+			for i = 1, visibleReserve do
+				local x = magX + (smallX + 15) * i
+				if looseRoundReserve then
+					-- One empty mini-block equals one loose shell/round. The loaded tube/internal
+					-- magazine remains the large filled block on the left.
+					surface.SetDrawColor(255, 255, 255, 255 * lerpAmmoCheck)
+					surface.DrawOutlinedRect(x - 5, magY - 5, smallX + 10, smallY + 10, 1)
+				else
+					local magAmmo = math.min(clipsize, reserveAmmo)
+					reserveAmmo = reserveAmmo - magAmmo
+					local reserveLeft = math.ceil(magAmmo / clipsize * smallY)
+					col2:SetUnpacked(LerpColor(magAmmo / clipsize, yellow, color_white))
+					col2.a = 255 * lerpAmmoCheck
+					surface.SetDrawColor(col2)
+					surface.DrawRect(x, magY - reserveLeft + smallY, smallX, reserveLeft)
+					surface.DrawOutlinedRect(x - 5, magY - 5, smallX + 10, smallY + 10, 1)
+				end
 			end
 
-			if magCount > 3 then
-				local extraMags = "+" .. (magCount - 3)
-				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4 + 1, magY + smallX / 2 + 1, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-				draw.SimpleText(extraMags, "AmmoFont", magX + (smallX + 15) * 4, magY + smallX / 2, Color(255, 255, 255, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+			if magCount > visibleReserve then
+				local extraMags = "+" .. (magCount - visibleReserve)
+				local extraX = magX + (smallX + 15) * (visibleReserve + 1)
+				draw.SimpleText(extraMags, "AmmoFont", extraX + 1, magY + smallX / 2 + 1, Color(0, 0, 0, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+				draw.SimpleText(extraMags, "AmmoFont", extraX, magY + smallX / 2, Color(255, 255, 255, 255 * lerpAmmoCheck), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 			end
 		end
 	}

@@ -446,13 +446,15 @@ module[2] = function(owner, org, timeValue)
 	org.respiratoryRate = math.Round(Lerp(bradyapnea, 14, 4))
 	org.respiratoryArrest = drugRespiratoryDepression >= opioidRespiratoryArrestThreshold
 
-	-- Arterial oxygenation and oxygen-carrying capacity are separate. Acute
-	-- hemorrhage removes circulating RBC mass/volume, but it does not directly
-	-- desaturate the blood that still passes through functioning lungs.
-	local normalBloodVolume = hg.organism.normalBloodVolume or 5000
-	local bloodCarryK = math.Clamp(rawBlood / math.max(normalBloodVolume, 1), 0, 1)
-	local bloodCarryO2Cap = o2.range * bloodCarryK
+	-- Arterial saturation comes from lungs; hemorrhage separately limits how much
+	-- oxygen can be transported through the whole circulation. The transport curve
+	-- is shared with preload/cardiac-output math and is intentionally non-linear.
+	local hemorrhageTransportK = hg.organism.GetHemorrhageOxygenTransportFraction
+		and hg.organism.GetHemorrhageOxygenTransportFraction(rawBlood)
+		or math.Clamp(rawBlood / math.max(hg.organism.normalBloodVolume or 5000, 1), 0, 1)
+	local bloodCarryO2Cap = o2.range * hemorrhageTransportK
 	org.bloodCarryO2Cap = bloodCarryO2Cap
+	org.hemorrhageOxygenTransport = hemorrhageTransportK
 	local bloodO2Cap = org.bloodO2Cap or o2.range
 
 	local bodyTemperature = org.temperature or 36.7
@@ -934,7 +936,9 @@ module[2] = function(owner, org, timeValue)
 	local deliveryO2Cap = min(bloodO2Cap, bloodCarryO2Cap, pulseO2Cap, perfusionO2Cap, exertionO2Cap)
 	if o2[1] > deliveryO2Cap then
 		local deliveryFailure = math.Clamp(1 - deliveryO2Cap / math.max(o2.range, 1), 0, 1)
-		local deliveryResponse = 1 - math.exp(-timeValue * (0.16 + deliveryFailure * 0.45))
+		local hemorrhageFailure = math.Clamp(1 - hemorrhageTransportK, 0, 1)
+		local decayRate = 0.16 + deliveryFailure * 0.45 + hemorrhageFailure ^ 3 * 0.50
+		local deliveryResponse = 1 - math.exp(-timeValue * decayRate)
 		o2[1] = o2[1] + (deliveryO2Cap - o2[1]) * deliveryResponse
 	end
 

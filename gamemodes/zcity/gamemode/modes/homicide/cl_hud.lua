@@ -13,8 +13,8 @@ local color_white = Color(255, 255, 255, 255)
 local vector_origin = Vector(0, 0, 0)
 
 local function draw_shadow_text(text, cx, cy)
-	draw.DrawText(text, "HomigradFontMedium", cx + 1, cy + 1, vgui_color_text_shadow, TEXT_ALIGN_CENTER)
-	draw.DrawText(text, "HomigradFontMedium", cx, cy, vgui_color_text_main, TEXT_ALIGN_CENTER)
+	draw.DrawText(text, "HomigradFontVSmall", cx + 1, cy + 1, vgui_color_text_shadow, TEXT_ALIGN_CENTER)
+	draw.DrawText(text, "HomigradFontVSmall", cx, cy, vgui_color_text_main, TEXT_ALIGN_CENTER)
 end
 
 local vector_one = Vector(1, 1, 1)
@@ -170,7 +170,7 @@ hook.Add("HUDPaint", "HMCD_SubRoles_Abilities", function()
 	local y_offset = 30
 	y_offset = y_offset + ScreenScale(15)
 	
-	surface.SetFont("HomigradFontMedium")
+	surface.SetFont("HomigradFontVSmall")
 	
 	if(ply:Alive())then
 		if(ply.isTraitor)then
@@ -321,7 +321,7 @@ hook.Add("HUDPaint", "HMCD_SubRoles_Abilities", function()
 						
 						local tcx, tcy = bar_x - bar_width / 2, bar_y + bar_height / 2
 						
-						draw_RotatedText(chemical_name, "HomigradFontMedium", tcx, tcy, vgui_color_text_shadow, 90, 1)
+						draw_RotatedText(chemical_name, "HomigradFontVSmall", tcx, tcy, vgui_color_text_shadow, 90, 1)
 						
 						bar_x = bar_x - bar_width - after_side_bar_offset
 					end
@@ -363,21 +363,21 @@ end)
 
 surface.CreateFont("TraitorPanelTitle", {
 	font = "coolvetica",
-	size = 22,
+	size = 17,
 	weight = 500,
 	antialias = true
 })
 
 surface.CreateFont("TraitorPanelText", {
 	font = "coolvetica",
-	size = 19,
+	size = 15,
 	weight = 500,
 	antialias = true
 })
 
 surface.CreateFont("TraitorPanelWords", {
 	font = "coolvetica",
-	size = 24,
+	size = 18,
 	weight = 700,
 	antialias = true,
 	italic = false
@@ -394,7 +394,7 @@ local traitor_panel = {
     spacing = 26,
     padding = 15,
     left_padding = 90, 
-    avatar_size = 24, 
+    avatar_size = 18, 
     fade_speed = 3,
     instance = nil,
     visible = true,

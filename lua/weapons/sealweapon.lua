@@ -202,6 +202,35 @@ function SWEP:SecondaryAttack()
     end
 end
 
+function SWEP:ApplySealTreatment(kind, healer, strength)
+    if CLIENT or self.SealConvertedToEntity then return false end
+
+    local before = math.max(self.SealStoredBleedRate or 0, 0)
+    if before <= 0.05 then return false end
+
+    local cfg = HG_SEAL_CONFIG or {}
+    strength = math.Clamp(tonumber(strength) or 1, 0.1, 1)
+    local reduction, flat
+    if kind == "ducttape" then
+        reduction = cfg.DUCT_TAPE_BLEED_REDUCTION or 0.80
+        flat = cfg.DUCT_TAPE_BLEED_FLAT or 3
+    else
+        reduction = cfg.BANDAGE_BLEED_REDUCTION or 0.65
+        flat = cfg.BANDAGE_BLEED_FLAT or 2
+    end
+
+    local after = math.max(before * (1 - reduction * strength) - flat * strength, 0)
+    if after >= before - 0.01 then return false end
+
+    self.SealStoredBleedRate = after
+    self:SetNW2Float("SealBlood", math.max(self.SealStoredBlood or 0, 0))
+    self:SetNW2Float("SealBleedRate", after)
+    if IsValid(healer) and healer:IsPlayer() then
+        healer:ChatPrint(kind == "ducttape" and "You tape the seal's wound closed." or "You bandage the seal's wound.")
+    end
+    return true, before - after
+end
+
 function SWEP:UpdateSealPhysiology(now)
     if CLIENT or self.SealConvertedToEntity then return end
     local cfg = HG_SEAL_CONFIG or {}
@@ -213,6 +242,23 @@ function SWEP:UpdateSealPhysiology(now)
         self.SealStoredBlood = math.max((self.SealStoredBlood or cfg.MAX_BLOOD_ML or 1200) - bleedRate * dt, 0)
         self.SealStoredBleedRate = bleedRate * math.exp(-(cfg.BLEED_CLOT_RATE or 0.02) * dt)
     end
+
+    local owner = self:GetOwner()
+    if bleedRate >= (cfg.HELD_BLEED_FX_MIN_RATE or 0.5) and IsValid(owner) and owner:IsPlayer() and now >= (self.NextHeldSealBleedFX or 0) then
+        local intensity = math.Clamp(bleedRate / 25, 0, 1)
+        self.NextHeldSealBleedFX = now + Lerp(intensity, 1.05, 0.3)
+        local hand = owner:LookupBone("ValveBiped.Bip01_R_Hand")
+        local pos = owner:WorldSpaceCenter()
+        if hand then
+            local handPos = owner:GetBonePosition(hand)
+            if isvector(handPos) then pos = handPos end
+        end
+        local velocity = owner:GetVelocity() * 0.12 + VectorRand() * Lerp(intensity, 6, 20) + Vector(0, 0, -14)
+        if HG_EmitSealBlood then HG_EmitSealBlood(owner, pos, velocity, intensity) end
+    end
+
+    self:SetNW2Float("SealBlood", math.max(self.SealStoredBlood or 0, 0))
+    self:SetNW2Float("SealBleedRate", math.max(self.SealStoredBleedRate or 0, 0))
 
     local maxBlood = cfg.MAX_BLOOD_ML or 1200
     if (self.SealStoredHealth or cfg.MAX_HEALTH or 100) <= 0 or maxBlood - (self.SealStoredBlood or maxBlood) >= (cfg.FATAL_BLOOD_LOSS_ML or 500) then

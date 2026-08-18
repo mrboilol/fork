@@ -463,6 +463,36 @@ end)
 	addBloodPart(pos, Vector(25, 0, 0), mat_huy, math.random(10, 15), math.random(10, 15))
 end)]]
 
+
+net.Receive("hg_seal_blood_drop", function()
+    local source = net.ReadEntity()
+    local pos = net.ReadVector()
+    local velocity = net.ReadVector()
+    local intensity = math.Clamp(net.ReadFloat(), 0, 1)
+    if not hg.addBloodPart then return end
+
+    local count = math.Clamp(1 + math.floor(intensity * 3 + 0.25), 1, 4)
+    local owner = IsValid(source) and source or nil
+    for i = 1, count do
+        local spread = Lerp(intensity, 3, 12)
+        local size = Lerp(intensity, 1.5, 2.7)
+        hg.addBloodPart(
+            pos + VectorRand(-0.7, 0.7),
+            velocity + VectorRand(-spread, spread),
+            nil,
+            size,
+            size,
+            false,
+            false,
+            owner
+        )
+    end
+
+    if intensity > 0.45 and hg.addBloodPart2 and math.Rand(0, 1) < intensity * 0.45 then
+        hg.addBloodPart2(pos, velocity * 0.35 + VectorRand(-6, 6), nil, 8, 8, 0.35, false, owner)
+    end
+end)
+
 net.Receive("bloodsquirt2", function()
 	local ent = net.ReadEntity()
 	

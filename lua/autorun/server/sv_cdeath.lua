@@ -35,6 +35,21 @@ local function DeathEffectRoundActive()
     return true
 end
 
+local function DeathEffectCanRespawn(ply)
+    if not IsValid(ply) or ply:Alive() then return false end
+
+    -- ZCity owns round respawn eligibility.  The cinematic death screen must
+    -- never call Spawn() around that gate (Homicide intentionally returns false).
+    if isfunction(ply.CanSpawn) then
+        local ok, allowed = pcall(ply.CanSpawn, ply)
+        if ok then return allowed == true end
+    end
+
+    -- Preserve standalone compatibility if this death effect is ever loaded
+    -- without ZCity's PLAYER:CanSpawn implementation.
+    return not DeathEffectRoundActive()
+end
+
 -- respawn block
 hook.Add("PlayerDeathThink", "DeathEffect_BlockRespawn", function(ply)
     if ply:GetNWBool("DeathEffect_BlockRespawn", false) then
@@ -47,7 +62,7 @@ hook.Add("PlayerDeath", "DeathEffect_OnDeath", function(ply)
         ply:SetNWBool("DeathEffect_BlockRespawn", false)
 
         timer.Simple(0, function()
-            if IsValid(ply) and not ply:Alive() then
+            if IsValid(ply) and not ply:Alive() and DeathEffectCanRespawn(ply) then
                 ply:Spawn()
             end
         end)
@@ -66,6 +81,7 @@ hook.Add("PlayerDeath", "DeathEffect_OnDeath", function(ply)
         net.WriteBool(GetConVar("deatheffect_spectator"):GetBool())
         net.WriteBool(GetConVar("deatheffect_compat"):GetBool())
         net.WriteFloat(GetConVar("deatheffect_options_delay"):GetFloat())
+        net.WriteBool(DeathEffectCanRespawn(ply))
     net.Send(ply)
 end)
 
@@ -75,11 +91,11 @@ end)
 
 -- client triggers
 net.Receive("DeathEffect_Respawn", function(len, ply)
-    if IsValid(ply) and not ply:Alive() then
-        ply:SetNWBool("DeathEffect_BlockRespawn", false)
-        ply:UnSpectate()
-        ply:Spawn()
-    end
+    if not IsValid(ply) or ply:Alive() or not DeathEffectCanRespawn(ply) then return end
+
+    ply:SetNWBool("DeathEffect_BlockRespawn", false)
+    ply:UnSpectate()
+    ply:Spawn()
 end)
 
 -- allow respawning because compat mode is on

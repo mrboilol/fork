@@ -55,7 +55,7 @@ function PANEL:Construct()
 			surface.DrawOutlinedRect(1, 1, w - 2, h - 2, 3)
 		end
 		
-		surface.SetFont("ZB_InterfaceMedium")
+		surface.SetFont("ZB_InterfaceSmall")
 
 		local tw, th = surface.GetTextSize(self.Title)
 		

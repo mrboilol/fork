@@ -106,17 +106,51 @@ function ENT:KillSeal(reason)
     self.SealBleedRate = 0
     self:SetHealth(0)
     self:SetState("dead")
+    self:SetSkin(4)
     self.IsSleeping = false
     self.IsEating = false
     self.AIDisabled = true
     RemoveSealTimers(self)
     self:StopSound("sealplush/snop.wav")
+
+    -- Death has its own one-shot vocalization.  Sound level is deliberately
+    -- much higher than ordinary hurt calls, but it is emitted only once.
+    local deathSound = screamSounds[math.random(#screamSounds)]
+    self:EmitSound(deathSound, cfg.DEATH_SOUND_LEVEL or 140, math.random(82, 94), 1, CHAN_VOICE)
     self:SyncPhysiology()
 
     local phys = self:GetPhysicsObject()
     if IsValid(phys) then phys:Wake() end
     self:SetRenderMode(RENDERMODE_TRANSCOLOR)
     self.SealRemoveAt = self.SealDeathTime + (cfg.CORPSE_LIFETIME or 15)
+end
+
+function ENT:ApplySealTreatment(kind, healer, strength)
+    if not self.SealAlive then return false end
+
+    local before = math.max(self.SealBleedRate or 0, 0)
+    if before <= 0.05 then return false end
+
+    local cfg = HG_SEAL_CONFIG or {}
+    strength = math.Clamp(tonumber(strength) or 1, 0.1, 1)
+    local reduction, flat
+    if kind == "ducttape" then
+        reduction = cfg.DUCT_TAPE_BLEED_REDUCTION or 0.80
+        flat = cfg.DUCT_TAPE_BLEED_FLAT or 3
+    else
+        reduction = cfg.BANDAGE_BLEED_REDUCTION or 0.65
+        flat = cfg.BANDAGE_BLEED_FLAT or 2
+    end
+
+    local after = math.max(before * (1 - reduction * strength) - flat * strength, 0)
+    if after >= before - 0.01 then return false end
+
+    self.SealBleedRate = after
+    self:SyncPhysiology()
+    if IsValid(healer) and healer:IsPlayer() then
+        healer:ChatPrint(kind == "ducttape" and "You tape the seal's wound closed." or "You bandage the seal's wound.")
+    end
+    return true, before - after
 end
 
 function ENT:UpdatePhysiology(now)
@@ -136,14 +170,8 @@ function ENT:UpdatePhysiology(now)
             local intensity = math.Clamp(bleedRate / 25, 0, 1)
             self.NextSealBleedFX = now + Lerp(intensity, 1.1, 0.28)
             local pos = self.SealLastWoundLocal and self:LocalToWorld(self.SealLastWoundLocal) or self:WorldSpaceCenter()
-            local effect = EffectData()
-            effect:SetOrigin(pos)
-            effect:SetNormal(VectorRand():GetNormalized())
-            effect:SetColor(BLOOD_COLOR_RED)
-            effect:SetScale(Lerp(intensity, 0.35, 0.9))
-            util.Effect("BloodImpact", effect, true, true)
-            local tr = util.TraceLine({start = pos, endpos = pos + Vector(0, 0, -80), filter = self, mask = MASK_SOLID})
-            if tr.Hit then util.Decal("Blood", tr.HitPos + tr.HitNormal, tr.HitPos - tr.HitNormal) end
+            local velocity = self:GetVelocity() * 0.12 + VectorRand() * Lerp(intensity, 8, 26) + Vector(0, 0, -12)
+            if HG_EmitSealBlood then HG_EmitSealBlood(self, pos, velocity, intensity) end
         end
 
         local maxBlood = self.SealMaxBlood or cfg.MAX_BLOOD_ML or 1200
@@ -687,6 +715,10 @@ function ENT:OnTakeDamage(dmg)
     if isvector(damagePos) and damagePos:LengthSqr() > 0 then self.SealLastWoundLocal = self:WorldToLocal(damagePos) end
     self:SetHealth(math.max(self:Health() - amount, 0))
 
+    local cfg = HG_SEAL_CONFIG or {}
+    local hurtSound = screamSounds[math.random(#screamSounds)]
+    self:EmitSound(hurtSound, cfg.HURT_SOUND_LEVEL or 82, math.random(96, 108), 1, CHAN_VOICE)
+
     local bleedAdd = 0
     if dmg:IsDamageType(DMG_BULLET) or dmg:IsDamageType(DMG_BUCKSHOT) then
         bleedAdd = amount * 0.5
@@ -698,15 +730,19 @@ function ENT:OnTakeDamage(dmg)
         bleedAdd = amount * 0.08
     end
     self.SealBleedRate = math.min((self.SealBleedRate or 0) + bleedAdd, 80)
+    if bleedAdd > 0 and HG_EmitSealBlood then
+        local pos = self.SealLastWoundLocal and self:LocalToWorld(self.SealLastWoundLocal) or self:WorldSpaceCenter()
+        local force = dmg:GetDamageForce()
+        local direction = isvector(force) and force:LengthSqr() > 1 and force:GetNormalized() or VectorRand():GetNormalized()
+        local velocity = self:GetVelocity() * 0.15 + direction * math.Clamp(amount * 3, 20, 120) + VectorRand() * 18
+        HG_EmitSealBlood(self, pos, velocity, math.Clamp(bleedAdd / 18, 0.15, 1))
+    end
 
     if amount >= 20 and CurTime() - self.LastBigDamageTime > 10 then
         self.LastBigDamageTime = CurTime()
         self:SetSkin(4)
         if self.IsSleeping then self:WakeUp() end
         self.Mood = math.max(self.Mood - 0.4, -1)
-        local soundToPlay = screamSounds[math.random(#screamSounds)]
-        self:StopSound(soundToPlay)
-        self:EmitSound(soundToPlay, 299, math.random(95, 110))
         timer.Simple(3, function()
             if IsValid(self) and self.SealAlive and self.State ~= "scared" then self:SetSkin(0) end
         end)

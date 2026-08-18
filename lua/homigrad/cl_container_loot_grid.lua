@@ -122,13 +122,13 @@ function hg.OpenContainerLootGrid(options)
 		surface.DrawRect(0, 0, w, h)
 		surface.SetDrawColor(255, 255, 255, 255)
 		surface.DrawOutlinedRect(0, 0, w, h, 1)
-		draw.SimpleText(self:GetText(), "ZCity_Menu_Settings_Small", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+		draw.SimpleText(self:GetText(), "ZCity_Menu_Settings_Tiny", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 	end
 	close.DoClick = function() menu:Close() end
 
 	menu.PaintOver = function(self, w, h)
-		draw.DrawText(options.title or "Container", "ZCity_Menu_Settings_Small", 14, 12, color_white, TEXT_ALIGN_LEFT)
-		draw.DrawText(options.helpText or "Hold LMB - Search | LMB - Take | R - Close", "ZCity_Tiny", w / 2, h - h * 0.04, Color(255, 255, 255, 45), TEXT_ALIGN_CENTER)
+		draw.DrawText(options.title or "Container", "ZCity_Menu_Settings_Tiny", 14, 12, color_white, TEXT_ALIGN_LEFT)
+		draw.DrawText(options.helpText or "Hold LMB - Search | LMB - Take | R - Close", "ZCity_SuperTiny", w / 2, h - h * 0.04, Color(255, 255, 255, 45), TEXT_ALIGN_CENTER)
 	end
 
 	local released = false
@@ -287,7 +287,7 @@ function hg.OpenContainerLootGrid(options)
 				end
 			end
 			if not found then
-				draw.SimpleText("?", "ZCity_Small", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("?", "ZCity_Tiny", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				if (self.RevealProgress or 0) > 0 then
 					surface.SetDrawColor(150, 150, 150, 210)
 					surface.DrawRect(6, h - 10, (w - 12) * self.RevealProgress, 4)
@@ -305,7 +305,7 @@ function hg.OpenContainerLootGrid(options)
 			end
 			surface.SetDrawColor(self.col1, self.col1, self.col1, 210)
 			surface.DrawOutlinedRect(0, 0, w, h, 1)
-			DrawScrollingText(self, GetItemName(class), "ZCity_Tiny", w / 2, hasIcon and h / 1.3 or h / 3, w - 10, color_white)
+			DrawScrollingText(self, GetItemName(class), "ZCity_SuperTiny", w / 2, hasIcon and h / 1.3 or h / 3, w - 10, color_white)
 		end
 	end
 

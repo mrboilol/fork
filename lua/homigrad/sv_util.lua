@@ -894,6 +894,86 @@ function hgDamageDoor(ent, damage, force, attacker)
 	return SDD_DamageDoor(ent, damageInfo:GetDamage(), damageInfo) == true
 end
 
+local DOOR_KICK = {
+	STRUCTURAL_DAMAGE = 0.22, -- normalized integrity loss at impact 1 before material resistance
+	HINGE_START = 0.72,
+	OPEN_BASE_CHANCE = 0.22,
+	OPEN_IMPACT_CHANCE = 0.52,
+}
+
+local function isDoorLocked(door)
+	local locked = door:GetInternalVariable("m_bLocked")
+	return locked == true or locked == 1
+end
+
+local function fastKickOpenDoor(door, attacker, impact)
+	if not IsValid(door) or isDoorLocked(door) then return false end
+
+	local oldSpeed = tonumber(door:GetInternalVariable("Speed")) or tonumber(door:GetKeyValues().speed) or 100
+	local fastSpeed = math.Clamp(oldSpeed * Lerp(math.Clamp(impact, 0, 1.5) / 1.5, 3.5, 8), 350, 1200)
+	door:SetSaveValue("Speed", fastSpeed)
+
+	if IsValid(attacker) and attacker:IsPlayer() then
+		local oldName = attacker:GetName()
+		local kickName = oldName .. "_hgkick_" .. attacker:EntIndex()
+		attacker:SetName(kickName)
+		if door:GetClass() == "prop_door_rotating" then
+			door:Fire("openawayfrom", kickName, 0, attacker, attacker)
+		else
+			door:Fire("open", kickName, 0, attacker, attacker)
+		end
+		attacker:SetName(oldName)
+	else
+		door:Fire("open", "", 0)
+	end
+
+	timer.Simple(1.5, function()
+		if IsValid(door) then door:SetSaveValue("Speed", oldSpeed) end
+	end)
+	return true
+end
+
+-- impact is normalized kick energy: around 1 is a committed hard kick.
+-- The same value drives structural damage, fast-opening chance and hinge failure.
+function hgKickDoor(door, attacker, impact, direction, dropkick)
+	if not IsValid(door) or not hgIsDoor(door) or door:GetNoDraw() then return "none" end
+
+	impact = math.Clamp(tonumber(impact) or 0, 0, 1.5)
+	direction = isvector(direction) and direction:GetNormalized() or Vector(1, 0, 0)
+	dropkick = dropkick == true
+
+	local model = string.lower(door:GetModel() or "")
+	local metal = door:GetMaterialType() == MAT_METAL or string.find(model, "metal", 1, true) ~= nil
+	local materialResistance = metal and 1.45 or 1
+	local structuralLoss = DOOR_KICK.STRUCTURAL_DAMAGE * (impact ^ 1.35) / materialResistance
+	door.HGKickIntegrity = math.Clamp((door.HGKickIntegrity or 1) - structuralLoss, 0, 1)
+
+	local doorDamage = 6 + 34 * (impact ^ 1.35)
+	hgDamageDoor(door, doorDamage, direction * doorDamage * 45, attacker)
+	if not IsValid(door) or door:GetNoDraw() then return "damaged" end
+
+	local damageFraction = 1 - door.HGKickIntegrity
+	local highEnergy = math.Clamp((impact - DOOR_KICK.HINGE_START) / (1.5 - DOOR_KICK.HINGE_START), 0, 1)
+	local hingeStress = math.Clamp(damageFraction * 0.65 + highEnergy * (dropkick and 0.75 or 0.5), 0, 1)
+	local hingeChance = hingeStress * (isDoorLocked(door) and 0.38 or 0.52)
+
+	if door.HGKickIntegrity <= 0.04 or math.Rand(0, 1) < hingeChance then
+		hgBlastThatDoor(door, direction * Lerp(impact / 1.5, 130, 320), true)
+		return "hinged"
+	end
+
+	if not isDoorLocked(door) then
+		local openChance = math.Clamp(DOOR_KICK.OPEN_BASE_CHANCE + impact * DOOR_KICK.OPEN_IMPACT_CHANCE + damageFraction * 0.18, 0, 0.96)
+		if math.Rand(0, 1) < openChance and fastKickOpenDoor(door, attacker, impact) then
+			door:EmitSound("physics/wood/wood_box_impact_hard3.wav", 70, math.random(90, 105))
+			return "opened"
+		end
+	end
+
+	door:EmitSound(metal and "physics/metal/metal_solid_impact_hard3.wav" or "physics/wood/wood_crate_impact_hard" .. math.random(1, 4) .. ".ogg", 70, math.random(92, 106))
+	return "damaged"
+end
+
 function hgBlastDoors(blaster, pos, power, range, ignoreVisChecks) -- taken from JMod
 	for k, door in pairs(ents.FindInSphere(pos, 40 * power * (range or 1))) do
 		if hgIsDoor(door) and hook.Run("hg_CanDestroyDoor", door, blaster, pos, power, range, ignore) ~= false then
@@ -932,10 +1012,10 @@ function DoorIsOpen2( door )
 	end
 end
 
-function hgBlastThatDoor(ent, vel) -- taken from JMod
+function hgBlastThatDoor(ent, vel, forceBreak) -- taken from JMod
 	local meleeHit = ent.SDD_LastMeleeHit and ent.SDD_LastMeleeHit > CurTime() - 0.1
-	if SDD_DamageDoor and (meleeHit or math.random(100) <= 60) and SDD_DamageDoor(ent, math.random(20, 45)) then return end
-	if SDD_AdvanceDoorBreakPhase and SDD_AdvanceDoorBreakPhase(ent) then return end
+	if not forceBreak and SDD_DamageDoor and (meleeHit or math.random(100) <= 60) and SDD_DamageDoor(ent, math.random(20, 45)) then return end
+	if not forceBreak and SDD_AdvanceDoorBreakPhase and SDD_AdvanceDoorBreakPhase(ent) then return end
 
 	local Moddel, Pozishun, Ayngul, Muteeriul, Skin = ent:GetModel(), ent:GetPos(), ent:GetAngles(), ent:GetMaterial(), ent:GetSkin()
 	sound.Play("Wood_Crate.Break", Pozishun, 60, 100)

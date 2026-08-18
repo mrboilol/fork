@@ -227,6 +227,7 @@ function zb:CheckWinner(tbl)
 end
 
 zb.ROUND_TIME = zb.ROUND_TIME or 300
+local ROUND_END_STARTUP_GRACE = 3
 
 function zb:ShouldRoundEnd()
 	local time = zb.ROUND_TIME
@@ -247,7 +248,11 @@ function zb:ShouldRoundEnd()
 end
 
 function zb:EndRoundThink()
-	if zb.ROUND_STATE == 1 and zb:ShouldRoundEnd() then zb:EndRound() end
+	if zb.ROUND_STATE == 1
+		and CurTime() >= (zb.ROUND_END_CHECK_AFTER or 0)
+		and zb:ShouldRoundEnd() then
+		zb:EndRound()
+	end
 	if zb.ROUND_STATE == 3 then
 		if !zb.END_TIME then
 			zb.END_TIME = (CurTime() + (CurrentRound().end_time or 5))
@@ -725,8 +730,11 @@ function zb:RoundStart()
 
 	VFIRE_DISABLED = false
 
-	zb.ROUND_BEGIN = CurTime()
-	hg.UpdateRoundTime()
+	local roundStart = CurTime()
+	zb.ROUND_START = roundStart
+	zb.ROUND_BEGIN = roundStart
+	zb.ROUND_END_CHECK_AFTER = roundStart + ROUND_END_STARTUP_GRACE
+	hg.UpdateRoundTime(zb.ROUND_TIME, zb.ROUND_START, zb.ROUND_BEGIN)
 
 	net.Start("RoundInfo")
 		net.WriteString(mode.name or "hmcd")

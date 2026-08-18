@@ -91,7 +91,7 @@ function SWEP:SecondaryAttack()
 	self:Heal(hg.GetCurrentCharacter(owner) or owner)
 end
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 local lang1, lang2 = Angle(0, -10, 0), Angle(0, 10, 0)
 function SWEP:Animation()
@@ -108,7 +108,7 @@ function SWEP:Think()
 	self:SetHold(self.HoldType)
 
 	local owner = self:GetOwner()
-	if IsValid(owner) and not owner:KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+	if IsValid(owner) and not owner:KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 12, 0))
 	end
 end

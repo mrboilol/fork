@@ -1,4 +1,5 @@
 local MODE = MODE
+MODE.Abstract = true
 
 local DEFAULT_HEALTH = 100
 local DEFAULT_STAMINA = 60 * 3

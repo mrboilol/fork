@@ -288,15 +288,15 @@ if CLIENT then
 			surface.DrawRect(0, 0, w, h)
 			surface.SetDrawColor(255, 255, 255, 255)
 			surface.DrawOutlinedRect(0, 0, w, h, 1)
-			draw.SimpleText(self:GetText(), "ZCity_Menu_Settings_Small", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+			draw.SimpleText(self:GetText(), "ZCity_Menu_Settings_Tiny", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 		end
 		close.DoClick = function()
 			plyMenu:Close()
 		end
 		plyMenu.PaintOver = function(self, w, h)
-			draw.DrawText(name, "ZCity_Menu_Settings_Small", 14, 12, color_white, TEXT_ALIGN_LEFT)
+			draw.DrawText(name, "ZCity_Menu_Settings_Tiny", 14, 12, color_white, TEXT_ALIGN_LEFT)
 
-			draw.DrawText("Hold LMB - Search | LMB - Take | RMB - Item menu", "ZCity_Tiny", w / 2, h - h*0.04 , clr_text, TEXT_ALIGN_CENTER)
+			draw.DrawText("Hold LMB - Search | LMB - Take | RMB - Item menu", "ZCity_SuperTiny", w / 2, h - h*0.04 , clr_text, TEXT_ALIGN_CENTER)
 		end
 		function plyMenu:Think()
 			local ent = self.ent
@@ -557,7 +557,7 @@ if CLIENT then
 						end
 					end
 					if not found then
-						draw.SimpleText("?", "ZCity_Small", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+						draw.SimpleText("?", "ZCity_Tiny", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 						if (button.RevealProgress or 0) > 0 then
 							surface.SetDrawColor(150, 150, 150, 210)
 							surface.DrawRect(6, h - 10, (w - 12) * button.RevealProgress, 4)
@@ -590,7 +590,7 @@ if CLIENT then
 						surface.DrawRect(0, h - 4, w * progress, 4)
 					end
 					local Text = (tab == "Ammo" and game.GetAmmoName(name)) or language.GetPhrase(name)
-					drawBouncingText(self, Text, "ZCity_Tiny", w / 2, (HaveIcon and h / 1.3) or h / 3, w - 10, color_white)
+					drawBouncingText(self, Text, "ZCity_SuperTiny", w / 2, (HaveIcon and h / 1.3) or h / 3, w - 10, color_white)
 				end
 			end
 		end
@@ -641,7 +641,7 @@ if CLIENT then
 						surface.DrawOutlinedRect(xx * (cell + gap), yy * (cell + gap), cell, cell, 1)
 					end
 				end
-				draw.SimpleText("?", "ZCity_Small", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+				draw.SimpleText("?", "ZCity_Tiny", w / 2, h / 2, Color(225, 225, 225), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 				if (self.RevealProgress or 0) > 0 then
 					surface.SetDrawColor(150, 150, 150, 210)
 					surface.DrawRect(6, h - 10, (w - 12) * self.RevealProgress, 4)

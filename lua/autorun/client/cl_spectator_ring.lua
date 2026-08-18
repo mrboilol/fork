@@ -282,9 +282,6 @@ hook.Add("HUDPaint", "DrawSpectatorUnconsciousRing", function()
         draw.SimpleText(dotText, "UnconsciousDots", centerX, centerY, dotColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     else
         if hg and hg.DrawOrganismECG then
-            if hg.DrawOrganismECGVitals then
-                hg.DrawOrganismECGVitals(org, centerX - 270, centerY - 112, 540, ringAlpha)
-            end
             hg.DrawOrganismECG(organismEKGState, centerX, centerY, 540, 140, org, dotColor, ringAlpha)
         else
             DrawEKG(centerX, centerY, 540, 140, heartRate, org.pulse or 70, dotColor, ringAlpha)

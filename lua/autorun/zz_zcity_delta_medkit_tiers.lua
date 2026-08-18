@@ -1,6 +1,6 @@
 if SERVER then AddCSLuaFile() end
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
 
 local MEDKIT_TYPES = {
     basic = {
@@ -223,7 +223,7 @@ local function patchPainkillerWeapons()
                 local org = ent.organism
                 if not org or not self.modeValues or self.modeValues[1] <= 0 then return end
                 local owner = self:GetOwner()
-                if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+                if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
                     self:SetHolding(math.min(self:GetHolding() + 4, 100))
                     if self:GetHolding() < 100 then return end
                 end

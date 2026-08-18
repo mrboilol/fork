@@ -746,6 +746,7 @@ function GM:ScoreboardShow()
 	body:Dock(FILL)
 	body:DockMargin(SB_Unit(10), SB_Unit(8), SB_Unit(10), SB_Unit(8))
 	body.Paint = function() end
+	local nextRowRefresh = 0
 	body.Think = function()
 		if switchingPage then
 			pageAlpha = math.Approach(pageAlpha, 0, FrameTime() * 850)
@@ -759,6 +760,11 @@ function GM:ScoreboardShow()
 		end
 
 		if IsValid(body.List) then body.List:SetAlpha(pageAlpha) end
+
+		if not switchingPage and RefreshRows and CurTime() >= nextRowRefresh then
+			nextRowRefresh = CurTime() + 0.45
+			RefreshRows()
+		end
 	end
 
 	local function RequestPlayerXP(ply)
@@ -908,49 +914,6 @@ function GM:ScoreboardShow()
 		playersCol:SetSize(cw, h)
 	end
 
-	local function ClearRows(panel)
-		local canvas = panel:GetCanvas()
-		if not IsValid(canvas) then return end
-		for _, child in ipairs(canvas:GetChildren()) do
-			child:Remove()
-		end
-	end
-
-	local function BuildRows()
-		if not IsValid(scoreBoardMenu) then return end
-		ClearRows(playerListPanel)
-		ClearRows(spectatorListPanel)
-
-		local activePlayers = {}
-		local specPlayers = {}
-		for _, ply in player.Iterator() do
-			if CurrentRound().name == "fear" and not ply:Alive() then continue end
-			if disappearance and ply ~= lply then continue end
-			if ply:Team() == TEAM_SPECTATOR then
-				specPlayers[#specPlayers + 1] = ply
-			else
-				activePlayers[#activePlayers + 1] = ply
-			end
-		end
-
-		SortPlayers(activePlayers, playerSort)
-		SortPlayers(specPlayers, spectatorSort)
-
-		for i, ply in ipairs(activePlayers) do
-			AddPlayerRow(playerListPanel:GetCanvas(), ply, i)
-		end
-		for i, ply in ipairs(specPlayers) do
-			AddPlayerRow(spectatorListPanel:GetCanvas(), ply, i)
-		end
-	end
-
-	local nextRefresh = 0
-	scoreBoardMenu.Think = function()
-		if nextRefresh > CurTime() then return end
-		nextRefresh = CurTime() + 0.45
-		BuildRows()
-	end
-	BuildRows()
 
 	return true
 end

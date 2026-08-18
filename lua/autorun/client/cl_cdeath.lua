@@ -44,11 +44,13 @@ local DEATH_COLORS = {
 local cfg_spectator     = true
 local cfg_compat        = false
 local cfg_options_delay = 4
+local cfg_can_respawn   = false
 
 net.Receive("DeathEffect_Config", function()
     cfg_spectator     = net.ReadBool()
     cfg_compat        = net.ReadBool()
     cfg_options_delay = net.ReadFloat()
+    cfg_can_respawn   = net.ReadBool()
 end)
 
 -- convars (client)
@@ -554,7 +556,7 @@ local function CinematicDeathTracker()
     if CDeath.inSpectator and not CDeath.inTransition then
         local reloadDown = SafeKeyDown(reloadKeyCode)
 
-        if reloadDown and not CDeath.prevSpecReloadDown then
+        if reloadDown and not CDeath.prevSpecReloadDown and cfg_can_respawn then
             local now = CurTime()
             if (now - CDeath.lastReloadPressTime) <= DOUBLE_CLICK_WINDOW then
                 BeginTransition(DoRespawn)
@@ -698,7 +700,9 @@ local function CinematicDeathBackground()
     end
 
     if CDeath.inSpectator then
-        local hint = "double click [" .. reloadKeyName .. "] to respawn"
+        local hint = cfg_can_respawn
+            and ("double click [" .. reloadKeyName .. "] to respawn")
+            or "respawn unavailable until the round allows it"
         surface.SetFont("DeathEffect_Hint")
         local hw = surface.GetTextSize(hint)
         surface.SetTextColor(Color(180, 180, 180, 140))

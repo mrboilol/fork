@@ -67,10 +67,18 @@ end
 SWEP.offsetVec = Vector(4, -3.5, 0)
 SWEP.offsetAng = Angle(90, 90, 0)
 
-local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = Judge animations, 1 = progressive minigames", 0, 1)
+local hg_healanims = ConVarExists("hg_healanims") and GetConVar("hg_healanims") or CreateConVar("hg_healanims", 0, FCVAR_REPLICATED + FCVAR_ARCHIVE, "Healing method: 0 = original models + progressive minigames, 1 = Judge animations", 0, 1)
+
+local judgeBandageClasses = {
+	weapon_bandage_sh = true,
+	weapon_bigbandage_sh = true,
+	weapon_packedbandage_sh = true,
+	weapon_combatbandage_sh = true,
+	weapon_quikclotbandage_sh = true
+}
 
 function SWEP:UseJudgeBandageTPIK()
-	return self.BandageTPIK == true and hg_healanims:GetInt() == 0
+	return self.BandageTPIK == true and judgeBandageClasses[self:GetClass()] == true and hg_healanims:GetInt() == 1
 end
 
 function SWEP:ApplyBandageVisualMode()
@@ -173,7 +181,11 @@ function SWEP:DrawWorldModel2(nodraw)
 		local offsetAng = self.offsetAng
 		local medical = hg and hg.MedicalMinigame
 		local preferredArm = medical and medical.GetPreferredArm and medical.GetPreferredArm(weaponOwner)
-		local useLeft = preferredArm == "left"
+		local useLeft = preferredArm == "left" and not hg_healanims:GetBool()
+		if useLeft then
+			offsetVec = Vector(offsetVec.x, -offsetVec.y, offsetVec.z)
+			offsetAng = Angle(offsetAng.p, -offsetAng.y, -offsetAng.r)
+		end
 		local boneid = owner:LookupBone(useLeft and "ValveBiped.Bip01_L_Hand" or "ValveBiped.Bip01_R_Hand")
 		if not boneid then return end
 		local matrix = owner:GetBoneMatrix(boneid)
@@ -230,12 +242,14 @@ function SWEP:BoneSet(lookup_name, vec, ang)
 
 	local medical = hg and hg.MedicalMinigame
 	local preferredArm = medical and medical.GetPreferredArm and medical.GetPreferredArm(owner)
-	if preferredArm == "left" then
+	if preferredArm == "left" and not hg_healanims:GetBool() then
 		if string.sub(lookup_name, 1, 2) == "r_" then
 			lookup_name = "l_" .. string.sub(lookup_name, 3)
 		elseif string.sub(lookup_name, 1, 2) == "l_" then
 			lookup_name = "r_" .. string.sub(lookup_name, 3)
 		end
+		vec = Vector(vec.x, -vec.y, vec.z)
+		ang = Angle(ang.p, -ang.y, -ang.r)
 	end
 
 	hg.bone.Set(owner, lookup_name, vec, ang, "bandage", 0.01)
@@ -266,7 +280,7 @@ function SWEP:Think()
 		self.ModelScale = math.Clamp(self.modeValues[1] / (self.modeValuesdef[1][1] * 0.8), 0.5, 1)
 	end
 
-	if not self:GetOwner():KeyDown(IN_ATTACK) and hg_healanims:GetBool() then
+	if not self:GetOwner():KeyDown(IN_ATTACK) and not hg_healanims:GetBool() then
 		self:SetHolding(math.max(self:GetHolding() - 12, 0))
 	end
 
@@ -589,6 +603,24 @@ function SWEP:SpawnGarbage(mdl_custom, skin_custom, snd_custom, clr_custom, bgs_
 	end
 end
 
+local function ResolveSealTreatmentTarget(ent, allowPlayerProxy)
+    if not IsValid(ent) then return end
+    if ent:GetClass() == "sealplush" then return ent end
+
+    if allowPlayerProxy and ent:IsPlayer() then
+        local active = ent:GetActiveWeapon()
+        if IsValid(active) and active:GetClass() == "sealweapon" then return active end
+    end
+
+    if allowPlayerProxy and ent:IsRagdoll() and hg.RagdollOwner then
+        local ply = hg.RagdollOwner(ent)
+        if IsValid(ply) then
+            local active = ply:GetActiveWeapon()
+            if IsValid(active) and active:GetClass() == "sealweapon" then return active end
+        end
+    end
+end
+
 -- WoundTBL = {dmgBlood / 2, localPos, localAng, bone, time}
 SWEP.ShouldDeleteOnFullUse = true
 if SERVER then
@@ -620,6 +652,29 @@ if SERVER then
 			org.hypoxiaTime = math.Approach(org.hypoxiaTime or 0, 0, amount * 4)
 			org.severeHypoxiaTime = math.Approach(org.severeHypoxiaTime or 0, 0, amount * 3)
 		end
+	end
+
+	function SWEP:TreatSeal(ent)
+		local owner = self:GetOwner()
+		local seal = ResolveSealTreatmentTarget(ent, ent ~= owner)
+		if not IsValid(seal) or not seal.ApplySealTreatment then return end
+
+		local cfg = HG_SEAL_CONFIG or {}
+		local fullCost = cfg.BANDAGE_TREATMENT_COST or 12
+		local available = math.max(self.modeValues and self.modeValues[1] or 0, 0)
+		if available <= 0 then return end
+
+		local used = math.min(fullCost, available)
+		local done = seal:ApplySealTreatment("bandage", owner, used / math.max(fullCost, 0.01))
+		if not done then return end
+
+		self.modeValues[1] = math.max(available - used, 0)
+		if not self:UseJudgeBandageTPIK() then owner:EmitSound("snd_jack_hmcd_bandage.wav", 60, math.random(95, 105)) end
+		if self.modeValues[1] <= 0 and self.ShouldDeleteOnFullUse then
+			owner:SelectWeapon("weapon_hands_sh")
+			self:Remove()
+		end
+		return true
 	end
 
 	function SWEP:Bandage(ent, bone)
@@ -773,6 +828,8 @@ if SERVER then
 	end
 
 	function SWEP:Heal(ent, mode, bone)
+		if self:TreatSeal(ent) then return true end
+
 		if ent:IsNPC() then
 			self:NPCHeal(ent, 0.15, "snd_jack_hmcd_bandage.ogg")
 		end
@@ -781,7 +838,7 @@ if SERVER then
 		if not org then return end
 	
 		local owner = self:GetOwner()
-		if ent == hg.GetCurrentCharacter(owner) and hg_healanims:GetBool() then
+		if ent == hg.GetCurrentCharacter(owner) and not hg_healanims:GetBool() then
 			self:SetHolding(math.min(self:GetHolding() + 10, 100))
 
 			if self:GetHolding() < 100 then return end
@@ -1450,6 +1507,9 @@ function SWEP:EnableBandageTPIK()
 end
 
 function SWEP:GetBandageTPIKUseTime(target)
+	local seal = ResolveSealTreatmentTarget(target, target ~= self:GetOwner())
+	if IsValid(seal) then return 3.2 end
+
 	local org = IsValid(target) and target.organism
 	if not org then return self.BandageUseTime end
 
@@ -1472,9 +1532,17 @@ function SWEP:GetBandageTPIKUseTime(target)
 end
 
 function SWEP:CanBandageTPIK(target)
-	local org = IsValid(target) and target.organism
 	local available = self.modeValues and self.modeValues[1] or 0
-	if not org or available <= 0 then return false end
+	if available <= 0 then return false end
+
+	local seal = ResolveSealTreatmentTarget(target, target ~= self:GetOwner())
+	if IsValid(seal) then
+		local bleed = seal:GetClass() == "sealweapon" and (seal.SealStoredBleedRate or 0) or (seal.SealBleedRate or 0)
+		return bleed > 0.05
+	end
+
+	local org = IsValid(target) and target.organism
+	if not org then return false end
 
 	for _, wound in ipairs(org.wounds or {}) do
 		if (wound[1] or 0) > 0.1 then return true end

@@ -3,7 +3,7 @@ SWEP.Base = "weapon_tpik_base"
 SWEP.PrintName = "Beta-Blocker"
 SWEP.Instructions = "Beta blockers can help in stressful situations, will reduce your panic and adrenaline. Very useful in combat at certain doses."
 SWEP.Category = "ZCity Medicine"
-SWEP.Spawnable = true
+SWEP.Spawnable = false
 SWEP.AdminOnly = false
 
 SWEP.WorldModel = "models/weapons/nmrih/items/phalanx/w_phalanx.mdl"

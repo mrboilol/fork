@@ -9,6 +9,9 @@ function SWEP:ResetTransientAimState()
 	self.recoilWobbleAmp = 0
 	self.ShotMuzzleWobble = Angle(0, 0, 0)
 	self.ShotMuzzleOffset = Vector(0, 0, 0)
+	self.inertialAim = nil
+	self.inertialAimVelocity = Angle(0, 0, 0)
+	self.weaponReadiness = nil
 	self.cache_trace = nil
 	self:SetLastShootTime(0)
 end

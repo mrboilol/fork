@@ -287,18 +287,33 @@ local dislocated_leg = {
 	"THE ANKLE'S TWISTED- BUT THE KNEE'S THE REAL PROBLEM!",
 }
 
+local function getThoughtPlayer(org)
+	if not org or not org.isPly then return nil end
+
+	local owner = org.owner
+	if IsValid(owner) and owner:IsPlayer() then return owner end
+
+	if IsValid(owner) and hg.RagdollOwner then
+		local ply = hg.RagdollOwner(owner)
+		if IsValid(ply) and ply:IsPlayer() then return ply end
+	end
+end
+
 local function sendThought(org, msg, key, delay, clr)
-	if org.isPly and IsValid(org.owner) and org.owner.Thought then
-		org.owner:Thought(msg, delay or 1, key, 0, clr)
+	local ply = getThoughtPlayer(org)
+	if IsValid(ply) and ply.Thought then
+		ply:Thought(msg, delay or 1, key, 0, clr)
 	end
 end
 
 local function hasNewThoughts(org)
-	return org.isPly and IsValid(org.owner) and org.owner:GetInfoNum("hg_newthoughts", 0) > 0
+	local ply = getThoughtPlayer(org)
+	return IsValid(ply) and ply:GetInfoNum("hg_newthoughts", 0) > 0
 end
 
 local function sendLimbThought(org, messages, key, clr)
-	if not org.isPly or not IsValid(org.owner) or not istable(messages) or #messages == 0 then return end
+	local ply = getThoughtPlayer(org)
+	if not IsValid(ply) or not istable(messages) or #messages == 0 then return end
 
 	org.lastLimbThought = org.lastLimbThought or {}
 	local index = math.random(#messages)
@@ -310,8 +325,8 @@ local function sendLimbThought(org, messages, key, clr)
 	local msg = messages[index]
 	if hasNewThoughts(org) then
 		sendThought(org, msg, "thought_" .. key, 10, clr)
-	elseif org.owner.Notify then
-		org.owner:Notify(msg, 10, key, 0.15, nil, clr)
+	elseif ply.Notify then
+		ply:Notify(msg, 10, key, 0.15, nil, clr)
 	end
 
 	-- This injury was already reported immediately. Do not let the periodic
